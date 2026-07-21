@@ -1,0 +1,17 @@
+{
+  "name": "PlatePlan — Elliott & Chloe",
+  "short_name": "PlatePlan",
+  "description": "Shared recipes, meal planning and shopping for Elliott and Chloe.",
+  "start_url": "./PlatePlan.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F7F6F2",
+  "theme_color": "#F7F6F2",
+  "orientation": "any",
+  "icons": [
+    {"src":"./icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"./icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
+    {"src":"./icon-192-maskable.png","sizes":"192x192","type":"image/png","purpose":"maskable"},
+    {"src":"./icon-512-maskable.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
+  ]
+}
