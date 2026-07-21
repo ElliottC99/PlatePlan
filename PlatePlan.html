@@ -247,6 +247,96 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
   .traffic-pill.green{color:var(--green);background:var(--green-bg)}
   .traffic-pill.amber{color:var(--amber);background:var(--amber-bg)}
   .traffic-pill.red{color:var(--red);background:var(--red-bg)}
+
+/* Responsive layout contracts */
+.view-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.vault-filters{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.recipe-card-layout{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.recipe-card-main{min-width:0;flex:1}
+.recipe-card-name{font-size:14px;line-height:1.3;overflow-wrap:anywhere}
+.recipe-card-meta,.recipe-fit{display:flex;align-items:center;flex-wrap:wrap}
+.recipe-card-meta{gap:5px;margin-top:5px}
+.recipe-fit{font-size:12px;color:var(--text2);gap:8px;margin-top:6px}
+.recipe-card-actions{display:grid;grid-template-columns:repeat(3,108px);gap:5px;align-items:center;flex-shrink:0}
+.recipe-card-actions .btn,.hierarchy-actions .btn,.subtype-actions .btn{width:100%;justify-content:center;text-align:center;white-space:nowrap}
+.enhanced-layout{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.enhanced-actions{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap;flex-shrink:0}
+.hierarchy-card-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,320px);gap:18px;align-items:start}
+.hierarchy-actions,.subtype-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;align-self:start}
+.subtype-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,340px);gap:18px;align-items:start;padding:10px 0;border-top:1px solid rgba(0,0,0,.04)}
+.product-card-layout{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.product-card-actions{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap;flex-shrink:0}
+.slot-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.slot-actions .btn{margin-left:0!important}
+
+@media(max-width:640px){
+  html,body{max-width:100%;overflow-x:hidden}
+  body{font-size:14px}
+  header{height:52px;padding:0 10px;gap:8px}
+  header>.row-center{gap:5px;justify-content:flex-end;min-width:0}
+  header>.row-center>div:last-child{display:none}
+  .logo{font-size:14px;flex-shrink:0}
+  nav{padding:0 8px;scrollbar-width:thin}
+  .ntab{padding:10px 12px}
+  main{padding:14px 10px;max-width:100%}
+  h2{font-size:18px}
+  .card{padding:14px;margin-bottom:10px}
+  .card-inner{padding:10px}
+  input,select,textarea{font-size:16px}
+  .btn{min-height:38px;padding:8px 12px}
+  .btn.sm{min-height:34px;padding:6px 9px}
+  .view-toolbar{align-items:stretch;flex-direction:column;gap:10px}
+  .view-toolbar>.btn-row,.view-toolbar>.row-center{justify-content:flex-start;width:100%}
+  .view-toolbar>.btn-row>.btn{flex:1}
+  .vault-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:7px}
+  .vault-filters input{grid-column:1/-1;width:100%!important}
+  .vault-filters select{width:100%!important;min-width:0}
+  .grid2,.grid3,.diff-grid{grid-template-columns:1fr}
+  .recipe-card{padding:12px;margin-bottom:10px}
+  .recipe-card-layout{display:block!important}
+  .recipe-card-name{font-size:15px!important;display:block}
+  .recipe-card-actions{grid-template-columns:repeat(2,minmax(0,1fr))!important;width:100%;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+  .recipe-card-actions .btn{min-height:36px!important;font-size:12px!important;padding:6px 8px!important}
+  .recipe-fit{line-height:1.45}
+  .enhanced-box{padding:10px;margin-top:12px}
+  .enhanced-layout{display:block!important}
+  .enhanced-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;margin-top:10px;padding-top:8px;border-top:1px solid var(--border)}
+  .enhanced-actions .btn{min-height:34px!important;font-size:11px!important;padding:5px 7px!important;justify-content:center}
+  .hierarchy-card-layout,.subtype-row{grid-template-columns:1fr!important;gap:10px!important}
+  .hierarchy-actions,.subtype-actions{grid-template-columns:repeat(2,minmax(0,1fr))!important;width:100%;padding-top:9px;border-top:1px solid var(--border)}
+  .subtype-row{padding:12px 0!important}
+  .product-card-layout{display:block!important}
+  .product-card-actions{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;margin-top:10px;padding-top:9px;border-top:1px solid var(--border)}
+  .product-card-actions .btn{width:100%;justify-content:center}
+  .meal-slot-grid,.plan-summary{grid-template-columns:1fr;min-width:0}
+  .day-plan-card{padding:12px 10px}
+  .slot-row{display:grid;grid-template-columns:58px minmax(0,1fr);align-items:start;gap:5px 8px;padding:9px 0}
+  .slot-lbl{grid-column:1;grid-row:1/span 3;width:auto}
+  .slot-name,.slot-skipped{grid-column:2;min-width:0;overflow-wrap:anywhere;line-height:1.35}
+  .slot-actions{grid-column:2;display:flex;flex-wrap:wrap;gap:5px}
+  .slot-macro{white-space:normal;margin-right:auto;align-self:center}
+  .slot-actions .btn{min-height:30px!important;padding:4px 7px!important}
+  .slot-row>.recipe-search-wrap{grid-column:2;width:100%;min-width:0;margin:0}
+  .recipe-search-input{width:100%;font-size:16px}
+  #plan-content,#plan-meal-prep-panel,#shop-meal-prep-panel{min-width:0;overflow-wrap:anywhere}
+  #plan-meal-prep-panel .row-between>div:first-child,#shop-meal-prep-panel .row-between>div:first-child{min-width:0;overflow-wrap:anywhere}
+  #plan-meal-prep-panel .row-between>.btn,#shop-meal-prep-panel .row-between>.btn{min-width:56px;flex-shrink:0}
+  #shop-summary>.card>.row-between{display:block}
+  #shop-summary .btn-row{display:grid;grid-template-columns:1fr;width:100%;margin-top:10px}
+  .shop-item-details summary{gap:8px;align-items:flex-start}
+  .shop-item-details summary>span:first-child{min-width:0;overflow-wrap:anywhere}
+  .shop-item-details>div{padding-left:4px!important;min-width:0}
+  .shop-meal-row{grid-template-columns:22px minmax(0,1fr)!important}
+  .shop-meal-row>span:last-child{grid-column:2;white-space:normal!important}
+  .modal-wrap{padding:8px}
+  .modal{width:100%;padding:16px;border-radius:12px;overflow-wrap:anywhere}
+  .modal .btn-row{gap:6px}
+  .mapping-row{align-items:stretch;flex-direction:column}
+  .auth-card{padding:18px}
+  .prefs-person{padding:12px}
+  #pref-exclude-ui .mapping-search-container{min-width:100%!important}
+  .dq-card .row-between{gap:10px}
+}
 </style>
 </head>
 <body>
@@ -277,9 +367,9 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 <main>
 
 <div id="view-vault" class="view active">
-  <div class="row-between" style="margin-bottom:14px;align-items:center">
+  <div class="view-toolbar">
     <h2 style="margin:0">Recipe vault</h2>
-    <div class="row-center" style="flex-wrap:wrap;justify-content:flex-end">
+    <div class="vault-filters">
       <input type="search" id="vault-search" placeholder="Search recipes..." oninput="renderVault()" style="width:220px;font-size:12px">
       <select id="vault-sort" onchange="renderVault()" style="width:auto;font-size:12px">
         <option value="name">Name A-Z</option>
@@ -359,7 +449,7 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
         <label>Description</label>
         <input type="text" id="r-src-other" placeholder="e.g. Mum's recipe card, meal prep app" oninput="updateSrcPreview()">
       </div>
-      <div id="src-preview" class="src-preview" style="display: none;">Stored as: <a href="https://www.tiktok.com/@emsbalance/video/7635989949652782358" target="_blank" style="color:var(--purple)">https://www.tiktok.com/@emsbalance/video/7635989949652782358</a></div>
+      <div id="src-preview" class="src-preview" style="display: none;"></div>
     </div>
     <hr class="divider">
     <div class="field">
@@ -382,7 +472,7 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 </div>
 
 <div id="view-ingredients" class="view">
-  <div class="row-between" style="margin-bottom:14px;align-items:center">
+  <div class="view-toolbar">
     <h2 style="margin:0">Ingredient bank</h2>
     <div class="btn-row">
       <button class="btn sm ghost" onclick="openCategoryManagerModal()">Categories</button>
@@ -403,7 +493,7 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 </div>
 
 <div id="view-bank" class="view">
-  <div class="row-between" style="margin-bottom:14px;align-items:center">
+  <div class="view-toolbar">
     <h2 style="margin:0">Product bank</h2>
     <div class="btn-row">
       <button class="btn sm primary" onclick="showAddIng()">+ Add product</button>
@@ -471,7 +561,7 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 
 <div id="view-planner" class="view">
   <div style="margin-bottom:14px">
-    <div class="row-between" style="align-items:center;gap:12px;flex-wrap:wrap">
+    <div class="view-toolbar" style="flex-wrap:wrap">
       <h2 style="margin:0">Meal planner</h2>
       <div class="row-center">
         <select id="plan-days" onchange="buildExclGrid()" style="width:auto;font-size:12px"><option value="1">1 day</option><option value="2">2 days</option><option value="3">3 days</option><option value="4">4 days</option><option value="5">5 days</option><option value="6">6 days</option><option value="7">7 days</option><option value="8">8 days</option><option value="9">9 days</option><option value="10">10 days</option></select>
@@ -536,7 +626,7 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 </div>
 
 <div id="view-planlib" class="view">
-  <div class="row-between" style="margin-bottom:14px;align-items:center;gap:12px;flex-wrap:wrap">
+  <div class="view-toolbar" style="flex-wrap:wrap">
     <div>
       <h2 style="margin:0">Meal Plan Library</h2>
       <p style="font-size:12px;color:var(--text2);margin:5px 0 0">Saved meal plans live here so the planner itself can stay focused on generating and adjusting the current plan.</p>
@@ -548,7 +638,7 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 
 
 <div id="view-shopping" class="view">
-  <div class="row-between" style="margin-bottom:14px;align-items:center">
+  <div class="view-toolbar">
     <h2 style="margin:0">Shopping list</h2>
     <div class="row-center">
         <select id="shop-group-by" onchange="updateShopGroupPref(this.value)" style="width:auto; font-size:12px;">
@@ -564,7 +654,7 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 </div>
 
 <div id="view-data" class="view">
-    <div class="row-between" style="margin-bottom:14px;align-items:center">
+    <div class="view-toolbar">
       <h2 style="margin:0">Data Quality Centre</h2>
       <button class="btn sm ghost" onclick="renderDataQuality()">Refresh Scans</button>
     </div>
@@ -683,8 +773,8 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
     </div>
     
     <div id="tesco-search-hint" style="display: none; background: var(--surface2); padding: 10px; border-radius: 8px; margin-bottom: 14px; font-size: 13px;">
-        Looking for <strong id="tesco-search-term">Baby Plum Tomatoes</strong>? 
-        <a id="tesco-search-link" href="https://www.tesco.com/groceries/en-GB/search?query=Baby%20Plum%20Tomatoes" target="_blank" class="btn sm primary" style="margin-left:10px;">Search Tesco</a>
+        Looking for <strong id="tesco-search-term"></strong>? 
+        <a id="tesco-search-link" href="#" target="_blank" class="btn sm primary" style="margin-left:10px;">Search Tesco</a>
     </div>
     
     <div id="tesco-bookmarklet-panel" style="background: var(--purple-bg); border-radius: 8px; padding: 12px; margin-bottom: 14px;">
@@ -700,7 +790,7 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
     <div class="btn-row" id="tesco-extract-actions" style="margin-bottom: 10px;">
       <button class="btn primary" onclick="extractTescoProduct()">Extract details</button>
     </div>
-    <div id="tesco-msg"><div class="msg success">Extracted details! Please review below before saving.</div></div>
+    <div id="tesco-msg"></div>
 
     <div id="tesco-preview" style="display: block; margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px;"></div>
   </div>
@@ -768,18 +858,7 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
     <h3>Merge Duplicate Ingredient</h3>
     <p style="font-size:12px; color:var(--text2); margin-bottom:14px;">Select the PRIMARY ingredient to keep. The other will be deleted, and all recipes/plans will update to use the primary.</p>
     
-    <div id="merge-options-container" style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
-        <div style="background:var(--green-bg); border:1px solid var(--green); border-radius:8px; padding:10px; margin-bottom:10px;">
-            <div style="font-weight:600; color:var(--green); margin-bottom:4px;">PRIMARY (Keeping):</div>
-            <div style="font-size:13px;">Quorn Chicken Style Pieces <span style="color:var(--text2)">(Quorn)</span></div>
-        </div>
-        <div style="font-weight:600; font-size:12px; margin-bottom:6px;">WILL BE DELETED &amp; REPLACED BY PRIMARY:</div>
-        
-            <div style="background:var(--red-bg); border:1px solid var(--red); border-radius:8px; padding:10px; margin-bottom:6px;">
-                <div style="font-size:13px;">Quorn Chicken Style Pieces <span style="color:var(--text2)">(No brand)</span></div>
-            </div>
-        
-    </div>
+    <div id="merge-options-container" style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;"></div>
 
     <div class="btn-row">
         <button class="btn primary" onclick="executeMerge()">Confirm Merge</button>
@@ -7488,7 +7567,7 @@ function renderVault(){
         parts.push(`<span title="${ppEscapeHtml(fitC.warn.join(', ') || 'On target')}" style="cursor:help">Chloe ${fitC.label.split(' ')[0]} ${ppEscapeHtml(portions.c)}</span>`);
       }
       const fitTag = `<span class="tag" title="Lower is better. Sum of calorie misses and protein shortfall. Protein above target is treated as good.${useEnhanced ? ' This score uses the enhanced version.' : ''}">Fit score ${Math.round(score)}${useEnhanced ? ' · enhanced' : ''}</span>`;
-      return { portions, html: `<div style="font-size:12px;color:var(--text2);display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px">${parts.join('')} ${fitTag}</div>` };
+      return { portions, html: `<div class="recipe-fit">${parts.join('')} ${fitTag}</div>` };
     };
 
     const originalFit = buildFit(r, false);
@@ -7497,13 +7576,13 @@ function renderVault(){
     const enhancedChanges = r.enhanced?.changes ? `<div style="font-size:12px;color:var(--text2);margin-top:6px">${ppEscapeHtml(r.enhanced.changes)}</div>` : '';
 
     return `<div class="recipe-card">
-      <div class="row-between" style="margin-bottom:2px;align-items:flex-start;gap:12px">
-        <div style="min-width:0;flex:1">
-          <strong style="font-size:14px">${ppEscapeHtml(r.name)}</strong>
-          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:4px">${meta}</div>
+      <div class="recipe-card-layout">
+        <div class="recipe-card-main">
+          <strong class="recipe-card-name">${ppEscapeHtml(r.name)}</strong>
+          <div class="recipe-card-meta">${meta}</div>
           ${originalFit.html}
         </div>
-        <div style="display:grid;grid-template-columns:repeat(3,108px);gap:5px;align-items:center;justify-items:center;flex-shrink:0">
+        <div class="recipe-card-actions">
             <button class="btn sm ghost" style="width:100%;text-align:center;white-space:nowrap" onclick="editRecipeModalView('${r.id}')">Review Modal</button>
             <button class="btn sm ghost" style="width:100%;text-align:center;white-space:nowrap" onclick="viewRecipe('${r.id}', null)">View</button>
             <button class="btn sm ghost" style="width:100%;text-align:center;white-space:nowrap" onclick="downloadRecipeCard('${r.id}')">Recipe Card</button>
@@ -7513,13 +7592,13 @@ function renderVault(){
           </div>
       </div>
       ${r.enhanced ? `<div class="enhanced-box">
-        <div class="row-between" style="gap:8px;align-items:flex-start">
+        <div class="enhanced-layout">
           <div style="min-width:0;flex:1">
             <div class="enhanced-lbl">Enhanced version</div>
             ${enhancedFit.html}
             ${enhancedChanges}
           </div>
-          <div class="row-center" style="gap:5px;justify-content:flex-end;flex-wrap:wrap;flex-shrink:0">
+          <div class="enhanced-actions">
             <button class="btn sm ghost" style="padding:2px 5px;font-size:10px" onclick="viewRecipe('${r.id}', null, 'enhanced')">View</button>
             <button class="btn sm ghost" style="padding:2px 5px;font-size:10px" onclick="downloadRecipeCard('${r.id}', 'enhanced')">Recipe Card</button>
             <button class="btn sm ghost" style="padding:2px 5px;font-size:10px" onclick="editEnhancedRecipe('${r.id}')">Edit</button>
@@ -8054,7 +8133,7 @@ function renderIngredientBank(){
         const gProducts = getGroupProducts(g.id);
         const gDefault = getProduct(g.defaultProductId) || gProducts[0] || null;
         const gDefaultLabel = g.manualDefaultProductId ? 'Default' : 'Auto default';
-        return `<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,340px);gap:18px;align-items:start;padding:10px 0;border-top:1px solid rgba(0,0,0,0.04)">
+        return `<div class="subtype-row">
           <div style="min-width:0">
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
               <strong style="font-size:13px">${ppEscapeHtml(getGroupTypeName(g))}</strong>
@@ -8062,7 +8141,7 @@ function renderIngredientBank(){
             </div>
             ${gDefault ? `<div style="font-size:11px;color:var(--text2);margin-top:2px">${gDefaultLabel}: ${ppEscapeHtml(gDefault.name)} · ${getProductProteinPer100Kcal(gDefault).toFixed(1)}g protein / 100kcal</div>` : `<div style="font-size:11px;color:var(--red);margin-top:2px">No default product</div>`}
           </div>
-          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;align-self:start">
+          <div class="subtype-actions">
             <button class="btn sm ghost" style="justify-content:center" onclick="renameIngredientGroupPrompt('${g.id}')">Sub-type</button>
             <button class="btn sm ghost" style="justify-content:center" onclick="editGroupAliasesPrompt('${g.id}')">Aliases</button>
             <button class="btn sm ghost" style="justify-content:center" onclick="mergeIngredientGroupPrompt('${g.id}')">Merge</button>
@@ -8075,7 +8154,7 @@ function renderIngredientBank(){
       </div>
     </details>` : '';
     return `<div class="bank-card" data-category="${ppEscapeAttr(CAT[family.cat] || family.cat || 'Other')}" data-ingredient="${ppEscapeAttr(family.name)}">
-      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,320px);gap:18px;align-items:start">
+      <div class="hierarchy-card-layout">
         <div style="min-width:0">
           <div style="font-size:11px;color:var(--text3);margin-bottom:3px">${ppEscapeHtml(CAT[family.cat] || family.cat || 'Other')} > ${ppEscapeHtml(family.name || 'Ingredient')}${showSubTypes ? ' > sub-types' : ''}</div>
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -8088,7 +8167,7 @@ function renderIngredientBank(){
           ${(family.aliases || []).length > 1 ? `<div style="font-size:11px;color:var(--text2);margin-top:5px"><strong>Aliases:</strong> ${ppEscapeHtml((family.aliases || []).slice(0,6).join(', '))}${family.aliases.length > 6 ? '...' : ''}</div>` : ''}
           ${family.notes ? `<div style="font-size:12px;color:var(--text2);margin-top:5px">${ppEscapeHtml(family.notes)}</div>` : ''}
         </div>
-        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;align-self:start">
+        <div class="hierarchy-actions">
           <button class="btn sm ghost" style="justify-content:center" onclick="openIngredientFamilyDetailsModal('${family.id}')">Ingredient</button>
           <button class="btn sm ghost" style="justify-content:center" onclick="openIngredientFamilyAliasesModal('${family.id}')">Aliases</button>
           <button class="btn sm ghost" style="justify-content:center" onclick="addSubTypeToFamilyPrompt('${family.id}')">+ Sub-type</button>
@@ -8969,7 +9048,7 @@ function renderBank(){
       ? `<div class="msg warn" style="font-size:11px;margin:6px 0 0;padding:6px 8px">Check nutrition basis: powders/supplements must be stored per 100g/ml, not per scoop.</div>`
       : '';
     
-    return`<div class="bank-card"><div class="row-between"><div style="flex:1"><div style="font-size:14px;font-weight:600">${ing.name}</div>${ing.brand&&ing.brand!=='Generic'?`<div style="font-size:12px;color:var(--text2);margin-bottom:4px">${ing.brand}</div>`:''}<div style="font-size:11px;color:var(--text3);margin:3px 0">${ppEscapeHtml(hierarchy)}</div><div class="row-center" style="margin:4px 0;gap:5px"><span class="rank rank-${rank}" title="${protDensity.toFixed(1)}g protein per 100 kcal">${protDensity>=15?'Very high protein':protDensity>=10?'High protein':protDensity>=5?'Medium protein':'Lower protein'}</span><span class="tag" title="Category">${ppEscapeHtml(CAT[group?.cat || ing.cat]||group?.cat||ing.cat||'Other')}</span><span class="tag" title="Ingredient">${ppEscapeHtml(getProductFamily(ing))}</span>${group?`<span class="tag" title="Type">Type: ${ppEscapeHtml(getGroupTypeName(group))}</span>`:''}${isDefaultProduct?`<span class="tag green" title="Automatic default product: highest protein per 100 kcal in this type">Auto default</span>`:''}${ing.storage ? `<span class="tag" style="text-transform:capitalize;">${ing.storage}</span>` : ''}</div><div class="macro-bar"><span class="mpill p">P <span>${p}g</span></span><span class="mpill"><span>${ing.cal}</span> kcal</span><span class="mpill">C <span>${ing.carb}g</span></span><span class="mpill">F <span>${ing.fat}g</span></span></div>${basisWarning}<div class="row-center" style="margin-top:5px; gap:8px;">${pkcal?`<span style="font-size:11px;color:var(--blue)"><strong>${pkcal}g</strong> P / 100kcal</span>`:''}${ppenny?`<span style="font-size:11px;color:var(--blue)"><strong>${ppenny}g</strong> P / &pound;</span>`:''}</div>${ing.notes?`<div style="font-size:12px;color:var(--text2);margin-top:4px">${ing.notes}</div>`:''}${ing.price&&ing.packSize?`<div style="font-size:12px;color:var(--text2);margin-top:4px;">&pound;${ing.price.toFixed(2)} for ${formattedPackSize}</div>`:''}${variantLabels.length>1?`<div style="font-size:11px;color:var(--text2);margin-top:4px;"><strong>Pack variants:</strong> ${variantLabels.map(ppEscapeHtml).join(' · ')}</div>`:''}${ing.sourceUrl?`<div style="font-size:11px;margin-top:4px;"><a href="${ing.sourceUrl}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:underline">View on Tesco ↗</a></div>`:''}</div><div class="row-center" style="flex-shrink:0;align-self:flex-start;flex-wrap:wrap;justify-content:flex-end"><button class="btn sm ghost" onclick="editIng('${ing.id}')">Edit</button><button class="btn sm ghost" onclick="assignProductToGroupPrompt('${ing.id}')">Type</button><button class="btn sm danger" onclick="deleteIng('${ing.id}')">Delete</button></div></div></div>`;
+    return`<div class="bank-card"><div class="product-card-layout"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;overflow-wrap:anywhere">${ing.name}</div>${ing.brand&&ing.brand!=='Generic'?`<div style="font-size:12px;color:var(--text2);margin-bottom:4px">${ing.brand}</div>`:''}<div style="font-size:11px;color:var(--text3);margin:3px 0;overflow-wrap:anywhere">${ppEscapeHtml(hierarchy)}</div><div class="row-center" style="margin:4px 0;gap:5px"><span class="rank rank-${rank}" title="${protDensity.toFixed(1)}g protein per 100 kcal">${protDensity>=15?'Very high protein':protDensity>=10?'High protein':protDensity>=5?'Medium protein':'Lower protein'}</span><span class="tag" title="Category">${ppEscapeHtml(CAT[group?.cat || ing.cat]||group?.cat||ing.cat||'Other')}</span><span class="tag" title="Ingredient">${ppEscapeHtml(getProductFamily(ing))}</span>${group?`<span class="tag" title="Type">Type: ${ppEscapeHtml(getGroupTypeName(group))}</span>`:''}${isDefaultProduct?`<span class="tag green" title="Automatic default product: highest protein per 100 kcal in this type">Auto default</span>`:''}${ing.storage ? `<span class="tag" style="text-transform:capitalize;">${ing.storage}</span>` : ''}</div><div class="macro-bar"><span class="mpill p">P <span>${p}g</span></span><span class="mpill"><span>${ing.cal}</span> kcal</span><span class="mpill">C <span>${ing.carb}g</span></span><span class="mpill">F <span>${ing.fat}g</span></span></div>${basisWarning}<div class="row-center" style="margin-top:5px; gap:8px;">${pkcal?`<span style="font-size:11px;color:var(--blue)"><strong>${pkcal}g</strong> P / 100kcal</span>`:''}${ppenny?`<span style="font-size:11px;color:var(--blue)"><strong>${ppenny}g</strong> P / &pound;</span>`:''}</div>${ing.notes?`<div style="font-size:12px;color:var(--text2);margin-top:4px">${ing.notes}</div>`:''}${ing.price&&ing.packSize?`<div style="font-size:12px;color:var(--text2);margin-top:4px;">&pound;${ing.price.toFixed(2)} for ${formattedPackSize}</div>`:''}${variantLabels.length>1?`<div style="font-size:11px;color:var(--text2);margin-top:4px;"><strong>Pack variants:</strong> ${variantLabels.map(ppEscapeHtml).join(' · ')}</div>`:''}${ing.sourceUrl?`<div style="font-size:11px;margin-top:4px;"><a href="${ing.sourceUrl}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:underline">View on Tesco ↗</a></div>`:''}</div><div class="product-card-actions"><button class="btn sm ghost" onclick="editIng('${ing.id}')">Edit</button><button class="btn sm ghost" onclick="assignProductToGroupPrompt('${ing.id}')">Type</button><button class="btn sm danger" onclick="deleteIng('${ing.id}')">Delete</button></div></div></div>`;
   }).join('');
 }
 
@@ -11983,7 +12062,8 @@ function renderPlan(){
       }
       const rowAttrs = showRecipe ? ` data-plan-person="${rowPerson}" data-plan-cal="${rowCal}" data-plan-prot="${rowProt}"` : '';
 
-      dayRowsHtml+='<div class="slot-row"'+rowAttrs+'><span class="slot-lbl" style="color:'+SLOT_COLORS[sl.key]+'">'+lblLines[0]+'<br>'+lblLines[1]+'</span>'+(isEx?'<span class="slot-skipped">Not needed</span>':'<span class="slot-name">'+(r?ppEscapeHtml(r.name):'<span style="color:var(--text3)">Not set</span>')+(slotInfo.variant==='enhanced'?' <span class="tag green">Enhanced</span>':'')+'</span>'+(showRecipe?'<span class="slot-macro">'+calStr+'</span><button class="btn sm ghost" style="margin-left:5px;padding:2px 5px;font-size:10px" onclick="viewRecipe(\''+rId+'\', \''+(instanceId||'')+'\', \''+slotInfo.variant+'\')">View/Opt.</button><button class="btn sm ghost" style="margin-left:4px;padding:2px 5px;font-size:10px" onclick="reviewRecipeModalView(\''+rId+'\', \''+(instanceId||'')+'\', \''+slotInfo.variant+'\')">Review</button>':'')+mkSel(d,sl.key,sl.key.includes('breakfast')?'breakfast':sl.key.includes('lunch')?'lunch':'dinner',sl.key.endsWith('E')?'Elliott':sl.key.endsWith('C')?'Chloe':'any'))+'</div>';
+      const slotActionsHtml = showRecipe ? '<div class="slot-actions"><span class="slot-macro">'+calStr+'</span><button class="btn sm ghost" style="padding:2px 5px;font-size:10px" onclick="viewRecipe(\''+rId+'\', \''+(instanceId||'')+'\', \''+slotInfo.variant+'\')">View/Opt.</button><button class="btn sm ghost" style="padding:2px 5px;font-size:10px" onclick="reviewRecipeModalView(\''+rId+'\', \''+(instanceId||'')+'\', \''+slotInfo.variant+'\')">Review</button></div>' : '';
+      dayRowsHtml+='<div class="slot-row"'+rowAttrs+'><span class="slot-lbl" style="color:'+SLOT_COLORS[sl.key]+'">'+lblLines[0]+'<br>'+lblLines[1]+'</span>'+(isEx?'<span class="slot-skipped">Not needed</span>':'<span class="slot-name">'+(r?ppEscapeHtml(r.name):'<span style="color:var(--text3)">Not set</span>')+(slotInfo.variant==='enhanced'?' <span class="tag green">Enhanced</span>':'')+'</span>'+slotActionsHtml+mkSel(d,sl.key,sl.key.includes('breakfast')?'breakfast':sl.key.includes('lunch')?'lunch':'dinner',sl.key.endsWith('E')?'Elliott':sl.key.endsWith('C')?'Chloe':'any'))+'</div>';
     });
     daySummary.score = calculatePlanDayScoreFromTotals(daySummary.totals);
     const summaryHtml = ['e','c'].map(p=>`<div class="summary-box">${renderPlannerPersonSummaryBox(p, daySummary)}</div>`).join('');
