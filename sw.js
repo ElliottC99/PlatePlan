@@ -1,5 +1,5 @@
-const PLATEPLAN_CACHE = 'plateplan-shell-v4';
-const PLATEPLAN_SHELL = [
+const PLATEPLAN_CACHE = 'plateplan-shell-v5';
+const PLATEPLAN_LOCAL_SHELL = [
   './',
   './PlatePlan.html',
   './manifest.json',
@@ -14,14 +14,19 @@ const PLATEPLAN_SHELL = [
   './vendor/tesseract/core/tesseract-core-simd.wasm.js',
   './vendor/tesseract/core/tesseract-core-lstm.wasm.js',
   './vendor/tesseract/core/tesseract-core-simd-lstm.wasm.js',
-  './vendor/tesseract/lang/eng.traineddata.gz',
+  './vendor/tesseract/lang/eng.traineddata.gz'
+];
+const PLATEPLAN_OPTIONAL_SHELL = [
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js',
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js'
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(PLATEPLAN_CACHE).then(cache => cache.addAll(PLATEPLAN_SHELL)));
+  event.waitUntil(caches.open(PLATEPLAN_CACHE).then(async cache => {
+    await cache.addAll(PLATEPLAN_LOCAL_SHELL);
+    await Promise.allSettled(PLATEPLAN_OPTIONAL_SHELL.map(url => cache.add(url)));
+  }));
 });
 
 self.addEventListener('activate', event => {
@@ -53,4 +58,5 @@ self.addEventListener('fetch', event => {
 
 self.addEventListener('message', event => {
   if(event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+  if(event.data?.type === 'GET_VERSION') event.source?.postMessage({type:'PLATEPLAN_VERSION',cacheName:PLATEPLAN_CACHE});
 });

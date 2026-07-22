@@ -261,6 +261,7 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 .recipe-card-actions .btn,.hierarchy-actions .btn,.subtype-actions .btn{width:100%;justify-content:center;text-align:center;white-space:nowrap}
 .enhanced-layout{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .enhanced-actions{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap;flex-shrink:0}
+.enhanced-actions>.enhanced-more-action{display:none}
 .hierarchy-card-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,320px);gap:18px;align-items:start}
 .hierarchy-actions,.subtype-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;align-self:start}
 .subtype-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,340px);gap:18px;align-items:start;padding:10px 0;border-top:1px solid rgba(0,0,0,.04)}
@@ -324,6 +325,8 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
   .enhanced-box{padding:10px;margin-top:12px}
   .enhanced-layout{display:block!important}
   .enhanced-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;margin-top:10px;padding-top:8px;border-top:1px solid var(--border)}
+  .enhanced-actions>.btn{display:none}
+  .enhanced-actions>.enhanced-primary-action,.enhanced-actions>.enhanced-more-action{display:inline-flex;width:100%}
   .enhanced-actions .btn{min-height:34px!important;font-size:11px!important;padding:5px 7px!important;justify-content:center}
   .hierarchy-card-layout,.subtype-row{grid-template-columns:1fr!important;gap:10px!important}
   .hierarchy-actions,.subtype-actions{grid-template-columns:repeat(2,minmax(0,1fr))!important;width:100%;padding-top:9px;border-top:1px solid var(--border)}
@@ -393,6 +396,118 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
   .plan-date-control{width:100%}
   .plan-date-control input[type="date"]{flex:1;min-width:0;width:100%}
   .row-between,.row-center,.tag,.badge,.mpill,a{min-width:0;overflow-wrap:anywhere}
+}
+
+/* Pixel-first responsive contracts: compact is the baseline presentation. */
+.mobile-editor-card{min-width:0;max-width:100%;overflow-wrap:anywhere}
+.mobile-field-label{display:none;font-size:11px;font-weight:700;color:var(--text2);margin:0 0 4px}
+.review-ingredient-row{display:grid;grid-template-columns:22px 58px 66px minmax(86px,.65fr) minmax(220px,2.2fr) 56px 150px;gap:6px;margin-bottom:5px;align-items:center;min-width:0}
+.review-ingredient-row>*{min-width:0}
+.review-ingredient-name{position:relative;min-width:0}
+.review-mapping-status{font-size:10px;line-height:1.35;color:var(--text3);margin-top:4px;overflow-wrap:anywhere}
+.review-mapping-status.unmapped{color:var(--red)}
+.review-mobile-actions{display:none}
+.review-desktop-actions{display:flex;gap:4px;justify-content:flex-end;align-items:center}
+.review-exclude-control{display:flex;align-items:center;justify-content:center;cursor:pointer;margin:0}
+.review-exclude-label{display:none}
+.enhancement-filter-grid{display:grid;grid-template-columns:1.3fr .9fr .9fr .9fr .9fr;gap:6px;margin-bottom:8px;align-items:center}
+.enhancement-choice-actions{display:flex;gap:5px;align-items:center;flex-wrap:wrap;justify-content:flex-end;min-width:150px}
+.review-secondary-section>summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--text2);padding:8px 0;min-height:44px;display:flex;align-items:center}
+.review-secondary-section[open]>summary{margin-bottom:8px}
+.plan-library-card{margin:0;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:12px}
+.plan-library-layout{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.plan-library-main{min-width:0;flex:1;overflow-wrap:anywhere}
+.plan-library-title{font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+.plan-library-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.plan-library-recipe-preview{color:var(--text2);margin-top:7px;line-height:1.45;overflow-wrap:anywhere}
+.plan-library-actions{display:flex;justify-content:flex-end;gap:5px;flex-wrap:wrap;flex-shrink:0}
+.mobile-labelled-switch{display:flex;align-items:center;gap:9px;min-height:44px;color:var(--text);font-size:12px}
+.mobile-labelled-switch input{width:20px;height:20px;flex:0 0 auto}
+.update-progress-copy{display:grid;gap:9px;text-align:center;padding:8px 0}
+.update-progress-copy .spinner{margin-bottom:3px}
+.mobile-only-action{display:none!important}
+
+@media(max-width:599px){
+  html,body{max-width:100%;overflow-x:visible}
+  body{font-size:14px}
+  main{padding-left:10px;padding-right:10px;width:100%;max-width:100%}
+  main,.view,.card,.card-inner,.summary-box,.day-plan-card,.dq-card,.bank-card,.recipe-card{min-width:0;max-width:100%;overflow-wrap:anywhere}
+  img,video,canvas,svg{max-width:100%;height:auto}
+  input,select,textarea{min-width:0;max-width:100%;font-size:16px}
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),select{min-height:48px}
+  .btn,.mobile-sheet button,.mobile-nav button{min-height:48px;white-space:normal;text-align:center;justify-content:center}
+  .btn.sm{min-height:48px}
+  .recipe-card-actions .btn,.enhanced-actions .btn,.product-card-actions .btn,.hierarchy-actions .btn,.subtype-actions .btn{min-height:48px!important;white-space:normal!important}
+  .slot-actions .btn{min-height:48px!important}
+  .mobile-nav button{padding:6px 2px}
+  .modal-wrap{overflow-x:visible}
+  .modal-wrap>.modal{overflow-x:visible}
+  .modal-tabs{position:sticky;top:47px;z-index:7;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;padding:8px 0;background:var(--surface)}
+  .modal-tabs .mt2{min-width:0;text-align:center;padding:8px 4px;overflow-wrap:anywhere}
+  .rev-ing-header.review-ingredient-row{display:none!important}
+  .review-ingredient-row{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:10px!important;padding:12px!important;margin:0 0 10px!important;border:1px solid var(--border);border-radius:12px;background:var(--surface2);align-items:end!important;cursor:default!important}
+  .review-ingredient-row .review-drag-handle{display:none}
+  .mobile-field-label{display:block}
+  .review-ingredient-name{grid-column:1/-1;grid-row:1}
+  .review-ingredient-qty{grid-column:1}
+  .review-ingredient-unit{grid-column:2}
+  .review-ingredient-section{grid-column:1/-1}
+  .review-exclude-control{grid-column:1/-1;justify-content:flex-start;min-height:44px;padding:0 2px;gap:9px;color:var(--text)}
+  .review-exclude-control input{width:20px;height:20px;flex:0 0 auto}
+  .review-exclude-label{display:inline;font-size:12px;font-weight:600}
+  .review-desktop-actions{display:none!important}
+  .review-mobile-actions{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px;padding-top:2px}
+  .review-mobile-actions .btn{width:100%}
+  .review-mapping-status{font-size:11px;margin-top:5px}
+  .enhancement-filter-grid{grid-template-columns:1fr!important}
+  .enhancement-choice-row{flex-direction:column;align-items:stretch!important}
+  .enhancement-choice-actions{width:100%;min-width:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;justify-content:stretch}
+  .enhancement-choice-actions input,.enhancement-choice-actions select{width:100%!important}
+  .plan-library-card{padding:13px 12px}
+  .plan-library-layout{display:block}
+  .plan-library-meta{gap:5px;margin-top:7px}
+  .plan-library-meta .tag{padding:4px 7px;line-height:1.35}
+  .plan-library-actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);width:100%;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+  .plan-library-actions>.desktop-only-mobile-hide{display:none!important}
+  .plan-library-actions>.mobile-only-action{display:inline-flex!important}
+  .plan-library-actions .btn{width:100%}
+  .product-card-actions>.desktop-only-mobile-hide,.hierarchy-actions>.desktop-only-mobile-hide,.subtype-actions>.desktop-only-mobile-hide{display:none!important}
+  .product-card-actions>.mobile-only-action,.hierarchy-actions>.mobile-only-action,.subtype-actions>.mobile-only-action{display:inline-flex!important;width:100%}
+  .product-card-actions,.hierarchy-actions,.subtype-actions{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .dq-card>.row-between,.product-card-layout,.hierarchy-card-layout,.subtype-row{min-width:0}
+  .dq-card>.row-between{flex-direction:column;align-items:stretch}
+  .dq-card>.row-between>.btn,.dq-card>.row-between>details{width:100%;min-width:0!important}
+  .dq-card>.row-between>details>summary{width:100%;justify-content:center}
+  .shop-item,.shop-item-details summary{min-width:0;max-width:100%}
+  .shop-item-details summary{flex-wrap:wrap}
+  .recipe-search-drop,.map-dropdown,.review-ing-search-dropdown{max-width:calc(100vw - 24px);left:0;right:auto;width:100%;min-width:0}
+  .modal [style*="grid-template-columns:1.3fr"],.modal [style*="grid-template-columns:repeat(4"],.modal [style*="grid-template-columns:minmax(160px"],.modal [style*="grid-template-columns:minmax(0, 2fr"],.modal [style*="grid-template-columns:minmax(0,2fr"]{grid-template-columns:1fr!important}
+  .modal [style*="min-width:150px"],.modal [style*="min-width:180px"],.modal [style*="min-width:190px"],.modal [style*="min-width:220px"],.modal [style*="min-width:260px"],.modal [style*="min-width:280px"]{min-width:0!important;width:100%}
+  #tesco-diagnostics-box table,#tesco-diagnostics-box thead,#tesco-diagnostics-box tbody,#tesco-diagnostics-box tr,#tesco-diagnostics-box th,#tesco-diagnostics-box td{display:block;width:100%}
+  #tesco-diagnostics-box thead{display:none}
+  #tesco-diagnostics-box tr{padding:7px 0;border-bottom:1px solid var(--border)!important}
+  #tesco-diagnostics-box td{padding:2px 4px!important;overflow-wrap:anywhere}
+}
+
+@media(min-width:600px) and (max-width:839px){
+  html,body{overflow-x:visible}
+  main{max-width:800px}
+  input,select,textarea{min-width:0;max-width:100%;font-size:16px}
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),select,.btn,.btn.sm{min-height:48px}
+  .modal-wrap,.modal-wrap>.modal{overflow-x:visible}
+  .rev-ing-header.review-ingredient-row{display:none!important}
+  .review-ingredient-row{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:10px!important;padding:12px!important;margin:0 0 10px!important;border:1px solid var(--border);border-radius:12px;background:var(--surface2);align-items:end!important;cursor:default!important}
+  .review-ingredient-row .review-drag-handle{display:none}
+  .mobile-field-label{display:block}
+  .review-ingredient-name{grid-column:1/-1;grid-row:1}
+  .review-ingredient-qty{grid-column:1}
+  .review-ingredient-unit{grid-column:2}
+  .review-ingredient-section,.review-exclude-control,.review-desktop-actions{grid-column:1/-1}
+  .review-exclude-control{justify-content:flex-start;min-height:44px;gap:9px}
+  .review-exclude-label{display:inline;font-size:12px;font-weight:600}
+  .review-desktop-actions{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}
+  .review-desktop-actions .btn{min-height:44px;width:100%}
+  .plan-library-layout{gap:10px}
 }
 </style>
 </head>
@@ -1524,7 +1639,8 @@ const SK='plateplan_v1';
 const BAKED_CANDIDATE_SK='plateplan_v1_baked_candidate';
 const RECOVERY_SK='plateplan_v1_recovery';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='19.0';
+const PLATEPLAN_APP_VERSION='19.1';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v5';
 const SEED=[];
 
 let state = null;
@@ -1571,19 +1687,102 @@ const UNIT_TO_GRAMS={
 };
 
 function isMobilePlatePlan(){ return window.matchMedia('(max-width:640px)').matches; }
-function openMobileMore(){ document.getElementById('mobile-more-wrap')?.classList.add('open'); }
-function closeMobileMore(){ document.getElementById('mobile-more-wrap')?.classList.remove('open'); }
+let platePlanLastMobileFocus = null;
+let platePlanReturningFromUiClose = false;
+let platePlanHandlingHistoryPop = false;
+function returnFromPlatePlanUiHistory(){
+  platePlanReturningFromUiClose=true;
+  history.back();
+}
+function markMobileLayerForBack(wrap, kind){
+  if(!wrap || !isMobilePlatePlan() || wrap.dataset.historyEntry === '1') return;
+  try {
+    const activeMarked=document.querySelector('.modal-wrap.open[data-history-entry="1"],.mobile-more-wrap.open[data-history-entry="1"],.mobile-action-sheet-wrap.open[data-history-entry="1"]');
+    const nextState={ ...(history.state || {}), platePlanLayer:kind };
+    if(history.state?.platePlanLayer && !activeMarked) history.replaceState(nextState,'');
+    else history.pushState(nextState, '');
+    wrap.dataset.historyEntry = '1';
+  } catch(_err) {}
+}
+function restoreMobileLayerFocus(){
+  const target=platePlanLastMobileFocus;
+  platePlanLastMobileFocus=null;
+  if(target && document.contains(target)) setTimeout(()=>target.focus?.(),0);
+}
+function openMobileMore(){
+  const wrap=document.getElementById('mobile-more-wrap'); if(!wrap) return;
+  platePlanLastMobileFocus=document.activeElement;
+  wrap.classList.add('open');
+  markMobileLayerForBack(wrap,'more');
+  setTimeout(()=>wrap.querySelector('button')?.focus(),0);
+}
+function closeMobileMore(fromHistory=false){
+  const wrap=document.getElementById('mobile-more-wrap'); if(!wrap) return;
+  const marked=wrap.dataset.historyEntry==='1';
+  wrap.classList.remove('open'); delete wrap.dataset.historyEntry;
+  restoreMobileLayerFocus();
+  if(marked && !fromHistory) returnFromPlatePlanUiHistory();
+}
 function mobileMoreView(id){ closeMobileMore(); showView(id); }
 function syncMobileNavigation(id){
   const primary = ['vault','add','planner','shopping'].includes(id) ? id : 'more';
   document.querySelectorAll('#mobile-nav button').forEach(button=>button.classList.toggle('active',button.dataset.view===primary));
 }
-function closeMobileActionSheet(){ document.getElementById('mobile-action-sheet-wrap')?.classList.remove('open'); }
+function closeMobileActionSheet(fromHistory=false){
+  const wrap=document.getElementById('mobile-action-sheet-wrap'); if(!wrap) return;
+  const marked=wrap.dataset.historyEntry==='1';
+  wrap.classList.remove('open'); delete wrap.dataset.historyEntry;
+  restoreMobileLayerFocus();
+  if(marked && !fromHistory) returnFromPlatePlanUiHistory();
+}
 function openMobileActionSheet(title, actions){
   const host=document.getElementById('mobile-action-sheet'); if(!host) return;
-  host.innerHTML=`<div class="mobile-sheet-handle"></div><div class="row-between" style="align-items:center;margin-bottom:10px"><h3 style="margin:0">${ppEscapeHtml(title||'Actions')}</h3><button class="btn sm ghost" onclick="closeMobileActionSheet()">Close</button></div><div style="display:grid;gap:6px">${actions.map(action=>`<button class="btn ${action.danger?'danger':''}" onclick="closeMobileActionSheet();${action.onclick}">${ppEscapeHtml(action.label)}</button>`).join('')}</div>`;
-  document.getElementById('mobile-action-sheet-wrap')?.classList.add('open');
+  const titleId='mobile-action-sheet-title';
+  host.setAttribute('role','dialog'); host.setAttribute('aria-modal','true'); host.setAttribute('aria-labelledby',titleId);
+  host.innerHTML=`<div class="mobile-sheet-handle"></div><div class="row-between" style="align-items:center;margin-bottom:10px"><h3 id="${titleId}" style="margin:0">${ppEscapeHtml(title||'Actions')}</h3><button class="btn sm ghost" onclick="closeMobileActionSheet()">Close</button></div><div style="display:grid;gap:6px">${actions.map(action=>`<button class="btn ${action.danger?'danger':''}" onclick="closeMobileActionSheet(true);${action.onclick}">${ppEscapeHtml(action.label)}</button>`).join('')}</div>`;
+  const wrap=document.getElementById('mobile-action-sheet-wrap');
+  platePlanLastMobileFocus=document.activeElement;
+  wrap?.classList.add('open');
+  markMobileLayerForBack(wrap,'actions');
+  setTimeout(()=>host.querySelector('button')?.focus(),0);
 }
+
+function installPlatePlanModalHistory(){
+  if(!isMobilePlatePlan() || !document.body || document.body.dataset.modalHistoryReady==='1') return;
+  document.body.dataset.modalHistoryReady='1';
+  new MutationObserver(records=>records.forEach(record=>{
+    const wrap=record.target;
+    if(!(wrap instanceof HTMLElement) || !wrap.classList.contains('modal-wrap')) return;
+    if(wrap.classList.contains('open')) markMobileLayerForBack(wrap,'modal');
+    else if(wrap.dataset.historyEntry==='1'){
+      delete wrap.dataset.historyEntry;
+      if(!platePlanHandlingHistoryPop) returnFromPlatePlanUiHistory();
+    }
+  })).observe(document.body,{subtree:true,attributes:true,attributeFilter:['class']});
+}
+
+window.addEventListener('popstate',()=>{
+  if(platePlanReturningFromUiClose){platePlanReturningFromUiClose=false;return;}
+  platePlanHandlingHistoryPop=true;
+  const action=document.getElementById('mobile-action-sheet-wrap');
+  if(action?.classList.contains('open')){closeMobileActionSheet(true);setTimeout(()=>platePlanHandlingHistoryPop=false,0);return;}
+  const more=document.getElementById('mobile-more-wrap');
+  if(more?.classList.contains('open')){closeMobileMore(true);setTimeout(()=>platePlanHandlingHistoryPop=false,0);return;}
+  const modal=Array.from(document.querySelectorAll('.modal-wrap.open')).pop();
+  const close=modal?.querySelector('button[onclick*="close" i]');
+  if(close) close.click(); else modal?.classList.remove('open');
+  setTimeout(()=>platePlanHandlingHistoryPop=false,0);
+});
+document.addEventListener('keydown',event=>{
+  if(event.key!=='Escape') return;
+  const action=document.getElementById('mobile-action-sheet-wrap');
+  if(action?.classList.contains('open')){event.preventDefault();closeMobileActionSheet();return;}
+  const more=document.getElementById('mobile-more-wrap');
+  if(more?.classList.contains('open')){event.preventDefault();closeMobileMore();return;}
+  const modal=Array.from(document.querySelectorAll('.modal-wrap.open')).pop();
+  const close=modal?.querySelector('button[onclick*="close" i]');
+  if(close){event.preventDefault();close.click();}
+});
 function openRecipeActions(recipeId){
   const recipe=getProductIndexRecipe(recipeId); if(!recipe) return;
   openMobileActionSheet(recipe.name,[
@@ -1592,6 +1791,42 @@ function openRecipeActions(recipeId){
     {label:'Duplicate',onclick:`duplicateRecipe('${ppEscapeAttr(recipeId)}')`},
     {label:'Edit source recipe',onclick:`editRecipe('${ppEscapeAttr(recipeId)}')`},
     {label:'Delete',onclick:`deleteRecipe('${ppEscapeAttr(recipeId)}')`,danger:true}
+  ]);
+}
+function openEnhancedRecipeActions(recipeId){
+  const recipe=getProductIndexRecipe(recipeId); if(!recipe?.enhanced) return;
+  openMobileActionSheet(`${recipe.name} · Enhanced`,[
+    {label:'Recipe card',onclick:`downloadRecipeCard('${ppEscapeAttr(recipeId)}','enhanced')`},
+    {label:'Edit enhanced recipe',onclick:`editEnhancedRecipe('${ppEscapeAttr(recipeId)}')`},
+    {label:'Delete enhanced version',onclick:`deleteEnhancedRecipe('${ppEscapeAttr(recipeId)}')`,danger:true}
+  ]);
+}
+function openProductBankActions(productId){
+  const product=getProduct(productId); if(!product) return;
+  openMobileActionSheet(product.name || 'Product actions',[
+    {label:'Assign sub-type',onclick:`assignProductToGroupPrompt('${ppEscapeAttr(productId)}')`},
+    {label:'Delete product',onclick:`deleteIng('${ppEscapeAttr(productId)}')`,danger:true}
+  ]);
+}
+function openIngredientFamilyActions(familyId){
+  const family=getIngredientFamily(familyId); if(!family) return;
+  openMobileActionSheet(family.name || 'Ingredient actions',[
+    {label:'Edit aliases',onclick:`openIngredientFamilyAliasesModal('${ppEscapeAttr(familyId)}')`},
+    {label:'Add sub-type',onclick:`addSubTypeToFamilyPrompt('${ppEscapeAttr(familyId)}')`},
+    {label:'Merge ingredient',onclick:`mergeIngredientFamilyPrompt('${ppEscapeAttr(familyId)}')`},
+    {label:'Make sub-type',onclick:`openIngredientToSubTypeModal('${ppEscapeAttr(familyId)}')`},
+    {label:'Manage products',onclick:`openProductDefaultPicker('family','${ppEscapeAttr(familyId)}')`},
+    {label:'Delete ingredient',onclick:`deleteIngredientFamilyPrompt('${ppEscapeAttr(familyId)}')`,danger:true}
+  ]);
+}
+function openIngredientGroupActions(groupId){
+  const group=getIngredientGroup(groupId); if(!group) return;
+  openMobileActionSheet(getGroupTypeName(group) || 'Sub-type actions',[
+    {label:'Edit aliases',onclick:`editGroupAliasesPrompt('${ppEscapeAttr(groupId)}')`},
+    {label:'Merge sub-type',onclick:`mergeIngredientGroupPrompt('${ppEscapeAttr(groupId)}')`},
+    {label:'Make ingredient',onclick:`convertSubTypeToIngredient('${ppEscapeAttr(groupId)}')`},
+    {label:'Manage products',onclick:`openProductDefaultPicker('group','${ppEscapeAttr(groupId)}')`},
+    {label:'Delete sub-type',onclick:`deleteIngredientGroupPrompt('${ppEscapeAttr(groupId)}')`,danger:true}
   ]);
 }
 function getProductIndexRecipe(id){ return platePlanIndexes.recipes.get(id) || (state?.recipes||[]).find(recipe=>recipe.id===id) || null; }
@@ -2405,23 +2640,99 @@ function initPlatePlanCloudSync(){
   }catch(error){ updatePlatePlanSyncStatus('error',error.message); }
 }
 
+let platePlanSwRegistration=null;
+let platePlanUpdateApplying=false;
+let platePlanUpdateReloading=false;
+let platePlanUpdateTimer=null;
+let platePlanOfferedUpdateWorker=null;
+let platePlanActiveCacheVersion='';
+const PLATEPLAN_UPDATED_SESSION_KEY='plateplan_update_completed';
+
+function showPlatePlanUpdateOffer(registration){
+  const worker=registration?.waiting;
+  if(!worker || !navigator.serviceWorker.controller || worker===platePlanOfferedUpdateWorker || platePlanUpdateApplying) return;
+  platePlanOfferedUpdateWorker=worker;
+  openAppInfoModal('PlatePlan update available','A newer version is ready to install.<div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="applyPlatePlanAppUpdate()">Update now</button></div>');
+}
+
+function requestPlatePlanWorkerVersion(){
+  navigator.serviceWorker.controller?.postMessage({type:'GET_VERSION'});
+}
+
 function registerPlatePlanServiceWorker(){
   if(!('serviceWorker' in navigator)||location.protocol==='file:') return;
-  navigator.serviceWorker.register('./sw.js').then(registration=>{
-    const offerUpdate=()=>{
-      if(!registration.waiting) return;
-      openAppInfoModal('PlatePlan update available','A newer version is ready.<div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="applyPlatePlanAppUpdate()">Update now</button></div>');
-    };
-    if(registration.waiting) offerUpdate();
-    registration.addEventListener('updatefound',()=>registration.installing?.addEventListener('statechange',()=>{ if(registration.waiting) offerUpdate(); }));
+  const completed=sessionStorage.getItem(PLATEPLAN_UPDATED_SESSION_KEY);
+  if(completed){
+    sessionStorage.removeItem(PLATEPLAN_UPDATED_SESSION_KEY);
+    setTimeout(()=>openAppInfoModal('PlatePlan updated',`PlatePlan updated to version <strong>${ppEscapeHtml(completed)}</strong>.`),450);
+  }
+  navigator.serviceWorker.addEventListener('message',event=>{
+    if(event.data?.type==='PLATEPLAN_VERSION') platePlanActiveCacheVersion=event.data.cacheName||'';
+  });
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(platePlanUpdateReloading) return;
+    platePlanUpdateReloading=true;
+    clearTimeout(platePlanUpdateTimer);
+    sessionStorage.setItem(PLATEPLAN_UPDATED_SESSION_KEY,PLATEPLAN_APP_VERSION);
+    location.reload();
+  });
+  navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(registration=>{
+    platePlanSwRegistration=registration;
+    showPlatePlanUpdateOffer(registration);
+    registration.addEventListener('updatefound',()=>{
+      const installing=registration.installing;
+      installing?.addEventListener('statechange',()=>{
+        if(installing.state==='installed') showPlatePlanUpdateOffer(registration);
+      });
+    });
+    requestPlatePlanWorkerVersion();
+    setTimeout(()=>registration.update().catch(error=>console.info('PlatePlan update check unavailable',error)),1200);
   }).catch(error=>console.warn('PlatePlan service worker registration failed',error));
-  let refreshing=false;
-  navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(!refreshing){ refreshing=true; location.reload(); } });
+}
+
+function waitForPlatePlanWaitingWorker(registration,timeoutMs=10000){
+  return new Promise((resolve,reject)=>{
+    if(registration?.waiting) return resolve(registration.waiting);
+    let settled=false;
+    const finish=worker=>{if(settled)return;settled=true;clearTimeout(timer);worker?resolve(worker):reject(new Error('The update did not finish installing.'));};
+    const watch=worker=>{
+      if(!worker) return;
+      worker.addEventListener('statechange',()=>{
+        if(registration.waiting||worker.state==='installed') finish(registration.waiting||worker);
+        else if(worker.state==='redundant') finish(null);
+      });
+    };
+    watch(registration?.installing);
+    registration?.addEventListener('updatefound',()=>watch(registration.installing),{once:true});
+    const timer=setTimeout(()=>finish(null),timeoutMs);
+  });
+}
+
+function showPlatePlanUpdateFailure(message){
+  hideOverlay();
+  platePlanUpdateApplying=false;
+  openAppInfoModal('Update could not finish',`${ppEscapeHtml(message||'PlatePlan could not activate the update.')}<div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="applyPlatePlanAppUpdate()">Retry</button><button class="btn ghost" onclick="closeAppConfirmModal()">Close</button></div>`);
 }
 
 async function applyPlatePlanAppUpdate(){
-  const registration=await navigator.serviceWorker.getRegistration();
-  registration?.waiting?.postMessage({type:'SKIP_WAITING'});
+  if(platePlanUpdateApplying) return;
+  platePlanUpdateApplying=true;
+  closeAppConfirmModal();
+  showOverlay('Installing PlatePlan update…','PlatePlan will reopen automatically.');
+  try{
+    const registration=platePlanSwRegistration||await navigator.serviceWorker.getRegistration();
+    if(!registration) throw new Error('No PlatePlan service worker is registered.');
+    let worker=registration.waiting;
+    if(!worker){
+      await registration.update();
+      worker=await waitForPlatePlanWaitingWorker(registration);
+    }
+    platePlanUpdateTimer=setTimeout(()=>showPlatePlanUpdateFailure('The update timed out before PlatePlan reopened.'),15000);
+    worker.postMessage({type:'SKIP_WAITING'});
+  }catch(error){
+    clearTimeout(platePlanUpdateTimer);
+    showPlatePlanUpdateFailure(navigator.onLine===false?'You are offline. Reconnect, then retry the update.':error.message);
+  }
 }
 
 function getRecoveryPoints(){
@@ -2539,6 +2850,7 @@ function clearVolatileSavedDom(root = document){
 
 document.addEventListener('DOMContentLoaded', () => {
   performance.mark?.('plateplan-start');
+  installPlatePlanModalHistory();
   clearVolatileSavedDom(document);
   loadBakedState();
   state = loadState();
@@ -2749,9 +3061,9 @@ function getBoosters(gapGrams) {
 function getImprovementSuggestions(ings, prefix = 'enh') {
     const currentGroupIds = new Set((ings || []).filter(i=>i.groupId).map(i=>i.groupId));
     const catOptions = Object.entries(CAT).filter(([k,v]) => v).sort((a,b)=>a[1].localeCompare(b[1])).map(([k,v]) => `<option value="${ppEscapeAttr(k)}">${ppEscapeHtml(v)}</option>`).join('');
-    return `<div style="margin-top:15px;border-top:1px solid var(--border);padding-top:10px;">
-        <h4 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text2);margin-bottom:8px">Nutritional Improvement Suggestions</h4>
-        <div style="display:grid;grid-template-columns:1.3fr .9fr .9fr .9fr .9fr;gap:6px;margin-bottom:8px;align-items:center">
+    return `<details class="review-secondary-section" style="margin-top:15px;border-top:1px solid var(--border);padding-top:10px;">
+        <summary>Nutritional improvement tools</summary>
+        <div class="enhancement-filter-grid">
           <input type="search" id="enhance-search-${prefix}" placeholder="Search ingredients or sub-types..." oninput="renderEnhancementFinder('${prefix}')" style="font-size:12px;padding:6px 9px">
           <select id="enhance-cat-${prefix}" onchange="renderEnhancementFinder('${prefix}')" style="font-size:12px"><option value="all">All categories</option>${catOptions}</select>
           <input type="search" id="enhance-family-${prefix}" placeholder="Ingredient" oninput="renderEnhancementFinder('${prefix}')" style="font-size:12px;padding:6px 9px">
@@ -2765,7 +3077,7 @@ function getImprovementSuggestions(ings, prefix = 'enh') {
           </select>
         </div>
         <div id="enhancement-results-${prefix}" data-current-group-ids="${[...currentGroupIds].map(ppEscapeAttr).join(',')}"><div style="font-size:12px;color:var(--text2);padding:8px 0">Start typing to search ingredients or sub-types to add.</div></div>
-    </div>`;
+    </details>`;
 }
 
 
@@ -2849,14 +3161,14 @@ function renderEnhancementFinder(prefix = 'enh'){
       const controlId = `${prefix}-${row.kind}-${row.id}`.replace(/[^a-zA-Z0-9_-]/g,'_');
       const badge = row.kind === 'ingredient' ? 'Ingredient' : 'Sub-type';
       return `<div class="card-inner" style="padding:9px 10px;margin-bottom:7px;background:var(--surface);border-left:3px solid var(--purple)">
-        <div class="row-between" style="gap:8px;align-items:flex-start">
+        <div class="row-between enhancement-choice-row" style="gap:8px;align-items:flex-start">
           <div style="min-width:0;flex:1">
             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><strong>${ppEscapeHtml(row.name || badge)}</strong><span class="tag">${badge}</span></div>
             <div style="font-size:11px;color:var(--text3);margin-top:2px">${ppEscapeHtml(row.hierarchy || '')}</div>
             <div style="font-size:11px;color:var(--text2);margin-top:2px">Default product: ${ppEscapeHtml(product.name || 'Product')}${product.brand && product.brand !== 'Generic' ? ` · ${ppEscapeHtml(product.brand)}` : ''}</div>
             <div class="macro-bar" style="margin-top:5px"><span class="mpill">${Math.round(product.cal || 0)} kcal/100g</span><span class="mpill p">P ${round1(product.prot || 0)}g/100g</span><span class="mpill">${round1(pkcal)}g P/100kcal</span><span class="mpill">${round1(ppound)}g P/£</span>${cost100 ? `<span class="mpill">£${cost100.toFixed(2)}/100g</span>` : ''}</div>
           </div>
-          <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;justify-content:flex-end;min-width:150px">
+          <div class="enhancement-choice-actions" style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
             <input type="number" id="enhance-qty-${controlId}" value="100" min="0" step="0.1" style="width:64px;font-size:12px;padding:5px 6px">
             <select id="enhance-unit-${controlId}" style="width:58px;font-size:12px;padding:5px 6px"><option value="g">g</option><option value="ml">ml</option><option value="qty">qty</option></select>
             <button class="btn sm ghost" onclick="addImprovementChoiceToModal('${ppEscapeAttr(row.kind)}','${ppEscapeAttr(row.id)}','${ppEscapeAttr(prefix)}','${ppEscapeAttr(controlId)}')">Add</button>
@@ -6731,8 +7043,7 @@ function renderModalIngs(prefix, ings) {
     const context = getReviewResolutionContext();
     ings = applyReviewContextToIngredients(ings || [], context);
     const list = document.getElementById(prefix + '-ings-list');
-    const grid = 'grid-template-columns:22px 58px 66px minmax(86px,.65fr) minmax(220px,2.2fr) 56px 150px;';
-    const header = `<div class="rev-ing-header" style="display:grid;${grid}gap:6px;margin-bottom:4px;align-items:center;font-size:11px;color:var(--text2);font-weight:600;">
+    const header = `<div class="rev-ing-header review-ingredient-row" style="margin-bottom:4px;font-size:11px;color:var(--text2);font-weight:600;">
        <span></span>
        <span>Qty</span>
        <span>Unit</span>
@@ -6747,18 +7058,23 @@ function renderModalIngs(prefix, ings) {
         const amount = normaliseRecipeAmountForUi(p);
         const family = p.ingredientId ? getIngredientFamily(p.ingredientId) : null;
         const displayName = p.mappedViaIngredient && family ? family.name : (p.name || '');
-        return `<div class="rev-ing-row" draggable="true" ondragstart="startReviewIngredientDrag(event)" ondragover="overReviewIngredientDrag(event)" ondragend="endReviewIngredientDrag(event, '${prefix}')" data-bankid="${p.bankId||''}" data-original-bankid="${p.originalBankId || p.bankId || ''}" data-original-key="${p.originalKey || p.originalGroupId || p.originalBankId || getRecipeIngredientKey(p)}" data-groupid="${p.groupId || getRecipeIngredientGroupId(p) || ''}" data-ingredientid="${p.ingredientId || ''}" data-mapped-via-ingredient="${p.mappedViaIngredient ? '1' : ''}" data-prefix="${prefix}" data-stock-water="${p.stockWaterMl || ''}" style="display:grid;${grid}gap:6px;margin-bottom:5px;align-items:center;">
+        const groupId = p.groupId || getRecipeIngredientGroupId(p) || '';
+        const group = groupId ? getIngredientGroup(groupId) : null;
+        const product = resolveProductForIngredient({ ...p, groupId }).product;
+        const mappingText = group ? `${getGroupHierarchyText(group)}${product?.name ? ` · ${product.name}` : ''}` : (product?.name || 'Not mapped yet');
+        return `<div class="rev-ing-row review-ingredient-row mobile-editor-card" draggable="true" ondragstart="startReviewIngredientDrag(event)" ondragover="overReviewIngredientDrag(event)" ondragend="endReviewIngredientDrag(event, '${prefix}')" data-bankid="${p.bankId||''}" data-original-bankid="${p.originalBankId || p.bankId || ''}" data-original-key="${p.originalKey || p.originalGroupId || p.originalBankId || getRecipeIngredientKey(p)}" data-groupid="${groupId}" data-ingredientid="${p.ingredientId || ''}" data-mapped-via-ingredient="${p.mappedViaIngredient ? '1' : ''}" data-prefix="${prefix}" data-stock-water="${p.stockWaterMl || ''}">
            <span class="review-drag-handle" title="Drag to reorder" style="cursor:grab;color:var(--text3);font-size:16px;text-align:center;line-height:1;user-select:none;">⋮</span>
-           <input type="number" class="r-qty" value="${amount.qty||1}" style="width:100%;min-width:0" step="0.1" min="0" oninput="recalcModal('${prefix}')">
-           ${renderReviewUnitSelect(amount.unit || 'qty', prefix, p.name || '')}
-           ${renderSectionInput('r-section', p.section || '', `${prefix}-section-options`, `refreshReviewSectionOptions('${prefix}'); recalcModal('${prefix}')`, '100%')}
-           <div style="position:relative;min-width:0"><input type="text" class="r-name" value="${(displayName||'').replace(/"/g, '&quot;')}" style="width:100%;min-width:0" oninput="handleReviewIngredientNameInput(this, '${prefix}')" onfocus="renderReviewIngredientSearch(this, '${prefix}')" onblur="setTimeout(()=>closeReviewIngredientSearchDropdown(this.closest('.rev-ing-row')),160)"><div class="r-row-error" style="display:none;color:var(--red);font-size:10px;line-height:1.25;margin-top:3px;"></div></div>
-           <label style="display:flex;align-items:center;justify-content:center;cursor:pointer;" title="Keep this in the recipe and shopping list, but exclude it from nutrition totals."><input type="checkbox" class="r-exclude-nutrition" ${p.excludeNutrition?'checked':''} onchange="recalcModal('${prefix}')"></label>
-           <div style="display:flex;gap:4px;justify-content:flex-end;align-items:center;">
+           <div class="review-ingredient-qty"><span class="mobile-field-label">Quantity</span><input type="number" class="r-qty" value="${amount.qty||1}" style="width:100%;min-width:0" step="0.1" min="0" oninput="recalcModal('${prefix}')"></div>
+           <div class="review-ingredient-unit"><span class="mobile-field-label">Unit</span>${renderReviewUnitSelect(amount.unit || 'qty', prefix, p.name || '')}</div>
+           <div class="review-ingredient-section"><span class="mobile-field-label">Section</span>${renderSectionInput('r-section', p.section || '', `${prefix}-section-options`, `refreshReviewSectionOptions('${prefix}'); recalcModal('${prefix}')`, '100%')}</div>
+           <div class="review-ingredient-name" style="position:relative;min-width:0"><span class="mobile-field-label">Ingredient</span><input type="text" class="r-name" value="${ppEscapeAttr(displayName||'')}" style="width:100%;min-width:0" oninput="handleReviewIngredientNameInput(this, '${prefix}')" onfocus="renderReviewIngredientSearch(this, '${prefix}')" onblur="setTimeout(()=>closeReviewIngredientSearchDropdown(this.closest('.rev-ing-row')),160)"><div class="review-mapping-status${group || product ? '' : ' unmapped'}">${ppEscapeHtml(mappingText)}</div><div class="r-row-error" style="display:none;color:var(--red);font-size:10px;line-height:1.25;margin-top:3px;"></div></div>
+           <label class="review-exclude-control" title="Keep this in the recipe and shopping list, but exclude it from nutrition totals."><input type="checkbox" class="r-exclude-nutrition" ${p.excludeNutrition?'checked':''} onchange="recalcModal('${prefix}')"><span class="review-exclude-label">Not eaten / exclude from nutrition</span></label>
+           <div class="review-desktop-actions" style="display:flex;gap:4px;justify-content:flex-end;align-items:center;">
              <button type="button" class="btn sm ghost r-edit-ing" onclick="editModalRowIngredient(this)" style="padding:4px 6px;font-size:10px;display:${p.bankId?'inline-block':'none'}">Edit</button>
              <button type="button" class="btn sm ghost r-replace-ing" onclick="openModalIngredientReplace(this)" style="padding:4px 6px;font-size:10px">Replace</button>
              <button class="btn sm danger ghost" onclick="removeReviewIngredientRow(this, '${prefix}')">&times;</button>
            </div>
+           <div class="review-mobile-actions"><button type="button" class="btn ghost r-replace-ing" onclick="openModalIngredientReplace(this)">Replace</button><button type="button" class="btn ghost" onclick="openReviewIngredientActions(this, '${prefix}')">More</button></div>
         </div>`;
     }).join('');
     list.innerHTML = header + rows + `<datalist id="${prefix}-section-options"></datalist>`;
@@ -6784,6 +7100,39 @@ function editModalRowIngredient(btn){
     if(!bankId && row?.dataset.groupid) bankId = resolveProductForIngredient({ groupId: row.dataset.groupid }).product?.id || '';
     hideReviewTooltip();
     if(bankId) editIng(bankId);
+}
+
+let mobileReviewIngredientRow = null;
+function openReviewIngredientActions(btn, prefix){
+    mobileReviewIngredientRow = btn.closest('.rev-ing-row');
+    if(!mobileReviewIngredientRow) return;
+    const canEdit = !!(mobileReviewIngredientRow.dataset.bankid || mobileReviewIngredientRow.dataset.groupid);
+    const actions = [];
+    if(canEdit) actions.push({ label:'Edit mapped product', onclick:`runReviewIngredientMobileAction('edit', '${prefix}')` });
+    actions.push(
+      { label:'Move up', onclick:`runReviewIngredientMobileAction('up', '${prefix}')` },
+      { label:'Move down', onclick:`runReviewIngredientMobileAction('down', '${prefix}')` },
+      { label:'Delete ingredient', danger:true, onclick:`runReviewIngredientMobileAction('delete', '${prefix}')` }
+    );
+    openMobileActionSheet('Ingredient actions', actions);
+}
+
+function runReviewIngredientMobileAction(action, prefix){
+    const row = mobileReviewIngredientRow;
+    mobileReviewIngredientRow = null;
+    closeMobileActionSheet();
+    if(!row) return;
+    if(action === 'edit') return editModalRowIngredient(row.querySelector('.r-edit-ing') || row);
+    if(action === 'delete') return removeReviewIngredientRow(row, prefix);
+    if(action === 'up') {
+      const previous = row.previousElementSibling;
+      if(previous?.classList.contains('rev-ing-row')) row.parentNode.insertBefore(row, previous);
+    }
+    if(action === 'down') {
+      const next = row.nextElementSibling;
+      if(next?.classList.contains('rev-ing-row')) row.parentNode.insertBefore(next, row);
+    }
+    recalcModal(prefix);
 }
 
 let reviewReplaceTargetRow = null;
@@ -6909,7 +7258,13 @@ function updateModalIngredientContributionTitles(prefix){
       const hasName = !!(input?.value || '').trim();
       const errorText = hasName ? getReviewIngredientDataError(ing, resolved) : '';
       const errorEl = row.querySelector('.r-row-error');
+      const mappingEl = row.querySelector('.review-mapping-status');
       if(editBtn) editBtn.style.display = resolvedProduct ? 'inline-block' : 'none';
+      if(mappingEl) {
+        const group = ing?.groupId ? getIngredientGroup(ing.groupId) : null;
+        mappingEl.textContent = group ? `${getGroupHierarchyText(group)}${resolvedProduct?.name ? ` · ${resolvedProduct.name}` : ''}` : (resolvedProduct?.name || 'Not mapped yet');
+        mappingEl.classList.toggle('unmapped', !group && !resolvedProduct);
+      }
       if(input) {
         if(errorText) {
           input.style.borderColor = 'var(--red)';
@@ -6954,7 +7309,7 @@ function copyOriginalMethodToEnhanced(){
 function addModalIng(prefix) {
     const container = document.getElementById(prefix + '-ings-list');
     const div = document.createElement('div');
-    div.className = 'rev-ing-row';
+    div.className = 'rev-ing-row review-ingredient-row mobile-editor-card';
     div.dataset.bankid = '';
     div.dataset.originalBankid = '';
     div.dataset.originalKey = '';
@@ -6962,22 +7317,22 @@ function addModalIng(prefix) {
     div.dataset.ingredientid = '';
     div.dataset.mappedViaIngredient = '';
     div.dataset.prefix = prefix;
-    div.style = 'display:grid;grid-template-columns:22px 58px 66px minmax(86px,.65fr) minmax(220px,2.2fr) 56px 150px;gap:6px;margin-bottom:5px;align-items:center;';
     div.draggable = true;
     div.setAttribute('ondragstart', 'startReviewIngredientDrag(event)');
     div.setAttribute('ondragover', 'overReviewIngredientDrag(event)');
     div.setAttribute('ondragend', `endReviewIngredientDrag(event, '${prefix}')`);
     div.innerHTML = `<span class="review-drag-handle" title="Drag to reorder" style="cursor:grab;color:var(--text3);font-size:16px;text-align:center;line-height:1;user-select:none;">⋮</span>
-       <input type="number" class="r-qty" value="1" style="width:100%;min-width:0" step="0.1" min="0" oninput="recalcModal('${prefix}')">
-       ${renderReviewUnitSelect('qty', prefix)}
-       ${renderSectionInput('r-section', '', `${prefix}-section-options`, `refreshReviewSectionOptions('${prefix}'); recalcModal('${prefix}')`, '100%')}
-       <div style="position:relative;min-width:0"><input type="text" class="r-name" value="" style="width:100%;min-width:0" oninput="handleReviewIngredientNameInput(this, '${prefix}')" onfocus="renderReviewIngredientSearch(this, '${prefix}')" onblur="setTimeout(()=>closeReviewIngredientSearchDropdown(this.closest('.rev-ing-row')),160)"><div class="r-row-error" style="display:none;color:var(--red);font-size:10px;line-height:1.25;margin-top:3px;"></div></div>
-       <label style="display:flex;align-items:center;justify-content:center;cursor:pointer;" title="Keep this in the recipe and shopping list, but exclude it from nutrition totals."><input type="checkbox" class="r-exclude-nutrition" onchange="recalcModal('${prefix}')"></label>
-       <div style="display:flex;gap:4px;justify-content:flex-end;align-items:center;">
+       <div class="review-ingredient-qty"><span class="mobile-field-label">Quantity</span><input type="number" class="r-qty" value="1" style="width:100%;min-width:0" step="0.1" min="0" oninput="recalcModal('${prefix}')"></div>
+       <div class="review-ingredient-unit"><span class="mobile-field-label">Unit</span>${renderReviewUnitSelect('qty', prefix)}</div>
+       <div class="review-ingredient-section"><span class="mobile-field-label">Section</span>${renderSectionInput('r-section', '', `${prefix}-section-options`, `refreshReviewSectionOptions('${prefix}'); recalcModal('${prefix}')`, '100%')}</div>
+       <div class="review-ingredient-name" style="position:relative;min-width:0"><span class="mobile-field-label">Ingredient</span><input type="text" class="r-name" value="" style="width:100%;min-width:0" oninput="handleReviewIngredientNameInput(this, '${prefix}')" onfocus="renderReviewIngredientSearch(this, '${prefix}')" onblur="setTimeout(()=>closeReviewIngredientSearchDropdown(this.closest('.rev-ing-row')),160)"><div class="review-mapping-status unmapped">Not mapped yet</div><div class="r-row-error" style="display:none;color:var(--red);font-size:10px;line-height:1.25;margin-top:3px;"></div></div>
+       <label class="review-exclude-control" title="Keep this in the recipe and shopping list, but exclude it from nutrition totals."><input type="checkbox" class="r-exclude-nutrition" onchange="recalcModal('${prefix}')"><span class="review-exclude-label">Not eaten / exclude from nutrition</span></label>
+       <div class="review-desktop-actions" style="display:flex;gap:4px;justify-content:flex-end;align-items:center;">
          <button type="button" class="btn sm ghost r-edit-ing" onclick="editModalRowIngredient(this)" style="padding:4px 6px;font-size:10px;display:none">Edit</button>
          <button type="button" class="btn sm ghost r-replace-ing" onclick="openModalIngredientReplace(this)" style="padding:4px 6px;font-size:10px">Replace</button>
          <button class="btn sm danger ghost" onclick="removeReviewIngredientRow(this, '${prefix}')">&times;</button>
-       </div>`;
+       </div>
+       <div class="review-mobile-actions"><button type="button" class="btn ghost r-replace-ing" onclick="openModalIngredientReplace(this)">Replace</button><button type="button" class="btn ghost" onclick="openReviewIngredientActions(this, '${prefix}')">More</button></div>`;
     const sectionOptions = document.getElementById(prefix + '-section-options');
     if(sectionOptions) container.insertBefore(div, sectionOptions);
     else container.appendChild(div);
@@ -8021,10 +8376,11 @@ function renderVault(){
             ${enhancedChanges}
           </div>
           <div class="enhanced-actions">
-            <button class="btn sm ghost" style="padding:2px 5px;font-size:10px" onclick="viewRecipe('${r.id}', null, 'enhanced')">View</button>
+            <button class="btn sm ghost enhanced-primary-action" style="padding:2px 5px;font-size:10px" onclick="viewRecipe('${r.id}', null, 'enhanced')">View</button>
             <button class="btn sm ghost" style="padding:2px 5px;font-size:10px" onclick="downloadRecipeCard('${r.id}', 'enhanced')">Recipe Card</button>
             <button class="btn sm ghost" style="padding:2px 5px;font-size:10px" onclick="editEnhancedRecipe('${r.id}')">Edit</button>
             <button class="btn sm danger ghost" style="padding:2px 5px;font-size:10px" onclick="deleteEnhancedRecipe('${r.id}')">Delete</button>
+            <button class="btn sm ghost enhanced-more-action" onclick="openEnhancedRecipeActions('${r.id}')">More</button>
           </div>
         </div>
       </div>` : ''}
@@ -8567,12 +8923,14 @@ function renderIngredientBank(){
             ${gDefault ? `<div style="font-size:11px;color:var(--text2);margin-top:2px">${gDefaultLabel}: ${ppEscapeHtml(gDefault.name)} · ${getProductProteinPer100Kcal(gDefault).toFixed(1)}g protein / 100kcal</div>` : `<div style="font-size:11px;color:var(--red);margin-top:2px">No default product</div>`}
           </div>
           <div class="subtype-actions">
-            <button class="btn sm ghost" style="justify-content:center" onclick="renameIngredientGroupPrompt('${g.id}')">Sub-type</button>
-            <button class="btn sm ghost" style="justify-content:center" onclick="editGroupAliasesPrompt('${g.id}')">Aliases</button>
-            <button class="btn sm ghost" style="justify-content:center" onclick="mergeIngredientGroupPrompt('${g.id}')">Merge</button>
-            <button class="btn sm ghost" style="justify-content:center" onclick="convertSubTypeToIngredient('${g.id}')">Make Ingredient</button>
-            <button class="btn sm ghost" style="justify-content:center" onclick="openProductDefaultPicker('group','${g.id}')">Products</button>
-            <button class="btn sm danger" style="justify-content:center" onclick="deleteIngredientGroupPrompt('${g.id}')">Delete</button>
+            <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="renameIngredientGroupPrompt('${g.id}')">Sub-type</button>
+            <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="editGroupAliasesPrompt('${g.id}')">Aliases</button>
+            <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="mergeIngredientGroupPrompt('${g.id}')">Merge</button>
+            <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="convertSubTypeToIngredient('${g.id}')">Make Ingredient</button>
+            <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="openProductDefaultPicker('group','${g.id}')">Products</button>
+            <button class="btn sm danger desktop-only-mobile-hide" style="justify-content:center" onclick="deleteIngredientGroupPrompt('${g.id}')">Delete</button>
+            <button class="btn sm ghost mobile-only-action" onclick="renameIngredientGroupPrompt('${g.id}')">Edit sub-type</button>
+            <button class="btn sm ghost mobile-only-action" onclick="openIngredientGroupActions('${g.id}')">More</button>
           </div>
         </div>`;
       }).join('')}
@@ -8593,13 +8951,15 @@ function renderIngredientBank(){
           ${family.notes ? `<div style="font-size:12px;color:var(--text2);margin-top:5px">${ppEscapeHtml(family.notes)}</div>` : ''}
         </div>
         <div class="hierarchy-actions">
-          <button class="btn sm ghost" style="justify-content:center" onclick="openIngredientFamilyDetailsModal('${family.id}')">Ingredient</button>
-          <button class="btn sm ghost" style="justify-content:center" onclick="openIngredientFamilyAliasesModal('${family.id}')">Aliases</button>
-          <button class="btn sm ghost" style="justify-content:center" onclick="addSubTypeToFamilyPrompt('${family.id}')">+ Sub-type</button>
-          <button class="btn sm ghost" style="justify-content:center" onclick="mergeIngredientFamilyPrompt('${family.id}')">Merge</button>
-          <button class="btn sm ghost" style="justify-content:center" onclick="openIngredientToSubTypeModal('${family.id}')">Make Sub-type</button>
-          <button class="btn sm ghost" style="justify-content:center" onclick="openProductDefaultPicker('family','${family.id}')">Products</button>
-          <button class="btn sm danger" style="justify-content:center;grid-column:span 2" onclick="deleteIngredientFamilyPrompt('${family.id}')">Delete</button>
+          <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="openIngredientFamilyDetailsModal('${family.id}')">Ingredient</button>
+          <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="openIngredientFamilyAliasesModal('${family.id}')">Aliases</button>
+          <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="addSubTypeToFamilyPrompt('${family.id}')">+ Sub-type</button>
+          <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="mergeIngredientFamilyPrompt('${family.id}')">Merge</button>
+          <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="openIngredientToSubTypeModal('${family.id}')">Make Sub-type</button>
+          <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="openProductDefaultPicker('family','${family.id}')">Products</button>
+          <button class="btn sm danger desktop-only-mobile-hide" style="justify-content:center;grid-column:span 2" onclick="deleteIngredientFamilyPrompt('${family.id}')">Delete</button>
+          <button class="btn sm ghost mobile-only-action" onclick="openIngredientFamilyDetailsModal('${family.id}')">Edit ingredient</button>
+          <button class="btn sm ghost mobile-only-action" onclick="openIngredientFamilyActions('${family.id}')">More</button>
         </div>
       </div>
       ${typeRows}
@@ -9478,7 +9838,7 @@ function renderBank(){
       ? `<div class="msg warn" style="font-size:11px;margin:6px 0 0;padding:6px 8px">Check nutrition basis: powders/supplements must be stored per 100g/ml, not per scoop.</div>`
       : '';
     
-    return`<div class="bank-card"><div class="product-card-layout"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;overflow-wrap:anywhere">${ing.name}</div>${ing.brand&&ing.brand!=='Generic'?`<div style="font-size:12px;color:var(--text2);margin-bottom:4px">${ing.brand}</div>`:''}<div style="font-size:11px;color:var(--text3);margin:3px 0;overflow-wrap:anywhere">${ppEscapeHtml(hierarchy)}</div><div class="row-center" style="margin:4px 0;gap:5px"><span class="rank rank-${rank}" title="${protDensity.toFixed(1)}g protein per 100 kcal">${protDensity>=15?'Very high protein':protDensity>=10?'High protein':protDensity>=5?'Medium protein':'Lower protein'}</span><span class="tag" title="Category">${ppEscapeHtml(CAT[group?.cat || ing.cat]||group?.cat||ing.cat||'Other')}</span><span class="tag" title="Ingredient">${ppEscapeHtml(getProductFamily(ing))}</span>${group?`<span class="tag" title="Type">Type: ${ppEscapeHtml(getGroupTypeName(group))}</span>`:''}${isDefaultProduct?`<span class="tag green" title="Automatic default product: highest protein per 100 kcal in this type">Auto default</span>`:''}${ing.storage ? `<span class="tag" style="text-transform:capitalize;">${ing.storage}</span>` : ''}</div><div class="macro-bar"><span class="mpill p">P <span>${p}g</span></span><span class="mpill"><span>${ing.cal}</span> kcal</span><span class="mpill">C <span>${ing.carb}g</span></span><span class="mpill">F <span>${ing.fat}g</span></span></div>${basisWarning}<div class="row-center" style="margin-top:5px; gap:8px;">${pkcal?`<span style="font-size:11px;color:var(--blue)"><strong>${pkcal}g</strong> P / 100kcal</span>`:''}${ppenny?`<span style="font-size:11px;color:var(--blue)"><strong>${ppenny}g</strong> P / &pound;</span>`:''}</div>${ing.notes?`<div style="font-size:12px;color:var(--text2);margin-top:4px">${ing.notes}</div>`:''}${ing.price&&ing.packSize?`<div style="font-size:12px;color:var(--text2);margin-top:4px;">&pound;${ing.price.toFixed(2)} for ${formattedPackSize}</div>`:''}${variantLabels.length>1?`<div style="font-size:11px;color:var(--text2);margin-top:4px;"><strong>Pack variants:</strong> ${variantLabels.map(ppEscapeHtml).join(' · ')}</div>`:''}${ing.sourceUrl?`<div style="font-size:11px;margin-top:4px;"><a href="${ing.sourceUrl}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:underline">View on Tesco ↗</a></div>`:''}</div><div class="product-card-actions"><button class="btn sm ghost" onclick="editIng('${ing.id}')">Edit</button><button class="btn sm ghost" onclick="assignProductToGroupPrompt('${ing.id}')">Type</button><button class="btn sm danger" onclick="deleteIng('${ing.id}')">Delete</button></div></div></div>`;
+    return`<div class="bank-card"><div class="product-card-layout"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;overflow-wrap:anywhere">${ing.name}</div>${ing.brand&&ing.brand!=='Generic'?`<div style="font-size:12px;color:var(--text2);margin-bottom:4px">${ing.brand}</div>`:''}<div style="font-size:11px;color:var(--text3);margin:3px 0;overflow-wrap:anywhere">${ppEscapeHtml(hierarchy)}</div><div class="row-center" style="margin:4px 0;gap:5px"><span class="rank rank-${rank}" title="${protDensity.toFixed(1)}g protein per 100 kcal">${protDensity>=15?'Very high protein':protDensity>=10?'High protein':protDensity>=5?'Medium protein':'Lower protein'}</span><span class="tag" title="Category">${ppEscapeHtml(CAT[group?.cat || ing.cat]||group?.cat||ing.cat||'Other')}</span><span class="tag" title="Ingredient">${ppEscapeHtml(getProductFamily(ing))}</span>${group?`<span class="tag" title="Type">Type: ${ppEscapeHtml(getGroupTypeName(group))}</span>`:''}${isDefaultProduct?`<span class="tag green" title="Automatic default product: highest protein per 100 kcal in this type">Auto default</span>`:''}${ing.storage ? `<span class="tag" style="text-transform:capitalize;">${ing.storage}</span>` : ''}</div><div class="macro-bar"><span class="mpill p">P <span>${p}g</span></span><span class="mpill"><span>${ing.cal}</span> kcal</span><span class="mpill">C <span>${ing.carb}g</span></span><span class="mpill">F <span>${ing.fat}g</span></span></div>${basisWarning}<div class="row-center" style="margin-top:5px; gap:8px;">${pkcal?`<span style="font-size:11px;color:var(--blue)"><strong>${pkcal}g</strong> P / 100kcal</span>`:''}${ppenny?`<span style="font-size:11px;color:var(--blue)"><strong>${ppenny}g</strong> P / &pound;</span>`:''}</div>${ing.notes?`<div style="font-size:12px;color:var(--text2);margin-top:4px">${ing.notes}</div>`:''}${ing.price&&ing.packSize?`<div style="font-size:12px;color:var(--text2);margin-top:4px;">&pound;${ing.price.toFixed(2)} for ${formattedPackSize}</div>`:''}${variantLabels.length>1?`<div style="font-size:11px;color:var(--text2);margin-top:4px;"><strong>Pack variants:</strong> ${variantLabels.map(ppEscapeHtml).join(' · ')}</div>`:''}${ing.sourceUrl?`<div style="font-size:11px;margin-top:4px;"><a href="${ing.sourceUrl}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:underline">View on Tesco ↗</a></div>`:''}</div><div class="product-card-actions"><button class="btn sm ghost desktop-only-mobile-hide" onclick="editIng('${ing.id}')">Edit</button><button class="btn sm ghost desktop-only-mobile-hide" onclick="assignProductToGroupPrompt('${ing.id}')">Type</button><button class="btn sm danger desktop-only-mobile-hide" onclick="deleteIng('${ing.id}')">Delete</button><button class="btn sm ghost mobile-only-action" onclick="editIng('${ing.id}')">Edit product</button><button class="btn sm ghost mobile-only-action" onclick="openProductBankActions('${ing.id}')">More</button></div></div></div>`;
   }).join('')+progressiveListButton('bank',totalProducts,visibleProducts.length);
 }
 
@@ -12679,31 +13039,52 @@ function renderPlanHistoryPanel(){
   const hist = state.planHistory || [];
   const body = !hist.length
     ? '<div style="font-size:12px;color:var(--text3)">No saved meal plans yet. Generate a plan, then use Save current plan.</div>'
-    : `<div style="display:flex;flex-direction:column;gap:8px">${hist.map((p,i)=>{
+    : `<div style="display:grid;gap:10px">${hist.map((p,i)=>{
       const dt = p.date ? new Date(p.date).toLocaleString() : 'Previous plan';
       const dateRange=getPlanDateRangeLabel(p);
-      const ids = getPlanRecipeIds(p).slice(0,8).map(id => state.recipes.find(r=>r.id===id)?.name || id);
+      const allIds = getPlanRecipeIds(p);
+      const ids = allIds.slice(0,3).map(id => getProductIndexRecipe(id)?.name || id);
+      const remaining = Math.max(0, allIds.length - ids.length);
       const status = p.savedStatus || (p.confirmedShopping ? 'Shopping confirmed' : 'PlatePlan generated');
       const title = p.name || `Saved plan ${i+1}`;
-      return `<div class="summary-box">
-        <div class="row-between" style="gap:8px;align-items:flex-start">
-          <div style="min-width:0;flex:1">
-            <strong>${ppEscapeHtml(title)}</strong>
-            <div style="color:var(--text2);margin-top:2px">${ppEscapeHtml(dt)} · ${p.days||0} days${dateRange?' · '+ppEscapeHtml(dateRange):''} · Score ${p.score?.score ?? p.score ?? '—'}</div>
-            <div style="color:var(--text2);margin-top:2px">${ppEscapeHtml(status)} · Saved by ${ppEscapeHtml(p.savedBy || 'PlatePlan')}</div>
-            <div style="color:var(--text2);margin-top:4px">${ids.map(ppEscapeHtml).join(', ')}</div>
+      const score = p.score?.score ?? p.score ?? '—';
+      return `<article class="plan-library-card">
+        <div class="plan-library-layout">
+          <div class="plan-library-main">
+            <strong class="plan-library-title">${ppEscapeHtml(title)}</strong>
+            <div class="plan-library-meta">
+              <span class="tag">${p.days||0} days</span>
+              ${dateRange?`<span class="tag">${ppEscapeHtml(dateRange)}</span>`:''}
+              <span class="tag">Score ${ppEscapeHtml(score)}</span>
+              <span class="tag">${ppEscapeHtml(status)}</span>
+            </div>
+            <div style="color:var(--text3);margin-top:7px">Saved ${ppEscapeHtml(dt)} · ${ppEscapeHtml(p.savedBy || 'PlatePlan')}</div>
+            <div class="plan-library-recipe-preview"><strong>Recipes:</strong> ${ids.length ? ids.map(ppEscapeHtml).join(', ') : 'No recipes'}${remaining ? ` <span class="tag">+${remaining} more</span>` : ''}</div>
           </div>
-          <div class="btn-row" style="justify-content:flex-end;gap:5px;flex-shrink:0">
-            <button class="btn sm ghost" onclick="viewPlanHistory(${i})">View</button>
-            <button class="btn sm ghost" onclick="openSavedPlanRecipeCards(${i})">Recipe cards</button>
-            <button class="btn sm ghost" onclick="loadPlanHistoryForEdit(${i})">Edit</button>
-            <button class="btn sm ghost" onclick="renamePlanHistory(${i})">Rename</button>
-            <button class="btn sm danger ghost" onclick="deletePlanHistory(${i})">Delete</button>
+          <div class="plan-library-actions">
+            <button class="btn sm primary desktop-only-mobile-hide" onclick="openSavedPlanRecipeCards(${i})">Recipe cards</button>
+            <button class="btn sm ghost desktop-only-mobile-hide" onclick="viewPlanHistory(${i})">View schedule</button>
+            <button class="btn sm ghost desktop-only-mobile-hide" onclick="loadPlanHistoryForEdit(${i})">Edit</button>
+            <button class="btn sm ghost desktop-only-mobile-hide" onclick="renamePlanHistory(${i})">Rename</button>
+            <button class="btn sm danger ghost desktop-only-mobile-hide" onclick="deletePlanHistory(${i})">Delete</button>
+            <button class="btn primary mobile-only-action" onclick="openSavedPlanRecipeCards(${i})">Recipe cards</button>
+            <button class="btn ghost mobile-only-action" onclick="openPlanHistoryActions(${i})">More</button>
           </div>
         </div>
-      </div>`;
+      </article>`;
     }).join('')}</div>`;
   el.innerHTML = `<div class="card" style="font-size:12px;margin:0">${body}</div>`;
+}
+
+function openPlanHistoryActions(index){
+  const p=(state.planHistory||[])[index];
+  if(!p) return;
+  openMobileActionSheet(p.name || `Saved plan ${index+1}`,[
+    {label:'View schedule',onclick:`viewPlanHistory(${index})`},
+    {label:'Edit plan',onclick:`loadPlanHistoryForEdit(${index})`},
+    {label:'Rename',onclick:`renamePlanHistory(${index})`},
+    {label:'Delete saved plan',onclick:`deletePlanHistory(${index})`,danger:true}
+  ]);
 }
 
 
