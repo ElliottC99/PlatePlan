@@ -8,6 +8,9 @@
 window.PLATEPLAN_FIREBASE = {
   configured: true,
   householdId: 'elliott-chloe',
+  aiEnabled: false,
+  aiModel: 'gemini-2.5-flash',
+  recaptchaEnterpriseSiteKey: '',
   config: {
     apiKey: "AIzaSyBBIDYTpgjy1_HRxe3GCeMHFqit-rxod-w",
     authDomain: "plateplan-a5131.firebaseapp.com",

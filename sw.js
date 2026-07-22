@@ -1,4 +1,4 @@
-const PLATEPLAN_CACHE = 'plateplan-shell-v3';
+const PLATEPLAN_CACHE = 'plateplan-shell-v4';
 const PLATEPLAN_SHELL = [
   './',
   './PlatePlan.html',
@@ -8,6 +8,13 @@ const PLATEPLAN_SHELL = [
   './icon-512.png',
   './icon-192-maskable.png',
   './icon-512-maskable.png',
+  './vendor/tesseract/tesseract.min.js',
+  './vendor/tesseract/worker.min.js',
+  './vendor/tesseract/core/tesseract-core.wasm.js',
+  './vendor/tesseract/core/tesseract-core-simd.wasm.js',
+  './vendor/tesseract/core/tesseract-core-lstm.wasm.js',
+  './vendor/tesseract/core/tesseract-core-simd-lstm.wasm.js',
+  './vendor/tesseract/lang/eng.traineddata.gz',
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js',
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js'
