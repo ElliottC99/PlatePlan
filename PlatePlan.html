@@ -1918,8 +1918,8 @@ const BAKED_CANDIDATE_SK='plateplan_v1_baked_candidate';
 const RECOVERY_SK='plateplan_v1_recovery';
 const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='19.3.1';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v8';
+const PLATEPLAN_APP_VERSION='19.3.2';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v9';
 const SEED=[];
 
 let state = null;
@@ -4378,9 +4378,17 @@ function getGroupHierarchyText(group){
 }
 
 function getGroupCategoryOptionsHtml(selected = 'other'){
-  return Object.entries(CAT)
-    .sort((a,b)=>a[1].localeCompare(b[1]))
-    .map(([key,label]) => `<option value="${ppEscapeHtml(key)}"${key===selected?' selected':''}>${ppEscapeHtml(label)}</option>`)
+  const selectedKey=String(selected||'other');
+  const entries=Object.entries(CAT)
+    .filter(([key,label])=>key&&typeof label==='string'&&label.trim())
+    .map(([key,label])=>[String(key),label.trim()]);
+  if(selectedKey&&!entries.some(([key])=>key===selectedKey)){
+    const fallbackLabel=selectedKey.split(/[-_]+/).filter(Boolean).map(word=>word.charAt(0).toUpperCase()+word.slice(1)).join(' ')||'Other';
+    entries.push([selectedKey,fallbackLabel]);
+  }
+  return entries
+    .sort((a,b)=>String(a[1]).localeCompare(String(b[1]),'en',{sensitivity:'base'}))
+    .map(([key,label]) => `<option value="${ppEscapeAttr(key)}"${key===selectedKey?' selected':''}>${ppEscapeHtml(label)}</option>`)
     .join('');
 }
 
