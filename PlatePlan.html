@@ -10,6 +10,13 @@
 <link rel="icon" href="./icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <title>PlatePlan — Elliott &amp; Chloe</title>
+<script>
+try{
+  const platePlanAppearance=localStorage.getItem('plateplan_appearance')||'system';
+  if(platePlanAppearance==='light'||platePlanAppearance==='dark') document.documentElement.dataset.theme=platePlanAppearance;
+  document.documentElement.style.colorScheme=platePlanAppearance==='system'?'light dark':platePlanAppearance;
+}catch(e){}
+</script>
 <style>
 :root {
   --bg: #F7F6F2;
@@ -643,6 +650,73 @@ a{color:var(--action)}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}
 }
+
+/* PlatePlan 19.3 readability and interaction layer */
+html[data-theme="light"]{
+  color-scheme:light;
+  --bg:#F7F6F2;--surface:#FFFFFF;--surface2:#F0EFE9;--border:#E2E0D8;--border-strong:#C8C5BA;
+  --text:#1A1916;--text2:#5D5A53;--text3:#817E76;--green:#1A6B4A;--green-bg:#EAF4EF;
+  --purple:#4A3D8F;--purple-bg:#EEEAF9;--coral:#A8402A;--coral-bg:#FAECEA;
+  --amber:#7A5200;--amber-bg:#FDF3E0;--red:#991F1F;--red-bg:#FDEAEA;
+  --blue:#1A4A6B;--blue-bg:#EAF0F4;--action:#0969da;--action-hover:#0757b8;--action-bg:#eaf3ff;
+  --focus:#0a84ff;--overlay:rgba(18,18,20,.46);--shadow:0 12px 38px rgba(24,24,28,.14);
+}
+html[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#111214;--surface:#1b1c1f;--surface2:#24262a;--border:#35383e;--border-strong:#555a63;
+  --text:#f2f3f5;--text2:#c3c6cd;--text3:#969ca6;--green:#72d5a5;--green-bg:#18392c;
+  --purple:#c4b5fd;--purple-bg:#30294a;--coral:#ff9b83;--coral-bg:#492820;
+  --amber:#ffd071;--amber-bg:#433317;--red:#ff9f9f;--red-bg:#482323;
+  --blue:#8ab4f8;--blue-bg:#1d334e;--action:#5b9cf6;--action-hover:#77adf7;--action-bg:#1d334e;
+  --focus:#73aef8;--overlay:rgba(0,0,0,.68);--shadow:0 16px 44px rgba(0,0,0,.46);
+}
+.breakable-url,.breakable-id{overflow-wrap:anywhere;word-break:break-word}
+.recipe-card-name,.plan-library-title,.plan-library-main,.plan-library-recipe-preview,.shop-item-copy,
+.slot-name,.slot-skipped,.review-mapping-status,.mobile-editor-card,.bank-card,.dq-card,
+.modal-wrap>.modal,.row-between,.row-center,.tag,.badge,.mpill,a:not(.breakable-url){
+  overflow-wrap:normal;word-break:normal;hyphens:none;
+}
+.slot-name.breakable-url{overflow-wrap:anywhere;word-break:break-word}
+.bank-card [style*="overflow-wrap:anywhere"],.modal [style*="overflow-wrap:anywhere"],.summary-box [style*="overflow-wrap:anywhere"]{
+  overflow-wrap:normal!important;word-break:normal!important;hyphens:none!important;
+}
+.clamp-copy{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;word-break:normal;overflow-wrap:normal}
+.clamp-copy.expanded{display:block;overflow:visible}
+.text-expand-btn{min-height:36px!important;padding:4px 0!important;border:0!important;background:transparent!important;color:var(--action)!important;font-size:13px!important}
+.card-details{border-top:1px solid var(--border);margin-top:10px;padding-top:4px}
+.card-details>summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--action);font-size:14px;font-weight:650;list-style:none}
+.card-details>summary::-webkit-details-marker{display:none}
+.appearance-control{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:4px;background:var(--surface2);border-radius:12px}
+.appearance-control button{min-height:44px;border:0;border-radius:9px;background:transparent;color:var(--text2);font:650 14px/1 var(--font);cursor:pointer}
+.appearance-control button[aria-pressed="true"]{background:var(--surface);color:var(--action);box-shadow:0 1px 5px rgba(0,0,0,.12)}
+.nutrition-detail-trigger{appearance:none;border:0;background:transparent;color:inherit;font:inherit;padding:0;cursor:pointer;text-align:inherit;border-radius:6px}
+.nutrition-detail-trigger:focus-visible{outline:3px solid color-mix(in srgb,var(--focus) 38%,transparent);outline-offset:3px}
+.fit-detail-button{border:0;background:transparent;color:inherit;padding:5px 3px;min-height:36px;border-radius:8px;font:inherit;cursor:pointer;text-align:left}
+.fit-detail-button:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.nutrition-detail-wrap{position:fixed;inset:0;z-index:720;background:var(--overlay);display:none;align-items:flex-end;padding:0!important;overflow:hidden!important}
+.nutrition-detail-wrap.open{display:flex}
+.nutrition-detail-panel{width:100%;max-height:82dvh;overflow-y:auto;background:var(--surface);border-radius:20px 20px 0 0;padding:14px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:var(--shadow)}
+.nutrition-detail-head{position:sticky;top:-14px;background:var(--surface);display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);z-index:2}
+.nutrition-detail-row{display:flex;justify-content:space-between;gap:18px;padding:8px 0;border-bottom:1px solid var(--border)}
+.herb-status{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:8px;font-size:13px;color:var(--text2)}
+.herb-pair-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.workspace-error{margin:10px 0}
+@media(min-width:700px) and (hover:hover) and (pointer:fine){
+  .nutrition-detail-wrap{background:transparent;pointer-events:none;align-items:flex-start}
+  .nutrition-detail-panel{position:fixed;width:min(380px,calc(100vw - 24px));max-height:min(70vh,620px);border-radius:14px;padding:14px 16px;pointer-events:auto;border:1px solid var(--border)}
+}
+@media(max-width:599px){
+  body{font-size:16px;line-height:1.5}
+  h2{font-size:21px;line-height:1.25} h3{font-size:16px;line-height:1.3}
+  label,.dq-warning,.shop-qty,.planner-compact-copy{font-size:14px}
+  .tag,.badge,.rank,.section-label{font-size:12px;line-height:1.35}
+  .recipe-card-name,.plan-library-title,.bank-card strong{font-size:16px!important;line-height:1.4!important}
+  .recipe-card-meta,.recipe-fit,.plan-library-meta,.plan-library-recipe-preview{font-size:14px}
+  .mobile-sheet-grid{grid-template-columns:1fr}
+  .product-card-actions,.hierarchy-actions,.subtype-actions,.plan-library-actions{grid-template-columns:1fr!important}
+  .herb-pair-grid{grid-template-columns:1fr}
+  .modal-tabs .mt2{overflow-wrap:normal;word-break:normal;font-size:13px}
+}
 </style>
 </head>
 <body>
@@ -1029,6 +1103,15 @@ a{color:var(--action)}
 
 <div id="view-prefs" class="view">
   <h2>Preferences</h2>
+  <div class="card grouped-section">
+    <h3>Appearance</h3>
+    <p style="font-size:14px;color:var(--text2);margin-bottom:10px">Use your device appearance automatically or choose a local override for this device.</p>
+    <div class="appearance-control" role="group" aria-label="PlatePlan appearance">
+      <button type="button" data-appearance="system" onclick="setPlatePlanAppearance('system')">System</button>
+      <button type="button" data-appearance="light" onclick="setPlatePlanAppearance('light')">Light</button>
+      <button type="button" data-appearance="dark" onclick="setPlatePlanAppearance('dark')">Dark</button>
+    </div>
+  </div>
   <div class="card">
     <h3>Dietary constraints</h3>
     <div class="field" style="display: none;"><label>Foods to always exclude</label><input type="text" id="pref-exclude" placeholder="mushrooms, courgette"></div><div class="field" id="pref-exclude-ui">
@@ -1833,14 +1916,16 @@ let CAT = { ...STANDARD_CATS };
 const SK='plateplan_v1';
 const BAKED_CANDIDATE_SK='plateplan_v1_baked_candidate';
 const RECOVERY_SK='plateplan_v1_recovery';
+const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='19.2';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v6';
+const PLATEPLAN_APP_VERSION='19.3';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v7';
 const SEED=[];
 
 let state = null;
 let browserStateBeforeBakedComparison = null;
 let editId=null,editIngId=null,activeFamily='all',mappingContext=null,pendingRecipeNutritionFix=null,currentReviewInstanceId=null,currentReviewVariant='original';
+let productEditorReturnToReview=false;
 let productBankFamilySearchText = '';
 let activeCat='all';
 let currentReviewMealTypes=null;
@@ -2006,6 +2091,7 @@ function openProductBankActions(productId){
 function openIngredientFamilyActions(familyId){
   const family=getIngredientFamily(familyId); if(!family) return;
   openMobileActionSheet(family.name || 'Ingredient actions',[
+    {label:'Fresh/dried conversion',onclick:`openHerbConversionPanel('${ppEscapeAttr(familyId)}')`},
     {label:'Edit aliases',onclick:`openIngredientFamilyAliasesModal('${ppEscapeAttr(familyId)}')`},
     {label:'Add sub-type',onclick:`addSubTypeToFamilyPrompt('${ppEscapeAttr(familyId)}')`},
     {label:'Merge ingredient',onclick:`mergeIngredientFamilyPrompt('${ppEscapeAttr(familyId)}')`},
@@ -2185,7 +2271,7 @@ function applyBakedFileState(){
     state = loadState();
     refreshPlatePlanDerivedState({ persist:true, render:true });
     document.getElementById('baked-state-recovery-banner')?.remove();
-  }catch(e){ alert('Could not load the file data.'); }
+  }catch(e){ openAppInfoModal('File data unavailable','PlatePlan could not load the data embedded in this file. Your browser data has not been replaced.'); }
 }
 
 function dismissBakedFileState(){
@@ -3054,14 +3140,48 @@ function clearVolatileSavedDom(root = document){
   [
     'product-default-picker-wrap','ingredient-to-subtype-wrap','ingredient-family-details-wrap',
     'ingredient-group-details-wrap','ingredient-group-picker-wrap','ingredient-family-picker-wrap',
+    'ingredient-herb-conversion-wrap',
     'category-manager-wrap','ingredient-group-merge-wrap','delete-ingredient-group-wrap',
     'ingredient-alias-suggestion-wrap','tesco-duplicate-wrap','review-replace-wrap',
-    'review-hover-tip','app-confirm-wrap','plateplan-import-preview-wrap','cat-reassign-modal',
+    'review-hover-tip','app-confirm-wrap','app-prompt-wrap','plateplan-import-preview-wrap','cat-reassign-modal',
     'plateplan-auth-screen','plateplan-cloud-migration-wrap','plateplan-sync-conflict-wrap','recipe-recognition-wrap','saved-plan-pack-wrap',
     'plateplan-toast-region'
   ].forEach(id => find(id)?.remove());
   root.querySelectorAll?.('.modal-wrap.open,.mobile-more-wrap.open,.mobile-action-sheet-wrap.open').forEach(el=>{el.classList.remove('open');delete el.dataset.historyEntry;});
   const photoActions=find('recipe-photo-actions'); if(photoActions) photoActions.style.display='none';
+}
+
+function getPlatePlanAppearance(){
+  try{
+    const value=localStorage.getItem(PLATEPLAN_APPEARANCE_SK)||'system';
+    return ['system','light','dark'].includes(value)?value:'system';
+  }catch(e){ return 'system'; }
+}
+
+function platePlanAppearanceIsDark(){
+  const appearance=getPlatePlanAppearance();
+  return appearance==='dark'||(appearance==='system'&&window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+}
+
+function syncPlatePlanAppearanceControls(){
+  const appearance=getPlatePlanAppearance();
+  document.querySelectorAll('[data-appearance]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.appearance===appearance)));
+}
+
+function applyPlatePlanAppearance(){
+  const appearance=getPlatePlanAppearance();
+  if(appearance==='system') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme=appearance;
+  document.documentElement.style.colorScheme=appearance==='system'?'light dark':appearance;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content',platePlanAppearanceIsDark()?'#111214':'#F7F6F2');
+  syncPlatePlanAppearanceControls();
+}
+
+function setPlatePlanAppearance(appearance){
+  const safe=['system','light','dark'].includes(appearance)?appearance:'system';
+  try{ localStorage.setItem(PLATEPLAN_APPEARANCE_SK,safe); }catch(e){}
+  applyPlatePlanAppearance();
+  showPlatePlanToast(`Appearance set to ${safe}.`);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -3071,12 +3191,10 @@ document.addEventListener('DOMContentLoaded', () => {
   loadBakedState();
   state = loadState();
   rebuildPlatePlanIndexes();
-  const syncThemeColor=()=>{
-    const dark=window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',dark?'#111214':'#F7F6F2');
-  };
-  syncThemeColor();
-  window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change',syncThemeColor);
+  applyPlatePlanAppearance();
+  window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change',()=>{
+    if(getPlatePlanAppearance()==='system') applyPlatePlanAppearance();
+  });
   
   renderCatOptions('mi-cat', 'other');
   renderCatOptions('pp-cat', 'other');
@@ -3418,7 +3536,7 @@ function addImprovementChoiceToModal(kind, id, prefix = 'enh', controlId = ''){
     const product = choice.product;
     const group = choice.group;
     if(!group || !product) {
-      alert('This ingredient does not have a usable default product yet. Add or assign a default product first.');
+      openAppInfoModal('Default product needed','This ingredient does not have a usable default product yet. Add or assign a default product first.');
       return;
     }
     const safeId = controlId || `${prefix}-${kind}-${id}`.replace(/[^a-zA-Z0-9_-]/g,'_');
@@ -3478,8 +3596,7 @@ function renderCatOptions(selectId, defaultVal) {
   syncCategorySearchInput(selectId);
   sel.onchange = (e) => {
     if(e.target.value === '__add_new__') {
-      const name = prompt("Enter new category name:");
-      if(name) {
+      openAppPromptModal('Add category','Category name','','Add category',name=>{
         const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
         state.customCats[slug] = name;
         CAT[slug] = name;
@@ -3495,10 +3612,10 @@ function renderCatOptions(selectId, defaultVal) {
         syncCategorySearchInput(selectId);
         renderBank();
         renderDataQuality();
-      } else {
+      },()=>{
         sel.value = defaultVal || 'other'; 
         syncCategorySearchInput(selectId);
-      }
+      });
     }
   };
 }
@@ -3593,7 +3710,7 @@ function downloadPlatePlanBlob(filename, content, type){
 
 function savePlatePlanFiles(){
   const el = document.getElementById('baked-state');
-  if(!el) return alert('Could not find PlatePlan save data block.');
+  if(!el) return openAppInfoModal('Save unavailable','PlatePlan could not find its save-data block.');
   const stamp = new Date().toISOString().slice(0,10);
   try{
     if(typeof saveState === 'function') saveState();
@@ -3609,7 +3726,7 @@ function savePlatePlanFiles(){
   }catch(e){
     console.error(e);
     if(typeof showMsg === 'function') showMsg('prefs-data-msg','Could not save PlatePlan files.','error');
-    else alert('Could not save PlatePlan files.');
+    else openAppInfoModal('Save failed','PlatePlan could not save the requested files.');
   }
 }
 
@@ -5562,48 +5679,69 @@ function formatContributionValue(key,value){
   return `${rounded}${meta.unit ? ' ' + meta.unit : ''}`;
 }
 
+let nutritionDetailsTrigger=null;
 function ensureReviewTooltip(){
-  let el = document.getElementById('review-hover-tip');
-  if(!el){
-    el = document.createElement('div');
-    el.id = 'review-hover-tip';
-    el.style.cssText = 'position:fixed;display:none;z-index:1000;max-width:320px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.45;color:var(--text);pointer-events:none;';
-    document.body.appendChild(el);
+  let wrap=document.getElementById('review-hover-tip');
+  if(wrap)wrap.remove();
+  wrap=document.createElement('div');
+  wrap.id='review-hover-tip';
+  wrap.className='modal-wrap nutrition-detail-wrap';
+  wrap.innerHTML=`<section class="nutrition-detail-panel" role="document">
+    <div class="nutrition-detail-head"><h3 id="nutrition-detail-title" style="margin:0">Nutrition details</h3><button type="button" class="btn sm ghost" onclick="hideReviewTooltip()">Close</button></div>
+    <div id="nutrition-detail-content" style="padding-top:10px"></div>
+  </section>`;
+  wrap.addEventListener('click',event=>{if(event.target===wrap)hideReviewTooltip();});
+  document.body.appendChild(wrap);
+  return wrap;
+}
+
+function positionReviewTooltip(trigger){
+  const wrap=document.getElementById('review-hover-tip');
+  const panel=wrap?.querySelector('.nutrition-detail-panel');
+  if(!wrap||!panel||!trigger||!window.matchMedia('(min-width:700px) and (hover:hover) and (pointer:fine)').matches)return;
+  const anchor=trigger.getBoundingClientRect();
+  const width=Math.min(380,window.innerWidth-24);
+  const left=Math.max(12,Math.min(window.innerWidth-width-12,anchor.left));
+  const top=Math.max(12,Math.min(window.innerHeight-panel.offsetHeight-12,anchor.bottom+8));
+  panel.style.left=left+'px';
+  panel.style.top=top+'px';
+}
+
+function showReviewTooltip(trigger,html,title='Nutrition details'){
+  if(!html)return;
+  hideReviewTooltip(true);
+  const wrap=ensureReviewTooltip();
+  nutritionDetailsTrigger=trigger||document.activeElement;
+  document.getElementById('nutrition-detail-title').textContent=title;
+  document.getElementById('nutrition-detail-content').innerHTML=html;
+  wrap.classList.add('open');
+  positionReviewTooltip(nutritionDetailsTrigger);
+  setTimeout(()=>wrap.querySelector('button')?.focus(),0);
+}
+
+function hideReviewTooltip(preserveFocus=false){
+  const wrap=document.getElementById('review-hover-tip');
+  if(wrap){
+    wrap.classList.remove('open');
+    wrap.remove();
   }
-  return el;
+  if(!preserveFocus&&nutritionDetailsTrigger?.isConnected)nutritionDetailsTrigger.focus({preventScroll:true});
+  nutritionDetailsTrigger=null;
 }
 
-function positionReviewTooltip(evt){
-  const tip = ensureReviewTooltip();
-  const pad = 14;
-  const rect = tip.getBoundingClientRect();
-  let left = evt.clientX + pad;
-  let top = evt.clientY + pad;
-  if(left + rect.width > window.innerWidth - 8) left = Math.max(8, evt.clientX - rect.width - pad);
-  if(top + rect.height > window.innerHeight - 8) top = Math.max(8, evt.clientY - rect.height - pad);
-  tip.style.left = left + 'px';
-  tip.style.top = top + 'px';
-}
-
-function showReviewTooltip(evt, html){
-  if(!html) return;
-  const tip = ensureReviewTooltip();
-  tip.innerHTML = html;
-  tip.style.display = 'block';
-  positionReviewTooltip(evt);
-}
-
-function hideReviewTooltip(){
-  const tip = document.getElementById('review-hover-tip');
-  if(tip) tip.style.display = 'none';
-}
-
-function bindReviewTooltip(el, html){
-  if(!el) return;
-  el.title = '';
-  el.onmouseenter = evt => showReviewTooltip(evt, html);
-  el.onmousemove = evt => positionReviewTooltip(evt);
-  el.onmouseleave = hideReviewTooltip;
+function bindReviewTooltip(el,html,label='Open nutrition details'){
+  if(!el)return;
+  el.removeAttribute('title');
+  el.classList.add('nutrition-detail-trigger');
+  if(!/^(BUTTON|INPUT)$/.test(el.tagName)){
+    el.setAttribute('role','button');
+    el.tabIndex=0;
+  }
+  el.setAttribute('aria-label',label);
+  el.setAttribute('aria-haspopup','dialog');
+  el.onclick=event=>{event.stopPropagation();showReviewTooltip(el,html,label);};
+  el.onkeydown=event=>{if((event.key==='Enter'||event.key===' ')&&!/^(BUTTON|INPUT)$/.test(el.tagName)){event.preventDefault();showReviewTooltip(el,html,label);}};
+  el.onmouseenter=null;el.onmousemove=null;el.onmouseleave=null;
 }
 
 function ingredientContributionHtml(ing, recipe, targetServes){
@@ -5615,12 +5753,17 @@ function ingredientContributionHtml(ing, recipe, targetServes){
     const pct = pctOf(c.total[key] || 0, totals[key] || 0);
     return `<div style="display:flex;justify-content:space-between;gap:18px;"><span>${meta.label}</span><strong>${pct}%</strong></div>`;
   }).join('');
-  const counted = c.counted ? '' : '<div style="margin-top:6px;color:var(--amber);font-weight:600">not counted in nutrition</div>';
-  return `<div style="font-weight:700;margin-bottom:4px">${ppEscapeHtml(c.bankIng.name || ing.name || 'Ingredient')}</div>
+  const counted = c.counted ? '<span class="tag good">Included</span>' : '<span class="tag warn">Not counted</span>';
+  return `<div style="font-weight:700;margin-bottom:4px">${ppEscapeHtml(c.group?.name || ing.name || 'Ingredient')}</div>
     <div style="color:var(--text2);margin-bottom:7px">${ppEscapeHtml(ing.raw || ing.name || '')}</div>
-    <div style="color:var(--text2);margin-bottom:7px">${round1(c.effectiveG)}g effective weight</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:9px">${counted}<span class="tag">${ppEscapeHtml(c.bankIng.name || 'Mapped product')}</span></div>
     ${rows}
-    ${counted}`;
+    <details class="card-details"><summary>Calculation details</summary>
+      <div>Effective mapped quantity: <strong>${round1(c.effectiveG)}g</strong></div>
+      <div>Elliott portion: ${c.portions.ePct > 0 ? `${c.e.cal} kcal · ${c.e.prot}g protein` : 'Not allocated'}</div>
+      <div>Chloe portion: ${c.portions.cPct > 0 ? `${c.c.cal} kcal · ${c.c.prot}g protein` : 'Not allocated'}</div>
+      <div>Nutrition source: Product Bank only.</div>
+    </details>`;
 }
 
 function nutrientContributionBreakdownHtml(recipe, nutrientKey){
@@ -5639,11 +5782,12 @@ function nutrientContributionBreakdownHtml(recipe, nutrientKey){
     };
   }).filter(Boolean).filter(row => row.value > 0).sort((a,b) => b.value - a.value);
 
-  if(!rows.length) return `<div style="font-weight:700;margin-bottom:6px">${meta.label} contributors</div><div style="color:var(--text2)">No mapped counted ingredients yet.</div>`;
+  if(!rows.length) return `<div style="font-weight:700;margin-bottom:6px">${meta.label}</div><div style="color:var(--text2)">No mapped counted ingredients contribute to this value.</div>`;
 
-  return `<div style="font-weight:700;margin-bottom:6px">${meta.label} contributors</div>` +
+  return `<div style="font-weight:700;margin-bottom:6px">${meta.label}: ${formatContributionValue(nutrientKey, total)}</div>
+    <div style="color:var(--text2);margin-bottom:8px">Mapped Product Bank contributors</div>` +
     rows.slice(0, 12).map(row => `<div style="display:flex;justify-content:space-between;gap:18px;"><span>${ppEscapeHtml(row.name)}</span><strong>${row.pct}%</strong></div>`).join('') +
-    `<div style="color:var(--text2);margin-top:7px">Total: ${formatContributionValue(nutrientKey, total)}</div>`;
+    `<details class="card-details"><summary>Calculation details</summary><div>Calculated only from mapped, counted ingredients. No AI or stored-macro fallback is used.</div></details>`;
 }
 
 function portionNutrientContributionBreakdownHtml(recipe, nutrientKey, personPrefix, targetServes){
@@ -5681,8 +5825,16 @@ function updateModalNutritionBreakdownTooltips(prefix, recipe){
     if(!input) return;
     const wrap = input.closest('div');
     const html = nutrientContributionBreakdownHtml(recipe, key);
-    bindReviewTooltip(input, html);
-    if(wrap) bindReviewTooltip(wrap, html);
+    let button=wrap?.querySelector(`.nutrition-info-button[data-nutrient="${key}"]`);
+    if(wrap&&!button){
+      button=document.createElement('button');
+      button.type='button';
+      button.className='btn sm ghost nutrition-info-button';
+      button.dataset.nutrient=key;
+      button.textContent='Details';
+      wrap.appendChild(button);
+    }
+    if(button)bindReviewTooltip(button,html,`Open ${REVIEW_NUTRIENTS[key].label} contributors`);
   });
 }
 
@@ -5919,14 +6071,14 @@ function recalcRecipesUsingIngredient(bankId){
 
 function recalcRecipeNutrition(id){
   const r = state.recipes.find(x=>x.id===id);
-  if(!r){ alert('Recipe not found.'); return; }
-  if(!r.ingredients || !r.ingredients.length){ alert('No ingredients on this recipe to recalc from.'); return; }
+  if(!r){ openAppInfoModal('Recipe unavailable','The recipe could not be found.'); return; }
+  if(!r.ingredients || !r.ingredients.length){ openAppInfoModal('Ingredients needed','This recipe has no ingredients to recalculate.'); return; }
   const n = calcRecipeNutrition(r.ingredients, r.serves||1);
-  if(!n.matched){ alert('None of this recipe\u2019s ingredients are mapped to the bank yet.'); return; }
+  if(!n.matched){ openAppInfoModal('Mapped products needed','None of this recipe\u2019s ingredients are mapped to Product Bank yet.'); return; }
   recalcRecipeObject(r);
   saveState();
   if(typeof renderVault==='function') renderVault();
-  alert('Recalculated. '+n.matched+'/'+n.total+' ingredients matched the bank.');
+  showPlatePlanToast(`Recalculated with ${n.matched} of ${n.total} mapped ingredients.`);
 }
 
 // Per-meal portion math.
@@ -7477,7 +7629,12 @@ function editModalRowIngredient(btn){
     let bankId = row ? row.dataset.bankid : '';
     if(!bankId && row?.dataset.groupid) bankId = resolveProductForIngredient({ groupId: row.dataset.groupid }).product?.id || '';
     hideReviewTooltip();
-    if(bankId) editIng(bankId);
+    if(bankId){
+      productEditorReturnToReview=!!document.getElementById('modal-wrap')?.classList.contains('open');
+      editIng(bankId);
+    }else{
+      openAppInfoModal('Product unavailable','The mapped Product Bank item could not be found. Refresh the recipe mapping and try again.');
+    }
 }
 
 let mobileReviewIngredientRow = null;
@@ -7642,6 +7799,14 @@ function updateModalIngredientContributionTitles(prefix){
         const group = ing?.groupId ? getIngredientGroup(ing.groupId) : null;
         mappingEl.textContent = group ? `${getGroupHierarchyText(group)}${resolvedProduct?.name ? ` · ${resolvedProduct.name}` : ''}` : (resolvedProduct?.name || 'Not mapped yet');
         mappingEl.classList.toggle('unmapped', !group && !resolvedProduct);
+        if(html){
+          const info=document.createElement('button');
+          info.type='button';
+          info.className='btn sm ghost nutrition-info-button';
+          info.textContent='Nutrition details';
+          mappingEl.append(' · ',info);
+          bindReviewTooltip(info,html,`Open nutrition contribution for ${resolvedProduct?.name||ing?.name||'ingredient'}`);
+        }
       }
       if(input) {
         if(errorText) {
@@ -7658,9 +7823,7 @@ function updateModalIngredientContributionTitles(prefix){
         errorEl.textContent = errorText;
         errorEl.style.display = errorText ? 'block' : 'none';
       }
-      row.style.cursor = html ? 'help' : '';
-      bindReviewTooltip(row, html);
-      bindReviewTooltip(input, html);
+      row.style.cursor = '';
     });
 }
 
@@ -8130,15 +8293,16 @@ function saveTemporaryPlanReview(){
 function confirmSave(){ saveBoth(); }
 function deleteEnhancedVersion() {
     if(!editId) return;
-    if(!confirm("Remove the enhanced version from this recipe?")) return;
-    const r = state.recipes.find(x=>x.id === editId);
-    if(r) {
-        delete r.enhanced;
-        saveState();
-        closeModal();
-        renderVault();
-        showMsg('form-msg','Enhanced version removed.','success');
-    }
+    openAppConfirmModal('Remove enhanced version?','The original recipe will remain unchanged.','Remove enhanced version',()=>{
+      const r = state.recipes.find(x=>x.id === editId);
+      if(r) {
+          delete r.enhanced;
+          saveState();
+          closeModal();
+          renderVault();
+          showPlatePlanToast('Enhanced version removed.');
+      }
+    });
 }
 function saveToVault(r){
   ensureIngredientGroups();
@@ -8188,9 +8352,10 @@ function createDataQualityIssue({ entityType, entityId, code, severity = 'gap', 
 }
 
 function beginDataQualityFix(entityType,entityId,issueKey){
-    editorNavigationStack.push({view:'data',issueKey,scrollY:window.scrollY,openedAt:Date.now()});
+    const section=document.querySelector(`[data-dq-key="${CSS.escape(issueKey||'')}"]`)?.closest('details');
+    editorNavigationStack.push({view:'data',issueKey,scrollY:window.scrollY,sectionOpen:!!section?.open,openedAt:Date.now()});
     if(entityType === 'product') return editIng(entityId);
-    if(entityType === 'ingredient') return openIngredientFamilyDetailsModal(entityId);
+    if(entityType === 'ingredient') return openIngredientEditor(entityId,document.activeElement);
     if(entityType === 'subtype') return openIngredientGroupDetailsModal(entityId,'name');
     if(entityType === 'recipe' || entityType === 'recipe-ingredient') return editRecipeModalView(String(entityId).split(':')[0]);
 }
@@ -8206,10 +8371,15 @@ function finishEditorReturn(defaultView = ''){
     showView(context.view||'data');
     requestAnimationFrame(()=>{
       const row=document.querySelector(`[data-dq-key="${CSS.escape(context.issueKey||'')}"]`);
-      if(row){ row.closest('details')?.setAttribute('open',''); row.classList.add('dq-return-highlight'); row.scrollIntoView({block:'center'}); }
+      const host=document.getElementById('dq-missing-list');
+      if(row){
+        row.closest('details')?.setAttribute('open','');
+        row.classList.add('dq-return-highlight');
+        row.scrollIntoView({block:'center'});
+        if(host) host.insertAdjacentHTML('afterbegin','<div class="msg" style="margin:0 0 10px">Saved. This issue still needs attention.</div>');
+      }
       else{
         window.scrollTo({top:Math.max(0,context.scrollY||0),behavior:'instant'});
-        const host=document.getElementById('dq-missing-list');
         if(host) host.insertAdjacentHTML('afterbegin','<div class="msg success" style="margin:0 0 10px">Issue fixed and Data Quality has been refreshed.</div>');
       }
     });
@@ -8454,13 +8624,14 @@ function renderDataQuality() {
 function deleteCategory(slug) {
     const affected = state.ingredients.filter(i => i.cat === slug);
     if (affected.length === 0) {
-        if(!confirm("Delete this category?")) return;
-        state.customCats[slug] = null;
-        delete CAT[slug];
-        saveState();
-        ['mi-cat', 'pp-cat', 'tp-cat', 'mini-cat'].forEach(id => renderCatOptions(id, 'other'));
-        renderDataQuality();
-        renderBank();
+        openAppConfirmModal('Delete category?',`Delete <strong>${ppEscapeHtml(CAT[slug]||slug)}</strong>?`,'Delete category',()=>{
+          state.customCats[slug] = null;
+          delete CAT[slug];
+          saveState();
+          ['mi-cat', 'pp-cat', 'tp-cat', 'mini-cat'].forEach(id => renderCatOptions(id, 'other'));
+          renderDataQuality();
+          renderBank();
+        });
         return;
     }
 
@@ -8502,7 +8673,7 @@ function confirmCategoryReassign(oldSlug) {
     const existingVal = document.getElementById('cat-reassign-existing').value;
     const newName = document.getElementById('cat-reassign-new').value.trim();
     if (!existingVal && !newName) {
-        alert('Please choose an existing category or enter a new category name.');
+        openAppInfoModal('Choose a category','Choose an existing category or enter a new category name before continuing.');
         return;
     }
     runWithRecoveryPoint(`Before deleting category ${CAT[oldSlug] || oldSlug}`, () => applyCategoryReassign(oldSlug, existingVal, newName));
@@ -8530,8 +8701,8 @@ function applyCategoryReassign(oldSlug, existingVal, newName) {
 
 function editCategory(slug) {
     let currentName = CAT[slug];
-    let newName = prompt("Edit category name:", currentName);
-    if(newName && newName.trim() !== currentName) {
+    openAppPromptModal('Edit category','Category name',currentName,'Save',newName=>{
+      if(newName.trim() !== currentName) {
         state.customCats[slug] = newName.trim();
         CAT[slug] = newName.trim();
         saveState();
@@ -8541,7 +8712,8 @@ function editCategory(slug) {
         });
         renderDataQuality();
         renderBank();
-    }
+      }
+    });
 }
 
 let mergeContext = null;
@@ -8638,7 +8810,7 @@ function applyProductMerge() {
     closeMergeModal();
     renderDataQuality();
     renderBank();
-    alert("Merge successful. Recipes and overrides updated.");
+    showPlatePlanToast('Merge complete. Recipes and plan overrides were updated.');
 }
 
 
@@ -8655,6 +8827,39 @@ function ingRaw(ing){
   const stockText = formatStockIngredientText(ing);
   if(stockText) return stockText;
   return ing.raw||[ing.qty||'',ing.unit||'',ing.name||''].filter(Boolean).join(' ');
+}
+function renderExpandableText(text,key,className=''){
+  const value=String(text||'');
+  const safeKey=String(key||('copy-'+dataQualityFingerprint(value))).replace(/[^a-zA-Z0-9_-]/g,'-');
+  const needsToggle=value.length>46;
+  return `<span id="expand-${ppEscapeAttr(safeKey)}" class="${ppEscapeAttr(className)}${needsToggle?' clamp-copy':''}">${ppEscapeHtml(value)}</span>${needsToggle?`<button type="button" class="btn text-expand-btn" aria-expanded="false" aria-controls="expand-${ppEscapeAttr(safeKey)}" onclick="toggleExpandableText(this,'expand-${ppEscapeAttr(safeKey)}')">Show more</button>`:''}`;
+}
+function toggleExpandableText(button,targetId){
+  const target=document.getElementById(targetId);
+  if(!target)return;
+  const expanded=target.classList.toggle('expanded');
+  button.setAttribute('aria-expanded',String(expanded));
+  button.textContent=expanded?'Show less':'Show more';
+}
+function openVaultFitDetails(trigger,recipeId,variant='original',personKey='e'){
+  const recipe=getProductIndexRecipe(recipeId);
+  if(!recipe)return openAppInfoModal('Recipe unavailable','That recipe could not be found.');
+  const mealType=getContextMealType(recipe,null,(recipe.types||[recipe.type||'dinner'])[0]);
+  const bundle=calculateRecipeDisplayNutrition({recipe,variant,mealType});
+  const portions=bundle?.portions||{};
+  const person=personKey==='c'?'Chloe':'Elliott';
+  const targets=getBudgets(personKey,mealType);
+  const calories=personKey==='c'?portions.cCal:portions.eCal;
+  const protein=personKey==='c'?portions.cProt:portions.eProt;
+  const recipePct=personKey==='c'?portions.c:portions.e;
+  const fit=calculateFit(calories,protein,targets.cal,targets.prot);
+  const html=`<div style="font-weight:750;font-size:16px;margin-bottom:8px">${ppEscapeHtml(person)} · ${ppEscapeHtml(recipe.name)}</div>
+    <div class="nutrition-detail-row"><span>Allocated recipe portion</span><strong>${ppEscapeHtml(recipePct||'Not allocated')}</strong></div>
+    <div class="nutrition-detail-row"><span>Calories</span><strong>${Math.round(calories||0)} / ${Math.round(targets.cal||0)} kcal</strong></div>
+    <div class="nutrition-detail-row"><span>Protein</span><strong>${round1(protein||0)} / ${round1(targets.prot||0)}g</strong></div>
+    <div class="msg ${fit.warn.length?'info':'success'}" style="margin:10px 0 0">${ppEscapeHtml(fit.warn.join(', ')||'This portion is on target.')}</div>
+    <details class="card-details"><summary>Calculation details</summary><div>Fit score is based on calorie distance and protein shortfall. Nutrition comes only from mapped Product Bank products${variant==='enhanced'?' in the enhanced version':''}.</div></details>`;
+  showReviewTooltip(trigger,html,`${person} nutrition and fit details`);
 }
 function renderVault(){
   const ft=document.getElementById('filter-type').value,fw=document.getElementById('filter-who').value;
@@ -8713,14 +8918,14 @@ function renderVault(){
       if(showE) {
         const fitE = calculateFit(portions.eCal, portions.eProt, eTgt.cal, eTgt.prot);
         score += fitE.score * 100;
-        parts.push(`<span title="${ppEscapeHtml(fitE.warn.join(', ') || 'On target')}" style="cursor:help">Elliott ${fitE.label.split(' ')[0]} ${ppEscapeHtml(portions.e)}</span>`);
+        parts.push(`<button type="button" class="fit-detail-button" onclick="openVaultFitDetails(this,'${ppEscapeAttr(r.id)}','${useEnhanced?'enhanced':'original'}','e')">Elliott ${fitE.label.split(' ')[0]} ${ppEscapeHtml(portions.e)}</button>`);
       }
       if(showC) {
         const fitC = calculateFit(portions.cCal, portions.cProt, cTgt.cal, cTgt.prot);
         score += fitC.score * 100;
-        parts.push(`<span title="${ppEscapeHtml(fitC.warn.join(', ') || 'On target')}" style="cursor:help">Chloe ${fitC.label.split(' ')[0]} ${ppEscapeHtml(portions.c)}</span>`);
+        parts.push(`<button type="button" class="fit-detail-button" onclick="openVaultFitDetails(this,'${ppEscapeAttr(r.id)}','${useEnhanced?'enhanced':'original'}','c')">Chloe ${fitC.label.split(' ')[0]} ${ppEscapeHtml(portions.c)}</button>`);
       }
-      const fitTag = `<span class="tag" title="Lower is better. Sum of calorie misses and protein shortfall. Protein above target is treated as good.${useEnhanced ? ' This score uses the enhanced version.' : ''}">Fit score ${Math.round(score)}${useEnhanced ? ' · enhanced' : ''}</span>`;
+      const fitTag = `<span class="tag">Fit score ${Math.round(score)}${useEnhanced ? ' · enhanced' : ''}</span>`;
       return { portions, html: `<div class="recipe-fit">${parts.join('')} ${fitTag}</div>` };
     };
 
@@ -8732,7 +8937,7 @@ function renderVault(){
     return `<div class="recipe-card">
       <div class="recipe-card-layout">
         <div class="recipe-card-main">
-          <strong class="recipe-card-name">${ppEscapeHtml(r.name)}</strong>
+          ${renderExpandableText(r.name,`recipe-${r.id}`,'recipe-card-name')}
           <div class="recipe-card-meta">${meta}</div>
           ${originalFit.html}
         </div>
@@ -9277,6 +9482,7 @@ function renderIngredientBank(){
   });
   const familyCard = family => {
     const groups = (family.typeIds || []).map(id => getIngredientGroup(id)).filter(Boolean).sort((a,b)=>getGroupTypeName(a).localeCompare(getGroupTypeName(b)));
+    const herbPair=getFamilyHerbPair(family.id);
     const products = groups.flatMap(g => getGroupProducts(g.id));
     const defaultGroup = getIngredientGroup(family.defaultTypeId) || groups[0] || null;
     const defaultProduct = defaultGroup ? (getProduct(defaultGroup.defaultProductId) || getGroupProducts(defaultGroup.id)[0] || null) : null;
@@ -9297,6 +9503,7 @@ function renderIngredientBank(){
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
               <strong style="font-size:13px">${ppEscapeHtml(getGroupTypeName(g))}</strong>
               <span class="tag">${gProducts.length} product${gProducts.length===1?'':'s'}</span>
+              ${g.herbForm&&g.herbKey?`<span class="tag green">${g.herbForm==='fresh'?'Fresh herb':'Dried herb'} · 3:1 pair</span>`:''}
             </div>
             ${gDefault ? `<div style="font-size:11px;color:var(--text2);margin-top:2px">${gDefaultLabel}: ${ppEscapeHtml(gDefault.name)} · ${getProductProteinPer100Kcal(gDefault).toFixed(1)}g protein / 100kcal</div>` : `<div style="font-size:11px;color:var(--red);margin-top:2px">No default product</div>`}
           </div>
@@ -9314,7 +9521,7 @@ function renderIngredientBank(){
       }).join('')}
       </div>
     </details>` : '';
-    return `<div class="bank-card" data-category="${ppEscapeAttr(CAT[family.cat] || family.cat || 'Other')}" data-ingredient="${ppEscapeAttr(family.name)}">
+    return `<div class="bank-card" data-family-id="${ppEscapeAttr(family.id)}" data-category="${ppEscapeAttr(CAT[family.cat] || family.cat || 'Other')}" data-ingredient="${ppEscapeAttr(family.name)}">
       <div class="hierarchy-card-layout">
         <div style="min-width:0">
           <div style="font-size:11px;color:var(--text3);margin-bottom:3px">${ppEscapeHtml(CAT[family.cat] || family.cat || 'Other')} > ${ppEscapeHtml(family.name || 'Ingredient')}${showSubTypes ? ' > sub-types' : ''}</div>
@@ -9327,16 +9534,18 @@ function renderIngredientBank(){
           ${defaultProduct ? `<div style="font-size:12px;color:var(--text2);margin-top:5px"><strong>${defaultLabel}:</strong> ${ppEscapeHtml(defaultProduct.name)}${defaultProduct.brand&&defaultProduct.brand!=='Generic'?' ('+ppEscapeHtml(defaultProduct.brand)+')':''}${defaultScore ? ` · ${defaultScore}g protein / 100kcal` : ''}</div>` : `<div style="font-size:12px;color:var(--red);margin-top:5px">No default product yet.</div>`}
           ${(family.aliases || []).length > 1 ? `<div style="font-size:11px;color:var(--text2);margin-top:5px"><strong>Aliases:</strong> ${ppEscapeHtml((family.aliases || []).slice(0,6).join(', '))}${family.aliases.length > 6 ? '...' : ''}</div>` : ''}
           ${family.notes ? `<div style="font-size:12px;color:var(--text2);margin-top:5px">${ppEscapeHtml(family.notes)}</div>` : ''}
+          <div class="herb-status"><strong>Fresh/dried conversion:</strong> ${herbPair.fresh&&herbPair.dried?`${ppEscapeHtml(getGroupTypeName(herbPair.fresh))} ↔ ${ppEscapeHtml(getGroupTypeName(herbPair.dried))} · 3:1`:'Not configured'} <button type="button" class="btn sm ghost" onclick="openHerbConversionPanel('${ppEscapeAttr(family.id)}')">${herbPair.fresh&&herbPair.dried?'Edit pairing':'Configure'}</button></div>
         </div>
         <div class="hierarchy-actions">
-          <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="openIngredientFamilyDetailsModal('${family.id}')">Ingredient</button>
+          <button class="btn sm ghost desktop-only-mobile-hide ingredient-edit-action" style="justify-content:center" onclick="openIngredientEditor('${family.id}',this)">Edit ingredient</button>
+          <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="openHerbConversionPanel('${family.id}')">Herb conversion</button>
           <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="openIngredientFamilyAliasesModal('${family.id}')">Aliases</button>
           <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="addSubTypeToFamilyPrompt('${family.id}')">+ Sub-type</button>
           <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="mergeIngredientFamilyPrompt('${family.id}')">Merge</button>
           <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="openIngredientToSubTypeModal('${family.id}')">Make Sub-type</button>
           <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="openProductDefaultPicker('family','${family.id}')">Products</button>
           <button class="btn sm danger desktop-only-mobile-hide" style="justify-content:center;grid-column:span 2" onclick="deleteIngredientFamilyPrompt('${family.id}')">Delete</button>
-          <button class="btn sm ghost mobile-only-action" onclick="openIngredientFamilyDetailsModal('${family.id}')">Edit ingredient</button>
+          <button class="btn sm primary mobile-only-action ingredient-edit-action" onclick="openIngredientEditor('${family.id}',this)">Edit ingredient</button>
           <button class="btn sm ghost mobile-only-action" onclick="openIngredientFamilyActions('${family.id}')">More</button>
         </div>
       </div>
@@ -9370,6 +9579,100 @@ function getFamilyGroups(familyId){
 
 function getFamilyProducts(familyId){
   return getFamilyGroups(familyId).flatMap(g => getGroupProducts(g.id));
+}
+
+let herbConversionFamilyId=null;
+function getFamilyHerbPair(familyId){
+  const groups=getFamilyGroups(familyId);
+  const fresh=groups.find(group=>group.herbForm==='fresh'&&group.herbKey);
+  const dried=groups.find(group=>group.herbForm==='dried'&&group.herbKey&&(!fresh||group.herbKey===fresh.herbKey));
+  return {fresh,dried,key:fresh?.herbKey||dried?.herbKey||''};
+}
+function ensureHerbConversionPanel(){
+  let wrap=document.getElementById('ingredient-herb-conversion-wrap');
+  if(wrap)wrap.remove();
+  wrap=document.createElement('div');
+  wrap.id='ingredient-herb-conversion-wrap';
+  wrap.className='modal-wrap';
+  wrap.style.zIndex='445';
+  wrap.innerHTML=`<div class="modal" style="max-width:560px">
+    <div class="row-between" style="align-items:center;margin-bottom:12px">
+      <div><h3 style="margin:0">Fresh/dried conversion</h3><div id="herb-conversion-context" style="font-size:14px;color:var(--text2);margin-top:3px"></div></div>
+      <button class="btn sm ghost" onclick="closeHerbConversionPanel()">Close</button>
+    </div>
+    <div class="msg info" style="margin:0 0 14px">PlatePlan uses 3 parts fresh to 1 part dried for paired culinary herbs. This only changes temporary planned-meal substitutions.</div>
+    <div class="herb-pair-grid">
+      <div class="field"><label for="herb-conversion-fresh">Fresh sub-type</label><select id="herb-conversion-fresh"></select></div>
+      <div class="field"><label for="herb-conversion-dried">Dried sub-type</label><select id="herb-conversion-dried"></select></div>
+    </div>
+    <div id="herb-conversion-msg"></div>
+    <details class="card-details"><summary>How this works</summary><div style="font-size:14px;color:var(--text2);padding-bottom:10px">Choose two sub-types of the same ingredient. If one is missing, select Create new. Products remain mapped to their existing sub-types; no Recipe Vault recipe is edited.</div></details>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn primary" onclick="saveHerbConversionPair()">Save pairing</button>
+      <button class="btn ghost" onclick="clearHerbConversionPair()">Clear pairing</button>
+      <button class="btn ghost" onclick="closeHerbConversionPanel()">Cancel</button>
+    </div>
+  </div>`;
+  document.body.appendChild(wrap);
+  return wrap;
+}
+function herbConversionOptions(groups,selected,form){
+  return `<option value="">Choose ${form} sub-type</option>${groups.map(group=>`<option value="${ppEscapeAttr(group.id)}"${group.id===selected?' selected':''}>${ppEscapeHtml(getGroupTypeName(group))}</option>`).join('')}<option value="__create__">Create new ${form} sub-type…</option>`;
+}
+function openHerbConversionPanel(familyId){
+  const family=getIngredientFamily(familyId);
+  if(!family)return showPlatePlanToast('That ingredient could not be found.');
+  if(typeof closeMobileActionSheet==='function')closeMobileActionSheet(true);
+  herbConversionFamilyId=family.id;
+  const groups=getFamilyGroups(family.id);
+  const pair=getFamilyHerbPair(family.id);
+  const wrap=ensureHerbConversionPanel();
+  document.getElementById('herb-conversion-context').textContent=family.name;
+  document.getElementById('herb-conversion-fresh').innerHTML=herbConversionOptions(groups,pair.fresh?.id||'','fresh');
+  document.getElementById('herb-conversion-dried').innerHTML=herbConversionOptions(groups,pair.dried?.id||'','dried');
+  wrap.classList.add('open');
+  setTimeout(()=>document.getElementById('herb-conversion-fresh')?.focus(),0);
+}
+function closeHerbConversionPanel(){
+  document.getElementById('ingredient-herb-conversion-wrap')?.classList.remove('open');
+  herbConversionFamilyId=null;
+}
+function createHerbSubType(family,form){
+  const name=`${form==='fresh'?'Fresh':'Dried'} ${family.name}`;
+  const group={id:'grp'+Date.now()+Math.random().toString(36).slice(2,6),name,cat:family.cat||'herbs',family:family.name,ingredientId:family.id,aliases:[name],defaultProductId:null,productIds:[],notes:'',herbForm:form,herbKey:canonicalGroupKey(family.name)};
+  state.ingredientGroups.push(group);
+  if(!Array.isArray(family.typeIds))family.typeIds=[];
+  family.typeIds.push(group.id);
+  if(!family.defaultTypeId)family.defaultTypeId=group.id;
+  return group;
+}
+function saveHerbConversionPair(){
+  const family=getIngredientFamily(herbConversionFamilyId);
+  const msg=document.getElementById('herb-conversion-msg');
+  if(!family)return;
+  let freshId=document.getElementById('herb-conversion-fresh')?.value||'';
+  let driedId=document.getElementById('herb-conversion-dried')?.value||'';
+  let fresh=freshId==='__create__'?createHerbSubType(family,'fresh'):getIngredientGroup(freshId);
+  let dried=driedId==='__create__'?createHerbSubType(family,'dried'):getIngredientGroup(driedId);
+  if(!fresh||!dried){if(msg)msg.innerHTML='<div class="msg error">Choose both a fresh and dried sub-type.</div>';return;}
+  if(fresh.id===dried.id){if(msg)msg.innerHTML='<div class="msg error">Fresh and dried must use different sub-types.</div>';return;}
+  const key=canonicalGroupKey(family.name);
+  getFamilyGroups(family.id).forEach(group=>{if(group.id!==fresh.id&&group.id!==dried.id&&group.herbKey===key){group.herbForm='';group.herbKey='';}});
+  fresh.herbForm='fresh';fresh.herbKey=key;
+  dried.herbForm='dried';dried.herbKey=key;
+  saveState();
+  closeHerbConversionPanel();
+  refreshHierarchyViews();
+  showPlatePlanToast(`${family.name} fresh/dried pairing saved.`);
+}
+function clearHerbConversionPair(){
+  const family=getIngredientFamily(herbConversionFamilyId);
+  if(!family)return;
+  getFamilyGroups(family.id).forEach(group=>{group.herbForm='';group.herbKey='';});
+  saveState();
+  closeHerbConversionPanel();
+  refreshHierarchyViews();
+  showPlatePlanToast(`${family.name} conversion pairing cleared.`);
 }
 
 let productDefaultPickerContext = null;
@@ -9715,10 +10018,36 @@ function createIngredientFamilyPrompt(){
 
 let ingredientFamilyDetailsId = null;
 let ingredientFamilyDetailsCreate = false;
+let ingredientEditorOrigin = null;
+
+function preparePlatePlanWorkspace(wrap,trigger=null){
+  if(typeof closeMobileActionSheet==='function') closeMobileActionSheet(true);
+  if(typeof closeMobileMore==='function') closeMobileMore(true);
+  if(!wrap) return null;
+  wrap.setAttribute('role','dialog');
+  wrap.setAttribute('aria-modal','true');
+  if(trigger) ingredientEditorOrigin={element:trigger,scrollY:window.scrollY};
+  document.body.appendChild(wrap);
+  return wrap;
+}
+
+function restoreIngredientEditorOrigin(){
+  const origin=ingredientEditorOrigin;
+  ingredientEditorOrigin=null;
+  if(!origin)return;
+  requestAnimationFrame(()=>{
+    window.scrollTo({top:origin.scrollY||0,behavior:'instant'});
+    if(origin.element?.isConnected) origin.element.focus({preventScroll:true});
+    else if(ingredientFamilyDetailsId) document.querySelector(`[data-family-id="${CSS.escape(ingredientFamilyDetailsId)}"] .ingredient-edit-action`)?.focus({preventScroll:true});
+  });
+}
 
 function ensureIngredientFamilyDetailsModal(){
-  let wrap = document.getElementById('ingredient-family-details-wrap');
-  if(wrap) return wrap;
+  const matches=Array.from(document.querySelectorAll('#ingredient-family-details-wrap'));
+  let wrap=matches.shift()||null;
+  matches.forEach(node=>node.remove());
+  if(wrap&&!wrap.querySelector('#ingredient-family-details-name')){wrap.remove();wrap=null;}
+  if(wrap) return preparePlatePlanWorkspace(wrap);
   wrap = document.createElement('div');
   wrap.id = 'ingredient-family-details-wrap';
   wrap.className = 'modal-wrap';
@@ -9748,7 +10077,25 @@ function ensureIngredientFamilyDetailsModal(){
       </div>
     </div>`;
   document.body.appendChild(wrap);
-  return wrap;
+  return preparePlatePlanWorkspace(wrap);
+}
+
+function openIngredientEditor(familyId,trigger=null){
+  const family=getIngredientFamily(familyId);
+  if(!family){
+    showPlatePlanToast('That ingredient could not be found. Refreshing the Ingredient Bank.');
+    renderIngredientBank();
+    return false;
+  }
+  try{
+    ingredientEditorOrigin={element:trigger||document.activeElement,scrollY:window.scrollY};
+    openIngredientFamilyDetailsModal(familyId,false);
+    return true;
+  }catch(error){
+    console.error('Could not open ingredient editor',error);
+    showPlatePlanToast('Could not open that ingredient. Please close other panels and try again.');
+    return false;
+  }
 }
 
 function openIngredientFamilyDetailsModal(familyId = '', create = false){
@@ -9757,7 +10104,7 @@ function openIngredientFamilyDetailsModal(familyId = '', create = false){
   const family = familyId ? getIngredientFamily(familyId) : null;
   ingredientFamilyDetailsId = family?.id || '';
   ingredientFamilyDetailsCreate = create || !family;
-  const wrap = ensureIngredientFamilyDetailsModal();
+  const wrap = preparePlatePlanWorkspace(ensureIngredientFamilyDetailsModal(),ingredientEditorOrigin?.element||document.activeElement);
   document.getElementById('ingredient-family-details-title').textContent = ingredientFamilyDetailsCreate ? 'Create ingredient' : 'Edit ingredient';
   document.getElementById('ingredient-family-details-cat').innerHTML = getGroupCategoryOptionsHtml(family?.cat || 'other');
   document.getElementById('ingredient-family-details-name').value = family?.name || '';
@@ -9769,9 +10116,17 @@ function openIngredientFamilyDetailsModal(familyId = '', create = false){
 
 function closeIngredientFamilyDetailsModal(preserveEditorReturn=false){
   document.getElementById('ingredient-family-details-wrap')?.classList.remove('open');
+  const savedId=ingredientFamilyDetailsId;
   ingredientFamilyDetailsId = null;
   ingredientFamilyDetailsCreate = false;
   if(!preserveEditorReturn) abandonEditorReturn();
+  const origin=ingredientEditorOrigin;
+  ingredientEditorOrigin=null;
+  requestAnimationFrame(()=>{
+    window.scrollTo({top:origin?.scrollY||window.scrollY,behavior:'instant'});
+    if(origin?.element?.isConnected) origin.element.focus({preventScroll:true});
+    else if(savedId) document.querySelector(`[data-family-id="${CSS.escape(savedId)}"] .ingredient-edit-action`)?.focus({preventScroll:true});
+  });
 }
 
 function saveIngredientFamilyDetailsModal(){
@@ -12208,7 +12563,7 @@ function ensureIngredientTescoUpdateButton(){
   const row = document.createElement('div');
   row.id = 'mi-tesco-actions';
   row.style.cssText = 'display:flex;justify-content:flex-end;margin:-4px 0 12px;';
-  row.innerHTML = '<button type="button" class="btn sm ghost" onclick="openTescoImportForIngredientEdit()">🛒 Paste/update from Tesco</button>';
+  row.innerHTML = '<button type="button" class="btn sm ghost" onclick="openTescoImportForIngredientEdit()">Paste/update from Tesco</button>';
   title.insertAdjacentElement('afterend', row);
 }
 
@@ -12407,7 +12762,7 @@ function editIng(id){
   editIngId=id;
   ensureIngredientModalDetached();
   ensureIngredientTescoUpdateButton();
-  document.getElementById('mi-title').textContent='Edit ingredient';
+  document.getElementById('mi-title').textContent='Edit product';
   document.getElementById('mi-name').value=ing.name||'';
   document.getElementById('mi-brand').value=ing.brand||'';
   document.getElementById('mi-cat').value=CAT[ing.cat] ? ing.cat : 'other';
@@ -12454,6 +12809,8 @@ function refreshAfterIngredientEdit(productId = ''){
 }
 
 let appConfirmAction = null;
+let appPromptAction = null;
+let appPromptCancelAction = null;
 
 function ensureAppConfirmModal(){
   let wrap = document.getElementById('app-confirm-wrap');
@@ -12516,6 +12873,51 @@ function closeAppConfirmModal(){
   appConfirmAction = null;
 }
 
+function ensureAppPromptModal(){
+  let wrap=document.getElementById('app-prompt-wrap');
+  if(wrap)return wrap;
+  wrap=document.createElement('div');
+  wrap.id='app-prompt-wrap';
+  wrap.className='modal-wrap sheet-mobile';
+  wrap.style.zIndex='455';
+  wrap.innerHTML=`<div class="modal" style="max-width:500px">
+    <div class="row-between" style="align-items:center;margin-bottom:10px"><h3 id="app-prompt-title" style="margin:0">Enter a value</h3><button class="btn sm ghost" onclick="closeAppPromptModal(false)">Close</button></div>
+    <label id="app-prompt-label" for="app-prompt-input">Value</label>
+    <input id="app-prompt-input" type="text" style="width:100%;margin:7px 0 14px">
+    <div class="btn-row"><button class="btn primary" id="app-prompt-ok">Save</button><button class="btn ghost" onclick="closeAppPromptModal(false)">Cancel</button></div>
+  </div>`;
+  document.body.appendChild(wrap);
+  return wrap;
+}
+
+function openAppPromptModal(title,label,initialValue,confirmLabel,onConfirm,onCancel){
+  const wrap=ensureAppPromptModal();
+  appPromptAction=onConfirm;
+  appPromptCancelAction=onCancel;
+  document.getElementById('app-prompt-title').textContent=title||'Enter a value';
+  document.getElementById('app-prompt-label').textContent=label||'Value';
+  const input=document.getElementById('app-prompt-input');
+  input.value=initialValue||'';
+  document.getElementById('app-prompt-ok').textContent=confirmLabel||'Save';
+  document.getElementById('app-prompt-ok').onclick=()=>{
+    const value=input.value.trim();
+    if(!value){input.focus();return;}
+    const action=appPromptAction;
+    closeAppPromptModal(true);
+    if(typeof action==='function')action(value);
+  };
+  wrap.classList.add('open');
+  setTimeout(()=>{input.focus();input.select();},0);
+}
+
+function closeAppPromptModal(confirmed=false){
+  document.getElementById('app-prompt-wrap')?.classList.remove('open');
+  const cancel=appPromptCancelAction;
+  appPromptAction=null;
+  appPromptCancelAction=null;
+  if(!confirmed&&typeof cancel==='function')cancel();
+}
+
 function saveManualIng(){
   if(typeof setCategoryFromSearch === 'function'){
     setCategoryFromSearch('mi-cat', document.getElementById('mi-cat-search')?.value || '', true);
@@ -12568,6 +12970,15 @@ function saveManualIng(){
   closeIngModal();
   editIngId=null;
   refreshAfterIngredientEdit(ing.id);
+  if(productEditorReturnToReview){
+    productEditorReturnToReview=false;
+    if(document.getElementById('modal-wrap')?.classList.contains('open')){
+      recalcModal(currentReviewVariant === 'enhanced' ? 'enh' : 'orig');
+      document.getElementById('modal-title')?.focus?.({preventScroll:true});
+      showPlatePlanToast('Product saved. Continue reviewing the recipe.');
+      return;
+    }
+  }
   finishEditorReturn();
 }
 
@@ -12584,6 +12995,11 @@ function cancelManualIng() {
       return;
     }
     closeIngModal();
+    if(productEditorReturnToReview){
+      productEditorReturnToReview=false;
+      document.getElementById('modal-wrap')?.querySelector('button,input,select,textarea')?.focus?.({preventScroll:true});
+      return;
+    }
     abandonEditorReturn();
 }
 
@@ -13310,7 +13726,7 @@ function renderPlan(){
       const rowAttrs = showRecipe ? ` data-plan-person="${rowPerson}" data-plan-cal="${rowCal}" data-plan-prot="${rowProt}"` : '';
 
       const slotActionsHtml = showRecipe ? '<div class="slot-actions"><span class="slot-macro">'+calStr+'</span><button class="btn sm ghost" style="padding:2px 5px;font-size:10px" onclick="viewRecipe(\''+rId+'\', \''+(instanceId||'')+'\', \''+slotInfo.variant+'\')">View/Opt.</button><button class="btn sm ghost" style="padding:2px 5px;font-size:10px" onclick="reviewRecipeModalView(\''+rId+'\', \''+(instanceId||'')+'\', \''+slotInfo.variant+'\')">Review</button></div>' : '';
-      dayRowsHtml+='<div class="slot-row"'+rowAttrs+'><span class="slot-lbl" style="color:'+SLOT_COLORS[sl.key]+'">'+lblLines[0]+'<br>'+lblLines[1]+'</span>'+(isEx?'<span class="slot-skipped">Not needed</span>':'<span class="slot-name">'+(r?ppEscapeHtml(r.name):'<span style="color:var(--text3)">Not set</span>')+(slotInfo.variant==='enhanced'?' <span class="tag green">Enhanced</span>':'')+'</span>'+slotActionsHtml+mkSel(d,sl.key,sl.key.includes('breakfast')?'breakfast':sl.key.includes('lunch')?'lunch':'dinner',sl.key.endsWith('E')?'Elliott':sl.key.endsWith('C')?'Chloe':'any'))+'</div>';
+      dayRowsHtml+='<div class="slot-row"'+rowAttrs+'><span class="slot-lbl" style="color:'+SLOT_COLORS[sl.key]+'">'+lblLines[0]+'<br>'+lblLines[1]+'</span>'+(isEx?'<span class="slot-skipped">Not needed</span>':'<span class="slot-name'+(r&&/(?:https?:\/\/|www\.)/i.test(r.name||'')?' breakable-url':'')+'">'+(r?ppEscapeHtml(r.name):'<span style="color:var(--text3)">Not set</span>')+(slotInfo.variant==='enhanced'?' <span class="tag green">Enhanced</span>':'')+'</span>'+slotActionsHtml+mkSel(d,sl.key,sl.key.includes('breakfast')?'breakfast':sl.key.includes('lunch')?'lunch':'dinner',sl.key.endsWith('E')?'Elliott':sl.key.endsWith('C')?'Chloe':'any'))+'</div>';
     });
     daySummary.score = calculatePlanDayScoreFromTotals(daySummary.totals);
     const summaryHtml = ['e','c'].map(p=>`<div class="summary-box">${renderPlannerPersonSummaryBox(p, daySummary)}</div>`).join('');
@@ -13428,7 +13844,7 @@ function renderPlanHistoryPanel(){
       return `<article class="plan-library-card">
         <div class="plan-library-layout">
           <div class="plan-library-main">
-            <strong class="plan-library-title">${ppEscapeHtml(title)}</strong>
+            ${renderExpandableText(title,`plan-${p.id||i}`,'plan-library-title')}
             <div class="plan-library-meta">
               <span class="tag">${p.days||0} days</span>
               ${dateRange?`<span class="tag">${ppEscapeHtml(dateRange)}</span>`:''}
@@ -13436,7 +13852,7 @@ function renderPlanHistoryPanel(){
               <span class="tag">${ppEscapeHtml(status)}</span>
             </div>
             <div style="color:var(--text3);margin-top:7px">Saved ${ppEscapeHtml(dt)} · ${ppEscapeHtml(p.savedBy || 'PlatePlan')}</div>
-            <div class="plan-library-recipe-preview"><strong>Recipes:</strong> ${ids.length ? ids.map(ppEscapeHtml).join(', ') : 'No recipes'}${remaining ? ` <span class="tag">+${remaining} more</span>` : ''}</div>
+            <div class="plan-library-recipe-preview"><strong>Recipes:</strong> ${renderExpandableText(ids.length ? ids.join(', ') : 'No recipes',`plan-recipes-${p.id||i}`,'')}${remaining ? ` <span class="tag">+${remaining} more</span>` : ''}</div>
           </div>
           <div class="plan-library-actions">
             <button class="btn sm primary desktop-only-mobile-hide" onclick="openSavedPlanRecipeCards(${i})">Recipe cards</button>
@@ -13883,13 +14299,13 @@ function applyShoppingBatchTargets(targets, mode, productId = '', quantityOverri
 
 function openBatchSubstituteFromSelection(scopeId, mode){
   const targets = getSelectedShoppingTargets(scopeId);
-  if(!targets.length) return alert('Select at least one meal row first.');
+  if(!targets.length) return openAppInfoModal('Select meals','Select at least one meal row first.');
   openSubstituteModalForTargets(targets, mode);
 }
 
 function confirmRemoveShoppingBatch(scopeId){
   const targets = getSelectedShoppingTargets(scopeId);
-  if(!targets.length) return alert('Select at least one meal row first.');
+  if(!targets.length) return openAppInfoModal('Select meals','Select at least one meal row first.');
   openAppConfirmModal('Remove selected ingredients?', `Remove this ingredient from ${targets.length} planned portion${targets.length === 1 ? '' : 's'}?`, 'Remove', () => applyShoppingBatchTargets(targets, 'remove'));
 }
 
@@ -14273,7 +14689,7 @@ function downloadRecipePackSnapshot(snapshot,filename='PlatePlan recipe pack.htm
 
 // Retained only as an internal reference while the shared structured builder above drives every active UI action.
 function generateRecipePackLegacyUnused(){
-  if(!state.plan?.slots){ alert('Generate a meal plan first.'); return; }
+  if(!state.plan?.slots){ openAppInfoModal('Meal plan needed','Generate a meal plan first.'); return; }
   const cards = [];
   const days = state.plan.days || Object.keys(state.plan.slots || {}).length || 0;
   const priority = PRODUCT_PRIORITY_LABELS[state.plan.productPriority || state.prefs.productPriority || 'protein'] || 'Highest protein';
@@ -14449,7 +14865,7 @@ function generateRecipePackLegacyUnused(){
     });
   }
 
-  if(!cards.length){ alert('No planned recipes to export.'); return; }
+  if(!cards.length){ openAppInfoModal('No recipes to export','Add recipes to the meal plan before downloading a recipe pack.'); return; }
 
   const html = `<!doctype html>
 <html>
@@ -14653,7 +15069,7 @@ function selectSubstItem(bankId) {
 
 function confirmSubstitute() {
   const { targets, newBankId, mode } = currentSubstContext;
-  if(!newBankId) return alert('Please select a product from the dropdown.');
+  if(!newBankId) return openAppInfoModal('Choose a product','Select a Product Bank item from the list before applying the replacement.');
   const quantityOverrides=(currentSubstContext.herbConversions||[]).map((conversion,index)=>{
     if(!conversion) return null;
     const qty=+document.querySelector(`[data-herb-qty="${index}"]`)?.value;
@@ -15030,7 +15446,7 @@ function hideOverlay(){document.getElementById('overlay').classList.remove('visi
 
 
 <div id="manual-ing-panel" style="display: none;" class="card" data-modal-wrapped="1"><div id="mi-inner-wrap" style="background: var(--surface); border-radius: 14px; padding: 24px; max-width: 560px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 40px;">
-    <h3 id="mi-title">Edit ingredient</h3><div id="mi-tesco-actions" style="display: flex; justify-content: flex-end; margin: -4px 0px 12px;"><button type="button" class="btn sm ghost" onclick="openTescoImportForIngredientEdit()">🛒 Paste/update from Tesco</button></div>
+    <h3 id="mi-title">Edit product</h3><div id="mi-tesco-actions" style="display: flex; justify-content: flex-end; margin: -4px 0px 12px;"><button type="button" class="btn sm ghost" onclick="openTescoImportForIngredientEdit()">Paste/update from Tesco</button></div>
     <div class="grid2">
       <div><label>Product name</label><input type="text" id="mi-name" placeholder="Product name"></div>
       <div><label>Brand</label><input type="text" id="mi-brand" placeholder="Quorn"></div>
@@ -15104,4 +15520,27 @@ function hideOverlay(){document.getElementById('overlay').classList.remove('visi
 
 
 
-</body></html>
+<div id="ingredient-family-details-wrap" class="modal-wrap" style="z-index: 440;">
+    <div class="modal" style="max-width:540px">
+      <div class="row-between" style="align-items:center;margin-bottom:10px">
+        <h3 id="ingredient-family-details-title" style="margin:0">Edit ingredient</h3>
+        <button class="btn sm ghost" onclick="closeIngredientFamilyDetailsModal()">Close</button>
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <select id="ingredient-family-details-cat"></select>
+      </div>
+      <div class="field">
+        <label>Ingredient name</label>
+        <input type="text" id="ingredient-family-details-name" placeholder="e.g. Pasta, Asparagus, Tofu">
+      </div>
+      <div class="field">
+        <label>Notes</label>
+        <textarea id="ingredient-family-details-notes" style="min-height:70px"></textarea>
+      </div>
+      <div id="ingredient-family-details-msg"></div>
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn primary" onclick="saveIngredientFamilyDetailsModal()">Save</button>
+        <button class="btn ghost" onclick="closeIngredientFamilyDetailsModal()">Cancel</button>
+      </div>
+    </div></div></body></html>
