@@ -1,4 +1,4 @@
-const PLATEPLAN_CACHE = 'plateplan-shell-v5';
+const PLATEPLAN_CACHE = 'plateplan-shell-v6';
 const PLATEPLAN_LOCAL_SHELL = [
   './',
   './PlatePlan.html',

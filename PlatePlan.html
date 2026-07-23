@@ -509,6 +509,140 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
   .review-desktop-actions .btn{min-height:44px;width:100%}
   .plan-library-layout{gap:10px}
 }
+
+/* PlatePlan 19.2 coherence layer */
+:root{
+  color-scheme:light dark;
+  --action:#0969da;
+  --action-hover:#0757b8;
+  --action-bg:#eaf3ff;
+  --focus:#0a84ff;
+  --overlay:rgba(18,18,20,.46);
+  --shadow:0 12px 38px rgba(24,24,28,.14);
+  --radius-sm:8px;
+  --radius-md:12px;
+  --radius-lg:18px;
+}
+body{line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:var(--action)}
+.ntab.active{color:var(--action);border-bottom-color:var(--action)}
+.cf.active,.mt2.active{background:var(--action);color:#fff}
+.mobile-nav button.active{background:var(--action-bg)!important;color:var(--action)!important}
+.mobile-nav button svg{display:block;width:20px;height:20px;margin:0 auto 3px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.source-link{color:var(--action);background:var(--action-bg)}
+.btn{min-height:40px;line-height:1.2;border-radius:var(--radius-sm)}
+.btn.primary,.btn.dq-fix-btn{background:var(--action);border-color:var(--action);color:#fff;font-weight:650}
+.btn.primary:hover,.btn.dq-fix-btn:hover{background:var(--action-hover);opacity:1}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible,[role="button"]:focus-visible{
+  outline:3px solid color-mix(in srgb,var(--focus) 38%,transparent);
+  outline-offset:2px;
+}
+.btn:disabled,input:disabled,select:disabled,textarea:disabled{opacity:.52;cursor:not-allowed}
+.modal-wrap,.mobile-more-wrap,.mobile-action-sheet-wrap{background:var(--overlay)}
+.modal,.mobile-sheet,.auth-card{box-shadow:var(--shadow)}
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.grouped-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;margin-bottom:12px}
+.grouped-row{padding:12px 14px;border-bottom:1px solid var(--border)}
+.grouped-row:last-child{border-bottom:0}
+.planner-compact-shell{margin-bottom:14px}
+.planner-compact-card{display:grid;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px 16px}
+.planner-compact-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.planner-compact-title{font-size:18px;font-weight:720;letter-spacing:-.02em}
+.planner-compact-copy{font-size:12px;color:var(--text2);margin-top:2px}
+.planner-quick-fields{display:grid;grid-template-columns:minmax(100px,.55fr) minmax(180px,1fr);gap:10px}
+.planner-quick-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.planner-quick-actions .btn.primary{flex:1}
+.plan-options-wrap .modal{max-width:780px}
+.plan-options-body{display:grid;gap:14px}
+.plan-options-section{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px}
+.plan-options-section>h3{font-size:14px;margin-bottom:10px}
+.plan-options-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.plan-options-workspace-actions{position:sticky;bottom:0;z-index:3;margin:14px -20px -20px;padding:10px 20px calc(10px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--surface) 94%,transparent);border-top:1px solid var(--border);backdrop-filter:blur(12px)}
+.traffic-picker{display:grid!important;grid-template-columns:auto repeat(3,48px);gap:7px!important;align-items:center!important}
+.traffic-pill{position:relative;justify-content:center;width:48px;height:48px;padding:0!important;border-width:2px!important}
+.traffic-pill input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.traffic-pill .traffic-symbol{font-size:18px;line-height:1;font-weight:800}
+.traffic-pill:has(input:not(:checked)){background:var(--surface)!important;color:var(--text3)!important;border-color:var(--border)!important;filter:saturate(.35)}
+.traffic-pill:has(input:checked){box-shadow:inset 0 0 0 1px currentColor}
+.shop-item-details{transition:opacity .15s ease,background-color .15s ease}
+.shop-item-summary{display:grid!important;grid-template-columns:48px minmax(0,1fr) 24px;align-items:center;gap:8px;min-height:54px}
+.shop-home-check{width:22px!important;height:22px!important;margin:0 auto;accent-color:var(--action);cursor:pointer}
+.shop-item-copy{min-width:0;overflow-wrap:anywhere}
+.shop-item-copy .shop-need{display:block;color:var(--text2);font-size:12px;font-weight:500;margin-top:2px}
+.shop-home-section{margin-top:18px}
+.shop-home-section>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:48px;cursor:pointer;font-size:13px;font-weight:700;color:var(--text2);list-style:none}
+.shop-home-section>summary::-webkit-details-marker{display:none}
+.shop-home-section .shop-item-details{opacity:.7}
+.plateplan-toast-region{position:fixed;left:50%;bottom:calc(82px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:1000;width:min(420px,calc(100vw - 24px));pointer-events:none}
+.plateplan-toast{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;border-radius:12px;background:#202124;color:#fff;box-shadow:var(--shadow);pointer-events:auto;animation:toast-in .18s ease-out}
+.plateplan-toast button{border:0;background:transparent;color:#8ab4f8;font:inherit;font-weight:700;cursor:pointer;min-height:36px;padding:0 6px}
+@keyframes toast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.dq-issue-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start;padding:12px 0;border-bottom:1px solid var(--border)}
+.dq-issue-row:last-child{border-bottom:0}
+.dq-issue-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.dq-fix-btn{min-width:76px;justify-content:center}
+
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#111214;
+    --surface:#1b1c1f;
+    --surface2:#24262a;
+    --border:#35383e;
+    --border-strong:#555a63;
+    --text:#f2f3f5;
+    --text2:#b6bac2;
+    --text3:#858b95;
+    --green:#72d5a5;
+    --green-bg:#18392c;
+    --purple:#c4b5fd;
+    --purple-bg:#30294a;
+    --coral:#ff9b83;
+    --coral-bg:#492820;
+    --amber:#ffd071;
+    --amber-bg:#433317;
+    --red:#ff8f8f;
+    --red-bg:#482323;
+    --blue:#8ab4f8;
+    --blue-bg:#1d334e;
+    --action:#5b9cf6;
+    --action-hover:#77adf7;
+    --action-bg:#1d334e;
+    --focus:#73aef8;
+    --overlay:rgba(0,0,0,.68);
+    --shadow:0 16px 44px rgba(0,0,0,.46);
+  }
+  img:not([src*="icon"]){filter:brightness(.94)}
+  .source-link{color:var(--blue)}
+  .btn.primary,.btn.dq-fix-btn{color:#07111f}
+  .recipe-search-drop,.map-dropdown,.review-ing-search-dropdown{box-shadow:0 10px 28px rgba(0,0,0,.42)}
+}
+
+@media(max-width:599px){
+  main{padding:14px 12px calc(88px + env(safe-area-inset-bottom))}
+  .card,.recipe-card,.bank-card,.dq-card{padding:14px;border-radius:var(--radius-md)}
+  .planner-quick-fields,.plan-options-grid{grid-template-columns:1fr}
+  .planner-compact-head{display:block}
+  .planner-compact-head .btn{width:100%;margin-top:10px}
+  .planner-quick-actions{display:grid;grid-template-columns:1fr}
+  .plan-options-wrap{padding:0!important;background:var(--surface)}
+  .plan-options-wrap>.modal{width:100%;max-width:none;min-height:100dvh;margin:0;border-radius:0;padding:0;display:flex;flex-direction:column}
+  .plan-options-appbar{position:sticky;top:0;z-index:6;background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:10px 12px}
+  .plan-options-body{padding:14px 12px calc(92px + env(safe-area-inset-bottom));flex:1}
+  .plan-options-workspace-actions{position:fixed;left:0;right:0;bottom:0;margin:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:grid;grid-template-columns:1fr 1fr}
+  .traffic-picker{grid-template-columns:minmax(68px,1fr) repeat(3,48px)!important;width:100%}
+  .dq-issue-row{grid-template-columns:1fr}
+  .dq-issue-actions{justify-content:stretch}
+  .dq-issue-actions .btn{flex:1}
+  .dq-fix-btn{width:100%}
+  .shop-item-summary{grid-template-columns:48px minmax(0,1fr) 20px!important;flex-wrap:nowrap!important}
+  .shop-item-details>div{padding-left:8px!important}
+  .view-toolbar{align-items:flex-start}
+  .view-toolbar>.btn-row{width:100%;display:grid;grid-template-columns:1fr}
+}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}
+}
 </style>
 </head>
 <body>
@@ -537,11 +671,11 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 </nav>
 
 <div class="mobile-nav" id="mobile-nav" aria-label="Main navigation">
-  <button data-view="vault" class="active" onclick="showView('vault')"><span>🍽</span>Recipes</button>
-  <button data-view="add" onclick="showView('add')"><span>＋</span>Add</button>
-  <button data-view="planner" onclick="showView('planner')"><span>▦</span>Plan</button>
-  <button data-view="shopping" onclick="showView('shopping')"><span>✓</span>Shopping</button>
-  <button data-view="more" onclick="openMobileMore()"><span>•••</span>More</button>
+  <button data-view="vault" class="active" onclick="showView('vault')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M5 4v7M8 4v7M5 8h3M6.5 11v9M16 4c-2 3-2 7 0 9h2V4M18 13v7"></path></svg>Recipes</button>
+  <button data-view="add" onclick="showView('add')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Add</button>
+  <button data-view="planner" onclick="showView('planner')"><svg aria-hidden="true" viewbox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2"></path></svg>Plan</button>
+  <button data-view="shopping" onclick="showView('shopping')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 5h2l2 10h9l2-7H7M9 20h.01M17 20h.01"></path></svg>Shopping</button>
+  <button data-view="more" onclick="openMobileMore()"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg>More</button>
 </div>
 <div class="mobile-more-wrap" id="mobile-more-wrap" onclick="if(event.target===this)closeMobileMore()">
   <div class="mobile-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-more-title">
@@ -711,7 +845,7 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
     <h2 style="margin:0">Product bank</h2>
     <div class="btn-row">
       <button class="btn sm primary" onclick="showAddIng()">+ Add product</button>
-      <button class="btn sm" onclick="showTescoImport()" style="background:var(--purple-bg);color:var(--purple);border-color:var(--purple)">🛒 Import Tesco</button>
+      <button class="btn sm" onclick="showTescoImport()" style="background:var(--purple-bg);color:var(--purple);border-color:var(--purple)">Import Tesco</button>
     </div>
   </div>
   <div id="bank-groups-panel"></div>
@@ -983,7 +1117,7 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 <div class="modal-wrap" id="tesco-modal-wrap" style="z-index: 170;">
   <div class="modal" style="max-width: 800px;">
     <div class="row-between" style="margin-bottom:14px;align-items:center">
-      <h2 id="tesco-import-title" style="margin:0">🛒 Import Tesco Product</h2>
+      <h2 id="tesco-import-title" style="margin:0">Import Tesco product</h2>
       <button class="btn sm ghost" onclick="closeTescoModal()">Cancel</button>
     </div>
     
@@ -1007,7 +1141,68 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
     </div>
     <div id="tesco-msg"></div>
 
-    <div id="tesco-preview" style="display: block; margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px;"></div>
+    <div id="tesco-preview" style="display: block; margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px;">
+      <div id="tesco-diagnostics-box" style=""></div>
+      <h3 id="tesco-details-heading" style="margin-bottom:10px">Review extracted details</h3>
+      <div class="grid2">
+        <div><label>Product name</label><input type="text" id="tp-name" placeholder="Product name"></div>
+        <div><label>Brand</label><input type="text" id="tp-brand" placeholder="Brand"></div>
+      </div>
+      <div class="grid2">
+          <div class="field" style="display: block;"><label>Category</label><input type="search" id="tp-cat-search" placeholder="Search category" list="tp-cat-category-options" style="width: 100%;"><select id="tp-cat" style="display: none;"></select><datalist id="tp-cat-category-options"></datalist></div>
+          <div class="field"><label>Storage</label><select id="tp-storage"><option value="">-- Select --</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="cupboard">Cupboard</option></select></div>
+      </div>
+      <p class="section-label">Per 100g</p>
+      <div class="grid3">
+        <div><label>Calories (kcal)</label><input type="number" id="tp-cal" placeholder="0"></div>
+        <div><label>Fat (g)</label><input type="number" id="tp-fat" placeholder="0"></div>
+        <div><label>Carbs (g)</label><input type="number" id="tp-carb" placeholder="0"></div>
+        <div><label>Fibre (g)</label><input type="number" id="tp-fibre" placeholder="0"></div>
+        <div><label>Protein (g)</label><input type="number" id="tp-prot" placeholder="0"></div>
+      </div>
+      <div class="grid3">
+        <div><label>Price per pack (£)</label><input type="number" id="tp-price" placeholder="0" step="0.01"></div>
+        <div>
+          <label>Pack size</label>
+          <div style="display:flex;gap:5px">
+            <input type="number" id="tp-pack" placeholder="500">
+            <select id="tp-pack-unit" style="width:70px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
+              <option value="g">g</option>
+              <option value="ml">ml</option>
+              <option value="qty">qty</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label>Weight of 1 item</label>
+          <div style="display:flex;gap:5px">
+            <input type="number" id="tp-item-weight" placeholder="e.g. 75">
+            <select id="tp-item-weight-unit" style="width:70px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
+              <option value="g">g</option>
+              <option value="ml">ml</option>
+              <option value="qty">qty</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label>Drained / usable weight</label>
+          <div style="display:flex;gap:5px">
+            <input type="number" id="tp-drained-weight" placeholder="e.g. 235">
+            <select id="tp-drained-weight-unit" style="width:70px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
+              <option value="g">g</option>
+              <option value="ml">ml</option>
+              <option value="qty">qty</option>
+            </select>
+          </div>
+        </div>
+      </div>
+        <div class="field" style="display: none;"><label>Meat substitute for (optional)<input type="text" id="tp-meatsub" placeholder="e.g. mince, chicken, bacon"></label></div>
+      <div class="field"><label>Notes</label><input type="text" id="tp-notes" placeholder="e.g. Found in freezer aisle"></div>
+      <div class="btn-row" style="margin-top:4px">
+        <button class="btn primary" id="tesco-save-btn" onclick="saveTescoIngredient()">Save to Product Bank</button>
+      </div>
+      <div id="tesco-save-msg"></div>
+    </div>
   </div>
 </div>
 
@@ -1639,8 +1834,8 @@ const SK='plateplan_v1';
 const BAKED_CANDIDATE_SK='plateplan_v1_baked_candidate';
 const RECOVERY_SK='plateplan_v1_recovery';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='19.1';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v5';
+const PLATEPLAN_APP_VERSION='19.2';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v6';
 const SEED=[];
 
 let state = null;
@@ -2036,7 +2231,11 @@ function loadState(){
   if (s.plan && typeof s.plan === 'object') {
     if (!Array.isArray(s.plan.mealPrepGroups)) s.plan.mealPrepGroups = [];
     if (!Array.isArray(s.plan.declinedMealPrepGroups)) s.plan.declinedMealPrepGroups = [];
+    if (!s.plan.shoppingAtHome || typeof s.plan.shoppingAtHome !== 'object' || Array.isArray(s.plan.shoppingAtHome)) s.plan.shoppingAtHome = {};
   }
+  s.planHistory.forEach(plan => {
+    if(plan && (!plan.shoppingAtHome || typeof plan.shoppingAtHome !== 'object' || Array.isArray(plan.shoppingAtHome))) plan.shoppingAtHome = {};
+  });
   if (!s.prefs.productPriority) s.prefs.productPriority = 'protein';
   if (!s.prefs.planTrafficFilter) s.prefs.planTrafficFilter = 'any';
   if (!Array.isArray(s.prefs.planTrafficE)) s.prefs.planTrafficE = ['green','amber','red'];
@@ -2644,6 +2843,7 @@ let platePlanSwRegistration=null;
 let platePlanUpdateApplying=false;
 let platePlanUpdateReloading=false;
 let platePlanUpdateTimer=null;
+let platePlanUpdateActivationPoll=null;
 let platePlanOfferedUpdateWorker=null;
 let platePlanActiveCacheVersion='';
 const PLATEPLAN_UPDATED_SESSION_KEY='plateplan_update_completed';
@@ -2659,6 +2859,15 @@ function requestPlatePlanWorkerVersion(){
   navigator.serviceWorker.controller?.postMessage({type:'GET_VERSION'});
 }
 
+function completePlatePlanUpdateReload(){
+  if(platePlanUpdateReloading)return;
+  platePlanUpdateReloading=true;
+  clearTimeout(platePlanUpdateTimer);
+  clearInterval(platePlanUpdateActivationPoll);
+  sessionStorage.setItem(PLATEPLAN_UPDATED_SESSION_KEY,PLATEPLAN_APP_VERSION);
+  location.reload();
+}
+
 function registerPlatePlanServiceWorker(){
   if(!('serviceWorker' in navigator)||location.protocol==='file:') return;
   const completed=sessionStorage.getItem(PLATEPLAN_UPDATED_SESSION_KEY);
@@ -2670,11 +2879,7 @@ function registerPlatePlanServiceWorker(){
     if(event.data?.type==='PLATEPLAN_VERSION') platePlanActiveCacheVersion=event.data.cacheName||'';
   });
   navigator.serviceWorker.addEventListener('controllerchange',()=>{
-    if(platePlanUpdateReloading) return;
-    platePlanUpdateReloading=true;
-    clearTimeout(platePlanUpdateTimer);
-    sessionStorage.setItem(PLATEPLAN_UPDATED_SESSION_KEY,PLATEPLAN_APP_VERSION);
-    location.reload();
+    completePlatePlanUpdateReload();
   });
   navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(registration=>{
     platePlanSwRegistration=registration;
@@ -2710,6 +2915,7 @@ function waitForPlatePlanWaitingWorker(registration,timeoutMs=10000){
 
 function showPlatePlanUpdateFailure(message){
   hideOverlay();
+  clearInterval(platePlanUpdateActivationPoll);
   platePlanUpdateApplying=false;
   openAppInfoModal('Update could not finish',`${ppEscapeHtml(message||'PlatePlan could not activate the update.')}<div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="applyPlatePlanAppUpdate()">Retry</button><button class="btn ghost" onclick="closeAppConfirmModal()">Close</button></div>`);
 }
@@ -2727,7 +2933,15 @@ async function applyPlatePlanAppUpdate(){
       await registration.update();
       worker=await waitForPlatePlanWaitingWorker(registration);
     }
-    platePlanUpdateTimer=setTimeout(()=>showPlatePlanUpdateFailure('The update timed out before PlatePlan reopened.'),15000);
+    clearInterval(platePlanUpdateActivationPoll);
+    platePlanUpdateActivationPoll=setInterval(()=>{
+      if(worker.state==='activated'||registration.active===worker)completePlatePlanUpdateReload();
+    },250);
+    platePlanUpdateTimer=setTimeout(()=>{
+      clearInterval(platePlanUpdateActivationPoll);
+      if(worker.state==='activated'||registration.active===worker)completePlatePlanUpdateReload();
+      else showPlatePlanUpdateFailure('The update timed out before PlatePlan reopened.');
+    },15000);
     worker.postMessage({type:'SKIP_WAITING'});
   }catch(error){
     clearTimeout(platePlanUpdateTimer);
@@ -2831,7 +3045,7 @@ function clearVolatileSavedDom(root = document){
     'shop-content','shop-summary','shop-meal-prep-panel',
     'dq-missing-list','dq-duplicate-list','dq-cat-list',
     'mapping-list','orig-ings-list','enh-ings-list','view-modal-content',
-    'replace-ing-body','parse-ing-list','tesco-preview','recipe-photo-previews','recipe-photo-msg','mobile-action-sheet'
+    'replace-ing-body','parse-ing-list','tesco-diagnostics-box','tesco-save-msg','tp-cat','tp-cat-category-options','recipe-photo-previews','recipe-photo-msg','mobile-action-sheet'
   ].forEach(id => {
     const el = find(id);
     if(el) el.innerHTML = '';
@@ -2843,8 +3057,10 @@ function clearVolatileSavedDom(root = document){
     'category-manager-wrap','ingredient-group-merge-wrap','delete-ingredient-group-wrap',
     'ingredient-alias-suggestion-wrap','tesco-duplicate-wrap','review-replace-wrap',
     'review-hover-tip','app-confirm-wrap','plateplan-import-preview-wrap','cat-reassign-modal',
-    'plateplan-auth-screen','plateplan-cloud-migration-wrap','plateplan-sync-conflict-wrap','recipe-recognition-wrap','saved-plan-pack-wrap'
+    'plateplan-auth-screen','plateplan-cloud-migration-wrap','plateplan-sync-conflict-wrap','recipe-recognition-wrap','saved-plan-pack-wrap',
+    'plateplan-toast-region'
   ].forEach(id => find(id)?.remove());
+  root.querySelectorAll?.('.modal-wrap.open,.mobile-more-wrap.open,.mobile-action-sheet-wrap.open').forEach(el=>{el.classList.remove('open');delete el.dataset.historyEntry;});
   const photoActions=find('recipe-photo-actions'); if(photoActions) photoActions.style.display='none';
 }
 
@@ -2855,6 +3071,12 @@ document.addEventListener('DOMContentLoaded', () => {
   loadBakedState();
   state = loadState();
   rebuildPlatePlanIndexes();
+  const syncThemeColor=()=>{
+    const dark=window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',dark?'#111214':'#F7F6F2');
+  };
+  syncThemeColor();
+  window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change',syncThemeColor);
   
   renderCatOptions('mi-cat', 'other');
   renderCatOptions('pp-cat', 'other');
@@ -4383,6 +4605,163 @@ function resolveProductForIngredientWithContext(recipeIng, context = {}){
   return resolveProductForIngredient(adjusted, context);
 }
 
+function enhancePlanTrafficControls(){
+  const symbols={green:'✓',amber:'–',red:'!'};
+  const names={green:'Green recipes',amber:'Amber recipes',red:'Red recipes'};
+  document.querySelectorAll('.traffic-pill').forEach(label=>{
+    const input=label.querySelector('input');
+    if(!input||label.querySelector('.traffic-symbol'))return;
+    const value=input.value;
+    input.setAttribute('aria-label',names[value]||value);
+    input.setAttribute('title',names[value]||value);
+    [...label.childNodes].forEach(node=>{if(node!==input)node.remove();});
+    const symbol=document.createElement('span');
+    symbol.className='traffic-symbol';
+    symbol.setAttribute('aria-hidden','true');
+    symbol.textContent=symbols[value]||'•';
+    label.appendChild(symbol);
+  });
+}
+
+function updatePlannerCompactHeader(){
+  const shell=document.getElementById('planner-compact-shell');
+  if(!shell||!state)return;
+  const hasPlan=!!(state.plan?.slots&&Object.values(state.plan.slots).some(day=>Object.values(day||{}).some(Boolean)));
+  const empty=document.getElementById('planner-quick-setup');
+  const active=document.getElementById('planner-active-setup');
+  if(empty)empty.style.display=hasPlan?'none':'grid';
+  if(active)active.style.display=hasPlan?'grid':'none';
+  const originalDays=document.getElementById('plan-days');
+  const originalStart=document.getElementById('plan-start-date');
+  const quickDays=document.getElementById('plan-quick-days');
+  const quickStart=document.getElementById('plan-quick-start');
+  if(quickDays)quickDays.value=String(hasPlan?(state.plan.days||originalDays?.value||7):(originalDays?.value||7));
+  if(quickStart)quickStart.value=hasPlan?(state.plan.dayDates?.[1]||''):(originalStart?.value||'');
+  const copy=document.getElementById('planner-active-copy');
+  if(copy&&hasPlan){
+    const days=state.plan.days||Object.keys(state.plan.slots||{}).length;
+    const dateRange=getPlanDateRangeLabel(state.plan);
+    copy.textContent=[`${days} day${days===1?'':'s'}`,dateRange].filter(Boolean).join(' · ');
+  }
+}
+
+function ensurePlannerOptionsUI(){
+  const planner=document.getElementById('view-planner');
+  if(!planner||document.getElementById('planner-compact-shell'))return;
+  const legacy=[...planner.children].find(child=>child.querySelector?.('#plan-days'));
+  const setup=document.getElementById('plan-setup-card');
+  if(!legacy||!setup)return;
+  const days=document.getElementById('plan-days');
+  const date=document.querySelector('#view-planner .plan-date-control');
+  const priority=document.getElementById('plan-product-priority');
+  const repeats=['breakfast','lunch','dinner'].map(meal=>document.getElementById(`plan-repeat-${meal}`)?.closest('label')).filter(Boolean);
+  const traffic=[...legacy.querySelectorAll('.traffic-picker')];
+  const dayOptions=[...days.options].map(option=>`<option value="${ppEscapeAttr(option.value)}">${ppEscapeHtml(option.textContent)}</option>`).join('');
+
+  const compact=document.createElement('section');
+  compact.id='planner-compact-shell';
+  compact.className='planner-compact-shell';
+  compact.innerHTML=`<div class="planner-compact-card" id="planner-quick-setup">
+      <div class="planner-compact-head"><div><div class="planner-compact-title">Meal planner</div><div class="planner-compact-copy">Choose the essentials, then generate. Detailed choices are in Plan options.</div></div><button class="btn ghost" onclick="openPlanOptionsWorkspace()">Plan options</button></div>
+      <div class="planner-quick-fields"><div><label for="plan-quick-days">Length</label><select id="plan-quick-days">${dayOptions}</select></div><div><label for="plan-quick-start">Starts (optional)</label><input id="plan-quick-start" type="date"></div></div>
+      <div class="planner-quick-actions"><button class="btn primary" onclick="generatePlanFromQuickSetup()">Generate plan</button></div>
+    </div>
+    <div class="planner-compact-card" id="planner-active-setup" style="display:none">
+      <div class="planner-compact-head"><div><div class="planner-compact-title">Meal planner</div><div class="planner-compact-copy" id="planner-active-copy"></div></div><button class="btn primary" onclick="openPlanOptionsWorkspace()">Edit plan settings</button></div>
+    </div>`;
+  planner.insertBefore(compact,legacy);
+
+  const wrap=document.createElement('div');
+  wrap.id='plan-options-wrap';
+  wrap.className='modal-wrap plan-options-wrap';
+  wrap.innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-labelledby="plan-options-title">
+    <div class="plan-options-appbar row-between" style="align-items:center"><div><h2 id="plan-options-title" style="margin:0">Plan options</h2><div style="font-size:12px;color:var(--text2)">Meal-plan generation settings</div></div><button class="btn ghost" onclick="closePlanOptionsWorkspace()">Close</button></div>
+    <div class="plan-options-body">
+      <section class="plan-options-section"><h3>Plan details</h3><div class="plan-options-grid" id="plan-options-details"></div></section>
+      <section class="plan-options-section"><h3>Recipe selection</h3><div class="plan-options-grid" id="plan-options-selection"></div></section>
+      <section class="plan-options-section"><h3>Traffic-light filters</h3><p style="font-size:12px;color:var(--text2);margin-bottom:10px">Choose the fit statuses PlatePlan may use for each person. Symbols keep the controls readable without relying on colour alone.</p><div style="display:grid;gap:10px" id="plan-options-traffic"></div></section>
+      <section class="plan-options-section"><h3>Meal slots</h3><div id="plan-options-slots"></div></section>
+    </div>
+    <div class="plan-options-workspace-actions"><button class="btn primary" onclick="generatePlanFromOptions()">Generate plan</button><button class="btn danger" onclick="confirmClearPlanFromOptions()">Clear plan</button></div>
+  </div>`;
+  document.body.appendChild(wrap);
+
+  const details=wrap.querySelector('#plan-options-details');
+  const daysField=document.createElement('div');
+  daysField.innerHTML='<label for="plan-days">Length</label>';
+  daysField.appendChild(days);
+  const dateField=document.createElement('div');
+  dateField.innerHTML='<label>Calendar dates</label>';
+  date.style.margin='0';
+  dateField.appendChild(date);
+  details.append(daysField,dateField);
+
+  const selection=wrap.querySelector('#plan-options-selection');
+  const priorityField=document.createElement('div');
+  priorityField.innerHTML='<label for="plan-product-priority">Product priority</label>';
+  priority.style.width='100%';
+  priorityField.appendChild(priority);
+  selection.appendChild(priorityField);
+  repeats.forEach(label=>{label.style.display='block';label.querySelector('select').style.width='100%';selection.appendChild(label);});
+
+  const trafficHost=wrap.querySelector('#plan-options-traffic');
+  traffic.forEach(picker=>trafficHost.appendChild(picker));
+  enhancePlanTrafficControls();
+
+  setup.style.display='';
+  setup.classList.remove('card');
+  setup.style.margin='0';
+  const setupTitle=setup.querySelector('h3');if(setupTitle)setupTitle.style.display='none';
+  wrap.querySelector('#plan-options-slots').appendChild(setup);
+  legacy.remove();
+  updatePlannerCompactHeader();
+}
+
+function syncPlannerQuickControls(){
+  const days=document.getElementById('plan-days');
+  const start=document.getElementById('plan-start-date');
+  const quickDays=document.getElementById('plan-quick-days');
+  const quickStart=document.getElementById('plan-quick-start');
+  if(days&&quickDays)days.value=quickDays.value;
+  if(start&&quickStart)start.value=quickStart.value;
+}
+
+function generatePlanFromQuickSetup(){
+  syncPlannerQuickControls();
+  buildExclGrid();
+  generatePlan();
+}
+
+function openPlanOptionsWorkspace(){
+  ensurePlannerOptionsUI();
+  const wrap=document.getElementById('plan-options-wrap');if(!wrap)return;
+  const days=document.getElementById('plan-days');
+  if(state.plan?.days&&days)days.value=String(state.plan.days);
+  const start=document.getElementById('plan-start-date');
+  if(start)start.value=state.plan?.dayDates?.[1]||document.getElementById('plan-quick-start')?.value||'';
+  setMealRepeatControlValues();
+  setPlanTrafficSelectValues();
+  renderExclGrid();
+  platePlanLastMobileFocus=document.activeElement;
+  wrap.classList.add('open');
+  markMobileLayerForBack(wrap,'plan-options');
+  setTimeout(()=>wrap.querySelector('button')?.focus(),0);
+}
+
+function closePlanOptionsWorkspace(fromHistory=false){
+  const wrap=document.getElementById('plan-options-wrap');if(!wrap)return;
+  const marked=wrap.dataset.historyEntry==='1';
+  wrap.classList.remove('open');delete wrap.dataset.historyEntry;
+  updatePlannerCompactHeader();
+  restoreMobileLayerFocus();
+  if(marked&&!fromHistory)returnFromPlatePlanUiHistory();
+}
+
+function generatePlanFromOptions(){generatePlan();}
+function confirmClearPlanFromOptions(){
+  openAppConfirmModal('Clear active meal plan?','This removes the current working plan and its shopping checklist. Saved plans remain in the Meal Plan Library.','Clear plan',()=>{clearPlan();closePlanOptionsWorkspace();});
+}
+
 function ensurePlannerShell(){
   const planner = document.getElementById('view-planner');
   if(planner && !document.getElementById('plan-setup-card')){
@@ -4418,6 +4797,7 @@ function ensurePlannerShell(){
     const content = document.getElementById('shop-content');
     if(content) content.insertAdjacentHTML('beforebegin', '<div id="shop-meal-prep-panel"></div>');
   }
+  ensurePlannerOptionsUI();
 }
 
 
@@ -4484,6 +4864,7 @@ function snapshotCurrentPlan(savedStatus = 'PlatePlan generated', name = ''){
     dayDates: JSON.parse(JSON.stringify(state.plan.dayDates || {})),
     productPriority: state.plan.productPriority || state.prefs.productPriority || 'protein',
     productSelections: JSON.parse(JSON.stringify(state.plan.productSelections || {})),
+    shoppingAtHome: JSON.parse(JSON.stringify(state.plan.shoppingAtHome || {})),
     overrides: JSON.parse(JSON.stringify(state.overrides || {})),
     score: calculatePlanScore(state.plan),
     mealPrepGroups: JSON.parse(JSON.stringify(state.plan.mealPrepGroups || [])),
@@ -4677,7 +5058,6 @@ function renderPlanOverallSummaryHtml(score){
   if(!el) return;
   if(!state.plan?.slots){ el.innerHTML=''; return; }
   el.innerHTML = `<div class="card" style="border-color:var(--green);margin-bottom:12px">
-    <div class="row-between" style="gap:10px;align-items:flex-start">
       <div>
         <h3 style="margin-bottom:6px;color:var(--green)">Meal plan summary</h3>
         <div class="plan-summary">
@@ -4687,8 +5067,6 @@ function renderPlanOverallSummaryHtml(score){
         </div>
         <div style="font-size:12px;color:var(--text2);margin-top:6px">Missing meals and snacks are assumed to be covered outside PlatePlan.</div>
       </div>
-      <button class="btn sm ghost" onclick="showPlanSetup()">Edit slots / regenerate</button>
-    </div>
   </div>`;
 }
 
@@ -7840,8 +8218,8 @@ function finishEditorReturn(defaultView = ''){
 
 function dataQualityFixButton(issue){
     const supported=['product','ingredient','subtype','recipe','recipe-ingredient'];
-    if(!supported.includes(issue.entityType)) return issue.fixButtonHtml||'';
-    return `<button class="btn sm ghost" onclick="beginDataQualityFix('${ppEscapeAttr(issue.entityType)}','${ppEscapeAttr(issue.entityId)}','${ppEscapeAttr(issue.key)}')">Fix</button>`;
+    if(!supported.includes(issue.entityType)) return String(issue.fixButtonHtml||'').replace(/class="btn sm ghost"/,'class="btn sm dq-fix-btn"');
+    return `<button class="btn sm dq-fix-btn" onclick="beginDataQualityFix('${ppEscapeAttr(issue.entityType)}','${ppEscapeAttr(issue.entityId)}','${ppEscapeAttr(issue.key)}')">Fix</button>`;
 }
 
 function renderDataQualityIssue(issue, dismissible = false){
@@ -7849,21 +8227,21 @@ function renderDataQualityIssue(issue, dismissible = false){
       ? `<button class="btn sm ghost" onclick="ignoreDataQualityWarning('${ppEscapeAttr(issue.key)}','${ppEscapeAttr(issue.fingerprint)}')">Looks right</button>`
       : '';
     const severityLabel = issue.severity === 'blocker' ? '<span class="tag bad" style="margin-left:6px">Blocks calculation</span>' : '';
-    return `<div class="row-between" data-dq-key="${ppEscapeAttr(issue.key)}" style="border-bottom:1px solid var(--border);padding:8px 0;gap:10px;align-items:flex-start">
+    return `<div class="dq-issue-row" data-dq-key="${ppEscapeAttr(issue.key)}">
       <div style="min-width:0"><div style="font-weight:600;font-size:13px">${ppEscapeHtml(issue.title)}${severityLabel}</div><div class="dq-warning">${ppEscapeHtml(issue.message)}</div></div>
-      <div class="btn-row" style="flex-wrap:nowrap">${ignoreButton}${dataQualityFixButton(issue)}</div>
+      <div class="dq-issue-actions">${ignoreButton}${dataQualityFixButton(issue)}</div>
     </div>`;
 }
 
 function renderDataQualityWarningRow(title, message, fixButtonHtml = '', ignoreKey = ''){
     const ignoreButton = ignoreKey ? `<button class="btn sm ghost" onclick="ignoreDataQualityWarning('${ppEscapeAttr(ignoreKey)}')">Looks right</button>` : '';
     return `
-    <div class="row-between" style="border-bottom:1px solid var(--border); padding:8px 0; gap:10px;">
+    <div class="dq-issue-row">
         <div>
             <div style="font-weight:600; font-size:13px;">${ppEscapeHtml(title)}</div>
             <div class="dq-warning">${ppEscapeHtml(message)}</div>
         </div>
-        <div class="btn-row" style="flex-wrap:nowrap">${ignoreButton}${fixButtonHtml}</div>
+        <div class="dq-issue-actions">${ignoreButton}${String(fixButtonHtml||'').replace(/class="btn sm ghost"/,'class="btn sm dq-fix-btn"')}</div>
     </div>`;
 }
 
@@ -7895,7 +8273,7 @@ function collectUnusualNumberWarnings(){
     const warnings = [];
     state.ingredients.forEach(product => {
         const title = product.name || 'Unnamed product';
-        const fix = `<button class="btn sm ghost" onclick="editIng('${ppEscapeAttr(product.id)}')">Fix</button>`;
+        const fix = `<button class="btn sm dq-fix-btn" onclick="editIng('${ppEscapeAttr(product.id)}')">Fix</button>`;
         const addProductWarning = (field, value, message) => {
             const rounded = Math.round((+value || 0) * 10) / 10;
             addPotentialDataQualityWarning(warnings, `product-${product.id}-${field}-${rounded}`, title, message, fix);
@@ -7919,7 +8297,7 @@ function collectUnusualNumberWarnings(){
         dataQualityRecipeVariants(recipe).forEach(variant => {
             const suffix = variant.label === 'Enhanced' ? ' enhanced' : ' original';
             const title = `${recipe.name || 'Untitled recipe'} (${variant.label})`;
-            const fix = `<button class="btn sm ghost" onclick="editRecipeModalView('${ppEscapeAttr(recipe.id)}')">Fix</button>`;
+            const fix = `<button class="btn sm dq-fix-btn" onclick="editRecipeModalView('${ppEscapeAttr(recipe.id)}')">Fix</button>`;
             const ps = dataQualityVariantPerServing(recipe, variant);
             const cal = +ps.cal || 0;
             const prot = +ps.prot || 0;
@@ -7966,7 +8344,7 @@ function collectMissingOilWarnings(){
             if(!recipeVariantMethodSuggestsOil(variant.steps)) return;
             const title = `${recipe.name || 'Untitled recipe'} (${variant.label})`;
             const key = `recipe-${recipe.id}-${variant.label}-missing-oil`;
-            const fix = `<button class="btn sm ghost" onclick="editRecipeModalView('${ppEscapeAttr(recipe.id)}')">Fix</button>`;
+            const fix = `<button class="btn sm dq-fix-btn" onclick="editRecipeModalView('${ppEscapeAttr(recipe.id)}')">Fix</button>`;
             addPotentialDataQualityWarning(warnings, key, title, 'Method suggests oil or frying, but no oil is listed in the ingredients.', fix);
         });
     });
@@ -7979,7 +8357,7 @@ function collectDeterministicDataQualityIssues(){
     const add = input => issues.push(createDataQualityIssue(input));
 
     (state.ingredients || []).forEach(product => {
-        const fix = `<button class="btn sm ghost" onclick="editIng('${ppEscapeAttr(product.id)}')">Fix</button>`;
+        const fix = `<button class="btn sm dq-fix-btn" onclick="editIng('${ppEscapeAttr(product.id)}')">Fix</button>`;
         if(!hasUsableIngredientNutrition(product)) add({entityType:'product',entityId:product.id,code:'unusable-nutrition',severity:'blocker',title:product.name || 'Unnamed product',message:'No usable mapped nutrition is available.',fixButtonHtml:fix,source:[product.cal,product.prot,product.carb,product.fat,product.fibre,product.name]});
         if(!(+(product.price) > 0)) add({entityType:'product',entityId:product.id,code:'missing-price',title:product.name || 'Unnamed product',message:'Price is missing.',fixButtonHtml:fix,source:product.price});
         if(!(+(product.packSize) > 0) || !product.packUnit) add({entityType:'product',entityId:product.id,code:'missing-pack',title:product.name || 'Unnamed product',message:'Pack size or unit is missing.',fixButtonHtml:fix,source:[product.packSize,product.packUnit]});
@@ -7988,7 +8366,7 @@ function collectDeterministicDataQualityIssues(){
     });
 
     (state.recipes || []).forEach(recipe => {
-        const fix = `<button class="btn sm ghost" onclick="editRecipeModalView('${ppEscapeAttr(recipe.id)}')">Fix</button>`;
+        const fix = `<button class="btn sm dq-fix-btn" onclick="editRecipeModalView('${ppEscapeAttr(recipe.id)}')">Fix</button>`;
         dataQualityRecipeVariants(recipe).forEach(variant => {
             const variantId = variant.label.toLowerCase();
             const title = `${recipe.name || 'Untitled recipe'} · ${variant.label}`;
@@ -8014,13 +8392,13 @@ function collectDeterministicDataQualityIssues(){
 
     (state.ingredientFamilies || []).forEach(family => {
         const groups = getFamilyGroups(family.id);
-        const fix = `<button class="btn sm ghost" onclick="openIngredientFamilyDetailsModal('${ppEscapeAttr(family.id)}')">Fix</button>`;
+        const fix = `<button class="btn sm dq-fix-btn" onclick="openIngredientFamilyDetailsModal('${ppEscapeAttr(family.id)}')">Fix</button>`;
         if(!groups.length) add({entityType:'ingredient',entityId:family.id,code:'no-subtypes',title:family.name || 'Unnamed ingredient',message:'Ingredient has no sub-types.',fixButtonHtml:fix,source:family.typeIds});
         if(!family.cat || family.cat === 'other') add({entityType:'ingredient',entityId:family.id,code:'missing-category',title:family.name || 'Unnamed ingredient',message:'Ingredient has no sorted category.',fixButtonHtml:fix,source:family.cat});
     });
     (state.ingredientGroups || []).forEach(group => {
         const products = getGroupProducts(group.id);
-        const fix = `<button class="btn sm ghost" onclick="openIngredientGroupDetailsModal('${ppEscapeAttr(group.id)}','name')">Fix</button>`;
+        const fix = `<button class="btn sm dq-fix-btn" onclick="openIngredientGroupDetailsModal('${ppEscapeAttr(group.id)}','name')">Fix</button>`;
         const title = getGroupHierarchyText(group);
         if(!group.ingredientId || !getIngredientFamily(group.ingredientId)) add({entityType:'subtype',entityId:group.id,code:'missing-ingredient-link',title,message:'Sub-type is not linked to a valid ingredient.',fixButtonHtml:fix,source:group.ingredientId});
         if(!products.length) add({entityType:'subtype',entityId:group.id,code:'no-products',title,message:'Sub-type has no linked products.',fixButtonHtml:fix,source:products.map(p => p.id)});
@@ -11195,11 +11573,11 @@ function showTescoImport(context = null){
   const diagnosticsBox = document.getElementById('tesco-diagnostics-box');
   if(diagnosticsBox) diagnosticsBox.style.display = manualAddMode ? 'none' : '';
   const importTitle = document.getElementById('tesco-import-title');
-  if(importTitle) importTitle.textContent = manualAddMode ? 'Add Ingredient' : '🛒 Import Tesco Product';
+  if(importTitle) importTitle.textContent = manualAddMode ? 'Add product' : 'Import Tesco product';
   const detailsHeading = document.getElementById('tesco-details-heading');
-  if(detailsHeading) detailsHeading.textContent = manualAddMode ? 'Add Ingredient' : 'Review extracted details';
+  if(detailsHeading) detailsHeading.textContent = manualAddMode ? 'Product details' : 'Review extracted details';
   const saveBtn = document.getElementById('tesco-save-btn');
-  if(saveBtn) saveBtn.textContent = manualAddMode ? 'Add Ingredient' : 'Save to ingredient bank';
+  if(saveBtn) saveBtn.textContent = manualAddMode ? 'Add product' : 'Save to Product Bank';
   ['tesco-bookmarklet-panel','tesco-paste-panel','tesco-extract-actions'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.style.display = manualAddMode ? 'none' : '';
@@ -12748,7 +13126,7 @@ function generatePlan(){
   snapshotCurrentPlan();
   state.overrides = {};
   const dayDates=buildPlanDayDates(document.getElementById('plan-start-date')?.value||'',days);
-  const nextPlan = {days,slots,dayDates,productPriority:priority,trafficFilter:{ e: state.prefs.planTrafficE || ['green','amber','red'], c: state.prefs.planTrafficC || ['green','amber','red'] },mealRepeatCadence:cadence,productSelections,warnings:[],score:null,confirmedShopping:false,mealPrepGroups:[],declinedMealPrepGroups:[]};
+  const nextPlan = {days,slots,dayDates,productPriority:priority,trafficFilter:{ e: state.prefs.planTrafficE || ['green','amber','red'], c: state.prefs.planTrafficC || ['green','amber','red'] },mealRepeatCadence:cadence,productSelections,shoppingAtHome:{},warnings:[],score:null,confirmedShopping:false,mealPrepGroups:[],declinedMealPrepGroups:[]};
   nextPlan.score = calculatePlanScore(nextPlan);
   state.plan = nextPlan;
   const autoPrepSuggestions = findMealPrepSuggestions(state.plan).filter(s => {
@@ -12756,7 +13134,7 @@ function generatePlan(){
     return repeat > 1 && (s.days || []).length >= repeat;
   });
   state.plan.mealPrepGroups = autoPrepSuggestions.map(s => ({ key:s.key, recipeId:s.recipeId, variant:s.variant, mealKey:s.mealKey, peopleKey:s.peopleKey, days:s.days }));
-  saveState();renderPlan();
+  saveState();renderPlan();closePlanOptionsWorkspace();showPlatePlanToast('Meal plan generated.');
 }
 
 function getSlotPersonPrefix(slotKey){
@@ -12944,8 +13322,9 @@ function renderPlan(){
   renderPlanHistoryPanel();
   reconcileVisiblePlanSummaries();
   const setup=document.getElementById('plan-setup-card');
-  if(setup && hasValidSlots) setup.style.display = 'none';
+  if(setup) setup.style.display = '';
   document.getElementById('plan-actions').style.display = hasValidSlots ? 'block' : 'none';
+  updatePlannerCompactHeader();
 }
 function swapSlot(day,slot,id){
     if(!state.plan.slots[day]) state.plan.slots[day]={};
@@ -12977,14 +13356,12 @@ function clearPlan(){
     const setup=document.getElementById('plan-setup-card'); if(setup) setup.style.display = '';
     document.getElementById('plan-actions').style.display = 'none';
     renderPlanHistoryPanel();
+    updatePlannerCompactHeader();
 }
 
 function showPlanSetup(){
   ensurePlannerShell();
-  const setup=document.getElementById('plan-setup-card');
-  if(setup) setup.style.display = '';
-  renderExclGrid();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  openPlanOptionsWorkspace();
 }
 
 function renderPlanOverallSummary(){
@@ -13118,6 +13495,7 @@ function loadPlanHistoryForEdit(index){
         dayDates: JSON.parse(JSON.stringify(p.dayDates || {})),
         productPriority: p.productPriority || state.prefs.productPriority || 'protein',
         productSelections: JSON.parse(JSON.stringify(p.productSelections || {})),
+        shoppingAtHome: JSON.parse(JSON.stringify(p.shoppingAtHome || {})),
         warnings: [],
         score: calculatePlanScore({ days:p.days, slots:p.slots, productSelections:p.productSelections }),
         confirmedShopping: !!p.confirmedShopping,
@@ -13331,6 +13709,39 @@ function decodeShopTarget(value){
 
 function formatShoppingBatchAmount(grams){
   return `${Math.round((+grams || 0) * 10) / 10}g`;
+}
+
+function getShoppingLineStateKey(groupId,bankId,fallback=''){
+  return [String(groupId||normaliseAliasText(fallback)||'unresolved'),String(bankId||'unresolved')].join('|');
+}
+
+function setShoppingAtHome(key,checked,{quiet=false}={}){
+  if(!state.plan?.slots||!key)return;
+  if(!state.plan.shoppingAtHome||typeof state.plan.shoppingAtHome!=='object')state.plan.shoppingAtHome={};
+  if(checked)state.plan.shoppingAtHome[key]=true;else delete state.plan.shoppingAtHome[key];
+  state.plan.confirmedShopping=false;
+  saveState();
+  markPlatePlanViewsDirty('shopping','planlib');
+  renderShopping();
+  if(!quiet){
+    showPlatePlanToast(checked?'Moved to Already have.':'Moved back to your shopping list.',{
+      label:'Undo',
+      onclick:()=>setShoppingAtHome(key,!checked,{quiet:true})
+    });
+  }
+}
+
+function organiseShoppingAtHomeRows(host){
+  if(!host)return;
+  const rows=[...host.querySelectorAll('.shop-item-details[data-at-home="true"]')];
+  if(!rows.length)return;
+  const section=document.createElement('details');
+  section.className='shop-home-section grouped-section';
+  section.innerHTML=`<summary class="grouped-row"><span>Already have</span><span>${rows.length} item${rows.length===1?'':'s'} <span aria-hidden="true">⌄</span></span></summary><div class="grouped-row" data-shop-home-rows></div>`;
+  const target=section.querySelector('[data-shop-home-rows]');
+  rows.forEach(row=>target.appendChild(row));
+  host.querySelectorAll('.shop-section').forEach(group=>{if(!group.querySelector('.shop-item-details'))group.remove();});
+  host.appendChild(section);
 }
 
 function groupShoppingAllocationsByMeal(allocations){
@@ -13622,10 +14033,10 @@ function renderShopping(){
         const raw = ingRaw(adjustedIng);
         const amt = getShoppingAmount(adjustedIng, bankIng, slotScale);
         const grams = amt.grams;
-        const k = `${groupId || raw.toLowerCase().trim()}|${actualBankId || 'unresolved'}`;
+        const k = getShoppingLineStateKey(groupId,actualBankId,raw);
 
         if(k){
-          if(!agg[k]) agg[k] = { name: actualName || raw, productName: bankIng?.name || '', bankId: actualBankId, groupId, group: getGroupingKey(bankIng?.name || actualName || raw, actualBankId, groupId), grams: 0, needQty: 0, needUnit: amt.unit, mixedUnits: false, allocations: [] };
+          if(!agg[k]) agg[k] = { key:k, name: actualName || raw, productName: bankIng?.name || '', bankId: actualBankId, groupId, group: getGroupingKey(bankIng?.name || actualName || raw, actualBankId, groupId), grams: 0, needQty: 0, needUnit: amt.unit, mixedUnits: false, allocations: [] };
           agg[k].grams += grams;
           if(agg[k].needUnit === amt.unit && !agg[k].mixedUnits) {
             agg[k].needQty += amt.qty;
@@ -13670,9 +14081,15 @@ function renderShopping(){
       if (!groupedData[g]) groupedData[g] = [];
       groupedData[g].push(item);
   });
-  const priceSummary = calculateShoppingPriceFromAggregates(agg);
+  if(!state.plan.shoppingAtHome||typeof state.plan.shoppingAtHome!=='object')state.plan.shoppingAtHome={};
+  const validShoppingKeys=new Set(Object.keys(agg));
+  const staleShoppingKeys=Object.keys(state.plan.shoppingAtHome).filter(key=>!validShoppingKeys.has(key));
+  if(staleShoppingKeys.length){staleShoppingKeys.forEach(key=>delete state.plan.shoppingAtHome[key]);saveState();}
+  const buyableAgg=Object.fromEntries(Object.entries(agg).filter(([key])=>!state.plan.shoppingAtHome[key]));
+  const allPriceSummary = calculateShoppingPriceFromAggregates(agg);
+  const priceSummary = calculateShoppingPriceFromAggregates(buyableAgg);
   estimatedTotal = priceSummary.estimatedTotal;
-  consumedTotal = priceSummary.consumedTotal;
+  consumedTotal = allPriceSummary.consumedTotal;
   
   let html='';
   Object.entries(groupedData).forEach(([gKey, items])=>{
@@ -13680,6 +14097,7 @@ function renderShopping(){
       let title = (groupMode === 'family' || groupMode === 'category') ? gKey : (gKey ? gKey.charAt(0).toUpperCase() + gKey.slice(1) : 'Other');
       
       html+='<div class="shop-section"><h3>'+title+'</h3><div class="card" style="padding:0 14px">'+items.sort((a,b)=>a.name.localeCompare(b.name)).map(it=>{
+          const isAtHome=!!state.plan.shoppingAtHome?.[it.key];
           let displayName = it.name;
           const productLabel = it.productName && it.productName !== it.name ? ` <span style="color:var(--text3);font-size:12px;font-weight:normal;">(${ppEscapeHtml(it.productName)})</span>` : '';
           const needLabel = formatShoppingNeed(it);
@@ -13697,7 +14115,7 @@ function renderShopping(){
           const allocationHtml = renderShoppingMealAllocationRows(it, itemScope);
 
           let optimiserHtml = '';
-          if (it.bankId && it.grams > 0) {
+          if (!isAtHome && it.bankId && it.grams > 0) {
               const bi = state.ingredients.find(x => x.id === it.bankId);
               if (bi) {
                   const variants = getPackVariants(bi);
@@ -13725,10 +14143,11 @@ function renderShopping(){
 
 
           return `
-          <details class="shop-item-details" style="padding:6px 0; border-bottom:1px solid var(--border);">
-              <summary style="font-size:13px; cursor:pointer; outline:none; font-weight:500; display:flex; justify-content:space-between;">
-                  <span>${ppEscapeHtml(displayName)}${productLabel} <span style="color:var(--text3);font-size:12px;font-weight:normal;">Need ${needLabel}</span></span>
-                  <span style="font-size:10px;color:var(--text3);">▼</span>
+          <details class="shop-item-details" data-shopping-key="${ppEscapeAttr(it.key)}" data-at-home="${isAtHome?'true':'false'}" style="padding:6px 0; border-bottom:1px solid var(--border);">
+              <summary class="shop-item-summary" style="font-size:13px; cursor:pointer; outline:none; font-weight:500;">
+                  <input class="shop-home-check" type="checkbox" ${isAtHome?'checked':''} aria-label="${ppEscapeAttr(isAtHome?'Remove '+displayName+' from Already have':'Mark '+displayName+' as already at home')}" onclick="event.stopPropagation()" onchange="event.stopPropagation();setShoppingAtHome('${ppEscapeAttr(it.key)}',this.checked)">
+                  <span class="shop-item-copy">${ppEscapeHtml(displayName)}${productLabel}<span class="shop-need">Need ${needLabel}</span></span>
+                  <span style="font-size:12px;color:var(--text3);" aria-hidden="true">⌄</span>
               </summary>
               <div style="padding-left:15px; margin-top:5px; font-size:12px; color:var(--text2);">
                   ${allocationHtml}
@@ -13738,6 +14157,7 @@ function renderShopping(){
       }).join('')+'</div></div>';
   });
   el.innerHTML=html||'<div class="empty">No ingredients to list.</div>';
+  organiseShoppingAtHomeRows(el);
   const summary=document.getElementById('shop-summary');
   renderMealPrepSuggestions();
   if(summary){
@@ -14108,10 +14528,10 @@ function closeSavedPlanRecipeCards(){document.getElementById('saved-plan-pack-wr
 function downloadCurrentSavedPlanPack(){if(currentSavedPlanPackSnapshot)downloadRecipePackSnapshot(currentSavedPlanPackSnapshot,`${currentSavedPlanPackSnapshot.planName||'PlatePlan saved plan'} recipe pack.html`);}
 
 function copyList(){
-  const items=document.querySelectorAll('#shop-content .shop-item-details summary span:first-child');
-  if(!items.length)return alert('No shopping list to copy.');
-  const text=Array.from(items).map(i=>'- '+i.textContent).join('\n');
-  navigator.clipboard.writeText(text).then(()=>alert('Shopping list copied!')).catch(()=>alert('Copy failed -- please select and copy manually.'));
+  const items=document.querySelectorAll('#shop-content .shop-item-details[data-at-home="false"] .shop-item-copy');
+  if(!items.length)return openAppInfoModal('Shopping list','Everything is currently marked as already at home.');
+  const text=Array.from(items).map(i=>'- '+i.innerText.trim().replace(/\s+/g,' ')).join('\n');
+  navigator.clipboard.writeText(text).then(()=>showPlatePlanToast('Shopping list copied.')).catch(()=>openAppInfoModal('Copy failed','PlatePlan could not access the clipboard. Please select and copy the list manually.'));
 }
 
 // == MEAL PRODUCT OVERRIDE MODAL LOGIC ==
@@ -14585,6 +15005,20 @@ function savePrefs(){
 }
 
 // == UTILS ==
+const platePlanToastActions=new Map();
+function runPlatePlanToastAction(id){
+  const action=platePlanToastActions.get(id);platePlanToastActions.delete(id);
+  document.getElementById(`plateplan-toast-${id}`)?.remove();
+  if(typeof action==='function')action();
+}
+function showPlatePlanToast(message,action=null){
+  let region=document.getElementById('plateplan-toast-region');
+  if(!region){region=document.createElement('div');region.id='plateplan-toast-region';region.className='plateplan-toast-region';region.setAttribute('role','status');region.setAttribute('aria-live','polite');document.body.appendChild(region);}
+  const id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  if(action?.onclick)platePlanToastActions.set(id,action.onclick);
+  region.innerHTML=`<div class="plateplan-toast" id="plateplan-toast-${id}"><span>${ppEscapeHtml(message)}</span>${action?.onclick?`<button onclick="runPlatePlanToastAction('${ppEscapeAttr(id)}')">${ppEscapeHtml(action.label||'Undo')}</button>`:''}</div>`;
+  setTimeout(()=>{document.getElementById(`plateplan-toast-${id}`)?.remove();platePlanToastActions.delete(id);},4200);
+}
 function showMsg(id,msg,type){const el=document.getElementById(id);if(!el)return;el.innerHTML='<div class="msg '+type+'">'+msg+'</div>';setTimeout(()=>{if(el)el.innerHTML='';},4000);}
 function showOverlay(msg,sub){document.getElementById('overlay-msg').textContent=msg;document.getElementById('overlay-sub').textContent=sub||'';document.getElementById('overlay').classList.add('visible');}
 function hideOverlay(){document.getElementById('overlay').classList.remove('visible');}
