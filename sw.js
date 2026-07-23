@@ -1,4 +1,4 @@
-const PLATEPLAN_CACHE = 'plateplan-shell-v7';
+const PLATEPLAN_CACHE = 'plateplan-shell-v8';
 const PLATEPLAN_LOCAL_SHELL = [
   './',
   './PlatePlan.html',
@@ -21,6 +21,7 @@ const PLATEPLAN_OPTIONAL_SHELL = [
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js',
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js'
 ];
+let platePlanReloadClientsAfterActivate = false;
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(PLATEPLAN_CACHE).then(async cache => {
@@ -33,6 +34,14 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => Promise.all(keys.filter(key => key !== PLATEPLAN_CACHE).map(key => caches.delete(key))))
       .then(() => self.clients.claim())
+      .then(async () => {
+        if(!platePlanReloadClientsAfterActivate) return;
+        const clients = await self.clients.matchAll({type:'window',includeUncontrolled:true});
+        clients.forEach(client => client.postMessage({type:'PLATEPLAN_UPDATE_ACTIVATED',cacheName:PLATEPLAN_CACHE}));
+        setTimeout(() => {
+          clients.forEach(client => client.navigate(client.url).catch(()=>{}));
+        },1200);
+      })
   );
 });
 
@@ -57,6 +66,13 @@ self.addEventListener('fetch', event => {
 });
 
 self.addEventListener('message', event => {
-  if(event.data?.type === 'SKIP_WAITING') self.skipWaiting();
-  if(event.data?.type === 'GET_VERSION') event.source?.postMessage({type:'PLATEPLAN_VERSION',cacheName:PLATEPLAN_CACHE});
+  if(event.data?.type === 'SKIP_WAITING'){
+    platePlanReloadClientsAfterActivate = true;
+    event.waitUntil(self.skipWaiting());
+  }
+  if(event.data?.type === 'GET_VERSION'){
+    const message={type:'PLATEPLAN_VERSION',cacheName:PLATEPLAN_CACHE};
+    if(event.ports?.[0]) event.ports[0].postMessage(message);
+    else event.source?.postMessage(message);
+  }
 });

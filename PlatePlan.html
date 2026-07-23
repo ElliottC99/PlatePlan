@@ -1918,8 +1918,8 @@ const BAKED_CANDIDATE_SK='plateplan_v1_baked_candidate';
 const RECOVERY_SK='plateplan_v1_recovery';
 const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='19.3';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v7';
+const PLATEPLAN_APP_VERSION='19.3.1';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v8';
 const SEED=[];
 
 let state = null;
@@ -2404,8 +2404,15 @@ let platePlanRemoteBuffer=new Map();
 let platePlanEditBaselines={};
 
 function capturePlatePlanEditBaseline(key){
-  const projection=platePlanStateProjection(state);
-  platePlanEditBaselines[key]={value:cleanCloudValue(projection[key]??null),revision:+platePlanCloudRevisions[key]||0,capturedAt:Date.now()};
+  try{
+    const projection=platePlanStateProjection(state);
+    platePlanEditBaselines[key]={value:cleanCloudValue(projection[key]??null),revision:+platePlanCloudRevisions[key]||0,capturedAt:Date.now()};
+    return true;
+  }catch(error){
+    console.warn('PlatePlan could not capture an edit baseline; opening the editor without cloud conflict metadata.',key,error);
+    delete platePlanEditBaselines[key];
+    return false;
+  }
 }
 
 function getPlatePlanDeviceId(){
@@ -2932,6 +2939,7 @@ let platePlanUpdateTimer=null;
 let platePlanUpdateActivationPoll=null;
 let platePlanOfferedUpdateWorker=null;
 let platePlanActiveCacheVersion='';
+let platePlanPendingTargetCache='';
 const PLATEPLAN_UPDATED_SESSION_KEY='plateplan_update_completed';
 
 function showPlatePlanUpdateOffer(registration){
@@ -2945,27 +2953,64 @@ function requestPlatePlanWorkerVersion(){
   navigator.serviceWorker.controller?.postMessage({type:'GET_VERSION'});
 }
 
-function completePlatePlanUpdateReload(){
+function getPlatePlanWorkerVersion(worker,timeoutMs=1800){
+  return new Promise(resolve=>{
+    if(!worker)return resolve('');
+    const channel=new MessageChannel();
+    let settled=false;
+    const onGlobalMessage=event=>{if(event.data?.type==='PLATEPLAN_VERSION')finish(event.data.cacheName||'');};
+    const finish=value=>{if(settled)return;settled=true;clearTimeout(timer);navigator.serviceWorker.removeEventListener('message',onGlobalMessage);resolve(value||'');};
+    channel.port1.onmessage=event=>finish(event.data?.cacheName||'');
+    navigator.serviceWorker.addEventListener('message',onGlobalMessage);
+    const timer=setTimeout(()=>finish(''),timeoutMs);
+    try{worker.postMessage({type:'GET_VERSION'},[channel.port2]);}
+    catch(_error){finish('');}
+  });
+}
+
+function setPlatePlanUpdateCompletionMarker(cacheName=''){
+  try{sessionStorage.setItem(PLATEPLAN_UPDATED_SESSION_KEY,JSON.stringify({cacheName:cacheName||'',requestedAt:Date.now()}));}
+  catch(_error){}
+}
+
+async function confirmPlatePlanUpdateAfterReload(registration){
+  const raw=sessionStorage.getItem(PLATEPLAN_UPDATED_SESSION_KEY);
+  if(!raw)return;
+  let expectedCache='';
+  try{expectedCache=JSON.parse(raw)?.cacheName||'';}catch(_error){}
+  const activeCache=await getPlatePlanWorkerVersion(navigator.serviceWorker.controller);
+  if(expectedCache&&activeCache!==expectedCache){
+    const waitingCache=await getPlatePlanWorkerVersion(registration?.waiting);
+    if(registration?.waiting&&waitingCache===expectedCache){
+      platePlanPendingTargetCache=expectedCache;
+      registration.waiting.postMessage({type:'SKIP_WAITING'});
+      setTimeout(()=>location.reload(),1800);
+    }
+    return;
+  }
+  sessionStorage.removeItem(PLATEPLAN_UPDATED_SESSION_KEY);
+  closeAppConfirmModal();
+  hideOverlay();
+  setTimeout(()=>openAppInfoModal('PlatePlan updated',`PlatePlan updated to version <strong>${ppEscapeHtml(PLATEPLAN_APP_VERSION)}</strong>.`),350);
+}
+
+function completePlatePlanUpdateReload(targetCache=''){
   if(platePlanUpdateReloading)return;
   platePlanUpdateReloading=true;
   clearTimeout(platePlanUpdateTimer);
   clearInterval(platePlanUpdateActivationPoll);
-  sessionStorage.setItem(PLATEPLAN_UPDATED_SESSION_KEY,PLATEPLAN_APP_VERSION);
+  setPlatePlanUpdateCompletionMarker(targetCache||platePlanPendingTargetCache);
   location.reload();
 }
 
 function registerPlatePlanServiceWorker(){
   if(!('serviceWorker' in navigator)||location.protocol==='file:') return;
-  const completed=sessionStorage.getItem(PLATEPLAN_UPDATED_SESSION_KEY);
-  if(completed){
-    sessionStorage.removeItem(PLATEPLAN_UPDATED_SESSION_KEY);
-    setTimeout(()=>openAppInfoModal('PlatePlan updated',`PlatePlan updated to version <strong>${ppEscapeHtml(completed)}</strong>.`),450);
-  }
   navigator.serviceWorker.addEventListener('message',event=>{
     if(event.data?.type==='PLATEPLAN_VERSION') platePlanActiveCacheVersion=event.data.cacheName||'';
+    if(event.data?.type==='PLATEPLAN_UPDATE_ACTIVATED') completePlatePlanUpdateReload(event.data.cacheName||platePlanPendingTargetCache);
   });
   navigator.serviceWorker.addEventListener('controllerchange',()=>{
-    completePlatePlanUpdateReload();
+    if(platePlanUpdateApplying||sessionStorage.getItem(PLATEPLAN_UPDATED_SESSION_KEY)) completePlatePlanUpdateReload(platePlanPendingTargetCache);
   });
   navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(registration=>{
     platePlanSwRegistration=registration;
@@ -2977,6 +3022,7 @@ function registerPlatePlanServiceWorker(){
       });
     });
     requestPlatePlanWorkerVersion();
+    confirmPlatePlanUpdateAfterReload(registration);
     setTimeout(()=>registration.update().catch(error=>console.info('PlatePlan update check unavailable',error)),1200);
   }).catch(error=>console.warn('PlatePlan service worker registration failed',error));
 }
@@ -3019,15 +3065,16 @@ async function applyPlatePlanAppUpdate(){
       await registration.update();
       worker=await waitForPlatePlanWaitingWorker(registration);
     }
+    platePlanPendingTargetCache=await getPlatePlanWorkerVersion(worker);
+    setPlatePlanUpdateCompletionMarker(platePlanPendingTargetCache);
     clearInterval(platePlanUpdateActivationPoll);
     platePlanUpdateActivationPoll=setInterval(()=>{
-      if(worker.state==='activated'||registration.active===worker)completePlatePlanUpdateReload();
+      if(worker.state==='activated'||registration.active===worker)completePlatePlanUpdateReload(platePlanPendingTargetCache);
     },250);
     platePlanUpdateTimer=setTimeout(()=>{
       clearInterval(platePlanUpdateActivationPoll);
-      if(worker.state==='activated'||registration.active===worker)completePlatePlanUpdateReload();
-      else showPlatePlanUpdateFailure('The update timed out before PlatePlan reopened.');
-    },15000);
+      completePlatePlanUpdateReload(platePlanPendingTargetCache);
+    },10000);
     worker.postMessage({type:'SKIP_WAITING'});
   }catch(error){
     clearTimeout(platePlanUpdateTimer);
@@ -10092,9 +10139,16 @@ function openIngredientEditor(familyId,trigger=null){
     openIngredientFamilyDetailsModal(familyId,false);
     return true;
   }catch(error){
-    console.error('Could not open ingredient editor',error);
-    showPlatePlanToast('Could not open that ingredient. Please close other panels and try again.');
-    return false;
+    console.warn('Rebuilding the ingredient editor after an opening error.',error);
+    document.querySelectorAll('#ingredient-family-details-wrap').forEach(node=>node.remove());
+    try{
+      openIngredientFamilyDetailsModal(familyId,false);
+      return true;
+    }catch(retryError){
+      console.error('Could not open ingredient editor after rebuilding it.',retryError);
+      openAppInfoModal('Could not open ingredient',`PlatePlan rebuilt the editor but could not open this ingredient. No data was changed.<details class="card-details"><summary>Technical detail</summary><div class="breakable-id">${ppEscapeHtml(retryError?.message||String(retryError))}</div></details>`);
+      return false;
+    }
   }
 }
 
