@@ -1,4 +1,4 @@
-const PLATEPLAN_CACHE = 'plateplan-shell-v15';
+const PLATEPLAN_CACHE = 'plateplan-shell-v16';
 const PLATEPLAN_LOCAL_SHELL = [
   './',
   './PlatePlan.html',
@@ -7,14 +7,7 @@ const PLATEPLAN_LOCAL_SHELL = [
   './icon-192.png',
   './icon-512.png',
   './icon-192-maskable.png',
-  './icon-512-maskable.png',
-  './vendor/tesseract/tesseract.min.js',
-  './vendor/tesseract/worker.min.js',
-  './vendor/tesseract/core/tesseract-core.wasm.js',
-  './vendor/tesseract/core/tesseract-core-simd.wasm.js',
-  './vendor/tesseract/core/tesseract-core-lstm.wasm.js',
-  './vendor/tesseract/core/tesseract-core-simd-lstm.wasm.js',
-  './vendor/tesseract/lang/eng.traineddata.gz'
+  './icon-512-maskable.png'
 ];
 const PLATEPLAN_OPTIONAL_SHELL = [
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js',
