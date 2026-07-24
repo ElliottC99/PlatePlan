@@ -268,7 +268,12 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 .recipe-card-actions .btn,.hierarchy-actions .btn,.subtype-actions .btn{width:100%;justify-content:center;text-align:center;white-space:nowrap}
 .enhanced-layout{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .enhanced-actions{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap;flex-shrink:0}
-.enhanced-actions>.enhanced-more-action{display:none}
+.enhanced-actions>.enhanced-more-action{display:inline-flex}
+.category-combobox{position:relative}
+.category-suggestions{position:absolute;z-index:520;left:0;right:0;top:calc(100% + 4px);max-height:min(280px,45vh);overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:5px}
+.category-suggestions[hidden]{display:none}
+.category-suggestion{display:flex;width:100%;min-height:48px;align-items:center;padding:10px 12px;border:0;border-radius:8px;background:transparent;color:var(--text);font:inherit;text-align:left}
+.category-suggestion:hover,.category-suggestion.active{background:var(--surface2)}
 .hierarchy-card-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,320px);gap:18px;align-items:start}
 .hierarchy-actions,.subtype-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;align-self:start}
 .subtype-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,340px);gap:18px;align-items:start;padding:10px 0;border-top:1px solid rgba(0,0,0,.04)}
@@ -871,7 +876,7 @@ main{max-width:var(--content-max);padding:22px 20px 96px}
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
 
-/* PlatePlan 20.1 — readable actions and compact mobile workspaces */
+/* PlatePlan 20.2 — essential workflow and planner reliability */
 .btn.primary,.btn.dq-fix-btn,.cf.active,.mt2.active{
   background:var(--action-fill,#0969da)!important;
   border-color:var(--action-fill,#0969da)!important;
@@ -2252,8 +2257,8 @@ const RECOVERY_SK='plateplan_v1_recovery';
 const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='20.1';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v11';
+const PLATEPLAN_APP_VERSION='20.2';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v12';
 const SEED=[];
 
 let state = null;
@@ -2421,7 +2426,9 @@ function openRecipeActions(recipeId){
 function openEnhancedRecipeActions(recipeId){
   const recipe=getProductIndexRecipe(recipeId); if(!recipe?.enhanced) return;
   openMobileActionSheet(`${recipe.name} · Enhanced`,[
+    {label:'Review enhanced recipe',onclick:`reviewEnhancedRecipe('${ppEscapeAttr(recipeId)}')`},
     {label:'Recipe card',onclick:`downloadRecipeCard('${ppEscapeAttr(recipeId)}','enhanced')`},
+    {label:'Duplicate complete recipe',onclick:`duplicateRecipe('${ppEscapeAttr(recipeId)}')`},
     {label:'Edit enhanced recipe',onclick:`editEnhancedRecipe('${ppEscapeAttr(recipeId)}')`},
     {label:'Delete enhanced version',onclick:`deleteEnhancedRecipe('${ppEscapeAttr(recipeId)}')`,danger:true}
   ]);
@@ -4052,44 +4059,110 @@ function syncCategorySearchInput(selectId){
 
 function enhanceCategorySearch(selectId){
   const select = document.getElementById(selectId);
-  if(!select || document.getElementById(selectId + '-search')) return;
+  if(!select) return;
   const field = select.closest('.field') || select.parentElement;
   if(field) field.style.display = 'block';
   select.style.display = 'none';
-  const input = document.createElement('input');
-  input.type = 'search';
-  input.id = selectId + '-search';
-  input.placeholder = 'Search category';
-  input.setAttribute('list', selectId + '-category-options');
-  input.style.width = '100%';
-  input.oninput = () => setCategoryFromSearch(selectId, input.value);
-  input.onchange = () => setCategoryFromSearch(selectId, input.value, true);
-  const datalist = document.createElement('datalist');
-  datalist.id = selectId + '-category-options';
-  datalist.innerHTML = getCategorySearchOptions().map(([k,v]) => `<option value="${ppEscapeAttr(v)}"></option>`).join('');
-  select.parentNode.insertBefore(input, select);
-  select.parentNode.insertBefore(datalist, select.nextSibling);
+  let input = document.getElementById(selectId + '-search');
+  if(!input){
+    input = document.createElement('input');
+    input.type = 'search';
+    input.id = selectId + '-search';
+    input.placeholder = 'Search category';
+    input.style.width = '100%';
+    select.parentNode.insertBefore(input, select);
+  }
+  input.removeAttribute('list');
+  let host=input.parentElement;
+  if(!host.classList.contains('category-combobox')){
+    host.classList.add('category-combobox');
+  }
+  let suggestions=document.getElementById(selectId+'-category-suggestions');
+  if(!suggestions){
+    suggestions=document.createElement('div');
+    suggestions.id=selectId+'-category-suggestions';
+    suggestions.className='category-suggestions';
+    suggestions.hidden=true;
+    input.insertAdjacentElement('afterend',suggestions);
+  }
+  input.oninput=()=>renderCategorySuggestions(selectId,input.value);
+  input.onfocus=()=>renderCategorySuggestions(selectId,input.value);
+  input.onkeydown=event=>handleCategorySearchKeydown(event,selectId);
+  input.onblur=()=>setTimeout(()=>{const menu=document.getElementById(selectId+'-category-suggestions');if(menu)menu.hidden=true;},160);
   syncCategorySearchInput(selectId);
 }
 
 function setCategoryFromSearch(selectId, value, allowCreate = false){
   const select = document.getElementById(selectId);
-  if(!select) return;
+  if(!select) return false;
   const raw = String(value || '').trim();
   const match = getCategorySearchOptions().find(([k,v]) => canonicalGroupKey(v) === canonicalGroupKey(raw) || canonicalGroupKey(k) === canonicalGroupKey(raw));
   if(match){
     select.value = match[0];
     syncCategorySearchInput(selectId);
-    return;
+    return match[0];
   }
-  if(allowCreate && raw){
-    const slug = raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'other';
-    state.customCats[slug] = raw;
-    CAT[slug] = raw;
-    saveState();
-    ['mi-cat', 'pp-cat', 'tp-cat', 'mini-cat'].forEach(id => renderCatOptions(id, id === selectId ? slug : document.getElementById(id)?.value || 'other'));
-    syncCategorySearchInput(selectId);
+  return false;
+}
+
+function renderCategorySuggestions(selectId,query=''){
+  const menu=document.getElementById(selectId+'-category-suggestions');
+  if(!menu)return;
+  const needle=canonicalGroupKey(query);
+  const options=getCategorySearchOptions().filter(([key,label])=>!needle||canonicalGroupKey(label).includes(needle)||canonicalGroupKey(key).includes(needle));
+  menu.innerHTML=options.length?options.map(([key,label],index)=>`<button type="button" class="category-suggestion${index===0?' active':''}" data-category-key="${ppEscapeAttr(key)}" onmousedown="event.preventDefault()" onclick="chooseCategorySuggestion('${ppEscapeAttr(selectId)}','${ppEscapeAttr(key)}')">${ppEscapeHtml(label)}</button>`).join(''):'<div style="padding:11px 12px;color:var(--text2)">No existing category. Saving will ask before creating it.</div>';
+  menu.hidden=false;
+}
+
+function chooseCategorySuggestion(selectId,key){
+  const select=document.getElementById(selectId);
+  if(!select||!CAT[key])return;
+  select.value=key;
+  syncCategorySearchInput(selectId);
+  const menu=document.getElementById(selectId+'-category-suggestions');
+  if(menu)menu.hidden=true;
+  document.getElementById(selectId+'-search')?.focus();
+}
+
+function handleCategorySearchKeydown(event,selectId){
+  const menu=document.getElementById(selectId+'-category-suggestions');
+  if(!menu||menu.hidden)return;
+  const choices=[...menu.querySelectorAll('.category-suggestion')];
+  if(!choices.length)return;
+  let index=choices.findIndex(choice=>choice.classList.contains('active'));
+  if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+    event.preventDefault();
+    choices[index]?.classList.remove('active');
+    index=event.key==='ArrowDown'?Math.min(choices.length-1,index+1):Math.max(0,index-1);
+    choices[index].classList.add('active');choices[index].scrollIntoView({block:'nearest'});
+  }else if(event.key==='Enter'){
+    event.preventDefault();choices[Math.max(0,index)]?.click();
+  }else if(event.key==='Escape'){
+    event.preventDefault();menu.hidden=true;
   }
+}
+
+function uniqueCategorySlug(label){
+  const base=String(label||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'other';
+  let slug=base,index=2;
+  while(CAT[slug]&&canonicalGroupKey(CAT[slug])!==canonicalGroupKey(label))slug=`${base}-${index++}`;
+  return slug;
+}
+
+function resolveCategoryBeforeProductSave(selectId,onReady){
+  const input=document.getElementById(selectId+'-search');
+  const raw=String(input?.value||'').trim();
+  const match=setCategoryFromSearch(selectId,raw);
+  if(match){onReady(match);return;}
+  if(!raw){input?.focus();return showPlatePlanToast('Choose a category before saving.','error');}
+  openAppConfirmModal('Create new category?',`No existing category matches <strong>${ppEscapeHtml(raw)}</strong>. Create this category and continue saving the product?`,'Create category',()=>{
+    const existing=getCategorySearchOptions().find(([key,label])=>canonicalGroupKey(label)===canonicalGroupKey(raw)||canonicalGroupKey(key)===canonicalGroupKey(raw));
+    const slug=existing?.[0]||uniqueCategorySlug(raw);
+    if(!existing){state.customCats[slug]=raw;CAT[slug]=raw;}
+    ['mi-cat','pp-cat','tp-cat','mini-cat'].forEach(id=>{const element=document.getElementById(id);if(element)renderCatOptions(id,id===selectId?slug:element.value||'other');});
+    chooseCategorySuggestion(selectId,slug);
+    onReady(slug);
+  },()=>input?.focus());
 }
 
 function enhanceAllCategorySearches(){
@@ -5246,7 +5319,8 @@ function syncPlannerQuickControls(){
 
 function generatePlanFromQuickSetup(){
   syncPlannerQuickControls();
-  buildExclGrid();
+  initExcluded(false);
+  renderExclGrid();
   generatePlan();
 }
 
@@ -8270,7 +8344,7 @@ function endReviewIngredientDrag(event, prefix){
 
 function renderModalIngs(prefix, ings) {
     const context = getReviewResolutionContext();
-    ings = applyReviewContextToIngredients(ings || [], context);
+    ings = orderRecipeIngredientsBySection(applyReviewContextToIngredients(ings || [], context));
     const list = document.getElementById(prefix + '-ings-list');
     const header = `<div class="rev-ing-header review-ingredient-row" style="margin-bottom:4px;font-size:11px;color:var(--text2);font-weight:600;">
        <span></span>
@@ -8896,7 +8970,7 @@ function extractModalList(prefix) {
         const text = r.querySelector('.r-step').value.trim();
         if(text) steps.push(text);
     });
-    return { ings, steps };
+    return { ings:orderRecipeIngredientsBySection(ings), steps };
 }
 
 function buildRecipeFromModal(useEnh){
@@ -9045,9 +9119,9 @@ function ignoreDataQualityWarning(key, fingerprint = ''){
     renderDataQuality();
 }
 
-function createDataQualityIssue({ entityType, entityId, code, severity = 'gap', title, message, fixButtonHtml = '', source = null, legacyKey = '' }){
+function createDataQualityIssue({ entityType, entityId, code, severity = 'gap', title, message, fixButtonHtml = '', fixTarget = null, source = null, legacyKey = '' }){
     const key = `${entityType}:${entityId}:${code}`;
-    return { entityType, entityId, code, severity, title, message, fixButtonHtml, key, legacyKey, fingerprint:dataQualityFingerprint(source) };
+    return { entityType, entityId, code, severity, title, message, fixButtonHtml, fixTarget, key, legacyKey, fingerprint:dataQualityFingerprint(source) };
 }
 
 function beginDataQualityFix(entityType,entityId,issueKey){
@@ -9056,7 +9130,10 @@ function beginDataQualityFix(entityType,entityId,issueKey){
     if(entityType === 'product') return editIng(entityId);
     if(entityType === 'ingredient') return openIngredientEditor(entityId,document.activeElement);
     if(entityType === 'subtype') return openIngredientGroupDetailsModal(entityId,'name');
-    if(entityType === 'recipe' || entityType === 'recipe-ingredient') return editRecipeModalView(String(entityId).split(':')[0]);
+    if(entityType === 'recipe' || entityType === 'recipe-ingredient'){
+      const parts=String(entityId).split(':');
+      return editRecipeModalView(parts[0],parts[1]==='enhanced'?'enhanced':'original');
+    }
 }
 
 function abandonEditorReturn(){
@@ -9087,8 +9164,9 @@ function finishEditorReturn(defaultView = ''){
 
 function dataQualityFixButton(issue){
     const supported=['product','ingredient','subtype','recipe','recipe-ingredient'];
-    if(!supported.includes(issue.entityType)) return String(issue.fixButtonHtml||'').replace(/class="btn sm ghost"/,'class="btn sm dq-fix-btn"');
-    return `<button class="btn sm dq-fix-btn" onclick="beginDataQualityFix('${ppEscapeAttr(issue.entityType)}','${ppEscapeAttr(issue.entityId)}','${ppEscapeAttr(issue.key)}')">Fix</button>`;
+    const target=issue.fixTarget||{entityType:issue.entityType,entityId:issue.entityId};
+    if(!supported.includes(target.entityType)) return String(issue.fixButtonHtml||'').replace(/class="btn sm ghost"/,'class="btn sm dq-fix-btn"');
+    return `<button class="btn sm dq-fix-btn" onclick="beginDataQualityFix('${ppEscapeAttr(target.entityType)}','${ppEscapeAttr(target.entityId)}','${ppEscapeAttr(issue.key)}')">Fix</button>`;
 }
 
 function renderDataQualityIssue(issue, dismissible = false){
@@ -9224,6 +9302,7 @@ function collectDeterministicDataQualityIssues(){
     ensureIngredientGroups();
     const issues = [];
     const add = input => issues.push(createDataQualityIssue(input));
+    const extremeCostProducts = new Map();
 
     (state.ingredients || []).forEach(product => {
         const fix = `<button class="btn sm dq-fix-btn" onclick="editIng('${ppEscapeAttr(product.id)}')">Fix</button>`;
@@ -9232,6 +9311,17 @@ function collectDeterministicDataQualityIssues(){
         if(!(+(product.packSize) > 0) || !product.packUnit) add({entityType:'product',entityId:product.id,code:'missing-pack',title:product.name || 'Unnamed product',message:'Pack size or unit is missing.',fixButtonHtml:fix,source:[product.packSize,product.packUnit]});
         if(!product.storage) add({entityType:'product',entityId:product.id,code:'missing-storage',title:product.name || 'Unnamed product',message:'Storage location is missing.',fixButtonHtml:fix,source:product.storage});
         if(!product.groupId || !getIngredientGroup(product.groupId)) add({entityType:'product',entityId:product.id,code:'missing-hierarchy-link',title:product.name || 'Unnamed product',message:'Product is not linked to a valid ingredient sub-type.',fixButtonHtml:fix,source:[product.groupId,product.cat]});
+        const packUnit=String(product.packUnit||'').toLowerCase();
+        const itemWeightUnit=String(product.itemWeightUnit||'g').toLowerCase();
+        if(['g','ml'].includes(packUnit) && packUnit===itemWeightUnit && +product.itemWeight>0 && +product.packSize>0 && +product.itemWeight>+product.packSize){
+            add({entityType:'product',entityId:product.id,code:'item-heavier-than-pack',title:product.name || 'Unnamed product',message:`Pack size (${product.packSize}${packUnit}) is smaller than the recorded weight of one item (${product.itemWeight}${itemWeightUnit}). This can produce extreme recipe costs.`,fixButtonHtml:fix,source:[product.packSize,packUnit,product.itemWeight,itemWeightUnit,product.price]});
+        }
+        if(packUnit==='qty' && !(+product.itemWeight>0)){
+            add({entityType:'product',entityId:product.id,code:'count-pack-missing-item-weight',title:product.name || 'Unnamed product',message:'This is a counted pack but the weight of one item is missing, so nutrition and consumed cost cannot be calculated reliably.',fixButtonHtml:fix,source:[product.packSize,product.packUnit,product.itemWeight,product.itemWeightUnit]});
+        }
+        if(packUnit==='qty' && +product.itemCount>0 && +product.packSize>0 && +product.itemCount!==+product.packSize){
+            add({entityType:'product',entityId:product.id,code:'count-pack-mismatch',title:product.name || 'Unnamed product',message:`Pack size says ${product.packSize} items but item count says ${product.itemCount}. Confirm the correct count.`,fixButtonHtml:fix,source:[product.packSize,product.packUnit,product.itemCount,product.itemWeight]});
+        }
     });
 
     (state.recipes || []).forEach(recipe => {
@@ -9249,14 +9339,45 @@ function collectDeterministicDataQualityIssues(){
                 const entityId = `${recipe.id}:${variantId}:${index}`;
                 const ingredientName = ingredient.name || ingredient.raw || `Ingredient ${index + 1}`;
                 if(!resolved.product){
-                    add({entityType:'recipe-ingredient',entityId,code:'unmapped-counted-ingredient',severity:'blocker',title,message:`${ingredientName} has a counted quantity but no mapped product.`,fixButtonHtml:fix,source:[ingredient.name,ingredient.raw,ingredient.qty,ingredient.unit,ingredient.groupId,ingredient.bankId]});
+                    add({entityType:'recipe-ingredient',entityId,code:'unmapped-counted-ingredient',severity:'blocker',title,message:`${ingredientName} has a counted quantity but no mapped product.`,fixButtonHtml:fix,fixTarget:resolved.group?.id?{entityType:'subtype',entityId:resolved.group.id}:null,source:[ingredient.name,ingredient.raw,ingredient.qty,ingredient.unit,ingredient.groupId,ingredient.bankId]});
                     return;
                 }
-                if(needsItemWeightForQtyIngredient(ingredient, resolved.product)) add({entityType:'recipe-ingredient',entityId,code:'missing-item-weight',severity:'blocker',title,message:`${ingredientName} is counted as items, but its product has no item weight.`,fixButtonHtml:fix,source:[ingredient.qty,ingredient.unit,resolved.product.id,resolved.product.itemWeight,resolved.product.itemWeightUnit]});
+                if(needsItemWeightForQtyIngredient(ingredient, resolved.product)) add({entityType:'recipe-ingredient',entityId,code:'missing-item-weight',severity:'blocker',title,message:`${ingredientName} is counted as items, but its product has no item weight.`,fixButtonHtml:fix,fixTarget:{entityType:'product',entityId:resolved.product.id},source:[ingredient.qty,ingredient.unit,resolved.product.id,resolved.product.itemWeight,resolved.product.itemWeightUnit]});
                 const mappingWarning = getIngredientMappingWarning(ingredient, resolved);
                 if(mappingWarning) add({entityType:'recipe-ingredient',entityId,code:'mapping-mismatch',title,message:mappingWarning,fixButtonHtml:fix,source:[ingredient.name,ingredient.groupId,ingredient.bankId,resolved.group?.id,resolved.product?.id]});
             });
+
+            const serves=+(variant.data?.serves||recipe.serves)||1;
+            const productCosts=new Map();
+            (variant.ingredients||[]).forEach(ingredient=>{
+                if(!ingredient||typeof ingredient!=='object')return;
+                const resolved=resolveProductForIngredient(ingredient,{});
+                const product=resolved.product;
+                if(!product?.price||!product.packSize)return;
+                const grams=getEffectiveIngredientGrams(ingredient,product);
+                let packGrams=+product.packSize||0;
+                if(product.packUnit==='qty')packGrams=packGrams*(+product.itemWeight||100);
+                else if(!['g','ml'].includes(product.packUnit))packGrams=toGrams(packGrams,product.packUnit,+product.itemWeight||100);
+                if(!(grams>0&&packGrams>0))return;
+                productCosts.set(product.id,(productCosts.get(product.id)||0)+((+product.price/packGrams)*grams/serves));
+            });
+            const perServing=[...productCosts.values()].reduce((sum,value)=>sum+value,0);
+            if(perServing>15){
+                productCosts.forEach((contribution,productId)=>{
+                    if(contribution<=10)return;
+                    const product=getProduct(productId);if(!product)return;
+                    const current=extremeCostProducts.get(productId)||{product,recipes:new Map(),maxContribution:0};
+                    current.recipes.set(`${recipe.id}:${variantId}`,`${recipe.name || 'Untitled recipe'} · ${variant.label}`);
+                    current.maxContribution=Math.max(current.maxContribution,contribution);
+                    extremeCostProducts.set(productId,current);
+                });
+            }
         });
+    });
+
+    extremeCostProducts.forEach(({product,recipes,maxContribution})=>{
+        const recipeNames=[...recipes.values()];
+        add({entityType:'product',entityId:product.id,code:'extreme-recipe-cost',title:product.name || 'Unnamed product',message:`This product contributes up to £${maxContribution.toFixed(2)} per serving in ${recipeNames.join(', ')}. Check its price, pack unit, pack size and item weight.`,fixTarget:{entityType:'product',entityId:product.id},source:[product.price,product.packSize,product.packUnit,product.itemWeight,product.itemWeightUnit,recipeNames,maxContribution.toFixed(2)]});
     });
 
     (state.ingredientFamilies || []).forEach(family => {
@@ -9670,8 +9791,21 @@ function normaliseRecipeIngredientSection(section){
   return normaliseAliasText(section || '');
 }
 
+function orderRecipeIngredientsBySection(ingredients){
+  const rows=Array.isArray(ingredients)?ingredients.slice():[];
+  const named=new Map();
+  const blank=[];
+  rows.forEach(item=>{
+    const section=normaliseRecipeIngredientSection(item?.section);
+    if(!section){blank.push(item);return;}
+    if(!named.has(section))named.set(section,[]);
+    named.get(section).push(item);
+  });
+  return [...named.values()].flat().concat(blank);
+}
+
 function renderGroupedIngredientItems(ingredients, renderItem, options = {}){
-  const rows = Array.isArray(ingredients) ? ingredients : [];
+  const rows = orderRecipeIngredientsBySection(ingredients);
   const hasSections = rows.some(item => normaliseRecipeIngredientSection(item?.section));
   if(!hasSections) return rows.map(renderItem).join('');
   let current = null;
@@ -9791,6 +9925,10 @@ function editEnhancedRecipe(id) {
     switchModalTab('enhanced');
 }
 
+function reviewEnhancedRecipe(id){
+    editRecipeModalView(id,'enhanced');
+}
+
 function deleteEnhancedRecipe(id) {
     const r = state.recipes.find(x => x.id === id);
     if(!r?.enhanced) return;
@@ -9818,10 +9956,10 @@ function reviewRecipeModalView(id, instanceId = null, tab = 'original') {
     openModal(r.name, payload, true, { instanceId, tab });
 }
 
-function editRecipeModalView(id) {
+function editRecipeModalView(id, initialTab = 'original') {
     capturePlatePlanEditBaseline('recipes/'+id);
     currentReviewInstanceId = null;
-    currentReviewVariant = 'original';
+    currentReviewVariant = initialTab === 'enhanced' ? 'enhanced' : 'original';
     const r = state.recipes.find(x => x.id === id);
     if (!r) return;
     editId = id;
@@ -9837,7 +9975,7 @@ function editRecipeModalView(id) {
     }
 
     const payload = { original: r, enhanced: r.enhanced || {} };
-    openModal(r.name, payload, true);
+    openModal(r.name, payload, true, {tab:currentReviewVariant});
 }
 
 
@@ -13131,9 +13269,10 @@ function openTescoDuplicateChoice(match, data, pendingTesco){
   wrap.classList.add('open');
 }
 
-function saveTescoIngredient(){
+function saveTescoIngredient(categoryReady=false){
   const name = document.getElementById('tp-name').value.trim();
   if(!name) return showMsg('tesco-save-msg','Please enter a product name.','error');
+  if(!categoryReady)return resolveCategoryBeforeProductSave('tp-cat',()=>saveTescoIngredient(true));
 
   const pendingTesco = window.pendingTescoMapping;
   const manualAddMode = pendingTesco?.type === 'manualAdd';
@@ -13536,6 +13675,7 @@ function refreshAfterIngredientEdit(productId = ''){
 }
 
 let appConfirmAction = null;
+let appConfirmCancelAction = null;
 let appPromptAction = null;
 let appPromptCancelAction = null;
 
@@ -13562,9 +13702,10 @@ function ensureAppConfirmModal(){
   return wrap;
 }
 
-function openAppConfirmModal(title, copy, confirmLabel, onConfirm){
+function openAppConfirmModal(title, copy, confirmLabel, onConfirm, onCancel=null){
   const wrap = ensureAppConfirmModal();
   appConfirmAction = onConfirm;
+  appConfirmCancelAction = onCancel;
   document.getElementById('app-confirm-title').textContent = title || 'Confirm';
   document.getElementById('app-confirm-copy').innerHTML = copy || '';
   const cancel = wrap.querySelector('.btn-row .btn.ghost');
@@ -13573,7 +13714,7 @@ function openAppConfirmModal(title, copy, confirmLabel, onConfirm){
   btn.textContent = confirmLabel || 'Confirm';
   btn.onclick = () => {
     const action = appConfirmAction;
-    closeAppConfirmModal();
+    closeAppConfirmModal(true);
     if(typeof action === 'function') action();
   };
   wrap.classList.add('open');
@@ -13582,6 +13723,7 @@ function openAppConfirmModal(title, copy, confirmLabel, onConfirm){
 function openAppInfoModal(title, copy){
   const wrap = ensureAppConfirmModal();
   appConfirmAction = null;
+  appConfirmCancelAction = null;
   document.getElementById('app-confirm-title').textContent = title || 'Information';
   document.getElementById('app-confirm-copy').innerHTML = copy || '';
   const btn = document.getElementById('app-confirm-ok');
@@ -13592,12 +13734,15 @@ function openAppInfoModal(title, copy){
   wrap.classList.add('open');
 }
 
-function closeAppConfirmModal(){
+function closeAppConfirmModal(confirmed=false){
   const wrap = document.getElementById('app-confirm-wrap');
   const cancel = wrap?.querySelector('.btn-row .btn.ghost');
   if(cancel) cancel.style.display = '';
   if(wrap) wrap.classList.remove('open');
+  const cancelAction=appConfirmCancelAction;
   appConfirmAction = null;
+  appConfirmCancelAction = null;
+  if(!confirmed&&typeof cancelAction==='function')cancelAction();
 }
 
 function ensureAppPromptModal(){
@@ -13645,12 +13790,10 @@ function closeAppPromptModal(confirmed=false){
   if(!confirmed&&typeof cancel==='function')cancel();
 }
 
-function saveManualIng(){
-  if(typeof setCategoryFromSearch === 'function'){
-    setCategoryFromSearch('mi-cat', document.getElementById('mi-cat-search')?.value || '', true);
-  }
+function saveManualIng(categoryReady=false){
   const name=document.getElementById('mi-name').value.trim();
   if(!name)return showMsg('mi-msg','Please enter a name.','error');
+  if(!categoryReady)return resolveCategoryBeforeProductSave('mi-cat',()=>saveManualIng(true));
   
   const existingIng = editIngId ? state.ingredients.find(x=>x.id===editIngId) : null;
   const ing={
@@ -14146,13 +14289,13 @@ function clearPlanCalendarDates(){
   if(state.plan?.slots){state.plan.dayDates={};saveState();markPlatePlanViewsDirty('today','shopping','planlib');renderPlan();}
 }
 
-function initExcluded(){
+function initExcluded(persist=true){
   ensurePlannerShell();
   const days=parseInt(document.getElementById('plan-days').value)||9;
   const old=state.excluded||{};
   state.excluded={};
   for(let d=1;d<=days;d++){state.excluded[d]={};SLOTS.forEach(s=>state.excluded[d][s.key]=(old[d]&&old[d][s.key])||false);}
-  saveState();
+  if(persist)saveState();
 }
 function buildExclGrid(){initExcluded();renderExclGrid();}
 function renderExclGrid(){
@@ -14192,22 +14335,76 @@ function inclAll(){const days=parseInt(document.getElementById('plan-days').valu
 function exclAllDinners(){const days=parseInt(document.getElementById('plan-days').value)||9;for(let d=1;d<=days;d++)setSlotMealMode(d,'dinner','none');}
 function exclAllDays(){const days=parseInt(document.getElementById('plan-days').value)||9;for(let d=1;d<=days;d++)['breakfast','lunch','dinner'].forEach(m=>setSlotMealMode(d,m,'none'));}
 
+function plannerOptionHasUsableMappings(option,priority){
+  const recipe=option?.variant==='enhanced'&&option.recipe?.enhanced?{...option.recipe,...option.recipe.enhanced,ingredients:option.recipe.enhanced.ingredients||[]} : option?.recipe;
+  if(!recipe)return false;
+  return (recipe.ingredients||[]).every(ing=>{
+    if(ing?.excludeNutrition)return true;
+    const groupId=getRecipeIngredientGroupId(ing);
+    const preferred=groupId?selectBestProductForGroup(groupId,priority):null;
+    const resolved=resolveProductForIngredient(ing,{productSelections:preferred&&groupId?{[groupId]:preferred.id}:{}});
+    return !!resolved.product&&isUsableProduct(resolved.product);
+  });
+}
+
+function explainUnavailablePlanSlot(type,who,priority){
+  const typed=getPlannerRecipeOptions(type,who,{applyExclusions:false,applyTrafficFilter:false});
+  if(!typed.length)return `No ${type} recipes are available for ${who}.`;
+  const allowed=getPlannerRecipeOptions(type,who,{applyExclusions:true,applyTrafficFilter:false});
+  if(!allowed.length)return `${who}'s exclusions remove every available ${type} recipe.`;
+  const traffic=getPlannerRecipeOptions(type,who,{applyExclusions:true});
+  if(!traffic.length)return `The selected traffic-light filters remove every ${type} recipe for ${who}.`;
+  if(!traffic.some(option=>plannerOptionHasUsableMappings(option,priority)))return `${type} recipes for ${who} need usable Product Bank mappings.`;
+  return `No eligible ${type} recipe could be selected for ${who}.`;
+}
+
+function showPlanGenerationProblem(title,copy){
+  const host=document.getElementById('plan-warnings');
+  if(host)host.innerHTML=`<div class="msg error"><strong>${ppEscapeHtml(title)}</strong><div style="margin-top:5px">${ppEscapeHtml(copy)}</div><div class="btn-row" style="margin-top:10px"><button class="btn primary" onclick="includeAllMealsAndGenerate()">Include all meals</button><button class="btn ghost" onclick="openPlanOptionsWorkspace()">Edit plan options</button></div></div>`;
+}
+
+function includeAllMealsAndGenerate(){
+  const days=parseInt(document.getElementById('plan-days')?.value)||9;
+  for(let day=1;day<=days;day++){
+    if(!state.excluded[day])state.excluded[day]={};
+    ['breakfast','lunch','dinner'].forEach(meal=>{
+      state.excluded[day][meal+'E']=false;
+      state.excluded[day][meal+'C']=false;
+    });
+  }
+  renderExclGrid();
+  generatePlan();
+}
+
 function generatePlan(){
   ensurePlannerShell();
-  setMealRepeatControlValues();
   const days=parseInt(document.getElementById('plan-days').value)||9;
+  initExcluded(false);
+  const selectedSlots=[];
+  for(let day=1;day<=days;day++)['breakfast','lunch','dinner'].forEach(meal=>{
+    const mode=getSlotMealMode(day,meal);
+    if(mode==='elliott'||mode==='both')selectedSlots.push({day,meal,who:'Elliott',key:meal+'E'});
+    if(mode==='chloe'||mode==='both')selectedSlots.push({day,meal,who:'Chloe',key:meal+'C'});
+  });
+  if(!selectedSlots.length){
+    showPlanGenerationProblem('No meals selected','Every meal is set to None. Your current meal plan has been kept.');
+    return;
+  }
+  const priority = document.getElementById('plan-product-priority')?.value || state.prefs.productPriority || 'protein';
   const usedInNewPlan = new Set();
   const choose = (type, who, shared=false) => {
     let p = getPlannerRecipeOptions(type, shared ? 'any' : who, { applyExclusions:true, avoidHistory:true });
     if(shared) p = p.filter(opt => opt.recipe?.who === 'both');
+    p=p.filter(option=>plannerOptionHasUsableMappings(option,priority));
     let fresh = p.filter(opt => !usedInNewPlan.has(opt.id));
     if(!fresh.length) fresh = p;
-    if(!fresh.length && !shared) fresh = getPlannerRecipeOptions(type, who, { applyExclusions:true });
+    if(!fresh.length && !shared) fresh = getPlannerRecipeOptions(type, who, { applyExclusions:true }).filter(option=>plannerOptionHasUsableMappings(option,priority));
     const picked = fresh[Math.floor(Math.random() * fresh.length)] || null;
     if(picked) usedInNewPlan.add(picked.id);
     return picked;
   };
   const slots={};
+  const unresolved=[];
   for(let d=1;d<=days;d++){
       slots[d]={breakfastE:null,breakfastC:null,lunchE:null,lunchC:null,dinnerE:null,dinnerC:null};
       ['breakfast','lunch','dinner'].forEach(meal => {
@@ -14222,18 +14419,20 @@ function generatePlan(){
             const recE = choose(meal, 'Elliott', false);
             const recC = choose(meal, 'Chloe', false);
             if(recE) slots[d][meal+'E'] = makePlanSlot(recE.id, recE.variant);
+            else unresolved.push({day:d,meal,who:'Elliott',key:meal+'E'});
             if(recC) slots[d][meal+'C'] = makePlanSlot(recC.id, recC.variant);
+            else unresolved.push({day:d,meal,who:'Chloe',key:meal+'C'});
           }
           return;
         }
         const who = mode === 'chloe' ? 'Chloe' : 'Elliott';
         const rec = choose(meal, who, false);
         if(rec) slots[d][meal + (mode === 'chloe' ? 'C' : 'E')] = makePlanSlot(rec.id, rec.variant);
+        else unresolved.push({day:d,meal,who,key:meal + (mode === 'chloe' ? 'C' : 'E')});
       });
   }
 
   const cadence = getMealRepeatCadence();
-  state.prefs.mealRepeatCadence = cadence;
   const applyCadence = (meal, blockSize) => {
     if(blockSize <= 1) return;
     for(let start = 1; start <= days; start += blockSize){
@@ -14256,20 +14455,37 @@ function generatePlan(){
   applyCadence('lunch', cadence.lunch);
   applyCadence('dinner', cadence.dinner);
 
-  const priority = document.getElementById('plan-product-priority')?.value || state.prefs.productPriority || 'protein';
-  state.prefs.productPriority = priority;
-  savePlanTrafficPrefs();
-  const productSelections = lockProductSelectionsForSlots(slots, priority);
+  let productSelections = lockProductSelectionsForSlots(slots, priority);
   const blockers = findProductResolutionBlockersForSlots(slots, productSelections);
   if(blockers.length){
-    document.getElementById('plan-warnings').innerHTML += '<div class="msg error" style="margin-bottom:6px"><strong>Plan not generated.</strong> Add usable bank products for: '+blockers.map(ppEscapeHtml).join(', ')+'</div>';
-    saveState();
+    Object.entries(slots).forEach(([day,daySlots])=>Object.entries(daySlots).forEach(([key,slot])=>{
+      if(!slot)return;
+      const single={1:{[key]:slot}};
+      if(findProductResolutionBlockersForSlots(single,lockProductSelectionsForSlots(single,priority)).length){
+        const meal=getMealTypeFromSlotKey(key);
+        const who=key.endsWith('C')?'Chloe':'Elliott';
+        daySlots[key]=null;
+        unresolved.push({day:+day,meal,who,key});
+      }
+    }));
+    productSelections=lockProductSelectionsForSlots(slots,priority);
+  }
+  const remainingUnresolved=unresolved.filter(item=>!slots[item.day]?.[item.key]);
+  const filled=selectedSlots.filter(item=>slots[item.day]?.[item.key]).length;
+  if(!filled){
+    const reason=remainingUnresolved.length?explainUnavailablePlanSlot(remainingUnresolved[0].meal,remainingUnresolved[0].who,priority):'No eligible recipes were found.';
+    showPlanGenerationProblem('No meals could be generated',`${reason} Your current meal plan has been kept.`);
     return;
   }
+  const warningMessages=[...new Set(remainingUnresolved.map(item=>`${formatPlanDayLabel({dayDates:buildPlanDayDates(document.getElementById('plan-start-date')?.value||'',days)},item.day,{short:true})} ${item.meal} for ${item.who}: ${explainUnavailablePlanSlot(item.meal,item.who,priority)}`))];
   snapshotCurrentPlan();
   state.overrides = {};
   const dayDates=buildPlanDayDates(document.getElementById('plan-start-date')?.value||'',days);
-  const nextPlan = {days,slots,dayDates,productPriority:priority,trafficFilter:{ e: state.prefs.planTrafficE || ['green','amber','red'], c: state.prefs.planTrafficC || ['green','amber','red'] },mealRepeatCadence:cadence,productSelections,shoppingAtHome:{},warnings:[],score:null,confirmedShopping:false,mealPrepGroups:[],declinedMealPrepGroups:[]};
+  state.prefs.productPriority = priority;
+  state.prefs.mealRepeatCadence = cadence;
+  state.prefs.planTrafficE = getSelectedPlanTrafficStatuses('e');
+  state.prefs.planTrafficC = getSelectedPlanTrafficStatuses('c');
+  const nextPlan = {days,slots,dayDates,productPriority:priority,trafficFilter:{ e: state.prefs.planTrafficE, c: state.prefs.planTrafficC },mealRepeatCadence:cadence,productSelections,shoppingAtHome:{},warnings:warningMessages,score:null,confirmedShopping:false,mealPrepGroups:[],declinedMealPrepGroups:[]};
   nextPlan.score = calculatePlanScore(nextPlan);
   state.plan = nextPlan;
   const autoPrepSuggestions = findMealPrepSuggestions(state.plan).filter(s => {
@@ -14277,7 +14493,13 @@ function generatePlan(){
     return repeat > 1 && (s.days || []).length >= repeat;
   });
   state.plan.mealPrepGroups = autoPrepSuggestions.map(s => ({ key:s.key, recipeId:s.recipeId, variant:s.variant, mealKey:s.mealKey, peopleKey:s.peopleKey, days:s.days }));
-  saveState();renderPlan();closePlanOptionsWorkspace();showPlatePlanToast('Meal plan generated.');
+  saveState();renderPlan();closePlanOptionsWorkspace();
+  const message=`Generated ${filled} of ${selectedSlots.length} selected meals.`;
+  showPlatePlanToast(message);
+  if(remainingUnresolved.length){
+    const host=document.getElementById('plan-warnings');
+    if(host)host.innerHTML=`<div class="msg warn"><strong>${ppEscapeHtml(message)}</strong><div style="margin-top:5px">${warningMessages.slice(0,6).map(ppEscapeHtml).join('<br>')}${warningMessages.length>6?`<br>And ${warningMessages.length-6} more unresolved meals.`:''}</div><button class="btn sm ghost" style="margin-top:9px" onclick="openPlanOptionsWorkspace()">Edit plan options</button></div>`;
+  }
 }
 
 function getSlotPersonPrefix(slotKey){
@@ -15345,9 +15567,10 @@ function buildRecipeCardPackSnapshot(planContext = state.plan, overrideStore = s
         const resolved=resolveProductForIngredientWithContext(adjusted,context);
         const product=resolved.product||null;
         const amount=getShoppingAmount(adjusted,product,scale);
-        const section=normaliseRecipeIngredientSection(adjusted?.section)||'';
-        const key=[section||'no-section',resolved.groupId||adjusted?.groupId||adjusted?.bankId||normaliseAliasText(adjusted?.name||ingRaw(adjusted)),product?.id||'unresolved',adjusted?.excludeNutrition?'not-counted':'counted'].join('|');
-        if(!aggregate[key])aggregate[key]={ing:adjusted,product,groupName:resolved.group?.name||adjusted?.name||ingRaw(adjusted),section,qty:0,grams:0,unit:amount.unit,mixed:false,notCounted:!!adjusted?.excludeNutrition,changed:adjusted?.bankId!==original?.bankId};
+        const sectionKey=normaliseRecipeIngredientSection(adjusted?.section)||'';
+        const section=String(adjusted?.section||'').trim();
+        const key=[sectionKey||'no-section',resolved.groupId||adjusted?.groupId||adjusted?.bankId||normaliseAliasText(adjusted?.name||ingRaw(adjusted)),product?.id||'unresolved',adjusted?.excludeNutrition?'not-counted':'counted'].join('|');
+        if(!aggregate[key])aggregate[key]={ing:adjusted,product,groupName:resolved.group?.name||adjusted?.name||ingRaw(adjusted),section,sectionKey,qty:0,grams:0,unit:amount.unit,mixed:false,notCounted:!!adjusted?.excludeNutrition,changed:adjusted?.bankId!==original?.bankId};
         const row=aggregate[key];row.grams+=amount.grams||0;if(row.unit===amount.unit&&!row.mixed)row.qty+=amount.qty||0;else row.mixed=true;row.changed=row.changed||adjusted?.bankId!==original?.bankId;
       });
     });
@@ -15356,9 +15579,10 @@ function buildRecipeCardPackSnapshot(planContext = state.plan, overrideStore = s
       const amount=row.mixed?{qty:row.grams,unit:'g',grams:row.grams}:{qty:row.qty,unit:row.unit,grams:row.grams};
       const displayIng={...(row.ing||{}),name:row.ing?.name||row.groupName||row.product?.name||''};
       const item={label:formatRecipePackIngredientAmount(displayIng,row.product,amount),mapping:[row.groupName,row.product?.name].filter(Boolean).join(' · '),notCounted:row.notCounted,changed:row.changed};
-      const section=row.section||'';if(!sections.has(section))sections.set(section,[]);sections.get(section).push(item);
+      const sectionKey=row.sectionKey||'';if(!sections.has(sectionKey))sections.set(sectionKey,{section:row.section||'',items:[]});sections.get(sectionKey).items.push(item);
     });
-    return [...sections.entries()].map(([section,items])=>({section,items}));
+    const ordered=[...sections.values()];
+    return ordered.filter(group=>group.section).concat(ordered.filter(group=>!group.section));
   };
   for(let day=1;day<=days;day++){
     const slots=planContext.slots[day]||{};
