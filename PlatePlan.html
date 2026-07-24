@@ -579,6 +579,13 @@ a{color:var(--action)}
 .traffic-pill .traffic-symbol{font-size:18px;line-height:1;font-weight:800}
 .traffic-pill:has(input:not(:checked)){background:var(--surface)!important;color:var(--text3)!important;border-color:var(--border)!important;filter:saturate(.35)}
 .traffic-pill:has(input:checked){box-shadow:inset 0 0 0 1px currentColor}
+.traffic-availability{margin-top:10px;padding:11px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface)}
+.traffic-availability-row{display:grid;grid-template-columns:minmax(64px,.5fr) minmax(120px,1fr) minmax(0,1.5fr);gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--border);font-size:12px}
+.traffic-availability-row:first-of-type{border-top:0}
+.traffic-availability-row>div{display:flex;gap:8px;flex-wrap:wrap}
+.traffic-availability-row>div span{color:var(--text2)}
+.traffic-availability-row>div span.bad{color:var(--red)}
+.traffic-selected-copy{color:var(--text2)}
 .shop-item-details{transition:opacity .15s ease,background-color .15s ease}
 .shop-item-summary{display:grid!important;grid-template-columns:48px minmax(0,1fr) 24px;align-items:center;gap:8px;min-height:54px}
 .shop-home-check{width:22px!important;height:22px!important;margin:0 auto;accent-color:var(--action);cursor:pointer}
@@ -647,6 +654,8 @@ a{color:var(--action)}
   .plan-options-body{padding:14px 12px calc(92px + env(safe-area-inset-bottom));flex:1}
   .plan-options-workspace-actions{position:fixed;left:0;right:0;bottom:0;margin:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:grid;grid-template-columns:1fr 1fr}
   .traffic-picker{grid-template-columns:minmax(68px,1fr) repeat(3,48px)!important;width:100%}
+  .traffic-availability-row{grid-template-columns:1fr;gap:3px}
+  .traffic-availability-row>div{margin-top:3px}
   .dq-issue-row{grid-template-columns:1fr}
   .dq-issue-actions{justify-content:stretch}
   .dq-issue-actions .btn{flex:1}
@@ -876,7 +885,7 @@ main{max-width:var(--content-max);padding:22px 20px 96px}
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
 
-/* PlatePlan 20.2.1 — planner traffic-filter compatibility repair */
+/* PlatePlan 20.2.2 — visible and reliable planner traffic filters */
 .btn.primary,.btn.dq-fix-btn,.cf.active,.mt2.active{
   background:var(--action-fill,#0969da)!important;
   border-color:var(--action-fill,#0969da)!important;
@@ -2257,8 +2266,8 @@ const RECOVERY_SK='plateplan_v1_recovery';
 const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='20.2.1';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v13';
+const PLATEPLAN_APP_VERSION='20.2.2';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v14';
 const SEED=[];
 
 let state = null;
@@ -3725,8 +3734,9 @@ function normalisePlanTrafficStatuses(values){
 function getSelectedPlanTrafficStatuses(personPrefix){
     const id = personPrefix === 'c' ? 'plan-traffic-c' : 'plan-traffic-e';
     const fallback = personPrefix === 'c' ? state.prefs.planTrafficC : state.prefs.planTrafficE;
-    const checks = Array.from(document.querySelectorAll(`input[name="${id}"]:checked`)).map(el => el.value);
-    if(checks.length) return normalisePlanTrafficStatuses(checks);
+    const inputs=Array.from(document.querySelectorAll(`input[name="${id}"]`));
+    const checks = inputs.filter(input=>input.checked).map(el => el.value);
+    if(inputs.length) return normalisePlanTrafficStatuses(checks);
     const el = document.getElementById(id);
     const selected = el ? Array.from(el.selectedOptions).map(o => o.value) : fallback;
     return normalisePlanTrafficStatuses(selected);
@@ -3744,7 +3754,9 @@ function setPlanTrafficSelectValues(){
 function savePlanTrafficPrefs(){
     state.prefs.planTrafficE = getSelectedPlanTrafficStatuses('e');
     state.prefs.planTrafficC = getSelectedPlanTrafficStatuses('c');
+    setPlanTrafficSelectValues();
     saveState();
+    renderPlanTrafficAvailabilitySummary();
 }
 
 function getMealRepeatCadence(){
@@ -3787,6 +3799,28 @@ function getPlanTrafficFilterRules(){
     const e = normalisePlanTrafficStatuses(getSelectedPlanTrafficStatuses('e'));
     const c = normalisePlanTrafficStatuses(getSelectedPlanTrafficStatuses('c'));
     return { e, c, label:`Elliott ${formatPlanTrafficLabel(e)} and Chloe ${formatPlanTrafficLabel(c)}` };
+}
+
+function renderPlanTrafficAvailabilitySummary(){
+    const host=document.getElementById('plan-traffic-availability');
+    if(!host||!state)return;
+    const rules=getPlanTrafficFilterRules();
+    const priority=document.getElementById('plan-product-priority')?.value||state.prefs.productPriority||'protein';
+    const personRow=(who,prefix)=>{
+      const counts=['breakfast','lunch','dinner'].map(meal=>{
+        const options=getPlannerRecipeOptions(meal,who,{applyExclusions:true,trafficRules:rules}).filter(option=>plannerOptionHasUsableMappings(option,priority));
+        return `<span class="${options.length?'':'bad'}">${toTitleCase(meal)} <strong>${options.length}</strong></span>`;
+      }).join('');
+      const selected=(prefix==='e'?rules.e:rules.c).map(toTitleCase).join(', ');
+      return `<div class="traffic-availability-row"><strong>${ppEscapeHtml(who)}</strong><span class="traffic-selected-copy">${ppEscapeHtml(selected)}</span><div>${counts}</div></div>`;
+    };
+    host.innerHTML=`<div class="row-between" style="gap:8px;align-items:center;margin-bottom:5px"><div style="font-size:12px;font-weight:700">Recipes available with these filters</div><div class="btn-row"><button type="button" class="btn sm primary" onclick="setPlanTrafficPreset('green')">Green only</button><button type="button" class="btn sm ghost" onclick="setPlanTrafficPreset('all')">All colours</button></div></div>${personRow('Elliott','e')}${personRow('Chloe','c')}<div style="font-size:11px;color:var(--text2);margin-top:6px">Coloured controls are included; grey controls are excluded. If the final selected colour is turned off, PlatePlan selects all three.</div>`;
+}
+
+function setPlanTrafficPreset(preset){
+    const allowed=preset==='green'?new Set(['green']):new Set(['green','amber','red']);
+    document.querySelectorAll('input[name="plan-traffic-e"],input[name="plan-traffic-c"]').forEach(input=>{input.checked=allowed.has(input.value);});
+    savePlanTrafficPrefs();
 }
 
 function plannerRecipePassesTrafficFilter(row, mealType, who, suppliedRules=null){
@@ -5307,7 +5341,15 @@ function ensurePlannerOptionsUI(){
 
   const trafficHost=wrap.querySelector('#plan-options-traffic');
   traffic.forEach(picker=>trafficHost.appendChild(picker));
+  if(!document.getElementById('plan-traffic-availability')){
+    const summary=document.createElement('div');
+    summary.id='plan-traffic-availability';
+    summary.className='traffic-availability';
+    trafficHost.insertAdjacentElement('afterend',summary);
+  }
   enhancePlanTrafficControls();
+  setPlanTrafficSelectValues();
+  renderPlanTrafficAvailabilitySummary();
 
   setup.style.display='';
   setup.classList.remove('card');
@@ -5343,6 +5385,7 @@ function openPlanOptionsWorkspace(){
   if(start)start.value=state.plan?.dayDates?.[1]||document.getElementById('plan-quick-start')?.value||'';
   setMealRepeatControlValues();
   setPlanTrafficSelectValues();
+  renderPlanTrafficAvailabilitySummary();
   renderExclGrid();
   platePlanLastMobileFocus=document.activeElement;
   wrap.classList.add('open');
@@ -14465,6 +14508,18 @@ function generatePlan(){
   applyCadence('breakfast', cadence.breakfast);
   applyCadence('lunch', cadence.lunch);
   applyCadence('dinner', cadence.dinner);
+
+  Object.entries(slots).forEach(([day,daySlots])=>Object.entries(daySlots).forEach(([key,slot])=>{
+    if(!slot)return;
+    const info=getPlanSlotInfo(slot);
+    const who=key.endsWith('C')?'Chloe':'Elliott';
+    const meal=getMealTypeFromSlotKey(key);
+    const row={recipe:info.recipe,variant:info.variant||'original'};
+    if(!plannerRecipePassesTrafficFilter(row,meal,who,trafficRules)){
+      daySlots[key]=null;
+      unresolved.push({day:+day,meal,who,key,reason:'traffic-audit'});
+    }
+  }));
 
   let productSelections = lockProductSelectionsForSlots(slots, priority);
   const blockers = findProductResolutionBlockersForSlots(slots, productSelections);
