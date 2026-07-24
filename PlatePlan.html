@@ -717,36 +717,191 @@ html[data-theme="dark"]{
   .herb-pair-grid{grid-template-columns:1fr}
   .modal-tabs .mt2{overflow-wrap:normal;word-break:normal;font-size:13px}
 }
+
+/* PlatePlan 20.0 — Today-first adaptive application shell */
+:root{
+  --space-1:4px;
+  --space-2:8px;
+  --space-3:12px;
+  --space-4:16px;
+  --space-5:20px;
+  --space-6:24px;
+  --radius-control:10px;
+  --radius-card:16px;
+  --radius-sheet:22px;
+  --chrome-bg:color-mix(in srgb,var(--surface) 88%,transparent);
+  --content-max:1080px;
+}
+body{line-height:1.45;overflow-wrap:normal;word-break:normal}
+button,input,select,textarea{font:inherit}
+.app-header{
+  background:var(--chrome-bg);
+  -webkit-backdrop-filter:saturate(140%) blur(18px);
+  backdrop-filter:saturate(140%) blur(18px);
+  padding:max(0px,env(safe-area-inset-top)) 16px 0;
+  height:calc(58px + env(safe-area-inset-top));
+  border-color:color-mix(in srgb,var(--border) 72%,transparent);
+}
+.app-header-actions{display:flex;align-items:center;gap:8px;min-width:0}
+.app-create-button{min-height:42px;border-radius:999px;padding:8px 14px}
+.app-create-button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.desktop-sidebar{display:none}
+main{max-width:var(--content-max);padding:22px 20px 96px}
+.view-title{font-size:28px;line-height:1.12;letter-spacing:-.035em;margin:0}
+.view-subtitle{font-size:14px;color:var(--text2);margin-top:5px}
+.today-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+.today-date-nav{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.today-date-nav .btn{min-height:42px;border-radius:999px}
+.today-date-label{font-size:13px;font-weight:700;color:var(--text2);min-width:132px;text-align:center}
+.today-people{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:20px}
+.today-person{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-card);padding:16px}
+.today-person-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+.today-person-name{font-size:17px;font-weight:750;letter-spacing:-.015em}
+.today-person-copy{font-size:12px;color:var(--text3)}
+.today-target-row{display:grid;grid-template-columns:82px minmax(0,1fr);gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--border)}
+.today-target-row:first-of-type{border-top:0}
+.today-target-meal{font-size:13px;font-weight:650}
+.today-target-values{min-width:0}
+.today-target-line{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--text2);margin-bottom:5px}
+.today-progress{height:6px;background:var(--surface2);border-radius:999px;overflow:hidden}
+.today-progress>span{display:block;height:100%;width:var(--progress,0%);max-width:100%;background:var(--action);border-radius:inherit}
+.today-progress.protein>span{background:var(--green)}
+.today-meal-section{margin-top:18px}
+.today-meal-heading{font-size:12px;font-weight:750;text-transform:uppercase;letter-spacing:.07em;color:var(--text2);margin:0 0 8px}
+.today-meal-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-card);padding:16px;margin-bottom:10px}
+.today-meal-layout{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.today-meal-main{min-width:0;flex:1}
+.today-meal-name{font-size:17px;font-weight:750;line-height:1.3;letter-spacing:-.015em}
+.today-meal-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:7px}
+.today-portions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.today-portion{background:var(--surface2);border-radius:11px;padding:10px 11px;font-size:12px;color:var(--text2)}
+.today-portion strong{display:block;color:var(--text);font-size:13px;margin-bottom:3px}
+.today-empty{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-card);padding:34px 22px;text-align:center}
+.today-empty h3{font-size:18px;margin-bottom:7px}
+.today-empty p{max-width:480px;margin:0 auto 16px;color:var(--text2)}
+.today-empty .btn-row{justify-content:center}
+.nav-group-label{font-size:10px;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--text3);padding:10px 12px 5px}
+.nav-group{border-top:1px solid var(--border);padding:5px 0}
+.nav-group:first-of-type{border-top:0}
+.nav-group>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;min-height:40px;padding:5px 12px;color:var(--text2);font-size:12px;font-weight:700;cursor:pointer}
+.nav-group>summary::-webkit-details-marker{display:none}
+.nav-group>summary::after{content:'›';font-size:18px;transform:rotate(90deg);transition:transform .15s ease}
+.nav-group:not([open])>summary::after{transform:rotate(0)}
+.desktop-sidebar .ntab{display:flex;align-items:center;width:100%;min-height:44px;padding:9px 12px;margin:0;border:0;border-radius:10px;white-space:normal}
+.desktop-sidebar .ntab.active{background:var(--action-bg);color:var(--action);border:0}
+.desktop-sidebar .ntab:hover{background:var(--surface2)}
+.desktop-sidebar-footer{margin-top:auto;padding:12px}
+.sync-pill[data-status="synced"]{font-size:0;padding:8px}
+.sync-pill[data-status="synced"]::after{content:'Synced';font-size:11px}
+.sync-pill[data-status="saving"],.sync-pill[data-status="offline"],.sync-pill[data-status="conflict"],.sync-pill[data-status="error"],.sync-pill[data-status="connecting"]{font-size:11px}
+.sync-user-label{display:none!important}
+.mobile-nav{
+  background:var(--chrome-bg)!important;
+  -webkit-backdrop-filter:saturate(140%) blur(18px);
+  backdrop-filter:saturate(140%) blur(18px);
+  border-color:color-mix(in srgb,var(--border) 72%,transparent)!important;
+}
+.mobile-nav button{border-radius:12px!important}
+.mobile-sheet,.modal{border:1px solid color-mix(in srgb,var(--border) 78%,transparent)}
+.mobile-action-sheet-wrap.open{display:flex;position:fixed;inset:0;z-index:500;background:var(--overlay);align-items:center;justify-content:center;padding:20px}
+.mobile-action-sheet-wrap .mobile-sheet{width:min(430px,100%);max-height:min(78vh,680px);overflow-y:auto;background:var(--surface);border-radius:var(--radius-sheet);padding:18px;box-shadow:0 18px 60px rgba(0,0,0,.24)}
+.card,.recipe-card,.bank-card,.dq-card,.plan-library-card{border-radius:var(--radius-card)}
+.empty{line-height:1.5}
+.breakable-url,.breakable-id{overflow-wrap:anywhere!important;word-break:break-word!important}
+.recipe-card-name,.plan-library-title,.plan-library-main,.plan-library-recipe-preview,.shop-item-copy,
+.hierarchy-card-layout,.subtype-copy,.dq-copy,.mobile-editor-card,.review-mapping-status{
+  overflow-wrap:normal!important;word-break:normal!important;hyphens:none!important;
+}
+@media(max-width:839px){
+  .view :where(h1,h2,h3,h4,p,span,strong,label,button,.tag,.badge,.row-between,.row-center,.slot-name,.shop-item-copy,.dq-copy,.plan-library-main,.hierarchy-card-layout),
+  .modal :where(h1,h2,h3,h4,p,span,strong,label,button,.tag,.badge,.row-between,.row-center){
+    overflow-wrap:normal!important;
+    word-break:normal!important;
+    hyphens:none!important;
+  }
+  .view :where(.breakable-url,.breakable-id),.modal :where(.breakable-url,.breakable-id){
+    overflow-wrap:anywhere!important;
+    word-break:break-word!important;
+  }
+}
+@media(max-width:839px){
+  .desktop-sidebar{display:none!important}
+  .mobile-nav{position:fixed;z-index:120;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(5,1fr);padding:5px 4px calc(5px + env(safe-area-inset-bottom));box-shadow:0 -4px 18px rgba(0,0,0,.08)}
+  .mobile-nav button{min-width:0;min-height:52px;border:0;background:transparent;color:var(--text2);font:650 10px/1.15 var(--font);padding:6px 2px;cursor:pointer}
+  .mobile-nav button svg{display:block;width:20px;height:20px;margin:0 auto 3px}
+  .mobile-more-wrap,.mobile-action-sheet-wrap{position:fixed;inset:0;background:var(--overlay);z-index:500;align-items:flex-end;padding:0}
+  .mobile-more-wrap.open,.mobile-action-sheet-wrap.open{display:flex}
+  .mobile-action-sheet-wrap{justify-content:stretch}
+  .mobile-action-sheet-wrap .mobile-sheet{width:100%;max-width:none;max-height:min(82vh,720px);border-radius:22px 22px 0 0;padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
+}
+@media(max-width:599px){
+  .app-header{padding-left:12px;padding-right:12px}
+  .app-create-button{width:44px;padding:0;justify-content:center}
+  .app-create-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+  main{padding:18px 14px calc(92px + env(safe-area-inset-bottom))}
+  .today-header{display:block}
+  .today-date-nav{margin-top:14px;display:grid;grid-template-columns:44px minmax(0,1fr) 44px 62px}
+  .today-date-nav .btn{padding:7px 8px}
+  .today-date-label{min-width:0}
+  .today-people{grid-template-columns:1fr}
+  .today-meal-layout{display:block}
+  .today-meal-layout>.btn{width:100%;margin-top:14px}
+  .today-portions{grid-template-columns:1fr}
+  .today-target-row{grid-template-columns:72px minmax(0,1fr)}
+  .view-title{font-size:26px}
+}
+@media(min-width:840px){
+  .app{display:grid;grid-template-columns:238px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);min-height:100vh}
+  .app-header{grid-column:1/-1;grid-row:1}
+  .desktop-sidebar{grid-column:1;grid-row:2;display:flex;flex-direction:column;position:sticky;top:calc(58px + env(safe-area-inset-top));height:calc(100vh - 58px - env(safe-area-inset-top));overflow-y:auto;background:var(--surface);border-right:1px solid var(--border);padding:10px 8px}
+  main{grid-column:2;grid-row:2;margin:0 auto;padding:28px 30px 54px}
+  .mobile-nav,.mobile-more-wrap{display:none!important}
+}
+@media(prefers-reduced-transparency:reduce){
+  .app-header,.mobile-nav{background:var(--surface)!important;-webkit-backdrop-filter:none;backdrop-filter:none}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
 </style>
 </head>
 <body>
 <div class="app">
 
-<header>
+<header class="app-header">
   <div class="logo">Plate<span>Plan</span></div>
-  <div class="row-center">
+  <div class="app-header-actions">
+    <button class="btn primary app-create-button" type="button" onclick="openCreateActionSheet()" aria-label="Add to PlatePlan"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span class="app-create-label">Add</span></button>
     <button id="sync-status" class="sync-pill" data-status="local" onclick="openPlatePlanSyncPanel()" title="PlatePlan sync status">Local only</button>
     <span id="sync-user" class="sync-user-label" style="font-size:11px;color:var(--text3)"></span>
-    <button class="btn sm" onclick="savePlatePlanFiles()">Save</button>
-    <div style="font-size:12px;color:var(--text2)">Elliott &amp; Chloe</div>
   </div>
 </header>
 
-<nav>
-  <div class="ntab active" onclick="showView('vault')">Recipes</div>
-  <div class="ntab" onclick="showView('add')">Add recipe</div>
-  <div class="ntab" onclick="showView('ingredients')">Ingredient bank</div>
-  <div class="ntab" onclick="clearProductGroupFilter();showView('bank')">Product bank</div>
-  <div class="ntab" onclick="showView('planner')">Meal planner</div>
-  <div class="ntab" onclick="showView('planlib')">Meal Plan Library</div>
-  <div class="ntab" onclick="showView('shopping')">Shopping list</div>
-  <div class="ntab" onclick="showView('data')">Data Quality</div>
-  <div class="ntab" onclick="showView('prefs')">Preferences</div>
+<nav class="desktop-sidebar" aria-label="Main navigation">
+  <div class="nav-group-label">PlatePlan</div>
+  <button class="ntab active" data-view="today" onclick="showView('today')">Today</button>
+  <button class="ntab" data-view="vault" onclick="showView('vault')">Recipes</button>
+  <button class="ntab" data-view="planner" onclick="showView('planner')">Meal Planner</button>
+  <button class="ntab" data-view="shopping" onclick="showView('shopping')">Shopping</button>
+  <details class="nav-group" data-sidebar-group="library" open>
+    <summary>Library</summary>
+    <button class="ntab" data-view="planlib" onclick="showView('planlib')">Meal Plan Library</button>
+  </details>
+  <details class="nav-group" data-sidebar-group="data" open>
+    <summary>Data</summary>
+    <button class="ntab" data-view="ingredients" onclick="showView('ingredients')">Ingredient Bank</button>
+    <button class="ntab" data-view="bank" onclick="clearProductGroupFilter();showView('bank')">Product Bank</button>
+    <button class="ntab" data-view="data" onclick="showView('data')">Data Quality</button>
+  </details>
+  <details class="nav-group" data-sidebar-group="settings" open>
+    <summary>Settings</summary>
+    <button class="ntab" data-view="prefs" onclick="showView('prefs')">Preferences</button>
+  </details>
 </nav>
 
 <div class="mobile-nav" id="mobile-nav" aria-label="Main navigation">
-  <button data-view="vault" class="active" onclick="showView('vault')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M5 4v7M8 4v7M5 8h3M6.5 11v9M16 4c-2 3-2 7 0 9h2V4M18 13v7"></path></svg>Recipes</button>
-  <button data-view="add" onclick="showView('add')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Add</button>
+  <button data-view="today" class="active" onclick="showView('today')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5M6.5 10v9h11v-9M10 19v-5h4v5"></path></svg>Today</button>
+  <button data-view="vault" onclick="showView('vault')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M5 4v7M8 4v7M5 8h3M6.5 11v9M16 4c-2 3-2 7 0 9h2V4M18 13v7"></path></svg>Recipes</button>
   <button data-view="planner" onclick="showView('planner')"><svg aria-hidden="true" viewbox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2"></path></svg>Plan</button>
   <button data-view="shopping" onclick="showView('shopping')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 5h2l2 10h9l2-7H7M9 20h.01M17 20h.01"></path></svg>Shopping</button>
   <button data-view="more" onclick="openMobileMore()"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg>More</button>
@@ -756,12 +911,11 @@ html[data-theme="dark"]{
     <div class="mobile-sheet-handle"></div>
     <div class="row-between" style="align-items:center;margin-bottom:12px"><h3 id="mobile-more-title" style="margin:0">More PlatePlan</h3><button class="btn sm ghost" onclick="closeMobileMore()">Close</button></div>
     <div class="mobile-sheet-grid">
+      <button class="btn" onclick="mobileMoreView('planlib')">Meal Plan Library</button>
       <button class="btn" onclick="mobileMoreView('ingredients')">Ingredient bank</button>
       <button class="btn" onclick="clearProductGroupFilter();mobileMoreView('bank')">Product bank</button>
-      <button class="btn" onclick="mobileMoreView('planlib')">Plan history</button>
       <button class="btn" onclick="mobileMoreView('data')">Data Quality</button>
       <button class="btn" onclick="mobileMoreView('prefs')">Preferences</button>
-      <button class="btn" onclick="closeMobileMore();savePlatePlanFiles()">Save &amp; backup</button>
     </div>
   </div>
 </div>
@@ -769,7 +923,23 @@ html[data-theme="dark"]{
 
 <main>
 
-<div id="view-vault" class="view active">
+<div id="view-today" class="view active">
+  <div class="today-header">
+    <div>
+      <h1 class="view-title">Today</h1>
+      <div class="view-subtitle" id="today-subtitle">Your planned meals</div>
+    </div>
+    <div class="today-date-nav" aria-label="Browse meal-plan dates">
+      <button class="btn ghost" type="button" onclick="moveTodayDate(-1)" aria-label="Previous day">‹</button>
+      <div class="today-date-label" id="today-date-label" aria-live="polite"></div>
+      <button class="btn ghost" type="button" onclick="moveTodayDate(1)" aria-label="Next day">›</button>
+      <button class="btn ghost" type="button" onclick="resetTodayDate()">Today</button>
+    </div>
+  </div>
+  <div id="today-content"></div>
+</div>
+
+<div id="view-vault" class="view">
   <div class="view-toolbar">
     <h2 style="margin:0">Recipe vault</h2>
     <div class="vault-filters">
@@ -1917,9 +2087,10 @@ const SK='plateplan_v1';
 const BAKED_CANDIDATE_SK='plateplan_v1_baked_candidate';
 const RECOVERY_SK='plateplan_v1_recovery';
 const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
+const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='19.3.2';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v9';
+const PLATEPLAN_APP_VERSION='20.0';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v10';
 const SEED=[];
 
 let state = null;
@@ -1934,7 +2105,7 @@ let currentReviewServes=null;
 let currentMiniEditId = null;
 let platePlanIndexes = { products:new Map(), groups:new Map(), families:new Map(), recipes:new Map(), recipeDependencies:new Map() };
 let platePlanNutritionCache = new Map();
-let platePlanDirtyViews = new Set(['vault','ingredients','bank','planner','planlib','shopping','data','prefs']);
+let platePlanDirtyViews = new Set(['today','vault','ingredients','bank','planner','planlib','shopping','data','prefs']);
 let platePlanRemoteRefreshTimer = null;
 let platePlanRemoteChanges = { products:new Set(), groups:new Set(), recipes:new Set(), full:false, renderOnly:false };
 let editorNavigationStack = [];
@@ -1966,7 +2137,7 @@ const UNIT_TO_GRAMS={
   sprig:2, sprigs:2, leaf:1, leaves:2
 };
 
-function isMobilePlatePlan(){ return window.matchMedia('(max-width:640px)').matches; }
+function isMobilePlatePlan(){ return window.matchMedia('(max-width:839px)').matches; }
 let platePlanLastMobileFocus = null;
 let platePlanReturningFromUiClose = false;
 let platePlanHandlingHistoryPop = false;
@@ -2005,7 +2176,7 @@ function closeMobileMore(fromHistory=false){
 }
 function mobileMoreView(id){ closeMobileMore(); showView(id); }
 function syncMobileNavigation(id){
-  const primary = ['vault','add','planner','shopping'].includes(id) ? id : 'more';
+  const primary = ['today','vault','planner','shopping'].includes(id) ? id : 'more';
   document.querySelectorAll('#mobile-nav button').forEach(button=>button.classList.toggle('active',button.dataset.view===primary));
 }
 function closeMobileActionSheet(fromHistory=false){
@@ -2026,6 +2197,17 @@ function openMobileActionSheet(title, actions){
   markMobileLayerForBack(wrap,'actions');
   setTimeout(()=>host.querySelector('button')?.focus(),0);
 }
+
+function openCreateActionSheet(){
+  openMobileActionSheet('Add a recipe',[
+    {label:'Add manually',onclick:`openManualRecipeEntry()`},
+    {label:'Scan recipe photos',onclick:`openRecipeCaptureFromToolbar()`},
+    {label:'Paste recipe text',onclick:`openRecipeTextFromToolbar()`}
+  ]);
+}
+function openManualRecipeEntry(){ showView('add'); setTimeout(()=>document.getElementById('r-name')?.focus(),0); }
+function openRecipeCaptureFromToolbar(){ showView('add'); setTimeout(()=>openRecipePhotoPicker('library'),0); }
+function openRecipeTextFromToolbar(){ showView('add'); setTimeout(()=>openRecipeTextPaste(),0); }
 
 function installPlatePlanModalHistory(){
   if(!isMobilePlatePlan() || !document.body || document.body.dataset.modalHistoryReady==='1') return;
@@ -2091,7 +2273,6 @@ function openProductBankActions(productId){
 function openIngredientFamilyActions(familyId){
   const family=getIngredientFamily(familyId); if(!family) return;
   openMobileActionSheet(family.name || 'Ingredient actions',[
-    {label:'Fresh/dried conversion',onclick:`openHerbConversionPanel('${ppEscapeAttr(familyId)}')`},
     {label:'Edit aliases',onclick:`openIngredientFamilyAliasesModal('${ppEscapeAttr(familyId)}')`},
     {label:'Add sub-type',onclick:`addSubTypeToFamilyPrompt('${ppEscapeAttr(familyId)}')`},
     {label:'Merge ingredient',onclick:`mergeIngredientFamilyPrompt('${ppEscapeAttr(familyId)}')`},
@@ -2134,7 +2315,7 @@ function rebuildPlatePlanIndexes(){
   recipes.forEach(recipe=>[...(recipe.ingredients||[]),...(recipe.enhanced?.ingredients||[])].forEach(ing=>{ remember(ing?.bankId,recipe.id); remember(ing?.groupId,recipe.id); }));
   platePlanIndexes={products,groups,families,recipes,recipeDependencies};
 }
-function markPlatePlanViewsDirty(...names){ (names.length?names:['vault','ingredients','bank','planner','planlib','shopping','data','prefs']).forEach(name=>platePlanDirtyViews.add(name)); }
+function markPlatePlanViewsDirty(...names){ (names.length?names:['today','vault','ingredients','bank','planner','planlib','shopping','data','prefs']).forEach(name=>platePlanDirtyViews.add(name)); }
 
 // == INITIALIZATION ==
 function loadBakedState(){
@@ -3173,7 +3354,7 @@ function deleteRecoveryPoint(id){
 function clearVolatileSavedDom(root = document){
   const find = id => root.getElementById ? root.getElementById(id) : root.querySelector('#' + id);
   [
-    'vault-list','ingredient-groups-list','bank-list',
+    'today-content','vault-list','ingredient-groups-list','bank-list',
     'plan-content','plan-overall-summary','plan-meal-prep-panel','plan-history-panel','plan-warnings',
     'shop-content','shop-summary','shop-meal-prep-panel',
     'dq-missing-list','dq-duplicate-list','dq-cat-list',
@@ -3231,6 +3412,20 @@ function setPlatePlanAppearance(appearance){
   showPlatePlanToast(`Appearance set to ${safe}.`);
 }
 
+function installPlatePlanSidebarState(){
+  let saved={};
+  try{saved=JSON.parse(localStorage.getItem(PLATEPLAN_SIDEBAR_SK)||'{}')||{};}catch(_error){}
+  document.querySelectorAll('.desktop-sidebar details[data-sidebar-group]').forEach(group=>{
+    const key=group.dataset.sidebarGroup;
+    if(typeof saved[key]==='boolean') group.open=saved[key];
+    group.addEventListener('toggle',()=>{
+      const next={};
+      document.querySelectorAll('.desktop-sidebar details[data-sidebar-group]').forEach(item=>{next[item.dataset.sidebarGroup]=item.open;});
+      try{localStorage.setItem(PLATEPLAN_SIDEBAR_SK,JSON.stringify(next));}catch(_error){}
+    });
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   performance.mark?.('plateplan-start');
   installPlatePlanModalHistory();
@@ -3239,6 +3434,7 @@ document.addEventListener('DOMContentLoaded', () => {
   state = loadState();
   rebuildPlatePlanIndexes();
   applyPlatePlanAppearance();
+  installPlatePlanSidebarState();
   window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change',()=>{
     if(getPlatePlanAppearance()==='system') applyPlatePlanAppearance();
   });
@@ -3259,8 +3455,21 @@ document.addEventListener('DOMContentLoaded', () => {
   rebuildPlatePlanIndexes();
   saveState();
 
-  renderVault();
-  platePlanDirtyViews.delete('vault');
+  resetTodayDate({render:false});
+  renderToday();
+  platePlanDirtyViews.delete('today');
+  scheduleTodayMidnightRefresh();
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState!=='visible') return;
+    const actualDate=getPlatePlanLocalToday();
+    const dateChanged=!!platePlanLastActualDate&&platePlanLastActualDate!==actualDate;
+    platePlanLastActualDate=actualDate;
+    if(document.getElementById('view-today')?.classList.contains('active')){
+      if(dateChanged) platePlanTodayDate=actualDate;
+      renderToday();
+    }
+    scheduleTodayMidnightRefresh();
+  });
   performance.mark?.('plateplan-usable');
   try{ performance.measure?.('plateplan-local-startup','plateplan-start','plateplan-usable'); }catch(e){}
   renderBakedStateRecoveryBanner();
@@ -3755,32 +3964,6 @@ function downloadPlatePlanBlob(filename, content, type){
   URL.revokeObjectURL(url);
 }
 
-function savePlatePlanFiles(){
-  const el = document.getElementById('baked-state');
-  if(!el) return openAppInfoModal('Save unavailable','PlatePlan could not find its save-data block.');
-  const stamp = new Date().toISOString().slice(0,10);
-  try{
-    if(typeof saveState === 'function') saveState();
-    const stateJson = JSON.stringify(state);
-    const htmlRoot = document.documentElement.cloneNode(true);
-    const baked = htmlRoot.querySelector('#baked-state');
-    if(baked) baked.textContent = stateJson;
-    if(typeof clearVolatileSavedDom === 'function') clearVolatileSavedDom(htmlRoot);
-    const html = '<!DOCTYPE html>\n<html lang="en">' + htmlRoot.innerHTML + '</html>';
-    downloadPlatePlanBlob('PlatePlan saved ' + stamp + '.html', html, 'text/html');
-    downloadPlatePlanBlob('PlatePlan data backup ' + stamp + '.json', JSON.stringify(getPlatePlanBackupPayload(), null, 2), 'application/json');
-    if(typeof showMsg === 'function') showMsg('prefs-data-msg','PlatePlan saved as HTML and JSON backup.','success');
-  }catch(e){
-    console.error(e);
-    if(typeof showMsg === 'function') showMsg('prefs-data-msg','Could not save PlatePlan files.','error');
-    else openAppInfoModal('Save failed','PlatePlan could not save the requested files.');
-  }
-}
-
-function exportSnapshot(){
-  savePlatePlanFiles();
-}
-
 // == NORMALIZED SEARCH HELPERS ==
 function getSearchVariants(str) {
   const q = (str || '').toLowerCase().trim();
@@ -4207,7 +4390,7 @@ function inferIngredientFamilyFromText(text){
     ['Onion', ['onion','onions','red onion','brown onion']],
     ['Potato', ['potato','potatoes']],
     ['Pepper', ['bell pepper','red pepper','green pepper','yellow pepper']],
-    ['Broccoli', ['broccoli','tenderstem broccoli']],
+    ['Broccoli', ['broccoli','tenderstem']],
     ['Spinach', ['spinach']],
     ['Cabbage', ['cabbage']],
     ['Carrot', ['carrot','carrots']],
@@ -6066,8 +6249,8 @@ function refreshAllProductDefaultsAndRecipeNutrition(){
 
 function renderPlatePlanDependentViews(){
   markPlatePlanViewsDirty();
-  const active=document.querySelector('.view.active')?.id?.replace('view-','')||'vault';
-  const renderers={vault:renderVault,ingredients:renderIngredientBank,bank:renderBank,planner:renderPlan,planlib:renderPlanHistoryPanel,shopping:renderShopping,data:renderDataQuality,prefs:loadPrefs};
+  const active=document.querySelector('.view.active')?.id?.replace('view-','')||'today';
+  const renderers={today:renderToday,vault:renderVault,ingredients:renderIngredientBank,bank:renderBank,planner:renderPlan,planlib:renderPlanHistoryPanel,shopping:renderShopping,data:renderDataQuality,prefs:loadPrefs};
   if(renderers[active]){ renderers[active](); platePlanDirtyViews.delete(active); }
   if(mappingContext && document.getElementById('mapping-modal-wrap')?.classList.contains('open')) renderMappingList();
   if(document.getElementById('modal-wrap')?.classList.contains('open')){
@@ -6481,14 +6664,206 @@ function getIngredientUsage(bankId) {
    return { recipes, plans };
 }
 
+// == TODAY ==
+let platePlanTodayDate='';
+let platePlanTodayTimer=null;
+let platePlanLastActualDate='';
+
+function getPlatePlanLocalToday(){
+  return formatPlanLocalDateValue(new Date());
+}
+
+function formatTodayDateLabel(value){
+  const date=parsePlanLocalDate(value);
+  return date ? new Intl.DateTimeFormat('en-GB',{weekday:'short',day:'numeric',month:'short'}).format(date) : '';
+}
+
+function resetTodayDate({render=true}={}){
+  platePlanTodayDate=getPlatePlanLocalToday();
+  platePlanLastActualDate=platePlanTodayDate;
+  if(render) renderToday();
+}
+
+function moveTodayDate(amount){
+  const date=parsePlanLocalDate(platePlanTodayDate)||parsePlanLocalDate(getPlatePlanLocalToday());
+  date.setDate(date.getDate()+(+amount||0));
+  platePlanTodayDate=formatPlanLocalDateValue(date);
+  renderToday();
+}
+
+function getTodayPlanDay(dateValue,planContext=state?.plan){
+  return Object.entries(planContext?.dayDates||{}).find(([,value])=>value===dateValue)?.[0]||'';
+}
+
+function getNextDatedPlanDay(dateValue,planContext=state?.plan){
+  return Object.entries(planContext?.dayDates||{})
+    .filter(([,value])=>parsePlanLocalDate(value)&&value>dateValue)
+    .sort((a,b)=>a[1].localeCompare(b[1]))[0]||null;
+}
+
+function stablePlatePlanValue(value){
+  if(Array.isArray(value)) return value.map(stablePlatePlanValue);
+  if(value&&typeof value==='object') return Object.fromEntries(Object.keys(value).sort().map(key=>[key,stablePlatePlanValue(value[key])]));
+  return value;
+}
+
+function getTodayResolvedFingerprint(info,mealType){
+  if(!info?.active) return '';
+  const context=getPlanContextForInstance(info.instanceId);
+  const ingredients=(info.active.ingredients||[]).map(ingredient=>{
+    const key=getRecipeIngredientKey(ingredient);
+    if(isIngredientRemovedInContext(ingredient,context)) return {key,removed:true};
+    const adjusted=getAdjustedIngredientForContext(ingredient,context);
+    const resolved=resolveProductForIngredientWithContext(adjusted,context);
+    return {
+      key,
+      qty:+adjusted.qty||0,
+      unit:adjusted.unit||'',
+      productId:resolved.productId||resolved.product?.id||'',
+      mergeInto:context.mergeInto?.[key]||''
+    };
+  });
+  return JSON.stringify(stablePlatePlanValue({
+    recipeId:info.id,
+    variant:info.variant||'original',
+    mealType,
+    ingredients
+  }));
+}
+
+function getTodaySlotEntry(day,slotKey,person,mealType){
+  if(state.excluded?.[day]?.[slotKey]) return null;
+  const info=getPlanSlotInfo(state.plan?.slots?.[day]?.[slotKey]);
+  if(!info.active) return null;
+  const calculated=getPlannedSlotNutrition(info.active,slotKey,info.instanceId,state.plan);
+  return {day,slotKey,person,mealType,info,calculated,fingerprint:getTodayResolvedFingerprint(info,mealType)};
+}
+
+function renderTodayPersonPanel(person,label,entries){
+  const rows=['breakfast','lunch','dinner'].map(mealType=>{
+    const entry=entries.find(item=>item.person===person&&item.mealType===mealType);
+    const actualCal=Math.round(entry?.calculated?.cal||0);
+    const actualProt=Math.round((entry?.calculated?.prot||0)*10)/10;
+    const target=getBudgets(person,mealType);
+    const calPct=target.cal?Math.min(100,Math.round(actualCal/target.cal*100)):0;
+    const protPct=target.prot?Math.min(100,Math.round(actualProt/target.prot*100)):0;
+    return `<div class="today-target-row">
+      <div class="today-target-meal">${ppEscapeHtml(toTitleCase(mealType))}</div>
+      <div class="today-target-values">
+        <div class="today-target-line"><span>${actualCal} / ${Math.round(target.cal)} kcal</span><span>${actualProt} / ${Math.round(target.prot)}g protein</span></div>
+        <div class="today-progress" role="progressbar" aria-label="${ppEscapeAttr(toTitleCase(mealType))} calories" aria-valuemin="0" aria-valuemax="${Math.round(target.cal)}" aria-valuenow="${actualCal}"><span style="--progress:${calPct}%"></span></div>
+        <div class="today-progress protein" role="progressbar" aria-label="${ppEscapeAttr(toTitleCase(mealType))} protein" aria-valuemin="0" aria-valuemax="${Math.round(target.prot)}" aria-valuenow="${actualProt}" style="margin-top:4px"><span style="--progress:${protPct}%"></span></div>
+      </div>
+    </div>`;
+  }).join('');
+  return `<section class="today-person" aria-label="${ppEscapeAttr(label)} meal nutrition">
+    <div class="today-person-head"><div class="today-person-name">${ppEscapeHtml(label)}</div><div class="today-person-copy">Meal allocation</div></div>
+    ${rows}
+  </section>`;
+}
+
+function renderTodayMealCard(group){
+  const entry=group[0];
+  const info=entry.info;
+  const people=group.map(item=>item.person==='e'?'Elliott':'Chloe');
+  const portions=group.map(item=>{
+    const nutrition=item.calculated||{};
+    const portionValue=item.person==='e'
+      ? item.calculated?.portions?.eSingleServ
+      : item.calculated?.portions?.cSingleServ;
+    return `<div class="today-portion"><strong>${item.person==='e'?'Elliott':'Chloe'} · ${Math.round(nutrition.cal||0)} kcal · ${Math.round((nutrition.prot||0)*10)/10}g protein</strong>${Math.round((portionValue||0)*10)/10} serving${Math.abs((portionValue||0)-1)<.001?'':'s'}</div>`;
+  }).join('');
+  return `<article class="today-meal-card">
+    <div class="today-meal-layout">
+      <div class="today-meal-main">
+        <div class="today-meal-name">${ppEscapeHtml(info.active.name||info.recipe?.name||'Recipe')}</div>
+        <div class="today-meal-meta"><span class="tag">${ppEscapeHtml(info.variant==='enhanced'?'Enhanced':'Original')}</span><span class="tag">${ppEscapeHtml(people.join(' & '))}</span></div>
+        <div class="today-portions">${portions}</div>
+      </div>
+      <button class="btn primary" type="button" onclick="viewRecipe('${ppEscapeAttr(info.id)}','${ppEscapeAttr(info.instanceId||'')}','${ppEscapeAttr(info.variant||'original')}')">View recipe</button>
+    </div>
+  </article>`;
+}
+
+function renderTodayEmpty(title,copy,actions=''){
+  return `<div class="today-empty"><h3>${ppEscapeHtml(title)}</h3><p>${ppEscapeHtml(copy)}</p>${actions?`<div class="btn-row">${actions}</div>`:''}</div>`;
+}
+
+function renderToday(){
+  const host=document.getElementById('today-content');
+  if(!host||!state) return;
+  if(!platePlanTodayDate) platePlanTodayDate=getPlatePlanLocalToday();
+  const label=document.getElementById('today-date-label');
+  const subtitle=document.getElementById('today-subtitle');
+  if(label) label.textContent=formatTodayDateLabel(platePlanTodayDate);
+  if(!state.plan?.slots||!Object.keys(state.plan.slots).length){
+    if(subtitle) subtitle.textContent='Your planned meals';
+    host.innerHTML=renderTodayEmpty('No active meal plan','Generate a meal plan to see the exact meals for each calendar day.',`<button class="btn primary" onclick="showView('planner')">Open Meal Planner</button>`);
+    return;
+  }
+  const dated=Object.values(state.plan.dayDates||{}).some(value=>parsePlanLocalDate(value));
+  if(!dated){
+    if(subtitle) subtitle.textContent='This plan has no calendar dates';
+    host.innerHTML=renderTodayEmpty('Assign dates to this plan','Today only shows meals that are explicitly assigned to a calendar date.',`<button class="btn primary" onclick="showView('planner');setTimeout(()=>openPlanOptionsWorkspace(),0)">Assign dates</button><button class="btn ghost" onclick="showView('planner')">View plan</button>`);
+    return;
+  }
+  const day=getTodayPlanDay(platePlanTodayDate);
+  if(!day){
+    const next=getNextDatedPlanDay(platePlanTodayDate);
+    const nextCopy=next?` The next dated plan day is ${formatPlanDayLabel(state.plan,next[0],{short:true})}.`:'';
+    if(subtitle) subtitle.textContent='No plan day is assigned';
+    host.innerHTML=renderTodayEmpty('No meals planned for this date',`This date is not assigned to the active meal plan.${nextCopy}`,`<button class="btn primary" onclick="showView('planner')">Open Meal Planner</button>`);
+    return;
+  }
+  if(subtitle) subtitle.textContent=formatPlanDayLabel(state.plan,day,{short:false});
+  const entries=[];
+  const mealDefinitions=[
+    {mealType:'breakfast',e:'breakfastE',c:'breakfastC'},
+    {mealType:'lunch',e:'lunchE',c:'lunchC'},
+    {mealType:'dinner',e:'dinnerE',c:'dinnerC'}
+  ];
+  mealDefinitions.forEach(meal=>{
+    const e=getTodaySlotEntry(day,meal.e,'e',meal.mealType);
+    const c=getTodaySlotEntry(day,meal.c,'c',meal.mealType);
+    if(e) entries.push(e);
+    if(c) entries.push(c);
+  });
+  if(!entries.length){
+    host.innerHTML=renderTodayEmpty('No meals planned for this date','This plan day has no included breakfast, lunch or dinner meals.',`<button class="btn primary" onclick="showView('planner')">Open Meal Planner</button>`);
+    return;
+  }
+  const panels=`<div class="today-people">${renderTodayPersonPanel('e','Elliott',entries)}${renderTodayPersonPanel('c','Chloe',entries)}</div>`;
+  const meals=mealDefinitions.map(meal=>{
+    const mealEntries=entries.filter(entry=>entry.mealType===meal.mealType);
+    if(!mealEntries.length) return '';
+    const groups=mealEntries.length===2&&mealEntries[0].fingerprint===mealEntries[1].fingerprint?[mealEntries]:mealEntries.map(entry=>[entry]);
+    return `<section class="today-meal-section"><h2 class="today-meal-heading">${ppEscapeHtml(toTitleCase(meal.mealType))}</h2>${groups.map(renderTodayMealCard).join('')}</section>`;
+  }).join('');
+  host.innerHTML=panels+meals;
+}
+
+function scheduleTodayMidnightRefresh(){
+  clearTimeout(platePlanTodayTimer);
+  const now=new Date();
+  const next=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1,0,0,1);
+  platePlanTodayTimer=setTimeout(()=>{
+    const previousActual=platePlanLastActualDate||formatPlanLocalDateValue(now);
+    const wasActualDate=platePlanTodayDate===previousActual;
+    platePlanLastActualDate=getPlatePlanLocalToday();
+    if(wasActualDate) platePlanTodayDate=getPlatePlanLocalToday();
+    if(document.getElementById('view-today')?.classList.contains('active')) renderToday();
+    scheduleTodayMidnightRefresh();
+  },Math.max(1000,next.getTime()-now.getTime()));
+}
+
 // == NAV ==
 function showView(id){
-  const views=['vault','add','ingredients','bank','planner','planlib','shopping','data','prefs'];
-  document.querySelectorAll('nav .ntab').forEach((t,i)=>t.classList.toggle('active',views[i]===id));
+  document.querySelectorAll('.desktop-sidebar .ntab').forEach(tab=>tab.classList.toggle('active',tab.dataset.view===id));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   const view = document.getElementById('view-'+id);
   if(view) view.classList.add('active');
   syncMobileNavigation(id);
+  if(id==='today'){ resetTodayDate({render:false}); renderToday(); }
   if(id==='vault')renderVault();
   if(id==='ingredients')renderIngredientBank();
   if(id==='bank')renderBank();
@@ -8997,13 +9372,8 @@ function renderVault(){
           ${originalFit.html}
         </div>
         <div class="recipe-card-actions">
-            <button class="btn sm ghost" style="width:100%;text-align:center;white-space:nowrap" onclick="editRecipeModalView('${r.id}')">Review Modal</button>
-            <button class="btn sm ghost mobile-primary" style="width:100%;text-align:center;white-space:nowrap" onclick="viewRecipe('${r.id}', null)">View</button>
-            <button class="btn sm ghost" style="width:100%;text-align:center;white-space:nowrap" onclick="downloadRecipeCard('${r.id}')">Recipe Card</button>
-            <button class="btn sm ghost" style="width:100%;text-align:center;white-space:nowrap" onclick="duplicateRecipe('${r.id}')">Duplicate</button>
-            <button class="btn sm ghost" style="width:100%;text-align:center;white-space:nowrap" onclick="editRecipe('${r.id}')">Edit</button>
-            <button class="btn sm danger" style="width:100%;text-align:center;white-space:nowrap" onclick="deleteRecipe('${r.id}')">Delete</button>
-            <button class="btn sm ghost mobile-only mobile-more" onclick="openRecipeActions('${r.id}')">More…</button>
+            <button class="btn sm primary mobile-primary" onclick="viewRecipe('${r.id}', null)">View</button>
+            <button class="btn sm ghost mobile-more" onclick="openRecipeActions('${r.id}')">More</button>
           </div>
       </div>
       ${r.enhanced ? `<div class="enhanced-box">
@@ -9014,10 +9384,7 @@ function renderVault(){
             ${enhancedChanges}
           </div>
           <div class="enhanced-actions">
-            <button class="btn sm ghost enhanced-primary-action" style="padding:2px 5px;font-size:10px" onclick="viewRecipe('${r.id}', null, 'enhanced')">View</button>
-            <button class="btn sm ghost" style="padding:2px 5px;font-size:10px" onclick="downloadRecipeCard('${r.id}', 'enhanced')">Recipe Card</button>
-            <button class="btn sm ghost" style="padding:2px 5px;font-size:10px" onclick="editEnhancedRecipe('${r.id}')">Edit</button>
-            <button class="btn sm danger ghost" style="padding:2px 5px;font-size:10px" onclick="deleteEnhancedRecipe('${r.id}')">Delete</button>
+            <button class="btn sm primary enhanced-primary-action" onclick="viewRecipe('${r.id}', null, 'enhanced')">View</button>
             <button class="btn sm ghost enhanced-more-action" onclick="openEnhancedRecipeActions('${r.id}')">More</button>
           </div>
         </div>
@@ -9538,6 +9905,7 @@ function renderIngredientBank(){
   const familyCard = family => {
     const groups = (family.typeIds || []).map(id => getIngredientGroup(id)).filter(Boolean).sort((a,b)=>getGroupTypeName(a).localeCompare(getGroupTypeName(b)));
     const herbPair=getFamilyHerbPair(family.id);
+    const herbsAndSpices=family.cat==='herbs';
     const products = groups.flatMap(g => getGroupProducts(g.id));
     const defaultGroup = getIngredientGroup(family.defaultTypeId) || groups[0] || null;
     const defaultProduct = defaultGroup ? (getProduct(defaultGroup.defaultProductId) || getGroupProducts(defaultGroup.id)[0] || null) : null;
@@ -9558,7 +9926,7 @@ function renderIngredientBank(){
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
               <strong style="font-size:13px">${ppEscapeHtml(getGroupTypeName(g))}</strong>
               <span class="tag">${gProducts.length} product${gProducts.length===1?'':'s'}</span>
-              ${g.herbForm&&g.herbKey?`<span class="tag green">${g.herbForm==='fresh'?'Fresh herb':'Dried herb'} · 3:1 pair</span>`:''}
+              ${herbsAndSpices&&g.herbForm&&g.herbKey?`<span class="tag green">${g.herbForm==='fresh'?'Fresh':'Dried'} · 3:1 pair</span>`:''}
             </div>
             ${gDefault ? `<div style="font-size:11px;color:var(--text2);margin-top:2px">${gDefaultLabel}: ${ppEscapeHtml(gDefault.name)} · ${getProductProteinPer100Kcal(gDefault).toFixed(1)}g protein / 100kcal</div>` : `<div style="font-size:11px;color:var(--red);margin-top:2px">No default product</div>`}
           </div>
@@ -9589,11 +9957,10 @@ function renderIngredientBank(){
           ${defaultProduct ? `<div style="font-size:12px;color:var(--text2);margin-top:5px"><strong>${defaultLabel}:</strong> ${ppEscapeHtml(defaultProduct.name)}${defaultProduct.brand&&defaultProduct.brand!=='Generic'?' ('+ppEscapeHtml(defaultProduct.brand)+')':''}${defaultScore ? ` · ${defaultScore}g protein / 100kcal` : ''}</div>` : `<div style="font-size:12px;color:var(--red);margin-top:5px">No default product yet.</div>`}
           ${(family.aliases || []).length > 1 ? `<div style="font-size:11px;color:var(--text2);margin-top:5px"><strong>Aliases:</strong> ${ppEscapeHtml((family.aliases || []).slice(0,6).join(', '))}${family.aliases.length > 6 ? '...' : ''}</div>` : ''}
           ${family.notes ? `<div style="font-size:12px;color:var(--text2);margin-top:5px">${ppEscapeHtml(family.notes)}</div>` : ''}
-          <div class="herb-status"><strong>Fresh/dried conversion:</strong> ${herbPair.fresh&&herbPair.dried?`${ppEscapeHtml(getGroupTypeName(herbPair.fresh))} ↔ ${ppEscapeHtml(getGroupTypeName(herbPair.dried))} · 3:1`:'Not configured'} <button type="button" class="btn sm ghost" onclick="openHerbConversionPanel('${ppEscapeAttr(family.id)}')">${herbPair.fresh&&herbPair.dried?'Edit pairing':'Configure'}</button></div>
+          ${herbsAndSpices?`<div class="herb-status"><strong>Fresh/dried conversion:</strong> ${herbPair.fresh&&herbPair.dried?`${ppEscapeHtml(getGroupTypeName(herbPair.fresh))} ↔ ${ppEscapeHtml(getGroupTypeName(herbPair.dried))} · 3:1`:'Not configured'} <span class="tag">Edit ingredient to configure</span></div>`:''}
         </div>
         <div class="hierarchy-actions">
           <button class="btn sm ghost desktop-only-mobile-hide ingredient-edit-action" style="justify-content:center" onclick="openIngredientEditor('${family.id}',this)">Edit ingredient</button>
-          <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="openHerbConversionPanel('${family.id}')">Herb conversion</button>
           <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="openIngredientFamilyAliasesModal('${family.id}')">Aliases</button>
           <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="addSubTypeToFamilyPrompt('${family.id}')">+ Sub-type</button>
           <button class="btn sm ghost desktop-only-mobile-hide" style="justify-content:center" onclick="mergeIngredientFamilyPrompt('${family.id}')">Merge</button>
@@ -9637,11 +10004,18 @@ function getFamilyProducts(familyId){
 }
 
 let herbConversionFamilyId=null;
-function getFamilyHerbPair(familyId){
+function isHerbsAndSpicesFamily(family){ return family?.cat==='herbs'; }
+function isHerbsAndSpicesGroup(group){
+  const family=getGroupIngredientFamily(group);
+  return group?.cat==='herbs'&&family?.cat==='herbs';
+}
+function getFamilyHerbPair(familyId,{includeInactive=false}={}){
+  const family=getIngredientFamily(familyId);
+  if(!includeInactive&&!isHerbsAndSpicesFamily(family)) return {fresh:null,dried:null,key:'',active:false};
   const groups=getFamilyGroups(familyId);
   const fresh=groups.find(group=>group.herbForm==='fresh'&&group.herbKey);
   const dried=groups.find(group=>group.herbForm==='dried'&&group.herbKey&&(!fresh||group.herbKey===fresh.herbKey));
-  return {fresh,dried,key:fresh?.herbKey||dried?.herbKey||''};
+  return {fresh,dried,key:fresh?.herbKey||dried?.herbKey||'',active:isHerbsAndSpicesFamily(family)};
 }
 function ensureHerbConversionPanel(){
   let wrap=document.getElementById('ingredient-herb-conversion-wrap');
@@ -9655,7 +10029,7 @@ function ensureHerbConversionPanel(){
       <div><h3 style="margin:0">Fresh/dried conversion</h3><div id="herb-conversion-context" style="font-size:14px;color:var(--text2);margin-top:3px"></div></div>
       <button class="btn sm ghost" onclick="closeHerbConversionPanel()">Close</button>
     </div>
-    <div class="msg info" style="margin:0 0 14px">PlatePlan uses 3 parts fresh to 1 part dried for paired culinary herbs. This only changes temporary planned-meal substitutions.</div>
+    <div class="msg info" style="margin:0 0 14px">Within Herbs &amp; Spices, PlatePlan uses 3 parts fresh to 1 part dried for a deliberately paired ingredient. This only changes temporary planned-meal substitutions.</div>
     <div class="herb-pair-grid">
       <div class="field"><label for="herb-conversion-fresh">Fresh sub-type</label><select id="herb-conversion-fresh"></select></div>
       <div class="field"><label for="herb-conversion-dried">Dried sub-type</label><select id="herb-conversion-dried"></select></div>
@@ -9677,6 +10051,7 @@ function herbConversionOptions(groups,selected,form){
 function openHerbConversionPanel(familyId){
   const family=getIngredientFamily(familyId);
   if(!family)return showPlatePlanToast('That ingredient could not be found.');
+  if(!isHerbsAndSpicesFamily(family)) return openAppInfoModal('Fresh/dried conversion unavailable','Move this ingredient into Herbs &amp; Spices before configuring a fresh/dried pairing. Existing pairing metadata is preserved while it is outside that category.');
   if(typeof closeMobileActionSheet==='function')closeMobileActionSheet(true);
   herbConversionFamilyId=family.id;
   const groups=getFamilyGroups(family.id);
@@ -9694,7 +10069,7 @@ function closeHerbConversionPanel(){
 }
 function createHerbSubType(family,form){
   const name=`${form==='fresh'?'Fresh':'Dried'} ${family.name}`;
-  const group={id:'grp'+Date.now()+Math.random().toString(36).slice(2,6),name,cat:family.cat||'herbs',family:family.name,ingredientId:family.id,aliases:[name],defaultProductId:null,productIds:[],notes:'',herbForm:form,herbKey:canonicalGroupKey(family.name)};
+  const group={id:'grp'+Date.now()+Math.random().toString(36).slice(2,6),name,cat:'herbs',family:family.name,ingredientId:family.id,aliases:[name],defaultProductId:null,productIds:[],notes:'',herbForm:form,herbKey:canonicalGroupKey(family.name)};
   state.ingredientGroups.push(group);
   if(!Array.isArray(family.typeIds))family.typeIds=[];
   family.typeIds.push(group.id);
@@ -9705,6 +10080,7 @@ function saveHerbConversionPair(){
   const family=getIngredientFamily(herbConversionFamilyId);
   const msg=document.getElementById('herb-conversion-msg');
   if(!family)return;
+  if(!isHerbsAndSpicesFamily(family)){if(msg)msg.innerHTML='<div class="msg error">Fresh/dried pairings are available only inside Herbs &amp; Spices.</div>';return;}
   let freshId=document.getElementById('herb-conversion-fresh')?.value||'';
   let driedId=document.getElementById('herb-conversion-dried')?.value||'';
   let fresh=freshId==='__create__'?createHerbSubType(family,'fresh'):getIngredientGroup(freshId);
@@ -9718,6 +10094,7 @@ function saveHerbConversionPair(){
   saveState();
   closeHerbConversionPanel();
   refreshHierarchyViews();
+  refreshIngredientFamilyHerbEditor();
   showPlatePlanToast(`${family.name} fresh/dried pairing saved.`);
 }
 function clearHerbConversionPair(){
@@ -9727,6 +10104,7 @@ function clearHerbConversionPair(){
   saveState();
   closeHerbConversionPanel();
   refreshHierarchyViews();
+  refreshIngredientFamilyHerbEditor();
   showPlatePlanToast(`${family.name} conversion pairing cleared.`);
 }
 
@@ -10101,7 +10479,7 @@ function ensureIngredientFamilyDetailsModal(){
   const matches=Array.from(document.querySelectorAll('#ingredient-family-details-wrap'));
   let wrap=matches.shift()||null;
   matches.forEach(node=>node.remove());
-  if(wrap&&!wrap.querySelector('#ingredient-family-details-name')){wrap.remove();wrap=null;}
+  if(wrap&&(!wrap.querySelector('#ingredient-family-details-name')||!wrap.querySelector('#ingredient-family-herb-field'))){wrap.remove();wrap=null;}
   if(wrap) return preparePlatePlanWorkspace(wrap);
   wrap = document.createElement('div');
   wrap.id = 'ingredient-family-details-wrap';
@@ -10115,7 +10493,7 @@ function ensureIngredientFamilyDetailsModal(){
       </div>
       <div class="field">
         <label>Category</label>
-        <select id="ingredient-family-details-cat"></select>
+        <select id="ingredient-family-details-cat" onchange="refreshIngredientFamilyHerbEditor()"></select>
       </div>
       <div class="field">
         <label>Ingredient name</label>
@@ -10125,6 +10503,12 @@ function ensureIngredientFamilyDetailsModal(){
         <label>Notes</label>
         <textarea id="ingredient-family-details-notes" style="min-height:70px"></textarea>
       </div>
+      <section class="card-inner" id="ingredient-family-herb-field" style="display:none;margin:12px 0">
+        <div style="font-weight:750">Fresh/dried conversion</div>
+        <div id="ingredient-family-herb-summary" style="font-size:14px;color:var(--text2);margin:5px 0 10px"></div>
+        <button type="button" class="btn" id="ingredient-family-herb-action" onclick="openIngredientEditorHerbConversion()">Configure pairing</button>
+        <div style="font-size:12px;color:var(--text2);margin-top:8px">A planned-meal substitution can use the fixed 3 fresh : 1 dried ratio. Recipe Vault quantities are never changed.</div>
+      </section>
       <div id="ingredient-family-details-msg"></div>
       <div class="btn-row" style="margin-top:14px">
         <button class="btn primary" onclick="saveIngredientFamilyDetailsModal()">Save</button>
@@ -10160,6 +10544,32 @@ function openIngredientEditor(familyId,trigger=null){
   }
 }
 
+function refreshIngredientFamilyHerbEditor(){
+  const section=document.getElementById('ingredient-family-herb-field');
+  if(!section) return;
+  const cat=document.getElementById('ingredient-family-details-cat')?.value||'other';
+  section.style.display=cat==='herbs'?'block':'none';
+  if(cat!=='herbs') return;
+  const family=getIngredientFamily(ingredientFamilyDetailsId);
+  const summary=document.getElementById('ingredient-family-herb-summary');
+  const action=document.getElementById('ingredient-family-herb-action');
+  if(!family){
+    if(summary) summary.textContent='Save this ingredient first, then reopen it to create or pair fresh and dried sub-types.';
+    if(action){action.disabled=true;action.textContent='Save ingredient first';}
+    return;
+  }
+  const pair=getFamilyHerbPair(family.id,{includeInactive:true});
+  if(summary) summary.textContent=pair.fresh&&pair.dried
+    ? `${getGroupTypeName(pair.fresh)} ↔ ${getGroupTypeName(pair.dried)} · 3:1`
+    : 'Not configured';
+  if(action){action.disabled=false;action.textContent=pair.fresh&&pair.dried?'Edit pairing':'Configure pairing';}
+}
+
+function openIngredientEditorHerbConversion(){
+  if(!ingredientFamilyDetailsId) return;
+  openHerbConversionPanel(ingredientFamilyDetailsId);
+}
+
 function openIngredientFamilyDetailsModal(familyId = '', create = false){
   if(familyId) capturePlatePlanEditBaseline('ingredientFamilies/'+familyId);
   ensureIngredientGroups();
@@ -10172,6 +10582,7 @@ function openIngredientFamilyDetailsModal(familyId = '', create = false){
   document.getElementById('ingredient-family-details-name').value = family?.name || '';
   document.getElementById('ingredient-family-details-notes').value = family?.notes || '';
   document.getElementById('ingredient-family-details-msg').innerHTML = '';
+  refreshIngredientFamilyHerbEditor();
   wrap.classList.add('open');
   setTimeout(()=>document.getElementById('ingredient-family-details-name')?.focus(),0);
 }
@@ -11311,10 +11722,6 @@ function ensureIngredientGroupDetailsModal(){
         <button type="button" class="btn sm ghost" id="ingredient-group-family-create-btn" style="margin-top:6px;display:none" onclick="createIngredientForGroupDetails()">Create New Ingredient</button>
         <div style="font-size:11px;color:var(--text2);margin-top:4px">This is the everyday ingredient. The type is the more specific subtype used by recipes.</div>
       </div>
-      <div class="grid2" id="ingredient-group-herb-field">
-        <div><label>Herb form</label><select id="ingredient-group-herb-form"><option value="">Not a fresh/dried herb</option><option value="fresh">Fresh</option><option value="dried">Dried</option></select></div>
-        <div><label>Herb pairing name</label><input type="text" id="ingredient-group-herb-key" placeholder="e.g. basil or thyme"><div style="font-size:11px;color:var(--text2);margin-top:4px">Fresh and dried types convert only when this name matches.</div></div>
-      </div>
       <div class="field" id="ingredient-group-aliases-field">
         <label>Aliases</label>
         <textarea id="ingredient-group-aliases-input" style="min-height:110px" placeholder="One alias per line, or comma-separated"></textarea>
@@ -11346,14 +11753,10 @@ function openIngredientGroupDetailsModal(groupId, mode = 'name'){
   document.getElementById('ingredient-group-category-field').style.display = (mode === 'name' || mode === 'family' || mode === 'create') ? 'block' : 'none';
   document.getElementById('ingredient-group-name-field').style.display = (mode === 'name' || mode === 'create') ? 'block' : 'none';
   document.getElementById('ingredient-group-family-field').style.display = (mode === 'name' || mode === 'family' || mode === 'create') ? 'block' : 'none';
-  document.getElementById('ingredient-group-herb-field').style.display = (mode === 'name' || mode === 'create') ? 'grid' : 'none';
   document.getElementById('ingredient-group-aliases-field').style.display = (mode === 'aliases' || mode === 'create') ? 'block' : 'none';
   document.getElementById('ingredient-group-category-input').innerHTML = getGroupCategoryOptionsHtml(group?.cat || 'other');
   document.getElementById('ingredient-group-name-input').value = group?.name || '';
   document.getElementById('ingredient-group-family-input').value = group?.family || '';
-  const herbSuggestion=inferHerbMetadata(group?.name,group?.family,...(group?.aliases||[]));
-  document.getElementById('ingredient-group-herb-form').value = group?.herbForm || herbSuggestion.herbForm;
-  document.getElementById('ingredient-group-herb-key').value = group?.herbKey || herbSuggestion.herbKey;
   ingredientGroupDetailsFamilyId = group?.ingredientId || getGroupIngredientFamily(group)?.id || null;
   renderIngredientGroupFamilyOptions(group?.family || '');
   document.getElementById('ingredient-group-aliases-input').value = (group?.aliases || []).join('\n');
@@ -11472,9 +11875,7 @@ function saveIngredientGroupDetailsModal(){
       aliases:aliasesText.split(/[\n,]/).map(a=>a.trim()).filter(Boolean),
       defaultProductId:null,
       productIds:[],
-      notes:'',
-      herbForm:document.getElementById('ingredient-group-herb-form')?.value||'',
-      herbKey:canonicalGroupKey(document.getElementById('ingredient-group-herb-key')?.value||'')
+      notes:''
     };
     family.typeIds.push(group.id);
     if(!family.defaultTypeId) family.defaultTypeId = group.id;
@@ -11543,11 +11944,6 @@ function saveIngredientGroupDetailsModal(){
     syncIngredientGroupAliases(group, getGroupProducts(group.id));
   }
   if(group) {
-    if(ingredientGroupDetailsMode === 'name' || ingredientGroupDetailsMode === 'create'){
-      group.herbForm=document.getElementById('ingredient-group-herb-form')?.value||'';
-      group.herbKey=canonicalGroupKey(document.getElementById('ingredient-group-herb-key')?.value||'');
-      if(!group.herbForm) group.herbKey='';
-    }
     ensureIngredientFamilyForGroup(group, state);
     const products = getGroupProducts(group.id);
     products.forEach(product => { if(group.cat) product.cat = group.cat; });
@@ -13468,17 +13864,17 @@ function setPlanDayDate(day,value){
   if(!state.plan?.slots)return;
   const next={...(state.plan.dayDates||{})};if(value)next[day]=value;else delete next[day];
   const error=validatePlanDayDates(next);if(error){showMsg('plan-warnings',error,'error');renderPlan();return;}
-  state.plan.dayDates=next;saveState();markPlatePlanViewsDirty('shopping','planlib');renderPlan();renderPlanHistoryPanel();
+  state.plan.dayDates=next;saveState();markPlatePlanViewsDirty('today','shopping','planlib');renderPlan();renderPlanHistoryPanel();
 }
 function applyPlanCalendarStart(){
   if(!state.plan?.slots)return showMsg('plan-warnings','Generate a meal plan before applying calendar dates.','warn');
   const start=document.getElementById('plan-start-date')?.value||'';
   if(!start)return clearPlanCalendarDates();
-  state.plan.dayDates=buildPlanDayDates(start,state.plan.days||Object.keys(state.plan.slots||{}).length);saveState();markPlatePlanViewsDirty('shopping','planlib');renderPlan();
+  state.plan.dayDates=buildPlanDayDates(start,state.plan.days||Object.keys(state.plan.slots||{}).length);saveState();markPlatePlanViewsDirty('today','shopping','planlib');renderPlan();
 }
 function clearPlanCalendarDates(){
   const input=document.getElementById('plan-start-date');if(input)input.value='';
-  if(state.plan?.slots){state.plan.dayDates={};saveState();markPlatePlanViewsDirty('shopping','planlib');renderPlan();}
+  if(state.plan?.slots){state.plan.dayDates={};saveState();markPlatePlanViewsDirty('today','shopping','planlib');renderPlan();}
 }
 
 function initExcluded(){
@@ -13917,13 +14313,8 @@ function renderPlanHistoryPanel(){
             <div class="plan-library-recipe-preview"><strong>Recipes:</strong> ${renderExpandableText(ids.length ? ids.join(', ') : 'No recipes',`plan-recipes-${p.id||i}`,'')}${remaining ? ` <span class="tag">+${remaining} more</span>` : ''}</div>
           </div>
           <div class="plan-library-actions">
-            <button class="btn sm primary desktop-only-mobile-hide" onclick="openSavedPlanRecipeCards(${i})">Recipe cards</button>
-            <button class="btn sm ghost desktop-only-mobile-hide" onclick="viewPlanHistory(${i})">View schedule</button>
-            <button class="btn sm ghost desktop-only-mobile-hide" onclick="loadPlanHistoryForEdit(${i})">Edit</button>
-            <button class="btn sm ghost desktop-only-mobile-hide" onclick="renamePlanHistory(${i})">Rename</button>
-            <button class="btn sm danger ghost desktop-only-mobile-hide" onclick="deletePlanHistory(${i})">Delete</button>
-            <button class="btn primary mobile-only-action" onclick="openSavedPlanRecipeCards(${i})">Recipe cards</button>
-            <button class="btn ghost mobile-only-action" onclick="openPlanHistoryActions(${i})">More</button>
+            <button class="btn sm primary" onclick="openSavedPlanRecipeCards(${i})">Recipe cards</button>
+            <button class="btn sm ghost" onclick="openPlanHistoryActions(${i})">More</button>
           </div>
         </div>
       </article>`;
@@ -13936,6 +14327,7 @@ function openPlanHistoryActions(index){
   if(!p) return;
   openMobileActionSheet(p.name || `Saved plan ${index+1}`,[
     {label:'View schedule',onclick:`viewPlanHistory(${index})`},
+    {label:'Download recipe pack',onclick:`downloadSavedPlanPack(${index})`},
     {label:'Edit plan',onclick:`loadPlanHistoryForEdit(${index})`},
     {label:'Rename',onclick:`renamePlanHistory(${index})`},
     {label:'Delete saved plan',onclick:`deletePlanHistory(${index})`,danger:true}
@@ -15004,6 +15396,16 @@ function openSavedPlanRecipeCards(index){
 function scrollToSavedPackCard(cardId){const card=document.getElementById(`saved-${cardId}`);if(card){card.open=true;card.scrollIntoView({behavior:'smooth',block:'start'});}}
 function closeSavedPlanRecipeCards(){document.getElementById('saved-plan-pack-wrap')?.classList.remove('open');currentSavedPlanPackSnapshot=null;}
 function downloadCurrentSavedPlanPack(){if(currentSavedPlanPackSnapshot)downloadRecipePackSnapshot(currentSavedPlanPackSnapshot,`${currentSavedPlanPackSnapshot.planName||'PlatePlan saved plan'} recipe pack.html`);}
+function downloadSavedPlanPack(index){
+  const plan=(state.planHistory||[])[index];
+  if(!plan) return;
+  if(!plan.cardPackSnapshot){
+    plan.cardPackSnapshot=buildRecipeCardPackSnapshot(plan,plan.overrides||{},{planName:plan.name||`Saved plan ${index+1}`,reconstructed:true,createdAt:new Date().toISOString()});
+    saveState();
+  }
+  if(!plan.cardPackSnapshot?.cards?.length) return openAppInfoModal('Recipe pack','No recipe cards are available for this saved plan.');
+  downloadRecipePackSnapshot(plan.cardPackSnapshot,`${plan.name||'PlatePlan saved plan'} recipe pack.html`);
+}
 
 function copyList(){
   const items=document.querySelectorAll('#shop-content .shop-item-details[data-at-home="false"] .shop-item-copy');
@@ -15041,7 +15443,7 @@ function buildHerbConversion(target,replacement){
   const ing=getPlannedIngredientForSubstitutionTarget(target); if(!ing||!replacement) return null;
   const sourceGroup=getIngredientGroup(ing.groupId||getProduct(ing.bankId)?.groupId);
   const targetGroup=getIngredientGroup(replacement.groupId);
-  if(!sourceGroup?.herbForm||!targetGroup?.herbForm||sourceGroup.herbForm===targetGroup.herbForm||!sourceGroup.herbKey||sourceGroup.herbKey!==targetGroup.herbKey) return null;
+  if(!isHerbsAndSpicesGroup(sourceGroup)||!isHerbsAndSpicesGroup(targetGroup)||!sourceGroup?.herbForm||!targetGroup?.herbForm||sourceGroup.herbForm===targetGroup.herbForm||!sourceGroup.herbKey||sourceGroup.herbKey!==targetGroup.herbKey) return null;
   const factor=sourceGroup.herbForm==='fresh'&&targetGroup.herbForm==='dried'?1/3:3;
   const compatible=['g','ml','tsp','tbsp'].includes(String(ing.unit||'').toLowerCase().replace(/s$/,''));
   const converted=readableHerbQuantity(+ing.qty||0,ing.unit,factor);
