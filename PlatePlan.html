@@ -575,7 +575,7 @@ a{color:var(--action)}
 .plan-options-workspace-actions{position:sticky;bottom:0;z-index:3;margin:14px -20px -20px;padding:10px 20px calc(10px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--surface) 94%,transparent);border-top:1px solid var(--border);backdrop-filter:blur(12px)}
 .traffic-picker{display:grid!important;grid-template-columns:auto repeat(3,48px);gap:7px!important;align-items:center!important}
 .traffic-pill{position:relative;justify-content:center;width:48px;height:48px;padding:0!important;border-width:2px!important}
-.traffic-pill input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.traffic-pill input{position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none}
 .traffic-pill .traffic-symbol{font-size:18px;line-height:1;font-weight:800}
 .traffic-pill:has(input:not(:checked)){background:var(--surface)!important;color:var(--text3)!important;border-color:var(--border)!important;filter:saturate(.35)}
 .traffic-pill:has(input:checked){box-shadow:inset 0 0 0 1px currentColor}
@@ -885,7 +885,7 @@ main{max-width:var(--content-max);padding:22px 20px 96px}
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
 
-/* PlatePlan 20.2.2 — visible and reliable planner traffic filters */
+/* PlatePlan 20.2.3 — reliable touch traffic-filter controls */
 .btn.primary,.btn.dq-fix-btn,.cf.active,.mt2.active{
   background:var(--action-fill,#0969da)!important;
   border-color:var(--action-fill,#0969da)!important;
@@ -2266,8 +2266,8 @@ const RECOVERY_SK='plateplan_v1_recovery';
 const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='20.2.2';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v14';
+const PLATEPLAN_APP_VERSION='20.2.3';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v15';
 const SEED=[];
 
 let state = null;
@@ -3746,6 +3746,7 @@ function setPlanTrafficSelectValues(){
     [['plan-traffic-e', state.prefs.planTrafficE], ['plan-traffic-c', state.prefs.planTrafficC]].forEach(([id, values]) => {
       const allowed = new Set(normalisePlanTrafficStatuses(values));
       document.querySelectorAll(`input[name="${id}"]`).forEach(input => { input.checked = allowed.has(input.value); });
+      document.querySelectorAll(`input[name="${id}"]`).forEach(input => input.closest('.traffic-pill')?.setAttribute('aria-pressed',input.checked?'true':'false'));
       const el = document.getElementById(id);
       if(el) Array.from(el.options).forEach(opt => { opt.selected = allowed.has(opt.value); });
     });
@@ -3757,6 +3758,21 @@ function savePlanTrafficPrefs(){
     setPlanTrafficSelectValues();
     saveState();
     renderPlanTrafficAvailabilitySummary();
+}
+
+function togglePlanTrafficStatus(personPrefix,status){
+    const id=personPrefix==='c'?'plan-traffic-c':'plan-traffic-e';
+    const inputs=Array.from(document.querySelectorAll(`input[name="${id}"]`));
+    const selected=new Set(inputs.filter(input=>input.checked).map(input=>input.value));
+    if(selected.has(status)){
+      if(selected.size===1){
+        showPlatePlanToast('Keep at least one traffic-light colour selected.');
+        return;
+      }
+      selected.delete(status);
+    }else selected.add(status);
+    inputs.forEach(input=>{input.checked=selected.has(input.value);});
+    savePlanTrafficPrefs();
 }
 
 function getMealRepeatCadence(){
@@ -5249,6 +5265,20 @@ function enhancePlanTrafficControls(){
     const value=input.value;
     input.setAttribute('aria-label',names[value]||value);
     input.setAttribute('title',names[value]||value);
+    input.tabIndex=-1;
+    input.disabled=true;
+    input.setAttribute('aria-hidden','true');
+    const personPrefix=input.name==='plan-traffic-c'?'c':'e';
+    label.setAttribute('role','button');
+    label.setAttribute('tabindex','0');
+    label.setAttribute('aria-label',`${names[value]||value} for ${personPrefix==='c'?'Chloe':'Elliott'}`);
+    label.setAttribute('aria-pressed',input.checked?'true':'false');
+    label.onclick=event=>{event.preventDefault();togglePlanTrafficStatus(personPrefix,value);};
+    label.onkeydown=event=>{
+      if(event.key!=='Enter'&&event.key!==' ')return;
+      event.preventDefault();
+      togglePlanTrafficStatus(personPrefix,value);
+    };
     [...label.childNodes].forEach(node=>{if(node!==input)node.remove();});
     const symbol=document.createElement('span');
     symbol.className='traffic-symbol';
