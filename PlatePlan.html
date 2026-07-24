@@ -876,7 +876,7 @@ main{max-width:var(--content-max);padding:22px 20px 96px}
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
 
-/* PlatePlan 20.2 — essential workflow and planner reliability */
+/* PlatePlan 20.2.1 — planner traffic-filter compatibility repair */
 .btn.primary,.btn.dq-fix-btn,.cf.active,.mt2.active{
   background:var(--action-fill,#0969da)!important;
   border-color:var(--action-fill,#0969da)!important;
@@ -2257,8 +2257,8 @@ const RECOVERY_SK='plateplan_v1_recovery';
 const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='20.2';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v12';
+const PLATEPLAN_APP_VERSION='20.2.1';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v13';
 const SEED=[];
 
 let state = null;
@@ -3712,19 +3712,29 @@ function getRecipeVariantTrafficStatus(row, person, mealType){
     return calculateFit(actualCal, actualProt, tgt.cal, tgt.prot).status;
 }
 
+function normalisePlanTrafficStatuses(values){
+    const valid=['green','amber','red'];
+    const rows=(Array.isArray(values)?values:[values])
+      .flatMap(value=>String(value||'').toLowerCase().split(/[\s,|/]+/))
+      .filter(Boolean);
+    if(rows.some(value=>value==='any'||value==='all'||value==='unrestricted'))return valid.slice();
+    const selected=valid.filter(status=>rows.some(value=>value===status||value.includes(status)));
+    return selected.length?selected:valid.slice();
+}
+
 function getSelectedPlanTrafficStatuses(personPrefix){
     const id = personPrefix === 'c' ? 'plan-traffic-c' : 'plan-traffic-e';
     const fallback = personPrefix === 'c' ? state.prefs.planTrafficC : state.prefs.planTrafficE;
     const checks = Array.from(document.querySelectorAll(`input[name="${id}"]:checked`)).map(el => el.value);
-    if(checks.length) return checks;
+    if(checks.length) return normalisePlanTrafficStatuses(checks);
     const el = document.getElementById(id);
     const selected = el ? Array.from(el.selectedOptions).map(o => o.value) : fallback;
-    return (Array.isArray(selected) && selected.length) ? selected : ['green','amber','red'];
+    return normalisePlanTrafficStatuses(selected);
 }
 
 function setPlanTrafficSelectValues(){
     [['plan-traffic-e', state.prefs.planTrafficE], ['plan-traffic-c', state.prefs.planTrafficC]].forEach(([id, values]) => {
-      const allowed = new Set(Array.isArray(values) && values.length ? values : ['green','amber','red']);
+      const allowed = new Set(normalisePlanTrafficStatuses(values));
       document.querySelectorAll(`input[name="${id}"]`).forEach(input => { input.checked = allowed.has(input.value); });
       const el = document.getElementById(id);
       if(el) Array.from(el.options).forEach(opt => { opt.selected = allowed.has(opt.value); });
@@ -3774,13 +3784,13 @@ function formatPlanTrafficLabel(statuses){
 }
 
 function getPlanTrafficFilterRules(){
-    const e = getSelectedPlanTrafficStatuses('e');
-    const c = getSelectedPlanTrafficStatuses('c');
+    const e = normalisePlanTrafficStatuses(getSelectedPlanTrafficStatuses('e'));
+    const c = normalisePlanTrafficStatuses(getSelectedPlanTrafficStatuses('c'));
     return { e, c, label:`Elliott ${formatPlanTrafficLabel(e)} and Chloe ${formatPlanTrafficLabel(c)}` };
 }
 
-function plannerRecipePassesTrafficFilter(row, mealType, who){
-    const rules = getPlanTrafficFilterRules();
+function plannerRecipePassesTrafficFilter(row, mealType, who, suppliedRules=null){
+    const rules = suppliedRules || getPlanTrafficFilterRules();
     const target = String(who || '').toLowerCase();
     const checkE = target === 'any' || target === 'elliott' || target === 'both';
     const checkC = target === 'any' || target === 'chloe' || target === 'both';
@@ -6087,7 +6097,7 @@ function getPlannerRecipeOptions(type, who, opts = {}){
       return rows;
     });
   if(opts.applyTrafficFilter !== false) {
-    rows = rows.filter(row => plannerRecipePassesTrafficFilter(row, type, who));
+    rows = rows.filter(row => plannerRecipePassesTrafficFilter(row, type, who, opts.trafficRules || null));
   }
   if(opts.avoidHistory){
     rows.forEach(row => row.historyRank = used.has(row.id) ? used.get(row.id) + 1 : 0);
@@ -14347,12 +14357,12 @@ function plannerOptionHasUsableMappings(option,priority){
   });
 }
 
-function explainUnavailablePlanSlot(type,who,priority){
+function explainUnavailablePlanSlot(type,who,priority,trafficRules=null){
   const typed=getPlannerRecipeOptions(type,who,{applyExclusions:false,applyTrafficFilter:false});
   if(!typed.length)return `No ${type} recipes are available for ${who}.`;
   const allowed=getPlannerRecipeOptions(type,who,{applyExclusions:true,applyTrafficFilter:false});
   if(!allowed.length)return `${who}'s exclusions remove every available ${type} recipe.`;
-  const traffic=getPlannerRecipeOptions(type,who,{applyExclusions:true});
+  const traffic=getPlannerRecipeOptions(type,who,{applyExclusions:true,trafficRules});
   if(!traffic.length)return `The selected traffic-light filters remove every ${type} recipe for ${who}.`;
   if(!traffic.some(option=>plannerOptionHasUsableMappings(option,priority)))return `${type} recipes for ${who} need usable Product Bank mappings.`;
   return `No eligible ${type} recipe could be selected for ${who}.`;
@@ -14391,14 +14401,15 @@ function generatePlan(){
     return;
   }
   const priority = document.getElementById('plan-product-priority')?.value || state.prefs.productPriority || 'protein';
+  const trafficRules=getPlanTrafficFilterRules();
   const usedInNewPlan = new Set();
   const choose = (type, who, shared=false) => {
-    let p = getPlannerRecipeOptions(type, shared ? 'any' : who, { applyExclusions:true, avoidHistory:true });
+    let p = getPlannerRecipeOptions(type, shared ? 'any' : who, { applyExclusions:true, avoidHistory:true, trafficRules });
     if(shared) p = p.filter(opt => opt.recipe?.who === 'both');
     p=p.filter(option=>plannerOptionHasUsableMappings(option,priority));
     let fresh = p.filter(opt => !usedInNewPlan.has(opt.id));
     if(!fresh.length) fresh = p;
-    if(!fresh.length && !shared) fresh = getPlannerRecipeOptions(type, who, { applyExclusions:true }).filter(option=>plannerOptionHasUsableMappings(option,priority));
+    if(!fresh.length && !shared) fresh = getPlannerRecipeOptions(type, who, { applyExclusions:true, trafficRules }).filter(option=>plannerOptionHasUsableMappings(option,priority));
     const picked = fresh[Math.floor(Math.random() * fresh.length)] || null;
     if(picked) usedInNewPlan.add(picked.id);
     return picked;
@@ -14473,18 +14484,18 @@ function generatePlan(){
   const remainingUnresolved=unresolved.filter(item=>!slots[item.day]?.[item.key]);
   const filled=selectedSlots.filter(item=>slots[item.day]?.[item.key]).length;
   if(!filled){
-    const reason=remainingUnresolved.length?explainUnavailablePlanSlot(remainingUnresolved[0].meal,remainingUnresolved[0].who,priority):'No eligible recipes were found.';
+    const reason=remainingUnresolved.length?explainUnavailablePlanSlot(remainingUnresolved[0].meal,remainingUnresolved[0].who,priority,trafficRules):'No eligible recipes were found.';
     showPlanGenerationProblem('No meals could be generated',`${reason} Your current meal plan has been kept.`);
     return;
   }
-  const warningMessages=[...new Set(remainingUnresolved.map(item=>`${formatPlanDayLabel({dayDates:buildPlanDayDates(document.getElementById('plan-start-date')?.value||'',days)},item.day,{short:true})} ${item.meal} for ${item.who}: ${explainUnavailablePlanSlot(item.meal,item.who,priority)}`))];
+  const warningMessages=[...new Set(remainingUnresolved.map(item=>`${formatPlanDayLabel({dayDates:buildPlanDayDates(document.getElementById('plan-start-date')?.value||'',days)},item.day,{short:true})} ${item.meal} for ${item.who}: ${explainUnavailablePlanSlot(item.meal,item.who,priority,trafficRules)}`))];
   snapshotCurrentPlan();
   state.overrides = {};
   const dayDates=buildPlanDayDates(document.getElementById('plan-start-date')?.value||'',days);
   state.prefs.productPriority = priority;
   state.prefs.mealRepeatCadence = cadence;
-  state.prefs.planTrafficE = getSelectedPlanTrafficStatuses('e');
-  state.prefs.planTrafficC = getSelectedPlanTrafficStatuses('c');
+  state.prefs.planTrafficE = trafficRules.e;
+  state.prefs.planTrafficC = trafficRules.c;
   const nextPlan = {days,slots,dayDates,productPriority:priority,trafficFilter:{ e: state.prefs.planTrafficE, c: state.prefs.planTrafficC },mealRepeatCadence:cadence,productSelections,shoppingAtHome:{},warnings:warningMessages,score:null,confirmedShopping:false,mealPrepGroups:[],declinedMealPrepGroups:[]};
   nextPlan.score = calculatePlanScore(nextPlan);
   state.plan = nextPlan;
