@@ -889,7 +889,7 @@ main{max-width:var(--content-max);padding:22px 20px 96px}
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
 
-/* PlatePlan 20.2.4 — public-build traffic-filter identity repair */
+/* PlatePlan 20.3 — flexible meal rescheduling */
 .btn.primary,.btn.dq-fix-btn,.cf.active,.mt2.active{
   background:var(--action-fill,#0969da)!important;
   border-color:var(--action-fill,#0969da)!important;
@@ -958,6 +958,16 @@ main{max-width:var(--content-max);padding:22px 20px 96px}
   border-top:1px solid var(--border);
   background:var(--surface);
 }
+.plan-reschedule-wrap{align-items:center;justify-content:center}
+.plan-reschedule-wrap>.modal{width:min(560px,calc(100vw - 32px))}
+.plan-reschedule-summary{padding:12px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface2);margin:12px 0}
+.plan-reschedule-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.plan-reschedule-fields .field{margin:0}
+.plan-reschedule-preview{min-height:48px;margin-top:12px;padding:11px 12px;border-radius:var(--radius-md);background:var(--info-bg);color:var(--text);font-size:13px;line-height:1.45}
+.plan-slot-reason{display:inline-flex;align-items:center;gap:6px;min-width:0;color:var(--text2);font-weight:650}
+.plan-slot-reason::before{content:"";width:8px;height:8px;flex:0 0 auto;border-radius:50%;background:var(--text3)}
+.today-reason-card{padding:13px 14px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.today-reason-card strong{display:block;margin-bottom:3px}
 
 @media(max-width:599px){
   .planner-compact-actions{display:grid;grid-template-columns:1fr;width:100%;margin-top:10px}
@@ -1021,6 +1031,9 @@ main{max-width:var(--content-max);padding:22px 20px 96px}
   .plan-dates-start .btn{width:100%}
   .plan-date-row{grid-template-columns:minmax(76px,.7fr) minmax(0,1.3fr);gap:10px}
   .plan-dates-actions{grid-template-columns:1fr 1fr;padding-left:14px;padding-right:14px}
+  .plan-reschedule-wrap{padding:0!important;align-items:flex-end!important;background:var(--overlay)!important}
+  .plan-reschedule-wrap>.modal{width:100%!important;height:auto!important;max-height:88dvh!important;margin:0!important;border-radius:var(--radius-sheet) var(--radius-sheet) 0 0!important}
+  .plan-reschedule-fields{grid-template-columns:1fr}
 }
 @media(max-height:520px){
   .plan-options-wrap.open,.plan-dates-wrap.open{
@@ -2270,8 +2283,8 @@ const RECOVERY_SK='plateplan_v1_recovery';
 const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='20.2.4';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v16';
+const PLATEPLAN_APP_VERSION='20.3';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v17';
 const SEED=[];
 
 let state = null;
@@ -2293,6 +2306,8 @@ let editorNavigationStack = [];
 let platePlanListLimits = { vault:24, bank:24, ingredients:24 };
 let platePlanListSignatures = { vault:'', bank:'', ingredients:'' };
 let platePlanListSearchTimers = {};
+let platePlanRescheduleSource = null;
+let platePlanRescheduleUndo = null;
 const PLATEPLAN_LIST_BATCH = 24;
 
 const URL_TYPES=['tiktok','website','youtube','instagram'];
@@ -2682,9 +2697,11 @@ function loadState(){
     if (!Array.isArray(s.plan.mealPrepGroups)) s.plan.mealPrepGroups = [];
     if (!Array.isArray(s.plan.declinedMealPrepGroups)) s.plan.declinedMealPrepGroups = [];
     if (!s.plan.shoppingAtHome || typeof s.plan.shoppingAtHome !== 'object' || Array.isArray(s.plan.shoppingAtHome)) s.plan.shoppingAtHome = {};
+    if (!s.plan.slotReasons || typeof s.plan.slotReasons !== 'object' || Array.isArray(s.plan.slotReasons)) s.plan.slotReasons = {};
   }
   s.planHistory.forEach(plan => {
     if(plan && (!plan.shoppingAtHome || typeof plan.shoppingAtHome !== 'object' || Array.isArray(plan.shoppingAtHome))) plan.shoppingAtHome = {};
+    if(plan && (!plan.slotReasons || typeof plan.slotReasons !== 'object' || Array.isArray(plan.slotReasons))) plan.slotReasons = {};
   });
   if (!s.prefs.productPriority) s.prefs.productPriority = 'protein';
   if (!s.prefs.planTrafficFilter) s.prefs.planTrafficFilter = 'any';
@@ -3555,7 +3572,7 @@ function clearVolatileSavedDom(root = document){
     'category-manager-wrap','ingredient-group-merge-wrap','delete-ingredient-group-wrap',
     'ingredient-alias-suggestion-wrap','tesco-duplicate-wrap','review-replace-wrap',
     'review-hover-tip','app-confirm-wrap','app-prompt-wrap','plateplan-import-preview-wrap','cat-reassign-modal',
-    'plateplan-auth-screen','plateplan-cloud-migration-wrap','plateplan-sync-conflict-wrap','recipe-recognition-wrap','saved-plan-pack-wrap','plan-dates-wrap',
+    'plateplan-auth-screen','plateplan-cloud-migration-wrap','plateplan-sync-conflict-wrap','recipe-recognition-wrap','saved-plan-pack-wrap','plan-dates-wrap','plan-reschedule-wrap',
     'plateplan-toast-region'
   ].forEach(id => find(id)?.remove());
   root.querySelectorAll?.('.modal-wrap.open,.mobile-more-wrap.open,.mobile-action-sheet-wrap.open').forEach(el=>{el.classList.remove('open');delete el.dataset.historyEntry;});
@@ -5655,6 +5672,7 @@ function snapshotCurrentPlan(savedStatus = 'PlatePlan generated', name = ''){
     days: state.plan.days || 0,
     slots: JSON.parse(JSON.stringify(state.plan.slots || {})),
     dayDates: JSON.parse(JSON.stringify(state.plan.dayDates || {})),
+    slotReasons: JSON.parse(JSON.stringify(state.plan.slotReasons || {})),
     productPriority: state.plan.productPriority || state.prefs.productPriority || 'protein',
     productSelections: JSON.parse(JSON.stringify(state.plan.productSelections || {})),
     shoppingAtHome: JSON.parse(JSON.stringify(state.plan.shoppingAtHome || {})),
@@ -7218,8 +7236,20 @@ function renderTodayMealCard(group){
         <div class="today-meal-meta"><span class="tag">${ppEscapeHtml(info.variant==='enhanced'?'Enhanced':'Original')}</span><span class="tag">${ppEscapeHtml(people.join(' & '))}</span></div>
         <div class="today-portions">${portions}</div>
       </div>
-      <button class="btn primary" type="button" onclick="viewRecipe('${ppEscapeAttr(info.id)}','${ppEscapeAttr(info.instanceId||'')}','${ppEscapeAttr(info.variant||'original')}')">View recipe</button>
+      <div class="btn-row">
+        <button class="btn primary" type="button" onclick="viewRecipe('${ppEscapeAttr(info.id)}','${ppEscapeAttr(info.instanceId||'')}','${ppEscapeAttr(info.variant||'original')}')">View recipe</button>
+        <button class="btn ghost" type="button" onclick="openPlanReschedule(${+entry.day},'${ppEscapeAttr(entry.slotKey)}')">Reschedule</button>
+      </div>
     </div>
+  </article>`;
+}
+
+function renderTodayReasonCard(group){
+  const entry=group[0];
+  const people=group.map(item=>item.person==='e'?'Elliott':'Chloe').join(' & ');
+  return `<article class="today-reason-card">
+    <strong>${ppEscapeHtml(formatPlanSlotReason(entry.reason))}</strong>
+    <div style="color:var(--text2)">${ppEscapeHtml(people)} · no recipe scheduled</div>
   </article>`;
 }
 
@@ -7255,6 +7285,7 @@ function renderToday(){
   }
   if(subtitle) subtitle.textContent=formatPlanDayLabel(state.plan,day,{short:false});
   const entries=[];
+  const reasonEntries=[];
   const mealDefinitions=[
     {mealType:'breakfast',e:'breakfastE',c:'breakfastC'},
     {mealType:'lunch',e:'lunchE',c:'lunchC'},
@@ -7265,17 +7296,27 @@ function renderToday(){
     const c=getTodaySlotEntry(day,meal.c,'c',meal.mealType);
     if(e) entries.push(e);
     if(c) entries.push(c);
+    if(!e){
+      const reason=getPlanSlotReason(state.plan,day,meal.e);
+      if(reason)reasonEntries.push({day:+day,slotKey:meal.e,person:'e',mealType:meal.mealType,reason});
+    }
+    if(!c){
+      const reason=getPlanSlotReason(state.plan,day,meal.c);
+      if(reason)reasonEntries.push({day:+day,slotKey:meal.c,person:'c',mealType:meal.mealType,reason});
+    }
   });
-  if(!entries.length){
+  if(!entries.length&&!reasonEntries.length){
     host.innerHTML=renderTodayEmpty('No meals planned for this date','This plan day has no included breakfast, lunch or dinner meals.',`<button class="btn primary" onclick="showView('planner')">Open Meal Planner</button>`);
     return;
   }
-  const panels=`<div class="today-people">${renderTodayPersonPanel('e','Elliott',entries)}${renderTodayPersonPanel('c','Chloe',entries)}</div>`;
+  const panels=entries.length?`<div class="today-people">${renderTodayPersonPanel('e','Elliott',entries)}${renderTodayPersonPanel('c','Chloe',entries)}</div>`:'';
   const meals=mealDefinitions.map(meal=>{
     const mealEntries=entries.filter(entry=>entry.mealType===meal.mealType);
-    if(!mealEntries.length) return '';
+    const mealReasons=reasonEntries.filter(entry=>entry.mealType===meal.mealType);
+    if(!mealEntries.length&&!mealReasons.length) return '';
     const groups=mealEntries.length===2&&mealEntries[0].fingerprint===mealEntries[1].fingerprint?[mealEntries]:mealEntries.map(entry=>[entry]);
-    return `<section class="today-meal-section"><h2 class="today-meal-heading">${ppEscapeHtml(toTitleCase(meal.mealType))}</h2>${groups.map(renderTodayMealCard).join('')}</section>`;
+    const reasonGroups=mealReasons.length===2&&formatPlanSlotReason(mealReasons[0].reason)===formatPlanSlotReason(mealReasons[1].reason)?[mealReasons]:mealReasons.map(entry=>[entry]);
+    return `<section class="today-meal-section"><h2 class="today-meal-heading">${ppEscapeHtml(toTitleCase(meal.mealType))}</h2>${groups.map(renderTodayMealCard).join('')}${reasonGroups.map(renderTodayReasonCard).join('')}</section>`;
   }).join('');
   host.innerHTML=panels+meals;
 }
@@ -14384,6 +14425,263 @@ function clearPlanCalendarDates(){
   if(state.plan?.slots){state.plan.dayDates={};saveState();markPlatePlanViewsDirty('today','shopping','planlib');renderPlan();}
 }
 
+const PLAN_SLOT_REASON_LABELS={
+  eating_out:'Eating out',
+  away:'Away',
+  leftovers:'Leftovers',
+  skipped:'Skipped',
+  other:'Other'
+};
+function getPlanSlotReasonKey(day,slotKey){return `${day}|${slotKey}`;}
+function getPlanSlotReason(planContext,day,slotKey){
+  const value=planContext?.slotReasons?.[getPlanSlotReasonKey(day,slotKey)];
+  if(!value)return null;
+  if(typeof value==='string')return {code:value,note:''};
+  return {code:value.code||'other',note:value.note||''};
+}
+function formatPlanSlotReason(reason){
+  if(!reason)return '';
+  const base=PLAN_SLOT_REASON_LABELS[reason.code]||PLAN_SLOT_REASON_LABELS.other;
+  return reason.note ? (reason.code==='other'?reason.note:`${base} · ${reason.note}`) : base;
+}
+function setPlanSlotReason(day,slotKey,code,note=''){
+  if(!state.plan.slotReasons||typeof state.plan.slotReasons!=='object')state.plan.slotReasons={};
+  const key=getPlanSlotReasonKey(day,slotKey);
+  if(!code)delete state.plan.slotReasons[key];
+  else state.plan.slotReasons[key]={code:PLAN_SLOT_REASON_LABELS[code]?code:'other',note:String(note||'').trim()};
+}
+function clearPlanSlotReason(day,slotKey,{persist=true}={}){
+  if(!state.plan?.slotReasons)return;
+  delete state.plan.slotReasons[getPlanSlotReasonKey(day,slotKey)];
+  if(!persist)return;
+  saveState();
+  markPlatePlanViewsDirty('today','shopping','planlib');
+  renderPlan();
+  if(document.getElementById('view-today')?.classList.contains('active'))renderToday();
+  showPlatePlanToast('Plan note cleared.');
+}
+function findPlanSlotLocation(instanceId){
+  if(!instanceId||!state.plan?.slots)return null;
+  for(const [day,daySlots] of Object.entries(state.plan.slots)){
+    for(const [slotKey,slot] of Object.entries(daySlots||{})){
+      if(slot&&typeof slot==='object'&&slot.instanceId===instanceId)return {day:+day,slotKey,slot};
+    }
+  }
+  return null;
+}
+function getPlanSlotCounterpartKey(slotKey){
+  if(String(slotKey).endsWith('E'))return String(slotKey).slice(0,-1)+'C';
+  if(String(slotKey).endsWith('C'))return String(slotKey).slice(0,-1)+'E';
+  return '';
+}
+function planSlotsCanMoveTogether(day,slotKey){
+  const counterpartKey=getPlanSlotCounterpartKey(slotKey);
+  const first=getPlanSlotInfo(state.plan?.slots?.[day]?.[slotKey]);
+  const second=getPlanSlotInfo(state.plan?.slots?.[day]?.[counterpartKey]);
+  const mealType=getMealTypeFromSlotKey(slotKey);
+  return !!(first.active&&second.active&&getTodayResolvedFingerprint(first,mealType)===getTodayResolvedFingerprint(second,mealType));
+}
+function emptyPlanDaySlots(){
+  return Object.fromEntries(SLOTS.map(slot=>[slot.key,null]));
+}
+function insertPlanDayAt(index,dateValue){
+  const plan=state.plan;
+  const oldDays=Math.max(+plan.days||0,...Object.keys(plan.slots||{}).map(Number).filter(Number.isFinite),0);
+  const slots={};
+  const dayDates={};
+  const excluded={};
+  for(let day=1;day<=oldDays;day++){
+    const nextDay=day>=index?day+1:day;
+    slots[nextDay]=plan.slots?.[day]||emptyPlanDaySlots();
+    if(plan.dayDates?.[day])dayDates[nextDay]=plan.dayDates[day];
+    if(state.excluded?.[day])excluded[nextDay]=state.excluded[day];
+  }
+  slots[index]=emptyPlanDaySlots();
+  dayDates[index]=dateValue;
+  excluded[index]=Object.fromEntries(SLOTS.map(slot=>[slot.key,false]));
+  const slotReasons={};
+  Object.entries(plan.slotReasons||{}).forEach(([key,value])=>{
+    const match=key.match(/^(\d+)\|(.+)$/);
+    if(!match)return;
+    const oldDay=+match[1];
+    slotReasons[getPlanSlotReasonKey(oldDay>=index?oldDay+1:oldDay,match[2])]=value;
+  });
+  plan.days=oldDays+1;
+  plan.slots=slots;
+  plan.dayDates=dayDates;
+  plan.slotReasons=slotReasons;
+  state.excluded={...(state.excluded||{}),...excluded};
+  Object.keys(state.excluded).forEach(key=>{if(+key>=1&&+key<=oldDays+1&&!excluded[key])delete state.excluded[key];});
+  return index;
+}
+function ensurePlanDayForReschedule(dateValue){
+  const existing=getTodayPlanDay(dateValue,state.plan);
+  if(existing)return +existing;
+  const days=Math.max(+state.plan.days||0,...Object.keys(state.plan.slots||{}).map(Number).filter(Number.isFinite),0);
+  const dated=Object.entries(state.plan.dayDates||{}).filter(([,value])=>parsePlanLocalDate(value)).sort((a,b)=>+a[0]-+b[0]);
+  const next=dated.find(([,value])=>value>dateValue);
+  return insertPlanDayAt(next?+next[0]:days+1,dateValue);
+}
+function ensurePlanRescheduleModal(){
+  let wrap=document.getElementById('plan-reschedule-wrap');
+  if(wrap)return wrap;
+  wrap=document.createElement('div');
+  wrap.id='plan-reschedule-wrap';
+  wrap.className='modal-wrap sheet-mobile plan-reschedule-wrap';
+  wrap.innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-labelledby="plan-reschedule-title">
+    <div class="row-between" style="align-items:center;gap:10px">
+      <h3 id="plan-reschedule-title" style="margin:0">Reschedule meal</h3>
+      <button class="btn sm ghost" type="button" onclick="closePlanRescheduleModal()">Close</button>
+    </div>
+    <div class="plan-reschedule-summary" id="plan-reschedule-summary"></div>
+    <div class="plan-reschedule-fields">
+      <div class="field" id="plan-reschedule-scope-field"><label for="plan-reschedule-scope">Move for</label><select id="plan-reschedule-scope" onchange="updatePlanReschedulePreview()"></select></div>
+      <div class="field"><label for="plan-reschedule-date">New date</label><input id="plan-reschedule-date" type="date" onchange="updatePlanReschedulePreview()"></div>
+      <div class="field"><label for="plan-reschedule-meal">Meal</label><select id="plan-reschedule-meal" onchange="updatePlanReschedulePreview()"><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option></select></div>
+      <div class="field"><label for="plan-reschedule-reason">Why is the original slot changing?</label><select id="plan-reschedule-reason" onchange="updatePlanReschedulePreview()">${Object.entries(PLAN_SLOT_REASON_LABELS).map(([value,label])=>`<option value="${value}">${label}</option>`).join('')}</select></div>
+      <div class="field" style="grid-column:1/-1"><label for="plan-reschedule-note">Optional note</label><input id="plan-reschedule-note" maxlength="80" placeholder="For example: birthday dinner" oninput="updatePlanReschedulePreview()"></div>
+    </div>
+    <div class="plan-reschedule-preview" id="plan-reschedule-preview" role="status" aria-live="polite"></div>
+    <div class="btn-row">
+      <button class="btn ghost" type="button" onclick="closePlanRescheduleModal()">Cancel</button>
+      <button class="btn primary" type="button" onclick="confirmPlanReschedule()">Reschedule meal</button>
+    </div>
+  </div>`;
+  document.body.appendChild(wrap);
+  return wrap;
+}
+function getPlanRescheduleSourceKeys(){
+  if(!platePlanRescheduleSource)return [];
+  const scope=document.getElementById('plan-reschedule-scope')?.value||'single';
+  const keys=[platePlanRescheduleSource.slotKey];
+  const counterpart=getPlanSlotCounterpartKey(platePlanRescheduleSource.slotKey);
+  if(scope==='both'&&counterpart&&planSlotsCanMoveTogether(platePlanRescheduleSource.day,platePlanRescheduleSource.slotKey))keys.push(counterpart);
+  return keys;
+}
+function openPlanReschedule(day,slotKey){
+  const info=getPlanSlotInfo(state.plan?.slots?.[day]?.[slotKey]);
+  if(!info.active)return showPlatePlanToast('That planned meal is no longer available.');
+  closeMobileActionSheet(true);
+  const wrap=ensurePlanRescheduleModal();
+  platePlanRescheduleSource={day:+day,slotKey,instanceId:info.instanceId};
+  const person=slotKey.endsWith('C')?'Chloe':'Elliott';
+  const together=planSlotsCanMoveTogether(+day,slotKey);
+  const scope=wrap.querySelector('#plan-reschedule-scope');
+  scope.innerHTML=together?`<option value="both">Elliott and Chloe</option><option value="single">${person} only</option>`:`<option value="single">${person}</option>`;
+  scope.value=together?'both':'single';
+  const sourceDate=state.plan.dayDates?.[day]||getPlatePlanLocalToday();
+  const parsed=parsePlanLocalDate(sourceDate)||parsePlanLocalDate(getPlatePlanLocalToday());
+  parsed.setDate(parsed.getDate()+1);
+  wrap.querySelector('#plan-reschedule-date').value=formatPlanLocalDateValue(parsed);
+  wrap.querySelector('#plan-reschedule-meal').value=getMealTypeFromSlotKey(slotKey)||'dinner';
+  wrap.querySelector('#plan-reschedule-reason').value='eating_out';
+  wrap.querySelector('#plan-reschedule-note').value='';
+  wrap.querySelector('#plan-reschedule-summary').innerHTML=`<strong>${ppEscapeHtml(info.active.name||info.recipe?.name||'Planned meal')}</strong><div style="color:var(--text2);margin-top:4px">${ppEscapeHtml(formatPlanDayLabel(state.plan,day,{short:true}))} · ${ppEscapeHtml(toTitleCase(getMealTypeFromSlotKey(slotKey)))} · ${ppEscapeHtml(together?'Elliott and Chloe':person)}</div>`;
+  platePlanLastMobileFocus=document.activeElement;
+  wrap.classList.add('open');
+  markMobileLayerForBack(wrap,'plan-reschedule');
+  updatePlanReschedulePreview();
+  setTimeout(()=>wrap.querySelector('#plan-reschedule-date')?.focus(),0);
+}
+function closePlanRescheduleModal(fromHistory=false){
+  const wrap=document.getElementById('plan-reschedule-wrap');if(!wrap)return;
+  const marked=wrap.dataset.historyEntry==='1';
+  wrap.classList.remove('open');delete wrap.dataset.historyEntry;
+  platePlanRescheduleSource=null;
+  restoreMobileLayerFocus();
+  if(marked&&!fromHistory)returnFromPlatePlanUiHistory();
+}
+function updatePlanReschedulePreview(){
+  const host=document.getElementById('plan-reschedule-preview');
+  if(!host||!platePlanRescheduleSource)return;
+  const dateValue=document.getElementById('plan-reschedule-date')?.value||'';
+  const meal=document.getElementById('plan-reschedule-meal')?.value||'dinner';
+  if(!parsePlanLocalDate(dateValue)){host.textContent='Choose a valid destination date.';return;}
+  const existingDay=getTodayPlanDay(dateValue,state.plan);
+  const people=getPlanRescheduleSourceKeys().map(key=>key.endsWith('C')?'Chloe':'Elliott');
+  const occupied=existingDay?people.filter(person=>state.plan.slots?.[existingDay]?.[meal+(person==='Chloe'?'C':'E')]).length:0;
+  const destination=existingDay?formatPlanDayLabel(state.plan,existingDay,{short:true}):formatTodayDateLabel(dateValue);
+  const collision=occupied?` ${occupied===people.length?'The destination is occupied, so the meals will swap.':'An occupied destination will swap; an empty destination will move.'}`:'';
+  const extension=existingDay?'':' This date will be added to the active plan.';
+  host.textContent=`Move ${people.join(' and ')} to ${destination} · ${toTitleCase(meal)}.${collision}${extension}`;
+}
+function refreshAfterPlanReschedule(message){
+  state.plan.mealPrepGroups=[];
+  state.plan.declinedMealPrepGroups=[];
+  state.plan.score=calculatePlanScore(state.plan);
+  saveState();
+  markPlatePlanViewsDirty('today','shopping','planlib');
+  renderPlan();
+  renderPlanHistoryPanel();
+  if(document.getElementById('view-today')?.classList.contains('active'))renderToday();
+  if(document.getElementById('view-shopping')?.classList.contains('active'))renderShopping();
+  showPlatePlanToast(message,{label:'Undo',onclick:undoPlanReschedule});
+}
+function confirmPlanReschedule(){
+  if(!platePlanRescheduleSource||!state.plan?.slots)return;
+  const dateValue=document.getElementById('plan-reschedule-date')?.value||'';
+  const targetMeal=document.getElementById('plan-reschedule-meal')?.value||'dinner';
+  const reason=document.getElementById('plan-reschedule-reason')?.value||'eating_out';
+  const note=document.getElementById('plan-reschedule-note')?.value?.trim()||'';
+  if(!parsePlanLocalDate(dateValue))return showPlatePlanToast('Choose a valid destination date.');
+  if(reason==='other'&&!note)return showPlatePlanToast('Add a short description for Other.');
+  const sourceKeys=getPlanRescheduleSourceKeys();
+  const sourceItems=sourceKeys.map(slotKey=>{
+    const info=getPlanSlotInfo(state.plan.slots?.[platePlanRescheduleSource.day]?.[slotKey]);
+    return info.instanceId?{slotKey,instanceId:info.instanceId,personSuffix:slotKey.endsWith('C')?'C':'E'}:null;
+  }).filter(Boolean);
+  if(!sourceItems.length)return showPlatePlanToast('The planned meal has changed. Reopen Reschedule.');
+  platePlanRescheduleUndo={
+    plan:JSON.parse(JSON.stringify(state.plan)),
+    excluded:JSON.parse(JSON.stringify(state.excluded||{}))
+  };
+  const targetDay=ensurePlanDayForReschedule(dateValue);
+  const moves=sourceItems.map(item=>{
+    const source=findPlanSlotLocation(item.instanceId);
+    const targetSlotKey=targetMeal+item.personSuffix;
+    return source?{...item,source,targetSlotKey,destination:state.plan.slots?.[targetDay]?.[targetSlotKey]||null}:null;
+  }).filter(Boolean);
+  if(moves.every(move=>move.source.day===targetDay&&move.source.slotKey===move.targetSlotKey)){
+    platePlanRescheduleUndo=null;
+    return showPlatePlanToast('That meal is already in the selected slot.');
+  }
+  moves.forEach(move=>{
+    if(!state.plan.slots[targetDay])state.plan.slots[targetDay]=emptyPlanDaySlots();
+    state.plan.slots[targetDay][move.targetSlotKey]=move.source.slot;
+    setPlanSlotReason(targetDay,move.targetSlotKey,'');
+    if(!state.excluded[targetDay])state.excluded[targetDay]={};
+    state.excluded[targetDay][move.targetSlotKey]=false;
+  });
+  moves.forEach(move=>{
+    if(move.source.day===targetDay&&moves.some(other=>other.targetSlotKey===move.source.slotKey))return;
+    if(move.destination){
+      state.plan.slots[move.source.day][move.source.slotKey]=move.destination;
+      setPlanSlotReason(move.source.day,move.source.slotKey,'');
+    }else{
+      state.plan.slots[move.source.day][move.source.slotKey]=null;
+      setPlanSlotReason(move.source.day,move.source.slotKey,reason,note);
+    }
+    if(!state.excluded[move.source.day])state.excluded[move.source.day]={};
+    state.excluded[move.source.day][move.source.slotKey]=false;
+  });
+  closePlanRescheduleModal();
+  refreshAfterPlanReschedule(`Meal rescheduled to ${formatTodayDateLabel(dateValue)}.`);
+}
+function undoPlanReschedule(){
+  if(!platePlanRescheduleUndo)return;
+  state.plan=platePlanRescheduleUndo.plan;
+  state.excluded=platePlanRescheduleUndo.excluded;
+  platePlanRescheduleUndo=null;
+  state.plan.score=calculatePlanScore(state.plan);
+  saveState();
+  markPlatePlanViewsDirty('today','shopping','planlib');
+  renderPlan();
+  renderPlanHistoryPanel();
+  if(document.getElementById('view-today')?.classList.contains('active'))renderToday();
+  if(document.getElementById('view-shopping')?.classList.contains('active'))renderShopping();
+  showPlatePlanToast('Reschedule undone.');
+}
+
 function initExcluded(persist=true){
   ensurePlannerShell();
   const days=parseInt(document.getElementById('plan-days').value)||9;
@@ -14593,7 +14891,7 @@ function generatePlan(){
   state.prefs.mealRepeatCadence = cadence;
   state.prefs.planTrafficE = trafficRules.e;
   state.prefs.planTrafficC = trafficRules.c;
-  const nextPlan = {days,slots,dayDates,productPriority:priority,trafficFilter:{ e: state.prefs.planTrafficE, c: state.prefs.planTrafficC },mealRepeatCadence:cadence,productSelections,shoppingAtHome:{},warnings:warningMessages,score:null,confirmedShopping:false,mealPrepGroups:[],declinedMealPrepGroups:[]};
+  const nextPlan = {days,slots,dayDates,slotReasons:{},productPriority:priority,trafficFilter:{ e: state.prefs.planTrafficE, c: state.prefs.planTrafficC },mealRepeatCadence:cadence,productSelections,shoppingAtHome:{},warnings:warningMessages,score:null,confirmedShopping:false,mealPrepGroups:[],declinedMealPrepGroups:[]};
   nextPlan.score = calculatePlanScore(nextPlan);
   state.plan = nextPlan;
   const autoPrepSuggestions = findMealPrepSuggestions(state.plan).filter(s => {
@@ -14782,8 +15080,15 @@ function renderPlan(){
       }
       const rowAttrs = showRecipe ? ` data-plan-person="${rowPerson}" data-plan-cal="${rowCal}" data-plan-prot="${rowProt}"` : '';
 
-      const slotActionsHtml = showRecipe ? '<div class="slot-actions"><span class="slot-macro">'+calStr+'</span><button class="btn sm ghost" style="padding:2px 5px;font-size:10px" onclick="viewRecipe(\''+rId+'\', \''+(instanceId||'')+'\', \''+slotInfo.variant+'\')">View/Opt.</button><button class="btn sm ghost" style="padding:2px 5px;font-size:10px" onclick="reviewRecipeModalView(\''+rId+'\', \''+(instanceId||'')+'\', \''+slotInfo.variant+'\')">Review</button></div>' : '';
-      dayRowsHtml+='<div class="slot-row"'+rowAttrs+'><span class="slot-lbl" style="color:'+SLOT_COLORS[sl.key]+'">'+lblLines[0]+'<br>'+lblLines[1]+'</span>'+(isEx?'<span class="slot-skipped">Not needed</span>':'<span class="slot-name'+(r&&/(?:https?:\/\/|www\.)/i.test(r.name||'')?' breakable-url':'')+'">'+(r?ppEscapeHtml(r.name):'<span style="color:var(--text3)">Not set</span>')+(slotInfo.variant==='enhanced'?' <span class="tag green">Enhanced</span>':'')+'</span>'+slotActionsHtml+mkSel(d,sl.key,sl.key.includes('breakfast')?'breakfast':sl.key.includes('lunch')?'lunch':'dinner',sl.key.endsWith('E')?'Elliott':sl.key.endsWith('C')?'Chloe':'any'))+'</div>';
+      const slotReason=getPlanSlotReason(state.plan,d,sl.key);
+      const slotReasonLabel=formatPlanSlotReason(slotReason);
+      const slotActionsHtml = showRecipe
+        ? '<div class="slot-actions"><span class="slot-macro">'+calStr+'</span><button class="btn sm primary" onclick="viewRecipe(\''+rId+'\', \''+(instanceId||'')+'\', \''+slotInfo.variant+'\')">View</button><button class="btn sm ghost" onclick="openPlannedMealActions('+d+',\''+sl.key+'\')">More</button></div>'
+        : slotReason
+          ? '<div class="slot-actions"><button class="btn sm ghost" onclick="clearPlanSlotReason('+d+',\''+sl.key+'\')">Clear reason</button></div>'
+          : '';
+      const emptyContent=slotReason?'<span class="plan-slot-reason">'+ppEscapeHtml(slotReasonLabel)+'</span>':'<span style="color:var(--text3)">Not set</span>';
+      dayRowsHtml+='<div class="slot-row"'+rowAttrs+'><span class="slot-lbl" style="color:'+SLOT_COLORS[sl.key]+'">'+lblLines[0]+'<br>'+lblLines[1]+'</span>'+(isEx?'<span class="slot-skipped">Not needed</span>':'<span class="slot-name'+(r&&/(?:https?:\/\/|www\.)/i.test(r.name||'')?' breakable-url':'')+'">'+(r?ppEscapeHtml(r.name):emptyContent)+(slotInfo.variant==='enhanced'?' <span class="tag green">Enhanced</span>':'')+'</span>'+slotActionsHtml+mkSel(d,sl.key,sl.key.includes('breakfast')?'breakfast':sl.key.includes('lunch')?'lunch':'dinner',sl.key.endsWith('E')?'Elliott':sl.key.endsWith('C')?'Chloe':'any'))+'</div>';
     });
     daySummary.score = calculatePlanDayScoreFromTotals(daySummary.totals);
     const summaryHtml = ['e','c'].map(p=>`<div class="summary-box">${renderPlannerPersonSummaryBox(p, daySummary)}</div>`).join('');
@@ -14799,6 +15104,14 @@ function renderPlan(){
   document.getElementById('plan-actions').style.display = hasValidSlots ? 'block' : 'none';
   updatePlannerCompactHeader();
 }
+function openPlannedMealActions(day,slotKey){
+  const info=getPlanSlotInfo(state.plan?.slots?.[day]?.[slotKey]);
+  if(!info.active)return showPlatePlanToast('That planned meal is no longer available.');
+  openMobileActionSheet(info.active.name||info.recipe?.name||'Planned meal',[
+    {label:'Review meal options',onclick:`reviewRecipeModalView('${ppEscapeAttr(info.id)}','${ppEscapeAttr(info.instanceId||'')}','${ppEscapeAttr(info.variant||'original')}')`},
+    {label:'Reschedule meal',onclick:`openPlanReschedule(${+day},'${ppEscapeAttr(slotKey)}')`}
+  ]);
+}
 function swapSlot(day,slot,id){
     if(!state.plan.slots[day]) state.plan.slots[day]={};
     if(id) {
@@ -14807,6 +15120,7 @@ function swapSlot(day,slot,id){
     } else {
         state.plan.slots[day][slot] = null;
     }
+    setPlanSlotReason(day,slot,'');
     const priority = state.plan.productPriority || state.prefs.productPriority || 'protein';
     state.plan.productSelections = lockProductSelectionsForSlots(state.plan.slots, priority);
     state.plan.productPriority = priority;
@@ -14942,7 +15256,12 @@ function viewPlanHistory(index){
     const day = p.slots?.[d] || {};
     const meals = SLOTS.map(sl => {
       const info = getPlanSlotInfo(day[sl.key]);
-      return info.active ? `${SLOT_LABELS[sl.key].replace('\n',' ')}: ${info.active.name}${info.variant==='enhanced'?' (Enhanced)':''}` : '';
+      const reason=getPlanSlotReason(p,d,sl.key);
+      return info.active
+        ? `${SLOT_LABELS[sl.key].replace('\n',' ')}: ${info.active.name}${info.variant==='enhanced'?' (Enhanced)':''}`
+        : reason
+          ? `${SLOT_LABELS[sl.key].replace('\n',' ')}: ${formatPlanSlotReason(reason)}`
+          : '';
     }).filter(Boolean);
     if(meals.length) rows.push(`<div class="summary-box"><strong>${ppEscapeHtml(formatPlanDayLabel(p,d,{short:true}))}</strong><div>${meals.map(ppEscapeHtml).join('<br>')}</div></div>`);
   }
@@ -14962,6 +15281,7 @@ function loadPlanHistoryForEdit(index){
         days: p.days || Object.keys(p.slots || {}).length || 0,
         slots: JSON.parse(JSON.stringify(p.slots || {})),
         dayDates: JSON.parse(JSON.stringify(p.dayDates || {})),
+        slotReasons: JSON.parse(JSON.stringify(p.slotReasons || {})),
         productPriority: p.productPriority || state.prefs.productPriority || 'protein',
         productSelections: JSON.parse(JSON.stringify(p.productSelections || {})),
         shoppingAtHome: JSON.parse(JSON.stringify(p.shoppingAtHome || {})),
@@ -16498,7 +16818,7 @@ function showPlatePlanToast(message,action=null){
   const id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
   if(action?.onclick)platePlanToastActions.set(id,action.onclick);
   region.innerHTML=`<div class="plateplan-toast" id="plateplan-toast-${id}"><span>${ppEscapeHtml(message)}</span>${action?.onclick?`<button onclick="runPlatePlanToastAction('${ppEscapeAttr(id)}')">${ppEscapeHtml(action.label||'Undo')}</button>`:''}</div>`;
-  setTimeout(()=>{document.getElementById(`plateplan-toast-${id}`)?.remove();platePlanToastActions.delete(id);},4200);
+  setTimeout(()=>{document.getElementById(`plateplan-toast-${id}`)?.remove();platePlanToastActions.delete(id);},action?.onclick?8000:4200);
 }
 function showMsg(id,msg,type){const el=document.getElementById(id);if(!el)return;el.innerHTML='<div class="msg '+type+'">'+msg+'</div>';setTimeout(()=>{if(el)el.innerHTML='';},4000);}
 function showOverlay(msg,sub){document.getElementById('overlay-msg').textContent=msg;document.getElementById('overlay-sub').textContent=sub||'';document.getElementById('overlay').classList.add('visible');}
