@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='20.4';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v18';
+const PLATEPLAN_APP_VERSION='21.0';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v19';
 const SEED=[];
 
 let state = null;
@@ -686,6 +686,7 @@ function saveState(){
   try{ localStorage.setItem(SK,JSON.stringify(state)); }
   catch(e){ updatePlatePlanSyncStatus('error','Browser storage is full'); return false; }
   if(platePlanCloudReady&&!platePlanSyncSuppress) schedulePlatePlanCloudDiff();
+  window.dispatchEvent(new CustomEvent('plateplan:state-saved',{detail:{source:'legacy',savedAt:Date.now()}}));
   return true;
 }
 
@@ -1491,7 +1492,7 @@ document.addEventListener('DOMContentLoaded', () => {
   saveState();
 
   resetTodayDate({render:false});
-  renderToday();
+  requestPlatePlanViewRender('today');
   platePlanDirtyViews.delete('today');
   scheduleTodayMidnightRefresh();
   document.addEventListener('visibilitychange',()=>{
@@ -5171,12 +5172,7 @@ function scheduleTodayMidnightRefresh(){
 }
 
 // == NAV ==
-function showView(id){
-  document.querySelectorAll('.desktop-sidebar .ntab').forEach(tab=>tab.classList.toggle('active',tab.dataset.view===id));
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  const view = document.getElementById('view-'+id);
-  if(view) view.classList.add('active');
-  syncMobileNavigation(id);
+function renderPlatePlanLegacyView(id){
   if(id==='today'){ resetTodayDate({render:false}); renderToday(); }
   if(id==='vault')renderVault();
   if(id==='ingredients')renderIngredientBank();
@@ -5195,6 +5191,23 @@ function showView(id){
   if(id==='shopping')renderShopping();
   if(id==='prefs')loadPrefs();
   if(id==='data')renderDataQuality();
+}
+
+function requestPlatePlanViewRender(id){
+  if(globalThis.PlatePlanModules?.renderView){
+    globalThis.PlatePlanModules.renderView(id);
+    return;
+  }
+  renderPlatePlanLegacyView(id);
+}
+
+function showView(id){
+  document.querySelectorAll('.desktop-sidebar .ntab').forEach(tab=>tab.classList.toggle('active',tab.dataset.view===id));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  const view = document.getElementById('view-'+id);
+  if(view) view.classList.add('active');
+  syncMobileNavigation(id);
+  requestPlatePlanViewRender(id);
   platePlanDirtyViews.delete(id);
   window.scrollTo({top:0,behavior:'instant'});
 }
@@ -14658,3 +14671,31 @@ function showPlatePlanToast(message,action=null){
 function showMsg(id,msg,type){const el=document.getElementById(id);if(!el)return;el.innerHTML='<div class="msg '+type+'">'+msg+'</div>';setTimeout(()=>{if(el)el.innerHTML='';},4000);}
 function showOverlay(msg,sub){document.getElementById('overlay-msg').textContent=msg;document.getElementById('overlay-sub').textContent=sub||'';document.getElementById('overlay').classList.add('visible');}
 function hideOverlay(){document.getElementById('overlay').classList.remove('visible');}
+
+function runPlatePlanDelegatedAction(code,event,element){
+  return (function delegatedPlatePlanAction(event){
+    // This direct evaluation preserves the exact legacy handler scope while
+    // runtime DOM attributes migrate to the delegated module action system.
+    return eval(code);
+  }).call(element,event);
+}
+
+globalThis.PlatePlanLegacy=Object.freeze({
+  version:PLATEPLAN_APP_VERSION,
+  expectedCache:PLATEPLAN_EXPECTED_CACHE,
+  getState:()=>state,
+  saveState,
+  calculateRecipeDisplayNutrition,
+  getPlanContextForInstance,
+  refreshPlatePlanDerivedState,
+  renderLegacyView:renderPlatePlanLegacyView,
+  runDelegatedAction:runPlatePlanDelegatedAction,
+  showInfo:openAppInfoModal,
+  createRecoveryPoint,
+  renderRecoveryPanel,
+  initCloudSync:initPlatePlanCloudSync,
+  signOut:signOutPlatePlan,
+  registerServiceWorker:registerPlatePlanServiceWorker,
+  applyUpdate:applyPlatePlanAppUpdate
+});
+window.dispatchEvent(new CustomEvent('plateplan:legacy-ready',{detail:{version:PLATEPLAN_APP_VERSION}}));

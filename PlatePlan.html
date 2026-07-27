@@ -17,10 +17,10 @@ try{
   document.documentElement.style.colorScheme=platePlanAppearance==='system'?'light dark':platePlanAppearance;
 }catch(e){}
 </script>
-<link rel="stylesheet" href="./styles/tokens.css">
-<link rel="stylesheet" href="./styles/components.css">
-<link rel="stylesheet" href="./styles/responsive.css">
-<link rel="stylesheet" href="./styles/print.css" media="print">
+<link rel="stylesheet" href="./styles/tokens.css?v=21.0">
+<link rel="stylesheet" href="./styles/components.css?v=21.0">
+<link rel="stylesheet" href="./styles/responsive.css?v=21.0">
+<link rel="stylesheet" href="./styles/print.css?v=21.0" media="print">
 </head>
 <body>
 <div class="app">
@@ -28,55 +28,55 @@ try{
 <header class="app-header">
   <div class="logo">Plate<span>Plan</span></div>
   <div class="app-header-actions">
-    <button class="btn primary app-create-button" type="button" onclick="openCreateActionSheet()" aria-label="Add to PlatePlan"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span class="app-create-label">Add</span></button>
-    <button id="sync-status" class="sync-pill" data-status="local" onclick="openPlatePlanSyncPanel()" title="PlatePlan sync status">Local only</button>
+    <button class="btn primary app-create-button" type="button" data-pp-click="openCreateActionSheet()" aria-label="Add to PlatePlan"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span class="app-create-label">Add</span></button>
+    <button id="sync-status" class="sync-pill" data-status="local" data-pp-click="openPlatePlanSyncPanel()" title="PlatePlan sync status">Local only</button>
     <span id="sync-user" class="sync-user-label" style="font-size:11px;color:var(--text3)"></span>
   </div>
 </header>
 
 <nav class="desktop-sidebar" aria-label="Main navigation">
   <div class="nav-group-label">PlatePlan</div>
-  <button class="ntab active" data-view="today" onclick="showView('today')">Today</button>
-  <button class="ntab" data-view="vault" onclick="showView('vault')">Recipes</button>
-  <button class="ntab" data-view="planner" onclick="showView('planner')">Meal Planner</button>
-  <button class="ntab" data-view="shopping" onclick="showView('shopping')">Shopping</button>
+  <button class="ntab active" data-view="today" data-pp-click="showView('today')">Today</button>
+  <button class="ntab" data-view="vault" data-pp-click="showView('vault')">Recipes</button>
+  <button class="ntab" data-view="planner" data-pp-click="showView('planner')">Meal Planner</button>
+  <button class="ntab" data-view="shopping" data-pp-click="showView('shopping')">Shopping</button>
   <details class="nav-group" data-sidebar-group="library" open>
     <summary>Library</summary>
-    <button class="ntab" data-view="planlib" onclick="showView('planlib')">Meal Plan Library</button>
+    <button class="ntab" data-view="planlib" data-pp-click="showView('planlib')">Meal Plan Library</button>
   </details>
   <details class="nav-group" data-sidebar-group="data" open>
     <summary>Data</summary>
-    <button class="ntab" data-view="ingredients" onclick="showView('ingredients')">Ingredient Bank</button>
-    <button class="ntab" data-view="bank" onclick="clearProductGroupFilter();showView('bank')">Product Bank</button>
-    <button class="ntab" data-view="data" onclick="showView('data')">Data Quality</button>
+    <button class="ntab" data-view="ingredients" data-pp-click="showView('ingredients')">Ingredient Bank</button>
+    <button class="ntab" data-view="bank" data-pp-click="clearProductGroupFilter();showView('bank')">Product Bank</button>
+    <button class="ntab" data-view="data" data-pp-click="showView('data')">Data Quality</button>
   </details>
   <details class="nav-group" data-sidebar-group="settings" open>
     <summary>Settings</summary>
-    <button class="ntab" data-view="prefs" onclick="showView('prefs')">Preferences</button>
+    <button class="ntab" data-view="prefs" data-pp-click="showView('prefs')">Preferences</button>
   </details>
 </nav>
 
 <div class="mobile-nav" id="mobile-nav" aria-label="Main navigation">
-  <button data-view="today" class="active" onclick="showView('today')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5M6.5 10v9h11v-9M10 19v-5h4v5"></path></svg>Today</button>
-  <button data-view="vault" onclick="showView('vault')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M5 4v7M8 4v7M5 8h3M6.5 11v9M16 4c-2 3-2 7 0 9h2V4M18 13v7"></path></svg>Recipes</button>
-  <button data-view="planner" onclick="showView('planner')"><svg aria-hidden="true" viewbox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2"></path></svg>Plan</button>
-  <button data-view="shopping" onclick="showView('shopping')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 5h2l2 10h9l2-7H7M9 20h.01M17 20h.01"></path></svg>Shopping</button>
-  <button data-view="more" onclick="openMobileMore()"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg>More</button>
+  <button data-view="today" class="active" data-pp-click="showView('today')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5M6.5 10v9h11v-9M10 19v-5h4v5"></path></svg>Today</button>
+  <button data-view="vault" data-pp-click="showView('vault')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M5 4v7M8 4v7M5 8h3M6.5 11v9M16 4c-2 3-2 7 0 9h2V4M18 13v7"></path></svg>Recipes</button>
+  <button data-view="planner" data-pp-click="showView('planner')"><svg aria-hidden="true" viewbox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2"></path></svg>Plan</button>
+  <button data-view="shopping" data-pp-click="showView('shopping')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 5h2l2 10h9l2-7H7M9 20h.01M17 20h.01"></path></svg>Shopping</button>
+  <button data-view="more" data-pp-click="openMobileMore()"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg>More</button>
 </div>
-<div class="mobile-more-wrap" id="mobile-more-wrap" onclick="if(event.target===this)closeMobileMore()">
+<div class="mobile-more-wrap" id="mobile-more-wrap" data-pp-click="if(event.target===this)closeMobileMore()">
   <div class="mobile-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-more-title">
     <div class="mobile-sheet-handle"></div>
-    <div class="row-between" style="align-items:center;margin-bottom:12px"><h3 id="mobile-more-title" style="margin:0">More PlatePlan</h3><button class="btn sm ghost" onclick="closeMobileMore()">Close</button></div>
+    <div class="row-between" style="align-items:center;margin-bottom:12px"><h3 id="mobile-more-title" style="margin:0">More PlatePlan</h3><button class="btn sm ghost" data-pp-click="closeMobileMore()">Close</button></div>
     <div class="mobile-sheet-grid">
-      <button class="btn" onclick="mobileMoreView('planlib')">Meal Plan Library</button>
-      <button class="btn" onclick="mobileMoreView('ingredients')">Ingredient bank</button>
-      <button class="btn" onclick="clearProductGroupFilter();mobileMoreView('bank')">Product bank</button>
-      <button class="btn" onclick="mobileMoreView('data')">Data Quality</button>
-      <button class="btn" onclick="mobileMoreView('prefs')">Preferences</button>
+      <button class="btn" data-pp-click="mobileMoreView('planlib')">Meal Plan Library</button>
+      <button class="btn" data-pp-click="mobileMoreView('ingredients')">Ingredient bank</button>
+      <button class="btn" data-pp-click="clearProductGroupFilter();mobileMoreView('bank')">Product bank</button>
+      <button class="btn" data-pp-click="mobileMoreView('data')">Data Quality</button>
+      <button class="btn" data-pp-click="mobileMoreView('prefs')">Preferences</button>
     </div>
   </div>
 </div>
-<div class="mobile-action-sheet-wrap" id="mobile-action-sheet-wrap" onclick="if(event.target===this)closeMobileActionSheet()"><div class="mobile-sheet" id="mobile-action-sheet"></div></div>
+<div class="mobile-action-sheet-wrap" id="mobile-action-sheet-wrap" data-pp-click="if(event.target===this)closeMobileActionSheet()"><div class="mobile-sheet" id="mobile-action-sheet"></div></div>
 
 <main>
 
@@ -87,10 +87,10 @@ try{
       <div class="view-subtitle" id="today-subtitle">Your planned meals</div>
     </div>
     <div class="today-date-nav" aria-label="Browse meal-plan dates">
-      <button class="btn ghost" type="button" onclick="moveTodayDate(-1)" aria-label="Previous day">‹</button>
+      <button class="btn ghost" type="button" data-pp-click="moveTodayDate(-1)" aria-label="Previous day">‹</button>
       <div class="today-date-label" id="today-date-label" aria-live="polite"></div>
-      <button class="btn ghost" type="button" onclick="moveTodayDate(1)" aria-label="Next day">›</button>
-      <button class="btn ghost" type="button" onclick="resetTodayDate()">Today</button>
+      <button class="btn ghost" type="button" data-pp-click="moveTodayDate(1)" aria-label="Next day">›</button>
+      <button class="btn ghost" type="button" data-pp-click="resetTodayDate()">Today</button>
     </div>
   </div>
   <div id="today-content"></div>
@@ -100,19 +100,19 @@ try{
   <div class="view-toolbar">
     <h2 style="margin:0">Recipe vault</h2>
     <div class="vault-filters">
-      <input type="search" id="vault-search" placeholder="Search recipes..." oninput="schedulePlatePlanListRender('vault')" style="width:220px;font-size:12px">
-      <select id="vault-sort" onchange="renderVault()" style="width:auto;font-size:12px">
+      <input type="search" id="vault-search" placeholder="Search recipes..." data-pp-input="schedulePlatePlanListRender('vault')" style="width:220px;font-size:12px">
+      <select id="vault-sort" data-pp-change="renderVault()" style="width:auto;font-size:12px">
         <option value="name">Name A-Z</option>
         <option value="needs_work">Needs most work</option>
         <option value="best_fit">Best fit</option>
       </select>
-      <select id="filter-type" onchange="renderVault()" style="width:auto;font-size:12px">
+      <select id="filter-type" data-pp-change="renderVault()" style="width:auto;font-size:12px">
         <option value="all">All types</option>
         <option value="breakfast">Breakfast</option>
         <option value="lunch">Lunch</option>
         <option value="dinner">Dinner</option>
       </select>
-      <select id="filter-who" onchange="renderVault()" style="width:auto;font-size:12px">
+      <select id="filter-who" data-pp-change="renderVault()" style="width:auto;font-size:12px">
         <option value="all">Everyone</option>
         <option value="Elliott">Elliott</option>
         <option value="Chloe">Chloe</option>
@@ -130,18 +130,18 @@ try{
       <div class="row-between" style="align-items:flex-start;gap:10px;flex-wrap:wrap">
         <div><strong>Scan a recipe</strong><div style="font-size:12px;color:var(--text2);margin-top:3px">Photograph up to four printed or handwritten pages, or paste text from Live Text or Google Lens.</div></div>
         <div class="btn-row">
-          <button type="button" class="btn sm" onclick="openRecipePhotoPicker('camera')">Take photo</button>
-          <button type="button" class="btn sm" onclick="openRecipePhotoPicker('library')">Choose photos</button>
-          <button type="button" class="btn sm ghost" onclick="openRecipeTextPaste()">Paste extracted text</button>
+          <button type="button" class="btn sm" data-pp-click="openRecipePhotoPicker('camera')">Take photo</button>
+          <button type="button" class="btn sm" data-pp-click="openRecipePhotoPicker('library')">Choose photos</button>
+          <button type="button" class="btn sm ghost" data-pp-click="openRecipeTextPaste()">Paste extracted text</button>
         </div>
       </div>
-      <input id="recipe-photo-camera-input" type="file" accept="image/*" capture="environment" hidden onchange="handleRecipePhotoSelection(event)">
-      <input id="recipe-photo-input" type="file" accept="image/*" multiple hidden onchange="handleRecipePhotoSelection(event)">
+      <input id="recipe-photo-camera-input" type="file" accept="image/*" capture="environment" hidden data-pp-change="handleRecipePhotoSelection(event)">
+      <input id="recipe-photo-input" type="file" accept="image/*" multiple hidden data-pp-change="handleRecipePhotoSelection(event)">
       <div id="recipe-photo-previews" class="photo-preview-grid" style="display:none"></div>
       <div class="btn-row" id="recipe-photo-actions" style="display:none">
-        <button type="button" class="btn primary" onclick="recogniseRecipePhotos()">Recognise recipe</button>
-        <button type="button" class="btn ghost" onclick="recogniseRecipePhotosLocally()">Use on-device OCR</button>
-        <button type="button" class="btn ghost" onclick="clearRecipePhotos()">Clear photos</button>
+        <button type="button" class="btn primary" data-pp-click="recogniseRecipePhotos()">Recognise recipe</button>
+        <button type="button" class="btn ghost" data-pp-click="recogniseRecipePhotosLocally()">Use on-device OCR</button>
+        <button type="button" class="btn ghost" data-pp-click="clearRecipePhotos()">Clear photos</button>
       </div>
       <div id="recipe-photo-msg"></div>
     </div>
@@ -172,7 +172,7 @@ try{
     <div class="field">
       <label style="margin-bottom:6px">Source <span style="font-weight:400;color:var(--text2)">(optional)</span></label>
       <div style="display:flex;gap:8px;align-items:center">
-        <select id="r-src-type" onchange="updateSrcFields()" style="width:160px;flex:none">
+        <select id="r-src-type" data-pp-change="updateSrcFields()" style="width:160px;flex:none">
           <option value="">No source</option>
           <option value="tiktok">TikTok</option>
           <option value="website">Website / blog</option>
@@ -189,14 +189,14 @@ try{
       </div>
       <div id="src-book-fields" class="src-book-fields" style="display: none;">
         <div class="grid3">
-          <div><label>Book title</label><input type="text" id="r-src-book" placeholder="e.g. Ottolenghi Simple" oninput="updateSrcPreview()"></div>
-          <div><label>Author</label><input type="text" id="r-src-author" placeholder="e.g. Yotam Ottolenghi" oninput="updateSrcPreview()"></div>
-          <div><label>Page</label><input type="text" id="r-src-page" placeholder="e.g. 142" oninput="updateSrcPreview()"></div>
+          <div><label>Book title</label><input type="text" id="r-src-book" placeholder="e.g. Ottolenghi Simple" data-pp-input="updateSrcPreview()"></div>
+          <div><label>Author</label><input type="text" id="r-src-author" placeholder="e.g. Yotam Ottolenghi" data-pp-input="updateSrcPreview()"></div>
+          <div><label>Page</label><input type="text" id="r-src-page" placeholder="e.g. 142" data-pp-input="updateSrcPreview()"></div>
         </div>
       </div>
       <div id="src-other-field" class="src-other-field" style="display: none;">
         <label>Description</label>
-        <input type="text" id="r-src-other" placeholder="e.g. Mum's recipe card, meal prep app" oninput="updateSrcPreview()">
+        <input type="text" id="r-src-other" placeholder="e.g. Mum's recipe card, meal prep app" data-pp-input="updateSrcPreview()">
       </div>
       <div id="src-preview" class="src-preview" style="display: none;"></div>
     </div>
@@ -213,8 +213,8 @@ try{
       Save will structure your inputs, map volumes, and calculate nutrition against your ingredient bank.
     </div>
     <div class="btn-row">
-      <button class="btn primary" onclick="submitRecipe()">Parse &amp; Verify</button>
-      <button class="btn ghost" onclick="clearForm()">Clear</button>
+      <button class="btn primary" data-pp-click="submitRecipe()">Parse &amp; Verify</button>
+      <button class="btn ghost" data-pp-click="clearForm()">Clear</button>
     </div>
     <div id="form-msg"></div>
   </div>
@@ -224,9 +224,9 @@ try{
   <div class="view-toolbar">
     <h2 style="margin:0">Ingredient bank</h2>
     <div class="btn-row">
-      <button class="btn sm ghost" onclick="openCategoryManagerModal()">Categories</button>
-      <button class="btn sm" onclick="createIngredientFamilyPrompt()">+ Ingredient</button>
-      <button class="btn sm ghost" onclick="createIngredientGroupPrompt()">+ Sub-type</button>
+      <button class="btn sm ghost" data-pp-click="openCategoryManagerModal()">Categories</button>
+      <button class="btn sm" data-pp-click="createIngredientFamilyPrompt()">+ Ingredient</button>
+      <button class="btn sm ghost" data-pp-click="createIngredientGroupPrompt()">+ Sub-type</button>
     </div>
   </div>
   <div class="card" style="margin-bottom:12px">
@@ -235,7 +235,7 @@ try{
         <div style="font-weight:700;margin-bottom:3px">Category → Ingredient → Sub-type → Product</div>
         <div style="font-size:12px;color:var(--text2)">Recipes map to ingredients or sub-types. Products stay in the Product Bank and provide the nutrition and shopping data.</div>
       </div>
-      <input type="search" id="ingredient-group-search" placeholder="Search category, ingredient, type, aliases..." oninput="schedulePlatePlanListRender('ingredients')" style="font-size:12px;max-width:260px">
+      <input type="search" id="ingredient-group-search" placeholder="Search category, ingredient, type, aliases..." data-pp-input="schedulePlatePlanListRender('ingredients')" style="font-size:12px;max-width:260px">
     </div>
   </div>
   <div id="ingredient-groups-list"></div>
@@ -245,8 +245,8 @@ try{
   <div class="view-toolbar">
     <h2 style="margin:0">Product bank</h2>
     <div class="btn-row">
-      <button class="btn sm primary" onclick="showAddIng()">+ Add product</button>
-      <button class="btn sm" onclick="showTescoImport()" style="background:var(--purple-bg);color:var(--purple);border-color:var(--purple)">Import Tesco</button>
+      <button class="btn sm primary" data-pp-click="showAddIng()">+ Add product</button>
+      <button class="btn sm" data-pp-click="showTescoImport()" style="background:var(--purple-bg);color:var(--purple);border-color:var(--purple)">Import Tesco</button>
     </div>
   </div>
   <div id="bank-groups-panel"></div>
@@ -286,24 +286,24 @@ try{
 
   <div class="cat-filter" id="cat-filter">
     <div style="width:100%;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-top:2px">Category</div>
-    <div class="cf active" onclick="setCat('all')">all</div><div class="cf" onclick="setCat('baking-spices')">Baking</div><div class="cf" onclick="setCat('beverages')">Beverages</div><div class="cf" onclick="setCat('carbs-pasta-rice')">Carbs (Pasta/Rice/Potato)</div><div class="cf" onclick="setCat('dairy-alternative')">Dairy &amp; Eggs</div><div class="cf" onclick="setCat('fruit')">Fruit &amp; Vegetables</div><div class="cf" onclick="setCat('grain')">Grains, Legumes &amp; Pulses</div><div class="cf" onclick="setCat('herbs')">Herbs &amp; Spices</div><div class="cf" onclick="setCat('meat-substitute')">Meat Substitutes</div><div class="cf" onclick="setCat('nuts-seeds')">Nuts &amp; Seeds</div><div class="cf" onclick="setCat('other')">Other</div><div class="cf" onclick="setCat('sauces-condiments')">Sauces, Condiments &amp; Pastes</div><div class="cf" onclick="setCat('store-cupboard')">Store Cupboard</div><div class="cf" onclick="setCat('supplement')">Supplements</div><div class="cf" onclick="setCat('tofu-tempeh')">Tofu, Tempeh &amp; Seitan</div>
+    <div class="cf active" data-pp-click="setCat('all')">all</div><div class="cf" data-pp-click="setCat('baking-spices')">Baking</div><div class="cf" data-pp-click="setCat('beverages')">Beverages</div><div class="cf" data-pp-click="setCat('carbs-pasta-rice')">Carbs (Pasta/Rice/Potato)</div><div class="cf" data-pp-click="setCat('dairy-alternative')">Dairy &amp; Eggs</div><div class="cf" data-pp-click="setCat('fruit')">Fruit &amp; Vegetables</div><div class="cf" data-pp-click="setCat('grain')">Grains, Legumes &amp; Pulses</div><div class="cf" data-pp-click="setCat('herbs')">Herbs &amp; Spices</div><div class="cf" data-pp-click="setCat('meat-substitute')">Meat Substitutes</div><div class="cf" data-pp-click="setCat('nuts-seeds')">Nuts &amp; Seeds</div><div class="cf" data-pp-click="setCat('other')">Other</div><div class="cf" data-pp-click="setCat('sauces-condiments')">Sauces, Condiments &amp; Pastes</div><div class="cf" data-pp-click="setCat('store-cupboard')">Store Cupboard</div><div class="cf" data-pp-click="setCat('supplement')">Supplements</div><div class="cf" data-pp-click="setCat('tofu-tempeh')">Tofu, Tempeh &amp; Seitan</div>
     <div style="width:100%;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-top:6px">Ingredient</div>
     <div style="width:100%;display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
-      <input type="search" id="bank-family-search" list="bank-family-options" placeholder="Search ingredient..." oninput="handleProductBankFamilySearch(this.value)" onchange="selectProductBankFamilyFromSearch(this.value)" style="font-size:12px;padding:5px 10px;max-width:260px;flex:1;min-width:180px">
+      <input type="search" id="bank-family-search" list="bank-family-options" placeholder="Search ingredient..." data-pp-input="handleProductBankFamilySearch(this.value)" data-pp-change="selectProductBankFamilyFromSearch(this.value)" style="font-size:12px;padding:5px 10px;max-width:260px;flex:1;min-width:180px">
       <datalist id="bank-family-options"></datalist>
       
     </div>
   </div>
   <div class="row-center" style="margin-bottom:12px">
     <label style="margin:0;font-size:12px">Sort:</label>
-    <select id="bank-sort" onchange="renderBank()" style="width:auto;font-size:12px">
+    <select id="bank-sort" data-pp-change="renderBank()" style="width:auto;font-size:12px">
       <option value="name">Name</option>
       <option value="prot">Protein</option>
       <option value="cal">Calories</option>
       <option value="value">Protein per £</option>
       <option value="prot_kcal">Protein per 100 kcal</option>
     </select>
-    <input type="text" id="bank-search" placeholder="Search products or groups..." oninput="schedulePlatePlanListRender('bank')" style="font-size:12px;padding:5px 10px;max-width:210px">
+    <input type="text" id="bank-search" placeholder="Search products or groups..." data-pp-input="schedulePlatePlanListRender('bank')" style="font-size:12px;padding:5px 10px;max-width:210px">
   </div>
   <div id="bank-list"></div>
 </div>
@@ -313,9 +313,9 @@ try{
     <div class="view-toolbar" style="flex-wrap:wrap">
       <h2 style="margin:0">Meal planner</h2>
       <div class="row-center">
-        <select id="plan-days" onchange="buildExclGrid()" style="width:auto;font-size:12px"><option value="1">1 day</option><option value="2">2 days</option><option value="3">3 days</option><option value="4">4 days</option><option value="5">5 days</option><option value="6">6 days</option><option value="7">7 days</option><option value="8">8 days</option><option value="9">9 days</option><option value="10">10 days</option></select>
-        <div class="plan-date-control"><label style="font-size:11px;color:var(--text2)">Starts <input id="plan-start-date" type="date" aria-label="Meal plan start date"></label><button class="btn sm ghost" onclick="applyPlanCalendarStart()">Apply dates</button><button class="btn sm ghost" onclick="clearPlanCalendarDates()">Clear dates</button></div>
-        <select id="plan-product-priority" onchange="state.prefs.productPriority=this.value;saveState()" style="width:auto;font-size:12px">
+        <select id="plan-days" data-pp-change="buildExclGrid()" style="width:auto;font-size:12px"><option value="1">1 day</option><option value="2">2 days</option><option value="3">3 days</option><option value="4">4 days</option><option value="5">5 days</option><option value="6">6 days</option><option value="7">7 days</option><option value="8">8 days</option><option value="9">9 days</option><option value="10">10 days</option></select>
+        <div class="plan-date-control"><label style="font-size:11px;color:var(--text2)">Starts <input id="plan-start-date" type="date" aria-label="Meal plan start date"></label><button class="btn sm ghost" data-pp-click="applyPlanCalendarStart()">Apply dates</button><button class="btn sm ghost" data-pp-click="clearPlanCalendarDates()">Clear dates</button></div>
+        <select id="plan-product-priority" data-pp-change="state.prefs.productPriority=this.value;saveState()" style="width:auto;font-size:12px">
           <option value="protein">Highest protein</option>
           <option value="low_kcal">Lowest kcal</option>
           <option value="protein_per_kcal">Protein per kcal</option>
@@ -324,31 +324,31 @@ try{
           <option value="cost_per_100">Lowest cost per 100g/ml</option>
         </select>
         <label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px">Breakfast repeat
-          <select id="plan-repeat-breakfast" onchange="saveMealRepeatCadence()" style="width:auto;font-size:12px"><option value="1">1 day</option><option value="2">2 days</option><option value="3">3 days</option><option value="4">4 days</option><option value="5">5 days</option><option value="6">6 days</option><option value="7">7 days</option><option value="8">8 days</option><option value="9">9 days</option><option value="10">10 days</option></select>
+          <select id="plan-repeat-breakfast" data-pp-change="saveMealRepeatCadence()" style="width:auto;font-size:12px"><option value="1">1 day</option><option value="2">2 days</option><option value="3">3 days</option><option value="4">4 days</option><option value="5">5 days</option><option value="6">6 days</option><option value="7">7 days</option><option value="8">8 days</option><option value="9">9 days</option><option value="10">10 days</option></select>
         </label>
         <label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px">Lunch repeat
-          <select id="plan-repeat-lunch" onchange="saveMealRepeatCadence()" style="width:auto;font-size:12px"><option value="1">1 day</option><option value="2">2 days</option><option value="3">3 days</option><option value="4">4 days</option><option value="5">5 days</option><option value="6">6 days</option><option value="7">7 days</option><option value="8">8 days</option><option value="9">9 days</option><option value="10">10 days</option></select>
+          <select id="plan-repeat-lunch" data-pp-change="saveMealRepeatCadence()" style="width:auto;font-size:12px"><option value="1">1 day</option><option value="2">2 days</option><option value="3">3 days</option><option value="4">4 days</option><option value="5">5 days</option><option value="6">6 days</option><option value="7">7 days</option><option value="8">8 days</option><option value="9">9 days</option><option value="10">10 days</option></select>
         </label>
         <label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px">Dinner repeat
-          <select id="plan-repeat-dinner" onchange="saveMealRepeatCadence()" style="width:auto;font-size:12px"><option value="1">1 day</option><option value="2">2 days</option><option value="3">3 days</option><option value="4">4 days</option><option value="5">5 days</option><option value="6">6 days</option><option value="7">7 days</option><option value="8">8 days</option><option value="9">9 days</option><option value="10">10 days</option></select>
+          <select id="plan-repeat-dinner" data-pp-change="saveMealRepeatCadence()" style="width:auto;font-size:12px"><option value="1">1 day</option><option value="2">2 days</option><option value="3">3 days</option><option value="4">4 days</option><option value="5">5 days</option><option value="6">6 days</option><option value="7">7 days</option><option value="8">8 days</option><option value="9">9 days</option><option value="10">10 days</option></select>
         </label>
-        <button class="btn primary sm" onclick="generatePlan()">Generate plan</button>
-        <button class="btn sm ghost" onclick="clearPlan()">Clear</button>
+        <button class="btn primary sm" data-pp-click="generatePlan()">Generate plan</button>
+        <button class="btn sm ghost" data-pp-click="clearPlan()">Clear</button>
       </div>
     </div>
     <div class="row-center" style="margin-top:10px;gap:12px;align-items:flex-start;flex-wrap:wrap">
       <div style="font-size:12px;color:var(--text2);font-weight:600;padding-top:8px">Include traffic lights</div>
       <div class="traffic-picker" data-person="e" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <span style="font-size:11px;color:var(--text2);font-weight:700;margin-right:2px">Elliott</span>
-        <label class="traffic-pill green"><input type="checkbox" name="plan-traffic-e" value="green" onchange="savePlanTrafficPrefs()"> Green</label>
-        <label class="traffic-pill amber"><input type="checkbox" name="plan-traffic-e" value="amber" onchange="savePlanTrafficPrefs()"> Amber</label>
-        <label class="traffic-pill red"><input type="checkbox" name="plan-traffic-e" value="red" onchange="savePlanTrafficPrefs()"> Red</label>
+        <label class="traffic-pill green"><input type="checkbox" name="plan-traffic-e" value="green" data-pp-change="savePlanTrafficPrefs()"> Green</label>
+        <label class="traffic-pill amber"><input type="checkbox" name="plan-traffic-e" value="amber" data-pp-change="savePlanTrafficPrefs()"> Amber</label>
+        <label class="traffic-pill red"><input type="checkbox" name="plan-traffic-e" value="red" data-pp-change="savePlanTrafficPrefs()"> Red</label>
       </div>
       <div class="traffic-picker" data-person="c" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <span style="font-size:11px;color:var(--text2);font-weight:700;margin-right:2px">Chloe</span>
-        <label class="traffic-pill green"><input type="checkbox" name="plan-traffic-c" value="green" onchange="savePlanTrafficPrefs()"> Green</label>
-        <label class="traffic-pill amber"><input type="checkbox" name="plan-traffic-c" value="amber" onchange="savePlanTrafficPrefs()"> Amber</label>
-        <label class="traffic-pill red"><input type="checkbox" name="plan-traffic-c" value="red" onchange="savePlanTrafficPrefs()"> Red</label>
+        <label class="traffic-pill green"><input type="checkbox" name="plan-traffic-c" value="green" data-pp-change="savePlanTrafficPrefs()"> Green</label>
+        <label class="traffic-pill amber"><input type="checkbox" name="plan-traffic-c" value="amber" data-pp-change="savePlanTrafficPrefs()"> Amber</label>
+        <label class="traffic-pill red"><input type="checkbox" name="plan-traffic-c" value="red" data-pp-change="savePlanTrafficPrefs()"> Red</label>
       </div>
     </div>
   </div>
@@ -357,9 +357,9 @@ try{
     <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Tap any slot to exclude it — e.g. dinner on day 3 if you're eating out. Green = included, grey = excluded.</p>
     <div id="excl-grid"></div>
     <div class="btn-row" style="margin-top:10px">
-      <button class="btn sm ghost" onclick="inclAll()">Include all</button>
-      <button class="btn sm ghost" onclick="exclAllDinners()">Exclude all dinners</button>
-      <button class="btn sm ghost" onclick="exclAllDays()">Exclude all days</button>
+      <button class="btn sm ghost" data-pp-click="inclAll()">Include all</button>
+      <button class="btn sm ghost" data-pp-click="exclAllDinners()">Exclude all dinners</button>
+      <button class="btn sm ghost" data-pp-click="exclAllDays()">Exclude all days</button>
     </div>
   </div>
   <div id="plan-warnings" style="margin-bottom:10px"></div>
@@ -368,9 +368,9 @@ try{
   <div id="plan-actions" class="card" style="display: block; margin-top: 15px; border-color: var(--green);">
     <h3 style="color:var(--green); margin-bottom: 8px;">Meal Plan Actions</h3>
     <div class="btn-row">
-      <button class="btn" onclick="openSaveMealPlanModal()">Save Current Plan</button>
-      <button class="btn primary" onclick="showView('shopping')">Generate Shopping List</button>
-      <button class="btn" style="background:var(--purple-bg);color:var(--purple);border-color:var(--purple);" onclick="generateRecipePack()">Generate Recipe Pack (Print/PDF)</button>
+      <button class="btn" data-pp-click="openSaveMealPlanModal()">Save Current Plan</button>
+      <button class="btn primary" data-pp-click="showView('shopping')">Generate Shopping List</button>
+      <button class="btn" style="background:var(--purple-bg);color:var(--purple);border-color:var(--purple);" data-pp-click="generateRecipePack()">Generate Recipe Pack (Print/PDF)</button>
     </div>
   </div>
 </div>
@@ -381,7 +381,7 @@ try{
       <h2 style="margin:0">Meal Plan Library</h2>
       <p style="font-size:12px;color:var(--text2);margin:5px 0 0">Saved meal plans live here so the planner itself can stay focused on generating and adjusting the current plan.</p>
     </div>
-    <button class="btn sm primary" onclick="openSaveMealPlanModal()">Save current plan</button>
+    <button class="btn sm primary" data-pp-click="openSaveMealPlanModal()">Save current plan</button>
   </div>
   <div id="plan-history-panel"></div>
 </div>
@@ -391,12 +391,12 @@ try{
   <div class="view-toolbar">
     <h2 style="margin:0">Shopping list</h2>
     <div class="row-center">
-        <select id="shop-group-by" onchange="updateShopGroupPref(this.value)" style="width:auto; font-size:12px;">
+        <select id="shop-group-by" data-pp-change="updateShopGroupPref(this.value)" style="width:auto; font-size:12px;">
             <option value="family">Group by Ingredient</option>
             <option value="category">Group by Category</option>
             <option value="storage">Group by Storage</option>
         </select>
-        <button class="btn sm" onclick="copyList()">Copy list</button>
+        <button class="btn sm" data-pp-click="copyList()">Copy list</button>
     </div>
   </div>
   <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Generated from your current meal plan. Allocations trace back to specific meal instances. Use "Product" to choose the product for one specific recipe occurrence.</p>
@@ -406,7 +406,7 @@ try{
 <div id="view-data" class="view">
     <div class="view-toolbar">
       <h2 style="margin:0">Data Quality Centre</h2>
-      <button class="btn sm ghost" onclick="renderDataQuality()">Refresh Scans</button>
+      <button class="btn sm ghost" data-pp-click="renderDataQuality()">Refresh Scans</button>
     </div>
     
     <div class="card" style="border-left:3px solid var(--amber);">
@@ -434,9 +434,9 @@ try{
     <h3>Appearance</h3>
     <p style="font-size:14px;color:var(--text2);margin-bottom:10px">Use your device appearance automatically or choose a local override for this device.</p>
     <div class="appearance-control" role="group" aria-label="PlatePlan appearance">
-      <button type="button" data-appearance="system" onclick="setPlatePlanAppearance('system')">System</button>
-      <button type="button" data-appearance="light" onclick="setPlatePlanAppearance('light')">Light</button>
-      <button type="button" data-appearance="dark" onclick="setPlatePlanAppearance('dark')">Dark</button>
+      <button type="button" data-appearance="system" data-pp-click="setPlatePlanAppearance('system')">System</button>
+      <button type="button" data-appearance="light" data-pp-click="setPlatePlanAppearance('light')">Light</button>
+      <button type="button" data-appearance="dark" data-pp-click="setPlatePlanAppearance('dark')">Dark</button>
     </div>
   </div>
   <div class="card">
@@ -450,10 +450,10 @@ try{
         <option value="chloe">Chloe only</option>
       </select>
       <div class="mapping-search-container" style="position:relative;flex:1;min-width:220px">
-        <input type="text" class="map-search-input" id="pref-exclude-search" autocomplete="off" placeholder="Search ingredients or products..." oninput="handleExcludeSearch()" onfocus="handleExcludeSearch()">
+        <input type="text" class="map-search-input" id="pref-exclude-search" autocomplete="off" placeholder="Search ingredients or products..." data-pp-input="handleExcludeSearch()" data-pp-focus="handleExcludeSearch()">
         <div class="map-dropdown" id="pref-exclude-dropdown" style="display:none"></div>
       </div>
-      <button class="btn sm ghost" onclick="viewExclusions()">View list</button>
+      <button class="btn sm ghost" data-pp-click="viewExclusions()">View list</button>
     </div>
     <div id="pref-exclude-preview" style="font-size:12px;color:var(--text2);margin-top:6px"></div>
   </div>
@@ -463,14 +463,14 @@ try{
     <div class="grid2" style="margin-top:10px">
       <div class="prefs-person">
         <div class="prefs-person-label">Elliott</div>
-        <label>Daily calories</label><input type="number" id="pref-ecal" style="margin-bottom:8px" oninput="calcBudgets()">
-        <label>Daily protein (g)</label><input type="number" id="pref-eprot" style="margin-bottom:8px" oninput="calcBudgets()">
+        <label>Daily calories</label><input type="number" id="pref-ecal" style="margin-bottom:8px" data-pp-input="calcBudgets()">
+        <label>Daily protein (g)</label><input type="number" id="pref-eprot" style="margin-bottom:8px" data-pp-input="calcBudgets()">
         <h4 style="margin-top:14px;font-size:11px;color:var(--text2)">MEAL ALLOCATION (%)</h4>
         <div class="grid2" style="margin-top:6px;gap:6px">
-          <div><label>Breakfast</label><input type="number" id="pref-eb" oninput="calcBudgets()"></div>
-          <div><label>Lunch</label><input type="number" id="pref-el" oninput="calcBudgets()"></div>
-          <div><label>Dinner</label><input type="number" id="pref-ed" oninput="calcBudgets()"></div>
-          <div><label>Snacks</label><input type="number" id="pref-es" oninput="calcBudgets()"></div>
+          <div><label>Breakfast</label><input type="number" id="pref-eb" data-pp-input="calcBudgets()"></div>
+          <div><label>Lunch</label><input type="number" id="pref-el" data-pp-input="calcBudgets()"></div>
+          <div><label>Dinner</label><input type="number" id="pref-ed" data-pp-input="calcBudgets()"></div>
+          <div><label>Snacks</label><input type="number" id="pref-es" data-pp-input="calcBudgets()"></div>
         </div>
         <div id="ebudget-text" style="font-size:11px;color:var(--text2);margin-top:8px;line-height:1.4">
         <strong>Breakfast Budget:</strong> 440kcal / 26g P<br>
@@ -481,14 +481,14 @@ try{
       </div>
       <div class="prefs-person">
         <div class="prefs-person-label">Chloe</div>
-        <label>Daily calories</label><input type="number" id="pref-ccal" style="margin-bottom:8px" oninput="calcBudgets()">
-        <label>Daily protein (g)</label><input type="number" id="pref-cprot" style="margin-bottom:8px" oninput="calcBudgets()">
+        <label>Daily calories</label><input type="number" id="pref-ccal" style="margin-bottom:8px" data-pp-input="calcBudgets()">
+        <label>Daily protein (g)</label><input type="number" id="pref-cprot" style="margin-bottom:8px" data-pp-input="calcBudgets()">
         <h4 style="margin-top:14px;font-size:11px;color:var(--text2)">MEAL ALLOCATION (%)</h4>
         <div class="grid2" style="margin-top:6px;gap:6px">
-          <div><label>Breakfast</label><input type="number" id="pref-cb" oninput="calcBudgets()"></div>
-          <div><label>Lunch</label><input type="number" id="pref-cl" oninput="calcBudgets()"></div>
-          <div><label>Dinner</label><input type="number" id="pref-cd" oninput="calcBudgets()"></div>
-          <div><label>Snacks</label><input type="number" id="pref-cs" oninput="calcBudgets()"></div>
+          <div><label>Breakfast</label><input type="number" id="pref-cb" data-pp-input="calcBudgets()"></div>
+          <div><label>Lunch</label><input type="number" id="pref-cl" data-pp-input="calcBudgets()"></div>
+          <div><label>Dinner</label><input type="number" id="pref-cd" data-pp-input="calcBudgets()"></div>
+          <div><label>Snacks</label><input type="number" id="pref-cs" data-pp-input="calcBudgets()"></div>
         </div>
         <div id="cbudget-text" style="font-size:11px;color:var(--text2);margin-top:8px;line-height:1.4">
         <strong>Breakfast Budget:</strong> 240kcal / 15g P<br>
@@ -503,12 +503,12 @@ try{
     <h3>Data backup and recovery</h3>
     <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Use this before switching files or after doing lots of data fixes. It exports the live browser-saved PlatePlan data, not just the baked data inside the HTML file.</p>
     <div class="btn-row">
-      <button class="btn sm ghost" onclick="downloadPlatePlanDataBackup()">Export PlatePlan Data</button>
-      <label class="btn sm ghost" style="cursor:pointer">Import PlatePlan Data<input type="file" accept="application/json,.json" style="display:none" onchange="importPlatePlanDataBackup(this)"></label>
+      <button class="btn sm ghost" data-pp-click="downloadPlatePlanDataBackup()">Export PlatePlan Data</button>
+      <label class="btn sm ghost" style="cursor:pointer">Import PlatePlan Data<input type="file" accept="application/json,.json" style="display:none" data-pp-change="importPlatePlanDataBackup(this)"></label>
     </div>
     <div id="prefs-data-msg"></div>
     <div id="prefs-recovery-list" style="margin-top:12px"></div>
-    <div style="margin-top:14px"><button class="btn primary" id="btn-save-prefs" onclick="savePrefs()">Save preferences</button><div id="prefs-msg"></div></div>
+    <div style="margin-top:14px"><button class="btn primary" id="btn-save-prefs" data-pp-click="savePrefs()">Save preferences</button><div id="prefs-msg"></div></div>
   </div>
 </div>
 
@@ -528,7 +528,7 @@ try{
   <div class="modal" style="max-width: 800px;">
     <div class="row-between" style="margin-bottom:14px;align-items:center">
       <h2 id="tesco-import-title" style="margin:0">Import Tesco product</h2>
-      <button class="btn sm ghost" onclick="closeTescoModal()">Cancel</button>
+      <button class="btn sm ghost" data-pp-click="closeTescoModal()">Cancel</button>
     </div>
     
     <div id="tesco-search-hint" style="display: none; background: var(--surface2); padding: 10px; border-radius: 8px; margin-bottom: 14px; font-size: 13px;">
@@ -539,7 +539,7 @@ try{
     <div id="tesco-bookmarklet-panel" style="background: var(--purple-bg); border-radius: 8px; padding: 12px; margin-bottom: 14px;">
      <h4 style="color:var(--purple); margin-bottom:6px; font-size:13px;">Option A: Fast Import (Recommended)</h4>
      <p style="font-size:12px; color:var(--text2); margin-bottom:8px;">Drag this updated button to your bookmarks bar. Click it on any Tesco product page to securely copy the data, then paste the result below.</p>
-     <a href="javascript:(function(){var%20d=document,n='',b='',p=0,ps=null,pu='g',iw=null,ic=null;var%20diag={nutritionSource:'Fallback',nutritionBasis:'unknown',sourceValues:{cal:null,prot:null,carb:null,fat:null,fibre:null},parsedValues:{cal:0,prot:0,carb:0,fat:0,fibre:0},storageText:'',breadcrumbs:'',packSource:'none',packCandidates:[]};try{var%20scripts=d.querySelectorAll('script[type=&quot;application/ld+json&quot;]');for(var%20s%20of%20scripts){var%20j=JSON.parse(s.textContent);var%20items=Array.isArray(j)?j:(j['@graph']||[j]);for(var%20x%20of%20items){var%20t=x['@type'];if(!t)continue;var%20types=Array.isArray(t)?t:[t];if(types.indexOf('Product')&gt;=0){if(x.name)n=x.name;if(x.brand)b=(x.brand.name||x.brand)+'';if(x.offers){var%20off=Array.isArray(x.offers)?x.offers[0]:x.offers;if(off&amp;&amp;off.price)p=off.price;}if(x.weight&amp;&amp;x.weight.value){var%20u=(x.weight.unitCode||x.weight.unitText||'g')+'';ps=parseFloat(x.weight.value);pu=u.toLowerCase().replace('grm','g').replace('kgm','kg').replace('mlt','ml').replace('ltr','l');diag.packSource='jsonld.weight';}if(x.size&amp;&amp;typeof%20x.size==='string')diag.packCandidates.push('size:'+x.size);if(x.additionalProperty){var%20aps=Array.isArray(x.additionalProperty)?x.additionalProperty:[x.additionalProperty];for(var%20ap%20of%20aps){if(!ap||!ap.name)continue;var%20nm=(ap.name+'').toLowerCase();if(nm.indexOf('net%20contents')&gt;=0||nm.indexOf('pack%20size')&gt;=0||nm.indexOf('weight')&gt;=0||nm.indexOf('quantity')&gt;=0)diag.packCandidates.push(ap.name+':%20'+ap.value);}}}if(types.indexOf('BreadcrumbList')&gt;=0&amp;&amp;x.itemListElement)diag.breadcrumbs=x.itemListElement.map(function(e){return(e.item&amp;&amp;e.item.name)||e.name||'';}).filter(Boolean).join('%20&gt;%20');}}}catch(e){}if(!n)n=((d.querySelector('h1')||{}).textContent||'');n=n.trim();if(!p){var%20pEl=d.querySelector('[data-auto=&quot;price-value&quot;],[data-auto=&quot;price&quot;],.price-per-sellable-unit%20.value,.priceText');if(pEl)p=pEl.textContent.replace(/[^\d.]/g,'');}if(!diag.breadcrumbs)diag.breadcrumbs=Array.from(d.querySelectorAll('.breadcrumbs__link,.breadcrumb-item,[class*=&quot;breadcrumb&quot;]%20a')).map(function(el){return%20el.textContent.trim();}).filter(Boolean).join('%20&gt;%20');function%20parsePack(str){if(!str)return%20null;str=str.replace(/\s+/g,'%20').trim();if(/per\s+serving|per\s+portion|each\s+serving|serving\s+size|per\s+\d+\s*g\s|typical\s+values\s+per/i.test(str))return%20null;var%20m=str.match(/(\d+)\s*[x%C3%97]\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l)\b/i);if(m){var%20c=parseInt(m[1],10),e=parseFloat(m[2]),u=m[3].toLowerCase();return{count:c,each:e,total:c*e,unit:u};}m=str.match(/(\d+)\s*pack\b/i)||str.match(/pack\s+of\s+(\d+)/i);if(m)return{count:parseInt(m[1],10),each:null,total:parseInt(m[1],10),unit:'qty'};m=str.match(/(\d+(?:\.\d+)?)\s*(g|kg|ml|l)\b/i);if(m)return{count:1,each:parseFloat(m[1]),total:parseFloat(m[1]),unit:m[2].toLowerCase()};return%20null;}function%20pick(r,src){if(!r)return%20false;ps=r.total;iw=r.each!=null?r.each:r.total;pu=r.unit;ic=r.count;diag.packSource=src;return%20true;}var%20labels=['net%20contents','pack%20size','quantity','product%20weight','net%20weight','weight','size','volume'];var%20picked=ps!=null;if(!picked){var%20els=d.querySelectorAll('dt,dd,th,td,li,div,span,p,strong,h2,h3,h4');for(var%20i=0;i&lt;els.length&amp;&amp;!picked;i++){var%20el=els[i];var%20tx=(el.textContent||'').trim().toLowerCase().replace(/[:\s]+$/,'');if(!tx||tx.length&gt;30)continue;if(labels.indexOf(tx)&lt;0)continue;var%20sib=el.nextElementSibling;var%20cand=sib?sib.textContent.trim():'';if(!cand){var%20par=el.parentElement;if(par)cand=par.textContent.replace(el.textContent,'').trim();}diag.packCandidates.push('label['+tx+']:'+cand.slice(0,60));if(pick(parsePack(cand),'label:'+tx))picked=true;}}if(!picked){var%20prod=d.querySelector('[id*=&quot;product-details&quot;],[class*=&quot;product-info&quot;],[class*=&quot;ProductInfo&quot;],main')||d.body;var%20ptxt=(prod.innerText||prod.textContent||'');var%20re=/(net%20contents|pack%20size|net%20weight|product%20weight|quantity|volume)[\s:]+([^\n]{1,40})/ig,mm;while((mm=re.exec(ptxt))&amp;&amp;!picked){diag.packCandidates.push('inline['+mm[1]+']:'+mm[2].slice(0,60));if(pick(parsePack(mm[2]),'inline:'+mm[1].toLowerCase()))picked=true;}}if(!picked){var%20pm=n.match(/\(([^)]+)\)\s*$/);if(pm&amp;&amp;pick(parsePack(pm[1]),'name-paren'))picked=true;}if(!picked&amp;&amp;pick(parsePack(n),'name-trailing'))picked=true;if(pu==='kg'){ps*=1000;if(iw)iw*=1000;pu='g';}else%20if(pu==='l'){ps*=1000;if(iw)iw*=1000;pu='ml';}var%20bodyTxt=(d.body.innerText||d.body.textContent||'').toLowerCase();var%20stm=bodyTxt.match(/(keep%20refrigerated|keep%20frozen|store%20in%20a%20cool|keep%20in%20the%20fridge|freeze|frozen)/i);if(stm)diag.storageText=stm[1];var%20rows=[],tt=null;var%20tables=Array.from(d.querySelectorAll('table'));tt=tables.find(function(t){var%20x=t.textContent.toLowerCase();return%20x.indexOf('protein')&gt;=0&amp;&amp;(x.indexOf('energy')&gt;=0||x.indexOf('kcal')&gt;=0);});if(tt){rows=Array.from(tt.querySelectorAll('tr'));diag.nutritionSource='Nutrition%20Table';}else{var%20dv=Array.from(d.querySelectorAll('.nutrition-row,[data-auto=&quot;nutrition-row&quot;],.nutrition-event-nutrient'));if(dv.length){rows=dv;diag.nutritionSource='Div-based';}}if(rows.length){var%20bi=1;var%20hd=Array.from((tt||d).querySelectorAll('th,.nutrition-header,.column-header'));hd.forEach(function(th,i){var%20tx=th.textContent.toLowerCase();if(tx.indexOf('100g')&gt;=0||tx.indexOf('100ml')&gt;=0){bi=i;diag.nutritionBasis=tx.trim();}});if(diag.nutritionBasis==='unknown')diag.nutritionBasis=bodyTxt.indexOf('typical%20values%20per%20100')&gt;=0?'per100g%20(inferred)':'assumed%20per%20100g';rows.forEach(function(r){var%20txt=r.textContent.toLowerCase().trim();var%20cells=Array.from(r.querySelectorAll('td,th,.value,span,div.nut-val')).map(function(c){return%20c.textContent.trim();}).filter(Boolean);if(cells.length&lt;2)return;var%20ct=cells[Math.min(bi,cells.length-1)]||cells[1];var%20nm=ct.match(/(\d+\.?\d*)/),num=nm?parseFloat(nm[1]):0;function%20P(k,pat,sk){if(pat.test(txt)&amp;&amp;(!sk||!sk.test(txt))){diag.sourceValues[k]=ct;diag.parsedValues[k]=num;}}if(/^(energy|calories|energy%20\(kcal\))/.test(txt)){var%20km=ct.match(/(\d+\.?\d*)\s*kcal/i);diag.sourceValues.cal=ct;diag.parsedValues.cal=km?parseFloat(km[1]):num;}else{P('fat',/^(fat|total%20fat)/,/saturates/);P('carb',/^(carbohydrate|carbs|available%20carbohydrate|total%20carbohydrate)/,/sugars/);P('fibre',/^(fibre|fiber|dietary%20fibre)/);P('prot',/^(protein|proteins)/);}});}else{diag.nutritionSource='Not%20found%20(Expand%20section?)';}var%20out={name:n,brand:b,price:parseFloat(p)||0,cal:diag.parsedValues.cal,fat:diag.parsedValues.fat,carb:diag.parsedValues.carb,fibre:diag.parsedValues.fibre,prot:diag.parsedValues.prot,packSize:ps||null,packUnit:pu,itemWeight:iw||null,itemCount:ic||null,url:location.href,diagnostics:diag};var%20sJSON=JSON.stringify(out);var%20ta=d.createElement('textarea');ta.value=sJSON;d.body.appendChild(ta);ta.select();try{d.execCommand('copy');alert('PlatePlan%20v2%20copied!\nName:%20'+n+'\nPack:%20'+(ps?ps+pu:'NONE')+'%20(src:%20'+diag.packSource+')\nNutrition:%20'+diag.nutritionSource);}catch(e){prompt('Copy%20JSON:',sJSON);}d.body.removeChild(ta);})();" class="btn sm" style="background:var(--purple); color:#fff; cursor:grab; text-decoration:none;" onclick="event.preventDefault()">Tesco to PlatePlan</a>
+     <a href="javascript:(function(){var%20d=document,n='',b='',p=0,ps=null,pu='g',iw=null,ic=null;var%20diag={nutritionSource:'Fallback',nutritionBasis:'unknown',sourceValues:{cal:null,prot:null,carb:null,fat:null,fibre:null},parsedValues:{cal:0,prot:0,carb:0,fat:0,fibre:0},storageText:'',breadcrumbs:'',packSource:'none',packCandidates:[]};try{var%20scripts=d.querySelectorAll('script[type=&quot;application/ld+json&quot;]');for(var%20s%20of%20scripts){var%20j=JSON.parse(s.textContent);var%20items=Array.isArray(j)?j:(j['@graph']||[j]);for(var%20x%20of%20items){var%20t=x['@type'];if(!t)continue;var%20types=Array.isArray(t)?t:[t];if(types.indexOf('Product')&gt;=0){if(x.name)n=x.name;if(x.brand)b=(x.brand.name||x.brand)+'';if(x.offers){var%20off=Array.isArray(x.offers)?x.offers[0]:x.offers;if(off&amp;&amp;off.price)p=off.price;}if(x.weight&amp;&amp;x.weight.value){var%20u=(x.weight.unitCode||x.weight.unitText||'g')+'';ps=parseFloat(x.weight.value);pu=u.toLowerCase().replace('grm','g').replace('kgm','kg').replace('mlt','ml').replace('ltr','l');diag.packSource='jsonld.weight';}if(x.size&amp;&amp;typeof%20x.size==='string')diag.packCandidates.push('size:'+x.size);if(x.additionalProperty){var%20aps=Array.isArray(x.additionalProperty)?x.additionalProperty:[x.additionalProperty];for(var%20ap%20of%20aps){if(!ap||!ap.name)continue;var%20nm=(ap.name+'').toLowerCase();if(nm.indexOf('net%20contents')&gt;=0||nm.indexOf('pack%20size')&gt;=0||nm.indexOf('weight')&gt;=0||nm.indexOf('quantity')&gt;=0)diag.packCandidates.push(ap.name+':%20'+ap.value);}}}if(types.indexOf('BreadcrumbList')&gt;=0&amp;&amp;x.itemListElement)diag.breadcrumbs=x.itemListElement.map(function(e){return(e.item&amp;&amp;e.item.name)||e.name||'';}).filter(Boolean).join('%20&gt;%20');}}}catch(e){}if(!n)n=((d.querySelector('h1')||{}).textContent||'');n=n.trim();if(!p){var%20pEl=d.querySelector('[data-auto=&quot;price-value&quot;],[data-auto=&quot;price&quot;],.price-per-sellable-unit%20.value,.priceText');if(pEl)p=pEl.textContent.replace(/[^\d.]/g,'');}if(!diag.breadcrumbs)diag.breadcrumbs=Array.from(d.querySelectorAll('.breadcrumbs__link,.breadcrumb-item,[class*=&quot;breadcrumb&quot;]%20a')).map(function(el){return%20el.textContent.trim();}).filter(Boolean).join('%20&gt;%20');function%20parsePack(str){if(!str)return%20null;str=str.replace(/\s+/g,'%20').trim();if(/per\s+serving|per\s+portion|each\s+serving|serving\s+size|per\s+\d+\s*g\s|typical\s+values\s+per/i.test(str))return%20null;var%20m=str.match(/(\d+)\s*[x%C3%97]\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l)\b/i);if(m){var%20c=parseInt(m[1],10),e=parseFloat(m[2]),u=m[3].toLowerCase();return{count:c,each:e,total:c*e,unit:u};}m=str.match(/(\d+)\s*pack\b/i)||str.match(/pack\s+of\s+(\d+)/i);if(m)return{count:parseInt(m[1],10),each:null,total:parseInt(m[1],10),unit:'qty'};m=str.match(/(\d+(?:\.\d+)?)\s*(g|kg|ml|l)\b/i);if(m)return{count:1,each:parseFloat(m[1]),total:parseFloat(m[1]),unit:m[2].toLowerCase()};return%20null;}function%20pick(r,src){if(!r)return%20false;ps=r.total;iw=r.each!=null?r.each:r.total;pu=r.unit;ic=r.count;diag.packSource=src;return%20true;}var%20labels=['net%20contents','pack%20size','quantity','product%20weight','net%20weight','weight','size','volume'];var%20picked=ps!=null;if(!picked){var%20els=d.querySelectorAll('dt,dd,th,td,li,div,span,p,strong,h2,h3,h4');for(var%20i=0;i&lt;els.length&amp;&amp;!picked;i++){var%20el=els[i];var%20tx=(el.textContent||'').trim().toLowerCase().replace(/[:\s]+$/,'');if(!tx||tx.length&gt;30)continue;if(labels.indexOf(tx)&lt;0)continue;var%20sib=el.nextElementSibling;var%20cand=sib?sib.textContent.trim():'';if(!cand){var%20par=el.parentElement;if(par)cand=par.textContent.replace(el.textContent,'').trim();}diag.packCandidates.push('label['+tx+']:'+cand.slice(0,60));if(pick(parsePack(cand),'label:'+tx))picked=true;}}if(!picked){var%20prod=d.querySelector('[id*=&quot;product-details&quot;],[class*=&quot;product-info&quot;],[class*=&quot;ProductInfo&quot;],main')||d.body;var%20ptxt=(prod.innerText||prod.textContent||'');var%20re=/(net%20contents|pack%20size|net%20weight|product%20weight|quantity|volume)[\s:]+([^\n]{1,40})/ig,mm;while((mm=re.exec(ptxt))&amp;&amp;!picked){diag.packCandidates.push('inline['+mm[1]+']:'+mm[2].slice(0,60));if(pick(parsePack(mm[2]),'inline:'+mm[1].toLowerCase()))picked=true;}}if(!picked){var%20pm=n.match(/\(([^)]+)\)\s*$/);if(pm&amp;&amp;pick(parsePack(pm[1]),'name-paren'))picked=true;}if(!picked&amp;&amp;pick(parsePack(n),'name-trailing'))picked=true;if(pu==='kg'){ps*=1000;if(iw)iw*=1000;pu='g';}else%20if(pu==='l'){ps*=1000;if(iw)iw*=1000;pu='ml';}var%20bodyTxt=(d.body.innerText||d.body.textContent||'').toLowerCase();var%20stm=bodyTxt.match(/(keep%20refrigerated|keep%20frozen|store%20in%20a%20cool|keep%20in%20the%20fridge|freeze|frozen)/i);if(stm)diag.storageText=stm[1];var%20rows=[],tt=null;var%20tables=Array.from(d.querySelectorAll('table'));tt=tables.find(function(t){var%20x=t.textContent.toLowerCase();return%20x.indexOf('protein')&gt;=0&amp;&amp;(x.indexOf('energy')&gt;=0||x.indexOf('kcal')&gt;=0);});if(tt){rows=Array.from(tt.querySelectorAll('tr'));diag.nutritionSource='Nutrition%20Table';}else{var%20dv=Array.from(d.querySelectorAll('.nutrition-row,[data-auto=&quot;nutrition-row&quot;],.nutrition-event-nutrient'));if(dv.length){rows=dv;diag.nutritionSource='Div-based';}}if(rows.length){var%20bi=1;var%20hd=Array.from((tt||d).querySelectorAll('th,.nutrition-header,.column-header'));hd.forEach(function(th,i){var%20tx=th.textContent.toLowerCase();if(tx.indexOf('100g')&gt;=0||tx.indexOf('100ml')&gt;=0){bi=i;diag.nutritionBasis=tx.trim();}});if(diag.nutritionBasis==='unknown')diag.nutritionBasis=bodyTxt.indexOf('typical%20values%20per%20100')&gt;=0?'per100g%20(inferred)':'assumed%20per%20100g';rows.forEach(function(r){var%20txt=r.textContent.toLowerCase().trim();var%20cells=Array.from(r.querySelectorAll('td,th,.value,span,div.nut-val')).map(function(c){return%20c.textContent.trim();}).filter(Boolean);if(cells.length&lt;2)return;var%20ct=cells[Math.min(bi,cells.length-1)]||cells[1];var%20nm=ct.match(/(\d+\.?\d*)/),num=nm?parseFloat(nm[1]):0;function%20P(k,pat,sk){if(pat.test(txt)&amp;&amp;(!sk||!sk.test(txt))){diag.sourceValues[k]=ct;diag.parsedValues[k]=num;}}if(/^(energy|calories|energy%20\(kcal\))/.test(txt)){var%20km=ct.match(/(\d+\.?\d*)\s*kcal/i);diag.sourceValues.cal=ct;diag.parsedValues.cal=km?parseFloat(km[1]):num;}else{P('fat',/^(fat|total%20fat)/,/saturates/);P('carb',/^(carbohydrate|carbs|available%20carbohydrate|total%20carbohydrate)/,/sugars/);P('fibre',/^(fibre|fiber|dietary%20fibre)/);P('prot',/^(protein|proteins)/);}});}else{diag.nutritionSource='Not%20found%20(Expand%20section?)';}var%20out={name:n,brand:b,price:parseFloat(p)||0,cal:diag.parsedValues.cal,fat:diag.parsedValues.fat,carb:diag.parsedValues.carb,fibre:diag.parsedValues.fibre,prot:diag.parsedValues.prot,packSize:ps||null,packUnit:pu,itemWeight:iw||null,itemCount:ic||null,url:location.href,diagnostics:diag};var%20sJSON=JSON.stringify(out);var%20ta=d.createElement('textarea');ta.value=sJSON;d.body.appendChild(ta);ta.select();try{d.execCommand('copy');alert('PlatePlan%20v2%20copied!\nName:%20'+n+'\nPack:%20'+(ps?ps+pu:'NONE')+'%20(src:%20'+diag.packSource+')\nNutrition:%20'+diag.nutritionSource);}catch(e){prompt('Copy%20JSON:',sJSON);}d.body.removeChild(ta);})();" class="btn sm" style="background:var(--purple); color:#fff; cursor:grab; text-decoration:none;" data-pp-click="event.preventDefault()">Tesco to PlatePlan</a>
     </div>
 
     <div class="field" id="tesco-paste-panel" style="">
@@ -547,7 +547,7 @@ try{
       <textarea id="tesco-paste" style="min-height:90px;font-size:12px" placeholder="Paste copied data here..."></textarea>
     </div>
     <div class="btn-row" id="tesco-extract-actions" style="margin-bottom: 10px;">
-      <button class="btn primary" onclick="extractTescoProduct()">Extract details</button>
+      <button class="btn primary" data-pp-click="extractTescoProduct()">Extract details</button>
     </div>
     <div id="tesco-msg"></div>
 
@@ -609,7 +609,7 @@ try{
         <div class="field" style="display: none;"><label>Meat substitute for (optional)<input type="text" id="tp-meatsub" placeholder="e.g. mince, chicken, bacon"></label></div>
       <div class="field"><label>Notes</label><input type="text" id="tp-notes" placeholder="e.g. Found in freezer aisle"></div>
       <div class="btn-row" style="margin-top:4px">
-        <button class="btn primary" id="tesco-save-btn" onclick="saveTescoIngredient()">Save to Product Bank</button>
+        <button class="btn primary" id="tesco-save-btn" data-pp-click="saveTescoIngredient()">Save to Product Bank</button>
       </div>
       <div id="tesco-save-msg"></div>
     </div>
@@ -620,23 +620,23 @@ try{
   <div class="modal" style="max-width: 800px;">
     <div class="row-between" style="margin-bottom:14px;align-items:center">
       <h2 style="margin:0">Verify Parsed Details</h2>
-      <button class="btn sm ghost" onclick="document.getElementById('parse-modal-wrap').classList.remove('open')">Cancel</button>
+      <button class="btn sm ghost" data-pp-click="document.getElementById('parse-modal-wrap').classList.remove('open')">Cancel</button>
     </div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Please check the extracted amounts, units, and steps before matching against the bank. Nutrition is scaled based on these volumes.</p>
     
     <div style="display:grid; grid-template-columns: 1fr; gap:20px; align-items:start;">
       <div>
         <h3 style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">Ingredients</h3>
-        <div id="parse-ing-list" style="display:flex; flex-direction:column; gap:8px;"></div><button id="parse-add-ingredient-btn" class="btn sm ghost" style="margin-top:8px" onclick="addParseIngredientRow()">+ Add ingredient</button>
+        <div id="parse-ing-list" style="display:flex; flex-direction:column; gap:8px;"></div><button id="parse-add-ingredient-btn" class="btn sm ghost" style="margin-top:8px" data-pp-click="addParseIngredientRow()">+ Add ingredient</button>
       </div>
       <div>
         <h3 style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">Method Steps</h3>
         <div id="parse-method-list" style="display:flex; flex-direction:column; gap:8px;"></div>
-        <button class="btn sm ghost" style="margin-top:8px" onclick="addParseMethodStep()">+ Add step</button>
+        <button class="btn sm ghost" style="margin-top:8px" data-pp-click="addParseMethodStep()">+ Add step</button>
       </div>
     </div>
     <div class="btn-row" style="margin-top:20px; border-top:1px solid var(--border); padding-top:14px;">
-      <button class="btn primary" onclick="confirmParseAndMatch()">Confirm &amp; Map Ingredients</button>
+      <button class="btn primary" data-pp-click="confirmParseAndMatch()">Confirm &amp; Map Ingredients</button>
     </div>
   </div>
 </div>
@@ -648,8 +648,8 @@ try{
     <div id="mapping-list" style="overflow-y: auto; flex: 1; min-height:200px; padding-right:10px;"></div>
     <div id="mapping-msg" style="margin-top: 10px;"></div>
     <div class="btn-row" style="margin-top: 15px; padding-top:15px; border-top:1px solid var(--border);">
-       <button class="btn primary" onclick="confirmMapping()">Confirm &amp; Calculate</button>
-       <button class="btn ghost" onclick="document.getElementById('mapping-modal-wrap').classList.remove('open')">Cancel</button>
+       <button class="btn primary" data-pp-click="confirmMapping()">Confirm &amp; Calculate</button>
+       <button class="btn ghost" data-pp-click="document.getElementById('mapping-modal-wrap').classList.remove('open')">Cancel</button>
     </div>
   </div>
 </div>
@@ -660,16 +660,16 @@ try{
     <p style="font-size:12px; color:var(--text2); margin-bottom:10px;">Choose a product for the selected meal rows.</p>
     <div id="subst-target-summary" style="font-size:12px;color:var(--text2);margin-bottom:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px"></div>
     <div class="mapping-search-container" style="position:relative; margin-bottom: 15px;">
-        <input type="text" class="map-search-input" id="subst-search" autocomplete="off" placeholder="Search products..." oninput="handleSubstSearch(event)" onfocus="handleSubstSearch(event)">
+        <input type="text" class="map-search-input" id="subst-search" autocomplete="off" placeholder="Search products..." data-pp-input="handleSubstSearch(event)" data-pp-focus="handleSubstSearch(event)">
         <div class="map-dropdown" id="subst-dropdown" style="display:none;"></div>
     </div>
     <div id="subst-selected" style="font-size:13px; font-weight:500; margin-bottom: 15px; color:var(--green);"></div>
     <div id="subst-herb-conversion" style="display:none;margin-bottom:15px"></div>
     
     <div class="btn-row" style="margin-top: 15px;">
-        <button class="btn primary" onclick="confirmSubstitute()">Apply</button>
-        <button class="btn ghost" style="color:var(--purple); border-color:var(--purple);" onclick="openTescoImportFromSubst()">🛒 Import Tesco</button>
-        <button class="btn ghost" onclick="closeSubstituteModal()">Cancel</button>
+        <button class="btn primary" data-pp-click="confirmSubstitute()">Apply</button>
+        <button class="btn ghost" style="color:var(--purple); border-color:var(--purple);" data-pp-click="openTescoImportFromSubst()">🛒 Import Tesco</button>
+        <button class="btn ghost" data-pp-click="closeSubstituteModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -682,8 +682,8 @@ try{
     <div id="merge-options-container" style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;"></div>
 
     <div class="btn-row">
-        <button class="btn primary" onclick="executeMerge()">Confirm Merge</button>
-        <button class="btn ghost" onclick="closeMergeModal()">Cancel</button>
+        <button class="btn primary" data-pp-click="executeMerge()">Confirm Merge</button>
+        <button class="btn ghost" data-pp-click="closeMergeModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -693,8 +693,8 @@ try{
       <h3>Replace before delete</h3>
       <div id="replace-ing-body"></div>
       <div class="btn-row" style="margin-top:14px;">
-          <button class="btn primary" onclick="confirmReplaceAndDelete()">Replace &amp; Delete</button>
-          <button class="btn ghost" onclick="closeReplaceModal()">Cancel</button>
+          <button class="btn primary" data-pp-click="confirmReplaceAndDelete()">Replace &amp; Delete</button>
+          <button class="btn ghost" data-pp-click="closeReplaceModal()">Cancel</button>
       </div>
   </div>
 </div>
@@ -736,8 +736,8 @@ try{
        </div>
        <div id="mini-msg"></div>
        <div class="btn-row" style="margin-top:14px">
-         <button class="btn primary" onclick="saveMiniIng()">Save &amp; Map</button>
-         <button class="btn ghost" onclick="document.getElementById('mini-ing-wrap').classList.remove('open')">Cancel</button>
+         <button class="btn primary" data-pp-click="saveMiniIng()">Save &amp; Map</button>
+         <button class="btn ghost" data-pp-click="document.getElementById('mini-ing-wrap').classList.remove('open')">Cancel</button>
        </div>
    </div>
 </div>
@@ -746,13 +746,13 @@ try{
   <div class="modal" style="max-width: 800px; max-height:90vh; overflow-y:auto;">
     <div class="row-between" style="margin-bottom:4px;align-items:center">
       <h2 style="margin:0">Review recipe</h2>
-      <button class="btn sm ghost" onclick="closeModal()">Close</button>
+      <button class="btn sm ghost" data-pp-click="closeModal()">Close</button>
     </div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:12px" id="review-info">Nutrition calculated from mapped ingredient bank items. Edit mapped ingredients if anything looks wrong.</p>
     <div class="modal-tabs" id="modal-tabs-container">
-      <div class="mt2" onclick="switchModalTab('original')">Original</div>
-      <div class="mt2 active" id="tab-btn-enhanced" onclick="switchModalTab('enhanced')" style="display: block;">Enhanced</div>
-      <div class="mt2" id="tab-btn-compare" onclick="switchModalTab('compare')" style="display: block;">Compare</div>
+      <div class="mt2" data-pp-click="switchModalTab('original')">Original</div>
+      <div class="mt2 active" id="tab-btn-enhanced" data-pp-click="switchModalTab('enhanced')" style="display: block;">Enhanced</div>
+      <div class="mt2" id="tab-btn-compare" data-pp-click="switchModalTab('compare')" style="display: block;">Compare</div>
     </div>
 
     <div id="mtab-original" class="mtab">
@@ -879,11 +879,11 @@ try{
       <div id="orig-improvements"><div style="margin-top:15px;border-top:1px solid var(--border);padding-top:10px;">
         <h4 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text2);margin-bottom:8px">Nutritional Improvement Suggestions</h4>
         <div style="display:grid;grid-template-columns:1.3fr .9fr .9fr .9fr .9fr;gap:6px;margin-bottom:8px;align-items:center">
-          <input type="search" id="enhance-search-orig" placeholder="Search ingredients or sub-types..." oninput="renderEnhancementFinder('orig')" style="font-size:12px;padding:6px 9px">
-          <select id="enhance-cat-orig" onchange="renderEnhancementFinder('orig')" style="font-size:12px"><option value="all">All categories</option><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option></select>
-          <input type="search" id="enhance-family-orig" placeholder="Ingredient" oninput="renderEnhancementFinder('orig')" style="font-size:12px;padding:6px 9px">
-          <input type="search" id="enhance-type-orig" placeholder="Sub-type" oninput="renderEnhancementFinder('orig')" style="font-size:12px;padding:6px 9px">
-          <select id="enhance-sort-orig" onchange="renderEnhancementFinder('orig')" style="font-size:12px">
+          <input type="search" id="enhance-search-orig" placeholder="Search ingredients or sub-types..." data-pp-input="renderEnhancementFinder('orig')" style="font-size:12px;padding:6px 9px">
+          <select id="enhance-cat-orig" data-pp-change="renderEnhancementFinder('orig')" style="font-size:12px"><option value="all">All categories</option><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option></select>
+          <input type="search" id="enhance-family-orig" placeholder="Ingredient" data-pp-input="renderEnhancementFinder('orig')" style="font-size:12px;padding:6px 9px">
+          <input type="search" id="enhance-type-orig" placeholder="Sub-type" data-pp-input="renderEnhancementFinder('orig')" style="font-size:12px;padding:6px 9px">
+          <select id="enhance-sort-orig" data-pp-change="renderEnhancementFinder('orig')" style="font-size:12px">
             <option value="protein_per_kcal">Protein per kcal</option>
             <option value="protein_per_pound">Protein per £</option>
             <option value="protein">Highest protein</option>
@@ -898,42 +898,42 @@ try{
         <div class="field">
           <label>Ingredients</label>
           <div id="orig-ings-list"></div>
-          <button class="btn sm ghost" onclick="addModalIng('orig')">+ Add ingredient</button>
+          <button class="btn sm ghost" data-pp-click="addModalIng('orig')">+ Add ingredient</button>
         </div>
         <div class="field" style="border-top:1px solid var(--border);padding-top:14px;">
           <label>Method</label>
           <div id="orig-method-list">
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">1.</span>
-           <textarea class="r-step" style="flex:1;min-height:40px;" oninput="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" onclick="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
+           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">2.</span>
-           <textarea class="r-step" style="flex:1;min-height:40px;" oninput="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" onclick="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
+           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">3.</span>
-           <textarea class="r-step" style="flex:1;min-height:40px;" oninput="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" onclick="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
+           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">4.</span>
-           <textarea class="r-step" style="flex:1;min-height:40px;" oninput="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" onclick="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
+           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">5.</span>
-           <textarea class="r-step" style="flex:1;min-height:40px;" oninput="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" onclick="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
+           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     </div>
-          <button class="btn sm ghost" onclick="addModalMethod('orig')">+ Add step</button>
+          <button class="btn sm ghost" data-pp-click="addModalMethod('orig')">+ Add step</button>
         </div>
       </div>
     </div>
@@ -941,7 +941,7 @@ try{
     <div id="mtab-enhanced" class="mtab active">
       <div class="estimated-note" id="enh-note" style="background: var(--amber-bg); color: var(--amber);">Manual editing mode -- edit to create your enhanced version. Nutrition will recalculate from the ingredient bank.</div>
       <div id="bank-flags"></div>
-      <div class="field"><label>Recipe name</label><input type="text" id="enh-name" oninput="updateSaveBothVisibility()"></div>
+      <div class="field"><label>Recipe name</label><input type="text" id="enh-name" data-pp-input="updateSaveBothVisibility()"></div>
       <div class="grid3">
         <div title=""><label>Calories (Energy)</label><input type="number" id="enh-cal" readonly style="background:var(--surface2)" title=""></div>
         <div title=""><label>Fat (g)</label><input type="number" id="enh-fat" readonly style="background:var(--surface2)" title=""></div>
@@ -1062,11 +1062,11 @@ try{
     </div><div style="margin-top:15px;border-top:1px solid var(--border);padding-top:10px;">
         <h4 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text2);margin-bottom:8px">Nutritional Improvement Suggestions</h4>
         <div style="display:grid;grid-template-columns:1.3fr .9fr .9fr .9fr .9fr;gap:6px;margin-bottom:8px;align-items:center">
-          <input type="search" id="enhance-search-enh" placeholder="Search ingredients or sub-types..." oninput="renderEnhancementFinder('enh')" style="font-size:12px;padding:6px 9px">
-          <select id="enhance-cat-enh" onchange="renderEnhancementFinder('enh')" style="font-size:12px"><option value="all">All categories</option><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option></select>
-          <input type="search" id="enhance-family-enh" placeholder="Ingredient" oninput="renderEnhancementFinder('enh')" style="font-size:12px;padding:6px 9px">
-          <input type="search" id="enhance-type-enh" placeholder="Sub-type" oninput="renderEnhancementFinder('enh')" style="font-size:12px;padding:6px 9px">
-          <select id="enhance-sort-enh" onchange="renderEnhancementFinder('enh')" style="font-size:12px">
+          <input type="search" id="enhance-search-enh" placeholder="Search ingredients or sub-types..." data-pp-input="renderEnhancementFinder('enh')" style="font-size:12px;padding:6px 9px">
+          <select id="enhance-cat-enh" data-pp-change="renderEnhancementFinder('enh')" style="font-size:12px"><option value="all">All categories</option><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option></select>
+          <input type="search" id="enhance-family-enh" placeholder="Ingredient" data-pp-input="renderEnhancementFinder('enh')" style="font-size:12px;padding:6px 9px">
+          <input type="search" id="enhance-type-enh" placeholder="Sub-type" data-pp-input="renderEnhancementFinder('enh')" style="font-size:12px;padding:6px 9px">
+          <select id="enhance-sort-enh" data-pp-change="renderEnhancementFinder('enh')" style="font-size:12px">
             <option value="protein_per_kcal">Protein per kcal</option>
             <option value="protein_per_pound">Protein per £</option>
             <option value="protein">Highest protein</option>
@@ -1077,55 +1077,55 @@ try{
         <div id="enhancement-results-enh" data-current-group-ids=""><div style="font-size:12px;color:var(--text2);padding:8px 0">Start typing to search ingredients or sub-types to add.</div></div>
     </div></div>
       
-      <div class="field"><label>Key changes made</label><textarea id="enh-changes" style="min-height:60px" oninput="updateSaveBothVisibility()"></textarea></div>
+      <div class="field"><label>Key changes made</label><textarea id="enh-changes" style="min-height:60px" data-pp-input="updateSaveBothVisibility()"></textarea></div>
       <div class="review-recipe-sections" style="display:grid; grid-template-columns:1fr; gap:18px;">
         <div class="field">
           <label>Ingredients</label>
           <div id="enh-ings-list"></div>
-          <button class="btn sm ghost" onclick="addModalIng('enh')">+ Add ingredient</button>
+          <button class="btn sm ghost" data-pp-click="addModalIng('enh')">+ Add ingredient</button>
         </div>
         <div class="field" style="border-top:1px solid var(--border);padding-top:14px;">
           <div class="row-between" style="align-items:center;margin-bottom:4px;">
             <label style="margin:0">Method</label>
-            <button type="button" class="btn sm ghost" onclick="copyOriginalMethodToEnhanced()">Copy From Original</button>
+            <button type="button" class="btn sm ghost" data-pp-click="copyOriginalMethodToEnhanced()">Copy From Original</button>
           </div>
           <div id="enh-method-list">
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">1.</span>
-           <textarea class="r-step" style="flex:1;min-height:40px;" oninput="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" onclick="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
+           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">2.</span>
-           <textarea class="r-step" style="flex:1;min-height:40px;" oninput="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" onclick="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
+           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">3.</span>
-           <textarea class="r-step" style="flex:1;min-height:40px;" oninput="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" onclick="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
+           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">4.</span>
-           <textarea class="r-step" style="flex:1;min-height:40px;" oninput="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" onclick="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
+           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">5.</span>
-           <textarea class="r-step" style="flex:1;min-height:40px;" oninput="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" onclick="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
+           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
         </div>
     </div>
-          <button class="btn sm ghost" onclick="addModalMethod('enh')">+ Add step</button>
+          <button class="btn sm ghost" data-pp-click="addModalMethod('enh')">+ Add step</button>
         </div>
       </div>
       
       <div class="btn-row" style="margin-top:10px; border-top:1px solid var(--border); padding-top:10px;">
-          <button class="btn sm danger" onclick="deleteEnhancedVersion()">Delete Enhanced Version</button>
+          <button class="btn sm danger" data-pp-click="deleteEnhancedVersion()">Delete Enhanced Version</button>
       </div>
     </div>
 
@@ -1137,10 +1137,10 @@ try{
     </div>
 
     <div class="btn-row" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
-      <button class="btn primary" id="save-both-btn" onclick="saveBoth()" style="">Save Both</button>
-      <button class="btn primary" id="save-temp-plan-btn" onclick="saveTemporaryPlanReview()" style="display:none">Apply to meal plan only</button>
-      <button class="btn" id="save-orig-only-btn" onclick="saveOrigOnly()">Save Original Only</button>
-      <button class="btn danger" onclick="closeModal()">Discard</button>
+      <button class="btn primary" id="save-both-btn" data-pp-click="saveBoth()" style="">Save Both</button>
+      <button class="btn primary" id="save-temp-plan-btn" data-pp-click="saveTemporaryPlanReview()" style="display:none">Apply to meal plan only</button>
+      <button class="btn" id="save-orig-only-btn" data-pp-click="saveOrigOnly()">Save Original Only</button>
+      <button class="btn danger" data-pp-click="closeModal()">Discard</button>
     </div>
   </div>
 </div>
@@ -1154,14 +1154,15 @@ try{
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script src="./firebase-config.js"></script>
-<script src="./scripts/plateplan-app.js"></script>
+<script src="./scripts/plateplan-app.js?v=21.0"></script>
+<script type="module" src="./scripts/main.js?v=21.0"></script>
 
 
 
 
 
 <div id="manual-ing-panel" style="display: none;" class="card" data-modal-wrapped="1"><div id="mi-inner-wrap" style="background: var(--surface); border-radius: 14px; padding: 24px; max-width: 560px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 40px;">
-    <h3 id="mi-title">Edit product</h3><div id="mi-tesco-actions" style="display: flex; justify-content: flex-end; margin: -4px 0px 12px;"><button type="button" class="btn sm ghost" onclick="openTescoImportForIngredientEdit()">Paste/update from Tesco</button></div>
+    <h3 id="mi-title">Edit product</h3><div id="mi-tesco-actions" style="display: flex; justify-content: flex-end; margin: -4px 0px 12px;"><button type="button" class="btn sm ghost" data-pp-click="openTescoImportForIngredientEdit()">Paste/update from Tesco</button></div>
     <div class="grid2">
       <div><label>Product name</label><input type="text" id="mi-name" placeholder="Product name"></div>
       <div><label>Brand</label><input type="text" id="mi-brand" placeholder="Quorn"></div>
@@ -1225,11 +1226,11 @@ try{
       <div><label>Price (£)</label><input type="number" id="mi-var-price" placeholder="1.25" step="0.01"></div>
       <div><label>Weight of 1 item</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-item-weight" placeholder="75"><select id="mi-var-item-weight-unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option><option value="qty">qty</option></select></div></div>
       <div><label>Drained / usable weight</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-drained-weight" placeholder="235"><select id="mi-var-drained-weight-unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option><option value="qty">qty</option></select></div></div>
-      <div style="display:flex;align-items:flex-end;"><button type="button" class="btn sm secondary" onclick="addManualPackVariant()">Add variant</button></div>
+      <div style="display:flex;align-items:flex-end;"><button type="button" class="btn sm secondary" data-pp-click="addManualPackVariant()">Add variant</button></div>
     </div>
   </div>
     <div class="field"><label>Notes</label><input type="text" id="mi-notes" placeholder="e.g. Great in bolognese, buy frozen"></div>
-    <div class="btn-row"><button class="btn primary" onclick="saveManualIng()">Save</button><button class="btn ghost" onclick="cancelManualIng()">Cancel</button></div>
+    <div class="btn-row"><button class="btn primary" data-pp-click="saveManualIng()">Save</button><button class="btn ghost" data-pp-click="cancelManualIng()">Cancel</button></div>
     <div id="mi-msg"></div>
   </div></div>
 
@@ -1239,7 +1240,7 @@ try{
     <div class="modal" style="max-width:540px">
       <div class="row-between" style="align-items:center;margin-bottom:10px">
         <h3 id="ingredient-family-details-title" style="margin:0">Edit ingredient</h3>
-        <button class="btn sm ghost" onclick="closeIngredientFamilyDetailsModal()">Close</button>
+        <button class="btn sm ghost" data-pp-click="closeIngredientFamilyDetailsModal()">Close</button>
       </div>
       <div class="field">
         <label>Category</label>
@@ -1255,7 +1256,7 @@ try{
       </div>
       <div id="ingredient-family-details-msg"></div>
       <div class="btn-row" style="margin-top:14px">
-        <button class="btn primary" onclick="saveIngredientFamilyDetailsModal()">Save</button>
-        <button class="btn ghost" onclick="closeIngredientFamilyDetailsModal()">Cancel</button>
+        <button class="btn primary" data-pp-click="saveIngredientFamilyDetailsModal()">Save</button>
+        <button class="btn ghost" data-pp-click="closeIngredientFamilyDetailsModal()">Cancel</button>
       </div>
     </div></div></body></html>
