@@ -1,0 +1,25 @@
+:root {
+  --bg: #F7F6F2;
+  --surface: #FFFFFF;
+  --surface2: #F0EFE9;
+  --border: #E2E0D8;
+  --border-strong: #C8C5BA;
+  --text: #1A1916;
+  --text2: #6B6860;
+  --text3: #A8A69E;
+  --green: #1A6B4A;
+  --green-bg: #EAF4EF;
+  --purple: #4A3D8F;
+  --purple-bg: #EEEAF9;
+  --coral: #A8402A;
+  --coral-bg: #FAECEA;
+  --amber: #7A5200;
+  --amber-bg: #FDF3E0;
+  --red: #991F1F;
+  --red-bg: #FDEAEA;
+  --blue: #1A4A6B;
+  --blue-bg: #EAF0F4;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);font-size:14px;color:var(--text);background:var(--bg);min-height:100vh}

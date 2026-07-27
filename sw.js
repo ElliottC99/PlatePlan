@@ -1,9 +1,14 @@
-const PLATEPLAN_CACHE = 'plateplan-shell-v17';
+const PLATEPLAN_CACHE = 'plateplan-shell-v18';
 const PLATEPLAN_LOCAL_SHELL = [
   './',
   './PlatePlan.html',
   './manifest.json',
   './firebase-config.js',
+  './styles/tokens.css',
+  './styles/components.css',
+  './styles/responsive.css',
+  './styles/print.css',
+  './scripts/plateplan-app.js',
   './icon-192.png',
   './icon-512.png',
   './icon-192-maskable.png',

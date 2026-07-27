@@ -1,0 +1,6 @@
+/* The application shell stays quiet when a browser print is requested.
+   Downloaded recipe cards and packs provide their own isolated print CSS. */
+@media print {
+  header, nav, .mobile-nav, .desktop-sidebar, .plateplan-toast-region { display:none !important; }
+  main { max-width:none; padding:0; }
+}
