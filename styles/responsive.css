@@ -800,3 +800,133 @@ main{max-width:var(--content-max);padding:22px 20px 96px}
   .plan-options-body,.plan-dates-body{min-height:0!important;overflow-y:auto!important}
   .plan-options-workspace-actions{position:static!important;flex:0 0 auto;margin:0!important}
 }
+
+/* PlatePlan 21.1 — past-day access and guided meal rescheduling */
+.plan-earlier-days-heading{
+  margin:0 0 12px;
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  background:var(--surface);
+  overflow:hidden;
+  scroll-margin-top:88px;
+}
+.plan-earlier-days-toggle{
+  width:100%;
+  min-height:58px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:10px 14px;
+  border:0;
+  background:transparent;
+  color:var(--text);
+  text-align:left;
+  font:inherit;
+  cursor:pointer;
+}
+.plan-earlier-days-toggle:hover{background:var(--surface2)}
+.plan-earlier-days-toggle:focus-visible{outline:3px solid var(--focus);outline-offset:-3px}
+.plan-earlier-days-toggle span:first-child{min-width:0}
+.plan-earlier-days-toggle strong,.plan-earlier-days-toggle small{display:block}
+.plan-earlier-days-toggle small{margin-top:2px;color:var(--text2);font-size:13px;font-weight:500}
+.plan-earlier-days-toggle span:last-child{flex:0 0 auto;color:var(--action);font-size:14px;font-weight:700}
+.plan-reschedule-wrap>.modal{
+  width:min(620px,calc(100vw - 32px));
+  max-height:min(88dvh,780px);
+  padding:0;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+.plan-reschedule-appbar{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:14px 16px 12px;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);
+}
+.plan-reschedule-appbar h3{margin:0;color:var(--text);font-size:20px;line-height:1.2}
+.plan-reschedule-appbar h3+div{margin-top:3px;color:var(--text2);font-size:13px}
+.plan-reschedule-body{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  padding:14px 16px 18px;
+}
+.plan-reschedule-actions{
+  flex:0 0 auto;
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--border);
+  background:var(--surface);
+}
+.plan-reschedule-summary{margin:0 0 16px}
+.plan-reschedule-summary strong{display:block;color:var(--text);font-size:16px;line-height:1.35}
+.plan-reschedule-summary div{margin-top:4px;color:var(--text2);font-size:14px}
+.plan-reschedule-step{padding:14px 0;border-top:1px solid var(--border)}
+.plan-reschedule-step h4{margin:0 0 10px;color:var(--text);font-size:14px;line-height:1.35}
+.plan-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.plan-choice-grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.plan-choice{
+  min-width:0;
+  min-height:48px;
+  padding:9px 11px;
+  border:1px solid var(--border);
+  border-radius:var(--radius-md);
+  background:var(--surface);
+  color:var(--text);
+  font:inherit;
+  font-size:14px;
+  font-weight:650;
+  line-height:1.25;
+  text-align:center;
+  white-space:normal;
+  overflow-wrap:normal;
+  word-break:normal;
+  cursor:pointer;
+}
+.plan-choice:hover{background:var(--surface2)}
+.plan-choice.selected{
+  border-color:var(--action-fill);
+  background:var(--action-fill);
+  color:var(--on-action);
+  box-shadow:0 0 0 1px var(--action-fill);
+}
+.plan-choice:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.plan-reschedule-other,.plan-reschedule-note{margin-top:10px}
+.plan-reschedule-other label,.plan-reschedule-note label{display:block;margin-bottom:6px;color:var(--text);font-size:13px;font-weight:650}
+.plan-reschedule-other input,.plan-reschedule-note input{width:100%;min-height:48px}
+.plan-note-toggle{margin-top:10px}
+.plan-reschedule-preview{margin-top:14px}
+.plan-reschedule-collision{
+  padding:16px;
+  border:1px solid var(--amber);
+  border-radius:var(--radius-lg);
+  background:var(--amber-bg);
+  color:var(--text);
+}
+.plan-reschedule-collision h4{margin:0 0 7px;font-size:17px}
+.plan-reschedule-collision p{margin:0;color:var(--text2);font-size:14px;line-height:1.5}
+@media(max-width:599px){
+  .plan-reschedule-wrap>.modal{
+    width:100%!important;
+    height:min(92dvh,780px)!important;
+    max-height:92dvh!important;
+  }
+  .plan-reschedule-appbar{padding:12px 14px 10px}
+  .plan-reschedule-body{padding:12px 14px 16px}
+  .plan-reschedule-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(82px,1fr));padding-left:14px;padding-right:14px}
+  .plan-reschedule-actions .btn{width:100%;min-width:0}
+}
+@media(max-width:340px){
+  .plan-choice-grid{grid-template-columns:1fr}
+  .plan-choice-grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .plan-reschedule-appbar h3{font-size:18px}
+}

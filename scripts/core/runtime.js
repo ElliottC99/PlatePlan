@@ -1,13 +1,13 @@
 const FEATURE_LOADERS = Object.freeze({
-  today: () => import('../features/today.js?v=21.0'),
-  vault: () => import('../features/recipes.js?v=21.0'),
-  ingredients: () => import('../features/ingredients.js?v=21.0'),
-  bank: () => import('../features/products.js?v=21.0'),
-  planner: () => import('../features/planner.js?v=21.0'),
-  planlib: () => import('../features/library.js?v=21.0'),
-  shopping: () => import('../features/shopping.js?v=21.0'),
-  data: () => import('../features/data-quality.js?v=21.0'),
-  prefs: () => import('../features/preferences.js?v=21.0'),
+  today: () => import('../features/today.js?v=21.1'),
+  vault: () => import('../features/recipes.js?v=21.1'),
+  ingredients: () => import('../features/ingredients.js?v=21.1'),
+  bank: () => import('../features/products.js?v=21.1'),
+  planner: () => import('../features/planner.js?v=21.1'),
+  planlib: () => import('../features/library.js?v=21.1'),
+  shopping: () => import('../features/shopping.js?v=21.1'),
+  data: () => import('../features/data-quality.js?v=21.1'),
+  prefs: () => import('../features/preferences.js?v=21.1'),
 });
 
 /**
