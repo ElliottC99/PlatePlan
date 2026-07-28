@@ -20,6 +20,16 @@
   --blue: #1A4A6B;
   --blue-bg: #EAF0F4;
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --type-title: 28px;
+  --type-heading: 20px;
+  --type-body: 17px;
+  --type-secondary: 14px;
+  --type-caption: 12px;
+  --space-unit: 4px;
+  --radius-control: 12px;
+  --radius-group: 16px;
+  --focus-ring: 0 0 0 3px rgba(9,105,218,.28);
+  --separator: rgba(60,60,67,.18);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:var(--font);font-size:14px;color:var(--text);background:var(--bg);min-height:100vh}
+body{font-family:var(--font);font-size:var(--type-body);line-height:1.47;color:var(--text);background:var(--bg);min-height:100vh;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}

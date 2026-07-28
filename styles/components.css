@@ -198,6 +198,40 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 .plateplan-update-meta{display:grid;gap:0;margin-top:12px;border-top:1px solid var(--border)}
 .plateplan-update-meta>div{display:grid;grid-template-columns:minmax(100px,.6fr) minmax(0,1fr);gap:12px;padding:9px 0;border-bottom:1px solid var(--border)}
 .plateplan-update-meta dt{color:var(--text2);font-size:12px}.plateplan-update-meta dd{margin:0;text-align:right;font-size:12px;color:var(--text);overflow-wrap:break-word}
+
+/* PlatePlan 22.0 — grouped navigation and local search */
+.app-menu-button{display:inline-flex;align-items:center;gap:7px}
+.app-menu-button svg{width:19px;height:19px;fill:currentColor}
+.plateplan-sheet-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}
+.plateplan-sheet-header h3{margin:0;font-size:20px;letter-spacing:-.02em}
+.plateplan-sheet-header p{margin:3px 0 0;color:var(--text2);font-size:14px}
+.plateplan-menu-groups{display:grid;gap:16px}
+.plateplan-menu-groups section{display:grid;gap:0}
+.plateplan-menu-groups h4{margin:0;padding:0 4px 7px;color:var(--text2);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.plateplan-menu-groups section>button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:48px;padding:11px 12px;border:0;border-top:1px solid var(--border);background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.plateplan-menu-groups section>button:first-of-type{border-top:0}
+.plateplan-menu-groups section>button:hover,.plateplan-menu-groups section>button:focus-visible{background:var(--surface2)}
+.search-view-header{margin-bottom:18px}
+.global-search-field{display:grid;grid-template-columns:24px minmax(0,1fr);align-items:center;gap:10px;min-height:52px;padding:0 14px;border:1px solid var(--border-strong);border-radius:15px;background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.global-search-field:focus-within{border-color:var(--action);box-shadow:0 0 0 3px color-mix(in srgb,var(--action) 18%,transparent)}
+.global-search-field svg{width:22px;height:22px;fill:none;stroke:var(--text2);stroke-width:1.8;stroke-linecap:round}
+.global-search-field input{width:100%;min-height:50px;padding:0;border:0;background:transparent;color:var(--text);font-size:17px;outline:0}
+.search-status{min-height:26px;padding:9px 3px 0;color:var(--text2);font-size:14px}
+.search-result-group{margin-top:20px}
+.search-result-group>h2{display:flex;align-items:baseline;gap:7px;margin:0 0 7px;padding:0 4px;font-size:15px}
+.search-result-group>h2 span{color:var(--text3);font-size:13px;font-weight:600}
+.search-result-list{overflow:hidden;border:1px solid var(--border);border-radius:16px;background:var(--surface)}
+.search-result-row{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;min-height:58px;padding:11px 14px;border:0;border-top:1px solid var(--border);background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.search-result-row:first-child{border-top:0}
+.search-result-row:hover,.search-result-row:focus-visible{background:var(--surface2)}
+.search-result-row>span:first-child{display:grid;gap:2px;min-width:0}
+.search-result-row strong{font-size:16px;line-height:1.3}
+.search-result-row small{color:var(--text2);font-size:14px;line-height:1.35}
+.search-result-row>span:last-child{color:var(--text3);font-size:24px}
+.search-empty{padding:54px 22px;text-align:center;color:var(--text2)}
+.search-empty h2{margin:0 0 7px;color:var(--text);font-size:19px}
+.search-empty p{max-width:480px;margin:0 auto;font-size:15px;line-height:1.5}
+.search-empty-icon{margin-bottom:10px;color:var(--text3);font-size:34px}
 @media(max-width:599px){
   .plateplan-update-banner{bottom:calc(72px + env(safe-area-inset-bottom));align-items:stretch;flex-direction:column;gap:10px}
   .plateplan-update-banner-actions{display:grid;grid-template-columns:1fr auto}.plateplan-update-banner-actions .btn{justify-content:center}

@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='21.3.2';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v24';
+const PLATEPLAN_APP_VERSION='22.0';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v25';
 const SEED=[];
 
 let state = null;
@@ -181,7 +181,7 @@ function closeMobileMore(fromHistory=false){
 }
 function mobileMoreView(id){ closeMobileMore(); showView(id); }
 function syncMobileNavigation(id){
-  const primary = ['today','vault','planner','shopping'].includes(id) ? id : 'more';
+  const primary = ['today','vault','planner','shopping','search'].includes(id) ? id : '';
   document.querySelectorAll('#mobile-nav button').forEach(button=>button.classList.toggle('active',button.dataset.view===primary));
 }
 function closeMobileActionSheet(fromHistory=false){
@@ -1358,7 +1358,10 @@ function installPlatePlanSidebarState(){
   });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+let platePlanApplicationInitialized=false;
+function initializePlatePlanApplication(){
+  if(platePlanApplicationInitialized)return;
+  platePlanApplicationInitialized=true;
   performance.mark?.('plateplan-start');
   installPlatePlanModalHistory();
   clearVolatileSavedDom(document);
@@ -1417,7 +1420,12 @@ document.addEventListener('DOMContentLoaded', () => {
           document.querySelectorAll('.map-dropdown').forEach(d => d.style.display = 'none');
       }
   });
-});
+}
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',initializePlatePlanApplication,{once:true});
+}else{
+  queueMicrotask(initializePlatePlanApplication);
+}
 
 // == MEAL BUDGETS & FIT SCORING ==
 function getBudgets(person, mealType) {
@@ -5300,6 +5308,30 @@ function renderPlatePlanLegacyView(id){
   if(id==='data')renderDataQuality();
 }
 
+const platePlanFeatureRenderers=Object.freeze({
+  today(){
+    resetTodayDate({render:false});
+    return renderToday();
+  },
+  vault:renderVault,
+  ingredients:renderIngredientBank,
+  bank:renderBank,
+  planner(){
+    ensurePlannerShell();
+    const daySel=document.getElementById('plan-days');
+    if(daySel && state.plan?.days) daySel.value=String(state.plan.days);
+    buildExclGrid();
+    return renderPlan();
+  },
+  planlib(){
+    ensurePlannerShell();
+    return renderPlanHistoryPanel();
+  },
+  shopping:renderShopping,
+  prefs:loadPrefs,
+  data:renderDataQuality
+});
+
 function requestPlatePlanViewRender(id){
   if(globalThis.PlatePlanModules?.renderView){
     globalThis.PlatePlanModules.renderView(id);
@@ -5317,6 +5349,35 @@ function showView(id){
   requestPlatePlanViewRender(id);
   platePlanDirtyViews.delete(id);
   window.scrollTo({top:0,behavior:'instant'});
+}
+
+function openPlatePlanSearchResult(type,id,title=''){
+  if(type==='recipe'){
+    showView('vault');
+    setTimeout(()=>viewRecipe(id),0);
+    return;
+  }
+  if(type==='ingredient'||type==='subtype'){
+    showView('ingredients');
+    setTimeout(()=>{
+      const input=document.getElementById('ingredient-group-search');
+      if(input)input.value=title||'';
+      renderIngredientBank();
+      input?.focus();
+    },0);
+    return;
+  }
+  if(type==='product'){
+    showView('bank');
+    setTimeout(()=>{
+      const input=document.getElementById('bank-search');
+      if(input)input.value=title||'';
+      renderBank();
+      input?.focus();
+    },0);
+    return;
+  }
+  if(type==='plan') showView('planlib');
 }
 
 // == FREE PHOTO-TO-RECIPE CAPTURE ==
@@ -9647,7 +9708,7 @@ function renderBank(){
       ? `<div class="msg warn" style="font-size:11px;margin:6px 0 0;padding:6px 8px">Check nutrition basis: powders/supplements must be stored per 100g/ml, not per scoop.</div>`
       : '';
     
-    return`<div class="bank-card"><div class="product-card-layout"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;overflow-wrap:anywhere">${ing.name}</div>${ing.brand&&ing.brand!=='Generic'?`<div style="font-size:12px;color:var(--text2);margin-bottom:4px">${ing.brand}</div>`:''}<div style="font-size:11px;color:var(--text3);margin:3px 0;overflow-wrap:anywhere">${ppEscapeHtml(hierarchy)}</div><div class="row-center" style="margin:4px 0;gap:5px"><span class="rank rank-${rank}" title="${protDensity.toFixed(1)}g protein per 100 kcal">${protDensity>=15?'Very high protein':protDensity>=10?'High protein':protDensity>=5?'Medium protein':'Lower protein'}</span><span class="tag" title="Category">${ppEscapeHtml(CAT[group?.cat || ing.cat]||group?.cat||ing.cat||'Other')}</span><span class="tag" title="Ingredient">${ppEscapeHtml(getProductFamily(ing))}</span>${group?`<span class="tag" title="Type">Type: ${ppEscapeHtml(getGroupTypeName(group))}</span>`:''}${isDefaultProduct?`<span class="tag green" title="Automatic default product: highest protein per 100 kcal in this type">Auto default</span>`:''}${ing.storage ? `<span class="tag" style="text-transform:capitalize;">${ing.storage}</span>` : ''}</div><div class="macro-bar"><span class="mpill p">P <span>${p}g</span></span><span class="mpill"><span>${ing.cal}</span> kcal</span><span class="mpill">C <span>${ing.carb}g</span></span><span class="mpill">F <span>${ing.fat}g</span></span></div>${basisWarning}<div class="row-center" style="margin-top:5px; gap:8px;">${pkcal?`<span style="font-size:11px;color:var(--blue)"><strong>${pkcal}g</strong> P / 100kcal</span>`:''}${ppenny?`<span style="font-size:11px;color:var(--blue)"><strong>${ppenny}g</strong> P / &pound;</span>`:''}</div>${ing.notes?`<div style="font-size:12px;color:var(--text2);margin-top:4px">${ing.notes}</div>`:''}${ing.price&&ing.packSize?`<div style="font-size:12px;color:var(--text2);margin-top:4px;">&pound;${ing.price.toFixed(2)} for ${formattedPackSize}</div>`:''}${variantLabels.length>1?`<div style="font-size:11px;color:var(--text2);margin-top:4px;"><strong>Pack variants:</strong> ${variantLabels.map(ppEscapeHtml).join(' · ')}</div>`:''}${ing.sourceUrl?`<div style="font-size:11px;margin-top:4px;"><a href="${ing.sourceUrl}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:underline">View on Tesco ↗</a></div>`:''}</div><div class="product-card-actions"><button class="btn sm ghost desktop-only-mobile-hide" onclick="editIng('${ing.id}')">Edit</button><button class="btn sm ghost desktop-only-mobile-hide" onclick="assignProductToGroupPrompt('${ing.id}')">Type</button><button class="btn sm danger desktop-only-mobile-hide" onclick="deleteIng('${ing.id}')">Delete</button><button class="btn sm ghost mobile-only-action" onclick="editIng('${ing.id}')">Edit product</button><button class="btn sm ghost mobile-only-action" onclick="openProductBankActions('${ing.id}')">More</button></div></div></div>`;
+    return`<div class="bank-card"><div class="product-card-layout"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;overflow-wrap:break-word">${ing.name}</div>${ing.brand&&ing.brand!=='Generic'?`<div style="font-size:12px;color:var(--text2);margin-bottom:4px">${ing.brand}</div>`:''}<div style="font-size:11px;color:var(--text3);margin:3px 0;overflow-wrap:break-word">${ppEscapeHtml(hierarchy)}</div><div class="row-center" style="margin:4px 0;gap:5px"><span class="rank rank-${rank}" title="${protDensity.toFixed(1)}g protein per 100 kcal">${protDensity>=15?'Very high protein':protDensity>=10?'High protein':protDensity>=5?'Medium protein':'Lower protein'}</span><span class="tag" title="Category">${ppEscapeHtml(CAT[group?.cat || ing.cat]||group?.cat||ing.cat||'Other')}</span><span class="tag" title="Ingredient">${ppEscapeHtml(getProductFamily(ing))}</span>${group?`<span class="tag" title="Type">Type: ${ppEscapeHtml(getGroupTypeName(group))}</span>`:''}${isDefaultProduct?`<span class="tag green" title="Automatic default product: highest protein per 100 kcal in this type">Auto default</span>`:''}${ing.storage ? `<span class="tag" style="text-transform:capitalize;">${ing.storage}</span>` : ''}</div><div class="macro-bar"><span class="mpill p">P <span>${p}g</span></span><span class="mpill"><span>${ing.cal}</span> kcal</span><span class="mpill">C <span>${ing.carb}g</span></span><span class="mpill">F <span>${ing.fat}g</span></span></div>${basisWarning}<div class="row-center" style="margin-top:5px; gap:8px;">${pkcal?`<span style="font-size:11px;color:var(--blue)"><strong>${pkcal}g</strong> P / 100kcal</span>`:''}${ppenny?`<span style="font-size:11px;color:var(--blue)"><strong>${ppenny}g</strong> P / &pound;</span>`:''}</div>${ing.notes?`<div style="font-size:12px;color:var(--text2);margin-top:4px">${ing.notes}</div>`:''}${ing.price&&ing.packSize?`<div style="font-size:12px;color:var(--text2);margin-top:4px;">&pound;${ing.price.toFixed(2)} for ${formattedPackSize}</div>`:''}${variantLabels.length>1?`<div style="font-size:11px;color:var(--text2);margin-top:4px;"><strong>Pack variants:</strong> ${variantLabels.map(ppEscapeHtml).join(' · ')}</div>`:''}${ing.sourceUrl?`<div style="font-size:11px;margin-top:4px;"><a href="${ing.sourceUrl}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:underline">View on Tesco ↗</a></div>`:''}</div><div class="product-card-actions"><button class="btn sm ghost desktop-only-mobile-hide" onclick="editIng('${ing.id}')">Edit</button><button class="btn sm ghost desktop-only-mobile-hide" onclick="assignProductToGroupPrompt('${ing.id}')">Type</button><button class="btn sm danger desktop-only-mobile-hide" onclick="deleteIng('${ing.id}')">Delete</button><button class="btn sm ghost mobile-only-action" onclick="editIng('${ing.id}')">Edit product</button><button class="btn sm ghost mobile-only-action" onclick="openProductBankActions('${ing.id}')">More</button></div></div></div>`;
   }).join('')+progressiveListButton('bank',totalProducts,visibleProducts.length);
 }
 
@@ -15396,6 +15457,8 @@ globalThis.PlatePlanLegacy=Object.freeze({
   getPlanContextForInstance,
   refreshPlatePlanDerivedState,
   renderLegacyView:renderPlatePlanLegacyView,
+  renderers:platePlanFeatureRenderers,
+  openSearchResult:openPlatePlanSearchResult,
   runDelegatedAction:runPlatePlanDelegatedAction,
   showInfo:openAppInfoModal,
   closeInfo:closeAppConfirmModal,

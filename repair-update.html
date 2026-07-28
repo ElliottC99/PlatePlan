@@ -35,7 +35,7 @@
     <p>This resets only PlatePlan’s offline application files, then reopens the latest published version.</p>
     <p class="reassurance"><strong>Your recipes and plans are safe.</strong> This does not clear LocalStorage, Firebase data, recovery points or sign-in information.</p>
     <button type="button" id="repair-button">Repair and reopen PlatePlan</button>
-    <a id="return-link" href="./PlatePlan.html?update-repair=21.3.2">Return to PlatePlan</a>
+    <a id="return-link" href="./PlatePlan.html?update-repair=22.0">Return to PlatePlan</a>
     <div id="repair-status" role="status" aria-live="polite"></div>
   </main>
   <script>
@@ -73,8 +73,8 @@
             );
           }
 
-          setStatus('Reopening PlatePlan 21.3.2…');
-          location.replace(`./PlatePlan.html?update-repair=21.3.2&fresh=${stamp}`);
+          setStatus('Reopening PlatePlan 22.0…');
+          location.replace(`./PlatePlan.html?update-repair=22.0&fresh=${stamp}`);
         } catch (error) {
           button.disabled = false;
           returnLink.style.display = 'flex';
