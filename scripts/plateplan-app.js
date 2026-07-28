@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='21.2';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v21';
+const PLATEPLAN_APP_VERSION='21.3';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v22';
 const SEED=[];
 
 let state = null;
@@ -431,6 +431,9 @@ function renderBakedStateRecoveryBanner(){
   if(existing) existing.remove();
   const banner = document.createElement('div');
   banner.id = 'baked-state-recovery-banner';
+  banner.setAttribute('role','dialog');
+  banner.setAttribute('aria-modal','true');
+  banner.setAttribute('aria-label','Choose the PlatePlan data to keep');
   banner.style.cssText = 'position:sticky;top:0;z-index:500;background:var(--amber-bg);border:1px solid var(--amber);color:var(--text);padding:10px 14px;margin:0 0 12px;border-radius:8px;display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;';
   banner.innerHTML = `
     <div style="font-size:13px;line-height:1.35;flex:1;min-width:280px">
@@ -443,6 +446,7 @@ function renderBakedStateRecoveryBanner(){
       <button class="btn sm ghost" onclick="dismissBakedFileState()">Keep Browser Data</button>
     </div>`;
   document.body.prepend(banner);
+  setPlatePlanStartupInert(true,banner.id);
 }
 
 function useBakedFileState(){
@@ -459,12 +463,14 @@ function applyBakedFileState(){
     state = loadState();
     refreshPlatePlanDerivedState({ persist:true, render:true });
     document.getElementById('baked-state-recovery-banner')?.remove();
+    setPlatePlanStartupInert(false);
   }catch(e){ openAppInfoModal('File data unavailable','PlatePlan could not load the data embedded in this file. Your browser data has not been replaced.'); }
 }
 
 function dismissBakedFileState(){
   try{ localStorage.removeItem(BAKED_CANDIDATE_SK); }catch(e){}
   document.getElementById('baked-state-recovery-banner')?.remove();
+  setPlatePlanStartupInert(false);
 }
 
 function loadState(){
@@ -981,10 +987,15 @@ function ensurePlatePlanMigrationModal(){
 }
 
 function showPlatePlanMigrationPreview(owner=true,initializing=false){
+  if(document.getElementById('baked-state-recovery-banner')){
+    setTimeout(()=>showPlatePlanMigrationPreview(owner,initializing),600);
+    return;
+  }
   const wrap=ensurePlatePlanMigrationModal();
   const counts=getPlatePlanMigrationCounts();
   wrap.innerHTML=`<div class="modal" style="max-width:560px"><h3>Set up shared PlatePlan</h3><p style="font-size:13px;color:var(--text2);line-height:1.45;margin:8px 0 12px">${initializing?'A previous upload was interrupted. It is safe to retry; records use their existing IDs.':'This Firebase household has not been initialised. Review the browser data before making it the shared version.'}</p><div class="card-inner" style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;font-size:12px"><div><strong>${counts.recipes}</strong> recipes</div><div><strong>${counts.products}</strong> products</div><div><strong>${counts.ingredients}</strong> ingredients</div><div><strong>${counts.subTypes}</strong> sub-types</div><div><strong>${counts.overrides}</strong> plan overrides</div><div>Schema <strong>${PLATEPLAN_SCHEMA_VERSION}</strong></div></div>${owner?'<div class="btn-row"><button class="btn primary" onclick="uploadInitialPlatePlanState()">Upload this browser data</button><button class="btn ghost" onclick="signOutPlatePlan()">Sign out</button></div>':'<div class="msg warn">The owner account must complete the first upload. This account will download it afterwards.</div><button class="btn ghost" onclick="signOutPlatePlan()">Sign out</button>'}<div id="plateplan-migration-msg"></div></div>`;
   wrap.classList.add('open');
+  setPlatePlanStartupInert(true,wrap.id);
 }
 
 async function uploadInitialPlatePlanState(){
@@ -1008,6 +1019,7 @@ async function uploadInitialPlatePlanState(){
     }
     await household.set({status:'ready',initialized:true,initializedAt:firebase.firestore.FieldValue.serverTimestamp(),schemaVersion:PLATEPLAN_SCHEMA_VERSION,appVersion:PLATEPLAN_APP_VERSION,counts},{merge:true});
     document.getElementById('plateplan-cloud-migration-wrap')?.classList.remove('open');
+    setPlatePlanStartupInert(false);
     await loadSharedPlatePlan();
   }catch(error){
     console.warn('Initial PlatePlan upload failed',error);
@@ -1039,8 +1051,38 @@ function ensurePlatePlanAuthScreen(){
   document.body.appendChild(screen); return screen;
 }
 
-function showPlatePlanAuthScreen(){ ensurePlatePlanAuthScreen().style.display='flex'; }
-function hidePlatePlanAuthScreen(){ const screen=document.getElementById('plateplan-auth-screen'); if(screen) screen.style.display='none'; }
+function setPlatePlanStartupInert(active,exceptionId=''){
+  document.querySelectorAll('body > *').forEach(element=>{
+    if(!(element instanceof HTMLElement)||['SCRIPT','STYLE'].includes(element.tagName)||element.id===exceptionId)return;
+    if(active){
+      if(element.dataset.startupInert!=='1'){
+        element.dataset.startupInert='1';
+        element.dataset.startupAriaHidden=element.getAttribute('aria-hidden')??'';
+      }
+      element.inert=true;
+      element.setAttribute('aria-hidden','true');
+    }else if(element.dataset.startupInert==='1'){
+      element.inert=false;
+      const previous=element.dataset.startupAriaHidden;
+      if(previous)element.setAttribute('aria-hidden',previous);else element.removeAttribute('aria-hidden');
+      delete element.dataset.startupInert;
+      delete element.dataset.startupAriaHidden;
+    }
+  });
+}
+
+function showPlatePlanAuthScreen(){
+  const screen=ensurePlatePlanAuthScreen();
+  screen.style.display='flex';
+  setPlatePlanStartupInert(true,screen.id);
+}
+function hidePlatePlanAuthScreen(){
+  const screen=document.getElementById('plateplan-auth-screen');
+  if(screen)screen.style.display='none';
+  setPlatePlanStartupInert(false);
+  const sourceChoice=document.getElementById('baked-state-recovery-banner');
+  if(sourceChoice)setPlatePlanStartupInert(true,sourceChoice.id);
+}
 
 async function signInPlatePlanWithGoogle(){
   try{
@@ -1124,156 +1166,6 @@ function initPlatePlanCloudSync(){
       else{ platePlanCloudUser=null; platePlanCloudReady=false; document.getElementById('sync-user').textContent=''; updatePlatePlanSyncStatus('connecting','Sign in required'); showPlatePlanAuthScreen(); }
     });
   }catch(error){ updatePlatePlanSyncStatus('error',error.message); }
-}
-
-let platePlanSwRegistration=null;
-let platePlanUpdateApplying=false;
-let platePlanUpdateReloading=false;
-let platePlanUpdateTimer=null;
-let platePlanUpdateActivationPoll=null;
-let platePlanOfferedUpdateWorker=null;
-let platePlanActiveCacheVersion='';
-let platePlanPendingTargetCache='';
-const PLATEPLAN_UPDATED_SESSION_KEY='plateplan_update_completed';
-
-function showPlatePlanUpdateOffer(registration){
-  const worker=registration?.waiting;
-  if(!worker || !navigator.serviceWorker.controller || worker===platePlanOfferedUpdateWorker || platePlanUpdateApplying) return;
-  platePlanOfferedUpdateWorker=worker;
-  openAppInfoModal('PlatePlan update available','A newer version is ready to install.<div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="applyPlatePlanAppUpdate()">Update now</button></div>');
-}
-
-function requestPlatePlanWorkerVersion(){
-  navigator.serviceWorker.controller?.postMessage({type:'GET_VERSION'});
-}
-
-function getPlatePlanWorkerVersion(worker,timeoutMs=1800){
-  return new Promise(resolve=>{
-    if(!worker)return resolve('');
-    const channel=new MessageChannel();
-    let settled=false;
-    const onGlobalMessage=event=>{if(event.data?.type==='PLATEPLAN_VERSION')finish(event.data.cacheName||'');};
-    const finish=value=>{if(settled)return;settled=true;clearTimeout(timer);navigator.serviceWorker.removeEventListener('message',onGlobalMessage);resolve(value||'');};
-    channel.port1.onmessage=event=>finish(event.data?.cacheName||'');
-    navigator.serviceWorker.addEventListener('message',onGlobalMessage);
-    const timer=setTimeout(()=>finish(''),timeoutMs);
-    try{worker.postMessage({type:'GET_VERSION'},[channel.port2]);}
-    catch(_error){finish('');}
-  });
-}
-
-function setPlatePlanUpdateCompletionMarker(cacheName=''){
-  try{sessionStorage.setItem(PLATEPLAN_UPDATED_SESSION_KEY,JSON.stringify({cacheName:cacheName||'',requestedAt:Date.now()}));}
-  catch(_error){}
-}
-
-async function confirmPlatePlanUpdateAfterReload(registration){
-  const raw=sessionStorage.getItem(PLATEPLAN_UPDATED_SESSION_KEY);
-  if(!raw)return;
-  let expectedCache='';
-  try{expectedCache=JSON.parse(raw)?.cacheName||'';}catch(_error){}
-  const activeCache=await getPlatePlanWorkerVersion(navigator.serviceWorker.controller);
-  if(expectedCache&&activeCache!==expectedCache){
-    const waitingCache=await getPlatePlanWorkerVersion(registration?.waiting);
-    if(registration?.waiting&&waitingCache===expectedCache){
-      platePlanPendingTargetCache=expectedCache;
-      registration.waiting.postMessage({type:'SKIP_WAITING'});
-      setTimeout(()=>location.reload(),1800);
-    }
-    return;
-  }
-  sessionStorage.removeItem(PLATEPLAN_UPDATED_SESSION_KEY);
-  closeAppConfirmModal();
-  hideOverlay();
-  setTimeout(()=>openAppInfoModal('PlatePlan updated',`PlatePlan updated to version <strong>${ppEscapeHtml(PLATEPLAN_APP_VERSION)}</strong>.`),350);
-}
-
-function completePlatePlanUpdateReload(targetCache=''){
-  if(platePlanUpdateReloading)return;
-  platePlanUpdateReloading=true;
-  clearTimeout(platePlanUpdateTimer);
-  clearInterval(platePlanUpdateActivationPoll);
-  setPlatePlanUpdateCompletionMarker(targetCache||platePlanPendingTargetCache);
-  location.reload();
-}
-
-function registerPlatePlanServiceWorker(){
-  if(!('serviceWorker' in navigator)||location.protocol==='file:') return;
-  navigator.serviceWorker.addEventListener('message',event=>{
-    if(event.data?.type==='PLATEPLAN_VERSION') platePlanActiveCacheVersion=event.data.cacheName||'';
-    if(event.data?.type==='PLATEPLAN_UPDATE_ACTIVATED') completePlatePlanUpdateReload(event.data.cacheName||platePlanPendingTargetCache);
-  });
-  navigator.serviceWorker.addEventListener('controllerchange',()=>{
-    if(platePlanUpdateApplying||sessionStorage.getItem(PLATEPLAN_UPDATED_SESSION_KEY)) completePlatePlanUpdateReload(platePlanPendingTargetCache);
-  });
-  navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(registration=>{
-    platePlanSwRegistration=registration;
-    showPlatePlanUpdateOffer(registration);
-    registration.addEventListener('updatefound',()=>{
-      const installing=registration.installing;
-      installing?.addEventListener('statechange',()=>{
-        if(installing.state==='installed') showPlatePlanUpdateOffer(registration);
-      });
-    });
-    requestPlatePlanWorkerVersion();
-    confirmPlatePlanUpdateAfterReload(registration);
-    setTimeout(()=>registration.update().catch(error=>console.info('PlatePlan update check unavailable',error)),1200);
-  }).catch(error=>console.warn('PlatePlan service worker registration failed',error));
-}
-
-function waitForPlatePlanWaitingWorker(registration,timeoutMs=10000){
-  return new Promise((resolve,reject)=>{
-    if(registration?.waiting) return resolve(registration.waiting);
-    let settled=false;
-    const finish=worker=>{if(settled)return;settled=true;clearTimeout(timer);worker?resolve(worker):reject(new Error('The update did not finish installing.'));};
-    const watch=worker=>{
-      if(!worker) return;
-      worker.addEventListener('statechange',()=>{
-        if(registration.waiting||worker.state==='installed') finish(registration.waiting||worker);
-        else if(worker.state==='redundant') finish(null);
-      });
-    };
-    watch(registration?.installing);
-    registration?.addEventListener('updatefound',()=>watch(registration.installing),{once:true});
-    const timer=setTimeout(()=>finish(null),timeoutMs);
-  });
-}
-
-function showPlatePlanUpdateFailure(message){
-  hideOverlay();
-  clearInterval(platePlanUpdateActivationPoll);
-  platePlanUpdateApplying=false;
-  openAppInfoModal('Update could not finish',`${ppEscapeHtml(message||'PlatePlan could not activate the update.')}<div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="applyPlatePlanAppUpdate()">Retry</button><button class="btn ghost" onclick="closeAppConfirmModal()">Close</button></div>`);
-}
-
-async function applyPlatePlanAppUpdate(){
-  if(platePlanUpdateApplying) return;
-  platePlanUpdateApplying=true;
-  closeAppConfirmModal();
-  showOverlay('Installing PlatePlan update…','PlatePlan will reopen automatically.');
-  try{
-    const registration=platePlanSwRegistration||await navigator.serviceWorker.getRegistration();
-    if(!registration) throw new Error('No PlatePlan service worker is registered.');
-    let worker=registration.waiting;
-    if(!worker){
-      await registration.update();
-      worker=await waitForPlatePlanWaitingWorker(registration);
-    }
-    platePlanPendingTargetCache=await getPlatePlanWorkerVersion(worker);
-    setPlatePlanUpdateCompletionMarker(platePlanPendingTargetCache);
-    clearInterval(platePlanUpdateActivationPoll);
-    platePlanUpdateActivationPoll=setInterval(()=>{
-      if(worker.state==='activated'||registration.active===worker)completePlatePlanUpdateReload(platePlanPendingTargetCache);
-    },250);
-    platePlanUpdateTimer=setTimeout(()=>{
-      clearInterval(platePlanUpdateActivationPoll);
-      completePlatePlanUpdateReload(platePlanPendingTargetCache);
-    },10000);
-    worker.postMessage({type:'SKIP_WAITING'});
-  }catch(error){
-    clearTimeout(platePlanUpdateTimer);
-    showPlatePlanUpdateFailure(navigator.onLine===false?'You are offline. Reconnect, then retry the update.':error.message);
-  }
 }
 
 function getRecoveryPoints(){
@@ -1515,7 +1407,6 @@ document.addEventListener('DOMContentLoaded', () => {
   performance.mark?.('plateplan-usable');
   try{ performance.measure?.('plateplan-local-startup','plateplan-start','plateplan-usable'); }catch(e){}
   renderBakedStateRecoveryBanner();
-  registerPlatePlanServiceWorker();
   initPlatePlanCloudSync();
   window.addEventListener('online',()=>{ updatePlatePlanSyncStatus(getPlatePlanSyncOutbox().length?'saving':'connecting'); flushPlatePlanSyncOutbox(); });
   window.addEventListener('offline',()=>updatePlatePlanSyncStatus('offline'));
@@ -15507,11 +15398,13 @@ globalThis.PlatePlanLegacy=Object.freeze({
   renderLegacyView:renderPlatePlanLegacyView,
   runDelegatedAction:runPlatePlanDelegatedAction,
   showInfo:openAppInfoModal,
+  closeInfo:closeAppConfirmModal,
+  showOverlay,
+  hideOverlay,
+  showToast:showPlatePlanToast,
   createRecoveryPoint,
   renderRecoveryPanel,
   initCloudSync:initPlatePlanCloudSync,
-  signOut:signOutPlatePlan,
-  registerServiceWorker:registerPlatePlanServiceWorker,
-  applyUpdate:applyPlatePlanAppUpdate
+  signOut:signOutPlatePlan
 });
 window.dispatchEvent(new CustomEvent('plateplan:legacy-ready',{detail:{version:PLATEPLAN_APP_VERSION}}));

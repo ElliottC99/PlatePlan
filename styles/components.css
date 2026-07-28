@@ -190,6 +190,19 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 .sync-pill[data-status="conflict"]::before,.sync-pill[data-status="error"]::before{background:var(--red)}
 .auth-screen{position:fixed;inset:0;z-index:900;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
 .auth-card{width:100%;max-width:390px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.12)}
+.plateplan-update-banner{position:fixed;z-index:880;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(620px,calc(100vw - 28px));display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border:1px solid var(--border-strong);border-radius:16px;background:var(--surface);color:var(--text);box-shadow:0 18px 54px rgba(0,0,0,.18)}
+.plateplan-update-banner-copy{display:grid;gap:3px;min-width:0}.plateplan-update-banner-copy strong{font-size:14px}.plateplan-update-banner-copy span{font-size:13px;color:var(--text2);line-height:1.4}
+.plateplan-update-banner-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto}.plateplan-update-banner .btn{min-height:44px}
+.plateplan-update-dialog-actions{margin-top:14px}.plateplan-update-dialog-actions .btn{min-height:44px}
+.plateplan-update-settings-head{align-items:center}.plateplan-update-settings-head h3{margin:0}.plateplan-update-settings-head p{margin:4px 0 0;color:var(--text2);font-size:13px}
+.plateplan-update-meta{display:grid;gap:0;margin-top:12px;border-top:1px solid var(--border)}
+.plateplan-update-meta>div{display:grid;grid-template-columns:minmax(100px,.6fr) minmax(0,1fr);gap:12px;padding:9px 0;border-bottom:1px solid var(--border)}
+.plateplan-update-meta dt{color:var(--text2);font-size:12px}.plateplan-update-meta dd{margin:0;text-align:right;font-size:12px;color:var(--text);overflow-wrap:break-word}
+@media(max-width:599px){
+  .plateplan-update-banner{bottom:calc(72px + env(safe-area-inset-bottom));align-items:stretch;flex-direction:column;gap:10px}
+  .plateplan-update-banner-actions{display:grid;grid-template-columns:1fr auto}.plateplan-update-banner-actions .btn{justify-content:center}
+  .plateplan-update-settings-head{align-items:stretch;flex-direction:column}.plateplan-update-settings-head .btn{width:100%;justify-content:center;min-height:48px}
+}
 .sync-compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
 .sync-compare pre{white-space:pre-wrap;word-break:break-word;max-height:150px;overflow:auto;background:var(--surface2);border-radius:7px;padding:8px;font-size:11px}
 @media(max-width:600px){.sync-user-label{display:none}.sync-compare{grid-template-columns:1fr}header{padding:0 10px}.sync-pill{padding:4px 6px}}

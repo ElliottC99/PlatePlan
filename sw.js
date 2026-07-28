@@ -1,35 +1,37 @@
-const PLATEPLAN_CACHE = 'plateplan-shell-v21';
+const PLATEPLAN_CACHE = 'plateplan-shell-v22';
+const PLATEPLAN_APP_VERSION = '21.3';
+const PLATEPLAN_BUILD_ID = '21.3-v22';
 const PLATEPLAN_LOCAL_SHELL = [
   './',
   './PlatePlan.html',
   './manifest.json',
   './firebase-config.js',
-  './styles/tokens.css?v=21.2',
-  './styles/components.css?v=21.2',
-  './styles/responsive.css?v=21.2',
-  './styles/print.css?v=21.2',
-  './scripts/plateplan-app.js?v=21.2',
-  './scripts/main.js?v=21.2',
-  './scripts/core/contracts.js?v=21.2',
-  './scripts/core/store.js?v=21.2',
-  './scripts/core/runtime.js?v=21.2',
-  './scripts/services/firebase.js?v=21.2',
-  './scripts/services/sync.js?v=21.2',
-  './scripts/services/recovery.js?v=21.2',
-  './scripts/services/updates.js?v=21.2',
-  './scripts/ui/actions.js?v=21.2',
-  './scripts/ui/navigation.js?v=21.2',
-  './scripts/ui/workspaces.js?v=21.2',
-  './scripts/features/create-legacy-view.js?v=21.2',
-  './scripts/features/today.js?v=21.2',
-  './scripts/features/recipes.js?v=21.2',
-  './scripts/features/ingredients.js?v=21.2',
-  './scripts/features/products.js?v=21.2',
-  './scripts/features/planner.js?v=21.2',
-  './scripts/features/library.js?v=21.2',
-  './scripts/features/shopping.js?v=21.2',
-  './scripts/features/data-quality.js?v=21.2',
-  './scripts/features/preferences.js?v=21.2',
+  './styles/tokens.css?v=21.3',
+  './styles/components.css?v=21.3',
+  './styles/responsive.css?v=21.3',
+  './styles/print.css?v=21.3',
+  './scripts/plateplan-app.js?v=21.3',
+  './scripts/main.js?v=21.3',
+  './scripts/core/contracts.js?v=21.3',
+  './scripts/core/store.js?v=21.3',
+  './scripts/core/runtime.js?v=21.3',
+  './scripts/services/firebase.js?v=21.3',
+  './scripts/services/sync.js?v=21.3',
+  './scripts/services/recovery.js?v=21.3',
+  './scripts/services/updates.js?v=21.3',
+  './scripts/ui/actions.js?v=21.3',
+  './scripts/ui/navigation.js?v=21.3',
+  './scripts/ui/workspaces.js?v=21.3',
+  './scripts/features/create-legacy-view.js?v=21.3',
+  './scripts/features/today.js?v=21.3',
+  './scripts/features/recipes.js?v=21.3',
+  './scripts/features/ingredients.js?v=21.3',
+  './scripts/features/products.js?v=21.3',
+  './scripts/features/planner.js?v=21.3',
+  './scripts/features/library.js?v=21.3',
+  './scripts/features/shopping.js?v=21.3',
+  './scripts/features/data-quality.js?v=21.3',
+  './scripts/features/preferences.js?v=21.3',
   './icon-192.png',
   './icon-512.png',
   './icon-192-maskable.png',
@@ -40,7 +42,7 @@ const PLATEPLAN_OPTIONAL_SHELL = [
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js',
   'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js'
 ];
-let platePlanReloadClientsAfterActivate = false;
+let platePlanActivationRequested = false;
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(PLATEPLAN_CACHE).then(async cache => {
@@ -54,12 +56,17 @@ self.addEventListener('activate', event => {
     caches.keys().then(keys => Promise.all(keys.filter(key => key !== PLATEPLAN_CACHE).map(key => caches.delete(key))))
       .then(() => self.clients.claim())
       .then(async () => {
-        if(!platePlanReloadClientsAfterActivate) return;
         const clients = await self.clients.matchAll({type:'window',includeUncontrolled:true});
-        clients.forEach(client => client.postMessage({type:'PLATEPLAN_UPDATE_ACTIVATED',cacheName:PLATEPLAN_CACHE}));
-        setTimeout(() => {
-          clients.forEach(client => client.navigate(client.url).catch(()=>{}));
-        },1200);
+        const detail = {
+          cacheName: PLATEPLAN_CACHE,
+          appVersion: PLATEPLAN_APP_VERSION,
+          buildId: PLATEPLAN_BUILD_ID,
+          requested: platePlanActivationRequested,
+        };
+        clients.forEach(client => {
+          client.postMessage({type:'PLATEPLAN_UPDATE_ACTIVE',...detail});
+          client.postMessage({type:'PLATEPLAN_UPDATE_ACTIVATED',...detail});
+        });
       })
   );
 });
@@ -85,12 +92,25 @@ self.addEventListener('fetch', event => {
 });
 
 self.addEventListener('message', event => {
-  if(event.data?.type === 'SKIP_WAITING'){
-    platePlanReloadClientsAfterActivate = true;
+  if(event.data?.type === 'PLATEPLAN_ACTIVATE_UPDATE' || event.data?.type === 'SKIP_WAITING'){
+    platePlanActivationRequested = true;
+    if(event.ports?.[0]){
+      event.ports[0].postMessage({
+        type:'PLATEPLAN_ACTIVATION_ACCEPTED',
+        cacheName:PLATEPLAN_CACHE,
+        appVersion:PLATEPLAN_APP_VERSION,
+        buildId:PLATEPLAN_BUILD_ID
+      });
+    }
     event.waitUntil(self.skipWaiting());
   }
-  if(event.data?.type === 'GET_VERSION'){
-    const message={type:'PLATEPLAN_VERSION',cacheName:PLATEPLAN_CACHE};
+  if(event.data?.type === 'PLATEPLAN_GET_VERSION' || event.data?.type === 'GET_VERSION'){
+    const message={
+      type:'PLATEPLAN_VERSION',
+      cacheName:PLATEPLAN_CACHE,
+      appVersion:PLATEPLAN_APP_VERSION,
+      buildId:PLATEPLAN_BUILD_ID
+    };
     if(event.ports?.[0]) event.ports[0].postMessage(message);
     else event.source?.postMessage(message);
   }

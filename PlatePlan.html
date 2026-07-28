@@ -17,10 +17,10 @@ try{
   document.documentElement.style.colorScheme=platePlanAppearance==='system'?'light dark':platePlanAppearance;
 }catch(e){}
 </script>
-<link rel="stylesheet" href="./styles/tokens.css?v=21.2">
-<link rel="stylesheet" href="./styles/components.css?v=21.2">
-<link rel="stylesheet" href="./styles/responsive.css?v=21.2">
-<link rel="stylesheet" href="./styles/print.css?v=21.2" media="print">
+<link rel="stylesheet" href="./styles/tokens.css?v=21.3">
+<link rel="stylesheet" href="./styles/components.css?v=21.3">
+<link rel="stylesheet" href="./styles/responsive.css?v=21.3">
+<link rel="stylesheet" href="./styles/print.css?v=21.3" media="print">
 </head>
 <body>
 <div class="app">
@@ -439,6 +439,20 @@ try{
       <button type="button" data-appearance="light" data-pp-click="setPlatePlanAppearance('light')">Light</button>
       <button type="button" data-appearance="dark" data-pp-click="setPlatePlanAppearance('dark')">Dark</button>
     </div>
+  </div>
+  <div class="card grouped-section plateplan-update-settings">
+    <div class="row-between plateplan-update-settings-head">
+      <div>
+        <h3>Application updates</h3>
+        <p>PlatePlan checks quietly and asks before reopening.</p>
+      </div>
+      <button class="btn ghost" type="button" id="plateplan-check-update" data-pp-click="globalThis.PlatePlanModules?.updates.check({manual:true})">Check for updates</button>
+    </div>
+    <dl class="plateplan-update-meta">
+      <div><dt>Version</dt><dd id="plateplan-update-version">21.3</dd></div>
+      <div><dt>Offline cache</dt><dd id="plateplan-update-cache">plateplan-shell-v22</dd></div>
+      <div><dt>Status</dt><dd id="plateplan-update-status" aria-live="polite">Ready</dd></div>
+    </dl>
   </div>
   <div class="card">
     <h3>Dietary constraints</h3>
@@ -1153,8 +1167,8 @@ try{
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script src="./firebase-config.js"></script>
-<script src="./scripts/plateplan-app.js?v=21.2"></script>
-<script type="module" src="./scripts/main.js?v=21.2"></script>
+<script src="./scripts/plateplan-app.js?v=21.3"></script>
+<script type="module" src="./scripts/main.js?v=21.3"></script>
 
 
 
