@@ -30,6 +30,14 @@ export function normaliseUpdateMarker(raw) {
   }
 }
 
+export function releaseMatches(info, appVersion, expectedCache) {
+  return Boolean(
+    info?.cacheName &&
+    info.cacheName === expectedCache &&
+    (!info.appVersion || info.appVersion === appVersion)
+  );
+}
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, character => ({
     '&': '&amp;',
@@ -259,6 +267,33 @@ export function createUpdateService({
     catch (_error) { return null; }
   };
 
+  const isCurrentRelease = info => releaseMatches(info, appVersion, expectedCache);
+
+  const getInstalledReleaseInfo = async () => {
+    const workers = [
+      navigator.serviceWorker.controller,
+      registration?.active,
+    ].filter((worker, index, all) => worker && all.indexOf(worker) === index);
+    let lastInfo = { appVersion: '', cacheName: '', buildId: '' };
+    for (const worker of workers) {
+      const info = await getWorkerInfo(worker);
+      if (isCurrentRelease(info)) return info;
+      if (info.cacheName) lastInfo = info;
+    }
+    return lastInfo;
+  };
+
+  const finishAlreadyActive = info => {
+    clearTimeout(activationTimer);
+    applying = false;
+    activeCacheName = info?.cacheName || expectedCache;
+    clearMarker();
+    removeBanner();
+    legacy.hideOverlay?.();
+    publish('complete');
+    legacy.showToast?.(`PlatePlan ${appVersion} is installed and ready.`);
+  };
+
   const showFailure = message => {
     clearTimeout(activationTimer);
     applying = false;
@@ -352,9 +387,27 @@ export function createUpdateService({
 
       let worker = registration?.waiting;
       if (!worker) {
+        const activeBeforeCheck = await getInstalledReleaseInfo();
+        if (isCurrentRelease(activeBeforeCheck)) {
+          finishAlreadyActive(activeBeforeCheck);
+          return;
+        }
         publish('checking');
         showOverlayPhase('Checking for the PlatePlan update…', 'This should only take a moment.');
         await registration?.update();
+        worker = registration?.waiting;
+        if (!worker && !registration?.installing) {
+          const activeAfterCheck = await getInstalledReleaseInfo();
+          if (isCurrentRelease(activeAfterCheck)) {
+            finishAlreadyActive(activeAfterCheck);
+            return;
+          }
+          throw new Error(
+            'No downloaded update is waiting. GitHub Pages may still be publishing; close this message and try again in a few minutes.'
+          );
+        }
+      }
+      if (!worker) {
         worker = await waitForWaitingWorker();
       }
 
@@ -493,9 +546,12 @@ export function createUpdateService({
     const targetCache = marker.targetCache || expectedCache;
     const targetVersion = marker.targetVersion || appVersion;
     if (
+      isCurrentRelease(active) ||
+      (
       active.cacheName &&
       (!targetCache || active.cacheName === targetCache) &&
       (!targetVersion || active.appVersion === targetVersion)
+      )
     ) {
       clearMarker();
       removeBanner();
