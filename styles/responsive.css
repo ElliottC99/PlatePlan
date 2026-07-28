@@ -930,3 +930,25 @@ main{max-width:var(--content-max);padding:22px 20px 96px}
   .plan-choice-grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
   .plan-reschedule-appbar h3{font-size:18px}
 }
+
+@media(max-width:599px){
+  .long-workspace{padding:0!important;background:var(--surface)!important}
+  .long-workspace>.modal{width:100%!important;height:100dvh!important;max-height:none!important;margin:0!important;border-radius:0!important}
+  .workspace-appbar{padding:11px 12px}
+  .workspace-scroll{padding:12px 12px 112px}
+  .workspace-actionbar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding-left:12px;padding-right:12px}
+  .workspace-actionbar .btn{min-width:0;width:100%}
+  .use-up-row{grid-template-columns:minmax(0,1fr) minmax(72px,88px);padding:12px 0}
+  .use-up-row .use-up-product{grid-column:1/-1}
+  .use-up-row select{min-width:0}
+  .use-up-row .btn{grid-column:1/-1;width:100%}
+  .use-up-finder-filters{grid-template-columns:1fr}
+  .use-up-product-filter{display:grid}
+  .use-up-result{display:grid;gap:10px;padding:14px 0}
+  .use-up-result .btn-row{display:grid;grid-template-columns:1fr 1fr}
+  .use-up-result .btn{width:100%;min-width:0}
+  .plan-studio-toolbar{grid-template-columns:1fr;padding:10px 12px}
+  .plan-studio-add-date{display:grid;grid-template-columns:1fr auto}
+  .plan-studio-grid{grid-template-columns:1fr}
+  .plan-studio-slot{grid-template-columns:64px minmax(0,1fr)}
+}

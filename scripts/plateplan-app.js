@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='21.1';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v20';
+const PLATEPLAN_APP_VERSION='21.2';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v21';
 const SEED=[];
 
 let state = null;
@@ -468,7 +468,7 @@ function dismissBakedFileState(){
 }
 
 function loadState(){
-  let s = {recipes:[],ingredients:[...SEED],ingredientGroups:[],ingredientFamilies:[],ignoredGroupMergeSuggestions:[],ignoredDataQualityWarnings:[],dataQualityDismissals:{},plan:{},planHistory:[],excluded:{},prefs:{exclude:'mushrooms, courgette',exclusions:{shared:[],elliott:[],chloe:[]},diet:'vegetarian',ecal:2400,eprot:130,ccal:1700,cprot:100, shopGroupBy: 'family', productPriority:'protein'}, customCats:{}};
+  let s = {recipes:[],ingredients:[...SEED],ingredientGroups:[],ingredientFamilies:[],ignoredGroupMergeSuggestions:[],ignoredDataQualityWarnings:[],dataQualityDismissals:{},useUpProducts:{},plan:{},planHistory:[],excluded:{},prefs:{exclude:'mushrooms, courgette',exclusions:{shared:[],elliott:[],chloe:[]},diet:'vegetarian',ecal:2400,eprot:130,ccal:1700,cprot:100, shopGroupBy: 'family', productPriority:'protein',prioritiseUseUpProducts:false}, customCats:{}};
   try{
     const d=localStorage.getItem(SK);
     if(d){
@@ -497,6 +497,7 @@ function loadState(){
   if (!Array.isArray(s.planHistory)) s.planHistory = [];
   if (!Array.isArray(s.ignoredGroupMergeSuggestions)) s.ignoredGroupMergeSuggestions = [];
   if (!Array.isArray(s.ignoredDataQualityWarnings)) s.ignoredDataQualityWarnings = [];
+  if (!s.useUpProducts || typeof s.useUpProducts !== 'object' || Array.isArray(s.useUpProducts)) s.useUpProducts = {};
   if (!s.dataQualityDismissals || typeof s.dataQualityDismissals !== 'object' || Array.isArray(s.dataQualityDismissals)) s.dataQualityDismissals = {};
   if(!s.meta || typeof s.meta !== 'object') s.meta = {};
   s.meta.schemaVersion = +s.meta.schemaVersion || 1;
@@ -513,6 +514,7 @@ function loadState(){
     if(plan && (!plan.slotReasons || typeof plan.slotReasons !== 'object' || Array.isArray(plan.slotReasons))) plan.slotReasons = {};
   });
   if (!s.prefs.productPriority) s.prefs.productPriority = 'protein';
+  s.prefs.prioritiseUseUpProducts = !!s.prefs.prioritiseUseUpProducts;
   if (!s.prefs.planTrafficFilter) s.prefs.planTrafficFilter = 'any';
   if (!Array.isArray(s.prefs.planTrafficE)) s.prefs.planTrafficE = ['green','amber','red'];
   if (!Array.isArray(s.prefs.planTrafficC)) s.prefs.planTrafficC = ['green','amber','red'];
@@ -641,6 +643,7 @@ function platePlanStateProjection(source=state){
   out['plans/history']=cleanCloudValue(source?.planHistory||[]);
   out['settings/shared']=cleanCloudValue({
     prefs:source?.prefs||{},customCats:source?.customCats||{},excluded:source?.excluded||{},
+    useUpProducts:source?.useUpProducts||{},
     ignoredGroupMergeSuggestions:source?.ignoredGroupMergeSuggestions||[],
     ignoredDataQualityWarnings:source?.ignoredDataQualityWarnings||[],
     dataQualityDismissals:source?.dataQualityDismissals||{},packPicks:source?.packPicks||{},meta:source?.meta||{}
@@ -849,7 +852,7 @@ function applyPlatePlanProjectionRecord(key,value,{remote=true}={}){
   }else if(key==='plans/current') state.plan=cleanCloudValue(value||{});
   else if(key==='plans/history') state.planHistory=cleanCloudValue(value||[]);
   else if(key==='settings/shared'&&value){
-    ['prefs','customCats','excluded','ignoredGroupMergeSuggestions','ignoredDataQualityWarnings','dataQualityDismissals','packPicks','meta'].forEach(name=>{
+    ['prefs','customCats','excluded','useUpProducts','ignoredGroupMergeSuggestions','ignoredDataQualityWarnings','dataQualityDismissals','packPicks','meta'].forEach(name=>{
       if(value[name]!==undefined) state[name]=cleanCloudValue(value[name]);
     });
     CAT={...STANDARD_CATS,...(state.customCats||{})};
@@ -1482,6 +1485,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderCatOptions('tp-cat', 'other');
   renderCatOptions('mini-cat', 'other');
   hideLegacyCategoryAndMeatFields();
+  installPackModelSummaryListeners();
   
   document.getElementById('shop-group-by').value = state.prefs.shopGroupBy || 'family';
   if(document.getElementById('plan-product-priority')) document.getElementById('plan-product-priority').value = state.prefs.productPriority || 'protein';
@@ -2465,14 +2469,69 @@ const PRODUCT_PRIORITY_LABELS = {
   cost_per_100: 'Lowest cost per 100g/ml'
 };
 
+function normalisePackMeasure(value,unit,itemAmount=0){
+  const amount=+value||0;
+  const key=String(unit||'g').toLowerCase();
+  if(!amount)return 0;
+  if(key==='g'||key==='ml')return amount;
+  if(key==='kg'||key==='l')return amount*1000;
+  if(key==='qty')return itemAmount>0?amount*itemAmount:0;
+  return toGrams(amount,key,itemAmount||100);
+}
+
+function getProductItemAmount(product){
+  if(!product)return 0;
+  return normalisePackMeasure(product.itemWeight,product.itemWeightUnit||'g');
+}
+
+function getProductGrossPackAmount(product){
+  if(!product)return 0;
+  const itemAmount=getProductItemAmount(product);
+  return normalisePackMeasure(product.packSize,product.packUnit||'g',itemAmount);
+}
+
+function getProductUsablePackAmount(product){
+  if(!product)return 0;
+  const itemAmount=getProductItemAmount(product);
+  const drained=normalisePackMeasure(product.drainedWeight,product.drainedWeightUnit||product.packUnit||'g',itemAmount);
+  return drained>0?drained:getProductGrossPackAmount(product);
+}
+
+function getProductDerivedItemCount(product){
+  const usable=getProductUsablePackAmount(product);
+  const item=getProductItemAmount(product);
+  return usable>0&&item>0?usable/item:0;
+}
+
 function productPackGrams(product){
-  if(!product) return 0;
-  const size = +product.packSize || 0;
-  const unit = product.packUnit || 'g';
-  if(!size) return 0;
-  if(unit === 'qty') return size * (+product.itemWeight || 100);
-  if(unit === 'g' || unit === 'ml') return size;
-  return toGrams(size, unit, +product.itemWeight || 100);
+  return getProductUsablePackAmount(product);
+}
+
+function normaliseLegacyCountedPackOnSave(product){
+  if(!product||String(product.packUnit||'').toLowerCase()!=='qty')return product;
+  const count=+product.packSize||+product.itemCount||0;
+  const item=getProductItemAmount(product);
+  if(count>0&&item>0){
+    product.legacyItemCount=count;
+    product.itemCount=count;
+    product.packSize=Math.round(count*item*1000)/1000;
+    product.packUnit=String(product.itemWeightUnit||'g').toLowerCase()==='ml'?'ml':'g';
+  }
+  return product;
+}
+
+function formatProductPackSummary(product){
+  if(!product)return '';
+  const gross=getProductGrossPackAmount(product);
+  const usable=getProductUsablePackAmount(product);
+  const item=getProductItemAmount(product);
+  const count=getProductDerivedItemCount(product);
+  const unit=(product.drainedWeight?product.drainedWeightUnit:product.packUnit)==='ml'?'ml':'g';
+  if(!gross&&!usable)return 'Add a total pack size to calculate purchasing and cost.';
+  const grossLabel=`${round1(gross)}${unit} pack`;
+  const usableLabel=+product.drainedWeight>0?` · ${round1(usable)}${unit} drained`:'';
+  const itemLabel=item>0?` ÷ ${round1(item)}${unit} each = ${round1(count)} usable item${Math.abs(count-1)<0.001?'':'s'}`:'';
+  return grossLabel+usableLabel+itemLabel;
 }
 
 function isUsableProduct(product){
@@ -2790,6 +2849,32 @@ function formatPackDisplay(size, unit, itemWeight){
     return iw ? `${n} items × ${iw}g = ${Math.round(total * 10) / 10}g` : `${n} items`;
   }
   return `${n}${unit || 'g'}`;
+}
+
+function readPackModelFromEditor(prefix){
+  return {
+    packSize:+document.getElementById(prefix+'-pack')?.value||0,
+    packUnit:document.getElementById(prefix+'-pack-unit')?.value||'g',
+    itemWeight:+document.getElementById(prefix+'-item-weight')?.value||0,
+    itemWeightUnit:document.getElementById(prefix+'-item-weight-unit')?.value||'g',
+    drainedWeight:+document.getElementById(prefix+'-drained-weight')?.value||0,
+    drainedWeightUnit:document.getElementById(prefix+'-drained-weight-unit')?.value||'g'
+  };
+}
+function updatePackModelSummary(prefix){
+  const host=document.getElementById(prefix+'-pack-summary');if(host)host.textContent=formatProductPackSummary(readPackModelFromEditor(prefix));
+}
+function installPackModelSummaryListeners(){
+  ['mi','tp'].forEach(prefix=>['pack','pack-unit','item-weight','item-weight-unit','drained-weight','drained-weight-unit'].forEach(suffix=>{
+    const field=document.getElementById(`${prefix}-${suffix}`);if(field&&!field.dataset.packSummaryBound){field.dataset.packSummaryBound='1';field.addEventListener('input',()=>updatePackModelSummary(prefix));field.addEventListener('change',()=>updatePackModelSummary(prefix));}
+  }));
+}
+function setPackUnitEditorValue(selectId,value,{allowLegacyCount=false}={}){
+  const select=document.getElementById(selectId);if(!select)return;
+  let legacy=[...select.options].find(option=>option.value==='qty');
+  if(allowLegacyCount&&!legacy){legacy=document.createElement('option');legacy.value='qty';legacy.textContent='items (legacy — add item weight)';select.appendChild(legacy);}
+  if(!allowLegacyCount&&legacy)legacy.remove();
+  select.value=allowLegacyCount&&value==='qty'?'qty':(['g','ml'].includes(value)?value:'g');
 }
 
 function getProductProteinPer100Kcal(product){
@@ -3199,7 +3284,7 @@ function ensurePlannerOptionsUI(){
       <div class="planner-quick-actions"><button class="btn primary" onclick="generatePlanFromQuickSetup()">Generate plan</button></div>
     </div>
     <div class="planner-compact-card" id="planner-active-setup" style="display:none">
-      <div class="planner-compact-head"><div><div class="planner-compact-title">Meal planner</div><div class="planner-compact-copy" id="planner-active-copy"></div></div><div class="planner-compact-actions"><button class="btn ghost" onclick="openPlanDatesWorkspace()">Assign dates</button><button class="btn primary" onclick="openPlanOptionsWorkspace()">Edit plan settings</button></div></div>
+      <div class="planner-compact-head"><div><div class="planner-compact-title">Meal planner</div><div class="planner-compact-copy" id="planner-active-copy"></div></div><div class="planner-compact-actions"><button class="btn primary" onclick="openPlanStudio()">Rearrange plan</button><button class="btn ghost" onclick="openPlanDatesWorkspace()">Assign dates</button><button class="btn ghost" onclick="openPlanOptionsWorkspace()">Edit plan settings</button></div></div>
     </div>`;
   planner.insertBefore(compact,legacy);
 
@@ -3211,6 +3296,7 @@ function ensurePlannerOptionsUI(){
     <div class="plan-options-body">
       <section class="plan-options-section"><h3>Plan details</h3><div class="plan-options-grid" id="plan-options-details"></div></section>
       <section class="plan-options-section"><h3>Recipe selection</h3><div class="plan-options-grid" id="plan-options-selection"></div></section>
+      <section class="plan-options-section"><div class="row-between"><div><h3 style="margin:0">Use up products</h3><p style="font-size:12px;color:var(--text2);margin:4px 0 0">Shared stock guidance for generation and Shopping.</p></div><button class="btn sm ghost" type="button" onclick="clearUseUpProducts()">Clear</button></div><div id="use-up-products-editor"></div></section>
       <section class="plan-options-section"><h3>Traffic-light filters</h3><p style="font-size:12px;color:var(--text2);margin-bottom:10px">Choose the fit statuses PlatePlan may use for each person. Symbols keep the controls readable without relying on colour alone.</p><div style="display:grid;gap:10px" id="plan-options-traffic"></div></section>
       <section class="plan-options-section"><h3>Meal slots</h3><div id="plan-options-slots"></div></section>
     </div>
@@ -3235,6 +3321,10 @@ function ensurePlannerOptionsUI(){
   priorityField.appendChild(priority);
   selection.appendChild(priorityField);
   repeats.forEach(label=>{label.style.display='block';label.querySelector('select').style.width='100%';selection.appendChild(label);});
+  const useUpToggle=document.createElement('label');
+  useUpToggle.className='use-up-priority-toggle';
+  useUpToggle.innerHTML='<input type="checkbox" id="plan-prioritise-use-up" onchange="setPrioritiseUseUpProducts(this.checked)"> <span><strong>Prioritise Use up products</strong><small>Keep nutrition, traffic filters, exclusions and variety authoritative.</small></span>';
+  selection.appendChild(useUpToggle);
 
   const trafficHost=wrap.querySelector('#plan-options-traffic');
   traffic.forEach(picker=>trafficHost.appendChild(picker));
@@ -3247,6 +3337,7 @@ function ensurePlannerOptionsUI(){
   enhancePlanTrafficControls();
   setPlanTrafficSelectValues();
   renderPlanTrafficAvailabilitySummary();
+  renderUseUpProductsEditor();
 
   setup.style.display='';
   setup.classList.remove('card');
@@ -3270,6 +3361,7 @@ function generatePlanFromQuickSetup(){
   syncPlannerQuickControls();
   initExcluded(false);
   renderExclGrid();
+  renderUseUpProductsEditor();
   generatePlan();
 }
 
@@ -3513,6 +3605,7 @@ function snapshotCurrentPlan(savedStatus = 'PlatePlan generated', name = ''){
     slotReasons: JSON.parse(JSON.stringify(state.plan.slotReasons || {})),
     productPriority: state.plan.productPriority || state.prefs.productPriority || 'protein',
     productSelections: JSON.parse(JSON.stringify(state.plan.productSelections || {})),
+    useUpProductIds: JSON.parse(JSON.stringify(state.plan.useUpProductIds || [])),
     shoppingAtHome: JSON.parse(JSON.stringify(state.plan.shoppingAtHome || {})),
     overrides: JSON.parse(JSON.stringify(state.overrides || {})),
     score: calculatePlanScore(state.plan),
@@ -4049,6 +4142,136 @@ function getPlannerRecipeOptions(type, who, opts = {}){
   return rows;
 }
 
+let platePlanUseUpCoverageCache=new Map();
+function getUseUpEntries(){
+  return Object.entries(state.useUpProducts||{}).map(([productId,entry])=>({
+    productId,
+    product:getProduct(productId),
+    quantity:+entry?.quantity||0,
+    unit:['g','ml','item','pack','unknown'].includes(entry?.unit)?entry.unit:'unknown'
+  })).filter(entry=>entry.product);
+}
+function getUseUpAvailableAmount(entry){
+  if(!entry||!(entry.quantity>0)||entry.unit==='unknown')return null;
+  if(entry.unit==='pack')return entry.quantity*getProductUsablePackAmount(entry.product);
+  if(entry.unit==='item')return entry.quantity*getProductItemAmount(entry.product);
+  return entry.quantity;
+}
+function getRecipeUseUpCoverage(option,productIds=null){
+  const active=option?.variant==='enhanced'&&option.recipe?.enhanced?{...option.recipe,...option.recipe.enhanced,ingredients:option.recipe.enhanced.ingredients||[]} : option?.recipe;
+  if(!active)return {matches:[],matchedCount:0,otherIngredients:0,score:0};
+  const allowed=productIds?new Set(productIds):null;
+  const entries=getUseUpEntries().filter(entry=>!allowed||allowed.has(entry.productId));
+  const signature=JSON.stringify([active.id||option.id,option.variant||'original',active.ingredients,entries.map(e=>[e.productId,e.quantity,e.unit])]);
+  if(platePlanUseUpCoverageCache.has(signature))return platePlanUseUpCoverageCache.get(signature);
+  const matches=[];
+  const matchedIngredientKeys=new Set();
+  entries.forEach(entry=>{
+    let used=0;
+    (active.ingredients||[]).forEach((ing,index)=>{
+      const groupId=getRecipeIngredientGroupId(ing);
+      if(entry.product.groupId&&groupId===entry.product.groupId){
+        used+=getEffectiveIngredientGrams(ing,entry.product);
+        matchedIngredientKeys.add(index);
+      }
+    });
+    if(used>0){
+      const available=getUseUpAvailableAmount(entry);
+      matches.push({productId:entry.productId,product:entry.product,used,available,remainder:available==null?null:Math.max(0,available-used)});
+    }
+  });
+  const knownUtilisation=matches.reduce((sum,row)=>sum+(row.available>0?Math.min(row.used,row.available)/row.available:0),0);
+  const result={matches,matchedCount:matches.length,otherIngredients:Math.max(0,(active.ingredients||[]).length-matchedIngredientKeys.size),score:matches.length*100+knownUtilisation*35-Math.max(0,(active.ingredients||[]).length-matchedIngredientKeys.size)};
+  platePlanUseUpCoverageCache.set(signature,result);
+  return result;
+}
+function rankPlannerOptionsForUseUp(options,mealType,who,productIds=null){
+  return (options||[]).map(option=>{
+    const baseCoverage=getRecipeUseUpCoverage(option,productIds);
+    const active=option.variant==='enhanced'&&option.recipe?.enhanced?{...option.recipe,...option.recipe.enhanced,ingredients:option.recipe.enhanced.ingredients||[]} : option.recipe;
+    const bundle=calculateRecipeDisplayNutrition({recipe:option.recipe,variant:option.variant,mealType});
+    const portions=bundle?.portions||{};
+    const person=String(who||'').toLowerCase().startsWith('c')?'c':'e';
+    const serves=+active?.serves||+option.recipe?.serves||1;
+    const portionServings=String(who||'').toLowerCase()==='both'?(+portions.eSingleServ||0)+(+portions.cSingleServ||0):(person==='c'?(+portions.cSingleServ||0):(+portions.eSingleServ||0));
+    const portionScale=portionServings>0?portionServings/serves:1;
+    const scaledMatches=baseCoverage.matches.map(match=>{const used=match.used*portionScale;return {...match,used,remainder:match.available==null?null:Math.max(0,match.available-used)};});
+    const knownUtilisation=scaledMatches.reduce((sum,row)=>sum+(row.available>0?Math.min(row.used,row.available)/row.available:0),0);
+    const coverage={...baseCoverage,matches:scaledMatches,score:scaledMatches.length*100+knownUtilisation*35-baseCoverage.otherIngredients};
+    const cal=person==='c'?portions.cCal:portions.eCal;
+    const prot=person==='c'?portions.cProt:portions.eProt;
+    const target=getBudgets(person,mealType);
+    const nutritionFit=calculateFit(cal||0,prot||0,target.cal||1,target.prot||1);
+    return {...option,useUpCoverage:coverage,useUpRank:coverage.score-(nutritionFit.score||0)*12-(option.historyRank||0)*8,active};
+  }).sort((a,b)=>b.useUpRank-a.useUpRank||(a.label||'').localeCompare(b.label||''));
+}
+function applyUseUpSelectionsToPlan(slots,selections){
+  const selected=getUseUpEntries().filter(entry=>isUsableProduct(entry.product));
+  Object.values(slots||{}).forEach(day=>Object.values(day||{}).forEach(slot=>{
+    const info=getPlanSlotInfo(slot);
+    const recipe=info.active;
+    if(!recipe)return;
+    (recipe.ingredients||[]).forEach(ing=>{
+      const groupId=getRecipeIngredientGroupId(ing);
+      const entry=selected.find(item=>item.product.groupId&&item.product.groupId===groupId);
+      if(entry)selections[groupId]=entry.productId;
+    });
+  }));
+  return selections;
+}
+
+function setPrioritiseUseUpProducts(checked){
+  state.prefs.prioritiseUseUpProducts=!!checked&&getUseUpEntries().length>0;
+  saveState();
+  renderUseUpProductsEditor();
+}
+function useUpQuantityLabel(entry){
+  if(!entry||entry.unit==='unknown'||!(+entry.quantity>0))return 'Quantity unknown';
+  const labels={g:'g',ml:'ml',item:' items',pack:' packs'};
+  return `${round1(entry.quantity)}${labels[entry.unit]||''}`;
+}
+function renderUseUpProductsEditor(){
+  const host=document.getElementById('use-up-products-editor');
+  const toggle=document.getElementById('plan-prioritise-use-up');
+  const entries=getUseUpEntries();
+  if(toggle){toggle.checked=!!state.prefs.prioritiseUseUpProducts;toggle.disabled=!entries.length;}
+  if(!host)return;
+  host.innerHTML=`<div class="use-up-add"><div class="mapping-search-container"><input id="use-up-product-search" type="search" placeholder="Search Product Bank…" autocomplete="off" oninput="renderUseUpProductSuggestions(this.value)" onfocus="renderUseUpProductSuggestions(this.value)"><div class="map-dropdown" id="use-up-product-suggestions" style="display:none"></div></div></div>
+    <div class="use-up-list">${entries.length?entries.map(entry=>`<div class="use-up-row"><div class="use-up-product"><strong>${ppEscapeHtml(entry.product.name)}</strong><small>${ppEscapeHtml(getGroupHierarchyText(getIngredientGroup(entry.product.groupId)||{cat:entry.product.cat,name:entry.product.name}))}</small></div><input type="number" min="0" step="0.1" value="${entry.quantity||''}" aria-label="Available quantity for ${ppEscapeAttr(entry.product.name)}" oninput="updateUseUpProduct('${ppEscapeAttr(entry.productId)}','quantity',this.value,false)"><select aria-label="Available unit for ${ppEscapeAttr(entry.product.name)}" onchange="updateUseUpProduct('${ppEscapeAttr(entry.productId)}','unit',this.value,false)">${[['unknown','Unknown'],['g','grams'],['ml','millilitres'],['item','items'],['pack','packs']].map(([value,label])=>`<option value="${value}"${entry.unit===value?' selected':''}>${label}</option>`).join('')}</select><button class="btn sm ghost" type="button" onclick="removeUseUpProduct('${ppEscapeAttr(entry.productId)}')">Remove</button></div>`).join(''):'<div class="empty compact">No products added yet.</div>'}</div>`;
+}
+function renderUseUpProductSuggestions(query=''){
+  const host=document.getElementById('use-up-product-suggestions');if(!host)return;
+  const q=canonicalGroupKey(query);
+  const selected=new Set(Object.keys(state.useUpProducts||{}));
+  const rows=(state.ingredients||[]).filter(product=>!selected.has(product.id)&&(!q||canonicalGroupKey([product.name,product.brand,getProductFamily(product)].join(' ')).includes(q))).slice(0,30);
+  host.innerHTML=rows.map(product=>`<button type="button" class="map-drop-item" onclick="addUseUpProduct('${ppEscapeAttr(product.id)}')"><strong>${ppEscapeHtml(product.name)}</strong><small>${ppEscapeHtml(getGroupHierarchyText(getIngredientGroup(product.groupId)||{cat:product.cat,name:product.name}))}</small></button>`).join('')||'<div class="empty compact">No matching products.</div>';
+  host.style.display='block';
+}
+function addUseUpProduct(productId){
+  if(!getProduct(productId))return;
+  if(!state.useUpProducts)state.useUpProducts={};
+  state.useUpProducts[productId]={quantity:null,unit:'unknown'};
+  saveState();platePlanUseUpCoverageCache.clear();renderUseUpProductsEditor();
+}
+let platePlanUseUpSaveTimer=null;
+function updateUseUpProduct(productId,field,value,rerender=true){
+  const entry=state.useUpProducts?.[productId];if(!entry)return;
+  if(field==='quantity')entry.quantity=+value||null;
+  if(field==='unit')entry.unit=['g','ml','item','pack','unknown'].includes(value)?value:'unknown';
+  platePlanUseUpCoverageCache.clear();
+  clearTimeout(platePlanUseUpSaveTimer);platePlanUseUpSaveTimer=setTimeout(()=>saveState(),180);
+  if(rerender)renderUseUpProductsEditor();
+}
+function removeUseUpProduct(productId){
+  delete state.useUpProducts?.[productId];
+  if(!getUseUpEntries().length)state.prefs.prioritiseUseUpProducts=false;
+  saveState();platePlanUseUpCoverageCache.clear();renderUseUpProductsEditor();
+}
+function clearUseUpProducts(){
+  if(!getUseUpEntries().length)return;
+  openAppConfirmModal('Clear Use up products?','This removes the shared stock guidance. It does not change your Product Bank or active plan.','Clear list',()=>{state.useUpProducts={};state.prefs.prioritiseUseUpProducts=false;saveState();platePlanUseUpCoverageCache.clear();renderUseUpProductsEditor();});
+}
+
 function lockProductSelectionsForSlots(slots, priority){
   const selections = {};
   Object.values(slots || {}).forEach(day => {
@@ -4134,18 +4357,9 @@ function getRecipeIngredientGrams(ing, bankIng){
 }
 
 function getEffectiveIngredientGrams(ing, bankIng){
-  let g = getRecipeIngredientGrams(ing, bankIng);
-  const rawText = (ing?.raw || ing?.name || '').toLowerCase();
-  const alreadyDrained = rawText.includes('drained') || rawText.includes('drained weight') || rawText.includes('after draining');
-  const packSize = +bankIng?.packSize || 0;
-  const drainedWeight = +bankIng?.drainedWeight || 0;
-  if(!alreadyDrained && drainedWeight > 0 && packSize > 0) {
-    let packGrams = packSize;
-    if(bankIng.packUnit === 'qty') packGrams = packSize * (bankIng.itemWeight || drainedWeight || 100);
-    else if(bankIng.packUnit && bankIng.packUnit !== 'g' && bankIng.packUnit !== 'ml') packGrams = toGrams(packSize, bankIng.packUnit, bankIng.itemWeight || 100);
-    if(packGrams > 0) g = g * (drainedWeight / packGrams);
-  }
-  return g;
+  // Recipe weights already describe edible quantity. Drained weight affects
+  // purchasing and cost coverage, never the nutrition quantity a recipe states.
+  return getRecipeIngredientGrams(ing, bankIng);
 }
 
 function round1(n){return Math.round((+n || 0) * 10) / 10;}
@@ -4442,9 +4656,8 @@ function calcRecipeNutrition(structuredIngs,serves,context={}){
     }
     
     if(bankIng.price&&bankIng.packSize){
-      let packGrams = bankIng.packSize;
-      if(bankIng.packUnit === 'qty') packGrams = bankIng.packSize * (bankIng.itemWeight || 100);
-      else if(bankIng.packUnit !== 'g' && bankIng.packUnit !== 'ml') packGrams = toGrams(bankIng.packSize, bankIng.packUnit, bankIng.itemWeight || 100);
+      const packGrams = getProductUsablePackAmount(bankIng);
+      if(packGrams>0)
       cost += (bankIng.price / packGrams) * g;
     }
   }
@@ -4555,6 +4768,7 @@ function renderPlatePlanDependentViews(){
 
 function refreshPlatePlanDerivedState({ persist = false, render = true, changedProductIds = [], changedGroupIds = [], changedRecipeIds = [], full = false } = {}){
   platePlanNutritionCache.clear();
+  platePlanUseUpCoverageCache.clear();
   ensureIngredientGroups();
   ensureIngredientFamilies();
   rebuildPlatePlanIndexes();
@@ -7299,6 +7513,23 @@ function collectDeterministicDataQualityIssues(){
         if(!product.groupId || !getIngredientGroup(product.groupId)) add({entityType:'product',entityId:product.id,code:'missing-hierarchy-link',title:product.name || 'Unnamed product',message:'Product is not linked to a valid ingredient sub-type.',fixButtonHtml:fix,source:[product.groupId,product.cat]});
         const packUnit=String(product.packUnit||'').toLowerCase();
         const itemWeightUnit=String(product.itemWeightUnit||'g').toLowerCase();
+        const drainedUnit=String(product.drainedWeightUnit||packUnit||'g').toLowerCase();
+        const gross=getProductGrossPackAmount(product),usable=getProductUsablePackAmount(product),itemAmount=getProductItemAmount(product),derived=getProductDerivedItemCount(product);
+        if(+product.drainedWeight>0&&packUnit!=='qty'&&drainedUnit!==packUnit){
+            add({entityType:'product',entityId:product.id,code:'incompatible-pack-units',title:product.name||'Unnamed product',message:`Pack size uses ${packUnit}, but drained weight uses ${drainedUnit}. Use matching weight or volume units.`,fixButtonHtml:fix,source:[product.packSize,packUnit,product.drainedWeight,drainedUnit]});
+        }
+        if(+product.itemWeight>0&&packUnit!=='qty'&&itemWeightUnit!==packUnit){
+            add({entityType:'product',entityId:product.id,code:'incompatible-item-unit',title:product.name||'Unnamed product',message:`Pack size uses ${packUnit}, but one item uses ${itemWeightUnit}. Use matching weight or volume units.`,fixButtonHtml:fix,source:[product.packSize,packUnit,product.itemWeight,itemWeightUnit]});
+        }
+        if(+product.drainedWeight>0&&gross>0&&usable>gross){
+            add({entityType:'product',entityId:product.id,code:'drained-over-gross',title:product.name||'Unnamed product',message:'Drained usable content is larger than the gross pack size.',fixButtonHtml:fix,source:[gross,usable,packUnit,drainedUnit]});
+        }
+        if(itemAmount>0&&usable>0&&itemAmount>usable){
+            add({entityType:'product',entityId:product.id,code:'item-over-usable-pack',title:product.name||'Unnamed product',message:'One item is heavier than the usable contents of the entire pack.',fixButtonHtml:fix,source:[itemAmount,usable,itemWeightUnit]});
+        }
+        if(derived>1.05&&Math.abs(derived-Math.round(derived))>0.12){
+            add({entityType:'product',entityId:product.id,code:'implausible-derived-count',title:product.name||'Unnamed product',message:`The usable pack amount implies ${round1(derived)} items. Check total, drained and item weights.`,fixButtonHtml:fix,source:[gross,usable,itemAmount,derived]});
+        }
         if(['g','ml'].includes(packUnit) && packUnit===itemWeightUnit && +product.itemWeight>0 && +product.packSize>0 && +product.itemWeight>+product.packSize){
             add({entityType:'product',entityId:product.id,code:'item-heavier-than-pack',title:product.name || 'Unnamed product',message:`Pack size (${product.packSize}${packUnit}) is smaller than the recorded weight of one item (${product.itemWeight}${itemWeightUnit}). This can produce extreme recipe costs.`,fixButtonHtml:fix,source:[product.packSize,packUnit,product.itemWeight,itemWeightUnit,product.price]});
         }
@@ -7341,9 +7572,7 @@ function collectDeterministicDataQualityIssues(){
                 const product=resolved.product;
                 if(!product?.price||!product.packSize)return;
                 const grams=getEffectiveIngredientGrams(ingredient,product);
-                let packGrams=+product.packSize||0;
-                if(product.packUnit==='qty')packGrams=packGrams*(+product.itemWeight||100);
-                else if(!['g','ml'].includes(product.packUnit))packGrams=toGrams(packGrams,product.packUnit,+product.itemWeight||100);
+                const packGrams=getProductUsablePackAmount(product);
                 if(!(grams>0&&packGrams>0))return;
                 productCosts.set(product.id,(productCosts.get(product.id)||0)+((+product.price/packGrams)*grams/serves));
             });
@@ -7767,6 +7996,96 @@ function renderVault(){
       </div>` : ''}
     </div>`;
   }).join('')+progressiveListButton('vault',totalRecipes,visibleRecipes.length);
+}
+
+let platePlanUseUpFinder={meal:'dinner',who:'both',productIds:[],assign:null};
+function ensureUseUpRecipeFinder(){
+  let wrap=document.getElementById('use-up-finder-wrap');
+  if(wrap)return wrap;
+  wrap=document.createElement('div');wrap.id='use-up-finder-wrap';wrap.className='modal-wrap long-workspace use-up-finder-wrap';
+  wrap.innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-labelledby="use-up-finder-title"><div class="workspace-appbar"><div><h2 id="use-up-finder-title">Use up ingredients</h2><p>Find eligible recipes that make the best use of your shared list.</p></div><button class="btn ghost" type="button" onclick="closeUseUpRecipeFinder()">Close</button></div><div class="workspace-scroll"><div id="use-up-finder-controls"></div><div id="use-up-finder-results"></div></div></div>`;
+  document.body.appendChild(wrap);return wrap;
+}
+function openUseUpRecipeFinder(){
+  if(!getUseUpEntries().length){
+    showView('planner');setTimeout(()=>openPlanOptionsWorkspace(),0);
+    return showPlatePlanToast('Add products to Use up products in Plan options first.');
+  }
+  const wrap=ensureUseUpRecipeFinder();
+  platePlanUseUpFinder.productIds=getUseUpEntries().map(entry=>entry.productId);
+  platePlanLastMobileFocus=document.activeElement;wrap.classList.add('open');markMobileLayerForBack(wrap,'use-up-finder');renderUseUpRecipeFinder();
+}
+function closeUseUpRecipeFinder(fromHistory=false){
+  const wrap=document.getElementById('use-up-finder-wrap');if(!wrap)return;
+  const marked=wrap.dataset.historyEntry==='1';wrap.classList.remove('open');delete wrap.dataset.historyEntry;restoreMobileLayerFocus();if(marked&&!fromHistory)returnFromPlatePlanUiHistory();
+}
+function setUseUpFinderFilter(field,value){
+  if(field==='meal'&&['breakfast','lunch','dinner'].includes(value))platePlanUseUpFinder.meal=value;
+  if(field==='who'&&['Elliott','Chloe','both'].includes(value))platePlanUseUpFinder.who=value;
+  renderUseUpRecipeFinder();
+}
+function toggleUseUpFinderProduct(productId,checked){
+  const set=new Set(platePlanUseUpFinder.productIds||[]);if(checked)set.add(productId);else set.delete(productId);platePlanUseUpFinder.productIds=[...set];renderUseUpRecipeFinder();
+}
+function getUseUpFinderResults(){
+  const meal=platePlanUseUpFinder.meal,who=platePlanUseUpFinder.who;
+  const trafficRules=getPlanTrafficFilterRules();
+  let rows=getPlannerRecipeOptions(meal,who==='both'?'any':who,{applyExclusions:true,trafficRules});
+  if(who==='both')rows=rows.filter(row=>row.recipe?.who==='both'&&recipeAllowedForPerson(row.recipe,'Elliott')&&recipeAllowedForPerson(row.recipe,'Chloe')&&plannerRecipePassesTrafficFilter(row,meal,'Elliott',trafficRules)&&plannerRecipePassesTrafficFilter(row,meal,'Chloe',trafficRules));
+  rows=rows.filter(row=>plannerOptionHasUsableMappings(row,state.prefs.productPriority||'protein'));
+  const allowed=new Set(platePlanUseUpFinder.productIds||[]);
+  return rankPlannerOptionsForUseUp(rows,meal,who==='Chloe'?'Chloe':'Elliott',[...allowed]).filter(row=>row.useUpCoverage.matches.length).sort((a,b)=>b.useUpCoverage.matches.length-a.useUpCoverage.matches.length||b.useUpRank-a.useUpRank);
+}
+function renderUseUpRecipeFinder(){
+  const controls=document.getElementById('use-up-finder-controls'),results=document.getElementById('use-up-finder-results');if(!controls||!results)return;
+  const entries=getUseUpEntries();
+  controls.innerHTML=`<div class="use-up-finder-filters"><label>Meal<select onchange="setUseUpFinderFilter('meal',this.value)">${['breakfast','lunch','dinner'].map(value=>`<option value="${value}"${platePlanUseUpFinder.meal===value?' selected':''}>${toTitleCase(value)}</option>`).join('')}</select></label><label>For<select onchange="setUseUpFinderFilter('who',this.value)">${[['both','Both'],['Elliott','Elliott'],['Chloe','Chloe']].map(([value,label])=>`<option value="${value}"${platePlanUseUpFinder.who===value?' selected':''}>${label}</option>`).join('')}</select></label></div><fieldset class="use-up-product-filter"><legend>Products to match</legend>${entries.map(entry=>`<label><input type="checkbox" ${platePlanUseUpFinder.productIds.includes(entry.productId)?'checked':''} onchange="toggleUseUpFinderProduct('${ppEscapeAttr(entry.productId)}',this.checked)"> ${ppEscapeHtml(entry.product.name)} <small>${ppEscapeHtml(useUpQuantityLabel(entry))}</small></label>`).join('')}</fieldset>`;
+  const rows=getUseUpFinderResults();
+  results.innerHTML=rows.length?`<div class="use-up-result-list">${rows.slice(0,48).map(row=>{
+    const coverage=row.useUpCoverage;
+    const bundle=calculateRecipeDisplayNutrition({recipe:row.recipe,variant:row.variant,mealType:platePlanUseUpFinder.meal});
+    const portions=bundle?.portions||{};
+    const people=platePlanUseUpFinder.who==='both'?`E ${Math.round(portions.eCal||0)} kcal / P${round1(portions.eProt)}g · C ${Math.round(portions.cCal||0)} kcal / P${round1(portions.cProt)}g`:platePlanUseUpFinder.who==='Chloe'?`${Math.round(portions.cCal||0)} kcal / P${round1(portions.cProt)}g`:`${Math.round(portions.eCal||0)} kcal / P${round1(portions.eProt)}g`;
+    const matchText=coverage.matches.map(match=>`${match.product.name}: use about ${formatShoppingBatchAmount(match.used)}${match.remainder==null?'':`, ${formatShoppingBatchAmount(match.remainder)} left`}`).join(' · ');
+    const matchedIds=new Set(coverage.matches.map(match=>match.productId)),unmatched=getUseUpEntries().filter(entry=>platePlanUseUpFinder.productIds.includes(entry.productId)&&!matchedIds.has(entry.productId)).map(entry=>entry.product.name);
+    const trafficPeople=platePlanUseUpFinder.who==='both'?['Elliott','Chloe']:[platePlanUseUpFinder.who];
+    const traffic=trafficPeople.map(person=>`${person} ${toTitleCase(getRecipeVariantTrafficStatus(row,person,platePlanUseUpFinder.meal))}`).join(' · ');
+    return `<article class="use-up-result"><div><h3>${ppEscapeHtml(row.label)}</h3><p><strong>Uses:</strong> ${ppEscapeHtml(matchText)}</p>${unmatched.length?`<p><strong>Not used:</strong> ${ppEscapeHtml(unmatched.join(', '))}</p>`:''}<p>${coverage.otherIngredients} other ingredient${coverage.otherIngredients===1?'':'s'} · ${ppEscapeHtml(people)} · ${ppEscapeHtml(traffic)}</p></div><div class="btn-row"><button class="btn primary" onclick="viewRecipe('${ppEscapeAttr(row.id)}',null,'${row.variant}')">View recipe</button><button class="btn ghost" onclick="openUseUpAssign('${ppEscapeAttr(row.id)}','${row.variant}')">Assign to plan</button></div></article>`;
+  }).join('')}</div>`:'<div class="empty">No eligible recipe uses the selected products with these meal, exclusion and traffic-light settings.</div>';
+}
+function openUseUpAssign(recipeId,variant){
+  if(!state.plan?.slots)return openAppConfirmModal('No active plan','Open Meal Planner to generate or set up an active plan first.','Open Meal Planner',()=>{closeUseUpRecipeFinder();showView('planner');});
+  const recipe=state.recipes.find(item=>item.id===recipeId);if(!recipe)return;
+  platePlanUseUpFinder.assign={recipeId,variant};
+  let wrap=document.getElementById('use-up-assign-wrap');if(!wrap){wrap=document.createElement('div');wrap.id='use-up-assign-wrap';wrap.className='modal-wrap sheet-mobile';document.body.appendChild(wrap);}
+  const days=Array.from({length:+state.plan.days||0},(_,i)=>i+1);
+  wrap.innerHTML=`<div class="modal"><div class="row-between"><h3 style="margin:0">Assign ${ppEscapeHtml(recipe.name)}</h3><button class="btn ghost" onclick="closeUseUpAssign()">Close</button></div><div class="grid2" style="margin-top:14px"><label>Day<select id="use-up-assign-day">${days.map(day=>`<option value="${day}">${ppEscapeHtml(formatPlanDayLabel(state.plan,day,{short:true}))}</option>`).join('')}</select></label><label>For<select id="use-up-assign-person"><option value="E">Elliott</option><option value="C">Chloe</option></select></label><label>Meal<select id="use-up-assign-meal"><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner"${platePlanUseUpFinder.meal==='dinner'?' selected':''}>Dinner</option></select></label></div><div class="btn-row" style="margin-top:14px"><button class="btn primary" onclick="confirmUseUpAssign()">Continue</button></div></div>`;
+  wrap.classList.add('open');
+}
+function closeUseUpAssign(){document.getElementById('use-up-assign-wrap')?.classList.remove('open');}
+let platePlanChoiceAction=null;
+function openAppChoiceModal(title,copy,choices,onChoose){
+  let wrap=document.getElementById('app-choice-wrap');if(!wrap){wrap=document.createElement('div');wrap.id='app-choice-wrap';wrap.className='modal-wrap sheet-mobile';document.body.appendChild(wrap);}
+  platePlanChoiceAction=onChoose;
+  wrap.innerHTML=`<div class="modal"><h3>${ppEscapeHtml(title)}</h3><p>${ppEscapeHtml(copy)}</p><div class="btn-row">${(choices||[]).map((choice,index)=>`<button class="btn ${index===choices.length-1?'danger':'primary'}" onclick="chooseAppChoice('${ppEscapeAttr(choice.value)}')">${ppEscapeHtml(choice.label)}</button>`).join('')}<button class="btn ghost" onclick="closeAppChoiceModal()">Cancel</button></div></div>`;
+  wrap.classList.add('open');
+}
+function chooseAppChoice(value){const action=platePlanChoiceAction;closeAppChoiceModal();if(typeof action==='function')action(value);}
+function closeAppChoiceModal(){document.getElementById('app-choice-wrap')?.classList.remove('open');platePlanChoiceAction=null;}
+function confirmUseUpAssign(mode='review'){
+  const draft=platePlanUseUpFinder.assign;if(!draft)return;
+  const day=+document.getElementById('use-up-assign-day')?.value||0,person=document.getElementById('use-up-assign-person')?.value||'E',meal=document.getElementById('use-up-assign-meal')?.value||'dinner',key=meal+person;
+  const existing=state.plan?.slots?.[day]?.[key];
+  const apply=replace=>{
+    const old=existing;
+    const next=makePlanSlot(draft.recipeId,draft.variant);state.plan.slots[day][key]=next;
+    const info=getPlanSlotInfo(next),ov=getPlanOverride(info.instanceId),coverage=getRecipeUseUpCoverage({id:draft.recipeId,variant:draft.variant,recipe:state.recipes.find(r=>r.id===draft.recipeId)});
+    coverage.matches.filter(match=>platePlanUseUpFinder.productIds.includes(match.productId)).forEach(match=>{if(match.product.groupId)ov.productOverrides[match.product.groupId]=match.productId;});
+    if(replace==='swap'&&old){const empty=Object.entries(state.plan.slots).flatMap(([d,slots])=>Object.keys(slots).filter(k=>!slots[k]).map(k=>({day:+d,key:k}))).find(place=>place.key.endsWith(person));if(empty)state.plan.slots[empty.day][empty.key]=old;}
+    state.plan.confirmedShopping=false;state.plan.mealPrepGroups=[];state.plan.score=calculatePlanScore(state.plan);platePlanNutritionCache.clear();markPlatePlanViewsDirty();saveState();closeUseUpAssign();renderPlan();showPlatePlanToast('Recipe assigned to the active plan.');
+  };
+  if(existing&&mode==='review')return openAppChoiceModal('That slot is occupied','Choose how to apply this suggestion.',[{label:'Swap to an empty slot',value:'swap'},{label:'Replace existing meal',value:'replace'}],value=>apply(value));
+  apply(mode);
 }
 
 function safeFileName(name){
@@ -9428,7 +9747,7 @@ function renderBank(){
     const pricePer100=ing.price&&packInGrams?((ing.price/packInGrams)*100).toFixed(1):null;
     const ppenny=ing.price&&packInGrams?((p*packInGrams/100)/ing.price).toFixed(1):null;
     const pkcal=ing.cal?((p/ing.cal)*100).toFixed(1):null;
-    const formattedPackSize = formatPackDisplay(ing.packSize, ing.packUnit || 'g', ing.itemWeight);
+    const formattedPackSize = formatProductPackSummary(ing);
     const variantLabels = getIngredientPackVariantLabels(ing);
     const group = getIngredientGroup(ing.groupId);
     const isDefaultProduct = group && group.defaultProductId === ing.id;
@@ -10796,7 +11115,7 @@ function showTescoImport(context = null){
   if(document.getElementById('tp-cat')) document.getElementById('tp-cat').value = 'other';
   syncCategorySearchInput('tp-cat');
   if(document.getElementById('tp-storage')) document.getElementById('tp-storage').value = '';
-  if(document.getElementById('tp-pack-unit')) document.getElementById('tp-pack-unit').value = 'qty';
+  setPackUnitEditorValue('tp-pack-unit','g',{allowLegacyCount:false});
   if(document.getElementById('tp-item-weight-unit')) document.getElementById('tp-item-weight-unit').value = 'g';
   if(document.getElementById('tp-drained-weight-unit')) document.getElementById('tp-drained-weight-unit').value = 'g';
   
@@ -11057,8 +11376,11 @@ function extractTescoProduct() {
     const itemWeightGuess = getTescoItemWeightGuess(data, name);
     const realItemCount = +data.itemCount || 0;
     const countablePack = realItemCount > 1 && itemWeightGuess;
-    if(document.getElementById('tp-pack')) document.getElementById('tp-pack').value = countablePack ? realItemCount : (data.packSize || '');
-    if(document.getElementById('tp-pack-unit')) document.getElementById('tp-pack-unit').value = countablePack ? 'qty' : (data.packUnit || 'g');
+    const importedPackUnit=String(data.packUnit||'g').toLowerCase();
+    const importedItemUnit=String(data.itemWeightUnit||'g').toLowerCase()==='ml'?'ml':'g';
+    const totalPackAmount=countablePack&&importedPackUnit==='qty'?realItemCount*itemWeightGuess:(data.packSize||'');
+    if(document.getElementById('tp-pack')) document.getElementById('tp-pack').value = totalPackAmount;
+    setPackUnitEditorValue('tp-pack-unit',countablePack?importedItemUnit:importedPackUnit,{allowLegacyCount:importedPackUnit==='qty'&&!itemWeightGuess});
     
     if(document.getElementById('tp-item-weight')) {
         document.getElementById('tp-item-weight').value = itemWeightGuess;
@@ -11068,6 +11390,7 @@ function extractTescoProduct() {
         document.getElementById('tp-drained-weight').value = data.drainedWeight || '';
     }
     if(document.getElementById('tp-drained-weight-unit')) document.getElementById('tp-drained-weight-unit').value = data.drainedWeightUnit || 'g';
+    updatePackModelSummary('tp');
     
     if(document.getElementById('tp-storage')) document.getElementById('tp-storage').value = storage;
 
@@ -11150,7 +11473,7 @@ function finishTescoImportSelection(pendingTesco, ingredientId, ingredientName, 
 }
 
 function createTescoIngredientFromData(data){
-  return {
+  return normaliseLegacyCountedPackOnSave({
     id:'ing'+Date.now(),
     name: data.name,
     brand: data.brand || '',
@@ -11172,7 +11495,7 @@ function createTescoIngredientFromData(data){
     sourceUrl: data.sourceUrl || null,
     itemCount: data.itemCount || null,
     meatSubstituteFor: null
-  };
+  });
 }
 
 function addTescoPackVariant(match, data){
@@ -11188,7 +11511,7 @@ function addTescoPackVariant(match, data){
         drainedWeightUnit: match.drainedWeightUnit || 'g'
       });
   }
-  match.packOptions.push({
+  match.packOptions.push(normaliseLegacyCountedPackOnSave({
     packSize: data.packSize,
     packUnit: data.packUnit || 'g',
     price: data.price,
@@ -11198,7 +11521,7 @@ function addTescoPackVariant(match, data){
     drainedWeightUnit: data.drainedWeightUnit || 'g',
     sourceUrl: data.sourceUrl || null,
     itemCount: data.itemCount || null
-  });
+  }));
   if(data.drainedWeight) {
     match.drainedWeight = data.drainedWeight;
     match.drainedWeightUnit = data.drainedWeightUnit || 'g';
@@ -11271,7 +11594,7 @@ function saveTescoIngredient(categoryReady=false){
   const newDrainedWeightUnit = document.getElementById('tp-drained-weight-unit')?.value||'g';
   const newSourceUrl = manualAddMode ? null : (window.__lastTescoImport ? window.__lastTescoImport.url : null);
   const newItemCount = newUnit === 'qty' ? newSize : (!manualAddMode && window.__lastTescoImport ? window.__lastTescoImport.itemCount : null);
-  const tescoData = {
+  const tescoData = normaliseLegacyCountedPackOnSave({
     name,
     brand: document.getElementById('tp-brand').value.trim(),
     cat: document.getElementById('tp-cat').value,
@@ -11291,7 +11614,7 @@ function saveTescoIngredient(categoryReady=false){
     notes: document.getElementById('tp-notes').value.trim(),
     sourceUrl: newSourceUrl,
     itemCount: newItemCount
-  };
+  });
 
   if(pendingTesco && pendingTesco.type === 'editIng' && pendingTesco.ingredientId){
       const target = state.ingredients.find(i => i.id === pendingTesco.ingredientId);
@@ -11322,7 +11645,7 @@ function saveTescoIngredient(categoryReady=false){
       return;
   }
 
-  const ing = {
+  const ing = normaliseLegacyCountedPackOnSave({
     id:'ing'+Date.now(),
     name,
     brand: document.getElementById('tp-brand').value.trim(),
@@ -11344,7 +11667,7 @@ function saveTescoIngredient(categoryReady=false){
     sourceUrl: newSourceUrl,
     itemCount: newItemCount,
     meatSubstituteFor: null
-  };
+  });
 
   state.ingredients.push(ing);
   if(pendingTesco?.type === 'subst' && currentSubstContext.groupId) {
@@ -11476,7 +11799,7 @@ function getIngredientPackVariantLabels(ing){
     const key=[size,unit,itemWeight].join('|');
     if(seen.has(key))return;
     seen.add(key);
-    rows.push(formatPackDisplay(size, unit, itemWeight));
+    rows.push(formatProductPackSummary({packSize:size,packUnit:unit,itemWeight,itemWeightUnit:po.itemWeightUnit||'g',drainedWeight:po.drainedWeight,drainedWeightUnit:po.drainedWeightUnit||'g'}));
   };
   addVariant(ing);
   (ing.packOptions||[]).forEach(addVariant);
@@ -11488,9 +11811,8 @@ function formatIngredientPackVariantLabel(po){
   const size = po.packSize ?? po.size;
   const unit = po.packUnit || po.unit || 'g';
   const itemWeight = po.itemWeight || null;
-  let label = formatPackDisplay(size, unit, itemWeight);
+  let label = formatProductPackSummary({packSize:size,packUnit:unit,itemWeight,itemWeightUnit:po.itemWeightUnit||'g',drainedWeight:po.drainedWeight,drainedWeightUnit:po.drainedWeightUnit||'g'});
   if(!label && itemWeight) label = `${itemWeight}g item`;
-  if(po.drainedWeight) label += `${label ? ' · ' : ''}${po.drainedWeight}${po.drainedWeightUnit || 'g'} drained`;
   if(po.price) label += `${label ? ' · ' : ''}£${(+po.price).toFixed(2)}`;
   return label;
 }
@@ -11516,10 +11838,10 @@ function renderIngredientPackVariantsEditor(ing){
     <ul style="margin:6px 0 10px 18px;padding:0;">${rows || '<li>No pack variants saved yet.</li>'}</ul>
     <div class="grid3" style="margin-top:8px;">
       <div><label>Variant size</label><input type="number" id="mi-var-pack" placeholder="400"></div>
-      <div><label>Unit</label><select id="mi-var-unit"><option value="qty">qty</option><option value="g">g</option><option value="ml">ml</option></select></div>
+      <div><label>Total unit</label><select id="mi-var-unit"><option value="g">g</option><option value="ml">ml</option></select></div>
       <div><label>Price (£)</label><input type="number" id="mi-var-price" placeholder="1.25" step="0.01"></div>
-      <div><label>Weight of 1 item</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-item-weight" placeholder="75"><select id="mi-var-item-weight-unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option><option value="qty">qty</option></select></div></div>
-      <div><label>Drained / usable weight</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-drained-weight" placeholder="235"><select id="mi-var-drained-weight-unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option><option value="qty">qty</option></select></div></div>
+      <div><label>Weight / volume of 1 usable item</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-item-weight" placeholder="75"><select id="mi-var-item-weight-unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option></select></div></div>
+      <div><label>Drained weight (usable content)</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-drained-weight" placeholder="235"><select id="mi-var-drained-weight-unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option></select></div></div>
       <div style="display:flex;align-items:flex-end;"><button type="button" class="btn sm secondary" onclick="addManualPackVariant()">Add variant</button></div>
     </div>
   `;
@@ -11539,7 +11861,7 @@ function addManualPackVariant(){
   const drainedWeightUnit = document.getElementById('mi-var-drained-weight-unit')?.value || 'g';
   if(!packSize) return showMsg('mi-msg','Enter a variant pack size first.','error');
   if(!ing.packOptions) ing.packOptions = [];
-  ing.packOptions.push({ packSize, packUnit, price, itemWeight, itemWeightUnit, drainedWeight, drainedWeightUnit });
+  ing.packOptions.push(normaliseLegacyCountedPackOnSave({ packSize, packUnit, price, itemWeight, itemWeightUnit, drainedWeight, drainedWeightUnit }));
   if(drainedWeight && !ing.drainedWeight) {
     ing.drainedWeight = drainedWeight;
     ing.drainedWeightUnit = drainedWeightUnit;
@@ -11610,6 +11932,7 @@ function editIng(id){
   hideLegacyCategoryAndMeatFields();
   const ing=state.ingredients.find(i=>i.id===id);
   if(!ing)return;
+  const packDisplay=normaliseLegacyCountedPackOnSave({...ing});
 
   editIngId=id;
   ensureIngredientModalDetached();
@@ -11626,12 +11949,13 @@ function editIng(id){
   document.getElementById('mi-fibre').value=ing.fibre||'';
   document.getElementById('mi-prot').value=ing.prot||'';
   document.getElementById('mi-price').value=ing.price||'';
-  document.getElementById('mi-pack').value=ing.packSize||'';
-  document.getElementById('mi-pack-unit').value=ing.packUnit||'g';
+  document.getElementById('mi-pack').value=packDisplay.packSize||'';
+  setPackUnitEditorValue('mi-pack-unit',packDisplay.packUnit||'g',{allowLegacyCount:packDisplay.packUnit==='qty'});
   document.getElementById('mi-item-weight').value=ing.itemWeight||'';
   if(document.getElementById('mi-item-weight-unit')) document.getElementById('mi-item-weight-unit').value=ing.itemWeightUnit||'g';
   if(document.getElementById('mi-drained-weight')) document.getElementById('mi-drained-weight').value=ing.drainedWeight||'';
   if(document.getElementById('mi-drained-weight-unit')) document.getElementById('mi-drained-weight-unit').value=ing.drainedWeightUnit||'g';
+  updatePackModelSummary('mi');
   document.getElementById('mi-notes').value=ing.notes||'';
   if(document.getElementById('mi-meatsub')) document.getElementById('mi-meatsub').value=ing.meatSubstituteFor||'';
   ['mi-serving-size','mi-serving-cal','mi-serving-fat','mi-serving-carb','mi-serving-fibre','mi-serving-prot'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -11782,7 +12106,7 @@ function saveManualIng(categoryReady=false){
   if(!categoryReady)return resolveCategoryBeforeProductSave('mi-cat',()=>saveManualIng(true));
   
   const existingIng = editIngId ? state.ingredients.find(x=>x.id===editIngId) : null;
-  const ing={
+  const ing=normaliseLegacyCountedPackOnSave({
     id:editIngId||('ing'+Date.now()),
     name,
     brand:document.getElementById('mi-brand').value.trim(),
@@ -11806,7 +12130,7 @@ function saveManualIng(categoryReady=false){
     packOptions: existingIng ? (existingIng.packOptions || []) : [],
     notes:document.getElementById('mi-notes').value.trim(),
     meatSubstituteFor: existingIng ? (existingIng.meatSubstituteFor || null) : null
-  };
+  });
   
   if(editIngId){
     const i=state.ingredients.findIndex(x=>x.id===editIngId);
@@ -12822,6 +13146,150 @@ function applyPlanReschedule(mode='move'){
   refreshAfterPlanReschedule(`Meal ${mode==='swap'?'swapped':'rescheduled'} to ${destinationLabel}.`);
 }
 
+let platePlanStudioSession=null;
+let platePlanStudioApplyUndo=null;
+function clonePlatePlanValue(value){return JSON.parse(JSON.stringify(value));}
+function planStudioFingerprint(plan){return JSON.stringify(plan||{});}
+function ensurePlanStudio(){
+  let wrap=document.getElementById('plan-studio-wrap');if(wrap)return wrap;
+  wrap=document.createElement('div');wrap.id='plan-studio-wrap';wrap.className='modal-wrap long-workspace plan-studio-wrap';
+  wrap.innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-labelledby="plan-studio-title"><div class="workspace-appbar"><div><h2 id="plan-studio-title">Rearrange plan</h2><p>Stage changes across the full plan, then review their impact before applying.</p></div><button class="btn ghost" onclick="closePlanStudio()">Close</button></div><div class="plan-studio-toolbar" id="plan-studio-toolbar"></div><div class="workspace-scroll"><div id="plan-studio-links"></div><div id="plan-studio-grid"></div><div id="plan-studio-impact"></div></div><div class="workspace-actionbar"><button class="btn ghost" onclick="undoPlanStudioChange()">Undo last</button><button class="btn ghost" onclick="resetPlanStudioDraft()">Reset draft</button><button class="btn primary" onclick="applyPlanStudio()">Apply changes</button></div></div>`;
+  document.body.appendChild(wrap);return wrap;
+}
+function openPlanStudio(){
+  if(!state.plan?.slots)return showPlatePlanToast('Generate a meal plan first.');
+  const wrap=ensurePlanStudio();
+  platePlanStudioSession={basePlan:clonePlatePlanValue(state.plan),baseExcluded:clonePlatePlanValue(state.excluded||{}),draftPlan:clonePlatePlanValue(state.plan),draftExcluded:clonePlatePlanValue(state.excluded||{}),baseFingerprint:planStudioFingerprint(state.plan),baseRevision:+platePlanCloudRevisions['plans/current']||0,selected:null,moveTogether:true,reason:'plans_changed',note:'',changes:[],undo:[],collision:null};
+  platePlanLastMobileFocus=document.activeElement;wrap.classList.add('open');markMobileLayerForBack(wrap,'plan-studio');renderPlanStudio();
+}
+function closePlanStudio(fromHistory=false){
+  const wrap=document.getElementById('plan-studio-wrap');if(!wrap)return;
+  const marked=wrap.dataset.historyEntry==='1';wrap.classList.remove('open');delete wrap.dataset.historyEntry;platePlanStudioSession=null;restoreMobileLayerFocus();if(marked&&!fromHistory)returnFromPlatePlanUiHistory();
+}
+function planStudioDays(){
+  const plan=platePlanStudioSession?.draftPlan;return Object.keys(plan?.slots||{}).map(Number).filter(Number.isFinite).sort((a,b)=>a-b);
+}
+function setPlanStudioReason(value){if(platePlanStudioSession)platePlanStudioSession.reason=PLAN_SLOT_REASON_LABELS[value]?value:'plans_changed';}
+function setPlanStudioNote(value){if(platePlanStudioSession)platePlanStudioSession.note=String(value||'').slice(0,80);}
+function setPlanStudioMoveTogether(value){if(platePlanStudioSession){platePlanStudioSession.moveTogether=!!value;renderPlanStudio();}}
+function selectPlanStudioSlot(day,key){
+  const session=platePlanStudioSession;if(!session)return;
+  const slot=session.draftPlan.slots?.[day]?.[key];
+  if(!session.selected){
+    if(!slot)return showPlatePlanToast('Choose a meal first, then choose its destination.');
+    session.selected={day:+day,key};
+    renderPlanStudio();return;
+  }
+  if(session.selected.day===+day&&session.selected.key===key){session.selected=null;renderPlanStudio();return;}
+  const destination=session.draftPlan.slots?.[day]?.[key]||null;
+  if(destination){
+    session.collision={day:+day,key};
+    renderPlanStudioCollision();return;
+  }
+  stagePlanStudioMove(+day,key,'move');
+}
+function renderPlanStudioCollision(){
+  const session=platePlanStudioSession;if(!session?.collision)return;
+  openAppChoiceModal('Destination occupied','Swap the two meals, or replace the destination meal. The draft remains reversible until Apply changes.',[{label:'Swap meals',value:'swap'},{label:'Replace destination',value:'replace'}],mode=>stagePlanStudioMove(session.collision.day,session.collision.key,mode));
+}
+function planStudioMoveKeys(source){
+  const session=platePlanStudioSession;
+  const keys=[source.key];
+  const counterpart=getPlanSlotCounterpartKey(source.key);
+  if(session.moveTogether&&counterpart&&planSlotsEquivalentInPlan(session.draftPlan,source.day,source.key,counterpart))keys.push(counterpart);
+  return keys;
+}
+function planSlotsEquivalentInPlan(plan,day,key,counterpart){
+  const a=getPlanSlotInfo(plan?.slots?.[day]?.[key],plan),b=getPlanSlotInfo(plan?.slots?.[day]?.[counterpart],plan);
+  if(!a.active||!b.active)return false;
+  const contextA=getPlanContextForInstance(a.instanceId,plan,state.overrides),contextB=getPlanContextForInstance(b.instanceId,plan,state.overrides);
+  return a.id===b.id&&a.variant===b.variant&&JSON.stringify({...contextA,instanceId:null})===JSON.stringify({...contextB,instanceId:null});
+}
+function stagePlanStudioMove(targetDay,targetKey,mode){
+  const session=platePlanStudioSession,source=session?.selected;if(!session||!source)return;
+  if(!session.reason)return showPlatePlanToast('Choose a reason before moving a meal.');
+  session.undo.push({draftPlan:clonePlatePlanValue(session.draftPlan),draftExcluded:clonePlatePlanValue(session.draftExcluded),changes:clonePlatePlanValue(session.changes)});
+  const sourceKeys=planStudioMoveKeys(source);
+  sourceKeys.forEach(sourceKey=>{
+    const suffix=sourceKey.endsWith('C')?'C':'E';
+    const destinationKey=getMealTypeFromSlotKey(targetKey)+suffix;
+    const sourceSlot=session.draftPlan.slots[source.day]?.[sourceKey]||null;
+    const destinationSlot=session.draftPlan.slots[targetDay]?.[destinationKey]||null;
+    if(!sourceSlot)return;
+    if(!session.draftPlan.slots[targetDay])session.draftPlan.slots[targetDay]=emptyPlanDaySlots();
+    session.draftPlan.slots[targetDay][destinationKey]=sourceSlot;
+    if(mode==='swap'&&destinationSlot)session.draftPlan.slots[source.day][sourceKey]=destinationSlot;
+    else session.draftPlan.slots[source.day][sourceKey]=null;
+    const reasonKey=getPlanSlotReasonKey(source.day,sourceKey);
+    if(!session.draftPlan.slotReasons)session.draftPlan.slotReasons={};
+    if(mode==='swap')delete session.draftPlan.slotReasons[reasonKey];
+    else session.draftPlan.slotReasons[reasonKey]={code:session.reason,note:session.note||'',updatedAt:new Date().toISOString()};
+    session.changes.push({mode,sourceDay:source.day,sourceKey,targetDay,destinationKey,replaced:!!destinationSlot,recipe:getPlanSlotInfo(sourceSlot,session.draftPlan).active?.name||'Meal'});
+  });
+  session.selected=null;session.collision=null;renderPlanStudio();
+}
+function undoPlanStudioChange(){
+  const session=platePlanStudioSession,last=session?.undo.pop();if(!last)return showPlatePlanToast('There is no staged change to undo.');
+  session.draftPlan=last.draftPlan;session.draftExcluded=last.draftExcluded;session.changes=last.changes;session.selected=null;renderPlanStudio();
+}
+function resetPlanStudioDraft(){
+  const session=platePlanStudioSession;if(!session)return;
+  session.draftPlan=clonePlatePlanValue(session.basePlan);session.draftExcluded=clonePlatePlanValue(session.baseExcluded);session.changes=[];session.undo=[];session.selected=null;renderPlanStudio();
+}
+function addPlanStudioDate(){
+  const session=platePlanStudioSession,value=document.getElementById('plan-studio-new-date')?.value||'';if(!session||!parsePlanLocalDate(value))return showPlatePlanToast('Choose a valid date.');
+  if(Object.values(session.draftPlan.dayDates||{}).includes(value))return showPlatePlanToast('That date is already in the active plan.');
+  session.undo.push({draftPlan:clonePlatePlanValue(session.draftPlan),draftExcluded:clonePlatePlanValue(session.draftExcluded),changes:clonePlatePlanValue(session.changes)});
+  const oldDays=planStudioDays();const before=oldDays.find(day=>(session.draftPlan.dayDates?.[day]||'')>value);const index=before||((session.draftPlan.days||oldDays.length)+1);
+  const slots={},dates={},excluded={};
+  oldDays.forEach(day=>{const next=day>=index?day+1:day;slots[next]=session.draftPlan.slots[day];if(session.draftPlan.dayDates?.[day])dates[next]=session.draftPlan.dayDates[day];excluded[next]=session.draftExcluded[day]||Object.fromEntries(SLOTS.map(slot=>[slot.key,false]));});
+  const shiftedReasons={};Object.entries(session.draftPlan.slotReasons||{}).forEach(([key,reason])=>{const match=key.match(/^(\d+)\|(.+)$/);if(!match){shiftedReasons[key]=reason;return;}const day=+match[1];shiftedReasons[getPlanSlotReasonKey(day>=index?day+1:day,match[2])]=reason;});
+  slots[index]=emptyPlanDaySlots();dates[index]=value;excluded[index]=Object.fromEntries(SLOTS.map(slot=>[slot.key,false]));
+  session.draftPlan.slots=slots;session.draftPlan.dayDates=dates;session.draftPlan.slotReasons=shiftedReasons;session.draftPlan.days=oldDays.length+1;session.draftExcluded=excluded;
+  session.changes.forEach(change=>{if(change.sourceDay>=index)change.sourceDay++;if(change.targetDay>=index)change.targetDay++;});if(session.selected?.day>=index)session.selected.day++;
+  session.changes.push({mode:'new-date',targetDay:index,recipe:`Added ${formatTodayDateLabel(value)}`});renderPlanStudio();
+}
+function getPlanStudioImpact(){
+  const session=platePlanStudioSession;if(!session)return null;
+  const affected=[...new Set(session.changes.flatMap(change=>[change.sourceDay,change.targetDay]).filter(Boolean))];
+  const nutrition=affected.map(day=>{
+    const totals={E:{cal:0,prot:0},C:{cal:0,prot:0}};
+    Object.entries(session.draftPlan.slots?.[day]||{}).forEach(([key,slot])=>{const info=getPlanSlotInfo(slot,session.draftPlan);if(!info.active)return;const n=getPlannedSlotNutrition(info.active,key,info.instanceId,session.draftPlan);const person=key.endsWith('C')?'C':'E';totals[person].cal+=+n?.cal||0;totals[person].prot+=+n?.prot||0;});
+    return {day,totals};
+  });
+  const empty=affected.reduce((sum,day)=>sum+Object.values(session.draftPlan.slots?.[day]||{}).filter(value=>!value).length,0);
+  return {affected,nutrition,empty,prepBefore:findMealPrepSuggestions(session.basePlan).length,prepAfter:findMealPrepSuggestions(session.draftPlan).length};
+}
+function renderPlanStudio(){
+  const session=platePlanStudioSession;if(!session)return;
+  const toolbar=document.getElementById('plan-studio-toolbar'),links=document.getElementById('plan-studio-links'),grid=document.getElementById('plan-studio-grid'),impact=document.getElementById('plan-studio-impact');if(!toolbar||!grid)return;
+  const counterpart=session.selected?getPlanSlotCounterpartKey(session.selected.key):'',canTogether=!!(session.selected&&counterpart&&planSlotsEquivalentInPlan(session.draftPlan,session.selected.day,session.selected.key,counterpart));
+  toolbar.innerHTML=`<label>Reason for emptied slots<select onchange="setPlanStudioReason(this.value)">${Object.entries(PLAN_SLOT_REASON_LABELS).map(([value,label])=>`<option value="${value}"${session.reason===value?' selected':''}>${ppEscapeHtml(label)}</option>`).join('')}</select></label><label>Optional note<input maxlength="80" value="${ppEscapeAttr(session.note||'')}" oninput="setPlanStudioNote(this.value)"></label><div class="plan-studio-add-date"><input id="plan-studio-new-date" type="date" aria-label="Add date outside current plan"><button class="btn ghost" onclick="addPlanStudioDate()">Add date</button></div>${canTogether?`<label class="plan-studio-together"><input type="checkbox" ${session.moveTogether?'checked':''} onchange="setPlanStudioMoveTogether(this.checked)"> Move equivalent Elliott and Chloe meals together</label>`:''}`;
+  const days=planStudioDays();const today=getPlatePlanLocalToday();
+  links.innerHTML=`<nav class="plan-studio-links" aria-label="Plan dates">${days.map(day=>`<a href="#plan-studio-day-${day}" class="${session.draftPlan.dayDates?.[day]===today?'today':''}">${ppEscapeHtml(formatPlanDayLabel(session.draftPlan,day,{short:true}))}</a>`).join('')}</nav>`;
+  grid.innerHTML=`<div class="plan-studio-grid">${days.map(day=>`<section class="plan-studio-day" id="plan-studio-day-${day}"><h3>${ppEscapeHtml(formatPlanDayLabel(session.draftPlan,day,{short:true}))}</h3>${['breakfast','lunch','dinner'].map(meal=>`<div class="plan-studio-meal"><strong>${toTitleCase(meal)}</strong>${['E','C'].map(person=>{const key=meal+person,info=getPlanSlotInfo(session.draftPlan.slots?.[day]?.[key],session.draftPlan),selected=session.selected?.day===day&&session.selected?.key===key;return `<button class="plan-studio-slot ${selected?'selected':''} ${info.active?'filled':'empty'}" aria-pressed="${selected}" onclick="selectPlanStudioSlot(${day},'${key}')"><span>${person==='E'?'Elliott':'Chloe'}</span><strong>${ppEscapeHtml(info.active?.name||'Empty')}</strong>${info.variant==='enhanced'?'<small>Enhanced</small>':''}</button>`;}).join('')}</div>`).join('')}</section>`).join('')}</div>`;
+  const summary=getPlanStudioImpact();
+  impact.innerHTML=`<section class="plan-studio-impact"><h3>Impact review</h3>${session.changes.length?`<ul>${session.changes.map(change=>`<li><strong>${ppEscapeHtml(toTitleCase(change.mode.replace('-',' ')))}</strong> · ${ppEscapeHtml(change.recipe)}${change.sourceDay?` · ${ppEscapeHtml(formatPlanDayLabel(session.draftPlan,change.sourceDay,{short:true}))} → ${ppEscapeHtml(formatPlanDayLabel(session.draftPlan,change.targetDay,{short:true}))}`:''}</li>`).join('')}</ul><div class="plan-studio-nutrition">${summary.nutrition.map(row=>`<div><strong>${ppEscapeHtml(formatPlanDayLabel(session.draftPlan,row.day,{short:true}))}</strong><span>Elliott ${Math.round(row.totals.E.cal)} kcal / P${round1(row.totals.E.prot)}g</span><span>Chloe ${Math.round(row.totals.C.cal)} kcal / P${round1(row.totals.C.prot)}g</span></div>`).join('')}</div><p>${summary.empty} empty selected-person slots across affected days. Meal-prep groupings: ${summary.prepBefore} → ${summary.prepAfter}.</p><div class="msg warn">Shopping will recalculate after moved, swapped or replaced meals are applied.</div>`:'<div class="empty compact">Tap a meal, then tap its destination. No active-plan data changes until Apply changes.</div>'}</section>`;
+}
+function applyPlanStudio(){
+  const session=platePlanStudioSession;if(!session||!session.changes.length)return showPlatePlanToast('Stage at least one change first.');
+  const revision=+platePlanCloudRevisions['plans/current']||0;
+  if(revision!==session.baseRevision||planStudioFingerprint(state.plan)!==session.baseFingerprint)return openAppInfoModal('Plan changed on another device','Your draft has been preserved, but the active plan changed after Plan Studio opened. Close and reopen Plan Studio to review against the latest plan before applying.');
+  runWithRecoveryPoint('Before applying Plan Studio changes',()=>{
+    platePlanStudioApplyUndo={plan:clonePlatePlanValue(state.plan),excluded:clonePlatePlanValue(state.excluded||{})};
+    state.plan=clonePlatePlanValue(session.draftPlan);state.excluded=clonePlatePlanValue(session.draftExcluded);state.plan.confirmedShopping=false;state.plan.mealPrepGroups=[];state.plan.declinedMealPrepGroups=[];state.plan.score=calculatePlanScore(state.plan);
+    platePlanNutritionCache.clear();markPlatePlanViewsDirty();saveState();closePlanStudio();renderPlan();if(document.getElementById('view-today')?.classList.contains('active'))renderToday();showPlatePlanToast('Plan changes applied. Undo is available from the planner.');renderPlanStudioUndoBanner();
+  });
+}
+function renderPlanStudioUndoBanner(){
+  const host=document.getElementById('plan-warnings');if(!host||!platePlanStudioApplyUndo)return;
+  host.innerHTML=`<div class="msg success">Plan Studio changes applied. <button class="btn sm ghost" onclick="undoAppliedPlanStudio()">Undo</button></div>`;
+}
+function undoAppliedPlanStudio(){
+  if(!platePlanStudioApplyUndo)return;
+  state.plan=platePlanStudioApplyUndo.plan;state.excluded=platePlanStudioApplyUndo.excluded;platePlanStudioApplyUndo=null;platePlanNutritionCache.clear();markPlatePlanViewsDirty();saveState();renderPlan();if(document.getElementById('view-today')?.classList.contains('active'))renderToday();showPlatePlanToast('Plan Studio changes undone.');
+}
+
 function initExcluded(persist=true){
   ensurePlannerShell();
   const days=parseInt(document.getElementById('plan-days').value)||9;
@@ -12925,6 +13393,7 @@ function generatePlan(){
   }
   const priority = document.getElementById('plan-product-priority')?.value || state.prefs.productPriority || 'protein';
   const trafficRules=getPlanTrafficFilterRules();
+  const prioritiseUseUp=!!state.prefs.prioritiseUseUpProducts&&getUseUpEntries().length>0;
   const usedInNewPlan = new Set();
   const choose = (type, who, shared=false) => {
     let p = getPlannerRecipeOptions(type, shared ? 'any' : who, { applyExclusions:true, avoidHistory:true, trafficRules });
@@ -12933,7 +13402,8 @@ function generatePlan(){
     let fresh = p.filter(opt => !usedInNewPlan.has(opt.id));
     if(!fresh.length) fresh = p;
     if(!fresh.length && !shared) fresh = getPlannerRecipeOptions(type, who, { applyExclusions:true, trafficRules }).filter(option=>plannerOptionHasUsableMappings(option,priority));
-    const picked = fresh[Math.floor(Math.random() * fresh.length)] || null;
+    if(prioritiseUseUp)fresh=rankPlannerOptionsForUseUp(fresh,type,shared?'both':who);
+    const picked = prioritiseUseUp?(fresh[0]||null):(fresh[Math.floor(Math.random() * fresh.length)] || null);
     if(picked) usedInNewPlan.add(picked.id);
     return picked;
   };
@@ -13002,6 +13472,7 @@ function generatePlan(){
   }));
 
   let productSelections = lockProductSelectionsForSlots(slots, priority);
+  if(prioritiseUseUp)productSelections=applyUseUpSelectionsToPlan(slots,productSelections);
   const blockers = findProductResolutionBlockersForSlots(slots, productSelections);
   if(blockers.length){
     Object.entries(slots).forEach(([day,daySlots])=>Object.entries(daySlots).forEach(([key,slot])=>{
@@ -13015,6 +13486,7 @@ function generatePlan(){
       }
     }));
     productSelections=lockProductSelectionsForSlots(slots,priority);
+    if(prioritiseUseUp)productSelections=applyUseUpSelectionsToPlan(slots,productSelections);
   }
   const remainingUnresolved=unresolved.filter(item=>!slots[item.day]?.[item.key]);
   const filled=selectedSlots.filter(item=>slots[item.day]?.[item.key]).length;
@@ -13031,7 +13503,7 @@ function generatePlan(){
   state.prefs.mealRepeatCadence = cadence;
   state.prefs.planTrafficE = trafficRules.e;
   state.prefs.planTrafficC = trafficRules.c;
-  const nextPlan = {days,slots,dayDates,slotReasons:{},productPriority:priority,trafficFilter:{ e: state.prefs.planTrafficE, c: state.prefs.planTrafficC },mealRepeatCadence:cadence,productSelections,shoppingAtHome:{},warnings:warningMessages,score:null,confirmedShopping:false,mealPrepGroups:[],declinedMealPrepGroups:[]};
+  const nextPlan = {days,slots,dayDates,slotReasons:{},productPriority:priority,trafficFilter:{ e: state.prefs.planTrafficE, c: state.prefs.planTrafficC },mealRepeatCadence:cadence,productSelections,useUpProductIds:prioritiseUseUp?getUseUpEntries().map(entry=>entry.productId):[],shoppingAtHome:{},warnings:warningMessages,score:null,confirmedShopping:false,mealPrepGroups:[],declinedMealPrepGroups:[]};
   nextPlan.score = calculatePlanScore(nextPlan);
   platePlanEarlierDaysExpanded = false;
   state.plan = nextPlan;
@@ -13451,6 +13923,7 @@ function loadPlanHistoryForEdit(index){
         slotReasons: JSON.parse(JSON.stringify(p.slotReasons || {})),
         productPriority: p.productPriority || state.prefs.productPriority || 'protein',
         productSelections: JSON.parse(JSON.stringify(p.productSelections || {})),
+        useUpProductIds: JSON.parse(JSON.stringify(p.useUpProductIds || [])),
         shoppingAtHome: JSON.parse(JSON.stringify(p.shoppingAtHome || {})),
         warnings: [],
         score: calculatePlanScore({ days:p.days, slots:p.slots, productSelections:p.productSelections }),
@@ -13526,9 +13999,10 @@ function getPackVariants(baseIng) {
     }
     let uniq = [];
     options.forEach(opt => {
-        const grossG = (opt.unit !== 'g' && opt.unit !== 'ml') ? toGrams(opt.size, opt.unit, opt.itemWeight||100) : (+opt.size || 0);
-        const drainedG = +opt.drainedWeight > 0 ? toGrams(+opt.drainedWeight, opt.drainedWeightUnit || 'g', opt.itemWeight || 100) : 0;
-        const g = drainedG || grossG;
+        const model={packSize:opt.size,packUnit:opt.unit,itemWeight:opt.itemWeight,itemWeightUnit:opt.itemWeightUnit||'g',drainedWeight:opt.drainedWeight,drainedWeightUnit:opt.drainedWeightUnit||'g'};
+        const grossG = getProductGrossPackAmount(model);
+        const drainedG = +opt.drainedWeight > 0 ? getProductUsablePackAmount(model) : 0;
+        const g = getProductUsablePackAmount(model);
         if (g > 0 && opt.price > 0 && !uniq.some(uo => uo.g === g && uo.price === opt.price)) {
             uniq.push({ ...opt, g, grossG, drainedG, key: `${g}|${opt.price}` });
         }
@@ -14022,6 +14496,26 @@ function renderShopping(){
       });
     });
   }
+
+  const requiredAgg={};
+  Object.entries(agg).forEach(([key,item])=>{requiredAgg[key]={...item,allocations:[...(item.allocations||[])]};});
+  const useUpByProduct=new Map(getUseUpEntries().map(entry=>[entry.productId,entry]));
+  Object.values(agg).forEach(item=>{
+    item.requiredGrams=item.grams;
+    item.toBuyGrams=item.grams;
+    item.useUpAvailable=null;
+    item.useUpUsed=0;
+    item.useUpRemainder=null;
+    const entry=useUpByProduct.get(item.bankId);
+    const available=getUseUpAvailableAmount(entry);
+    if(available==null)return;
+    item.useUpAvailable=available;
+    item.useUpUsed=Math.min(item.requiredGrams,available);
+    item.useUpRemainder=Math.max(0,available-item.requiredGrams);
+    item.toBuyGrams=Math.max(0,item.requiredGrams-available);
+    item.grams=item.toBuyGrams;
+    if(!item.mixedUnits&&item.needQty>0&&item.requiredGrams>0)item.needQty*=item.toBuyGrams/item.requiredGrams;
+  });
   
   const groupedData = {};
   if(groupMode === 'family') {
@@ -14042,7 +14536,7 @@ function renderShopping(){
   const staleShoppingKeys=Object.keys(state.plan.shoppingAtHome).filter(key=>!validShoppingKeys.has(key));
   if(staleShoppingKeys.length){staleShoppingKeys.forEach(key=>delete state.plan.shoppingAtHome[key]);saveState();}
   const buyableAgg=Object.fromEntries(Object.entries(agg).filter(([key])=>!state.plan.shoppingAtHome[key]));
-  const allPriceSummary = calculateShoppingPriceFromAggregates(agg);
+  const allPriceSummary = calculateShoppingPriceFromAggregates(requiredAgg);
   const priceSummary = calculateShoppingPriceFromAggregates(buyableAgg);
   estimatedTotal = priceSummary.estimatedTotal;
   consumedTotal = allPriceSummary.consumedTotal;
@@ -14057,6 +14551,7 @@ function renderShopping(){
           let displayName = it.name;
           const productLabel = it.productName && it.productName !== it.name ? ` <span style="color:var(--text3);font-size:12px;font-weight:normal;">(${ppEscapeHtml(it.productName)})</span>` : '';
           const needLabel = formatShoppingNeed(it);
+          const stockLabel=it.useUpAvailable==null?'':`<span class="shop-use-up"><strong>Use-up stock:</strong> required ${formatShoppingBatchAmount(it.requiredGrams)} · available ${formatShoppingBatchAmount(it.useUpAvailable)} · planned use ${formatShoppingBatchAmount(it.useUpUsed)} · remaining ${formatShoppingBatchAmount(it.useUpRemainder)} · to buy ${formatShoppingBatchAmount(it.toBuyGrams)}</span>`;
           if(isFreshGarlicIngredient({ name: it.name }, { name: it.productName }) && it.grams) {
               const totalCloves = Math.round(it.grams / 6);
               const heads = Math.floor(totalCloves / 11);
@@ -14102,7 +14597,7 @@ function renderShopping(){
           <details class="shop-item-details" data-shopping-key="${ppEscapeAttr(it.key)}" data-at-home="${isAtHome?'true':'false'}" style="padding:6px 0; border-bottom:1px solid var(--border);">
               <summary class="shop-item-summary" style="font-size:13px; cursor:pointer; outline:none; font-weight:500;">
                   <input class="shop-home-check" type="checkbox" ${isAtHome?'checked':''} aria-label="${ppEscapeAttr(isAtHome?'Remove '+displayName+' from Already have':'Mark '+displayName+' as already at home')}" onclick="event.stopPropagation()" onchange="event.stopPropagation();setShoppingAtHome('${ppEscapeAttr(it.key)}',this.checked)">
-                  <span class="shop-item-copy">${ppEscapeHtml(displayName)}${productLabel}<span class="shop-need">Need ${needLabel}</span></span>
+                  <span class="shop-item-copy" data-copy="${ppEscapeAttr(`${displayName} — ${it.useUpAvailable!=null?'To buy':'Need'} ${needLabel}`)}">${ppEscapeHtml(displayName)}${productLabel}<span class="shop-need">${it.useUpAvailable!=null?'To buy':'Need'} ${needLabel}</span>${stockLabel}</span>
                   <span style="font-size:12px;color:var(--text3);" aria-hidden="true">⌄</span>
               </summary>
               <div style="padding-left:15px; margin-top:5px; font-size:12px; color:var(--text2);">
@@ -14498,7 +14993,8 @@ function downloadSavedPlanPack(index){
 function copyList(){
   const items=document.querySelectorAll('#shop-content .shop-item-details[data-at-home="false"] .shop-item-copy');
   if(!items.length)return openAppInfoModal('Shopping list','Everything is currently marked as already at home.');
-  const text=Array.from(items).map(i=>'- '+i.innerText.trim().replace(/\s+/g,' ')).join('\n');
+  const text=Array.from(items).filter(i=>!/\bTo buy 0(?:g|ml)\b/i.test(i.dataset.copy||'')).map(i=>'- '+(i.dataset.copy||i.innerText).trim().replace(/\s+/g,' ')).join('\n');
+  if(!text)return openAppInfoModal('Shopping list','Use-up stock and Already have selections cover everything on this list.');
   navigator.clipboard.writeText(text).then(()=>showPlatePlanToast('Shopping list copied.')).catch(()=>openAppInfoModal('Copy failed','PlatePlan could not access the clipboard. Please select and copy the list manually.'));
 }
 
@@ -14954,6 +15450,7 @@ function savePrefs(){
   }
 
   state.prefs={
+    ...state.prefs,
     exclude:document.getElementById('pref-exclude').value,
     exclusions: state.prefs.exclusions || {shared:[],elliott:[],chloe:[]},
     diet:document.getElementById('pref-diet').value,

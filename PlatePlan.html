@@ -17,10 +17,10 @@ try{
   document.documentElement.style.colorScheme=platePlanAppearance==='system'?'light dark':platePlanAppearance;
 }catch(e){}
 </script>
-<link rel="stylesheet" href="./styles/tokens.css?v=21.1">
-<link rel="stylesheet" href="./styles/components.css?v=21.1">
-<link rel="stylesheet" href="./styles/responsive.css?v=21.1">
-<link rel="stylesheet" href="./styles/print.css?v=21.1" media="print">
+<link rel="stylesheet" href="./styles/tokens.css?v=21.2">
+<link rel="stylesheet" href="./styles/components.css?v=21.2">
+<link rel="stylesheet" href="./styles/responsive.css?v=21.2">
+<link rel="stylesheet" href="./styles/print.css?v=21.2" media="print">
 </head>
 <body>
 <div class="app">
@@ -100,6 +100,7 @@ try{
   <div class="view-toolbar">
     <h2 style="margin:0">Recipe vault</h2>
     <div class="vault-filters">
+      <button class="btn primary" type="button" data-pp-click="openUseUpRecipeFinder()">Use up ingredients</button>
       <input type="search" id="vault-search" placeholder="Search recipes..." data-pp-input="schedulePlatePlanListRender('vault')" style="width:220px;font-size:12px">
       <select id="vault-sort" data-pp-change="renderVault()" style="width:auto;font-size:12px">
         <option value="name">Name A-Z</option>
@@ -573,39 +574,37 @@ try{
       <div class="grid3">
         <div><label>Price per pack (£)</label><input type="number" id="tp-price" placeholder="0" step="0.01"></div>
         <div>
-          <label>Pack size</label>
+          <label>Total pack size</label>
           <div style="display:flex;gap:5px">
             <input type="number" id="tp-pack" placeholder="500">
             <select id="tp-pack-unit" style="width:70px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
               <option value="g">g</option>
               <option value="ml">ml</option>
-              <option value="qty">qty</option>
             </select>
           </div>
         </div>
         <div>
-          <label>Weight of 1 item</label>
+          <label>Weight / volume of 1 usable item</label>
           <div style="display:flex;gap:5px">
             <input type="number" id="tp-item-weight" placeholder="e.g. 75">
             <select id="tp-item-weight-unit" style="width:70px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
               <option value="g">g</option>
               <option value="ml">ml</option>
-              <option value="qty">qty</option>
             </select>
           </div>
         </div>
         <div>
-          <label>Drained / usable weight</label>
+          <label>Drained weight (usable content)</label>
           <div style="display:flex;gap:5px">
             <input type="number" id="tp-drained-weight" placeholder="e.g. 235">
             <select id="tp-drained-weight-unit" style="width:70px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
               <option value="g">g</option>
               <option value="ml">ml</option>
-              <option value="qty">qty</option>
             </select>
           </div>
         </div>
       </div>
+      <div id="tp-pack-summary" class="pack-model-summary" aria-live="polite"></div>
         <div class="field" style="display: none;"><label>Meat substitute for (optional)<input type="text" id="tp-meatsub" placeholder="e.g. mince, chicken, bacon"></label></div>
       <div class="field"><label>Notes</label><input type="text" id="tp-notes" placeholder="e.g. Found in freezer aisle"></div>
       <div class="btn-row" style="margin-top:4px">
@@ -1154,8 +1153,8 @@ try{
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script src="./firebase-config.js"></script>
-<script src="./scripts/plateplan-app.js?v=21.1"></script>
-<script type="module" src="./scripts/main.js?v=21.1"></script>
+<script src="./scripts/plateplan-app.js?v=21.2"></script>
+<script type="module" src="./scripts/main.js?v=21.2"></script>
 
 
 
@@ -1183,49 +1182,47 @@ try{
     <div class="grid3">
       <div><label>Price per pack (£)</label><input type="number" id="mi-price" placeholder="2.50" step="0.01"></div>
       <div>
-        <label>Pack size</label>
+        <label>Total pack size</label>
         <div style="display:flex; gap:5px;">
           <input type="number" id="mi-pack" placeholder="500">
           <select id="mi-pack-unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
             <option value="g">g</option>
             <option value="ml">ml</option>
-            <option value="qty">qty</option>
           </select>
         </div>
       </div>
             <div>
-        <label>Weight of 1 item</label>
+        <label>Weight / volume of 1 usable item</label>
         <div style="display:flex; gap:5px;">
           <input type="number" id="mi-item-weight" placeholder="e.g. 75">
           <select id="mi-item-weight-unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
             <option value="g">g</option>
             <option value="ml">ml</option>
-            <option value="qty">qty</option>
           </select>
         </div>
       </div>
       <div>
-        <label>Drained / usable weight</label>
+        <label>Drained weight (usable content)</label>
         <div style="display:flex; gap:5px;">
           <input type="number" id="mi-drained-weight" placeholder="e.g. 235">
           <select id="mi-drained-weight-unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
             <option value="g">g</option>
             <option value="ml">ml</option>
-            <option value="qty">qty</option>
           </select>
         </div>
       </div>
     </div>
+    <div id="mi-pack-summary" class="pack-model-summary" aria-live="polite"></div>
         <div class="field" style="display: none;"><label>Meat substitute for (optional)<input type="text" id="mi-meatsub" placeholder="e.g. mince, chicken, bacon"></label></div>
     <div id="mi-pack-variants" style="display: block; margin: 8px 0px 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); font-size: 12px; color: var(--text2);">
     <strong>Available Tesco Variants</strong>
     <ul style="margin:6px 0 10px 18px;padding:0;"><li style="margin:3px 0;"><span>4 items × 95g = 380g · £0.86</span> <span class="tag">Current pack</span></li></ul>
     <div class="grid3" style="margin-top:8px;">
       <div><label>Variant size</label><input type="number" id="mi-var-pack" placeholder="400"></div>
-      <div><label>Unit</label><select id="mi-var-unit"><option value="qty">qty</option><option value="g">g</option><option value="ml">ml</option></select></div>
+      <div><label>Total unit</label><select id="mi-var-unit"><option value="g">g</option><option value="ml">ml</option></select></div>
       <div><label>Price (£)</label><input type="number" id="mi-var-price" placeholder="1.25" step="0.01"></div>
-      <div><label>Weight of 1 item</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-item-weight" placeholder="75"><select id="mi-var-item-weight-unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option><option value="qty">qty</option></select></div></div>
-      <div><label>Drained / usable weight</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-drained-weight" placeholder="235"><select id="mi-var-drained-weight-unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option><option value="qty">qty</option></select></div></div>
+      <div><label>Weight / volume of 1 usable item</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-item-weight" placeholder="75"><select id="mi-var-item-weight-unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option></select></div></div>
+      <div><label>Drained weight (usable content)</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-drained-weight" placeholder="235"><select id="mi-var-drained-weight-unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option></select></div></div>
       <div style="display:flex;align-items:flex-end;"><button type="button" class="btn sm secondary" data-pp-click="addManualPackVariant()">Add variant</button></div>
     </div>
   </div>

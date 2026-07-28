@@ -1,4 +1,4 @@
-import { validatePlatePlanState } from './contracts.js?v=21.1';
+import { validatePlatePlanState } from './contracts.js?v=21.2';
 
 /**
  * Small observable adapter around PlatePlan's existing local-first state.
