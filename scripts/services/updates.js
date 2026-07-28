@@ -78,6 +78,7 @@ export function createUpdateService({
   let lastCheckAt = 0;
   let activeCacheName = '';
   let verifyingController = false;
+  let failureCount = 0;
   try { lastCheckAt = Number(localStorage.getItem(UPDATE_LAST_CHECK_KEY)) || 0; } catch (_error) {}
   const subscribers = new Set();
 
@@ -287,6 +288,7 @@ export function createUpdateService({
     clearTimeout(activationTimer);
     applying = false;
     activeCacheName = info?.cacheName || expectedCache;
+    failureCount = 0;
     clearMarker();
     removeBanner();
     legacy.hideOverlay?.();
@@ -297,19 +299,26 @@ export function createUpdateService({
   const showFailure = message => {
     clearTimeout(activationTimer);
     applying = false;
+    failureCount += 1;
     legacy.hideOverlay?.();
     publish('error', message);
+    const repeated = failureCount > 1;
     legacy.showInfo?.(
       'Update could not finish',
       `<p>${escapeHtml(message || 'PlatePlan could not activate the update.')}</p>
+       ${repeated ? '<p>Retrying has not resolved this update. Use <strong>Repair update</strong> to reset only PlatePlan’s offline application files; your recipes and plans are not removed.</p>' : ''}
        <div class="btn-row plateplan-update-dialog-actions">
-         <button class="btn primary" type="button" id="plateplan-update-retry">Retry</button>
+         <button class="btn ${repeated ? 'ghost' : 'primary'}" type="button" id="plateplan-update-retry">Retry</button>
+         <button class="btn ${repeated ? 'primary' : 'ghost'}" type="button" id="plateplan-update-repair">Repair update</button>
          <button class="btn ghost" type="button" id="plateplan-update-close">Close</button>
        </div>`
     );
     document.getElementById('plateplan-update-retry')?.addEventListener('click', () => {
       legacy.closeInfo?.();
       apply();
+    });
+    document.getElementById('plateplan-update-repair')?.addEventListener('click', () => {
+      location.assign('./repair-update.html');
     });
     document.getElementById('plateplan-update-close')?.addEventListener('click', () => legacy.closeInfo?.());
   };

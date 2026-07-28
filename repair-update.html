@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f7f6f2">
+  <title>Repair PlatePlan update</title>
+  <style>
+    :root{color-scheme:light dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f7f6f2;color:#1d1d1f}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:calc(24px + env(safe-area-inset-top)) 18px calc(24px + env(safe-area-inset-bottom));background:#f7f6f2}
+    main{width:min(100%,480px);padding:24px;border:1px solid #d8d5cf;border-radius:22px;background:#fff;box-shadow:0 18px 55px rgba(0,0,0,.1)}
+    h1{font-size:26px;line-height:1.15;margin:0 0 10px}
+    p{font-size:17px;line-height:1.5;margin:0 0 14px;color:#4d4d52}
+    .reassurance{padding:12px 14px;border-radius:14px;background:#eef5ff;color:#203755;font-size:15px}
+    button,a{min-height:48px;border-radius:13px;font:inherit;font-weight:650}
+    button{width:100%;border:0;padding:12px 16px;background:#0866d9;color:#fff;cursor:pointer}
+    button:disabled{opacity:.58;cursor:wait}
+    a{display:none;align-items:center;justify-content:center;margin-top:10px;border:1px solid #b6b6ba;color:#0866d9;text-decoration:none}
+    #repair-status{min-height:24px;margin-top:14px;font-size:15px;color:#4d4d52}
+    #repair-status.error{color:#b42318}
+    @media(prefers-color-scheme:dark){
+      :root,body{background:#111214;color:#f5f5f7}
+      main{background:#1c1d20;border-color:#393a3f}
+      p,#repair-status{color:#c6c6cb}
+      .reassurance{background:#17263b;color:#d7e7ff}
+      a{border-color:#56575d;color:#72aaff}
+    }
+    @media(prefers-reduced-motion:no-preference){main{animation:appear .18s ease-out}@keyframes appear{from{opacity:0;transform:translateY(5px)}}}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Repair PlatePlan update</h1>
+    <p>This resets only PlatePlan’s offline application files, then reopens the latest published version.</p>
+    <p class="reassurance"><strong>Your recipes and plans are safe.</strong> This does not clear LocalStorage, Firebase data, recovery points or sign-in information.</p>
+    <button type="button" id="repair-button">Repair and reopen PlatePlan</button>
+    <a id="return-link" href="./PlatePlan.html?update-repair=21.3.2">Return to PlatePlan</a>
+    <div id="repair-status" role="status" aria-live="polite"></div>
+  </main>
+  <script>
+    (() => {
+      const button = document.getElementById('repair-button');
+      const status = document.getElementById('repair-status');
+      const returnLink = document.getElementById('return-link');
+      const setStatus = (message, error = false) => {
+        status.textContent = message;
+        status.classList.toggle('error', error);
+      };
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        returnLink.style.display = 'none';
+        setStatus('Checking the latest PlatePlan files…');
+        try {
+          const stamp = Date.now();
+          const probe = await fetch(`./PlatePlan.html?update-repair-probe=${stamp}`, {
+            cache: 'no-store',
+            credentials: 'same-origin',
+          });
+          if (!probe.ok) throw new Error('GitHub Pages has not finished publishing the repair files.');
+
+          setStatus('Removing the stuck offline update…');
+          if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.map(registration => registration.unregister()));
+          }
+          if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            await Promise.all(
+              cacheNames
+                .filter(name => name.startsWith('plateplan-shell-'))
+                .map(name => caches.delete(name))
+            );
+          }
+
+          setStatus('Reopening PlatePlan 21.3.2…');
+          location.replace(`./PlatePlan.html?update-repair=21.3.2&fresh=${stamp}`);
+        } catch (error) {
+          button.disabled = false;
+          returnLink.style.display = 'flex';
+          setStatus(
+            navigator.onLine === false
+              ? 'You are offline. Reconnect, then try the repair again.'
+              : `${error.message || 'The update repair could not finish'} Try again after GitHub Pages has published.`,
+            true
+          );
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

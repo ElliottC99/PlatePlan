@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='21.3.1';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v23';
+const PLATEPLAN_APP_VERSION='21.3.2';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v24';
 const SEED=[];
 
 let state = null;
