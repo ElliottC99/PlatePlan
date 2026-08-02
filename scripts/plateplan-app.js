@@ -1460,9 +1460,8 @@ function getBudgets(person, mealType) {
     const p = state.prefs || {};
     const eAlloc = p.eAlloc || {b:15, l:25, d:45, s:15};
     const cAlloc = p.cAlloc || {b:25, l:30, d:35, s:10};
-    const useSeparateProt = !!p.separateProteinAlloc;
-    const eProtAlloc = useSeparateProt && p.eProtAlloc ? p.eProtAlloc : eAlloc;
-    const cProtAlloc = useSeparateProt && p.cProtAlloc ? p.cProtAlloc : cAlloc;
+    const eProtAlloc = p.eProtAlloc || eAlloc;
+    const cProtAlloc = p.cProtAlloc || cAlloc;
 
     const alloc = person === 'e' ? eAlloc : cAlloc;
     const protAlloc = person === 'e' ? eProtAlloc : cProtAlloc;
@@ -15319,41 +15318,29 @@ function viewExclusions(){
 }
 
 function toggleSeparateProteinAllocUI() {
-  const isSeparate = !!document.getElementById('pref-separate-protein')?.checked;
-  const eWrap = document.getElementById('eprot-alloc-wrap');
-  const cWrap = document.getElementById('cprot-alloc-wrap');
-  if(eWrap) eWrap.style.display = isSeparate ? 'block' : 'none';
-  if(cWrap) cWrap.style.display = isSeparate ? 'block' : 'none';
-  const eLabel = document.getElementById('label-eb-alloc');
-  const cLabel = document.getElementById('label-cb-alloc');
-  if(eLabel) eLabel.textContent = isSeparate ? 'CALORIE MEAL ALLOCATION (%)' : 'MEAL ALLOCATION (%)';
-  if(cLabel) cLabel.textContent = isSeparate ? 'CALORIE MEAL ALLOCATION (%)' : 'MEAL ALLOCATION (%)';
+  // Retained for compatibility
 }
 
 function loadPrefs(){
   const p=state.prefs||{};
   ensureExclusionPrefsUI();
-  document.getElementById('pref-exclude').value=p.exclude||'';
-  document.getElementById('pref-diet').value=p.diet||'vegetarian';
-  document.getElementById('pref-ecal').value=p.ecal||2400;
-  document.getElementById('pref-eprot').value=p.eprot||130;
-  document.getElementById('pref-ccal').value=p.ccal||1700;
-  document.getElementById('pref-cprot').value=p.cprot||100;
+  if(document.getElementById('pref-exclude')) document.getElementById('pref-exclude').value=p.exclude||'';
+  if(document.getElementById('pref-diet')) document.getElementById('pref-diet').value=p.diet||'vegetarian';
+  if(document.getElementById('pref-ecal')) document.getElementById('pref-ecal').value=p.ecal||2400;
+  if(document.getElementById('pref-eprot')) document.getElementById('pref-eprot').value=p.eprot||130;
+  if(document.getElementById('pref-ccal')) document.getElementById('pref-ccal').value=p.ccal||1700;
+  if(document.getElementById('pref-cprot')) document.getElementById('pref-cprot').value=p.cprot||100;
   const ea = p.eAlloc || {b:15, l:25, d:45, s:15};
-  document.getElementById('pref-eb').value = ea.b;
-  document.getElementById('pref-el').value = ea.l;
-  document.getElementById('pref-ed').value = ea.d;
-  document.getElementById('pref-es').value = ea.s;
+  if(document.getElementById('pref-eb')) document.getElementById('pref-eb').value = ea.b;
+  if(document.getElementById('pref-el')) document.getElementById('pref-el').value = ea.l;
+  if(document.getElementById('pref-ed')) document.getElementById('pref-ed').value = ea.d;
+  if(document.getElementById('pref-es')) document.getElementById('pref-es').value = ea.s;
 
   const ca = p.cAlloc || {b:25, l:30, d:35, s:10};
-  document.getElementById('pref-cb').value = ca.b;
-  document.getElementById('pref-cl').value = ca.l;
-  document.getElementById('pref-cd').value = ca.d;
-  document.getElementById('pref-cs').value = ca.s;
-
-  const sepProt = !!p.separateProteinAlloc;
-  const sepProtInput = document.getElementById('pref-separate-protein');
-  if(sepProtInput) sepProtInput.checked = sepProt;
+  if(document.getElementById('pref-cb')) document.getElementById('pref-cb').value = ca.b;
+  if(document.getElementById('pref-cl')) document.getElementById('pref-cl').value = ca.l;
+  if(document.getElementById('pref-cd')) document.getElementById('pref-cd').value = ca.d;
+  if(document.getElementById('pref-cs')) document.getElementById('pref-cs').value = ca.s;
 
   const epa = p.eProtAlloc || ea;
   if(document.getElementById('pref-epb')) document.getElementById('pref-epb').value = epa.b;
@@ -15367,43 +15354,40 @@ function loadPrefs(){
   if(document.getElementById('pref-cpd')) document.getElementById('pref-cpd').value = cpa.d;
   if(document.getElementById('pref-cps')) document.getElementById('pref-cps').value = cpa.s;
 
-  toggleSeparateProteinAllocUI();
   calcBudgets();
   renderExclusionPreview();
   renderRecoveryPanel();
 }
 
 function calcBudgets() {
-  const ecal = +document.getElementById('pref-ecal').value||2400;
-  const eprot = +document.getElementById('pref-eprot').value||130;
-  const eb = +document.getElementById('pref-eb').value||0;
-  const el = +document.getElementById('pref-el').value||0;
-  const ed = +document.getElementById('pref-ed').value||0;
-  const es = +document.getElementById('pref-es').value||0;
+  const ecal = +document.getElementById('pref-ecal')?.value||2400;
+  const eprot = +document.getElementById('pref-eprot')?.value||130;
+  const eb = +document.getElementById('pref-eb')?.value||0;
+  const el = +document.getElementById('pref-el')?.value||0;
+  const ed = +document.getElementById('pref-ed')?.value||0;
+  const es = +document.getElementById('pref-es')?.value||0;
 
-  const ccal = +document.getElementById('pref-ccal').value||1700;
-  const cprot = +document.getElementById('pref-cprot').value||100;
-  const cb = +document.getElementById('pref-cb').value||0;
-  const cl = +document.getElementById('pref-cl').value||0;
-  const cd = +document.getElementById('pref-cd').value||0;
-  const cs = +document.getElementById('pref-cs').value||0;
+  const ccal = +document.getElementById('pref-ccal')?.value||1700;
+  const cprot = +document.getElementById('pref-cprot')?.value||100;
+  const cb = +document.getElementById('pref-cb')?.value||0;
+  const cl = +document.getElementById('pref-cl')?.value||0;
+  const cd = +document.getElementById('pref-cd')?.value||0;
+  const cs = +document.getElementById('pref-cs')?.value||0;
 
-  const isSeparate = !!document.getElementById('pref-separate-protein')?.checked;
+  const epb = +document.getElementById('pref-epb')?.value||0;
+  const epl = +document.getElementById('pref-epl')?.value||0;
+  const epd = +document.getElementById('pref-epd')?.value||0;
+  const eps = +document.getElementById('pref-eps')?.value||0;
 
-  const epb = isSeparate ? (+document.getElementById('pref-epb')?.value||0) : eb;
-  const epl = isSeparate ? (+document.getElementById('pref-epl')?.value||0) : el;
-  const epd = isSeparate ? (+document.getElementById('pref-epd')?.value||0) : ed;
-  const eps = isSeparate ? (+document.getElementById('pref-eps')?.value||0) : es;
-
-  const cpb = isSeparate ? (+document.getElementById('pref-cpb')?.value||0) : cb;
-  const cpl = isSeparate ? (+document.getElementById('pref-cpl')?.value||0) : cl;
-  const cpd = isSeparate ? (+document.getElementById('pref-cpd')?.value||0) : cd;
-  const cps = isSeparate ? (+document.getElementById('pref-cps')?.value||0) : cs;
+  const cpb = +document.getElementById('pref-cpb')?.value||0;
+  const cpl = +document.getElementById('pref-cpl')?.value||0;
+  const cpd = +document.getElementById('pref-cpd')?.value||0;
+  const cps = +document.getElementById('pref-cps')?.value||0;
 
   const eCalValid = (eb+el+ed+es) === 100;
   const cCalValid = (cb+cl+cd+cs) === 100;
-  const eProtValid = !isSeparate || (epb+epl+epd+eps) === 100;
-  const cProtValid = !isSeparate || (cpb+cpl+cpd+cps) === 100;
+  const eProtValid = (epb+epl+epd+eps) === 100;
+  const cProtValid = (cpb+cpl+cpd+cps) === 100;
 
   const eValid = eCalValid && eProtValid;
   const cValid = cCalValid && cProtValid;
@@ -15424,26 +15408,32 @@ function calcBudgets() {
   const saveBtn = document.getElementById('btn-save-prefs');
   if(saveBtn) saveBtn.disabled = !(eValid && cValid);
 
-  if(eValid) {
-    document.getElementById('ebudget-text').innerHTML = `
-        <strong>Breakfast Budget:</strong> ${Math.round(ecal*eb/100)}kcal / ${Math.round(eprot*epb/100)}g P<br>
-        <strong>Lunch Budget:</strong> ${Math.round(ecal*el/100)}kcal / ${Math.round(eprot*epl/100)}g P<br>
-        <strong>Dinner Budget:</strong> ${Math.round(ecal*ed/100)}kcal / ${Math.round(eprot*epd/100)}g P<br>
-        <strong>Snacks Budget:</strong> ${Math.round(ecal*es/100)}kcal / ${Math.round(eprot*eps/100)}g P
-    `;
-  } else {
-    document.getElementById('ebudget-text').innerHTML = '';
+  const eBudgetEl = document.getElementById('ebudget-text');
+  if(eBudgetEl) {
+    if(eValid) {
+      eBudgetEl.innerHTML = `
+          <strong>Breakfast Budget:</strong> ${Math.round(ecal*eb/100)}kcal / ${Math.round(eprot*epb/100)}g P<br>
+          <strong>Lunch Budget:</strong> ${Math.round(ecal*el/100)}kcal / ${Math.round(eprot*epl/100)}g P<br>
+          <strong>Dinner Budget:</strong> ${Math.round(ecal*ed/100)}kcal / ${Math.round(eprot*epd/100)}g P<br>
+          <strong>Snacks Budget:</strong> ${Math.round(ecal*es/100)}kcal / ${Math.round(eprot*eps/100)}g P
+      `;
+    } else {
+      eBudgetEl.innerHTML = '';
+    }
   }
 
-  if(cValid) {
-    document.getElementById('cbudget-text').innerHTML = `
-        <strong>Breakfast Budget:</strong> ${Math.round(ccal*cb/100)}kcal / ${Math.round(cprot*cpb/100)}g P<br>
-        <strong>Lunch Budget:</strong> ${Math.round(ccal*cl/100)}kcal / ${Math.round(cprot*cpl/100)}g P<br>
-        <strong>Dinner Budget:</strong> ${Math.round(ccal*cd/100)}kcal / ${Math.round(cprot*cpd/100)}g P<br>
-        <strong>Snacks Budget:</strong> ${Math.round(ccal*cs/100)}kcal / ${Math.round(cprot*cps/100)}g P
-    `;
-  } else {
-    document.getElementById('cbudget-text').innerHTML = '';
+  const cBudgetEl = document.getElementById('cbudget-text');
+  if(cBudgetEl) {
+    if(cValid) {
+      cBudgetEl.innerHTML = `
+          <strong>Breakfast Budget:</strong> ${Math.round(ccal*cb/100)}kcal / ${Math.round(cprot*cpb/100)}g P<br>
+          <strong>Lunch Budget:</strong> ${Math.round(ccal*cl/100)}kcal / ${Math.round(cprot*cpl/100)}g P<br>
+          <strong>Dinner Budget:</strong> ${Math.round(ccal*cd/100)}kcal / ${Math.round(cprot*cpd/100)}g P<br>
+          <strong>Snacks Budget:</strong> ${Math.round(ccal*cs/100)}kcal / ${Math.round(cprot*cps/100)}g P
+      `;
+    } else {
+      cBudgetEl.innerHTML = '';
+    }
   }
 }
 
@@ -15581,43 +15571,42 @@ function importPlatePlanDataBackup(input){
 }
 
 function savePrefs(){
-  const eb = +document.getElementById('pref-eb').value||0;
-  const el = +document.getElementById('pref-el').value||0;
-  const ed = +document.getElementById('pref-ed').value||0;
-  const es = +document.getElementById('pref-es').value||0;
-  const cb = +document.getElementById('pref-cb').value||0;
-  const cl = +document.getElementById('pref-cl').value||0;
-  const cd = +document.getElementById('pref-cd').value||0;
-  const cs = +document.getElementById('pref-cs').value||0;
+  const eb = +document.getElementById('pref-eb')?.value||0;
+  const el = +document.getElementById('pref-el')?.value||0;
+  const ed = +document.getElementById('pref-ed')?.value||0;
+  const es = +document.getElementById('pref-es')?.value||0;
 
-  const isSeparate = !!document.getElementById('pref-separate-protein')?.checked;
-  const epb = isSeparate ? (+document.getElementById('pref-epb')?.value||0) : eb;
-  const epl = isSeparate ? (+document.getElementById('pref-epl')?.value||0) : el;
-  const epd = isSeparate ? (+document.getElementById('pref-epd')?.value||0) : ed;
-  const eps = isSeparate ? (+document.getElementById('pref-eps')?.value||0) : es;
+  const cb = +document.getElementById('pref-cb')?.value||0;
+  const cl = +document.getElementById('pref-cl')?.value||0;
+  const cd = +document.getElementById('pref-cd')?.value||0;
+  const cs = +document.getElementById('pref-cs')?.value||0;
 
-  const cpb = isSeparate ? (+document.getElementById('pref-cpb')?.value||0) : cb;
-  const cpl = isSeparate ? (+document.getElementById('pref-cpl')?.value||0) : cl;
-  const cpd = isSeparate ? (+document.getElementById('pref-cpd')?.value||0) : cd;
-  const cps = isSeparate ? (+document.getElementById('pref-cps')?.value||0) : cs;
+  const epb = +document.getElementById('pref-epb')?.value||0;
+  const epl = +document.getElementById('pref-epl')?.value||0;
+  const epd = +document.getElementById('pref-epd')?.value||0;
+  const eps = +document.getElementById('pref-eps')?.value||0;
 
-  if((eb+el+ed+es) !== 100 || (cb+cl+cd+cs) !== 100 || (isSeparate && ((epb+epl+epd+eps) !== 100 || (cpb+cpl+cpd+cps) !== 100))) {
-    showMsg('prefs-msg','Percentages must total 100%.','error');
+  const cpb = +document.getElementById('pref-cpb')?.value||0;
+  const cpl = +document.getElementById('pref-cpl')?.value||0;
+  const cpd = +document.getElementById('pref-cpd')?.value||0;
+  const cps = +document.getElementById('pref-cps')?.value||0;
+
+  if((eb+el+ed+es) !== 100 || (cb+cl+cd+cs) !== 100 || (epb+epl+epd+eps) !== 100 || (cpb+cpl+cpd+cps) !== 100) {
+    showMsg('prefs-msg','Percentages must total 100% for both calories and protein.','error');
     return;
   }
 
   state.prefs={
     ...state.prefs,
-    exclude:document.getElementById('pref-exclude').value,
+    exclude: document.getElementById('pref-exclude')?.value||'',
     exclusions: state.prefs.exclusions || {shared:[],elliott:[],chloe:[]},
-    diet:document.getElementById('pref-diet').value,
-    ecal:+document.getElementById('pref-ecal').value||2400,
-    eprot:+document.getElementById('pref-eprot').value||130,
-    ccal:+document.getElementById('pref-ccal').value||1700,
-    cprot:+document.getElementById('pref-cprot').value||100,
+    diet: document.getElementById('pref-diet')?.value||'vegetarian',
+    ecal: +document.getElementById('pref-ecal')?.value||2400,
+    eprot: +document.getElementById('pref-eprot')?.value||130,
+    ccal: +document.getElementById('pref-ccal')?.value||1700,
+    cprot: +document.getElementById('pref-cprot')?.value||100,
     eAlloc: {b:eb, l:el, d:ed, s:es},
     cAlloc: {b:cb, l:cl, d:cd, s:cs},
-    separateProteinAlloc: isSeparate,
     eProtAlloc: {b:epb, l:epl, d:epd, s:eps},
     cProtAlloc: {b:cpb, l:cpl, d:cpd, s:cps},
     shopGroupBy: state.prefs.shopGroupBy || 'family',
