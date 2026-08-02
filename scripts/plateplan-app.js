@@ -1457,10 +1457,16 @@ if(document.readyState==='loading'){
 
 // == MEAL BUDGETS & FIT SCORING ==
 function getBudgets(person, mealType) {
-    const p = state.prefs;
+    const p = state.prefs || {};
     const eAlloc = p.eAlloc || {b:15, l:25, d:45, s:15};
     const cAlloc = p.cAlloc || {b:25, l:30, d:35, s:10};
+    const useSeparateProt = !!p.separateProteinAlloc;
+    const eProtAlloc = useSeparateProt && p.eProtAlloc ? p.eProtAlloc : eAlloc;
+    const cProtAlloc = useSeparateProt && p.cProtAlloc ? p.cProtAlloc : cAlloc;
+
     const alloc = person === 'e' ? eAlloc : cAlloc;
+    const protAlloc = person === 'e' ? eProtAlloc : cProtAlloc;
+
     const meal = String(mealType || '').toLowerCase();
     let mKey = 'd'; // default dinner for legacy/unknown meal contexts
     if(meal.includes('breakfast')) mKey = 'b';
@@ -1468,9 +1474,10 @@ function getBudgets(person, mealType) {
     else if(meal.includes('snack')) mKey = 's';
     else if(meal.includes('dinner')) mKey = 'd';
 
-    const pct = (alloc[mKey] || 0) / 100;
-    const cal = (person === 'e' ? p.ecal : p.ccal) * pct;
-    const prot = (person === 'e' ? p.eprot : p.cprot) * pct;
+    const calPct = (alloc[mKey] || 0) / 100;
+    const protPct = (protAlloc[mKey] || 0) / 100;
+    const cal = (person === 'e' ? (p.ecal || 2400) : (p.ccal || 1700)) * calPct;
+    const prot = (person === 'e' ? (p.eprot || 130) : (p.cprot || 100)) * protPct;
     return {cal, prot};
 }
 
@@ -1685,7 +1692,8 @@ function getImprovementSuggestions(ings, prefix = 'enh') {
           <input type="search" id="enhance-family-${prefix}" placeholder="Ingredient" oninput="renderEnhancementFinder('${prefix}')" style="font-size:12px;padding:6px 9px">
           <input type="search" id="enhance-type-${prefix}" placeholder="Sub-type" oninput="renderEnhancementFinder('${prefix}')" style="font-size:12px;padding:6px 9px">
           <select id="enhance-sort-${prefix}" onchange="renderEnhancementFinder('${prefix}')" style="font-size:12px">
-            <option value="protein_per_kcal">Protein per kcal</option>
+            <option value="protein_per_kcal">Protein per kcal (highest)</option>
+            <option value="least_protein_per_kcal">Least protein per kcal (low efficiency)</option>
             <option value="protein_per_pound">Protein per £</option>
             <option value="protein">Highest protein</option>
             <option value="low_kcal">Lowest kcal</option>
@@ -1694,6 +1702,7 @@ function getImprovementSuggestions(ings, prefix = 'enh') {
         </div>
         <div id="enhancement-results-${prefix}" data-current-group-ids="${[...currentGroupIds].map(ppEscapeAttr).join(',')}"><div style="font-size:12px;color:var(--text2);padding:8px 0">Start typing to search ingredients or sub-types to add.</div></div>
     </details>`;
+}
 }
 
 
@@ -2822,6 +2831,7 @@ function scoreProductByPriority(product, priority = 'protein'){
   const price = +product?.price || 0;
   if(priority === 'low_kcal') return -(+product?.cal || 0);
   if(priority === 'protein_per_kcal' || priority === 'prot_kcal') return getProductProteinPer100Kcal(product);
+  if(priority === 'least_protein_per_kcal') return -getProductProteinPer100Kcal(product);
   if(priority === 'protein_per_pound' || priority === 'value') return getProductProteinPerPound(product);
   if(priority === 'lowest_cost') return price > 0 ? -price : -999999;
   if(priority === 'cost_per_100') return (price > 0 && packGrams > 0) ? -(price / packGrams * 100) : -999999;
@@ -6875,6 +6885,99 @@ function renderReviewCostSummary(nutrition, portions){
     </div>`;
 }
 
+function renderLeastProteinEfficientSection(modalIngs, recipe, prefix = 'enh') {
+  if(!modalIngs || !modalIngs.length) return '';
+  const items = [];
+  modalIngs.forEach((ing, idx) => {
+    if(ing.excludeNutrition) return;
+    const c = getIngredientContribution(ing, recipe, recipe.serves);
+    if(!c) return;
+    const cal = c.total?.cal || 0;
+    const prot = c.total?.prot || 0;
+    if(cal <= 0) return;
+    const pPer100 = (prot / cal) * 100;
+    items.push({
+      ing,
+      idx,
+      name: c.bankIng?.name || ing.name || 'Ingredient',
+      raw: ing.raw || ing.name || '',
+      cal,
+      prot,
+      pPer100
+    });
+  });
+
+  if(!items.length) return '';
+
+  items.sort((a, b) => a.pPer100 - b.pPer100);
+
+  const topItems = items.slice(0, 5);
+
+  const rows = topItems.map((item, rank) => {
+    const tagClass = item.pPer100 < 2 ? 'badge-coral' : (item.pPer100 < 5 ? 'warn' : 'good');
+    const displayPPer100 = Math.round(item.pPer100 * 10) / 10;
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            <span style="color:var(--text2);margin-right:4px">#${rank+1}</span> ${ppEscapeHtml(item.name)}
+          </div>
+          <div style="font-size:11px;color:var(--text2)">${Math.round(item.cal)} kcal · ${round1(item.prot)}g protein</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="badge ${tagClass}" style="font-size:11px">${displayPPer100}g P / 100 kcal</span>
+          <button type="button" class="btn sm ghost" onclick="searchSubstituteForIngredient('${ppEscapeAttr(prefix)}', '${ppEscapeAttr(item.name)}')">Replace</button>
+          <button type="button" class="btn sm ghost" onclick="highlightReviewIngredientRow('${ppEscapeAttr(prefix)}', ${item.idx})">Locate</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <details class="review-secondary-section least-protein-tool" open style="margin-top:12px;border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--surface2)">
+      <summary style="font-weight:600;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:space-between">
+        <span>Least Protein per kcal Efficient Items</span>
+        <span class="tag warn" style="font-size:10px">Optimization Tool</span>
+      </summary>
+      <div style="font-size:12px;color:var(--text2);margin:6px 0 8px;line-height:1.4">
+        Ingredients with the lowest protein return per calorie in this recipe. Swapping or reducing these will improve recipe protein efficiency.
+      </div>
+      <div class="least-protein-rows">
+        ${rows}
+      </div>
+    </details>
+  `;
+}
+
+function searchSubstituteForIngredient(prefix, name) {
+  const searchInput = document.getElementById(`enhance-search-${prefix}`);
+  const sortSelect = document.getElementById(`enhance-sort-${prefix}`);
+  if(sortSelect) sortSelect.value = 'protein_per_kcal';
+  if(searchInput) {
+    searchInput.value = name;
+    renderEnhancementFinder(prefix);
+    const toolDetails = searchInput.closest('details');
+    if(toolDetails) toolDetails.open = true;
+    searchInput.focus();
+    searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function highlightReviewIngredientRow(prefix, idx) {
+  const rows = document.querySelectorAll(`#${prefix}-ings-list .rev-ing-row`);
+  const targetRow = rows[idx];
+  if(targetRow) {
+    targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    targetRow.style.transition = 'background-color 0.3s ease, outline 0.3s ease';
+    targetRow.style.outline = '2px solid var(--purple, #8b5cf6)';
+    targetRow.style.backgroundColor = 'var(--purple-bg, rgba(139, 92, 246, 0.15))';
+    setTimeout(() => {
+      targetRow.style.outline = '';
+      targetRow.style.backgroundColor = '';
+    }, 2500);
+  }
+}
+
 function recalcModal(prefix) {
     const rows = document.querySelectorAll(`#${prefix}-ings-list .rev-ing-row`);
     const serves = getReviewServesFallback();
@@ -6989,9 +7092,10 @@ function recalcModal(prefix) {
       `;
     }
 
+    const tooltipRecipe = { ingredients: modalIngs, serves, who, types: mealTypes, resolutionContext: getReviewResolutionContext(), instanceId: currentReviewInstanceId };
     const nutritionSummary = document.getElementById(prefix + '-nutrition-summary');
     if(nutritionSummary) {
-      nutritionSummary.innerHTML = renderReviewCostSummary(nutrition, portions);
+      nutritionSummary.innerHTML = renderReviewCostSummary(nutrition, portions) + renderLeastProteinEfficientSection(modalIngs, tooltipRecipe, prefix);
       if(prefix === 'enh') nutritionSummary.innerHTML += getImprovementSuggestions(validIngs, 'enh');
     }
 
@@ -7000,7 +7104,6 @@ function recalcModal(prefix) {
         setTimeout(() => renderEnhancementFinder('orig'), 0);
     }
     if(prefix === 'enh') setTimeout(() => renderEnhancementFinder('enh'), 0);
-    const tooltipRecipe = { ingredients: modalIngs, serves, who, types: mealTypes, resolutionContext: getReviewResolutionContext(), instanceId: currentReviewInstanceId };
     bindPortionNutritionTooltips(portionSummary, tooltipRecipe, serves);
     updateModalIngredientContributionTitles(prefix);
     updateModalNutritionBreakdownTooltips(prefix, tooltipRecipe);
@@ -15215,6 +15318,18 @@ function viewExclusions(){
   openAppInfoModal('Excluded foods', html);
 }
 
+function toggleSeparateProteinAllocUI() {
+  const isSeparate = !!document.getElementById('pref-separate-protein')?.checked;
+  const eWrap = document.getElementById('eprot-alloc-wrap');
+  const cWrap = document.getElementById('cprot-alloc-wrap');
+  if(eWrap) eWrap.style.display = isSeparate ? 'block' : 'none';
+  if(cWrap) cWrap.style.display = isSeparate ? 'block' : 'none';
+  const eLabel = document.getElementById('label-eb-alloc');
+  const cLabel = document.getElementById('label-cb-alloc');
+  if(eLabel) eLabel.textContent = isSeparate ? 'CALORIE MEAL ALLOCATION (%)' : 'MEAL ALLOCATION (%)';
+  if(cLabel) cLabel.textContent = isSeparate ? 'CALORIE MEAL ALLOCATION (%)' : 'MEAL ALLOCATION (%)';
+}
+
 function loadPrefs(){
   const p=state.prefs||{};
   ensureExclusionPrefsUI();
@@ -15236,6 +15351,23 @@ function loadPrefs(){
   document.getElementById('pref-cd').value = ca.d;
   document.getElementById('pref-cs').value = ca.s;
 
+  const sepProt = !!p.separateProteinAlloc;
+  const sepProtInput = document.getElementById('pref-separate-protein');
+  if(sepProtInput) sepProtInput.checked = sepProt;
+
+  const epa = p.eProtAlloc || ea;
+  if(document.getElementById('pref-epb')) document.getElementById('pref-epb').value = epa.b;
+  if(document.getElementById('pref-epl')) document.getElementById('pref-epl').value = epa.l;
+  if(document.getElementById('pref-epd')) document.getElementById('pref-epd').value = epa.d;
+  if(document.getElementById('pref-eps')) document.getElementById('pref-eps').value = epa.s;
+
+  const cpa = p.cProtAlloc || ca;
+  if(document.getElementById('pref-cpb')) document.getElementById('pref-cpb').value = cpa.b;
+  if(document.getElementById('pref-cpl')) document.getElementById('pref-cpl').value = cpa.l;
+  if(document.getElementById('pref-cpd')) document.getElementById('pref-cpd').value = cpa.d;
+  if(document.getElementById('pref-cps')) document.getElementById('pref-cps').value = cpa.s;
+
+  toggleSeparateProteinAllocUI();
   calcBudgets();
   renderExclusionPreview();
   renderRecoveryPanel();
@@ -15256,18 +15388,48 @@ function calcBudgets() {
   const cd = +document.getElementById('pref-cd').value||0;
   const cs = +document.getElementById('pref-cs').value||0;
 
-  const eValid = (eb+el+ed+es) === 100;
-  const cValid = (cb+cl+cd+cs) === 100;
+  const isSeparate = !!document.getElementById('pref-separate-protein')?.checked;
 
-  document.getElementById('alloc-warn').style.display = (eValid && cValid) ? 'none' : 'block';
-  document.getElementById('btn-save-prefs').disabled = !(eValid && cValid);
+  const epb = isSeparate ? (+document.getElementById('pref-epb')?.value||0) : eb;
+  const epl = isSeparate ? (+document.getElementById('pref-epl')?.value||0) : el;
+  const epd = isSeparate ? (+document.getElementById('pref-epd')?.value||0) : ed;
+  const eps = isSeparate ? (+document.getElementById('pref-eps')?.value||0) : es;
+
+  const cpb = isSeparate ? (+document.getElementById('pref-cpb')?.value||0) : cb;
+  const cpl = isSeparate ? (+document.getElementById('pref-cpl')?.value||0) : cl;
+  const cpd = isSeparate ? (+document.getElementById('pref-cpd')?.value||0) : cd;
+  const cps = isSeparate ? (+document.getElementById('pref-cps')?.value||0) : cs;
+
+  const eCalValid = (eb+el+ed+es) === 100;
+  const cCalValid = (cb+cl+cd+cs) === 100;
+  const eProtValid = !isSeparate || (epb+epl+epd+eps) === 100;
+  const cProtValid = !isSeparate || (cpb+cpl+cpd+cps) === 100;
+
+  const eValid = eCalValid && eProtValid;
+  const cValid = cCalValid && cProtValid;
+
+  const warnEl = document.getElementById('alloc-warn');
+  if(warnEl) {
+    if(!eCalValid || !cCalValid) {
+      warnEl.textContent = 'Calorie percentages must total 100% for each person.';
+      warnEl.style.display = 'block';
+    } else if(!eProtValid || !cProtValid) {
+      warnEl.textContent = 'Protein percentages must total 100% for each person.';
+      warnEl.style.display = 'block';
+    } else {
+      warnEl.style.display = 'none';
+    }
+  }
+
+  const saveBtn = document.getElementById('btn-save-prefs');
+  if(saveBtn) saveBtn.disabled = !(eValid && cValid);
 
   if(eValid) {
     document.getElementById('ebudget-text').innerHTML = `
-        <strong>Breakfast Budget:</strong> ${Math.round(ecal*eb/100)}kcal / ${Math.round(eprot*eb/100)}g P<br>
-        <strong>Lunch Budget:</strong> ${Math.round(ecal*el/100)}kcal / ${Math.round(eprot*el/100)}g P<br>
-        <strong>Dinner Budget:</strong> ${Math.round(ecal*ed/100)}kcal / ${Math.round(eprot*ed/100)}g P<br>
-        <strong>Snacks Budget:</strong> ${Math.round(ecal*es/100)}kcal / ${Math.round(eprot*es/100)}g P
+        <strong>Breakfast Budget:</strong> ${Math.round(ecal*eb/100)}kcal / ${Math.round(eprot*epb/100)}g P<br>
+        <strong>Lunch Budget:</strong> ${Math.round(ecal*el/100)}kcal / ${Math.round(eprot*epl/100)}g P<br>
+        <strong>Dinner Budget:</strong> ${Math.round(ecal*ed/100)}kcal / ${Math.round(eprot*epd/100)}g P<br>
+        <strong>Snacks Budget:</strong> ${Math.round(ecal*es/100)}kcal / ${Math.round(eprot*eps/100)}g P
     `;
   } else {
     document.getElementById('ebudget-text').innerHTML = '';
@@ -15275,10 +15437,10 @@ function calcBudgets() {
 
   if(cValid) {
     document.getElementById('cbudget-text').innerHTML = `
-        <strong>Breakfast Budget:</strong> ${Math.round(ccal*cb/100)}kcal / ${Math.round(cprot*cb/100)}g P<br>
-        <strong>Lunch Budget:</strong> ${Math.round(ccal*cl/100)}kcal / ${Math.round(cprot*cl/100)}g P<br>
-        <strong>Dinner Budget:</strong> ${Math.round(ccal*cd/100)}kcal / ${Math.round(cprot*cd/100)}g P<br>
-        <strong>Snacks Budget:</strong> ${Math.round(ccal*cs/100)}kcal / ${Math.round(cprot*cs/100)}g P
+        <strong>Breakfast Budget:</strong> ${Math.round(ccal*cb/100)}kcal / ${Math.round(cprot*cpb/100)}g P<br>
+        <strong>Lunch Budget:</strong> ${Math.round(ccal*cl/100)}kcal / ${Math.round(cprot*cpl/100)}g P<br>
+        <strong>Dinner Budget:</strong> ${Math.round(ccal*cd/100)}kcal / ${Math.round(cprot*cpd/100)}g P<br>
+        <strong>Snacks Budget:</strong> ${Math.round(ccal*cs/100)}kcal / ${Math.round(cprot*cps/100)}g P
     `;
   } else {
     document.getElementById('cbudget-text').innerHTML = '';
@@ -15428,7 +15590,18 @@ function savePrefs(){
   const cd = +document.getElementById('pref-cd').value||0;
   const cs = +document.getElementById('pref-cs').value||0;
 
-  if((eb+el+ed+es) !== 100 || (cb+cl+cd+cs) !== 100) {
+  const isSeparate = !!document.getElementById('pref-separate-protein')?.checked;
+  const epb = isSeparate ? (+document.getElementById('pref-epb')?.value||0) : eb;
+  const epl = isSeparate ? (+document.getElementById('pref-epl')?.value||0) : el;
+  const epd = isSeparate ? (+document.getElementById('pref-epd')?.value||0) : ed;
+  const eps = isSeparate ? (+document.getElementById('pref-eps')?.value||0) : es;
+
+  const cpb = isSeparate ? (+document.getElementById('pref-cpb')?.value||0) : cb;
+  const cpl = isSeparate ? (+document.getElementById('pref-cpl')?.value||0) : cl;
+  const cpd = isSeparate ? (+document.getElementById('pref-cpd')?.value||0) : cd;
+  const cps = isSeparate ? (+document.getElementById('pref-cps')?.value||0) : cs;
+
+  if((eb+el+ed+es) !== 100 || (cb+cl+cd+cs) !== 100 || (isSeparate && ((epb+epl+epd+eps) !== 100 || (cpb+cpl+cpd+cps) !== 100))) {
     showMsg('prefs-msg','Percentages must total 100%.','error');
     return;
   }
@@ -15444,6 +15617,9 @@ function savePrefs(){
     cprot:+document.getElementById('pref-cprot').value||100,
     eAlloc: {b:eb, l:el, d:ed, s:es},
     cAlloc: {b:cb, l:cl, d:cd, s:cs},
+    separateProteinAlloc: isSeparate,
+    eProtAlloc: {b:epb, l:epl, d:epd, s:eps},
+    cProtAlloc: {b:cpb, l:cpl, d:cpd, s:cps},
     shopGroupBy: state.prefs.shopGroupBy || 'family',
     productPriority: document.getElementById('plan-product-priority')?.value || state.prefs.productPriority || 'protein'
   };
