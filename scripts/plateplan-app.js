@@ -632,28 +632,34 @@ function setPlatePlanSyncOutbox(value){
 }
 
 function cleanCloudValue(value){
-  if(value===undefined) return null;
+  if(value===undefined||value===null) return null;
+  if(typeof value !== 'object') return value;
   return JSON.parse(JSON.stringify(value));
 }
 
-function syncValuesEqual(a,b){ return JSON.stringify(a===undefined?null:a)===JSON.stringify(b===undefined?null:b); }
+function syncValuesEqual(a,b){
+  if(a===b) return true;
+  if(a==null && b==null) return true;
+  if(a==null || b==null) return false;
+  return JSON.stringify(a)===JSON.stringify(b);
+}
 
 function platePlanStateProjection(source=state){
   const out={};
-  (source?.recipes||[]).forEach(item=>{ if(item?.id) out['recipes/'+item.id]=cleanCloudValue(item); });
-  (source?.ingredients||[]).forEach(item=>{ if(item?.id) out['products/'+item.id]=cleanCloudValue(item); });
-  (source?.ingredientFamilies||[]).forEach(item=>{ if(item?.id) out['ingredientFamilies/'+item.id]=cleanCloudValue(item); });
-  (source?.ingredientGroups||[]).forEach(item=>{ if(item?.id) out['ingredientGroups/'+item.id]=cleanCloudValue(item); });
-  Object.entries(source?.overrides||{}).forEach(([id,value])=>{ out['overrides/'+id]=cleanCloudValue(value); });
-  out['plans/current']=cleanCloudValue(source?.plan||{});
-  out['plans/history']=cleanCloudValue(source?.planHistory||[]);
-  out['settings/shared']=cleanCloudValue({
+  (source?.recipes||[]).forEach(item=>{ if(item?.id) out['recipes/'+item.id]=item; });
+  (source?.ingredients||[]).forEach(item=>{ if(item?.id) out['products/'+item.id]=item; });
+  (source?.ingredientFamilies||[]).forEach(item=>{ if(item?.id) out['ingredientFamilies/'+item.id]=item; });
+  (source?.ingredientGroups||[]).forEach(item=>{ if(item?.id) out['ingredientGroups/'+item.id]=item; });
+  Object.entries(source?.overrides||{}).forEach(([id,value])=>{ out['overrides/'+id]=value; });
+  out['plans/current']=source?.plan||{};
+  out['plans/history']=source?.planHistory||[];
+  out['settings/shared']={
     prefs:source?.prefs||{},customCats:source?.customCats||{},excluded:source?.excluded||{},
     useUpProducts:source?.useUpProducts||{},
     ignoredGroupMergeSuggestions:source?.ignoredGroupMergeSuggestions||[],
     ignoredDataQualityWarnings:source?.ignoredDataQualityWarnings||[],
     dataQualityDismissals:source?.dataQualityDismissals||{},packPicks:source?.packPicks||{},meta:source?.meta||{}
-  });
+  };
   return out;
 }
 
@@ -670,7 +676,7 @@ function queuePlatePlanCloudDiff(){
   new Set([...Object.keys(platePlanLastProjection),...Object.keys(next)]).forEach(key=>{
     const before=Object.prototype.hasOwnProperty.call(platePlanLastProjection,key)?platePlanLastProjection[key]:null;
     const after=Object.prototype.hasOwnProperty.call(next,key)?next[key]:null;
-    if(!syncValuesEqual(before,after)) changed.push({key,base:before,local:after});
+    if(!syncValuesEqual(before,after)) changed.push({key,base:cleanCloudValue(before),local:cleanCloudValue(after)});
   });
   if(!changed.length) return;
   const operationId=changed.length>1?'op-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6):null;
@@ -693,12 +699,34 @@ function schedulePlatePlanCloudDiff(){
   platePlanSyncTimer=setTimeout(queuePlatePlanCloudDiff,180);
 }
 
-function saveState(){
-  try{ localStorage.setItem(SK,JSON.stringify(state)); }
-  catch(e){ updatePlatePlanSyncStatus('error','Browser storage is full'); return false; }
-  if(platePlanCloudReady&&!platePlanSyncSuppress) schedulePlatePlanCloudDiff();
+let platePlanSaveLocalStorageTimer = null;
+function saveState(immediate = false){
   window.dispatchEvent(new CustomEvent('plateplan:state-saved',{detail:{source:'legacy',savedAt:Date.now()}}));
+  const performDiskSave = () => {
+    try{ localStorage.setItem(SK,JSON.stringify(state)); }
+    catch(e){ updatePlatePlanSyncStatus('error','Browser storage is full'); return false; }
+    return true;
+  };
+  if (immediate) {
+    if (platePlanSaveLocalStorageTimer) { clearTimeout(platePlanSaveLocalStorageTimer); platePlanSaveLocalStorageTimer = null; }
+    performDiskSave();
+  } else if (!platePlanSaveLocalStorageTimer) {
+    platePlanSaveLocalStorageTimer = setTimeout(() => {
+      platePlanSaveLocalStorageTimer = null;
+      performDiskSave();
+    }, 200);
+  }
+  if(platePlanCloudReady&&!platePlanSyncSuppress) schedulePlatePlanCloudDiff();
   return true;
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    if (platePlanSaveLocalStorageTimer) {
+      clearTimeout(platePlanSaveLocalStorageTimer);
+      try { localStorage.setItem(SK, JSON.stringify(state)); } catch(_e){}
+    }
+  });
 }
 
 function updatePlatePlanSyncStatus(status,detail=''){
@@ -4869,7 +4897,11 @@ function calculateRecipeDisplayNutrition({ recipe, variant = 'original', ingredi
   if(!active.resolutionContext) active.resolutionContext = getPlanContextForInstance(instanceId, planContext, overrideStore);
   const types = active.types || [active.type || 'dinner'];
   const resolvedMealType = mealType || getContextMealType(active, instanceId, types[0] || 'dinner');
-  const cacheKey=recipe?.id?JSON.stringify([recipe.id,variant,instanceId||'',targetServes||'',serves||'',who||'',resolvedMealType,active.ingredients,active.resolutionContext,{ecal:state.prefs?.ecal,eprot:state.prefs?.eprot,ccal:state.prefs?.ccal,cprot:state.prefs?.cprot,eAlloc:state.prefs?.eAlloc,cAlloc:state.prefs?.cAlloc}]):'';
+  const ingLen = (active.ingredients || []).length;
+  const ingSig = ingLen ? (active.ingredients[0]?.id || active.ingredients[0]?.bankId || active.ingredients[0]?.name || '') : '';
+  const cacheKey = recipe?.id
+    ? `${recipe.id}:${variant}:${instanceId||''}:${targetServes||''}:${serves||''}:${who||''}:${resolvedMealType}:${ingLen}:${ingSig}:${state.prefs?.ecal||''}:${state.prefs?.eprot||''}:${state.prefs?.ccal||''}:${state.prefs?.cprot||''}`
+    : '';
   if(cacheKey&&platePlanNutritionCache.has(cacheKey)) return platePlanNutritionCache.get(cacheKey);
   const nutrition = (active.ingredients && active.ingredients.length)
     ? calcRecipeNutrition(active.ingredients, active.serves || 1, active.resolutionContext || {})

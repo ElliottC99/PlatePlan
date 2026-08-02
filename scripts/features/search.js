@@ -32,7 +32,12 @@ function makeEntry(group, type, id, title, detail, searchable) {
   };
 }
 
+let lastStateRef = null;
+let cachedEntries = [];
+
 function buildEntries(state) {
+  if (!state) return [];
+  if (state === lastStateRef && cachedEntries.length) return cachedEntries;
   const families = new Map((state.ingredientFamilies || []).map(item => [String(item.id), item]));
   const groups = new Map((state.ingredientGroups || []).map(item => [String(item.id), item]));
   const entries = [];
@@ -94,6 +99,8 @@ function buildEntries(state) {
       valuesText(plan.dayDates)
     ));
   });
+  lastStateRef = state;
+  cachedEntries = entries;
   return entries;
 }
 
