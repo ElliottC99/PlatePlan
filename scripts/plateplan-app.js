@@ -4300,7 +4300,7 @@ function getEffectiveIngredientGrams(ing, bankIng){
 function round1(n){return Math.round((+n || 0) * 10) / 10;}
 
 function getIngredientContribution(ing, recipe, targetServes){
-  if(!ing || (!ing.bankId && !ing.groupId)) return null;
+  if(!ing) return null;
   const resolved = resolveProductForIngredient(ing, recipe?.resolutionContext || {});
   const bankIng = resolved.product;
   if(!bankIng) return null;
@@ -4908,7 +4908,7 @@ function calculateRecipeDisplayNutrition({ recipe, variant = 'original', ingredi
   const ingLen = (active.ingredients || []).length;
   const ingSig = ingLen ? (active.ingredients[0]?.id || active.ingredients[0]?.bankId || active.ingredients[0]?.name || '') : '';
   const cacheKey = recipe?.id
-    ? `${recipe.id}:${variant}:${instanceId||''}:${targetServes||''}:${serves||''}:${who||''}:${resolvedMealType}:${ingLen}:${ingSig}:${state.prefs?.ecal||''}:${state.prefs?.eprot||''}:${state.prefs?.ccal||''}:${state.prefs?.cprot||''}`
+    ? `${recipe.id}:${variant}:${instanceId||''}:${targetServes||''}:${serves||''}:${who||''}:${resolvedMealType}:${ingLen}:${ingSig}:${state.prefs?.ecal||''}:${state.prefs?.eprot||''}:${state.prefs?.ccal||''}:${state.prefs?.cprot||''}:${JSON.stringify(state.prefs?.eAlloc||{})}:${JSON.stringify(state.prefs?.cAlloc||{})}:${JSON.stringify(state.prefs?.eProtAlloc||{})}:${JSON.stringify(state.prefs?.cProtAlloc||{})}`
     : '';
   if(cacheKey&&platePlanNutritionCache.has(cacheKey)) return platePlanNutritionCache.get(cacheKey);
   const nutrition = (active.ingredients && active.ingredients.length)
@@ -15304,6 +15304,36 @@ function calcBudgets() {
         <strong>Dinner Budget:</strong> ${Math.round(ccal*cd/100)}kcal / ${Math.round(cprot*cpd/100)}g P<br>
         <strong>Snacks Budget:</strong> ${Math.round(ccal*cs/100)}kcal / ${Math.round(cprot*cps/100)}g P
     `;
+  }
+
+  if (state && state.prefs) {
+    state.prefs.ecal = ecal;
+    state.prefs.eprot = eprot;
+    state.prefs.ccal = ccal;
+    state.prefs.cprot = cprot;
+    state.prefs.eAlloc = {b:eb, l:el, d:ed, s:es};
+    state.prefs.cAlloc = {b:cb, l:cl, d:cd, s:cs};
+    state.prefs.eProtAlloc = {b:epb, l:epl, d:epd, s:eps};
+    state.prefs.cProtAlloc = {b:cpb, l:cpl, d:cpd, s:cps};
+  }
+
+  if (typeof platePlanNutritionCache !== 'undefined' && platePlanNutritionCache.clear) {
+    platePlanNutritionCache.clear();
+  }
+
+  if (typeof recalcAllRecipes === 'function') {
+    recalcAllRecipes();
+  }
+
+  if (typeof saveState === 'function') {
+    saveState();
+  }
+
+  if (document.getElementById('modal-wrap')?.classList.contains('open')) {
+    if (typeof recalcModal === 'function') {
+      recalcModal('orig');
+      recalcModal('enh');
+    }
   }
 }
 window.calcBudgets = calcBudgets;
