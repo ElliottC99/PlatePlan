@@ -1,40 +1,40 @@
-const PLATEPLAN_CACHE = 'plateplan-shell-v25';
-const PLATEPLAN_APP_VERSION = '22.0';
-const PLATEPLAN_BUILD_ID = '22.0-v25';
+const PLATEPLAN_CACHE = 'plateplan-shell-v26';
+const PLATEPLAN_APP_VERSION = '23.0';
+const PLATEPLAN_BUILD_ID = '23.0-v26';
 const PLATEPLAN_LOCAL_SHELL = [
   './',
   './PlatePlan.html',
   './repair-update.html',
   './manifest.json',
   './firebase-config.js',
-  './styles/tokens.css?v=22.0',
-  './styles/components.css?v=22.0',
-  './styles/responsive.css?v=22.0',
-  './styles/print.css?v=22.0',
-  './scripts/plateplan-app.js?v=22.0',
-  './scripts/bootstrap.js?v=22.0',
-  './scripts/main.js?v=22.0',
-  './scripts/core/contracts.js?v=22.0',
-  './scripts/core/store.js?v=22.0',
-  './scripts/core/runtime.js?v=22.0',
-  './scripts/services/firebase.js?v=22.0',
-  './scripts/services/sync.js?v=22.0',
-  './scripts/services/recovery.js?v=22.0',
-  './scripts/services/updates.js?v=22.0',
-  './scripts/ui/actions.js?v=22.0',
-  './scripts/ui/navigation.js?v=22.0',
-  './scripts/ui/workspaces.js?v=22.0',
-  './scripts/features/create-legacy-view.js?v=22.0',
-  './scripts/features/today.js?v=22.0',
-  './scripts/features/recipes.js?v=22.0',
-  './scripts/features/ingredients.js?v=22.0',
-  './scripts/features/products.js?v=22.0',
-  './scripts/features/planner.js?v=22.0',
-  './scripts/features/library.js?v=22.0',
-  './scripts/features/shopping.js?v=22.0',
-  './scripts/features/search.js?v=22.0',
-  './scripts/features/data-quality.js?v=22.0',
-  './scripts/features/preferences.js?v=22.0',
+  './styles/tokens.css?v=23.0',
+  './styles/components.css?v=23.0',
+  './styles/responsive.css?v=23.0',
+  './styles/print.css?v=23.0',
+  './scripts/plateplan-app.js?v=23.0',
+  './scripts/bootstrap.js?v=23.0',
+  './scripts/main.js?v=23.0',
+  './scripts/core/contracts.js?v=23.0',
+  './scripts/core/store.js?v=23.0',
+  './scripts/core/runtime.js?v=23.0',
+  './scripts/services/firebase.js?v=23.0',
+  './scripts/services/sync.js?v=23.0',
+  './scripts/services/recovery.js?v=23.0',
+  './scripts/services/updates.js?v=23.0',
+  './scripts/ui/actions.js?v=23.0',
+  './scripts/ui/navigation.js?v=23.0',
+  './scripts/ui/workspaces.js?v=23.0',
+  './scripts/features/create-legacy-view.js?v=23.0',
+  './scripts/features/today.js?v=23.0',
+  './scripts/features/recipes.js?v=23.0',
+  './scripts/features/ingredients.js?v=23.0',
+  './scripts/features/products.js?v=23.0',
+  './scripts/features/planner.js?v=23.0',
+  './scripts/features/library.js?v=23.0',
+  './scripts/features/shopping.js?v=23.0',
+  './scripts/features/search.js?v=23.0',
+  './scripts/features/data-quality.js?v=23.0',
+  './scripts/features/preferences.js?v=23.0',
   './icon-192.png',
   './icon-512.png',
   './icon-192-maskable.png',
@@ -48,6 +48,7 @@ const PLATEPLAN_OPTIONAL_SHELL = [
 let platePlanActivationRequested = false;
 
 self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(caches.open(PLATEPLAN_CACHE).then(async cache => {
     await cache.addAll(PLATEPLAN_LOCAL_SHELL);
     await Promise.allSettled(PLATEPLAN_OPTIONAL_SHELL.map(url => cache.add(url)));
@@ -77,21 +78,21 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if(event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  if(url.origin === self.location.origin && (url.pathname.endsWith('.html') || url.pathname.endsWith('firebase-config.js'))){
+  
+  if (url.origin === self.location.origin) {
+    // Network-first strategy for local application assets
     event.respondWith(
-      caches.match(event.request).then(cached => {
-        const networkFetch = fetch(event.request).then(response => {
-          if(response && response.ok){
-            const copy = response.clone();
-            caches.open(PLATEPLAN_CACHE).then(cache => cache.put(event.request, copy));
-          }
-          return response;
-        }).catch(() => cached);
-        return cached || networkFetch;
-      })
+      fetch(event.request).then(response => {
+        if (response && response.ok) {
+          const copy = response.clone();
+          caches.open(PLATEPLAN_CACHE).then(cache => cache.put(event.request, copy));
+        }
+        return response;
+      }).catch(() => caches.match(event.request))
     );
     return;
   }
+
   event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
     if(response && response.ok){
       const copy = response.clone();
