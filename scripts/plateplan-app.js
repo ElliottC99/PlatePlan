@@ -15389,51 +15389,44 @@ function calcBudgets() {
   const eProtValid = (epb+epl+epd+eps) === 100;
   const cProtValid = (cpb+cpl+cpd+cps) === 100;
 
-  const eValid = eCalValid && eProtValid;
-  const cValid = cCalValid && cProtValid;
+  const errors = [];
+  if (!eCalValid) errors.push(`Elliott's calorie percentages total ${eb+el+ed+es}% (must equal 100%).`);
+  if (!cCalValid) errors.push(`Chloe's calorie percentages total ${cb+cl+cd+cs}% (must equal 100%).`);
+  if (!eProtValid) errors.push(`Elliott's protein percentages total ${epb+epl+epd+eps}% (must equal 100%).`);
+  if (!cProtValid) errors.push(`Chloe's protein percentages total ${cpb+cpl+cpd+cps}% (must equal 100%).`);
 
   const warnEl = document.getElementById('alloc-warn');
-  if(warnEl) {
-    if(!eCalValid || !cCalValid) {
-      warnEl.textContent = 'Calorie percentages must total 100% for each person.';
-      warnEl.style.display = 'block';
-    } else if(!eProtValid || !cProtValid) {
-      warnEl.textContent = 'Protein percentages must total 100% for each person.';
+  if (warnEl) {
+    if (errors.length > 0) {
+      warnEl.innerHTML = errors.join('<br>');
       warnEl.style.display = 'block';
     } else {
       warnEl.style.display = 'none';
     }
   }
 
+  const allValid = eCalValid && cCalValid && eProtValid && cProtValid;
   const saveBtn = document.getElementById('btn-save-prefs');
-  if(saveBtn) saveBtn.disabled = !(eValid && cValid);
+  if (saveBtn) saveBtn.disabled = !allValid;
 
   const eBudgetEl = document.getElementById('ebudget-text');
-  if(eBudgetEl) {
-    if(eValid) {
-      eBudgetEl.innerHTML = `
-          <strong>Breakfast Budget:</strong> ${Math.round(ecal*eb/100)}kcal / ${Math.round(eprot*epb/100)}g P<br>
-          <strong>Lunch Budget:</strong> ${Math.round(ecal*el/100)}kcal / ${Math.round(eprot*epl/100)}g P<br>
-          <strong>Dinner Budget:</strong> ${Math.round(ecal*ed/100)}kcal / ${Math.round(eprot*epd/100)}g P<br>
-          <strong>Snacks Budget:</strong> ${Math.round(ecal*es/100)}kcal / ${Math.round(eprot*eps/100)}g P
-      `;
-    } else {
-      eBudgetEl.innerHTML = '';
-    }
+  if (eBudgetEl) {
+    eBudgetEl.innerHTML = `
+        <strong>Breakfast Budget:</strong> ${Math.round(ecal*eb/100)}kcal / ${Math.round(eprot*epb/100)}g P<br>
+        <strong>Lunch Budget:</strong> ${Math.round(ecal*el/100)}kcal / ${Math.round(eprot*epl/100)}g P<br>
+        <strong>Dinner Budget:</strong> ${Math.round(ecal*ed/100)}kcal / ${Math.round(eprot*epd/100)}g P<br>
+        <strong>Snacks Budget:</strong> ${Math.round(ecal*es/100)}kcal / ${Math.round(eprot*eps/100)}g P
+    `;
   }
 
   const cBudgetEl = document.getElementById('cbudget-text');
-  if(cBudgetEl) {
-    if(cValid) {
-      cBudgetEl.innerHTML = `
-          <strong>Breakfast Budget:</strong> ${Math.round(ccal*cb/100)}kcal / ${Math.round(cprot*cpb/100)}g P<br>
-          <strong>Lunch Budget:</strong> ${Math.round(ccal*cl/100)}kcal / ${Math.round(cprot*cpl/100)}g P<br>
-          <strong>Dinner Budget:</strong> ${Math.round(ccal*cd/100)}kcal / ${Math.round(cprot*cpd/100)}g P<br>
-          <strong>Snacks Budget:</strong> ${Math.round(ccal*cs/100)}kcal / ${Math.round(cprot*cps/100)}g P
-      `;
-    } else {
-      cBudgetEl.innerHTML = '';
-    }
+  if (cBudgetEl) {
+    cBudgetEl.innerHTML = `
+        <strong>Breakfast Budget:</strong> ${Math.round(ccal*cb/100)}kcal / ${Math.round(cprot*cpb/100)}g P<br>
+        <strong>Lunch Budget:</strong> ${Math.round(ccal*cl/100)}kcal / ${Math.round(cprot*cpl/100)}g P<br>
+        <strong>Dinner Budget:</strong> ${Math.round(ccal*cd/100)}kcal / ${Math.round(cprot*cpd/100)}g P<br>
+        <strong>Snacks Budget:</strong> ${Math.round(ccal*cs/100)}kcal / ${Math.round(cprot*cps/100)}g P
+    `;
   }
 }
 
