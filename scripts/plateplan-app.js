@@ -6883,7 +6883,7 @@ function renderReviewCostSummary(nutrition, portions){
     </div>`;
 }
 
-function renderLeastProteinEfficientSection(modalIngs, recipe, prefix = 'enh') {
+function renderProteinEfficiencyAnalysisSection(modalIngs, recipe, prefix = 'enh') {
   if(!modalIngs || !modalIngs.length) return '';
   const items = [];
   modalIngs.forEach((ing, idx) => {
@@ -6907,13 +6907,18 @@ function renderLeastProteinEfficientSection(modalIngs, recipe, prefix = 'enh') {
 
   if(!items.length) return '';
 
-  items.sort((a, b) => a.pPer100 - b.pPer100);
+  const sortedWorst = [...items].sort((a, b) => a.pPer100 - b.pPer100);
+  const sortedBest = [...items].sort((a, b) => b.pPer100 - a.pPer100);
 
-  const topItems = items.slice(0, 5);
+  const topBest = sortedBest.slice(0, 5);
+  const topWorst = sortedWorst.slice(0, 5);
 
-  const rows = topItems.map((item, rank) => {
-    const tagClass = item.pPer100 < 2 ? 'badge-coral' : (item.pPer100 < 5 ? 'warn' : 'good');
+  const renderItemRow = (item, rank, isBest) => {
+    const tagClass = isBest 
+      ? (item.pPer100 >= 10 ? 'badge-purple' : (item.pPer100 >= 5 ? 'good' : 'warn'))
+      : (item.pPer100 < 2 ? 'badge-coral' : (item.pPer100 < 5 ? 'warn' : 'good'));
     const displayPPer100 = Math.round(item.pPer100 * 10) / 10;
+    
     return `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
         <div style="flex:1;min-width:0">
@@ -6924,28 +6929,50 @@ function renderLeastProteinEfficientSection(modalIngs, recipe, prefix = 'enh') {
         </div>
         <div style="display:flex;align-items:center;gap:6px">
           <span class="badge ${tagClass}" style="font-size:11px">${displayPPer100}g P / 100 kcal</span>
-          <button type="button" class="btn sm ghost" onclick="searchSubstituteForIngredient('${ppEscapeAttr(prefix)}', '${ppEscapeAttr(item.name)}')">Replace</button>
+          ${!isBest ? `<button type="button" class="btn sm ghost" onclick="searchSubstituteForIngredient('${ppEscapeAttr(prefix)}', '${ppEscapeAttr(item.name)}')">Replace</button>` : ''}
           <button type="button" class="btn sm ghost" onclick="highlightReviewIngredientRow('${ppEscapeAttr(prefix)}', ${item.idx})">Locate</button>
         </div>
       </div>
     `;
-  }).join('');
+  };
+
+  const bestRows = topBest.map((item, idx) => renderItemRow(item, idx, true)).join('');
+  const worstRows = topWorst.map((item, idx) => renderItemRow(item, idx, false)).join('');
 
   return `
-    <details class="review-secondary-section least-protein-tool" open style="margin-top:12px;border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--surface2)">
+    <details class="review-secondary-section protein-efficiency-tool" open style="margin-top:12px;border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--surface2)">
       <summary style="font-weight:600;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:space-between">
-        <span>Least Protein per kcal Efficient Items</span>
-        <span class="tag warn" style="font-size:10px">Optimization Tool</span>
+        <span>Protein per kcal Efficiency Analysis</span>
+        <span class="tag purple" style="font-size:10px">Best &amp; Worst Ingredients</span>
       </summary>
-      <div style="font-size:12px;color:var(--text2);margin:6px 0 8px;line-height:1.4">
-        Ingredients with the lowest protein return per calorie in this recipe. Swapping or reducing these will improve recipe protein efficiency.
+      <div style="font-size:12px;color:var(--text2);margin:6px 0 10px;line-height:1.4">
+        Identifies ingredients driving protein density versus those adding calories with low protein yield. Use this breakdown to optimize recipe macros.
       </div>
-      <div class="least-protein-rows">
-        ${rows}
+      
+      <div class="grid2" style="gap:12px;align-items:start">
+        <div style="background:var(--surface);padding:10px;border-radius:6px;border:1px solid var(--border)">
+          <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px;display:flex;align-items:center;gap:4px">
+            <span>★ Most Protein-Efficient (Best)</span>
+          </div>
+          <div class="best-protein-rows">
+            ${bestRows}
+          </div>
+        </div>
+
+        <div style="background:var(--surface);padding:10px;border-radius:6px;border:1px solid var(--border)">
+          <div style="font-size:12px;font-weight:700;color:var(--coral, #e11d48);margin-bottom:6px;display:flex;align-items:center;gap:4px">
+            <span>⚠️ Least Protein-Efficient (Worst)</span>
+          </div>
+          <div class="worst-protein-rows">
+            ${worstRows}
+          </div>
+        </div>
       </div>
     </details>
   `;
 }
+
+const renderLeastProteinEfficientSection = renderProteinEfficiencyAnalysisSection;
 
 function searchSubstituteForIngredient(prefix, name) {
   const searchInput = document.getElementById(`enhance-search-${prefix}`);
@@ -15194,6 +15221,16 @@ function loadPrefs(){
   if(document.getElementById('pref-cpd')) document.getElementById('pref-cpd').value = cpa.d;
   if(document.getElementById('pref-cps')) document.getElementById('pref-cps').value = cpa.s;
 
+  ['pref-ecal','pref-eprot','pref-eb','pref-el','pref-ed','pref-es','pref-epb','pref-epl','pref-epd','pref-eps',
+   'pref-ccal','pref-cprot','pref-cb','pref-cl','pref-cd','pref-cs','pref-cpb','pref-cpl','pref-cpd','pref-cps'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el && !el.dataset.budgetBound) {
+      el.dataset.budgetBound = '1';
+      el.addEventListener('input', calcBudgets);
+      el.addEventListener('change', calcBudgets);
+    }
+  });
+
   calcBudgets();
   renderExclusionPreview();
   renderRecoveryPanel();
@@ -15269,6 +15306,7 @@ function calcBudgets() {
     `;
   }
 }
+window.calcBudgets = calcBudgets;
 
 function downloadPlatePlanDataBackup(){
   try{
