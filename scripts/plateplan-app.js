@@ -1481,19 +1481,102 @@ function getBudgets(person, mealType) {
 }
 
 function calculateFit(actCal, actProt, tgtCal, tgtProt) {
-    const calDev = tgtCal > 0 ? Math.abs(actCal - tgtCal) / tgtCal : 0;
-    const protDev = tgtProt > 0 ? Math.max(0, tgtProt - actProt) / tgtProt : 0;
+    if (!tgtCal || !tgtProt) {
+      return { score: 0, status: 'green', label: '🟢 Great Fit', warn: [], calDiffPct: 0, protDiffPct: 0 };
+    }
+
+    const calDiffPct = ((actCal - tgtCal) / tgtCal) * 100;
+    const protDiffPct = ((actProt - tgtProt) / tgtProt) * 100;
+
+    // Protein shortfall (0 if target hit or exceeded)
+    const protDev = protDiffPct < 0 ? (Math.abs(protDiffPct) / 100) * 1.5 : 0;
+
+    // Calorie deviation
+    let calDev = 0;
+    if (calDiffPct > 0) {
+      // Over calorie budget
+      calDev = (calDiffPct / 100) * 1.2;
+    } else {
+      // Under calorie budget
+      const absCalDiff = Math.abs(calDiffPct);
+      if (protDiffPct >= 0) {
+        // Protein target met: 0-25% below is 0 penalty, 26-35% is tiny penalty, >35% is moderate penalty
+        if (absCalDiff > 35) {
+          calDev = 0.10 + ((absCalDiff - 35) / 100) * 0.8;
+        } else if (absCalDiff > 25) {
+          calDev = ((absCalDiff - 25) / 100) * 0.4;
+        } else {
+          calDev = 0;
+        }
+      } else {
+        // Protein target not met
+        if (absCalDiff > 35) {
+          calDev = (absCalDiff / 100) * 1.0;
+        } else if (absCalDiff > 25) {
+          calDev = (absCalDiff / 100) * 0.6;
+        } else {
+          calDev = (absCalDiff / 100) * 0.3;
+        }
+      }
+    }
+
     const score = calDev + protDev;
-    
-    let status = 'red', label = '🔴 Poor Fit';
-    if(calDev <= 0.1 && protDev <= 0.1) { status = 'green'; label = '🟢 Great Fit'; }
-    else if(calDev <= 0.2 && protDev <= 0.2) { status = 'amber'; label = '🟠 Acceptable Fit'; }
 
-    let warn = [];
-    if(calDev > 0.1) warn.push(`Calories ${Math.round(calDev*100)}% ${actCal>tgtCal?'above':'below'} target`);
-    if(protDev > 0.1) warn.push(`Protein ${Math.round(protDev*100)}% below target`);
+    // Calorie status:
+    // Green: 0 to 25% below, or up to 20% over
+    // Amber: 26 to 35% below, or 21 to 35% over
+    // Red: >35% below, or >35% over
+    let calStatus = 'green';
+    if (calDiffPct > 35) {
+      calStatus = 'red';
+    } else if (calDiffPct > 20) {
+      calStatus = 'amber';
+    } else if (calDiffPct >= -25) {
+      calStatus = 'green';
+    } else if (calDiffPct >= -35) {
+      calStatus = 'amber';
+    } else {
+      calStatus = 'red';
+    }
 
-    return {score, status, label, warn};
+    // Protein status
+    let protStatus = 'green';
+    if (protDiffPct >= -10) {
+      protStatus = 'green';
+    } else if (protDiffPct >= -25) {
+      protStatus = 'amber';
+    } else {
+      protStatus = 'red';
+    }
+
+    // Combined traffic status
+    let status = 'green';
+    if (calStatus === 'red' || protStatus === 'red') {
+      status = 'red';
+    } else if (calStatus === 'amber' || protStatus === 'amber') {
+      status = 'amber';
+    } else {
+      status = 'green';
+    }
+
+    const label = status === 'green' ? '🟢 Great Fit' : status === 'amber' ? '🟠 Acceptable Fit' : '🔴 Poor Fit';
+
+    const warn = [];
+    if (calDiffPct > 20) {
+      warn.push(`Calories ${Math.round(calDiffPct)}% above target`);
+    } else if (calDiffPct < -25) {
+      if (protDiffPct >= 0) {
+        warn.push(`Calories ${Math.round(Math.abs(calDiffPct))}% below target (protein target met)`);
+      } else {
+        warn.push(`Calories ${Math.round(Math.abs(calDiffPct))}% below target`);
+      }
+    }
+
+    if (protDiffPct < -10) {
+      warn.push(`Protein ${Math.round(Math.abs(protDiffPct))}% below target`);
+    }
+
+    return { score, status, label, warn, calDiffPct, protDiffPct };
 }
 function getRecipeVariantActiveRecipe(row){
     if(!row) return null;
@@ -1655,13 +1738,12 @@ function getRecipeFitScore(r){
     let score = 0;
     const addPerson = (prefix, actualCal, actualProt) => {
       const tgt = getBudgets(prefix, mealType);
-      const calPct = tgt.cal ? Math.abs(actualCal - tgt.cal) / tgt.cal * 100 : 0;
-      const protPct = tgt.prot ? Math.max(0, tgt.prot - actualProt) / tgt.prot * 100 : 0;
-      score += calPct + protPct;
+      const fit = calculateFit(actualCal, actualProt, tgt.cal, tgt.prot);
+      score += fit.score;
     };
     if(r.who === 'both' || r.who === 'Elliott') addPerson('e', portions.eCal, portions.eProt);
     if(r.who === 'both' || r.who === 'Chloe') addPerson('c', portions.cCal, portions.cProt);
-    return { raw: score, display: Math.round(score), usingEnhanced, portions };
+    return { raw: score, display: Math.round(score * 100), usingEnhanced, portions };
 }
 
 
