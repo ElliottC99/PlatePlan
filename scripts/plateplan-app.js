@@ -13748,7 +13748,7 @@ function renderPlan(){
     }
 
     return `<div class="recipe-search-wrap">
-      <input class="recipe-search-input" id="${inputId}" placeholder="Swap ${ppEscapeHtml(typeTitle)}..." oninput="filterRecipeSwap('${inputId}','${listId}')" onfocus="filterRecipeSwap('${inputId}','${listId}')">
+      <input class="recipe-search-input" id="${inputId}" type="text" autocomplete="off" spellcheck="false" data-update-ignore="true" placeholder="Swap ${ppEscapeHtml(typeTitle)}..." oninput="filterRecipeSwap(this,'${listId}')" onfocus="filterRecipeSwap(this,'${listId}')">
       <div class="recipe-search-drop" id="${listId}">
         ${optionsHtml}
       </div>
@@ -14102,22 +14102,27 @@ function deletePlanHistory(index){
   );
 }
 
-function filterRecipeSwap(inputId, listId){
-  const input=document.getElementById(inputId), list=document.getElementById(listId);
-  if(!input||!list)return;
+function filterRecipeSwap(inputRef, listRef){
+  const input = typeof inputRef === 'string' ? document.getElementById(inputRef) : (inputRef?.target ? inputRef.target : inputRef);
+  const list = typeof listRef === 'string' ? document.getElementById(listRef) : listRef;
+  if(!input || !list) return;
+  
   document.querySelectorAll('.recipe-search-drop').forEach(d => {
-    if(d.id !== listId) d.style.display = 'none';
+    if(d !== list) d.style.display = 'none';
   });
-  const terms=(input.value||'').toLowerCase().split(/\s+/).filter(Boolean);
-  list.style.display='block';
+  
+  const terms = (input.value || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  list.style.display = 'block';
+  
   let visibleCount = 0;
   const opts = list.querySelectorAll('.recipe-search-opt');
   opts.forEach(el => {
-    const hay=(el.dataset.search||el.textContent||'').toLowerCase();
-    const match = !terms.length || terms.every(t=>hay.includes(t));
+    const hay = (el.dataset.search || el.textContent || '').toLowerCase();
+    const match = !terms.length || terms.every(t => hay.includes(t));
     el.style.display = match ? '' : 'none';
     if(match) visibleCount++;
   });
+  
   let noMatchEl = list.querySelector('.recipe-search-no-match');
   if(opts.length > 0) {
     if(!visibleCount){
