@@ -13722,50 +13722,6 @@ function renderPlan(){
   const startInput=document.getElementById('plan-start-date');if(startInput)startInput.value=state.plan.dayDates?.[1]||'';
   let hasValidSlots = false;
   
-  const plannerOptionNutritionCache = new Map();
-  const getQuickOptionNutrition = (opt, type, who) => {
-    const personKey = String(who || '').toLowerCase().startsWith('c') ? 'c' : 'e';
-    const cacheKey = `${opt.id}:${opt.variant || 'original'}:${type}:${personKey}`;
-    if (plannerOptionNutritionCache.has(cacheKey)) return plannerOptionNutritionCache.get(cacheKey);
-    const info = getPlanSlotInfo({ id: opt.id, variant: opt.variant });
-    const bundle = info.recipe ? calculateRecipeDisplayNutrition({ recipe: info.recipe, variant: info.variant, mealType: type }) : null;
-    const portions = bundle?.portions || null;
-    const n = personKey === 'c' ? { cal: portions?.cCal || 0, prot: portions?.cProt || 0 } : { cal: portions?.eCal || 0, prot: portions?.eProt || 0 };
-    plannerOptionNutritionCache.set(cacheKey, n);
-    return n;
-  };
-
-  const mkSel=(day,slot,type,who)=>{
-    const p=getPlannerRecipeOptions(type, who);
-    const curObj=slots[day]?.[slot];
-    const curInfo=getPlanSlotInfo(curObj);
-    const curValue=curInfo.id ? curInfo.id + (curInfo.variant === 'enhanced' ? '::enhanced' : '') : '';
-    const listId=`recipe-drop-${day}-${slot}`;
-    const inputId=`recipe-search-${day}-${slot}`;
-    const typeTitle=toTitleCase(type);
-    
-    let optionsHtml = '';
-    if(p.length){
-      optionsHtml = p.map(opt=>{
-        const value=opt.id+(opt.variant==='enhanced'?'::enhanced':'');
-        const n=getQuickOptionNutrition(opt, type, who);
-        const searchStr=(opt.label+' '+(opt.enhanced?'enhanced':'')+' '+Math.round(n.cal||0)+' '+round1(n.prot||0)).toLowerCase();
-        return `<div class="recipe-search-opt" data-search="${ppEscapeAttr(searchStr)}" onclick="swapSlot(${day},'${slot}','${value}')">
-          <div style="font-weight:600">${ppEscapeHtml(opt.label)} ${opt.enhanced?'<span class="tag green">Enhanced</span>':''} ${curValue===value?'<span class="tag">current</span>':''}</div>
-          <div style="color:var(--text2);font-size:11px">${Math.round(n.cal||0)} kcal / P${round1(n.prot||0)}g</div>
-        </div>`;
-      }).join('');
-    } else {
-      optionsHtml = `<div class="recipe-search-no-match" style="padding:12px;font-size:12px;color:var(--text3);text-align:center">No ${ppEscapeHtml(typeTitle)} recipes available</div>`;
-    }
-
-    return `<div class="recipe-search-wrap">
-      <input class="recipe-search-input" id="${inputId}" type="text" autocomplete="off" spellcheck="false" data-update-ignore="true" placeholder="Swap ${ppEscapeHtml(typeTitle)}..." oninput="filterRecipeSwap(this,'${listId}')" onfocus="filterRecipeSwap(this,'${listId}')">
-      <div class="recipe-search-drop" id="${listId}">
-        ${optionsHtml}
-      </div>
-    </div>`;
-  };
   const makeRenderedDaySummary = () => {
     const totals = { e:{cal:0, prot:0}, c:{cal:0, prot:0} };
     const assumed = { e:{cal:0, prot:0, labels:['snacks']}, c:{cal:0, prot:0, labels:['snacks']} };
@@ -13863,12 +13819,12 @@ function renderPlan(){
       const slotReason=getPlanSlotReason(state.plan,d,sl.key);
       const slotReasonLabel=formatPlanSlotReason(slotReason);
       const slotActionsHtml = showRecipe
-        ? '<div class="slot-actions"><span class="slot-macro">'+calStr+'</span><button class="btn sm primary" onclick="viewRecipe(\''+rId+'\', \''+(instanceId||'')+'\', \''+slotInfo.variant+'\')">View</button><button class="btn sm ghost" onclick="openPlannedMealActions('+d+',\''+sl.key+'\')">More</button></div>'
+        ? '<div class="slot-actions"><span class="slot-macro">'+calStr+'</span><button class="btn sm primary" onclick="viewRecipe(\''+rId+'\', \''+(instanceId||'')+'\', \''+slotInfo.variant+'\')">View</button><button class="btn sm ghost" onclick="openSwapMealModal('+d+',\''+sl.key+'\')">Swap</button><button class="btn sm ghost" onclick="openPlannedMealActions('+d+',\''+sl.key+'\')">More</button></div>'
         : slotReason
-          ? '<div class="slot-actions"><button class="btn sm ghost" onclick="clearPlanSlotReason('+d+',\''+sl.key+'\')">Clear reason</button></div>'
-          : '';
+          ? '<div class="slot-actions"><button class="btn sm ghost" onclick="openSwapMealModal('+d+',\''+sl.key+'\')">Choose Meal</button><button class="btn sm ghost" onclick="clearPlanSlotReason('+d+',\''+sl.key+'\')">Clear reason</button></div>'
+          : '<div class="slot-actions"><button class="btn sm ghost" onclick="openSwapMealModal('+d+',\''+sl.key+'\')">Choose Meal</button></div>';
       const emptyContent=slotReason?'<span class="plan-slot-reason">'+ppEscapeHtml(slotReasonLabel)+'</span>':'<span style="color:var(--text3)">Not set</span>';
-      dayRowsHtml+='<div class="slot-row"'+rowAttrs+'><span class="slot-lbl" style="color:'+SLOT_COLORS[sl.key]+'">'+lblLines[0]+'<br>'+lblLines[1]+'</span>'+(isEx?'<span class="slot-skipped">Not needed</span>':'<span class="slot-name'+(r&&/(?:https?:\/\/|www\.)/i.test(r.name||'')?' breakable-url':'')+'">'+(r?ppEscapeHtml(r.name):emptyContent)+(slotInfo.variant==='enhanced'?' <span class="tag green">Enhanced</span>':'')+'</span>'+slotActionsHtml+mkSel(d,sl.key,sl.key.includes('breakfast')?'breakfast':sl.key.includes('lunch')?'lunch':'dinner',sl.key.endsWith('E')?'Elliott':sl.key.endsWith('C')?'Chloe':'any'))+'</div>';
+      dayRowsHtml+='<div class="slot-row"'+rowAttrs+'><span class="slot-lbl" style="color:'+SLOT_COLORS[sl.key]+'">'+lblLines[0]+'<br>'+lblLines[1]+'</span>'+(isEx?'<span class="slot-skipped">Not needed</span>':'<span class="slot-name'+(r&&/(?:https?:\/\/|www\.)/i.test(r.name||'')?' breakable-url':'')+'">'+(r?ppEscapeHtml(r.name):emptyContent)+(slotInfo.variant==='enhanced'?' <span class="tag green">Enhanced</span>':'')+'</span>'+slotActionsHtml)+'</div>';
     });
     daySummary.score = calculatePlanDayScoreFromTotals(daySummary.totals);
     const summaryHtml = ['e','c'].map(p=>`<div class="summary-box">${renderPlannerPersonSummaryBox(p, daySummary)}</div>`).join('');
@@ -13914,6 +13870,190 @@ function swapSlot(day,slot,id){
     saveState();
     renderPlan();
     showPlatePlanToast(swappedName ? `Swapped meal to ${swappedName}` : 'Meal slot cleared');
+}
+
+let currentSwapModalContext = null;
+let currentSwapModalFilter = 'all';
+
+function openSwapMealModal(day, slotKey) {
+  const dayNum = +day;
+  const slotInfo = getPlanSlotInfo(state.plan?.slots?.[dayNum]?.[slotKey]);
+  const mealType = slotKey.includes('breakfast') ? 'breakfast' : slotKey.includes('lunch') ? 'lunch' : 'dinner';
+  const who = slotKey.endsWith('E') ? 'Elliott' : slotKey.endsWith('C') ? 'Chloe' : 'any';
+  const dayLabel = formatPlanDayLabel(state.plan, dayNum, { short: true });
+  const typeTitle = toTitleCase(mealType);
+
+  const options = getPlannerRecipeOptions(mealType, who);
+  const curValue = slotInfo.id ? slotInfo.id + (slotInfo.variant === 'enhanced' ? '::enhanced' : '') : '';
+
+  currentSwapModalContext = {
+    day: dayNum,
+    slotKey,
+    mealType,
+    who,
+    dayLabel,
+    curValue,
+    curInfo: slotInfo,
+    options
+  };
+
+  let wrap = document.getElementById('swap-meal-modal-wrap');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'swap-meal-modal-wrap';
+    wrap.className = 'modal-wrap';
+    document.body.appendChild(wrap);
+  }
+
+  const curRecipeName = slotInfo.active ? (slotInfo.active.name || slotInfo.recipe?.name || 'Current Meal') : null;
+
+  wrap.innerHTML = `<div class="modal swap-meal-modal" style="max-width:620px;width:92vw;max-height:90vh;display:flex;flex-direction:column">
+    <div class="row-between" style="align-items:center;margin-bottom:12px;gap:10px;flex-shrink:0">
+      <div>
+        <h3 style="margin:0;font-size:17px;font-weight:700;color:var(--text)">Swap Meal — ${ppEscapeHtml(dayLabel)}</h3>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">${ppEscapeHtml(who)}'s ${ppEscapeHtml(typeTitle)}</div>
+      </div>
+      <button class="btn sm ghost" onclick="closeSwapMealModal()" aria-label="Close modal" style="font-size:16px;padding:4px 10px">✕</button>
+    </div>
+
+    ${curRecipeName ? `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;flex-shrink:0">
+        <div>
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Currently Planned</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-top:1px">${ppEscapeHtml(curRecipeName)} ${slotInfo.variant==='enhanced'?'<span class="tag green">Enhanced</span>':''}</div>
+        </div>
+        <button class="btn sm danger" onclick="executeSwapSlotAndClose(${dayNum}, '${slotKey}', '')">Clear Slot</button>
+      </div>
+    ` : `
+      <div style="background:var(--surface2);border:1px dashed var(--border);border-radius:10px;padding:10px 14px;margin-bottom:14px;color:var(--text3);font-size:13px;font-style:italic;flex-shrink:0">
+        No meal currently planned for this slot.
+      </div>
+    `}
+
+    <div style="margin-bottom:12px;display:flex;flex-direction:column;gap:8px;flex-shrink:0">
+      <div style="position:relative">
+        <input type="text" id="swap-modal-search-input" class="input" placeholder="Type to filter recipes (e.g. Chicken, Omelette, 500kcal)..." style="width:100%;font-size:13px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text)" oninput="renderSwapModalOptionsList()" autocomplete="off" spellcheck="false">
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;color:var(--text3);font-weight:600;margin-right:2px">Filter:</span>
+        <button type="button" class="btn sm active-filter-btn" id="swap-filter-all" onclick="setSwapModalFilter('all')">All (${options.length})</button>
+        <button type="button" class="btn sm ghost" id="swap-filter-enhanced" onclick="setSwapModalFilter('enhanced')">Enhanced</button>
+        <button type="button" class="btn sm ghost" id="swap-filter-original" onclick="setSwapModalFilter('original')">Original</button>
+      </div>
+    </div>
+
+    <div id="swap-modal-list-container" class="swap-modal-list" style="flex:1;min-height:180px;max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface)">
+    </div>
+
+    <div class="row-between" style="margin-top:14px;align-items:center;flex-shrink:0">
+      <button class="btn ghost sm" onclick="quickRandomizeSwap(${dayNum}, '${slotKey}')">🎲 Random Swap</button>
+      <button class="btn ghost sm" onclick="closeSwapMealModal()">Cancel</button>
+    </div>
+  </div>`;
+
+  wrap.classList.add('open');
+  currentSwapModalFilter = 'all';
+  renderSwapModalOptionsList();
+
+  setTimeout(() => {
+    document.getElementById('swap-modal-search-input')?.focus?.();
+  }, 100);
+}
+
+function setSwapModalFilter(filterType) {
+  currentSwapModalFilter = filterType;
+  ['all', 'enhanced', 'original'].forEach(f => {
+    const btn = document.getElementById(`swap-filter-${f}`);
+    if (btn) {
+      if (f === filterType) {
+        btn.className = 'btn sm active-filter-btn';
+      } else {
+        btn.className = 'btn sm ghost';
+      }
+    }
+  });
+  renderSwapModalOptionsList();
+}
+
+function renderSwapModalOptionsList() {
+  const container = document.getElementById('swap-modal-list-container');
+  if (!container || !currentSwapModalContext) return;
+
+  const { day, slotKey, mealType, who, curValue, options } = currentSwapModalContext;
+  const input = document.getElementById('swap-modal-search-input');
+  const rawQuery = (input?.value || '').trim();
+  const normalize = str => (str || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const terms = normalize(rawQuery).split(' ').filter(Boolean);
+
+  let filtered = options.filter(opt => {
+    if (currentSwapModalFilter === 'enhanced' && opt.variant !== 'enhanced') return false;
+    if (currentSwapModalFilter === 'original' && opt.variant === 'enhanced') return false;
+    if (!terms.length) return true;
+
+    const info = getPlanSlotInfo({ id: opt.id, variant: opt.variant });
+    const bundle = info.recipe ? calculateRecipeDisplayNutrition({ recipe: info.recipe, variant: info.variant, mealType }) : null;
+    const portions = bundle?.portions || null;
+    const personKey = String(who || '').toLowerCase().startsWith('c') ? 'c' : 'e';
+    const n = personKey === 'c' ? { cal: portions?.cCal || 0, prot: portions?.cProt || 0 } : { cal: portions?.eCal || 0, prot: portions?.eProt || 0 };
+
+    const searchHaystack = normalize(`${opt.label} ${opt.variant || ''} ${Math.round(n.cal || 0)}kcal ${round1(n.prot || 0)}g ${info.recipe?.ingredients?.map(i=>i.name).join(' ')||''}`);
+    return terms.every(t => searchHaystack.includes(t));
+  });
+
+  if (!filtered.length) {
+    container.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">
+      No matching replacement recipes found. Try a different search term or filter.
+    </div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(opt => {
+    const value = opt.id + (opt.variant === 'enhanced' ? '::enhanced' : '');
+    const isCurrent = curValue === value;
+    const info = getPlanSlotInfo({ id: opt.id, variant: opt.variant });
+    const bundle = info.recipe ? calculateRecipeDisplayNutrition({ recipe: info.recipe, variant: info.variant, mealType }) : null;
+    const portions = bundle?.portions || null;
+    const personKey = String(who || '').toLowerCase().startsWith('c') ? 'c' : 'e';
+    const n = personKey === 'c' ? { cal: portions?.cCal || 0, prot: portions?.cProt || 0 } : { cal: portions?.eCal || 0, prot: portions?.eProt || 0 };
+
+    return `<div class="swap-modal-item ${isCurrent ? 'is-current' : ''}" style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;transition:background 0.15s ease" onclick="executeSwapSlotAndClose(${day}, '${slotKey}', '${ppEscapeAttr(value)}')">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span>${ppEscapeHtml(opt.label)}</span>
+          ${opt.enhanced ? '<span class="tag green">Enhanced</span>' : ''}
+          ${isCurrent ? '<span class="tag">Currently Selected</span>' : ''}
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:3px;display:flex;gap:12px;flex-wrap:wrap">
+          <span>🔥 <strong>${Math.round(n.cal || 0)}</strong> kcal</span>
+          <span>💪 <strong>${round1(n.prot || 0)}</strong>g protein</span>
+          ${info.recipe?.serves ? `<span>🍽️ Serves ${info.recipe.serves}</span>` : ''}
+        </div>
+      </div>
+      <div style="flex-shrink:0">
+        <button class="btn sm ${isCurrent ? 'ghost' : 'primary'}" type="button">${isCurrent ? 'Selected' : 'Swap'}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function executeSwapSlotAndClose(day, slotKey, value) {
+  swapSlot(day, slotKey, value);
+  closeSwapMealModal();
+}
+
+function closeSwapMealModal() {
+  const wrap = document.getElementById('swap-meal-modal-wrap');
+  if (wrap) wrap.classList.remove('open');
+  currentSwapModalContext = null;
+}
+
+function quickRandomizeSwap(day, slotKey) {
+  if (!currentSwapModalContext || !currentSwapModalContext.options.length) return;
+  const options = currentSwapModalContext.options;
+  const randomIndex = Math.floor(Math.random() * options.length);
+  const picked = options[randomIndex];
+  const value = picked.id + (picked.variant === 'enhanced' ? '::enhanced' : '');
+  executeSwapSlotAndClose(day, slotKey, value);
 }
 
 function clearPlan(){
