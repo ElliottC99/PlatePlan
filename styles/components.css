@@ -140,8 +140,10 @@ textarea{resize:vertical;min-height:90px}
 .recipe-search-input{width:100%;font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);position:relative;z-index:2;pointer-events:auto;user-select:text;-webkit-user-select:text;cursor:text}
 .recipe-search-input:focus{outline:2px solid var(--green);border-color:var(--green)}
 .recipe-search-drop{display:none;position:absolute;top:calc(100% + 4px);right:0;width:280px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;max-height:240px;overflow-y:auto;z-index:1001;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.swap-modal-item{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;transition:all .15s ease}
 .swap-modal-item:hover{background:var(--surface2)}
-.swap-modal-item.is-current{background:var(--surface2);border-left:3px solid var(--green)}
+.swap-modal-item.is-current{background:var(--surface2);border-left:3px solid var(--border-strong)}
+.swap-modal-item.is-selected{background:var(--green-bg, rgba(16, 185, 129, 0.08))!important;border-left:4px solid var(--green)!important;outline:1px solid var(--green)}
 .active-filter-btn{background:var(--surface3)!important;font-weight:600!important;border-color:var(--border-strong)!important}
 .shop-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
 .excl-day{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 6px;text-align:center;cursor:pointer;transition:all .15s}

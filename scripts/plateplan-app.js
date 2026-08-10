@@ -13886,6 +13886,37 @@ function openSwapMealModal(day, slotKey) {
   const options = getPlannerRecipeOptions(mealType, who);
   const curValue = slotInfo.id ? slotInfo.id + (slotInfo.variant === 'enhanced' ? '::enhanced' : '') : '';
 
+  const personKey = String(who || '').toLowerCase().startsWith('c') ? 'c' : 'e';
+  const items = options.map(opt => {
+    const value = opt.id + (opt.variant === 'enhanced' ? '::enhanced' : '');
+    let cal = 0, prot = 0, serves = 0, ingredientsText = '';
+    try {
+      const info = getPlanSlotInfo({ id: opt.id, variant: opt.variant });
+      if (info.recipe) {
+        serves = info.recipe.serves || 0;
+        ingredientsText = (info.recipe.ingredients || []).map(i => i.name || i.ingredient || '').join(' ');
+        const bundle = calculateRecipeDisplayNutrition({ recipe: info.recipe, variant: info.variant, mealType });
+        const portions = bundle?.portions || null;
+        cal = personKey === 'c' ? (portions?.cCal || 0) : (portions?.eCal || 0);
+        prot = personKey === 'c' ? (portions?.cProt || 0) : (portions?.eProt || 0);
+      }
+    } catch(e) {
+      console.warn('Error calculating recipe nutrition for option:', e);
+    }
+    return {
+      id: opt.id,
+      variant: opt.variant || 'original',
+      value,
+      label: opt.label || 'Untitled Recipe',
+      enhanced: !!opt.enhanced,
+      cal: Math.round(cal || 0),
+      prot: round1(prot || 0),
+      serves,
+      ingredientsText,
+      searchHaystack: `${opt.label} ${opt.variant || ''} ${Math.round(cal || 0)}kcal ${round1(prot || 0)}g ${ingredientsText}`.toLowerCase()
+    };
+  });
+
   currentSwapModalContext = {
     day: dayNum,
     slotKey,
@@ -13894,7 +13925,8 @@ function openSwapMealModal(day, slotKey) {
     dayLabel,
     curValue,
     curInfo: slotInfo,
-    options
+    selectedRecipeValue: null,
+    items
   };
 
   let wrap = document.getElementById('swap-meal-modal-wrap');
@@ -13907,7 +13939,7 @@ function openSwapMealModal(day, slotKey) {
 
   const curRecipeName = slotInfo.active ? (slotInfo.active.name || slotInfo.recipe?.name || 'Current Meal') : null;
 
-  wrap.innerHTML = `<div class="modal swap-meal-modal" style="max-width:620px;width:92vw;max-height:90vh;display:flex;flex-direction:column">
+  wrap.innerHTML = `<div class="modal swap-meal-modal" style="max-width:640px;width:94vw;max-height:90vh;display:flex;flex-direction:column">
     <div class="row-between" style="align-items:center;margin-bottom:12px;gap:10px;flex-shrink:0">
       <div>
         <h3 style="margin:0;font-size:17px;font-weight:700;color:var(--text)">Swap Meal — ${ppEscapeHtml(dayLabel)}</h3>
@@ -13917,7 +13949,7 @@ function openSwapMealModal(day, slotKey) {
     </div>
 
     ${curRecipeName ? `
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;flex-shrink:0">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;flex-shrink:0">
         <div>
           <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Currently Planned</div>
           <div style="font-size:14px;font-weight:600;color:var(--text);margin-top:1px">${ppEscapeHtml(curRecipeName)} ${slotInfo.variant==='enhanced'?'<span class="tag green">Enhanced</span>':''}</div>
@@ -13925,7 +13957,7 @@ function openSwapMealModal(day, slotKey) {
         <button class="btn sm danger" onclick="executeSwapSlotAndClose(${dayNum}, '${slotKey}', '')">Clear Slot</button>
       </div>
     ` : `
-      <div style="background:var(--surface2);border:1px dashed var(--border);border-radius:10px;padding:10px 14px;margin-bottom:14px;color:var(--text3);font-size:13px;font-style:italic;flex-shrink:0">
+      <div style="background:var(--surface2);border:1px dashed var(--border);border-radius:10px;padding:10px 14px;margin-bottom:12px;color:var(--text3);font-size:13px;font-style:italic;flex-shrink:0">
         No meal currently planned for this slot.
       </div>
     `}
@@ -13936,18 +13968,23 @@ function openSwapMealModal(day, slotKey) {
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <span style="font-size:11px;color:var(--text3);font-weight:600;margin-right:2px">Filter:</span>
-        <button type="button" class="btn sm active-filter-btn" id="swap-filter-all" onclick="setSwapModalFilter('all')">All (${options.length})</button>
+        <button type="button" class="btn sm active-filter-btn" id="swap-filter-all" onclick="setSwapModalFilter('all')">All (${items.length})</button>
         <button type="button" class="btn sm ghost" id="swap-filter-enhanced" onclick="setSwapModalFilter('enhanced')">Enhanced</button>
         <button type="button" class="btn sm ghost" id="swap-filter-original" onclick="setSwapModalFilter('original')">Original</button>
       </div>
     </div>
 
-    <div id="swap-modal-list-container" class="swap-modal-list" style="flex:1;min-height:180px;max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface)">
+    <div id="swap-modal-list-container" class="swap-modal-list" style="flex:1;min-height:200px;max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface)">
     </div>
 
-    <div class="row-between" style="margin-top:14px;align-items:center;flex-shrink:0">
-      <button class="btn ghost sm" onclick="quickRandomizeSwap(${dayNum}, '${slotKey}')">🎲 Random Swap</button>
-      <button class="btn ghost sm" onclick="closeSwapMealModal()">Cancel</button>
+    <div class="row-between" style="margin-top:14px;align-items:center;flex-shrink:0;gap:10px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn ghost sm" onclick="quickRandomizeSwap(${dayNum}, '${slotKey}')">🎲 Random Swap</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn ghost sm" onclick="closeSwapMealModal()">Cancel</button>
+        <button id="swap-modal-confirm-btn" class="btn primary sm" disabled onclick="confirmSwapMealModal()">Confirm Swap</button>
+      </div>
     </div>
   </div>`;
 
@@ -13975,62 +14012,81 @@ function setSwapModalFilter(filterType) {
   renderSwapModalOptionsList();
 }
 
+function selectSwapModalRecipe(value) {
+  if (!currentSwapModalContext) return;
+  currentSwapModalContext.selectedRecipeValue = value;
+
+  const confirmBtn = document.getElementById('swap-modal-confirm-btn');
+  if (confirmBtn) {
+    const selectedItem = currentSwapModalContext.items.find(i => i.value === value);
+    confirmBtn.disabled = !value;
+    confirmBtn.textContent = selectedItem ? `Confirm Swap to "${selectedItem.label}"` : 'Confirm Swap';
+  }
+
+  const container = document.getElementById('swap-modal-list-container');
+  if (container) {
+    container.querySelectorAll('.swap-modal-item').forEach(el => {
+      if (el.dataset.value === value) {
+        el.classList.add('is-selected');
+      } else {
+        el.classList.remove('is-selected');
+      }
+    });
+  }
+}
+
+function confirmSwapMealModal() {
+  if (!currentSwapModalContext || !currentSwapModalContext.selectedRecipeValue) return;
+  const { day, slotKey, selectedRecipeValue } = currentSwapModalContext;
+  executeSwapSlotAndClose(day, slotKey, selectedRecipeValue);
+}
+
 function renderSwapModalOptionsList() {
   const container = document.getElementById('swap-modal-list-container');
   if (!container || !currentSwapModalContext) return;
 
-  const { day, slotKey, mealType, who, curValue, options } = currentSwapModalContext;
+  const { curValue, items, selectedRecipeValue } = currentSwapModalContext;
   const input = document.getElementById('swap-modal-search-input');
-  const rawQuery = (input?.value || '').trim();
+  const rawQuery = (input?.value || '').trim().toLowerCase();
   const normalize = str => (str || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   const terms = normalize(rawQuery).split(' ').filter(Boolean);
 
-  let filtered = options.filter(opt => {
-    if (currentSwapModalFilter === 'enhanced' && opt.variant !== 'enhanced') return false;
-    if (currentSwapModalFilter === 'original' && opt.variant === 'enhanced') return false;
+  let filtered = items.filter(item => {
+    if (currentSwapModalFilter === 'enhanced' && item.variant !== 'enhanced') return false;
+    if (currentSwapModalFilter === 'original' && item.variant === 'enhanced') return false;
     if (!terms.length) return true;
-
-    const info = getPlanSlotInfo({ id: opt.id, variant: opt.variant });
-    const bundle = info.recipe ? calculateRecipeDisplayNutrition({ recipe: info.recipe, variant: info.variant, mealType }) : null;
-    const portions = bundle?.portions || null;
-    const personKey = String(who || '').toLowerCase().startsWith('c') ? 'c' : 'e';
-    const n = personKey === 'c' ? { cal: portions?.cCal || 0, prot: portions?.cProt || 0 } : { cal: portions?.eCal || 0, prot: portions?.eProt || 0 };
-
-    const searchHaystack = normalize(`${opt.label} ${opt.variant || ''} ${Math.round(n.cal || 0)}kcal ${round1(n.prot || 0)}g ${info.recipe?.ingredients?.map(i=>i.name).join(' ')||''}`);
-    return terms.every(t => searchHaystack.includes(t));
+    return terms.every(t => item.searchHaystack.includes(t));
   });
 
   if (!filtered.length) {
-    container.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">
-      No matching replacement recipes found. Try a different search term or filter.
+    container.innerHTML = `<div style="padding:28px;text-align:center;color:var(--text3);font-size:13px">
+      No matching recipes found for "${ppEscapeHtml(rawQuery)}".
     </div>`;
     return;
   }
 
-  container.innerHTML = filtered.map(opt => {
-    const value = opt.id + (opt.variant === 'enhanced' ? '::enhanced' : '');
-    const isCurrent = curValue === value;
-    const info = getPlanSlotInfo({ id: opt.id, variant: opt.variant });
-    const bundle = info.recipe ? calculateRecipeDisplayNutrition({ recipe: info.recipe, variant: info.variant, mealType }) : null;
-    const portions = bundle?.portions || null;
-    const personKey = String(who || '').toLowerCase().startsWith('c') ? 'c' : 'e';
-    const n = personKey === 'c' ? { cal: portions?.cCal || 0, prot: portions?.cProt || 0 } : { cal: portions?.eCal || 0, prot: portions?.eProt || 0 };
+  container.innerHTML = filtered.map(item => {
+    const isCurrent = curValue === item.value;
+    const isSelected = selectedRecipeValue === item.value;
 
-    return `<div class="swap-modal-item ${isCurrent ? 'is-current' : ''}" style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;transition:background 0.15s ease" onclick="executeSwapSlotAndClose(${day}, '${slotKey}', '${ppEscapeAttr(value)}')">
+    return `<div class="swap-modal-item ${isCurrent ? 'is-current' : ''} ${isSelected ? 'is-selected' : ''}" data-value="${ppEscapeAttr(item.value)}" onclick="selectSwapModalRecipe('${ppEscapeAttr(item.value)}')" ondblclick="executeSwapSlotAndClose(${currentSwapModalContext.day}, '${currentSwapModalContext.slotKey}', '${ppEscapeAttr(item.value)}')">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <span>${ppEscapeHtml(opt.label)}</span>
-          ${opt.enhanced ? '<span class="tag green">Enhanced</span>' : ''}
+          <span>${ppEscapeHtml(item.label)}</span>
+          ${item.enhanced ? '<span class="tag green">Enhanced</span>' : ''}
           ${isCurrent ? '<span class="tag">Currently Selected</span>' : ''}
+          ${isSelected ? '<span class="tag green">✓ Ready to swap</span>' : ''}
         </div>
-        <div style="font-size:11px;color:var(--text2);margin-top:3px;display:flex;gap:12px;flex-wrap:wrap">
-          <span>🔥 <strong>${Math.round(n.cal || 0)}</strong> kcal</span>
-          <span>💪 <strong>${round1(n.prot || 0)}</strong>g protein</span>
-          ${info.recipe?.serves ? `<span>🍽️ Serves ${info.recipe.serves}</span>` : ''}
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;display:flex;gap:12px;flex-wrap:wrap">
+          <span>🔥 <strong>${item.cal}</strong> kcal</span>
+          <span>💪 <strong>${item.prot}</strong>g protein</span>
+          ${item.serves ? `<span>🍽️ Serves ${item.serves}</span>` : ''}
         </div>
       </div>
       <div style="flex-shrink:0">
-        <button class="btn sm ${isCurrent ? 'ghost' : 'primary'}" type="button">${isCurrent ? 'Selected' : 'Swap'}</button>
+        <button class="btn sm ${isSelected ? 'primary' : 'ghost'}" type="button" onclick="event.stopPropagation(); selectSwapModalRecipe('${ppEscapeAttr(item.value)}');">
+          ${isSelected ? 'Selected ✓' : 'Select'}
+        </button>
       </div>
     </div>`;
   }).join('');
@@ -14048,13 +14104,21 @@ function closeSwapMealModal() {
 }
 
 function quickRandomizeSwap(day, slotKey) {
-  if (!currentSwapModalContext || !currentSwapModalContext.options.length) return;
-  const options = currentSwapModalContext.options;
-  const randomIndex = Math.floor(Math.random() * options.length);
-  const picked = options[randomIndex];
-  const value = picked.id + (picked.variant === 'enhanced' ? '::enhanced' : '');
-  executeSwapSlotAndClose(day, slotKey, value);
+  if (!currentSwapModalContext || !currentSwapModalContext.items.length) return;
+  const items = currentSwapModalContext.items;
+  const randomIndex = Math.floor(Math.random() * items.length);
+  const picked = items[randomIndex];
+  executeSwapSlotAndClose(day, slotKey, picked.value);
 }
+
+window.openSwapMealModal = openSwapMealModal;
+window.closeSwapMealModal = closeSwapMealModal;
+window.setSwapModalFilter = setSwapModalFilter;
+window.selectSwapModalRecipe = selectSwapModalRecipe;
+window.confirmSwapMealModal = confirmSwapMealModal;
+window.executeSwapSlotAndClose = executeSwapSlotAndClose;
+window.quickRandomizeSwap = quickRandomizeSwap;
+window.renderSwapModalOptionsList = renderSwapModalOptionsList;
 
 function clearPlan(){
     state.plan={}; 
