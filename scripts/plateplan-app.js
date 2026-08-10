@@ -1442,10 +1442,13 @@ function initializePlatePlanApplication(){
   window.addEventListener('online',()=>{ updatePlatePlanSyncStatus(getPlatePlanSyncOutbox().length?'saving':'connecting'); flushPlatePlanSyncOutbox(); });
   window.addEventListener('offline',()=>updatePlatePlanSyncStatus('offline'));
 
-  // Close map dropdowns on outside click
+  // Close map and recipe search dropdowns on outside click
   document.addEventListener('click', (e) => {
       if(!e.target.closest('.mapping-search-container')) {
           document.querySelectorAll('.map-dropdown').forEach(d => d.style.display = 'none');
+      }
+      if(!e.target.closest('.recipe-search-wrap')) {
+          document.querySelectorAll('.recipe-search-drop').forEach(d => d.style.display = 'none');
       }
   });
 }
@@ -4139,9 +4142,18 @@ function renderMealPrepSuggestions(){
 
 function getPlannerRecipeOptions(type, who, opts = {}){
   const used = opts.avoidHistory ? getUsedRecipeIdsFromHistory() : new Map();
+  const targetType = String(type || '').toLowerCase();
+  const targetWho = String(who || '').toLowerCase();
+
   let rows = state.recipes
-    .filter(r => (r.types || [r.type]).includes(type) && (who === 'any' || r.who === who || r.who === 'both'))
-    .filter(r => !opts.applyExclusions || who === 'any' || recipeAllowedForPerson(r, who))
+    .filter(r => {
+      const recipeTypes = (r.types || [r.type || 'dinner']).map(t => String(t).toLowerCase());
+      const typeMatches = recipeTypes.includes(targetType);
+      const recipeWho = String(r.who || 'both').toLowerCase();
+      const whoMatches = targetWho === 'any' || recipeWho === 'any' || recipeWho === 'both' || recipeWho === targetWho;
+      return typeMatches && whoMatches;
+    })
+    .filter(r => !opts.applyExclusions || targetWho === 'any' || recipeAllowedForPerson(r, who))
     .flatMap(r => {
       const rows = [{ id:r.id, variant:'original', recipe:r, label:r.name }];
       if(r.enhanced) rows.push({ id:r.id, variant:'enhanced', recipe:r, label:(r.enhanced.name || r.name + ' (Enhanced)'), enhanced:true });
@@ -13642,6 +13654,56 @@ function togglePlatePlanEarlierDays(){
   }
 }
 
+function checkIsPlanExpired(plan, localToday){
+  if(!plan || !plan.slots) return false;
+  const days = plan.days || Object.keys(plan.slots).length || 0;
+  if(!days) return false;
+  const datedEntries = Object.entries(plan.dayDates || {}).filter(([, v]) => !!parsePlanLocalDate(v));
+  if(!datedEntries.length) return false;
+  const dates = datedEntries.map(([, v]) => v).sort();
+  const maxDate = dates[dates.length - 1];
+  return maxDate < localToday;
+}
+
+function getTomorrowLocalDate(){
+  const now = new Date();
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const y = tomorrow.getFullYear();
+  const m = String(tomorrow.getMonth() + 1).padStart(2, '0');
+  const d = String(tomorrow.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function generateNewPlanStartingTomorrow(){
+  const tomorrow = getTomorrowLocalDate();
+  const startInput = document.getElementById('plan-start-date');
+  if(startInput) startInput.value = tomorrow;
+  const quickStartInput = document.getElementById('plan-quick-start');
+  if(quickStartInput) quickStartInput.value = tomorrow;
+  
+  const days = state.plan?.days || parseInt(document.getElementById('plan-days')?.value, 10) || 7;
+  if(state.plan) {
+    state.plan.dayDates = buildPlanDayDates(tomorrow, days);
+  }
+  
+  const setupCard = document.getElementById('plan-setup-card');
+  if(setupCard) setupCard.style.display = '';
+
+  generatePlan();
+  showPlatePlanToast('Generated new meal plan starting tomorrow!');
+}
+
+function openPlanSetupAndFocus(){
+  const setupCard = document.getElementById('plan-setup-card');
+  if(setupCard){
+    setupCard.style.display = '';
+    setupCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  const tomorrow = getTomorrowLocalDate();
+  const startInput = document.getElementById('plan-start-date');
+  if(startInput && !startInput.value) startInput.value = tomorrow;
+}
+
 function renderPlan(){
   ensurePlannerShell();
   installPlannerSummaryObserver();
@@ -13665,21 +13727,30 @@ function renderPlan(){
     const curValue=curInfo.id ? curInfo.id + (curInfo.variant === 'enhanced' ? '::enhanced' : '') : '';
     const listId=`recipe-drop-${day}-${slot}`;
     const inputId=`recipe-search-${day}-${slot}`;
+    const typeTitle=toTitleCase(type);
+    
+    let optionsHtml = '';
+    if(p.length){
+      optionsHtml = p.map(opt=>{
+        const value=opt.id+(opt.variant==='enhanced'?'::enhanced':'');
+        const info=getPlanSlotInfo({id:opt.id,variant:opt.variant});
+        const bundle=info.recipe ? calculateRecipeDisplayNutrition({ recipe:info.recipe, variant:info.variant, mealType:type }) : null;
+        const portions=bundle?.portions || null;
+        const personKey=String(who || '').toLowerCase().startsWith('c') ? 'c' : 'e';
+        const n=personKey === 'c' ? { cal:portions?.cCal || 0, prot:portions?.cProt || 0 } : { cal:portions?.eCal || 0, prot:portions?.eProt || 0 };
+        return `<div class="recipe-search-opt" data-search="${ppEscapeHtml((opt.label+' '+(opt.enhanced?'enhanced':'')+' '+Math.round(n.cal||0)+' '+round1(n.prot||0)).toLowerCase())}" onclick="swapSlot(${day},'${slot}','${value}')">
+          <div style="font-weight:600">${ppEscapeHtml(opt.label)} ${opt.enhanced?'<span class="tag green">Enhanced</span>':''} ${curValue===value?'<span class="tag">current</span>':''}</div>
+          <div style="color:var(--text2);font-size:11px">${Math.round(n.cal||0)} kcal / P${round1(n.prot||0)}g</div>
+        </div>`;
+      }).join('');
+    } else {
+      optionsHtml = `<div class="recipe-search-no-match" style="padding:12px;font-size:12px;color:var(--text3);text-align:center">No ${ppEscapeHtml(typeTitle)} recipes available</div>`;
+    }
+
     return `<div class="recipe-search-wrap">
-      <input class="recipe-search-input" id="${inputId}" placeholder="Search swap..." oninput="filterRecipeSwap('${inputId}','${listId}')" onfocus="filterRecipeSwap('${inputId}','${listId}')">
+      <input class="recipe-search-input" id="${inputId}" placeholder="Swap ${ppEscapeHtml(typeTitle)}..." oninput="filterRecipeSwap('${inputId}','${listId}')" onfocus="filterRecipeSwap('${inputId}','${listId}')">
       <div class="recipe-search-drop" id="${listId}">
-        ${p.map(opt=>{
-          const value=opt.id+(opt.variant==='enhanced'?'::enhanced':'');
-          const info=getPlanSlotInfo({id:opt.id,variant:opt.variant});
-          const bundle=info.recipe ? calculateRecipeDisplayNutrition({ recipe:info.recipe, variant:info.variant, mealType:type }) : null;
-          const portions=bundle?.portions || null;
-          const personKey=String(who || '').toLowerCase().startsWith('c') ? 'c' : 'e';
-          const n=personKey === 'c' ? { cal:portions?.cCal || 0, prot:portions?.cProt || 0 } : { cal:portions?.eCal || 0, prot:portions?.eProt || 0 };
-          return `<div class="recipe-search-opt" data-search="${ppEscapeHtml((opt.label+' '+(opt.enhanced?'enhanced':'')+' '+Math.round(n.cal||0)+' '+round1(n.prot||0)).toLowerCase())}" onclick="swapSlot(${day},'${slot}','${value}')">
-            <div style="font-weight:600">${ppEscapeHtml(opt.label)} ${opt.enhanced?'<span class="tag green">Enhanced</span>':''} ${curValue===value?'<span class="tag">current</span>':''}</div>
-            <div style="color:var(--text2);font-size:11px">${Math.round(n.cal||0)} kcal / P${round1(n.prot||0)}g</div>
-          </div>`;
-        }).join('')}
+        ${optionsHtml}
       </div>
     </div>`;
   };
@@ -13702,6 +13773,30 @@ function renderPlan(){
   };
   let html='';
   const localToday=getPlatePlanLocalToday();
+  const isPlanExpired = checkIsPlanExpired(state.plan, localToday);
+  if(isPlanExpired){
+    const tomorrow = getTomorrowLocalDate();
+    const datedEntries = Object.entries(state.plan.dayDates || {}).filter(([, v]) => !!parsePlanLocalDate(v));
+    const dates = datedEntries.map(([, v]) => v).sort();
+    const maxDate = dates[dates.length - 1] || localToday;
+    const endLabel = parsePlanLocalDate(maxDate) ? formatPlanDateShort(maxDate) : maxDate;
+    const tomorrowLabel = formatPlanDateShort(tomorrow);
+    html += `<div class="card plan-expired-banner" style="background:var(--surface2);border:1px solid var(--border-strong);border-radius:14px;padding:16px 18px;margin-bottom:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">
+      <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
+        <div style="width:38px;height:38px;border-radius:10px;background:var(--amber-bg);color:var(--amber);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0;">
+          ⏳
+        </div>
+        <div style="flex:1;min-width:220px">
+          <div style="font-weight:700;font-size:15px;color:var(--text);margin-bottom:3px">Current Meal Plan Ended (${ppEscapeHtml(endLabel)})</div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.4">Your previous plan has completed. Ready for next week? Generate a fresh plan starting tomorrow (${ppEscapeHtml(tomorrowLabel)}).</div>
+          <div class="btn-row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
+            <button type="button" class="btn primary sm" onclick="generateNewPlanStartingTomorrow()">✨ Generate Plan Starting Tomorrow</button>
+            <button type="button" class="btn ghost sm" onclick="openPlanSetupAndFocus()">⚙️ Setup Settings</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
   const earlierDays=Array.from({length:days},(_,index)=>index+1).filter(day=>{
     const value=state.plan.dayDates?.[day]||'';
     return !!parsePlanLocalDate(value)&&value<localToday;
@@ -14010,12 +14105,34 @@ function deletePlanHistory(index){
 function filterRecipeSwap(inputId, listId){
   const input=document.getElementById(inputId), list=document.getElementById(listId);
   if(!input||!list)return;
+  document.querySelectorAll('.recipe-search-drop').forEach(d => {
+    if(d.id !== listId) d.style.display = 'none';
+  });
   const terms=(input.value||'').toLowerCase().split(/\s+/).filter(Boolean);
   list.style.display='block';
-  Array.from(list.querySelectorAll('.recipe-search-opt')).forEach(el=>{
+  let visibleCount = 0;
+  const opts = list.querySelectorAll('.recipe-search-opt');
+  opts.forEach(el => {
     const hay=(el.dataset.search||el.textContent||'').toLowerCase();
-    el.style.display=!terms.length||terms.every(t=>hay.includes(t))?'':'none';
+    const match = !terms.length || terms.every(t=>hay.includes(t));
+    el.style.display = match ? '' : 'none';
+    if(match) visibleCount++;
   });
+  let noMatchEl = list.querySelector('.recipe-search-no-match');
+  if(opts.length > 0) {
+    if(!visibleCount){
+      if(!noMatchEl){
+        noMatchEl = document.createElement('div');
+        noMatchEl.className = 'recipe-search-no-match';
+        noMatchEl.style.cssText = 'padding:12px;font-size:12px;color:var(--text3);text-align:center;';
+        noMatchEl.textContent = 'No matching recipes found';
+        list.appendChild(noMatchEl);
+      }
+      noMatchEl.style.display = 'block';
+    } else if(noMatchEl) {
+      noMatchEl.style.display = 'none';
+    }
+  }
 }
 
 // == SHOPPING WITH EXPANDABLE OVERRIDES & VIEW TOGGLE ==
