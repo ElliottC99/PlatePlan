@@ -114,9 +114,10 @@ textarea{resize:vertical;min-height:90px}
 .rank-low{background:var(--surface2);color:var(--text2)}
 
 /* PLANNER */
-.day-plan-card{background:var(--surface2);border-radius:10px;padding:12px 14px;margin-bottom:8px}
+.day-plan-card{background:var(--surface2);border-radius:10px;padding:12px 14px;margin-bottom:8px;position:relative;overflow:visible!important}
 .day-plan-card.skipped{background:transparent;border:1px dashed var(--border);opacity:.55}
-.slot-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)}
+.slot-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);position:relative}
+.slot-row.has-open-drop{position:relative;z-index:1000!important}
 .slot-row:last-child{border-bottom:none}
 .slot-lbl{font-size:11px;width:74px;flex-shrink:0;line-height:1.35;font-weight:500}
 .slot-name{flex:1;min-width:0;font-size:13px}
@@ -135,9 +136,10 @@ textarea{resize:vertical;min-height:90px}
 .summary-box{border:1px solid var(--border);border-radius:8px;background:var(--surface2);padding:10px;font-size:12px}
 .summary-box strong{display:block;font-size:13px;margin-bottom:4px;color:var(--text)}
 .recipe-search-wrap{position:relative;min-width:160px;max-width:240px;flex-shrink:0}
+.recipe-search-wrap.is-open{z-index:1000!important}
 .recipe-search-input{width:100%;font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);position:relative;z-index:2;pointer-events:auto;user-select:text;-webkit-user-select:text;cursor:text}
 .recipe-search-input:focus{outline:2px solid var(--green);border-color:var(--green)}
-.recipe-search-drop{display:none;position:absolute;top:calc(100% + 4px);right:0;width:280px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;max-height:240px;overflow-y:auto;z-index:500;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.recipe-search-drop{display:none;position:absolute;top:calc(100% + 4px);right:0;width:280px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;max-height:240px;overflow-y:auto;z-index:1001;box-shadow:0 8px 24px rgba(0,0,0,.18)}
 .recipe-search-opt{padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px;transition:background .15s}
 .recipe-search-opt:hover,.recipe-search-opt:active{background:var(--surface2)}
 .shop-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}

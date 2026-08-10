@@ -1449,6 +1449,8 @@ function initializePlatePlanApplication(){
       }
       if(!e.target.closest('.recipe-search-wrap')) {
           document.querySelectorAll('.recipe-search-drop').forEach(d => d.style.display = 'none');
+          document.querySelectorAll('.recipe-search-wrap').forEach(w => w.classList.remove('is-open'));
+          document.querySelectorAll('.slot-row').forEach(sr => sr.classList.remove('has-open-drop'));
       }
   });
 }
@@ -13720,6 +13722,19 @@ function renderPlan(){
   const startInput=document.getElementById('plan-start-date');if(startInput)startInput.value=state.plan.dayDates?.[1]||'';
   let hasValidSlots = false;
   
+  const plannerOptionNutritionCache = new Map();
+  const getQuickOptionNutrition = (opt, type, who) => {
+    const personKey = String(who || '').toLowerCase().startsWith('c') ? 'c' : 'e';
+    const cacheKey = `${opt.id}:${opt.variant || 'original'}:${type}:${personKey}`;
+    if (plannerOptionNutritionCache.has(cacheKey)) return plannerOptionNutritionCache.get(cacheKey);
+    const info = getPlanSlotInfo({ id: opt.id, variant: opt.variant });
+    const bundle = info.recipe ? calculateRecipeDisplayNutrition({ recipe: info.recipe, variant: info.variant, mealType: type }) : null;
+    const portions = bundle?.portions || null;
+    const n = personKey === 'c' ? { cal: portions?.cCal || 0, prot: portions?.cProt || 0 } : { cal: portions?.eCal || 0, prot: portions?.eProt || 0 };
+    plannerOptionNutritionCache.set(cacheKey, n);
+    return n;
+  };
+
   const mkSel=(day,slot,type,who)=>{
     const p=getPlannerRecipeOptions(type, who);
     const curObj=slots[day]?.[slot];
@@ -13733,12 +13748,9 @@ function renderPlan(){
     if(p.length){
       optionsHtml = p.map(opt=>{
         const value=opt.id+(opt.variant==='enhanced'?'::enhanced':'');
-        const info=getPlanSlotInfo({id:opt.id,variant:opt.variant});
-        const bundle=info.recipe ? calculateRecipeDisplayNutrition({ recipe:info.recipe, variant:info.variant, mealType:type }) : null;
-        const portions=bundle?.portions || null;
-        const personKey=String(who || '').toLowerCase().startsWith('c') ? 'c' : 'e';
-        const n=personKey === 'c' ? { cal:portions?.cCal || 0, prot:portions?.cProt || 0 } : { cal:portions?.eCal || 0, prot:portions?.eProt || 0 };
-        return `<div class="recipe-search-opt" data-search="${ppEscapeHtml((opt.label+' '+(opt.enhanced?'enhanced':'')+' '+Math.round(n.cal||0)+' '+round1(n.prot||0)).toLowerCase())}" onclick="swapSlot(${day},'${slot}','${value}')">
+        const n=getQuickOptionNutrition(opt, type, who);
+        const searchStr=(opt.label+' '+(opt.enhanced?'enhanced':'')+' '+Math.round(n.cal||0)+' '+round1(n.prot||0)).toLowerCase();
+        return `<div class="recipe-search-opt" data-search="${ppEscapeAttr(searchStr)}" onclick="swapSlot(${day},'${slot}','${value}')">
           <div style="font-weight:600">${ppEscapeHtml(opt.label)} ${opt.enhanced?'<span class="tag green">Enhanced</span>':''} ${curValue===value?'<span class="tag">current</span>':''}</div>
           <div style="color:var(--text2);font-size:11px">${Math.round(n.cal||0)} kcal / P${round1(n.prot||0)}g</div>
         </div>`;
@@ -13882,9 +13894,12 @@ function openPlannedMealActions(day,slotKey){
 }
 function swapSlot(day,slot,id){
     if(!state.plan.slots[day]) state.plan.slots[day]={};
+    let swappedName = '';
     if(id) {
         const parsed = parsePlanRecipeValue(id);
         state.plan.slots[day][slot] = makePlanSlot(parsed.id, parsed.variant);
+        const info = getPlanSlotInfo(state.plan.slots[day][slot]);
+        swappedName = info?.active?.name || info?.recipe?.name || '';
     } else {
         state.plan.slots[day][slot] = null;
     }
@@ -13898,6 +13913,7 @@ function swapSlot(day,slot,id){
     state.plan.score = calculatePlanScore(state.plan);
     saveState();
     renderPlan();
+    showPlatePlanToast(swappedName ? `Swapped meal to ${swappedName}` : 'Meal slot cleared');
 }
 
 function clearPlan(){
@@ -14107,17 +14123,40 @@ function filterRecipeSwap(inputRef, listRef){
   const list = typeof listRef === 'string' ? document.getElementById(listRef) : listRef;
   if(!input || !list) return;
   
+  const currentWrap = input.closest('.recipe-search-wrap');
+  const currentSlotRow = input.closest('.slot-row');
+
   document.querySelectorAll('.recipe-search-drop').forEach(d => {
-    if(d !== list) d.style.display = 'none';
+    if(d !== list) {
+      d.style.display = 'none';
+      d.closest('.recipe-search-wrap')?.classList.remove('is-open');
+      d.closest('.slot-row')?.classList.remove('has-open-drop');
+    }
   });
-  
-  const terms = (input.value || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+
+  if (currentWrap) currentWrap.classList.add('is-open');
+  if (currentSlotRow) currentSlotRow.classList.add('has-open-drop');
   list.style.display = 'block';
+
+  const normalize = str => {
+    if (!str) return '';
+    return String(str)
+      .toLowerCase()
+      .replace(/&#039;|&#39;|&apos;|'/g, "'")
+      .replace(/&amp;|&/g, ' and ')
+      .replace(/[^a-z0-9\s']/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const rawVal = input.value || '';
+  const query = normalize(rawVal);
+  const terms = query.split(/\s+/).filter(Boolean);
   
   let visibleCount = 0;
   const opts = list.querySelectorAll('.recipe-search-opt');
   opts.forEach(el => {
-    const hay = (el.dataset.search || el.textContent || '').toLowerCase();
+    const hay = normalize(el.dataset.search || el.textContent || '');
     const match = !terms.length || terms.every(t => hay.includes(t));
     el.style.display = match ? '' : 'none';
     if(match) visibleCount++;
