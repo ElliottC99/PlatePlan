@@ -5353,13 +5353,13 @@ function renderToday(){
   if(label) label.textContent=formatTodayDateLabel(platePlanTodayDate);
   if(!state.plan?.slots||!Object.keys(state.plan.slots).length){
     if(subtitle) subtitle.textContent='Your planned meals';
-    host.innerHTML=renderTodayEmpty('No active meal plan','Generate a meal plan to see the exact meals for each calendar day.',`<button class="btn primary" onclick="showView('planner')">Open Meal Planner</button>`);
+    host.innerHTML=renderTodayEmpty('No active meal plan','Apply a meal plan from your library, or generate a new one in the Meal Planner.',`<button class="btn primary" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
     return;
   }
   const dated=Object.values(state.plan.dayDates||{}).some(value=>parsePlanLocalDate(value));
   if(!dated){
     if(subtitle) subtitle.textContent='This plan has no calendar dates';
-    host.innerHTML=renderTodayEmpty('Assign dates to this plan','Today only shows meals that are explicitly assigned to a calendar date.',`<button class="btn primary" onclick="showView('planner');setTimeout(()=>openPlanDatesWorkspace(),0)">Assign dates</button><button class="btn ghost" onclick="showView('planner')">View plan</button>`);
+    host.innerHTML=renderTodayEmpty('Assign dates to this plan','Today only shows meals that are explicitly assigned to a calendar date.',`<button class="btn primary" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner');setTimeout(()=>openPlanDatesWorkspace(),0)">Assign dates</button><button class="btn ghost" onclick="showView('planner')">View plan</button>`);
     return;
   }
   const day=getTodayPlanDay(platePlanTodayDate);
@@ -5367,7 +5367,7 @@ function renderToday(){
     const next=getNextDatedPlanDay(platePlanTodayDate);
     const nextCopy=next?` The next dated plan day is ${formatPlanDayLabel(state.plan,next[0],{short:true})}.`:'';
     if(subtitle) subtitle.textContent='No plan day is assigned';
-    host.innerHTML=renderTodayEmpty('No meals planned for this date',`This date is not assigned to the active meal plan.${nextCopy}`,`<button class="btn primary" onclick="showView('planner')">Open Meal Planner</button>`);
+    host.innerHTML=renderTodayEmpty('No meals planned for this date',`This date is not assigned to the active meal plan.${nextCopy}`,`<button class="btn primary" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
     return;
   }
   if(subtitle) subtitle.textContent=formatPlanDayLabel(state.plan,day,{short:false});
@@ -5393,7 +5393,7 @@ function renderToday(){
     }
   });
   if(!entries.length&&!reasonEntries.length){
-    host.innerHTML=renderTodayEmpty('No meals planned for this date','This plan day has no included breakfast, lunch or dinner meals.',`<button class="btn primary" onclick="showView('planner')">Open Meal Planner</button>`);
+    host.innerHTML=renderTodayEmpty('No meals planned for this date','This plan day has no included breakfast, lunch or dinner meals.',`<button class="btn primary" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
     return;
   }
   const panels=entries.length?`<div class="today-people">${renderTodayPersonPanel('e','Elliott',entries)}${renderTodayPersonPanel('c','Chloe',entries)}</div>`:'';
@@ -5407,6 +5407,140 @@ function renderToday(){
   }).join('');
   host.innerHTML=panels+meals;
 }
+
+function openApplyPlanFromLibraryModal(){
+  let wrap=document.getElementById('apply-plan-library-modal-wrap');
+  if(!wrap){
+    wrap=document.createElement('div');
+    wrap.id='apply-plan-library-modal-wrap';
+    wrap.className='modal-wrap';
+    document.body.appendChild(wrap);
+  }
+
+  const hist=state.planHistory||[];
+  const todayStr=getPlatePlanLocalToday();
+
+  let bodyHtml='';
+  if(!hist.length){
+    bodyHtml=`<div style="text-align:center;padding:28px 16px;color:var(--text2)">
+      <div style="font-size:36px;margin-bottom:12px">📚</div>
+      <h4 style="margin:0 0 6px 0;font-size:16px;font-weight:700;color:var(--text)">No Saved Meal Plans Yet</h4>
+      <p style="font-size:13px;color:var(--text2);margin:0 0 18px 0;line-height:1.4">You don't have any saved meal plans in your library. Generate a meal plan in the planner and save it to reuse anytime.</p>
+      <button class="btn primary sm" onclick="closeApplyPlanLibraryModal();showView('planner')">Open Meal Planner</button>
+    </div>`;
+  } else {
+    const cardsHtml=hist.map((p,i)=>{
+      const dt=p.date?new Date(p.date).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'Saved plan';
+      const dateRange=getPlanDateRangeLabel(p);
+      const allIds=getPlanRecipeIds(p);
+      const ids=allIds.slice(0,4).map(id=>getProductIndexRecipe(id)?.name||id);
+      const remaining=Math.max(0,allIds.length-ids.length);
+      const title=p.name||`Saved plan ${i+1}`;
+      const score=p.score?.score??p.score??'—';
+
+      return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--text)">${ppEscapeHtml(title)}</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+              <span class="tag">${p.days||0} days</span>
+              ${dateRange?`<span class="tag">${ppEscapeHtml(dateRange)}</span>`:''}
+              <span class="tag">Score ${ppEscapeHtml(score)}</span>
+            </div>
+          </div>
+          <button class="btn primary sm" style="flex-shrink:0" onclick="applyPlanFromLibraryModalConfirm(${i})">Apply Plan</button>
+        </div>
+        <div style="font-size:11px;color:var(--text3)">
+          Saved ${ppEscapeHtml(dt)} · <strong>Recipes:</strong> ${ppEscapeHtml(ids.length?ids.join(', '):'No recipes')}${remaining?` (+${remaining} more)`:''}
+        </div>
+      </div>`;
+    }).join('');
+
+    bodyHtml=`<div style="margin-bottom:14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">Start date for applied plan:</label>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <input type="date" id="apply-plan-library-start-date" class="input" value="${ppEscapeAttr(todayStr)}" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px">
+        <span style="font-size:11px;color:var(--text2)">Day 1 will be set to this date</span>
+      </div>
+    </div>
+    <div style="max-height:380px;overflow-y:auto;padding-right:2px">
+      ${cardsHtml}
+    </div>`;
+  }
+
+  wrap.innerHTML=`<div class="modal" style="max-width:580px;width:92vw;max-height:90vh;display:flex;flex-direction:column">
+    <div class="row-between" style="align-items:center;margin-bottom:14px;flex-shrink:0">
+      <div>
+        <h3 style="margin:0;font-size:17px;font-weight:700;color:var(--text)">Apply Meal Plan from Library</h3>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">Select a saved plan to activate on your calendar</div>
+      </div>
+      <button class="btn sm ghost" onclick="closeApplyPlanLibraryModal()" aria-label="Close modal" style="font-size:16px;padding:4px 10px">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto">
+      ${bodyHtml}
+    </div>
+    <div class="row-between" style="margin-top:14px;align-items:center;flex-shrink:0">
+      <button class="btn ghost sm" onclick="closeApplyPlanLibraryModal();showView('planner')">Create New in Planner</button>
+      <button class="btn ghost sm" onclick="closeApplyPlanLibraryModal()">Close</button>
+    </div>
+  </div>`;
+
+  wrap.classList.add('open');
+}
+
+function closeApplyPlanLibraryModal(){
+  const wrap=document.getElementById('apply-plan-library-modal-wrap');
+  if(wrap) wrap.classList.remove('open');
+}
+
+function applyPlanFromLibraryModalConfirm(index){
+  const startDateInput=document.getElementById('apply-plan-library-start-date');
+  const startDate=startDateInput?.value||getPlatePlanLocalToday();
+  applyPlanFromLibraryDirect(index,startDate);
+  closeApplyPlanLibraryModal();
+}
+
+function applyPlanFromLibraryDirect(index,startDate){
+  const p=(state.planHistory||[])[index];
+  if(!p) return;
+
+  if(state.plan?.slots&&Object.keys(state.plan.slots).length){
+    snapshotCurrentPlan('Auto-saved before applying plan from library',defaultPlanSaveName(state.plan));
+  }
+
+  const days=p.days||Object.keys(p.slots||{}).length||7;
+  const start=startDate||getPlatePlanLocalToday();
+  const dayDates=buildPlanDayDates(start,days);
+
+  state.plan={
+    days: days,
+    slots: JSON.parse(JSON.stringify(p.slots||{})),
+    dayDates: dayDates,
+    slotReasons: JSON.parse(JSON.stringify(p.slotReasons||{})),
+    productPriority: p.productPriority||state.prefs?.productPriority||'protein',
+    productSelections: JSON.parse(JSON.stringify(p.productSelections||{})),
+    useUpProductIds: JSON.parse(JSON.stringify(p.useUpProductIds||[])),
+    shoppingAtHome: JSON.parse(JSON.stringify(p.shoppingAtHome||{})),
+    warnings: [],
+    score: calculatePlanScore({days:days,slots:p.slots,productSelections:p.productSelections}),
+    confirmedShopping: !!p.confirmedShopping,
+    mealPrepGroups: JSON.parse(JSON.stringify(p.mealPrepGroups||[])),
+    declinedMealPrepGroups: JSON.parse(JSON.stringify(p.declinedMealPrepGroups||[]))
+  };
+  state.overrides=JSON.parse(JSON.stringify(p.overrides||{}));
+
+  platePlanNutritionCache.clear();
+  markPlatePlanViewsDirty('today','planner','shopping','planlib');
+  saveState();
+  renderPlan();
+  showView('today');
+  showPlatePlanToast(`Applied "${p.name||'Saved Plan'}" starting ${start}`);
+}
+
+window.openApplyPlanFromLibraryModal=openApplyPlanFromLibraryModal;
+window.closeApplyPlanLibraryModal=closeApplyPlanLibraryModal;
+window.applyPlanFromLibraryModalConfirm=applyPlanFromLibraryModalConfirm;
+window.applyPlanFromLibraryDirect=applyPlanFromLibraryDirect;
 
 function scheduleTodayMidnightRefresh(){
   clearTimeout(platePlanTodayTimer);
@@ -14228,6 +14362,7 @@ function openPlanHistoryActions(index){
   const p=(state.planHistory||[])[index];
   if(!p) return;
   openMobileActionSheet(p.name || `Saved plan ${index+1}`,[
+    {label:'Apply plan starting today',onclick:`applyPlanFromLibraryDirect(${index})`},
     {label:'View schedule',onclick:`viewPlanHistory(${index})`},
     {label:'Download recipe pack',onclick:`downloadSavedPlanPack(${index})`},
     {label:'Edit plan',onclick:`loadPlanHistoryForEdit(${index})`},
