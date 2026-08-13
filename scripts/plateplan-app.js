@@ -631,10 +631,21 @@ function setPlatePlanSyncOutbox(value){
   updatePlatePlanSyncStatus(navigator.onLine?'saving':'offline');
 }
 
+let platePlanLastSyncError=null;
+
 function cleanCloudValue(value){
   if(value===undefined||value===null) return null;
   if(typeof value !== 'object') return value;
-  return JSON.parse(JSON.stringify(value));
+  try {
+    const jsonStr = JSON.stringify(value, (k, v) => {
+      if (typeof v === 'number' && (isNaN(v) || !isFinite(v))) return null;
+      if (v === undefined) return undefined;
+      return v;
+    });
+    return jsonStr ? JSON.parse(jsonStr) : null;
+  } catch(e) {
+    return null;
+  }
 }
 
 function syncValuesEqual(a,b){
@@ -821,40 +832,24 @@ async function flushPlatePlanSyncOutbox(){
         setPlatePlanSyncOutbox(outbox);
       }
       const ref=platePlanCloudRef(op.key);
-      let conflictData=null;
       try{
-        await platePlanDb.runTransaction(async transaction=>{
-          const snapshot=await transaction.get(ref);
-          const cloud=snapshot.exists?snapshot.data():null;
-          const remote=cloud?.value??null;
-          const remoteRevision=+cloud?.revision||0;
-          if(remoteRevision!==+op.baseRevision&&!syncValuesEqual(remote,op.base)){
-            if(op.baseRevision===0 || op.base===null || syncValuesEqual(op.base,{})){
-              op.base=remote;
-              op.baseRevision=remoteRevision;
-            }
-            const conflicts=[];
-            const merged=threeWayPlatePlanMerge(op.base,op.local,remote,[],conflicts);
-            if(conflicts.length){
-              if(op.key==='plans/current' || op.key==='plans/history' || op.key==='settings/shared' || op.key.startsWith('recipes/') || op.key.startsWith('products/') || op.key.startsWith('ingredientFamilies/') || op.key.startsWith('ingredientGroups/') || op.key.startsWith('overrides/')){
-                op.local=cleanCloudValue(op.local);
-                op.base=remote;
-                op.baseRevision=remoteRevision;
-              } else {
-                conflictData={op,remote,remoteRevision,merged,conflicts};
-                throw new Error('PLATEPLAN_CONFLICT');
-              }
-            }else{
-              op.local=merged; op.base=remote; op.baseRevision=remoteRevision;
-            }
-          }
-          const nextRevision=remoteRevision+1;
-          if(op.local===null) transaction.delete(ref);
-          else transaction.set(ref,{value:cleanCloudValue(op.local),revision:nextRevision,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:platePlanCloudUser.uid,deviceId:getPlatePlanDeviceId(),operationId:op.operationId||null});
-          platePlanCloudRevisions[op.key]=nextRevision;
-        });
+        const nextRevision=(+op.baseRevision||+platePlanCloudRevisions[op.key]||0)+1;
+        const cleaned=cleanCloudValue(op.local);
+        if(cleaned===null){
+          await ref.delete();
+        } else {
+          await ref.set({
+            value: cleaned,
+            revision: nextRevision,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedBy: platePlanCloudUser.uid,
+            deviceId: getPlatePlanDeviceId(),
+            operationId: op.operationId||null
+          });
+        }
+        platePlanCloudRevisions[op.key]=nextRevision;
       }catch(error){
-        if(conflictData){ showPlatePlanConflict(conflictData); return; }
+        platePlanLastSyncError=error?.message||String(error);
         op.retryCount=(op.retryCount||0)+1;
         if(op.retryCount>5){
           console.warn('Dropping stuck sync operation after 5 retries:',op.key,error);
@@ -881,10 +876,12 @@ async function flushPlatePlanSyncOutbox(){
     platePlanSyncSuppress=true;
     try{ platePlanNutritionCache.clear();rebuildPlatePlanIndexes();renderPlatePlanDependentViews();localStorage.setItem(SK,JSON.stringify(state)); }
     finally{ platePlanSyncSuppress=false; }
+    platePlanLastSyncError=null;
     updatePlatePlanSyncStatus('synced');
   }catch(error){
     console.warn('PlatePlan sync write failed',error);
-    updatePlatePlanSyncStatus(navigator.onLine?'error':'offline',error?.message||'Cloud write failed');
+    platePlanLastSyncError=error?.message||'Cloud write failed';
+    updatePlatePlanSyncStatus(navigator.onLine?'error':'offline',platePlanLastSyncError);
   }finally{ platePlanSyncFlushing=false; }
 }
 
@@ -1218,13 +1215,25 @@ async function signOutPlatePlan(){
   if(platePlanAuth) await platePlanAuth.signOut();
 }
 
+function clearPlatePlanSyncOutbox(){
+  localStorage.setItem(SYNC_OUTBOX_SK, JSON.stringify([]));
+  platePlanLastSyncError = null;
+  updatePlatePlanSyncStatus('synced');
+  showPlatePlanToast('Sync queue cleared.');
+}
+
 function openPlatePlanSyncPanel(){
   const configured=!!window.PLATEPLAN_FIREBASE?.configured;
   if(!configured) return openAppInfoModal('Cloud sync not configured','PlatePlan is working locally. Complete the steps in <strong>PLATEPLAN_FIREBASE_SETUP.md</strong>, then set <code>configured: true</code> in <code>firebase-config.js</code>.');
   const email=platePlanCloudUser?.email||'Not signed in';
   const pending=getPlatePlanSyncOutbox().length;
-  openAppInfoModal('PlatePlan sync',`<div style="display:grid;gap:7px;font-size:13px"><div><strong>Account:</strong> ${ppEscapeHtml(email)}</div><div><strong>Device:</strong> ${ppEscapeHtml(getPlatePlanDeviceId())}</div><div><strong>Waiting changes:</strong> ${pending}</div></div><div class="btn-row" style="margin-top:12px"><button class="btn sm" onclick="flushPlatePlanSyncOutbox();closeAppConfirmModal()">Sync now</button><button class="btn sm ghost" onclick="signOutPlatePlan();closeAppConfirmModal()">Sign out</button></div>`);
+  const errorHtml=platePlanLastSyncError?`<div style="color:var(--red);font-size:12px;background:rgba(239,68,68,0.08);padding:8px 10px;border-radius:6px;margin-top:4px"><strong>Last sync error:</strong> ${ppEscapeHtml(platePlanLastSyncError)}</div>`:'';
+  const clearBtn=pending>0?`<button class="btn sm danger ghost" onclick="clearPlatePlanSyncOutbox();closeAppConfirmModal()">Clear queue</button>`:'';
+  openAppInfoModal('PlatePlan sync',`<div style="display:grid;gap:7px;font-size:13px"><div><strong>Account:</strong> ${ppEscapeHtml(email)}</div><div><strong>Device:</strong> ${ppEscapeHtml(getPlatePlanDeviceId())}</div><div><strong>Waiting changes:</strong> ${pending}</div>${errorHtml}</div><div class="btn-row" style="margin-top:12px"><button class="btn sm" onclick="flushPlatePlanSyncOutbox();closeAppConfirmModal()">Sync now</button>${clearBtn}<button class="btn sm ghost" onclick="signOutPlatePlan();closeAppConfirmModal()">Sign out</button></div>`);
 }
+
+window.clearPlatePlanSyncOutbox=clearPlatePlanSyncOutbox;
+window.openPlatePlanSyncPanel=openPlatePlanSyncPanel;
 
 async function startPlatePlanForSignedInUser(user){
   platePlanCloudUser=user;
