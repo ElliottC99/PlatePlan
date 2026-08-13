@@ -3150,7 +3150,7 @@ function resolveProductForIngredient(recipeIng, context = {}){
 
   let productId = '';
   if(groupId && overrides[groupId]) productId = overrides[groupId];
-  else if(groupId && context.productSelections && context.productSelections[groupId]) productId = context.productSelections[groupId];
+  else if(groupId && context.useProductSelections && context.productSelections && context.productSelections[groupId]) productId = context.productSelections[groupId];
   else if(recipeIng?.bankId && legacyOverrides[recipeIng.bankId]) productId = legacyOverrides[recipeIng.bankId];
   else if(group?.defaultProductId) productId = group.defaultProductId;
   else if(recipeIng?.bankId) productId = recipeIng.bankId;
@@ -5305,7 +5305,27 @@ function renderTodayPersonPanel(person,label,entries){
   </section>`;
 }
 
-function renderTodayMealCard(group){
+function isMealEatenOnDate(dateStr, mealType){
+  if(!state.plan) return false;
+  state.plan.eatenMeals = state.plan.eatenMeals || {};
+  return !!state.plan.eatenMeals[`${dateStr}:${mealType}`];
+}
+
+function toggleMealEatenOnDate(dateStr, mealType){
+  if(!state.plan) return;
+  state.plan.eatenMeals = state.plan.eatenMeals || {};
+  const key = `${dateStr}:${mealType}`;
+  const nextState = !state.plan.eatenMeals[key];
+  state.plan.eatenMeals[key] = nextState;
+
+  saveState(true);
+  if(platePlanCloudReady && !platePlanSyncSuppress) queuePlatePlanCloudDiff();
+
+  if(document.getElementById('view-today')?.classList.contains('active')) renderToday();
+  showPlatePlanToast(nextState ? `Marked ${toTitleCase(mealType)} as eaten ✓` : `Unmarked ${toTitleCase(mealType)}`);
+}
+
+function renderTodayMealCard(group, isEaten = false, mealType = 'dinner'){
   const entry=group[0];
   const info=entry.info;
   const people=group.map(item=>item.person==='e'?'Elliott':'Chloe');
@@ -5316,14 +5336,27 @@ function renderTodayMealCard(group){
       : item.calculated?.portions?.cSingleServ;
     return `<div class="today-portion"><strong>${item.person==='e'?'Elliott':'Chloe'} · ${Math.round(nutrition.cal||0)} kcal · ${Math.round((nutrition.prot||0)*10)/10}g protein</strong>${Math.round((portionValue||0)*10)/10} serving${Math.abs((portionValue||0)-1)<.001?'':'s'}</div>`;
   }).join('');
-  return `<article class="today-meal-card">
+
+  const eatenBtn = isEaten
+    ? `<button class="btn success sm" type="button" style="background:#10b981;color:#fff;border-color:#10b981" onclick="toggleMealEatenOnDate('${platePlanTodayDate}','${ppEscapeAttr(mealType)}')">✓ Eaten</button>`
+    : `<button class="btn ghost sm" type="button" onclick="toggleMealEatenOnDate('${platePlanTodayDate}','${ppEscapeAttr(mealType)}')">Mark eaten</button>`;
+
+  return `<article class="today-meal-card ${isEaten ? 'eaten-card' : ''}" style="${isEaten ? 'opacity:0.8;border-color:var(--border-muted,#10b98144)' : ''}">
     <div class="today-meal-layout">
       <div class="today-meal-main">
-        <div class="today-meal-name">${ppEscapeHtml(info.active.name||info.recipe?.name||'Recipe')}</div>
-        <div class="today-meal-meta"><span class="tag">${ppEscapeHtml(info.variant==='enhanced'?'Enhanced':'Original')}</span><span class="tag">${ppEscapeHtml(people.join(' & '))}</span></div>
-        <div class="today-portions">${portions}</div>
+        <div class="today-meal-name" style="display:flex;align-items:center;gap:8px">
+          ${isEaten ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#10b981;color:#fff;font-size:11px;font-weight:bold" title="Eaten">✓</span>` : ''}
+          <span style="${isEaten ? 'text-decoration:line-through;opacity:0.8' : ''}">${ppEscapeHtml(info.active.name||info.recipe?.name||'Recipe')}</span>
+        </div>
+        <div class="today-meal-meta">
+          <span class="tag">${ppEscapeHtml(info.variant==='enhanced'?'Enhanced':'Original')}</span>
+          <span class="tag">${ppEscapeHtml(people.join(' & '))}</span>
+          ${isEaten ? `<span class="tag success" style="background:#10b9811f;color:#10b981;border:1px solid #10b98144;font-weight:600">Eaten</span>` : ''}
+        </div>
+        <div class="today-portions" style="${isEaten ? 'opacity:0.75' : ''}">${portions}</div>
       </div>
-      <div class="btn-row">
+      <div class="btn-row" style="align-items:center">
+        ${eatenBtn}
         <button class="btn primary" type="button" onclick="viewRecipe('${ppEscapeAttr(info.id)}','${ppEscapeAttr(info.instanceId||'')}','${ppEscapeAttr(info.variant||'original')}')">View recipe</button>
         <button class="btn ghost" type="button" onclick="openPlanReschedule(${+entry.day},'${ppEscapeAttr(entry.slotKey)}')">Reschedule</button>
       </div>
@@ -5397,14 +5430,35 @@ function renderToday(){
     return;
   }
   const panels=entries.length?`<div class="today-people">${renderTodayPersonPanel('e','Elliott',entries)}${renderTodayPersonPanel('c','Chloe',entries)}</div>`:'';
-  const meals=mealDefinitions.map(meal=>{
+
+  const mealSections=mealDefinitions.map(meal=>{
     const mealEntries=entries.filter(entry=>entry.mealType===meal.mealType);
     const mealReasons=reasonEntries.filter(entry=>entry.mealType===meal.mealType);
-    if(!mealEntries.length&&!mealReasons.length) return '';
+    if(!mealEntries.length&&!mealReasons.length) return null;
+    const isEaten=isMealEatenOnDate(platePlanTodayDate,meal.mealType);
     const groups=mealEntries.length===2&&mealEntries[0].fingerprint===mealEntries[1].fingerprint?[mealEntries]:mealEntries.map(entry=>[entry]);
     const reasonGroups=mealReasons.length===2&&formatPlanSlotReason(mealReasons[0].reason)===formatPlanSlotReason(mealReasons[1].reason)?[mealReasons]:mealReasons.map(entry=>[entry]);
-    return `<section class="today-meal-section"><h2 class="today-meal-heading">${ppEscapeHtml(toTitleCase(meal.mealType))}</h2>${groups.map(renderTodayMealCard).join('')}${reasonGroups.map(renderTodayReasonCard).join('')}</section>`;
-  }).join('');
+
+    return {
+      mealType: meal.mealType,
+      isEaten,
+      html: `<section class="today-meal-section ${isEaten ? 'is-eaten-section' : ''}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h2 class="today-meal-heading" style="margin:0">${ppEscapeHtml(toTitleCase(meal.mealType))}</h2>
+          ${isEaten ? `<span class="tag" style="background:#10b98122;color:#10b981;border:1px solid #10b98144;font-weight:600;padding:2px 8px;border-radius:12px;font-size:11px">✓ Eaten</span>` : ''}
+        </div>
+        ${groups.map(g => renderTodayMealCard(g, isEaten, meal.mealType)).join('')}
+        ${reasonGroups.map(renderTodayReasonCard).join('')}
+      </section>`
+    };
+  }).filter(Boolean);
+
+  mealSections.sort((a,b)=>{
+    if(a.isEaten!==b.isEaten) return a.isEaten ? 1 : -1;
+    return 0;
+  });
+
+  const meals=mealSections.map(s=>s.html).join('');
   host.innerHTML=panels+meals;
 }
 
@@ -5531,7 +5585,8 @@ function applyPlanFromLibraryDirect(index,startDate){
 
   platePlanNutritionCache.clear();
   markPlatePlanViewsDirty('today','planner','shopping','planlib');
-  saveState();
+  saveState(true);
+  if(platePlanCloudReady && !platePlanSyncSuppress) queuePlatePlanCloudDiff();
   renderPlan();
   showView('today');
   showPlatePlanToast(`Applied "${p.name||'Saved Plan'}" starting ${start}`);
@@ -5541,6 +5596,8 @@ window.openApplyPlanFromLibraryModal=openApplyPlanFromLibraryModal;
 window.closeApplyPlanLibraryModal=closeApplyPlanLibraryModal;
 window.applyPlanFromLibraryModalConfirm=applyPlanFromLibraryModalConfirm;
 window.applyPlanFromLibraryDirect=applyPlanFromLibraryDirect;
+window.toggleMealEatenOnDate=toggleMealEatenOnDate;
+window.isMealEatenOnDate=isMealEatenOnDate;
 
 function scheduleTodayMidnightRefresh(){
   clearTimeout(platePlanTodayTimer);
@@ -13711,7 +13768,7 @@ function getSlotPersonPrefix(slotKey){
 function getPlannedSlotNutrition(recipe, slotKey, instanceId, planContext = state.plan){
   if(!recipe) return null;
   const mealType = getMealTypeFromSlotKey(slotKey) || (recipe.types && recipe.types[0]) || recipe.type || 'dinner';
-  const bundle = calculateRecipeDisplayNutrition({ recipe:null, ingredients:recipe.ingredients || [], serves:recipe.serves || 1, who:recipe.who || 'both', mealType, instanceId, planContext });
+  const bundle = calculateRecipeDisplayNutrition({ recipe, ingredients:recipe.ingredients || [], serves:recipe.serves || 1, who:recipe.who || 'both', mealType, instanceId, planContext });
   const recalc = bundle?.nutrition || { cal:0, prot:0 };
   const portions = bundle?.portions || calcPortions(recalc.perServing || recalc, state.prefs, recipe.serves || 1, recipe.who || 'both', mealType);
   const prefix = getSlotPersonPrefix(slotKey);
