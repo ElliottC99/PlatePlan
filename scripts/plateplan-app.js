@@ -680,7 +680,6 @@ function platePlanCloudRef(key){
   return platePlanDb.collection('households').doc(config.householdId).collection(parts[0]).doc(encodeURIComponent(parts.slice(1).join('/')));
 }
 
-let platePlanSyncTimer = null;
 let platePlanAutoSyncInterval = null;
 let platePlanHasPendingLocalChanges = false;
 let platePlanLastSyncedAt = null;
