@@ -670,7 +670,7 @@ function platePlanCloudRef(key){
 }
 
 function queuePlatePlanCloudDiff(){
-  if(!platePlanCloudReady||platePlanSyncSuppress||!state) return;
+  if(platePlanSyncSuppress||!state) return;
   const next=platePlanStateProjection(state);
   const changed=[];
   new Set([...Object.keys(platePlanLastProjection),...Object.keys(next)]).forEach(key=>{
@@ -691,7 +691,11 @@ function queuePlatePlanCloudDiff(){
   });
   platePlanLastProjection=next;
   try{ setPlatePlanSyncOutbox(outbox); }catch(e){ updatePlatePlanSyncStatus('error','Sync queue could not be saved'); return; }
-  flushPlatePlanSyncOutbox();
+  if(platePlanCloudReady && platePlanCloudUser && navigator.onLine){
+    flushPlatePlanSyncOutbox();
+  } else {
+    updatePlatePlanSyncStatus('saving', `${outbox.length} pending changes`);
+  }
 }
 
 function schedulePlatePlanCloudDiff(){
@@ -708,7 +712,7 @@ function saveState(immediate = false){
     return true;
   };
   performDiskSave();
-  if(platePlanCloudReady&&!platePlanSyncSuppress) queuePlatePlanCloudDiff();
+  if(!platePlanSyncSuppress) queuePlatePlanCloudDiff();
   return true;
 }
 
@@ -1075,22 +1079,53 @@ async function loadSharedPlatePlan(){
   const projection=await readPlatePlanCloudProjection();
   const localRecipes = Array.isArray(state?.recipes) ? state.recipes : [];
   const localPlan = state?.plan;
+  const outbox = getPlatePlanSyncOutbox();
+  const outboxKeys = new Set(outbox.map(op => op.key));
+
   (localRecipes || []).forEach(r => {
-    if(r?.id && !projection['recipes/' + r.id]) {
-      projection['recipes/' + r.id] = cleanCloudValue(r);
+    if(r?.id) {
+      const key = 'recipes/' + r.id;
+      const cloudRecipe = projection[key];
+      if(!cloudRecipe) {
+        projection[key] = cleanCloudValue(r);
+      } else if(outboxKeys.has(key)) {
+        const outboxOp = outbox.find(op => op.key === key);
+        if(outboxOp?.local) projection[key] = cleanCloudValue(outboxOp.local);
+      } else if(r.updatedAt && cloudRecipe.updatedAt && new Date(r.updatedAt) > new Date(cloudRecipe.updatedAt)) {
+        projection[key] = cleanCloudValue(r);
+      }
     }
   });
-  if(localPlan?.slots && Object.keys(localPlan.slots).length && (!projection['plans/current'] || !Object.keys(projection['plans/current']?.slots || {}).length)) {
-    projection['plans/current'] = cleanCloudValue(localPlan);
+
+  if(localPlan?.slots && Object.keys(localPlan.slots).length) {
+    const cloudPlan = projection['plans/current'];
+    const hasCloudSlots = cloudPlan?.slots && Object.keys(cloudPlan.slots).length;
+    if(!hasCloudSlots || outboxKeys.has('plans/current')) {
+      projection['plans/current'] = cleanCloudValue(localPlan);
+    } else if(localPlan.updatedAt && cloudPlan.updatedAt && new Date(localPlan.updatedAt) > new Date(cloudPlan.updatedAt)) {
+      projection['plans/current'] = cleanCloudValue(localPlan);
+    }
   }
+
   const localPrefs = state?.prefs;
   if(localPrefs && Object.keys(localPrefs).length) {
     if(!projection['settings/shared']) {
       projection['settings/shared'] = { prefs: cleanCloudValue(localPrefs) };
-    } else if(!projection['settings/shared']?.prefs || !Object.keys(projection['settings/shared']?.prefs || {}).length) {
-      projection['settings/shared'] = { ...projection['settings/shared'], prefs: cleanCloudValue(localPrefs) };
+    } else {
+      const cloudPrefs = projection['settings/shared']?.prefs || {};
+      if(outboxKeys.has('settings/shared')) {
+        const outboxOp = outbox.find(op => op.key === 'settings/shared');
+        if(outboxOp?.local?.prefs) {
+          projection['settings/shared'].prefs = cleanCloudValue(outboxOp.local.prefs);
+        }
+      } else if(localPrefs.updatedAt && cloudPrefs.updatedAt && new Date(localPrefs.updatedAt) > new Date(cloudPrefs.updatedAt)) {
+        projection['settings/shared'].prefs = cleanCloudValue({ ...cloudPrefs, ...localPrefs });
+      } else {
+        projection['settings/shared'].prefs = cleanCloudValue({ ...localPrefs, ...cloudPrefs });
+      }
     }
   }
+
   const current=platePlanStateProjection(state);
   if(!syncValuesEqual(current,projection)&&state?.recipes?.length) createRecoveryPoint('Before loading shared cloud data');
   applyPlatePlanProjection(projection);
@@ -5423,10 +5458,17 @@ function renderToday(){
     host.innerHTML=renderTodayEmpty('No active meal plan','Apply a meal plan from your library, or generate a new one in the Meal Planner.',`<button class="btn primary" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
     return;
   }
-  const dated=Object.values(state.plan.dayDates||{}).some(value=>parsePlanLocalDate(value));
+  let dated=Object.values(state.plan.dayDates||{}).some(value=>parsePlanLocalDate(value));
+  if(!dated && state.plan.slots && Object.keys(state.plan.slots).length){
+    const days=state.plan.days||Object.keys(state.plan.slots).length||7;
+    state.plan.dayDates=buildPlanDayDates(platePlanTodayDate||getPlatePlanLocalToday(),days);
+    state.plan.updatedAt=new Date().toISOString();
+    saveState(true);
+    dated=true;
+  }
   if(!dated){
     if(subtitle) subtitle.textContent='This plan has no calendar dates';
-    host.innerHTML=renderTodayEmpty('Assign dates to this plan','Today only shows meals that are explicitly assigned to a calendar date.',`<button class="btn primary" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner');setTimeout(()=>openPlanDatesWorkspace(),0)">Assign dates</button><button class="btn ghost" onclick="showView('planner')">View plan</button>`);
+    host.innerHTML=renderTodayEmpty('Assign dates to this plan','Today only shows meals that are explicitly assigned to a calendar date.',`<button class="btn primary" onclick="rollActivePlanToDate('${platePlanTodayDate}')">Start plan from today</button><button class="btn ghost" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner');setTimeout(()=>openPlanDatesWorkspace(),0)">Assign dates</button>`);
     return;
   }
   const day=getTodayPlanDay(platePlanTodayDate);
@@ -5434,7 +5476,7 @@ function renderToday(){
     const next=getNextDatedPlanDay(platePlanTodayDate);
     const nextCopy=next?` The next dated plan day is ${formatPlanDayLabel(state.plan,next[0],{short:true})}.`:'';
     if(subtitle) subtitle.textContent='No plan day is assigned';
-    host.innerHTML=renderTodayEmpty('No meals planned for this date',`This date is not assigned to the active meal plan.${nextCopy}`,`<button class="btn primary" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
+    host.innerHTML=renderTodayEmpty('No meals planned for this date',`This date (${formatTodayDateLabel(platePlanTodayDate)}) is not assigned to the active meal plan.${nextCopy}`,`<button class="btn primary" onclick="rollActivePlanToDate('${platePlanTodayDate}')">Start plan cycle from today</button><button class="btn ghost" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
     return;
   }
   if(subtitle) subtitle.textContent=formatPlanDayLabel(state.plan,day,{short:false});
@@ -5613,7 +5655,9 @@ function applyPlanFromLibraryDirect(index,startDate){
     score: calculatePlanScore({days:days,slots:p.slots,productSelections:p.productSelections}),
     confirmedShopping: !!p.confirmedShopping,
     mealPrepGroups: JSON.parse(JSON.stringify(p.mealPrepGroups||[])),
-    declinedMealPrepGroups: JSON.parse(JSON.stringify(p.declinedMealPrepGroups||[]))
+    declinedMealPrepGroups: JSON.parse(JSON.stringify(p.declinedMealPrepGroups||[])),
+    updatedAt: new Date().toISOString(),
+    appliedAt: new Date().toISOString()
   };
   state.overrides=JSON.parse(JSON.stringify(p.overrides||{}));
 
@@ -5626,10 +5670,25 @@ function applyPlanFromLibraryDirect(index,startDate){
   showPlatePlanToast(`Applied "${p.name||'Saved Plan'}" starting ${start}`);
 }
 
+function rollActivePlanToDate(startDate){
+  if(!state?.plan?.slots||!Object.keys(state.plan.slots).length) return;
+  const start=startDate||getPlatePlanLocalToday();
+  const days=state.plan.days||Object.keys(state.plan.slots).length||7;
+  state.plan.dayDates=buildPlanDayDates(start,days);
+  state.plan.updatedAt=new Date().toISOString();
+  platePlanNutritionCache.clear();
+  markPlatePlanViewsDirty('today','planner','shopping','planlib');
+  saveState(true);
+  renderPlan();
+  if(document.getElementById('view-today')?.classList.contains('active')) renderToday();
+  showPlatePlanToast(`Plan dates rolled forward starting ${formatTodayDateLabel(start)}`);
+}
+
 window.openApplyPlanFromLibraryModal=openApplyPlanFromLibraryModal;
 window.closeApplyPlanLibraryModal=closeApplyPlanLibraryModal;
 window.applyPlanFromLibraryModalConfirm=applyPlanFromLibraryModalConfirm;
 window.applyPlanFromLibraryDirect=applyPlanFromLibraryDirect;
+window.rollActivePlanToDate=rollActivePlanToDate;
 window.toggleMealEatenOnDate=toggleMealEatenOnDate;
 window.isMealEatenOnDate=isMealEatenOnDate;
 
@@ -7723,9 +7782,10 @@ function saveToVault(r){
   attachGroups(r.ingredients);
   if(r.enhanced?.ingredients) attachGroups(r.enhanced.ingredients);
   recalcRecipeObject(r);
+  r.updatedAt = new Date().toISOString();
   if(editId){const i=state.recipes.findIndex(x=>x.id===editId);if(i>-1)state.recipes[i]=r;}
   else state.recipes.push(r);
-  saveState();closeModal(true);clearForm();finishEditorReturn('vault');
+  saveState(true);closeModal(true);clearForm();finishEditorReturn('vault');
 }
 
 // == DATA QUALITY CENTRE (Part Q) ==
@@ -13769,15 +13829,16 @@ function generatePlan(){
     showPlanGenerationProblem('No meals could be generated',`${reason} Your current meal plan has been kept.`);
     return;
   }
-  const warningMessages=[...new Set(remainingUnresolved.map(item=>`${formatPlanDayLabel({dayDates:buildPlanDayDates(document.getElementById('plan-start-date')?.value||'',days)},item.day,{short:true})} ${item.meal} for ${item.who}: ${explainUnavailablePlanSlot(item.meal,item.who,priority,trafficRules)}`))];
+  const planStartInput = document.getElementById('plan-start-date')?.value || getPlatePlanLocalToday();
+  const warningMessages=[...new Set(remainingUnresolved.map(item=>`${formatPlanDayLabel({dayDates:buildPlanDayDates(planStartInput,days)},item.day,{short:true})} ${item.meal} for ${item.who}: ${explainUnavailablePlanSlot(item.meal,item.who,priority,trafficRules)}`))];
   snapshotCurrentPlan();
   state.overrides = {};
-  const dayDates=buildPlanDayDates(document.getElementById('plan-start-date')?.value||'',days);
+  const dayDates=buildPlanDayDates(planStartInput,days);
   state.prefs.productPriority = priority;
   state.prefs.mealRepeatCadence = cadence;
   state.prefs.planTrafficE = trafficRules.e;
   state.prefs.planTrafficC = trafficRules.c;
-  const nextPlan = {days,slots,dayDates,slotReasons:{},productPriority:priority,trafficFilter:{ e: state.prefs.planTrafficE, c: state.prefs.planTrafficC },mealRepeatCadence:cadence,productSelections,useUpProductIds:prioritiseUseUp?getUseUpEntries().map(entry=>entry.productId):[],shoppingAtHome:{},warnings:warningMessages,score:null,confirmedShopping:false,mealPrepGroups:[],declinedMealPrepGroups:[]};
+  const nextPlan = {days,slots,dayDates,slotReasons:{},productPriority:priority,trafficFilter:{ e: state.prefs.planTrafficE, c: state.prefs.planTrafficC },mealRepeatCadence:cadence,productSelections,useUpProductIds:prioritiseUseUp?getUseUpEntries().map(entry=>entry.productId):[],shoppingAtHome:{},warnings:warningMessages,score:null,confirmedShopping:false,mealPrepGroups:[],declinedMealPrepGroups:[],updatedAt:new Date().toISOString()};
   nextPlan.score = calculatePlanScore(nextPlan);
   platePlanEarlierDaysExpanded = false;
   state.plan = nextPlan;
@@ -13786,7 +13847,8 @@ function generatePlan(){
     return repeat > 1 && (s.days || []).length >= repeat;
   });
   state.plan.mealPrepGroups = autoPrepSuggestions.map(s => ({ key:s.key, recipeId:s.recipeId, variant:s.variant, mealKey:s.mealKey, peopleKey:s.peopleKey, days:s.days }));
-  saveState();renderPlan();closePlanOptionsWorkspace();
+  markPlatePlanViewsDirty('today', 'planner', 'shopping', 'planlib');
+  saveState(true);renderPlan();closePlanOptionsWorkspace();
   const message=`Generated ${filled} of ${selectedSlots.length} selected meals.`;
   showPlatePlanToast(message);
   if(remainingUnresolved.length){
@@ -16172,6 +16234,7 @@ function savePrefs(){
 
   state.prefs={
     ...state.prefs,
+    updatedAt: new Date().toISOString(),
     exclude: document.getElementById('pref-exclude')?.value||'',
     exclusions: state.prefs.exclusions || {shared:[],elliott:[],chloe:[]},
     diet: document.getElementById('pref-diet')?.value||'vegetarian',
@@ -16187,7 +16250,7 @@ function savePrefs(){
     productPriority: document.getElementById('plan-product-priority')?.value || state.prefs.productPriority || 'protein'
   };
   recalcAllRecipes();
-  saveState();
+  saveState(true);
   showMsg('prefs-msg','Preferences saved.','success');
   renderVault(); // refreshes any views dependent on macros
 }
