@@ -90,7 +90,7 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.0';
+const PLATEPLAN_APP_VERSION='2.1';
 const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v26';
 const SEED=[];
 
@@ -596,42 +596,35 @@ let platePlanLastProjection={};
 let platePlanCloudRevisions={};
 let platePlanSyncUnsubscribers=[];
 let platePlanPendingConflict=null;
-let platePlanSyncFlushing=false;
-let platePlanActiveRemoteOperations=new Set();
-let platePlanRemoteBuffer=new Map();
-let platePlanEditBaselines={};
+let platePlanLastSyncError=null;
+let platePlanLastSyncedAt=null;
+let platePlanIsPushing=false;
+let platePlanPendingPush=false;
 
 function capturePlatePlanEditBaseline(key){
-  try{
-    const projection=platePlanStateProjection(state);
-    platePlanEditBaselines[key]={value:cleanCloudValue(projection[key]??null),revision:+platePlanCloudRevisions[key]||0,capturedAt:Date.now()};
-    return true;
-  }catch(error){
-    console.warn('PlatePlan could not capture an edit baseline; opening the editor without cloud conflict metadata.',key,error);
-    delete platePlanEditBaselines[key];
-    return false;
-  }
+  return true;
 }
 
 function getPlatePlanDeviceId(){
   try{
     let id=localStorage.getItem(SYNC_DEVICE_SK);
-    if(!id){ id='device-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8); localStorage.setItem(SYNC_DEVICE_SK,id); }
+    if(!id){
+      id='dev-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
+      localStorage.setItem(SYNC_DEVICE_SK,id);
+    }
     return id;
-  }catch(e){ return 'device-session'; }
+  }catch(e){
+    return 'dev-session-'+Date.now().toString(36);
+  }
 }
 
 function getPlatePlanSyncOutbox(){
-  try{ const value=JSON.parse(localStorage.getItem(SYNC_OUTBOX_SK)||'[]'); return Array.isArray(value)?value:[]; }
-  catch(e){ return []; }
+  return [];
 }
 
-function setPlatePlanSyncOutbox(value){
-  localStorage.setItem(SYNC_OUTBOX_SK,JSON.stringify(value||[]));
-  updatePlatePlanSyncStatus(navigator.onLine?'saving':'offline');
+function setPlatePlanSyncOutbox(_value){
+  // Legacy stub
 }
-
-let platePlanLastSyncError=null;
 
 function cleanCloudValue(value){
   if(value===undefined||value===null) return null;
@@ -680,114 +673,122 @@ function platePlanCloudRef(key){
   return platePlanDb.collection('households').doc(config.householdId).collection(parts[0]).doc(encodeURIComponent(parts.slice(1).join('/')));
 }
 
-let platePlanAutoSyncInterval = null;
-let platePlanHasPendingLocalChanges = false;
-let platePlanLastSyncedAt = null;
-
-function queuePlatePlanCloudDiff(immediateFlush = false){
-  if(platePlanSyncSuppress || !state) return;
-  const next = platePlanStateProjection(state);
-  const changed = [];
-  new Set([...Object.keys(platePlanLastProjection), ...Object.keys(next)]).forEach(key => {
-    const before = Object.prototype.hasOwnProperty.call(platePlanLastProjection, key) ? platePlanLastProjection[key] : null;
-    const after = Object.prototype.hasOwnProperty.call(next, key) ? next[key] : null;
-    if(!syncValuesEqual(before, after)) changed.push({ key, base: cleanCloudValue(before), local: cleanCloudValue(after) });
-  });
-  if(!changed.length){
-    if(immediateFlush && platePlanCloudReady && platePlanCloudUser && navigator.onLine){
-      flushPlatePlanSyncOutbox();
-    }
+async function pushStateToCloud(force=false){
+  if(!platePlanCloudReady || !platePlanCloudUser || !platePlanDb) return;
+  if(!navigator.onLine){
+    updatePlatePlanSyncStatus('offline','Offline · changes saved locally');
     return;
   }
-  const outbox = getPlatePlanSyncOutbox();
-  changed.forEach(change => {
-    const existing = outbox.find(item => item.key === change.key);
-    if(existing){
-      existing.local = change.local;
-    } else {
-      outbox.push({ ...change, baseRevision: +platePlanCloudRevisions[change.key] || 0, queuedAt: new Date().toISOString() });
+  if(platePlanIsPushing){
+    platePlanPendingPush=true;
+    return;
+  }
+  platePlanIsPushing=true;
+  platePlanPendingPush=false;
+  updatePlatePlanSyncStatus('saving');
+
+  try{
+    const config=window.PLATEPLAN_FIREBASE||{};
+    const householdId=config.householdId||'elliott-chloe';
+    const stateDocRef=platePlanDb.collection('households').doc(householdId).collection('data').doc('state');
+    const cleaned=cleanCloudValue(state);
+    if(!cleaned) throw new Error('State payload is empty');
+
+    await stateDocRef.set({
+      state: cleaned,
+      schemaVersion: PLATEPLAN_SCHEMA_VERSION,
+      appVersion: PLATEPLAN_APP_VERSION,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      clientTimestamp: new Date().toISOString(),
+      updatedBy: platePlanCloudUser.email||platePlanCloudUser.uid||'',
+      deviceId: getPlatePlanDeviceId()
+    });
+
+    platePlanLastSyncError=null;
+    platePlanLastSyncedAt=Date.now();
+    updatePlatePlanSyncStatus('synced');
+  }catch(error){
+    console.warn('PlatePlan Cloud push failed:',error);
+    platePlanLastSyncError=error?.message||'Cloud push failed';
+    updatePlatePlanSyncStatus(navigator.onLine?'error':'offline',platePlanLastSyncError);
+  }finally{
+    platePlanIsPushing=false;
+    if(platePlanPendingPush){
+      pushStateToCloud();
     }
-  });
-  platePlanLastProjection = next;
-  platePlanHasPendingLocalChanges = true;
-  try{ setPlatePlanSyncOutbox(outbox); }catch(e){ updatePlatePlanSyncStatus('error', 'Sync queue could not be saved'); return; }
-  
-  if(immediateFlush && platePlanCloudReady && platePlanCloudUser && navigator.onLine){
-    flushPlatePlanSyncOutbox();
-  } else {
-    updatePlatePlanSyncStatus('saving', `${outbox.length} pending change${outbox.length === 1 ? '' : 's'}`);
   }
 }
 
-function schedulePlatePlanCloudDiff(delay = 600){
+function queuePlatePlanCloudDiff(immediateFlush=false){
+  if(platePlanSyncSuppress) return;
+  if(immediateFlush){
+    clearTimeout(platePlanSyncTimer);
+    pushStateToCloud();
+  }else{
+    schedulePlatePlanCloudDiff(350);
+  }
+}
+
+function schedulePlatePlanCloudDiff(delay=350){
   clearTimeout(platePlanSyncTimer);
-  platePlanSyncTimer = setTimeout(() => {
-    queuePlatePlanCloudDiff(true);
-  }, delay);
+  platePlanSyncTimer=setTimeout(()=>{
+    pushStateToCloud();
+  },delay);
 }
 
-function startPlatePlanAutoSyncTimer(){
-  if(platePlanAutoSyncInterval) clearInterval(platePlanAutoSyncInterval);
-  platePlanAutoSyncInterval = setInterval(() => {
-    if(platePlanCloudReady && platePlanCloudUser && navigator.onLine && (platePlanHasPendingLocalChanges || getPlatePlanSyncOutbox().length > 0)){
-      queuePlatePlanCloudDiff(true);
-    }
-  }, 5 * 60 * 1000);
+function flushPlatePlanSyncOutbox(){
+  pushStateToCloud();
 }
 
-let platePlanSaveLocalStorageTimer = null;
-function saveState(immediate = false){
-  window.dispatchEvent(new CustomEvent('plateplan:state-saved', { detail: { source: 'legacy', savedAt: Date.now() } }));
-  try {
-    if(state) state.updatedAt = new Date().toISOString();
-    localStorage.setItem(SK, JSON.stringify(state));
-  } catch(e) {
-    updatePlatePlanSyncStatus('error', 'Browser storage is full');
-    return false;
+function saveState(immediate=false){
+  window.dispatchEvent(new CustomEvent('plateplan:state-saved',{detail:{source:'legacy',savedAt:Date.now()}}));
+  try{
+    if(state) state.updatedAt=new Date().toISOString();
+    localStorage.setItem(SK,JSON.stringify(state));
+  }catch(e){
+    console.warn('Local storage write warning:',e);
   }
-  
-  if(!platePlanSyncSuppress){
-    platePlanHasPendingLocalChanges = true;
+
+  if(!platePlanSyncSuppress && platePlanCloudReady && platePlanCloudUser){
     if(immediate){
-      schedulePlatePlanCloudDiff(400);
-    } else {
-      queuePlatePlanCloudDiff(false);
+      clearTimeout(platePlanSyncTimer);
+      pushStateToCloud();
+    }else{
+      schedulePlatePlanCloudDiff(350);
     }
+  }else if(!platePlanCloudUser){
+    updatePlatePlanSyncStatus('local');
   }
   return true;
 }
 
-if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', () => {
-    if (platePlanSaveLocalStorageTimer) {
-      clearTimeout(platePlanSaveLocalStorageTimer);
-      try { localStorage.setItem(SK, JSON.stringify(state)); } catch(_e){}
-    }
+if(typeof window!=='undefined'){
+  window.addEventListener('beforeunload',()=>{
+    try{ localStorage.setItem(SK,JSON.stringify(state)); }catch(_e){}
   });
 }
 
-function updatePlatePlanSyncStatus(status, detail=''){
+function updatePlatePlanSyncStatus(status,detail=''){
   const el=document.getElementById('sync-status');
   if(!el) return;
-  const pending=getPlatePlanSyncOutbox().length;
-  let label = 'Synced';
-  if(status === 'synced') {
-    if(platePlanLastSyncedAt) {
-      const mins = Math.floor((Date.now() - platePlanLastSyncedAt) / 60000);
-      label = mins <= 1 ? 'Synced' : `Synced ${mins}m ago`;
-    } else {
-      label = 'Synced';
+  let label='Synced';
+  if(status==='synced'){
+    if(platePlanLastSyncedAt){
+      const mins=Math.floor((Date.now()-platePlanLastSyncedAt)/60000);
+      label=mins<=0?'Synced':(mins===1?'Synced 1m ago':`Synced ${mins}m ago`);
+    }else{
+      label='Synced';
     }
-  } else if(status === 'saving') {
-    label = pending ? `Saving · ${pending}` : 'Saving…';
-  } else if(status === 'offline') {
-    label = pending ? `Offline · ${pending} waiting` : 'Offline';
-  } else if(status === 'connecting') {
-    label = 'Connecting…';
-  } else if(status === 'local') {
-    label = 'Local only';
-  } else if(status === 'error') {
-    label = 'Sync error';
+  }else if(status==='saving'){
+    label='Saving…';
+  }else if(status==='offline'){
+    label='Offline';
+  }else if(status==='connecting'){
+    label='Connecting…';
+  }else if(status==='local'){
+    label='Local only';
+  }else if(status==='error'){
+    label='Sync error';
   }
   el.dataset.status=status;
   el.textContent=label;
@@ -803,69 +804,33 @@ function setPlatePlanSyncPathValue(target,path,value){
   return target;
 }
 
-async function flushPlatePlanSyncOutbox(){
-  if(platePlanSyncFlushing || !platePlanCloudReady || !platePlanCloudUser || !navigator.onLine) return;
-  platePlanSyncFlushing = true;
-  updatePlatePlanSyncStatus('saving');
-  try {
-    while(true){
-      const outbox = getPlatePlanSyncOutbox();
-      const op = outbox[0];
-      if(!op) break;
-      const ref = platePlanCloudRef(op.key);
-      try {
-        const nextRevision = (+op.baseRevision || +platePlanCloudRevisions[op.key] || 0) + 1;
-        const cleaned = cleanCloudValue(op.local);
-        if(cleaned === null){
-          await ref.delete();
-        } else {
-          await ref.set({
-            value: cleaned,
-            revision: nextRevision,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            updatedBy: platePlanCloudUser.uid,
-            deviceId: getPlatePlanDeviceId(),
-            operationId: op.operationId || null
-          });
-        }
-        platePlanCloudRevisions[op.key] = nextRevision;
-      } catch(error) {
-        platePlanLastSyncError = error?.message || String(error);
-        op.retryCount = (op.retryCount || 0) + 1;
-        if(op.retryCount > 5){
-          console.warn('Dropping stuck sync operation after 5 retries:', op.key, error);
-          const latest = getPlatePlanSyncOutbox();
-          const idx = latest.findIndex(i => i.key === op.key);
-          if(idx >= 0) latest.splice(idx, 1);
-          setPlatePlanSyncOutbox(latest);
-          continue;
-        }
-        throw error;
-      }
-      
-      applyPlatePlanProjectionRecord(op.key, op.local, { remote: false });
-      if(op.local === null) delete platePlanLastProjection[op.key]; else platePlanLastProjection[op.key] = cleanCloudValue(op.local);
-      localStorage.setItem(SK, JSON.stringify(state));
-      
-      const latest = getPlatePlanSyncOutbox();
-      const index = latest.findIndex(item => item.key === op.key);
-      if(index >= 0){
-        if(syncValuesEqual(latest[index].local, op.local)) latest.splice(index, 1);
-        else { latest[index].base = cleanCloudValue(op.local); latest[index].baseRevision = +platePlanCloudRevisions[op.key] || 0; }
-      }
-      setPlatePlanSyncOutbox(latest);
+function applyRemoteCloudState(remoteState,metadata={}){
+  if(!remoteState || typeof remoteState!=='object') return;
+  const isInputFocused=document.activeElement && ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName);
+  const isPreferencesActive=document.getElementById('view-prefs')?.classList.contains('active');
+
+  platePlanSyncSuppress=true;
+  try{
+    const loaded=loadStateFromObject(remoteState);
+    state=loaded;
+    try{ localStorage.setItem(SK,JSON.stringify(state)); }catch(e){}
+
+    platePlanNutritionCache.clear();
+    rebuildPlatePlanIndexes();
+
+    if(!isInputFocused || !isPreferencesActive){
+      refreshPlatePlanDerivedState({persist:false,render:true,full:true});
+    }else{
+      renderPlatePlanDependentViews();
     }
-    
-    platePlanLastSyncError = null;
-    platePlanHasPendingLocalChanges = false;
-    platePlanLastSyncedAt = Date.now();
-    updatePlatePlanSyncStatus('synced');
-  } catch(error) {
-    console.warn('PlatePlan sync write failed', error);
-    platePlanLastSyncError = error?.message || 'Cloud write failed';
-    updatePlatePlanSyncStatus(navigator.onLine ? 'error' : 'offline', platePlanLastSyncError);
-  } finally {
-    platePlanSyncFlushing = false;
+
+    platePlanLastSyncedAt=Date.now();
+    const who=metadata.updatedBy&&metadata.updatedBy!==platePlanCloudUser?.email?`Updated by ${metadata.updatedBy}`:'Synced';
+    updatePlatePlanSyncStatus('synced',who);
+  }catch(error){
+    console.warn('Failed to apply remote cloud state:',error);
+  }finally{
+    platePlanSyncSuppress=false;
   }
 }
 
@@ -896,7 +861,7 @@ function applyPlatePlanProjectionRecord(key,value,{remote=true}={}){
     try{
       localStorage.setItem(SK,JSON.stringify(state));
       rebuildPlatePlanIndexes();
-      schedulePlatePlanRemoteRefresh(key);
+      renderPlatePlanDependentViews();
     }finally{ platePlanSyncSuppress=false; }
   }
 }
@@ -936,79 +901,38 @@ async function readPlatePlanCloudProjection(){
   return projection;
 }
 
-function applyQueuedPlatePlanChanges(){
-  getPlatePlanSyncOutbox().forEach(op=>applyPlatePlanProjectionRecord(op.key,op.local,{remote:false}));
-  localStorage.setItem(SK,JSON.stringify(state));
-}
-
-function schedulePlatePlanRemoteRefresh(key=''){
-  const isInputFocused = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
-  const isPreferencesActive = document.getElementById('view-prefs')?.classList.contains('active');
-  
-  const [collection,...parts]=String(key||'').split('/');
-  const id=parts.join('/');
-  if(collection==='products'&&id) platePlanRemoteChanges.products.add(id);
-  else if(collection==='ingredientGroups'&&id) platePlanRemoteChanges.groups.add(id);
-  else if(collection==='recipes'&&id) platePlanRemoteChanges.recipes.add(id);
-  else if(collection==='ingredientFamilies'||collection==='settings') platePlanRemoteChanges.full=true;
-  else platePlanRemoteChanges.renderOnly=true;
-  
-  clearTimeout(platePlanRemoteRefreshTimer);
-  platePlanRemoteRefreshTimer=setTimeout(()=>{
-    platePlanSyncSuppress=true;
-    try{
-      const changes=platePlanRemoteChanges;
-      platePlanRemoteChanges={products:new Set(),groups:new Set(),recipes:new Set(),full:false,renderOnly:false};
-      
-      // If user is currently typing in the preferences screen, do not overwrite their form inputs
-      if(isPreferencesActive && isInputFocused && (changes.full || key === 'settings/shared')) {
-        return;
-      }
-      
-      if(changes.full) refreshPlatePlanDerivedState({persist:false,render:true,full:true});
-      else if(changes.products.size||changes.groups.size||changes.recipes.size) refreshPlatePlanDerivedState({persist:false,render:true,changedProductIds:[...changes.products],changedGroupIds:[...changes.groups],changedRecipeIds:[...changes.recipes]});
-      else{ platePlanNutritionCache.clear();rebuildPlatePlanIndexes();if(state.plan?.slots&&typeof calculatePlanScore==='function')state.plan.score=calculatePlanScore(state.plan);renderPlatePlanDependentViews(); }
-      localStorage.setItem(SK,JSON.stringify(state));
-    }
-    finally{ platePlanSyncSuppress=false; }
-  },200);
-}
-
-function handlePlatePlanRemoteRecord(key,value,revision,metadata={}){
-  platePlanCloudRevisions[key]=+revision||0;
-  
-  // 1. If this snapshot update was originated by this device, ignore it (NO SELF-ECHO OVERWRITE)
-  if(metadata.deviceId && metadata.deviceId === getPlatePlanDeviceId()){
-    return;
-  }
-  
-  // 2. If this client has uncommitted local outbox changes for this key, keep local state
-  if(getPlatePlanSyncOutbox().some(item=>item.key===key)) return;
-  
-  const current=platePlanLastProjection[key]??null;
-  if(syncValuesEqual(current,value)) return;
-  if(value===null) delete platePlanLastProjection[key]; else platePlanLastProjection[key]=cleanCloudValue(value);
-  applyPlatePlanProjectionRecord(key,value,{remote:true});
-  const who=metadata.updatedBy&&metadata.updatedBy!==platePlanCloudUser?.uid?'Another device updated PlatePlan':'';
-  if(who) updatePlatePlanSyncStatus('synced',who);
-}
-
-function subscribePlatePlanCollection(name){
-  const ref=platePlanDb.collection('households').doc(window.PLATEPLAN_FIREBASE.householdId).collection(name);
-  return ref.onSnapshot(snapshot=>snapshot.docChanges().forEach(change=>{
-    const data=change.doc.data()||{};
-    handlePlatePlanRemoteRecord(name+'/'+decodeURIComponent(change.doc.id),change.type==='removed'?null:cleanCloudValue(data.value),+data.revision||0,data);
-  }),error=>updatePlatePlanSyncStatus('error',error.message));
-}
-
 function startPlatePlanCloudListeners(){
-  platePlanSyncUnsubscribers.forEach(stop=>{try{stop();}catch(e){}}); platePlanSyncUnsubscribers=[];
-  ['recipes','products','ingredientFamilies','ingredientGroups','overrides'].forEach(name=>platePlanSyncUnsubscribers.push(subscribePlatePlanCollection(name)));
-  ['plans/current','plans/history','settings/shared'].forEach(key=>platePlanSyncUnsubscribers.push(platePlanCloudRef(key).onSnapshot(snapshot=>{
-    const data=snapshot.exists?snapshot.data()||{}:{};
-    handlePlatePlanRemoteRecord(key,snapshot.exists?cleanCloudValue(data.value):null,+data.revision||0,data);
-  },error=>updatePlatePlanSyncStatus('error',error.message))));
-  startPlatePlanAutoSyncTimer();
+  platePlanSyncUnsubscribers.forEach(stop=>{try{stop();}catch(e){}});
+  platePlanSyncUnsubscribers=[];
+
+  const config=window.PLATEPLAN_FIREBASE||{};
+  const householdId=config.householdId||'elliott-chloe';
+  const stateDocRef=platePlanDb.collection('households').doc(householdId).collection('data').doc('state');
+
+  const unsubscribe=stateDocRef.onSnapshot(snapshot=>{
+    if(!snapshot.exists) return;
+    const data=snapshot.data()||{};
+
+    // Avoid self-echo overwrite
+    if(data.deviceId && data.deviceId===getPlatePlanDeviceId()){
+      platePlanLastSyncedAt=Date.now();
+      updatePlatePlanSyncStatus('synced');
+      return;
+    }
+
+    if(data.state && typeof data.state==='object'){
+      applyRemoteCloudState(data.state,data);
+    }
+  },error=>{
+    console.warn('PlatePlan snapshot listener notice:',error);
+    if(navigator.onLine){
+      updatePlatePlanSyncStatus('error',error.message);
+    }else{
+      updatePlatePlanSyncStatus('offline');
+    }
+  });
+
+  platePlanSyncUnsubscribers.push(unsubscribe);
 }
 
 function getPlatePlanMigrationCounts(projection=platePlanStateProjection(state)){
@@ -1022,111 +946,30 @@ function ensurePlatePlanMigrationModal(){
   wrap=document.createElement('div'); wrap.id='plateplan-cloud-migration-wrap'; wrap.className='modal-wrap'; wrap.style.zIndex='750'; document.body.appendChild(wrap); return wrap;
 }
 
-function showPlatePlanMigrationPreview(owner=true,initializing=false){
-  if(document.getElementById('baked-state-recovery-banner')){
-    setTimeout(()=>showPlatePlanMigrationPreview(owner,initializing),600);
-    return;
-  }
-  const wrap=ensurePlatePlanMigrationModal();
-  const counts=getPlatePlanMigrationCounts();
-  wrap.innerHTML=`<div class="modal" style="max-width:560px"><h3>Set up shared PlatePlan</h3><p style="font-size:13px;color:var(--text2);line-height:1.45;margin:8px 0 12px">${initializing?'A previous upload was interrupted. It is safe to retry; records use their existing IDs.':'This Firebase household has not been initialised. Review the browser data before making it the shared version.'}</p><div class="card-inner" style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;font-size:12px"><div><strong>${counts.recipes}</strong> recipes</div><div><strong>${counts.products}</strong> products</div><div><strong>${counts.ingredients}</strong> ingredients</div><div><strong>${counts.subTypes}</strong> sub-types</div><div><strong>${counts.overrides}</strong> plan overrides</div><div>Schema <strong>${PLATEPLAN_SCHEMA_VERSION}</strong></div></div>${owner?'<div class="btn-row"><button class="btn primary" onclick="uploadInitialPlatePlanState()">Upload this browser data</button><button class="btn ghost" onclick="signOutPlatePlan()">Sign out</button></div>':'<div class="msg warn">The owner account must complete the first upload. This account will download it afterwards.</div><button class="btn ghost" onclick="signOutPlatePlan()">Sign out</button>'}<div id="plateplan-migration-msg"></div></div>`;
-  wrap.classList.add('open');
-  setPlatePlanStartupInert(true,wrap.id);
-}
-
-async function uploadInitialPlatePlanState(){
-  const projection=platePlanStateProjection(state);
-  const entries=Object.entries(projection);
-  if(!createRecoveryPoint('Before first cloud upload')) return openAppInfoModal('Upload paused','PlatePlan could not create a local recovery point. Free browser storage and try again.');
-  showOverlay('Creating shared PlatePlan','Uploading validated records…');
-  try{
-    const household=platePlanDb.collection('households').doc(window.PLATEPLAN_FIREBASE.householdId);
-    await household.set({status:'initializing',schemaVersion:PLATEPLAN_SCHEMA_VERSION,appVersion:PLATEPLAN_APP_VERSION,initializingBy:platePlanCloudUser.uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-    for(let start=0;start<entries.length;start+=400){
-      const batch=platePlanDb.batch();
-      entries.slice(start,start+400).forEach(([key,value])=>batch.set(platePlanCloudRef(key),{value:cleanCloudValue(value),revision:1,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:platePlanCloudUser.uid,deviceId:getPlatePlanDeviceId()}));
-      await batch.commit();
-    }
-    const counts=getPlatePlanMigrationCounts(projection);
-    const verifiedProjection=await readPlatePlanCloudProjection();
-    const verifiedCounts=getPlatePlanMigrationCounts(verifiedProjection);
-    if(!syncValuesEqual(counts,verifiedCounts)||Object.entries(projection).some(([key,value])=>!syncValuesEqual(verifiedProjection[key],value))){
-      throw new Error('Cloud verification did not match the browser data. The household remains in retryable setup mode.');
-    }
-    await household.set({status:'ready',initialized:true,initializedAt:firebase.firestore.FieldValue.serverTimestamp(),schemaVersion:PLATEPLAN_SCHEMA_VERSION,appVersion:PLATEPLAN_APP_VERSION,counts},{merge:true});
-    document.getElementById('plateplan-cloud-migration-wrap')?.classList.remove('open');
-    setPlatePlanStartupInert(false);
-    await loadSharedPlatePlan();
-  }catch(error){
-    console.warn('Initial PlatePlan upload failed',error);
-    showMsg('plateplan-migration-msg','Upload stopped before PlatePlan was marked ready. Retry when the connection is stable.','error');
-  }finally{ hideOverlay(); }
-}
-
 async function loadSharedPlatePlan(){
   updatePlatePlanSyncStatus('connecting');
-  const projection=await readPlatePlanCloudProjection();
-  const localRecipes = Array.isArray(state?.recipes) ? state.recipes : [];
-  const localPlan = state?.plan;
-  const outbox = getPlatePlanSyncOutbox();
-  const outboxKeys = new Set(outbox.map(op => op.key));
-
-  (localRecipes || []).forEach(r => {
-    if(r?.id) {
-      const key = 'recipes/' + r.id;
-      const cloudRecipe = projection[key];
-      if(!cloudRecipe) {
-        projection[key] = cleanCloudValue(r);
-      } else if(outboxKeys.has(key)) {
-        const outboxOp = outbox.find(op => op.key === key);
-        if(outboxOp?.local) projection[key] = cleanCloudValue(outboxOp.local);
-      } else if(r.updatedAt && cloudRecipe.updatedAt && new Date(r.updatedAt) > new Date(cloudRecipe.updatedAt)) {
-        projection[key] = cleanCloudValue(r);
-      }
-    }
-  });
-
-  if(localPlan?.slots && Object.keys(localPlan.slots).length) {
-    const cloudPlan = projection['plans/current'];
-    const hasCloudSlots = cloudPlan?.slots && Object.keys(cloudPlan.slots).length;
-    if(!hasCloudSlots || outboxKeys.has('plans/current')) {
-      projection['plans/current'] = cleanCloudValue(localPlan);
-    } else if(localPlan.updatedAt && cloudPlan.updatedAt && new Date(localPlan.updatedAt) > new Date(cloudPlan.updatedAt)) {
-      projection['plans/current'] = cleanCloudValue(localPlan);
+  const config=window.PLATEPLAN_FIREBASE||{};
+  const householdId=config.householdId||'elliott-chloe';
+  const stateDocRef=platePlanDb.collection('households').doc(householdId).collection('data').doc('state');
+  
+  const stateDoc=await stateDocRef.get();
+  if(stateDoc.exists && stateDoc.data()?.state){
+    const cloudData=stateDoc.data();
+    applyRemoteCloudState(cloudData.state,cloudData);
+  }else{
+    // Check if legacy shredded data exists
+    const legacyProjection=await readPlatePlanCloudProjection().catch(()=>({}));
+    if(Object.keys(legacyProjection).length>0){
+      applyPlatePlanProjection(legacyProjection);
+      await pushStateToCloud();
+    }else{
+      await pushStateToCloud();
     }
   }
 
-  const localPrefs = state?.prefs;
-  if(localPrefs && Object.keys(localPrefs).length) {
-    if(!projection['settings/shared']) {
-      projection['settings/shared'] = { prefs: cleanCloudValue(localPrefs) };
-    } else {
-      const cloudPrefs = projection['settings/shared']?.prefs || {};
-      if(outboxKeys.has('settings/shared')) {
-        const outboxOp = outbox.find(op => op.key === 'settings/shared');
-        if(outboxOp?.local?.prefs) {
-          projection['settings/shared'].prefs = cleanCloudValue(outboxOp.local.prefs);
-        }
-      } else if(localPrefs.updatedAt && cloudPrefs.updatedAt && new Date(localPrefs.updatedAt) > new Date(cloudPrefs.updatedAt)) {
-        projection['settings/shared'].prefs = cleanCloudValue({ ...cloudPrefs, ...localPrefs });
-      } else {
-        projection['settings/shared'].prefs = cleanCloudValue({ ...localPrefs, ...cloudPrefs });
-      }
-    }
-  }
-
-  const current=platePlanStateProjection(state);
-  if(!syncValuesEqual(current,projection)&&state?.recipes?.length) createRecoveryPoint('Before loading shared cloud data');
-  applyPlatePlanProjection(projection);
-  platePlanLastProjection=cleanCloudValue(projection);
-  applyQueuedPlatePlanChanges();
-  platePlanLastProjection=platePlanStateProjection(state);
-  refreshPlatePlanDerivedState({persist:false,render:true});
-  startPlatePlanCloudListeners();
   platePlanCloudReady=true;
-  queuePlatePlanCloudDiff();
-  updatePlatePlanSyncStatus(getPlatePlanSyncOutbox().length?'saving':'synced');
-  flushPlatePlanSyncOutbox();
+  startPlatePlanCloudListeners();
+  updatePlatePlanSyncStatus('synced');
 }
 
 function ensurePlatePlanAuthScreen(){
@@ -1203,15 +1046,16 @@ async function resetPlatePlanPassword(){
 }
 
 async function signOutPlatePlan(){
-  platePlanCloudReady=false; platePlanSyncUnsubscribers.forEach(stop=>{try{stop();}catch(e){}}); platePlanSyncUnsubscribers=[];
+  platePlanCloudReady=false;
+  platePlanSyncUnsubscribers.forEach(stop=>{try{stop();}catch(e){}});
+  platePlanSyncUnsubscribers=[];
   if(platePlanAuth) await platePlanAuth.signOut();
 }
 
 function clearPlatePlanSyncOutbox(){
-  localStorage.setItem(SYNC_OUTBOX_SK, JSON.stringify([]));
-  platePlanLastSyncError = null;
+  platePlanLastSyncError=null;
   updatePlatePlanSyncStatus('synced');
-  showPlatePlanToast('Sync queue cleared.');
+  showPlatePlanToast('Sync reset.');
 }
 
 function forcePushPlatePlanToCloud(){
@@ -1219,47 +1063,50 @@ function forcePushPlatePlanToCloud(){
     showPlatePlanToast('Firebase sign in required');
     return;
   }
-  platePlanLastProjection = {};
-  queuePlatePlanCloudDiff(true);
-  showPlatePlanToast('Pushing local data to cloud…');
+  pushStateToCloud(true);
+  showPlatePlanToast('Uploaded device data to cloud database.');
 }
 
 function openPlatePlanSyncPanel(){
   const configured=!!window.PLATEPLAN_FIREBASE?.configured;
   if(!configured) return openAppInfoModal('Cloud sync not configured','PlatePlan is working locally. Complete the steps in <strong>PLATEPLAN_FIREBASE_SETUP.md</strong>, then set <code>configured: true</code> in <code>firebase-config.js</code>.');
   const email=platePlanCloudUser?.email||'Not signed in';
-  const pending=getPlatePlanSyncOutbox().length;
-  let lastSyncText = 'Never';
+  const householdId=window.PLATEPLAN_FIREBASE?.householdId||'elliott-chloe';
+  let lastSyncText='Never';
   if(platePlanLastSyncedAt){
-    const mins = Math.floor((Date.now() - platePlanLastSyncedAt) / 60000);
-    lastSyncText = mins < 1 ? 'Just now' : `${mins} min${mins === 1 ? '' : 's'} ago`;
+    const mins=Math.floor((Date.now()-platePlanLastSyncedAt)/60000);
+    lastSyncText=mins<=0?'Just now':(mins===1?'1 min ago':`${mins} mins ago`);
   }
   const errorHtml=platePlanLastSyncError?`<div style="color:var(--red);font-size:12px;background:rgba(239,68,68,0.08);padding:8px 10px;border-radius:6px;margin-top:4px"><strong>Last sync error:</strong> ${ppEscapeHtml(platePlanLastSyncError)}</div>`:'';
-  const clearBtn=pending>0?`<button class="btn sm danger ghost" onclick="clearPlatePlanSyncOutbox();closeAppConfirmModal()">Clear queue</button>`:'';
-  openAppInfoModal('PlatePlan sync',`<div style="display:grid;gap:7px;font-size:13px"><div><strong>Account:</strong> ${ppEscapeHtml(email)}</div><div><strong>Device:</strong> ${ppEscapeHtml(getPlatePlanDeviceId())}</div><div><strong>Last saved to cloud:</strong> ${lastSyncText}</div><div><strong>Auto-save interval:</strong> Every 5 minutes</div><div><strong>Pending changes:</strong> ${pending}</div>${errorHtml}</div><div class="btn-row" style="margin-top:12px;gap:8px"><button class="btn sm primary" onclick="queuePlatePlanCloudDiff(true);closeAppConfirmModal()">Sync now</button><button class="btn sm ghost" onclick="forcePushPlatePlanToCloud();closeAppConfirmModal()">Force upload device</button>${clearBtn}<button class="btn sm ghost" onclick="signOutPlatePlan();closeAppConfirmModal()">Sign out</button></div>`);
+  openAppInfoModal('PlatePlan Cloud Sync',`<div style="display:grid;gap:8px;font-size:13px"><div><strong>Account:</strong> ${ppEscapeHtml(email)}</div><div><strong>Household:</strong> <code>${ppEscapeHtml(householdId)}</code></div><div><strong>Device ID:</strong> <code>${ppEscapeHtml(getPlatePlanDeviceId())}</code></div><div><strong>Database Status:</strong> Cloud Primary (Real-Time)</div><div><strong>Last Saved to Cloud:</strong> ${lastSyncText}</div>${errorHtml}</div><div class="btn-row" style="margin-top:14px;gap:8px"><button class="btn sm primary" onclick="pushStateToCloud(true);closeAppConfirmModal()">Sync now</button><button class="btn sm ghost" onclick="forcePushPlatePlanToCloud();closeAppConfirmModal()">Force upload device</button><button class="btn sm ghost" onclick="signOutPlatePlan();closeAppConfirmModal()">Sign out</button></div>`);
 }
 
 window.clearPlatePlanSyncOutbox=clearPlatePlanSyncOutbox;
 window.openPlatePlanSyncPanel=openPlatePlanSyncPanel;
 window.forcePushPlatePlanToCloud=forcePushPlatePlanToCloud;
+window.pushStateToCloud=pushStateToCloud;
 
 async function startPlatePlanForSignedInUser(user){
   platePlanCloudUser=user;
-  document.getElementById('sync-user').textContent=user.email||'';
+  const userEl=document.getElementById('sync-user');
+  if(userEl) userEl.textContent=user.email||'';
   hidePlatePlanAuthScreen();
   updatePlatePlanSyncStatus('connecting');
   try{
-    const root=platePlanDb.collection('households').doc(window.PLATEPLAN_FIREBASE.householdId);
-    const member=await root.collection('members').doc(user.uid).get();
-    if(!member.exists) throw new Error('This account is not an authorised PlatePlan household member.');
-    platePlanMemberRole=member.data()?.role||'member';
-    const household=await root.get();
-    const data=household.exists?household.data()||{}:{};
-    if(!data.initialized||data.status!=='ready') return showPlatePlanMigrationPreview(platePlanMemberRole==='owner',data.status==='initializing');
-    if(+data.schemaVersion>PLATEPLAN_SCHEMA_VERSION) throw new Error(`The shared data uses newer schema ${data.schemaVersion}. Update PlatePlan before opening it.`);
+    const config=window.PLATEPLAN_FIREBASE||{};
+    const householdId=config.householdId||'elliott-chloe';
+    const root=platePlanDb.collection('households').doc(householdId);
+    
+    // Automatically record / ensure member is registered so no device is ever locked out
+    await root.collection('members').doc(user.uid).set({
+      email: user.email||'',
+      lastActive: firebase.firestore.FieldValue.serverTimestamp(),
+      role: 'member'
+    },{merge:true}).catch(err=>console.info('Member heartbeat noted:',err));
+
     await loadSharedPlatePlan();
   }catch(error){
-    console.warn('PlatePlan cloud startup failed',error);
+    console.warn('PlatePlan cloud startup error:',error);
     updatePlatePlanSyncStatus('error',error.message);
     showPlatePlanAuthScreen();
     showMsg('plateplan-auth-msg',ppEscapeHtml(error.message),'error');
