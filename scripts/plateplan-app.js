@@ -696,7 +696,7 @@ function queuePlatePlanCloudDiff(){
 
 function schedulePlatePlanCloudDiff(){
   clearTimeout(platePlanSyncTimer);
-  platePlanSyncTimer=setTimeout(queuePlatePlanCloudDiff,180);
+  queuePlatePlanCloudDiff();
 }
 
 let platePlanSaveLocalStorageTimer = null;
@@ -707,16 +707,8 @@ function saveState(immediate = false){
     catch(e){ updatePlatePlanSyncStatus('error','Browser storage is full'); return false; }
     return true;
   };
-  if (immediate) {
-    if (platePlanSaveLocalStorageTimer) { clearTimeout(platePlanSaveLocalStorageTimer); platePlanSaveLocalStorageTimer = null; }
-    performDiskSave();
-  } else if (!platePlanSaveLocalStorageTimer) {
-    platePlanSaveLocalStorageTimer = setTimeout(() => {
-      platePlanSaveLocalStorageTimer = null;
-      performDiskSave();
-    }, 200);
-  }
-  if(platePlanCloudReady&&!platePlanSyncSuppress) schedulePlatePlanCloudDiff();
+  performDiskSave();
+  if(platePlanCloudReady&&!platePlanSyncSuppress) queuePlatePlanCloudDiff();
   return true;
 }
 
@@ -820,7 +812,7 @@ async function flushPlatePlanSyncOutbox(){
       if(!op) break;
       updatePlatePlanSyncStatus('saving');
       if(op.operationId&&!op.operationStarted){
-        await markPlatePlanOperation(op.operationId,'pending');
+        await markPlatePlanOperation(op.operationId,'pending').catch(e=>console.info('Operation tag deferred',e));
         outbox.filter(item=>item.operationId===op.operationId).forEach(item=>item.operationStarted=true);
         setPlatePlanSyncOutbox(outbox);
       }
@@ -833,10 +825,24 @@ async function flushPlatePlanSyncOutbox(){
           const remote=cloud?.value??null;
           const remoteRevision=+cloud?.revision||0;
           if(remoteRevision!==+op.baseRevision&&!syncValuesEqual(remote,op.base)){
+            if(op.baseRevision===0 || op.base===null || syncValuesEqual(op.base,{})){
+              op.base=remote;
+              op.baseRevision=remoteRevision;
+            }
             const conflicts=[];
             const merged=threeWayPlatePlanMerge(op.base,op.local,remote,[],conflicts);
-            if(conflicts.length){ conflictData={op,remote,remoteRevision,merged,conflicts}; throw new Error('PLATEPLAN_CONFLICT'); }
-            op.local=merged; op.base=remote; op.baseRevision=remoteRevision;
+            if(conflicts.length){
+              if(op.key==='plans/current' || op.key==='plans/history' || op.key==='settings/shared' || op.key.startsWith('recipes/') || op.key.startsWith('products/') || op.key.startsWith('ingredientFamilies/') || op.key.startsWith('ingredientGroups/') || op.key.startsWith('overrides/')){
+                op.local=cleanCloudValue(op.local);
+                op.base=remote;
+                op.baseRevision=remoteRevision;
+              } else {
+                conflictData={op,remote,remoteRevision,merged,conflicts};
+                throw new Error('PLATEPLAN_CONFLICT');
+              }
+            }else{
+              op.local=merged; op.base=remote; op.baseRevision=remoteRevision;
+            }
           }
           const nextRevision=remoteRevision+1;
           if(op.local===null) transaction.delete(ref);
@@ -845,6 +851,15 @@ async function flushPlatePlanSyncOutbox(){
         });
       }catch(error){
         if(conflictData){ showPlatePlanConflict(conflictData); return; }
+        op.retryCount=(op.retryCount||0)+1;
+        if(op.retryCount>5){
+          console.warn('Dropping stuck sync operation after 5 retries:',op.key,error);
+          const latest=getPlatePlanSyncOutbox();
+          const idx=latest.findIndex(i=>i.key===op.key);
+          if(idx>=0) latest.splice(idx,1);
+          setPlatePlanSyncOutbox(latest);
+          continue;
+        }
         throw error;
       }
       applyPlatePlanProjectionRecord(op.key,op.local,{remote:false});
@@ -857,7 +872,7 @@ async function flushPlatePlanSyncOutbox(){
         else{ latest[index].base=cleanCloudValue(op.local); latest[index].baseRevision=+platePlanCloudRevisions[op.key]||0; }
       }
       setPlatePlanSyncOutbox(latest);
-      if(op.operationId&&!latest.some(item=>item.operationId===op.operationId)) await markPlatePlanOperation(op.operationId,'complete');
+      if(op.operationId&&!latest.some(item=>item.operationId===op.operationId)) await markPlatePlanOperation(op.operationId,'complete').catch(e=>console.info('Operation tag finish deferred',e));
     }
     platePlanSyncSuppress=true;
     try{ platePlanNutritionCache.clear();rebuildPlatePlanIndexes();renderPlatePlanDependentViews();localStorage.setItem(SK,JSON.stringify(state)); }
@@ -1058,6 +1073,24 @@ async function uploadInitialPlatePlanState(){
 async function loadSharedPlatePlan(){
   updatePlatePlanSyncStatus('connecting');
   const projection=await readPlatePlanCloudProjection();
+  const localRecipes = Array.isArray(state?.recipes) ? state.recipes : [];
+  const localPlan = state?.plan;
+  (localRecipes || []).forEach(r => {
+    if(r?.id && !projection['recipes/' + r.id]) {
+      projection['recipes/' + r.id] = cleanCloudValue(r);
+    }
+  });
+  if(localPlan?.slots && Object.keys(localPlan.slots).length && (!projection['plans/current'] || !Object.keys(projection['plans/current']?.slots || {}).length)) {
+    projection['plans/current'] = cleanCloudValue(localPlan);
+  }
+  const localPrefs = state?.prefs;
+  if(localPrefs && Object.keys(localPrefs).length) {
+    if(!projection['settings/shared']) {
+      projection['settings/shared'] = { prefs: cleanCloudValue(localPrefs) };
+    } else if(!projection['settings/shared']?.prefs || !Object.keys(projection['settings/shared']?.prefs || {}).length) {
+      projection['settings/shared'] = { ...projection['settings/shared'], prefs: cleanCloudValue(localPrefs) };
+    }
+  }
   const current=platePlanStateProjection(state);
   if(!syncValuesEqual(current,projection)&&state?.recipes?.length) createRecoveryPoint('Before loading shared cloud data');
   applyPlatePlanProjection(projection);
@@ -1067,6 +1100,7 @@ async function loadSharedPlatePlan(){
   refreshPlatePlanDerivedState({persist:false,render:true});
   startPlatePlanCloudListeners();
   platePlanCloudReady=true;
+  queuePlatePlanCloudDiff();
   updatePlatePlanSyncStatus(getPlatePlanSyncOutbox().length?'saving':'synced');
   flushPlatePlanSyncOutbox();
 }
