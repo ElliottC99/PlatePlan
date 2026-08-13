@@ -90,7 +90,7 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='23.0';
+const PLATEPLAN_APP_VERSION='2.0';
 const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v26';
 const SEED=[];
 
@@ -680,50 +680,81 @@ function platePlanCloudRef(key){
   return platePlanDb.collection('households').doc(config.householdId).collection(parts[0]).doc(encodeURIComponent(parts.slice(1).join('/')));
 }
 
-function queuePlatePlanCloudDiff(){
-  if(platePlanSyncSuppress||!state) return;
-  const next=platePlanStateProjection(state);
-  const changed=[];
-  new Set([...Object.keys(platePlanLastProjection),...Object.keys(next)]).forEach(key=>{
-    const before=Object.prototype.hasOwnProperty.call(platePlanLastProjection,key)?platePlanLastProjection[key]:null;
-    const after=Object.prototype.hasOwnProperty.call(next,key)?next[key]:null;
-    if(!syncValuesEqual(before,after)) changed.push({key,base:cleanCloudValue(before),local:cleanCloudValue(after)});
+let platePlanSyncTimer = null;
+let platePlanAutoSyncInterval = null;
+let platePlanHasPendingLocalChanges = false;
+let platePlanLastSyncedAt = null;
+
+function queuePlatePlanCloudDiff(immediateFlush = false){
+  if(platePlanSyncSuppress || !state) return;
+  const next = platePlanStateProjection(state);
+  const changed = [];
+  new Set([...Object.keys(platePlanLastProjection), ...Object.keys(next)]).forEach(key => {
+    const before = Object.prototype.hasOwnProperty.call(platePlanLastProjection, key) ? platePlanLastProjection[key] : null;
+    const after = Object.prototype.hasOwnProperty.call(next, key) ? next[key] : null;
+    if(!syncValuesEqual(before, after)) changed.push({ key, base: cleanCloudValue(before), local: cleanCloudValue(after) });
   });
-  if(!changed.length) return;
-  const operationId=changed.length>1?'op-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6):null;
-  const outbox=getPlatePlanSyncOutbox();
-  changed.forEach(change=>{
-    const editBaseline=platePlanEditBaselines[change.key];
-    if(editBaseline&&Date.now()-editBaseline.capturedAt<30*60*1000){ change.base=editBaseline.value; change.baseRevision=editBaseline.revision; }
-    const existing=outbox.find(item=>item.key===change.key);
-    if(existing){ existing.local=change.local; existing.operationId=existing.operationId||operationId; }
-    else outbox.push({...change,baseRevision:change.baseRevision??(+platePlanCloudRevisions[change.key]||0),operationId,queuedAt:new Date().toISOString()});
-    delete platePlanEditBaselines[change.key];
+  if(!changed.length){
+    if(immediateFlush && platePlanCloudReady && platePlanCloudUser && navigator.onLine){
+      flushPlatePlanSyncOutbox();
+    }
+    return;
+  }
+  const outbox = getPlatePlanSyncOutbox();
+  changed.forEach(change => {
+    const existing = outbox.find(item => item.key === change.key);
+    if(existing){
+      existing.local = change.local;
+    } else {
+      outbox.push({ ...change, baseRevision: +platePlanCloudRevisions[change.key] || 0, queuedAt: new Date().toISOString() });
+    }
   });
-  platePlanLastProjection=next;
-  try{ setPlatePlanSyncOutbox(outbox); }catch(e){ updatePlatePlanSyncStatus('error','Sync queue could not be saved'); return; }
-  if(platePlanCloudReady && platePlanCloudUser && navigator.onLine){
+  platePlanLastProjection = next;
+  platePlanHasPendingLocalChanges = true;
+  try{ setPlatePlanSyncOutbox(outbox); }catch(e){ updatePlatePlanSyncStatus('error', 'Sync queue could not be saved'); return; }
+  
+  if(immediateFlush && platePlanCloudReady && platePlanCloudUser && navigator.onLine){
     flushPlatePlanSyncOutbox();
   } else {
-    updatePlatePlanSyncStatus('saving', `${outbox.length} pending changes`);
+    updatePlatePlanSyncStatus('saving', `${outbox.length} pending change${outbox.length === 1 ? '' : 's'}`);
   }
 }
 
-function schedulePlatePlanCloudDiff(){
+function schedulePlatePlanCloudDiff(delay = 600){
   clearTimeout(platePlanSyncTimer);
-  queuePlatePlanCloudDiff();
+  platePlanSyncTimer = setTimeout(() => {
+    queuePlatePlanCloudDiff(true);
+  }, delay);
+}
+
+function startPlatePlanAutoSyncTimer(){
+  if(platePlanAutoSyncInterval) clearInterval(platePlanAutoSyncInterval);
+  platePlanAutoSyncInterval = setInterval(() => {
+    if(platePlanCloudReady && platePlanCloudUser && navigator.onLine && (platePlanHasPendingLocalChanges || getPlatePlanSyncOutbox().length > 0)){
+      queuePlatePlanCloudDiff(true);
+    }
+  }, 5 * 60 * 1000);
 }
 
 let platePlanSaveLocalStorageTimer = null;
 function saveState(immediate = false){
-  window.dispatchEvent(new CustomEvent('plateplan:state-saved',{detail:{source:'legacy',savedAt:Date.now()}}));
-  const performDiskSave = () => {
-    try{ localStorage.setItem(SK,JSON.stringify(state)); }
-    catch(e){ updatePlatePlanSyncStatus('error','Browser storage is full'); return false; }
-    return true;
-  };
-  performDiskSave();
-  if(!platePlanSyncSuppress) queuePlatePlanCloudDiff();
+  window.dispatchEvent(new CustomEvent('plateplan:state-saved', { detail: { source: 'legacy', savedAt: Date.now() } }));
+  try {
+    if(state) state.updatedAt = new Date().toISOString();
+    localStorage.setItem(SK, JSON.stringify(state));
+  } catch(e) {
+    updatePlatePlanSyncStatus('error', 'Browser storage is full');
+    return false;
+  }
+  
+  if(!platePlanSyncSuppress){
+    platePlanHasPendingLocalChanges = true;
+    if(immediate){
+      schedulePlatePlanCloudDiff(400);
+    } else {
+      queuePlatePlanCloudDiff(false);
+    }
+  }
   return true;
 }
 
@@ -736,14 +767,32 @@ if (typeof window !== 'undefined') {
   });
 }
 
-function updatePlatePlanSyncStatus(status,detail=''){
+function updatePlatePlanSyncStatus(status, detail=''){
   const el=document.getElementById('sync-status');
   if(!el) return;
   const pending=getPlatePlanSyncOutbox().length;
-  const labels={local:'Local only',connecting:'Connecting…',synced:'Synced',saving:pending?`Saving ${pending}`:'Saving…',offline:pending?`Offline · ${pending} waiting`:'Offline',conflict:'Conflict',error:'Sync error'};
+  let label = 'Synced';
+  if(status === 'synced') {
+    if(platePlanLastSyncedAt) {
+      const mins = Math.floor((Date.now() - platePlanLastSyncedAt) / 60000);
+      label = mins <= 1 ? 'Synced' : `Synced ${mins}m ago`;
+    } else {
+      label = 'Synced';
+    }
+  } else if(status === 'saving') {
+    label = pending ? `Saving · ${pending}` : 'Saving…';
+  } else if(status === 'offline') {
+    label = pending ? `Offline · ${pending} waiting` : 'Offline';
+  } else if(status === 'connecting') {
+    label = 'Connecting…';
+  } else if(status === 'local') {
+    label = 'Local only';
+  } else if(status === 'error') {
+    label = 'Sync error';
+  }
   el.dataset.status=status;
-  el.textContent=labels[status]||status;
-  el.title=detail||labels[status]||'';
+  el.textContent=label;
+  el.title=detail||label||'';
 }
 
 function setPlatePlanSyncPathValue(target,path,value){
@@ -755,87 +804,20 @@ function setPlatePlanSyncPathValue(target,path,value){
   return target;
 }
 
-function threeWayPlatePlanMerge(base,local,remote,path=[],conflicts=[]){
-  if(syncValuesEqual(local,remote)) return cleanCloudValue(local);
-  if(syncValuesEqual(local,base)) return cleanCloudValue(remote);
-  if(syncValuesEqual(remote,base)) return cleanCloudValue(local);
-  const objects=[base,local,remote].every(v=>v&&typeof v==='object'&&!Array.isArray(v));
-  if(objects){
-    const merged={};
-    new Set([...Object.keys(base),...Object.keys(local),...Object.keys(remote)]).forEach(key=>{
-      const value=threeWayPlatePlanMerge(base[key],local[key],remote[key],[...path,key],conflicts);
-      if(value!==undefined) merged[key]=value;
-    });
-    return merged;
-  }
-  conflicts.push({path,base:cleanCloudValue(base),local:cleanCloudValue(local),remote:cleanCloudValue(remote)});
-  return cleanCloudValue(local);
-}
-
-function formatPlatePlanConflictValue(value){
-  const text=JSON.stringify(value,null,2);
-  return ppEscapeHtml(text===undefined?'Not present':text);
-}
-
-function showPlatePlanConflict(conflict){
-  platePlanPendingConflict=conflict;
-  updatePlatePlanSyncStatus('conflict');
-  let wrap=document.getElementById('plateplan-sync-conflict-wrap');
-  if(!wrap){
-    wrap=document.createElement('div'); wrap.id='plateplan-sync-conflict-wrap'; wrap.className='modal-wrap'; wrap.style.zIndex='700'; document.body.appendChild(wrap);
-  }
-  wrap.innerHTML=`<div class="modal" style="max-width:760px"><div class="row-between"><h3 style="margin:0">A newer cloud change needs review</h3><button class="btn sm ghost" onclick="closePlatePlanConflict()">Later</button></div><p style="font-size:12px;color:var(--text2);margin:8px 0 12px">Both devices changed the same ${ppEscapeHtml(conflict.op.key)} fields. Choose which value to keep for each conflict.</p><div style="max-height:55vh;overflow:auto">${conflict.conflicts.map((item,index)=>`<div class="card-inner"><strong style="font-size:12px">${ppEscapeHtml(item.path.join('.')||'Entire record')}</strong><div class="sync-compare"><div><label>Your device</label><pre>${formatPlatePlanConflictValue(item.local)}</pre></div><div><label>Cloud</label><pre>${formatPlatePlanConflictValue(item.remote)}</pre></div></div><select data-sync-conflict="${index}"><option value="local">Keep my value</option><option value="remote">Use cloud value</option></select></div>`).join('')}</div><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="resolvePlatePlanConflict()">Apply choices</button><button class="btn ghost" onclick="closePlatePlanConflict()">Decide later</button></div></div>`;
-  wrap.classList.add('open');
-}
-
-function closePlatePlanConflict(){ document.getElementById('plateplan-sync-conflict-wrap')?.classList.remove('open'); }
-
-function resolvePlatePlanConflict(){
-  const conflict=platePlanPendingConflict;
-  if(!conflict) return;
-  let resolved=cleanCloudValue(conflict.merged);
-  conflict.conflicts.forEach((item,index)=>{
-    const choice=document.querySelector(`[data-sync-conflict="${index}"]`)?.value||'local';
-    const value=choice==='remote'?item.remote:item.local;
-    if(!item.path.length) resolved=cleanCloudValue(value); else resolved=setPlatePlanSyncPathValue(resolved||{},item.path,value);
-  });
-  applyPlatePlanProjectionRecord(conflict.op.key,resolved,{remote:false});
-  if(resolved===null) delete platePlanLastProjection[conflict.op.key]; else platePlanLastProjection[conflict.op.key]=cleanCloudValue(resolved);
-  localStorage.setItem(SK,JSON.stringify(state));
-  const outbox=getPlatePlanSyncOutbox();
-  const queued=outbox.find(item=>item.key===conflict.op.key);
-  if(queued){ queued.base=conflict.remote; queued.baseRevision=conflict.remoteRevision; queued.local=resolved; }
-  setPlatePlanSyncOutbox(outbox);
-  platePlanPendingConflict=null;
-  closePlatePlanConflict();
-  flushPlatePlanSyncOutbox();
-}
-
-async function markPlatePlanOperation(operationId,status){
-  if(!operationId||!platePlanDb) return;
-  const cfg=window.PLATEPLAN_FIREBASE;
-  await platePlanDb.collection('households').doc(cfg.householdId).collection('operations').doc(operationId).set({status,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:platePlanCloudUser?.uid||'',deviceId:getPlatePlanDeviceId()},{merge:true});
-}
-
 async function flushPlatePlanSyncOutbox(){
-  if(platePlanSyncFlushing||!platePlanCloudReady||!platePlanCloudUser||!navigator.onLine||platePlanPendingConflict) return;
-  platePlanSyncFlushing=true;
-  try{
+  if(platePlanSyncFlushing || !platePlanCloudReady || !platePlanCloudUser || !navigator.onLine) return;
+  platePlanSyncFlushing = true;
+  updatePlatePlanSyncStatus('saving');
+  try {
     while(true){
-      const outbox=getPlatePlanSyncOutbox();
-      const op=outbox[0];
+      const outbox = getPlatePlanSyncOutbox();
+      const op = outbox[0];
       if(!op) break;
-      updatePlatePlanSyncStatus('saving');
-      if(op.operationId&&!op.operationStarted){
-        await markPlatePlanOperation(op.operationId,'pending').catch(e=>console.info('Operation tag deferred',e));
-        outbox.filter(item=>item.operationId===op.operationId).forEach(item=>item.operationStarted=true);
-        setPlatePlanSyncOutbox(outbox);
-      }
-      const ref=platePlanCloudRef(op.key);
-      try{
-        const nextRevision=(+op.baseRevision||+platePlanCloudRevisions[op.key]||0)+1;
-        const cleaned=cleanCloudValue(op.local);
-        if(cleaned===null){
+      const ref = platePlanCloudRef(op.key);
+      try {
+        const nextRevision = (+op.baseRevision || +platePlanCloudRevisions[op.key] || 0) + 1;
+        const cleaned = cleanCloudValue(op.local);
+        if(cleaned === null){
           await ref.delete();
         } else {
           await ref.set({
@@ -844,45 +826,48 @@ async function flushPlatePlanSyncOutbox(){
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             updatedBy: platePlanCloudUser.uid,
             deviceId: getPlatePlanDeviceId(),
-            operationId: op.operationId||null
+            operationId: op.operationId || null
           });
         }
-        platePlanCloudRevisions[op.key]=nextRevision;
-      }catch(error){
-        platePlanLastSyncError=error?.message||String(error);
-        op.retryCount=(op.retryCount||0)+1;
-        if(op.retryCount>5){
-          console.warn('Dropping stuck sync operation after 5 retries:',op.key,error);
-          const latest=getPlatePlanSyncOutbox();
-          const idx=latest.findIndex(i=>i.key===op.key);
-          if(idx>=0) latest.splice(idx,1);
+        platePlanCloudRevisions[op.key] = nextRevision;
+      } catch(error) {
+        platePlanLastSyncError = error?.message || String(error);
+        op.retryCount = (op.retryCount || 0) + 1;
+        if(op.retryCount > 5){
+          console.warn('Dropping stuck sync operation after 5 retries:', op.key, error);
+          const latest = getPlatePlanSyncOutbox();
+          const idx = latest.findIndex(i => i.key === op.key);
+          if(idx >= 0) latest.splice(idx, 1);
           setPlatePlanSyncOutbox(latest);
           continue;
         }
         throw error;
       }
-      applyPlatePlanProjectionRecord(op.key,op.local,{remote:false});
-      if(op.local===null) delete platePlanLastProjection[op.key]; else platePlanLastProjection[op.key]=cleanCloudValue(op.local);
-      localStorage.setItem(SK,JSON.stringify(state));
-      const latest=getPlatePlanSyncOutbox();
-      const index=latest.findIndex(item=>item.key===op.key);
-      if(index>=0){
-        if(syncValuesEqual(latest[index].local,op.local)) latest.splice(index,1);
-        else{ latest[index].base=cleanCloudValue(op.local); latest[index].baseRevision=+platePlanCloudRevisions[op.key]||0; }
+      
+      applyPlatePlanProjectionRecord(op.key, op.local, { remote: false });
+      if(op.local === null) delete platePlanLastProjection[op.key]; else platePlanLastProjection[op.key] = cleanCloudValue(op.local);
+      localStorage.setItem(SK, JSON.stringify(state));
+      
+      const latest = getPlatePlanSyncOutbox();
+      const index = latest.findIndex(item => item.key === op.key);
+      if(index >= 0){
+        if(syncValuesEqual(latest[index].local, op.local)) latest.splice(index, 1);
+        else { latest[index].base = cleanCloudValue(op.local); latest[index].baseRevision = +platePlanCloudRevisions[op.key] || 0; }
       }
       setPlatePlanSyncOutbox(latest);
-      if(op.operationId&&!latest.some(item=>item.operationId===op.operationId)) await markPlatePlanOperation(op.operationId,'complete').catch(e=>console.info('Operation tag finish deferred',e));
     }
-    platePlanSyncSuppress=true;
-    try{ platePlanNutritionCache.clear();rebuildPlatePlanIndexes();renderPlatePlanDependentViews();localStorage.setItem(SK,JSON.stringify(state)); }
-    finally{ platePlanSyncSuppress=false; }
-    platePlanLastSyncError=null;
+    
+    platePlanLastSyncError = null;
+    platePlanHasPendingLocalChanges = false;
+    platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-  }catch(error){
-    console.warn('PlatePlan sync write failed',error);
-    platePlanLastSyncError=error?.message||'Cloud write failed';
-    updatePlatePlanSyncStatus(navigator.onLine?'error':'offline',platePlanLastSyncError);
-  }finally{ platePlanSyncFlushing=false; }
+  } catch(error) {
+    console.warn('PlatePlan sync write failed', error);
+    platePlanLastSyncError = error?.message || 'Cloud write failed';
+    updatePlatePlanSyncStatus(navigator.onLine ? 'error' : 'offline', platePlanLastSyncError);
+  } finally {
+    platePlanSyncFlushing = false;
+  }
 }
 
 function applyPlatePlanProjectionRecord(key,value,{remote=true}={}){
@@ -929,7 +914,6 @@ function applyPlatePlanProjection(projection){
 }
 
 function loadStateFromObject(value){
-  const previous=null;
   try{
     const raw=localStorage.getItem(SK);
     localStorage.setItem(SK,JSON.stringify(value||{}));
@@ -959,6 +943,9 @@ function applyQueuedPlatePlanChanges(){
 }
 
 function schedulePlatePlanRemoteRefresh(key=''){
+  const isInputFocused = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+  const isPreferencesActive = document.getElementById('view-prefs')?.classList.contains('active');
+  
   const [collection,...parts]=String(key||'').split('/');
   const id=parts.join('/');
   if(collection==='products'&&id) platePlanRemoteChanges.products.add(id);
@@ -966,25 +953,39 @@ function schedulePlatePlanRemoteRefresh(key=''){
   else if(collection==='recipes'&&id) platePlanRemoteChanges.recipes.add(id);
   else if(collection==='ingredientFamilies'||collection==='settings') platePlanRemoteChanges.full=true;
   else platePlanRemoteChanges.renderOnly=true;
+  
   clearTimeout(platePlanRemoteRefreshTimer);
   platePlanRemoteRefreshTimer=setTimeout(()=>{
     platePlanSyncSuppress=true;
     try{
       const changes=platePlanRemoteChanges;
       platePlanRemoteChanges={products:new Set(),groups:new Set(),recipes:new Set(),full:false,renderOnly:false};
+      
+      // If user is currently typing in the preferences screen, do not overwrite their form inputs
+      if(isPreferencesActive && isInputFocused && (changes.full || key === 'settings/shared')) {
+        return;
+      }
+      
       if(changes.full) refreshPlatePlanDerivedState({persist:false,render:true,full:true});
       else if(changes.products.size||changes.groups.size||changes.recipes.size) refreshPlatePlanDerivedState({persist:false,render:true,changedProductIds:[...changes.products],changedGroupIds:[...changes.groups],changedRecipeIds:[...changes.recipes]});
       else{ platePlanNutritionCache.clear();rebuildPlatePlanIndexes();if(state.plan?.slots&&typeof calculatePlanScore==='function')state.plan.score=calculatePlanScore(state.plan);renderPlatePlanDependentViews(); }
       localStorage.setItem(SK,JSON.stringify(state));
     }
     finally{ platePlanSyncSuppress=false; }
-  },120);
+  },200);
 }
 
 function handlePlatePlanRemoteRecord(key,value,revision,metadata={}){
   platePlanCloudRevisions[key]=+revision||0;
-  if(platePlanActiveRemoteOperations.size){ platePlanRemoteBuffer.set(key,{value,revision,metadata}); return; }
+  
+  // 1. If this snapshot update was originated by this device, ignore it (NO SELF-ECHO OVERWRITE)
+  if(metadata.deviceId && metadata.deviceId === getPlatePlanDeviceId()){
+    return;
+  }
+  
+  // 2. If this client has uncommitted local outbox changes for this key, keep local state
   if(getPlatePlanSyncOutbox().some(item=>item.key===key)) return;
+  
   const current=platePlanLastProjection[key]??null;
   if(syncValuesEqual(current,value)) return;
   if(value===null) delete platePlanLastProjection[key]; else platePlanLastProjection[key]=cleanCloudValue(value);
@@ -1008,15 +1009,7 @@ function startPlatePlanCloudListeners(){
     const data=snapshot.exists?snapshot.data()||{}:{};
     handlePlatePlanRemoteRecord(key,snapshot.exists?cleanCloudValue(data.value):null,+data.revision||0,data);
   },error=>updatePlatePlanSyncStatus('error',error.message))));
-  const operations=platePlanDb.collection('households').doc(window.PLATEPLAN_FIREBASE.householdId).collection('operations');
-  platePlanSyncUnsubscribers.push(operations.onSnapshot(snapshot=>{
-    platePlanActiveRemoteOperations.clear();
-    snapshot.forEach(doc=>{ if(doc.data()?.status==='pending') platePlanActiveRemoteOperations.add(doc.id); });
-    if(!platePlanActiveRemoteOperations.size&&platePlanRemoteBuffer.size){
-      const buffered=[...platePlanRemoteBuffer.entries()]; platePlanRemoteBuffer.clear();
-      buffered.forEach(([key,item])=>handlePlatePlanRemoteRecord(key,item.value,item.revision,item.metadata));
-    }
-  }));
+  startPlatePlanAutoSyncTimer();
 }
 
 function getPlatePlanMigrationCounts(projection=platePlanStateProjection(state)){
@@ -1222,18 +1215,34 @@ function clearPlatePlanSyncOutbox(){
   showPlatePlanToast('Sync queue cleared.');
 }
 
+function forcePushPlatePlanToCloud(){
+  if(!platePlanCloudReady || !platePlanCloudUser){
+    showPlatePlanToast('Firebase sign in required');
+    return;
+  }
+  platePlanLastProjection = {};
+  queuePlatePlanCloudDiff(true);
+  showPlatePlanToast('Pushing local data to cloud…');
+}
+
 function openPlatePlanSyncPanel(){
   const configured=!!window.PLATEPLAN_FIREBASE?.configured;
   if(!configured) return openAppInfoModal('Cloud sync not configured','PlatePlan is working locally. Complete the steps in <strong>PLATEPLAN_FIREBASE_SETUP.md</strong>, then set <code>configured: true</code> in <code>firebase-config.js</code>.');
   const email=platePlanCloudUser?.email||'Not signed in';
   const pending=getPlatePlanSyncOutbox().length;
+  let lastSyncText = 'Never';
+  if(platePlanLastSyncedAt){
+    const mins = Math.floor((Date.now() - platePlanLastSyncedAt) / 60000);
+    lastSyncText = mins < 1 ? 'Just now' : `${mins} min${mins === 1 ? '' : 's'} ago`;
+  }
   const errorHtml=platePlanLastSyncError?`<div style="color:var(--red);font-size:12px;background:rgba(239,68,68,0.08);padding:8px 10px;border-radius:6px;margin-top:4px"><strong>Last sync error:</strong> ${ppEscapeHtml(platePlanLastSyncError)}</div>`:'';
   const clearBtn=pending>0?`<button class="btn sm danger ghost" onclick="clearPlatePlanSyncOutbox();closeAppConfirmModal()">Clear queue</button>`:'';
-  openAppInfoModal('PlatePlan sync',`<div style="display:grid;gap:7px;font-size:13px"><div><strong>Account:</strong> ${ppEscapeHtml(email)}</div><div><strong>Device:</strong> ${ppEscapeHtml(getPlatePlanDeviceId())}</div><div><strong>Waiting changes:</strong> ${pending}</div>${errorHtml}</div><div class="btn-row" style="margin-top:12px"><button class="btn sm" onclick="flushPlatePlanSyncOutbox();closeAppConfirmModal()">Sync now</button>${clearBtn}<button class="btn sm ghost" onclick="signOutPlatePlan();closeAppConfirmModal()">Sign out</button></div>`);
+  openAppInfoModal('PlatePlan sync',`<div style="display:grid;gap:7px;font-size:13px"><div><strong>Account:</strong> ${ppEscapeHtml(email)}</div><div><strong>Device:</strong> ${ppEscapeHtml(getPlatePlanDeviceId())}</div><div><strong>Last saved to cloud:</strong> ${lastSyncText}</div><div><strong>Auto-save interval:</strong> Every 5 minutes</div><div><strong>Pending changes:</strong> ${pending}</div>${errorHtml}</div><div class="btn-row" style="margin-top:12px;gap:8px"><button class="btn sm primary" onclick="queuePlatePlanCloudDiff(true);closeAppConfirmModal()">Sync now</button><button class="btn sm ghost" onclick="forcePushPlatePlanToCloud();closeAppConfirmModal()">Force upload device</button>${clearBtn}<button class="btn sm ghost" onclick="signOutPlatePlan();closeAppConfirmModal()">Sign out</button></div>`);
 }
 
 window.clearPlatePlanSyncOutbox=clearPlatePlanSyncOutbox;
 window.openPlatePlanSyncPanel=openPlatePlanSyncPanel;
+window.forcePushPlatePlanToCloud=forcePushPlatePlanToCloud;
 
 async function startPlatePlanForSignedInUser(user){
   platePlanCloudUser=user;
