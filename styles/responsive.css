@@ -7,8 +7,8 @@
 .recipe-card-meta,.recipe-fit{display:flex;align-items:center;flex-wrap:wrap}
 .recipe-card-meta{gap:5px;margin-top:5px}
 .recipe-fit{font-size:12px;color:var(--text2);gap:8px;margin-top:6px}
-.recipe-card-actions{display:grid;grid-template-columns:repeat(3,108px);gap:5px;align-items:center;flex-shrink:0}
-.recipe-card-actions .btn,.hierarchy-actions .btn,.subtype-actions .btn{width:100%;justify-content:center;text-align:center;white-space:nowrap}
+.recipe-card-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-shrink:0}
+.recipe-card-actions .btn,.hierarchy-actions .btn,.subtype-actions .btn{width:auto;min-width:76px;justify-content:center;text-align:center;white-space:nowrap}
 .enhanced-layout{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .enhanced-actions{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap;flex-shrink:0}
 .enhanced-actions>.enhanced-more-action{display:inline-flex}
@@ -558,9 +558,65 @@ main{max-width:var(--content-max);padding:22px 20px 96px}
 .today-meal-card.eaten-card{border-color:rgba(16,185,129,0.35);background:rgba(16,185,129,0.03)}
 .today-meal-card-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .today-meal-card-left{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
-.today-eaten-circle{width:32px;height:32px;border-radius:50%;border:2px solid var(--border);background:var(--surface2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:transparent;transition:all .15s ease;font-size:15px;font-weight:bold;padding:0;outline:none}
-.today-eaten-circle:hover{border-color:var(--green);transform:scale(1.05)}
-.today-eaten-circle.is-checked{background:#10b981;border-color:#10b981;color:#fff}
+.today-eaten-circle{
+  width:32px!important;
+  height:32px!important;
+  min-width:32px!important;
+  min-height:32px!important;
+  max-width:32px!important;
+  max-height:32px!important;
+  aspect-ratio:1/1!important;
+  border-radius:50%!important;
+  border:2px solid var(--border-strong, #cbd5e1)!important;
+  background:var(--surface2)!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  cursor:pointer!important;
+  flex:0 0 32px!important;
+  flex-shrink:0!important;
+  color:transparent!important;
+  padding:0!important;
+  margin:0!important;
+  line-height:1!important;
+  outline:none!important;
+  box-sizing:border-box!important;
+  -webkit-appearance:none!important;
+  appearance:none!important;
+  transition:all .18s cubic-bezier(0.16, 1, 0.3, 1)!important;
+}
+.today-eaten-circle:hover{
+  border-color:var(--green)!important;
+  transform:scale(1.06);
+}
+.today-eaten-circle:active{
+  transform:scale(0.94);
+}
+.today-eaten-circle.is-checked{
+  background:var(--green, #10b981)!important;
+  border-color:var(--green, #10b981)!important;
+  color:#fff!important;
+  box-shadow:0 2px 8px rgba(16,185,129,0.32);
+}
+.today-eaten-circle svg{
+  width:15px;
+  height:15px;
+  stroke:currentColor;
+  stroke-width:3;
+  fill:none;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  display:block;
+  pointer-events:none;
+  opacity:0;
+  transform:scale(0.5);
+  transition:opacity .15s ease, transform .15s ease;
+}
+.today-eaten-circle.is-checked svg{
+  opacity:1;
+  transform:scale(1);
+  color:#fff;
+}
 .today-meal-info{min-width:0;flex:1}
 .today-meal-name{font-size:16px;font-weight:700;line-height:1.3;letter-spacing:-.015em;display:flex;align-items:center;gap:6px}
 .today-meal-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px}

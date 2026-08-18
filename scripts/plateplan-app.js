@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.2';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v26';
+const PLATEPLAN_APP_VERSION='2.3.1';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v28';
 const SEED=[];
 
 let state = null;
@@ -251,7 +251,8 @@ document.addEventListener('keydown',event=>{
   if(close){event.preventDefault();close.click();}
 });
 function openRecipeActions(recipeId){
-  const recipe=getProductIndexRecipe(recipeId); if(!recipe) return;
+  const recipe=getProductIndexRecipe(recipeId) || (state?.recipes||[]).find(r=>r.id===recipeId);
+  if(!recipe) return;
   openMobileActionSheet(recipe.name,[
     {label:'Review recipe',onclick:`editRecipeModalView('${ppEscapeAttr(recipeId)}')`},
     {label:'Recipe card',onclick:`downloadRecipeCard('${ppEscapeAttr(recipeId)}')`},
@@ -261,7 +262,15 @@ function openRecipeActions(recipeId){
   ]);
 }
 function openEnhancedRecipeActions(recipeId){
-  const recipe=getProductIndexRecipe(recipeId); if(!recipe?.enhanced) return;
+  const recipe=getProductIndexRecipe(recipeId) || (state?.recipes||[]).find(r=>r.id===recipeId);
+  if(!recipe) return;
+  if(!recipe.enhanced){
+    openMobileActionSheet(recipe.name,[
+      {label:'Create enhanced version',onclick:`editEnhancedRecipe('${ppEscapeAttr(recipeId)}')`},
+      {label:'Review recipe',onclick:`editRecipeModalView('${ppEscapeAttr(recipeId)}')`}
+    ]);
+    return;
+  }
   openMobileActionSheet(`${recipe.name} · Enhanced`,[
     {label:'Review enhanced recipe',onclick:`reviewEnhancedRecipe('${ppEscapeAttr(recipeId)}')`},
     {label:'Recipe card',onclick:`downloadRecipeCard('${ppEscapeAttr(recipeId)}','enhanced')`},
@@ -5436,7 +5445,9 @@ function renderTodayMealCard(group, mealType = 'dinner'){
   return `<article class="today-meal-card ${isEaten ? 'eaten-card' : ''}" id="today-card-${ppEscapeAttr(mealType)}-${ppEscapeAttr(personKey)}">
     <div class="today-meal-card-top">
       <div class="today-meal-card-left">
-        <button class="today-eaten-circle ${isEaten ? 'is-checked' : ''}" type="button" aria-label="${isEaten ? 'Mark as not eaten' : 'Mark as eaten'}" onclick="${toggleCall}">✓</button>
+        <button class="today-eaten-circle ${isEaten ? 'is-checked' : ''}" type="button" aria-label="${isEaten ? 'Mark as not eaten' : 'Mark as eaten'}" onclick="${toggleCall}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </button>
         <div class="today-meal-info">
           <div class="today-meal-name" style="${isEaten ? 'text-decoration:line-through;opacity:0.75' : ''}">
             ${ppEscapeHtml(info.active.name||info.recipe?.name||'Recipe')}
@@ -8530,8 +8541,8 @@ function renderVault(){
           ${originalFit.html}
         </div>
         <div class="recipe-card-actions">
-            <button class="btn sm primary mobile-primary" onclick="viewRecipe('${r.id}', null)">View</button>
-            <button class="btn sm ghost mobile-more" onclick="openRecipeActions('${r.id}')">More</button>
+            <button class="btn sm primary mobile-primary" onclick="viewRecipe('${ppEscapeAttr(r.id)}', null)">View</button>
+            <button class="btn sm ghost mobile-more" onclick="openRecipeActions('${ppEscapeAttr(r.id)}')">More</button>
           </div>
       </div>
       ${r.enhanced ? `<div class="enhanced-box">
@@ -8542,8 +8553,8 @@ function renderVault(){
             ${enhancedChanges}
           </div>
           <div class="enhanced-actions">
-            <button class="btn sm primary enhanced-primary-action" onclick="viewRecipe('${r.id}', null, 'enhanced')">View</button>
-            <button class="btn sm ghost enhanced-more-action" onclick="openEnhancedRecipeActions('${r.id}')">More</button>
+            <button class="btn sm primary enhanced-primary-action" onclick="viewRecipe('${ppEscapeAttr(r.id)}', null, 'enhanced')">View</button>
+            <button class="btn sm ghost enhanced-more-action" onclick="openEnhancedRecipeActions('${ppEscapeAttr(r.id)}')">More</button>
           </div>
         </div>
       </div>` : ''}

@@ -1,2 +1,2 @@
-import { createLegacyView } from './create-legacy-view.js?v=22.0';
+import { createLegacyView } from './create-legacy-view.js?v=2.3.1';
 export default createLegacyView({ id: 'prefs', rootId: 'view-prefs' });

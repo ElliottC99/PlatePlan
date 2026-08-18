@@ -1,14 +1,14 @@
 const FEATURE_LOADERS = Object.freeze({
-  today: () => import('../features/today.js?v=22.0'),
-  vault: () => import('../features/recipes.js?v=22.0'),
-  ingredients: () => import('../features/ingredients.js?v=22.0'),
-  bank: () => import('../features/products.js?v=22.0'),
-  planner: () => import('../features/planner.js?v=22.0'),
-  planlib: () => import('../features/library.js?v=22.0'),
-  shopping: () => import('../features/shopping.js?v=22.0'),
-  search: () => import('../features/search.js?v=22.0'),
-  data: () => import('../features/data-quality.js?v=22.0'),
-  prefs: () => import('../features/preferences.js?v=22.0'),
+  today: () => import('../features/today.js?v=2.3.1'),
+  vault: () => import('../features/recipes.js?v=2.3.1'),
+  ingredients: () => import('../features/ingredients.js?v=2.3.1'),
+  bank: () => import('../features/products.js?v=2.3.1'),
+  planner: () => import('../features/planner.js?v=2.3.1'),
+  planlib: () => import('../features/library.js?v=2.3.1'),
+  shopping: () => import('../features/shopping.js?v=2.3.1'),
+  search: () => import('../features/search.js?v=2.3.1'),
+  data: () => import('../features/data-quality.js?v=2.3.1'),
+  prefs: () => import('../features/preferences.js?v=2.3.1'),
 });
 
 /**

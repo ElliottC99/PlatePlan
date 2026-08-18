@@ -1,40 +1,40 @@
-const PLATEPLAN_CACHE = 'plateplan-shell-v26';
-const PLATEPLAN_APP_VERSION = '23.0';
-const PLATEPLAN_BUILD_ID = '23.0-v26';
+const PLATEPLAN_CACHE = 'plateplan-shell-v28';
+const PLATEPLAN_APP_VERSION = '2.3.1';
+const PLATEPLAN_BUILD_ID = '2.3.1-v28';
 const PLATEPLAN_LOCAL_SHELL = [
   './',
   './PlatePlan.html',
   './repair-update.html',
   './manifest.json',
   './firebase-config.js',
-  './styles/tokens.css?v=23.0',
-  './styles/components.css?v=23.0',
-  './styles/responsive.css?v=23.0',
-  './styles/print.css?v=23.0',
-  './scripts/plateplan-app.js?v=23.0',
-  './scripts/bootstrap.js?v=23.0',
-  './scripts/main.js?v=23.0',
-  './scripts/core/contracts.js?v=23.0',
-  './scripts/core/store.js?v=23.0',
-  './scripts/core/runtime.js?v=23.0',
-  './scripts/services/firebase.js?v=23.0',
-  './scripts/services/sync.js?v=23.0',
-  './scripts/services/recovery.js?v=23.0',
-  './scripts/services/updates.js?v=23.0',
-  './scripts/ui/actions.js?v=23.0',
-  './scripts/ui/navigation.js?v=23.0',
-  './scripts/ui/workspaces.js?v=23.0',
-  './scripts/features/create-legacy-view.js?v=23.0',
-  './scripts/features/today.js?v=23.0',
-  './scripts/features/recipes.js?v=23.0',
-  './scripts/features/ingredients.js?v=23.0',
-  './scripts/features/products.js?v=23.0',
-  './scripts/features/planner.js?v=23.0',
-  './scripts/features/library.js?v=23.0',
-  './scripts/features/shopping.js?v=23.0',
-  './scripts/features/search.js?v=23.0',
-  './scripts/features/data-quality.js?v=23.0',
-  './scripts/features/preferences.js?v=23.0',
+  './styles/tokens.css?v=2.3.1',
+  './styles/components.css?v=2.3.1',
+  './styles/responsive.css?v=2.3.1',
+  './styles/print.css?v=2.3.1',
+  './scripts/plateplan-app.js?v=2.3.1',
+  './scripts/bootstrap.js?v=2.3.1',
+  './scripts/main.js?v=2.3.1',
+  './scripts/core/contracts.js?v=2.3.1',
+  './scripts/core/store.js?v=2.3.1',
+  './scripts/core/runtime.js?v=2.3.1',
+  './scripts/services/firebase.js?v=2.3.1',
+  './scripts/services/sync.js?v=2.3.1',
+  './scripts/services/recovery.js?v=2.3.1',
+  './scripts/services/updates.js?v=2.3.1',
+  './scripts/ui/actions.js?v=2.3.1',
+  './scripts/ui/navigation.js?v=2.3.1',
+  './scripts/ui/workspaces.js?v=2.3.1',
+  './scripts/features/create-legacy-view.js?v=2.3.1',
+  './scripts/features/today.js?v=2.3.1',
+  './scripts/features/recipes.js?v=2.3.1',
+  './scripts/features/ingredients.js?v=2.3.1',
+  './scripts/features/products.js?v=2.3.1',
+  './scripts/features/planner.js?v=2.3.1',
+  './scripts/features/library.js?v=2.3.1',
+  './scripts/features/shopping.js?v=2.3.1',
+  './scripts/features/search.js?v=2.3.1',
+  './scripts/features/data-quality.js?v=2.3.1',
+  './scripts/features/preferences.js?v=2.3.1',
   './icon-192.png',
   './icon-512.png',
   './icon-192-maskable.png',
@@ -50,7 +50,7 @@ let platePlanActivationRequested = false;
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(caches.open(PLATEPLAN_CACHE).then(async cache => {
-    await cache.addAll(PLATEPLAN_LOCAL_SHELL);
+    await cache.addAll(PLATEPLAN_LOCAL_SHELL).catch(() => {});
     await Promise.allSettled(PLATEPLAN_OPTIONAL_SHELL.map(url => cache.add(url)));
   }));
 });
@@ -76,16 +76,17 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  if(event.request.method !== 'GET') return;
+  if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  
+  if (!url.protocol.startsWith('http')) return;
+
   if (url.origin === self.location.origin) {
     // Network-first strategy for local application assets
     event.respondWith(
       fetch(event.request).then(response => {
         if (response && response.ok) {
           const copy = response.clone();
-          caches.open(PLATEPLAN_CACHE).then(cache => cache.put(event.request, copy));
+          caches.open(PLATEPLAN_CACHE).then(cache => cache.put(event.request, copy)).catch(() => {});
         }
         return response;
       }).catch(() => caches.match(event.request))
@@ -93,13 +94,18 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
-    if(response && response.ok){
-      const copy = response.clone();
-      caches.open(PLATEPLAN_CACHE).then(cache => cache.put(event.request, copy));
-    }
-    return response;
-  })));
+  event.respondWith(
+    caches.match(event.request).then(cached => {
+      if (cached) return cached;
+      return fetch(event.request).then(response => {
+        if (response && response.ok) {
+          const copy = response.clone();
+          caches.open(PLATEPLAN_CACHE).then(cache => cache.put(event.request, copy)).catch(() => {});
+        }
+        return response;
+      }).catch(() => new Response('', { status: 408, statusText: 'Offline or network error' }));
+    }).catch(() => fetch(event.request).catch(() => new Response('', { status: 408, statusText: 'Offline' })))
+  );
 });
 
 self.addEventListener('message', event => {
