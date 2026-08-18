@@ -690,19 +690,76 @@ async function pushStateToCloud(force=false){
   try{
     const config=window.PLATEPLAN_FIREBASE||{};
     const householdId=config.householdId||'elliott-chloe';
-    const stateDocRef=platePlanDb.collection('households').doc(householdId).collection('data').doc('state');
+    const dataCol=platePlanDb.collection('households').doc(householdId).collection('data');
     const cleaned=cleanCloudValue(state);
     if(!cleaned) throw new Error('State payload is empty');
 
-    await stateDocRef.set({
-      state: cleaned,
+    const deviceId=getPlatePlanDeviceId();
+    const userEmail=platePlanCloudUser.email||platePlanCloudUser.uid||'';
+    const nowIso=new Date().toISOString();
+    const serverTs=firebase.firestore.FieldValue.serverTimestamp();
+
+    const baseMeta={
+      updatedAt: serverTs,
+      clientTimestamp: nowIso,
+      updatedBy: userEmail,
+      deviceId: deviceId
+    };
+
+    const metaPayload={
+      ...baseMeta,
       schemaVersion: PLATEPLAN_SCHEMA_VERSION,
       appVersion: PLATEPLAN_APP_VERSION,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      clientTimestamp: new Date().toISOString(),
-      updatedBy: platePlanCloudUser.email||platePlanCloudUser.uid||'',
-      deviceId: getPlatePlanDeviceId()
-    });
+      prefs: cleaned.prefs || {},
+      customCats: cleaned.customCats || {},
+      excluded: cleaned.excluded || {},
+      useUpProducts: cleaned.useUpProducts || {},
+      ignoredGroupMergeSuggestions: cleaned.ignoredGroupMergeSuggestions || [],
+      ignoredDataQualityWarnings: cleaned.ignoredDataQualityWarnings || [],
+      dataQualityDismissals: cleaned.dataQualityDismissals || {},
+      packPicks: cleaned.packPicks || {},
+      meta: cleaned.meta || {}
+    };
+
+    const recipesPayload={
+      ...baseMeta,
+      recipes: cleaned.recipes || []
+    };
+
+    const productsPayload={
+      ...baseMeta,
+      ingredients: cleaned.ingredients || []
+    };
+
+    const taxonomyPayload={
+      ...baseMeta,
+      ingredientGroups: cleaned.ingredientGroups || [],
+      ingredientFamilies: cleaned.ingredientFamilies || []
+    };
+
+    const plannerPayload={
+      ...baseMeta,
+      plan: cleaned.plan || {},
+      overrides: cleaned.overrides || {}
+    };
+
+    const historyPayload={
+      ...baseMeta,
+      planHistory: cleaned.planHistory || []
+    };
+
+    const batch = platePlanDb.batch();
+    batch.set(dataCol.doc('meta'), metaPayload);
+    batch.set(dataCol.doc('recipes'), recipesPayload);
+    batch.set(dataCol.doc('products'), productsPayload);
+    batch.set(dataCol.doc('taxonomy'), taxonomyPayload);
+    batch.set(dataCol.doc('planner'), plannerPayload);
+    batch.set(dataCol.doc('history'), historyPayload);
+
+    await batch.commit();
+
+    // Clean up oversized monolithic legacy state doc if present
+    dataCol.doc('state').delete().catch(()=>{});
 
     platePlanLastSyncError=null;
     platePlanLastSyncedAt=Date.now();
@@ -907,26 +964,68 @@ function startPlatePlanCloudListeners(){
 
   const config=window.PLATEPLAN_FIREBASE||{};
   const householdId=config.householdId||'elliott-chloe';
-  const stateDocRef=platePlanDb.collection('households').doc(householdId).collection('data').doc('state');
+  const dataCol=platePlanDb.collection('households').doc(householdId).collection('data');
 
-  const unsubscribe=stateDocRef.onSnapshot(snapshot=>{
-    if(!snapshot.exists) return;
-    const data=snapshot.data()||{};
+  const unsubscribe=dataCol.onSnapshot(snapshot=>{
+    if(!snapshot || snapshot.empty) return;
+
+    let hasRemoteChange = false;
+    let lastUpdatedBy = '';
+    const docs = {};
+
+    snapshot.forEach(doc => {
+      const data = doc.data() || {};
+      docs[doc.id] = data;
+      if(data.deviceId && data.deviceId !== getPlatePlanDeviceId()){
+        hasRemoteChange = true;
+        if(data.updatedBy) lastUpdatedBy = data.updatedBy;
+      }
+    });
 
     // Avoid self-echo overwrite
-    if(data.deviceId && data.deviceId===getPlatePlanDeviceId()){
+    if(!hasRemoteChange){
       platePlanLastSyncedAt=Date.now();
       updatePlatePlanSyncStatus('synced');
       return;
     }
 
-    if(data.state && typeof data.state==='object'){
-      applyRemoteCloudState(data.state,data);
+    if(docs.meta || docs.recipes || docs.products || docs.taxonomy || docs.planner || docs.history){
+      const metaDoc = docs.meta || {};
+      const recipesDoc = docs.recipes || {};
+      const productsDoc = docs.products || {};
+      const taxonomyDoc = docs.taxonomy || {};
+      const plannerDoc = docs.planner || {};
+      const historyDoc = docs.history || {};
+
+      const assembledState = {
+        schemaVersion: metaDoc.schemaVersion || state?.schemaVersion || PLATEPLAN_SCHEMA_VERSION,
+        updatedAt: metaDoc.clientTimestamp || new Date().toISOString(),
+        prefs: metaDoc.prefs !== undefined ? metaDoc.prefs : (state?.prefs || {}),
+        customCats: metaDoc.customCats !== undefined ? metaDoc.customCats : (state?.customCats || {}),
+        excluded: metaDoc.excluded !== undefined ? metaDoc.excluded : (state?.excluded || {}),
+        useUpProducts: metaDoc.useUpProducts !== undefined ? metaDoc.useUpProducts : (state?.useUpProducts || {}),
+        ignoredGroupMergeSuggestions: metaDoc.ignoredGroupMergeSuggestions !== undefined ? metaDoc.ignoredGroupMergeSuggestions : (state?.ignoredGroupMergeSuggestions || []),
+        ignoredDataQualityWarnings: metaDoc.ignoredDataQualityWarnings !== undefined ? metaDoc.ignoredDataQualityWarnings : (state?.ignoredDataQualityWarnings || []),
+        dataQualityDismissals: metaDoc.dataQualityDismissals !== undefined ? metaDoc.dataQualityDismissals : (state?.dataQualityDismissals || {}),
+        packPicks: metaDoc.packPicks !== undefined ? metaDoc.packPicks : (state?.packPicks || {}),
+        meta: metaDoc.meta !== undefined ? metaDoc.meta : (state?.meta || {}),
+        recipes: recipesDoc.recipes !== undefined ? recipesDoc.recipes : (state?.recipes || []),
+        ingredients: productsDoc.ingredients !== undefined ? productsDoc.ingredients : (state?.ingredients || []),
+        ingredientGroups: taxonomyDoc.ingredientGroups !== undefined ? taxonomyDoc.ingredientGroups : (state?.ingredientGroups || []),
+        ingredientFamilies: taxonomyDoc.ingredientFamilies !== undefined ? taxonomyDoc.ingredientFamilies : (state?.ingredientFamilies || []),
+        plan: plannerDoc.plan !== undefined ? plannerDoc.plan : (state?.plan || {}),
+        overrides: plannerDoc.overrides !== undefined ? plannerDoc.overrides : (state?.overrides || {}),
+        planHistory: historyDoc.planHistory !== undefined ? historyDoc.planHistory : (state?.planHistory || [])
+      };
+
+      applyRemoteCloudState(assembledState, { updatedBy: lastUpdatedBy });
+    } else if(docs.state && typeof docs.state.state === 'object'){
+      applyRemoteCloudState(docs.state.state, docs.state);
     }
   },error=>{
     console.warn('PlatePlan snapshot listener notice:',error);
     if(navigator.onLine){
-      updatePlatePlanSyncStatus('error',error.message);
+      updatePlatePlanSyncStatus(error.code === 'permission-denied' ? 'connecting' : 'error', error.message);
     }else{
       updatePlatePlanSyncStatus('offline');
     }
@@ -950,12 +1049,45 @@ async function loadSharedPlatePlan(){
   updatePlatePlanSyncStatus('connecting');
   const config=window.PLATEPLAN_FIREBASE||{};
   const householdId=config.householdId||'elliott-chloe';
-  const stateDocRef=platePlanDb.collection('households').doc(householdId).collection('data').doc('state');
+  const dataCol=platePlanDb.collection('households').doc(householdId).collection('data');
   
-  const stateDoc=await stateDocRef.get();
-  if(stateDoc.exists && stateDoc.data()?.state){
-    const cloudData=stateDoc.data();
-    applyRemoteCloudState(cloudData.state,cloudData);
+  const snapshot=await dataCol.get();
+  const docs={};
+  snapshot.forEach(doc=>{ docs[doc.id]=doc.data()||{}; });
+
+  if(docs.meta || docs.recipes || docs.products || docs.taxonomy || docs.planner || docs.history){
+    const metaDoc = docs.meta || {};
+    const recipesDoc = docs.recipes || {};
+    const productsDoc = docs.products || {};
+    const taxonomyDoc = docs.taxonomy || {};
+    const plannerDoc = docs.planner || {};
+    const historyDoc = docs.history || {};
+
+    const assembledState = {
+      schemaVersion: metaDoc.schemaVersion || PLATEPLAN_SCHEMA_VERSION,
+      updatedAt: metaDoc.clientTimestamp || new Date().toISOString(),
+      prefs: metaDoc.prefs || {},
+      customCats: metaDoc.customCats || {},
+      excluded: metaDoc.excluded || {},
+      useUpProducts: metaDoc.useUpProducts || {},
+      ignoredGroupMergeSuggestions: metaDoc.ignoredGroupMergeSuggestions || [],
+      ignoredDataQualityWarnings: metaDoc.ignoredDataQualityWarnings || [],
+      dataQualityDismissals: metaDoc.dataQualityDismissals || {},
+      packPicks: metaDoc.packPicks || {},
+      meta: metaDoc.meta || {},
+      recipes: recipesDoc.recipes || [],
+      ingredients: productsDoc.ingredients || [],
+      ingredientGroups: taxonomyDoc.ingredientGroups || [],
+      ingredientFamilies: taxonomyDoc.ingredientFamilies || [],
+      plan: plannerDoc.plan || {},
+      overrides: plannerDoc.overrides || {},
+      planHistory: historyDoc.planHistory || []
+    };
+
+    applyRemoteCloudState(assembledState, metaDoc);
+  }else if(docs.state && typeof docs.state.state==='object'){
+    applyRemoteCloudState(docs.state.state, docs.state);
+    await pushStateToCloud();
   }else{
     // Check if legacy shredded data exists
     const legacyProjection=await readPlatePlanCloudProjection().catch(()=>({}));
