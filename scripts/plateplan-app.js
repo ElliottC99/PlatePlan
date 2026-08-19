@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.3.1';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v28';
+const PLATEPLAN_APP_VERSION='2.3.2';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v29';
 const SEED=[];
 
 let state = null;
@@ -5781,6 +5781,10 @@ function scheduleTodayMidnightRefresh(){
 function renderPlatePlanLegacyView(id){
   if(id==='today'){ resetTodayDate({render:false}); renderToday(); }
   if(id==='vault')renderVault();
+  if(id==='add'){
+    // When navigating to add view without an active edit ID, ensure clean form
+    if(!editId) clearForm();
+  }
   if(id==='ingredients')renderIngredientBank();
   if(id==='bank')renderBank();
   if(id==='planner'){
@@ -5805,6 +5809,9 @@ const platePlanFeatureRenderers=Object.freeze({
     return renderToday();
   },
   vault:renderVault,
+  add(){
+    if(!editId) clearForm();
+  },
   ingredients:renderIngredientBank,
   bank:renderBank,
   planner(){

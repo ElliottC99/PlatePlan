@@ -1,14 +1,15 @@
 const FEATURE_LOADERS = Object.freeze({
-  today: () => import('../features/today.js?v=2.3.1'),
-  vault: () => import('../features/recipes.js?v=2.3.1'),
-  ingredients: () => import('../features/ingredients.js?v=2.3.1'),
-  bank: () => import('../features/products.js?v=2.3.1'),
-  planner: () => import('../features/planner.js?v=2.3.1'),
-  planlib: () => import('../features/library.js?v=2.3.1'),
-  shopping: () => import('../features/shopping.js?v=2.3.1'),
-  search: () => import('../features/search.js?v=2.3.1'),
-  data: () => import('../features/data-quality.js?v=2.3.1'),
-  prefs: () => import('../features/preferences.js?v=2.3.1'),
+  today: () => import('../features/today.js?v=2.3.2'),
+  vault: () => import('../features/recipes.js?v=2.3.2'),
+  add: () => import('../features/recipe-add.js?v=2.3.2'),
+  ingredients: () => import('../features/ingredients.js?v=2.3.2'),
+  bank: () => import('../features/products.js?v=2.3.2'),
+  planner: () => import('../features/planner.js?v=2.3.2'),
+  planlib: () => import('../features/library.js?v=2.3.2'),
+  shopping: () => import('../features/shopping.js?v=2.3.2'),
+  search: () => import('../features/search.js?v=2.3.2'),
+  data: () => import('../features/data-quality.js?v=2.3.2'),
+  prefs: () => import('../features/preferences.js?v=2.3.2'),
 });
 
 /**
@@ -21,7 +22,7 @@ export function createPlatePlanRuntime(context) {
 
   const loadFeature = async id => {
     if (loaded.has(id)) return loaded.get(id);
-    if (!FEATURE_LOADERS[id]) throw new Error(`Unknown PlatePlan view: ${id}`);
+    if (!FEATURE_LOADERS[id]) return null;
     if (!loading.has(id)) {
       loading.set(id, FEATURE_LOADERS[id]().then(module => {
         const feature = module.default || module.feature;
@@ -40,15 +41,19 @@ export function createPlatePlanRuntime(context) {
 
   const renderView = async id => {
     try {
+      if (!FEATURE_LOADERS[id]) {
+        context.legacy.renderLegacyView(id);
+        return null;
+      }
       const feature = await loadFeature(id);
-      return await feature.render(context);
+      if (feature) {
+        return await feature.render(context);
+      }
+      context.legacy.renderLegacyView(id);
+      return null;
     } catch (error) {
       console.error(`PlatePlan could not load ${id}`, error);
       context.legacy.renderLegacyView(id);
-      context.legacy.showInfo?.(
-        'A screen could not finish loading',
-        'PlatePlan used its compatibility view instead. Your data has not been changed.'
-      );
       return null;
     }
   };
