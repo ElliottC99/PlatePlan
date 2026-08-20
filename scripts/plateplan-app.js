@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.3.2';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v29';
+const PLATEPLAN_APP_VERSION='2.3.3';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v30';
 const SEED=[];
 
 let state = null;
@@ -5077,8 +5077,9 @@ function calculateRecipeDisplayNutrition({ recipe, variant = 'original', ingredi
   const resolvedMealType = mealType || getContextMealType(active, instanceId, types[0] || 'dinner');
   const ingLen = (active.ingredients || []).length;
   const ingSig = ingLen ? (active.ingredients[0]?.id || active.ingredients[0]?.bankId || active.ingredients[0]?.name || '') : '';
+  const recipeUpdated = recipe?.updatedAt || '';
   const cacheKey = recipe?.id
-    ? `${recipe.id}:${variant}:${instanceId||''}:${targetServes||''}:${serves||''}:${who||''}:${resolvedMealType}:${ingLen}:${ingSig}:${state.prefs?.ecal||''}:${state.prefs?.eprot||''}:${state.prefs?.ccal||''}:${state.prefs?.cprot||''}:${JSON.stringify(state.prefs?.eAlloc||{})}:${JSON.stringify(state.prefs?.cAlloc||{})}:${JSON.stringify(state.prefs?.eProtAlloc||{})}:${JSON.stringify(state.prefs?.cProtAlloc||{})}`
+    ? `${recipe.id}:${recipeUpdated}:${variant}:${instanceId||''}:${targetServes||''}:${serves||''}:${who||''}:${resolvedMealType}:${ingLen}:${ingSig}:${state.prefs?.ecal||''}:${state.prefs?.eprot||''}:${state.prefs?.ccal||''}:${state.prefs?.cprot||''}:${JSON.stringify(state.prefs?.eAlloc||{})}:${JSON.stringify(state.prefs?.cAlloc||{})}:${JSON.stringify(state.prefs?.eProtAlloc||{})}:${JSON.stringify(state.prefs?.cProtAlloc||{})}`
     : '';
   if(cacheKey&&platePlanNutritionCache.has(cacheKey)) return platePlanNutritionCache.get(cacheKey);
   const nutrition = (active.ingredients && active.ingredients.length)
@@ -7863,6 +7864,9 @@ function saveToVault(r){
   r.updatedAt = new Date().toISOString();
   if(editId){const i=state.recipes.findIndex(x=>x.id===editId);if(i>-1)state.recipes[i]=r;}
   else state.recipes.push(r);
+  platePlanNutritionCache.clear();
+  markPlatePlanViewsDirty();
+  rebuildPlatePlanIndexes();
   saveState(true);closeModal(true);clearForm();finishEditorReturn('vault');
 }
 
@@ -8483,17 +8487,16 @@ function renderVault(){
     ].join(' ').toLowerCase();
     return(ft==='all'||types.includes(ft))&&(fw==='all'||r.who===fw)&&(!q||searchable.includes(q));
   });
-  recipes.sort((a,b)=>{
-    if(sort === 'needs_work') {
-      const diff = getRecipeFitScore(b).raw - getRecipeFitScore(a).raw;
+  if(sort === 'needs_work' || sort === 'best_fit') {
+    const scoreMap = new Map();
+    recipes.forEach(r => scoreMap.set(r.id, getRecipeFitScore(r).raw));
+    recipes.sort((a,b)=>{
+      const diff = sort === 'best_fit' ? (scoreMap.get(a.id) - scoreMap.get(b.id)) : (scoreMap.get(b.id) - scoreMap.get(a.id));
       return diff || a.name.localeCompare(b.name,'en',{sensitivity:'base'});
-    }
-    if(sort === 'best_fit') {
-      const diff = getRecipeFitScore(a).raw - getRecipeFitScore(b).raw;
-      return diff || a.name.localeCompare(b.name,'en',{sensitivity:'base'});
-    }
-    return a.name.localeCompare(b.name,'en',{sensitivity:'base'});
-  });
+    });
+  } else {
+    recipes.sort((a,b)=>a.name.localeCompare(b.name,'en',{sensitivity:'base'}));
+  }
   if(!recipes.length){list.innerHTML='<div class="empty">No matching recipes found.</div>';return;}
   const listSignature=[ft,fw,q,sort].join('|');
   resetProgressiveList('vault',listSignature);
@@ -9059,8 +9062,11 @@ function savePreviewScaleToCurrent(targetServes) {
     const scaledR = applyScaleToRecipeDefinition(targetServes);
     const idx = state.recipes.findIndex(x => x.id === scaledR.id);
     if(idx > -1) {
+        scaledR.updatedAt = new Date().toISOString();
         state.recipes[idx] = scaledR;
-        saveState();
+        platePlanNutritionCache.clear();
+        markPlatePlanViewsDirty();
+        saveState(true);
         document.getElementById('view-modal-wrap').classList.remove('open');
         renderVault();
         if(state.plan?.slots) renderPlan(); 
@@ -9072,8 +9078,11 @@ function savePreviewScaleAsNew(targetServes) {
     const scaledR = applyScaleToRecipeDefinition(targetServes);
     scaledR.id = 'r' + Date.now();
     scaledR.name = scaledR.name + " (Scaled)";
+    scaledR.updatedAt = new Date().toISOString();
     state.recipes.push(scaledR);
-    saveState();
+    platePlanNutritionCache.clear();
+    markPlatePlanViewsDirty();
+    saveState(true);
     document.getElementById('view-modal-wrap').classList.remove('open');
     renderVault();
     showMsg('form-msg','Saved as new recipe.','success');
@@ -9130,9 +9139,12 @@ function duplicateRecipe(id){
     const clone=JSON.parse(JSON.stringify(r));
     clone.id='r'+Date.now();
     clone.name=clone.name+' (Copy)';
+    clone.updatedAt=new Date().toISOString();
     if(clone.enhanced) clone.enhanced.name=clone.enhanced.name+' (Copy)';
     state.recipes.push(clone);
-    saveState();
+    platePlanNutritionCache.clear();
+    markPlatePlanViewsDirty();
+    saveState(true);
     renderVault();
     editRecipe(clone.id);
 }

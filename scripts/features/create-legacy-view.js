@@ -23,7 +23,7 @@ export function createLegacyView(configuration) {
     if (element) element.dataset.featureDirty = 'true';
   };
 
-  const performRender = async () => {
+  const performRender = async (immediate = false) => {
     if (!context) return null;
     if (rendering) {
       renderAgain = true;
@@ -31,12 +31,10 @@ export function createLegacyView(configuration) {
     }
     rendering = true;
     const element = root();
-    element?.setAttribute('aria-busy', 'true');
     try {
-      await new Promise(resolve => {
-        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(resolve);
-        else resolve();
-      });
+      if (!immediate && typeof requestAnimationFrame === 'function') {
+        await new Promise(resolve => requestAnimationFrame(resolve));
+      }
       const renderer = context.legacy.renderers?.[id];
       if (typeof renderer !== 'function') {
         throw new Error(`PlatePlan feature ${id} has no registered renderer`);
@@ -49,11 +47,10 @@ export function createLegacyView(configuration) {
       }));
       return result;
     } finally {
-      element?.removeAttribute('aria-busy');
       rendering = false;
       if (renderAgain) {
         renderAgain = false;
-        performRender();
+        performRender(true);
       }
     }
   };
@@ -67,12 +64,12 @@ export function createLegacyView(configuration) {
       config.install?.(context, root());
       context.store.subscribe(() => {
         markDirty();
-        if (root()?.classList.contains('active')) performRender();
+        if (root()?.classList.contains('active')) performRender(true);
       });
     },
     render(nextContext) {
       context ||= nextContext;
-      return performRender();
+      return performRender(true);
     },
     markDirty,
   });
