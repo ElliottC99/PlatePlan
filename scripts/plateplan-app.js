@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.3.3';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v30';
+const PLATEPLAN_APP_VERSION='2.3.4';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v31';
 const SEED=[];
 
 let state = null;
@@ -4729,11 +4729,9 @@ function getReviewIngredientDataError(ing, resolved){
   if(!ing || typeof ing !== 'object' || !String(ing.name || '').trim()) return '';
   if(ing.excludeNutrition) return '';
   const product = resolved?.product || null;
-  if(!product) return 'This ingredient is not mapped yet. Search and select an ingredient or sub-type.';
-  const mappingWarning = getIngredientMappingWarning(ing, resolved);
-  if(mappingWarning) return 'Check mapping: ' + mappingWarning;
-  if(!hasUsableIngredientNutrition(product)) return 'Missing nutrition data for the mapped product. Edit the product to add calories, protein, carbs, fat and fibre.';
-  if(needsItemWeightForQtyIngredient(ing, product)) return 'Missing weight of 1 item for this quantity-based ingredient. Edit the product to add weight of 1 item.';
+  if(!product && !resolved?.group) return 'This ingredient is not mapped yet. Search and select an ingredient or sub-type.';
+  if(product && !hasUsableIngredientNutrition(product)) return 'Missing nutrition data for the mapped product. Edit the product to add calories, protein, carbs, fat and fibre.';
+  if(product && needsItemWeightForQtyIngredient(ing, product)) return 'Missing weight of 1 item for this quantity-based ingredient. Edit the product to add weight of 1 item.';
   return '';
 }
 
@@ -5124,20 +5122,8 @@ function ingredientDisplayNameForRecipe(ing){
 }
 
 function getIngredientMappingWarning(ing, resolved){
-  if(!ing || typeof ing !== 'object' || !resolved) return '';
-  const recipeName = normaliseAliasText(ing.name || '');
-  const group = resolved.group;
-  const product = resolved.product;
-  if(!recipeName || (!group && !product)) return '';
-  const hay = [
-    group?.name,
-    group?.family,
-    ...(group?.aliases || []),
-    product?.name,
-    product?.brand
-  ].filter(Boolean).map(normaliseAliasText).join(' ');
-  if(!hay || hay.includes(recipeName) || recipeName.includes(normaliseAliasText(group?.name || ''))) return '';
-  return `${ing.name} is mapped to ${group?.name || product?.name || 'another ingredient'}${product?.name ? ' using ' + product.name : ''}`;
+  // Do not flag caution warnings on confirmed or assigned ingredient mappings
+  return '';
 }
 
 function renderIngredientMappingNote(ing, resolved, options = {}){
@@ -5145,9 +5131,8 @@ function renderIngredientMappingNote(ing, resolved, options = {}){
   const groupName = resolved.group?.name || '';
   const productName = resolved.product?.name || '';
   if(!groupName && !productName) return '';
-  const warning = getIngredientMappingWarning(ing, resolved);
-  const mappedText = `${warning ? 'check mapping: ' : 'mapped to '}${groupName || productName}${productName ? ' using ' + productName : ''}`;
-  const color = warning ? '#a61b1b' : (options.color || 'var(--text3)');
+  const mappedText = `mapped to ${groupName || productName}${productName ? ' using ' + productName : ''}`;
+  const color = options.color || 'var(--text3)';
   return ` <span class="muted" style="color:${color};font-size:${options.fontSize || '11px'}">${ppEscapeHtml(mappedText)}</span>`;
 }
 function portionDeltaText(actual, target, unit) {
