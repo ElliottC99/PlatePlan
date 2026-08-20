@@ -1,13 +1,13 @@
-import { assertAuthoritativeInterfaces } from './core/contracts.js?v=2.3.5';
-import { createPlatePlanStore } from './core/store.js?v=2.3.5';
-import { createPlatePlanRuntime } from './core/runtime.js?v=2.3.5';
-import { createFirebaseService } from './services/firebase.js?v=2.3.5';
-import { createSyncService } from './services/sync.js?v=2.3.5';
-import { createRecoveryService } from './services/recovery.js?v=2.3.5';
-import { createUpdateService } from './services/updates.js?v=2.3.5';
-import { installDelegatedActions } from './ui/actions.js?v=2.3.5';
-import { installNavigation } from './ui/navigation.js?v=2.3.5';
-import { createWorkspaceService } from './ui/workspaces.js?v=2.3.5';
+import { assertAuthoritativeInterfaces } from './core/contracts.js?v=2.3.6';
+import { createPlatePlanStore } from './core/store.js?v=2.3.6';
+import { createPlatePlanRuntime } from './core/runtime.js?v=2.3.6';
+import { createFirebaseService } from './services/firebase.js?v=2.3.6';
+import { createSyncService } from './services/sync.js?v=2.3.6';
+import { createRecoveryService } from './services/recovery.js?v=2.3.6';
+import { createUpdateService } from './services/updates.js?v=2.3.6';
+import { installDelegatedActions } from './ui/actions.js?v=2.3.6';
+import { installNavigation } from './ui/navigation.js?v=2.3.6';
+import { createWorkspaceService } from './ui/workspaces.js?v=2.3.6';
 
 const legacy = globalThis.PlatePlanLegacy;
 assertAuthoritativeInterfaces(legacy);
@@ -17,8 +17,8 @@ const workspaces = createWorkspaceService();
 const updates = createUpdateService({
   legacy,
   workspaces,
-  appVersion: '2.3.5',
-  expectedCache: 'plateplan-shell-v32',
+  appVersion: '2.3.6',
+  expectedCache: 'plateplan-shell-v33',
 });
 const context = Object.freeze({
   legacy,
