@@ -12,7 +12,7 @@ export function createLegacyView(configuration) {
   let context = null;
   let installed = false;
   let rendering = false;
-  let renderAgain = false;
+  let renderScheduled = false;
 
   const root = () => typeof document === 'undefined'
     ? null
@@ -26,7 +26,13 @@ export function createLegacyView(configuration) {
   const performRender = async (immediate = false) => {
     if (!context) return null;
     if (rendering) {
-      renderAgain = true;
+      if (!renderScheduled) {
+        renderScheduled = true;
+        Promise.resolve().then(() => {
+          renderScheduled = false;
+          if (root()?.classList.contains('active')) performRender(true);
+        });
+      }
       return null;
     }
     rendering = true;
@@ -46,12 +52,11 @@ export function createLegacyView(configuration) {
         detail: { id },
       }));
       return result;
+    } catch (err) {
+      console.error(`PlatePlan error rendering feature ${id}:`, err);
+      return null;
     } finally {
       rendering = false;
-      if (renderAgain) {
-        renderAgain = false;
-        performRender(true);
-      }
     }
   };
 
@@ -64,7 +69,9 @@ export function createLegacyView(configuration) {
       config.install?.(context, root());
       context.store.subscribe(() => {
         markDirty();
-        if (root()?.classList.contains('active')) performRender(true);
+        if (root()?.classList.contains('active') && !rendering) {
+          performRender(true);
+        }
       });
     },
     render(nextContext) {

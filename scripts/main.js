@@ -1,13 +1,13 @@
-import { assertAuthoritativeInterfaces } from './core/contracts.js?v=2.3.6';
-import { createPlatePlanStore } from './core/store.js?v=2.3.6';
-import { createPlatePlanRuntime } from './core/runtime.js?v=2.3.6';
-import { createFirebaseService } from './services/firebase.js?v=2.3.6';
-import { createSyncService } from './services/sync.js?v=2.3.6';
-import { createRecoveryService } from './services/recovery.js?v=2.3.6';
-import { createUpdateService } from './services/updates.js?v=2.3.6';
-import { installDelegatedActions } from './ui/actions.js?v=2.3.6';
-import { installNavigation } from './ui/navigation.js?v=2.3.6';
-import { createWorkspaceService } from './ui/workspaces.js?v=2.3.6';
+import { assertAuthoritativeInterfaces } from './core/contracts.js?v=2.3.7';
+import { createPlatePlanStore } from './core/store.js?v=2.3.7';
+import { createPlatePlanRuntime } from './core/runtime.js?v=2.3.7';
+import { createFirebaseService } from './services/firebase.js?v=2.3.7';
+import { createSyncService } from './services/sync.js?v=2.3.7';
+import { createRecoveryService } from './services/recovery.js?v=2.3.7';
+import { createUpdateService } from './services/updates.js?v=2.3.7';
+import { installDelegatedActions } from './ui/actions.js?v=2.3.7';
+import { installNavigation } from './ui/navigation.js?v=2.3.7';
+import { createWorkspaceService } from './ui/workspaces.js?v=2.3.7';
 
 const legacy = globalThis.PlatePlanLegacy;
 assertAuthoritativeInterfaces(legacy);
@@ -17,8 +17,8 @@ const workspaces = createWorkspaceService();
 const updates = createUpdateService({
   legacy,
   workspaces,
-  appVersion: '2.3.6',
-  expectedCache: 'plateplan-shell-v33',
+  appVersion: '2.3.7',
+  expectedCache: 'plateplan-shell-v34',
 });
 const context = Object.freeze({
   legacy,
@@ -33,7 +33,7 @@ const runtime = createPlatePlanRuntime(context);
 const actions = installDelegatedActions(legacy);
 const uninstallNavigation = installNavigation(runtime);
 const syncRuntimeMarker = () => {
-  document.documentElement.dataset.plateplanRuntime = '2.3.5';
+  document.documentElement.dataset.plateplanRuntime = '2.3.7';
   document.documentElement.dataset.plateplanLoadedViews = runtime.loadedViews().sort().join(',');
 };
 window.addEventListener('plateplan:feature-loaded', syncRuntimeMarker);
@@ -50,11 +50,11 @@ globalThis.PlatePlanModules = Object.freeze({
   updates,
   workspaces,
   uninstallNavigation,
-  version: '2.3.5',
+  version: '2.3.7',
 });
 
 window.dispatchEvent(new CustomEvent('plateplan:modules-ready', {
-  detail: { version: '2.3.5', loadedViews: runtime.loadedViews() },
+  detail: { version: '2.3.7', loadedViews: runtime.loadedViews() },
 }));
 
 if (document.readyState === 'loading') {

@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.3.6';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v33';
+const PLATEPLAN_APP_VERSION='2.3.7';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v34';
 const SEED=[];
 
 let state = null;
@@ -3926,10 +3926,13 @@ function reconcileVisiblePlanSummaries(){
     cards.forEach(card => {
       const summary = summarizeVisiblePlanDayCard(card);
       const boxes = card.querySelectorAll('.plan-summary .summary-box');
-      if(boxes[0]) boxes[0].innerHTML = renderPlannerPersonSummaryBox('e', summary);
-      if(boxes[1]) boxes[1].innerHTML = renderPlannerPersonSummaryBox('c', summary);
+      const boxE = renderPlannerPersonSummaryBox('e', summary);
+      const boxC = renderPlannerPersonSummaryBox('c', summary);
+      if(boxes[0] && boxes[0].innerHTML !== boxE) boxes[0].innerHTML = boxE;
+      if(boxes[1] && boxes[1].innerHTML !== boxC) boxes[1].innerHTML = boxC;
       const scoreTag = card.querySelector('.row-between .tag');
-      if(scoreTag) scoreTag.textContent = 'Score ' + summary.score;
+      const scoreText = 'Score ' + summary.score;
+      if(scoreTag && scoreTag.textContent !== scoreText) scoreTag.textContent = scoreText;
       aggregate.scores.push(summary.score);
       ['e','c'].forEach(person => {
         aggregate[person].cal += summary.totals[person].cal;
@@ -3944,22 +3947,13 @@ function reconcileVisiblePlanSummaries(){
     };
     if(state.plan) state.plan.score = visibleScore;
     renderPlanOverallSummaryHtml(visibleScore);
-    saveState();
   } finally {
     reconcilingPlanSummaries = false;
   }
 }
 
 function installPlannerSummaryObserver(){
-  const target = document.getElementById('plan-content');
-  if(!target || plannerSummaryObserver) return;
-  plannerSummaryObserver = new MutationObserver(() => {
-    if(reconcilingPlanSummaries) return;
-    requestAnimationFrame(() => {
-      if(document.getElementById('view-planner')?.classList.contains('active')) reconcileVisiblePlanSummaries();
-    });
-  });
-  plannerSummaryObserver.observe(target, { childList:true, subtree:true, characterData:true });
+  // Intentionally no-op to eliminate DOM mutation feedback loops that can crash the browser tab
 }
 
 function parsePlanRecipeValue(value){
@@ -14471,7 +14465,6 @@ function renderPlan(){
   reconcileVisiblePlanSummaries();
   renderMealPrepSuggestions();
   renderPlanHistoryPanel();
-  reconcileVisiblePlanSummaries();
   const setup=document.getElementById('plan-setup-card');
   if(setup) setup.style.display = '';
   document.getElementById('plan-actions').style.display = hasValidSlots ? 'block' : 'none';
@@ -14786,7 +14779,6 @@ function renderPlanOverallSummary(){
   }
   const score = calculatePlanScore(state.plan);
   state.plan.score = score;
-  saveState();
   renderPlanOverallSummaryHtml(score);
 }
 
