@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.3.4';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v31';
+const PLATEPLAN_APP_VERSION='2.3.5';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v32';
 const SEED=[];
 
 let state = null;
@@ -16228,36 +16228,6 @@ function calcBudgets() {
         <strong>Snacks Budget:</strong> ${Math.round(ccal*cs/100)}kcal / ${Math.round(cprot*cps/100)}g P
     `;
   }
-
-  if (state && state.prefs) {
-    state.prefs.ecal = ecal;
-    state.prefs.eprot = eprot;
-    state.prefs.ccal = ccal;
-    state.prefs.cprot = cprot;
-    state.prefs.eAlloc = {b:eb, l:el, d:ed, s:es};
-    state.prefs.cAlloc = {b:cb, l:cl, d:cd, s:cs};
-    state.prefs.eProtAlloc = {b:epb, l:epl, d:epd, s:eps};
-    state.prefs.cProtAlloc = {b:cpb, l:cpl, d:cpd, s:cps};
-  }
-
-  if (typeof platePlanNutritionCache !== 'undefined' && platePlanNutritionCache.clear) {
-    platePlanNutritionCache.clear();
-  }
-
-  if (typeof recalcAllRecipes === 'function') {
-    recalcAllRecipes();
-  }
-
-  if (typeof saveState === 'function') {
-    saveState();
-  }
-
-  if (document.getElementById('modal-wrap')?.classList.contains('open')) {
-    if (typeof recalcModal === 'function') {
-      recalcModal('orig');
-      recalcModal('enh');
-    }
-  }
 }
 window.calcBudgets = calcBudgets;
 
@@ -16437,8 +16407,17 @@ function savePrefs(){
     shopGroupBy: state.prefs.shopGroupBy || 'family',
     productPriority: document.getElementById('plan-product-priority')?.value || state.prefs.productPriority || 'protein'
   };
+  if (typeof platePlanNutritionCache !== 'undefined' && platePlanNutritionCache.clear) {
+    platePlanNutritionCache.clear();
+  }
   recalcAllRecipes();
   saveState(true);
+  if (document.getElementById('modal-wrap')?.classList.contains('open')) {
+    if (typeof recalcModal === 'function') {
+      recalcModal('orig');
+      recalcModal('enh');
+    }
+  }
   showMsg('prefs-msg','Preferences saved.','success');
   renderVault(); // refreshes any views dependent on macros
 }

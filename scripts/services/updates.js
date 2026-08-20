@@ -8,8 +8,8 @@
 
 export function createUpdateService({
   legacy = globalThis.PlatePlanLegacy || {},
-  appVersion = '2.3.4',
-  expectedCache = 'plateplan-shell-v31',
+  appVersion = '2.3.5',
+  expectedCache = 'plateplan-shell-v32',
 } = {}) {
   let registration = null;
   let checking = false;
