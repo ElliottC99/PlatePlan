@@ -297,10 +297,47 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 .plan-studio-slot span,.plan-studio-slot small{font-size:12px;color:var(--text2)}.plan-studio-slot strong{overflow-wrap:normal;word-break:normal}.plan-studio-slot.selected{border:2px solid var(--blue);background:var(--blue-bg)}.plan-studio-slot.empty{border-style:dashed}
 .plan-studio-impact{margin-top:18px;padding:14px;border:1px solid var(--border);border-radius:var(--radius-lg)}.plan-studio-impact h3{margin-top:0}.plan-studio-impact li{margin:5px 0}.plan-studio-nutrition{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}.plan-studio-nutrition>div{display:grid;gap:3px;padding:10px;background:var(--surface2);border-radius:var(--radius-md);font-size:13px}
 
-/* Pinned / Pre-selected Recipes */
-.pinned-recipes-list{display:grid;gap:8px;margin-top:10px}
-.pinned-recipe-row{display:grid;grid-template-columns:minmax(140px,1fr) minmax(110px,140px) minmax(100px,130px) auto;gap:8px;align-items:center;padding:9px 0;border-top:1px solid var(--border)}
+/* Pinned / Pre-selected Recipes & Apple HIG Planner Components */
+.pinned-recipes-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-group, 16px);padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,0.03)}
+.pinned-recipes-list{display:grid;gap:10px;margin-top:12px}
+.pinned-recipe-row{display:grid;grid-template-columns:minmax(140px,1fr) minmax(105px,130px) minmax(95px,120px) auto;gap:10px;align-items:center;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-control, 12px);transition:all 0.15s ease}
 .pinned-recipe-info{min-width:0}
-.pinned-recipe-info strong{display:block;font-size:13px;overflow-wrap:normal;word-break:normal}
-.pinned-recipe-info small{display:block;color:var(--text2);font-size:12px;margin-top:2px}
-.tag.pinned{background:var(--purple-bg, #f3e8ff);color:var(--purple, #7e22ce);border:1px solid color-mix(in srgb, var(--purple, #7e22ce) 25%, transparent);font-weight:600;font-size:11px;display:inline-flex;align-items:center;gap:3px}
+.pinned-recipe-info strong{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:650;color:var(--text);overflow-wrap:normal;word-break:normal}
+.pinned-recipe-info small{display:block;color:var(--text2);font-size:12px;margin-top:3px}
+.tag.pinned{background:var(--purple-bg, #f3e8ff);color:var(--purple, #7e22ce);border:1px solid color-mix(in srgb, var(--purple, #7e22ce) 25%, transparent);font-weight:650;font-size:11px;padding:2px 7px;border-radius:999px;display:inline-flex;align-items:center;gap:4px}
+.tag.enhanced-pill{background:var(--green-bg, #EAF4EF);color:var(--green, #1A6B4A);border:1px solid color-mix(in srgb, var(--green, #1A6B4A) 25%, transparent);font-weight:650;font-size:11px;padding:2px 7px;border-radius:999px;display:inline-flex;align-items:center;gap:4px}
+.prefer-enhanced-toggle{display:flex!important;align-items:flex-start;gap:12px;grid-column:1/-1;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius-control, 12px);background:var(--surface);cursor:pointer;user-select:none;transition:background 0.15s ease}
+.prefer-enhanced-toggle:hover{background:var(--surface2)}
+.prefer-enhanced-toggle input{width:22px;height:22px;flex:0 0 auto;accent-color:var(--green)}
+.prefer-enhanced-toggle small{display:block;color:var(--text2);margin-top:3px;font-size:12px;line-height:1.4}
+
+/* Apple HIG Segmented Control */
+.segmented-control{display:inline-flex;background:var(--surface2, #F0EFE9);padding:3px;border-radius:10px;border:1px solid var(--border);gap:2px;user-select:none;overflow-x:auto;max-width:100%}
+.segmented-control button{background:transparent;border:none;outline:none;padding:6px 12px;font-size:12px;font-weight:600;color:var(--text2);border-radius:7px;cursor:pointer;transition:all 0.18s cubic-bezier(0.16, 1, 0.3, 1);white-space:nowrap}
+.segmented-control button.active{background:var(--surface, #FFFFFF);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.04);font-weight:700}
+
+/* Apple HIG Recipe Picker Modal */
+.recipe-picker-modal{max-width:680px;width:95vw;max-height:88vh;display:flex;flex-direction:column;border-radius:var(--radius-group, 18px);box-shadow:0 20px 40px rgba(0,0,0,0.18);padding:20px;overflow:hidden}
+.recipe-picker-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-shrink:0}
+.recipe-picker-search-bar{position:relative;width:100%;margin-bottom:12px;flex-shrink:0}
+.recipe-picker-search-bar input{width:100%;font-size:14px;padding:10px 36px 10px 36px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);outline:none;transition:border-color 0.15s ease}
+.recipe-picker-search-bar input:focus{border-color:var(--border-strong);background:var(--surface)}
+.recipe-picker-search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px;pointer-events:none}
+.recipe-picker-clear-btn{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);font-size:14px;cursor:pointer;padding:4px 6px;border-radius:50%}
+.recipe-picker-list{flex:1;min-height:220px;max-height:420px;overflow-y:auto;display:grid;gap:8px;padding-right:2px}
+.recipe-picker-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all 0.15s ease;text-align:left}
+.recipe-picker-item:hover{background:var(--surface2);border-color:var(--border-strong)}
+.recipe-picker-item-main{min-width:0;flex:1}
+.recipe-picker-item-title{font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.recipe-picker-item-sub{font-size:12px;color:var(--text2);margin-top:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.recipe-picker-item-macros{display:flex;gap:6px;align-items:center;flex-shrink:0}
+
+/* Plan Actions Toolbar Apple HIG */
+.planner-toolbar-hig{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-group, 16px);box-shadow:0 1px 3px rgba(0,0,0,0.03)}
+.planner-toolbar-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+@media(max-width:680px){
+  .pinned-recipe-row{grid-template-columns:1fr;gap:8px}
+  .recipe-picker-modal{padding:16px}
+  .recipe-picker-item{flex-direction:column;align-items:flex-start}
+}

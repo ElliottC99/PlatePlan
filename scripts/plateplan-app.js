@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.3.9';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v35';
+const PLATEPLAN_APP_VERSION='2.4.0';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v36';
 const SEED=[];
 
 let state = null;
@@ -3553,7 +3553,7 @@ function ensurePlannerOptionsUI(){
       <div class="planner-quick-actions"><button class="btn primary" onclick="generatePlanFromQuickSetup()">Generate plan</button></div>
     </div>
     <div class="planner-compact-card" id="planner-active-setup" style="display:none">
-      <div class="planner-compact-head"><div><div class="planner-compact-title">Meal planner</div><div class="planner-compact-copy" id="planner-active-copy"></div></div><div class="planner-compact-actions"><button class="btn primary" onclick="openPlanStudio()">Rearrange plan</button><button class="btn ghost" onclick="openPlanDatesWorkspace()">Assign dates</button><button class="btn ghost" onclick="openPlanOptionsWorkspace()">Edit plan settings</button></div></div>
+      <div class="planner-compact-head"><div><div class="planner-compact-title">Meal planner</div><div class="planner-compact-copy" id="planner-active-copy"></div></div><div class="planner-compact-actions"><button class="btn primary" onclick="openPlanStudio()">Rearrange plan</button><button class="btn ghost" onclick="prioritiseAllPlannedEnhancedRecipes()" title="Upgrade all eligible meals to Enhanced for better fit scores">✨ Prioritise Enhanced</button><button class="btn ghost" onclick="openPlanDatesWorkspace()">Assign dates</button><button class="btn ghost" onclick="openPlanOptionsWorkspace()">Edit plan settings</button></div></div>
     </div>`;
   planner.insertBefore(compact,legacy);
 
@@ -3591,6 +3591,11 @@ function ensurePlannerOptionsUI(){
   priorityField.appendChild(priority);
   selection.appendChild(priorityField);
   repeats.forEach(label=>{label.style.display='block';label.querySelector('select').style.width='100%';selection.appendChild(label);});
+  const preferEnhancedToggle=document.createElement('label');
+  preferEnhancedToggle.className='prefer-enhanced-toggle';
+  preferEnhancedToggle.innerHTML='<input type="checkbox" id="plan-prefer-enhanced" onchange="setPreferEnhancedRecipes(this.checked)"> <span><strong>✨ Prioritise Enhanced Recipes</strong><small>Prioritise enhanced variants for higher protein density and better (lower) macro fit scores.</small></span>';
+  selection.appendChild(preferEnhancedToggle);
+
   const useUpToggle=document.createElement('label');
   useUpToggle.className='use-up-priority-toggle';
   useUpToggle.innerHTML='<input type="checkbox" id="plan-prioritise-use-up" onchange="setPrioritiseUseUpProducts(this.checked)"> <span><strong>Prioritise Use up products</strong><small>Keep nutrition, traffic filters, exclusions and variety authoritative.</small></span>';
@@ -3644,6 +3649,8 @@ function openPlanOptionsWorkspace(){
   if(state.plan?.days&&days)days.value=String(state.plan.days);
   const start=document.getElementById('plan-start-date');
   if(start)start.value=state.plan?.dayDates?.[1]||document.getElementById('plan-quick-start')?.value||'';
+  const preferToggle=document.getElementById('plan-prefer-enhanced');
+  if(preferToggle) preferToggle.checked = state.prefs?.preferEnhancedRecipes !== false;
   setMealRepeatControlValues();
   setPlanTrafficSelectValues();
   renderPlanTrafficAvailabilitySummary();
@@ -4552,67 +4559,249 @@ function clearUseUpProducts(){
 function getPinnedRecipesList(){
   return Array.isArray(state.prefs?.pinnedRecipes) ? state.prefs.pinnedRecipes : [];
 }
+
+let currentPinnedPickerFilter = 'all';
+let currentPinnedPickerSearch = '';
+
+function setPreferEnhancedRecipes(checked){
+  if(!state.prefs) state.prefs = {};
+  state.prefs.preferEnhancedRecipes = !!checked;
+  saveState();
+}
+
 function renderPinnedRecipesEditor(){
   const host = document.getElementById('pinned-recipes-editor');
   if(!host) return;
   const list = getPinnedRecipesList();
-  host.innerHTML = `<div class="use-up-add"><div class="mapping-search-container"><input id="pinned-recipe-search" type="search" placeholder="Search recipes to pre-select…" autocomplete="off" oninput="renderPinnedRecipeSuggestions(this.value)" onfocus="renderPinnedRecipeSuggestions(this.value)"><div class="map-dropdown" id="pinned-recipe-suggestions" style="display:none"></div></div></div>
-    <div class="pinned-recipes-list">${list.length ? list.map(item => {
-      const rec = getRecipe(item.recipeId);
-      const name = rec ? rec.name : 'Unknown Recipe';
-      const variantLabel = item.variant === 'enhanced' ? 'Enhanced' : 'Original';
-      const daysCount = parseInt(item.daysCount) || 1;
-      const targetDay = item.targetDay ? parseInt(item.targetDay) : 0;
-      const maxDays = parseInt(state.plan?.days || document.getElementById('plan-days')?.value) || 7;
-      let dayOptions = '<option value="0"' + (targetDay === 0 ? ' selected' : '') + '>Any day</option>';
-      for(let d = 1; d <= maxDays; d++){
-        dayOptions += '<option value="' + d + '"' + (targetDay === d ? ' selected' : '') + '>Day ' + d + '</option>';
-      }
-      return `<div class="pinned-recipe-row">
-        <div class="pinned-recipe-info">
-          <strong>${ppEscapeHtml(name)}${item.variant === 'enhanced' ? ' <span class="tag green" style="font-size:10px;padding:1px 5px">Enhanced</span>' : ''}</strong>
-          <small>${ppEscapeHtml(toTitleCase(rec?.type || 'Dinner'))} · ${ppEscapeHtml(rec?.who === 'both' ? 'Shared' : rec?.who || 'Any')}</small>
-        </div>
-        <div>
-          <select aria-label="Repeat count for ${ppEscapeAttr(name)}" onchange="updatePinnedRecipe('${ppEscapeAttr(item.recipeId)}','${ppEscapeAttr(item.variant || 'original')}','daysCount',this.value)">
-            ${[1,2,3,4,5,6,7].map(num => `<option value="${num}"${daysCount === num ? ' selected' : ''}>${num} day${num > 1 ? 's' : ''}</option>`).join('')}
-          </select>
-        </div>
-        <div>
-          <select aria-label="Target day for ${ppEscapeAttr(name)}" onchange="updatePinnedRecipe('${ppEscapeAttr(item.recipeId)}','${ppEscapeAttr(item.variant || 'original')}','targetDay',this.value)">
-            ${dayOptions}
-          </select>
-        </div>
-        <button class="btn sm ghost" type="button" onclick="removePinnedRecipe('${ppEscapeAttr(item.recipeId)}','${ppEscapeAttr(item.variant || 'original')}');">Remove</button>
-      </div>`;
-    }).join('') : '<div class="empty compact">No pre-selected recipes added. Generator will choose freely based on preferences.</div>'}</div>`;
+  const maxDays = parseInt(state.plan?.days || document.getElementById('plan-days')?.value) || 7;
+  
+  host.innerHTML = `<div class="pinned-recipes-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn primary sm" onclick="openPinnedRecipePicker()" style="display:inline-flex;align-items:center;gap:6px">
+        <span>+</span> Add pre-selected recipe
+      </button>
+      ${list.length ? `<button type="button" class="btn ghost sm" onclick="clearPinnedRecipes()" style="color:var(--red)">Clear all (${list.length})</button>` : ''}
+    </div>
+    <div class="pinned-recipes-list">
+      ${list.length ? list.map(item => {
+        const rec = getRecipe(item.recipeId);
+        const name = rec ? rec.name : 'Unknown Recipe';
+        const isEnhanced = item.variant === 'enhanced';
+        const daysCount = parseInt(item.daysCount) || 1;
+        const targetDay = item.targetDay ? parseInt(item.targetDay) : 0;
+        let dayOptions = '<option value="0"' + (targetDay === 0 ? ' selected' : '') + '>Any day</option>';
+        for(let d = 1; d <= maxDays; d++){
+          dayOptions += '<option value="' + d + '"' + (targetDay === d ? ' selected' : '') + '>Day ' + d + '</option>';
+        }
+        const recipeType = (rec?.types && rec?.types[0]) || rec?.type || 'dinner';
+        return `<div class="pinned-recipe-row">
+          <div class="pinned-recipe-info">
+            <strong>${ppEscapeHtml(name)}${isEnhanced ? ' <span class="tag enhanced-pill">✨ Enhanced</span>' : ''}</strong>
+            <small>${ppEscapeHtml(toTitleCase(recipeType))} · ${ppEscapeHtml(rec?.who === 'both' ? 'Shared' : rec?.who || 'Any')}</small>
+          </div>
+          <div>
+            <select aria-label="Repeat count for ${ppEscapeAttr(name)}" onchange="updatePinnedRecipe('${ppEscapeAttr(item.recipeId)}','${ppEscapeAttr(item.variant || 'original')}','daysCount',this.value)">
+              ${[1,2,3,4,5,6,7].map(num => `<option value="${num}"${daysCount === num ? ' selected' : ''}>${num} day${num > 1 ? 's' : ''}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <select aria-label="Target day for ${ppEscapeAttr(name)}" onchange="updatePinnedRecipe('${ppEscapeAttr(item.recipeId)}','${ppEscapeAttr(item.variant || 'original')}','targetDay',this.value)">
+              ${dayOptions}
+            </select>
+          </div>
+          <button class="btn sm ghost" type="button" onclick="removePinnedRecipe('${ppEscapeAttr(item.recipeId)}','${ppEscapeAttr(item.variant || 'original')}');" aria-label="Remove ${ppEscapeAttr(name)}" style="color:var(--text2)">✕</button>
+        </div>`;
+      }).join('') : '<div class="empty compact" style="text-align:center;padding:16px 8px;color:var(--text2)">No pre-selected recipes added. Tap "+ Add pre-selected recipe" to pin specific meals before generating.</div>'}
+    </div>
+  </div>`;
 }
-function renderPinnedRecipeSuggestions(query = ''){
-  const host = document.getElementById('pinned-recipe-suggestions');
+
+function openPinnedRecipePicker(){
+  let wrap = document.getElementById('pinned-recipe-picker-wrap');
+  if(!wrap){
+    wrap = document.createElement('div');
+    wrap.id = 'pinned-recipe-picker-wrap';
+    wrap.className = 'modal-wrap';
+    document.body.appendChild(wrap);
+  }
+  
+  currentPinnedPickerFilter = 'all';
+  currentPinnedPickerSearch = '';
+  
+  wrap.innerHTML = `<div class="modal recipe-picker-modal" role="dialog" aria-modal="true" aria-labelledby="pinned-picker-title">
+    <div class="recipe-picker-head">
+      <div>
+        <h3 id="pinned-picker-title" style="margin:0;font-size:18px;font-weight:750">Pre-select Recipes</h3>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">Pin recipes to guarantee placement in your plan</div>
+      </div>
+      <button class="btn sm ghost" type="button" onclick="closePinnedRecipePicker()" aria-label="Close">✕</button>
+    </div>
+
+    <div class="recipe-picker-search-bar">
+      <span class="recipe-picker-search-icon">🔍</span>
+      <input type="search" id="pinned-picker-search-input" placeholder="Search recipe name, ingredients, tags…" autocomplete="off" oninput="handlePinnedPickerSearch(this.value)">
+      <button type="button" class="recipe-picker-clear-btn" id="pinned-picker-clear-btn" style="display:none" onclick="clearPinnedPickerSearch()">✕</button>
+    </div>
+
+    <div style="margin-bottom:12px;overflow-x:auto;padding-bottom:2px">
+      <div class="segmented-control" role="tablist">
+        <button type="button" role="tab" class="active" id="pinned-tab-all" onclick="setPinnedRecipePickerFilter('all')">All</button>
+        <button type="button" role="tab" id="pinned-tab-enhanced" onclick="setPinnedRecipePickerFilter('enhanced')">✨ Enhanced</button>
+        <button type="button" role="tab" id="pinned-tab-original" onclick="setPinnedRecipePickerFilter('original')">Original</button>
+        <button type="button" role="tab" id="pinned-tab-breakfast" onclick="setPinnedRecipePickerFilter('breakfast')">Breakfast</button>
+        <button type="button" role="tab" id="pinned-tab-lunch" onclick="setPinnedRecipePickerFilter('lunch')">Lunch</button>
+        <button type="button" role="tab" id="pinned-tab-dinner" onclick="setPinnedRecipePickerFilter('dinner')">Dinner</button>
+      </div>
+    </div>
+
+    <div class="recipe-picker-list" id="pinned-picker-list-container"></div>
+
+    <div class="row-between" style="margin-top:14px;align-items:center;flex-shrink:0">
+      <div style="font-size:12px;color:var(--text2)" id="pinned-picker-count"></div>
+      <button class="btn ghost sm" type="button" onclick="closePinnedRecipePicker()">Done</button>
+    </div>
+  </div>`;
+
+  wrap.classList.add('open');
+  renderPinnedRecipePickerList();
+  setTimeout(() => document.getElementById('pinned-picker-search-input')?.focus(), 50);
+}
+
+function closePinnedRecipePicker(){
+  const wrap = document.getElementById('pinned-recipe-picker-wrap');
+  if(wrap) wrap.classList.remove('open');
+  renderPinnedRecipesEditor();
+}
+
+function setPinnedRecipePickerFilter(filter){
+  currentPinnedPickerFilter = filter;
+  ['all','enhanced','original','breakfast','lunch','dinner'].forEach(f => {
+    const tab = document.getElementById(`pinned-tab-${f}`);
+    if(tab) tab.classList.toggle('active', f === filter);
+  });
+  renderPinnedRecipePickerList();
+}
+
+function handlePinnedPickerSearch(value){
+  currentPinnedPickerSearch = String(value || '').trim();
+  const clearBtn = document.getElementById('pinned-picker-clear-btn');
+  if(clearBtn) clearBtn.style.display = currentPinnedPickerSearch ? 'block' : 'none';
+  renderPinnedRecipePickerList();
+}
+
+function clearPinnedPickerSearch(){
+  const input = document.getElementById('pinned-picker-search-input');
+  if(input) { input.value = ''; input.focus(); }
+  handlePinnedPickerSearch('');
+}
+
+function renderPinnedRecipePickerList(){
+  const host = document.getElementById('pinned-picker-list-container');
   if(!host) return;
-  const q = String(query || '').trim().toLowerCase();
+  const countHost = document.getElementById('pinned-picker-count');
+  const q = currentPinnedPickerSearch.toLowerCase();
+  const filter = currentPinnedPickerFilter;
   const pinned = getPinnedRecipesList();
   const pinnedKeys = new Set(pinned.map(p => `${p.recipeId}::${p.variant || 'original'}`));
+
   const rows = [];
-  (state.recipes || []).forEach(recipe => {
-    if(!recipe || !recipe.id) return;
-    const origKey = `${recipe.id}::original`;
-    const matchName = String(recipe.name || '').toLowerCase().includes(q);
-    const matchType = String(recipe.type || '').toLowerCase().includes(q);
-    if(!pinnedKeys.has(origKey) && (!q || matchName || matchType)){
-      rows.push({ id: recipe.id, variant: 'original', name: recipe.name, type: recipe.type, who: recipe.who });
+  (state.recipes || []).forEach(r => {
+    if(!r || !r.id) return;
+    const rTypes = (r.types || [r.type || 'dinner']).map(t => String(t).toLowerCase());
+    const rType = rTypes[0] || 'dinner';
+    const matchType = !['breakfast','lunch','dinner'].includes(filter) || rTypes.includes(filter);
+    if(!matchType) return;
+
+    const ingText = (r.ingredients || []).map(i => i.name || i.ingredient || '').join(' ').toLowerCase();
+    const searchMatch = !q || r.name.toLowerCase().includes(q) || rType.includes(q) || ingText.includes(q);
+    if(!searchMatch) return;
+
+    // Original version candidate
+    if(filter !== 'enhanced') {
+      const isPinned = pinnedKeys.has(`${r.id}::original`);
+      rows.push({
+        id: r.id,
+        variant: 'original',
+        recipe: r,
+        name: r.name,
+        type: rType,
+        who: r.who || 'both',
+        isPinned,
+        isEnhanced: false
+      });
     }
-    if(recipe.hasEnhancedVariant || recipe.enhancedProteinPortion || recipe.enhancedPortions){
-      const enhKey = `${recipe.id}::enhanced`;
-      if(!pinnedKeys.has(enhKey) && (!q || matchName || matchType || q.includes('enh'))){
-        rows.push({ id: recipe.id, variant: 'enhanced', name: recipe.name + ' (Enhanced)', type: recipe.type, who: recipe.who, isEnhanced: true });
-      }
+
+    // Enhanced version candidate
+    if(filter !== 'original' && r.enhanced && ((r.enhanced.ingredients && r.enhanced.ingredients.length) || (r.enhanced.method && r.enhanced.method.length) || (r.enhanced.steps && r.enhanced.steps.length) || r.enhanced.name || r.enhanced.changes)) {
+      const isPinned = pinnedKeys.has(`${r.id}::enhanced`);
+      rows.push({
+        id: r.id,
+        variant: 'enhanced',
+        recipe: r,
+        name: r.enhanced.name || (r.name + ' (Enhanced)'),
+        type: rType,
+        who: r.who || 'both',
+        isPinned,
+        isEnhanced: true
+      });
     }
   });
-  const limited = rows.slice(0, 30);
-  host.innerHTML = limited.map(item => `<button type="button" class="map-drop-item" onclick="addPinnedRecipe('${ppEscapeAttr(item.id)}','${ppEscapeAttr(item.variant)}')"><strong>${ppEscapeHtml(item.name)}</strong><small>${ppEscapeHtml(toTitleCase(item.type || 'dinner'))} · ${ppEscapeHtml(item.who === 'both' ? 'Shared' : item.who || 'Any')}</small></button>`).join('') || '<div class="empty compact">No matching recipes.</div>';
-  host.style.display = 'block';
+
+  if(countHost) countHost.textContent = `${rows.length} recipe option${rows.length === 1 ? '' : 's'}`;
+
+  if(!rows.length){
+    host.innerHTML = `<div class="empty compact" style="text-align:center;padding:32px 16px;color:var(--text2)">
+      <div>No matching recipes found for "${ppEscapeHtml(currentPinnedPickerSearch || currentPinnedPickerFilter)}".</div>
+    </div>`;
+    return;
+  }
+
+  host.innerHTML = rows.map(item => {
+    let macroSummary = '';
+    try {
+      const bundle = calculateRecipeDisplayNutrition({ recipe: item.recipe, variant: item.variant, mealType: item.type });
+      const portions = bundle?.portions;
+      if(portions) {
+        const cal = Math.round(portions.eCal || portions.cCal || item.recipe.cal || 0);
+        const prot = round1(portions.eProt || portions.cProt || item.recipe.prot || 0);
+        macroSummary = `<span class="slot-macro" style="font-size:11px">${cal} kcal · P${prot}g</span>`;
+      }
+    } catch(e){}
+
+    return `<div class="recipe-picker-item" onclick="togglePinnedPickerSelection('${ppEscapeAttr(item.id)}','${ppEscapeAttr(item.variant)}')">
+      <div class="recipe-picker-item-main">
+        <div class="recipe-picker-item-title">
+          <span>${ppEscapeHtml(item.name)}</span>
+          ${item.isEnhanced ? '<span class="tag enhanced-pill">✨ Enhanced</span>' : ''}
+          ${item.isPinned ? '<span class="tag pinned">Pre-selected</span>' : ''}
+        </div>
+        <div class="recipe-picker-item-sub">
+          <span>${ppEscapeHtml(toTitleCase(item.type))}</span>
+          <span>·</span>
+          <span>${ppEscapeHtml(item.who === 'both' ? 'Shared' : item.who || 'Any')}</span>
+        </div>
+      </div>
+      <div class="recipe-picker-item-macros">
+        ${macroSummary}
+        <button type="button" class="btn sm ${item.isPinned ? 'ghost' : 'primary'}" style="min-width:64px;pointer-events:none">
+          ${item.isPinned ? 'Remove' : '+ Select'}
+        </button>
+      </div>
+    </div>`;
+  }).join('');
 }
+
+function togglePinnedPickerSelection(recipeId, variant){
+  const pinned = getPinnedRecipesList();
+  const exists = pinned.find(p => p.recipeId === recipeId && (p.variant || 'original') === (variant || 'original'));
+  if(exists){
+    removePinnedRecipe(recipeId, variant);
+  } else {
+    addPinnedRecipe(recipeId, variant);
+  }
+  renderPinnedRecipePickerList();
+}
+
 function addPinnedRecipe(recipeId, variant = 'original'){
   if(!state.prefs) state.prefs = {};
   if(!Array.isArray(state.prefs.pinnedRecipes)) state.prefs.pinnedRecipes = [];
@@ -14276,6 +14465,34 @@ function generatePlan(){
     });
   }
 
+  const preferEnhanced = state.prefs?.preferEnhancedRecipes !== false;
+
+  const scoreCandidateOption = (opt, type, who) => {
+    let baseScore = 0;
+    try {
+      const bundle = calculateRecipeDisplayNutrition({ recipe: opt.recipe, variant: opt.variant, mealType: type });
+      const portions = bundle?.portions;
+      if(portions) {
+        if(who === 'Elliott' || who === 'elliott') {
+          const fit = calculateFit(portions.eCal, portions.eProt, getTarget('e', 'cal') / 3, getTarget('e', 'prot') / 3);
+          baseScore = fit?.score || 0;
+        } else if(who === 'Chloe' || who === 'chloe') {
+          const fit = calculateFit(portions.cCal, portions.cProt, getTarget('c', 'cal') / 3, getTarget('c', 'prot') / 3);
+          baseScore = fit?.score || 0;
+        } else {
+          const fitE = calculateFit(portions.eCal, portions.eProt, getTarget('e', 'cal') / 3, getTarget('e', 'prot') / 3);
+          const fitC = calculateFit(portions.cCal, portions.cProt, getTarget('c', 'cal') / 3, getTarget('c', 'prot') / 3);
+          baseScore = ((fitE?.score || 0) + (fitC?.score || 0)) / 2;
+        }
+      }
+    } catch(e){}
+
+    if(preferEnhanced && opt.variant === 'enhanced') {
+      baseScore -= 0.5; // Bonus for enhanced variants (lower score is better)
+    }
+    return baseScore;
+  };
+
   const choose = (type, who, shared=false) => {
     let p = getPlannerRecipeOptions(type, shared ? 'any' : who, { applyExclusions:true, avoidHistory:true, trafficRules });
     if(shared) p = p.filter(opt => opt.recipe?.who === 'both');
@@ -14283,8 +14500,26 @@ function generatePlan(){
     let fresh = p.filter(opt => !usedInNewPlan.has(opt.id));
     if(!fresh.length) fresh = p;
     if(!fresh.length && !shared) fresh = getPlannerRecipeOptions(type, who, { applyExclusions:true, trafficRules }).filter(option=>plannerOptionHasUsableMappings(option,priority));
-    if(prioritiseUseUp)fresh=rankPlannerOptionsForUseUp(fresh,type,shared?'both':who);
-    const picked = prioritiseUseUp?(fresh[0]||null):(fresh[Math.floor(Math.random() * fresh.length)] || null);
+    
+    if(prioritiseUseUp) {
+      fresh = rankPlannerOptionsForUseUp(fresh, type, shared ? 'both' : who);
+    } else if(preferEnhanced && fresh.length > 1) {
+      fresh = fresh.map(opt => ({
+        opt,
+        score: scoreCandidateOption(opt, type, shared ? 'both' : who) + (Math.random() * 0.12)
+      })).sort((a, b) => a.score - b.score).map(item => item.opt);
+    }
+    
+    let picked = null;
+    if(prioritiseUseUp) {
+      picked = fresh[0] || null;
+    } else if(preferEnhanced && fresh.length > 0) {
+      const topPoolSize = Math.min(fresh.length, 3);
+      picked = fresh[Math.floor(Math.random() * topPoolSize)] || fresh[0] || null;
+    } else {
+      picked = fresh[Math.floor(Math.random() * fresh.length)] || null;
+    }
+    
     if(picked) usedInNewPlan.add(picked.id);
     return picked;
   };
@@ -14728,13 +14963,90 @@ function renderPlan(){
     </div>`;
   }
 }
+function toggleSlotVariant(day, slotKey){
+  const info = getPlanSlotInfo(state.plan?.slots?.[day]?.[slotKey]);
+  if(!info.recipe) return;
+  const currentVariant = info.variant || 'original';
+  const newVariant = currentVariant === 'enhanced' ? 'original' : 'enhanced';
+  
+  state.plan.slots[day][slotKey] = makePlanSlot(info.id, newVariant);
+  const priority = state.plan.productPriority || state.prefs?.productPriority || 'protein';
+  state.plan.productSelections = lockProductSelectionsForSlots(state.plan.slots, priority);
+  state.plan.score = calculatePlanScore(state.plan);
+  saveState();
+  renderPlan();
+  showPlatePlanToast(`Switched to ${newVariant === 'enhanced' ? '✨ Enhanced' : 'Original'} variant for ${info.recipe.name}`);
+}
+
+function prioritiseAllPlannedEnhancedRecipes(){
+  if(!state.plan?.slots) return showPlatePlanToast('No active meal plan to prioritise.');
+  let upgradedCount = 0;
+  
+  Object.entries(state.plan.slots).forEach(([day, daySlots]) => {
+    Object.entries(daySlots || {}).forEach(([slotKey, slotVal]) => {
+      if(!slotVal) return;
+      const info = getPlanSlotInfo(slotVal);
+      if(!info.recipe || info.variant === 'enhanced') return;
+      const r = info.recipe;
+      const hasEnhanced = r.enhanced && ((r.enhanced.ingredients && r.enhanced.ingredients.length) || (r.enhanced.method && r.enhanced.method.length) || (r.enhanced.steps && r.enhanced.steps.length) || r.enhanced.name || r.enhanced.changes || r.enhancedPortions);
+      if(hasEnhanced){
+        state.plan.slots[day][slotKey] = makePlanSlot(info.id, 'enhanced');
+        upgradedCount++;
+      }
+    });
+  });
+  
+  if(upgradedCount > 0){
+    const priority = state.plan.productPriority || state.prefs?.productPriority || 'protein';
+    state.plan.productSelections = lockProductSelectionsForSlots(state.plan.slots, priority);
+    state.plan.score = calculatePlanScore(state.plan);
+    saveState();
+    renderPlan();
+    showPlatePlanToast(`✨ Prioritised ${upgradedCount} meal(s) to Enhanced variants for better fit scores!`);
+  } else {
+    showPlatePlanToast('All eligible meals in your plan are already using Enhanced variants.');
+  }
+}
+
 function openPlannedMealActions(day,slotKey){
   const info=getPlanSlotInfo(state.plan?.slots?.[day]?.[slotKey]);
-  if(!info.active)return showPlatePlanToast('That planned meal is no longer available.');
-  openMobileActionSheet(info.active.name||info.recipe?.name||'Planned meal',[
-    {label:'Review meal options',onclick:`reviewRecipeModalView('${ppEscapeAttr(info.id)}','${ppEscapeAttr(info.instanceId||'')}','${ppEscapeAttr(info.variant||'original')}')`},
-    {label:'Reschedule meal',onclick:`openPlanReschedule(${+day},'${ppEscapeAttr(slotKey)}')`}
-  ]);
+  if(!info.active && !info.recipe) return showPlatePlanToast('That planned meal is no longer available.');
+  const r = info.recipe;
+  const hasEnhanced = r && r.enhanced && ((r.enhanced.ingredients && r.enhanced.ingredients.length) || (r.enhanced.method && r.enhanced.method.length) || (r.enhanced.steps && r.enhanced.steps.length) || r.enhanced.name || r.enhanced.changes || r.enhancedPortions);
+  const isEnhanced = info.variant === 'enhanced';
+
+  const actions = [];
+  if(hasEnhanced){
+    if(isEnhanced){
+      actions.push({
+        label: '🔄 Switch to Original variant',
+        onclick: `toggleSlotVariant(${+day},'${ppEscapeAttr(slotKey)}')`
+      });
+    } else {
+      actions.push({
+        label: '✨ Switch to Enhanced variant (Higher Protein)',
+        onclick: `toggleSlotVariant(${+day},'${ppEscapeAttr(slotKey)}')`
+      });
+    }
+  }
+  actions.push({
+    label: 'Review recipe & portions',
+    onclick: `reviewRecipeModalView('${ppEscapeAttr(info.id)}','${ppEscapeAttr(info.instanceId||'')}','${ppEscapeAttr(info.variant||'original')}')`
+  });
+  actions.push({
+    label: 'Swap / Choose different meal',
+    onclick: `openSwapMealModal(${+day},'${ppEscapeAttr(slotKey)}')`
+  });
+  actions.push({
+    label: 'Reschedule meal',
+    onclick: `openPlanReschedule(${+day},'${ppEscapeAttr(slotKey)}')`
+  });
+  actions.push({
+    label: 'Clear slot',
+    onclick: `swapSlot(${+day},'${ppEscapeAttr(slotKey)}',null)`
+  });
+
+  openMobileActionSheet(info.active?.name || info.recipe?.name || 'Planned meal', actions);
 }
 function swapSlot(day,slot,id){
     if(!state.plan.slots[day]) state.plan.slots[day]={};
