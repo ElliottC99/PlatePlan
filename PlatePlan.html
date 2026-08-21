@@ -17,16 +17,16 @@ try{
   document.documentElement.style.colorScheme=platePlanAppearance==='system'?'light dark':platePlanAppearance;
 }catch(e){}
 </script>
-<link rel="stylesheet" href="./styles/tokens.css?v=2.3.7">
-<link rel="stylesheet" href="./styles/components.css?v=2.3.7">
-<link rel="stylesheet" href="./styles/responsive.css?v=2.3.7">
-<link rel="stylesheet" href="./styles/print.css?v=2.3.7" media="print">
+<link rel="stylesheet" href="./styles/tokens.css?v=2.3.8">
+<link rel="stylesheet" href="./styles/components.css?v=2.3.8">
+<link rel="stylesheet" href="./styles/responsive.css?v=2.3.8">
+<link rel="stylesheet" href="./styles/print.css?v=2.3.8" media="print">
 </head>
 <body>
 <div class="app">
 
 <header class="app-header">
-  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v2.3.7</span></div>
+  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v2.3.8</span></div>
   <div class="app-header-actions">
     <button class="btn primary app-create-button" type="button" data-pp-click="openCreateActionSheet()" aria-label="Add to PlatePlan"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span class="app-create-label">Add</span></button>
     <button class="btn ghost app-menu-button" type="button" data-pp-click="openMobileMore()" aria-label="Open PlatePlan menu"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="19" cy="12" r="1.3"></circle></svg><span>Menu</span></button>
@@ -462,8 +462,8 @@ try{
       <button class="btn ghost" type="button" id="plateplan-check-update" data-pp-click="globalThis.PlatePlanModules?.updates.check({manual:true})">Check for updates</button>
     </div>
     <dl class="plateplan-update-meta">
-      <div><dt>Version</dt><dd id="plateplan-update-version">v2.3.7</dd></div>
-      <div><dt>Offline cache</dt><dd id="plateplan-update-cache">plateplan-shell-v34</dd></div>
+      <div><dt>Version</dt><dd id="plateplan-update-version">v2.3.8</dd></div>
+      <div><dt>Offline cache</dt><dd id="plateplan-update-cache">plateplan-shell-v35</dd></div>
       <div><dt>Status</dt><dd id="plateplan-update-status" aria-live="polite">Up to date</dd></div>
     </dl>
   </div>
@@ -802,14 +802,14 @@ try{
     <div id="mtab-original" class="mtab">
       <div class="estimated-note" id="orig-note" style="background: var(--green-bg); color: var(--green);">Nutrition calculated from verified bank data</div>
       <div class="field"><label>Recipe name</label><input type="text" id="orig-name"></div>
-      <div class="grid3">
+      <div class="grid3" style="display: none;">
         <div title=""><label>Calories (Energy)</label><input type="number" id="orig-cal" readonly style="background:var(--surface2)" title=""></div>
         <div title=""><label>Fat (g)</label><input type="number" id="orig-fat" readonly style="background:var(--surface2)" title=""></div>
         <div title=""><label>Carbs (g)</label><input type="number" id="orig-carb" readonly style="background:var(--surface2)" title=""></div>
         <div title=""><label>Fibre (g)</label><input type="number" id="orig-fibre" readonly style="background:var(--surface2)" title=""></div>
         <div title=""><label>Protein (g)</label><input type="number" id="orig-prot" readonly style="background:var(--surface2)" title=""></div>
       </div>
-      <div class="grid2">
+      <div class="grid2" style="display: none;">
         <div><label>Elliott's portion</label><input type="text" id="orig-pe" readonly style="background:var(--surface2)"></div>
         <div><label>Chloe's portion</label><input type="text" id="orig-pc" readonly style="background:var(--surface2)"></div>
       </div>
@@ -986,18 +986,18 @@ try{
       <div class="estimated-note" id="enh-note" style="background: var(--amber-bg); color: var(--amber);">Manual editing mode -- edit to create your enhanced version. Nutrition will recalculate from the ingredient bank.</div>
       <div id="bank-flags"></div>
       <div class="field"><label>Recipe name</label><input type="text" id="enh-name" data-pp-input="updateSaveBothVisibility()"></div>
-      <div class="grid3">
+      <div class="grid3" style="display: none;">
         <div title=""><label>Calories (Energy)</label><input type="number" id="enh-cal" readonly style="background:var(--surface2)" title=""></div>
         <div title=""><label>Fat (g)</label><input type="number" id="enh-fat" readonly style="background:var(--surface2)" title=""></div>
         <div title=""><label>Carbs (g)</label><input type="number" id="enh-carb" readonly style="background:var(--surface2)" title=""></div>
         <div title=""><label>Fibre (g)</label><input type="number" id="enh-fibre" readonly style="background:var(--surface2)" title=""></div>
         <div title=""><label>Protein (g)</label><input type="number" id="enh-prot" readonly style="background:var(--surface2)" title=""></div>
       </div>
-      <div class="grid2">
+      <div class="grid2" style="display: none;">
         <div><label>Elliott's portion</label><input type="text" id="enh-pe" readonly style="background:var(--surface2)"></div>
         <div><label>Chloe's portion</label><input type="text" id="enh-pc" readonly style="background:var(--surface2)"></div>
       </div>
-            <div id="enh-warn" class="msg warn" style="display: none; margin-bottom: 12px;"><strong>Note:</strong> Some ingredients added manually are unmapped. They will count as 0 calories.</div>
+      <div id="enh-warn" class="msg warn" style="display: none; margin-bottom: 12px;"><strong>Note:</strong> Some ingredients added manually are unmapped. They will count as 0 calories.</div>
       <div id="enh-portion-summary">
         <div style="margin-bottom:14px;background:var(--surface2);padding:10px;border-radius:8px">
             <div style="font-weight:600;font-size:12px;margin-bottom:6px">Portion Allocation (dinner)</div>
@@ -1198,7 +1198,7 @@ try{
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js" crossorigin="anonymous"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js" crossorigin="anonymous"></script>
 <script src="./firebase-config.js"></script>
-<script type="module" src="./scripts/bootstrap.js?v=2.3.7"></script>
+<script type="module" src="./scripts/bootstrap.js?v=2.3.8"></script>
 
 
 

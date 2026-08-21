@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.3.7';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v34';
+const PLATEPLAN_APP_VERSION='2.3.8';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v35';
 const SEED=[];
 
 let state = null;
@@ -3046,6 +3046,12 @@ function getProduct(productId){
   return platePlanIndexes.products.get(productId) || (state?.ingredients || []).find(i => i.id === productId) || null;
 }
 
+function getRecipe(recipeId){
+  if(!recipeId) return null;
+  return platePlanIndexes.recipes?.get(recipeId) || (state?.recipes || []).find(r => r.id === recipeId) || null;
+}
+globalThis.getRecipe = getRecipe;
+
 function getGroupProducts(groupId){
   const group = getIngredientGroup(groupId);
   const ids = new Set(group?.productIds || []);
@@ -5576,120 +5582,132 @@ function renderTodayEmpty(title,copy,actions=''){
 function renderToday(){
   const host=document.getElementById('today-content');
   if(!host||!state) return;
-  if(!platePlanTodayDate) platePlanTodayDate=getPlatePlanLocalToday();
-  const label=document.getElementById('today-date-label');
-  const subtitle=document.getElementById('today-subtitle');
-  if(label) label.textContent=formatTodayDateLabel(platePlanTodayDate);
-  if(!state.plan?.slots||!Object.keys(state.plan.slots).length){
-    if(subtitle) subtitle.textContent='Your planned meals';
-    host.innerHTML=renderTodayEmpty('No active meal plan','Apply a meal plan from your library, or generate a new one in the Meal Planner.',`<button class="btn primary" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
-    return;
-  }
-  let dated=Object.values(state.plan.dayDates||{}).some(value=>parsePlanLocalDate(value));
-  if(!dated && state.plan.slots && Object.keys(state.plan.slots).length){
-    const days=state.plan.days||Object.keys(state.plan.slots).length||7;
-    state.plan.dayDates=buildPlanDayDates(platePlanTodayDate||getPlatePlanLocalToday(),days);
-    state.plan.updatedAt=new Date().toISOString();
-    saveState(true);
-    dated=true;
-  }
-  if(!dated){
-    if(subtitle) subtitle.textContent='This plan has no calendar dates';
-    host.innerHTML=renderTodayEmpty('Assign dates to this plan','Today only shows meals that are explicitly assigned to a calendar date.',`<button class="btn primary" onclick="rollActivePlanToDate('${platePlanTodayDate}')">Start plan from today</button><button class="btn ghost" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner');setTimeout(()=>openPlanDatesWorkspace(),0)">Assign dates</button>`);
-    return;
-  }
-  const day=getTodayPlanDay(platePlanTodayDate);
-  if(!day){
-    const next=getNextDatedPlanDay(platePlanTodayDate);
-    const nextCopy=next?` The next dated plan day is ${formatPlanDayLabel(state.plan,next[0],{short:true})}.`:'';
-    if(subtitle) subtitle.textContent='No plan day is assigned';
-    host.innerHTML=renderTodayEmpty('No meals planned for this date',`This date (${formatTodayDateLabel(platePlanTodayDate)}) is not assigned to the active meal plan.${nextCopy}`,`<button class="btn primary" onclick="rollActivePlanToDate('${platePlanTodayDate}')">Start plan cycle from today</button><button class="btn ghost" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
-    return;
-  }
-  if(subtitle) subtitle.textContent=formatPlanDayLabel(state.plan,day,{short:false});
-  const entries=[];
-  const reasonEntries=[];
-  const mealDefinitions=[
-    {mealType:'breakfast',e:'breakfastE',c:'breakfastC'},
-    {mealType:'lunch',e:'lunchE',c:'lunchC'},
-    {mealType:'dinner',e:'dinnerE',c:'dinnerC'}
-  ];
-  mealDefinitions.forEach(meal=>{
-    const e=getTodaySlotEntry(day,meal.e,'e',meal.mealType);
-    const c=getTodaySlotEntry(day,meal.c,'c',meal.mealType);
-    if(e) entries.push(e);
-    if(c) entries.push(c);
-    if(!e){
-      const reason=getPlanSlotReason(state.plan,day,meal.e);
-      if(reason)reasonEntries.push({day:+day,slotKey:meal.e,person:'e',mealType:meal.mealType,reason});
+  try {
+    if(!platePlanTodayDate) platePlanTodayDate=getPlatePlanLocalToday();
+    const label=document.getElementById('today-date-label');
+    const subtitle=document.getElementById('today-subtitle');
+    if(label) label.textContent=formatTodayDateLabel(platePlanTodayDate);
+    if(!state.plan?.slots||!Object.keys(state.plan.slots).length){
+      if(subtitle) subtitle.textContent='Your planned meals';
+      host.innerHTML=renderTodayEmpty('No active meal plan','Apply a meal plan from your library, or generate a new one in the Meal Planner.',`<button class="btn primary" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
+      return;
     }
-    if(!c){
-      const reason=getPlanSlotReason(state.plan,day,meal.c);
-      if(reason)reasonEntries.push({day:+day,slotKey:meal.c,person:'c',mealType:meal.mealType,reason});
+    let dated=Object.values(state.plan.dayDates||{}).some(value=>parsePlanLocalDate(value));
+    if(!dated && state.plan.slots && Object.keys(state.plan.slots).length){
+      const days=state.plan.days||Object.keys(state.plan.slots).length||7;
+      state.plan.dayDates=buildPlanDayDates(platePlanTodayDate||getPlatePlanLocalToday(),days);
+      state.plan.updatedAt=new Date().toISOString();
+      try { localStorage.setItem(SK, JSON.stringify(state)); } catch(_e) {}
+      dated=true;
     }
-  });
-  if(!entries.length&&!reasonEntries.length){
-    host.innerHTML=renderTodayEmpty('No meals planned for this date','This plan day has no included breakfast, lunch or dinner meals.',`<button class="btn primary" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
-    return;
-  }
-
-  // Calculate daily totals for Option A summary
-  let eCal=0, eProt=0, cCal=0, cProt=0;
-  entries.forEach(item => {
-    if(item.person === 'e'){
-      eCal += (item.calculated?.cal || 0);
-      eProt += (item.calculated?.prot || 0);
-    } else if(item.person === 'c'){
-      cCal += (item.calculated?.cal || 0);
-      cProt += (item.calculated?.prot || 0);
+    if(!dated){
+      if(subtitle) subtitle.textContent='This plan has no calendar dates';
+      host.innerHTML=renderTodayEmpty('Assign dates to this plan','Today only shows meals that are explicitly assigned to a calendar date.',`<button class="btn primary" onclick="rollActivePlanToDate('${platePlanTodayDate}')">Start plan from today</button><button class="btn ghost" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner');setTimeout(()=>openPlanDatesWorkspace(),0)">Assign dates</button>`);
+      return;
     }
-  });
-  const eBudgets = ['breakfast','lunch','dinner'].reduce((acc,m)=>{ const b=getBudgets('e',m); return {cal:acc.cal+b.cal, prot:acc.prot+b.prot}; }, {cal:0,prot:0});
-  const cBudgets = ['breakfast','lunch','dinner'].reduce((acc,m)=>{ const b=getBudgets('c',m); return {cal:acc.cal+b.cal, prot:acc.prot+b.prot}; }, {cal:0,prot:0});
+    const day=getTodayPlanDay(platePlanTodayDate);
+    if(!day){
+      const next=getNextDatedPlanDay(platePlanTodayDate);
+      const nextCopy=next?` The next dated plan day is ${formatPlanDayLabel(state.plan,next[0],{short:true})}.`:'';
+      if(subtitle) subtitle.textContent='No plan day is assigned';
+      host.innerHTML=renderTodayEmpty('No meals planned for this date',`This date (${formatTodayDateLabel(platePlanTodayDate)}) is not assigned to the active meal plan.${nextCopy}`,`<button class="btn primary" onclick="rollActivePlanToDate('${platePlanTodayDate}')">Start plan cycle from today</button><button class="btn ghost" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
+      return;
+    }
+    if(subtitle) subtitle.textContent=formatPlanDayLabel(state.plan,day,{short:false});
+    const entries=[];
+    const reasonEntries=[];
+    const mealDefinitions=[
+      {mealType:'breakfast',e:'breakfastE',c:'breakfastC'},
+      {mealType:'lunch',e:'lunchE',c:'lunchC'},
+      {mealType:'dinner',e:'dinnerE',c:'dinnerC'}
+    ];
+    mealDefinitions.forEach(meal=>{
+      const e=getTodaySlotEntry(day,meal.e,'e',meal.mealType);
+      const c=getTodaySlotEntry(day,meal.c,'c',meal.mealType);
+      if(e) entries.push(e);
+      if(c) entries.push(c);
+      if(!e){
+        const reason=getPlanSlotReason(state.plan,day,meal.e);
+        if(reason)reasonEntries.push({day:+day,slotKey:meal.e,person:'e',mealType:meal.mealType,reason});
+      }
+      if(!c){
+        const reason=getPlanSlotReason(state.plan,day,meal.c);
+        if(reason)reasonEntries.push({day:+day,slotKey:meal.c,person:'c',mealType:meal.mealType,reason});
+      }
+    });
+    if(!entries.length&&!reasonEntries.length){
+      host.innerHTML=renderTodayEmpty('No meals planned for this date','This plan day has no included breakfast, lunch or dinner meals.',`<button class="btn primary" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
+      return;
+    }
 
-  const summaryHtml = entries.length ? `<details class="today-summary-accordion" id="today-daily-summary-accordion">
-    <summary class="today-summary-summary">
-      <div class="today-summary-chips">
-        <span class="tag" style="background:var(--action);color:#fff;font-weight:700">Daily Targets</span>
-        <span class="today-summary-chip"><strong>Elliott:</strong> ${Math.round(eCal)} / ${Math.round(eBudgets.cal)} kcal · ${Math.round(eProt*10)/10} / ${Math.round(eBudgets.prot)}g protein</span>
-        <span class="today-summary-chip"><strong>Chloe:</strong> ${Math.round(cCal)} / ${Math.round(cBudgets.cal)} kcal · ${Math.round(cProt*10)/10} / ${Math.round(cBudgets.prot)}g protein</span>
-      </div>
-      <span class="today-summary-arrow">▾</span>
-    </summary>
-    <div class="today-summary-body">
-      <div class="today-people">${renderTodayPersonPanel('e','Elliott',entries)}${renderTodayPersonPanel('c','Chloe',entries)}</div>
-    </div>
-  </details>` : '';
+    // Calculate daily totals for Option A summary
+    let eCal=0, eProt=0, cCal=0, cProt=0;
+    entries.forEach(item => {
+      if(item.person === 'e'){
+        eCal += (item.calculated?.cal || 0);
+        eProt += (item.calculated?.prot || 0);
+      } else if(item.person === 'c'){
+        cCal += (item.calculated?.cal || 0);
+        cProt += (item.calculated?.prot || 0);
+      }
+    });
+    const eBudgets = ['breakfast','lunch','dinner'].reduce((acc,m)=>{ const b=getBudgets('e',m); return {cal:acc.cal+b.cal, prot:acc.prot+b.prot}; }, {cal:0,prot:0});
+    const cBudgets = ['breakfast','lunch','dinner'].reduce((acc,m)=>{ const b=getBudgets('c',m); return {cal:acc.cal+b.cal, prot:acc.prot+b.prot}; }, {cal:0,prot:0});
 
-  const mealSections=mealDefinitions.map(meal=>{
-    const mealEntries=entries.filter(entry=>entry.mealType===meal.mealType);
-    const mealReasons=reasonEntries.filter(entry=>entry.mealType===meal.mealType);
-    if(!mealEntries.length&&!mealReasons.length) return null;
-    const isEaten=isMealEatenOnDate(platePlanTodayDate,meal.mealType,'both');
-    const groups=mealEntries.length===2&&mealEntries[0].fingerprint===mealEntries[1].fingerprint?[mealEntries]:mealEntries.map(entry=>[entry]);
-    const reasonGroups=mealReasons.length===2&&formatPlanSlotReason(mealReasons[0].reason)===formatPlanSlotReason(mealReasons[1].reason)?[mealReasons]:mealReasons.map(entry=>[entry]);
-
-    return {
-      mealType: meal.mealType,
-      isEaten,
-      html: `<section class="today-meal-section ${isEaten ? 'is-eaten-section' : ''}">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <h2 class="today-meal-heading" style="margin:0">${ppEscapeHtml(toTitleCase(meal.mealType))}</h2>
-          ${isEaten ? `<span class="tag" style="background:#10b98122;color:#10b981;border:1px solid #10b98144;font-weight:600;padding:2px 8px;border-radius:12px;font-size:11px">✓ Eaten</span>` : ''}
+    const summaryHtml = entries.length ? `<details class="today-summary-accordion" id="today-daily-summary-accordion">
+      <summary class="today-summary-summary">
+        <div class="today-summary-chips">
+          <span class="tag" style="background:var(--action);color:#fff;font-weight:700">Daily Targets</span>
+          <span class="today-summary-chip"><strong>Elliott:</strong> ${Math.round(eCal)} / ${Math.round(eBudgets.cal)} kcal · ${Math.round(eProt*10)/10} / ${Math.round(eBudgets.prot)}g protein</span>
+          <span class="today-summary-chip"><strong>Chloe:</strong> ${Math.round(cCal)} / ${Math.round(cBudgets.cal)} kcal · ${Math.round(cProt*10)/10} / ${Math.round(cBudgets.prot)}g protein</span>
         </div>
-        ${groups.map(g => renderTodayMealCard(g, meal.mealType)).join('')}
-        ${reasonGroups.map(renderTodayReasonCard).join('')}
-      </section>`
-    };
-  }).filter(Boolean);
+        <span class="today-summary-arrow">▾</span>
+      </summary>
+      <div class="today-summary-body">
+        <div class="today-people">${renderTodayPersonPanel('e','Elliott',entries)}${renderTodayPersonPanel('c','Chloe',entries)}</div>
+      </div>
+    </details>` : '';
 
-  mealSections.sort((a,b)=>{
-    if(a.isEaten!==b.isEaten) return a.isEaten ? 1 : -1;
-    return 0;
-  });
+    const mealSections=mealDefinitions.map(meal=>{
+      const mealEntries=entries.filter(entry=>entry.mealType===meal.mealType);
+      const mealReasons=reasonEntries.filter(entry=>entry.mealType===meal.mealType);
+      if(!mealEntries.length&&!mealReasons.length) return null;
+      const isEaten=isMealEatenOnDate(platePlanTodayDate,meal.mealType,'both');
+      const groups=mealEntries.length===2&&mealEntries[0].fingerprint===mealEntries[1].fingerprint?[mealEntries]:mealEntries.map(entry=>[entry]);
+      const reasonGroups=mealReasons.length===2&&formatPlanSlotReason(mealReasons[0].reason)===formatPlanSlotReason(mealReasons[1].reason)?[mealReasons]:mealReasons.map(entry=>[entry]);
 
-  const meals=mealSections.map(s=>s.html).join('');
-  host.innerHTML=summaryHtml+meals;
+      return {
+        mealType: meal.mealType,
+        isEaten,
+        html: `<section class="today-meal-section ${isEaten ? 'is-eaten-section' : ''}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <h2 class="today-meal-heading" style="margin:0">${ppEscapeHtml(toTitleCase(meal.mealType))}</h2>
+            ${isEaten ? `<span class="tag" style="background:#10b98122;color:#10b981;border:1px solid #10b98144;font-weight:600;padding:2px 8px;border-radius:12px;font-size:11px">✓ Eaten</span>` : ''}
+          </div>
+          ${groups.map(g => renderTodayMealCard(g, meal.mealType)).join('')}
+          ${reasonGroups.map(renderTodayReasonCard).join('')}
+        </section>`
+      };
+    }).filter(Boolean);
+
+    mealSections.sort((a,b)=>{
+      if(a.isEaten!==b.isEaten) return a.isEaten ? 1 : -1;
+      return 0;
+    });
+
+    const meals=mealSections.map(s=>s.html).join('');
+    host.innerHTML=summaryHtml+meals;
+  } catch(err) {
+    console.error('Error rendering Today view:', err);
+    host.innerHTML = `<div class="card" style="padding:20px;text-align:center;margin:16px 0;">
+      <h3 style="margin-top:0">Unable to load today's plan</h3>
+      <p style="color:var(--text2);font-size:13px">There was a temporary display issue loading the planned meals for this date.</p>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
+        <button class="btn primary sm" onclick="renderToday()">Retry</button>
+        <button class="btn ghost sm" onclick="showView('planner')">Open Meal Planner</button>
+      </div>
+    </div>`;
+  }
 }
 
 function openApplyPlanFromLibraryModal(){
@@ -7964,15 +7982,24 @@ function dataQualityFingerprint(value){
 }
 
 function isDataQualityWarningIgnored(key, fingerprint = ''){
+    if(!key) return false;
     if(new Set(state.ignoredDataQualityWarnings || []).has(key)) return true;
-    return !!fingerprint && state.dataQualityDismissals?.[key] === fingerprint;
+    if(state.dataQualityDismissals && typeof state.dataQualityDismissals === 'object'){
+        if(state.dataQualityDismissals[key]){
+            if(!fingerprint) return true;
+            return state.dataQualityDismissals[key] === fingerprint;
+        }
+    }
+    return false;
 }
 
 function ignoreDataQualityWarning(key, fingerprint = ''){
     if(!key) return;
     if(!state.dataQualityDismissals || typeof state.dataQualityDismissals !== 'object') state.dataQualityDismissals = {};
+    if(!Array.isArray(state.ignoredDataQualityWarnings)) state.ignoredDataQualityWarnings = [];
+    if(!state.ignoredDataQualityWarnings.includes(key)) state.ignoredDataQualityWarnings.push(key);
     state.dataQualityDismissals[key] = fingerprint || dataQualityFingerprint(key);
-    saveState();
+    saveState(true);
     renderDataQuality();
 }
 
@@ -12805,13 +12832,19 @@ function saveManualIng(categoryReady=false){
     const i=state.ingredients.findIndex(x=>x.id===editIngId);
     if(i>-1)state.ingredients[i]=ing;
   }else state.ingredients.push(ing);
-  if(ing.groupId) {
+  if(ing.groupId && getIngredientGroup(ing.groupId)) {
     ensureProductAssignedToGroup(ing, name, ing.groupId);
     syncProductHierarchyCategory(ing, getIngredientGroup(ing.groupId), ing.cat);
+  } else {
+    const assignedGroup = ensureProductAssignedToGroup(ing, name, '', true);
+    if(assignedGroup) {
+      ing.groupId = assignedGroup.id;
+      syncProductHierarchyCategory(ing, assignedGroup, ing.cat);
+    }
   }
   refreshProductGroupAndRecipes(ing.id);
   
-  saveState();
+  saveState(true);
   if(handlePendingRecipeNutritionAfterSave(ing.id)){
     refreshAfterIngredientEdit(ing.id);
     return;
@@ -14321,154 +14354,168 @@ function renderPlan(){
   ensurePlannerShell();
   installPlannerSummaryObserver();
   const el=document.getElementById('plan-content');
-  if(!state.plan||!state.plan.slots){
+  if(!el) return;
+  try {
+    if(!state.plan||!state.plan.slots){
       el.innerHTML='';
-      document.getElementById('plan-actions').style.display = 'none';
+      const actions=document.getElementById('plan-actions'); if(actions) actions.style.display = 'none';
       const overall=document.getElementById('plan-overall-summary'); if(overall) overall.innerHTML='';
       const prep=document.getElementById('plan-meal-prep-panel'); if(prep) prep.innerHTML='';
       return;
-  }
-  
-  const{days,slots}=state.plan;
-  const startInput=document.getElementById('plan-start-date');if(startInput)startInput.value=state.plan.dayDates?.[1]||'';
-  let hasValidSlots = false;
-  
-  const makeRenderedDaySummary = () => {
-    const totals = { e:{cal:0, prot:0}, c:{cal:0, prot:0} };
-    const assumed = { e:{cal:0, prot:0, labels:['snacks']}, c:{cal:0, prot:0, labels:['snacks']} };
-    ['e','c'].forEach(person => {
-      const b = getBudgets(person, 'snack');
-      totals[person].cal += +b.cal || 0;
-      totals[person].prot += +b.prot || 0;
-      assumed[person].cal += +b.cal || 0;
-      assumed[person].prot += +b.prot || 0;
-    });
-    return {
-      totals,
-      targets:{ e:{ cal:+state.prefs.ecal || 0, prot:+state.prefs.eprot || 0 }, c:{ cal:+state.prefs.ccal || 0, prot:+state.prefs.cprot || 0 } },
-      assumed,
-      score:0
+    }
+    
+    const{days,slots}=state.plan;
+    const startInput=document.getElementById('plan-start-date');if(startInput)startInput.value=state.plan.dayDates?.[1]||'';
+    let hasValidSlots = false;
+    
+    const makeRenderedDaySummary = () => {
+      const totals = { e:{cal:0, prot:0}, c:{cal:0, prot:0} };
+      const assumed = { e:{cal:0, prot:0, labels:['snacks']}, c:{cal:0, prot:0, labels:['snacks']} };
+      ['e','c'].forEach(person => {
+        const b = getBudgets(person, 'snack');
+        totals[person].cal += +b.cal || 0;
+        totals[person].prot += +b.prot || 0;
+        assumed[person].cal += +b.cal || 0;
+        assumed[person].prot += +b.prot || 0;
+      });
+      return {
+        totals,
+        targets:{ e:{ cal:+state.prefs.ecal || 0, prot:+state.prefs.eprot || 0 }, c:{ cal:+state.prefs.ccal || 0, prot:+state.prefs.cprot || 0 } },
+        assumed,
+        score:0
+      };
     };
-  };
-  let html='';
-  if(state.isDraftPlan || state.draftPlan){
-    html += `<div class="card draft-plan-step-banner" style="background:var(--surface2);border:1.5px solid var(--action);border-radius:14px;padding:16px 18px;margin-bottom:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
-        <div>
-          <div style="font-weight:750;font-size:15px;color:var(--text);display:flex;align-items:center;gap:6px">
-            <span class="tag" style="background:var(--action);color:#fff;font-weight:700">Step 1 of 2</span>
-            Review Generated Meal Plan
+    let html='';
+    if(state.isDraftPlan || state.draftPlan){
+      html += `<div class="card draft-plan-step-banner" style="background:var(--surface2);border:1.5px solid var(--action);border-radius:14px;padding:16px 18px;margin-bottom:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div>
+            <div style="font-weight:750;font-size:15px;color:var(--text);display:flex;align-items:center;gap:6px">
+              <span class="tag" style="background:var(--action);color:#fff;font-weight:700">Step 1 of 2</span>
+              Review Generated Meal Plan
+            </div>
+            <div style="font-size:13px;color:var(--text2);margin-top:4px;line-height:1.4">
+              Review your scheduled meals. When ready, proceed to the shopping list to check ingredients and confirm your plan. (Not saved yet)
+            </div>
           </div>
-          <div style="font-size:13px;color:var(--text2);margin-top:4px;line-height:1.4">
-            Review your scheduled meals. When ready, proceed to the shopping list to check ingredients and confirm your plan. (Not saved yet)
-          </div>
-        </div>
-        <div class="btn-row" style="margin:0;gap:8px;flex-wrap:wrap">
-          <button class="btn ghost sm" onclick="discardDraftPlan()">Discard</button>
-          <button class="btn primary sm" onclick="proceedDraftToShopping()" style="font-weight:700">Proceed to Shopping List →</button>
-        </div>
-      </div>
-    </div>`;
-  }
-  const localToday=getPlatePlanLocalToday();
-  const isPlanExpired = checkIsPlanExpired(state.plan, localToday);
-  if(isPlanExpired){
-    const tomorrow = getTomorrowLocalDate();
-    const datedEntries = Object.entries(state.plan.dayDates || {}).filter(([, v]) => !!parsePlanLocalDate(v));
-    const dates = datedEntries.map(([, v]) => v).sort();
-    const maxDate = dates[dates.length - 1] || localToday;
-    const endLabel = parsePlanLocalDate(maxDate) ? formatPlanDateShort(maxDate) : maxDate;
-    const tomorrowLabel = formatPlanDateShort(tomorrow);
-    html += `<div class="card plan-expired-banner" style="background:var(--surface2);border:1px solid var(--border-strong);border-radius:14px;padding:16px 18px;margin-bottom:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">
-      <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
-        <div style="width:38px;height:38px;border-radius:10px;background:var(--amber-bg);color:var(--amber);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0;">
-          ⏳
-        </div>
-        <div style="flex:1;min-width:220px">
-          <div style="font-weight:700;font-size:15px;color:var(--text);margin-bottom:3px">Current Meal Plan Ended (${ppEscapeHtml(endLabel)})</div>
-          <div style="font-size:13px;color:var(--text2);line-height:1.4">Your previous plan has completed. Ready for next week? Generate a fresh plan starting tomorrow (${ppEscapeHtml(tomorrowLabel)}).</div>
-          <div class="btn-row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
-            <button type="button" class="btn primary sm" onclick="generateNewPlanStartingTomorrow()">✨ Generate Plan Starting Tomorrow</button>
-            <button type="button" class="btn ghost sm" onclick="openPlanSetupAndFocus()">⚙️ Setup Settings</button>
+          <div class="btn-row" style="margin:0;gap:8px;flex-wrap:wrap">
+            <button class="btn ghost sm" onclick="discardDraftPlan()">Discard</button>
+            <button class="btn primary sm" onclick="proceedDraftToShopping()" style="font-weight:700">Proceed to Shopping List →</button>
           </div>
         </div>
-      </div>
-    </div>`;
-  }
-  const earlierDays=Array.from({length:days},(_,index)=>index+1).filter(day=>{
-    const value=state.plan.dayDates?.[day]||'';
-    return !!parsePlanLocalDate(value)&&value<localToday;
-  });
-  if(earlierDays.length){
-    const firstLabel=formatPlanDayLabel(state.plan,earlierDays[0],{short:true});
-    const lastLabel=formatPlanDayLabel(state.plan,earlierDays[earlierDays.length-1],{short:true});
-    const range=earlierDays.length>1?`${firstLabel} – ${lastLabel}`:firstLabel;
-    html+=`<div class="plan-earlier-days-heading" id="plan-earlier-days-heading">
-      <button type="button" class="plan-earlier-days-toggle" aria-expanded="${platePlanEarlierDaysExpanded}" onclick="togglePlatePlanEarlierDays()">
-        <span><strong>Earlier days</strong><small>${ppEscapeHtml(range)} · ${earlierDays.length} day${earlierDays.length===1?'':'s'}</small></span>
-        <span aria-hidden="true">${platePlanEarlierDaysExpanded?'Hide':'Show'}</span>
-      </button>
-    </div>`;
-  }
-  for(let d=1;d<=days;d++){
-    if(earlierDays.includes(d)&&!platePlanEarlierDaysExpanded)continue;
-    const s=slots[d]||{};
-    const allEx=SLOTS.every(sl=>state.excluded[d]?.[sl.key]);
-    if(allEx){html+='<div class="day-plan-card skipped"><div style="display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap"><strong>'+ppEscapeHtml(formatPlanDayLabel(state.plan,d,{short:true}))+'</strong><input type="date" aria-label="Date for day '+d+'" value="'+ppEscapeAttr(state.plan.dayDates?.[d]||'')+'" onchange="setPlanDayDate('+d+',this.value)" style="width:auto"><span style="color:var(--text3)">-- no meals planned</span></div></div>';continue;}
-    const daySlotInfos = buildPlanDaySlotInfos(state.plan, d);
-    const daySummary = makeRenderedDaySummary();
-    let dayRowsHtml = '';
-    SLOTS.forEach(sl=>{
-      const isEx=state.excluded[d]?.[sl.key];
-      const slotData = s[sl.key];
-      const slotInfo = getPlanSlotInfo(slotData);
-      const r = slotInfo.active;
-      const rId = slotInfo.id;
-      const instanceId = slotInfo.instanceId;
-      const lblLines=SLOT_LABELS[sl.key].split('\n');
-      const showRecipe = !!r && !isEx;
-      
-      if(showRecipe) hasValidSlots = true;
-      
-      const slotNutrition = daySlotInfos.find(info => info.slotKey === sl.key) || getPlannerSlotNutritionInfo(state.plan, d, sl.key);
-      let calStr = '';
-      let rowCal = 0;
-      let rowProt = 0;
-      let rowPerson = sl.key.endsWith('E') ? 'e' : sl.key.endsWith('C') ? 'c' : '';
-      if(showRecipe) {
-          rowCal = +slotNutrition.cal || 0;
-          rowProt = +slotNutrition.prot || 0;
-          calStr = `${Math.round(rowCal)}kcal / P${round1(rowProt)}g`;
-          if(rowPerson) {
-            daySummary.totals[rowPerson].cal += rowCal;
-            daySummary.totals[rowPerson].prot += rowProt;
-          }
-      }
-      const rowAttrs = showRecipe ? ` data-plan-person="${rowPerson}" data-plan-cal="${rowCal}" data-plan-prot="${rowProt}"` : '';
-
-      const slotReason=getPlanSlotReason(state.plan,d,sl.key);
-      const slotReasonLabel=formatPlanSlotReason(slotReason);
-      const slotActionsHtml = showRecipe
-        ? '<div class="slot-actions"><span class="slot-macro">'+calStr+'</span><button class="btn sm primary" onclick="viewRecipe(\''+rId+'\', \''+(instanceId||'')+'\', \''+slotInfo.variant+'\')">View</button><button class="btn sm ghost" onclick="openSwapMealModal('+d+',\''+sl.key+'\')">Swap</button><button class="btn sm ghost" onclick="openPlannedMealActions('+d+',\''+sl.key+'\')">More</button></div>'
-        : slotReason
-          ? '<div class="slot-actions"><button class="btn sm ghost" onclick="openSwapMealModal('+d+',\''+sl.key+'\')">Choose Meal</button><button class="btn sm ghost" onclick="clearPlanSlotReason('+d+',\''+sl.key+'\')">Clear reason</button></div>'
-          : '<div class="slot-actions"><button class="btn sm ghost" onclick="openSwapMealModal('+d+',\''+sl.key+'\')">Choose Meal</button></div>';
-      const emptyContent=slotReason?'<span class="plan-slot-reason">'+ppEscapeHtml(slotReasonLabel)+'</span>':'<span style="color:var(--text3)">Not set</span>';
-      const isPinned = !!(r && getPinnedRecipesList().some(p => p.recipeId === rId && (p.variant || 'original') === (slotInfo.variant || 'original')));
-      dayRowsHtml+='<div class="slot-row"'+rowAttrs+'><span class="slot-lbl" style="color:'+SLOT_COLORS[sl.key]+'">'+lblLines[0]+'<br>'+lblLines[1]+'</span>'+(isEx?'<span class="slot-skipped">Not needed</span>':'<span class="slot-name'+(r&&/(?:https?:\/\/|www\.)/i.test(r.name||'')?' breakable-url':'')+'">'+(r?ppEscapeHtml(r.name):emptyContent)+(slotInfo.variant==='enhanced'?' <span class="tag green">Enhanced</span>':'')+(isPinned?' <span class="tag pinned" title="Pre-selected recipe">Pinned</span>':'')+'</span>'+slotActionsHtml)+'</div>';
+      </div>`;
+    }
+    const localToday=getPlatePlanLocalToday();
+    const isPlanExpired = checkIsPlanExpired(state.plan, localToday);
+    if(isPlanExpired){
+      const tomorrow = getTomorrowLocalDate();
+      const datedEntries = Object.entries(state.plan.dayDates || {}).filter(([, v]) => !!parsePlanLocalDate(v));
+      const dates = datedEntries.map(([, v]) => v).sort();
+      const maxDate = dates[dates.length - 1] || localToday;
+      const endLabel = parsePlanLocalDate(maxDate) ? formatPlanDateShort(maxDate) : maxDate;
+      const tomorrowLabel = formatPlanDateShort(tomorrow);
+      html += `<div class="card plan-expired-banner" style="background:var(--surface2);border:1px solid var(--border-strong);border-radius:14px;padding:16px 18px;margin-bottom:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">
+        <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
+          <div style="width:38px;height:38px;border-radius:10px;background:var(--amber-bg);color:var(--amber);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0;">
+            ⏳
+          </div>
+          <div style="flex:1;min-width:220px">
+            <div style="font-weight:700;font-size:15px;color:var(--text);margin-bottom:3px">Current Meal Plan Ended (${ppEscapeHtml(endLabel)})</div>
+            <div style="font-size:13px;color:var(--text2);line-height:1.4">Your previous plan has completed. Ready for next week? Generate a fresh plan starting tomorrow (${ppEscapeHtml(tomorrowLabel)}).</div>
+            <div class="btn-row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
+              <button type="button" class="btn primary sm" onclick="generateNewPlanStartingTomorrow()">✨ Generate Plan Starting Tomorrow</button>
+              <button type="button" class="btn ghost sm" onclick="openPlanSetupAndFocus()">⚙️ Setup Settings</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }
+    const earlierDays=Array.from({length:days},(_,index)=>index+1).filter(day=>{
+      const value=state.plan.dayDates?.[day]||'';
+      return !!parsePlanLocalDate(value)&&value<localToday;
     });
-    daySummary.score = calculatePlanDayScoreFromTotals(daySummary.totals);
-    const summaryHtml = ['e','c'].map(p=>`<div class="summary-box">${renderPlannerPersonSummaryBox(p, daySummary)}</div>`).join('');
-    html+='<div class="day-plan-card"><div class="row-between" style="margin-bottom:10px;gap:8px;flex-wrap:wrap"><div class="plan-date-control"><div style="font-size:13px;font-weight:600">'+ppEscapeHtml(formatPlanDayLabel(state.plan,d,{short:true}))+'</div><input type="date" aria-label="Date for day '+d+'" value="'+ppEscapeAttr(state.plan.dayDates?.[d]||'')+'" onchange="setPlanDayDate('+d+',this.value)"></div><span class="tag" title="Lower is better. Calories miss plus protein shortfall.">Score '+daySummary.score+'</span></div><div class="plan-summary">'+summaryHtml+'</div>'+dayRowsHtml+'</div>';
+    if(earlierDays.length){
+      const firstLabel=formatPlanDayLabel(state.plan,earlierDays[0],{short:true});
+      const lastLabel=formatPlanDayLabel(state.plan,earlierDays[earlierDays.length-1],{short:true});
+      const range=earlierDays.length>1?`${firstLabel} – ${lastLabel}`:firstLabel;
+      html+=`<div class="plan-earlier-days-heading" id="plan-earlier-days-heading">
+        <button type="button" class="plan-earlier-days-toggle" aria-expanded="${platePlanEarlierDaysExpanded}" onclick="togglePlatePlanEarlierDays()">
+          <span><strong>Earlier days</strong><small>${ppEscapeHtml(range)} · ${earlierDays.length} day${earlierDays.length===1?'':'s'}</small></span>
+          <span aria-hidden="true">${platePlanEarlierDaysExpanded?'Hide':'Show'}</span>
+        </button>
+      </div>`;
+    }
+    for(let d=1;d<=days;d++){
+      if(earlierDays.includes(d)&&!platePlanEarlierDaysExpanded)continue;
+      const s=slots[d]||{};
+      const allEx=SLOTS.every(sl=>state.excluded[d]?.[sl.key]);
+      if(allEx){html+='<div class="day-plan-card skipped"><div style="display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap"><strong>'+ppEscapeHtml(formatPlanDayLabel(state.plan,d,{short:true}))+'</strong><input type="date" aria-label="Date for day '+d+'" value="'+ppEscapeAttr(state.plan.dayDates?.[d]||'')+'" onchange="setPlanDayDate('+d+',this.value)" style="width:auto"><span style="color:var(--text3)">-- no meals planned</span></div></div>';continue;}
+      const daySlotInfos = buildPlanDaySlotInfos(state.plan, d);
+      const daySummary = makeRenderedDaySummary();
+      let dayRowsHtml = '';
+      SLOTS.forEach(sl=>{
+        const isEx=state.excluded[d]?.[sl.key];
+        const slotData = s[sl.key];
+        const slotInfo = getPlanSlotInfo(slotData);
+        const r = slotInfo.active;
+        const rId = slotInfo.id;
+        const instanceId = slotInfo.instanceId;
+        const lblLines=SLOT_LABELS[sl.key].split('\n');
+        const showRecipe = !!r && !isEx;
+        
+        if(showRecipe) hasValidSlots = true;
+        
+        const slotNutrition = daySlotInfos.find(info => info.slotKey === sl.key) || getPlannerSlotNutritionInfo(state.plan, d, sl.key);
+        let calStr = '';
+        let rowCal = 0;
+        let rowProt = 0;
+        let rowPerson = sl.key.endsWith('E') ? 'e' : sl.key.endsWith('C') ? 'c' : '';
+        if(showRecipe) {
+            rowCal = +slotNutrition.cal || 0;
+            rowProt = +slotNutrition.prot || 0;
+            calStr = `${Math.round(rowCal)}kcal / P${round1(rowProt)}g`;
+            if(rowPerson) {
+              daySummary.totals[rowPerson].cal += rowCal;
+              daySummary.totals[rowPerson].prot += rowProt;
+            }
+        }
+        const rowAttrs = showRecipe ? ` data-plan-person="${rowPerson}" data-plan-cal="${rowCal}" data-plan-prot="${rowProt}"` : '';
+
+        const slotReason=getPlanSlotReason(state.plan,d,sl.key);
+        const slotReasonLabel=formatPlanSlotReason(slotReason);
+        const slotActionsHtml = showRecipe
+          ? '<div class="slot-actions"><span class="slot-macro">'+calStr+'</span><button class="btn sm primary" onclick="viewRecipe(\''+rId+'\', \''+(instanceId||'')+'\', \''+slotInfo.variant+'\')">View</button><button class="btn sm ghost" onclick="openSwapMealModal('+d+',\''+sl.key+'\')">Swap</button><button class="btn sm ghost" onclick="openPlannedMealActions('+d+',\''+sl.key+'\')">More</button></div>'
+          : slotReason
+            ? '<div class="slot-actions"><button class="btn sm ghost" onclick="openSwapMealModal('+d+',\''+sl.key+'\')">Choose Meal</button><button class="btn sm ghost" onclick="clearPlanSlotReason('+d+',\''+sl.key+'\')">Clear reason</button></div>'
+            : '<div class="slot-actions"><button class="btn sm ghost" onclick="openSwapMealModal('+d+',\''+sl.key+'\')">Choose Meal</button></div>';
+        const emptyContent=slotReason?'<span class="plan-slot-reason">'+ppEscapeHtml(slotReasonLabel)+'</span>':'<span style="color:var(--text3)">Not set</span>';
+        const isPinned = !!(r && getPinnedRecipesList().some(p => p.recipeId === rId && (p.variant || 'original') === (slotInfo.variant || 'original')));
+        dayRowsHtml+='<div class="slot-row"'+rowAttrs+'><span class="slot-lbl" style="color:'+SLOT_COLORS[sl.key]+'">'+lblLines[0]+'<br>'+lblLines[1]+'</span>'+(isEx?'<span class="slot-skipped">Not needed</span>':'<span class="slot-name'+(r&&/(?:https?:\/\/|www\.)/i.test(r.name||'')?' breakable-url':'')+'">'+(r?ppEscapeHtml(r.name):emptyContent)+(slotInfo.variant==='enhanced'?' <span class="tag green">Enhanced</span>':'')+(isPinned?' <span class="tag pinned" title="Pre-selected recipe">Pinned</span>':'')+'</span>'+slotActionsHtml)+'</div>';
+      });
+      daySummary.score = calculatePlanDayScoreFromTotals(daySummary.totals);
+      const summaryHtml = ['e','c'].map(p=>`<div class="summary-box">${renderPlannerPersonSummaryBox(p, daySummary)}</div>`).join('');
+      html+='<div class="day-plan-card"><div class="row-between" style="margin-bottom:10px;gap:8px;flex-wrap:wrap"><div class="plan-date-control"><div style="font-size:13px;font-weight:600">'+ppEscapeHtml(formatPlanDayLabel(state.plan,d,{short:true}))+'</div><input type="date" aria-label="Date for day '+d+'" value="'+ppEscapeAttr(state.plan.dayDates?.[d]||'')+'" onchange="setPlanDayDate('+d+',this.value)"></div><span class="tag" title="Lower is better. Calories miss plus protein shortfall.">Score '+daySummary.score+'</span></div><div class="plan-summary">'+summaryHtml+'</div>'+dayRowsHtml+'</div>';
+    }
+    el.innerHTML=html;
+    reconcileVisiblePlanSummaries();
+    renderMealPrepSuggestions();
+    renderPlanHistoryPanel();
+    const setup=document.getElementById('plan-setup-card');
+    if(setup) setup.style.display = '';
+    const actions=document.getElementById('plan-actions');
+    if(actions) actions.style.display = hasValidSlots ? 'block' : 'none';
+    updatePlannerCompactHeader();
+  } catch(err) {
+    console.error('Error rendering Meal Planner:', err);
+    el.innerHTML = `<div class="card" style="padding:24px;text-align:center;margin:16px 0;">
+      <h3 style="margin-top:0">Unable to display meal plan</h3>
+      <p style="color:var(--text2);font-size:13px">There was an unexpected error rendering the meal planner schedule.</p>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
+        <button class="btn primary sm" onclick="renderPlan()">Reload Plan</button>
+        <button class="btn ghost sm" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button>
+      </div>
+    </div>`;
   }
-  el.innerHTML=html;
-  reconcileVisiblePlanSummaries();
-  renderMealPrepSuggestions();
-  renderPlanHistoryPanel();
-  const setup=document.getElementById('plan-setup-card');
-  if(setup) setup.style.display = '';
-  document.getElementById('plan-actions').style.display = hasValidSlots ? 'block' : 'none';
-  updatePlannerCompactHeader();
 }
 function openPlannedMealActions(day,slotKey){
   const info=getPlanSlotInfo(state.plan?.slots?.[day]?.[slotKey]);
@@ -16643,6 +16690,8 @@ globalThis.PlatePlanLegacy=Object.freeze({
   expectedCache:PLATEPLAN_EXPECTED_CACHE,
   getState:()=>state,
   saveState,
+  getRecipe,
+  getProduct,
   calculateRecipeDisplayNutrition,
   getPlanContextForInstance,
   refreshPlatePlanDerivedState,
