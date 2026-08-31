@@ -1136,6 +1136,12 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   .mobile-sheet{border-radius:20px 20px 0 0}
   .mobile-sheet button,.plateplan-menu-groups button{min-height:52px}
   .modal-wrap>.modal{padding-left:14px;padding-right:14px}
+  #view-modal-wrap{padding:0!important;align-items:stretch!important;justify-content:stretch!important}
+  #view-modal-wrap>.modal{width:100%!important;max-width:100%!important;height:100dvh!important;max-height:100dvh!important;border-radius:0!important;margin:0!important;padding:0!important;display:flex!important;flex-direction:column!important;box-shadow:none!important;border:none!important}
+  .recipe-view-sheet{height:100%!important;max-height:100dvh!important;border-radius:0!important}
+  .recipe-view-nav{padding:12px 14px!important}
+  .recipe-view-body{padding:14px 14px calc(32px + env(safe-area-inset-bottom))!important}
+  .recipe-view-content-grid{grid-template-columns:1fr!important;gap:14px!important}
   .btn-row{gap:8px}
   .btn-row>.btn{flex:1 1 140px}
   .plan-summary,.diff-grid,.grid2,.grid3{grid-template-columns:minmax(0,1fr)}
