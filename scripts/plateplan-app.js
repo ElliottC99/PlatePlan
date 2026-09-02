@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.6.1';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v39';
+const PLATEPLAN_APP_VERSION='2.6.2';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v40';
 const SEED=[];
 
 let state = null;
@@ -950,9 +950,9 @@ function reconcilePlatePlanState(local, remote) {
       const ri = mergedIngsMap.get(li.id);
       const localTime = li.updatedAt ? new Date(li.updatedAt).getTime() : 0;
       const remoteTime = ri.updatedAt ? new Date(ri.updatedAt).getTime() : 0;
-      if (localTime > remoteTime) {
+      if (localTime >= remoteTime) {
         mergedIngsMap.set(li.id, li);
-        hasLocalNewer = true;
+        if (localTime > remoteTime) hasLocalNewer = true;
       }
     }
   });
@@ -964,9 +964,18 @@ function reconcilePlatePlanState(local, remote) {
   const mergedGroupsMap = new Map();
   remoteGroups.forEach(g => { if (g && g.id) mergedGroupsMap.set(g.id, g); });
   localGroups.forEach(lg => {
-    if (lg && lg.id && !mergedGroupsMap.has(lg.id)) {
+    if (!lg || !lg.id) return;
+    if (!mergedGroupsMap.has(lg.id)) {
       mergedGroupsMap.set(lg.id, lg);
       hasLocalNewer = true;
+    } else {
+      const rg = mergedGroupsMap.get(lg.id);
+      const localTime = lg.updatedAt ? new Date(lg.updatedAt).getTime() : 0;
+      const remoteTime = rg.updatedAt ? new Date(rg.updatedAt).getTime() : 0;
+      if (localTime >= remoteTime) {
+        mergedGroupsMap.set(lg.id, lg);
+        if (localTime > remoteTime) hasLocalNewer = true;
+      }
     }
   });
 
@@ -975,9 +984,18 @@ function reconcilePlatePlanState(local, remote) {
   const mergedFamiliesMap = new Map();
   remoteFamilies.forEach(f => { if (f && f.id) mergedFamiliesMap.set(f.id, f); });
   localFamilies.forEach(lf => {
-    if (lf && lf.id && !mergedFamiliesMap.has(lf.id)) {
+    if (!lf || !lf.id) return;
+    if (!mergedFamiliesMap.has(lf.id)) {
       mergedFamiliesMap.set(lf.id, lf);
       hasLocalNewer = true;
+    } else {
+      const rf = mergedFamiliesMap.get(lf.id);
+      const localTime = lf.updatedAt ? new Date(lf.updatedAt).getTime() : 0;
+      const remoteTime = rf.updatedAt ? new Date(rf.updatedAt).getTime() : 0;
+      if (localTime >= remoteTime) {
+        mergedFamiliesMap.set(lf.id, lf);
+        if (localTime > remoteTime) hasLocalNewer = true;
+      }
     }
   });
 
@@ -6612,26 +6630,6 @@ function normaliseRecognisedRecipe(value){
   return {name:String(value?.name||''),servings:+value?.servings||null,timeMinutes:+value?.timeMinutes||null,sourceType:String(value?.sourceType||''),bookTitle:String(value?.bookTitle||''),author:String(value?.author||''),page:String(value?.page||''),ingredients:(value?.ingredients||[]).map(String).filter(Boolean),method:(value?.method||[]).map(String).filter(Boolean),warnings:(value?.warnings||[]).map(String).filter(Boolean),rawText:String(value?.rawText||'')};
 }
 
-function openRecipeTextPaste(){
-  const wrap=ensureRecipeRecognitionModal();
-  wrap.querySelector('.modal').innerHTML=`<div class="row-between" style="align-items:center;margin-bottom:10px"><h3 style="margin:0">Paste extracted recipe text</h3><button class="btn sm ghost" onclick="closeRecipeRecognitionModal()">Close</button></div><p style="font-size:12px;color:var(--text2);margin-bottom:10px">Copy text using Apple Live Text or Google Lens, then paste it below. PlatePlan will structure it for review.</p><textarea id="recipe-paste-text" style="min-height:45dvh" placeholder="Recipe name&#10;&#10;Ingredients&#10;...&#10;&#10;Method&#10;..."></textarea><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="reviewPastedRecipeText()">Review text</button><button class="btn ghost" onclick="closeRecipeRecognitionModal()">Cancel</button></div>`;
-  wrap.classList.add('open');setTimeout(()=>document.getElementById('recipe-paste-text')?.focus(),0);
-}
-function reviewPastedRecipeText(){
-  try {
-    const text=(document.getElementById('recipe-paste-text')?.value||'').trim();
-    if(!text){
-      showToast('Please paste some recipe text first.');
-      return;
-    }
-    const parsed = parsePastedRecipeText(text);
-    openRecipeRecognitionReview(parsed, 'Pasted text');
-  } catch(err) {
-    console.error('Error reviewing pasted recipe text:', err);
-    alert('An error occurred while reviewing text: ' + (err?.message || err));
-  }
-}
-
 function ensureRecipeRecognitionModal(){
   let wrap=document.getElementById('recipe-recognition-wrap');if(wrap)return wrap;
   wrap=document.createElement('div');wrap.id='recipe-recognition-wrap';wrap.className='modal-wrap';wrap.style.zIndex='620';wrap.innerHTML='<div class="modal" style="max-width:700px"></div>';document.body.appendChild(wrap);return wrap;
@@ -6644,15 +6642,87 @@ function openRecipeRecognitionReview(recipe,label){
   wrap.classList.add('open');
 }
 
+function openRecipeTextPaste(){
+  const wrap=ensureRecipeRecognitionModal();
+  wrap.querySelector('.modal').innerHTML=`<div class="row-between" style="align-items:center;margin-bottom:10px"><h3 style="margin:0">Paste extracted recipe text</h3><button class="btn sm ghost" onclick="closeRecipeRecognitionModal()">Close</button></div><p style="font-size:12px;color:var(--text2);margin-bottom:10px">Copy text using Apple Live Text or Google Lens, then paste it below. PlatePlan will structure it for review.</p><textarea id="recipe-paste-text" style="min-height:45dvh" placeholder="Recipe name&#10;&#10;Ingredients&#10;...&#10;&#10;Method&#10;..."></textarea><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="reviewPastedRecipeText()">Review text</button><button class="btn ghost" onclick="closeRecipeRecognitionModal()">Cancel</button></div>`;
+  wrap.classList.add('open');setTimeout(()=>document.getElementById('recipe-paste-text')?.focus(),0);
+}
+function reviewPastedRecipeText(){
+  try {
+    const text=(document.getElementById('recipe-paste-text')?.value||'').trim();
+    if(!text){
+      if(typeof showPlatePlanToast === 'function') showPlatePlanToast('Please paste some recipe text first.');
+      else if(typeof showToast === 'function') showToast('Please paste some recipe text first.');
+      return;
+    }
+    const parsed = parsePastedRecipeText(text);
+    applyRecognisedRecipeDirectlyToForm(parsed);
+  } catch(err) {
+    console.error('Error reviewing pasted recipe text:', err);
+    if(typeof showPlatePlanToast === 'function') showPlatePlanToast('An error occurred while parsing recipe text: ' + (err?.message || err));
+    else alert('An error occurred while parsing text: ' + (err?.message || err));
+  }
+}
+
+function applyRecognisedRecipeDirectlyToForm(parsed){
+  const recipe = normaliseRecognisedRecipe(parsed || {});
+  
+  if(typeof clearForm === 'function') clearForm();
+
+  const nameEl = document.getElementById('r-name');
+  if(nameEl) nameEl.value = recipe.name || '';
+
+  const servesOrigEl = document.getElementById('r-serves-orig');
+  const servesTargetEl = document.getElementById('r-serves');
+  const servesVal = recipe.servings ? String(recipe.servings) : '';
+  if(servesOrigEl) servesOrigEl.value = servesVal;
+  if(servesTargetEl) servesTargetEl.value = servesVal || '2';
+
+  const timeEl = document.getElementById('r-time');
+  if(timeEl) timeEl.value = recipe.timeMinutes ? String(recipe.timeMinutes) : '';
+
+  const ingsEl = document.getElementById('r-ingredients');
+  if(ingsEl) ingsEl.value = Array.isArray(recipe.ingredients) ? recipe.ingredients.join('\n') : (recipe.ingredients || '');
+
+  const methodEl = document.getElementById('r-method');
+  if(methodEl) methodEl.value = Array.isArray(recipe.method) ? recipe.method.join('\n') : (recipe.method || '');
+
+  const bookTitle = recipe.bookTitle || '';
+  const author = recipe.author || '';
+  const page = recipe.page || '';
+  const srcType = document.getElementById('r-src-type');
+  if(bookTitle || author || page){
+    if(srcType) srcType.value = 'book';
+    updateSrcFields();
+    const bookEl = document.getElementById('r-src-book');
+    const authEl = document.getElementById('r-src-author');
+    const pageEl = document.getElementById('r-src-page');
+    if(bookEl) bookEl.value = bookTitle;
+    if(authEl) authEl.value = author;
+    if(pageEl) pageEl.value = page;
+    updateSrcPreview();
+  }
+
+  closeRecipeRecognitionModal();
+  clearRecipePhotos();
+  showView('add');
+
+  requestAnimationFrame(() => {
+    nameEl?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    nameEl?.focus();
+  });
+  showMsg('form-msg', 'Recipe text loaded. Select original serves, target serves, meal type, suitable for, and source, then click Parse & Verify.', 'info');
+  if(typeof showPlatePlanToast === 'function') showPlatePlanToast('Recipe text loaded into Add Recipe');
+}
+
 function applyRecognisedRecipeToForm(){
-  document.getElementById('r-name').value=document.getElementById('recognised-name')?.value.trim()||'';
-  const serves=document.getElementById('recognised-serves')?.value||'';document.getElementById('r-serves-orig').value=serves;document.getElementById('r-serves').value=serves;
-  document.getElementById('r-time').value=document.getElementById('recognised-time')?.value||'';
-  document.getElementById('r-ingredients').value=document.getElementById('recognised-ingredients')?.value||'';
-  document.getElementById('r-method').value=document.getElementById('recognised-method')?.value||'';
-  const book=document.getElementById('recognised-book')?.value.trim()||'';
-  if(book){document.getElementById('r-src-type').value='book';updateSrcFields();document.getElementById('r-src-book').value=book;updateSrcPreview();}
-  closeRecipeRecognitionModal();clearRecipePhotos();showView('add');document.getElementById('r-name')?.scrollIntoView({block:'start'});showMsg('form-msg','Recognised text added. Check it, then use Parse & Verify.','success');
+  const name = document.getElementById('recognised-name')?.value.trim() || '';
+  const serves = +document.getElementById('recognised-serves')?.value || null;
+  const timeMinutes = +document.getElementById('recognised-time')?.value || null;
+  const bookTitle = document.getElementById('recognised-book')?.value.trim() || '';
+  const ingredients = (document.getElementById('recognised-ingredients')?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
+  const method = (document.getElementById('recognised-method')?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
+  applyRecognisedRecipeDirectlyToForm({ name, servings: serves, timeMinutes, bookTitle, ingredients, method });
 }
 
 // == SOURCE FIELDS ==

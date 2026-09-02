@@ -5,7 +5,7 @@
  * Holding DOMContentLoaded with top-level await preserves the existing boot
  * contract while feature modules continue moving out of the legacy source.
  */
-const CURRENT_BUILD_ID = '2.6.1-v39';
+const CURRENT_BUILD_ID = '2.6.2-v40';
 try {
   if (localStorage.getItem('plateplan_installed_build') !== CURRENT_BUILD_ID) {
     if ('caches' in window) {
@@ -30,7 +30,7 @@ function loadClassicScript(source) {
 document.documentElement.dataset.plateplanBoot = 'shell';
 await new Promise(resolve => requestAnimationFrame(resolve));
 document.documentElement.dataset.plateplanBoot = 'loading-core';
-await loadClassicScript('./scripts/plateplan-app.js?v=2.6.1');
-await import('./main.js?v=2.6.1');
+await loadClassicScript('./scripts/plateplan-app.js?v=2.6.2');
+await import('./main.js?v=2.6.2');
 document.documentElement.dataset.plateplanBoot = 'ready';
 
