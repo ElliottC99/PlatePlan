@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.5.1';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v37';
+const PLATEPLAN_APP_VERSION='2.6.0';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v38';
 const SEED=[];
 
 let state = null;
@@ -281,10 +281,15 @@ function openEnhancedRecipeActions(recipeId){
 }
 function openProductBankActions(productId){
   const product=getProduct(productId); if(!product) return;
-  openMobileActionSheet(product.name || 'Product actions',[
-    {label:'Assign sub-type',onclick:`assignProductToGroupPrompt('${ppEscapeAttr(productId)}')`},
-    {label:'Delete product',onclick:`deleteIng('${ppEscapeAttr(productId)}')`,danger:true}
-  ]);
+  const group=getIngredientGroup(product.groupId);
+  const actions = [
+    {label:'Reallocate / Change Ingredient',onclick:`openProductReallocationModal('${ppEscapeAttr(productId)}')`},
+  ];
+  if(group){
+    actions.push({label:'Delink from Ingredient',onclick:`confirmDelinkProduct('${ppEscapeAttr(productId)}')`});
+  }
+  actions.push({label:'Delete product',onclick:`deleteIng('${ppEscapeAttr(productId)}')`,danger:true});
+  openMobileActionSheet(product.name || 'Product actions', actions);
 }
 function openIngredientFamilyActions(familyId){
   const family=getIngredientFamily(familyId); if(!family) return;
@@ -2515,7 +2520,9 @@ function splitPastedIngredientText(text){
     .replace(/\u00a0/g, ' ')
     .replace(/([0-9#*]\ufe0f?\u20e3|[①②③④⑤⑥⑦⑧⑨⑩]|[-*•‣⁃∙·▪▫◦●○■□☐☑☒✓✔]|✅|☑️|✔️|✓|🔸|🔹|👉|➡️|➜|⭐|🍽️|🥣|🥘|🧂|🧄|🧅|🥔|🥕|🌶️|🍅|🧀|🥚|🍋|🥑|🍗|🥩|🥦)\s*/gu, '\n$1 ')
     .replace(/;\s*/g, '\n');
-  normalised = normalised.replace(/\s+(?=(?:\d+(?:\.\d+)?|\d+\s+\d+\/\d+|\d+\/\d+|[½⅓⅔¼¾⅛⅜⅝⅞])\s*(?:g|kg|ml|l|tsp|tbsp|cup|tin|tins|can|cans|clove|cloves|bulb|bulbs|head|heads|handful|handfuls|bunch|bunches|pinch|dash|slice|slices|piece|pieces|stalk|stalks|sprig|sprigs|leaf|leaves|x\b|×\b|qty\b|each\b))/gi, '\n');
+  
+  // Protect multiplier expressions like "1 x 450g", "2 x 400g", "1x 250g", "2 × 100ml" from being split
+  normalised = normalised.replace(/(?<!(?:\b\d+|\bone|\btwo|\bthree|\bfour)\s*[x×])\s+(?=(?:\d+(?:\.\d+)?|\d+\s+\d+\/\d+|\d+\/\d+|[½⅓⅔¼¾⅛⅜⅝⅞])\s*(?:g|kg|ml|l|tsp|tbsp|cup|tin|tins|can|cans|clove|cloves|bulb|bulbs|head|heads|handful|handfuls|bunch|bunches|pinch|dash|slice|slices|piece|pieces|stalk|stalks|sprig|sprigs|leaf|leaves|pack|packs|block|blocks|pot|pots|jar|jars|bottle|bottles|x\b|×\b|qty\b|each\b))/gi, '\n');
   return normalised.split(/\n+/).map(cleanIngredientLinePrefix).filter(Boolean);
 }
 
@@ -2554,6 +2561,86 @@ function splitPastedMethodText(text){
   return normalised.split(/\n+/).map(l => cleanIngredientLinePrefix(l).trim()).filter(Boolean);
 }
 
+function convertMethodQuantitiesToPercentages(steps, parsedIngs = []){
+  if(!Array.isArray(steps)) return [];
+  const ings = (parsedIngs || []).map(ing => {
+    const rawName = (ing.name || ing.raw || '').toLowerCase().trim();
+    const baseName = rawName.replace(/\b(diced|chopped|sliced|grated|minced|crushed|peeled|firm|extra firm|fresh|dried|tinned|canned|organic|ground|whole|half|halved)\b/g, '').replace(/\s+/g, ' ').trim();
+    const grams = +ing.grams || (['g','ml'].includes(ing.unit) ? +ing.qty : 0);
+    const qty = +ing.qty || 0;
+    const unit = ing.unit || 'g';
+    return {
+      raw: ing.raw,
+      name: ing.name,
+      rawName,
+      baseName,
+      grams,
+      qty,
+      unit
+    };
+  }).filter(i => i.name && (i.grams > 0 || i.qty > 0));
+
+  return steps.map(step => {
+    let text = String(step || '');
+    ings.forEach(ing => {
+      const searchTerms = [ing.name.toLowerCase(), ing.baseName].filter(t => t && t.length >= 3);
+      if(!searchTerms.length) return;
+
+      const hasIngMention = searchTerms.some(term => new RegExp(`\\b${escapeRegex(term)}\\b`, 'i').test(text));
+      if(!hasIngMention) return;
+
+      const termPattern = searchTerms.map(escapeRegex).join('|');
+      const qtyPattern = new RegExp(`(?<!\\b(?:at|to|heat to|gas mark|for|in|about)\\s+)(?:(\\d+(?:\\.\\d+)?)\\s*(g|kg|ml|l|tbsp|tsp|cups?|tins?|cans?|cloves?|slices?|pieces?)\\s+(?:of\\s+)?(?:the\\s+)?(${termPattern}))`, 'gi');
+
+      text = text.replace(qtyPattern, (match, amountStr, unitStr, ingMention) => {
+        const amount = parseFloat(amountStr);
+        let amountInGrams = amount;
+        const u = (unitStr || '').toLowerCase();
+        if(u === 'kg') amountInGrams = amount * 1000;
+        else if(u === 'l') amountInGrams = amount * 1000;
+        else if(u === 'tbsp') amountInGrams = amount * 15;
+        else if(u === 'tsp') amountInGrams = amount * 5;
+
+        const totalGrams = ing.grams || toGrams(ing.qty, ing.unit);
+
+        if(totalGrams > 0 && amountInGrams > 0){
+          const ratio = amountInGrams / totalGrams;
+          const pct = Math.round(ratio * 100);
+
+          if(pct >= 95 && pct <= 105){
+            return `all (${pct}%) of the ${ingMention}`;
+          } else if(pct >= 45 && pct <= 55){
+            return `half (50%) of the ${ingMention}`;
+          } else if(pct >= 30 && pct <= 36){
+            return `one-third (${pct}%) of the ${ingMention}`;
+          } else if(pct >= 63 && pct <= 70){
+            return `two-thirds (${pct}%) of the ${ingMention}`;
+          } else if(pct >= 22 && pct <= 28){
+            return `one-quarter (25%) of the ${ingMention}`;
+          } else if(pct >= 72 && pct <= 78){
+            return `three-quarters (75%) of the ${ingMention}`;
+          } else {
+            return `${pct}% of the ${ingMention}`;
+          }
+        } else if(ing.qty > 0){
+          const ratio = amount / ing.qty;
+          const pct = Math.round(ratio * 100);
+          if(pct >= 95 && pct <= 105){
+            return `all (${pct}%) of the ${ingMention}`;
+          } else if(pct >= 45 && pct <= 55){
+            return `half (50%) of the ${ingMention}`;
+          } else {
+            return `${pct}% of the ${ingMention}`;
+          }
+        }
+        return match;
+      });
+    });
+
+    return text;
+  });
+}
+
 function detectStockIngredient(raw){
   const text = String(raw || '').toLowerCase();
   if(!/\bstock\b/.test(text) || !/\b(vegetable|veg|chicken|beef|stock)\b/.test(text)) return null;
@@ -2584,35 +2671,71 @@ function parseIngredientLine(raw){
   raw = normaliseLeadingQuantity(raw);
 
   let parsed = null;
-  const m=raw.match(/^(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tsp|tbsp|cup|tin|tins|can|cans|clove|cloves|bulb|bulbs|head|heads|handful|handfuls|bunch|bunches|pinch|dash|slice|slices|piece|pieces|stalk|stalks|sprig|sprigs|leaf|leaves)s?\s+(?:of\s+)?(.+)$/i);
-  if(m){
-    const qty=parseFloat(m[1]);
-    let unit=m[2].toLowerCase().replace(/s$/,'');
-    if(unit==='tin'||unit==='can')unit='tin';
-    if(unit==='bulb'||unit==='head')unit='head';
-    const name=m[3].replace(/\s*\(.*?\)\s*/g,'').trim();
-    parsed = {raw,qty,unit,name};
-  } else {
-    const m2=raw.match(/^(handful|bunch|pinch|dash|sprig)s?\s+(?:of\s+)?(.+)$/i);
-    if(m2){
-      const unit=m2[1].toLowerCase();
-      const name=m2[2].replace(/\s*\(.*?\)\s*/g,'').trim();
-      parsed = {raw,qty:1,unit,name};
-    } else {
-      const m3=raw.match(/^(\d+(?:\.\d+)?)(g|kg|ml|l)\s+(.+)$/i);
-      if(m3){
-        const qty=parseFloat(m3[1]);
-        const unit=m3[2].toLowerCase();
-        const name=m3[3].replace(/\s*\(.*?\)\s*/g,'').trim();
-        parsed = {raw,qty,unit,name};
+
+  // 1. Multiplier with specific sub-quantity, e.g. "1 x 450g firm tofu", "2 x 400g tins chickpeas", "1 x 250g pack spinach", "2 x 150ml cream"
+  const multiWithSub = raw.match(/^(\d+(?:\.\d+)?)\s*(?:x|×)\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tsp|tbsp|cup|tin|tins|can|cans|clove|cloves|bulb|bulbs|head|heads|handful|handfuls|bunch|bunches|pinch|dash|slice|slices|piece|pieces|stalk|stalks|sprig|sprigs|leaf|leaves|pack|packs|block|blocks|pot|pots|jar|jars|bottle|bottles)?\s*(?:of\s+)?(?:tins?|cans?|packs?|blocks?|pots?|jars?|bottles?|of\s+)?(.+)$/i);
+  if(multiWithSub){
+    const count = parseFloat(multiWithSub[1]);
+    const subQty = parseFloat(multiWithSub[2]);
+    let rawUnit = (multiWithSub[3] || 'g').toLowerCase().replace(/s$/,'');
+    if(rawUnit === 'tin' || rawUnit === 'can') rawUnit = 'tin';
+    if(['pack','block','pot','jar','bottle'].includes(rawUnit)) rawUnit = 'g';
+    const totalQty = count * subQty;
+    const name = multiWithSub[4].replace(/\s*\(.*?\)\s*/g,'').trim();
+    parsed = { raw, qty: totalQty, unit: rawUnit, name };
+  }
+
+  // 2. Multiplier without sub-quantity, e.g. "1 x red onion", "2 x tins chickpeas", "2 x cloves garlic", "1 x block halloumi"
+  if(!parsed){
+    const multiSimple = raw.match(/^(\d+(?:\.\d+)?)\s*(?:x|×)\s*(?:of\s+)?(?:tins?|cans?|packs?|blocks?|pots?|jars?|bottles?|of\s+)?(.+)$/i);
+    if(multiSimple){
+      const count = parseFloat(multiSimple[1]);
+      const remainder = multiSimple[2].trim();
+      const discreteMatch = remainder.match(/^(clove|cloves|bulb|bulbs|head|heads|handful|handfuls|bunch|bunches|pinch|dash|slice|slices|piece|pieces|stalk|stalks|sprig|sprigs|leaf|leaves|tin|tins|can|cans)\s+(?:of\s+)?(.+)$/i);
+      if(discreteMatch){
+        let dUnit = discreteMatch[1].toLowerCase().replace(/s$/,'');
+        if(dUnit === 'tin' || dUnit === 'can') dUnit = 'tin';
+        const dName = discreteMatch[2].replace(/\s*\(.*?\)\s*/g,'').trim();
+        parsed = { raw, qty: count, unit: dUnit, name: dName };
       } else {
-        const m4=raw.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
-        if(m4){
-            const qty = parseFloat(m4[1]);
-            const name = m4[2].replace(/\s*\(.*?\)\s*/g,'').trim();
-            parsed = {raw, qty, unit: 'qty', name};
+        const name = remainder.replace(/\s*\(.*?\)\s*/g,'').trim();
+        parsed = { raw, qty: count, unit: 'qty', name };
+      }
+    }
+  }
+
+  // 3. Standard quantity + unit matching
+  if(!parsed){
+    const m=raw.match(/^(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tsp|tbsp|cup|tin|tins|can|cans|clove|cloves|bulb|bulbs|head|heads|handful|handfuls|bunch|bunches|pinch|dash|slice|slices|piece|pieces|stalk|stalks|sprig|sprigs|leaf|leaves)s?\s+(?:of\s+)?(.+)$/i);
+    if(m){
+      const qty=parseFloat(m[1]);
+      let unit=m[2].toLowerCase().replace(/s$/,'');
+      if(unit==='tin'||unit==='can')unit='tin';
+      if(unit==='bulb'||unit==='head')unit='head';
+      const name=m[3].replace(/\s*\(.*?\)\s*/g,'').trim();
+      parsed = {raw,qty,unit,name};
+    } else {
+      const m2=raw.match(/^(handful|bunch|pinch|dash|sprig)s?\s+(?:of\s+)?(.+)$/i);
+      if(m2){
+        const unit=m2[1].toLowerCase();
+        const name=m2[2].replace(/\s*\(.*?\)\s*/g,'').trim();
+        parsed = {raw,qty:1,unit,name};
+      } else {
+        const m3=raw.match(/^(\d+(?:\.\d+)?)(g|kg|ml|l)\s+(.+)$/i);
+        if(m3){
+          const qty=parseFloat(m3[1]);
+          const unit=m3[2].toLowerCase();
+          const name=m3[3].replace(/\s*\(.*?\)\s*/g,'').trim();
+          parsed = {raw,qty,unit,name};
         } else {
-            parsed = {raw,qty:1,unit:'qty',name:raw.replace(/\s*\(.*?\)\s*/g,'').trim()||raw};
+          const m4=raw.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
+          if(m4){
+              const qty = parseFloat(m4[1]);
+              const name = m4[2].replace(/\s*\(.*?\)\s*/g,'').trim();
+              parsed = {raw, qty, unit: 'qty', name};
+          } else {
+              parsed = {raw,qty:1,unit:'qty',name:raw.replace(/\s*\(.*?\)\s*/g,'').trim()||raw};
+          }
         }
       }
     }
@@ -6452,7 +6575,9 @@ function parsePastedRecipeText(raw){
   }
   const serves=+(String(raw).match(/serves?\s*[:\-]?\s*(\d+)/i)||[])[1]||null;
   const time=+(String(raw).match(/(?:prep|cook|total)\s*time\s*[:\-]?\s*(\d+)\s*(?:min|minutes?)/i)||[])[1]||null;
-  return normaliseRecognisedRecipe({name,servings:serves,timeMinutes:time,ingredients,method,warnings:['On-device OCR is best-effort. Check quantities and instructions against the photo.'],rawText:String(raw||'')});
+  const parsedIngs = ingredients.map(parseIngredientLine).filter(Boolean);
+  const convertedMethod = convertMethodQuantitiesToPercentages(method, parsedIngs);
+  return normaliseRecognisedRecipe({name,servings:serves,timeMinutes:time,ingredients,method:convertedMethod.length?convertedMethod:method,warnings:[],rawText:String(raw||'')});
 }
 
 function normaliseRecognisedRecipe(value){
@@ -6611,7 +6736,8 @@ function submitRecipe(){
       return p;
   }).filter(Boolean);
   
-  const methodSteps=splitPastedMethodText(methodText);
+  const rawSteps=splitPastedMethodText(methodText);
+  const methodSteps=convertMethodQuantitiesToPercentages(rawSteps, parsedIngs);
   
   document.getElementById('r-serves').value = targetServes;
 
@@ -10968,7 +11094,7 @@ function renderBank(){
       ? `<div class="msg warn" style="font-size:11px;margin:6px 0 0;padding:6px 8px">Check nutrition basis: powders/supplements must be stored per 100g/ml, not per scoop.</div>`
       : '';
     
-    return`<div class="bank-card"><div class="product-card-layout"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;overflow-wrap:break-word">${ing.name}</div>${ing.brand&&ing.brand!=='Generic'?`<div style="font-size:12px;color:var(--text2);margin-bottom:4px">${ing.brand}</div>`:''}<div style="font-size:11px;color:var(--text3);margin:3px 0;overflow-wrap:break-word">${ppEscapeHtml(hierarchy)}</div><div class="row-center" style="margin:4px 0;gap:5px"><span class="rank rank-${rank}" title="${protDensity.toFixed(1)}g protein per 100 kcal">${protDensity>=15?'Very high protein':protDensity>=10?'High protein':protDensity>=5?'Medium protein':'Lower protein'}</span><span class="tag" title="Category">${ppEscapeHtml(CAT[group?.cat || ing.cat]||group?.cat||ing.cat||'Other')}</span><span class="tag" title="Ingredient">${ppEscapeHtml(getProductFamily(ing))}</span>${group?`<span class="tag" title="Type">Type: ${ppEscapeHtml(getGroupTypeName(group))}</span>`:''}${isDefaultProduct?`<span class="tag green" title="Automatic default product: highest protein per 100 kcal in this type">Auto default</span>`:''}${ing.storage ? `<span class="tag" style="text-transform:capitalize;">${ing.storage}</span>` : ''}</div><div class="macro-bar"><span class="mpill p">P <span>${p}g</span></span><span class="mpill"><span>${ing.cal}</span> kcal</span><span class="mpill">C <span>${ing.carb}g</span></span><span class="mpill">F <span>${ing.fat}g</span></span></div>${basisWarning}<div class="row-center" style="margin-top:5px; gap:8px;">${pkcal?`<span style="font-size:11px;color:var(--blue)"><strong>${pkcal}g</strong> P / 100kcal</span>`:''}${ppenny?`<span style="font-size:11px;color:var(--blue)"><strong>${ppenny}g</strong> P / &pound;</span>`:''}</div>${ing.notes?`<div style="font-size:12px;color:var(--text2);margin-top:4px">${ing.notes}</div>`:''}${ing.price&&ing.packSize?`<div style="font-size:12px;color:var(--text2);margin-top:4px;">&pound;${ing.price.toFixed(2)} for ${formattedPackSize}</div>`:''}${variantLabels.length>1?`<div style="font-size:11px;color:var(--text2);margin-top:4px;"><strong>Pack variants:</strong> ${variantLabels.map(ppEscapeHtml).join(' · ')}</div>`:''}${ing.sourceUrl?`<div style="font-size:11px;margin-top:4px;"><a href="${ing.sourceUrl}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:underline">View on Tesco ↗</a></div>`:''}</div><div class="product-card-actions"><button class="btn sm ghost desktop-only-mobile-hide" onclick="editIng('${ing.id}')">Edit</button><button class="btn sm ghost desktop-only-mobile-hide" onclick="assignProductToGroupPrompt('${ing.id}')">Type</button><button class="btn sm danger desktop-only-mobile-hide" onclick="deleteIng('${ing.id}')">Delete</button><button class="btn sm ghost mobile-only-action" onclick="editIng('${ing.id}')">Edit product</button><button class="btn sm ghost mobile-only-action" onclick="openProductBankActions('${ing.id}')">More</button></div></div></div>`;
+    return`<div class="bank-card"><div class="product-card-layout"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;overflow-wrap:break-word">${ing.name}</div>${ing.brand&&ing.brand!=='Generic'?`<div style="font-size:12px;color:var(--text2);margin-bottom:4px">${ing.brand}</div>`:''}<div style="font-size:11px;color:var(--text3);margin:3px 0;overflow-wrap:break-word">${ppEscapeHtml(hierarchy)}</div><div class="row-center" style="margin:4px 0;gap:5px"><span class="rank rank-${rank}" title="${protDensity.toFixed(1)}g protein per 100 kcal">${protDensity>=15?'Very high protein':protDensity>=10?'High protein':protDensity>=5?'Medium protein':'Lower protein'}</span><span class="tag" title="Category">${ppEscapeHtml(CAT[group?.cat || ing.cat]||group?.cat||ing.cat||'Other')}</span><span class="tag" title="Ingredient">${ppEscapeHtml(getProductFamily(ing))}</span>${group?`<span class="tag" title="Type">Type: ${ppEscapeHtml(getGroupTypeName(group))}</span>`:''}${isDefaultProduct?`<span class="tag green" title="Automatic default product: highest protein per 100 kcal in this type">Auto default</span>`:''}${ing.storage ? `<span class="tag" style="text-transform:capitalize;">${ing.storage}</span>` : ''}</div><div class="macro-bar"><span class="mpill p">P <span>${p}g</span></span><span class="mpill"><span>${ing.cal}</span> kcal</span><span class="mpill">C <span>${ing.carb}g</span></span><span class="mpill">F <span>${ing.fat}g</span></span></div>${basisWarning}<div class="row-center" style="margin-top:5px; gap:8px;">${pkcal?`<span style="font-size:11px;color:var(--blue)"><strong>${pkcal}g</strong> P / 100kcal</span>`:''}${ppenny?`<span style="font-size:11px;color:var(--blue)"><strong>${ppenny}g</strong> P / &pound;</span>`:''}</div>${ing.notes?`<div style="font-size:12px;color:var(--text2);margin-top:4px">${ing.notes}</div>`:''}${ing.price&&ing.packSize?`<div style="font-size:12px;color:var(--text2);margin-top:4px;">&pound;${ing.price.toFixed(2)} for ${formattedPackSize}</div>`:''}${variantLabels.length>1?`<div style="font-size:11px;color:var(--text2);margin-top:4px;"><strong>Pack variants:</strong> ${variantLabels.map(ppEscapeHtml).join(' · ')}</div>`:''}${ing.sourceUrl?`<div style="font-size:11px;margin-top:4px;"><a href="${ing.sourceUrl}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:underline">View on Tesco ↗</a></div>`:''}</div><div class="product-card-actions"><button class="btn sm ghost desktop-only-mobile-hide" onclick="editIng('${ing.id}')">Edit</button><button class="btn sm ghost desktop-only-mobile-hide" onclick="openProductReallocationModal('${ing.id}')">Reallocate</button><button class="btn sm danger desktop-only-mobile-hide" onclick="deleteIng('${ing.id}')">Delete</button><button class="btn sm ghost mobile-only-action" onclick="editIng('${ing.id}')">Edit product</button><button class="btn sm ghost mobile-only-action" onclick="openProductBankActions('${ing.id}')">More</button></div></div></div>`;
   }).join('')+progressiveListButton('bank',totalProducts,visibleProducts.length);
 }
 
@@ -11432,6 +11558,323 @@ function setGroupDefaultProduct(groupId, productId){
   renderIngredientBank();
   renderBank();
   renderVault();
+}
+
+function renderEditProductLinkage(ing){
+  const el = document.getElementById('mi-linkage-container');
+  if(!el || !ing) return;
+  const group = getIngredientGroup(ing.groupId);
+  const family = group ? getGroupIngredientFamily(group) : null;
+  if(group){
+    el.innerHTML = `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px;">
+        <div class="row-between" style="align-items:center;gap:10px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.04em">Linked Ingredient & Sub-type</div>
+            <div style="font-size:13px;font-weight:600;margin-top:2px;color:var(--text)">
+              ${ppEscapeHtml(family?.name || group.family || 'Ingredient')} &rarr; <span style="color:var(--green)">${ppEscapeHtml(getGroupTypeName(group))}</span>
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">${ppEscapeHtml(getGroupHierarchyText(group))}</div>
+          </div>
+          <div class="btn-row" style="margin:0;gap:6px">
+            <button type="button" class="btn sm ghost" onclick="openProductReallocationModal('${ppEscapeHtml(ing.id)}')">Reallocate</button>
+            <button type="button" class="btn sm danger ghost" onclick="confirmDelinkProduct('${ppEscapeHtml(ing.id)}')">Delink</button>
+          </div>
+        </div>
+      </div>`;
+  } else {
+    el.innerHTML = `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px;">
+        <div class="row-between" style="align-items:center;gap:10px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.04em">Ingredient Linkage</div>
+            <div style="font-size:13px;color:var(--text2);margin-top:2px">Standalone product (not linked to any ingredient)</div>
+          </div>
+          <div class="btn-row" style="margin:0">
+            <button type="button" class="btn sm primary" onclick="openProductReallocationModal('${ppEscapeHtml(ing.id)}')">Link to Ingredient</button>
+          </div>
+        </div>
+      </div>`;
+  }
+}
+
+let activeReallocationProductId = null;
+
+function ensureProductReallocationModal(){
+  let wrap = document.getElementById('product-reallocation-wrap');
+  if(wrap) return wrap;
+  wrap = document.createElement('div');
+  wrap.id = 'product-reallocation-wrap';
+  wrap.className = 'modal-wrap';
+  wrap.style.zIndex = '450';
+  wrap.innerHTML = `
+    <div class="modal" style="max-width:580px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;">
+      <div class="row-between" style="align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+        <div>
+          <h3 id="product-reallocation-title" style="margin:0;font-size:16px">Reallocate Product</h3>
+          <div id="product-reallocation-subtitle" style="font-size:12px;color:var(--text2);margin-top:2px"></div>
+        </div>
+        <button class="btn sm ghost" onclick="closeProductReallocationModal()">&times;</button>
+      </div>
+      <div id="product-reallocation-body" style="overflow-y:auto;flex:1;padding-right:4px;">
+        <div id="product-reallocation-current" style="margin-bottom:12px;"></div>
+        
+        <!-- Option 1: Existing ingredient -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;">
+          <div style="font-weight:700;font-size:13px;margin-bottom:6px">Option 1: Allocate to Existing Ingredient / Sub-type</div>
+          <input type="search" id="product-reallocation-search" placeholder="Search ingredient or sub-type..." oninput="filterReallocationOptions(this.value)" style="width:100%;padding:7px 10px;font-size:12px;margin-bottom:8px">
+          <div id="product-reallocation-options" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:var(--surface)"></div>
+        </div>
+
+        <!-- Option 2: Invent new ingredient -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;">
+          <div style="font-weight:700;font-size:13px;margin-bottom:6px">Option 2: Invent New Ingredient & Sub-type</div>
+          <div class="grid2" style="gap:8px">
+            <div>
+              <label style="font-size:11px;font-weight:600">Ingredient Name</label>
+              <input type="text" id="product-reallocation-new-family" placeholder="e.g. Tempeh" style="font-size:12px">
+            </div>
+            <div>
+              <label style="font-size:11px;font-weight:600">Sub-type Name</label>
+              <input type="text" id="product-reallocation-new-type" placeholder="e.g. Smoked Tempeh" style="font-size:12px">
+            </div>
+          </div>
+          <div style="margin-top:8px">
+            <label style="font-size:11px;font-weight:600">Category</label>
+            <select id="product-reallocation-new-cat" style="font-size:12px;width:100%"></select>
+          </div>
+          <button type="button" class="btn sm secondary" style="margin-top:10px;width:100%" onclick="saveProductReallocationToNewIngredient()">Create Ingredient & Allocate Product</button>
+        </div>
+
+        <!-- Delink standalone option -->
+        <div id="product-reallocation-delink-row" style="margin-top:8px;text-align:right"></div>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  return wrap;
+}
+
+function openProductReallocationModal(productId){
+  const product = getProduct(productId);
+  if(!product) return;
+  activeReallocationProductId = productId;
+  const wrap = ensureProductReallocationModal();
+
+  document.getElementById('product-reallocation-title').textContent = `Reallocate "${product.name}"`;
+  document.getElementById('product-reallocation-subtitle').textContent = product.brand && product.brand !== 'Generic' ? product.brand : 'Product reallocation';
+
+  const group = getIngredientGroup(product.groupId);
+  const family = group ? getGroupIngredientFamily(group) : null;
+  const currentEl = document.getElementById('product-reallocation-current');
+  if(group){
+    currentEl.innerHTML = `<div style="font-size:12px;color:var(--text2)">Currently linked to: <strong>${ppEscapeHtml(family?.name || group.family)}</strong> &rarr; <span style="color:var(--green);font-weight:600">${ppEscapeHtml(getGroupTypeName(group))}</span></div>`;
+  } else {
+    currentEl.innerHTML = `<div style="font-size:12px;color:var(--text2)">Currently <strong>Standalone</strong> (not linked to any ingredient).</div>`;
+  }
+
+  // Populate categories
+  const catSelect = document.getElementById('product-reallocation-new-cat');
+  if(catSelect){
+    catSelect.innerHTML = Object.entries(CAT).map(([k, v]) => `<option value="${ppEscapeAttr(k)}" ${k === (product.cat || 'other') ? 'selected' : ''}>${ppEscapeHtml(v)}</option>`).join('');
+  }
+
+  // Clear new ingredient inputs
+  const famInput = document.getElementById('product-reallocation-new-family');
+  const typeInput = document.getElementById('product-reallocation-new-type');
+  if(famInput) famInput.value = family?.name || getProductFamily(product) || '';
+  if(typeInput) typeInput.value = group ? getGroupTypeName(group) : product.name;
+
+  // Render options list
+  const searchInput = document.getElementById('product-reallocation-search');
+  if(searchInput) searchInput.value = '';
+  filterReallocationOptions('');
+
+  // Delink button
+  const delinkRow = document.getElementById('product-reallocation-delink-row');
+  if(delinkRow){
+    if(group){
+      delinkRow.innerHTML = `<button type="button" class="btn sm danger ghost" onclick="confirmDelinkProduct('${ppEscapeHtml(product.id)}')">Delink product from ingredient (make standalone)</button>`;
+    } else {
+      delinkRow.innerHTML = '';
+    }
+  }
+
+  wrap.classList.add('open');
+  setTimeout(() => searchInput?.focus(), 50);
+}
+
+function closeProductReallocationModal(){
+  const wrap = document.getElementById('product-reallocation-wrap');
+  if(wrap) wrap.classList.remove('open');
+  activeReallocationProductId = null;
+}
+
+function filterReallocationOptions(query = ''){
+  const listEl = document.getElementById('product-reallocation-options');
+  if(!listEl) return;
+  ensureIngredientGroups();
+  const q = String(query || '').trim().toLowerCase();
+  const groups = (state.ingredientGroups || []).slice();
+
+  let filtered = groups;
+  if(q){
+    const variants = getSearchVariants(q);
+    filtered = groups.filter(g => {
+      const gName = (g.name || '').toLowerCase();
+      const gFam = (g.family || '').toLowerCase();
+      const gCat = (CAT[g.cat] || g.cat || '').toLowerCase();
+      const gAliases = (g.aliases || []).join(' ').toLowerCase();
+      return variants.some(v => gName.includes(v) || gFam.includes(v) || gCat.includes(v) || gAliases.includes(v));
+    });
+  }
+
+  filtered.sort((a,b) => (a.family||'').localeCompare(b.family||'') || (a.name||'').localeCompare(b.name||''));
+
+  if(!filtered.length){
+    listEl.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--text2)">No matching ingredient sub-types found. Use Option 2 below to invent a new one.</div>';
+    return;
+  }
+
+  listEl.innerHTML = filtered.slice(0, 35).map(g => {
+    const isCurrent = activeReallocationProductId && getProduct(activeReallocationProductId)?.groupId === g.id;
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);${isCurrent ? 'background:var(--surface2);' : ''}">
+        <div style="min-width:0">
+          <div style="font-size:12px;font-weight:600">${ppEscapeHtml(g.family || 'Ingredient')} &rarr; <span style="color:var(--green)">${ppEscapeHtml(getGroupTypeName(g))}</span></div>
+          <div style="font-size:10px;color:var(--text3)">${ppEscapeHtml(CAT[g.cat] || g.cat || 'Other')} · ${(g.productIds||[]).length} product${(g.productIds||[]).length===1?'':'s'}</div>
+        </div>
+        <div>
+          ${isCurrent 
+            ? '<span class="tag green" style="font-size:11px">Current</span>' 
+            : `<button type="button" class="btn sm primary" style="padding:3px 8px;font-size:11px" onclick="reallocateProductToExistingGroup('${ppEscapeHtml(activeReallocationProductId)}', '${ppEscapeHtml(g.id)}')">Allocate</button>`}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function reallocateProductToExistingGroup(productId, targetGroupId){
+  const product = getProduct(productId);
+  const targetGroup = getIngredientGroup(targetGroupId);
+  if(!product || !targetGroup) return;
+
+  const oldGroupId = product.groupId;
+  if(oldGroupId && oldGroupId !== targetGroup.id){
+    const oldGroup = getIngredientGroup(oldGroupId);
+    if(oldGroup && Array.isArray(oldGroup.productIds)){
+      oldGroup.productIds = oldGroup.productIds.filter(id => id !== product.id);
+    }
+    refreshAutoDefaultProductForGroup(oldGroupId);
+  }
+
+  ensureProductAssignedToGroup(product, targetGroup.name, targetGroup.id);
+  syncProductHierarchyCategory(product, targetGroup, product.cat);
+  refreshProductGroupAndRecipes(product.id);
+  refreshAutoDefaultProductForGroup(targetGroup.id);
+
+  saveState();
+  renderIngredientBank();
+  renderBank();
+  renderVault();
+
+  if(editIngId === product.id){
+    renderEditProductLinkage(product);
+  }
+
+  closeProductReallocationModal();
+  showToast(`"${product.name}" reallocated to ${getGroupTypeName(targetGroup)}.`);
+}
+
+function saveProductReallocationToNewIngredient(){
+  if(!activeReallocationProductId) return;
+  const product = getProduct(activeReallocationProductId);
+  if(!product) return;
+
+  const familyName = normaliseAliasText(document.getElementById('product-reallocation-new-family')?.value || '');
+  const typeName = normaliseAliasText(document.getElementById('product-reallocation-new-type')?.value || '');
+  const cat = document.getElementById('product-reallocation-new-cat')?.value || product.cat || 'other';
+
+  if(!familyName || !typeName){
+    return alert('Please enter both an ingredient name and sub-type name.');
+  }
+
+  const family = ensureIngredientFamilyByName(familyName, cat);
+  const group = {
+    id: 'grp' + Date.now() + Math.random().toString(36).slice(2,6),
+    name: toTitleCase(typeName),
+    cat: cat || family.cat || 'other',
+    family: family.name,
+    ingredientId: family.id,
+    aliases: [typeName],
+    defaultProductId: product.id,
+    productIds: [product.id],
+    notes: ''
+  };
+
+  if(!Array.isArray(family.typeIds)) family.typeIds = [];
+  family.typeIds.push(group.id);
+  if(!family.defaultTypeId) family.defaultTypeId = group.id;
+
+  syncIngredientGroupAliases(group, []);
+  state.ingredientGroups.push(group);
+
+  const oldGroupId = product.groupId;
+  if(oldGroupId && oldGroupId !== group.id){
+    const oldGroup = getIngredientGroup(oldGroupId);
+    if(oldGroup && Array.isArray(oldGroup.productIds)){
+      oldGroup.productIds = oldGroup.productIds.filter(id => id !== product.id);
+    }
+    refreshAutoDefaultProductForGroup(oldGroupId);
+  }
+
+  ensureProductAssignedToGroup(product, group.name, group.id);
+  syncProductHierarchyCategory(product, group, product.cat);
+  refreshProductGroupAndRecipes(product.id);
+  refreshAutoDefaultProductForGroup(group.id);
+
+  saveState();
+  renderIngredientBank();
+  renderBank();
+  renderVault();
+
+  if(editIngId === product.id){
+    renderEditProductLinkage(product);
+  }
+
+  closeProductReallocationModal();
+  showToast(`"${product.name}" allocated to new ingredient ${family.name} (${group.name}).`);
+}
+
+function confirmDelinkProduct(productId){
+  const product = getProduct(productId);
+  if(!product) return;
+  const group = getIngredientGroup(product.groupId);
+  const groupName = group ? getGroupTypeName(group) : 'ingredient';
+
+  if(!confirm(`Are you sure you want to delink "${product.name}" from ${groupName}?\n\nIt will become a standalone product not attached to any recipe ingredient.`)){
+    return;
+  }
+
+  const oldGroupId = product.groupId;
+  product.groupId = '';
+  if(oldGroupId){
+    const oldGroup = getIngredientGroup(oldGroupId);
+    if(oldGroup && Array.isArray(oldGroup.productIds)){
+      oldGroup.productIds = oldGroup.productIds.filter(id => id !== product.id);
+    }
+    refreshAutoDefaultProductForGroup(oldGroupId);
+  }
+
+  saveState();
+  renderIngredientBank();
+  renderBank();
+  renderVault();
+
+  if(editIngId === product.id){
+    renderEditProductLinkage(product);
+  }
+
+  closeProductReallocationModal();
+  showToast(`"${product.name}" delinked from ingredient.`);
 }
 
 let productBankGroupFilterId = null;
@@ -13178,6 +13621,7 @@ function editIng(id){
   const msgEl=document.getElementById('mi-msg');if(msgEl)msgEl.innerHTML='';
   updateServingConverterHint(ing);
   renderIngredientPackVariantsEditor(ing);
+  renderEditProductLinkage(ing);
 
   // Show as a centred overlay modal instead of scrolling to top of page
   const panel = document.getElementById('manual-ing-panel');
