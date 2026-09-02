@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.6.0';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v38';
+const PLATEPLAN_APP_VERSION='2.6.1';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v39';
 const SEED=[];
 
 let state = null;
@@ -2561,84 +2561,96 @@ function splitPastedMethodText(text){
   return normalised.split(/\n+/).map(l => cleanIngredientLinePrefix(l).trim()).filter(Boolean);
 }
 
+function escapeRegex(string){
+  return String(string || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+function ppEscapeRegex(string){
+  return escapeRegex(string);
+}
+
 function convertMethodQuantitiesToPercentages(steps, parsedIngs = []){
   if(!Array.isArray(steps)) return [];
-  const ings = (parsedIngs || []).map(ing => {
-    const rawName = (ing.name || ing.raw || '').toLowerCase().trim();
-    const baseName = rawName.replace(/\b(diced|chopped|sliced|grated|minced|crushed|peeled|firm|extra firm|fresh|dried|tinned|canned|organic|ground|whole|half|halved)\b/g, '').replace(/\s+/g, ' ').trim();
-    const grams = +ing.grams || (['g','ml'].includes(ing.unit) ? +ing.qty : 0);
-    const qty = +ing.qty || 0;
-    const unit = ing.unit || 'g';
-    return {
-      raw: ing.raw,
-      name: ing.name,
-      rawName,
-      baseName,
-      grams,
-      qty,
-      unit
-    };
-  }).filter(i => i.name && (i.grams > 0 || i.qty > 0));
+  try {
+    const ings = (parsedIngs || []).map(ing => {
+      const rawName = (ing.name || ing.raw || '').toLowerCase().trim();
+      const baseName = rawName.replace(/\b(diced|chopped|sliced|grated|minced|crushed|peeled|firm|extra firm|fresh|dried|tinned|canned|organic|ground|whole|half|halved)\b/g, '').replace(/\s+/g, ' ').trim();
+      const grams = +ing.grams || (['g','ml'].includes(ing.unit) ? +ing.qty : 0);
+      const qty = +ing.qty || 0;
+      const unit = ing.unit || 'g';
+      return {
+        raw: ing.raw,
+        name: ing.name,
+        rawName,
+        baseName,
+        grams,
+        qty,
+        unit
+      };
+    }).filter(i => i.name && (i.grams > 0 || i.qty > 0));
 
-  return steps.map(step => {
-    let text = String(step || '');
-    ings.forEach(ing => {
-      const searchTerms = [ing.name.toLowerCase(), ing.baseName].filter(t => t && t.length >= 3);
-      if(!searchTerms.length) return;
+    return steps.map(step => {
+      let text = String(step || '');
+      ings.forEach(ing => {
+        const searchTerms = [ing.name.toLowerCase(), ing.baseName].filter(t => t && t.length >= 3);
+        if(!searchTerms.length) return;
 
-      const hasIngMention = searchTerms.some(term => new RegExp(`\\b${escapeRegex(term)}\\b`, 'i').test(text));
-      if(!hasIngMention) return;
+        const hasIngMention = searchTerms.some(term => new RegExp(`\\b${escapeRegex(term)}\\b`, 'i').test(text));
+        if(!hasIngMention) return;
 
-      const termPattern = searchTerms.map(escapeRegex).join('|');
-      const qtyPattern = new RegExp(`(?<!\\b(?:at|to|heat to|gas mark|for|in|about)\\s+)(?:(\\d+(?:\\.\\d+)?)\\s*(g|kg|ml|l|tbsp|tsp|cups?|tins?|cans?|cloves?|slices?|pieces?)\\s+(?:of\\s+)?(?:the\\s+)?(${termPattern}))`, 'gi');
+        const termPattern = searchTerms.map(escapeRegex).join('|');
+        const qtyPattern = new RegExp(`(?<!\\b(?:at|to|heat to|gas mark|for|in|about)\\s+)(?:(\\d+(?:\\.\\d+)?)\\s*(g|kg|ml|l|tbsp|tsp|cups?|tins?|cans?|cloves?|slices?|pieces?)\\s+(?:of\\s+)?(?:the\\s+)?(${termPattern}))`, 'gi');
 
-      text = text.replace(qtyPattern, (match, amountStr, unitStr, ingMention) => {
-        const amount = parseFloat(amountStr);
-        let amountInGrams = amount;
-        const u = (unitStr || '').toLowerCase();
-        if(u === 'kg') amountInGrams = amount * 1000;
-        else if(u === 'l') amountInGrams = amount * 1000;
-        else if(u === 'tbsp') amountInGrams = amount * 15;
-        else if(u === 'tsp') amountInGrams = amount * 5;
+        text = text.replace(qtyPattern, (match, amountStr, unitStr, ingMention) => {
+          const amount = parseFloat(amountStr);
+          let amountInGrams = amount;
+          const u = (unitStr || '').toLowerCase();
+          if(u === 'kg') amountInGrams = amount * 1000;
+          else if(u === 'l') amountInGrams = amount * 1000;
+          else if(u === 'tbsp') amountInGrams = amount * 15;
+          else if(u === 'tsp') amountInGrams = amount * 5;
 
-        const totalGrams = ing.grams || toGrams(ing.qty, ing.unit);
+          const totalGrams = ing.grams || toGrams(ing.qty, ing.unit);
 
-        if(totalGrams > 0 && amountInGrams > 0){
-          const ratio = amountInGrams / totalGrams;
-          const pct = Math.round(ratio * 100);
+          if(totalGrams > 0 && amountInGrams > 0){
+            const ratio = amountInGrams / totalGrams;
+            const pct = Math.round(ratio * 100);
 
-          if(pct >= 95 && pct <= 105){
-            return `all (${pct}%) of the ${ingMention}`;
-          } else if(pct >= 45 && pct <= 55){
-            return `half (50%) of the ${ingMention}`;
-          } else if(pct >= 30 && pct <= 36){
-            return `one-third (${pct}%) of the ${ingMention}`;
-          } else if(pct >= 63 && pct <= 70){
-            return `two-thirds (${pct}%) of the ${ingMention}`;
-          } else if(pct >= 22 && pct <= 28){
-            return `one-quarter (25%) of the ${ingMention}`;
-          } else if(pct >= 72 && pct <= 78){
-            return `three-quarters (75%) of the ${ingMention}`;
-          } else {
-            return `${pct}% of the ${ingMention}`;
+            if(pct >= 95 && pct <= 105){
+              return `all (${pct}%) of the ${ingMention}`;
+            } else if(pct >= 45 && pct <= 55){
+              return `half (50%) of the ${ingMention}`;
+            } else if(pct >= 30 && pct <= 36){
+              return `one-third (${pct}%) of the ${ingMention}`;
+            } else if(pct >= 63 && pct <= 70){
+              return `two-thirds (${pct}%) of the ${ingMention}`;
+            } else if(pct >= 22 && pct <= 28){
+              return `one-quarter (25%) of the ${ingMention}`;
+            } else if(pct >= 72 && pct <= 78){
+              return `three-quarters (75%) of the ${ingMention}`;
+            } else {
+              return `${pct}% of the ${ingMention}`;
+            }
+          } else if(ing.qty > 0){
+            const ratio = amount / ing.qty;
+            const pct = Math.round(ratio * 100);
+            if(pct >= 95 && pct <= 105){
+              return `all (${pct}%) of the ${ingMention}`;
+            } else if(pct >= 45 && pct <= 55){
+              return `half (50%) of the ${ingMention}`;
+            } else {
+              return `${pct}% of the ${ingMention}`;
+            }
           }
-        } else if(ing.qty > 0){
-          const ratio = amount / ing.qty;
-          const pct = Math.round(ratio * 100);
-          if(pct >= 95 && pct <= 105){
-            return `all (${pct}%) of the ${ingMention}`;
-          } else if(pct >= 45 && pct <= 55){
-            return `half (50%) of the ${ingMention}`;
-          } else {
-            return `${pct}% of the ${ingMention}`;
-          }
-        }
-        return match;
+          return match;
+        });
       });
-    });
 
-    return text;
-  });
+      return text;
+    });
+  } catch(e) {
+    console.warn('Error converting method quantities to percentages:', e);
+    return steps;
+  }
 }
 
 function detectStockIngredient(raw){
@@ -6560,24 +6572,40 @@ async function recogniseRecipePhotosLocally(){
 }
 
 function parsePastedRecipeText(raw){
-  const lines=String(raw||'').replace(/\r/g,'').split('\n').map(line=>line.trim()).filter(Boolean);
-  const ingredientHeader=lines.findIndex(line=>/^ingredients?\b/i.test(line));
-  const methodHeader=lines.findIndex(line=>/^(method|instructions?|directions?)\b/i.test(line));
-  const titleEnd=[ingredientHeader,methodHeader].filter(index=>index>=0).sort((a,b)=>a-b)[0]??1;
-  const name=(lines.slice(0,titleEnd).find(line=>!/^serves?|prep|cook|total/i.test(line))||lines[0]||'').replace(/^recipe\s*:?\s*/i,'');
-  let ingredients=[],method=[];
-  if(ingredientHeader>=0){const end=methodHeader>ingredientHeader?methodHeader:lines.length;ingredients=lines.slice(ingredientHeader+1,end);}
-  if(methodHeader>=0) method=lines.slice(methodHeader+1);
-  if(!ingredients.length||!method.length){
-    const looksIngredient=line=>/^(?:[-•]\s*)?(?:\d|½|¼|¾|one |two |a )/i.test(line)&&/\b(g|kg|ml|l|tsp|tbsp|cup|tin|can|bunch|clove|slice|handful|pinch|x)\b/i.test(line);
-    if(!ingredients.length) ingredients=lines.filter(looksIngredient);
-    if(!method.length) method=lines.filter(line=>line!==name&&!ingredients.includes(line)&&!/^(ingredients?|method|instructions?|directions?)\b/i.test(line));
+  try {
+    const lines=String(raw||'').replace(/\r/g,'').split('\n').map(line=>line.trim()).filter(Boolean);
+    if(!lines.length){
+      return normaliseRecognisedRecipe({name:'',servings:null,timeMinutes:null,ingredients:[],method:[],warnings:[],rawText:''});
+    }
+    const ingredientHeader=lines.findIndex(line=>/^ingredients?\b/i.test(line));
+    const methodHeader=lines.findIndex(line=>/^(method|instructions?|directions?|steps?)\b/i.test(line));
+    const titleEnd=[ingredientHeader,methodHeader].filter(index=>index>=0).sort((a,b)=>a-b)[0]??1;
+    const name=(lines.slice(0,titleEnd).find(line=>!/^serves?|prep|cook|total/i.test(line))||lines[0]||'').replace(/^recipe\s*:?\s*/i,'');
+    let ingredients=[],method=[];
+    if(ingredientHeader>=0){const end=methodHeader>ingredientHeader?methodHeader:lines.length;ingredients=lines.slice(ingredientHeader+1,end);}
+    if(methodHeader>=0) method=lines.slice(methodHeader+1);
+    if(!ingredients.length||!method.length){
+      const looksIngredient=line=>/^(?:[-•*]\s*)?(?:\d|½|¼|¾|one |two |a )/i.test(line)&&/\b(g|kg|ml|l|tsp|tbsp|cup|tin|can|bunch|clove|slice|handful|pinch|x|pack|block)\b/i.test(line);
+      if(!ingredients.length) ingredients=lines.filter(looksIngredient);
+      if(!method.length) method=lines.filter(line=>line!==name&&!ingredients.includes(line)&&!/^(ingredients?|method|instructions?|directions?|steps?)\b/i.test(line));
+    }
+    const serves=+(String(raw).match(/serves?\s*[:\-]?\s*(\d+)/i)||[])[1]||null;
+    const time=+(String(raw).match(/(?:prep|cook|total)\s*time\s*[:\-]?\s*(\d+)\s*(?:min|minutes?)/i)||[])[1]||null;
+    const parsedIngs = ingredients.map(parseIngredientLine).filter(Boolean);
+    const convertedMethod = convertMethodQuantitiesToPercentages(method, parsedIngs);
+    return normaliseRecognisedRecipe({name,servings:serves,timeMinutes:time,ingredients,method:convertedMethod.length?convertedMethod:method,warnings:[],rawText:String(raw||'')});
+  } catch(err) {
+    console.warn('parsePastedRecipeText error fallback:', err);
+    return normaliseRecognisedRecipe({
+      name: 'Pasted Recipe',
+      servings: 2,
+      timeMinutes: 30,
+      ingredients: String(raw||'').split('\n').filter(Boolean),
+      method: [],
+      warnings: ['Could not automatically structure all sections; please review fields.'],
+      rawText: String(raw||'')
+    });
   }
-  const serves=+(String(raw).match(/serves?\s*[:\-]?\s*(\d+)/i)||[])[1]||null;
-  const time=+(String(raw).match(/(?:prep|cook|total)\s*time\s*[:\-]?\s*(\d+)\s*(?:min|minutes?)/i)||[])[1]||null;
-  const parsedIngs = ingredients.map(parseIngredientLine).filter(Boolean);
-  const convertedMethod = convertMethodQuantitiesToPercentages(method, parsedIngs);
-  return normaliseRecognisedRecipe({name,servings:serves,timeMinutes:time,ingredients,method:convertedMethod.length?convertedMethod:method,warnings:[],rawText:String(raw||'')});
 }
 
 function normaliseRecognisedRecipe(value){
@@ -6589,7 +6617,20 @@ function openRecipeTextPaste(){
   wrap.querySelector('.modal').innerHTML=`<div class="row-between" style="align-items:center;margin-bottom:10px"><h3 style="margin:0">Paste extracted recipe text</h3><button class="btn sm ghost" onclick="closeRecipeRecognitionModal()">Close</button></div><p style="font-size:12px;color:var(--text2);margin-bottom:10px">Copy text using Apple Live Text or Google Lens, then paste it below. PlatePlan will structure it for review.</p><textarea id="recipe-paste-text" style="min-height:45dvh" placeholder="Recipe name&#10;&#10;Ingredients&#10;...&#10;&#10;Method&#10;..."></textarea><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="reviewPastedRecipeText()">Review text</button><button class="btn ghost" onclick="closeRecipeRecognitionModal()">Cancel</button></div>`;
   wrap.classList.add('open');setTimeout(()=>document.getElementById('recipe-paste-text')?.focus(),0);
 }
-function reviewPastedRecipeText(){const text=document.getElementById('recipe-paste-text')?.value||'';if(!text.trim())return;openRecipeRecognitionReview(parsePastedRecipeText(text),'Pasted text');}
+function reviewPastedRecipeText(){
+  try {
+    const text=(document.getElementById('recipe-paste-text')?.value||'').trim();
+    if(!text){
+      showToast('Please paste some recipe text first.');
+      return;
+    }
+    const parsed = parsePastedRecipeText(text);
+    openRecipeRecognitionReview(parsed, 'Pasted text');
+  } catch(err) {
+    console.error('Error reviewing pasted recipe text:', err);
+    alert('An error occurred while reviewing text: ' + (err?.message || err));
+  }
+}
 
 function ensureRecipeRecognitionModal(){
   let wrap=document.getElementById('recipe-recognition-wrap');if(wrap)return wrap;
