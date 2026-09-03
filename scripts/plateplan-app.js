@@ -90,7 +90,7 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.6.6';
+const PLATEPLAN_APP_VERSION='2.6.7';
 const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v42';
 const SEED=[];
 
@@ -747,9 +747,9 @@ function platePlanCloudRef(key){
 
 let platePlanCurrentPushPromise = null;
 
-function persistPlatePlanDataQualityFix(reason = 'Data quality update'){
+async function persistPlatePlanDataQualityFix(reason = 'Data quality update'){
   saveState(true);
-  pushStateToCloud(true);
+  return await pushStateToCloud(true);
 }
 
 async function pushStateToCloud(force=false){
@@ -7296,40 +7296,48 @@ function openRecipeRecognitionReview(recipe,label){
 
 function openRecipeTextPaste(){
   const wrap=ensureRecipeRecognitionModal();
-  wrap.querySelector('.modal').innerHTML=`<div class="row-between" style="align-items:center;margin-bottom:10px"><h3 style="margin:0">Paste extracted recipe text</h3><button class="btn sm ghost" onclick="closeRecipeRecognitionModal()">Close</button></div><p style="font-size:12px;color:var(--text2);margin-bottom:10px">Copy text using Apple Live Text or Google Lens, then paste it below. PlatePlan will structure it for review.</p><textarea id="recipe-paste-text" style="min-height:45dvh" placeholder="Recipe name&#10;&#10;Number of Servings: 4&#10;Prep time: 15 mins&#10;&#10;Ingredients&#10;...&#10;&#10;Method&#10;..."></textarea><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="reviewPastedRecipeText()">Review recipe</button><button class="btn ghost" onclick="applyPastedRecipeDirectlyFromModal()">Use directly in Add Recipe</button><button class="btn ghost" onclick="closeRecipeRecognitionModal()">Cancel</button></div>`;
+  wrap.querySelector('.modal').innerHTML=`<div class="row-between" style="align-items:center;margin-bottom:10px"><h3 style="margin:0">Paste extracted recipe text</h3><button class="btn sm ghost" onclick="cancelRecipeTextPaste()">Close</button></div><p style="font-size:12px;color:var(--text2);margin-bottom:10px">Copy text using Apple Live Text or Google Lens, then paste it below. PlatePlan will structure it for review.</p><textarea id="recipe-paste-text" style="min-height:45dvh" placeholder="Recipe name&#10;&#10;Number of Servings: 4&#10;Prep time: 15 mins&#10;&#10;Ingredients&#10;...&#10;&#10;Method&#10;..."></textarea><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="applyPastedRecipeDirectlyFromModal()">Use directly in Add Recipe</button><button class="btn ghost" onclick="cancelRecipeTextPaste()">Cancel</button></div>`;
   wrap.classList.add('open');setTimeout(()=>document.getElementById('recipe-paste-text')?.focus(),0);
+}
+
+function cancelRecipeTextPaste(){
+  const ta = document.getElementById('recipe-paste-text');
+  if(ta) ta.value = '';
+  closeRecipeRecognitionModal();
 }
 
 function reviewPastedRecipeText(){
   try {
     const text=(document.getElementById('recipe-paste-text')?.value||'').trim();
     if(!text){
-      if(typeof showPlatePlanToast === 'function') showPlatePlanToast('Please paste some recipe text first.');
-      else if(typeof showToast === 'function') showToast('Please paste some recipe text first.');
+      if(typeof showPlatePlanToast === 'function') showPlatePlanToast('Please paste some recipe text first.', 'error');
+      else if(typeof showToast === 'function') showToast('Please paste some recipe text first.', 'error');
       return;
     }
     const parsed = parsePastedRecipeText(text);
     openRecipeRecognitionReview(parsed, 'Pasted text · review recipe');
   } catch(err) {
     console.error('Error reviewing pasted recipe text:', err);
-    if(typeof showPlatePlanToast === 'function') showPlatePlanToast('An error occurred while parsing recipe text: ' + (err?.message || err));
+    if(typeof showPlatePlanToast === 'function') showPlatePlanToast('An error occurred while parsing recipe text: ' + (err?.message || err), 'error');
     else alert('An error occurred while parsing text: ' + (err?.message || err));
   }
 }
 
 function applyPastedRecipeDirectlyFromModal(){
   try {
-    const text=(document.getElementById('recipe-paste-text')?.value||'').trim();
+    const textEl = document.getElementById('recipe-paste-text');
+    const text = (textEl?.value || '').trim();
     if(!text){
-      if(typeof showPlatePlanToast === 'function') showPlatePlanToast('Please paste some recipe text first.');
-      else if(typeof showToast === 'function') showToast('Please paste some recipe text first.');
+      if(typeof showPlatePlanToast === 'function') showPlatePlanToast('Please paste some recipe text first.', 'error');
+      else if(typeof showToast === 'function') showToast('Please paste some recipe text first.', 'error');
+      textEl?.focus();
       return;
     }
     const parsed = parsePastedRecipeText(text);
     applyRecognisedRecipeDirectlyToForm(parsed);
   } catch(err) {
     console.error('Error applying pasted recipe text:', err);
-    if(typeof showPlatePlanToast === 'function') showPlatePlanToast('An error occurred: ' + (err?.message || err));
+    if(typeof showPlatePlanToast === 'function') showPlatePlanToast('An error occurred: ' + (err?.message || err), 'error');
   }
 }
 
@@ -14563,7 +14571,7 @@ function closeAppPromptModal(confirmed=false){
   if(!confirmed&&typeof cancel==='function')cancel();
 }
 
-function saveManualIng(categoryReady=false){
+async function saveManualIng(categoryReady=false){
   const name=document.getElementById('mi-name').value.trim();
   if(!name)return showMsg('mi-msg','Please enter a name.','error');
   if(!categoryReady)return resolveCategoryBeforeProductSave('mi-cat',()=>saveManualIng(true));
@@ -14601,6 +14609,7 @@ function saveManualIng(categoryReady=false){
     const i=state.ingredients.findIndex(x=>x.id===editIngId);
     if(i>-1)state.ingredients[i]=ing;
   }else state.ingredients.push(ing);
+  rebuildPlatePlanIndexes();
   if(ing.groupId && getIngredientGroup(ing.groupId)) {
     const grp = getIngredientGroup(ing.groupId);
     if(grp) grp.updatedAt = nowIso;
@@ -14616,7 +14625,7 @@ function saveManualIng(categoryReady=false){
   }
   refreshProductGroupAndRecipes(ing.id);
   
-  saveState(true);
+  await persistPlatePlanDataQualityFix('Product update');
   if(handlePendingRecipeNutritionAfterSave(ing.id)){
     refreshAfterIngredientEdit(ing.id);
     return;
