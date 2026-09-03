@@ -1,6 +1,6 @@
-const PLATEPLAN_CACHE = 'plateplan-shell-v40';
-const PLATEPLAN_APP_VERSION = '2.6.4';
-const PLATEPLAN_BUILD_ID = '2.6.4-v40';
+const PLATEPLAN_CACHE = 'plateplan-shell-v41';
+const PLATEPLAN_APP_VERSION = '2.6.5';
+const PLATEPLAN_BUILD_ID = '2.6.5-v41';
 const PLATEPLAN_LOCAL_SHELL = [
   './',
   './PlatePlan.html',

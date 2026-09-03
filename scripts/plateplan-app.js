@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.6.4';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v40';
+const PLATEPLAN_APP_VERSION='2.6.5';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v41';
 const SEED=[];
 
 let state = null;
@@ -629,6 +629,27 @@ let platePlanLastSyncError=null;
 let platePlanLastSyncedAt=null;
 let platePlanIsPushing=false;
 let platePlanPendingPush=false;
+let platePlanSyncErrorCount=0;
+let platePlanBackoffUntil=0;
+let platePlanLastPushCompletedAt=0;
+let platePlanLegacyStateDeleted=false;
+let platePlanLastPushedSignatures={
+  meta:'',
+  recipes:'',
+  products:'',
+  taxonomy:'',
+  planner:'',
+  history:''
+};
+
+function computePayloadSignature(obj){
+  if(!obj || typeof obj !== 'object') return '';
+  try {
+    return JSON.stringify(obj);
+  } catch(e){
+    return String(Date.now());
+  }
+}
 
 function capturePlatePlanEditBaseline(key){
   return true;
@@ -708,6 +729,22 @@ async function pushStateToCloud(force=false){
     updatePlatePlanSyncStatus('offline','Offline · changes saved locally');
     return;
   }
+
+  // 1. Exponential backoff guard to prevent overloading backend during errors
+  const now = Date.now();
+  if(!force && now < platePlanBackoffUntil){
+    schedulePlatePlanCloudDiff(platePlanBackoffUntil - now + 500);
+    return;
+  }
+
+  // 2. Minimum push interval (throttle) to protect Firestore write streams
+  const PUSH_THROTTLE_MS = 1500;
+  if(!force && (now - platePlanLastPushCompletedAt) < PUSH_THROTTLE_MS){
+    schedulePlatePlanCloudDiff(PUSH_THROTTLE_MS - (now - platePlanLastPushCompletedAt));
+    return;
+  }
+
+  // 3. Concurrency lock
   if(platePlanIsPushing){
     platePlanPendingPush=true;
     return;
@@ -723,20 +760,8 @@ async function pushStateToCloud(force=false){
     const cleaned=cleanCloudValue(state);
     if(!cleaned) throw new Error('State payload is empty');
 
-    const deviceId=getPlatePlanDeviceId();
-    const userEmail=platePlanCloudUser.email||platePlanCloudUser.uid||'';
-    const nowIso=new Date().toISOString();
-    const serverTs=firebase.firestore.FieldValue.serverTimestamp();
-
-    const baseMeta={
-      updatedAt: serverTs,
-      clientTimestamp: nowIso,
-      updatedBy: userEmail,
-      deviceId: deviceId
-    };
-
-    const metaPayload={
-      ...baseMeta,
+    // Document contents for dirty-checking
+    const metaContent = {
       schemaVersion: PLATEPLAN_SCHEMA_VERSION,
       appVersion: PLATEPLAN_APP_VERSION,
       prefs: cleaned.prefs || {},
@@ -750,57 +775,99 @@ async function pushStateToCloud(force=false){
       meta: cleaned.meta || {}
     };
 
-    const recipesPayload={
-      ...baseMeta,
+    const recipesContent = {
       recipes: cleaned.recipes || []
     };
 
-    const productsPayload={
-      ...baseMeta,
+    const productsContent = {
       ingredients: cleaned.ingredients || []
     };
 
-    const taxonomyPayload={
-      ...baseMeta,
+    const taxonomyContent = {
       ingredientGroups: cleaned.ingredientGroups || [],
       ingredientFamilies: cleaned.ingredientFamilies || []
     };
 
-    const plannerPayload={
-      ...baseMeta,
+    const plannerContent = {
       plan: cleaned.plan || {},
       overrides: cleaned.overrides || {}
     };
 
-    const historyPayload={
-      ...baseMeta,
+    const historyContent = {
       planHistory: cleaned.planHistory || []
     };
 
+    const sigs = {
+      meta: computePayloadSignature(metaContent),
+      recipes: computePayloadSignature(recipesContent),
+      products: computePayloadSignature(productsContent),
+      taxonomy: computePayloadSignature(taxonomyContent),
+      planner: computePayloadSignature(plannerContent),
+      history: computePayloadSignature(historyContent)
+    };
+
+    // Determine which documents actually modified their content
+    const changedKeys = Object.keys(sigs).filter(k => force || sigs[k] !== platePlanLastPushedSignatures[k]);
+
+    if(changedKeys.length === 0){
+      // Nothing changed: completely skip Firestore write batch to avoid exhausting stream queue
+      platePlanLastPushCompletedAt=Date.now();
+      platePlanLastSyncError=null;
+      platePlanLastSyncedAt=Date.now();
+      updatePlatePlanSyncStatus('synced');
+      return;
+    }
+
+    const deviceId=getPlatePlanDeviceId();
+    const userEmail=platePlanCloudUser.email||platePlanCloudUser.uid||'';
+    const nowIso=new Date().toISOString();
+    const serverTs=firebase.firestore.FieldValue.serverTimestamp();
+
+    const baseMeta={
+      updatedAt: serverTs,
+      clientTimestamp: nowIso,
+      updatedBy: userEmail,
+      deviceId: deviceId
+    };
+
     const batch = platePlanDb.batch();
-    batch.set(dataCol.doc('meta'), metaPayload);
-    batch.set(dataCol.doc('recipes'), recipesPayload);
-    batch.set(dataCol.doc('products'), productsPayload);
-    batch.set(dataCol.doc('taxonomy'), taxonomyPayload);
-    batch.set(dataCol.doc('planner'), plannerPayload);
-    batch.set(dataCol.doc('history'), historyPayload);
+    if(changedKeys.includes('meta')) batch.set(dataCol.doc('meta'), { ...baseMeta, ...metaContent });
+    if(changedKeys.includes('recipes')) batch.set(dataCol.doc('recipes'), { ...baseMeta, ...recipesContent });
+    if(changedKeys.includes('products')) batch.set(dataCol.doc('products'), { ...baseMeta, ...productsContent });
+    if(changedKeys.includes('taxonomy')) batch.set(dataCol.doc('taxonomy'), { ...baseMeta, ...taxonomyContent });
+    if(changedKeys.includes('planner')) batch.set(dataCol.doc('planner'), { ...baseMeta, ...plannerContent });
+    if(changedKeys.includes('history')) batch.set(dataCol.doc('history'), { ...baseMeta, ...historyContent });
 
     await batch.commit();
 
-    // Clean up oversized monolithic legacy state doc if present
-    dataCol.doc('state').delete().catch(()=>{});
+    // Store verified pushed signatures
+    changedKeys.forEach(k => { platePlanLastPushedSignatures[k] = sigs[k]; });
 
+    // Clean up oversized monolithic legacy state doc at most once
+    if(!platePlanLegacyStateDeleted){
+      platePlanLegacyStateDeleted=true;
+      dataCol.doc('state').delete().catch(()=>{});
+    }
+
+    platePlanSyncErrorCount=0;
+    platePlanBackoffUntil=0;
+    platePlanLastPushCompletedAt=Date.now();
     platePlanLastSyncError=null;
     platePlanLastSyncedAt=Date.now();
     updatePlatePlanSyncStatus('synced');
   }catch(error){
     console.warn('PlatePlan Cloud push failed:',error);
+    platePlanSyncErrorCount++;
+    // Exponential backoff to protect backend: 3s, 6s, 12s, 24s, up to 60s
+    const backoffMs = Math.min(60000, Math.pow(2, platePlanSyncErrorCount) * 1500);
+    platePlanBackoffUntil = Date.now() + backoffMs;
     platePlanLastSyncError=error?.message||'Cloud push failed';
     updatePlatePlanSyncStatus(navigator.onLine?'error':'offline',platePlanLastSyncError);
   }finally{
     platePlanIsPushing=false;
     if(platePlanPendingPush){
-      pushStateToCloud();
+      // Queue next push with safety delay instead of synchronous recursion
+      schedulePlatePlanCloudDiff(1500);
     }
   }
 }
@@ -811,11 +878,11 @@ function queuePlatePlanCloudDiff(immediateFlush=false){
     clearTimeout(platePlanSyncTimer);
     pushStateToCloud();
   }else{
-    schedulePlatePlanCloudDiff(350);
+    schedulePlatePlanCloudDiff(800);
   }
 }
 
-function schedulePlatePlanCloudDiff(delay=350){
+function schedulePlatePlanCloudDiff(delay=800){
   clearTimeout(platePlanSyncTimer);
   platePlanSyncTimer=setTimeout(()=>{
     pushStateToCloud();
@@ -826,7 +893,7 @@ function flushPlatePlanSyncOutbox(){
   pushStateToCloud();
 }
 
-function saveState(immediate=true){
+function saveState(immediate=false){
   window.dispatchEvent(new CustomEvent('plateplan:state-saved',{detail:{source:'legacy',savedAt:Date.now()}}));
   try{
     if(state) state.updatedAt=new Date().toISOString();
@@ -843,7 +910,7 @@ function saveState(immediate=true){
       clearTimeout(platePlanSyncTimer);
       pushStateToCloud();
     }else{
-      schedulePlatePlanCloudDiff(350);
+      schedulePlatePlanCloudDiff(800);
     }
   }else if(!platePlanCloudUser){
     updatePlatePlanSyncStatus('local');
@@ -1025,7 +1092,7 @@ function reconcilePlatePlanState(local, remote) {
         const remoteScore = getProductCompleteness(ri);
         const merged = mergeProductPreservingValidData(li, ri, remoteScore > localScore);
         mergedIngsMap.set(li.id, merged);
-        if (localScore > remoteScore || JSON.stringify(li) !== JSON.stringify(ri)) {
+        if (localScore > remoteScore) {
           hasLocalNewer = true;
         }
       }
@@ -1071,7 +1138,9 @@ function reconcilePlatePlanState(local, remote) {
       } else {
         const mergedGroup = mergeGroupsPreservingLinks(lg, rg, false);
         mergedGroupsMap.set(lg.id, mergedGroup);
-        if (JSON.stringify(lg) !== JSON.stringify(rg)) hasLocalNewer = true;
+        if ((lg.ingredientId && !rg.ingredientId) || (lg.productIds || []).length > (rg.productIds || []).length || (lg.aliases || []).length > (rg.aliases || []).length) {
+          hasLocalNewer = true;
+        }
       }
     }
   });
@@ -1111,7 +1180,9 @@ function reconcilePlatePlanState(local, remote) {
       } else {
         const mergedFamily = mergeFamiliesPreservingTypes(lf, rf, false);
         mergedFamiliesMap.set(lf.id, mergedFamily);
-        if (JSON.stringify(lf) !== JSON.stringify(rf)) hasLocalNewer = true;
+        if ((lf.typeIds || []).length > (rf.typeIds || []).length || (lf.aliases || []).length > (rf.aliases || []).length) {
+          hasLocalNewer = true;
+        }
       }
     }
   });
@@ -1198,7 +1269,7 @@ function applyRemoteCloudState(remoteState,metadata={}){
     updatePlatePlanSyncStatus('synced',who);
 
     if(hasLocalNewer && platePlanCloudReady && platePlanCloudUser){
-      setTimeout(() => pushStateToCloud(true), 100);
+      schedulePlatePlanCloudDiff(3000);
     }
   }catch(error){
     console.warn('Failed to apply remote cloud state:',error);
@@ -1227,7 +1298,7 @@ function applyPlatePlanProjectionRecord(key,value,{remote=true}={}){
       } else {
         // Keep local item and push if online
         if(platePlanCloudReady && platePlanCloudUser){
-          setTimeout(() => pushStateToCloud(true), 100);
+          schedulePlatePlanCloudDiff(3000);
         }
       }
     } else {
@@ -1307,18 +1378,39 @@ function startPlatePlanCloudListeners(){
   const unsubscribe=dataCol.onSnapshot(snapshot=>{
     if(!snapshot || snapshot.empty) return;
 
+    // 1. Ignore local writes that have not yet been committed to the server
+    if(snapshot.metadata && snapshot.metadata.hasPendingWrites){
+      return;
+    }
+
+    const currentDeviceId = getPlatePlanDeviceId();
+    const docChanges = typeof snapshot.docChanges === 'function' ? snapshot.docChanges() : [];
+
     let hasRemoteChange = false;
     let lastUpdatedBy = '';
     const docs = {};
 
     snapshot.forEach(doc => {
-      const data = doc.data() || {};
-      docs[doc.id] = data;
-      if(data.deviceId && data.deviceId !== getPlatePlanDeviceId()){
-        hasRemoteChange = true;
-        if(data.updatedBy) lastUpdatedBy = data.updatedBy;
-      }
+      docs[doc.id] = doc.data() || {};
     });
+
+    if(docChanges.length > 0){
+      for(const change of docChanges){
+        const data = change.doc.data() || {};
+        if(data.deviceId && data.deviceId !== currentDeviceId){
+          hasRemoteChange = true;
+          if(data.updatedBy) lastUpdatedBy = data.updatedBy;
+        }
+      }
+    } else {
+      snapshot.forEach(doc => {
+        const data = doc.data() || {};
+        if(data.deviceId && data.deviceId !== currentDeviceId){
+          hasRemoteChange = true;
+          if(data.updatedBy) lastUpdatedBy = data.updatedBy;
+        }
+      });
+    }
 
     // Avoid self-echo overwrite
     if(!hasRemoteChange){
