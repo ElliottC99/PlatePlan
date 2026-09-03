@@ -90,7 +90,7 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.6.3';
+const PLATEPLAN_APP_VERSION='2.6.4';
 const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v40';
 const SEED=[];
 
@@ -123,6 +123,7 @@ const URL_TYPES=['tiktok','website','youtube','instagram'];
 let recipePhotoFiles=[];
 let recipePhotoObjectUrls=[];
 let platePlanAiModules=null;
+let platePlanPreserveAddForm=false;
 const SLOTS=[
   {key:'breakfastE',short:'Brekkie E',color:'var(--green)',cls:'badge-green'},
   {key:'breakfastC',short:'Brekkie C',color:'var(--green)',cls:'badge-green'},
@@ -963,6 +964,36 @@ function reconcilePlatePlanState(local, remote) {
 
   const mergedRecipes = Array.from(mergedRecipesMap.values());
 
+  // Helper: preserve valid data fields when merging two product versions
+  const mergeProductPreservingValidData = (lp, rp, preferRemote = false) => {
+    const primary = preferRemote ? rp : lp;
+    const fallback = preferRemote ? lp : rp;
+    const merged = { ...fallback, ...primary };
+    // Guard critical fields: never allow an invalid or missing value to clobber a valid value
+    if (!(+(primary.price) > 0) && +(fallback.price) > 0) merged.price = fallback.price;
+    if (!(+(primary.packSize) > 0) && +(fallback.packSize) > 0) {
+      merged.packSize = fallback.packSize;
+      merged.packUnit = fallback.packUnit || merged.packUnit;
+    }
+    if (!primary.storage && fallback.storage) merged.storage = fallback.storage;
+    if (!primary.groupId && fallback.groupId) merged.groupId = fallback.groupId;
+    if (!(+(primary.cal) > 0 || +(primary.prot) > 0) && (+(fallback.cal) > 0 || +(fallback.prot) > 0)) {
+      merged.cal = fallback.cal;
+      merged.fat = fallback.fat;
+      merged.carb = fallback.carb;
+      merged.fibre = fallback.fibre;
+      merged.prot = fallback.prot;
+    }
+    if (!(+(primary.itemWeight) > 0) && +(fallback.itemWeight) > 0) {
+      merged.itemWeight = fallback.itemWeight;
+      merged.itemWeightUnit = fallback.itemWeightUnit || merged.itemWeightUnit;
+    }
+    if ((!primary.cat || primary.cat === 'other') && fallback.cat && fallback.cat !== 'other') {
+      merged.cat = fallback.cat;
+    }
+    return merged;
+  };
+
   // 2. Ingredients / Products reconciliation
   const localIngs = Array.isArray(local.ingredients) ? local.ingredients : [];
   const remoteIngs = Array.isArray(remote.ingredients) ? remote.ingredients : [];
@@ -978,25 +1009,24 @@ function reconcilePlatePlanState(local, remote) {
       const localTime = li.updatedAt ? new Date(li.updatedAt).getTime() : 0;
       const remoteTime = ri.updatedAt ? new Date(ri.updatedAt).getTime() : 0;
       if (localTime > remoteTime) {
-        mergedIngsMap.set(li.id, li);
+        // Local is strictly newer; preserve any extra remote info if local omitted it
+        mergedIngsMap.set(li.id, mergeProductPreservingValidData(li, ri, false));
         hasLocalNewer = true;
       } else if (remoteTime > localTime) {
         // Remote is newer, but preserve non-empty local fields if remote dropped them
-        const mergedProduct = { ...li, ...ri };
+        const mergedProduct = mergeProductPreservingValidData(li, ri, true);
         mergedIngsMap.set(li.id, mergedProduct);
+        if (getProductCompleteness(li) > getProductCompleteness(ri)) {
+          hasLocalNewer = true;
+        }
       } else {
         // Timestamps equal or both absent: check data completeness to prevent losing local fixes
         const localScore = getProductCompleteness(li);
         const remoteScore = getProductCompleteness(ri);
-        if (localScore >= remoteScore) {
-          const merged = { ...ri, ...li };
-          mergedIngsMap.set(li.id, merged);
-          if (localScore > remoteScore || JSON.stringify(li) !== JSON.stringify(ri)) {
-            hasLocalNewer = true;
-          }
-        } else {
-          const merged = { ...li, ...ri };
-          mergedIngsMap.set(li.id, merged);
+        const merged = mergeProductPreservingValidData(li, ri, remoteScore > localScore);
+        mergedIngsMap.set(li.id, merged);
+        if (localScore > remoteScore || JSON.stringify(li) !== JSON.stringify(ri)) {
+          hasLocalNewer = true;
         }
       }
     }
@@ -1004,6 +1034,21 @@ function reconcilePlatePlanState(local, remote) {
   const mergedIngs = Array.from(mergedIngsMap.values());
 
   // 3. Ingredient Groups and Families
+  const mergeGroupsPreservingLinks = (lg, rg, preferRemote = false) => {
+    const primary = preferRemote ? rg : lg;
+    const fallback = preferRemote ? lg : rg;
+    return {
+      ...fallback,
+      ...primary,
+      ingredientId: primary.ingredientId || fallback.ingredientId || '',
+      family: primary.family || fallback.family || '',
+      cat: (primary.cat && primary.cat !== 'other') ? primary.cat : (fallback.cat || primary.cat || 'other'),
+      defaultProductId: primary.defaultProductId || fallback.defaultProductId || '',
+      productIds: Array.from(new Set([...(rg.productIds || []), ...(lg.productIds || [])])),
+      aliases: Array.from(new Set([...(rg.aliases || []), ...(lg.aliases || [])]))
+    };
+  };
+
   const localGroups = Array.isArray(local.ingredientGroups) ? local.ingredientGroups : [];
   const remoteGroups = Array.isArray(remote.ingredientGroups) ? remote.ingredientGroups : [];
   const mergedGroupsMap = new Map();
@@ -1018,22 +1063,31 @@ function reconcilePlatePlanState(local, remote) {
       const localTime = lg.updatedAt ? new Date(lg.updatedAt).getTime() : 0;
       const remoteTime = rg.updatedAt ? new Date(rg.updatedAt).getTime() : 0;
       if (localTime > remoteTime) {
-        mergedGroupsMap.set(lg.id, lg);
+        mergedGroupsMap.set(lg.id, mergeGroupsPreservingLinks(lg, rg, false));
         hasLocalNewer = true;
       } else if (remoteTime > localTime) {
-        mergedGroupsMap.set(lg.id, rg);
+        mergedGroupsMap.set(lg.id, mergeGroupsPreservingLinks(lg, rg, true));
+        if (lg.ingredientId && !rg.ingredientId) hasLocalNewer = true;
       } else {
-        const mergedGroup = {
-          ...rg,
-          ...lg,
-          productIds: Array.from(new Set([...(rg.productIds || []), ...(lg.productIds || [])])),
-          aliases: Array.from(new Set([...(rg.aliases || []), ...(lg.aliases || [])]))
-        };
+        const mergedGroup = mergeGroupsPreservingLinks(lg, rg, false);
         mergedGroupsMap.set(lg.id, mergedGroup);
         if (JSON.stringify(lg) !== JSON.stringify(rg)) hasLocalNewer = true;
       }
     }
   });
+
+  const mergeFamiliesPreservingTypes = (lf, rf, preferRemote = false) => {
+    const primary = preferRemote ? rf : lf;
+    const fallback = preferRemote ? lf : rf;
+    return {
+      ...fallback,
+      ...primary,
+      cat: (primary.cat && primary.cat !== 'other') ? primary.cat : (fallback.cat || primary.cat || 'other'),
+      defaultTypeId: primary.defaultTypeId || fallback.defaultTypeId || '',
+      typeIds: Array.from(new Set([...(rf.typeIds || []), ...(lf.typeIds || [])])),
+      aliases: Array.from(new Set([...(rf.aliases || []), ...(lf.aliases || [])]))
+    };
+  };
 
   const localFamilies = Array.isArray(local.ingredientFamilies) ? local.ingredientFamilies : [];
   const remoteFamilies = Array.isArray(remote.ingredientFamilies) ? remote.ingredientFamilies : [];
@@ -1049,17 +1103,13 @@ function reconcilePlatePlanState(local, remote) {
       const localTime = lf.updatedAt ? new Date(lf.updatedAt).getTime() : 0;
       const remoteTime = rf.updatedAt ? new Date(rf.updatedAt).getTime() : 0;
       if (localTime > remoteTime) {
-        mergedFamiliesMap.set(lf.id, lf);
+        mergedFamiliesMap.set(lf.id, mergeFamiliesPreservingTypes(lf, rf, false));
         hasLocalNewer = true;
       } else if (remoteTime > localTime) {
-        mergedFamiliesMap.set(lf.id, rf);
+        mergedFamiliesMap.set(lf.id, mergeFamiliesPreservingTypes(lf, rf, true));
+        if ((lf.typeIds || []).length > (rf.typeIds || []).length) hasLocalNewer = true;
       } else {
-        const mergedFamily = {
-          ...rf,
-          ...lf,
-          typeIds: Array.from(new Set([...(rf.typeIds || []), ...(lf.typeIds || [])])),
-          aliases: Array.from(new Set([...(rf.aliases || []), ...(lf.aliases || [])]))
-        };
+        const mergedFamily = mergeFamiliesPreservingTypes(lf, rf, false);
         mergedFamiliesMap.set(lf.id, mergedFamily);
         if (JSON.stringify(lf) !== JSON.stringify(rf)) hasLocalNewer = true;
       }
@@ -1208,8 +1258,14 @@ function applyPlatePlanProjectionRecord(key,value,{remote=true}={}){
 function applyPlatePlanProjection(projection){
   platePlanSyncSuppress=true;
   try{
-    state.recipes=[]; state.ingredients=[]; state.ingredientFamilies=[]; state.ingredientGroups=[]; state.overrides={};
-    state.plan={}; state.planHistory=[];
+    if(!state) state = loadState();
+    if(!Array.isArray(state.recipes)) state.recipes = [];
+    if(!Array.isArray(state.ingredients)) state.ingredients = [];
+    if(!Array.isArray(state.ingredientFamilies)) state.ingredientFamilies = [];
+    if(!Array.isArray(state.ingredientGroups)) state.ingredientGroups = [];
+    if(!state.overrides) state.overrides = {};
+    if(!state.plan) state.plan = {};
+    if(!Array.isArray(state.planHistory)) state.planHistory = [];
     Object.entries(projection).forEach(([key,value])=>applyPlatePlanProjectionRecord(key,value,{remote:false}));
     state=loadStateFromObject(state);
     localStorage.setItem(SK,JSON.stringify(state));
@@ -3222,7 +3278,11 @@ function ensureIngredientFamilies(targetState = state){
     family.aliases = (family.aliases || []).map(normaliseAliasText).filter(Boolean);
     if(family.name && !family.aliases.some(a => canonicalGroupKey(a) === canonicalGroupKey(family.name))) family.aliases.unshift(family.name);
   });
-  targetState.ingredientFamilies = targetState.ingredientFamilies.filter(f => (f.typeIds || []).length);
+  targetState.ingredientFamilies = targetState.ingredientFamilies.filter(f => {
+    if(!f) return false;
+    if((f.typeIds || []).length > 0) return true;
+    return Boolean(f.id && f.name && f.name !== 'Ingredient');
+  });
 }
 
 function getKnownFamilies(){
@@ -3468,11 +3528,26 @@ function syncProductHierarchyCategory(product, group = null, preferredCat = ''){
   const chosen = preferredCat || product.cat || group?.cat || family?.cat || 'other';
   const established = [family?.cat, group?.cat].find(cat => cat && cat !== 'other');
   const finalCat = established || chosen || 'other';
-  if(finalCat) product.cat = finalCat;
+  const nowIso = new Date().toISOString();
+  if(finalCat && product.cat !== finalCat){
+    product.cat = finalCat;
+    product.updatedAt = nowIso;
+  }
   if(group){
-    if(!group.cat || group.cat === 'other' || (preferredCat && preferredCat !== 'other' && !established)) group.cat = finalCat;
-    if(family && (!family.cat || family.cat === 'other' || (preferredCat && preferredCat !== 'other' && !established))) family.cat = finalCat;
-    getGroupProducts(group.id).forEach(p => { if(p) p.cat = group.cat || finalCat; });
+    let groupChanged = false;
+    if(!group.cat || group.cat === 'other' || (preferredCat && preferredCat !== 'other' && !established)){
+      if(group.cat !== finalCat){ group.cat = finalCat; groupChanged = true; }
+    }
+    if(family && (!family.cat || family.cat === 'other' || (preferredCat && preferredCat !== 'other' && !established))){
+      if(family.cat !== finalCat){ family.cat = finalCat; family.updatedAt = nowIso; }
+    }
+    if(groupChanged) group.updatedAt = nowIso;
+    getGroupProducts(group.id).forEach(p => {
+      if(p && p.cat !== (group.cat || finalCat)){
+        p.cat = group.cat || finalCat;
+        p.updatedAt = nowIso;
+      }
+    });
   }
 }
 
@@ -3504,6 +3579,7 @@ function ensureProductAssignedToGroup(product, preferredGroupName = '', preferre
     group = state.ingredientGroups.find(g => canonicalGroupKey(g.name) === key);
   }
   if(!group && !allowCreate) return null;
+  const nowIso = new Date().toISOString();
   if(!group){
     group = {
       id: 'grp' + Date.now() + Math.random().toString(36).slice(2,6),
@@ -3514,22 +3590,30 @@ function ensureProductAssignedToGroup(product, preferredGroupName = '', preferre
       defaultProductId: product.id,
       productIds: [],
       notes: '',
-      ingredientId: null
+      ingredientId: null,
+      updatedAt: nowIso
     };
     state.ingredientGroups.push(group);
   }
 
   state.ingredientGroups.forEach(g => {
-    if(g.id !== group.id && Array.isArray(g.productIds)) g.productIds = g.productIds.filter(id => id !== product.id);
+    if(g.id !== group.id && Array.isArray(g.productIds) && g.productIds.includes(product.id)){
+      g.productIds = g.productIds.filter(id => id !== product.id);
+      g.updatedAt = nowIso;
+    }
   });
 
   product.groupId = group.id;
+  product.updatedAt = nowIso;
+  group.updatedAt = nowIso;
   if(!Array.isArray(group.productIds)) group.productIds = [];
   if(!group.productIds.includes(product.id)) group.productIds.push(product.id);
   syncIngredientGroupAliases(group, getGroupProducts(group.id));
   addIngredientGroupAlias(group, preferredGroupName);
   if(!group.cat) group.cat = product.cat || 'other';
   if(!group.family) group.family = inferIngredientFamilyFromText(group.name + ' ' + product.name);
+  const family = ensureIngredientFamilyForGroup(group, state);
+  if(family) family.updatedAt = nowIso;
   ensureIngredientFamilies(state);
   syncProductHierarchyCategory(product, group, product.cat);
   refreshAutoDefaultProductForGroup(group.id);
@@ -6475,8 +6559,9 @@ function renderPlatePlanLegacyView(id){
   if(id==='today'){ resetTodayDate({render:false}); renderToday(); }
   if(id==='vault')renderVault();
   if(id==='add'){
-    // When navigating to add view without an active edit ID, ensure clean form
-    if(!editId) clearForm();
+    // When navigating to add view without an active edit ID, ensure clean form unless explicitly preserved
+    if(!editId && !platePlanPreserveAddForm) clearForm();
+    platePlanPreserveAddForm = false;
   }
   if(id==='ingredients')renderIngredientBank();
   if(id==='bank')renderBank();
@@ -6727,10 +6812,28 @@ function openRecipeRecognitionReview(recipe,label){
 
 function openRecipeTextPaste(){
   const wrap=ensureRecipeRecognitionModal();
-  wrap.querySelector('.modal').innerHTML=`<div class="row-between" style="align-items:center;margin-bottom:10px"><h3 style="margin:0">Paste extracted recipe text</h3><button class="btn sm ghost" onclick="closeRecipeRecognitionModal()">Close</button></div><p style="font-size:12px;color:var(--text2);margin-bottom:10px">Copy text using Apple Live Text or Google Lens, then paste it below. PlatePlan will structure it for review.</p><textarea id="recipe-paste-text" style="min-height:45dvh" placeholder="Recipe name&#10;&#10;Ingredients&#10;...&#10;&#10;Method&#10;..."></textarea><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="reviewPastedRecipeText()">Review text</button><button class="btn ghost" onclick="closeRecipeRecognitionModal()">Cancel</button></div>`;
+  wrap.querySelector('.modal').innerHTML=`<div class="row-between" style="align-items:center;margin-bottom:10px"><h3 style="margin:0">Paste extracted recipe text</h3><button class="btn sm ghost" onclick="closeRecipeRecognitionModal()">Close</button></div><p style="font-size:12px;color:var(--text2);margin-bottom:10px">Copy text using Apple Live Text or Google Lens, then paste it below. PlatePlan will structure it for review.</p><textarea id="recipe-paste-text" style="min-height:45dvh" placeholder="Recipe name&#10;&#10;Ingredients&#10;...&#10;&#10;Method&#10;..."></textarea><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="reviewPastedRecipeText()">Review recipe</button><button class="btn ghost" onclick="applyPastedRecipeDirectlyFromModal()">Use directly in Add Recipe</button><button class="btn ghost" onclick="closeRecipeRecognitionModal()">Cancel</button></div>`;
   wrap.classList.add('open');setTimeout(()=>document.getElementById('recipe-paste-text')?.focus(),0);
 }
+
 function reviewPastedRecipeText(){
+  try {
+    const text=(document.getElementById('recipe-paste-text')?.value||'').trim();
+    if(!text){
+      if(typeof showPlatePlanToast === 'function') showPlatePlanToast('Please paste some recipe text first.');
+      else if(typeof showToast === 'function') showToast('Please paste some recipe text first.');
+      return;
+    }
+    const parsed = parsePastedRecipeText(text);
+    openRecipeRecognitionReview(parsed, 'Pasted text · review recipe');
+  } catch(err) {
+    console.error('Error reviewing pasted recipe text:', err);
+    if(typeof showPlatePlanToast === 'function') showPlatePlanToast('An error occurred while parsing recipe text: ' + (err?.message || err));
+    else alert('An error occurred while parsing text: ' + (err?.message || err));
+  }
+}
+
+function applyPastedRecipeDirectlyFromModal(){
   try {
     const text=(document.getElementById('recipe-paste-text')?.value||'').trim();
     if(!text){
@@ -6741,34 +6844,56 @@ function reviewPastedRecipeText(){
     const parsed = parsePastedRecipeText(text);
     applyRecognisedRecipeDirectlyToForm(parsed);
   } catch(err) {
-    console.error('Error reviewing pasted recipe text:', err);
-    if(typeof showPlatePlanToast === 'function') showPlatePlanToast('An error occurred while parsing recipe text: ' + (err?.message || err));
-    else alert('An error occurred while parsing text: ' + (err?.message || err));
+    console.error('Error applying pasted recipe text:', err);
+    if(typeof showPlatePlanToast === 'function') showPlatePlanToast('An error occurred: ' + (err?.message || err));
   }
 }
 
 function applyRecognisedRecipeDirectlyToForm(parsed){
   const recipe = normaliseRecognisedRecipe(parsed || {});
   
+  // Set preservation flag so showView('add') does not wipe the form
+  platePlanPreserveAddForm = true;
+  showView('add');
+
+  // Clean existing form state explicitly first
   if(typeof clearForm === 'function') clearForm();
 
   const nameEl = document.getElementById('r-name');
-  if(nameEl) nameEl.value = recipe.name || '';
+  if(nameEl){
+    nameEl.value = recipe.name || '';
+    nameEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
 
   const servesOrigEl = document.getElementById('r-serves-orig');
   const servesTargetEl = document.getElementById('r-serves');
   const servesVal = recipe.servings ? String(recipe.servings) : '';
-  if(servesOrigEl) servesOrigEl.value = servesVal;
-  if(servesTargetEl) servesTargetEl.value = servesVal || '2';
+  if(servesOrigEl){
+    servesOrigEl.value = servesVal;
+    servesOrigEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  if(servesTargetEl){
+    servesTargetEl.value = servesVal || '2';
+    servesTargetEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
 
   const timeEl = document.getElementById('r-time');
-  if(timeEl) timeEl.value = recipe.timeMinutes ? String(recipe.timeMinutes) : '';
+  if(timeEl){
+    timeEl.value = recipe.timeMinutes ? String(recipe.timeMinutes) : '';
+    timeEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
 
   const ingsEl = document.getElementById('r-ingredients');
-  if(ingsEl) ingsEl.value = Array.isArray(recipe.ingredients) ? recipe.ingredients.join('\n') : (recipe.ingredients || '');
+  if(ingsEl){
+    ingsEl.value = Array.isArray(recipe.ingredients) ? recipe.ingredients.join('\n') : (recipe.ingredients || '');
+    ingsEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
 
   const methodEl = document.getElementById('r-method');
-  if(methodEl) methodEl.value = Array.isArray(recipe.method) ? recipe.method.join('\n') : (recipe.method || '');
+  if(methodEl){
+    methodEl.value = Array.isArray(recipe.method) ? recipe.method.join('\n') : (recipe.method || '');
+    methodEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
 
   const bookTitle = recipe.bookTitle || '';
   const author = recipe.author || '';
@@ -6788,7 +6913,6 @@ function applyRecognisedRecipeDirectlyToForm(parsed){
 
   closeRecipeRecognitionModal();
   clearRecipePhotos();
-  showView('add');
 
   requestAnimationFrame(() => {
     nameEl?.scrollIntoView({ block: 'start', behavior: 'smooth' });
