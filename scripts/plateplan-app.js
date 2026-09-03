@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.6.5';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v41';
+const PLATEPLAN_APP_VERSION='2.6.6';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v42';
 const SEED=[];
 
 let state = null;
@@ -124,6 +124,7 @@ let recipePhotoFiles=[];
 let recipePhotoObjectUrls=[];
 let platePlanAiModules=null;
 let platePlanPreserveAddForm=false;
+let platePlanPendingRecipePreFill=null;
 const SLOTS=[
   {key:'breakfastE',short:'Brekkie E',color:'var(--green)',cls:'badge-green'},
   {key:'breakfastC',short:'Brekkie C',color:'var(--green)',cls:'badge-green'},
@@ -536,6 +537,16 @@ function loadState(){
   if (!s.dataQualityDismissals || typeof s.dataQualityDismissals !== 'object' || Array.isArray(s.dataQualityDismissals)) s.dataQualityDismissals = {};
   if(!s.meta || typeof s.meta !== 'object') s.meta = {};
   s.meta.schemaVersion = +s.meta.schemaVersion || 1;
+  if(!Array.isArray(s.meta.deletedProductIds)) s.meta.deletedProductIds = [];
+  if(!Array.isArray(s.meta.deletedCategoryIds)) s.meta.deletedCategoryIds = [];
+  if(s.meta.deletedProductIds.length > 0){
+    const delSet = new Set(s.meta.deletedProductIds);
+    s.ingredients = (s.ingredients || []).filter(i => !delSet.has(i.id));
+  }
+  if(s.meta.deletedCategoryIds.length > 0){
+    const delCatSet = new Set(s.meta.deletedCategoryIds);
+    delCatSet.forEach(cid => { delete s.customCats[cid]; });
+  }
   if (!Array.isArray(s.ingredientGroups)) s.ingredientGroups = [];
   if (!Array.isArray(s.ingredientFamilies)) s.ingredientFamilies = [];
   if (s.plan && typeof s.plan === 'object') {
@@ -604,10 +615,21 @@ function loadState(){
       r.enhanced.nutrition = { total: etot, perServing: eps };
     }
   });
+  if(!s.meta || typeof s.meta !== 'object') s.meta = {};
+  if(!Array.isArray(s.meta.deletedProductIds)) s.meta.deletedProductIds = [];
+  if(!Array.isArray(s.meta.deletedCategoryIds)) s.meta.deletedCategoryIds = [];
+  if(s.meta.deletedProductIds.length > 0){
+    const delSet = new Set(s.meta.deletedProductIds);
+    s.ingredients = (s.ingredients || []).filter(i => !delSet.has(i.id));
+  }
+  if(s.meta.deletedCategoryIds.length > 0){
+    const delCatSet = new Set(s.meta.deletedCategoryIds);
+    delCatSet.forEach(cid => { delete s.customCats[cid]; });
+  }
   ensureIngredientGroups(s);
 
   CAT = { ...STANDARD_CATS, ...s.customCats };
-  Object.keys(CAT).forEach(k => { if(!CAT[k]) delete CAT[k]; });
+  Object.keys(CAT).forEach(k => { if(!CAT[k] || s.meta.deletedCategoryIds.includes(k)) delete CAT[k]; });
   return s;
 }
 
@@ -723,6 +745,13 @@ function platePlanCloudRef(key){
   return platePlanDb.collection('households').doc(config.householdId).collection(parts[0]).doc(encodeURIComponent(parts.slice(1).join('/')));
 }
 
+let platePlanCurrentPushPromise = null;
+
+function persistPlatePlanDataQualityFix(reason = 'Data quality update'){
+  saveState(true);
+  pushStateToCloud(true);
+}
+
 async function pushStateToCloud(force=false){
   if(!platePlanCloudReady || !platePlanCloudUser || !platePlanDb) return;
   if(!navigator.onLine){
@@ -730,146 +759,171 @@ async function pushStateToCloud(force=false){
     return;
   }
 
-  // 1. Exponential backoff guard to prevent overloading backend during errors
+  // 1. Exponential backoff guard: bypassed during forced updates
   const now = Date.now();
   if(!force && now < platePlanBackoffUntil){
     schedulePlatePlanCloudDiff(platePlanBackoffUntil - now + 500);
     return;
   }
 
-  // 2. Minimum push interval (throttle) to protect Firestore write streams
+  // 2. Minimum push interval (throttle): bypassed during forced updates
   const PUSH_THROTTLE_MS = 1500;
   if(!force && (now - platePlanLastPushCompletedAt) < PUSH_THROTTLE_MS){
     schedulePlatePlanCloudDiff(PUSH_THROTTLE_MS - (now - platePlanLastPushCompletedAt));
     return;
   }
 
-  // 3. Concurrency lock
+  // 3. Concurrency lock: if forced, await the active in-flight push then re-execute forced push
   if(platePlanIsPushing){
     platePlanPendingPush=true;
+    if(force && platePlanCurrentPushPromise){
+      try {
+        await platePlanCurrentPushPromise;
+      } catch(_e) {}
+      return pushStateToCloud(true);
+    }
     return;
   }
   platePlanIsPushing=true;
   platePlanPendingPush=false;
   updatePlatePlanSyncStatus('saving');
 
-  try{
-    const config=window.PLATEPLAN_FIREBASE||{};
-    const householdId=config.householdId||'elliott-chloe';
-    const dataCol=platePlanDb.collection('households').doc(householdId).collection('data');
-    const cleaned=cleanCloudValue(state);
-    if(!cleaned) throw new Error('State payload is empty');
+  platePlanCurrentPushPromise = (async () => {
+    try{
+      const config=window.PLATEPLAN_FIREBASE||{};
+      const householdId=config.householdId||'elliott-chloe';
+      const dataCol=platePlanDb.collection('households').doc(householdId).collection('data');
+      const cleaned=cleanCloudValue(state);
+      if(!cleaned) throw new Error('State payload is empty');
 
-    // Document contents for dirty-checking
-    const metaContent = {
-      schemaVersion: PLATEPLAN_SCHEMA_VERSION,
-      appVersion: PLATEPLAN_APP_VERSION,
-      prefs: cleaned.prefs || {},
-      customCats: cleaned.customCats || {},
-      excluded: cleaned.excluded || {},
-      useUpProducts: cleaned.useUpProducts || {},
-      ignoredGroupMergeSuggestions: cleaned.ignoredGroupMergeSuggestions || [],
-      ignoredDataQualityWarnings: cleaned.ignoredDataQualityWarnings || [],
-      dataQualityDismissals: cleaned.dataQualityDismissals || {},
-      packPicks: cleaned.packPicks || {},
-      meta: cleaned.meta || {}
-    };
+      // Ensure tombstones sync across sessions
+      const deletedProductIds = Array.from(new Set([
+        ...(Array.isArray(cleaned.meta?.deletedProductIds) ? cleaned.meta.deletedProductIds : []),
+        ...(Array.isArray(state?.meta?.deletedProductIds) ? state.meta.deletedProductIds : [])
+      ]));
+      const deletedCategoryIds = Array.from(new Set([
+        ...(Array.isArray(cleaned.meta?.deletedCategoryIds) ? cleaned.meta.deletedCategoryIds : []),
+        ...(Array.isArray(state?.meta?.deletedCategoryIds) ? state.meta.deletedCategoryIds : [])
+      ]));
 
-    const recipesContent = {
-      recipes: cleaned.recipes || []
-    };
+      // Document contents for dirty-checking
+      const metaContent = {
+        schemaVersion: PLATEPLAN_SCHEMA_VERSION,
+        appVersion: PLATEPLAN_APP_VERSION,
+        prefs: cleaned.prefs || {},
+        customCats: cleaned.customCats || {},
+        excluded: cleaned.excluded || {},
+        useUpProducts: cleaned.useUpProducts || {},
+        ignoredGroupMergeSuggestions: cleaned.ignoredGroupMergeSuggestions || [],
+        ignoredDataQualityWarnings: cleaned.ignoredDataQualityWarnings || [],
+        dataQualityDismissals: cleaned.dataQualityDismissals || {},
+        packPicks: cleaned.packPicks || {},
+        meta: {
+          ...(cleaned.meta || {}),
+          deletedProductIds,
+          deletedCategoryIds
+        }
+      };
 
-    const productsContent = {
-      ingredients: cleaned.ingredients || []
-    };
+      const recipesContent = {
+        recipes: cleaned.recipes || []
+      };
 
-    const taxonomyContent = {
-      ingredientGroups: cleaned.ingredientGroups || [],
-      ingredientFamilies: cleaned.ingredientFamilies || []
-    };
+      const productsContent = {
+        ingredients: cleaned.ingredients || []
+      };
 
-    const plannerContent = {
-      plan: cleaned.plan || {},
-      overrides: cleaned.overrides || {}
-    };
+      const taxonomyContent = {
+        ingredientGroups: cleaned.ingredientGroups || [],
+        ingredientFamilies: cleaned.ingredientFamilies || []
+      };
 
-    const historyContent = {
-      planHistory: cleaned.planHistory || []
-    };
+      const plannerContent = {
+        plan: cleaned.plan || {},
+        overrides: cleaned.overrides || {}
+      };
 
-    const sigs = {
-      meta: computePayloadSignature(metaContent),
-      recipes: computePayloadSignature(recipesContent),
-      products: computePayloadSignature(productsContent),
-      taxonomy: computePayloadSignature(taxonomyContent),
-      planner: computePayloadSignature(plannerContent),
-      history: computePayloadSignature(historyContent)
-    };
+      const historyContent = {
+        planHistory: cleaned.planHistory || []
+      };
 
-    // Determine which documents actually modified their content
-    const changedKeys = Object.keys(sigs).filter(k => force || sigs[k] !== platePlanLastPushedSignatures[k]);
+      const sigs = {
+        meta: computePayloadSignature(metaContent),
+        recipes: computePayloadSignature(recipesContent),
+        products: computePayloadSignature(productsContent),
+        taxonomy: computePayloadSignature(taxonomyContent),
+        planner: computePayloadSignature(plannerContent),
+        history: computePayloadSignature(historyContent)
+      };
 
-    if(changedKeys.length === 0){
-      // Nothing changed: completely skip Firestore write batch to avoid exhausting stream queue
+      // Determine which documents actually modified their content
+      const changedKeys = Object.keys(sigs).filter(k => force || sigs[k] !== platePlanLastPushedSignatures[k]);
+
+      if(changedKeys.length === 0){
+        // Nothing changed: completely skip Firestore write batch to avoid exhausting stream queue
+        platePlanLastPushCompletedAt=Date.now();
+        platePlanLastSyncError=null;
+        platePlanLastSyncedAt=Date.now();
+        updatePlatePlanSyncStatus('synced');
+        return;
+      }
+
+      const deviceId=getPlatePlanDeviceId();
+      const userEmail=platePlanCloudUser.email||platePlanCloudUser.uid||'';
+      const nowIso=new Date().toISOString();
+      const serverTs=firebase.firestore.FieldValue.serverTimestamp();
+
+      const baseMeta={
+        updatedAt: serverTs,
+        clientTimestamp: nowIso,
+        updatedBy: userEmail,
+        deviceId: deviceId
+      };
+
+      const batch = platePlanDb.batch();
+      if(changedKeys.includes('meta')) batch.set(dataCol.doc('meta'), { ...baseMeta, ...metaContent });
+      if(changedKeys.includes('recipes')) batch.set(dataCol.doc('recipes'), { ...baseMeta, ...recipesContent });
+      if(changedKeys.includes('products')) batch.set(dataCol.doc('products'), { ...baseMeta, ...productsContent });
+      if(changedKeys.includes('taxonomy')) batch.set(dataCol.doc('taxonomy'), { ...baseMeta, ...taxonomyContent });
+      if(changedKeys.includes('planner')) batch.set(dataCol.doc('planner'), { ...baseMeta, ...plannerContent });
+      if(changedKeys.includes('history')) batch.set(dataCol.doc('history'), { ...baseMeta, ...historyContent });
+
+      await batch.commit();
+
+      // Store verified pushed signatures
+      changedKeys.forEach(k => { platePlanLastPushedSignatures[k] = sigs[k]; });
+
+      // Clean up oversized monolithic legacy state doc at most once
+      if(!platePlanLegacyStateDeleted){
+        platePlanLegacyStateDeleted=true;
+        dataCol.doc('state').delete().catch(()=>{});
+      }
+
+      platePlanSyncErrorCount=0;
+      platePlanBackoffUntil=0;
       platePlanLastPushCompletedAt=Date.now();
       platePlanLastSyncError=null;
       platePlanLastSyncedAt=Date.now();
       updatePlatePlanSyncStatus('synced');
-      return;
+    }catch(error){
+      console.warn('PlatePlan Cloud push failed:',error);
+      platePlanSyncErrorCount++;
+      // Exponential backoff to protect backend: 3s, 6s, 12s, 24s, up to 60s
+      const backoffMs = Math.min(60000, Math.pow(2, platePlanSyncErrorCount) * 1500);
+      platePlanBackoffUntil = Date.now() + backoffMs;
+      platePlanLastSyncError=error?.message||'Cloud push failed';
+      updatePlatePlanSyncStatus(navigator.onLine?'error':'offline',platePlanLastSyncError);
+    }finally{
+      platePlanIsPushing=false;
+      platePlanCurrentPushPromise=null;
+      if(platePlanPendingPush){
+        // Queue next push with safety delay instead of synchronous recursion
+        schedulePlatePlanCloudDiff(1500);
+      }
     }
+  })();
 
-    const deviceId=getPlatePlanDeviceId();
-    const userEmail=platePlanCloudUser.email||platePlanCloudUser.uid||'';
-    const nowIso=new Date().toISOString();
-    const serverTs=firebase.firestore.FieldValue.serverTimestamp();
-
-    const baseMeta={
-      updatedAt: serverTs,
-      clientTimestamp: nowIso,
-      updatedBy: userEmail,
-      deviceId: deviceId
-    };
-
-    const batch = platePlanDb.batch();
-    if(changedKeys.includes('meta')) batch.set(dataCol.doc('meta'), { ...baseMeta, ...metaContent });
-    if(changedKeys.includes('recipes')) batch.set(dataCol.doc('recipes'), { ...baseMeta, ...recipesContent });
-    if(changedKeys.includes('products')) batch.set(dataCol.doc('products'), { ...baseMeta, ...productsContent });
-    if(changedKeys.includes('taxonomy')) batch.set(dataCol.doc('taxonomy'), { ...baseMeta, ...taxonomyContent });
-    if(changedKeys.includes('planner')) batch.set(dataCol.doc('planner'), { ...baseMeta, ...plannerContent });
-    if(changedKeys.includes('history')) batch.set(dataCol.doc('history'), { ...baseMeta, ...historyContent });
-
-    await batch.commit();
-
-    // Store verified pushed signatures
-    changedKeys.forEach(k => { platePlanLastPushedSignatures[k] = sigs[k]; });
-
-    // Clean up oversized monolithic legacy state doc at most once
-    if(!platePlanLegacyStateDeleted){
-      platePlanLegacyStateDeleted=true;
-      dataCol.doc('state').delete().catch(()=>{});
-    }
-
-    platePlanSyncErrorCount=0;
-    platePlanBackoffUntil=0;
-    platePlanLastPushCompletedAt=Date.now();
-    platePlanLastSyncError=null;
-    platePlanLastSyncedAt=Date.now();
-    updatePlatePlanSyncStatus('synced');
-  }catch(error){
-    console.warn('PlatePlan Cloud push failed:',error);
-    platePlanSyncErrorCount++;
-    // Exponential backoff to protect backend: 3s, 6s, 12s, 24s, up to 60s
-    const backoffMs = Math.min(60000, Math.pow(2, platePlanSyncErrorCount) * 1500);
-    platePlanBackoffUntil = Date.now() + backoffMs;
-    platePlanLastSyncError=error?.message||'Cloud push failed';
-    updatePlatePlanSyncStatus(navigator.onLine?'error':'offline',platePlanLastSyncError);
-  }finally{
-    platePlanIsPushing=false;
-    if(platePlanPendingPush){
-      // Queue next push with safety delay instead of synchronous recursion
-      schedulePlatePlanCloudDiff(1500);
-    }
-  }
+  return platePlanCurrentPushPromise;
 }
 
 function queuePlatePlanCloudDiff(immediateFlush=false){
@@ -908,7 +962,7 @@ function saveState(immediate=false){
   if(!platePlanSyncSuppress && platePlanCloudReady && platePlanCloudUser){
     if(immediate){
       clearTimeout(platePlanSyncTimer);
-      pushStateToCloud();
+      pushStateToCloud(true);
     }else{
       schedulePlatePlanCloudDiff(800);
     }
@@ -1061,13 +1115,24 @@ function reconcilePlatePlanState(local, remote) {
     return merged;
   };
 
+  // Tombstones for deleted products and categories
+  const localDeletedProducts = new Set(Array.isArray(local.meta?.deletedProductIds) ? local.meta.deletedProductIds : []);
+  const remoteDeletedProducts = new Set(Array.isArray(remote.meta?.deletedProductIds) ? remote.meta.deletedProductIds : []);
+  const allDeletedProducts = new Set([...localDeletedProducts, ...remoteDeletedProducts]);
+
+  const localDeletedCats = new Set(Array.isArray(local.meta?.deletedCategoryIds) ? local.meta.deletedCategoryIds : []);
+  const remoteDeletedCats = new Set(Array.isArray(remote.meta?.deletedCategoryIds) ? remote.meta.deletedCategoryIds : []);
+  const allDeletedCats = new Set([...localDeletedCats, ...remoteDeletedCats]);
+
   // 2. Ingredients / Products reconciliation
   const localIngs = Array.isArray(local.ingredients) ? local.ingredients : [];
   const remoteIngs = Array.isArray(remote.ingredients) ? remote.ingredients : [];
   const mergedIngsMap = new Map();
-  remoteIngs.forEach(i => { if (i && i.id) mergedIngsMap.set(i.id, i); });
+  remoteIngs.forEach(i => {
+    if (i && i.id && !allDeletedProducts.has(i.id)) mergedIngsMap.set(i.id, i);
+  });
   localIngs.forEach(li => {
-    if (!li || !li.id) return;
+    if (!li || !li.id || allDeletedProducts.has(li.id)) return;
     if (!mergedIngsMap.has(li.id)) {
       mergedIngsMap.set(li.id, li);
       hasLocalNewer = true;
@@ -1212,6 +1277,9 @@ function reconcilePlatePlanState(local, remote) {
 
   // 6. Settings, Prefs, Categories, Dismissals
   const mergedCustomCats = { ...(remote.customCats || {}), ...(local.customCats || {}) };
+  allDeletedCats.forEach(slug => {
+    delete mergedCustomCats[slug];
+  });
   const mergedDismissals = { ...(remote.dataQualityDismissals || {}), ...(local.dataQualityDismissals || {}) };
   const mergedUseUp = { ...(remote.useUpProducts || remote.pantry || {}), ...(local.useUpProducts || local.pantry || {}) };
   const mergedPackPicks = { ...(remote.packPicks || {}), ...(local.packPicks || {}) };
@@ -1227,7 +1295,12 @@ function reconcilePlatePlanState(local, remote) {
     ignoredDataQualityWarnings: Array.from(new Set([...(remote.ignoredDataQualityWarnings || []), ...(local.ignoredDataQualityWarnings || [])])),
     dataQualityDismissals: mergedDismissals,
     packPicks: mergedPackPicks,
-    meta: { ...(remote.meta || {}), ...(local.meta || {}) },
+    meta: {
+      ...(remote.meta || {}),
+      ...(local.meta || {}),
+      deletedProductIds: Array.from(allDeletedProducts),
+      deletedCategoryIds: Array.from(allDeletedCats)
+    },
     recipes: mergedRecipes,
     ingredients: mergedIngs,
     ingredientGroups: Array.from(mergedGroupsMap.values()),
@@ -1504,7 +1577,11 @@ async function loadSharedPlatePlan(){
       ignoredDataQualityWarnings: metaDoc.ignoredDataQualityWarnings || [],
       dataQualityDismissals: metaDoc.dataQualityDismissals || {},
       packPicks: metaDoc.packPicks || {},
-      meta: metaDoc.meta || {},
+      meta: {
+        ...(metaDoc.meta || {}),
+        deletedProductIds: Array.isArray(metaDoc.meta?.deletedProductIds) ? metaDoc.meta.deletedProductIds : (Array.isArray(metaDoc.deletedProductIds) ? metaDoc.deletedProductIds : []),
+        deletedCategoryIds: Array.isArray(metaDoc.meta?.deletedCategoryIds) ? metaDoc.meta.deletedCategoryIds : (Array.isArray(metaDoc.deletedCategoryIds) ? metaDoc.deletedCategoryIds : [])
+      },
       recipes: recipesDoc.recipes || [],
       ingredients: productsDoc.ingredients || [],
       ingredientGroups: taxonomyDoc.ingredientGroups || [],
@@ -1936,6 +2013,20 @@ function initializePlatePlanApplication(){
   initPlatePlanCloudSync();
   window.addEventListener('online',()=>{ updatePlatePlanSyncStatus(getPlatePlanSyncOutbox().length?'saving':'connecting'); flushPlatePlanSyncOutbox(); });
   window.addEventListener('offline',()=>updatePlatePlanSyncStatus('offline'));
+
+  // Sync Original Serves to Target Servings unless manually edited
+  const origServesInput = document.getElementById('r-serves-orig');
+  const targetServesInput = document.getElementById('r-serves');
+  if(origServesInput && targetServesInput){
+    origServesInput.addEventListener('input', () => {
+      if(!targetServesInput.dataset.manuallyChanged || !targetServesInput.value){
+        targetServesInput.value = origServesInput.value;
+      }
+    });
+    targetServesInput.addEventListener('input', () => {
+      targetServesInput.dataset.manuallyChanged = 'true';
+    });
+  }
 
   // Close map and recipe search dropdowns on outside click
   document.addEventListener('click', (e) => {
@@ -6647,12 +6738,108 @@ function scheduleTodayMidnightRefresh(){
 }
 
 // == NAV ==
+function applyPendingRecipePreFillToForm(){
+  if(!platePlanPendingRecipePreFill) return;
+  const recipe = platePlanPendingRecipePreFill;
+  platePlanPendingRecipePreFill = null;
+
+  // Clear existing form cleanly
+  if(typeof clearForm === 'function') clearForm();
+
+  // Recipe Name
+  const nameEl = document.getElementById('r-name');
+  if(nameEl && recipe.name){
+    nameEl.value = recipe.name;
+    nameEl.dispatchEvent(new Event('input', { bubbles: true }));
+    nameEl.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // Original Serves & Target Servings (Servings Sync)
+  const servesOrigEl = document.getElementById('r-serves-orig');
+  const servesTargetEl = document.getElementById('r-serves');
+  const servesVal = recipe.servings ? String(recipe.servings) : '';
+  if(servesOrigEl){
+    servesOrigEl.value = servesVal;
+    servesOrigEl.dispatchEvent(new Event('input', { bubbles: true }));
+    servesOrigEl.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  if(servesTargetEl){
+    servesTargetEl.value = servesVal || '2';
+    delete servesTargetEl.dataset.manuallyChanged;
+    servesTargetEl.dispatchEvent(new Event('input', { bubbles: true }));
+    servesTargetEl.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // Prep time (mins)
+  const timeEl = document.getElementById('r-time');
+  if(timeEl && recipe.timeMinutes !== null && recipe.timeMinutes !== undefined && recipe.timeMinutes !== ''){
+    timeEl.value = String(recipe.timeMinutes);
+    timeEl.dispatchEvent(new Event('input', { bubbles: true }));
+    timeEl.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // Ingredients
+  const ingsEl = document.getElementById('r-ingredients');
+  if(ingsEl && recipe.ingredients){
+    ingsEl.value = Array.isArray(recipe.ingredients) ? recipe.ingredients.join('\n') : String(recipe.ingredients);
+    ingsEl.dispatchEvent(new Event('input', { bubbles: true }));
+    ingsEl.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // Method
+  const methodEl = document.getElementById('r-method');
+  if(methodEl && recipe.method){
+    methodEl.value = Array.isArray(recipe.method) ? recipe.method.join('\n') : String(recipe.method);
+    methodEl.dispatchEvent(new Event('input', { bubbles: true }));
+    methodEl.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // Meal types
+  if(typeof setMealTypes === 'function'){
+    const types = Array.isArray(recipe.mealTypes) && recipe.mealTypes.length ? recipe.mealTypes : ['dinner'];
+    setMealTypes(types);
+  }
+
+  // Source fields
+  const bookTitle = recipe.bookTitle || '';
+  const author = recipe.author || '';
+  const page = recipe.page || '';
+  const url = recipe.url || '';
+  const srcType = document.getElementById('r-src-type');
+  if(recipe.sourceType && srcType){
+    srcType.value = recipe.sourceType;
+    if(typeof updateSrcFields === 'function') updateSrcFields();
+    if(recipe.sourceType === 'book'){
+      const bookEl = document.getElementById('r-src-book');
+      const authEl = document.getElementById('r-src-author');
+      const pageEl = document.getElementById('r-src-page');
+      if(bookEl && bookTitle) bookEl.value = bookTitle;
+      if(authEl && author) authEl.value = author;
+      if(pageEl && page) pageEl.value = page;
+    } else if(['tiktok','website','youtube','instagram'].includes(recipe.sourceType)){
+      const urlEl = document.getElementById('r-src-url');
+      if(urlEl && url) urlEl.value = url;
+    }
+    if(typeof updateSrcPreview === 'function') updateSrcPreview();
+  }
+
+  requestAnimationFrame(() => {
+    nameEl?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    nameEl?.focus();
+  });
+  if(typeof showMsg === 'function') showMsg('form-msg', 'Recipe text loaded. Select original serves, target serves, meal type, suitable for, and source, then click Parse & Verify.', 'info');
+  if(typeof showPlatePlanToast === 'function') showPlatePlanToast('Recipe text loaded into Add Recipe');
+}
+
 function renderPlatePlanLegacyView(id){
   if(id==='today'){ resetTodayDate({render:false}); renderToday(); }
   if(id==='vault')renderVault();
   if(id==='add'){
-    // When navigating to add view without an active edit ID, ensure clean form unless explicitly preserved
-    if(!editId && !platePlanPreserveAddForm) clearForm();
+    if(platePlanPendingRecipePreFill){
+      applyPendingRecipePreFillToForm();
+    }else if(!editId && !platePlanPreserveAddForm){
+      clearForm();
+    }
     platePlanPreserveAddForm = false;
   }
   if(id==='ingredients')renderIngredientBank();
@@ -6680,7 +6867,12 @@ const platePlanFeatureRenderers=Object.freeze({
   },
   vault:renderVault,
   add(){
-    if(!editId) clearForm();
+    if(platePlanPendingRecipePreFill){
+      applyPendingRecipePreFillToForm();
+    }else if(!editId && !platePlanPreserveAddForm){
+      clearForm();
+    }
+    platePlanPreserveAddForm = false;
   },
   ingredients:renderIngredientBank,
   bank:renderBank,
@@ -6849,35 +7041,219 @@ async function recogniseRecipePhotosLocally(){
   finally{try{await worker?.terminate();}catch(e){}hideOverlay();}
 }
 
+function parseTimeToCleanMinutes(str){
+  if(str === null || str === undefined) return null;
+  const s = String(str).toLowerCase().trim();
+  if(!s) return null;
+
+  // Check for range like "20-25 mins"
+  const rangeMatch = s.match(/(\d+)\s*[-–]\s*(\d+)\s*(?:mins?|minutes?)/i);
+  if(rangeMatch){
+    return Math.round((parseFloat(rangeMatch[1]) + parseFloat(rangeMatch[2])) / 2);
+  }
+
+  let totalSeconds = 0;
+  let matched = false;
+
+  // Match hours: e.g. "1 hour", "1.5 hours", "2 hrs", "1h"
+  const hrMatch = s.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h\b)/i);
+  if(hrMatch){
+    totalSeconds += parseFloat(hrMatch[1]) * 3600;
+    matched = true;
+  }
+
+  // Match minutes: e.g. "11 mins", "11 min", "11 minutes", "11m"
+  const minMatch = s.match(/(\d+(?:\.\d+)?)\s*(?:minutes?|mins?|m\b)/i);
+  if(minMatch){
+    totalSeconds += parseFloat(minMatch[1]) * 60;
+    matched = true;
+  }
+
+  // Match seconds: e.g. "35 secs", "35 sec", "35 seconds", "35s"
+  const secMatch = s.match(/(\d+(?:\.\d+)?)\s*(?:seconds?|secs?|s\b)/i);
+  if(secMatch){
+    totalSeconds += parseFloat(secMatch[1]);
+    matched = true;
+  }
+
+  if(matched){
+    const minutes = Math.round(totalSeconds / 60);
+    return minutes > 0 ? minutes : (totalSeconds > 0 ? 1 : null);
+  }
+
+  // Fallback to standalone integer
+  const numMatch = s.match(/\b(\d+)\b/);
+  if(numMatch){
+    return parseInt(numMatch[1], 10);
+  }
+
+  return null;
+}
+
+function parseRobustRecipeText(raw){
+  const text = String(raw || '').replace(/\r/g, '');
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  if(!lines.length){
+    return {
+      name: '',
+      servings: null,
+      timeMinutes: null,
+      ingredients: [],
+      method: [],
+      mealTypes: ['dinner'],
+      sourceType: '',
+      bookTitle: '',
+      author: '',
+      page: '',
+      url: '',
+      warnings: [],
+      rawText: ''
+    };
+  }
+
+  // 1. Recipe name & Servings
+  let name = '';
+  let servings = null;
+
+  // Extract servings: "Number of Servings: X", "Original Servings: X", "Servings: X", "Serves: X"
+  const servingsMatch = text.match(/(?:Number of Servings|Original Servings|Original Serves|Servings|Serves)\s*[:\-]?\s*(\d+)/i);
+  if(servingsMatch){
+    servings = parseInt(servingsMatch[1], 10);
+  }
+
+  // "Recipe name *" -> First line or text preceding "Number of Servings:" / metadata
+  const isMetaLine = l => /^(?:(?:Number of Servings|Original Servings|Original Serves|Servings?|Serves|Prep(?:aration)?(?:\s*time)?|Cook(?:\s*time)?|Total(?:\s*time)?|Time|Book|Cookbook|Author|By|Page|Source|Url|Link)\s*[:\-]|^https?:\/\/|^(?:ingredients?|method|instructions?|steps?)\b)/i.test(l);
+  const firstMetaIdx = lines.findIndex(isMetaLine);
+  if(firstMetaIdx > 0){
+    name = lines.slice(0, firstMetaIdx).join(' ').trim();
+  } else if(firstMetaIdx === 0){
+    name = lines[0];
+  } else {
+    name = lines[0] || '';
+  }
+  name = name.replace(/^(?:recipe\s*name|recipe|title)\s*[:\-]?\s*/i, '').trim();
+
+  // 2. Prep time (mins)
+  let timeMinutes = null;
+  const prepTimeMatch = text.match(/(?:Prep(?:aration)?\s*time|Prep)\s*[:\-]?\s*([^\n\r|]+)/i);
+  if(prepTimeMatch){
+    timeMinutes = parseTimeToCleanMinutes(prepTimeMatch[1]);
+  }
+  if(timeMinutes === null){
+    const totalTimeMatch = text.match(/(?:Total\s*time|Cook\s*time|Time)\s*[:\-]?\s*([^\n\r|]+)/i);
+    if(totalTimeMatch){
+      timeMinutes = parseTimeToCleanMinutes(totalTimeMatch[1]);
+    }
+  }
+  if(timeMinutes === null){
+    // Match compound time like "11 mins, 35 secs"
+    const compoundMatch = text.match(/(\d+\s*(?:hours?|hrs?|h)\s*(?:and\s*)?\d+\s*(?:mins?|minutes?|m)|\d+\s*(?:mins?|minutes?)\s*,?\s*\d+\s*(?:secs?|seconds?|s))/i);
+    if(compoundMatch){
+      timeMinutes = parseTimeToCleanMinutes(compoundMatch[1]);
+    }
+  }
+  if(timeMinutes === null){
+    const simpleMinMatch = text.match(/(\d+)\s*(?:mins?|minutes?)/i);
+    if(simpleMinMatch){
+      timeMinutes = parseTimeToCleanMinutes(simpleMinMatch[1]);
+    }
+  }
+
+  // 3. Ingredients & Method sections
+  const ingHeaderIdx = lines.findIndex(l => /^(?:[-*•#\s]*)ingredients?\b/i.test(l));
+  const methodHeaderIdx = lines.findIndex(l => /^(?:[-*•#\s]*)(?:method|instructions?|directions?|steps?|preparation)\b/i.test(l));
+
+  let ingredients = [];
+  let method = [];
+
+  if(ingHeaderIdx >= 0 && methodHeaderIdx > ingHeaderIdx){
+    ingredients = lines.slice(ingHeaderIdx + 1, methodHeaderIdx);
+    method = lines.slice(methodHeaderIdx + 1);
+  } else if(ingHeaderIdx >= 0 && methodHeaderIdx < 0){
+    ingredients = lines.slice(ingHeaderIdx + 1);
+  } else if(methodHeaderIdx >= 0 && ingHeaderIdx < 0){
+    method = lines.slice(methodHeaderIdx + 1);
+  } else {
+    const looksIngredient = l => /^(?:[-•*]\s*)?(?:\d|½|¼|¾|one |two |a |an )/i.test(l) && /\b(g|kg|ml|l|tsp|tbsp|cup|tin|can|bunch|clove|slice|handful|pinch|x|pack|block|onion|garlic|oil|salt|pepper|sauce|chicken|beef|egg|rice|pasta|cheese|butter|water|sugar|flour)\b/i.test(l);
+    lines.forEach(l => {
+      if(l === name || /^(?:serves?|number of servings|prep|cook|total|time|recipe)\b/i.test(l)) return;
+      if(looksIngredient(l)){
+        ingredients.push(l);
+      } else {
+        method.push(l);
+      }
+    });
+  }
+
+  ingredients = ingredients.filter(l => !/^(?:ingredients?|method|instructions?|steps?)\s*:?$/i.test(l.trim()));
+  method = method.filter(l => !/^(?:ingredients?|method|instructions?|steps?)\s*:?$/i.test(l.trim()));
+
+  // 4. Meal Types
+  const lowerText = text.toLowerCase();
+  const mealTypes = [];
+  if(lowerText.includes('breakfast') || lowerText.includes('brekkie') || lowerText.includes('pancake') || lowerText.includes('porridge') || lowerText.includes('waffle') || lowerText.includes('granola') || lowerText.includes('smoothie')) mealTypes.push('breakfast');
+  if(lowerText.includes('lunch') || lowerText.includes('sandwich') || lowerText.includes('salad') || lowerText.includes('wrap') || lowerText.includes('soup')) mealTypes.push('lunch');
+  if(lowerText.includes('dinner') || lowerText.includes('curry') || lowerText.includes('casserole') || lowerText.includes('roast') || lowerText.includes('pasta') || lowerText.includes('stew') || lowerText.includes('risotto') || lowerText.includes('pie') || lowerText.includes('stir-fry')) mealTypes.push('dinner');
+  if(lowerText.includes('snack') || lowerText.includes('dessert') || lowerText.includes('biscuit') || lowerText.includes('cookie') || lowerText.includes('cake') || lowerText.includes('muffin')) mealTypes.push('snack');
+  if(!mealTypes.length) mealTypes.push('dinner');
+
+  // 5. Source info
+  let sourceType = '';
+  let bookTitle = '';
+  let author = '';
+  let page = '';
+  let url = '';
+
+  const urlMatch = text.match(/(https?:\/\/[^\s\)\>\]]+)/i);
+  if(urlMatch){
+    url = urlMatch[1];
+    if(url.includes('tiktok.com')) sourceType = 'tiktok';
+    else if(url.includes('youtube.com') || url.includes('youtu.be')) sourceType = 'youtube';
+    else if(url.includes('instagram.com')) sourceType = 'instagram';
+    else sourceType = 'website';
+  }
+
+  const bookMatch = text.match(/(?:Book|From the book|Cookbook|Source)\s*:\s*([^\n\r,]+)/i);
+  if(bookMatch && !sourceType){
+    sourceType = 'book';
+    bookTitle = bookMatch[1].trim();
+  }
+  const authorMatch = text.match(/(?:Author|By)\s*:\s*([^\n\r,]+)/i);
+  if(authorMatch) author = authorMatch[1].trim();
+  const pageMatch = text.match(/(?:Page|p\.?)\s*[:\-]?\s*(\d+)/i);
+  if(pageMatch) page = pageMatch[1].trim();
+
+  return {
+    name,
+    servings,
+    timeMinutes,
+    ingredients,
+    method,
+    mealTypes,
+    sourceType,
+    bookTitle,
+    author,
+    page,
+    url,
+    warnings: [],
+    rawText: text
+  };
+}
+
 function parsePastedRecipeText(raw){
   try {
-    const lines=String(raw||'').replace(/\r/g,'').split('\n').map(line=>line.trim()).filter(Boolean);
-    if(!lines.length){
-      return normaliseRecognisedRecipe({name:'',servings:null,timeMinutes:null,ingredients:[],method:[],warnings:[],rawText:''});
-    }
-    const ingredientHeader=lines.findIndex(line=>/^ingredients?\b/i.test(line));
-    const methodHeader=lines.findIndex(line=>/^(method|instructions?|directions?|steps?)\b/i.test(line));
-    const titleEnd=[ingredientHeader,methodHeader].filter(index=>index>=0).sort((a,b)=>a-b)[0]??1;
-    const name=(lines.slice(0,titleEnd).find(line=>!/^serves?|prep|cook|total/i.test(line))||lines[0]||'').replace(/^recipe\s*:?\s*/i,'');
-    let ingredients=[],method=[];
-    if(ingredientHeader>=0){const end=methodHeader>ingredientHeader?methodHeader:lines.length;ingredients=lines.slice(ingredientHeader+1,end);}
-    if(methodHeader>=0) method=lines.slice(methodHeader+1);
-    if(!ingredients.length||!method.length){
-      const looksIngredient=line=>/^(?:[-•*]\s*)?(?:\d|½|¼|¾|one |two |a )/i.test(line)&&/\b(g|kg|ml|l|tsp|tbsp|cup|tin|can|bunch|clove|slice|handful|pinch|x|pack|block)\b/i.test(line);
-      if(!ingredients.length) ingredients=lines.filter(looksIngredient);
-      if(!method.length) method=lines.filter(line=>line!==name&&!ingredients.includes(line)&&!/^(ingredients?|method|instructions?|directions?|steps?)\b/i.test(line));
-    }
-    const serves=+(String(raw).match(/serves?\s*[:\-]?\s*(\d+)/i)||[])[1]||null;
-    const time=+(String(raw).match(/(?:prep|cook|total)\s*time\s*[:\-]?\s*(\d+)\s*(?:min|minutes?)/i)||[])[1]||null;
-    const parsedIngs = ingredients.map(parseIngredientLine).filter(Boolean);
-    const convertedMethod = convertMethodQuantitiesToPercentages(method, parsedIngs);
-    return normaliseRecognisedRecipe({name,servings:serves,timeMinutes:time,ingredients,method:convertedMethod.length?convertedMethod:method,warnings:[],rawText:String(raw||'')});
+    const parsed = parseRobustRecipeText(raw);
+    const parsedIngs = (parsed.ingredients || []).map(parseIngredientLine).filter(Boolean);
+    const convertedMethod = convertMethodQuantitiesToPercentages(parsed.method || [], parsedIngs);
+    parsed.method = convertedMethod.length ? convertedMethod : parsed.method;
+    return normaliseRecognisedRecipe(parsed);
   } catch(err) {
     console.warn('parsePastedRecipeText error fallback:', err);
     return normaliseRecognisedRecipe({
       name: 'Pasted Recipe',
       servings: 2,
       timeMinutes: 30,
+      mealTypes: ['dinner'],
       ingredients: String(raw||'').split('\n').filter(Boolean),
       method: [],
       warnings: ['Could not automatically structure all sections; please review fields.'],
@@ -6887,7 +7263,21 @@ function parsePastedRecipeText(raw){
 }
 
 function normaliseRecognisedRecipe(value){
-  return {name:String(value?.name||''),servings:+value?.servings||null,timeMinutes:+value?.timeMinutes||null,sourceType:String(value?.sourceType||''),bookTitle:String(value?.bookTitle||''),author:String(value?.author||''),page:String(value?.page||''),ingredients:(value?.ingredients||[]).map(String).filter(Boolean),method:(value?.method||[]).map(String).filter(Boolean),warnings:(value?.warnings||[]).map(String).filter(Boolean),rawText:String(value?.rawText||'')};
+  return {
+    name: String(value?.name || ''),
+    servings: value?.servings !== null && value?.servings !== undefined ? +value.servings : null,
+    timeMinutes: value?.timeMinutes !== null && value?.timeMinutes !== undefined ? +value.timeMinutes : null,
+    mealTypes: Array.isArray(value?.mealTypes) && value.mealTypes.length ? value.mealTypes : ['dinner'],
+    sourceType: String(value?.sourceType || ''),
+    bookTitle: String(value?.bookTitle || ''),
+    author: String(value?.author || ''),
+    page: String(value?.page || ''),
+    url: String(value?.url || ''),
+    ingredients: (value?.ingredients || []).map(String).filter(Boolean),
+    method: (value?.method || []).map(String).filter(Boolean),
+    warnings: (value?.warnings || []).map(String).filter(Boolean),
+    rawText: String(value?.rawText || '')
+  };
 }
 
 function ensureRecipeRecognitionModal(){
@@ -6896,7 +7286,9 @@ function ensureRecipeRecognitionModal(){
 }
 function closeRecipeRecognitionModal(){document.getElementById('recipe-recognition-wrap')?.classList.remove('open');}
 
+let currentRecognisedRecipe = null;
 function openRecipeRecognitionReview(recipe,label){
+  currentRecognisedRecipe = recipe;
   const wrap=ensureRecipeRecognitionModal();
   wrap.querySelector('.modal').innerHTML=`<div class="row-between" style="align-items:center;margin-bottom:10px"><div><h3 style="margin:0">Review recognised recipe</h3><div style="font-size:11px;color:var(--text2);margin-top:3px">${ppEscapeHtml(label)}</div></div><button class="btn sm ghost" onclick="closeRecipeRecognitionModal()">Close</button></div><div class="msg warn" style="margin:0 0 12px">Check every quantity and instruction against the original. Recognition never supplies nutrition.</div><div class="grid3"><div style="grid-column:span 2"><label>Name</label><input id="recognised-name" value="${ppEscapeAttr(recipe.name)}"></div><div><label>Servings</label><input id="recognised-serves" type="number" min="1" value="${recipe.servings||''}"></div></div><div class="grid2"><div><label>Time (minutes)</label><input id="recognised-time" type="number" min="1" value="${recipe.timeMinutes||''}"></div><div><label>Book/source title</label><input id="recognised-book" value="${ppEscapeAttr(recipe.bookTitle)}"></div></div><div class="field"><label>Ingredients — one per line</label><textarea id="recognised-ingredients" style="min-height:180px">${ppEscapeHtml(recipe.ingredients.join('\n'))}</textarea></div><div class="field"><label>Method — one step per line</label><textarea id="recognised-method" style="min-height:220px">${ppEscapeHtml(recipe.method.join('\n'))}</textarea></div>${recipe.warnings.length?`<div class="msg warn">${recipe.warnings.map(ppEscapeHtml).join('<br>')}</div>`:''}<div class="btn-row" style="margin-top:14px"><button class="btn primary" onclick="applyRecognisedRecipeToForm()">Use in Add Recipe</button><button class="btn ghost" onclick="closeRecipeRecognitionModal()">Keep reviewing</button></div>`;
   wrap.classList.add('open');
@@ -6904,7 +7296,7 @@ function openRecipeRecognitionReview(recipe,label){
 
 function openRecipeTextPaste(){
   const wrap=ensureRecipeRecognitionModal();
-  wrap.querySelector('.modal').innerHTML=`<div class="row-between" style="align-items:center;margin-bottom:10px"><h3 style="margin:0">Paste extracted recipe text</h3><button class="btn sm ghost" onclick="closeRecipeRecognitionModal()">Close</button></div><p style="font-size:12px;color:var(--text2);margin-bottom:10px">Copy text using Apple Live Text or Google Lens, then paste it below. PlatePlan will structure it for review.</p><textarea id="recipe-paste-text" style="min-height:45dvh" placeholder="Recipe name&#10;&#10;Ingredients&#10;...&#10;&#10;Method&#10;..."></textarea><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="reviewPastedRecipeText()">Review recipe</button><button class="btn ghost" onclick="applyPastedRecipeDirectlyFromModal()">Use directly in Add Recipe</button><button class="btn ghost" onclick="closeRecipeRecognitionModal()">Cancel</button></div>`;
+  wrap.querySelector('.modal').innerHTML=`<div class="row-between" style="align-items:center;margin-bottom:10px"><h3 style="margin:0">Paste extracted recipe text</h3><button class="btn sm ghost" onclick="closeRecipeRecognitionModal()">Close</button></div><p style="font-size:12px;color:var(--text2);margin-bottom:10px">Copy text using Apple Live Text or Google Lens, then paste it below. PlatePlan will structure it for review.</p><textarea id="recipe-paste-text" style="min-height:45dvh" placeholder="Recipe name&#10;&#10;Number of Servings: 4&#10;Prep time: 15 mins&#10;&#10;Ingredients&#10;...&#10;&#10;Method&#10;..."></textarea><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="reviewPastedRecipeText()">Review recipe</button><button class="btn ghost" onclick="applyPastedRecipeDirectlyFromModal()">Use directly in Add Recipe</button><button class="btn ghost" onclick="closeRecipeRecognitionModal()">Cancel</button></div>`;
   wrap.classList.add('open');setTimeout(()=>document.getElementById('recipe-paste-text')?.focus(),0);
 }
 
@@ -6944,84 +7336,35 @@ function applyPastedRecipeDirectlyFromModal(){
 function applyRecognisedRecipeDirectlyToForm(parsed){
   const recipe = normaliseRecognisedRecipe(parsed || {});
   
-  // Set preservation flag so showView('add') does not wipe the form
+  // Set pending pre-fill and preservation flag so form isn't wiped during view transition
+  platePlanPendingRecipePreFill = recipe;
   platePlanPreserveAddForm = true;
-  showView('add');
-
-  // Clean existing form state explicitly first
-  if(typeof clearForm === 'function') clearForm();
-
-  const nameEl = document.getElementById('r-name');
-  if(nameEl){
-    nameEl.value = recipe.name || '';
-    nameEl.dispatchEvent(new Event('input', { bubbles: true }));
-  }
-
-  const servesOrigEl = document.getElementById('r-serves-orig');
-  const servesTargetEl = document.getElementById('r-serves');
-  const servesVal = recipe.servings ? String(recipe.servings) : '';
-  if(servesOrigEl){
-    servesOrigEl.value = servesVal;
-    servesOrigEl.dispatchEvent(new Event('input', { bubbles: true }));
-  }
-  if(servesTargetEl){
-    servesTargetEl.value = servesVal || '2';
-    servesTargetEl.dispatchEvent(new Event('input', { bubbles: true }));
-  }
-
-  const timeEl = document.getElementById('r-time');
-  if(timeEl){
-    timeEl.value = recipe.timeMinutes ? String(recipe.timeMinutes) : '';
-    timeEl.dispatchEvent(new Event('input', { bubbles: true }));
-  }
-
-  const ingsEl = document.getElementById('r-ingredients');
-  if(ingsEl){
-    ingsEl.value = Array.isArray(recipe.ingredients) ? recipe.ingredients.join('\n') : (recipe.ingredients || '');
-    ingsEl.dispatchEvent(new Event('input', { bubbles: true }));
-  }
-
-  const methodEl = document.getElementById('r-method');
-  if(methodEl){
-    methodEl.value = Array.isArray(recipe.method) ? recipe.method.join('\n') : (recipe.method || '');
-    methodEl.dispatchEvent(new Event('input', { bubbles: true }));
-  }
-
-  const bookTitle = recipe.bookTitle || '';
-  const author = recipe.author || '';
-  const page = recipe.page || '';
-  const srcType = document.getElementById('r-src-type');
-  if(bookTitle || author || page){
-    if(srcType) srcType.value = 'book';
-    updateSrcFields();
-    const bookEl = document.getElementById('r-src-book');
-    const authEl = document.getElementById('r-src-author');
-    const pageEl = document.getElementById('r-src-page');
-    if(bookEl) bookEl.value = bookTitle;
-    if(authEl) authEl.value = author;
-    if(pageEl) pageEl.value = page;
-    updateSrcPreview();
-  }
 
   closeRecipeRecognitionModal();
   clearRecipePhotos();
 
-  requestAnimationFrame(() => {
-    nameEl?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    nameEl?.focus();
-  });
-  showMsg('form-msg', 'Recipe text loaded. Select original serves, target serves, meal type, suitable for, and source, then click Parse & Verify.', 'info');
-  if(typeof showPlatePlanToast === 'function') showPlatePlanToast('Recipe text loaded into Add Recipe');
+  showView('add');
+  applyPendingRecipePreFillToForm();
 }
 
 function applyRecognisedRecipeToForm(){
   const name = document.getElementById('recognised-name')?.value.trim() || '';
   const serves = +document.getElementById('recognised-serves')?.value || null;
-  const timeMinutes = +document.getElementById('recognised-time')?.value || null;
+  const timeMinutes = document.getElementById('recognised-time')?.value !== '' ? +document.getElementById('recognised-time')?.value : null;
   const bookTitle = document.getElementById('recognised-book')?.value.trim() || '';
   const ingredients = (document.getElementById('recognised-ingredients')?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
   const method = (document.getElementById('recognised-method')?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
-  applyRecognisedRecipeDirectlyToForm({ name, servings: serves, timeMinutes, bookTitle, ingredients, method });
+  
+  const merged = {
+    ...(currentRecognisedRecipe || {}),
+    name,
+    servings: serves,
+    timeMinutes,
+    bookTitle,
+    ingredients,
+    method
+  };
+  applyRecognisedRecipeDirectlyToForm(merged);
 }
 
 // == SOURCE FIELDS ==
@@ -7104,6 +7447,8 @@ function setMealTypes(types){['breakfast','lunch','dinner'].forEach(t=>{const el
 // == RECIPE FORM ==
 function clearForm(){
   ['r-name','r-serves','r-serves-orig','r-time','r-ingredients','r-method','r-src-url','r-src-book','r-src-author','r-src-page','r-src-other'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const targetServesEl = document.getElementById('r-serves');
+  if(targetServesEl) delete targetServesEl.dataset.manuallyChanged;
   document.getElementById('r-who').value='both';
   document.getElementById('r-src-type').value='';
   setMealTypes(['dinner']);
@@ -9283,10 +9628,13 @@ function deleteCategory(slug) {
     const affected = state.ingredients.filter(i => i.cat === slug);
     if (affected.length === 0) {
         openAppConfirmModal('Delete category?',`Delete <strong>${ppEscapeHtml(CAT[slug]||slug)}</strong>?`,'Delete category',()=>{
-          state.customCats[slug] = null;
+          delete state.customCats[slug];
           delete CAT[slug];
-          saveState();
+          state.meta = state.meta || {};
+          if (!Array.isArray(state.meta.deletedCategoryIds)) state.meta.deletedCategoryIds = [];
+          if (!state.meta.deletedCategoryIds.includes(slug)) state.meta.deletedCategoryIds.push(slug);
           ['mi-cat', 'pp-cat', 'tp-cat', 'mini-cat'].forEach(id => renderCatOptions(id, 'other'));
+          persistPlatePlanDataQualityFix('Category delete');
           renderDataQuality();
           renderBank();
         });
@@ -9349,12 +9697,18 @@ function applyCategoryReassign(oldSlug, existingVal, newName) {
     state.ingredients.forEach(i => { if (i.cat === oldSlug) i.cat = targetSlug; });
 
     // Delete old category
-    state.customCats[oldSlug] = null;
+    delete state.customCats[oldSlug];
     delete CAT[oldSlug];
+    state.meta = state.meta || {};
+    if (!Array.isArray(state.meta.deletedCategoryIds)) state.meta.deletedCategoryIds = [];
+    if (!state.meta.deletedCategoryIds.includes(oldSlug)) state.meta.deletedCategoryIds.push(oldSlug);
 
-    document.getElementById('cat-reassign-modal').remove();
+    document.getElementById('cat-reassign-modal')?.remove();
     ['mi-cat', 'pp-cat', 'tp-cat', 'mini-cat'].forEach(id => renderCatOptions(id, 'other'));
     refreshHierarchyViews();
+    persistPlatePlanDataQualityFix('Category reassign');
+    renderDataQuality();
+    renderBank();
 }
 
 function editCategory(slug) {
@@ -9460,12 +9814,18 @@ function applyProductMerge() {
         if(g.productIds.includes(pId)) refreshAutoDefaultProductForGroup(g.id);
     });
     
-    // 3. Delete old ingredients from bank
+    // 3. Delete old ingredients from bank and record tombstones
+    state.meta = state.meta || {};
+    if (!Array.isArray(state.meta.deletedProductIds)) state.meta.deletedProductIds = [];
+    oldIds.forEach(id => {
+      if (!state.meta.deletedProductIds.includes(id)) state.meta.deletedProductIds.push(id);
+    });
+
     state.ingredients = state.ingredients.filter(i => !oldIds.includes(i.id));
     refreshProductGroupAndRecipes(pId);
     
-    saveState();
     closeMergeModal();
+    persistPlatePlanDataQualityFix('Product merge');
     renderDataQuality();
     renderBank();
     showPlatePlanToast('Merge complete. Recipes and plan overrides were updated.');
@@ -14314,8 +14674,12 @@ function deleteIng(id){
           if(Array.isArray(group.productIds)) group.productIds = group.productIds.filter(pid => pid !== id);
           if(group.defaultProductId === id) refreshAutoDefaultProductForGroup(group.id);
         });
+        state.meta = state.meta || {};
+        if (!Array.isArray(state.meta.deletedProductIds)) state.meta.deletedProductIds = [];
+        if (!state.meta.deletedProductIds.includes(id)) state.meta.deletedProductIds.push(id);
         state.ingredients = state.ingredients.filter(i=>i.id!==id);
-        refreshPlatePlanDerivedState({ persist:true, render:true });
+        refreshPlatePlanDerivedState({ persist:false, render:true });
+        persistPlatePlanDataQualityFix('Delete product');
       })
     );
 }
@@ -14582,10 +14946,13 @@ function applyReplaceAndDelete(c){
         }
     });
 
-    // Finally, delete the ingredient
+    // Finally, delete the ingredient and record tombstone
+    state.meta = state.meta || {};
+    if (!Array.isArray(state.meta.deletedProductIds)) state.meta.deletedProductIds = [];
+    if (!state.meta.deletedProductIds.includes(c.targetId)) state.meta.deletedProductIds.push(c.targetId);
     state.ingredients = state.ingredients.filter(i => i.id !== c.targetId);
-    saveState();
     closeReplaceModal();
+    persistPlatePlanDataQualityFix('Replace and delete product');
     if(typeof renderBank==='function') renderBank();
     if(typeof renderVault==='function') renderVault();
     if(typeof renderDataQuality==='function') renderDataQuality();
