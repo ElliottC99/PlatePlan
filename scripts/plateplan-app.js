@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.6.7';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v42';
+const PLATEPLAN_APP_VERSION='2.6.8';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v43';
 const SEED=[];
 
 let state = null;
@@ -748,14 +748,24 @@ function platePlanCloudRef(key){
 let platePlanCurrentPushPromise = null;
 
 async function persistPlatePlanDataQualityFix(reason = 'Data quality update'){
-  saveState(true);
-  return await pushStateToCloud(true);
+  try {
+    saveState(true);
+    return await pushStateToCloud(true);
+  } catch(error) {
+    console.warn(`persistPlatePlanDataQualityFix failed (${reason}):`, error);
+    showPlatePlanToast('Save Failed: Database update could not be committed.');
+    throw error;
+  }
 }
 
 async function pushStateToCloud(force=false){
   if(!platePlanCloudReady || !platePlanCloudUser || !platePlanDb) return;
   if(!navigator.onLine){
     updatePlatePlanSyncStatus('offline','Offline · changes saved locally');
+    if(force){
+      showPlatePlanToast('Save Failed: Database update could not be committed.');
+      throw new Error('Save Failed: Database update could not be committed.');
+    }
     return;
   }
 
@@ -907,12 +917,14 @@ async function pushStateToCloud(force=false){
       updatePlatePlanSyncStatus('synced');
     }catch(error){
       console.warn('PlatePlan Cloud push failed:',error);
+      showPlatePlanToast('Save Failed: Database update could not be committed.');
       platePlanSyncErrorCount++;
       // Exponential backoff to protect backend: 3s, 6s, 12s, 24s, up to 60s
       const backoffMs = Math.min(60000, Math.pow(2, platePlanSyncErrorCount) * 1500);
       platePlanBackoffUntil = Date.now() + backoffMs;
       platePlanLastSyncError=error?.message||'Cloud push failed';
       updatePlatePlanSyncStatus(navigator.onLine?'error':'offline',platePlanLastSyncError);
+      throw error;
     }finally{
       platePlanIsPushing=false;
       platePlanCurrentPushPromise=null;
@@ -922,6 +934,7 @@ async function pushStateToCloud(force=false){
       }
     }
   })();
+  platePlanCurrentPushPromise.catch(()=>{});
 
   return platePlanCurrentPushPromise;
 }
@@ -14625,7 +14638,14 @@ async function saveManualIng(categoryReady=false){
   }
   refreshProductGroupAndRecipes(ing.id);
   
-  await persistPlatePlanDataQualityFix('Product update');
+  try {
+    await persistPlatePlanDataQualityFix('Product update');
+  } catch(error) {
+    console.error('saveManualIng failed to commit product to database:', error);
+    showPlatePlanToast('Save Failed: Database update could not be committed.');
+    showMsg('mi-msg', 'Save Failed: Database update could not be committed.', 'error');
+    return;
+  }
   if(handlePendingRecipeNutritionAfterSave(ing.id)){
     refreshAfterIngredientEdit(ing.id);
     return;
