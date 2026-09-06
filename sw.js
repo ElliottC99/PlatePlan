@@ -1,41 +1,41 @@
-const PLATEPLAN_CACHE = 'plateplan-shell-v45';
-const PLATEPLAN_APP_VERSION = '2.6.10';
-const PLATEPLAN_BUILD_ID = '2.6.10-v45';
+const PLATEPLAN_CACHE = 'plateplan-shell-v46';
+const PLATEPLAN_APP_VERSION = '2.6.11';
+const PLATEPLAN_BUILD_ID = '2.6.11-v46';
 const PLATEPLAN_LOCAL_SHELL = [
   './',
   './PlatePlan.html',
   './repair-update.html',
   './manifest.json',
   './firebase-config.js',
-  './styles/tokens.css?v=2.6.10',
-  './styles/components.css?v=2.6.10',
-  './styles/responsive.css?v=2.6.10',
-  './styles/print.css?v=2.6.10',
-  './scripts/plateplan-app.js?v=2.6.10',
-  './scripts/bootstrap.js?v=2.6.10',
-  './scripts/main.js?v=2.6.10',
-  './scripts/core/contracts.js?v=2.6.10',
-  './scripts/core/store.js?v=2.6.10',
-  './scripts/core/runtime.js?v=2.6.10',
-  './scripts/services/firebase.js?v=2.6.10',
-  './scripts/services/sync.js?v=2.6.10',
-  './scripts/services/recovery.js?v=2.6.10',
-  './scripts/services/updates.js?v=2.6.10',
-  './scripts/ui/actions.js?v=2.6.10',
-  './scripts/ui/navigation.js?v=2.6.10',
-  './scripts/ui/workspaces.js?v=2.6.10',
-  './scripts/features/create-legacy-view.js?v=2.6.10',
-  './scripts/features/today.js?v=2.6.10',
-  './scripts/features/recipes.js?v=2.6.10',
-  './scripts/features/recipe-add.js?v=2.6.10',
-  './scripts/features/ingredients.js?v=2.6.10',
-  './scripts/features/products.js?v=2.6.10',
-  './scripts/features/planner.js?v=2.6.10',
-  './scripts/features/library.js?v=2.6.10',
-  './scripts/features/shopping.js?v=2.6.10',
-  './scripts/features/search.js?v=2.6.10',
-  './scripts/features/data-quality.js?v=2.6.10',
-  './scripts/features/preferences.js?v=2.6.10',
+  './styles/tokens.css?v=2.6.11',
+  './styles/components.css?v=2.6.11',
+  './styles/responsive.css?v=2.6.11',
+  './styles/print.css?v=2.6.11',
+  './scripts/plateplan-app.js?v=2.6.11',
+  './scripts/bootstrap.js?v=2.6.11',
+  './scripts/main.js?v=2.6.11',
+  './scripts/core/contracts.js?v=2.6.11',
+  './scripts/core/store.js?v=2.6.11',
+  './scripts/core/runtime.js?v=2.6.11',
+  './scripts/services/firebase.js?v=2.6.11',
+  './scripts/services/sync.js?v=2.6.11',
+  './scripts/services/recovery.js?v=2.6.11',
+  './scripts/services/updates.js?v=2.6.11',
+  './scripts/ui/actions.js?v=2.6.11',
+  './scripts/ui/navigation.js?v=2.6.11',
+  './scripts/ui/workspaces.js?v=2.6.11',
+  './scripts/features/create-legacy-view.js?v=2.6.11',
+  './scripts/features/today.js?v=2.6.11',
+  './scripts/features/recipes.js?v=2.6.11',
+  './scripts/features/recipe-add.js?v=2.6.11',
+  './scripts/features/ingredients.js?v=2.6.11',
+  './scripts/features/products.js?v=2.6.11',
+  './scripts/features/planner.js?v=2.6.11',
+  './scripts/features/library.js?v=2.6.11',
+  './scripts/features/shopping.js?v=2.6.11',
+  './scripts/features/search.js?v=2.6.11',
+  './scripts/features/data-quality.js?v=2.6.11',
+  './scripts/features/preferences.js?v=2.6.11',
   './icon-192.png',
   './icon-512.png',
   './icon-192-maskable.png',
@@ -59,12 +59,12 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => {
-      const knownStaleCaches = ['plateplan-shell-v44', 'plateplan-shell-v43', 'plateplan-shell-v42', 'plateplan-shell-v41', 'plateplan-shell-v40'];
+      const knownStaleCaches = ['plateplan-shell-v45', 'plateplan-shell-v44', 'plateplan-shell-v43', 'plateplan-shell-v42', 'plateplan-shell-v41', 'plateplan-shell-v40'];
       return Promise.all(
         keys
           .filter(key => key !== PLATEPLAN_CACHE || knownStaleCaches.includes(key))
           .map(key => {
-            console.log('[SW v2.6.10] Evicting stale shell cache:', key);
+            console.log('[SW v2.6.11] Evicting stale shell cache:', key);
             return caches.delete(key);
           })
       );

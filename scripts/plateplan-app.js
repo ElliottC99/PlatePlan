@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.6.10';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v45';
+const PLATEPLAN_APP_VERSION='2.6.11';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v46';
 const SEED=[];
 
 let state = null;
@@ -530,6 +530,10 @@ function normalizeLoadedState(s, { injectSeed = false, restoreRecipeBackup = fal
   if (!s.dataQualityDismissals || typeof s.dataQualityDismissals !== 'object' || Array.isArray(s.dataQualityDismissals)) s.dataQualityDismissals = {};
   if(!s.meta || typeof s.meta !== 'object') s.meta = {};
   s.meta.schemaVersion = +s.meta.schemaVersion || 1;
+  const targetHouseholdId = s.meta.householdId || window.activeHouseholdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+  s.meta.householdId = targetHouseholdId;
+  window.activeHouseholdId = targetHouseholdId;
+  window.activeHousehold = { id: targetHouseholdId };
   if(!Array.isArray(s.meta.deletedProductIds)) s.meta.deletedProductIds = [];
   if(!Array.isArray(s.meta.deletedCategoryIds)) s.meta.deletedCategoryIds = [];
   if(s.meta.deletedProductIds.length > 0){
@@ -757,16 +761,26 @@ function platePlanStateProjection(source=state){
 }
 
 function getPlatePlanHouseholdId(){
-  return window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+  const hid = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+  if (!window.activeHouseholdId && hid) {
+    window.activeHouseholdId = hid;
+    window.activeHousehold = { id: hid };
+  }
+  if (state?.meta && !state.meta.householdId && hid) {
+    state.meta.householdId = hid;
+  }
+  return hid;
 }
 
-function getPlatePlanDataCollection(){
-  return platePlanDb.collection('households').doc(getPlatePlanHouseholdId()).collection('data');
+function getPlatePlanDataCollection(explicitHouseholdId){
+  const hid = explicitHouseholdId || getPlatePlanHouseholdId();
+  return platePlanDb.collection('households').doc(hid).collection('data');
 }
 
-function platePlanCloudRef(key){
+function platePlanCloudRef(key, explicitHouseholdId){
+  const hid = explicitHouseholdId || getPlatePlanHouseholdId();
   const parts=String(key).split('/');
-  return platePlanDb.collection('households').doc(getPlatePlanHouseholdId()).collection(parts[0]).doc(encodeURIComponent(parts.slice(1).join('/')));
+  return platePlanDb.collection('households').doc(hid).collection(parts[0]).doc(encodeURIComponent(parts.slice(1).join('/')));
 }
 
 let platePlanCurrentPushPromise = null;
@@ -788,6 +802,14 @@ async function persistPlatePlanDataQualityFix(reason = 'Data quality update'){
 }
 
 async function pushStateToCloud(force=false){
+  const targetHouseholdId = window.activeHouseholdId || state?.meta?.householdId;
+  if (!targetHouseholdId) {
+    console.error('[CLOUD SAVE ERROR] Active household ID is undefined! Aborting write.');
+    alert('Save Failed: Active household session not found. Please refresh and log in again.');
+    throw new Error('Active household ID is undefined');
+  }
+  console.log('[FIRESTORE ACTIVE PATH]', `households/${targetHouseholdId}/data/products`);
+
   if(!platePlanCloudReady || !platePlanCloudUser || !platePlanDb) return;
   if(!navigator.onLine){
     updatePlatePlanSyncStatus('offline','Offline · changes saved locally');
@@ -829,7 +851,7 @@ async function pushStateToCloud(force=false){
 
   platePlanCurrentPushPromise = (async () => {
     try{
-      const dataCol=getPlatePlanDataCollection();
+      const dataCol = platePlanDb.collection('households').doc(targetHouseholdId).collection('data');
       const cleaned=cleanCloudValue(state);
       if(!cleaned) throw new Error('State payload is empty');
 
@@ -976,17 +998,24 @@ const platePlanTransactionShield = {
 
 function createSafeStateSnapshot(sourceState) {
   if (!sourceState || typeof sourceState !== 'object') return {};
+  const targetHouseholdId = window.activeHouseholdId || sourceState?.meta?.householdId || 'elliott-chloe';
   try {
-    return JSON.parse(JSON.stringify(sourceState, (key, value) => {
+    const clone = JSON.parse(JSON.stringify(sourceState, (key, value) => {
       if (typeof value === 'function') return undefined;
       if (typeof Node !== 'undefined' && value instanceof Node) return undefined;
       if (value instanceof Set) return Array.from(value);
       if (value instanceof Map) return Object.fromEntries(value);
       return value;
     }));
+    if (!clone.meta) clone.meta = {};
+    clone.meta.householdId = targetHouseholdId;
+    return clone;
   } catch (err) {
     console.warn('createSafeStateSnapshot fallback clone:', err);
-    return JSON.parse(JSON.stringify(sourceState));
+    const clone = JSON.parse(JSON.stringify(sourceState));
+    if (!clone.meta) clone.meta = {};
+    clone.meta.householdId = targetHouseholdId;
+    return clone;
   }
 }
 
@@ -1300,6 +1329,13 @@ async function executeDataQualityTransaction(mutationType, payload = {}, options
 
     // Rollback local memory and storage
     state = rollbackState;
+    if (state) {
+      if (!state.meta) state.meta = {};
+      const hid = window.activeHouseholdId || rollbackState?.meta?.householdId || 'elliott-chloe';
+      state.meta.householdId = hid;
+      window.activeHouseholdId = hid;
+      window.activeHousehold = { id: hid };
+    }
     try {
       localStorage.setItem(SK, JSON.stringify(state));
       if (Array.isArray(state.recipes)) localStorage.setItem(RECIPES_BACKUP_SK, JSON.stringify(state.recipes));
@@ -1719,6 +1755,7 @@ function reconcilePlatePlanState(local, remote, options = {}) {
     meta: {
       ...(remote.meta || {}),
       ...(local.meta || {}),
+      householdId: window.activeHouseholdId || remote.meta?.householdId || local.meta?.householdId || 'elliott-chloe',
       deletedProductIds: Array.from(allDeletedProducts),
       deletedCategoryIds: Array.from(allDeletedCats)
     },
@@ -1973,7 +2010,15 @@ function ensurePlatePlanMigrationModal(){
 
 async function loadSharedPlatePlan(){
   updatePlatePlanSyncStatus('connecting');
-  const dataCol = getPlatePlanDataCollection();
+  const targetHouseholdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+  window.activeHouseholdId = targetHouseholdId;
+  window.activeHousehold = { id: targetHouseholdId };
+  if (!state.meta) state.meta = {};
+  state.meta.householdId = targetHouseholdId;
+
+  console.log('[FIRESTORE ACTIVE PATH]', `households/${targetHouseholdId}/data/products`);
+
+  const dataCol = platePlanDb.collection('households').doc(targetHouseholdId).collection('data');
   
   const snapshot=await dataCol.get();
   const docs={};
@@ -2017,6 +2062,7 @@ async function loadSharedPlatePlan(){
       packPicks: metaDoc.packPicks || {},
       meta: {
         ...(metaDoc.meta || {}),
+        householdId: targetHouseholdId,
         deletedProductIds: Array.isArray(metaDoc.meta?.deletedProductIds) ? metaDoc.meta.deletedProductIds : (Array.isArray(metaDoc.deletedProductIds) ? metaDoc.deletedProductIds : []),
         deletedCategoryIds: Array.isArray(metaDoc.meta?.deletedCategoryIds) ? metaDoc.meta.deletedCategoryIds : (Array.isArray(metaDoc.deletedCategoryIds) ? metaDoc.deletedCategoryIds : [])
       },
@@ -2171,7 +2217,11 @@ async function startPlatePlanForSignedInUser(user){
   updatePlatePlanSyncStatus('connecting');
   try{
     const config=window.PLATEPLAN_FIREBASE||{};
-    const householdId=config.householdId||'elliott-chloe';
+    const householdId=window.activeHouseholdId || state?.meta?.householdId || config.householdId || 'elliott-chloe';
+    window.activeHouseholdId = householdId;
+    window.activeHousehold = { id: householdId };
+    if (!state.meta) state.meta = {};
+    state.meta.householdId = householdId;
     const root=platePlanDb.collection('households').doc(householdId);
     
     // Automatically record / ensure member is registered so no device is ever locked out
@@ -2200,8 +2250,17 @@ function initPlatePlanCloudSync(){
     platePlanDb.enablePersistence({synchronizeTabs:true}).catch(error=>console.info('Firestore persistent cache unavailable',error.code));
     platePlanAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
     platePlanAuth.onAuthStateChanged(user=>{
-      if(user) startPlatePlanForSignedInUser(user);
-      else{ platePlanCloudUser=null; platePlanCloudReady=false; document.getElementById('sync-user').textContent=''; updatePlatePlanSyncStatus('connecting','Sign in required'); showPlatePlanAuthScreen(); }
+      if(user) {
+        const config=window.PLATEPLAN_FIREBASE||{};
+        const householdId=config.householdId || state?.meta?.householdId || window.activeHouseholdId || 'elliott-chloe';
+        window.activeHouseholdId = householdId;
+        window.activeHousehold = { id: householdId };
+        if (!state.meta) state.meta = {};
+        state.meta.householdId = householdId;
+        startPlatePlanForSignedInUser(user);
+      } else {
+        platePlanCloudUser=null; platePlanCloudReady=false; document.getElementById('sync-user').textContent=''; updatePlatePlanSyncStatus('connecting','Sign in required'); showPlatePlanAuthScreen();
+      }
     });
   }catch(error){ updatePlatePlanSyncStatus('error',error.message); }
 }
@@ -2405,6 +2464,11 @@ function initializePlatePlanApplication(){
   clearVolatileSavedDom(document);
   loadBakedState();
   state = loadState();
+  const bootHouseholdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+  window.activeHouseholdId = bootHouseholdId;
+  window.activeHousehold = { id: bootHouseholdId };
+  if (!state.meta) state.meta = {};
+  state.meta.householdId = bootHouseholdId;
   preserveStateBeforeModularMigration();
   rebuildPlatePlanIndexes();
   applyPlatePlanAppearance();
