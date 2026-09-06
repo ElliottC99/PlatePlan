@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.6.9';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v44';
+const PLATEPLAN_APP_VERSION='2.6.10';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v45';
 const SEED=[];
 
 let state = null;
@@ -491,32 +491,25 @@ function dismissBakedFileState(){
 
 const RECIPES_BACKUP_SK='plateplan_recipes_backup_v2';
 
-function loadState(){
-  let s = {recipes:[],ingredients:[...SEED],ingredientGroups:[],ingredientFamilies:[],ignoredGroupMergeSuggestions:[],ignoredDataQualityWarnings:[],dataQualityDismissals:{},useUpProducts:{},plan:{},planHistory:[],excluded:{},prefs:{exclude:'mushrooms, courgette',exclusions:{shared:[],elliott:[],chloe:[]},diet:'vegetarian',ecal:2400,eprot:130,ccal:1700,cprot:100, shopGroupBy: 'family', productPriority:'protein',prioritiseUseUpProducts:false}, customCats:{}};
-  try{
-    const d=localStorage.getItem(SK);
-    if(d){
-      const parsed = JSON.parse(d);
-      s = { ...s, ...parsed };
-      
-      const existingIds=new Set((s.ingredients||[]).map(i=>i.id));
-      const missing=SEED.filter(i=>!existingIds.has(i.id));
-      s.ingredients=[...(s.ingredients||[]),...missing];
-    }
-    const backupRaw = localStorage.getItem(RECIPES_BACKUP_SK);
-    if(backupRaw){
-      const backupRecipes = JSON.parse(backupRaw);
-      if(Array.isArray(backupRecipes) && backupRecipes.length > 0){
-        const existingRecipeIds = new Set((s.recipes || []).map(r => r?.id).filter(Boolean));
-        backupRecipes.forEach(br => {
-          if(br && br.id && !existingRecipeIds.has(br.id)){
-            s.recipes.push(br);
-          }
-        });
+function normalizeLoadedState(s, { injectSeed = false, restoreRecipeBackup = false } = {}){
+  if (!s || typeof s !== 'object') return s;
+
+  if (injectSeed && (!Array.isArray(s.ingredients) || s.ingredients.length === 0)) {
+    s.ingredients = [...SEED];
+  }
+
+  if (restoreRecipeBackup && (!Array.isArray(s.recipes) || s.recipes.length === 0)) {
+    try {
+      const backupRaw = localStorage.getItem(RECIPES_BACKUP_SK);
+      if (backupRaw) {
+        const backupRecipes = JSON.parse(backupRaw);
+        if (Array.isArray(backupRecipes) && backupRecipes.length > 0) {
+          s.recipes = backupRecipes;
+        }
       }
-    }
-  }catch(e){}
-  
+    } catch (_e) {}
+  }
+
   if (s.plan && s.plan.slots) {
       for (let d in s.plan.slots) {
           for (let k in s.plan.slots[d]) {
@@ -559,6 +552,7 @@ function loadState(){
     if(plan && (!plan.shoppingAtHome || typeof plan.shoppingAtHome !== 'object' || Array.isArray(plan.shoppingAtHome))) plan.shoppingAtHome = {};
     if(plan && (!plan.slotReasons || typeof plan.slotReasons !== 'object' || Array.isArray(plan.slotReasons))) plan.slotReasons = {};
   });
+  if (!s.prefs || typeof s.prefs !== 'object') s.prefs = {};
   if (!s.prefs.productPriority) s.prefs.productPriority = 'protein';
   s.prefs.prioritiseUseUpProducts = !!s.prefs.prioritiseUseUpProducts;
   if (!s.prefs.planTrafficFilter) s.prefs.planTrafficFilter = 'any';
@@ -631,6 +625,29 @@ function loadState(){
   CAT = { ...STANDARD_CATS, ...s.customCats };
   Object.keys(CAT).forEach(k => { if(!CAT[k] || s.meta.deletedCategoryIds.includes(k)) delete CAT[k]; });
   return s;
+}
+
+function loadState(){
+  let s = {recipes:[],ingredients:[...SEED],ingredientGroups:[],ingredientFamilies:[],ignoredGroupMergeSuggestions:[],ignoredDataQualityWarnings:[],dataQualityDismissals:{},useUpProducts:{},plan:{},planHistory:[],excluded:{},prefs:{exclude:'mushrooms, courgette',exclusions:{shared:[],elliott:[],chloe:[]},diet:'vegetarian',ecal:2400,eprot:130,ccal:1700,cprot:100, shopGroupBy: 'family', productPriority:'protein',prioritiseUseUpProducts:false}, customCats:{}};
+  try{
+    const d=localStorage.getItem(SK);
+    if(d){
+      const parsed = JSON.parse(d);
+      s = { ...s, ...parsed };
+      if (!Array.isArray(s.ingredients) || s.ingredients.length === 0) {
+        s.ingredients = [...SEED];
+      }
+    }
+    const backupRaw = localStorage.getItem(RECIPES_BACKUP_SK);
+    if(backupRaw && (!Array.isArray(s.recipes) || s.recipes.length === 0)){
+      const backupRecipes = JSON.parse(backupRaw);
+      if(Array.isArray(backupRecipes) && backupRecipes.length > 0){
+        s.recipes = backupRecipes;
+      }
+    }
+  }catch(e){}
+  
+  return normalizeLoadedState(s, { injectSeed: false, restoreRecipeBackup: false });
 }
 
 const SYNC_OUTBOX_SK='plateplan_v1_sync_outbox';
@@ -739,10 +756,17 @@ function platePlanStateProjection(source=state){
   return out;
 }
 
+function getPlatePlanHouseholdId(){
+  return window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+}
+
+function getPlatePlanDataCollection(){
+  return platePlanDb.collection('households').doc(getPlatePlanHouseholdId()).collection('data');
+}
+
 function platePlanCloudRef(key){
-  const config=window.PLATEPLAN_FIREBASE||{};
   const parts=String(key).split('/');
-  return platePlanDb.collection('households').doc(config.householdId).collection(parts[0]).doc(encodeURIComponent(parts.slice(1).join('/')));
+  return platePlanDb.collection('households').doc(getPlatePlanHouseholdId()).collection(parts[0]).doc(encodeURIComponent(parts.slice(1).join('/')));
 }
 
 let platePlanCurrentPushPromise = null;
@@ -805,9 +829,7 @@ async function pushStateToCloud(force=false){
 
   platePlanCurrentPushPromise = (async () => {
     try{
-      const config=window.PLATEPLAN_FIREBASE||{};
-      const householdId=config.householdId||'elliott-chloe';
-      const dataCol=platePlanDb.collection('households').doc(householdId).collection('data');
+      const dataCol=getPlatePlanDataCollection();
       const cleaned=cleanCloudValue(state);
       if(!cleaned) throw new Error('State payload is empty');
 
@@ -896,7 +918,7 @@ async function pushStateToCloud(force=false){
       };
 
       const batch = platePlanDb.batch();
-      if(changedKeys.includes('meta')) batch.set(dataCol.doc('meta'), { ...baseMeta, ...metaContent });
+      batch.set(dataCol.doc('meta'), { ...baseMeta, ...metaContent });
       if(changedKeys.includes('recipes')) batch.set(dataCol.doc('recipes'), { ...baseMeta, ...recipesContent });
       if(changedKeys.includes('products')) batch.set(dataCol.doc('products'), { ...baseMeta, ...productsContent });
       if(changedKeys.includes('taxonomy')) batch.set(dataCol.doc('taxonomy'), { ...baseMeta, ...taxonomyContent });
@@ -906,6 +928,7 @@ async function pushStateToCloud(force=false){
       await batch.commit();
 
       // Store verified pushed signatures
+      platePlanLastPushedSignatures.meta = sigs.meta;
       changedKeys.forEach(k => { platePlanLastPushedSignatures[k] = sigs[k]; });
 
       // Clean up oversized monolithic legacy state doc at most once
@@ -996,20 +1019,33 @@ async function executeDataQualityTransaction(mutationType, payload = {}, options
     // 3. Direct Root State Mutation
     switch (mutationType) {
       case 'UPDATE_PRODUCT': {
-        const { product, isNew } = payload;
+        const { product, isNew, groupUpdate } = payload;
         if (!product || !product.id) throw new Error('Invalid product payload');
         product.updatedAt = nowIso;
         if (isNew) {
-          state.ingredients.push(product);
+          const existingIdx = state.ingredients.findIndex(x => x.id === product.id);
+          if (existingIdx > -1) state.ingredients[existingIdx] = product;
+          else state.ingredients.push(product);
         } else {
           const idx = state.ingredients.findIndex(x => x.id === product.id);
           if (idx > -1) state.ingredients[idx] = product;
           else state.ingredients.push(product);
         }
-        if (payload.groupUpdate && payload.groupUpdate.id) {
-          const grp = (state.ingredientGroups || []).find(g => g.id === payload.groupUpdate.id);
+        if (groupUpdate && groupUpdate.id) {
+          const grp = (state.ingredientGroups || []).find(g => g.id === groupUpdate.id);
           if (grp) {
-            Object.assign(grp, payload.groupUpdate);
+            Object.assign(grp, groupUpdate);
+            grp.updatedAt = nowIso;
+          } else {
+            state.ingredientGroups.push(groupUpdate);
+          }
+        }
+        if (product.groupId) {
+          const grp = (state.ingredientGroups || []).find(g => g.id === product.groupId);
+          if (grp) {
+            if (!Array.isArray(grp.productIds)) grp.productIds = [];
+            if (!grp.productIds.includes(product.id)) grp.productIds.push(product.id);
+            if (!grp.defaultProductId) grp.defaultProductId = product.id;
             grp.updatedAt = nowIso;
           }
         }
@@ -1226,6 +1262,10 @@ async function executeDataQualityTransaction(mutationType, payload = {}, options
 
     state.updatedAt = nowIso;
 
+    // Refresh derived indexes & cache before serialization to cloud
+    rebuildPlatePlanIndexes();
+    platePlanNutritionCache.clear();
+
     // 4. Local Persistence
     try {
       localStorage.setItem(SK, JSON.stringify(state));
@@ -1234,13 +1274,11 @@ async function executeDataQualityTransaction(mutationType, payload = {}, options
       console.warn('Local storage write warning in executeDataQualityTransaction:', e);
     }
 
-    // 5. Explicit Forced Cloud Write
+    // 5. Explicit Forced Cloud Write: serializes live global state
     await pushStateToCloud(true);
 
     // 6. Finalize Success
     platePlanTransactionShield.lastCompletedAt = Date.now();
-    rebuildPlatePlanIndexes();
-    platePlanNutritionCache.clear();
 
     if (modalWrapId) {
       const modal = document.getElementById(modalWrapId);
@@ -1379,10 +1417,15 @@ function setPlatePlanSyncPathValue(target,path,value){
   return target;
 }
 
-function reconcilePlatePlanState(local, remote) {
+function reconcilePlatePlanState(local, remote, options = {}) {
   let hasLocalNewer = false;
   if (!remote || typeof remote !== 'object') return { state: local, hasLocalNewer: false };
   if (!local || typeof local !== 'object') return { state: remote, hasLocalNewer: false };
+
+  const isBoot = !!options.isBoot;
+  const localRootTime = local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
+  const remoteRootTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
+  const preferRemote = isBoot ? (remoteRootTime >= localRootTime || !localRootTime) : (remoteRootTime >= localRootTime);
 
   // Helper to score product data completeness
   const getProductCompleteness = p => {
@@ -1428,18 +1471,24 @@ function reconcilePlatePlanState(local, remote) {
         if (lr.enhanced && !rr.enhanced) {
           mergedRecipesMap.set(lr.id, { ...rr, enhanced: lr.enhanced });
           hasLocalNewer = true;
+        } else {
+          mergedRecipesMap.set(lr.id, rr);
         }
       } else {
         // Timestamps are equal or both missing
-        const localIngCount = (lr.ingredients || []).length;
-        const remoteIngCount = (rr.ingredients || []).length;
-        const localStepsCount = (lr.steps || []).length;
-        const remoteStepsCount = (rr.steps || []).length;
-        if (localIngCount > remoteIngCount || localStepsCount > remoteStepsCount || (lr.enhanced && !rr.enhanced)) {
-          mergedRecipesMap.set(lr.id, { ...rr, ...lr, enhanced: lr.enhanced || rr.enhanced });
-          hasLocalNewer = true;
-        } else if (JSON.stringify(lr) !== JSON.stringify(rr)) {
-          mergedRecipesMap.set(lr.id, { ...rr, ...lr });
+        if (preferRemote) {
+          mergedRecipesMap.set(lr.id, { ...lr, ...rr, enhanced: rr.enhanced || lr.enhanced });
+        } else {
+          const localIngCount = (lr.ingredients || []).length;
+          const remoteIngCount = (rr.ingredients || []).length;
+          const localStepsCount = (lr.steps || []).length;
+          const remoteStepsCount = (rr.steps || []).length;
+          if (localIngCount > remoteIngCount || localStepsCount > remoteStepsCount || (lr.enhanced && !rr.enhanced)) {
+            mergedRecipesMap.set(lr.id, { ...rr, ...lr, enhanced: lr.enhanced || rr.enhanced });
+            hasLocalNewer = true;
+          } else if (JSON.stringify(lr) !== JSON.stringify(rr)) {
+            mergedRecipesMap.set(lr.id, { ...rr, ...lr });
+          }
         }
       }
     }
@@ -1509,14 +1558,18 @@ function reconcilePlatePlanState(local, remote) {
       } else if (remoteTime > localTime) {
         mergedIngsMap.set(li.id, { ...li, ...ri });
       } else {
-        // Timestamps equal or both absent: check completeness to protect against losing edits
-        const localScore = getProductCompleteness(li);
-        const remoteScore = getProductCompleteness(ri);
-        if (localScore >= remoteScore) {
-          mergedIngsMap.set(li.id, { ...ri, ...li });
-          if (localScore > remoteScore) hasLocalNewer = true;
+        // Timestamps equal or both absent: check completeness or prefer remote on boot
+        if (preferRemote) {
+          mergedIngsMap.set(li.id, mergeProductPreservingValidData(li, ri, true));
         } else {
-          mergedIngsMap.set(li.id, { ...li, ...ri });
+          const localScore = getProductCompleteness(li);
+          const remoteScore = getProductCompleteness(ri);
+          if (localScore >= remoteScore) {
+            mergedIngsMap.set(li.id, { ...ri, ...li });
+            if (localScore > remoteScore) hasLocalNewer = true;
+          } else {
+            mergedIngsMap.set(li.id, { ...li, ...ri });
+          }
         }
       }
     }
@@ -1557,11 +1610,11 @@ function reconcilePlatePlanState(local, remote) {
         hasLocalNewer = true;
       } else if (remoteTime > localTime) {
         mergedGroupsMap.set(lg.id, mergeGroupsPreservingLinks(lg, rg, true));
-        if (lg.ingredientId && !rg.ingredientId) hasLocalNewer = true;
+        if (!preferRemote && lg.ingredientId && !rg.ingredientId) hasLocalNewer = true;
       } else {
-        const mergedGroup = mergeGroupsPreservingLinks(lg, rg, false);
+        const mergedGroup = mergeGroupsPreservingLinks(lg, rg, preferRemote);
         mergedGroupsMap.set(lg.id, mergedGroup);
-        if ((lg.ingredientId && !rg.ingredientId) || (lg.productIds || []).length > (rg.productIds || []).length || (lg.aliases || []).length > (rg.aliases || []).length) {
+        if (!preferRemote && ((lg.ingredientId && !rg.ingredientId) || (lg.productIds || []).length > (rg.productIds || []).length || (lg.aliases || []).length > (rg.aliases || []).length)) {
           hasLocalNewer = true;
         }
       }
@@ -1599,11 +1652,11 @@ function reconcilePlatePlanState(local, remote) {
         hasLocalNewer = true;
       } else if (remoteTime > localTime) {
         mergedFamiliesMap.set(lf.id, mergeFamiliesPreservingTypes(lf, rf, true));
-        if ((lf.typeIds || []).length > (rf.typeIds || []).length) hasLocalNewer = true;
+        if (!preferRemote && (lf.typeIds || []).length > (rf.typeIds || []).length) hasLocalNewer = true;
       } else {
-        const mergedFamily = mergeFamiliesPreservingTypes(lf, rf, false);
+        const mergedFamily = mergeFamiliesPreservingTypes(lf, rf, preferRemote);
         mergedFamiliesMap.set(lf.id, mergedFamily);
-        if ((lf.typeIds || []).length > (rf.typeIds || []).length || (lf.aliases || []).length > (rf.aliases || []).length) {
+        if (!preferRemote && ((lf.typeIds || []).length > (rf.typeIds || []).length || (lf.aliases || []).length > (rf.aliases || []).length)) {
           hasLocalNewer = true;
         }
       }
@@ -1611,7 +1664,9 @@ function reconcilePlatePlanState(local, remote) {
   });
 
   // 4. Overrides
-  const mergedOverrides = { ...(remote.overrides || {}), ...(local.overrides || {}) };
+  const mergedOverrides = preferRemote
+    ? { ...(local.overrides || {}), ...(remote.overrides || {}) }
+    : { ...(remote.overrides || {}), ...(local.overrides || {}) };
 
   // 5. Plan & Plan History
   let mergedPlan = remote.plan || {};
@@ -1620,7 +1675,7 @@ function reconcilePlatePlanState(local, remote) {
       mergedPlan = local.plan;
       hasLocalNewer = true;
     }
-  } else if (local.plan && Object.keys(local.plan?.slots || {}).length > 0 && !Object.keys(remote.plan?.slots || {}).length) {
+  } else if (!preferRemote && local.plan && Object.keys(local.plan?.slots || {}).length > 0 && !Object.keys(remote.plan?.slots || {}).length) {
     mergedPlan = local.plan;
     hasLocalNewer = true;
   }
@@ -1629,25 +1684,33 @@ function reconcilePlatePlanState(local, remote) {
   (local.planHistory || []).forEach(lp => {
     if (lp && lp.id && !mergedHistory.some(rp => rp.id === lp.id)) {
       mergedHistory.push(lp);
-      hasLocalNewer = true;
+      if (!preferRemote) hasLocalNewer = true;
     }
   });
 
   // 6. Settings, Prefs, Categories, Dismissals
-  const mergedCustomCats = { ...(remote.customCats || {}), ...(local.customCats || {}) };
+  const mergedCustomCats = preferRemote
+    ? { ...(local.customCats || {}), ...(remote.customCats || {}) }
+    : { ...(remote.customCats || {}), ...(local.customCats || {}) };
   allDeletedCats.forEach(slug => {
     delete mergedCustomCats[slug];
   });
-  const mergedDismissals = { ...(remote.dataQualityDismissals || {}), ...(local.dataQualityDismissals || {}) };
-  const mergedUseUp = { ...(remote.useUpProducts || remote.pantry || {}), ...(local.useUpProducts || local.pantry || {}) };
-  const mergedPackPicks = { ...(remote.packPicks || {}), ...(local.packPicks || {}) };
+  const mergedDismissals = preferRemote
+    ? { ...(local.dataQualityDismissals || {}), ...(remote.dataQualityDismissals || {}) }
+    : { ...(remote.dataQualityDismissals || {}), ...(local.dataQualityDismissals || {}) };
+  const mergedUseUp = preferRemote
+    ? { ...(local.useUpProducts || local.pantry || {}), ...(remote.useUpProducts || remote.pantry || {}) }
+    : { ...(remote.useUpProducts || remote.pantry || {}), ...(local.useUpProducts || local.pantry || {}) };
+  const mergedPackPicks = preferRemote
+    ? { ...(local.packPicks || {}), ...(remote.packPicks || {}) }
+    : { ...(remote.packPicks || {}), ...(local.packPicks || {}) };
 
   const mergedState = {
     schemaVersion: remote.schemaVersion || local.schemaVersion || PLATEPLAN_SCHEMA_VERSION,
-    updatedAt: new Date().toISOString(),
-    prefs: { ...(remote.prefs || {}), ...(local.prefs || {}) },
+    updatedAt: preferRemote ? (remote.updatedAt || local.updatedAt || new Date().toISOString()) : (local.updatedAt || remote.updatedAt || new Date().toISOString()),
+    prefs: preferRemote ? { ...(local.prefs || {}), ...(remote.prefs || {}) } : { ...(remote.prefs || {}), ...(local.prefs || {}) },
     customCats: mergedCustomCats,
-    excluded: { ...(remote.excluded || {}), ...(local.excluded || {}) },
+    excluded: preferRemote ? { ...(local.excluded || {}), ...(remote.excluded || {}) } : { ...(remote.excluded || {}), ...(local.excluded || {}) },
     useUpProducts: mergedUseUp,
     ignoredGroupMergeSuggestions: Array.from(new Set([...(remote.ignoredGroupMergeSuggestions || []), ...(local.ignoredGroupMergeSuggestions || [])])),
     ignoredDataQualityWarnings: Array.from(new Set([...(remote.ignoredDataQualityWarnings || []), ...(local.ignoredDataQualityWarnings || [])])),
@@ -1671,14 +1734,14 @@ function reconcilePlatePlanState(local, remote) {
   return { state: mergedState, hasLocalNewer };
 }
 
-function applyRemoteCloudState(remoteState,metadata={}){
+function applyRemoteCloudState(remoteState, metadata = {}, options = {}){
   if(!remoteState || typeof remoteState!=='object') return;
   const isInputFocused=document.activeElement && ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName);
   const isPreferencesActive=document.getElementById('view-prefs')?.classList.contains('active');
 
   platePlanSyncSuppress=true;
   try{
-    const { state: reconciled, hasLocalNewer } = reconcilePlatePlanState(state, remoteState);
+    const { state: reconciled, hasLocalNewer } = reconcilePlatePlanState(state, remoteState, options);
     const loaded=loadStateFromObject(reconciled);
     state=loaded;
     try{
@@ -1699,7 +1762,7 @@ function applyRemoteCloudState(remoteState,metadata={}){
     const who=metadata.updatedBy&&metadata.updatedBy!==platePlanCloudUser?.email?`Updated by ${metadata.updatedBy}`:'Synced';
     updatePlatePlanSyncStatus('synced',who);
 
-    if(hasLocalNewer && platePlanCloudReady && platePlanCloudUser){
+    if(hasLocalNewer && platePlanCloudReady && platePlanCloudUser && !options.isBoot){
       schedulePlatePlanCloudDiff(3000);
     }
   }catch(error){
@@ -1775,20 +1838,19 @@ function applyPlatePlanProjection(projection){
 }
 
 function loadStateFromObject(value){
+  if (!value || typeof value !== 'object') return value;
   try{
-    const raw=localStorage.getItem(SK);
-    localStorage.setItem(SK,JSON.stringify(value||{}));
-    const loaded=loadState();
-    if(raw===null) localStorage.removeItem(SK); else localStorage.setItem(SK,raw);
-    return loaded;
-  }catch(e){ return value; }
+    return normalizeLoadedState(JSON.parse(JSON.stringify(value)), { injectSeed: false, restoreRecipeBackup: false });
+  }catch(_e){
+    return normalizeLoadedState(value, { injectSeed: false, restoreRecipeBackup: false });
+  }
 }
 
 async function readPlatePlanCloudProjection(){
   const projection={};
   const collections=['recipes','products','ingredientFamilies','ingredientGroups','overrides'];
   for(const name of collections){
-    const snapshot=await platePlanDb.collection('households').doc(window.PLATEPLAN_FIREBASE.householdId).collection(name).get();
+    const snapshot=await platePlanDb.collection('households').doc(getPlatePlanHouseholdId()).collection(name).get();
     snapshot.forEach(doc=>{ const data=doc.data()||{}; const key=name+'/'+decodeURIComponent(doc.id); projection[key]=cleanCloudValue(data.value); platePlanCloudRevisions[key]=+data.revision||0; });
   }
   for(const key of ['plans/current','plans/history','settings/shared']){
@@ -1802,9 +1864,7 @@ function startPlatePlanCloudListeners(){
   platePlanSyncUnsubscribers.forEach(stop=>{try{stop();}catch(e){}});
   platePlanSyncUnsubscribers=[];
 
-  const config=window.PLATEPLAN_FIREBASE||{};
-  const householdId=config.householdId||'elliott-chloe';
-  const dataCol=platePlanDb.collection('households').doc(householdId).collection('data');
+  const dataCol = getPlatePlanDataCollection();
 
   const unsubscribe=dataCol.onSnapshot(snapshot=>{
     if(!snapshot || snapshot.empty) return;
@@ -1913,9 +1973,7 @@ function ensurePlatePlanMigrationModal(){
 
 async function loadSharedPlatePlan(){
   updatePlatePlanSyncStatus('connecting');
-  const config=window.PLATEPLAN_FIREBASE||{};
-  const householdId=config.householdId||'elliott-chloe';
-  const dataCol=platePlanDb.collection('households').doc(householdId).collection('data');
+  const dataCol = getPlatePlanDataCollection();
   
   const snapshot=await dataCol.get();
   const docs={};
@@ -1929,9 +1987,26 @@ async function loadSharedPlatePlan(){
     const plannerDoc = docs.planner || {};
     const historyDoc = docs.history || {};
 
+    const getDocTimestamp = doc => {
+      if (!doc) return 0;
+      if (doc.updatedAt?.toDate) return doc.updatedAt.toDate().getTime();
+      if (doc.clientTimestamp) return new Date(doc.clientTimestamp).getTime();
+      if (typeof doc.updatedAt === 'string') return new Date(doc.updatedAt).getTime();
+      return 0;
+    };
+    const maxRemoteTime = Math.max(
+      getDocTimestamp(metaDoc),
+      getDocTimestamp(productsDoc),
+      getDocTimestamp(recipesDoc),
+      getDocTimestamp(taxonomyDoc),
+      getDocTimestamp(plannerDoc),
+      getDocTimestamp(historyDoc)
+    );
+    const maxRemoteIso = maxRemoteTime > 0 ? new Date(maxRemoteTime).toISOString() : (metaDoc.clientTimestamp || new Date().toISOString());
+
     const assembledState = {
       schemaVersion: metaDoc.schemaVersion || PLATEPLAN_SCHEMA_VERSION,
-      updatedAt: metaDoc.clientTimestamp || new Date().toISOString(),
+      updatedAt: maxRemoteIso,
       prefs: metaDoc.prefs || {},
       customCats: metaDoc.customCats || {},
       excluded: metaDoc.excluded || {},
@@ -1954,9 +2029,9 @@ async function loadSharedPlatePlan(){
       planHistory: historyDoc.planHistory || []
     };
 
-    applyRemoteCloudState(assembledState, metaDoc);
+    applyRemoteCloudState(assembledState, metaDoc, { isBoot: true });
   }else if(docs.state && typeof docs.state.state==='object'){
-    applyRemoteCloudState(docs.state.state, docs.state);
+    applyRemoteCloudState(docs.state.state, docs.state, { isBoot: true });
     await pushStateToCloud();
   }else{
     // Check if legacy shredded data exists
@@ -2353,7 +2428,7 @@ function initializePlatePlanApplication(){
   installPlannerSummaryObserver();
   refreshAllProductDefaultsAndRecipeNutrition();
   rebuildPlatePlanIndexes();
-  saveState();
+  try{ localStorage.setItem(SK, JSON.stringify(state)); }catch(_e){}
 
   resetTodayDate({render:false});
   requestPlatePlanViewRender('today');
@@ -14961,14 +15036,26 @@ async function saveManualIng(categoryReady=false){
     updatedAt: nowIso
   });
 
+  // CRITICAL SEQUENCE: Update in-memory hierarchy, group assignments, category sync and recipe recalculations BEFORE pushing
   let groupUpdate = null;
   if(ing.groupId && getIngredientGroup(ing.groupId)) {
     const grp = getIngredientGroup(ing.groupId);
-    if(grp) {
-      grp.updatedAt = nowIso;
-      groupUpdate = grp;
+    ensureProductAssignedToGroup(ing, name, ing.groupId);
+    syncProductHierarchyCategory(ing, grp, ing.cat);
+    grp.updatedAt = nowIso;
+    groupUpdate = grp;
+  } else {
+    const assignedGroup = ensureProductAssignedToGroup(ing, name, '', true);
+    if(assignedGroup) {
+      assignedGroup.updatedAt = nowIso;
+      ing.groupId = assignedGroup.id;
+      syncProductHierarchyCategory(ing, assignedGroup, ing.cat);
+      groupUpdate = assignedGroup;
     }
   }
+
+  // Pre-calculate recipe nutrition impacts in-memory
+  recalcRecipesUsingIngredient(ing.id);
 
   try {
     await executeDataQualityTransaction('UPDATE_PRODUCT', {
@@ -14984,18 +15071,6 @@ async function saveManualIng(categoryReady=false){
     return;
   }
 
-  if(ing.groupId && getIngredientGroup(ing.groupId)) {
-    const grp = getIngredientGroup(ing.groupId);
-    ensureProductAssignedToGroup(ing, name, ing.groupId);
-    syncProductHierarchyCategory(ing, grp, ing.cat);
-  } else {
-    const assignedGroup = ensureProductAssignedToGroup(ing, name, '', true);
-    if(assignedGroup) {
-      assignedGroup.updatedAt = nowIso;
-      ing.groupId = assignedGroup.id;
-      syncProductHierarchyCategory(ing, assignedGroup, ing.cat);
-    }
-  }
   refreshProductGroupAndRecipes(ing.id);
 
   if(handlePendingRecipeNutritionAfterSave(ing.id)){
