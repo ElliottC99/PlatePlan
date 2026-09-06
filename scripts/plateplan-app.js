@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.6.8';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v43';
+const PLATEPLAN_APP_VERSION='2.6.9';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v44';
 const SEED=[];
 
 let state = null;
@@ -748,13 +748,18 @@ function platePlanCloudRef(key){
 let platePlanCurrentPushPromise = null;
 
 async function persistPlatePlanDataQualityFix(reason = 'Data quality update'){
+  platePlanTransactionShield.inFlight = true;
   try {
     saveState(true);
-    return await pushStateToCloud(true);
+    const result = await pushStateToCloud(true);
+    platePlanTransactionShield.lastCompletedAt = Date.now();
+    return result;
   } catch(error) {
     console.warn(`persistPlatePlanDataQualityFix failed (${reason}):`, error);
     showPlatePlanToast('Save Failed: Database update could not be committed.');
     throw error;
+  } finally {
+    platePlanTransactionShield.inFlight = false;
   }
 }
 
@@ -937,6 +942,350 @@ async function pushStateToCloud(force=false){
   platePlanCurrentPushPromise.catch(()=>{});
 
   return platePlanCurrentPushPromise;
+}
+
+// === DATA QUALITY TRANSACTION & REMOTE SHIELDING (v2.6.9) ===
+const platePlanTransactionShield = {
+  inFlight: false,
+  lastCompletedAt: 0,
+  cooldownMs: 4000
+};
+
+function createSafeStateSnapshot(sourceState) {
+  if (!sourceState || typeof sourceState !== 'object') return {};
+  try {
+    return JSON.parse(JSON.stringify(sourceState, (key, value) => {
+      if (typeof value === 'function') return undefined;
+      if (typeof Node !== 'undefined' && value instanceof Node) return undefined;
+      if (value instanceof Set) return Array.from(value);
+      if (value instanceof Map) return Object.fromEntries(value);
+      return value;
+    }));
+  } catch (err) {
+    console.warn('createSafeStateSnapshot fallback clone:', err);
+    return JSON.parse(JSON.stringify(sourceState));
+  }
+}
+
+/**
+ * Unified atomic execution pipeline for Data Quality operations.
+ * Single source of truth operating directly on root store (`state`).
+ */
+async function executeDataQualityTransaction(mutationType, payload = {}, options = {}) {
+  const { modalWrapId = null, submitButtonId = null, errorContainerId = null, successMessage = null } = options;
+  const submitBtn = submitButtonId ? document.getElementById(submitButtonId) : null;
+  const originalBtnText = submitBtn ? submitBtn.textContent : '';
+
+  // 1. UI Lock
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+  }
+  platePlanTransactionShield.inFlight = true;
+
+  if (errorContainerId) {
+    const errEl = document.getElementById(errorContainerId);
+    if (errEl) errEl.innerHTML = '';
+  }
+
+  // 2. Rollback Snapshot (State Purity Guaranteed)
+  const rollbackState = createSafeStateSnapshot(state);
+  const nowIso = new Date().toISOString();
+
+  try {
+    // 3. Direct Root State Mutation
+    switch (mutationType) {
+      case 'UPDATE_PRODUCT': {
+        const { product, isNew } = payload;
+        if (!product || !product.id) throw new Error('Invalid product payload');
+        product.updatedAt = nowIso;
+        if (isNew) {
+          state.ingredients.push(product);
+        } else {
+          const idx = state.ingredients.findIndex(x => x.id === product.id);
+          if (idx > -1) state.ingredients[idx] = product;
+          else state.ingredients.push(product);
+        }
+        if (payload.groupUpdate && payload.groupUpdate.id) {
+          const grp = (state.ingredientGroups || []).find(g => g.id === payload.groupUpdate.id);
+          if (grp) {
+            Object.assign(grp, payload.groupUpdate);
+            grp.updatedAt = nowIso;
+          }
+        }
+        break;
+      }
+
+      case 'MERGE_PRODUCTS': {
+        const { primaryId, oldIds, primaryGroup } = payload;
+        if (!primaryId || !Array.isArray(oldIds) || oldIds.length === 0) throw new Error('Invalid merge payload');
+
+        (state.recipes || []).forEach(r => {
+          (r.ingredients || []).forEach(ing => {
+            if (oldIds.includes(ing.bankId)) {
+              ing.bankId = primaryId;
+              ing.groupId = primaryGroup?.id || ing.groupId || '';
+            }
+          });
+          if (r.enhanced && Array.isArray(r.enhanced.ingredients)) {
+            r.enhanced.ingredients.forEach(ing => {
+              if (oldIds.includes(ing.bankId)) {
+                ing.bankId = primaryId;
+                ing.groupId = primaryGroup?.id || ing.groupId || '';
+              }
+            });
+          }
+        });
+
+        for (const instance in state.overrides) {
+          if (state.overrides[instance]?.productOverrides) {
+            const po = state.overrides[instance].productOverrides;
+            for (const gId in po) if (oldIds.includes(po[gId])) po[gId] = primaryId;
+          }
+          if (state.overrides[instance]?.substitutions) {
+            const subs = state.overrides[instance].substitutions;
+            for (const oId in subs) {
+              if (oldIds.includes(subs[oId])) subs[oId] = primaryId;
+            }
+          }
+        }
+
+        (state.ingredientGroups || []).forEach(g => {
+          if (!Array.isArray(g.productIds)) g.productIds = [];
+          if (g.productIds.some(id => oldIds.includes(id)) && !g.productIds.includes(primaryId)) {
+            g.productIds.push(primaryId);
+          }
+          g.productIds = g.productIds.filter(id => !oldIds.includes(id));
+          if (oldIds.includes(g.defaultProductId)) g.defaultProductId = primaryId;
+          g.updatedAt = nowIso;
+        });
+
+        state.meta = state.meta || {};
+        if (!Array.isArray(state.meta.deletedProductIds)) state.meta.deletedProductIds = [];
+        oldIds.forEach(id => {
+          if (!state.meta.deletedProductIds.includes(id)) state.meta.deletedProductIds.push(id);
+        });
+
+        state.ingredients = state.ingredients.filter(i => !oldIds.includes(i.id));
+        break;
+      }
+
+      case 'REASSIGN_CATEGORY': {
+        const { oldSlug, targetSlug } = payload;
+        if (!oldSlug || !targetSlug) throw new Error('Invalid category reassign payload');
+
+        state.ingredients.forEach(i => {
+          if (i.cat === oldSlug) {
+            i.cat = targetSlug;
+            i.updatedAt = nowIso;
+          }
+        });
+        (state.ingredientGroups || []).forEach(g => {
+          if (g.cat === oldSlug) {
+            g.cat = targetSlug;
+            g.updatedAt = nowIso;
+          }
+        });
+        (state.ingredientFamilies || []).forEach(f => {
+          if (f.cat === oldSlug) {
+            f.cat = targetSlug;
+            f.updatedAt = nowIso;
+          }
+        });
+
+        delete state.customCats[oldSlug];
+        delete CAT[oldSlug];
+        state.meta = state.meta || {};
+        if (!Array.isArray(state.meta.deletedCategoryIds)) state.meta.deletedCategoryIds = [];
+        if (!state.meta.deletedCategoryIds.includes(oldSlug)) state.meta.deletedCategoryIds.push(oldSlug);
+        break;
+      }
+
+      case 'DELETE_CATEGORY': {
+        const { slug } = payload;
+        if (!slug) throw new Error('Invalid delete category payload');
+        delete state.customCats[slug];
+        delete CAT[slug];
+        state.meta = state.meta || {};
+        if (!Array.isArray(state.meta.deletedCategoryIds)) state.meta.deletedCategoryIds = [];
+        if (!state.meta.deletedCategoryIds.includes(slug)) state.meta.deletedCategoryIds.push(slug);
+        break;
+      }
+
+      case 'RENAME_CATEGORY': {
+        const { slug, newName } = payload;
+        if (!slug || !newName) throw new Error('Invalid rename category payload');
+        state.customCats[slug] = newName.trim();
+        CAT[slug] = newName.trim();
+        break;
+      }
+
+      case 'SAVE_SUBTYPE_GROUP': {
+        const { groupData, isNew, affectedProducts = [], affectedFamily = null } = payload;
+        if (!groupData || !groupData.id) throw new Error('Invalid subtype group payload');
+        groupData.updatedAt = nowIso;
+        if (isNew) {
+          state.ingredientGroups.push(groupData);
+        } else {
+          const idx = state.ingredientGroups.findIndex(g => g.id === groupData.id);
+          if (idx > -1) state.ingredientGroups[idx] = groupData;
+          else state.ingredientGroups.push(groupData);
+        }
+        if (affectedFamily) {
+          affectedFamily.updatedAt = nowIso;
+          const fIdx = (state.ingredientFamilies || []).findIndex(f => f.id === affectedFamily.id);
+          if (fIdx > -1) state.ingredientFamilies[fIdx] = affectedFamily;
+          else state.ingredientFamilies.push(affectedFamily);
+        }
+        (affectedProducts || []).forEach(prod => {
+          prod.updatedAt = nowIso;
+          const pIdx = state.ingredients.findIndex(p => p.id === prod.id);
+          if (pIdx > -1) state.ingredients[pIdx] = prod;
+        });
+        break;
+      }
+
+      case 'SAVE_INGREDIENT_FAMILY': {
+        const { familyData, isNew, newGroup = null, affectedGroups = [], affectedProducts = [] } = payload;
+        if (!familyData || !familyData.id) throw new Error('Invalid ingredient family payload');
+        familyData.updatedAt = nowIso;
+        if (isNew) {
+          state.ingredientFamilies.push(familyData);
+        } else {
+          const idx = state.ingredientFamilies.findIndex(f => f.id === familyData.id);
+          if (idx > -1) state.ingredientFamilies[idx] = familyData;
+          else state.ingredientFamilies.push(familyData);
+        }
+        if (newGroup) {
+          newGroup.updatedAt = nowIso;
+          state.ingredientGroups.push(newGroup);
+        }
+        (affectedGroups || []).forEach(g => {
+          g.updatedAt = nowIso;
+          const gIdx = state.ingredientGroups.findIndex(x => x.id === g.id);
+          if (gIdx > -1) state.ingredientGroups[gIdx] = g;
+        });
+        (affectedProducts || []).forEach(p => {
+          p.updatedAt = nowIso;
+          const pIdx = state.ingredients.findIndex(x => x.id === p.id);
+          if (pIdx > -1) state.ingredients[pIdx] = p;
+        });
+        break;
+      }
+
+      case 'DELETE_PRODUCT': {
+        const { id } = payload;
+        if (!id) throw new Error('Invalid delete product payload');
+        (state.ingredientGroups || []).forEach(group => {
+          if (Array.isArray(group.productIds)) group.productIds = group.productIds.filter(pid => pid !== id);
+          if (group.defaultProductId === id) refreshAutoDefaultProductForGroup(group.id);
+        });
+        state.meta = state.meta || {};
+        if (!Array.isArray(state.meta.deletedProductIds)) state.meta.deletedProductIds = [];
+        if (!state.meta.deletedProductIds.includes(id)) state.meta.deletedProductIds.push(id);
+        state.ingredients = state.ingredients.filter(i => i.id !== id);
+        break;
+      }
+
+      case 'REPLACE_AND_DELETE_PRODUCT': {
+        const { targetId, replacements } = payload;
+        if (!targetId) throw new Error('Invalid replace and delete payload');
+        (replacements || []).forEach(r => {
+          const rec = (state.recipes || []).find(rc => rc.id === r.recipeId);
+          if (rec && rec[r.key] && rec[r.key][r.idx]) {
+            rec[r.key][r.idx].bankId = r.replacementId;
+          }
+        });
+        const firstReplacement = (replacements && replacements[0]) ? replacements[0].replacementId : null;
+        (state.ingredientGroups || []).forEach(group => {
+          if (Array.isArray(group.productIds)) group.productIds = group.productIds.filter(id => id !== targetId);
+          if (group.defaultProductId === targetId) {
+            group.defaultProductId = firstReplacement || group.productIds[0] || null;
+          }
+        });
+        state.meta = state.meta || {};
+        if (!Array.isArray(state.meta.deletedProductIds)) state.meta.deletedProductIds = [];
+        if (!state.meta.deletedProductIds.includes(targetId)) state.meta.deletedProductIds.push(targetId);
+        state.ingredients = state.ingredients.filter(i => i.id !== targetId);
+        break;
+      }
+
+      case 'DISMISS_WARNING': {
+        const { key, fingerprint } = payload;
+        if (!key) throw new Error('Invalid dismiss payload');
+        if (!state.dataQualityDismissals || typeof state.dataQualityDismissals !== 'object') state.dataQualityDismissals = {};
+        if (!Array.isArray(state.ignoredDataQualityWarnings)) state.ignoredDataQualityWarnings = [];
+        if (!state.ignoredDataQualityWarnings.includes(key)) state.ignoredDataQualityWarnings.push(key);
+        state.dataQualityDismissals[key] = fingerprint;
+        break;
+      }
+
+      default:
+        throw new Error(`Unknown mutationType: ${mutationType}`);
+    }
+
+    state.updatedAt = nowIso;
+
+    // 4. Local Persistence
+    try {
+      localStorage.setItem(SK, JSON.stringify(state));
+      if (Array.isArray(state.recipes)) localStorage.setItem(RECIPES_BACKUP_SK, JSON.stringify(state.recipes));
+    } catch (e) {
+      console.warn('Local storage write warning in executeDataQualityTransaction:', e);
+    }
+
+    // 5. Explicit Forced Cloud Write
+    await pushStateToCloud(true);
+
+    // 6. Finalize Success
+    platePlanTransactionShield.lastCompletedAt = Date.now();
+    rebuildPlatePlanIndexes();
+    platePlanNutritionCache.clear();
+
+    if (modalWrapId) {
+      const modal = document.getElementById(modalWrapId);
+      if (modal) {
+        modal.classList.remove('open');
+        if (modal.dataset.modalWrapped === '1' || modal.id === 'manual-ing-panel') {
+          modal.style.display = 'none';
+        }
+      }
+    }
+
+    if (successMessage) {
+      showPlatePlanToast(successMessage);
+    }
+
+    return true;
+  } catch (error) {
+    console.error(`[DataQuality Transaction Failed] ${mutationType}:`, error);
+
+    // Rollback local memory and storage
+    state = rollbackState;
+    try {
+      localStorage.setItem(SK, JSON.stringify(state));
+      if (Array.isArray(state.recipes)) localStorage.setItem(RECIPES_BACKUP_SK, JSON.stringify(state.recipes));
+    } catch (e) {}
+    rebuildPlatePlanIndexes();
+    platePlanNutritionCache.clear();
+
+    // Display error banner in modal
+    const errHtml = '<div class="msg error" style="margin:10px 0;font-weight:600">Database Write Failed: Changes were not saved.</div>';
+    if (errorContainerId) {
+      const errEl = document.getElementById(errorContainerId);
+      if (errEl) {
+        errEl.innerHTML = errHtml;
+      }
+    }
+    showPlatePlanToast('Database Write Failed: Changes were not saved.');
+    throw error;
+  } finally {
+    platePlanTransactionShield.inFlight = false;
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalBtnText;
+    }
+  }
 }
 
 function queuePlatePlanCloudDiff(immediateFlush=false){
@@ -1122,7 +1471,7 @@ function reconcilePlatePlanState(local, remote) {
       merged.itemWeight = fallback.itemWeight;
       merged.itemWeightUnit = fallback.itemWeightUnit || merged.itemWeightUnit;
     }
-    if ((!primary.cat || primary.cat === 'other') && fallback.cat && fallback.cat !== 'other') {
+    if (!primary.cat && fallback.cat) {
       merged.cat = fallback.cat;
     }
     return merged;
@@ -1154,24 +1503,20 @@ function reconcilePlatePlanState(local, remote) {
       const localTime = li.updatedAt ? new Date(li.updatedAt).getTime() : 0;
       const remoteTime = ri.updatedAt ? new Date(ri.updatedAt).getTime() : 0;
       if (localTime > remoteTime) {
-        // Local is strictly newer; preserve any extra remote info if local omitted it
-        mergedIngsMap.set(li.id, mergeProductPreservingValidData(li, ri, false));
+        // Local is strictly newer: local wins completely
+        mergedIngsMap.set(li.id, { ...ri, ...li });
         hasLocalNewer = true;
       } else if (remoteTime > localTime) {
-        // Remote is newer, but preserve non-empty local fields if remote dropped them
-        const mergedProduct = mergeProductPreservingValidData(li, ri, true);
-        mergedIngsMap.set(li.id, mergedProduct);
-        if (getProductCompleteness(li) > getProductCompleteness(ri)) {
-          hasLocalNewer = true;
-        }
+        mergedIngsMap.set(li.id, { ...li, ...ri });
       } else {
-        // Timestamps equal or both absent: check data completeness to prevent losing local fixes
+        // Timestamps equal or both absent: check completeness to protect against losing edits
         const localScore = getProductCompleteness(li);
         const remoteScore = getProductCompleteness(ri);
-        const merged = mergeProductPreservingValidData(li, ri, remoteScore > localScore);
-        mergedIngsMap.set(li.id, merged);
-        if (localScore > remoteScore) {
-          hasLocalNewer = true;
+        if (localScore >= remoteScore) {
+          mergedIngsMap.set(li.id, { ...ri, ...li });
+          if (localScore > remoteScore) hasLocalNewer = true;
+        } else {
+          mergedIngsMap.set(li.id, { ...li, ...ri });
         }
       }
     }
@@ -1463,6 +1808,11 @@ function startPlatePlanCloudListeners(){
 
   const unsubscribe=dataCol.onSnapshot(snapshot=>{
     if(!snapshot || snapshot.empty) return;
+
+    // Shield against remote snapshot overwriting in-flight transactions or immediate echoes
+    if(platePlanTransactionShield.inFlight || (Date.now() - platePlanTransactionShield.lastCompletedAt < platePlanTransactionShield.cooldownMs)){
+      return;
+    }
 
     // 1. Ignore local writes that have not yet been committed to the server
     if(snapshot.metadata && snapshot.metadata.hasPendingWrites){
@@ -9298,14 +9648,15 @@ function isDataQualityWarningIgnored(key, fingerprint = ''){
     return false;
 }
 
-function ignoreDataQualityWarning(key, fingerprint = ''){
+async function ignoreDataQualityWarning(key, fingerprint = ''){
     if(!key) return;
-    if(!state.dataQualityDismissals || typeof state.dataQualityDismissals !== 'object') state.dataQualityDismissals = {};
-    if(!Array.isArray(state.ignoredDataQualityWarnings)) state.ignoredDataQualityWarnings = [];
-    if(!state.ignoredDataQualityWarnings.includes(key)) state.ignoredDataQualityWarnings.push(key);
-    state.dataQualityDismissals[key] = fingerprint || dataQualityFingerprint(key);
-    saveState(true);
-    renderDataQuality();
+    const fp = fingerprint || dataQualityFingerprint(key);
+    try {
+      await executeDataQualityTransaction('DISMISS_WARNING', { key, fingerprint: fp });
+      renderDataQuality();
+    } catch(e) {
+      console.error('ignoreDataQualityWarning failed:', e);
+    }
 }
 
 function createDataQualityIssue({ entityType, entityId, code, severity = 'gap', title, message, fixButtonHtml = '', fixTarget = null, source = null, legacyKey = '' }){
@@ -9648,16 +9999,15 @@ function renderDataQuality() {
 function deleteCategory(slug) {
     const affected = state.ingredients.filter(i => i.cat === slug);
     if (affected.length === 0) {
-        openAppConfirmModal('Delete category?',`Delete <strong>${ppEscapeHtml(CAT[slug]||slug)}</strong>?`,'Delete category',()=>{
-          delete state.customCats[slug];
-          delete CAT[slug];
-          state.meta = state.meta || {};
-          if (!Array.isArray(state.meta.deletedCategoryIds)) state.meta.deletedCategoryIds = [];
-          if (!state.meta.deletedCategoryIds.includes(slug)) state.meta.deletedCategoryIds.push(slug);
-          ['mi-cat', 'pp-cat', 'tp-cat', 'mini-cat'].forEach(id => renderCatOptions(id, 'other'));
-          persistPlatePlanDataQualityFix('Category delete');
-          renderDataQuality();
-          renderBank();
+        openAppConfirmModal('Delete category?',`Delete <strong>${ppEscapeHtml(CAT[slug]||slug)}</strong>?`,'Delete category', async ()=>{
+          try {
+            await executeDataQualityTransaction('DELETE_CATEGORY', { slug });
+            ['mi-cat', 'pp-cat', 'tp-cat', 'mini-cat'].forEach(id => renderCatOptions(id, 'other'));
+            renderDataQuality();
+            renderBank();
+          } catch(e) {
+            console.error('Delete category failed:', e);
+          }
         });
         return;
     }
@@ -9703,10 +10053,10 @@ function confirmCategoryReassign(oldSlug) {
         openAppInfoModal('Choose a category','Choose an existing category or enter a new category name before continuing.');
         return;
     }
-    runWithRecoveryPoint(`Before deleting category ${CAT[oldSlug] || oldSlug}`, () => applyCategoryReassign(oldSlug, existingVal, newName));
+    applyCategoryReassign(oldSlug, existingVal, newName);
 }
 
-function applyCategoryReassign(oldSlug, existingVal, newName) {
+async function applyCategoryReassign(oldSlug, existingVal, newName) {
     let targetSlug = existingVal;
     if (!targetSlug && newName) {
         targetSlug = newName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -9714,37 +10064,33 @@ function applyCategoryReassign(oldSlug, existingVal, newName) {
         CAT[targetSlug] = newName;
     }
 
-    // Reassign all ingredients
-    state.ingredients.forEach(i => { if (i.cat === oldSlug) i.cat = targetSlug; });
-
-    // Delete old category
-    delete state.customCats[oldSlug];
-    delete CAT[oldSlug];
-    state.meta = state.meta || {};
-    if (!Array.isArray(state.meta.deletedCategoryIds)) state.meta.deletedCategoryIds = [];
-    if (!state.meta.deletedCategoryIds.includes(oldSlug)) state.meta.deletedCategoryIds.push(oldSlug);
-
-    document.getElementById('cat-reassign-modal')?.remove();
-    ['mi-cat', 'pp-cat', 'tp-cat', 'mini-cat'].forEach(id => renderCatOptions(id, 'other'));
-    refreshHierarchyViews();
-    persistPlatePlanDataQualityFix('Category reassign');
-    renderDataQuality();
-    renderBank();
+    try {
+      await executeDataQualityTransaction('REASSIGN_CATEGORY', { oldSlug, targetSlug });
+      document.getElementById('cat-reassign-modal')?.remove();
+      ['mi-cat', 'pp-cat', 'tp-cat', 'mini-cat'].forEach(id => renderCatOptions(id, 'other'));
+      refreshHierarchyViews();
+      renderDataQuality();
+      renderBank();
+    } catch(e) {
+      console.error('applyCategoryReassign failed:', e);
+    }
 }
 
 function editCategory(slug) {
     let currentName = CAT[slug];
-    openAppPromptModal('Edit category','Category name',currentName,'Save',newName=>{
+    openAppPromptModal('Edit category','Category name',currentName,'Save', async newName=>{
       if(newName.trim() !== currentName) {
-        state.customCats[slug] = newName.trim();
-        CAT[slug] = newName.trim();
-        saveState();
-        ['mi-cat', 'pp-cat', 'tp-cat', 'mini-cat'].forEach(id => {
-            let el = document.getElementById(id);
-            if(el) renderCatOptions(id, el.value);
-        });
-        renderDataQuality();
-        renderBank();
+        try {
+          await executeDataQualityTransaction('RENAME_CATEGORY', { slug, newName });
+          ['mi-cat', 'pp-cat', 'tp-cat', 'mini-cat'].forEach(id => {
+              let el = document.getElementById(id);
+              if(el) renderCatOptions(id, el.value);
+          });
+          renderDataQuality();
+          renderBank();
+        } catch(e) {
+          console.error('editCategory failed:', e);
+        }
       }
     });
 }
@@ -9779,77 +10125,34 @@ function closeMergeModal() {
     mergeContext = null;
 }
 
-function executeMerge() {
+async function executeMerge() {
     if(!mergeContext) return;
-    runWithRecoveryPoint('Before merging products', applyProductMerge);
+    await applyProductMerge();
 }
 
-function applyProductMerge() {
+async function applyProductMerge() {
     if(!mergeContext) return;
     const { primary, others } = mergeContext;
     const pId = primary.id;
     const oldIds = others.map(o => o.id);
     const primaryGroup = ensureProductAssignedToGroup(primary, primary.name, primary.groupId || '', !!primary.groupId);
-    
-    // 1. Update Recipes (Standard and Enhanced)
-    state.recipes.forEach(r => {
-        r.ingredients.forEach(ing => {
-          if(oldIds.includes(ing.bankId)) {
-            ing.bankId = pId;
-            ing.groupId = primaryGroup?.id || ing.groupId || '';
-          }
-        });
-        if(r.enhanced && r.enhanced.ingredients) {
-            r.enhanced.ingredients.forEach(ing => {
-              if(oldIds.includes(ing.bankId)) {
-                ing.bankId = pId;
-                ing.groupId = primaryGroup?.id || ing.groupId || '';
-              }
-            });
-        }
-    });
-    
-    // 2. Update Plan Overrides
-    for(let instance in state.overrides) {
-        if(state.overrides[instance].productOverrides) {
-            let po = state.overrides[instance].productOverrides;
-            for(let gId in po) if(oldIds.includes(po[gId])) po[gId] = pId;
-        }
-        if(state.overrides[instance].substitutions) {
-            let subs = state.overrides[instance].substitutions;
-            for(let oId in subs) {
-                // If the target of substitution was an old ID, point it to the new one
-                if(oldIds.includes(subs[oId])) subs[oId] = pId;
-                // Note: If the *source* of the substitution was an old ID, it technically shifts to the new ID structurally. 
-                // We will leave the key as is, since historical overrides map originalBankId to targetBankId.
-            }
-        }
+
+    try {
+      await executeDataQualityTransaction('MERGE_PRODUCTS', {
+        primaryId: pId,
+        oldIds,
+        primaryGroup
+      }, {
+        modalWrapId: 'merge-modal-wrap',
+        successMessage: 'Merge complete. Recipes and plan overrides were updated.'
+      });
+      refreshProductGroupAndRecipes(pId);
+      closeMergeModal();
+      renderDataQuality();
+      renderBank();
+    } catch(err) {
+      console.error('applyProductMerge transaction failed:', err);
     }
-
-    // 2b. Update canonical groups and defaults
-    (state.ingredientGroups || []).forEach(g => {
-        if(!Array.isArray(g.productIds)) g.productIds = [];
-        if(g.productIds.some(id => oldIds.includes(id)) && !g.productIds.includes(pId)) g.productIds.push(pId);
-        g.productIds = g.productIds.filter(id => !oldIds.includes(id));
-        if(oldIds.includes(g.defaultProductId)) g.defaultProductId = pId;
-        if(g.productIds.includes(pId)) refreshAutoDefaultProductForGroup(g.id);
-    });
-    
-    // 3. Delete old ingredients from bank and record tombstones
-    state.meta = state.meta || {};
-    if (!Array.isArray(state.meta.deletedProductIds)) state.meta.deletedProductIds = [];
-    oldIds.forEach(id => {
-      if (!state.meta.deletedProductIds.includes(id)) state.meta.deletedProductIds.push(id);
-    });
-
-    state.ingredients = state.ingredients.filter(i => !oldIds.includes(i.id));
-    refreshProductGroupAndRecipes(pId);
-    
-    closeMergeModal();
-    persistPlatePlanDataQualityFix('Product merge');
-    renderDataQuality();
-    renderBank();
-    showPlatePlanToast('Merge complete. Recipes and plan overrides were updated.');
 }
 
 
@@ -11445,7 +11748,7 @@ function closeIngredientFamilyDetailsModal(preserveEditorReturn=false){
   });
 }
 
-function saveIngredientFamilyDetailsModal(){
+async function saveIngredientFamilyDetailsModal(){
   const name = normaliseAliasText(document.getElementById('ingredient-family-details-name')?.value || '');
   const cat = document.getElementById('ingredient-family-details-cat')?.value || 'other';
   const notes = document.getElementById('ingredient-family-details-notes')?.value || '';
@@ -11461,11 +11764,16 @@ function saveIngredientFamilyDetailsModal(){
     return;
   }
   const nowIso = new Date().toISOString();
+  let isNew = false;
+  let newGroup = null;
+  let affectedGroups = [];
+  let affectedProducts = [];
+
   if(!family){
+    isNew = true;
     const id = ingredientFamilyIdFromName(name, cat);
     family = { id, name: toTitleCase(name), cat, aliases:[name], notes, typeIds:[], defaultTypeId:'', updatedAt: nowIso };
-    state.ingredientFamilies.push(family);
-    const group = {
+    newGroup = {
       id:'grp'+Date.now()+Math.random().toString(36).slice(2,6),
       name:toTitleCase(name),
       cat,
@@ -11477,9 +11785,8 @@ function saveIngredientFamilyDetailsModal(){
       notes:'',
       updatedAt: nowIso
     };
-    state.ingredientGroups.push(group);
-    family.typeIds.push(group.id);
-    family.defaultTypeId = group.id;
+    family.typeIds.push(newGroup.id);
+    family.defaultTypeId = newGroup.id;
   } else {
     const oldName = family.name;
     family.name = toTitleCase(name);
@@ -11490,17 +11797,33 @@ function saveIngredientFamilyDetailsModal(){
     [oldName, family.name].filter(Boolean).forEach(alias => {
       if(!family.aliases.some(a => canonicalGroupKey(a) === canonicalGroupKey(alias))) family.aliases.push(alias);
     });
-    getFamilyGroups(family.id).forEach(g => {
+    affectedGroups = getFamilyGroups(family.id);
+    affectedGroups.forEach(g => {
       g.family = family.name;
       g.cat = family.cat;
       g.updatedAt = nowIso;
-      getGroupProducts(g.id).forEach(p => { p.cat = family.cat; p.updatedAt = nowIso; });
+      getGroupProducts(g.id).forEach(p => { p.cat = family.cat; p.updatedAt = nowIso; affectedProducts.push(p); });
     });
   }
-  closeIngredientFamilyDetailsModal(true);
-  saveState(true);
-  refreshHierarchyViews();
-  finishEditorReturn();
+
+  try {
+    await executeDataQualityTransaction('SAVE_INGREDIENT_FAMILY', {
+      familyData: family,
+      isNew,
+      newGroup,
+      affectedGroups,
+      affectedProducts
+    }, {
+      modalWrapId: 'ingredient-family-details-wrap',
+      submitButtonId: 'ingredient-family-save-btn',
+      errorContainerId: 'ingredient-family-details-msg'
+    });
+    closeIngredientFamilyDetailsModal(true);
+    refreshHierarchyViews();
+    finishEditorReturn();
+  } catch(e) {
+    console.error('saveIngredientFamilyDetailsModal failed:', e);
+  }
 }
 
 function openIngredientFamilyAliasesModal(familyId){
@@ -12907,7 +13230,7 @@ function ensureIngredientGroupDetailsModal(){
       </div>
       <div id="ingredient-group-details-msg"></div>
       <div class="btn-row" style="margin-top:14px">
-        <button class="btn primary" onclick="saveIngredientGroupDetailsModal()">Save</button>
+        <button class="btn primary" id="ingredient-group-save-btn" onclick="saveIngredientGroupDetailsModal()">Save</button>
         <button class="btn ghost" onclick="closeIngredientGroupDetailsModal()">Cancel</button>
       </div>
     </div>`;
@@ -13026,10 +13349,13 @@ function resolveIngredientFamilyForGroupDetails(name, cat, fallbackFamily = null
   return fallbackFamily;
 }
 
-function saveIngredientGroupDetailsModal(){
+async function saveIngredientGroupDetailsModal(){
   let group = getIngredientGroup(ingredientGroupDetailsEditId);
   const msg = document.getElementById('ingredient-group-details-msg');
   const nowIso = new Date().toISOString();
+  let isNew = false;
+  let family = null;
+
   if(ingredientGroupDetailsMode === 'create'){
     const name = (document.getElementById('ingredient-group-name-input')?.value || '').trim();
     if(!name){
@@ -13044,7 +13370,7 @@ function saveIngredientGroupDetailsModal(){
     const aliasesText = document.getElementById('ingredient-group-aliases-input')?.value || '';
     const cat = document.getElementById('ingredient-group-category-input')?.value || 'other';
     const familyName = normaliseAliasText(document.getElementById('ingredient-group-family-input')?.value || '') || inferIngredientFamilyFromText(name) || name;
-    let family = window.pendingSubTypeFamilyId ? getIngredientFamily(window.pendingSubTypeFamilyId) : resolveIngredientFamilyForGroupDetails(familyName, cat);
+    family = window.pendingSubTypeFamilyId ? getIngredientFamily(window.pendingSubTypeFamilyId) : resolveIngredientFamilyForGroupDetails(familyName, cat);
     family.updatedAt = nowIso;
     group = {
       id:'grp'+Date.now()+Math.random().toString(36).slice(2,6),
@@ -13062,7 +13388,7 @@ function saveIngredientGroupDetailsModal(){
     if(!family.defaultTypeId) family.defaultTypeId = group.id;
     window.pendingSubTypeFamilyId = null;
     syncIngredientGroupAliases(group, []);
-    state.ingredientGroups.push(group);
+    isNew = true;
   } else if(!group) {
     return;
   } else if(ingredientGroupDetailsMode === 'name'){
@@ -13079,7 +13405,7 @@ function saveIngredientGroupDetailsModal(){
     }
     group.cat = document.getElementById('ingredient-group-category-input')?.value || group.cat || 'other';
     const familyName = normaliseAliasText(document.getElementById('ingredient-group-family-input')?.value || '') || group.family || inferIngredientFamilyFromText(name);
-    const family = resolveIngredientFamilyForGroupDetails(familyName, group.cat, getGroupIngredientFamily(group));
+    family = resolveIngredientFamilyForGroupDetails(familyName, group.cat, getGroupIngredientFamily(group));
     if(family){
       const oldFamily = getGroupIngredientFamily(group);
       if(oldFamily && oldFamily.id !== family.id){
@@ -13104,7 +13430,7 @@ function saveIngredientGroupDetailsModal(){
   } else if(ingredientGroupDetailsMode === 'family'){
     group.cat = document.getElementById('ingredient-group-category-input')?.value || group.cat || 'other';
     const familyName = normaliseAliasText(document.getElementById('ingredient-group-family-input')?.value || '');
-    const family = resolveIngredientFamilyForGroupDetails(familyName, group.cat, getGroupIngredientFamily(group));
+    family = resolveIngredientFamilyForGroupDetails(familyName, group.cat, getGroupIngredientFamily(group));
     if(family){
       group.ingredientId = family.id;
       group.family = family.name;
@@ -13118,12 +13444,13 @@ function saveIngredientGroupDetailsModal(){
     }
     group.updatedAt = nowIso;
   } else if(ingredientGroupDetailsMode === 'familyAliases'){
-    const family = getIngredientFamily(ingredientFamilyDetailsId);
-    if(family){
+    const fam = getIngredientFamily(ingredientFamilyDetailsId);
+    if(fam){
       const aliasesText = document.getElementById('ingredient-group-aliases-input')?.value || '';
-      family.aliases = aliasesText.split(/[\n,]/).map(a=>a.trim()).filter(Boolean);
-      if(family.name && !family.aliases.some(a => canonicalGroupKey(a) === canonicalGroupKey(family.name))) family.aliases.unshift(family.name);
-      family.updatedAt = nowIso;
+      fam.aliases = aliasesText.split(/[\n,]/).map(a=>a.trim()).filter(Boolean);
+      if(fam.name && !fam.aliases.some(a => canonicalGroupKey(a) === canonicalGroupKey(fam.name))) fam.aliases.unshift(fam.name);
+      fam.updatedAt = nowIso;
+      family = fam;
     }
   } else {
     const aliasesText = document.getElementById('ingredient-group-aliases-input')?.value || '';
@@ -13131,17 +13458,32 @@ function saveIngredientGroupDetailsModal(){
     group.updatedAt = nowIso;
     syncIngredientGroupAliases(group, getGroupProducts(group.id));
   }
+  let affectedProducts = [];
   if(group) {
     group.updatedAt = nowIso;
     ensureIngredientFamilyForGroup(group, state);
-    const products = getGroupProducts(group.id);
-    products.forEach(product => { if(group.cat) product.cat = group.cat; product.updatedAt = nowIso; });
-    syncIngredientGroupAliases(group, products);
+    affectedProducts = getGroupProducts(group.id);
+    affectedProducts.forEach(product => { if(group.cat) product.cat = group.cat; product.updatedAt = nowIso; });
+    syncIngredientGroupAliases(group, affectedProducts);
   }
-  closeIngredientGroupDetailsModal(true);
-  saveState(true);
-  refreshHierarchyViews();
-  finishEditorReturn();
+
+  try {
+    await executeDataQualityTransaction('SAVE_SUBTYPE_GROUP', {
+      groupData: group,
+      isNew,
+      affectedProducts,
+      affectedFamily: family
+    }, {
+      modalWrapId: 'ingredient-group-details-wrap',
+      submitButtonId: 'ingredient-group-save-btn',
+      errorContainerId: 'ingredient-group-details-msg'
+    });
+    closeIngredientGroupDetailsModal(true);
+    refreshHierarchyViews();
+    finishEditorReturn();
+  } catch(e) {
+    console.error('saveIngredientGroupDetailsModal failed:', e);
+  }
 }
 
 function getIngredientGroupSearchText(group){
@@ -14591,6 +14933,7 @@ async function saveManualIng(categoryReady=false){
   
   const nowIso = new Date().toISOString();
   const existingIng = editIngId ? state.ingredients.find(x=>x.id===editIngId) : null;
+  const isNew = !editIngId;
   const ing=normaliseLegacyCountedPackOnSave({
     id:editIngId||('ing'+Date.now()),
     name,
@@ -14617,15 +14960,32 @@ async function saveManualIng(categoryReady=false){
     meatSubstituteFor: existingIng ? (existingIng.meatSubstituteFor || null) : null,
     updatedAt: nowIso
   });
-  
-  if(editIngId){
-    const i=state.ingredients.findIndex(x=>x.id===editIngId);
-    if(i>-1)state.ingredients[i]=ing;
-  }else state.ingredients.push(ing);
-  rebuildPlatePlanIndexes();
+
+  let groupUpdate = null;
   if(ing.groupId && getIngredientGroup(ing.groupId)) {
     const grp = getIngredientGroup(ing.groupId);
-    if(grp) grp.updatedAt = nowIso;
+    if(grp) {
+      grp.updatedAt = nowIso;
+      groupUpdate = grp;
+    }
+  }
+
+  try {
+    await executeDataQualityTransaction('UPDATE_PRODUCT', {
+      product: ing,
+      isNew,
+      groupUpdate
+    }, {
+      submitButtonId: 'mi-save-btn',
+      errorContainerId: 'mi-msg'
+    });
+  } catch(error) {
+    console.error('saveManualIng failed transaction:', error);
+    return;
+  }
+
+  if(ing.groupId && getIngredientGroup(ing.groupId)) {
+    const grp = getIngredientGroup(ing.groupId);
     ensureProductAssignedToGroup(ing, name, ing.groupId);
     syncProductHierarchyCategory(ing, grp, ing.cat);
   } else {
@@ -14637,15 +14997,7 @@ async function saveManualIng(categoryReady=false){
     }
   }
   refreshProductGroupAndRecipes(ing.id);
-  
-  try {
-    await persistPlatePlanDataQualityFix('Product update');
-  } catch(error) {
-    console.error('saveManualIng failed to commit product to database:', error);
-    showPlatePlanToast('Save Failed: Database update could not be committed.');
-    showMsg('mi-msg', 'Save Failed: Database update could not be committed.', 'error');
-    return;
-  }
+
   if(handlePendingRecipeNutritionAfterSave(ing.id)){
     refreshAfterIngredientEdit(ing.id);
     return;
@@ -14698,17 +15050,13 @@ function deleteIng(id){
       'Delete product?',
       `Delete <strong>${ppEscapeHtml(product?.name || 'this product')}</strong> from Product Bank?`,
       'Delete product',
-      () => runWithRecoveryPoint('Before deleting product', () => {
-        (state.ingredientGroups || []).forEach(group => {
-          if(Array.isArray(group.productIds)) group.productIds = group.productIds.filter(pid => pid !== id);
-          if(group.defaultProductId === id) refreshAutoDefaultProductForGroup(group.id);
-        });
-        state.meta = state.meta || {};
-        if (!Array.isArray(state.meta.deletedProductIds)) state.meta.deletedProductIds = [];
-        if (!state.meta.deletedProductIds.includes(id)) state.meta.deletedProductIds.push(id);
-        state.ingredients = state.ingredients.filter(i=>i.id!==id);
-        refreshPlatePlanDerivedState({ persist:false, render:true });
-        persistPlatePlanDataQualityFix('Delete product');
+      () => runWithRecoveryPoint('Before deleting product', async () => {
+        try {
+          await executeDataQualityTransaction('DELETE_PRODUCT', { id });
+          refreshPlatePlanDerivedState({ persist:false, render:true });
+        } catch(e) {
+          console.error('deleteIng failed:', e);
+        }
       })
     );
 }
@@ -14924,67 +15272,26 @@ function performReplaceAndDelete(c){
     runWithRecoveryPoint('Before bulk replacing and deleting product', () => applyReplaceAndDelete(c));
 }
 
-function applyReplaceAndDelete(c){
+async function applyReplaceAndDelete(c){
     if(!c) return;
-    // Apply per-row replacements
-    const touched = new Set();
-    c.rows.forEach(row => {
-        const r = state.recipes.find(x=>x.id===row.recipeId); if(!r) return;
-        const arr = row.key==='enhanced' ? r.enhanced.ingredients : r.ingredients;
-        const ing = arr[row.idx]; if(!ing) return;
-        const newBank = state.ingredients.find(i=>i.id===row.replacementId); if(!newBank) return;
-        if(newBank.groupId) ensureProductAssignedToGroup(newBank, newBank.name, newBank.groupId);
-        refreshProductGroupAndRecipes(newBank.id);
-        const oldName = ing.name;
-        ing.bankId = newBank.id;
-        ing.groupId = newBank.groupId || '';
-        ing.name = newBank.name;
-        if(ing.raw && oldName) ing.raw = ing.raw.replace(oldName, newBank.name);
-        touched.add(r.id);
-    });
-
-    // Recalc nutrition for touched recipes
-    touched.forEach(rid => {
+    try {
+      await executeDataQualityTransaction('REPLACE_AND_DELETE_PRODUCT', {
+        targetId: c.targetId,
+        replacements: c.rows
+      });
+      // Recalc nutrition for touched recipes
+      const touched = new Set(c.rows.map(r => r.recipeId));
+      touched.forEach(rid => {
         const r = state.recipes.find(x=>x.id===rid); if(!r) return;
         recalcRecipeObject(r);
-    });
-
-    // Remap any meal-plan product choices or legacy substitution overrides
-    const firstReplacement = (c.rows[0] && c.rows[0].replacementId) || null;
-    (c.planRefs||[]).forEach(ref => {
-        if(ref.type === 'planSelection' && state.plan?.productSelections) {
-          if(firstReplacement) state.plan.productSelections[ref.groupId] = firstReplacement;
-          else delete state.plan.productSelections[ref.groupId];
-          return;
-        }
-        const overrideSet = ref.instanceId ? (state.overrides[ref.instanceId] || {}) : {};
-        if(ref.type === 'productOverride' && overrideSet.productOverrides) {
-          if(firstReplacement) overrideSet.productOverrides[ref.groupId] = firstReplacement;
-          else delete overrideSet.productOverrides[ref.groupId];
-        }
-        if(ref.type === 'substitution' && overrideSet.substitutions) {
-          if(firstReplacement) overrideSet.substitutions[ref.fromId] = firstReplacement;
-          else delete overrideSet.substitutions[ref.fromId];
-        }
-    });
-
-    (state.ingredientGroups || []).forEach(group => {
-        if(Array.isArray(group.productIds)) group.productIds = group.productIds.filter(id => id !== c.targetId);
-        if(group.defaultProductId === c.targetId) {
-            group.defaultProductId = firstReplacement || group.productIds[0] || null;
-        }
-    });
-
-    // Finally, delete the ingredient and record tombstone
-    state.meta = state.meta || {};
-    if (!Array.isArray(state.meta.deletedProductIds)) state.meta.deletedProductIds = [];
-    if (!state.meta.deletedProductIds.includes(c.targetId)) state.meta.deletedProductIds.push(c.targetId);
-    state.ingredients = state.ingredients.filter(i => i.id !== c.targetId);
-    closeReplaceModal();
-    persistPlatePlanDataQualityFix('Replace and delete product');
-    if(typeof renderBank==='function') renderBank();
-    if(typeof renderVault==='function') renderVault();
-    if(typeof renderDataQuality==='function') renderDataQuality();
+      });
+      closeReplaceModal();
+      if(typeof renderBank==='function') renderBank();
+      if(typeof renderVault==='function') renderVault();
+      if(typeof renderDataQuality==='function') renderDataQuality();
+    } catch(e) {
+      console.error('applyReplaceAndDelete failed:', e);
+    }
 }
 
 async function parsePlainNutritionLabel(text){
