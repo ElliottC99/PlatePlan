@@ -5,11 +5,15 @@
  * Holding DOMContentLoaded with top-level await preserves the existing boot
  * contract while feature modules continue moving out of the legacy source.
  */
-const CURRENT_BUILD_ID = '2.7.2-v52';
+const CURRENT_BUILD_ID = '2.6.14-v60';
 
-// 2. Expose global window actions immediately on app load before any async operations execute
+// Expose global window actions immediately on app load before any async operations execute
 window.logout = function() {
-  try { if (window.firebase && firebase.auth) firebase.auth().signOut(); } catch(e) {}
+  if (typeof signOutPlatePlan === 'function') {
+    try { signOutPlatePlan(); } catch(e) {}
+  } else if (window.firebase && firebase.auth) {
+    try { firebase.auth().signOut(); } catch(e) {}
+  }
   try { localStorage.clear(); } catch(e) {}
   try { sessionStorage.clear(); } catch(e) {}
   window.location.href = window.location.origin + window.location.pathname + '?reload=' + Date.now();
@@ -17,11 +21,10 @@ window.logout = function() {
 
 window.syncNow = async function() {
   console.log('[MANUAL SYNC TRIGGERED]');
-  const hId = window.activeHouseholdId || (typeof state !== 'undefined' ? state?.meta?.householdId : null) || localStorage.getItem('plateplan_household_id') || 'elliott-chloe';
-  window.activeHouseholdId = hId;
-  if (typeof loadSharedPlatePlan === 'function') {
-    await loadSharedPlatePlan(hId);
-    window.location.reload();
+  if (typeof pushStateToCloud === 'function') {
+    await pushStateToCloud(true);
+  } else if (typeof loadSharedPlatePlan === 'function') {
+    await loadSharedPlatePlan();
   }
 };
 
@@ -39,7 +42,7 @@ function loadClassicScript(source) {
 document.documentElement.dataset.plateplanBoot = 'shell';
 await new Promise(resolve => requestAnimationFrame(resolve));
 document.documentElement.dataset.plateplanBoot = 'loading-core';
-await loadClassicScript('./scripts/plateplan-app.js?v=2.7.2');
-await import('./main.js?v=2.7.2');
+await loadClassicScript('./scripts/plateplan-app.js?v=2.6.14');
+await import('./main.js?v=2.6.14');
 document.documentElement.dataset.plateplanBoot = 'ready';
 
