@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.6.12';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v47';
+const PLATEPLAN_APP_VERSION='2.6.13';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v49';
 const SEED=[];
 
 let state = null;
@@ -779,9 +779,16 @@ function getPlatePlanHouseholdId(){
   return hid;
 }
 
+function getHouseholdDocRef(db, householdId) {
+  const database = db || platePlanDb;
+  const hid = householdId || getPlatePlanHouseholdId();
+  return database.collection('households').doc(hid);
+}
+window.getHouseholdDocRef = getHouseholdDocRef;
+
 function getPlatePlanDataCollection(explicitHouseholdId){
   const hid = explicitHouseholdId || getPlatePlanHouseholdId();
-  return platePlanDb.collection('households').doc(hid).collection('data');
+  return getHouseholdDocRef(platePlanDb, hid).collection('data');
 }
 
 function platePlanCloudRef(key, explicitHouseholdId){
@@ -816,7 +823,7 @@ async function pushStateToCloud(force=false){
     alert('Save Failed: Active household session not found. Please refresh and log in again.');
     throw new Error('Active household ID is undefined');
   }
-  console.log('[FIRESTORE ACTIVE PATH]', `households/${targetHouseholdId}/data/products`);
+  console.log('[FIRESTORE WRITE PATH]', getHouseholdDocRef(platePlanDb, targetHouseholdId).path);
 
   if(!platePlanCloudReady || !platePlanCloudUser || !platePlanDb) return;
   if(!navigator.onLine){
@@ -859,9 +866,17 @@ async function pushStateToCloud(force=false){
 
   platePlanCurrentPushPromise = (async () => {
     try{
-      const dataCol = platePlanDb.collection('households').doc(targetHouseholdId).collection('data');
+      const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
+      const dataCol = householdDocRef.collection('data');
       const cleaned=cleanCloudValue(state);
       if(!cleaned) throw new Error('State payload is empty');
+
+      // Standardize Payload Envelope Structure: Write state directly to household root doc
+      await householdDocRef.set({
+        ingredients: cleaned.ingredients || state.ingredients || [],
+        updatedAt: state.updatedAt,
+        meta: cleaned.meta || state.meta || {}
+      }, { merge: true });
 
       // Ensure tombstones sync across sessions
       const deletedProductIds = Array.from(new Set([
@@ -2056,15 +2071,19 @@ async function loadSharedPlatePlan(){
   if (!state.meta) state.meta = {};
   state.meta.householdId = targetHouseholdId;
 
-  console.log('[FIRESTORE ACTIVE PATH]', `households/${targetHouseholdId}/data/products`);
+  const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
+  console.log('[FIRESTORE READ PATH]', householdDocRef.path);
 
-  const dataCol = platePlanDb.collection('households').doc(targetHouseholdId).collection('data');
-  
-  const snapshot=await dataCol.get();
+  const snapshot = await householdDocRef.get();
+  const rootData = (snapshot && snapshot.exists) ? (snapshot.data() || {}) : {};
+  const extractedIngredients = rootData.ingredients;
+
+  const dataCol = householdDocRef.collection('data');
+  const subSnapshot = await dataCol.get();
   const docs={};
-  snapshot.forEach(doc=>{ docs[doc.id]=doc.data()||{}; });
+  subSnapshot.forEach(doc=>{ docs[doc.id]=doc.data()||{}; });
 
-  if(docs.meta || docs.recipes || docs.products || docs.taxonomy || docs.planner || docs.history){
+  if(docs.meta || docs.recipes || docs.products || docs.taxonomy || docs.planner || docs.history || (snapshot && snapshot.exists)){
     const metaDoc = docs.meta || {};
     const recipesDoc = docs.recipes || {};
     const productsDoc = docs.products || {};
@@ -2080,6 +2099,7 @@ async function loadSharedPlatePlan(){
       return 0;
     };
     const maxRemoteTime = Math.max(
+      getDocTimestamp(rootData),
       getDocTimestamp(metaDoc),
       getDocTimestamp(productsDoc),
       getDocTimestamp(recipesDoc),
@@ -2087,32 +2107,35 @@ async function loadSharedPlatePlan(){
       getDocTimestamp(plannerDoc),
       getDocTimestamp(historyDoc)
     );
-    const maxRemoteIso = maxRemoteTime > 0 ? new Date(maxRemoteTime).toISOString() : (metaDoc.clientTimestamp || new Date().toISOString());
+    const maxRemoteIso = maxRemoteTime > 0 ? new Date(maxRemoteTime).toISOString() : (rootData.clientTimestamp || metaDoc.clientTimestamp || new Date().toISOString());
 
     const assembledState = {
-      schemaVersion: metaDoc.schemaVersion || PLATEPLAN_SCHEMA_VERSION,
+      schemaVersion: metaDoc.schemaVersion || rootData.schemaVersion || PLATEPLAN_SCHEMA_VERSION,
       updatedAt: maxRemoteIso,
-      prefs: metaDoc.prefs || {},
-      customCats: metaDoc.customCats || {},
-      excluded: metaDoc.excluded || {},
-      useUpProducts: metaDoc.useUpProducts || {},
-      ignoredGroupMergeSuggestions: metaDoc.ignoredGroupMergeSuggestions || [],
-      ignoredDataQualityWarnings: metaDoc.ignoredDataQualityWarnings || [],
-      dataQualityDismissals: metaDoc.dataQualityDismissals || {},
-      packPicks: metaDoc.packPicks || {},
+      prefs: metaDoc.prefs || rootData.prefs || {},
+      customCats: metaDoc.customCats || rootData.customCats || {},
+      excluded: metaDoc.excluded || rootData.excluded || {},
+      useUpProducts: metaDoc.useUpProducts || rootData.useUpProducts || {},
+      ignoredGroupMergeSuggestions: metaDoc.ignoredGroupMergeSuggestions || rootData.ignoredGroupMergeSuggestions || [],
+      ignoredDataQualityWarnings: metaDoc.ignoredDataQualityWarnings || rootData.ignoredDataQualityWarnings || [],
+      dataQualityDismissals: metaDoc.dataQualityDismissals || rootData.dataQualityDismissals || {},
+      packPicks: metaDoc.packPicks || rootData.packPicks || {},
       meta: {
+        ...(rootData.meta || {}),
         ...(metaDoc.meta || {}),
         householdId: targetHouseholdId,
-        deletedProductIds: Array.isArray(metaDoc.meta?.deletedProductIds) ? metaDoc.meta.deletedProductIds : (Array.isArray(metaDoc.deletedProductIds) ? metaDoc.deletedProductIds : []),
-        deletedCategoryIds: Array.isArray(metaDoc.meta?.deletedCategoryIds) ? metaDoc.meta.deletedCategoryIds : (Array.isArray(metaDoc.deletedCategoryIds) ? metaDoc.deletedCategoryIds : [])
+        deletedProductIds: Array.isArray(metaDoc.meta?.deletedProductIds) ? metaDoc.meta.deletedProductIds : (Array.isArray(metaDoc.deletedProductIds) ? metaDoc.deletedProductIds : (rootData.meta?.deletedProductIds || [])),
+        deletedCategoryIds: Array.isArray(metaDoc.meta?.deletedCategoryIds) ? metaDoc.meta.deletedCategoryIds : (Array.isArray(metaDoc.deletedCategoryIds) ? metaDoc.deletedCategoryIds : (rootData.meta?.deletedCategoryIds || []))
       },
-      recipes: recipesDoc.recipes || [],
-      ingredients: productsDoc.ingredients || [],
-      ingredientGroups: taxonomyDoc.ingredientGroups || [],
-      ingredientFamilies: taxonomyDoc.ingredientFamilies || [],
-      plan: plannerDoc.plan || {},
-      overrides: plannerDoc.overrides || {},
-      planHistory: historyDoc.planHistory || []
+      recipes: recipesDoc.recipes || rootData.recipes || [],
+      ingredients: (Array.isArray(extractedIngredients) && extractedIngredients.length > 0)
+        ? extractedIngredients
+        : (productsDoc.ingredients || extractedIngredients || []),
+      ingredientGroups: taxonomyDoc.ingredientGroups || rootData.ingredientGroups || [],
+      ingredientFamilies: taxonomyDoc.ingredientFamilies || rootData.ingredientFamilies || [],
+      plan: plannerDoc.plan || rootData.plan || {},
+      overrides: plannerDoc.overrides || rootData.overrides || {},
+      planHistory: historyDoc.planHistory || rootData.planHistory || []
     };
 
     applyRemoteCloudState(assembledState, metaDoc, { isBoot: true });
