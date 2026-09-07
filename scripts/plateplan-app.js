@@ -149,8 +149,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.7.1';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v51';
+const PLATEPLAN_APP_VERSION='2.7.2';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v52';
 const SEED=[];
 
 let state = null;
@@ -2186,28 +2186,69 @@ async function loadSharedPlatePlan(householdId){
   if (!state.meta) state.meta = {};
   state.meta.householdId = targetHouseholdId;
 
+  const hydrateFromOfflineBackup = () => {
+    try {
+      const backupRaw = localStorage.getItem('plateplan_offline_backup');
+      if (backupRaw) {
+        const backup = JSON.parse(backupRaw);
+        if (Array.isArray(backup.ingredients) && backup.ingredients.length > 0) {
+          state.ingredients = backup.ingredients;
+          if (backup.updatedAt) state.updatedAt = backup.updatedAt;
+          saveState();
+          if (typeof renderAll === 'function') renderAll();
+          console.info('[OFFLINE HYDRATION] Hydrated from plateplan_offline_backup (' + backup.ingredients.length + ' ingredients)');
+          return true;
+        }
+      }
+    } catch(e) {
+      console.warn('[OFFLINE HYDRATION ERROR]', e);
+    }
+    return false;
+  };
+
+  // If unauthenticated or offline: hydrate immediately from 'plateplan_offline_backup'
+  if (!platePlanCloudUser || !navigator.onLine || !platePlanDb) {
+    hydrateFromOfflineBackup();
+    updatePlatePlanSyncStatus(platePlanCloudUser ? 'offline' : 'connecting', platePlanCloudUser ? 'Offline mode (cached backup)' : 'Sign in required');
+    if (!platePlanCloudUser) {
+      showPlatePlanAuthScreen();
+    }
+    return;
+  }
+
   const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
   console.log('[FIRESTORE READ PATH]', householdDocRef.path);
 
   let snapshot = null;
-  if (navigator.onLine) {
-    try {
-      snapshot = await householdDocRef.get({ source: 'server' });
-    } catch (serverErr) {
-      console.warn('[FIRESTORE SERVER FETCH FALLBACK]', serverErr);
+  try {
+    if (navigator.onLine) {
+      try {
+        snapshot = await householdDocRef.get({ source: 'server' });
+      } catch (serverErr) {
+        console.warn('[FIRESTORE SERVER FETCH FALLBACK]', serverErr);
+        snapshot = await householdDocRef.get();
+      }
+    } else {
       snapshot = await householdDocRef.get();
     }
-  } else {
-    snapshot = await householdDocRef.get();
+  } catch (err) {
+    console.warn('[FIRESTORE READ ERROR]', err);
+    hydrateFromOfflineBackup();
+    updatePlatePlanSyncStatus('offline', err.message || 'Offline mode');
+    return;
   }
 
   const rootData = (snapshot && snapshot.exists) ? (snapshot.data() || {}) : {};
   const extractedIngredients = rootData.ingredients;
 
-  const dataCol = householdDocRef.collection('data');
-  const subSnapshot = await dataCol.get();
   const docs={};
-  subSnapshot.forEach(doc=>{ docs[doc.id]=doc.data()||{}; });
+  try {
+    const dataCol = householdDocRef.collection('data');
+    const subSnapshot = await dataCol.get();
+    subSnapshot.forEach(doc=>{ docs[doc.id]=doc.data()||{}; });
+  } catch(subErr) {
+    console.warn('[FIRESTORE SUBCOLLECTION ERROR]', subErr);
+  }
 
   if(snapshot && snapshot.exists && (Array.isArray(extractedIngredients) || docs.meta || docs.recipes || docs.products || docs.taxonomy || docs.planner || docs.history)){
     console.log('[AUTHORITATIVE BOOT HYDRATION] Hydrating directly from server snapshot, bypassing reconciliation...');
@@ -2449,8 +2490,9 @@ function initPlatePlanCloudSync(){
   if(!window.firebase) return updatePlatePlanSyncStatus('error','Firebase scripts did not load');
   try{
     platePlanFirebaseApp=firebase.apps.length?firebase.app():firebase.initializeApp(settings.config);
-    platePlanAuth=firebase.auth(); platePlanDb=firebase.firestore();
-    platePlanDb.enablePersistence({synchronizeTabs:true}).catch(error=>console.info('Firestore persistent cache unavailable',error.code));
+    platePlanAuth=firebase.auth();
+    // STRIP OFFLINE PERSISTENCE COMPLETELY: Initialize standard in-memory Firestore without IndexedDB locks
+    platePlanDb=firebase.firestore();
     platePlanAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
     let authSettled = false;
@@ -2459,10 +2501,23 @@ function initPlatePlanCloudSync(){
         console.warn('[AUTH FALLBACK TIMEOUT] onAuthStateChanged did not settle within 2500ms; falling back safely');
         if (!platePlanCloudUser) {
           updatePlatePlanSyncStatus(navigator.onLine ? 'connecting' : 'offline', 'Auth check timed out');
+          try {
+            const backupRaw = localStorage.getItem('plateplan_offline_backup');
+            if (backupRaw) {
+              const backup = JSON.parse(backupRaw);
+              if (Array.isArray(backup.ingredients) && backup.ingredients.length > 0 && (!state.ingredients || state.ingredients.length === 0)) {
+                state.ingredients = backup.ingredients;
+                if (backup.updatedAt) state.updatedAt = backup.updatedAt;
+                saveState();
+                if (typeof renderAll === 'function') renderAll();
+              }
+            }
+          } catch(e) {}
         }
       }
     }, 2500);
 
+    // Immediate unblocked auth observer
     platePlanAuth.onAuthStateChanged(user=>{
       authSettled = true;
       clearTimeout(authTimeout);
@@ -2482,6 +2537,18 @@ function initPlatePlanCloudSync(){
         const userEl = document.getElementById('sync-user');
         if (userEl) userEl.textContent='';
         updatePlatePlanSyncStatus('connecting','Sign in required');
+        try {
+          const backupRaw = localStorage.getItem('plateplan_offline_backup');
+          if (backupRaw) {
+            const backup = JSON.parse(backupRaw);
+            if (Array.isArray(backup.ingredients) && backup.ingredients.length > 0 && (!state.ingredients || state.ingredients.length === 0)) {
+              state.ingredients = backup.ingredients;
+              if (backup.updatedAt) state.updatedAt = backup.updatedAt;
+              saveState();
+              if (typeof renderAll === 'function') renderAll();
+            }
+          }
+        } catch(e) {}
         showPlatePlanAuthScreen();
       }
     }, error => {
@@ -2489,6 +2556,18 @@ function initPlatePlanCloudSync(){
       clearTimeout(authTimeout);
       console.warn('onAuthStateChanged error:', error);
       updatePlatePlanSyncStatus('error', error.message);
+      try {
+        const backupRaw = localStorage.getItem('plateplan_offline_backup');
+        if (backupRaw) {
+          const backup = JSON.parse(backupRaw);
+          if (Array.isArray(backup.ingredients) && backup.ingredients.length > 0 && (!state.ingredients || state.ingredients.length === 0)) {
+            state.ingredients = backup.ingredients;
+            if (backup.updatedAt) state.updatedAt = backup.updatedAt;
+            saveState();
+            if (typeof renderAll === 'function') renderAll();
+          }
+        }
+      } catch(e) {}
     });
   }catch(error){ updatePlatePlanSyncStatus('error',error.message); }
 }
