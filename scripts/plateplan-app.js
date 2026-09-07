@@ -1,3 +1,62 @@
+// 2. Expose global window actions immediately on app load before any async operations execute
+window.logout = function() {
+  try { if (window.firebase && firebase.auth) firebase.auth().signOut(); } catch(e) {}
+  try { localStorage.clear(); } catch(e) {}
+  try { sessionStorage.clear(); } catch(e) {}
+  window.location.href = window.location.origin + window.location.pathname + '?reload=' + Date.now();
+};
+
+window.syncNow = async function() {
+  console.log('[MANUAL SYNC TRIGGERED]');
+  const hId = window.activeHouseholdId || (typeof state !== 'undefined' ? state?.meta?.householdId : null) || (function(){ try { return localStorage.getItem('plateplan_household_id'); } catch(e) { return null; } })() || 'elliott-chloe';
+  window.activeHouseholdId = hId;
+  if (typeof loadSharedPlatePlan === 'function') {
+    await loadSharedPlatePlan(hId);
+    window.location.reload();
+  }
+};
+
+function bindTopBarActionListeners() {
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn && !logoutBtn.dataset.bound) {
+    logoutBtn.dataset.bound = 'true';
+    logoutBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      window.logout();
+    });
+  }
+
+  document.querySelectorAll('.sync-now-btn').forEach(btn => {
+    if (!btn.dataset.bound) {
+      btn.dataset.bound = 'true';
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        window.syncNow();
+      });
+    }
+  });
+
+  const syncBadge = document.getElementById('sync-status');
+  if (syncBadge && !syncBadge.dataset.bound) {
+    syncBadge.dataset.bound = 'true';
+    syncBadge.addEventListener('click', function(e) {
+      if (typeof openPlatePlanSyncPanel === 'function') {
+        openPlatePlanSyncPanel();
+      } else {
+        window.syncNow();
+      }
+    });
+  }
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindTopBarActionListeners);
+  } else {
+    bindTopBarActionListeners();
+  }
+}
+
 // == NUTRITION NORMALISATION MAP ==
 const NUTRITION_CANONICAL_MAP = {
   "carbohydrates": "carb", "carbs": "carb", "available carbohydrate": "carb", "available carbohydrates": "carb", "total carbohydrate": "carb",
@@ -90,8 +149,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.7.0';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v50';
+const PLATEPLAN_APP_VERSION='2.7.1';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v51';
 const SEED=[];
 
 let state = null;
@@ -632,28 +691,6 @@ function normalizeLoadedState(s, { injectSeed = false, restoreRecipeBackup = fal
 }
 
 function loadState(){
-  // 1. Nuclear Cache Reset on Boot
-  try {
-    if (localStorage.getItem('plateplan_version') !== '2.7.0') {
-      console.log('[v2.7.0 NUCLEAR PURGE] Executing plateplan-app local cache purge...');
-      const keysToRemove = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith('plateplan')) keysToRemove.push(k);
-      }
-      keysToRemove.forEach(k => localStorage.removeItem(k));
-      if (window.indexedDB && typeof indexedDB.databases === 'function') {
-        indexedDB.databases().then(dbs => {
-          dbs.forEach(db => { if (db.name) { try { indexedDB.deleteDatabase(db.name); } catch(_e) {} } });
-        }).catch(() => {});
-      }
-      ['plateplan', 'plateplan-db', 'plateplan_store', 'plateplan_cache', 'keyval-store'].forEach(name => {
-        try { indexedDB.deleteDatabase(name); } catch (_e) {}
-      });
-      localStorage.setItem('plateplan_version', '2.7.0');
-    }
-  } catch (_e) {}
-
   let s = {recipes:[],ingredients:[...SEED],ingredientGroups:[],ingredientFamilies:[],ignoredGroupMergeSuggestions:[],ignoredDataQualityWarnings:[],dataQualityDismissals:{},useUpProducts:{},plan:{},planHistory:[],excluded:{},prefs:{exclude:'mushrooms, courgette',exclusions:{shared:[],elliott:[],chloe:[]},diet:'vegetarian',ecal:2400,eprot:130,ccal:1700,cprot:100, shopGroupBy: 'family', productPriority:'protein',prioritiseUseUpProducts:false}, customCats:{}};
   try{
     const d=localStorage.getItem(SK);
@@ -670,6 +707,16 @@ function loadState(){
       if(Array.isArray(backupRecipes) && backupRecipes.length > 0){
         s.recipes = backupRecipes;
       }
+    }
+    const offlineBackupRaw = localStorage.getItem('plateplan_offline_backup');
+    if (offlineBackupRaw && (!Array.isArray(s.ingredients) || s.ingredients.length === 0)) {
+      try {
+        const parsedBackup = JSON.parse(offlineBackupRaw);
+        if (Array.isArray(parsedBackup.ingredients) && parsedBackup.ingredients.length > 0) {
+          s.ingredients = parsedBackup.ingredients;
+          if (parsedBackup.updatedAt) s.updatedAt = parsedBackup.updatedAt;
+        }
+      } catch(e) {}
     }
   }catch(e){}
   
@@ -790,7 +837,10 @@ function platePlanStateProjection(source=state){
 }
 
 function getPlatePlanHouseholdId(){
-  const hid = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+  let saved = '';
+  try { saved = localStorage.getItem('plateplan_household_id'); } catch(e) {}
+  const hid = saved || window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+  try { localStorage.setItem('plateplan_household_id', hid); } catch(e) {}
   if (!window.activeHouseholdId && hid) {
     window.activeHouseholdId = hid;
     window.activeHousehold = { id: hid };
@@ -2125,11 +2175,14 @@ function ensurePlatePlanMigrationModal(){
   wrap=document.createElement('div'); wrap.id='plateplan-cloud-migration-wrap'; wrap.className='modal-wrap'; wrap.style.zIndex='750'; document.body.appendChild(wrap); return wrap;
 }
 
-async function loadSharedPlatePlan(){
+async function loadSharedPlatePlan(householdId){
   updatePlatePlanSyncStatus('connecting');
-  const targetHouseholdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+  let savedHousehold = '';
+  try { savedHousehold = localStorage.getItem('plateplan_household_id'); } catch(e) {}
+  const targetHouseholdId = householdId || window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || savedHousehold || 'elliott-chloe';
   window.activeHouseholdId = targetHouseholdId;
   window.activeHousehold = { id: targetHouseholdId };
+  try { localStorage.setItem('plateplan_household_id', targetHouseholdId); } catch(e) {}
   if (!state.meta) state.meta = {};
   state.meta.householdId = targetHouseholdId;
 
@@ -2197,8 +2250,27 @@ async function loadSharedPlatePlan(){
     };
 
     applyRemoteCloudState(assembledState, metaDoc, { isBoot: true, bypassReconciliation: true });
+
+    try {
+      localStorage.setItem('plateplan_offline_backup', JSON.stringify({
+        ingredients: assembledState.ingredients,
+        updatedAt: assembledState.updatedAt,
+        householdId: targetHouseholdId,
+        timestamp: Date.now()
+      }));
+    } catch(e) {
+      console.warn('Could not save plateplan_offline_backup', e);
+    }
   }else if(docs.state && typeof docs.state.state==='object'){
     applyRemoteCloudState(docs.state.state, docs.state, { isBoot: true, bypassReconciliation: true });
+    try {
+      localStorage.setItem('plateplan_offline_backup', JSON.stringify({
+        ingredients: docs.state.state.ingredients || [],
+        updatedAt: docs.state.state.updatedAt || new Date().toISOString(),
+        householdId: targetHouseholdId,
+        timestamp: Date.now()
+      }));
+    } catch(e) {}
     await pushStateToCloud();
   }else{
     // Check if legacy shredded data exists
@@ -2344,7 +2416,10 @@ async function startPlatePlanForSignedInUser(user){
   updatePlatePlanSyncStatus('connecting');
   try{
     const config=window.PLATEPLAN_FIREBASE||{};
-    const householdId=window.activeHouseholdId || state?.meta?.householdId || config.householdId || 'elliott-chloe';
+    let savedHousehold = '';
+    try { savedHousehold = localStorage.getItem('plateplan_household_id'); } catch(e) {}
+    const householdId=savedHousehold || window.activeHouseholdId || state?.meta?.householdId || config.householdId || 'elliott-chloe';
+    try { localStorage.setItem('plateplan_household_id', householdId); } catch(e) {}
     window.activeHouseholdId = householdId;
     window.activeHousehold = { id: householdId };
     if (!state.meta) state.meta = {};
@@ -2358,7 +2433,7 @@ async function startPlatePlanForSignedInUser(user){
       role: 'member'
     },{merge:true}).catch(err=>console.info('Member heartbeat noted:',err));
 
-    await loadSharedPlatePlan();
+    await loadSharedPlatePlan(householdId);
   }catch(error){
     console.warn('PlatePlan cloud startup error:',error);
     updatePlatePlanSyncStatus('error',error.message);
@@ -2368,6 +2443,7 @@ async function startPlatePlanForSignedInUser(user){
 }
 
 function initPlatePlanCloudSync(){
+  try { bindTopBarActionListeners(); } catch(e) {}
   const settings=window.PLATEPLAN_FIREBASE||{};
   if(!settings.configured){ updatePlatePlanSyncStatus('local','Add Firebase configuration to enable shared sync'); return; }
   if(!window.firebase) return updatePlatePlanSyncStatus('error','Firebase scripts did not load');
@@ -2376,18 +2452,43 @@ function initPlatePlanCloudSync(){
     platePlanAuth=firebase.auth(); platePlanDb=firebase.firestore();
     platePlanDb.enablePersistence({synchronizeTabs:true}).catch(error=>console.info('Firestore persistent cache unavailable',error.code));
     platePlanAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+    let authSettled = false;
+    const authTimeout = setTimeout(() => {
+      if (!authSettled) {
+        console.warn('[AUTH FALLBACK TIMEOUT] onAuthStateChanged did not settle within 2500ms; falling back safely');
+        if (!platePlanCloudUser) {
+          updatePlatePlanSyncStatus(navigator.onLine ? 'connecting' : 'offline', 'Auth check timed out');
+        }
+      }
+    }, 2500);
+
     platePlanAuth.onAuthStateChanged(user=>{
+      authSettled = true;
+      clearTimeout(authTimeout);
       if(user) {
         const config=window.PLATEPLAN_FIREBASE||{};
-        const householdId=config.householdId || state?.meta?.householdId || window.activeHouseholdId || 'elliott-chloe';
+        let savedHousehold = '';
+        try { savedHousehold = localStorage.getItem('plateplan_household_id'); } catch(e) {}
+        const householdId=savedHousehold || config.householdId || state?.meta?.householdId || window.activeHouseholdId || 'elliott-chloe';
+        try { localStorage.setItem('plateplan_household_id', householdId); } catch(e) {}
         window.activeHouseholdId = householdId;
         window.activeHousehold = { id: householdId };
         if (!state.meta) state.meta = {};
         state.meta.householdId = householdId;
         startPlatePlanForSignedInUser(user);
       } else {
-        platePlanCloudUser=null; platePlanCloudReady=false; document.getElementById('sync-user').textContent=''; updatePlatePlanSyncStatus('connecting','Sign in required'); showPlatePlanAuthScreen();
+        platePlanCloudUser=null; platePlanCloudReady=false;
+        const userEl = document.getElementById('sync-user');
+        if (userEl) userEl.textContent='';
+        updatePlatePlanSyncStatus('connecting','Sign in required');
+        showPlatePlanAuthScreen();
       }
+    }, error => {
+      authSettled = true;
+      clearTimeout(authTimeout);
+      console.warn('onAuthStateChanged error:', error);
+      updatePlatePlanSyncStatus('error', error.message);
     });
   }catch(error){ updatePlatePlanSyncStatus('error',error.message); }
 }
