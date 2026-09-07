@@ -90,8 +90,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.6.13';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v49';
+const PLATEPLAN_APP_VERSION='2.7.0';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v50';
 const SEED=[];
 
 let state = null;
@@ -632,6 +632,28 @@ function normalizeLoadedState(s, { injectSeed = false, restoreRecipeBackup = fal
 }
 
 function loadState(){
+  // 1. Nuclear Cache Reset on Boot
+  try {
+    if (localStorage.getItem('plateplan_version') !== '2.7.0') {
+      console.log('[v2.7.0 NUCLEAR PURGE] Executing plateplan-app local cache purge...');
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('plateplan')) keysToRemove.push(k);
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+      if (window.indexedDB && typeof indexedDB.databases === 'function') {
+        indexedDB.databases().then(dbs => {
+          dbs.forEach(db => { if (db.name) { try { indexedDB.deleteDatabase(db.name); } catch(_e) {} } });
+        }).catch(() => {});
+      }
+      ['plateplan', 'plateplan-db', 'plateplan_store', 'plateplan_cache', 'keyval-store'].forEach(name => {
+        try { indexedDB.deleteDatabase(name); } catch (_e) {}
+      });
+      localStorage.setItem('plateplan_version', '2.7.0');
+    }
+  } catch (_e) {}
+
   let s = {recipes:[],ingredients:[...SEED],ingredientGroups:[],ingredientFamilies:[],ignoredGroupMergeSuggestions:[],ignoredDataQualityWarnings:[],dataQualityDismissals:{},useUpProducts:{},plan:{},planHistory:[],excluded:{},prefs:{exclude:'mushrooms, courgette',exclusions:{shared:[],elliott:[],chloe:[]},diet:'vegetarian',ecal:2400,eprot:130,ccal:1700,cprot:100, shopGroupBy: 'family', productPriority:'protein',prioritiseUseUpProducts:false}, customCats:{}};
   try{
     const d=localStorage.getItem(SK);
@@ -817,13 +839,14 @@ async function persistPlatePlanDataQualityFix(reason = 'Data quality update'){
 
 async function pushStateToCloud(force=false){
   if (state) state.updatedAt = new Date().toISOString();
-  const targetHouseholdId = window.activeHouseholdId || state?.meta?.householdId;
-  if (!targetHouseholdId) {
-    console.error('[CLOUD SAVE ERROR] Active household ID is undefined! Aborting write.');
-    alert('Save Failed: Active household session not found. Please refresh and log in again.');
-    throw new Error('Active household ID is undefined');
-  }
-  console.log('[FIRESTORE WRITE PATH]', getHouseholdDocRef(platePlanDb, targetHouseholdId).path);
+  // a. Resolves household ID directly (e.g. 'elliott-chloe')
+  const targetHouseholdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+  window.activeHouseholdId = targetHouseholdId;
+  if (state && !state.meta) state.meta = {};
+  if (state?.meta) state.meta.householdId = targetHouseholdId;
+
+  const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
+  console.log('[FIRESTORE WRITE PATH]', householdDocRef.path);
 
   if(!platePlanCloudReady || !platePlanCloudUser || !platePlanDb) return;
   if(!navigator.onLine){
@@ -849,7 +872,7 @@ async function pushStateToCloud(force=false){
     return;
   }
 
-  // 3. Concurrency lock: if forced, await the active in-flight push then re-execute forced push
+  // 3. Concurrency lock: if forced, await the active in-flight push then proceed
   if(platePlanIsPushing){
     platePlanPendingPush=true;
     if(force && platePlanCurrentPushPromise){
@@ -866,17 +889,48 @@ async function pushStateToCloud(force=false){
 
   platePlanCurrentPushPromise = (async () => {
     try{
-      const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
-      const dataCol = householdDocRef.collection('data');
       const cleaned=cleanCloudValue(state);
       if(!cleaned) throw new Error('State payload is empty');
 
-      // Standardize Payload Envelope Structure: Write state directly to household root doc
-      await householdDocRef.set({
+      // b. Direct setDoc/set operation on db.collection('households').doc(householdId) with { merge: true }
+      const writePayload = {
         ingredients: cleaned.ingredients || state.ingredients || [],
-        updatedAt: state.updatedAt,
+        updatedAt: state.updatedAt || new Date().toISOString(),
         meta: cleaned.meta || state.meta || {}
-      }, { merge: true });
+      };
+      await householdDocRef.set(writePayload, { merge: true });
+
+      // c. Immediately perform a read-back: await docRef.get({ source: 'server' })
+      let serverData = null;
+      try {
+        const readBackSnap = await householdDocRef.get({ source: 'server' });
+        if (readBackSnap.exists) {
+          serverData = readBackSnap.data() || {};
+        }
+      } catch (readBackErr) {
+        console.warn('[WRITE-THROUGH READ-BACK FALLBACK]', readBackErr);
+        const readBackSnap = await householdDocRef.get();
+        if (readBackSnap.exists) {
+          serverData = readBackSnap.data() || {};
+        }
+      }
+
+      // d. Verifies the returned server document contains the edited items. If verification fails, throws an explicit UI error toast.
+      const serverIngredients = serverData?.ingredients;
+      if (!Array.isArray(serverIngredients)) {
+        const errorMsg = 'Save Verification Failed: Server returned missing or invalid ingredients.';
+        showPlatePlanToast(errorMsg);
+        throw new Error(errorMsg);
+      }
+      if (writePayload.ingredients.length > 0 && serverIngredients.length === 0) {
+        const errorMsg = 'Save Verification Failed: Server returned empty ingredients array after write.';
+        showPlatePlanToast(errorMsg);
+        throw new Error(errorMsg);
+      }
+      console.log('[WRITE-THROUGH VERIFIED]', `Confirmed ${serverIngredients.length} ingredients on server doc: ${householdDocRef.path}`);
+
+      // Subcollection batch writes
+      const dataCol = householdDocRef.collection('data');
 
       // Ensure tombstones sync across sessions
       const deletedProductIds = Array.from(new Set([
@@ -1828,7 +1882,15 @@ function applyRemoteCloudState(remoteState, metadata = {}, options = {}){
 
   platePlanSyncSuppress=true;
   try{
-    const { state: reconciled, hasLocalNewer } = reconcilePlatePlanState(state, remoteState, options);
+    let reconciled;
+    let hasLocalNewer = false;
+    if (options.bypassReconciliation) {
+      reconciled = remoteState;
+    } else {
+      const rec = reconcilePlatePlanState(state, remoteState, options);
+      reconciled = rec.state;
+      hasLocalNewer = rec.hasLocalNewer;
+    }
     const loaded=loadStateFromObject(reconciled);
     state=loaded;
     if (Array.isArray(state?.ingredients)) {
@@ -2074,7 +2136,18 @@ async function loadSharedPlatePlan(){
   const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
   console.log('[FIRESTORE READ PATH]', householdDocRef.path);
 
-  const snapshot = await householdDocRef.get();
+  let snapshot = null;
+  if (navigator.onLine) {
+    try {
+      snapshot = await householdDocRef.get({ source: 'server' });
+    } catch (serverErr) {
+      console.warn('[FIRESTORE SERVER FETCH FALLBACK]', serverErr);
+      snapshot = await householdDocRef.get();
+    }
+  } else {
+    snapshot = await householdDocRef.get();
+  }
+
   const rootData = (snapshot && snapshot.exists) ? (snapshot.data() || {}) : {};
   const extractedIngredients = rootData.ingredients;
 
@@ -2083,7 +2156,8 @@ async function loadSharedPlatePlan(){
   const docs={};
   subSnapshot.forEach(doc=>{ docs[doc.id]=doc.data()||{}; });
 
-  if(docs.meta || docs.recipes || docs.products || docs.taxonomy || docs.planner || docs.history || (snapshot && snapshot.exists)){
+  if(snapshot && snapshot.exists && (Array.isArray(extractedIngredients) || docs.meta || docs.recipes || docs.products || docs.taxonomy || docs.planner || docs.history)){
+    console.log('[AUTHORITATIVE BOOT HYDRATION] Hydrating directly from server snapshot, bypassing reconciliation...');
     const metaDoc = docs.meta || {};
     const recipesDoc = docs.recipes || {};
     const productsDoc = docs.products || {};
@@ -2091,35 +2165,21 @@ async function loadSharedPlatePlan(){
     const plannerDoc = docs.planner || {};
     const historyDoc = docs.history || {};
 
-    const getDocTimestamp = doc => {
-      if (!doc) return 0;
-      if (doc.updatedAt?.toDate) return doc.updatedAt.toDate().getTime();
-      if (doc.clientTimestamp) return new Date(doc.clientTimestamp).getTime();
-      if (typeof doc.updatedAt === 'string') return new Date(doc.updatedAt).getTime();
-      return 0;
-    };
-    const maxRemoteTime = Math.max(
-      getDocTimestamp(rootData),
-      getDocTimestamp(metaDoc),
-      getDocTimestamp(productsDoc),
-      getDocTimestamp(recipesDoc),
-      getDocTimestamp(taxonomyDoc),
-      getDocTimestamp(plannerDoc),
-      getDocTimestamp(historyDoc)
-    );
-    const maxRemoteIso = maxRemoteTime > 0 ? new Date(maxRemoteTime).toISOString() : (rootData.clientTimestamp || metaDoc.clientTimestamp || new Date().toISOString());
+    const resolvedIngredients = (Array.isArray(extractedIngredients) && extractedIngredients.length > 0)
+      ? extractedIngredients
+      : (Array.isArray(productsDoc.ingredients) ? productsDoc.ingredients : (extractedIngredients || []));
 
     const assembledState = {
       schemaVersion: metaDoc.schemaVersion || rootData.schemaVersion || PLATEPLAN_SCHEMA_VERSION,
-      updatedAt: maxRemoteIso,
-      prefs: metaDoc.prefs || rootData.prefs || {},
-      customCats: metaDoc.customCats || rootData.customCats || {},
-      excluded: metaDoc.excluded || rootData.excluded || {},
-      useUpProducts: metaDoc.useUpProducts || rootData.useUpProducts || {},
-      ignoredGroupMergeSuggestions: metaDoc.ignoredGroupMergeSuggestions || rootData.ignoredGroupMergeSuggestions || [],
-      ignoredDataQualityWarnings: metaDoc.ignoredDataQualityWarnings || rootData.ignoredDataQualityWarnings || [],
-      dataQualityDismissals: metaDoc.dataQualityDismissals || rootData.dataQualityDismissals || {},
-      packPicks: metaDoc.packPicks || rootData.packPicks || {},
+      updatedAt: rootData.updatedAt || metaDoc.updatedAt || new Date().toISOString(),
+      prefs: metaDoc.prefs || rootData.prefs || state.prefs || {},
+      customCats: metaDoc.customCats || rootData.customCats || state.customCats || {},
+      excluded: metaDoc.excluded || rootData.excluded || state.excluded || {},
+      useUpProducts: metaDoc.useUpProducts || rootData.useUpProducts || state.useUpProducts || {},
+      ignoredGroupMergeSuggestions: metaDoc.ignoredGroupMergeSuggestions || rootData.ignoredGroupMergeSuggestions || state.ignoredGroupMergeSuggestions || [],
+      ignoredDataQualityWarnings: metaDoc.ignoredDataQualityWarnings || rootData.ignoredDataQualityWarnings || state.ignoredDataQualityWarnings || [],
+      dataQualityDismissals: metaDoc.dataQualityDismissals || rootData.dataQualityDismissals || state.dataQualityDismissals || {},
+      packPicks: metaDoc.packPicks || rootData.packPicks || state.packPicks || {},
       meta: {
         ...(rootData.meta || {}),
         ...(metaDoc.meta || {}),
@@ -2127,20 +2187,18 @@ async function loadSharedPlatePlan(){
         deletedProductIds: Array.isArray(metaDoc.meta?.deletedProductIds) ? metaDoc.meta.deletedProductIds : (Array.isArray(metaDoc.deletedProductIds) ? metaDoc.deletedProductIds : (rootData.meta?.deletedProductIds || [])),
         deletedCategoryIds: Array.isArray(metaDoc.meta?.deletedCategoryIds) ? metaDoc.meta.deletedCategoryIds : (Array.isArray(metaDoc.deletedCategoryIds) ? metaDoc.deletedCategoryIds : (rootData.meta?.deletedCategoryIds || []))
       },
-      recipes: recipesDoc.recipes || rootData.recipes || [],
-      ingredients: (Array.isArray(extractedIngredients) && extractedIngredients.length > 0)
-        ? extractedIngredients
-        : (productsDoc.ingredients || extractedIngredients || []),
-      ingredientGroups: taxonomyDoc.ingredientGroups || rootData.ingredientGroups || [],
-      ingredientFamilies: taxonomyDoc.ingredientFamilies || rootData.ingredientFamilies || [],
-      plan: plannerDoc.plan || rootData.plan || {},
-      overrides: plannerDoc.overrides || rootData.overrides || {},
-      planHistory: historyDoc.planHistory || rootData.planHistory || []
+      recipes: recipesDoc.recipes || rootData.recipes || state.recipes || [],
+      ingredients: resolvedIngredients,
+      ingredientGroups: taxonomyDoc.ingredientGroups || rootData.ingredientGroups || state.ingredientGroups || [],
+      ingredientFamilies: taxonomyDoc.ingredientFamilies || rootData.ingredientFamilies || state.ingredientFamilies || [],
+      plan: plannerDoc.plan || rootData.plan || state.plan || {},
+      overrides: plannerDoc.overrides || rootData.overrides || state.overrides || {},
+      planHistory: historyDoc.planHistory || rootData.planHistory || state.planHistory || []
     };
 
-    applyRemoteCloudState(assembledState, metaDoc, { isBoot: true });
+    applyRemoteCloudState(assembledState, metaDoc, { isBoot: true, bypassReconciliation: true });
   }else if(docs.state && typeof docs.state.state==='object'){
-    applyRemoteCloudState(docs.state.state, docs.state, { isBoot: true });
+    applyRemoteCloudState(docs.state.state, docs.state, { isBoot: true, bypassReconciliation: true });
     await pushStateToCloud();
   }else{
     // Check if legacy shredded data exists
