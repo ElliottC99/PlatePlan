@@ -1,41 +1,41 @@
-const PLATEPLAN_CACHE = 'plateplan-shell-v60';
-const PLATEPLAN_APP_VERSION = '2.6.14';
-const PLATEPLAN_BUILD_ID = '2.6.14-v60';
+const PLATEPLAN_CACHE = 'plateplan-shell-v61';
+const PLATEPLAN_APP_VERSION = '2.8.0';
+const PLATEPLAN_BUILD_ID = '2.8.0-v61';
 const PLATEPLAN_LOCAL_SHELL = [
   './',
   './PlatePlan.html',
   './repair-update.html',
   './manifest.json',
   './firebase-config.js',
-  './styles/tokens.css?v=2.6.14',
-  './styles/components.css?v=2.6.14',
-  './styles/responsive.css?v=2.6.14',
-  './styles/print.css?v=2.6.14',
-  './scripts/plateplan-app.js?v=2.6.14',
-  './scripts/bootstrap.js?v=2.6.14',
-  './scripts/main.js?v=2.6.14',
-  './scripts/core/contracts.js?v=2.6.14',
-  './scripts/core/store.js?v=2.6.14',
-  './scripts/core/runtime.js?v=2.6.14',
-  './scripts/services/firebase.js?v=2.6.14',
-  './scripts/services/sync.js?v=2.6.14',
-  './scripts/services/recovery.js?v=2.6.14',
-  './scripts/services/updates.js?v=2.6.14',
-  './scripts/ui/actions.js?v=2.6.14',
-  './scripts/ui/navigation.js?v=2.6.14',
-  './scripts/ui/workspaces.js?v=2.6.14',
-  './scripts/features/create-legacy-view.js?v=2.6.14',
-  './scripts/features/today.js?v=2.6.14',
-  './scripts/features/recipes.js?v=2.6.14',
-  './scripts/features/recipe-add.js?v=2.6.14',
-  './scripts/features/ingredients.js?v=2.6.14',
-  './scripts/features/products.js?v=2.6.14',
-  './scripts/features/planner.js?v=2.6.14',
-  './scripts/features/library.js?v=2.6.14',
-  './scripts/features/shopping.js?v=2.6.14',
-  './scripts/features/search.js?v=2.6.14',
-  './scripts/features/data-quality.js?v=2.6.14',
-  './scripts/features/preferences.js?v=2.6.14',
+  './styles/tokens.css?v=2.8.0',
+  './styles/components.css?v=2.8.0',
+  './styles/responsive.css?v=2.8.0',
+  './styles/print.css?v=2.8.0',
+  './scripts/plateplan-app.js?v=2.8.0',
+  './scripts/bootstrap.js?v=2.8.0',
+  './scripts/main.js?v=2.8.0',
+  './scripts/core/contracts.js?v=2.8.0',
+  './scripts/core/store.js?v=2.8.0',
+  './scripts/core/runtime.js?v=2.8.0',
+  './scripts/services/firebase.js?v=2.8.0',
+  './scripts/services/sync.js?v=2.8.0',
+  './scripts/services/recovery.js?v=2.8.0',
+  './scripts/services/updates.js?v=2.8.0',
+  './scripts/ui/actions.js?v=2.8.0',
+  './scripts/ui/navigation.js?v=2.8.0',
+  './scripts/ui/workspaces.js?v=2.8.0',
+  './scripts/features/create-legacy-view.js?v=2.8.0',
+  './scripts/features/today.js?v=2.8.0',
+  './scripts/features/recipes.js?v=2.8.0',
+  './scripts/features/recipe-add.js?v=2.8.0',
+  './scripts/features/ingredients.js?v=2.8.0',
+  './scripts/features/products.js?v=2.8.0',
+  './scripts/features/planner.js?v=2.8.0',
+  './scripts/features/library.js?v=2.8.0',
+  './scripts/features/shopping.js?v=2.8.0',
+  './scripts/features/search.js?v=2.8.0',
+  './scripts/features/data-quality.js?v=2.8.0',
+  './scripts/features/preferences.js?v=2.8.0',
   './icon-192.png',
   './icon-512.png',
   './icon-192-maskable.png',
@@ -50,10 +50,21 @@ let platePlanActivationRequested = false;
 
 self.addEventListener('install', event => {
   self.skipWaiting();
-  event.waitUntil(caches.open(PLATEPLAN_CACHE).then(async cache => {
-    await cache.addAll(PLATEPLAN_LOCAL_SHELL).catch(() => {});
-    await Promise.allSettled(PLATEPLAN_OPTIONAL_SHELL.map(url => cache.add(url)));
-  }));
+  event.waitUntil(
+    caches.keys().then(keys => {
+      return Promise.all(
+        keys
+          .filter(key => key !== PLATEPLAN_CACHE)
+          .map(key => {
+            console.log('[SW v2.8.0] Purging previous cache on install:', key);
+            return caches.delete(key);
+          })
+      );
+    }).then(() => caches.open(PLATEPLAN_CACHE)).then(async cache => {
+      await cache.addAll(PLATEPLAN_LOCAL_SHELL).catch(() => {});
+      await Promise.allSettled(PLATEPLAN_OPTIONAL_SHELL.map(url => cache.add(url)));
+    })
+  );
 });
 
 self.addEventListener('activate', event => {
@@ -63,7 +74,7 @@ self.addEventListener('activate', event => {
         keys
           .filter(key => key !== PLATEPLAN_CACHE)
           .map(key => {
-            console.log('[SW v2.6.14 EMERGENCY ROLLBACK] Purging previous shell cache:', key);
+            console.log('[SW v2.8.0] Purging previous shell cache:', key);
             return caches.delete(key);
           })
       );
