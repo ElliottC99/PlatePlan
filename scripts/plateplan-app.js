@@ -152,8 +152,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.8.2';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v63';
+const PLATEPLAN_APP_VERSION='2.8.3';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v64';
 const SEED=[];
 
 let state = null;
@@ -8368,45 +8368,352 @@ async function saveCurrentReviewedRecipe(){
   // Sequential Stepper Engine: Increment queue index
   state.importQueueIndex = (state.importQueueIndex || 0) + 1;
   if(state.importQueue && state.importQueueIndex < state.importQueue.length){
-    // Keep Review modal open and immediately load next queued item
-    const nextItem = state.importQueue[state.importQueueIndex];
-    const nextParsed = parseRecipeText(nextItem);
-    openRecipeRecognitionReview(nextParsed);
+    showPlatePlanToast(`Saved "${fullRecipe.name}" (${state.importQueueIndex} of ${state.importQueue.length})`);
+    loadBatchRecipeIntoStepA(state.importQueue[state.importQueueIndex]);
   } else {
     // Reset queue, close modal, and refresh main UI view
     state.importQueue = [];
     state.importQueueIndex = 0;
+    updateBatchUiBanners();
     closeRecipeRecognitionModal();
     showView('vault');
     renderVault();
+    showPlatePlanToast(`Saved "${fullRecipe.name}"`);
   }
 }
 
-function skipImportQueueItem(){
-  const skippedNum = (state.importQueueIndex || 0) + 1;
-  const totalInQueue = state.importQueue?.length || 1;
-  showPlatePlanToast(`Skipped recipe ${skippedNum} of ${totalInQueue}`);
+function detectRecipeTitle(rawText, index = 0){
+  const text = String(rawText || '').replace(/\r/g, '').trim();
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  for(const l of lines){
+    const m = l.match(/^(?:Recipe\s*Title|Title|Recipe)\s*[:\-]\s*(.+)$/i);
+    if(m && m[1]?.trim()) return m[1].trim();
+  }
+  for(const l of lines){
+    const m = l.match(/^Recipe\s*#?\d+\s*[:\-]\s*(.+)$/i);
+    if(m && m[1]?.trim()) return m[1].trim();
+  }
+  try {
+    const parsed = parseRobustRecipeText(text);
+    if(parsed.name && parsed.name !== 'Recipe' && parsed.name !== 'Untitled Recipe'){
+      return parsed.name;
+    }
+  } catch(_e){}
+  if(lines.length){
+    for(const candidate of lines){
+      if(!/^(?:ingredients?|method|instructions?|steps?|serves?|prep|cook|notes?)\b/i.test(candidate)){
+        return candidate.replace(/^#+\s*/, '').replace(/^Recipe\s*#?\d+\s*[:\-]?\s*/i, '').trim() || `Recipe ${index + 1}`;
+      }
+    }
+  }
+  return `Recipe ${index + 1}`;
+}
 
-  state.importQueueIndex = (state.importQueueIndex || 0) + 1;
-  if(state.importQueue && state.importQueueIndex < state.importQueue.length){
-    const nextItem = state.importQueue[state.importQueueIndex];
-    const nextParsed = parseRecipeText(nextItem);
-    openRecipeRecognitionReview(nextParsed);
+function isBatchImportActive(){
+  return Boolean(state && Array.isArray(state.importQueue) && state.importQueue.length > 0 && typeof state.importQueueIndex === 'number' && state.importQueueIndex < state.importQueue.length);
+}
+
+function updateBatchUiBanners(){
+  const active = isBatchImportActive();
+  const queue = (state && Array.isArray(state.importQueue)) ? state.importQueue : [];
+  const idx = (state && typeof state.importQueueIndex === 'number') ? state.importQueueIndex : 0;
+  const currentNum = idx + 1;
+  const totalNum = queue.length;
+  const statusText = `Batch Import: Recipe ${currentNum} of ${totalNum}`;
+
+  // 1. Step A: Add Recipe View Banner & Form Buttons
+  const bannerAdd = document.getElementById('batch-import-banner-add');
+  const skipAddBtn = document.getElementById('batch-skip-add-btn');
+  const abortAddBtn = document.getElementById('batch-abort-add-btn');
+  if(bannerAdd){
+    if(active && totalNum > 1){
+      bannerAdd.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <strong style="color:var(--purple,#4F46E5);font-size:14px">${ppEscapeHtml(statusText)}</strong>
+          <span style="font-size:12px;color:var(--text2)">Review detected inputs below, then click &ldquo;Parse &amp; Verify&rdquo; to proceed.</span>
+        </div>
+        <div class="btn-row" style="margin:0;gap:6px;flex-wrap:wrap">
+          <button type="button" class="btn sm secondary" onclick="skipBatchImportRecipe()">Skip Recipe</button>
+          <button type="button" class="btn sm danger ghost" onclick="abortBatchImport()">Abort Batch Import</button>
+        </div>
+      `;
+      bannerAdd.style.display = 'flex';
+    } else {
+      bannerAdd.style.display = 'none';
+      bannerAdd.innerHTML = '';
+    }
+  }
+  if(skipAddBtn) skipAddBtn.style.display = (active && totalNum > 1) ? 'inline-flex' : 'none';
+  if(abortAddBtn) abortAddBtn.style.display = (active && totalNum > 1) ? 'inline-flex' : 'none';
+
+  // 2. Step B: Parse Modal
+  const bannerParse = document.getElementById('batch-banner-parse');
+  const abortParseBtn = document.getElementById('batch-abort-parse-btn');
+  const skipParseBtn = document.getElementById('batch-skip-parse-btn');
+  const abortParseBtn2 = document.getElementById('batch-abort-parse-btn2');
+  if(bannerParse){
+    if(active && totalNum > 1){
+      bannerParse.textContent = statusText;
+      bannerParse.style.display = 'inline-block';
+    } else {
+      bannerParse.style.display = 'none';
+    }
+  }
+  if(abortParseBtn) abortParseBtn.style.display = (active && totalNum > 1) ? 'inline-flex' : 'none';
+  if(skipParseBtn) skipParseBtn.style.display = (active && totalNum > 1) ? 'inline-flex' : 'none';
+  if(abortParseBtn2) abortParseBtn2.style.display = (active && totalNum > 1) ? 'inline-flex' : 'none';
+
+  // 3. Step C: Mapping Modal
+  const bannerMapping = document.getElementById('batch-banner-mapping');
+  const abortMappingTop = document.getElementById('batch-abort-mapping-top');
+  const skipMappingBtn = document.getElementById('batch-skip-mapping-btn');
+  const abortMappingBtn = document.getElementById('batch-abort-mapping-btn');
+  if(bannerMapping){
+    if(active && totalNum > 1){
+      bannerMapping.textContent = statusText;
+      bannerMapping.style.display = 'inline-block';
+    } else {
+      bannerMapping.style.display = 'none';
+    }
+  }
+  if(abortMappingTop) abortMappingTop.style.display = (active && totalNum > 1) ? 'inline-flex' : 'none';
+  if(skipMappingBtn) skipMappingBtn.style.display = (active && totalNum > 1) ? 'inline-flex' : 'none';
+  if(abortMappingBtn) abortMappingBtn.style.display = (active && totalNum > 1) ? 'inline-flex' : 'none';
+
+  // 4. Step D: Review Modal
+  const bannerReview = document.getElementById('batch-banner-review');
+  const abortReviewTop = document.getElementById('batch-abort-review-top');
+  const skipReviewBtn = document.getElementById('batch-skip-review-btn');
+  const abortReviewBtn = document.getElementById('batch-abort-review-btn');
+  if(bannerReview){
+    if(active && totalNum > 1){
+      bannerReview.textContent = statusText;
+      bannerReview.style.display = 'inline-block';
+    } else {
+      bannerReview.style.display = 'none';
+    }
+  }
+  if(abortReviewTop) abortReviewTop.style.display = (active && totalNum > 1) ? 'inline-flex' : 'none';
+  if(skipReviewBtn) skipReviewBtn.style.display = (active && totalNum > 1) ? 'inline-flex' : 'none';
+  if(abortReviewBtn) abortReviewBtn.style.display = (active && totalNum > 1) ? 'inline-flex' : 'none';
+}
+
+function loadBatchRecipeIntoStepA(rawBlock){
+  if(!rawBlock) return;
+  // Ensure prior modals are closed cleanly
+  closeRecipeRecognitionModal();
+  document.getElementById('parse-modal-wrap')?.classList.remove('open');
+  document.getElementById('mapping-modal-wrap')?.classList.remove('open');
+  if(document.getElementById('modal-wrap')?.classList.contains('open')){
+    closeModal(true);
+  }
+
+  // Parse recipe block
+  const parsed = parseRobustRecipeText(rawBlock);
+  const detectedTitle = detectRecipeTitle(rawBlock, (state?.importQueueIndex || 0));
+
+  // Set flag so showView('add') does not clear our populated form fields
+  platePlanPreserveAddForm = true;
+  showView('add');
+
+  editId = null;
+  const formTitle = document.getElementById('form-title');
+  if(formTitle) formTitle.textContent = 'Add recipe';
+
+  // 1. Name
+  const nameEl = document.getElementById('r-name');
+  if(nameEl){
+    nameEl.value = parsed.name || detectedTitle;
+    nameEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  // 2. Servings (Original and Target)
+  const origServes = parsed.servings ? String(parsed.servings) : '2';
+  const servesOrigEl = document.getElementById('r-serves-orig');
+  const servesTargetEl = document.getElementById('r-serves');
+  if(servesOrigEl){
+    servesOrigEl.value = origServes;
+    servesOrigEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  if(servesTargetEl){
+    servesTargetEl.value = origServes;
+    delete servesTargetEl.dataset.manuallyChanged;
+    servesTargetEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  // 3. Time
+  const timeEl = document.getElementById('r-time');
+  if(timeEl){
+    timeEl.value = (parsed.timeMinutes !== null && parsed.timeMinutes !== undefined && parsed.timeMinutes !== '') ? String(parsed.timeMinutes) : '';
+    timeEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  // 4. Ingredients (raw text)
+  const ingsEl = document.getElementById('r-ingredients');
+  if(ingsEl){
+    const ingsList = Array.isArray(parsed.ingredients) ? parsed.ingredients : [];
+    ingsEl.value = ingsList.join('\n');
+    ingsEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  // 5. Method (raw instructions)
+  const methodEl = document.getElementById('r-method');
+  if(methodEl){
+    const methodList = Array.isArray(parsed.method) ? parsed.method : [];
+    methodEl.value = methodList.join('\n');
+    methodEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  // 6. Who
+  const whoEl = document.getElementById('r-who');
+  if(whoEl) whoEl.value = 'both';
+
+  // 7. Meal Types
+  if(typeof setMealTypes === 'function'){
+    const types = Array.isArray(parsed.mealTypes) && parsed.mealTypes.length ? parsed.mealTypes : ['dinner'];
+    setMealTypes(types);
+  }
+
+  // 8. Source
+  if(parsed.sourceType){
+    const srcType = document.getElementById('r-src-type');
+    if(srcType){
+      srcType.value = parsed.sourceType;
+      if(typeof updateSrcFields === 'function') updateSrcFields();
+      if(parsed.sourceType === 'book'){
+        const bookEl = document.getElementById('r-src-book');
+        const authEl = document.getElementById('r-src-author');
+        const pageEl = document.getElementById('r-src-page');
+        if(bookEl && parsed.bookTitle) bookEl.value = parsed.bookTitle;
+        if(authEl && parsed.author) authEl.value = parsed.author;
+        if(pageEl && parsed.page) pageEl.value = parsed.page;
+      } else if(['tiktok','website','youtube','instagram'].includes(parsed.sourceType)){
+        const urlEl = document.getElementById('r-src-url');
+        if(urlEl && parsed.url) urlEl.value = parsed.url;
+      }
+      if(typeof updateSrcPreview === 'function') updateSrcPreview();
+    }
+  } else {
+    const srcType = document.getElementById('r-src-type');
+    if(srcType){
+      srcType.value = '';
+      if(typeof updateSrcFields === 'function') updateSrcFields();
+      if(typeof updateSrcPreview === 'function') updateSrcPreview();
+    }
+  }
+
+  // Update batch UI status banners across screens
+  updateBatchUiBanners();
+
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function skipBatchImportRecipe(){
+  if(!state || !Array.isArray(state.importQueue) || !state.importQueue.length){
+    return;
+  }
+  const currentIndex = state.importQueueIndex || 0;
+  const total = state.importQueue.length;
+
+  closeRecipeRecognitionModal();
+  document.getElementById('parse-modal-wrap')?.classList.remove('open');
+  document.getElementById('mapping-modal-wrap')?.classList.remove('open');
+  if(document.getElementById('modal-wrap')?.classList.contains('open')){
+    closeModal(true);
+  }
+
+  state.importQueueIndex = currentIndex + 1;
+  if(state.importQueueIndex < state.importQueue.length){
+    showPlatePlanToast(`Skipped recipe ${currentIndex + 1} of ${total}. Loading recipe ${state.importQueueIndex + 1}...`);
+    loadBatchRecipeIntoStepA(state.importQueue[state.importQueueIndex]);
   } else {
     state.importQueue = [];
     state.importQueueIndex = 0;
-    closeRecipeRecognitionModal();
+    updateBatchUiBanners();
+    clearForm();
     showView('vault');
     renderVault();
+    showPlatePlanToast('Import queue completed.');
   }
 }
 
-function cancelImportQueueAndClose(){
-  if(state){
-    state.importQueue = [];
-    state.importQueueIndex = 0;
-  }
+function abortBatchImport(){
+  if(!state) state = {};
+  state.importQueue = [];
+  state.importQueueIndex = 0;
+
   closeRecipeRecognitionModal();
+  document.getElementById('parse-modal-wrap')?.classList.remove('open');
+  document.getElementById('mapping-modal-wrap')?.classList.remove('open');
+  if(document.getElementById('modal-wrap')?.classList.contains('open')){
+    closeModal(true);
+  }
+
+  clearForm();
+  updateBatchUiBanners();
+  showView('vault');
+  renderVault();
+
+  showPlatePlanToast('Batch import aborted. Remaining queued items discarded.');
+}
+
+function openConfirmRecipeIdentificationModal(blocks){
+  window.pendingIdentifiedRecipeBlocks = blocks;
+  const wrap = ensureRecipeRecognitionModal();
+  
+  const itemsHtml = blocks.map((b, idx) => {
+    const title = detectRecipeTitle(b, idx);
+    const parsed = parseRobustRecipeText(b);
+    const serves = parsed.servings ? `${parsed.servings} servings` : '2 servings';
+    const ingCount = (parsed.ingredients || []).length;
+    const stepCount = (parsed.method || []).length;
+    return `
+      <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:var(--surface)">
+        <div class="row-between" style="align-items:center;margin-bottom:4px;gap:8px;flex-wrap:wrap">
+          <strong style="font-size:14px;color:var(--text)">${idx + 1}. ${ppEscapeHtml(title)}</strong>
+          <span style="font-size:11px;color:var(--text2);background:var(--surface2);padding:2px 8px;border-radius:6px">🍽️ ${serves}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text2)">
+          ${ingCount} ingredients detected · ${stepCount} method steps
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  wrap.querySelector('.modal').innerHTML = `
+    <div class="row-between" style="align-items:center;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <h3 style="margin:0">Confirm Recipe Identification</h3>
+        <span style="background:var(--purple-bg, #EEF2FF);color:var(--purple, #4F46E5);font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px;border:1px solid rgba(79,70,229,0.2)">${blocks.length} Recipes Identified</span>
+      </div>
+      <button class="btn sm ghost" onclick="cancelImportQueueAndClose()">Close</button>
+    </div>
+    <div class="msg info" style="margin:0 0 14px;font-size:12px">
+      These recipes will cycle through the full step-by-step wizard: <strong>Add Recipe &rarr; Verify Parsed Details &rarr; Map Ingredients &rarr; Review Recipe</strong> for each recipe in the queue.
+    </div>
+    <div style="max-height:50dvh;overflow-y:auto;margin-bottom:14px;padding-right:4px">
+      ${itemsHtml}
+    </div>
+    <div class="btn-row" style="margin-top:14px;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn primary" onclick="confirmBatchIdentification()">Confirm &amp; Start Wizard Loop</button>
+      <button type="button" class="btn secondary" onclick="openRecipeTextPaste()">Back to Paste</button>
+      <button type="button" class="btn ghost" onclick="cancelImportQueueAndClose()">Cancel</button>
+    </div>
+  `;
+  wrap.classList.add('open');
+}
+
+function confirmBatchIdentification(){
+  const blocks = window.pendingIdentifiedRecipeBlocks || [];
+  if(!blocks.length) return;
+  if(!state) state = {};
+  state.importQueue = blocks;
+  state.importQueueIndex = 0;
+  window.pendingIdentifiedRecipeBlocks = null;
+
+  closeRecipeRecognitionModal();
+  loadBatchRecipeIntoStepA(state.importQueue[state.importQueueIndex]);
 }
 
 function startRecipeImportQueue(){
@@ -8422,17 +8729,13 @@ function startRecipeImportQueue(){
   if(!state) state = {};
   const blocks = splitPastedRecipeBlocks(rawText);
   if(blocks.length > 1){
-    state.importQueue = blocks;
-    state.importQueueIndex = 0;
+    openConfirmRecipeIdentificationModal(blocks);
   } else {
     state.importQueue = [rawText];
     state.importQueueIndex = 0;
+    closeRecipeRecognitionModal();
+    loadBatchRecipeIntoStepA(rawText);
   }
-
-  // Stepper trigger: automatically pass first item into parseRecipeText
-  const firstRecipeText = state.importQueue[state.importQueueIndex];
-  const parsed = parseRecipeText(firstRecipeText);
-  openRecipeRecognitionReview(parsed);
 }
 
 function updateRecipePasteTextStatus(){
@@ -8450,22 +8753,22 @@ function updateRecipePasteTextStatus(){
       badge.style.display = 'inline-block';
     }
     if(summary){
-      summary.innerHTML = `<strong>Multi-recipe queue detected:</strong> Found ${blocks.length} independent recipe blocks. Clicking below will queue them sequentially through Parse and Review.`;
+      summary.innerHTML = `<strong>Multi-recipe batch detected:</strong> Found ${blocks.length} independent recipe blocks. Clicking below will show the identification confirmation modal before starting the step-by-step wizard loop.`;
       summary.style.display = 'block';
     }
     if(btn){
-      btn.textContent = `Queue & Review ${blocks.length} Recipes`;
+      btn.textContent = `Identify & Queue ${blocks.length} Recipes`;
     }
   } else {
     if(badge) badge.style.display = 'none';
     if(summary) summary.style.display = 'none';
-    if(btn) btn.textContent = 'Parse & Review Recipe';
+    if(btn) btn.textContent = 'Import & Review Recipe';
   }
 }
 
 function openRecipeTextPaste(){
   const wrap=ensureRecipeRecognitionModal();
-  wrap.querySelector('.modal').innerHTML=`<div class="row-between" style="align-items:center;margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px"><h3 style="margin:0">Paste extracted recipe text</h3><span id="recipe-paste-badge" style="display:none;background:var(--purple-bg);color:var(--purple);font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px"></span></div><button class="btn sm ghost" onclick="cancelRecipeTextPaste()">Close</button></div><p style="font-size:12px;color:var(--text2);margin-bottom:10px">Paste recipe text below (supports single recipes or multi-recipe blocks separated by headers e.g. <code>Recipe Title:</code> or double blank lines). Recipes are queued sequentially through Parse and Review.</p><textarea id="recipe-paste-text" style="min-height:45dvh" oninput="updateRecipePasteTextStatus()" placeholder="Recipe Title: Spicy Chickpea Curry&#10;&#10;Number of Servings: 4&#10;Prep time: 15 mins&#10;&#10;Ingredients&#10;- 2 x 400g tins chickpeas&#10;- 1 x red onion&#10;- 2 tbsp olive oil&#10;&#10;Method&#10;1. Dice red onions.&#10;2. Fry 40% of the red onions in olive oil."></textarea><div id="recipe-paste-summary" style="display:none;margin-top:8px;font-size:12px;color:var(--text2);padding:8px 12px;background:var(--surface2);border-radius:8px"></div><div class="btn-row" style="margin-top:12px"><button id="recipe-paste-action-btn" class="btn primary" onclick="startRecipeImportQueue()">Parse &amp; Review</button><button class="btn ghost" onclick="cancelRecipeTextPaste()">Cancel</button></div>`;
+  wrap.querySelector('.modal').innerHTML=`<div class="row-between" style="align-items:center;margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px"><h3 style="margin:0">Paste extracted recipe text</h3><span id="recipe-paste-badge" style="display:none;background:var(--purple-bg);color:var(--purple);font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px"></span></div><button class="btn sm ghost" onclick="cancelRecipeTextPaste()">Close</button></div><p style="font-size:12px;color:var(--text2);margin-bottom:10px">Paste recipe text below (supports single recipes or multi-recipe blocks separated by headers e.g. <code>Recipe Title:</code> or double blank lines). Multi-recipe imports cycle through the full wizard step-by-step.</p><textarea id="recipe-paste-text" style="min-height:45dvh" oninput="updateRecipePasteTextStatus()" placeholder="Recipe Title: Spicy Chickpea Curry&#10;&#10;Number of Servings: 4&#10;Prep time: 15 mins&#10;&#10;Ingredients&#10;- 2 x 400g tins chickpeas&#10;- 1 x red onion&#10;- 2 tbsp olive oil&#10;&#10;Method&#10;1. Dice red onions.&#10;2. Fry 40% of the red onions in olive oil."></textarea><div id="recipe-paste-summary" style="display:none;margin-top:8px;font-size:12px;color:var(--text2);padding:8px 12px;background:var(--surface2);border-radius:8px"></div><div class="btn-row" style="margin-top:12px"><button id="recipe-paste-action-btn" class="btn primary" onclick="startRecipeImportQueue()">Import &amp; Review Recipe</button><button class="btn ghost" onclick="cancelRecipeTextPaste()">Cancel</button></div>`;
   wrap.classList.add('open');setTimeout(()=>document.getElementById('recipe-paste-text')?.focus(),0);
 }
 
@@ -8473,6 +8776,11 @@ function cancelRecipeTextPaste(){
   const ta = document.getElementById('recipe-paste-text');
   if(ta) ta.value = '';
   closeRecipeRecognitionModal();
+}
+
+function cancelImportQueueAndClose(){
+  closeRecipeRecognitionModal();
+  updateBatchUiBanners();
 }
 
 function reviewPastedRecipeText(){
@@ -8483,10 +8791,18 @@ function applyPastedRecipeDirectlyFromModal(){
   startRecipeImportQueue();
 }
 
+window.detectRecipeTitle = detectRecipeTitle;
+window.isBatchImportActive = isBatchImportActive;
+window.updateBatchUiBanners = updateBatchUiBanners;
+window.loadBatchRecipeIntoStepA = loadBatchRecipeIntoStepA;
+window.skipBatchImportRecipe = skipBatchImportRecipe;
+window.abortBatchImport = abortBatchImport;
+window.openConfirmRecipeIdentificationModal = openConfirmRecipeIdentificationModal;
+window.confirmBatchIdentification = confirmBatchIdentification;
 window.parseRecipeText = parseRecipeText;
 window.startRecipeImportQueue = startRecipeImportQueue;
 window.saveCurrentReviewedRecipe = saveCurrentReviewedRecipe;
-window.skipImportQueueItem = skipImportQueueItem;
+window.skipImportQueueItem = skipBatchImportRecipe;
 window.cancelImportQueueAndClose = cancelImportQueueAndClose;
 
 function openBatchRecipeReviewModal(recipes){
@@ -8793,6 +9109,7 @@ function openParseModal(ings, steps) {
   `).join('');
 
   document.getElementById('parse-modal-wrap').classList.add('open');
+  updateBatchUiBanners();
 }
 
 function renderParseIngredientRow(ing = {}) {
@@ -9205,6 +9522,7 @@ function openMappingModal() {
     renderMappingList();
     document.getElementById('mapping-msg').innerHTML = '';
     document.getElementById('mapping-modal-wrap').classList.add('open');
+    updateBatchUiBanners();
 }
 
 function renderMappingList() {
@@ -10280,6 +10598,7 @@ function openModal(name,result,isFallback, options = {}){
   if(saveOrigOnlyBtn) saveOrigOnlyBtn.style.display = isTemporaryReview ? 'none' : '';
   updateSaveBothVisibility();
   document.getElementById('modal-wrap')?.classList.add('open');
+  updateBatchUiBanners();
   switchModalTab(currentReviewVariant === 'enhanced' && (result.enhanced || existing?.enhanced) ? 'enhanced' : 'original');
 }
 
@@ -10522,10 +10841,46 @@ function saveToVault(r){
     markPlatePlanViewsDirty();
     rebuildPlatePlanIndexes();
     saveState(true);
+
+    try {
+      if(typeof platePlanDb !== 'undefined' && platePlanDb){
+        const targetHouseholdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+        const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
+        const singleRecipeRef = householdDocRef.collection('recipes').doc(r.id);
+        singleRecipeRef.set(cleanCloudValue(r), { merge: true }).catch(e => console.warn('singleRecipeRef doc.set error:', e));
+        const dataColRecipesRef = householdDocRef.collection('data').doc('recipes');
+        dataColRecipesRef.set({
+          recipes: cleanCloudValue(state.recipes),
+          updatedAt: (typeof firebase !== 'undefined' && firebase.firestore?.FieldValue) ? firebase.firestore.FieldValue.serverTimestamp() : nowIso
+        }, { merge: true }).catch(e => console.warn('dataColRecipesRef doc.set error:', e));
+      }
+    } catch(err) {
+      console.warn('Firestore doc.set error in saveToVault:', err);
+    }
+
     closeModal(true);
     clearForm();
-    finishEditorReturn('vault');
-    showPlatePlanToast(`Saved "${r.name}" to Recipe Vault`);
+
+    const isBatch = Boolean(state && Array.isArray(state.importQueue) && state.importQueue.length > 0 && typeof state.importQueueIndex === 'number' && state.importQueueIndex < state.importQueue.length);
+    if(isBatch){
+      const completedIdx = state.importQueueIndex;
+      const totalCount = state.importQueue.length;
+      if(completedIdx + 1 < totalCount){
+        state.importQueueIndex = completedIdx + 1;
+        showPlatePlanToast(`Saved "${r.name}" (${completedIdx + 1} of ${totalCount})`);
+        loadBatchRecipeIntoStepA(state.importQueue[state.importQueueIndex]);
+      } else {
+        state.importQueue = [];
+        state.importQueueIndex = 0;
+        updateBatchUiBanners();
+        finishEditorReturn('vault');
+        renderVault();
+        showPlatePlanToast(`All ${totalCount} recipes imported successfully!`);
+      }
+    } else {
+      finishEditorReturn('vault');
+      showPlatePlanToast(`Saved "${r.name}" to Recipe Vault`);
+    }
   });
 }
 
@@ -19877,7 +20232,13 @@ globalThis.PlatePlanLegacy=Object.freeze({
   addIngredient,
   deleteIngredient,
   saveManualIng,
-  deleteIng
+  deleteIng,
+  abortBatchImport,
+  skipBatchImportRecipe,
+  confirmBatchIdentification,
+  loadBatchRecipeIntoStepA,
+  openConfirmRecipeIdentificationModal,
+  updateBatchUiBanners
 });
 window.renderAll = renderAll;
 window.saveIngredient = saveIngredient;
@@ -19885,4 +20246,10 @@ window.addIngredient = addIngredient;
 window.deleteIngredient = deleteIngredient;
 window.saveManualIng = saveManualIng;
 window.deleteIng = deleteIng;
+window.abortBatchImport = abortBatchImport;
+window.skipBatchImportRecipe = skipBatchImportRecipe;
+window.confirmBatchIdentification = confirmBatchIdentification;
+window.loadBatchRecipeIntoStepA = loadBatchRecipeIntoStepA;
+window.openConfirmRecipeIdentificationModal = openConfirmRecipeIdentificationModal;
+window.updateBatchUiBanners = updateBatchUiBanners;
 window.dispatchEvent(new CustomEvent('plateplan:legacy-ready',{detail:{version:PLATEPLAN_APP_VERSION}}));
