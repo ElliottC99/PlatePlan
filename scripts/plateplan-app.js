@@ -117,10 +117,65 @@ function normalizeNutritionPayload(raw){
     return parsed;
 }
 
-function toTitleCase(str) {
-    return str.replace(/\w\S*/g, function(txt){
-        return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+function toAPTitleCase(str) {
+    if (!str || typeof str !== 'string') return '';
+    const trimmed = str.trim();
+    if (!trimmed) return '';
+
+    const lowerWords = new Set([
+        'a', 'an', 'the',
+        'in', 'on', 'at', 'to', 'from', 'by', 'with', 'of', 'for',
+        'and', 'but', 'or', 'nor'
+    ]);
+
+    const words = trimmed.split(/\s+/);
+    const len = words.length;
+
+    const formattedWords = words.map((word, index) => {
+        if (word.includes('-')) {
+            const parts = word.split('-');
+            const formattedParts = parts.map((part, pIdx) => {
+                if (!part) return part;
+                const cleanPart = part.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const isFirst = index === 0 && pIdx === 0;
+                const isLast = index === len - 1 && pIdx === parts.length - 1;
+                if (!isFirst && !isLast && lowerWords.has(cleanPart)) {
+                    return part.toLowerCase();
+                }
+                return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+            });
+            return formattedParts.join('-');
+        }
+
+        const match = word.match(/^([^\w]*)([\w']+)([^\w]*)$/);
+        if (!match) {
+            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        }
+
+        const [, leadingPunct, coreWord, trailingPunct] = match;
+        const lowerCore = coreWord.toLowerCase();
+        const isFirst = index === 0 || (index > 0 && /[:.!?\-–—]$/.test(words[index - 1]));
+        const isLast = index === len - 1;
+
+        let casedCore;
+        if (!isFirst && !isLast && lowerWords.has(lowerCore)) {
+            casedCore = lowerCore;
+        } else {
+            casedCore = coreWord.charAt(0).toUpperCase() + coreWord.slice(1).toLowerCase();
+        }
+
+        return leadingPunct + casedCore + trailingPunct;
     });
+
+    return formattedWords.join(' ');
+}
+
+function toTitleCase(str) {
+    if (!str || typeof str !== 'string') return '';
+    if (str.includes(' ') || str.includes('-')) {
+        return toAPTitleCase(str);
+    }
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
 // == CATEGORIES ==
@@ -152,8 +207,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.8.3';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v64';
+const PLATEPLAN_APP_VERSION='2.8.4';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v65';
 const SEED=[];
 
 let state = null;
@@ -910,7 +965,12 @@ async function saveIngredient(item){
   const householdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
   if(platePlanDb){
     const cleaned = cleanCloudValue(item) || item;
-    await platePlanDb.collection('households').doc(householdId).collection('products').doc(item.id).set(cleaned, { merge: true });
+    const writePromises = [
+      platePlanDb.collection('households').doc(householdId).collection('products').doc(item.id).set(cleaned, { merge: true }),
+      platePlanDb.collection('ingredients').doc(item.id).set(cleaned, { merge: true }),
+      platePlanDb.collection('households').doc(householdId).collection('ingredients').doc(item.id).set(cleaned, { merge: true })
+    ];
+    await Promise.allSettled(writePromises);
   }
 }
 
@@ -922,13 +982,51 @@ async function deleteIngredient(id){
   if(!id) return;
   const householdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
   if(platePlanDb){
-    await platePlanDb.collection('households').doc(householdId).collection('products').doc(id).delete();
+    const deletePromises = [
+      platePlanDb.collection('households').doc(householdId).collection('products').doc(id).delete(),
+      platePlanDb.collection('ingredients').doc(id).delete(),
+      platePlanDb.collection('households').doc(householdId).collection('ingredients').doc(id).delete()
+    ];
+    await Promise.allSettled(deletePromises);
+  }
+}
+
+function rehydrateActiveRecipeAndStateCache(options = {}){
+  const { changedProductIds = [], recipeId = null } = options;
+  if(typeof platePlanNutritionCache !== 'undefined' && platePlanNutritionCache.clear){
+    platePlanNutritionCache.clear();
+  }
+  rebuildPlatePlanIndexes();
+  if(recipeId){
+    recalcRecipeNutrition(recipeId);
+  } else {
+    recalcAllRecipes();
+  }
+  refreshPlatePlanDerivedState({ changedProductIds, persist: false, render: false });
+  if(document.getElementById('modal-wrap')?.classList.contains('open')){
+    if(typeof recalcModal === 'function'){
+      recalcModal('orig');
+      recalcModal('enh');
+    }
+  }
+  if(document.getElementById('view-vault')?.classList.contains('active')){
+    renderVault();
+  }
+  if(document.getElementById('view-data')?.classList.contains('active')){
+    renderDataQuality();
+  }
+  if(document.getElementById('view-bank')?.classList.contains('active')){
+    renderBank();
+  }
+  if(document.getElementById('view-today')?.classList.contains('active') && typeof renderToday === 'function'){
+    renderToday();
   }
 }
 
 window.saveIngredient = saveIngredient;
 window.addIngredient = addIngredient;
 window.deleteIngredient = deleteIngredient;
+window.rehydrateActiveRecipeAndStateCache = rehydrateActiveRecipeAndStateCache;
 
 async function pushStateToCloud(force=false){
   if (state) state.updatedAt = new Date().toISOString();
@@ -4525,15 +4623,41 @@ function getProductProteinPerPound(product){
   return price > 0 && packGrams > 0 ? (prot * packGrams / 100) / price : 0;
 }
 
-function scoreProductByPriority(product, priority = 'protein'){
+function getProductCostPerGram(product){
+  const packGrams = productPackGrams(product);
+  const price = +product?.price || 0;
+  return (price > 0 && packGrams > 0) ? (price / packGrams) : Infinity;
+}
+
+function getProductCostPerUnit(product){
+  const price = +product?.price || 0;
+  if (price <= 0) return Infinity;
+  const count = +product?.itemCount || (product?.packUnit === 'qty' ? +product?.packSize : 0) || 0;
+  if (count > 0) return price / count;
+  const packGrams = productPackGrams(product);
+  if (packGrams > 0) return (price / packGrams) * 100;
+  return price;
+}
+
+function getAutoMappingStrategy(){
+  return state?.prefs?.autoMappingStrategy || 'protein_per_kcal';
+}
+
+function scoreProductByPriority(product, priority = 'protein_per_kcal'){
   const packGrams = productPackGrams(product);
   const price = +product?.price || 0;
   if(priority === 'low_kcal') return -(+product?.cal || 0);
-  if(priority === 'protein_per_kcal' || priority === 'prot_kcal') return getProductProteinPer100Kcal(product);
+  if(priority === 'protein_per_kcal' || priority === 'prot_kcal' || priority === 'protein') return getProductProteinPer100Kcal(product);
   if(priority === 'least_protein_per_kcal') return -getProductProteinPer100Kcal(product);
   if(priority === 'protein_per_pound' || priority === 'value') return getProductProteinPerPound(product);
+  if(priority === 'lowest_cost_per_g' || priority === 'cost_per_g' || priority === 'cost_per_100') {
+    return (price > 0 && packGrams > 0) ? -(price / packGrams) : -999999;
+  }
+  if(priority === 'lowest_cost_per_unit' || priority === 'cost_per_unit') {
+    const cost = getProductCostPerUnit(product);
+    return isFinite(cost) && cost > 0 ? -cost : -999999;
+  }
   if(priority === 'lowest_cost') return price > 0 ? -price : -999999;
-  if(priority === 'cost_per_100') return (price > 0 && packGrams > 0) ? -(price / packGrams * 100) : -999999;
   return +product?.prot || 0;
 }
 
@@ -4545,9 +4669,11 @@ function bestDefaultProductIdForGroup(group, targetState = state){
     .filter(isUsableProduct);
   if(group.manualDefaultProductId && products.some(product => product.id === group.manualDefaultProductId)) return group.manualDefaultProductId;
   if(!products.length) return (group.productIds || [])[0] || null;
+  const strategy = (targetState?.prefs?.autoMappingStrategy) || getAutoMappingStrategy();
   return products
     .slice()
     .sort((a,b) =>
+      scoreProductByPriority(b, strategy) - scoreProductByPriority(a, strategy) ||
       getProductProteinPer100Kcal(b) - getProductProteinPer100Kcal(a) ||
       (+b.prot || 0) - (+a.prot || 0) ||
       (a.name || '').localeCompare(b.name || '')
@@ -4763,22 +4889,24 @@ function getRecipeIngredientGroupId(recipeIng){
   return product?.groupId || '';
 }
 
-function selectBestProductForGroup(groupId, priority = 'protein'){
+function selectBestProductForGroup(groupId, priority = null){
+  const strat = priority || getAutoMappingStrategy();
   const products = getGroupProducts(groupId).filter(isUsableProduct);
   if(!products.length) return null;
   return products.slice().sort((a,b) =>
-    scoreProductByPriority(b, priority) - scoreProductByPriority(a, priority) ||
+    scoreProductByPriority(b, strat) - scoreProductByPriority(a, strat) ||
     getProductProteinPer100Kcal(b) - getProductProteinPer100Kcal(a) ||
     (+b.prot || 0) - (+a.prot || 0) ||
     (a.name || '').localeCompare(b.name || '')
   )[0];
 }
 
-function selectBestProductForIngredientFamily(familyId, priority = 'protein_per_kcal'){
+function selectBestProductForIngredientFamily(familyId, priority = null){
+  const strat = priority || getAutoMappingStrategy();
   const products = getFamilyProducts(familyId).filter(isUsableProduct);
   if(!products.length) return null;
   return products.slice().sort((a,b) =>
-    scoreProductByPriority(b, priority) - scoreProductByPriority(a, priority) ||
+    scoreProductByPriority(b, strat) - scoreProductByPriority(a, strat) ||
     getProductProteinPer100Kcal(b) - getProductProteinPer100Kcal(a) ||
     (+b.prot || 0) - (+a.prot || 0) ||
     (a.name || '').localeCompare(b.name || '')
@@ -8026,6 +8154,7 @@ function parseRobustRecipeText(raw){
     name = lines[0] || '';
   }
   name = name.replace(/^(?:recipe\s*title|recipe\s*name|recipe|title)\s*[:\-]?\s*/i, '').trim();
+  name = toAPTitleCase(name);
 
   // 2. Prep time (mins)
   let timeMinutes = null;
@@ -8195,7 +8324,7 @@ function parsePastedRecipeText(raw){
 
 function normaliseRecognisedRecipe(value){
   return {
-    name: String(value?.name || ''),
+    name: toAPTitleCase(String(value?.name || '')),
     servings: value?.servings !== null && value?.servings !== undefined ? +value.servings : null,
     timeMinutes: value?.timeMinutes !== null && value?.timeMinutes !== undefined ? +value.timeMinutes : null,
     mealTypes: Array.isArray(value?.mealTypes) && value.mealTypes.length ? value.mealTypes : ['dinner'],
@@ -8387,22 +8516,23 @@ function detectRecipeTitle(rawText, index = 0){
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   for(const l of lines){
     const m = l.match(/^(?:Recipe\s*Title|Title|Recipe)\s*[:\-]\s*(.+)$/i);
-    if(m && m[1]?.trim()) return m[1].trim();
+    if(m && m[1]?.trim()) return toAPTitleCase(m[1].trim());
   }
   for(const l of lines){
     const m = l.match(/^Recipe\s*#?\d+\s*[:\-]\s*(.+)$/i);
-    if(m && m[1]?.trim()) return m[1].trim();
+    if(m && m[1]?.trim()) return toAPTitleCase(m[1].trim());
   }
   try {
     const parsed = parseRobustRecipeText(text);
     if(parsed.name && parsed.name !== 'Recipe' && parsed.name !== 'Untitled Recipe'){
-      return parsed.name;
+      return toAPTitleCase(parsed.name);
     }
   } catch(_e){}
   if(lines.length){
     for(const candidate of lines){
       if(!/^(?:ingredients?|method|instructions?|steps?|serves?|prep|cook|notes?)\b/i.test(candidate)){
-        return candidate.replace(/^#+\s*/, '').replace(/^Recipe\s*#?\d+\s*[:\-]?\s*/i, '').trim() || `Recipe ${index + 1}`;
+        const cleaned = candidate.replace(/^#+\s*/, '').replace(/^Recipe\s*#?\d+\s*[:\-]?\s*/i, '').trim();
+        return toAPTitleCase(cleaned) || `Recipe ${index + 1}`;
       }
     }
   }
@@ -9251,8 +9381,18 @@ function renderMapDropdown(idx, query) {
     const drop = document.getElementById(`map-dropdown-${idx}`);
     ensureIngredientGroups();
     const variants = getSearchVariants(query || '');
+    let productRows = [];
     let familyRows = [];
     if(variants.length) {
+      productRows = (state.ingredients || []).filter(p => {
+        if(!isUsableProduct(p)) return false;
+        const hay = [p.name, p.brand, CAT[p.cat] || p.cat].join(' ').toLowerCase();
+        return variants.some(q => hay.includes(q));
+      }).sort((a,b) => {
+        const strat = getAutoMappingStrategy();
+        return scoreProductByPriority(b, strat) - scoreProductByPriority(a, strat);
+      }).slice(0, 6);
+
       familyRows = (state.ingredientFamilies || []).filter(f => {
         const hay = [f.name, CAT[f.cat], f.cat, ...(f.aliases || [])].join(' ').toLowerCase();
         return variants.some(q => hay.includes(q));
@@ -9273,9 +9413,20 @@ function renderMapDropdown(idx, query) {
         return getGroupDisplayName(a).localeCompare(getGroupDisplayName(b));
     });
 
-    if(list.length === 0 && familyRows.length === 0) {
-        drop.innerHTML = `<div style="padding:8px 12px;font-size:12px;color:var(--text3)">No matching ingredients or sub-types found.</div>`;
+    if(list.length === 0 && familyRows.length === 0 && productRows.length === 0) {
+        drop.innerHTML = `<div style="padding:8px 12px;font-size:12px;color:var(--text3)">No matching products, ingredients or sub-types found.</div>`;
     } else {
+        const productHtml = productRows.map(p => {
+          const packStr = p.packSize ? `${p.packSize}${p.packUnit || 'g'}` : '';
+          const priceStr = p.price > 0 ? `£${(+p.price).toFixed(2)}` : '';
+          return `
+            <div class="map-drop-item" onclick="selectMapProductItem(${idx}, '${ppEscapeAttr(p.id)}')">
+                <div style="font-weight:600;font-size:13px">${ppEscapeHtml(p.name)} ${p.brand && p.brand !== 'Generic' ? `(${ppEscapeHtml(p.brand)})` : ''}</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">Product · ${ppEscapeHtml(CAT[p.cat] || p.cat || 'Other')}</div>
+                <div style="font-size:11px;color:var(--text2);margin-top:2px">${p.prot || 0}g P | ${p.cal || 0} kcal${packStr ? ` | ${packStr}` : ''}${priceStr ? ` | ${priceStr}` : ''}</div>
+            </div>
+          `;
+        }).join('');
         const familyHtml = familyRows.map(f => {
           const bestProduct = selectBestProductForIngredientFamily(f.id, 'protein_per_kcal');
           const bestGroup = bestProduct?.groupId ? getIngredientGroup(bestProduct.groupId) : null;
@@ -9302,10 +9453,30 @@ function renderMapDropdown(idx, query) {
             </div>
           `;
         }).join('');
-        drop.innerHTML = familyHtml + typeHtml;
+        drop.innerHTML = productHtml + familyHtml + typeHtml;
     }
     drop.style.display = 'block';
 }
+
+function selectMapProductItem(idx, productId) {
+    const p = getProduct(productId);
+    if (!p) return;
+    const ing = mappingContext?.ings?.[idx];
+    if (!ing) return;
+    ing.bankId = p.id;
+    ing.groupId = p.groupId || '';
+    ing.ingredientId = '';
+    ing.mappedViaIngredient = false;
+    const inp = document.getElementById(`map-search-${idx}`);
+    if (inp) inp.value = `${p.name}${p.brand && p.brand !== 'Generic' ? ` (${p.brand})` : ''}`;
+    const drop = document.getElementById(`map-dropdown-${idx}`);
+    if (drop) drop.style.display = 'none';
+    const row = document.getElementById(`map-row-${idx}`);
+    if (row) row.classList.remove('error');
+    const editBtn = document.getElementById(`edit-btn-${idx}`);
+    if (editBtn) editBtn.style.display = 'inline-block';
+}
+window.selectMapProductItem = selectMapProductItem;
 
 function selectMapIngredientFamily(idx, familyId){
   const family = getIngredientFamily(familyId);
@@ -9656,18 +9827,31 @@ function saveMiniIng() {
     } else {
         state.ingredients.push(newIng);
     }
-    const group = ensureProductAssignedToGroup(newIng, mappingContext.ings[mappingContext.activeIndex]?.name || name, '', true);
+    const group = ensureProductAssignedToGroup(newIng, mappingContext?.ings?.[mappingContext?.activeIndex]?.name || name, '', true);
     if(group) group.updatedAt = nowIso;
     refreshProductGroupAndRecipes(newIng.id);
     
+    saveIngredient(newIng);
     saveState(true);
     renderBank(); 
-    if(document.getElementById('view-data').classList.contains('active')) renderDataQuality();
+    if(document.getElementById('view-data')?.classList.contains('active')) renderDataQuality();
     
-    mappingContext.ings[mappingContext.activeIndex].bankId = newIng.id;
-    mappingContext.ings[mappingContext.activeIndex].groupId = group?.id || newIng.groupId || "";
+    if(mappingContext?.ings && mappingContext.activeIndex !== undefined && mappingContext.ings[mappingContext.activeIndex]){
+      mappingContext.ings[mappingContext.activeIndex].bankId = newIng.id;
+      mappingContext.ings[mappingContext.activeIndex].groupId = group?.id || newIng.groupId || "";
+    }
+
+    if(activeUnifiedMappingContext){
+      applyUnifiedMappingResult(activeUnifiedMappingContext, {
+        productId: newIng.id,
+        groupId: group?.id || newIng.groupId || '',
+        productName: newIng.name,
+        brand: newIng.brand
+      });
+    }
+
     document.getElementById('mini-ing-wrap').classList.remove('open');
-    renderMappingList();
+    if(mappingContext) renderMappingList();
 }
 
 function confirmMapping() {
@@ -9957,7 +10141,7 @@ function renderModalIngs(prefix, ings) {
            <div class="review-ingredient-qty"><span class="mobile-field-label">Quantity</span><input type="number" class="r-qty" value="${amount.qty||1}" style="width:100%;min-width:0" step="0.1" min="0" oninput="recalcModal('${prefix}')"></div>
            <div class="review-ingredient-unit"><span class="mobile-field-label">Unit</span>${renderReviewUnitSelect(amount.unit || 'qty', prefix, p.name || '')}</div>
            <div class="review-ingredient-section"><span class="mobile-field-label">Section</span>${renderSectionInput('r-section', p.section || '', `${prefix}-section-options`, `refreshReviewSectionOptions('${prefix}'); recalcModal('${prefix}')`, '100%')}</div>
-           <div class="review-ingredient-name" style="position:relative;min-width:0"><span class="mobile-field-label">Ingredient</span><input type="text" class="r-name" value="${ppEscapeAttr(displayName||'')}" style="width:100%;min-width:0" oninput="handleReviewIngredientNameInput(this, '${prefix}')" onfocus="renderReviewIngredientSearch(this, '${prefix}')" onblur="setTimeout(()=>closeReviewIngredientSearchDropdown(this.closest('.rev-ing-row')),160)"><div class="review-mapping-status${group || product ? '' : ' unmapped'}">${ppEscapeHtml(mappingText)}</div><div class="r-row-error" style="display:none;color:var(--red);font-size:10px;line-height:1.25;margin-top:3px;"></div></div>
+           <div class="review-ingredient-name" style="position:relative;min-width:0"><span class="mobile-field-label">Ingredient</span><input type="text" class="r-name" value="${ppEscapeAttr(displayName||'')}" style="width:100%;min-width:0" oninput="handleReviewIngredientNameInput(this, '${prefix}')" onfocus="renderReviewIngredientSearch(this, '${prefix}')" onblur="setTimeout(()=>closeReviewIngredientSearchDropdown(this.closest('.rev-ing-row')),160)"><div class="review-mapping-status${group || product ? '' : ' unmapped'}" onclick="openReviewMappingModalFromStatus(this)" style="cursor:pointer" title="Click to map or change product">${ppEscapeHtml(mappingText)}</div><div class="r-row-error" style="display:none;color:var(--red);font-size:10px;line-height:1.25;margin-top:3px;"></div></div>
            <label class="review-exclude-control" title="Keep this in the recipe and shopping list, but exclude it from nutrition totals."><input type="checkbox" class="r-exclude-nutrition" ${p.excludeNutrition?'checked':''} onchange="recalcModal('${prefix}')"><span class="review-exclude-label">Not eaten / exclude from nutrition</span></label>
            <div class="review-desktop-actions" style="display:flex;gap:4px;justify-content:flex-end;align-items:center;">
              <button type="button" class="btn sm ghost r-edit-ing" onclick="editModalRowIngredient(this)" style="padding:4px 6px;font-size:10px;display:${p.bankId?'inline-block':'none'}">Edit</button>
@@ -10056,19 +10240,289 @@ function ensureReviewReplaceModal(){
     return wrap;
 }
 
+let activeUnifiedMappingContext = null;
+
+function openUnifiedMappingModal(context){
+  activeUnifiedMappingContext = context;
+  const wrap = document.getElementById('unified-mapping-modal-wrap');
+  if(!wrap) return;
+  const nameEl = document.getElementById('unified-map-ing-name');
+  const rawEl = document.getElementById('unified-map-ing-raw');
+  const qtyTagEl = document.getElementById('unified-map-ing-qty-tag');
+  const searchInput = document.getElementById('unified-map-search');
+  
+  const ingName = context.ingredientName || 'Ingredient';
+  if(nameEl) nameEl.textContent = ingName;
+  if(rawEl) rawEl.textContent = context.rawText && context.rawText !== ingName ? `Original: "${context.rawText}"` : '';
+  if(qtyTagEl) {
+    const qtyStr = [context.qty, context.unit].filter(Boolean).join(' ');
+    qtyTagEl.textContent = qtyStr || 'No quantity';
+    qtyTagEl.style.display = qtyStr ? 'inline-block' : 'none';
+  }
+  
+  wrap.classList.add('open');
+  const query = context.initialQuery || ingName;
+  if(searchInput) {
+    searchInput.value = query;
+    setTimeout(() => {
+      searchInput.focus();
+      searchInput.select();
+    }, 50);
+  }
+  handleUnifiedMapSearch(query);
+}
+
+function closeUnifiedMappingModal(){
+  const wrap = document.getElementById('unified-mapping-modal-wrap');
+  if(wrap) wrap.classList.remove('open');
+  activeUnifiedMappingContext = null;
+}
+
+function handleUnifiedMapSearch(query){
+  const resultsEl = document.getElementById('unified-map-results');
+  if(!resultsEl) return;
+  const q = (query || '').trim();
+  const variants = getSearchVariants(q);
+  const strat = getAutoMappingStrategy();
+
+  let products = (state.ingredients || []).filter(p => {
+    if(!isUsableProduct(p)) return false;
+    if(!q) return true;
+    const hay = [p.name, p.brand, CAT[p.cat] || p.cat, p.notes].join(' ').toLowerCase();
+    return variants.some(v => hay.includes(v));
+  });
+
+  products.sort((a, b) => {
+    return scoreProductByPriority(b, strat) - scoreProductByPriority(a, strat) ||
+           getProductProteinPer100Kcal(b) - getProductProteinPer100Kcal(a) ||
+           (a.name || '').localeCompare(b.name || '');
+  });
+  const topProducts = products.slice(0, 15);
+
+  ensureIngredientGroups();
+  let groups = (state.ingredientGroups || []).filter(g => {
+    if(!q) return true;
+    const hay = getIngredientGroupSearchText(g);
+    return variants.some(v => hay.includes(v));
+  }).slice(0, 10);
+
+  if(!topProducts.length && !groups.length){
+    resultsEl.innerHTML = `
+      <div style="padding:24px;text-align:center;color:var(--text2)">
+        <p style="margin:0 0 10px;font-size:14px">No matching products or sub-types found for "<strong>${ppEscapeHtml(q)}</strong>".</p>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
+          <button type="button" class="btn sm ghost" style="color:var(--purple);border-color:var(--purple)" onclick="triggerTescoImportFromUnifiedMap()">Search &amp; Import from Tesco</button>
+          <button type="button" class="btn sm ghost" onclick="triggerNewProductFromUnifiedMap()">Create New Product</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+
+  if(topProducts.length > 0){
+    html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3);padding:6px 8px 4px;display:flex;justify-content:space-between">
+      <span>Products (${products.length})</span>
+      <span style="font-weight:500;text-transform:none">Strategy: ${ppEscapeHtml(strat.replace(/_/g, ' '))}</span>
+    </div>`;
+
+    html += topProducts.map(p => {
+      const packGrams = productPackGrams(p);
+      const price = +p.price || 0;
+      const costPerG = (price > 0 && packGrams > 0) ? (price / packGrams) * 100 : null;
+      const costPerUnit = getProductCostPerUnit(p);
+      const protPer100Kcal = getProductProteinPer100Kcal(p);
+      const group = p.groupId ? getIngredientGroup(p.groupId) : null;
+      
+      const badgeParts = [];
+      if(round1(p.prot) > 0) badgeParts.push(`${round1(p.prot)}g P`);
+      if(p.cal > 0) badgeParts.push(`${Math.round(p.cal)} kcal`);
+      if(protPer100Kcal > 0) badgeParts.push(`${round1(protPer100Kcal)}g/100kcal`);
+      if(p.packSize) badgeParts.push(`${p.packSize}${p.packUnit || 'g'}`);
+      if(price > 0) badgeParts.push(`£${price.toFixed(2)}`);
+      if(costPerG) badgeParts.push(`(£${(costPerG / 100).toFixed(2)}/100g)`);
+      else if(costPerUnit && isFinite(costPerUnit)) badgeParts.push(`(£${costPerUnit.toFixed(2)}/portion)`);
+
+      return `
+        <div class="unified-map-item" onclick="selectUnifiedMapProduct('${ppEscapeAttr(p.id)}', '${ppEscapeAttr(p.groupId || '')}')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;transition:background 0.15s">
+          <div style="min-width:0;flex:1;padding-right:10px">
+            <div style="font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px">
+              <span>${ppEscapeHtml(p.name)}</span>
+              ${p.brand && p.brand !== 'Generic' ? `<span style="font-weight:500;font-size:11px;color:var(--text2)">(${ppEscapeHtml(p.brand)})</span>` : ''}
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">
+              ${group ? `Sub-type: ${ppEscapeHtml(group.name)} · ` : ''}${ppEscapeHtml(CAT[p.cat] || p.cat || 'Other')}
+            </div>
+            <div style="font-size:11px;color:var(--text2);margin-top:3px;display:flex;flex-wrap:wrap;gap:4px">
+              <span class="tag" style="font-size:10px;padding:1px 6px">${badgeParts.join(' · ')}</span>
+            </div>
+          </div>
+          <button type="button" class="btn sm primary" style="flex-shrink:0;padding:4px 10px;font-size:11px">Select</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  if(groups.length > 0){
+    html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3);padding:10px 8px 4px;margin-top:6px">Sub-types / Ingredient Groups (${groups.length})</div>`;
+    html += groups.map(g => {
+      const defProd = resolveProductForIngredient({ groupId: g.id }).product;
+      return `
+        <div class="unified-map-item" onclick="selectUnifiedMapGroup('${ppEscapeAttr(g.id)}')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;transition:background 0.15s">
+          <div style="min-width:0;flex:1;padding-right:10px">
+            <div style="font-weight:700;font-size:13px">${ppEscapeHtml(getGroupTypeName(g))}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">${ppEscapeHtml(getGroupHierarchyText(g))}</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:2px">
+              Default: ${ppEscapeHtml(defProd ? `${defProd.name}${defProd.brand && defProd.brand !== 'Generic' ? ` (${defProd.brand})` : ''}` : 'None assigned')}
+            </div>
+          </div>
+          <button type="button" class="btn sm ghost" style="flex-shrink:0;padding:4px 10px;font-size:11px">Use Sub-type</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  resultsEl.innerHTML = html;
+  resultsEl.querySelectorAll('.unified-map-item').forEach(item => {
+    item.addEventListener('mouseenter', () => item.style.background = 'var(--surface2)');
+    item.addEventListener('mouseleave', () => item.style.background = 'transparent');
+  });
+}
+
+function selectUnifiedMapProduct(productId, groupId){
+  const product = getProduct(productId);
+  if(!product) return;
+  const targetGroupId = groupId || product.groupId || '';
+  if(activeUnifiedMappingContext){
+    applyUnifiedMappingResult(activeUnifiedMappingContext, {
+      productId: product.id,
+      groupId: targetGroupId,
+      productName: product.name,
+      brand: product.brand
+    });
+  }
+}
+
+function selectUnifiedMapGroup(groupId){
+  const group = getIngredientGroup(groupId);
+  if(!group) return;
+  const defProd = resolveProductForIngredient({ groupId: group.id }).product;
+  if(activeUnifiedMappingContext){
+    applyUnifiedMappingResult(activeUnifiedMappingContext, {
+      productId: defProd?.id || '',
+      groupId: group.id,
+      productName: getGroupTypeName(group),
+      brand: defProd?.brand || ''
+    });
+  }
+}
+
+function applyUnifiedMappingResult(context, result){
+  if(!context) return;
+  if(context.type === 'reviewRow' && context.rowEl){
+    const row = context.rowEl;
+    row.dataset.groupid = result.groupId || '';
+    row.dataset.bankid = result.productId || '';
+    row.dataset.ingredientid = '';
+    row.dataset.mappedViaIngredient = '';
+    
+    const nameInput = row.querySelector('.r-name');
+    if(nameInput && (!nameInput.value || nameInput.value === 'New item' || nameInput.value === 'Ingredient')){
+      nameInput.value = result.productName || '';
+    }
+
+    const editBtn = row.querySelector('.r-edit-ing');
+    if(editBtn) editBtn.style.display = result.productId ? 'inline-block' : 'none';
+
+    const prefix = context.prefix || 'orig';
+    closeUnifiedMappingModal();
+    recalcModal(prefix);
+  } else if(context.type === 'recipeIngredient' && context.recipeId){
+    const recipe = getRecipe(context.recipeId);
+    if(recipe){
+      const variant = context.variantKey === 'enhanced' ? recipe.variants?.enhanced : (recipe.variants?.original || recipe);
+      if(variant && Array.isArray(variant.ingredients) && variant.ingredients[context.ingredientIndex]){
+        const target = variant.ingredients[context.ingredientIndex];
+        target.bankId = result.productId || '';
+        target.groupId = result.groupId || '';
+        rehydrateActiveRecipeAndStateCache({ changedProductIds: [result.productId], recipeId: recipe.id });
+        saveRecipe(recipe);
+        saveState(true);
+      }
+    }
+    closeUnifiedMappingModal();
+    if(context.issueKey){
+      finishEditorReturn('data');
+    }
+  } else {
+    closeUnifiedMappingModal();
+  }
+}
+
+function triggerTescoImportFromUnifiedMap(){
+  const query = document.getElementById('unified-map-search')?.value || activeUnifiedMappingContext?.ingredientName || '';
+  window.pendingTescoMapping = {
+    type: 'unified',
+    name: query
+  };
+  openTescoModal();
+  const inp = document.getElementById('tesco-url');
+  if(inp){
+    inp.value = query;
+    fetchTescoData(query);
+  }
+}
+
+function triggerNewProductFromUnifiedMap(){
+  const query = document.getElementById('unified-map-search')?.value || activeUnifiedMappingContext?.ingredientName || '';
+  openMiniIng(query);
+}
+
+function openUnifiedMappingModalFromRow(row, prefix = 'orig'){
+  if(!row) return;
+  const currentName = row.querySelector('.r-name')?.value || '';
+  const rawText = row.dataset.raw || currentName;
+  const qty = row.querySelector('.r-qty')?.value || '';
+  const unit = row.querySelector('.r-unit')?.value || '';
+  openUnifiedMappingModal({
+    type: 'reviewRow',
+    rowEl: row,
+    prefix,
+    ingredientName: currentName,
+    rawText,
+    qty,
+    unit,
+    initialQuery: currentName
+  });
+}
+
+function openReviewMappingModalFromStatus(el){
+  const row = el?.closest('.rev-ing-row');
+  if(!row) return;
+  const prefix = row.dataset.prefix || row.closest('[id$="-ings-list"]')?.id?.replace('-ings-list','') || 'orig';
+  openUnifiedMappingModalFromRow(row, prefix);
+}
+
+window.openUnifiedMappingModal = openUnifiedMappingModal;
+window.closeUnifiedMappingModal = closeUnifiedMappingModal;
+window.handleUnifiedMapSearch = handleUnifiedMapSearch;
+window.selectUnifiedMapProduct = selectUnifiedMapProduct;
+window.selectUnifiedMapGroup = selectUnifiedMapGroup;
+window.triggerTescoImportFromUnifiedMap = triggerTescoImportFromUnifiedMap;
+window.triggerNewProductFromUnifiedMap = triggerNewProductFromUnifiedMap;
+window.openUnifiedMappingModalFromRow = openUnifiedMappingModalFromRow;
+window.openReviewMappingModalFromStatus = openReviewMappingModalFromStatus;
+
 function openModalIngredientReplace(btn){
     hideReviewTooltip();
     reviewReplaceTargetRow = btn.closest('.rev-ing-row');
-    const wrap = ensureReviewReplaceModal();
-    const currentName = reviewReplaceTargetRow?.querySelector('.r-name')?.value || '';
-    const search = document.getElementById('review-replace-search');
-    search.value = currentName;
-    renderReviewReplaceOptions(currentName);
-    wrap.classList.add('open');
-    setTimeout(() => search.focus(), 0);
+    const prefix = reviewReplaceTargetRow?.dataset?.prefix || reviewReplaceTargetRow?.closest('[id$="-ings-list"]')?.id?.replace('-ings-list','') || 'orig';
+    openUnifiedMappingModalFromRow(reviewReplaceTargetRow, prefix);
 }
 
 function closeModalIngredientReplace(){
+    closeUnifiedMappingModal();
     const wrap = document.getElementById('review-replace-wrap');
     if(wrap) wrap.classList.remove('open');
     reviewReplaceTargetRow = null;
@@ -10226,7 +10680,7 @@ function addModalIng(prefix) {
        <div class="review-ingredient-qty"><span class="mobile-field-label">Quantity</span><input type="number" class="r-qty" value="1" style="width:100%;min-width:0" step="0.1" min="0" oninput="recalcModal('${prefix}')"></div>
        <div class="review-ingredient-unit"><span class="mobile-field-label">Unit</span>${renderReviewUnitSelect('qty', prefix)}</div>
        <div class="review-ingredient-section"><span class="mobile-field-label">Section</span>${renderSectionInput('r-section', '', `${prefix}-section-options`, `refreshReviewSectionOptions('${prefix}'); recalcModal('${prefix}')`, '100%')}</div>
-       <div class="review-ingredient-name" style="position:relative;min-width:0"><span class="mobile-field-label">Ingredient</span><input type="text" class="r-name" value="" style="width:100%;min-width:0" oninput="handleReviewIngredientNameInput(this, '${prefix}')" onfocus="renderReviewIngredientSearch(this, '${prefix}')" onblur="setTimeout(()=>closeReviewIngredientSearchDropdown(this.closest('.rev-ing-row')),160)"><div class="review-mapping-status unmapped">Not mapped yet</div><div class="r-row-error" style="display:none;color:var(--red);font-size:10px;line-height:1.25;margin-top:3px;"></div></div>
+       <div class="review-ingredient-name" style="position:relative;min-width:0"><span class="mobile-field-label">Ingredient</span><input type="text" class="r-name" value="" style="width:100%;min-width:0" oninput="handleReviewIngredientNameInput(this, '${prefix}')" onfocus="renderReviewIngredientSearch(this, '${prefix}')" onblur="setTimeout(()=>closeReviewIngredientSearchDropdown(this.closest('.rev-ing-row')),160)"><div class="review-mapping-status unmapped" onclick="openReviewMappingModalFromStatus(this)" style="cursor:pointer" title="Click to map product">Not mapped yet</div><div class="r-row-error" style="display:none;color:var(--red);font-size:10px;line-height:1.25;margin-top:3px;"></div></div>
        <label class="review-exclude-control" title="Keep this in the recipe and shopping list, but exclude it from nutrition totals."><input type="checkbox" class="r-exclude-nutrition" onchange="recalcModal('${prefix}')"><span class="review-exclude-label">Not eaten / exclude from nutrition</span></label>
        <div class="review-desktop-actions" style="display:flex;gap:4px;justify-content:flex-end;align-items:center;">
          <button type="button" class="btn sm ghost r-edit-ing" onclick="editModalRowIngredient(this)" style="padding:4px 6px;font-size:10px;display:none">Edit</button>
@@ -10929,7 +11383,28 @@ function beginDataQualityFix(entityType,entityId,issueKey){
     if(entityType === 'product') return editIng(entityId);
     if(entityType === 'ingredient') return openIngredientEditor(entityId,document.activeElement);
     if(entityType === 'subtype') return openIngredientGroupDetailsModal(entityId,'name');
-    if(entityType === 'recipe' || entityType === 'recipe-ingredient'){
+    if(entityType === 'recipe-ingredient'){
+      const parts=String(entityId).split(':');
+      const recipe = getRecipe(parts[0]);
+      const variant = parts[1]==='enhanced' ? recipe?.variants?.enhanced : (recipe?.variants?.original || recipe);
+      const ing = variant?.ingredients?.[+parts[2]];
+      if(ing){
+        openUnifiedMappingModal({
+          type: 'recipeIngredient',
+          recipeId: parts[0],
+          variantKey: parts[1],
+          ingredientIndex: +parts[2],
+          ingredientName: ing.name || ing.raw || '',
+          rawText: ing.raw || ing.name || '',
+          qty: ing.qty ?? ing.grams ?? '',
+          unit: ing.unit || '',
+          issueKey
+        });
+        return;
+      }
+      return editRecipeModalView(parts[0],parts[1]==='enhanced'?'enhanced':'original');
+    }
+    if(entityType === 'recipe'){
       const parts=String(entityId).split(':');
       return editRecipeModalView(parts[0],parts[1]==='enhanced'?'enhanced':'original');
     }
@@ -15536,6 +16011,15 @@ function finishTescoImportSelection(pendingTesco, ingredientId, ingredientName, 
           renderBank();
           editIng(ingredientId);
           showMsg('mi-msg', message || 'Updated from Tesco.', 'success');
+      } else if (pendingTesco.type === 'unified') {
+          if (activeUnifiedMappingContext) {
+            applyUnifiedMappingResult(activeUnifiedMappingContext, {
+              productId: ingredientId,
+              groupId: product?.groupId || '',
+              productName: ingredientName,
+              brand: product?.brand || ''
+            });
+          }
       } else if (pendingTesco.type === 'manualAdd') {
           renderBank();
           renderIngredientBank();
@@ -15774,6 +16258,7 @@ function saveTescoIngredient(categoryReady=false){
   }
   syncProductHierarchyCategory(ing, ing.groupId ? getIngredientGroup(ing.groupId) : null, ing.cat);
   refreshPlatePlanDerivedState({changedProductIds:[ing.id],render:false});
+  saveIngredient(ing);
   saveState(true);
   
   const newIngId = ing.id;
@@ -15796,6 +16281,15 @@ function saveTescoIngredient(categoryReady=false){
           renderBank();
           editIng(newIngId);
           showMsg('mi-msg', 'Added this ingredient from Tesco.', 'success');
+      } else if (pendingTesco.type === 'unified') {
+          if (activeUnifiedMappingContext) {
+            applyUnifiedMappingResult(activeUnifiedMappingContext, {
+              productId: newIngId,
+              groupId: ing.groupId || '',
+              productName: ing.name,
+              brand: ing.brand
+            });
+          }
       } else if (pendingTesco.type === 'manualAdd') {
           renderBank();
           renderIngredientBank();
@@ -19863,6 +20357,7 @@ function loadPrefs(){
   ensureExclusionPrefsUI();
   if(document.getElementById('pref-exclude')) document.getElementById('pref-exclude').value=p.exclude||'';
   if(document.getElementById('pref-diet')) document.getElementById('pref-diet').value=p.diet||'vegetarian';
+  if(document.getElementById('pref-auto-mapping-strategy')) document.getElementById('pref-auto-mapping-strategy').value=p.autoMappingStrategy||'protein_per_kcal';
   if(document.getElementById('pref-ecal')) document.getElementById('pref-ecal').value=p.ecal||2400;
   if(document.getElementById('pref-eprot')) document.getElementById('pref-eprot').value=p.eprot||130;
   if(document.getElementById('pref-ccal')) document.getElementById('pref-ccal').value=p.ccal||1700;
@@ -20152,8 +20647,10 @@ function savePrefs(){
     eProtAlloc: {b:epb, l:epl, d:epd, s:eps},
     cProtAlloc: {b:cpb, l:cpl, d:cpd, s:cps},
     shopGroupBy: state.prefs.shopGroupBy || 'family',
+    autoMappingStrategy: document.getElementById('pref-auto-mapping-strategy')?.value || state.prefs.autoMappingStrategy || 'protein_per_kcal',
     productPriority: document.getElementById('plan-product-priority')?.value || state.prefs.productPriority || 'protein'
   };
+  refreshAllAutoDefaultProducts();
   if (typeof platePlanNutritionCache !== 'undefined' && platePlanNutritionCache.clear) {
     platePlanNutritionCache.clear();
   }
