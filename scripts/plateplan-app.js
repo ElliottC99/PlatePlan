@@ -152,8 +152,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.8.0';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v61';
+const PLATEPLAN_APP_VERSION='2.8.2';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v63';
 const SEED=[];
 
 let state = null;
@@ -200,8 +200,18 @@ const SLOT_COLORS={breakfastE:'var(--green)',breakfastC:'var(--green)',lunchE:'v
 
 const UNIT_TO_GRAMS={
   g:1, kg:1000, ml:1, l:1000,
-  tsp:5, tbsp:15, cup:240, tin:400, can:400,
-  handful:30, bunch:40, pinch:1, dash:1,
+  tsp:5, teaspoon:5, teaspoons:5,
+  tbsp:15, tablespoon:15, tablespoons:15,
+  cup:240, cups:240,
+  oz:28.35, ounce:28.35, ounces:28.35,
+  lb:453.6, lbs:453.6, pound:453.6, pounds:453.6,
+  'fl oz':30, 'fl. oz':30, 'fl. oz.':30, 'fluid oz':30, 'floz':30,
+  tin:400, can:400,
+  handful:30, handfuls:30,
+  'small bunch':15, 'small bunches':15,
+  'large bunch':30, 'large bunches':30,
+  bunch:20, bunches:20,
+  pinch:1, dash:1,
   slice:30, slices:30, piece:100, pieces:100, stalk:50, stalks:50,
   sprig:2, sprigs:2, leaf:1, leaves:2
 };
@@ -3605,7 +3615,10 @@ function cleanIngredientLinePrefix(raw){
   while(line && line !== prev){
     prev = line;
     line = line
-      .replace(/^(?:[-*•‣⁃∙·▪▫◦●○■□☐☑☒✓✔]+)\s*/u, '')
+      // Restrict list-item hyphen splitting strictly to line-leading bullet points matched by ^\s*-\s+
+      // Intra-word hyphens (e.g. sun-dried tomatoes, freeze-dried, medium-sized) are NEVER treated as ingredient delimiters
+      .replace(/^\s*-\s+/, '')
+      .replace(/^(?:[*•‣⁃∙·▪▫◦●○■□☐☑☒✓✔]+)\s*/u, '')
       .replace(/^(?:✅|☑️|✔️|✓|🔸|🔹|👉|➡️|➜|⭐|🍽️|🥣|🥘|🧂|🧄|🧅|🥔|🥕|🌶️|🍅|🧀|🥚|🍋|🥑|🍗|🥩|🥦)\s*/u, '')
       .replace(/^(?:[0-9#*]\ufe0f?\u20e3|[①②③④⑤⑥⑦⑧⑨⑩])\s*/u, '')
       .replace(/^(?:\[[ xX✓✔]?\]|\([ xX✓✔]?\))\s*/u, '')
@@ -3620,11 +3633,15 @@ function splitPastedIngredientText(text){
   let normalised = String(text || '')
     .replace(/\r/g, '\n')
     .replace(/\u00a0/g, ' ')
-    .replace(/([0-9#*]\ufe0f?\u20e3|[①②③④⑤⑥⑦⑧⑨⑩]|[-*•‣⁃∙·▪▫◦●○■□☐☑☒✓✔]|✅|☑️|✔️|✓|🔸|🔹|👉|➡️|➜|⭐|🍽️|🥣|🥘|🧂|🧄|🧅|🥔|🥕|🌶️|🍅|🧀|🥚|🍋|🥑|🍗|🥩|🥦)\s*/gu, '\n$1 ')
+    // Restrict list-item hyphen splitting strictly to line-leading bullet points matched by ^\s*-\s+
+    // Intra-word hyphens (e.g., "sun-dried tomatoes", "freeze-dried", "medium-sized") are NEVER treated as delimiters
+    .replace(/(?:^|\n)\s*-\s+/g, '\n- ')
+    // Bullet symbols & emojis (excluding hyphens so words like sun-dried tomatoes are not split)
+    .replace(/([0-9#*]\ufe0f?\u20e3|[①②③④⑤⑥⑦⑧⑨⑩]|[*•‣⁃∙·▪▫◦●○■□☐☑☒✓✔]|✅|☑️|✔️|✓|🔸|🔹|👉|➡️|➜|⭐|🍽️|🥣|🥘|🧂|🧄|🧅|🥔|🥕|🌶️|🍅|🧀|🥚|🍋|🥑|🍗|🥩|🥦)\s*/gu, '\n$1 ')
     .replace(/;\s*/g, '\n');
   
   // Protect multiplier expressions like "1 x 450g", "2 x 400g", "1x 250g", "2 × 100ml" from being split
-  normalised = normalised.replace(/(?<!(?:\b\d+|\bone|\btwo|\bthree|\bfour)\s*[x×])\s+(?=(?:\d+(?:\.\d+)?|\d+\s+\d+\/\d+|\d+\/\d+|[½⅓⅔¼¾⅛⅜⅝⅞])\s*(?:g|kg|ml|l|tsp|tbsp|cup|tin|tins|can|cans|clove|cloves|bulb|bulbs|head|heads|handful|handfuls|bunch|bunches|pinch|dash|slice|slices|piece|pieces|stalk|stalks|sprig|sprigs|leaf|leaves|pack|packs|block|blocks|pot|pots|jar|jars|bottle|bottles|x\b|×\b|qty\b|each\b))/gi, '\n');
+  normalised = normalised.replace(/(?<!(?:\b\d+|\bone|\btwo|\bthree|\bfour)\s*[x×])\s+(?=(?:\d+(?:\.\d+)?|\d+\s+\d+\/\d+|\d+\/\d+|[½⅓⅔¼¾⅛⅜⅝⅞])\s*(?:g|kg|ml|l|tsp|tbsp|cup|tin|tins|can|cans|clove|cloves|bulb|bulbs|head|heads|handful|handfuls|bunch|bunches|pinch|dash|slice|slices|piece|pieces|stalk|stalks|sprig|sprigs|leaf|leaves|pack|packs|block|blocks|pot|pots|jar|jars|bottle|bottles|oz|ounces?|lbs?|pounds?|fl\.?\s*oz\.?|x\b|×\b|qty\b|each\b))/gi, '\n');
   return normalised.split(/\n+/).map(cleanIngredientLinePrefix).filter(Boolean);
 }
 
@@ -3693,55 +3710,46 @@ function convertMethodQuantitiesToPercentages(steps, parsedIngs = []){
     return steps.map(step => {
       let text = String(step || '');
       ings.forEach(ing => {
-        const searchTerms = [ing.name.toLowerCase(), ing.baseName].filter(t => t && t.length >= 3);
+        const base = ing.baseName || ing.rawName;
+        const singular = base.replace(/s$/, '');
+        const plural = base.endsWith('s') ? base : base + 's';
+        const searchTerms = [...new Set([ing.rawName, (ing.name || '').toLowerCase(), base, singular, plural])]
+          .filter(t => t && t.length >= 3);
         if(!searchTerms.length) return;
 
-        const hasIngMention = searchTerms.some(term => new RegExp(`\\b${escapeRegex(term)}\\b`, 'i').test(text));
-        if(!hasIngMention) return;
-
         const termPattern = searchTerms.map(escapeRegex).join('|');
-        const qtyPattern = new RegExp(`(?<!\\b(?:at|to|heat to|gas mark|for|in|about)\\s+)(?:(\\d+(?:\\.\\d+)?)\\s*(g|kg|ml|l|tbsp|tsp|cups?|tins?|cans?|cloves?|slices?|pieces?)\\s+(?:of\\s+)?(?:the\\s+)?(${termPattern}))`, 'gi');
+        const unitOptions = 'g|kg|ml|l|tbsp|tablespoons?|tsp|teaspoons?|cups?|tins?|cans?|cloves?|slices?|pieces?|oz|ounces?|lbs?|pounds?|fl\\.?\\s*oz\\.?';
+        const qtyPattern = new RegExp(`(?<!\\b(?:at|to|heat to|gas mark|for|in|about)\\s+)(?:(\\d+(?:\\.\\d+)?)\\s*(${unitOptions})?\\s+(?:of\\s+)?(?:the\\s+)?(${termPattern}))`, 'gi');
 
         text = text.replace(qtyPattern, (match, amountStr, unitStr, ingMention) => {
           const amount = parseFloat(amountStr);
+          if(isNaN(amount) || amount <= 0) return match;
+
           let amountInGrams = amount;
-          const u = (unitStr || '').toLowerCase();
+          const u = (unitStr || '').toLowerCase().replace(/s$/, '');
           if(u === 'kg') amountInGrams = amount * 1000;
           else if(u === 'l') amountInGrams = amount * 1000;
-          else if(u === 'tbsp') amountInGrams = amount * 15;
-          else if(u === 'tsp') amountInGrams = amount * 5;
+          else if(u === 'tbsp' || u === 'tablespoon') amountInGrams = amount * 15;
+          else if(u === 'tsp' || u === 'teaspoon') amountInGrams = amount * 5;
+          else if(u === 'oz' || u === 'ounce') amountInGrams = amount * 28.35;
+          else if(u === 'lb' || u === 'pound') amountInGrams = amount * 453.6;
+          else if(u === 'cup') amountInGrams = amount * 240;
+          else if(u === 'fl oz' || u === 'floz' || u === 'fl. oz') amountInGrams = amount * 30;
 
           const totalGrams = ing.grams || toGrams(ing.qty, ing.unit);
 
-          if(totalGrams > 0 && amountInGrams > 0){
+          if(totalGrams > 0 && amountInGrams > 0 && unitStr){
             const ratio = amountInGrams / totalGrams;
-            const pct = Math.round(ratio * 100);
-
-            if(pct >= 95 && pct <= 105){
-              return `all (${pct}%) of the ${ingMention}`;
-            } else if(pct >= 45 && pct <= 55){
-              return `half (50%) of the ${ingMention}`;
-            } else if(pct >= 30 && pct <= 36){
-              return `one-third (${pct}%) of the ${ingMention}`;
-            } else if(pct >= 63 && pct <= 70){
-              return `two-thirds (${pct}%) of the ${ingMention}`;
-            } else if(pct >= 22 && pct <= 28){
-              return `one-quarter (25%) of the ${ingMention}`;
-            } else if(pct >= 72 && pct <= 78){
-              return `three-quarters (75%) of the ${ingMention}`;
-            } else {
-              return `${pct}% of the ${ingMention}`;
-            }
+            let pct = Math.round(ratio * 100);
+            if(pct > 100) pct = 100;
+            if(pct < 1) pct = 1;
+            return `${pct}% of the ${ingMention}`;
           } else if(ing.qty > 0){
             const ratio = amount / ing.qty;
-            const pct = Math.round(ratio * 100);
-            if(pct >= 95 && pct <= 105){
-              return `all (${pct}%) of the ${ingMention}`;
-            } else if(pct >= 45 && pct <= 55){
-              return `half (50%) of the ${ingMention}`;
-            } else {
-              return `${pct}% of the ${ingMention}`;
-            }
+            let pct = Math.round(ratio * 100);
+            if(pct > 100) pct = 100;
+            if(pct < 1) pct = 1;
+            return `${pct}% of the ${ingMention}`;
           }
           return match;
         });
@@ -3776,6 +3784,126 @@ function detectStockIngredient(raw){
   };
 }
 
+function normaliseMultiplierAndUnits(rawLine){
+  let text = String(rawLine || '').trim();
+  if(!text) return '';
+
+  // 1. Colloquial phrases to metric:
+  // - "small bunch" -> 15g
+  // - "large bunch" -> 30g
+  // - "bunch" -> 20g
+  // - "a handful of [ingredient]" / "handful" -> 30g
+  text = text.replace(/^(\d+(?:\.\d+)?\s*)?(?:a\s+)?small\s+bunch(?:es)?\b\s*(?:of\s+)?(.*)$/i, (m, countStr, remainder) => {
+    const c = countStr ? parseFloat(countStr) : 1;
+    return `${Math.round(c * 15 * 10) / 10}g ${remainder.trim()}`;
+  });
+
+  text = text.replace(/^(\d+(?:\.\d+)?\s*)?(?:a\s+)?large\s+bunch(?:es)?\b\s*(?:of\s+)?(.*)$/i, (m, countStr, remainder) => {
+    const c = countStr ? parseFloat(countStr) : 1;
+    return `${Math.round(c * 30 * 10) / 10}g ${remainder.trim()}`;
+  });
+
+  text = text.replace(/^(\d+(?:\.\d+)?\s*)?(?:a\s+)?bunch(?:es)?\b\s*(?:of\s+)?(.*)$/i, (m, countStr, remainder) => {
+    const c = countStr ? parseFloat(countStr) : 1;
+    return `${Math.round(c * 20 * 10) / 10}g ${remainder.trim()}`;
+  });
+
+  text = text.replace(/^(\d+(?:\.\d+)?\s*)?(?:a\s+)?handful(?:s)?\b\s*(?:of\s+)?(.*)$/i, (m, countStr, remainder) => {
+    const c = countStr ? parseFloat(countStr) : 1;
+    return `${Math.round(c * 30 * 10) / 10}g ${remainder.trim()}`;
+  });
+
+  // 2. Multiplier Detection: Compound quantity patterns such as (\d+)\s*x\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)
+  // (e.g., "2 x 400g tin", "1 x 450g pack", "2 x 14oz tin", "2 x 250ml")
+  const compoundMatch = text.match(/^(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)(?:\s+(?:tins?|cans?|packs?|blocks?|pots?|jars?|bottles?)\b)?\s*(?:of\s+)?(.*)$/i);
+  if(compoundMatch){
+    const count = parseFloat(compoundMatch[1]);
+    const subQty = parseFloat(compoundMatch[2]);
+    const rawUnit = compoundMatch[3].toLowerCase();
+    let remainder = compoundMatch[4].trim();
+    remainder = remainder.replace(/^(?:tins?|cans?|packs?|blocks?|pots?|jars?|bottles?)\s*(?:of\s+)?/i, '').trim();
+
+    let totalWeight = count * subQty;
+    let unit = 'g';
+
+    if(rawUnit === 'kg'){
+      totalWeight = count * subQty * 1000;
+      unit = 'g';
+    } else if(rawUnit === 'l' || rawUnit === 'litre' || rawUnit === 'litres' || rawUnit === 'liter' || rawUnit === 'liters'){
+      totalWeight = count * subQty * 1000;
+      unit = 'ml';
+    } else if(rawUnit === 'ml'){
+      totalWeight = count * subQty;
+      unit = 'ml';
+    } else if(rawUnit === 'oz' || rawUnit === 'ounce' || rawUnit === 'ounces'){
+      totalWeight = Math.round(count * subQty * 28.35 * 10) / 10;
+      unit = 'g';
+    } else if(rawUnit === 'lb' || rawUnit === 'lbs' || rawUnit === 'pound' || rawUnit === 'pounds'){
+      totalWeight = Math.round(count * subQty * 453.6 * 10) / 10;
+      unit = 'g';
+    } else if(rawUnit === 'floz' || rawUnit === 'fl oz'){
+      totalWeight = Math.round(count * subQty * 30 * 10) / 10;
+      unit = 'ml';
+    } else if(rawUnit === 'cup' || rawUnit === 'cups'){
+      totalWeight = Math.round(count * subQty * 240 * 10) / 10;
+      unit = 'ml';
+    } else if(rawUnit === 'tbsp' || rawUnit === 'tablespoon' || rawUnit === 'tablespoons'){
+      totalWeight = Math.round(count * subQty * 15 * 10) / 10;
+      unit = 'g';
+    } else if(rawUnit === 'tsp' || rawUnit === 'teaspoon' || rawUnit === 'teaspoons'){
+      totalWeight = Math.round(count * subQty * 5 * 10) / 10;
+      unit = 'g';
+    } else if(['tin','tins','can','cans'].includes(rawUnit)){
+      totalWeight = count * subQty * 400;
+      unit = 'g';
+    } else {
+      totalWeight = count * subQty;
+      unit = 'g';
+    }
+
+    return `${totalWeight}${unit} ${remainder}`;
+  }
+
+  // 3. Force convert all non-standard and imperial measurements directly into Metric (grams or ml):
+  // Imperial Liquid:
+  // fl oz -> ml (x 30)
+  text = text.replace(/^(\d+(?:\.\d+)?)\s*(?:fl\.?\s*oz\.?|fluid\s*ounces?)\b\s*(?:of\s+)?(.*)$/i, (m, q, rem) => {
+    const val = Math.round(parseFloat(q) * 30 * 10) / 10;
+    return `${val}ml ${rem.trim()}`;
+  });
+  // cups -> ml (x 240)
+  text = text.replace(/^(\d+(?:\.\d+)?)\s*(?:cups?)\b\s*(?:of\s+)?(.*)$/i, (m, q, rem) => {
+    const val = Math.round(parseFloat(q) * 240 * 10) / 10;
+    return `${val}ml ${rem.trim()}`;
+  });
+
+  // Imperial Weight:
+  // oz -> g (x 28.35)
+  text = text.replace(/^(\d+(?:\.\d+)?)\s*(?:oz|ounces?)\b\s*(?:of\s+)?(.*)$/i, (m, q, rem) => {
+    const val = Math.round(parseFloat(q) * 28.35 * 10) / 10;
+    return `${val}g ${rem.trim()}`;
+  });
+  // lbs / lb -> g (x 453.6)
+  text = text.replace(/^(\d+(?:\.\d+)?)\s*(?:lbs?|pounds?)\b\s*(?:of\s+)?(.*)$/i, (m, q, rem) => {
+    const val = Math.round(parseFloat(q) * 453.6 * 10) / 10;
+    return `${val}g ${rem.trim()}`;
+  });
+
+  // Spoons to Grams:
+  // tbsp / tablespoon -> 15g
+  text = text.replace(/^(\d+(?:\.\d+)?)\s*(?:tbsp|tablespoons?)\b\s*(?:of\s+)?(.*)$/i, (m, q, rem) => {
+    const val = Math.round(parseFloat(q) * 15 * 10) / 10;
+    return `${val}g ${rem.trim()}`;
+  });
+  // tsp / teaspoon -> 5g
+  text = text.replace(/^(\d+(?:\.\d+)?)\s*(?:tsp|teaspoons?)\b\s*(?:of\s+)?(.*)$/i, (m, q, rem) => {
+    const val = Math.round(parseFloat(q) * 5 * 10) / 10;
+    return `${val}g ${rem.trim()}`;
+  });
+
+  return text;
+}
+
 function parseIngredientLine(raw){
   raw = cleanIngredientLinePrefix(raw).replace(/^\xad\s*/, '').trim(); 
   if(!raw)return null;
@@ -3783,11 +3911,12 @@ function parseIngredientLine(raw){
   if(stock) return stock;
 
   raw = normaliseLeadingQuantity(raw);
+  raw = normaliseMultiplierAndUnits(raw);
 
   let parsed = null;
 
   // 1. Multiplier with specific sub-quantity, e.g. "1 x 450g firm tofu", "2 x 400g tins chickpeas", "1 x 250g pack spinach", "2 x 150ml cream"
-  const multiWithSub = raw.match(/^(\d+(?:\.\d+)?)\s*(?:x|×)\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tsp|tbsp|cup|tin|tins|can|cans|clove|cloves|bulb|bulbs|head|heads|handful|handfuls|bunch|bunches|pinch|dash|slice|slices|piece|pieces|stalk|stalks|sprig|sprigs|leaf|leaves|pack|packs|block|blocks|pot|pots|jar|jars|bottle|bottles)?\s*(?:of\s+)?(?:tins?|cans?|packs?|blocks?|pots?|jars?|bottles?|of\s+)?(.+)$/i);
+  const multiWithSub = raw.match(/^(\d+(?:\.\d+)?)\s*(?:x|×)\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tsp|tbsp|cup|tin|tins|can|cans|clove|cloves|bulb|bulbs|head|heads|handful|handfuls|bunch|bunches|pinch|dash|slice|slices|piece|pieces|stalk|stalks|sprig|sprigs|leaf|leaves|pack|packs|block|blocks|pot|pots|jar|jars|bottle|bottles|oz|ounces?|lbs?|pounds?|fl\.?\s*oz\.?)?\s*(?:of\s+)?(?:tins?|cans?|packs?|blocks?|pots?|jars?|bottles?|of\s+)?(.+)$/i);
   if(multiWithSub){
     const count = parseFloat(multiWithSub[1]);
     const subQty = parseFloat(multiWithSub[2]);
@@ -3820,7 +3949,7 @@ function parseIngredientLine(raw){
 
   // 3. Standard quantity + unit matching
   if(!parsed){
-    const m=raw.match(/^(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tsp|tbsp|cup|tin|tins|can|cans|clove|cloves|bulb|bulbs|head|heads|handful|handfuls|bunch|bunches|pinch|dash|slice|slices|piece|pieces|stalk|stalks|sprig|sprigs|leaf|leaves)s?\s+(?:of\s+)?(.+)$/i);
+    const m=raw.match(/^(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tsp|tbsp|cup|tin|tins|can|cans|clove|cloves|bulb|bulbs|head|heads|handful|handfuls|bunch|bunches|pinch|dash|slice|slices|piece|pieces|stalk|stalks|sprig|sprigs|leaf|leaves|oz|ounces?|lbs?|pounds?|fl\.?\s*oz\.?)s?\s+(?:of\s+)?(.+)$/i);
     if(m){
       const qty=parseFloat(m[1]);
       let unit=m[2].toLowerCase().replace(/s$/,'');
@@ -3861,6 +3990,9 @@ function parseIngredientLine(raw){
   if (unit === 'handful') {
       qty = qty * 30;
       unit = 'g';
+  } else if (unit === 'bunch') {
+      qty = qty * 20;
+      unit = 'g';
   } else if (unit === 'pinch' || unit === 'dash') {
       qty = qty * 1;
       unit = 'g';
@@ -3881,11 +4013,11 @@ function parseIngredientLine(raw){
       }
   }
 
-  const liquidMeasureToMl = ['tsp', 'tbsp', 'cup'];
-  const volToG = ['kg', 'tin', 'can'];
+  const liquidMeasureToMl = ['tsp', 'tbsp', 'cup', 'fl oz', 'floz'];
+  const volToG = ['kg', 'tin', 'can', 'oz', 'ounce', 'lb', 'lbs', 'pound', 'handful', 'bunch'];
   const discreteToQty = ['clove', 'head', 'bulb', 'slice', 'piece', 'stalk', 'sprig', 'leaf'];
 
-  if (liquidMeasureToMl.includes(unit) && isLikelyLiquidIngredientName(name)) {
+  if ((liquidMeasureToMl.includes(unit) && isLikelyLiquidIngredientName(name)) || unit === 'fl oz' || unit === 'floz') {
       qty = toGrams(qty, unit);
       unit = 'ml';
   } else if (liquidMeasureToMl.includes(unit) || volToG.includes(unit)) {
@@ -7893,7 +8025,7 @@ function parseRobustRecipeText(raw){
   } else {
     name = lines[0] || '';
   }
-  name = name.replace(/^(?:recipe\s*name|recipe|title)\s*[:\-]?\s*/i, '').trim();
+  name = name.replace(/^(?:recipe\s*title|recipe\s*name|recipe|title)\s*[:\-]?\s*/i, '').trim();
 
   // 2. Prep time (mins)
   let timeMinutes = null;
@@ -8002,6 +8134,43 @@ function parseRobustRecipeText(raw){
   };
 }
 
+function splitPastedRecipeBlocks(rawText){
+  const text = String(rawText || '').replace(/\r/g, '').trim();
+  if(!text) return [];
+
+  // 1. Check if text contains explicit recipe title header markers:
+  // e.g. "Recipe Title:", "Title:", "Recipe:"
+  // Or "Recipe 1:", "Recipe #1:"
+  const lines = text.split('\n');
+  const headerLineIndices = [];
+  lines.forEach((line, idx) => {
+    if(/^\s*(?:Recipe\s*Title|Title|Recipe)\s*[:\-]/i.test(line) || /^\s*Recipe\s*#?\d+\s*[:\-]/i.test(line)){
+      headerLineIndices.push(idx);
+    }
+  });
+
+  let blocks = [];
+  if(headerLineIndices.length > 1){
+    // Split into individual recipe blocks based on header lines
+    for(let i = 0; i < headerLineIndices.length; i++){
+      const start = headerLineIndices[i];
+      const end = (i + 1 < headerLineIndices.length) ? headerLineIndices[i + 1] : lines.length;
+      const blockText = lines.slice(start, end).join('\n').trim();
+      if(blockText) blocks.push(blockText);
+    }
+  } else if(/(?:\n\s*){3,}/.test(text)){
+    // Double-blank line breaks (\n\n\n or more)
+    const rawChunks = text.split(/(?:\n\s*){3,}/);
+    blocks = rawChunks.map(c => c.trim()).filter(c => c.length > 15);
+  }
+
+  if(!blocks.length){
+    blocks = [text];
+  }
+
+  return blocks;
+}
+
 function parsePastedRecipeText(raw){
   try {
     const parsed = parseRobustRecipeText(raw);
@@ -8049,16 +8218,254 @@ function ensureRecipeRecognitionModal(){
 function closeRecipeRecognitionModal(){document.getElementById('recipe-recognition-wrap')?.classList.remove('open');}
 
 let currentRecognisedRecipe = null;
-function openRecipeRecognitionReview(recipe,label){
+
+function parseRecipeText(raw){
+  return parsePastedRecipeText(raw);
+}
+
+function openRecipeRecognitionReview(recipe, label){
   currentRecognisedRecipe = recipe;
-  const wrap=ensureRecipeRecognitionModal();
-  wrap.querySelector('.modal').innerHTML=`<div class="row-between" style="align-items:center;margin-bottom:10px"><div><h3 style="margin:0">Review recognised recipe</h3><div style="font-size:11px;color:var(--text2);margin-top:3px">${ppEscapeHtml(label)}</div></div><button class="btn sm ghost" onclick="closeRecipeRecognitionModal()">Close</button></div><div class="msg warn" style="margin:0 0 12px">Check every quantity and instruction against the original. Recognition never supplies nutrition.</div><div class="grid3"><div style="grid-column:span 2"><label>Name</label><input id="recognised-name" value="${ppEscapeAttr(recipe.name)}"></div><div><label>Servings</label><input id="recognised-serves" type="number" min="1" value="${recipe.servings||''}"></div></div><div class="grid2"><div><label>Time (minutes)</label><input id="recognised-time" type="number" min="1" value="${recipe.timeMinutes||''}"></div><div><label>Book/source title</label><input id="recognised-book" value="${ppEscapeAttr(recipe.bookTitle)}"></div></div><div class="field"><label>Ingredients — one per line</label><textarea id="recognised-ingredients" style="min-height:180px">${ppEscapeHtml(recipe.ingredients.join('\n'))}</textarea></div><div class="field"><label>Method — one step per line</label><textarea id="recognised-method" style="min-height:220px">${ppEscapeHtml(recipe.method.join('\n'))}</textarea></div>${recipe.warnings.length?`<div class="msg warn">${recipe.warnings.map(ppEscapeHtml).join('<br>')}</div>`:''}<div class="btn-row" style="margin-top:14px"><button class="btn primary" onclick="applyRecognisedRecipeToForm()">Use in Add Recipe</button><button class="btn ghost" onclick="closeRecipeRecognitionModal()">Keep reviewing</button></div>`;
+  const wrap = ensureRecipeRecognitionModal();
+  const queueLen = (state && Array.isArray(state.importQueue)) ? state.importQueue.length : 0;
+  const queueIdx = (state && typeof state.importQueueIndex === 'number') ? state.importQueueIndex : 0;
+  const isMulti = queueLen > 1;
+
+  let progressBadge = '';
+  if (isMulti) {
+    progressBadge = `<span id="import-queue-counter-badge" style="background:var(--purple-bg, #EEF2FF);color:var(--purple, #4F46E5);font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px;border:1px solid rgba(79,70,229,0.2)">Reviewing Recipe ${queueIdx + 1} of ${queueLen}</span>`;
+  }
+
+  const subLabel = label || (isMulti ? `Sequential Import Queue (${queueIdx + 1} of ${queueLen})` : 'Pasted text · review recipe');
+
+  const skipBtnHtml = isMulti ? `
+    <button type="button" class="btn secondary" id="review-skip-recipe-btn" onclick="skipImportQueueItem()">Skip Recipe</button>
+  ` : '';
+
+  wrap.querySelector('.modal').innerHTML = `
+    <div class="row-between" style="align-items:center;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <h3 style="margin:0">Review Recipe</h3>
+        ${progressBadge}
+      </div>
+      <button class="btn sm ghost" onclick="cancelImportQueueAndClose()">Close</button>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:10px">${ppEscapeHtml(subLabel)}</div>
+    <div class="msg warn" style="margin:0 0 12px">Check every quantity and instruction against the original. Standard metric units and method percentages applied.</div>
+    <div class="grid3">
+      <div style="grid-column:span 2"><label>Name</label><input id="recognised-name" value="${ppEscapeAttr(recipe?.name || '')}"></div>
+      <div><label>Servings</label><input id="recognised-serves" type="number" min="1" value="${recipe?.servings || 2}"></div>
+    </div>
+    <div class="grid2">
+      <div><label>Time (minutes)</label><input id="recognised-time" type="number" min="1" value="${recipe?.timeMinutes || ''}"></div>
+      <div><label>Book/source title</label><input id="recognised-book" value="${ppEscapeAttr(recipe?.bookTitle || '')}"></div>
+    </div>
+    <div class="field">
+      <label>Ingredients — one per line</label>
+      <textarea id="recognised-ingredients" style="min-height:180px">${ppEscapeHtml((recipe?.ingredients || []).join('\n'))}</textarea>
+    </div>
+    <div class="field">
+      <label>Method — one step per line</label>
+      <textarea id="recognised-method" style="min-height:220px">${ppEscapeHtml((recipe?.method || []).join('\n'))}</textarea>
+    </div>
+    ${(recipe?.warnings && recipe.warnings.length) ? `<div class="msg warn">${recipe.warnings.map(ppEscapeHtml).join('<br>')}</div>` : ''}
+    <div class="btn-row" style="margin-top:14px;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn primary" id="review-save-recipe-btn" onclick="saveCurrentReviewedRecipe()">Save Recipe</button>
+      ${skipBtnHtml}
+      <button type="button" class="btn ghost" onclick="applyRecognisedRecipeToForm()">Edit in Add Form</button>
+      <button type="button" class="btn ghost" onclick="cancelImportQueueAndClose()">Cancel</button>
+    </div>
+  `;
   wrap.classList.add('open');
+}
+
+async function saveCurrentReviewedRecipe(){
+  const name = document.getElementById('recognised-name')?.value.trim() || 'Untitled Recipe';
+  const serves = +document.getElementById('recognised-serves')?.value || 2;
+  const timeMinutes = document.getElementById('recognised-time')?.value !== '' ? +document.getElementById('recognised-time')?.value : null;
+  const bookTitle = document.getElementById('recognised-book')?.value.trim() || '';
+  const ingredientsLines = (document.getElementById('recognised-ingredients')?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
+  const methodLines = (document.getElementById('recognised-method')?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
+
+  const parsedIngs = ingredientsLines.map(parseIngredientLine).filter(Boolean);
+  ensureIngredientGroups();
+  parsedIngs.forEach(ing => {
+    const groupMatch = fuzzyMatchIngredientGroup(ing.name);
+    if(groupMatch){
+      ing.groupId = groupMatch.id;
+      ing.bankId = resolveProductForIngredient(ing).product?.id || "";
+    } else {
+      const bankMatch = fuzzyMatchBank(ing.name);
+      if(bankMatch){
+        ing.bankId = bankMatch.id;
+        ing.groupId = bankMatch.groupId || "";
+      }
+    }
+  });
+
+  const nutrition = calcRecipeNutrition(parsedIngs, serves);
+  const ps = nutrition.perServing;
+  const mealTypes = currentRecognisedRecipe?.mealTypes || ['dinner'];
+  const portions = calcPortions(ps, state.prefs, serves, 'both', mealTypes[0] || 'dinner');
+  const nowIso = new Date().toISOString();
+  const recipeId = 'r' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+
+  const fullRecipe = {
+    id: recipeId,
+    name: name,
+    servings: serves,
+    serves: serves,
+    types: mealTypes,
+    ingredients: parsedIngs,
+    method: methodLines,
+    steps: methodLines,
+    ...ps,
+    nutrition: { total: nutrition.totalNutrition, perServing: ps },
+    portionE: portions.e,
+    portionC: portions.c,
+    bankCalculated: true,
+    source: (bookTitle || currentRecognisedRecipe?.sourceType) ? {
+      type: currentRecognisedRecipe?.sourceType || 'book',
+      book: bookTitle,
+      author: currentRecognisedRecipe?.author || '',
+      page: currentRecognisedRecipe?.page || '',
+      url: currentRecognisedRecipe?.url || ''
+    } : null,
+    timeMinutes: timeMinutes,
+    updatedAt: nowIso
+  };
+
+  recalcRecipeObject(fullRecipe);
+
+  if(!state) state = {};
+  if(!Array.isArray(state.recipes)) state.recipes = [];
+  state.recipes.push(fullRecipe);
+
+  // Requirement: Save current reviewed recipe document to Firestore (doc.set())
+  try {
+    if(typeof platePlanDb !== 'undefined' && platePlanDb){
+      const targetHouseholdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+      const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
+      // 1. Direct single recipe document in subcollection
+      const singleRecipeRef = householdDocRef.collection('recipes').doc(fullRecipe.id);
+      await singleRecipeRef.set(fullRecipe, { merge: true }).catch(e => console.warn('singleRecipeRef doc.set error:', e));
+      // 2. Aggregate data collection doc
+      const dataColRecipesRef = householdDocRef.collection('data').doc('recipes');
+      await dataColRecipesRef.set({
+        recipes: cleanCloudValue(state.recipes),
+        updatedAt: (typeof firebase !== 'undefined' && firebase.firestore?.FieldValue) ? firebase.firestore.FieldValue.serverTimestamp() : nowIso
+      }, { merge: true }).catch(e => console.warn('dataColRecipesRef doc.set error:', e));
+    }
+  } catch(err) {
+    console.warn('Firestore doc.set error during queue save:', err);
+  }
+
+  platePlanNutritionCache.clear();
+  markPlatePlanViewsDirty();
+  rebuildPlatePlanIndexes();
+  saveState(true);
+  showPlatePlanToast(`Saved "${fullRecipe.name}"`);
+
+  // Sequential Stepper Engine: Increment queue index
+  state.importQueueIndex = (state.importQueueIndex || 0) + 1;
+  if(state.importQueue && state.importQueueIndex < state.importQueue.length){
+    // Keep Review modal open and immediately load next queued item
+    const nextItem = state.importQueue[state.importQueueIndex];
+    const nextParsed = parseRecipeText(nextItem);
+    openRecipeRecognitionReview(nextParsed);
+  } else {
+    // Reset queue, close modal, and refresh main UI view
+    state.importQueue = [];
+    state.importQueueIndex = 0;
+    closeRecipeRecognitionModal();
+    showView('vault');
+    renderVault();
+  }
+}
+
+function skipImportQueueItem(){
+  const skippedNum = (state.importQueueIndex || 0) + 1;
+  const totalInQueue = state.importQueue?.length || 1;
+  showPlatePlanToast(`Skipped recipe ${skippedNum} of ${totalInQueue}`);
+
+  state.importQueueIndex = (state.importQueueIndex || 0) + 1;
+  if(state.importQueue && state.importQueueIndex < state.importQueue.length){
+    const nextItem = state.importQueue[state.importQueueIndex];
+    const nextParsed = parseRecipeText(nextItem);
+    openRecipeRecognitionReview(nextParsed);
+  } else {
+    state.importQueue = [];
+    state.importQueueIndex = 0;
+    closeRecipeRecognitionModal();
+    showView('vault');
+    renderVault();
+  }
+}
+
+function cancelImportQueueAndClose(){
+  if(state){
+    state.importQueue = [];
+    state.importQueueIndex = 0;
+  }
+  closeRecipeRecognitionModal();
+}
+
+function startRecipeImportQueue(){
+  const textEl = document.getElementById('recipe-paste-text');
+  const rawText = (textEl?.value || '').trim();
+  if(!rawText){
+    if(typeof showPlatePlanToast === 'function') showPlatePlanToast('Please paste some recipe text first.', 'error');
+    else if(typeof showToast === 'function') showToast('Please paste some recipe text first.', 'error');
+    textEl?.focus();
+    return;
+  }
+
+  if(!state) state = {};
+  const blocks = splitPastedRecipeBlocks(rawText);
+  if(blocks.length > 1){
+    state.importQueue = blocks;
+    state.importQueueIndex = 0;
+  } else {
+    state.importQueue = [rawText];
+    state.importQueueIndex = 0;
+  }
+
+  // Stepper trigger: automatically pass first item into parseRecipeText
+  const firstRecipeText = state.importQueue[state.importQueueIndex];
+  const parsed = parseRecipeText(firstRecipeText);
+  openRecipeRecognitionReview(parsed);
+}
+
+function updateRecipePasteTextStatus(){
+  const ta = document.getElementById('recipe-paste-text');
+  if(!ta) return;
+  const val = ta.value || '';
+  const blocks = splitPastedRecipeBlocks(val);
+  const badge = document.getElementById('recipe-paste-badge');
+  const summary = document.getElementById('recipe-paste-summary');
+  const btn = document.getElementById('recipe-paste-action-btn');
+
+  if(blocks.length > 1){
+    if(badge){
+      badge.textContent = `${blocks.length} recipes detected`;
+      badge.style.display = 'inline-block';
+    }
+    if(summary){
+      summary.innerHTML = `<strong>Multi-recipe queue detected:</strong> Found ${blocks.length} independent recipe blocks. Clicking below will queue them sequentially through Parse and Review.`;
+      summary.style.display = 'block';
+    }
+    if(btn){
+      btn.textContent = `Queue & Review ${blocks.length} Recipes`;
+    }
+  } else {
+    if(badge) badge.style.display = 'none';
+    if(summary) summary.style.display = 'none';
+    if(btn) btn.textContent = 'Parse & Review Recipe';
+  }
 }
 
 function openRecipeTextPaste(){
   const wrap=ensureRecipeRecognitionModal();
-  wrap.querySelector('.modal').innerHTML=`<div class="row-between" style="align-items:center;margin-bottom:10px"><h3 style="margin:0">Paste extracted recipe text</h3><button class="btn sm ghost" onclick="cancelRecipeTextPaste()">Close</button></div><p style="font-size:12px;color:var(--text2);margin-bottom:10px">Copy text using Apple Live Text or Google Lens, then paste it below. PlatePlan will structure it for review.</p><textarea id="recipe-paste-text" style="min-height:45dvh" placeholder="Recipe name&#10;&#10;Number of Servings: 4&#10;Prep time: 15 mins&#10;&#10;Ingredients&#10;...&#10;&#10;Method&#10;..."></textarea><div class="btn-row" style="margin-top:12px"><button class="btn primary" onclick="applyPastedRecipeDirectlyFromModal()">Use directly in Add Recipe</button><button class="btn ghost" onclick="cancelRecipeTextPaste()">Cancel</button></div>`;
+  wrap.querySelector('.modal').innerHTML=`<div class="row-between" style="align-items:center;margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px"><h3 style="margin:0">Paste extracted recipe text</h3><span id="recipe-paste-badge" style="display:none;background:var(--purple-bg);color:var(--purple);font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px"></span></div><button class="btn sm ghost" onclick="cancelRecipeTextPaste()">Close</button></div><p style="font-size:12px;color:var(--text2);margin-bottom:10px">Paste recipe text below (supports single recipes or multi-recipe blocks separated by headers e.g. <code>Recipe Title:</code> or double blank lines). Recipes are queued sequentially through Parse and Review.</p><textarea id="recipe-paste-text" style="min-height:45dvh" oninput="updateRecipePasteTextStatus()" placeholder="Recipe Title: Spicy Chickpea Curry&#10;&#10;Number of Servings: 4&#10;Prep time: 15 mins&#10;&#10;Ingredients&#10;- 2 x 400g tins chickpeas&#10;- 1 x red onion&#10;- 2 tbsp olive oil&#10;&#10;Method&#10;1. Dice red onions.&#10;2. Fry 40% of the red onions in olive oil."></textarea><div id="recipe-paste-summary" style="display:none;margin-top:8px;font-size:12px;color:var(--text2);padding:8px 12px;background:var(--surface2);border-radius:8px"></div><div class="btn-row" style="margin-top:12px"><button id="recipe-paste-action-btn" class="btn primary" onclick="startRecipeImportQueue()">Parse &amp; Review</button><button class="btn ghost" onclick="cancelRecipeTextPaste()">Cancel</button></div>`;
   wrap.classList.add('open');setTimeout(()=>document.getElementById('recipe-paste-text')?.focus(),0);
 }
 
@@ -8069,38 +8476,136 @@ function cancelRecipeTextPaste(){
 }
 
 function reviewPastedRecipeText(){
-  try {
-    const text=(document.getElementById('recipe-paste-text')?.value||'').trim();
-    if(!text){
-      if(typeof showPlatePlanToast === 'function') showPlatePlanToast('Please paste some recipe text first.', 'error');
-      else if(typeof showToast === 'function') showToast('Please paste some recipe text first.', 'error');
-      return;
-    }
-    const parsed = parsePastedRecipeText(text);
-    openRecipeRecognitionReview(parsed, 'Pasted text · review recipe');
-  } catch(err) {
-    console.error('Error reviewing pasted recipe text:', err);
-    if(typeof showPlatePlanToast === 'function') showPlatePlanToast('An error occurred while parsing recipe text: ' + (err?.message || err), 'error');
-    else alert('An error occurred while parsing text: ' + (err?.message || err));
-  }
+  startRecipeImportQueue();
 }
 
 function applyPastedRecipeDirectlyFromModal(){
-  try {
-    const textEl = document.getElementById('recipe-paste-text');
-    const text = (textEl?.value || '').trim();
-    if(!text){
-      if(typeof showPlatePlanToast === 'function') showPlatePlanToast('Please paste some recipe text first.', 'error');
-      else if(typeof showToast === 'function') showToast('Please paste some recipe text first.', 'error');
-      textEl?.focus();
-      return;
-    }
-    const parsed = parsePastedRecipeText(text);
-    applyRecognisedRecipeDirectlyToForm(parsed);
-  } catch(err) {
-    console.error('Error applying pasted recipe text:', err);
-    if(typeof showPlatePlanToast === 'function') showPlatePlanToast('An error occurred: ' + (err?.message || err), 'error');
-  }
+  startRecipeImportQueue();
+}
+
+window.parseRecipeText = parseRecipeText;
+window.startRecipeImportQueue = startRecipeImportQueue;
+window.saveCurrentReviewedRecipe = saveCurrentReviewedRecipe;
+window.skipImportQueueItem = skipImportQueueItem;
+window.cancelImportQueueAndClose = cancelImportQueueAndClose;
+
+function openBatchRecipeReviewModal(recipes){
+  window.pendingBatchRecipes = recipes;
+  const wrap = ensureRecipeRecognitionModal();
+  let itemsHtml = recipes.map((r, i) => `
+    <div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--surface)">
+      <div class="row-between" style="align-items:center;margin-bottom:6px">
+        <div style="font-weight:700;font-size:14px;color:var(--text)">${i+1}. ${ppEscapeHtml(r.name || 'Recipe ' + (i+1))}</div>
+        <div style="font-size:11px;color:var(--text2);display:flex;gap:8px">
+          <span>🍽️ ${r.servings ? r.servings + ' servings' : '2 servings'}</span>
+          <span>⏱️ ${r.timeMinutes ? r.timeMinutes + ' mins' : '30 mins'}</span>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:4px">
+        <strong>${(r.ingredients||[]).length} ingredients:</strong> ${(r.ingredients||[]).slice(0, 3).map(ppEscapeHtml).join(', ')}${(r.ingredients||[]).length > 3 ? '...' : ''}
+      </div>
+      <div style="font-size:11px;color:var(--text3)">
+        <strong>${(r.method||[]).length} steps</strong>
+      </div>
+    </div>
+  `).join('');
+
+  wrap.querySelector('.modal').innerHTML = `
+    <div class="row-between" style="align-items:center;margin-bottom:10px">
+      <div>
+        <h3 style="margin:0">Batch Review: ${recipes.length} Recipes Detected</h3>
+        <div style="font-size:11px;color:var(--text2);margin-top:3px">All ingredients normalised to metric and method percentages applied</div>
+      </div>
+      <button class="btn sm ghost" onclick="closeRecipeRecognitionModal()">Close</button>
+    </div>
+    <div style="max-height:55dvh;overflow-y:auto;margin:12px 0;padding-right:4px">
+      ${itemsHtml}
+    </div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn primary" onclick="importAllBatchRecipesToVault()">Import All ${recipes.length} Recipes to Vault</button>
+      <button class="btn secondary" onclick="useFirstBatchRecipeInForm()">Use 1st in Add Recipe</button>
+      <button class="btn ghost" onclick="openRecipeTextPaste()">Back to Paste</button>
+    </div>
+  `;
+  wrap.classList.add('open');
+}
+
+function importAllBatchRecipesToVault(){
+  const recipes = window.pendingBatchRecipes || [];
+  if(!recipes.length) return;
+
+  runWithRecoveryPoint('Before importing batch recipes (' + recipes.length + ')', () => {
+    let importedCount = 0;
+    const nowIso = new Date().toISOString();
+
+    recipes.forEach(r => {
+      const parsedIngs = (r.ingredients || []).map(parseIngredientLine).filter(Boolean);
+      ensureIngredientGroups();
+      parsedIngs.forEach(ing => {
+        const groupMatch = fuzzyMatchIngredientGroup(ing.name);
+        if(groupMatch){
+          ing.groupId = groupMatch.id;
+          ing.bankId = resolveProductForIngredient(ing).product?.id || "";
+        } else {
+          const bankMatch = fuzzyMatchBank(ing.name);
+          if(bankMatch){
+            ing.bankId = bankMatch.id;
+            ing.groupId = bankMatch.groupId || "";
+          }
+        }
+      });
+
+      const serves = r.servings || 2;
+      const nutrition = calcRecipeNutrition(parsedIngs, serves);
+      const ps = nutrition.perServing;
+      const portions = calcPortions(ps, state.prefs, serves, 'both', (r.mealTypes && r.mealTypes[0]) || 'dinner');
+
+      const fullRecipe = {
+        id: 'r' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        name: r.name || 'Untitled Recipe',
+        servings: serves,
+        serves: serves,
+        types: r.mealTypes || ['dinner'],
+        ingredients: parsedIngs,
+        method: r.method || [],
+        steps: r.method || [],
+        ...ps,
+        nutrition: { total: nutrition.totalNutrition, perServing: ps },
+        portionE: portions.e,
+        portionC: portions.c,
+        bankCalculated: true,
+        source: r.sourceType ? {
+          type: r.sourceType,
+          book: r.bookTitle || '',
+          author: r.author || '',
+          page: r.page || '',
+          url: r.url || ''
+        } : null,
+        timeMinutes: r.timeMinutes || null,
+        updatedAt: nowIso
+      };
+
+      recalcRecipeObject(fullRecipe);
+      state.recipes.push(fullRecipe);
+      importedCount++;
+    });
+
+    platePlanNutritionCache.clear();
+    markPlatePlanViewsDirty();
+    rebuildPlatePlanIndexes();
+    saveState(true);
+    closeRecipeRecognitionModal();
+    window.pendingBatchRecipes = null;
+    showView('vault');
+    renderVault();
+    showPlatePlanToast(`Successfully imported ${importedCount} recipes to Recipe Vault!`);
+  });
+}
+
+function useFirstBatchRecipeInForm(){
+  const recipes = window.pendingBatchRecipes || [];
+  if(!recipes.length) return;
+  applyRecognisedRecipeDirectlyToForm(recipes[0]);
 }
 
 function applyRecognisedRecipeDirectlyToForm(parsed){
