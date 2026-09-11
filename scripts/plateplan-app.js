@@ -207,8 +207,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.8.4';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v65';
+const PLATEPLAN_APP_VERSION='2.8.5';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v67';
 const SEED=[];
 
 let state = null;
@@ -467,41 +467,46 @@ function rebuildPlatePlanIndexes(){
 }
 function markPlatePlanViewsDirty(...names){ (names.length?names:['today','vault','ingredients','bank','planner','planlib','shopping','data','prefs']).forEach(name=>platePlanDirtyViews.add(name)); }
 
+function safeJsonStringify(value, fallback = '{}') {
+  if (value === undefined || value === null) return fallback;
+  try {
+    const seen = new WeakSet();
+    const str = JSON.stringify(value, (k, v) => {
+      if (typeof v === 'number' && (isNaN(v) || !isFinite(v))) return null;
+      if (v === undefined) return undefined;
+      if (typeof v === 'function') return undefined;
+      if (typeof Node !== 'undefined' && v instanceof Node) return undefined;
+      if (typeof v === 'object' && v !== null) {
+        if (v.constructor && (v.constructor.name === 'un' || v.constructor.name === 'P')) return undefined;
+        if (seen.has(v)) return undefined;
+        seen.add(v);
+      }
+      return v;
+    });
+    return str || fallback;
+  } catch (_e) {
+    return fallback;
+  }
+}
+
 // == INITIALIZATION ==
 function loadBakedState(){
   try{
     const el=document.getElementById('baked-state');
     if(!el)return;
-    const raw=el.textContent.trim();
-    if(!raw||raw==='{}')return;
-    const baked=JSON.parse(raw);
-    if(baked&&baked.recipes){
-      const existingRaw = localStorage.getItem(SK);
-      if(existingRaw){
-        try{
-          const existing = JSON.parse(existingRaw);
-          if(existing && Array.isArray(existing.recipes) && existing.recipes.length){
-            if(existingRaw !== raw){
-              browserStateBeforeBakedComparison = existing;
-              localStorage.setItem(BAKED_CANDIDATE_SK, raw);
-            }
-            el.textContent='{}';
-            return;
-          }
-        }catch(e){}
-      }
-      localStorage.setItem(SK,JSON.stringify(baked));
-      localStorage.removeItem(BAKED_CANDIDATE_SK);
-    }
     el.textContent='{}';
-  }catch(e){console.warn('Baked state load failed',e);}
+  }catch(e){console.warn('Baked state load skipped',e);}
 }
 
-function stableStateComparisonValue(value){
-  if(Array.isArray(value)) return value.map(stableStateComparisonValue);
+function stableStateComparisonValue(value, seen = new WeakSet()){
+  if(value && typeof value === 'object'){
+    if (seen.has(value)) return null;
+    seen.add(value);
+  }
+  if(Array.isArray(value)) return value.map(v => stableStateComparisonValue(v, seen));
   if(value && typeof value === 'object'){
     return Object.keys(value).sort().reduce((out, key) => {
-      out[key] = stableStateComparisonValue(value[key]);
+      out[key] = stableStateComparisonValue(value[key], seen);
       return out;
     }, {});
   }
@@ -509,7 +514,11 @@ function stableStateComparisonValue(value){
 }
 
 function stateValuesMatch(a, b){
-  return JSON.stringify(stableStateComparisonValue(a)) === JSON.stringify(stableStateComparisonValue(b));
+  try {
+    return safeJsonStringify(stableStateComparisonValue(a)) === safeJsonStringify(stableStateComparisonValue(b));
+  } catch(_e) {
+    return false;
+  }
 }
 
 function describeVersionCollection(browserItems, fileItems, label, nameForItem){
@@ -883,7 +892,7 @@ function syncValuesEqual(a,b){
   if(a===b) return true;
   if(a==null && b==null) return true;
   if(a==null || b==null) return false;
-  return JSON.stringify(a)===JSON.stringify(b);
+  return safeJsonStringify(a)===safeJsonStringify(b);
 }
 
 function platePlanStateProjection(source=state){
@@ -968,7 +977,8 @@ async function saveIngredient(item){
     const writePromises = [
       platePlanDb.collection('households').doc(householdId).collection('products').doc(item.id).set(cleaned, { merge: true }),
       platePlanDb.collection('ingredients').doc(item.id).set(cleaned, { merge: true }),
-      platePlanDb.collection('households').doc(householdId).collection('ingredients').doc(item.id).set(cleaned, { merge: true })
+      platePlanDb.collection('households').doc(householdId).collection('ingredients').doc(item.id).set(cleaned, { merge: true }),
+      platePlanDb.collection('households').doc(householdId).set({ ingredients: cleanCloudValue(state?.ingredients) || state?.ingredients || [] }, { merge: true })
     ];
     await Promise.allSettled(writePromises);
   }
@@ -1083,10 +1093,22 @@ async function pushStateToCloud(force=false){
       const cleaned=cleanCloudValue(state);
       if(!cleaned) throw new Error('State payload is empty');
 
-      // Server-authoritative sub-collection model: Do NOT modify or write back to parent document array
+      // Pure Cloud-First Architecture: households/elliott-chloe is the single source of truth
       const writePayload = {
         updatedAt: state.updatedAt || new Date().toISOString(),
-        meta: cleaned.meta || state.meta || {}
+        meta: cleaned.meta || state.meta || {},
+        ingredients: cleaned.ingredients || state.ingredients || [],
+        recipes: cleaned.recipes || state.recipes || [],
+        ingredientGroups: cleaned.ingredientGroups || state.ingredientGroups || [],
+        ingredientFamilies: cleaned.ingredientFamilies || state.ingredientFamilies || [],
+        plan: cleaned.plan || state.plan || {},
+        overrides: cleaned.overrides || state.overrides || {},
+        planHistory: cleaned.planHistory || state.planHistory || [],
+        prefs: cleaned.prefs || state.prefs || {},
+        customCats: cleaned.customCats || state.customCats || {},
+        useUpProducts: cleaned.useUpProducts || state.useUpProducts || {},
+        packPicks: cleaned.packPicks || state.packPicks || {},
+        dataQualityDismissals: cleaned.dataQualityDismissals || state.dataQualityDismissals || {}
       };
       await householdDocRef.set(writePayload, { merge: true });
 
@@ -1577,8 +1599,8 @@ async function executeDataQualityTransaction(mutationType, payload = {}, options
 
     // 4. Local Persistence
     try {
-      localStorage.setItem(SK, JSON.stringify(state));
-      if (Array.isArray(state.recipes)) localStorage.setItem(RECIPES_BACKUP_SK, JSON.stringify(state.recipes));
+      localStorage.setItem(SK, safeJsonStringify(state));
+      if (Array.isArray(state.recipes)) localStorage.setItem(RECIPES_BACKUP_SK, safeJsonStringify(state.recipes));
     } catch (e) {
       console.warn('Local storage write warning in executeDataQualityTransaction:', e);
     }
@@ -1617,8 +1639,8 @@ async function executeDataQualityTransaction(mutationType, payload = {}, options
       window.activeHousehold = { id: hid };
     }
     try {
-      localStorage.setItem(SK, JSON.stringify(state));
-      if (Array.isArray(state.recipes)) localStorage.setItem(RECIPES_BACKUP_SK, JSON.stringify(state.recipes));
+      localStorage.setItem(SK, safeJsonStringify(state));
+      if (Array.isArray(state.recipes)) localStorage.setItem(RECIPES_BACKUP_SK, safeJsonStringify(state.recipes));
     } catch (e) {}
     rebuildPlatePlanIndexes();
     platePlanNutritionCache.clear();
@@ -1664,12 +1686,14 @@ function flushPlatePlanSyncOutbox(){
 }
 
 function saveState(immediate=false){
-  window.dispatchEvent(new CustomEvent('plateplan:state-saved',{detail:{source:'legacy',savedAt:Date.now()}}));
+  window.dispatchEvent(new CustomEvent('plateplan:state-saved',{detail:{source:'cloud',savedAt:Date.now()}}));
+  if(state) state.updatedAt=new Date().toISOString();
+  window.state = state;
+  window.appState = state;
   try{
-    if(state) state.updatedAt=new Date().toISOString();
-    localStorage.setItem(SK,JSON.stringify(state));
+    localStorage.setItem(SK, safeJsonStringify(state));
     if(state && Array.isArray(state.recipes)){
-      localStorage.setItem(RECIPES_BACKUP_SK, JSON.stringify(state.recipes));
+      localStorage.setItem(RECIPES_BACKUP_SK, safeJsonStringify(state.recipes));
     }
   }catch(e){
     console.warn('Local storage write warning:',e);
@@ -1691,8 +1715,8 @@ function saveState(immediate=false){
 if(typeof window!=='undefined'){
   window.addEventListener('beforeunload',()=>{
     try{
-      localStorage.setItem(SK,JSON.stringify(state));
-      if(state?.recipes?.length) localStorage.setItem(RECIPES_BACKUP_SK, JSON.stringify(state.recipes));
+      localStorage.setItem(SK, safeJsonStringify(state));
+      if(state?.recipes?.length) localStorage.setItem(RECIPES_BACKUP_SK, safeJsonStringify(state.recipes));
     }catch(_e){}
   });
 }
@@ -2029,23 +2053,20 @@ function applyRemoteCloudState(remoteState, metadata = {}, options = {}){
   try{
     let reconciled;
     let hasLocalNewer = false;
-    if (options.bypassReconciliation) {
-      reconciled = remoteState;
-    } else {
-      const rec = reconcilePlatePlanState(state, remoteState, options);
-      reconciled = rec.state;
-      hasLocalNewer = rec.hasLocalNewer;
-    }
+    // Cloud-First Firestore Single Source of Truth: what exists in households/elliott-chloe is what renders on screen
+    reconciled = remoteState;
     const loaded=loadStateFromObject(reconciled);
     state=loaded;
+    window.state = state;
+    window.appState = state;
     if (Array.isArray(state?.ingredients)) {
       state.ingredients.forEach(ing => {
         if (!ing.updatedAt) ing.updatedAt = state.updatedAt || new Date().toISOString();
       });
     }
     try{
-      localStorage.setItem(SK,JSON.stringify(state));
-      if(state?.recipes?.length) localStorage.setItem(RECIPES_BACKUP_SK, JSON.stringify(state.recipes));
+      localStorage.setItem(SK, safeJsonStringify(state));
+      if(state?.recipes?.length) localStorage.setItem(RECIPES_BACKUP_SK, safeJsonStringify(state.recipes));
     }catch(e){}
 
     platePlanNutritionCache.clear();
@@ -2112,7 +2133,7 @@ function applyPlatePlanProjectionRecord(key,value,{remote=true}={}){
   if(remote){
     platePlanSyncSuppress=true;
     try{
-      localStorage.setItem(SK,JSON.stringify(state));
+      localStorage.setItem(SK,safeJsonStringify(state));
       rebuildPlatePlanIndexes();
       renderPlatePlanDependentViews();
     }finally{ platePlanSyncSuppress=false; }
@@ -2132,14 +2153,14 @@ function applyPlatePlanProjection(projection){
     if(!Array.isArray(state.planHistory)) state.planHistory = [];
     Object.entries(projection).forEach(([key,value])=>applyPlatePlanProjectionRecord(key,value,{remote:false}));
     state=loadStateFromObject(state);
-    localStorage.setItem(SK,JSON.stringify(state));
+    localStorage.setItem(SK,safeJsonStringify(state));
   }finally{ platePlanSyncSuppress=false; }
 }
 
 function loadStateFromObject(value){
   if (!value || typeof value !== 'object') return value;
   try{
-    return normalizeLoadedState(JSON.parse(JSON.stringify(value)), { injectSeed: false, restoreRecipeBackup: false });
+    return normalizeLoadedState(cleanCloudValue(value) || value, { injectSeed: false, restoreRecipeBackup: false });
   }catch(_e){
     return normalizeLoadedState(value, { injectSeed: false, restoreRecipeBackup: false });
   }
@@ -2167,6 +2188,57 @@ function startPlatePlanCloudListeners(){
   const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
   const dataCol = getPlatePlanDataCollection();
 
+  // 0. Primary Real-Time Snapshot Listener on households/elliott-chloe (Single Source of Truth)
+  const unsubHousehold = householdDocRef.onSnapshot(docSnapshot => {
+    if (!docSnapshot || !docSnapshot.exists) return;
+    if (platePlanTransactionShield.inFlight || (Date.now() - platePlanTransactionShield.lastCompletedAt < platePlanTransactionShield.cooldownMs)) {
+      return;
+    }
+    if (docSnapshot.metadata && docSnapshot.metadata.hasPendingWrites) {
+      return;
+    }
+    const docData = docSnapshot.data() || {};
+    const sourceData = (docData.state && typeof docData.state === 'object') ? docData.state : docData;
+
+    const assembled = {
+      schemaVersion: sourceData.schemaVersion || PLATEPLAN_SCHEMA_VERSION,
+      updatedAt: docData.updatedAt || sourceData.updatedAt || new Date().toISOString(),
+      prefs: sourceData.prefs !== undefined ? sourceData.prefs : (state?.prefs || {}),
+      customCats: sourceData.customCats !== undefined ? sourceData.customCats : (state?.customCats || {}),
+      excluded: sourceData.excluded !== undefined ? sourceData.excluded : (state?.excluded || {}),
+      useUpProducts: sourceData.useUpProducts !== undefined ? sourceData.useUpProducts : (state?.useUpProducts || {}),
+      ignoredGroupMergeSuggestions: sourceData.ignoredGroupMergeSuggestions || [],
+      ignoredDataQualityWarnings: sourceData.ignoredDataQualityWarnings || [],
+      dataQualityDismissals: sourceData.dataQualityDismissals || {},
+      packPicks: sourceData.packPicks || {},
+      meta: {
+        ...(state?.meta || {}),
+        ...(sourceData.meta || {}),
+        householdId: targetHouseholdId
+      },
+      recipes: sourceData.recipes !== undefined ? sourceData.recipes : (state?.recipes || []),
+      ingredients: (Array.isArray(sourceData.ingredients) && sourceData.ingredients.length > 0) ? sourceData.ingredients : (state?.ingredients || []),
+      ingredientGroups: sourceData.ingredientGroups !== undefined ? sourceData.ingredientGroups : (state?.ingredientGroups || []),
+      ingredientFamilies: sourceData.ingredientFamilies !== undefined ? sourceData.ingredientFamilies : (state?.ingredientFamilies || []),
+      plan: sourceData.plan !== undefined ? sourceData.plan : (state?.plan || {}),
+      overrides: sourceData.overrides !== undefined ? sourceData.overrides : (state?.overrides || {}),
+      planHistory: sourceData.planHistory !== undefined ? sourceData.planHistory : (state?.planHistory || [])
+    };
+
+    applyRemoteCloudState(assembled, docData, { bypassReconciliation: true });
+    window.state = state;
+    window.appState = state;
+    platePlanLastSyncedAt = Date.now();
+    updatePlatePlanSyncStatus('synced');
+  }, error => {
+    console.warn('[HOUSEHOLD SNAPSHOT LISTENER ERROR]', error);
+    if (!navigator.onLine) {
+      updatePlatePlanSyncStatus('offline');
+    }
+  });
+
+  platePlanSyncUnsubscribers.push(unsubHousehold);
+
   // 1. Real-Time Sub-Collection Snapshot Listener for products
   const productsCol = householdDocRef.collection('products');
   const unsubProducts = productsCol.onSnapshot(snapshot => {
@@ -2187,9 +2259,9 @@ function startPlatePlanCloudListeners(){
       return data;
     });
 
-    // Persist a backup copy to localStorage
+    // Persist a backup copy to localStorage safely
     try {
-      localStorage.setItem('plateplan_offline_backup', JSON.stringify(state.ingredients));
+      localStorage.setItem('plateplan_offline_backup', safeJsonStringify(state.ingredients));
     } catch(e) {
       console.warn('plateplan_offline_backup write warning:', e);
     }
@@ -2443,10 +2515,12 @@ async function loadSharedPlatePlan(){
       if (!ing.updatedAt) ing.updatedAt = state.updatedAt || new Date().toISOString();
     });
     try {
-      localStorage.setItem('plateplan_offline_backup', JSON.stringify(state.ingredients));
+      localStorage.setItem('plateplan_offline_backup', safeJsonStringify(state.ingredients));
     } catch(e) {}
   }
 
+  window.state = state;
+  window.appState = state;
   platePlanCloudReady=true;
   startPlatePlanCloudListeners();
   updatePlatePlanSyncStatus('synced');
@@ -2860,7 +2934,7 @@ function initializePlatePlanApplication(){
   installPlannerSummaryObserver();
   refreshAllProductDefaultsAndRecipeNutrition();
   rebuildPlatePlanIndexes();
-  try{ localStorage.setItem(SK, JSON.stringify(state)); }catch(_e){}
+  try{ localStorage.setItem(SK, safeJsonStringify(state)); }catch(_e){}
 
   resetTodayDate({render:false});
   requestPlatePlanViewRender('today');
@@ -2879,7 +2953,21 @@ function initializePlatePlanApplication(){
   });
   performance.mark?.('plateplan-usable');
   try{ performance.measure?.('plateplan-local-startup','plateplan-start','plateplan-usable'); }catch(e){}
-  renderBakedStateRecoveryBanner();
+  window.state = state;
+  window.appState = state;
+  try {
+    Object.defineProperty(window, 'state', {
+      get: () => state,
+      set: (v) => { state = v; },
+      configurable: true
+    });
+    Object.defineProperty(window, 'appState', {
+      get: () => state,
+      set: (v) => { state = v; },
+      configurable: true
+    });
+  } catch(_e) {}
+  // Cloud-First: remove baked state recovery banner to avoid local cache overrides
   initPlatePlanCloudSync();
   window.addEventListener('online',()=>{ updatePlatePlanSyncStatus(getPlatePlanSyncOutbox().length?'saving':'connecting'); flushPlatePlanSyncOutbox(); });
   window.addEventListener('offline',()=>updatePlatePlanSyncStatus('offline'));
@@ -7478,7 +7566,7 @@ function renderToday(){
       const days=state.plan.days||Object.keys(state.plan.slots).length||7;
       state.plan.dayDates=buildPlanDayDates(platePlanTodayDate||getPlatePlanLocalToday(),days);
       state.plan.updatedAt=new Date().toISOString();
-      try { localStorage.setItem(SK, JSON.stringify(state)); } catch(_e) {}
+      try { localStorage.setItem(SK, safeJsonStringify(state)); } catch(_e) {}
       dated=true;
     }
     if(!dated){
@@ -10420,6 +10508,40 @@ function selectUnifiedMapGroup(groupId){
 
 function applyUnifiedMappingResult(context, result){
   if(!context) return;
+  const householdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+  const targetIngId = context.ingredientId || (context.type === 'ingredient' ? (context.entityId || context.id) : null);
+
+  if (targetIngId) {
+    let targetIng = null;
+    if (Array.isArray(state?.ingredients)) {
+      targetIng = state.ingredients.find(i => i && i.id === targetIngId);
+    }
+    if (!targetIng && state?.ingredients && typeof state.ingredients === 'object') {
+      targetIng = state.ingredients[targetIngId];
+    }
+    if (targetIng) {
+      if (result.productId) targetIng.productId = result.productId;
+      if (result.tescoProductId || result.tpnb) targetIng.tescoProductId = result.tescoProductId || result.tpnb;
+      if (result.packOptions) targetIng.packOptions = result.packOptions;
+      if (result.sourceUrl || result.url) targetIng.sourceUrl = result.sourceUrl || result.url;
+      if (result.groupId) targetIng.groupId = result.groupId;
+    }
+    if (state?.ingredients && typeof state.ingredients === 'object' && !Array.isArray(state.ingredients)) {
+      state.ingredients[targetIngId] = targetIng || {
+        id: targetIngId,
+        productId: result.productId,
+        tescoProductId: result.tescoProductId || result.tpnb,
+        packOptions: result.packOptions,
+        sourceUrl: result.sourceUrl || result.url
+      };
+    }
+    const db = platePlanDb || (window.firebase && firebase.firestore && firebase.firestore());
+    if (db) {
+      db.collection('households').doc(householdId).set({ ingredients: cleanCloudValue(state.ingredients) || state.ingredients }, { merge: true })
+        .catch(err => console.warn('[FIRESTORE INGREDIENT MERGE WRITE ERROR]', err));
+    }
+  }
+
   if(context.type === 'reviewRow' && context.rowEl){
     const row = context.rowEl;
     row.dataset.groupid = result.groupId || '';
@@ -10446,9 +10568,20 @@ function applyUnifiedMappingResult(context, result){
         const target = variant.ingredients[context.ingredientIndex];
         target.bankId = result.productId || '';
         target.groupId = result.groupId || '';
+        if (result.productId) target.productId = result.productId;
+        if (result.tescoProductId || result.tpnb) target.tescoProductId = result.tescoProductId || result.tpnb;
+        if (result.packOptions) target.packOptions = result.packOptions;
+        if (result.sourceUrl || result.url) target.sourceUrl = result.sourceUrl || result.url;
         rehydrateActiveRecipeAndStateCache({ changedProductIds: [result.productId], recipeId: recipe.id });
         saveRecipe(recipe);
-        saveState(true);
+        
+        const db = platePlanDb || (window.firebase && firebase.firestore && firebase.firestore());
+        if (db) {
+          db.collection('households').doc(householdId).set({
+            ingredients: cleanCloudValue(state.ingredients) || state.ingredients,
+            recipes: cleanCloudValue(state.recipes) || state.recipes
+          }, { merge: true }).catch(err => console.warn('[FIRESTORE RECIPE MERGE WRITE ERROR]', err));
+        }
       }
     }
     closeUnifiedMappingModal();
@@ -11380,35 +11513,59 @@ function createDataQualityIssue({ entityType, entityId, code, severity = 'gap', 
 function beginDataQualityFix(entityType,entityId,issueKey){
     const section=document.querySelector(`[data-dq-key="${CSS.escape(issueKey||'')}"]`)?.closest('details');
     editorNavigationStack.push({view:'data',issueKey,scrollY:window.scrollY,sectionOpen:!!section?.open,openedAt:Date.now()});
-    if(entityType === 'product') return editIng(entityId);
-    if(entityType === 'ingredient') return openIngredientEditor(entityId,document.activeElement);
-    if(entityType === 'subtype') return openIngredientGroupDetailsModal(entityId,'name');
-    if(entityType === 'recipe-ingredient'){
-      const parts=String(entityId).split(':');
-      const recipe = getRecipe(parts[0]);
-      const variant = parts[1]==='enhanced' ? recipe?.variants?.enhanced : (recipe?.variants?.original || recipe);
-      const ing = variant?.ingredients?.[+parts[2]];
-      if(ing){
-        openUnifiedMappingModal({
-          type: 'recipeIngredient',
-          recipeId: parts[0],
-          variantKey: parts[1],
-          ingredientIndex: +parts[2],
-          ingredientName: ing.name || ing.raw || '',
-          rawText: ing.raw || ing.name || '',
-          qty: ing.qty ?? ing.grams ?? '',
-          unit: ing.unit || '',
-          issueKey
-        });
-        return;
-      }
-      return editRecipeModalView(parts[0],parts[1]==='enhanced'?'enhanced':'original');
+    if((issueKey && issueKey.includes('unmapped-counted-ingredient')) || entityType === 'recipe-ingredient'){
+      return openProductMappingModal(entityId, issueKey);
     }
+    if(entityType === 'product') return editIng(entityId);
+    if(entityType === 'ingredient') return openProductMappingModal(entityId, issueKey);
+    if(entityType === 'subtype') return openIngredientGroupDetailsModal(entityId,'name');
     if(entityType === 'recipe'){
       const parts=String(entityId).split(':');
       return editRecipeModalView(parts[0],parts[1]==='enhanced'?'enhanced':'original');
     }
 }
+
+function openProductMappingModal(ingredientId, issueKey = ''){
+  if (typeof ingredientId === 'string' && ingredientId.includes(':')) {
+    const parts = ingredientId.split(':');
+    const recipe = getRecipe(parts[0]);
+    const variant = parts[1] === 'enhanced' ? recipe?.variants?.enhanced : (recipe?.variants?.original || recipe);
+    const ing = variant?.ingredients?.[+parts[2]];
+    openUnifiedMappingModal({
+      type: 'recipeIngredient',
+      recipeId: parts[0],
+      variantKey: parts[1],
+      ingredientIndex: +parts[2],
+      ingredientName: ing?.name || ing?.raw || 'Ingredient',
+      rawText: ing?.raw || ing?.name || '',
+      qty: ing?.qty ?? ing?.grams ?? '',
+      unit: ing?.unit || '',
+      issueKey: issueKey || ''
+    });
+    return;
+  }
+
+  let ing = null;
+  if (Array.isArray(state?.ingredients)) {
+    ing = state.ingredients.find(i => i && i.id === ingredientId);
+  }
+  if (!ing && state?.ingredients && typeof state.ingredients === 'object') {
+    ing = state.ingredients[ingredientId];
+  }
+  
+  openUnifiedMappingModal({
+    type: 'ingredient',
+    ingredientId: ingredientId,
+    ingredientName: ing?.name || ingredientId || 'Ingredient',
+    rawText: ing?.raw || ing?.name || '',
+    qty: ing?.qty ?? ing?.grams ?? '',
+    unit: ing?.unit || '',
+    initialQuery: ing?.name || '',
+    issueKey: issueKey || ''
+  });
+}
+window.openProductMappingModal = openProductMappingModal;
+window.showProductSearchModal = openProductMappingModal;
 
 function abandonEditorReturn(){
     const context=editorNavigationStack[editorNavigationStack.length-1];
@@ -11630,7 +11787,8 @@ function collectDeterministicDataQualityIssues(){
                 const entityId = `${recipe.id}:${variantId}:${index}`;
                 const ingredientName = ingredient.name || ingredient.raw || `Ingredient ${index + 1}`;
                 if(!resolved.product){
-                    add({entityType:'recipe-ingredient',entityId,code:'unmapped-counted-ingredient',severity:'blocker',title,message:`${ingredientName} has a counted quantity but no mapped product.`,fixButtonHtml:fix,fixTarget:resolved.group?.id?{entityType:'subtype',entityId:resolved.group.id}:null,source:[ingredient.name,ingredient.raw,ingredient.qty,ingredient.unit,ingredient.groupId,ingredient.bankId]});
+                    const unmappedFix = `<button class="btn sm dq-fix-btn" onclick="openProductMappingModal('${ppEscapeAttr(entityId)}', 'recipe-ingredient:${ppEscapeAttr(entityId)}:unmapped-counted-ingredient')">Fix</button>`;
+                    add({entityType:'recipe-ingredient',entityId,code:'unmapped-counted-ingredient',severity:'blocker',title,message:`${ingredientName} has a counted quantity but no mapped product.`,fixButtonHtml:unmappedFix,fixTarget:{entityType:'recipe-ingredient',entityId},source:[ingredient.name,ingredient.raw,ingredient.qty,ingredient.unit,ingredient.groupId,ingredient.bankId]});
                     return;
                 }
                 if(needsItemWeightForQtyIngredient(ingredient, resolved.product)) add({entityType:'recipe-ingredient',entityId,code:'missing-item-weight',severity:'blocker',title,message:`${ingredientName} is counted as items, but its product has no item weight.`,fixButtonHtml:fix,fixTarget:{entityType:'product',entityId:resolved.product.id},source:[ingredient.qty,ingredient.unit,resolved.product.id,resolved.product.itemWeight,resolved.product.itemWeightUnit]});
