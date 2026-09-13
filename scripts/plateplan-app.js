@@ -207,8 +207,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.9.2';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v72';
+const PLATEPLAN_APP_VERSION='2.9.3';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v73';
 const SEED=[];
 
 function unwrapAndCleanItem(item){
@@ -1043,9 +1043,15 @@ async function saveIngredient(item){
   if(!item || !item.id) throw new Error('Product item must have an id');
   const householdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
   const db = platePlanDb || (window.firebase && firebase.firestore && firebase.firestore());
-  if(db){
+  if(db && platePlanCloudReady && platePlanCloudUser && navigator.onLine){
+    if(Date.now() < platePlanBackoffUntil){
+      console.warn('[FIRESTORE] Throttling direct ingredient write during active backoff.');
+      return;
+    }
     const cleaned = sanitizePayloadForFirestore(unwrapAndCleanItem(item));
-    await db.collection('households').doc(householdId).collection('ingredients').doc(item.id).set(cleaned, { merge: true });
+    await db.collection('households').doc(householdId).collection('ingredients').doc(item.id).set(cleaned, { merge: true }).catch(err => {
+      console.warn('saveIngredient cloud error:', err);
+    });
   }
 }
 window.saveIngredient = saveIngredient;
@@ -1060,7 +1066,9 @@ async function deleteIngredient(id){
   const householdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
   const db = platePlanDb || (window.firebase && firebase.firestore && firebase.firestore());
   if(db){
-    await db.collection('households').doc(householdId).collection('ingredients').doc(id).delete();
+    await db.collection('households').doc(householdId).collection('ingredients').doc(id).delete().catch(err => {
+      console.warn('deleteIngredient cloud error:', err);
+    });
   }
 }
 window.deleteIngredient = deleteIngredient;
@@ -1069,9 +1077,15 @@ async function saveRecipe(recipe){
   if(!recipe || !recipe.id) throw new Error('Recipe must have an id');
   const householdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
   const db = platePlanDb || (window.firebase && firebase.firestore && firebase.firestore());
-  if(db){
+  if(db && platePlanCloudReady && platePlanCloudUser && navigator.onLine){
+    if(Date.now() < platePlanBackoffUntil){
+      console.warn('[FIRESTORE] Throttling direct recipe write during active backoff.');
+      return;
+    }
     const cleaned = sanitizePayloadForFirestore(unwrapAndCleanItem(recipe));
-    await db.collection('households').doc(householdId).collection('recipes').doc(recipe.id).set(cleaned, { merge: true });
+    await db.collection('households').doc(householdId).collection('recipes').doc(recipe.id).set(cleaned, { merge: true }).catch(err => {
+      console.warn('saveRecipe cloud error:', err);
+    });
   }
 }
 window.saveRecipe = saveRecipe;
@@ -1216,28 +1230,35 @@ async function pushStateToCloud(force=false){
     return;
   }
 
-  // 1. Exponential backoff guard: bypassed during forced updates
+  // 1. Exponential backoff guard: applies to all sync attempts targeting households/elliott-chloe
   const now = Date.now();
-  if(!force && now < platePlanBackoffUntil){
-    schedulePlatePlanCloudDiff(platePlanBackoffUntil - now + 500);
+  if(now < platePlanBackoffUntil){
+    const remainingBackoff = platePlanBackoffUntil - now + 500;
+    schedulePlatePlanCloudDiff(remainingBackoff);
+    if(force){
+      console.warn(`[FIRESTORE WRITE THROTTLE] Cloud push deferred due to active backoff (${Math.round(remainingBackoff)}ms remaining).`);
+    }
     return;
   }
 
-  // 2. Minimum push interval (throttle): bypassed during forced updates
-  const PUSH_THROTTLE_MS = 1500;
-  if(!force && (now - platePlanLastPushCompletedAt) < PUSH_THROTTLE_MS){
-    schedulePlatePlanCloudDiff(PUSH_THROTTLE_MS - (now - platePlanLastPushCompletedAt));
+  // 2. Minimum push interval (throttle): debouncing rapid mutations to prevent write stream exhaustion
+  const MIN_PUSH_INTERVAL_MS = force ? 800 : 2000;
+  const elapsedSincePush = now - platePlanLastPushCompletedAt;
+  if(elapsedSincePush < MIN_PUSH_INTERVAL_MS){
+    schedulePlatePlanCloudDiff(MIN_PUSH_INTERVAL_MS - elapsedSincePush);
     return;
   }
 
-  // 3. Concurrency lock: if forced, await the active in-flight push then proceed
+  // 3. Concurrency lock: coalesce into pending push if write stream is in-flight or reconnecting
   if(platePlanIsPushing){
     platePlanPendingPush=true;
     if(force && platePlanCurrentPushPromise){
       try {
         await platePlanCurrentPushPromise;
       } catch(_e) {}
-      return pushStateToCloud(true);
+      if(platePlanPendingPush){
+        return pushStateToCloud(false);
+      }
     }
     return;
   }
@@ -1249,23 +1270,6 @@ async function pushStateToCloud(force=false){
     try{
       const cleaned=cleanCloudValue(state);
       if(!cleaned) throw new Error('State payload is empty');
-
-      // Subcollection Architecture: root document stores only metadata/preferences
-      const writePayload = {
-        updatedAt: state.updatedAt || new Date().toISOString(),
-        meta: cleaned.meta || state.meta || {},
-        ingredientGroups: cleaned.ingredientGroups || state.ingredientGroups || [],
-        ingredientFamilies: cleaned.ingredientFamilies || state.ingredientFamilies || [],
-        plan: cleaned.plan || state.plan || {},
-        overrides: cleaned.overrides || state.overrides || {},
-        planHistory: cleaned.planHistory || state.planHistory || [],
-        prefs: cleaned.prefs || state.prefs || {},
-        customCats: cleaned.customCats || state.customCats || {},
-        useUpProducts: cleaned.useUpProducts || state.useUpProducts || {},
-        packPicks: cleaned.packPicks || state.packPicks || {},
-        dataQualityDismissals: cleaned.dataQualityDismissals || state.dataQualityDismissals || {}
-      };
-      await householdDocRef.set(writePayload, { merge: true });
 
       // Subcollection batch writes
       const dataCol = householdDocRef.collection('data');
@@ -1345,7 +1349,25 @@ async function pushStateToCloud(force=false){
         deviceId: deviceId
       };
 
+      // Subcollection Architecture: root document stores only metadata/preferences
+      const writePayload = {
+        updatedAt: serverTs,
+        meta: cleaned.meta || state.meta || {},
+        ingredientGroups: cleaned.ingredientGroups || state.ingredientGroups || [],
+        ingredientFamilies: cleaned.ingredientFamilies || state.ingredientFamilies || [],
+        plan: cleaned.plan || state.plan || {},
+        overrides: cleaned.overrides || state.overrides || {},
+        planHistory: cleaned.planHistory || state.planHistory || [],
+        prefs: cleaned.prefs || state.prefs || {},
+        customCats: cleaned.customCats || state.customCats || {},
+        useUpProducts: cleaned.useUpProducts || state.useUpProducts || {},
+        packPicks: cleaned.packPicks || state.packPicks || {},
+        dataQualityDismissals: cleaned.dataQualityDismissals || state.dataQualityDismissals || {}
+      };
+
+      // Combined atomic batch write targeting households/elliott-chloe
       const batch = platePlanDb.batch();
+      batch.set(householdDocRef, writePayload, { merge: true });
       batch.set(dataCol.doc('meta'), { ...baseMeta, ...metaContent });
       if(changedKeys.includes('taxonomy')) batch.set(dataCol.doc('taxonomy'), { ...baseMeta, ...taxonomyContent });
       if(changedKeys.includes('planner')) batch.set(dataCol.doc('planner'), { ...baseMeta, ...plannerContent });
@@ -1371,20 +1393,28 @@ async function pushStateToCloud(force=false){
       updatePlatePlanSyncStatus('synced');
     }catch(error){
       console.warn('PlatePlan Cloud push failed:',error);
-      showPlatePlanToast('Save Failed: Database update could not be committed.');
       platePlanSyncErrorCount++;
-      // Exponential backoff to protect backend: 3s, 6s, 12s, 24s, up to 60s
-      const backoffMs = Math.min(60000, Math.pow(2, platePlanSyncErrorCount) * 1500);
+      const isExhausted = error?.code === 'resource-exhausted' || 
+                          String(error?.message || '').toLowerCase().includes('resource-exhausted') ||
+                          String(error?.message || '').toLowerCase().includes('quota') ||
+                          String(error?.message || '').toLowerCase().includes('too many');
+      const backoffMs = isExhausted
+        ? Math.max(15000, Math.min(120000, Math.pow(2, platePlanSyncErrorCount) * 5000))
+        : Math.min(60000, Math.pow(2, platePlanSyncErrorCount) * 1500);
       platePlanBackoffUntil = Date.now() + backoffMs;
       platePlanLastSyncError=error?.message||'Cloud push failed';
-      updatePlatePlanSyncStatus(navigator.onLine?'error':'offline',platePlanLastSyncError);
+      updatePlatePlanSyncStatus(navigator.onLine?'error':'offline', isExhausted ? 'Sync throttled (retrying)' : platePlanLastSyncError);
+      if(!isExhausted){
+        showPlatePlanToast('Save Failed: Database update could not be committed.');
+      }
       throw error;
     }finally{
       platePlanIsPushing=false;
       platePlanCurrentPushPromise=null;
       if(platePlanPendingPush){
-        // Queue next push with safety delay instead of synchronous recursion
-        schedulePlatePlanCloudDiff(1500);
+        // Queue next push with safety delay respecting backoff instead of synchronous recursion
+        const nextDelay = Math.max(1500, platePlanBackoffUntil > Date.now() ? (platePlanBackoffUntil - Date.now() + 500) : 1500);
+        schedulePlatePlanCloudDiff(nextDelay);
       }
     }
   })();
@@ -1829,9 +1859,10 @@ function queuePlatePlanCloudDiff(immediateFlush=false){
 
 function schedulePlatePlanCloudDiff(delay=800){
   clearTimeout(platePlanSyncTimer);
+  const effectiveDelay = Math.max(delay, platePlanBackoffUntil > Date.now() ? (platePlanBackoffUntil - Date.now() + 200) : 0);
   platePlanSyncTimer=setTimeout(()=>{
     pushStateToCloud();
-  },delay);
+  },effectiveDelay);
 }
 
 function flushPlatePlanSyncOutbox(){
@@ -10685,9 +10716,11 @@ function ensureReviewReplaceModal(){
 }
 
 let activeUnifiedMappingContext = null;
+window.activeUnifiedMappingContext = null;
 
 function openUnifiedMappingModal(context){
   activeUnifiedMappingContext = context;
+  window.activeUnifiedMappingContext = context;
   const wrap = document.getElementById('unified-mapping-modal-wrap');
   if(!wrap) return;
   const nameEl = document.getElementById('unified-map-ing-name');
@@ -10720,6 +10753,7 @@ function closeUnifiedMappingModal(){
   const wrap = document.getElementById('unified-mapping-modal-wrap');
   if(wrap) wrap.classList.remove('open');
   activeUnifiedMappingContext = null;
+  window.activeUnifiedMappingContext = null;
 }
 
 function handleUnifiedMapSearch(query){
@@ -10914,10 +10948,24 @@ function applyUnifiedMappingResult(context, result){
   }
 }
 
+function openTescoModal(context = null){
+  const ctx = context || window.pendingTescoMapping || activeUnifiedMappingContext || window.activeUnifiedMappingContext || null;
+  if(typeof showTescoImport === 'function'){
+    return showTescoImport(ctx);
+  }
+  const modal = document.getElementById('tesco-modal');
+  if(modal) modal.style.display = 'flex';
+}
+window.openTescoModal = openTescoModal;
+
 function showTescoSearchModal(ingredientId){
   try {
     let ingName = '';
-    const cleanId = typeof ingredientId === 'string' ? ingredientId : (ingredientId?.id || '');
+    const activeCtx = activeUnifiedMappingContext || window.activeUnifiedMappingContext || null;
+    let cleanId = typeof ingredientId === 'string' ? ingredientId : (ingredientId?.id || '');
+    if(!cleanId && activeCtx?.ingredientId){
+      cleanId = activeCtx.ingredientId;
+    }
     if(cleanId){
       if(Array.isArray(state?.ingredients)){
         const found = state.ingredients.find(i => i && i.id === cleanId);
@@ -10928,13 +10976,16 @@ function showTescoSearchModal(ingredientId){
         if(found) ingName = found.name || '';
       }
     }
-    const query = ingName || document.getElementById('unified-map-search')?.value || activeUnifiedMappingContext?.ingredientName || '';
-    window.pendingTescoMapping = {
+    const searchVal = document.getElementById('unified-map-search')?.value?.trim();
+    const query = ingName || searchVal || activeCtx?.ingredientName || '';
+    const ctx = {
       type: 'unified',
-      ingredientId: cleanId || activeUnifiedMappingContext?.ingredientId || '',
+      ingredientId: cleanId || activeCtx?.ingredientId || '',
       name: query
     };
-    openTescoModal();
+    window.pendingTescoMapping = ctx;
+    closeUnifiedMappingModal();
+    openTescoModal(ctx);
     const inp = document.getElementById('tesco-url');
     if(inp){
       inp.value = query;
@@ -10946,29 +10997,50 @@ function showTescoSearchModal(ingredientId){
 }
 window.showTescoSearchModal = showTescoSearchModal;
 
-function openProductPicker(ingredientId){
+function openAddProductModal(ingredientIdOrQuery = ''){
   try {
     let ingName = '';
-    const cleanId = typeof ingredientId === 'string' ? ingredientId : (ingredientId?.id || '');
-    if(cleanId){
+    const activeCtx = activeUnifiedMappingContext || window.activeUnifiedMappingContext || null;
+    let cleanId = typeof ingredientIdOrQuery === 'string' ? ingredientIdOrQuery : (ingredientIdOrQuery?.id || '');
+    if(cleanId && cleanId.startsWith('ing')){
       if(Array.isArray(state?.ingredients)){
         const found = state.ingredients.find(i => i && i.id === cleanId);
         if(found) ingName = found.name || '';
       }
-      if(!ingName && state?.ingredients && typeof state.ingredients === 'object'){
-        const found = state.ingredients[cleanId];
-        if(found) ingName = found.name || '';
-      }
+    } else if (cleanId) {
+      ingName = cleanId;
     }
-    const query = ingName || document.getElementById('unified-map-search')?.value || activeUnifiedMappingContext?.ingredientName || '';
-    if(typeof openMiniIng === 'function'){
+    if(!ingName && activeCtx?.ingredientName){
+      ingName = activeCtx.ingredientName;
+    }
+    const searchVal = document.getElementById('unified-map-search')?.value?.trim();
+    const query = ingName || searchVal || activeCtx?.ingredientName || '';
+    if(activeCtx){
+      window.pendingUnifiedAddContext = { ...activeCtx };
+    }
+    closeUnifiedMappingModal();
+    if(typeof showTescoImport === 'function'){
+      showTescoImport({
+        type: 'manualAdd',
+        name: query,
+        ingredientId: cleanId || activeCtx?.ingredientId || ''
+      });
+    } else if(typeof openMiniIng === 'function'){
       openMiniIng(query);
-    } else if(typeof openAddProductModal === 'function'){
-      openAddProductModal(query);
+    }
+    const nameInp = document.getElementById('tp-name') || document.getElementById('mi-name');
+    if(nameInp && query) {
+      nameInp.value = query;
+      nameInp.dispatchEvent(new Event('input', { bubbles: true }));
     }
   } catch(err) {
-    console.error('[OPEN PRODUCT PICKER ERROR]', err);
+    console.error('[OPEN ADD PRODUCT MODAL ERROR]', err);
   }
+}
+window.openAddProductModal = openAddProductModal;
+
+function openProductPicker(ingredientId){
+  return openAddProductModal(ingredientId);
 }
 window.openProductPicker = openProductPicker;
 
@@ -16531,8 +16603,9 @@ function finishTescoImportSelection(pendingTesco, ingredientId, ingredientName, 
           editIng(ingredientId);
           showMsg('mi-msg', message || 'Updated from Tesco.', 'success');
       } else if (pendingTesco.type === 'unified') {
-          if (activeUnifiedMappingContext) {
-            applyUnifiedMappingResult(activeUnifiedMappingContext, {
+          const ctx = activeUnifiedMappingContext || window.activeUnifiedMappingContext || window.pendingUnifiedAddContext;
+          if (ctx) {
+            applyUnifiedMappingResult(ctx, {
               productId: ingredientId,
               groupId: product?.groupId || '',
               productName: ingredientName,
@@ -16540,6 +16613,16 @@ function finishTescoImportSelection(pendingTesco, ingredientId, ingredientName, 
             });
           }
       } else if (pendingTesco.type === 'manualAdd') {
+          const ctx = activeUnifiedMappingContext || window.activeUnifiedMappingContext || window.pendingUnifiedAddContext;
+          if (ctx) {
+            applyUnifiedMappingResult(ctx, {
+              productId: ingredientId,
+              groupId: product?.groupId || '',
+              productName: ingredientName,
+              brand: product?.brand || ''
+            });
+            window.pendingUnifiedAddContext = null;
+          }
           renderBank();
           renderIngredientBank();
           if(document.getElementById('view-data')?.classList.contains('active')) renderDataQuality();
@@ -21262,7 +21345,20 @@ globalThis.PlatePlanLegacy=Object.freeze({
   confirmBatchIdentification,
   loadBatchRecipeIntoStepA,
   openConfirmRecipeIdentificationModal,
-  updateBatchUiBanners
+  updateBatchUiBanners,
+  openTescoModal,
+  showTescoSearchModal,
+  openAddProductModal,
+  openProductPicker,
+  showTescoImport,
+  closeTescoModal,
+  openUnifiedMappingModal,
+  closeUnifiedMappingModal,
+  openTescoImportFromSubst,
+  closeSubstituteModal,
+  confirmSubstitute,
+  extractTescoProduct,
+  saveTescoIngredient
 });
 window.renderAll = renderAll;
 window.saveIngredient = saveIngredient;
@@ -21276,4 +21372,17 @@ window.confirmBatchIdentification = confirmBatchIdentification;
 window.loadBatchRecipeIntoStepA = loadBatchRecipeIntoStepA;
 window.openConfirmRecipeIdentificationModal = openConfirmRecipeIdentificationModal;
 window.updateBatchUiBanners = updateBatchUiBanners;
+window.openTescoModal = openTescoModal;
+window.showTescoSearchModal = showTescoSearchModal;
+window.openAddProductModal = openAddProductModal;
+window.openProductPicker = openProductPicker;
+window.showTescoImport = showTescoImport;
+window.closeTescoModal = closeTescoModal;
+window.openUnifiedMappingModal = openUnifiedMappingModal;
+window.closeUnifiedMappingModal = closeUnifiedMappingModal;
+window.openTescoImportFromSubst = openTescoImportFromSubst;
+window.closeSubstituteModal = closeSubstituteModal;
+window.confirmSubstitute = confirmSubstitute;
+window.extractTescoProduct = extractTescoProduct;
+window.saveTescoIngredient = saveTescoIngredient;
 window.dispatchEvent(new CustomEvent('plateplan:legacy-ready',{detail:{version:PLATEPLAN_APP_VERSION}}));
