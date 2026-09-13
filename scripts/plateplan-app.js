@@ -825,6 +825,45 @@ function loadState(){
         s.recipes = backupRecipes;
       }
     }
+
+    // Restore active meal plan if empty
+    const planBackupRaw = localStorage.getItem('plateplan_plan_backup');
+    if(planBackupRaw && (!s.plan || typeof s.plan !== 'object' || Object.keys(s.plan).length === 0)){
+      try {
+        const parsedPlan = JSON.parse(planBackupRaw);
+        if(parsedPlan && typeof parsedPlan === 'object' && Object.keys(parsedPlan).length > 0){
+          s.plan = parsedPlan;
+        }
+      } catch(_e) {}
+    }
+
+    // Restore historical meal plans if empty
+    const historyBackupRaw = localStorage.getItem('plateplan_history_backup');
+    if(historyBackupRaw && (!Array.isArray(s.planHistory) || s.planHistory.length === 0)){
+      try {
+        const parsedHist = JSON.parse(historyBackupRaw);
+        if(Array.isArray(parsedHist) && parsedHist.length > 0){
+          s.planHistory = parsedHist;
+        }
+      } catch(_e) {}
+    }
+
+    // Check recovery points if plan or planHistory is still empty
+    if((!s.plan || typeof s.plan !== 'object' || Object.keys(s.plan).length === 0) || (!Array.isArray(s.planHistory) || s.planHistory.length === 0)){
+      try {
+        const recList = JSON.parse(localStorage.getItem(RECOVERY_SK) || '[]');
+        if(Array.isArray(recList)){
+          for(const point of recList){
+            if((!s.plan || typeof s.plan !== 'object' || Object.keys(s.plan).length === 0) && point?.state?.plan && Object.keys(point.state.plan).length > 0){
+              s.plan = point.state.plan;
+            }
+            if((!Array.isArray(s.planHistory) || s.planHistory.length === 0) && Array.isArray(point?.state?.planHistory) && point.state.planHistory.length > 0){
+              s.planHistory = point.state.planHistory;
+            }
+          }
+        }
+      } catch(_e) {}
+    }
   }catch(e){}
   
   return normalizeLoadedState(s, { injectSeed: false, restoreRecipeBackup: false });
@@ -1801,6 +1840,12 @@ function saveState(immediate=false){
     if(state && Array.isArray(state.recipes)){
       localStorage.setItem(RECIPES_BACKUP_SK, safeJsonStringify(state.recipes));
     }
+    if(state && state.plan && typeof state.plan === 'object' && Object.keys(state.plan).length > 0){
+      localStorage.setItem('plateplan_plan_backup', safeJsonStringify(state.plan));
+    }
+    if(state && Array.isArray(state.planHistory) && state.planHistory.length > 0){
+      localStorage.setItem('plateplan_history_backup', safeJsonStringify(state.planHistory));
+    }
   }catch(e){
     console.warn('Local storage write warning:',e);
   }
@@ -1823,6 +1868,8 @@ if(typeof window!=='undefined'){
     try{
       localStorage.setItem(SK, safeJsonStringify(state));
       if(state?.recipes?.length) localStorage.setItem(RECIPES_BACKUP_SK, safeJsonStringify(state.recipes));
+      if(state?.plan && typeof state.plan === 'object' && Object.keys(state.plan).length > 0) localStorage.setItem('plateplan_plan_backup', safeJsonStringify(state.plan));
+      if(Array.isArray(state?.planHistory) && state.planHistory.length > 0) localStorage.setItem('plateplan_history_backup', safeJsonStringify(state.planHistory));
     }catch(_e){}
   });
 }
@@ -2320,70 +2367,88 @@ window.populateRecipesState = populateRecipesState;
 
 async function performSubcollectionMigrationIfNeeded(db, householdId, rootDocData){
   if(!db || !householdId || !rootDocData) return;
-  const rawIngredients = rootDocData.ingredients;
-  const rawRecipes = rootDocData.recipes;
-
-  const hasIngredients = (Array.isArray(rawIngredients) && rawIngredients.length > 0) || (rawIngredients && typeof rawIngredients === 'object' && Object.keys(rawIngredients).length > 0);
-  const hasRecipes = (Array.isArray(rawRecipes) && rawRecipes.length > 0) || (rawRecipes && typeof rawRecipes === 'object' && Object.keys(rawRecipes).length > 0);
-
-  if(!hasIngredients && !hasRecipes) return;
-
-  console.log('[ONE-TIME SUBCOLLECTION MIGRATION] Starting migration of root document ingredients & recipes to subcollections...');
-  const householdDocRef = db.collection('households').doc(householdId);
-
-  // 1. Migrate ingredients to subcollection in batches of up to 400
-  if(hasIngredients){
-    const ingList = Array.isArray(rawIngredients) ? rawIngredients : Object.values(rawIngredients);
-    for(let i = 0; i < ingList.length; i += 400){
-      const batch = db.batch();
-      const chunk = ingList.slice(i, i + 400);
-      chunk.forEach(item => {
-        if(!item) return;
-        const clean = sanitizePayloadForFirestore(unwrapAndCleanItem(item));
-        const docId = clean.id || clean.productId || clean.bankId;
-        if(docId){
-          clean.id = String(docId);
-          batch.set(householdDocRef.collection('ingredients').doc(String(docId)), clean, { merge: true });
-        }
-      });
-      await batch.commit();
-    }
-    console.log(`[MIGRATION] Migrated ${ingList.length} ingredients to subcollection.`);
-  }
-
-  // 2. Migrate recipes to subcollection in batches of up to 400
-  if(hasRecipes){
-    const recList = Array.isArray(rawRecipes) ? rawRecipes : Object.values(rawRecipes);
-    for(let i = 0; i < recList.length; i += 400){
-      const batch = db.batch();
-      const chunk = recList.slice(i, i + 400);
-      chunk.forEach(item => {
-        if(!item) return;
-        const clean = sanitizePayloadForFirestore(unwrapAndCleanItem(item));
-        const docId = clean.id;
-        if(docId){
-          clean.id = String(docId);
-          batch.set(householdDocRef.collection('recipes').doc(String(docId)), clean, { merge: true });
-        }
-      });
-      await batch.commit();
-    }
-    console.log(`[MIGRATION] Migrated ${recList.length} recipes to subcollection.`);
-  }
-
-  // 3. Clear root doc monolithic fields
   try {
-    const updateObj = {};
-    if(window.firebase && firebase.firestore && firebase.firestore.FieldValue){
-      if(hasIngredients) updateObj.ingredients = firebase.firestore.FieldValue.delete();
-      if(hasRecipes) updateObj.recipes = firebase.firestore.FieldValue.delete();
+    const rawIngredients = rootDocData.ingredients;
+    const rawRecipes = rootDocData.recipes;
+
+    const hasIngredients = (Array.isArray(rawIngredients) && rawIngredients.length > 0) || (rawIngredients && typeof rawIngredients === 'object' && Object.keys(rawIngredients).length > 0);
+    const hasRecipes = (Array.isArray(rawRecipes) && rawRecipes.length > 0) || (rawRecipes && typeof rawRecipes === 'object' && Object.keys(rawRecipes).length > 0);
+
+    if(!hasIngredients && !hasRecipes) return;
+
+    console.log('[ONE-TIME SUBCOLLECTION MIGRATION] Starting migration of root document ingredients & recipes to subcollections...');
+    const householdDocRef = db.collection('households').doc(householdId);
+
+    // 1. Migrate ingredients to subcollection in batches of up to 400
+    if(hasIngredients){
+      try {
+        const ingList = Array.isArray(rawIngredients) ? rawIngredients : Object.values(rawIngredients);
+        for(let i = 0; i < ingList.length; i += 400){
+          const batch = db.batch();
+          const chunk = ingList.slice(i, i + 400);
+          chunk.forEach(item => {
+            if(!item) return;
+            const clean = sanitizePayloadForFirestore(unwrapAndCleanItem(item));
+            const rawId = clean.id || clean.productId || clean.bankId;
+            if(rawId){
+              const docId = String(rawId).replace(/[\/\s]/g, '_').trim();
+              if(docId){
+                clean.id = docId;
+                batch.set(householdDocRef.collection('ingredients').doc(docId), clean, { merge: true });
+              }
+            }
+          });
+          await batch.commit();
+        }
+        console.log(`[MIGRATION] Migrated ${ingList.length} ingredients to subcollection.`);
+      } catch(ingErr) {
+        console.warn('[MIGRATION] Error migrating ingredients batch:', ingErr);
+      }
     }
-    if(Object.keys(updateObj).length > 0){
-      await householdDocRef.update(updateObj);
-      console.log('[MIGRATION] Deleted root document monolithic ingredients & recipes arrays.');
+
+    // 2. Migrate recipes to subcollection in batches of up to 400
+    if(hasRecipes){
+      try {
+        const recList = Array.isArray(rawRecipes) ? rawRecipes : Object.values(rawRecipes);
+        for(let i = 0; i < recList.length; i += 400){
+          const batch = db.batch();
+          const chunk = recList.slice(i, i + 400);
+          chunk.forEach(item => {
+            if(!item) return;
+            const clean = sanitizePayloadForFirestore(unwrapAndCleanItem(item));
+            const rawId = clean.id;
+            if(rawId){
+              const docId = String(rawId).replace(/[\/\s]/g, '_').trim();
+              if(docId){
+                clean.id = docId;
+                batch.set(householdDocRef.collection('recipes').doc(docId), clean, { merge: true });
+              }
+            }
+          });
+          await batch.commit();
+        }
+        console.log(`[MIGRATION] Migrated ${recList.length} recipes to subcollection.`);
+      } catch(recErr) {
+        console.warn('[MIGRATION] Error migrating recipes batch:', recErr);
+      }
     }
-  } catch(delErr) {
-    console.warn('[MIGRATION] Could not delete root document legacy fields:', delErr);
+
+    // 3. Clear root doc monolithic fields
+    try {
+      const updateObj = {};
+      if(window.firebase && firebase.firestore && firebase.firestore.FieldValue){
+        if(hasIngredients) updateObj.ingredients = firebase.firestore.FieldValue.delete();
+        if(hasRecipes) updateObj.recipes = firebase.firestore.FieldValue.delete();
+      }
+      if(Object.keys(updateObj).length > 0){
+        await householdDocRef.update(updateObj);
+        console.log('[MIGRATION] Deleted root document monolithic ingredients & recipes arrays.');
+      }
+    } catch(delErr) {
+      console.warn('[MIGRATION] Could not delete root document legacy fields:', delErr);
+    }
+  } catch(globalMigErr) {
+    console.warn('[MIGRATION] Top-level migration caught error:', globalMigErr);
   }
 }
 window.performSubcollectionMigrationIfNeeded = performSubcollectionMigrationIfNeeded;
@@ -2450,9 +2515,15 @@ function startPlatePlanCloudListeners(){
 
     // Retain ONLY top-level metadata; NEVER overwrite ingredients or recipes from root document
     if(sourceData.prefs !== undefined) state.prefs = sourceData.prefs;
-    if(sourceData.plan !== undefined) state.plan = sourceData.plan;
+    if(sourceData.plan && typeof sourceData.plan === 'object' && Object.keys(sourceData.plan).length > 0){
+      state.plan = sourceData.plan;
+      try { localStorage.setItem('plateplan_plan_backup', safeJsonStringify(sourceData.plan)); } catch(e) {}
+    }
     if(sourceData.overrides !== undefined) state.overrides = sourceData.overrides;
-    if(sourceData.planHistory !== undefined) state.planHistory = sourceData.planHistory;
+    if(Array.isArray(sourceData.planHistory) && sourceData.planHistory.length > 0){
+      state.planHistory = sourceData.planHistory;
+      try { localStorage.setItem('plateplan_history_backup', safeJsonStringify(sourceData.planHistory)); } catch(e) {}
+    }
     if(sourceData.ingredientGroups !== undefined) state.ingredientGroups = sourceData.ingredientGroups;
     if(sourceData.ingredientFamilies !== undefined) state.ingredientFamilies = sourceData.ingredientFamilies;
     if(sourceData.customCats !== undefined) state.customCats = sourceData.customCats;
@@ -2474,6 +2545,46 @@ function startPlatePlanCloudListeners(){
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
   });
   platePlanSyncUnsubscribers.push(unsubHousehold);
+
+  // D. Subcollection Listener: plans/current
+  const unsubPlanCurrent = householdDocRef.collection('plans').doc('current').onSnapshot(docSnapshot => {
+    if(!docSnapshot || !docSnapshot.exists) return;
+    if(platePlanTransactionShield.inFlight || (Date.now() - platePlanTransactionShield.lastCompletedAt < platePlanTransactionShield.cooldownMs)) return;
+    if(docSnapshot.metadata && docSnapshot.metadata.hasPendingWrites) return;
+
+    const data = docSnapshot.data() || {};
+    const val = cleanCloudValue(data.value !== undefined ? data.value : data);
+    if(val && typeof val === 'object' && Object.keys(val).length > 0){
+      state.plan = val;
+      window.state = state;
+      window.appState = state;
+      try { localStorage.setItem('plateplan_plan_backup', safeJsonStringify(val)); } catch(e) {}
+      renderPlan();
+      try { if(document.getElementById('view-today')?.classList.contains('active')) renderToday(); } catch(e) {}
+    }
+  }, error => {
+    console.warn('[PLAN CURRENT LISTENER ERROR]', error);
+  });
+  platePlanSyncUnsubscribers.push(unsubPlanCurrent);
+
+  // E. Subcollection Listener: plans/history
+  const unsubPlanHistory = householdDocRef.collection('plans').doc('history').onSnapshot(docSnapshot => {
+    if(!docSnapshot || !docSnapshot.exists) return;
+    if(platePlanTransactionShield.inFlight || (Date.now() - platePlanTransactionShield.lastCompletedAt < platePlanTransactionShield.cooldownMs)) return;
+    if(docSnapshot.metadata && docSnapshot.metadata.hasPendingWrites) return;
+
+    const data = docSnapshot.data() || {};
+    const val = cleanCloudValue(data.value !== undefined ? data.value : (Array.isArray(data) ? data : data.planHistory));
+    if(Array.isArray(val) && val.length > 0){
+      state.planHistory = val;
+      window.state = state;
+      window.appState = state;
+      try { localStorage.setItem('plateplan_history_backup', safeJsonStringify(val)); } catch(e) {}
+    }
+  }, error => {
+    console.warn('[PLAN HISTORY LISTENER ERROR]', error);
+  });
+  platePlanSyncUnsubscribers.push(unsubPlanHistory);
 }
 
 function getPlatePlanMigrationCounts(projection=platePlanStateProjection(state)){
@@ -2618,16 +2729,108 @@ async function loadSharedPlatePlan(){
   state.packPicks = metaDoc.packPicks || rootData.packPicks || state.packPicks || {};
   state.ingredientGroups = taxonomyDoc.ingredientGroups || rootData.ingredientGroups || state.ingredientGroups || [];
   state.ingredientFamilies = taxonomyDoc.ingredientFamilies || rootData.ingredientFamilies || state.ingredientFamilies || [];
-  state.plan = plannerDoc.plan || rootData.plan || state.plan || {};
+
+  // 6. Resilient extraction of active plan and historical plan
+  let cloudPlanDoc = null;
+  let cloudHistoryDoc = null;
+  try {
+    const pSnap = await householdDocRef.collection('plans').doc('current').get();
+    if (pSnap && pSnap.exists) cloudPlanDoc = pSnap.data() || {};
+  } catch(_pErr) {}
+  try {
+    const hSnap = await householdDocRef.collection('plans').doc('history').get();
+    if (hSnap && hSnap.exists) cloudHistoryDoc = hSnap.data() || {};
+  } catch(_hErr) {}
+
+  function extractPlanCandidate(candidates) {
+    for (const c of candidates) {
+      if (!c) continue;
+      const unwrapped = (c.value !== undefined) ? c.value : ((c.plan !== undefined) ? c.plan : c);
+      if (unwrapped && typeof unwrapped === 'object' && !Array.isArray(unwrapped)) {
+        if (Object.keys(unwrapped).length > 0) return unwrapped;
+      }
+    }
+    return null;
+  }
+
+  function extractPlanHistoryCandidate(candidates) {
+    for (const c of candidates) {
+      if (!c) continue;
+      const unwrapped = (c.value !== undefined) ? c.value : ((c.planHistory !== undefined) ? c.planHistory : c);
+      if (Array.isArray(unwrapped) && unwrapped.length > 0) return unwrapped;
+      if (unwrapped && typeof unwrapped === 'object' && !Array.isArray(unwrapped)) {
+        const arr = Object.values(unwrapped);
+        if (arr.length > 0 && arr.some(item => item && typeof item === 'object')) return arr;
+      }
+    }
+    return null;
+  }
+
+  let localPlanBackup = null;
+  let localHistoryBackup = null;
+  let recoveryPointPlan = null;
+  let recoveryPointHistory = null;
+  try {
+    const rawP = localStorage.getItem('plateplan_plan_backup');
+    if (rawP) localPlanBackup = JSON.parse(rawP);
+  } catch(_e) {}
+  try {
+    const rawH = localStorage.getItem('plateplan_history_backup');
+    if (rawH) localHistoryBackup = JSON.parse(rawH);
+  } catch(_e) {}
+  try {
+    const recList = JSON.parse(localStorage.getItem(RECOVERY_SK) || '[]');
+    if (Array.isArray(recList)) {
+      for (const pt of recList) {
+        if (!recoveryPointPlan && pt?.state?.plan && typeof pt.state.plan === 'object' && Object.keys(pt.state.plan).length > 0) {
+          recoveryPointPlan = pt.state.plan;
+        }
+        if (!recoveryPointHistory && Array.isArray(pt?.state?.planHistory) && pt.state.planHistory.length > 0) {
+          recoveryPointHistory = pt.state.planHistory;
+        }
+      }
+    }
+  } catch(_e) {}
+
+  const resolvedPlan = extractPlanCandidate([
+    cloudPlanDoc,
+    plannerDoc.plan,
+    rootData.plan,
+    dataDocs.state?.state?.plan,
+    dataDocs.state?.plan,
+    state.plan,
+    localPlanBackup,
+    recoveryPointPlan
+  ]) || {};
+
+  const resolvedHistory = extractPlanHistoryCandidate([
+    cloudHistoryDoc,
+    historyDoc.planHistory,
+    rootData.planHistory,
+    dataDocs.state?.state?.planHistory,
+    dataDocs.state?.planHistory,
+    state.planHistory,
+    localHistoryBackup,
+    recoveryPointHistory
+  ]) || [];
+
+  state.plan = resolvedPlan;
   state.overrides = plannerDoc.overrides || rootData.overrides || state.overrides || {};
-  state.planHistory = historyDoc.planHistory || rootData.planHistory || state.planHistory || [];
+  state.planHistory = resolvedHistory;
+
+  if(resolvedPlan && typeof resolvedPlan === 'object' && Object.keys(resolvedPlan).length > 0){
+    try { localStorage.setItem('plateplan_plan_backup', safeJsonStringify(resolvedPlan)); } catch(_e) {}
+  }
+  if(Array.isArray(resolvedHistory) && resolvedHistory.length > 0){
+    try { localStorage.setItem('plateplan_history_backup', safeJsonStringify(resolvedHistory)); } catch(_e) {}
+  }
+
   state.meta = {
     ...(rootData.meta || {}),
     ...(metaDoc.meta || {}),
     householdId: targetHouseholdId
   };
 
-  // Subcollection snapshots are the absolute single source of truth: eliminate local storage overrides
   try {
     localStorage.setItem(SK, safeJsonStringify(state));
     localStorage.setItem('plateplan_offline_backup', safeJsonStringify(state.ingredients));
@@ -2637,6 +2840,7 @@ async function loadSharedPlatePlan(){
   window.appState = state;
   platePlanCloudReady = true;
 
+  setPlatePlanStartupInert(false);
   rebuildPlatePlanIndexes();
   renderAll();
 
@@ -2648,12 +2852,38 @@ function ensurePlatePlanAuthScreen(){
   let screen=document.getElementById('plateplan-auth-screen');
   if(screen) return screen;
   screen=document.createElement('div'); screen.id='plateplan-auth-screen'; screen.className='auth-screen';
-  screen.innerHTML=`<div class="auth-card"><div class="logo" style="font-size:20px;margin-bottom:5px">Plate<span>Plan</span></div><p style="font-size:13px;color:var(--text2);margin-bottom:15px">Sign in with Elliott's or Chloe's authorised Google account.</p><button class="btn" style="width:100%;justify-content:center;font-weight:600;padding:10px" type="button" onclick="signInPlatePlanWithGoogle()"><span style="font-size:16px;font-weight:700;color:#4285f4">G</span> Continue with Google</button><details style="margin-top:14px"><summary style="cursor:pointer;font-size:12px;color:var(--text2)">Use email and password instead</summary><form onsubmit="signInPlatePlan(event)" style="margin-top:10px"><label>Email</label><input id="plateplan-auth-email" type="email" autocomplete="username" required><label style="margin-top:10px">Password</label><input id="plateplan-auth-password" type="password" autocomplete="current-password" required><button class="btn primary" style="width:100%;justify-content:center;margin-top:14px" type="submit">Sign in with password</button></form><button class="btn ghost sm" style="margin-top:8px" onclick="resetPlatePlanPassword()">Forgotten password?</button></details><div id="plateplan-auth-msg"></div></div>`;
+  screen.style.display='none';
+  screen.innerHTML=`<div class="auth-card" style="position:relative">
+    <button type="button" class="btn icon ghost sm" style="position:absolute;top:12px;right:12px;cursor:pointer;padding:4px 8px;min-height:30px" onclick="dismissPlatePlanAuthScreen()" title="Close">✕</button>
+    <div class="logo" style="font-size:20px;margin-bottom:5px">Plate<span>Plan</span></div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:15px">Sign in with Elliott's or Chloe's authorised Google account to sync your household meal plan.</p>
+    <button class="btn" style="width:100%;justify-content:center;font-weight:600;padding:10px" type="button" onclick="signInPlatePlanWithGoogle()"><span style="font-size:16px;font-weight:700;color:#4285f4">G</span> Continue with Google</button>
+    <details style="margin-top:14px">
+      <summary style="cursor:pointer;font-size:12px;color:var(--text2)">Use email and password instead</summary>
+      <form onsubmit="signInPlatePlan(event)" style="margin-top:10px">
+        <label>Email</label><input id="plateplan-auth-email" type="email" autocomplete="username" required>
+        <label style="margin-top:10px">Password</label><input id="plateplan-auth-password" type="password" autocomplete="current-password" required>
+        <button class="btn primary" style="width:100%;justify-content:center;margin-top:14px" type="submit">Sign in with password</button>
+      </form>
+      <button class="btn ghost sm" style="margin-top:8px" type="button" onclick="resetPlatePlanPassword()">Forgotten password?</button>
+    </details>
+    <div id="plateplan-auth-msg"></div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:16px 0 12px">
+    <button class="btn ghost sm" style="width:100%;justify-content:center" type="button" onclick="dismissPlatePlanAuthScreen()">Continue using local data</button>
+  </div>`;
   document.body.appendChild(screen); return screen;
 }
 
+function dismissPlatePlanAuthScreen(){
+  hidePlatePlanAuthScreen();
+  setPlatePlanStartupInert(false);
+  updatePlatePlanSyncStatus('local','Local mode');
+  renderAll();
+}
+window.dismissPlatePlanAuthScreen = dismissPlatePlanAuthScreen;
+
 function setPlatePlanStartupInert(active,exceptionId=''){
-  document.querySelectorAll('body > *').forEach(element=>{
+  document.querySelectorAll('.app, body > *').forEach(element=>{
     if(!(element instanceof HTMLElement)||['SCRIPT','STYLE'].includes(element.tagName)||element.id===exceptionId)return;
     if(active){
       if(element.dataset.startupInert!=='1'){
@@ -2662,7 +2892,7 @@ function setPlatePlanStartupInert(active,exceptionId=''){
       }
       element.inert=true;
       element.setAttribute('aria-hidden','true');
-    }else if(element.dataset.startupInert==='1'){
+    }else{
       element.inert=false;
       const previous=element.dataset.startupAriaHidden;
       if(previous)element.setAttribute('aria-hidden',previous);else element.removeAttribute('aria-hidden');
@@ -2674,12 +2904,16 @@ function setPlatePlanStartupInert(active,exceptionId=''){
 
 function showPlatePlanAuthScreen(){
   const screen=ensurePlatePlanAuthScreen();
+  screen.classList.add('open');
   screen.style.display='flex';
   setPlatePlanStartupInert(true,screen.id);
 }
 function hidePlatePlanAuthScreen(){
   const screen=document.getElementById('plateplan-auth-screen');
-  if(screen)screen.style.display='none';
+  if(screen){
+    screen.classList.remove('open');
+    screen.style.display='none';
+  }
   setPlatePlanStartupInert(false);
   const sourceChoice=document.getElementById('baked-state-recovery-banner');
   if(sourceChoice)setPlatePlanStartupInert(true,sourceChoice.id);
@@ -2786,16 +3020,16 @@ async function startPlatePlanForSignedInUser(user){
   }catch(error){
     console.warn('PlatePlan cloud startup error:',error);
     updatePlatePlanSyncStatus('error',error.message);
-    showPlatePlanAuthScreen();
-    showMsg('plateplan-auth-msg',ppEscapeHtml(error.message),'error');
+    setPlatePlanStartupInert(false);
+    renderAll();
   }
 }
 
 function initPlatePlanCloudSync(){
   try { bindTopBarActionListeners(); } catch(e) {}
   const settings=window.PLATEPLAN_FIREBASE||{};
-  if(!settings.configured){ updatePlatePlanSyncStatus('local','Add Firebase configuration to enable shared sync'); return; }
-  if(!window.firebase) return updatePlatePlanSyncStatus('error','Firebase scripts did not load');
+  if(!settings.configured){ updatePlatePlanSyncStatus('local','Add Firebase configuration to enable shared sync'); setPlatePlanStartupInert(false); return; }
+  if(!window.firebase){ updatePlatePlanSyncStatus('error','Firebase scripts did not load'); setPlatePlanStartupInert(false); return; }
   try{
     platePlanFirebaseApp=firebase.apps.length?firebase.app():firebase.initializeApp(settings.config);
     platePlanAuth=firebase.auth();
@@ -2815,14 +3049,18 @@ function initPlatePlanCloudSync(){
         platePlanCloudUser=null; platePlanCloudReady=false;
         const userEl = document.getElementById('sync-user');
         if (userEl) userEl.textContent='';
-        updatePlatePlanSyncStatus('connecting','Sign in required');
-        showPlatePlanAuthScreen();
+        updatePlatePlanSyncStatus('local','Sign in for cloud sync');
+        setPlatePlanStartupInert(false);
       }
     }, error => {
       console.warn('onAuthStateChanged error:', error);
       updatePlatePlanSyncStatus('error', error.message);
+      setPlatePlanStartupInert(false);
     });
-  }catch(error){ updatePlatePlanSyncStatus('error',error.message); }
+  }catch(error){
+    updatePlatePlanSyncStatus('error',error.message);
+    setPlatePlanStartupInert(false);
+  }
 }
 
 function getRecoveryPoints(){
@@ -3086,7 +3324,9 @@ function initializePlatePlanApplication(){
     });
   } catch(_e) {}
   // Cloud-First: remove baked state recovery banner to avoid local cache overrides
+  setPlatePlanStartupInert(false);
   initPlatePlanCloudSync();
+  setPlatePlanStartupInert(false);
   window.addEventListener('online',()=>{ updatePlatePlanSyncStatus(getPlatePlanSyncOutbox().length?'saving':'connecting'); flushPlatePlanSyncOutbox(); });
   window.addEventListener('offline',()=>updatePlatePlanSyncStatus('offline'));
 
@@ -11551,7 +11791,7 @@ function saveToVault(r){
 
     try {
       if(typeof saveRecipe === 'function'){
-        await saveRecipe(r);
+        saveRecipe(r).catch(err => console.warn('saveRecipe error in saveToVault:', err));
       }
     } catch(err) {
       console.warn('saveRecipe error in saveToVault:', err);

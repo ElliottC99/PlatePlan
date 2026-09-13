@@ -45,4 +45,12 @@ document.documentElement.dataset.plateplanBoot = 'loading-core';
 await loadClassicScript('./scripts/plateplan-app.js?v=2.9.1');
 await import('./main.js?v=2.9.1');
 document.documentElement.dataset.plateplanBoot = 'ready';
+try {
+  document.querySelectorAll('.app, body > *').forEach(el => {
+    if (el instanceof HTMLElement && el.id !== 'plateplan-auth-screen' && el.id !== 'baked-state-recovery-banner') {
+      el.inert = false;
+      el.removeAttribute('aria-hidden');
+    }
+  });
+} catch(_e) {}
 
