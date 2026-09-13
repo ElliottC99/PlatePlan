@@ -207,8 +207,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.9.1';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v71';
+const PLATEPLAN_APP_VERSION='2.9.2';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v72';
 const SEED=[];
 
 function unwrapAndCleanItem(item){
@@ -983,7 +983,8 @@ function platePlanStateProjection(source=state){
 }
 
 function getPlatePlanHouseholdId(){
-  const hid = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+  const hid = window.CURRENT_HOUSEHOLD_ID || window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+  window.CURRENT_HOUSEHOLD_ID = hid;
   if (!window.activeHouseholdId && hid) {
     window.activeHouseholdId = hid;
     window.activeHousehold = { id: hid };
@@ -996,7 +997,8 @@ function getPlatePlanHouseholdId(){
 
 function getHouseholdDocRef(db, householdId) {
   const database = db || platePlanDb;
-  const hid = householdId || getPlatePlanHouseholdId();
+  const hid = householdId || window.CURRENT_HOUSEHOLD_ID || getPlatePlanHouseholdId();
+  window.CURRENT_HOUSEHOLD_ID = hid;
   return database.collection('households').doc(hid);
 }
 window.getHouseholdDocRef = getHouseholdDocRef;
@@ -1192,11 +1194,14 @@ window.rehydrateActiveRecipeAndStateCache = rehydrateActiveRecipeAndStateCache;
 
 async function pushStateToCloud(force=false){
   if (state) state.updatedAt = new Date().toISOString();
-  // a. Resolves household ID directly (e.g. 'elliott-chloe')
-  const targetHouseholdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
-  window.activeHouseholdId = targetHouseholdId;
+  // Explicitly retrieve and assign householdId before constructing Firestore paths or payloads
+  const householdId = window.CURRENT_HOUSEHOLD_ID || window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+  const targetHouseholdId = householdId;
+  window.CURRENT_HOUSEHOLD_ID = householdId;
+  window.activeHouseholdId = householdId;
+  window.activeHousehold = { id: householdId };
   if (state && !state.meta) state.meta = {};
-  if (state?.meta) state.meta.householdId = targetHouseholdId;
+  if (state?.meta) state.meta.householdId = householdId;
 
   const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
   console.log('[FIRESTORE WRITE PATH]', householdDocRef.path);
@@ -1447,6 +1452,9 @@ function createSafeStateSnapshot(sourceState) {
  * Single source of truth operating directly on root store (`state`).
  */
 async function executeDataQualityTransaction(mutationType, payload = {}, options = {}) {
+  const householdId = window.CURRENT_HOUSEHOLD_ID || window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+  window.CURRENT_HOUSEHOLD_ID = householdId;
+  window.activeHouseholdId = householdId;
   const { modalWrapId = null, submitButtonId = null, errorContainerId = null, successMessage = null } = options;
   const submitBtn = submitButtonId ? document.getElementById(submitButtonId) : null;
   const originalBtnText = submitBtn ? submitBtn.textContent : '';
@@ -18788,6 +18796,14 @@ function openPlanSetupAndFocus(){
   const startInput = document.getElementById('plan-start-date');
   if(startInput && !startInput.value) startInput.value = tomorrow;
 }
+
+function formatPlanDateShort(dateString){
+  if(!dateString) return '';
+  const date = parsePlanLocalDate(dateString);
+  if(!date) return String(dateString);
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).format(date);
+}
+window.formatPlanDateShort = formatPlanDateShort;
 
 function renderPlan(){
   ensurePlannerShell();
