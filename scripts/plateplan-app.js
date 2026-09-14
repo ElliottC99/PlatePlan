@@ -207,8 +207,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.9.4';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v74';
+const PLATEPLAN_APP_VERSION='2.9.5';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v75';
 const SEED=[];
 
 function unwrapAndCleanItem(item){
@@ -1270,6 +1270,18 @@ async function _executePushStateToCloud(force, targetHouseholdId, householdDocRe
     return;
   }
 
+  // Safely resolve householdId from arguments, state, global or fallback
+  const householdId = targetHouseholdId
+    || state?.householdId
+    || state?.meta?.householdId
+    || (typeof ACTIVE_HOUSEHOLD_ID !== 'undefined' ? ACTIVE_HOUSEHOLD_ID : null)
+    || (typeof window !== 'undefined' ? (window.CURRENT_HOUSEHOLD_ID || window.activeHouseholdId || window.PLATEPLAN_FIREBASE?.householdId) : null)
+    || 'elliott-chloe';
+
+  if(!householdDocRef && platePlanDb){
+    householdDocRef = getHouseholdDocRef(platePlanDb, householdId);
+  }
+
   // 1. Exponential backoff guard: applies to all sync attempts targeting households/elliott-chloe
   const now = Date.now();
   if(now < platePlanBackoffUntil){
@@ -1552,6 +1564,30 @@ async function executeDataQualityTransaction(mutationType, payload = {}, options
         const { product, isNew, groupUpdate } = payload;
         if (!product || !product.id) throw new Error('Invalid product payload');
         product.updatedAt = nowIso;
+
+        // Ensure product explicitly updates both ingredientId and subTypeId/subType
+        const targetGroup = (product.groupId ? (state.ingredientGroups || []).find(g => g.id === product.groupId) : null)
+          || (groupUpdate && groupUpdate.id ? groupUpdate : null)
+          || (product.subTypeId ? (state.ingredientGroups || []).find(g => g.id === product.subTypeId) : null);
+
+        if (targetGroup) {
+          product.groupId = targetGroup.id;
+          product.subTypeId = targetGroup.id;
+          if (targetGroup.name) product.subType = targetGroup.name;
+          const familyId = targetGroup.ingredientId
+            || (typeof getGroupIngredientFamily === 'function' ? getGroupIngredientFamily(targetGroup)?.id : '')
+            || payload.ingredientId
+            || product.ingredientId
+            || '';
+          if (familyId) product.ingredientId = familyId;
+        } else if (payload.ingredientId || product.ingredientId) {
+          product.ingredientId = payload.ingredientId || product.ingredientId;
+          if (payload.subTypeId || product.subTypeId) {
+            product.subTypeId = payload.subTypeId || product.subTypeId;
+            product.groupId = product.subTypeId;
+          }
+        }
+
         if (isNew) {
           const existingIdx = state.ingredients.findIndex(x => x.id === product.id);
           if (existingIdx > -1) state.ingredients[existingIdx] = product;
@@ -1828,8 +1864,15 @@ async function executeDataQualityTransaction(mutationType, payload = {}, options
       console.warn('Local storage write warning in executeDataQualityTransaction:', e);
     }
 
-    // 5. Explicit Forced Cloud Write: serializes live global state
-    await pushStateToCloud(true);
+    // 5. Explicit Forced Cloud Write: isolated in internal try/catch to protect local transaction
+    try {
+      await pushStateToCloud(true);
+    } catch (cloudErr) {
+      console.warn(`[executeDataQualityTransaction] Cloud push deferred or failed (${mutationType}), local mutation preserved:`, cloudErr);
+      if (typeof schedulePlatePlanCloudDiff === 'function') {
+        schedulePlatePlanCloudDiff(1000);
+      }
+    }
 
     // 6. Finalize Success
     platePlanTransactionShield.lastCompletedAt = Date.now();
@@ -5332,6 +5375,13 @@ function ensureProductAssignedToGroup(product, preferredGroupName = '', preferre
   });
 
   product.groupId = group.id;
+  product.subTypeId = group.id;
+  product.subType = group.name;
+  if(group.ingredientId) product.ingredientId = group.ingredientId;
+  else {
+    const fam = typeof getGroupIngredientFamily === 'function' ? getGroupIngredientFamily(group) : null;
+    if(fam) product.ingredientId = fam.id;
+  }
   product.updatedAt = nowIso;
   group.updatedAt = nowIso;
   if(!Array.isArray(group.productIds)) group.productIds = [];
@@ -15282,6 +15332,14 @@ function reallocateProductToExistingGroup(productId, targetGroupId){
   targetGroup.updatedAt = nowIso;
 
   ensureProductAssignedToGroup(product, targetGroup.name, targetGroup.id);
+  product.groupId = targetGroup.id;
+  product.subTypeId = targetGroup.id;
+  product.subType = targetGroup.name;
+  if(targetGroup.ingredientId) product.ingredientId = targetGroup.ingredientId;
+  else {
+    const fam = typeof getGroupIngredientFamily === 'function' ? getGroupIngredientFamily(targetGroup) : null;
+    if(fam) product.ingredientId = fam.id;
+  }
   syncProductHierarchyCategory(product, targetGroup, product.cat);
   refreshProductGroupAndRecipes(product.id);
   refreshAutoDefaultProductForGroup(targetGroup.id);
@@ -15346,6 +15404,10 @@ function saveProductReallocationToNewIngredient(){
   }
 
   product.updatedAt = nowIso;
+  product.groupId = group.id;
+  product.subTypeId = group.id;
+  product.subType = group.name;
+  product.ingredientId = family.id;
   ensureProductAssignedToGroup(product, group.name, group.id);
   syncProductHierarchyCategory(product, group, product.cat);
   refreshProductGroupAndRecipes(product.id);
@@ -15377,6 +15439,9 @@ function confirmDelinkProduct(productId){
   const nowIso = new Date().toISOString();
   const oldGroupId = product.groupId;
   product.groupId = '';
+  product.subTypeId = '';
+  product.subType = '';
+  product.ingredientId = '';
   product.updatedAt = nowIso;
   if(oldGroupId){
     const oldGroup = getIngredientGroup(oldGroupId);
@@ -17373,6 +17438,9 @@ async function saveManualIng(categoryReady=false){
     drainedWeight:+document.getElementById('mi-drained-weight')?.value||null,
     drainedWeightUnit:document.getElementById('mi-drained-weight-unit')?.value||'g',
     groupId: existingIng ? (existingIng.groupId || '') : '',
+    subTypeId: existingIng ? (existingIng.subTypeId || existingIng.groupId || '') : '',
+    subType: existingIng ? (existingIng.subType || '') : '',
+    ingredientId: existingIng ? (existingIng.ingredientId || '') : '',
     itemCount: existingIng ? (existingIng.itemCount || null) : null,
     sourceUrl: existingIng ? (existingIng.sourceUrl || null) : null,
     packOptions: existingIng ? (existingIng.packOptions || []) : [],
@@ -17389,13 +17457,24 @@ async function saveManualIng(categoryReady=false){
     syncProductHierarchyCategory(ing, grp, ing.cat);
     grp.updatedAt = nowIso;
     groupUpdate = grp;
+    ing.groupId = grp.id;
+    ing.subTypeId = grp.id;
+    ing.subType = grp.name;
+    const fam = (typeof getGroupIngredientFamily === 'function' ? getGroupIngredientFamily(grp) : null) || (grp.ingredientId ? getIngredientFamily(grp.ingredientId) : null);
+    if(fam) ing.ingredientId = fam.id;
+    else if(grp.ingredientId) ing.ingredientId = grp.ingredientId;
   } else {
     const assignedGroup = ensureProductAssignedToGroup(ing, name, '', true);
     if(assignedGroup) {
       assignedGroup.updatedAt = nowIso;
       ing.groupId = assignedGroup.id;
+      ing.subTypeId = assignedGroup.id;
+      ing.subType = assignedGroup.name;
       syncProductHierarchyCategory(ing, assignedGroup, ing.cat);
       groupUpdate = assignedGroup;
+      const fam = (typeof getGroupIngredientFamily === 'function' ? getGroupIngredientFamily(assignedGroup) : null) || (assignedGroup.ingredientId ? getIngredientFamily(assignedGroup.ingredientId) : null);
+      if(fam) ing.ingredientId = fam.id;
+      else if(assignedGroup.ingredientId) ing.ingredientId = assignedGroup.ingredientId;
     }
   }
 
@@ -17412,9 +17491,23 @@ async function saveManualIng(categoryReady=false){
       errorContainerId: 'mi-msg'
     });
   } catch(error) {
-    console.error('saveManualIng failed transaction:', error);
-    return;
+    console.warn('saveManualIng transaction error, ensuring local persistence:', error);
+    try {
+      const idx = state.ingredients.findIndex(x => x.id === ing.id);
+      if (idx > -1) state.ingredients[idx] = ing;
+      else state.ingredients.push(ing);
+      localStorage.setItem(SK, safeJsonStringify(state));
+      if (Array.isArray(state.recipes)) localStorage.setItem(RECIPES_BACKUP_SK, safeJsonStringify(state.recipes));
+    } catch(_saveErr) {
+      console.warn('Local storage fallback save error in saveManualIng:', _saveErr);
+    }
   }
+
+  try {
+    if (typeof pushStateToCloud === 'function') {
+      pushStateToCloud(false).catch(e => console.warn('Background cloud sync in saveManualIng:', e));
+    }
+  } catch(_pushErr) {}
 
   refreshProductGroupAndRecipes(ing.id);
 
