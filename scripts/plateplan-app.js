@@ -207,8 +207,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.9.3';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v73';
+const PLATEPLAN_APP_VERSION='2.9.4';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v74';
 const SEED=[];
 
 function unwrapAndCleanItem(item){
@@ -1206,6 +1206,9 @@ window.addIngredient = addIngredient;
 window.deleteIngredient = deleteIngredient;
 window.rehydrateActiveRecipeAndStateCache = rehydrateActiveRecipeAndStateCache;
 
+let platePlanCloudDebounceTimer = null;
+let platePlanDebounceResolvers = [];
+
 async function pushStateToCloud(force=false){
   if (state) state.updatedAt = new Date().toISOString();
   // Explicitly retrieve and assign householdId before constructing Firestore paths or payloads
@@ -1220,6 +1223,43 @@ async function pushStateToCloud(force=false){
   const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
   console.log('[FIRESTORE WRITE PATH]', householdDocRef.path);
 
+  // Debounce handler (300ms–500ms window) for local-to-cloud sync dispatches targeting households/elliott-chloe.
+  // Coalesces rapid, back-to-back state mutations or un-debounced watchers to prevent Firestore write queue exhaustion.
+  if(!force && platePlanCloudReady && platePlanCloudUser){
+    return new Promise((resolve, reject) => {
+      platePlanDebounceResolvers.push({ resolve, reject });
+      if(platePlanCloudDebounceTimer) clearTimeout(platePlanCloudDebounceTimer);
+      platePlanCloudDebounceTimer = setTimeout(async () => {
+        platePlanCloudDebounceTimer = null;
+        const resolvers = platePlanDebounceResolvers.slice();
+        platePlanDebounceResolvers = [];
+        try {
+          const res = await _executePushStateToCloud(false, targetHouseholdId, householdDocRef);
+          resolvers.forEach(r => r.resolve(res));
+        } catch(err) {
+          resolvers.forEach(r => r.reject(err));
+        }
+      }, 400); // 400ms debounce within 300ms–500ms window
+    });
+  }
+
+  if(platePlanCloudDebounceTimer){
+    clearTimeout(platePlanCloudDebounceTimer);
+    platePlanCloudDebounceTimer = null;
+  }
+  const pendingResolvers = platePlanDebounceResolvers.slice();
+  platePlanDebounceResolvers = [];
+  try {
+    const res = await _executePushStateToCloud(force, targetHouseholdId, householdDocRef);
+    pendingResolvers.forEach(r => r.resolve(res));
+    return res;
+  } catch(err) {
+    pendingResolvers.forEach(r => r.reject(err));
+    throw err;
+  }
+}
+
+async function _executePushStateToCloud(force, targetHouseholdId, householdDocRef){
   if(!platePlanCloudReady || !platePlanCloudUser || !platePlanDb) return;
   if(!navigator.onLine){
     updatePlatePlanSyncStatus('offline','Offline · changes saved locally');
@@ -1853,11 +1893,11 @@ function queuePlatePlanCloudDiff(immediateFlush=false){
     clearTimeout(platePlanSyncTimer);
     pushStateToCloud();
   }else{
-    schedulePlatePlanCloudDiff(800);
+    schedulePlatePlanCloudDiff(400);
   }
 }
 
-function schedulePlatePlanCloudDiff(delay=800){
+function schedulePlatePlanCloudDiff(delay=400){
   clearTimeout(platePlanSyncTimer);
   const effectiveDelay = Math.max(delay, platePlanBackoffUntil > Date.now() ? (platePlanBackoffUntil - Date.now() + 200) : 0);
   platePlanSyncTimer=setTimeout(()=>{
@@ -1894,7 +1934,7 @@ function saveState(immediate=false){
       clearTimeout(platePlanSyncTimer);
       pushStateToCloud(true);
     }else{
-      schedulePlatePlanCloudDiff(800);
+      schedulePlatePlanCloudDiff(400);
     }
   }else if(!platePlanCloudUser){
     updatePlatePlanSyncStatus('local');
@@ -12689,7 +12729,8 @@ function openUseUpAssign(recipeId,variant){
   platePlanUseUpFinder.assign={recipeId,variant};
   let wrap=document.getElementById('use-up-assign-wrap');if(!wrap){wrap=document.createElement('div');wrap.id='use-up-assign-wrap';wrap.className='modal-wrap sheet-mobile';document.body.appendChild(wrap);}
   const days=Array.from({length:+state.plan.days||0},(_,i)=>i+1);
-  wrap.innerHTML=`<div class="modal"><div class="row-between"><h3 style="margin:0">Assign ${ppEscapeHtml(recipe.name)}</h3><button class="btn ghost" onclick="closeUseUpAssign()">Close</button></div><div class="grid2" style="margin-top:14px"><label>Day<select id="use-up-assign-day">${days.map(day=>`<option value="${day}">${ppEscapeHtml(formatPlanDayLabel(state.plan,day,{short:true}))}</option>`).join('')}</select></label><label>For<select id="use-up-assign-person"><option value="E">Elliott</option><option value="C">Chloe</option></select></label><label>Meal<select id="use-up-assign-meal"><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner"${platePlanUseUpFinder.meal==='dinner'?' selected':''}>Dinner</option></select></label></div><div class="btn-row" style="margin-top:14px"><button class="btn primary" onclick="confirmUseUpAssign()">Continue</button></div></div>`;
+  const whoVal = platePlanUseUpFinder.who || 'both';
+  wrap.innerHTML=`<div class="modal"><div class="row-between"><h3 style="margin:0">Assign ${ppEscapeHtml(recipe.name)}</h3><button class="btn ghost" onclick="closeUseUpAssign()">Close</button></div><div class="grid2" style="margin-top:14px"><label>Day<select id="use-up-assign-day">${days.map(day=>`<option value="${day}">${ppEscapeHtml(formatPlanDayLabel(state.plan,day,{short:true}))}</option>`).join('')}</select></label><label>For<select id="use-up-assign-person"><option value="both"${whoVal==='both'?' selected':''}>Both (Shared)</option><option value="E"${whoVal==='Elliott'?' selected':''}>Elliott</option><option value="C"${whoVal==='Chloe'?' selected':''}>Chloe</option></select></label><label>Meal<select id="use-up-assign-meal"><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner"${platePlanUseUpFinder.meal==='dinner'?' selected':''}>Dinner</option></select></label></div><div class="btn-row" style="margin-top:14px"><button class="btn primary" onclick="confirmUseUpAssign()">Continue</button></div></div>`;
   wrap.classList.add('open');
 }
 function closeUseUpAssign(){document.getElementById('use-up-assign-wrap')?.classList.remove('open');}
@@ -12704,17 +12745,28 @@ function chooseAppChoice(value){const action=platePlanChoiceAction;closeAppChoic
 function closeAppChoiceModal(){document.getElementById('app-choice-wrap')?.classList.remove('open');platePlanChoiceAction=null;}
 function confirmUseUpAssign(mode='review'){
   const draft=platePlanUseUpFinder.assign;if(!draft)return;
-  const day=+document.getElementById('use-up-assign-day')?.value||0,person=document.getElementById('use-up-assign-person')?.value||'E',meal=document.getElementById('use-up-assign-meal')?.value||'dinner',key=meal+person;
-  const existing=state.plan?.slots?.[day]?.[key];
+  const day=+document.getElementById('use-up-assign-day')?.value||0,person=document.getElementById('use-up-assign-person')?.value||'both',meal=document.getElementById('use-up-assign-meal')?.value||'dinner';
+  const isBoth = person === 'both';
+  const keys = isBoth ? [meal+'E', meal+'C'] : [meal+person];
+  const occupied = keys.some(k => !!state.plan?.slots?.[day]?.[k]);
   const apply=replace=>{
-    const old=existing;
-    const next=makePlanSlot(draft.recipeId,draft.variant);state.plan.slots[day][key]=next;
-    const info=getPlanSlotInfo(next),ov=getPlanOverride(info.instanceId),coverage=getRecipeUseUpCoverage({id:draft.recipeId,variant:draft.variant,recipe:state.recipes.find(r=>r.id===draft.recipeId)});
-    coverage.matches.filter(match=>platePlanUseUpFinder.productIds.includes(match.productId)).forEach(match=>{if(match.product.groupId)ov.productOverrides[match.product.groupId]=match.productId;});
-    if(replace==='swap'&&old){const empty=Object.entries(state.plan.slots).flatMap(([d,slots])=>Object.keys(slots).filter(k=>!slots[k]).map(k=>({day:+d,key:k}))).find(place=>place.key.endsWith(person));if(empty)state.plan.slots[empty.day][empty.key]=old;}
-    state.plan.confirmedShopping=false;state.plan.mealPrepGroups=[];state.plan.score=calculatePlanScore(state.plan);platePlanNutritionCache.clear();markPlatePlanViewsDirty();saveState();closeUseUpAssign();renderPlan();showPlatePlanToast('Recipe assigned to the active plan.');
+    keys.forEach(k => {
+      const old=state.plan?.slots?.[day]?.[k];
+      const next=makePlanSlot(draft.recipeId,draft.variant);
+      if(!state.plan.slots[day]) state.plan.slots[day]={};
+      state.plan.slots[day][k]=next;
+      setPlanSlotReason(day, k, '');
+      const info=getPlanSlotInfo(next),ov=getPlanOverride(info.instanceId),coverage=getRecipeUseUpCoverage({id:draft.recipeId,variant:draft.variant,recipe:state.recipes.find(r=>r.id===draft.recipeId)});
+      coverage.matches.filter(match=>platePlanUseUpFinder.productIds.includes(match.productId)).forEach(match=>{if(match.product.groupId)ov.productOverrides[match.product.groupId]=match.productId;});
+      if(replace==='swap'&&old){
+        const personSuffix = k.slice(-1);
+        const empty=Object.entries(state.plan.slots).flatMap(([d,slots])=>Object.keys(slots).filter(sk=>!slots[sk]).map(sk=>({day:+d,key:sk}))).find(place=>place.key.endsWith(personSuffix));
+        if(empty)state.plan.slots[empty.day][empty.key]=old;
+      }
+    });
+    state.plan.confirmedShopping=false;state.plan.mealPrepGroups=[];state.plan.score=calculatePlanScore(state.plan);platePlanNutritionCache.clear();markPlatePlanViewsDirty();saveState();closeUseUpAssign();renderPlan();showPlatePlanToast(isBoth ? 'Recipe assigned for Elliott & Chloe to active plan.' : 'Recipe assigned to the active plan.');
   };
-  if(existing&&mode==='review')return openAppChoiceModal('That slot is occupied','Choose how to apply this suggestion.',[{label:'Swap to an empty slot',value:'swap'},{label:'Replace existing meal',value:'replace'}],value=>apply(value));
+  if(occupied&&mode==='review')return openAppChoiceModal('That slot is occupied','Choose how to apply this suggestion.',[{label:'Swap to an empty slot',value:'swap'},{label:'Replace existing meal',value:'replace'}],value=>apply(value));
   apply(mode);
 }
 
@@ -15244,7 +15296,7 @@ function reallocateProductToExistingGroup(productId, targetGroupId){
   }
 
   closeProductReallocationModal();
-  showToast(`"${product.name}" reallocated to ${getGroupTypeName(targetGroup)}.`);
+  showPlatePlanToast(`"${product.name}" reallocated to ${getGroupTypeName(targetGroup)}.`);
 }
 
 function saveProductReallocationToNewIngredient(){
@@ -15309,7 +15361,7 @@ function saveProductReallocationToNewIngredient(){
   }
 
   closeProductReallocationModal();
-  showToast(`"${product.name}" allocated to new ingredient ${family.name} (${group.name}).`);
+  showPlatePlanToast(`"${product.name}" allocated to new ingredient ${family.name} (${group.name}).`);
 }
 
 function confirmDelinkProduct(productId){
@@ -15345,7 +15397,7 @@ function confirmDelinkProduct(productId){
   }
 
   closeProductReallocationModal();
-  showToast(`"${product.name}" delinked from ingredient.`);
+  showPlatePlanToast(`"${product.name}" delinked from ingredient.`);
 }
 
 let productBankGroupFilterId = null;
@@ -18506,27 +18558,12 @@ function generatePlan(){
         
         let placed = false;
         if(mode === 'both'){
-          if(rec.who === 'both' || rec.who === 'any' || !rec.who){
-            if(!slots[d][mealType+'E'] && !slots[d][mealType+'C']){
-              slots[d][mealType+'E'] = makePlanSlot(rec.id, variant);
-              slots[d][mealType+'C'] = makePlanSlot(rec.id, variant);
-              pinnedSlots.add(`${d}:${mealType}E`);
-              pinnedSlots.add(`${d}:${mealType}C`);
-              placed = true;
-            }
-          } else if(rec.who === 'Elliott' || rec.who === 'elliott'){
-            if(!slots[d][mealType+'E']){
-              slots[d][mealType+'E'] = makePlanSlot(rec.id, variant);
-              pinnedSlots.add(`${d}:${mealType}E`);
-              placed = true;
-            }
-          } else if(rec.who === 'Chloe' || rec.who === 'chloe'){
-            if(!slots[d][mealType+'C']){
-              slots[d][mealType+'C'] = makePlanSlot(rec.id, variant);
-              pinnedSlots.add(`${d}:${mealType}C`);
-              placed = true;
-            }
-          }
+          // In dual-user view ("both" / household context), pre-selecting or assigning a meal allocates for both household members simultaneously
+          slots[d][mealType+'E'] = makePlanSlot(rec.id, variant);
+          slots[d][mealType+'C'] = makePlanSlot(rec.id, variant);
+          pinnedSlots.add(`${d}:${mealType}E`);
+          pinnedSlots.add(`${d}:${mealType}C`);
+          placed = true;
         } else if(mode === 'chloe' && (rec.who === 'both' || rec.who === 'any' || rec.who === 'Chloe' || rec.who === 'chloe' || !rec.who)){
           if(!slots[d][mealType+'C']){
             slots[d][mealType+'C'] = makePlanSlot(rec.id, variant);
@@ -19143,15 +19180,29 @@ function openPlannedMealActions(day,slotKey){
 function swapSlot(day,slot,id){
     if(!state.plan.slots[day]) state.plan.slots[day]={};
     let swappedName = '';
+    const mealType = slot.includes('breakfast') ? 'breakfast' : slot.includes('lunch') ? 'lunch' : 'dinner';
+    const slotMealMode = getSlotMealMode(day, mealType);
+    const counterpartKey = getPlanSlotCounterpartKey(slot);
+    const isDualView = slotMealMode === 'both' || (document.getElementById('filter-who')?.value === 'both') || (window.activeHouseholdId && slotMealMode !== 'elliott' && slotMealMode !== 'chloe');
+
     if(id) {
         const parsed = parsePlanRecipeValue(id);
         state.plan.slots[day][slot] = makePlanSlot(parsed.id, parsed.variant);
+        setPlanSlotReason(day,slot,'');
+        if(isDualView && counterpartKey) {
+            state.plan.slots[day][counterpartKey] = makePlanSlot(parsed.id, parsed.variant);
+            setPlanSlotReason(day,counterpartKey,'');
+        }
         const info = getPlanSlotInfo(state.plan.slots[day][slot]);
         swappedName = info?.active?.name || info?.recipe?.name || '';
     } else {
         state.plan.slots[day][slot] = null;
+        setPlanSlotReason(day,slot,'');
+        if(isDualView && counterpartKey) {
+            state.plan.slots[day][counterpartKey] = null;
+            setPlanSlotReason(day,counterpartKey,'');
+        }
     }
-    setPlanSlotReason(day,slot,'');
     const priority = state.plan.productPriority || state.prefs.productPriority || 'protein';
     state.plan.productSelections = lockProductSelectionsForSlots(state.plan.slots, priority);
     state.plan.productPriority = priority;
@@ -19161,7 +19212,10 @@ function swapSlot(day,slot,id){
     state.plan.score = calculatePlanScore(state.plan);
     saveState();
     renderPlan();
-    showPlatePlanToast(swappedName ? `Swapped meal to ${swappedName}` : 'Meal slot cleared');
+    const toastMsg = swappedName 
+      ? (isDualView ? `Assigned ${swappedName} for Elliott & Chloe` : `Swapped meal to ${swappedName}`)
+      : (isDualView ? 'Meal slots cleared for Elliott & Chloe' : 'Meal slot cleared');
+    showPlatePlanToast(toastMsg);
 }
 
 let currentSwapModalContext = null;
@@ -19171,14 +19225,18 @@ function openSwapMealModal(day, slotKey) {
   const dayNum = +day;
   const slotInfo = getPlanSlotInfo(state.plan?.slots?.[dayNum]?.[slotKey]);
   const mealType = slotKey.includes('breakfast') ? 'breakfast' : slotKey.includes('lunch') ? 'lunch' : 'dinner';
-  const who = slotKey.endsWith('E') ? 'Elliott' : slotKey.endsWith('C') ? 'Chloe' : 'any';
+  const slotMealMode = getSlotMealMode(dayNum, mealType);
+  const filterWhoVal = document.getElementById('filter-who')?.value;
+  const isDualView = slotMealMode === 'both' || filterWhoVal === 'both' || (window.activeHouseholdId && slotMealMode !== 'elliott' && slotMealMode !== 'chloe');
+  const who = isDualView ? 'both' : (slotKey.endsWith('E') ? 'Elliott' : slotKey.endsWith('C') ? 'Chloe' : 'any');
   const dayLabel = formatPlanDayLabel(state.plan, dayNum, { short: true });
   const typeTitle = toTitleCase(mealType);
 
-  const options = getPlannerRecipeOptions(mealType, who);
+  const options = getPlannerRecipeOptions(mealType, who === 'both' ? 'any' : who);
   const curValue = slotInfo.id ? slotInfo.id + (slotInfo.variant === 'enhanced' ? '::enhanced' : '') : '';
 
-  const personKey = String(who || '').toLowerCase().startsWith('c') ? 'c' : 'e';
+  const isBoth = who === 'both';
+  const personKey = isBoth ? 'both' : (String(who || '').toLowerCase().startsWith('c') ? 'c' : 'e');
   const items = options.map(opt => {
     const value = opt.id + (opt.variant === 'enhanced' ? '::enhanced' : '');
     let cal = 0, prot = 0, serves = 0, ingredientsText = '';
@@ -19189,8 +19247,13 @@ function openSwapMealModal(day, slotKey) {
         ingredientsText = (info.recipe.ingredients || []).map(i => i.name || i.ingredient || '').join(' ');
         const bundle = calculateRecipeDisplayNutrition({ recipe: info.recipe, variant: info.variant, mealType });
         const portions = bundle?.portions || null;
-        cal = personKey === 'c' ? (portions?.cCal || 0) : (portions?.eCal || 0);
-        prot = personKey === 'c' ? (portions?.cProt || 0) : (portions?.eProt || 0);
+        if(isBoth) {
+          cal = Math.round(((portions?.eCal || 0) + (portions?.cCal || 0)) / 2);
+          prot = round1(((portions?.eProt || 0) + (portions?.cProt || 0)) / 2);
+        } else {
+          cal = personKey === 'c' ? (portions?.cCal || 0) : (portions?.eCal || 0);
+          prot = personKey === 'c' ? (portions?.cProt || 0) : (portions?.eProt || 0);
+        }
       }
     } catch(e) {
       console.warn('Error calculating recipe nutrition for option:', e);
@@ -19235,7 +19298,7 @@ function openSwapMealModal(day, slotKey) {
     <div class="row-between" style="align-items:center;margin-bottom:12px;gap:10px;flex-shrink:0">
       <div>
         <h3 style="margin:0;font-size:17px;font-weight:700;color:var(--text)">Swap Meal — ${ppEscapeHtml(dayLabel)}</h3>
-        <div style="font-size:12px;color:var(--text2);margin-top:2px">${ppEscapeHtml(who)}'s ${ppEscapeHtml(typeTitle)}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">${ppEscapeHtml(who === 'both' ? 'Shared (Elliott & Chloe)' : who + "'s")} ${ppEscapeHtml(typeTitle)}</div>
       </div>
       <button class="btn sm ghost" onclick="closeSwapMealModal()" aria-label="Close modal" style="font-size:16px;padding:4px 10px">✕</button>
     </div>
@@ -21291,6 +21354,11 @@ function showPlatePlanToast(message,action=null){
   region.innerHTML=`<div class="plateplan-toast" id="plateplan-toast-${id}"><span>${ppEscapeHtml(message)}</span>${action?.onclick?`<button onclick="runPlatePlanToastAction('${ppEscapeAttr(id)}')">${ppEscapeHtml(action.label||'Undo')}</button>`:''}</div>`;
   setTimeout(()=>{document.getElementById(`plateplan-toast-${id}`)?.remove();platePlanToastActions.delete(id);},action?.onclick?8000:4200);
 }
+function showToast(message,action=null){
+  return showPlatePlanToast(message, action);
+}
+window.showPlatePlanToast = showPlatePlanToast;
+window.showToast = showToast;
 function showMsg(id,msg,type){const el=document.getElementById(id);if(!el)return;el.innerHTML='<div class="msg '+type+'">'+msg+'</div>';setTimeout(()=>{if(el)el.innerHTML='';},4000);}
 function showOverlay(msg,sub){document.getElementById('overlay-msg').textContent=msg;document.getElementById('overlay-sub').textContent=sub||'';document.getElementById('overlay').classList.add('visible');}
 function hideOverlay(){document.getElementById('overlay').classList.remove('visible');}
