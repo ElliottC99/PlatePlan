@@ -207,8 +207,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.9.5';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v75';
+const PLATEPLAN_APP_VERSION='2.9.6';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v76';
 const SEED=[];
 
 function unwrapAndCleanItem(item){
@@ -225,6 +225,15 @@ function unwrapAndCleanItem(item){
   delete clean.updatedBy;
   delete clean._syncStatus;
   delete clean._dirty;
+  // Rule A (Pure Dynamic Calculation): Never save calculated total macros into Firestore or state
+  delete clean.totalKcal;
+  delete clean.totalProtein;
+  delete clean.totalCarb;
+  delete clean.totalFat;
+  delete clean.totalNutrition;
+  if(clean.ingredients && Array.isArray(clean.ingredients)){
+    clean.isFavorite = (clean.isFavorite !== undefined) ? !!clean.isFavorite : false;
+  }
   return clean;
 }
 window.unwrapAndCleanItem = unwrapAndCleanItem;
@@ -2474,16 +2483,23 @@ window.populateIngredientsState = populateIngredientsState;
 function populateRecipesState(docs){
   if(!state) state = {};
   const recs = [];
-  (docs || []).forEach(doc => {
-    const raw = doc.data ? doc.data() : doc;
+  const list = Array.isArray(docs) ? docs : (docs && typeof docs === 'object' ? (Array.isArray(docs.recipes) ? docs.recipes : Object.values(docs)) : []);
+  list.forEach(doc => {
+    if(!doc) return;
+    const raw = (typeof doc.data === 'function') ? doc.data() : (doc.data && typeof doc.data === 'object' && !doc.name ? doc.data : doc);
+    if(!raw || typeof raw !== 'object') return;
     const clean = unwrapAndCleanItem(raw) || {};
-    if(!clean.id) clean.id = doc.id;
+    if(!clean.id) clean.id = doc.id || raw.id || ('recipe_' + Math.random().toString(36).substr(2, 9));
+    clean.isFavorite = (clean.isFavorite !== undefined) ? !!clean.isFavorite : false;
     recs.push(clean);
     recs[clean.id] = clean;
   });
   state.recipes = recs;
   window.state = state;
   window.appState = state;
+  try {
+    localStorage.setItem('plateplan_recipes_backup', safeJsonStringify(state.recipes));
+  } catch(e) {}
 }
 window.populateRecipesState = populateRecipesState;
 
@@ -2822,8 +2838,6 @@ async function loadSharedPlatePlan(){
 
   if (recipesSnapshot && !recipesSnapshot.empty) {
     populateRecipesState(recipesSnapshot.docs);
-  } else if (!Array.isArray(state.recipes)) {
-    state.recipes = [];
   }
 
   // 5. Hydrate Top-Level Metadata from root document (and fallback dataCol if present)
@@ -2833,6 +2847,30 @@ async function loadSharedPlatePlan(){
     const subSnapshot = await dataCol.get();
     subSnapshot.forEach(doc => { dataDocs[doc.id] = doc.data() || {}; });
   } catch(e) {}
+
+  // Fallback checks if recipes subcollection was empty or nested in rootDoc or dataDocs
+  if (!Array.isArray(state.recipes) || state.recipes.length === 0) {
+    const fallbackRecipes = rootData.recipes || rootData.data?.recipes || dataDocs.recipes || dataDocs.recipes?.recipes || dataDocs.recipes?.list || null;
+    if (fallbackRecipes) {
+      console.log('[RECIPES HYDRATION] Hydrating recipes from nested root/data fallback...');
+      populateRecipesState(fallbackRecipes);
+    } else {
+      try {
+        const localBackup = localStorage.getItem('plateplan_recipes_backup') || localStorage.getItem('plateplan_state_v2');
+        if (localBackup) {
+          const parsed = JSON.parse(localBackup);
+          const recs = parsed.recipes || (Array.isArray(parsed) ? parsed : null);
+          if (Array.isArray(recs) && recs.length > 0) {
+            console.log('[RECIPES HYDRATION] Hydrating recipes from local backup storage...');
+            populateRecipesState(recs);
+          }
+        }
+      } catch(bErr) {}
+    }
+  }
+  if (!Array.isArray(state.recipes)) {
+    state.recipes = [];
+  }
 
   const metaDoc = dataDocs.meta || {};
   const taxonomyDoc = dataDocs.taxonomy || {};
@@ -6510,8 +6548,9 @@ function getPlannerRecipeOptions(type, who, opts = {}){
     })
     .filter(r => !opts.applyExclusions || targetWho === 'any' || recipeAllowedForPerson(r, who))
     .flatMap(r => {
-      const rows = [{ id:r.id, variant:'original', recipe:r, label:r.name }];
-      if(r.enhanced) rows.push({ id:r.id, variant:'enhanced', recipe:r, label:(r.enhanced.name || r.name + ' (Enhanced)'), enhanced:true });
+      const isFav = !!r.isFavorite;
+      const rows = [{ id:r.id, variant:'original', recipe:r, label:r.name, isFavorite:isFav }];
+      if(r.enhanced) rows.push({ id:r.id, variant:'enhanced', recipe:r, label:(r.enhanced.name || r.name + ' (Enhanced)'), enhanced:true, isFavorite:isFav });
       return rows;
     });
   if(opts.applyTrafficFilter !== false) {
@@ -7040,14 +7079,14 @@ function getIngredientContribution(ing, recipe, targetServes){
   const recipeNutrition = calcRecipeNutrition(recipe.ingredients || [], recipeServes, recipe?.resolutionContext || {});
   const portions = calcPortions(recipeNutrition.perServing, state.prefs, previewServes, recipe?.who || 'both', mealType);
   const effectiveG = getEffectiveIngredientGrams(ing, bankIng) * previewScale;
-  const scale = effectiveG / 100;
+  const itemNutrition = calculateItemNutrition(bankIng, effectiveG, 'g');
   const counted = !ing.excludeNutrition;
   const total = counted ? {
-    cal: Math.round((bankIng.cal || 0) * scale),
-    prot: round1((bankIng.prot || 0) * scale),
-    carb: round1((bankIng.carb || 0) * scale),
-    fat: round1((bankIng.fat || 0) * scale),
-    fibre: round1((bankIng.fibre || 0) * scale)
+    cal: itemNutrition.kcal,
+    prot: itemNutrition.protein,
+    carb: itemNutrition.carbs,
+    fat: itemNutrition.fat,
+    fibre: itemNutrition.fibre
   } : {cal:0, prot:0, carb:0, fat:0, fibre:0};
   const eFactor = (portions.eRecipePct || 0) / 100;
   const cFactor = (portions.cRecipePct || 0) / 100;
@@ -7294,11 +7333,85 @@ function getReviewIngredientDataError(ing, resolved){
   return '';
 }
 
+/**
+ * Single Canonical Nutrition Engine
+ * Pure dynamic calculation contract:
+ * - Rule A: Calculated macros are calculated dynamically on render, NEVER saved to Firestore or state.
+ * - Rule B: Unit normalization converts volume/weight/counted units to grams using lookup tables.
+ * - Rule C: Zero-fallback contract: { kcal: 0, protein: 0, carbs: 0, fat: 0, fibre: 0, cost: 0, cal: 0, prot: 0, carb: 0 }.
+ */
+function calculateItemNutrition(item, quantity, unit = 'g'){
+  const zero = { kcal: 0, protein: 0, carbs: 0, fat: 0, fibre: 0, cost: 0, cal: 0, prot: 0, carb: 0 };
+  if (!item || typeof item !== 'object') return zero;
+
+  const q = parseFloat(quantity);
+  if (isNaN(q) || q <= 0) return zero;
+
+  let grams = 0;
+  const u = String(unit || 'g').trim().toLowerCase().replace(/s$/, '');
+
+  if (u === 'item' || u === 'piece' || u === 'qty' || u === 'pack' || u === 'can' || u === 'tin') {
+    const itemWeight = parseFloat(item.itemWeight) || parseFloat(item.drainedWeight) || parseFloat(item.packSize) || 0;
+    grams = q * itemWeight;
+  } else if (u === 'g' || u === 'gram') {
+    grams = q;
+  } else if (u === 'kg') {
+    grams = q * 1000;
+  } else if (u === 'ml') {
+    grams = q; // standard culinary density 1g/ml
+  } else if (u === 'l' || u === 'litre' || u === 'liter') {
+    grams = q * 1000;
+  } else if (typeof UNIT_TO_GRAMS !== 'undefined' && UNIT_TO_GRAMS[u]) {
+    grams = q * UNIT_TO_GRAMS[u];
+  } else if (typeof toGrams === 'function') {
+    grams = toGrams(q, u, item?.itemWeight || 100);
+  } else {
+    grams = q;
+  }
+
+  if (grams <= 0) return zero;
+
+  const scale = grams / 100;
+  const calVal = (parseFloat(item.cal) || parseFloat(item.calories) || parseFloat(item.kcal) || 0) * scale;
+  const protVal = (parseFloat(item.prot) || parseFloat(item.protein) || 0) * scale;
+  const carbVal = (parseFloat(item.carb) || parseFloat(item.carbs) || 0) * scale;
+  const fatVal = (parseFloat(item.fat) || 0) * scale;
+  const fibreVal = (parseFloat(item.fibre) || parseFloat(item.fiber) || 0) * scale;
+
+  let costVal = 0;
+  if (parseFloat(item.price) > 0) {
+    const packGrams = (typeof getProductUsablePackAmount === 'function') ? getProductUsablePackAmount(item) : (parseFloat(item.packSize) || 0);
+    if (packGrams > 0) {
+      costVal = (parseFloat(item.price) / packGrams) * grams;
+    }
+  }
+
+  const roundedKcal = Math.round(calVal);
+  const roundedProt = Math.round(protVal * 10) / 10;
+  const roundedCarb = Math.round(carbVal * 10) / 10;
+  const roundedFat = Math.round(fatVal * 10) / 10;
+  const roundedFibre = Math.round(fibreVal * 10) / 10;
+  const roundedCost = Math.round(costVal * 100) / 100;
+
+  return {
+    kcal: roundedKcal,
+    protein: roundedProt,
+    carbs: roundedCarb,
+    fat: roundedFat,
+    fibre: roundedFibre,
+    cost: roundedCost,
+    cal: roundedKcal,
+    prot: roundedProt,
+    carb: roundedCarb
+  };
+}
+window.calculateItemNutrition = calculateItemNutrition;
+
 function calcRecipeNutrition(structuredIngs,serves,context={}){
   let cal=0,prot=0,carb=0,fat=0,fibre=0,cost=0;
-  let matched=0,ingCount=structuredIngs.length;
+  let matched=0,ingCount=(structuredIngs||[]).length;
   
-  for(const ing of structuredIngs){
+  for(const ing of (structuredIngs||[])){
     if(isIngredientRemovedInContext(ing, context)) continue;
     if(!ing.bankId && !ing.groupId)continue;
     const adjustedIng = getAdjustedIngredientForContext(ing, context);
@@ -7307,21 +7420,16 @@ function calcRecipeNutrition(structuredIngs,serves,context={}){
     matched++;
     
     let g = getEffectiveIngredientGrams(adjustedIng, bankIng);
+    const itemNutrition = calculateItemNutrition(bankIng, g, 'g');
 
-    const scale = g / 100;
     if(!adjustedIng.excludeNutrition) {
-      cal+=((bankIng.cal||0)*scale);
-      prot+=((bankIng.prot||0)*scale);
-      carb+=((bankIng.carb||0)*scale);
-      fat+=((bankIng.fat||0)*scale);
-      fibre+=((bankIng.fibre||0)*scale);
+      cal += itemNutrition.kcal;
+      prot += itemNutrition.protein;
+      carb += itemNutrition.carbs;
+      fat += itemNutrition.fat;
+      fibre += itemNutrition.fibre;
     }
-    
-    if(bankIng.price&&bankIng.packSize){
-      const packGrams = getProductUsablePackAmount(bankIng);
-      if(packGrams>0)
-      cost += (bankIng.price / packGrams) * g;
-    }
+    cost += itemNutrition.cost;
   }
   const s = serves || 1;
   const totalNutrition = {
@@ -12263,7 +12371,15 @@ function collectDeterministicDataQualityIssues(){
         if(!(+(product.price) > 0)) add({entityType:'product',entityId:product.id,code:'missing-price',title:product.name || 'Unnamed product',message:'Price is missing.',fixButtonHtml:fix,source:product.price});
         if(!(+(product.packSize) > 0) || !product.packUnit) add({entityType:'product',entityId:product.id,code:'missing-pack',title:product.name || 'Unnamed product',message:'Pack size or unit is missing.',fixButtonHtml:fix,source:[product.packSize,product.packUnit]});
         if(!product.storage) add({entityType:'product',entityId:product.id,code:'missing-storage',title:product.name || 'Unnamed product',message:'Storage location is missing.',fixButtonHtml:fix,source:product.storage});
-        if(!product.groupId || !getIngredientGroup(product.groupId)) add({entityType:'product',entityId:product.id,code:'missing-hierarchy-link',title:product.name || 'Unnamed product',message:'Product is not linked to a valid ingredient sub-type.',fixButtonHtml:fix,source:[product.groupId,product.cat]});
+        const linkedGroup = product.groupId ? getIngredientGroup(product.groupId) : null;
+        let parentFamily = linkedGroup ? getGroupIngredientFamily(linkedGroup) : null;
+        if(!parentFamily && product.ingredientId) parentFamily = getIngredientFamily(product.ingredientId);
+        if(!parentFamily && product.cat) parentFamily = getIngredientFamily(product.cat);
+        const familySubGroups = parentFamily ? getFamilyGroups(parentFamily.id) : [];
+        const familyHasNoSubtypes = !!parentFamily && familySubGroups.length === 0;
+        const isCompliantWithoutSubtype = familyHasNoSubtypes && (product.subTypeId === null || product.subTypeId === 'default' || product.groupId === 'default' || !product.groupId);
+
+        if(!linkedGroup && !isCompliantWithoutSubtype) add({entityType:'product',entityId:product.id,code:'missing-hierarchy-link',title:product.name || 'Unnamed product',message:'Product is not linked to a valid ingredient sub-type.',fixButtonHtml:fix,source:[product.groupId,product.cat]});
         const packUnit=String(product.packUnit||'').toLowerCase();
         const itemWeightUnit=String(product.itemWeightUnit||'g').toLowerCase();
         const drainedUnit=String(product.drainedWeightUnit||packUnit||'g').toLowerCase();
@@ -12617,12 +12733,72 @@ function openVaultFitDetails(trigger,recipeId,variant='original',personKey='e'){
     <details class="card-details"><summary>Calculation details</summary><div>Fit score is based on calorie distance and protein shortfall. Nutrition comes only from mapped Product Bank products${variant==='enhanced'?' in the enhanced version':''}.</div></details>`;
   showReviewTooltip(trigger,html,`${person} nutrition and fit details`);
 }
+let vaultFilterFavoritesOnly = false;
+function toggleVaultFavoritesFilter(){
+  vaultFilterFavoritesOnly = !vaultFilterFavoritesOnly;
+  const btn = document.getElementById('vault-filter-fav');
+  if(btn){
+    btn.classList.toggle('active', vaultFilterFavoritesOnly);
+  }
+  renderVault();
+}
+window.toggleVaultFavoritesFilter = toggleVaultFavoritesFilter;
+
+function toggleRecipeFavorite(recipeId, event){
+  if(event){
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  const r = (state.recipes || []).find(x => x.id === recipeId);
+  if(!r) return;
+  r.isFavorite = !r.isFavorite;
+  r.updatedAt = new Date().toISOString();
+
+  try {
+    const householdId = (state && state.householdId) || ACTIVE_HOUSEHOLD_ID || 'elliott-chloe';
+    if(platePlanDb){
+      platePlanDb.collection('households').doc(householdId).collection('recipes').doc(String(r.id)).set(
+        sanitizePayloadForFirestore(unwrapAndCleanItem(r)),
+        { merge: true }
+      ).catch(e => console.warn('[RECIPE FAVORITE SYNC ERROR]', e));
+    }
+  } catch(e){}
+
+  saveState(true);
+  try {
+    localStorage.setItem('plateplan_recipes_backup', safeJsonStringify(state.recipes));
+  } catch(e){}
+
+  renderVault();
+  if(typeof previewBaseRecipe !== 'undefined' && previewBaseRecipe && previewBaseRecipe.id === recipeId){
+    previewBaseRecipe.isFavorite = r.isFavorite;
+    const favBtn = document.getElementById('modal-recipe-fav-btn');
+    if(favBtn){
+      favBtn.classList.toggle('active', r.isFavorite);
+      const svg = favBtn.querySelector('svg');
+      if(svg) svg.setAttribute('fill', r.isFavorite ? 'currentColor' : 'none');
+    }
+    const navSub = document.querySelector('.recipe-view-nav-subtitle');
+    if(navSub){
+      const existingTag = navSub.querySelector('.fav-tag');
+      if(r.isFavorite && !existingTag){
+        navSub.insertAdjacentHTML('afterbegin', '<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favorite</span> ');
+      } else if(!r.isFavorite && existingTag){
+        existingTag.remove();
+      }
+    }
+  }
+  showPlatePlanToast(r.isFavorite ? `Added "${r.name}" to favorites ❤️` : `Removed "${r.name}" from favorites`);
+}
+window.toggleRecipeFavorite = toggleRecipeFavorite;
+
 function renderVault(){
   const ft=document.getElementById('filter-type').value,fw=document.getElementById('filter-who').value;
   const q=(document.getElementById('vault-search')?.value||'').trim().toLowerCase();
   const sort=(document.getElementById('vault-sort')?.value)||'name';
   const list=document.getElementById('vault-list');
   const recipes=state.recipes.filter(r=>{
+    if(vaultFilterFavoritesOnly && !r.isFavorite) return false;
     const types=r.types||[r.type];
     const searchable=[
       r.name,
@@ -12633,18 +12809,20 @@ function renderVault(){
     ].join(' ').toLowerCase();
     return(ft==='all'||types.includes(ft))&&(fw==='all'||r.who===fw)&&(!q||searchable.includes(q));
   });
+  const scoreMap = new Map();
   if(sort === 'needs_work' || sort === 'best_fit') {
-    const scoreMap = new Map();
     recipes.forEach(r => scoreMap.set(r.id, getRecipeFitScore(r).raw));
-    recipes.sort((a,b)=>{
+  }
+  recipes.sort((a,b)=>{
+    if(!!b.isFavorite !== !!a.isFavorite) return b.isFavorite ? 1 : -1;
+    if(sort === 'needs_work' || sort === 'best_fit') {
       const diff = sort === 'best_fit' ? (scoreMap.get(a.id) - scoreMap.get(b.id)) : (scoreMap.get(b.id) - scoreMap.get(a.id));
       return diff || a.name.localeCompare(b.name,'en',{sensitivity:'base'});
-    });
-  } else {
-    recipes.sort((a,b)=>a.name.localeCompare(b.name,'en',{sensitivity:'base'}));
-  }
+    }
+    return a.name.localeCompare(b.name,'en',{sensitivity:'base'});
+  });
   if(!recipes.length){list.innerHTML='<div class="empty">No matching recipes found.</div>';return;}
-  const listSignature=[ft,fw,q,sort].join('|');
+  const listSignature=[ft,fw,q,sort,vaultFilterFavoritesOnly?'fav':'all'].join('|');
   resetProgressiveList('vault',listSignature);
   const totalRecipes=recipes.length;
   const visibleRecipes=recipes.slice(0,platePlanListLimits.vault);
@@ -12658,7 +12836,9 @@ function renderVault(){
     const showC = whoKey === 'both' || whoKey === 'chloe' || whoKey === 'c';
     const personLabel = whoKey === 'both' ? 'Shared' : (whoKey === 'elliott' || whoKey === 'e' ? 'Elliott' : (whoKey === 'chloe' || whoKey === 'c' ? 'Chloe' : r.who || 'Shared'));
     const badges=types.map(t=>'<span class="badge '+(t==='breakfast'?'badge-green':t==='lunch'?'badge-purple':'badge-coral')+'">'+ppEscapeHtml(toTitleCase(t))+'</span>').join(' ');
+    const favTag = r.isFavorite ? `<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favorite</span>` : '';
     const meta = [
+      favTag,
       badges,
       `<span class="tag">${ppEscapeHtml(personLabel)}</span>`,
       r.serves ? `<span class="tag">Serves ${ppEscapeHtml(r.serves)}</span>` : '',
@@ -12689,10 +12869,17 @@ function renderVault(){
     const enhancedFit = enhancedActive ? buildFit(enhancedActive, true) : null;
     const enhancedChanges = r.enhanced?.changes ? `<div style="font-size:12px;color:var(--text2);margin-top:6px">${ppEscapeHtml(r.enhanced.changes)}</div>` : '';
 
-    return `<div class="recipe-card">
+    return `<div class="recipe-card ${r.isFavorite ? 'is-favorite' : ''}">
       <div class="recipe-card-layout">
         <div class="recipe-card-main">
-          ${renderExpandableText(r.name,`recipe-${r.id}`,'recipe-card-name')}
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+            ${renderExpandableText(r.name,`recipe-${r.id}`,'recipe-card-name')}
+            <button type="button" class="recipe-fav-btn ${r.isFavorite ? 'active' : ''}" onclick="toggleRecipeFavorite('${ppEscapeAttr(r.id)}', event)" aria-label="${r.isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${r.isFavorite ? 'Favorited' : 'Add to favorites'}">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="${r.isFavorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+              </svg>
+            </button>
+          </div>
           <div class="recipe-card-meta">${meta}</div>
           ${originalFit.html}
         </div>
@@ -13206,12 +13393,14 @@ function renderRecipePreview(targetServes = 2) {
     const content = document.getElementById('view-modal-content');
     if (!content) return;
 
+    const isFav = !!(r.isFavorite || activeR.isFavorite);
     content.innerHTML = `
       <div class="recipe-view-sheet">
         <div class="recipe-view-nav">
           <div class="recipe-view-nav-title">
             <h2>${ppEscapeHtml(activeR.name)}</h2>
             <div class="recipe-view-nav-subtitle">
+              ${isFav ? '<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favorite</span>' : ''}
               ${isEnh ? '<span class="tag enhanced-pill">✨ Enhanced</span>' : ''}
               ${activeR.time ? `<span>⏱ ${activeR.time}m prep</span> · ` : ''}
               <span>${toTitleCase(mealType || 'Dinner')}</span>
@@ -13220,7 +13409,12 @@ function renderRecipePreview(targetServes = 2) {
               ${currentPreviewInstanceId ? '<span class="tag" style="background:var(--purple-bg);color:var(--purple);font-size:11px">Planned Meal</span>' : ''}
             </div>
           </div>
-          <div class="recipe-view-nav-actions">
+          <div class="recipe-view-nav-actions" style="display:flex;align-items:center;gap:8px">
+            <button type="button" id="modal-recipe-fav-btn" class="recipe-fav-btn ${isFav ? 'active' : ''}" onclick="toggleRecipeFavorite('${ppEscapeAttr(r.id)}', event)" aria-label="${isFav ? 'Remove from favorites' : 'Add to favorites'}" title="${isFav ? 'Favorited' : 'Add to favorites'}">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+              </svg>
+            </button>
             <button type="button" class="recipe-view-close-btn" onclick="closeRecipePreview()" aria-label="Close recipe">✕</button>
           </div>
         </div>
@@ -15344,6 +15538,7 @@ function reallocateProductToExistingGroup(productId, targetGroupId){
   refreshProductGroupAndRecipes(product.id);
   refreshAutoDefaultProductForGroup(targetGroup.id);
 
+  saveIngredient(product);
   saveState(true);
   renderIngredientBank();
   renderBank();
@@ -15413,6 +15608,7 @@ function saveProductReallocationToNewIngredient(){
   refreshProductGroupAndRecipes(product.id);
   refreshAutoDefaultProductForGroup(group.id);
 
+  saveIngredient(product);
   saveState(true);
   renderIngredientBank();
   renderBank();
@@ -19351,12 +19547,15 @@ function openSwapMealModal(day, slotKey) {
     } catch(e) {
       console.warn('Error calculating recipe nutrition for option:', e);
     }
+    const rec = (state.recipes || []).find(r => r.id === opt.id);
+    const isFav = !!(opt.isFavorite || rec?.isFavorite);
     return {
       id: opt.id,
       variant: opt.variant || 'original',
       value,
       label: opt.label || 'Untitled Recipe',
       enhanced: !!opt.enhanced,
+      isFavorite: isFav,
       cal: Math.round(cal || 0),
       prot: round1(prot || 0),
       serves,
@@ -19417,6 +19616,7 @@ function openSwapMealModal(day, slotKey) {
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <span style="font-size:11px;color:var(--text3);font-weight:600;margin-right:2px">Filter:</span>
         <button type="button" class="btn sm active-filter-btn" id="swap-filter-all" onclick="setSwapModalFilter('all')">All (${items.length})</button>
+        <button type="button" class="btn sm ghost" id="swap-filter-favorites" onclick="setSwapModalFilter('favorites')">❤️ Favorites</button>
         <button type="button" class="btn sm ghost" id="swap-filter-enhanced" onclick="setSwapModalFilter('enhanced')">Enhanced</button>
         <button type="button" class="btn sm ghost" id="swap-filter-original" onclick="setSwapModalFilter('original')">Original</button>
       </div>
@@ -19447,7 +19647,7 @@ function openSwapMealModal(day, slotKey) {
 
 function setSwapModalFilter(filterType) {
   currentSwapModalFilter = filterType;
-  ['all', 'enhanced', 'original'].forEach(f => {
+  ['all', 'favorites', 'enhanced', 'original'].forEach(f => {
     const btn = document.getElementById(`swap-filter-${f}`);
     if (btn) {
       if (f === filterType) {
@@ -19500,10 +19700,16 @@ function renderSwapModalOptionsList() {
   const terms = normalize(rawQuery).split(' ').filter(Boolean);
 
   let filtered = items.filter(item => {
+    if (currentSwapModalFilter === 'favorites' && !item.isFavorite) return false;
     if (currentSwapModalFilter === 'enhanced' && item.variant !== 'enhanced') return false;
     if (currentSwapModalFilter === 'original' && item.variant === 'enhanced') return false;
     if (!terms.length) return true;
     return terms.every(t => item.searchHaystack.includes(t));
+  });
+
+  filtered.sort((a, b) => {
+    if (!!b.isFavorite !== !!a.isFavorite) return b.isFavorite ? 1 : -1;
+    return a.label.localeCompare(b.label);
   });
 
   if (!filtered.length) {
@@ -19517,10 +19723,11 @@ function renderSwapModalOptionsList() {
     const isCurrent = curValue === item.value;
     const isSelected = selectedRecipeValue === item.value;
 
-    return `<div class="swap-modal-item ${isCurrent ? 'is-current' : ''} ${isSelected ? 'is-selected' : ''}" data-value="${ppEscapeAttr(item.value)}" onclick="selectSwapModalRecipe('${ppEscapeAttr(item.value)}')" ondblclick="executeSwapSlotAndClose(${currentSwapModalContext.day}, '${currentSwapModalContext.slotKey}', '${ppEscapeAttr(item.value)}')">
+    return `<div class="swap-modal-item ${item.isFavorite ? 'is-favorite' : ''} ${isCurrent ? 'is-current' : ''} ${isSelected ? 'is-selected' : ''}" data-value="${ppEscapeAttr(item.value)}" onclick="selectSwapModalRecipe('${ppEscapeAttr(item.value)}')" ondblclick="executeSwapSlotAndClose(${currentSwapModalContext.day}, '${currentSwapModalContext.slotKey}', '${ppEscapeAttr(item.value)}')">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span>${ppEscapeHtml(item.label)}</span>
+          ${item.isFavorite ? '<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-size:11px">❤️ Favorite</span>' : ''}
           ${item.enhanced ? '<span class="tag green">Enhanced</span>' : ''}
           ${isCurrent ? '<span class="tag">Currently Selected</span>' : ''}
           ${isSelected ? '<span class="tag green">✓ Ready to swap</span>' : ''}
@@ -19531,7 +19738,12 @@ function renderSwapModalOptionsList() {
           ${item.serves ? `<span>🍽️ Serves ${item.serves}</span>` : ''}
         </div>
       </div>
-      <div style="flex-shrink:0">
+      <div style="flex-shrink:0;display:flex;align-items:center;gap:8px">
+        <button type="button" class="recipe-fav-btn ${item.isFavorite ? 'active' : ''}" onclick="event.stopPropagation(); toggleRecipeFavorite('${ppEscapeAttr(item.id)}', event); if(currentSwapModalContext) { currentSwapModalContext.items.forEach(it => { if(it.id === '${ppEscapeAttr(item.id)}') it.isFavorite = !it.isFavorite; }); renderSwapModalOptionsList(); }" aria-label="${item.isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${item.isFavorite ? 'Favorited' : 'Add to favorites'}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="${item.isFavorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+          </svg>
+        </button>
         <button class="btn sm ${isSelected ? 'primary' : 'ghost'}" type="button" onclick="event.stopPropagation(); selectSwapModalRecipe('${ppEscapeAttr(item.value)}');">
           ${isSelected ? 'Selected ✓' : 'Select'}
         </button>
