@@ -207,9 +207,30 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.9.7';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v77';
+const PLATEPLAN_APP_VERSION='2.9.8';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v78';
 const SEED=[];
+
+let lastLoadedDataRecipesDoc = [];
+function parseRecipeDocumentToCleanArray(docData) {
+  if (!docData || typeof docData !== 'object') return [];
+  let rawList = [];
+  if (Array.isArray(docData.recipes)) {
+    rawList = docData.recipes;
+  } else if (docData.recipes && typeof docData.recipes === 'object') {
+    rawList = Object.entries(docData.recipes).map(([k, v]) => (v && typeof v === 'object' ? { id: v.id || k, ...v } : v));
+  } else if (Array.isArray(docData.list)) {
+    rawList = docData.list;
+  } else {
+    rawList = Object.entries(docData).map(([k, v]) => {
+      if (!v || typeof v !== 'object') return null;
+      return { id: v.id || k, ...v };
+    }).filter(Boolean);
+  }
+  return rawList.map(item => unwrapAndCleanItem(item)).filter(item => item && (item.name || item.title || item.ingredients));
+}
+window.parseRecipeDocumentToCleanArray = parseRecipeDocumentToCleanArray;
+window.isCloudHydrated = false;
 
 function unwrapAndCleanItem(item){
   if(!item || typeof item !== 'object') return item;
@@ -233,6 +254,7 @@ function unwrapAndCleanItem(item){
   delete clean.totalNutrition;
   if(clean.ingredients && Array.isArray(clean.ingredients)){
     clean.isFavorite = (clean.isFavorite !== undefined) ? !!clean.isFavorite : false;
+    clean.isFavourite = clean.isFavorite;
   }
   return clean;
 }
@@ -806,7 +828,7 @@ function normalizeLoadedState(s, { injectSeed = false, restoreRecipeBackup = fal
 }
 
 function loadState(){
-  let s = {recipes:[],ingredients:[...SEED],ingredientGroups:[],ingredientFamilies:[],ignoredGroupMergeSuggestions:[],ignoredDataQualityWarnings:[],dataQualityDismissals:{},useUpProducts:{},plan:{},planHistory:[],excluded:{},prefs:{exclude:'mushrooms, courgette',exclusions:{shared:[],elliott:[],chloe:[]},diet:'vegetarian',ecal:2400,eprot:130,ccal:1700,cprot:100, shopGroupBy: 'family', productPriority:'protein',prioritiseUseUpProducts:false}, customCats:{}};
+  let s = {recipes:[],ingredients:[...SEED],ingredientGroups:[],ingredientFamilies:[],ignoredGroupMergeSuggestions:[],ignoredDataQualityWarnings:[],dataQualityDismissals:{},useUpProducts:{},plan:{},planHistory:[],excluded:{},prefs:{exclude:'mushrooms, courgette',exclusions:{shared:[],elliott:[],chloe:[]},diet:'vegetarian',ecal:2400,eprot:130,ccal:1700,cprot:100, shopGroupBy: 'family', productPriority:'protein',prioritiseUseUpProducts:false}, customCats:{}, isCloudHydrated: false};
   try{
     const d=localStorage.getItem(SK);
     if(d){
@@ -2488,7 +2510,13 @@ function populateRecipesState(docs, options = {}){
     if(r && r.id) existingMap.set(String(r.id), r);
   });
 
-  const list = Array.isArray(docs) ? docs : (docs && typeof docs === 'object' ? (Array.isArray(docs.recipes) ? docs.recipes : Object.values(docs)) : []);
+  let list = [];
+  if (Array.isArray(docs)) {
+    list = docs;
+  } else if (docs && typeof docs === 'object') {
+    list = parseRecipeDocumentToCleanArray(docs);
+  }
+
   list.forEach(doc => {
     if(!doc) return;
     const raw = (typeof doc.data === 'function') ? doc.data() : (doc.data && typeof doc.data === 'object' && !doc.name ? doc.data : doc);
@@ -2502,6 +2530,7 @@ function populateRecipesState(docs, options = {}){
     }
     clean.id = String(clean.id);
     clean.isFavorite = (clean.isFavorite !== undefined) ? !!clean.isFavorite : false;
+    clean.isFavourite = clean.isFavorite;
 
     if(existingMap.has(clean.id)){
       const existing = existingMap.get(clean.id);
@@ -2650,7 +2679,9 @@ function startPlatePlanCloudListeners(){
     if(platePlanTransactionShield.inFlight || (Date.now() - platePlanTransactionShield.lastCompletedAt < platePlanTransactionShield.cooldownMs)) return;
     if(snapshot.metadata && snapshot.metadata.hasPendingWrites) return;
 
-    populateRecipesState(snapshot.docs);
+    // Merge subcollection docs with data/recipes document objects, deduplicating by id
+    const sources = [...snapshot.docs, ...(lastLoadedDataRecipesDoc || [])];
+    populateRecipesState(sources, { merge: true });
     window.state = state;
     window.appState = state;
 
@@ -2658,11 +2689,34 @@ function startPlatePlanCloudListeners(){
     renderAll();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
+    console.log("[v2.9.8 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
   }, error => {
     console.error('[RECIPES SUBCOLLECTION LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
   });
   platePlanSyncUnsubscribers.push(unsubRecipes);
+
+  // B2. Dedicated Subcollection Doc Listener: data/recipes
+  const unsubDataRecipes = householdDocRef.collection('data').doc('recipes').onSnapshot(docSnapshot => {
+    if(!docSnapshot || !docSnapshot.exists) return;
+    if(platePlanTransactionShield.inFlight || (Date.now() - platePlanTransactionShield.lastCompletedAt < platePlanTransactionShield.cooldownMs)) return;
+    if(docSnapshot.metadata && docSnapshot.metadata.hasPendingWrites) return;
+
+    const data = docSnapshot.data() || {};
+    lastLoadedDataRecipesDoc = parseRecipeDocumentToCleanArray(data);
+    populateRecipesState(lastLoadedDataRecipesDoc, { merge: true });
+    window.state = state;
+    window.appState = state;
+
+    rebuildPlatePlanIndexes();
+    renderAll();
+    platePlanLastSyncedAt = Date.now();
+    updatePlatePlanSyncStatus('synced');
+    console.log("[v2.9.8 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+  }, error => {
+    console.warn('[DATA RECIPES LISTENER ERROR]', error);
+  });
+  platePlanSyncUnsubscribers.push(unsubDataRecipes);
 
   // C. Lightweight Listener on doc('households/elliott-chloe') ONLY for top-level metadata
   const unsubHousehold = householdDocRef.onSnapshot(docSnapshot => {
@@ -2673,7 +2727,16 @@ function startPlatePlanCloudListeners(){
     const docData = docSnapshot.data() || {};
     const sourceData = (docData.state && typeof docData.state === 'object') ? docData.state : docData;
 
-    // Retain ONLY top-level metadata; NEVER overwrite ingredients or recipes from root document
+    // Guard Realtime Overwrites: Ensure root snapshot updates do NOT overwrite window.state.recipes.
+    // Instead, merge root recipes with the data/recipes document objects, deduplicating by id.
+    const rootRecipesRaw = sourceData.recipes || sourceData.data?.recipes;
+    if (rootRecipesRaw) {
+      const parsedRoot = parseRecipeDocumentToCleanArray(typeof rootRecipesRaw === 'object' ? rootRecipesRaw : { recipes: rootRecipesRaw });
+      const mergedSources = [...parsedRoot, ...(lastLoadedDataRecipesDoc || [])];
+      populateRecipesState(mergedSources, { merge: true });
+    }
+
+    // Retain ONLY top-level metadata; NEVER overwrite ingredients from root document
     if(sourceData.prefs !== undefined) state.prefs = sourceData.prefs;
     if(sourceData.plan && typeof sourceData.plan === 'object' && Object.keys(sourceData.plan).length > 0){
       state.plan = sourceData.plan;
@@ -2700,6 +2763,7 @@ function startPlatePlanCloudListeners(){
     renderAll();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
+    console.log("[v2.9.8 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
   }, error => {
     console.error('[HOUSEHOLD ROOT METADATA LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
@@ -2866,25 +2930,51 @@ async function loadSharedPlatePlan(){
     subSnapshot.forEach(doc => { dataDocs[doc.id] = doc.data() || {}; });
   } catch(e) {}
 
+  // Explicit Path Reading: Fetch the dedicated recipes document at doc(db, 'households', 'elliott-chloe', 'data', 'recipes')
+  try {
+    let dataRecipesRaw = dataDocs.recipes;
+    if (!dataRecipesRaw) {
+      const dataRecipesSnap = await householdDocRef.collection('data').doc('recipes').get();
+      if (dataRecipesSnap && dataRecipesSnap.exists) {
+        dataRecipesRaw = dataRecipesSnap.data() || {};
+      }
+    }
+    if (dataRecipesRaw) {
+      lastLoadedDataRecipesDoc = parseRecipeDocumentToCleanArray(dataRecipesRaw);
+    }
+  } catch(err) {
+    console.warn('[DEDICATED DATA/RECIPES READ ERROR]', err);
+  }
+
   // Explicit multi-path check across:
   // 1. Root document households/elliott-chloe (rootData.recipes & rootData.data.recipes)
   // 2. Subcollection path households/elliott-chloe/data (mapping documents containing recipe arrays or individual recipe objects)
   // 3. Subcollection path households/elliott-chloe/recipes
+  // 4. Dedicated document households/elliott-chloe/data/recipes
   const allRecipeSources = [];
   if (recipesSnapshot && !recipesSnapshot.empty) {
     recipesSnapshot.docs.forEach(doc => allRecipeSources.push(doc));
   }
 
+  if (lastLoadedDataRecipesDoc && lastLoadedDataRecipesDoc.length > 0) {
+    lastLoadedDataRecipesDoc.forEach(r => allRecipeSources.push(r));
+  }
+
   // Multi-path 1: Root document
   const rootRecipes = rootData.recipes || rootData.data?.recipes || null;
   if (rootRecipes) {
-    const arr = Array.isArray(rootRecipes) ? rootRecipes : Object.values(rootRecipes);
-    arr.forEach(r => { if(r) allRecipeSources.push(r); });
+    const parsedRoot = parseRecipeDocumentToCleanArray(typeof rootRecipes === 'object' ? rootRecipes : { recipes: rootRecipes });
+    parsedRoot.forEach(r => { if(r) allRecipeSources.push(r); });
   }
 
   // Multi-path 2: Subcollection data (specifically mapping documents containing recipe arrays or individual recipe objects)
   Object.entries(dataDocs).forEach(([docId, docContent]) => {
     if (!docContent || typeof docContent !== 'object') return;
+    if (docId === 'recipes') {
+      const parsed = parseRecipeDocumentToCleanArray(docContent);
+      parsed.forEach(r => { if(r) allRecipeSources.push(r); });
+      return;
+    }
     if (Array.isArray(docContent.recipes)) {
       docContent.recipes.forEach(r => { if(r) allRecipeSources.push(r); });
     } else if (docContent.recipes && typeof docContent.recipes === 'object') {
@@ -2913,7 +3003,10 @@ async function loadSharedPlatePlan(){
 
   // Deduplicate incoming items by recipe.id into window.state.recipes
   populateRecipesState(allRecipeSources);
+  state.isCloudHydrated = true;
+  window.isCloudHydrated = true;
   console.log(`[RECIPES HYDRATION] Deterministically hydrated and deduplicated ${state.recipes.length} recipes across multi-path check.`);
+  console.log("[v2.9.8 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
 
   const metaDoc = dataDocs.meta || {};
   const taxonomyDoc = dataDocs.taxonomy || {};
@@ -6591,9 +6684,10 @@ function getPlannerRecipeOptions(type, who, opts = {}){
     })
     .filter(r => !opts.applyExclusions || targetWho === 'any' || recipeAllowedForPerson(r, who))
     .flatMap(r => {
-      const isFav = !!r.isFavorite;
-      const rows = [{ id:r.id, variant:'original', recipe:r, label:r.name, isFavorite:isFav }];
-      if(r.enhanced) rows.push({ id:r.id, variant:'enhanced', recipe:r, label:(r.enhanced.name || r.name + ' (Enhanced)'), enhanced:true, isFavorite:isFav });
+      const origFav = (typeof isRecipeVariantFavourite === 'function') ? isRecipeVariantFavourite(r.id, 'original') : !!(r.isFavourite || r.isFavorite);
+      const enhFav = (typeof isRecipeVariantFavourite === 'function') ? isRecipeVariantFavourite(r.id, 'enhanced') : !!(r.isFavourite || r.isFavorite);
+      const rows = [{ id:r.id, variant:'original', recipe:r, label:r.name, isFavourite:origFav, isFavorite:origFav }];
+      if(r.enhanced) rows.push({ id:r.id, variant:'enhanced', recipe:r, label:(r.enhanced.name || r.name + ' (Enhanced)'), enhanced:true, isFavourite:enhFav, isFavorite:enhFav });
       return rows;
     });
   if(opts.applyTrafficFilter !== false) {
@@ -12562,10 +12656,19 @@ function collectDuplicateDataQualityAdvisories(){
 
 let isAuditing = false;
 function renderDataQuality() {
-    if (isAuditing) return;
-    isAuditing = true;
     const missingTarget = document.getElementById('dq-missing-list');
     const advisoryTarget = document.getElementById('dq-duplicate-list');
+    if (!state?.isCloudHydrated) {
+        const skeletonHtml = `<div class="ios-activity-skeleton">
+          <div class="spinner"></div>
+          <span class="ios-activity-skeleton-text">Syncing live cloud data before audit...</span>
+        </div>`;
+        if (missingTarget) missingTarget.innerHTML = skeletonHtml;
+        if (advisoryTarget) advisoryTarget.innerHTML = '';
+        return;
+    }
+    if (isAuditing) return;
+    isAuditing = true;
     const spinnerHtml = `<div class="dq-audit-loading" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 16px;gap:12px;color:var(--text2)">
       <div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--action-fill,#0969da);border-radius:50%;animation:spin 0.8s linear infinite"></div>
       <span style="font-size:13px;font-weight:600">Running data audit...</span>
@@ -12801,20 +12904,26 @@ function openVaultFitDetails(trigger,recipeId,variant='original',personKey='e'){
     <details class="card-details"><summary>Calculation details</summary><div>Fit score is based on calorie distance and protein shortfall. Nutrition comes only from mapped Product Bank products${variant==='enhanced'?' in the enhanced version':''}.</div></details>`;
   showReviewTooltip(trigger,html,`${person} nutrition and fit details`);
 }
+let vaultFilterFavouritesOnly = false;
 let vaultFilterFavoritesOnly = false;
-function toggleVaultFavoritesFilter(){
-  vaultFilterFavoritesOnly = !vaultFilterFavoritesOnly;
+function toggleVaultFavouritesFilter(){
+  vaultFilterFavouritesOnly = !vaultFilterFavouritesOnly;
+  vaultFilterFavoritesOnly = vaultFilterFavouritesOnly;
   const btn = document.getElementById('vault-filter-fav');
   if(btn){
-    btn.classList.toggle('active', vaultFilterFavoritesOnly);
-    btn.setAttribute('aria-pressed', vaultFilterFavoritesOnly ? 'true' : 'false');
+    btn.classList.toggle('active', vaultFilterFavouritesOnly);
+    btn.setAttribute('aria-pressed', vaultFilterFavouritesOnly ? 'true' : 'false');
   }
   renderVault();
 }
+function toggleVaultFavoritesFilter(){
+  toggleVaultFavouritesFilter();
+}
+window.toggleVaultFavouritesFilter = toggleVaultFavouritesFilter;
 window.toggleVaultFavoritesFilter = toggleVaultFavoritesFilter;
 
 function hasVariantFavoritingInitialized(){
-  const list = state?.userPrefs?.favoriteVariantIds || state?.prefs?.favoriteVariantIds;
+  const list = state?.userPrefs?.favouriteVariantIds || state?.prefs?.favouriteVariantIds || state?.userPrefs?.favoriteVariantIds || state?.prefs?.favoriteVariantIds;
   return Array.isArray(list);
 }
 
@@ -12822,33 +12931,38 @@ function ensureVariantFavoritingPrefs(){
   if(!state) state = {};
   if(!state.prefs) state.prefs = {};
   if(!state.userPrefs) state.userPrefs = state.prefs;
-  if(!Array.isArray(state.userPrefs.favoriteVariantIds)){
-    if(Array.isArray(state.prefs.favoriteVariantIds)){
-      state.userPrefs.favoriteVariantIds = state.prefs.favoriteVariantIds;
-    } else {
-      state.userPrefs.favoriteVariantIds = [];
-      (state.recipes || []).forEach(r => {
-        if(r && r.id && r.isFavorite){
-          const key = `${r.id}_original`;
-          if(!state.userPrefs.favoriteVariantIds.includes(key)){
-            state.userPrefs.favoriteVariantIds.push(key);
-          }
+  const existing = state.userPrefs.favouriteVariantIds || state.prefs.favouriteVariantIds || state.userPrefs.favoriteVariantIds || state.prefs.favoriteVariantIds;
+  if(!Array.isArray(existing)){
+    state.userPrefs.favouriteVariantIds = [];
+    (state.recipes || []).forEach(r => {
+      if(r && r.id && (r.isFavourite || r.isFavorite)){
+        const key = `${r.id}_original`;
+        if(!state.userPrefs.favouriteVariantIds.includes(key)){
+          state.userPrefs.favouriteVariantIds.push(key);
         }
-      });
-    }
+      }
+    });
+  } else {
+    state.userPrefs.favouriteVariantIds = existing;
   }
-  state.prefs.favoriteVariantIds = state.userPrefs.favoriteVariantIds;
-  return state.userPrefs.favoriteVariantIds;
+  state.prefs.favouriteVariantIds = state.userPrefs.favouriteVariantIds;
+  state.userPrefs.favoriteVariantIds = state.userPrefs.favouriteVariantIds;
+  state.prefs.favoriteVariantIds = state.userPrefs.favouriteVariantIds;
+  return state.userPrefs.favouriteVariantIds;
 }
 
-function isRecipeVariantFavorite(recipeId, variantKey = 'original'){
+function isRecipeVariantFavourite(recipeId, variantKey = 'original'){
   const list = ensureVariantFavoritingPrefs();
   const key = `${recipeId}_${variantKey}`;
   return list.includes(key);
 }
+function isRecipeVariantFavorite(recipeId, variantKey = 'original'){
+  return isRecipeVariantFavourite(recipeId, variantKey);
+}
+window.isRecipeVariantFavourite = isRecipeVariantFavourite;
 window.isRecipeVariantFavorite = isRecipeVariantFavorite;
 
-function toggleRecipeFavorite(recipeId, event, variantKey = 'original'){
+function toggleRecipeFavourite(recipeId, event, variantKey = 'original'){
   if(event){
     event.stopPropagation();
     event.preventDefault();
@@ -12864,7 +12978,9 @@ function toggleRecipeFavorite(recipeId, event, variantKey = 'original'){
   } else {
     list.splice(idx, 1);
   }
-  r.isFavorite = isRecipeVariantFavorite(r.id, 'original') || isRecipeVariantFavorite(r.id, 'enhanced');
+  const isNowFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced');
+  r.isFavourite = isNowFav;
+  r.isFavorite = isNowFav;
   r.updatedAt = new Date().toISOString();
 
   saveState(true);
@@ -12889,28 +13005,35 @@ function toggleRecipeFavorite(recipeId, event, variantKey = 'original'){
   renderVault();
 
   if(typeof previewBaseRecipe !== 'undefined' && previewBaseRecipe && previewBaseRecipe.id === recipeId){
+    previewBaseRecipe.isFavourite = r.isFavourite;
     previewBaseRecipe.isFavorite = r.isFavorite;
     const activeKey = (typeof currentViewTab !== 'undefined' && currentViewTab === 'enhanced') ? 'enhanced' : 'original';
-    const isCurrentActiveFav = isRecipeVariantFavorite(recipeId, activeKey);
+    const isCurrentActiveFav = isRecipeVariantFavourite(recipeId, activeKey);
     const favBtn = document.getElementById('modal-recipe-fav-btn');
     if(favBtn){
       favBtn.classList.toggle('active', isCurrentActiveFav);
       const svg = favBtn.querySelector('svg');
       if(svg) svg.setAttribute('fill', isCurrentActiveFav ? 'currentColor' : 'none');
+      favBtn.setAttribute('aria-label', isCurrentActiveFav ? 'Remove from favourites' : 'Add to favourites');
+      favBtn.setAttribute('title', isCurrentActiveFav ? 'Favourited' : 'Add to favourites');
     }
     const navSub = document.querySelector('.recipe-view-nav-subtitle');
     if(navSub){
       const existingTag = navSub.querySelector('.fav-tag');
       if(isCurrentActiveFav && !existingTag){
-        navSub.insertAdjacentHTML('afterbegin', '<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favorite</span> ');
+        navSub.insertAdjacentHTML('afterbegin', '<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favourite</span> ');
       } else if(!isCurrentActiveFav && existingTag){
         existingTag.remove();
       }
     }
   }
   const variantLabel = variantKey === 'enhanced' ? 'Enhanced' : 'Original';
-  showPlatePlanToast(willBeFav ? `Added "${r.name} (${variantLabel})" to favorites ❤️` : `Removed "${r.name} (${variantLabel})" from favorites`);
+  showPlatePlanToast(willBeFav ? `Added "${r.name} (${variantLabel})" to favourites ❤️` : `Removed "${r.name} (${variantLabel})" from favourites`);
 }
+function toggleRecipeFavorite(recipeId, event, variantKey = 'original'){
+  toggleRecipeFavourite(recipeId, event, variantKey);
+}
+window.toggleRecipeFavourite = toggleRecipeFavourite;
 window.toggleRecipeFavorite = toggleRecipeFavorite;
 
 function renderVault(){
@@ -12919,17 +13042,28 @@ function renderVault(){
   const sort=(document.getElementById('vault-sort')?.value)||'name';
   const list=document.getElementById('vault-list');
 
-  // Preserve and sync favorites filter button state
+  // Boot Phase Lock: Display iOS activity skeleton until cloud hydration finishes
+  if (!state?.isCloudHydrated) {
+    if (list) {
+      list.innerHTML = `<div class="ios-activity-skeleton">
+        <div class="spinner"></div>
+        <span class="ios-activity-skeleton-text">Syncing live recipes from cloud...</span>
+      </div>`;
+    }
+    return;
+  }
+
+  // Preserve and sync favourites filter button state
   const favFilterBtn = document.getElementById('vault-filter-fav');
   if(favFilterBtn){
-    favFilterBtn.classList.toggle('active', !!vaultFilterFavoritesOnly);
-    favFilterBtn.setAttribute('aria-pressed', vaultFilterFavoritesOnly ? 'true' : 'false');
+    favFilterBtn.classList.toggle('active', !!vaultFilterFavouritesOnly);
+    favFilterBtn.setAttribute('aria-pressed', vaultFilterFavouritesOnly ? 'true' : 'false');
   }
 
   ensureVariantFavoritingPrefs();
   const recipes=state.recipes.filter(r=>{
-    const hasAnyFav = isRecipeVariantFavorite(r.id, 'original') || isRecipeVariantFavorite(r.id, 'enhanced') || (!hasVariantFavoritingInitialized() && r.isFavorite);
-    if(vaultFilterFavoritesOnly && !hasAnyFav) return false;
+    const hasAnyFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
+    if(vaultFilterFavouritesOnly && !hasAnyFav) return false;
     const types=r.types||[r.type];
     const searchable=[
       r.name,
@@ -12945,8 +13079,8 @@ function renderVault(){
     recipes.forEach(r => scoreMap.set(r.id, getRecipeFitScore(r).raw));
   }
   recipes.sort((a,b)=>{
-    const aFav = isRecipeVariantFavorite(a.id, 'original') || isRecipeVariantFavorite(a.id, 'enhanced') || a.isFavorite;
-    const bFav = isRecipeVariantFavorite(b.id, 'original') || isRecipeVariantFavorite(b.id, 'enhanced') || b.isFavorite;
+    const aFav = isRecipeVariantFavourite(a.id, 'original') || isRecipeVariantFavourite(a.id, 'enhanced') || a.isFavourite || a.isFavorite;
+    const bFav = isRecipeVariantFavourite(b.id, 'original') || isRecipeVariantFavourite(b.id, 'enhanced') || b.isFavourite || b.isFavorite;
     if(!!bFav !== !!aFav) return bFav ? 1 : -1;
     if(sort === 'needs_work' || sort === 'best_fit') {
       const diff = sort === 'best_fit' ? (scoreMap.get(a.id) - scoreMap.get(b.id)) : (scoreMap.get(b.id) - scoreMap.get(a.id));
@@ -12955,7 +13089,7 @@ function renderVault(){
     return a.name.localeCompare(b.name,'en',{sensitivity:'base'});
   });
   if(!recipes.length){list.innerHTML='<div class="empty">No matching recipes found.</div>';return;}
-  const listSignature=[ft,fw,q,sort,vaultFilterFavoritesOnly?'fav':'all'].join('|');
+  const listSignature=[ft,fw,q,sort,vaultFilterFavouritesOnly?'fav':'all'].join('|');
   resetProgressiveList('vault',listSignature);
   const totalRecipes=recipes.length;
   const visibleRecipes=recipes.slice(0,platePlanListLimits.vault);
@@ -12970,10 +13104,10 @@ function renderVault(){
     const personLabel = whoKey === 'both' ? 'Shared' : (whoKey === 'elliott' || whoKey === 'e' ? 'Elliott' : (whoKey === 'chloe' || whoKey === 'c' ? 'Chloe' : r.who || 'Shared'));
     const badges=types.map(t=>'<span class="badge '+(t==='breakfast'?'badge-green':t==='lunch'?'badge-purple':'badge-coral')+'">'+ppEscapeHtml(toTitleCase(t))+'</span>').join(' ');
     
-    const origFav = isRecipeVariantFavorite(r.id, 'original') || (!hasVariantFavoritingInitialized() && r.isFavorite);
-    const enhFav = isRecipeVariantFavorite(r.id, 'enhanced');
+    const origFav = isRecipeVariantFavourite(r.id, 'original') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
+    const enhFav = isRecipeVariantFavourite(r.id, 'enhanced');
     const isAnyFav = origFav || enhFav;
-    const favTag = isAnyFav ? `<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favorite</span>` : '';
+    const favTag = isAnyFav ? `<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favourite</span>` : '';
     const meta = [
       favTag,
       badges,
@@ -13011,7 +13145,7 @@ function renderVault(){
         <div class="recipe-card-main">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
             ${renderExpandableText(r.name,`recipe-${r.id}`,'recipe-card-name')}
-            <button type="button" class="recipe-fav-btn ${origFav ? 'active' : ''}" onclick="toggleRecipeFavorite('${ppEscapeAttr(r.id)}', event, 'original')" aria-label="${origFav ? 'Remove original from favorites' : 'Add original to favorites'}" title="${origFav ? 'Original variant favorited' : 'Add original to favorites'}">
+            <button type="button" class="recipe-fav-btn ${origFav ? 'active' : ''}" onclick="toggleRecipeFavourite('${ppEscapeAttr(r.id)}', event, 'original')" aria-label="${origFav ? 'Remove original from favourites' : 'Add original to favourites'}" title="${origFav ? 'Original variant favourited' : 'Add original to favourites'}">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="${origFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
               </svg>
@@ -13030,7 +13164,7 @@ function renderVault(){
           <div style="min-width:0;flex:1">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
               <div class="enhanced-lbl" style="margin-bottom:0">Enhanced version</div>
-              <button type="button" class="recipe-fav-btn sm ${enhFav ? 'active' : ''}" onclick="toggleRecipeFavorite('${ppEscapeAttr(r.id)}', event, 'enhanced')" aria-label="${enhFav ? 'Remove enhanced from favorites' : 'Add enhanced to favorites'}" title="${enhFav ? 'Enhanced variant favorited' : 'Add enhanced to favorites'}" style="padding:2px">
+              <button type="button" class="recipe-fav-btn sm ${enhFav ? 'active' : ''}" onclick="toggleRecipeFavourite('${ppEscapeAttr(r.id)}', event, 'enhanced')" aria-label="${enhFav ? 'Remove enhanced from favourites' : 'Add enhanced to favourites'}" title="${enhFav ? 'Enhanced variant favourited' : 'Add enhanced to favourites'}" style="padding:2px">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="${enhFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                 </svg>
@@ -13538,14 +13672,14 @@ function renderRecipePreview(targetServes = 2) {
     if (!content) return;
 
     const variantKey = isEnh ? 'enhanced' : 'original';
-    const isFav = isRecipeVariantFavorite(r.id, variantKey) || (!hasVariantFavoritingInitialized() && r.isFavorite && !isEnh);
+    const isFav = isRecipeVariantFavourite(r.id, variantKey) || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite) && !isEnh);
     content.innerHTML = `
       <div class="recipe-view-sheet">
         <div class="recipe-view-nav">
           <div class="recipe-view-nav-title">
             <h2>${ppEscapeHtml(activeR.name)}</h2>
             <div class="recipe-view-nav-subtitle">
-              ${isFav ? '<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favorite</span>' : ''}
+              ${isFav ? '<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favourite</span>' : ''}
               ${isEnh ? '<span class="tag enhanced-pill">✨ Enhanced</span>' : ''}
               ${activeR.time ? `<span>⏱ ${activeR.time}m prep</span> · ` : ''}
               <span>${toTitleCase(mealType || 'Dinner')}</span>
@@ -13555,7 +13689,7 @@ function renderRecipePreview(targetServes = 2) {
             </div>
           </div>
           <div class="recipe-view-nav-actions" style="display:flex;align-items:center;gap:8px">
-            <button type="button" id="modal-recipe-fav-btn" class="recipe-fav-btn ${isFav ? 'active' : ''}" onclick="toggleRecipeFavorite('${ppEscapeAttr(r.id)}', event, '${variantKey}')" aria-label="${isFav ? 'Remove from favorites' : 'Add to favorites'}" title="${isFav ? 'Favorited' : 'Add to favorites'}">
+            <button type="button" id="modal-recipe-fav-btn" class="recipe-fav-btn ${isFav ? 'active' : ''}" onclick="toggleRecipeFavourite('${ppEscapeAttr(r.id)}', event, '${variantKey}')" aria-label="${isFav ? 'Remove from favourites' : 'Add to favourites'}" title="${isFav ? 'Favourited' : 'Add to favourites'}">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
               </svg>
@@ -19693,13 +19827,14 @@ function openSwapMealModal(day, slotKey) {
       console.warn('Error calculating recipe nutrition for option:', e);
     }
     const rec = (state.recipes || []).find(r => r.id === opt.id);
-    const isFav = !!(opt.isFavorite || rec?.isFavorite);
+    const isFav = isRecipeVariantFavourite(opt.id, opt.variant || 'original') || !!(rec?.isFavourite || rec?.isFavorite);
     return {
       id: opt.id,
       variant: opt.variant || 'original',
       value,
       label: opt.label || 'Untitled Recipe',
       enhanced: !!opt.enhanced,
+      isFavourite: isFav,
       isFavorite: isFav,
       cal: Math.round(cal || 0),
       prot: round1(prot || 0),
@@ -19761,7 +19896,7 @@ function openSwapMealModal(day, slotKey) {
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <span style="font-size:11px;color:var(--text3);font-weight:600;margin-right:2px">Filter:</span>
         <button type="button" class="btn sm active-filter-btn" id="swap-filter-all" onclick="setSwapModalFilter('all')">All (${items.length})</button>
-        <button type="button" class="btn sm ghost" id="swap-filter-favorites" onclick="setSwapModalFilter('favorites')">❤️ Favorites</button>
+        <button type="button" class="btn sm ghost" id="swap-filter-favourites" onclick="setSwapModalFilter('favourites')">❤️ Favourites</button>
         <button type="button" class="btn sm ghost" id="swap-filter-enhanced" onclick="setSwapModalFilter('enhanced')">Enhanced</button>
         <button type="button" class="btn sm ghost" id="swap-filter-original" onclick="setSwapModalFilter('original')">Original</button>
       </div>
@@ -19792,10 +19927,10 @@ function openSwapMealModal(day, slotKey) {
 
 function setSwapModalFilter(filterType) {
   currentSwapModalFilter = filterType;
-  ['all', 'favorites', 'enhanced', 'original'].forEach(f => {
+  ['all', 'favourites', 'favorites', 'enhanced', 'original'].forEach(f => {
     const btn = document.getElementById(`swap-filter-${f}`);
     if (btn) {
-      if (f === filterType) {
+      if (f === filterType || (f === 'favourites' && filterType === 'favorites') || (f === 'favorites' && filterType === 'favourites')) {
         btn.className = 'btn sm active-filter-btn';
       } else {
         btn.className = 'btn sm ghost';
@@ -19845,7 +19980,8 @@ function renderSwapModalOptionsList() {
   const terms = normalize(rawQuery).split(' ').filter(Boolean);
 
   let filtered = items.filter(item => {
-    if (currentSwapModalFilter === 'favorites' && !item.isFavorite) return false;
+    const isFav = item.isFavourite || item.isFavorite;
+    if ((currentSwapModalFilter === 'favourites' || currentSwapModalFilter === 'favorites') && !isFav) return false;
     if (currentSwapModalFilter === 'enhanced' && item.variant !== 'enhanced') return false;
     if (currentSwapModalFilter === 'original' && item.variant === 'enhanced') return false;
     if (!terms.length) return true;
@@ -19853,7 +19989,9 @@ function renderSwapModalOptionsList() {
   });
 
   filtered.sort((a, b) => {
-    if (!!b.isFavorite !== !!a.isFavorite) return b.isFavorite ? 1 : -1;
+    const aFav = a.isFavourite || a.isFavorite;
+    const bFav = b.isFavourite || b.isFavorite;
+    if (!!bFav !== !!aFav) return bFav ? 1 : -1;
     return a.label.localeCompare(b.label);
   });
 
@@ -19868,11 +20006,13 @@ function renderSwapModalOptionsList() {
     const isCurrent = curValue === item.value;
     const isSelected = selectedRecipeValue === item.value;
 
-    return `<div class="swap-modal-item ${item.isFavorite ? 'is-favorite' : ''} ${isCurrent ? 'is-current' : ''} ${isSelected ? 'is-selected' : ''}" data-value="${ppEscapeAttr(item.value)}" onclick="selectSwapModalRecipe('${ppEscapeAttr(item.value)}')" ondblclick="executeSwapSlotAndClose(${currentSwapModalContext.day}, '${currentSwapModalContext.slotKey}', '${ppEscapeAttr(item.value)}')">
+    const isFav = item.isFavourite || item.isFavorite;
+
+    return `<div class="swap-modal-item ${isFav ? 'is-favorite' : ''} ${isCurrent ? 'is-current' : ''} ${isSelected ? 'is-selected' : ''}" data-value="${ppEscapeAttr(item.value)}" onclick="selectSwapModalRecipe('${ppEscapeAttr(item.value)}')" ondblclick="executeSwapSlotAndClose(${currentSwapModalContext.day}, '${currentSwapModalContext.slotKey}', '${ppEscapeAttr(item.value)}')">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span>${ppEscapeHtml(item.label)}</span>
-          ${item.isFavorite ? '<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-size:11px">❤️ Favorite</span>' : ''}
+          ${isFav ? '<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-size:11px">❤️ Favourite</span>' : ''}
           ${item.enhanced ? '<span class="tag green">Enhanced</span>' : ''}
           ${isCurrent ? '<span class="tag">Currently Selected</span>' : ''}
           ${isSelected ? '<span class="tag green">✓ Ready to swap</span>' : ''}
@@ -19884,8 +20024,8 @@ function renderSwapModalOptionsList() {
         </div>
       </div>
       <div style="flex-shrink:0;display:flex;align-items:center;gap:8px">
-        <button type="button" class="recipe-fav-btn ${item.isFavorite ? 'active' : ''}" onclick="event.stopPropagation(); toggleRecipeFavorite('${ppEscapeAttr(item.id)}', event); if(currentSwapModalContext) { currentSwapModalContext.items.forEach(it => { if(it.id === '${ppEscapeAttr(item.id)}') it.isFavorite = !it.isFavorite; }); renderSwapModalOptionsList(); }" aria-label="${item.isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${item.isFavorite ? 'Favorited' : 'Add to favorites'}">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="${item.isFavorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <button type="button" class="recipe-fav-btn ${isFav ? 'active' : ''}" onclick="event.stopPropagation(); toggleRecipeFavourite('${ppEscapeAttr(item.id)}', event, '${ppEscapeAttr(item.variant || 'original')}'); if(currentSwapModalContext) { currentSwapModalContext.items.forEach(it => { if(it.id === '${ppEscapeAttr(item.id)}') { it.isFavourite = !it.isFavourite; it.isFavorite = it.isFavourite; } }); renderSwapModalOptionsList(); }" aria-label="${isFav ? 'Remove from favourites' : 'Add to favourites'}" title="${isFav ? 'Favourited' : 'Add to favourites'}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
           </svg>
         </button>
