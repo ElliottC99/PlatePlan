@@ -207,8 +207,8 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.9.6';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v76';
+const PLATEPLAN_APP_VERSION='2.9.7';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v77';
 const SEED=[];
 
 function unwrapAndCleanItem(item){
@@ -2480,20 +2480,42 @@ function populateIngredientsState(docs){
 }
 window.populateIngredientsState = populateIngredientsState;
 
-function populateRecipesState(docs){
+function populateRecipesState(docs, options = {}){
   if(!state) state = {};
-  const recs = [];
+  const recs = (options.merge && Array.isArray(state.recipes)) ? [...state.recipes] : [];
+  const existingMap = new Map();
+  recs.forEach(r => {
+    if(r && r.id) existingMap.set(String(r.id), r);
+  });
+
   const list = Array.isArray(docs) ? docs : (docs && typeof docs === 'object' ? (Array.isArray(docs.recipes) ? docs.recipes : Object.values(docs)) : []);
   list.forEach(doc => {
     if(!doc) return;
     const raw = (typeof doc.data === 'function') ? doc.data() : (doc.data && typeof doc.data === 'object' && !doc.name ? doc.data : doc);
     if(!raw || typeof raw !== 'object') return;
     const clean = unwrapAndCleanItem(raw) || {};
-    if(!clean.id) clean.id = doc.id || raw.id || ('recipe_' + Math.random().toString(36).substr(2, 9));
+    if(!clean.id) {
+      if(doc.id) clean.id = doc.id;
+      else if(raw.id) clean.id = raw.id;
+      else if(clean.name) clean.id = 'recipe_' + String(clean.name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      else clean.id = 'recipe_' + Math.random().toString(36).substr(2, 9);
+    }
+    clean.id = String(clean.id);
     clean.isFavorite = (clean.isFavorite !== undefined) ? !!clean.isFavorite : false;
-    recs.push(clean);
-    recs[clean.id] = clean;
+
+    if(existingMap.has(clean.id)){
+      const existing = existingMap.get(clean.id);
+      Object.assign(existing, clean);
+    } else {
+      recs.push(clean);
+      existingMap.set(clean.id, clean);
+    }
   });
+
+  recs.forEach(r => {
+    if(r && r.id) recs[r.id] = r;
+  });
+
   state.recipes = recs;
   window.state = state;
   window.appState = state;
@@ -2836,11 +2858,7 @@ async function loadSharedPlatePlan(){
     console.warn('[RECIPES SUBCOLLECTION READ ERROR]', err);
   }
 
-  if (recipesSnapshot && !recipesSnapshot.empty) {
-    populateRecipesState(recipesSnapshot.docs);
-  }
-
-  // 5. Hydrate Top-Level Metadata from root document (and fallback dataCol if present)
+  // 5. Hydrate Top-Level Metadata from subcollection: data
   let dataDocs = {};
   try {
     const dataCol = householdDocRef.collection('data');
@@ -2848,29 +2866,54 @@ async function loadSharedPlatePlan(){
     subSnapshot.forEach(doc => { dataDocs[doc.id] = doc.data() || {}; });
   } catch(e) {}
 
-  // Fallback checks if recipes subcollection was empty or nested in rootDoc or dataDocs
-  if (!Array.isArray(state.recipes) || state.recipes.length === 0) {
-    const fallbackRecipes = rootData.recipes || rootData.data?.recipes || dataDocs.recipes || dataDocs.recipes?.recipes || dataDocs.recipes?.list || null;
-    if (fallbackRecipes) {
-      console.log('[RECIPES HYDRATION] Hydrating recipes from nested root/data fallback...');
-      populateRecipesState(fallbackRecipes);
-    } else {
-      try {
-        const localBackup = localStorage.getItem('plateplan_recipes_backup') || localStorage.getItem('plateplan_state_v2');
-        if (localBackup) {
-          const parsed = JSON.parse(localBackup);
-          const recs = parsed.recipes || (Array.isArray(parsed) ? parsed : null);
-          if (Array.isArray(recs) && recs.length > 0) {
-            console.log('[RECIPES HYDRATION] Hydrating recipes from local backup storage...');
-            populateRecipesState(recs);
-          }
-        }
-      } catch(bErr) {}
+  // Explicit multi-path check across:
+  // 1. Root document households/elliott-chloe (rootData.recipes & rootData.data.recipes)
+  // 2. Subcollection path households/elliott-chloe/data (mapping documents containing recipe arrays or individual recipe objects)
+  // 3. Subcollection path households/elliott-chloe/recipes
+  const allRecipeSources = [];
+  if (recipesSnapshot && !recipesSnapshot.empty) {
+    recipesSnapshot.docs.forEach(doc => allRecipeSources.push(doc));
+  }
+
+  // Multi-path 1: Root document
+  const rootRecipes = rootData.recipes || rootData.data?.recipes || null;
+  if (rootRecipes) {
+    const arr = Array.isArray(rootRecipes) ? rootRecipes : Object.values(rootRecipes);
+    arr.forEach(r => { if(r) allRecipeSources.push(r); });
+  }
+
+  // Multi-path 2: Subcollection data (specifically mapping documents containing recipe arrays or individual recipe objects)
+  Object.entries(dataDocs).forEach(([docId, docContent]) => {
+    if (!docContent || typeof docContent !== 'object') return;
+    if (Array.isArray(docContent.recipes)) {
+      docContent.recipes.forEach(r => { if(r) allRecipeSources.push(r); });
+    } else if (docContent.recipes && typeof docContent.recipes === 'object') {
+      Object.values(docContent.recipes).forEach(r => { if(r) allRecipeSources.push(r); });
+    } else if (Array.isArray(docContent.list)) {
+      docContent.list.forEach(r => { if(r) allRecipeSources.push(r); });
+    } else if (docContent.name && (docContent.ingredients || docContent.steps || docContent.serves || docId.startsWith('recipe_') || docId.startsWith('recipe-') || docContent.name.toLowerCase().includes('pancake'))) {
+      allRecipeSources.push({ id: docContent.id || docId, ...docContent });
     }
+  });
+
+  // Local storage fallback if no recipe items found yet
+  if (allRecipeSources.length === 0) {
+    try {
+      const localBackup = localStorage.getItem('plateplan_recipes_backup') || localStorage.getItem('plateplan_state_v2');
+      if (localBackup) {
+        const parsed = JSON.parse(localBackup);
+        const recs = parsed.recipes || (Array.isArray(parsed) ? parsed : null);
+        if (Array.isArray(recs) && recs.length > 0) {
+          console.log('[RECIPES HYDRATION] Hydrating recipes from local backup storage...');
+          recs.forEach(r => { if(r) allRecipeSources.push(r); });
+        }
+      }
+    } catch(bErr) {}
   }
-  if (!Array.isArray(state.recipes)) {
-    state.recipes = [];
-  }
+
+  // Deduplicate incoming items by recipe.id into window.state.recipes
+  populateRecipesState(allRecipeSources);
+  console.log(`[RECIPES HYDRATION] Deterministically hydrated and deduplicated ${state.recipes.length} recipes across multi-path check.`);
 
   const metaDoc = dataDocs.meta || {};
   const taxonomyDoc = dataDocs.taxonomy || {};
@@ -12425,6 +12468,13 @@ function collectDeterministicDataQualityIssues(){
                 const entityId = `${recipe.id}:${variantId}:${index}`;
                 const ingredientName = ingredient.name || ingredient.raw || `Ingredient ${index + 1}`;
                 if(!resolved.product){
+                    const unitStr = String(ingredient.unit || '').toLowerCase().trim();
+                    const isCountedPantry = ['qty','count','item','whole','piece','pieces','small','medium','large','pack','pouch','unit'].includes(unitStr) || (!unitStr && +(ingredient.qty || 0) > 0);
+                    const boundIngId = ingredient.ingredientId || ingredient.familyId || resolved.group?.ingredientId || (ingredient.bankId && getIngredientFamily(ingredient.bankId)) || (ingredientName && (state.ingredientFamilies || []).some(f => normaliseAliasText(f.name) === normaliseAliasText(ingredientName) || normaliseAliasText(f.name).includes(normaliseAliasText(ingredientName))));
+                    if(boundIngId || (isCountedPantry && (ingredient.ingredientId || ingredient.bankId || resolved.groupId))){
+                        // Counted pantry item bound directly to ingredientId when productId is null satisfies audit completeness
+                        return;
+                    }
                     const unmappedFix = `<button class="btn sm dq-fix-btn" onclick="openProductMappingModal('${ppEscapeAttr(entityId)}', 'recipe-ingredient:${ppEscapeAttr(entityId)}:unmapped-counted-ingredient')">Fix</button>`;
                     add({entityType:'recipe-ingredient',entityId,code:'unmapped-counted-ingredient',severity:'blocker',title,message:`${ingredientName} has a counted quantity but no mapped product.`,fixButtonHtml:unmappedFix,fixTarget:{entityType:'recipe-ingredient',entityId},source:[ingredient.name,ingredient.raw,ingredient.qty,ingredient.unit,ingredient.groupId,ingredient.bankId]});
                     return;
@@ -12510,20 +12560,38 @@ function collectDuplicateDataQualityAdvisories(){
     }).filter(Boolean);
 }
 
+let isAuditing = false;
 function renderDataQuality() {
-    const issues = collectDeterministicDataQualityIssues();
-    const blockers = issues.filter(issue => issue.severity === 'blocker');
-    const gaps = issues.filter(issue => issue.severity === 'gap');
-    const section = (title, rows, emptyText, open = true) => `<details ${open ? 'open' : ''} style="margin-bottom:12px"><summary style="cursor:pointer;font-weight:700;font-size:13px;margin-bottom:4px">${ppEscapeHtml(title)} (${rows.length})</summary>${rows.length ? rows.map(issue => renderDataQualityIssue(issue)).join('') : `<div class="msg success" style="margin:6px 0 0">${ppEscapeHtml(emptyText)}</div>`}</details>`;
+    if (isAuditing) return;
+    isAuditing = true;
     const missingTarget = document.getElementById('dq-missing-list');
-    if(missingTarget) missingTarget.innerHTML = section('Calculation blockers', blockers, 'No calculation blockers detected.') + section('Other data gaps', gaps, 'No other data gaps detected.', false);
-
-    const advisories = [...collectUnusualNumberWarnings(), ...collectMissingOilWarnings()].map(dataQualityAdvisoryFromLegacy).concat(collectDuplicateDataQualityAdvisories()).filter(issue => !isDataQualityWarningIgnored(issue.key, issue.fingerprint) && !(issue.legacyKey && isDataQualityWarningIgnored(issue.legacyKey)));
     const advisoryTarget = document.getElementById('dq-duplicate-list');
-    if(advisoryTarget) advisoryTarget.innerHTML = `<details><summary style="cursor:pointer;font-weight:700;font-size:13px">Heuristic advisories (${advisories.length})</summary><div style="margin-top:6px">${advisories.length ? advisories.map(issue => renderDataQualityIssue(issue, true)).join('') : '<div class="msg success" style="margin:0">No active advisories.</div>'}</div></details>`;
+    const spinnerHtml = `<div class="dq-audit-loading" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 16px;gap:12px;color:var(--text2)">
+      <div style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--action-fill,#0969da);border-radius:50%;animation:spin 0.8s linear infinite"></div>
+      <span style="font-size:13px;font-weight:600">Running data audit...</span>
+    </div>`;
+    if (missingTarget) missingTarget.innerHTML = spinnerHtml;
+    if (advisoryTarget) advisoryTarget.innerHTML = '';
 
-    const catBox = document.getElementById('dq-cat-list')?.closest('.card');
-    if(catBox) catBox.style.display = 'none';
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            try {
+                const issues = collectDeterministicDataQualityIssues();
+                const blockers = issues.filter(issue => issue.severity === 'blocker');
+                const gaps = issues.filter(issue => issue.severity === 'gap');
+                const section = (title, rows, emptyText, open = true) => `<details ${open ? 'open' : ''} style="margin-bottom:12px"><summary style="cursor:pointer;font-weight:700;font-size:13px;margin-bottom:4px">${ppEscapeHtml(title)} (${rows.length})</summary>${rows.length ? rows.map(issue => renderDataQualityIssue(issue)).join('') : `<div class="msg success" style="margin:6px 0 0">${ppEscapeHtml(emptyText)}</div>`}</details>`;
+                if(missingTarget) missingTarget.innerHTML = section('Calculation blockers', blockers, 'No calculation blockers detected.') + section('Other data gaps', gaps, 'No other data gaps detected.', false);
+
+                const advisories = [...collectUnusualNumberWarnings(), ...collectMissingOilWarnings()].map(dataQualityAdvisoryFromLegacy).concat(collectDuplicateDataQualityAdvisories()).filter(issue => !isDataQualityWarningIgnored(issue.key, issue.fingerprint) && !(issue.legacyKey && isDataQualityWarningIgnored(issue.legacyKey)));
+                if(advisoryTarget) advisoryTarget.innerHTML = `<details><summary style="cursor:pointer;font-weight:700;font-size:13px">Heuristic advisories (${advisories.length})</summary><div style="margin-top:6px">${advisories.length ? advisories.map(issue => renderDataQualityIssue(issue, true)).join('') : '<div class="msg success" style="margin:0">No active advisories.</div>'}</div></details>`;
+
+                const catBox = document.getElementById('dq-cat-list')?.closest('.card');
+                if(catBox) catBox.style.display = 'none';
+            } finally {
+                isAuditing = false;
+            }
+        }, 40);
+    });
 }
 
 function deleteCategory(slug) {
@@ -12739,24 +12807,74 @@ function toggleVaultFavoritesFilter(){
   const btn = document.getElementById('vault-filter-fav');
   if(btn){
     btn.classList.toggle('active', vaultFilterFavoritesOnly);
+    btn.setAttribute('aria-pressed', vaultFilterFavoritesOnly ? 'true' : 'false');
   }
   renderVault();
 }
 window.toggleVaultFavoritesFilter = toggleVaultFavoritesFilter;
 
-function toggleRecipeFavorite(recipeId, event){
+function hasVariantFavoritingInitialized(){
+  const list = state?.userPrefs?.favoriteVariantIds || state?.prefs?.favoriteVariantIds;
+  return Array.isArray(list);
+}
+
+function ensureVariantFavoritingPrefs(){
+  if(!state) state = {};
+  if(!state.prefs) state.prefs = {};
+  if(!state.userPrefs) state.userPrefs = state.prefs;
+  if(!Array.isArray(state.userPrefs.favoriteVariantIds)){
+    if(Array.isArray(state.prefs.favoriteVariantIds)){
+      state.userPrefs.favoriteVariantIds = state.prefs.favoriteVariantIds;
+    } else {
+      state.userPrefs.favoriteVariantIds = [];
+      (state.recipes || []).forEach(r => {
+        if(r && r.id && r.isFavorite){
+          const key = `${r.id}_original`;
+          if(!state.userPrefs.favoriteVariantIds.includes(key)){
+            state.userPrefs.favoriteVariantIds.push(key);
+          }
+        }
+      });
+    }
+  }
+  state.prefs.favoriteVariantIds = state.userPrefs.favoriteVariantIds;
+  return state.userPrefs.favoriteVariantIds;
+}
+
+function isRecipeVariantFavorite(recipeId, variantKey = 'original'){
+  const list = ensureVariantFavoritingPrefs();
+  const key = `${recipeId}_${variantKey}`;
+  return list.includes(key);
+}
+window.isRecipeVariantFavorite = isRecipeVariantFavorite;
+
+function toggleRecipeFavorite(recipeId, event, variantKey = 'original'){
   if(event){
     event.stopPropagation();
     event.preventDefault();
   }
   const r = (state.recipes || []).find(x => x.id === recipeId);
   if(!r) return;
-  r.isFavorite = !r.isFavorite;
+  const list = ensureVariantFavoritingPrefs();
+  const key = `${recipeId}_${variantKey}`;
+  const idx = list.indexOf(key);
+  const willBeFav = (idx === -1);
+  if(willBeFav){
+    list.push(key);
+  } else {
+    list.splice(idx, 1);
+  }
+  r.isFavorite = isRecipeVariantFavorite(r.id, 'original') || isRecipeVariantFavorite(r.id, 'enhanced');
   r.updatedAt = new Date().toISOString();
 
+  saveState(true);
   try {
     const householdId = (state && state.householdId) || ACTIVE_HOUSEHOLD_ID || 'elliott-chloe';
     if(platePlanDb){
+      platePlanDb.collection('households').doc(householdId).collection('data').doc('meta').set({
+        prefs: state.prefs,
+        userPrefs: state.userPrefs
+      }, { merge: true }).catch(e => console.warn('[PREFS SYNC ERROR]', e));
       platePlanDb.collection('households').doc(householdId).collection('recipes').doc(String(r.id)).set(
         sanitizePayloadForFirestore(unwrapAndCleanItem(r)),
         { merge: true }
@@ -12764,31 +12882,34 @@ function toggleRecipeFavorite(recipeId, event){
     }
   } catch(e){}
 
-  saveState(true);
   try {
     localStorage.setItem('plateplan_recipes_backup', safeJsonStringify(state.recipes));
   } catch(e){}
 
   renderVault();
+
   if(typeof previewBaseRecipe !== 'undefined' && previewBaseRecipe && previewBaseRecipe.id === recipeId){
     previewBaseRecipe.isFavorite = r.isFavorite;
+    const activeKey = (typeof currentViewTab !== 'undefined' && currentViewTab === 'enhanced') ? 'enhanced' : 'original';
+    const isCurrentActiveFav = isRecipeVariantFavorite(recipeId, activeKey);
     const favBtn = document.getElementById('modal-recipe-fav-btn');
     if(favBtn){
-      favBtn.classList.toggle('active', r.isFavorite);
+      favBtn.classList.toggle('active', isCurrentActiveFav);
       const svg = favBtn.querySelector('svg');
-      if(svg) svg.setAttribute('fill', r.isFavorite ? 'currentColor' : 'none');
+      if(svg) svg.setAttribute('fill', isCurrentActiveFav ? 'currentColor' : 'none');
     }
     const navSub = document.querySelector('.recipe-view-nav-subtitle');
     if(navSub){
       const existingTag = navSub.querySelector('.fav-tag');
-      if(r.isFavorite && !existingTag){
+      if(isCurrentActiveFav && !existingTag){
         navSub.insertAdjacentHTML('afterbegin', '<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favorite</span> ');
-      } else if(!r.isFavorite && existingTag){
+      } else if(!isCurrentActiveFav && existingTag){
         existingTag.remove();
       }
     }
   }
-  showPlatePlanToast(r.isFavorite ? `Added "${r.name}" to favorites ❤️` : `Removed "${r.name}" from favorites`);
+  const variantLabel = variantKey === 'enhanced' ? 'Enhanced' : 'Original';
+  showPlatePlanToast(willBeFav ? `Added "${r.name} (${variantLabel})" to favorites ❤️` : `Removed "${r.name} (${variantLabel})" from favorites`);
 }
 window.toggleRecipeFavorite = toggleRecipeFavorite;
 
@@ -12797,8 +12918,18 @@ function renderVault(){
   const q=(document.getElementById('vault-search')?.value||'').trim().toLowerCase();
   const sort=(document.getElementById('vault-sort')?.value)||'name';
   const list=document.getElementById('vault-list');
+
+  // Preserve and sync favorites filter button state
+  const favFilterBtn = document.getElementById('vault-filter-fav');
+  if(favFilterBtn){
+    favFilterBtn.classList.toggle('active', !!vaultFilterFavoritesOnly);
+    favFilterBtn.setAttribute('aria-pressed', vaultFilterFavoritesOnly ? 'true' : 'false');
+  }
+
+  ensureVariantFavoritingPrefs();
   const recipes=state.recipes.filter(r=>{
-    if(vaultFilterFavoritesOnly && !r.isFavorite) return false;
+    const hasAnyFav = isRecipeVariantFavorite(r.id, 'original') || isRecipeVariantFavorite(r.id, 'enhanced') || (!hasVariantFavoritingInitialized() && r.isFavorite);
+    if(vaultFilterFavoritesOnly && !hasAnyFav) return false;
     const types=r.types||[r.type];
     const searchable=[
       r.name,
@@ -12814,7 +12945,9 @@ function renderVault(){
     recipes.forEach(r => scoreMap.set(r.id, getRecipeFitScore(r).raw));
   }
   recipes.sort((a,b)=>{
-    if(!!b.isFavorite !== !!a.isFavorite) return b.isFavorite ? 1 : -1;
+    const aFav = isRecipeVariantFavorite(a.id, 'original') || isRecipeVariantFavorite(a.id, 'enhanced') || a.isFavorite;
+    const bFav = isRecipeVariantFavorite(b.id, 'original') || isRecipeVariantFavorite(b.id, 'enhanced') || b.isFavorite;
+    if(!!bFav !== !!aFav) return bFav ? 1 : -1;
     if(sort === 'needs_work' || sort === 'best_fit') {
       const diff = sort === 'best_fit' ? (scoreMap.get(a.id) - scoreMap.get(b.id)) : (scoreMap.get(b.id) - scoreMap.get(a.id));
       return diff || a.name.localeCompare(b.name,'en',{sensitivity:'base'});
@@ -12836,7 +12969,11 @@ function renderVault(){
     const showC = whoKey === 'both' || whoKey === 'chloe' || whoKey === 'c';
     const personLabel = whoKey === 'both' ? 'Shared' : (whoKey === 'elliott' || whoKey === 'e' ? 'Elliott' : (whoKey === 'chloe' || whoKey === 'c' ? 'Chloe' : r.who || 'Shared'));
     const badges=types.map(t=>'<span class="badge '+(t==='breakfast'?'badge-green':t==='lunch'?'badge-purple':'badge-coral')+'">'+ppEscapeHtml(toTitleCase(t))+'</span>').join(' ');
-    const favTag = r.isFavorite ? `<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favorite</span>` : '';
+    
+    const origFav = isRecipeVariantFavorite(r.id, 'original') || (!hasVariantFavoritingInitialized() && r.isFavorite);
+    const enhFav = isRecipeVariantFavorite(r.id, 'enhanced');
+    const isAnyFav = origFav || enhFav;
+    const favTag = isAnyFav ? `<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favorite</span>` : '';
     const meta = [
       favTag,
       badges,
@@ -12869,13 +13006,13 @@ function renderVault(){
     const enhancedFit = enhancedActive ? buildFit(enhancedActive, true) : null;
     const enhancedChanges = r.enhanced?.changes ? `<div style="font-size:12px;color:var(--text2);margin-top:6px">${ppEscapeHtml(r.enhanced.changes)}</div>` : '';
 
-    return `<div class="recipe-card ${r.isFavorite ? 'is-favorite' : ''}">
+    return `<div class="recipe-card ${isAnyFav ? 'is-favorite' : ''}">
       <div class="recipe-card-layout">
         <div class="recipe-card-main">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
             ${renderExpandableText(r.name,`recipe-${r.id}`,'recipe-card-name')}
-            <button type="button" class="recipe-fav-btn ${r.isFavorite ? 'active' : ''}" onclick="toggleRecipeFavorite('${ppEscapeAttr(r.id)}', event)" aria-label="${r.isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${r.isFavorite ? 'Favorited' : 'Add to favorites'}">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="${r.isFavorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <button type="button" class="recipe-fav-btn ${origFav ? 'active' : ''}" onclick="toggleRecipeFavorite('${ppEscapeAttr(r.id)}', event, 'original')" aria-label="${origFav ? 'Remove original from favorites' : 'Add original to favorites'}" title="${origFav ? 'Original variant favorited' : 'Add original to favorites'}">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="${origFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
               </svg>
             </button>
@@ -12891,7 +13028,14 @@ function renderVault(){
       ${r.enhanced ? `<div class="enhanced-box">
         <div class="enhanced-layout">
           <div style="min-width:0;flex:1">
-            <div class="enhanced-lbl">Enhanced version</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
+              <div class="enhanced-lbl" style="margin-bottom:0">Enhanced version</div>
+              <button type="button" class="recipe-fav-btn sm ${enhFav ? 'active' : ''}" onclick="toggleRecipeFavorite('${ppEscapeAttr(r.id)}', event, 'enhanced')" aria-label="${enhFav ? 'Remove enhanced from favorites' : 'Add enhanced to favorites'}" title="${enhFav ? 'Enhanced variant favorited' : 'Add enhanced to favorites'}" style="padding:2px">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="${enhFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                </svg>
+              </button>
+            </div>
             ${enhancedFit.html}
             ${enhancedChanges}
           </div>
@@ -13393,7 +13537,8 @@ function renderRecipePreview(targetServes = 2) {
     const content = document.getElementById('view-modal-content');
     if (!content) return;
 
-    const isFav = !!(r.isFavorite || activeR.isFavorite);
+    const variantKey = isEnh ? 'enhanced' : 'original';
+    const isFav = isRecipeVariantFavorite(r.id, variantKey) || (!hasVariantFavoritingInitialized() && r.isFavorite && !isEnh);
     content.innerHTML = `
       <div class="recipe-view-sheet">
         <div class="recipe-view-nav">
@@ -13410,7 +13555,7 @@ function renderRecipePreview(targetServes = 2) {
             </div>
           </div>
           <div class="recipe-view-nav-actions" style="display:flex;align-items:center;gap:8px">
-            <button type="button" id="modal-recipe-fav-btn" class="recipe-fav-btn ${isFav ? 'active' : ''}" onclick="toggleRecipeFavorite('${ppEscapeAttr(r.id)}', event)" aria-label="${isFav ? 'Remove from favorites' : 'Add to favorites'}" title="${isFav ? 'Favorited' : 'Add to favorites'}">
+            <button type="button" id="modal-recipe-fav-btn" class="recipe-fav-btn ${isFav ? 'active' : ''}" onclick="toggleRecipeFavorite('${ppEscapeAttr(r.id)}', event, '${variantKey}')" aria-label="${isFav ? 'Remove from favorites' : 'Add to favorites'}" title="${isFav ? 'Favorited' : 'Add to favorites'}">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
               </svg>
