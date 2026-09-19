@@ -207,9 +207,9 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.9.9';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v79';
-console.log("[v2.9.9 CLOUD-ONLY]", "Legacy localStorage backups stripped. Cloud hydration active.");
+const PLATEPLAN_APP_VERSION='2.9.10';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v80';
+console.log("[v2.9.10 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
 const SEED=[];
 
 let lastLoadedDataRecipesDoc = [];
@@ -296,6 +296,514 @@ let platePlanRescheduleUndo = null;
 let platePlanRescheduleDraft = null;
 let platePlanEarlierDaysExpanded = false;
 const PLATEPLAN_LIST_BATCH = 24;
+
+// ============================================================================
+// == v2.9.10 ROBUST PERSISTENCE & STATE RECOVERY ARCHITECTURE ==
+// ============================================================================
+
+/**
+ * A. Defensive LocalStorage Engine
+ * Wraps operations, catches QuotaExceededError, auto-prunes non-essential keys,
+ * and preserves critical keys (household_id, session tokens, etc.).
+ */
+function safeLocalStorageSet(key, data) {
+  let serialized = '';
+  try {
+    serialized = typeof data === 'string' ? data : (typeof safeJsonStringify === 'function' ? safeJsonStringify(data) : JSON.stringify(data));
+  } catch(e) {
+    try { serialized = JSON.stringify(data); } catch(_e2) { serialized = String(data); }
+  }
+  try {
+    localStorage.setItem(key, serialized);
+    return true;
+  } catch (err) {
+    if (err && (err.name === 'QuotaExceededError' || err.code === 22 || String(err).includes('QuotaExceededError') || String(err.message || '').toLowerCase().includes('quota'))) {
+      console.warn(`[Storage Guard] LocalStorage full on key '${key}'. Pruning cache...`);
+      // Evict low-priority backup caches while preserving critical keys
+      const nonEssentialKeys = [
+        'plateplan_history_backup',
+        'plateplan_offline_backup',
+        'plateplan_v1_recovery',
+        'plateplan_recovery_history',
+        'plateplan_recipes_backup',
+        'plateplan_recipes_backup_v2',
+        'plateplan_state_v2'
+      ];
+      nonEssentialKeys.forEach(k => {
+        try { localStorage.removeItem(k); } catch(_e) {}
+      });
+
+      try {
+        localStorage.setItem(key, serialized);
+        return true;
+      } catch (retryErr) {
+        console.error(`[Storage Guard] LocalStorage write failed post-pruning:`, retryErr);
+        return false;
+      }
+    }
+    console.error(`[Storage Guard] LocalStorage write failed on key '${key}':`, err);
+    return false;
+  }
+}
+window.safeLocalStorageSet = safeLocalStorageSet;
+
+/**
+ * B. Firestore Payload Serialization Hygiene (1 MB Limit Guard)
+ * Strips heavy embedded recipe/ingredient trees, keeps light slot references,
+ * and rejects payloads exceeding 900,000 bytes.
+ */
+function sanitizePlanForFirestore(planData) {
+  if (!planData || typeof planData !== 'object') return {};
+
+  const sanitized = {
+    id: planData.id || 'active_plan',
+    name: planData.name || '',
+    days: planData.days || (planData.slots ? Object.keys(planData.slots).length : 0),
+    dayDates: planData.dayDates ? JSON.parse(JSON.stringify(planData.dayDates)) : {},
+    mealPrepGroups: Array.isArray(planData.mealPrepGroups) ? JSON.parse(JSON.stringify(planData.mealPrepGroups)) : [],
+    score: planData.score || null,
+    confirmedShopping: !!planData.confirmedShopping,
+    confirmedAt: planData.confirmedAt || null,
+    savedStatus: planData.savedStatus || 'Manually saved',
+    savedBy: planData.savedBy || 'PlatePlan',
+    updatedAt: planData.updatedAt || new Date().toISOString(),
+    productPriority: planData.productPriority || state?.prefs?.productPriority || 'protein',
+    slots: {}
+  };
+
+  if (planData.slots && typeof planData.slots === 'object') {
+    for (const [dayKey, daySlots] of Object.entries(planData.slots)) {
+      if (!daySlots || typeof daySlots !== 'object') continue;
+      sanitized.slots[dayKey] = {};
+      for (const [slotKey, rawSlot] of Object.entries(daySlots)) {
+        if (!rawSlot) {
+          sanitized.slots[dayKey][slotKey] = null;
+          continue;
+        }
+        if (typeof rawSlot === 'string') {
+          sanitized.slots[dayKey][slotKey] = rawSlot;
+          continue;
+        }
+        // Extract light slot reference only, stripping heavy nested recipe/ingredient objects
+        const recipeId = rawSlot.recipeId || rawSlot.id || (rawSlot.recipe && rawSlot.recipe.id) || '';
+        const lightSlot = {
+          id: recipeId,
+          recipeId: recipeId
+        };
+        if (rawSlot.instanceId) lightSlot.instanceId = rawSlot.instanceId;
+        if (rawSlot.variant && rawSlot.variant !== 'original') lightSlot.variant = rawSlot.variant;
+        if (rawSlot.quantity !== undefined && rawSlot.quantity !== null) lightSlot.quantity = rawSlot.quantity;
+        if (rawSlot.servings !== undefined && rawSlot.servings !== null) lightSlot.servings = rawSlot.servings;
+        if (rawSlot.portions) lightSlot.portions = rawSlot.portions;
+        if (rawSlot.customOverrides || rawSlot.overrides) {
+          lightSlot.customOverrides = rawSlot.customOverrides || rawSlot.overrides;
+        }
+        sanitized.slots[dayKey][slotKey] = lightSlot;
+      }
+    }
+  }
+
+  if (planData.slotReasons && typeof planData.slotReasons === 'object') {
+    sanitized.slotReasons = JSON.parse(JSON.stringify(planData.slotReasons));
+  }
+  if (planData.productSelections && typeof planData.productSelections === 'object') {
+    sanitized.productSelections = JSON.parse(JSON.stringify(planData.productSelections));
+  }
+  if (Array.isArray(planData.useUpProductIds)) {
+    sanitized.useUpProductIds = [...planData.useUpProductIds];
+  }
+  if (planData.shoppingAtHome && typeof planData.shoppingAtHome === 'object') {
+    sanitized.shoppingAtHome = JSON.parse(JSON.stringify(planData.shoppingAtHome));
+  }
+
+  // Pre-flight check: reject write operations if > 900,000 bytes
+  let serialized = '';
+  try {
+    serialized = JSON.stringify(sanitized);
+  } catch(err) {
+    throw new Error(`[Firestore Hygiene Error] Failed to serialize plan: ${err.message}`);
+  }
+
+  if (serialized.length > 900000) {
+    const errorMsg = `[Firestore Hygiene Error] Sanitized plan size (${serialized.length} bytes) exceeds 900,000 bytes limit.`;
+    console.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  return sanitized;
+}
+window.sanitizePlanForFirestore = sanitizePlanForFirestore;
+
+/**
+ * Universal Firestore helper wrappers supporting Modular and Compat SDKs
+ */
+function doc(dbInstance, ...pathSegments) {
+  const fullPath = pathSegments.join('/');
+  if (dbInstance && typeof dbInstance.doc === 'function') {
+    return dbInstance.doc(fullPath);
+  }
+  if (typeof platePlanDb !== 'undefined' && platePlanDb && typeof platePlanDb.doc === 'function') {
+    return platePlanDb.doc(fullPath);
+  }
+  return { path: fullPath };
+}
+window.doc = doc;
+
+async function setDoc(docRef, data, options = { merge: true }) {
+  if (docRef && typeof docRef.set === 'function') {
+    return await docRef.set(data, options);
+  }
+  const path = typeof docRef === 'string' ? docRef : docRef?.path;
+  if (path && typeof platePlanDb !== 'undefined' && platePlanDb) {
+    return await platePlanDb.doc(path).set(data, options);
+  }
+  throw new Error('Firestore database instance not available');
+}
+window.setDoc = setDoc;
+
+function serverTimestamp() {
+  if (typeof firebase !== 'undefined' && firebase.firestore?.FieldValue?.serverTimestamp) {
+    return firebase.firestore.FieldValue.serverTimestamp();
+  }
+  return new Date().toISOString();
+}
+window.serverTimestamp = serverTimestamp;
+
+/**
+ * Plan History append helper
+ */
+function updatePlanHistory(plan) {
+  if (!plan) return;
+  if (!Array.isArray(state?.planHistory)) {
+    if (state) state.planHistory = [];
+  }
+  const planId = plan.id || ('hist-' + Date.now());
+  const snap = {
+    id: planId,
+    date: plan.updatedAt || new Date().toISOString(),
+    name: plan.name || (typeof defaultPlanSaveName === 'function' ? defaultPlanSaveName(plan) : 'Saved Plan'),
+    savedBy: plan.savedBy || 'PlatePlan',
+    savedStatus: plan.savedStatus || 'Manually saved',
+    confirmedShopping: !!plan.confirmedShopping,
+    confirmedAt: plan.confirmedAt || null,
+    days: plan.days || (plan.slots ? Object.keys(plan.slots).length : 0),
+    slots: JSON.parse(JSON.stringify(plan.slots || {})),
+    dayDates: JSON.parse(JSON.stringify(plan.dayDates || {})),
+    score: plan.score || null,
+    mealPrepGroups: JSON.parse(JSON.stringify(plan.mealPrepGroups || []))
+  };
+  if (state) {
+    const filtered = (state.planHistory || []).filter(p => p.id !== planId);
+    state.planHistory = [snap, ...filtered].slice(0, 15);
+  }
+  safeLocalStorageSet('plateplan_history_backup', state?.planHistory || []);
+  if (typeof renderPlanHistoryPanel === 'function') renderPlanHistoryPanel();
+}
+window.updatePlanHistory = updatePlanHistory;
+
+/**
+ * C. Central Debounced Save Stream & Queue Pipeline
+ * Status flag: 'idle' | 'pending' | 'saving' | 'saved' | 'error'
+ */
+let planSaveState = 'idle';
+let planSaveDebounceTimer = null;
+let planSaveQueue = Promise.resolve();
+let planSaveResolvers = [];
+
+function getPlanSaveState() {
+  return planSaveState;
+}
+window.getPlanSaveState = getPlanSaveState;
+
+function updateUIState(options = {}) {
+  if (options.saveStatus) {
+    planSaveState = options.saveStatus;
+    updatePlanSaveUI(options.saveStatus);
+  }
+}
+window.updateUIState = updateUIState;
+
+function updatePlanSaveUI(status) {
+  const syncBtn = document.getElementById('sync-status');
+  const plannerSaveBtns = document.querySelectorAll('#plan-actions button, [data-pp-click="openSaveMealPlanModal()"]');
+
+  if (status === 'saving') {
+    if (syncBtn) {
+      syncBtn.dataset.status = 'saving';
+      syncBtn.textContent = 'Saving…';
+    }
+    plannerSaveBtns.forEach(btn => {
+      if (btn.textContent.includes('Save')) {
+        btn.dataset.prevText = btn.textContent;
+        btn.textContent = 'Saving…';
+        btn.disabled = true;
+      }
+    });
+  } else if (status === 'saved') {
+    if (syncBtn) {
+      syncBtn.dataset.status = 'synced';
+      syncBtn.textContent = '• Synced';
+    }
+    plannerSaveBtns.forEach(btn => {
+      if (btn.dataset.prevText) {
+        btn.textContent = btn.dataset.prevText;
+        delete btn.dataset.prevText;
+      }
+      btn.disabled = false;
+    });
+  } else if (status === 'error') {
+    if (syncBtn) {
+      syncBtn.dataset.status = 'error';
+      syncBtn.textContent = 'Save Failed (Offline Draft Stashed)';
+    }
+    plannerSaveBtns.forEach(btn => {
+      if (btn.dataset.prevText) {
+        btn.textContent = btn.dataset.prevText;
+        delete btn.dataset.prevText;
+      }
+      btn.disabled = false;
+    });
+  } else if (status === 'pending') {
+    if (syncBtn && syncBtn.dataset.status !== 'saving') {
+      syncBtn.textContent = 'Unsaved changes…';
+    }
+  }
+}
+window.updatePlanSaveUI = updatePlanSaveUI;
+
+function queuePlanSave(planData = state?.plan, immediate = false) {
+  updateUIState({ saveStatus: 'pending' });
+
+  return new Promise((resolve, reject) => {
+    planSaveResolvers.push({ resolve, reject });
+
+    if (planSaveDebounceTimer) {
+      clearTimeout(planSaveDebounceTimer);
+      planSaveDebounceTimer = null;
+    }
+
+    const runQueue = () => {
+      planSaveQueue = planSaveQueue.then(async () => {
+        const resolvers = planSaveResolvers.slice();
+        planSaveResolvers = [];
+        try {
+          const res = await savePlanTransactional(planData || state?.plan);
+          resolvers.forEach(r => r.resolve(res));
+          return res;
+        } catch (err) {
+          resolvers.forEach(r => r.reject(err));
+          throw err;
+        }
+      }).catch(err => {
+        console.error('[Plan Save Queue Execution Error]', err);
+      });
+      return planSaveQueue;
+    };
+
+    if (immediate) {
+      runQueue();
+    } else {
+      // Debounce rapid UI state updates by 1000 ms
+      planSaveDebounceTimer = setTimeout(() => {
+        planSaveDebounceTimer = null;
+        runQueue();
+      }, 1000);
+    }
+  });
+}
+window.queuePlanSave = queuePlanSave;
+
+async function savePlan(planData = state?.plan, immediate = true) {
+  return await queuePlanSave(planData, immediate);
+}
+window.savePlan = savePlan;
+
+/**
+ * D. Transactional Two-Phase UI Save Handler
+ */
+async function savePlanTransactional(planData) {
+  updateUIState({ saveStatus: 'saving' });
+
+  let firestoreSuccess = false;
+  let localStorageSuccess = false;
+
+  // Clean payload
+  let sanitizedPlan;
+  try {
+    sanitizedPlan = sanitizePlanForFirestore(planData);
+  } catch (cleanErr) {
+    console.error("[Firestore Sync Error]", cleanErr);
+    updateUIState({ saveStatus: 'error' });
+    if (typeof showPlatePlanToast === 'function') {
+      showPlatePlanToast("Could not save plan. Payload size exceeds limits.", "error");
+    }
+    if (state) state.uncommittedDraft = planData;
+    return false;
+  }
+
+  const targetHouseholdId = state?.householdId 
+    || window.CURRENT_HOUSEHOLD_ID 
+    || window.activeHouseholdId 
+    || state?.meta?.householdId 
+    || 'elliott-chloe';
+  if (state) state.householdId = targetHouseholdId;
+
+  // 1. Attempt Firestore write
+  if (typeof platePlanDb !== 'undefined' && platePlanDb && navigator.onLine) {
+    try {
+      const planId = planData?.id || 'active_plan';
+      const planRef = doc(platePlanDb, `households/${targetHouseholdId}/plans`, planId);
+      const serverTs = serverTimestamp();
+      await setDoc(planRef, { ...sanitizedPlan, updatedAt: serverTs }, { merge: true });
+
+      // Synchronize planner subcollection doc if active plan
+      if (planId === 'active_plan' || !planData?.id) {
+        const plannerRef = doc(platePlanDb, `households/${targetHouseholdId}/data`, 'planner');
+        await setDoc(plannerRef, { plan: sanitizedPlan, updatedAt: serverTs }, { merge: true });
+      }
+      firestoreSuccess = true;
+    } catch (err) {
+      console.error("[Firestore Sync Error]", err);
+    }
+  }
+
+  // 2. LocalStorage backup attempt
+  localStorageSuccess = safeLocalStorageSet('plateplan_plan_backup', sanitizedPlan);
+
+  // 3. Status Evaluation
+  if (firestoreSuccess || localStorageSuccess) {
+    if (state?.plan) {
+      state.plan.savedStatus = 'Manually saved';
+      state.plan.updatedAt = new Date().toISOString();
+      updatePlanHistory(state.plan);
+    }
+    if (state) state.uncommittedDraft = null;
+    updateUIState({ saveStatus: 'saved' });
+    if (typeof showPlatePlanToast === 'function') {
+      showPlatePlanToast("Plan saved successfully!", "success");
+    }
+    return true;
+  } else {
+    updateUIState({ saveStatus: 'error' });
+    if (typeof showPlatePlanToast === 'function') {
+      showPlatePlanToast("Could not save plan. Stashed in temporary session memory.", "error");
+    }
+    if (state) state.uncommittedDraft = sanitizedPlan;
+    return false;
+  }
+}
+window.savePlanTransactional = savePlanTransactional;
+
+/**
+ * E. Startup Recovery Sweep
+ * Inspects state.uncommittedDraft and plateplan_plan_backup.
+ * Prompts user if newer than remote/active plan.
+ */
+function checkStartupPlanRecovery(remotePlan = null) {
+  try {
+    let localDraft = state?.uncommittedDraft;
+    if (!localDraft) {
+      const raw = localStorage.getItem('plateplan_plan_backup');
+      if (raw) localDraft = JSON.parse(raw);
+    }
+    if (!localDraft || typeof localDraft !== 'object') return false;
+
+    const hasSlots = localDraft.slots && Object.values(localDraft.slots).some(d => Object.values(d || {}).some(Boolean));
+    if (!hasSlots) return false;
+
+    const localTime = localDraft.updatedAt ? new Date(localDraft.updatedAt).getTime() : 0;
+    const remoteTime = (remotePlan && remotePlan.updatedAt)
+      ? new Date(remotePlan.updatedAt).getTime()
+      : (state?.plan?.updatedAt ? new Date(state.plan.updatedAt).getTime() : 0);
+
+    const remoteHasSlots = remotePlan?.slots && Object.values(remotePlan.slots).some(d => Object.values(d || {}).some(Boolean));
+    if ((localTime > 0 && localTime > remoteTime + 2000) || (!remoteHasSlots && hasSlots)) {
+      renderPlanRecoveryBanner(localDraft);
+      return true;
+    }
+  } catch (err) {
+    console.warn('[Startup Recovery Sweep Warning]', err);
+  }
+  return false;
+}
+window.checkStartupPlanRecovery = checkStartupPlanRecovery;
+
+function renderPlanRecoveryBanner(draft) {
+  let el = document.getElementById('plan-recovery-banner');
+  if (!el) {
+    const viewPlanner = document.getElementById('view-planner');
+    const warnings = document.getElementById('plan-warnings');
+    if (!viewPlanner) return;
+    el = document.createElement('div');
+    el.id = 'plan-recovery-banner';
+    el.style.marginBottom = '10px';
+    if (warnings && warnings.parentNode) {
+      warnings.parentNode.insertBefore(el, warnings);
+    } else {
+      viewPlanner.prepend(el);
+    }
+  }
+
+  const dateObj = draft?.updatedAt ? new Date(draft.updatedAt) : new Date();
+  const timeStr = dateObj.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+
+  el.innerHTML = `
+    <div class="card" style="background:var(--amber-bg, rgba(245,158,11,0.12));border:1px solid var(--amber,#d97706);padding:12px 16px;border-radius:10px;margin:0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div style="font-size:13px;color:var(--text);font-weight:600;display:flex;align-items:center;gap:8px">
+        <span style="color:var(--amber,#d97706);font-size:16px">⚠️</span>
+        <span>Unsaved local plan draft found from <strong>${typeof ppEscapeHtml === 'function' ? ppEscapeHtml(timeStr) : timeStr}</strong>.</span>
+      </div>
+      <div class="btn-row" style="margin:0;gap:8px">
+        <button class="btn sm primary" type="button" onclick="restorePlanDraft()">Restore Draft</button>
+        <button class="btn sm ghost" type="button" onclick="discardPlanDraft()">Discard</button>
+      </div>
+    </div>
+  `;
+}
+window.renderPlanRecoveryBanner = renderPlanRecoveryBanner;
+
+function restorePlanDraft() {
+  let draft = state?.uncommittedDraft;
+  if (!draft) {
+    try {
+      const raw = localStorage.getItem('plateplan_plan_backup');
+      if (raw) draft = JSON.parse(raw);
+    } catch(e) {}
+  }
+  if (draft && state) {
+    state.plan = draft;
+    state.uncommittedDraft = null;
+    safeLocalStorageSet('plateplan_plan_backup', sanitizePlanForFirestore(draft));
+    if (typeof saveState === 'function') saveState(true);
+    if (typeof rebuildPlatePlanIndexes === 'function') rebuildPlatePlanIndexes();
+    if (typeof renderPlan === 'function') renderPlan();
+    dismissPlanRecoveryBanner();
+    if (typeof showPlatePlanToast === 'function') {
+      showPlatePlanToast('Restored local plan draft successfully.', 'success');
+    }
+  }
+}
+window.restorePlanDraft = restorePlanDraft;
+
+function discardPlanDraft() {
+  if (state) state.uncommittedDraft = null;
+  if (state?.plan) {
+    safeLocalStorageSet('plateplan_plan_backup', sanitizePlanForFirestore(state.plan));
+  } else {
+    try { localStorage.removeItem('plateplan_plan_backup'); } catch(e) {}
+  }
+  dismissPlanRecoveryBanner();
+  if (typeof showPlatePlanToast === 'function') {
+    showPlatePlanToast('Local plan draft discarded.', 'info');
+  }
+}
+window.discardPlanDraft = discardPlanDraft;
+
+function dismissPlanRecoveryBanner() {
+  const banner = document.getElementById('plan-recovery-banner');
+  if (banner) banner.innerHTML = '';
+}
+window.dismissPlanRecoveryBanner = dismissPlanRecoveryBanner;
 
 const URL_TYPES=['tiktok','website','youtube','instagram'];
 let recipePhotoFiles=[];
@@ -671,7 +1179,7 @@ function applyBakedFileState(){
     const raw = localStorage.getItem(BAKED_CANDIDATE_SK);
     if(!raw) return;
     const baked = JSON.parse(raw);
-    localStorage.setItem(SK, safeJsonStringify(baked));
+    safeLocalStorageSet(SK, safeJsonStringify(baked));
     localStorage.removeItem(BAKED_CANDIDATE_SK);
     state = loadState();
     refreshPlatePlanDerivedState({ persist:true, render:true });
@@ -1889,11 +2397,7 @@ async function executeDataQualityTransaction(mutationType, payload = {}, options
     platePlanNutritionCache.clear();
 
     // 4. Local Persistence
-    try {
-      localStorage.setItem(SK, safeJsonStringify(state));
-    } catch (e) {
-      console.warn('Local storage write warning in executeDataQualityTransaction:', e);
-    }
+    safeLocalStorageSet(SK, safeJsonStringify(state));
 
     // 5. Explicit Forced Cloud Write: isolated in internal try/catch to protect local transaction
     try {
@@ -1944,9 +2448,7 @@ async function executeDataQualityTransaction(mutationType, payload = {}, options
       window.activeHouseholdId = hid;
       window.activeHousehold = { id: hid };
     }
-    try {
-      localStorage.setItem(SK, safeJsonStringify(state));
-    } catch (e) {}
+    safeLocalStorageSet(SK, safeJsonStringify(state));
     rebuildPlatePlanIndexes();
     platePlanNutritionCache.clear();
 
@@ -1997,13 +2499,13 @@ function saveState(immediate=false){
   window.state = state;
   window.appState = state;
   try{
-    // Legacy full-state recipe backups removed to prevent QuotaExceededError crashes
-    localStorage.setItem(SK, safeJsonStringify(state));
+    // Defensive LocalStorage Engine via safeLocalStorageSet
+    safeLocalStorageSet(SK, safeJsonStringify(state));
     if(state && state.plan && typeof state.plan === 'object' && Object.keys(state.plan).length > 0){
-      localStorage.setItem('plateplan_plan_backup', safeJsonStringify(state.plan));
+      safeLocalStorageSet('plateplan_plan_backup', sanitizePlanForFirestore(state.plan));
     }
     if(state && Array.isArray(state.planHistory) && state.planHistory.length > 0){
-      localStorage.setItem('plateplan_history_backup', safeJsonStringify(state.planHistory));
+      safeLocalStorageSet('plateplan_history_backup', safeJsonStringify(state.planHistory));
     }
   }catch(e){
     console.warn('Local storage write warning:',e);
@@ -2016,6 +2518,11 @@ function saveState(immediate=false){
     }
   } catch(auditErr) {
     console.warn('Reactive audit error in saveState:', auditErr);
+  }
+
+  // Central debounced save stream for state.plan updates
+  if (state?.plan && typeof state.plan === 'object' && Object.keys(state.plan).length > 0) {
+    queuePlanSave(state.plan, immediate);
   }
 
   if(!platePlanSyncSuppress && platePlanCloudReady && platePlanCloudUser){
@@ -2034,9 +2541,13 @@ function saveState(immediate=false){
 if(typeof window!=='undefined'){
   window.addEventListener('beforeunload',()=>{
     try{
-      localStorage.setItem(SK, safeJsonStringify(state));
-      if(state?.plan && typeof state.plan === 'object' && Object.keys(state.plan).length > 0) localStorage.setItem('plateplan_plan_backup', safeJsonStringify(state.plan));
-      if(Array.isArray(state?.planHistory) && state.planHistory.length > 0) localStorage.setItem('plateplan_history_backup', safeJsonStringify(state.planHistory));
+      safeLocalStorageSet(SK, safeJsonStringify(state));
+      if(state?.plan && typeof state.plan === 'object' && Object.keys(state.plan).length > 0) {
+        safeLocalStorageSet('plateplan_plan_backup', sanitizePlanForFirestore(state.plan));
+      }
+      if(Array.isArray(state?.planHistory) && state.planHistory.length > 0) {
+        safeLocalStorageSet('plateplan_history_backup', safeJsonStringify(state.planHistory));
+      }
     }catch(_e){}
   });
 }
@@ -2384,9 +2895,7 @@ function applyRemoteCloudState(remoteState, metadata = {}, options = {}){
         if (!ing.updatedAt) ing.updatedAt = state.updatedAt || new Date().toISOString();
       });
     }
-    try{
-      localStorage.setItem(SK, safeJsonStringify(state));
-    }catch(e){}
+    safeLocalStorageSet(SK, safeJsonStringify(state));
 
     platePlanNutritionCache.clear();
     rebuildPlatePlanIndexes();
@@ -2452,7 +2961,7 @@ function applyPlatePlanProjectionRecord(key,value,{remote=true}={}){
   if(remote){
     platePlanSyncSuppress=true;
     try{
-      localStorage.setItem(SK,safeJsonStringify(state));
+      safeLocalStorageSet(SK,safeJsonStringify(state));
       rebuildPlatePlanIndexes();
       renderPlatePlanDependentViews();
     }finally{ platePlanSyncSuppress=false; }
@@ -2472,11 +2981,7 @@ function applyPlatePlanProjection(projection){
     if(!Array.isArray(state.planHistory)) state.planHistory = [];
     Object.entries(projection).forEach(([key,value])=>applyPlatePlanProjectionRecord(key,value,{remote:false}));
     state=loadStateFromObject(state);
-    try {
-      localStorage.setItem(SK,safeJsonStringify(state));
-    } catch(e) {
-      console.warn('Local storage write warning in applyPlatePlanProjection:', e);
-    }
+    safeLocalStorageSet(SK,safeJsonStringify(state));
   }finally{ platePlanSyncSuppress=false; }
 }
 
@@ -2673,9 +3178,7 @@ function startPlatePlanCloudListeners(){
     window.state = state;
     window.appState = state;
 
-    try {
-      localStorage.setItem('plateplan_offline_backup', safeJsonStringify(state.ingredients));
-    } catch(e) {}
+    safeLocalStorageSet('plateplan_offline_backup', safeJsonStringify(state.ingredients));
 
     rebuildPlatePlanIndexes();
     renderAll();
@@ -2705,7 +3208,7 @@ function startPlatePlanCloudListeners(){
     runDataQualityAudits();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v2.9.9 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+    console.log("[v2.9.10 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
   }, error => {
     console.error('[RECIPES SUBCOLLECTION LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
@@ -2729,7 +3232,7 @@ function startPlatePlanCloudListeners(){
     runDataQualityAudits();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v2.9.9 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+    console.log("[v2.9.10 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
   }, error => {
     console.warn('[DATA RECIPES LISTENER ERROR]', error);
   });
@@ -2756,13 +3259,16 @@ function startPlatePlanCloudListeners(){
     // Retain ONLY top-level metadata; NEVER overwrite ingredients from root document
     if(sourceData.prefs !== undefined) state.prefs = sourceData.prefs;
     if(sourceData.plan && typeof sourceData.plan === 'object' && Object.keys(sourceData.plan).length > 0){
-      state.plan = sourceData.plan;
-      try { localStorage.setItem('plateplan_plan_backup', safeJsonStringify(sourceData.plan)); } catch(e) {}
+      const hasConflict = checkStartupPlanRecovery(sourceData.plan);
+      if(!hasConflict) {
+        state.plan = sourceData.plan;
+        safeLocalStorageSet('plateplan_plan_backup', sanitizePlanForFirestore(sourceData.plan));
+      }
     }
     if(sourceData.overrides !== undefined) state.overrides = sourceData.overrides;
     if(Array.isArray(sourceData.planHistory) && sourceData.planHistory.length > 0){
       state.planHistory = sourceData.planHistory;
-      try { localStorage.setItem('plateplan_history_backup', safeJsonStringify(sourceData.planHistory)); } catch(e) {}
+      safeLocalStorageSet('plateplan_history_backup', safeJsonStringify(sourceData.planHistory));
     }
     if(sourceData.ingredientGroups !== undefined) state.ingredientGroups = sourceData.ingredientGroups;
     if(sourceData.ingredientFamilies !== undefined) state.ingredientFamilies = sourceData.ingredientFamilies;
@@ -2780,7 +3286,7 @@ function startPlatePlanCloudListeners(){
     renderAll();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v2.9.9 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+    console.log("[v2.9.10 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
   }, error => {
     console.error('[HOUSEHOLD ROOT METADATA LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
@@ -2796,12 +3302,15 @@ function startPlatePlanCloudListeners(){
     const data = docSnapshot.data() || {};
     const val = cleanCloudValue(data.value !== undefined ? data.value : data);
     if(val && typeof val === 'object' && Object.keys(val).length > 0){
-      state.plan = val;
-      window.state = state;
-      window.appState = state;
-      try { localStorage.setItem('plateplan_plan_backup', safeJsonStringify(val)); } catch(e) {}
-      renderPlan();
-      try { if(document.getElementById('view-today')?.classList.contains('active')) renderToday(); } catch(e) {}
+      const hasConflict = checkStartupPlanRecovery(val);
+      if(!hasConflict) {
+        state.plan = val;
+        window.state = state;
+        window.appState = state;
+        safeLocalStorageSet('plateplan_plan_backup', sanitizePlanForFirestore(val));
+        renderPlan();
+        try { if(document.getElementById('view-today')?.classList.contains('active')) renderToday(); } catch(e) {}
+      }
     }
   }, error => {
     console.warn('[PLAN CURRENT LISTENER ERROR]', error);
@@ -2820,7 +3329,7 @@ function startPlatePlanCloudListeners(){
       state.planHistory = val;
       window.state = state;
       window.appState = state;
-      try { localStorage.setItem('plateplan_history_backup', safeJsonStringify(val)); } catch(e) {}
+      safeLocalStorageSet('plateplan_history_backup', safeJsonStringify(val));
     }
   }, error => {
     console.warn('[PLAN HISTORY LISTENER ERROR]', error);
@@ -3023,7 +3532,7 @@ async function loadSharedPlatePlan(){
   state.isCloudHydrated = true;
   window.isCloudHydrated = true;
   console.log(`[RECIPES HYDRATION] Deterministically hydrated and deduplicated ${state.recipes.length} recipes across multi-path check.`);
-  console.log("[v2.9.9 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+  console.log("[v2.9.10 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
 
   const metaDoc = dataDocs.meta || {};
   const taxonomyDoc = dataDocs.taxonomy || {};
@@ -3132,10 +3641,10 @@ async function loadSharedPlatePlan(){
   state.planHistory = resolvedHistory;
 
   if(resolvedPlan && typeof resolvedPlan === 'object' && Object.keys(resolvedPlan).length > 0){
-    try { localStorage.setItem('plateplan_plan_backup', safeJsonStringify(resolvedPlan)); } catch(_e) {}
+    safeLocalStorageSet('plateplan_plan_backup', sanitizePlanForFirestore(resolvedPlan));
   }
   if(Array.isArray(resolvedHistory) && resolvedHistory.length > 0){
-    try { localStorage.setItem('plateplan_history_backup', safeJsonStringify(resolvedHistory)); } catch(_e) {}
+    safeLocalStorageSet('plateplan_history_backup', safeJsonStringify(resolvedHistory));
   }
 
   state.meta = {
@@ -3144,10 +3653,8 @@ async function loadSharedPlatePlan(){
     householdId: targetHouseholdId
   };
 
-  try {
-    localStorage.setItem(SK, safeJsonStringify(state));
-    localStorage.setItem('plateplan_offline_backup', safeJsonStringify(state.ingredients));
-  } catch(e) {}
+  safeLocalStorageSet(SK, safeJsonStringify(state));
+  safeLocalStorageSet('plateplan_offline_backup', safeJsonStringify(state.ingredients));
 
   window.state = state;
   window.appState = state;
@@ -3387,11 +3894,8 @@ function getRecoveryPoints(){
 function writeRecoveryPoints(points){
   const list = (points || []).slice(0,3);
   for(let count = list.length; count >= 0; count--){
-    try{
-      localStorage.setItem(RECOVERY_SK, safeJsonStringify(list.slice(0, count)));
+    if (safeLocalStorageSet(RECOVERY_SK, safeJsonStringify(list.slice(0, count)))) {
       return;
-    }catch(e){
-      // If local storage is full, attempt writing fewer snapshots
     }
   }
 }
@@ -3604,7 +4108,8 @@ function initializePlatePlanApplication(){
   installPlannerSummaryObserver();
   refreshAllProductDefaultsAndRecipeNutrition();
   rebuildPlatePlanIndexes();
-  try{ localStorage.setItem(SK, safeJsonStringify(state)); }catch(_e){}
+  safeLocalStorageSet(SK, safeJsonStringify(state));
+  checkStartupPlanRecovery(state?.plan);
 
   resetTodayDate({render:false});
   requestPlatePlanViewRender('today');
@@ -3670,6 +4175,8 @@ function initializePlatePlanApplication(){
       }
   });
 }
+window.initializePlatePlanApplication = initializePlatePlanApplication;
+window.initApp = initializePlatePlanApplication;
 if(document.readyState==='loading'){
   document.addEventListener('DOMContentLoaded',initializePlatePlanApplication,{once:true});
 }else{
@@ -8316,7 +8823,7 @@ function renderToday(){
       const days=state.plan.days||Object.keys(state.plan.slots).length||7;
       state.plan.dayDates=buildPlanDayDates(platePlanTodayDate||getPlatePlanLocalToday(),days);
       state.plan.updatedAt=new Date().toISOString();
-      try { localStorage.setItem(SK, safeJsonStringify(state)); } catch(_e) {}
+      safeLocalStorageSet(SK, safeJsonStringify(state));
       dated=true;
     }
     if(!dated){
@@ -18122,7 +18629,7 @@ async function saveManualIng(categoryReady=false){
       const idx = state.ingredients.findIndex(x => x.id === ing.id);
       if (idx > -1) state.ingredients[idx] = ing;
       else state.ingredients.push(ing);
-      localStorage.setItem(SK, safeJsonStringify(state));
+      safeLocalStorageSet(SK, safeJsonStringify(state));
     } catch(_saveErr) {
       console.warn('Local storage fallback save error in saveManualIng:', _saveErr);
     }
@@ -20279,12 +20786,31 @@ function openSaveMealPlanModal(){
      <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Plan name</label>
      <input id="save-plan-name" type="text" value="${ppEscapeHtml(defaultName)}" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--surface);color:var(--text)">`,
     'Save plan',
-    () => {
+    async () => {
       const name = document.getElementById('save-plan-name')?.value?.trim() || defaultName;
+      state.plan.name = name;
+      state.plan.savedStatus = 'Manually saved';
       const snap = snapshotCurrentPlan('Manually saved', name);
-      saveState();
-      renderPlanHistoryPanel();
-      if(snap) openAppInfoModal('Meal plan saved', `<div class="msg success" style="margin:0">Saved <strong>${ppEscapeHtml(name)}</strong> to the Meal Plan Library.</div>`);
+
+      const saveBtn = document.querySelector('#app-confirm-modal .btn.primary, .modal-actions .btn.primary');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+      }
+      try {
+        const success = await savePlanTransactional(state.plan);
+        renderPlanHistoryPanel();
+        if (success) {
+          openAppInfoModal('Meal plan saved', `<div class="msg success" style="margin:0">Saved <strong>${ppEscapeHtml(name)}</strong> to the Meal Plan Library.</div>`);
+        }
+      } catch (err) {
+        console.error('[Save Meal Plan Error]', err);
+      } finally {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save plan';
+        }
+      }
     }
   );
 }
