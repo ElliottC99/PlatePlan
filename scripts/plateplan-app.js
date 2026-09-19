@@ -207,8 +207,9 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.9.8';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v78';
+const PLATEPLAN_APP_VERSION='2.9.9';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v79';
+console.log("[v2.9.9 CLOUD-ONLY]", "Legacy localStorage backups stripped. Cloud hydration active.");
 const SEED=[];
 
 let lastLoadedDataRecipesDoc = [];
@@ -1890,7 +1891,6 @@ async function executeDataQualityTransaction(mutationType, payload = {}, options
     // 4. Local Persistence
     try {
       localStorage.setItem(SK, safeJsonStringify(state));
-      if (Array.isArray(state.recipes)) localStorage.setItem(RECIPES_BACKUP_SK, safeJsonStringify(state.recipes));
     } catch (e) {
       console.warn('Local storage write warning in executeDataQualityTransaction:', e);
     }
@@ -1922,6 +1922,15 @@ async function executeDataQualityTransaction(mutationType, payload = {}, options
       showPlatePlanToast(successMessage);
     }
 
+    // Reactive in-memory data quality audit recalculation
+    try {
+      if (typeof runDataQualityAudits === 'function') {
+        runDataQualityAudits(true);
+      }
+    } catch(auditErr) {
+      console.warn('Reactive audit error in executeDataQualityTransaction:', auditErr);
+    }
+
     return true;
   } catch (error) {
     console.error(`[DataQuality Transaction Failed] ${mutationType}:`, error);
@@ -1937,7 +1946,6 @@ async function executeDataQualityTransaction(mutationType, payload = {}, options
     }
     try {
       localStorage.setItem(SK, safeJsonStringify(state));
-      if (Array.isArray(state.recipes)) localStorage.setItem(RECIPES_BACKUP_SK, safeJsonStringify(state.recipes));
     } catch (e) {}
     rebuildPlatePlanIndexes();
     platePlanNutritionCache.clear();
@@ -1989,10 +1997,8 @@ function saveState(immediate=false){
   window.state = state;
   window.appState = state;
   try{
+    // Legacy full-state recipe backups removed to prevent QuotaExceededError crashes
     localStorage.setItem(SK, safeJsonStringify(state));
-    if(state && Array.isArray(state.recipes)){
-      localStorage.setItem(RECIPES_BACKUP_SK, safeJsonStringify(state.recipes));
-    }
     if(state && state.plan && typeof state.plan === 'object' && Object.keys(state.plan).length > 0){
       localStorage.setItem('plateplan_plan_backup', safeJsonStringify(state.plan));
     }
@@ -2001,6 +2007,15 @@ function saveState(immediate=false){
     }
   }catch(e){
     console.warn('Local storage write warning:',e);
+  }
+
+  // Reactive in-memory data quality audit run
+  try {
+    if (typeof runDataQualityAudits === 'function') {
+      runDataQualityAudits(document.getElementById('view-data')?.classList.contains('active'));
+    }
+  } catch(auditErr) {
+    console.warn('Reactive audit error in saveState:', auditErr);
   }
 
   if(!platePlanSyncSuppress && platePlanCloudReady && platePlanCloudUser){
@@ -2020,7 +2035,6 @@ if(typeof window!=='undefined'){
   window.addEventListener('beforeunload',()=>{
     try{
       localStorage.setItem(SK, safeJsonStringify(state));
-      if(state?.recipes?.length) localStorage.setItem(RECIPES_BACKUP_SK, safeJsonStringify(state.recipes));
       if(state?.plan && typeof state.plan === 'object' && Object.keys(state.plan).length > 0) localStorage.setItem('plateplan_plan_backup', safeJsonStringify(state.plan));
       if(Array.isArray(state?.planHistory) && state.planHistory.length > 0) localStorage.setItem('plateplan_history_backup', safeJsonStringify(state.planHistory));
     }catch(_e){}
@@ -2372,7 +2386,6 @@ function applyRemoteCloudState(remoteState, metadata = {}, options = {}){
     }
     try{
       localStorage.setItem(SK, safeJsonStringify(state));
-      if(state?.recipes?.length) localStorage.setItem(RECIPES_BACKUP_SK, safeJsonStringify(state.recipes));
     }catch(e){}
 
     platePlanNutritionCache.clear();
@@ -2459,7 +2472,11 @@ function applyPlatePlanProjection(projection){
     if(!Array.isArray(state.planHistory)) state.planHistory = [];
     Object.entries(projection).forEach(([key,value])=>applyPlatePlanProjectionRecord(key,value,{remote:false}));
     state=loadStateFromObject(state);
-    localStorage.setItem(SK,safeJsonStringify(state));
+    try {
+      localStorage.setItem(SK,safeJsonStringify(state));
+    } catch(e) {
+      console.warn('Local storage write warning in applyPlatePlanProjection:', e);
+    }
   }finally{ platePlanSyncSuppress=false; }
 }
 
@@ -2548,9 +2565,6 @@ function populateRecipesState(docs, options = {}){
   state.recipes = recs;
   window.state = state;
   window.appState = state;
-  try {
-    localStorage.setItem('plateplan_recipes_backup', safeJsonStringify(state.recipes));
-  } catch(e) {}
 }
 window.populateRecipesState = populateRecipesState;
 
@@ -2665,6 +2679,7 @@ function startPlatePlanCloudListeners(){
 
     rebuildPlatePlanIndexes();
     renderAll();
+    runDataQualityAudits();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
   }, error => {
@@ -2687,9 +2702,10 @@ function startPlatePlanCloudListeners(){
 
     rebuildPlatePlanIndexes();
     renderAll();
+    runDataQualityAudits();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v2.9.8 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+    console.log("[v2.9.9 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
   }, error => {
     console.error('[RECIPES SUBCOLLECTION LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
@@ -2710,9 +2726,10 @@ function startPlatePlanCloudListeners(){
 
     rebuildPlatePlanIndexes();
     renderAll();
+    runDataQualityAudits();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v2.9.8 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+    console.log("[v2.9.9 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
   }, error => {
     console.warn('[DATA RECIPES LISTENER ERROR]', error);
   });
@@ -2763,7 +2780,7 @@ function startPlatePlanCloudListeners(){
     renderAll();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v2.9.8 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+    console.log("[v2.9.9 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
   }, error => {
     console.error('[HOUSEHOLD ROOT METADATA LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
@@ -3006,7 +3023,7 @@ async function loadSharedPlatePlan(){
   state.isCloudHydrated = true;
   window.isCloudHydrated = true;
   console.log(`[RECIPES HYDRATION] Deterministically hydrated and deduplicated ${state.recipes.length} recipes across multi-path check.`);
-  console.log("[v2.9.8 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+  console.log("[v2.9.9 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
 
   const metaDoc = dataDocs.meta || {};
   const taxonomyDoc = dataDocs.taxonomy || {};
@@ -3139,6 +3156,7 @@ async function loadSharedPlatePlan(){
   setPlatePlanStartupInert(false);
   rebuildPlatePlanIndexes();
   renderAll();
+  runDataQualityAudits();
 
   startPlatePlanCloudListeners();
   updatePlatePlanSyncStatus('synced');
@@ -12277,6 +12295,50 @@ function createDataQualityIssue({ entityType, entityId, code, severity = 'gap', 
     return { entityType, entityId, code, severity, title, message, fixButtonHtml, fixTarget, key, legacyKey, fingerprint:dataQualityFingerprint(source) };
 }
 
+function fixSubtypeDataQuality(subTypeId, issueKey = ''){
+    if (issueKey) {
+      const section = document.querySelector(`[data-dq-key="${CSS.escape(issueKey)}"]`)?.closest('details');
+      editorNavigationStack.push({ view: 'data', issueKey, scrollY: window.scrollY, sectionOpen: !!section?.open, openedAt: Date.now() });
+    }
+    const group = getIngredientGroup(subTypeId);
+    const subTypeName = group ? (group.name || getGroupTypeName(group)) : (subTypeId || '');
+
+    // 1. Switch active view to Products tab ('bank')
+    showView('bank');
+
+    // 2. Apply search/filter for that sub-type ID/name
+    productBankGroupFilterId = group ? group.id : subTypeId;
+    productBankFamilyFilterId = null;
+    activeFamily = 'all';
+    activeCat = 'all';
+    const searchInput = document.getElementById('bank-search');
+    if (searchInput) {
+      searchInput.value = subTypeName;
+    }
+    renderBank();
+
+    // 3. Trigger product creation/linking modal with sub-type pre-selected
+    if (typeof showTescoImport === 'function') {
+      showTescoImport({
+        type: 'manualAdd',
+        name: subTypeName,
+        groupId: group ? group.id : subTypeId,
+        ingredientId: group?.ingredientId || ''
+      });
+    } else if (typeof openAddProductModal === 'function') {
+      openAddProductModal({
+        id: group ? group.id : subTypeId,
+        name: subTypeName,
+        groupId: group ? group.id : subTypeId
+      });
+    } else if (typeof showAddIng === 'function') {
+      showAddIng();
+      const nameInput = document.getElementById('mi-name');
+      if (nameInput) nameInput.value = subTypeName;
+    }
+}
+window.fixSubtypeDataQuality = fixSubtypeDataQuality;
+
 function beginDataQualityFix(entityType,entityId,issueKey){
     const section=document.querySelector(`[data-dq-key="${CSS.escape(issueKey||'')}"]`)?.closest('details');
     editorNavigationStack.push({view:'data',issueKey,scrollY:window.scrollY,sectionOpen:!!section?.open,openedAt:Date.now()});
@@ -12285,7 +12347,7 @@ function beginDataQualityFix(entityType,entityId,issueKey){
     }
     if(entityType === 'product') return editIng(entityId);
     if(entityType === 'ingredient') return openProductMappingModal(entityId, issueKey);
-    if(entityType === 'subtype') return openIngredientGroupDetailsModal(entityId,'name');
+    if(entityType === 'subtype') return fixSubtypeDataQuality(entityId, issueKey);
     if(entityType === 'recipe'){
       const parts=String(entityId).split(':');
       return editRecipeModalView(parts[0],parts[1]==='enhanced'?'enhanced':'original');
@@ -12364,7 +12426,8 @@ function dataQualityFixButton(issue){
     const supported=['product','ingredient','subtype','recipe','recipe-ingredient'];
     const target=issue.fixTarget||{entityType:issue.entityType,entityId:issue.entityId};
     if(!supported.includes(target.entityType)) return String(issue.fixButtonHtml||'').replace(/class="btn sm ghost"/,'class="btn sm dq-fix-btn"');
-    return `<button class="btn sm dq-fix-btn" onclick="beginDataQualityFix('${ppEscapeAttr(target.entityType)}','${ppEscapeAttr(target.entityId)}','${ppEscapeAttr(issue.key)}')">Fix</button>`;
+    const actionAttr = target.entityType === 'subtype' ? ` data-action="fix-subtype" data-subtype-id="${ppEscapeAttr(target.entityId)}"` : '';
+    return `<button class="btn sm dq-fix-btn"${actionAttr} onclick="beginDataQualityFix('${ppEscapeAttr(target.entityType)}','${ppEscapeAttr(target.entityId)}','${ppEscapeAttr(issue.key)}')">Fix</button>`;
 }
 
 function renderDataQualityIssue(issue, dismissible = false){
@@ -12617,7 +12680,7 @@ function collectDeterministicDataQualityIssues(){
     });
     (state.ingredientGroups || []).forEach(group => {
         const products = getGroupProducts(group.id);
-        const fix = `<button class="btn sm dq-fix-btn" onclick="openIngredientGroupDetailsModal('${ppEscapeAttr(group.id)}','name')">Fix</button>`;
+        const fix = `<button class="btn sm dq-fix-btn" data-action="fix-subtype" data-subtype-id="${ppEscapeAttr(group.id)}" onclick="fixSubtypeDataQuality('${ppEscapeAttr(group.id)}')">Fix</button>`;
         const title = getGroupHierarchyText(group);
         if(!group.ingredientId || !getIngredientFamily(group.ingredientId)) add({entityType:'subtype',entityId:group.id,code:'missing-ingredient-link',title,message:'Sub-type is not linked to a valid ingredient.',fixButtonHtml:fix,source:group.ingredientId});
         if(!products.length) add({entityType:'subtype',entityId:group.id,code:'no-products',title,message:'Sub-type has no linked products.',fixButtonHtml:fix,source:products.map(p => p.id)});
@@ -12688,6 +12751,8 @@ function renderDataQuality() {
                 const advisories = [...collectUnusualNumberWarnings(), ...collectMissingOilWarnings()].map(dataQualityAdvisoryFromLegacy).concat(collectDuplicateDataQualityAdvisories()).filter(issue => !isDataQualityWarningIgnored(issue.key, issue.fingerprint) && !(issue.legacyKey && isDataQualityWarningIgnored(issue.legacyKey)));
                 if(advisoryTarget) advisoryTarget.innerHTML = `<details><summary style="cursor:pointer;font-weight:700;font-size:13px">Heuristic advisories (${advisories.length})</summary><div style="margin-top:6px">${advisories.length ? advisories.map(issue => renderDataQualityIssue(issue, true)).join('') : '<div class="msg success" style="margin:0">No active advisories.</div>'}</div></details>`;
 
+                updateDataQualityBadge(blockers.length + gaps.length + advisories.length, blockers.length, gaps.length);
+
                 const catBox = document.getElementById('dq-cat-list')?.closest('.card');
                 if(catBox) catBox.style.display = 'none';
             } finally {
@@ -12696,6 +12761,86 @@ function renderDataQuality() {
         }, 40);
     });
 }
+
+function updateDataQualityBadge(count = 0, blockers = 0, gaps = 0){
+  document.querySelectorAll('[data-view="data"]').forEach(el => {
+    let badge = el.querySelector('.dq-nav-badge');
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'dq-nav-badge';
+        badge.style.cssText = 'margin-left:6px;font-size:11px;font-weight:700;padding:2px 6px;border-radius:10px;line-height:1;display:inline-block;';
+        el.appendChild(badge);
+      }
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.title = `${blockers} blockers, ${gaps} gaps, ${count} total issues`;
+      if (blockers > 0) {
+        badge.style.background = 'var(--red-bg, rgba(239,68,68,0.15))';
+        badge.style.color = 'var(--red, #dc2626)';
+      } else {
+        badge.style.background = 'var(--amber-bg, rgba(245,158,11,0.15))';
+        badge.style.color = 'var(--amber, #d97706)';
+      }
+    } else if (badge) {
+      badge.remove();
+    }
+  });
+
+  document.querySelectorAll('[data-pp-click*="mobileMoreView(\'data\')"], [onclick*="mobileMoreView(\'data\')"]').forEach(el => {
+    let badge = el.querySelector('.dq-nav-badge');
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'dq-nav-badge';
+        badge.style.cssText = 'margin-left:auto;margin-right:6px;background:var(--amber-bg, rgba(245,158,11,0.15));color:var(--amber,#d97706);font-size:11px;font-weight:700;padding:2px 6px;border-radius:10px;line-height:1;display:inline-block;';
+        const arrow = el.querySelector('[aria-hidden="true"]');
+        if (arrow) el.insertBefore(badge, arrow);
+        else el.appendChild(badge);
+      }
+      badge.textContent = count > 99 ? '99+' : count;
+      if (blockers > 0) {
+        badge.style.background = 'var(--red-bg, rgba(239,68,68,0.15))';
+        badge.style.color = 'var(--red, #dc2626)';
+      } else {
+        badge.style.background = 'var(--amber-bg, rgba(245,158,11,0.15))';
+        badge.style.color = 'var(--amber, #d97706)';
+      }
+    } else if (badge) {
+      badge.remove();
+    }
+  });
+}
+window.updateDataQualityBadge = updateDataQualityBadge;
+
+function runDataQualityAudits(shouldRender = false){
+  try {
+    const issues = collectDeterministicDataQualityIssues();
+    const advisories = [...collectUnusualNumberWarnings(), ...collectMissingOilWarnings()]
+      .map(dataQualityAdvisoryFromLegacy)
+      .concat(collectDuplicateDataQualityAdvisories())
+      .filter(issue => !isDataQualityWarningIgnored(issue.key, issue.fingerprint) && !(issue.legacyKey && isDataQualityWarningIgnored(issue.legacyKey)));
+
+    const blockers = issues.filter(issue => issue.severity === 'blocker');
+    const gaps = issues.filter(issue => issue.severity === 'gap');
+    const totalCount = issues.length + advisories.length;
+
+    updateDataQualityBadge(totalCount, blockers.length, gaps.length);
+
+    if (shouldRender || document.getElementById('view-data')?.classList.contains('active')) {
+      renderDataQuality();
+    }
+
+    window.dispatchEvent(new CustomEvent('plateplan:data-quality-updated', {
+      detail: { count: totalCount, blockers: blockers.length, gaps: gaps.length, issues, advisories }
+    }));
+
+    return { issues, advisories, totalCount, blockerCount: blockers.length, gapCount: gaps.length };
+  } catch(e) {
+    console.warn('runDataQualityAudits error:', e);
+    return null;
+  }
+}
+window.runDataQualityAudits = runDataQualityAudits;
 
 function deleteCategory(slug) {
     const affected = state.ingredients.filter(i => i.cat === slug);
@@ -12996,10 +13141,6 @@ function toggleRecipeFavourite(recipeId, event, variantKey = 'original'){
         { merge: true }
       ).catch(e => console.warn('[RECIPE FAVORITE SYNC ERROR]', e));
     }
-  } catch(e){}
-
-  try {
-    localStorage.setItem('plateplan_recipes_backup', safeJsonStringify(state.recipes));
   } catch(e){}
 
   renderVault();
@@ -16863,7 +17004,15 @@ function showTescoImport(context = null){
       const el = document.getElementById(id);
       if(el) el.value = '';
   });
-  if(document.getElementById('tp-cat')) document.getElementById('tp-cat').value = 'other';
+  if(context?.name && document.getElementById('tp-name')) {
+    document.getElementById('tp-name').value = context.name;
+  }
+  let initialCat = 'other';
+  if(context?.groupId) {
+    const linkedGrp = getIngredientGroup(context.groupId);
+    if(linkedGrp?.cat) initialCat = linkedGrp.cat;
+  }
+  if(document.getElementById('tp-cat')) document.getElementById('tp-cat').value = initialCat;
   syncCategorySearchInput('tp-cat');
   if(document.getElementById('tp-storage')) document.getElementById('tp-storage').value = '';
   setPackUnitEditorValue('tp-pack-unit','g',{allowLegacyCount:false});
@@ -17447,6 +17596,8 @@ function saveTescoIngredient(categoryReady=false){
   state.ingredients.push(ing);
   if(pendingTesco?.type === 'subst' && currentSubstContext.groupId) {
       ensureProductAssignedToGroup(ing, getIngredientGroup(currentSubstContext.groupId)?.name || ing.name, currentSubstContext.groupId);
+  } else if (pendingTesco?.groupId) {
+      ensureProductAssignedToGroup(ing, getIngredientGroup(pendingTesco.groupId)?.name || ing.name, pendingTesco.groupId);
   } else {
       promptGroupForImportedProduct(ing, pendingTesco?.name || ing.name);
   }
@@ -17972,7 +18123,6 @@ async function saveManualIng(categoryReady=false){
       if (idx > -1) state.ingredients[idx] = ing;
       else state.ingredients.push(ing);
       localStorage.setItem(SK, safeJsonStringify(state));
-      if (Array.isArray(state.recipes)) localStorage.setItem(RECIPES_BACKUP_SK, safeJsonStringify(state.recipes));
     } catch(_saveErr) {
       console.warn('Local storage fallback save error in saveManualIng:', _saveErr);
     }
@@ -17985,6 +18135,15 @@ async function saveManualIng(categoryReady=false){
   } catch(_pushErr) {}
 
   refreshProductGroupAndRecipes(ing.id);
+
+  // Force immediate audit re-calculation whenever a product weight, price, or unit is saved
+  try {
+    if (typeof runDataQualityAudits === 'function') {
+      runDataQualityAudits(true);
+    }
+  } catch(auditErr) {
+    console.warn('Reactive audit error in saveManualIng:', auditErr);
+  }
 
   if(handlePendingRecipeNutritionAfterSave(ing.id)){
     refreshAfterIngredientEdit(ing.id);
@@ -21963,6 +22122,27 @@ function runPlatePlanDelegatedAction(code,event,element){
     }
   }) : event;
   return (function delegatedPlatePlanAction(event){
+    // Sub-type audit card "Fix" action delegation case handler
+    const targetElement = element || (event && (event.currentTarget || event.target));
+    const isSubtypeFix = (targetElement?.dataset?.action === 'fix-subtype') ||
+      targetElement?.hasAttribute?.('data-subtype-id') ||
+      (code && (code.includes("beginDataQualityFix('subtype'") || code.includes('beginDataQualityFix("subtype"') || code.includes('fixSubtypeDataQuality')));
+
+    if (isSubtypeFix) {
+      let subTypeId = targetElement?.dataset?.subtypeId || targetElement?.getAttribute?.('data-subtype-id');
+      if (!subTypeId && code) {
+        const match = code.match(/beginDataQualityFix\(['"]subtype['"],\s*['"]([^'"]+)['"]/);
+        if (match) subTypeId = match[1];
+        else {
+          const directMatch = code.match(/fixSubtypeDataQuality\(['"]([^'"]+)['"]/);
+          if (directMatch) subTypeId = directMatch[1];
+        }
+      }
+      if (subTypeId) {
+        return fixSubtypeDataQuality(subTypeId);
+      }
+    }
+
     // This direct evaluation preserves the exact legacy handler scope while
     // runtime DOM attributes migrate to the delegated module action system.
     return eval(code);
@@ -22016,7 +22196,10 @@ globalThis.PlatePlanLegacy=Object.freeze({
   closeSubstituteModal,
   confirmSubstitute,
   extractTescoProduct,
-  saveTescoIngredient
+  saveTescoIngredient,
+  runDataQualityAudits,
+  updateDataQualityBadge,
+  fixSubtypeDataQuality
 });
 window.renderAll = renderAll;
 window.saveIngredient = saveIngredient;
@@ -22043,4 +22226,7 @@ window.closeSubstituteModal = closeSubstituteModal;
 window.confirmSubstitute = confirmSubstitute;
 window.extractTescoProduct = extractTescoProduct;
 window.saveTescoIngredient = saveTescoIngredient;
+window.runDataQualityAudits = runDataQualityAudits;
+window.updateDataQualityBadge = updateDataQualityBadge;
+window.fixSubtypeDataQuality = fixSubtypeDataQuality;
 window.dispatchEvent(new CustomEvent('plateplan:legacy-ready',{detail:{version:PLATEPLAN_APP_VERSION}}));
