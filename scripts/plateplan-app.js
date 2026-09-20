@@ -207,9 +207,9 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='2.9.10';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v80';
-console.log("[v2.9.10 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
+const PLATEPLAN_APP_VERSION='3.0.1';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v81';
+console.log("[v3.0.1 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
 const SEED=[];
 
 let lastLoadedDataRecipesDoc = [];
@@ -4478,7 +4478,7 @@ function getRecipeFitScore(r){
 function getBoosters(gapGrams) {
     if(gapGrams <= 0) return [];
     // Sort ingredients by protein density (prot per kcal)
-    const sorted = state.ingredients.filter(i=>i.prot>5 && i.cal>0).sort((a,b) => (b.prot/b.cal) - (a.prot/a.cal));
+    const sorted = (state.ingredients || []).filter(i=>i && i.prot>5 && i.cal>0).sort((a,b) => (b.prot/b.cal) - (a.prot/a.cal));
     const suggestions = [];
     for(let i=0; i<Math.min(5, sorted.length); i++) {
         const ing = sorted[i];
@@ -4661,10 +4661,18 @@ function addImprovementChoiceToModal(kind, id, prefix = 'enh', controlId = ''){
     recalcModal(prefix);
 }
 
+function transformProductGroup(product){
+    const groupVal = typeof product === 'string' ? product : (product?.group || product?.groupId || product?.subType || '');
+    return String(groupVal || '').replace(/[^a-zA-Z0-9_\s-]/g, '').trim();
+}
+window.transformProductGroup = transformProductGroup;
+
 function addImprovementProductToModal(productId, prefix = 'enh', controlId = ''){
     const product = getProduct(productId);
     if(!product) return;
-    addImprovementChoiceToModal('subtype', product.groupId || '', prefix, controlId || `${prefix}-subtype-${product.groupId || product.id}`.replace(/[^a-zA-Z0-9_-]/g,'_'));
+    const safeGroupId = (product?.groupId || product?.group || '').replace(/[^a-zA-Z0-9_-]/g,'_');
+    const safeId = (product?.id || '').replace(/[^a-zA-Z0-9_-]/g,'_');
+    addImprovementChoiceToModal('subtype', product?.groupId || '', prefix, controlId || `${prefix}-subtype-${safeGroupId || safeId}`);
 }
 
 function optimisePortions(id) {
@@ -6331,6 +6339,7 @@ function updatePlannerCompactHeader(){
 }
 
 function ensurePlannerOptionsUI(){
+  if(document.getElementById('planner-wizard-host')) return;
   const planner=document.getElementById('view-planner');
   if(!planner||document.getElementById('planner-compact-shell'))return;
   const legacy=[...planner.children].find(child=>child.querySelector?.('#plan-days'));
@@ -6341,7 +6350,7 @@ function ensurePlannerOptionsUI(){
   const priority=document.getElementById('plan-product-priority');
   const repeats=['breakfast','lunch','dinner'].map(meal=>document.getElementById(`plan-repeat-${meal}`)?.closest('label')).filter(Boolean);
   const traffic=[...legacy.querySelectorAll('.traffic-picker')];
-  const dayOptions=[...days.options].map(option=>`<option value="${ppEscapeAttr(option.value)}">${ppEscapeHtml(option.textContent)}</option>`).join('');
+  const dayOptions=days?[...days.options].map(option=>`<option value="${ppEscapeAttr(option.value)}">${ppEscapeHtml(option.textContent)}</option>`).join(''):'';
 
   const compact=document.createElement('section');
   compact.id='planner-compact-shell';
@@ -6376,20 +6385,20 @@ function ensurePlannerOptionsUI(){
   const details=wrap.querySelector('#plan-options-details');
   const daysField=document.createElement('div');
   daysField.innerHTML='<label for="plan-days">Length</label>';
-  daysField.appendChild(days);
+  if(days) daysField.appendChild(days);
   const dateField=document.createElement('div');
   dateField.innerHTML='<label>Calendar dates</label>';
-  date.style.margin='0';
-  dateField.appendChild(date);
+  if(date) date.style.margin='0';
+  if(date) dateField.appendChild(date);
   details.append(daysField,dateField);
 
   const selection=wrap.querySelector('#plan-options-selection');
   const priorityField=document.createElement('div');
   priorityField.innerHTML='<label for="plan-product-priority">Product priority</label>';
-  priority.style.width='100%';
-  priorityField.appendChild(priority);
+  if(priority) priority.style.width='100%';
+  if(priority) priorityField.appendChild(priority);
   selection.appendChild(priorityField);
-  repeats.forEach(label=>{label.style.display='block';label.querySelector('select').style.width='100%';selection.appendChild(label);});
+  repeats.forEach(label=>{label.style.display='block';const s=label.querySelector('select');if(s)s.style.width='100%';selection.appendChild(label);});
   const preferEnhancedToggle=document.createElement('label');
   preferEnhancedToggle.className='prefer-enhanced-toggle';
   preferEnhancedToggle.innerHTML='<input type="checkbox" id="plan-prefer-enhanced" onchange="setPreferEnhancedRecipes(this.checked)"> <span><strong>✨ Prioritise Enhanced Recipes</strong><small>Prioritise enhanced variants for higher protein density and better (lower) macro fit scores.</small></span>';
@@ -6414,11 +6423,13 @@ function ensurePlannerOptionsUI(){
   renderUseUpProductsEditor();
   renderPinnedRecipesEditor();
 
-  setup.style.display='';
-  setup.classList.remove('card');
-  setup.style.margin='0';
-  const setupTitle=setup.querySelector('h3');if(setupTitle)setupTitle.style.display='none';
-  wrap.querySelector('#plan-options-slots').appendChild(setup);
+  if(setup){
+    setup.style.display='';
+    setup.classList.remove('card');
+    setup.style.margin='0';
+    const setupTitle=setup.querySelector('h3');if(setupTitle)setupTitle.style.display='none';
+    wrap.querySelector('#plan-options-slots')?.appendChild(setup);
+  }
   legacy.remove();
   updatePlannerCompactHeader();
 }
@@ -6955,7 +6966,7 @@ function getPlanSlotInfo(slotData, planContext = state.plan, overrideStore = sta
   const parsed = typeof slotData === 'string'
     ? parsePlanRecipeValue(slotData)
     : { id: slotData.id || '', variant: slotData.variant || 'original' };
-  const recipe = state.recipes.find(x => x.id === parsed.id) || null;
+  const recipe = getRecipe(parsed.id);
   const variant = parsed.variant === 'enhanced' && recipe?.enhanced ? 'enhanced' : 'original';
   const active = recipe ? getRecipeVariantForDisplay(recipe, variant, typeof slotData === 'string' ? null : slotData.instanceId, planContext, overrideStore) : null;
   return {
@@ -10425,12 +10436,17 @@ function applyRecognisedRecipeToForm(){
 
 // == SOURCE FIELDS ==
 function updateSrcFields(){
-  const t=document.getElementById('r-src-type').value;
-  const hint=document.getElementById('src-type-hint');
-  document.getElementById('src-url-field').style.display=URL_TYPES.includes(t)?'block':'none';
-  document.getElementById('src-book-fields').style.display=t==='book'?'block':'none';
-  document.getElementById('src-other-field').style.display=t==='other'?'block':'none';
-  hint.style.display=t?'none':'inline';
+  const typeEl = document.getElementById('r-src-type');
+  if(!typeEl) return;
+  const t = typeEl.value;
+  const hint = document.getElementById('src-type-hint');
+  const urlField = document.getElementById('src-url-field');
+  const bookFields = document.getElementById('src-book-fields');
+  const otherField = document.getElementById('src-other-field');
+  if(urlField) urlField.style.display=URL_TYPES.includes(t)?'block':'none';
+  if(bookFields) bookFields.style.display=t==='book'?'block':'none';
+  if(otherField) otherField.style.display=t==='other'?'block':'none';
+  if(hint) hint.style.display=t?'none':'inline';
   const labels={tiktok:'TikTok URL',website:'Website URL',youtube:'YouTube URL',instagram:'Instagram URL'};
   if(labels[t])document.getElementById('src-url-label').textContent=labels[t];
   const placeholders={tiktok:'https://www.tiktok.com/@user/video/...',website:'https://...',youtube:'https://www.youtube.com/watch?v=...',instagram:'https://www.instagram.com/p/...'};
@@ -10707,8 +10723,10 @@ function handleMapSearch(e, idx) {
         mappingContext.ings[idx].bankId = "";
         mappingContext.ings[idx].ingredientId = "";
         mappingContext.ings[idx].mappedViaIngredient = false;
-        document.getElementById(`edit-btn-${idx}`).style.display = 'none';
-        document.getElementById(`map-row-${idx}`).classList.add('error');
+        const editBtn = document.getElementById(`edit-btn-${idx}`);
+        if(editBtn) editBtn.style.display = 'none';
+        const mapRow = document.getElementById(`map-row-${idx}`);
+        if(mapRow) mapRow.classList.add('error');
     }, 150);
 }
 
@@ -10857,9 +10875,12 @@ function selectMapIngredientDefault(idx, familyId){
     ing.bankId = product?.id || "";
     const inp = document.getElementById(`map-search-${idx}`);
     if(inp) inp.value = family.name;
-    document.getElementById(`map-dropdown-${idx}`).style.display = 'none';
-    document.getElementById(`map-row-${idx}`).classList.remove('error');
-    document.getElementById(`edit-btn-${idx}`).style.display = product ? 'inline-block' : 'none';
+    const drop = document.getElementById(`map-dropdown-${idx}`);
+    if(drop) drop.style.display = 'none';
+    const row = document.getElementById(`map-row-${idx}`);
+    if(row) row.classList.remove('error');
+    const editBtn = document.getElementById(`edit-btn-${idx}`);
+    if(editBtn) editBtn.style.display = product ? 'inline-block' : 'none';
     maybeSuggestIngredientAlias(idx, defaultGroup.id);
 }
 
@@ -10956,10 +10977,13 @@ function selectMapItem(idx, groupId) {
     mappingContext.ings[idx].ingredientId = "";
     mappingContext.ings[idx].mappedViaIngredient = false;
     const inp = document.getElementById(`map-search-${idx}`);
-    inp.value = getGroupTypeName(group);
-    document.getElementById(`map-dropdown-${idx}`).style.display = 'none';
-    document.getElementById(`map-row-${idx}`).classList.remove('error');
-    document.getElementById(`edit-btn-${idx}`).style.display = product ? 'inline-block' : 'none';
+    if(inp) inp.value = getGroupTypeName(group);
+    const drop = document.getElementById(`map-dropdown-${idx}`);
+    if(drop) drop.style.display = 'none';
+    const row = document.getElementById(`map-row-${idx}`);
+    if(row) row.classList.remove('error');
+    const editBtn = document.getElementById(`edit-btn-${idx}`);
+    if(editBtn) editBtn.style.display = product ? 'inline-block' : 'none';
     maybeSuggestIngredientAlias(idx, groupId);
 }
 
@@ -12802,7 +12826,7 @@ function createDataQualityIssue({ entityType, entityId, code, severity = 'gap', 
     return { entityType, entityId, code, severity, title, message, fixButtonHtml, fixTarget, key, legacyKey, fingerprint:dataQualityFingerprint(source) };
 }
 
-function fixSubtypeDataQuality(subTypeId, issueKey = ''){
+function openSubtypeResolutionModal(subTypeId, issueKey = ''){
     if (issueKey) {
       const section = document.querySelector(`[data-dq-key="${CSS.escape(issueKey)}"]`)?.closest('details');
       editorNavigationStack.push({ view: 'data', issueKey, scrollY: window.scrollY, sectionOpen: !!section?.open, openedAt: Date.now() });
@@ -12810,33 +12834,150 @@ function fixSubtypeDataQuality(subTypeId, issueKey = ''){
     const group = getIngredientGroup(subTypeId);
     const subTypeName = group ? (group.name || getGroupTypeName(group)) : (subTypeId || '');
 
-    // 1. Switch active view to Products tab ('bank')
-    showView('bank');
-
-    // 2. Apply search/filter for that sub-type ID/name
-    productBankGroupFilterId = group ? group.id : subTypeId;
-    productBankFamilyFilterId = null;
-    activeFamily = 'all';
-    activeCat = 'all';
-    const searchInput = document.getElementById('bank-search');
-    if (searchInput) {
-      searchInput.value = subTypeName;
+    let modal = document.getElementById('subtype-resolution-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'subtype-resolution-modal';
+      document.body.appendChild(modal);
     }
-    renderBank();
+    modal.className = 'modal active';
+    modal.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;padding:16px;';
+    
+    modal.innerHTML = `
+      <div class="card" style="width:100%;max-width:540px;padding:24px;border-radius:14px;background:var(--surface,#fff);box-shadow:0 12px 36px rgba(0,0,0,0.25);position:relative;max-height:90vh;overflow-y:auto">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px">
+          <div>
+            <h2 style="font-size:18px;font-weight:700;margin:0;color:var(--text)">Resolve Unlinked Sub-type</h2>
+            <div style="font-size:13px;color:var(--text2);margin-top:4px">
+              Sub-type: <strong style="color:var(--text)">${ppEscapeHtml(subTypeName)}</strong>
+            </div>
+          </div>
+          <button type="button" class="btn sm ghost" style="padding:4px 8px;font-size:16px;line-height:1" onclick="closeSubtypeResolutionModal()" title="Close">✕</button>
+        </div>
 
-    // 3. Trigger product creation/linking modal with sub-type pre-selected
+        <p style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:18px">
+          This sub-type currently has no linked products in your catalog. Choose one of the 3 resolution paths:
+        </p>
+
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <!-- 1. Link Existing Product -->
+          <div class="card" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface2)">
+            <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:var(--text);display:flex;align-items:center;gap:6px">
+              <span>🔗 1. Link Existing Product</span>
+            </div>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:10px">
+              Search your Product Bank and assign an existing product to this sub-type.
+            </div>
+            <input type="search" id="subtype-link-search" class="input" placeholder="Search product by name or brand..." style="font-size:13px;padding:8px 12px;width:100%;border-radius:8px;box-sizing:border-box" oninput="filterSubtypeLinkProducts(this.value, '${ppEscapeAttr(subTypeId)}')">
+            <div id="subtype-link-results" style="margin-top:8px;max-height:160px;overflow-y:auto;display:none;border:1px solid var(--border);border-radius:8px;background:var(--surface)"></div>
+          </div>
+
+          <!-- 2. Import from Tesco -->
+          <div class="card" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);cursor:pointer;transition:border-color 0.15s ease" onclick="resolveSubtypeViaTesco('${ppEscapeAttr(subTypeId)}')" onmouseover="this.style.borderColor='var(--action)'" onmouseout="this.style.borderColor='var(--border)'">
+            <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:var(--text);display:flex;align-items:center;justify-content:space-between">
+              <span>🛒 2. Import from Tesco</span>
+              <span class="btn sm primary" style="pointer-events:none;font-size:12px">Search Tesco →</span>
+            </div>
+            <div style="font-size:12px;color:var(--text2)">
+              Search the Tesco online catalog to automatically populate product title, brand, nutrition, and pack size.
+            </div>
+          </div>
+
+          <!-- 3. Create New Product -->
+          <div class="card" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);cursor:pointer;transition:border-color 0.15s ease" onclick="resolveSubtypeViaManual('${ppEscapeAttr(subTypeId)}')" onmouseover="this.style.borderColor='var(--action)'" onmouseout="this.style.borderColor='var(--border)'">
+            <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:var(--text);display:flex;align-items:center;justify-content:space-between">
+              <span>✨ 3. Create New Product</span>
+              <span class="btn sm ghost" style="pointer-events:none;font-size:12px">Blank Form →</span>
+            </div>
+            <div style="font-size:12px;color:var(--text2)">
+              Open the full blank product creation form with this sub-type pre-assigned.
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+}
+
+function closeSubtypeResolutionModal(){
+    const modal = document.getElementById('subtype-resolution-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function filterSubtypeLinkProducts(query, subTypeId){
+    const container = document.getElementById('subtype-link-results');
+    if (!container) return;
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) {
+      container.style.display = 'none';
+      container.innerHTML = '';
+      return;
+    }
+    const matches = (state.ingredients || []).filter(p => {
+      const name = String(p?.name || '').toLowerCase();
+      const brand = String(p?.brand || '').toLowerCase();
+      return name.includes(q) || brand.includes(q);
+    }).slice(0, 10);
+
+    if (!matches.length) {
+      container.style.display = 'block';
+      container.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--text3);text-align:center">No matching products found in bank.</div>';
+      return;
+    }
+
+    container.style.display = 'block';
+    container.innerHTML = matches.map(p => `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${ppEscapeHtml(p.name || 'Unnamed')}</div>
+          <div style="font-size:11px;color:var(--text2)">${ppEscapeHtml(p.brand || 'No brand')} · ${p.packSize || ''}${p.packUnit || ''}</div>
+        </div>
+        <button type="button" class="btn sm primary" style="font-size:11px;padding:3px 8px" onclick="resolveSubtypeViaExisting('${ppEscapeAttr(subTypeId)}', '${ppEscapeAttr(p.id)}')">Link Product</button>
+      </div>
+    `).join('');
+}
+
+function resolveSubtypeViaExisting(subTypeId, productId){
+    const product = getProduct(productId);
+    if (!product) {
+      showPlatePlanToast('Product not found.');
+      return;
+    }
+    product.groupId = subTypeId;
+    saveState(true);
+    if (platePlanCloudReady && !platePlanSyncSuppress) queuePlatePlanCloudDiff();
+    closeSubtypeResolutionModal();
+    renderDataQuality();
+    showPlatePlanToast(`Linked "${product.name}" to sub-type successfully! ✓`);
+}
+
+function resolveSubtypeViaTesco(subTypeId){
+    const group = getIngredientGroup(subTypeId);
+    const subTypeName = group ? (group.name || getGroupTypeName(group)) : (subTypeId || '');
+    closeSubtypeResolutionModal();
     if (typeof showTescoImport === 'function') {
       showTescoImport({
         type: 'manualAdd',
         name: subTypeName,
-        groupId: group ? group.id : subTypeId,
+        groupId: subTypeId,
         ingredientId: group?.ingredientId || ''
       });
-    } else if (typeof openAddProductModal === 'function') {
+    } else {
+      showPlatePlanToast('Tesco import is currently unavailable.');
+    }
+}
+
+function resolveSubtypeViaManual(subTypeId){
+    const group = getIngredientGroup(subTypeId);
+    const subTypeName = group ? (group.name || getGroupTypeName(group)) : (subTypeId || '');
+    closeSubtypeResolutionModal();
+    showView('bank');
+    productBankGroupFilterId = subTypeId;
+    renderBank();
+    if (typeof openAddProductModal === 'function') {
       openAddProductModal({
-        id: group ? group.id : subTypeId,
+        id: subTypeId,
         name: subTypeName,
-        groupId: group ? group.id : subTypeId
+        groupId: subTypeId
       });
     } else if (typeof showAddIng === 'function') {
       showAddIng();
@@ -12844,6 +12985,16 @@ function fixSubtypeDataQuality(subTypeId, issueKey = ''){
       if (nameInput) nameInput.value = subTypeName;
     }
 }
+
+function fixSubtypeDataQuality(subTypeId, issueKey = ''){
+    openSubtypeResolutionModal(subTypeId, issueKey);
+}
+window.openSubtypeResolutionModal = openSubtypeResolutionModal;
+window.closeSubtypeResolutionModal = closeSubtypeResolutionModal;
+window.filterSubtypeLinkProducts = filterSubtypeLinkProducts;
+window.resolveSubtypeViaExisting = resolveSubtypeViaExisting;
+window.resolveSubtypeViaTesco = resolveSubtypeViaTesco;
+window.resolveSubtypeViaManual = resolveSubtypeViaManual;
 window.fixSubtypeDataQuality = fixSubtypeDataQuality;
 
 function beginDataQualityFix(entityType,entityId,issueKey){
@@ -13709,7 +13860,7 @@ function renderVault(){
   }
 
   ensureVariantFavoritingPrefs();
-  const recipes=state.recipes.filter(r=>{
+  const recipes=(state.recipes || []).filter(r=>{
     const hasAnyFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
     if(vaultFilterFavouritesOnly && !hasAnyFav) return false;
     const types=r.types||[r.type];
@@ -14095,13 +14246,10 @@ function reviewRecipeModalView(id, instanceId = null, tab = 'original') {
     if(!r) return;
     editId = instanceId ? null : id;
     const hasEnh = !!r.enhanced;
-    if(hasEnh) {
-        document.getElementById('tab-btn-enhanced').style.display = 'block';
-        document.getElementById('tab-btn-compare').style.display = 'block';
-    } else {
-        document.getElementById('tab-btn-enhanced').style.display = 'none';
-        document.getElementById('tab-btn-compare').style.display = 'none';
-    }
+    const tabEnh = document.getElementById('tab-btn-enhanced');
+    const tabComp = document.getElementById('tab-btn-compare');
+    if(tabEnh) tabEnh.style.display = hasEnh ? 'block' : 'none';
+    if(tabComp) tabComp.style.display = hasEnh ? 'block' : 'none';
     const payload = { original: r, enhanced: r.enhanced || {} };
     openModal(r.name, payload, true, { instanceId, tab });
 }
@@ -14116,13 +14264,10 @@ function editRecipeModalView(id, initialTab = 'original') {
     
     // Set view config based on whether enhanced exists
     const hasEnh = !!r.enhanced;
-    if(hasEnh) {
-        document.getElementById('tab-btn-enhanced').style.display = 'block';
-        document.getElementById('tab-btn-compare').style.display = 'block';
-    } else {
-        document.getElementById('tab-btn-enhanced').style.display = 'none';
-        document.getElementById('tab-btn-compare').style.display = 'none';
-    }
+    const tabEnh = document.getElementById('tab-btn-enhanced');
+    const tabComp = document.getElementById('tab-btn-compare');
+    if(tabEnh) tabEnh.style.display = hasEnh ? 'block' : 'none';
+    if(tabComp) tabComp.style.display = hasEnh ? 'block' : 'none';
 
     const payload = { original: r, enhanced: r.enhanced || {} };
     openModal(r.name, payload, true, {tab:currentReviewVariant});
@@ -15389,10 +15534,10 @@ function openIngredientFamilyAliasesModal(familyId){
   ingredientGroupDetailsMode = 'familyAliases';
   document.getElementById('ingredient-group-details-title').textContent = 'Edit ingredient aliases';
   document.getElementById('ingredient-group-details-context').innerHTML = `<strong>${ppEscapeHtml(family.name)}</strong>`;
-  document.getElementById('ingredient-group-category-field').style.display = 'none';
-  document.getElementById('ingredient-group-name-field').style.display = 'none';
-  document.getElementById('ingredient-group-family-field').style.display = 'none';
-  document.getElementById('ingredient-group-aliases-field').style.display = 'block';
+  const catField = document.getElementById('ingredient-group-category-field'); if(catField) catField.style.display = 'none';
+  const nameField = document.getElementById('ingredient-group-name-field'); if(nameField) nameField.style.display = 'none';
+  const famField = document.getElementById('ingredient-group-family-field'); if(famField) famField.style.display = 'none';
+  const aliasField = document.getElementById('ingredient-group-aliases-field'); if(aliasField) aliasField.style.display = 'block';
   document.getElementById('ingredient-group-aliases-input').value = (family.aliases || []).join('\\n');
   document.getElementById('ingredient-group-details-msg').innerHTML = '';
   wrap.classList.add('open');
@@ -15423,7 +15568,8 @@ function mergeIngredientFamilyPrompt(sourceFamilyId){
   const search = document.getElementById('ingredient-group-merge-search');
   search.placeholder = 'Search target ingredient';
   search.value = '';
-  document.getElementById('ingredient-group-merge-selection').style.display = 'none';
+  const mergeSel = document.getElementById('ingredient-group-merge-selection');
+  if(mergeSel) mergeSel.style.display = 'none';
   document.getElementById('ingredient-group-merge-confirm').disabled = true;
   document.getElementById('ingredient-group-merge-confirm').onclick = confirmIngredientFamilyMerge;
   renderIngredientFamilyMergeOptions('');
@@ -15701,7 +15847,7 @@ function renderBank(){
   const search=(document.getElementById('bank-search').value||'').trim();
   const searchVariants = getSearchVariants(search);
   
-  let ings=state.ingredients.filter(i=>{
+  let ings=(state.ingredients || []).filter(i=>{
       const group = getIngredientGroup(i.groupId);
       const effectiveCat = group?.cat || i.cat || 'other';
       if(productBankGroupFilterId && i.groupId !== productBankGroupFilterId && !getGroupProducts(productBankGroupFilterId).some(p => p.id === i.id)) return false;
@@ -16828,10 +16974,14 @@ function openIngredientGroupDetailsModal(groupId, mode = 'name'){
   document.getElementById('ingredient-group-details-context').innerHTML = group
     ? `<strong>${ppEscapeHtml(getGroupHierarchyText(group))}</strong> <span class="tag">${products.length} product${products.length===1?'':'s'}</span>`
     : 'Create a recipe ingredient type. Products can be linked afterwards from Product Bank.';
-  document.getElementById('ingredient-group-category-field').style.display = (mode === 'name' || mode === 'family' || mode === 'create') ? 'block' : 'none';
-  document.getElementById('ingredient-group-name-field').style.display = (mode === 'name' || mode === 'create') ? 'block' : 'none';
-  document.getElementById('ingredient-group-family-field').style.display = (mode === 'name' || mode === 'family' || mode === 'create') ? 'block' : 'none';
-  document.getElementById('ingredient-group-aliases-field').style.display = (mode === 'aliases' || mode === 'create') ? 'block' : 'none';
+  const catField = document.getElementById('ingredient-group-category-field');
+  if(catField) catField.style.display = (mode === 'name' || mode === 'family' || mode === 'create') ? 'block' : 'none';
+  const nameField = document.getElementById('ingredient-group-name-field');
+  if(nameField) nameField.style.display = (mode === 'name' || mode === 'create') ? 'block' : 'none';
+  const famField = document.getElementById('ingredient-group-family-field');
+  if(famField) famField.style.display = (mode === 'name' || mode === 'family' || mode === 'create') ? 'block' : 'none';
+  const aliasField = document.getElementById('ingredient-group-aliases-field');
+  if(aliasField) aliasField.style.display = (mode === 'aliases' || mode === 'create') ? 'block' : 'none';
   document.getElementById('ingredient-group-category-input').innerHTML = getGroupCategoryOptionsHtml(group?.cat || 'other');
   document.getElementById('ingredient-group-name-input').value = group?.name || '';
   document.getElementById('ingredient-group-family-input').value = group?.family || '';
@@ -17225,9 +17375,11 @@ function openIngredientGroupMergeModal(sourceGroupId){
     ${(source.aliases || []).length ? `<div style="margin-top:4px"><strong>Aliases:</strong> ${ppEscapeHtml((source.aliases || []).join(', '))}</div>` : ''}
   `;
   const search = document.getElementById('ingredient-group-merge-search');
-  search.value = '';
-  document.getElementById('ingredient-group-merge-selection').style.display = 'none';
-  document.getElementById('ingredient-group-merge-confirm').disabled = true;
+  if(search) search.value = '';
+  const mergeSel = document.getElementById('ingredient-group-merge-selection');
+  if(mergeSel) mergeSel.style.display = 'none';
+  const confirmBtn = document.getElementById('ingredient-group-merge-confirm');
+  if(confirmBtn) confirmBtn.disabled = true;
   renderIngredientGroupMergeOptions('');
   wrap.classList.add('open');
   setTimeout(() => search.focus(), 0);
@@ -17471,9 +17623,12 @@ function setCat(c){
 
 function showParseIng(){
   hideLegacyCategoryAndMeatFields();
-  document.getElementById('parse-panel').style.display='block';
-  document.getElementById('manual-ing-panel').style.display='none';
-  document.getElementById('tesco-modal-wrap').classList.remove('open');
+  const parsePanel = document.getElementById('parse-panel');
+  if(parsePanel) parsePanel.style.display='block';
+  const manualIngPanel = document.getElementById('manual-ing-panel');
+  if(manualIngPanel) manualIngPanel.style.display='none';
+  const tescoWrap = document.getElementById('tesco-modal-wrap');
+  if(tescoWrap) tescoWrap.classList.remove('open');
   
   ['pp-name','pp-brand','pp-text','pp-price','pp-pack'].forEach(id => {
       const el = document.getElementById(id);
@@ -17491,9 +17646,12 @@ function showTescoImport(context = null){
   hideLegacyCategoryAndMeatFields();
   window.pendingTescoMapping = context;
   const manualAddMode = context?.type === 'manualAdd';
-  document.getElementById('tesco-paste').value='';
-  document.getElementById('tesco-msg').innerHTML='';
-  document.getElementById('tesco-preview').style.display = manualAddMode ? 'block' : 'none';
+  const pasteEl = document.getElementById('tesco-paste');
+  if(pasteEl) pasteEl.value='';
+  const msgEl = document.getElementById('tesco-msg');
+  if(msgEl) msgEl.innerHTML='';
+  const previewEl = document.getElementById('tesco-preview');
+  if(previewEl) previewEl.style.display = manualAddMode ? 'block' : 'none';
   const diagnosticsBox = document.getElementById('tesco-diagnostics-box');
   if(diagnosticsBox) diagnosticsBox.style.display = manualAddMode ? 'none' : '';
   const importTitle = document.getElementById('tesco-import-title');
@@ -17526,15 +17684,19 @@ function showTescoImport(context = null){
   if(document.getElementById('tp-item-weight-unit')) document.getElementById('tp-item-weight-unit').value = 'g';
   if(document.getElementById('tp-drained-weight-unit')) document.getElementById('tp-drained-weight-unit').value = 'g';
   
+  const searchHint = document.getElementById('tesco-search-hint');
   if(!manualAddMode && context && context.name) {
-      document.getElementById('tesco-search-hint').style.display = 'block';
-      document.getElementById('tesco-search-term').innerText = context.name;
-      document.getElementById('tesco-search-link').href = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(context.name)}`;
+      if(searchHint) searchHint.style.display = 'block';
+      const termEl = document.getElementById('tesco-search-term');
+      if(termEl) termEl.innerText = context.name;
+      const linkEl = document.getElementById('tesco-search-link');
+      if(linkEl) linkEl.href = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(context.name)}`;
   } else {
-      document.getElementById('tesco-search-hint').style.display = 'none';
+      if(searchHint) searchHint.style.display = 'none';
   }
   
-  document.getElementById('tesco-modal-wrap').classList.add('open');
+  const modalWrap = document.getElementById('tesco-modal-wrap');
+  if(modalWrap) modalWrap.classList.add('open');
 }
 
 function closeTescoModal() {
@@ -18063,7 +18225,7 @@ function saveTescoIngredient(categoryReady=false){
   }
 
   // Search for an existing ingredient to merge pack options
-  const existingMatches = state.ingredients.filter(i => {
+  const existingMatches = (state.ingredients || []).filter(i => {
      const n1 = i.name.toLowerCase().replace(/[^a-z0-9]/g, '');
      const n2 = name.toLowerCase().replace(/[^a-z0-9]/g, '');
      return n1.length > 3 && n2.length > 3 && (n1 === n2 || n1.includes(n2) || n2.includes(n1));
@@ -18124,9 +18286,12 @@ function saveTescoIngredient(categoryReady=false){
           renderMappingList();
       } else if (pendingTesco.type === 'subst') {
           currentSubstContext.newBankId = newIngId;
-          document.getElementById('subst-search').value = ing.name;
-          document.getElementById('subst-dropdown').style.display = 'none';
-          document.getElementById('subst-selected').textContent = `Replacing with: ${ing.name}`;
+          const sSearch = document.getElementById('subst-search');
+          if(sSearch) sSearch.value = ing.name;
+          const sDrop = document.getElementById('subst-dropdown');
+          if(sDrop) sDrop.style.display = 'none';
+          const sSel = document.getElementById('subst-selected');
+          if(sSel) sSel.textContent = `Replacing with: ${ing.name}`;
       } else if (pendingTesco.type === 'replace') {
           applyReplaceImportSelection(pendingTesco.widgetId, newIngId, ing.name);
       } else if (pendingTesco.type === 'editIng') {
@@ -18420,8 +18585,10 @@ function editIng(id){
     while(panel.firstChild) inner.appendChild(panel.firstChild);
     panel.appendChild(inner);
   }
-  document.getElementById('parse-panel').style.display='none';
-  document.getElementById('tesco-modal-wrap').classList.remove('open');
+  const parsePanel = document.getElementById('parse-panel');
+  if(parsePanel) parsePanel.style.display='none';
+  const tescoWrap = document.getElementById('tesco-modal-wrap');
+  if(tescoWrap) tescoWrap.classList.remove('open');
 }
 
 function refreshAfterIngredientEdit(productId = ''){
@@ -18833,9 +19000,12 @@ function renderReplaceModal(){
 }
 
 function replaceSearchFilter(widgetId, listId) {
-    const q = document.getElementById(widgetId+'-input').value.toLowerCase().trim();
+    const inp = document.getElementById(widgetId+'-input');
+    if(!inp) return;
+    const q = inp.value.toLowerCase().trim();
     const terms = q.split(/\s+/).filter(Boolean);
     const list = document.getElementById(listId);
+    if(!list) return;
     list.style.display = 'block';
     Array.from(list.querySelectorAll('.replace-search-opt')).forEach(el => {
         const haystack = (el.dataset.search || el.dataset.name || '').toLowerCase();
@@ -18874,21 +19044,27 @@ function replaceRowPick(widgetId, listId, el) {
     const name = el.dataset.name;
     // Extract row index from widgetId e.g. 'rrow-2'
     const idx = parseInt(widgetId.replace('rrow-', ''));
-    _replaceCtx.rows[idx].replacementId = id;
-    document.getElementById(widgetId+'-input').value = name;
-    document.getElementById(widgetId+'-selected').textContent = '✓ Selected: ' + name;
-    document.getElementById(listId).style.display = 'none';
+    if(_replaceCtx?.rows?.[idx]) _replaceCtx.rows[idx].replacementId = id;
+    const inp = document.getElementById(widgetId+'-input');
+    if(inp) inp.value = name;
+    const sel = document.getElementById(widgetId+'-selected');
+    if(sel) sel.textContent = '✓ Selected: ' + name;
+    const list = document.getElementById(listId);
+    if(list) list.style.display = 'none';
 }
 
 function replaceBulkPickAndApply(widgetId, listId, el) {
     const id = el.dataset.id;
     const name = el.dataset.name;
-    document.getElementById(widgetId+'-input').value = name;
-    document.getElementById(widgetId+'-selected').textContent = '✓ Applying to all rows: ' + name;
-    document.getElementById(listId).style.display = 'none';
-    _replaceCtx.rows.forEach(r => r.replacementId = id);
+    const bInp = document.getElementById(widgetId+'-input');
+    if(bInp) bInp.value = name;
+    const bSel = document.getElementById(widgetId+'-selected');
+    if(bSel) bSel.textContent = '✓ Applying to all rows: ' + name;
+    const list = document.getElementById(listId);
+    if(list) list.style.display = 'none';
+    if(_replaceCtx?.rows) _replaceCtx.rows.forEach(r => r.replacementId = id);
     // Update each row's search input to reflect the bulk selection
-    _replaceCtx.rows.forEach((r, i) => {
+    if(_replaceCtx?.rows) _replaceCtx.rows.forEach((r, i) => {
         const inp = document.getElementById('rrow-'+i+'-input');
         const sel = document.getElementById('rrow-'+i+'-selected');
         if(inp) inp.value = name;
@@ -19013,11 +19189,12 @@ function parseIng(){
     refreshProductGroupAndRecipes(ing.id);
     saveState();
     
-    document.getElementById('parse-panel').style.display='none';
+    const parsePanel = document.getElementById('parse-panel');
+    if(parsePanel) parsePanel.style.display='none';
     ['pp-name','pp-brand','pp-text','pp-price','pp-pack','pp-meatsub'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
-    document.getElementById('pp-storage').value = '';
-    document.getElementById('pp-pack-unit').value = 'qty';
-    document.getElementById('pp-item-weight').value = '';
+    const sEl = document.getElementById('pp-storage'); if(sEl) sEl.value = '';
+    const puEl = document.getElementById('pp-pack-unit'); if(puEl) puEl.value = 'qty';
+    const iwEl = document.getElementById('pp-item-weight'); if(iwEl) iwEl.value = '';
     renderBank();
     showMsg('bank-msg', hasCore ? 'Product added from pasted label. Please review the parsed nutrition values.' : 'Product added, but PlatePlan could not confidently read nutrition values. Please edit the product and fill the bank data.', hasCore ? 'success' : 'error');
   }catch(e){hideOverlay();showMsg('pp-msg','Could not parse this label locally. Please add the values manually.','error');}
@@ -19740,7 +19917,7 @@ window.discardDraftPlan = discardDraftPlan;
 
 function generatePlan(){
   ensurePlannerShell();
-  const days=parseInt(document.getElementById('plan-days').value)||9;
+  const days = parseInt(document.getElementById('wizard-plan-days')?.value || document.getElementById('plan-days')?.value || state.plannerDays || 10, 10) || 10;
   initExcluded(false);
   const selectedSlots=[];
   for(let day=1;day<=days;day++)['breakfast','lunch','dinner'].forEach(meal=>{
@@ -19820,30 +19997,38 @@ function generatePlan(){
     });
   }
 
-  const preferEnhanced = state.prefs?.preferEnhancedRecipes !== false;
-
   const scoreCandidateOption = (opt, type, who) => {
     let baseScore = 0;
     try {
       const bundle = calculateRecipeDisplayNutrition({ recipe: opt.recipe, variant: opt.variant, mealType: type });
       const portions = bundle?.portions;
       if(portions) {
+        let cal = 0, prot = 0;
         if(who === 'Elliott' || who === 'elliott') {
           const fit = calculateFit(portions.eCal, portions.eProt, getTarget('e', 'cal') / 3, getTarget('e', 'prot') / 3);
           baseScore = fit?.score || 0;
+          cal = portions.eCal || 0;
+          prot = portions.eProt || 0;
         } else if(who === 'Chloe' || who === 'chloe') {
           const fit = calculateFit(portions.cCal, portions.cProt, getTarget('c', 'cal') / 3, getTarget('c', 'prot') / 3);
           baseScore = fit?.score || 0;
+          cal = portions.cCal || 0;
+          prot = portions.cProt || 0;
         } else {
           const fitE = calculateFit(portions.eCal, portions.eProt, getTarget('e', 'cal') / 3, getTarget('e', 'prot') / 3);
           const fitC = calculateFit(portions.cCal, portions.cProt, getTarget('c', 'cal') / 3, getTarget('c', 'prot') / 3);
           baseScore = ((fitE?.score || 0) + (fitC?.score || 0)) / 2;
+          cal = ((portions.eCal || 0) + (portions.cCal || 0)) / 2;
+          prot = ((portions.eProt || 0) + (portions.cProt || 0)) / 2;
         }
+        // Automatic protein density bonus (higher protein per 100 kcal improves the score)
+        const proteinDensity = cal > 0 ? (prot / cal) * 100 : 0;
+        baseScore -= Math.min(2.0, proteinDensity * 0.1);
       }
     } catch(e){}
 
-    if(preferEnhanced && opt.variant === 'enhanced') {
-      baseScore -= 0.5; // Bonus for enhanced variants (lower score is better)
+    if(opt.variant === 'enhanced') {
+      baseScore -= 0.5; // Natural bonus for enhanced variants
     }
     return baseScore;
   };
@@ -19858,7 +20043,7 @@ function generatePlan(){
     
     if(prioritiseUseUp) {
       fresh = rankPlannerOptionsForUseUp(fresh, type, shared ? 'both' : who);
-    } else if(preferEnhanced && fresh.length > 1) {
+    } else if(fresh.length > 1) {
       fresh = fresh.map(opt => ({
         opt,
         score: scoreCandidateOption(opt, type, shared ? 'both' : who) + (Math.random() * 0.12)
@@ -19868,11 +20053,11 @@ function generatePlan(){
     let picked = null;
     if(prioritiseUseUp) {
       picked = fresh[0] || null;
-    } else if(preferEnhanced && fresh.length > 0) {
+    } else if(fresh.length > 0) {
       const topPoolSize = Math.min(fresh.length, 3);
       picked = fresh[Math.floor(Math.random() * topPoolSize)] || fresh[0] || null;
     } else {
-      picked = fresh[Math.floor(Math.random() * fresh.length)] || null;
+      picked = fresh[0] || null;
     }
     
     if(picked) usedInNewPlan.add(picked.id);
@@ -19980,7 +20165,7 @@ function generatePlan(){
     showPlanGenerationProblem('No meals could be generated',`${reason} Your current meal plan has been kept.`);
     return;
   }
-  const planStartInput = document.getElementById('plan-start-date')?.value || getPlatePlanLocalToday();
+  const planStartInput = document.getElementById('wizard-plan-start')?.value || document.getElementById('plan-start-date')?.value || state.plannerStartDate || getPlatePlanLocalToday();
   const warningMessages=[...new Set(remainingUnresolved.map(item=>`${formatPlanDayLabel({dayDates:buildPlanDayDates(planStartInput,days)},item.day,{short:true})} ${item.meal} for ${item.who}: ${explainUnavailablePlanSlot(item.meal,item.who,priority,trafficRules)}`))];
   state.overrides = {};
   const dayDates=buildPlanDayDates(planStartInput,days);
@@ -20003,6 +20188,7 @@ function generatePlan(){
   state.draftPlan = nextPlan;
   state.isDraftPlan = true;
   state.plan = nextPlan;
+  state.plannerStep = 2;
 
   markPlatePlanViewsDirty('today', 'planner', 'shopping', 'planlib');
   renderPlan();
@@ -20159,9 +20345,887 @@ function formatPlanDateShort(dateString){
 }
 window.formatPlanDateShort = formatPlanDateShort;
 
+// ==========================================
+// PLATEPLAN v3.0.1 MEAL PLANNER 4-STEP WIZARD
+// ==========================================
+
+function getPlannerWizardStep() {
+  if (state.plannerStep && [1, 2, 3, 4].includes(state.plannerStep)) {
+    return state.plannerStep;
+  }
+  if (state.plan && state.plan.slots && Object.keys(state.plan.slots).length > 0) {
+    return 2; // Default to Review Plan if active plan exists
+  }
+  return 1; // Otherwise start with Configure Requests
+}
+
+function setPlannerWizardStep(step) {
+  state.plannerStep = Math.max(1, Math.min(4, step));
+  renderPlannerWizard();
+}
+window.setPlannerWizardStep = setPlannerWizardStep;
+window.goToPlannerStep = setPlannerWizardStep;
+
+// Exclusions helpers
+function getActiveWizardExclusions() {
+  const list = [];
+  const excluded = state.excluded || {};
+  Object.entries(excluded).forEach(([day, slots]) => {
+    if (!slots) return;
+    const d = parseInt(day, 10);
+    ['breakfast', 'lunch', 'dinner'].forEach(meal => {
+      const eExcl = !!slots[meal + 'E'];
+      const cExcl = !!slots[meal + 'C'];
+      if (eExcl && cExcl) {
+        list.push({ day: d, meal, who: 'Both', keys: [meal + 'E', meal + 'C'], label: `Day ${d} ${meal.charAt(0).toUpperCase() + meal.slice(1)} (Both)` });
+      } else if (eExcl) {
+        list.push({ day: d, meal, who: 'Elliott', keys: [meal + 'E'], label: `Day ${d} ${meal.charAt(0).toUpperCase() + meal.slice(1)} (Elliott)` });
+      } else if (cExcl) {
+        list.push({ day: d, meal, who: 'Chloe', keys: [meal + 'C'], label: `Day ${d} ${meal.charAt(0).toUpperCase() + meal.slice(1)} (Chloe)` });
+      }
+    });
+  });
+  return list;
+}
+
+function removeWizardExclusion(day, keys) {
+  if (!state.excluded || !state.excluded[day]) return;
+  (Array.isArray(keys) ? keys : [keys]).forEach(k => {
+    state.excluded[day][k] = false;
+  });
+  saveState();
+  renderPlannerWizard();
+}
+window.removeWizardExclusion = removeWizardExclusion;
+
+function addWizardExclusionFromUI() {
+  const day = parseInt(document.getElementById('wizard-excl-day')?.value, 10) || 1;
+  const meal = document.getElementById('wizard-excl-meal')?.value || 'all';
+  const person = document.getElementById('wizard-excl-person')?.value || 'both';
+
+  state.excluded = state.excluded || {};
+  state.excluded[day] = state.excluded[day] || {};
+
+  const meals = meal === 'all' ? ['breakfast', 'lunch', 'dinner'] : [meal];
+  meals.forEach(m => {
+    if (person === 'both' || person === 'elliott') state.excluded[day][m + 'E'] = true;
+    if (person === 'both' || person === 'chloe') state.excluded[day][m + 'C'] = true;
+  });
+  saveState();
+  renderPlannerWizard();
+}
+window.addWizardExclusionFromUI = addWizardExclusionFromUI;
+
+function skipAllWizardDinners() {
+  const days = state.plannerDays || parseInt(document.getElementById('wizard-plan-days')?.value, 10) || 10;
+  state.excluded = state.excluded || {};
+  for (let d = 1; d <= days; d++) {
+    state.excluded[d] = state.excluded[d] || {};
+    state.excluded[d]['dinnerE'] = true;
+    state.excluded[d]['dinnerC'] = true;
+  }
+  saveState();
+  renderPlannerWizard();
+}
+window.skipAllWizardDinners = skipAllWizardDinners;
+
+function clearAllWizardExclusions() {
+  initExcluded(true);
+  renderPlannerWizard();
+}
+window.clearAllWizardExclusions = clearAllWizardExclusions;
+
+// Pinned recipes inline helpers
+function filterWizardPinRecipes(query) {
+  const container = document.getElementById('wizard-pin-search-results');
+  if (!container) return;
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+  const matches = (state.recipes || []).filter(r => String(r?.name || '').toLowerCase().includes(q)).slice(0, 6);
+  if (!matches.length) {
+    container.style.display = 'block';
+    container.innerHTML = '<div style="padding:8px;font-size:12px;color:var(--text3)">No recipes found.</div>';
+    return;
+  }
+  const targetDay = parseInt(document.getElementById('wizard-pin-day')?.value, 10) || 1;
+  container.style.display = 'block';
+  container.innerHTML = matches.map(r => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border)">
+      <span style="font-size:12px;font-weight:600">${ppEscapeHtml(r.name)}</span>
+      <button type="button" class="btn sm primary" style="font-size:11px;padding:2px 8px" onclick="pinWizardRecipe('${ppEscapeAttr(r.id)}', ${targetDay})">+ Pin Day ${targetDay}</button>
+    </div>
+  `).join('');
+}
+window.filterWizardPinRecipes = filterWizardPinRecipes;
+
+function pinWizardRecipe(recipeId, day) {
+  state.pinnedRecipes = state.pinnedRecipes || [];
+  state.pinnedRecipes = state.pinnedRecipes.filter(p => p.recipeId !== recipeId);
+  state.pinnedRecipes.push({ recipeId, targetDay: day, daysCount: 1, variant: 'original' });
+  saveState();
+  renderPlannerWizard();
+}
+window.pinWizardRecipe = pinWizardRecipe;
+
+function unpinWizardRecipe(recipeId) {
+  state.pinnedRecipes = (state.pinnedRecipes || []).filter(p => p.recipeId !== recipeId);
+  saveState();
+  renderPlannerWizard();
+}
+window.unpinWizardRecipe = unpinWizardRecipe;
+
+// Pantry Use-Up inline helpers
+function filterWizardUseUpProducts(query) {
+  const container = document.getElementById('wizard-useup-search-results');
+  if (!container) return;
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+  const matches = (state.ingredients || []).filter(p => {
+    const name = String(p?.name || '').toLowerCase();
+    const brand = String(p?.brand || '').toLowerCase();
+    return name.includes(q) || brand.includes(q);
+  }).slice(0, 6);
+
+  if (!matches.length) {
+    container.style.display = 'block';
+    container.innerHTML = '<div style="padding:8px;font-size:12px;color:var(--text3)">No products found.</div>';
+    return;
+  }
+
+  container.style.display = 'block';
+  container.innerHTML = matches.map(p => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border)">
+      <span style="font-size:12px;font-weight:600">${ppEscapeHtml(p.name)} <span style="color:var(--text3);font-size:11px">(${ppEscapeHtml(p.brand || 'No brand')})</span></span>
+      <button type="button" class="btn sm primary" style="font-size:11px;padding:2px 8px" onclick="addWizardUseUpProduct('${ppEscapeAttr(p.id)}')">+ Use Up</button>
+    </div>
+  `).join('');
+}
+window.filterWizardUseUpProducts = filterWizardUseUpProducts;
+
+function addWizardUseUpProduct(productId) {
+  state.useUpProducts = state.useUpProducts || [];
+  if (!state.useUpProducts.includes(productId)) {
+    state.useUpProducts.push(productId);
+  }
+  state.prefs = state.prefs || {};
+  state.prefs.prioritiseUseUpProducts = true;
+  saveState();
+  renderPlannerWizard();
+}
+window.addWizardUseUpProduct = addWizardUseUpProduct;
+
+function removeWizardUseUpProduct(productId) {
+  state.useUpProducts = (state.useUpProducts || []).filter(id => id !== productId);
+  saveState();
+  renderPlannerWizard();
+}
+window.removeWizardUseUpProduct = removeWizardUseUpProduct;
+
+// Inline swap handlers for Step 2
+function toggleInlineSwapPanel(day, slotKey) {
+  const panel = document.getElementById(`inline-swap-${day}-${slotKey}`);
+  if (!panel) return;
+  if (panel.style.display !== 'none') {
+    panel.style.display = 'none';
+    panel.innerHTML = '';
+    return;
+  }
+
+  const mealType = getMealTypeFromSlotKey(slotKey) || 'dinner';
+  const who = slotKey.endsWith('C') ? 'Chloe' : 'Elliott';
+  const currentSlot = state.plan?.slots?.[day]?.[slotKey];
+  const currentId = currentSlot?.id;
+
+  const options = getPlannerRecipeOptions(mealType, who, { applyExclusions: true, trafficRules: getPlanTrafficFilterRules() })
+    .filter(opt => opt.id !== currentId)
+    .slice(0, 5);
+
+  if (!options.length) {
+    panel.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:6px">No eligible alternative recipes found for this slot.</div>';
+    panel.style.display = 'block';
+    return;
+  }
+
+  panel.innerHTML = `
+    <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">Swap ${mealType} for ${who}:</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${options.map(opt => {
+        const r = opt.recipe;
+        const cal = Math.round(r?.cal || 0);
+        const prot = Math.round(r?.prot || 0);
+        return `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text)">${ppEscapeHtml(r?.name || 'Unnamed')}</div>
+              <div style="font-size:11px;color:var(--text2)">${cal} kcal · ${prot}g protein ${opt.variant === 'enhanced' ? '· <span style="color:var(--action)">Enhanced</span>' : ''}</div>
+            </div>
+            <button type="button" class="btn sm primary" style="font-size:11px;padding:3px 8px" onclick="executeInlineMealSwap(${day}, '${ppEscapeAttr(slotKey)}', '${ppEscapeAttr(opt.id)}', '${ppEscapeAttr(opt.variant || 'original')}')">Choose</button>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+  panel.style.display = 'block';
+}
+window.toggleInlineSwapPanel = toggleInlineSwapPanel;
+
+function executeInlineMealSwap(day, slotKey, recipeId, variant = 'original') {
+  if (!state.plan?.slots?.[day]) return;
+  state.plan.slots[day][slotKey] = makePlanSlot(recipeId, variant);
+  state.plan.score = calculatePlanScore(state.plan);
+  const autoPrepSuggestions = findMealPrepSuggestions(state.plan);
+  state.plan.mealPrepGroups = autoPrepSuggestions.map(s => ({ key:s.key, recipeId:s.recipeId, variant:s.variant, mealKey:s.mealKey, peopleKey:s.peopleKey, days:s.days }));
+  saveState();
+  renderPlannerWizard();
+  showPlatePlanToast('Meal slot swapped successfully! ✓');
+}
+window.executeInlineMealSwap = executeInlineMealSwap;
+
+// Shopping & substitution helpers for Step 3
+function toggleShoppingAtHome(itemKey) {
+  state.plan = state.plan || {};
+  state.plan.shoppingAtHome = state.plan.shoppingAtHome || {};
+  state.plan.shoppingAtHome[itemKey] = !state.plan.shoppingAtHome[itemKey];
+  saveState();
+  renderPlannerWizard();
+}
+window.toggleShoppingAtHome = toggleShoppingAtHome;
+
+function toggleInlineShoppingSubst(itemKey, groupId) {
+  const panel = document.getElementById(`subst-drawer-${itemKey}`);
+  if (!panel) return;
+  if (panel.style.display !== 'none') {
+    panel.style.display = 'none';
+    panel.innerHTML = '';
+    return;
+  }
+  const products = getGroupProducts(groupId);
+  if (!products.length) {
+    panel.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:6px">No alternate products found in this sub-type.</div>';
+    panel.style.display = 'block';
+    return;
+  }
+  panel.innerHTML = `
+    <div style="font-size:12px;font-weight:700;margin-bottom:6px">Select brand replacement:</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${products.map(p => `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text)">${ppEscapeHtml(p.name)}</div>
+            <div style="font-size:11px;color:var(--text2)">${ppEscapeHtml(p.brand || 'No brand')} · £${(+p.price || 0).toFixed(2)} (${p.packSize || ''}${p.packUnit || ''})</div>
+          </div>
+          <button type="button" class="btn sm ghost" style="font-size:11px;padding:3px 8px" onclick="selectShoppingProductOverride('${ppEscapeAttr(groupId)}', '${ppEscapeAttr(p.id)}')">Use This</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  panel.style.display = 'block';
+}
+window.toggleInlineShoppingSubst = toggleInlineShoppingSubst;
+
+function selectShoppingProductOverride(groupId, productId) {
+  state.plan = state.plan || {};
+  state.plan.productSelections = state.plan.productSelections || {};
+  state.plan.productSelections[groupId] = productId;
+  saveState();
+  renderPlannerWizard();
+  showPlatePlanToast('Product preference updated! ✓');
+}
+window.selectShoppingProductOverride = selectShoppingProductOverride;
+
+// Step 4: Atomic Commit
+async function commitPlannerWizardPlan() {
+  if (!state.plan || !state.plan.slots) {
+    showPlatePlanToast('No active plan found to commit.');
+    return;
+  }
+  const currentPlan = state.plan;
+  const committedPlan = {
+    ...currentPlan,
+    score: calculatePlanScore(currentPlan),
+    mealPrepGroups: currentPlan.mealPrepGroups || [],
+    appliedAt: new Date().toISOString(),
+    savedStatus: 'Saved',
+    shoppingAtHome: currentPlan.shoppingAtHome || {},
+    version: '3.0.1',
+    confirmedShopping: true,
+    updatedAt: new Date().toISOString()
+  };
+
+  state.plan = committedPlan;
+  delete state.draftPlan;
+  delete state.draftBackupPlan;
+  state.isDraftPlan = false;
+  state.plannerStep = 2; // Next time, show current review
+  
+  if (typeof savePlanTransactional === 'function') {
+    await savePlanTransactional(committedPlan);
+  }
+  saveState(true);
+  if (platePlanCloudReady && !platePlanSyncSuppress) queuePlatePlanCloudDiff();
+  markPlatePlanViewsDirty('today', 'planner', 'shopping', 'planlib');
+
+  showPlatePlanToast('Meal plan v3.0.1 committed! Displaying Today\'s meals. ✓');
+  showView('today');
+  renderToday();
+}
+window.commitPlannerWizardPlan = commitPlannerWizardPlan;
+
+function computeWizardShoppingAgg(plan = state.plan) {
+  if (!plan?.slots) return { items: [], totalCost: 0 };
+  const agg = {};
+  const days = plan.days || Object.keys(plan.slots).length;
+
+  for (let d = 1; d <= days; d++) {
+    const s = plan.slots[d] || {};
+    SLOTS.forEach(sl => {
+      if (state.excluded?.[d]?.[sl.key]) return;
+      const slotData = s[sl.key];
+      if (!slotData) return;
+      const slotInfo = getPlanSlotInfo(slotData);
+      const r = slotInfo.active;
+      if (!r || !r.ingredients) return;
+      const instanceId = slotInfo.instanceId;
+      const context = getPlanContextForInstance(instanceId);
+      const slotScale = getSlotShoppingScale(r, sl.key, instanceId);
+
+      (r.ingredients || []).forEach(ing => {
+        if (isIngredientRemovedInContext(ing, context)) return;
+        const adjustedIng = getAdjustedIngredientForContext(ing, context);
+        const resolved = resolveProductForIngredientWithContext(adjustedIng, context);
+        const bankIng = resolved.product || (adjustedIng.bankId ? state.ingredients.find(i => i.id === adjustedIng.bankId) : null);
+        const actualBankId = bankIng?.id || '';
+        const groupId = resolved.groupId || bankIng?.groupId || '';
+        const actualName = resolved.group?.name || bankIng?.name || adjustedIng.name || adjustedIng.raw || 'Ingredient';
+        const raw = ingRaw(adjustedIng);
+        const amt = getShoppingAmount(adjustedIng, bankIng, slotScale);
+        const k = getShoppingLineStateKey(groupId, actualBankId, raw);
+
+        if (!agg[k]) {
+          agg[k] = {
+            key: k,
+            name: actualName,
+            bankIng,
+            groupId,
+            grams: 0,
+            needQty: 0,
+            needUnit: amt.needUnit,
+            cat: CAT[resolved.group?.cat || bankIng?.cat] || 'General'
+          };
+        }
+        agg[k].grams += (amt.grams || 0);
+        agg[k].needQty += (amt.needQty || 0);
+      });
+    });
+  }
+
+  let totalCost = 0;
+  const items = Object.values(agg).map(item => {
+    let cost = 0;
+    let packsNeeded = 1;
+    if (item.bankIng && item.bankIng.price) {
+      const price = +item.bankIng.price || 0;
+      const packSize = +item.bankIng.packSize || 100;
+      const qty = item.needUnit === 'item' ? item.needQty : item.grams;
+      packsNeeded = Math.ceil(qty / Math.max(1, packSize));
+      cost = price * packsNeeded;
+    }
+    const isAtHome = !!(plan.shoppingAtHome && plan.shoppingAtHome[item.key]);
+    if (!isAtHome) {
+      totalCost += cost;
+    }
+    return {
+      ...item,
+      cost,
+      packsNeeded,
+      isAtHome
+    };
+  });
+
+  return { items, totalCost };
+}
+
+function renderPlannerWizard() {
+  const host = document.getElementById('planner-wizard-host');
+  if (!host) return;
+
+  const currentStep = getPlannerWizardStep();
+  const hasActivePlan = !!(state.plan?.slots && Object.keys(state.plan.slots).length > 0);
+
+  let html = `<div class="planner-wizard-container">`;
+
+  // Stepper Header
+  html += `
+    <div class="planner-wizard-stepper">
+      <button type="button" class="wizard-step-btn ${currentStep === 1 ? 'active' : currentStep > 1 ? 'completed' : ''}" onclick="setPlannerWizardStep(1)">
+        <span class="wizard-step-badge">1</span>
+        <span>Configure Requests</span>
+      </button>
+      <span style="color:var(--border-strong);font-weight:bold">→</span>
+      <button type="button" class="wizard-step-btn ${currentStep === 2 ? 'active' : currentStep > 2 ? 'completed' : ''}" ${!hasActivePlan ? 'disabled' : ''} onclick="setPlannerWizardStep(2)">
+        <span class="wizard-step-badge">2</span>
+        <span>Review Plan</span>
+      </button>
+      <span style="color:var(--border-strong);font-weight:bold">→</span>
+      <button type="button" class="wizard-step-btn ${currentStep === 3 ? 'active' : currentStep > 3 ? 'completed' : ''}" ${!hasActivePlan ? 'disabled' : ''} onclick="setPlannerWizardStep(3)">
+        <span class="wizard-step-badge">3</span>
+        <span>Shopping & Substitutions</span>
+      </button>
+      <span style="color:var(--border-strong);font-weight:bold">→</span>
+      <button type="button" class="wizard-step-btn ${currentStep === 4 ? 'active' : ''}" ${!hasActivePlan ? 'disabled' : ''} onclick="setPlannerWizardStep(4)">
+        <span class="wizard-step-badge">4</span>
+        <span>Commit Plan</span>
+      </button>
+    </div>
+  `;
+
+  // STEP 1: CONFIGURE REQUESTS
+  if (currentStep === 1) {
+    const daysVal = state.plannerDays || state.plan?.days || 10;
+    const startVal = state.plannerStartDate || state.plan?.dayDates?.[1] || getPlatePlanLocalToday();
+    const cadence = state.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
+    const trafficE = state.prefs?.planTrafficE || ['green', 'amber'];
+    const trafficC = state.prefs?.planTrafficC || ['green', 'amber'];
+    const activeExclusions = getActiveWizardExclusions();
+    const pinned = state.pinnedRecipes || [];
+    const useUp = state.useUpProducts || [];
+
+    html += `
+      <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <h2 style="margin:0;font-size:18px;font-weight:700">Step 1: Configure Plan Requests</h2>
+            <div style="font-size:13px;color:var(--text2);margin-top:4px">Define days, meal repeat cadence, skips, and pinned recipes before generating.</div>
+          </div>
+          <button type="button" class="btn primary" style="font-weight:700;padding:8px 18px" onclick="generatePlan()">✨ Generate Plan</button>
+        </div>
+
+        <!-- Parameters Grid -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:14px;background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border)">
+          <div>
+            <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">PLAN LENGTH</label>
+            <select id="wizard-plan-days" class="select" style="width:100%" onchange="state.plannerDays=parseInt(this.value)||10;saveState();">
+              ${[1,2,3,4,5,6,7,8,9,10,11,12,13,14].map(n => `<option value="${n}" ${n === daysVal ? 'selected' : ''}>${n} day${n>1?'s':''}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">START DATE</label>
+            <input type="date" id="wizard-plan-start" class="input" style="width:100%" value="${startVal}" onchange="state.plannerStartDate=this.value;saveState();">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">BREAKFAST REPEAT</label>
+            <select class="select" style="width:100%" onchange="state.prefs.mealRepeatCadence=state.prefs.mealRepeatCadence||{};state.prefs.mealRepeatCadence.breakfast=parseInt(this.value)||1;saveState();">
+              ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${n === cadence.breakfast ? 'selected' : ''}>${n} day${n>1?'s':''}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">LUNCH REPEAT</label>
+            <select class="select" style="width:100%" onchange="state.prefs.mealRepeatCadence=state.prefs.mealRepeatCadence||{};state.prefs.mealRepeatCadence.lunch=parseInt(this.value)||2;saveState();">
+              ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${n === cadence.lunch ? 'selected' : ''}>${n} day${n>1?'s':''}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">DINNER REPEAT</label>
+            <select class="select" style="width:100%" onchange="state.prefs.mealRepeatCadence=state.prefs.mealRepeatCadence||{};state.prefs.mealRepeatCadence.dinner=parseInt(this.value)||2;saveState();">
+              ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${n === cadence.dinner ? 'selected' : ''}>${n} day${n>1?'s':''}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <!-- Traffic Lights -->
+        <div style="background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border);display:flex;gap:20px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">ELLIOTT TRAFFIC LIGHTS</div>
+            <div style="display:flex;gap:8px">
+              ${['green', 'amber', 'red'].map(c => `
+                <label class="traffic-pill ${c}" style="cursor:pointer">
+                  <input type="checkbox" ${trafficE.includes(c)?'checked':''} onchange="
+                    state.prefs.planTrafficE = state.prefs.planTrafficE || [];
+                    if(this.checked){ if(!state.prefs.planTrafficE.includes('${c}')) state.prefs.planTrafficE.push('${c}'); }
+                    else { state.prefs.planTrafficE = state.prefs.planTrafficE.filter(x=>x!=='${c}'); }
+                    saveState();
+                  "> ${c.charAt(0).toUpperCase()+c.slice(1)}
+                </label>
+              `).join('')}
+            </div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">CHLOE TRAFFIC LIGHTS</div>
+            <div style="display:flex;gap:8px">
+              ${['green', 'amber', 'red'].map(c => `
+                <label class="traffic-pill ${c}" style="cursor:pointer">
+                  <input type="checkbox" ${trafficC.includes(c)?'checked':''} onchange="
+                    state.prefs.planTrafficC = state.prefs.planTrafficC || [];
+                    if(this.checked){ if(!state.prefs.planTrafficC.includes('${c}')) state.prefs.planTrafficC.push('${c}'); }
+                    else { state.prefs.planTrafficC = state.prefs.planTrafficC.filter(x=>x!=='${c}'); }
+                    saveState();
+                  "> ${c.charAt(0).toUpperCase()+c.slice(1)}
+                </label>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+
+        <!-- Slot Exclusions -->
+        <div style="background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--text)">Slot Exclusions (${activeExclusions.length})</div>
+              <div style="font-size:12px;color:var(--text2)">Skip specific meal slots (eating out, travel, etc.).</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button type="button" class="btn sm ghost" onclick="skipAllWizardDinners()">+ Skip All Dinners</button>
+              <button type="button" class="btn sm ghost" onclick="clearAllWizardExclusions()">Clear Skips</button>
+            </div>
+          </div>
+
+          <!-- Active Exclusion Chips -->
+          <div id="wizard-exclusions-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+            ${activeExclusions.length === 0 ? '<span style="font-size:12px;color:var(--text3)">No meal slots excluded. All slots will be planned.</span>' : ''}
+            ${activeExclusions.map(ex => `
+              <span class="exclusion-chip">
+                ${ppEscapeHtml(ex.label)}
+                <button type="button" onclick="removeWizardExclusion(${ex.day}, ${JSON.stringify(ex.keys)})" title="Remove exclusion">✕</button>
+              </span>
+            `).join('')}
+          </div>
+
+          <!-- Inline Add Exclusion Control -->
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="wizard-excl-day" class="select sm" style="width:auto">
+              ${Array.from({length: daysVal}, (_, i) => i + 1).map(d => `<option value="${d}">Day ${d}</option>`).join('')}
+            </select>
+            <select id="wizard-excl-meal" class="select sm" style="width:auto">
+              <option value="all">All meals</option>
+              <option value="breakfast">Breakfast</option>
+              <option value="lunch">Lunch</option>
+              <option value="dinner">Dinner</option>
+            </select>
+            <select id="wizard-excl-person" class="select sm" style="width:auto">
+              <option value="both">Both (Elliott & Chloe)</option>
+              <option value="elliott">Elliott only</option>
+              <option value="chloe">Chloe only</option>
+            </select>
+            <button type="button" class="btn sm primary" onclick="addWizardExclusionFromUI()">+ Skip Slot</button>
+          </div>
+        </div>
+
+        <!-- Pinned Recipes & Pantry Use-Up -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:14px">
+          <!-- Pinned Recipes -->
+          <div style="background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border)">
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">Pinned Recipes (${pinned.length})</div>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Lock specific recipes to calendar days.</div>
+            
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+              ${pinned.length === 0 ? '<span style="font-size:12px;color:var(--text3)">No pinned recipes.</span>' : ''}
+              ${pinned.map(p => {
+                const r = getRecipe(p.recipeId);
+                return `
+                  <span class="inline-search-chip">
+                    📌 ${ppEscapeHtml(r?.name || 'Recipe')} (Day ${p.targetDay || 1})
+                    <button type="button" onclick="unpinWizardRecipe('${ppEscapeAttr(p.recipeId)}')">✕</button>
+                  </span>
+                `;
+              }).join('')}
+            </div>
+
+            <div style="display:flex;gap:6px">
+              <select id="wizard-pin-day" class="select sm" style="width:auto">
+                ${Array.from({length: daysVal}, (_, i) => i + 1).map(d => `<option value="${d}">Day ${d}</option>`).join('')}
+              </select>
+              <input type="search" class="input sm" placeholder="Search recipe to pin..." style="flex:1" oninput="filterWizardPinRecipes(this.value)">
+            </div>
+            <div id="wizard-pin-search-results" style="margin-top:6px;max-height:140px;overflow-y:auto;display:none;background:var(--surface);border:1px solid var(--border);border-radius:8px"></div>
+          </div>
+
+          <!-- Pantry Use-Up -->
+          <div style="background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border)">
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">Pantry Use-Up (${useUp.length})</div>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Prioritise recipes that use ingredients expiring in your pantry.</div>
+
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+              ${useUp.length === 0 ? '<span style="font-size:12px;color:var(--text3)">No items designated for pantry use-up.</span>' : ''}
+              ${useUp.map(id => {
+                const prod = getProduct(id);
+                return `
+                  <span class="inline-search-chip">
+                    🥫 ${ppEscapeHtml(prod?.name || 'Product')}
+                    <button type="button" onclick="removeWizardUseUpProduct('${ppEscapeAttr(id)}')">✕</button>
+                  </span>
+                `;
+              }).join('')}
+            </div>
+
+            <input type="search" class="input sm" placeholder="Search product to use up..." style="width:100%" oninput="filterWizardUseUpProducts(this.value)">
+            <div id="wizard-useup-search-results" style="margin-top:6px;max-height:140px;overflow-y:auto;display:none;background:var(--surface);border:1px solid var(--border);border-radius:8px"></div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:6px">
+          <button type="button" class="btn primary" style="font-weight:700;padding:10px 24px;font-size:14px" onclick="generatePlan()">✨ Generate Meal Plan →</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // STEP 2: REVIEW PLAN
+  else if (currentStep === 2) {
+    if (!hasActivePlan) {
+      html += `
+        <div class="card" style="padding:24px;text-align:center">
+          <h3>No Meal Plan Generated Yet</h3>
+          <p style="color:var(--text2);font-size:13px;margin-bottom:14px">Configure your days and requests in Step 1 to generate your meal plan.</p>
+          <button type="button" class="btn primary" onclick="setPlannerWizardStep(1)">← Go to Step 1: Configure Requests</button>
+        </div>
+      `;
+    } else {
+      const plan = state.plan;
+      const days = plan.days || Object.keys(plan.slots).length;
+      const prepGroups = plan.mealPrepGroups || [];
+
+      html += `
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <h2 style="margin:0;font-size:18px;font-weight:700">Step 2: Review Generated Meal Plan</h2>
+              <div style="font-size:13px;color:var(--text2);margin-top:4px">Review daily macro fits and swap any meal directly inline.</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button type="button" class="btn ghost sm" onclick="setPlannerWizardStep(1)">← Edit Requests</button>
+              <button type="button" class="btn primary sm" style="font-weight:700" onclick="setPlannerWizardStep(3)">Proceed to Shopping List →</button>
+            </div>
+          </div>
+
+          <!-- Dense Daily Plan Grid -->
+          <div class="dense-plan-grid">
+      `;
+
+      for (let d = 1; d <= days; d++) {
+        const dateLabel = formatPlanDayLabel(plan, d, { short: true });
+        const dateString = plan.dayDates?.[d] || '';
+        const daySlots = plan.slots?.[d] || {};
+
+        // Calculate Day Macros
+        let eCal = 0, eProt = 0, cCal = 0, cProt = 0;
+        ['breakfast', 'lunch', 'dinner'].forEach(m => {
+          const sE = daySlots[m + 'E'];
+          const sC = daySlots[m + 'C'];
+          if (sE) {
+            const info = getPlanSlotInfo(sE);
+            const nut = getPlannedSlotNutrition(info?.active, m + 'E', info?.instanceId, plan);
+            if (nut) { eCal += nut.cal || 0; eProt += nut.prot || 0; }
+          }
+          if (sC) {
+            const info = getPlanSlotInfo(sC);
+            const nut = getPlannedSlotNutrition(info?.active, m + 'C', info?.instanceId, plan);
+            if (nut) { cCal += nut.cal || 0; cProt += nut.prot || 0; }
+          }
+        });
+
+        // Check Batch Prep
+        const dayPreps = prepGroups.filter(g => (g.days || []).includes(d));
+
+        html += `
+          <div class="dense-plan-day-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:8px">
+              <div>
+                <span style="font-weight:750;font-size:14px;color:var(--text)">Day ${d}</span>
+                <span style="font-size:12px;color:var(--text2);margin-left:6px">${ppEscapeHtml(dateLabel)}</span>
+              </div>
+              <div style="font-size:11px;font-weight:650;color:var(--text2)">
+                E: ${Math.round(eCal)} kcal · ${Math.round(eProt)}g | C: ${Math.round(cCal)} kcal · ${Math.round(cProt)}g
+              </div>
+            </div>
+
+            ${dayPreps.map(p => `
+              <div class="batch-prep-badge">
+                🍱 Batch Prep (${p.days.length} days: Day ${p.days.join(', ')})
+              </div>
+            `).join('')}
+
+            <!-- Meals List -->
+            <div style="display:flex;flex-direction:column;gap:8px">
+              ${['breakfast', 'lunch', 'dinner'].map(meal => {
+                const slotKeyE = meal + 'E';
+                const slotKeyC = meal + 'C';
+                const sE = daySlots[slotKeyE];
+                const sC = daySlots[slotKeyC];
+                const infoE = sE ? getPlanSlotInfo(sE) : null;
+                const infoC = sC ? getPlanSlotInfo(sC) : null;
+                const rE = infoE?.active;
+                const rC = infoC?.active;
+                const isShared = rE && rC && infoE.id === infoC.id && infoE.variant === infoC.variant;
+
+                if (!rE && !rC) {
+                  return `
+                    <div class="dense-plan-person-row" style="opacity:0.6">
+                      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase">${meal}</div>
+                      <div style="font-size:12px;color:var(--text3);font-style:italic">Excluded / Not planned</div>
+                    </div>
+                  `;
+                }
+
+                if (isShared) {
+                  return `
+                    <div class="dense-plan-person-row">
+                      <div style="display:flex;align-items:center;justify-content:space-between">
+                        <span style="font-size:11px;font-weight:750;color:var(--text2);text-transform:uppercase">${meal} (Both)</span>
+                        <button type="button" class="dense-plan-swap-btn" onclick="toggleInlineSwapPanel(${d}, '${slotKeyE}')">Swap ▾</button>
+                      </div>
+                      <div class="dense-plan-slot">
+                        <span style="font-weight:600;color:var(--text)">${ppEscapeHtml(rE.name)} ${infoE.variant === 'enhanced' ? '<span style="font-size:10px;color:var(--action);font-weight:700">ENHANCED</span>' : ''}</span>
+                      </div>
+                      <div id="inline-swap-${d}-${slotKeyE}" class="inline-swap-panel" style="display:none"></div>
+                    </div>
+                  `;
+                }
+
+                return `
+                  <div class="dense-plan-person-row">
+                    <div style="font-size:11px;font-weight:750;color:var(--text2);text-transform:uppercase">${meal}</div>
+                    
+                    ${rE ? `
+                      <div class="dense-plan-slot">
+                        <span><strong style="color:var(--text2)">E:</strong> ${ppEscapeHtml(rE.name)} ${infoE.variant === 'enhanced' ? '<span style="font-size:10px;color:var(--action)">[Enh]</span>' : ''}</span>
+                        <button type="button" class="dense-plan-swap-btn" onclick="toggleInlineSwapPanel(${d}, '${slotKeyE}')">Swap ▾</button>
+                      </div>
+                      <div id="inline-swap-${d}-${slotKeyE}" class="inline-swap-panel" style="display:none"></div>
+                    ` : ''}
+
+                    ${rC ? `
+                      <div class="dense-plan-slot" style="margin-top:4px">
+                        <span><strong style="color:var(--text2)">C:</strong> ${ppEscapeHtml(rC.name)} ${infoC.variant === 'enhanced' ? '<span style="font-size:10px;color:var(--action)">[Enh]</span>' : ''}</span>
+                        <button type="button" class="dense-plan-swap-btn" onclick="toggleInlineSwapPanel(${d}, '${slotKeyC}')">Swap ▾</button>
+                      </div>
+                      <div id="inline-swap-${d}-${slotKeyC}" class="inline-swap-panel" style="display:none"></div>
+                    ` : ''}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      html += `
+          </div>
+          
+          <!-- Bottom Step 2 Actions -->
+          <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <button type="button" class="btn ghost" onclick="setPlannerWizardStep(1)">← Back to Configure</button>
+            <button type="button" class="btn primary" style="font-weight:700;padding:10px 24px" onclick="setPlannerWizardStep(3)">Proceed to Shopping List & Substitutions →</button>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // STEP 3: SHOPPING LIST & SUBSTITUTIONS
+  else if (currentStep === 3) {
+    if (!hasActivePlan) {
+      html += `
+        <div class="card" style="padding:24px;text-align:center">
+          <h3>No Meal Plan Active</h3>
+          <p style="color:var(--text2);font-size:13px;margin-bottom:14px">Generate a meal plan first before viewing the shopping list.</p>
+          <button type="button" class="btn primary" onclick="setPlannerWizardStep(1)">← Go to Step 1</button>
+        </div>
+      `;
+    } else {
+      const { items, totalCost } = computeWizardShoppingAgg(state.plan);
+      const categories = {};
+      items.forEach(item => {
+        (categories[item.cat] = categories[item.cat] || []).push(item);
+      });
+
+      html += `
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <h2 style="margin:0;font-size:18px;font-weight:700">Step 3: Shopping List & Substitutions</h2>
+              <div style="font-size:13px;color:var(--text2);margin-top:4px">
+                Total Estimated Cost: <strong style="color:var(--action)">£${totalCost.toFixed(2)}</strong> (${items.filter(x => !x.isAtHome).length} items to buy)
+              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button type="button" class="btn ghost sm" onclick="setPlannerWizardStep(2)">← Back to Plan</button>
+              <button type="button" class="btn primary sm" style="font-weight:700" onclick="commitPlannerWizardPlan()">✓ Save Shopping List & Commit Plan →</button>
+            </div>
+          </div>
+
+          <!-- Categorized Shopping Items -->
+          <div style="display:flex;flex-direction:column;gap:14px">
+            ${Object.entries(categories).map(([cat, catItems]) => `
+              <div class="card" style="padding:16px">
+                <div style="font-weight:750;font-size:14px;color:var(--text);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+                  <span>${ppEscapeHtml(cat)}</span>
+                  <span style="font-size:12px;color:var(--text2)">${catItems.length} item${catItems.length>1?'s':''}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  ${catItems.map(item => `
+                    <div style="display:flex;flex-direction:column;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px">
+                      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+                        <div style="display:flex;align-items:center;gap:10px">
+                          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:13px;margin:0">
+                            <input type="checkbox" ${item.isAtHome ? 'checked' : ''} onchange="toggleShoppingAtHome('${ppEscapeAttr(item.key)}')">
+                            <span style="${item.isAtHome ? 'text-decoration:line-through;color:var(--text3);' : 'font-weight:600;color:var(--text);'}">${ppEscapeHtml(item.name)}</span>
+                          </label>
+                          ${item.isAtHome ? '<span class="tag" style="font-size:10px;background:var(--green-bg);color:var(--green);border:1px solid var(--green)">In Pantry</span>' : ''}
+                        </div>
+                        <div style="display:flex;align-items:center;gap:12px">
+                          <span style="font-size:12px;color:var(--text2)">
+                            ${item.needUnit === 'item' ? `${item.needQty} item${item.needQty>1?'s':''}` : `${Math.round(item.grams)}g`}
+                            ${item.bankIng ? `(£${item.cost.toFixed(2)})` : ''}
+                          </span>
+                          <button type="button" class="btn sm ghost" style="font-size:11px;padding:2px 8px" onclick="toggleInlineShoppingSubst('${ppEscapeAttr(item.key)}', '${ppEscapeAttr(item.groupId)}')">Swap Brand / Substitute ▾</button>
+                        </div>
+                      </div>
+                      <div id="subst-drawer-${item.key}" class="subst-row-drawer" style="display:none"></div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <!-- Bottom Step 3 Actions -->
+          <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <button type="button" class="btn ghost" onclick="setPlannerWizardStep(2)">← Back to Review Plan</button>
+            <button type="button" class="btn primary" style="font-weight:700;padding:10px 24px" onclick="commitPlannerWizardPlan()">✓ Save Shopping List & Plan (Commit to Today) →</button>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // STEP 4: ATOMIC COMMIT
+  else if (currentStep === 4) {
+    html += `
+      <div class="card" style="padding:28px;text-align:center">
+        <h2 style="margin-top:0">Committing Meal Plan v3.0.1...</h2>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:18px">Finalizing plan metadata, locking shopping quantities, and synchronizing with your live dashboard.</p>
+        <button type="button" class="btn primary" onclick="commitPlannerWizardPlan()">Commit Plan Now</button>
+      </div>
+    `;
+  }
+
+  html += `</div>`;
+  host.innerHTML = html;
+}
+window.renderPlannerWizard = renderPlannerWizard;
+
 function renderPlan(){
   ensurePlannerShell();
   installPlannerSummaryObserver();
+  renderPlannerWizard();
   const el=document.getElementById('plan-content');
   if(!el) return;
   try {
@@ -20734,16 +21798,18 @@ window.renderSwapModalOptionsList = renderSwapModalOptionsList;
 function clearPlan(){
     state.plan={}; 
     state.overrides={}; // Purge orphaned execution data
+    state.plannerStep = 1;
     platePlanEarlierDaysExpanded = false;
     saveState();
-    document.getElementById('plan-content').innerHTML='';
-    document.getElementById('plan-warnings').innerHTML='';
+    const content = document.getElementById('plan-content'); if(content) content.innerHTML='';
+    const warnings = document.getElementById('plan-warnings'); if(warnings) warnings.innerHTML='';
     const overall=document.getElementById('plan-overall-summary'); if(overall) overall.innerHTML='';
     const prep=document.getElementById('plan-meal-prep-panel'); if(prep) prep.innerHTML='';
     const setup=document.getElementById('plan-setup-card'); if(setup) setup.style.display = '';
-    document.getElementById('plan-actions').style.display = 'none';
+    const actions = document.getElementById('plan-actions'); if(actions) actions.style.display = 'none';
     renderPlanHistoryPanel();
     updatePlannerCompactHeader();
+    renderPlannerWizard();
 }
 
 function showPlanSetup(){
@@ -22169,9 +23235,9 @@ function handleSubstSearch(e) {
 function selectSubstItem(bankId) {
   currentSubstContext.newBankId = bankId;
   const b = state.ingredients.find(i=>i.id===bankId);
-  document.getElementById('subst-search').value = b?.name || '';
-  document.getElementById('subst-dropdown').style.display = 'none';
-  document.getElementById('subst-selected').textContent = b ? `Using product: ${b.name}` : '';
+  const sSearch = document.getElementById('subst-search'); if(sSearch) sSearch.value = b?.name || '';
+  const sDrop = document.getElementById('subst-dropdown'); if(sDrop) sDrop.style.display = 'none';
+  const sSel = document.getElementById('subst-selected'); if(sSel) sSel.textContent = b ? `Using product: ${b.name}` : '';
   renderHerbConversionPreview();
 }
 
@@ -22269,8 +23335,10 @@ function addExclusion(type, id, name, groupId=''){
   if(!state.prefs.exclusions) state.prefs.exclusions={shared:[],elliott:[],chloe:[]};
   const row={ type, id, name, ...(groupId?{groupId}:{}) };
   if(!state.prefs.exclusions[scope].some(x => x.id===id || normaliseAliasText(x.name)===normaliseAliasText(name))) state.prefs.exclusions[scope].push(row);
-  document.getElementById('pref-exclude-search').value='';
-  document.getElementById('pref-exclude-dropdown').style.display='none';
+  const pSearch = document.getElementById('pref-exclude-search');
+  if(pSearch) pSearch.value='';
+  const pDrop = document.getElementById('pref-exclude-dropdown');
+  if(pDrop) pDrop.style.display='none';
   saveState();
   renderExclusionPreview();
 }
