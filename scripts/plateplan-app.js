@@ -207,9 +207,13 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='3.0.1';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v81';
-console.log("[v3.0.1 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
+const PLATEPLAN_APP_VERSION='3.0.2';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v82';
+console.log("[v3.0.2 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
+
+let isHydrating = false;
+window.isHydrating = false;
+let lastPersistedStateJson = null;
 const SEED=[];
 
 let lastLoadedDataRecipesDoc = [];
@@ -572,6 +576,10 @@ function updatePlanSaveUI(status) {
 window.updatePlanSaveUI = updatePlanSaveUI;
 
 function queuePlanSave(planData = state?.plan, immediate = false) {
+  if (isHydrating || window.isHydrating) {
+    console.log('[v3.0.2 STATE PERSISTENCE] queuePlanSave blocked during hydration.');
+    return Promise.resolve(false);
+  }
   updateUIState({ saveStatus: 'pending' });
 
   return new Promise((resolve, reject) => {
@@ -1750,6 +1758,17 @@ let platePlanCloudDebounceTimer = null;
 let platePlanDebounceResolvers = [];
 
 async function pushStateToCloud(force=false){
+  if (isHydrating || window.isHydrating) {
+    console.log('[v3.0.2 STATE PERSISTENCE] PushStateToCloud blocked during hydration.');
+    return Promise.resolve(false);
+  }
+
+  const currentStateJson = safeJsonStringify(state);
+  if (!force && lastPersistedStateJson && lastPersistedStateJson === currentStateJson) {
+    console.log('[v3.0.2 STATE PERSISTENCE] State unchanged from last persisted; skipping cloud push.');
+    return Promise.resolve(true);
+  }
+
   if (state) state.updatedAt = new Date().toISOString();
   // Explicitly retrieve and assign householdId before constructing Firestore paths or payloads
   const householdId = window.CURRENT_HOUSEHOLD_ID || window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
@@ -1763,7 +1782,7 @@ async function pushStateToCloud(force=false){
   const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
   console.log('[FIRESTORE WRITE PATH]', householdDocRef.path);
 
-  // Debounce handler (300ms–500ms window) for local-to-cloud sync dispatches targeting households/elliott-chloe.
+  // Debounce handler (1000ms window) for local-to-cloud sync dispatches targeting households/elliott-chloe.
   // Coalesces rapid, back-to-back state mutations or un-debounced watchers to prevent Firestore write queue exhaustion.
   if(!force && platePlanCloudReady && platePlanCloudUser){
     return new Promise((resolve, reject) => {
@@ -1779,7 +1798,7 @@ async function pushStateToCloud(force=false){
         } catch(err) {
           resolvers.forEach(r => r.reject(err));
         }
-      }, 400); // 400ms debounce within 300ms–500ms window
+      }, 1000); // 1000ms debounce
     });
   }
 
@@ -1982,6 +2001,8 @@ async function _executePushStateToCloud(force, targetHouseholdId, householdDocRe
       platePlanLastPushCompletedAt=Date.now();
       platePlanLastSyncError=null;
       platePlanLastSyncedAt=Date.now();
+      lastPersistedStateJson = safeJsonStringify(state);
+      console.log('[v3.0.2 STATE PERSISTENCE] State successfully pushed to cloud with debounce 1000ms.');
       updatePlatePlanSyncStatus('synced');
     }catch(error){
       console.warn('PlatePlan Cloud push failed:',error);
