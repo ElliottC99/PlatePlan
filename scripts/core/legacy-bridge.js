@@ -1,5 +1,5 @@
 /**
- * PlatePlan v3.3.3 - Compatibility Bridge
+ * PlatePlan v3.3.4 - Compatibility Bridge
  * Implements authoritative legacy interfaces required by core contracts and services.
  */
 export const PlatePlanLegacy = {

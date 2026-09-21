@@ -1,5 +1,5 @@
 /**
- * PlatePlan v3.3.3 - Modular Firebase & Cloud Sync Service
+ * PlatePlan v3.3.4 - Modular Firebase & Cloud Sync Service
  */
 
 let firebaseApp = null;

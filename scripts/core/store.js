@@ -1,5 +1,5 @@
-import { validatePlatePlanState } from './contracts.js?v=3.3.3';
-import { pushStateToCloud } from '../services/firebase-service.js?v=3.3.3';
+import { validatePlatePlanState } from './contracts.js?v=3.3.4';
+import { pushStateToCloud } from '../services/firebase-service.js?v=3.3.4';
 
 // Purge legacy backup keys on startup to prevent state resurrection bugs
 if (typeof localStorage !== 'undefined') {
