@@ -17,16 +17,16 @@ try{
   document.documentElement.style.colorScheme=platePlanAppearance==='system'?'light dark':platePlanAppearance;
 }catch(e){}
 </script>
-<link rel="stylesheet" href="./styles/tokens.css?v=3.0.5">
-<link rel="stylesheet" href="./styles/components.css?v=3.0.5">
-<link rel="stylesheet" href="./styles/responsive.css?v=3.0.5">
-<link rel="stylesheet" href="./styles/print.css?v=3.0.5" media="print">
+<link rel="stylesheet" href="./styles/tokens.css?v=3.0.6">
+<link rel="stylesheet" href="./styles/components.css?v=3.0.6">
+<link rel="stylesheet" href="./styles/responsive.css?v=3.0.6">
+<link rel="stylesheet" href="./styles/print.css?v=3.0.6" media="print">
 </head>
 <body>
 <div class="app">
 
 <header class="app-header">
-  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v3.0.5</span></div>
+  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v3.0.6</span></div>
   <div class="app-header-actions">
     <button class="btn primary app-create-button" type="button" data-pp-click="openCreateActionSheet()" aria-label="Add to PlatePlan"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span class="app-create-label">Add</span></button>
     <button class="btn ghost app-menu-button" type="button" data-pp-click="openMobileMore()" aria-label="Open PlatePlan menu"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="19" cy="12" r="1.3"></circle></svg><span>Menu</span></button>
@@ -64,7 +64,7 @@ try{
   <button data-view="today" class="active" data-pp-click="showView('today')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5M6.5 10v9h11v-9M10 19v-5h4v5"></path></svg>Today</button>
   <button data-view="vault" data-pp-click="showView('vault')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M5 4v7M8 4v7M5 8h3M6.5 11v9M16 4c-2 3-2 7 0 9h2V4M18 13v7"></path></svg>Recipes</button>
   <button data-view="planner" data-pp-click="showView('planner')"><svg aria-hidden="true" viewbox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2"></path></svg>Plan</button>
-  <button data-view="shopping" data-pp-click="showView('shopping')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 5h2l2 10h9l2-7H7M9 20h.01M17 20h.01"></path></svg>Shopping</button>
+  <button data-view="data" data-pp-click="showView('data')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>Data Quality</button>
   <button data-view="search" data-pp-click="showView('search')"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"></circle><path d="m15 15 4 4"></path></svg>Search</button>
 </div>
 <div class="mobile-more-wrap" id="mobile-more-wrap" data-pp-click="if(event.target===this)closeMobileMore()">
@@ -380,7 +380,10 @@ try{
 <div id="view-data" class="view">
     <div class="view-toolbar">
       <h2 style="margin:0">Data Quality Centre</h2>
-      <button class="btn sm ghost" data-pp-click="renderDataQuality()">Refresh Scans</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn sm ghost" data-pp-click="runGlobalProductRelink()">Batch Relink Products</button>
+        <button class="btn sm ghost" data-pp-click="renderDataQuality()">Refresh Scans</button>
+      </div>
     </div>
     
     <div class="card" style="border-left:3px solid var(--amber);">
@@ -422,8 +425,8 @@ try{
       <button class="btn ghost" type="button" id="plateplan-check-update" data-pp-click="globalThis.PlatePlanModules?.updates.check({manual:true})">Check for updates</button>
     </div>
     <dl class="plateplan-update-meta">
-      <div><dt>Version</dt><dd id="plateplan-update-version">v3.0.5</dd></div>
-      <div><dt>Offline cache</dt><dd id="plateplan-update-cache">plateplan-shell-v85</dd></div>
+      <div><dt>Version</dt><dd id="plateplan-update-version">v3.0.6</dd></div>
+      <div><dt>Offline cache</dt><dd id="plateplan-update-cache">plateplan-shell-v86</dd></div>
       <div><dt>Status</dt><dd id="plateplan-update-status" aria-live="polite">Up to date</dd></div>
     </dl>
   </div>
@@ -566,62 +569,66 @@ try{
     </div>
     <div id="tesco-msg"></div>
 
-    <div id="tesco-preview" style="display: block; margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px;">
-      <div id="tesco-diagnostics-box" style=""></div>
-      <h3 id="tesco-details-heading" style="margin-bottom:10px">Review extracted details</h3>
-      <div class="grid2">
-        <div><label>Product name</label><input type="text" id="tp-name" placeholder="Product name"></div>
-        <div><label>Brand</label><input type="text" id="tp-brand" placeholder="Brand"></div>
+    <div id="tesco-preview" style="display: none; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+      <h3 id="tesco-details-heading" style="margin-bottom:8px; font-size:15px;">Review product details</h3>
+      <div class="grid2" style="gap:10px; margin-bottom:10px;">
+        <div><label style="font-size:12px; font-weight:600;">Product name</label><input type="text" id="tp-name" placeholder="Product name"></div>
+        <div><label style="font-size:12px; font-weight:600;">Brand</label><input type="text" id="tp-brand" placeholder="Brand"></div>
       </div>
-      <div class="grid2">
-          <div class="field" style="display: block;"><label>Category</label><input type="search" id="tp-cat-search" placeholder="Search category" list="tp-cat-category-options" style="width: 100%;"><select id="tp-cat" style="display: none;"></select><datalist id="tp-cat-category-options"></datalist></div>
-          <div class="field"><label>Storage</label><select id="tp-storage"><option value="">-- Select --</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="cupboard">Cupboard</option></select></div>
+      <div class="grid2" style="gap:10px; margin-bottom:10px;">
+        <div class="field" style="display: block; margin:0;"><label style="font-size:12px; font-weight:600;">Category</label><input type="search" id="tp-cat-search" placeholder="Search category" list="tp-cat-category-options" style="width: 100%;"><select id="tp-cat" style="display: none;"></select><datalist id="tp-cat-category-options"></datalist></div>
+        <div class="field" style="margin:0;"><label style="font-size:12px; font-weight:600;">Storage</label><select id="tp-storage"><option value="">-- Select --</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="cupboard">Cupboard</option></select></div>
       </div>
-      <p class="section-label">Per 100g</p>
-      <div class="grid3">
-        <div><label>Calories (kcal)</label><input type="number" id="tp-cal" placeholder="0"></div>
-        <div><label>Fat (g)</label><input type="number" id="tp-fat" placeholder="0"></div>
-        <div><label>Carbs (g)</label><input type="number" id="tp-carb" placeholder="0"></div>
-        <div><label>Fibre (g)</label><input type="number" id="tp-fibre" placeholder="0"></div>
-        <div><label>Protein (g)</label><input type="number" id="tp-prot" placeholder="0"></div>
-      </div>
-      <div class="grid3">
-        <div><label>Price per pack (£)</label><input type="number" id="tp-price" placeholder="0" step="0.01"></div>
+      <div class="grid3" style="gap:10px; margin-bottom:10px;">
+        <div><label style="font-size:12px; font-weight:600;">Price per pack (£)</label><input type="number" id="tp-price" placeholder="0.00" step="0.01"></div>
         <div>
-          <label>Total pack size</label>
+          <label style="font-size:12px; font-weight:600;">Pack size &amp; unit</label>
           <div style="display:flex;gap:5px">
             <input type="number" id="tp-pack" placeholder="500">
-            <select id="tp-pack-unit" style="width:70px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
+            <select id="tp-pack-unit" style="width:75px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
               <option value="g">g</option>
               <option value="ml">ml</option>
+              <option value="qty">qty</option>
             </select>
           </div>
         </div>
         <div>
-          <label>Weight / volume of 1 usable item</label>
-          <div style="display:flex;gap:5px">
-            <input type="number" id="tp-item-weight" placeholder="e.g. 75">
-            <select id="tp-item-weight-unit" style="width:70px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
-              <option value="g">g</option>
-              <option value="ml">ml</option>
-            </select>
-          </div>
-        </div>
-        <div>
-          <label>Drained weight (usable content)</label>
+          <label style="font-size:12px; font-weight:600;">Usable / Drained weight</label>
           <div style="display:flex;gap:5px">
             <input type="number" id="tp-drained-weight" placeholder="e.g. 235">
-            <select id="tp-drained-weight-unit" style="width:70px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
+            <select id="tp-drained-weight-unit" style="width:75px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
               <option value="g">g</option>
               <option value="ml">ml</option>
             </select>
           </div>
         </div>
       </div>
-      <div id="tp-pack-summary" class="pack-model-summary" aria-live="polite"></div>
-        <div class="field" style="display: none;"><label>Meat substitute for (optional)<input type="text" id="tp-meatsub" placeholder="e.g. mince, chicken, bacon"></label></div>
-      <div class="field"><label>Notes</label><input type="text" id="tp-notes" placeholder="e.g. Found in freezer aisle"></div>
-      <div class="btn-row" style="margin-top:4px">
+      <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px; margin-bottom:10px;">
+        <div style="font-size:12px; font-weight:700; color:var(--text2); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.04em;">Nutrition per 100g</div>
+        <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:8px;">
+          <div><label style="font-size:11px;">Calories (kcal)</label><input type="number" id="tp-cal" placeholder="0"></div>
+          <div><label style="font-size:11px;">Protein (g)</label><input type="number" id="tp-prot" placeholder="0"></div>
+          <div><label style="font-size:11px;">Carbs (g)</label><input type="number" id="tp-carb" placeholder="0"></div>
+          <div><label style="font-size:11px;">Fat (g)</label><input type="number" id="tp-fat" placeholder="0"></div>
+          <div><label style="font-size:11px;">Fibre (g)</label><input type="number" id="tp-fibre" placeholder="0"></div>
+        </div>
+      </div>
+      <div class="grid2" style="gap:10px; margin-bottom:10px;">
+        <div>
+          <label style="font-size:12px; font-weight:600;">1 Usable item weight (optional)</label>
+          <div style="display:flex;gap:5px">
+            <input type="number" id="tp-item-weight" placeholder="e.g. 75">
+            <select id="tp-item-weight-unit" style="width:75px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
+              <option value="g">g</option>
+              <option value="ml">ml</option>
+            </select>
+          </div>
+        </div>
+        <div><label style="font-size:12px; font-weight:600;">Notes</label><input type="text" id="tp-notes" placeholder="e.g. Found in freezer aisle"></div>
+      </div>
+      <div id="tp-pack-summary" class="pack-model-summary" aria-live="polite" style="margin-bottom:8px;"></div>
+      <div class="field" style="display: none;"><label>Meat substitute for (optional)<input type="text" id="tp-meatsub" placeholder="e.g. mince, chicken, bacon"></label></div>
+      <div class="btn-row" style="margin-top:6px">
         <button class="btn primary" id="tesco-save-btn" data-pp-click="saveTescoIngredient()">Save to Product Bank</button>
       </div>
       <div id="tesco-save-msg"></div>
@@ -1229,7 +1236,7 @@ try{
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js" crossorigin="anonymous"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js" crossorigin="anonymous"></script>
 <script src="./firebase-config.js"></script>
-<script type="module" src="./scripts/bootstrap.js?v=3.0.5"></script>
+<script type="module" src="./scripts/bootstrap.js?v=3.0.6"></script>
 
 
 

@@ -1,16 +1,28 @@
 const FEATURE_LOADERS = Object.freeze({
-  today: () => import('../features/today.js?v=3.0.5'),
-  vault: () => import('../features/recipes.js?v=3.0.5'),
-  add: () => import('../features/recipe-add.js?v=3.0.5'),
-  ingredients: () => import('../features/ingredients.js?v=3.0.5'),
-  bank: () => import('../features/products.js?v=3.0.5'),
-  planner: () => import('../features/planner.js?v=3.0.5'),
-  planlib: () => import('../features/library.js?v=3.0.5'),
-  shopping: () => import('../features/shopping.js?v=3.0.5'),
-  search: () => import('../features/search.js?v=3.0.5'),
-  data: () => import('../features/data-quality.js?v=3.0.5'),
-  prefs: () => import('../features/preferences.js?v=3.0.5'),
+  today: () => import('../features/today.js?v=3.0.6'),
+  vault: () => import('../features/recipes.js?v=3.0.6'),
+  add: () => import('../features/recipe-add.js?v=3.0.6'),
+  ingredients: () => import('../features/ingredients.js?v=3.0.6'),
+  bank: () => import('../features/products.js?v=3.0.6'),
+  planner: () => import('../features/planner.js?v=3.0.6'),
+  planlib: () => import('../features/library.js?v=3.0.6'),
+  shopping: () => import('../features/shopping.js?v=3.0.6'),
+  search: () => import('../features/search.js?v=3.0.6'),
+  data: () => import('../features/data-quality.js?v=3.0.6'),
+  prefs: () => import('../features/preferences.js?v=3.0.6'),
 });
+
+// Scan localStorage keys and remove obsolete legacy keys on startup
+try {
+  const obsoleteKeys = ['app_version', 'data:chloe', 'data:elliott', 'plateplan_v1', 'plateplan_v1_chloe', 'plateplan_v1_elliott', 'plateplan_v1_device_id'];
+  obsoleteKeys.forEach(key => {
+    try {
+      if (localStorage.getItem(key) !== null) {
+        localStorage.removeItem(key);
+      }
+    } catch (_err) {}
+  });
+} catch (_e) {}
 
 /**
  * Native lazy feature runtime. Import promises are cached so each view module

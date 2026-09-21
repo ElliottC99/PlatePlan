@@ -207,10 +207,10 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='3.0.5';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v85';
-window.APP_VERSION = '3.0.5';
-console.log("[v3.0.5 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
+const PLATEPLAN_APP_VERSION='3.0.6';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v86';
+window.APP_VERSION = '3.0.6';
+console.log("[v3.0.6 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
 
 try {
   localStorage.removeItem('plateplan_v1_recovery');
@@ -296,68 +296,368 @@ function sanitizePayloadForFirestore(data){
 }
 window.sanitizePayloadForFirestore = sanitizePayloadForFirestore;
 
-// == v3.0.5 PIECEWISE FIT SCORE & TRAFFIC LIGHT FORMULA ==
-function calculateMacroFitTierAndScore(calActual, calTarget, protActual, protTarget) {
-  const cAct = Number(calActual) || 0;
-  const cTgt = Number(calTarget) || 0;
-  const pAct = Number(protActual) || 0;
-  const pTgt = Number(protTarget) || 0;
+// == v3.0.6 DUAL-PROFILE MEAL-SLOT TARGET RESOLVER ==
+function getMealTypeTargets(mealType = 'dinner') {
+  const mt = (mealType || 'dinner').toLowerCase();
+  const eTgt = typeof getBudgets === 'function' ? getBudgets('e', mt) : { cal: 840, prot: 45.5 };
+  const cTgt = typeof getBudgets === 'function' ? getBudgets('c', mt) : { cal: 595, prot: 35 };
+  return {
+    mealType: mt,
+    targetCal_E: Number(eTgt?.cal) || 0,
+    targetProt_E: Number(eTgt?.prot) || 0,
+    targetCal_C: Number(cTgt?.cal) || 0,
+    targetProt_C: Number(cTgt?.prot) || 0,
+    e: eTgt,
+    c: cTgt
+  };
+}
+window.getMealTypeTargets = getMealTypeTargets;
 
-  if (cTgt <= 0 || pTgt <= 0) {
-    return { tier: 'amber-green', score: 70, label: 'No Target Set', colors: 'background:#fef9c3;color:#854d0e;border:1px solid #fde047;', rC: 1, rP: 1 };
+function getVaultTargetMacros(mealType = 'dinner') {
+  return getMealTypeTargets(mealType);
+}
+window.getVaultTargetMacros = getVaultTargetMacros;
+
+function computeProfileFitScore(actualCal, targetCal, actualProt, targetProt) {
+  const aCal = Number(actualCal) || 0;
+  const tCal = Number(targetCal) || 0;
+  const aProt = Number(actualProt) || 0;
+  const tProt = Number(targetProt) || 0;
+
+  let calScore = 100;
+  if (tCal > 0) {
+    const calError = Math.abs(aCal - tCal) / tCal;
+    calScore = Math.max(0, 100 - (calError * 100));
   }
 
-  const rC = cAct / cTgt;
-  const rP = pAct / pTgt;
+  let protScore = 100;
+  if (tProt > 0) {
+    protScore = aProt >= tProt
+      ? 100
+      : Math.max(0, 100 - (((tProt - aProt) / tProt) * 100));
+  }
+
+  return (calScore * 0.50) + (protScore * 0.50);
+}
+window.computeProfileFitScore = computeProfileFitScore;
+
+// == v3.0.6 DUAL-PORTION MEAL-TYPE FIT SCORE ENGINE ==
+function calculateMacroFitTierAndScore(calActualOrRecipe, mealTypeOrTargets, protAct, protTgt) {
+  let mealType = 'dinner';
+  let variant = 'original';
+  let recipeObj = null;
+  let customTargets = null;
+
+  let actualCal_E = 0, targetCal_E = 0, actualProt_E = 0, targetProt_E = 0;
+  let actualCal_C = 0, targetCal_C = 0, actualProt_C = 0, targetProt_C = 0;
+  let whoKey = 'both';
+
+  if (typeof calActualOrRecipe === 'object' && calActualOrRecipe !== null) {
+    recipeObj = calActualOrRecipe.recipe || calActualOrRecipe;
+    variant = calActualOrRecipe.variant || 'original';
+
+    if (typeof mealTypeOrTargets === 'string') {
+      mealType = mealTypeOrTargets;
+    } else if (typeof mealTypeOrTargets === 'object' && mealTypeOrTargets !== null) {
+      if (mealTypeOrTargets.mealType) mealType = mealTypeOrTargets.mealType;
+      if (mealTypeOrTargets.variant) variant = mealTypeOrTargets.variant;
+      customTargets = mealTypeOrTargets;
+    } else if (calActualOrRecipe.mealType) {
+      mealType = calActualOrRecipe.mealType;
+    } else {
+      const types = recipeObj.types || [recipeObj.type || 'dinner'];
+      mealType = types[0] || 'dinner';
+    }
+
+    whoKey = String(recipeObj.who || 'both').trim().toLowerCase();
+
+    // Resolve meal slot targets
+    const slotTargets = customTargets || getMealTypeTargets(mealType);
+    targetCal_E = Number(slotTargets.targetCal_E ?? slotTargets.eCal ?? slotTargets.e?.cal ?? slotTargets.cal) || 0;
+    targetProt_E = Number(slotTargets.targetProt_E ?? slotTargets.eProt ?? slotTargets.e?.prot ?? slotTargets.prot) || 0;
+    targetCal_C = Number(slotTargets.targetCal_C ?? slotTargets.cCal ?? slotTargets.c?.cal ?? slotTargets.cal) || 0;
+    targetProt_C = Number(slotTargets.targetProt_C ?? slotTargets.cProt ?? slotTargets.c?.prot ?? slotTargets.prot) || 0;
+
+    // Resolve split portions
+    let portions = calActualOrRecipe.portions;
+    if (!portions && typeof calculateRecipeDisplayNutrition === 'function' && (recipeObj.ingredients || recipeObj.enhanced || recipeObj.name)) {
+      try {
+        const bundle = calculateRecipeDisplayNutrition({ recipe: recipeObj, variant, mealType });
+        portions = bundle?.portions;
+      } catch (e) {}
+    }
+
+    if (!portions && typeof calcPortions === 'function') {
+      const perServing = recipeObj.perServing || recipeObj.nutrition || recipeObj;
+      portions = calcPortions(perServing, window.state?.prefs || {}, recipeObj.serves || 2, recipeObj.who || 'both', mealType);
+    }
+
+    if (portions) {
+      actualCal_E = Number(portions.eCal) || 0;
+      actualProt_E = Number(portions.eProt) || 0;
+      actualCal_C = Number(portions.cCal) || 0;
+      actualProt_C = Number(portions.cProt) || 0;
+    } else {
+      const ps = recipeObj.perServing || recipeObj.nutrition || recipeObj;
+      const cal = Number(ps.cal ?? ps.calories ?? ps.kcal) || 0;
+      const prot = Number(ps.prot ?? ps.protein) || 0;
+      actualCal_E = cal;
+      actualProt_E = prot;
+      actualCal_C = cal;
+      actualProt_C = prot;
+    }
+  } else {
+    // Positional arguments
+    const actCal = Number(calActualOrRecipe) || 0;
+    const tgtCal = Number(mealTypeOrTargets) || 0;
+    const actProt = Number(protAct) || 0;
+    const tgtProt = Number(protTgt) || 0;
+
+    actualCal_E = actCal;
+    targetCal_E = tgtCal;
+    actualProt_E = actProt;
+    targetProt_E = tgtProt;
+
+    actualCal_C = actCal;
+    targetCal_C = tgtCal;
+    actualProt_C = actProt;
+    targetProt_C = tgtProt;
+  }
+
+  const score_Elliott = computeProfileFitScore(actualCal_E, targetCal_E, actualProt_E, targetProt_E);
+  const score_Chloe = computeProfileFitScore(actualCal_C, targetCal_C, actualProt_C, targetProt_C);
+
+  let finalScore = 0;
+  if (whoKey === 'elliott' || whoKey === 'e') {
+    finalScore = Math.round(score_Elliott);
+  } else if (whoKey === 'chloe' || whoKey === 'c') {
+    finalScore = Math.round(score_Chloe);
+  } else {
+    finalScore = Math.round((score_Elliott * 0.50) + (score_Chloe * 0.50));
+  }
+
+  const clampedScore = Math.max(0, Math.min(100, finalScore));
 
   let tier = 'red';
-  let rawScore = 25;
   let label = 'Poor Fit';
-  let colors = 'background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;';
+  let color = '#EF4444';
+  let colors = 'background-color:#EF4444;color:#FFFFFF;';
 
-  // 1. GREEN (Ideal Fit | Score 85-100): Rp >= 1.0 AND 0.95 <= Rc <= 1.05
-  if (rP >= 1.0 && rC >= 0.95 && rC <= 1.05) {
+  if (clampedScore >= 85) {
     tier = 'green';
-    const calDev = Math.abs(1.0 - rC); // 0 to 0.05
-    rawScore = 100 - (calDev / 0.05) * 15;
     label = 'Ideal Fit';
-    colors = 'background:#dcfce7;color:#15803d;border:1px solid #86efac;';
-  }
-  // 2. AMBER-GREEN (Acceptable | Score 65-84):
-  // (Rp >= 1.0 AND 1.05 < Rc <= 1.15) OR (0.90 <= Rp < 1.0 AND Rc <= 1.05)
-  else if ((rP >= 1.0 && rC > 1.05 && rC <= 1.15) || (rP >= 0.90 && rP < 1.0 && rC <= 1.05)) {
+    color = '#10B981';
+    colors = 'background-color:#10B981;color:#FFFFFF;';
+  } else if (clampedScore >= 65) {
     tier = 'amber-green';
-    const pDev = rP < 1.0 ? (1.0 - rP) / 0.10 : 0;
-    const cDev = rC > 1.05 ? (rC - 1.05) / 0.10 : 0;
-    rawScore = 84 - Math.max(pDev, cDev) * 19;
-    label = 'Acceptable';
-    colors = 'background:#fef9c3;color:#854d0e;border:1px solid #fde047;';
-  }
-  // 3. AMBER-RED (Suboptimal | Score 40-64):
-  // (Rp < 0.90 AND Rc <= 1.05) OR (Rp >= 1.0 AND Rc > 1.15)
-  else if ((rP < 0.90 && rC <= 1.05) || (rP >= 1.0 && rC > 1.15)) {
+    label = 'Acceptable Fit';
+    color = '#84CC16';
+    colors = 'background-color:#84CC16;color:#FFFFFF;';
+  } else if (clampedScore >= 40) {
     tier = 'amber-red';
-    const pDev = rP < 0.90 ? (0.90 - rP) / 0.30 : 0;
-    const cDev = rC > 1.15 ? (rC - 1.15) / 0.35 : 0;
-    rawScore = 64 - Math.max(pDev, cDev) * 24;
-    label = 'Suboptimal';
-    colors = 'background:#ffedd5;color:#9a3412;border:1px solid #fdba74;';
-  }
-  // 4. RED (Poor Fit | Score 0-39):
-  // Rp < 0.90 AND Rc > 1.05
-  else {
+    label = 'Suboptimal Fit';
+    color = '#F59E0B';
+    colors = 'background-color:#F59E0B;color:#FFFFFF;';
+  } else {
     tier = 'red';
-    const pDev = Math.max(0, 0.90 - rP) / 0.90;
-    const cDev = Math.max(0, rC - 1.05) / 0.95;
-    rawScore = 39 - Math.max(pDev, cDev) * 39;
     label = 'Poor Fit';
-    colors = 'background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;';
+    color = '#EF4444';
+    colors = 'background-color:#EF4444;color:#FFFFFF;';
   }
 
-  const score = Math.min(100, Math.max(0, Math.round(rawScore)));
-  return { tier, score, label, colors, rC, rP };
+  const badgeStyle = `${colors}border-radius:4px;padding:2px 8px;font-weight:600;font-size:11px;display:inline-block;`;
+
+  return {
+    tier,
+    score: clampedScore,
+    raw: clampedScore,
+    color,
+    label,
+    colors,
+    badgeStyle,
+    score_E: score_Elliott,
+    score_C: score_Chloe
+  };
 }
 window.calculateMacroFitTierAndScore = calculateMacroFitTierAndScore;
+
+// == v3.0.6 PRE-SORT FIT SCORE COMPUTATION ENGINE ==
+function getEffectiveRecipeFitScore(recipe, targetSlot = 'dinner') {
+  if (!recipe) return { score: 0, bestVariant: 'original', scoreOriginal: 0, scoreEnhanced: 0 };
+
+  const rawRecipe = recipe.recipe || (recipe.id ? (window.state?.recipes || []).find(r => r.id === recipe.id) : null) || recipe;
+
+  // 1. Original Variant Score
+  const resOriginal = calculateMacroFitTierAndScore({ recipe: rawRecipe, variant: 'original' }, targetSlot);
+  const scoreOriginal = typeof resOriginal === 'number' ? resOriginal : (resOriginal?.score ?? 0);
+
+  // 2. Enhanced Variant Score
+  let scoreEnhanced = 0;
+  const hasEnhanced = !!(rawRecipe.enhanced || rawRecipe.enhancedMacros || recipe.enhanced || recipe.enhancedMacros || (recipe.variant === 'enhanced'));
+  if (hasEnhanced) {
+    const resEnhanced = calculateMacroFitTierAndScore({ recipe: rawRecipe, variant: 'enhanced' }, targetSlot);
+    scoreEnhanced = typeof resEnhanced === 'number' ? resEnhanced : (resEnhanced?.score ?? 0);
+  }
+
+  const bestVariant = scoreEnhanced > scoreOriginal ? 'enhanced' : 'original';
+  const maxScore = Math.max(scoreOriginal, scoreEnhanced);
+
+  return {
+    score: maxScore,
+    bestVariant,
+    scoreOriginal,
+    scoreEnhanced
+  };
+}
+window.getEffectiveRecipeFitScore = getEffectiveRecipeFitScore;
+
+function attachComputedFitScores(recipes = [], targetSlot = 'dinner') {
+  if (!Array.isArray(recipes)) return [];
+  return recipes.map(recipe => {
+    if (!recipe) return recipe;
+    const effective = getEffectiveRecipeFitScore(recipe, targetSlot);
+    recipe._computedFitScore = effective.score;
+    recipe._bestVariant = effective.bestVariant;
+    recipe._scoreOriginal = effective.scoreOriginal;
+    recipe._scoreEnhanced = effective.scoreEnhanced;
+    return recipe;
+  });
+}
+window.attachComputedFitScores = attachComputedFitScores;
+window.hydrateScoresForSorting = attachComputedFitScores;
+
+function getSortedRecipes(recipes = [], sortOption = 'name', activeSlotTargets = 'dinner') {
+  const scoredRecipes = attachComputedFitScores([...recipes], activeSlotTargets);
+
+  const isFav = (r) => {
+    if (!r) return false;
+    if (typeof isRecipeVariantFavourite === 'function') {
+      return isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || r.isFavourite || r.isFavorite;
+    }
+    return !!(r.isFavourite || r.isFavorite);
+  };
+
+  switch (sortOption) {
+    case 'best-fit':
+    case 'best_fit':
+    case 'fit-desc':
+      return scoredRecipes.sort((a, b) => {
+        const aF = isFav(a), bF = isFav(b);
+        if (!!bF !== !!aF) return bF ? 1 : -1;
+        const diff = (b._computedFitScore ?? 0) - (a._computedFitScore ?? 0);
+        return diff || (a.name || a.label || '').localeCompare(b.name || b.label || '', 'en', { sensitivity: 'base' });
+      });
+
+    case 'needs-work':
+    case 'needs_work':
+    case 'fit-asc':
+      return scoredRecipes.sort((a, b) => {
+        const aF = isFav(a), bF = isFav(b);
+        if (!!bF !== !!aF) return bF ? 1 : -1;
+        const diff = (a._computedFitScore ?? 0) - (b._computedFitScore ?? 0);
+        return diff || (a.name || a.label || '').localeCompare(b.name || b.label || '', 'en', { sensitivity: 'base' });
+      });
+
+    case 'name':
+    default:
+      return scoredRecipes.sort((a, b) => {
+        const aF = isFav(a), bF = isFav(b);
+        if (!!bF !== !!aF) return bF ? 1 : -1;
+        return (a.name || a.label || '').localeCompare(b.name || b.label || '', 'en', { sensitivity: 'base' });
+      });
+  }
+}
+window.getSortedRecipes = getSortedRecipes;
+window.sortRecipesByFit = getSortedRecipes;
+
+// == v3.0.6 BATCH RECIPE PRODUCT RELINKING ENGINE ==
+async function runGlobalProductRelink() {
+  console.log('[v3.0.6 RELINK ENGINE] Starting batch recipe product relinking...');
+  if (!state) return { success: false, updatedCount: 0 };
+  const recipesList = Array.isArray(state.recipes) ? state.recipes : (state.recipes && typeof state.recipes === 'object' ? Object.values(state.recipes) : []);
+  if (!recipesList.length) {
+    showPlatePlanToast('No recipes found to relink.');
+    return { success: true, updatedCount: 0 };
+  }
+
+  const productsList = Array.isArray(state.products) ? state.products : (Array.isArray(state.bank) ? state.bank : (Array.isArray(state.ingredients) ? state.ingredients : []));
+  const productMap = new Map();
+  const aliasMap = new Map();
+
+  productsList.forEach(p => {
+    if (!p) return;
+    if (p.id) productMap.set(String(p.id).toLowerCase(), p);
+    if (p.name) {
+      const norm = normaliseAliasText(p.name);
+      if (norm) aliasMap.set(norm, p);
+    }
+  });
+
+  let relinkedCount = 0;
+  for (const recipe of recipesList) {
+    if (!recipe) continue;
+    let modified = false;
+
+    const processIngList = (ingList) => {
+      if (!Array.isArray(ingList)) return;
+      ingList.forEach(ing => {
+        if (!ing) return;
+        let matchedProduct = null;
+        if (ing.productId && productMap.has(String(ing.productId).toLowerCase())) {
+          matchedProduct = productMap.get(String(ing.productId).toLowerCase());
+        } else if (ing.bankId && productMap.has(String(ing.bankId).toLowerCase())) {
+          matchedProduct = productMap.get(String(ing.bankId).toLowerCase());
+        } else if (ing.groupId) {
+          matchedProduct = resolveProductForIngredient(ing)?.product || null;
+        }
+        if (!matchedProduct) {
+          const normName = normaliseAliasText(ing.name || ing.raw || '');
+          if (normName && aliasMap.has(normName)) {
+            matchedProduct = aliasMap.get(normName);
+          }
+        }
+
+        if (matchedProduct) {
+          if (ing.productId !== matchedProduct.id || ing.bankId !== matchedProduct.id) {
+            ing.productId = matchedProduct.id;
+            ing.bankId = matchedProduct.id;
+            if (matchedProduct.groupId && !ing.groupId) ing.groupId = matchedProduct.groupId;
+            if (matchedProduct.name && !ing.productName) ing.productName = matchedProduct.name;
+            modified = true;
+          }
+        }
+      });
+    };
+
+    processIngList(recipe.ingredients);
+    if (recipe.enhanced && recipe.enhanced.ingredients) {
+      processIngList(recipe.enhanced.ingredients);
+    }
+    if (recipe.variants) {
+      Object.values(recipe.variants).forEach(v => {
+        if (v && v.ingredients) processIngList(v.ingredients);
+      });
+    }
+
+    if (modified) {
+      recipe.updatedAt = new Date().toISOString();
+      relinkedCount++;
+      try {
+        await saveRecipe(recipe);
+      } catch (err) {
+        console.warn('[RELINK ENGINE] Error syncing recipe:', recipe.id, err);
+      }
+    }
+  }
+
+  saveState();
+  rebuildPlatePlanIndexes();
+  renderAll();
+  console.log(`[v3.0.6 RELINK ENGINE] Relink complete. Updated ${relinkedCount} recipes.`);
+  showPlatePlanToast(`Relink complete! Updated ${relinkedCount} recipes. ✓`);
+  return { success: true, updatedCount: relinkedCount };
+}
+window.runGlobalProductRelink = runGlobalProductRelink;
 
 let state = null;
 let browserStateBeforeBakedComparison = null;
@@ -2648,9 +2948,9 @@ function saveState(immediate=false){
   window.dispatchEvent(new CustomEvent('plateplan:state-saved',{detail:{source:'cloud',savedAt:Date.now()}}));
   if(state) {
     state.updatedAt=new Date().toISOString();
-    state.version = '3.0.5';
+    state.version = '3.0.6';
     if (state.plan && typeof state.plan === 'object') {
-      state.plan.version = '3.0.5';
+      state.plan.version = '3.0.6';
     }
   }
   window.state = state;
@@ -2678,7 +2978,7 @@ function saveState(immediate=false){
   }
 
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.0.5 STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
+    console.log('[v3.0.6 STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
     return true;
   }
 
@@ -3376,7 +3676,7 @@ function startPlatePlanCloudListeners(){
     runDataQualityAudits();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v3.0.5 HYDRATION]", state.recipes.length, "recipes loaded.");
+    console.log("[v3.0.6 HYDRATION]", state.recipes.length, "recipes loaded.");
   }, error => {
     console.error('[RECIPES SUBCOLLECTION LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
@@ -3400,7 +3700,7 @@ function startPlatePlanCloudListeners(){
     runDataQualityAudits();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v3.0.5 HYDRATION]", state.recipes.length, "recipes loaded.");
+    console.log("[v3.0.6 HYDRATION]", state.recipes.length, "recipes loaded.");
   }, error => {
     console.warn('[DATA RECIPES LISTENER ERROR]', error);
   });
@@ -3454,7 +3754,7 @@ function startPlatePlanCloudListeners(){
     renderAll();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v3.0.5 HYDRATION]", state.recipes.length, "recipes loaded.");
+    console.log("[v3.0.6 HYDRATION]", state.recipes.length, "recipes loaded.");
   }, error => {
     console.error('[HOUSEHOLD ROOT METADATA LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
@@ -3703,7 +4003,7 @@ async function loadSharedPlatePlan(){
   state.isCloudHydrated = true;
   window.isCloudHydrated = true;
   console.log(`[RECIPES HYDRATION] Deterministically hydrated and deduplicated ${state.recipes.length} recipes across multi-path check.`);
-  console.log("[v3.0.5 HYDRATION]", state.recipes.length, "recipes loaded.");
+  console.log("[v3.0.6 HYDRATION]", state.recipes.length, "recipes loaded.");
 
   const metaDoc = dataDocs.meta || {};
   const taxonomyDoc = dataDocs.taxonomy || {};
@@ -4634,21 +4934,14 @@ function plannerRecipePassesTrafficFilter(row, mealType, who, suppliedRules=null
 }
 
 
-function getRecipeFitScore(r){
+function getRecipeFitScore(r, customMealType = null){
     const types = r.types || [r.type || 'dinner'];
-    const mealType = types[0] || 'dinner';
+    const mealType = customMealType || types[0] || 'dinner';
     const usingEnhanced = !!(r.enhanced && (r.enhanced.ingredients || r.enhanced.nutrition || r.enhanced.cal || r.enhanced.prot));
     const bundle = calculateRecipeDisplayNutrition({ recipe:r, variant:usingEnhanced ? 'enhanced' : 'original', mealType });
     const portions = bundle?.portions || calcPortions({}, state.prefs, r.serves || 2, r.who || 'both', mealType);
-    let score = 0;
-    const addPerson = (prefix, actualCal, actualProt) => {
-      const tgt = getBudgets(prefix, mealType);
-      const fit = calculateFit(actualCal, actualProt, tgt.cal, tgt.prot);
-      score += fit.score;
-    };
-    if(r.who === 'both' || r.who === 'Elliott') addPerson('e', portions.eCal, portions.eProt);
-    if(r.who === 'both' || r.who === 'Chloe') addPerson('c', portions.cCal, portions.cProt);
-    return { raw: score, display: Math.round(score * 100), usingEnhanced, portions };
+    const fitRes = calculateMacroFitTierAndScore({ recipe: r, variant: usingEnhanced ? 'enhanced' : 'original', portions }, mealType);
+    return { raw: fitRes.score, display: fitRes.score, fit: fitRes, usingEnhanced, portions };
 }
 
 
@@ -14198,12 +14491,14 @@ function openVaultFitDetails(trigger,recipeId,variant='original',personKey='e'){
   const protein=personKey==='c'?portions.cProt:portions.eProt;
   const recipePct=personKey==='c'?portions.c:portions.e;
   const fit=calculateFit(calories,protein,targets.cal,targets.prot);
+  const profileScore=Math.round(computeProfileFitScore(calories,targets.cal,protein,targets.prot));
   const html=`<div style="font-weight:750;font-size:16px;margin-bottom:8px">${ppEscapeHtml(person)} · ${ppEscapeHtml(recipe.name)}</div>
     <div class="nutrition-detail-row"><span>Allocated recipe portion</span><strong>${ppEscapeHtml(recipePct||'Not allocated')}</strong></div>
     <div class="nutrition-detail-row"><span>Calories</span><strong>${Math.round(calories||0)} / ${Math.round(targets.cal||0)} kcal</strong></div>
     <div class="nutrition-detail-row"><span>Protein</span><strong>${round1(protein||0)} / ${round1(targets.prot||0)}g</strong></div>
+    <div class="nutrition-detail-row"><span>Slot Fit Score (${person})</span><strong>${profileScore}%</strong></div>
     <div class="msg ${fit.warn.length?'info':'success'}" style="margin:10px 0 0">${ppEscapeHtml(fit.warn.join(', ')||'This portion is on target.')}</div>
-    <details class="card-details"><summary>Calculation details</summary><div>Fit score is based on calorie distance and protein shortfall. Nutrition comes only from mapped Product Bank products${variant==='enhanced'?' in the enhanced version':''}.</div></details>`;
+    <details class="card-details"><summary>Calculation details</summary><div>Fit score is calculated 50% from calorie error relative to target and 50% from protein target achievement for ${person} for ${mealType}.</div></details>`;
   showReviewTooltip(trigger,html,`${person} nutrition and fit details`);
 }
 let vaultFilterFavouritesOnly = false;
@@ -14334,6 +14629,98 @@ function toggleRecipeFavorite(recipeId, event, variantKey = 'original'){
 window.toggleRecipeFavourite = toggleRecipeFavourite;
 window.toggleRecipeFavorite = toggleRecipeFavorite;
 
+// == v3.0.6 RECIPE VAULT CARD RENDERER ==
+function renderRecipeCard(r, options = {}) {
+  const targetMacros = options.targetMacros || getVaultTargetMacros();
+  const types = r.types || [r.type || 'dinner'];
+  const mealType = options.mealType || getContextMealType(r, null, types[0] || 'dinner');
+  const eTgt = options.eTgt || getBudgets('e', mealType);
+  const cTgt = options.cTgt || getBudgets('c', mealType);
+  const whoKey = String(r.who || 'both').toLowerCase();
+  const showE = options.showE !== undefined ? options.showE : (whoKey === 'both' || whoKey === 'elliott' || whoKey === 'e');
+  const showC = options.showC !== undefined ? options.showC : (whoKey === 'both' || whoKey === 'chloe' || whoKey === 'c');
+  const personLabel = whoKey === 'both' ? 'Shared' : (whoKey === 'elliott' || whoKey === 'e' ? 'Elliott' : (whoKey === 'chloe' || whoKey === 'c' ? 'Chloe' : r.who || 'Shared'));
+  const badges = types.map(t => '<span class="badge ' + (t === 'breakfast' ? 'badge-green' : t === 'lunch' ? 'badge-purple' : 'badge-coral') + '">' + ppEscapeHtml(toTitleCase(t)) + '</span>').join(' ');
+
+  const origFav = isRecipeVariantFavourite(r.id, 'original') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
+  const enhFav = isRecipeVariantFavourite(r.id, 'enhanced');
+  const isAnyFav = origFav || enhFav;
+  const favTag = isAnyFav ? `<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favourite</span>` : '';
+  const meta = [
+    favTag,
+    badges,
+    `<span class="tag">${ppEscapeHtml(personLabel)}</span>`,
+    r.serves ? `<span class="tag">Serves ${ppEscapeHtml(r.serves)}</span>` : '',
+    r.time ? `<span class="tag">${ppEscapeHtml(r.time)}m</span>` : ''
+  ].filter(Boolean).join(' ');
+
+  const buildFit = (active, useEnhanced = false) => {
+    const bundle = calculateRecipeDisplayNutrition({ recipe: r, variant: useEnhanced ? 'enhanced' : 'original', mealType });
+    const portions = bundle?.portions || calcPortions({}, state.prefs, r.serves || 2, r.who || 'both', mealType);
+    const parts = [];
+    if (showE) {
+      const fitE = calculateFit(portions.eCal, portions.eProt, eTgt.cal, eTgt.prot);
+      parts.push(`<button type="button" class="fit-detail-button" onclick="openVaultFitDetails(this,'${ppEscapeAttr(r.id)}','${useEnhanced ? 'enhanced' : 'original'}','e')">Elliott ${fitE.label.split(' ')[0]} ${ppEscapeHtml(portions.e)}</button>`);
+    }
+    if (showC) {
+      const fitC = calculateFit(portions.cCal, portions.cProt, cTgt.cal, cTgt.prot);
+      parts.push(`<button type="button" class="fit-detail-button" onclick="openVaultFitDetails(this,'${ppEscapeAttr(r.id)}','${useEnhanced ? 'enhanced' : 'original'}','c')">Chloe ${fitC.label.split(' ')[0]} ${ppEscapeHtml(portions.c)}</button>`);
+    }
+
+    // Dynamically calculate dual-portion fit score for the specified meal slot
+    const { score, color, label } = calculateMacroFitTierAndScore({ recipe: r, variant: useEnhanced ? 'enhanced' : 'original', portions }, mealType);
+    const fitTag = `<span class="tag" style="background-color:${color};color:#FFFFFF;border-color:${color};font-weight:600" title="${ppEscapeAttr(label)}">Fit score ${score}${useEnhanced ? ' · enhanced' : ''}</span>`;
+    return { portions, html: `<div class="recipe-fit">${parts.join('')} ${fitTag}</div>` };
+  };
+
+  const originalFit = buildFit(r, false);
+  const enhancedActive = r.enhanced ? { ...r, ...r.enhanced, ingredients: r.enhanced.ingredients || r.ingredients } : null;
+  const enhancedFit = enhancedActive ? buildFit(enhancedActive, true) : null;
+  const enhancedChanges = r.enhanced?.changes ? `<div style="font-size:12px;color:var(--text2);margin-top:6px">${ppEscapeHtml(r.enhanced.changes)}</div>` : '';
+
+  return `<div class="recipe-card ${isAnyFav ? 'is-favorite' : ''}">
+    <div class="recipe-card-layout">
+      <div class="recipe-card-main">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+          ${renderExpandableText(r.name, `recipe-${r.id}`, 'recipe-card-name')}
+          <button type="button" class="recipe-fav-btn ${origFav ? 'active' : ''}" onclick="toggleRecipeFavourite('${ppEscapeAttr(r.id)}', event, 'original')" aria-label="${origFav ? 'Remove original from favourites' : 'Add original to favourites'}" title="${origFav ? 'Original variant favourited' : 'Add original to favourites'}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="${origFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="recipe-card-meta">${meta}</div>
+        ${originalFit.html}
+      </div>
+      <div class="recipe-card-actions">
+        <button class="btn sm primary mobile-primary" onclick="viewRecipe('${ppEscapeAttr(r.id)}', null)">View</button>
+        <button class="btn sm ghost mobile-more" onclick="openRecipeActions('${ppEscapeAttr(r.id)}')">More</button>
+      </div>
+    </div>
+    ${r.enhanced ? `<div class="enhanced-box">
+      <div class="enhanced-layout">
+        <div style="min-width:0;flex:1">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
+            <div class="enhanced-lbl" style="margin-bottom:0">Enhanced version</div>
+            <button type="button" class="recipe-fav-btn sm ${enhFav ? 'active' : ''}" onclick="toggleRecipeFavourite('${ppEscapeAttr(r.id)}', event, 'enhanced')" aria-label="${enhFav ? 'Remove enhanced from favourites' : 'Add enhanced to favourites'}" title="${enhFav ? 'Enhanced variant favourited' : 'Add enhanced to favourites'}" style="padding:2px">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="${enhFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+              </svg>
+            </button>
+          </div>
+          ${enhancedFit.html}
+          ${enhancedChanges}
+        </div>
+        <div class="enhanced-actions">
+          <button class="btn sm primary enhanced-primary-action" onclick="viewRecipe('${ppEscapeAttr(r.id)}', null, 'enhanced')">View</button>
+          <button class="btn sm ghost enhanced-more-action" onclick="openEnhancedRecipeActions('${ppEscapeAttr(r.id)}')">More</button>
+        </div>
+      </div>
+    </div>` : ''}
+  </div>`;
+}
+window.renderRecipeCard = renderRecipeCard;
+
 function renderVault(){
   const ft=document.getElementById('filter-type').value,fw=document.getElementById('filter-who').value;
   const q=(document.getElementById('vault-search')?.value||'').trim().toLowerCase();
@@ -14372,114 +14759,20 @@ function renderVault(){
     ].join(' ').toLowerCase();
     return(ft==='all'||types.includes(ft))&&(fw==='all'||r.who===fw)&&(!q||searchable.includes(q));
   });
-  const scoreMap = new Map();
-  if(sort === 'needs_work' || sort === 'best_fit') {
-    recipes.forEach(r => scoreMap.set(r.id, getRecipeFitScore(r).raw));
-  }
-  recipes.sort((a,b)=>{
-    const aFav = isRecipeVariantFavourite(a.id, 'original') || isRecipeVariantFavourite(a.id, 'enhanced') || a.isFavourite || a.isFavorite;
-    const bFav = isRecipeVariantFavourite(b.id, 'original') || isRecipeVariantFavourite(b.id, 'enhanced') || b.isFavourite || b.isFavorite;
-    if(!!bFav !== !!aFav) return bFav ? 1 : -1;
-    if(sort === 'needs_work' || sort === 'best_fit') {
-      const diff = sort === 'best_fit' ? (scoreMap.get(a.id) - scoreMap.get(b.id)) : (scoreMap.get(b.id) - scoreMap.get(a.id));
-      return diff || a.name.localeCompare(b.name,'en',{sensitivity:'base'});
-    }
-    return a.name.localeCompare(b.name,'en',{sensitivity:'base'});
-  });
-  if(!recipes.length){list.innerHTML='<div class="empty">No matching recipes found.</div>';return;}
+
+  const selectedMealType = ft !== 'all' ? ft : 'dinner';
+  const sortedRecipes = getSortedRecipes(recipes, sort, selectedMealType);
+
+  if(!sortedRecipes.length){list.innerHTML='<div class="empty">No matching recipes found.</div>';return;}
   const listSignature=[ft,fw,q,sort,vaultFilterFavouritesOnly?'fav':'all'].join('|');
   resetProgressiveList('vault',listSignature);
-  const totalRecipes=recipes.length;
-  const visibleRecipes=recipes.slice(0,platePlanListLimits.vault);
-  list.innerHTML=visibleRecipes.map(r=>{
-    const types=r.types||[r.type||'dinner'];
-    const mealType = getContextMealType(r, null, types[0] || 'dinner');
-    const eTgt = getBudgets('e', mealType);
-    const cTgt = getBudgets('c', mealType);
-    const whoKey = String(r.who || 'both').toLowerCase();
-    const showE = whoKey === 'both' || whoKey === 'elliott' || whoKey === 'e';
-    const showC = whoKey === 'both' || whoKey === 'chloe' || whoKey === 'c';
-    const personLabel = whoKey === 'both' ? 'Shared' : (whoKey === 'elliott' || whoKey === 'e' ? 'Elliott' : (whoKey === 'chloe' || whoKey === 'c' ? 'Chloe' : r.who || 'Shared'));
-    const badges=types.map(t=>'<span class="badge '+(t==='breakfast'?'badge-green':t==='lunch'?'badge-purple':'badge-coral')+'">'+ppEscapeHtml(toTitleCase(t))+'</span>').join(' ');
-    
-    const origFav = isRecipeVariantFavourite(r.id, 'original') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
-    const enhFav = isRecipeVariantFavourite(r.id, 'enhanced');
-    const isAnyFav = origFav || enhFav;
-    const favTag = isAnyFav ? `<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favourite</span>` : '';
-    const meta = [
-      favTag,
-      badges,
-      `<span class="tag">${ppEscapeHtml(personLabel)}</span>`,
-      r.serves ? `<span class="tag">Serves ${ppEscapeHtml(r.serves)}</span>` : '',
-      r.time ? `<span class="tag">${ppEscapeHtml(r.time)}m</span>` : ''
-    ].filter(Boolean).join(' ');
-
-    const buildFit = (active, useEnhanced=false) => {
-      const bundle = calculateRecipeDisplayNutrition({ recipe:r, variant:useEnhanced ? 'enhanced' : 'original', mealType });
-      const portions = bundle?.portions || calcPortions({}, state.prefs, r.serves || 2, r.who || 'both', mealType);
-      let score = 0;
-      const parts = [];
-      if(showE) {
-        const fitE = calculateFit(portions.eCal, portions.eProt, eTgt.cal, eTgt.prot);
-        score += fitE.score * 100;
-        parts.push(`<button type="button" class="fit-detail-button" onclick="openVaultFitDetails(this,'${ppEscapeAttr(r.id)}','${useEnhanced?'enhanced':'original'}','e')">Elliott ${fitE.label.split(' ')[0]} ${ppEscapeHtml(portions.e)}</button>`);
-      }
-      if(showC) {
-        const fitC = calculateFit(portions.cCal, portions.cProt, cTgt.cal, cTgt.prot);
-        score += fitC.score * 100;
-        parts.push(`<button type="button" class="fit-detail-button" onclick="openVaultFitDetails(this,'${ppEscapeAttr(r.id)}','${useEnhanced?'enhanced':'original'}','c')">Chloe ${fitC.label.split(' ')[0]} ${ppEscapeHtml(portions.c)}</button>`);
-      }
-      const fitTag = `<span class="tag">Fit score ${Math.round(score)}${useEnhanced ? ' · enhanced' : ''}</span>`;
-      return { portions, html: `<div class="recipe-fit">${parts.join('')} ${fitTag}</div>` };
-    };
-
-    const originalFit = buildFit(r, false);
-    const enhancedActive = r.enhanced ? { ...r, ...r.enhanced, ingredients: r.enhanced.ingredients || r.ingredients } : null;
-    const enhancedFit = enhancedActive ? buildFit(enhancedActive, true) : null;
-    const enhancedChanges = r.enhanced?.changes ? `<div style="font-size:12px;color:var(--text2);margin-top:6px">${ppEscapeHtml(r.enhanced.changes)}</div>` : '';
-
-    return `<div class="recipe-card ${isAnyFav ? 'is-favorite' : ''}">
-      <div class="recipe-card-layout">
-        <div class="recipe-card-main">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-            ${renderExpandableText(r.name,`recipe-${r.id}`,'recipe-card-name')}
-            <button type="button" class="recipe-fav-btn ${origFav ? 'active' : ''}" onclick="toggleRecipeFavourite('${ppEscapeAttr(r.id)}', event, 'original')" aria-label="${origFav ? 'Remove original from favourites' : 'Add original to favourites'}" title="${origFav ? 'Original variant favourited' : 'Add original to favourites'}">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="${origFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-              </svg>
-            </button>
-          </div>
-          <div class="recipe-card-meta">${meta}</div>
-          ${originalFit.html}
-        </div>
-        <div class="recipe-card-actions">
-            <button class="btn sm primary mobile-primary" onclick="viewRecipe('${ppEscapeAttr(r.id)}', null)">View</button>
-            <button class="btn sm ghost mobile-more" onclick="openRecipeActions('${ppEscapeAttr(r.id)}')">More</button>
-          </div>
-      </div>
-      ${r.enhanced ? `<div class="enhanced-box">
-        <div class="enhanced-layout">
-          <div style="min-width:0;flex:1">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
-              <div class="enhanced-lbl" style="margin-bottom:0">Enhanced version</div>
-              <button type="button" class="recipe-fav-btn sm ${enhFav ? 'active' : ''}" onclick="toggleRecipeFavourite('${ppEscapeAttr(r.id)}', event, 'enhanced')" aria-label="${enhFav ? 'Remove enhanced from favourites' : 'Add enhanced to favourites'}" title="${enhFav ? 'Enhanced variant favourited' : 'Add enhanced to favourites'}" style="padding:2px">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="${enhFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                </svg>
-              </button>
-            </div>
-            ${enhancedFit.html}
-            ${enhancedChanges}
-          </div>
-          <div class="enhanced-actions">
-            <button class="btn sm primary enhanced-primary-action" onclick="viewRecipe('${ppEscapeAttr(r.id)}', null, 'enhanced')">View</button>
-            <button class="btn sm ghost enhanced-more-action" onclick="openEnhancedRecipeActions('${ppEscapeAttr(r.id)}')">More</button>
-          </div>
-        </div>
-      </div>` : ''}
-    </div>`;
-  }).join('')+progressiveListButton('vault',totalRecipes,visibleRecipes.length);
+  const totalRecipes=sortedRecipes.length;
+  const visibleRecipes=sortedRecipes.slice(0,platePlanListLimits.vault);
+  list.innerHTML=visibleRecipes.map(r => renderRecipeCard(r, { mealType: selectedMealType })).join('')+progressiveListButton('vault',totalRecipes,visibleRecipes.length);
 }
+window.renderVault = renderVault;
+window.renderRecipeVault = renderVault;
+window.renderVaultGrid = renderVault;
 
 let platePlanUseUpFinder={meal:'dinner',who:'both',productIds:[],assign:null};
 function ensureUseUpRecipeFinder(){
@@ -21032,10 +21325,10 @@ function removeWizardUseUpProduct(productId) {
 }
 window.removeWizardUseUpProduct = removeWizardUseUpProduct;
 
-// DEDICATED PLAN DELETION PIPELINE (v3.0.4)
+// DEDICATED PLAN DELETION PIPELINE (v3.0.6)
 async function deletePlan(targetId) {
   if (!targetId) return;
-  console.log('[v3.0.4 STATE PERSISTENCE] Executing dedicated deletePlan pipeline for:', targetId);
+  console.log('[v3.0.6 STATE PERSISTENCE] Executing dedicated deletePlan pipeline for:', targetId);
   const householdId = window.CURRENT_HOUSEHOLD_ID || window.activeHouseholdId || state?.meta?.householdId || 'elliott-chloe';
 
   // 1. Mutate local state
@@ -21053,12 +21346,12 @@ async function deletePlan(targetId) {
     if (state) state.plan = null;
   }
 
-  // Persist directly to local storage backups defensively WITHOUT calling savePlan() or saveState()
+  // Persist directly to local storage backups defensively
   try {
     safeLocalStorageSet(SK, safeJsonStringify(state));
     safeLocalStorageSet('plateplan_plan_backup', '');
     if (Array.isArray(state.planHistory)) {
-      safeLocalStorageSet('plateplan_history_backup', safeJsonStringify(state.planHistory));
+      safeSaveHistoryBackup(state.planHistory);
     }
   } catch(e) {}
 
@@ -21067,10 +21360,10 @@ async function deletePlan(targetId) {
     const db = platePlanDb || (window.firebase && firebase.firestore && firebase.firestore());
     if (db) {
       await db.collection('households').doc(householdId).collection('plans').doc(targetId).delete();
-      console.log('[v3.0.4 STATE PERSISTENCE] Plan deleted directly from Firestore:', targetId);
+      console.log('[v3.0.6 STATE PERSISTENCE] Plan deleted directly from Firestore:', targetId);
     }
   } catch(err) {
-    console.warn('[v3.0.4 STATE PERSISTENCE] Direct Firestore deletion error:', err);
+    console.warn('[v3.0.6 STATE PERSISTENCE] Direct Firestore deletion error:', err);
   }
 
   // 3. Transition UI directly to Step 1 of the Meal Planner if no active plans
@@ -21470,7 +21763,7 @@ function commitPlannerWizardPlan() {
     appliedAt: new Date().toISOString(),
     savedStatus: 'Saved',
     shoppingAtHome: currentPlan.shoppingAtHome || {},
-    version: '3.0.5',
+    version: '3.0.6',
     confirmedShopping: true,
     updatedAt: new Date().toISOString()
   };
@@ -21490,7 +21783,7 @@ function commitPlannerWizardPlan() {
     saveState(true);
     if (platePlanCloudReady && !platePlanSyncSuppress) queuePlatePlanCloudDiff();
     markPlatePlanViewsDirty('today', 'planner', 'shopping', 'planlib');
-    showPlatePlanToast('Meal plan v3.0.5 committed! Displaying Today\'s meals. ✓');
+    showPlatePlanToast('Meal plan v3.0.6 committed! Displaying Today\'s meals. ✓');
     if (typeof showView === 'function') {
       showView('today');
     }
@@ -22050,7 +22343,7 @@ function renderPlannerWizard() {
   else if (currentStep === 4) {
     html += `
       <div class="card" style="padding:28px;text-align:center">
-        <h2 style="margin-top:0">Committing Meal Plan v3.0.5...</h2>
+        <h2 style="margin-top:0">Committing Meal Plan v3.0.6...</h2>
         <p style="color:var(--text2);font-size:13px;margin-bottom:18px">Finalizing plan metadata, locking shopping quantities, and synchronizing with your live dashboard.</p>
         <button type="button" class="btn primary" onclick="commitPlannerWizardPlan()">Commit Plan Now</button>
       </div>
@@ -22377,7 +22670,7 @@ function openSwapMealModal(day, slotKey) {
   const personKey = isBoth ? 'both' : (String(who || '').toLowerCase().startsWith('c') ? 'c' : 'e');
   const items = options.map(opt => {
     const value = opt.id + (opt.variant === 'enhanced' ? '::enhanced' : '');
-    let cal = 0, prot = 0, serves = 0, ingredientsText = '';
+    let cal = 0, prot = 0, serves = 0, ingredientsText = '', fitRes = null;
     try {
       const info = getPlanSlotInfo({ id: opt.id, variant: opt.variant });
       if (info.recipe) {
@@ -22385,6 +22678,7 @@ function openSwapMealModal(day, slotKey) {
         ingredientsText = (info.recipe.ingredients || []).map(i => i.name || i.ingredient || '').join(' ');
         const bundle = calculateRecipeDisplayNutrition({ recipe: info.recipe, variant: info.variant, mealType });
         const portions = bundle?.portions || null;
+        fitRes = calculateMacroFitTierAndScore({ recipe: info.recipe, variant: info.variant, portions }, mealType);
         if(isBoth) {
           cal = Math.round(((portions?.eCal || 0) + (portions?.cCal || 0)) / 2);
           prot = round1(((portions?.eProt || 0) + (portions?.cProt || 0)) / 2);
@@ -22410,6 +22704,9 @@ function openSwapMealModal(day, slotKey) {
       prot: round1(prot || 0),
       serves,
       ingredientsText,
+      fitScore: fitRes?.score ?? 0,
+      fitColor: fitRes?.color ?? '#10B981',
+      fitLabel: fitRes?.label ?? 'Fit',
       searchHaystack: `${opt.label} ${opt.variant || ''} ${Math.round(cal || 0)}kcal ${round1(prot || 0)}g ${ingredientsText}`.toLowerCase()
     };
   });
@@ -22463,12 +22760,22 @@ function openSwapMealModal(day, slotKey) {
       <div style="position:relative">
         <input type="text" id="swap-modal-search-input" class="input" placeholder="Type to filter recipes (e.g. Chicken, Omelette, 500kcal)..." style="width:100%;font-size:13px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text)" oninput="renderSwapModalOptionsList()" autocomplete="off" spellcheck="false">
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <span style="font-size:11px;color:var(--text3);font-weight:600;margin-right:2px">Filter:</span>
-        <button type="button" class="btn sm active-filter-btn" id="swap-filter-all" onclick="setSwapModalFilter('all')">All (${items.length})</button>
-        <button type="button" class="btn sm ghost" id="swap-filter-favourites" onclick="setSwapModalFilter('favourites')">❤️ Favourites</button>
-        <button type="button" class="btn sm ghost" id="swap-filter-enhanced" onclick="setSwapModalFilter('enhanced')">Enhanced</button>
-        <button type="button" class="btn sm ghost" id="swap-filter-original" onclick="setSwapModalFilter('original')">Original</button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <span style="font-size:11px;color:var(--text3);font-weight:600;margin-right:2px">Filter:</span>
+          <button type="button" class="btn sm active-filter-btn" id="swap-filter-all" onclick="setSwapModalFilter('all')">All (${items.length})</button>
+          <button type="button" class="btn sm ghost" id="swap-filter-favourites" onclick="setSwapModalFilter('favourites')">❤️ Favourites</button>
+          <button type="button" class="btn sm ghost" id="swap-filter-enhanced" onclick="setSwapModalFilter('enhanced')">Enhanced</button>
+          <button type="button" class="btn sm ghost" id="swap-filter-original" onclick="setSwapModalFilter('original')">Original</button>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="font-size:11px;color:var(--text3);font-weight:600">Sort:</span>
+          <select id="swap-modal-sort-select" class="input sm" style="font-size:12px;padding:3px 8px;border-radius:6px;background:var(--surface);color:var(--text);border:1px solid var(--border)" onchange="renderSwapModalOptionsList()">
+            <option value="best-fit" selected>Best Fit</option>
+            <option value="needs-work">Needs Work</option>
+            <option value="name">Name</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -22558,12 +22865,9 @@ function renderSwapModalOptionsList() {
     return terms.every(t => item.searchHaystack.includes(t));
   });
 
-  filtered.sort((a, b) => {
-    const aFav = a.isFavourite || a.isFavorite;
-    const bFav = b.isFavourite || b.isFavorite;
-    if (!!bFav !== !!aFav) return bFav ? 1 : -1;
-    return a.label.localeCompare(b.label);
-  });
+  const sortOption = document.getElementById('swap-modal-sort-select')?.value || 'best-fit';
+  const targetSlot = currentSwapModalContext.mealType || 'dinner';
+  filtered = getSortedRecipes(filtered, sortOption, targetSlot);
 
   if (!filtered.length) {
     container.innerHTML = `<div style="padding:28px;text-align:center;color:var(--text3);font-size:13px">
@@ -22578,6 +22882,18 @@ function renderSwapModalOptionsList() {
 
     const isFav = item.isFavourite || item.isFavorite;
 
+    const fitScoreVal = item._computedFitScore !== undefined ? item._computedFitScore : (item.fitScore ?? 0);
+    const bestVar = item._bestVariant || (item.variant === 'enhanced' ? 'enhanced' : 'original');
+    const isEnhancedFit = bestVar === 'enhanced';
+
+    let fitColor = item.fitColor || '#10B981';
+    if (item._computedFitScore !== undefined) {
+      if (fitScoreVal >= 85) fitColor = '#10B981';
+      else if (fitScoreVal >= 65) fitColor = '#84CC16';
+      else if (fitScoreVal >= 40) fitColor = '#F59E0B';
+      else fitColor = '#EF4444';
+    }
+
     return `<div class="swap-modal-item ${isFav ? 'is-favorite' : ''} ${isCurrent ? 'is-current' : ''} ${isSelected ? 'is-selected' : ''}" data-value="${ppEscapeAttr(item.value)}" onclick="selectSwapModalRecipe('${ppEscapeAttr(item.value)}')" ondblclick="executeSwapSlotAndClose(${currentSwapModalContext.day}, '${currentSwapModalContext.slotKey}', '${ppEscapeAttr(item.value)}')">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -22587,10 +22903,11 @@ function renderSwapModalOptionsList() {
           ${isCurrent ? '<span class="tag">Currently Selected</span>' : ''}
           ${isSelected ? '<span class="tag green">✓ Ready to swap</span>' : ''}
         </div>
-        <div style="font-size:11px;color:var(--text2);margin-top:4px;display:flex;gap:12px;flex-wrap:wrap">
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
           <span>🔥 <strong>${item.cal}</strong> kcal</span>
           <span>💪 <strong>${item.prot}</strong>g protein</span>
           ${item.serves ? `<span>🍽️ Serves ${item.serves}</span>` : ''}
+          <span class="tag" style="background-color:${fitColor};color:#FFFFFF;border-color:${fitColor};font-weight:600">Fit score ${fitScoreVal}${isEnhancedFit ? ' · Enhanced' : ''}</span>
         </div>
       </div>
       <div style="flex-shrink:0;display:flex;align-items:center;gap:8px">
@@ -22858,7 +23175,7 @@ function deletePlanHistory(index){
         state.planHistory.splice(index, 1);
         try {
           safeLocalStorageSet(SK, safeJsonStringify(state));
-          safeLocalStorageSet('plateplan_history_backup', safeJsonStringify(state.planHistory));
+          safeSaveHistoryBackup(state.planHistory);
         } catch(e) {}
         state.plannerStep = 1;
         renderAll();
