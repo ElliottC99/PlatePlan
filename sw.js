@@ -1,41 +1,41 @@
-const PLATEPLAN_CACHE = 'plateplan-shell-v82';
-const PLATEPLAN_APP_VERSION = '3.0.2';
-const PLATEPLAN_BUILD_ID = '3.0.2-v82';
+const PLATEPLAN_CACHE = 'plateplan-shell-v83';
+const PLATEPLAN_APP_VERSION = '3.0.3';
+const PLATEPLAN_BUILD_ID = '3.0.3-v83';
 const PLATEPLAN_LOCAL_SHELL = [
   './',
   './PlatePlan.html',
   './repair-update.html',
   './manifest.json',
   './firebase-config.js',
-  './styles/tokens.css?v=3.0.2',
-  './styles/components.css?v=3.0.2',
-  './styles/responsive.css?v=3.0.2',
-  './styles/print.css?v=3.0.2',
-  './scripts/plateplan-app.js?v=3.0.2',
-  './scripts/bootstrap.js?v=3.0.2',
-  './scripts/main.js?v=3.0.2',
-  './scripts/core/contracts.js?v=3.0.2',
-  './scripts/core/store.js?v=3.0.2',
-  './scripts/core/runtime.js?v=3.0.2',
-  './scripts/services/firebase.js?v=3.0.2',
-  './scripts/services/sync.js?v=3.0.2',
-  './scripts/services/recovery.js?v=3.0.2',
-  './scripts/services/updates.js?v=3.0.2',
-  './scripts/ui/actions.js?v=3.0.2',
-  './scripts/ui/navigation.js?v=3.0.2',
-  './scripts/ui/workspaces.js?v=3.0.2',
-  './scripts/features/create-legacy-view.js?v=3.0.2',
-  './scripts/features/today.js?v=3.0.2',
-  './scripts/features/recipes.js?v=3.0.2',
-  './scripts/features/recipe-add.js?v=3.0.2',
-  './scripts/features/ingredients.js?v=3.0.2',
-  './scripts/features/products.js?v=3.0.2',
-  './scripts/features/planner.js?v=3.0.2',
-  './scripts/features/library.js?v=3.0.2',
-  './scripts/features/shopping.js?v=3.0.2',
-  './scripts/features/search.js?v=3.0.2',
-  './scripts/features/data-quality.js?v=3.0.2',
-  './scripts/features/preferences.js?v=3.0.2',
+  './styles/tokens.css?v=3.0.3',
+  './styles/components.css?v=3.0.3',
+  './styles/responsive.css?v=3.0.3',
+  './styles/print.css?v=3.0.3',
+  './scripts/plateplan-app.js?v=3.0.3',
+  './scripts/bootstrap.js?v=3.0.3',
+  './scripts/main.js?v=3.0.3',
+  './scripts/core/contracts.js?v=3.0.3',
+  './scripts/core/store.js?v=3.0.3',
+  './scripts/core/runtime.js?v=3.0.3',
+  './scripts/services/firebase.js?v=3.0.3',
+  './scripts/services/sync.js?v=3.0.3',
+  './scripts/services/recovery.js?v=3.0.3',
+  './scripts/services/updates.js?v=3.0.3',
+  './scripts/ui/actions.js?v=3.0.3',
+  './scripts/ui/navigation.js?v=3.0.3',
+  './scripts/ui/workspaces.js?v=3.0.3',
+  './scripts/features/create-legacy-view.js?v=3.0.3',
+  './scripts/features/today.js?v=3.0.3',
+  './scripts/features/recipes.js?v=3.0.3',
+  './scripts/features/recipe-add.js?v=3.0.3',
+  './scripts/features/ingredients.js?v=3.0.3',
+  './scripts/features/products.js?v=3.0.3',
+  './scripts/features/planner.js?v=3.0.3',
+  './scripts/features/library.js?v=3.0.3',
+  './scripts/features/shopping.js?v=3.0.3',
+  './scripts/features/search.js?v=3.0.3',
+  './scripts/features/data-quality.js?v=3.0.3',
+  './scripts/features/preferences.js?v=3.0.3',
   './icon-192.png',
   './icon-512.png',
   './icon-192-maskable.png',
@@ -56,7 +56,7 @@ self.addEventListener('install', event => {
         keys
           .filter(key => key !== PLATEPLAN_CACHE)
           .map(key => {
-            console.log('[SW v2.9.10] Purging previous cache on install:', key);
+            console.log('[SW v3.0.3] Purging previous cache on install:', key);
             return caches.delete(key);
           })
       );
@@ -74,7 +74,7 @@ self.addEventListener('activate', event => {
         keys
           .filter(key => key !== PLATEPLAN_CACHE)
           .map(key => {
-            console.log('[SW v2.9.10] Purging previous shell cache:', key);
+            console.log('[SW v3.0.3] Purging previous shell cache:', key);
             return caches.delete(key);
           })
       );

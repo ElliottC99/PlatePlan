@@ -207,9 +207,10 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='3.0.2';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v82';
-console.log("[v3.0.2 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
+const PLATEPLAN_APP_VERSION='3.0.3';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v83';
+window.APP_VERSION = '3.0.3';
+console.log("[v3.0.3 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
 
 let isHydrating = false;
 window.isHydrating = false;
@@ -302,7 +303,7 @@ let platePlanEarlierDaysExpanded = false;
 const PLATEPLAN_LIST_BATCH = 24;
 
 // ============================================================================
-// == v2.9.10 ROBUST PERSISTENCE & STATE RECOVERY ARCHITECTURE ==
+// == v3.0.3 ROBUST PERSISTENCE & STATE RECOVERY ARCHITECTURE ==
 // ============================================================================
 
 /**
@@ -577,7 +578,7 @@ window.updatePlanSaveUI = updatePlanSaveUI;
 
 function queuePlanSave(planData = state?.plan, immediate = false) {
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.0.2 STATE PERSISTENCE] queuePlanSave blocked during hydration.');
+    console.log('[v3.0.3 STATE PERSISTENCE] queuePlanSave blocked during hydration.');
     return Promise.resolve(false);
   }
   updateUIState({ saveStatus: 'pending' });
@@ -1759,13 +1760,13 @@ let platePlanDebounceResolvers = [];
 
 async function pushStateToCloud(force=false){
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.0.2 STATE PERSISTENCE] PushStateToCloud blocked during hydration.');
+    console.log('[v3.0.3 STATE PERSISTENCE] PushStateToCloud blocked during hydration.');
     return Promise.resolve(false);
   }
 
   const currentStateJson = safeJsonStringify(state);
   if (!force && lastPersistedStateJson && lastPersistedStateJson === currentStateJson) {
-    console.log('[v3.0.2 STATE PERSISTENCE] State unchanged from last persisted; skipping cloud push.');
+    console.log('[v3.0.3 STATE PERSISTENCE] State unchanged from last persisted; skipping cloud push.');
     return Promise.resolve(true);
   }
 
@@ -2002,7 +2003,7 @@ async function _executePushStateToCloud(force, targetHouseholdId, householdDocRe
       platePlanLastSyncError=null;
       platePlanLastSyncedAt=Date.now();
       lastPersistedStateJson = safeJsonStringify(state);
-      console.log('[v3.0.2 STATE PERSISTENCE] State successfully pushed to cloud with debounce 1000ms.');
+      console.log('[v3.0.3 STATE PERSISTENCE] State successfully pushed to cloud with debounce 1000ms.');
       updatePlatePlanSyncStatus('synced');
     }catch(error){
       console.warn('PlatePlan Cloud push failed:',error);
@@ -2518,7 +2519,13 @@ function flushPlatePlanSyncOutbox(){
 
 function saveState(immediate=false){
   window.dispatchEvent(new CustomEvent('plateplan:state-saved',{detail:{source:'cloud',savedAt:Date.now()}}));
-  if(state) state.updatedAt=new Date().toISOString();
+  if(state) {
+    state.updatedAt=new Date().toISOString();
+    state.version = '3.0.3';
+    if (state.plan && typeof state.plan === 'object') {
+      state.plan.version = '3.0.3';
+    }
+  }
   window.state = state;
   window.appState = state;
   try{
@@ -2544,7 +2551,7 @@ function saveState(immediate=false){
   }
 
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.0.2 STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
+    console.log('[v3.0.3 STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
     return true;
   }
 
@@ -3236,7 +3243,7 @@ function startPlatePlanCloudListeners(){
     runDataQualityAudits();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v2.9.10 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+    console.log("[v3.0.3 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
   }, error => {
     console.error('[RECIPES SUBCOLLECTION LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
@@ -3260,7 +3267,7 @@ function startPlatePlanCloudListeners(){
     runDataQualityAudits();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v2.9.10 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+    console.log("[v3.0.3 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
   }, error => {
     console.warn('[DATA RECIPES LISTENER ERROR]', error);
   });
@@ -3314,7 +3321,7 @@ function startPlatePlanCloudListeners(){
     renderAll();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v2.9.10 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+    console.log("[v3.0.3 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
   }, error => {
     console.error('[HOUSEHOLD ROOT METADATA LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
@@ -3563,7 +3570,7 @@ async function loadSharedPlatePlan(){
   state.isCloudHydrated = true;
   window.isCloudHydrated = true;
   console.log(`[RECIPES HYDRATION] Deterministically hydrated and deduplicated ${state.recipes.length} recipes across multi-path check.`);
-  console.log("[v2.9.10 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+  console.log("[v3.0.3 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
 
   const metaDoc = dataDocs.meta || {};
   const taxonomyDoc = dataDocs.taxonomy || {};
@@ -3702,7 +3709,7 @@ async function loadSharedPlatePlan(){
     isHydrating = false;
     window.isHydrating = false;
     lastPersistedStateJson = safeJsonStringify(state);
-    console.log('[v3.0.2 STATE PERSISTENCE] Hydration complete; cloud diff checks enabled.');
+    console.log('[v3.0.3 STATE PERSISTENCE] Hydration complete; cloud diff checks enabled.');
   }
 }
 
@@ -11220,8 +11227,15 @@ function saveMiniIng() {
     if(currentMiniEditId) {
         const idx = state.ingredients.findIndex(x => x.id === currentMiniEditId);
         if(idx > -1) state.ingredients[idx] = newIng;
+        if (typeof persistProductToBank === 'function') persistProductToBank(newIng);
+        else saveIngredient(newIng);
     } else {
-        state.ingredients.push(newIng);
+        if (typeof persistProductToBank === 'function') {
+            persistProductToBank(newIng);
+        } else {
+            state.ingredients.push(newIng);
+            saveIngredient(newIng);
+        }
     }
     const group = ensureProductAssignedToGroup(newIng, mappingContext?.ings?.[mappingContext?.activeIndex]?.name || name, '', true);
     if(group) group.updatedAt = nowIso;
@@ -18299,7 +18313,11 @@ function saveTescoIngredient(categoryReady=false){
     updatedAt: new Date().toISOString()
   });
 
-  state.ingredients.push(ing);
+  if (typeof persistProductToBank === 'function') {
+    persistProductToBank(ing);
+  } else {
+    state.ingredients.push(ing);
+  }
   if(pendingTesco?.type === 'subst' && currentSubstContext.groupId) {
       ensureProductAssignedToGroup(ing, getIngredientGroup(currentSubstContext.groupId)?.name || ing.name, currentSubstContext.groupId);
   } else if (pendingTesco?.groupId) {
@@ -20383,7 +20401,7 @@ function formatPlanDateShort(dateString){
 window.formatPlanDateShort = formatPlanDateShort;
 
 // ==========================================
-// PLATEPLAN v3.0.2 MEAL PLANNER 4-STEP WIZARD
+// PLATEPLAN v3.0.3 MEAL PLANNER 4-STEP WIZARD
 // ==========================================
 
 function getPlannerWizardStep() {
@@ -20566,63 +20584,299 @@ function removeWizardUseUpProduct(productId) {
 }
 window.removeWizardUseUpProduct = removeWizardUseUpProduct;
 
-// Inline swap handlers for Step 2
-function toggleInlineSwapPanel(day, slotKey) {
-  const panel = document.getElementById(`inline-swap-${day}-${slotKey}`);
-  if (!panel) return;
-  if (panel.style.display !== 'none') {
-    panel.style.display = 'none';
-    panel.innerHTML = '';
-    return;
+// DEDICATED PLAN DELETION PIPELINE (v3.0.3)
+async function deletePlan(targetId) {
+  if (!targetId) return;
+  console.log('[v3.0.3 STATE PERSISTENCE] Executing dedicated deletePlan pipeline for:', targetId);
+  const householdId = window.CURRENT_HOUSEHOLD_ID || window.activeHouseholdId || state?.meta?.householdId || 'elliott-chloe';
+
+  // 1. Mutate local state
+  if (Array.isArray(window.state?.plans)) {
+    window.state.plans = window.state.plans.filter(p => p && p.id !== targetId);
+  }
+  if (Array.isArray(state?.plans)) {
+    state.plans = state.plans.filter(p => p && p.id !== targetId);
+  }
+  if (Array.isArray(state?.planHistory)) {
+    state.planHistory = state.planHistory.filter(p => p && p.id !== targetId && p.planId !== targetId);
+  }
+  if (window.state?.plan?.id === targetId || state?.plan?.id === targetId) {
+    if (window.state) window.state.plan = null;
+    if (state) state.plan = null;
   }
 
-  const mealType = getMealTypeFromSlotKey(slotKey) || 'dinner';
-  const who = slotKey.endsWith('C') ? 'Chloe' : 'Elliott';
-  const currentSlot = state.plan?.slots?.[day]?.[slotKey];
-  const currentId = currentSlot?.id;
+  // Persist directly to local storage backups defensively WITHOUT calling savePlan() or saveState()
+  try {
+    safeLocalStorageSet(SK, safeJsonStringify(state));
+    safeLocalStorageSet('plateplan_plan_backup', '');
+    if (Array.isArray(state.planHistory)) {
+      safeLocalStorageSet('plateplan_history_backup', safeJsonStringify(state.planHistory));
+    }
+  } catch(e) {}
 
-  const options = getPlannerRecipeOptions(mealType, who, { applyExclusions: true, trafficRules: getPlanTrafficFilterRules() })
-    .filter(opt => opt.id !== currentId)
-    .slice(0, 5);
-
-  if (!options.length) {
-    panel.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:6px">No eligible alternative recipes found for this slot.</div>';
-    panel.style.display = 'block';
-    return;
+  // 2. Direct Firestore deletion
+  try {
+    const db = platePlanDb || (window.firebase && firebase.firestore && firebase.firestore());
+    if (db) {
+      await db.collection('households').doc(householdId).collection('plans').doc(targetId).delete();
+      console.log('[v3.0.3 STATE PERSISTENCE] Plan deleted directly from Firestore:', targetId);
+    }
+  } catch(err) {
+    console.warn('[v3.0.3 STATE PERSISTENCE] Direct Firestore deletion error:', err);
   }
 
-  panel.innerHTML = `
-    <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">Swap ${mealType} for ${who}:</div>
-    <div style="display:flex;flex-direction:column;gap:6px">
-      ${options.map(opt => {
-        const r = opt.recipe;
-        const cal = Math.round(r?.cal || 0);
-        const prot = Math.round(r?.prot || 0);
-        return `
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
-            <div>
-              <div style="font-size:13px;font-weight:600;color:var(--text)">${ppEscapeHtml(r?.name || 'Unnamed')}</div>
-              <div style="font-size:11px;color:var(--text2)">${cal} kcal · ${prot}g protein ${opt.variant === 'enhanced' ? '· <span style="color:var(--action)">Enhanced</span>' : ''}</div>
-            </div>
-            <button type="button" class="btn sm primary" style="font-size:11px;padding:3px 8px" onclick="executeInlineMealSwap(${day}, '${ppEscapeAttr(slotKey)}', '${ppEscapeAttr(opt.id)}', '${ppEscapeAttr(opt.variant || 'original')}')">Choose</button>
-          </div>
-        `;
-      }).join('')}
+  // 3. Transition UI directly to Step 1 of the Meal Planner
+  state.plannerStep = 1;
+  renderAll();
+  showPlatePlanToast('Plan deleted successfully. ✓');
+}
+window.deletePlan = deletePlan;
+
+// ATOMIC PRODUCT PERSISTENCE (v3.0.3)
+async function persistProductToBank(newProduct) {
+  if (!newProduct) throw new Error('Cannot persist empty product');
+  if (!newProduct.id) newProduct.id = 'ing' + Date.now();
+  if (!newProduct.updatedAt) newProduct.updatedAt = new Date().toISOString();
+
+  // 1. Ensure window.state.products and window.state.ingredients exist and append
+  if (!Array.isArray(window.state.products)) {
+    window.state.products = Array.isArray(window.state.ingredients) ? [...window.state.ingredients] : (Array.isArray(state?.ingredients) ? [...state.ingredients] : []);
+  }
+  if (!Array.isArray(state.products)) {
+    state.products = window.state.products;
+  }
+  if (!Array.isArray(state.ingredients)) {
+    state.ingredients = [];
+  }
+  if (!Array.isArray(window.state.ingredients)) {
+    window.state.ingredients = state.ingredients;
+  }
+
+  const pIdx = window.state.products.findIndex(p => p && p.id === newProduct.id);
+  if (pIdx > -1) {
+    window.state.products[pIdx] = newProduct;
+  } else {
+    window.state.products.push(newProduct);
+  }
+
+  const iIdx = state.ingredients.findIndex(p => p && p.id === newProduct.id);
+  if (iIdx > -1) {
+    state.ingredients[iIdx] = newProduct;
+  } else {
+    state.ingredients.push(newProduct);
+  }
+
+  rebuildPlatePlanIndexes();
+
+  // 2. Immediately dispatch a Firestore write to the households/elliott-chloe/products collection
+  const householdId = window.CURRENT_HOUSEHOLD_ID || window.activeHouseholdId || state?.meta?.householdId || 'elliott-chloe';
+  const cleaned = sanitizePayloadForFirestore(unwrapAndCleanItem(newProduct));
+  
+  let firestorePromise = null;
+  const db = platePlanDb || (window.firebase && firebase.firestore && firebase.firestore());
+  if (db) {
+    const writeProducts = db.collection('households').doc(householdId).collection('products').doc(newProduct.id).set(cleaned, { merge: true });
+    const writeIngredients = db.collection('households').doc(householdId).collection('ingredients').doc(newProduct.id).set(cleaned, { merge: true });
+    firestorePromise = Promise.all([writeProducts, writeIngredients]).catch(err => {
+      console.warn('[v3.0.3 STATE PERSISTENCE] persistProductToBank Firestore write warning:', err);
+    });
+  } else {
+    firestorePromise = Promise.resolve();
+  }
+
+  try {
+    safeLocalStorageSet(SK, safeJsonStringify(state));
+  } catch(e) {}
+
+  await Promise.race([firestorePromise, new Promise(r => setTimeout(r, 200))]);
+  return newProduct;
+}
+window.persistProductToBank = persistProductToBank;
+
+// SEARCHABLE RECIPE SWAP MODAL (v3.0.3 Step 2)
+let currentSearchableSwapContext = null;
+
+function ensureSearchableRecipeSwapModalDom() {
+  let modal = document.getElementById('searchable-recipe-swap-modal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'searchable-recipe-swap-modal';
+  modal.className = 'modal-backdrop';
+  modal.style.display = 'none';
+  modal.innerHTML = `
+    <div class="modal-card" style="max-width: 680px; width: 92%; max-height: 85vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 16px; background: var(--surface); box-shadow: 0 10px 30px rgba(0,0,0,0.2); border: 1px solid var(--border);">
+      <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface2);">
+        <div>
+          <h3 id="swap-modal-title" style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text);">Swap Recipe</h3>
+          <div id="swap-modal-subtitle" style="font-size: 12px; color: var(--text2); margin-top: 2px;">Search across all recipes by title, ingredient, or tag.</div>
+        </div>
+        <button type="button" class="btn ghost sm" onclick="closeSearchableRecipeSwapModal()" style="font-size: 18px; line-height: 1; padding: 4px 8px;">✕</button>
+      </div>
+      <div style="padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--surface);">
+        <input type="search" id="swap-modal-search" class="input" placeholder="Type recipe name, ingredient (e.g. chicken, tofu), or tag..." style="width: 100%; font-size: 14px; padding: 8px 12px;" oninput="filterSearchableRecipeSwapModal(this.value)" autofocus>
+      </div>
+      <div id="swap-modal-results" style="flex: 1; overflow-y: auto; padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; max-height: 55vh;">
+        <!-- Candidate recipes render here -->
+      </div>
+      <div style="padding: 12px 20px; border-top: 1px solid var(--border); background: var(--surface2); display: flex; justify-content: flex-end;">
+        <button type="button" class="btn ghost sm" onclick="closeSearchableRecipeSwapModal()">Cancel</button>
+      </div>
     </div>
   `;
-  panel.style.display = 'block';
+  document.body.appendChild(modal);
+  return modal;
 }
-window.toggleInlineSwapPanel = toggleInlineSwapPanel;
 
-function executeInlineMealSwap(day, slotKey, recipeId, variant = 'original') {
-  if (!state.plan?.slots?.[day]) return;
-  state.plan.slots[day][slotKey] = makePlanSlot(recipeId, variant);
+function openSearchableRecipeSwapModal(day, slotKey, isShared = false) {
+  currentSearchableSwapContext = { day, slotKey, isShared };
+  const modal = ensureSearchableRecipeSwapModalDom();
+  const mealType = getMealTypeFromSlotKey(slotKey) || 'dinner';
+  const person = isShared ? 'Both (Elliott & Chloe)' : (slotKey.endsWith('C') ? 'Chloe' : 'Elliott');
+  
+  const titleEl = document.getElementById('swap-modal-title');
+  if (titleEl) titleEl.textContent = `Swap ${mealType.charAt(0).toUpperCase() + mealType.slice(1)} for ${person} (Day ${day})`;
+  
+  const searchInput = document.getElementById('swap-modal-search');
+  if (searchInput) searchInput.value = '';
+  
+  filterSearchableRecipeSwapModal('');
+  modal.style.display = 'flex';
+  if (searchInput) setTimeout(() => searchInput.focus(), 50);
+}
+window.openSearchableRecipeSwapModal = openSearchableRecipeSwapModal;
+
+function closeSearchableRecipeSwapModal() {
+  const modal = document.getElementById('searchable-recipe-swap-modal');
+  if (modal) modal.style.display = 'none';
+  currentSearchableSwapContext = null;
+}
+window.closeSearchableRecipeSwapModal = closeSearchableRecipeSwapModal;
+
+function filterSearchableRecipeSwapModal(query = '') {
+  const resultsContainer = document.getElementById('swap-modal-results');
+  if (!resultsContainer) return;
+  if (!currentSearchableSwapContext) return;
+
+  const { day, slotKey, isShared } = currentSearchableSwapContext;
+  const currentSlot = state.plan?.slots?.[day]?.[slotKey];
+  const currentId = currentSlot?.id;
+  const cleanQ = (query || '').toLowerCase().trim();
+
+  // All recipes from window.state.recipes
+  const allRecipes = Array.isArray(window.state?.recipes) ? window.state.recipes : (Array.isArray(state?.recipes) ? state.recipes : []);
+  
+  const candidates = allRecipes.filter(r => {
+    if (!r || !r.id) return false;
+    if (r.id === currentId) return false;
+    if (!cleanQ) return true;
+    
+    const nameMatch = (r.name || r.title || '').toLowerCase().includes(cleanQ);
+    if (nameMatch) return true;
+    
+    const ingMatch = Array.isArray(r.ingredients) && r.ingredients.some(i => (i?.name || i?.raw || '').toLowerCase().includes(cleanQ));
+    if (ingMatch) return true;
+    
+    const tagMatch = Array.isArray(r.tags) && r.tags.some(t => String(t).toLowerCase().includes(cleanQ));
+    if (tagMatch) return true;
+
+    const catMatch = (r.category || r.cuisine || '').toLowerCase().includes(cleanQ);
+    return catMatch;
+  });
+
+  if (candidates.length === 0) {
+    resultsContainer.innerHTML = `
+      <div style="text-align: center; padding: 24px; color: var(--text3); font-size: 13px;">
+        No recipes match "${ppEscapeHtml(query)}". Try another search term.
+      </div>
+    `;
+    return;
+  }
+
+  // Calculate day fit score for each candidate recipe
+  resultsContainer.innerHTML = candidates.map(r => {
+    const cal = Math.round(r.cal || 0);
+    const prot = Math.round(r.prot || 0);
+    
+    // Simulate placing r in slot and get daily fit score
+    let fitScorePercent = 85;
+    try {
+      if (state.plan?.slots?.[day]) {
+        const simPlan = {
+          ...state.plan,
+          slots: {
+            ...state.plan.slots,
+            [day]: {
+              ...state.plan.slots[day],
+              [slotKey]: makePlanSlot(r.id, 'original')
+            }
+          }
+        };
+        const summary = getPlanDaySummary(day, simPlan);
+        fitScorePercent = Math.max(0, Math.min(100, Math.round(100 - (summary?.score || 0))));
+      }
+    } catch(e) {}
+
+    const placeholderImg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44"><rect width="44" height="44" rx="6" fill="%23e5e7eb"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="20">🍲</text></svg>`;
+    const imgSrc = r.photo || r.img || r.image || placeholderImg;
+
+    return `
+      <div class="swap-candidate-row" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; transition: border-color 0.15s ease;">
+        <img src="${imgSrc}" style="width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" alt="${ppEscapeAttr(r.name || 'Recipe')}" onerror="this.src='${placeholderImg}'" />
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-weight: 650; font-size: 13.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${ppEscapeHtml(r.name || r.title || 'Untitled Recipe')}
+          </div>
+          <div style="font-size: 11.5px; color: var(--text2); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span><strong>${cal}</strong> kcal</span>
+            <span>·</span>
+            <span><strong>${prot}g</strong> protein</span>
+            <span>·</span>
+            <span class="tag" style="font-size: 10.5px; padding: 1px 6px; font-weight: 700; background: ${fitScorePercent >= 75 ? 'var(--green-bg, #dcfce7)' : 'var(--amber-bg, #fef3c7)'}; color: ${fitScorePercent >= 75 ? 'var(--green, #16a34a)' : 'var(--amber, #d97706)'}; border: 1px solid currentColor;">
+              Fit Score ${fitScorePercent}%
+            </span>
+          </div>
+        </div>
+        <button type="button" class="btn sm primary" style="font-size: 12px; font-weight: 700; padding: 6px 12px; white-space: nowrap; flex-shrink: 0;" onclick="selectAndSwapRecipe('${ppEscapeAttr(r.id)}', 'original')">
+          Select &amp; Swap
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+window.filterSearchableRecipeSwapModal = filterSearchableRecipeSwapModal;
+
+function selectAndSwapRecipe(recipeId, variant = 'original') {
+  if (!currentSearchableSwapContext || !state.plan?.slots) return;
+  const { day, slotKey, isShared } = currentSearchableSwapContext;
+  if (!state.plan.slots[day]) state.plan.slots[day] = {};
+
+  if (isShared) {
+    const meal = getMealTypeFromSlotKey(slotKey) || 'dinner';
+    state.plan.slots[day][meal + 'E'] = makePlanSlot(recipeId, variant);
+    state.plan.slots[day][meal + 'C'] = makePlanSlot(recipeId, variant);
+  } else {
+    state.plan.slots[day][slotKey] = makePlanSlot(recipeId, variant);
+  }
+
   state.plan.score = calculatePlanScore(state.plan);
   const autoPrepSuggestions = findMealPrepSuggestions(state.plan);
   state.plan.mealPrepGroups = autoPrepSuggestions.map(s => ({ key:s.key, recipeId:s.recipeId, variant:s.variant, mealKey:s.mealKey, peopleKey:s.peopleKey, days:s.days }));
   saveState();
+  closeSearchableRecipeSwapModal();
   renderPlannerWizard();
-  showPlatePlanToast('Meal slot swapped successfully! ✓');
+  showPlatePlanToast('Recipe swapped & Fit Score updated! ✓');
+}
+window.selectAndSwapRecipe = selectAndSwapRecipe;
+
+// Backward-compatibility wrapper for any inline caller
+function toggleInlineSwapPanel(day, slotKey) {
+  openSearchableRecipeSwapModal(day, slotKey);
+}
+window.toggleInlineSwapPanel = toggleInlineSwapPanel;
+
+function executeInlineMealSwap(day, slotKey, recipeId, variant = 'original') {
+  selectAndSwapRecipe(recipeId, variant);
 }
 window.executeInlineMealSwap = executeInlineMealSwap;
 
@@ -20678,8 +20932,8 @@ function selectShoppingProductOverride(groupId, productId) {
 }
 window.selectShoppingProductOverride = selectShoppingProductOverride;
 
-// Step 4: Atomic Commit
-async function commitPlannerWizardPlan() {
+// Step 4: Atomic Commit & Auto-Redirect (v3.0.3)
+function commitPlannerWizardPlan() {
   if (!state.plan || !state.plan.slots) {
     showPlatePlanToast('No active plan found to commit.');
     return;
@@ -20692,27 +20946,38 @@ async function commitPlannerWizardPlan() {
     appliedAt: new Date().toISOString(),
     savedStatus: 'Saved',
     shoppingAtHome: currentPlan.shoppingAtHome || {},
-    version: '3.0.2',
+    version: '3.0.3',
     confirmedShopping: true,
     updatedAt: new Date().toISOString()
   };
 
   state.plan = committedPlan;
+  window.state = state;
   delete state.draftPlan;
   delete state.draftBackupPlan;
   state.isDraftPlan = false;
   state.plannerStep = 2; // Next time, show current review
   
-  if (typeof savePlanTransactional === 'function') {
-    await savePlanTransactional(committedPlan);
-  }
-  saveState(true);
-  if (platePlanCloudReady && !platePlanSyncSuppress) queuePlatePlanCloudDiff();
-  markPlatePlanViewsDirty('today', 'planner', 'shopping', 'planlib');
+  const commitPromise = (typeof savePlanTransactional === 'function')
+    ? savePlanTransactional(committedPlan)
+    : (typeof saveState === 'function' ? Promise.resolve(saveState(true)) : Promise.resolve());
 
-  showPlatePlanToast('Meal plan v3.0.2 committed! Displaying Today\'s meals. ✓');
-  showView('today');
-  renderToday();
+  commitPromise.then(() => {
+    saveState(true);
+    if (platePlanCloudReady && !platePlanSyncSuppress) queuePlatePlanCloudDiff();
+    markPlatePlanViewsDirty('today', 'planner', 'shopping', 'planlib');
+    showPlatePlanToast('Meal plan v3.0.3 committed! Displaying Today\'s meals. ✓');
+    if (typeof showView === 'function') {
+      showView('today');
+    }
+    window.location.hash = '#/today';
+    if (typeof renderToday === 'function') {
+      renderToday();
+    }
+  }).catch(err => {
+    console.error('Failed to commit meal plan:', err);
+    showPlatePlanToast('Failed to commit meal plan. Check network connection.');
+  });
 }
 window.commitPlannerWizardPlan = commitPlannerWizardPlan;
 
@@ -20832,8 +21097,10 @@ function renderPlannerWizard() {
     const trafficE = state.prefs?.planTrafficE || ['green', 'amber'];
     const trafficC = state.prefs?.planTrafficC || ['green', 'amber'];
     const activeExclusions = getActiveWizardExclusions();
-    const pinned = state.pinnedRecipes || [];
-    const useUp = state.useUpProducts || [];
+    const rawPinned = window.state?.planOptions?.pinnedMeals || (typeof planOptions !== 'undefined' ? planOptions?.pinnedMeals : null) || state?.pinnedRecipes;
+    const pinned = Array.isArray(rawPinned) ? rawPinned : [];
+    const rawUseUp = window.state?.planOptions?.useUp || (typeof planOptions !== 'undefined' ? planOptions?.useUp : null) || state?.useUpProducts;
+    const useUp = Array.isArray(rawUseUp) ? rawUseUp : (rawUseUp && typeof rawUseUp === 'object' ? Object.keys(rawUseUp) : []);
 
     html += `
       <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:18px">
@@ -21025,9 +21292,11 @@ function renderPlannerWizard() {
         </div>
       `;
     } else {
-      const plan = state.plan;
-      const days = plan.days || Object.keys(plan.slots).length;
-      const prepGroups = plan.mealPrepGroups || [];
+      const plan = state.plan || {};
+      const rawSlots = plan.slots;
+      const safeSlots = Array.isArray(rawSlots) ? rawSlots : (rawSlots && typeof rawSlots === 'object' ? Object.values(rawSlots) : []);
+      const days = plan.days || safeSlots.length || 0;
+      const prepGroups = Array.isArray(plan.mealPrepGroups) ? plan.mealPrepGroups : [];
 
       html += `
         <div style="display:flex;flex-direction:column;gap:16px">
@@ -21048,7 +21317,6 @@ function renderPlannerWizard() {
 
       for (let d = 1; d <= days; d++) {
         const dateLabel = formatPlanDayLabel(plan, d, { short: true });
-        const dateString = plan.dayDates?.[d] || '';
         const daySlots = plan.slots?.[d] || {};
 
         // Calculate Day Macros
@@ -21069,7 +21337,7 @@ function renderPlannerWizard() {
         });
 
         // Check Batch Prep
-        const dayPreps = prepGroups.filter(g => (g.days || []).includes(d));
+        const dayPreps = prepGroups.filter(g => (Array.isArray(g?.days) ? g.days : []).includes(d));
 
         html += `
           <div class="dense-plan-day-card">
@@ -21116,12 +21384,11 @@ function renderPlannerWizard() {
                     <div class="dense-plan-person-row">
                       <div style="display:flex;align-items:center;justify-content:space-between">
                         <span style="font-size:11px;font-weight:750;color:var(--text2);text-transform:uppercase">${meal} (Both)</span>
-                        <button type="button" class="dense-plan-swap-btn" onclick="toggleInlineSwapPanel(${d}, '${slotKeyE}')">Swap ▾</button>
+                        <button type="button" class="dense-plan-swap-btn" onclick="openSearchableRecipeSwapModal(${d}, '${slotKeyE}', true)">Swap ▾</button>
                       </div>
                       <div class="dense-plan-slot">
                         <span style="font-weight:600;color:var(--text)">${ppEscapeHtml(rE.name)} ${infoE.variant === 'enhanced' ? '<span style="font-size:10px;color:var(--action);font-weight:700">ENHANCED</span>' : ''}</span>
                       </div>
-                      <div id="inline-swap-${d}-${slotKeyE}" class="inline-swap-panel" style="display:none"></div>
                     </div>
                   `;
                 }
@@ -21133,17 +21400,15 @@ function renderPlannerWizard() {
                     ${rE ? `
                       <div class="dense-plan-slot">
                         <span><strong style="color:var(--text2)">E:</strong> ${ppEscapeHtml(rE.name)} ${infoE.variant === 'enhanced' ? '<span style="font-size:10px;color:var(--action)">[Enh]</span>' : ''}</span>
-                        <button type="button" class="dense-plan-swap-btn" onclick="toggleInlineSwapPanel(${d}, '${slotKeyE}')">Swap ▾</button>
+                        <button type="button" class="dense-plan-swap-btn" onclick="openSearchableRecipeSwapModal(${d}, '${slotKeyE}', false)">Swap ▾</button>
                       </div>
-                      <div id="inline-swap-${d}-${slotKeyE}" class="inline-swap-panel" style="display:none"></div>
                     ` : ''}
 
                     ${rC ? `
                       <div class="dense-plan-slot" style="margin-top:4px">
                         <span><strong style="color:var(--text2)">C:</strong> ${ppEscapeHtml(rC.name)} ${infoC.variant === 'enhanced' ? '<span style="font-size:10px;color:var(--action)">[Enh]</span>' : ''}</span>
-                        <button type="button" class="dense-plan-swap-btn" onclick="toggleInlineSwapPanel(${d}, '${slotKeyC}')">Swap ▾</button>
+                        <button type="button" class="dense-plan-swap-btn" onclick="openSearchableRecipeSwapModal(${d}, '${slotKeyC}', false)">Swap ▾</button>
                       </div>
-                      <div id="inline-swap-${d}-${slotKeyC}" class="inline-swap-panel" style="display:none"></div>
                     ` : ''}
                   </div>
                 `;
@@ -21183,6 +21448,8 @@ function renderPlannerWizard() {
         (categories[item.cat] = categories[item.cat] || []).push(item);
       });
 
+      const fallbackSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><rect width="40" height="40" rx="4" fill="%23e5e7eb"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="18">🛒</text></svg>`;
+
       html += `
         <div style="display:flex;flex-direction:column;gap:16px">
           <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
@@ -21207,27 +21474,28 @@ function renderPlannerWizard() {
                   <span style="font-size:12px;color:var(--text2)">${catItems.length} item${catItems.length>1?'s':''}</span>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:8px">
-                  ${catItems.map(item => `
-                    <div style="display:flex;flex-direction:column;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px">
-                      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-                        <div style="display:flex;align-items:center;gap:10px">
-                          <label style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:13px;margin:0">
-                            <input type="checkbox" ${item.isAtHome ? 'checked' : ''} onchange="toggleShoppingAtHome('${ppEscapeAttr(item.key)}')">
-                            <span style="${item.isAtHome ? 'text-decoration:line-through;color:var(--text3);' : 'font-weight:600;color:var(--text);'}">${ppEscapeHtml(item.name)}</span>
-                          </label>
-                          ${item.isAtHome ? '<span class="tag" style="font-size:10px;background:var(--green-bg);color:var(--green);border:1px solid var(--green)">In Pantry</span>' : ''}
+                  ${catItems.map(item => {
+                    const imgSrc = item.bankIng?.photo || item.bankIng?.img || item.bankIng?.image || fallbackSvg;
+                    const brandTitle = item.bankIng ? ((item.bankIng.brand ? item.bankIng.brand + ' - ' : '') + (item.bankIng.name || item.name)) : (item.name || 'Store product');
+                    return `
+                      <div class="shopping-list-row" style="display: flex; align-items: center; gap: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px;">
+                        <input type="checkbox" class="acquired-checkbox" ${item.isAtHome ? 'checked' : ''} onchange="toggleShoppingAtHome('${ppEscapeAttr(item.key)}')" />
+                        <img src="${imgSrc}" style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0;" alt="${ppEscapeAttr(item.name)}" onerror="this.src='${fallbackSvg}'" />
+                        <div class="title-block" style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
+                          <span class="primary-subtype" style="${item.isAtHome ? 'text-decoration: line-through; opacity: 0.7;' : 'font-weight: 600; color: var(--text);'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${ppEscapeHtml(item.name)}</span>
+                          <span class="secondary-brand-title" style="font-size: 0.85em; color: var(--text2, #666); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${ppEscapeHtml(brandTitle)}</span>
                         </div>
-                        <div style="display:flex;align-items:center;gap:12px">
-                          <span style="font-size:12px;color:var(--text2)">
-                            ${item.needUnit === 'item' ? `${item.needQty} item${item.needQty>1?'s':''}` : `${Math.round(item.grams)}g`}
-                            ${item.bankIng ? `(£${item.cost.toFixed(2)})` : ''}
-                          </span>
-                          <button type="button" class="btn sm ghost" style="font-size:11px;padding:2px 8px" onclick="toggleInlineShoppingSubst('${ppEscapeAttr(item.key)}', '${ppEscapeAttr(item.groupId)}')">Swap Brand / Substitute ▾</button>
+                        <div class="qty-cost" style="text-align: right; font-size: 12px; color: var(--text2); flex-shrink: 0;">
+                          <div>${item.needUnit === 'item' ? `${item.needQty} item${item.needQty>1?'s':''}` : `${Math.round(item.grams)}g`}</div>
+                          ${item.bankIng && item.cost > 0 ? `<div style="font-weight: 600; color: var(--action);">£${item.cost.toFixed(2)}</div>` : ''}
+                        </div>
+                        <div class="swap-dropdown" style="flex-shrink: 0;">
+                          <button type="button" class="btn sm ghost" style="font-size: 11px; padding: 4px 8px;" onclick="toggleInlineShoppingSubst('${ppEscapeAttr(item.key)}', '${ppEscapeAttr(item.groupId)}')">Swap Brand / Substitute ▾</button>
                         </div>
                       </div>
                       <div id="subst-drawer-${item.key}" class="subst-row-drawer" style="display:none"></div>
-                    </div>
-                  `).join('')}
+                    `;
+                  }).join('')}
                 </div>
               </div>
             `).join('')}
@@ -21247,7 +21515,7 @@ function renderPlannerWizard() {
   else if (currentStep === 4) {
     html += `
       <div class="card" style="padding:28px;text-align:center">
-        <h2 style="margin-top:0">Committing Meal Plan v3.0.2...</h2>
+        <h2 style="margin-top:0">Committing Meal Plan v3.0.3...</h2>
         <p style="color:var(--text2);font-size:13px;margin-bottom:18px">Finalizing plan metadata, locking shopping quantities, and synchronizing with your live dashboard.</p>
         <button type="button" class="btn primary" onclick="commitPlannerWizardPlan()">Commit Plan Now</button>
       </div>
@@ -22043,14 +22311,23 @@ function renamePlanHistory(index){
 function deletePlanHistory(index){
   const p = (state.planHistory || [])[index];
   if(!p) return;
+  const targetId = p.id || p.planId;
   openAppConfirmModal(
     'Delete saved meal plan?',
     `Delete <strong>${ppEscapeHtml(p.name || 'this saved plan')}</strong> from the Meal Plan Library? This will not delete recipes or products.`,
     'Delete plan',
     () => {
-      state.planHistory.splice(index, 1);
-      saveState();
-      renderPlanHistoryPanel();
+      if (targetId) {
+        deletePlan(targetId);
+      } else {
+        state.planHistory.splice(index, 1);
+        try {
+          safeLocalStorageSet(SK, safeJsonStringify(state));
+          safeLocalStorageSet('plateplan_history_backup', safeJsonStringify(state.planHistory));
+        } catch(e) {}
+        state.plannerStep = 1;
+        renderAll();
+      }
     }
   );
 }

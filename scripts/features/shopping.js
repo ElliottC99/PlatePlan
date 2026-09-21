@@ -1,2 +1,2 @@
-import { createLegacyView } from './create-legacy-view.js?v=2.3.9';
+import { createLegacyView } from './create-legacy-view.js?v=3.0.3';
 export default createLegacyView({ id: 'shopping', rootId: 'view-shopping' });

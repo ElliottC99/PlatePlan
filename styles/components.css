@@ -365,7 +365,7 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 .recipe-method-list{padding-left:18px;margin:0;display:grid;gap:10px;font-size:13.5px;color:var(--text);line-height:1.5}
 .recipe-method-list li{padding-left:4px;margin-bottom:2px}
 
-/* Meal Planner v3.0.2 Wizard Styles */
+/* Meal Planner v3.0.3 Wizard Styles */
 .planner-wizard-container{display:flex;flex-direction:column;gap:18px}
 .planner-wizard-stepper{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-group, 16px);padding:8px 12px;box-shadow:0 1px 3px rgba(0,0,0,0.02);overflow-x:auto}
 .wizard-step-btn{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all 0.15s ease}
