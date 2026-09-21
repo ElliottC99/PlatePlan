@@ -1,5 +1,2 @@
-export default {
-  render: async (context) => {
-    if (typeof window.renderAdd === 'function') await window.renderAdd();
-  }
-};
+import { createLegacyView } from './create-legacy-view.js?v=3.3.0';
+export default createLegacyView({ id: 'add', rootId: 'view-add' });

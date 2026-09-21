@@ -1,13 +1,2 @@
-const renderPreferences = async () => {
-  // Logic to render preferences
-  console.log('Rendering preferences');
-};
-window.renderPreferences = renderPreferences;
-
-export { renderPreferences };
-
-export default {
-  render: async (context) => {
-    await renderPreferences();
-  }
-};
+import { createLegacyView } from './create-legacy-view.js?v=3.3.0';
+export default createLegacyView({ id: 'prefs', rootId: 'view-prefs' });

@@ -32,8 +32,10 @@ function actionElementForEvent(event, eventName) {
 
 /**
  * Convert application inline handlers into delegated actions at runtime.
+ * Standalone downloaded recipe packs are not modified and retain their Print
+ * buttons. This bridge is temporary while feature markup moves into modules.
  */
-export function installDelegatedActions() {
+export function installDelegatedActions(legacy) {
   upgradeTree(document);
 
   for (const eventName of EVENT_NAMES) {
@@ -43,25 +45,19 @@ export function installDelegatedActions() {
       const code = element.getAttribute(DATA_ATTRIBUTE_FOR_EVENT.get(eventName)) || '';
       if (!code.trim()) return;
       try {
-        // Native action runner: tries to evaluate or call global function
-        let result;
-        if (code.includes('(')) {
-          result = eval(code); // Fallback to eval for existing inline handlers
-        } else {
-          const fn = window[code];
-          if (typeof fn === 'function') {
-            result = fn(event, element);
-          }
-        }
+        const result = legacy.runDelegatedAction(code, event, element);
         if (result === false) {
           event.preventDefault();
           event.stopPropagation();
         }
       } catch (error) {
         console.error(`PlatePlan ${eventName} action failed`, error);
-        // Only show fatal modal for user-initiated clicks/submits
+        // Only show fatal modal for user-initiated clicks/submits, never for background/transient/drag events
         if (['click', 'submit'].includes(eventName)) {
-          alert('This action could not finish. PlatePlan kept your data unchanged. Close the panel and try the action again.');
+          legacy.showInfo?.(
+            'This action could not finish',
+            'PlatePlan kept your data unchanged. Close the panel and try the action again.'
+          );
         }
       }
     }, true);

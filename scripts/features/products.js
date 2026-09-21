@@ -1,3 +1,4 @@
+import { createLegacyView } from './create-legacy-view.js?v=3.3.0';
 
 /**
  * Returns literal HTML template string for Tesco Import Review Modal
@@ -127,17 +128,4 @@ export function showTescoImportReviewModal(productData = {}, targetSubtype = nul
   }
 }
 
-const renderBank = async () => {
-  // Logic to render the bank
-  console.log('Rendering bank');
-};
-window.renderBank = renderBank;
-window.renderProducts = renderBank;
-
-export { renderBank as renderProductBank };
-
-export default {
-  render: async (context) => {
-    await renderBank();
-  }
-};
+export default createLegacyView({ id: 'bank', rootId: 'view-bank' });

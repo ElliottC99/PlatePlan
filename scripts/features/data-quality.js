@@ -1,23 +1,13 @@
-import { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs } from './products.js?v=3.3.7';
-import { replaceRecipeIngredient } from './recipes.js?v=3.3.7';
-import { safeStringify } from '../core/utils.js?v=3.3.7';
+import { createLegacyView } from './create-legacy-view.js?v=3.3.0';
+import { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs } from './products.js?v=3.3.0';
+import { replaceRecipeIngredient } from './recipes.js?v=3.3.0';
 
 export { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs, replaceRecipeIngredient };
 
-const renderDataQuality = async () => {
-  // Logic to render data quality
-  console.log('Rendering data quality');
-};
-window.renderDataQuality = renderDataQuality;
-
-export { renderDataQuality };
-
-export default {
-  render: async (context) => {
-    await renderDataQuality();
-  },
-  install(context) {
-    const root = document.getElementById('view-data');
+export default createLegacyView({
+  id: 'data',
+  rootId: 'view-data',
+  install(context, root) {
     if (!root) return;
     root.addEventListener('click', async (event) => {
       const button = event.target.closest('.dq-fix-btn');
@@ -118,7 +108,7 @@ export default {
           if (context && context.store && typeof context.store.save === 'function') {
             await context.store.save({ reason: 'data-quality-tesco-fix' });
           } else {
-            localStorage.setItem('plateplan_v2', safeStringify(window.state));
+            localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
             if (typeof window.renderAll === 'function') {
               window.renderAll();
             }
@@ -146,4 +136,4 @@ export default {
       });
     }, true);
   }
-};
+});

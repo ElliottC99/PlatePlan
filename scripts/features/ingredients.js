@@ -1,13 +1,2 @@
-const renderIngredients = async () => {
-  // Logic to render the ingredients
-  console.log('Rendering ingredients');
-};
-window.renderIngredients = renderIngredients;
-
-export { renderIngredients as renderIngredientBank };
-
-export default {
-  render: async (context) => {
-    await renderIngredients();
-  }
-};
+import { createLegacyView } from './create-legacy-view.js?v=3.3.0';
+export default createLegacyView({ id: 'ingredients', rootId: 'view-ingredients' });

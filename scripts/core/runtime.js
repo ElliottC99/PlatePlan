@@ -1,20 +1,20 @@
 ['plateplan_plan_backup', 'plateplan_offline_backup', 'plateplan_history_v2', 'plateplan_v1'].forEach(key => {
   localStorage.removeItem(key);
 });
-console.log('[PlatePlan v3.3.15] Engine initialized. Legacy keys purged.');
+console.log('[PlatePlan v3.3.0] Engine initialized. Legacy keys purged.');
 
 const FEATURE_LOADERS = Object.freeze({
-  today: () => import('../features/today.js'),
-  vault: () => import('../features/recipes.js'),
-  add: () => import('../features/recipe-add.js'),
-  ingredients: () => import('../features/ingredients.js'),
-  bank: () => import('../features/products.js'),
-  planner: () => import('../features/planner.js'),
-  planlib: () => import('../features/library.js'),
-  shopping: () => import('../features/shopping.js'),
-  search: () => import('../features/search.js'),
-  data: () => import('../features/data-quality.js'),
-  prefs: () => import('../features/preferences.js'),
+  today: () => import('../features/today.js?v=3.3.0'),
+  vault: () => import('../features/recipes.js?v=3.3.0'),
+  add: () => import('../features/recipe-add.js?v=3.3.0'),
+  ingredients: () => import('../features/ingredients.js?v=3.3.0'),
+  bank: () => import('../features/products.js?v=3.3.0'),
+  planner: () => import('../features/planner.js?v=3.3.0'),
+  planlib: () => import('../features/library.js?v=3.3.0'),
+  shopping: () => import('../features/shopping.js?v=3.3.0'),
+  search: () => import('../features/search.js?v=3.3.0'),
+  data: () => import('../features/data-quality.js?v=3.3.0'),
+  prefs: () => import('../features/preferences.js?v=3.3.0'),
 });
 
 // Scan localStorage keys and remove obsolete legacy keys on startup
@@ -58,33 +58,19 @@ export function createPlatePlanRuntime(context) {
 
   const renderView = async id => {
     try {
-      document.querySelectorAll('.view').forEach(v => {
-        v.classList.remove('active');
-        v.style.display = 'none';
-      });
-      const targetView = document.getElementById(`view-${id}`) || document.getElementById(id);
-      if (targetView) {
-        targetView.classList.add('active');
-        targetView.style.display = 'block';
-      }
-
       if (!FEATURE_LOADERS[id]) {
+        context.legacy.renderLegacyView(id);
         return null;
       }
       const feature = await loadFeature(id);
-      
-      // Execute the global renderer if it exists
-      const rendererName = 'render' + id.charAt(0).toUpperCase() + id.slice(1);
-      if (typeof window[rendererName] === 'function') {
-        window[rendererName]();
-      }
-      
       if (feature) {
         return await feature.render(context);
       }
+      context.legacy.renderLegacyView(id);
       return null;
     } catch (error) {
       console.error(`PlatePlan could not load ${id}`, error);
+      context.legacy.renderLegacyView(id);
       return null;
     }
   };

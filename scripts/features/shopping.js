@@ -1,5 +1,2 @@
-export default {
-  render: async (context) => {
-    if (typeof window.renderShopping === 'function') await window.renderShopping();
-  }
-};
+import { createLegacyView } from './create-legacy-view.js?v=3.3.0';
+export default createLegacyView({ id: 'shopping', rootId: 'view-shopping' });

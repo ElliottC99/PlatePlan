@@ -1,5 +1,2 @@
-export default {
-  render: async (context) => {
-    if (typeof window.renderPlanlib === 'function') await window.renderPlanlib();
-  }
-};
+import { createLegacyView } from './create-legacy-view.js?v=3.3.0';
+export default createLegacyView({ id: 'planlib', rootId: 'view-planlib' });

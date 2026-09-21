@@ -1,4 +1,4 @@
-import { safeStringify } from '../core/utils.js?v=3.3.7';
+import { createLegacyView } from './create-legacy-view.js?v=3.3.0';
 
 /**
  * Synchronous ingredient replacement with timestamping and try/catch rollback
@@ -18,7 +18,7 @@ export async function replaceRecipeIngredient(recipeId, ingredientIndex, newProd
   const target = variant.ingredients[ingredientIndex];
   
   // Clone the state for potential rollback
-  const previousStateStr = safeStringify(window.state);
+  const previousStateStr = JSON.stringify(window.state);
 
   // 1. Ensure the link action assigns the product ID to the recipe ingredient (ingredient.id = productId)
   target.id = newProductId;
@@ -31,7 +31,7 @@ export async function replaceRecipeIngredient(recipeId, ingredientIndex, newProd
   recipe.updatedAt = nowIso;
 
   // 3. Save state locally (localStorage.setItem('plateplan_v2', ...))
-  localStorage.setItem('plateplan_v2', safeStringify(window.state));
+  localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
 
   // 4. Synchronously force a UI re-render
   if (typeof window.rehydrateActiveRecipeAndStateCache === 'function') {
@@ -68,72 +68,4 @@ export async function replaceRecipeIngredient(recipeId, ingredientIndex, newProd
   }
 }
 
-const renderVault = async () => {
-  const list = document.getElementById('vault-list');
-  if (!list) return;
-
-  if (!window.state || !Array.isArray(window.state.recipes)) {
-    list.innerHTML = '<div class="msg info">No recipes found in state.</div>';
-    return;
-  }
-
-  const recipes = window.state.recipes.filter(r => r && r.id);
-  
-  if (recipes.length === 0) {
-    list.innerHTML = '<div class="msg info">Your recipe vault is empty.</div>';
-    return;
-  }
-
-  // Basic search/sort/filter logic
-  const search = document.getElementById('vault-search')?.value.toLowerCase() || '';
-  const typeFilter = document.getElementById('filter-type')?.value || 'all';
-  const whoFilter = document.getElementById('filter-who')?.value || 'all';
-  const favFilter = document.getElementById('vault-filter-fav')?.getAttribute('aria-pressed') === 'true';
-
-  const filtered = recipes.filter(r => {
-    const name = (r.name || '').toLowerCase();
-    const matchesSearch = !search || name.includes(search);
-    const matchesType = typeFilter === 'all' || r.type === typeFilter || (Array.isArray(r.type) && r.type.includes(typeFilter));
-    const matchesWho = whoFilter === 'all' || r.who === whoFilter || r.who === 'both';
-    const matchesFav = !favFilter || r.favourite;
-    return matchesSearch && matchesType && matchesWho && matchesFav;
-  });
-
-  list.innerHTML = filtered.map(r => {
-    const timeLabel = r.time ? `<span>${r.time} mins</span>` : '';
-    const whoLabel = r.who ? `<span class="badge sm">${r.who}</span>` : '';
-    const typeLabel = r.type ? `<span style="text-transform: capitalize">${r.type}</span>` : '';
-    const servings = r.serves || r.portions || 0;
-    
-    return `
-      <div class="card recipe-card" style="cursor:pointer; transition: transform 0.1s;" data-pp-click="openRecipe('${r.id}')">
-        <div class="row-between" style="align-items: flex-start; margin-bottom: 8px;">
-          <div style="font-weight: 700; font-size: 15px; color: var(--text1);">${r.name || 'Untitled Recipe'}</div>
-          ${r.favourite ? '<span style="color: var(--red);">❤️</span>' : ''}
-        </div>
-        <div style="display:flex; gap:10px; font-size:11px; color:var(--text2); margin-bottom:12px; align-items:center;">
-          ${typeLabel}
-          ${timeLabel}
-          ${servings ? `<span>${servings} servings</span>` : ''}
-          ${whoLabel}
-        </div>
-        <div class="grid4" style="gap:4px; padding-top:10px; border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(4, 1fr);">
-          <div style="font-size:11px;"><strong>${r.cal || 0}</strong> <span style="color:var(--text3)">kcal</span></div>
-          <div style="font-size:11px;"><strong>${r.prot || 0}g</strong> <span style="color:var(--text3)">P</span></div>
-          <div style="font-size:11px;"><strong>${r.carb || 0}g</strong> <span style="color:var(--text3)">C</span></div>
-          <div style="font-size:11px;"><strong>${r.fat || 0}g</strong> <span style="color:var(--text3)">F</span></div>
-        </div>
-      </div>
-    `;
-  }).join('');
-};
-window.renderVault = renderVault;
-
-export { renderVault };
-
-export default {
-  render: async (context) => {
-    await renderVault();
-  }
-};
-
+export default createLegacyView({ id: 'vault', rootId: 'view-vault' });
