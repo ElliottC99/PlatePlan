@@ -4,6 +4,8 @@ const renderPreferences = async () => {
 };
 window.renderPreferences = renderPreferences;
 
+export { renderPreferences };
+
 export default {
   render: async (context) => {
     await renderPreferences();

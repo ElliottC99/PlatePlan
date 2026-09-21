@@ -4,6 +4,8 @@ const renderIngredients = async () => {
 };
 window.renderIngredients = renderIngredients;
 
+export { renderIngredients as renderIngredientBank };
+
 export default {
   render: async (context) => {
     await renderIngredients();

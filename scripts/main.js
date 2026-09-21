@@ -1,15 +1,31 @@
-import { createPlatePlanStore } from './core/store.js?v=3.3.12';
-import { createPlatePlanRuntime } from './core/runtime.js?v=3.3.12';
-import { createFirebaseService } from './services/firebase.js?v=3.3.12';
-import { initFirebaseService } from './services/firebase-service.js?v=3.3.12';
-import { createSyncService } from './services/sync.js?v=3.3.12';
-import { createRecoveryService } from './services/recovery.js?v=3.3.12';
-import { createUpdateService } from './services/updates.js?v=3.3.12';
-import { installDelegatedActions } from './ui/actions.js?v=3.3.12';
-import { installNavigation } from './ui/navigation.js?v=3.3.12';
-import { createWorkspaceService } from './ui/workspaces.js?v=3.3.12';
+import { createPlatePlanStore } from './core/store.js?v=3.3.13';
+import { createPlatePlanRuntime } from './core/runtime.js?v=3.3.13';
+import { createFirebaseService } from './services/firebase.js?v=3.3.13';
+import { initFirebaseService } from './services/firebase-service.js?v=3.3.13';
+import { createSyncService } from './services/sync.js?v=3.3.13';
+import { createRecoveryService } from './services/recovery.js?v=3.3.13';
+import { createUpdateService } from './services/updates.js?v=3.3.13';
+import { installDelegatedActions } from './ui/actions.js?v=3.3.13';
+import { installNavigation } from './ui/navigation.js?v=3.3.13';
+import { createWorkspaceService } from './ui/workspaces.js?v=3.3.13';
 
-window.APP_VERSION = '3.3.12';
+import { renderVault } from './features/recipes.js?v=3.3.13';
+import { renderPlanner } from './features/planner.js?v=3.3.13';
+import { renderIngredientBank } from './features/ingredients.js?v=3.3.13';
+import { renderProductBank } from './features/products.js?v=3.3.13';
+import { renderDataQuality } from './features/data-quality.js?v=3.3.13';
+import { renderPreferences } from './features/preferences.js?v=3.3.13';
+
+window.renderVault = renderVault;
+window.renderPlanner = renderPlanner;
+window.renderIngredients = renderIngredientBank;
+window.renderProducts = renderProductBank;
+window.renderDataQuality = renderDataQuality;
+window.renderPreferences = renderPreferences;
+
+console.log('[PlatePlan v3.3.13] Engine initialized');
+
+window.APP_VERSION = '3.3.13';
 
 // Step 1: Initialize store and load local fallback state
 const store = createPlatePlanStore();
@@ -18,7 +34,7 @@ store.getState();
 const workspaces = createWorkspaceService();
 const updates = createUpdateService({
   workspaces,
-  appVersion: '3.3.12',
+  appVersion: '3.3.13',
   expectedCache: 'plateplan-shell-v96',
 });
 const context = Object.freeze({
@@ -33,13 +49,13 @@ const runtime = createPlatePlanRuntime(context);
 const actions = installDelegatedActions();
 const uninstallNavigation = installNavigation(runtime);
 const syncRuntimeMarker = () => {
-  document.documentElement.dataset.plateplanRuntime = '3.3.12';
+  document.documentElement.dataset.plateplanRuntime = '3.3.13';
   document.documentElement.dataset.plateplanLoadedViews = runtime.loadedViews().sort().join(',');
 };
 window.addEventListener('plateplan:feature-loaded', syncRuntimeMarker);
 
 // Wire deletePlan globally to our store's resilient deletePlan implementation
-import { deletePlan } from './core/store.js?v=3.3.12';
+import { deletePlan } from './core/store.js?v=3.3.13';
 window.deletePlan = deletePlan;
 window.showView = (id) => {
   runtime.renderView(id);
@@ -99,11 +115,11 @@ globalThis.PlatePlanModules = Object.freeze({
   updates,
   workspaces,
   uninstallNavigation,
-  version: '3.3.12',
+  version: '3.3.13',
 });
 
 window.dispatchEvent(new CustomEvent('plateplan:modules-ready', {
-  detail: { version: '3.3.12', loadedViews: runtime.loadedViews() },
+  detail: { version: '3.3.13', loadedViews: runtime.loadedViews() },
 }));
 
 if (document.readyState === 'loading') {

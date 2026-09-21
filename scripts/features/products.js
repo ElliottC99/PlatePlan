@@ -134,6 +134,8 @@ const renderBank = async () => {
 window.renderBank = renderBank;
 window.renderProducts = renderBank;
 
+export { renderBank as renderProductBank };
+
 export default {
   render: async (context) => {
     await renderBank();

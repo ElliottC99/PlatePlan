@@ -8,6 +8,8 @@ const renderPlanner = async () => {
 };
 window.renderPlanner = renderPlanner;
 
+export { renderPlanner };
+
 export default {
   render: async (context) => {
     await renderPlanner();

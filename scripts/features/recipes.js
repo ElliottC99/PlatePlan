@@ -74,6 +74,8 @@ const renderVault = async () => {
 };
 window.renderVault = renderVault;
 
+export { renderVault };
+
 export default {
   render: async (context) => {
     await renderVault();
