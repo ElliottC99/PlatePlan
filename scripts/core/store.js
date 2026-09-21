@@ -1,4 +1,5 @@
-import { validatePlatePlanState } from './contracts.js?v=3.3.0';
+import { validatePlatePlanState } from './contracts.js?v=3.3.3';
+import { pushStateToCloud } from '../services/firebase-service.js?v=3.3.3';
 
 // Purge legacy backup keys on startup to prevent state resurrection bugs
 if (typeof localStorage !== 'undefined') {
@@ -37,6 +38,7 @@ export function decorateDeletedPlanIds(arr) {
 
 if (typeof window !== 'undefined') {
   window.state = window.state || {};
+  window.plateplanSubscribers = window.plateplanSubscribers || [];
   
   // Sanitize initial deletedPlanIds
   let deletedList = window.state.deletedPlanIds;
@@ -67,6 +69,18 @@ if (typeof window !== 'undefined') {
     configurable: true,
     enumerable: true
   });
+}
+
+export function subscribeToStore(callback) {
+  if (typeof callback !== 'function') return () => {};
+  if (typeof window !== 'undefined') {
+    window.plateplanSubscribers = window.plateplanSubscribers || [];
+    window.plateplanSubscribers.push(callback);
+    return () => {
+      window.plateplanSubscribers = window.plateplanSubscribers.filter(cb => cb !== callback);
+    };
+  }
+  return () => {};
 }
 
 /**
@@ -139,6 +153,11 @@ export function createPlatePlanStore(adapter) {
     listeners.forEach(listener => {
       try { listener(event); } catch (error) { console.error('PlatePlan store listener failed', error); }
     });
+    if (typeof window !== 'undefined' && Array.isArray(window.plateplanSubscribers)) {
+      window.plateplanSubscribers.forEach(cb => {
+        try { cb(state); } catch (e) { console.error('PlatePlan subscriber failed', e); }
+      });
+    }
     return event;
   };
 
@@ -156,7 +175,10 @@ export function createPlatePlanStore(adapter) {
       savingThroughStore = true;
       const saved = adapter.saveState();
       savingThroughStore = false;
-      if (saved) publish(detail);
+      if (saved) {
+        publish(detail);
+        pushStateToCloud().catch(err => console.error('Cloud push failed on save:', err));
+      }
       return saved;
     },
     mutate: (reason, mutator, detail = {}) => {
@@ -165,7 +187,10 @@ export function createPlatePlanStore(adapter) {
       savingThroughStore = true;
       const saved = adapter.saveState();
       savingThroughStore = false;
-      if (saved) publish({ ...detail, reason });
+      if (saved) {
+        publish({ ...detail, reason });
+        pushStateToCloud().catch(err => console.error('Cloud push failed on mutate:', err));
+      }
       return { saved, result };
     },
     subscribe: listener => {
