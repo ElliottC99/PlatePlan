@@ -42,6 +42,7 @@ window.addEventListener('plateplan:feature-loaded', syncRuntimeMarker);
 import { deletePlan } from './core/store.js?v=3.3.6';
 window.deletePlan = deletePlan;
 window.showView = (id) => runtime.renderView(id);
+window.clearProductGroupFilter = () => { console.log('clearProductGroupFilter called'); };
 
 
 // Eagerly load core feature modules to establish DOM ownership, attach listeners, and claim active modular view ownership
