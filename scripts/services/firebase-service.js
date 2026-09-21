@@ -1,7 +1,7 @@
-import { safeStringify } from '../core/utils.js?v=3.3.6';
+import { safeStringify } from '../core/utils.js?v=3.3.9';
 
 /**
- * PlatePlan v3.3.6 - Modular Firebase & Cloud Sync Service
+ * PlatePlan v3.3.9 - Modular Firebase & Cloud Sync Service
  */
 
 let firebaseApp = null;

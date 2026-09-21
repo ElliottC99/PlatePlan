@@ -1,5 +1,5 @@
 /**
- * PlatePlan v3.3.6 - Pure Core Utilities
+ * PlatePlan v3.3.9 - Pure Core Utilities
  */
 export function sanitizeString(str) {
   if (typeof str !== 'string') return '';

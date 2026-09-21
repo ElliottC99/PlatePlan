@@ -1,7 +1,7 @@
 /**
- * PlatePlan bootstrap v3.3.6 - Pure ES Module Bootloader
+ * PlatePlan bootstrap v3.3.9 - Pure ES Module Bootloader
  */
-const CURRENT_BUILD_ID = '3.3.6-v91';
+const CURRENT_BUILD_ID = '3.3.9-v91';
 
 window.logout = function() {
   if (window.firebase && firebase.auth) {
@@ -22,7 +22,7 @@ window.syncNow = async function() {
 document.documentElement.dataset.plateplanBoot = 'shell';
 await new Promise(resolve => requestAnimationFrame(resolve));
 document.documentElement.dataset.plateplanBoot = 'loading-core';
-await import('./main.js?v=3.3.6');
+await import('./main.js?v=3.3.9');
 document.documentElement.dataset.plateplanBoot = 'ready';
 try {
   document.querySelectorAll('.app, body > *').forEach(el => {
