@@ -373,7 +373,7 @@ let platePlanEarlierDaysExpanded = false;
 const PLATEPLAN_LIST_BATCH = 24;
 
 // ============================================================================
-// == v3.0.3 ROBUST PERSISTENCE & STATE RECOVERY ARCHITECTURE ==
+// == v3.0.4 ROBUST PERSISTENCE & STATE RECOVERY ARCHITECTURE ==
 // ============================================================================
 
 /**
@@ -2086,7 +2086,7 @@ async function _executePushStateToCloud(force, targetHouseholdId, householdDocRe
       platePlanLastSyncError=null;
       platePlanLastSyncedAt=Date.now();
       lastPersistedStateJson = safeJsonStringify(state);
-      console.log('[v3.0.3 STATE PERSISTENCE] State successfully pushed to cloud with debounce 1000ms.');
+      console.log('[v3.0.4 STATE PERSISTENCE] State successfully pushed to cloud with debounce 1000ms.');
       updatePlatePlanSyncStatus('synced');
     }catch(error){
       console.warn('PlatePlan Cloud push failed:',error);
@@ -3332,7 +3332,7 @@ function startPlatePlanCloudListeners(){
     runDataQualityAudits();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v3.0.3 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+    console.log("[v3.0.4 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
   }, error => {
     console.error('[RECIPES SUBCOLLECTION LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
@@ -3356,7 +3356,7 @@ function startPlatePlanCloudListeners(){
     runDataQualityAudits();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v3.0.3 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+    console.log("[v3.0.4 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
   }, error => {
     console.warn('[DATA RECIPES LISTENER ERROR]', error);
   });
@@ -3410,7 +3410,7 @@ function startPlatePlanCloudListeners(){
     renderAll();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v3.0.3 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+    console.log("[v3.0.4 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
   }, error => {
     console.error('[HOUSEHOLD ROOT METADATA LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
@@ -3659,7 +3659,7 @@ async function loadSharedPlatePlan(){
   state.isCloudHydrated = true;
   window.isCloudHydrated = true;
   console.log(`[RECIPES HYDRATION] Deterministically hydrated and deduplicated ${state.recipes.length} recipes across multi-path check.`);
-  console.log("[v3.0.3 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+  console.log("[v3.0.4 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
 
   const metaDoc = dataDocs.meta || {};
   const taxonomyDoc = dataDocs.taxonomy || {};
@@ -3798,7 +3798,7 @@ async function loadSharedPlatePlan(){
     isHydrating = false;
     window.isHydrating = false;
     lastPersistedStateJson = safeJsonStringify(state);
-    console.log('[v3.0.3 STATE PERSISTENCE] Hydration complete; cloud diff checks enabled.');
+    console.log('[v3.0.4 STATE PERSISTENCE] Hydration complete; cloud diff checks enabled.');
   }
 }
 
@@ -13016,10 +13016,10 @@ function openSubtypeResolutionModal(subTypeId, issueKey = ''){
           <div class="card" style="padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);cursor:pointer;transition:border-color 0.15s ease" onclick="resolveSubtypeViaTesco('${ppEscapeAttr(subTypeId)}')" onmouseover="this.style.borderColor='var(--action)'" onmouseout="this.style.borderColor='var(--border)'">
             <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:var(--text);display:flex;align-items:center;justify-content:space-between">
               <span>🛒 2. Import from Tesco</span>
-              <span class="btn sm primary" style="pointer-events:none;font-size:12px">Search Tesco →</span>
+              <span class="btn sm primary" style="pointer-events:none;font-size:12px">Paste Bookmarklet JSON →</span>
             </div>
             <div style="font-size:12px;color:var(--text2)">
-              Search the Tesco online catalog to automatically populate product title, brand, nutrition, and pack size.
+              Paste output from the Tesco product bookmarklet to automatically extract title, brand, nutrition, price, and pack weight.
             </div>
           </div>
 
@@ -13042,6 +13042,117 @@ function closeSubtypeResolutionModal(){
     const modal = document.getElementById('subtype-resolution-modal');
     if (modal) modal.style.display = 'none';
 }
+
+function openTescoJsonImportModal(subTypeId) {
+    closeSubtypeResolutionModal();
+    let modal = document.getElementById('tesco-json-import-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'tesco-json-import-modal';
+      document.body.appendChild(modal);
+    }
+    modal.className = 'modal active';
+    modal.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;padding:16px;';
+
+    const group = getIngredientGroup(subTypeId);
+    const subTypeName = group ? (group.name || getGroupTypeName(group)) : (subTypeId || '');
+
+    modal.innerHTML = `
+      <div class="card" style="width:100%;max-width:560px;padding:24px;border-radius:14px;background:var(--surface,#fff);box-shadow:0 12px 36px rgba(0,0,0,0.25);position:relative;max-height:90vh;overflow-y:auto">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px">
+          <div>
+            <h2 style="font-size:18px;font-weight:700;margin:0;color:var(--text)">Import from Tesco (Bookmarklet JSON)</h2>
+            <div style="font-size:13px;color:var(--text2);margin-top:4px">
+              Target Sub-type: <strong style="color:var(--text)">${ppEscapeHtml(subTypeName)}</strong>
+            </div>
+          </div>
+          <button type="button" class="btn sm ghost" style="padding:4px 8px;font-size:16px;line-height:1" onclick="closeTescoJsonImportModal()" title="Close">✕</button>
+        </div>
+
+        <p style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:14px">
+          Run the PlatePlan bookmarklet on any Tesco grocery product page, then paste the exported JSON below:
+        </p>
+
+        <textarea id="tesco-json-payload" placeholder="Paste Tesco Bookmarklet JSON output here..." style="width:100%;height:140px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;padding:12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);box-sizing:border-box;resize:vertical" autofocus></textarea>
+        
+        <div id="tesco-json-error" style="display:none;color:var(--red,#dc2626);font-size:12px;margin-top:8px"></div>
+
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+          <button type="button" class="btn ghost sm" onclick="closeTescoJsonImportModal()">Cancel</button>
+          <button type="button" class="btn primary sm" style="font-weight:700" onclick="processTescoJsonPayload('${ppEscapeAttr(subTypeId)}')">Process &amp; Link Product</button>
+        </div>
+      </div>
+    `;
+}
+window.openTescoJsonImportModal = openTescoJsonImportModal;
+
+function closeTescoJsonImportModal() {
+    const modal = document.getElementById('tesco-json-import-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeTescoJsonImportModal = closeTescoJsonImportModal;
+
+async function processTescoJsonPayload(subTypeId) {
+    const rawText = document.getElementById('tesco-json-payload')?.value?.trim();
+    const errorEl = document.getElementById('tesco-json-error');
+    if (!rawText) {
+      if (errorEl) {
+        errorEl.textContent = 'Please paste the Tesco JSON payload before processing.';
+        errorEl.style.display = 'block';
+      }
+      return;
+    }
+
+    let data = null;
+    try {
+      data = JSON.parse(rawText);
+    } catch (err) {
+      if (errorEl) {
+        errorEl.textContent = 'Invalid JSON syntax. Please verify the copied bookmarklet output.';
+        errorEl.style.display = 'block';
+      }
+      return;
+    }
+
+    const group = getIngredientGroup(subTypeId);
+    const cat = group?.cat || 'other';
+
+    const product = {
+      id: data.id || ('ing' + Date.now()),
+      name: data.title || data.name || data.productTitle || 'Tesco Product',
+      brand: data.brand || 'Tesco',
+      cat: cat,
+      groupId: subTypeId,
+      cal: parseFloat(data.cal || data.calories || data.kcal || data.energyKcal || 0) || 0,
+      prot: parseFloat(data.prot || data.protein || data.proteinG || 0) || 0,
+      fat: parseFloat(data.fat || data.fatG || 0) || 0,
+      carb: parseFloat(data.carb || data.carbs || data.carbohydrate || data.carbG || 0) || 0,
+      fibre: parseFloat(data.fibre || data.fiber || data.fibreG || 0) || 0,
+      price: parseFloat(data.price || data.unitPrice || data.cost || 0) || 0,
+      packSize: parseFloat(data.packSize || data.packageWeight || data.weight || data.size || 100) || 100,
+      packUnit: String(data.packUnit || data.unit || 'g').toLowerCase(),
+      photo: data.photo || data.img || data.image || data.imageUrl || '',
+      tescoUrl: data.url || data.tescoUrl || '',
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      await persistProductToBank(product);
+      if (group) {
+        group.productId = product.id;
+      }
+      closeTescoJsonImportModal();
+      renderDataQuality();
+      showPlatePlanToast(`Imported "${product.name}" and linked to sub-type! ✓`);
+    } catch (err) {
+      console.error('Failed to persist Tesco product:', err);
+      if (errorEl) {
+        errorEl.textContent = 'Failed to save product: ' + err.message;
+        errorEl.style.display = 'block';
+      }
+    }
+}
+window.processTescoJsonPayload = processTescoJsonPayload;
 
 function filterSubtypeLinkProducts(query, subTypeId){
     const container = document.getElementById('subtype-link-results');
@@ -13091,19 +13202,7 @@ function resolveSubtypeViaExisting(subTypeId, productId){
 }
 
 function resolveSubtypeViaTesco(subTypeId){
-    const group = getIngredientGroup(subTypeId);
-    const subTypeName = group ? (group.name || getGroupTypeName(group)) : (subTypeId || '');
-    closeSubtypeResolutionModal();
-    if (typeof showTescoImport === 'function') {
-      showTescoImport({
-        type: 'manualAdd',
-        name: subTypeName,
-        groupId: subTypeId,
-        ingredientId: group?.ingredientId || ''
-      });
-    } else {
-      showPlatePlanToast('Tesco import is currently unavailable.');
-    }
+    openTescoJsonImportModal(subTypeId);
 }
 
 function resolveSubtypeViaManual(subTypeId){
@@ -20490,7 +20589,7 @@ function formatPlanDateShort(dateString){
 window.formatPlanDateShort = formatPlanDateShort;
 
 // ==========================================
-// PLATEPLAN v3.0.3 MEAL PLANNER 4-STEP WIZARD
+// PLATEPLAN v3.0.4 MEAL PLANNER 4-STEP WIZARD
 // ==========================================
 
 function getPlannerWizardStep() {
@@ -20673,10 +20772,10 @@ function removeWizardUseUpProduct(productId) {
 }
 window.removeWizardUseUpProduct = removeWizardUseUpProduct;
 
-// DEDICATED PLAN DELETION PIPELINE (v3.0.3)
+// DEDICATED PLAN DELETION PIPELINE (v3.0.4)
 async function deletePlan(targetId) {
   if (!targetId) return;
-  console.log('[v3.0.3 STATE PERSISTENCE] Executing dedicated deletePlan pipeline for:', targetId);
+  console.log('[v3.0.4 STATE PERSISTENCE] Executing dedicated deletePlan pipeline for:', targetId);
   const householdId = window.CURRENT_HOUSEHOLD_ID || window.activeHouseholdId || state?.meta?.householdId || 'elliott-chloe';
 
   // 1. Mutate local state
@@ -20708,20 +20807,22 @@ async function deletePlan(targetId) {
     const db = platePlanDb || (window.firebase && firebase.firestore && firebase.firestore());
     if (db) {
       await db.collection('households').doc(householdId).collection('plans').doc(targetId).delete();
-      console.log('[v3.0.3 STATE PERSISTENCE] Plan deleted directly from Firestore:', targetId);
+      console.log('[v3.0.4 STATE PERSISTENCE] Plan deleted directly from Firestore:', targetId);
     }
   } catch(err) {
-    console.warn('[v3.0.3 STATE PERSISTENCE] Direct Firestore deletion error:', err);
+    console.warn('[v3.0.4 STATE PERSISTENCE] Direct Firestore deletion error:', err);
   }
 
-  // 3. Transition UI directly to Step 1 of the Meal Planner
-  state.plannerStep = 1;
+  // 3. Transition UI directly to Step 1 of the Meal Planner if no active plans
+  if (!state.plan || !state.plan.slots || (Array.isArray(state.plans) && state.plans.length === 0)) {
+    state.plannerStep = 1;
+  }
   renderAll();
   showPlatePlanToast('Plan deleted successfully. ✓');
 }
 window.deletePlan = deletePlan;
 
-// ATOMIC PRODUCT PERSISTENCE (v3.0.3)
+// ATOMIC PRODUCT PERSISTENCE (v3.0.4)
 async function persistProductToBank(newProduct) {
   if (!newProduct) throw new Error('Cannot persist empty product');
   if (!newProduct.id) newProduct.id = 'ing' + Date.now();
@@ -20767,7 +20868,7 @@ async function persistProductToBank(newProduct) {
     const writeProducts = db.collection('households').doc(householdId).collection('products').doc(newProduct.id).set(cleaned, { merge: true });
     const writeIngredients = db.collection('households').doc(householdId).collection('ingredients').doc(newProduct.id).set(cleaned, { merge: true });
     firestorePromise = Promise.all([writeProducts, writeIngredients]).catch(err => {
-      console.warn('[v3.0.3 STATE PERSISTENCE] persistProductToBank Firestore write warning:', err);
+      console.warn('[v3.0.4 STATE PERSISTENCE] persistProductToBank Firestore write warning:', err);
     });
   } else {
     firestorePromise = Promise.resolve();
@@ -20782,7 +20883,7 @@ async function persistProductToBank(newProduct) {
 }
 window.persistProductToBank = persistProductToBank;
 
-// SEARCHABLE RECIPE SWAP MODAL (v3.0.3 Step 2)
+// SEARCHABLE RECIPE SWAP MODAL (v3.0.4 Step 2)
 let currentSearchableSwapContext = null;
 
 function ensureSearchableRecipeSwapModalDom() {
@@ -21021,7 +21122,41 @@ function selectShoppingProductOverride(groupId, productId) {
 }
 window.selectShoppingProductOverride = selectShoppingProductOverride;
 
-// Step 4: Atomic Commit & Auto-Redirect (v3.0.3)
+// Reset Planner to Step 1 & Clear Draft Plan
+function resetPlannerStartFresh() {
+  if (state) {
+    state.draftPlan = null;
+    state.draftBackupPlan = null;
+    state.isDraftPlan = false;
+    state.plannerStep = 1;
+    state.pinnedRecipes = [];
+    state.useUpProducts = [];
+    if (state.planOptions) {
+      state.planOptions.pinnedMeals = [];
+      state.planOptions.useUp = [];
+    }
+  }
+  if (window.state) {
+    window.state.draftPlan = null;
+    window.state.draftBackupPlan = null;
+    window.state.isDraftPlan = false;
+    window.state.plannerStep = 1;
+  }
+  const today = new Date().toISOString().split('T')[0];
+  const startInp = document.getElementById('wizard-plan-start');
+  if (startInp) startInp.value = today;
+  state.plannerStartDate = today;
+  const daysInp = document.getElementById('wizard-plan-days');
+  if (daysInp) daysInp.value = '10';
+  state.plannerDays = 10;
+
+  saveState();
+  renderPlannerWizard();
+  showPlatePlanToast('Meal planner reset to Step 1. ✓');
+}
+window.resetPlannerStartFresh = resetPlannerStartFresh;
+
+// Step 4: Atomic Commit & Auto-Redirect (v3.0.4)
 function commitPlannerWizardPlan() {
   if (!state.plan || !state.plan.slots) {
     showPlatePlanToast('No active plan found to commit.');
@@ -21035,7 +21170,7 @@ function commitPlannerWizardPlan() {
     appliedAt: new Date().toISOString(),
     savedStatus: 'Saved',
     shoppingAtHome: currentPlan.shoppingAtHome || {},
-    version: '3.0.3',
+    version: '3.0.4',
     confirmedShopping: true,
     updatedAt: new Date().toISOString()
   };
@@ -21055,7 +21190,7 @@ function commitPlannerWizardPlan() {
     saveState(true);
     if (platePlanCloudReady && !platePlanSyncSuppress) queuePlatePlanCloudDiff();
     markPlatePlanViewsDirty('today', 'planner', 'shopping', 'planlib');
-    showPlatePlanToast('Meal plan v3.0.3 committed! Displaying Today\'s meals. ✓');
+    showPlatePlanToast('Meal plan v3.0.4 committed! Displaying Today\'s meals. ✓');
     if (typeof showView === 'function') {
       showView('today');
     }
@@ -21153,6 +21288,19 @@ function renderPlannerWizard() {
 
   let html = `<div class="planner-wizard-container">`;
 
+  // Top Planner Header with "Start Fresh" Action
+  html += `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+      <div>
+        <h1 style="margin:0;font-size:20px;font-weight:750;color:var(--text);letter-spacing:-0.02em">Meal Planner</h1>
+        <div style="font-size:12.5px;color:var(--text2);margin-top:2px">Configure household requests, review daily macro scores, customize shopping, and commit.</div>
+      </div>
+      <button type="button" class="btn ghost sm" style="display:flex;align-items:center;gap:6px;color:var(--red,#dc2626);border-color:var(--red,#dc2626);font-weight:600" onclick="resetPlannerStartFresh()">
+        <span>↺</span> Start Fresh
+      </button>
+    </div>
+  `;
+
   // Stepper Header
   html += `
     <div class="planner-wizard-stepper">
@@ -21181,7 +21329,8 @@ function renderPlannerWizard() {
   // STEP 1: CONFIGURE REQUESTS
   if (currentStep === 1) {
     const daysVal = state.plannerDays || state.plan?.days || 10;
-    const startVal = state.plannerStartDate || state.plan?.dayDates?.[1] || getPlatePlanLocalToday();
+    const today = new Date().toISOString().split('T')[0];
+    const startVal = state.plannerStartDate || state.plan?.dayDates?.[1] || today;
     const cadence = state.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
     const trafficE = state.prefs?.planTrafficE || ['green', 'amber'];
     const trafficC = state.prefs?.planTrafficC || ['green', 'amber'];
@@ -21520,7 +21669,7 @@ function renderPlannerWizard() {
     }
   }
 
-  // STEP 3: SHOPPING LIST & SUBSTITUTIONS
+  // STEP 3: SHOPPING LIST & SUBSTITUTIONS (Apple HIG Compliant)
   else if (currentStep === 3) {
     if (!hasActivePlan) {
       html += `
@@ -21537,49 +21686,46 @@ function renderPlannerWizard() {
         (categories[item.cat] = categories[item.cat] || []).push(item);
       });
 
-      const fallbackSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><rect width="40" height="40" rx="4" fill="%23e5e7eb"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="18">🛒</text></svg>`;
-
       html += `
-        <div style="display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;flex-direction:column;gap:16px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',sans-serif">
           <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
             <div>
-              <h2 style="margin:0;font-size:18px;font-weight:700">Step 3: Shopping List & Substitutions</h2>
+              <h2 style="margin:0;font-size:18px;font-weight:700">Step 3: Shopping List &amp; Substitutions</h2>
               <div style="font-size:13px;color:var(--text2);margin-top:4px">
                 Total Estimated Cost: <strong style="color:var(--action)">£${totalCost.toFixed(2)}</strong> (${items.filter(x => !x.isAtHome).length} items to buy)
               </div>
             </div>
             <div style="display:flex;gap:8px">
               <button type="button" class="btn ghost sm" onclick="setPlannerWizardStep(2)">← Back to Plan</button>
-              <button type="button" class="btn primary sm" style="font-weight:700" onclick="commitPlannerWizardPlan()">✓ Save Shopping List & Commit Plan →</button>
+              <button type="button" class="btn primary sm" style="font-weight:700" onclick="commitPlannerWizardPlan()">✓ Save Shopping List &amp; Commit Plan →</button>
             </div>
           </div>
 
           <!-- Categorized Shopping Items -->
           <div style="display:flex;flex-direction:column;gap:14px">
             ${Object.entries(categories).map(([cat, catItems]) => `
-              <div class="card" style="padding:16px">
-                <div style="font-weight:750;font-size:14px;color:var(--text);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+              <div class="card" style="padding:16px;background:var(--surface,#fff)">
+                <div style="font-weight:750;font-size:14px;color:var(--text);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
                   <span>${ppEscapeHtml(cat)}</span>
                   <span style="font-size:12px;color:var(--text2)">${catItems.length} item${catItems.length>1?'s':''}</span>
                 </div>
-                <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;flex-direction:column;gap:1px;border-radius:10px;overflow:hidden;border:1px solid #E5E5EA">
                   ${catItems.map(item => {
-                    const imgSrc = item.bankIng?.photo || item.bankIng?.img || item.bankIng?.image || fallbackSvg;
                     const brandTitle = item.bankIng ? ((item.bankIng.brand ? item.bankIng.brand + ' - ' : '') + (item.bankIng.name || item.name)) : (item.name || 'Store product');
                     return `
-                      <div class="shopping-list-row" style="display: flex; align-items: center; gap: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px;">
-                        <input type="checkbox" class="acquired-checkbox" ${item.isAtHome ? 'checked' : ''} onchange="toggleShoppingAtHome('${ppEscapeAttr(item.key)}')" />
-                        <img src="${imgSrc}" style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0;" alt="${ppEscapeAttr(item.name)}" onerror="this.src='${fallbackSvg}'" />
-                        <div class="title-block" style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
-                          <span class="primary-subtype" style="${item.isAtHome ? 'text-decoration: line-through; opacity: 0.7;' : 'font-weight: 600; color: var(--text);'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${ppEscapeHtml(item.name)}</span>
-                          <span class="secondary-brand-title" style="font-size: 0.85em; color: var(--text2, #666); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${ppEscapeHtml(brandTitle)}</span>
+                      <div class="shopping-list-row" style="display: flex; align-items: center; background: #FFFFFF; border-bottom: 1px solid #E5E5EA; padding: 12px 16px;">
+                        <input type="checkbox" class="acquired-checkbox" style="width: 24px; height: 24px; accent-color: #007AFF; margin-right: 12px; cursor: pointer; flex-shrink: 0;" ${item.isAtHome ? 'checked' : ''} onchange="toggleShoppingAtHome('${ppEscapeAttr(item.key)}')" />
+                        ${item.bankIng?.photo ? `<img src="${item.bankIng.photo}" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover; margin-right: 12px; flex-shrink: 0;" alt="${ppEscapeAttr(item.name)}" onerror="this.style.display='none'" />` : ''}
+                        <div class="title-block" style="flex: 1; display: flex; flex-direction: column; min-width: 0; padding-right: 12px;">
+                          <span class="primary-subtype" style="${item.isAtHome ? 'text-decoration: line-through; opacity: 0.6;' : 'font-weight: 600; color: #1C1C1E;'}; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${ppEscapeHtml(item.name)}</span>
+                          <span class="secondary-brand-title" style="font-size: 13px; color: #8E8E93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">${ppEscapeHtml(brandTitle)}</span>
                         </div>
-                        <div class="qty-cost" style="text-align: right; font-size: 12px; color: var(--text2); flex-shrink: 0;">
-                          <div>${item.needUnit === 'item' ? `${item.needQty} item${item.needQty>1?'s':''}` : `${Math.round(item.grams)}g`}</div>
-                          ${item.bankIng && item.cost > 0 ? `<div style="font-weight: 600; color: var(--action);">£${item.cost.toFixed(2)}</div>` : ''}
+                        <div class="qty-cost" style="text-align: right; font-size: 13px; color: var(--text2); flex-shrink: 0; margin-right: 14px;">
+                          <div style="font-weight: 500">${item.needUnit === 'item' ? `${item.needQty} item${item.needQty>1?'s':''}` : `${Math.round(item.grams)}g`}</div>
+                          ${item.bankIng && item.cost > 0 ? `<div style="font-weight: 600; color: var(--action); margin-top: 2px;">£${item.cost.toFixed(2)}</div>` : ''}
                         </div>
                         <div class="swap-dropdown" style="flex-shrink: 0;">
-                          <button type="button" class="btn sm ghost" style="font-size: 11px; padding: 4px 8px;" onclick="toggleInlineShoppingSubst('${ppEscapeAttr(item.key)}', '${ppEscapeAttr(item.groupId)}')">Swap Brand / Substitute ▾</button>
+                          <button type="button" class="btn sm ghost" style="font-size: 11px; padding: 4px 8px;" onclick="toggleInlineShoppingSubst('${ppEscapeAttr(item.key)}', '${ppEscapeAttr(item.groupId)}')">Swap Brand ▾</button>
                         </div>
                       </div>
                       <div id="subst-drawer-${item.key}" class="subst-row-drawer" style="display:none"></div>
@@ -21593,7 +21739,7 @@ function renderPlannerWizard() {
           <!-- Bottom Step 3 Actions -->
           <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
             <button type="button" class="btn ghost" onclick="setPlannerWizardStep(2)">← Back to Review Plan</button>
-            <button type="button" class="btn primary" style="font-weight:700;padding:10px 24px" onclick="commitPlannerWizardPlan()">✓ Save Shopping List & Plan (Commit to Today) →</button>
+            <button type="button" class="btn primary" style="font-weight:700;padding:10px 24px" onclick="commitPlannerWizardPlan()">✓ Save Shopping List &amp; Plan (Commit to Today) →</button>
           </div>
         </div>
       `;
@@ -21604,7 +21750,7 @@ function renderPlannerWizard() {
   else if (currentStep === 4) {
     html += `
       <div class="card" style="padding:28px;text-align:center">
-        <h2 style="margin-top:0">Committing Meal Plan v3.0.3...</h2>
+        <h2 style="margin-top:0">Committing Meal Plan v3.0.4...</h2>
         <p style="color:var(--text2);font-size:13px;margin-bottom:18px">Finalizing plan metadata, locking shopping quantities, and synchronizing with your live dashboard.</p>
         <button type="button" class="btn primary" onclick="commitPlannerWizardPlan()">Commit Plan Now</button>
       </div>
