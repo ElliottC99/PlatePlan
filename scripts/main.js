@@ -41,7 +41,25 @@ window.addEventListener('plateplan:feature-loaded', syncRuntimeMarker);
 // Wire deletePlan globally to our store's resilient deletePlan implementation
 import { deletePlan } from './core/store.js?v=3.3.6';
 window.deletePlan = deletePlan;
-window.showView = (id) => runtime.renderView(id);
+window.showView = (id) => {
+  runtime.renderView(id);
+  // Update sidebar active classes
+  document.querySelectorAll('.ntab, [data-view]').forEach(tab => {
+    tab.classList.remove('active');
+    if (tab.dataset.view === id || tab.id === `tab-${id}`) {
+      tab.classList.add('active');
+    }
+  });
+};
+window.openSearchResult = (type, id, title) => {
+  if (type === 'recipe') {
+    window.showView('vault');
+  } else if (type === 'plan') {
+    window.showView('today');
+  } else {
+    window.showView('bank');
+  }
+};
 window.clearProductGroupFilter = () => { console.log('clearProductGroupFilter called'); };
 
 

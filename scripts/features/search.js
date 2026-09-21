@@ -170,11 +170,18 @@ export default Object.freeze({
     host.addEventListener('click', event => {
       const button = event.target.closest?.('[data-search-type]');
       if (!button) return;
-      context.legacy.openSearchResult?.(
-        button.dataset.searchType,
-        button.dataset.searchId,
-        button.dataset.searchTitle
-      );
+      const type = button.dataset.searchType;
+      const id = button.dataset.searchId;
+      const title = button.dataset.searchTitle;
+      
+      // Native navigation handler
+      if (type === 'recipe') {
+        window.showView('vault');
+      } else if (type === 'plan') {
+        window.showView('today');
+      } else {
+        window.showView('bank');
+      }
     });
     context.store.subscribe(() => {
       if (document.getElementById('view-search')?.classList.contains('active')) render();
