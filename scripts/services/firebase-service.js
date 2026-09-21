@@ -1,5 +1,7 @@
+import { safeStringify } from '../core/utils.js?v=3.3.6';
+
 /**
- * PlatePlan v3.3.5 - Modular Firebase & Cloud Sync Service
+ * PlatePlan v3.3.6 - Modular Firebase & Cloud Sync Service
  */
 
 let firebaseApp = null;
@@ -99,7 +101,7 @@ export function startCloudSyncListeners() {
       if (cloudTime > localTime) {
         window.state.plan = data.plan;
         if (typeof window.localStorage !== 'undefined') {
-          localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+          localStorage.setItem('plateplan_v2', safeStringify(window.state));
         }
         window.dispatchEvent(new CustomEvent('plateplan:remote-state-applied', { detail: { source: 'household-doc' } }));
         if (typeof window.renderAll === 'function') window.renderAll();
@@ -120,7 +122,7 @@ export function startCloudSyncListeners() {
       const merged = window.PlatePlanModules.store.mergeRecipesSnapshot(window.state.recipes, cloudRecipes);
       window.state.recipes = merged;
       if (typeof window.localStorage !== 'undefined') {
-        localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+        localStorage.setItem('plateplan_v2', safeStringify(window.state));
       }
       window.dispatchEvent(new CustomEvent('plateplan:remote-state-applied', { detail: { source: 'recipes-collection' } }));
       if (typeof window.renderAll === 'function') window.renderAll();
@@ -157,7 +159,7 @@ export function startCloudSyncListeners() {
       }
       console.log('[Firebase] Plans synced:', window.state.plans?.length);
       if (typeof window.localStorage !== 'undefined') {
-        localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+        localStorage.setItem('plateplan_v2', safeStringify(window.state));
       }
       window.dispatchEvent(new CustomEvent('plateplan:remote-state-applied', { detail: { source: 'plans-collection' } }));
       if (Array.isArray(window.plateplanSubscribers)) {
@@ -181,7 +183,7 @@ export function startCloudSyncListeners() {
     if (window.state) {
       window.state.products = cloudProducts;
       if (typeof window.localStorage !== 'undefined') {
-        localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+        localStorage.setItem('plateplan_v2', safeStringify(window.state));
       }
       window.dispatchEvent(new CustomEvent('plateplan:remote-state-applied', { detail: { source: 'products-collection' } }));
     }

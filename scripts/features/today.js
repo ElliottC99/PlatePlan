@@ -1,8 +1,31 @@
 /**
- * PlatePlan v3.3.5 - Reactive Today Feature View with Robust Selector, Dynamic Fallback, & Defensive Guard
+ * PlatePlan v3.3.6 - Native Today Feature View with Date Navigation & Plan Mapping
  */
-import { createLegacyView } from './create-legacy-view.js?v=3.3.5';
-import { subscribeToStore } from '../core/store.js?v=3.3.5';
+import { createLegacyView } from './create-legacy-view.js?v=3.3.6';
+import { subscribeToStore } from '../core/store.js?v=3.3.6';
+
+let selectedDate = new Date();
+
+function formatDateKey(d) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatDisplayDate(d) {
+  return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+window.moveTodayDate = function(direction) {
+  selectedDate.setDate(selectedDate.getDate() + Number(direction));
+  renderTodayContent();
+};
+
+window.resetTodayDate = function() {
+  selectedDate = new Date();
+  renderTodayContent();
+};
 
 function getTodayContainer() {
   let el = document.getElementById('view-today') || 
@@ -12,7 +35,6 @@ function getTodayContainer() {
            document.querySelector('.today-container');
   
   if (!el && typeof document !== 'undefined') {
-    console.warn('[Today View] Container not found in DOM. Dynamically creating fallback container element.');
     el = document.createElement('div');
     el.id = 'view-today';
     el.className = 'view active today-container';
@@ -22,58 +44,92 @@ function getTodayContainer() {
   return el;
 }
 
+function renderTodayContent() {
+  try {
+    const container = getTodayContainer();
+    if (!container) return;
+
+    const dateLabelEl = container.querySelector('#today-date-label') || document.getElementById('today-date-label');
+    if (dateLabelEl) {
+      dateLabelEl.textContent = formatDisplayDate(selectedDate);
+    }
+
+    const contentEl = container.querySelector('#today-content') || document.getElementById('today-content');
+    if (!contentEl) return;
+
+    window.state = window.state || {};
+    const plans = Array.isArray(window.state.plans) ? window.state.plans : [];
+    const recipes = Array.isArray(window.state.recipes) ? window.state.recipes : [];
+    const targetDateStr = formatDateKey(selectedDate);
+
+    // Filter plans for selectedDate (checking p.date, p.day, or p.startDate)
+    const matchingPlans = plans.filter(p => {
+      if (!p) return false;
+      const pDate = p.date || p.day || p.startDate || '';
+      return String(pDate).startsWith(targetDateStr) || String(pDate) === targetDateStr;
+    });
+
+    if (matchingPlans.length === 0) {
+      contentEl.innerHTML = `
+        <div style="text-align:center;padding:40px 20px;color:var(--text2,#666);">
+          <h3 style="margin-bottom:8px;font-size:18px;color:var(--text1,#111);">No meals planned for ${formatDisplayDate(selectedDate)}</h3>
+          <p style="margin-bottom:20px;font-size:14px;">Use the Meal Planner or add recipes to populate your schedule.</p>
+          <button class="btn primary" onclick="showView('planner')">Open Meal Planner</button>
+        </div>
+      `;
+      return;
+    }
+
+    let html = '<div class="today-plans-grid" style="display:grid;gap:16px;margin-top:16px;">';
+    matchingPlans.forEach((plan, idx) => {
+      const recipeId = plan.recipeId || plan.id;
+      const recipe = recipes.find(r => r && (r.id === recipeId || r.recipeId === recipeId)) || {};
+      const recipeName = plan.title || recipe.name || plan.name || `Meal ${idx + 1}`;
+      const mealType = plan.mealType || plan.slot || 'Dinner';
+      const prepTime = recipe.prepTime || recipe.time || '20 mins';
+
+      html += `
+        <div class="today-plan-card" style="background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+            <span style="background:var(--surface2,#edf2f7);color:var(--text1,#2d3748);font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;text-transform:uppercase;letter-spacing:0.05em;">${mealType}</span>
+            <span style="font-size:12px;color:var(--text3,#718096);">${prepTime}</span>
+          </div>
+          <h4 style="font-size:18px;font-weight:600;color:var(--text1,#1a202c);margin:0 0 8px 0;">${recipeName}</h4>
+          ${recipe.description ? `<p style="font-size:14px;color:var(--text2,#4a5568);margin:0 0 16px 0;">${recipe.description}</p>` : ''}
+          <div style="display:flex;gap:8px;">
+            <button class="btn sm primary" onclick="showView('vault')">View Recipe</button>
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+    contentEl.innerHTML = html;
+  } catch (err) {
+    console.error('[Today View] Render error:', err);
+  }
+}
+
 const todayView = createLegacyView({
   id: 'today',
   rootId: 'view-today',
   install: (context, rootEl) => {
-    try {
-      const container = getTodayContainer();
-      if (typeof window !== 'undefined' && container) {
-        window.state = window.state || {};
-        window.state.plans = Array.isArray(window.state.plans) ? window.state.plans : [];
-        window.state.recipes = Array.isArray(window.state.recipes) ? window.state.recipes : [];
-        
-        if (container.classList.contains('active') || !container.classList.contains('hidden')) {
-          todayView.render(context);
-        }
-      }
-    } catch (err) {
-      console.error('[Today View] Critical Error during install/render:', err);
-    }
+    renderTodayContent();
   }
 });
 
 if (typeof window !== 'undefined') {
-  subscribeToStore((state) => {
-    try {
-      if (state) {
-        state.plans = Array.isArray(state.plans) ? state.plans : [];
-        state.recipes = Array.isArray(state.recipes) ? state.recipes : [];
-      }
-      const container = getTodayContainer();
-      if (container && (container.classList.contains('active') || !container.classList.contains('hidden'))) {
-        todayView.render();
-      }
-    } catch (err) {
-      console.error('[Today View] Critical Error in store subscriber render:', err);
+  window.renderToday = renderTodayContent;
+  subscribeToStore(() => {
+    const container = getTodayContainer();
+    if (container && (container.classList.contains('active') || !container.classList.contains('hidden'))) {
+      renderTodayContent();
     }
   });
 
-  const triggerInitialRender = () => {
-    try {
-      const container = getTodayContainer();
-      if (container) {
-        todayView.render();
-      }
-    } catch (err) {
-      console.error('[Today View] Critical Error during initial render trigger:', err);
-    }
-  };
-
   if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    setTimeout(triggerInitialRender, 50);
+    setTimeout(renderTodayContent, 50);
   } else {
-    window.addEventListener('DOMContentLoaded', triggerInitialRender);
+    window.addEventListener('DOMContentLoaded', renderTodayContent);
   }
 }
 

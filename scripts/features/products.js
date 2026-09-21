@@ -1,4 +1,4 @@
-import { createLegacyView } from './create-legacy-view.js?v=3.3.5';
+import { createLegacyView } from './create-legacy-view.js?v=3.3.6';
 
 /**
  * Returns literal HTML template string for Tesco Import Review Modal

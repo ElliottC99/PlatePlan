@@ -1,5 +1,5 @@
 /**
- * PlatePlan v3.3.5 - Pure Core Utilities
+ * PlatePlan v3.3.6 - Pure Core Utilities
  */
 export function sanitizeString(str) {
   if (typeof str !== 'string') return '';
@@ -25,3 +25,19 @@ export function slugify(text) {
     .replace(/[^\w ]+/g, '')
     .replace(/ +/g, '-');
 }
+
+export function safeStringify(obj) {
+  const seen = new WeakSet();
+  return JSON.stringify(obj, (key, value) => {
+    if (value === null || value === undefined) return value;
+    if (typeof value === 'function') return undefined;
+    if (typeof Element !== 'undefined' && value instanceof Element) return undefined;
+    if (typeof Node !== 'undefined' && value instanceof Node) return undefined;
+    if (typeof value === 'object') {
+      if (seen.has(value)) return undefined;
+      seen.add(value);
+    }
+    return value;
+  });
+}
+

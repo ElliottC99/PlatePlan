@@ -1,4 +1,5 @@
-import { createLegacyView } from './create-legacy-view.js?v=3.3.5';
+import { createLegacyView } from './create-legacy-view.js?v=3.3.6';
+import { safeStringify } from '../core/utils.js?v=3.3.6';
 
 /**
  * Synchronous ingredient replacement with timestamping and try/catch rollback
@@ -18,7 +19,7 @@ export async function replaceRecipeIngredient(recipeId, ingredientIndex, newProd
   const target = variant.ingredients[ingredientIndex];
   
   // Clone the state for potential rollback
-  const previousStateStr = JSON.stringify(window.state);
+  const previousStateStr = safeStringify(window.state);
 
   // 1. Ensure the link action assigns the product ID to the recipe ingredient (ingredient.id = productId)
   target.id = newProductId;
@@ -31,7 +32,7 @@ export async function replaceRecipeIngredient(recipeId, ingredientIndex, newProd
   recipe.updatedAt = nowIso;
 
   // 3. Save state locally (localStorage.setItem('plateplan_v2', ...))
-  localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+  localStorage.setItem('plateplan_v2', safeStringify(window.state));
 
   // 4. Synchronously force a UI re-render
   if (typeof window.rehydrateActiveRecipeAndStateCache === 'function') {

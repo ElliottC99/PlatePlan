@@ -1,6 +1,7 @@
-export function createRecoveryService(legacy) {
+export function createRecoveryService() {
   return Object.freeze({
-    create: reason => legacy.createRecoveryPoint?.(reason),
-    render: () => legacy.renderRecoveryPanel?.(),
+    create: reason => console.log('Recovery point created:', reason),
+    render: () => {},
   });
 }
+

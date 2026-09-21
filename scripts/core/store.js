@@ -1,5 +1,6 @@
-import { validatePlatePlanState } from './contracts.js?v=3.3.5';
-import { pushStateToCloud } from '../services/firebase-service.js?v=3.3.5';
+import { validatePlatePlanState } from './contracts.js?v=3.3.6';
+import { pushStateToCloud } from '../services/firebase-service.js?v=3.3.6';
+import { safeStringify } from './utils.js?v=3.3.6';
 
 // Purge legacy backup keys on startup to prevent state resurrection bugs
 if (typeof localStorage !== 'undefined') {
@@ -139,10 +140,42 @@ export function mergeRecipesSnapshot(localRecipes, cloudRecipes) {
   return Array.from(recipeMap.values());
 }
 
+const nativeAdapter = {
+  getState() {
+    if (!window.state) {
+      try {
+        const saved = localStorage.getItem('plateplan_v2');
+        window.state = saved ? JSON.parse(saved) : {};
+      } catch (e) {
+        window.state = {};
+      }
+    }
+    window.state.recipes = window.state.recipes || [];
+    window.state.ingredients = window.state.ingredients || [];
+    window.state.ingredientFamilies = window.state.ingredientFamilies || [];
+    window.state.ingredientGroups = window.state.ingredientGroups || [];
+    window.state.plans = window.state.plans || [];
+    window.state.plan = window.state.plan || {};
+    window.state.products = window.state.products || [];
+    return window.state;
+  },
+  saveState() {
+    try {
+      const state = this.getState();
+      localStorage.setItem('plateplan_v2', safeStringify(state));
+      window.dispatchEvent(new CustomEvent('plateplan:state-saved', { detail: { state } }));
+      return true;
+    } catch (e) {
+      console.error('Failed to save state', e);
+      return false;
+    }
+  }
+};
+
 /**
  * Small observable adapter around PlatePlan's existing local-first state.
  */
-export function createPlatePlanStore(adapter) {
+export function createPlatePlanStore(adapter = nativeAdapter) {
   const listeners = new Set();
   let savingThroughStore = false;
 
@@ -208,7 +241,7 @@ export function createPlatePlanStore(adapter) {
  */
 export async function deletePlan(planId) {
   if (!window.state) window.state = {};
-  const previousPlan = window.state.plan ? JSON.parse(JSON.stringify(window.state.plan)) : {};
+  const previousPlan = window.state.plan ? JSON.parse(safeStringify(window.state.plan)) : {};
 
   // Synchronously remove backup key
   localStorage.removeItem('plateplan_plan_backup');
@@ -238,7 +271,7 @@ export async function deletePlan(planId) {
   }
 
   // Persist state locally
-  localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+  localStorage.setItem('plateplan_v2', safeStringify(window.state));
 
   // If the modular store exists, publish the update
   if (window.PlatePlanModules?.store) {

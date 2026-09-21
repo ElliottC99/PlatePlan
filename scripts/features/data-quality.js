@@ -1,6 +1,7 @@
-import { createLegacyView } from './create-legacy-view.js?v=3.3.5';
-import { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs } from './products.js?v=3.3.5';
-import { replaceRecipeIngredient } from './recipes.js?v=3.3.5';
+import { createLegacyView } from './create-legacy-view.js?v=3.3.6';
+import { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs } from './products.js?v=3.3.6';
+import { replaceRecipeIngredient } from './recipes.js?v=3.3.6';
+import { safeStringify } from '../core/utils.js?v=3.3.6';
 
 export { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs, replaceRecipeIngredient };
 
@@ -108,7 +109,7 @@ export default createLegacyView({
           if (context && context.store && typeof context.store.save === 'function') {
             await context.store.save({ reason: 'data-quality-tesco-fix' });
           } else {
-            localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+            localStorage.setItem('plateplan_v2', safeStringify(window.state));
             if (typeof window.renderAll === 'function') {
               window.renderAll();
             }
