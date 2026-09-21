@@ -1,38 +1,50 @@
-import { validatePlatePlanState } from './contracts.js?v=3.0.9';
+import { validatePlatePlanState } from './contracts.js?v=3.1.0';
+import { loadState, saveState } from './utils.js?v=3.1.0';
 
 if (typeof window !== 'undefined') {
   window.state = window.state || {};
-  window.state.deletedPlanIds = window.state.deletedPlanIds || new Set();
+  window.state.deletedPlanIds = window.state.deletedPlanIds || [];
   window.deletedPlanIds = window.deletedPlanIds || window.state.deletedPlanIds;
 }
 
 /**
- * Filter out plans whose IDs are tracked in deletedPlanIds set
+ * Initialise window.state entirely through scripts/core/store.js
  */
-export function filterPlansSnapshot(plansList, deletedSet) {
-  if (!Array.isArray(plansList)) return [];
-  const set = deletedSet || window.state?.deletedPlanIds || window.deletedPlanIds;
-  if (!set || !(set instanceof Set) || set.size === 0) return plansList;
-  return plansList.filter(plan => plan && !set.has(plan.id) && !set.has(plan.planId));
+export function initializeStoreState(legacy) {
+  if (typeof window !== 'undefined') {
+    if (legacy && typeof legacy.loadState === 'function') {
+      window.state = legacy.loadState();
+      window.appState = window.state;
+    } else {
+      window.state = loadState();
+      window.appState = window.state;
+    }
+    window.state.deletedPlanIds = window.state.deletedPlanIds || [];
+    window.deletedPlanIds = window.deletedPlanIds || window.state.deletedPlanIds;
+  }
+  return window.state;
 }
 
 /**
- * Safely parses any timestamp representation (Date string, Milliseconds, Firestore Timestamp) to Epoch milliseconds
+ * Filter out plans whose IDs are tracked in deletedPlanIds array
  */
-export function parseTimestamp(val) {
-  if (!val) return 0;
-  if (typeof val.toDate === 'function') {
-    return val.toDate().getTime();
-  }
-  if (val.seconds !== undefined) {
-    return val.seconds * 1000 + Math.floor((val.nanoseconds || 0) / 1000000);
-  }
-  if (val._seconds !== undefined) {
-    return val._seconds * 1000 + Math.floor((val._nanoseconds || 0) / 1000000);
-  }
-  const d = new Date(val);
-  const time = d.getTime();
-  return isNaN(time) ? 0 : time;
+export function filterPlansSnapshot(plansList, deletedList) {
+  if (!Array.isArray(plansList)) return [];
+  const list = deletedList || window.state?.deletedPlanIds || window.deletedPlanIds;
+  if (!list || !Array.isArray(list) || list.length === 0) return plansList;
+  return plansList.filter(plan => plan && !list.includes(plan.id) && !list.includes(plan.planId));
+}
+
+/**
+ * Safely parses any timestamp representation to Epoch milliseconds
+ */
+export function parseTimestamp(ts) {
+  if (!ts) return 0;
+  if (typeof ts === 'number') return ts;
+  if (typeof ts === 'string') return new Date(ts).getTime();
+  if (ts && typeof ts.toDate === 'function') return ts.toDate().getTime();
+  if (ts && typeof ts.seconds === 'number') return ts.seconds * 1000;
+  return 0;
 }
 
 /**
@@ -57,8 +69,8 @@ export function mergeRecipesSnapshot(localRecipes, cloudRecipes) {
       const localTime = parseTimestamp(localR.updatedAt);
       const cloudTime = parseTimestamp(cloudR.updatedAt);
 
-      // Only overwrite if cloud timestamp is equal to or newer than local timestamp
-      if (!localTime || cloudTime >= localTime) {
+      // Only overwrite if cloud timestamp is strictly newer than local timestamp
+      if (!localTime || cloudTime > localTime) {
         recipeMap.set(id, { ...localR, ...cloudR });
       }
     } else {
@@ -76,8 +88,10 @@ export function createPlatePlanStore(adapter) {
   const listeners = new Set();
   let savingThroughStore = false;
 
+  const getState = () => adapter?.getState ? adapter.getState() : (window.state || {});
+
   const publish = detail => {
-    const state = adapter.getState();
+    const state = getState();
     const validation = validatePlatePlanState(state);
     const event = { state, validation, detail: detail || {} };
     listeners.forEach(listener => {
@@ -94,20 +108,20 @@ export function createPlatePlanStore(adapter) {
   }
 
   return Object.freeze({
-    getState: () => adapter.getState(),
-    validate: () => validatePlatePlanState(adapter.getState()),
+    getState,
+    validate: () => validatePlatePlanState(getState()),
     save: (detail = {}) => {
       savingThroughStore = true;
-      const saved = adapter.saveState();
+      const saved = adapter?.saveState ? adapter.saveState() : saveState(getState());
       savingThroughStore = false;
       if (saved) publish(detail);
       return saved;
     },
     mutate: (reason, mutator, detail = {}) => {
-      const state = adapter.getState();
+      const state = getState();
       const result = mutator(state);
       savingThroughStore = true;
-      const saved = adapter.saveState();
+      const saved = adapter?.saveState ? adapter.saveState() : saveState(getState());
       savingThroughStore = false;
       if (saved) publish({ ...detail, reason });
       return { saved, result };
@@ -129,14 +143,23 @@ export async function deletePlan(planId) {
   if (!window.state) window.state = {};
   const previousPlan = window.state.plan ? JSON.parse(JSON.stringify(window.state.plan)) : {};
 
+  // Purge backup key
+  localStorage.removeItem('plateplan_plan_backup');
+
+  // Migrate to Array and add deleted ID
+  window.state.deletedPlanIds = window.state.deletedPlanIds || [];
+  if (!window.state.deletedPlanIds.includes(planId)) {
+    window.state.deletedPlanIds.push(planId);
+  }
+  // Remove the plan from the local array
+  window.state.plans = (window.state.plans || []).filter(p => p.id !== planId);
+  localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+
   // 1. Clear plan from state: state.plan = {}
   window.state.plan = {};
   if (typeof state !== 'undefined' && state) {
     state.plan = {};
   }
-
-  // 2. Erase from localStorage
-  localStorage.removeItem('plateplan_plan_backup');
 
   // 3. Synchronously call renderAll()
   if (typeof window.renderAll === 'function') {

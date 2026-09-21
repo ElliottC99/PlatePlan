@@ -1,4 +1,4 @@
-import { createLegacyView } from './create-legacy-view.js?v=3.0.9';
+import { createLegacyView } from './create-legacy-view.js?v=3.1.2';
 
 /**
  * Resilient plan deletion with synchronous state update, UI re-render, and try/catch rollback
@@ -7,14 +7,23 @@ export async function deletePlan(planId) {
   if (!window.state) window.state = {};
   const previousPlan = window.state.plan ? JSON.parse(JSON.stringify(window.state.plan)) : {};
 
+  // Purge backup key
+  localStorage.removeItem('plateplan_plan_backup');
+
+  // Migrate to Array and add deleted ID
+  window.state.deletedPlanIds = window.state.deletedPlanIds || [];
+  if (!window.state.deletedPlanIds.includes(planId)) {
+    window.state.deletedPlanIds.push(planId);
+  }
+  // Remove the plan from the local array
+  window.state.plans = (window.state.plans || []).filter(p => p.id !== planId);
+  localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+
   // 1. Clear plan from state: state.plan = {}
   window.state.plan = {};
   if (typeof state !== 'undefined' && state) {
     state.plan = {};
   }
-
-  // 2. Erase from localStorage
-  localStorage.removeItem('plateplan_plan_backup');
 
   // 3. Synchronously call renderAll()
   if (typeof window.renderAll === 'function') {

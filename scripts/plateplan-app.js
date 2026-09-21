@@ -207,14 +207,14 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='3.0.9';
+const PLATEPLAN_APP_VERSION='3.1.0';
 const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v89';
-window.APP_VERSION = '3.0.9';
+window.APP_VERSION = '3.1.0';
 window._hydrationLogged = false;
 window.state = window.state || {};
-window.state.deletedPlanIds = window.state.deletedPlanIds || new Set();
+window.state.deletedPlanIds = window.state.deletedPlanIds || [];
 window.deletedPlanIds = window.deletedPlanIds || window.state.deletedPlanIds;
-console.log("[v3.0.9 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
+// console.log("[v3.0.9 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
 
 try {
   const OBSOLETE_KEYS = ['app_version', 'data:chloe', 'data:elliott', 'plateplan_v1', 'plateplan_v1_baked_candidate', 'plateplan_v1_chloe', 'plateplan_v1_elliott', 'plateplan_v1_device_id', 'plateplan_v1_recovery', 'plateplan_history_backup'];
@@ -779,6 +779,10 @@ function safeSaveHistoryBackup(historyArray) {
 window.safeSaveHistoryBackup = safeSaveHistoryBackup;
 
 function safeLocalStorageSet(key, data) {
+  if (key === 'plateplan_v2') {
+    // State persistence must be handled exclusively by scripts/core/store.js
+    return true;
+  }
   let serialized = '';
   try {
     serialized = typeof data === 'string' ? data : (typeof safeJsonStringify === 'function' ? safeJsonStringify(data) : JSON.stringify(data));
@@ -3701,9 +3705,10 @@ async function performSubcollectionMigrationIfNeeded(db, householdId, rootDocDat
 window.performSubcollectionMigrationIfNeeded = performSubcollectionMigrationIfNeeded;
 
 function startPlatePlanCloudListeners(){
+  console.log('[PlatePlan v3.1.0] Legacy Firestore onSnapshot listeners bypassed. Core engine in charge.');
   platePlanSyncUnsubscribers.forEach(stop=>{try{stop();}catch(e){}});
   platePlanSyncUnsubscribers=[];
-
+  return;
   const targetHouseholdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
   const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
 
@@ -21555,7 +21560,7 @@ window.removeWizardUseUpProduct = removeWizardUseUpProduct;
 
 // DEDICATED PLAN DELETION PIPELINE (v3.0.9)
 if (!window.state) window.state = {};
-window.state.deletedPlanIds = window.state.deletedPlanIds || new Set();
+window.state.deletedPlanIds = window.state.deletedPlanIds || [];
 window.deletedPlanIds = window.deletedPlanIds || window.state.deletedPlanIds;
 
 async function deletePlan(planId) {

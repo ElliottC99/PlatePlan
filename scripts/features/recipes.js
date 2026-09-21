@@ -1,4 +1,4 @@
-import { createLegacyView } from './create-legacy-view.js?v=3.0.9';
+import { createLegacyView } from './create-legacy-view.js?v=3.1.2';
 
 /**
  * Synchronous ingredient replacement with timestamping and try/catch rollback
