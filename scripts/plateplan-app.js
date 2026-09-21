@@ -207,9 +207,9 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='3.1.0';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v89';
-window.APP_VERSION = '3.1.0';
+const PLATEPLAN_APP_VERSION='3.3.1-mod';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v90';
+window.APP_VERSION = '3.3.1-mod';
 window._hydrationLogged = false;
 window.state = window.state || {};
 window.state.deletedPlanIds = window.state.deletedPlanIds || [];
@@ -350,189 +350,43 @@ function sanitizePayloadForFirestore(data){
 window.sanitizePayloadForFirestore = sanitizePayloadForFirestore;
 
 // == v3.0.6 DUAL-PROFILE MEAL-SLOT TARGET RESOLVER ==
-function getMealTypeTargets(mealType = 'dinner') {
-  const mt = (mealType || 'dinner').toLowerCase();
-  const eTgt = typeof getBudgets === 'function' ? getBudgets('e', mt) : { cal: 840, prot: 45.5 };
-  const cTgt = typeof getBudgets === 'function' ? getBudgets('c', mt) : { cal: 595, prot: 35 };
-  return {
-    mealType: mt,
-    targetCal_E: Number(eTgt?.cal) || 0,
-    targetProt_E: Number(eTgt?.prot) || 0,
-    targetCal_C: Number(cTgt?.cal) || 0,
-    targetProt_C: Number(cTgt?.prot) || 0,
-    e: eTgt,
-    c: cTgt
-  };
-}
-window.getMealTypeTargets = getMealTypeTargets;
-
-function getVaultTargetMacros(mealType = 'dinner') {
-  return getMealTypeTargets(mealType);
-}
-window.getVaultTargetMacros = getVaultTargetMacros;
-
-function computeProfileFitScore(actualCal, targetCal, actualProt, targetProt) {
-  const aCal = Number(actualCal) || 0;
-  const tCal = Number(targetCal) || 0;
-  const aProt = Number(actualProt) || 0;
-  const tProt = Number(targetProt) || 0;
-
-  let calScore = 100;
-  if (tCal > 0) {
-    const calError = Math.abs(aCal - tCal) / tCal;
-    calScore = Math.max(0, 100 - (calError * 100));
-  }
-
-  let protScore = 100;
-  if (tProt > 0) {
-    protScore = aProt >= tProt
-      ? 100
-      : Math.max(0, 100 - (((tProt - aProt) / tProt) * 100));
-  }
-
-  return (calScore * 0.50) + (protScore * 0.50);
-}
-window.computeProfileFitScore = computeProfileFitScore;
-
-// == v3.0.6 DUAL-PORTION MEAL-TYPE FIT SCORE ENGINE ==
-function calculateMacroFitTierAndScore(calActualOrRecipe, mealTypeOrTargets, protAct, protTgt) {
-  let mealType = 'dinner';
-  let variant = 'original';
-  let recipeObj = null;
-  let customTargets = null;
-
-  let actualCal_E = 0, targetCal_E = 0, actualProt_E = 0, targetProt_E = 0;
-  let actualCal_C = 0, targetCal_C = 0, actualProt_C = 0, targetProt_C = 0;
-  let whoKey = 'both';
-
-  if (typeof calActualOrRecipe === 'object' && calActualOrRecipe !== null) {
-    recipeObj = calActualOrRecipe.recipe || calActualOrRecipe;
-    variant = calActualOrRecipe.variant || 'original';
-
-    if (typeof mealTypeOrTargets === 'string') {
-      mealType = mealTypeOrTargets;
-    } else if (typeof mealTypeOrTargets === 'object' && mealTypeOrTargets !== null) {
-      if (mealTypeOrTargets.mealType) mealType = mealTypeOrTargets.mealType;
-      if (mealTypeOrTargets.variant) variant = mealTypeOrTargets.variant;
-      customTargets = mealTypeOrTargets;
-    } else if (calActualOrRecipe.mealType) {
-      mealType = calActualOrRecipe.mealType;
-    } else {
-      const types = recipeObj.types || [recipeObj.type || 'dinner'];
-      mealType = types[0] || 'dinner';
-    }
-
-    whoKey = String(recipeObj.who || 'both').trim().toLowerCase();
-
-    // Resolve meal slot targets
-    const slotTargets = customTargets || getMealTypeTargets(mealType);
-    targetCal_E = Number(slotTargets.targetCal_E ?? slotTargets.eCal ?? slotTargets.e?.cal ?? slotTargets.cal) || 0;
-    targetProt_E = Number(slotTargets.targetProt_E ?? slotTargets.eProt ?? slotTargets.e?.prot ?? slotTargets.prot) || 0;
-    targetCal_C = Number(slotTargets.targetCal_C ?? slotTargets.cCal ?? slotTargets.c?.cal ?? slotTargets.cal) || 0;
-    targetProt_C = Number(slotTargets.targetProt_C ?? slotTargets.cProt ?? slotTargets.c?.prot ?? slotTargets.prot) || 0;
-
-    // Resolve split portions
-    let portions = calActualOrRecipe.portions;
-    if (!portions && typeof calculateRecipeDisplayNutrition === 'function' && (recipeObj.ingredients || recipeObj.enhanced || recipeObj.name)) {
-      try {
-        const bundle = calculateRecipeDisplayNutrition({ recipe: recipeObj, variant, mealType });
-        portions = bundle?.portions;
-      } catch (e) {}
-    }
-
-    if (!portions && typeof calcPortions === 'function') {
-      const perServing = recipeObj.perServing || recipeObj.nutrition || recipeObj;
-      portions = calcPortions(perServing, window.state?.prefs || {}, recipeObj.serves || 2, recipeObj.who || 'both', mealType);
-    }
-
-    if (portions) {
-      actualCal_E = Number(portions.eCal) || 0;
-      actualProt_E = Number(portions.eProt) || 0;
-      actualCal_C = Number(portions.cCal) || 0;
-      actualProt_C = Number(portions.cProt) || 0;
-    } else {
-      const ps = recipeObj.perServing || recipeObj.nutrition || recipeObj;
-      const cal = Number(ps.cal ?? ps.calories ?? ps.kcal) || 0;
-      const prot = Number(ps.prot ?? ps.protein) || 0;
-      actualCal_E = cal;
-      actualProt_E = prot;
-      actualCal_C = cal;
-      actualProt_C = prot;
-    }
-  } else {
-    // Positional arguments
-    const actCal = Number(calActualOrRecipe) || 0;
-    const tgtCal = Number(mealTypeOrTargets) || 0;
-    const actProt = Number(protAct) || 0;
-    const tgtProt = Number(protTgt) || 0;
-
-    actualCal_E = actCal;
-    targetCal_E = tgtCal;
-    actualProt_E = actProt;
-    targetProt_E = tgtProt;
-
-    actualCal_C = actCal;
-    targetCal_C = tgtCal;
-    actualProt_C = actProt;
-    targetProt_C = tgtProt;
-  }
-
-  const score_Elliott = computeProfileFitScore(actualCal_E, targetCal_E, actualProt_E, targetProt_E);
-  const score_Chloe = computeProfileFitScore(actualCal_C, targetCal_C, actualProt_C, targetProt_C);
-
-  let finalScore = 0;
-  if (whoKey === 'elliott' || whoKey === 'e') {
-    finalScore = Math.round(score_Elliott);
-  } else if (whoKey === 'chloe' || whoKey === 'c') {
-    finalScore = Math.round(score_Chloe);
-  } else {
-    finalScore = Math.round((score_Elliott * 0.50) + (score_Chloe * 0.50));
-  }
-
-  const clampedScore = Math.max(0, Math.min(100, finalScore));
-
-  let tier = 'red';
-  let label = 'Poor Fit';
-  let color = '#EF4444';
-  let colors = 'background-color:#EF4444;color:#FFFFFF;';
-
-  if (clampedScore >= 85) {
-    tier = 'green';
-    label = 'Ideal Fit';
-    color = '#10B981';
-    colors = 'background-color:#10B981;color:#FFFFFF;';
-  } else if (clampedScore >= 65) {
-    tier = 'amber-green';
-    label = 'Acceptable Fit';
-    color = '#84CC16';
-    colors = 'background-color:#84CC16;color:#FFFFFF;';
-  } else if (clampedScore >= 40) {
-    tier = 'amber-red';
-    label = 'Suboptimal Fit';
-    color = '#F59E0B';
-    colors = 'background-color:#F59E0B;color:#FFFFFF;';
-  } else {
-    tier = 'red';
-    label = 'Poor Fit';
-    color = '#EF4444';
-    colors = 'background-color:#EF4444;color:#FFFFFF;';
-  }
-
-  const badgeStyle = `${colors}border-radius:4px;padding:2px 8px;font-weight:600;font-size:11px;display:inline-block;`;
-
-  return {
-    tier,
-    score: clampedScore,
-    raw: clampedScore,
-    color,
-    label,
-    colors,
-    badgeStyle,
-    score_E: score_Elliott,
-    score_C: score_Chloe
-  };
-}
-window.calculateMacroFitTierAndScore = calculateMacroFitTierAndScore;
+window.ppEscapeAttr = ppEscapeAttr;
+window.ppEscapeHtml = ppEscapeHtml;
+window.toTitleCase = toTitleCase;
+window.getContextMealType = getContextMealType;
+window.getBudgets = getBudgets;
+window.calculateRecipeDisplayNutrition = calculateRecipeDisplayNutrition;
+window.calcPortions = calcPortions;
+window.calculateFit = calculateFit;
+window.renderExpandableText = renderExpandableText;
+window.saveState = saveState;
+window.progressiveListButton = progressiveListButton;
+window.resetProgressiveList = resetProgressiveList;
+window.getProductIndexRecipe = getProductIndexRecipe;
+window.openMobileActionSheet = openMobileActionSheet;
+window.ingRaw = ingRaw;
+window.unwrapAndCleanItem = unwrapAndCleanItem;
+window.sanitizePayloadForFirestore = sanitizePayloadForFirestore;
+window.renderRecipePreview = renderRecipePreview;
+window.hasVariantFavoritingInitialized = typeof hasVariantFavoritingInitialized !== 'undefined' ? hasVariantFavoritingInitialized : () => false;
+window.ensureVariantFavoritingPrefs = typeof ensureVariantFavoritingPrefs !== 'undefined' ? ensureVariantFavoritingPrefs : () => [];
+window.ACTIVE_HOUSEHOLD_ID = typeof ACTIVE_HOUSEHOLD_ID !== 'undefined' ? ACTIVE_HOUSEHOLD_ID : 'elliott-chloe';
+window.platePlanDb = typeof platePlanDb !== 'undefined' ? platePlanDb : null;
+window.platePlanListLimits = typeof platePlanListLimits !== 'undefined' ? platePlanListLimits : { vault: 24 };
+window.vaultFilterFavouritesOnly = typeof vaultFilterFavouritesOnly !== 'undefined' ? vaultFilterFavouritesOnly : false;
+window.previewBaseRecipe = typeof previewBaseRecipe !== 'undefined' ? previewBaseRecipe : null;
+window.currentPreviewInstanceId = typeof currentPreviewInstanceId !== 'undefined' ? currentPreviewInstanceId : null;
+window.currentViewTab = typeof currentViewTab !== 'undefined' ? currentViewTab : 'original';
+window.currentPreviewServingMode = typeof currentPreviewServingMode !== 'undefined' ? currentPreviewServingMode : 'both';
+window.currentPreviewSingleServes = typeof currentPreviewSingleServes !== 'undefined' ? currentPreviewSingleServes : 1;
+window.editEnhancedRecipe = typeof editEnhancedRecipe !== 'undefined' ? editEnhancedRecipe : null;
+window.editRecipeModalView = typeof editRecipeModalView !== 'undefined' ? editRecipeModalView : null;
+window.downloadRecipeCard = typeof downloadRecipeCard !== 'undefined' ? downloadRecipeCard : null;
+window.duplicateRecipe = typeof duplicateRecipe !== 'undefined' ? duplicateRecipe : null;
+window.editRecipe = typeof editRecipe !== 'undefined' ? editRecipe : null;
+window.deleteRecipe = typeof deleteRecipe !== 'undefined' ? deleteRecipe : null;
+window.reviewEnhancedRecipe = typeof reviewEnhancedRecipe !== 'undefined' ? reviewEnhancedRecipe : null;
+window.deleteEnhancedRecipe = typeof deleteEnhancedRecipe !== 'undefined' ? deleteEnhancedRecipe : null;
 
 // == v3.0.6 PRE-SORT FIT SCORE COMPUTATION ENGINE ==
 function getEffectiveRecipeFitScore(recipe, targetSlot = 'dinner') {
@@ -1435,35 +1289,8 @@ document.addEventListener('keydown',event=>{
   const close=modal?.querySelector('button[onclick*="close" i]');
   if(close){event.preventDefault();close.click();}
 });
-function openRecipeActions(recipeId){
-  const recipe=getProductIndexRecipe(recipeId) || (state?.recipes||[]).find(r=>r.id===recipeId);
-  if(!recipe) return;
-  openMobileActionSheet(recipe.name,[
-    {label:'Review recipe',onclick:`editRecipeModalView('${ppEscapeAttr(recipeId)}')`},
-    {label:'Recipe card',onclick:`downloadRecipeCard('${ppEscapeAttr(recipeId)}')`},
-    {label:'Duplicate',onclick:`duplicateRecipe('${ppEscapeAttr(recipeId)}')`},
-    {label:'Edit source recipe',onclick:`editRecipe('${ppEscapeAttr(recipeId)}')`},
-    {label:'Delete',onclick:`deleteRecipe('${ppEscapeAttr(recipeId)}')`,danger:true}
-  ]);
-}
-function openEnhancedRecipeActions(recipeId){
-  const recipe=getProductIndexRecipe(recipeId) || (state?.recipes||[]).find(r=>r.id===recipeId);
-  if(!recipe) return;
-  if(!recipe.enhanced){
-    openMobileActionSheet(recipe.name,[
-      {label:'Create enhanced version',onclick:`editEnhancedRecipe('${ppEscapeAttr(recipeId)}')`},
-      {label:'Review recipe',onclick:`editRecipeModalView('${ppEscapeAttr(recipeId)}')`}
-    ]);
-    return;
-  }
-  openMobileActionSheet(`${recipe.name} · Enhanced`,[
-    {label:'Review enhanced recipe',onclick:`reviewEnhancedRecipe('${ppEscapeAttr(recipeId)}')`},
-    {label:'Recipe card',onclick:`downloadRecipeCard('${ppEscapeAttr(recipeId)}','enhanced')`},
-    {label:'Duplicate complete recipe',onclick:`duplicateRecipe('${ppEscapeAttr(recipeId)}')`},
-    {label:'Edit enhanced recipe',onclick:`editEnhancedRecipe('${ppEscapeAttr(recipeId)}')`},
-    {label:'Delete enhanced version',onclick:`deleteEnhancedRecipe('${ppEscapeAttr(recipeId)}')`,danger:true}
-  ]);
-}
+// Actions moved to modular recipes.js
+
 function openProductBankActions(productId){
   const product=getProduct(productId); if(!product) return;
   const group=getIngredientGroup(product.groupId);
@@ -14734,231 +14561,8 @@ function ensureVariantFavoritingPrefs(){
   return state.userPrefs.favouriteVariantIds;
 }
 
-function isRecipeVariantFavourite(recipeId, variantKey = 'original'){
-  const list = ensureVariantFavoritingPrefs();
-  const key = `${recipeId}_${variantKey}`;
-  return list.includes(key);
-}
-function isRecipeVariantFavorite(recipeId, variantKey = 'original'){
-  return isRecipeVariantFavourite(recipeId, variantKey);
-}
-window.isRecipeVariantFavourite = isRecipeVariantFavourite;
-window.isRecipeVariantFavorite = isRecipeVariantFavorite;
+// Vault rendering and favoriting moved to modular recipes.js
 
-function toggleRecipeFavourite(recipeId, event, variantKey = 'original'){
-  if(event){
-    event.stopPropagation();
-    event.preventDefault();
-  }
-  const r = (state.recipes || []).find(x => x.id === recipeId);
-  if(!r) return;
-  const list = ensureVariantFavoritingPrefs();
-  const key = `${recipeId}_${variantKey}`;
-  const idx = list.indexOf(key);
-  const willBeFav = (idx === -1);
-  if(willBeFav){
-    list.push(key);
-  } else {
-    list.splice(idx, 1);
-  }
-  const isNowFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced');
-  r.isFavourite = isNowFav;
-  r.isFavorite = isNowFav;
-  r.updatedAt = new Date().toISOString();
-
-  saveState(true);
-  try {
-    const householdId = (state && state.householdId) || ACTIVE_HOUSEHOLD_ID || 'elliott-chloe';
-    if(platePlanDb){
-      platePlanDb.collection('households').doc(householdId).collection('data').doc('meta').set({
-        prefs: state.prefs,
-        userPrefs: state.userPrefs
-      }, { merge: true }).catch(e => console.warn('[PREFS SYNC ERROR]', e));
-      platePlanDb.collection('households').doc(householdId).collection('recipes').doc(String(r.id)).set(
-        sanitizePayloadForFirestore(unwrapAndCleanItem(r)),
-        { merge: true }
-      ).catch(e => console.warn('[RECIPE FAVORITE SYNC ERROR]', e));
-    }
-  } catch(e){}
-
-  renderVault();
-
-  if(typeof previewBaseRecipe !== 'undefined' && previewBaseRecipe && previewBaseRecipe.id === recipeId){
-    previewBaseRecipe.isFavourite = r.isFavourite;
-    previewBaseRecipe.isFavorite = r.isFavorite;
-    const activeKey = (typeof currentViewTab !== 'undefined' && currentViewTab === 'enhanced') ? 'enhanced' : 'original';
-    const isCurrentActiveFav = isRecipeVariantFavourite(recipeId, activeKey);
-    const favBtn = document.getElementById('modal-recipe-fav-btn');
-    if(favBtn){
-      favBtn.classList.toggle('active', isCurrentActiveFav);
-      const svg = favBtn.querySelector('svg');
-      if(svg) svg.setAttribute('fill', isCurrentActiveFav ? 'currentColor' : 'none');
-      favBtn.setAttribute('aria-label', isCurrentActiveFav ? 'Remove from favourites' : 'Add to favourites');
-      favBtn.setAttribute('title', isCurrentActiveFav ? 'Favourited' : 'Add to favourites');
-    }
-    const navSub = document.querySelector('.recipe-view-nav-subtitle');
-    if(navSub){
-      const existingTag = navSub.querySelector('.fav-tag');
-      if(isCurrentActiveFav && !existingTag){
-        navSub.insertAdjacentHTML('afterbegin', '<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favourite</span> ');
-      } else if(!isCurrentActiveFav && existingTag){
-        existingTag.remove();
-      }
-    }
-  }
-  const variantLabel = variantKey === 'enhanced' ? 'Enhanced' : 'Original';
-  showPlatePlanToast(willBeFav ? `Added "${r.name} (${variantLabel})" to favourites ❤️` : `Removed "${r.name} (${variantLabel})" from favourites`);
-}
-function toggleRecipeFavorite(recipeId, event, variantKey = 'original'){
-  toggleRecipeFavourite(recipeId, event, variantKey);
-}
-window.toggleRecipeFavourite = toggleRecipeFavourite;
-window.toggleRecipeFavorite = toggleRecipeFavorite;
-
-// == v3.0.6 RECIPE VAULT CARD RENDERER ==
-function renderRecipeCard(r, options = {}) {
-  const targetMacros = options.targetMacros || getVaultTargetMacros();
-  const types = r.types || [r.type || 'dinner'];
-  const mealType = options.mealType || getContextMealType(r, null, types[0] || 'dinner');
-  const eTgt = options.eTgt || getBudgets('e', mealType);
-  const cTgt = options.cTgt || getBudgets('c', mealType);
-  const whoKey = String(r.who || 'both').toLowerCase();
-  const showE = options.showE !== undefined ? options.showE : (whoKey === 'both' || whoKey === 'elliott' || whoKey === 'e');
-  const showC = options.showC !== undefined ? options.showC : (whoKey === 'both' || whoKey === 'chloe' || whoKey === 'c');
-  const personLabel = whoKey === 'both' ? 'Shared' : (whoKey === 'elliott' || whoKey === 'e' ? 'Elliott' : (whoKey === 'chloe' || whoKey === 'c' ? 'Chloe' : r.who || 'Shared'));
-  const badges = types.map(t => '<span class="badge ' + (t === 'breakfast' ? 'badge-green' : t === 'lunch' ? 'badge-purple' : 'badge-coral') + '">' + ppEscapeHtml(toTitleCase(t)) + '</span>').join(' ');
-
-  const origFav = isRecipeVariantFavourite(r.id, 'original') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
-  const enhFav = isRecipeVariantFavourite(r.id, 'enhanced');
-  const isAnyFav = origFav || enhFav;
-  const favTag = isAnyFav ? `<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favourite</span>` : '';
-  const meta = [
-    favTag,
-    badges,
-    `<span class="tag">${ppEscapeHtml(personLabel)}</span>`,
-    r.serves ? `<span class="tag">Serves ${ppEscapeHtml(r.serves)}</span>` : '',
-    r.time ? `<span class="tag">${ppEscapeHtml(r.time)}m</span>` : ''
-  ].filter(Boolean).join(' ');
-
-  const buildFit = (active, useEnhanced = false) => {
-    const bundle = calculateRecipeDisplayNutrition({ recipe: r, variant: useEnhanced ? 'enhanced' : 'original', mealType });
-    const portions = bundle?.portions || calcPortions({}, state.prefs, r.serves || 2, r.who || 'both', mealType);
-    const parts = [];
-    if (showE) {
-      const fitE = calculateFit(portions.eCal, portions.eProt, eTgt.cal, eTgt.prot);
-      parts.push(`<button type="button" class="fit-detail-button" onclick="openVaultFitDetails(this,'${ppEscapeAttr(r.id)}','${useEnhanced ? 'enhanced' : 'original'}','e')">Elliott ${fitE.label.split(' ')[0]} ${ppEscapeHtml(portions.e)}</button>`);
-    }
-    if (showC) {
-      const fitC = calculateFit(portions.cCal, portions.cProt, cTgt.cal, cTgt.prot);
-      parts.push(`<button type="button" class="fit-detail-button" onclick="openVaultFitDetails(this,'${ppEscapeAttr(r.id)}','${useEnhanced ? 'enhanced' : 'original'}','c')">Chloe ${fitC.label.split(' ')[0]} ${ppEscapeHtml(portions.c)}</button>`);
-    }
-
-    // Dynamically calculate dual-portion fit score for the specified meal slot
-    const { score, color, label } = calculateMacroFitTierAndScore({ recipe: r, variant: useEnhanced ? 'enhanced' : 'original', portions }, mealType);
-    const fitTag = `<span class="tag" style="background-color:${color};color:#FFFFFF;border-color:${color};font-weight:600" title="${ppEscapeAttr(label)}">Fit score ${score}${useEnhanced ? ' · enhanced' : ''}</span>`;
-    return { portions, html: `<div class="recipe-fit">${parts.join('')} ${fitTag}</div>` };
-  };
-
-  const originalFit = buildFit(r, false);
-  const enhancedActive = r.enhanced ? { ...r, ...r.enhanced, ingredients: r.enhanced.ingredients || r.ingredients } : null;
-  const enhancedFit = enhancedActive ? buildFit(enhancedActive, true) : null;
-  const enhancedChanges = r.enhanced?.changes ? `<div style="font-size:12px;color:var(--text2);margin-top:6px">${ppEscapeHtml(r.enhanced.changes)}</div>` : '';
-
-  return `<div class="recipe-card ${isAnyFav ? 'is-favorite' : ''}">
-    <div class="recipe-card-layout">
-      <div class="recipe-card-main">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-          ${renderExpandableText(r.name, `recipe-${r.id}`, 'recipe-card-name')}
-          <button type="button" class="recipe-fav-btn ${origFav ? 'active' : ''}" onclick="toggleRecipeFavourite('${ppEscapeAttr(r.id)}', event, 'original')" aria-label="${origFav ? 'Remove original from favourites' : 'Add original to favourites'}" title="${origFav ? 'Original variant favourited' : 'Add original to favourites'}">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="${origFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-            </svg>
-          </button>
-        </div>
-        <div class="recipe-card-meta">${meta}</div>
-        ${originalFit.html}
-      </div>
-      <div class="recipe-card-actions">
-        <button class="btn sm primary mobile-primary" onclick="viewRecipe('${ppEscapeAttr(r.id)}', null)">View</button>
-        <button class="btn sm ghost mobile-more" onclick="openRecipeActions('${ppEscapeAttr(r.id)}')">More</button>
-      </div>
-    </div>
-    ${r.enhanced ? `<div class="enhanced-box">
-      <div class="enhanced-layout">
-        <div style="min-width:0;flex:1">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
-            <div class="enhanced-lbl" style="margin-bottom:0">Enhanced version</div>
-            <button type="button" class="recipe-fav-btn sm ${enhFav ? 'active' : ''}" onclick="toggleRecipeFavourite('${ppEscapeAttr(r.id)}', event, 'enhanced')" aria-label="${enhFav ? 'Remove enhanced from favourites' : 'Add enhanced to favourites'}" title="${enhFav ? 'Enhanced variant favourited' : 'Add enhanced to favourites'}" style="padding:2px">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="${enhFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-              </svg>
-            </button>
-          </div>
-          ${enhancedFit.html}
-          ${enhancedChanges}
-        </div>
-        <div class="enhanced-actions">
-          <button class="btn sm primary enhanced-primary-action" onclick="viewRecipe('${ppEscapeAttr(r.id)}', null, 'enhanced')">View</button>
-          <button class="btn sm ghost enhanced-more-action" onclick="openEnhancedRecipeActions('${ppEscapeAttr(r.id)}')">More</button>
-        </div>
-      </div>
-    </div>` : ''}
-  </div>`;
-}
-window.renderRecipeCard = renderRecipeCard;
-
-function renderVault(){
-  const ft=document.getElementById('filter-type').value,fw=document.getElementById('filter-who').value;
-  const q=(document.getElementById('vault-search')?.value||'').trim().toLowerCase();
-  const sort=(document.getElementById('vault-sort')?.value)||'name';
-  const list=document.getElementById('vault-list');
-
-  // Boot Phase Lock: Display iOS activity skeleton until cloud hydration finishes
-  if (!state?.isCloudHydrated) {
-    if (list) {
-      list.innerHTML = `<div class="ios-activity-skeleton">
-        <div class="spinner"></div>
-        <span class="ios-activity-skeleton-text">Syncing live recipes from cloud...</span>
-      </div>`;
-    }
-    return;
-  }
-
-  // Preserve and sync favourites filter button state
-  const favFilterBtn = document.getElementById('vault-filter-fav');
-  if(favFilterBtn){
-    favFilterBtn.classList.toggle('active', !!vaultFilterFavouritesOnly);
-    favFilterBtn.setAttribute('aria-pressed', vaultFilterFavouritesOnly ? 'true' : 'false');
-  }
-
-  ensureVariantFavoritingPrefs();
-  const recipes=(state.recipes || []).filter(r=>{
-    const hasAnyFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
-    if(vaultFilterFavouritesOnly && !hasAnyFav) return false;
-    const types=r.types||[r.type];
-    const searchable=[
-      r.name,
-      r.source,
-      r.who,
-      ...(types||[]),
-      ...(r.ingredients||[]).map(ing=>ingRaw(ing))
-    ].join(' ').toLowerCase();
-    return(ft==='all'||types.includes(ft))&&(fw==='all'||r.who===fw)&&(!q||searchable.includes(q));
-  });
-
-  const selectedMealType = ft !== 'all' ? ft : 'dinner';
-  const sortedRecipes = getSortedRecipes(recipes, sort, selectedMealType);
-
-  if(!sortedRecipes.length){list.innerHTML='<div class="empty">No matching recipes found.</div>';return;}
-  const listSignature=[ft,fw,q,sort,vaultFilterFavouritesOnly?'fav':'all'].join('|');
-  resetProgressiveList('vault',listSignature);
-  const totalRecipes=sortedRecipes.length;
-  const visibleRecipes=sortedRecipes.slice(0,platePlanListLimits.vault);
-  list.innerHTML=visibleRecipes.map(r => renderRecipeCard(r, { mealType: selectedMealType })).join('')+progressiveListButton('vault',totalRecipes,visibleRecipes.length);
-}
-window.renderVault = renderVault;
-window.renderRecipeVault = renderVault;
-window.renderVaultGrid = renderVault;
 
 let platePlanUseUpFinder={meal:'dinner',who:'both',productIds:[],assign:null};
 function ensureUseUpRecipeFinder(){
@@ -15291,42 +14895,8 @@ function updateRecipePreviewScale(val) {
   renderRecipePreview(target);
 }
 
-function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both') {
-  const r = state.recipes.find(x => x.id === id);
-  if (!r) return;
-  previewBaseRecipe = clonePlatePlanValue(r); // isolated deep copy for scaling
-  currentPreviewInstanceId = instanceId;
-  currentViewTab = (tab === 'enhanced' && r.enhanced) ? 'enhanced' : 'original';
-  currentPreviewServingMode = servingMode || 'both';
-  currentPreviewSingleServes = 1;
+// viewRecipe moved to modular recipes.js
 
-  // Preserve old plan substitution records for older saved plans.
-  if (instanceId && state.overrides[instanceId]?.substitutions && !state.overrides[instanceId]?.productOverrides) {
-      const subs = state.overrides[instanceId].substitutions;
-      const applySubs = (ings) => {
-          if(!ings) return;
-          ings.forEach(ing => {
-              if (ing.bankId && subs[ing.bankId]) {
-                  const subId = subs[ing.bankId];
-                  const subIng = state.ingredients.find(i => i.id === subId);
-                  if(subIng) {
-                      ing.originalBankId = ing.bankId;
-                      ing.originalName = ing.name;
-                      ing.bankId = subIng.id;
-                      ing.name = subIng.name;
-                      ing.isSubstituted = true;
-                  }
-              }
-          });
-      };
-      applySubs(previewBaseRecipe.ingredients);
-      if(previewBaseRecipe.enhanced) applySubs(previewBaseRecipe.enhanced.ingredients);
-  }
-
-  const wrap = document.getElementById('view-modal-wrap');
-  if (wrap) wrap.classList.add('open');
-  renderRecipePreview(previewBaseRecipe.serves || 2);
-}
 
 function renderRecipePreview(targetServes = 2) {
     const r = previewBaseRecipe;

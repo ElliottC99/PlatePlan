@@ -5,7 +5,7 @@
  * Holding DOMContentLoaded with top-level await preserves the existing boot
  * contract while feature modules continue moving out of the legacy source.
  */
-const CURRENT_BUILD_ID = '3.3.0-v90';
+const CURRENT_BUILD_ID = '3.3.1-mod-v90';
 
 // Expose global window actions immediately on app load before any async operations execute
 window.logout = function() {
@@ -42,8 +42,8 @@ function loadClassicScript(source) {
 document.documentElement.dataset.plateplanBoot = 'shell';
 await new Promise(resolve => requestAnimationFrame(resolve));
 document.documentElement.dataset.plateplanBoot = 'loading-core';
-await loadClassicScript('./scripts/plateplan-app.js?v=3.3.0');
-await import('./main.js?v=3.3.0');
+await loadClassicScript('./scripts/plateplan-app.js?v=3.3.1-mod');
+await import('./main.js?v=3.3.1-mod');
 document.documentElement.dataset.plateplanBoot = 'ready';
 try {
   document.querySelectorAll('.app, body > *').forEach(el => {
