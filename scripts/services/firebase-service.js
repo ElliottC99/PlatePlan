@@ -1,5 +1,5 @@
 /**
- * PlatePlan v3.3.4 - Modular Firebase & Cloud Sync Service
+ * PlatePlan v3.3.5 - Modular Firebase & Cloud Sync Service
  */
 
 let firebaseApp = null;
@@ -129,6 +129,48 @@ export function startCloudSyncListeners() {
     console.error('[Firebase] Recipes listener error:', err);
   });
 
+  unsubscribePlans = householdDocRef.collection('plans').onSnapshot(snapshot => {
+    if (snapshot.empty) {
+      if (!window.state?.plans || window.state.plans.length === 0) {
+        // Fallback to local storage if available
+        try {
+          const cached = localStorage.getItem('plateplan_v2');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed.plans) && parsed.plans.length > 0) {
+              window.state.plans = parsed.plans;
+            }
+          }
+        } catch (e) {}
+      }
+      console.log('[Firebase] Plans synced:', window.state?.plans?.length || 0);
+      return;
+    }
+    const cloudPlans = [];
+    snapshot.forEach(doc => {
+      cloudPlans.push({ id: doc.id, ...doc.data() });
+    });
+
+    if (window.state) {
+      if (cloudPlans.length > 0) {
+        window.state.plans = cloudPlans;
+      }
+      console.log('[Firebase] Plans synced:', window.state.plans?.length);
+      if (typeof window.localStorage !== 'undefined') {
+        localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+      }
+      window.dispatchEvent(new CustomEvent('plateplan:remote-state-applied', { detail: { source: 'plans-collection' } }));
+      if (Array.isArray(window.plateplanSubscribers)) {
+        window.plateplanSubscribers.forEach(cb => {
+          try { cb(window.state); } catch (e) {}
+        });
+      }
+      if (typeof window.renderAll === 'function') window.renderAll();
+    }
+  }, err => {
+    console.error('[Firebase] Plans listener error:', err);
+  });
+
   unsubscribeProducts = householdDocRef.collection('products').onSnapshot(snapshot => {
     if (snapshot.empty) return;
     const cloudProducts = [];
@@ -182,6 +224,18 @@ export async function pushStateToCloud(force = false) {
           const docId = String(prod.id || prod.barcode);
           const ref = householdDocRef.collection('products').doc(docId);
           batch.set(ref, { ...prod, updatedAt: prod.updatedAt || new Date().toISOString() }, { merge: true });
+        }
+      });
+      await batch.commit();
+    }
+
+    if (Array.isArray(window.state.plans)) {
+      const batch = db.batch();
+      window.state.plans.forEach(plan => {
+        if (plan && (plan.id || plan.planId)) {
+          const docId = String(plan.id || plan.planId);
+          const ref = householdDocRef.collection('plans').doc(docId);
+          batch.set(ref, { ...plan, updatedAt: plan.updatedAt || new Date().toISOString() }, { merge: true });
         }
       });
       await batch.commit();

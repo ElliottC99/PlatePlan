@@ -1,6 +1,6 @@
-import { createLegacyView } from './create-legacy-view.js?v=3.3.4';
-import { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs } from './products.js?v=3.3.4';
-import { replaceRecipeIngredient } from './recipes.js?v=3.3.4';
+import { createLegacyView } from './create-legacy-view.js?v=3.3.5';
+import { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs } from './products.js?v=3.3.5';
+import { replaceRecipeIngredient } from './recipes.js?v=3.3.5';
 
 export { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs, replaceRecipeIngredient };
 

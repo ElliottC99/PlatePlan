@@ -1,8 +1,8 @@
 /**
- * PlatePlan v3.3.4 - Reactive Today Feature View with Robust Selector, Dynamic Fallback, & Defensive Guard
+ * PlatePlan v3.3.5 - Reactive Today Feature View with Robust Selector, Dynamic Fallback, & Defensive Guard
  */
-import { createLegacyView } from './create-legacy-view.js?v=3.3.4';
-import { subscribeToStore } from '../core/store.js?v=3.3.4';
+import { createLegacyView } from './create-legacy-view.js?v=3.3.5';
+import { subscribeToStore } from '../core/store.js?v=3.3.5';
 
 function getTodayContainer() {
   let el = document.getElementById('view-today') || 
