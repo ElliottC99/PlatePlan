@@ -1,28 +1,72 @@
-import { validatePlatePlanState } from './contracts.js?v=3.1.0';
-import { loadState, saveState } from './utils.js?v=3.1.0';
+import { validatePlatePlanState } from './contracts.js?v=3.3.0';
 
-if (typeof window !== 'undefined') {
-  window.state = window.state || {};
-  window.state.deletedPlanIds = window.state.deletedPlanIds || [];
-  window.deletedPlanIds = window.deletedPlanIds || window.state.deletedPlanIds;
+// Purge legacy backup keys on startup to prevent state resurrection bugs
+if (typeof localStorage !== 'undefined') {
+  ['plateplan_plan_backup', 'plateplan_offline_backup', 'plateplan_history_v2', 'plateplan_v1'].forEach(key => {
+    localStorage.removeItem(key);
+  });
 }
 
 /**
- * Initialise window.state entirely through scripts/core/store.js
+ * Decorates an array with standard Set-like .has() and .size properties
+ * non-enumberably, so they do not show up in JSON.stringify() operations.
  */
-export function initializeStoreState(legacy) {
-  if (typeof window !== 'undefined') {
-    if (legacy && typeof legacy.loadState === 'function') {
-      window.state = legacy.loadState();
-      window.appState = window.state;
-    } else {
-      window.state = loadState();
-      window.appState = window.state;
-    }
-    window.state.deletedPlanIds = window.state.deletedPlanIds || [];
-    window.deletedPlanIds = window.deletedPlanIds || window.state.deletedPlanIds;
+export function decorateDeletedPlanIds(arr) {
+  if (!Array.isArray(arr)) arr = [];
+  if (!Object.prototype.hasOwnProperty.call(arr, 'has')) {
+    Object.defineProperty(arr, 'has', {
+      value: function(val) {
+        return this.includes(val);
+      },
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
   }
-  return window.state;
+  if (!Object.prototype.hasOwnProperty.call(arr, 'size')) {
+    Object.defineProperty(arr, 'size', {
+      get: function() {
+        return this.length;
+      },
+      configurable: true,
+      enumerable: false
+    });
+  }
+  return arr;
+}
+
+if (typeof window !== 'undefined') {
+  window.state = window.state || {};
+  
+  // Sanitize initial deletedPlanIds
+  let deletedList = window.state.deletedPlanIds;
+  if (deletedList instanceof Set) {
+    deletedList = Array.from(deletedList);
+  }
+  window.state.deletedPlanIds = decorateDeletedPlanIds(deletedList || []);
+
+  // Intercept window.deletedPlanIds on window
+  Object.defineProperty(window, 'deletedPlanIds', {
+    get: function() {
+      if (window.state && window.state.deletedPlanIds) {
+        if (!(window.state.deletedPlanIds instanceof Set) && !Object.prototype.hasOwnProperty.call(window.state.deletedPlanIds, 'has')) {
+          decorateDeletedPlanIds(window.state.deletedPlanIds);
+        }
+        return window.state.deletedPlanIds;
+      }
+      return [];
+    },
+    set: function(val) {
+      if (val instanceof Set) {
+        val = Array.from(val);
+      }
+      if (window.state) {
+        window.state.deletedPlanIds = decorateDeletedPlanIds(val || []);
+      }
+    },
+    configurable: true,
+    enumerable: true
+  });
 }
 
 /**
@@ -88,10 +132,8 @@ export function createPlatePlanStore(adapter) {
   const listeners = new Set();
   let savingThroughStore = false;
 
-  const getState = () => adapter?.getState ? adapter.getState() : (window.state || {});
-
   const publish = detail => {
-    const state = getState();
+    const state = adapter.getState();
     const validation = validatePlatePlanState(state);
     const event = { state, validation, detail: detail || {} };
     listeners.forEach(listener => {
@@ -108,20 +150,20 @@ export function createPlatePlanStore(adapter) {
   }
 
   return Object.freeze({
-    getState,
-    validate: () => validatePlatePlanState(getState()),
+    getState: () => adapter.getState(),
+    validate: () => validatePlatePlanState(adapter.getState()),
     save: (detail = {}) => {
       savingThroughStore = true;
-      const saved = adapter?.saveState ? adapter.saveState() : saveState(getState());
+      const saved = adapter.saveState();
       savingThroughStore = false;
       if (saved) publish(detail);
       return saved;
     },
     mutate: (reason, mutator, detail = {}) => {
-      const state = getState();
+      const state = adapter.getState();
       const result = mutator(state);
       savingThroughStore = true;
-      const saved = adapter?.saveState ? adapter.saveState() : saveState(getState());
+      const saved = adapter.saveState();
       savingThroughStore = false;
       if (saved) publish({ ...detail, reason });
       return { saved, result };
@@ -143,36 +185,66 @@ export async function deletePlan(planId) {
   if (!window.state) window.state = {};
   const previousPlan = window.state.plan ? JSON.parse(JSON.stringify(window.state.plan)) : {};
 
-  // Purge backup key
+  // Synchronously remove backup key
   localStorage.removeItem('plateplan_plan_backup');
 
-  // Migrate to Array and add deleted ID
+  // Ensure window.state.deletedPlanIds is an Array and add deleted ID
   window.state.deletedPlanIds = window.state.deletedPlanIds || [];
+  if (window.state.deletedPlanIds instanceof Set) {
+    window.state.deletedPlanIds = Array.from(window.state.deletedPlanIds);
+  }
+  window.state.deletedPlanIds = decorateDeletedPlanIds(window.state.deletedPlanIds);
   if (!window.state.deletedPlanIds.includes(planId)) {
     window.state.deletedPlanIds.push(planId);
   }
-  // Remove the plan from the local array
-  window.state.plans = (window.state.plans || []).filter(p => p.id !== planId);
-  localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
 
-  // 1. Clear plan from state: state.plan = {}
-  window.state.plan = {};
+  // Filter planId out of local plans array
+  window.state.plans = (window.state.plans || []).filter(p => p && p.id !== planId && p.planId !== planId);
+
+  // Clear current active plan if it matches the deleted planId
+  if (window.state.plan && (window.state.plan.id === planId || window.state.plan.planId === planId)) {
+    window.state.plan = {};
+  }
   if (typeof state !== 'undefined' && state) {
-    state.plan = {};
+    if (state.plan && (state.plan.id === planId || state.plan.planId === planId)) {
+      state.plan = {};
+    }
+    state.plans = (state.plans || []).filter(p => p && p.id !== planId && p.planId !== planId);
   }
 
-  // 3. Synchronously call renderAll()
+  // Persist state locally
+  localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+
+  // If the modular store exists, publish the update
+  if (window.PlatePlanModules?.store) {
+    try {
+      window.PlatePlanModules.store.publish({ reason: 'plan-deletion', planId });
+    } catch (e) {
+      console.error('Store publish failed', e);
+    }
+  }
+
+  // Synchronously re-render all UI
   if (typeof window.renderAll === 'function') {
     window.renderAll();
   }
 
-  // 4. Run Firestore update within a try/catch
+  // Execute cloud deletion via Firestore deleteDoc within a safe try/catch block
   try {
     const householdId = window.activeHouseholdId || window.state?.meta?.householdId || 'elliott-chloe';
     const db = window.platePlanDb || (window.firebase && window.firebase.firestore && window.firebase.firestore());
     if (db) {
       const householdDocRef = db.collection('households').doc(householdId);
-      await householdDocRef.collection('plans').doc('current').delete();
+      const currentDocRef = householdDocRef.collection('plans').doc('current');
+      
+      const deleteDoc = async (docRef) => {
+        if (typeof docRef.delete === 'function') {
+          return await docRef.delete();
+        }
+      };
+
+      await deleteDoc(currentDocRef);
+
       const fb = window.firebase || (window.PLATEPLAN_FIREBASE && window.PLATEPLAN_FIREBASE.firebase) || (window.firebaseObj);
       if (fb) {
         await householdDocRef.update({ plan: fb.firestore.FieldValue.delete() });
@@ -180,7 +252,7 @@ export async function deletePlan(planId) {
     }
   } catch (err) {
     console.error('[PLAN DELETE ERROR - ROLLING BACK]', err);
-    // 5. Rollback to restore the local state.plan from its in-memory clone and re-render
+    // Rollback: restore the local state.plan from its in-memory clone and re-render
     window.state.plan = previousPlan;
     if (typeof state !== 'undefined' && state) {
       state.plan = previousPlan;

@@ -1,6 +1,6 @@
-import { createLegacyView } from './create-legacy-view.js?v=3.1.2';
-import { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs } from './products.js?v=3.1.2';
-import { replaceRecipeIngredient } from './recipes.js?v=3.1.2';
+import { createLegacyView } from './create-legacy-view.js?v=3.3.0';
+import { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs } from './products.js?v=3.3.0';
+import { replaceRecipeIngredient } from './recipes.js?v=3.3.0';
 
 export { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs, replaceRecipeIngredient };
 
@@ -134,6 +134,6 @@ export default createLegacyView({
           modalOverlay.style.display = 'none';
         }
       });
-    });
+    }, true);
   }
 });

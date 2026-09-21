@@ -45,9 +45,7 @@ export function installDelegatedActions(legacy) {
       const code = element.getAttribute(DATA_ATTRIBUTE_FOR_EVENT.get(eventName)) || '';
       if (!code.trim()) return;
       try {
-        const result = legacy?.runDelegatedAction
-          ? legacy.runDelegatedAction(code, event, element)
-          : (typeof window.runDelegatedAction === 'function' ? window.runDelegatedAction(code, event, element) : null);
+        const result = legacy.runDelegatedAction(code, event, element);
         if (result === false) {
           event.preventDefault();
           event.stopPropagation();
@@ -56,17 +54,10 @@ export function installDelegatedActions(legacy) {
         console.error(`PlatePlan ${eventName} action failed`, error);
         // Only show fatal modal for user-initiated clicks/submits, never for background/transient/drag events
         if (['click', 'submit'].includes(eventName)) {
-          if (legacy?.showInfo) {
-            legacy.showInfo(
-              'This action could not finish',
-              'PlatePlan kept your data unchanged. Close the panel and try the action again.'
-            );
-          } else if (typeof window.openAppInfoModal === 'function') {
-            window.openAppInfoModal(
-              'This action could not finish',
-              'PlatePlan kept your data unchanged. Close the panel and try the action again.'
-            );
-          }
+          legacy.showInfo?.(
+            'This action could not finish',
+            'PlatePlan kept your data unchanged. Close the panel and try the action again.'
+          );
         }
       }
     }, true);
