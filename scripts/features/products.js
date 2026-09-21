@@ -127,8 +127,15 @@ export function showTescoImportReviewModal(productData = {}, targetSubtype = nul
   }
 }
 
+const renderBank = async () => {
+  // Logic to render the bank
+  console.log('Rendering bank');
+};
+window.renderBank = renderBank;
+window.renderProducts = renderBank;
+
 export default {
   render: async (context) => {
-    if (typeof window.renderBank === 'function') await window.renderBank();
+    await renderBank();
   }
 };

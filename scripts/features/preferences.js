@@ -1,5 +1,11 @@
+const renderPreferences = async () => {
+  // Logic to render preferences
+  console.log('Rendering preferences');
+};
+window.renderPreferences = renderPreferences;
+
 export default {
   render: async (context) => {
-    if (typeof window.renderPrefs === 'function') await window.renderPrefs();
+    await renderPreferences();
   }
 };

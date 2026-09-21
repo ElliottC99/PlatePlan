@@ -68,9 +68,15 @@ export async function replaceRecipeIngredient(recipeId, ingredientIndex, newProd
   }
 }
 
+const renderVault = async () => {
+  // Logic to render the vault
+  console.log('Rendering vault');
+};
+window.renderVault = renderVault;
+
 export default {
   render: async (context) => {
-    if (typeof window.renderVault === 'function') await window.renderVault();
+    await renderVault();
   }
 };
 

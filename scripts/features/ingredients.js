@@ -1,5 +1,11 @@
+const renderIngredients = async () => {
+  // Logic to render the ingredients
+  console.log('Rendering ingredients');
+};
+window.renderIngredients = renderIngredients;
+
 export default {
   render: async (context) => {
-    if (typeof window.renderIngredients === 'function') await window.renderIngredients();
+    await renderIngredients();
   }
 };

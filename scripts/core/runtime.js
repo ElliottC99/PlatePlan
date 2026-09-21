@@ -58,14 +58,27 @@ export function createPlatePlanRuntime(context) {
 
   const renderView = async id => {
     try {
-      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(v => {
+        v.classList.remove('active');
+        v.style.display = 'none';
+      });
       const targetView = document.getElementById(`view-${id}`) || document.getElementById(id);
-      if (targetView) targetView.classList.add('active');
+      if (targetView) {
+        targetView.classList.add('active');
+        targetView.style.display = 'block';
+      }
 
       if (!FEATURE_LOADERS[id]) {
         return null;
       }
       const feature = await loadFeature(id);
+      
+      // Execute the global renderer if it exists
+      const rendererName = 'render' + id.charAt(0).toUpperCase() + id.slice(1);
+      if (typeof window[rendererName] === 'function') {
+        window[rendererName]();
+      }
+      
       if (feature) {
         return await feature.render(context);
       }

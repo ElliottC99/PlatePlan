@@ -4,9 +4,15 @@ import { safeStringify } from '../core/utils.js?v=3.3.7';
 
 export { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs, replaceRecipeIngredient };
 
+const renderData = async () => {
+  // Logic to render data quality
+  console.log('Rendering data quality');
+};
+window.renderData = renderData;
+
 export default {
   render: async (context) => {
-    if (typeof window.renderDataQuality === 'function') await window.renderDataQuality();
+    await renderData();
   },
   install(context) {
     const root = document.getElementById('view-data');
