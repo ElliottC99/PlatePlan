@@ -207,14 +207,14 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='3.0.8';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v88';
-window.APP_VERSION = '3.0.8';
+const PLATEPLAN_APP_VERSION='3.0.9';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v89';
+window.APP_VERSION = '3.0.9';
 window._hydrationLogged = false;
 window.state = window.state || {};
 window.state.deletedPlanIds = window.state.deletedPlanIds || new Set();
 window.deletedPlanIds = window.deletedPlanIds || window.state.deletedPlanIds;
-console.log("[v3.0.8 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
+console.log("[v3.0.9 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
 
 try {
   const OBSOLETE_KEYS = ['app_version', 'data:chloe', 'data:elliott', 'plateplan_v1', 'plateplan_v1_baked_candidate', 'plateplan_v1_chloe', 'plateplan_v1_elliott', 'plateplan_v1_device_id', 'plateplan_v1_recovery', 'plateplan_history_backup'];
@@ -625,7 +625,7 @@ window.sortRecipesByFit = getSortedRecipes;
 
 // == v3.0.6 BATCH RECIPE PRODUCT RELINKING ENGINE ==
 async function runGlobalProductRelink() {
-  console.log('[v3.0.6 RELINK ENGINE] Starting batch recipe product relinking...');
+  // console.log('[v3.0.6 RELINK ENGINE] Starting batch recipe product relinking...');
   if (!state) return { success: false, updatedCount: 0 };
   const recipesList = Array.isArray(state.recipes) ? state.recipes : (state.recipes && typeof state.recipes === 'object' ? Object.values(state.recipes) : []);
   if (!recipesList.length) {
@@ -706,7 +706,7 @@ async function runGlobalProductRelink() {
   saveState();
   rebuildPlatePlanIndexes();
   renderAll();
-  console.log(`[v3.0.6 RELINK ENGINE] Relink complete. Updated ${relinkedCount} recipes.`);
+  // console.log(`[v3.0.6 RELINK ENGINE] Relink complete. Updated ${relinkedCount} recipes.`);
   showPlatePlanToast(`Relink complete! Updated ${relinkedCount} recipes. ✓`);
   return { success: true, updatedCount: relinkedCount };
 }
@@ -3736,9 +3736,55 @@ function startPlatePlanCloudListeners(){
     if(platePlanTransactionShield.inFlight || (Date.now() - platePlanTransactionShield.lastCompletedAt < platePlanTransactionShield.cooldownMs)) return;
     if(snapshot.metadata && snapshot.metadata.hasPendingWrites) return;
 
-    // Merge subcollection docs with data/recipes document objects, deduplicating by id
+    if (!state.recipes) state.recipes = [];
+    const recipeMap = new Map();
+    state.recipes.forEach(r => {
+      if (r && r.id) recipeMap.set(String(r.id), r);
+    });
+
     const sources = [...snapshot.docs, ...(lastLoadedDataRecipesDoc || [])];
-    populateRecipesState(sources, { merge: true });
+    sources.forEach(doc => {
+      if (!doc) return;
+      const raw = (typeof doc.data === 'function') ? doc.data() : (doc.data && typeof doc.data === 'object' && !doc.name ? doc.data : doc);
+      if (!raw || typeof raw !== 'object') return;
+      const clean = unwrapAndCleanItem(raw) || {};
+      if (!clean.id) {
+        if (doc.id) clean.id = doc.id;
+        else if (raw.id) clean.id = raw.id;
+        else if (clean.name) clean.id = 'recipe_' + String(clean.name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        else clean.id = 'recipe_' + Math.random().toString(36).substr(2, 9);
+      }
+      clean.id = String(clean.id);
+      clean.isFavorite = (clean.isFavorite !== undefined) ? !!clean.isFavorite : false;
+      clean.isFavourite = clean.isFavorite;
+
+      const parseTS = (val) => {
+        if (!val) return 0;
+        if (typeof val.toDate === 'function') return val.toDate().getTime();
+        if (val.seconds !== undefined) return val.seconds * 1000 + Math.floor((val.nanoseconds || 0) / 1000000);
+        if (val._seconds !== undefined) return val._seconds * 1000 + Math.floor((val._nanoseconds || 0) / 1000000);
+        const d = new Date(val);
+        const t = d.getTime();
+        return isNaN(t) ? 0 : t;
+      };
+
+      if (recipeMap.has(clean.id)) {
+        const existing = recipeMap.get(clean.id);
+        const localTime = parseTS(existing.updatedAt);
+        const cloudTime = parseTS(clean.updatedAt);
+        if (!localTime || cloudTime >= localTime) {
+          Object.assign(existing, clean);
+        }
+      } else {
+        state.recipes.push(clean);
+        recipeMap.set(clean.id, clean);
+      }
+    });
+
+    state.recipes.forEach(r => {
+      if (r && r.id) state.recipes[r.id] = r;
+    });
+
     window.state = state;
     window.appState = state;
 
@@ -3747,10 +3793,6 @@ function startPlatePlanCloudListeners(){
     runDataQualityAudits();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    if(!window._hydrationLogged) {
-      console.log("[v3.0.8 HYDRATION]", state.recipes.length, "recipes loaded.");
-      window._hydrationLogged = true;
-    }
   }, error => {
     console.error('[RECIPES SUBCOLLECTION LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
@@ -3774,7 +3816,7 @@ function startPlatePlanCloudListeners(){
     runDataQualityAudits();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v3.0.6 HYDRATION]", state.recipes.length, "recipes loaded.");
+    // console.log("[v3.0.6 HYDRATION]", state.recipes.length, "recipes loaded.");
   }, error => {
     console.warn('[DATA RECIPES LISTENER ERROR]', error);
   });
@@ -3828,7 +3870,7 @@ function startPlatePlanCloudListeners(){
     renderAll();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v3.0.6 HYDRATION]", state.recipes.length, "recipes loaded.");
+    // console.log("[v3.0.6 HYDRATION]", state.recipes.length, "recipes loaded.");
   }, error => {
     console.error('[HOUSEHOLD ROOT METADATA LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
@@ -3913,7 +3955,7 @@ async function loadSharedPlatePlan(){
     window.appState = state;
 
     const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
-    console.log('[FIRESTORE READ PATH]', householdDocRef.path);
+    // console.log('[FIRESTORE READ PATH]', householdDocRef.path);
 
   // 1. Fetch Root Document
   let rootSnapshot = null;
@@ -4069,7 +4111,7 @@ async function loadSharedPlatePlan(){
         const parsed = JSON.parse(localBackup);
         const recs = parsed.recipes || (Array.isArray(parsed) ? parsed : null);
         if (Array.isArray(recs) && recs.length > 0) {
-          console.log('[RECIPES HYDRATION] Hydrating recipes from local backup storage...');
+          // console.log('[RECIPES HYDRATION] Hydrating recipes from local backup storage...');
           recs.forEach(r => { if(r) allRecipeSources.push(r); });
         }
       }
@@ -4080,9 +4122,9 @@ async function loadSharedPlatePlan(){
   populateRecipesState(allRecipeSources);
   state.isCloudHydrated = true;
   window.isCloudHydrated = true;
-  console.log(`[RECIPES HYDRATION] Deterministically hydrated and deduplicated ${state.recipes.length} recipes across multi-path check.`);
+  // console.log(`[RECIPES HYDRATION] Deterministically hydrated and deduplicated ${state.recipes.length} recipes across multi-path check.`);
   if(!window._hydrationLogged) {
-    console.log("[v3.0.7 HYDRATION]", state.recipes.length, "recipes loaded.");
+    // console.log("[v3.0.7 HYDRATION]", state.recipes.length, "recipes loaded.");
     window._hydrationLogged = true;
   }
 
@@ -4223,7 +4265,7 @@ async function loadSharedPlatePlan(){
     isHydrating = false;
     window.isHydrating = false;
     lastPersistedStateJson = safeJsonStringify(state);
-    console.log('[v3.0.5 STATE PERSISTENCE] Hydration complete; cloud diff checks enabled.');
+    // console.log('[v3.0.5 STATE PERSISTENCE] Hydration complete; cloud diff checks enabled.');
   }
 }
 
@@ -19217,21 +19259,23 @@ function saveTescoIngredient(categoryReady=false){
     id:'ing'+Date.now(),
     name,
     brand: document.getElementById('tp-brand').value.trim(),
-    cat: document.getElementById('tp-cat').value,
-    storage: document.getElementById('tp-storage').value,
+    cat: selectedCat,
+    category: selectedCat,
+    storage: selectedStorage,
     cal: +document.getElementById('tp-cal').value||0,
     fat: +document.getElementById('tp-fat').value||0,
     carb: +document.getElementById('tp-carb').value||0,
-    fibre: +document.getElementById('tp-fibre').value||0,
+    fibre: selectedFibre,
     prot: +document.getElementById('tp-prot').value||0,
-    price: +document.getElementById('tp-price').value||null,
-    packSize: +document.getElementById('tp-pack').value||null,
-    packUnit: document.getElementById('tp-pack-unit').value||'g',
-    itemWeight: +document.getElementById('tp-item-weight').value||null,
-    itemWeightUnit: document.getElementById('tp-item-weight-unit')?.value||'g',
-    drainedWeight: +document.getElementById('tp-drained-weight')?.value||null,
-    drainedWeightUnit: document.getElementById('tp-drained-weight-unit')?.value||'g',
-    notes: document.getElementById('tp-notes').value.trim(),
+    price: newPrice,
+    packSize: newSize,
+    packUnit: newUnit,
+    itemWeight: newWeight,
+    itemWeightUnit: newWeightUnit,
+    drainedWeight: newDrainedWeight,
+    usableWeight: newDrainedWeight,
+    drainedWeightUnit: newDrainedWeightUnit,
+    notes: selectedNotes,
     sourceUrl: newSourceUrl,
     itemCount: newItemCount,
     meatSubstituteFor: null,
@@ -21509,73 +21553,48 @@ function removeWizardUseUpProduct(productId) {
 }
 window.removeWizardUseUpProduct = removeWizardUseUpProduct;
 
-// DEDICATED PLAN DELETION PIPELINE (v3.0.8)
+// DEDICATED PLAN DELETION PIPELINE (v3.0.9)
 if (!window.state) window.state = {};
 window.state.deletedPlanIds = window.state.deletedPlanIds || new Set();
 window.deletedPlanIds = window.deletedPlanIds || window.state.deletedPlanIds;
 
 async function deletePlan(planId) {
-  if (!planId) return;
-  const householdId = window.CURRENT_HOUSEHOLD_ID || window.activeHouseholdId || state?.meta?.householdId || 'elliott-chloe';
+  if (!window.state) window.state = {};
+  const previousPlan = window.state.plan ? JSON.parse(JSON.stringify(window.state.plan)) : {};
 
-  // 1. Synchronously add planId to window.state.deletedPlanIds
-  window.state.deletedPlanIds.add(planId);
-  window.deletedPlanIds.add(planId);
-
-  // Preserve removed plan for rollback
-  let previousPlans = Array.isArray(window.state.plans) ? [...window.state.plans] : [];
-  let previousPlan = previousPlans.find(p => p && (p.id === planId || p.planId === planId));
-
-  // 2. Synchronously filter planId out of window.state.plans
-  if (Array.isArray(window.state.plans)) {
-    window.state.plans = window.state.plans.filter(p => p && p.id !== planId && p.planId !== planId);
-  }
-  if (Array.isArray(state?.plans)) {
-    state.plans = state.plans.filter(p => p && p.id !== planId && p.planId !== planId);
-  }
-  if (Array.isArray(state?.planHistory)) {
-    state.planHistory = state.planHistory.filter(p => p && p.id !== planId && p.planId !== planId);
-  }
-  if (window.state?.plan?.id === planId || state?.plan?.id === planId) {
-    if (window.state) window.state.plan = null;
-    if (state) state.plan = null;
+  // 1. Clear plan from state: state.plan = {}
+  window.state.plan = {};
+  if (typeof state !== 'undefined' && state) {
+    state.plan = {};
   }
 
-  // Persist directly to local storage backups
-  try {
-    safeLocalStorageSet(SK, safeJsonStringify(state));
-    safeLocalStorageSet('plateplan_plan_backup', '');
-    if (Array.isArray(state.plans)) {
-      safeLocalStorageSet('plateplan_history_v2', JSON.stringify(state.plans));
-    }
-  } catch(e) {}
+  // 2. Erase from localStorage
+  localStorage.removeItem('plateplan_plan_backup');
 
-  // 3. Trigger a UI re-render
-  if (!state.plan || !state.plan.slots || (Array.isArray(state.plans) && state.plans.length === 0)) {
-    state.plannerStep = 1;
-  }
+  // 3. Synchronously call renderAll()
   if (typeof renderPlanHistory === 'function') renderPlanHistory();
   if (typeof renderPlan === 'function') renderPlan();
   renderAll();
 
-  // 4. Execute the Firestore deleteDoc wrapped in a try/catch
+  // 4. Run Firestore update within a try/catch
   try {
-    const db = platePlanDb || (window.firebase && firebase.firestore && firebase.firestore());
+    const householdId = window.activeHouseholdId || window.state?.meta?.householdId || 'elliott-chloe';
+    const db = window.platePlanDb || (window.firebase && window.firebase.firestore && window.firebase.firestore());
     if (db) {
-      await db.collection('households').doc(householdId).collection('plans').doc(planId).delete();
-      console.log('[v3.0.8 STATE PERSISTENCE] Plan deleted directly from Firestore:', planId);
+      const householdDocRef = db.collection('households').doc(householdId);
+      await householdDocRef.collection('plans').doc('current').delete();
+      const fb = window.firebase || (window.PLATEPLAN_FIREBASE && window.PLATEPLAN_FIREBASE.firebase) || (window.firebaseObj);
+      if (fb) {
+        await householdDocRef.update({ plan: fb.firestore.FieldValue.delete() });
+      }
       showPlatePlanToast('Plan deleted successfully. ✓');
     }
-  } catch(err) {
-    console.error('[v3.0.8 STATE PERSISTENCE] Direct Firestore deletion error - ROLLING BACK:', err);
-    // 5. In catch block: remove planId from deleted set, restore it to plans, re-render, and show error toast
-    window.state.deletedPlanIds.delete(planId);
-    window.deletedPlanIds.delete(planId);
-    if (previousPlan) {
-      if (!Array.isArray(window.state.plans)) window.state.plans = [];
-      window.state.plans.push(previousPlan);
-      if (!Array.isArray(state.plans)) state.plans = [];
-      state.plans.push(previousPlan);
+  } catch (err) {
+    console.error('[PLAN DELETE ERROR - ROLLING BACK]', err);
+    // 5. Rollback to restore the local state.plan from its in-memory clone and re-render
+    window.state.plan = previousPlan;
+    if (typeof state !== 'undefined' && state) {
+      state.plan = previousPlan;
     }
     if (typeof renderPlanHistory === 'function') renderPlanHistory();
     if (typeof renderPlan === 'function') renderPlan();
