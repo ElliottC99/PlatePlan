@@ -207,10 +207,15 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='3.0.4';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v84';
-window.APP_VERSION = '3.0.4';
-console.log("[v3.0.4 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
+const PLATEPLAN_APP_VERSION='3.0.5';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v85';
+window.APP_VERSION = '3.0.5';
+console.log("[v3.0.5 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
+
+try {
+  localStorage.removeItem('plateplan_v1_recovery');
+  localStorage.removeItem('plateplan_history_backup');
+} catch(_e) {}
 
 let isHydrating = false;
 window.isHydrating = false;
@@ -291,7 +296,7 @@ function sanitizePayloadForFirestore(data){
 }
 window.sanitizePayloadForFirestore = sanitizePayloadForFirestore;
 
-// == v3.0.4 PIECEWISE FIT SCORE & TRAFFIC LIGHT FORMULA ==
+// == v3.0.5 PIECEWISE FIT SCORE & TRAFFIC LIGHT FORMULA ==
 function calculateMacroFitTierAndScore(calActual, calTarget, protActual, protTarget) {
   const cAct = Number(calActual) || 0;
   const cTgt = Number(calTarget) || 0;
@@ -299,14 +304,14 @@ function calculateMacroFitTierAndScore(calActual, calTarget, protActual, protTar
   const pTgt = Number(protTarget) || 0;
 
   if (cTgt <= 0 || pTgt <= 0) {
-    return { tier: 'amber-green', score: 70, label: 'No Target Set', colors: 'background:#fef9c3;color:#854d0e;border:1px solid #fde047;' };
+    return { tier: 'amber-green', score: 70, label: 'No Target Set', colors: 'background:#fef9c3;color:#854d0e;border:1px solid #fde047;', rC: 1, rP: 1 };
   }
 
   const rC = cAct / cTgt;
   const rP = pAct / pTgt;
 
   let tier = 'red';
-  let score = 25;
+  let rawScore = 25;
   let label = 'Poor Fit';
   let colors = 'background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;';
 
@@ -314,7 +319,7 @@ function calculateMacroFitTierAndScore(calActual, calTarget, protActual, protTar
   if (rP >= 1.0 && rC >= 0.95 && rC <= 1.05) {
     tier = 'green';
     const calDev = Math.abs(1.0 - rC); // 0 to 0.05
-    score = Math.round(100 - (calDev / 0.05) * 15);
+    rawScore = 100 - (calDev / 0.05) * 15;
     label = 'Ideal Fit';
     colors = 'background:#dcfce7;color:#15803d;border:1px solid #86efac;';
   }
@@ -322,7 +327,9 @@ function calculateMacroFitTierAndScore(calActual, calTarget, protActual, protTar
   // (Rp >= 1.0 AND 1.05 < Rc <= 1.15) OR (0.90 <= Rp < 1.0 AND Rc <= 1.05)
   else if ((rP >= 1.0 && rC > 1.05 && rC <= 1.15) || (rP >= 0.90 && rP < 1.0 && rC <= 1.05)) {
     tier = 'amber-green';
-    score = 75;
+    const pDev = rP < 1.0 ? (1.0 - rP) / 0.10 : 0;
+    const cDev = rC > 1.05 ? (rC - 1.05) / 0.10 : 0;
+    rawScore = 84 - Math.max(pDev, cDev) * 19;
     label = 'Acceptable';
     colors = 'background:#fef9c3;color:#854d0e;border:1px solid #fde047;';
   }
@@ -330,7 +337,9 @@ function calculateMacroFitTierAndScore(calActual, calTarget, protActual, protTar
   // (Rp < 0.90 AND Rc <= 1.05) OR (Rp >= 1.0 AND Rc > 1.15)
   else if ((rP < 0.90 && rC <= 1.05) || (rP >= 1.0 && rC > 1.15)) {
     tier = 'amber-red';
-    score = 52;
+    const pDev = rP < 0.90 ? (0.90 - rP) / 0.30 : 0;
+    const cDev = rC > 1.15 ? (rC - 1.15) / 0.35 : 0;
+    rawScore = 64 - Math.max(pDev, cDev) * 24;
     label = 'Suboptimal';
     colors = 'background:#ffedd5;color:#9a3412;border:1px solid #fdba74;';
   }
@@ -338,11 +347,14 @@ function calculateMacroFitTierAndScore(calActual, calTarget, protActual, protTar
   // Rp < 0.90 AND Rc > 1.05
   else {
     tier = 'red';
-    score = 25;
+    const pDev = Math.max(0, 0.90 - rP) / 0.90;
+    const cDev = Math.max(0, rC - 1.05) / 0.95;
+    rawScore = 39 - Math.max(pDev, cDev) * 39;
     label = 'Poor Fit';
     colors = 'background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;';
   }
 
+  const score = Math.min(100, Math.max(0, Math.round(rawScore)));
   return { tier, score, label, colors, rC, rP };
 }
 window.calculateMacroFitTierAndScore = calculateMacroFitTierAndScore;
@@ -373,14 +385,46 @@ let platePlanEarlierDaysExpanded = false;
 const PLATEPLAN_LIST_BATCH = 24;
 
 // ============================================================================
-// == v3.0.4 ROBUST PERSISTENCE & STATE RECOVERY ARCHITECTURE ==
+// == v3.0.5 ROBUST PERSISTENCE & STATE RECOVERY ARCHITECTURE ==
 // ============================================================================
 
 /**
- * A. Defensive LocalStorage Engine
- * Wraps operations, catches QuotaExceededError, auto-prunes non-essential keys,
+ * A. Defensive LocalStorage Engine & Quota Management
+ * Wraps operations, catches QuotaExceededError, auto-prunes legacy bloat keys,
  * and preserves critical keys (household_id, session tokens, etc.).
  */
+function safeSaveHistoryBackup(historyArray) {
+  try {
+    localStorage.removeItem('plateplan_history_backup');
+    localStorage.removeItem('plateplan_v1_recovery');
+  } catch(_e) {}
+  if (!Array.isArray(historyArray) || !historyArray.length) {
+    try { localStorage.setItem('plateplan_history_v2', '[]'); } catch(_e) {}
+    return;
+  }
+  let items = historyArray.slice(-30).map(p => {
+    if (!p || typeof p !== 'object') return null;
+    return {
+      id: p.id || ('plan_' + Date.now()),
+      name: p.name || p.title || 'Meal Plan',
+      days: p.days || (p.slots ? Object.keys(p.slots).length : 0),
+      createdAt: p.createdAt || p.appliedAt || p.date,
+      score: p.score || 0,
+      slots: p.slots || {}
+    };
+  }).filter(Boolean);
+
+  let serialized = JSON.stringify(items);
+  while (serialized.length > 100000 && items.length > 1) {
+    items.shift();
+    serialized = JSON.stringify(items);
+  }
+  try {
+    localStorage.setItem('plateplan_history_v2', serialized);
+  } catch (_err) {}
+}
+window.safeSaveHistoryBackup = safeSaveHistoryBackup;
+
 function safeLocalStorageSet(key, data) {
   let serialized = '';
   try {
@@ -394,11 +438,11 @@ function safeLocalStorageSet(key, data) {
   } catch (err) {
     if (err && (err.name === 'QuotaExceededError' || err.code === 22 || String(err).includes('QuotaExceededError') || String(err.message || '').toLowerCase().includes('quota'))) {
       console.warn(`[Storage Guard] LocalStorage full on key '${key}'. Pruning cache...`);
-      // Evict low-priority backup caches while preserving critical keys
+      // Evict legacy/low-priority backup caches while preserving critical keys
       const nonEssentialKeys = [
+        'plateplan_v1_recovery',
         'plateplan_history_backup',
         'plateplan_offline_backup',
-        'plateplan_v1_recovery',
         'plateplan_recovery_history',
         'plateplan_recipes_backup',
         'plateplan_recipes_backup_v2',
@@ -571,7 +615,7 @@ function updatePlanHistory(plan) {
     const filtered = (state.planHistory || []).filter(p => p.id !== planId);
     state.planHistory = [snap, ...filtered].slice(0, 15);
   }
-  safeLocalStorageSet('plateplan_history_backup', state?.planHistory || []);
+  safeSaveHistoryBackup(state?.planHistory || []);
   if (typeof renderPlanHistoryPanel === 'function') renderPlanHistoryPanel();
 }
 window.updatePlanHistory = updatePlanHistory;
@@ -1464,7 +1508,7 @@ function loadState(){
     }
 
     // Restore historical meal plans if empty
-    const historyBackupRaw = localStorage.getItem('plateplan_history_backup');
+    const historyBackupRaw = localStorage.getItem('plateplan_history_v2') || localStorage.getItem('plateplan_history_backup');
     if(historyBackupRaw && (!Array.isArray(s.planHistory) || s.planHistory.length === 0)){
       try {
         const parsedHist = JSON.parse(historyBackupRaw);
@@ -2604,9 +2648,9 @@ function saveState(immediate=false){
   window.dispatchEvent(new CustomEvent('plateplan:state-saved',{detail:{source:'cloud',savedAt:Date.now()}}));
   if(state) {
     state.updatedAt=new Date().toISOString();
-    state.version = '3.0.4';
+    state.version = '3.0.5';
     if (state.plan && typeof state.plan === 'object') {
-      state.plan.version = '3.0.4';
+      state.plan.version = '3.0.5';
     }
   }
   window.state = state;
@@ -2618,7 +2662,7 @@ function saveState(immediate=false){
       safeLocalStorageSet('plateplan_plan_backup', sanitizePlanForFirestore(state.plan));
     }
     if(state && Array.isArray(state.planHistory) && state.planHistory.length > 0){
-      safeLocalStorageSet('plateplan_history_backup', safeJsonStringify(state.planHistory));
+      safeSaveHistoryBackup(state.planHistory);
     }
   }catch(e){
     console.warn('Local storage write warning:',e);
@@ -2634,7 +2678,7 @@ function saveState(immediate=false){
   }
 
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.0.4 STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
+    console.log('[v3.0.5 STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
     return true;
   }
 
@@ -3332,7 +3376,7 @@ function startPlatePlanCloudListeners(){
     runDataQualityAudits();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v3.0.4 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+    console.log("[v3.0.5 HYDRATION]", state.recipes.length, "recipes loaded.");
   }, error => {
     console.error('[RECIPES SUBCOLLECTION LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
@@ -3356,7 +3400,7 @@ function startPlatePlanCloudListeners(){
     runDataQualityAudits();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v3.0.4 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+    console.log("[v3.0.5 HYDRATION]", state.recipes.length, "recipes loaded.");
   }, error => {
     console.warn('[DATA RECIPES LISTENER ERROR]', error);
   });
@@ -3392,7 +3436,7 @@ function startPlatePlanCloudListeners(){
     if(sourceData.overrides !== undefined) state.overrides = sourceData.overrides;
     if(Array.isArray(sourceData.planHistory) && sourceData.planHistory.length > 0){
       state.planHistory = sourceData.planHistory;
-      safeLocalStorageSet('plateplan_history_backup', safeJsonStringify(sourceData.planHistory));
+      safeSaveHistoryBackup(sourceData.planHistory);
     }
     if(sourceData.ingredientGroups !== undefined) state.ingredientGroups = sourceData.ingredientGroups;
     if(sourceData.ingredientFamilies !== undefined) state.ingredientFamilies = sourceData.ingredientFamilies;
@@ -3410,7 +3454,7 @@ function startPlatePlanCloudListeners(){
     renderAll();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v3.0.4 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+    console.log("[v3.0.5 HYDRATION]", state.recipes.length, "recipes loaded.");
   }, error => {
     console.error('[HOUSEHOLD ROOT METADATA LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
@@ -3453,7 +3497,7 @@ function startPlatePlanCloudListeners(){
       state.planHistory = val;
       window.state = state;
       window.appState = state;
-      safeLocalStorageSet('plateplan_history_backup', safeJsonStringify(val));
+      safeSaveHistoryBackup(val);
     }
   }, error => {
     console.warn('[PLAN HISTORY LISTENER ERROR]', error);
@@ -3659,7 +3703,7 @@ async function loadSharedPlatePlan(){
   state.isCloudHydrated = true;
   window.isCloudHydrated = true;
   console.log(`[RECIPES HYDRATION] Deterministically hydrated and deduplicated ${state.recipes.length} recipes across multi-path check.`);
-  console.log("[v3.0.4 HYDRATION]", state.recipes.length, "recipes loaded:", state.recipes.map(r => r.name || r.title));
+  console.log("[v3.0.5 HYDRATION]", state.recipes.length, "recipes loaded.");
 
   const metaDoc = dataDocs.meta || {};
   const taxonomyDoc = dataDocs.taxonomy || {};
@@ -3724,7 +3768,7 @@ async function loadSharedPlatePlan(){
     if (rawP) localPlanBackup = JSON.parse(rawP);
   } catch(_e) {}
   try {
-    const rawH = localStorage.getItem('plateplan_history_backup');
+    const rawH = localStorage.getItem('plateplan_history_v2') || localStorage.getItem('plateplan_history_backup');
     if (rawH) localHistoryBackup = JSON.parse(rawH);
   } catch(_e) {}
   try {
@@ -3771,7 +3815,7 @@ async function loadSharedPlatePlan(){
     safeLocalStorageSet('plateplan_plan_backup', sanitizePlanForFirestore(resolvedPlan));
   }
   if(Array.isArray(resolvedHistory) && resolvedHistory.length > 0){
-    safeLocalStorageSet('plateplan_history_backup', safeJsonStringify(resolvedHistory));
+    safeSaveHistoryBackup(resolvedHistory);
   }
 
   state.meta = {
@@ -3798,7 +3842,7 @@ async function loadSharedPlatePlan(){
     isHydrating = false;
     window.isHydrating = false;
     lastPersistedStateJson = safeJsonStringify(state);
-    console.log('[v3.0.4 STATE PERSISTENCE] Hydration complete; cloud diff checks enabled.');
+    console.log('[v3.0.5 STATE PERSISTENCE] Hydration complete; cloud diff checks enabled.');
   }
 }
 
@@ -8289,6 +8333,56 @@ function recalcAllRecipes(){
   state.recipes.forEach(r => { if(recalcRecipeObject(r)) changed++; });
   return changed;
 }
+
+function relinkSubtypeProductsInRecipes(subtypeId, preferredProductId) {
+  if (!subtypeId || !preferredProductId) return 0;
+  const group = getIngredientGroup(subtypeId);
+  const product = getProduct(preferredProductId);
+  if (group) {
+    group.defaultProductId = preferredProductId;
+    group.productId = preferredProductId;
+    if (!Array.isArray(group.productIds)) group.productIds = [];
+    if (!group.productIds.includes(preferredProductId)) group.productIds.push(preferredProductId);
+  }
+  if (product && product.groupId !== subtypeId) {
+    product.groupId = subtypeId;
+  }
+
+  let updatedRecipeCount = 0;
+  const allRecipes = Array.isArray(state?.recipes) ? state.recipes : [];
+  allRecipes.forEach(recipe => {
+    let touched = false;
+    const processIngredient = (ing) => {
+      if (!ing) return;
+      const ingGroupId = getRecipeIngredientGroupId(ing) || ing.groupId || '';
+      if (ingGroupId === subtypeId || ing.bankId === preferredProductId) {
+        ing.bankId = preferredProductId;
+        ing.groupId = subtypeId;
+        touched = true;
+      }
+    };
+
+    (recipe.ingredients || []).forEach(processIngredient);
+    if (recipe.enhanced && Array.isArray(recipe.enhanced.ingredients)) {
+      recipe.enhanced.ingredients.forEach(processIngredient);
+    }
+
+    if (touched) {
+      recalcRecipeObject(recipe);
+      updatedRecipeCount++;
+    }
+  });
+
+  refreshPlatePlanDerivedState({
+    changedProductIds: [preferredProductId],
+    changedGroupIds: [subtypeId],
+    persist: true,
+    render: true
+  });
+
+  return updatedRecipeCount;
+}
+window.relinkSubtypeProductsInRecipes = relinkSubtypeProductsInRecipes;
 
 function refreshProductGroupAndRecipes(productId){
   const product = getProduct(productId);
@@ -13043,6 +13137,9 @@ function closeSubtypeResolutionModal(){
     if (modal) modal.style.display = 'none';
 }
 
+let currentTescoImportData = null;
+let currentTescoImportPayloadCache = '';
+
 function openTescoJsonImportModal(subTypeId) {
     closeSubtypeResolutionModal();
     let modal = document.getElementById('tesco-json-import-modal');
@@ -13054,14 +13151,23 @@ function openTescoJsonImportModal(subTypeId) {
     modal.className = 'modal active';
     modal.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;padding:16px;';
 
+    renderTescoJsonImportStep1(subTypeId);
+}
+window.openTescoJsonImportModal = openTescoJsonImportModal;
+
+function renderTescoJsonImportStep1(subTypeId, initialPayload = '') {
+    const modal = document.getElementById('tesco-json-import-modal');
+    if (!modal) return;
+
     const group = getIngredientGroup(subTypeId);
     const subTypeName = group ? (group.name || getGroupTypeName(group)) : (subTypeId || '');
+    const searchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(subTypeName)}`;
 
     modal.innerHTML = `
-      <div class="card" style="width:100%;max-width:560px;padding:24px;border-radius:14px;background:var(--surface,#fff);box-shadow:0 12px 36px rgba(0,0,0,0.25);position:relative;max-height:90vh;overflow-y:auto">
+      <div class="card" style="width:100%;max-width:580px;padding:24px;border-radius:14px;background:var(--surface,#fff);box-shadow:0 12px 36px rgba(0,0,0,0.25);position:relative;max-height:90vh;overflow-y:auto">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px">
           <div>
-            <h2 style="font-size:18px;font-weight:700;margin:0;color:var(--text)">Import from Tesco (Bookmarklet JSON)</h2>
+            <h2 style="font-size:18px;font-weight:700;margin:0;color:var(--text)">Import from Tesco (Step 1 of 2)</h2>
             <div style="font-size:13px;color:var(--text2);margin-top:4px">
               Target Sub-type: <strong style="color:var(--text)">${ppEscapeHtml(subTypeName)}</strong>
             </div>
@@ -13069,39 +13175,40 @@ function openTescoJsonImportModal(subTypeId) {
           <button type="button" class="btn sm ghost" style="padding:4px 8px;font-size:16px;line-height:1" onclick="closeTescoJsonImportModal()" title="Close">✕</button>
         </div>
 
-        <p style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:14px">
-          Run the PlatePlan bookmarklet on any Tesco grocery product page, then paste the exported JSON below:
-        </p>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div style="font-size:13px;color:var(--text)">
+            Open Tesco.com, search for your item, copy the URL, and run your PlatePlan Bookmarklet:
+          </div>
+          <a href="${ppEscapeAttr(searchUrl)}" target="_blank" rel="noopener noreferrer" class="btn sm ghost" style="font-size:12px;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;text-decoration:none">
+            🔍 Search "${ppEscapeHtml(subTypeName)}" on Tesco ↗
+          </a>
+        </div>
 
-        <textarea id="tesco-json-payload" placeholder="Paste Tesco Bookmarklet JSON output here..." style="width:100%;height:140px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;padding:12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);box-sizing:border-box;resize:vertical" autofocus></textarea>
+        <textarea id="tesco-json-payload" placeholder="Paste Tesco Bookmarklet JSON payload here..." style="width:100%;height:140px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;padding:12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);box-sizing:border-box;resize:vertical" autofocus>${ppEscapeHtml(initialPayload || currentTescoImportPayloadCache || '')}</textarea>
         
         <div id="tesco-json-error" style="display:none;color:var(--red,#dc2626);font-size:12px;margin-top:8px"></div>
 
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
           <button type="button" class="btn ghost sm" onclick="closeTescoJsonImportModal()">Cancel</button>
-          <button type="button" class="btn primary sm" style="font-weight:700" onclick="processTescoJsonPayload('${ppEscapeAttr(subTypeId)}')">Process &amp; Link Product</button>
+          <button type="button" class="btn primary sm" style="font-weight:700" onclick="previewTescoJsonPayload('${ppEscapeAttr(subTypeId)}')">Parse JSON →</button>
         </div>
       </div>
     `;
 }
-window.openTescoJsonImportModal = openTescoJsonImportModal;
+window.renderTescoJsonImportStep1 = renderTescoJsonImportStep1;
 
-function closeTescoJsonImportModal() {
-    const modal = document.getElementById('tesco-json-import-modal');
-    if (modal) modal.style.display = 'none';
-}
-window.closeTescoJsonImportModal = closeTescoJsonImportModal;
-
-async function processTescoJsonPayload(subTypeId) {
+function previewTescoJsonPayload(subTypeId) {
     const rawText = document.getElementById('tesco-json-payload')?.value?.trim();
     const errorEl = document.getElementById('tesco-json-error');
     if (!rawText) {
       if (errorEl) {
-        errorEl.textContent = 'Please paste the Tesco JSON payload before processing.';
+        errorEl.textContent = 'Please paste the Tesco JSON payload before proceeding.';
         errorEl.style.display = 'block';
       }
       return;
     }
+
+    currentTescoImportPayloadCache = rawText;
 
     let data = null;
     try {
@@ -13117,10 +13224,20 @@ async function processTescoJsonPayload(subTypeId) {
     const group = getIngredientGroup(subTypeId);
     const cat = group?.cat || 'other';
 
-    const product = {
+    let brand = toTitleCase((data.brand || '').trim());
+    let name = data.title || data.name || data.productTitle || 'Tesco Product';
+    if (brand && brand !== 'Generic') {
+      let re = new RegExp('\\b' + brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'ig');
+      name = name.replace(re, '').trim();
+    }
+    name = name.replace(/\s+(?:\d+\s*[x×]\s*)?\d+(?:\.\d+)?\s*(g|kg|ml|l|pack)$/i, '').trim();
+    name = name.replace(/^[-,\s]+|[-,\s]+$/g, '').trim();
+    name = toTitleCase(name) || 'Tesco Product';
+
+    currentTescoImportData = {
       id: data.id || ('ing' + Date.now()),
-      name: data.title || data.name || data.productTitle || 'Tesco Product',
-      brand: data.brand || 'Tesco',
+      name: name,
+      brand: brand || 'Tesco',
       cat: cat,
       groupId: subTypeId,
       cal: parseFloat(data.cal || data.calories || data.kcal || data.energyKcal || 0) || 0,
@@ -13132,25 +13249,170 @@ async function processTescoJsonPayload(subTypeId) {
       packSize: parseFloat(data.packSize || data.packageWeight || data.weight || data.size || 100) || 100,
       packUnit: String(data.packUnit || data.unit || 'g').toLowerCase(),
       photo: data.photo || data.img || data.image || data.imageUrl || '',
-      tescoUrl: data.url || data.tescoUrl || '',
+      tescoUrl: data.url || data.tescoUrl || ''
+    };
+
+    renderTescoJsonImportStep2(subTypeId);
+}
+window.previewTescoJsonPayload = previewTescoJsonPayload;
+
+function renderTescoJsonImportStep2(subTypeId) {
+    const modal = document.getElementById('tesco-json-import-modal');
+    if (!modal || !currentTescoImportData) return;
+
+    const group = getIngredientGroup(subTypeId);
+    const subTypeName = group ? (group.name || getGroupTypeName(group)) : (subTypeId || '');
+    const p = currentTescoImportData;
+
+    modal.innerHTML = `
+      <div class="card" style="width:100%;max-width:580px;padding:24px;border-radius:14px;background:var(--surface,#fff);box-shadow:0 12px 36px rgba(0,0,0,0.25);position:relative;max-height:90vh;overflow-y:auto">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px">
+          <div>
+            <h2 style="font-size:18px;font-weight:700;margin:0;color:var(--text)">Review Extracted Product (Step 2 of 2)</h2>
+            <div style="font-size:13px;color:var(--text2);margin-top:4px">
+              Target Sub-type: <strong style="color:var(--text)">${ppEscapeHtml(subTypeName)}</strong>
+            </div>
+          </div>
+          <button type="button" class="btn sm ghost" style="padding:4px 8px;font-size:16px;line-height:1" onclick="closeTescoJsonImportModal()" title="Close">✕</button>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text)">Product Name</label>
+              <input type="text" id="tesco-edit-title" class="input" style="width:100%;box-sizing:border-box" value="${ppEscapeAttr(p.name)}" />
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text)">Brand</label>
+              <input type="text" id="tesco-edit-brand" class="input" style="width:100%;box-sizing:border-box" value="${ppEscapeAttr(p.brand)}" />
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text)">Price (£)</label>
+              <input type="number" step="0.01" id="tesco-edit-price" class="input" style="width:100%;box-sizing:border-box" value="${p.price}" />
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text)">Pack Size</label>
+              <input type="number" step="1" id="tesco-edit-pack-size" class="input" style="width:100%;box-sizing:border-box" value="${p.packSize}" />
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text)">Unit</label>
+              <select id="tesco-edit-pack-unit" class="input" style="width:100%;box-sizing:border-box">
+                <option value="g" ${p.packUnit==='g'?'selected':''}>g</option>
+                <option value="kg" ${p.packUnit==='kg'?'selected':''}>kg</option>
+                <option value="ml" ${p.packUnit==='ml'?'selected':''}>ml</option>
+                <option value="l" ${p.packUnit==='l'?'selected':''}>l</option>
+                <option value="pack" ${p.packUnit==='pack'?'selected':''}>pack</option>
+                <option value="item" ${p.packUnit==='item'?'selected':''}>item</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px">
+            <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--text)">Nutrition per 100g / 100ml</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
+              <div>
+                <label style="display:block;font-size:11px;color:var(--text2);margin-bottom:2px">Calories (kcal)</label>
+                <input type="number" step="0.1" id="tesco-edit-cal" class="input" style="width:100%;box-sizing:border-box;font-size:12px" value="${p.cal}" />
+              </div>
+              <div>
+                <label style="display:block;font-size:11px;color:var(--text2);margin-bottom:2px">Protein (g)</label>
+                <input type="number" step="0.1" id="tesco-edit-prot" class="input" style="width:100%;box-sizing:border-box;font-size:12px" value="${p.prot}" />
+              </div>
+              <div>
+                <label style="display:block;font-size:11px;color:var(--text2);margin-bottom:2px">Carbs (g)</label>
+                <input type="number" step="0.1" id="tesco-edit-carb" class="input" style="width:100%;box-sizing:border-box;font-size:12px" value="${p.carb}" />
+              </div>
+              <div>
+                <label style="display:block;font-size:11px;color:var(--text2);margin-bottom:2px">Fat (g)</label>
+                <input type="number" step="0.1" id="tesco-edit-fat" class="input" style="width:100%;box-sizing:border-box;font-size:12px" value="${p.fat}" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tesco-edit-error" style="display:none;color:var(--red,#dc2626);font-size:12px;margin-bottom:10px"></div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:16px">
+          <button type="button" class="btn ghost sm" onclick="renderTescoJsonImportStep1('${ppEscapeAttr(subTypeId)}')">← Back</button>
+          <div style="display:flex;gap:8px">
+            <button type="button" class="btn ghost sm" onclick="closeTescoJsonImportModal()">Cancel</button>
+            <button type="button" class="btn primary sm" style="font-weight:700" onclick="confirmTescoProductImport('${ppEscapeAttr(subTypeId)}')">Confirm &amp; Link to Sub-type ✓</button>
+          </div>
+        </div>
+      </div>
+    `;
+}
+window.renderTescoJsonImportStep2 = renderTescoJsonImportStep2;
+
+async function confirmTescoProductImport(subTypeId) {
+    const title = document.getElementById('tesco-edit-title')?.value?.trim();
+    const brand = document.getElementById('tesco-edit-brand')?.value?.trim();
+    const price = parseFloat(document.getElementById('tesco-edit-price')?.value) || 0;
+    const packSize = parseFloat(document.getElementById('tesco-edit-pack-size')?.value) || 100;
+    const packUnit = document.getElementById('tesco-edit-pack-unit')?.value || 'g';
+    const cal = parseFloat(document.getElementById('tesco-edit-cal')?.value) || 0;
+    const prot = parseFloat(document.getElementById('tesco-edit-prot')?.value) || 0;
+    const carb = parseFloat(document.getElementById('tesco-edit-carb')?.value) || 0;
+    const fat = parseFloat(document.getElementById('tesco-edit-fat')?.value) || 0;
+    const fibre = parseFloat(currentTescoImportData?.fibre || 0) || 0;
+    const errorEl = document.getElementById('tesco-edit-error');
+
+    if (!title) {
+      if (errorEl) {
+        errorEl.textContent = 'Product title is required.';
+        errorEl.style.display = 'block';
+      }
+      return;
+    }
+
+    const group = getIngredientGroup(subTypeId);
+    const cat = group?.cat || 'other';
+
+    const product = {
+      ...(currentTescoImportData || {}),
+      id: currentTescoImportData?.id || ('ing' + Date.now()),
+      name: title,
+      brand: brand || 'Tesco',
+      cat: cat,
+      groupId: subTypeId,
+      cal: cal,
+      prot: prot,
+      carb: carb,
+      fat: fat,
+      fibre: fibre,
+      price: price,
+      packSize: packSize,
+      packUnit: packUnit,
       updatedAt: new Date().toISOString()
     };
 
     try {
       await persistProductToBank(product);
-      if (group) {
-        group.productId = product.id;
-      }
+      relinkSubtypeProductsInRecipes(subTypeId, product.id);
       closeTescoJsonImportModal();
       renderDataQuality();
-      showPlatePlanToast(`Imported "${product.name}" and linked to sub-type! ✓`);
+      showPlatePlanToast(`Imported "${product.name}" and relinked across recipes! ✓`);
     } catch (err) {
-      console.error('Failed to persist Tesco product:', err);
+      console.error('Failed to confirm Tesco product import:', err);
       if (errorEl) {
         errorEl.textContent = 'Failed to save product: ' + err.message;
         errorEl.style.display = 'block';
       }
     }
+}
+window.confirmTescoProductImport = confirmTescoProductImport;
+
+function closeTescoJsonImportModal() {
+    const modal = document.getElementById('tesco-json-import-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeTescoJsonImportModal = closeTescoJsonImportModal;
+
+async function processTescoJsonPayload(subTypeId) {
+    return previewTescoJsonPayload(subTypeId);
 }
 window.processTescoJsonPayload = processTescoJsonPayload;
 
@@ -13193,9 +13455,7 @@ function resolveSubtypeViaExisting(subTypeId, productId){
       showPlatePlanToast('Product not found.');
       return;
     }
-    product.groupId = subTypeId;
-    saveState(true);
-    if (platePlanCloudReady && !platePlanSyncSuppress) queuePlatePlanCloudDiff();
+    relinkSubtypeProductsInRecipes(subTypeId, productId);
     closeSubtypeResolutionModal();
     renderDataQuality();
     showPlatePlanToast(`Linked "${product.name}" to sub-type successfully! ✓`);
@@ -20974,17 +21234,19 @@ function filterSearchableRecipeSwapModal(query = '') {
     return catMatch;
   });
 
+  resultsContainer.innerHTML = '';
+
   if (candidates.length === 0) {
-    resultsContainer.innerHTML = `
-      <div style="text-align: center; padding: 24px; color: var(--text3); font-size: 13px;">
-        No recipes match "${ppEscapeHtml(query)}". Try another search term.
-      </div>
-    `;
+    const emptyDiv = document.createElement('div');
+    emptyDiv.style.cssText = 'text-align: center; padding: 24px; color: var(--text3); font-size: 13px;';
+    emptyDiv.textContent = `No recipes match "${query}". Try another search term.`;
+    resultsContainer.appendChild(emptyDiv);
     return;
   }
 
-  // Calculate day fit score for each candidate recipe
-  resultsContainer.innerHTML = candidates.map(r => {
+  const placeholderImg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44"><rect width="44" height="44" rx="6" fill="%23e5e7eb"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="20">🍲</text></svg>`;
+
+  candidates.forEach(r => {
     const cal = Math.round(r.cal || 0);
     const prot = Math.round(r.prot || 0);
     
@@ -21007,32 +21269,70 @@ function filterSearchableRecipeSwapModal(query = '') {
       }
     } catch(e) {}
 
-    const placeholderImg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44"><rect width="44" height="44" rx="6" fill="%23e5e7eb"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="20">🍲</text></svg>`;
-    const imgSrc = r.photo || r.img || r.image || placeholderImg;
+    const row = document.createElement('div');
+    row.className = 'swap-candidate-row';
+    row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; transition: border-color 0.15s ease;';
 
-    return `
-      <div class="swap-candidate-row" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; transition: border-color 0.15s ease;">
-        <img src="${imgSrc}" style="width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex-shrink: 0;" alt="${ppEscapeAttr(r.name || 'Recipe')}" onerror="this.src='${placeholderImg}'" />
-        <div style="flex: 1; min-width: 0;">
-          <div style="font-weight: 650; font-size: 13.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            ${ppEscapeHtml(r.name || r.title || 'Untitled Recipe')}
-          </div>
-          <div style="font-size: 11.5px; color: var(--text2); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <span><strong>${cal}</strong> kcal</span>
-            <span>·</span>
-            <span><strong>${prot}g</strong> protein</span>
-            <span>·</span>
-            <span class="tag" style="font-size: 10.5px; padding: 1px 6px; font-weight: 700; background: ${fitScorePercent >= 75 ? 'var(--green-bg, #dcfce7)' : 'var(--amber-bg, #fef3c7)'}; color: ${fitScorePercent >= 75 ? 'var(--green, #16a34a)' : 'var(--amber, #d97706)'}; border: 1px solid currentColor;">
-              Fit Score ${fitScorePercent}%
-            </span>
-          </div>
-        </div>
-        <button type="button" class="btn sm primary" style="font-size: 12px; font-weight: 700; padding: 6px 12px; white-space: nowrap; flex-shrink: 0;" onclick="selectAndSwapRecipe('${ppEscapeAttr(r.id)}', 'original')">
-          Select &amp; Swap
-        </button>
-      </div>
-    `;
-  }).join('');
+    const img = document.createElement('img');
+    img.style.cssText = 'width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex-shrink: 0;';
+    img.alt = r.name || 'Recipe';
+    img.src = r.photo || r.img || r.image || placeholderImg;
+    img.onerror = () => { img.src = placeholderImg; };
+    row.appendChild(img);
+
+    const infoDiv = document.createElement('div');
+    infoDiv.style.cssText = 'flex: 1; min-width: 0;';
+
+    const titleEl = document.createElement('div');
+    titleEl.style.cssText = 'font-weight: 650; font-size: 13.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+    titleEl.textContent = r.name || r.title || 'Untitled Recipe';
+    infoDiv.appendChild(titleEl);
+
+    const metaDiv = document.createElement('div');
+    metaDiv.style.cssText = 'font-size: 11.5px; color: var(--text2); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;';
+
+    const calSpan = document.createElement('span');
+    const calStrong = document.createElement('strong');
+    calStrong.textContent = String(cal);
+    calSpan.appendChild(calStrong);
+    calSpan.appendChild(document.createTextNode(' kcal'));
+    metaDiv.appendChild(calSpan);
+
+    const dot1 = document.createElement('span');
+    dot1.textContent = '·';
+    metaDiv.appendChild(dot1);
+
+    const protSpan = document.createElement('span');
+    const protStrong = document.createElement('strong');
+    protStrong.textContent = `${prot}g`;
+    protSpan.appendChild(protStrong);
+    protSpan.appendChild(document.createTextNode(' protein'));
+    metaDiv.appendChild(protSpan);
+
+    const dot2 = document.createElement('span');
+    dot2.textContent = '·';
+    metaDiv.appendChild(dot2);
+
+    const tagSpan = document.createElement('span');
+    tagSpan.className = 'tag';
+    const isGood = fitScorePercent >= 75;
+    tagSpan.style.cssText = `font-size: 10.5px; padding: 1px 6px; font-weight: 700; background: ${isGood ? 'var(--green-bg, #dcfce7)' : 'var(--amber-bg, #fef3c7)'}; color: ${isGood ? 'var(--green, #16a34a)' : 'var(--amber, #d97706)'}; border: 1px solid currentColor; border-radius: 4px;`;
+    tagSpan.textContent = `Fit Score ${fitScorePercent}%`;
+    metaDiv.appendChild(tagSpan);
+
+    infoDiv.appendChild(metaDiv);
+    row.appendChild(infoDiv);
+
+    const swapBtn = document.createElement('button');
+    swapBtn.type = 'button';
+    swapBtn.className = 'btn sm primary';
+    swapBtn.style.cssText = 'font-size: 12px; font-weight: 700; padding: 6px 12px; white-space: nowrap; flex-shrink: 0;';
+    swapBtn.textContent = 'Select & Swap';
+    swapBtn.onclick = () => selectAndSwapRecipe(r.id, 'original');
+    row.appendChild(swapBtn);
+
+    resultsContainer.appendChild(row);
+  });
 }
 window.filterSearchableRecipeSwapModal = filterSearchableRecipeSwapModal;
 
@@ -21170,7 +21470,7 @@ function commitPlannerWizardPlan() {
     appliedAt: new Date().toISOString(),
     savedStatus: 'Saved',
     shoppingAtHome: currentPlan.shoppingAtHome || {},
-    version: '3.0.4',
+    version: '3.0.5',
     confirmedShopping: true,
     updatedAt: new Date().toISOString()
   };
@@ -21190,7 +21490,7 @@ function commitPlannerWizardPlan() {
     saveState(true);
     if (platePlanCloudReady && !platePlanSyncSuppress) queuePlatePlanCloudDiff();
     markPlatePlanViewsDirty('today', 'planner', 'shopping', 'planlib');
-    showPlatePlanToast('Meal plan v3.0.4 committed! Displaying Today\'s meals. ✓');
+    showPlatePlanToast('Meal plan v3.0.5 committed! Displaying Today\'s meals. ✓');
     if (typeof showView === 'function') {
       showView('today');
     }
@@ -21750,7 +22050,7 @@ function renderPlannerWizard() {
   else if (currentStep === 4) {
     html += `
       <div class="card" style="padding:28px;text-align:center">
-        <h2 style="margin-top:0">Committing Meal Plan v3.0.4...</h2>
+        <h2 style="margin-top:0">Committing Meal Plan v3.0.5...</h2>
         <p style="color:var(--text2);font-size:13px;margin-bottom:18px">Finalizing plan metadata, locking shopping quantities, and synchronizing with your live dashboard.</p>
         <button type="button" class="btn primary" onclick="commitPlannerWizardPlan()">Commit Plan Now</button>
       </div>
