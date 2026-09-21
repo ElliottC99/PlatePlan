@@ -1,15 +1,15 @@
 const FEATURE_LOADERS = Object.freeze({
-  today: () => import('../features/today.js?v=3.0.3'),
-  vault: () => import('../features/recipes.js?v=3.0.3'),
-  add: () => import('../features/recipe-add.js?v=3.0.3'),
-  ingredients: () => import('../features/ingredients.js?v=3.0.3'),
-  bank: () => import('../features/products.js?v=3.0.3'),
-  planner: () => import('../features/planner.js?v=3.0.3'),
-  planlib: () => import('../features/library.js?v=3.0.3'),
-  shopping: () => import('../features/shopping.js?v=3.0.3'),
-  search: () => import('../features/search.js?v=3.0.3'),
-  data: () => import('../features/data-quality.js?v=3.0.3'),
-  prefs: () => import('../features/preferences.js?v=3.0.3'),
+  today: () => import('../features/today.js?v=3.0.4'),
+  vault: () => import('../features/recipes.js?v=3.0.4'),
+  add: () => import('../features/recipe-add.js?v=3.0.4'),
+  ingredients: () => import('../features/ingredients.js?v=3.0.4'),
+  bank: () => import('../features/products.js?v=3.0.4'),
+  planner: () => import('../features/planner.js?v=3.0.4'),
+  planlib: () => import('../features/library.js?v=3.0.4'),
+  shopping: () => import('../features/shopping.js?v=3.0.4'),
+  search: () => import('../features/search.js?v=3.0.4'),
+  data: () => import('../features/data-quality.js?v=3.0.4'),
+  prefs: () => import('../features/preferences.js?v=3.0.4'),
 });
 
 /**

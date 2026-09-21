@@ -207,10 +207,10 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='3.0.3';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v83';
-window.APP_VERSION = '3.0.3';
-console.log("[v3.0.3 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
+const PLATEPLAN_APP_VERSION='3.0.4';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v84';
+window.APP_VERSION = '3.0.4';
+console.log("[v3.0.4 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
 
 let isHydrating = false;
 window.isHydrating = false;
@@ -266,16 +266,86 @@ function unwrapAndCleanItem(item){
 }
 window.unwrapAndCleanItem = unwrapAndCleanItem;
 
+function stripUndefinedValues(obj) {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(stripUndefinedValues);
+  const copy = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined) {
+      copy[k] = stripUndefinedValues(v);
+    }
+  }
+  return copy;
+}
+window.stripUndefinedValues = stripUndefinedValues;
+
 function sanitizePayloadForFirestore(data){
   if(data === undefined) return null;
   try {
-    return JSON.parse(JSON.stringify(data, (k, v) => (v === undefined ? null : v)));
+    const cleaned = stripUndefinedValues(data);
+    return JSON.parse(JSON.stringify(cleaned, (k, v) => (v === undefined ? null : v)));
   } catch(err) {
     console.error('[PAYLOAD SANITIZATION ERROR]', err);
     return data;
   }
 }
 window.sanitizePayloadForFirestore = sanitizePayloadForFirestore;
+
+// == v3.0.4 PIECEWISE FIT SCORE & TRAFFIC LIGHT FORMULA ==
+function calculateMacroFitTierAndScore(calActual, calTarget, protActual, protTarget) {
+  const cAct = Number(calActual) || 0;
+  const cTgt = Number(calTarget) || 0;
+  const pAct = Number(protActual) || 0;
+  const pTgt = Number(protTarget) || 0;
+
+  if (cTgt <= 0 || pTgt <= 0) {
+    return { tier: 'amber-green', score: 70, label: 'No Target Set', colors: 'background:#fef9c3;color:#854d0e;border:1px solid #fde047;' };
+  }
+
+  const rC = cAct / cTgt;
+  const rP = pAct / pTgt;
+
+  let tier = 'red';
+  let score = 25;
+  let label = 'Poor Fit';
+  let colors = 'background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;';
+
+  // 1. GREEN (Ideal Fit | Score 85-100): Rp >= 1.0 AND 0.95 <= Rc <= 1.05
+  if (rP >= 1.0 && rC >= 0.95 && rC <= 1.05) {
+    tier = 'green';
+    const calDev = Math.abs(1.0 - rC); // 0 to 0.05
+    score = Math.round(100 - (calDev / 0.05) * 15);
+    label = 'Ideal Fit';
+    colors = 'background:#dcfce7;color:#15803d;border:1px solid #86efac;';
+  }
+  // 2. AMBER-GREEN (Acceptable | Score 65-84):
+  // (Rp >= 1.0 AND 1.05 < Rc <= 1.15) OR (0.90 <= Rp < 1.0 AND Rc <= 1.05)
+  else if ((rP >= 1.0 && rC > 1.05 && rC <= 1.15) || (rP >= 0.90 && rP < 1.0 && rC <= 1.05)) {
+    tier = 'amber-green';
+    score = 75;
+    label = 'Acceptable';
+    colors = 'background:#fef9c3;color:#854d0e;border:1px solid #fde047;';
+  }
+  // 3. AMBER-RED (Suboptimal | Score 40-64):
+  // (Rp < 0.90 AND Rc <= 1.05) OR (Rp >= 1.0 AND Rc > 1.15)
+  else if ((rP < 0.90 && rC <= 1.05) || (rP >= 1.0 && rC > 1.15)) {
+    tier = 'amber-red';
+    score = 52;
+    label = 'Suboptimal';
+    colors = 'background:#ffedd5;color:#9a3412;border:1px solid #fdba74;';
+  }
+  // 4. RED (Poor Fit | Score 0-39):
+  // Rp < 0.90 AND Rc > 1.05
+  else {
+    tier = 'red';
+    score = 25;
+    label = 'Poor Fit';
+    colors = 'background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;';
+  }
+
+  return { tier, score, label, colors, rC, rP };
+}
+window.calculateMacroFitTierAndScore = calculateMacroFitTierAndScore;
 
 let state = null;
 let browserStateBeforeBakedComparison = null;
@@ -578,9 +648,16 @@ window.updatePlanSaveUI = updatePlanSaveUI;
 
 function queuePlanSave(planData = state?.plan, immediate = false) {
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.0.3 STATE PERSISTENCE] queuePlanSave blocked during hydration.');
+    console.log('[v3.0.4 STATE PERSISTENCE] queuePlanSave blocked during hydration.');
     return Promise.resolve(false);
   }
+
+  // Unbind autosave while inside Steps 1, 2, or 3 of Meal Planner
+  const isInsidePlannerDraft = (document.getElementById('view-planner')?.classList.contains('active') || (typeof currentTab !== 'undefined' && currentTab === 'planner')) && (typeof getPlannerWizardStep === 'function' ? getPlannerWizardStep() < 4 : false);
+  if (isInsidePlannerDraft && !immediate) {
+    return Promise.resolve(false);
+  }
+
   updateUIState({ saveStatus: 'pending' });
 
   return new Promise((resolve, reject) => {
@@ -1760,13 +1837,19 @@ let platePlanDebounceResolvers = [];
 
 async function pushStateToCloud(force=false){
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.0.3 STATE PERSISTENCE] PushStateToCloud blocked during hydration.');
+    console.log('[v3.0.4 STATE PERSISTENCE] PushStateToCloud blocked during hydration.');
+    return Promise.resolve(false);
+  }
+
+  // Unbind pushState during Steps 1-3 of Meal Planner
+  const isInsidePlannerDraft = (document.getElementById('view-planner')?.classList.contains('active') || (typeof currentTab !== 'undefined' && currentTab === 'planner')) && (typeof getPlannerWizardStep === 'function' ? getPlannerWizardStep() < 4 : false);
+  if (isInsidePlannerDraft && !force) {
     return Promise.resolve(false);
   }
 
   const currentStateJson = safeJsonStringify(state);
   if (!force && lastPersistedStateJson && lastPersistedStateJson === currentStateJson) {
-    console.log('[v3.0.3 STATE PERSISTENCE] State unchanged from last persisted; skipping cloud push.');
+    console.log('[v3.0.4 STATE PERSISTENCE] State unchanged from last persisted; skipping cloud push.');
     return Promise.resolve(true);
   }
 
@@ -2521,9 +2604,9 @@ function saveState(immediate=false){
   window.dispatchEvent(new CustomEvent('plateplan:state-saved',{detail:{source:'cloud',savedAt:Date.now()}}));
   if(state) {
     state.updatedAt=new Date().toISOString();
-    state.version = '3.0.3';
+    state.version = '3.0.4';
     if (state.plan && typeof state.plan === 'object') {
-      state.plan.version = '3.0.3';
+      state.plan.version = '3.0.4';
     }
   }
   window.state = state;
@@ -2551,7 +2634,13 @@ function saveState(immediate=false){
   }
 
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.0.3 STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
+    console.log('[v3.0.4 STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
+    return true;
+  }
+
+  // Unbind autosave while inside Steps 1, 2, or 3 of Meal Planner
+  const isInsidePlannerDraft = (document.getElementById('view-planner')?.classList.contains('active') || (typeof currentTab !== 'undefined' && currentTab === 'planner')) && (typeof getPlannerWizardStep === 'function' ? getPlannerWizardStep() < 4 : false);
+  if (isInsidePlannerDraft && !immediate) {
     return true;
   }
 
