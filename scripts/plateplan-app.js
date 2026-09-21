@@ -2493,16 +2493,17 @@ async function executeDataQualityTransaction(mutationType, payload = {}, options
 }
 
 function queuePlatePlanCloudDiff(immediateFlush=false){
-  if(platePlanSyncSuppress) return;
+  if(platePlanSyncSuppress || isHydrating || window.isHydrating) return;
   if(immediateFlush){
     clearTimeout(platePlanSyncTimer);
     pushStateToCloud();
   }else{
-    schedulePlatePlanCloudDiff(400);
+    schedulePlatePlanCloudDiff(1000);
   }
 }
 
-function schedulePlatePlanCloudDiff(delay=400){
+function schedulePlatePlanCloudDiff(delay=1000){
+  if(platePlanSyncSuppress || isHydrating || window.isHydrating) return;
   clearTimeout(platePlanSyncTimer);
   const effectiveDelay = Math.max(delay, platePlanBackoffUntil > Date.now() ? (platePlanBackoffUntil - Date.now() + 200) : 0);
   platePlanSyncTimer=setTimeout(()=>{
@@ -2511,6 +2512,7 @@ function schedulePlatePlanCloudDiff(delay=400){
 }
 
 function flushPlatePlanSyncOutbox(){
+  if(isHydrating || window.isHydrating) return;
   pushStateToCloud();
 }
 
@@ -2541,6 +2543,11 @@ function saveState(immediate=false){
     console.warn('Reactive audit error in saveState:', auditErr);
   }
 
+  if (isHydrating || window.isHydrating) {
+    console.log('[v3.0.2 STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
+    return true;
+  }
+
   // Central debounced save stream for state.plan updates
   if (state?.plan && typeof state.plan === 'object' && Object.keys(state.plan).length > 0) {
     queuePlanSave(state.plan, immediate);
@@ -2551,7 +2558,7 @@ function saveState(immediate=false){
       clearTimeout(platePlanSyncTimer);
       pushStateToCloud(true);
     }else{
-      schedulePlatePlanCloudDiff(400);
+      schedulePlatePlanCloudDiff(1000);
     }
   }else if(!platePlanCloudUser){
     updatePlatePlanSyncStatus('local');
@@ -3370,22 +3377,25 @@ function ensurePlatePlanMigrationModal(){
 }
 
 async function loadSharedPlatePlan(){
-  // Unsubscribe any legacy document listeners
-  platePlanSyncUnsubscribers.forEach(stop=>{try{stop();}catch(e){}});
-  platePlanSyncUnsubscribers=[];
+  isHydrating = true;
+  window.isHydrating = true;
+  try {
+    // Unsubscribe any legacy document listeners
+    platePlanSyncUnsubscribers.forEach(stop=>{try{stop();}catch(e){}});
+    platePlanSyncUnsubscribers=[];
 
-  updatePlatePlanSyncStatus('connecting');
-  const targetHouseholdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
-  window.activeHouseholdId = targetHouseholdId;
-  window.activeHousehold = { id: targetHouseholdId };
-  if (!state) state = loadState() || {};
-  if (!state.meta) state.meta = {};
-  state.meta.householdId = targetHouseholdId;
-  window.state = state;
-  window.appState = state;
+    updatePlatePlanSyncStatus('connecting');
+    const targetHouseholdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
+    window.activeHouseholdId = targetHouseholdId;
+    window.activeHousehold = { id: targetHouseholdId };
+    if (!state) state = loadState() || {};
+    if (!state.meta) state.meta = {};
+    state.meta.householdId = targetHouseholdId;
+    window.state = state;
+    window.appState = state;
 
-  const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
-  console.log('[FIRESTORE READ PATH]', householdDocRef.path);
+    const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
+    console.log('[FIRESTORE READ PATH]', householdDocRef.path);
 
   // 1. Fetch Root Document
   let rootSnapshot = null;
@@ -3688,6 +3698,12 @@ async function loadSharedPlatePlan(){
 
   startPlatePlanCloudListeners();
   updatePlatePlanSyncStatus('synced');
+  } finally {
+    isHydrating = false;
+    window.isHydrating = false;
+    lastPersistedStateJson = safeJsonStringify(state);
+    console.log('[v3.0.2 STATE PERSISTENCE] Hydration complete; cloud diff checks enabled.');
+  }
 }
 
 function ensurePlatePlanAuthScreen(){
@@ -20367,7 +20383,7 @@ function formatPlanDateShort(dateString){
 window.formatPlanDateShort = formatPlanDateShort;
 
 // ==========================================
-// PLATEPLAN v3.0.1 MEAL PLANNER 4-STEP WIZARD
+// PLATEPLAN v3.0.2 MEAL PLANNER 4-STEP WIZARD
 // ==========================================
 
 function getPlannerWizardStep() {
@@ -20676,7 +20692,7 @@ async function commitPlannerWizardPlan() {
     appliedAt: new Date().toISOString(),
     savedStatus: 'Saved',
     shoppingAtHome: currentPlan.shoppingAtHome || {},
-    version: '3.0.1',
+    version: '3.0.2',
     confirmedShopping: true,
     updatedAt: new Date().toISOString()
   };
@@ -20694,7 +20710,7 @@ async function commitPlannerWizardPlan() {
   if (platePlanCloudReady && !platePlanSyncSuppress) queuePlatePlanCloudDiff();
   markPlatePlanViewsDirty('today', 'planner', 'shopping', 'planlib');
 
-  showPlatePlanToast('Meal plan v3.0.1 committed! Displaying Today\'s meals. ✓');
+  showPlatePlanToast('Meal plan v3.0.2 committed! Displaying Today\'s meals. ✓');
   showView('today');
   renderToday();
 }
@@ -21231,7 +21247,7 @@ function renderPlannerWizard() {
   else if (currentStep === 4) {
     html += `
       <div class="card" style="padding:28px;text-align:center">
-        <h2 style="margin-top:0">Committing Meal Plan v3.0.1...</h2>
+        <h2 style="margin-top:0">Committing Meal Plan v3.0.2...</h2>
         <p style="color:var(--text2);font-size:13px;margin-bottom:18px">Finalizing plan metadata, locking shopping quantities, and synchronizing with your live dashboard.</p>
         <button type="button" class="btn primary" onclick="commitPlannerWizardPlan()">Commit Plan Now</button>
       </div>
