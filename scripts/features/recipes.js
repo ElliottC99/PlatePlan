@@ -69,8 +69,59 @@ export async function replaceRecipeIngredient(recipeId, ingredientIndex, newProd
 }
 
 const renderVault = async () => {
-  // Logic to render the vault
-  console.log('Rendering vault');
+  const list = document.getElementById('vault-list');
+  if (!list) return;
+
+  if (!window.state || !Array.isArray(window.state.recipes)) {
+    list.innerHTML = '<div class="msg info">No recipes found in state.</div>';
+    return;
+  }
+
+  const recipes = window.state.recipes.filter(r => r && r.id);
+  
+  if (recipes.length === 0) {
+    list.innerHTML = '<div class="msg info">Your recipe vault is empty.</div>';
+    return;
+  }
+
+  // Basic search/sort/filter logic
+  const search = document.getElementById('vault-search')?.value.toLowerCase() || '';
+  const typeFilter = document.getElementById('filter-type')?.value || 'all';
+  const whoFilter = document.getElementById('filter-who')?.value || 'all';
+  const favFilter = document.getElementById('vault-filter-fav')?.getAttribute('aria-pressed') === 'true';
+
+  const filtered = recipes.filter(r => {
+    const name = (r.name || '').toLowerCase();
+    const matchesSearch = !search || name.includes(search);
+    const matchesType = typeFilter === 'all' || r.type === typeFilter || (Array.isArray(r.type) && r.type.includes(typeFilter));
+    const matchesWho = whoFilter === 'all' || r.who === whoFilter || r.who === 'both';
+    const matchesFav = !favFilter || r.favourite;
+    return matchesSearch && matchesType && matchesWho && matchesFav;
+  });
+
+  list.innerHTML = filtered.map(r => {
+    const timeLabel = r.time ? `<span>${r.time} mins</span>` : '';
+    const whoLabel = r.who ? `<span class="badge sm">${r.who}</span>` : '';
+    const typeLabel = r.type ? `<span style="text-transform: capitalize">${r.type}</span>` : '';
+    
+    return `
+      <div class="card recipe-card" style="cursor:pointer; transition: transform 0.1s;" data-pp-click="openRecipe('${r.id}')">
+        <div class="row-between" style="align-items: flex-start; margin-bottom: 8px;">
+          <div style="font-weight: 700; font-size: 15px; color: var(--text1);">${r.name || 'Untitled Recipe'}</div>
+          ${r.favourite ? '<span style="color: var(--red);">❤️</span>' : ''}
+        </div>
+        <div style="display:flex; gap:10px; font-size:12px; color:var(--text2); margin-bottom:12px; align-items:center;">
+          ${typeLabel}
+          ${timeLabel}
+          ${whoLabel}
+        </div>
+        <div class="grid2" style="gap:8px; padding-top:10px; border-top: 1px solid var(--border);">
+          <div style="font-size:12px;"><strong>${r.calories || 0}</strong> <span style="color:var(--text3)">kcal</span></div>
+          <div style="font-size:12px;"><strong>${r.protein || 0}g</strong> <span style="color:var(--text3)">protein</span></div>
+        </div>
+      </div>
+    `;
+  }).join('');
 };
 window.renderVault = renderVault;
 

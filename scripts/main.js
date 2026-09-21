@@ -1,20 +1,20 @@
-import { createPlatePlanStore } from './core/store.js?v=3.3.13';
-import { createPlatePlanRuntime } from './core/runtime.js?v=3.3.13';
-import { createFirebaseService } from './services/firebase.js?v=3.3.13';
-import { initFirebaseService } from './services/firebase-service.js?v=3.3.13';
-import { createSyncService } from './services/sync.js?v=3.3.13';
-import { createRecoveryService } from './services/recovery.js?v=3.3.13';
-import { createUpdateService } from './services/updates.js?v=3.3.13';
-import { installDelegatedActions } from './ui/actions.js?v=3.3.13';
-import { installNavigation } from './ui/navigation.js?v=3.3.13';
-import { createWorkspaceService } from './ui/workspaces.js?v=3.3.13';
+import { createPlatePlanStore } from './core/store.js?v=3.3.14';
+import { createPlatePlanRuntime } from './core/runtime.js?v=3.3.14';
+import { createFirebaseService } from './services/firebase.js?v=3.3.14';
+import { initFirebaseService } from './services/firebase-service.js?v=3.3.14';
+import { createSyncService } from './services/sync.js?v=3.3.14';
+import { createRecoveryService } from './services/recovery.js?v=3.3.14';
+import { createUpdateService } from './services/updates.js?v=3.3.14';
+import { installDelegatedActions } from './ui/actions.js?v=3.3.14';
+import { installNavigation } from './ui/navigation.js?v=3.3.14';
+import { createWorkspaceService } from './ui/workspaces.js?v=3.3.14';
 
-import { renderVault } from './features/recipes.js?v=3.3.13';
-import { renderPlanner } from './features/planner.js?v=3.3.13';
-import { renderIngredientBank } from './features/ingredients.js?v=3.3.13';
-import { renderProductBank } from './features/products.js?v=3.3.13';
-import { renderDataQuality } from './features/data-quality.js?v=3.3.13';
-import { renderPreferences } from './features/preferences.js?v=3.3.13';
+import { renderVault } from './features/recipes.js?v=3.3.14';
+import { renderPlanner } from './features/planner.js?v=3.3.14';
+import { renderIngredientBank } from './features/ingredients.js?v=3.3.14';
+import { renderProductBank } from './features/products.js?v=3.3.14';
+import { renderDataQuality } from './features/data-quality.js?v=3.3.14';
+import { renderPreferences } from './features/preferences.js?v=3.3.14';
 
 window.renderVault = renderVault;
 window.renderPlanner = renderPlanner;
@@ -23,9 +23,9 @@ window.renderProducts = renderProductBank;
 window.renderDataQuality = renderDataQuality;
 window.renderPreferences = renderPreferences;
 
-console.log('[PlatePlan v3.3.13] Engine initialized');
+console.log('[PlatePlan v3.3.14] Engine initialized');
 
-window.APP_VERSION = '3.3.13';
+window.APP_VERSION = '3.3.14';
 
 // Step 1: Initialize store and load local fallback state
 const store = createPlatePlanStore();
@@ -34,8 +34,8 @@ store.getState();
 const workspaces = createWorkspaceService();
 const updates = createUpdateService({
   workspaces,
-  appVersion: '3.3.13',
-  expectedCache: 'plateplan-shell-v96',
+  appVersion: '3.3.14',
+  expectedCache: 'plate-plan-cache-v3.3.14',
 });
 const context = Object.freeze({
   store,
@@ -49,13 +49,13 @@ const runtime = createPlatePlanRuntime(context);
 const actions = installDelegatedActions();
 const uninstallNavigation = installNavigation(runtime);
 const syncRuntimeMarker = () => {
-  document.documentElement.dataset.plateplanRuntime = '3.3.13';
+  document.documentElement.dataset.plateplanRuntime = '3.3.14';
   document.documentElement.dataset.plateplanLoadedViews = runtime.loadedViews().sort().join(',');
 };
 window.addEventListener('plateplan:feature-loaded', syncRuntimeMarker);
 
 // Wire deletePlan globally to our store's resilient deletePlan implementation
-import { deletePlan } from './core/store.js?v=3.3.13';
+import { deletePlan } from './core/store.js?v=3.3.14';
 window.deletePlan = deletePlan;
 window.showView = (id) => {
   runtime.renderView(id);
@@ -115,11 +115,11 @@ globalThis.PlatePlanModules = Object.freeze({
   updates,
   workspaces,
   uninstallNavigation,
-  version: '3.3.13',
+  version: '3.3.14',
 });
 
 window.dispatchEvent(new CustomEvent('plateplan:modules-ready', {
-  detail: { version: '3.3.13', loadedViews: runtime.loadedViews() },
+  detail: { version: '3.3.14', loadedViews: runtime.loadedViews() },
 }));
 
 if (document.readyState === 'loading') {
