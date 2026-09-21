@@ -200,21 +200,24 @@ const STANDARD_CATS = {
 let CAT = { ...STANDARD_CATS };
 
 // == STATE ==
-const SK='plateplan_v1';
-const BAKED_CANDIDATE_SK='plateplan_v1_baked_candidate';
-const RECOVERY_SK='plateplan_v1_recovery';
+const SK='plateplan_v2';
+const BAKED_CANDIDATE_SK='plateplan_v2_baked_candidate';
+const RECOVERY_SK='plateplan_v2_recovery';
 const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='3.0.7';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v87';
-window.APP_VERSION = '3.0.7';
+const PLATEPLAN_APP_VERSION='3.0.8';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v88';
+window.APP_VERSION = '3.0.8';
 window._hydrationLogged = false;
-console.log("[v3.0.7 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
+window.state = window.state || {};
+window.state.deletedPlanIds = window.state.deletedPlanIds || new Set();
+window.deletedPlanIds = window.deletedPlanIds || window.state.deletedPlanIds;
+console.log("[v3.0.8 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
 
 try {
-  const OBSOLETE_KEYS = ['app_version', 'data:chloe', 'data:elliott', 'plateplan_v1', 'plateplan_v1_chloe', 'plateplan_v1_elliott', 'plateplan_v1_device_id', 'plateplan_v1_recovery', 'plateplan_history_backup'];
+  const OBSOLETE_KEYS = ['app_version', 'data:chloe', 'data:elliott', 'plateplan_v1', 'plateplan_v1_baked_candidate', 'plateplan_v1_chloe', 'plateplan_v1_elliott', 'plateplan_v1_device_id', 'plateplan_v1_recovery', 'plateplan_history_backup'];
   OBSOLETE_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch(e) {} });
 } catch(_e) {}
 
@@ -3588,7 +3591,11 @@ function populateRecipesState(docs, options = {}){
 
     if(existingMap.has(clean.id)){
       const existing = existingMap.get(clean.id);
-      Object.assign(existing, clean);
+      const localTime = new Date(existing.updatedAt || 0).getTime() || Number(existing.updatedAt || 0);
+      const cloudTime = new Date(clean.updatedAt || 0).getTime() || Number(clean.updatedAt || 0);
+      if (!localTime || cloudTime >= localTime) {
+        Object.assign(existing, clean);
+      }
     } else {
       recs.push(clean);
       existingMap.set(clean.id, clean);
@@ -3741,7 +3748,7 @@ function startPlatePlanCloudListeners(){
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
     if(!window._hydrationLogged) {
-      console.log("[v3.0.7 HYDRATION]", state.recipes.length, "recipes loaded.");
+      console.log("[v3.0.8 HYDRATION]", state.recipes.length, "recipes loaded.");
       window._hydrationLogged = true;
     }
   }, error => {
@@ -12437,14 +12444,49 @@ function applyUnifiedMappingResult(context, result){
       const variant = context.variantKey === 'enhanced' ? recipe.variants?.enhanced : (recipe.variants?.original || recipe);
       if(variant && Array.isArray(variant.ingredients) && variant.ingredients[context.ingredientIndex]){
         const target = variant.ingredients[context.ingredientIndex];
+        const previousProductId = target.productId || target.bankId || '';
+
+        // 1. Capture current ISO timestamp
+        const nowIso = new Date().toISOString();
+
+        // 2. Synchronously update specific ingredient's productId in window.state.recipes
         target.bankId = result.productId || '';
         target.groupId = result.groupId || '';
         if (result.productId) target.productId = result.productId;
         if (result.tescoProductId || result.tpnb) target.tescoProductId = result.tescoProductId || result.tpnb;
         if (result.packOptions) target.packOptions = result.packOptions;
         if (result.sourceUrl || result.url) target.sourceUrl = result.sourceUrl || result.url;
+
+        // 3. Synchronously apply new timestamp to recipe's updatedAt field
+        recipe.updatedAt = nowIso;
+
+        if (Array.isArray(window.state?.recipes)) {
+          const idx = window.state.recipes.findIndex(r => r && r.id === recipe.id);
+          if (idx !== -1) window.state.recipes[idx] = recipe;
+        }
+
+        // 4. Trigger an immediate UI re-render
         rehydrateActiveRecipeAndStateCache({ changedProductIds: [result.productId], recipeId: recipe.id });
-        saveRecipe(recipe).catch(err => console.error('[SAVE RECIPE ERROR]', err));
+        renderAll();
+
+        // 5. Execute Firestore write wrapped in a try/catch
+        (async () => {
+          try {
+            const db = platePlanDb || (window.firebase && firebase.firestore && firebase.firestore());
+            if (db) {
+              const cleanRecipe = sanitizePayloadForFirestore(unwrapAndCleanItem(recipe));
+              await db.collection('households').doc(householdId).collection('recipes').doc(recipe.id).set(cleanRecipe, { merge: true });
+            }
+          } catch(err) {
+            console.error('[INGREDIENT LINK REVERT - ROLLING BACK]', err);
+            // 6. In catch block: revert local ingredient productId, re-render UI, show error toast
+            target.productId = previousProductId;
+            target.bankId = previousProductId;
+            rehydrateActiveRecipeAndStateCache({ changedProductIds: [previousProductId], recipeId: recipe.id });
+            renderAll();
+            showPlatePlanToast('Failed to link ingredient in cloud. Reverted change.', 'error');
+          }
+        })();
       }
     }
     closeUnifiedMappingModal();
@@ -18545,10 +18587,11 @@ function showTescoImportReviewModal(productData = {}, targetSubtype = null) {
 
   if (productData.name && document.getElementById('tp-name')) document.getElementById('tp-name').value = productData.name;
   if (productData.brand && document.getElementById('tp-brand')) document.getElementById('tp-brand').value = productData.brand;
-  if (productData.cat && document.getElementById('tp-cat')) {
-    document.getElementById('tp-cat').value = productData.cat;
-    syncCategorySearchInput('tp-cat');
-  }
+  if (productData.cat && document.getElementById('import-category')) document.getElementById('import-category').value = productData.cat;
+  if (productData.storage && document.getElementById('import-storage')) document.getElementById('import-storage').value = productData.storage;
+  if (productData.drainedWeight !== undefined && document.getElementById('import-usable-weight')) document.getElementById('import-usable-weight').value = productData.drainedWeight;
+  if (productData.fibre !== undefined && document.getElementById('import-fibre')) document.getElementById('import-fibre').value = productData.fibre;
+  if (productData.notes && document.getElementById('import-notes')) document.getElementById('import-notes').value = productData.notes;
   if (productData.storage && document.getElementById('tp-storage')) document.getElementById('tp-storage').value = productData.storage;
   if (productData.price !== undefined && document.getElementById('tp-price')) document.getElementById('tp-price').value = productData.price;
   if (productData.packSize !== undefined && document.getElementById('tp-pack')) document.getElementById('tp-pack').value = productData.packSize;
@@ -19105,19 +19148,27 @@ function saveTescoIngredient(categoryReady=false){
   const newUnit = document.getElementById('tp-pack-unit').value||'g';
   const newWeight = +document.getElementById('tp-item-weight').value||null;
   const newWeightUnit = document.getElementById('tp-item-weight-unit')?.value||'g';
-  const newDrainedWeight = +document.getElementById('tp-drained-weight')?.value||null;
+  const explicitUsableWeight = +document.getElementById('import-usable-weight')?.value || null;
+  const newDrainedWeight = explicitUsableWeight || (+document.getElementById('tp-drained-weight')?.value||null);
   const newDrainedWeightUnit = document.getElementById('tp-drained-weight-unit')?.value||'g';
   const newSourceUrl = manualAddMode ? null : (window.__lastTescoImport ? window.__lastTescoImport.url : null);
   const newItemCount = newUnit === 'qty' ? newSize : (!manualAddMode && window.__lastTescoImport ? window.__lastTescoImport.itemCount : null);
+  
+  const selectedCat = document.getElementById('import-category')?.value || document.getElementById('tp-cat')?.value || 'other';
+  const selectedStorage = document.getElementById('import-storage')?.value || document.getElementById('tp-storage')?.value || '';
+  const selectedFibre = +document.getElementById('import-fibre')?.value || +document.getElementById('tp-fibre')?.value || 0;
+  const selectedNotes = document.getElementById('import-notes')?.value?.trim() || document.getElementById('tp-notes')?.value?.trim() || '';
+
   const tescoData = normaliseLegacyCountedPackOnSave({
     name,
     brand: document.getElementById('tp-brand').value.trim(),
-    cat: document.getElementById('tp-cat').value,
-    storage: document.getElementById('tp-storage').value,
+    cat: selectedCat,
+    category: selectedCat,
+    storage: selectedStorage,
     cal: +document.getElementById('tp-cal').value||0,
     fat: +document.getElementById('tp-fat').value||0,
     carb: +document.getElementById('tp-carb').value||0,
-    fibre: +document.getElementById('tp-fibre').value||0,
+    fibre: selectedFibre,
     prot: +document.getElementById('tp-prot').value||0,
     price: newPrice,
     packSize: newSize,
@@ -19125,8 +19176,9 @@ function saveTescoIngredient(categoryReady=false){
     itemWeight: newWeight,
     itemWeightUnit: newWeightUnit,
     drainedWeight: newDrainedWeight,
+    usableWeight: newDrainedWeight,
     drainedWeightUnit: newDrainedWeightUnit,
-    notes: document.getElementById('tp-notes').value.trim(),
+    notes: selectedNotes,
     sourceUrl: newSourceUrl,
     itemCount: newItemCount
   });
@@ -21457,58 +21509,78 @@ function removeWizardUseUpProduct(productId) {
 }
 window.removeWizardUseUpProduct = removeWizardUseUpProduct;
 
-// DEDICATED PLAN DELETION PIPELINE (v3.0.6)
-if (!window.deletedPlanIds) window.deletedPlanIds = new Set();
-async function deletePlan(targetId) {
-  if (!targetId) return;
-  window.deletedPlanIds.add(targetId);
-  console.log('[v3.0.7 STATE PERSISTENCE] Executing optimistic deletePlan pipeline for:', targetId);
+// DEDICATED PLAN DELETION PIPELINE (v3.0.8)
+if (!window.state) window.state = {};
+window.state.deletedPlanIds = window.state.deletedPlanIds || new Set();
+window.deletedPlanIds = window.deletedPlanIds || window.state.deletedPlanIds;
+
+async function deletePlan(planId) {
+  if (!planId) return;
   const householdId = window.CURRENT_HOUSEHOLD_ID || window.activeHouseholdId || state?.meta?.householdId || 'elliott-chloe';
 
-  // 1. Mutate local state
-  if (Array.isArray(window.state?.plans)) {
-    window.state.plans = window.state.plans.filter(p => p && p.id !== targetId);
+  // 1. Synchronously add planId to window.state.deletedPlanIds
+  window.state.deletedPlanIds.add(planId);
+  window.deletedPlanIds.add(planId);
+
+  // Preserve removed plan for rollback
+  let previousPlans = Array.isArray(window.state.plans) ? [...window.state.plans] : [];
+  let previousPlan = previousPlans.find(p => p && (p.id === planId || p.planId === planId));
+
+  // 2. Synchronously filter planId out of window.state.plans
+  if (Array.isArray(window.state.plans)) {
+    window.state.plans = window.state.plans.filter(p => p && p.id !== planId && p.planId !== planId);
   }
   if (Array.isArray(state?.plans)) {
-    state.plans = state.plans.filter(p => p && p.id !== targetId);
+    state.plans = state.plans.filter(p => p && p.id !== planId && p.planId !== planId);
   }
   if (Array.isArray(state?.planHistory)) {
-    state.planHistory = state.planHistory.filter(p => p && p.id !== targetId && p.planId !== targetId);
+    state.planHistory = state.planHistory.filter(p => p && p.id !== planId && p.planId !== planId);
   }
-  if (window.state?.plan?.id === targetId || state?.plan?.id === targetId) {
+  if (window.state?.plan?.id === planId || state?.plan?.id === planId) {
     if (window.state) window.state.plan = null;
     if (state) state.plan = null;
   }
 
-  // Persist directly to local storage backups defensively
+  // Persist directly to local storage backups
   try {
     safeLocalStorageSet(SK, safeJsonStringify(state));
     safeLocalStorageSet('plateplan_plan_backup', '');
     if (Array.isArray(state.plans)) {
       safeLocalStorageSet('plateplan_history_v2', JSON.stringify(state.plans));
     }
-    if (Array.isArray(state.planHistory)) {
-      safeSaveHistoryBackup(state.planHistory);
-    }
   } catch(e) {}
 
-  // 2. Transition UI directly
+  // 3. Trigger a UI re-render
   if (!state.plan || !state.plan.slots || (Array.isArray(state.plans) && state.plans.length === 0)) {
     state.plannerStep = 1;
   }
   if (typeof renderPlanHistory === 'function') renderPlanHistory();
+  if (typeof renderPlan === 'function') renderPlan();
   renderAll();
-  showPlatePlanToast('Plan deleted successfully. ✓');
 
-  // 3. Direct Firestore deletion
+  // 4. Execute the Firestore deleteDoc wrapped in a try/catch
   try {
     const db = platePlanDb || (window.firebase && firebase.firestore && firebase.firestore());
     if (db) {
-      await db.collection('households').doc(householdId).collection('plans').doc(targetId).delete();
-      console.log('[v3.0.7 STATE PERSISTENCE] Plan deleted directly from Firestore:', targetId);
+      await db.collection('households').doc(householdId).collection('plans').doc(planId).delete();
+      console.log('[v3.0.8 STATE PERSISTENCE] Plan deleted directly from Firestore:', planId);
+      showPlatePlanToast('Plan deleted successfully. ✓');
     }
   } catch(err) {
-    console.warn('[v3.0.7 STATE PERSISTENCE] Direct Firestore deletion error:', err);
+    console.error('[v3.0.8 STATE PERSISTENCE] Direct Firestore deletion error - ROLLING BACK:', err);
+    // 5. In catch block: remove planId from deleted set, restore it to plans, re-render, and show error toast
+    window.state.deletedPlanIds.delete(planId);
+    window.deletedPlanIds.delete(planId);
+    if (previousPlan) {
+      if (!Array.isArray(window.state.plans)) window.state.plans = [];
+      window.state.plans.push(previousPlan);
+      if (!Array.isArray(state.plans)) state.plans = [];
+      state.plans.push(previousPlan);
+    }
+    if (typeof renderPlanHistory === 'function') renderPlanHistory();
+    if (typeof renderPlan === 'function') renderPlan();
+    renderAll();
+    showPlatePlanToast('Failed to delete plan from cloud. Plan restored.', 'error');
   }
 }
 window.deletePlan = deletePlan;
