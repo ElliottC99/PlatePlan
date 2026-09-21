@@ -1,8 +1,7 @@
 /**
- * PlatePlan v3.3.6 - Native Today Feature View with Date Navigation & Plan Mapping
+ * PlatePlan v3.3.7 - Native Today Feature View
  */
-import { createLegacyView } from './create-legacy-view.js?v=3.3.6';
-import { subscribeToStore } from '../core/store.js?v=3.3.6';
+import { subscribeToStore } from '../core/store.js?v=3.3.7';
 
 let selectedDate = new Date();
 
@@ -28,20 +27,11 @@ window.resetTodayDate = function() {
 };
 
 function getTodayContainer() {
-  let el = document.getElementById('view-today') || 
-           document.getElementById('today-view') || 
-           document.getElementById('tab-today') || 
-           document.querySelector('[data-view="today"]') || 
-           document.querySelector('.today-container');
-  
-  if (!el && typeof document !== 'undefined') {
-    el = document.createElement('div');
-    el.id = 'view-today';
-    el.className = 'view active today-container';
-    const mainShell = document.querySelector('main') || document.getElementById('main-content') || document.body;
-    mainShell.appendChild(el);
-  }
-  return el;
+  return document.getElementById('view-today') || 
+         document.getElementById('today-view') || 
+         document.getElementById('tab-today') || 
+         document.querySelector('[data-view="today"]') || 
+         document.querySelector('.today-container');
 }
 
 function renderTodayContent() {
@@ -109,28 +99,10 @@ function renderTodayContent() {
   }
 }
 
-const todayView = createLegacyView({
-  id: 'today',
-  rootId: 'view-today',
-  install: (context, rootEl) => {
-    renderTodayContent();
+export default {
+  render: async (context) => renderTodayContent(),
+  install: (context) => {
+    window.renderToday = renderTodayContent;
+    subscribeToStore(renderTodayContent);
   }
-});
-
-if (typeof window !== 'undefined') {
-  window.renderToday = renderTodayContent;
-  subscribeToStore(() => {
-    const container = getTodayContainer();
-    if (container && (container.classList.contains('active') || !container.classList.contains('hidden'))) {
-      renderTodayContent();
-    }
-  });
-
-  if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    setTimeout(renderTodayContent, 50);
-  } else {
-    window.addEventListener('DOMContentLoaded', renderTodayContent);
-  }
-}
-
-export default todayView;
+};

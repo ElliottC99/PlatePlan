@@ -41,6 +41,7 @@ window.addEventListener('plateplan:feature-loaded', syncRuntimeMarker);
 // Wire deletePlan globally to our store's resilient deletePlan implementation
 import { deletePlan } from './core/store.js?v=3.3.6';
 window.deletePlan = deletePlan;
+window.showView = (id) => runtime.renderView(id);
 
 
 // Eagerly load core feature modules to establish DOM ownership, attach listeners, and claim active modular view ownership

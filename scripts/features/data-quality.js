@@ -1,14 +1,15 @@
-import { createLegacyView } from './create-legacy-view.js?v=3.3.6';
-import { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs } from './products.js?v=3.3.6';
-import { replaceRecipeIngredient } from './recipes.js?v=3.3.6';
-import { safeStringify } from '../core/utils.js?v=3.3.6';
+import { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs } from './products.js?v=3.3.7';
+import { replaceRecipeIngredient } from './recipes.js?v=3.3.7';
+import { safeStringify } from '../core/utils.js?v=3.3.7';
 
 export { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs, replaceRecipeIngredient };
 
-export default createLegacyView({
-  id: 'data',
-  rootId: 'view-data',
-  install(context, root) {
+export default {
+  render: async (context) => {
+    if (typeof window.renderDataQuality === 'function') await window.renderDataQuality();
+  },
+  install(context) {
+    const root = document.getElementById('view-data');
     if (!root) return;
     root.addEventListener('click', async (event) => {
       const button = event.target.closest('.dq-fix-btn');
@@ -137,4 +138,4 @@ export default createLegacyView({
       });
     }, true);
   }
-});
+};

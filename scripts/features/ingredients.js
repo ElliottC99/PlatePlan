@@ -1,2 +1,5 @@
-import { createLegacyView } from './create-legacy-view.js?v=3.3.6';
-export default createLegacyView({ id: 'ingredients', rootId: 'view-ingredients' });
+export default {
+  render: async (context) => {
+    if (typeof window.renderIngredients === 'function') await window.renderIngredients();
+  }
+};

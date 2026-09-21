@@ -1,5 +1,4 @@
-import { createLegacyView } from './create-legacy-view.js?v=3.3.6';
-import { safeStringify } from '../core/utils.js?v=3.3.6';
+import { safeStringify } from '../core/utils.js?v=3.3.7';
 
 /**
  * Synchronous ingredient replacement with timestamping and try/catch rollback
@@ -69,4 +68,9 @@ export async function replaceRecipeIngredient(recipeId, ingredientIndex, newProd
   }
 }
 
-export default createLegacyView({ id: 'vault', rootId: 'view-vault' });
+export default {
+  render: async (context) => {
+    if (typeof window.renderVault === 'function') await window.renderVault();
+  }
+};
+

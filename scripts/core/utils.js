@@ -33,6 +33,9 @@ export function safeStringify(obj) {
     if (typeof value === 'function') return undefined;
     if (typeof Element !== 'undefined' && value instanceof Element) return undefined;
     if (typeof Node !== 'undefined' && value instanceof Node) return undefined;
+    if (key === 'target' || key === 'src' || key === 'view' || key === '_delegate' || key === 'firestore' || key === 'auth' || key === 'i') {
+      if (typeof value === 'object' && value !== null) return '[Circular/Ref]';
+    }
     if (typeof value === 'object') {
       if (seen.has(value)) return undefined;
       seen.add(value);

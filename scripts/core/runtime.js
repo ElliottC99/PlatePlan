@@ -4,17 +4,17 @@
 console.log('[PlatePlan v3.3.6] Engine initialized. Legacy keys purged.');
 
 const FEATURE_LOADERS = Object.freeze({
-  today: () => import('../features/today.js?v=3.3.6'),
-  vault: () => import('../features/recipes.js?v=3.3.6'),
-  add: () => import('../features/recipe-add.js?v=3.3.6'),
-  ingredients: () => import('../features/ingredients.js?v=3.3.6'),
-  bank: () => import('../features/products.js?v=3.3.6'),
-  planner: () => import('../features/planner.js?v=3.3.6'),
-  planlib: () => import('../features/library.js?v=3.3.6'),
-  shopping: () => import('../features/shopping.js?v=3.3.6'),
-  search: () => import('../features/search.js?v=3.3.6'),
-  data: () => import('../features/data-quality.js?v=3.3.6'),
-  prefs: () => import('../features/preferences.js?v=3.3.6'),
+  today: () => import('../features/today.js'),
+  vault: () => import('../features/recipes.js'),
+  add: () => import('../features/recipe-add.js'),
+  ingredients: () => import('../features/ingredients.js'),
+  bank: () => import('../features/products.js'),
+  planner: () => import('../features/planner.js'),
+  planlib: () => import('../features/library.js'),
+  shopping: () => import('../features/shopping.js'),
+  search: () => import('../features/search.js'),
+  data: () => import('../features/data-quality.js'),
+  prefs: () => import('../features/preferences.js'),
 });
 
 // Scan localStorage keys and remove obsolete legacy keys on startup
@@ -58,19 +58,20 @@ export function createPlatePlanRuntime(context) {
 
   const renderView = async id => {
     try {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      const targetView = document.getElementById(`view-${id}`) || document.getElementById(id);
+      if (targetView) targetView.classList.add('active');
+
       if (!FEATURE_LOADERS[id]) {
-        context.legacy.renderLegacyView(id);
         return null;
       }
       const feature = await loadFeature(id);
       if (feature) {
         return await feature.render(context);
       }
-      context.legacy.renderLegacyView(id);
       return null;
     } catch (error) {
       console.error(`PlatePlan could not load ${id}`, error);
-      context.legacy.renderLegacyView(id);
       return null;
     }
   };

@@ -1,2 +1,5 @@
-import { createLegacyView } from './create-legacy-view.js?v=3.3.6';
-export default createLegacyView({ id: 'prefs', rootId: 'view-prefs' });
+export default {
+  render: async (context) => {
+    if (typeof window.renderPrefs === 'function') await window.renderPrefs();
+  }
+};
