@@ -207,14 +207,15 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='3.0.6';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v86';
-window.APP_VERSION = '3.0.6';
-console.log("[v3.0.6 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
+const PLATEPLAN_APP_VERSION='3.0.7';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v87';
+window.APP_VERSION = '3.0.7';
+window._hydrationLogged = false;
+console.log("[v3.0.7 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
 
 try {
-  localStorage.removeItem('plateplan_v1_recovery');
-  localStorage.removeItem('plateplan_history_backup');
+  const OBSOLETE_KEYS = ['app_version', 'data:chloe', 'data:elliott', 'plateplan_v1', 'plateplan_v1_chloe', 'plateplan_v1_elliott', 'plateplan_v1_device_id', 'plateplan_v1_recovery', 'plateplan_history_backup'];
+  OBSOLETE_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch(e) {} });
 } catch(_e) {}
 
 let isHydrating = false;
@@ -242,6 +243,54 @@ function parseRecipeDocumentToCleanArray(docData) {
 }
 window.parseRecipeDocumentToCleanArray = parseRecipeDocumentToCleanArray;
 window.isCloudHydrated = false;
+
+function safeJsonStringify(value, space = null, fallback = '{}') {
+  if (value === undefined || value === null) {
+    return (space !== null && space !== undefined) ? 'null' : fallback;
+  }
+  try {
+    const seen = new WeakSet();
+    const replacer = (k, v) => {
+      if (typeof v === 'number') return (isNaN(v) || !isFinite(v)) ? null : v;
+      if (v === undefined) return undefined;
+      if (typeof v === 'function' || typeof v === 'symbol') return undefined;
+      if (typeof BigInt !== 'undefined' && typeof v === 'bigint') return String(v);
+      if (typeof Node !== 'undefined' && (v instanceof Node || v instanceof Window)) return undefined;
+      if (typeof Event !== 'undefined' && v instanceof Event) return undefined;
+      if (typeof v === 'object' && v !== null) {
+        if (v.constructor && (
+          v.constructor.name === 'un' ||
+          v.constructor.name === 'P' ||
+          v.constructor.name === 'HTMLImageElement' ||
+          v.constructor.name === 'HTMLCanvasElement' ||
+          v.constructor.name === 'SyntheticBaseEvent'
+        )) {
+          return undefined;
+        }
+        if ('nodeType' in v || 'ownerDocument' in v) return undefined;
+        if (seen.has(v)) return undefined;
+        seen.add(v);
+      }
+      return v;
+    };
+    const str = (space !== null && space !== undefined) ? JSON.stringify(value, replacer, space) : JSON.stringify(value, replacer);
+    return str !== undefined ? str : fallback;
+  } catch (_e) {
+    return fallback;
+  }
+}
+window.safeJsonStringify = safeJsonStringify;
+
+function clonePlatePlanValue(value) {
+  if (value === null || value === undefined) return value;
+  try {
+    const str = safeJsonStringify(value, null, 'null');
+    return str === 'null' ? value : JSON.parse(str);
+  } catch (e) {
+    return value;
+  }
+}
+window.clonePlatePlanValue = clonePlatePlanValue;
 
 function unwrapAndCleanItem(item){
   if(!item || typeof item !== 'object') return item;
@@ -288,7 +337,8 @@ function sanitizePayloadForFirestore(data){
   if(data === undefined) return null;
   try {
     const cleaned = stripUndefinedValues(data);
-    return JSON.parse(JSON.stringify(cleaned, (k, v) => (v === undefined ? null : v)));
+    const jsonStr = safeJsonStringify(cleaned, null, 'null');
+    return JSON.parse(jsonStr);
   } catch(err) {
     console.error('[PAYLOAD SANITIZATION ERROR]', err);
     return data;
@@ -1309,7 +1359,7 @@ function closeMobileMore(fromHistory=false){
 }
 function mobileMoreView(id){ closeMobileMore(); showView(id); }
 function syncMobileNavigation(id){
-  const primary = ['today','vault','planner','shopping','search'].includes(id) ? id : '';
+  const primary = ['today','vault','planner','data','search'].includes(id) ? id : '';
   document.querySelectorAll('#mobile-nav button').forEach(button=>button.classList.toggle('active',button.dataset.view===primary));
 }
 function closeMobileActionSheet(fromHistory=false){
@@ -2045,6 +2095,20 @@ window.deleteIngredient = deleteIngredient;
 
 async function saveRecipe(recipe){
   if(!recipe || !recipe.id) throw new Error('Recipe must have an id');
+  recipe.updatedAt = Date.now();
+
+  if (Array.isArray(state?.recipes)) {
+    const idx = state.recipes.findIndex(r => r && r.id === recipe.id);
+    if (idx > -1) state.recipes[idx] = recipe;
+    else state.recipes.push(recipe);
+  }
+  if (Array.isArray(window.state?.recipes)) {
+    const idx = window.state.recipes.findIndex(r => r && r.id === recipe.id);
+    if (idx > -1) window.state.recipes[idx] = recipe;
+    else window.state.recipes.push(recipe);
+  }
+  if (typeof saveState === 'function') saveState();
+
   const householdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
   const db = platePlanDb || (window.firebase && firebase.firestore && firebase.firestore());
   if(db && platePlanCloudReady && platePlanCloudUser && navigator.onLine){
@@ -3676,7 +3740,10 @@ function startPlatePlanCloudListeners(){
     runDataQualityAudits();
     platePlanLastSyncedAt = Date.now();
     updatePlatePlanSyncStatus('synced');
-    console.log("[v3.0.6 HYDRATION]", state.recipes.length, "recipes loaded.");
+    if(!window._hydrationLogged) {
+      console.log("[v3.0.7 HYDRATION]", state.recipes.length, "recipes loaded.");
+      window._hydrationLogged = true;
+    }
   }, error => {
     console.error('[RECIPES SUBCOLLECTION LISTENER ERROR]', error);
     if(!navigator.onLine) updatePlatePlanSyncStatus('offline');
@@ -3770,6 +3837,7 @@ function startPlatePlanCloudListeners(){
     const data = docSnapshot.data() || {};
     const val = cleanCloudValue(data.value !== undefined ? data.value : data);
     if(val && typeof val === 'object' && Object.keys(val).length > 0){
+      if(window.deletedPlanIds && val.id && window.deletedPlanIds.has(val.id)) return;
       const hasConflict = checkStartupPlanRecovery(val);
       if(!hasConflict) {
         state.plan = val;
@@ -3792,8 +3860,11 @@ function startPlatePlanCloudListeners(){
     if(docSnapshot.metadata && docSnapshot.metadata.hasPendingWrites) return;
 
     const data = docSnapshot.data() || {};
-    const val = cleanCloudValue(data.value !== undefined ? data.value : (Array.isArray(data) ? data : data.planHistory));
+    let val = cleanCloudValue(data.value !== undefined ? data.value : (Array.isArray(data) ? data : data.planHistory));
     if(Array.isArray(val) && val.length > 0){
+      if(window.deletedPlanIds && window.deletedPlanIds.size > 0) {
+        val = val.filter(item => item && !window.deletedPlanIds.has(item.id) && !window.deletedPlanIds.has(item.planId));
+      }
       state.planHistory = val;
       window.state = state;
       window.appState = state;
@@ -4003,7 +4074,10 @@ async function loadSharedPlatePlan(){
   state.isCloudHydrated = true;
   window.isCloudHydrated = true;
   console.log(`[RECIPES HYDRATION] Deterministically hydrated and deduplicated ${state.recipes.length} recipes across multi-path check.`);
-  console.log("[v3.0.6 HYDRATION]", state.recipes.length, "recipes loaded.");
+  if(!window._hydrationLogged) {
+    console.log("[v3.0.7 HYDRATION]", state.recipes.length, "recipes loaded.");
+    window._hydrationLogged = true;
+  }
 
   const metaDoc = dataDocs.meta || {};
   const taxonomyDoc = dataDocs.taxonomy || {};
@@ -4924,12 +4998,17 @@ function setPlanTrafficPreset(preset){
 }
 
 function plannerRecipePassesTrafficFilter(row, mealType, who, suppliedRules=null){
+    const minFitScore = state?.prefs?.minFitScore || 0;
+    if (minFitScore > 0) {
+      const effScore = (row._computedFitScore !== undefined) ? row._computedFitScore : (getEffectiveRecipeFitScore(row.recipe || row, mealType)?.score || 0);
+      if (effScore < minFitScore) return false;
+    }
     const rules = suppliedRules || getPlanTrafficFilterRules();
     const target = String(who || '').toLowerCase();
     const checkE = target === 'any' || target === 'elliott' || target === 'both';
     const checkC = target === 'any' || target === 'chloe' || target === 'both';
-    if(checkE && !rules.e.includes(getRecipeVariantTrafficStatus(row, 'Elliott', mealType))) return false;
-    if(checkC && !rules.c.includes(getRecipeVariantTrafficStatus(row, 'Chloe', mealType))) return false;
+    if(checkE && rules.e && rules.e.length && !rules.e.includes(getRecipeVariantTrafficStatus(row, 'Elliott', mealType))) return false;
+    if(checkC && rules.c && rules.c.length && !rules.c.includes(getRecipeVariantTrafficStatus(row, 'Chloe', mealType))) return false;
     return true;
 }
 
@@ -7161,17 +7240,17 @@ function snapshotCurrentPlan(savedStatus = 'PlatePlan generated', name = ''){
     confirmedShopping: !!state.plan.confirmedShopping,
     confirmedAt: state.plan.confirmedAt || null,
     days: state.plan.days || 0,
-    slots: JSON.parse(JSON.stringify(state.plan.slots || {})),
-    dayDates: JSON.parse(JSON.stringify(state.plan.dayDates || {})),
-    slotReasons: JSON.parse(JSON.stringify(state.plan.slotReasons || {})),
+    slots: clonePlatePlanValue(state.plan.slots || {}),
+    dayDates: clonePlatePlanValue(state.plan.dayDates || {}),
+    slotReasons: clonePlatePlanValue(state.plan.slotReasons || {}),
     productPriority: state.plan.productPriority || state.prefs.productPriority || 'protein',
-    productSelections: JSON.parse(JSON.stringify(state.plan.productSelections || {})),
-    useUpProductIds: JSON.parse(JSON.stringify(state.plan.useUpProductIds || [])),
-    shoppingAtHome: JSON.parse(JSON.stringify(state.plan.shoppingAtHome || {})),
-    overrides: JSON.parse(JSON.stringify(state.overrides || {})),
+    productSelections: clonePlatePlanValue(state.plan.productSelections || {}),
+    useUpProductIds: clonePlatePlanValue(state.plan.useUpProductIds || []),
+    shoppingAtHome: clonePlatePlanValue(state.plan.shoppingAtHome || {}),
+    overrides: clonePlatePlanValue(state.overrides || {}),
     score: calculatePlanScore(state.plan),
-    mealPrepGroups: JSON.parse(JSON.stringify(state.plan.mealPrepGroups || [])),
-    declinedMealPrepGroups: JSON.parse(JSON.stringify(state.plan.declinedMealPrepGroups || [])),
+    mealPrepGroups: clonePlatePlanValue(state.plan.mealPrepGroups || []),
+    declinedMealPrepGroups: clonePlatePlanValue(state.plan.declinedMealPrepGroups || []),
     warnings: state.plan.warnings || []
   };
   snap.cardPackSnapshot=buildRecipeCardPackSnapshot(state.plan,state.overrides,{planName:snap.name||defaultPlanSaveName(state.plan),createdAt:snap.date});
@@ -9573,22 +9652,22 @@ function applyPlanFromLibraryDirect(index,startDate){
 
   state.plan={
     days: days,
-    slots: JSON.parse(JSON.stringify(p.slots||{})),
+    slots: clonePlatePlanValue(p.slots||{}),
     dayDates: dayDates,
-    slotReasons: JSON.parse(JSON.stringify(p.slotReasons||{})),
+    slotReasons: clonePlatePlanValue(p.slotReasons||{}),
     productPriority: p.productPriority||state.prefs?.productPriority||'protein',
-    productSelections: JSON.parse(JSON.stringify(p.productSelections||{})),
-    useUpProductIds: JSON.parse(JSON.stringify(p.useUpProductIds||[])),
-    shoppingAtHome: JSON.parse(JSON.stringify(p.shoppingAtHome||{})),
+    productSelections: clonePlatePlanValue(p.productSelections||{}),
+    useUpProductIds: clonePlatePlanValue(p.useUpProductIds||[]),
+    shoppingAtHome: clonePlatePlanValue(p.shoppingAtHome||{}),
     warnings: [],
     score: calculatePlanScore({days:days,slots:p.slots,productSelections:p.productSelections}),
     confirmedShopping: !!p.confirmedShopping,
-    mealPrepGroups: JSON.parse(JSON.stringify(p.mealPrepGroups||[])),
-    declinedMealPrepGroups: JSON.parse(JSON.stringify(p.declinedMealPrepGroups||[])),
+    mealPrepGroups: clonePlatePlanValue(p.mealPrepGroups||[]),
+    declinedMealPrepGroups: clonePlatePlanValue(p.declinedMealPrepGroups||[]),
     updatedAt: new Date().toISOString(),
     appliedAt: new Date().toISOString()
   };
-  state.overrides=JSON.parse(JSON.stringify(p.overrides||{}));
+  state.overrides=clonePlatePlanValue(p.overrides||{});
 
   platePlanNutritionCache.clear();
   markPlatePlanViewsDirty('today','planner','shopping','planlib');
@@ -12167,9 +12246,17 @@ function closeUnifiedMappingModal(){
   window.activeUnifiedMappingContext = null;
 }
 
+function switchUnifiedMapTab(tabName) {
+  window.unifiedMapActiveTab = tabName;
+  const searchInput = document.getElementById('unified-map-search');
+  handleUnifiedMapSearch(searchInput ? searchInput.value : '');
+}
+window.switchUnifiedMapTab = switchUnifiedMapTab;
+
 function handleUnifiedMapSearch(query){
   const resultsEl = document.getElementById('unified-map-results');
   if(!resultsEl) return;
+  if(!window.unifiedMapActiveTab) window.unifiedMapActiveTab = 'product';
   const q = (query || '').trim();
   const variants = getSearchVariants(q);
   const strat = getAutoMappingStrategy();
@@ -12186,90 +12273,100 @@ function handleUnifiedMapSearch(query){
            getProductProteinPer100Kcal(b) - getProductProteinPer100Kcal(a) ||
            (a.name || '').localeCompare(b.name || '');
   });
-  const topProducts = products.slice(0, 15);
+  const topProducts = products.slice(0, 20);
 
   ensureIngredientGroups();
   let groups = (state.ingredientGroups || []).filter(g => {
     if(!q) return true;
     const hay = getIngredientGroupSearchText(g);
     return variants.some(v => hay.includes(v));
-  }).slice(0, 10);
+  }).slice(0, 15);
 
-  if(!topProducts.length && !groups.length){
-    resultsEl.innerHTML = `
-      <div style="padding:24px;text-align:center;color:var(--text2)">
-        <p style="margin:0 0 10px;font-size:14px">No matching products or sub-types found for "<strong>${ppEscapeHtml(q)}</strong>".</p>
-        <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
-          <button type="button" class="btn sm ghost" style="color:var(--purple);border-color:var(--purple)" onclick="triggerTescoImportFromUnifiedMap()">Search &amp; Import from Tesco</button>
-          <button type="button" class="btn sm ghost" onclick="triggerNewProductFromUnifiedMap()">Create New Product</button>
-        </div>
-      </div>
-    `;
-    return;
-  }
+  let html = `
+    <div style="display:flex;gap:8px;margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:8px">
+      <button type="button" class="btn sm ${window.unifiedMapActiveTab !== 'subtype' ? 'primary' : 'ghost'}" onclick="switchUnifiedMapTab('product')">Tab 1: Change Product (Same Sub-type)</button>
+      <button type="button" class="btn sm ${window.unifiedMapActiveTab === 'subtype' ? 'primary' : 'ghost'}" onclick="switchUnifiedMapTab('subtype')">Tab 2: Change Sub-type / Ingredient</button>
+    </div>
+  `;
 
-  let html = '';
-
-  if(topProducts.length > 0){
-    html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3);padding:6px 8px 4px;display:flex;justify-content:space-between">
-      <span>Products (${products.length})</span>
-      <span style="font-weight:500;text-transform:none">Strategy: ${ppEscapeHtml(strat.replace(/_/g, ' '))}</span>
-    </div>`;
-
-    html += topProducts.map(p => {
-      const packGrams = productPackGrams(p);
-      const price = +p.price || 0;
-      const costPerG = (price > 0 && packGrams > 0) ? (price / packGrams) * 100 : null;
-      const costPerUnit = getProductCostPerUnit(p);
-      const protPer100Kcal = getProductProteinPer100Kcal(p);
-      const group = p.groupId ? getIngredientGroup(p.groupId) : null;
-      
-      const badgeParts = [];
-      if(round1(p.prot) > 0) badgeParts.push(`${round1(p.prot)}g P`);
-      if(p.cal > 0) badgeParts.push(`${Math.round(p.cal)} kcal`);
-      if(protPer100Kcal > 0) badgeParts.push(`${round1(protPer100Kcal)}g/100kcal`);
-      if(p.packSize) badgeParts.push(`${p.packSize}${p.packUnit || 'g'}`);
-      if(price > 0) badgeParts.push(`£${price.toFixed(2)}`);
-      if(costPerG) badgeParts.push(`(£${(costPerG / 100).toFixed(2)}/100g)`);
-      else if(costPerUnit && isFinite(costPerUnit)) badgeParts.push(`(£${costPerUnit.toFixed(2)}/portion)`);
-
-      return `
-        <div class="unified-map-item" onclick="selectUnifiedMapProduct('${ppEscapeAttr(p.id)}', '${ppEscapeAttr(p.groupId || '')}')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;transition:background 0.15s">
-          <div style="min-width:0;flex:1;padding-right:10px">
-            <div style="font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px">
-              <span>${ppEscapeHtml(p.name)}</span>
-              ${p.brand && p.brand !== 'Generic' ? `<span style="font-weight:500;font-size:11px;color:var(--text2)">(${ppEscapeHtml(p.brand)})</span>` : ''}
-            </div>
-            <div style="font-size:11px;color:var(--text3);margin-top:2px">
-              ${group ? `Sub-type: ${ppEscapeHtml(group.name)} · ` : ''}${ppEscapeHtml(CAT[p.cat] || p.cat || 'Other')}
-            </div>
-            <div style="font-size:11px;color:var(--text2);margin-top:3px;display:flex;flex-wrap:wrap;gap:4px">
-              <span class="tag" style="font-size:10px;padding:1px 6px">${badgeParts.join(' · ')}</span>
-            </div>
+  if(window.unifiedMapActiveTab !== 'subtype') {
+    if(!topProducts.length) {
+      html += `
+        <div style="padding:20px;text-align:center;color:var(--text2)">
+          <p style="margin:0 0 10px;font-size:13px">No matching products found for "<strong>${ppEscapeHtml(q)}</strong>".</p>
+          <div style="display:flex;gap:8px;justify-content:center;margin-top:10px">
+            <button type="button" class="btn sm ghost" style="color:var(--purple);border-color:var(--purple)" onclick="triggerTescoImportFromUnifiedMap()">Search &amp; Import from Tesco</button>
+            <button type="button" class="btn sm ghost" onclick="triggerNewProductFromUnifiedMap()">Create New Product</button>
           </div>
-          <button type="button" class="btn sm primary" style="flex-shrink:0;padding:4px 10px;font-size:11px">Select</button>
         </div>
       `;
-    }).join('');
-  }
+    } else {
+      html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3);padding:6px 8px 4px;display:flex;justify-content:space-between">
+        <span>Products (${products.length})</span>
+        <span style="font-weight:500;text-transform:none">Strategy: ${ppEscapeHtml(strat.replace(/_/g, ' '))}</span>
+      </div>`;
 
-  if(groups.length > 0){
-    html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3);padding:10px 8px 4px;margin-top:6px">Sub-types / Ingredient Groups (${groups.length})</div>`;
-    html += groups.map(g => {
-      const defProd = resolveProductForIngredient({ groupId: g.id }).product;
-      return `
-        <div class="unified-map-item" onclick="selectUnifiedMapGroup('${ppEscapeAttr(g.id)}')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;transition:background 0.15s">
-          <div style="min-width:0;flex:1;padding-right:10px">
-            <div style="font-weight:700;font-size:13px">${ppEscapeHtml(getGroupTypeName(g))}</div>
-            <div style="font-size:11px;color:var(--text3);margin-top:2px">${ppEscapeHtml(getGroupHierarchyText(g))}</div>
-            <div style="font-size:11px;color:var(--text2);margin-top:2px">
-              Default: ${ppEscapeHtml(defProd ? `${defProd.name}${defProd.brand && defProd.brand !== 'Generic' ? ` (${defProd.brand})` : ''}` : 'None assigned')}
+      html += topProducts.map(p => {
+        const packGrams = productPackGrams(p);
+        const price = +p.price || 0;
+        const costPerG = (price > 0 && packGrams > 0) ? (price / packGrams) * 100 : null;
+        const costPerUnit = getProductCostPerUnit(p);
+        const protPer100Kcal = getProductProteinPer100Kcal(p);
+        const group = p.groupId ? getIngredientGroup(p.groupId) : null;
+        
+        const badgeParts = [];
+        if(round1(p.prot) > 0) badgeParts.push(`${round1(p.prot)}g P`);
+        if(p.cal > 0) badgeParts.push(`${Math.round(p.cal)} kcal`);
+        if(protPer100Kcal > 0) badgeParts.push(`${round1(protPer100Kcal)}g/100kcal`);
+        if(p.packSize) badgeParts.push(`${p.packSize}${p.packUnit || 'g'}`);
+        if(price > 0) badgeParts.push(`£${price.toFixed(2)}`);
+        if(costPerG) badgeParts.push(`(£${(costPerG / 100).toFixed(2)}/100g)`);
+        else if(costPerUnit && isFinite(costPerUnit)) badgeParts.push(`(£${costPerUnit.toFixed(2)}/portion)`);
+
+        return `
+          <div class="unified-map-item" onclick="selectUnifiedMapProduct('${ppEscapeAttr(p.id)}', '${ppEscapeAttr(p.groupId || '')}')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;transition:background 0.15s">
+            <div style="min-width:0;flex:1;padding-right:10px">
+              <div style="font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px">
+                <span>${ppEscapeHtml(p.name)}</span>
+                ${p.brand && p.brand !== 'Generic' ? `<span style="font-weight:500;font-size:11px;color:var(--text2)">(${ppEscapeHtml(p.brand)})</span>` : ''}
+              </div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px">
+                ${group ? `Sub-type: ${ppEscapeHtml(group.name)} · ` : ''}${ppEscapeHtml(CAT[p.cat] || p.cat || 'Other')}
+              </div>
+              <div style="font-size:11px;color:var(--text2);margin-top:3px;display:flex;flex-wrap:wrap;gap:4px">
+                <span class="tag" style="font-size:10px;padding:1px 6px">${badgeParts.join(' · ')}</span>
+              </div>
             </div>
+            <button type="button" class="btn sm primary" style="flex-shrink:0;padding:4px 10px;font-size:11px">Select Product</button>
           </div>
-          <button type="button" class="btn sm ghost" style="flex-shrink:0;padding:4px 10px;font-size:11px">Use Sub-type</button>
+        `;
+      }).join('');
+    }
+  } else {
+    if(!groups.length) {
+      html += `
+        <div style="padding:20px;text-align:center;color:var(--text2)">
+          <p style="margin:0 0 10px;font-size:13px">No matching sub-types found for "<strong>${ppEscapeHtml(q)}</strong>".</p>
         </div>
       `;
-    }).join('');
+    } else {
+      html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3);padding:6px 8px 4px">Sub-types / Ingredient Groups (${groups.length})</div>`;
+      html += groups.map(g => {
+        const defProd = resolveProductForIngredient({ groupId: g.id }).product;
+        return `
+          <div class="unified-map-item" onclick="selectUnifiedMapGroup('${ppEscapeAttr(g.id)}')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;transition:background 0.15s">
+            <div style="min-width:0;flex:1;padding-right:10px">
+              <div style="font-weight:700;font-size:13px">${ppEscapeHtml(getGroupTypeName(g))}</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px">${ppEscapeHtml(getGroupHierarchyText(g))}</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:2px">
+                Default Product: ${ppEscapeHtml(defProd ? `${defProd.name}${defProd.brand && defProd.brand !== 'Generic' ? ` (${defProd.brand})` : ''}` : 'None assigned')}
+              </div>
+            </div>
+            <button type="button" class="btn sm ghost" style="flex-shrink:0;padding:4px 10px;font-size:11px">Use Sub-type</button>
+          </div>
+        `;
+      }).join('');
+    }
   }
 
   resultsEl.innerHTML = html;
@@ -15108,7 +15205,7 @@ function updateRecipePreviewScale(val) {
 function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both') {
   const r = state.recipes.find(x => x.id === id);
   if (!r) return;
-  previewBaseRecipe = JSON.parse(JSON.stringify(r)); // isolated deep copy for scaling
+  previewBaseRecipe = clonePlatePlanValue(r); // isolated deep copy for scaling
   currentPreviewInstanceId = instanceId;
   currentViewTab = (tab === 'enhanced' && r.enhanced) ? 'enhanced' : 'original';
   currentPreviewServingMode = servingMode || 'both';
@@ -15362,7 +15459,7 @@ function renderRecipePreview(targetServes = 2) {
 
 function applyScaleToRecipeDefinition(targetServes) {
     const scale = targetServes / previewBaseRecipe.serves;
-    const r = JSON.parse(JSON.stringify(previewBaseRecipe));
+    const r = clonePlatePlanValue(previewBaseRecipe);
     r.serves = targetServes;
     r.ingredients.forEach(i => {
         if(i.qty) {
@@ -18434,6 +18531,41 @@ function showParseIng(){
 }
 
 // Global Tesco Import Hooks
+function showTescoImportReviewModal(productData = {}, targetSubtype = null) {
+  const context = {
+    type: 'manualAdd',
+    groupId: targetSubtype || productData.groupId || productData.subTypeId || null,
+    name: productData.name || '',
+    ...productData
+  };
+  showTescoImport(context);
+  
+  if (document.getElementById('tesco-preview')) document.getElementById('tesco-preview').style.display = 'block';
+  if (document.getElementById('tesco-diagnostics-box')) document.getElementById('tesco-diagnostics-box').style.display = 'none';
+
+  if (productData.name && document.getElementById('tp-name')) document.getElementById('tp-name').value = productData.name;
+  if (productData.brand && document.getElementById('tp-brand')) document.getElementById('tp-brand').value = productData.brand;
+  if (productData.cat && document.getElementById('tp-cat')) {
+    document.getElementById('tp-cat').value = productData.cat;
+    syncCategorySearchInput('tp-cat');
+  }
+  if (productData.storage && document.getElementById('tp-storage')) document.getElementById('tp-storage').value = productData.storage;
+  if (productData.price !== undefined && document.getElementById('tp-price')) document.getElementById('tp-price').value = productData.price;
+  if (productData.packSize !== undefined && document.getElementById('tp-pack')) document.getElementById('tp-pack').value = productData.packSize;
+  if (productData.packUnit && document.getElementById('tp-pack-unit')) setPackUnitEditorValue('tp-pack-unit', productData.packUnit);
+  if (productData.cal !== undefined && document.getElementById('tp-cal')) document.getElementById('tp-cal').value = productData.cal;
+  if (productData.prot !== undefined && document.getElementById('tp-prot')) document.getElementById('tp-prot').value = productData.prot;
+  if (productData.carb !== undefined && document.getElementById('tp-carb')) document.getElementById('tp-carb').value = productData.carb;
+  if (productData.fat !== undefined && document.getElementById('tp-fat')) document.getElementById('tp-fat').value = productData.fat;
+  if (productData.fibre !== undefined && document.getElementById('tp-fibre')) document.getElementById('tp-fibre').value = productData.fibre;
+  if (productData.drainedWeight !== undefined && document.getElementById('tp-drained-weight')) document.getElementById('tp-drained-weight').value = productData.drainedWeight;
+  if (productData.drainedWeightUnit && document.getElementById('tp-drained-weight-unit')) document.getElementById('tp-drained-weight-unit').value = productData.drainedWeightUnit;
+  if (productData.itemWeight !== undefined && document.getElementById('tp-item-weight')) document.getElementById('tp-item-weight').value = productData.itemWeight;
+  if (productData.itemWeightUnit && document.getElementById('tp-item-weight-unit')) document.getElementById('tp-item-weight-unit').value = productData.itemWeightUnit;
+  if (productData.notes && document.getElementById('tp-notes')) document.getElementById('tp-notes').value = productData.notes;
+}
+window.showTescoImportReviewModal = showTescoImportReviewModal;
+
 function showTescoImport(context = null){
   hideLegacyCategoryAndMeatFields();
   window.pendingTescoMapping = context;
@@ -18445,7 +18577,7 @@ function showTescoImport(context = null){
   const previewEl = document.getElementById('tesco-preview');
   if(previewEl) previewEl.style.display = manualAddMode ? 'block' : 'none';
   const diagnosticsBox = document.getElementById('tesco-diagnostics-box');
-  if(diagnosticsBox) diagnosticsBox.style.display = manualAddMode ? 'none' : '';
+  if(diagnosticsBox) diagnosticsBox.style.display = 'none';
   const importTitle = document.getElementById('tesco-import-title');
   if(importTitle) importTitle.textContent = manualAddMode ? 'Add product' : 'Import Tesco product';
   const detailsHeading = document.getElementById('tesco-details-heading');
@@ -21326,9 +21458,11 @@ function removeWizardUseUpProduct(productId) {
 window.removeWizardUseUpProduct = removeWizardUseUpProduct;
 
 // DEDICATED PLAN DELETION PIPELINE (v3.0.6)
+if (!window.deletedPlanIds) window.deletedPlanIds = new Set();
 async function deletePlan(targetId) {
   if (!targetId) return;
-  console.log('[v3.0.6 STATE PERSISTENCE] Executing dedicated deletePlan pipeline for:', targetId);
+  window.deletedPlanIds.add(targetId);
+  console.log('[v3.0.7 STATE PERSISTENCE] Executing optimistic deletePlan pipeline for:', targetId);
   const householdId = window.CURRENT_HOUSEHOLD_ID || window.activeHouseholdId || state?.meta?.householdId || 'elliott-chloe';
 
   // 1. Mutate local state
@@ -21350,28 +21484,32 @@ async function deletePlan(targetId) {
   try {
     safeLocalStorageSet(SK, safeJsonStringify(state));
     safeLocalStorageSet('plateplan_plan_backup', '');
+    if (Array.isArray(state.plans)) {
+      safeLocalStorageSet('plateplan_history_v2', JSON.stringify(state.plans));
+    }
     if (Array.isArray(state.planHistory)) {
       safeSaveHistoryBackup(state.planHistory);
     }
   } catch(e) {}
 
-  // 2. Direct Firestore deletion
+  // 2. Transition UI directly
+  if (!state.plan || !state.plan.slots || (Array.isArray(state.plans) && state.plans.length === 0)) {
+    state.plannerStep = 1;
+  }
+  if (typeof renderPlanHistory === 'function') renderPlanHistory();
+  renderAll();
+  showPlatePlanToast('Plan deleted successfully. ✓');
+
+  // 3. Direct Firestore deletion
   try {
     const db = platePlanDb || (window.firebase && firebase.firestore && firebase.firestore());
     if (db) {
       await db.collection('households').doc(householdId).collection('plans').doc(targetId).delete();
-      console.log('[v3.0.6 STATE PERSISTENCE] Plan deleted directly from Firestore:', targetId);
+      console.log('[v3.0.7 STATE PERSISTENCE] Plan deleted directly from Firestore:', targetId);
     }
   } catch(err) {
-    console.warn('[v3.0.6 STATE PERSISTENCE] Direct Firestore deletion error:', err);
+    console.warn('[v3.0.7 STATE PERSISTENCE] Direct Firestore deletion error:', err);
   }
-
-  // 3. Transition UI directly to Step 1 of the Meal Planner if no active plans
-  if (!state.plan || !state.plan.slots || (Array.isArray(state.plans) && state.plans.length === 0)) {
-    state.plannerStep = 1;
-  }
-  renderAll();
-  showPlatePlanToast('Plan deleted successfully. ✓');
 }
 window.deletePlan = deletePlan;
 
@@ -21975,37 +22113,16 @@ function renderPlannerWizard() {
           </div>
         </div>
 
-        <!-- Traffic Lights -->
-        <div style="background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border);display:flex;gap:20px;flex-wrap:wrap">
-          <div>
-            <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">ELLIOTT TRAFFIC LIGHTS</div>
-            <div style="display:flex;gap:8px">
-              ${['green', 'amber', 'red'].map(c => `
-                <label class="traffic-pill ${c}" style="cursor:pointer">
-                  <input type="checkbox" ${trafficE.includes(c)?'checked':''} onchange="
-                    state.prefs.planTrafficE = state.prefs.planTrafficE || [];
-                    if(this.checked){ if(!state.prefs.planTrafficE.includes('${c}')) state.prefs.planTrafficE.push('${c}'); }
-                    else { state.prefs.planTrafficE = state.prefs.planTrafficE.filter(x=>x!=='${c}'); }
-                    saveState();
-                  "> ${c.charAt(0).toUpperCase()+c.slice(1)}
-                </label>
-              `).join('')}
-            </div>
-          </div>
-          <div>
-            <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">CHLOE TRAFFIC LIGHTS</div>
-            <div style="display:flex;gap:8px">
-              ${['green', 'amber', 'red'].map(c => `
-                <label class="traffic-pill ${c}" style="cursor:pointer">
-                  <input type="checkbox" ${trafficC.includes(c)?'checked':''} onchange="
-                    state.prefs.planTrafficC = state.prefs.planTrafficC || [];
-                    if(this.checked){ if(!state.prefs.planTrafficC.includes('${c}')) state.prefs.planTrafficC.push('${c}'); }
-                    else { state.prefs.planTrafficC = state.prefs.planTrafficC.filter(x=>x!=='${c}'); }
-                    saveState();
-                  "> ${c.charAt(0).toUpperCase()+c.slice(1)}
-                </label>
-              `).join('')}
-            </div>
+        <!-- Minimum Fit Score Filter -->
+        <div style="background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border)">
+          <div class="field" style="margin:0">
+            <label for="wizard-fit-score-filter" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">MINIMUM RECIPE FIT SCORE</label>
+            <select id="wizard-fit-score-filter" class="select" style="width:100%" onchange="state.prefs.minFitScore = parseInt(this.value, 10) || 0; saveState();">
+              <option value="0" ${(!state.prefs?.minFitScore || state.prefs.minFitScore === 0) ? 'selected' : ''}>All Recipes (0–100)</option>
+              <option value="85" ${state.prefs?.minFitScore === 85 ? 'selected' : ''}>Ideal Fit Only (85–100)</option>
+              <option value="65" ${state.prefs?.minFitScore === 65 ? 'selected' : ''}>Acceptable Fit+ (65–100)</option>
+              <option value="40" ${state.prefs?.minFitScore === 40 ? 'selected' : ''}>Suboptimal Fit+ (40–100)</option>
+            </select>
           </div>
         </div>
 
@@ -23121,20 +23238,20 @@ function loadPlanHistoryForEdit(index){
       if(state.plan?.slots) snapshotCurrentPlan('Auto-saved before loading saved plan', defaultPlanSaveName(state.plan));
       state.plan = {
         days: p.days || Object.keys(p.slots || {}).length || 0,
-        slots: JSON.parse(JSON.stringify(p.slots || {})),
-        dayDates: JSON.parse(JSON.stringify(p.dayDates || {})),
-        slotReasons: JSON.parse(JSON.stringify(p.slotReasons || {})),
+        slots: clonePlatePlanValue(p.slots || {}),
+        dayDates: clonePlatePlanValue(p.dayDates || {}),
+        slotReasons: clonePlatePlanValue(p.slotReasons || {}),
         productPriority: p.productPriority || state.prefs.productPriority || 'protein',
-        productSelections: JSON.parse(JSON.stringify(p.productSelections || {})),
-        useUpProductIds: JSON.parse(JSON.stringify(p.useUpProductIds || [])),
-        shoppingAtHome: JSON.parse(JSON.stringify(p.shoppingAtHome || {})),
+        productSelections: clonePlatePlanValue(p.productSelections || {}),
+        useUpProductIds: clonePlatePlanValue(p.useUpProductIds || []),
+        shoppingAtHome: clonePlatePlanValue(p.shoppingAtHome || {}),
         warnings: [],
         score: calculatePlanScore({ days:p.days, slots:p.slots, productSelections:p.productSelections }),
         confirmedShopping: !!p.confirmedShopping,
-        mealPrepGroups: JSON.parse(JSON.stringify(p.mealPrepGroups || [])),
-        declinedMealPrepGroups: JSON.parse(JSON.stringify(p.declinedMealPrepGroups || []))
+        mealPrepGroups: clonePlatePlanValue(p.mealPrepGroups || []),
+        declinedMealPrepGroups: clonePlatePlanValue(p.declinedMealPrepGroups || [])
       };
-      state.overrides = JSON.parse(JSON.stringify(p.overrides || {}));
+      state.overrides = clonePlatePlanValue(p.overrides || {});
       saveState();
       renderPlan();
       showView('planner');
@@ -23988,7 +24105,7 @@ function buildRecipeCardPackSnapshot(planContext = state.plan, overrideStore = s
   const contents=[],contentIds=new Map();
   const compactCards=cards.map(card=>{
     const content={name:card.name,time:card.time,serves:card.serves,source:card.source,ingredients:card.ingredients,method:card.method};
-    const fingerprint=JSON.stringify(content);let contentId=contentIds.get(fingerprint);
+    const fingerprint=safeJsonStringify(content);let contentId=contentIds.get(fingerprint);
     if(!contentId){contentId=`content-${contents.length+1}`;contentIds.set(fingerprint,contentId);contents.push({id:contentId,...content});}
     const {name,time,serves,source,ingredients,method,...summary}=card;
     return {...summary,contentId};

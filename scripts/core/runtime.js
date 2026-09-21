@@ -1,15 +1,15 @@
 const FEATURE_LOADERS = Object.freeze({
-  today: () => import('../features/today.js?v=3.0.6'),
-  vault: () => import('../features/recipes.js?v=3.0.6'),
-  add: () => import('../features/recipe-add.js?v=3.0.6'),
-  ingredients: () => import('../features/ingredients.js?v=3.0.6'),
-  bank: () => import('../features/products.js?v=3.0.6'),
-  planner: () => import('../features/planner.js?v=3.0.6'),
-  planlib: () => import('../features/library.js?v=3.0.6'),
-  shopping: () => import('../features/shopping.js?v=3.0.6'),
-  search: () => import('../features/search.js?v=3.0.6'),
-  data: () => import('../features/data-quality.js?v=3.0.6'),
-  prefs: () => import('../features/preferences.js?v=3.0.6'),
+  today: () => import('../features/today.js?v=3.0.7'),
+  vault: () => import('../features/recipes.js?v=3.0.7'),
+  add: () => import('../features/recipe-add.js?v=3.0.7'),
+  ingredients: () => import('../features/ingredients.js?v=3.0.7'),
+  bank: () => import('../features/products.js?v=3.0.7'),
+  planner: () => import('../features/planner.js?v=3.0.7'),
+  planlib: () => import('../features/library.js?v=3.0.7'),
+  shopping: () => import('../features/shopping.js?v=3.0.7'),
+  search: () => import('../features/search.js?v=3.0.7'),
+  data: () => import('../features/data-quality.js?v=3.0.7'),
+  prefs: () => import('../features/preferences.js?v=3.0.7'),
 });
 
 // Scan localStorage keys and remove obsolete legacy keys on startup
