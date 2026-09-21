@@ -103,6 +103,7 @@ const renderVault = async () => {
     const timeLabel = r.time ? `<span>${r.time} mins</span>` : '';
     const whoLabel = r.who ? `<span class="badge sm">${r.who}</span>` : '';
     const typeLabel = r.type ? `<span style="text-transform: capitalize">${r.type}</span>` : '';
+    const servings = r.serves || r.portions || 0;
     
     return `
       <div class="card recipe-card" style="cursor:pointer; transition: transform 0.1s;" data-pp-click="openRecipe('${r.id}')">
@@ -110,14 +111,17 @@ const renderVault = async () => {
           <div style="font-weight: 700; font-size: 15px; color: var(--text1);">${r.name || 'Untitled Recipe'}</div>
           ${r.favourite ? '<span style="color: var(--red);">❤️</span>' : ''}
         </div>
-        <div style="display:flex; gap:10px; font-size:12px; color:var(--text2); margin-bottom:12px; align-items:center;">
+        <div style="display:flex; gap:10px; font-size:11px; color:var(--text2); margin-bottom:12px; align-items:center;">
           ${typeLabel}
           ${timeLabel}
+          ${servings ? `<span>${servings} servings</span>` : ''}
           ${whoLabel}
         </div>
-        <div class="grid2" style="gap:8px; padding-top:10px; border-top: 1px solid var(--border);">
-          <div style="font-size:12px;"><strong>${r.calories || 0}</strong> <span style="color:var(--text3)">kcal</span></div>
-          <div style="font-size:12px;"><strong>${r.protein || 0}g</strong> <span style="color:var(--text3)">protein</span></div>
+        <div class="grid4" style="gap:4px; padding-top:10px; border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(4, 1fr);">
+          <div style="font-size:11px;"><strong>${r.cal || 0}</strong> <span style="color:var(--text3)">kcal</span></div>
+          <div style="font-size:11px;"><strong>${r.prot || 0}g</strong> <span style="color:var(--text3)">P</span></div>
+          <div style="font-size:11px;"><strong>${r.carb || 0}g</strong> <span style="color:var(--text3)">C</span></div>
+          <div style="font-size:11px;"><strong>${r.fat || 0}g</strong> <span style="color:var(--text3)">F</span></div>
         </div>
       </div>
     `;

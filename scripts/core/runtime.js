@@ -1,7 +1,7 @@
 ['plateplan_plan_backup', 'plateplan_offline_backup', 'plateplan_history_v2', 'plateplan_v1'].forEach(key => {
   localStorage.removeItem(key);
 });
-console.log('[PlatePlan v3.3.14] Engine initialized. Legacy keys purged.');
+console.log('[PlatePlan v3.3.15] Engine initialized. Legacy keys purged.');
 
 const FEATURE_LOADERS = Object.freeze({
   today: () => import('../features/today.js'),
