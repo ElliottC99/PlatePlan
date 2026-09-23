@@ -1,4 +1,4 @@
-import { validatePlatePlanState } from './contracts.js?v=3.3.0';
+import { validatePlatePlanState } from './contracts.js?v=3.3.3-mod';
 
 // Purge legacy backup keys on startup to prevent state resurrection bugs
 if (typeof localStorage !== 'undefined') {

@@ -207,11 +207,13 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='3.3.2-mod';
+const PLATEPLAN_APP_VERSION='3.3.3-mod';
 const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v90';
-window.APP_VERSION = '3.3.2-mod';
+window.APP_VERSION = '3.3.3-mod';
 window._hydrationLogged = false;
 window.state = window.state || {};
+window.state.meta = window.state.meta || {};
+window.state.meta.version = PLATEPLAN_APP_VERSION;
 window.state.deletedPlanIds = window.state.deletedPlanIds || [];
 window.deletedPlanIds = window.deletedPlanIds || window.state.deletedPlanIds;
 // console.log("[v3.0.9 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
@@ -867,7 +869,7 @@ window.updatePlanSaveUI = updatePlanSaveUI;
 
 function queuePlanSave(planData = state?.plan, immediate = false) {
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.3.2-mod STATE PERSISTENCE] queuePlanSave blocked during hydration.');
+    console.log('[v3.3.3-mod STATE PERSISTENCE] queuePlanSave blocked during hydration.');
     return Promise.resolve(false);
   }
 
@@ -1194,11 +1196,37 @@ function closeMobileActionSheet(fromHistory=false){
   restoreMobileLayerFocus();
   if(marked && !fromHistory) returnFromPlatePlanUiHistory();
 }
+
+function executeSheetAction(actionFn, ...args) {
+  // 1. Close action sheet safely without resetting global modal overlay locks
+  if (typeof closeMobileActionSheet === 'function') {
+    closeMobileActionSheet(false);
+  } else if (typeof window.closeMobileActionSheet === 'function') {
+    window.closeMobileActionSheet(false);
+  }
+  // 2. Defer target action slightly to allow DOM transition to clear
+  setTimeout(() => {
+    if (typeof actionFn === 'function') {
+      actionFn(...args);
+    } else if (typeof window[actionFn] === 'function') {
+      window[actionFn](...args);
+    } else if (typeof eval !== 'undefined') {
+      try {
+        const fn = eval(actionFn);
+        if (typeof fn === 'function') fn(...args);
+      } catch(e) {
+        console.error('executeSheetAction error executing:', actionFn, e);
+      }
+    }
+  }, 50);
+}
+window.executeSheetAction = executeSheetAction;
+
 function openMobileActionSheet(title, actions){
   const host=document.getElementById('mobile-action-sheet'); if(!host) return;
   const titleId='mobile-action-sheet-title';
   host.setAttribute('role','dialog'); host.setAttribute('aria-modal','true'); host.setAttribute('aria-labelledby',titleId);
-  host.innerHTML=`<div class="mobile-sheet-handle"></div><div class="row-between" style="align-items:center;margin-bottom:10px"><h3 id="${titleId}" style="margin:0">${ppEscapeHtml(title||'Actions')}</h3><button class="btn sm ghost" onclick="closeMobileActionSheet()">Close</button></div><div style="display:grid;gap:6px">${actions.map(action=>`<button class="btn ${action.danger?'danger':''}" onclick="closeMobileActionSheet(true);${action.onclick}">${ppEscapeHtml(action.label)}</button>`).join('')}</div>`;
+  host.innerHTML=`<div class="mobile-sheet-handle"></div><div class="row-between" style="align-items:center;margin-bottom:10px"><h3 id="${titleId}" style="margin:0">${ppEscapeHtml(title||'Actions')}</h3><button class="btn sm ghost" onclick="closeMobileActionSheet()">Close</button></div><div style="display:grid;gap:6px">${actions.map(action=>`<button class="btn ${action.danger?'danger':''}" onclick="executeSheetAction(function(){ ${action.onclick}; })">${ppEscapeHtml(action.label)}</button>`).join('')}</div>`;
   const wrap=document.getElementById('mobile-action-sheet-wrap');
   platePlanLastMobileFocus=document.activeElement;
   wrap?.classList.add('open');
@@ -1222,14 +1250,29 @@ function openRecipeActions(recipeId){
   const wrap = document.getElementById('mobile-action-sheet-wrap');
   const sheet = document.getElementById('mobile-action-sheet');
   if (!sheet) return;
-  const actions = [
-    { label: 'Review recipe', onclick: `editRecipeModalView('${ppEscapeAttr(recipeId)}')` },
-    { label: 'Recipe card', onclick: `downloadRecipeCard('${ppEscapeAttr(recipeId)}')` },
-    { label: 'Duplicate', onclick: `duplicateRecipe('${ppEscapeAttr(recipeId)}')` },
-    { label: 'Edit source recipe', onclick: `editRecipe('${ppEscapeAttr(recipeId)}')` },
-    { label: 'Delete', onclick: `deleteRecipe('${ppEscapeAttr(recipeId)}')`, danger: true }
-  ];
-  openMobileActionSheet(recipe.name, actions);
+  const titleId = 'mobile-action-sheet-title';
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
+  sheet.setAttribute('aria-labelledby', titleId);
+  sheet.innerHTML = `
+    <div class="mobile-sheet-handle"></div>
+    <div class="row-between" style="align-items:center;margin-bottom:10px">
+      <h3 id="${titleId}" style="margin:0">${ppEscapeHtml(recipe.name || 'Actions')}</h3>
+      <button type="button" class="btn sm ghost" onclick="closeMobileActionSheet()">Close</button>
+    </div>
+    <div style="display:grid;gap:6px">
+      <button type="button" class="btn" onclick="executeSheetAction('editRecipeModalView', '${ppEscapeAttr(recipeId)}')">Review recipe</button>
+      <button type="button" class="btn" onclick="executeSheetAction('downloadRecipeCard', '${ppEscapeAttr(recipeId)}')">Recipe card</button>
+      <button type="button" class="btn" onclick="executeSheetAction('duplicateRecipe', '${ppEscapeAttr(recipeId)}')">Duplicate</button>
+      <button type="button" class="btn" onclick="executeSheetAction('editRecipe', '${ppEscapeAttr(recipeId)}')">Edit source recipe</button>
+      <button type="button" class="btn danger" onclick="executeSheetAction('deleteRecipe', '${ppEscapeAttr(recipeId)}')">Delete</button>
+    </div>
+  `;
+  if (wrap) {
+    wrap.classList.add('open');
+    markMobileLayerForBack(wrap, 'actions');
+  }
+  setTimeout(() => sheet.querySelector('button')?.focus(), 0);
 }
 function openEnhancedRecipeActions(recipeId){
   if (typeof window.openEnhancedRecipeActions === 'function' && window.openEnhancedRecipeActions !== openEnhancedRecipeActions) {
@@ -1237,20 +1280,38 @@ function openEnhancedRecipeActions(recipeId){
   }
   const recipe = getProductIndexRecipe(recipeId) || (state?.recipes || []).find(r => r.id === recipeId);
   if (!recipe) return;
-  if (!recipe.enhanced) {
-    openMobileActionSheet(recipe.name, [
-      { label: 'Create enhanced version', onclick: `editEnhancedRecipe('${ppEscapeAttr(recipeId)}')` },
-      { label: 'Review recipe', onclick: `editRecipeModalView('${ppEscapeAttr(recipeId)}')` }
-    ]);
-    return;
+  const wrap = document.getElementById('mobile-action-sheet-wrap');
+  const sheet = document.getElementById('mobile-action-sheet');
+  if (!sheet) return;
+  const titleId = 'mobile-action-sheet-title';
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
+  sheet.setAttribute('aria-labelledby', titleId);
+  const title = !recipe.enhanced ? (recipe.name || 'Actions') : `${recipe.name || 'Recipe'} · Enhanced`;
+  sheet.innerHTML = `
+    <div class="mobile-sheet-handle"></div>
+    <div class="row-between" style="align-items:center;margin-bottom:10px">
+      <h3 id="${titleId}" style="margin:0">${ppEscapeHtml(title)}</h3>
+      <button type="button" class="btn sm ghost" onclick="closeMobileActionSheet()">Close</button>
+    </div>
+    <div style="display:grid;gap:6px">
+      ${!recipe.enhanced ? `
+        <button type="button" class="btn" onclick="executeSheetAction('editEnhancedRecipe', '${ppEscapeAttr(recipeId)}')">Create enhanced version</button>
+        <button type="button" class="btn" onclick="executeSheetAction('editRecipeModalView', '${ppEscapeAttr(recipeId)}')">Review recipe</button>
+      ` : `
+        <button type="button" class="btn" onclick="executeSheetAction('reviewEnhancedRecipe', '${ppEscapeAttr(recipeId)}')">Review enhanced recipe</button>
+        <button type="button" class="btn" onclick="executeSheetAction('downloadRecipeCard', '${ppEscapeAttr(recipeId)}', 'enhanced')">Recipe card</button>
+        <button type="button" class="btn" onclick="executeSheetAction('duplicateRecipe', '${ppEscapeAttr(recipeId)}')">Duplicate complete recipe</button>
+        <button type="button" class="btn" onclick="executeSheetAction('editEnhancedRecipe', '${ppEscapeAttr(recipeId)}')">Edit enhanced recipe</button>
+        <button type="button" class="btn danger" onclick="executeSheetAction('deleteEnhancedRecipe', '${ppEscapeAttr(recipeId)}')">Delete enhanced version</button>
+      `}
+    </div>
+  `;
+  if (wrap) {
+    wrap.classList.add('open');
+    markMobileLayerForBack(wrap, 'actions');
   }
-  openMobileActionSheet(`${recipe.name} · Enhanced`, [
-    { label: 'Review enhanced recipe', onclick: `reviewEnhancedRecipe('${ppEscapeAttr(recipeId)}')` },
-    { label: 'Recipe card', onclick: `downloadRecipeCard('${ppEscapeAttr(recipeId)}','enhanced')` },
-    { label: 'Duplicate complete recipe', onclick: `duplicateRecipe('${ppEscapeAttr(recipeId)}')` },
-    { label: 'Edit enhanced recipe', onclick: `editEnhancedRecipe('${ppEscapeAttr(recipeId)}')` },
-    { label: 'Delete enhanced version', onclick: `deleteEnhancedRecipe('${ppEscapeAttr(recipeId)}')`, danger: true }
-  ]);
+  setTimeout(() => sheet.querySelector('button')?.focus(), 0);
 }
 window.openRecipeActions = openRecipeActions;
 window.openEnhancedRecipeActions = openEnhancedRecipeActions;
@@ -2062,7 +2123,7 @@ let platePlanDebounceResolvers = [];
 
 async function pushStateToCloud(force=false){
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.3.2-mod STATE PERSISTENCE] PushStateToCloud blocked during hydration.');
+    console.log('[v3.3.3-mod STATE PERSISTENCE] PushStateToCloud blocked during hydration.');
     return Promise.resolve(false);
   }
 
@@ -2074,7 +2135,7 @@ async function pushStateToCloud(force=false){
 
   const currentStateJson = safeJsonStringify(state);
   if (!force && lastPersistedStateJson && lastPersistedStateJson === currentStateJson) {
-    console.log('[v3.3.2-mod STATE PERSISTENCE] State unchanged from last persisted; skipping cloud push.');
+    console.log('[v3.3.3-mod STATE PERSISTENCE] State unchanged from last persisted; skipping cloud push.');
     return Promise.resolve(true);
   }
 
@@ -2311,7 +2372,7 @@ async function _executePushStateToCloud(force, targetHouseholdId, householdDocRe
       platePlanLastSyncError=null;
       platePlanLastSyncedAt=Date.now();
       lastPersistedStateJson = safeJsonStringify(state);
-      console.log('[v3.3.2-mod STATE PERSISTENCE] State successfully pushed to cloud with debounce 1000ms.');
+      console.log('[v3.3.3-mod STATE PERSISTENCE] State successfully pushed to cloud with debounce 1000ms.');
       updatePlatePlanSyncStatus('synced');
     }catch(error){
       console.warn('PlatePlan Cloud push failed:',error);
@@ -2859,7 +2920,7 @@ function saveState(immediate=false){
   }
 
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.3.2-mod STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
+    console.log('[v3.3.3-mod STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
     return true;
   }
 
@@ -3515,7 +3576,7 @@ async function performSubcollectionMigrationIfNeeded(db, householdId, rootDocDat
 window.performSubcollectionMigrationIfNeeded = performSubcollectionMigrationIfNeeded;
 
 function startPlatePlanCloudListeners(){
-  console.log('[PlatePlan v3.3.2-mod] Legacy Firestore onSnapshot listeners bypassed. Core engine in charge.');
+  console.log('[PlatePlan v3.3.3-mod] Legacy Firestore onSnapshot listeners bypassed. Core engine in charge.');
   platePlanSyncUnsubscribers.forEach(stop=>{try{stop();}catch(e){}});
   platePlanSyncUnsubscribers=[];
   return;
@@ -4504,7 +4565,7 @@ let platePlanApplicationInitialized=false;
 function initializePlatePlanApplication(){
   if(platePlanApplicationInitialized)return;
   platePlanApplicationInitialized=true;
-  console.log('[PlatePlan v3.3.2-mod] Initializing core application...');
+  console.log('[PlatePlan v3.3.3-mod] Initializing core application...');
   performance.mark?.('plateplan-start');
   installPlatePlanModalHistory();
   clearVolatileSavedDom(document);
@@ -15015,8 +15076,14 @@ let currentPreviewSingleServes = 1;
 
 function closeRecipePreview() {
   const wrap = document.getElementById('view-modal-wrap');
-  if (wrap) wrap.classList.remove('open');
+  if (wrap) {
+    wrap.classList.remove('open');
+    wrap.style.display = 'none';
+    wrap.style.visibility = 'hidden';
+  }
+  document.body.classList.remove('modal-open');
 }
+window.closeRecipePreview = closeRecipePreview;
 
 function switchPreviewServingMode(mode) {
   currentPreviewServingMode = mode;
@@ -15066,7 +15133,12 @@ function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both
   window.currentPreviewSingleServes = 1;
 
   const wrap = document.getElementById('view-modal-wrap');
-  if (wrap) wrap.classList.add('open');
+  if (wrap) {
+    wrap.classList.add('open');
+    wrap.style.display = 'flex';
+    wrap.style.visibility = 'visible';
+  }
+  document.body.classList.add('modal-open');
   renderRecipePreview(r.serves || 2);
 }
 window.viewRecipe = viewRecipe;
@@ -15190,9 +15262,12 @@ function renderRecipePreview(targetServes = 2) {
     const content = document.getElementById('view-modal-content');
     if (!content) return;
     const wrap = document.getElementById('view-modal-wrap');
-    if (wrap && !wrap.classList.contains('open')) {
+    if (wrap) {
       wrap.classList.add('open');
+      wrap.style.display = 'flex';
+      wrap.style.visibility = 'visible';
     }
+    document.body.classList.add('modal-open');
 
     const variantKey = isEnh ? 'enhanced' : 'original';
     const isFav = (typeof isRecipeVariantFavourite === 'function' ? isRecipeVariantFavourite(r.id, variantKey) : false) || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite) && !isEnh);
@@ -21406,7 +21481,7 @@ async function persistProductToBank(newProduct) {
     const writeProducts = db.collection('households').doc(householdId).collection('products').doc(newProduct.id).set(cleaned, { merge: true });
     const writeIngredients = db.collection('households').doc(householdId).collection('ingredients').doc(newProduct.id).set(cleaned, { merge: true });
     firestorePromise = Promise.all([writeProducts, writeIngredients]).catch(err => {
-      console.warn('[v3.3.2-mod STATE PERSISTENCE] persistProductToBank Firestore write warning:', err);
+      console.warn('[v3.3.3-mod STATE PERSISTENCE] persistProductToBank Firestore write warning:', err);
     });
   } else {
     firestorePromise = Promise.resolve();
@@ -23043,14 +23118,33 @@ function renderPlanHistoryPanel(){
 function openPlanHistoryActions(index){
   const p=(state.planHistory||[])[index];
   if(!p) return;
-  openMobileActionSheet(p.name || `Saved plan ${index+1}`,[
-    {label:'Apply plan starting today',onclick:`applyPlanFromLibraryDirect(${index})`},
-    {label:'View schedule',onclick:`viewPlanHistory(${index})`},
-    {label:'Download recipe pack',onclick:`downloadSavedPlanPack(${index})`},
-    {label:'Edit plan',onclick:`loadPlanHistoryForEdit(${index})`},
-    {label:'Rename',onclick:`renamePlanHistory(${index})`},
-    {label:'Delete saved plan',onclick:`deletePlanHistory(${index})`,danger:true}
-  ]);
+  const wrap = document.getElementById('mobile-action-sheet-wrap');
+  const sheet = document.getElementById('mobile-action-sheet');
+  if (!sheet) return;
+  const titleId = 'mobile-action-sheet-title';
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
+  sheet.setAttribute('aria-labelledby', titleId);
+  sheet.innerHTML = `
+    <div class="mobile-sheet-handle"></div>
+    <div class="row-between" style="align-items:center;margin-bottom:10px">
+      <h3 id="${titleId}" style="margin:0">${ppEscapeHtml(p.name || `Saved plan ${index+1}`)}</h3>
+      <button type="button" class="btn sm ghost" onclick="closeMobileActionSheet()">Close</button>
+    </div>
+    <div style="display:grid;gap:6px">
+      <button type="button" class="btn" onclick="executeSheetAction('applyPlanFromLibraryDirect', ${index})">Apply plan starting today</button>
+      <button type="button" class="btn" onclick="executeSheetAction('viewPlanHistory', ${index})">View schedule</button>
+      <button type="button" class="btn" onclick="executeSheetAction('downloadSavedPlanPack', ${index})">Download recipe pack</button>
+      <button type="button" class="btn" onclick="executeSheetAction('loadPlanHistoryForEdit', ${index})">Edit plan</button>
+      <button type="button" class="btn" onclick="executeSheetAction('renamePlanHistory', ${index})">Rename</button>
+      <button type="button" class="btn danger" onclick="executeSheetAction('deletePlanHistory', ${index})">Delete saved plan</button>
+    </div>
+  `;
+  if (wrap) {
+    wrap.classList.add('open');
+    markMobileLayerForBack(wrap, 'actions');
+  }
+  setTimeout(() => sheet.querySelector('button')?.focus(), 0);
 }
 
 
@@ -23125,28 +23219,54 @@ function renamePlanHistory(index){
 }
 
 function deletePlanHistory(index){
-  const p = (state.planHistory || [])[index];
-  if(!p) return;
-  const targetId = p.id || p.planId;
+  const historyList = window.state?.planHistory || (typeof state !== 'undefined' ? state?.planHistory : []) || [];
+  const p = historyList[index];
+  if (!p) return;
+
   openAppConfirmModal(
     'Delete saved meal plan?',
     `Delete <strong>${ppEscapeHtml(p.name || 'this saved plan')}</strong> from the Meal Plan Library? This will not delete recipes or products.`,
     'Delete plan',
     () => {
-      if (targetId) {
-        deletePlan(targetId);
-      } else {
+      // 1. Remove from local state.planHistory array
+      if (window.state?.planHistory) {
+        window.state.planHistory.splice(index, 1);
+      }
+      if (typeof state !== 'undefined' && state?.planHistory && state.planHistory !== window.state?.planHistory) {
         state.planHistory.splice(index, 1);
-        try {
-          safeLocalStorageSet(SK, safeJsonStringify(state));
-          safeSaveHistoryBackup(state.planHistory);
-        } catch(e) {}
-        state.plannerStep = 1;
-        renderAll();
+      }
+
+      // 2. Persist updated state to localStorage
+      try {
+        safeLocalStorageSet(SK, safeJsonStringify(window.state || state));
+        if (typeof safeSaveHistoryBackup === 'function') {
+          safeSaveHistoryBackup(window.state?.planHistory || state?.planHistory);
+        }
+      } catch(e) {
+        console.error('Local persistence error during plan history delete:', e);
+      }
+
+      // 3. Trigger cloud state sync if persistence engine exists
+      if (window.PlatePlanModules?.store) {
+        window.PlatePlanModules.store.publish({ reason: 'plan-history-deletion', index });
+      }
+
+      // 4. Re-render UI
+      if (typeof window.renderAll === 'function') {
+        window.renderAll();
+      } else if (typeof window.renderMealPlanLibrary === 'function') {
+        window.renderMealPlanLibrary();
+      } else if (typeof renderPlanHistoryPanel === 'function') {
+        renderPlanHistoryPanel();
+      }
+
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast('Saved meal plan deleted', 'success');
       }
     }
   );
 }
+window.deletePlanHistory = deletePlanHistory;
 
 function filterRecipeSwap(inputRef, listRef){
   const input = typeof inputRef === 'string' ? document.getElementById(inputRef) : (inputRef?.target ? inputRef.target : inputRef);
@@ -24865,6 +24985,31 @@ function runPlatePlanDelegatedAction(code,event,element){
       }
       if (subTypeId) {
         return fixSubtypeDataQuality(subTypeId);
+      }
+    }
+
+    // Direct viewRecipe dispatch to ensure safe string parameter extraction without evaluation errors
+    const viewMatch = typeof code === 'string' && code.trim().match(/^viewRecipe\s*\(\s*(['"][^'"]+['"]|[^\s,]+)(?:\s*,\s*([^)]*))?\)\s*;?$/);
+    if (viewMatch) {
+      let recId = viewMatch[1];
+      if ((recId.startsWith("'") && recId.endsWith("'")) || (recId.startsWith('"') && recId.endsWith('"'))) {
+        recId = recId.slice(1, -1);
+      }
+      let secondArg = null;
+      if (viewMatch[2]) {
+        const rawSecond = viewMatch[2].trim();
+        if (rawSecond === 'null' || rawSecond === 'undefined') {
+          secondArg = null;
+        } else if ((rawSecond.startsWith("'") && rawSecond.endsWith("'")) || (rawSecond.startsWith('"') && rawSecond.endsWith('"'))) {
+          secondArg = rawSecond.slice(1, -1);
+        } else {
+          secondArg = rawSecond;
+        }
+      }
+      if (typeof window.viewRecipe === 'function') {
+        return window.viewRecipe(recId, secondArg);
+      } else if (typeof viewRecipe === 'function') {
+        return viewRecipe(recId, secondArg);
       }
     }
 

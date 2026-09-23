@@ -1,8 +1,8 @@
 /**
- * PlatePlan v3.3.2-mod - Recipe Vault Module
+ * PlatePlan v3.3.3-mod - Recipe Vault Module
  * Extracted from monolith for modular maintenance.
  */
-import { createLegacyView } from './create-legacy-view.js?v=3.3.0';
+import { createLegacyView } from './create-legacy-view.js?v=3.3.3-mod';
 
 export function isRecipeVariantFavourite(recipeId, variantKey = 'original') {
   if (!recipeId) return false;
@@ -505,9 +505,14 @@ function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both
     if (window.previewBaseRecipe.enhanced) applySubs(window.previewBaseRecipe.enhanced.ingredients);
   }
 
-  // Directive 1.3 & 1.4: Add open class to #view-modal-wrap and invoke window.renderRecipePreview
+  // Explicit modal wrap open trigger, flex display, and body scroll lock
   const wrap = document.getElementById('view-modal-wrap');
-  if (wrap) wrap.classList.add('open');
+  if (wrap) {
+    wrap.classList.add('open');
+    wrap.style.display = 'flex';
+    wrap.style.visibility = 'visible';
+  }
+  document.body.classList.add('modal-open');
   if (typeof window.renderRecipePreview === 'function') {
     window.renderRecipePreview(window.previewBaseRecipe.serves || 2);
   }
@@ -585,6 +590,28 @@ function toggleRecipeFavourite(recipeId, event, variantKey = 'original') {
   }
 }
 
+if (typeof window.executeSheetAction !== 'function') {
+  window.executeSheetAction = function(actionFn, ...args) {
+    if (typeof window.closeMobileActionSheet === 'function') {
+      window.closeMobileActionSheet(false);
+    }
+    setTimeout(() => {
+      if (typeof actionFn === 'function') {
+        actionFn(...args);
+      } else if (typeof window[actionFn] === 'function') {
+        window[actionFn](...args);
+      } else if (typeof eval !== 'undefined') {
+        try {
+          const fn = eval(actionFn);
+          if (typeof fn === 'function') fn(...args);
+        } catch(e) {
+          console.error('executeSheetAction execution failed:', actionFn, e);
+        }
+      }
+    }, 50);
+  };
+}
+
 // Directive 3: Fix "More" Recipe Actions Sheet (openRecipeActions)
 // 1. Target #mobile-action-sheet-wrap and #mobile-action-sheet
 // 2. Ensure calling openRecipeActions(id) adds open class to #mobile-action-sheet-wrap and renders context options
@@ -596,14 +623,6 @@ function openRecipeActions(recipeId) {
   const wrap = document.getElementById('mobile-action-sheet-wrap');
   const sheet = document.getElementById('mobile-action-sheet');
   if (!sheet) return;
-
-  const actions = [
-    { label: 'Review recipe', onclick: `editRecipeModalView('${window.ppEscapeAttr(recipeId)}')` },
-    { label: 'Recipe card', onclick: `downloadRecipeCard('${window.ppEscapeAttr(recipeId)}')` },
-    { label: 'Duplicate', onclick: `duplicateRecipe('${window.ppEscapeAttr(recipeId)}')` },
-    { label: 'Edit source recipe', onclick: `editRecipe('${window.ppEscapeAttr(recipeId)}')` },
-    { label: 'Delete', onclick: `deleteRecipe('${window.ppEscapeAttr(recipeId)}')`, danger: true }
-  ];
 
   const titleId = 'mobile-action-sheet-title';
   sheet.setAttribute('role', 'dialog');
@@ -617,7 +636,11 @@ function openRecipeActions(recipeId) {
       <button type="button" class="btn sm ghost" onclick="closeMobileActionSheet()">Close</button>
     </div>
     <div style="display:grid;gap:6px">
-      ${actions.map(action => `<button type="button" class="btn ${action.danger ? 'danger' : ''}" onclick="closeMobileActionSheet(true);${action.onclick}">${escapeHtml(action.label)}</button>`).join('')}
+      <button type="button" class="btn" onclick="executeSheetAction('editRecipeModalView', '${window.ppEscapeAttr(recipeId)}')">Review recipe</button>
+      <button type="button" class="btn" onclick="executeSheetAction('downloadRecipeCard', '${window.ppEscapeAttr(recipeId)}')">Recipe card</button>
+      <button type="button" class="btn" onclick="executeSheetAction('duplicateRecipe', '${window.ppEscapeAttr(recipeId)}')">Duplicate</button>
+      <button type="button" class="btn" onclick="executeSheetAction('editRecipe', '${window.ppEscapeAttr(recipeId)}')">Edit source recipe</button>
+      <button type="button" class="btn danger" onclick="executeSheetAction('deleteRecipe', '${window.ppEscapeAttr(recipeId)}')">Delete</button>
     </div>
   `;
 
@@ -639,17 +662,6 @@ function openEnhancedRecipeActions(recipeId) {
   const sheet = document.getElementById('mobile-action-sheet');
   if (!sheet) return;
 
-  const actions = !recipe.enhanced ? [
-    { label: 'Create enhanced version', onclick: `editEnhancedRecipe('${window.ppEscapeAttr(recipeId)}')` },
-    { label: 'Review recipe', onclick: `editRecipeModalView('${window.ppEscapeAttr(recipeId)}')` }
-  ] : [
-    { label: 'Review enhanced recipe', onclick: `reviewEnhancedRecipe('${window.ppEscapeAttr(recipeId)}')` },
-    { label: 'Recipe card', onclick: `downloadRecipeCard('${window.ppEscapeAttr(recipeId)}','enhanced')` },
-    { label: 'Duplicate complete recipe', onclick: `duplicateRecipe('${window.ppEscapeAttr(recipeId)}')` },
-    { label: 'Edit enhanced recipe', onclick: `editEnhancedRecipe('${window.ppEscapeAttr(recipeId)}')` },
-    { label: 'Delete enhanced version', onclick: `deleteEnhancedRecipe('${window.ppEscapeAttr(recipeId)}')`, danger: true }
-  ];
-
   const titleId = 'mobile-action-sheet-title';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'true');
@@ -663,7 +675,16 @@ function openEnhancedRecipeActions(recipeId) {
       <button type="button" class="btn sm ghost" onclick="closeMobileActionSheet()">Close</button>
     </div>
     <div style="display:grid;gap:6px">
-      ${actions.map(action => `<button type="button" class="btn ${action.danger ? 'danger' : ''}" onclick="closeMobileActionSheet(true);${action.onclick}">${escapeHtml(action.label)}</button>`).join('')}
+      ${!recipe.enhanced ? `
+        <button type="button" class="btn" onclick="executeSheetAction('editEnhancedRecipe', '${window.ppEscapeAttr(recipeId)}')">Create enhanced version</button>
+        <button type="button" class="btn" onclick="executeSheetAction('editRecipeModalView', '${window.ppEscapeAttr(recipeId)}')">Review recipe</button>
+      ` : `
+        <button type="button" class="btn" onclick="executeSheetAction('reviewEnhancedRecipe', '${window.ppEscapeAttr(recipeId)}')">Review enhanced recipe</button>
+        <button type="button" class="btn" onclick="executeSheetAction('downloadRecipeCard', '${window.ppEscapeAttr(recipeId)}', 'enhanced')">Recipe card</button>
+        <button type="button" class="btn" onclick="executeSheetAction('duplicateRecipe', '${window.ppEscapeAttr(recipeId)}')">Duplicate complete recipe</button>
+        <button type="button" class="btn" onclick="executeSheetAction('editEnhancedRecipe', '${window.ppEscapeAttr(recipeId)}')">Edit enhanced recipe</button>
+        <button type="button" class="btn danger" onclick="executeSheetAction('deleteEnhancedRecipe', '${window.ppEscapeAttr(recipeId)}')">Delete enhanced version</button>
+      `}
     </div>
   `;
 
