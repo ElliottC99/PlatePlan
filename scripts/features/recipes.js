@@ -1,8 +1,8 @@
 /**
- * PlatePlan v3.3.4-mod - Recipe Vault Module
+ * PlatePlan v3.3.5-mod - Recipe Vault Module
  * Extracted from monolith for modular maintenance.
  */
-import { createLegacyView } from './create-legacy-view.js?v=3.3.4-mod';
+import { createLegacyView } from './create-legacy-view.js?v=3.3.5-mod';
 
 export function isRecipeVariantFavourite(recipeId, variantKey = 'original') {
   if (!recipeId) return false;
@@ -470,16 +470,27 @@ function renderVault() {
 }
 
 // Directive 1: Fix viewRecipe Modal Population
-function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both') {
+function viewRecipe(id, instanceId = null, tab = 'ingredients', servingMode = null) {
   const r = (window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : []) || []).find(x => x && x.id === id);
-  if (!r) return;
-  // Directive 1.2: Ensure previewBaseRecipe is attached to window.previewBaseRecipe = window.clonePlatePlanValue(r)
+  if (!r) {
+    console.error('[viewRecipe] Recipe not found:', id);
+    return;
+  }
+
+  // Ensure modal wrap is attached to body
+  const wrap = document.getElementById('view-modal-wrap');
+  const content = document.getElementById('view-modal-content');
+  if (wrap && wrap.parentElement && wrap.parentElement !== document.body && wrap.parentElement.id !== 'app-container') {
+    document.body.appendChild(wrap);
+  }
+
+  // Ensure previewBaseRecipe is attached to window.previewBaseRecipe
   const cloneFn = typeof window.clonePlatePlanValue === 'function'
     ? window.clonePlatePlanValue
     : (val => JSON.parse(JSON.stringify(val)));
   window.previewBaseRecipe = cloneFn(r);
   window.currentPreviewInstanceId = instanceId;
-  window.currentViewTab = (tab === 'enhanced' && r.enhanced) ? 'enhanced' : 'original';
+  window.currentViewTab = (tab === 'enhanced' && r.enhanced) ? 'enhanced' : (tab === 'original' ? 'original' : tab);
   window.currentPreviewServingMode = servingMode || 'both';
   window.currentPreviewSingleServes = 1;
 
@@ -511,7 +522,6 @@ function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both
   }
 
   // 2. Explicitly set modal display properties on #view-modal-wrap
-  const wrap = document.getElementById('view-modal-wrap');
   if (wrap) {
     wrap.classList.add('open', 'active');
     wrap.style.setProperty('display', 'flex', 'important');
@@ -519,8 +529,27 @@ function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both
     wrap.style.setProperty('opacity', '1', 'important');
     wrap.style.setProperty('z-index', '99999', 'important');
   }
+  if (content) {
+    content.style.setProperty('display', 'block', 'important');
+    content.style.setProperty('visibility', 'visible', 'important');
+    content.style.setProperty('opacity', '1', 'important');
+  }
   document.body.classList.add('modal-open');
 }
+window.viewRecipe = viewRecipe;
+
+window.editRecipeModalView = function(id, initialTab = 'ingredients') {
+  const r = (window.state?.recipes || []).find(x => x.id === id);
+  if (!r) {
+    console.error('[editRecipeModalView] Recipe not found:', id);
+    return;
+  }
+  if (typeof window.openModal === 'function') {
+    window.openModal(r.name, r, false, { instanceId: null, tab: initialTab });
+  } else if (typeof openModal === 'function') {
+    openModal(r.name, r, false, { instanceId: null, tab: initialTab });
+  }
+};
 
 function toggleRecipeFavourite(recipeId, event, variantKey = 'original') {
   if (event) {
@@ -594,26 +623,21 @@ function toggleRecipeFavourite(recipeId, event, variantKey = 'original') {
   }
 }
 
-window.executeSheetAction = function(fnOrName, ...args) {
-  // 1. Close only the mobile action sheet container without destroying global modal backdrops
+window.executeSheetAction = function(actionFnName, ...args) {
   const sheet = document.getElementById('mobile-action-sheet');
-  if (sheet) sheet.classList.remove('open', 'active');
+  const overlay = document.getElementById('mobile-action-sheet-overlay');
   const wrap = document.getElementById('mobile-action-sheet-wrap');
+  if (sheet) sheet.classList.remove('open', 'active');
+  if (overlay) overlay.classList.remove('open', 'active');
   if (wrap) wrap.classList.remove('open', 'active');
 
-  // 2. Defer execution slightly for DOM transition cleanup
   setTimeout(() => {
-    if (typeof fnOrName === 'function') {
-      fnOrName(...args);
-    } else if (typeof window[fnOrName] === 'function') {
-      window[fnOrName](...args);
-    } else if (typeof eval !== 'undefined') {
-      try {
-        const fn = eval(fnOrName);
-        if (typeof fn === 'function') fn(...args);
-      } catch(e) {
-        console.error('executeSheetAction execution failed:', fnOrName, e);
-      }
+    if (typeof window[actionFnName] === 'function') {
+      window[actionFnName](...args);
+    } else if (typeof actionFnName === 'function') {
+      actionFnName(...args);
+    } else {
+      console.error(`[executeSheetAction] Function '${actionFnName}' not found on window.`);
     }
   }, 50);
 };

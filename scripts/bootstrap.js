@@ -5,7 +5,40 @@
  * Holding DOMContentLoaded with top-level await preserves the existing boot
  * contract while feature modules continue moving out of the legacy source.
  */
-const CURRENT_BUILD_ID = '3.3.4-mod-v91';
+
+const CURRENT_BUILD_ID = '3.3.5-mod-v92';
+
+export function sanitizeModalDOMHierarchy() {
+  const modalIds = [
+    'view-modal-wrap',
+    'modal-wrap',
+    'tesco-modal-wrap',
+    'mobile-action-sheet',
+    'mobile-action-sheet-wrap',
+    'app-confirm-modal',
+    'app-confirm-wrap',
+    'manual-ing-panel',
+    'parse-modal-wrap',
+    'mapping-modal-wrap',
+    'unified-mapping-modal-wrap',
+    'subst-modal-wrap',
+    'merge-modal-wrap',
+    'replace-ing-wrap',
+    'mini-ing-wrap',
+    'ingredient-family-details-wrap'
+  ];
+  modalIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.parentElement && el.parentElement !== document.body && el.parentElement.id !== 'app-container') {
+      console.warn(`[PlatePlan DOM Engine] Reparenting #${id} from <${el.parentElement.tagName} id="${el.parentElement.id}"> to <body>`);
+      document.body.appendChild(el);
+    }
+  });
+}
+
+window.sanitizeModalDOMHierarchy = sanitizeModalDOMHierarchy;
+document.addEventListener('DOMContentLoaded', sanitizeModalDOMHierarchy);
+if (document.readyState !== 'loading') sanitizeModalDOMHierarchy();
 
 // Expose global window actions immediately on app load before any async operations execute
 window.logout = function() {
@@ -42,10 +75,16 @@ function loadClassicScript(source) {
 document.documentElement.dataset.plateplanBoot = 'shell';
 await new Promise(resolve => requestAnimationFrame(resolve));
 document.documentElement.dataset.plateplanBoot = 'loading-core';
-await loadClassicScript('./scripts/plateplan-app.js?v=3.3.4-mod');
-await import('./features/recipes.js?v=3.3.4-mod');
-await import('./main.js?v=3.3.4-mod');
+
+await loadClassicScript('./scripts/recipes.js?v=3.3.5-mod').catch(() => {});
+await loadClassicScript('./scripts/actions.js?v=3.3.5-mod').catch(() => {});
+await loadClassicScript('./scripts/plateplan-app.js?v=3.3.5-mod');
+await import('./features/recipes.js?v=3.3.5-mod');
+await import('./main.js?v=3.3.5-mod');
+
+sanitizeModalDOMHierarchy();
 document.documentElement.dataset.plateplanBoot = 'ready';
+
 try {
   document.querySelectorAll('.app, body > *').forEach(el => {
     if (el instanceof HTMLElement && el.id !== 'plateplan-auth-screen' && el.id !== 'baked-state-recovery-banner') {

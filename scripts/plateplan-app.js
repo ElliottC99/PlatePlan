@@ -207,15 +207,48 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='3.3.4-mod';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v91';
-window.APP_VERSION = '3.3.4-mod';
+const PLATEPLAN_APP_VERSION='3.3.5-mod';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v92';
+window.APP_VERSION = '3.3.5-mod';
 window._hydrationLogged = false;
 window.state = window.state || {};
 window.state.meta = window.state.meta || {};
-window.state.meta.version = PLATEPLAN_APP_VERSION;
+window.state.meta.version = '3.3.5-mod';
 window.state.deletedPlanIds = window.state.deletedPlanIds || [];
 window.deletedPlanIds = window.deletedPlanIds || window.state.deletedPlanIds;
+
+function sanitizeModalDOMHierarchy() {
+  const modalIds = [
+    'view-modal-wrap',
+    'modal-wrap',
+    'tesco-modal-wrap',
+    'mobile-action-sheet',
+    'mobile-action-sheet-wrap',
+    'app-confirm-modal',
+    'app-confirm-wrap',
+    'manual-ing-panel',
+    'parse-modal-wrap',
+    'mapping-modal-wrap',
+    'unified-mapping-modal-wrap',
+    'subst-modal-wrap',
+    'merge-modal-wrap',
+    'replace-ing-wrap',
+    'mini-ing-wrap',
+    'ingredient-family-details-wrap'
+  ];
+  modalIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.parentElement && el.parentElement !== document.body && el.parentElement.id !== 'app-container') {
+      console.warn(`[PlatePlan DOM Engine] Reparenting #${id} from <${el.parentElement.tagName} id="${el.parentElement.id}"> to <body>`);
+      document.body.appendChild(el);
+    }
+  });
+}
+window.sanitizeModalDOMHierarchy = sanitizeModalDOMHierarchy;
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', sanitizeModalDOMHierarchy);
+  if (document.readyState !== 'loading') sanitizeModalDOMHierarchy();
+}
 // console.log("[v3.0.9 STATE PERSISTENCE]", "Defensive LocalStorage guard, sanitized Firestore streams, debounced autosave, and startup recovery active.");
 
 try {
@@ -869,7 +902,7 @@ window.updatePlanSaveUI = updatePlanSaveUI;
 
 function queuePlanSave(planData = state?.plan, immediate = false, options = {}) {
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.3.4-mod STATE PERSISTENCE] queuePlanSave blocked during hydration.');
+    console.log('[v3.3.5-mod STATE PERSISTENCE] queuePlanSave blocked during hydration.');
     return Promise.resolve(false);
   }
 
@@ -1197,26 +1230,30 @@ function closeMobileActionSheet(fromHistory=false){
   if(marked && !fromHistory) returnFromPlatePlanUiHistory();
 }
 
-function executeSheetAction(fnOrName, ...args) {
+function executeSheetAction(actionFnName, ...args) {
   // 1. Close only the mobile action sheet container without destroying global modal backdrops
   const sheet = document.getElementById('mobile-action-sheet');
-  if (sheet) sheet.classList.remove('open', 'active');
+  const overlay = document.getElementById('mobile-action-sheet-overlay');
   const wrap = document.getElementById('mobile-action-sheet-wrap');
+  if (sheet) sheet.classList.remove('open', 'active');
+  if (overlay) overlay.classList.remove('open', 'active');
   if (wrap) wrap.classList.remove('open', 'active');
 
   // 2. Defer execution slightly for DOM transition cleanup
   setTimeout(() => {
-    if (typeof fnOrName === 'function') {
-      fnOrName(...args);
-    } else if (typeof window[fnOrName] === 'function') {
-      window[fnOrName](...args);
+    if (typeof window[actionFnName] === 'function') {
+      window[actionFnName](...args);
+    } else if (typeof actionFnName === 'function') {
+      actionFnName(...args);
     } else if (typeof eval !== 'undefined') {
       try {
-        const fn = eval(fnOrName);
+        const fn = eval(actionFnName);
         if (typeof fn === 'function') fn(...args);
       } catch(e) {
-        console.error('executeSheetAction error executing:', fnOrName, e);
+        console.error(`[executeSheetAction] Function '${actionFnName}' not found on window.`, e);
       }
+    } else {
+      console.error(`[executeSheetAction] Function '${actionFnName}' not found on window.`);
     }
   }, 50);
 }
@@ -2123,7 +2160,7 @@ let platePlanDebounceResolvers = [];
 
 async function pushStateToCloud(force=false){
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.3.4-mod STATE PERSISTENCE] PushStateToCloud blocked during hydration.');
+    console.log('[v3.3.5-mod STATE PERSISTENCE] PushStateToCloud blocked during hydration.');
     return Promise.resolve(false);
   }
 
@@ -2135,7 +2172,7 @@ async function pushStateToCloud(force=false){
 
   const currentStateJson = safeJsonStringify(state);
   if (!force && lastPersistedStateJson && lastPersistedStateJson === currentStateJson) {
-    console.log('[v3.3.4-mod STATE PERSISTENCE] State unchanged from last persisted; skipping cloud push.');
+    console.log('[v3.3.5-mod STATE PERSISTENCE] State unchanged from last persisted; skipping cloud push.');
     return Promise.resolve(true);
   }
 
@@ -2372,7 +2409,7 @@ async function _executePushStateToCloud(force, targetHouseholdId, householdDocRe
       platePlanLastSyncError=null;
       platePlanLastSyncedAt=Date.now();
       lastPersistedStateJson = safeJsonStringify(state);
-      console.log('[v3.3.4-mod STATE PERSISTENCE] State successfully pushed to cloud with debounce 1000ms.');
+      console.log('[v3.3.5-mod STATE PERSISTENCE] State successfully pushed to cloud with debounce 1000ms.');
       updatePlatePlanSyncStatus('synced');
     }catch(error){
       console.warn('PlatePlan Cloud push failed:',error);
@@ -2920,7 +2957,7 @@ function saveState(immediate=false){
   }
 
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.3.4-mod STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
+    console.log('[v3.3.5-mod STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
     return true;
   }
 
@@ -3576,7 +3613,7 @@ async function performSubcollectionMigrationIfNeeded(db, householdId, rootDocDat
 window.performSubcollectionMigrationIfNeeded = performSubcollectionMigrationIfNeeded;
 
 function startPlatePlanCloudListeners(){
-  console.log('[PlatePlan v3.3.4-mod] Legacy Firestore onSnapshot listeners bypassed. Core engine in charge.');
+  console.log('[PlatePlan v3.3.5-mod] Legacy Firestore onSnapshot listeners bypassed. Core engine in charge.');
   platePlanSyncUnsubscribers.forEach(stop=>{try{stop();}catch(e){}});
   platePlanSyncUnsubscribers=[];
   return;
@@ -4565,7 +4602,7 @@ let platePlanApplicationInitialized=false;
 function initializePlatePlanApplication(){
   if(platePlanApplicationInitialized)return;
   platePlanApplicationInitialized=true;
-  console.log('[PlatePlan v3.3.4-mod] Initializing core application...');
+  console.log('[PlatePlan v3.3.5-mod] Initializing core application...');
   performance.mark?.('plateplan-start');
   installPlatePlanModalHistory();
   clearVolatileSavedDom(document);
@@ -15064,12 +15101,15 @@ function reviewRecipeModalView(id, instanceId = null, tab = 'original') {
     openModal(r.name, payload, true, { instanceId, tab });
 }
 
-function editRecipeModalView(id, initialTab = 'original') {
+function editRecipeModalView(id, initialTab = 'ingredients') {
     capturePlatePlanEditBaseline('recipes/'+id);
     currentReviewInstanceId = null;
     currentReviewVariant = initialTab === 'enhanced' ? 'enhanced' : 'original';
     const r = (window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : []) || []).find(x => x && x.id === id);
-    if (!r) return;
+    if (!r) {
+      console.error('[editRecipeModalView] Recipe not found:', id);
+      return;
+    }
     editId = id;
     
     // Set view config based on whether enhanced exists
@@ -15081,6 +15121,7 @@ function editRecipeModalView(id, initialTab = 'original') {
 
     openModal(r.name, r, false, { instanceId: null, tab: initialTab });
 }
+window.editRecipeModalView = editRecipeModalView;
 
 
 // == ISOLATED DYNAMIC RECIPE PREVIEW & SUBSTITUTION ==
@@ -15133,12 +15174,23 @@ function updateRecipePreviewScale(val) {
 }
 
 // viewRecipe implementation with window.previewBaseRecipe and window.renderRecipePreview
-function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both') {
+function viewRecipe(id, instanceId = null, tab = 'ingredients', servingMode = null) {
   if (typeof window.viewRecipe === 'function' && window.viewRecipe !== viewRecipe) {
     return window.viewRecipe(id, instanceId, tab, servingMode);
   }
   const r = (window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : []) || []).find(x => x && x.id === id);
-  if (!r) return;
+  if (!r) {
+    console.error('[viewRecipe] Recipe not found:', id);
+    return;
+  }
+
+  // Ensure modal wrap is attached to body
+  const wrap = document.getElementById('view-modal-wrap');
+  const content = document.getElementById('view-modal-content');
+  if (wrap && wrap.parentElement && wrap.parentElement !== document.body && wrap.parentElement.id !== 'app-container') {
+    document.body.appendChild(wrap);
+  }
+
   const cloneFn = typeof clonePlatePlanValue === 'function'
     ? clonePlatePlanValue
     : (typeof window.clonePlatePlanValue === 'function' ? window.clonePlatePlanValue : (val => JSON.parse(JSON.stringify(val))));
@@ -15146,7 +15198,7 @@ function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both
   window.previewBaseRecipe = previewBaseRecipe;
   currentPreviewInstanceId = instanceId;
   window.currentPreviewInstanceId = instanceId;
-  currentViewTab = (tab === 'enhanced' && r.enhanced) ? 'enhanced' : 'original';
+  currentViewTab = (tab === 'enhanced' && r.enhanced) ? 'enhanced' : (tab === 'original' ? 'original' : tab);
   window.currentViewTab = currentViewTab;
   currentPreviewServingMode = servingMode || 'both';
   window.currentPreviewServingMode = currentPreviewServingMode;
@@ -15161,13 +15213,17 @@ function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both
   }
 
   // 2. Explicitly set modal display properties on #view-modal-wrap
-  const wrap = document.getElementById('view-modal-wrap');
   if (wrap) {
     wrap.classList.add('open', 'active');
     wrap.style.setProperty('display', 'flex', 'important');
     wrap.style.setProperty('visibility', 'visible', 'important');
     wrap.style.setProperty('opacity', '1', 'important');
     wrap.style.setProperty('z-index', '99999', 'important');
+  }
+  if (content) {
+    content.style.setProperty('display', 'block', 'important');
+    content.style.setProperty('visibility', 'visible', 'important');
+    content.style.setProperty('opacity', '1', 'important');
   }
   document.body.classList.add('modal-open');
 }
@@ -21511,7 +21567,7 @@ async function persistProductToBank(newProduct) {
     const writeProducts = db.collection('households').doc(householdId).collection('products').doc(newProduct.id).set(cleaned, { merge: true });
     const writeIngredients = db.collection('households').doc(householdId).collection('ingredients').doc(newProduct.id).set(cleaned, { merge: true });
     firestorePromise = Promise.all([writeProducts, writeIngredients]).catch(err => {
-      console.warn('[v3.3.4-mod STATE PERSISTENCE] persistProductToBank Firestore write warning:', err);
+      console.warn('[v3.3.5-mod STATE PERSISTENCE] persistProductToBank Firestore write warning:', err);
     });
   } else {
     firestorePromise = Promise.resolve();
@@ -23255,9 +23311,9 @@ function deletePlanHistory(index){
 
   openAppConfirmModal(
     'Delete saved meal plan?',
-    `Delete <strong>${ppEscapeHtml(p.name || 'this saved plan')}</strong> from the Meal Plan Library?`,
+    `Delete <strong>${ppEscapeHtml(p.name || 'this saved plan')}</strong> from your library?`,
     'Delete plan',
-    () => {
+    async () => {
       // 1. Mutate local state array
       if (window.state?.planHistory) {
         window.state.planHistory.splice(index, 1);
@@ -23275,13 +23331,25 @@ function deletePlanHistory(index){
         }
       } catch(e) {}
 
-      // 3. Immediately push updated state to Firestore cloud storage
-      if (typeof window.pushStateToCloud === 'function') {
-        window.pushStateToCloud();
-      } else if (typeof pushStateToCloud === 'function') {
-        pushStateToCloud();
-      } else if (typeof window.saveState === 'function') {
-        window.saveState();
+      // 3. Direct Firestore root document write
+      if (typeof platePlanDb !== 'undefined' && platePlanDb) {
+        try {
+          const householdId = typeof getPlatePlanHouseholdId === 'function'
+            ? getPlatePlanHouseholdId()
+            : ((window.state && window.state.householdId) || window.ACTIVE_HOUSEHOLD_ID || 'elliott-chloe');
+          if (platePlanDb.collection) {
+            const serverTs = (typeof firebase !== 'undefined' && firebase.firestore?.FieldValue?.serverTimestamp)
+              ? firebase.firestore.FieldValue.serverTimestamp()
+              : new Date().toISOString();
+            await platePlanDb.collection('households').doc(householdId).set({
+              planHistory: window.state?.planHistory || state?.planHistory || [],
+              updatedAt: serverTs
+            }, { merge: true });
+            console.log('[v3.3.5-mod] Successfully written planHistory directly to root household document.');
+          }
+        } catch (err) {
+          console.error('[v3.3.5-mod] Direct Firestore planHistory write failed:', err);
+        }
       }
 
       if (window.PlatePlanModules?.store) {
