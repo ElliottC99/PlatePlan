@@ -28,8 +28,8 @@ export default createLegacyView({
         modalOverlay.style.left = '0';
         modalOverlay.style.width = '100vw';
         modalOverlay.style.height = '100vh';
-        modalOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-        modalOverlay.style.zIndex = '9999';
+        modalOverlay.style.backgroundColor = 'transparent'; // Removes double-dark backdrop
+        modalOverlay.style.zIndex = '1000';
         modalOverlay.style.display = 'flex';
         modalOverlay.style.alignItems = 'center';
         modalOverlay.style.justifyContent = 'center';
@@ -41,7 +41,7 @@ export default createLegacyView({
       const subTypeName = group ? (group.name || group.id) : subtypeId;
 
       modalOverlay.innerHTML = `
-        <div class="card" style="width: 100%; max-width: 600px; padding: 24px; border-radius: 14px; background: var(--surface, #fff); box-shadow: 0 12px 36px rgba(0,0,0,0.25); max-height: 90vh; overflow-y: auto;">
+        <div style="width: 100%; max-width: 600px; padding: 24px; border-radius: 14px; background: var(--surface, #1e1e1e); border: 1px solid var(--border); box-shadow: 0 12px 36px rgba(0,0,0,0.5); max-height: 85vh; overflow-y: auto; min-height: 0;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
             <h2 style="font-size:18px; font-weight:700; margin:0; color:var(--text)">Review Extracted Product</h2>
             <button class="btn sm ghost" id="dq-tesco-close-btn" style="padding:4px 8px; font-size:16px; line-height:1">✕</button>
