@@ -1,7 +1,7 @@
 const PLATEPLAN_CACHE = 'plateplan-shell-v90';
 const CACHE_NAME = 'plateplan-shell-v90';
-const PLATEPLAN_APP_VERSION = '3.3.0';
-const PLATEPLAN_BUILD_ID = '3.3.0-v90';
+const PLATEPLAN_APP_VERSION = '3.3.2-mod';
+const PLATEPLAN_BUILD_ID = '3.3.2-mod-v90';
 const PLATEPLAN_LOCAL_SHELL = [
   './',
   './PlatePlan.html',
@@ -57,7 +57,7 @@ self.addEventListener('install', event => {
         keys
           .filter(key => key !== PLATEPLAN_CACHE)
           .map(key => {
-            console.log('[SW v3.3.0] Purging previous cache on install:', key);
+            console.log('[SW v3.3.2-mod] Purging previous cache on install:', key);
             return caches.delete(key);
           })
       );
@@ -75,7 +75,7 @@ self.addEventListener('activate', event => {
         keys
           .filter(key => key !== PLATEPLAN_CACHE)
           .map(key => {
-            console.log('[SW v3.3.0] Purging previous shell cache:', key);
+            console.log('[SW v3.3.2-mod] Purging previous shell cache:', key);
             return caches.delete(key);
           })
       );

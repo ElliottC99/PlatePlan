@@ -1,5 +1,5 @@
 /**
- * PlatePlan v3.3.1-mod - Recipe Vault Module
+ * PlatePlan v3.3.2-mod - Recipe Vault Module
  * Extracted from monolith for modular maintenance.
  */
 import { createLegacyView } from './create-legacy-view.js?v=3.3.0';
@@ -28,16 +28,42 @@ export const isRecipeVariantFavorite = isRecipeVariantFavourite;
 // (Internal dependency for fit scores)
 function getMealTypeTargets(mealType = 'dinner') {
   const mt = (mealType || 'dinner').toLowerCase();
-  const eTgt = typeof window.getBudgets === 'function' ? window.getBudgets('e', mt) : { cal: 840, prot: 45.5 };
-  const cTgt = typeof window.getBudgets === 'function' ? window.getBudgets('c', mt) : { cal: 595, prot: 35 };
+  const prefs = window.state?.prefs || (typeof state !== 'undefined' ? state?.prefs : null) || {};
+  const ecal = Number(prefs.ecal) || 2400;
+  const eprot = Number(prefs.eprot) || 130;
+  const ccal = Number(prefs.ccal) || 1700;
+  const cprot = Number(prefs.cprot) || 100;
+
+  const eAlloc = prefs.eAlloc || { b: 15, l: 25, d: 45, s: 15 };
+  const cAlloc = prefs.cAlloc || { b: 25, l: 30, d: 35, s: 10 };
+  const eProtAlloc = prefs.eProtAlloc || eAlloc;
+  const cProtAlloc = prefs.cProtAlloc || cAlloc;
+
+  let mKey = 'd';
+  if (mt.includes('breakfast')) mKey = 'b';
+  else if (mt.includes('lunch')) mKey = 'l';
+  else if (mt.includes('snack')) mKey = 's';
+  else if (mt.includes('dinner')) mKey = 'd';
+
+  const eCalPct = (eAlloc[mKey] ?? 45) / 100;
+  const eProtPct = (eProtAlloc[mKey] ?? eAlloc[mKey] ?? 45) / 100;
+  const cCalPct = (cAlloc[mKey] ?? 35) / 100;
+  const cProtPct = (cProtAlloc[mKey] ?? cAlloc[mKey] ?? 35) / 100;
+
+  const targetCal_E = ecal * eCalPct;
+  const targetProt_E = eprot * eProtPct;
+  const targetCal_C = ccal * cCalPct;
+  const targetProt_C = cprot * cProtPct;
+
   return {
     mealType: mt,
-    targetCal_E: Number(eTgt?.cal) || 0,
-    targetProt_E: Number(eTgt?.prot) || 0,
-    targetCal_C: Number(cTgt?.cal) || 0,
-    targetProt_C: Number(cTgt?.prot) || 0,
-    e: eTgt,
-    c: cTgt
+    targetCal_E,
+    targetProt_E,
+    targetCal_C,
+    targetProt_C,
+    e: { cal: targetCal_E, prot: targetProt_E },
+    c: { cal: targetCal_C, prot: targetProt_C },
+    prefs: { ecal, eprot, ccal, cprot }
   };
 }
 
@@ -45,11 +71,33 @@ function getVaultTargetMacros(mealType = 'dinner') {
   return getMealTypeTargets(mealType);
 }
 
-function computeProfileFitScore(actualCal, targetCal, actualProt, targetProt) {
+function computeProfileFitScore(actualCal, targetCal, actualProt, targetProt, person = null) {
+  const prefs = window.state?.prefs || (typeof state !== 'undefined' ? state?.prefs : null) || {};
+  const ecal = Number(prefs.ecal) || 2400;
+  const eprot = Number(prefs.eprot) || 130;
+  const ccal = Number(prefs.ccal) || 1700;
+  const cprot = Number(prefs.cprot) || 100;
+
+  let tCal = Number(targetCal) || 0;
+  let tProt = Number(targetProt) || 0;
+
+  if (person === 'elliott' || person === 'e') {
+    if (!tCal) tCal = ecal * 0.45;
+    if (!tProt) tProt = eprot * 0.45;
+  } else if (person === 'chloe' || person === 'c') {
+    if (!tCal) tCal = ccal * 0.35;
+    if (!tProt) tProt = cprot * 0.35;
+  }
+
+  if (tCal <= 0) {
+    tCal = ((ecal * 0.45) + (ccal * 0.35)) / 2;
+  }
+  if (tProt <= 0) {
+    tProt = ((eprot * 0.45) + (cprot * 0.35)) / 2;
+  }
+
   const aCal = Number(actualCal) || 0;
-  const tCal = Number(targetCal) || 0;
   const aProt = Number(actualProt) || 0;
-  const tProt = Number(targetProt) || 0;
 
   let calScore = 100;
   if (tCal > 0) {
@@ -97,12 +145,18 @@ function calculateMacroFitTierAndScore(calActualOrRecipe, mealTypeOrTargets, pro
 
     whoKey = String(recipeObj.who || 'both').trim().toLowerCase();
 
-    // Resolve meal slot targets
+    // Resolve meal slot targets using window.state.prefs
     const slotTargets = customTargets || getMealTypeTargets(mealType);
-    targetCal_E = Number(slotTargets.targetCal_E ?? slotTargets.eCal ?? slotTargets.e?.cal ?? slotTargets.cal) || 0;
-    targetProt_E = Number(slotTargets.targetProt_E ?? slotTargets.eProt ?? slotTargets.e?.prot ?? slotTargets.prot) || 0;
-    targetCal_C = Number(slotTargets.targetCal_C ?? slotTargets.cCal ?? slotTargets.c?.cal ?? slotTargets.cal) || 0;
-    targetProt_C = Number(slotTargets.targetProt_C ?? slotTargets.cProt ?? slotTargets.c?.prot ?? slotTargets.prot) || 0;
+    const prefs = window.state?.prefs || (typeof state !== 'undefined' ? state?.prefs : null) || {};
+    const ecal = Number(prefs.ecal) || 2400;
+    const eprot = Number(prefs.eprot) || 130;
+    const ccal = Number(prefs.ccal) || 1700;
+    const cprot = Number(prefs.cprot) || 100;
+
+    targetCal_E = Number(slotTargets.targetCal_E ?? slotTargets.eCal ?? slotTargets.e?.cal ?? slotTargets.cal) || (ecal * 0.45);
+    targetProt_E = Number(slotTargets.targetProt_E ?? slotTargets.eProt ?? slotTargets.e?.prot ?? slotTargets.prot) || (eprot * 0.45);
+    targetCal_C = Number(slotTargets.targetCal_C ?? slotTargets.cCal ?? slotTargets.c?.cal ?? slotTargets.cal) || (ccal * 0.35);
+    targetProt_C = Number(slotTargets.targetProt_C ?? slotTargets.cProt ?? slotTargets.c?.prot ?? slotTargets.prot) || (cprot * 0.35);
 
     // Resolve split portions
     let portions = calActualOrRecipe.portions;
@@ -150,8 +204,8 @@ function calculateMacroFitTierAndScore(calActualOrRecipe, mealTypeOrTargets, pro
     targetProt_C = tgtProt;
   }
 
-  const score_Elliott = computeProfileFitScore(actualCal_E, targetCal_E, actualProt_E, targetProt_E);
-  const score_Chloe = computeProfileFitScore(actualCal_C, targetCal_C, actualProt_C, targetProt_C);
+  const score_Elliott = computeProfileFitScore(actualCal_E, targetCal_E, actualProt_E, targetProt_E, 'elliott');
+  const score_Chloe = computeProfileFitScore(actualCal_C, targetCal_C, actualProt_C, targetProt_C, 'chloe');
 
   let finalScore = 0;
   if (whoKey === 'elliott' || whoKey === 'e') {
@@ -208,11 +262,11 @@ function calculateMacroFitTierAndScore(calActualOrRecipe, mealTypeOrTargets, pro
 
 // == RECIPE VAULT CARD RENDERER ==
 function renderRecipeCard(r, options = {}) {
-  const targetMacros = options.targetMacros || getVaultTargetMacros();
   const types = r.types || [r.type || 'dinner'];
-  const mealType = options.mealType || window.getContextMealType(r, null, types[0] || 'dinner');
-  const eTgt = options.eTgt || window.getBudgets('e', mealType);
-  const cTgt = options.cTgt || window.getBudgets('c', mealType);
+  const mealType = options.mealType || (typeof window.getContextMealType === 'function' ? window.getContextMealType(r, null, types[0] || 'dinner') : (types[0] || 'dinner'));
+  const targetMacros = options.targetMacros || getVaultTargetMacros(mealType);
+  const eTgt = options.eTgt || targetMacros.e || (typeof window.getBudgets === 'function' ? window.getBudgets('e', mealType) : { cal: 840, prot: 45.5 });
+  const cTgt = options.cTgt || targetMacros.c || (typeof window.getBudgets === 'function' ? window.getBudgets('c', mealType) : { cal: 595, prot: 35 });
   const whoKey = String(r.who || 'both').toLowerCase();
   const showE = options.showE !== undefined ? options.showE : (whoKey === 'both' || whoKey === 'elliott' || whoKey === 'e');
   const showC = options.showC !== undefined ? options.showC : (whoKey === 'both' || whoKey === 'chloe' || whoKey === 'c');
@@ -244,7 +298,7 @@ function renderRecipeCard(r, options = {}) {
       parts.push(`<button type="button" class="fit-detail-button" onclick="openVaultFitDetails(this,'${window.ppEscapeAttr(r.id)}','${useEnhanced ? 'enhanced' : 'original'}','c')">Chloe ${fitC.label.split(' ')[0]} ${window.ppEscapeHtml(portions.c)}</button>`);
     }
 
-    const { score, color, label } = calculateMacroFitTierAndScore({ recipe: r, variant: useEnhanced ? 'enhanced' : 'original', portions }, mealType);
+    const { score, color, label } = calculateMacroFitTierAndScore({ recipe: r, variant: useEnhanced ? 'enhanced' : 'original', portions }, { mealType, targetCal_E: eTgt.cal, targetProt_E: eTgt.prot, targetCal_C: cTgt.cal, targetProt_C: cTgt.prot });
     const fitTag = `<span class="tag" style="background-color:${color};color:#FFFFFF;border-color:${color};font-weight:600" title="${window.ppEscapeAttr(label)}">Fit score ${score}${useEnhanced ? ' · enhanced' : ''}</span>`;
     return { portions, html: `<div class="recipe-fit">${parts.join('')} ${fitTag}</div>` };
   };
@@ -313,18 +367,38 @@ function renderVault() {
     return;
   }
 
+  // Directive 4: Check if #vault-filter-fav has .active class or window.state.vaultFavOnly is true
   const favFilterBtn = document.getElementById('vault-filter-fav');
+  const isFavOnly = !!(favFilterBtn?.classList.contains('active') || window.state?.vaultFavOnly || window.vaultFilterFavouritesOnly);
   if (favFilterBtn) {
-    favFilterBtn.classList.toggle('active', !!window.vaultFilterFavouritesOnly);
-    favFilterBtn.setAttribute('aria-pressed', window.vaultFilterFavouritesOnly ? 'true' : 'false');
+    favFilterBtn.classList.toggle('active', isFavOnly);
+    favFilterBtn.setAttribute('aria-pressed', isFavOnly ? 'true' : 'false');
+    // Directive 4: Bind a click listener to #vault-filter-fav that toggles its .active class and re-runs renderVault()
+    if (!favFilterBtn.dataset.boundFavFilter) {
+      favFilterBtn.dataset.boundFavFilter = 'true';
+      favFilterBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        favFilterBtn.classList.toggle('active');
+        const active = favFilterBtn.classList.contains('active');
+        favFilterBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        if (window.state) window.state.vaultFavOnly = active;
+        window.vaultFilterFavouritesOnly = active;
+        renderVault();
+      });
+    }
   }
 
   if (typeof window.ensureVariantFavoritingPrefs === 'function') {
     window.ensureVariantFavoritingPrefs();
   }
+
+  // Directive 4: If active, filter window.state.recipes to only include recipes where isFavorite or isFavourite is truthy
   const recipes = (window.state?.recipes || []).filter(r => {
-    const hasAnyFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || (!window.hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
-    if (window.vaultFilterFavouritesOnly && !hasAnyFav) return false;
+    if (!r) return false;
+    if (isFavOnly) {
+      const isFav = !!(r.isFavorite || r.isFavourite || isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced'));
+      if (!isFav) return false;
+    }
     const types = r.types || [r.type];
     const searchable = [
       r.name,
@@ -337,12 +411,52 @@ function renderVault() {
   });
 
   const selectedMealType = ft !== 'all' ? ft : 'dinner';
+
+  // Directive 2: Update macro target sources to use window.state.prefs:
+  // Elliott Targets: window.state.prefs.ecal and window.state.prefs.eprot
+  // Chloe Targets: window.state.prefs.ccal and window.state.prefs.cprot
+  const prefs = window.state?.prefs || (typeof state !== 'undefined' ? state?.prefs : null) || {};
+  const ecal = Number(prefs.ecal) || 2400;
+  const eprot = Number(prefs.eprot) || 130;
+  const ccal = Number(prefs.ccal) || 1700;
+  const cprot = Number(prefs.cprot) || 100;
+
+  const eAlloc = prefs.eAlloc || { b: 15, l: 25, d: 45, s: 15 };
+  const cAlloc = prefs.cAlloc || { b: 25, l: 30, d: 35, s: 10 };
+  const eProtAlloc = prefs.eProtAlloc || eAlloc;
+  const cProtAlloc = prefs.cProtAlloc || cAlloc;
+
+  let mKey = 'd';
+  if (selectedMealType.includes('breakfast')) mKey = 'b';
+  else if (selectedMealType.includes('lunch')) mKey = 'l';
+  else if (selectedMealType.includes('snack')) mKey = 's';
+  else if (selectedMealType.includes('dinner')) mKey = 'd';
+
+  const eTgt = {
+    cal: ecal * ((eAlloc[mKey] ?? 45) / 100),
+    prot: eprot * ((eProtAlloc[mKey] ?? eAlloc[mKey] ?? 45) / 100)
+  };
+  const cTgt = {
+    cal: ccal * ((cAlloc[mKey] ?? 35) / 100),
+    prot: cprot * ((cProtAlloc[mKey] ?? cAlloc[mKey] ?? 35) / 100)
+  };
+  const targetMacros = {
+    mealType: selectedMealType,
+    targetCal_E: eTgt.cal,
+    targetProt_E: eTgt.prot,
+    targetCal_C: cTgt.cal,
+    targetProt_C: cTgt.prot,
+    e: eTgt,
+    c: cTgt,
+    prefs: { ecal, eprot, ccal, cprot }
+  };
+
   const sortedRecipes = (typeof window.getSortedRecipes === 'function')
     ? window.getSortedRecipes(recipes, sort, selectedMealType)
     : recipes;
 
   if (!sortedRecipes.length) { list.innerHTML = '<div class="empty">No matching recipes found.</div>'; return; }
-  const listSignature = [ft, fw, q, sort, window.vaultFilterFavouritesOnly ? 'fav' : 'all'].join('|');
+  const listSignature = [ft, fw, q, sort, isFavOnly ? 'fav' : 'all'].join('|');
   if (typeof window.resetProgressiveList === 'function') {
     window.resetProgressiveList('vault', listSignature);
   }
@@ -352,26 +466,31 @@ function renderVault() {
   const progBtn = typeof window.progressiveListButton === 'function'
     ? window.progressiveListButton('vault', totalRecipes, visibleRecipes.length)
     : '';
-  list.innerHTML = visibleRecipes.map(r => renderRecipeCard(r, { mealType: selectedMealType })).join('') + progBtn;
+  list.innerHTML = visibleRecipes.map(r => renderRecipeCard(r, { mealType: selectedMealType, eTgt, cTgt, targetMacros })).join('') + progBtn;
 }
 
+// Directive 1: Fix viewRecipe Modal Population
 function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both') {
-  const r = window.state.recipes.find(x => x.id === id);
+  const r = (window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : []) || []).find(x => x && x.id === id);
   if (!r) return;
-  window.previewBaseRecipe = window.clonePlatePlanValue(r);
+  // Directive 1.2: Ensure previewBaseRecipe is attached to window.previewBaseRecipe = window.clonePlatePlanValue(r)
+  const cloneFn = typeof window.clonePlatePlanValue === 'function'
+    ? window.clonePlatePlanValue
+    : (val => JSON.parse(JSON.stringify(val)));
+  window.previewBaseRecipe = cloneFn(r);
   window.currentPreviewInstanceId = instanceId;
   window.currentViewTab = (tab === 'enhanced' && r.enhanced) ? 'enhanced' : 'original';
   window.currentPreviewServingMode = servingMode || 'both';
   window.currentPreviewSingleServes = 1;
 
-  if (instanceId && window.state.overrides[instanceId]?.substitutions && !window.state.overrides[instanceId]?.productOverrides) {
+  if (instanceId && window.state?.overrides?.[instanceId]?.substitutions && !window.state?.overrides?.[instanceId]?.productOverrides) {
     const subs = window.state.overrides[instanceId].substitutions;
     const applySubs = (ings) => {
       if (!ings) return;
       ings.forEach(ing => {
         if (ing.bankId && subs[ing.bankId]) {
           const subId = subs[ing.bankId];
-          const subIng = window.state.ingredients.find(i => i.id === subId);
+          const subIng = (window.state.ingredients || []).find(i => i.id === subId);
           if (subIng) {
             ing.originalBankId = ing.bankId;
             ing.originalName = ing.name;
@@ -386,9 +505,12 @@ function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both
     if (window.previewBaseRecipe.enhanced) applySubs(window.previewBaseRecipe.enhanced.ingredients);
   }
 
+  // Directive 1.3 & 1.4: Add open class to #view-modal-wrap and invoke window.renderRecipePreview
   const wrap = document.getElementById('view-modal-wrap');
   if (wrap) wrap.classList.add('open');
-  window.renderRecipePreview(window.previewBaseRecipe.serves || 2);
+  if (typeof window.renderRecipePreview === 'function') {
+    window.renderRecipePreview(window.previewBaseRecipe.serves || 2);
+  }
 }
 
 function toggleRecipeFavourite(recipeId, event, variantKey = 'original') {
@@ -396,9 +518,11 @@ function toggleRecipeFavourite(recipeId, event, variantKey = 'original') {
     event.stopPropagation();
     event.preventDefault();
   }
-  const r = (window.state.recipes || []).find(x => x.id === recipeId);
+  const r = (window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : []) || []).find(x => x && x.id === recipeId);
   if (!r) return;
-  const list = window.ensureVariantFavoritingPrefs();
+  const list = typeof window.ensureVariantFavoritingPrefs === 'function'
+    ? window.ensureVariantFavoritingPrefs()
+    : (window.state?.userPrefs?.favouriteVariantIds || []);
   const key = `${recipeId}_${variantKey}`;
   const idx = list.indexOf(key);
   const willBeFav = (idx === -1);
@@ -407,18 +531,20 @@ function toggleRecipeFavourite(recipeId, event, variantKey = 'original') {
   } else {
     list.splice(idx, 1);
   }
-  const isNowFav = window.isRecipeVariantFavourite(r.id, 'original') || window.isRecipeVariantFavourite(r.id, 'enhanced');
+  const isNowFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced');
   r.isFavourite = isNowFav;
   r.isFavorite = isNowFav;
   r.updatedAt = new Date().toISOString();
 
-  window.saveState(true);
+  if (typeof window.saveState === 'function') {
+    window.saveState(true);
+  }
   try {
     const householdId = (window.state && window.state.householdId) || window.ACTIVE_HOUSEHOLD_ID || 'elliott-chloe';
     if (window.platePlanDb) {
       window.platePlanDb.collection('households').doc(householdId).collection('data').doc('meta').set({
-        prefs: window.state.prefs,
-        userPrefs: window.state.userPrefs
+        prefs: window.state?.prefs || {},
+        userPrefs: window.state?.userPrefs || {}
       }, { merge: true }).catch(e => console.warn('[PREFS SYNC ERROR]', e));
       window.platePlanDb.collection('households').doc(householdId).collection('recipes').doc(String(r.id)).set(
         window.sanitizePayloadForFirestore(window.unwrapAndCleanItem(r)),
@@ -427,13 +553,14 @@ function toggleRecipeFavourite(recipeId, event, variantKey = 'original') {
     }
   } catch (e) {}
 
+  // Directive 2: Ensure that re-rendering after toggling a favorite uses exact preference paths
   renderVault();
 
   if (typeof window.previewBaseRecipe !== 'undefined' && window.previewBaseRecipe && window.previewBaseRecipe.id === recipeId) {
     window.previewBaseRecipe.isFavourite = r.isFavourite;
     window.previewBaseRecipe.isFavorite = r.isFavorite;
     const activeKey = (typeof window.currentViewTab !== 'undefined' && window.currentViewTab === 'enhanced') ? 'enhanced' : 'original';
-    const isCurrentActiveFav = window.isRecipeVariantFavourite(recipeId, activeKey);
+    const isCurrentActiveFav = isRecipeVariantFavourite(recipeId, activeKey);
     const favBtn = document.getElementById('modal-recipe-fav-btn');
     if (favBtn) {
       favBtn.classList.toggle('active', isCurrentActiveFav);
@@ -453,38 +580,100 @@ function toggleRecipeFavourite(recipeId, event, variantKey = 'original') {
     }
   }
   const variantLabel = variantKey === 'enhanced' ? 'Enhanced' : 'Original';
-  window.showPlatePlanToast(willBeFav ? `Added "${r.name} (${variantLabel})" to favourites ❤️` : `Removed "${r.name} (${variantLabel})" from favourites`);
+  if (typeof window.showPlatePlanToast === 'function') {
+    window.showPlatePlanToast(willBeFav ? `Added "${r.name} (${variantLabel})" to favourites ❤️` : `Removed "${r.name} (${variantLabel})" from favourites`);
+  }
 }
 
+// Directive 3: Fix "More" Recipe Actions Sheet (openRecipeActions)
+// 1. Target #mobile-action-sheet-wrap and #mobile-action-sheet
+// 2. Ensure calling openRecipeActions(id) adds open class to #mobile-action-sheet-wrap and renders context options
 function openRecipeActions(recipeId) {
-  const recipe = window.getProductIndexRecipe(recipeId) || (window.state?.recipes || []).find(r => r.id === recipeId);
+  const recipe = (typeof window.getProductIndexRecipe === 'function' ? window.getProductIndexRecipe(recipeId) : null) ||
+    (window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : []) || []).find(r => r && r.id === recipeId);
   if (!recipe) return;
-  window.openMobileActionSheet(recipe.name, [
+
+  const wrap = document.getElementById('mobile-action-sheet-wrap');
+  const sheet = document.getElementById('mobile-action-sheet');
+  if (!sheet) return;
+
+  const actions = [
     { label: 'Review recipe', onclick: `editRecipeModalView('${window.ppEscapeAttr(recipeId)}')` },
     { label: 'Recipe card', onclick: `downloadRecipeCard('${window.ppEscapeAttr(recipeId)}')` },
     { label: 'Duplicate', onclick: `duplicateRecipe('${window.ppEscapeAttr(recipeId)}')` },
     { label: 'Edit source recipe', onclick: `editRecipe('${window.ppEscapeAttr(recipeId)}')` },
     { label: 'Delete', onclick: `deleteRecipe('${window.ppEscapeAttr(recipeId)}')`, danger: true }
-  ]);
+  ];
+
+  const titleId = 'mobile-action-sheet-title';
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
+  sheet.setAttribute('aria-labelledby', titleId);
+  const escapeHtml = typeof window.ppEscapeHtml === 'function' ? window.ppEscapeHtml : (s => s);
+  sheet.innerHTML = `
+    <div class="mobile-sheet-handle"></div>
+    <div class="row-between" style="align-items:center;margin-bottom:10px">
+      <h3 id="${titleId}" style="margin:0">${escapeHtml(recipe.name || 'Actions')}</h3>
+      <button type="button" class="btn sm ghost" onclick="closeMobileActionSheet()">Close</button>
+    </div>
+    <div style="display:grid;gap:6px">
+      ${actions.map(action => `<button type="button" class="btn ${action.danger ? 'danger' : ''}" onclick="closeMobileActionSheet(true);${action.onclick}">${escapeHtml(action.label)}</button>`).join('')}
+    </div>
+  `;
+
+  if (wrap) {
+    wrap.classList.add('open');
+    if (typeof window.markMobileLayerForBack === 'function') {
+      window.markMobileLayerForBack(wrap, 'actions');
+    }
+  }
+  setTimeout(() => sheet.querySelector('button')?.focus(), 0);
 }
 
 function openEnhancedRecipeActions(recipeId) {
-  const recipe = window.getProductIndexRecipe(recipeId) || (window.state?.recipes || []).find(r => r.id === recipeId);
+  const recipe = (typeof window.getProductIndexRecipe === 'function' ? window.getProductIndexRecipe(recipeId) : null) ||
+    (window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : []) || []).find(r => r && r.id === recipeId);
   if (!recipe) return;
-  if (!recipe.enhanced) {
-    window.openMobileActionSheet(recipe.name, [
-      { label: 'Create enhanced version', onclick: `editEnhancedRecipe('${window.ppEscapeAttr(recipeId)}')` },
-      { label: 'Review recipe', onclick: `editRecipeModalView('${window.ppEscapeAttr(recipeId)}')` }
-    ]);
-    return;
-  }
-  window.openMobileActionSheet(`${recipe.name} · Enhanced`, [
+
+  const wrap = document.getElementById('mobile-action-sheet-wrap');
+  const sheet = document.getElementById('mobile-action-sheet');
+  if (!sheet) return;
+
+  const actions = !recipe.enhanced ? [
+    { label: 'Create enhanced version', onclick: `editEnhancedRecipe('${window.ppEscapeAttr(recipeId)}')` },
+    { label: 'Review recipe', onclick: `editRecipeModalView('${window.ppEscapeAttr(recipeId)}')` }
+  ] : [
     { label: 'Review enhanced recipe', onclick: `reviewEnhancedRecipe('${window.ppEscapeAttr(recipeId)}')` },
     { label: 'Recipe card', onclick: `downloadRecipeCard('${window.ppEscapeAttr(recipeId)}','enhanced')` },
     { label: 'Duplicate complete recipe', onclick: `duplicateRecipe('${window.ppEscapeAttr(recipeId)}')` },
     { label: 'Edit enhanced recipe', onclick: `editEnhancedRecipe('${window.ppEscapeAttr(recipeId)}')` },
     { label: 'Delete enhanced version', onclick: `deleteEnhancedRecipe('${window.ppEscapeAttr(recipeId)}')`, danger: true }
-  ]);
+  ];
+
+  const titleId = 'mobile-action-sheet-title';
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
+  sheet.setAttribute('aria-labelledby', titleId);
+  const escapeHtml = typeof window.ppEscapeHtml === 'function' ? window.ppEscapeHtml : (s => s);
+  const title = !recipe.enhanced ? (recipe.name || 'Actions') : `${recipe.name || 'Recipe'} · Enhanced`;
+  sheet.innerHTML = `
+    <div class="mobile-sheet-handle"></div>
+    <div class="row-between" style="align-items:center;margin-bottom:10px">
+      <h3 id="${titleId}" style="margin:0">${escapeHtml(title)}</h3>
+      <button type="button" class="btn sm ghost" onclick="closeMobileActionSheet()">Close</button>
+    </div>
+    <div style="display:grid;gap:6px">
+      ${actions.map(action => `<button type="button" class="btn ${action.danger ? 'danger' : ''}" onclick="closeMobileActionSheet(true);${action.onclick}">${escapeHtml(action.label)}</button>`).join('')}
+    </div>
+  `;
+
+  if (wrap) {
+    wrap.classList.add('open');
+    if (typeof window.markMobileLayerForBack === 'function') {
+      window.markMobileLayerForBack(wrap, 'actions');
+    }
+  }
+  setTimeout(() => sheet.querySelector('button')?.focus(), 0);
 }
 
 export function replaceRecipeIngredient(recipeId, oldIngredientId, newIngredient) {
@@ -541,3 +730,4 @@ export {
 };
 
 export default createLegacyView({ id: 'vault', rootId: 'view-vault' });
+

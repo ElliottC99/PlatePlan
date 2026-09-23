@@ -207,9 +207,9 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='3.3.1-mod';
+const PLATEPLAN_APP_VERSION='3.3.2-mod';
 const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v90';
-window.APP_VERSION = '3.3.1-mod';
+window.APP_VERSION = '3.3.2-mod';
 window._hydrationLogged = false;
 window.state = window.state || {};
 window.state.deletedPlanIds = window.state.deletedPlanIds || [];
@@ -867,7 +867,7 @@ window.updatePlanSaveUI = updatePlanSaveUI;
 
 function queuePlanSave(planData = state?.plan, immediate = false) {
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.0.4 STATE PERSISTENCE] queuePlanSave blocked during hydration.');
+    console.log('[v3.3.2-mod STATE PERSISTENCE] queuePlanSave blocked during hydration.');
     return Promise.resolve(false);
   }
 
@@ -1213,6 +1213,47 @@ function openCreateActionSheet(){
     {label:'Paste recipe text',onclick:`openRecipeTextFromToolbar()`}
   ]);
 }
+function openRecipeActions(recipeId){
+  if (typeof window.openRecipeActions === 'function' && window.openRecipeActions !== openRecipeActions) {
+    return window.openRecipeActions(recipeId);
+  }
+  const recipe = getProductIndexRecipe(recipeId) || (state?.recipes || []).find(r => r.id === recipeId);
+  if (!recipe) return;
+  const wrap = document.getElementById('mobile-action-sheet-wrap');
+  const sheet = document.getElementById('mobile-action-sheet');
+  if (!sheet) return;
+  const actions = [
+    { label: 'Review recipe', onclick: `editRecipeModalView('${ppEscapeAttr(recipeId)}')` },
+    { label: 'Recipe card', onclick: `downloadRecipeCard('${ppEscapeAttr(recipeId)}')` },
+    { label: 'Duplicate', onclick: `duplicateRecipe('${ppEscapeAttr(recipeId)}')` },
+    { label: 'Edit source recipe', onclick: `editRecipe('${ppEscapeAttr(recipeId)}')` },
+    { label: 'Delete', onclick: `deleteRecipe('${ppEscapeAttr(recipeId)}')`, danger: true }
+  ];
+  openMobileActionSheet(recipe.name, actions);
+}
+function openEnhancedRecipeActions(recipeId){
+  if (typeof window.openEnhancedRecipeActions === 'function' && window.openEnhancedRecipeActions !== openEnhancedRecipeActions) {
+    return window.openEnhancedRecipeActions(recipeId);
+  }
+  const recipe = getProductIndexRecipe(recipeId) || (state?.recipes || []).find(r => r.id === recipeId);
+  if (!recipe) return;
+  if (!recipe.enhanced) {
+    openMobileActionSheet(recipe.name, [
+      { label: 'Create enhanced version', onclick: `editEnhancedRecipe('${ppEscapeAttr(recipeId)}')` },
+      { label: 'Review recipe', onclick: `editRecipeModalView('${ppEscapeAttr(recipeId)}')` }
+    ]);
+    return;
+  }
+  openMobileActionSheet(`${recipe.name} · Enhanced`, [
+    { label: 'Review enhanced recipe', onclick: `reviewEnhancedRecipe('${ppEscapeAttr(recipeId)}')` },
+    { label: 'Recipe card', onclick: `downloadRecipeCard('${ppEscapeAttr(recipeId)}','enhanced')` },
+    { label: 'Duplicate complete recipe', onclick: `duplicateRecipe('${ppEscapeAttr(recipeId)}')` },
+    { label: 'Edit enhanced recipe', onclick: `editEnhancedRecipe('${ppEscapeAttr(recipeId)}')` },
+    { label: 'Delete enhanced version', onclick: `deleteEnhancedRecipe('${ppEscapeAttr(recipeId)}')`, danger: true }
+  ]);
+}
+window.openRecipeActions = openRecipeActions;
+window.openEnhancedRecipeActions = openEnhancedRecipeActions;
 function openManualRecipeEntry(){ showView('add'); setTimeout(()=>document.getElementById('r-name')?.focus(),0); }
 function openRecipeCaptureFromToolbar(){ showView('add'); setTimeout(()=>openRecipePhotoPicker('library'),0); }
 function openRecipeTextFromToolbar(){ showView('add'); setTimeout(()=>openRecipeTextPaste(),0); }
@@ -2021,7 +2062,7 @@ let platePlanDebounceResolvers = [];
 
 async function pushStateToCloud(force=false){
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.0.4 STATE PERSISTENCE] PushStateToCloud blocked during hydration.');
+    console.log('[v3.3.2-mod STATE PERSISTENCE] PushStateToCloud blocked during hydration.');
     return Promise.resolve(false);
   }
 
@@ -2033,7 +2074,7 @@ async function pushStateToCloud(force=false){
 
   const currentStateJson = safeJsonStringify(state);
   if (!force && lastPersistedStateJson && lastPersistedStateJson === currentStateJson) {
-    console.log('[v3.0.4 STATE PERSISTENCE] State unchanged from last persisted; skipping cloud push.');
+    console.log('[v3.3.2-mod STATE PERSISTENCE] State unchanged from last persisted; skipping cloud push.');
     return Promise.resolve(true);
   }
 
@@ -2270,7 +2311,7 @@ async function _executePushStateToCloud(force, targetHouseholdId, householdDocRe
       platePlanLastSyncError=null;
       platePlanLastSyncedAt=Date.now();
       lastPersistedStateJson = safeJsonStringify(state);
-      console.log('[v3.0.4 STATE PERSISTENCE] State successfully pushed to cloud with debounce 1000ms.');
+      console.log('[v3.3.2-mod STATE PERSISTENCE] State successfully pushed to cloud with debounce 1000ms.');
       updatePlatePlanSyncStatus('synced');
     }catch(error){
       console.warn('PlatePlan Cloud push failed:',error);
@@ -2818,7 +2859,7 @@ function saveState(immediate=false){
   }
 
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.0.6 STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
+    console.log('[v3.3.2-mod STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
     return true;
   }
 
@@ -3474,7 +3515,7 @@ async function performSubcollectionMigrationIfNeeded(db, householdId, rootDocDat
 window.performSubcollectionMigrationIfNeeded = performSubcollectionMigrationIfNeeded;
 
 function startPlatePlanCloudListeners(){
-  console.log('[PlatePlan v3.1.0] Legacy Firestore onSnapshot listeners bypassed. Core engine in charge.');
+  console.log('[PlatePlan v3.3.2-mod] Legacy Firestore onSnapshot listeners bypassed. Core engine in charge.');
   platePlanSyncUnsubscribers.forEach(stop=>{try{stop();}catch(e){}});
   platePlanSyncUnsubscribers=[];
   return;
@@ -4445,13 +4486,29 @@ function installPlatePlanSidebarState(){
   });
 }
 
+function syncPlatePlanVersionDisplay() {
+  const versionStr = `v${PLATEPLAN_APP_VERSION}`;
+  const versionEl = document.getElementById('plateplan-update-version');
+  if (versionEl) versionEl.textContent = versionStr;
+  const logoPill = document.querySelector('.logo span:last-child');
+  if (logoPill && (logoPill.textContent.startsWith('v') || logoPill.textContent.includes('mod'))) {
+    logoPill.textContent = versionStr;
+  }
+  document.querySelectorAll('.app-version, #footer-version, #main-footer-version, .footer-version').forEach(el => {
+    el.textContent = versionStr;
+  });
+}
+window.syncPlatePlanVersionDisplay = syncPlatePlanVersionDisplay;
+
 let platePlanApplicationInitialized=false;
 function initializePlatePlanApplication(){
   if(platePlanApplicationInitialized)return;
   platePlanApplicationInitialized=true;
+  console.log('[PlatePlan v3.3.2-mod] Initializing core application...');
   performance.mark?.('plateplan-start');
   installPlatePlanModalHistory();
   clearVolatileSavedDom(document);
+  syncPlatePlanVersionDisplay();
   loadBakedState();
   state = loadState();
   const bootHouseholdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
@@ -4559,7 +4616,7 @@ if(document.readyState==='loading'){
 
 // == MEAL BUDGETS & FIT SCORING ==
 function getBudgets(person, mealType) {
-    const p = state.prefs || {};
+    const p = (window.state && window.state.prefs) || state.prefs || {};
     const eAlloc = p.eAlloc || {b:15, l:25, d:45, s:15};
     const cAlloc = p.cAlloc || {b:25, l:30, d:35, s:10};
     const eProtAlloc = p.eProtAlloc || eAlloc;
@@ -4577,8 +4634,8 @@ function getBudgets(person, mealType) {
 
     const calPct = (alloc[mKey] || 0) / 100;
     const protPct = (protAlloc[mKey] || 0) / 100;
-    const cal = (person === 'e' ? (p.ecal || 2400) : (p.ccal || 1700)) * calPct;
-    const prot = (person === 'e' ? (p.eprot || 130) : (p.cprot || 100)) * protPct;
+    const cal = (person === 'e' ? (Number(p.ecal) || 2400) : (Number(p.ccal) || 1700)) * calPct;
+    const prot = (person === 'e' ? (Number(p.eprot) || 130) : (Number(p.cprot) || 100)) * protPct;
     return {cal, prot};
 }
 
@@ -14556,16 +14613,33 @@ function renderVault(...args) {
   const sort = (document.getElementById('vault-sort')?.value) || 'name';
 
   const favFilterBtn = document.getElementById('vault-filter-fav');
+  const isFavOnly = !!(favFilterBtn?.classList.contains('active') || window.state?.vaultFavOnly || vaultFilterFavouritesOnly);
   if (favFilterBtn) {
-    favFilterBtn.classList.toggle('active', !!vaultFilterFavouritesOnly);
-    favFilterBtn.setAttribute('aria-pressed', vaultFilterFavouritesOnly ? 'true' : 'false');
+    favFilterBtn.classList.toggle('active', isFavOnly);
+    favFilterBtn.setAttribute('aria-pressed', isFavOnly ? 'true' : 'false');
+    if (!favFilterBtn.dataset.boundFavFilter) {
+      favFilterBtn.dataset.boundFavFilter = 'true';
+      favFilterBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        favFilterBtn.classList.toggle('active');
+        const active = favFilterBtn.classList.contains('active');
+        favFilterBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        if (window.state) window.state.vaultFavOnly = active;
+        vaultFilterFavouritesOnly = active;
+        window.vaultFilterFavouritesOnly = active;
+        renderVault();
+      });
+    }
   }
 
   ensureVariantFavoritingPrefs();
-  const currentRecipes = (state?.recipes || window.state?.recipes || []);
+  const currentRecipes = (window.state?.recipes || state?.recipes || []);
   const recipes = currentRecipes.filter(r => {
-    const hasAnyFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
-    if (vaultFilterFavouritesOnly && !hasAnyFav) return false;
+    if (!r) return false;
+    if (isFavOnly) {
+      const isFav = !!(r.isFavorite || r.isFavourite || isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced'));
+      if (!isFav) return false;
+    }
     const types = r.types || [r.type];
     const searchable = [
       r.name,
@@ -14583,7 +14657,7 @@ function renderVault(...args) {
     : recipes;
 
   if (!sortedRecipes.length) { list.innerHTML = '<div class="empty">No matching recipes found.</div>'; return; }
-  const listSignature = [ft, fw, q, sort, vaultFilterFavouritesOnly ? 'fav' : 'all'].join('|');
+  const listSignature = [ft, fw, q, sort, isFavOnly ? 'fav' : 'all'].join('|');
   if (typeof resetProgressiveList === 'function') {
     resetProgressiveList('vault', listSignature);
   }
@@ -14596,8 +14670,44 @@ function renderVault(...args) {
     ? progressiveListButton('vault', totalRecipes, visibleRecipes.length)
     : '';
 
+  const prefs = (window.state && window.state.prefs) || state?.prefs || {};
+  const ecal = Number(prefs.ecal) || 2400;
+  const eprot = Number(prefs.eprot) || 130;
+  const ccal = Number(prefs.ccal) || 1700;
+  const cprot = Number(prefs.cprot) || 100;
+
+  const eAlloc = prefs.eAlloc || { b: 15, l: 25, d: 45, s: 15 };
+  const cAlloc = prefs.cAlloc || { b: 25, l: 30, d: 35, s: 10 };
+  const eProtAlloc = prefs.eProtAlloc || eAlloc;
+  const cProtAlloc = prefs.cProtAlloc || cAlloc;
+
+  let mKey = 'd';
+  if (selectedMealType.includes('breakfast')) mKey = 'b';
+  else if (selectedMealType.includes('lunch')) mKey = 'l';
+  else if (selectedMealType.includes('snack')) mKey = 's';
+  else if (selectedMealType.includes('dinner')) mKey = 'd';
+
+  const eTgt = {
+    cal: ecal * ((eAlloc[mKey] ?? 45) / 100),
+    prot: eprot * ((eProtAlloc[mKey] ?? eAlloc[mKey] ?? 45) / 100)
+  };
+  const cTgt = {
+    cal: ccal * ((cAlloc[mKey] ?? 35) / 100),
+    prot: cprot * ((cProtAlloc[mKey] ?? cAlloc[mKey] ?? 35) / 100)
+  };
+  const targetMacros = {
+    mealType: selectedMealType,
+    targetCal_E: eTgt.cal,
+    targetProt_E: eTgt.prot,
+    targetCal_C: cTgt.cal,
+    targetProt_C: cTgt.prot,
+    e: eTgt,
+    c: cTgt,
+    prefs: { ecal, eprot, ccal, cprot }
+  };
+
   if (cardRenderer) {
-    list.innerHTML = visibleRecipes.map(r => cardRenderer(r, { mealType: selectedMealType })).join('') + progBtn;
+    list.innerHTML = visibleRecipes.map(r => cardRenderer(r, { mealType: selectedMealType, eTgt, cTgt, targetMacros })).join('') + progBtn;
   }
 }
 window.renderVault = renderVault;
@@ -14934,16 +15044,45 @@ function updateRecipePreviewScale(val) {
   renderRecipePreview(target);
 }
 
-// viewRecipe moved to modular recipes.js
+// viewRecipe implementation with window.previewBaseRecipe and window.renderRecipePreview
+function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both') {
+  if (typeof window.viewRecipe === 'function' && window.viewRecipe !== viewRecipe) {
+    return window.viewRecipe(id, instanceId, tab, servingMode);
+  }
+  const r = (window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : []) || []).find(x => x && x.id === id);
+  if (!r) return;
+  const cloneFn = typeof clonePlatePlanValue === 'function'
+    ? clonePlatePlanValue
+    : (typeof window.clonePlatePlanValue === 'function' ? window.clonePlatePlanValue : (val => JSON.parse(JSON.stringify(val))));
+  previewBaseRecipe = cloneFn(r);
+  window.previewBaseRecipe = previewBaseRecipe;
+  currentPreviewInstanceId = instanceId;
+  window.currentPreviewInstanceId = instanceId;
+  currentViewTab = (tab === 'enhanced' && r.enhanced) ? 'enhanced' : 'original';
+  window.currentViewTab = currentViewTab;
+  currentPreviewServingMode = servingMode || 'both';
+  window.currentPreviewServingMode = currentPreviewServingMode;
+  currentPreviewSingleServes = 1;
+  window.currentPreviewSingleServes = 1;
 
+  const wrap = document.getElementById('view-modal-wrap');
+  if (wrap) wrap.classList.add('open');
+  renderRecipePreview(r.serves || 2);
+}
+window.viewRecipe = viewRecipe;
 
 function renderRecipePreview(targetServes = 2) {
-    const r = previewBaseRecipe;
+    const r = window.previewBaseRecipe || previewBaseRecipe;
     if(!r) return;
+    previewBaseRecipe = r;
+    window.previewBaseRecipe = r;
     const hasEnh = !!r.enhanced;
-    const isEnh = currentViewTab === 'enhanced' && hasEnh;
+    const isEnh = (window.currentViewTab || currentViewTab) === 'enhanced' && hasEnh;
+    const activePreviewInstanceId = window.currentPreviewInstanceId !== undefined ? window.currentPreviewInstanceId : currentPreviewInstanceId;
+    const activePreviewServingMode = window.currentPreviewServingMode || currentPreviewServingMode;
+    const activePreviewSingleServes = window.currentPreviewSingleServes || currentPreviewSingleServes;
 
-    const bundle = calculateRecipeDisplayNutrition({ recipe:r, variant:isEnh ? 'enhanced' : 'original', instanceId:currentPreviewInstanceId, targetServes });
+    const bundle = calculateRecipeDisplayNutrition({ recipe:r, variant:isEnh ? 'enhanced' : 'original', instanceId:activePreviewInstanceId, targetServes });
     if(!bundle) return;
 
     const activeR = bundle.active;
@@ -15050,6 +15189,10 @@ function renderRecipePreview(targetServes = 2) {
 
     const content = document.getElementById('view-modal-content');
     if (!content) return;
+    const wrap = document.getElementById('view-modal-wrap');
+    if (wrap && !wrap.classList.contains('open')) {
+      wrap.classList.add('open');
+    }
 
     const variantKey = isEnh ? 'enhanced' : 'original';
     const isFav = (typeof isRecipeVariantFavourite === 'function' ? isRecipeVariantFavourite(r.id, variantKey) : false) || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite) && !isEnh);
@@ -21263,7 +21406,7 @@ async function persistProductToBank(newProduct) {
     const writeProducts = db.collection('households').doc(householdId).collection('products').doc(newProduct.id).set(cleaned, { merge: true });
     const writeIngredients = db.collection('households').doc(householdId).collection('ingredients').doc(newProduct.id).set(cleaned, { merge: true });
     firestorePromise = Promise.all([writeProducts, writeIngredients]).catch(err => {
-      console.warn('[v3.0.4 STATE PERSISTENCE] persistProductToBank Firestore write warning:', err);
+      console.warn('[v3.3.2-mod STATE PERSISTENCE] persistProductToBank Firestore write warning:', err);
     });
   } else {
     firestorePromise = Promise.resolve();
@@ -24402,6 +24545,7 @@ function loadPrefs(){
   calcBudgets();
   renderExclusionPreview();
   renderRecoveryPanel();
+  syncPlatePlanVersionDisplay();
 }
 
 function calcBudgets() {

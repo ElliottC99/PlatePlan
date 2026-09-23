@@ -1,12 +1,12 @@
 {
   "name": "plateplan",
-  "version": "3.3.1-mod",
+  "version": "3.3.2-mod",
   "type": "module",
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
     "build": "echo 'No build required for static site'",
-    "lint": "node --check server.js"
+    "lint": "node --check server.js && node --check scripts/plateplan-app.js && node --check scripts/features/recipes.js"
   },
   "dependencies": {
     "express": "^4.19.2"
