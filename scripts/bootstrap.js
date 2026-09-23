@@ -88,6 +88,15 @@ document.documentElement.dataset.plateplanBoot = 'loading-core';
 
 await loadClassicScript('./scripts/recipes.js?v=3.3.7-mod').catch(() => {});
 await loadClassicScript('./scripts/actions.js?v=3.3.7-mod').catch(() => {});
+await loadClassicScript('./scripts/utils/nutrition.js?v=3.3.7-mod');
+await loadClassicScript('./scripts/core/state.js?v=3.3.7-mod');
+await loadClassicScript('./scripts/utils/ingredients.js?v=3.3.7-mod');
+await loadClassicScript('./scripts/utils/dom.js?v=3.3.7-mod');
+await loadClassicScript('./scripts/services/cloud-sync.js?v=3.3.7-mod');
+await loadClassicScript('./scripts/features/ingredient-bank.js?v=3.3.7-mod');
+await loadClassicScript('./scripts/features/shopping-list.js?v=3.3.7-mod');
+await loadClassicScript('./scripts/features/recipe-editor.js?v=3.3.7-mod');
+await loadClassicScript('./scripts/features/planner.js?v=3.3.7-mod');
 await loadClassicScript('./scripts/plateplan-app.js?v=3.3.7-mod');
 await import('./features/recipes.js?v=3.3.7-mod');
 await import('./main.js?v=3.3.7-mod');

@@ -1,3 +1,5 @@
+import { createLegacyView } from '../features/create-legacy-view.js?v=3.3.7-mod';
+
 ['plateplan_plan_backup', 'plateplan_offline_backup', 'plateplan_history_v2', 'plateplan_v1'].forEach(key => {
   localStorage.removeItem(key);
 });
@@ -42,9 +44,10 @@ export function createPlatePlanRuntime(context) {
     if (!FEATURE_LOADERS[id]) return null;
     if (!loading.has(id)) {
       loading.set(id, FEATURE_LOADERS[id]().then(module => {
-        const feature = module.default || module.feature;
+        let feature = module ? (module.default || module.feature) : null;
         if (!feature || typeof feature.render !== 'function') {
-          throw new Error(`PlatePlan view module ${id} has no render function`);
+          const rootId = id === 'data' ? 'view-data-quality' : (id === 'bank' ? 'view-bank' : `view-${id}`);
+          feature = createLegacyView({ id, rootId });
         }
         feature.install?.(context);
         loaded.set(id, feature);
