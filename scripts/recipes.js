@@ -1,5 +1,5 @@
 /**
- * PlatePlan v3.3.6-mod - Recipes and Recipe Modal Engine
+ * PlatePlan v3.3.7-mod - Recipes and Recipe Modal Engine
  */
 
 window.findRecipeByIdOrInstance = function(targetId) {
@@ -97,8 +97,6 @@ window.viewRecipe = function(id, instanceId = null, tab = 'ingredients', serving
     wrap.style.setProperty('overflow-y', 'auto', 'important');
   }
   if (content) {
-    content.style.setProperty('max-height', 'calc(100vh - 40px)', 'important');
-    content.style.setProperty('overflow-y', 'auto', 'important');
     content.style.setProperty('display', 'block', 'important');
     content.style.setProperty('visibility', 'visible', 'important');
     content.style.setProperty('opacity', '1', 'important');

@@ -207,13 +207,13 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='3.3.6-mod';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v93';
-window.APP_VERSION = '3.3.6-mod';
+const PLATEPLAN_APP_VERSION='3.3.7-mod';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v94';
+window.APP_VERSION = '3.3.7-mod';
 window._hydrationLogged = false;
 window.state = window.state || {};
 window.state.meta = window.state.meta || {};
-window.state.meta.version = '3.3.6-mod';
+window.state.meta.version = '3.3.7-mod';
 window.state.deletedPlanIds = window.state.deletedPlanIds || [];
 window.deletedPlanIds = window.deletedPlanIds || window.state.deletedPlanIds;
 
@@ -291,7 +291,9 @@ function sanitizeModalDOMHierarchy() {
   topLevelWrappers.forEach(id => {
     const el = document.getElementById(id);
     if (el && el.parentElement && el.parentElement !== document.body && el.parentElement.id !== 'app-container') {
-      console.warn(`[PlatePlan DOM Engine] Reparenting top-level #${id} to <body>`);
+      if (typeof window !== 'undefined' && window.PP_DEBUG) {
+        console.warn(`[PlatePlan DOM Engine] Reparenting top-level #${id} to <body>`);
+      }
       document.body.appendChild(el);
     }
   });
@@ -960,7 +962,7 @@ window.updatePlanSaveUI = updatePlanSaveUI;
 
 function queuePlanSave(planData = state?.plan, immediate = false, options = {}) {
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.3.5-mod STATE PERSISTENCE] queuePlanSave blocked during hydration.');
+    console.log('[v3.3.7-mod STATE PERSISTENCE] queuePlanSave blocked during hydration.');
     return Promise.resolve(false);
   }
 
@@ -2218,7 +2220,7 @@ let platePlanDebounceResolvers = [];
 
 async function pushStateToCloud(force=false){
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.3.5-mod STATE PERSISTENCE] PushStateToCloud blocked during hydration.');
+    console.log('[v3.3.7-mod STATE PERSISTENCE] PushStateToCloud blocked during hydration.');
     return Promise.resolve(false);
   }
 
@@ -2230,7 +2232,7 @@ async function pushStateToCloud(force=false){
 
   const currentStateJson = safeJsonStringify(state);
   if (!force && lastPersistedStateJson && lastPersistedStateJson === currentStateJson) {
-    console.log('[v3.3.5-mod STATE PERSISTENCE] State unchanged from last persisted; skipping cloud push.');
+    console.log('[v3.3.7-mod STATE PERSISTENCE] State unchanged from last persisted; skipping cloud push.');
     return Promise.resolve(true);
   }
 
@@ -2467,7 +2469,7 @@ async function _executePushStateToCloud(force, targetHouseholdId, householdDocRe
       platePlanLastSyncError=null;
       platePlanLastSyncedAt=Date.now();
       lastPersistedStateJson = safeJsonStringify(state);
-      console.log('[v3.3.5-mod STATE PERSISTENCE] State successfully pushed to cloud with debounce 1000ms.');
+      console.log('[v3.3.7-mod STATE PERSISTENCE] State successfully pushed to cloud with debounce 1000ms.');
       updatePlatePlanSyncStatus('synced');
     }catch(error){
       console.warn('PlatePlan Cloud push failed:',error);
@@ -3015,7 +3017,7 @@ function saveState(immediate=false){
   }
 
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.3.5-mod STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
+    console.log('[v3.3.7-mod STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
     return true;
   }
 
@@ -3671,7 +3673,7 @@ async function performSubcollectionMigrationIfNeeded(db, householdId, rootDocDat
 window.performSubcollectionMigrationIfNeeded = performSubcollectionMigrationIfNeeded;
 
 function startPlatePlanCloudListeners(){
-  console.log('[PlatePlan v3.3.5-mod] Legacy Firestore onSnapshot listeners bypassed. Core engine in charge.');
+  console.log('[PlatePlan v3.3.7-mod] Legacy Firestore onSnapshot listeners bypassed. Core engine in charge.');
   platePlanSyncUnsubscribers.forEach(stop=>{try{stop();}catch(e){}});
   platePlanSyncUnsubscribers=[];
   return;
@@ -4660,7 +4662,7 @@ let platePlanApplicationInitialized=false;
 function initializePlatePlanApplication(){
   if(platePlanApplicationInitialized)return;
   platePlanApplicationInitialized=true;
-  console.log('[PlatePlan v3.3.5-mod] Initializing core application...');
+  console.log('[PlatePlan v3.3.7-mod] Initializing core application...');
   performance.mark?.('plateplan-start');
   installPlatePlanModalHistory();
   clearVolatileSavedDom(document);
@@ -15293,8 +15295,6 @@ function viewRecipe(id, instanceId = null, tab = 'ingredients', servingMode = nu
     wrap.style.setProperty('overflow-y', 'auto', 'important');
   }
   if (content) {
-    content.style.setProperty('max-height', 'calc(100vh - 40px)', 'important');
-    content.style.setProperty('overflow-y', 'auto', 'important');
     content.style.setProperty('display', 'block', 'important');
     content.style.setProperty('visibility', 'visible', 'important');
     content.style.setProperty('opacity', '1', 'important');
@@ -21641,7 +21641,7 @@ async function persistProductToBank(newProduct) {
     const writeProducts = db.collection('households').doc(householdId).collection('products').doc(newProduct.id).set(cleaned, { merge: true });
     const writeIngredients = db.collection('households').doc(householdId).collection('ingredients').doc(newProduct.id).set(cleaned, { merge: true });
     firestorePromise = Promise.all([writeProducts, writeIngredients]).catch(err => {
-      console.warn('[v3.3.5-mod STATE PERSISTENCE] persistProductToBank Firestore write warning:', err);
+      console.warn('[v3.3.7-mod STATE PERSISTENCE] persistProductToBank Firestore write warning:', err);
     });
   } else {
     firestorePromise = Promise.resolve();
@@ -23419,10 +23419,10 @@ function deletePlanHistory(index){
               planHistory: window.state?.planHistory || state?.planHistory || [],
               updatedAt: serverTs
             }, { merge: true });
-            console.log('[v3.3.5-mod] Successfully written planHistory directly to root household document.');
+            console.log('[v3.3.7-mod] Successfully written planHistory directly to root household document.');
           }
         } catch (err) {
-          console.error('[v3.3.5-mod] Direct Firestore planHistory write failed:', err);
+          console.error('[v3.3.7-mod] Direct Firestore planHistory write failed:', err);
         }
       }
 

@@ -1,5 +1,5 @@
 /**
- * PlatePlan v3.3.6-mod - Action Sheet and Plan History Deletion Engine
+ * PlatePlan v3.3.7-mod - Action Sheet and Plan History Deletion Engine
  */
 
 window.executeSheetAction = function(actionFnName, ...args) {
@@ -65,10 +65,10 @@ window.deletePlanHistory = function(index) {
             planHistory: window.state?.planHistory || state?.planHistory || [],
             updatedAt: serverTs
           }, { merge: true });
-          console.log('[v3.3.6-mod] Successfully written planHistory directly to root household document.');
+          console.log('[v3.3.7-mod] Successfully written planHistory directly to root household document.');
         }
       } catch (err) {
-        console.error('[v3.3.6-mod] Direct Firestore planHistory write failed:', err);
+        console.error('[v3.3.7-mod] Direct Firestore planHistory write failed:', err);
       }
     }
 

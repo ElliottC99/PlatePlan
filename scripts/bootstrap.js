@@ -1,12 +1,12 @@
 /**
- * PlatePlan bootstrap v3.3.6-mod.
+ * PlatePlan bootstrap v3.3.7-mod.
  *
  * The parsed shell can paint before the compatibility layer is evaluated.
  * Holding DOMContentLoaded with top-level await preserves the existing boot
  * contract while feature modules continue moving out of the legacy source.
  */
 
-const CURRENT_BUILD_ID = '3.3.6-mod-v93';
+const CURRENT_BUILD_ID = '3.3.7-mod-v94';
 
 export function sanitizeModalDOMHierarchy() {
   // Move top-level wrappers to <body>
@@ -31,7 +31,9 @@ export function sanitizeModalDOMHierarchy() {
   topLevelWrappers.forEach(id => {
     const el = document.getElementById(id);
     if (el && el.parentElement && el.parentElement !== document.body && el.parentElement.id !== 'app-container') {
-      console.warn(`[PlatePlan DOM Engine] Reparenting top-level #${id} to <body>`);
+      if (typeof window !== 'undefined' && window.PP_DEBUG) {
+        console.warn(`[PlatePlan DOM Engine] Reparenting top-level #${id} to <body>`);
+      }
       document.body.appendChild(el);
     }
   });
@@ -84,15 +86,15 @@ document.documentElement.dataset.plateplanBoot = 'shell';
 await new Promise(resolve => requestAnimationFrame(resolve));
 document.documentElement.dataset.plateplanBoot = 'loading-core';
 
-await loadClassicScript('./scripts/recipes.js?v=3.3.6-mod').catch(() => {});
-await loadClassicScript('./scripts/actions.js?v=3.3.6-mod').catch(() => {});
-await loadClassicScript('./scripts/plateplan-app.js?v=3.3.6-mod');
-await import('./features/recipes.js?v=3.3.6-mod');
-await import('./main.js?v=3.3.6-mod');
+await loadClassicScript('./scripts/recipes.js?v=3.3.7-mod').catch(() => {});
+await loadClassicScript('./scripts/actions.js?v=3.3.7-mod').catch(() => {});
+await loadClassicScript('./scripts/plateplan-app.js?v=3.3.7-mod');
+await import('./features/recipes.js?v=3.3.7-mod');
+await import('./main.js?v=3.3.7-mod');
 
 sanitizeModalDOMHierarchy();
 document.documentElement.dataset.plateplanBoot = 'ready';
-console.log('[PlatePlan v3.3.6-mod] Engine & Modal Resolution initialized.');
+console.log('[PlatePlan v3.3.7-mod] Engine & Modal Resolution initialized.');
 
 try {
   document.querySelectorAll('.app, body > *').forEach(el => {

@@ -173,41 +173,74 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 .dq-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:10px; }
 .dq-warning { font-size:11px; color:var(--red); font-weight:500; margin-top:4px; }
 
-/* Modal - Apple HIG Sheet & Dialog Presentation */
-.modal-wrap, .modal-backdrop, .modal-overlay {
+/* Global Modal Scroll Container */
+.modal-wrap, 
+#view-modal-wrap, 
+#modal-wrap, 
+#tesco-modal-wrap {
   position: fixed !important;
-  inset: 0 !important;
   top: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
   left: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
-  z-index: 99999 !important;
+  height: 100dvh !important;
   background: rgba(0, 0, 0, 0.5) !important;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  
+  /* Crucial Scroll Controls */
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  overscroll-behavior-y: contain;
+  box-sizing: border-box;
+  padding: 20px 12px;
+  z-index: 99999 !important;
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
-  overflow-y: auto !important;
-  -webkit-overflow-scrolling: touch !important;
-  padding: 20px 12px !important;
-  box-sizing: border-box !important;
-  display: none;
-  align-items: flex-start !important;
-  justify-content: center !important;
 }
-.modal-wrap.open, .modal-wrap.active {display:flex !important; visibility:visible !important; opacity:1 !important; animation:appleModalIn 0.22s cubic-bezier(0.16, 1, 0.3, 1)}
+.modal-wrap:not(.open):not(.active),
+#view-modal-wrap:not(.open):not(.active) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+.modal-wrap.open, .modal-wrap.active,
+#view-modal-wrap.open, #view-modal-wrap.active {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  animation: appleModalIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
 @keyframes appleModalIn{from{opacity:0;transform:scale(0.97) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
-.modal-card, #view-modal-content, .modal-content, .modal{
-  background:var(--surface);
-  border-radius:20px;
-  max-width:760px;
-  width:100%;
-  max-height: calc(100vh - 40px) !important;
-  overflow-y: auto !important;
-  margin: auto 0 !important;
-  padding:24px;
-  box-shadow:0 24px 60px rgba(0,0,0,.22), 0 4px 16px rgba(0,0,0,.08);
-  border:1px solid color-mix(in srgb, var(--border) 65%, transparent)
+
+/* Modal Inner Card Rules */
+.modal-card, 
+#view-modal-content, 
+.modal-content, 
+.modal-body,
+.modal {
+  background: var(--surface);
+  border-radius: 20px;
+  max-width: 760px;
+  width: 100%;
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+  touch-action: auto !important;
+  margin: auto 0;
+  pointer-events: auto !important;
+  padding: 24px;
+  box-shadow: 0 24px 60px rgba(0,0,0,.22), 0 4px 16px rgba(0,0,0,.08);
+  border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+}
+
+/* Prevent Body Scroll Locking Interference */
+body.modal-open {
+  overflow: hidden !important;
+  touch-action: none;
 }
 .modal-tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;background:var(--surface2);padding:4px;border-radius:12px;border:1px solid var(--border)}
 .mt2{padding:7px 16px;border-radius:9px;font-size:13px;cursor:pointer;color:var(--text2);background:transparent;font-weight:600;transition:all 0.15s ease;border:none}

@@ -1,8 +1,8 @@
 /**
- * PlatePlan v3.3.6-mod - Recipe Vault Module
+ * PlatePlan v3.3.7-mod - Recipe Vault Module
  * Extracted from monolith for modular maintenance.
  */
-import { createLegacyView } from './create-legacy-view.js?v=3.3.6-mod';
+import { createLegacyView } from './create-legacy-view.js?v=3.3.7-mod';
 
 export function isRecipeVariantFavourite(recipeId, variantKey = 'original') {
   if (!recipeId) return false;
@@ -533,8 +533,6 @@ function viewRecipe(id, instanceId = null, tab = 'ingredients', servingMode = nu
     wrap.style.setProperty('overflow-y', 'auto', 'important');
   }
   if (content) {
-    content.style.setProperty('max-height', 'calc(100vh - 40px)', 'important');
-    content.style.setProperty('overflow-y', 'auto', 'important');
     content.style.setProperty('display', 'block', 'important');
     content.style.setProperty('visibility', 'visible', 'important');
     content.style.setProperty('opacity', '1', 'important');
