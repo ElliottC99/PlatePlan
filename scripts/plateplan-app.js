@@ -349,45 +349,6 @@ function sanitizePayloadForFirestore(data){
 }
 window.sanitizePayloadForFirestore = sanitizePayloadForFirestore;
 
-// == v3.0.6 DUAL-PROFILE MEAL-SLOT TARGET RESOLVER ==
-window.ppEscapeAttr = ppEscapeAttr;
-window.ppEscapeHtml = ppEscapeHtml;
-window.toTitleCase = toTitleCase;
-window.getContextMealType = getContextMealType;
-window.getBudgets = getBudgets;
-window.calculateRecipeDisplayNutrition = calculateRecipeDisplayNutrition;
-window.calcPortions = calcPortions;
-window.calculateFit = calculateFit;
-window.renderExpandableText = renderExpandableText;
-window.saveState = saveState;
-window.progressiveListButton = progressiveListButton;
-window.resetProgressiveList = resetProgressiveList;
-window.getProductIndexRecipe = getProductIndexRecipe;
-window.openMobileActionSheet = openMobileActionSheet;
-window.ingRaw = ingRaw;
-window.unwrapAndCleanItem = unwrapAndCleanItem;
-window.sanitizePayloadForFirestore = sanitizePayloadForFirestore;
-window.renderRecipePreview = renderRecipePreview;
-window.hasVariantFavoritingInitialized = typeof hasVariantFavoritingInitialized !== 'undefined' ? hasVariantFavoritingInitialized : () => false;
-window.ensureVariantFavoritingPrefs = typeof ensureVariantFavoritingPrefs !== 'undefined' ? ensureVariantFavoritingPrefs : () => [];
-window.ACTIVE_HOUSEHOLD_ID = typeof ACTIVE_HOUSEHOLD_ID !== 'undefined' ? ACTIVE_HOUSEHOLD_ID : 'elliott-chloe';
-window.platePlanDb = typeof platePlanDb !== 'undefined' ? platePlanDb : null;
-window.platePlanListLimits = typeof platePlanListLimits !== 'undefined' ? platePlanListLimits : { vault: 24 };
-window.vaultFilterFavouritesOnly = typeof vaultFilterFavouritesOnly !== 'undefined' ? vaultFilterFavouritesOnly : false;
-window.previewBaseRecipe = typeof previewBaseRecipe !== 'undefined' ? previewBaseRecipe : null;
-window.currentPreviewInstanceId = typeof currentPreviewInstanceId !== 'undefined' ? currentPreviewInstanceId : null;
-window.currentViewTab = typeof currentViewTab !== 'undefined' ? currentViewTab : 'original';
-window.currentPreviewServingMode = typeof currentPreviewServingMode !== 'undefined' ? currentPreviewServingMode : 'both';
-window.currentPreviewSingleServes = typeof currentPreviewSingleServes !== 'undefined' ? currentPreviewSingleServes : 1;
-window.editEnhancedRecipe = typeof editEnhancedRecipe !== 'undefined' ? editEnhancedRecipe : null;
-window.editRecipeModalView = typeof editRecipeModalView !== 'undefined' ? editRecipeModalView : null;
-window.downloadRecipeCard = typeof downloadRecipeCard !== 'undefined' ? downloadRecipeCard : null;
-window.duplicateRecipe = typeof duplicateRecipe !== 'undefined' ? duplicateRecipe : null;
-window.editRecipe = typeof editRecipe !== 'undefined' ? editRecipe : null;
-window.deleteRecipe = typeof deleteRecipe !== 'undefined' ? deleteRecipe : null;
-window.reviewEnhancedRecipe = typeof reviewEnhancedRecipe !== 'undefined' ? reviewEnhancedRecipe : null;
-window.deleteEnhancedRecipe = typeof deleteEnhancedRecipe !== 'undefined' ? deleteEnhancedRecipe : null;
-
 // == v3.0.6 PRE-SORT FIT SCORE COMPUTATION ENGINE ==
 function getEffectiveRecipeFitScore(recipe, targetSlot = 'dinner') {
   if (!recipe) return { score: 0, bestVariant: 'original', scoreOriginal: 0, scoreEnhanced: 0 };
@@ -395,14 +356,17 @@ function getEffectiveRecipeFitScore(recipe, targetSlot = 'dinner') {
   const rawRecipe = recipe.recipe || (recipe.id ? (window.state?.recipes || []).find(r => r.id === recipe.id) : null) || recipe;
 
   // 1. Original Variant Score
-  const resOriginal = calculateMacroFitTierAndScore({ recipe: rawRecipe, variant: 'original' }, targetSlot);
+  const fnFit = typeof calculateMacroFitTierAndScore === 'function'
+    ? calculateMacroFitTierAndScore
+    : (typeof window !== 'undefined' && typeof window.calculateMacroFitTierAndScore === 'function' ? window.calculateMacroFitTierAndScore : null);
+  const resOriginal = fnFit ? fnFit({ recipe: rawRecipe, variant: 'original' }, targetSlot) : { score: 0 };
   const scoreOriginal = typeof resOriginal === 'number' ? resOriginal : (resOriginal?.score ?? 0);
 
   // 2. Enhanced Variant Score
   let scoreEnhanced = 0;
   const hasEnhanced = !!(rawRecipe.enhanced || rawRecipe.enhancedMacros || recipe.enhanced || recipe.enhancedMacros || (recipe.variant === 'enhanced'));
-  if (hasEnhanced) {
-    const resEnhanced = calculateMacroFitTierAndScore({ recipe: rawRecipe, variant: 'enhanced' }, targetSlot);
+  if (hasEnhanced && fnFit) {
+    const resEnhanced = fnFit({ recipe: rawRecipe, variant: 'enhanced' }, targetSlot);
     scoreEnhanced = typeof resEnhanced === 'number' ? resEnhanced : (resEnhanced?.score ?? 0);
   }
 
@@ -1349,28 +1313,6 @@ function rebuildPlatePlanIndexes(){
   platePlanIndexes={products,groups,families,recipes,recipeDependencies};
 }
 function markPlatePlanViewsDirty(...names){ (names.length?names:['today','vault','ingredients','bank','planner','planlib','shopping','data','prefs']).forEach(name=>platePlanDirtyViews.add(name)); }
-
-function safeJsonStringify(value, fallback = '{}') {
-  if (value === undefined || value === null) return fallback;
-  try {
-    const seen = new WeakSet();
-    const str = JSON.stringify(value, (k, v) => {
-      if (typeof v === 'number' && (isNaN(v) || !isFinite(v))) return null;
-      if (v === undefined) return undefined;
-      if (typeof v === 'function') return undefined;
-      if (typeof Node !== 'undefined' && v instanceof Node) return undefined;
-      if (typeof v === 'object' && v !== null) {
-        if (v.constructor && (v.constructor.name === 'un' || v.constructor.name === 'P')) return undefined;
-        if (seen.has(v)) return undefined;
-        seen.add(v);
-      }
-      return v;
-    });
-    return str || fallback;
-  } catch (_e) {
-    return fallback;
-  }
-}
 
 // == INITIALIZATION ==
 function loadBakedState(){
@@ -9723,7 +9665,12 @@ const platePlanFeatureRenderers=Object.freeze({
     resetTodayDate({render:false});
     return renderToday();
   },
-  vault:renderVault,
+  vault(){
+    if (typeof window !== 'undefined' && typeof window.renderVault === 'function') {
+      return window.renderVault();
+    }
+    return typeof renderVault === 'function' ? renderVault() : null;
+  },
   add(){
     if(platePlanPendingRecipePreFill){
       applyPendingRecipePreFillToForm();
@@ -14561,7 +14508,99 @@ function ensureVariantFavoritingPrefs(){
   return state.userPrefs.favouriteVariantIds;
 }
 
-// Vault rendering and favoriting moved to modular recipes.js
+function isRecipeVariantFavourite(recipeId, variantKey = 'original'){
+  if(!recipeId) return false;
+  const list = typeof ensureVariantFavoritingPrefs === 'function'
+    ? ensureVariantFavoritingPrefs()
+    : (typeof window !== 'undefined' && typeof window.ensureVariantFavoritingPrefs === 'function'
+      ? window.ensureVariantFavoritingPrefs()
+      : []);
+  const key = `${recipeId}_${variantKey}`;
+  if(Array.isArray(list) && list.includes(key)){
+    return true;
+  }
+  const hasInit = typeof hasVariantFavoritingInitialized === 'function'
+    ? hasVariantFavoritingInitialized()
+    : (typeof window !== 'undefined' && typeof window.hasVariantFavoritingInitialized === 'function'
+      ? window.hasVariantFavoritingInitialized()
+      : false);
+  if(!hasInit && variantKey === 'original'){
+    const rec = (state?.recipes || window.state?.recipes || []).find(r => r && r.id === recipeId);
+    if(rec && (rec.isFavourite || rec.isFavorite)) return true;
+  }
+  return false;
+}
+const isRecipeVariantFavorite = isRecipeVariantFavourite;
+window.isRecipeVariantFavourite = isRecipeVariantFavourite;
+window.isRecipeVariantFavorite = isRecipeVariantFavourite;
+
+function renderVault(...args) {
+  if (typeof window !== 'undefined' && typeof window.renderVault === 'function' && window.renderVault !== renderVault) {
+    return window.renderVault(...args);
+  }
+  const list = document.getElementById('vault-list');
+  if (!list) return;
+
+  if (!state?.isCloudHydrated && !window.state?.isCloudHydrated) {
+    list.innerHTML = `<div class="ios-activity-skeleton">
+      <div class="spinner"></div>
+      <span class="ios-activity-skeleton-text">Syncing live recipes from cloud...</span>
+    </div>`;
+    return;
+  }
+
+  const ftEl = document.getElementById('filter-type');
+  const fwEl = document.getElementById('filter-who');
+  const ft = ftEl?.value || 'all', fw = fwEl?.value || 'all';
+  const q = (document.getElementById('vault-search')?.value || '').trim().toLowerCase();
+  const sort = (document.getElementById('vault-sort')?.value) || 'name';
+
+  const favFilterBtn = document.getElementById('vault-filter-fav');
+  if (favFilterBtn) {
+    favFilterBtn.classList.toggle('active', !!vaultFilterFavouritesOnly);
+    favFilterBtn.setAttribute('aria-pressed', vaultFilterFavouritesOnly ? 'true' : 'false');
+  }
+
+  ensureVariantFavoritingPrefs();
+  const currentRecipes = (state?.recipes || window.state?.recipes || []);
+  const recipes = currentRecipes.filter(r => {
+    const hasAnyFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
+    if (vaultFilterFavouritesOnly && !hasAnyFav) return false;
+    const types = r.types || [r.type];
+    const searchable = [
+      r.name,
+      r.source,
+      r.who,
+      ...(types || []),
+      ...(r.ingredients || []).map(ing => (typeof ingRaw === 'function' ? ingRaw(ing) : (ing?.name || '')))
+    ].join(' ').toLowerCase();
+    return (ft === 'all' || types.includes(ft)) && (fw === 'all' || r.who === fw) && (!q || searchable.includes(q));
+  });
+
+  const selectedMealType = ft !== 'all' ? ft : 'dinner';
+  const sortedRecipes = (typeof getSortedRecipes === 'function')
+    ? getSortedRecipes(recipes, sort, selectedMealType)
+    : recipes;
+
+  if (!sortedRecipes.length) { list.innerHTML = '<div class="empty">No matching recipes found.</div>'; return; }
+  const listSignature = [ft, fw, q, sort, vaultFilterFavouritesOnly ? 'fav' : 'all'].join('|');
+  if (typeof resetProgressiveList === 'function') {
+    resetProgressiveList('vault', listSignature);
+  }
+  const totalRecipes = sortedRecipes.length;
+  const visibleRecipes = sortedRecipes.slice(0, platePlanListLimits?.vault || 24);
+  const cardRenderer = typeof renderRecipeCard === 'function'
+    ? renderRecipeCard
+    : (typeof window.renderRecipeCard === 'function' ? window.renderRecipeCard : null);
+  const progBtn = typeof progressiveListButton === 'function'
+    ? progressiveListButton('vault', totalRecipes, visibleRecipes.length)
+    : '';
+
+  if (cardRenderer) {
+    list.innerHTML = visibleRecipes.map(r => cardRenderer(r, { mealType: selectedMealType })).join('') + progBtn;
+  }
+}
+window.renderVault = renderVault;
 
 
 let platePlanUseUpFinder={meal:'dinner',who:'both',productIds:[],assign:null};
@@ -15013,7 +15052,7 @@ function renderRecipePreview(targetServes = 2) {
     if (!content) return;
 
     const variantKey = isEnh ? 'enhanced' : 'original';
-    const isFav = isRecipeVariantFavourite(r.id, variantKey) || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite) && !isEnh);
+    const isFav = (typeof isRecipeVariantFavourite === 'function' ? isRecipeVariantFavourite(r.id, variantKey) : false) || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite) && !isEnh);
     content.innerHTML = `
       <div class="recipe-view-sheet">
         <div class="recipe-view-nav">
@@ -20237,7 +20276,6 @@ function applyPlanReschedule(mode='move'){
 
 let platePlanStudioSession=null;
 let platePlanStudioApplyUndo=null;
-function clonePlatePlanValue(value){return JSON.parse(JSON.stringify(value));}
 function planStudioFingerprint(plan){return JSON.stringify(plan||{});}
 function ensurePlanStudio(){
   let wrap=document.getElementById('plan-studio-wrap');if(wrap)return wrap;
@@ -22474,7 +22512,7 @@ function openSwapMealModal(day, slotKey) {
       console.warn('Error calculating recipe nutrition for option:', e);
     }
     const rec = (state.recipes || []).find(r => r.id === opt.id);
-    const isFav = isRecipeVariantFavourite(opt.id, opt.variant || 'original') || !!(rec?.isFavourite || rec?.isFavorite);
+    const isFav = (typeof isRecipeVariantFavourite === 'function' ? isRecipeVariantFavourite(opt.id, opt.variant || 'original') : false) || !!(rec?.isFavourite || rec?.isFavorite);
     return {
       id: opt.id,
       variant: opt.variant || 'original',
@@ -24692,6 +24730,44 @@ function runPlatePlanDelegatedAction(code,event,element){
   }).call(element, delegatedEvent);
 }
 
+window.ppEscapeAttr = ppEscapeAttr;
+window.ppEscapeHtml = ppEscapeHtml;
+window.toTitleCase = toTitleCase;
+window.getContextMealType = getContextMealType;
+window.getBudgets = getBudgets;
+window.calculateRecipeDisplayNutrition = calculateRecipeDisplayNutrition;
+window.calcPortions = calcPortions;
+window.calculateFit = calculateFit;
+window.renderExpandableText = renderExpandableText;
+window.saveState = saveState;
+window.progressiveListButton = progressiveListButton;
+window.resetProgressiveList = resetProgressiveList;
+window.getProductIndexRecipe = getProductIndexRecipe;
+window.openMobileActionSheet = openMobileActionSheet;
+window.ingRaw = ingRaw;
+window.unwrapAndCleanItem = unwrapAndCleanItem;
+window.sanitizePayloadForFirestore = sanitizePayloadForFirestore;
+window.renderRecipePreview = renderRecipePreview;
+window.hasVariantFavoritingInitialized = typeof hasVariantFavoritingInitialized !== 'undefined' ? hasVariantFavoritingInitialized : () => false;
+window.ensureVariantFavoritingPrefs = typeof ensureVariantFavoritingPrefs !== 'undefined' ? ensureVariantFavoritingPrefs : () => [];
+window.ACTIVE_HOUSEHOLD_ID = typeof ACTIVE_HOUSEHOLD_ID !== 'undefined' ? ACTIVE_HOUSEHOLD_ID : 'elliott-chloe';
+window.platePlanDb = typeof platePlanDb !== 'undefined' ? platePlanDb : null;
+window.platePlanListLimits = typeof platePlanListLimits !== 'undefined' ? platePlanListLimits : { vault: 24 };
+window.vaultFilterFavouritesOnly = typeof vaultFilterFavouritesOnly !== 'undefined' ? vaultFilterFavouritesOnly : false;
+window.previewBaseRecipe = typeof previewBaseRecipe !== 'undefined' ? previewBaseRecipe : null;
+window.currentPreviewInstanceId = typeof currentPreviewInstanceId !== 'undefined' ? currentPreviewInstanceId : null;
+window.currentViewTab = typeof currentViewTab !== 'undefined' ? currentViewTab : 'original';
+window.currentPreviewServingMode = typeof currentPreviewServingMode !== 'undefined' ? currentPreviewServingMode : 'both';
+window.currentPreviewSingleServes = typeof currentPreviewSingleServes !== 'undefined' ? currentPreviewSingleServes : 1;
+window.editEnhancedRecipe = typeof editEnhancedRecipe !== 'undefined' ? editEnhancedRecipe : null;
+window.editRecipeModalView = typeof editRecipeModalView !== 'undefined' ? editRecipeModalView : null;
+window.downloadRecipeCard = typeof downloadRecipeCard !== 'undefined' ? downloadRecipeCard : null;
+window.duplicateRecipe = typeof duplicateRecipe !== 'undefined' ? duplicateRecipe : null;
+window.editRecipe = typeof editRecipe !== 'undefined' ? editRecipe : null;
+window.deleteRecipe = typeof deleteRecipe !== 'undefined' ? deleteRecipe : null;
+window.reviewEnhancedRecipe = typeof reviewEnhancedRecipe !== 'undefined' ? reviewEnhancedRecipe : null;
+window.deleteEnhancedRecipe = typeof deleteEnhancedRecipe !== 'undefined' ? deleteEnhancedRecipe : null;
+
 globalThis.PlatePlanLegacy=Object.freeze({
   version:PLATEPLAN_APP_VERSION,
   expectedCache:PLATEPLAN_EXPECTED_CACHE,
@@ -24772,4 +24848,7 @@ window.saveTescoIngredient = saveTescoIngredient;
 window.runDataQualityAudits = runDataQualityAudits;
 window.updateDataQualityBadge = updateDataQualityBadge;
 window.fixSubtypeDataQuality = fixSubtypeDataQuality;
+window.renderVault = renderVault;
+window.isRecipeVariantFavourite = isRecipeVariantFavourite;
+window.isRecipeVariantFavorite = isRecipeVariantFavourite;
 window.dispatchEvent(new CustomEvent('plateplan:legacy-ready',{detail:{version:PLATEPLAN_APP_VERSION}}));

@@ -2,6 +2,27 @@
  * PlatePlan v3.3.1-mod - Recipe Vault Module
  * Extracted from monolith for modular maintenance.
  */
+import { createLegacyView } from './create-legacy-view.js?v=3.3.0';
+
+export function isRecipeVariantFavourite(recipeId, variantKey = 'original') {
+  if (!recipeId) return false;
+  const list = typeof window.ensureVariantFavoritingPrefs === 'function'
+    ? window.ensureVariantFavoritingPrefs()
+    : (window.state?.userPrefs?.favouriteVariantIds || window.state?.prefs?.favouriteVariantIds || []);
+  const key = `${recipeId}_${variantKey}`;
+  if (Array.isArray(list) && list.includes(key)) {
+    return true;
+  }
+  const hasInit = typeof window.hasVariantFavoritingInitialized === 'function'
+    ? window.hasVariantFavoritingInitialized()
+    : false;
+  if (!hasInit && variantKey === 'original') {
+    const rec = (window.state?.recipes || []).find(r => r && r.id === recipeId);
+    if (rec && (rec.isFavourite || rec.isFavorite)) return true;
+  }
+  return false;
+}
+export const isRecipeVariantFavorite = isRecipeVariantFavourite;
 
 // == DUAL-PROFILE MEAL-SLOT TARGET RESOLVER ==
 // (Internal dependency for fit scores)
@@ -276,18 +297,19 @@ function renderRecipeCard(r, options = {}) {
 }
 
 function renderVault() {
-  const ft = document.getElementById('filter-type').value, fw = document.getElementById('filter-who').value;
+  const ft = document.getElementById('filter-type')?.value || 'all';
+  const fw = document.getElementById('filter-who')?.value || 'all';
   const q = (document.getElementById('vault-search')?.value || '').trim().toLowerCase();
   const sort = (document.getElementById('vault-sort')?.value) || 'name';
   const list = document.getElementById('vault-list');
 
+  if (!list) return;
+
   if (!window.state?.isCloudHydrated) {
-    if (list) {
-      list.innerHTML = `<div class="ios-activity-skeleton">
-        <div class="spinner"></div>
-        <span class="ios-activity-skeleton-text">Syncing live recipes from cloud...</span>
-      </div>`;
-    }
+    list.innerHTML = `<div class="ios-activity-skeleton">
+      <div class="spinner"></div>
+      <span class="ios-activity-skeleton-text">Syncing live recipes from cloud...</span>
+    </div>`;
     return;
   }
 
@@ -297,9 +319,11 @@ function renderVault() {
     favFilterBtn.setAttribute('aria-pressed', window.vaultFilterFavouritesOnly ? 'true' : 'false');
   }
 
-  window.ensureVariantFavoritingPrefs();
-  const recipes = (window.state.recipes || []).filter(r => {
-    const hasAnyFav = window.isRecipeVariantFavourite(r.id, 'original') || window.isRecipeVariantFavourite(r.id, 'enhanced') || (!window.hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
+  if (typeof window.ensureVariantFavoritingPrefs === 'function') {
+    window.ensureVariantFavoritingPrefs();
+  }
+  const recipes = (window.state?.recipes || []).filter(r => {
+    const hasAnyFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || (!window.hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
     if (window.vaultFilterFavouritesOnly && !hasAnyFav) return false;
     const types = r.types || [r.type];
     const searchable = [
@@ -307,20 +331,28 @@ function renderVault() {
       r.source,
       r.who,
       ...(types || []),
-      ...(r.ingredients || []).map(ing => window.ingRaw(ing))
+      ...(r.ingredients || []).map(ing => (typeof window.ingRaw === 'function' ? window.ingRaw(ing) : (ing?.name || '')))
     ].join(' ').toLowerCase();
     return (ft === 'all' || types.includes(ft)) && (fw === 'all' || r.who === fw) && (!q || searchable.includes(q));
   });
 
   const selectedMealType = ft !== 'all' ? ft : 'dinner';
-  const sortedRecipes = window.getSortedRecipes(recipes, sort, selectedMealType);
+  const sortedRecipes = (typeof window.getSortedRecipes === 'function')
+    ? window.getSortedRecipes(recipes, sort, selectedMealType)
+    : recipes;
 
   if (!sortedRecipes.length) { list.innerHTML = '<div class="empty">No matching recipes found.</div>'; return; }
   const listSignature = [ft, fw, q, sort, window.vaultFilterFavouritesOnly ? 'fav' : 'all'].join('|');
-  window.resetProgressiveList('vault', listSignature);
+  if (typeof window.resetProgressiveList === 'function') {
+    window.resetProgressiveList('vault', listSignature);
+  }
   const totalRecipes = sortedRecipes.length;
-  const visibleRecipes = sortedRecipes.slice(0, window.platePlanListLimits.vault);
-  list.innerHTML = visibleRecipes.map(r => renderRecipeCard(r, { mealType: selectedMealType })).join('') + window.progressiveListButton('vault', totalRecipes, visibleRecipes.length);
+  const visibleCount = window.platePlanListLimits?.vault || 24;
+  const visibleRecipes = sortedRecipes.slice(0, visibleCount);
+  const progBtn = typeof window.progressiveListButton === 'function'
+    ? window.progressiveListButton('vault', totalRecipes, visibleRecipes.length)
+    : '';
+  list.innerHTML = visibleRecipes.map(r => renderRecipeCard(r, { mealType: selectedMealType })).join('') + progBtn;
 }
 
 function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both') {
@@ -455,6 +487,31 @@ function openEnhancedRecipeActions(recipeId) {
   ]);
 }
 
+export function replaceRecipeIngredient(recipeId, oldIngredientId, newIngredient) {
+  const recipe = (window.state?.recipes || []).find(r => r.id === recipeId);
+  if (!recipe) return false;
+  let replaced = false;
+  const replaceInList = (list) => {
+    if (!Array.isArray(list)) return;
+    list.forEach(item => {
+      if (item && (item.bankId === oldIngredientId || item.id === oldIngredientId)) {
+        if (typeof newIngredient === 'string') {
+          item.name = newIngredient;
+        } else if (newIngredient && typeof newIngredient === 'object') {
+          Object.assign(item, newIngredient);
+        }
+        replaced = true;
+      }
+    });
+  };
+  replaceInList(recipe.ingredients);
+  if (recipe.enhanced) replaceInList(recipe.enhanced.ingredients);
+  if (replaced && typeof window.saveState === 'function') {
+    window.saveState(true);
+  }
+  return replaced;
+}
+
 // Bind to window for global exposure and inline HTML handlers
 window.renderVault = renderVault;
 window.renderRecipeCard = renderRecipeCard;
@@ -469,3 +526,18 @@ window.getMealTypeTargets = getMealTypeTargets;
 window.getVaultTargetMacros = getVaultTargetMacros;
 window.isRecipeVariantFavourite = isRecipeVariantFavourite;
 window.isRecipeVariantFavorite = isRecipeVariantFavourite;
+
+export {
+  renderVault,
+  renderRecipeCard,
+  viewRecipe,
+  toggleRecipeFavourite,
+  calculateMacroFitTierAndScore,
+  getMealTypeTargets,
+  getVaultTargetMacros,
+  computeProfileFitScore,
+  openRecipeActions,
+  openEnhancedRecipeActions
+};
+
+export default createLegacyView({ id: 'vault', rootId: 'view-vault' });

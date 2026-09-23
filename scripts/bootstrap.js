@@ -43,7 +43,8 @@ document.documentElement.dataset.plateplanBoot = 'shell';
 await new Promise(resolve => requestAnimationFrame(resolve));
 document.documentElement.dataset.plateplanBoot = 'loading-core';
 await loadClassicScript('./scripts/plateplan-app.js?v=3.3.1-mod');
-await import('./main.js?v=3.3.1-mod');
+await import('./features/recipes.js?v=3.3.0');
+await import('./main.js?v=3.3.0');
 document.documentElement.dataset.plateplanBoot = 'ready';
 try {
   document.querySelectorAll('.app, body > *').forEach(el => {
