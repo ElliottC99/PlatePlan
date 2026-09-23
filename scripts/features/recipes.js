@@ -1,8 +1,8 @@
 /**
- * PlatePlan v3.3.5-mod - Recipe Vault Module
+ * PlatePlan v3.3.6-mod - Recipe Vault Module
  * Extracted from monolith for modular maintenance.
  */
-import { createLegacyView } from './create-legacy-view.js?v=3.3.5-mod';
+import { createLegacyView } from './create-legacy-view.js?v=3.3.6-mod';
 
 export function isRecipeVariantFavourite(recipeId, variantKey = 'original') {
   if (!recipeId) return false;
@@ -471,9 +471,11 @@ function renderVault() {
 
 // Directive 1: Fix viewRecipe Modal Population
 function viewRecipe(id, instanceId = null, tab = 'ingredients', servingMode = null) {
-  const r = (window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : []) || []).find(x => x && x.id === id);
+  const r = (typeof window.findRecipeByIdOrInstance === 'function')
+    ? window.findRecipeByIdOrInstance(id || instanceId)
+    : (window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : []) || []).find(x => x && (x.id === id || x.id === instanceId));
   if (!r) {
-    console.error('[viewRecipe] Recipe not found:', id);
+    console.error('[viewRecipe] Recipe not found:', id, instanceId);
     return;
   }
 
@@ -528,8 +530,11 @@ function viewRecipe(id, instanceId = null, tab = 'ingredients', servingMode = nu
     wrap.style.setProperty('visibility', 'visible', 'important');
     wrap.style.setProperty('opacity', '1', 'important');
     wrap.style.setProperty('z-index', '99999', 'important');
+    wrap.style.setProperty('overflow-y', 'auto', 'important');
   }
   if (content) {
+    content.style.setProperty('max-height', 'calc(100vh - 40px)', 'important');
+    content.style.setProperty('overflow-y', 'auto', 'important');
     content.style.setProperty('display', 'block', 'important');
     content.style.setProperty('visibility', 'visible', 'important');
     content.style.setProperty('opacity', '1', 'important');
@@ -539,15 +544,20 @@ function viewRecipe(id, instanceId = null, tab = 'ingredients', servingMode = nu
 window.viewRecipe = viewRecipe;
 
 window.editRecipeModalView = function(id, initialTab = 'ingredients') {
-  const r = (window.state?.recipes || []).find(x => x.id === id);
-  if (!r) {
-    console.error('[editRecipeModalView] Recipe not found:', id);
+  const recipeData = (typeof window.findRecipeByIdOrInstance === 'function')
+    ? window.findRecipeByIdOrInstance(id)
+    : (window.state?.recipes || []).find(x => x.id === id);
+  if (!recipeData) {
+    console.error('[editRecipeModalView] Failed to resolve recipe data for ID:', id);
+    if (typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast('Recipe data could not be loaded', 'error');
+    }
     return;
   }
   if (typeof window.openModal === 'function') {
-    window.openModal(r.name, r, false, { instanceId: null, tab: initialTab });
+    window.openModal(recipeData.name || 'Recipe Details', recipeData, false, { instanceId: id, tab: initialTab });
   } else if (typeof openModal === 'function') {
-    openModal(r.name, r, false, { instanceId: null, tab: initialTab });
+    openModal(recipeData.name || 'Recipe Details', recipeData, false, { instanceId: id, tab: initialTab });
   }
 };
 

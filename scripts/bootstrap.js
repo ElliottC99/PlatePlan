@@ -1,19 +1,19 @@
 /**
- * PlatePlan bootstrap.
+ * PlatePlan bootstrap v3.3.6-mod.
  *
  * The parsed shell can paint before the compatibility layer is evaluated.
  * Holding DOMContentLoaded with top-level await preserves the existing boot
  * contract while feature modules continue moving out of the legacy source.
  */
 
-const CURRENT_BUILD_ID = '3.3.5-mod-v92';
+const CURRENT_BUILD_ID = '3.3.6-mod-v93';
 
 export function sanitizeModalDOMHierarchy() {
-  const modalIds = [
+  // Move top-level wrappers to <body>
+  const topLevelWrappers = [
     'view-modal-wrap',
     'modal-wrap',
     'tesco-modal-wrap',
-    'mobile-action-sheet',
     'mobile-action-sheet-wrap',
     'app-confirm-modal',
     'app-confirm-wrap',
@@ -27,13 +27,21 @@ export function sanitizeModalDOMHierarchy() {
     'mini-ing-wrap',
     'ingredient-family-details-wrap'
   ];
-  modalIds.forEach(id => {
+
+  topLevelWrappers.forEach(id => {
     const el = document.getElementById(id);
     if (el && el.parentElement && el.parentElement !== document.body && el.parentElement.id !== 'app-container') {
-      console.warn(`[PlatePlan DOM Engine] Reparenting #${id} from <${el.parentElement.tagName} id="${el.parentElement.id}"> to <body>`);
+      console.warn(`[PlatePlan DOM Engine] Reparenting top-level #${id} to <body>`);
       document.body.appendChild(el);
     }
   });
+
+  // Ensure #mobile-action-sheet remains INSIDE #mobile-action-sheet-wrap
+  const sheet = document.getElementById('mobile-action-sheet');
+  const sheetWrap = document.getElementById('mobile-action-sheet-wrap');
+  if (sheet && sheetWrap && sheet.parentElement !== sheetWrap) {
+    sheetWrap.appendChild(sheet);
+  }
 }
 
 window.sanitizeModalDOMHierarchy = sanitizeModalDOMHierarchy;
@@ -76,14 +84,15 @@ document.documentElement.dataset.plateplanBoot = 'shell';
 await new Promise(resolve => requestAnimationFrame(resolve));
 document.documentElement.dataset.plateplanBoot = 'loading-core';
 
-await loadClassicScript('./scripts/recipes.js?v=3.3.5-mod').catch(() => {});
-await loadClassicScript('./scripts/actions.js?v=3.3.5-mod').catch(() => {});
-await loadClassicScript('./scripts/plateplan-app.js?v=3.3.5-mod');
-await import('./features/recipes.js?v=3.3.5-mod');
-await import('./main.js?v=3.3.5-mod');
+await loadClassicScript('./scripts/recipes.js?v=3.3.6-mod').catch(() => {});
+await loadClassicScript('./scripts/actions.js?v=3.3.6-mod').catch(() => {});
+await loadClassicScript('./scripts/plateplan-app.js?v=3.3.6-mod');
+await import('./features/recipes.js?v=3.3.6-mod');
+await import('./main.js?v=3.3.6-mod');
 
 sanitizeModalDOMHierarchy();
 document.documentElement.dataset.plateplanBoot = 'ready';
+console.log('[PlatePlan v3.3.6-mod] Engine & Modal Resolution initialized.');
 
 try {
   document.querySelectorAll('.app, body > *').forEach(el => {

@@ -1,7 +1,7 @@
-const PLATEPLAN_CACHE = 'plateplan-shell-v92';
-const CACHE_NAME = 'plateplan-shell-v92';
-const PLATEPLAN_APP_VERSION = '3.3.5-mod';
-const PLATEPLAN_BUILD_ID = '3.3.5-mod-v92';
+const PLATEPLAN_CACHE = 'plateplan-shell-v93';
+const CACHE_NAME = 'plateplan-shell-v93';
+const PLATEPLAN_APP_VERSION = '3.3.6-mod';
+const PLATEPLAN_BUILD_ID = '3.3.6-mod-v93';
 
 const PLATEPLAN_LOCAL_SHELL = [
   './',
@@ -9,37 +9,37 @@ const PLATEPLAN_LOCAL_SHELL = [
   './repair-update.html',
   './manifest.json',
   './firebase-config.js',
-  './styles/tokens.css?v=3.3.5-mod',
-  './styles/components.css?v=3.3.5-mod',
-  './styles/responsive.css?v=3.3.5-mod',
-  './styles/print.css?v=3.3.5-mod',
-  './scripts/recipes.js?v=3.3.5-mod',
-  './scripts/actions.js?v=3.3.5-mod',
-  './scripts/plateplan-app.js?v=3.3.5-mod',
-  './scripts/bootstrap.js?v=3.3.5-mod',
-  './scripts/main.js?v=3.3.5-mod',
-  './scripts/core/contracts.js?v=3.3.5-mod',
-  './scripts/core/store.js?v=3.3.5-mod',
-  './scripts/core/runtime.js?v=3.3.5-mod',
-  './scripts/services/firebase.js?v=3.3.5-mod',
-  './scripts/services/sync.js?v=3.3.5-mod',
-  './scripts/services/recovery.js?v=3.3.5-mod',
-  './scripts/services/updates.js?v=3.3.5-mod',
-  './scripts/ui/actions.js?v=3.3.5-mod',
-  './scripts/ui/navigation.js?v=3.3.5-mod',
-  './scripts/ui/workspaces.js?v=3.3.5-mod',
-  './scripts/features/create-legacy-view.js?v=3.3.5-mod',
-  './scripts/features/today.js?v=3.3.5-mod',
-  './scripts/features/recipes.js?v=3.3.5-mod',
-  './scripts/features/recipe-add.js?v=3.3.5-mod',
-  './scripts/features/ingredients.js?v=3.3.5-mod',
-  './scripts/features/products.js?v=3.3.5-mod',
-  './scripts/features/planner.js?v=3.3.5-mod',
-  './scripts/features/library.js?v=3.3.5-mod',
-  './scripts/features/shopping.js?v=3.3.5-mod',
-  './scripts/features/search.js?v=3.3.5-mod',
-  './scripts/features/data-quality.js?v=3.3.5-mod',
-  './scripts/features/preferences.js?v=3.3.5-mod',
+  './styles/tokens.css?v=3.3.6-mod',
+  './styles/components.css?v=3.3.6-mod',
+  './styles/responsive.css?v=3.3.6-mod',
+  './styles/print.css?v=3.3.6-mod',
+  './scripts/recipes.js?v=3.3.6-mod',
+  './scripts/actions.js?v=3.3.6-mod',
+  './scripts/plateplan-app.js?v=3.3.6-mod',
+  './scripts/bootstrap.js?v=3.3.6-mod',
+  './scripts/main.js?v=3.3.6-mod',
+  './scripts/core/contracts.js?v=3.3.6-mod',
+  './scripts/core/store.js?v=3.3.6-mod',
+  './scripts/core/runtime.js?v=3.3.6-mod',
+  './scripts/services/firebase.js?v=3.3.6-mod',
+  './scripts/services/sync.js?v=3.3.6-mod',
+  './scripts/services/recovery.js?v=3.3.6-mod',
+  './scripts/services/updates.js?v=3.3.6-mod',
+  './scripts/ui/actions.js?v=3.3.6-mod',
+  './scripts/ui/navigation.js?v=3.3.6-mod',
+  './scripts/ui/workspaces.js?v=3.3.6-mod',
+  './scripts/features/create-legacy-view.js?v=3.3.6-mod',
+  './scripts/features/today.js?v=3.3.6-mod',
+  './scripts/features/recipes.js?v=3.3.6-mod',
+  './scripts/features/recipe-add.js?v=3.3.6-mod',
+  './scripts/features/ingredients.js?v=3.3.6-mod',
+  './scripts/features/products.js?v=3.3.6-mod',
+  './scripts/features/planner.js?v=3.3.6-mod',
+  './scripts/features/library.js?v=3.3.6-mod',
+  './scripts/features/shopping.js?v=3.3.6-mod',
+  './scripts/features/search.js?v=3.3.6-mod',
+  './scripts/features/data-quality.js?v=3.3.6-mod',
+  './scripts/features/preferences.js?v=3.3.6-mod',
   './icon-192.png',
   './icon-512.png',
   './icon-192-maskable.png',
@@ -60,7 +60,7 @@ self.addEventListener('install', event => {
         keys
           .filter(key => key !== PLATEPLAN_CACHE)
           .map(key => {
-            console.log('[SW v3.3.5-mod] Purging previous cache on install:', key);
+            console.log('[SW v3.3.6-mod] Purging previous cache on install:', key);
             return caches.delete(key);
           })
       );
@@ -78,7 +78,7 @@ self.addEventListener('activate', event => {
         keys
           .filter(key => key !== PLATEPLAN_CACHE)
           .map(key => {
-            console.log('[SW v3.3.5-mod] Purging previous shell cache:', key);
+            console.log('[SW v3.3.6-mod] Purging previous shell cache:', key);
             return caches.delete(key);
           })
       );

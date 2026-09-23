@@ -1,15 +1,15 @@
-import { assertAuthoritativeInterfaces } from './core/contracts.js?v=3.3.5-mod';
-import { createPlatePlanStore } from './core/store.js?v=3.3.5-mod';
-import { createPlatePlanRuntime } from './core/runtime.js?v=3.3.5-mod';
-import { createFirebaseService } from './services/firebase.js?v=3.3.5-mod';
-import { createSyncService } from './services/sync.js?v=3.3.5-mod';
-import { createRecoveryService } from './services/recovery.js?v=3.3.5-mod';
-import { createUpdateService } from './services/updates.js?v=3.3.5-mod';
-import { installDelegatedActions } from './ui/actions.js?v=3.3.5-mod';
-import { installNavigation } from './ui/navigation.js?v=3.3.5-mod';
-import { createWorkspaceService } from './ui/workspaces.js?v=3.3.5-mod';
+import { assertAuthoritativeInterfaces } from './core/contracts.js?v=3.3.6-mod';
+import { createPlatePlanStore } from './core/store.js?v=3.3.6-mod';
+import { createPlatePlanRuntime } from './core/runtime.js?v=3.3.6-mod';
+import { createFirebaseService } from './services/firebase.js?v=3.3.6-mod';
+import { createSyncService } from './services/sync.js?v=3.3.6-mod';
+import { createRecoveryService } from './services/recovery.js?v=3.3.6-mod';
+import { createUpdateService } from './services/updates.js?v=3.3.6-mod';
+import { installDelegatedActions } from './ui/actions.js?v=3.3.6-mod';
+import { installNavigation } from './ui/navigation.js?v=3.3.6-mod';
+import { createWorkspaceService } from './ui/workspaces.js?v=3.3.6-mod';
 
-window.APP_VERSION = '3.3.5-mod';
+window.APP_VERSION = '3.3.6-mod';
 
 const legacy = globalThis.PlatePlanLegacy;
 assertAuthoritativeInterfaces(legacy);
@@ -19,8 +19,8 @@ const workspaces = createWorkspaceService();
 const updates = createUpdateService({
   legacy,
   workspaces,
-  appVersion: '3.3.5-mod',
-  expectedCache: 'plateplan-shell-v91',
+  appVersion: '3.3.6-mod',
+  expectedCache: 'plateplan-shell-v93',
 });
 const context = Object.freeze({
   legacy,
@@ -35,13 +35,13 @@ const runtime = createPlatePlanRuntime(context);
 const actions = installDelegatedActions(legacy);
 const uninstallNavigation = installNavigation(runtime);
 const syncRuntimeMarker = () => {
-  document.documentElement.dataset.plateplanRuntime = '3.3.5-mod';
+  document.documentElement.dataset.plateplanRuntime = '3.3.6-mod';
   document.documentElement.dataset.plateplanLoadedViews = runtime.loadedViews().sort().join(',');
 };
 window.addEventListener('plateplan:feature-loaded', syncRuntimeMarker);
 
 // Wire deletePlan globally to our store's resilient deletePlan implementation
-import { deletePlan } from './core/store.js?v=3.3.5-mod';
+import { deletePlan } from './core/store.js?v=3.3.6-mod';
 window.deletePlan = deletePlan;
 
 // Eagerly load core feature modules to establish DOM ownership, attach listeners, and claim active modular view ownership
@@ -78,11 +78,11 @@ globalThis.PlatePlanModules = Object.freeze({
   updates,
   workspaces,
   uninstallNavigation,
-  version: '3.3.5-mod',
+  version: '3.3.6-mod',
 });
 
 window.dispatchEvent(new CustomEvent('plateplan:modules-ready', {
-  detail: { version: '3.3.5-mod', loadedViews: runtime.loadedViews() },
+  detail: { version: '3.3.6-mod', loadedViews: runtime.loadedViews() },
 }));
 
 if (document.readyState === 'loading') {

@@ -183,19 +183,32 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
   left: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
-  z-index: 9999 !important;
-  background: rgba(0,0,0,.42);
+  z-index: 99999 !important;
+  background: rgba(0, 0, 0, 0.5) !important;
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
-  overflow-y: auto;
-  padding: 24px 16px;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding: 20px 12px !important;
+  box-sizing: border-box !important;
   display: none;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start !important;
+  justify-content: center !important;
 }
-.modal-wrap.open{display:flex;animation:appleModalIn 0.22s cubic-bezier(0.16, 1, 0.3, 1)}
+.modal-wrap.open, .modal-wrap.active {display:flex !important; visibility:visible !important; opacity:1 !important; animation:appleModalIn 0.22s cubic-bezier(0.16, 1, 0.3, 1)}
 @keyframes appleModalIn{from{opacity:0;transform:scale(0.97) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
-.modal{background:var(--surface);border-radius:20px;max-width:760px;width:100%;margin:auto;padding:24px;box-shadow:0 24px 60px rgba(0,0,0,.22), 0 4px 16px rgba(0,0,0,.08);border:1px solid color-mix(in srgb, var(--border) 65%, transparent)}
+.modal-card, #view-modal-content, .modal-content, .modal{
+  background:var(--surface);
+  border-radius:20px;
+  max-width:760px;
+  width:100%;
+  max-height: calc(100vh - 40px) !important;
+  overflow-y: auto !important;
+  margin: auto 0 !important;
+  padding:24px;
+  box-shadow:0 24px 60px rgba(0,0,0,.22), 0 4px 16px rgba(0,0,0,.08);
+  border:1px solid color-mix(in srgb, var(--border) 65%, transparent)
+}
 .modal-tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;background:var(--surface2);padding:4px;border-radius:12px;border:1px solid var(--border)}
 .mt2{padding:7px 16px;border-radius:9px;font-size:13px;cursor:pointer;color:var(--text2);background:transparent;font-weight:600;transition:all 0.15s ease;border:none}
 .mt2:hover{color:var(--text)}

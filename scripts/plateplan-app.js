@@ -207,22 +207,74 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='3.3.5-mod';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v92';
-window.APP_VERSION = '3.3.5-mod';
+const PLATEPLAN_APP_VERSION='3.3.6-mod';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v93';
+window.APP_VERSION = '3.3.6-mod';
 window._hydrationLogged = false;
 window.state = window.state || {};
 window.state.meta = window.state.meta || {};
-window.state.meta.version = '3.3.5-mod';
+window.state.meta.version = '3.3.6-mod';
 window.state.deletedPlanIds = window.state.deletedPlanIds || [];
 window.deletedPlanIds = window.deletedPlanIds || window.state.deletedPlanIds;
 
+window.findRecipeByIdOrInstance = function(targetId) {
+  if (!targetId) return null;
+
+  // 1. Check base recipe library
+  const baseRecipes = window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : []) || [];
+  let found = baseRecipes.find(r => r && (r.id === targetId || String(r.id) === String(targetId)));
+  if (found) return found;
+
+  // 2. Search active meal plan items (currentPlan / plan)
+  const currentPlan = window.state?.currentPlan || window.state?.plan || (typeof state !== 'undefined' ? (state?.currentPlan || state?.plan) : {}) || {};
+  const planDays = currentPlan.days || currentPlan.slots || currentPlan;
+  if (typeof planDays === 'object' && planDays !== null) {
+    for (const day in planDays) {
+      const meals = Array.isArray(planDays[day]) ? planDays[day] : [];
+      for (const meal of meals) {
+        if (!meal) continue;
+        if (meal.id === targetId || meal.instanceId === targetId || String(meal.id) === String(targetId) || String(meal.instanceId) === String(targetId)) {
+          // Resolve base recipe by recipeId if available
+          if (meal.recipeId) {
+            const matchedBase = baseRecipes.find(r => r && (r.id === meal.recipeId || String(r.id) === String(meal.recipeId)));
+            if (matchedBase) return { ...matchedBase, ...meal };
+          }
+          return meal;
+        }
+      }
+    }
+  }
+
+  // 3. Search saved plan history
+  const history = window.state?.planHistory || (typeof state !== 'undefined' ? state?.planHistory : []) || [];
+  for (const plan of history) {
+    if (!plan) continue;
+    const days = plan.days || plan.plan || plan.slots || {};
+    if (typeof days === 'object' && days !== null) {
+      for (const day in days) {
+        const meals = Array.isArray(days[day]) ? days[day] : [];
+        for (const meal of meals) {
+          if (!meal) continue;
+          if (meal.id === targetId || meal.instanceId === targetId || String(meal.id) === String(targetId) || String(meal.instanceId) === String(targetId)) {
+            if (meal.recipeId) {
+              const matchedBase = baseRecipes.find(r => r && (r.id === meal.recipeId || String(r.id) === String(meal.recipeId)));
+              if (matchedBase) return { ...matchedBase, ...meal };
+            }
+            return meal;
+          }
+        }
+      }
+    }
+  }
+
+  return null;
+};
+
 function sanitizeModalDOMHierarchy() {
-  const modalIds = [
+  const topLevelWrappers = [
     'view-modal-wrap',
     'modal-wrap',
     'tesco-modal-wrap',
-    'mobile-action-sheet',
     'mobile-action-sheet-wrap',
     'app-confirm-modal',
     'app-confirm-wrap',
@@ -236,13 +288,19 @@ function sanitizeModalDOMHierarchy() {
     'mini-ing-wrap',
     'ingredient-family-details-wrap'
   ];
-  modalIds.forEach(id => {
+  topLevelWrappers.forEach(id => {
     const el = document.getElementById(id);
     if (el && el.parentElement && el.parentElement !== document.body && el.parentElement.id !== 'app-container') {
-      console.warn(`[PlatePlan DOM Engine] Reparenting #${id} from <${el.parentElement.tagName} id="${el.parentElement.id}"> to <body>`);
+      console.warn(`[PlatePlan DOM Engine] Reparenting top-level #${id} to <body>`);
       document.body.appendChild(el);
     }
   });
+
+  const sheet = document.getElementById('mobile-action-sheet');
+  const sheetWrap = document.getElementById('mobile-action-sheet-wrap');
+  if (sheet && sheetWrap && sheet.parentElement !== sheetWrap) {
+    sheetWrap.appendChild(sheet);
+  }
 }
 window.sanitizeModalDOMHierarchy = sanitizeModalDOMHierarchy;
 if (typeof document !== 'undefined') {
@@ -13088,8 +13146,8 @@ function openModal(name,result,isFallback, options = {}){
   currentReviewVariant = options.tab || 'original';
   const isTemporaryReview = !!currentReviewInstanceId;
   const existing = editId ? (state?.recipes || []).find(x => x.id === editId) : null;
-  const o = result.original || {};
-  const e = result.enhanced || (existing?.enhanced ? JSON.parse(JSON.stringify(existing.enhanced)) : { ...o, name: (name || 'Recipe') + ' (enhanced)', changes: '', bankIngredients: [] });
+  const o = (result && result.original) ? result.original : (result && (result.ingredients || result.method || result.steps || result.name) ? result : {});
+  const e = (result && result.enhanced) ? result.enhanced : (existing?.enhanced ? JSON.parse(JSON.stringify(existing.enhanced)) : (o.enhanced ? o.enhanced : { ...o, name: (name || 'Recipe') + ' (enhanced)', changes: '', bankIngredients: [] }));
   const hasCreatedEnhanced = !!(e && ((e.ingredients || []).length || (e.method || e.steps || []).length || String(e.changes || '').trim()));
   currentReviewMealTypes = (o.types && o.types.length) ? o.types.slice() : (result.types && result.types.length ? result.types.slice() : getMealTypes());
   if(!currentReviewMealTypes.length) currentReviewMealTypes = ['dinner'];
@@ -15089,28 +15147,38 @@ function deleteEnhancedRecipe(id) {
 }
 
 function reviewRecipeModalView(id, instanceId = null, tab = 'original') {
-    const r = state.recipes.find(x => x.id === id);
-    if(!r) return;
-    editId = instanceId ? null : id;
+    const r = (typeof window.findRecipeByIdOrInstance === 'function')
+      ? window.findRecipeByIdOrInstance(id || instanceId)
+      : (state?.recipes || []).find(x => x && (x.id === id || x.id === instanceId));
+    if(!r) {
+      console.error('[reviewRecipeModalView] Failed to resolve recipe for ID:', id, instanceId);
+      return;
+    }
+    editId = instanceId ? null : (r.id || id);
     const hasEnh = !!r.enhanced;
     const tabEnh = document.getElementById('tab-btn-enhanced');
     const tabComp = document.getElementById('tab-btn-compare');
     if(tabEnh) tabEnh.style.display = hasEnh ? 'block' : 'none';
     if(tabComp) tabComp.style.display = hasEnh ? 'block' : 'none';
     const payload = { original: r, enhanced: r.enhanced || {} };
-    openModal(r.name, payload, true, { instanceId, tab });
+    openModal(r.name, payload, true, { instanceId: instanceId || id, tab });
 }
 
 function editRecipeModalView(id, initialTab = 'ingredients') {
-    capturePlatePlanEditBaseline('recipes/'+id);
-    currentReviewInstanceId = null;
-    currentReviewVariant = initialTab === 'enhanced' ? 'enhanced' : 'original';
-    const r = (window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : []) || []).find(x => x && x.id === id);
+    const r = (typeof window.findRecipeByIdOrInstance === 'function')
+      ? window.findRecipeByIdOrInstance(id)
+      : (window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : []) || []).find(x => x && x.id === id);
     if (!r) {
-      console.error('[editRecipeModalView] Recipe not found:', id);
+      console.error('[editRecipeModalView] Failed to resolve recipe data for ID:', id);
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast('Recipe data could not be loaded', 'error');
+      }
       return;
     }
-    editId = id;
+    editId = r.id || id;
+    capturePlatePlanEditBaseline('recipes/'+editId);
+    currentReviewInstanceId = null;
+    currentReviewVariant = initialTab === 'enhanced' ? 'enhanced' : 'original';
     
     // Set view config based on whether enhanced exists
     const hasEnh = !!r.enhanced;
@@ -15119,7 +15187,8 @@ function editRecipeModalView(id, initialTab = 'ingredients') {
     if(tabEnh) tabEnh.style.display = hasEnh ? 'block' : 'none';
     if(tabComp) tabComp.style.display = hasEnh ? 'block' : 'none';
 
-    openModal(r.name, r, false, { instanceId: null, tab: initialTab });
+    const payload = { original: r, enhanced: r.enhanced || {} };
+    openModal(r.name, payload, false, { instanceId: null, tab: initialTab });
 }
 window.editRecipeModalView = editRecipeModalView;
 
@@ -15178,9 +15247,11 @@ function viewRecipe(id, instanceId = null, tab = 'ingredients', servingMode = nu
   if (typeof window.viewRecipe === 'function' && window.viewRecipe !== viewRecipe) {
     return window.viewRecipe(id, instanceId, tab, servingMode);
   }
-  const r = (window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : []) || []).find(x => x && x.id === id);
+  const r = (typeof window.findRecipeByIdOrInstance === 'function')
+    ? window.findRecipeByIdOrInstance(id || instanceId)
+    : (window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : []) || []).find(x => x && (x.id === id || x.id === instanceId));
   if (!r) {
-    console.error('[viewRecipe] Recipe not found:', id);
+    console.error('[viewRecipe] Recipe not found:', id, instanceId);
     return;
   }
 
@@ -15219,8 +15290,11 @@ function viewRecipe(id, instanceId = null, tab = 'ingredients', servingMode = nu
     wrap.style.setProperty('visibility', 'visible', 'important');
     wrap.style.setProperty('opacity', '1', 'important');
     wrap.style.setProperty('z-index', '99999', 'important');
+    wrap.style.setProperty('overflow-y', 'auto', 'important');
   }
   if (content) {
+    content.style.setProperty('max-height', 'calc(100vh - 40px)', 'important');
+    content.style.setProperty('overflow-y', 'auto', 'important');
     content.style.setProperty('display', 'block', 'important');
     content.style.setProperty('visibility', 'visible', 'important');
     content.style.setProperty('opacity', '1', 'important');
