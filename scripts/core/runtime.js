@@ -1,20 +1,20 @@
 ['plateplan_plan_backup', 'plateplan_offline_backup', 'plateplan_history_v2', 'plateplan_v1'].forEach(key => {
   localStorage.removeItem(key);
 });
-console.log('[PlatePlan v3.3.3-mod] Engine initialized. Legacy keys purged.');
+console.log('[PlatePlan v3.3.4-mod] Engine initialized. Legacy keys purged.');
 
 const FEATURE_LOADERS = Object.freeze({
-  today: () => import('../features/today.js?v=3.3.3-mod'),
-  vault: () => import('../features/recipes.js?v=3.3.3-mod'),
-  add: () => import('../features/recipe-add.js?v=3.3.3-mod'),
-  ingredients: () => import('../features/ingredients.js?v=3.3.3-mod'),
-  bank: () => import('../features/products.js?v=3.3.3-mod'),
-  planner: () => import('../features/planner.js?v=3.3.3-mod'),
-  planlib: () => import('../features/library.js?v=3.3.3-mod'),
-  shopping: () => import('../features/shopping.js?v=3.3.3-mod'),
-  search: () => import('../features/search.js?v=3.3.3-mod'),
-  data: () => import('../features/data-quality.js?v=3.3.3-mod'),
-  prefs: () => import('../features/preferences.js?v=3.3.3-mod'),
+  today: () => import('../features/today.js?v=3.3.4-mod'),
+  vault: () => import('../features/recipes.js?v=3.3.4-mod'),
+  add: () => import('../features/recipe-add.js?v=3.3.4-mod'),
+  ingredients: () => import('../features/ingredients.js?v=3.3.4-mod'),
+  bank: () => import('../features/products.js?v=3.3.4-mod'),
+  planner: () => import('../features/planner.js?v=3.3.4-mod'),
+  planlib: () => import('../features/library.js?v=3.3.4-mod'),
+  shopping: () => import('../features/shopping.js?v=3.3.4-mod'),
+  search: () => import('../features/search.js?v=3.3.4-mod'),
+  data: () => import('../features/data-quality.js?v=3.3.4-mod'),
+  prefs: () => import('../features/preferences.js?v=3.3.4-mod'),
 });
 
 // Scan localStorage keys and remove obsolete legacy keys on startup

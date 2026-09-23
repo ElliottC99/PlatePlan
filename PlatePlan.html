@@ -17,10 +17,10 @@ try{
   document.documentElement.style.colorScheme=platePlanAppearance==='system'?'light dark':platePlanAppearance;
 }catch(e){}
 </script>
-<link rel="stylesheet" href="./styles/tokens.css?v=3.3.3-mod">
-<link rel="stylesheet" href="./styles/components.css?v=3.3.3-mod">
-<link rel="stylesheet" href="./styles/responsive.css?v=3.3.3-mod">
-<link rel="stylesheet" href="./styles/print.css?v=3.3.3-mod" media="print">
+<link rel="stylesheet" href="./styles/tokens.css?v=3.3.4-mod">
+<link rel="stylesheet" href="./styles/components.css?v=3.3.4-mod">
+<link rel="stylesheet" href="./styles/responsive.css?v=3.3.4-mod">
+<link rel="stylesheet" href="./styles/print.css?v=3.3.4-mod" media="print">
 <style>
 .modal-wrap, .modal-backdrop, .modal-overlay {
   position: fixed !important;
@@ -31,7 +31,7 @@ try{
   left: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
-  z-index: 9999 !important;
+  z-index: 99999 !important;
 }
 #view-modal-wrap {
   position: fixed !important;
@@ -42,35 +42,41 @@ try{
   bottom: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
-  z-index: 9999 !important;
+  z-index: 99999 !important;
   align-items: center;
   justify-content: center;
+  background: rgba(0, 0, 0, 0.6) !important;
 }
-#view-modal-wrap:not(.open) {
+#view-modal-wrap:not(.open):not(.active) {
   display: none !important;
   visibility: hidden !important;
+  opacity: 0 !important;
 }
-#view-modal-wrap.open {
+#view-modal-wrap.open,
+#view-modal-wrap.active {
   display: flex !important;
   visibility: visible !important;
+  opacity: 1 !important;
 }
 #view-modal-content {
   width: min(1040px, 94vw) !important;
   max-width: 1040px !important;
-  max-height: min(90vh, 900px) !important;
-  overflow: hidden !important;
-  display: flex !important;
-  flex-direction: column !important;
+  max-height: 90vh !important;
+  display: block !important;
+  opacity: 1 !important;
+  transform: none !important;
+  overflow-y: auto !important;
   padding: 0 !important;
   border-radius: var(--radius-group, 20px) !important;
 }
 .recipe-view-sheet {
   width: 100% !important;
-  height: 100% !important;
-  max-height: 88vh;
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: hidden !important;
+  height: auto !important;
+  max-height: 90vh !important;
+  display: block !important;
+  opacity: 1 !important;
+  transform: none !important;
+  overflow-y: auto !important;
   border-radius: var(--radius-group, 20px);
 }
 </style>
@@ -79,7 +85,7 @@ try{
 <div class="app">
 
 <header class="app-header">
-  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v3.3.3-mod</span></div>
+  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v3.3.4-mod</span></div>
   <div class="app-header-actions">
     <button class="btn primary app-create-button" type="button" data-pp-click="openCreateActionSheet()" aria-label="Add to PlatePlan"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span class="app-create-label">Add</span></button>
     <button class="btn ghost app-menu-button" type="button" data-pp-click="openMobileMore()" aria-label="Open PlatePlan menu"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="19" cy="12" r="1.3"></circle></svg><span>Menu</span></button>
@@ -113,7 +119,7 @@ try{
   <div class="desktop-sidebar-footer" id="desktop-sidebar-footer">
     <div style="font-size:11px;color:var(--text3);display:flex;align-items:center;justify-content:space-between">
       <span>PlatePlan</span>
-      <span class="app-version" id="footer-version">v3.3.3-mod</span>
+      <span class="app-version" id="footer-version">v3.3.4-mod</span>
     </div>
   </div>
 </nav>
@@ -140,7 +146,7 @@ try{
       <section><h4>Settings</h4><button data-pp-click="mobileMoreView('prefs')"><span>Preferences, sync and recovery</span><span aria-hidden="true">›</span></button></section>
     </div>
     <div class="mobile-more-footer" style="padding:14px 4px 6px;text-align:center;font-size:11px;color:var(--text3)">
-      PlatePlan <span class="app-version">v3.3.3-mod</span>
+      PlatePlan <span class="app-version">v3.3.4-mod</span>
     </div>
   </div>
 </div>
@@ -486,8 +492,8 @@ try{
       <button class="btn ghost" type="button" id="plateplan-check-update" data-pp-click="globalThis.PlatePlanModules?.updates.check({manual:true})">Check for updates</button>
     </div>
     <dl class="plateplan-update-meta">
-      <div><dt>Version</dt><dd id="plateplan-update-version">v3.3.3-mod</dd></div>
-      <div><dt>Offline cache</dt><dd id="plateplan-update-cache">plateplan-shell-v90</dd></div>
+      <div><dt>Version</dt><dd id="plateplan-update-version">v3.3.4-mod</dd></div>
+      <div><dt>Offline cache</dt><dd id="plateplan-update-cache">plateplan-shell-v91</dd></div>
       <div><dt>Status</dt><dd id="plateplan-update-status" aria-live="polite">Up to date</dd></div>
     </dl>
   </div>
@@ -592,7 +598,7 @@ try{
 </div>
 
 <footer class="app-footer" id="main-app-footer" style="padding:16px 20px 24px;margin-top:auto;font-size:11px;color:var(--text3);text-align:center">
-  PlatePlan <span class="app-version" id="main-footer-version">v3.3.3-mod</span>
+  PlatePlan <span class="app-version" id="main-footer-version">v3.3.4-mod</span>
 </footer>
 </main>
 </div>
@@ -1340,7 +1346,7 @@ try{
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js" crossorigin="anonymous"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js" crossorigin="anonymous"></script>
 <script src="./firebase-config.js"></script>
-<script type="module" src="./scripts/bootstrap.js?v=3.3.3-mod"></script>
+<script type="module" src="./scripts/bootstrap.js?v=3.3.4-mod"></script>
 
 
 

@@ -1,8 +1,8 @@
 /**
- * PlatePlan v3.3.3-mod - Recipe Vault Module
+ * PlatePlan v3.3.4-mod - Recipe Vault Module
  * Extracted from monolith for modular maintenance.
  */
-import { createLegacyView } from './create-legacy-view.js?v=3.3.3-mod';
+import { createLegacyView } from './create-legacy-view.js?v=3.3.4-mod';
 
 export function isRecipeVariantFavourite(recipeId, variantKey = 'original') {
   if (!recipeId) return false;
@@ -505,17 +505,21 @@ function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both
     if (window.previewBaseRecipe.enhanced) applySubs(window.previewBaseRecipe.enhanced.ingredients);
   }
 
-  // Explicit modal wrap open trigger, flex display, and body scroll lock
-  const wrap = document.getElementById('view-modal-wrap');
-  if (wrap) {
-    wrap.classList.add('open');
-    wrap.style.display = 'flex';
-    wrap.style.visibility = 'visible';
-  }
-  document.body.classList.add('modal-open');
+  // 1. Invoke renderRecipePreview before applying visibility styles
   if (typeof window.renderRecipePreview === 'function') {
     window.renderRecipePreview(window.previewBaseRecipe.serves || 2);
   }
+
+  // 2. Explicitly set modal display properties on #view-modal-wrap
+  const wrap = document.getElementById('view-modal-wrap');
+  if (wrap) {
+    wrap.classList.add('open', 'active');
+    wrap.style.setProperty('display', 'flex', 'important');
+    wrap.style.setProperty('visibility', 'visible', 'important');
+    wrap.style.setProperty('opacity', '1', 'important');
+    wrap.style.setProperty('z-index', '99999', 'important');
+  }
+  document.body.classList.add('modal-open');
 }
 
 function toggleRecipeFavourite(recipeId, event, variantKey = 'original') {
@@ -590,27 +594,29 @@ function toggleRecipeFavourite(recipeId, event, variantKey = 'original') {
   }
 }
 
-if (typeof window.executeSheetAction !== 'function') {
-  window.executeSheetAction = function(actionFn, ...args) {
-    if (typeof window.closeMobileActionSheet === 'function') {
-      window.closeMobileActionSheet(false);
-    }
-    setTimeout(() => {
-      if (typeof actionFn === 'function') {
-        actionFn(...args);
-      } else if (typeof window[actionFn] === 'function') {
-        window[actionFn](...args);
-      } else if (typeof eval !== 'undefined') {
-        try {
-          const fn = eval(actionFn);
-          if (typeof fn === 'function') fn(...args);
-        } catch(e) {
-          console.error('executeSheetAction execution failed:', actionFn, e);
-        }
+window.executeSheetAction = function(fnOrName, ...args) {
+  // 1. Close only the mobile action sheet container without destroying global modal backdrops
+  const sheet = document.getElementById('mobile-action-sheet');
+  if (sheet) sheet.classList.remove('open', 'active');
+  const wrap = document.getElementById('mobile-action-sheet-wrap');
+  if (wrap) wrap.classList.remove('open', 'active');
+
+  // 2. Defer execution slightly for DOM transition cleanup
+  setTimeout(() => {
+    if (typeof fnOrName === 'function') {
+      fnOrName(...args);
+    } else if (typeof window[fnOrName] === 'function') {
+      window[fnOrName](...args);
+    } else if (typeof eval !== 'undefined') {
+      try {
+        const fn = eval(fnOrName);
+        if (typeof fn === 'function') fn(...args);
+      } catch(e) {
+        console.error('executeSheetAction execution failed:', fnOrName, e);
       }
-    }, 50);
-  };
-}
+    }
+  }, 50);
+};
 
 // Directive 3: Fix "More" Recipe Actions Sheet (openRecipeActions)
 // 1. Target #mobile-action-sheet-wrap and #mobile-action-sheet

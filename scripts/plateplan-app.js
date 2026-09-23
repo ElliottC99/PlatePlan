@@ -207,9 +207,9 @@ const PLATEPLAN_APPEARANCE_SK='plateplan_appearance';
 const PLATEPLAN_SIDEBAR_SK='plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK='plateplan_modular_migration_20_4';
 const PLATEPLAN_SCHEMA_VERSION=1;
-const PLATEPLAN_APP_VERSION='3.3.3-mod';
-const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v90';
-window.APP_VERSION = '3.3.3-mod';
+const PLATEPLAN_APP_VERSION='3.3.4-mod';
+const PLATEPLAN_EXPECTED_CACHE='plateplan-shell-v91';
+window.APP_VERSION = '3.3.4-mod';
 window._hydrationLogged = false;
 window.state = window.state || {};
 window.state.meta = window.state.meta || {};
@@ -867,9 +867,9 @@ function updatePlanSaveUI(status) {
 }
 window.updatePlanSaveUI = updatePlanSaveUI;
 
-function queuePlanSave(planData = state?.plan, immediate = false) {
+function queuePlanSave(planData = state?.plan, immediate = false, options = {}) {
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.3.3-mod STATE PERSISTENCE] queuePlanSave blocked during hydration.');
+    console.log('[v3.3.4-mod STATE PERSISTENCE] queuePlanSave blocked during hydration.');
     return Promise.resolve(false);
   }
 
@@ -894,7 +894,7 @@ function queuePlanSave(planData = state?.plan, immediate = false) {
         const resolvers = planSaveResolvers.slice();
         planSaveResolvers = [];
         try {
-          const res = await savePlanTransactional(planData || state?.plan);
+          const res = await savePlanTransactional(planData || state?.plan, options);
           resolvers.forEach(r => r.resolve(res));
           return res;
         } catch (err) {
@@ -920,15 +920,15 @@ function queuePlanSave(planData = state?.plan, immediate = false) {
 }
 window.queuePlanSave = queuePlanSave;
 
-async function savePlan(planData = state?.plan, immediate = true) {
-  return await queuePlanSave(planData, immediate);
+async function savePlan(planData = state?.plan, immediate = true, options = {}) {
+  return await queuePlanSave(planData, immediate, options);
 }
 window.savePlan = savePlan;
 
 /**
  * D. Transactional Two-Phase UI Save Handler
  */
-async function savePlanTransactional(planData) {
+async function savePlanTransactional(planData, options = {}) {
   updateUIState({ saveStatus: 'saving' });
 
   let firestoreSuccess = false;
@@ -941,7 +941,7 @@ async function savePlanTransactional(planData) {
   } catch (cleanErr) {
     console.error("[Firestore Sync Error]", cleanErr);
     updateUIState({ saveStatus: 'error' });
-    if (typeof showPlatePlanToast === 'function') {
+    if (options?.showToast === true && typeof showPlatePlanToast === 'function') {
       showPlatePlanToast("Could not save plan. Payload size exceeds limits.", "error");
     }
     if (state) state.uncommittedDraft = planData;
@@ -986,13 +986,13 @@ async function savePlanTransactional(planData) {
     }
     if (state) state.uncommittedDraft = null;
     updateUIState({ saveStatus: 'saved' });
-    if (typeof showPlatePlanToast === 'function') {
+    if (options?.showToast === true && typeof showPlatePlanToast === 'function') {
       showPlatePlanToast("Plan saved successfully!", "success");
     }
     return true;
   } else {
     updateUIState({ saveStatus: 'error' });
-    if (typeof showPlatePlanToast === 'function') {
+    if (options?.showToast === true && typeof showPlatePlanToast === 'function') {
       showPlatePlanToast("Could not save plan. Stashed in temporary session memory.", "error");
     }
     if (state) state.uncommittedDraft = sanitizedPlan;
@@ -1197,25 +1197,25 @@ function closeMobileActionSheet(fromHistory=false){
   if(marked && !fromHistory) returnFromPlatePlanUiHistory();
 }
 
-function executeSheetAction(actionFn, ...args) {
-  // 1. Close action sheet safely without resetting global modal overlay locks
-  if (typeof closeMobileActionSheet === 'function') {
-    closeMobileActionSheet(false);
-  } else if (typeof window.closeMobileActionSheet === 'function') {
-    window.closeMobileActionSheet(false);
-  }
-  // 2. Defer target action slightly to allow DOM transition to clear
+function executeSheetAction(fnOrName, ...args) {
+  // 1. Close only the mobile action sheet container without destroying global modal backdrops
+  const sheet = document.getElementById('mobile-action-sheet');
+  if (sheet) sheet.classList.remove('open', 'active');
+  const wrap = document.getElementById('mobile-action-sheet-wrap');
+  if (wrap) wrap.classList.remove('open', 'active');
+
+  // 2. Defer execution slightly for DOM transition cleanup
   setTimeout(() => {
-    if (typeof actionFn === 'function') {
-      actionFn(...args);
-    } else if (typeof window[actionFn] === 'function') {
-      window[actionFn](...args);
+    if (typeof fnOrName === 'function') {
+      fnOrName(...args);
+    } else if (typeof window[fnOrName] === 'function') {
+      window[fnOrName](...args);
     } else if (typeof eval !== 'undefined') {
       try {
-        const fn = eval(actionFn);
+        const fn = eval(fnOrName);
         if (typeof fn === 'function') fn(...args);
       } catch(e) {
-        console.error('executeSheetAction error executing:', actionFn, e);
+        console.error('executeSheetAction error executing:', fnOrName, e);
       }
     }
   }, 50);
@@ -2123,7 +2123,7 @@ let platePlanDebounceResolvers = [];
 
 async function pushStateToCloud(force=false){
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.3.3-mod STATE PERSISTENCE] PushStateToCloud blocked during hydration.');
+    console.log('[v3.3.4-mod STATE PERSISTENCE] PushStateToCloud blocked during hydration.');
     return Promise.resolve(false);
   }
 
@@ -2135,7 +2135,7 @@ async function pushStateToCloud(force=false){
 
   const currentStateJson = safeJsonStringify(state);
   if (!force && lastPersistedStateJson && lastPersistedStateJson === currentStateJson) {
-    console.log('[v3.3.3-mod STATE PERSISTENCE] State unchanged from last persisted; skipping cloud push.');
+    console.log('[v3.3.4-mod STATE PERSISTENCE] State unchanged from last persisted; skipping cloud push.');
     return Promise.resolve(true);
   }
 
@@ -2372,7 +2372,7 @@ async function _executePushStateToCloud(force, targetHouseholdId, householdDocRe
       platePlanLastSyncError=null;
       platePlanLastSyncedAt=Date.now();
       lastPersistedStateJson = safeJsonStringify(state);
-      console.log('[v3.3.3-mod STATE PERSISTENCE] State successfully pushed to cloud with debounce 1000ms.');
+      console.log('[v3.3.4-mod STATE PERSISTENCE] State successfully pushed to cloud with debounce 1000ms.');
       updatePlatePlanSyncStatus('synced');
     }catch(error){
       console.warn('PlatePlan Cloud push failed:',error);
@@ -2920,7 +2920,7 @@ function saveState(immediate=false){
   }
 
   if (isHydrating || window.isHydrating) {
-    console.log('[v3.3.3-mod STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
+    console.log('[v3.3.4-mod STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
     return true;
   }
 
@@ -3576,7 +3576,7 @@ async function performSubcollectionMigrationIfNeeded(db, householdId, rootDocDat
 window.performSubcollectionMigrationIfNeeded = performSubcollectionMigrationIfNeeded;
 
 function startPlatePlanCloudListeners(){
-  console.log('[PlatePlan v3.3.3-mod] Legacy Firestore onSnapshot listeners bypassed. Core engine in charge.');
+  console.log('[PlatePlan v3.3.4-mod] Legacy Firestore onSnapshot listeners bypassed. Core engine in charge.');
   platePlanSyncUnsubscribers.forEach(stop=>{try{stop();}catch(e){}});
   platePlanSyncUnsubscribers=[];
   return;
@@ -4565,7 +4565,7 @@ let platePlanApplicationInitialized=false;
 function initializePlatePlanApplication(){
   if(platePlanApplicationInitialized)return;
   platePlanApplicationInitialized=true;
-  console.log('[PlatePlan v3.3.3-mod] Initializing core application...');
+  console.log('[PlatePlan v3.3.4-mod] Initializing core application...');
   performance.mark?.('plateplan-start');
   installPlatePlanModalHistory();
   clearVolatileSavedDom(document);
@@ -13113,7 +13113,15 @@ function openModal(name,result,isFallback, options = {}){
   if(saveTempBtn) saveTempBtn.style.display = isTemporaryReview ? '' : 'none';
   if(saveOrigOnlyBtn) saveOrigOnlyBtn.style.display = isTemporaryReview ? 'none' : '';
   updateSaveBothVisibility();
-  document.getElementById('modal-wrap')?.classList.add('open');
+  const modalWrap = document.getElementById('modal-wrap');
+  if (modalWrap) {
+    modalWrap.classList.add('open', 'active');
+    modalWrap.style.setProperty('display', 'flex', 'important');
+    modalWrap.style.setProperty('visibility', 'visible', 'important');
+    modalWrap.style.setProperty('opacity', '1', 'important');
+    modalWrap.style.setProperty('z-index', '99999', 'important');
+  }
+  document.body.classList.add('modal-open');
   updateBatchUiBanners();
   switchModalTab(currentReviewVariant === 'enhanced' && (result.enhanced || existing?.enhanced) ? 'enhanced' : 'original');
 }
@@ -13124,7 +13132,17 @@ function switchModalTab(tab){
   document.getElementById('mtab-'+tab)?.classList.add('active');
 }
 function closeModal(preserveEditorReturn=false){
-  document.getElementById('modal-wrap')?.classList.remove('open');
+  const modalWrap = document.getElementById('modal-wrap');
+  if (modalWrap) {
+    modalWrap.classList.remove('open', 'active');
+    modalWrap.style.removeProperty('display');
+    modalWrap.style.removeProperty('visibility');
+    modalWrap.style.removeProperty('opacity');
+    modalWrap.style.removeProperty('z-index');
+    modalWrap.style.display = 'none';
+    modalWrap.style.visibility = 'hidden';
+  }
+  document.body.classList.remove('modal-open');
   currentReviewMealTypes=null;
   currentReviewWho=null;
   currentReviewServes=null;
@@ -15050,7 +15068,7 @@ function editRecipeModalView(id, initialTab = 'original') {
     capturePlatePlanEditBaseline('recipes/'+id);
     currentReviewInstanceId = null;
     currentReviewVariant = initialTab === 'enhanced' ? 'enhanced' : 'original';
-    const r = state.recipes.find(x => x.id === id);
+    const r = (window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : []) || []).find(x => x && x.id === id);
     if (!r) return;
     editId = id;
     
@@ -15061,8 +15079,7 @@ function editRecipeModalView(id, initialTab = 'original') {
     if(tabEnh) tabEnh.style.display = hasEnh ? 'block' : 'none';
     if(tabComp) tabComp.style.display = hasEnh ? 'block' : 'none';
 
-    const payload = { original: r, enhanced: r.enhanced || {} };
-    openModal(r.name, payload, true, {tab:currentReviewVariant});
+    openModal(r.name, r, false, { instanceId: null, tab: initialTab });
 }
 
 
@@ -15077,7 +15094,11 @@ let currentPreviewSingleServes = 1;
 function closeRecipePreview() {
   const wrap = document.getElementById('view-modal-wrap');
   if (wrap) {
-    wrap.classList.remove('open');
+    wrap.classList.remove('open', 'active');
+    wrap.style.removeProperty('display');
+    wrap.style.removeProperty('visibility');
+    wrap.style.removeProperty('opacity');
+    wrap.style.removeProperty('z-index');
     wrap.style.display = 'none';
     wrap.style.visibility = 'hidden';
   }
@@ -15132,14 +15153,23 @@ function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both
   currentPreviewSingleServes = 1;
   window.currentPreviewSingleServes = 1;
 
+  // 1. Invoke window.renderRecipePreview before applying visibility styles
+  if (typeof window.renderRecipePreview === 'function') {
+    window.renderRecipePreview(window.previewBaseRecipe.serves || 2);
+  } else {
+    renderRecipePreview(r.serves || 2);
+  }
+
+  // 2. Explicitly set modal display properties on #view-modal-wrap
   const wrap = document.getElementById('view-modal-wrap');
   if (wrap) {
-    wrap.classList.add('open');
-    wrap.style.display = 'flex';
-    wrap.style.visibility = 'visible';
+    wrap.classList.add('open', 'active');
+    wrap.style.setProperty('display', 'flex', 'important');
+    wrap.style.setProperty('visibility', 'visible', 'important');
+    wrap.style.setProperty('opacity', '1', 'important');
+    wrap.style.setProperty('z-index', '99999', 'important');
   }
   document.body.classList.add('modal-open');
-  renderRecipePreview(r.serves || 2);
 }
 window.viewRecipe = viewRecipe;
 
@@ -21481,7 +21511,7 @@ async function persistProductToBank(newProduct) {
     const writeProducts = db.collection('households').doc(householdId).collection('products').doc(newProduct.id).set(cleaned, { merge: true });
     const writeIngredients = db.collection('households').doc(householdId).collection('ingredients').doc(newProduct.id).set(cleaned, { merge: true });
     firestorePromise = Promise.all([writeProducts, writeIngredients]).catch(err => {
-      console.warn('[v3.3.3-mod STATE PERSISTENCE] persistProductToBank Firestore write warning:', err);
+      console.warn('[v3.3.4-mod STATE PERSISTENCE] persistProductToBank Firestore write warning:', err);
     });
   } else {
     firestorePromise = Promise.resolve();
@@ -23225,10 +23255,10 @@ function deletePlanHistory(index){
 
   openAppConfirmModal(
     'Delete saved meal plan?',
-    `Delete <strong>${ppEscapeHtml(p.name || 'this saved plan')}</strong> from the Meal Plan Library? This will not delete recipes or products.`,
+    `Delete <strong>${ppEscapeHtml(p.name || 'this saved plan')}</strong> from the Meal Plan Library?`,
     'Delete plan',
     () => {
-      // 1. Remove from local state.planHistory array
+      // 1. Mutate local state array
       if (window.state?.planHistory) {
         window.state.planHistory.splice(index, 1);
       }
@@ -23236,17 +23266,24 @@ function deletePlanHistory(index){
         state.planHistory.splice(index, 1);
       }
 
-      // 2. Persist updated state to localStorage
+      // 2. Save locally
       try {
+        localStorage.setItem('plateplan_v2', JSON.stringify(window.state || state));
         safeLocalStorageSet(SK, safeJsonStringify(window.state || state));
         if (typeof safeSaveHistoryBackup === 'function') {
           safeSaveHistoryBackup(window.state?.planHistory || state?.planHistory);
         }
-      } catch(e) {
-        console.error('Local persistence error during plan history delete:', e);
+      } catch(e) {}
+
+      // 3. Immediately push updated state to Firestore cloud storage
+      if (typeof window.pushStateToCloud === 'function') {
+        window.pushStateToCloud();
+      } else if (typeof pushStateToCloud === 'function') {
+        pushStateToCloud();
+      } else if (typeof window.saveState === 'function') {
+        window.saveState();
       }
 
-      // 3. Trigger cloud state sync if persistence engine exists
       if (window.PlatePlanModules?.store) {
         window.PlatePlanModules.store.publish({ reason: 'plan-history-deletion', index });
       }
