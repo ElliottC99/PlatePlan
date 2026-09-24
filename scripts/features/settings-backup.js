@@ -376,7 +376,11 @@
       window.state = imported;
       if(!window.state.meta || typeof window.state.meta !== 'object') window.state.meta = {};
       window.state.meta.schemaVersion = +window.state.meta.schemaVersion || schemaVersion;
-      ensureIngredientGroups(window.state);
+      if (typeof ensureIngredientGroups === 'function') {
+        ensureIngredientGroups(window.state);
+      } else if (typeof window.ensureIngredientGroups === 'function') {
+        window.ensureIngredientGroups(window.state);
+      }
       refreshPlatePlanDerivedState({ persist:true, render:true });
       localStorage.removeItem(BAKED_CANDIDATE_SK);
       closePlatePlanImportPreview();
@@ -404,15 +408,21 @@
   }
 
   // Difference Summary helpers
-  function stableStateComparisonValue(value, seen = new WeakSet()){
+  function stableStateComparisonValue(value, seen = new WeakSet(), depth = 0){
+    if(depth > 20) return null;
     if(value && typeof value === 'object'){
+      if (typeof value.nodeType === 'number' || (typeof Element !== 'undefined' && value instanceof Element)) return null;
+      if (value === window || (typeof global !== 'undefined' && value === global)) return null;
+      if (typeof value.preventDefault === 'function' || (typeof Event !== 'undefined' && value instanceof Event)) return null;
       if (seen.has(value)) return null;
       seen.add(value);
     }
-    if(Array.isArray(value)) return value.map(v => stableStateComparisonValue(v, seen));
+    if(Array.isArray(value)) return value.map(v => stableStateComparisonValue(v, seen, depth + 1));
     if(value && typeof value === 'object'){
       return Object.keys(value).sort().reduce((out, key) => {
-        out[key] = stableStateComparisonValue(value[key], seen);
+        try {
+          out[key] = stableStateComparisonValue(value[key], seen, depth + 1);
+        } catch (_) {}
         return out;
       }, {});
     }
@@ -420,8 +430,9 @@
   }
 
   function stateValuesMatch(a, b){
+    const stringify = typeof safeJsonStringify === 'function' ? safeJsonStringify : (typeof window !== 'undefined' && window.safeJsonStringify ? window.safeJsonStringify : (v => JSON.stringify(v)));
     try {
-      return safeJsonStringify(stableStateComparisonValue(a)) === safeJsonStringify(stableStateComparisonValue(b));
+      return stringify(stableStateComparisonValue(a)) === stringify(stableStateComparisonValue(b));
     } catch(_e) {
       return false;
     }
@@ -480,7 +491,8 @@
 
   // == Data Quality Centre ==
   function dataQualityFingerprint(value){
-    const text = safeJsonStringify(value ?? null);
+    const stringify = typeof safeJsonStringify === 'function' ? safeJsonStringify : (typeof window !== 'undefined' && window.safeJsonStringify ? window.safeJsonStringify : (v => JSON.stringify(v ?? null)));
+    const text = stringify(value ?? null) || '';
     let hash = 2166136261;
     for(let i = 0; i < text.length; i++){
         hash ^= text.charCodeAt(i);
@@ -650,9 +662,19 @@
   }
 
   function recipeVariantHasOilIngredient(ingredients){
+    const resolveFamily = typeof getGroupIngredientFamily === 'function'
+      ? getGroupIngredientFamily
+      : (typeof window !== 'undefined' && typeof window.getGroupIngredientFamily === 'function'
+          ? window.getGroupIngredientFamily
+          : (() => null));
+    const resolveProduct = typeof resolveProductForIngredient === 'function'
+      ? resolveProductForIngredient
+      : (typeof window !== 'undefined' && typeof window.resolveProductForIngredient === 'function'
+          ? window.resolveProductForIngredient
+          : (() => ({ product: null, group: null })));
     return (ingredients || []).some(ing => {
-        const resolved = resolveProductForIngredient(ing);
-        const family = resolved.group ? getGroupIngredientFamily(resolved.group) : null;
+        const resolved = resolveProduct(ing) || {};
+        const family = resolved.group ? resolveFamily(resolved.group) : null;
         const text = [ing.raw, ing.name, resolved.group?.name, ...(resolved.group?.aliases || []), family?.name, ...(family?.aliases || []), resolved.product?.name].filter(Boolean).join(' ').toLowerCase();
         return /\b(olive|vegetable|sesame|rapeseed|sunflower|avocado|coconut)?\s*oil\b/.test(text);
     });
@@ -681,22 +703,49 @@
   }
 
   function collectDeterministicDataQualityIssues(){
-    ensureIngredientGroups();
+    if (typeof ensureIngredientGroups === 'function') {
+      ensureIngredientGroups();
+    } else if (typeof window.ensureIngredientGroups === 'function') {
+      window.ensureIngredientGroups();
+    }
     const issues = [];
     const add = input => issues.push(createDataQualityIssue(input));
     const extremeCostProducts = new Map();
 
+    const resolveGroup = typeof getIngredientGroup === 'function' ? getIngredientGroup : (typeof window !== 'undefined' && window.getIngredientGroup ? window.getIngredientGroup : (() => null));
+    const resolveFamily = typeof getGroupIngredientFamily === 'function' ? getGroupIngredientFamily : (typeof window !== 'undefined' && window.getGroupIngredientFamily ? window.getGroupIngredientFamily : (() => null));
+    const resolveFamDirect = typeof getIngredientFamily === 'function' ? getIngredientFamily : (typeof window !== 'undefined' && window.getIngredientFamily ? window.getIngredientFamily : (() => null));
+    const resolveFamilyGroups = typeof getFamilyGroups === 'function' ? getFamilyGroups : (typeof window !== 'undefined' && window.getFamilyGroups ? window.getFamilyGroups : (() => []));
+    const resolveGroupProds = typeof getGroupProducts === 'function' ? getGroupProducts : (typeof window !== 'undefined' && window.getGroupProducts ? window.getGroupProducts : (() => []));
+    const resolveHierarchyText = typeof getGroupHierarchyText === 'function' ? getGroupHierarchyText : (typeof window !== 'undefined' && window.getGroupHierarchyText ? window.getGroupHierarchyText : (g => g?.name || ''));
+    const resolveProduct = typeof resolveProductForIngredient === 'function' ? resolveProductForIngredient : (typeof window !== 'undefined' && window.resolveProductForIngredient ? window.resolveProductForIngredient : (() => ({ product: null, group: null })));
+    const checkItemWeight = typeof needsItemWeightForQtyIngredient === 'function' ? needsItemWeightForQtyIngredient : (typeof window !== 'undefined' && window.needsItemWeightForQtyIngredient ? window.needsItemWeightForQtyIngredient : (() => false));
+    const checkMappingWarning = typeof getIngredientMappingWarning === 'function' ? getIngredientMappingWarning : (typeof window !== 'undefined' && window.getIngredientMappingWarning ? window.getIngredientMappingWarning : (() => null));
+    const r1 = typeof round1 === 'function' ? round1 : (typeof window !== 'undefined' && window.round1 ? window.round1 : (v => Math.round((+v || 0) * 10) / 10));
+    const normAlias = typeof normaliseAliasText === 'function' ? normaliseAliasText : (typeof window !== 'undefined' && window.normaliseAliasText ? window.normaliseAliasText : (t => String(t || '').trim()));
+    const resolveProductById = typeof getProduct === 'function' ? getProduct : (typeof window !== 'undefined' && window.getProduct ? window.getProduct : (() => null));
+    const resolveGrams = typeof getEffectiveIngredientGrams === 'function' ? getEffectiveIngredientGrams : (typeof window !== 'undefined' && window.getEffectiveIngredientGrams ? window.getEffectiveIngredientGrams : (() => 0));
+    const resolveUsablePack = typeof getProductUsablePackAmount === 'function' ? getProductUsablePackAmount : (typeof window !== 'undefined' && window.getProductUsablePackAmount ? window.getProductUsablePackAmount : (p => +(p?.packSize || 100)));
+    const resolveGrossPack = typeof getProductGrossPackAmount === 'function' ? getProductGrossPackAmount : (typeof window !== 'undefined' && window.getProductGrossPackAmount ? window.getProductGrossPackAmount : (p => +(p?.packSize || 100)));
+    const resolveItemAmount = typeof getProductItemAmount === 'function' ? getProductItemAmount : (typeof window !== 'undefined' && window.getProductItemAmount ? window.getProductItemAmount : (p => +(p?.itemWeight || 0)));
+    const resolveDerivedItemCount = typeof getProductDerivedItemCount === 'function' ? getProductDerivedItemCount : (typeof window !== 'undefined' && window.getProductDerivedItemCount ? window.getProductDerivedItemCount : (() => 0));
+
     (window.state.ingredients || []).forEach(product => {
         const fix = `<button class="btn sm dq-fix-btn" onclick="editIng('${ppEscapeAttr(product.id)}')">Fix</button>`;
-        if(!hasUsableIngredientNutrition(product)) add({entityType:'product',entityId:product.id,code:'unusable-nutrition',severity:'blocker',title:product.name || 'Unnamed product',message:'No usable mapped nutrition is available.',fixButtonHtml:fix,source:[product.cal,product.prot,product.carb,product.fat,product.fibre,product.name]});
+        const isNutritionUsable = typeof hasUsableIngredientNutrition === 'function'
+          ? hasUsableIngredientNutrition(product)
+          : (typeof window !== 'undefined' && typeof window.hasUsableIngredientNutrition === 'function'
+              ? window.hasUsableIngredientNutrition(product)
+              : true);
+        if(!isNutritionUsable) add({entityType:'product',entityId:product.id,code:'unusable-nutrition',severity:'blocker',title:product.name || 'Unnamed product',message:'No usable mapped nutrition is available.',fixButtonHtml:fix,source:[product.cal,product.prot,product.carb,product.fat,product.fibre,product.name]});
         if(!(+(product.price) > 0)) add({entityType:'product',entityId:product.id,code:'missing-price',title:product.name || 'Unnamed product',message:'Price is missing.',fixButtonHtml:fix,source:product.price});
         if(!(+(product.packSize) > 0) || !product.packUnit) add({entityType:'product',entityId:product.id,code:'missing-pack',title:product.name || 'Unnamed product',message:'Pack size or unit is missing.',fixButtonHtml:fix,source:[product.packSize,product.packUnit]});
         if(!product.storage) add({entityType:'product',entityId:product.id,code:'missing-storage',title:product.name || 'Unnamed product',message:'Storage location is missing.',fixButtonHtml:fix,source:product.storage});
-        const linkedGroup = product.groupId ? getIngredientGroup(product.groupId) : null;
-        let parentFamily = linkedGroup ? getGroupIngredientFamily(linkedGroup) : null;
-        if(!parentFamily && product.ingredientId) parentFamily = getIngredientFamily(product.ingredientId);
-        if(!parentFamily && product.cat) parentFamily = getIngredientFamily(product.cat);
-        const familySubGroups = parentFamily ? getFamilyGroups(parentFamily.id) : [];
+        const linkedGroup = product.groupId ? resolveGroup(product.groupId) : null;
+        let parentFamily = linkedGroup ? resolveFamily(linkedGroup) : null;
+        if(!parentFamily && product.ingredientId) parentFamily = resolveFamDirect(product.ingredientId);
+        if(!parentFamily && product.cat) parentFamily = resolveFamDirect(product.cat);
+        const familySubGroups = parentFamily ? resolveFamilyGroups(parentFamily.id) : [];
         const familyHasNoSubtypes = !!parentFamily && familySubGroups.length === 0;
         const isCompliantWithoutSubtype = familyHasNoSubtypes && (product.subTypeId === null || product.subTypeId === 'default' || product.groupId === 'default' || !product.groupId);
 
@@ -704,7 +753,7 @@
         const packUnit=String(product.packUnit||'').toLowerCase();
         const itemWeightUnit=String(product.itemWeightUnit||'g').toLowerCase();
         const drainedUnit=String(product.drainedWeightUnit||packUnit||'g').toLowerCase();
-        const gross=getProductGrossPackAmount(product),usable=getProductUsablePackAmount(product),itemAmount=getProductItemAmount(product),derived=getProductDerivedItemCount(product);
+        const gross=resolveGrossPack(product),usable=resolveUsablePack(product),itemAmount=resolveItemAmount(product),derived=resolveDerivedItemCount(product);
         if(+product.drainedWeight>0&&packUnit!=='qty'&&drainedUnit!==packUnit){
             add({entityType:'product',entityId:product.id,code:'incompatible-pack-units',title:product.name||'Unnamed product',message:`Pack size uses ${packUnit}, but drained weight uses ${drainedUnit}. Use matching weight or volume units.`,fixButtonHtml:fix,source:[product.packSize,packUnit,product.drainedWeight,drainedUnit]});
         }
@@ -718,7 +767,7 @@
             add({entityType:'product',entityId:product.id,code:'item-over-usable-pack',title:product.name||'Unnamed product',message:'One item is heavier than the usable contents of the entire pack.',fixButtonHtml:fix,source:[itemAmount,usable,itemWeightUnit]});
         }
         if(derived>1.05&&Math.abs(derived-Math.round(derived))>0.12){
-            add({entityType:'product',entityId:product.id,code:'implausible-derived-count',title:product.name||'Unnamed product',message:`The usable pack amount implies ${round1(derived)} items. Check total, drained and item weights.`,fixButtonHtml:fix,source:[gross,usable,itemAmount,derived]});
+            add({entityType:'product',entityId:product.id,code:'implausible-derived-count',title:product.name||'Unnamed product',message:`The usable pack amount implies ${r1(derived)} items. Check total, drained and item weights.`,fixButtonHtml:fix,source:[gross,usable,itemAmount,derived]});
         }
         if(['g','ml'].includes(packUnit) && packUnit===itemWeightUnit && +product.itemWeight>0 && +product.packSize>0 && +product.itemWeight>+product.packSize){
             add({entityType:'product',entityId:product.id,code:'item-heavier-than-pack',title:product.name || 'Unnamed product',message:`Pack size (${product.packSize}${packUnit}) is smaller than the recorded weight of one item (${product.itemWeight}${itemWeightUnit}). This can produce extreme recipe costs.`,fixButtonHtml:fix,source:[product.packSize,packUnit,product.itemWeight,itemWeightUnit,product.price]});
@@ -742,13 +791,13 @@
                 if(!ingredient || typeof ingredient !== 'object' || ingredient.excludeNutrition) return;
                 const qty = +(ingredient.qty ?? ingredient.grams ?? 0);
                 if(!(qty > 0)) return;
-                const resolved = resolveProductForIngredient(ingredient, {});
+                const resolved = resolveProduct(ingredient, {}) || {};
                 const entityId = `${recipe.id}:${variantId}:${index}`;
                 const ingredientName = ingredient.name || ingredient.raw || `Ingredient ${index + 1}`;
                 if(!resolved.product){
                     const unitStr = String(ingredient.unit || '').toLowerCase().trim();
                     const isCountedPantry = ['qty','count','item','whole','piece','pieces','small','medium','large','pack','pouch','unit'].includes(unitStr) || (!unitStr && +(ingredient.qty || 0) > 0);
-                    const boundIngId = ingredient.ingredientId || ingredient.familyId || resolved.group?.ingredientId || (ingredient.bankId && getIngredientFamily(ingredient.bankId)) || (ingredientName && (window.state.ingredientFamilies || []).some(f => normaliseAliasText(f.name) === normaliseAliasText(ingredientName) || normaliseAliasText(f.name).includes(normaliseAliasText(ingredientName))));
+                    const boundIngId = ingredient.ingredientId || ingredient.familyId || resolved.group?.ingredientId || (ingredient.bankId && resolveFamDirect(ingredient.bankId)) || (ingredientName && (window.state.ingredientFamilies || []).some(f => normAlias(f.name) === normAlias(ingredientName) || normAlias(f.name).includes(normAlias(ingredientName))));
                     if(boundIngId || (isCountedPantry && (ingredient.ingredientId || ingredient.bankId || resolved.groupId))){
                         // Counted pantry item bound directly to ingredientId when productId is null satisfies audit completeness
                         return;
@@ -757,8 +806,8 @@
                     add({entityType:'recipe-ingredient',entityId,code:'unmapped-counted-ingredient',severity:'blocker',title,message:`${ingredientName} has a counted quantity but no mapped product.`,fixButtonHtml:unmappedFix,fixTarget:{entityType:'recipe-ingredient',entityId},source:[ingredient.name,ingredient.raw,ingredient.qty,ingredient.unit,ingredient.groupId,ingredient.bankId]});
                     return;
                 }
-                if(needsItemWeightForQtyIngredient(ingredient, resolved.product)) add({entityType:'recipe-ingredient',entityId,code:'missing-item-weight',severity:'blocker',title,message:`${ingredientName} is counted as items, but its product has no item weight.`,fixButtonHtml:fix,fixTarget:{entityType:'product',entityId:resolved.product.id},source:[ingredient.qty,ingredient.unit,resolved.product.id,resolved.product.itemWeight,resolved.product.itemWeightUnit]});
-                const mappingWarning = getIngredientMappingWarning(ingredient, resolved);
+                if(checkItemWeight(ingredient, resolved.product)) add({entityType:'recipe-ingredient',entityId,code:'missing-item-weight',severity:'blocker',title,message:`${ingredientName} is counted as items, but its product has no item weight.`,fixButtonHtml:fix,fixTarget:{entityType:'product',entityId:resolved.product.id},source:[ingredient.qty,ingredient.unit,resolved.product.id,resolved.product.itemWeight,resolved.product.itemWeightUnit]});
+                const mappingWarning = checkMappingWarning(ingredient, resolved);
                 if(mappingWarning) add({entityType:'recipe-ingredient',entityId,code:'mapping-mismatch',title,message:mappingWarning,fixButtonHtml:fix,source:[ingredient.name,ingredient.groupId,ingredient.bankId,resolved.group?.id,resolved.product?.id]});
             });
 
@@ -766,11 +815,11 @@
             const productCosts=new Map();
             (variant.ingredients||[]).forEach(ingredient=>{
                 if(!ingredient||typeof ingredient!=='object')return;
-                const resolved=resolveProductForIngredient(ingredient,{});
+                const resolved=resolveProduct(ingredient,{}) || {};
                 const product=resolved.product;
                 if(!product?.price||!product.packSize)return;
-                const grams=getEffectiveIngredientGrams(ingredient,product);
-                const packGrams=getProductUsablePackAmount(product);
+                const grams=resolveGrams(ingredient,product);
+                const packGrams=resolveUsablePack(product);
                 if(!(grams>0&&packGrams>0))return;
                 productCosts.set(product.id,(productCosts.get(product.id)||0)+((+product.price/packGrams)*grams/serves));
             });
@@ -778,7 +827,7 @@
             if(perServing>15){
                 productCosts.forEach((contribution,productId)=>{
                     if(contribution<=10)return;
-                    const product=getProduct(productId);if(!product)return;
+                    const product=resolveProductById(productId);if(!product)return;
                     const current=extremeCostProducts.get(productId)||{product,recipes:new Map(),maxContribution:0};
                     current.recipes.set(`${recipe.id}:${variantId}`,`${recipe.name || 'Untitled recipe'} · ${variant.label}`);
                     current.maxContribution=Math.max(current.maxContribution,contribution);
@@ -794,18 +843,18 @@
     });
 
     (window.state.ingredientFamilies || []).forEach(family => {
-        const groups = getFamilyGroups(family.id);
+        const groups = resolveFamilyGroups(family.id);
         const fix = `<button class="btn sm dq-fix-btn" onclick="openIngredientFamilyDetailsModal('${ppEscapeAttr(family.id)}')">Fix</button>`;
         if(!groups.length) add({entityType:'ingredient',entityId:family.id,code:'no-subtypes',title:family.name || 'Unnamed ingredient',message:'Ingredient has no sub-types.',fixButtonHtml:fix,source:family.typeIds});
         if(!family.cat || family.cat === 'other') add({entityType:'ingredient',entityId:family.id,code:'missing-category',title:family.name || 'Unnamed ingredient',message:'Ingredient has no sorted category.',fixButtonHtml:fix,source:family.cat});
     });
     (window.state.ingredientGroups || []).forEach(group => {
-        const products = getGroupProducts(group.id);
+        const products = resolveGroupProds(group.id);
         const fix = `<button class="btn sm dq-fix-btn" data-action="fix-subtype" data-subtype-id="${ppEscapeAttr(group.id)}" onclick="fixSubtypeDataQuality('${ppEscapeAttr(group.id)}')">Fix</button>`;
-        const title = getGroupHierarchyText(group);
-        if(!group.ingredientId || !getIngredientFamily(group.ingredientId)) add({entityType:'subtype',entityId:group.id,code:'missing-ingredient-link',title,message:'Sub-type is not linked to a valid ingredient.',fixButtonHtml:fix,source:group.ingredientId});
+        const title = resolveHierarchyText(group);
+        if(!group.ingredientId || !resolveFamDirect(group.ingredientId)) add({entityType:'subtype',entityId:group.id,code:'missing-ingredient-link',title,message:'Sub-type is not linked to a valid ingredient.',fixButtonHtml:fix,source:group.ingredientId});
         if(!products.length) add({entityType:'subtype',entityId:group.id,code:'no-products',title,message:'Sub-type has no linked products.',fixButtonHtml:fix,source:products.map(p => p.id)});
-        if(products.length && !resolveProductForIngredient({groupId:group.id}).product) add({entityType:'subtype',entityId:group.id,code:'no-valid-default',title,message:'Sub-type has products but no usable default.',fixButtonHtml:fix,source:[group.defaultProductId,group.manualDefaultProductId,products.map(p => [p.id,p.cal,p.prot])]});
+        if(products.length && !resolveProduct({groupId:group.id}).product) add({entityType:'subtype',entityId:group.id,code:'no-valid-default',title,message:'Sub-type has products but no usable default.',fixButtonHtml:fix,source:[group.defaultProductId,group.manualDefaultProductId,products.map(p => [p.id,p.cal,p.prot])]});
         if(!group.cat || group.cat === 'other') add({entityType:'subtype',entityId:group.id,code:'missing-category',title,message:'Sub-type has no sorted category.',fixButtonHtml:fix,source:group.cat});
     });
     return issues;

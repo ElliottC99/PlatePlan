@@ -131,22 +131,37 @@ export function mergeRecipesSnapshot(localRecipes, cloudRecipes) {
 export function createPlatePlanStore(adapter) {
   const listeners = new Set();
   let savingThroughStore = false;
+  let isPublishing = false;
 
   const publish = detail => {
-    const state = adapter.getState();
-    const validation = validatePlatePlanState(state);
-    const event = { state, validation, detail: detail || {} };
-    listeners.forEach(listener => {
-      try { listener(event); } catch (error) { console.error('PlatePlan store listener failed', error); }
-    });
-    return event;
+    if (isPublishing) {
+      return;
+    }
+    isPublishing = true;
+    try {
+      const state = adapter.getState();
+      const validation = validatePlatePlanState(state);
+      const event = { state, validation, detail: detail || {} };
+      listeners.forEach(listener => {
+        try { listener(event); } catch (error) { console.error('PlatePlan store listener failed', error); }
+      });
+      return event;
+    } finally {
+      isPublishing = false;
+    }
   };
 
   if (typeof window !== 'undefined') {
     window.addEventListener('plateplan:state-saved', event => {
-      if (!savingThroughStore) publish(event.detail);
+      if (!savingThroughStore && !isPublishing) {
+        Promise.resolve().then(() => publish(event.detail));
+      }
     });
-    window.addEventListener('plateplan:remote-state-applied', event => publish(event.detail));
+    window.addEventListener('plateplan:remote-state-applied', event => {
+      if (!isPublishing) {
+        Promise.resolve().then(() => publish(event.detail));
+      }
+    });
   }
 
   return Object.freeze({

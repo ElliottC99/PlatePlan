@@ -6,29 +6,70 @@
 
 (() => {
   const sanitizePayloadForFirestore = (data) => {
+    if (data === undefined) return null;
+    if (data === null || typeof data !== 'object') return data;
+    try {
+      const cleaned = stripUndefinedValues(data);
+      if (!cleaned || typeof cleaned !== 'object') {
+        return cleaned;
+      }
+      const jsonStr = (typeof window !== 'undefined' && typeof window.safeJsonStringify === 'function')
+        ? window.safeJsonStringify(cleaned)
+        : JSON.stringify(cleaned);
 
-  if (data === undefined) return null;
-  try {
-    const cleaned = stripUndefinedValues(data);
-    const jsonStr = (typeof window !== 'undefined' && typeof window.safeJsonStringify === 'function')
-      ? window.safeJsonStringify(cleaned, null, 'null')
-      : JSON.stringify(cleaned);
-    return JSON.parse(jsonStr);
-  } catch (err) {
-    console.error('[PAYLOAD SANITIZATION ERROR]', err);
-    return data;
-  }
-};
-
-const stripUndefinedValues = (obj) => {
-  if (obj === null || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(stripUndefinedValues);
-  const copy = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined) {
-      copy[k] = stripUndefinedValues(v);
+      if (typeof jsonStr !== 'string' || !jsonStr.trim()) {
+        return cleaned;
+      }
+      const trimmed = jsonStr.trim();
+      if (!trimmed.startsWith('{') && !trimmed.startsWith('[') && !trimmed.startsWith('"')) {
+        return cleaned;
+      }
+      return JSON.parse(trimmed);
+    } catch (err) {
+      console.error('[PAYLOAD SANITIZATION ERROR]', err);
+      return data;
     }
+  };
+
+const stripUndefinedValues = (obj, seen = new Set(), depth = 0) => {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (depth > 20) return '[Depth Exceeded]';
+  if (seen.has(obj)) return '[Circular]';
+
+  // Guard against DOM elements, window-like host objects, and events
+  if (typeof obj.nodeType === 'number' || (typeof Element !== 'undefined' && obj instanceof Element)) {
+    return '[DOM Node]';
   }
+  if (obj === window || (typeof global !== 'undefined' && obj === global)) {
+    return '[Global]';
+  }
+  if (typeof obj.preventDefault === 'function' || (typeof Event !== 'undefined' && obj instanceof Event)) {
+    return '[Event]';
+  }
+
+  seen.add(obj);
+
+  if (Array.isArray(obj)) {
+    const arrCopy = [];
+    for (const item of obj) {
+      arrCopy.push(stripUndefinedValues(item, seen, depth + 1));
+    }
+    seen.delete(obj);
+    return arrCopy;
+  }
+
+  const copy = {};
+  try {
+    for (const [k, v] of Object.entries(obj)) {
+      if (v !== undefined) {
+        copy[k] = stripUndefinedValues(v, seen, depth + 1);
+      }
+    }
+  } catch (err) {
+    seen.delete(obj);
+    return '[Restricted]';
+  }
+  seen.delete(obj);
   return copy;
 };
 
@@ -268,6 +309,51 @@ const restoreRecoveredPlan = () => {
   }
 };
 
+const ensureIngredientGroups = (target = null) => {
+  const s = target || (typeof window !== 'undefined' ? window.state : null) || (typeof state !== 'undefined' ? state : null);
+  if (!s || typeof s !== 'object') return [];
+  if (!Array.isArray(s.ingredientGroups)) {
+    s.ingredientGroups = [];
+  }
+  if (!Array.isArray(s.ingredientFamilies)) {
+    s.ingredientFamilies = [];
+  }
+  if (!Array.isArray(s.ingredients)) {
+    s.ingredients = [];
+  }
+  if (Array.isArray(s.recipes)) {
+    s.recipes.forEach(r => {
+      if (!r || typeof r !== 'object') return;
+      if (!Array.isArray(r.ingredientGroups)) {
+        r.ingredientGroups = [];
+      }
+      if (r.enhanced && typeof r.enhanced === 'object' && !Array.isArray(r.enhanced.ingredientGroups)) {
+        r.enhanced.ingredientGroups = [];
+      }
+    });
+  }
+  if (typeof window !== 'undefined' && window.platePlanIndexes?.groups) {
+    s.ingredientGroups.forEach(g => {
+      if (g && g.id) window.platePlanIndexes.groups.set(g.id, g);
+    });
+  }
+  return s.ingredientGroups;
+};
+
+const ensureIngredientFamilies = (target = null) => {
+  const s = target || (typeof window !== 'undefined' ? window.state : null) || (typeof state !== 'undefined' ? state : null);
+  if (!s || typeof s !== 'object') return [];
+  if (!Array.isArray(s.ingredientFamilies)) {
+    s.ingredientFamilies = [];
+  }
+  if (typeof window !== 'undefined' && window.platePlanIndexes?.families) {
+    s.ingredientFamilies.forEach(f => {
+      if (f && f.id) window.platePlanIndexes.families.set(f.id, f);
+    });
+  }
+  return s.ingredientFamilies;
+};
+
 if (typeof window !== 'undefined') {
   window.sanitizePayloadForFirestore = sanitizePayloadForFirestore;
   window.sanitizePlanForFirestore = sanitizePlanForFirestore;
@@ -276,6 +362,10 @@ if (typeof window !== 'undefined') {
   window.unwrapAndCleanItem = unwrapAndCleanItem;
   window.cleanObject = cleanObject;
   window.stripUndefinedValues = stripUndefinedValues;
+  window.safeLocalStorageSet = safeLocalStorageSet;
+  window.safeSaveHistoryBackup = safeSaveHistoryBackup;
+  window.ensureIngredientGroups = ensureIngredientGroups;
+  window.ensureIngredientFamilies = ensureIngredientFamilies;
 
   window.PlatePlanState = {
     sanitizePayloadForFirestore,
@@ -287,6 +377,8 @@ if (typeof window !== 'undefined') {
     stripUndefinedValues,
     safeLocalStorageSet,
     safeSaveHistoryBackup,
+    ensureIngredientGroups,
+    ensureIngredientFamilies,
     savePlan,
     savePlanTransactional,
     pushStateToCloud,

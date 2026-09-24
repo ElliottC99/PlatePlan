@@ -177,7 +177,9 @@ export default Object.freeze({
       );
     });
     context.store.subscribe(() => {
-      if (document.getElementById('view-search')?.classList.contains('active')) render();
+      Promise.resolve().then(() => {
+        if (document.getElementById('view-search')?.classList.contains('active')) render();
+      });
     });
     renderSearch = render;
   },

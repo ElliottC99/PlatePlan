@@ -6,7 +6,10 @@
 
 (() => {
 function sanitizePayloadForFirestore(data) {
-  if (typeof window !== 'undefined' && typeof window.sanitizePayloadForFirestore === 'function') {
+  if (typeof window !== 'undefined' && window.PlatePlanState && typeof window.PlatePlanState.sanitizePayloadForFirestore === 'function') {
+    return window.PlatePlanState.sanitizePayloadForFirestore(data);
+  }
+  if (typeof window !== 'undefined' && typeof window.sanitizePayloadForFirestore === 'function' && window.sanitizePayloadForFirestore !== sanitizePayloadForFirestore) {
     return window.sanitizePayloadForFirestore(data);
   }
   if (data === undefined) return null;
@@ -18,44 +21,89 @@ function sanitizePayloadForFirestore(data) {
 }
 
 function unwrapAndCleanItem(item) {
-  if (typeof window !== 'undefined' && typeof window.unwrapAndCleanItem === 'function') {
+  if (typeof window !== 'undefined' && window.PlatePlanState && typeof window.PlatePlanState.unwrapAndCleanItem === 'function') {
+    return window.PlatePlanState.unwrapAndCleanItem(item);
+  }
+  if (typeof window !== 'undefined' && typeof window.unwrapAndCleanItem === 'function' && window.unwrapAndCleanItem !== unwrapAndCleanItem) {
     return window.unwrapAndCleanItem(item);
   }
   return item;
 }
 
 function sanitizePlanForFirestore(plan) {
-  if (typeof window !== 'undefined' && typeof window.sanitizePlanForFirestore === 'function') {
+  if (typeof window !== 'undefined' && window.PlatePlanState && typeof window.PlatePlanState.sanitizePlanForFirestore === 'function') {
+    return window.PlatePlanState.sanitizePlanForFirestore(plan);
+  }
+  if (typeof window !== 'undefined' && typeof window.sanitizePlanForFirestore === 'function' && window.sanitizePlanForFirestore !== sanitizePlanForFirestore) {
     return window.sanitizePlanForFirestore(plan);
   }
   return sanitizePayloadForFirestore(unwrapAndCleanItem(plan));
 }
 
 function sanitizeRecipeForFirestore(recipe) {
-  if (typeof window !== 'undefined' && typeof window.sanitizeRecipeForFirestore === 'function') {
+  if (typeof window !== 'undefined' && window.PlatePlanState && typeof window.PlatePlanState.sanitizeRecipeForFirestore === 'function') {
+    return window.PlatePlanState.sanitizeRecipeForFirestore(recipe);
+  }
+  if (typeof window !== 'undefined' && typeof window.sanitizeRecipeForFirestore === 'function' && window.sanitizeRecipeForFirestore !== sanitizeRecipeForFirestore) {
     return window.sanitizeRecipeForFirestore(recipe);
   }
   return sanitizePayloadForFirestore(unwrapAndCleanItem(recipe));
 }
 
 function sanitizeIngredientForFirestore(ing) {
-  if (typeof window !== 'undefined' && typeof window.sanitizeIngredientForFirestore === 'function') {
+  if (typeof window !== 'undefined' && window.PlatePlanState && typeof window.PlatePlanState.sanitizeIngredientForFirestore === 'function') {
+    return window.PlatePlanState.sanitizeIngredientForFirestore(ing);
+  }
+  if (typeof window !== 'undefined' && typeof window.sanitizeIngredientForFirestore === 'function' && window.sanitizeIngredientForFirestore !== sanitizeIngredientForFirestore) {
     return window.sanitizeIngredientForFirestore(ing);
   }
   return sanitizePayloadForFirestore(unwrapAndCleanItem(ing));
 }
 
 function cleanObject(obj) {
-  if (typeof window !== 'undefined' && typeof window.cleanObject === 'function') {
+  if (typeof window !== 'undefined' && window.PlatePlanState && typeof window.PlatePlanState.cleanObject === 'function') {
+    return window.PlatePlanState.cleanObject(obj);
+  }
+  if (typeof window !== 'undefined' && typeof window.cleanObject === 'function' && window.cleanObject !== cleanObject) {
     return window.cleanObject(obj);
   }
   return sanitizePayloadForFirestore(unwrapAndCleanItem(obj));
+}
+
+function safeLocalStorageSet(key, val) {
+  if (typeof window !== 'undefined' && typeof window.safeLocalStorageSet === 'function' && window.safeLocalStorageSet !== safeLocalStorageSet) {
+    return window.safeLocalStorageSet(key, val);
+  }
+  try {
+    const payload = typeof val === 'string' ? val : (typeof safeJsonStringify === 'function' ? safeJsonStringify(val) : JSON.stringify(val));
+    localStorage.setItem(key, payload);
+    return true;
+  } catch (e) {
+    console.warn('[LocalStorage Write Warning]', e);
+    return false;
+  }
+}
+
+function safeSaveHistoryBackup(historyList) {
+  if (typeof window !== 'undefined' && typeof window.safeSaveHistoryBackup === 'function' && window.safeSaveHistoryBackup !== safeSaveHistoryBackup) {
+    return window.safeSaveHistoryBackup(historyList);
+  }
+  try {
+    const payload = typeof safeJsonStringify === 'function' ? safeJsonStringify(historyList || []) : JSON.stringify(historyList || []);
+    localStorage.setItem('plateplan_history_backup', payload);
+    return true;
+  } catch (e) {
+    console.warn('[History Backup Warning]', e);
+    return false;
+  }
 }
 
 const SYNC_OUTBOX_SK='plateplan_v1_sync_outbox';
 const SYNC_DEVICE_SK='plateplan_v1_device_id';
 let platePlanCloudReady=false;
 let platePlanSyncSuppress=false;
+let isHydrating=false;
+window.isHydrating=false;
 let platePlanSyncTimer=null;
 let platePlanFirebaseApp=null;
 let platePlanAuth=null;
@@ -198,6 +246,7 @@ function platePlanCloudRef(key, explicitHouseholdId){
 }
 
 let platePlanCurrentPushPromise = null;
+let lastPersistedStateJson = null;
 
 async function persistPlatePlanDataQualityFix(reason = 'Data quality update'){
   platePlanTransactionShield.inFlight = true;
@@ -215,10 +264,28 @@ async function persistPlatePlanDataQualityFix(reason = 'Data quality update'){
   }
 }
 
+let isRenderingAll = false;
 function renderAll(){
-  rebuildPlatePlanIndexes();
-  platePlanNutritionCache.clear();
-  refreshPlatePlanDerivedState({ persist: false, render: true, full: true });
+  if (isRenderingAll) return;
+  isRenderingAll = true;
+  try {
+    rebuildPlatePlanIndexes();
+    platePlanNutritionCache.clear();
+    refreshPlatePlanDerivedState({ persist: false, render: false, full: true });
+    
+    if (typeof window !== 'undefined') {
+      const activeTab = document.querySelector('.ntab.active, .mobile-nav button.active');
+      const activeView = activeTab?.dataset?.view || 'today';
+      const renderFn = window.renderPlatePlanLegacyView || window.PlatePlanRouter?.renderPlatePlanLegacyView;
+      if (typeof renderFn === 'function') {
+        renderFn(activeView);
+      }
+    }
+  } catch (err) {
+    console.error('Error in renderAll:', err);
+  } finally {
+    isRenderingAll = false;
+  }
 }
 window.renderAll = renderAll;
 
@@ -1148,7 +1215,7 @@ async function executeDataQualityTransaction(mutationType, payload = {}, options
 }
 
 function queuePlatePlanCloudDiff(immediateFlush=false){
-  if(platePlanSyncSuppress || isHydrating || window.isHydrating) return;
+  if(platePlanSyncSuppress || isHydrating || window.isHydrating || isHydratingRemoteState || window.isHydratingRemoteState) return;
   if(immediateFlush){
     clearTimeout(platePlanSyncTimer);
     pushStateToCloud();
@@ -1172,6 +1239,10 @@ function flushPlatePlanSyncOutbox(){
 }
 
 function saveState(immediate=false){
+  if (isHydrating || window.isHydrating) {
+    console.log('[v3.3.7-mod STATE PERSISTENCE] saveState called during hydration; skipped.');
+    return true;
+  }
   window.dispatchEvent(new CustomEvent('plateplan:state-saved',{detail:{source:'cloud',savedAt:Date.now()}}));
   if(state) {
     state.updatedAt=new Date().toISOString();
@@ -1202,11 +1273,6 @@ function saveState(immediate=false){
     }
   } catch(auditErr) {
     console.warn('Reactive audit error in saveState:', auditErr);
-  }
-
-  if (isHydrating || window.isHydrating) {
-    console.log('[v3.3.7-mod STATE PERSISTENCE] saveState called during hydration; cloud diff skipped.');
-    return true;
   }
 
   // Unbind autosave while inside Steps 1, 2, or 3 of Meal Planner
@@ -1718,6 +1784,20 @@ function populateIngredientsState(docs){
   window.appState = state;
 }
 window.populateIngredientsState = populateIngredientsState;
+
+function parseRecipeDocumentToCleanArray(docData) {
+  if (!docData) return [];
+  if (Array.isArray(docData)) return docData;
+  if (typeof docData !== 'object') return [];
+  if (Array.isArray(docData.recipes)) return docData.recipes;
+  if (Array.isArray(docData.items)) return docData.items;
+  if (Array.isArray(docData.list)) return docData.list;
+  const values = Object.values(docData).filter(v => v && typeof v === 'object' && (v.id || v.name));
+  if (values.length > 0) return values;
+  if (docData.id || docData.name) return [docData];
+  return [];
+}
+window.parseRecipeDocumentToCleanArray = parseRecipeDocumentToCleanArray;
 
 function populateRecipesState(docs, options = {}){
   if(!state) state = {};
@@ -2391,42 +2471,43 @@ async function loadSharedPlatePlan(){
     recoveryPointHistory
   ]) || [];
 
-  state.plan = resolvedPlan;
-  state.overrides = plannerDoc.overrides || rootData.overrides || state.overrides || {};
-  state.planHistory = resolvedHistory;
+    state.plan = resolvedPlan;
+    state.overrides = plannerDoc.overrides || rootData.overrides || state.overrides || {};
+    state.planHistory = resolvedHistory;
 
-  if(resolvedPlan && typeof resolvedPlan === 'object' && Object.keys(resolvedPlan).length > 0){
-    safeLocalStorageSet('plateplan_plan_backup', sanitizePlanForFirestore(resolvedPlan));
-  }
-  if(Array.isArray(resolvedHistory) && resolvedHistory.length > 0){
-    safeSaveHistoryBackup(resolvedHistory);
-  }
+    if(resolvedPlan && typeof resolvedPlan === 'object' && Object.keys(resolvedPlan).length > 0){
+      safeLocalStorageSet('plateplan_plan_backup', sanitizePlanForFirestore(resolvedPlan));
+    }
+    if(Array.isArray(resolvedHistory) && resolvedHistory.length > 0){
+      safeSaveHistoryBackup(resolvedHistory);
+    }
 
-  state.meta = {
-    ...(rootData.meta || {}),
-    ...(metaDoc.meta || {}),
-    householdId: targetHouseholdId
-  };
+    state.meta = {
+      ...(rootData.meta || {}),
+      ...(metaDoc.meta || {}),
+      householdId: targetHouseholdId
+    };
 
-  safeLocalStorageSet(SK, safeJsonStringify(state));
-  safeLocalStorageSet('plateplan_offline_backup', safeJsonStringify(state.ingredients));
+    safeLocalStorageSet(SK, safeJsonStringify(state));
+    safeLocalStorageSet('plateplan_offline_backup', safeJsonStringify(state.ingredients));
 
-  window.state = state;
-  window.appState = state;
-  platePlanCloudReady = true;
+    window.state = state;
+    window.appState = state;
+    platePlanCloudReady = true;
 
-  setPlatePlanStartupInert(false);
-  rebuildPlatePlanIndexes();
-  renderAll();
-  runDataQualityAudits();
+    setPlatePlanStartupInert(false);
+    rebuildPlatePlanIndexes();
+    renderAll();
+    runDataQualityAudits();
 
-  startPlatePlanCloudListeners();
-  updatePlatePlanSyncStatus('synced');
+    startPlatePlanCloudListeners();
+    updatePlatePlanSyncStatus('synced');
+  } catch(err) {
+    console.error('[loadSharedPlatePlan] Error applying state:', err);
   } finally {
     isHydrating = false;
     window.isHydrating = false;
     lastPersistedStateJson = safeJsonStringify(state);
-    // console.log('[v3.0.5 STATE PERSISTENCE] Hydration complete; cloud diff checks enabled.');
   }
 }
 
@@ -2591,8 +2672,16 @@ async function startPlatePlanForSignedInUser(user){
     const householdId=config.householdId || 'elliott-chloe';
     window.activeHouseholdId = householdId;
     window.activeHousehold = { id: householdId };
-    if (!state.meta) state.meta = {};
-    state.meta.householdId = householdId;
+    if (typeof state === 'undefined' || !state) {
+      if (typeof window !== 'undefined') {
+        window.state = window.state || {};
+        state = window.state;
+      }
+    }
+    if (typeof state !== 'undefined' && state) {
+      if (!state.meta) state.meta = {};
+      state.meta.householdId = householdId;
+    }
     const root=platePlanDb.collection('households').doc(householdId);
     
     // Automatically record / ensure member is registered so no device is ever locked out
@@ -2637,8 +2726,16 @@ function initPlatePlanCloudSync(){
           const householdId=config.householdId || 'elliott-chloe';
           window.activeHouseholdId = householdId;
           window.activeHousehold = { id: householdId };
-          if (!state.meta) state.meta = {};
-          state.meta.householdId = householdId;
+          if (typeof state === 'undefined' || !state) {
+            if (typeof window !== 'undefined') {
+              window.state = window.state || {};
+              state = window.state;
+            }
+          }
+          if (typeof state !== 'undefined' && state) {
+            if (!state.meta) state.meta = {};
+            state.meta.householdId = householdId;
+          }
           startPlatePlanForSignedInUser(user);
         } else {
           // Attempt anonymous sign-in fallback for instant Firestore connectivity
@@ -2726,22 +2823,47 @@ function initPlatePlanCloudSync(){
     sanitizeRecipeForFirestore,
     sanitizeIngredientForFirestore,
     cleanObject,
+    safeLocalStorageSet,
+    safeSaveHistoryBackup,
     get platePlanDb() { return platePlanDb; },
     get platePlanAuth() { return platePlanAuth; }
   };
 
   if (typeof window !== 'undefined') {
     Object.assign(window, window.PlatePlanCloud);
+    // Explicitly preserve PlatePlanState authoritative sanitization methods to prevent proxy/alias loops
+    if (window.PlatePlanState) {
+      if (typeof window.PlatePlanState.sanitizePayloadForFirestore === 'function') {
+        window.sanitizePayloadForFirestore = window.PlatePlanState.sanitizePayloadForFirestore;
+      }
+      if (typeof window.PlatePlanState.sanitizePlanForFirestore === 'function') {
+        window.sanitizePlanForFirestore = window.PlatePlanState.sanitizePlanForFirestore;
+      }
+      if (typeof window.PlatePlanState.sanitizeRecipeForFirestore === 'function') {
+        window.sanitizeRecipeForFirestore = window.PlatePlanState.sanitizeRecipeForFirestore;
+      }
+      if (typeof window.PlatePlanState.sanitizeIngredientForFirestore === 'function') {
+        window.sanitizeIngredientForFirestore = window.PlatePlanState.sanitizeIngredientForFirestore;
+      }
+      if (typeof window.PlatePlanState.unwrapAndCleanItem === 'function') {
+        window.unwrapAndCleanItem = window.PlatePlanState.unwrapAndCleanItem;
+      }
+      if (typeof window.PlatePlanState.cleanObject === 'function') {
+        window.cleanObject = window.PlatePlanState.cleanObject;
+      }
+      if (typeof window.PlatePlanState.safeLocalStorageSet === 'function') {
+        window.safeLocalStorageSet = window.PlatePlanState.safeLocalStorageSet;
+      }
+      if (typeof window.PlatePlanState.safeSaveHistoryBackup === 'function') {
+        window.safeSaveHistoryBackup = window.PlatePlanState.safeSaveHistoryBackup;
+      }
+    }
     window.initPlatePlanCloudSync = initPlatePlanCloudSync;
     window.pushStateToCloud = pushStateToCloud;
     window.saveState = saveState;
     window.loadSharedPlatePlan = loadSharedPlatePlan;
-    window.sanitizePayloadForFirestore = window.sanitizePayloadForFirestore || sanitizePayloadForFirestore;
-    window.sanitizePlanForFirestore = window.sanitizePlanForFirestore || sanitizePlanForFirestore;
-    window.sanitizeRecipeForFirestore = window.sanitizeRecipeForFirestore || sanitizeRecipeForFirestore;
-    window.sanitizeIngredientForFirestore = window.sanitizeIngredientForFirestore || sanitizeIngredientForFirestore;
-    window.unwrapAndCleanItem = window.unwrapAndCleanItem || unwrapAndCleanItem;
-    window.cleanObject = window.cleanObject || cleanObject;
+    window.safeLocalStorageSet = window.safeLocalStorageSet || safeLocalStorageSet;
+    window.safeSaveHistoryBackup = window.safeSaveHistoryBackup || safeSaveHistoryBackup;
   }
 
   if (typeof window !== 'undefined' && window.firebase && window.PLATEPLAN_FIREBASE) {

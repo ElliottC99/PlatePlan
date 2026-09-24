@@ -1,87 +1,147 @@
 // == COMPATIBILITY BRIDGE ==
-globalThis.PlatePlanLegacy = Object.freeze({
-  version: window.PLATEPLAN_APP_VERSION || '3.3.7-mod',
-  expectedCache: window.PLATEPLAN_EXPECTED_CACHE || 'plateplan-shell-v94',
-  getState: () => (typeof state !== 'undefined' ? state : (window.state || {})),
-  saveState: (...args) => (window.saveState || window.PlatePlanCloud?.saveState || (typeof saveState !== 'undefined' ? saveState : () => {}))(...args),
-  getRecipe: (...args) => (window.getRecipe || (typeof getRecipe !== 'undefined' ? getRecipe : () => null))(...args),
-  getProduct: (...args) => (window.getProduct || (typeof getProduct !== 'undefined' ? getProduct : () => null))(...args),
-  calculateRecipeDisplayNutrition: (...args) => (window.calculateRecipeDisplayNutrition || window.PlatePlanNutrition?.calculateRecipeDisplayNutrition || (typeof calculateRecipeDisplayNutrition !== 'undefined' ? calculateRecipeDisplayNutrition : () => {}))(...args),
-  getPlanContextForInstance: (...args) => (window.getPlanContextForInstance || window.PlatePlanPlanner?.getPlanContextForInstance || (typeof getPlanContextForInstance !== 'undefined' ? getPlanContextForInstance : () => {}))(...args),
-  refreshPlatePlanDerivedState: (...args) => (window.refreshPlatePlanDerivedState || (typeof refreshPlatePlanDerivedState !== 'undefined' ? refreshPlatePlanDerivedState : () => {}))(...args),
-  renderLegacyView: (...args) => (window.renderPlatePlanLegacyView || (typeof renderPlatePlanLegacyView !== 'undefined' ? renderPlatePlanLegacyView : () => {}))(...args),
-  renderers: typeof platePlanFeatureRenderers !== 'undefined' ? platePlanFeatureRenderers : (window.platePlanFeatureRenderers || {}),
-  openSearchResult: (...args) => (window.openPlatePlanSearchResult || (typeof openPlatePlanSearchResult !== 'undefined' ? openPlatePlanSearchResult : () => {}))(...args),
-  runDelegatedAction: (...args) => (window.runPlatePlanDelegatedAction || (typeof runPlatePlanDelegatedAction !== 'undefined' ? runPlatePlanDelegatedAction : () => {}))(...args),
-  showInfo: (...args) => (window.openAppInfoModal || window.PlatePlanIngredientBank?.openAppInfoModal || (typeof openAppInfoModal !== 'undefined' ? openAppInfoModal : () => {}))(...args),
-  closeInfo: (...args) => (window.closeAppConfirmModal || (typeof closeAppConfirmModal !== 'undefined' ? closeAppConfirmModal : () => {}))(...args),
-  showOverlay: (...args) => (window.showOverlay || (typeof showOverlay !== 'undefined' ? showOverlay : () => {}))(...args),
-  hideOverlay: (...args) => (window.hideOverlay || (typeof hideOverlay !== 'undefined' ? hideOverlay : () => {}))(...args),
-  showToast: (...args) => (window.showPlatePlanToast || (typeof showPlatePlanToast !== 'undefined' ? showPlatePlanToast : () => {}))(...args),
-  createRecoveryPoint: (...args) => (window.createRecoveryPoint || (typeof createRecoveryPoint !== 'undefined' ? createRecoveryPoint : () => {}))(...args),
-  renderRecoveryPanel: (...args) => (window.renderRecoveryPanel || (typeof renderRecoveryPanel !== 'undefined' ? renderRecoveryPanel : () => {}))(...args),
-  initCloudSync: (...args) => (window.initPlatePlanCloudSync || window.PlatePlanCloud?.initPlatePlanCloudSync || (typeof initPlatePlanCloudSync !== 'undefined' ? initPlatePlanCloudSync : () => {}))(...args),
-  signOut: (...args) => (window.signOutPlatePlan || window.PlatePlanCloud?.signOutPlatePlan || (typeof signOutPlatePlan !== 'undefined' ? signOutPlatePlan : () => {}))(...args),
-  renderAll: (...args) => (window.renderAll || (typeof renderAll !== 'undefined' ? renderAll : () => {}))(...args),
-  saveIngredient: (...args) => (window.saveIngredient || window.PlatePlanIngredientBank?.saveIngredient || (typeof saveIngredient !== 'undefined' ? saveIngredient : () => {}))(...args),
-  addIngredient: (...args) => (window.addIngredient || window.PlatePlanIngredientBank?.addIngredient || (typeof addIngredient !== 'undefined' ? addIngredient : () => {}))(...args),
-  deleteIngredient: (...args) => (window.deleteIngredient || window.PlatePlanIngredientBank?.deleteIngredient || (typeof deleteIngredient !== 'undefined' ? deleteIngredient : () => {}))(...args),
-  saveManualIng: (...args) => (window.saveManualIng || window.PlatePlanIngredientBank?.saveManualIng || (typeof saveManualIng !== 'undefined' ? saveManualIng : () => {}))(...args),
-  deleteIng: (...args) => (window.deleteIng || (typeof deleteIng !== 'undefined' ? deleteIng : () => {}))(...args),
-  abortBatchImport: (...args) => (window.abortBatchImport || (typeof abortBatchImport !== 'undefined' ? abortBatchImport : () => {}))(...args),
-  skipBatchImportRecipe: (...args) => (window.skipBatchImportRecipe || (typeof skipBatchImportRecipe !== 'undefined' ? skipBatchImportRecipe : () => {}))(...args),
-  confirmBatchIdentification: (...args) => (window.confirmBatchIdentification || (typeof confirmBatchIdentification !== 'undefined' ? confirmBatchIdentification : () => {}))(...args),
-  loadBatchRecipeIntoStepA: (...args) => (window.loadBatchRecipeIntoStepA || (typeof loadBatchRecipeIntoStepA !== 'undefined' ? loadBatchRecipeIntoStepA : () => {}))(...args),
-  openConfirmRecipeIdentificationModal: (...args) => (window.openConfirmRecipeIdentificationModal || (typeof openConfirmRecipeIdentificationModal !== 'undefined' ? openConfirmRecipeIdentificationModal : () => {}))(...args),
-  updateBatchUiBanners: (...args) => (window.updateBatchUiBanners || (typeof updateBatchUiBanners !== 'undefined' ? updateBatchUiBanners : () => {}))(...args),
-  openTescoModal: (...args) => (window.openTescoModal || window.PlatePlanRecipeEditor?.openTescoModal || (typeof openTescoModal !== 'undefined' ? openTescoModal : () => {}))(...args),
-  showTescoSearchModal: (...args) => (window.showTescoSearchModal || window.PlatePlanRecipeEditor?.showTescoSearchModal || (typeof showTescoSearchModal !== 'undefined' ? showTescoSearchModal : () => {}))(...args),
-  openAddProductModal: (...args) => (window.openAddProductModal || window.PlatePlanRecipeEditor?.openAddProductModal || (typeof openAddProductModal !== 'undefined' ? openAddProductModal : () => {}))(...args),
-  openProductPicker: (...args) => (window.openProductPicker || window.PlatePlanRecipeEditor?.openProductPicker || (typeof openProductPicker !== 'undefined' ? openProductPicker : () => {}))(...args),
-  showTescoImport: (...args) => (window.showTescoImport || window.PlatePlanIngredientBank?.showTescoImport || (typeof showTescoImport !== 'undefined' ? showTescoImport : () => {}))(...args),
-  closeTescoModal: (...args) => (window.closeTescoModal || window.PlatePlanIngredientBank?.closeTescoModal || (typeof closeTescoModal !== 'undefined' ? closeTescoModal : () => {}))(...args),
-  openUnifiedMappingModal: (...args) => (window.openUnifiedMappingModal || window.PlatePlanRecipeEditor?.openUnifiedMappingModal || (typeof openUnifiedMappingModal !== 'undefined' ? openUnifiedMappingModal : () => {}))(...args),
-  closeUnifiedMappingModal: (...args) => (window.closeUnifiedMappingModal || window.PlatePlanRecipeEditor?.closeUnifiedMappingModal || (typeof closeUnifiedMappingModal !== 'undefined' ? closeUnifiedMappingModal : () => {}))(...args),
-  openTescoImportFromSubst: (...args) => (window.openTescoImportFromSubst || window.PlatePlanIngredientBank?.openTescoImportFromSubst || (typeof openTescoImportFromSubst !== 'undefined' ? openTescoImportFromSubst : () => {}))(...args),
-  closeSubstituteModal: (...args) => (window.closeSubstituteModal || window.PlatePlanShoppingList?.closeSubstituteModal || (typeof closeSubstituteModal !== 'undefined' ? closeSubstituteModal : () => {}))(...args),
-  confirmSubstitute: (...args) => (window.confirmSubstitute || window.PlatePlanShoppingList?.confirmSubstitute || (typeof confirmSubstitute !== 'undefined' ? confirmSubstitute : () => {}))(...args),
-  extractTescoProduct: (...args) => (window.extractTescoProduct || window.PlatePlanIngredientBank?.extractTescoProduct || (typeof extractTescoProduct !== 'undefined' ? extractTescoProduct : () => {}))(...args),
-  saveTescoIngredient: (...args) => (window.saveTescoIngredient || window.PlatePlanIngredientBank?.saveTescoIngredient || (typeof saveTescoIngredient !== 'undefined' ? saveTescoIngredient : () => {}))(...args),
-  runDataQualityAudits: (...args) => (window.runDataQualityAudits || (typeof runDataQualityAudits !== 'undefined' ? runDataQualityAudits : () => {}))(...args),
-  updateDataQualityBadge: (...args) => (window.updateDataQualityBadge || (typeof updateDataQualityBadge !== 'undefined' ? updateDataQualityBadge : () => {}))(...args),
-  fixSubtypeDataQuality: (...args) => (window.fixSubtypeDataQuality || (typeof fixSubtypeDataQuality !== 'undefined' ? fixSubtypeDataQuality : () => {}))(...args)
-});
+(() => {
+  const escapeHtmlFallback = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const escapeAttrFallback = (value) => escapeHtmlFallback(value).replace(/`/g, '&#96;');
+  if (typeof window !== 'undefined') {
+    if (!window.ppEscapeHtml) window.ppEscapeHtml = escapeHtmlFallback;
+    if (!window.ppEscapeAttr) window.ppEscapeAttr = escapeAttrFallback;
+  }
 
-window.renderAll = typeof renderAll !== 'undefined' ? renderAll : (window.renderAll || window.PlatePlanLegacy?.renderAll);
-window.saveIngredient = typeof saveIngredient !== 'undefined' ? saveIngredient : (window.saveIngredient || window.PlatePlanIngredientBank?.saveIngredient);
-window.addIngredient = typeof addIngredient !== 'undefined' ? addIngredient : (window.addIngredient || window.PlatePlanIngredientBank?.addIngredient);
-window.deleteIngredient = typeof deleteIngredient !== 'undefined' ? deleteIngredient : (window.deleteIngredient || window.PlatePlanIngredientBank?.deleteIngredient);
-window.saveManualIng = typeof saveManualIng !== 'undefined' ? saveManualIng : (window.saveManualIng || window.PlatePlanIngredientBank?.saveManualIng);
-window.deleteIng = typeof deleteIng !== 'undefined' ? deleteIng : (window.deleteIng || window.PlatePlanIngredientBank?.deleteIng);
-window.abortBatchImport = typeof abortBatchImport !== 'undefined' ? abortBatchImport : window.abortBatchImport;
-window.skipBatchImportRecipe = typeof skipBatchImportRecipe !== 'undefined' ? skipBatchImportRecipe : window.skipBatchImportRecipe;
-window.confirmBatchIdentification = typeof confirmBatchIdentification !== 'undefined' ? confirmBatchIdentification : window.confirmBatchIdentification;
-window.loadBatchRecipeIntoStepA = typeof loadBatchRecipeIntoStepA !== 'undefined' ? loadBatchRecipeIntoStepA : window.loadBatchRecipeIntoStepA;
-window.openConfirmRecipeIdentificationModal = typeof openConfirmRecipeIdentificationModal !== 'undefined' ? openConfirmRecipeIdentificationModal : window.openConfirmRecipeIdentificationModal;
-window.updateBatchUiBanners = typeof updateBatchUiBanners !== 'undefined' ? updateBatchUiBanners : window.updateBatchUiBanners;
-window.openTescoModal = typeof openTescoModal !== 'undefined' ? openTescoModal : (window.openTescoModal || window.PlatePlanRecipeEditor?.openTescoModal);
-window.showTescoSearchModal = typeof showTescoSearchModal !== 'undefined' ? showTescoSearchModal : (window.showTescoSearchModal || window.PlatePlanRecipeEditor?.showTescoSearchModal);
-window.openAddProductModal = typeof openAddProductModal !== 'undefined' ? openAddProductModal : (window.openAddProductModal || window.PlatePlanRecipeEditor?.openAddProductModal);
-window.openProductPicker = typeof openProductPicker !== 'undefined' ? openProductPicker : (window.openProductPicker || window.PlatePlanRecipeEditor?.openProductPicker);
-window.showTescoImport = typeof showTescoImport !== 'undefined' ? showTescoImport : (window.showTescoImport || window.PlatePlanIngredientBank?.showTescoImport);
-window.closeTescoModal = typeof closeTescoModal !== 'undefined' ? closeTescoModal : (window.closeTescoModal || window.PlatePlanIngredientBank?.closeTescoModal);
-window.openUnifiedMappingModal = typeof openUnifiedMappingModal !== 'undefined' ? openUnifiedMappingModal : (window.openUnifiedMappingModal || window.PlatePlanRecipeEditor?.openUnifiedMappingModal);
-window.closeUnifiedMappingModal = typeof closeUnifiedMappingModal !== 'undefined' ? closeUnifiedMappingModal : (window.closeUnifiedMappingModal || window.PlatePlanRecipeEditor?.closeUnifiedMappingModal);
-window.openTescoImportFromSubst = typeof openTescoImportFromSubst !== 'undefined' ? openTescoImportFromSubst : (window.openTescoImportFromSubst || window.PlatePlanIngredientBank?.openTescoImportFromSubst);
-window.closeSubstituteModal = typeof closeSubstituteModal !== 'undefined' ? closeSubstituteModal : (window.closeSubstituteModal || window.PlatePlanShoppingList?.closeSubstituteModal);
-window.confirmSubstitute = typeof confirmSubstitute !== 'undefined' ? confirmSubstitute : (window.confirmSubstitute || window.PlatePlanShoppingList?.confirmSubstitute);
-window.extractTescoProduct = typeof extractTescoProduct !== 'undefined' ? extractTescoProduct : (window.extractTescoProduct || window.PlatePlanIngredientBank?.extractTescoProduct);
-window.saveTescoIngredient = typeof saveTescoIngredient !== 'undefined' ? saveTescoIngredient : (window.saveTescoIngredient || window.PlatePlanIngredientBank?.saveTescoIngredient);
-window.runDataQualityAudits = typeof runDataQualityAudits !== 'undefined' ? runDataQualityAudits : window.runDataQualityAudits;
-window.updateDataQualityBadge = typeof updateDataQualityBadge !== 'undefined' ? updateDataQualityBadge : window.updateDataQualityBadge;
-window.fixSubtypeDataQuality = typeof fixSubtypeDataQuality !== 'undefined' ? fixSubtypeDataQuality : window.fixSubtypeDataQuality;
-window.renderVault = typeof renderVault !== 'undefined' ? renderVault : window.renderVault;
-window.isRecipeVariantFavourite = typeof isRecipeVariantFavourite !== 'undefined' ? isRecipeVariantFavourite : window.isRecipeVariantFavourite;
-window.isRecipeVariantFavorite = typeof isRecipeVariantFavourite !== 'undefined' ? isRecipeVariantFavourite : window.isRecipeVariantFavorite;
+  const bridgeFunctions = {};
 
-window.dispatchEvent(new CustomEvent('plateplan:legacy-ready', { detail: { version: window.PLATEPLAN_APP_VERSION || '3.3.7-mod' } }));
+  const safeResolve = (globalName, fallback = () => {}) => {
+    const bridgeFn = (...args) => {
+      // Find the actual target function on window
+      const fn = window[globalName];
+      // Make sure we don't call ourselves recursively
+      if (fn && typeof fn === 'function' && fn !== bridgeFn) {
+        return fn(...args);
+      }
+      return fallback(...args);
+    };
+    bridgeFunctions[globalName] = bridgeFn;
+    return bridgeFn;
+  };
+
+  globalThis.PlatePlanLegacy = Object.freeze({
+    version: window.PLATEPLAN_APP_VERSION || '3.3.7-mod',
+    expectedCache: window.PLATEPLAN_EXPECTED_CACHE || 'plateplan-shell-v94',
+    getState: () => (typeof state !== 'undefined' ? state : (window.state || {})),
+    saveState: safeResolve('saveState'),
+    getRecipe: safeResolve('getRecipe'),
+    getProduct: safeResolve('getProduct'),
+    calculateRecipeDisplayNutrition: safeResolve('calculateRecipeDisplayNutrition'),
+    getPlanContextForInstance: safeResolve('getPlanContextForInstance'),
+    refreshPlatePlanDerivedState: safeResolve('refreshPlatePlanDerivedState'),
+    renderLegacyView: safeResolve('renderPlatePlanLegacyView'),
+    get renderers() {
+      return typeof platePlanFeatureRenderers !== 'undefined' ? platePlanFeatureRenderers : (window.platePlanFeatureRenderers || window.PlatePlanRouter?.platePlanFeatureRenderers || {});
+    },
+    openSearchResult: safeResolve('openPlatePlanSearchResult'),
+    runDelegatedAction: safeResolve('runPlatePlanDelegatedAction'),
+    showInfo: safeResolve('openAppInfoModal'),
+    closeInfo: safeResolve('closeAppConfirmModal'),
+    showOverlay: safeResolve('showOverlay'),
+    hideOverlay: safeResolve('hideOverlay'),
+    showToast: safeResolve('showPlatePlanToast'),
+    createRecoveryPoint: safeResolve('createRecoveryPoint'),
+    renderRecoveryPanel: safeResolve('renderRecoveryPanel'),
+    initCloudSync: safeResolve('initPlatePlanCloudSync'),
+    signOut: safeResolve('signOutPlatePlan'),
+    renderAll: safeResolve('renderAll'),
+    saveIngredient: safeResolve('saveIngredient'),
+    addIngredient: safeResolve('addIngredient'),
+    deleteIngredient: safeResolve('deleteIngredient'),
+    saveManualIng: safeResolve('saveManualIng'),
+    deleteIng: safeResolve('deleteIng'),
+    abortBatchImport: safeResolve('abortBatchImport'),
+    skipBatchImportRecipe: safeResolve('skipBatchImportRecipe'),
+    confirmBatchIdentification: safeResolve('confirmBatchIdentification'),
+    loadBatchRecipeIntoStepA: safeResolve('loadBatchRecipeIntoStepA'),
+    openConfirmRecipeIdentificationModal: safeResolve('openConfirmRecipeIdentificationModal'),
+    updateBatchUiBanners: safeResolve('updateBatchUiBanners'),
+    openTescoModal: safeResolve('openTescoModal'),
+    showTescoSearchModal: safeResolve('showTescoSearchModal'),
+    openAddProductModal: safeResolve('openAddProductModal'),
+    openProductPicker: safeResolve('openProductPicker'),
+    showTescoImport: safeResolve('showTescoImport'),
+    closeTescoModal: safeResolve('closeTescoModal'),
+    openUnifiedMappingModal: safeResolve('openUnifiedMappingModal'),
+    closeUnifiedMappingModal: safeResolve('closeUnifiedMappingModal'),
+    openTescoImportFromSubst: safeResolve('openTescoImportFromSubst'),
+    closeSubstituteModal: safeResolve('closeSubstituteModal'),
+    confirmSubstitute: safeResolve('confirmSubstitute'),
+    extractTescoProduct: safeResolve('extractTescoProduct'),
+    saveTescoIngredient: safeResolve('saveTescoIngredient'),
+    runDataQualityAudits: safeResolve('runDataQualityAudits'),
+    updateDataQualityBadge: safeResolve('updateDataQualityBadge'),
+    fixSubtypeDataQuality: safeResolve('fixSubtypeDataQuality'),
+    ensureIngredientGroups: safeResolve('ensureIngredientGroups'),
+    ensureIngredientFamilies: safeResolve('ensureIngredientFamilies'),
+    hasUsableIngredientNutrition: safeResolve('hasUsableIngredientNutrition'),
+    getGroupIngredientFamily: safeResolve('getGroupIngredientFamily'),
+    resolveProductForIngredient: safeResolve('resolveProductForIngredient'),
+    resolveProductForIngredientWithContext: safeResolve('resolveProductForIngredientWithContext'),
+    getGroupProducts: safeResolve('getGroupProducts'),
+    getFamilyGroups: safeResolve('getFamilyGroups'),
+    getGroupHierarchyText: safeResolve('getGroupHierarchyText'),
+    needsItemWeightForQtyIngredient: safeResolve('needsItemWeightForQtyIngredient'),
+    getIngredientMappingWarning: safeResolve('getIngredientMappingWarning'),
+    round1: safeResolve('round1'),
+    normaliseAliasText: safeResolve('normaliseAliasText'),
+    inferIngredientFamilyFromText: safeResolve('inferIngredientFamilyFromText'),
+    getIngredientById: safeResolve('getIngredientById'),
+    getProductById: safeResolve('getProductById'),
+    getEffectiveProductPrice: safeResolve('getEffectiveProductPrice'),
+    calculateIngredientCost: safeResolve('calculateIngredientCost')
+  });
+
+  // Assign the global properties only if they aren't already defined as different functions
+  const assignGlobal = (name, fallback) => {
+    const existing = window[name];
+    if (!existing || existing === bridgeFunctions[name]) {
+      window[name] = fallback;
+    }
+  };
+
+  assignGlobal('resolveProductForIngredient', safeResolve('resolveProductForIngredient', (...args) => (window.PlatePlanIngredients?.resolveProductForIngredient || window.PlatePlanNutrition?.resolveProductForIngredient || window.resolveProductForIngredient || (() => ({ product: null, group: null, productId: null, groupId: null })))(...args)));
+  assignGlobal('resolveProductForIngredientWithContext', safeResolve('resolveProductForIngredientWithContext', (...args) => (window.PlatePlanIngredients?.resolveProductForIngredientWithContext || window.resolveProductForIngredientWithContext || window.resolveProductForIngredient || (() => ({ product: null, group: null, productId: null, groupId: null })))(...args)));
+  assignGlobal('getGroupProducts', safeResolve('getGroupProducts', (...args) => (window.PlatePlanIngredients?.getGroupProducts || window.getGroupProducts || (() => []))(...args)));
+  assignGlobal('getFamilyGroups', safeResolve('getFamilyGroups', (...args) => (window.PlatePlanIngredients?.getFamilyGroups || window.getFamilyGroups || (() => []))(...args)));
+  assignGlobal('getGroupHierarchyText', safeResolve('getGroupHierarchyText', (...args) => (window.PlatePlanIngredients?.getGroupHierarchyText || window.getGroupHierarchyText || (g => g?.name || ''))(...args)));
+  assignGlobal('needsItemWeightForQtyIngredient', safeResolve('needsItemWeightForQtyIngredient', (...args) => (window.PlatePlanIngredients?.needsItemWeightForQtyIngredient || window.needsItemWeightForQtyIngredient || (() => false))(...args)));
+  assignGlobal('getIngredientMappingWarning', safeResolve('getIngredientMappingWarning', (...args) => (window.PlatePlanIngredients?.getIngredientMappingWarning || window.getIngredientMappingWarning || (() => null))(...args)));
+  assignGlobal('round1', safeResolve('round1', (...args) => (window.PlatePlanIngredients?.round1 || window.round1 || (v => Math.round((+v || 0) * 10) / 10))(...args)));
+  assignGlobal('normaliseAliasText', safeResolve('normaliseAliasText', (...args) => (window.PlatePlanIngredients?.normaliseAliasText || window.normaliseAliasText || (t => String(t || '').trim()))(...args)));
+  assignGlobal('inferIngredientFamilyFromText', safeResolve('inferIngredientFamilyFromText', (...args) => (window.PlatePlanIngredients?.inferIngredientFamilyFromText || window.inferIngredientFamilyFromText || (t => String(t || '').trim()))(...args)));
+  assignGlobal('getIngredientById', safeResolve('getIngredientById', (...args) => (window.PlatePlanIngredients?.getIngredientById || window.getIngredientById || (() => null))(...args)));
+  assignGlobal('getProductById', safeResolve('getProductById', (...args) => (window.PlatePlanIngredients?.getProductById || window.getProductById || (() => null))(...args)));
+  assignGlobal('getEffectiveProductPrice', safeResolve('getEffectiveProductPrice', (...args) => (window.PlatePlanIngredients?.getEffectiveProductPrice || window.getEffectiveProductPrice || (() => 0))(...args)));
+  assignGlobal('calculateIngredientCost', safeResolve('calculateIngredientCost', (...args) => (window.PlatePlanIngredients?.calculateIngredientCost || window.calculateIngredientCost || (() => 0))(...args)));
+  assignGlobal('getGroupIngredientFamily', safeResolve('getGroupIngredientFamily', (...args) => (window.PlatePlanNutrition?.getGroupIngredientFamily || window.PlatePlanModals?.getGroupIngredientFamily || window.getGroupIngredientFamily || (() => null))(...args)));
+  assignGlobal('hasUsableIngredientNutrition', safeResolve('hasUsableIngredientNutrition', (...args) => (window.PlatePlanNutrition?.hasUsableIngredientNutrition || hasUsableIngredientNutrition || (() => false))(...args)));
+  assignGlobal('ensureIngredientGroups', safeResolve('ensureIngredientGroups', (...args) => (window.PlatePlanState?.ensureIngredientGroups || window.PlatePlanNutrition?.ensureIngredientGroups || (() => []))(...args)));
+  assignGlobal('ensureIngredientFamilies', safeResolve('ensureIngredientFamilies', (...args) => (window.PlatePlanState?.ensureIngredientFamilies || window.PlatePlanNutrition?.ensureIngredientFamilies || (() => []))(...args)));
+  assignGlobal('renderAll', bridgeFunctions['renderAll']);
+  assignGlobal('saveIngredient', safeResolve('saveIngredient', (...args) => (window.PlatePlanIngredientBank?.saveIngredient || (() => {}))(...args)));
+  assignGlobal('addIngredient', safeResolve('addIngredient', (...args) => (window.PlatePlanIngredientBank?.addIngredient || (() => {}))(...args)));
+  assignGlobal('deleteIngredient', safeResolve('deleteIngredient', (...args) => (window.PlatePlanIngredientBank?.deleteIngredient || (() => {}))(...args)));
+  assignGlobal('saveManualIng', safeResolve('saveManualIng', (...args) => (window.PlatePlanIngredientBank?.saveManualIng || (() => {}))(...args)));
+  assignGlobal('deleteIng', safeResolve('deleteIng', (...args) => (window.PlatePlanIngredientBank?.deleteIng || (() => {}))(...args)));
+
+  assignGlobal('openTescoModal', safeResolve('openTescoModal', (...args) => (window.PlatePlanRecipeEditor?.openTescoModal || (() => {}))(...args)));
+  assignGlobal('showTescoSearchModal', safeResolve('showTescoSearchModal', (...args) => (window.PlatePlanRecipeEditor?.showTescoSearchModal || (() => {}))(...args)));
+  assignGlobal('openAddProductModal', safeResolve('openAddProductModal', (...args) => (window.PlatePlanRecipeEditor?.openAddProductModal || (() => {}))(...args)));
+  assignGlobal('openProductPicker', safeResolve('openProductPicker', (...args) => (window.PlatePlanRecipeEditor?.openProductPicker || (() => {}))(...args)));
+  assignGlobal('showTescoImport', safeResolve('showTescoImport', (...args) => (window.PlatePlanIngredientBank?.showTescoImport || (() => {}))(...args)));
+  assignGlobal('closeTescoModal', safeResolve('closeTescoModal', (...args) => (window.PlatePlanIngredientBank?.closeTescoModal || (() => {}))(...args)));
+  assignGlobal('openUnifiedMappingModal', safeResolve('openUnifiedMappingModal', (...args) => (window.PlatePlanRecipeEditor?.openUnifiedMappingModal || (() => {}))(...args)));
+  assignGlobal('closeUnifiedMappingModal', safeResolve('closeUnifiedMappingModal', (...args) => (window.PlatePlanRecipeEditor?.closeUnifiedMappingModal || (() => {}))(...args)));
+  assignGlobal('openTescoImportFromSubst', safeResolve('openTescoImportFromSubst', (...args) => (window.PlatePlanIngredientBank?.openTescoImportFromSubst || (() => {}))(...args)));
+  assignGlobal('closeSubstituteModal', safeResolve('closeSubstituteModal', (...args) => (window.PlatePlanShoppingList?.closeSubstituteModal || (() => {}))(...args)));
+  assignGlobal('confirmSubstitute', safeResolve('confirmSubstitute', (...args) => (window.PlatePlanShoppingList?.confirmSubstitute || (() => {}))(...args)));
+  assignGlobal('extractTescoProduct', safeResolve('extractTescoProduct', (...args) => (window.PlatePlanIngredientBank?.extractTescoProduct || (() => {}))(...args)));
+  assignGlobal('saveTescoIngredient', safeResolve('saveTescoIngredient', (...args) => (window.PlatePlanIngredientBank?.saveTescoIngredient || (() => {}))(...args)));
+
+  window.dispatchEvent(new CustomEvent('plateplan:legacy-ready', { detail: { version: window.PLATEPLAN_APP_VERSION || '3.3.7-mod' } }));
+})();

@@ -5,6 +5,24 @@
  */
 
 (() => {
+const ppEscapeHtml = (value) => {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+};
+
+const ppEscapeAttr = (value) => {
+  return ppEscapeHtml(value).replace(/`/g, '&#96;');
+};
+
+if (typeof window !== 'undefined') {
+  if (!window.ppEscapeHtml) window.ppEscapeHtml = ppEscapeHtml;
+  if (!window.ppEscapeAttr) window.ppEscapeAttr = ppEscapeAttr;
+}
+
 const platePlanToastActions = new Map();
 
 const runPlatePlanToastAction = (id) => {

@@ -425,6 +425,7 @@
 
   if (typeof window !== 'undefined') {
     window.PlatePlanRouter = PlatePlanRouter;
+    window.platePlanFeatureRenderers = platePlanFeatureRenderers;
 
     // Explicit backward-compatibility bindings on window
     window.bindTopBarActionListeners = bindTopBarActionListeners;

@@ -719,6 +719,58 @@ function getIngredientFamily(familyId) {
 }
 window.getIngredientFamily = getIngredientFamily;
 
+function getGroupIngredientFamily(groupOrId, targetState = null) {
+  if (!groupOrId) return null;
+  const s = targetState || (typeof window !== 'undefined' ? window.state : null) || null;
+  const families = s?.ingredientFamilies || [];
+  const groups = s?.ingredientGroups || [];
+
+  let group = groupOrId;
+  if (typeof group === 'string' || typeof group === 'number') {
+    const strId = String(group);
+    if (typeof window !== 'undefined' && window.platePlanIndexes?.groups) {
+      group = window.platePlanIndexes.groups.get(strId) || window.platePlanIndexes.groups.get(group);
+    }
+    if (!group || typeof group !== 'object') {
+      group = groups.find(g => g && (String(g.id) === strId || g.name === groupOrId));
+    }
+    if (!group) {
+      if (typeof window !== 'undefined' && window.platePlanIndexes?.families) {
+        const directFam = window.platePlanIndexes.families.get(strId) || window.platePlanIndexes.families.get(groupOrId);
+        if (directFam) return directFam;
+      }
+      return families.find(f => f && (String(f.id) === strId || f.name === groupOrId)) || null;
+    }
+  }
+
+  if (!group || typeof group !== 'object') return null;
+
+  const familyId = group.ingredientId || group.familyId;
+  if (familyId) {
+    if (typeof window !== 'undefined' && window.platePlanIndexes?.families) {
+      const found = window.platePlanIndexes.families.get(String(familyId)) || window.platePlanIndexes.families.get(familyId);
+      if (found) return found;
+    }
+    const found = families.find(f => f && (String(f.id) === String(familyId) || f.name === familyId));
+    if (found) return found;
+  }
+
+  if (group.family) {
+    const famStr = String(group.family).trim().toLowerCase();
+    const found = families.find(f => f && (String(f.id) === group.family || String(f.name || '').trim().toLowerCase() === famStr));
+    if (found) return found;
+    return { id: group.ingredientId || group.familyId || group.family, name: group.family, cat: group.cat || 'other' };
+  }
+
+  if (group.cat) {
+    const found = families.find(f => f && (f.cat === group.cat || f.id === group.cat));
+    if (found) return found;
+  }
+
+  return null;
+}
+window.getGroupIngredientFamily = getGroupIngredientFamily;
+
 function getProduct(productId) {
   if (!productId) return null;
   return window.platePlanIndexes?.products?.get(productId) || (window.state?.ingredients || []).find(i => i.id === productId) || null;

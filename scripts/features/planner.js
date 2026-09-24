@@ -5208,7 +5208,8 @@ function filterRecipeSwap(inputRef, listRef){
     installPlannerSummaryObserver,
     resetTodayDate,
     scheduleTodayMidnightRefresh,
-    platePlanUseUpCoverageCache
+    platePlanUseUpCoverageCache,
+    moveTodayDate
   };
 
   if (typeof window !== 'undefined') {
@@ -5218,5 +5219,6 @@ function filterRecipeSwap(inputRef, listRef){
     window.resetTodayDate = resetTodayDate;
     window.scheduleTodayMidnightRefresh = scheduleTodayMidnightRefresh;
     window.platePlanUseUpCoverageCache = platePlanUseUpCoverageCache;
+    window.moveTodayDate = moveTodayDate;
   }
 })();

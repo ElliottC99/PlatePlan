@@ -415,6 +415,564 @@ const computeMacroProgress = (actual = 0, target = 0, isProtein = false) => {
   return { pct, label, color, isMet };
 };
 
+const getEffectiveIngredientGrams = (ing, product) => {
+  if (!ing) return 0;
+  const qty = parseFloat(ing.qty ?? ing.amount ?? ing.grams ?? 0);
+  const unit = (ing.unit || '').toLowerCase().trim();
+  const itemWeight = product ? (parseFloat(product.itemWeight) || 100) : 100;
+  return window.toGrams ? window.toGrams(qty, unit, itemWeight) : qty;
+};
+
+const calcPortions = (nutrition, prefs, serves, who, mealType) => {
+  const s = parseFloat(serves) || 1;
+  const p = prefs || window.state?.prefs || {};
+  
+  const eBud = (window.PlatePlanNutrition && typeof window.PlatePlanNutrition.getBudgets === 'function')
+    ? window.PlatePlanNutrition.getBudgets('e', mealType, p)
+    : getBudgets('e', mealType, p);
+  const cBud = (window.PlatePlanNutrition && typeof window.PlatePlanNutrition.getBudgets === 'function')
+    ? window.PlatePlanNutrition.getBudgets('c', mealType, p)
+    : getBudgets('c', mealType, p);
+
+  let eServ = 0;
+  let cServ = 0;
+
+  const w = String(who || 'both').toLowerCase();
+  if (w === 'e') {
+    eServ = s;
+    cServ = 0;
+  } else if (w === 'c') {
+    eServ = 0;
+    cServ = s;
+  } else {
+    const totalCalTarget = eBud.cal + cBud.cal;
+    if (totalCalTarget > 0) {
+      eServ = s * (eBud.cal / totalCalTarget);
+      cServ = s * (cBud.cal / totalCalTarget);
+    } else {
+      eServ = s / 2;
+      cServ = s / 2;
+    }
+  }
+
+  const calPerServ = parseFloat(nutrition?.cal ?? nutrition?.kcal ?? 0);
+  const protPerServ = parseFloat(nutrition?.prot ?? nutrition?.protein ?? 0);
+  const carbPerServ = parseFloat(nutrition?.carb ?? nutrition?.carbs ?? 0);
+  const fatPerServ = parseFloat(nutrition?.fat ?? 0);
+  const fibrePerServ = parseFloat(nutrition?.fibre ?? nutrition?.fiber ?? 0);
+
+  const eCal = eServ * calPerServ;
+  const eProt = eServ * protPerServ;
+  const cCal = cServ * calPerServ;
+  const cProt = cServ * protPerServ;
+
+  const totalCal = eCal + cCal;
+  const ePct = totalCal > 0 ? (eCal / totalCal) * 100 : 0;
+  const cPct = totalCal > 0 ? (cCal / totalCal) * 100 : 0;
+
+  return {
+    eSingleServ: Math.round(eServ * 100) / 100,
+    cSingleServ: Math.round(cServ * 100) / 100,
+    eCal: Math.round(eCal),
+    eProt: Math.round(eProt * 10) / 10,
+    cCal: Math.round(cCal),
+    cProt: Math.round(cProt * 10) / 10,
+    ePct: Math.round(ePct),
+    cPct: Math.round(cPct),
+    e: (Math.round(eServ * 100) / 100) + ' serving' + (Math.abs(eServ - 1) < 0.01 ? '' : 's'),
+    c: (Math.round(cServ * 100) / 100) + ' serving' + (Math.abs(cServ - 1) < 0.01 ? '' : 's')
+  };
+};
+
+const resolveProductForIngredient = (ingredientOrId, contextOrState = null, targetState = null) => {
+  if (typeof window !== 'undefined' && typeof window.PlatePlanIngredients?.resolveProductForIngredient === 'function') {
+    return window.PlatePlanIngredients.resolveProductForIngredient(ingredientOrId, contextOrState, targetState);
+  }
+
+  if (!ingredientOrId) {
+    return { product: null, group: null, productId: null, groupId: null };
+  }
+
+  let s = targetState;
+  let resolutionContext = null;
+
+  if (contextOrState && (contextOrState.ingredients || contextOrState.ingredientGroups || contextOrState.ingredientProductMappings || contextOrState.recipes)) {
+    s = contextOrState;
+  } else if (contextOrState && typeof contextOrState === 'object') {
+    resolutionContext = contextOrState;
+  }
+  if (!s) {
+    s = (typeof window !== 'undefined' ? window.state : null) || (typeof state !== 'undefined' ? state : null);
+  }
+
+  const productsList = s?.ingredients || s?.products || [];
+  const groupsList = s?.ingredientGroups || [];
+  const mappings = s?.ingredientProductMappings || {};
+
+  let ing = ingredientOrId;
+  let directId = null;
+  if (typeof ing === 'string' || typeof ing === 'number') {
+    directId = String(ing);
+    ing = { id: directId, productId: directId, bankId: directId };
+  }
+
+  const findProductById = (id) => {
+    if (!id) return null;
+    const str = String(id);
+    if (typeof window !== 'undefined' && window.platePlanIndexes?.products) {
+      const idxP = window.platePlanIndexes.products.get(str) || window.platePlanIndexes.products.get(id);
+      if (idxP) return idxP;
+    }
+    if (typeof window !== 'undefined' && typeof window.getProduct === 'function') {
+      const p = window.getProduct(id);
+      if (p) return p;
+    }
+    return productsList.find(p => p && (String(p.id) === str || p.name === id)) || null;
+  };
+
+  const findGroupById = (id) => {
+    if (!id) return null;
+    const str = String(id);
+    if (typeof window !== 'undefined' && window.platePlanIndexes?.groups) {
+      const idxG = window.platePlanIndexes.groups.get(str) || window.platePlanIndexes.groups.get(id);
+      if (idxG) return idxG;
+    }
+    if (typeof window !== 'undefined' && typeof window.getIngredientGroup === 'function') {
+      const g = window.getIngredientGroup(id);
+      if (g) return g;
+    }
+    return groupsList.find(g => g && (String(g.id) === str || g.name === id)) || null;
+  };
+
+  let product = null;
+  let group = null;
+
+  if (resolutionContext) {
+    const overId = (ing.id && resolutionContext.productOverrides?.[ing.id]) ||
+                   (ing.id && resolutionContext.substitutions?.[ing.id]) ||
+                   (ing.groupId && resolutionContext.productSelections?.[ing.groupId]) ||
+                   (ing.groupId && resolutionContext.productOverrides?.[ing.groupId]);
+    if (overId) {
+      product = findProductById(overId);
+    }
+  }
+
+  if (!product && ing.product && typeof ing.product === 'object') {
+    product = ing.product;
+  }
+
+  if (!product && mappings) {
+    const mappedId = (ing.ingredientId && mappings[ing.ingredientId]) ||
+                     (ing.id && mappings[ing.id]) ||
+                     (ing.name && mappings[ing.name]);
+    if (mappedId) {
+      product = findProductById(mappedId);
+    }
+  }
+
+  if (!product) {
+    const pId = ing.productId || ing.bankId;
+    if (pId) {
+      product = findProductById(pId);
+    }
+  }
+
+  const targetGroupId = ing.groupId || ing.subTypeId;
+  if (targetGroupId) {
+    group = findGroupById(targetGroupId);
+  }
+
+  if (product && !group) {
+    const pGroupId = product.groupId || product.subTypeId;
+    if (pGroupId) {
+      group = findGroupById(pGroupId);
+    }
+  }
+
+  if (!product && group) {
+    const defId = group.manualDefaultProductId || group.defaultProductId;
+    if (defId) {
+      product = findProductById(defId);
+    }
+    if (!product) {
+      const groupProducts = productsList.filter(p => p && (p.groupId === group.id || p.subTypeId === group.id));
+      if (groupProducts.length > 0) {
+        product = groupProducts.find(p => p && (+p.cal > 0 || +p.prot > 0)) || groupProducts[0];
+      }
+    }
+  }
+
+  if (!product && directId && !group) {
+    group = findGroupById(directId);
+    if (group) {
+      const defId = group.manualDefaultProductId || group.defaultProductId;
+      if (defId) product = findProductById(defId);
+      if (!product) {
+        const groupProducts = productsList.filter(p => p && (p.groupId === group.id || p.subTypeId === group.id));
+        if (groupProducts.length > 0) product = groupProducts[0];
+      }
+    }
+  }
+
+  if (!product && !group && (ing.ingredientId || ing.familyId)) {
+    const famId = ing.ingredientId || ing.familyId;
+    const fam = (s?.ingredientFamilies || []).find(f => f && (f.id === famId || f.name === famId));
+    if (fam) {
+      const defaultGroup = fam.defaultTypeId ? findGroupById(fam.defaultTypeId) : null;
+      if (defaultGroup) {
+        group = defaultGroup;
+        const defId = defaultGroup.manualDefaultProductId || defaultGroup.defaultProductId;
+        if (defId) product = findProductById(defId);
+        if (!product) {
+          const groupProducts = productsList.filter(p => p && (p.groupId === defaultGroup.id || p.subTypeId === defaultGroup.id));
+          if (groupProducts.length > 0) product = groupProducts[0];
+        }
+      }
+    }
+  }
+
+  return {
+    ...(product || {}),
+    product: product || null,
+    group: group || null,
+    productId: product?.id || null,
+    groupId: group?.id || ing.groupId || null
+  };
+};
+
+const getEffectiveIngredientAmount = (ing, resolutionContext) => {
+  if (resolutionContext && resolutionContext.ingredientQuantityOverrides?.[ing.id] !== undefined) {
+    return parseFloat(resolutionContext.ingredientQuantityOverrides[ing.id]) || 0;
+  }
+  return parseFloat(ing.qty ?? ing.amount ?? ing.grams ?? 1);
+};
+
+const calculateRecipeDisplayNutrition = (options = {}) => {
+  const {
+    recipe = null,
+    ingredients = null,
+    serves = null,
+    who = null,
+    mealType = null,
+    variant = 'original',
+    instanceId = null,
+    planContext = null,
+    overrideStore = null
+  } = options;
+
+  let activeRecipe = recipe;
+  if (typeof recipe === 'string') {
+    activeRecipe = window.state?.recipes?.find(r => r.id === recipe) || null;
+  }
+
+  const v = variant || 'original';
+  let activeIngredients = ingredients || activeRecipe?.ingredients || [];
+  let activeServes = parseFloat(serves ?? activeRecipe?.serves ?? 1);
+  let activeWho = who ?? activeRecipe?.who ?? 'both';
+
+  if (activeRecipe && v === 'enhanced' && activeRecipe.enhanced) {
+    if (activeRecipe.enhanced.ingredients) activeIngredients = activeRecipe.enhanced.ingredients;
+    if (activeRecipe.enhanced.serves) activeServes = parseFloat(activeRecipe.enhanced.serves);
+    if (activeRecipe.enhanced.who) activeWho = activeRecipe.enhanced.who;
+  }
+
+  const resolutionContext = window.getPlanContextForInstance ? window.getPlanContextForInstance(instanceId, planContext, overrideStore) : null;
+
+  let totalCal = 0, totalProt = 0, totalCarb = 0, totalFat = 0, totalFibre = 0;
+  let matchedCount = 0;
+  const resolvedIngs = [];
+
+  for (const ing of activeIngredients) {
+    if (resolutionContext && resolutionContext.removeIngredientKeys?.[ing.id]) continue;
+
+    const product = resolveProductForIngredient(ing, resolutionContext);
+    if (product) matchedCount++;
+
+    const qty = getEffectiveIngredientAmount(ing, resolutionContext);
+    const unit = ing.unit || 'g';
+    const grams = getEffectiveIngredientGrams({ qty, unit }, product);
+
+    const scale = grams / 100;
+    const cal = (parseFloat(product?.cal) || parseFloat(product?.calories) || parseFloat(product?.kcal) || 0) * scale;
+    const prot = (parseFloat(product?.prot) || parseFloat(product?.protein) || 0) * scale;
+    const carb = (parseFloat(product?.carb) || parseFloat(product?.carbs) || 0) * scale;
+    const fat = (parseFloat(product?.fat) || 0) * scale;
+    const fibre = (parseFloat(product?.fibre) || parseFloat(product?.fiber) || 0) * scale;
+
+    totalCal += cal;
+    totalProt += prot;
+    totalCarb += carb;
+    totalFat += fat;
+    totalFibre += fibre;
+
+    resolvedIngs.push({
+      ...ing,
+      qty,
+      unit,
+      grams,
+      product,
+      calculated: { cal, prot, carb, fat, fibre }
+    });
+  }
+
+  const s = Math.max(1, activeServes);
+  const nutrition = {
+    cal: Math.round(totalCal),
+    prot: Math.round(totalProt * 10) / 10,
+    carb: Math.round(totalCarb * 10) / 10,
+    fat: Math.round(totalFat * 10) / 10,
+    fibre: Math.round(totalFibre * 10) / 10
+  };
+
+  const perServing = {
+    cal: Math.round(totalCal / s),
+    prot: Math.round((totalProt / s) * 10) / 10,
+    carb: Math.round((totalCarb / s) * 10) / 10,
+    fat: Math.round((totalFat / s) * 10) / 10,
+    fibre: Math.round((totalFibre / s) * 10) / 10
+  };
+
+  const portions = calcPortions(perServing, window.state?.prefs || {}, s, activeWho, mealType || 'dinner');
+
+  const eServ = portions.eSingleServ;
+  const cServ = portions.cSingleServ;
+
+  portions.eCarb = Math.round(eServ * perServing.carb * 10) / 10;
+  portions.eFat = Math.round(eServ * perServing.fat * 10) / 10;
+  portions.eFibre = Math.round(eServ * perServing.fibre * 10) / 10;
+
+  portions.cCarb = Math.round(cServ * perServing.carb * 10) / 10;
+  portions.cFat = Math.round(cServ * perServing.fat * 10) / 10;
+  portions.cFibre = Math.round(cServ * perServing.fibre * 10) / 10;
+
+  portions.eRecipePct = Math.round((eServ / s) * 100);
+  portions.cRecipePct = Math.round((cServ / s) * 100);
+
+  return {
+    active: activeRecipe ? (v === 'enhanced' && activeRecipe.enhanced ? { ...activeRecipe, ...activeRecipe.enhanced } : activeRecipe) : { serves: s, who: activeWho },
+    mealType: mealType || 'dinner',
+    resolutionContext,
+    nutrition: {
+      ...perServing,
+      perServing,
+      totalNutrition: nutrition
+    },
+    totalNutrition: nutrition,
+    perServing,
+    portions,
+    matched: matchedCount,
+    total: activeIngredients.length
+  };
+};
+
+const calcRecipeNutrition = (ingredients = [], serves = 1) => {
+  const bundle = calculateRecipeDisplayNutrition({ ingredients, serves: parseFloat(serves) || 1 });
+  return {
+    ...bundle.nutrition,
+    perServing: bundle.perServing,
+    totalNutrition: bundle.totalNutrition
+  };
+};
+
+const recalcRecipeNutrition = (recipeId) => {
+  const recipe = window.state?.recipes?.find(r => r.id === recipeId);
+  if (!recipe) return;
+
+  const bundleOrig = calculateRecipeDisplayNutrition({ recipe, variant: 'original' });
+  recipe.originalNutrition = bundleOrig.totalNutrition;
+  recipe.perServing = bundleOrig.perServing;
+  recipe.portions = bundleOrig.portions;
+
+  if (recipe.enhanced) {
+    const bundleEnh = calculateRecipeDisplayNutrition({ recipe, variant: 'enhanced' });
+    recipe.enhancedNutrition = bundleEnh.totalNutrition;
+    recipe.enhanced.perServing = bundleEnh.perServing;
+    recipe.enhanced.portions = bundleEnh.portions;
+  }
+};
+
+const recalcAllRecipes = () => {
+  const recipes = window.state?.recipes || [];
+  recipes.forEach(r => {
+    recalcRecipeNutrition(r.id);
+  });
+};
+
+let isRefreshingDerivedState = false;
+const refreshPlatePlanDerivedState = (options = {}) => {
+  if (isRefreshingDerivedState) return;
+  isRefreshingDerivedState = true;
+  try {
+    const { persist = false, render = true, changedProductIds = [], changedGroupIds = [], changedRecipeIds = [], full = false } = options;
+
+    if (window.PlatePlanModals && typeof window.PlatePlanModals.rebuildPlatePlanIndexes === 'function') {
+      window.PlatePlanModals.rebuildPlatePlanIndexes();
+    } else if (window.rebuildPlatePlanIndexes) {
+      window.rebuildPlatePlanIndexes();
+    }
+
+    if (window.platePlanNutritionCache && window.platePlanNutritionCache.clear) {
+      window.platePlanNutritionCache.clear();
+    }
+
+    if (changedRecipeIds && changedRecipeIds.length > 0) {
+      changedRecipeIds.forEach(id => recalcRecipeNutrition(id));
+    } else if (full || (changedProductIds && changedProductIds.length > 0)) {
+      recalcAllRecipes();
+    }
+
+    if (persist) {
+      if (window.PlatePlanModals && typeof window.PlatePlanModals.saveState === 'function') {
+        window.PlatePlanModals.saveState();
+      } else if (typeof window.saveState === 'function') {
+        window.saveState();
+      }
+    }
+
+    if (render) {
+      Promise.resolve().then(() => {
+        if (typeof window.renderAll === 'function') {
+          window.renderAll();
+        } else if (window.PlatePlanRouter && typeof window.PlatePlanRouter.renderAll === 'function') {
+          window.PlatePlanRouter.renderAll();
+        }
+      });
+    }
+  } finally {
+    isRefreshingDerivedState = false;
+  }
+};
+
+const ensureIngredientGroups = (target = null) => {
+  const s = target || (typeof window !== 'undefined' ? window.state : null) || (typeof state !== 'undefined' ? state : null);
+  if (!s || typeof s !== 'object') return [];
+  if (!Array.isArray(s.ingredientGroups)) {
+    s.ingredientGroups = [];
+  }
+  if (!Array.isArray(s.ingredientFamilies)) {
+    s.ingredientFamilies = [];
+  }
+  if (!Array.isArray(s.ingredients)) {
+    s.ingredients = [];
+  }
+  if (Array.isArray(s.recipes)) {
+    s.recipes.forEach(r => {
+      if (!r || typeof r !== 'object') return;
+      if (!Array.isArray(r.ingredientGroups)) {
+        r.ingredientGroups = [];
+      }
+      if (r.enhanced && typeof r.enhanced === 'object' && !Array.isArray(r.enhanced.ingredientGroups)) {
+        r.enhanced.ingredientGroups = [];
+      }
+    });
+  }
+  if (typeof window !== 'undefined' && window.platePlanIndexes?.groups) {
+    s.ingredientGroups.forEach(g => {
+      if (g && g.id) window.platePlanIndexes.groups.set(g.id, g);
+    });
+  }
+  return s.ingredientGroups;
+};
+
+const ensureIngredientFamilies = (target = null) => {
+  const s = target || (typeof window !== 'undefined' ? window.state : null) || (typeof state !== 'undefined' ? state : null);
+  if (!s || typeof s !== 'object') return [];
+  if (!Array.isArray(s.ingredientFamilies)) {
+    s.ingredientFamilies = [];
+  }
+  if (typeof window !== 'undefined' && window.platePlanIndexes?.families) {
+    s.ingredientFamilies.forEach(f => {
+      if (f && f.id) window.platePlanIndexes.families.set(f.id, f);
+    });
+  }
+  return s.ingredientFamilies;
+};
+
+const hasUsableIngredientNutrition = (ingredient) => {
+  if (!ingredient) return false;
+  let target = ingredient;
+  if (typeof target === 'string' || typeof target === 'number') {
+    const s = typeof window !== 'undefined' ? window.state : (typeof state !== 'undefined' ? state : null);
+    if (s?.ingredients) {
+      if (Array.isArray(s.ingredients)) {
+        target = s.ingredients.find(i => i && (i.id === target || String(i.id) === String(target)));
+      } else if (typeof s.ingredients === 'object') {
+        target = s.ingredients[target] || Object.values(s.ingredients).find(i => i && (i.id === target || String(i.id) === String(target)));
+      }
+    }
+    if (!target && typeof window !== 'undefined' && window.platePlanIndexes?.ingredients) {
+      target = window.platePlanIndexes.ingredients.get(ingredient);
+    }
+  }
+  if (!target || typeof target !== 'object') return false;
+
+  const n = (target.nutrition && typeof target.nutrition === 'object') ? target.nutrition : {};
+  const cal = target.cal ?? target.calories ?? target.kcal ?? target.kcals ?? target.energy ?? n.cal ?? n.calories ?? n.kcal ?? n.kcals;
+  const prot = target.prot ?? target.protein ?? n.prot ?? n.protein;
+  const carb = target.carb ?? target.carbs ?? n.carb ?? n.carbs;
+  const fat = target.fat ?? n.fat;
+  const fibre = target.fibre ?? target.fiber ?? n.fibre ?? n.fiber;
+
+  const isValidNum = (v) => v !== null && v !== undefined && v !== '' && !isNaN(Number(v)) && Number(v) >= 0;
+
+  if (isValidNum(cal) && Number(cal) > 0) return true;
+  if ((isValidNum(prot) && Number(prot) > 0) || (isValidNum(carb) && Number(carb) > 0) || (isValidNum(fat) && Number(fat) > 0) || (isValidNum(fibre) && Number(fibre) > 0)) return true;
+  if (isValidNum(cal) && isValidNum(prot) && isValidNum(carb)) return true;
+
+  return false;
+};
+
+const getGroupIngredientFamily = (groupOrId, targetState = null) => {
+  if (!groupOrId) return null;
+  const s = targetState || (typeof window !== 'undefined' ? window.state : null) || (typeof state !== 'undefined' ? state : null);
+  const families = s?.ingredientFamilies || [];
+  const groups = s?.ingredientGroups || [];
+
+  let group = groupOrId;
+  if (typeof group === 'string' || typeof group === 'number') {
+    const strId = String(group);
+    if (typeof window !== 'undefined' && window.platePlanIndexes?.groups) {
+      group = window.platePlanIndexes.groups.get(strId) || window.platePlanIndexes.groups.get(group);
+    }
+    if (!group || typeof group !== 'object') {
+      group = groups.find(g => g && (String(g.id) === strId || g.name === groupOrId));
+    }
+    if (!group) {
+      if (typeof window !== 'undefined' && window.platePlanIndexes?.families) {
+        const directFam = window.platePlanIndexes.families.get(strId) || window.platePlanIndexes.families.get(groupOrId);
+        if (directFam) return directFam;
+      }
+      return families.find(f => f && (String(f.id) === strId || f.name === groupOrId)) || null;
+    }
+  }
+
+  if (!group || typeof group !== 'object') return null;
+
+  const familyId = group.ingredientId || group.familyId;
+  if (familyId) {
+    if (typeof window !== 'undefined' && window.platePlanIndexes?.families) {
+      const found = window.platePlanIndexes.families.get(String(familyId)) || window.platePlanIndexes.families.get(familyId);
+      if (found) return found;
+    }
+    const found = families.find(f => f && (String(f.id) === String(familyId) || f.name === familyId));
+    if (found) return found;
+  }
+
+  if (group.family) {
+    const famStr = String(group.family).trim().toLowerCase();
+    const found = families.find(f => f && (String(f.id) === group.family || String(f.name || '').trim().toLowerCase() === famStr));
+    if (found) return found;
+    return { id: group.ingredientId || group.familyId || group.family, name: group.family, cat: group.cat || 'other' };
+  }
+
+  if (group.cat) {
+    const found = families.find(f => f && (f.cat === group.cat || f.id === group.cat));
+    if (found) return found;
+  }
+
+  return null;
+};
+
 if (typeof window !== 'undefined') {
   window.PlatePlanNutrition = {
     NUTRITION_CANONICAL_MAP,
@@ -430,7 +988,32 @@ if (typeof window !== 'undefined') {
     attachComputedFitScores,
     getSortedRecipes,
     calculatePlanDayTotals,
-    computeMacroProgress
+    computeMacroProgress,
+    getEffectiveIngredientGrams,
+    calcPortions,
+    calculateRecipeDisplayNutrition,
+    calcRecipeNutrition,
+    recalcRecipeNutrition,
+    recalcAllRecipes,
+    refreshPlatePlanDerivedState,
+    ensureIngredientGroups,
+    ensureIngredientFamilies,
+    hasUsableIngredientNutrition,
+    getGroupIngredientFamily,
+    resolveProductForIngredient
   };
+
+  window.resolveProductForIngredient = resolveProductForIngredient;
+  window.getEffectiveIngredientGrams = getEffectiveIngredientGrams;
+  window.calcPortions = calcPortions;
+  window.calculateRecipeDisplayNutrition = calculateRecipeDisplayNutrition;
+  window.calcRecipeNutrition = calcRecipeNutrition;
+  window.recalcRecipeNutrition = recalcRecipeNutrition;
+  window.recalcAllRecipes = recalcAllRecipes;
+  window.refreshPlatePlanDerivedState = refreshPlatePlanDerivedState;
+  window.ensureIngredientGroups = ensureIngredientGroups;
+  window.ensureIngredientFamilies = ensureIngredientFamilies;
+  window.hasUsableIngredientNutrition = hasUsableIngredientNutrition;
+  window.getGroupIngredientFamily = getGroupIngredientFamily;
 }
 })();

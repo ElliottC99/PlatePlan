@@ -482,6 +482,271 @@ const fuzzyMatchIngredientGroup = (name) => {
   return bestScore >= 0.35 ? best : null;
 };
 
+const round1 = (value) => Math.round((parseFloat(value) || 0) * 10) / 10;
+
+const normaliseAliasText = (text) => String(text || '').replace(/\s+/g, ' ').trim();
+
+const inferIngredientFamilyFromText = (text) => {
+  if (!text) return '';
+  const clean = String(text).trim();
+  const s = typeof window !== 'undefined' ? window.state : null;
+  const families = s?.ingredientFamilies || [];
+  const found = families.find(f => f && (f.name.toLowerCase() === clean.toLowerCase() || clean.toLowerCase().includes(f.name.toLowerCase())));
+  return found ? found.name : clean;
+};
+
+const getIngredientById = (id, targetState = null) => {
+  if (!id) return null;
+  const s = targetState || (typeof window !== 'undefined' ? window.state : null);
+  const families = s?.ingredientFamilies || [];
+  return families.find(f => f && (f.id === id || f.name === id)) || null;
+};
+
+const getProductById = (id, targetState = null) => {
+  if (!id) return null;
+  const s = targetState || (typeof window !== 'undefined' ? window.state : null);
+  const prods = s?.ingredients || s?.products || [];
+  return prods.find(p => p && (p.id === id || p.name === id)) || null;
+};
+
+const getEffectiveProductPrice = (product) => {
+  if (!product) return 0;
+  return parseFloat(product.price) || 0;
+};
+
+const getGroupProducts = (groupId, targetState = null) => {
+  if (!groupId) return [];
+  const s = targetState || (typeof window !== 'undefined' ? window.state : null) || (typeof state !== 'undefined' ? state : null);
+  const list = s?.ingredients || s?.products || [];
+  return list.filter(p => p && (p.groupId === groupId || p.subTypeId === groupId || (Array.isArray(p.groupIds) && p.groupIds.includes(groupId))));
+};
+
+const getFamilyGroups = (familyId, targetState = null) => {
+  if (!familyId) return [];
+  const s = targetState || (typeof window !== 'undefined' ? window.state : null) || (typeof state !== 'undefined' ? state : null);
+  const families = s?.ingredientFamilies || [];
+  const groups = s?.ingredientGroups || [];
+  const family = (typeof window !== 'undefined' && window.platePlanIndexes?.families?.get(familyId)) ||
+                 families.find(f => f && (f.id === familyId || f.name === familyId)) || null;
+
+  if (family?.typeIds && Array.isArray(family.typeIds) && family.typeIds.length > 0) {
+    const mapped = family.typeIds.map(id => {
+      return (typeof window !== 'undefined' && window.platePlanIndexes?.groups?.get(id)) ||
+             groups.find(g => g && g.id === id) || null;
+    }).filter(Boolean);
+    if (mapped.length > 0) return mapped;
+  }
+
+  return groups.filter(g => g && (g.ingredientId === familyId || g.familyId === familyId || (family && g.family === family.name)));
+};
+
+const getGroupHierarchyText = (group) => {
+  if (!group) return '';
+  const cat = (typeof CAT !== 'undefined' && CAT[group.cat]) || group.cat || 'Other';
+  const resolveFamily = typeof getGroupIngredientFamily === 'function' ? getGroupIngredientFamily : (window.getGroupIngredientFamily || (() => null));
+  const fam = group.family || resolveFamily(group)?.name || 'Ingredient';
+  const typeName = (typeof getGroupTypeName === 'function' ? getGroupTypeName(group) : (window.getGroupTypeName ? window.getGroupTypeName(group) : group.name)) || 'Sub-type';
+  return `${cat} > ${fam} > ${typeName}`;
+};
+
+const needsItemWeightForQtyIngredient = (ingredient, product) => {
+  if (!ingredient || !product) return false;
+  const unitStr = String(ingredient.unit || '').toLowerCase().trim();
+  const isCounted = ['qty', 'count', 'item', 'items', 'whole', 'piece', 'pieces', 'pack', 'unit', 'units'].includes(unitStr) || (!unitStr && +(ingredient.qty || ingredient.grams || 0) > 0);
+  if (!isCounted) return false;
+  const packUnit = String(product.packUnit || '').toLowerCase().trim();
+  if (packUnit === 'qty' && +(product.itemWeight || 0) > 0) return false;
+  if (['g', 'ml', 'kg', 'l'].includes(packUnit) && !(+product.itemWeight > 0)) return true;
+  if (!(+product.itemWeight > 0) && !(+product.drainedWeight > 0) && packUnit !== 'qty') return true;
+  return false;
+};
+
+const getIngredientMappingWarning = (ingredient, resolved) => {
+  if (!ingredient || !resolved) return null;
+  if (ingredient.groupId && resolved.group?.id && ingredient.groupId !== resolved.group.id) {
+    return `Sub-type mismatch: ingredient specifies ${ingredient.groupId} but mapped to ${resolved.group.id}.`;
+  }
+  return null;
+};
+
+const calculateIngredientCost = (ingredient, product, serves = 1) => {
+  if (!ingredient || !product || !(+product.price > 0)) return 0;
+  const getGrams = typeof getEffectiveIngredientGrams === 'function' ? getEffectiveIngredientGrams : (window.getEffectiveIngredientGrams || (() => 0));
+  const grams = getGrams(ingredient, product);
+  const getUsable = typeof getProductUsablePackAmount === 'function' ? getProductUsablePackAmount : (window.getProductUsablePackAmount || (() => +(product.packSize || 100)));
+  const packGrams = getUsable(product);
+  if (!(grams > 0 && packGrams > 0)) return 0;
+  const activeServes = +(serves) || 1;
+  return ((+product.price / packGrams) * grams) / activeServes;
+};
+
+const resolveProductForIngredient = (ingredientOrId, contextOrState = null, targetState = null) => {
+  if (!ingredientOrId) {
+    return { product: null, group: null, productId: null, groupId: null };
+  }
+
+  let s = targetState;
+  let resolutionContext = null;
+
+  if (contextOrState && (contextOrState.ingredients || contextOrState.ingredientGroups || contextOrState.ingredientProductMappings || contextOrState.recipes)) {
+    s = contextOrState;
+  } else if (contextOrState && typeof contextOrState === 'object') {
+    resolutionContext = contextOrState;
+  }
+  if (!s) {
+    s = (typeof window !== 'undefined' ? window.state : null) || (typeof state !== 'undefined' ? state : null);
+  }
+
+  const productsList = s?.ingredients || s?.products || [];
+  const groupsList = s?.ingredientGroups || [];
+  const mappings = s?.ingredientProductMappings || {};
+
+  let ing = ingredientOrId;
+  let directId = null;
+  if (typeof ing === 'string' || typeof ing === 'number') {
+    directId = String(ing);
+    ing = { id: directId, productId: directId, bankId: directId };
+  }
+
+  const findProductById = (id) => {
+    if (!id) return null;
+    const str = String(id);
+    if (typeof window !== 'undefined' && window.platePlanIndexes?.products) {
+      const idxP = window.platePlanIndexes.products.get(str) || window.platePlanIndexes.products.get(id);
+      if (idxP) return idxP;
+    }
+    if (typeof window !== 'undefined' && typeof window.getProduct === 'function') {
+      const p = window.getProduct(id);
+      if (p) return p;
+    }
+    return productsList.find(p => p && (String(p.id) === str || p.name === id)) || null;
+  };
+
+  const findGroupById = (id) => {
+    if (!id) return null;
+    const str = String(id);
+    if (typeof window !== 'undefined' && window.platePlanIndexes?.groups) {
+      const idxG = window.platePlanIndexes.groups.get(str) || window.platePlanIndexes.groups.get(id);
+      if (idxG) return idxG;
+    }
+    if (typeof window !== 'undefined' && typeof window.getIngredientGroup === 'function') {
+      const g = window.getIngredientGroup(id);
+      if (g) return g;
+    }
+    return groupsList.find(g => g && (String(g.id) === str || g.name === id)) || null;
+  };
+
+  let product = null;
+  let group = null;
+
+  // 1. Context overrides first
+  if (resolutionContext) {
+    const overId = (ing.id && resolutionContext.productOverrides?.[ing.id]) ||
+                   (ing.id && resolutionContext.substitutions?.[ing.id]) ||
+                   (ing.groupId && resolutionContext.productSelections?.[ing.groupId]) ||
+                   (ing.groupId && resolutionContext.productOverrides?.[ing.groupId]);
+    if (overId) {
+      product = findProductById(overId);
+    }
+  }
+
+  // 2. Direct product object on ingredient
+  if (!product && ing.product && typeof ing.product === 'object') {
+    product = ing.product;
+  }
+
+  // 3. Mappings lookup by ingredientId or raw/name
+  if (!product && mappings) {
+    const mappedId = (ing.ingredientId && mappings[ing.ingredientId]) ||
+                     (ing.id && mappings[ing.id]) ||
+                     (ing.name && mappings[ing.name]);
+    if (mappedId) {
+      product = findProductById(mappedId);
+    }
+  }
+
+  // 4. By bankId / productId
+  if (!product) {
+    const pId = ing.productId || ing.bankId;
+    if (pId) {
+      product = findProductById(pId);
+    }
+  }
+
+  // 5. Look up group if specified
+  const targetGroupId = ing.groupId || ing.subTypeId;
+  if (targetGroupId) {
+    group = findGroupById(targetGroupId);
+  }
+
+  // If product found but no group, resolve group from product
+  if (product && !group) {
+    const pGroupId = product.groupId || product.subTypeId;
+    if (pGroupId) {
+      group = findGroupById(pGroupId);
+    }
+  }
+
+  // 6. If no product yet, but we have a group, resolve default product for group
+  if (!product && group) {
+    const defId = group.manualDefaultProductId || group.defaultProductId;
+    if (defId) {
+      product = findProductById(defId);
+    }
+    if (!product) {
+      const groupProducts = productsList.filter(p => p && (p.groupId === group.id || p.subTypeId === group.id));
+      if (groupProducts.length > 0) {
+        product = groupProducts.find(p => p && (+p.cal > 0 || +p.prot > 0)) || groupProducts[0];
+      }
+    }
+  }
+
+  // 7. By directId if input was string and wasn't found as product
+  if (!product && directId && !group) {
+    group = findGroupById(directId);
+    if (group) {
+      const defId = group.manualDefaultProductId || group.defaultProductId;
+      if (defId) product = findProductById(defId);
+      if (!product) {
+        const groupProducts = productsList.filter(p => p && (p.groupId === group.id || p.subTypeId === group.id));
+        if (groupProducts.length > 0) product = groupProducts[0];
+      }
+    }
+  }
+
+  // 8. Family fallback if ingredientId or familyId is present
+  if (!product && !group && (ing.ingredientId || ing.familyId)) {
+    const famId = ing.ingredientId || ing.familyId;
+    const fam = (s?.ingredientFamilies || []).find(f => f && (f.id === famId || f.name === famId));
+    if (fam) {
+      const defaultGroup = fam.defaultTypeId ? findGroupById(fam.defaultTypeId) : null;
+      if (defaultGroup) {
+        group = defaultGroup;
+        const defId = defaultGroup.manualDefaultProductId || defaultGroup.defaultProductId;
+        if (defId) product = findProductById(defId);
+        if (!product) {
+          const groupProducts = productsList.filter(p => p && (p.groupId === defaultGroup.id || p.subTypeId === defaultGroup.id));
+          if (groupProducts.length > 0) product = groupProducts[0];
+        }
+      }
+    }
+  }
+
+  const result = {
+    ...(product || {}),
+    product: product || null,
+    group: group || null,
+    productId: product?.id || null,
+    groupId: group?.id || ing.groupId || null
+  };
+
+  return result;
+};
+
+const resolveProductForIngredientWithContext = (ingredientOrId, context, targetState = null) => {
+  return resolveProductForIngredient(ingredientOrId, context, targetState);
+};
+
 if (typeof window !== 'undefined') {
   window.PlatePlanIngredients = {
     normaliseUnicodeFractions,
@@ -500,7 +765,36 @@ if (typeof window !== 'undefined') {
     parseIngredientLine,
     parseIngredient: parseIngredientLine,
     fuzzyMatchBank,
-    fuzzyMatchIngredientGroup
+    fuzzyMatchIngredientGroup,
+    resolveProductForIngredient,
+    resolveProductForIngredientWithContext,
+    getGroupProducts,
+    getFamilyGroups,
+    getGroupHierarchyText,
+    needsItemWeightForQtyIngredient,
+    getIngredientMappingWarning,
+    round1,
+    normaliseAliasText,
+    inferIngredientFamilyFromText,
+    getIngredientById,
+    getProductById,
+    getEffectiveProductPrice,
+    calculateIngredientCost
   };
+
+  window.resolveProductForIngredient = resolveProductForIngredient;
+  window.resolveProductForIngredientWithContext = resolveProductForIngredientWithContext;
+  window.getGroupProducts = getGroupProducts;
+  window.getFamilyGroups = getFamilyGroups;
+  window.getGroupHierarchyText = getGroupHierarchyText;
+  window.needsItemWeightForQtyIngredient = needsItemWeightForQtyIngredient;
+  window.getIngredientMappingWarning = getIngredientMappingWarning;
+  window.round1 = round1;
+  window.normaliseAliasText = normaliseAliasText;
+  window.inferIngredientFamilyFromText = inferIngredientFamilyFromText;
+  window.getIngredientById = getIngredientById;
+  window.getProductById = getProductById;
+  window.getEffectiveProductPrice = getEffectiveProductPrice;
+  window.calculateIngredientCost = calculateIngredientCost;
 }
 })();

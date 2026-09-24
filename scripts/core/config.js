@@ -9,6 +9,103 @@ const PLATEPLAN_SIDEBAR_SK = 'plateplan_sidebar_groups';
 const PLATEPLAN_MODULAR_MIGRATION_SK = 'plateplan_modular_migration_20_4';
 const PLATEPLAN_EXPECTED_CACHE = 'plateplan-shell-v94';
 
+function safeJsonStringify(obj, replacer = null, spaces = null) {
+  const seen = new Set();
+  const safeReplacer = function (key, value) {
+    if (value !== null && typeof value === 'object') {
+      if (typeof value.nodeType === 'number') return '[DOM Node]';
+      if (typeof value.preventDefault === 'function') return '[Event]';
+      if (seen.has(value)) {
+        return '[Circular]';
+      }
+      seen.add(value);
+    }
+    if (typeof value === 'bigint') {
+      return value.toString();
+    }
+    if (replacer) {
+      return replacer(key, value);
+    }
+    return value;
+  }
+  try {
+    return JSON.stringify(obj, safeReplacer, spaces);
+  } catch (err) {
+    console.warn('[safeJsonStringify failed]', err);
+    return '"[Unserializable]"';
+  }
+}
+window.safeJsonStringify = safeJsonStringify;
+
+function safeLocalStorageSet(key, val) {
+  try {
+    const payload = typeof val === 'string' ? val : (typeof safeJsonStringify === 'function' ? safeJsonStringify(val) : JSON.stringify(val));
+    localStorage.setItem(key, payload);
+    return true;
+  } catch (e) {
+    console.warn('[LocalStorage Write Warning]', e);
+    return false;
+  }
+}
+window.safeLocalStorageSet = safeLocalStorageSet;
+
+function safeSaveHistoryBackup(historyList) {
+  try {
+    const payload = typeof safeJsonStringify === 'function' ? safeJsonStringify(historyList || []) : JSON.stringify(historyList || []);
+    localStorage.setItem('plateplan_history_backup', payload);
+    return true;
+  } catch (e) {
+    console.warn('[History Backup Warning]', e);
+    return false;
+  }
+}
+window.safeSaveHistoryBackup = safeSaveHistoryBackup;
+
+function clonePlatePlanValue(val) {
+  if (val === null || val === undefined) return val;
+  try {
+    if (typeof structuredClone === 'function') {
+      return structuredClone(val);
+    }
+  } catch (e) {}
+
+  const seen = new Map();
+  const cloner = (x, depth = 0) => {
+    if (x === null || typeof x !== 'object') return x;
+    if (depth > 20) return null;
+    if (seen.has(x)) return seen.get(x);
+
+    if (x instanceof Date) return new Date(x.getTime());
+    if (x instanceof RegExp) return new RegExp(x.source, x.flags);
+    if (typeof x.nodeType === 'number' || (typeof Element !== 'undefined' && x instanceof Element)) return null;
+    if (x === window || (typeof global !== 'undefined' && x === global)) return null;
+    if (typeof x.preventDefault === 'function' || (typeof Event !== 'undefined' && x instanceof Event)) return null;
+
+    if (Array.isArray(x)) {
+      const copy = [];
+      seen.set(x, copy);
+      for (const item of x) {
+        copy.push(cloner(item, depth + 1));
+      }
+      return copy;
+    }
+
+    const copy = {};
+    seen.set(x, copy);
+    try {
+      for (const [k, v] of Object.entries(x)) {
+        copy[k] = cloner(v, depth + 1);
+      }
+    } catch (err) {}
+    return copy;
+  };
+  return cloner(val);
+}
+window.clonePlatePlanValue = clonePlatePlanValue;
+
+var platePlanNutritionCache = new Map();
+window.platePlanNutritionCache = platePlanNutritionCache;
+
 const STANDARD_CATS = {
   'meat-substitute': 'Meat substitutes',
   'legume': 'Legumes & pulses',

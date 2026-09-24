@@ -5,7 +5,7 @@
 
 window.platePlanApplicationInitialized = false;
 
-export function initializePlatePlanApplication() {
+function initializePlatePlanApplication() {
   if (window.platePlanApplicationInitialized) return;
   window.platePlanApplicationInitialized = true;
   console.log('[PlatePlan v3.3.7-mod] Initializing core application with standardized startup sequence...');
