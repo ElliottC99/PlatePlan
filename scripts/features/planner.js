@@ -5,6 +5,20 @@
  */
 
 (() => {
+const getState = () => (typeof window !== 'undefined' && window.state) || (typeof state !== 'undefined' ? state : {});
+
+const getMealTypeFromSlotKey = (slotKey) => {
+  if (!slotKey) return 'dinner';
+  const s = String(slotKey).toLowerCase();
+  if (s.startsWith('breakfast')) return 'breakfast';
+  if (s.startsWith('lunch')) return 'lunch';
+  if (s.startsWith('dinner')) return 'dinner';
+  return 'dinner';
+};
+if (typeof window !== 'undefined') {
+  window.getMealTypeFromSlotKey = getMealTypeFromSlotKey;
+}
+
 function enhancePlanTrafficControls(){
   const symbols={green:'✓',amber:'–',red:'!'};
   const names={green:'Green recipes',amber:'Amber recipes',red:'Red recipes'};
@@ -336,7 +350,7 @@ function ensurePlannerShell(){
     if(!history){
       library.insertAdjacentHTML('beforeend', '<div id="plan-history-panel"></div>');
       history = document.getElementById('plan-history-panel');
-    } else if(!history.closest('#view-planlib')) {
+    } else if(history.closest && !history.closest('#view-planlib')) {
       library.appendChild(history);
     }
   }
@@ -4137,13 +4151,14 @@ function renderPlan(){
     for(let d=1;d<=days;d++){
       if(earlierDays.includes(d)&&!platePlanEarlierDaysExpanded)continue;
       const s=slots[d]||{};
-      const allEx=SLOTS.every(sl=>state.excluded[d]?.[sl.key]);
+      const exMap=(state.excluded||{})[d]||{};
+      const allEx=SLOTS.every(sl=>exMap[sl.key]);
       if(allEx){html+='<div class="day-plan-card skipped"><div style="display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap"><strong>'+ppEscapeHtml(formatPlanDayLabel(state.plan,d,{short:true}))+'</strong><input type="date" aria-label="Date for day '+d+'" value="'+ppEscapeAttr(state.plan.dayDates?.[d]||'')+'" onchange="setPlanDayDate('+d+',this.value)" style="width:auto"><span style="color:var(--text3)">-- no meals planned</span></div></div>';continue;}
       const daySlotInfos = buildPlanDaySlotInfos(state.plan, d);
       const daySummary = makeRenderedDaySummary();
       let dayRowsHtml = '';
       SLOTS.forEach(sl=>{
-        const isEx=state.excluded[d]?.[sl.key];
+        const isEx=exMap[sl.key];
         const slotData = s[sl.key];
         const slotInfo = getPlanSlotInfo(slotData);
         const r = slotInfo.active;
@@ -5209,11 +5224,20 @@ function filterRecipeSwap(inputRef, listRef){
     resetTodayDate,
     scheduleTodayMidnightRefresh,
     platePlanUseUpCoverageCache,
-    moveTodayDate
+    moveTodayDate,
+    getMealTypeFromSlotKey,
+    renderPlannerView: renderPlan,
+    renderLibrary: renderPlanHistoryPanel,
+    renderMealPlanLibrary: renderPlanHistoryPanel,
+    renderPlanlib: renderPlanHistoryPanel
   };
 
   if (typeof window !== 'undefined') {
     Object.assign(window, window.PlatePlanPlanner);
+    window.renderPlannerView = renderPlan;
+    window.renderLibrary = renderPlanHistoryPanel;
+    window.renderMealPlanLibrary = renderPlanHistoryPanel;
+    window.renderPlanlib = renderPlanHistoryPanel;
     window.ensurePlannerShell = ensurePlannerShell;
     window.installPlannerSummaryObserver = installPlannerSummaryObserver;
     window.resetTodayDate = resetTodayDate;

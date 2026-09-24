@@ -1015,5 +1015,13 @@ if (typeof window !== 'undefined') {
   window.ensureIngredientFamilies = ensureIngredientFamilies;
   window.hasUsableIngredientNutrition = hasUsableIngredientNutrition;
   window.getGroupIngredientFamily = getGroupIngredientFamily;
+  window.getBudgets = getBudgets;
+  window.calculatePlanDayTotals = calculatePlanDayTotals;
+  window.calculateFit = calculateFit;
+  window.calculateRecipeNutrition = calculateRecipeNutrition;
+  window.attachComputedFitScores = attachComputedFitScores;
+  window.getSortedRecipes = getSortedRecipes;
+  window.getEffectiveRecipeFitScore = getEffectiveRecipeFitScore;
+  window.computeMacroProgress = computeMacroProgress;
 }
 })();

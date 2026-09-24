@@ -154,11 +154,32 @@
   function renderPlatePlanLegacyView(id) {
     if (id === 'today') {
       (window.resetTodayDate || window.PlatePlanPlanner?.resetTodayDate || (typeof resetTodayDate !== 'undefined' ? resetTodayDate : () => {}))({ render: false });
-      if (typeof renderToday === 'function') renderToday(); else window.PlatePlanPlanner?.renderToday?.();
+      if (typeof window.PlatePlanViews?.renderToday === 'function') {
+        window.PlatePlanViews.renderToday();
+      } else if (typeof window.PlatePlanPlanner?.renderToday === 'function') {
+        window.PlatePlanPlanner.renderToday();
+      } else if (typeof window.renderToday === 'function') {
+        window.renderToday();
+      } else if (typeof renderToday === 'function') {
+        renderToday();
+      } else {
+        console.warn('[Router] No renderer found for today view');
+      }
     }
     if (id === 'vault') {
-      if (typeof window.renderVault === 'function') window.renderVault();
-      else if (typeof renderVault === 'function') renderVault();
+      if (typeof window.PlatePlanRecipes?.renderVault === 'function') {
+        window.PlatePlanRecipes.renderVault();
+      } else if (typeof window.PlatePlanViews?.renderVault === 'function') {
+        window.PlatePlanViews.renderVault();
+      } else if (typeof window.renderVault === 'function') {
+        window.renderVault();
+      } else if (typeof window.renderRecipes === 'function') {
+        window.renderRecipes();
+      } else if (typeof renderVault === 'function') {
+        renderVault();
+      } else {
+        console.warn('[Router] No renderer found for recipes/vault view');
+      }
     }
     if (id === 'add') {
       if (window.platePlanPendingRecipePreFill) {
@@ -169,42 +190,116 @@
       window.platePlanPreserveAddForm = false;
     }
     if (id === 'ingredients') {
-      if (typeof renderIngredientBank === 'function') renderIngredientBank(); else window.PlatePlanIngredientBank?.renderIngredientBank?.();
+      if (typeof window.PlatePlanIngredientBank?.renderIngredientBank === 'function') {
+        window.PlatePlanIngredientBank.renderIngredientBank();
+      } else if (typeof window.PlatePlanIngredientBank?.renderIngredients === 'function') {
+        window.PlatePlanIngredientBank.renderIngredients();
+      } else if (typeof window.renderIngredientBank === 'function') {
+        window.renderIngredientBank();
+      } else if (typeof renderIngredientBank === 'function') {
+        renderIngredientBank();
+      } else {
+        console.warn('[Router] No renderer found for ingredient bank view');
+      }
     }
     if (id === 'bank') {
-      if (typeof renderBank === 'function') renderBank(); else window.PlatePlanIngredientBank?.renderBank?.();
+      if (typeof window.PlatePlanIngredientBank?.renderProductBank === 'function') {
+        window.PlatePlanIngredientBank.renderProductBank();
+      } else if (typeof window.PlatePlanIngredientBank?.renderBank === 'function') {
+        window.PlatePlanIngredientBank.renderBank();
+      } else if (typeof window.renderProductBank === 'function') {
+        window.renderProductBank();
+      } else if (typeof window.renderBank === 'function') {
+        window.renderBank();
+      } else if (typeof renderBank === 'function') {
+        renderBank();
+      } else {
+        console.warn('[Router] No renderer found for product bank view');
+      }
     }
     if (id === 'planner') {
       (window.ensurePlannerShell || window.PlatePlanPlanner?.ensurePlannerShell || (typeof ensurePlannerShell !== 'undefined' ? ensurePlannerShell : () => {}))();
       const daySel = document.getElementById('plan-days');
       if (daySel && window.state?.plan?.days) daySel.value = String(window.state.plan.days);
       if (typeof buildExclGrid === 'function') buildExclGrid();
-      if (typeof renderPlan === 'function') renderPlan(); else window.PlatePlanPlanner?.renderPlan?.();
+      if (typeof window.PlatePlanPlanner?.renderPlannerView === 'function') {
+        window.PlatePlanPlanner.renderPlannerView();
+      } else if (typeof window.PlatePlanPlanner?.renderPlan === 'function') {
+        window.PlatePlanPlanner.renderPlan();
+      } else if (typeof window.PlatePlanPlanner?.renderPlanner === 'function') {
+        window.PlatePlanPlanner.renderPlanner();
+      } else if (typeof window.renderPlan === 'function') {
+        window.renderPlan();
+      } else if (typeof renderPlan === 'function') {
+        renderPlan();
+      } else {
+        console.warn('[Router] No renderer found for planner view');
+      }
     }
     if (id === 'planlib') {
       (window.ensurePlannerShell || window.PlatePlanPlanner?.ensurePlannerShell || (typeof ensurePlannerShell !== 'undefined' ? ensurePlannerShell : () => {}))();
-      if (typeof renderPlanHistoryPanel === 'function') renderPlanHistoryPanel(); else window.PlatePlanPlanner?.renderPlanHistoryPanel?.();
+      if (typeof window.PlatePlanPlanner?.renderPlanHistoryPanel === 'function') {
+        window.PlatePlanPlanner.renderPlanHistoryPanel();
+      } else if (typeof window.PlatePlanPlanner?.renderLibrary === 'function') {
+        window.PlatePlanPlanner.renderLibrary();
+      } else if (typeof window.PlatePlanPlanner?.renderMealPlanLibrary === 'function') {
+        window.PlatePlanPlanner.renderMealPlanLibrary();
+      } else if (typeof window.renderPlanHistoryPanel === 'function') {
+        window.renderPlanHistoryPanel();
+      } else if (typeof renderPlanHistoryPanel === 'function') {
+        renderPlanHistoryPanel();
+      } else {
+        console.warn('[Router] No renderer found for meal plan library view');
+      }
     }
     if (id === 'shopping') {
-      if (typeof renderShopping === 'function') renderShopping(); else window.PlatePlanShoppingList?.renderShopping?.();
+      if (typeof window.PlatePlanShoppingList?.renderShopping === 'function') {
+        window.PlatePlanShoppingList.renderShopping();
+      } else if (typeof window.PlatePlanShopping?.renderShopping === 'function') {
+        window.PlatePlanShopping.renderShopping();
+      } else if (typeof window.renderShopping === 'function') {
+        window.renderShopping();
+      } else if (typeof renderShopping === 'function') {
+        renderShopping();
+      } else {
+        console.warn('[Router] No renderer found for shopping view');
+      }
     }
     if (id === 'prefs') {
-      if (typeof loadPrefs === 'function') loadPrefs();
+      if (typeof window.PlatePlanSettings?.renderPreferences === 'function') {
+        window.PlatePlanSettings.renderPreferences();
+      } else if (typeof loadPrefs === 'function') {
+        loadPrefs();
+      } else if (typeof window.loadPrefs === 'function') {
+        window.loadPrefs();
+      } else {
+        console.warn('[Router] No renderer found for prefs view');
+      }
     }
     if (id === 'data') {
-      if (typeof renderDataQuality === 'function') renderDataQuality();
+      if (typeof window.PlatePlanDataQuality?.renderDataQuality === 'function') {
+        window.PlatePlanDataQuality.renderDataQuality();
+      } else if (typeof renderDataQuality === 'function') {
+        renderDataQuality();
+      } else if (typeof window.renderDataQuality === 'function') {
+        window.renderDataQuality();
+      } else {
+        console.warn('[Router] No renderer found for data quality view');
+      }
     }
   }
 
   const platePlanFeatureRenderers = Object.freeze({
     today() {
       (window.resetTodayDate || window.PlatePlanPlanner?.resetTodayDate || (typeof resetTodayDate !== 'undefined' ? resetTodayDate : () => {}))({ render: false });
-      return typeof renderToday === 'function' ? renderToday() : window.PlatePlanPlanner?.renderToday?.();
+      if (typeof window.PlatePlanViews?.renderToday === 'function') return window.PlatePlanViews.renderToday();
+      if (typeof window.PlatePlanPlanner?.renderToday === 'function') return window.PlatePlanPlanner.renderToday();
+      return typeof renderToday === 'function' ? renderToday() : (typeof window.renderToday === 'function' ? window.renderToday() : null);
     },
     vault() {
-      if (typeof window !== 'undefined' && typeof window.renderVault === 'function') {
-        return window.renderVault();
-      }
+      if (typeof window.PlatePlanRecipes?.renderVault === 'function') return window.PlatePlanRecipes.renderVault();
+      if (typeof window.PlatePlanViews?.renderVault === 'function') return window.PlatePlanViews.renderVault();
+      if (typeof window.renderVault === 'function') return window.renderVault();
       return typeof renderVault === 'function' ? renderVault() : null;
     },
     add() {
@@ -215,22 +310,55 @@
       }
       window.platePlanPreserveAddForm = false;
     },
-    ingredients() { return typeof renderIngredientBank === 'function' ? renderIngredientBank() : window.PlatePlanIngredientBank?.renderIngredientBank?.(); },
-    bank() { return typeof renderBank === 'function' ? renderBank() : window.PlatePlanIngredientBank?.renderBank?.(); },
+    ingredients() {
+      if (typeof window.PlatePlanIngredientBank?.renderIngredientBank === 'function') return window.PlatePlanIngredientBank.renderIngredientBank();
+      if (typeof window.PlatePlanIngredientBank?.renderIngredients === 'function') return window.PlatePlanIngredientBank.renderIngredients();
+      if (typeof window.renderIngredientBank === 'function') return window.renderIngredientBank();
+      return typeof renderIngredientBank === 'function' ? renderIngredientBank() : null;
+    },
+    bank() {
+      if (typeof window.PlatePlanIngredientBank?.renderProductBank === 'function') return window.PlatePlanIngredientBank.renderProductBank();
+      if (typeof window.PlatePlanIngredientBank?.renderBank === 'function') return window.PlatePlanIngredientBank.renderBank();
+      if (typeof window.renderProductBank === 'function') return window.renderProductBank();
+      if (typeof window.renderBank === 'function') return window.renderBank();
+      return typeof renderBank === 'function' ? renderBank() : null;
+    },
     planner() {
       (window.ensurePlannerShell || window.PlatePlanPlanner?.ensurePlannerShell || (typeof ensurePlannerShell !== 'undefined' ? ensurePlannerShell : () => {}))();
       const daySel = document.getElementById('plan-days');
       if (daySel && window.state?.plan?.days) daySel.value = String(window.state.plan.days);
       if (typeof buildExclGrid === 'function') buildExclGrid();
-      return typeof renderPlan === 'function' ? renderPlan() : window.PlatePlanPlanner?.renderPlan?.();
+      if (typeof window.PlatePlanPlanner?.renderPlannerView === 'function') return window.PlatePlanPlanner.renderPlannerView();
+      if (typeof window.PlatePlanPlanner?.renderPlan === 'function') return window.PlatePlanPlanner.renderPlan();
+      if (typeof window.renderPlan === 'function') return window.renderPlan();
+      return typeof renderPlan === 'function' ? renderPlan() : null;
     },
     planlib() {
       (window.ensurePlannerShell || window.PlatePlanPlanner?.ensurePlannerShell || (typeof ensurePlannerShell !== 'undefined' ? ensurePlannerShell : () => {}))();
-      return typeof renderPlanHistoryPanel === 'function' ? renderPlanHistoryPanel() : window.PlatePlanPlanner?.renderPlanHistoryPanel?.();
+      if (typeof window.PlatePlanPlanner?.renderPlanHistoryPanel === 'function') return window.PlatePlanPlanner.renderPlanHistoryPanel();
+      if (typeof window.PlatePlanPlanner?.renderLibrary === 'function') return window.PlatePlanPlanner.renderLibrary();
+      if (typeof window.PlatePlanPlanner?.renderMealPlanLibrary === 'function') return window.PlatePlanPlanner.renderMealPlanLibrary();
+      if (typeof window.renderPlanHistoryPanel === 'function') return window.renderPlanHistoryPanel();
+      return typeof renderPlanHistoryPanel === 'function' ? renderPlanHistoryPanel() : null;
     },
-    shopping() { return typeof renderShopping === 'function' ? renderShopping() : window.PlatePlanShoppingList?.renderShopping?.(); },
-    prefs() { return typeof loadPrefs === 'function' ? loadPrefs() : null; },
-    data() { return typeof renderDataQuality === 'function' ? renderDataQuality() : null; }
+    shopping() {
+      if (typeof window.PlatePlanShoppingList?.renderShopping === 'function') return window.PlatePlanShoppingList.renderShopping();
+      if (typeof window.PlatePlanShopping?.renderShopping === 'function') return window.PlatePlanShopping.renderShopping();
+      if (typeof window.renderShopping === 'function') return window.renderShopping();
+      return typeof renderShopping === 'function' ? renderShopping() : null;
+    },
+    prefs() {
+      if (typeof window.PlatePlanSettings?.renderPreferences === 'function') return window.PlatePlanSettings.renderPreferences();
+      if (typeof loadPrefs === 'function') return loadPrefs();
+      if (typeof window.loadPrefs === 'function') return window.loadPrefs();
+      return null;
+    },
+    data() {
+      if (typeof window.PlatePlanDataQuality?.renderDataQuality === 'function') return window.PlatePlanDataQuality.renderDataQuality();
+      if (typeof renderDataQuality === 'function') return renderDataQuality();
+      if (typeof window.renderDataQuality === 'function') return window.renderDataQuality();
+      return null;
+    }
   });
 
   function requestPlatePlanViewRender(id) {

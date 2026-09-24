@@ -479,7 +479,7 @@ function renderShopping(){
   for(let d=1;d<=days;d++){
     const s=slots[d]||{};
     (typeof SLOTS !== 'undefined' ? SLOTS : []).forEach(sl=>{
-      if(activeState.excluded[d]?.[sl.key])return;
+      if((activeState.excluded||{})[d]?.[sl.key])return;
       const slotData = s[sl.key];
       if(!slotData)return;
       

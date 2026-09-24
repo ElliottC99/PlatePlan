@@ -453,6 +453,25 @@ const fuzzyMatchBank = (name) => {
   return bestScore >= 0.4 ? best : null;
 };
 
+const canonicalGroupKey = (str) => {
+  return String(str || '')
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const canonicalGroupNameFromProduct = (product) => {
+  if (!product) return '';
+  let name = String(product.name || '').trim();
+  if (product.brand && product.brand !== 'Generic' && name.toLowerCase().startsWith(product.brand.toLowerCase())) {
+    name = name.slice(product.brand.length).trim();
+  }
+  name = name.replace(/\b\d+(?:\.\d+)?\s*(?:g|kg|ml|l|pack|pk|tins?|cans?)\b/gi, '').trim();
+  name = name.replace(/\s+/g, ' ').trim();
+  return name || product.name || '';
+};
+
 const fuzzyMatchIngredientGroup = (name) => {
   const groups = window.state?.ingredientGroups || [];
   if (!name || !groups.length) return null;
@@ -461,7 +480,7 @@ const fuzzyMatchIngredientGroup = (name) => {
   let best = null, bestScore = 0;
 
   for (const group of groups) {
-    const canonicalKeyFn = window.canonicalGroupKey || (s => s.toLowerCase());
+    const canonicalKeyFn = canonicalGroupKey;
     const exactFields = [group.name, group.family, ...(group.aliases || [])].map(canonicalKeyFn);
     if (variants.some(variant => exactFields.includes(canonicalKeyFn(variant)))) return group;
     
@@ -776,6 +795,8 @@ if (typeof window !== 'undefined') {
     round1,
     normaliseAliasText,
     inferIngredientFamilyFromText,
+    canonicalGroupKey,
+    canonicalGroupNameFromProduct,
     getIngredientById,
     getProductById,
     getEffectiveProductPrice,
@@ -792,6 +813,8 @@ if (typeof window !== 'undefined') {
   window.round1 = round1;
   window.normaliseAliasText = normaliseAliasText;
   window.inferIngredientFamilyFromText = inferIngredientFamilyFromText;
+  window.canonicalGroupKey = canonicalGroupKey;
+  window.canonicalGroupNameFromProduct = canonicalGroupNameFromProduct;
   window.getIngredientById = getIngredientById;
   window.getProductById = getProductById;
   window.getEffectiveProductPrice = getEffectiveProductPrice;

@@ -5,8 +5,145 @@
  */
 
 (() => {
+// Safe state accessor fallback
+const getState = () => (typeof window !== 'undefined' && window.state) || (typeof state !== 'undefined' ? state : {});
+
+// Safe local fallbacks for core helpers
+var ensureIngredientGroups = (...args) => (window.ensureIngredientGroups || window.PlatePlanState?.ensureIngredientGroups || (() => []))(...args);
+var ensureIngredientFamilies = (...args) => (window.ensureIngredientFamilies || window.PlatePlanState?.ensureIngredientFamilies || (() => []))(...args);
+var canonicalGroupKey = (...args) => (window.canonicalGroupKey || window.PlatePlanIngredients?.canonicalGroupKey || (s => String(s || '').toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim()))(...args);
+var canonicalGroupNameFromProduct = (...args) => (window.canonicalGroupNameFromProduct || window.PlatePlanIngredients?.canonicalGroupNameFromProduct || (p => p?.name || ''))(...args);
+var CAT = (typeof window !== 'undefined' && window.CAT) || (typeof CAT !== 'undefined' ? CAT : {});
+
+function groupIsHiddenDefaultType(group) {
+  if (!group) return false;
+  if (group.hiddenDefault || group.isDefault) return true;
+  const fam = typeof getGroupIngredientFamily === 'function' ? getGroupIngredientFamily(group) : null;
+  if (fam && canonicalGroupKey(fam.name) === canonicalGroupKey(group.name)) return true;
+  return false;
+}
+
+function getKnownFamilies() {
+  const s = getState();
+  const names = new Set();
+  (s.ingredientFamilies || []).forEach(f => {
+    if (f?.name) names.add(f.name);
+  });
+  (s.ingredientGroups || []).forEach(g => {
+    if (g?.family) names.add(g.family);
+  });
+  return Array.from(names).sort((a, b) => a.localeCompare(b));
+}
+
+function getProductProteinPer100Kcal(product) {
+  if (!product) return 0;
+  const cal = parseFloat(product.cal) || 0;
+  const prot = parseFloat(product.prot) || 0;
+  if (cal <= 0) return 0;
+  return (prot / cal) * 100;
+}
+
+function familyKey(name) {
+  if (!name) return '';
+  return String(name)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function getProductFamily(product) {
+  if (!product) return 'Other';
+  if (product.groupId) {
+    const group = typeof getIngredientGroup === 'function' ? getIngredientGroup(product.groupId) : null;
+    if (group) {
+      if (group.family) return group.family;
+      const fam = typeof getGroupIngredientFamily === 'function' ? getGroupIngredientFamily(group) : null;
+      if (fam?.name) return fam.name;
+    }
+  }
+  if (product.family) return product.family;
+  if (product.familyId || product.ingredientId) {
+    const fam = typeof getIngredientFamily === 'function' ? getIngredientFamily(product.familyId || product.ingredientId) : null;
+    if (fam?.name) return fam.name;
+  }
+  const inferred = typeof inferIngredientFamilyFromText === 'function' ? inferIngredientFamilyFromText(product.name) : '';
+  return inferred || product.name || 'Other';
+}
+
+// Module filter and state variables (hoisted to avoid TDZ)
+var activeCat = 'all';
+var activeFamily = 'all';
+var productBankGroupFilterId = null;
+var productBankFamilyFilterId = null;
+var productBankFamilySearchText = '';
+var ingredientSubTypesOpenIds = new Set();
+var ingredientSubTypesKeepOpenId = null;
+var herbConversionFamilyId = null;
+var productDefaultPickerContext = null;
+var ingredientToSubTypeSourceId = null;
+var ingredientFamilyDetailsId = null;
+var ingredientFamilyDetailsCreate = false;
+var ingredientEditorOrigin = null;
+var ingredientFamilyMergeSourceId = null;
+var ingredientFamilyMergeTargetId = null;
+var ingredientFamilyMergeTargetKind = 'family';
+var ingredientGroupPickerContext = null;
+var ingredientGroupPickerMode = 'type';
+var activeReallocationProductId = null;
+var familyPickerGroupId = null;
+var familyRenameOriginal = '';
+var ingredientGroupDetailsEditId = null;
+var ingredientGroupDetailsMode = 'name';
+var ingredientGroupDetailsFamilyId = null;
+var ingredientGroupMergeSourceId = null;
+var ingredientGroupMergeTargetId = null;
+var ingredientGroupMergeTargetKind = 'group';
+var deleteIngredientGroupId = null;
+var pendingAliasSuggestion = null;
+var currentTescoImportData = null;
+var currentTescoImportPayloadCache = '';
+var appConfirmAction = null;
+var appConfirmCancelAction = null;
+var appPromptAction = null;
+var appPromptCancelAction = null;
+var _replaceCtx = null;
+
+// == HELPER FUNCTIONS FOR PRODUCT PACK FORMATTING ==
+function formatProductPackSummary(product) {
+  if (!product) return '';
+  const size = product.packSize ?? '';
+  const unit = product.packUnit || 'g';
+  const itemWeight = product.itemWeight;
+  const itemWeightUnit = product.itemWeightUnit || 'g';
+  const drainedWeight = product.drainedWeight;
+  const drainedWeightUnit = product.drainedWeightUnit || 'g';
+  
+  let base = size !== '' && size !== null && size !== undefined ? `${size}${unit}` : '';
+  const parts = [];
+  if (base) parts.push(base);
+  if (drainedWeight && +drainedWeight > 0) {
+    parts.push(`drained: ${drainedWeight}${drainedWeightUnit}`);
+  }
+  if (itemWeight && +itemWeight > 0) {
+    parts.push(`1 item: ${itemWeight}${itemWeightUnit}`);
+  }
+  return parts.join(' · ') || `${size || ''}${unit || ''}`.trim();
+}
+if (typeof window !== 'undefined') window.formatProductPackSummary = formatProductPackSummary;
+
+function formatPackDisplay(size, unit = 'g', itemWeight = null) {
+  if (!size && size !== 0) return '';
+  const u = unit || 'g';
+  if (itemWeight && +itemWeight > 0 && u !== 'g' && u !== 'ml') {
+    return `${size}${u} (${itemWeight}g/item)`;
+  }
+  return `${size}${u}`;
+}
+if (typeof window !== 'undefined') window.formatPackDisplay = formatPackDisplay;
+
 // == TYPE-AHEAD SEARCH MAPPING ==
-let searchTimeout = null;
+
 
 function handleMapFocus(idx) {
     renderMapDropdown(idx, document.getElementById(`map-search-${idx}`).value);
@@ -182,7 +319,7 @@ function selectMapIngredientDefault(idx, familyId){
     maybeSuggestIngredientAlias(idx, defaultGroup.id);
 }
 
-let pendingAliasSuggestion = null;
+
 
 function recipeIngredientAliasCandidate(ing){
   const candidate = normaliseAliasText(ing?.name || '');
@@ -669,8 +806,7 @@ function closeSubtypeResolutionModal(){
     if (modal) modal.style.display = 'none';
 }
 
-let currentTescoImportData = null;
-let currentTescoImportPayloadCache = '';
+
 
 function openTescoJsonImportModal(subTypeId) {
     closeSubtypeResolutionModal();
@@ -1216,8 +1352,7 @@ function renderIngredientBank(){
   ingredientSubTypesKeepOpenId = null;
 }
 
-let ingredientSubTypesKeepOpenId = null;
-let ingredientSubTypesOpenIds = new Set();
+
 
 function rememberIngredientSubTypesOpen(familyId, isOpen){
   if(!familyId) return;
@@ -1225,7 +1360,7 @@ function rememberIngredientSubTypesOpen(familyId, isOpen){
   else ingredientSubTypesOpenIds.delete(familyId);
 }
 
-let productBankFamilyFilterId = null;
+
 
 function getFamilyGroups(familyId){
   const family = getIngredientFamily(familyId);
@@ -1236,7 +1371,7 @@ function getFamilyProducts(familyId){
   return getFamilyGroups(familyId).flatMap(g => getGroupProducts(g.id));
 }
 
-let herbConversionFamilyId=null;
+
 function isHerbsAndSpicesFamily(family){ return family?.cat==='herbs'; }
 function isHerbsAndSpicesGroup(group){
   const family=getGroupIngredientFamily(group);
@@ -1341,7 +1476,7 @@ function clearHerbConversionPair(){
   showPlatePlanToast(`${family.name} conversion pairing cleared.`);
 }
 
-let productDefaultPickerContext = null;
+
 
 function ensureProductDefaultPickerModal(){
   let wrap = document.getElementById('product-default-picker-wrap');
@@ -1462,7 +1597,7 @@ function refreshHierarchyViews(){
   refreshPlatePlanDerivedState({persist:true, render:true});
 }
 
-let ingredientToSubTypeSourceId = null;
+
 
 function ensureIngredientToSubTypeModal(){
   let wrap = document.getElementById('ingredient-to-subtype-wrap');
@@ -1688,9 +1823,7 @@ function createIngredientFamilyPrompt(){
   openIngredientFamilyDetailsModal('', true);
 }
 
-let ingredientFamilyDetailsId = null;
-let ingredientFamilyDetailsCreate = false;
-let ingredientEditorOrigin = null;
+
 
 function preparePlatePlanWorkspace(wrap,trigger=null){
   if(typeof closeMobileActionSheet==='function') closeMobileActionSheet(true);
@@ -1946,9 +2079,7 @@ function addSubTypeToFamilyPrompt(familyId){
   window.pendingSubTypeFamilyId = family.id;
 }
 
-let ingredientFamilyMergeSourceId = null;
-let ingredientFamilyMergeTargetId = null;
-let ingredientFamilyMergeTargetKind = 'family';
+
 
 function mergeIngredientFamilyPrompt(sourceFamilyId){
   const source = getIngredientFamily(sourceFamilyId);
@@ -2237,11 +2368,12 @@ function renderBank(){
       ${activeFamily !== 'all' ? `<span class="tag">Ingredient: ${ppEscapeHtml(activeFamilyLabel)}</span><button class="btn sm ghost" onclick="clearProductBankFamilyFilter()">Clear</button>` : ''}
     </div>
   `;
-  const sort=document.getElementById('bank-sort').value;
-  const search=(document.getElementById('bank-search').value||'').trim();
+  const sort=(document.getElementById('bank-sort')?.value) || 'name';
+  const search=(document.getElementById('bank-search')?.value||'').trim();
   const searchVariants = getSearchVariants(search);
   
-  let ings=(state.ingredients || []).filter(i=>{
+  const stateRef = getState();
+  let ings=(stateRef.ingredients || []).filter(i=>{
       const group = getIngredientGroup(i.groupId);
       const effectiveCat = group?.cat || i.cat || 'other';
       if(productBankGroupFilterId && i.groupId !== productBankGroupFilterId && !getGroupProducts(productBankGroupFilterId).some(p => p.id === i.id)) return false;
@@ -2272,11 +2404,15 @@ function renderBank(){
   else if(sort==='value')ings.sort((a,b)=>scoreProductByPriority(b, 'protein_per_pound') - scoreProductByPriority(a, 'protein_per_pound'));
   else ings.sort((a,b)=>a.name.localeCompare(b.name));
   const bankSignature=[activeCat,activeFamily,productBankGroupFilterId||'',productBankFamilyFilterId||'',search,sort].join('|');
-  resetProgressiveList('bank',bankSignature);
+  if (typeof resetProgressiveList === 'function') {
+    resetProgressiveList('bank',bankSignature);
+  }
   const totalProducts=ings.length;
-  const visibleProducts=ings.slice(0,platePlanListLimits.bank);
+  const listLimit = (typeof window !== 'undefined' && window.platePlanListLimits?.bank) || (typeof platePlanListLimits !== 'undefined' && platePlanListLimits?.bank) || 30;
+  const visibleProducts=ings.slice(0, listLimit);
   
   const el=document.getElementById('bank-list');
+  if(!el) return;
   const groupFilter = productBankGroupFilterId ? getIngredientGroup(productBankGroupFilterId) : null;
   const familyFilter = productBankFamilyFilterId ? getIngredientFamily(productBankFamilyFilterId) : null;
   const groupFilterHtml = groupFilter ? `<div class="card" style="margin-bottom:12px;background:var(--surface2)">
@@ -2298,25 +2434,26 @@ function renderBank(){
   </div>` : '';
   if(!ings.length){el.innerHTML=groupFilterHtml + '<div class="empty">No products found.</div>';return;}
   
+  const progBtn = typeof progressiveListButton === 'function' ? progressiveListButton('bank',totalProducts,visibleProducts.length) : '';
   el.innerHTML=groupFilterHtml + visibleProducts.map(ing=>{
     const p=ing.prot||0;
     const protDensity = ing.cal ? (p / ing.cal) * 100 : 0; // g protein per 100 kcal
     const rank = protDensity >= 10 ? 'high' : protDensity >= 5 ? 'mid' : 'low';
-    const packInGrams = productPackGrams(ing);
+    const packInGrams = typeof productPackGrams === 'function' ? productPackGrams(ing) : 100;
     const pricePer100=ing.price&&packInGrams?((ing.price/packInGrams)*100).toFixed(1):null;
     const ppenny=ing.price&&packInGrams?((p*packInGrams/100)/ing.price).toFixed(1):null;
     const pkcal=ing.cal?((p/ing.cal)*100).toFixed(1):null;
     const formattedPackSize = formatProductPackSummary(ing);
-    const variantLabels = getIngredientPackVariantLabels(ing);
+    const variantLabels = typeof getIngredientPackVariantLabels === 'function' ? getIngredientPackVariantLabels(ing) : [];
     const group = getIngredientGroup(ing.groupId);
     const isDefaultProduct = group && group.defaultProductId === ing.id;
     const hierarchy = group ? getGroupHierarchyText(group) : `${CAT[ing.cat] || ing.cat || 'Other'} > ${getProductFamily(ing)} > Unassigned type`;
-    const basisWarning = isPowderOrSupplementProduct(ing) && (+ing.cal > 0 && +ing.cal < 200 && +ing.prot > 0 && +ing.prot < 40)
+    const basisWarning = typeof isPowderOrSupplementProduct === 'function' && isPowderOrSupplementProduct(ing) && (+ing.cal > 0 && +ing.cal < 200 && +ing.prot > 0 && +ing.prot < 40)
       ? `<div class="msg warn" style="font-size:11px;margin:6px 0 0;padding:6px 8px">Check nutrition basis: powders/supplements must be stored per 100g/ml, not per scoop.</div>`
       : '';
     
     return`<div class="bank-card"><div class="product-card-layout"><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;overflow-wrap:break-word">${ing.name}</div>${ing.brand&&ing.brand!=='Generic'?`<div style="font-size:12px;color:var(--text2);margin-bottom:4px">${ing.brand}</div>`:''}<div style="font-size:11px;color:var(--text3);margin:3px 0;overflow-wrap:break-word">${ppEscapeHtml(hierarchy)}</div><div class="row-center" style="margin:4px 0;gap:5px"><span class="rank rank-${rank}" title="${protDensity.toFixed(1)}g protein per 100 kcal">${protDensity>=15?'Very high protein':protDensity>=10?'High protein':protDensity>=5?'Medium protein':'Lower protein'}</span><span class="tag" title="Category">${ppEscapeHtml(CAT[group?.cat || ing.cat]||group?.cat||ing.cat||'Other')}</span><span class="tag" title="Ingredient">${ppEscapeHtml(getProductFamily(ing))}</span>${group?`<span class="tag" title="Type">Type: ${ppEscapeHtml(getGroupTypeName(group))}</span>`:''}${isDefaultProduct?`<span class="tag green" title="Automatic default product: highest protein per 100 kcal in this type">Auto default</span>`:''}${ing.storage ? `<span class="tag" style="text-transform:capitalize;">${ing.storage}</span>` : ''}</div><div class="macro-bar"><span class="mpill p">P <span>${p}g</span></span><span class="mpill"><span>${ing.cal}</span> kcal</span><span class="mpill">C <span>${ing.carb}g</span></span><span class="mpill">F <span>${ing.fat}g</span></span></div>${basisWarning}<div class="row-center" style="margin-top:5px; gap:8px;">${pkcal?`<span style="font-size:11px;color:var(--blue)"><strong>${pkcal}g</strong> P / 100kcal</span>`:''}${ppenny?`<span style="font-size:11px;color:var(--blue)"><strong>${ppenny}g</strong> P / &pound;</span>`:''}</div>${ing.notes?`<div style="font-size:12px;color:var(--text2);margin-top:4px">${ing.notes}</div>`:''}${ing.price&&ing.packSize?`<div style="font-size:12px;color:var(--text2);margin-top:4px;">&pound;${ing.price.toFixed(2)} for ${formattedPackSize}</div>`:''}${variantLabels.length>1?`<div style="font-size:11px;color:var(--text2);margin-top:4px;"><strong>Pack variants:</strong> ${variantLabels.map(ppEscapeHtml).join(' · ')}</div>`:''}${ing.sourceUrl?`<div style="font-size:11px;margin-top:4px;"><a href="${ing.sourceUrl}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:underline">View on Tesco ↗</a></div>`:''}</div><div class="product-card-actions"><button class="btn sm ghost desktop-only-mobile-hide" onclick="editIng('${ing.id}')">Edit</button><button class="btn sm ghost desktop-only-mobile-hide" onclick="openProductReallocationModal('${ing.id}')">Reallocate</button><button class="btn sm danger desktop-only-mobile-hide" onclick="deleteIng('${ing.id}')">Delete</button><button class="btn sm ghost mobile-only-action" onclick="editIng('${ing.id}')">Edit product</button><button class="btn sm ghost mobile-only-action" onclick="openProductBankActions('${ing.id}')">More</button></div></div></div>`;
-  }).join('')+progressiveListButton('bank',totalProducts,visibleProducts.length);
+  }).join('')+progBtn;
 }
 
 function getProductBankFamilyFilterOptions(){
@@ -2432,8 +2569,7 @@ function assignProductToGroupPrompt(productId){
   openProductGroupPickerModal(product.id);
 }
 
-let ingredientGroupPickerContext = null;
-let ingredientGroupPickerMode = 'type';
+
 
 function ensureGroupPickerModal(){
   let wrap = document.getElementById('ingredient-group-picker-wrap');
@@ -2819,7 +2955,7 @@ function renderEditProductLinkage(ing){
   }
 }
 
-let activeReallocationProductId = null;
+
 
 function ensureProductReallocationModal(){
   let wrap = document.getElementById('product-reallocation-wrap');
@@ -3128,7 +3264,7 @@ function confirmDelinkProduct(productId){
   showPlatePlanToast(`"${product.name}" delinked from ingredient.`);
 }
 
-let productBankGroupFilterId = null;
+
 
 function showGroupProducts(groupId){
   const group = getIngredientGroup(groupId);
@@ -3162,8 +3298,7 @@ function editGroupFamilyPrompt(groupId){
   openIngredientFamilyPickerModal(groupId);
 }
 
-let familyPickerGroupId = null;
-let familyRenameOriginal = '';
+
 
 function ensureIngredientFamilyPickerModal(){
   let wrap = document.getElementById('ingredient-family-picker-wrap');
@@ -3299,9 +3434,7 @@ function renameCurrentIngredientFamily(){
   if(msg) msg.innerHTML = `<div class="msg success">Renamed ${ppEscapeHtml(oldName)} to ${ppEscapeHtml(nextName)}.</div>`;
 }
 
-let ingredientGroupDetailsEditId = null;
-let ingredientGroupDetailsMode = 'name';
-let ingredientGroupDetailsFamilyId = null;
+
 
 function inferHerbMetadata(...values){
   const text=normaliseAliasText(values.filter(Boolean).join(' ')).toLowerCase();
@@ -3723,9 +3856,7 @@ function mergeIngredientFamilyIntoGroup(sourceFamilyId, targetGroupId){
   return true;
 }
 
-let ingredientGroupMergeSourceId = null;
-let ingredientGroupMergeTargetId = null;
-let ingredientGroupMergeTargetKind = 'group';
+
 
 function ensureIngredientGroupMergeModal(){
   let wrap = document.getElementById('ingredient-group-merge-wrap');
@@ -3915,7 +4046,7 @@ function mergeIngredientGroupPrompt(sourceGroupId){
   openIngredientGroupMergeModal(sourceGroupId);
 }
 
-let deleteIngredientGroupId = null;
+
 
 function getIngredientGroupRecipeUsage(groupId){
   const rows = [];
@@ -4968,10 +5099,7 @@ function refreshAfterIngredientEdit(productId = ''){
   return refreshPlatePlanDerivedState({ changedProductIds:productId?[productId]:[], render:true });
 }
 
-let appConfirmAction = null;
-let appConfirmCancelAction = null;
-let appPromptAction = null;
-let appPromptCancelAction = null;
+
 
 function ensureAppConfirmModal(){
   let wrap = document.getElementById('app-confirm-wrap');
@@ -5256,7 +5384,7 @@ function deleteIng(id){
 }
 
 // === Replace-before-delete flow ===
-let _replaceCtx = null; // { targetId, rows:[{recipeId, key:'ingredients'|'enhanced', idx, replacementId}] }
+
 
 function openReplaceIngredientModal(targetId){
     const target = state.ingredients.find(i=>i.id===targetId);
@@ -5748,11 +5876,35 @@ function parseIng(){
     openTescoImportFromSubst,
     extractTescoProduct,
     saveTescoIngredient,
-    showTescoImportReviewModal
+    showTescoImportReviewModal,
+    renderProductBank: renderBank,
+    renderProducts: renderBank,
+    renderIngredients: renderIngredientBank,
+    renderIngredientBankView: renderIngredientBank,
+    formatProductPackSummary,
+    formatPackDisplay,
+    groupIsHiddenDefaultType,
+    getKnownFamilies,
+    getProductProteinPer100Kcal,
+    familyKey,
+    getProductFamily
   };
 
   if (typeof window !== 'undefined') {
     Object.assign(window, window.PlatePlanIngredientBank);
+    window.renderProductBank = renderBank;
+    window.renderProducts = renderBank;
+    window.renderIngredients = renderIngredientBank;
+    window.renderIngredientBankView = renderIngredientBank;
+    window.formatProductPackSummary = formatProductPackSummary;
+    window.formatPackDisplay = formatPackDisplay;
+    window.groupIsHiddenDefaultType = groupIsHiddenDefaultType;
+    window.getKnownFamilies = getKnownFamilies;
+    window.getProductProteinPer100Kcal = getProductProteinPer100Kcal;
+    window.familyKey = familyKey;
+    window.getProductFamily = getProductFamily;
+    window.PlatePlanIngredients = Object.assign(window.PlatePlanIngredients || {}, window.PlatePlanIngredientBank);
+    window.PlatePlanProducts = window.PlatePlanIngredientBank;
     window.openAppInfoModal = openAppInfoModal;
     window.closeAppConfirmModal = closeAppConfirmModal;
     window.openAppConfirmModal = openAppConfirmModal;

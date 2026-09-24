@@ -762,6 +762,8 @@ export function replaceRecipeIngredient(recipeId, oldIngredientId, newIngredient
 
 // Bind to window for global exposure and inline HTML handlers
 window.renderVault = renderVault;
+window.renderRecipes = renderVault;
+window.renderRecipesView = renderVault;
 window.renderRecipeCard = renderRecipeCard;
 window.viewRecipe = viewRecipe;
 window.toggleRecipeFavourite = toggleRecipeFavourite;
@@ -775,8 +777,28 @@ window.getVaultTargetMacros = getVaultTargetMacros;
 window.isRecipeVariantFavourite = isRecipeVariantFavourite;
 window.isRecipeVariantFavorite = isRecipeVariantFavourite;
 
+window.PlatePlanRecipes = {
+  renderVault,
+  renderRecipes: renderVault,
+  renderRecipesView: renderVault,
+  renderRecipeCard,
+  viewRecipe,
+  toggleRecipeFavourite,
+  toggleRecipeFavorite: toggleRecipeFavourite,
+  openRecipeActions,
+  openEnhancedRecipeActions,
+  computeProfileFitScore,
+  calculateMacroFitTierAndScore,
+  getMealTypeTargets,
+  getVaultTargetMacros,
+  isRecipeVariantFavourite,
+  isRecipeVariantFavorite: isRecipeVariantFavourite
+};
+
 export {
   renderVault,
+  renderVault as renderRecipes,
+  renderVault as renderRecipesView,
   renderRecipeCard,
   viewRecipe,
   toggleRecipeFavourite,

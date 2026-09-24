@@ -123,8 +123,77 @@
 
     calcBudgets();
     renderExclusionPreview();
-    renderRecoveryPanel();
+    if (typeof renderRecoveryPanel === 'function') renderRecoveryPanel();
     syncPlatePlanVersionDisplay();
+  }
+
+  function getRecoveryPoints() {
+    try {
+      const raw = localStorage.getItem(typeof RECOVERY_SK !== 'undefined' ? RECOVERY_SK : 'plateplan_v2_recovery');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function createRecoveryPoint(reason = 'Manual backup') {
+    try {
+      const points = getRecoveryPoints();
+      const newPoint = {
+        id: 'rec_' + Date.now(),
+        time: new Date().toISOString(),
+        reason,
+        state: JSON.parse(JSON.stringify(window.state || {}))
+      };
+      points.unshift(newPoint);
+      if (points.length > 10) points.length = 10;
+      localStorage.setItem(typeof RECOVERY_SK !== 'undefined' ? RECOVERY_SK : 'plateplan_v2_recovery', JSON.stringify(points));
+      renderRecoveryPanel();
+    } catch (e) {
+      console.warn('[Recovery] Failed to create recovery point', e);
+    }
+  }
+
+  function renderRecoveryPanel() {
+    const listEl = document.getElementById('prefs-recovery-list');
+    if (!listEl) return;
+    const points = getRecoveryPoints();
+    if (!points.length) {
+      listEl.innerHTML = '<div style="font-size:12px;color:var(--text3)">No recent recovery snapshots.</div>';
+      return;
+    }
+    listEl.innerHTML = points.map(pt => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+        <div>
+          <strong>${typeof ppEscapeHtml === 'function' ? ppEscapeHtml(pt.reason || 'Snapshot') : pt.reason}</strong>
+          <div style="color:var(--text3);font-size:11px">${new Date(pt.time).toLocaleString()}</div>
+        </div>
+        <button class="btn sm ghost" onclick="restorePlatePlanRecoveryPoint('${pt.id}')">Restore</button>
+      </div>
+    `).join('');
+  }
+
+  function restorePlatePlanRecoveryPoint(id) {
+    try {
+      const points = getRecoveryPoints();
+      const found = points.find(p => p.id === id);
+      if (found && found.state) {
+        window.state = Object.assign(window.state || {}, found.state);
+        if (typeof saveState === 'function') saveState();
+        if (typeof showPlatePlanToast === 'function') showPlatePlanToast('Recovery snapshot restored');
+        if (typeof renderAll === 'function') renderAll();
+      }
+    } catch (e) {
+      console.error('[Recovery] Restore failed', e);
+    }
+  }
+
+  function syncPlatePlanVersionDisplay() {
+    const v = window.APP_VERSION || (typeof APP_VERSION !== 'undefined' ? APP_VERSION : '3.3.7-mod');
+    ['app-version-display', 'plateplan-version-text', 'pref-version-display'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = v;
+    });
   }
 
   function calcBudgets() {
@@ -1049,6 +1118,10 @@
     renderDataQuality,
     updateDataQualityBadge,
     resetAllData,
+    renderRecoveryPanel,
+    createRecoveryPoint,
+    restorePlatePlanRecoveryPoint,
+    syncPlatePlanVersionDisplay,
     openAppInfoModal: (...args) => (window.openAppInfoModal || (typeof openAppInfoModal !== 'undefined' ? openAppInfoModal : () => {}))(...args)
   };
 
@@ -1061,6 +1134,10 @@
   window.removeExclusion = removeExclusion;
   window.renderExclusionPreview = renderExclusionPreview;
   window.viewExclusions = viewExclusions;
+  window.renderRecoveryPanel = renderRecoveryPanel;
+  window.createRecoveryPoint = createRecoveryPoint;
+  window.restorePlatePlanRecoveryPoint = restorePlatePlanRecoveryPoint;
+  window.syncPlatePlanVersionDisplay = syncPlatePlanVersionDisplay;
   window.exportDataJSON = downloadPlatePlanDataBackup; // mapped as legacy backup
   window.importDataJSON = importPlatePlanDataBackup; // mapped as legacy import
   window.downloadPlatePlanDataBackup = downloadPlatePlanDataBackup;

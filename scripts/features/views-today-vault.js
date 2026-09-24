@@ -442,7 +442,8 @@
     const list = document.getElementById('vault-list');
     if (!list) return;
 
-    if (!state?.isCloudHydrated && !window.state?.isCloudHydrated) {
+    const currentRecipes = (window.state?.recipes || (typeof state !== 'undefined' ? state?.recipes : null) || []);
+    if (!currentRecipes.length && !window.isPlatePlanHydrated && !window.state?.isCloudHydrated) {
       list.innerHTML = `<div class="ios-activity-skeleton">
         <div class="spinner"></div>
         <span class="ios-activity-skeleton-text">Syncing live recipes from cloud...</span>
@@ -476,7 +477,6 @@
     }
 
     ensureVariantFavoritingPrefs();
-    const currentRecipes = (window.state?.recipes || state?.recipes || []);
     const recipes = currentRecipes.filter(r => {
       if (!r) return false;
       if (isFavOnly) {
@@ -561,6 +561,8 @@
     renderToday,
     renderTodayView: renderToday,
     renderVault,
+    renderRecipes: renderVault,
+    renderRecipesView: renderVault,
     formatTodayDateLabel,
     renderTodayPersonPanel,
     renderTodayMealCard,
@@ -586,6 +588,8 @@
   window.renderTodayLoadingSkeleton = renderTodayLoadingSkeleton;
   window.isPlatePlanStateReady = isPlatePlanStateReady;
   window.renderVault = renderVault;
+  window.renderRecipes = renderVault;
+  window.renderRecipesView = renderVault;
   window.formatTodayDateLabel = formatTodayDateLabel;
   window.ingRaw = ingRaw;
   window.renderExpandableText = renderExpandableText;
