@@ -6,7 +6,7 @@
     "dev": "node server.js",
     "start": "node server.js",
     "build": "echo 'No build required for static site'",
-    "lint": "node --check server.js && node --check scripts/plateplan-app.js && node --check scripts/services/cloud-sync.js && node --check scripts/features/ingredient-bank.js && node --check scripts/features/planner.js && node --check scripts/features/recipe-editor.js && node --check scripts/features/shopping-list.js && node --check scripts/features/recipes.js && node --check scripts/recipes.js && node --check scripts/actions.js"
+    "lint": "node --check server.js && node --check scripts/core/config.js && node --check scripts/core/bridge.js && node --check scripts/features/modals.js && node --check scripts/core/app.js && node --check scripts/core/router.js && node --check scripts/services/cloud-sync.js && node --check scripts/features/ingredient-bank.js && node --check scripts/features/planner.js && node --check scripts/features/recipe-editor.js && node --check scripts/features/shopping-list.js && node --check scripts/features/recipes.js && node --check scripts/recipes.js && node --check scripts/actions.js && node --check scripts/features/views-today-vault.js && node --check scripts/features/settings-backup.js"
   },
   "dependencies": {
     "express": "^4.19.2"

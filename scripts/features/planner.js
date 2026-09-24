@@ -1486,29 +1486,6 @@ function getTodaySlotEntry(day,slotKey,person,mealType){
   return {day,slotKey,person,mealType,info,calculated,fingerprint:getTodayResolvedFingerprint(info,mealType)};
 }
 
-function renderTodayPersonPanel(person,label,entries){
-  const rows=['breakfast','lunch','dinner'].map(mealType=>{
-    const entry=entries.find(item=>item.person===person&&item.mealType===mealType);
-    const actualCal=Math.round(entry?.calculated?.cal||0);
-    const actualProt=Math.round((entry?.calculated?.prot||0)*10)/10;
-    const target=getBudgets(person,mealType);
-    const calPct=target.cal?Math.min(100,Math.round(actualCal/target.cal*100)):0;
-    const protPct=target.prot?Math.min(100,Math.round(actualProt/target.prot*100)):0;
-    return `<div class="today-target-row">
-      <div class="today-target-meal">${ppEscapeHtml(toTitleCase(mealType))}</div>
-      <div class="today-target-values">
-        <div class="today-target-line"><span>${actualCal} / ${Math.round(target.cal)} kcal</span><span>${actualProt} / ${Math.round(target.prot)}g protein</span></div>
-        <div class="today-progress" role="progressbar" aria-label="${ppEscapeAttr(toTitleCase(mealType))} calories" aria-valuemin="0" aria-valuemax="${Math.round(target.cal)}" aria-valuenow="${actualCal}"><span style="--progress:${calPct}%"></span></div>
-        <div class="today-progress protein" role="progressbar" aria-label="${ppEscapeAttr(toTitleCase(mealType))} protein" aria-valuemin="0" aria-valuemax="${Math.round(target.prot)}" aria-valuenow="${actualProt}" style="margin-top:4px"><span style="--progress:${protPct}%"></span></div>
-      </div>
-    </div>`;
-  }).join('');
-  return `<section class="today-person" aria-label="${ppEscapeAttr(label)} meal nutrition">
-    <div class="today-person-head"><div class="today-person-name">${ppEscapeHtml(label)}</div><div class="today-person-copy">Meal allocation</div></div>
-    ${rows}
-  </section>`;
-}
-
 function isMealEatenOnDate(dateStr, mealType, person = 'both'){
   if(!state.plan) return false;
   state.plan.eatenMeals = state.plan.eatenMeals || {};
@@ -1547,208 +1524,6 @@ function toggleMealEatenOnDate(dateStr, mealType, person = 'both'){
   if(platePlanCloudReady && !platePlanSyncSuppress) queuePlatePlanCloudDiff();
 
   if(document.getElementById('view-today')?.classList.contains('active')) renderToday();
-}
-
-function renderTodayMealCard(group, mealType = 'dinner'){
-  const isShared = group.length === 2;
-  const entry = group[0];
-  const info = entry.info;
-  const personKey = isShared ? 'both' : entry.person;
-  const isEaten = isMealEatenOnDate(platePlanTodayDate, mealType, personKey);
-  const people = group.map(item=>item.person==='e'?'Elliott':'Chloe');
-
-  const macroText = isShared
-    ? `${Math.round(entry.calculated?.cal||0)} kcal · ${Math.round((entry.calculated?.prot||0)*10)/10}g protein`
-    : `${Math.round(entry.calculated?.cal||0)} kcal · ${Math.round((entry.calculated?.prot||0)*10)/10}g protein`;
-
-  const portions = group.map(item=>{
-    const nutrition = item.calculated||{};
-    const portionValue = item.person==='e'
-      ? item.calculated?.portions?.eSingleServ
-      : item.calculated?.portions?.cSingleServ;
-    const personName = item.person==='e'?'Elliott':'Chloe';
-    return `<div class="today-portion"><strong>${personName} · ${Math.round(nutrition.cal||0)} kcal · ${Math.round((nutrition.prot||0)*10)/10}g protein</strong>${Math.round((portionValue||0)*10)/10} serving${Math.abs((portionValue||0)-1)<.001?'':'s'}</div>`;
-  }).join('');
-
-  const toggleCall = `toggleMealEatenOnDate('${platePlanTodayDate}','${ppEscapeAttr(mealType)}','${ppEscapeAttr(personKey)}')`;
-
-  return `<article class="today-meal-card ${isEaten ? 'eaten-card' : ''}" id="today-card-${ppEscapeAttr(mealType)}-${ppEscapeAttr(personKey)}">
-    <div class="today-meal-card-top">
-      <div class="today-meal-card-left">
-        <button class="today-eaten-circle ${isEaten ? 'is-checked' : ''}" type="button" aria-label="${isEaten ? 'Mark as not eaten' : 'Mark as eaten'}" onclick="${toggleCall}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
-        </button>
-        <div class="today-meal-info">
-          <div class="today-meal-name" style="${isEaten ? 'text-decoration:line-through;opacity:0.75' : ''}">
-            ${ppEscapeHtml(info.active.name||info.recipe?.name||'Recipe')}
-          </div>
-          <div class="today-meal-meta">
-            <span class="tag">${ppEscapeHtml(people.join(' & '))}</span>
-            <span class="tag">${ppEscapeHtml(info.variant==='enhanced'?'Enhanced':'Original')}</span>
-            ${isEaten ? `<span class="tag success" style="background:#10b9811f;color:#10b981;border:1px solid #10b98144;font-weight:600">Eaten</span>` : ''}
-          </div>
-        </div>
-      </div>
-      <div class="today-meal-macro-pill">${ppEscapeHtml(macroText)}</div>
-    </div>
-    <div class="today-card-disclosure-row">
-      <details class="today-card-disclosure">
-        <summary>
-          <span>Portions & details</span>
-          <span class="today-card-disclosure-arrow">▾</span>
-        </summary>
-        <div class="today-portions">${portions}</div>
-        <div class="today-card-actions">
-          <button class="btn ghost sm" type="button" onclick="openPlanReschedule(${+entry.day},'${ppEscapeAttr(entry.slotKey)}')">Reschedule meal</button>
-        </div>
-      </details>
-      <button class="btn primary sm today-view-recipe-btn" type="button" onclick="viewRecipe('${ppEscapeAttr(info.id)}','${ppEscapeAttr(info.instanceId||'')}','${ppEscapeAttr(info.variant||'original')}')">View recipe</button>
-    </div>
-  </article>`;
-}
-
-function renderTodayReasonCard(group){
-  const entry=group[0];
-  const people=group.map(item=>item.person==='e'?'Elliott':'Chloe').join(' & ');
-  return `<article class="today-reason-card">
-    <strong>${ppEscapeHtml(formatPlanSlotReason(entry.reason))}</strong>
-    <div style="color:var(--text2)">${ppEscapeHtml(people)} · no recipe scheduled</div>
-  </article>`;
-}
-
-function renderTodayEmpty(title,copy,actions=''){
-  return `<div class="today-empty"><h3>${ppEscapeHtml(title)}</h3><p>${ppEscapeHtml(copy)}</p>${actions?`<div class="btn-row">${actions}</div>`:''}</div>`;
-}
-
-function renderToday(){
-  const host=document.getElementById('today-content');
-  if(!host||!state) return;
-  try {
-    if(!platePlanTodayDate) platePlanTodayDate=getPlatePlanLocalToday();
-    const label=document.getElementById('today-date-label');
-    const subtitle=document.getElementById('today-subtitle');
-    if(label) label.textContent=formatTodayDateLabel(platePlanTodayDate);
-    if(!state.plan?.slots||!Object.keys(state.plan.slots).length){
-      if(subtitle) subtitle.textContent='Your planned meals';
-      host.innerHTML=renderTodayEmpty('No active meal plan','Apply a meal plan from your library, or generate a new one in the Meal Planner.',`<button class="btn primary" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
-      return;
-    }
-    let dated=Object.values(state.plan.dayDates||{}).some(value=>parsePlanLocalDate(value));
-    if(!dated && state.plan.slots && Object.keys(state.plan.slots).length){
-      const days=state.plan.days||Object.keys(state.plan.slots).length||7;
-      state.plan.dayDates=buildPlanDayDates(platePlanTodayDate||getPlatePlanLocalToday(),days);
-      state.plan.updatedAt=new Date().toISOString();
-      safeLocalStorageSet(SK, safeJsonStringify(state));
-      dated=true;
-    }
-    if(!dated){
-      if(subtitle) subtitle.textContent='This plan has no calendar dates';
-      host.innerHTML=renderTodayEmpty('Assign dates to this plan','Today only shows meals that are explicitly assigned to a calendar date.',`<button class="btn primary" onclick="rollActivePlanToDate('${platePlanTodayDate}')">Start plan from today</button><button class="btn ghost" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner');setTimeout(()=>openPlanDatesWorkspace(),0)">Assign dates</button>`);
-      return;
-    }
-    const day=getTodayPlanDay(platePlanTodayDate);
-    if(!day){
-      const next=getNextDatedPlanDay(platePlanTodayDate);
-      const nextCopy=next?` The next dated plan day is ${formatPlanDayLabel(state.plan,next[0],{short:true})}.`:'';
-      if(subtitle) subtitle.textContent='No plan day is assigned';
-      host.innerHTML=renderTodayEmpty('No meals planned for this date',`This date (${formatTodayDateLabel(platePlanTodayDate)}) is not assigned to the active meal plan.${nextCopy}`,`<button class="btn primary" onclick="rollActivePlanToDate('${platePlanTodayDate}')">Start plan cycle from today</button><button class="btn ghost" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
-      return;
-    }
-    if(subtitle) subtitle.textContent=formatPlanDayLabel(state.plan,day,{short:false});
-    const entries=[];
-    const reasonEntries=[];
-    const mealDefinitions=[
-      {mealType:'breakfast',e:'breakfastE',c:'breakfastC'},
-      {mealType:'lunch',e:'lunchE',c:'lunchC'},
-      {mealType:'dinner',e:'dinnerE',c:'dinnerC'}
-    ];
-    mealDefinitions.forEach(meal=>{
-      const e=getTodaySlotEntry(day,meal.e,'e',meal.mealType);
-      const c=getTodaySlotEntry(day,meal.c,'c',meal.mealType);
-      if(e) entries.push(e);
-      if(c) entries.push(c);
-      if(!e){
-        const reason=getPlanSlotReason(state.plan,day,meal.e);
-        if(reason)reasonEntries.push({day:+day,slotKey:meal.e,person:'e',mealType:meal.mealType,reason});
-      }
-      if(!c){
-        const reason=getPlanSlotReason(state.plan,day,meal.c);
-        if(reason)reasonEntries.push({day:+day,slotKey:meal.c,person:'c',mealType:meal.mealType,reason});
-      }
-    });
-    if(!entries.length&&!reasonEntries.length){
-      host.innerHTML=renderTodayEmpty('No meals planned for this date','This plan day has no included breakfast, lunch or dinner meals.',`<button class="btn primary" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
-      return;
-    }
-
-    // Calculate daily totals for Option A summary
-    let eCal=0, eProt=0, cCal=0, cProt=0;
-    entries.forEach(item => {
-      if(item.person === 'e'){
-        eCal += (item.calculated?.cal || 0);
-        eProt += (item.calculated?.prot || 0);
-      } else if(item.person === 'c'){
-        cCal += (item.calculated?.cal || 0);
-        cProt += (item.calculated?.prot || 0);
-      }
-    });
-    const eBudgets = ['breakfast','lunch','dinner'].reduce((acc,m)=>{ const b=getBudgets('e',m); return {cal:acc.cal+b.cal, prot:acc.prot+b.prot}; }, {cal:0,prot:0});
-    const cBudgets = ['breakfast','lunch','dinner'].reduce((acc,m)=>{ const b=getBudgets('c',m); return {cal:acc.cal+b.cal, prot:acc.prot+b.prot}; }, {cal:0,prot:0});
-
-    const summaryHtml = entries.length ? `<details class="today-summary-accordion" id="today-daily-summary-accordion">
-      <summary class="today-summary-summary">
-        <div class="today-summary-chips">
-          <span class="tag" style="background:var(--action);color:#fff;font-weight:700">Daily Targets</span>
-          <span class="today-summary-chip"><strong>Elliott:</strong> ${Math.round(eCal)} / ${Math.round(eBudgets.cal)} kcal · ${Math.round(eProt*10)/10} / ${Math.round(eBudgets.prot)}g protein</span>
-          <span class="today-summary-chip"><strong>Chloe:</strong> ${Math.round(cCal)} / ${Math.round(cBudgets.cal)} kcal · ${Math.round(cProt*10)/10} / ${Math.round(cBudgets.prot)}g protein</span>
-        </div>
-        <span class="today-summary-arrow">▾</span>
-      </summary>
-      <div class="today-summary-body">
-        <div class="today-people">${renderTodayPersonPanel('e','Elliott',entries)}${renderTodayPersonPanel('c','Chloe',entries)}</div>
-      </div>
-    </details>` : '';
-
-    const mealSections=mealDefinitions.map(meal=>{
-      const mealEntries=entries.filter(entry=>entry.mealType===meal.mealType);
-      const mealReasons=reasonEntries.filter(entry=>entry.mealType===meal.mealType);
-      if(!mealEntries.length&&!mealReasons.length) return null;
-      const isEaten=isMealEatenOnDate(platePlanTodayDate,meal.mealType,'both');
-      const groups=mealEntries.length===2&&mealEntries[0].fingerprint===mealEntries[1].fingerprint?[mealEntries]:mealEntries.map(entry=>[entry]);
-      const reasonGroups=mealReasons.length===2&&formatPlanSlotReason(mealReasons[0].reason)===formatPlanSlotReason(mealReasons[1].reason)?[mealReasons]:mealReasons.map(entry=>[entry]);
-
-      return {
-        mealType: meal.mealType,
-        isEaten,
-        html: `<section class="today-meal-section ${isEaten ? 'is-eaten-section' : ''}">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <h2 class="today-meal-heading" style="margin:0">${ppEscapeHtml(toTitleCase(meal.mealType))}</h2>
-            ${isEaten ? `<span class="tag" style="background:#10b98122;color:#10b981;border:1px solid #10b98144;font-weight:600;padding:2px 8px;border-radius:12px;font-size:11px">✓ Eaten</span>` : ''}
-          </div>
-          ${groups.map(g => renderTodayMealCard(g, meal.mealType)).join('')}
-          ${reasonGroups.map(renderTodayReasonCard).join('')}
-        </section>`
-      };
-    }).filter(Boolean);
-
-    mealSections.sort((a,b)=>{
-      if(a.isEaten!==b.isEaten) return a.isEaten ? 1 : -1;
-      return 0;
-    });
-
-    const meals=mealSections.map(s=>s.html).join('');
-    host.innerHTML=summaryHtml+meals;
-  } catch(err) {
-    console.error('Error rendering Today view:', err);
-    host.innerHTML = `<div class="card" style="padding:20px;text-align:center;margin:16px 0;">
-      <h3 style="margin-top:0">Unable to load today's plan</h3>
-      <p style="color:var(--text2);font-size:13px">There was a temporary display issue loading the planned meals for this date.</p>
-      <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
-        <button class="btn primary sm" onclick="renderToday()">Retry</button>
-        <button class="btn ghost sm" onclick="showView('planner')">Open Meal Planner</button>
-      </div>
-    </div>`;
-  }
 }
 
 function openApplyPlanFromLibraryModal(){
@@ -1904,6 +1679,11 @@ window.applyPlanFromLibraryDirect=applyPlanFromLibraryDirect;
 window.rollActivePlanToDate=rollActivePlanToDate;
 window.toggleMealEatenOnDate=toggleMealEatenOnDate;
 window.isMealEatenOnDate=isMealEatenOnDate;
+window.getTodaySlotEntry=getTodaySlotEntry;
+window.getTodayResolvedFingerprint=getTodayResolvedFingerprint;
+window.getNextDatedPlanDay=getNextDatedPlanDay;
+window.getPlanSlotReason=getPlanSlotReason;
+window.formatPlanSlotReason=formatPlanSlotReason;
 
 function scheduleTodayMidnightRefresh(){
   clearTimeout(platePlanTodayTimer);
@@ -5421,7 +5201,7 @@ function filterRecipeSwap(inputRef, listRef){
     renderPlannerPersonSummaryBox,
     getPlatePlanLocalToday,
     getTodayPlanDay,
-    renderToday,
+    parsePlanLocalDate,
     openApplyPlanFromLibraryModal,
     applyPlanFromLibraryDirect,
     ensurePlannerShell,
