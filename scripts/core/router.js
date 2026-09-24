@@ -348,6 +348,9 @@
   }
 
   function renderAll() {
+    if (window.isHydrating || (!window.isPlatePlanHydrated && !window.PlatePlanState?.isReady)) {
+      return;
+    }
     if (typeof window.renderAll === 'function' && window.renderAll !== renderAll) {
       return window.renderAll();
     }

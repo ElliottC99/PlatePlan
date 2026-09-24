@@ -93,7 +93,8 @@
     getIngredientById: safeResolve('getIngredientById'),
     getProductById: safeResolve('getProductById'),
     getEffectiveProductPrice: safeResolve('getEffectiveProductPrice'),
-    calculateIngredientCost: safeResolve('calculateIngredientCost')
+    calculateIngredientCost: safeResolve('calculateIngredientCost'),
+    parsePlanLocalDate: safeResolve('parsePlanLocalDate')
   });
 
   // Assign the global properties only if they aren't already defined as different functions
@@ -103,6 +104,16 @@
       window[name] = fallback;
     }
   };
+
+  assignGlobal('parsePlanLocalDate', safeResolve('parsePlanLocalDate', (value) => {
+    if (window.PlatePlanPlanner?.parsePlanLocalDate) return window.PlatePlanPlanner.parsePlanLocalDate(value);
+    if (!value || typeof value !== 'string') return null;
+    const parts = value.split('-').map(Number);
+    if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return null;
+    const [y, m, d] = parts;
+    const date = new Date(y, m - 1, d);
+    return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d ? date : null;
+  }));
 
   assignGlobal('resolveProductForIngredient', safeResolve('resolveProductForIngredient', (...args) => (window.PlatePlanIngredients?.resolveProductForIngredient || window.PlatePlanNutrition?.resolveProductForIngredient || window.resolveProductForIngredient || (() => ({ product: null, group: null, productId: null, groupId: null })))(...args)));
   assignGlobal('resolveProductForIngredientWithContext', safeResolve('resolveProductForIngredientWithContext', (...args) => (window.PlatePlanIngredients?.resolveProductForIngredientWithContext || window.resolveProductForIngredientWithContext || window.resolveProductForIngredient || (() => ({ product: null, group: null, productId: null, groupId: null })))(...args)));

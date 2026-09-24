@@ -612,7 +612,7 @@
 
   function collectUnusualNumberWarnings(){
     const warnings = [];
-    window.state.ingredients.forEach(product => {
+    (window.state?.ingredients || []).forEach(product => {
         const title = product.name || 'Unnamed product';
         const fix = `<button class="btn sm dq-fix-btn" onclick="editIng('${ppEscapeAttr(product.id)}')">Fix</button>`;
         const addProductWarning = (field, value, message) => {
@@ -632,7 +632,7 @@
         }
     });
 
-    window.state.recipes.forEach(recipe => {
+    (window.state?.recipes || []).forEach(recipe => {
         const mealTypes = recipe.types || [];
         const isMainMeal = mealTypes.some(t => ['lunch','dinner'].includes(t));
         dataQualityRecipeVariants(recipe).forEach(variant => {
@@ -687,7 +687,7 @@
 
   function collectMissingOilWarnings(){
     const warnings = [];
-    window.state.recipes.forEach(recipe => {
+    (window.state?.recipes || []).forEach(recipe => {
         const mealTypes = recipe.types || [];
         if(!mealTypes.some(t => ['lunch','dinner'].includes(t))) return;
         dataQualityRecipeVariants(recipe).forEach(variant => {
@@ -730,7 +730,7 @@
     const resolveItemAmount = typeof getProductItemAmount === 'function' ? getProductItemAmount : (typeof window !== 'undefined' && window.getProductItemAmount ? window.getProductItemAmount : (p => +(p?.itemWeight || 0)));
     const resolveDerivedItemCount = typeof getProductDerivedItemCount === 'function' ? getProductDerivedItemCount : (typeof window !== 'undefined' && window.getProductDerivedItemCount ? window.getProductDerivedItemCount : (() => 0));
 
-    (window.state.ingredients || []).forEach(product => {
+    (window.state?.ingredients || []).forEach(product => {
         const fix = `<button class="btn sm dq-fix-btn" onclick="editIng('${ppEscapeAttr(product.id)}')">Fix</button>`;
         const isNutritionUsable = typeof hasUsableIngredientNutrition === 'function'
           ? hasUsableIngredientNutrition(product)
@@ -780,7 +780,7 @@
         }
     });
 
-    (window.state.recipes || []).forEach(recipe => {
+    (window.state?.recipes || []).forEach(recipe => {
         const fix = `<button class="btn sm dq-fix-btn" onclick="editRecipeModalView('${ppEscapeAttr(recipe.id)}')">Fix</button>`;
         dataQualityRecipeVariants(recipe).forEach(variant => {
             const variantId = variant.label.toLowerCase();
@@ -842,13 +842,13 @@
         add({entityType:'product',entityId:product.id,code:'extreme-recipe-cost',title:product.name || 'Unnamed product',message:`This product contributes up to £${maxContribution.toFixed(2)} per serving in ${recipeNames.join(', ')}. Check its price, pack unit, pack size and item weight.`,fixTarget:{entityType:'product',entityId:product.id},source:[product.price,product.packSize,product.packUnit,product.itemWeight,product.itemWeightUnit,recipeNames,maxContribution.toFixed(2)]});
     });
 
-    (window.state.ingredientFamilies || []).forEach(family => {
+    (window.state?.ingredientFamilies || []).forEach(family => {
         const groups = resolveFamilyGroups(family.id);
         const fix = `<button class="btn sm dq-fix-btn" onclick="openIngredientFamilyDetailsModal('${ppEscapeAttr(family.id)}')">Fix</button>`;
         if(!groups.length) add({entityType:'ingredient',entityId:family.id,code:'no-subtypes',title:family.name || 'Unnamed ingredient',message:'Ingredient has no sub-types.',fixButtonHtml:fix,source:family.typeIds});
         if(!family.cat || family.cat === 'other') add({entityType:'ingredient',entityId:family.id,code:'missing-category',title:family.name || 'Unnamed ingredient',message:'Ingredient has no sorted category.',fixButtonHtml:fix,source:family.cat});
     });
-    (window.state.ingredientGroups || []).forEach(group => {
+    (window.state?.ingredientGroups || []).forEach(group => {
         const products = resolveGroupProds(group.id);
         const fix = `<button class="btn sm dq-fix-btn" data-action="fix-subtype" data-subtype-id="${ppEscapeAttr(group.id)}" onclick="fixSubtypeDataQuality('${ppEscapeAttr(group.id)}')">Fix</button>`;
         const title = resolveHierarchyText(group);
@@ -863,8 +863,8 @@
   function dataQualityAdvisoryFromLegacy(warning){
     let entityType = 'advisory';
     let entityId = warning.key;
-    const product = (window.state.ingredients || []).find(item => warning.key.startsWith(`product-${item.id}-`));
-    const recipe = (window.state.recipes || []).find(item => warning.key.startsWith(`recipe-${item.id}-`));
+    const product = (window.state?.ingredients || []).find(item => warning.key.startsWith(`product-${item.id}-`));
+    const recipe = (window.state?.recipes || []).find(item => warning.key.startsWith(`recipe-${item.id}-`));
     if(product){ entityType = 'product'; entityId = product.id; }
     if(recipe){ entityType = 'recipe'; entityId = recipe.id; }
     const code = warning.key.replace(entityType === 'product' ? `product-${entityId}-` : entityType === 'recipe' ? `recipe-${entityId}-` : '', '').replace(/-[-\d.]+$/, '') || 'advisory';
@@ -873,12 +873,12 @@
 
   function collectDuplicateDataQualityAdvisories(){
     const groups = {};
-    (window.state.ingredients || []).forEach(product => {
+    (window.state?.ingredients || []).forEach(product => {
         const norm = String(product.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         if(!norm) return;
         (groups[norm] ||= []).push(product);
     });
-    const ignoredLegacy = new Set(window.state.ignoredGroupMergeSuggestions || []);
+    const ignoredLegacy = new Set(window.state?.ignoredGroupMergeSuggestions || []);
     return Object.entries(groups).filter(([,products]) => products.length > 1).map(([norm,products]) => {
         const legacyKey = `product-dupe-${norm}`;
         if(ignoredLegacy.has(legacyKey)) return null;

@@ -315,11 +315,24 @@ window.normalizeLoadedState = normalizeLoadedState;
 function loadState() {
   window.isHydrating = true;
   let loaded = null;
-  try {
-    const raw = localStorage.getItem('plateplan_plan_backup');
-    if (raw) loaded = JSON.parse(raw);
-  } catch (e) {
-    console.warn('[State Hydration Engine] LocalStorage backup reading failed.', e);
+  const candidateKeys = ['plateplan_v2', 'plateplan_state_v2', 'plateplan_state_backup', 'plateplan_plan_backup'];
+  for (const key of candidateKeys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.recipes || parsed.plan || parsed.ingredients || parsed.slots) {
+            loaded = parsed;
+            break;
+          } else if (!loaded) {
+            loaded = parsed;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`[State Hydration Engine] LocalStorage key ${key} reading failed.`, e);
+    }
   }
 
   const normalized = normalizeLoadedState(loaded || {});

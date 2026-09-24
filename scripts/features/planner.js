@@ -1438,11 +1438,11 @@ function moveTodayDate(amount){
   renderToday();
 }
 
-function getTodayPlanDay(dateValue,planContext=state?.plan){
+function getTodayPlanDay(dateValue,planContext=(typeof state !== 'undefined' ? state?.plan : window.state?.plan)){
   return Object.entries(planContext?.dayDates||{}).find(([,value])=>value===dateValue)?.[0]||'';
 }
 
-function getNextDatedPlanDay(dateValue,planContext=state?.plan){
+function getNextDatedPlanDay(dateValue,planContext=(typeof state !== 'undefined' ? state?.plan : window.state?.plan)){
   return Object.entries(planContext?.dayDates||{})
     .filter(([,value])=>parsePlanLocalDate(value)&&value>dateValue)
     .sort((a,b)=>a[1].localeCompare(b[1]))[0]||null;

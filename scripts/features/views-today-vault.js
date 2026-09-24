@@ -9,6 +9,33 @@
   window.platePlanTodayDate = window.platePlanTodayDate || '';
   window.platePlanTodayTimer = window.platePlanTodayTimer || null;
   window.platePlanLastActualDate = window.platePlanLastActualDate || '';
+  var platePlanTodayDate = window.platePlanTodayDate || '';
+
+  var parsePlanLocalDate = (v) => (window.parsePlanLocalDate || window.PlatePlanPlanner?.parsePlanLocalDate || ((val) => {
+    if(!val||typeof val!=='string') return null;
+    const parts=val.split('-').map(Number);
+    if(parts.length!==3||parts.some(n=>!Number.isFinite(n))) return null;
+    const [y,m,d]=parts;
+    const date=new Date(y,m-1,d);
+    return date.getFullYear()===y&&date.getMonth()===m-1&&date.getDate()===d?date:null;
+  }))(v);
+
+  var getPlatePlanLocalToday = () => (window.getPlatePlanLocalToday || window.PlatePlanPlanner?.getPlatePlanLocalToday || (() => new Date().toISOString().slice(0,10)))();
+  var buildPlanDayDates = (...args) => (window.buildPlanDayDates || window.PlatePlanPlanner?.buildPlanDayDates || (() => ({})))(...args);
+  var getTodayPlanDay = (...args) => (window.getTodayPlanDay || window.PlatePlanPlanner?.getTodayPlanDay || (() => null))(...args);
+  var getNextDatedPlanDay = (...args) => (window.getNextDatedPlanDay || window.PlatePlanPlanner?.getNextDatedPlanDay || (() => null))(...args);
+  var formatPlanDayLabel = (...args) => (window.formatPlanDayLabel || window.PlatePlanPlanner?.formatPlanDayLabel || ((p, d) => `Day ${d}`))(...args);
+  var getTodaySlotEntry = (...args) => (window.getTodaySlotEntry || window.PlatePlanPlanner?.getTodaySlotEntry || (() => null))(...args);
+  var getPlanSlotReason = (...args) => (window.getPlanSlotReason || window.PlatePlanPlanner?.getPlanSlotReason || (() => null))(...args);
+  var formatPlanSlotReason = (...args) => (window.formatPlanSlotReason || window.PlatePlanPlanner?.formatPlanSlotReason || (r => String(r || '')))(...args);
+  var getBudgets = (...args) => (window.getBudgets || window.PlatePlanPlanner?.getBudgets || (() => ({ cal: 0, prot: 0 })))(...args);
+  var toTitleCase = (...args) => (window.toTitleCase || (s => String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1)))(...args);
+  var isMealEatenOnDate = (...args) => (window.isMealEatenOnDate || window.PlatePlanPlanner?.isMealEatenOnDate || (() => false))(...args);
+  var SK = window.PLATEPLAN_STORAGE_KEY || 'plateplan_state_backup';
+  var safeLocalStorageSet = (...args) => (window.safeLocalStorageSet || window.PlatePlanState?.safeLocalStorageSet || ((k, v) => { try { localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); } catch(e){} }))(...args);
+  var safeJsonStringify = (...args) => (window.safeJsonStringify || (v => JSON.stringify(v)))(...args);
+  var ppEscapeHtml = (str) => (typeof window.ppEscapeHtml === 'function' ? window.ppEscapeHtml(str) : (String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))));
+  var ppEscapeAttr = (str) => (typeof window.ppEscapeAttr === 'function' ? window.ppEscapeAttr(str) : (String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))));
 
   // == TODAY HELPERS & VIEWS ==
 
@@ -111,25 +138,63 @@
     return `<div class="today-empty"><h3>${ppEscapeHtml(title)}</h3><p>${ppEscapeHtml(copy)}</p>${actions?`<div class="btn-row">${actions}</div>`:''}</div>`;
   }
 
+  function renderTodayLoadingSkeleton(){
+    return `<div class="today-skeleton" aria-busy="true" aria-label="Loading planned meals" style="display:flex;flex-direction:column;gap:14px;padding:8px 0;opacity:0.75">
+      <div style="height:24px;width:180px;background:var(--card,rgba(128,128,128,0.1));border-radius:6px"></div>
+      <div style="height:100px;background:var(--card,rgba(128,128,128,0.08));border-radius:12px;border:1px solid var(--border)"></div>
+      <div style="height:100px;background:var(--card,rgba(128,128,128,0.08));border-radius:12px;border:1px solid var(--border)"></div>
+    </div>`;
+  }
+
+  function isPlatePlanStateReady(){
+    if (typeof window === 'undefined') return true;
+    if (window.isHydrating) return false;
+    if (window.PlatePlanState?.isReady || window.isPlatePlanHydrated || window.PlatePlanState?.isHydrated) return true;
+    if (window.platePlanApplicationInitialized && window.platePlanIndexes?.products) return true;
+    const s = window.state || (typeof state !== 'undefined' ? state : null);
+    if (s && ((s.recipes && s.recipes.length > 0) || (s.plan?.slots && Object.keys(s.plan.slots).length > 0))) {
+      return true;
+    }
+    return false;
+  }
+
   function renderToday(){
     const host=document.getElementById('today-content');
-    if(!host||!state) return;
+    if(!host) return;
+
+    if(!isPlatePlanStateReady()){
+      const subtitle=document.getElementById('today-subtitle');
+      if(subtitle) subtitle.textContent='Loading your planned meals…';
+      host.innerHTML=renderTodayLoadingSkeleton();
+      if(typeof window !== 'undefined'){
+        window.addEventListener('plateplan:state-ready', () => {
+          if(document.getElementById('view-today')?.classList.contains('active')){
+            renderToday();
+          }
+        }, { once: true });
+      }
+      return;
+    }
+
+    const currentState = (typeof state !== 'undefined' ? state : window.state);
+    if(!currentState) return;
     try {
-      if(!platePlanTodayDate) platePlanTodayDate=getPlatePlanLocalToday();
+      platePlanTodayDate = window.platePlanTodayDate || (typeof getPlatePlanLocalToday === 'function' ? getPlatePlanLocalToday() : '');
+      window.platePlanTodayDate = platePlanTodayDate;
       const label=document.getElementById('today-date-label');
       const subtitle=document.getElementById('today-subtitle');
       if(label) label.textContent=formatTodayDateLabel(platePlanTodayDate);
-      if(!state.plan?.slots||!Object.keys(state.plan.slots).length){
+      if(!currentState.plan?.slots||!Object.keys(currentState.plan.slots).length){
         if(subtitle) subtitle.textContent='Your planned meals';
         host.innerHTML=renderTodayEmpty('No active meal plan','Apply a meal plan from your library, or generate a new one in the Meal Planner.',`<button class="btn primary" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
         return;
       }
-      let dated=Object.values(state.plan.dayDates||{}).some(value=>parsePlanLocalDate(value));
-      if(!dated && state.plan.slots && Object.keys(state.plan.slots).length){
-        const days=state.plan.days||Object.keys(state.plan.slots).length||7;
-        state.plan.dayDates=buildPlanDayDates(platePlanTodayDate||getPlatePlanLocalToday(),days);
-        state.plan.updatedAt=new Date().toISOString();
-        safeLocalStorageSet(SK, safeJsonStringify(state));
+      let dated=Object.values(currentState.plan.dayDates||{}).some(value=>parsePlanLocalDate(value));
+      if(!dated && currentState.plan.slots && Object.keys(currentState.plan.slots).length){
+        const days=currentState.plan.days||Object.keys(currentState.plan.slots).length||7;
+        currentState.plan.dayDates=buildPlanDayDates(platePlanTodayDate||getPlatePlanLocalToday(),days);
+        currentState.plan.updatedAt=new Date().toISOString();
+        safeLocalStorageSet(SK, safeJsonStringify(currentState));
         dated=true;
       }
       if(!dated){
@@ -137,15 +202,15 @@
         host.innerHTML=renderTodayEmpty('Assign dates to this plan','Today only shows meals that are explicitly assigned to a calendar date.',`<button class="btn primary" onclick="rollActivePlanToDate('${platePlanTodayDate}')">Start plan from today</button><button class="btn ghost" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner');setTimeout(()=>openPlanDatesWorkspace(),0)">Assign dates</button>`);
         return;
       }
-      const day=getTodayPlanDay(platePlanTodayDate);
+      const day=getTodayPlanDay(platePlanTodayDate, currentState.plan);
       if(!day){
-        const next=getNextDatedPlanDay(platePlanTodayDate);
-        const nextCopy=next?` The next dated plan day is ${formatPlanDayLabel(state.plan,next[0],{short:true})}.`:'';
+        const next=getNextDatedPlanDay(platePlanTodayDate, currentState.plan);
+        const nextCopy=next?` The next dated plan day is ${formatPlanDayLabel(currentState.plan,next[0],{short:true})}.`:'';
         if(subtitle) subtitle.textContent='No plan day is assigned';
         host.innerHTML=renderTodayEmpty('No meals planned for this date',`This date (${formatTodayDateLabel(platePlanTodayDate)}) is not assigned to the active meal plan.${nextCopy}`,`<button class="btn primary" onclick="rollActivePlanToDate('${platePlanTodayDate}')">Start plan cycle from today</button><button class="btn ghost" onclick="openApplyPlanFromLibraryModal()">Apply Plan from Library</button><button class="btn ghost" onclick="showView('planner')">Open Meal Planner</button>`);
         return;
       }
-      if(subtitle) subtitle.textContent=formatPlanDayLabel(state.plan,day,{short:false});
+      if(subtitle) subtitle.textContent=formatPlanDayLabel(currentState.plan,day,{short:false});
       const entries=[];
       const reasonEntries=[];
       const mealDefinitions=[
@@ -159,11 +224,11 @@
         if(e) entries.push(e);
         if(c) entries.push(c);
         if(!e){
-          const reason=getPlanSlotReason(state.plan,day,meal.e);
+          const reason=getPlanSlotReason(currentState.plan,day,meal.e);
           if(reason)reasonEntries.push({day:+day,slotKey:meal.e,person:'e',mealType:meal.mealType,reason});
         }
         if(!c){
-          const reason=getPlanSlotReason(state.plan,day,meal.c);
+          const reason=getPlanSlotReason(currentState.plan,day,meal.c);
           if(reason)reasonEntries.push({day:+day,slotKey:meal.c,person:'c',mealType:meal.mealType,reason});
         }
       });
@@ -494,12 +559,15 @@
 
   window.PlatePlanViews = {
     renderToday,
+    renderTodayView: renderToday,
     renderVault,
     formatTodayDateLabel,
     renderTodayPersonPanel,
     renderTodayMealCard,
     renderTodayReasonCard,
     renderTodayEmpty,
+    renderTodayLoadingSkeleton,
+    isPlatePlanStateReady,
     formatStockIngredientText,
     ingRaw,
     renderExpandableText,
@@ -514,6 +582,9 @@
   };
 
   window.renderToday = renderToday;
+  window.renderTodayView = renderToday;
+  window.renderTodayLoadingSkeleton = renderTodayLoadingSkeleton;
+  window.isPlatePlanStateReady = isPlatePlanStateReady;
   window.renderVault = renderVault;
   window.formatTodayDateLabel = formatTodayDateLabel;
   window.ingRaw = ingRaw;

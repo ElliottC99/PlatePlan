@@ -23,7 +23,12 @@ function initializePlatePlanApplication() {
 
   // 1. Initialize default global state (window.state)
   window.state = window.state || {};
-  window.state = window.state || {};
+
+  // Initialize hydration and readiness state flags
+  window.isPlatePlanHydrated = false;
+  if (!window.PlatePlanState) window.PlatePlanState = {};
+  window.PlatePlanState.isReady = false;
+  window.PlatePlanState.isHydrated = false;
 
   // 2. Call window.PlatePlanCloud.initPlatePlanCloudSync()
   if (window.PlatePlanCloud && typeof window.PlatePlanCloud.initPlatePlanCloudSync === 'function') {
@@ -35,19 +40,23 @@ function initializePlatePlanApplication() {
   // Define window.PlatePlanState.hydrateState wrapper
   if (window.PlatePlanState) {
     window.PlatePlanState.hydrateState = function() {
+      window.isHydrating = true;
       window.state = window.PlatePlanModals?.loadState() || {};
       window.appState = window.state;
+      window.isHydrating = false;
       return window.state;
     };
   }
 
   // 3. Hydrate state from local/cloud storage via window.PlatePlanState
+  window.isHydrating = true;
   if (window.PlatePlanState && typeof window.PlatePlanState.hydrateState === 'function') {
     window.PlatePlanState.hydrateState();
   } else {
     window.state = window.PlatePlanModals?.loadState() || {};
     window.appState = window.state;
   }
+  window.isHydrating = false;
 
   const bootHouseholdId = window.activeHouseholdId || window.state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
   window.activeHouseholdId = bootHouseholdId;
@@ -117,6 +126,19 @@ function initializePlatePlanApplication() {
       window.refreshAllProductDefaultsAndRecipeNutrition();
     }
     window.PlatePlanModals?.rebuildPlatePlanIndexes();
+  }
+
+  // Set clear ready flags BEFORE calling renderAll
+  window.isHydrating = false;
+  window.isPlatePlanHydrated = true;
+  if (window.PlatePlanState) {
+    window.PlatePlanState.isReady = true;
+    window.PlatePlanState.isHydrated = true;
+  }
+  if (typeof window.dispatchEvent === 'function') {
+    try {
+      window.dispatchEvent(new CustomEvent('plateplan:state-ready', { detail: { state: window.state } }));
+    } catch (_evErr) {}
   }
 
   if (window.PlatePlanState && typeof window.PlatePlanState.safeLocalStorageSet === 'function') {

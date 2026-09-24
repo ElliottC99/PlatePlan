@@ -267,6 +267,9 @@ async function persistPlatePlanDataQualityFix(reason = 'Data quality update'){
 let isRenderingAll = false;
 function renderAll(){
   if (isRenderingAll) return;
+  if (window.isHydrating || (!window.isPlatePlanHydrated && !window.PlatePlanState?.isReady)) {
+    return;
+  }
   isRenderingAll = true;
   try {
     rebuildPlatePlanIndexes();
