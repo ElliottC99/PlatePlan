@@ -81,6 +81,16 @@
     hasUsableIngredientNutrition: safeResolve('hasUsableIngredientNutrition'),
     getGroupIngredientFamily: safeResolve('getGroupIngredientFamily'),
     resolveProductForIngredient: safeResolve('resolveProductForIngredient'),
+    normalizeNutrientKey: safeResolve('normalizeNutrientKey'),
+    numericNutritionValues: safeResolve('numericNutritionValues'),
+    normalizeEnergyKcal: safeResolve('normalizeEnergyKcal'),
+    normalizeNutritionPayload: safeResolve('normalizeNutritionPayload'),
+    calculateItemNutrition: safeResolve('calculateItemNutrition'),
+    calculateRecipeNutrition: safeResolve('calculateRecipeNutrition'),
+    calculateFit: safeResolve('calculateFit'),
+    getBudgets: safeResolve('getBudgets'),
+    calculatePlanDayTotals: safeResolve('calculatePlanDayTotals'),
+    computeMacroProgress: safeResolve('computeMacroProgress'),
     resolveProductForIngredientWithContext: safeResolve('resolveProductForIngredientWithContext'),
     getGroupProducts: safeResolve('getGroupProducts'),
     getFamilyGroups: safeResolve('getFamilyGroups'),
@@ -88,13 +98,113 @@
     needsItemWeightForQtyIngredient: safeResolve('needsItemWeightForQtyIngredient'),
     getIngredientMappingWarning: safeResolve('getIngredientMappingWarning'),
     round1: safeResolve('round1'),
+    getBankState: safeResolve('getBankState'),
+    resetState: safeResolve('resetState'),
+    getCloudState: safeResolve('getCloudState'),
+    resetCloudState: safeResolve('resetState'),
+    getEditorState: safeResolve('getEditorState'),
+    resetEditorState: safeResolve('resetState'),
     normaliseAliasText: safeResolve('normaliseAliasText'),
     inferIngredientFamilyFromText: safeResolve('inferIngredientFamilyFromText'),
     getIngredientById: safeResolve('getIngredientById'),
     getProductById: safeResolve('getProductById'),
     getEffectiveProductPrice: safeResolve('getEffectiveProductPrice'),
     calculateIngredientCost: safeResolve('calculateIngredientCost'),
-    parsePlanLocalDate: safeResolve('parsePlanLocalDate')
+    formatProductPackSummary: safeResolve('formatProductPackSummary'),
+    formatPackDisplay: safeResolve('formatPackDisplay'),
+    formatIngredientPackVariantLabel: safeResolve('formatIngredientPackVariantLabel'),
+    getProductProteinPer100Kcal: safeResolve('getProductProteinPer100Kcal'),
+    parsePlainNutritionLabel: safeResolve('parsePlainNutritionLabel'),
+    familyKey: safeResolve('familyKey'),
+    inferHerbMetadata: safeResolve('inferHerbMetadata'),
+    getIngredientGroupSearchText: safeResolve('getIngredientGroupSearchText'),
+    isPowderOrSupplementProduct: safeResolve('isPowderOrSupplementProduct'),
+    parsePlanLocalDate: safeResolve('parsePlanLocalDate'),
+    getPlatePlanLocalToday: safeResolve('getPlatePlanLocalToday'),
+    formatPlanLocalDateValue: safeResolve('formatPlanLocalDateValue'),
+    buildPlanDayDates: safeResolve('buildPlanDayDates'),
+    formatPlanDayLabel: safeResolve('formatPlanDayLabel'),
+    getPlanDateRangeLabel: safeResolve('getPlanDateRangeLabel'),
+    validatePlanDayDates: safeResolve('validatePlanDayDates'),
+    getMealTypeFromSlotKey: safeResolve('getMealTypeFromSlotKey'),
+    parsePlanRecipeValue: safeResolve('parsePlanRecipeValue'),
+    makePlanSlot: safeResolve('makePlanSlot'),
+    getPlanSlotReasonKey: safeResolve('getPlanSlotReasonKey'),
+    formatPlanSlotReason: safeResolve('formatPlanSlotReason'),
+    getPlanSlotCounterpartKey: safeResolve('getPlanSlotCounterpartKey'),
+    planSlotsCanMoveTogether: safeResolve('planSlotsCanMoveTogether'),
+    calculatePlanScore: safeResolve('calculatePlanScore'),
+    calculatePlanDayScoreFromTotals: safeResolve('calculatePlanDayScoreFromTotals'),
+    fmtPlanDelta: safeResolve('fmtPlanDelta'),
+    planDeltaColor: safeResolve('planDeltaColor'),
+    parsePlannerVisibleMacro: safeResolve('parsePlannerVisibleMacro'),
+    mealPrepPeopleKey: safeResolve('mealPrepPeopleKey'),
+    mealPrepIdentityKey: safeResolve('mealPrepIdentityKey'),
+    mealPrepSuggestionKey: safeResolve('mealPrepSuggestionKey'),
+    formatMealPrepDays: safeResolve('formatMealPrepDays'),
+    getUseUpAvailableAmount: safeResolve('getUseUpAvailableAmount'),
+    getRecipeUseUpCoverage: safeResolve('getRecipeUseUpCoverage'),
+    normaliseExclusionList: safeResolve('normaliseExclusionList'),
+    recipeMatchesExclusion: safeResolve('recipeMatchesExclusion'),
+    recipeAllowedForPerson: safeResolve('recipeAllowedForPerson'),
+    getUsedRecipeIdsFromHistory: safeResolve('getUsedRecipeIdsFromHistory'),
+    getPlanRecipeIds: safeResolve('getPlanRecipeIds'),
+    resetStudioSession: safeResolve('resetStudioSession'),
+    resetSwapContext: safeResolve('resetSwapContext'),
+    sanitizePayloadForFirestore: safeResolve('sanitizePayloadForFirestore'),
+    unwrapAndCleanItem: safeResolve('unwrapAndCleanItem'),
+    sanitizePlanForFirestore: safeResolve('sanitizePlanForFirestore'),
+    sanitizeRecipeForFirestore: safeResolve('sanitizeRecipeForFirestore'),
+    sanitizeIngredientForFirestore: safeResolve('sanitizeIngredientForFirestore'),
+    cleanObject: safeResolve('cleanObject'),
+    computePayloadSignature: safeResolve('computePayloadSignature'),
+    capturePlatePlanEditBaseline: safeResolve('capturePlatePlanEditBaseline'),
+    getPlatePlanDeviceId: safeResolve('getPlatePlanDeviceId'),
+    clearLocks: safeResolve('clearLocks'),
+    getSyncDiagnostics: safeResolve('getSyncDiagnostics'),
+    applyScaleToRecipeDefinition: safeResolve('applyScaleToRecipeDefinition'),
+    renderProteinEfficiencyAnalysisSection: safeResolve('renderProteinEfficiencyAnalysisSection'),
+    normaliseRecipeIngredientSection: safeResolve('normaliseRecipeIngredientSection'),
+    orderRecipeIngredientsBySection: safeResolve('orderRecipeIngredientsBySection'),
+    uniqueSectionNames: safeResolve('uniqueSectionNames'),
+    normaliseReviewCompareText: safeResolve('normaliseReviewCompareText'),
+    comparableReviewIngredients: safeResolve('comparableReviewIngredients'),
+    comparableReviewSteps: safeResolve('comparableReviewSteps'),
+    applyReviewContextToIngredients: safeResolve('applyReviewContextToIngredients'),
+    safeFileName: safeResolve('safeFileName'),
+    getPlatePlanBackupPayload: safeResolve('getPlatePlanBackupPayload'),
+    validatePlatePlanImport: safeResolve('validatePlatePlanImport'),
+    renderBakedStateDifferenceSummary: safeResolve('renderBakedStateDifferenceSummary'),
+    dataQualityFingerprint: safeResolve('dataQualityFingerprint'),
+    createDataQualityIssue: safeResolve('createDataQualityIssue'),
+    resetRecipeEditorState: safeResolve('resetRecipeEditorState', (...args) => (window.PlatePlanRecipeEditor?.resetState || (() => {}))(...args)),
+    getRecipeEditorState: safeResolve('getRecipeEditorState', (...args) => (window.PlatePlanRecipeEditor?.getEditorState || (() => ({})))(...args)),
+    resetSettingsBackupState: safeResolve('resetSettingsBackupState', (...args) => (window.PlatePlanSettingsBackup?.resetState || (() => {}))(...args)),
+    getSettingsBackupState: safeResolve('getSettingsBackupState', (...args) => (window.PlatePlanSettingsBackup?.getSettingsState || (() => ({})))(...args)),
+    resetNutritionState: safeResolve('resetNutritionState', (...args) => (window.PlatePlanNutrition?.resetState || (() => {}))(...args)),
+    getNutritionState: safeResolve('getNutritionState', (...args) => (window.PlatePlanNutrition?.getNutritionState || (() => ({})))(...args)),
+    resetShoppingState: safeResolve('resetShoppingState', (...args) => (window.PlatePlanShoppingList?.resetState || (() => {}))(...args)),
+    getShoppingState: safeResolve('getShoppingState', (...args) => (window.PlatePlanShoppingList?.getShoppingState || (() => ({})))(...args)),
+    getPackVariants: safeResolve('getPackVariants'),
+    getOptimalPurchase: safeResolve('getOptimalPurchase'),
+    calculateShoppingPriceFromAggregates: safeResolve('calculateShoppingPriceFromAggregates'),
+    encodeShopTarget: safeResolve('encodeShopTarget'),
+    decodeShopTarget: safeResolve('decodeShopTarget'),
+    formatShoppingBatchAmount: safeResolve('formatShoppingBatchAmount'),
+    getShoppingLineStateKey: safeResolve('getShoppingLineStateKey'),
+    groupShoppingAllocationsByMeal: safeResolve('groupShoppingAllocationsByMeal'),
+    readableHerbQuantity: safeResolve('readableHerbQuantity'),
+    buildHerbConversion: safeResolve('buildHerbConversion'),
+    formatTodayDateLabel: safeResolve('formatTodayDateLabel'),
+    formatStockIngredientText: safeResolve('formatStockIngredientText'),
+    ingRaw: safeResolve('ingRaw'),
+    hasVariantFavoritingInitialized: safeResolve('hasVariantFavoritingInitialized'),
+    ensureVariantFavoritingPrefs: safeResolve('ensureVariantFavoritingPrefs'),
+    isRecipeVariantFavourite: safeResolve('isRecipeVariantFavourite'),
+    isRecipeVariantFavorite: safeResolve('isRecipeVariantFavorite'),
+    calculateVaultTargetMacros: safeResolve('calculateVaultTargetMacros'),
+    resetVaultState: safeResolve('resetVaultState', (...args) => (window.PlatePlanRecipes?.resetState || (() => {}))(...args)),
+    getVaultState: safeResolve('getVaultState', (...args) => (window.PlatePlanRecipes?.getRecipesState || (() => ({})))(...args))
   });
 
   // Assign the global properties only if they aren't already defined as different functions
@@ -104,6 +214,16 @@
       window[name] = fallback;
     }
   };
+
+  assignGlobal('formatProductPackSummary', safeResolve('formatProductPackSummary', (...args) => (window.PlatePlanIngredients?.formatProductPackSummary || window.formatProductPackSummary || (() => ''))(...args)));
+  assignGlobal('formatPackDisplay', safeResolve('formatPackDisplay', (...args) => (window.PlatePlanIngredients?.formatPackDisplay || window.formatPackDisplay || ((s, u = 'g') => `${s}${u}`))(...args)));
+  assignGlobal('formatIngredientPackVariantLabel', safeResolve('formatIngredientPackVariantLabel', (...args) => (window.PlatePlanIngredients?.formatIngredientPackVariantLabel || window.formatIngredientPackVariantLabel || (() => ''))(...args)));
+  assignGlobal('getProductProteinPer100Kcal', safeResolve('getProductProteinPer100Kcal', (...args) => (window.PlatePlanNutrition?.getProductProteinPer100Kcal || window.getProductProteinPer100Kcal || (() => 0))(...args)));
+  assignGlobal('parsePlainNutritionLabel', safeResolve('parsePlainNutritionLabel', (...args) => (window.PlatePlanNutrition?.parsePlainNutritionLabel || window.parsePlainNutritionLabel || (async () => ({})))(...args)));
+  assignGlobal('familyKey', safeResolve('familyKey', (...args) => (window.PlatePlanIngredients?.familyKey || window.familyKey || (s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')))(...args)));
+  assignGlobal('inferHerbMetadata', safeResolve('inferHerbMetadata', (...args) => (window.PlatePlanIngredients?.inferHerbMetadata || window.inferHerbMetadata || (() => ({ herbForm: '', herbKey: '' })))(...args)));
+  assignGlobal('getIngredientGroupSearchText', safeResolve('getIngredientGroupSearchText', (...args) => (window.PlatePlanIngredients?.getIngredientGroupSearchText || window.getIngredientGroupSearchText || (() => ''))(...args)));
+  assignGlobal('isPowderOrSupplementProduct', safeResolve('isPowderOrSupplementProduct', (...args) => (window.PlatePlanIngredients?.isPowderOrSupplementProduct || window.isPowderOrSupplementProduct || (() => false))(...args)));
 
   assignGlobal('parsePlanLocalDate', safeResolve('parsePlanLocalDate', (value) => {
     if (window.PlatePlanPlanner?.parsePlanLocalDate) return window.PlatePlanPlanner.parsePlanLocalDate(value);
@@ -153,6 +273,24 @@
   assignGlobal('confirmSubstitute', safeResolve('confirmSubstitute', (...args) => (window.PlatePlanShoppingList?.confirmSubstitute || (() => {}))(...args)));
   assignGlobal('extractTescoProduct', safeResolve('extractTescoProduct', (...args) => (window.PlatePlanIngredientBank?.extractTescoProduct || (() => {}))(...args)));
   assignGlobal('saveTescoIngredient', safeResolve('saveTescoIngredient', (...args) => (window.PlatePlanIngredientBank?.saveTescoIngredient || (() => {}))(...args)));
+  assignGlobal('resetModalContext', safeResolve('resetModalContext', (...args) => (window.PlatePlanIngredientBank?.resetModalContext || (() => {}))(...args)));
+  assignGlobal('getPlatePlanBackupPayload', safeResolve('getPlatePlanBackupPayload', (...args) => (window.PlatePlanSettingsBackup?.getPlatePlanBackupPayload || window.getPlatePlanBackupPayload || (() => ({})))(...args)));
+  assignGlobal('validatePlatePlanImport', safeResolve('validatePlatePlanImport', (...args) => (window.PlatePlanSettingsBackup?.validatePlatePlanImport || window.validatePlatePlanImport || (() => ({ valid: false, errors: [] })))(...args)));
+  assignGlobal('renderBakedStateDifferenceSummary', safeResolve('renderBakedStateDifferenceSummary', (...args) => (window.PlatePlanSettingsBackup?.renderBakedStateDifferenceSummary || window.renderBakedStateDifferenceSummary || (() => ''))(...args)));
+  assignGlobal('dataQualityFingerprint', safeResolve('dataQualityFingerprint', (...args) => (window.PlatePlanSettingsBackup?.dataQualityFingerprint || window.dataQualityFingerprint || (() => ''))(...args)));
+  assignGlobal('createDataQualityIssue', safeResolve('createDataQualityIssue', (...args) => (window.PlatePlanSettingsBackup?.createDataQualityIssue || window.createDataQualityIssue || (() => ({})))(...args)));
+  assignGlobal('resetSettingsBackupState', safeResolve('resetSettingsBackupState', (...args) => (window.PlatePlanSettingsBackup?.resetState || (() => {}))(...args)));
+  assignGlobal('getSettingsBackupState', safeResolve('getSettingsBackupState', (...args) => (window.PlatePlanSettingsBackup?.getSettingsState || (() => ({})))(...args)));
+  assignGlobal('formatTodayDateLabel', safeResolve('formatTodayDateLabel', (...args) => (window.PlatePlanToday?.formatTodayDateLabel || window.formatTodayDateLabel || (d => d))(...args)));
+  assignGlobal('formatStockIngredientText', safeResolve('formatStockIngredientText', (...args) => (window.PlatePlanToday?.formatStockIngredientText || window.formatStockIngredientText || (() => ''))(...args)));
+  assignGlobal('ingRaw', safeResolve('ingRaw', (...args) => (window.PlatePlanToday?.ingRaw || window.ingRaw || (i => String(i || '')))(...args)));
+  assignGlobal('hasVariantFavoritingInitialized', safeResolve('hasVariantFavoritingInitialized', (...args) => (window.PlatePlanRecipes?.hasVariantFavoritingInitialized || (() => false))(...args)));
+  assignGlobal('ensureVariantFavoritingPrefs', safeResolve('ensureVariantFavoritingPrefs', (...args) => (window.PlatePlanRecipes?.ensureVariantFavoritingPrefs || (() => []))(...args)));
+  assignGlobal('isRecipeVariantFavourite', safeResolve('isRecipeVariantFavourite', (...args) => (window.PlatePlanRecipes?.isRecipeVariantFavourite || (() => false))(...args)));
+  assignGlobal('isRecipeVariantFavorite', safeResolve('isRecipeVariantFavorite', (...args) => (window.PlatePlanRecipes?.isRecipeVariantFavorite || (() => false))(...args)));
+  assignGlobal('calculateVaultTargetMacros', safeResolve('calculateVaultTargetMacros', (...args) => (window.PlatePlanRecipes?.calculateVaultTargetMacros || (() => ({})))(...args)));
+  assignGlobal('resetVaultState', safeResolve('resetVaultState', (...args) => (window.PlatePlanRecipes?.resetState || (() => {}))(...args)));
+  assignGlobal('getVaultState', safeResolve('getVaultState', (...args) => (window.PlatePlanRecipes?.getRecipesState || (() => ({})))(...args)));
 
   window.dispatchEvent(new CustomEvent('plateplan:legacy-ready', { detail: { version: window.PLATEPLAN_APP_VERSION || '3.3.7-mod' } }));
 })();
