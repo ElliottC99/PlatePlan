@@ -1,5 +1,5 @@
 import { assertAuthoritativeInterfaces } from './core/contracts.js?v=3.3.7-mod';
-import { createPlatePlanStore } from './core/store.js?v=3.3.7-mod';
+import { createPlatePlanStore, deletePlan } from './core/store.js?v=3.3.7-mod';
 import { createPlatePlanRuntime } from './core/runtime.js?v=3.3.7-mod';
 import { createFirebaseService } from './services/firebase.js?v=3.3.7-mod';
 import { createSyncService } from './services/sync.js?v=3.3.7-mod';
@@ -41,7 +41,6 @@ const syncRuntimeMarker = () => {
 window.addEventListener('plateplan:feature-loaded', syncRuntimeMarker);
 
 // Wire deletePlan globally to our store's resilient deletePlan implementation
-import { deletePlan } from './core/store.js?v=3.3.7-mod';
 window.deletePlan = deletePlan;
 
 // Eagerly load core feature modules to establish DOM ownership, attach listeners, and claim active modular view ownership
