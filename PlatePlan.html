@@ -209,32 +209,34 @@ body.modal-open {
 <div id="view-vault" class="view">
   <div class="view-toolbar">
     <h2 style="margin:0">Recipe vault</h2>
-    <div class="vault-filters">
+    <div class="vault-filters" style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
       <button class="btn primary" type="button" data-pp-click="openUseUpRecipeFinder()">Use up ingredients</button>
       <button type="button" id="vault-filter-fav" class="btn sm ghost fav-filter-btn" data-pp-click="toggleVaultFavouritesFilter()" aria-pressed="false" title="Filter favourites only" style="display:inline-flex;align-items:center;gap:6px">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" class="heart-icon"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
         <span>Favourites Only</span>
       </button>
-      <input type="search" id="vault-search" placeholder="Search recipes..." data-pp-input="schedulePlatePlanListRender('vault')" style="width:200px;font-size:12px">
-      <select id="vault-sort" data-pp-change="renderVault()" style="width:auto;font-size:12px">
-        <option value="name">Name A-Z</option>
-        <option value="needs_work">Needs most work</option>
-        <option value="best_fit">Best fit</option>
-      </select>
-      <select id="filter-type" data-pp-change="renderVault()" style="width:auto;font-size:12px">
-        <option value="all">All types</option>
-        <option value="breakfast">Breakfast</option>
-        <option value="lunch">Lunch</option>
-        <option value="dinner">Dinner</option>
-      </select>
-      <div class="vault-who-container" style="display: flex; align-items: center; flex-wrap: nowrap; gap: 8px; white-space: nowrap;">
-        <label for="filter-who" style="margin: 0; font-size: 12px; white-space: nowrap;">Person:</label>
-        <select id="filter-who" data-pp-change="renderVault()" style="width: auto; font-size: 12px; white-space: nowrap;">
-          <option value="all">Everyone</option>
-          <option value="Elliott">Elliott</option>
-          <option value="Chloe">Chloe</option>
-          <option value="both">Shared</option>
+      <input type="search" id="vault-search" placeholder="Search recipes..." data-pp-input="schedulePlatePlanListRender('vault')" style="flex: 1 1 200px; font-size: 12px;">
+      <div class="vault-dropdowns-group" style="display: flex; gap: 8px; flex-wrap: nowrap; align-items: center;">
+        <select id="vault-sort" data-pp-change="renderVault()" style="width: auto; font-size: 12px;">
+          <option value="name">Name A-Z</option>
+          <option value="needs_work">Needs most work</option>
+          <option value="best_fit">Best fit</option>
         </select>
+        <select id="filter-type" data-pp-change="renderVault()" style="width: auto; font-size: 12px;">
+          <option value="all">All types</option>
+          <option value="breakfast">Breakfast</option>
+          <option value="lunch">Lunch</option>
+          <option value="dinner">Dinner</option>
+        </select>
+        <div class="vault-who-container" style="display: flex; align-items: center; flex-wrap: nowrap; gap: 6px; white-space: nowrap;">
+          <label for="filter-who" style="margin: 0; font-size: 12px; white-space: nowrap;">Person:</label>
+          <select id="filter-who" data-pp-change="renderVault()" style="width: auto; font-size: 12px; white-space: nowrap;">
+            <option value="all">Everyone</option>
+            <option value="Elliott">Elliott</option>
+            <option value="Chloe">Chloe</option>
+            <option value="both">Shared</option>
+          </select>
+        </div>
       </div>
     </div>
   </div>

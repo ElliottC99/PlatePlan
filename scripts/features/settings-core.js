@@ -12,14 +12,47 @@
 
   const SettingsState = window.PlatePlanSettingsBackup.State;
 
+  function syncAppearanceControlState() {
+    const activeTheme = window.PlatePlanCloud?.State?.settings?.appearance ||
+                        window.state?.prefs?.appearance ||
+                        localStorage.getItem('plateplan_appearance') ||
+                        'system';
+
+    const buttons = document.querySelectorAll('.appearance-control button, [data-appearance], [data-pp-click*="setPlatePlanAppearance"]');
+    buttons.forEach(btn => {
+      const targetVal = btn.getAttribute('data-appearance') || 
+                        btn.getAttribute('data-pp-click') || '';
+      
+      const isMatch = targetVal.includes(`'${activeTheme}'`) || 
+                      targetVal === activeTheme || 
+                      (activeTheme === 'system' && targetVal.includes('system'));
+
+      if (isMatch) {
+        btn.classList.add('active');
+        btn.setAttribute('aria-pressed', 'true');
+        btn.setAttribute('aria-selected', 'true');
+      } else {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-pressed', 'false');
+        btn.setAttribute('aria-selected', 'false');
+      }
+    });
+  }
+
   function loadPrefs() {
-    const p = window.state?.prefs || {};
+    const p = window.state?.prefs || window.PlatePlanCloud?.State?.settings || {};
     const ecal = document.getElementById('pref-ecal');
     if (ecal) ecal.value = p.ecal || 2400;
     
+    syncAppearanceControlState();
+
     if (typeof window.syncPlatePlanVersionDisplay === 'function') {
       window.syncPlatePlanVersionDisplay();
     }
+  }
+
+  function renderPreferences() {
+    loadPrefs();
   }
 
   function savePrefs() {
@@ -60,12 +93,16 @@
 
   Object.assign(window.PlatePlanSettings, {
     loadPrefs,
+    renderPreferences,
+    syncAppearanceControlState,
     savePrefs,
     createRecoveryPoint,
     resetAllData
   });
 
   window.loadPrefs = loadPrefs;
+  window.renderPreferences = renderPreferences;
+  window.syncAppearanceControlState = syncAppearanceControlState;
   window.savePrefs = savePrefs;
   window.createRecoveryPoint = createRecoveryPoint;
   window.resetAllData = resetAllData;

@@ -291,6 +291,7 @@
   assignGlobal('calculateVaultTargetMacros', safeResolve('calculateVaultTargetMacros', (...args) => (window.PlatePlanRecipes?.calculateVaultTargetMacros || (() => ({})))(...args)));
   assignGlobal('resetVaultState', safeResolve('resetVaultState', (...args) => (window.PlatePlanRecipes?.resetState || (() => {}))(...args)));
   assignGlobal('getVaultState', safeResolve('getVaultState', (...args) => (window.PlatePlanRecipes?.getRecipesState || (() => ({})))(...args)));
+  assignGlobal('resetStudioSession', safeResolve('resetStudioSession', (...args) => (window.PlatePlanPlanner?.resetStudioSession || window.resetStudioSession || (() => {}))(...args)));
 
   window.dispatchEvent(new CustomEvent('plateplan:legacy-ready', { detail: { version: window.PLATEPLAN_APP_VERSION || '3.3.7-mod' } }));
 })();

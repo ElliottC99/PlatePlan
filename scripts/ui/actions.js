@@ -162,4 +162,14 @@ if (typeof window !== 'undefined') {
     const filterTypeSelect = document.getElementById('filter-type');
     if (filterTypeSelect) filterTypeSelect.value = 'all';
   };
+
+  window.resetStudioSession = function() {
+    if (window.PlatePlanPlanner?.resetStudioSession) {
+      return window.PlatePlanPlanner.resetStudioSession();
+    }
+    if (window.PlatePlanPlanner?.State) {
+      window.PlatePlanPlanner.State.studioSession = null;
+      window.PlatePlanPlanner.State.studioUndoBuffer = null;
+    }
+  };
 }
