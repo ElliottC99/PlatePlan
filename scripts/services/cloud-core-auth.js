@@ -24,18 +24,19 @@
       state.authContext.db = firebase.firestore();
 
       state.authContext.auth.onAuthStateChanged(async (user) => {
-        state.user = user;
-        state.authContext.user = user;
-        
         if (user) {
+          state.user = user;
+          state.authContext.user = user;
           console.log('[CloudAuth] User logged in:', user.email);
-          window.syncStatus = 'pending';
+          state.syncStatus = 'syncing';
           if (typeof window.pullCloudHydrate === 'function') {
             await window.pullCloudHydrate();
           }
         } else {
           console.log('[CloudAuth] User logged out');
-          window.syncStatus = 'local_only';
+          state.user = null;
+          state.authContext.user = null;
+          state.syncStatus = 'local_only';
           window.PlatePlanCloud.resetState();
         }
       });
