@@ -3,8 +3,9 @@
  * Firestore document fetch routines and remote delta queries.
  */
   window.pullCloudHydrate = async function() {
-    const state = window.PlatePlanCloud?.State;
-    if (!state || state.isHydrating) return;
+    const cloud = window.PlatePlanCloud;
+    const state = cloud?.State;
+    if (!state || state.isHydrating || state.isSyncing) return;
 
     const firebaseAuth = window.firebase && firebase.auth ? firebase.auth() : null;
     const currentUser = state.user || (firebaseAuth ? firebaseAuth.currentUser : null);
@@ -15,12 +16,13 @@
       return;
     }
 
+    state.isSyncing = true;
     state.isHydrating = true;
     window.syncStatus = 'pending';
 
     try {
-      console.log('[CloudHydrate] Starting pull...');
-      const refs = window.PlatePlanCloud.Refs;
+      console.log('[CloudHydrate] Starting batch pull...');
+      const refs = cloud.Refs;
 
       const planRef = refs.getPlanDoc();
       const settingsRef = refs.getSettingsDoc();
@@ -40,8 +42,8 @@
       ]);
 
       const remoteData = {
-        plan: planDoc.data() || null,
-        settings: settingsDoc.data() || null,
+        plan: planDoc.exists ? planDoc.data() : null,
+        settings: settingsDoc.exists ? settingsDoc.data() : null,
         recipes: recipesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
         ingredients: ingredientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
       };
@@ -59,6 +61,7 @@
       state.lastSyncError = e.message;
     } finally {
       state.isHydrating = false;
+      state.isSyncing = false;
     }
   };
 

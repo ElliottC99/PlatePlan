@@ -227,12 +227,15 @@ body.modal-open {
         <option value="lunch">Lunch</option>
         <option value="dinner">Dinner</option>
       </select>
-      <select id="filter-who" data-pp-change="renderVault()" style="width:auto;font-size:12px">
-        <option value="all">Everyone</option>
-        <option value="Elliott">Elliott</option>
-        <option value="Chloe">Chloe</option>
-        <option value="both">Shared</option>
-      </select>
+      <div class="vault-who-container" style="display: flex; align-items: center; flex-wrap: nowrap; gap: 8px; white-space: nowrap;">
+        <label for="filter-who" style="margin: 0; font-size: 12px; white-space: nowrap;">Person:</label>
+        <select id="filter-who" data-pp-change="renderVault()" style="width: auto; font-size: 12px; white-space: nowrap;">
+          <option value="all">Everyone</option>
+          <option value="Elliott">Elliott</option>
+          <option value="Chloe">Chloe</option>
+          <option value="both">Shared</option>
+        </select>
+      </div>
     </div>
   </div>
   <div id="vault-list"></div>

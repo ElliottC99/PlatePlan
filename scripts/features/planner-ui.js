@@ -26,6 +26,11 @@
     const state = getState();
     const container = document.getElementById('view-planner');
     if (!container) return;
+    if (typeof window.renderMealPlannerWizard === 'function') {
+      window.renderMealPlannerWizard();
+    } else if (typeof window.PlatePlanPlanner?.renderMealPlannerWizard === 'function') {
+      window.PlatePlanPlanner.renderMealPlannerWizard();
+    }
     renderPlan();
   }
 

@@ -1,6 +1,8 @@
 /* Responsive layout contracts */
 .view-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
 .vault-filters{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.vault-who-container{display:flex!important;align-items:center!important;flex-wrap:nowrap!important;gap:8px!important;white-space:nowrap!important}
+.vault-who-container select{width:auto!important;white-space:nowrap!important}
 .recipe-card-layout{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .recipe-card-main{min-width:0;flex:1}
 .recipe-card-name{font-size:14px;line-height:1.3;overflow-wrap:break-word}
