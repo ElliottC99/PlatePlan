@@ -1,6 +1,6 @@
 /**
- * src/main.js (v3.3.16)
- * Native Delegated Action Bridge via window.runPlatePlanDelegatedAction.
+ * src/main.js (v3.3.17)
+ * Native Delegated Action Bridge with Parent Unhiding & Opacity Enforcement.
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
@@ -37,7 +37,7 @@ function setupRecipeActionBridge() {
     if (!actionStr) return;
 
     event.preventDefault();
-    console.log(`[Action Bridge v3.3.16] Delegating action: "${actionStr}"`);
+    console.log(`[Action Bridge v3.3.17] Delegating action: "${actionStr}"`);
 
     try {
       if (typeof window.runPlatePlanDelegatedAction === 'function') {
@@ -47,19 +47,29 @@ function setupRecipeActionBridge() {
         execFn.call(actionBtn, event);
       }
 
-      // Unhide modal wraps if triggered
+      // Unhide modal wraps and fix opacity/parent display
       setTimeout(() => {
-        const modalWrap = document.querySelector('#view-modal-wrap.open, .modal-wrap.open, .modal.open');
-        if (modalWrap) {
-          modalWrap.style.display = 'flex';
-          modalWrap.style.visibility = 'visible';
-          modalWrap.style.opacity = '1';
-          modalWrap.style.zIndex = '99999';
-        }
+        const openModals = document.querySelectorAll('#view-modal-wrap.open, .modal-wrap.open, .modal.open');
+        openModals.forEach((modalWrap) => {
+          modalWrap.style.setProperty('display', 'flex', 'important');
+          modalWrap.style.setProperty('visibility', 'visible', 'important');
+          modalWrap.style.setProperty('opacity', '1', 'important');
+          modalWrap.style.setProperty('z-index', '99999', 'important');
+
+          // Unhide any hidden parent container (such as #tesco-modal-wrap)
+          let parent = modalWrap.parentElement;
+          while (parent && parent !== document.body) {
+            const style = window.getComputedStyle(parent);
+            if (style.display === 'none') {
+              parent.style.setProperty('display', 'block', 'important');
+            }
+            parent = parent.parentElement;
+          }
+        });
       }, 50);
 
     } catch (err) {
-      console.error(`[Action Bridge v3.3.16] Execution error for: ${actionStr}`, err);
+      console.error(`[Action Bridge v3.3.17] Execution error for: ${actionStr}`, err);
     }
   }, true);
 }
@@ -98,7 +108,7 @@ function sanitizeRecipes(recipes) {
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.16 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.17 (ES6 Modern)';
   }
 }
 
@@ -113,11 +123,11 @@ document.addEventListener('plateplan:state:recipes', (e) => {
       try { window.renderAll(); } catch (err) { console.warn('[Modern Bridge] renderAll warning:', err); }
     }
   }
-  console.log(`[Modern Bridge v3.3.16] Action bridge synchronized with ${cleanRecipes.length} recipes.`);
+  console.log(`[Modern Bridge v3.3.17] Action bridge synchronized with ${cleanRecipes.length} recipes.`);
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.16] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.17] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupRecipeActionBridge();
   await waitForAuth();
