@@ -1,66 +1,102 @@
 /**
- * src/main.js (v3.3.13)
- * Secure ES6 data bridge with strict type-sanitized global state initialization.
+ * src/main.js (v3.3.14)
+ * Secure ES6 data bridge with Recipe Action Delegation & Modal Bridge.
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
 import { getState } from './store/store.js';
 
-// 1. STRICT TYPE SANITIZATION (Wipes string pollution like '[Circular]' from window.state)
+// 1. STRICT TYPE SANITIZATION
 if (typeof window !== 'undefined') {
-  // Ensure window.state is a valid, non-null object
-  if (typeof window.state !== 'object' || window.state === null) {
-    window.state = {};
-  }
+  if (typeof window.state !== 'object' || window.state === null) window.state = {};
+  if (typeof window.state.userPrefs !== 'object' || window.state.userPrefs === null) window.state.userPrefs = {};
+  if (typeof window.state.settings !== 'object' || window.state.settings === null) window.state.settings = {};
 
-  // Ensure window.state.userPrefs is a valid, non-null object
-  if (typeof window.state.userPrefs !== 'object' || window.state.userPrefs === null) {
-    window.state.userPrefs = {};
-  }
-
-  // Ensure window.state.settings is a valid object
-  if (typeof window.state.settings !== 'object' || window.state.settings === null) {
-    window.state.settings = {};
-  }
-
-  // Instantiate concrete array targets for legacy lookups
   window.state.recipes = Array.isArray(window.state.recipes) ? window.state.recipes : [];
   window.state.favourites = Array.isArray(window.state.favourites) ? window.state.favourites : [];
   window.state.userFavourites = Array.isArray(window.state.userFavourites) ? window.state.userFavourites : [];
   window.state.ingredients = Array.isArray(window.state.ingredients) ? window.state.ingredients : [];
   
-  window.state.userPrefs.favouriteVariantIds = Array.isArray(window.state.userPrefs.favouriteVariantIds)
-    ? window.state.userPrefs.favouriteVariantIds
-    : [];
-  window.state.userPrefs.favourites = Array.isArray(window.state.userPrefs.favourites)
-    ? window.state.userPrefs.favourites
-    : [];
+  window.state.userPrefs.favouriteVariantIds = Array.isArray(window.state.userPrefs.favouriteVariantIds) ? window.state.userPrefs.favouriteVariantIds : [];
+  window.state.userPrefs.favourites = Array.isArray(window.state.userPrefs.favourites) ? window.state.userPrefs.favourites : [];
 
-  // Global top-level aliases read directly by legacy functions
   window.favourites = window.state.favourites;
   window.userFavourites = window.state.userFavourites;
+}
 
-  // Monkey-patch or wrap isRecipeVariantFavourite in legacy window space if present, to prevent unhandled crashes
-  if (typeof window.isRecipeVariantFavourite === 'function') {
-    const origFavCheck = window.isRecipeVariantFavourite;
-    window.isRecipeVariantFavourite = function(...args) {
-      try {
-        return origFavCheck.apply(this, args);
-      } catch (e) {
-        return false;
-      }
-    };
-  }
+// 2. RECIPE ACTION & MODAL DELEGATION BRIDGE
+function setupRecipeActionBridge() {
+  if (typeof window === 'undefined' || window.__plateplan_action_bridge_attached) return;
+  window.__plateplan_action_bridge_attached = true;
+
+  document.addEventListener('click', (event) => {
+    const actionBtn = event.target.closest('[data-action], button[data-recipe-id], a[data-recipe-id], .action-item');
+    if (!actionBtn) return;
+
+    const action = actionBtn.dataset.action || actionBtn.getAttribute('action');
+    const recipeId = actionBtn.dataset.recipeId || actionBtn.closest('[data-recipe-id]')?.dataset.recipeId;
+
+    if (!action && !recipeId) return;
+
+    console.log(`[Action Bridge] Captured action "${action}" for recipeId: "${recipeId}"`);
+
+    const recipe = (window.allRecipes || []).find(r => String(r.id) === String(recipeId) || String(r._id) === String(recipeId));
+
+    // Route actions to legacy modal methods or fallback state dispatches
+    switch (action) {
+      case 'view':
+      case 'view-recipe':
+      case 'open-recipe':
+        if (typeof window.PlatePlanRecipes?.openRecipeModal === 'function') {
+          window.PlatePlanRecipes.openRecipeModal(recipeId || recipe);
+        } else if (typeof window.showRecipeDetails === 'function') {
+          window.showRecipeDetails(recipeId || recipe);
+        }
+        break;
+
+      case 'review':
+      case 'review-recipe':
+        if (typeof window.PlatePlanRecipes?.openReviewModal === 'function') {
+          window.PlatePlanRecipes.openReviewModal(recipeId || recipe);
+        }
+        break;
+
+      case 'card':
+      case 'recipe-card':
+        if (typeof window.PlatePlanRecipes?.openRecipeCard === 'function') {
+          window.PlatePlanRecipes.openRecipeCard(recipeId || recipe);
+        }
+        break;
+
+      case 'duplicate':
+      case 'duplicate-recipe':
+        if (typeof window.PlatePlanRecipes?.duplicateRecipe === 'function') {
+          window.PlatePlanRecipes.duplicateRecipe(recipeId || recipe);
+        }
+        break;
+
+      case 'edit':
+      case 'edit-recipe':
+      case 'edit-source':
+        if (typeof window.PlatePlanRecipes?.openEditModal === 'function') {
+          window.PlatePlanRecipes.openEditModal(recipeId || recipe);
+        }
+        break;
+
+      case 'delete':
+      case 'delete-recipe':
+        if (typeof window.PlatePlanRecipes?.deleteRecipe === 'function') {
+          window.PlatePlanRecipes.deleteRecipe(recipeId || recipe);
+        }
+        break;
+    }
+  }, true);
 }
 
 // Deep mutator to ensure clean recipes and variants
 function deepMutate(obj) {
-  if (obj === null || typeof obj !== 'object') {
-    return obj;
-  }
-  if (Array.isArray(obj)) {
-    return obj.map(item => deepMutate(item));
-  }
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(item => deepMutate(item));
   
   const keys = Object.keys(obj);
   for (const key of keys) {
@@ -91,7 +127,7 @@ function sanitizeRecipes(recipes) {
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.13 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.14 (ES6 Modern)';
   }
 }
 
@@ -116,7 +152,7 @@ document.addEventListener('plateplan:state:recipes', (e) => {
       try { window.schedulePlatePlanListRender('vault'); } catch (err) { console.warn('[Modern Bridge] schedulePlatePlanListRender warning:', err); }
     }
   }
-  console.log(`[Modern Bridge v3.3.13] Type-sanitized state synchronized with ${cleanRecipes.length} recipes.`);
+  console.log(`[Modern Bridge v3.3.14] Action-delegated bridge synchronized with ${cleanRecipes.length} recipes.`);
 });
 
 // Sync ingredients, preferences, and plans when they change
@@ -158,8 +194,9 @@ document.addEventListener('plateplan:state:plan', (e) => {
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.13] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.14] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
+  setupRecipeActionBridge();
   await waitForAuth();
   await hydrateHouseholdData();
 }
