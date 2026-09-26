@@ -1,6 +1,6 @@
 /**
- * src/main.js (v3.3.15)
- * Secure ES6 data bridge with Native Inline Action Execution (pp-click).
+ * src/main.js (v3.3.16)
+ * Native Delegated Action Bridge via window.runPlatePlanDelegatedAction.
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
@@ -24,7 +24,7 @@ if (typeof window !== 'undefined') {
   window.userFavourites = window.state.userFavourites;
 }
 
-// 2. NATIVE INLINE ACTION BRIDGE (Executes data-pp-click strings globally)
+// 2. NATIVE DELEGATED ACTION BRIDGE
 function setupRecipeActionBridge() {
   if (typeof window === 'undefined' || window.__plateplan_action_bridge_attached) return;
   window.__plateplan_action_bridge_attached = true;
@@ -36,24 +36,32 @@ function setupRecipeActionBridge() {
     const actionStr = actionBtn.dataset.ppClick || actionBtn.getAttribute('data-pp-click');
     if (!actionStr) return;
 
-    // Prevent default behavior if it's a form button or anchor tag
     event.preventDefault();
-    console.log(`[Action Bridge v3.3.15] Executing legacy inline action: "${actionStr}"`);
+    console.log(`[Action Bridge v3.3.16] Delegating action: "${actionStr}"`);
 
     try {
-      // Create an execution function scoped to the global window
-      const executeLegacyAction = new Function(`
-        try {
-          ${actionStr}
-        } catch (e) {
-          console.error('[Action Bridge] Execution failed for:', \`${actionStr}\`, e);
+      if (typeof window.runPlatePlanDelegatedAction === 'function') {
+        window.runPlatePlanDelegatedAction(actionStr, event, actionBtn);
+      } else {
+        const execFn = new Function('event', `with(window) { ${actionStr} }`);
+        execFn.call(actionBtn, event);
+      }
+
+      // Unhide modal wraps if triggered
+      setTimeout(() => {
+        const modalWrap = document.querySelector('#view-modal-wrap.open, .modal-wrap.open, .modal.open');
+        if (modalWrap) {
+          modalWrap.style.display = 'flex';
+          modalWrap.style.visibility = 'visible';
+          modalWrap.style.opacity = '1';
+          modalWrap.style.zIndex = '99999';
         }
-      `);
-      executeLegacyAction.call(window);
+      }, 50);
+
     } catch (err) {
-      console.error(`[Action Bridge] Failed to parse action string: ${actionStr}`, err);
+      console.error(`[Action Bridge v3.3.16] Execution error for: ${actionStr}`, err);
     }
-  }, true); // Use capture phase to ensure it intercepts before dead legacy handlers
+  }, true);
 }
 
 // Deep mutator to ensure clean recipes and variants
@@ -90,7 +98,7 @@ function sanitizeRecipes(recipes) {
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.15 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.16 (ES6 Modern)';
   }
 }
 
@@ -101,63 +109,15 @@ document.addEventListener('plateplan:state:recipes', (e) => {
   if (typeof window !== 'undefined') {
     window.state.recipes = cleanRecipes;
     window.allRecipes = cleanRecipes;
-    if (window.PlatePlanRecipes) {
-      window.PlatePlanRecipes.State = window.PlatePlanRecipes.State || {};
-      window.PlatePlanRecipes.State.recipes = cleanRecipes;
-    }
     if (typeof window.renderAll === 'function') {
       try { window.renderAll(); } catch (err) { console.warn('[Modern Bridge] renderAll warning:', err); }
     }
-    if (typeof window.PlatePlanRecipes?.renderVault === 'function') {
-      try { window.PlatePlanRecipes.renderVault(); } catch (err) { console.warn('[Modern Bridge] renderVault warning:', err); }
-    }
-    if (typeof window.schedulePlatePlanListRender === 'function') {
-      try { window.schedulePlatePlanListRender('vault'); } catch (err) { console.warn('[Modern Bridge] schedulePlatePlanListRender warning:', err); }
-    }
   }
-  console.log(`[Modern Bridge v3.3.15] Native inline action bridge synchronized with ${cleanRecipes.length} recipes.`);
-});
-
-// Sync ingredients, preferences, and plans when they change
-document.addEventListener('plateplan:state:ingredients', (e) => {
-  if (typeof window !== 'undefined') {
-    window.allIngredients = e.detail || [];
-    if (window.state) window.state.ingredients = e.detail || [];
-    if (window.PlatePlanBank) {
-      window.PlatePlanBank.State = window.PlatePlanBank.State || {};
-      window.PlatePlanBank.State.ingredients = e.detail || [];
-    }
-    if (typeof window.PlatePlanIngredientBank?.renderProductBank === 'function') {
-      try { window.PlatePlanIngredientBank.renderProductBank(); } catch (err) { console.warn('[Modern Bridge] renderProductBank warning:', err); }
-    }
-  }
-});
-
-document.addEventListener('plateplan:state:preferences', (e) => {
-  if (typeof window !== 'undefined' && e.detail) {
-    if (window.state) window.state.settings = e.detail;
-    if (window.PlatePlanCloud) {
-      window.PlatePlanCloud.State = window.PlatePlanCloud.State || {};
-      window.PlatePlanCloud.State.settings = e.detail;
-    }
-    if (typeof window.PlatePlanSettings?.renderPreferences === 'function') {
-      try { window.PlatePlanSettings.renderPreferences(); } catch (err) { console.warn('[Modern Bridge] renderPreferences warning:', err); }
-    }
-  }
-});
-
-document.addEventListener('plateplan:state:plan', (e) => {
-  if (typeof window !== 'undefined' && e.detail) {
-    if (window.state) window.state.plan = e.detail;
-    if (window.PlatePlan) {
-      window.PlatePlan.State = window.PlatePlan.State || {};
-      window.PlatePlan.State.plan = e.detail;
-    }
-  }
+  console.log(`[Modern Bridge v3.3.16] Action bridge synchronized with ${cleanRecipes.length} recipes.`);
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.15] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.16] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupRecipeActionBridge();
   await waitForAuth();
