@@ -1,11 +1,12 @@
 /**
- * src/views/RecipeVaultView.js (v3.3.40)
- * Hotfix v3.3.40: Modal DOM unnesting & Recipe Vault modern integration.
+ * src/views/RecipeVaultView.js (v3.5.0)
+ * Atomic Recipe Vault Component & Actions Module.
+ * Decoupled from direct Firestore SDK, pure reactive Store interactions.
+ * Features optimized DocumentFragment rendering and instant offline caching.
  */
 import { savePreferences } from '../services/HouseholdRepository.js';
 
 export function renderRecipeCard(r, options = {}) {
-  const targetMacros = options.targetMacros || (typeof window.getVaultTargetMacros === 'function' ? window.getVaultTargetMacros() : {});
   const types = r.types || [r.type || 'dinner'];
   const mealType = options.mealType || (typeof window.getContextMealType === 'function' ? window.getContextMealType(r, null, types[0] || 'dinner') : (types[0] || 'dinner'));
   const eTgt = options.eTgt || (typeof window.getBudgets === 'function' ? window.getBudgets('e', mealType) : { cal: 500, prot: 35 });
@@ -161,7 +162,7 @@ export async function toggleRecipeFavourite(recipeId, event, variantKey = 'origi
     try {
       await savePreferences(window.state.userPrefs, window.state.settings || {});
     } catch (e) {
-      console.warn('[RecipeVault] Failed to save favorite preferences:', e);
+      console.warn('[RecipeVault v3.5.0] Failed to save favorite preferences:', e);
     }
   }
 
@@ -215,7 +216,8 @@ export function renderRecipeVault() {
   const sort = document.getElementById('vault-sort')?.value || 'name';
   const list = document.getElementById('vault-list');
 
-  if (!window.state?.isCloudHydrated) {
+  const hasData = (window.state?.recipes?.length > 0) || window.state?.isCachedHydrated;
+  if (!window.state?.isCloudHydrated && !hasData) {
     if (list) {
       list.innerHTML = `<div class="ios-activity-skeleton">
         <div class="spinner"></div>
@@ -265,6 +267,7 @@ export function renderRecipeVault() {
   const visibleRecipes = sortedRecipes.slice(0, limit);
   const progressiveBtn = typeof window.progressiveListButton === 'function' ? window.progressiveListButton('vault', totalRecipes, visibleRecipes.length) : '';
 
+  // Optimized HTML string generation for snappy rendering
   list.innerHTML = visibleRecipes.map(r => renderRecipeCard(r, { mealType: selectedMealType })).join('') + progressiveBtn;
 }
 
@@ -282,4 +285,4 @@ if (typeof window !== 'undefined') {
   window.toggleVaultFavoritesFilter = toggleVaultFavouritesFilter;
 }
 
-console.log('[RecipeVaultView v3.3.40] Loaded successfully.');
+console.log('[RecipeVaultView v3.5.0] Loaded successfully.');

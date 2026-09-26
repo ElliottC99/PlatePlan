@@ -1,10 +1,11 @@
 /**
- * src/services/HydrationService.js (v3.3.35)
- * Orchestrates concurrent fetching from HouseholdRepository and populating the centralized Store and window.state.
+ * src/services/HydrationService.js (v3.5.0)
+ * Orchestrates concurrent fetching from HouseholdRepository, invalidating/updating cache,
+ * and populating the centralized Store and window.state.
  */
 
 import { getRecipes, getIngredients, getPreferences, getCurrentPlan } from './HouseholdRepository.js';
-import { setRecipes, setIngredients, setPreferences, setCurrentPlan } from '../store/store.js';
+import { setRecipes, setIngredients, setPreferences, setCurrentPlan, saveStateCache } from '../store/store.js';
 
 /**
  * Hydrate all household data domains concurrently into the reactive Store.
@@ -27,6 +28,7 @@ export async function hydrateHouseholdData() {
     // Populate window.state directly for legacy/ES6 bridge compatibility
     if (typeof window !== 'undefined') {
       window.state = window.state || {};
+      window.state.isCloudHydrated = true;
 
       const docData = preferencesData || {};
       const userPrefs = docData.userPrefs || docData;
@@ -65,13 +67,14 @@ export async function hydrateHouseholdData() {
       window.state.userPrefs.nutritionTargets = nutritionTargets;
       window.state.settings = docData.settings || window.state.settings || {};
 
-      console.log('[HydrationService v3.3.35] Mapped userPrefs and nutritionTargets to window.state', window.state.userPrefs);
+      console.log('[HydrationService v3.5.0] Mapped userPrefs and nutritionTargets to window.state', window.state.userPrefs);
     }
 
-    console.log('[HydrationService v3.3.35] Household data hydrated successfully into Store.');
+    saveStateCache();
+    console.log('[HydrationService v3.5.0] Household data hydrated successfully into Store and persisted to local cache.');
     return { success: true, timestamp: Date.now() };
   } catch (err) {
-    console.error('[HydrationService v3.3.35] Hydration failed:', err);
+    console.error('[HydrationService v3.5.0] Hydration failed:', err);
     return { success: false, error: err };
   }
 }

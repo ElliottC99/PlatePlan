@@ -1,10 +1,23 @@
 /**
- * src/services/HouseholdRepository.js (v3.3.32)
- * Dedicated data access repository for household-scoped Firestore queries.
- * Quarantines database interactions away from UI components and standard state logic.
+ * src/services/HouseholdRepository.js (v3.5.0)
+ * Dedicated data access repository for household-scoped Firestore operations.
+ * Completely isolated from DOM manipulation and UI rendering.
+ * All operations target the shared household path 'households/elliott-chloe'.
  */
 
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
+
+/**
+ * Helper to ensure Firestore db instance is available.
+ * @returns {boolean}
+ */
+function isDbAvailable() {
+  if (!db) {
+    console.warn('[HouseholdRepository v3.5.0] Firestore db instance not initialized.');
+    return false;
+  }
+  return true;
+}
 
 /**
  * Fetch all recipes for the shared household.
@@ -12,10 +25,7 @@ import { db, HOUSEHOLD_ID } from '../config/firebase.js';
  */
 export async function getRecipes() {
   try {
-    if (!db) {
-      console.warn('[HouseholdRepository v3.3.32] Firestore db instance not initialized.');
-      return [];
-    }
+    if (!isDbAvailable()) return [];
     const snap = await db
       .collection('households')
       .doc(HOUSEHOLD_ID)
@@ -27,8 +37,62 @@ export async function getRecipes() {
       ...doc.data()
     }));
   } catch (err) {
-    console.error('[HouseholdRepository v3.3.32] Error fetching recipes:', err);
+    console.error('[HouseholdRepository v3.5.0] Error fetching recipes:', err);
     return [];
+  }
+}
+
+/**
+ * Persist or update a single recipe document.
+ * @param {Object} recipe Recipe data object. Must contain either id or a valid name.
+ * @returns {Promise<{success: boolean, id?: string, error?: any}>}
+ */
+export async function saveRecipe(recipe) {
+  try {
+    if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
+    if (!recipe || typeof recipe !== 'object') {
+      return { success: false, error: 'Invalid recipe data' };
+    }
+
+    const recipeData = { ...recipe, updatedAt: new Date().toISOString() };
+    const recipeId = recipe.id || db.collection('households').doc(HOUSEHOLD_ID).collection('recipes').doc().id;
+    delete recipeData.id;
+
+    await db
+      .collection('households')
+      .doc(HOUSEHOLD_ID)
+      .collection('recipes')
+      .doc(recipeId)
+      .set(recipeData, { merge: true });
+
+    return { success: true, id: recipeId };
+  } catch (err) {
+    console.error('[HouseholdRepository v3.5.0] Error saving recipe:', err);
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Delete a recipe document by ID.
+ * @param {string} recipeId
+ * @returns {Promise<{success: boolean, error?: any}>}
+ */
+export async function deleteRecipe(recipeId) {
+  try {
+    if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
+    if (!recipeId) return { success: false, error: 'Missing recipe ID' };
+
+    await db
+      .collection('households')
+      .doc(HOUSEHOLD_ID)
+      .collection('recipes')
+      .doc(recipeId)
+      .delete();
+
+    return { success: true };
+  } catch (err) {
+    console.error('[HouseholdRepository v3.5.0] Error deleting recipe:', err);
+    return { success: false, error: err };
   }
 }
 
@@ -38,10 +102,7 @@ export async function getRecipes() {
  */
 export async function getIngredients() {
   try {
-    if (!db) {
-      console.warn('[HouseholdRepository v3.3.32] Firestore db instance not initialized.');
-      return [];
-    }
+    if (!isDbAvailable()) return [];
     const snap = await db
       .collection('households')
       .doc(HOUSEHOLD_ID)
@@ -53,8 +114,62 @@ export async function getIngredients() {
       ...doc.data()
     }));
   } catch (err) {
-    console.error('[HouseholdRepository v3.3.32] Error fetching ingredients:', err);
+    console.error('[HouseholdRepository v3.5.0] Error fetching ingredients:', err);
     return [];
+  }
+}
+
+/**
+ * Persist or update an ingredient document.
+ * @param {Object} ingredient Ingredient data object.
+ * @returns {Promise<{success: boolean, id?: string, error?: any}>}
+ */
+export async function saveIngredient(ingredient) {
+  try {
+    if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
+    if (!ingredient || typeof ingredient !== 'object') {
+      return { success: false, error: 'Invalid ingredient data' };
+    }
+
+    const ingData = { ...ingredient, updatedAt: new Date().toISOString() };
+    const ingId = ingredient.id || db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients').doc().id;
+    delete ingData.id;
+
+    await db
+      .collection('households')
+      .doc(HOUSEHOLD_ID)
+      .collection('ingredients')
+      .doc(ingId)
+      .set(ingData, { merge: true });
+
+    return { success: true, id: ingId };
+  } catch (err) {
+    console.error('[HouseholdRepository v3.5.0] Error saving ingredient:', err);
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Delete an ingredient document by ID.
+ * @param {string} ingredientId
+ * @returns {Promise<{success: boolean, error?: any}>}
+ */
+export async function deleteIngredient(ingredientId) {
+  try {
+    if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
+    if (!ingredientId) return { success: false, error: 'Missing ingredient ID' };
+
+    await db
+      .collection('households')
+      .doc(HOUSEHOLD_ID)
+      .collection('ingredients')
+      .doc(ingredientId)
+      .delete();
+
+    return { success: true };
+  } catch (err) {
+    console.error('[HouseholdRepository v3.5.0] Error deleting ingredient:', err);
+    return { success: false, error: err };
   }
 }
 
@@ -64,10 +179,7 @@ export async function getIngredients() {
  */
 export async function getPreferences() {
   try {
-    if (!db) {
-      console.warn('[HouseholdRepository v3.3.32] Firestore db instance not initialized.');
-      return null;
-    }
+    if (!isDbAvailable()) return null;
 
     const [prefSnap, rootSnap] = await Promise.all([
       db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences').get().catch(() => null),
@@ -92,7 +204,7 @@ export async function getPreferences() {
       }
     };
   } catch (err) {
-    console.error('[HouseholdRepository v3.3.32] Error fetching preferences:', err);
+    console.error('[HouseholdRepository v3.5.0] Error fetching preferences:', err);
     return null;
   }
 }
@@ -105,10 +217,7 @@ export async function getPreferences() {
  */
 export async function savePreferences(userPrefs, settings = {}) {
   try {
-    if (!db) {
-      console.warn('[HouseholdRepository v3.3.32] Firestore db instance not initialized.');
-      return false;
-    }
+    if (!isDbAvailable()) return false;
 
     const prefRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences');
     const rootRef = db.collection('households').doc(HOUSEHOLD_ID);
@@ -125,10 +234,9 @@ export async function savePreferences(userPrefs, settings = {}) {
       rootRef.set(payload, { merge: true })
     ]);
 
-    console.log('[HouseholdRepository v3.3.32] Successfully persisted preferences to Firestore.');
     return true;
   } catch (err) {
-    console.error('[HouseholdRepository v3.3.32] Error saving preferences to Firestore:', err);
+    console.error('[HouseholdRepository v3.5.0] Error saving preferences to Firestore:', err);
     return false;
   }
 }
@@ -139,10 +247,7 @@ export async function savePreferences(userPrefs, settings = {}) {
  */
 export async function getCurrentPlan() {
   try {
-    if (!db) {
-      console.warn('[HouseholdRepository v3.3.32] Firestore db instance not initialized.');
-      return null;
-    }
+    if (!isDbAvailable()) return null;
     const docSnap = await db
       .collection('households')
       .doc(HOUSEHOLD_ID)
@@ -152,7 +257,36 @@ export async function getCurrentPlan() {
 
     return docSnap.exists ? { id: docSnap.id, ...docSnap.data() } : null;
   } catch (err) {
-    console.error('[HouseholdRepository v3.3.32] Error fetching current plan:', err);
+    console.error('[HouseholdRepository v3.5.0] Error fetching current plan:', err);
     return null;
+  }
+}
+
+/**
+ * Persist current meal plan document to Firestore.
+ * @param {Object} plan Meal plan data object
+ * @returns {Promise<boolean>} Success status
+ */
+export async function saveCurrentPlan(plan) {
+  try {
+    if (!isDbAvailable()) return false;
+    if (!plan || typeof plan !== 'object') return false;
+
+    const payload = {
+      ...plan,
+      updatedAt: new Date().toISOString()
+    };
+
+    await db
+      .collection('households')
+      .doc(HOUSEHOLD_ID)
+      .collection('plans')
+      .doc('current')
+      .set(payload, { merge: true });
+
+    return true;
+  } catch (err) {
+    console.error('[HouseholdRepository v3.5.0] Error saving current plan:', err);
+    return false;
   }
 }

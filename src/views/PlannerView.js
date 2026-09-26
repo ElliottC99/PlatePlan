@@ -1,5 +1,5 @@
 /**
- * src/views/PlannerView.js (v3.3.35)
+ * src/views/PlannerView.js (v3.5.0)
  * Componentized Weekly Planner, Wizard & Swap Modal View.
  */
 
@@ -1046,7 +1046,7 @@ export function renderPlanOverallSummary() {
 
 // Bind Global Aliases for Action Bridge and Legacy Compatibility
 if (typeof window !== 'undefined') {
-  console.log('[PlannerView v3.3.35] Initializing PlannerView & recipe modal aliases...');
+  console.log('[PlannerView v3.5.0] Initializing PlannerView & recipe modal aliases...');
   window.renderPlanner = renderPlanner;
   window.renderPlannerWizard = renderPlannerWizard;
   window.renderPlan = renderPlan;
@@ -1068,7 +1068,7 @@ if (typeof window !== 'undefined') {
 
   window.openRecipeModal = function(id, instanceId, variant) {
     if (typeof window.viewRecipe === 'function') return window.viewRecipe(id, instanceId, variant);
-    console.warn('[PlannerView v3.3.35] viewRecipe not found on window');
+    console.warn('[PlannerView v3.5.0] viewRecipe not found on window');
   };
   window.showRecipeModal = window.openRecipeModal;
   window.openRecipeDetailModal = window.openRecipeModal;

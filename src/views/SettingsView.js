@@ -1,6 +1,7 @@
 /**
- * src/views/SettingsView.js (v3.3.33)
+ * src/views/SettingsView.js (v3.5.0)
  * Componentized Settings & Preferences View Function.
+ * Quarantined from direct Firebase SDK, using dedicated HouseholdRepository.
  */
 
 import { savePreferences } from '../services/HouseholdRepository.js';
@@ -228,7 +229,7 @@ export function renderSettingsView() {
 
         <div class="pp-input-group">
           <label>Active Architecture Version</label>
-          <input type="text" value="v3.3.33 (ES6 Modern)" readonly style="background: #f8fafc; color: #475569; font-weight: 600;">
+          <input type="text" value="v3.4.2 (ES6 Modern)" readonly style="background: #f8fafc; color: #475569; font-weight: 600;">
         </div>
       </div>
 
@@ -317,7 +318,7 @@ export function renderSettingsView() {
       window.state.settings.mappingStrategy = container.querySelector('#pp-setting-strategy')?.value || 'protein_per_kcal';
       window.state.settings.theme = container.querySelector('#pp-setting-theme')?.value || 'system';
 
-      console.log('[Settings v3.3.33] Saved user preferences to state:', window.state.userPrefs);
+      console.log('[Settings v3.5.0] Saved user preferences to state:', window.state.userPrefs);
       
       // Persist to Firestore
       await savePreferences(window.state.userPrefs, window.state.settings);
@@ -339,7 +340,7 @@ export function renderSettingsView() {
   const refreshBtn = container.querySelector('#pp-refresh-data-btn');
   if (refreshBtn) {
     refreshBtn.onclick = () => {
-      console.log('[Settings v3.3.33] Triggering household data refresh...');
+      console.log('[Settings v3.5.0] Triggering household data refresh...');
       hydrateHouseholdData();
     };
   }
