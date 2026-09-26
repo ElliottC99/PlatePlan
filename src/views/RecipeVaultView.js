@@ -1,6 +1,6 @@
 /**
- * src/views/RecipeVaultView.js (v3.3.38)
- * Hotfix v3.3.38: TDZ initialization guards & version alignment.
+ * src/views/RecipeVaultView.js (v3.3.39)
+ * Hotfix v3.3.39: Event deduplication & modern recipe action integration.
  */
 import { savePreferences } from '../services/HouseholdRepository.js';
 
@@ -282,4 +282,4 @@ if (typeof window !== 'undefined') {
   window.toggleVaultFavoritesFilter = toggleVaultFavouritesFilter;
 }
 
-console.log('[RecipeVaultView v3.3.38] Loaded successfully.');
+console.log('[RecipeVaultView v3.3.39] Loaded successfully.');

@@ -15195,7 +15195,7 @@ function renderRecipePreview(targetServes = 2) {
     if (!content) return;
 
     const variantKey = isEnh ? 'enhanced' : 'original';
-    const isFav = isRecipeVariantFavourite(r.id, variantKey) || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite) && !isEnh);
+    const isFav = (typeof window.isRecipeVariantFavourite === 'function' ? window.isRecipeVariantFavourite(r.id, variantKey) : (typeof isRecipeVariantFavourite === 'function' ? isRecipeVariantFavourite(r.id, variantKey) : false)) || ((r.isFavourite || r.isFavorite) && !isEnh);
     content.innerHTML = `
       <div class="recipe-view-sheet">
         <div class="recipe-view-nav">
@@ -15396,30 +15396,47 @@ function editRecipe(id){
   showView('add');
 }
 function deleteRecipe(id){
-  const recipe = state.recipes.find(r => r.id === id);
+  const activeState = window.state || state || {};
+  const recipes = activeState.recipes || (typeof state !== 'undefined' ? state.recipes : []) || [];
+  const recipe = recipes.find(r => r.id === id);
   if(!recipe) return;
   openAppConfirmModal('Delete recipe?', `Delete <strong>${ppEscapeHtml(recipe.name || 'this recipe')}</strong>?`, 'Delete recipe', () =>
     runWithRecoveryPoint('Before deleting recipe', () => {
-      state.recipes=state.recipes.filter(r=>r.id!==id);
+      const nextRecipes = recipes.filter(r => r.id !== id);
+      activeState.recipes = nextRecipes;
+      if (typeof state !== 'undefined') state.recipes = nextRecipes;
       deleteRecipeFromCloud(id);
-      refreshPlatePlanDerivedState({ persist:true, render:true });
+      if (typeof window.saveHouseholdRecipes === 'function') {
+        window.saveHouseholdRecipes(nextRecipes);
+      }
+      document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: nextRecipes }));
+      if (typeof window.renderVault === 'function') window.renderVault();
+      if (typeof showPlatePlanToast === 'function') showPlatePlanToast('Recipe deleted');
     })
   );
 }
 
 function duplicateRecipe(id){
-    const r=state.recipes.find(x=>x.id===id);
-    if(!r)return;
-    const clone=JSON.parse(JSON.stringify(r));
-    clone.id='r'+Date.now();
-    clone.name=clone.name+' (Copy)';
-    clone.updatedAt=new Date().toISOString();
-    if(clone.enhanced) clone.enhanced.name=clone.enhanced.name+' (Copy)';
-    state.recipes.push(clone);
+    const activeState = window.state || state || {};
+    const recipes = activeState.recipes || (typeof state !== 'undefined' ? state.recipes : []) || [];
+    const r = recipes.find(x => x.id === id);
+    if(!r) return;
+    const clone = JSON.parse(JSON.stringify(r));
+    clone.id = 'r' + Date.now();
+    clone.name = clone.name + ' (Copy)';
+    clone.updatedAt = new Date().toISOString();
+    if(clone.enhanced) clone.enhanced.name = clone.enhanced.name + ' (Copy)';
+    recipes.push(clone);
+    activeState.recipes = recipes;
+    if (typeof state !== 'undefined') state.recipes = recipes;
     platePlanNutritionCache.clear();
     markPlatePlanViewsDirty();
-    saveState(true);
-    renderVault();
+    if (typeof window.saveHouseholdRecipes === 'function') {
+      window.saveHouseholdRecipes(recipes);
+    }
+    document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: recipes }));
+    if (typeof window.renderVault === 'function') window.renderVault();
+    if (typeof showPlatePlanToast === 'function') showPlatePlanToast('Recipe duplicated');
     editRecipe(clone.id);
 }
 // == INGREDIENT / PRODUCT BANKS ==
