@@ -1,6 +1,6 @@
 /**
  * src/main.js (v3.3.4)
- * Main application entry point for PlatePlan's modernized ES6 architecture.
+ * Main entry point enforcing auth-first execution order, reactive UI components, and navigation routing.
  */
 
 import { hydrateHouseholdData } from './services/HydrationService.js';
@@ -14,9 +14,9 @@ document.addEventListener('plateplan:state:recipes', (e) => {
 });
 
 async function initApp() {
-  console.log('[Modern Bootstrapper v3.3.4] Initializing ES6 Application & UI Components...');
+  console.log('[Modern Bootstrapper v3.3.4] Initializing ES6 Application & Navigation...');
 
-  // Initialize UI components, navigation router, and mount points
+  // Initialize UI components, footer, and router
   initNavigationRouter();
   initRecipeList('recipe-container');
   initVersionFooter('app-version');

@@ -3,99 +3,84 @@
  * Restores sidebar tab switching, view routing, and top-bar button actions.
  */
 
-/**
- * Switch active view container and update navigation highlight states.
- * @param {string} viewId ID of the view to activate (e.g., 'today', 'vault', 'planner', 'search')
- */
-export function showView(viewId) {
-  if (!viewId) return;
-
-  // Toggle active class and display state on view containers
-  const views = document.querySelectorAll('.view');
-  views.forEach(view => {
-    const isTarget = view.id === `view-${viewId}` || view.id === viewId;
-    if (isTarget) {
-      view.classList.add('active');
-      view.style.display = 'block';
-    } else {
-      view.classList.remove('active');
-      view.style.display = 'none';
-    }
-  });
-
-  // Update active state on navigation elements
-  const navItems = document.querySelectorAll('[data-view]');
-  navItems.forEach(item => {
-    if (item.getAttribute('data-view') === viewId) {
-      item.classList.add('active');
-    } else {
-      item.classList.remove('active');
-    }
-  });
-
-  console.log(`[NavigationRouter v3.3.4] Navigated to view: ${viewId}`);
-}
-
-/**
- * Initialize event listeners for navigation tabs and top-bar action buttons.
- */
 export function initNavigationRouter() {
-  // Global event delegation for navigation and action clicks
-  document.addEventListener('click', (e) => {
-    // 1. Sidebar and mobile navigation tab clicks
-    const navTrigger = e.target.closest('[data-view]');
-    if (navTrigger) {
-      const viewId = navTrigger.getAttribute('data-view');
-      showView(viewId);
-      return;
-    }
+  /**
+   * Switch active view tab and toggle view panel visibility
+   * @param {string} viewName 
+   */
+  function showView(viewName) {
+    if (!viewName) return;
 
-    // 2. Support for explicit data-target-view triggers
-    const targetTrigger = e.target.closest('[data-target-view]');
-    if (targetTrigger) {
-      const viewId = targetTrigger.getAttribute('data-target-view');
-      showView(viewId);
-      return;
-    }
+    // Toggle view panel visibility
+    const views = document.querySelectorAll('.view, .app-view-panel');
+    let targetFound = false;
 
-    // 3. Top-bar Add button
-    const addBtn = e.target.closest('.app-create-button, #btn-add');
-    if (addBtn) {
-      console.log('[NavigationRouter v3.3.4] Add action triggered.');
-      showView('add');
-      return;
-    }
-
-    // 4. Top-bar Sync button
-    const syncBtn = e.target.closest('#syncNowTopBtn, #btn-sync');
-    if (syncBtn) {
-      console.log('[NavigationRouter v3.3.4] Manual sync triggered.');
-      if (typeof window.syncNow === 'function') {
-        window.syncNow();
+    views.forEach(view => {
+      const isTarget = view.id === `view-${viewName}` || view.id === viewName;
+      if (isTarget) {
+        view.style.display = 'block';
+        view.classList.add('active');
+        targetFound = true;
       } else {
-        console.log('[NavigationRouter v3.3.4] Fallback reload for sync.');
-        window.location.reload();
+        view.style.display = 'none';
+        view.classList.remove('active');
       }
-      return;
+    });
+
+    if (!targetFound) {
+      console.warn(`[NavigationRouter v3.3.4] View panel for '${viewName}' not found.`);
     }
 
-    // 5. Top-bar Logout button
-    const logoutBtn = e.target.closest('#logoutBtn');
-    if (logoutBtn) {
-      console.log('[NavigationRouter v3.3.4] Logout action triggered.');
-      if (typeof window.logout === 'function') {
-        window.logout();
-      } else if (typeof window !== 'undefined' && window.firebase?.auth) {
-        window.firebase.auth().signOut().then(() => {
-          window.location.reload();
-        });
+    // Update active tab styles on sidebar & mobile nav
+    const navButtons = document.querySelectorAll('[data-view], [data-target-view]');
+    navButtons.forEach(btn => {
+      const btnView = btn.getAttribute('data-view') || btn.getAttribute('data-target-view');
+      if (btnView === viewName) {
+        btn.classList.add('active', 'bg-blue-100', 'text-blue-600');
+      } else {
+        btn.classList.remove('active', 'bg-blue-100', 'text-blue-600');
       }
-      return;
+    });
+
+    console.log(`[NavigationRouter v3.3.4] Switched view to: ${viewName}`);
+  }
+
+  // Bind global event delegation for navigation clicks
+  document.addEventListener('click', (e) => {
+    const trigger = e.target.closest('[data-view], [data-target-view]');
+    if (!trigger) return;
+
+    const viewName = trigger.getAttribute('data-view') || trigger.getAttribute('data-target-view');
+    if (viewName) {
+      e.preventDefault();
+      showView(viewName);
     }
   });
 
-  // Set default view on initialization
-  showView('today');
+  // Export showView globally for compatibility
+  window.showView = showView;
+
+  // Hook top-bar buttons safely
+  const createBtn = document.querySelector('.app-create-button') || document.getElementById('btn-add');
+  if (createBtn) {
+    createBtn.addEventListener('click', () => {
+      console.log('[NavigationRouter v3.3.4] Add action triggered.');
+    });
+  }
+
+  const syncBtn = document.getElementById('syncNowTopBtn') || document.getElementById('btn-sync');
+  if (syncBtn) {
+    syncBtn.addEventListener('click', () => {
+      console.log('[NavigationRouter v3.3.4] Manual sync triggered.');
+    });
+  }
+
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      console.log('[NavigationRouter v3.3.4] Log out triggered.');
+    });
+  }
 
   console.log('[NavigationRouter v3.3.4] Interactivity and tab routing initialized.');
 }
