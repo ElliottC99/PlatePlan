@@ -1,6 +1,6 @@
 /**
- * src/views/RecipeVaultView.js (v3.3.37)
- * Phase 5.4 Hotfix: Recipe Vault favoriting persistence via savePreferences and clean state dispatch.
+ * src/views/RecipeVaultView.js (v3.3.38)
+ * Hotfix v3.3.38: TDZ initialization guards & version alignment.
  */
 import { savePreferences } from '../services/HouseholdRepository.js';
 
@@ -157,7 +157,6 @@ export async function toggleRecipeFavourite(recipeId, event, variantKey = 'origi
   r.isFavorite = isNowFav;
   r.updatedAt = new Date().toISOString();
 
-  // Persist directly via savePreferences without triggering plan-save logic
   if (window.state?.userPrefs) {
     try {
       await savePreferences(window.state.userPrefs, window.state.settings || {});
@@ -283,4 +282,4 @@ if (typeof window !== 'undefined') {
   window.toggleVaultFavoritesFilter = toggleVaultFavouritesFilter;
 }
 
-console.log('[RecipeVaultView v3.3.37] Loaded successfully.');
+console.log('[RecipeVaultView v3.3.38] Loaded successfully.');

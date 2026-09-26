@@ -1,4 +1,13 @@
 // Expose global window actions immediately on app load before any async operations execute
+globalThis.PlatePlanLegacy = globalThis.PlatePlanLegacy || {
+  getState: () => (typeof state !== 'undefined' ? state : {}),
+  saveState: (imm) => (typeof saveState === 'function' ? saveState(imm) : null),
+  calculateRecipeDisplayNutrition: (opts) => (typeof calculateRecipeDisplayNutrition === 'function' ? calculateRecipeDisplayNutrition(opts) : {}),
+  getPlanContextForInstance: (id) => (typeof getPlanContextForInstance === 'function' ? getPlanContextForInstance(id) : null),
+  refreshPlatePlanDerivedState: () => (typeof refreshPlatePlanDerivedState === 'function' ? refreshPlatePlanDerivedState() : null),
+  renderLegacyView: (id) => (typeof renderPlatePlanLegacyView === 'function' ? renderPlatePlanLegacyView(id) : null),
+  runDelegatedAction: (code, ev, el) => (typeof runPlatePlanDelegatedAction === 'function' ? runPlatePlanDelegatedAction(code, ev, el) : null),
+};
 window.logout = function() {
   if (typeof signOutPlatePlan === 'function') {
     try { signOutPlatePlan(); } catch(e) {}
@@ -9896,7 +9905,7 @@ const platePlanFeatureRenderers=Object.freeze({
     resetTodayDate({render:false});
     return renderToday();
   },
-  vault:renderVault,
+  vault: () => (typeof window.renderVault === 'function' ? window.renderVault() : (typeof renderVault === 'function' ? renderVault() : null)),
   add(){
     if(platePlanPendingRecipePreFill){
       applyPendingRecipePreFillToForm();
@@ -15031,7 +15040,13 @@ function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both
     console.warn('[viewRecipe] Recipe not found:', id);
     return;
   }
-  previewBaseRecipe = clonePlatePlanValue(r); // isolated deep copy for scaling
+  const clonedRecipe = clonePlatePlanValue(r); // isolated deep copy for scaling
+  if (typeof previewBaseRecipe !== 'undefined') {
+    previewBaseRecipe = clonedRecipe;
+  } else {
+    window.previewBaseRecipe = clonedRecipe;
+  }
+  const baseRec = (typeof previewBaseRecipe !== 'undefined' && previewBaseRecipe) || window.previewBaseRecipe || clonedRecipe;
   currentPreviewInstanceId = cleanInstanceId;
   currentViewTab = (tab === 'enhanced' && r.enhanced) ? 'enhanced' : 'original';
   currentPreviewServingMode = servingMode || 'both';
@@ -15056,13 +15071,13 @@ function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both
               }
           });
       };
-      applySubs(previewBaseRecipe.ingredients);
-      if(previewBaseRecipe.enhanced) applySubs(previewBaseRecipe.enhanced.ingredients);
+      applySubs(baseRec.ingredients);
+      if(baseRec.enhanced) applySubs(baseRec.enhanced.ingredients);
   }
 
   const wrap = document.getElementById('view-modal-wrap');
   if (wrap) wrap.classList.add('open');
-  renderRecipePreview(previewBaseRecipe.serves || 2);
+  renderRecipePreview(baseRec.serves || 2);
 }
 
 function renderRecipePreview(targetServes = 2) {
@@ -24799,9 +24814,12 @@ function savePrefs(){
 }
 
 // == UTILS ==
-const platePlanToastActions=new Map();
+window.platePlanToastActions = window.platePlanToastActions || new Map();
+const platePlanToastActions = window.platePlanToastActions;
 function runPlatePlanToastAction(id){
-  const action=platePlanToastActions.get(id);platePlanToastActions.delete(id);
+  const toastActions = (typeof platePlanToastActions !== 'undefined' && platePlanToastActions) || window.platePlanToastActions || new Map();
+  const action = toastActions instanceof Map ? toastActions.get(id) : toastActions[id];
+  if(toastActions instanceof Map) toastActions.delete(id); else delete toastActions[id];
   document.getElementById(`plateplan-toast-${id}`)?.remove();
   if(typeof action==='function')action();
 }
@@ -24809,9 +24827,16 @@ function showPlatePlanToast(message,action=null){
   let region=document.getElementById('plateplan-toast-region');
   if(!region){region=document.createElement('div');region.id='plateplan-toast-region';region.className='plateplan-toast-region';region.setAttribute('role','status');region.setAttribute('aria-live','polite');document.body.appendChild(region);}
   const id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-  if(action?.onclick)platePlanToastActions.set(id,action.onclick);
+  const toastActions = (typeof platePlanToastActions !== 'undefined' && platePlanToastActions) || window.platePlanToastActions || new Map();
+  if(action?.onclick){
+    if(toastActions instanceof Map) toastActions.set(id,action.onclick);
+    else toastActions[id] = action.onclick;
+  }
   region.innerHTML=`<div class="plateplan-toast" id="plateplan-toast-${id}"><span>${ppEscapeHtml(message)}</span>${action?.onclick?`<button onclick="runPlatePlanToastAction('${ppEscapeAttr(id)}')">${ppEscapeHtml(action.label||'Undo')}</button>`:''}</div>`;
-  setTimeout(()=>{document.getElementById(`plateplan-toast-${id}`)?.remove();platePlanToastActions.delete(id);},action?.onclick?8000:4200);
+  setTimeout(()=>{
+    document.getElementById(`plateplan-toast-${id}`)?.remove();
+    if(toastActions instanceof Map) toastActions.delete(id); else delete toastActions[id];
+  },action?.onclick?8000:4200);
 }
 function showToast(message,action=null){
   return showPlatePlanToast(message, action);
