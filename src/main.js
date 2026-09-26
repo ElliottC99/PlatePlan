@@ -1,64 +1,63 @@
 /**
- * src/main.js (v3.3.7)
- * Secure ES6 data bridge with deep recursive object normalization for legacy UI safety.
+ * src/main.js (v3.3.8)
+ * Secure ES6 data bridge featuring a JavaScript Proxy Data Shield for legacy UI bulletproofing.
  */
 
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
 import { getState } from './store/store.js';
 
-// Deep recursive normalizer to guarantee no nested property is undefined when legacy code calls .includes()
-function deepSanitize(obj) {
-  if (obj === null || typeof obj !== 'object') {
-    return obj;
-  }
-  if (Array.isArray(obj)) {
-    return obj.map(item => deepSanitize(item));
-  }
-  const sanitized = {};
-  for (const key of Object.keys(obj)) {
-    const val = obj[key];
-    // If it looks like an array field that might be checked with .includes(), default to [] if undefined/null
-    if (val === undefined || val === null) {
-      if (['tags', 'categories', 'favourites', 'labels', 'ingredients', 'variants', 'steps', 'allergens'].includes(key)) {
-        sanitized[key] = [];
-      } else {
-        sanitized[key] = null;
+// Creates a recursive Proxy that traps undefined property lookups and returns [] for array-like checks
+function createRecipeProxy(target) {
+  return new Proxy(target, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+      
+      // If property doesn't exist or is null/undefined, protect against .includes() or iterator crashes
+      if (value === undefined || value === null) {
+        // If it sounds like an array property, return empty array
+        if (typeof prop === 'string' && (prop.includes('tag') || prop.includes('favourite') || prop.includes('category') || prop.includes('variant') || prop.includes('ingredient') || prop.includes('label'))) {
+          return [];
+        }
+        return [];
       }
-    } else {
-      sanitized[key] = deepSanitize(val);
+      
+      // If it's a nested object or array, wrap it recursively in a Proxy as well
+      if (typeof value === 'object') {
+        if (Array.isArray(value)) {
+          return value.map(item => (typeof item === 'object' && item !== null ? createRecipeProxy(item) : item));
+        }
+        return createRecipeProxy(value);
+      }
+      
+      return value;
     }
-  }
-  // Ensure mandatory top-level or variant array properties exist even if missing entirely
-  sanitized.tags = Array.isArray(sanitized.tags) ? sanitized.tags : [];
-  sanitized.categories = Array.isArray(sanitized.categories) ? sanitized.categories : [];
-  sanitized.variants = Array.isArray(sanitized.variants) ? sanitized.variants : [];
-  
-  return sanitized;
+  });
 }
 
-function sanitizeRecipes(recipes) {
+function shieldRecipes(recipes) {
   if (!Array.isArray(recipes)) return [];
-  return recipes.map(recipe => deepSanitize(recipe));
+  return recipes.map(recipe => createRecipeProxy(recipe));
 }
 
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.7 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.8 (ES6 Modern)';
   }
 }
 
 document.addEventListener('plateplan:state:recipes', (e) => {
-  const cleanRecipes = sanitizeRecipes(e.detail || []);
-  console.log(`[Modern Bridge v3.3.7] Deep-sanitized and synced ${cleanRecipes.length} recipes to app UI.`);
+  const rawRecipes = e.detail || [];
+  const shieldedRecipes = shieldRecipes(rawRecipes);
+  console.log(`[Modern Bridge v3.3.8] Shielded ${shieldedRecipes.length} recipes via Proxy into app UI.`);
   
   if (typeof window !== 'undefined') {
-    window.allRecipes = cleanRecipes;
-    if (window.state) window.state.recipes = cleanRecipes;
+    window.allRecipes = shieldedRecipes;
+    if (window.state) window.state.recipes = shieldedRecipes;
     if (window.PlatePlanRecipes) {
       window.PlatePlanRecipes.State = window.PlatePlanRecipes.State || {};
-      window.PlatePlanRecipes.State.recipes = cleanRecipes;
+      window.PlatePlanRecipes.State.recipes = shieldedRecipes;
     }
     if (typeof window.renderAll === 'function') {
       try { window.renderAll(); } catch (err) { console.warn('[Modern Bridge] renderAll warning:', err); }
@@ -111,7 +110,7 @@ document.addEventListener('plateplan:state:plan', (e) => {
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.7] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.8] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   await waitForAuth();
   await hydrateHouseholdData();
