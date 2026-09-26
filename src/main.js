@@ -1,9 +1,10 @@
 /**
- * src/main.js (v3.3.31)
- * Phase 11.1: Per-Person Nutritional Targets & 4-Meal Breakdown Integration.
+ * src/main.js (v3.3.32)
+ * Phase 11.2: Hydration & Firestore Persistence Bridge for Preferences & Targets.
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
+import { savePreferences } from './services/HouseholdRepository.js';
 import { getState } from './store/store.js';
 
 // 1. STRICT TYPE SANITIZATION
@@ -446,7 +447,7 @@ export function renderSettingsView() {
 
         <div class="pp-input-group">
           <label>Active Architecture Version</label>
-          <input type="text" value="v3.3.31 (ES6 Modern)" readonly style="background: #f8fafc; color: #475569; font-weight: 600;">
+          <input type="text" value="v3.3.32 (ES6 Modern)" readonly style="background: #f8fafc; color: #475569; font-weight: 600;">
         </div>
       </div>
 
@@ -464,7 +465,10 @@ export function renderSettingsView() {
   // Attach Save listener
   const saveBtn = container.querySelector('#pp-save-settings-btn');
   if (saveBtn) {
-    saveBtn.onclick = () => {
+    saveBtn.onclick = async () => {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+
       window.state.userPrefs = window.state.userPrefs || {};
       window.state.userPrefs.diet = container.querySelector('#pp-setting-diet')?.value || 'none';
       window.state.userPrefs.glutenFree = container.querySelector('#pp-setting-gf')?.checked || false;
@@ -532,9 +536,15 @@ export function renderSettingsView() {
       window.state.settings.mappingStrategy = container.querySelector('#pp-setting-strategy')?.value || 'protein_per_kcal';
       window.state.settings.theme = container.querySelector('#pp-setting-theme')?.value || 'system';
 
-      console.log('[Settings v3.3.31] Saved user preferences to state:', window.state.userPrefs);
+      console.log('[Settings v3.3.32] Saved user preferences to state:', window.state.userPrefs);
+      
+      // Persist to Firestore
+      await savePreferences(window.state.userPrefs, window.state.settings);
+
+      // Dispatch CustomEvent
       document.dispatchEvent(new CustomEvent('plateplan:state:preferences', { detail: window.state.userPrefs }));
 
+      saveBtn.disabled = false;
       saveBtn.textContent = '✓ Preferences Saved';
       saveBtn.style.background = '#16a34a';
       setTimeout(() => {
@@ -548,7 +558,7 @@ export function renderSettingsView() {
   const refreshBtn = container.querySelector('#pp-refresh-data-btn');
   if (refreshBtn) {
     refreshBtn.onclick = () => {
-      console.log('[Settings v3.3.31] Triggering household data refresh...');
+      console.log('[Settings v3.3.32] Triggering household data refresh...');
       hydrateHouseholdData();
     };
   }
@@ -840,7 +850,7 @@ function setupRecipeActionBridge() {
       const rawArgs = actionStr.substring(actionStr.indexOf('(') + 1, actionStr.lastIndexOf(')'));
       const args = rawArgs.split(',').map(s => s.trim().replace(/^['"]|['"]$/g, ''));
 
-      console.log(`[Action Bridge v3.3.31] Intercepted Swap Action:`, args);
+      console.log(`[Action Bridge v3.3.32] Intercepted Swap Action:`, args);
       window.toggleInlineShoppingSubst(args[0] || '', args[1] || '');
       return;
     }
@@ -897,7 +907,7 @@ function sanitizeRecipes(recipes) {
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.31 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.32 (ES6 Modern)';
   }
 }
 
@@ -919,7 +929,7 @@ document.addEventListener('plateplan:state:preferences', () => {
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.31] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.32] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupRecipeActionBridge();
   await waitForAuth();
