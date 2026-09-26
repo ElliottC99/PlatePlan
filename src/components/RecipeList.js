@@ -1,5 +1,5 @@
 /**
- * src/components/RecipeList.js (v3.3.3)
+ * src/components/RecipeList.js (v3.3.4)
  * Reactive UI component for rendering the household recipe catalog.
  */
 
@@ -8,7 +8,7 @@ import { getState } from '../store/store.js';
 export function initRecipeList(containerId) {
   const container = document.getElementById(containerId);
   if (!container) {
-    console.warn(`[RecipeList v3.3.3] Container element #${containerId} not found in DOM.`);
+    console.warn(`[RecipeList v3.3.4] Container element #${containerId} not found in DOM.`);
     return;
   }
 
