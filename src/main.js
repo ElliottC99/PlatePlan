@@ -1,6 +1,6 @@
 /**
- * src/main.js (v3.3.14)
- * Secure ES6 data bridge with Recipe Action Delegation & Modal Bridge.
+ * src/main.js (v3.3.15)
+ * Secure ES6 data bridge with Native Inline Action Execution (pp-click).
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
@@ -24,73 +24,36 @@ if (typeof window !== 'undefined') {
   window.userFavourites = window.state.userFavourites;
 }
 
-// 2. RECIPE ACTION & MODAL DELEGATION BRIDGE
+// 2. NATIVE INLINE ACTION BRIDGE (Executes data-pp-click strings globally)
 function setupRecipeActionBridge() {
   if (typeof window === 'undefined' || window.__plateplan_action_bridge_attached) return;
   window.__plateplan_action_bridge_attached = true;
 
   document.addEventListener('click', (event) => {
-    const actionBtn = event.target.closest('[data-action], button[data-recipe-id], a[data-recipe-id], .action-item');
+    const actionBtn = event.target.closest('[data-pp-click]');
     if (!actionBtn) return;
 
-    const action = actionBtn.dataset.action || actionBtn.getAttribute('action');
-    const recipeId = actionBtn.dataset.recipeId || actionBtn.closest('[data-recipe-id]')?.dataset.recipeId;
+    const actionStr = actionBtn.dataset.ppClick || actionBtn.getAttribute('data-pp-click');
+    if (!actionStr) return;
 
-    if (!action && !recipeId) return;
+    // Prevent default behavior if it's a form button or anchor tag
+    event.preventDefault();
+    console.log(`[Action Bridge v3.3.15] Executing legacy inline action: "${actionStr}"`);
 
-    console.log(`[Action Bridge] Captured action "${action}" for recipeId: "${recipeId}"`);
-
-    const recipe = (window.allRecipes || []).find(r => String(r.id) === String(recipeId) || String(r._id) === String(recipeId));
-
-    // Route actions to legacy modal methods or fallback state dispatches
-    switch (action) {
-      case 'view':
-      case 'view-recipe':
-      case 'open-recipe':
-        if (typeof window.PlatePlanRecipes?.openRecipeModal === 'function') {
-          window.PlatePlanRecipes.openRecipeModal(recipeId || recipe);
-        } else if (typeof window.showRecipeDetails === 'function') {
-          window.showRecipeDetails(recipeId || recipe);
+    try {
+      // Create an execution function scoped to the global window
+      const executeLegacyAction = new Function(`
+        try {
+          ${actionStr}
+        } catch (e) {
+          console.error('[Action Bridge] Execution failed for:', \`${actionStr}\`, e);
         }
-        break;
-
-      case 'review':
-      case 'review-recipe':
-        if (typeof window.PlatePlanRecipes?.openReviewModal === 'function') {
-          window.PlatePlanRecipes.openReviewModal(recipeId || recipe);
-        }
-        break;
-
-      case 'card':
-      case 'recipe-card':
-        if (typeof window.PlatePlanRecipes?.openRecipeCard === 'function') {
-          window.PlatePlanRecipes.openRecipeCard(recipeId || recipe);
-        }
-        break;
-
-      case 'duplicate':
-      case 'duplicate-recipe':
-        if (typeof window.PlatePlanRecipes?.duplicateRecipe === 'function') {
-          window.PlatePlanRecipes.duplicateRecipe(recipeId || recipe);
-        }
-        break;
-
-      case 'edit':
-      case 'edit-recipe':
-      case 'edit-source':
-        if (typeof window.PlatePlanRecipes?.openEditModal === 'function') {
-          window.PlatePlanRecipes.openEditModal(recipeId || recipe);
-        }
-        break;
-
-      case 'delete':
-      case 'delete-recipe':
-        if (typeof window.PlatePlanRecipes?.deleteRecipe === 'function') {
-          window.PlatePlanRecipes.deleteRecipe(recipeId || recipe);
-        }
-        break;
+      `);
+      executeLegacyAction.call(window);
+    } catch (err) {
+      console.error(`[Action Bridge] Failed to parse action string: ${actionStr}`, err);
     }
-  }, true);
+  }, true); // Use capture phase to ensure it intercepts before dead legacy handlers
 }
 
 // Deep mutator to ensure clean recipes and variants
@@ -127,7 +90,7 @@ function sanitizeRecipes(recipes) {
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.14 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.15 (ES6 Modern)';
   }
 }
 
@@ -152,7 +115,7 @@ document.addEventListener('plateplan:state:recipes', (e) => {
       try { window.schedulePlatePlanListRender('vault'); } catch (err) { console.warn('[Modern Bridge] schedulePlatePlanListRender warning:', err); }
     }
   }
-  console.log(`[Modern Bridge v3.3.14] Action-delegated bridge synchronized with ${cleanRecipes.length} recipes.`);
+  console.log(`[Modern Bridge v3.3.15] Native inline action bridge synchronized with ${cleanRecipes.length} recipes.`);
 });
 
 // Sync ingredients, preferences, and plans when they change
@@ -194,7 +157,7 @@ document.addEventListener('plateplan:state:plan', (e) => {
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.14] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.15] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupRecipeActionBridge();
   await waitForAuth();
