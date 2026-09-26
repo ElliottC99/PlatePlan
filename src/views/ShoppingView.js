@@ -1,5 +1,5 @@
 /**
- * src/views/ShoppingView.js (v3.5.0)
+ * src/views/ShoppingView.js (v3.6.0)
  * Componentized Shopping List View with reactive store subscription.
  * Real-time state synchronization with Household Meal Plan and Reactive Store.
  * Uses optimized DOM rendering for high performance.

@@ -1,5 +1,5 @@
 /**
- * src/views/RecipeVaultView.js (v3.5.0)
+ * src/views/RecipeVaultView.js (v3.6.0)
  * Atomic Recipe Vault Component & Actions Module.
  * Decoupled from direct Firestore SDK, pure reactive Store interactions.
  * Features optimized DocumentFragment rendering and instant offline caching.
@@ -162,7 +162,7 @@ export async function toggleRecipeFavourite(recipeId, event, variantKey = 'origi
     try {
       await savePreferences(window.state.userPrefs, window.state.settings || {});
     } catch (e) {
-      console.warn('[RecipeVault v3.5.0] Failed to save favorite preferences:', e);
+      console.warn('[RecipeVault v3.6.0] Failed to save favorite preferences:', e);
     }
   }
 
@@ -285,4 +285,4 @@ if (typeof window !== 'undefined') {
   window.toggleVaultFavoritesFilter = toggleVaultFavouritesFilter;
 }
 
-console.log('[RecipeVaultView v3.5.0] Loaded successfully.');
+console.log('[RecipeVaultView v3.6.0] Loaded successfully.');
