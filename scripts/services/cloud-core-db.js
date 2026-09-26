@@ -1,11 +1,13 @@
 /**
  * scripts/services/cloud-core-db.js
- * Shared Household Firebase Firestore initialization and reference builders.
+ * Household-scoped Firestore database initialization and collection reference builders.
  */
 (function() {
   'use strict';
 
-  // 1. Hardcoded Fallback Firebase Configuration
+  window.PlatePlanCloud = window.PlatePlanCloud || {};
+
+  // 1. Hardcoded Firebase Configuration Fallback
   const firebaseConfig = (typeof window !== 'undefined' && window.PLATEPLAN_FIREBASE?.config) || {
     apiKey: "AIzaSyBBIDYTpgjy1_HRxe3GCeMHFqit-rxod-w",
     authDomain: "plateplan-a5131.firebaseapp.com",
@@ -15,25 +17,18 @@
     appId: "1:504753226211:web:8ee091c1da1f5c7023a0d6"
   };
 
-  // 2. Ensure Firebase App is Initialized BEFORE Firestore or Persistence
-  window.ensureFirebaseAppInitialized = function() {
-    if (typeof window === 'undefined' || !window.firebase) return null;
-    if (!window.firebase.apps.length) {
-      try {
-        const app = window.firebase.initializeApp(firebaseConfig);
-        console.log("[FIREBASE] Initialized successfully with household config.");
-        return app;
-      } catch (err) {
-        console.warn('[FIREBASE] initializeApp warning:', err);
-      }
-    }
-    return window.firebase.apps.length ? window.firebase.app() : null;
-  };
-
-  // 3. Initialize Firebase App & Setup Firestore Persistence
+  // 2. Strict Sequential Initialization
   let db = null;
   if (typeof window !== 'undefined' && window.firebase) {
-    window.ensureFirebaseAppInitialized();
+    if (!window.firebase.apps.length) {
+      try {
+        window.firebase.initializeApp(firebaseConfig);
+        console.log("[FIREBASE] App initialized successfully with household config.");
+      } catch (err) {
+        console.warn("[FIREBASE] Initialization warning:", err);
+      }
+    }
+    
     if (window.firebase.apps.length && typeof window.firebase.firestore === 'function') {
       try {
         db = window.firebase.firestore();
@@ -41,38 +36,30 @@
           .then(() => console.log("[FIRESTORE] Offline persistence active with tab synchronization."))
           .catch((err) => console.warn("[FIRESTORE] Persistence warning:", err.code || err));
       } catch (err) {
-        console.warn("[FIRESTORE] Setup error:", err);
+        console.warn("[FIRESTORE] Setup warning:", err);
       }
     }
   }
 
   const getDb = () => {
-    if (!db) {
-      window.ensureFirebaseAppInitialized();
-      if (window.firebase?.apps?.length && typeof window.firebase.firestore === 'function') {
+    if (!db && typeof window !== 'undefined' && window.firebase) {
+      if (!window.firebase.apps.length) {
+        window.firebase.initializeApp(firebaseConfig);
+      }
+      if (window.firebase.apps.length && typeof window.firebase.firestore === 'function') {
         db = window.firebase.firestore();
       }
     }
-    return db || null;
+    return db;
   };
 
-  // 4. Export globally with the required Refs structure targeting the shared Household path
-  const HOUSEHOLD_ID = (typeof window !== 'undefined' && window.PLATEPLAN_FIREBASE?.householdId) || 'elliott-chloe';
-
-  window.PlatePlanCloud = window.PlatePlanCloud || {};
   window.PlatePlanCloud.getDb = getDb;
 
+  // 3. Fixed Household Collection References (Elliotti & Chloe Household)
   window.PlatePlanCloud.Refs = {
-    getPlanDoc: () => getDb()?.collection('households').doc(HOUSEHOLD_ID).collection('plans').doc('current'),
-    getRecipesColl: () => getDb()?.collection('households').doc(HOUSEHOLD_ID).collection('recipes'),
-    getIngredientsColl: () => getDb()?.collection('households').doc(HOUSEHOLD_ID).collection('ingredients'),
-    getSettingsDoc: () => getDb()?.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences'),
-    getAuditColl: () => getDb()?.collection('households').doc(HOUSEHOLD_ID).collection('audit')
+    getPlanDoc: () => getDb()?.collection('households').doc('elliott-chloe').collection('plans').doc('current'),
+    getSettingsDoc: () => getDb()?.collection('households').doc('elliott-chloe').collection('settings').doc('preferences'),
+    getRecipesColl: () => getDb()?.collection('households').doc('elliott-chloe').collection('recipes'),
+    getIngredientsColl: () => getDb()?.collection('households').doc('elliott-chloe').collection('ingredients')
   };
-
-  // Top-level helper bindings for direct access
-  window.PlatePlanCloud.getPlanDoc = window.PlatePlanCloud.Refs.getPlanDoc;
-  window.PlatePlanCloud.getRecipesColl = window.PlatePlanCloud.Refs.getRecipesColl;
-  window.PlatePlanCloud.getIngredientsColl = window.PlatePlanCloud.Refs.getIngredientsColl;
-  window.PlatePlanCloud.getSettingsDoc = window.PlatePlanCloud.Refs.getSettingsDoc;
 })();

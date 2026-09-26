@@ -4,15 +4,8 @@
  */
   window.pullCloudHydrate = function() {
     const cloud = window.PlatePlanCloud;
-    const state = cloud?.State || {};
-    if (state.isHydrating) return Promise.resolve();
-
-    const refs = cloud?.Refs;
-    if (!refs || typeof refs.getRecipesColl !== 'function') {
-      console.warn('[CloudHydrate] Pull skipped: PlatePlanCloud.Refs not initialized.');
-      if (state) state.syncStatus = 'local_only';
-      return Promise.resolve();
-    }
+    const state = cloud?.State;
+    if (!state || state.isHydrating) return Promise.resolve();
 
     // 1. Instant Local Cache Hydration into Domain Namespaces (Non-Blocking UI Render)
     try {
