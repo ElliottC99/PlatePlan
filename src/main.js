@@ -1,13 +1,41 @@
 /**
- * src/main.js (v3.3.10)
- * Secure ES6 data bridge with exhaustive deep mutation and global state/favourites safeguarding.
+ * src/main.js (v3.3.12)
+ * Secure ES6 data bridge with concrete synchronous global state pre-population.
  */
-
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
 import { getState } from './store/store.js';
 
-// Exhaustively mutates any object/array to ensure no property is undefined
+// 1. SYNCHRONOUS CONCRETE STATE PRE-POPULATION (Guarantees zero undefined legacy paths)
+if (typeof window !== 'undefined') {
+  window.state = window.state || {};
+  
+  // Statically instantiate all nested legacy state objects and arrays so assignments persist
+  window.state.recipes = Array.isArray(window.state.recipes) ? window.state.recipes : [];
+  window.state.favourites = Array.isArray(window.state.favourites) ? window.state.favourites : [];
+  window.state.userFavourites = Array.isArray(window.state.userFavourites) ? window.state.userFavourites : [];
+  window.state.ingredients = Array.isArray(window.state.ingredients) ? window.state.ingredients : [];
+  window.state.settings = window.state.settings || {};
+  
+  window.state.prefs = window.state.prefs || {};
+  window.state.userPrefs = window.state.userPrefs || window.state.prefs;
+  
+  window.state.userPrefs.favouriteVariantIds = Array.isArray(window.state.userPrefs.favouriteVariantIds) 
+    ? window.state.userPrefs.favouriteVariantIds 
+    : [];
+  window.state.userPrefs.favourites = Array.isArray(window.state.userPrefs.favourites) 
+    ? window.state.userPrefs.favourites 
+    : [];
+  window.state.prefs.favouriteVariantIds = window.state.userPrefs.favouriteVariantIds;
+
+  // Global top-level aliases often read directly by legacy functions
+  window.favourites = window.state.favourites;
+  window.userFavourites = window.state.userFavourites;
+  window.allRecipes = window.state.recipes;
+  window.allIngredients = window.state.ingredients;
+}
+
+// Exhaustive deep mutator for recipes and variants
 function deepMutate(obj) {
   if (obj === null || typeof obj !== 'object') {
     return obj;
@@ -19,7 +47,7 @@ function deepMutate(obj) {
   const keys = Object.keys(obj);
   for (const key of keys) {
     if (obj[key] === undefined || obj[key] === null) {
-      if (['tags', 'categories', 'favourites', 'labels', 'ingredients', 'variants', 'steps', 'allergens', 'favouritedBy', 'userFavourites'].includes(key)) {
+      if (['tags', 'categories', 'favourites', 'labels', 'ingredients', 'variants', 'steps', 'allergens', 'favouritedBy', 'userFavourites', 'favouriteVariantIds', 'favoriteVariantIds'].includes(key)) {
         obj[key] = [];
       } else {
         obj[key] = '';
@@ -42,43 +70,10 @@ function sanitizeRecipes(recipes) {
   return recipes.map(recipe => deepMutate(JSON.parse(JSON.stringify(recipe))));
 }
 
-// Initialize and shield global state to prevent global undefined lookups
-function ensureGlobalState(cleanRecipes) {
-  if (typeof window === 'undefined') return;
-
-  window.allRecipes = cleanRecipes;
-  
-  // Initialize window.state if missing, or populate its missing arrays
-  window.state = window.state || {};
-  window.state.recipes = cleanRecipes;
-  window.state.favourites = Array.isArray(window.state.favourites) ? window.state.favourites : [];
-  window.state.userFavourites = Array.isArray(window.state.userFavourites) ? window.state.userFavourites : [];
-  window.state.settings = window.state.settings || {};
-  window.state.ingredients = Array.isArray(window.state.ingredients) ? window.state.ingredients : [];
-
-  // Also set global top-level fallbacks often read by legacy code
-  window.favourites = window.favourites || [];
-  window.userFavourites = window.userFavourites || [];
-
-  // Wrap window.state in a Proxy to trap any accidental undefined property reads
-  window.state = new Proxy(window.state, {
-    get(target, prop, receiver) {
-      const val = Reflect.get(target, prop, receiver);
-      if (val === undefined || val === null) {
-        if (['favourites', 'userFavourites', 'recipes', 'ingredients', 'tags', 'categories', 'variants'].includes(prop)) {
-          return [];
-        }
-        return {};
-      }
-      return val;
-    }
-  });
-}
-
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.10 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.12 (ES6 Modern)';
   }
 }
 
@@ -86,10 +81,9 @@ document.addEventListener('plateplan:state:recipes', (e) => {
   const rawRecipes = e.detail || [];
   const cleanRecipes = sanitizeRecipes(rawRecipes);
   
-  ensureGlobalState(cleanRecipes);
-  console.log(`[Modern Bridge v3.3.10] Global state shielded and ${cleanRecipes.length} recipes synced.`);
-  
   if (typeof window !== 'undefined') {
+    window.state.recipes = cleanRecipes;
+    window.allRecipes = cleanRecipes;
     if (window.PlatePlanRecipes) {
       window.PlatePlanRecipes.State = window.PlatePlanRecipes.State || {};
       window.PlatePlanRecipes.State.recipes = cleanRecipes;
@@ -104,6 +98,7 @@ document.addEventListener('plateplan:state:recipes', (e) => {
       try { window.schedulePlatePlanListRender('vault'); } catch (err) { console.warn('[Modern Bridge] schedulePlatePlanListRender warning:', err); }
     }
   }
+  console.log(`[Modern Bridge v3.3.12] Concrete state synchronized with ${cleanRecipes.length} recipes.`);
 });
 
 // Sync ingredients, preferences, and plans when they change
@@ -145,7 +140,7 @@ document.addEventListener('plateplan:state:plan', (e) => {
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.10] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.12] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   await waitForAuth();
   await hydrateHouseholdData();
