@@ -1,6 +1,6 @@
 /**
  * src/main.js (v3.3.35)
- * Phase 5.3: Weekly Planner View Extraction into /src/views/PlannerView.js.
+ * Phase 5.3.1 Hotfix: Recipe modal bridge routing and version badge alignment.
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
@@ -86,6 +86,13 @@ window.renderPlanner = function() {
   renderPlanner();
 };
 
+window.openRecipeModal = function(id, instanceId, variant) {
+  if (typeof window.viewRecipe === 'function') return window.viewRecipe(id, instanceId, variant);
+  console.warn('[main.js v3.3.35] viewRecipe not found on window');
+};
+window.showRecipeModal = window.openRecipeModal;
+window.openRecipeDetailModal = window.openRecipeModal;
+
 // ----------------------------------------------------------------------------
 // NATIVE DELEGATED ACTION BRIDGE
 // ----------------------------------------------------------------------------
@@ -98,7 +105,7 @@ function setupRecipeActionBridge() {
   document.addEventListener('click', (event) => {
     patchSwapLabels();
 
-    const target = event.target.closest('[data-pp-click], [onclick*="toggleInlineShoppingSubst"], button');
+    const target = event.target.closest('[data-pp-click], [onclick*="toggleInlineShoppingSubst"], [onclick*="viewRecipe"], [onclick*="openRecipeModal"], button');
     if (!target) return;
 
     const onclickStr = target.getAttribute('onclick') || '';
@@ -114,6 +121,22 @@ function setupRecipeActionBridge() {
 
       console.log(`[Action Bridge v3.3.35] Intercepted Swap Action:`, args);
       window.toggleInlineShoppingSubst(args[0] || '', args[1] || '');
+      return;
+    }
+
+    if (actionStr.includes('openRecipeModal') || actionStr.includes('viewRecipe') || actionStr.includes('showRecipeModal') || actionStr.includes('openRecipeDetailModal')) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const rawArgs = actionStr.substring(actionStr.indexOf('(') + 1, actionStr.lastIndexOf(')'));
+      const args = rawArgs.split(',').map(s => s.trim().replace(/^['"]|['"]$/g, ''));
+
+      console.log(`[Action Bridge v3.3.35] Intercepted Recipe Modal Action:`, args);
+      if (typeof window.viewRecipe === 'function') {
+        window.viewRecipe(args[0] || '', args[1] || '', args[2] || '');
+      } else if (typeof window.openRecipeModal === 'function') {
+        window.openRecipeModal(args[0] || '', args[1] || '', args[2] || '');
+      }
       return;
     }
 
