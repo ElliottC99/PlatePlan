@@ -1,6 +1,6 @@
 /**
- * src/main.js (v3.3.23)
- * Native Delegated Action Bridge with Direct Substitution Routing (v3.3.23).
+ * src/main.js (v3.3.24)
+ * Native Delegated Action Bridge with Robust Substitution & Real-Time Label Patching.
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
@@ -47,7 +47,7 @@ function patchSwapLabels() {
       node.nodeValue = node.nodeValue.replace(/Swap Brand/g, 'Swap Product');
     }
   }
-  document.querySelectorAll('button, a, span, label').forEach(el => {
+  document.querySelectorAll('button, a, span, label, div').forEach(el => {
     if (el.title && el.title.includes('Swap Brand')) {
       el.title = el.title.replace(/Swap Brand/g, 'Swap Product');
     }
@@ -57,10 +57,24 @@ function patchSwapLabels() {
   });
 }
 
-// 2. NATIVE DELEGATED ACTION BRIDGE & DIRECT ARGUMENT ROUTING
+// Initialize Real-Time Label Patching Observer
+function initLabelObserver() {
+  if (typeof window === 'undefined' || window.__pp_label_observer_active) return;
+  window.__pp_label_observer_active = true;
+
+  const observer = new MutationObserver(() => {
+    patchSwapLabels();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  patchSwapLabels();
+}
+
+// 2. NATIVE DELEGATED ACTION BRIDGE & ROBUST SUBSTITUTION ROUTING
 function setupRecipeActionBridge() {
   if (typeof window === 'undefined' || window.__plateplan_action_bridge_attached) return;
   window.__plateplan_action_bridge_attached = true;
+
+  initLabelObserver();
 
   const observeModals = () => {
     const tescoMaster = document.getElementById('tesco-modal-wrap');
@@ -103,14 +117,17 @@ function setupRecipeActionBridge() {
     if (!actionStr) return;
 
     event.preventDefault();
-    console.log(`[Action Bridge v3.3.23] Delegating action: "${actionStr}"`);
+    console.log(`[Action Bridge v3.3.24] Delegating action: "${actionStr}"`);
 
     try {
-      // Direct Execution Routing for Substitution & Parameterized Actions
-      if (actionStr.startsWith('toggleInlineShoppingSubst')) {
-        const match = actionStr.match(/toggleInlineShoppingSubst\s*\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/);
-        if (match && typeof window.toggleInlineShoppingSubst === 'function') {
-          window.toggleInlineShoppingSubst(match[1], match[2]);
+      // Robust Direct Routing for Substitution
+      if (actionStr.includes('toggleInlineShoppingSubst')) {
+        const rawArgs = actionStr.substring(actionStr.indexOf('(') + 1, actionStr.lastIndexOf(')'));
+        const args = rawArgs.split(',').map(s => s.trim().replace(/^['"]|['"]$/g, ''));
+        
+        if (typeof window.toggleInlineShoppingSubst === 'function' && args.length >= 2) {
+          console.log(`[Action Bridge v3.3.24] Executing toggleInlineShoppingSubst with args:`, args[0], args[1]);
+          window.toggleInlineShoppingSubst(args[0], args[1]);
           patchSwapLabels();
           return;
         }
@@ -160,7 +177,7 @@ function setupRecipeActionBridge() {
       }, 50);
 
     } catch (err) {
-      console.error(`[Action Bridge v3.3.23] Execution error for: ${actionStr}`, err);
+      console.error(`[Action Bridge v3.3.24] Execution error for: ${actionStr}`, err);
     }
   }, true);
 }
@@ -199,7 +216,7 @@ function sanitizeRecipes(recipes) {
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.23 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.24 (ES6 Modern)';
   }
 }
 
@@ -214,11 +231,11 @@ document.addEventListener('plateplan:state:recipes', (e) => {
       try { window.renderAll(); } catch (err) { console.warn('[Modern Bridge] renderAll warning:', err); }
     }
   }
-  console.log(`[Modern Bridge v3.3.23] Action bridge synchronized with ${cleanRecipes.length} recipes.`);
+  console.log(`[Modern Bridge v3.3.24] Action bridge synchronized with ${cleanRecipes.length} recipes.`);
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.23] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.24] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupRecipeActionBridge();
   await waitForAuth();
