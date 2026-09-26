@@ -1,6 +1,6 @@
 /**
- * src/main.js (v3.3.17)
- * Native Delegated Action Bridge with Parent Unhiding & Opacity Enforcement.
+ * src/main.js (v3.3.18)
+ * Native Delegated Action Bridge with Master Container Lifecycle Management.
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
@@ -24,20 +24,65 @@ if (typeof window !== 'undefined') {
   window.userFavourites = window.state.userFavourites;
 }
 
-// 2. NATIVE DELEGATED ACTION BRIDGE
+// Helper: Strip forced inline styles from all modal wrappers
+function purgeModalOverrides() {
+  const wrappers = document.querySelectorAll('#tesco-modal-wrap, .modal-wrap, .modal');
+  wrappers.forEach((el) => {
+    el.style.removeProperty('display');
+    el.style.removeProperty('opacity');
+    el.style.removeProperty('visibility');
+    el.style.removeProperty('z-index');
+  });
+}
+
+// 2. NATIVE DELEGATED ACTION BRIDGE & LIFECYCLE OBSERVER
 function setupRecipeActionBridge() {
   if (typeof window === 'undefined' || window.__plateplan_action_bridge_attached) return;
   window.__plateplan_action_bridge_attached = true;
 
+  // Observe modal wrap elements to clean up overrides when closed
+  const observeModals = () => {
+    const tescoMaster = document.getElementById('tesco-modal-wrap');
+    const modalWraps = document.querySelectorAll('.modal-wrap, .modal');
+    const allTargets = [tescoMaster, ...modalWraps].filter(Boolean);
+
+    allTargets.forEach((target) => {
+      if (target.__pp_observed) return;
+      target.__pp_observed = true;
+
+      const observer = new MutationObserver(() => {
+        const openChild = document.querySelector('.modal-wrap.open, .modal.open, [id$="-modal-wrap"].open');
+        if (!openChild) {
+          purgeModalOverrides();
+        }
+      });
+      observer.observe(target, { attributes: true, attributeFilter: ['class'] });
+    });
+  };
+
+  observeModals();
+
   document.addEventListener('click', (event) => {
+    observeModals();
+
+    const closeBtn = event.target.closest('.close, .close-modal, .modal-backdrop, [data-pp-click*="close"]');
     const actionBtn = event.target.closest('[data-pp-click]');
+
+    // Explicit close handling
+    if (closeBtn && !actionBtn) {
+      const activeModal = closeBtn.closest('.modal-wrap, .modal, [id$="-modal-wrap"]');
+      if (activeModal) activeModal.classList.remove('open');
+      setTimeout(purgeModalOverrides, 20);
+      return;
+    }
+
     if (!actionBtn) return;
 
     const actionStr = actionBtn.dataset.ppClick || actionBtn.getAttribute('data-pp-click');
     if (!actionStr) return;
 
     event.preventDefault();
-    console.log(`[Action Bridge v3.3.17] Delegating action: "${actionStr}"`);
+    console.log(`[Action Bridge v3.3.18] Delegating action: "${actionStr}"`);
 
     try {
       if (typeof window.runPlatePlanDelegatedAction === 'function') {
@@ -47,29 +92,29 @@ function setupRecipeActionBridge() {
         execFn.call(actionBtn, event);
       }
 
-      // Unhide modal wraps and fix opacity/parent display
+      // Update display state based on open status
       setTimeout(() => {
-        const openModals = document.querySelectorAll('#view-modal-wrap.open, .modal-wrap.open, .modal.open');
-        openModals.forEach((modalWrap) => {
-          modalWrap.style.setProperty('display', 'flex', 'important');
-          modalWrap.style.setProperty('visibility', 'visible', 'important');
-          modalWrap.style.setProperty('opacity', '1', 'important');
-          modalWrap.style.setProperty('z-index', '99999', 'important');
-
-          // Unhide any hidden parent container (such as #tesco-modal-wrap)
-          let parent = modalWrap.parentElement;
-          while (parent && parent !== document.body) {
-            const style = window.getComputedStyle(parent);
-            if (style.display === 'none') {
-              parent.style.setProperty('display', 'block', 'important');
-            }
-            parent = parent.parentElement;
+        const openChild = document.querySelector('.modal-wrap.open, .modal.open, [id$="-modal-wrap"].open');
+        
+        if (!openChild) {
+          purgeModalOverrides();
+        } else {
+          // Unhide master container if present
+          const tescoMaster = document.getElementById('tesco-modal-wrap');
+          if (tescoMaster) {
+            tescoMaster.style.setProperty('display', 'block', 'important');
           }
-        });
+
+          // Ensure active open modal is visible
+          openChild.style.setProperty('display', 'flex', 'important');
+          openChild.style.setProperty('visibility', 'visible', 'important');
+          openChild.style.setProperty('opacity', '1', 'important');
+          openChild.style.setProperty('z-index', '99999', 'important');
+        }
       }, 50);
 
     } catch (err) {
-      console.error(`[Action Bridge v3.3.17] Execution error for: ${actionStr}`, err);
+      console.error(`[Action Bridge v3.3.18] Execution error for: ${actionStr}`, err);
     }
   }, true);
 }
@@ -108,7 +153,7 @@ function sanitizeRecipes(recipes) {
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.17 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.18 (ES6 Modern)';
   }
 }
 
@@ -123,11 +168,11 @@ document.addEventListener('plateplan:state:recipes', (e) => {
       try { window.renderAll(); } catch (err) { console.warn('[Modern Bridge] renderAll warning:', err); }
     }
   }
-  console.log(`[Modern Bridge v3.3.17] Action bridge synchronized with ${cleanRecipes.length} recipes.`);
+  console.log(`[Modern Bridge v3.3.18] Action bridge synchronized with ${cleanRecipes.length} recipes.`);
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.17] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.18] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupRecipeActionBridge();
   await waitForAuth();
