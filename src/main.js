@@ -1,6 +1,6 @@
 /**
- * src/main.js (v3.3.30)
- * Phase 11.0: Settings View, User Preferences, System Polish & Cleanup.
+ * src/main.js (v3.3.31)
+ * Phase 11.1: Per-Person Nutritional Targets & 4-Meal Breakdown Integration.
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
@@ -222,20 +222,47 @@ window.renderShoppingList = function() {
 };
 
 // ----------------------------------------------------------------------------
-// PHASE 11.0: SETTINGS VIEW & USER PREFERENCES
+// PHASE 11.1: SETTINGS VIEW & USER PREFERENCES
 // ----------------------------------------------------------------------------
 export function renderSettingsView() {
   const container = document.getElementById('view-prefs') || document.getElementById('view-settings');
   if (!container) return;
 
-  const prefs = window.state.userPrefs || {};
-  const settings = window.state.settings || {};
+  const prefs = window.state?.userPrefs || {};
+  const settings = window.state?.settings || {};
+  const targets = prefs.nutritionTargets || {};
+  const eTargets = targets.elliott || {};
+  const eMeals = eTargets.meals || {};
+  const cTargets = targets.chloe || {};
+  const cMeals = cTargets.meals || {};
+
+  const elliottDailyCal = prefs.elliottCal || eTargets.dailyKcal || 2200;
+  const elliottDailyProt = prefs.elliottProt || eTargets.dailyProtein || 140;
+  const elliottBfCal = eMeals.breakfast?.kcal ?? 550;
+  const elliottBfProt = eMeals.breakfast?.protein ?? 35;
+  const elliottLuCal = eMeals.lunch?.kcal ?? 650;
+  const elliottLuProt = eMeals.lunch?.protein ?? 40;
+  const elliottDiCal = eMeals.dinner?.kcal ?? 750;
+  const elliottDiProt = eMeals.dinner?.protein ?? 45;
+  const elliottSnCal = eMeals.snacking?.kcal ?? 250;
+  const elliottSnProt = eMeals.snacking?.protein ?? 20;
+
+  const chloeDailyCal = prefs.chloeCal || cTargets.dailyKcal || 1800;
+  const chloeDailyProt = prefs.chloeProt || cTargets.dailyProtein || 110;
+  const chloeBfCal = cMeals.breakfast?.kcal ?? 450;
+  const chloeBfProt = cMeals.breakfast?.protein ?? 25;
+  const chloeLuCal = cMeals.lunch?.kcal ?? 500;
+  const chloeLuProt = cMeals.lunch?.protein ?? 30;
+  const chloeDiCal = cMeals.dinner?.kcal ?? 650;
+  const chloeDiProt = cMeals.dinner?.protein ?? 40;
+  const chloeSnCal = cMeals.snacking?.kcal ?? 200;
+  const chloeSnProt = cMeals.snacking?.protein ?? 15;
 
   container.innerHTML = `
     <style>
       .pp-settings-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
       .pp-settings-title { font-size: 16px; font-weight: 700; color: #0f172a; margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; }
-      .pp-settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+      .pp-settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
       .pp-input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
       .pp-input-group label { font-size: 12px; font-weight: 600; color: #475569; }
       .pp-input-group input, .pp-input-group select { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; outline: none; background: #fff; }
@@ -306,29 +333,99 @@ export function renderSettingsView() {
 
     <!-- 3. Macro Targets & Allocation -->
     <div class="pp-settings-card">
-      <div class="pp-settings-title">⚡ Daily Nutritional Targets</div>
+      <div class="pp-settings-title">⚡ Daily Nutritional Targets & 4-Meal Breakdown</div>
+      <p style="font-size: 12px; color: #64748b; margin: -4px 0 16px 0;">Individual calorie and protein targets across Breakfast, Lunch, Dinner, and Snacking/Drinking for Elliott & Chloe.</p>
+
       <div class="pp-settings-grid">
-        <div style="background: #fafafa; border: 1px solid #f1f5f9; padding: 16px; border-radius: 10px;">
-          <div style="font-weight: 700; font-size: 14px; color: #2563eb; margin-bottom: 10px;">Elliott's Targets</div>
-          <div class="pp-input-group">
-            <label>Daily Calorie Target (kcal)</label>
-            <input type="number" id="pp-macro-e-cal" value="${prefs.elliottCal || 2200}" placeholder="2200">
+        <!-- Elliott Card -->
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: 12px;">
+          <div style="font-weight: 700; font-size: 15px; color: #2563eb; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <span>Elliott's Targets</span>
+            <span style="font-size: 11px; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 10px; font-weight: 600;">Member 1</span>
           </div>
-          <div class="pp-input-group">
-            <label>Daily Protein Target (g)</label>
-            <input type="number" id="pp-macro-e-prot" value="${prefs.elliottProt || 140}" placeholder="140">
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; background: #ffffff; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1;">
+            <div class="pp-input-group" style="margin-bottom:0;">
+              <label>Daily Calories (kcal)</label>
+              <input type="number" id="pp-macro-e-cal" value="${elliottDailyCal}">
+            </div>
+            <div class="pp-input-group" style="margin-bottom:0;">
+              <label>Daily Protein (g)</label>
+              <input type="number" id="pp-macro-e-prot" value="${elliottDailyProt}">
+            </div>
+          </div>
+
+          <div style="font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 8px; text-transform: uppercase;">4-Meal Slot Breakdown</div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: grid; grid-template-columns: 90px 1fr 1fr; gap: 8px; align-items: center; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+              <span style="font-size: 12px; font-weight: 600; color: #334155;">🍳 Breakfast</span>
+              <input type="number" id="pp-macro-e-bf-cal" value="${elliottBfCal}" placeholder="kcal" style="padding:4px 8px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;">
+              <input type="number" id="pp-macro-e-bf-prot" value="${elliottBfProt}" placeholder="protein (g)" style="padding:4px 8px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 90px 1fr 1fr; gap: 8px; align-items: center; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+              <span style="font-size: 12px; font-weight: 600; color: #334155;">🥗 Lunch</span>
+              <input type="number" id="pp-macro-e-lu-cal" value="${elliottLuCal}" placeholder="kcal" style="padding:4px 8px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;">
+              <input type="number" id="pp-macro-e-lu-prot" value="${elliottLuProt}" placeholder="protein (g)" style="padding:4px 8px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 90px 1fr 1fr; gap: 8px; align-items: center; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+              <span style="font-size: 12px; font-weight: 600; color: #334155;">🍲 Dinner</span>
+              <input type="number" id="pp-macro-e-di-cal" value="${elliottDiCal}" placeholder="kcal" style="padding:4px 8px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;">
+              <input type="number" id="pp-macro-e-di-prot" value="${elliottDiProt}" placeholder="protein (g)" style="padding:4px 8px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 90px 1fr 1fr; gap: 8px; align-items: center; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+              <span style="font-size: 12px; font-weight: 600; color: #334155;">🥤 Snacking</span>
+              <input type="number" id="pp-macro-e-sn-cal" value="${elliottSnCal}" placeholder="kcal" style="padding:4px 8px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;">
+              <input type="number" id="pp-macro-e-sn-prot" value="${elliottSnProt}" placeholder="protein (g)" style="padding:4px 8px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;">
+            </div>
           </div>
         </div>
 
-        <div style="background: #fafafa; border: 1px solid #f1f5f9; padding: 16px; border-radius: 10px;">
-          <div style="font-weight: 700; font-size: 14px; color: #ec4899; margin-bottom: 10px;">Chloe's Targets</div>
-          <div class="pp-input-group">
-            <label>Daily Calorie Target (kcal)</label>
-            <input type="number" id="pp-macro-c-cal" value="${prefs.chloeCal || 1800}" placeholder="1800">
+        <!-- Chloe Card -->
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: 12px;">
+          <div style="font-weight: 700; font-size: 15px; color: #ec4899; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <span>Chloe's Targets</span>
+            <span style="font-size: 11px; background: #fce7f3; color: #be185d; padding: 2px 8px; border-radius: 10px; font-weight: 600;">Member 2</span>
           </div>
-          <div class="pp-input-group">
-            <label>Daily Protein Target (g)</label>
-            <input type="number" id="pp-macro-c-prot" value="${prefs.chloeProt || 110}" placeholder="110">
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; background: #ffffff; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1;">
+            <div class="pp-input-group" style="margin-bottom:0;">
+              <label>Daily Calories (kcal)</label>
+              <input type="number" id="pp-macro-c-cal" value="${chloeDailyCal}">
+            </div>
+            <div class="pp-input-group" style="margin-bottom:0;">
+              <label>Daily Protein (g)</label>
+              <input type="number" id="pp-macro-c-prot" value="${chloeDailyProt}">
+            </div>
+          </div>
+
+          <div style="font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 8px; text-transform: uppercase;">4-Meal Slot Breakdown</div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: grid; grid-template-columns: 90px 1fr 1fr; gap: 8px; align-items: center; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+              <span style="font-size: 12px; font-weight: 600; color: #334155;">🍳 Breakfast</span>
+              <input type="number" id="pp-macro-c-bf-cal" value="${chloeBfCal}" placeholder="kcal" style="padding:4px 8px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;">
+              <input type="number" id="pp-macro-c-bf-prot" value="${chloeBfProt}" placeholder="protein (g)" style="padding:4px 8px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 90px 1fr 1fr; gap: 8px; align-items: center; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+              <span style="font-size: 12px; font-weight: 600; color: #334155;">🥗 Lunch</span>
+              <input type="number" id="pp-macro-c-lu-cal" value="${chloeLuCal}" placeholder="kcal" style="padding:4px 8px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;">
+              <input type="number" id="pp-macro-c-lu-prot" value="${chloeLuProt}" placeholder="protein (g)" style="padding:4px 8px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 90px 1fr 1fr; gap: 8px; align-items: center; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+              <span style="font-size: 12px; font-weight: 600; color: #334155;">🍲 Dinner</span>
+              <input type="number" id="pp-macro-c-di-cal" value="${chloeDiCal}" placeholder="kcal" style="padding:4px 8px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;">
+              <input type="number" id="pp-macro-c-di-prot" value="${chloeDiProt}" placeholder="protein (g)" style="padding:4px 8px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 90px 1fr 1fr; gap: 8px; align-items: center; background: #fff; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+              <span style="font-size: 12px; font-weight: 600; color: #334155;">🥤 Snacking</span>
+              <input type="number" id="pp-macro-c-sn-cal" value="${chloeSnCal}" placeholder="kcal" style="padding:4px 8px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;">
+              <input type="number" id="pp-macro-c-sn-prot" value="${chloeSnProt}" placeholder="protein (g)" style="padding:4px 8px; font-size:12px; border:1px solid #cbd5e1; border-radius:6px;">
+            </div>
           </div>
         </div>
       </div>
@@ -349,7 +446,7 @@ export function renderSettingsView() {
 
         <div class="pp-input-group">
           <label>Active Architecture Version</label>
-          <input type="text" value="v3.3.30 (ES6 Modern)" readonly style="background: #f8fafc; color: #475569; font-weight: 600;">
+          <input type="text" value="v3.3.31 (ES6 Modern)" readonly style="background: #f8fafc; color: #475569; font-weight: 600;">
         </div>
       </div>
 
@@ -373,16 +470,71 @@ export function renderSettingsView() {
       window.state.userPrefs.glutenFree = container.querySelector('#pp-setting-gf')?.checked || false;
       window.state.userPrefs.dairyFree = container.querySelector('#pp-setting-df')?.checked || false;
       window.state.userPrefs.nutFree = container.querySelector('#pp-setting-nutfree')?.checked || false;
-      window.state.userPrefs.elliottCal = Number(container.querySelector('#pp-macro-e-cal')?.value || 2200);
-      window.state.userPrefs.elliottProt = Number(container.querySelector('#pp-macro-e-prot')?.value || 140);
-      window.state.userPrefs.chloeCal = Number(container.querySelector('#pp-macro-c-cal')?.value || 1800);
-      window.state.userPrefs.chloeProt = Number(container.querySelector('#pp-macro-c-prot')?.value || 110);
+
+      const eDailyCal = Number(container.querySelector('#pp-macro-e-cal')?.value || 2200);
+      const eDailyProt = Number(container.querySelector('#pp-macro-e-prot')?.value || 140);
+      const cDailyCal = Number(container.querySelector('#pp-macro-c-cal')?.value || 1800);
+      const cDailyProt = Number(container.querySelector('#pp-macro-c-prot')?.value || 110);
+
+      window.state.userPrefs.elliottCal = eDailyCal;
+      window.state.userPrefs.elliottProt = eDailyProt;
+      window.state.userPrefs.chloeCal = cDailyCal;
+      window.state.userPrefs.chloeProt = cDailyProt;
+
+      window.state.userPrefs.nutritionTargets = {
+        elliott: {
+          dailyKcal: eDailyCal,
+          dailyProtein: eDailyProt,
+          meals: {
+            breakfast: {
+              kcal: Number(container.querySelector('#pp-macro-e-bf-cal')?.value || 550),
+              protein: Number(container.querySelector('#pp-macro-e-bf-prot')?.value || 35)
+            },
+            lunch: {
+              kcal: Number(container.querySelector('#pp-macro-e-lu-cal')?.value || 650),
+              protein: Number(container.querySelector('#pp-macro-e-lu-prot')?.value || 40)
+            },
+            dinner: {
+              kcal: Number(container.querySelector('#pp-macro-e-di-cal')?.value || 750),
+              protein: Number(container.querySelector('#pp-macro-e-di-prot')?.value || 45)
+            },
+            snacking: {
+              kcal: Number(container.querySelector('#pp-macro-e-sn-cal')?.value || 250),
+              protein: Number(container.querySelector('#pp-macro-e-sn-prot')?.value || 20)
+            }
+          }
+        },
+        chloe: {
+          dailyKcal: cDailyCal,
+          dailyProtein: cDailyProt,
+          meals: {
+            breakfast: {
+              kcal: Number(container.querySelector('#pp-macro-c-bf-cal')?.value || 450),
+              protein: Number(container.querySelector('#pp-macro-c-bf-prot')?.value || 25)
+            },
+            lunch: {
+              kcal: Number(container.querySelector('#pp-macro-c-lu-cal')?.value || 500),
+              protein: Number(container.querySelector('#pp-macro-c-lu-prot')?.value || 30)
+            },
+            dinner: {
+              kcal: Number(container.querySelector('#pp-macro-c-di-cal')?.value || 650),
+              protein: Number(container.querySelector('#pp-macro-c-di-prot')?.value || 40)
+            },
+            snacking: {
+              kcal: Number(container.querySelector('#pp-macro-c-sn-cal')?.value || 200),
+              protein: Number(container.querySelector('#pp-macro-c-sn-prot')?.value || 15)
+            }
+          }
+        }
+      };
 
       window.state.settings = window.state.settings || {};
       window.state.settings.mappingStrategy = container.querySelector('#pp-setting-strategy')?.value || 'protein_per_kcal';
       window.state.settings.theme = container.querySelector('#pp-setting-theme')?.value || 'system';
 
-      console.log('[Settings v3.3.30] Saved user preferences to state:', window.state.userPrefs);
+      console.log('[Settings v3.3.31] Saved user preferences to state:', window.state.userPrefs);
+      document.dispatchEvent(new CustomEvent('plateplan:state:preferences', { detail: window.state.userPrefs }));
+
       saveBtn.textContent = '✓ Preferences Saved';
       saveBtn.style.background = '#16a34a';
       setTimeout(() => {
@@ -396,7 +548,7 @@ export function renderSettingsView() {
   const refreshBtn = container.querySelector('#pp-refresh-data-btn');
   if (refreshBtn) {
     refreshBtn.onclick = () => {
-      console.log('[Settings v3.3.30] Triggering household data refresh...');
+      console.log('[Settings v3.3.31] Triggering household data refresh...');
       hydrateHouseholdData();
     };
   }
@@ -688,7 +840,7 @@ function setupRecipeActionBridge() {
       const rawArgs = actionStr.substring(actionStr.indexOf('(') + 1, actionStr.lastIndexOf(')'));
       const args = rawArgs.split(',').map(s => s.trim().replace(/^['"]|['"]$/g, ''));
 
-      console.log(`[Action Bridge v3.3.30] Intercepted Swap Action:`, args);
+      console.log(`[Action Bridge v3.3.31] Intercepted Swap Action:`, args);
       window.toggleInlineShoppingSubst(args[0] || '', args[1] || '');
       return;
     }
@@ -745,7 +897,7 @@ function sanitizeRecipes(recipes) {
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.30 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.31 (ES6 Modern)';
   }
 }
 
@@ -767,7 +919,7 @@ document.addEventListener('plateplan:state:preferences', () => {
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.30] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.31] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupRecipeActionBridge();
   await waitForAuth();
