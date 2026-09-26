@@ -8,8 +8,8 @@
 
 export function createUpdateService({
   legacy = globalThis.PlatePlanLegacy || {},
-  appVersion = '3.3.7-mod',
-  expectedCache = 'plateplan-shell-v94',
+  appVersion = '2.9.0',
+  expectedCache = 'plateplan-shell-v68',
 } = {}) {
   let registration = null;
   let checking = false;
@@ -20,18 +20,13 @@ export function createUpdateService({
     const statusEl = document.getElementById('plateplan-update-status');
     const buttonEl = document.getElementById('plateplan-check-update');
 
-    const formattedVer = appVersion.startsWith('v') ? appVersion : `v${appVersion}`;
-    if (versionEl) versionEl.textContent = formattedVer;
+    if (versionEl) versionEl.textContent = `v${appVersion}`;
     if (cacheEl) cacheEl.textContent = expectedCache;
     if (statusEl && statusMessage) statusEl.textContent = statusMessage;
     if (buttonEl) {
       buttonEl.disabled = checking;
       buttonEl.textContent = checking ? 'Checking…' : 'Check for updates';
     }
-
-    document.querySelectorAll('.app-version, #footer-version, #main-footer-version').forEach(el => {
-      el.textContent = formattedVer;
-    });
   };
 
   const register = async () => {

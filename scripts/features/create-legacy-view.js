@@ -69,12 +69,9 @@ export function createLegacyView(configuration) {
       config.install?.(context, root());
       context.store.subscribe(() => {
         markDirty();
-        // Defer rendering to a microtask to completely avoid synchronous stack overflow loops
-        Promise.resolve().then(() => {
-          if (root()?.classList.contains('active') && !rendering) {
-            performRender(true);
-          }
-        });
+        if (root()?.classList.contains('active') && !rendering) {
+          performRender(true);
+        }
       });
     },
     render(nextContext) {

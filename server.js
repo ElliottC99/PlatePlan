@@ -11,15 +11,11 @@ const PORT = 3000;
 app.use(express.static(__dirname));
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'PlatePlan.html'));
 });
 
 app.get('*', (req, res) => {
-  if (path.extname(req.path)) {
-    res.status(404).send('Not found');
-    return;
-  }
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'PlatePlan.html'));
 });
 
 app.listen(PORT, '0.0.0.0', () => {

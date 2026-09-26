@@ -1,17 +1,6 @@
-/**
- * scripts/features/planner.js
- * PlatePlan Feature Module: Meal Planner View Wrapper
- */
-import { createLegacyView } from './create-legacy-view.js?v=3.3.7-mod';
+import { createLegacyView } from './create-legacy-view.js?v=3.3.0';
+import { deletePlan } from '../core/store.js?v=3.3.0';
 
-export default createLegacyView({
-  id: 'planner',
-  rootId: 'view-planner',
-  afterRender: () => {
-    if (typeof window.renderPlannerView === 'function') {
-      window.renderPlannerView();
-    } else if (typeof window.renderPlan === 'function') {
-      window.renderPlan();
-    }
-  }
-});
+export { deletePlan };
+
+export default createLegacyView({ id: 'planner', rootId: 'view-planner' });

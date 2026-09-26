@@ -1,4 +1,4 @@
-import { validatePlatePlanState } from './contracts.js?v=3.3.7-mod';
+import { validatePlatePlanState } from './contracts.js?v=3.3.0';
 
 // Purge legacy backup keys on startup to prevent state resurrection bugs
 if (typeof localStorage !== 'undefined') {
@@ -131,37 +131,22 @@ export function mergeRecipesSnapshot(localRecipes, cloudRecipes) {
 export function createPlatePlanStore(adapter) {
   const listeners = new Set();
   let savingThroughStore = false;
-  let isPublishing = false;
 
   const publish = detail => {
-    if (isPublishing) {
-      return;
-    }
-    isPublishing = true;
-    try {
-      const state = adapter.getState();
-      const validation = validatePlatePlanState(state);
-      const event = { state, validation, detail: detail || {} };
-      listeners.forEach(listener => {
-        try { listener(event); } catch (error) { console.error('PlatePlan store listener failed', error); }
-      });
-      return event;
-    } finally {
-      isPublishing = false;
-    }
+    const state = adapter.getState();
+    const validation = validatePlatePlanState(state);
+    const event = { state, validation, detail: detail || {} };
+    listeners.forEach(listener => {
+      try { listener(event); } catch (error) { console.error('PlatePlan store listener failed', error); }
+    });
+    return event;
   };
 
   if (typeof window !== 'undefined') {
     window.addEventListener('plateplan:state-saved', event => {
-      if (!savingThroughStore && !isPublishing) {
-        Promise.resolve().then(() => publish(event.detail));
-      }
+      if (!savingThroughStore) publish(event.detail);
     });
-    window.addEventListener('plateplan:remote-state-applied', event => {
-      if (!isPublishing) {
-        Promise.resolve().then(() => publish(event.detail));
-      }
-    });
+    window.addEventListener('plateplan:remote-state-applied', event => publish(event.detail));
   }
 
   return Object.freeze({
@@ -228,11 +213,7 @@ export async function deletePlan(planId) {
   }
 
   // Persist state locally
-  try {
-    localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
-  } catch (err) {
-    console.warn('[Store] LocalStorage quota exceeded. Relying on cloud persistence.');
-  }
+  localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
 
   // If the modular store exists, publish the update
   if (window.PlatePlanModules?.store) {

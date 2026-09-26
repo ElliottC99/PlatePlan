@@ -1,8 +1,9 @@
-import { createLegacyView } from './create-legacy-view.js?v=3.3.7-mod';
+import { createLegacyView } from './create-legacy-view.js?v=3.3.0';
 import { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs } from './products.js?v=3.3.0';
- 
-export { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs };
- 
+import { replaceRecipeIngredient } from './recipes.js?v=3.3.0';
+
+export { renderTescoImportReviewModalHtml, readTescoImportReviewModalInputs, replaceRecipeIngredient };
+
 export default createLegacyView({
   id: 'data',
   rootId: 'view-data',
@@ -11,13 +12,13 @@ export default createLegacyView({
     root.addEventListener('click', async (event) => {
       const button = event.target.closest('.dq-fix-btn');
       if (!button) return;
- 
+
       const subtypeId = button.dataset.subtypeId || button.getAttribute('data-subtype-id');
       if (!subtypeId) return;
- 
+
       event.preventDefault();
       event.stopPropagation();
- 
+
       let modalOverlay = document.getElementById('dq-tesco-modal-overlay');
       if (!modalOverlay) {
         modalOverlay = document.createElement('div');
@@ -27,20 +28,20 @@ export default createLegacyView({
         modalOverlay.style.left = '0';
         modalOverlay.style.width = '100vw';
         modalOverlay.style.height = '100vh';
-        modalOverlay.style.backgroundColor = 'transparent'; // Removes double-dark backdrop
-        modalOverlay.style.zIndex = '1000';
+        modalOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        modalOverlay.style.zIndex = '9999';
         modalOverlay.style.display = 'flex';
         modalOverlay.style.alignItems = 'center';
         modalOverlay.style.justifyContent = 'center';
         document.body.appendChild(modalOverlay);
       }
- 
+
       const group = window.state?.ingredients?.find(g => g.id === subtypeId) || 
                     (typeof window.getIngredientGroup === 'function' ? window.getIngredientGroup(subtypeId) : null);
       const subTypeName = group ? (group.name || group.id) : subtypeId;
- 
+
       modalOverlay.innerHTML = `
-        <div style="width: 100%; max-width: 600px; padding: 24px; border-radius: 14px; background: var(--surface, #1e1e1e); border: 1px solid var(--border); box-shadow: 0 12px 36px rgba(0,0,0,0.5); max-height: 85vh; overflow-y: auto; min-height: 0;">
+        <div class="card" style="width: 100%; max-width: 600px; padding: 24px; border-radius: 14px; background: var(--surface, #fff); box-shadow: 0 12px 36px rgba(0,0,0,0.25); max-height: 90vh; overflow-y: auto;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
             <h2 style="font-size:18px; font-weight:700; margin:0; color:var(--text)">Review Extracted Product</h2>
             <button class="btn sm ghost" id="dq-tesco-close-btn" style="padding:4px 8px; font-size:16px; line-height:1">✕</button>
@@ -49,12 +50,12 @@ export default createLegacyView({
         </div>
       `;
       modalOverlay.style.display = 'flex';
- 
+
       // Pre-populate values
       if (document.getElementById('tp-name')) document.getElementById('tp-name').value = subTypeName;
       if (group?.cat && document.getElementById('import-category')) document.getElementById('import-category').value = group.cat;
       if (group?.storage && document.getElementById('import-storage')) document.getElementById('import-storage').value = group.storage;
- 
+
       const saveBtn = modalOverlay.querySelector('#tesco-save-btn');
       if (saveBtn) {
         saveBtn.addEventListener('click', async () => {
@@ -74,7 +75,7 @@ export default createLegacyView({
           const notes = document.getElementById('import-notes')?.value || extraInputs.notes || '';
           const category = extraInputs.category;
           const storage = extraInputs.storage;
- 
+
           const newProduct = {
             id: 'ing' + Date.now(),
             name,
@@ -93,7 +94,7 @@ export default createLegacyView({
             notes,
             updatedAt: Date.now()
           };
- 
+
           if (!window.state.products) {
             window.state.products = [];
           }
@@ -103,7 +104,7 @@ export default createLegacyView({
             window.state.ingredients = [];
           }
           window.state.ingredients.push(newProduct);
- 
+
           if (context && context.store && typeof context.store.save === 'function') {
             await context.store.save({ reason: 'data-quality-tesco-fix' });
           } else {
@@ -112,22 +113,22 @@ export default createLegacyView({
               window.renderAll();
             }
           }
- 
+
           if (typeof window.showPlatePlanToast === 'function') {
             window.showPlatePlanToast('Product saved successfully to Product Bank! ✓');
           }
- 
+
           modalOverlay.style.display = 'none';
         });
       }
- 
+
       const closeBtn = modalOverlay.querySelector('#dq-tesco-close-btn');
       if (closeBtn) {
         closeBtn.addEventListener('click', () => {
           modalOverlay.style.display = 'none';
         });
       }
- 
+
       modalOverlay.addEventListener('click', (e) => {
         if (e.target === modalOverlay) {
           modalOverlay.style.display = 'none';

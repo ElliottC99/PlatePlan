@@ -17,91 +17,21 @@ try{
   document.documentElement.style.colorScheme=platePlanAppearance==='system'?'light dark':platePlanAppearance;
 }catch(e){}
 </script>
-<link rel="stylesheet" href="./styles/tokens.css?v=3.3.7-mod">
-<link rel="stylesheet" href="./styles/components.css?v=3.3.7-mod">
-<link rel="stylesheet" href="./styles/responsive.css?v=3.3.7-mod">
-<link rel="stylesheet" href="./styles/print.css?v=3.3.7-mod" media="print">
+<link rel="stylesheet" href="./styles/tokens.css?v=3.3.0">
+<link rel="stylesheet" href="./styles/components.css?v=3.3.0">
+<link rel="stylesheet" href="./styles/responsive.css?v=3.3.0">
+<link rel="stylesheet" href="./styles/print.css?v=3.3.0" media="print">
 <style>
-/* Global Modal Scroll Container */
-.modal-wrap, 
-#view-modal-wrap, 
-#modal-wrap, 
-#tesco-modal-wrap {
+.modal-wrap, .modal-backdrop, .modal-overlay {
   position: fixed !important;
+  inset: 0 !important;
   top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
   left: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
-  height: 100dvh !important;
-  background: rgba(0, 0, 0, 0.5) !important;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  
-  /* Crucial Scroll Controls */
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  -webkit-overflow-scrolling: touch !important;
-  touch-action: pan-y !important;
-  overscroll-behavior-y: contain;
-  box-sizing: border-box;
-  padding: 20px 12px;
-  z-index: 99999 !important;
-}
-
-.modal-wrap:not(.open):not(.active),
-#view-modal-wrap:not(.open):not(.active) {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-}
-
-.modal-wrap.open,
-.modal-wrap.active,
-#view-modal-wrap.open,
-#view-modal-wrap.active {
-  display: flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-}
-
-/* Modal Inner Card Rules */
-.modal-card, 
-#view-modal-content, 
-.modal-content, 
-.modal-body,
-.modal {
-  max-height: none !important;
-  height: auto !important;
-  overflow: visible !important;
-  touch-action: auto !important;
-  margin: auto 0;
-  pointer-events: auto !important;
-}
-
-#view-modal-content {
-  width: min(1040px, 94vw) !important;
-  max-width: 1040px !important;
-  display: block !important;
-  opacity: 1 !important;
-  transform: none !important;
-  padding: 0 !important;
-  border-radius: var(--radius-group, 20px) !important;
-}
-
-.recipe-view-sheet {
-  width: 100% !important;
-  height: auto !important;
-  display: block !important;
-  opacity: 1 !important;
-  transform: none !important;
-  border-radius: var(--radius-group, 20px);
-}
-
-/* Prevent Body Scroll Locking Interference */
-body.modal-open {
-  overflow: hidden !important;
-  touch-action: none;
+  z-index: 9999 !important;
 }
 </style>
 </head>
@@ -109,7 +39,7 @@ body.modal-open {
 <div class="app">
 
 <header class="app-header">
-  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v3.3.7-mod</span></div>
+  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v3.3.0</span></div>
   <div class="app-header-actions">
     <button class="btn primary app-create-button" type="button" data-pp-click="openCreateActionSheet()" aria-label="Add to PlatePlan"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span class="app-create-label">Add</span></button>
     <button class="btn ghost app-menu-button" type="button" data-pp-click="openMobileMore()" aria-label="Open PlatePlan menu"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="19" cy="12" r="1.3"></circle></svg><span>Menu</span></button>
@@ -140,12 +70,6 @@ body.modal-open {
     <summary>Settings</summary>
     <button class="ntab" data-view="prefs" data-pp-click="showView('prefs')">Preferences</button>
   </details>
-  <div class="desktop-sidebar-footer" id="desktop-sidebar-footer">
-    <div style="font-size:11px;color:var(--text3);display:flex;align-items:center;justify-content:space-between">
-      <span>PlatePlan</span>
-      <span class="app-version" id="footer-version">v3.3.7-mod</span>
-    </div>
-  </div>
 </nav>
 
 <div class="mobile-nav" id="mobile-nav" aria-label="Main navigation">
@@ -169,11 +93,9 @@ body.modal-open {
       <section><h4>Data</h4><button data-pp-click="mobileMoreView('ingredients')"><span>Ingredient Bank</span><span aria-hidden="true">›</span></button><button data-pp-click="clearProductGroupFilter();mobileMoreView('bank')"><span>Product Bank</span><span aria-hidden="true">›</span></button><button data-pp-click="mobileMoreView('data')"><span>Data Quality</span><span aria-hidden="true">›</span></button></section>
       <section><h4>Settings</h4><button data-pp-click="mobileMoreView('prefs')"><span>Preferences, sync and recovery</span><span aria-hidden="true">›</span></button></section>
     </div>
-    <div class="mobile-more-footer" style="padding:14px 4px 6px;text-align:center;font-size:11px;color:var(--text3)">
-      PlatePlan <span class="app-version">v3.3.7-mod</span>
-    </div>
   </div>
 </div>
+<div class="mobile-action-sheet-wrap" id="mobile-action-sheet-wrap" data-pp-click="if(event.target===this)closeMobileActionSheet()"><div class="mobile-sheet" id="mobile-action-sheet"></div></div>
 
 <main>
 
@@ -209,35 +131,30 @@ body.modal-open {
 <div id="view-vault" class="view">
   <div class="view-toolbar">
     <h2 style="margin:0">Recipe vault</h2>
-    <div class="vault-filters" style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+    <div class="vault-filters">
       <button class="btn primary" type="button" data-pp-click="openUseUpRecipeFinder()">Use up ingredients</button>
       <button type="button" id="vault-filter-fav" class="btn sm ghost fav-filter-btn" data-pp-click="toggleVaultFavouritesFilter()" aria-pressed="false" title="Filter favourites only" style="display:inline-flex;align-items:center;gap:6px">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" class="heart-icon"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
         <span>Favourites Only</span>
       </button>
-      <input type="search" id="vault-search" placeholder="Search recipes..." data-pp-input="schedulePlatePlanListRender('vault')" style="flex: 1 1 200px; font-size: 12px;">
-      <div class="vault-dropdowns-group" style="display: flex; gap: 8px; flex-wrap: nowrap; align-items: center;">
-        <select id="vault-sort" data-pp-change="renderVault()" style="width: auto; font-size: 12px;">
-          <option value="name">Name A-Z</option>
-          <option value="needs_work">Needs most work</option>
-          <option value="best_fit">Best fit</option>
-        </select>
-        <select id="filter-type" data-pp-change="renderVault()" style="width: auto; font-size: 12px;">
-          <option value="all">All types</option>
-          <option value="breakfast">Breakfast</option>
-          <option value="lunch">Lunch</option>
-          <option value="dinner">Dinner</option>
-        </select>
-        <div class="vault-who-container" style="display: flex; align-items: center; flex-wrap: nowrap; gap: 6px; white-space: nowrap;">
-          <label for="filter-who" style="margin: 0; font-size: 12px; white-space: nowrap;">Person:</label>
-          <select id="filter-who" data-pp-change="renderVault()" style="width: auto; font-size: 12px; white-space: nowrap;">
-            <option value="all">Everyone</option>
-            <option value="Elliott">Elliott</option>
-            <option value="Chloe">Chloe</option>
-            <option value="both">Shared</option>
-          </select>
-        </div>
-      </div>
+      <input type="search" id="vault-search" placeholder="Search recipes..." data-pp-input="schedulePlatePlanListRender('vault')" style="width:200px;font-size:12px">
+      <select id="vault-sort" data-pp-change="renderVault()" style="width:auto;font-size:12px">
+        <option value="name">Name A-Z</option>
+        <option value="needs_work">Needs most work</option>
+        <option value="best_fit">Best fit</option>
+      </select>
+      <select id="filter-type" data-pp-change="renderVault()" style="width:auto;font-size:12px">
+        <option value="all">All types</option>
+        <option value="breakfast">Breakfast</option>
+        <option value="lunch">Lunch</option>
+        <option value="dinner">Dinner</option>
+      </select>
+      <select id="filter-who" data-pp-change="renderVault()" style="width:auto;font-size:12px">
+        <option value="all">Everyone</option>
+        <option value="Elliott">Elliott</option>
+        <option value="Chloe">Chloe</option>
+        <option value="both">Shared</option>
+      </select>
     </div>
   </div>
   <div id="vault-list"></div>
@@ -520,8 +437,8 @@ body.modal-open {
       <button class="btn ghost" type="button" id="plateplan-check-update" data-pp-click="globalThis.PlatePlanModules?.updates.check({manual:true})">Check for updates</button>
     </div>
     <dl class="plateplan-update-meta">
-      <div><dt>Version</dt><dd id="plateplan-update-version">v3.3.7-mod</dd></div>
-      <div><dt>Offline cache</dt><dd id="plateplan-update-cache">plateplan-shell-v94</dd></div>
+      <div><dt>Version</dt><dd id="plateplan-update-version">v3.0.7</dd></div>
+      <div><dt>Offline cache</dt><dd id="plateplan-update-cache">plateplan-shell-v87</dd></div>
       <div><dt>Status</dt><dd id="plateplan-update-status" aria-live="polite">Up to date</dd></div>
     </dl>
   </div>
@@ -625,15 +542,7 @@ body.modal-open {
   </div>
 </div>
 
-<footer class="app-footer" id="main-app-footer" style="padding:16px 20px 24px;margin-top:auto;font-size:11px;color:var(--text3);text-align:center">
-  PlatePlan <span class="app-version" id="main-footer-version">v3.3.7-mod</span>
-</footer>
 </main>
-</div>
-
-<div class="mobile-action-sheet-wrap" id="mobile-action-sheet-wrap" data-pp-click="if(event.target===this)closeMobileActionSheet()">
-  <div class="mobile-action-sheet-overlay" id="mobile-action-sheet-overlay" data-pp-click="closeMobileActionSheet()"></div>
-  <div class="mobile-sheet mobile-action-sheet" id="mobile-action-sheet"></div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -717,6 +626,7 @@ body.modal-open {
           <textarea id="import-notes" placeholder="Additional notes..." style="width:100%; min-height:48px; padding:6px; border-radius:6px; border:1px solid var(--border);"></textarea>
         </div>
       </div>
+      <div class="grid2" style="gap:10px; margin-bottom:10px;">
       <div class="grid2" style="gap:10px; margin-bottom:10px;">
         <div class="field" style="display: block; margin:0;"><label style="font-size:12px; font-weight:600;">Category</label><input type="search" id="tp-cat-search" placeholder="Search category" list="tp-cat-category-options" style="width: 100%;"><select id="tp-cat" style="display: none;"></select><datalist id="tp-cat-category-options"></datalist></div>
         <div class="field" style="margin:0;"><label style="font-size:12px; font-weight:600;">Storage</label><select id="tp-storage"><option value="">-- Select --</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="cupboard">Cupboard</option></select></div>
@@ -1369,7 +1279,7 @@ body.modal-open {
   </div>
 </div>
 
-<div class="modal-wrap" id="view-modal-wrap" onclick="if(event.target===this)closeRecipePreview()">
+<div class="modal-wrap" id="view-modal-wrap">
   <div class="modal" id="view-modal-content" style="max-width: 1040px;"></div>
 </div>
 
@@ -1378,7 +1288,14 @@ body.modal-open {
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js" crossorigin="anonymous"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js" crossorigin="anonymous"></script>
 <script src="./firebase-config.js"></script>
-<script type="module" src="./scripts/bootstrap.js?v=3.3.7-mod"></script>
+<!-- Legacy database/bootstrap scripts commented out to prevent race conditions during refactor -->
+<!-- <script type="module" src="./scripts/bootstrap.js?v=3.3.0"></script> -->
+<!-- <script src="./scripts/services/cloud-core-db.js"></script> -->
+<!-- <script src="./scripts/services/cloud-hydrate-pull.js"></script> -->
+<!-- <script src="./scripts/services/cloud-hydrate-merge.js"></script> -->
+
+<!-- Modern ES6 Architecture Entry Point -->
+<script type="module" src="./src/main.js"></script>
 
 
 

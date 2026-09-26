@@ -1,17 +1,14 @@
 {
   "name": "plateplan",
-  "version": "3.3.7-mod",
+  "version": "3.3.0",
   "type": "module",
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
     "build": "echo 'No build required for static site'",
-    "lint": "node --check server.js && node --check scripts/core/config.js && node --check scripts/core/bridge.js && node --check scripts/core/router-guards.js && node --check scripts/core/router-core.js && node --check scripts/core/router-renderers.js && node --check scripts/core/router-events.js && node --check scripts/utils/nutrition-math.js && node --check scripts/utils/nutrition-calc.js && node --check scripts/utils/nutrition-derivation.js && node --check scripts/utils/nutrition.js && node --check scripts/utils/ingredient-parse.js && node --check scripts/utils/ingredient-resolvers.js && node --check scripts/utils/ingredients.js && node --check scripts/utils/planner-dates.js && node --check scripts/utils/planner-calc.js && node --check scripts/utils/cloud-calc.js && node --check scripts/utils/recipe-calc.js && node --check scripts/utils/backup-calc.js && node --check scripts/utils/vault-calc.js && node --check scripts/utils/shopping-calc.js && node --check scripts/services/cloud-state.js && node --check scripts/services/cloud-core-auth.js && node --check scripts/services/cloud-core-db.js && node --check scripts/services/cloud-hydrate-pull.js && node --check scripts/services/cloud-hydrate-merge.js && node --check scripts/services/cloud-push-queue.js && node --check scripts/services/cloud-push-sync.js && node --check scripts/services/cloud-ui.js && node --check scripts/features/modals-core.js && node --check scripts/features/modals-dialogs.js && node --check scripts/features/modals-forms.js && node --check scripts/features/recipes-core.js && node --check scripts/features/recipes-actions.js && node --check scripts/features/recipes-ui.js && node --check scripts/features/settings-core.js && node --check scripts/features/settings-backup-export.js && node --check scripts/features/settings-backup-import.js && node --check scripts/features/settings-backup-audit-diff.js && node --check scripts/features/settings-backup-audit-log.js && node --check scripts/features/today-ui.js && node --check scripts/features/bank-products-core.js && node --check scripts/features/bank-products-ui.js && node --check scripts/features/bank-products-modal.js && node --check scripts/features/bank-products-filters.js && node --check scripts/features/bank-ingredients-core.js && node --check scripts/features/bank-ingredients-ui.js && node --check scripts/features/bank-ingredients-modal.js && node --check scripts/features/bank-ui-main.js && node --check scripts/features/bank-ui-events.js && node --check scripts/features/bank-fillers.js && node --check scripts/features/planner-ui.js && node --check scripts/features/planner-swap.js && node --check scripts/features/planner-modals.js && node --check scripts/features/planner-studio.js && node --check scripts/features/recipe-editor-state.js && node --check scripts/features/recipe-editor-ui-main.js && node --check scripts/features/recipe-editor-ui-fields.js && node --check scripts/features/recipe-editor-ui-steps.js && node --check scripts/features/recipe-editor-preview-card.js && node --check scripts/features/recipe-editor-preview-nutrition.js && node --check scripts/features/recipe-editor-mapping-table.js && node --check scripts/features/recipe-editor-mapping-modal.js && node --check scripts/features/shopping-list-alloc.js && node --check scripts/features/shopping-list-ui.js && node --check scripts/features/shopping-list-subst.js"
+    "lint": "node --check server.js"
   },
   "dependencies": {
     "express": "^4.19.2"
-  },
-  "devDependencies": {
-    "acorn": "^8.18.0"
   }
 }
