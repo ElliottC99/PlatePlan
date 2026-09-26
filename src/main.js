@@ -1,6 +1,6 @@
 /**
- * src/main.js (v3.3.34)
- * Phase 5.2: Shopping List & Swap Modal View Extraction into /src/views/ShoppingView.js.
+ * src/main.js (v3.3.35)
+ * Phase 5.3: Weekly Planner View Extraction into /src/views/PlannerView.js.
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
@@ -8,6 +8,7 @@ import { savePreferences } from './services/HouseholdRepository.js';
 import { getState } from './store/store.js';
 import { renderSettingsView } from './views/SettingsView.js';
 import { renderShoppingListUI, renderScrollableSwapModal } from './views/ShoppingView.js';
+import { renderPlanner } from './views/PlannerView.js';
 
 // 1. STRICT TYPE SANITIZATION
 if (typeof window !== 'undefined') {
@@ -64,6 +65,7 @@ function initLabelObserver() {
 // ----------------------------------------------------------------------------
 export { renderSettingsView };
 export { renderShoppingListUI, renderScrollableSwapModal };
+export { renderPlanner };
 
 window.renderSettings = function() {
   renderSettingsView();
@@ -78,6 +80,10 @@ window.renderShoppingList = function() {
 
 window.toggleInlineShoppingSubst = function(groupKey, itemKey) {
   renderScrollableSwapModal(groupKey, itemKey);
+};
+
+window.renderPlanner = function() {
+  renderPlanner();
 };
 
 // ----------------------------------------------------------------------------
@@ -106,7 +112,7 @@ function setupRecipeActionBridge() {
       const rawArgs = actionStr.substring(actionStr.indexOf('(') + 1, actionStr.lastIndexOf(')'));
       const args = rawArgs.split(',').map(s => s.trim().replace(/^['"]|['"]$/g, ''));
 
-      console.log(`[Action Bridge v3.3.34] Intercepted Swap Action:`, args);
+      console.log(`[Action Bridge v3.3.35] Intercepted Swap Action:`, args);
       window.toggleInlineShoppingSubst(args[0] || '', args[1] || '');
       return;
     }
@@ -120,6 +126,12 @@ function setupRecipeActionBridge() {
     if (actionStr.includes('prefs') || actionStr.includes('settings') || actionStr.includes("showView('prefs')")) {
       setTimeout(() => {
         renderSettingsView();
+      }, 50);
+    }
+
+    if (actionStr.includes('planner') || actionStr.includes("showView('planner')")) {
+      setTimeout(() => {
+        renderPlanner();
       }, 50);
     }
 
@@ -163,7 +175,7 @@ function sanitizeRecipes(recipes) {
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.34 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.35 (ES6 Modern)';
   }
 }
 
@@ -184,8 +196,12 @@ document.addEventListener('plateplan:state:preferences', () => {
   renderSettingsView();
 });
 
+document.addEventListener('plateplan:state:planner', () => {
+  renderPlanner();
+});
+
 async function initApp() {
-  console.log('[Modern Bridge v3.3.34] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.35] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupRecipeActionBridge();
   await waitForAuth();
