@@ -1,6 +1,6 @@
 /**
- * src/main.js (v3.3.35)
- * Phase 5.3.1 Hotfix: Recipe modal bridge routing and version badge alignment.
+ * src/main.js (v3.3.36)
+ * Phase 5.4: Recipe Vault / Recipe Library Domain Extraction & ES6 Modernization.
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
@@ -9,6 +9,7 @@ import { getState } from './store/store.js';
 import { renderSettingsView } from './views/SettingsView.js';
 import { renderShoppingListUI, renderScrollableSwapModal } from './views/ShoppingView.js';
 import { renderPlanner } from './views/PlannerView.js';
+import { renderRecipeVault } from './views/RecipeVaultView.js';
 
 // 1. STRICT TYPE SANITIZATION
 if (typeof window !== 'undefined') {
@@ -66,6 +67,7 @@ function initLabelObserver() {
 export { renderSettingsView };
 export { renderShoppingListUI, renderScrollableSwapModal };
 export { renderPlanner };
+export { renderRecipeVault };
 
 window.renderSettings = function() {
   renderSettingsView();
@@ -86,9 +88,19 @@ window.renderPlanner = function() {
   renderPlanner();
 };
 
+window.renderVault = function() {
+  renderRecipeVault();
+};
+window.renderRecipeVault = function() {
+  renderRecipeVault();
+};
+window.renderVaultGrid = function() {
+  renderRecipeVault();
+};
+
 window.openRecipeModal = function(id, instanceId, variant) {
   if (typeof window.viewRecipe === 'function') return window.viewRecipe(id, instanceId, variant);
-  console.warn('[main.js v3.3.35] viewRecipe not found on window');
+  console.warn('[main.js v3.3.36] viewRecipe not found on window');
 };
 window.showRecipeModal = window.openRecipeModal;
 window.openRecipeDetailModal = window.openRecipeModal;
@@ -119,7 +131,7 @@ function setupRecipeActionBridge() {
       const rawArgs = actionStr.substring(actionStr.indexOf('(') + 1, actionStr.lastIndexOf(')'));
       const args = rawArgs.split(',').map(s => s.trim().replace(/^['"]|['"]$/g, ''));
 
-      console.log(`[Action Bridge v3.3.35] Intercepted Swap Action:`, args);
+      console.log(`[Action Bridge v3.3.36] Intercepted Swap Action:`, args);
       window.toggleInlineShoppingSubst(args[0] || '', args[1] || '');
       return;
     }
@@ -131,7 +143,7 @@ function setupRecipeActionBridge() {
       const rawArgs = actionStr.substring(actionStr.indexOf('(') + 1, actionStr.lastIndexOf(')'));
       const args = rawArgs.split(',').map(s => s.trim().replace(/^['"]|['"]$/g, ''));
 
-      console.log(`[Action Bridge v3.3.35] Intercepted Recipe Modal Action:`, args);
+      console.log(`[Action Bridge v3.3.36] Intercepted Recipe Modal Action:`, args);
       if (typeof window.viewRecipe === 'function') {
         window.viewRecipe(args[0] || '', args[1] || '', args[2] || '');
       } else if (typeof window.openRecipeModal === 'function') {
@@ -155,6 +167,12 @@ function setupRecipeActionBridge() {
     if (actionStr.includes('planner') || actionStr.includes("showView('planner')")) {
       setTimeout(() => {
         renderPlanner();
+      }, 50);
+    }
+
+    if (actionStr.includes('vault') || actionStr.includes("showView('vault')")) {
+      setTimeout(() => {
+        renderRecipeVault();
       }, 50);
     }
 
@@ -198,7 +216,7 @@ function sanitizeRecipes(recipes) {
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.35 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.36 (ES6 Modern)';
   }
 }
 
@@ -209,6 +227,7 @@ document.addEventListener('plateplan:state:recipes', (e) => {
     window.state.recipes = cleanRecipes;
     window.allRecipes = cleanRecipes;
   }
+  renderRecipeVault();
 });
 
 document.addEventListener('plateplan:state:shopping', () => {
@@ -224,7 +243,7 @@ document.addEventListener('plateplan:state:planner', () => {
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.35] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.36] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupRecipeActionBridge();
   await waitForAuth();
