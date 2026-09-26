@@ -1,36 +1,57 @@
 /**
- * src/main.js (v3.3.6)
- * Secure ES6 data bridge with legacy UI object normalization and v3.3.6 version binding.
+ * src/main.js (v3.3.7)
+ * Secure ES6 data bridge with deep recursive object normalization for legacy UI safety.
  */
 
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
 import { getState } from './store/store.js';
 
-function sanitizeRecipes(recipes) {
-  if (!Array.isArray(recipes)) return [];
-  return recipes.map(recipe => ({
-    ...recipe,
-    tags: Array.isArray(recipe.tags) ? recipe.tags : [],
-    categories: Array.isArray(recipe.categories) ? recipe.categories : [],
-    variants: Array.isArray(recipe.variants) ? recipe.variants.map(v => ({
-      ...v,
-      tags: Array.isArray(v.tags) ? v.tags : []
-    })) : []
-  }));
+// Deep recursive normalizer to guarantee no nested property is undefined when legacy code calls .includes()
+function deepSanitize(obj) {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => deepSanitize(item));
+  }
+  const sanitized = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    // If it looks like an array field that might be checked with .includes(), default to [] if undefined/null
+    if (val === undefined || val === null) {
+      if (['tags', 'categories', 'favourites', 'labels', 'ingredients', 'variants', 'steps', 'allergens'].includes(key)) {
+        sanitized[key] = [];
+      } else {
+        sanitized[key] = null;
+      }
+    } else {
+      sanitized[key] = deepSanitize(val);
+    }
+  }
+  // Ensure mandatory top-level or variant array properties exist even if missing entirely
+  sanitized.tags = Array.isArray(sanitized.tags) ? sanitized.tags : [];
+  sanitized.categories = Array.isArray(sanitized.categories) ? sanitized.categories : [];
+  sanitized.variants = Array.isArray(sanitized.variants) ? sanitized.variants : [];
+  
+  return sanitized;
 }
 
-// Update version footer badge in the DOM if present
+function sanitizeRecipes(recipes) {
+  if (!Array.isArray(recipes)) return [];
+  return recipes.map(recipe => deepSanitize(recipe));
+}
+
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.6 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.7 (ES6 Modern)';
   }
 }
 
 document.addEventListener('plateplan:state:recipes', (e) => {
   const cleanRecipes = sanitizeRecipes(e.detail || []);
-  console.log(`[Modern Bridge v3.3.6] Sanitized and synced ${cleanRecipes.length} recipes to app UI.`);
+  console.log(`[Modern Bridge v3.3.7] Deep-sanitized and synced ${cleanRecipes.length} recipes to app UI.`);
   
   if (typeof window !== 'undefined') {
     window.allRecipes = cleanRecipes;
@@ -90,7 +111,7 @@ document.addEventListener('plateplan:state:plan', (e) => {
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.6] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.7] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   await waitForAuth();
   await hydrateHouseholdData();
