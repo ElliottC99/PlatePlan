@@ -1,6 +1,6 @@
 /**
- * src/main.js (v3.3.19)
- * Native Delegated Action Bridge with Transparent Master Container Handling.
+ * src/main.js (v3.3.20)
+ * Native Delegated Action Bridge with Phase 9 Planner Shell Integration.
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
@@ -37,7 +37,7 @@ function purgeModalOverrides() {
   });
 }
 
-// 2. NATIVE DELEGATED ACTION BRIDGE & LIFECYCLE OBSERVER
+// 2. NATIVE DELEGATED ACTION BRIDGE & PLANNER HOOKS
 function setupRecipeActionBridge() {
   if (typeof window === 'undefined' || window.__plateplan_action_bridge_attached) return;
   window.__plateplan_action_bridge_attached = true;
@@ -82,7 +82,7 @@ function setupRecipeActionBridge() {
     if (!actionStr) return;
 
     event.preventDefault();
-    console.log(`[Action Bridge v3.3.19] Delegating action: "${actionStr}"`);
+    console.log(`[Action Bridge v3.3.20] Delegating action: "${actionStr}"`);
 
     try {
       if (typeof window.runPlatePlanDelegatedAction === 'function') {
@@ -92,13 +92,22 @@ function setupRecipeActionBridge() {
         execFn.call(actionBtn, event);
       }
 
+      // Phase 9: Intercept planner view activations and trigger shell generation
+      if (actionStr.includes('planner') || actionStr.includes("showView('planner')")) {
+        setTimeout(() => {
+          if (typeof window.ensurePlannerShell === 'function') {
+            window.ensurePlannerShell();
+            console.log('[Action Bridge v3.3.20] ensurePlannerShell invoked successfully.');
+          }
+        }, 50);
+      }
+
       setTimeout(() => {
         const openChild = document.querySelector('.modal-wrap.open, .modal.open, [id$="-modal-wrap"].open');
         
         if (!openChild) {
           purgeModalOverrides();
         } else {
-          // Unhide master container transparently so it doesn't cast a background overlay
           const tescoMaster = document.getElementById('tesco-modal-wrap');
           if (tescoMaster) {
             tescoMaster.style.setProperty('display', 'block', 'important');
@@ -106,7 +115,6 @@ function setupRecipeActionBridge() {
             tescoMaster.style.setProperty('backdrop-filter', 'none', 'important');
           }
 
-          // Ensure active open modal is fully visible
           openChild.style.setProperty('display', 'flex', 'important');
           openChild.style.setProperty('visibility', 'visible', 'important');
           openChild.style.setProperty('opacity', '1', 'important');
@@ -115,7 +123,7 @@ function setupRecipeActionBridge() {
       }, 50);
 
     } catch (err) {
-      console.error(`[Action Bridge v3.3.19] Execution error for: ${actionStr}`, err);
+      console.error(`[Action Bridge v3.3.20] Execution error for: ${actionStr}`, err);
     }
   }, true);
 }
@@ -154,7 +162,7 @@ function sanitizeRecipes(recipes) {
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.19 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.20 (ES6 Modern)';
   }
 }
 
@@ -169,11 +177,11 @@ document.addEventListener('plateplan:state:recipes', (e) => {
       try { window.renderAll(); } catch (err) { console.warn('[Modern Bridge] renderAll warning:', err); }
     }
   }
-  console.log(`[Modern Bridge v3.3.19] Action bridge synchronized with ${cleanRecipes.length} recipes.`);
+  console.log(`[Modern Bridge v3.3.20] Action bridge synchronized with ${cleanRecipes.length} recipes.`);
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.19] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.20] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupRecipeActionBridge();
   await waitForAuth();
