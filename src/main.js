@@ -1,6 +1,6 @@
 /**
- * src/main.js (v3.3.9)
- * Secure ES6 data bridge with exhaustive deep mutation for legacy UI stability.
+ * src/main.js (v3.3.10)
+ * Secure ES6 data bridge with exhaustive deep mutation and global state/favourites safeguarding.
  */
 
 import { waitForAuth } from './services/AuthService.js';
@@ -19,7 +19,6 @@ function deepMutate(obj) {
   const keys = Object.keys(obj);
   for (const key of keys) {
     if (obj[key] === undefined || obj[key] === null) {
-      // Default array-like or collection properties to []
       if (['tags', 'categories', 'favourites', 'labels', 'ingredients', 'variants', 'steps', 'allergens', 'favouritedBy', 'userFavourites'].includes(key)) {
         obj[key] = [];
       } else {
@@ -30,7 +29,6 @@ function deepMutate(obj) {
     }
   }
   
-  // Guarantee baseline array properties exist on every recipe/variant
   if (!Array.isArray(obj.tags)) obj.tags = [];
   if (!Array.isArray(obj.categories)) obj.categories = [];
   if (!Array.isArray(obj.variants)) obj.variants = [];
@@ -44,21 +42,54 @@ function sanitizeRecipes(recipes) {
   return recipes.map(recipe => deepMutate(JSON.parse(JSON.stringify(recipe))));
 }
 
+// Initialize and shield global state to prevent global undefined lookups
+function ensureGlobalState(cleanRecipes) {
+  if (typeof window === 'undefined') return;
+
+  window.allRecipes = cleanRecipes;
+  
+  // Initialize window.state if missing, or populate its missing arrays
+  window.state = window.state || {};
+  window.state.recipes = cleanRecipes;
+  window.state.favourites = Array.isArray(window.state.favourites) ? window.state.favourites : [];
+  window.state.userFavourites = Array.isArray(window.state.userFavourites) ? window.state.userFavourites : [];
+  window.state.settings = window.state.settings || {};
+  window.state.ingredients = Array.isArray(window.state.ingredients) ? window.state.ingredients : [];
+
+  // Also set global top-level fallbacks often read by legacy code
+  window.favourites = window.favourites || [];
+  window.userFavourites = window.userFavourites || [];
+
+  // Wrap window.state in a Proxy to trap any accidental undefined property reads
+  window.state = new Proxy(window.state, {
+    get(target, prop, receiver) {
+      const val = Reflect.get(target, prop, receiver);
+      if (val === undefined || val === null) {
+        if (['favourites', 'userFavourites', 'recipes', 'ingredients', 'tags', 'categories', 'variants'].includes(prop)) {
+          return [];
+        }
+        return {};
+      }
+      return val;
+    }
+  });
+}
+
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.9 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.10 (ES6 Modern)';
   }
 }
 
 document.addEventListener('plateplan:state:recipes', (e) => {
   const rawRecipes = e.detail || [];
   const cleanRecipes = sanitizeRecipes(rawRecipes);
-  console.log(`[Modern Bridge v3.3.9] Deep-mutated and synced ${cleanRecipes.length} recipes to app UI.`);
+  
+  ensureGlobalState(cleanRecipes);
+  console.log(`[Modern Bridge v3.3.10] Global state shielded and ${cleanRecipes.length} recipes synced.`);
   
   if (typeof window !== 'undefined') {
-    window.allRecipes = cleanRecipes;
-    if (window.state) window.state.recipes = cleanRecipes;
     if (window.PlatePlanRecipes) {
       window.PlatePlanRecipes.State = window.PlatePlanRecipes.State || {};
       window.PlatePlanRecipes.State.recipes = cleanRecipes;
@@ -114,7 +145,7 @@ document.addEventListener('plateplan:state:plan', (e) => {
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.9] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.10] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   await waitForAuth();
   await hydrateHouseholdData();
