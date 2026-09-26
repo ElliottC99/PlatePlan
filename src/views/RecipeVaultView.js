@@ -1,6 +1,6 @@
 /**
- * src/views/RecipeVaultView.js (v3.3.39)
- * Hotfix v3.3.39: Event deduplication & modern recipe action integration.
+ * src/views/RecipeVaultView.js (v3.3.40)
+ * Hotfix v3.3.40: Modal DOM unnesting & Recipe Vault modern integration.
  */
 import { savePreferences } from '../services/HouseholdRepository.js';
 
@@ -282,4 +282,4 @@ if (typeof window !== 'undefined') {
   window.toggleVaultFavoritesFilter = toggleVaultFavouritesFilter;
 }
 
-console.log('[RecipeVaultView v3.3.39] Loaded successfully.');
+console.log('[RecipeVaultView v3.3.40] Loaded successfully.');

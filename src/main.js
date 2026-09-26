@@ -1,6 +1,6 @@
 /**
- * src/main.js (v3.3.39)
- * Hotfix v3.3.39: Event deduplication with stopImmediatePropagation & version alignment.
+ * src/main.js (v3.3.40)
+ * Hotfix v3.3.40: Modal DOM unnesting & event bridge alignment.
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
@@ -100,7 +100,7 @@ window.renderVaultGrid = function() {
 
 window.openRecipeModal = function(id, instanceId, variant) {
   if (typeof window.viewRecipe === 'function') return window.viewRecipe(id, instanceId, variant);
-  console.warn('[main.js v3.3.39] viewRecipe not found on window');
+  console.warn('[main.js v3.3.40] viewRecipe not found on window');
 };
 window.showRecipeModal = window.openRecipeModal;
 window.openRecipeDetailModal = window.openRecipeModal;
@@ -135,7 +135,7 @@ function setupRecipeActionBridge() {
         return (val === 'null' || val === 'undefined') ? null : val;
       });
 
-      console.log(`[Action Bridge v3.3.39] Intercepted Swap Action:`, args);
+      console.log(`[Action Bridge v3.3.40] Intercepted Swap Action:`, args);
       window.toggleInlineShoppingSubst(args[0] || '', args[1] || '');
       return;
     }
@@ -151,7 +151,7 @@ function setupRecipeActionBridge() {
         return (val === 'null' || val === 'undefined' || val === '') ? null : val;
       });
 
-      console.log(`[Action Bridge v3.3.39] Intercepted Recipe Modal Action:`, args);
+      console.log(`[Action Bridge v3.3.40] Intercepted Recipe Modal Action:`, args);
       if (typeof window.viewRecipe === 'function') {
         window.viewRecipe(args[0] || '', args[1] || null, args[2] || 'original', args[3] || 'both');
       } else if (typeof window.openRecipeModal === 'function') {
@@ -226,7 +226,7 @@ function sanitizeRecipes(recipes) {
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.39 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.40 (ES6 Modern)';
   }
 }
 
@@ -253,7 +253,7 @@ document.addEventListener('plateplan:state:planner', () => {
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.39] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.40] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupRecipeActionBridge();
   await waitForAuth();
