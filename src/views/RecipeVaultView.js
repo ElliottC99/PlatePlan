@@ -1,7 +1,8 @@
 /**
- * src/views/RecipeVaultView.js (v3.3.36)
- * Phase 5.4: Recipe Vault / Recipe Library Domain Extraction.
+ * src/views/RecipeVaultView.js (v3.3.37)
+ * Phase 5.4 Hotfix: Recipe Vault favoriting persistence via savePreferences and clean state dispatch.
  */
+import { savePreferences } from '../services/HouseholdRepository.js';
 
 export function renderRecipeCard(r, options = {}) {
   const targetMacros = options.targetMacros || (typeof window.getVaultTargetMacros === 'function' ? window.getVaultTargetMacros() : {});
@@ -135,7 +136,7 @@ export function isRecipeVariantFavourite(recipeId, variantKey = 'original') {
   return list.includes(key);
 }
 
-export function toggleRecipeFavourite(recipeId, event, variantKey = 'original') {
+export async function toggleRecipeFavourite(recipeId, event, variantKey = 'original') {
   if (event) {
     event.stopPropagation();
     event.preventDefault();
@@ -156,23 +157,16 @@ export function toggleRecipeFavourite(recipeId, event, variantKey = 'original') 
   r.isFavorite = isNowFav;
   r.updatedAt = new Date().toISOString();
 
-  if (typeof window.saveState === 'function') {
-    window.saveState(true);
-  }
-  try {
-    const householdId = (window.state && window.state.householdId) || window.ACTIVE_HOUSEHOLD_ID || 'elliott-chloe';
-    if (window.platePlanDb) {
-      window.platePlanDb.collection('households').doc(householdId).collection('data').doc('meta').set({
-        prefs: window.state.prefs,
-        userPrefs: window.state.userPrefs
-      }, { merge: true }).catch(e => console.warn('[PREFS SYNC ERROR]', e));
-      window.platePlanDb.collection('households').doc(householdId).collection('recipes').doc(String(r.id)).set(
-        window.sanitizePayloadForFirestore ? window.sanitizePayloadForFirestore(window.unwrapAndCleanItem ? window.unwrapAndCleanItem(r) : r) : r,
-        { merge: true }
-      ).catch(e => console.warn('[RECIPE FAVORITE SYNC ERROR]', e));
+  // Persist directly via savePreferences without triggering plan-save logic
+  if (window.state?.userPrefs) {
+    try {
+      await savePreferences(window.state.userPrefs, window.state.settings || {});
+    } catch (e) {
+      console.warn('[RecipeVault] Failed to save favorite preferences:', e);
     }
-  } catch(e) {}
+  }
 
+  document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: window.state?.recipes }));
   renderRecipeVault();
 
   if (typeof window.previewBaseRecipe !== 'undefined' && window.previewBaseRecipe && window.previewBaseRecipe.id === recipeId) {
@@ -287,7 +281,6 @@ if (typeof window !== 'undefined') {
   window.isRecipeVariantFavorite = isRecipeVariantFavourite;
   window.toggleVaultFavouritesFilter = toggleVaultFavouritesFilter;
   window.toggleVaultFavoritesFilter = toggleVaultFavouritesFilter;
-  window.toggleVaultFavoritesFilter = toggleVaultFavouritesFilter;
 }
 
-console.log('[RecipeVaultView v3.3.36] Loaded successfully.');
+console.log('[RecipeVaultView v3.3.37] Loaded successfully.');

@@ -15023,23 +15023,29 @@ function updateRecipePreviewScale(val) {
 }
 
 function viewRecipe(id, instanceId = null, tab = 'original', servingMode = 'both') {
-  const r = state.recipes.find(x => x.id === id);
-  if (!r) return;
+  const activeState = window.state || state || {};
+  const recipes = activeState.recipes || (typeof state !== 'undefined' ? state.recipes : []) || [];
+  const cleanInstanceId = (instanceId === 'null' || instanceId === 'undefined' || !instanceId) ? null : instanceId;
+  const r = recipes.find(x => String(x.id) === String(id));
+  if (!r) {
+    console.warn('[viewRecipe] Recipe not found:', id);
+    return;
+  }
   previewBaseRecipe = clonePlatePlanValue(r); // isolated deep copy for scaling
-  currentPreviewInstanceId = instanceId;
+  currentPreviewInstanceId = cleanInstanceId;
   currentViewTab = (tab === 'enhanced' && r.enhanced) ? 'enhanced' : 'original';
   currentPreviewServingMode = servingMode || 'both';
   currentPreviewSingleServes = 1;
 
   // Preserve old plan substitution records for older saved plans.
-  if (instanceId && state.overrides[instanceId]?.substitutions && !state.overrides[instanceId]?.productOverrides) {
-      const subs = state.overrides[instanceId].substitutions;
+  if (cleanInstanceId && activeState.overrides && activeState.overrides[cleanInstanceId]?.substitutions && !activeState.overrides[cleanInstanceId]?.productOverrides) {
+      const subs = activeState.overrides[cleanInstanceId].substitutions;
       const applySubs = (ings) => {
           if(!ings) return;
           ings.forEach(ing => {
               if (ing.bankId && subs[ing.bankId]) {
                   const subId = subs[ing.bankId];
-                  const subIng = state.ingredients.find(i => i.id === subId);
+                  const subIng = (activeState.ingredients || []).find(i => i.id === subId);
                   if(subIng) {
                       ing.originalBankId = ing.bankId;
                       ing.originalName = ing.name;
