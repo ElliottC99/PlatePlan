@@ -1,6 +1,6 @@
 /**
- * src/main.js (v3.3.20)
- * Native Delegated Action Bridge with Phase 9 Planner Shell Integration.
+ * src/main.js (v3.3.21)
+ * Native Delegated Action Bridge with Phase 10 Shopping & Tesco Integration.
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
@@ -16,6 +16,7 @@ if (typeof window !== 'undefined') {
   window.state.favourites = Array.isArray(window.state.favourites) ? window.state.favourites : [];
   window.state.userFavourites = Array.isArray(window.state.userFavourites) ? window.state.userFavourites : [];
   window.state.ingredients = Array.isArray(window.state.ingredients) ? window.state.ingredients : [];
+  window.state.confirmedShopping = Array.isArray(window.state.confirmedShopping) ? window.state.confirmedShopping : [];
   
   window.state.userPrefs.favouriteVariantIds = Array.isArray(window.state.userPrefs.favouriteVariantIds) ? window.state.userPrefs.favouriteVariantIds : [];
   window.state.userPrefs.favourites = Array.isArray(window.state.userPrefs.favourites) ? window.state.userPrefs.favourites : [];
@@ -37,7 +38,7 @@ function purgeModalOverrides() {
   });
 }
 
-// 2. NATIVE DELEGATED ACTION BRIDGE & PLANNER HOOKS
+// 2. NATIVE DELEGATED ACTION BRIDGE & SHOPPING HOOKS
 function setupRecipeActionBridge() {
   if (typeof window === 'undefined' || window.__plateplan_action_bridge_attached) return;
   window.__plateplan_action_bridge_attached = true;
@@ -82,7 +83,7 @@ function setupRecipeActionBridge() {
     if (!actionStr) return;
 
     event.preventDefault();
-    console.log(`[Action Bridge v3.3.20] Delegating action: "${actionStr}"`);
+    console.log(`[Action Bridge v3.3.21] Delegating action: "${actionStr}"`);
 
     try {
       if (typeof window.runPlatePlanDelegatedAction === 'function') {
@@ -92,12 +93,20 @@ function setupRecipeActionBridge() {
         execFn.call(actionBtn, event);
       }
 
-      // Phase 9: Intercept planner view activations and trigger shell generation
+      // Phase 9 & 10: Intercept view activations and render routines
       if (actionStr.includes('planner') || actionStr.includes("showView('planner')")) {
         setTimeout(() => {
           if (typeof window.ensurePlannerShell === 'function') {
             window.ensurePlannerShell();
-            console.log('[Action Bridge v3.3.20] ensurePlannerShell invoked successfully.');
+          }
+        }, 50);
+      }
+
+      if (actionStr.includes('shopping') || actionStr.includes("showView('shopping')")) {
+        setTimeout(() => {
+          if (typeof window.renderShopping === 'function') {
+            window.renderShopping();
+            console.log('[Action Bridge v3.3.21] renderShopping invoked successfully.');
           }
         }, 50);
       }
@@ -123,7 +132,7 @@ function setupRecipeActionBridge() {
       }, 50);
 
     } catch (err) {
-      console.error(`[Action Bridge v3.3.20] Execution error for: ${actionStr}`, err);
+      console.error(`[Action Bridge v3.3.21] Execution error for: ${actionStr}`, err);
     }
   }, true);
 }
@@ -162,7 +171,7 @@ function sanitizeRecipes(recipes) {
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.20 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.21 (ES6 Modern)';
   }
 }
 
@@ -177,11 +186,11 @@ document.addEventListener('plateplan:state:recipes', (e) => {
       try { window.renderAll(); } catch (err) { console.warn('[Modern Bridge] renderAll warning:', err); }
     }
   }
-  console.log(`[Modern Bridge v3.3.20] Action bridge synchronized with ${cleanRecipes.length} recipes.`);
+  console.log(`[Modern Bridge v3.3.21] Action bridge synchronized with ${cleanRecipes.length} recipes.`);
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.20] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.21] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupRecipeActionBridge();
   await waitForAuth();
