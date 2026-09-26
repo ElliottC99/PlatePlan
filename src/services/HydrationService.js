@@ -1,5 +1,5 @@
 /**
- * src/services/HydrationService.js
+ * src/services/HydrationService.js (v3.3.3)
  * Orchestrates concurrent fetching from HouseholdRepository and populating the centralized Store.
  */
 
@@ -24,10 +24,10 @@ export async function hydrateHouseholdData() {
     setPreferences(preferences);
     setCurrentPlan(plan);
 
-    console.log('[HydrationService] Household data hydrated successfully into Store.');
+    console.log('[HydrationService v3.3.3] Household data hydrated successfully into Store.');
     return { success: true, timestamp: Date.now() };
   } catch (err) {
-    console.error('[HydrationService] Hydration failed:', err);
+    console.error('[HydrationService v3.3.3] Hydration failed:', err);
     return { success: false, error: err };
   }
 }

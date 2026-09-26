@@ -1,5 +1,5 @@
 /**
- * src/services/AuthService.js (v3.3.1)
+ * src/services/AuthService.js (v3.3.3)
  * Halts application hydration until Firebase Auth state is fully resolved.
  */
 
@@ -11,10 +11,10 @@ export function waitForAuth() {
     const unsubscribe = window.firebase.auth().onAuthStateChanged(user => {
       unsubscribe();
       if (user) {
-        console.log(`[AuthService] v3.3.1 - Authenticated as: ${user.email}`);
+        console.log(`[AuthService] v3.3.3 - Authenticated as: ${user.email}`);
         resolve(user);
       } else {
-        console.warn('[AuthService] v3.3.1 - No user session detected.');
+        console.warn('[AuthService] v3.3.3 - No user session detected.');
         resolve(null);
       }
     }, error => reject(error));
