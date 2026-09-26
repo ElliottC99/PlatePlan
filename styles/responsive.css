@@ -1,4 +1,11 @@
 /* Responsive layout contracts */
+.vault-header-toolbar, .filter-bar, .vault-who-container {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 12px !important;
+    white-space: nowrap !important;
+}
 .view-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
 .vault-filters{display:flex!important;flex-wrap:wrap!important;align-items:center!important;gap:12px!important}
 #vault-search{flex:1 1 200px!important;font-size:12px!important}

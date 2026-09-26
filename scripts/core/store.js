@@ -228,7 +228,11 @@ export async function deletePlan(planId) {
   }
 
   // Persist state locally
-  localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+  try {
+    localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+  } catch (err) {
+    console.warn('[Store] LocalStorage quota exceeded. Relying on cloud persistence.');
+  }
 
   // If the modular store exists, publish the update
   if (window.PlatePlanModules?.store) {
