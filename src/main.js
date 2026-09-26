@@ -1,6 +1,6 @@
 /**
- * src/main.js (v3.3.22)
- * Native Delegated Action Bridge with Phase 10.2 "Swap Product" Integration.
+ * src/main.js (v3.3.23)
+ * Native Delegated Action Bridge with Direct Substitution Routing (v3.3.23).
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
@@ -57,7 +57,7 @@ function patchSwapLabels() {
   });
 }
 
-// 2. NATIVE DELEGATED ACTION BRIDGE & "SWAP PRODUCT" HOOKS
+// 2. NATIVE DELEGATED ACTION BRIDGE & DIRECT ARGUMENT ROUTING
 function setupRecipeActionBridge() {
   if (typeof window === 'undefined' || window.__plateplan_action_bridge_attached) return;
   window.__plateplan_action_bridge_attached = true;
@@ -103,9 +103,19 @@ function setupRecipeActionBridge() {
     if (!actionStr) return;
 
     event.preventDefault();
-    console.log(`[Action Bridge v3.3.22] Delegating action: "${actionStr}"`);
+    console.log(`[Action Bridge v3.3.23] Delegating action: "${actionStr}"`);
 
     try {
+      // Direct Execution Routing for Substitution & Parameterized Actions
+      if (actionStr.startsWith('toggleInlineShoppingSubst')) {
+        const match = actionStr.match(/toggleInlineShoppingSubst\s*\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/);
+        if (match && typeof window.toggleInlineShoppingSubst === 'function') {
+          window.toggleInlineShoppingSubst(match[1], match[2]);
+          patchSwapLabels();
+          return;
+        }
+      }
+
       if (typeof window.runPlatePlanDelegatedAction === 'function') {
         window.runPlatePlanDelegatedAction(actionStr, event, actionBtn);
       } else {
@@ -126,13 +136,6 @@ function setupRecipeActionBridge() {
             window.renderShopping();
             patchSwapLabels();
           }
-        }, 50);
-      }
-
-      if (actionStr.includes('toggleInlineShoppingSubst') || actionStr.includes('Subst')) {
-        setTimeout(() => {
-          patchSwapLabels();
-          console.log('[Action Bridge v3.3.22] Swap Product substitution panel toggled.');
         }, 50);
       }
 
@@ -157,7 +160,7 @@ function setupRecipeActionBridge() {
       }, 50);
 
     } catch (err) {
-      console.error(`[Action Bridge v3.3.22] Execution error for: ${actionStr}`, err);
+      console.error(`[Action Bridge v3.3.23] Execution error for: ${actionStr}`, err);
     }
   }, true);
 }
@@ -196,7 +199,7 @@ function sanitizeRecipes(recipes) {
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.22 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.23 (ES6 Modern)';
   }
 }
 
@@ -211,11 +214,11 @@ document.addEventListener('plateplan:state:recipes', (e) => {
       try { window.renderAll(); } catch (err) { console.warn('[Modern Bridge] renderAll warning:', err); }
     }
   }
-  console.log(`[Modern Bridge v3.3.22] Action bridge synchronized with ${cleanRecipes.length} recipes.`);
+  console.log(`[Modern Bridge v3.3.23] Action bridge synchronized with ${cleanRecipes.length} recipes.`);
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.22] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.23] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupRecipeActionBridge();
   await waitForAuth();
