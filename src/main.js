@@ -1,6 +1,6 @@
 /**
- * src/main.js (v3.3.21)
- * Native Delegated Action Bridge with Phase 10 Shopping & Tesco Integration.
+ * src/main.js (v3.3.22)
+ * Native Delegated Action Bridge with Phase 10.2 "Swap Product" Integration.
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
@@ -38,7 +38,26 @@ function purgeModalOverrides() {
   });
 }
 
-// 2. NATIVE DELEGATED ACTION BRIDGE & SHOPPING HOOKS
+// Helper: Rename "Swap Brand" to "Swap Product" across DOM nodes
+function patchSwapLabels() {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+  let node;
+  while (node = walker.nextNode()) {
+    if (node.nodeValue && node.nodeValue.includes('Swap Brand')) {
+      node.nodeValue = node.nodeValue.replace(/Swap Brand/g, 'Swap Product');
+    }
+  }
+  document.querySelectorAll('button, a, span, label').forEach(el => {
+    if (el.title && el.title.includes('Swap Brand')) {
+      el.title = el.title.replace(/Swap Brand/g, 'Swap Product');
+    }
+    if (el.placeholder && el.placeholder.includes('Swap Brand')) {
+      el.placeholder = el.placeholder.replace(/Swap Brand/g, 'Swap Product');
+    }
+  });
+}
+
+// 2. NATIVE DELEGATED ACTION BRIDGE & "SWAP PRODUCT" HOOKS
 function setupRecipeActionBridge() {
   if (typeof window === 'undefined' || window.__plateplan_action_bridge_attached) return;
   window.__plateplan_action_bridge_attached = true;
@@ -66,6 +85,7 @@ function setupRecipeActionBridge() {
 
   document.addEventListener('click', (event) => {
     observeModals();
+    patchSwapLabels();
 
     const closeBtn = event.target.closest('.close, .close-modal, .modal-backdrop, [data-pp-click*="close"]');
     const actionBtn = event.target.closest('[data-pp-click]');
@@ -83,7 +103,7 @@ function setupRecipeActionBridge() {
     if (!actionStr) return;
 
     event.preventDefault();
-    console.log(`[Action Bridge v3.3.21] Delegating action: "${actionStr}"`);
+    console.log(`[Action Bridge v3.3.22] Delegating action: "${actionStr}"`);
 
     try {
       if (typeof window.runPlatePlanDelegatedAction === 'function') {
@@ -93,12 +113,10 @@ function setupRecipeActionBridge() {
         execFn.call(actionBtn, event);
       }
 
-      // Phase 9 & 10: Intercept view activations and render routines
+      // View & Substitution Interceptors
       if (actionStr.includes('planner') || actionStr.includes("showView('planner')")) {
         setTimeout(() => {
-          if (typeof window.ensurePlannerShell === 'function') {
-            window.ensurePlannerShell();
-          }
+          if (typeof window.ensurePlannerShell === 'function') window.ensurePlannerShell();
         }, 50);
       }
 
@@ -106,8 +124,15 @@ function setupRecipeActionBridge() {
         setTimeout(() => {
           if (typeof window.renderShopping === 'function') {
             window.renderShopping();
-            console.log('[Action Bridge v3.3.21] renderShopping invoked successfully.');
+            patchSwapLabels();
           }
+        }, 50);
+      }
+
+      if (actionStr.includes('toggleInlineShoppingSubst') || actionStr.includes('Subst')) {
+        setTimeout(() => {
+          patchSwapLabels();
+          console.log('[Action Bridge v3.3.22] Swap Product substitution panel toggled.');
         }, 50);
       }
 
@@ -132,7 +157,7 @@ function setupRecipeActionBridge() {
       }, 50);
 
     } catch (err) {
-      console.error(`[Action Bridge v3.3.21] Execution error for: ${actionStr}`, err);
+      console.error(`[Action Bridge v3.3.22] Execution error for: ${actionStr}`, err);
     }
   }, true);
 }
@@ -171,7 +196,7 @@ function sanitizeRecipes(recipes) {
 function updateVersionBadge() {
   const footerEl = document.getElementById('app-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.3.21 (ES6 Modern)';
+    footerEl.textContent = 'v3.3.22 (ES6 Modern)';
   }
 }
 
@@ -186,11 +211,11 @@ document.addEventListener('plateplan:state:recipes', (e) => {
       try { window.renderAll(); } catch (err) { console.warn('[Modern Bridge] renderAll warning:', err); }
     }
   }
-  console.log(`[Modern Bridge v3.3.21] Action bridge synchronized with ${cleanRecipes.length} recipes.`);
+  console.log(`[Modern Bridge v3.3.22] Action bridge synchronized with ${cleanRecipes.length} recipes.`);
 });
 
 async function initApp() {
-  console.log('[Modern Bridge v3.3.21] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.3.22] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupRecipeActionBridge();
   await waitForAuth();
