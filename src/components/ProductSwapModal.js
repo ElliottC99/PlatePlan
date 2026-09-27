@@ -1,5 +1,5 @@
 /**
- * src/components/ProductSwapModal.js (v3.6.0)
+ * src/components/ProductSwapModal.js (v3.7.4)
  * Granular modal component for ingredient & product substitution.
  * Quarantined from direct database operations, handles state update dispatching cleanly.
  */
@@ -212,7 +212,7 @@ export function renderScrollableSwapModal(groupKey, itemKey) {
 }
 
 export async function executeSwapInState(groupKey, itemKey, newProduct, scope) {
-  console.log(`[Swap Executed v3.6.0] Scope: ${scope}, Target Group: ${groupKey}, Item: ${itemKey}, Replacement:`, newProduct);
+  console.log(`[Swap Executed v3.7.4] Scope: ${scope}, Target Group: ${groupKey}, Item: ${itemKey}, Replacement:`, newProduct);
 
   const shoppingLists = ['confirmedShopping', 'shoppingList', 'generatedList'];
 
@@ -243,7 +243,7 @@ export async function executeSwapInState(groupKey, itemKey, newProduct, scope) {
   if (window.state?.plan && typeof window.state.plan === 'object') {
     window.state.plan.productSelections = window.state.plan.productSelections || {};
     window.state.plan.productSelections[itemKey] = newProduct.id || newProduct.name;
-    saveCurrentPlan(window.state.plan).catch(e => console.warn('[ProductSwapModal v3.6.0] Error updating plan with swapped product:', e));
+    saveCurrentPlan(window.state.plan).catch(e => console.warn('[ProductSwapModal v3.7.4] Error updating plan with swapped product:', e));
   }
 
   document.dispatchEvent(new CustomEvent('plateplan:state:shopping', { detail: window.state?.confirmedShopping }));

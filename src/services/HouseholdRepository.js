@@ -1,5 +1,5 @@
 /**
- * src/services/HouseholdRepository.js (v3.6.0)
+ * src/services/HouseholdRepository.js (v3.7.4)
  * Dedicated data access repository for household-scoped Firestore operations.
  * Completely isolated from DOM manipulation and UI rendering.
  * All operations target the shared household path 'households/elliott-chloe'.
@@ -13,7 +13,7 @@ import { db, HOUSEHOLD_ID } from '../config/firebase.js';
  */
 function isDbAvailable() {
   if (!db) {
-    console.warn('[HouseholdRepository v3.6.0] Firestore db instance not initialized.');
+    console.warn('[HouseholdRepository v3.7.4] Firestore db instance not initialized.');
     return false;
   }
   return true;
@@ -37,7 +37,7 @@ export async function getRecipes() {
       ...doc.data()
     }));
   } catch (err) {
-    console.error('[HouseholdRepository v3.6.0] Error fetching recipes:', err);
+    console.error('[HouseholdRepository v3.7.4] Error fetching recipes:', err);
     return [];
   }
 }
@@ -67,7 +67,7 @@ export async function saveRecipe(recipe) {
 
     return { success: true, id: recipeId };
   } catch (err) {
-    console.error('[HouseholdRepository v3.6.0] Error saving recipe:', err);
+    console.error('[HouseholdRepository v3.7.4] Error saving recipe:', err);
     return { success: false, error: err };
   }
 }
@@ -91,7 +91,7 @@ export async function deleteRecipe(recipeId) {
 
     return { success: true };
   } catch (err) {
-    console.error('[HouseholdRepository v3.6.0] Error deleting recipe:', err);
+    console.error('[HouseholdRepository v3.7.4] Error deleting recipe:', err);
     return { success: false, error: err };
   }
 }
@@ -114,7 +114,7 @@ export async function getIngredients() {
       ...doc.data()
     }));
   } catch (err) {
-    console.error('[HouseholdRepository v3.6.0] Error fetching ingredients:', err);
+    console.error('[HouseholdRepository v3.7.4] Error fetching ingredients:', err);
     return [];
   }
 }
@@ -144,7 +144,7 @@ export async function saveIngredient(ingredient) {
 
     return { success: true, id: ingId };
   } catch (err) {
-    console.error('[HouseholdRepository v3.6.0] Error saving ingredient:', err);
+    console.error('[HouseholdRepository v3.7.4] Error saving ingredient:', err);
     return { success: false, error: err };
   }
 }
@@ -168,7 +168,7 @@ export async function deleteIngredient(ingredientId) {
 
     return { success: true };
   } catch (err) {
-    console.error('[HouseholdRepository v3.6.0] Error deleting ingredient:', err);
+    console.error('[HouseholdRepository v3.7.4] Error deleting ingredient:', err);
     return { success: false, error: err };
   }
 }
@@ -204,7 +204,7 @@ export async function getPreferences() {
       }
     };
   } catch (err) {
-    console.error('[HouseholdRepository v3.6.0] Error fetching preferences:', err);
+    console.error('[HouseholdRepository v3.7.4] Error fetching preferences:', err);
     return null;
   }
 }
@@ -236,7 +236,7 @@ export async function savePreferences(userPrefs, settings = {}) {
 
     return true;
   } catch (err) {
-    console.error('[HouseholdRepository v3.6.0] Error saving preferences to Firestore:', err);
+    console.error('[HouseholdRepository v3.7.4] Error saving preferences to Firestore:', err);
     return false;
   }
 }
@@ -257,7 +257,7 @@ export async function getCurrentPlan() {
 
     return docSnap.exists ? { id: docSnap.id, ...docSnap.data() } : null;
   } catch (err) {
-    console.error('[HouseholdRepository v3.6.0] Error fetching current plan:', err);
+    console.error('[HouseholdRepository v3.7.4] Error fetching current plan:', err);
     return null;
   }
 }
@@ -286,7 +286,7 @@ export async function saveCurrentPlan(plan) {
 
     return true;
   } catch (err) {
-    console.error('[HouseholdRepository v3.6.0] Error saving current plan:', err);
+    console.error('[HouseholdRepository v3.7.4] Error saving current plan:', err);
     return false;
   }
 }

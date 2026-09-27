@@ -1,5 +1,5 @@
 /**
- * src/services/HydrationService.js (v3.6.0)
+ * src/services/HydrationService.js (v3.7.4)
  * Orchestrates concurrent fetching from HouseholdRepository, invalidating/updating cache,
  * and populating the centralized Store and window.state.
  */
@@ -67,14 +67,14 @@ export async function hydrateHouseholdData() {
       window.state.userPrefs.nutritionTargets = nutritionTargets;
       window.state.settings = docData.settings || window.state.settings || {};
 
-      console.log('[HydrationService v3.6.0] Mapped userPrefs and nutritionTargets to window.state', window.state.userPrefs);
+      console.log('[HydrationService v3.7.4] Mapped userPrefs and nutritionTargets to window.state', window.state.userPrefs);
     }
 
     saveStateCache();
-    console.log('[HydrationService v3.6.0] Household data hydrated successfully into Store and persisted to local cache.');
+    console.log('[HydrationService v3.7.4] Household data hydrated successfully into Store and persisted to local cache.');
     return { success: true, timestamp: Date.now() };
   } catch (err) {
-    console.error('[HydrationService v3.6.0] Hydration failed:', err);
+    console.error('[HydrationService v3.7.4] Hydration failed:', err);
     return { success: false, error: err };
   }
 }

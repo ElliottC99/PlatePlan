@@ -1,12 +1,12 @@
 /**
- * sw.js (v3.6.0)
+ * sw.js (v3.7.4)
  * Service Worker for PlatePlan PWA offline support & asset caching.
  * Caches core app shell, modern ES6 modules, stylesheets, and icons.
  */
 
-const PLATEPLAN_CACHE = 'plateplan-shell-v3.6.0';
-const PLATEPLAN_APP_VERSION = '3.6.0';
-const PLATEPLAN_BUILD_ID = '3.6.0-v95';
+const PLATEPLAN_CACHE = 'plateplan-shell-v3.7.4';
+const PLATEPLAN_APP_VERSION = '3.7.4';
+const PLATEPLAN_BUILD_ID = '3.7.4-v100';
 
 const PLATEPLAN_PRECACHE_ASSETS = [
   '/',
@@ -23,6 +23,11 @@ const PLATEPLAN_PRECACHE_ASSETS = [
   '/src/services/AuthService.js',
   '/src/services/HydrationService.js',
   '/src/services/HouseholdRepository.js',
+  '/src/services/TescoImportService.js',
+  '/src/services/RecipeOcrService.js',
+  '/src/services/NutritionService.js',
+  '/src/services/FitScoreService.js',
+  '/src/utils/unitConverter.js',
   '/src/services/ActionBridge.js',
   '/src/views/SettingsView.js',
   '/src/views/ShoppingView.js',

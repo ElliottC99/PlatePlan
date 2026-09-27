@@ -1,5 +1,5 @@
 /**
- * src/main.js (v3.6.0)
+ * src/main.js (v3.7.4)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronization,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -12,6 +12,20 @@ import { renderSettingsView } from './views/SettingsView.js';
 import { renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired } from './views/ShoppingView.js';
 import { renderPlanner } from './views/PlannerView.js';
 import { renderRecipeVault } from './views/RecipeVaultView.js';
+import * as TescoImportService from './services/TescoImportService.js';
+import * as RecipeOcrService from './services/RecipeOcrService.js';
+import * as UnitConverter from './utils/unitConverter.js';
+import * as NutritionService from './services/NutritionService.js';
+import * as FitScoreService from './services/FitScoreService.js';
+
+// Expose services globally for seamless classic script interop
+if (typeof window !== 'undefined') {
+  window.TescoImportService = TescoImportService;
+  window.RecipeOcrService = RecipeOcrService;
+  window.UnitConverter = UnitConverter;
+  window.NutritionService = NutritionService;
+  window.FitScoreService = FitScoreService;
+}
 
 // 1. STRICT STATE INITIALIZATION & SANITIZATION
 if (typeof window !== 'undefined') {
@@ -52,7 +66,7 @@ if (typeof window !== 'undefined') {
     if (typeof window.viewRecipe === 'function') {
       return window.viewRecipe(id, instanceId, variant, targetPerson);
     }
-    console.warn('[main.js v3.6.0] viewRecipe not found on window');
+    console.warn('[main.js v3.7.4] viewRecipe not found on window');
   };
   window.showRecipeModal = window.openRecipeModal;
   window.openRecipeDetailModal = window.openRecipeModal;
@@ -68,7 +82,7 @@ function reportAppError(message, type = 'error') {
   lastErrorMessage = message;
   lastErrorTime = now;
 
-  console.error(`[PlatePlan Error Telemetry v3.6.0]`, message);
+  console.error(`[PlatePlan Error Telemetry v3.7.4]`, message);
   if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
     window.showPlatePlanToast(message, type);
   }
@@ -102,10 +116,10 @@ function registerServiceWorker() {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js')
         .then(reg => {
-          console.log('[SW v3.6.0] Service worker registered successfully with scope:', reg.scope);
+          console.log('[SW v3.7.4] Service worker registered successfully with scope:', reg.scope);
         })
         .catch(err => {
-          console.warn('[SW v3.6.0] Service worker registration failed:', err);
+          console.warn('[SW v3.7.4] Service worker registration failed:', err);
         });
     });
   }
@@ -139,7 +153,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.6.0 (ES6 Modern)';
+    footerEl.textContent = 'v3.7.4 (ES6 Modern)';
   }
 }
 
@@ -188,7 +202,7 @@ async function initApp() {
   if (isAppInitialized) return;
   isAppInitialized = true;
 
-  console.log('[Modern Bridge v3.6.0] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.7.4] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupActionBridge();
   setupSubscriptions();

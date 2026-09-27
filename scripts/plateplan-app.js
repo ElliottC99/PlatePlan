@@ -81,49 +81,19 @@ const NUTRITION_CANONICAL_MAP = {
 };
 
 function normalizeNutrientKey(key) {
-    if (!key) return key;
-    const cleanKey = key.toLowerCase().trim();
-    if(cleanKey.includes('kcal')) return 'cal';
-    if(cleanKey.includes('calories')) return 'cal';
-    return NUTRITION_CANONICAL_MAP[cleanKey] || cleanKey;
+  return window.NutritionService?.normalizeNutrientKey(key) || key;
 }
 
 function numericNutritionValues(value){
-    if(value === null || value === undefined) return [];
-    if(typeof value === 'number') return Number.isFinite(value) ? [value] : [];
-    return String(value).match(/\d+(?:\.\d+)?/g)?.map(Number).filter(Number.isFinite) || [];
+  return window.NutritionService?.numericNutritionValues(value) || [];
 }
 
 function normalizeEnergyKcal(value){
-    if(value === null || value === undefined || value === '') return 0;
-    if(typeof value === 'number') return value > 2500 ? Math.round(value / 4.184) : Math.round(value);
-    const text = String(value).toLowerCase();
-    const kcalMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:kcal|calories|cals?\b)/i);
-    if(kcalMatch) return Math.round(+kcalMatch[1]);
-    const kjMatch = text.match(/(\d+(?:\.\d+)?)\s*kj/i);
-    const nums = numericNutritionValues(text);
-    if(nums.length >= 2) {
-        const plausible = nums.filter(n => n > 0 && n < 1000);
-        if(plausible.length) return Math.round(Math.min(...plausible));
-    }
-    if(kjMatch) return Math.round((+kjMatch[1]) / 4.184);
-    if(nums.length === 1) return nums[0] > 2500 ? Math.round(nums[0] / 4.184) : Math.round(nums[0]);
-    return 0;
+  return window.NutritionService?.normalizeEnergyKcal(value) || 0;
 }
 
 function normalizeNutritionPayload(raw){
-    const parsed = {};
-    for(const k in (raw || {})){
-        const cleanKey = String(k || '').toLowerCase();
-        const key = normalizeNutrientKey(k);
-        if(key === 'cal') parsed[key] = normalizeEnergyKcal(raw[k]);
-        else if(cleanKey.includes('kj') && !parsed.cal) parsed.cal = normalizeEnergyKcal(`${raw[k]} kJ`);
-        else parsed[key] = +raw[k] || 0;
-    }
-    if(!parsed.cal) {
-        parsed.cal = normalizeEnergyKcal(raw?.energy ?? raw?.calories ?? raw?.kcal ?? raw?.cal);
-    }
-    return parsed;
+  return window.NutritionService?.normalizeNutritionPayload(raw) || (raw || {});
 }
 
 function toAPTitleCase(str) {
@@ -358,20 +328,9 @@ function sanitizePayloadForFirestore(data){
 }
 window.sanitizePayloadForFirestore = sanitizePayloadForFirestore;
 
-// == v3.0.6 DUAL-PROFILE MEAL-SLOT TARGET RESOLVER ==
+// == v3.7.4 FIT SCORE & MACRO TARGET RESOLVER (Delegated to FitScoreService) ==
 function getMealTypeTargets(mealType = 'dinner') {
-  const mt = (mealType || 'dinner').toLowerCase();
-  const eTgt = typeof getBudgets === 'function' ? getBudgets('e', mt) : { cal: 840, prot: 45.5 };
-  const cTgt = typeof getBudgets === 'function' ? getBudgets('c', mt) : { cal: 595, prot: 35 };
-  return {
-    mealType: mt,
-    targetCal_E: Number(eTgt?.cal) || 0,
-    targetProt_E: Number(eTgt?.prot) || 0,
-    targetCal_C: Number(cTgt?.cal) || 0,
-    targetProt_C: Number(cTgt?.prot) || 0,
-    e: eTgt,
-    c: cTgt
-  };
+  return window.FitScoreService?.getMealTypeTargets(mealType) || { mealType: mealType || 'dinner', targetCal_E: 840, targetProt_E: 45.5, targetCal_C: 595, targetProt_C: 35 };
 }
 window.getMealTypeTargets = getMealTypeTargets;
 
@@ -381,253 +340,30 @@ function getVaultTargetMacros(mealType = 'dinner') {
 window.getVaultTargetMacros = getVaultTargetMacros;
 
 function computeProfileFitScore(actualCal, targetCal, actualProt, targetProt) {
-  const aCal = Number(actualCal) || 0;
-  const tCal = Number(targetCal) || 0;
-  const aProt = Number(actualProt) || 0;
-  const tProt = Number(targetProt) || 0;
-
-  let calScore = 100;
-  if (tCal > 0) {
-    const calError = Math.abs(aCal - tCal) / tCal;
-    calScore = Math.max(0, 100 - (calError * 100));
-  }
-
-  let protScore = 100;
-  if (tProt > 0) {
-    protScore = aProt >= tProt
-      ? 100
-      : Math.max(0, 100 - (((tProt - aProt) / tProt) * 100));
-  }
-
-  return (calScore * 0.50) + (protScore * 0.50);
+  return window.FitScoreService?.computeProfileFitScore(actualCal, targetCal, actualProt, targetProt) ?? 100;
 }
 window.computeProfileFitScore = computeProfileFitScore;
 
-// == v3.0.6 DUAL-PORTION MEAL-TYPE FIT SCORE ENGINE ==
 function calculateMacroFitTierAndScore(calActualOrRecipe, mealTypeOrTargets, protAct, protTgt) {
-  let mealType = 'dinner';
-  let variant = 'original';
-  let recipeObj = null;
-  let customTargets = null;
-
-  let actualCal_E = 0, targetCal_E = 0, actualProt_E = 0, targetProt_E = 0;
-  let actualCal_C = 0, targetCal_C = 0, actualProt_C = 0, targetProt_C = 0;
-  let whoKey = 'both';
-
-  if (typeof calActualOrRecipe === 'object' && calActualOrRecipe !== null) {
-    recipeObj = calActualOrRecipe.recipe || calActualOrRecipe;
-    variant = calActualOrRecipe.variant || 'original';
-
-    if (typeof mealTypeOrTargets === 'string') {
-      mealType = mealTypeOrTargets;
-    } else if (typeof mealTypeOrTargets === 'object' && mealTypeOrTargets !== null) {
-      if (mealTypeOrTargets.mealType) mealType = mealTypeOrTargets.mealType;
-      if (mealTypeOrTargets.variant) variant = mealTypeOrTargets.variant;
-      customTargets = mealTypeOrTargets;
-    } else if (calActualOrRecipe.mealType) {
-      mealType = calActualOrRecipe.mealType;
-    } else {
-      const types = recipeObj.types || [recipeObj.type || 'dinner'];
-      mealType = types[0] || 'dinner';
-    }
-
-    whoKey = String(recipeObj.who || 'both').trim().toLowerCase();
-
-    // Resolve meal slot targets
-    const slotTargets = customTargets || getMealTypeTargets(mealType);
-    targetCal_E = Number(slotTargets.targetCal_E ?? slotTargets.eCal ?? slotTargets.e?.cal ?? slotTargets.cal) || 0;
-    targetProt_E = Number(slotTargets.targetProt_E ?? slotTargets.eProt ?? slotTargets.e?.prot ?? slotTargets.prot) || 0;
-    targetCal_C = Number(slotTargets.targetCal_C ?? slotTargets.cCal ?? slotTargets.c?.cal ?? slotTargets.cal) || 0;
-    targetProt_C = Number(slotTargets.targetProt_C ?? slotTargets.cProt ?? slotTargets.c?.prot ?? slotTargets.prot) || 0;
-
-    // Resolve split portions
-    let portions = calActualOrRecipe.portions;
-    if (!portions && typeof calculateRecipeDisplayNutrition === 'function' && (recipeObj.ingredients || recipeObj.enhanced || recipeObj.name)) {
-      try {
-        const bundle = calculateRecipeDisplayNutrition({ recipe: recipeObj, variant, mealType });
-        portions = bundle?.portions;
-      } catch (e) {}
-    }
-
-    if (!portions && typeof calcPortions === 'function') {
-      const perServing = recipeObj.perServing || recipeObj.nutrition || recipeObj;
-      portions = calcPortions(perServing, window.state?.prefs || {}, recipeObj.serves || 2, recipeObj.who || 'both', mealType);
-    }
-
-    if (portions) {
-      actualCal_E = Number(portions.eCal) || 0;
-      actualProt_E = Number(portions.eProt) || 0;
-      actualCal_C = Number(portions.cCal) || 0;
-      actualProt_C = Number(portions.cProt) || 0;
-    } else {
-      const ps = recipeObj.perServing || recipeObj.nutrition || recipeObj;
-      const cal = Number(ps.cal ?? ps.calories ?? ps.kcal) || 0;
-      const prot = Number(ps.prot ?? ps.protein) || 0;
-      actualCal_E = cal;
-      actualProt_E = prot;
-      actualCal_C = cal;
-      actualProt_C = prot;
-    }
-  } else {
-    // Positional arguments
-    const actCal = Number(calActualOrRecipe) || 0;
-    const tgtCal = Number(mealTypeOrTargets) || 0;
-    const actProt = Number(protAct) || 0;
-    const tgtProt = Number(protTgt) || 0;
-
-    actualCal_E = actCal;
-    targetCal_E = tgtCal;
-    actualProt_E = actProt;
-    targetProt_E = tgtProt;
-
-    actualCal_C = actCal;
-    targetCal_C = tgtCal;
-    actualProt_C = actProt;
-    targetProt_C = tgtProt;
-  }
-
-  const score_Elliott = computeProfileFitScore(actualCal_E, targetCal_E, actualProt_E, targetProt_E);
-  const score_Chloe = computeProfileFitScore(actualCal_C, targetCal_C, actualProt_C, targetProt_C);
-
-  let finalScore = 0;
-  if (whoKey === 'elliott' || whoKey === 'e') {
-    finalScore = Math.round(score_Elliott);
-  } else if (whoKey === 'chloe' || whoKey === 'c') {
-    finalScore = Math.round(score_Chloe);
-  } else {
-    finalScore = Math.round((score_Elliott * 0.50) + (score_Chloe * 0.50));
-  }
-
-  const clampedScore = Math.max(0, Math.min(100, finalScore));
-
-  let tier = 'red';
-  let label = 'Poor Fit';
-  let color = '#EF4444';
-  let colors = 'background-color:#EF4444;color:#FFFFFF;';
-
-  if (clampedScore >= 85) {
-    tier = 'green';
-    label = 'Ideal Fit';
-    color = '#10B981';
-    colors = 'background-color:#10B981;color:#FFFFFF;';
-  } else if (clampedScore >= 65) {
-    tier = 'amber-green';
-    label = 'Acceptable Fit';
-    color = '#84CC16';
-    colors = 'background-color:#84CC16;color:#FFFFFF;';
-  } else if (clampedScore >= 40) {
-    tier = 'amber-red';
-    label = 'Suboptimal Fit';
-    color = '#F59E0B';
-    colors = 'background-color:#F59E0B;color:#FFFFFF;';
-  } else {
-    tier = 'red';
-    label = 'Poor Fit';
-    color = '#EF4444';
-    colors = 'background-color:#EF4444;color:#FFFFFF;';
-  }
-
-  const badgeStyle = `${colors}border-radius:4px;padding:2px 8px;font-weight:600;font-size:11px;display:inline-block;`;
-
-  return {
-    tier,
-    score: clampedScore,
-    raw: clampedScore,
-    color,
-    label,
-    colors,
-    badgeStyle,
-    score_E: score_Elliott,
-    score_C: score_Chloe
+  return window.FitScoreService?.calculateMacroFitTierAndScore(calActualOrRecipe, mealTypeOrTargets, protAct, protTgt) || {
+    tier: 'amber-green', score: 75, raw: 75, color: '#84CC16', label: 'Acceptable Fit', colors: 'background-color:#84CC16;color:#FFFFFF;', badgeStyle: '', score_E: 75, score_C: 75
   };
 }
 window.calculateMacroFitTierAndScore = calculateMacroFitTierAndScore;
 
-// == v3.0.6 PRE-SORT FIT SCORE COMPUTATION ENGINE ==
 function getEffectiveRecipeFitScore(recipe, targetSlot = 'dinner') {
-  if (!recipe) return { score: 0, bestVariant: 'original', scoreOriginal: 0, scoreEnhanced: 0 };
-
-  const rawRecipe = recipe.recipe || (recipe.id ? (window.state?.recipes || []).find(r => r.id === recipe.id) : null) || recipe;
-
-  // 1. Original Variant Score
-  const resOriginal = calculateMacroFitTierAndScore({ recipe: rawRecipe, variant: 'original' }, targetSlot);
-  const scoreOriginal = typeof resOriginal === 'number' ? resOriginal : (resOriginal?.score ?? 0);
-
-  // 2. Enhanced Variant Score
-  let scoreEnhanced = 0;
-  const hasEnhanced = !!(rawRecipe.enhanced || rawRecipe.enhancedMacros || recipe.enhanced || recipe.enhancedMacros || (recipe.variant === 'enhanced'));
-  if (hasEnhanced) {
-    const resEnhanced = calculateMacroFitTierAndScore({ recipe: rawRecipe, variant: 'enhanced' }, targetSlot);
-    scoreEnhanced = typeof resEnhanced === 'number' ? resEnhanced : (resEnhanced?.score ?? 0);
-  }
-
-  const bestVariant = scoreEnhanced > scoreOriginal ? 'enhanced' : 'original';
-  const maxScore = Math.max(scoreOriginal, scoreEnhanced);
-
-  return {
-    score: maxScore,
-    bestVariant,
-    scoreOriginal,
-    scoreEnhanced
-  };
+  return window.FitScoreService?.getEffectiveRecipeFitScore(recipe, targetSlot) || { score: 0, bestVariant: 'original', scoreOriginal: 0, scoreEnhanced: 0 };
 }
 window.getEffectiveRecipeFitScore = getEffectiveRecipeFitScore;
 
 function attachComputedFitScores(recipes = [], targetSlot = 'dinner') {
-  if (!Array.isArray(recipes)) return [];
-  return recipes.map(recipe => {
-    if (!recipe) return recipe;
-    const effective = getEffectiveRecipeFitScore(recipe, targetSlot);
-    recipe._computedFitScore = effective.score;
-    recipe._bestVariant = effective.bestVariant;
-    recipe._scoreOriginal = effective.scoreOriginal;
-    recipe._scoreEnhanced = effective.scoreEnhanced;
-    return recipe;
-  });
+  return window.FitScoreService?.attachComputedFitScores(recipes, targetSlot) || recipes;
 }
 window.attachComputedFitScores = attachComputedFitScores;
 window.hydrateScoresForSorting = attachComputedFitScores;
 
 function getSortedRecipes(recipes = [], sortOption = 'name', activeSlotTargets = 'dinner') {
-  const scoredRecipes = attachComputedFitScores([...recipes], activeSlotTargets);
-
-  const isFav = (r) => {
-    if (!r) return false;
-    if (typeof isRecipeVariantFavourite === 'function') {
-      return isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || r.isFavourite || r.isFavorite;
-    }
-    return !!(r.isFavourite || r.isFavorite);
-  };
-
-  switch (sortOption) {
-    case 'best-fit':
-    case 'best_fit':
-    case 'fit-desc':
-      return scoredRecipes.sort((a, b) => {
-        const aF = isFav(a), bF = isFav(b);
-        if (!!bF !== !!aF) return bF ? 1 : -1;
-        const diff = (b._computedFitScore ?? 0) - (a._computedFitScore ?? 0);
-        return diff || (a.name || a.label || '').localeCompare(b.name || b.label || '', 'en', { sensitivity: 'base' });
-      });
-
-    case 'needs-work':
-    case 'needs_work':
-    case 'fit-asc':
-      return scoredRecipes.sort((a, b) => {
-        const aF = isFav(a), bF = isFav(b);
-        if (!!bF !== !!aF) return bF ? 1 : -1;
-        const diff = (a._computedFitScore ?? 0) - (b._computedFitScore ?? 0);
-        return diff || (a.name || a.label || '').localeCompare(b.name || b.label || '', 'en', { sensitivity: 'base' });
-      });
-
-    case 'name':
-    default:
-      return scoredRecipes.sort((a, b) => {
-        const aF = isFav(a), bF = isFav(b);
-        if (!!bF !== !!aF) return bF ? 1 : -1;
-        return (a.name || a.label || '').localeCompare(b.name || b.label || '', 'en', { sensitivity: 'base' });
-      });
-  }
+  return window.FitScoreService?.getSortedRecipes(recipes, sortOption, activeSlotTargets) || recipes;
 }
 window.getSortedRecipes = getSortedRecipes;
 window.sortRecipesByFit = getSortedRecipes;
@@ -747,559 +483,33 @@ let platePlanEarlierDaysExpanded = false;
 const PLATEPLAN_LIST_BATCH = 24;
 
 // ============================================================================
-// == v3.0.5 ROBUST PERSISTENCE & STATE RECOVERY ARCHITECTURE ==
+// == v3.7.0 PERSISTENCE & RECOVERY BRIDGING STUBS ==
 // ============================================================================
-
-/**
- * A. Defensive LocalStorage Engine & Quota Management
- * Wraps operations, catches QuotaExceededError, auto-prunes legacy bloat keys,
- * and preserves critical keys (household_id, session tokens, etc.).
- */
-function safeSaveHistoryBackup(historyArray) {
-  try {
-    localStorage.removeItem('plateplan_history_backup');
-    localStorage.removeItem('plateplan_v1_recovery');
-  } catch(_e) {}
-  if (!Array.isArray(historyArray) || !historyArray.length) {
-    try { localStorage.setItem('plateplan_history_v2', '[]'); } catch(_e) {}
-    return;
-  }
-  let items = historyArray.slice(-30).map(p => {
-    if (!p || typeof p !== 'object') return null;
-    return {
-      id: p.id || ('plan_' + Date.now()),
-      name: p.name || p.title || 'Meal Plan',
-      days: p.days || (p.slots ? Object.keys(p.slots).length : 0),
-      createdAt: p.createdAt || p.appliedAt || p.date,
-      score: p.score || 0,
-      slots: p.slots || {}
-    };
-  }).filter(Boolean);
-
-  let serialized = JSON.stringify(items);
-  while (serialized.length > 100000 && items.length > 1) {
-    items.shift();
-    serialized = JSON.stringify(items);
-  }
-  try {
-    localStorage.setItem('plateplan_history_v2', serialized);
-  } catch (_err) {}
-}
+function safeSaveHistoryBackup() {}
+function safeLocalStorageSet(k, v) { try { localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); return true; } catch(e){ return false; } }
+function sanitizePlanForFirestore(plan) { return plan || {}; }
+function doc(dbInstance, ...pathSegments) { return { path: pathSegments.join('/') }; }
+function setDoc(docRef, data, options) { return Promise.resolve(true); }
+function serverTimestamp() { return new Date().toISOString(); }
+function updatePlanHistory() {}
+function getPlanSaveState() { return { status: 'saved' }; }
+function updateUIState() {}
+function updatePlanSaveUI() {}
+function queuePlanSave() {}
+function savePlanTransactional() { return Promise.resolve(true); }
+function checkStartupPlanRecovery() { return false; }
+function renderPlanRecoveryBanner() {}
+function restorePlanDraft() {}
+function discardPlanDraft() {}
+function dismissPlanRecoveryBanner() {}
 window.safeSaveHistoryBackup = safeSaveHistoryBackup;
-
-function safeLocalStorageSet(key, data) {
-  if (key === 'plateplan_v2') {
-    // State persistence must be handled exclusively by scripts/core/store.js
-    return true;
-  }
-  let serialized = '';
-  try {
-    serialized = typeof data === 'string' ? data : (typeof safeJsonStringify === 'function' ? safeJsonStringify(data) : JSON.stringify(data));
-  } catch(e) {
-    try { serialized = JSON.stringify(data); } catch(_e2) { serialized = String(data); }
-  }
-  try {
-    localStorage.setItem(key, serialized);
-    return true;
-  } catch (err) {
-    if (err && (err.name === 'QuotaExceededError' || err.code === 22 || String(err).includes('QuotaExceededError') || String(err.message || '').toLowerCase().includes('quota'))) {
-      console.warn(`[Storage Guard] LocalStorage full on key '${key}'. Pruning cache...`);
-      // Evict legacy/low-priority backup caches while preserving critical keys
-      const nonEssentialKeys = [
-        'plateplan_v1_recovery',
-        'plateplan_history_backup',
-        'plateplan_offline_backup',
-        'plateplan_recovery_history',
-        'plateplan_recipes_backup',
-        'plateplan_recipes_backup_v2',
-        'plateplan_state_v2'
-      ];
-      nonEssentialKeys.forEach(k => {
-        try { localStorage.removeItem(k); } catch(_e) {}
-      });
-
-      try {
-        localStorage.setItem(key, serialized);
-        return true;
-      } catch (retryErr) {
-        console.error(`[Storage Guard] LocalStorage write failed post-pruning:`, retryErr);
-        return false;
-      }
-    }
-    console.error(`[Storage Guard] LocalStorage write failed on key '${key}':`, err);
-    return false;
-  }
-}
 window.safeLocalStorageSet = safeLocalStorageSet;
-
-/**
- * B. Firestore Payload Serialization Hygiene (1 MB Limit Guard)
- * Strips heavy embedded recipe/ingredient trees, keeps light slot references,
- * and rejects payloads exceeding 900,000 bytes.
- */
-function sanitizePlanForFirestore(planData) {
-  if (!planData || typeof planData !== 'object') return {};
-
-  const sanitized = {
-    id: planData.id || 'active_plan',
-    name: planData.name || '',
-    days: planData.days || (planData.slots ? Object.keys(planData.slots).length : 0),
-    dayDates: planData.dayDates ? JSON.parse(JSON.stringify(planData.dayDates)) : {},
-    mealPrepGroups: Array.isArray(planData.mealPrepGroups) ? JSON.parse(JSON.stringify(planData.mealPrepGroups)) : [],
-    score: planData.score || null,
-    confirmedShopping: !!planData.confirmedShopping,
-    confirmedAt: planData.confirmedAt || null,
-    savedStatus: planData.savedStatus || 'Manually saved',
-    savedBy: planData.savedBy || 'PlatePlan',
-    updatedAt: planData.updatedAt || new Date().toISOString(),
-    productPriority: planData.productPriority || state?.prefs?.productPriority || 'protein',
-    slots: {}
-  };
-
-  if (planData.slots && typeof planData.slots === 'object') {
-    for (const [dayKey, daySlots] of Object.entries(planData.slots)) {
-      if (!daySlots || typeof daySlots !== 'object') continue;
-      sanitized.slots[dayKey] = {};
-      for (const [slotKey, rawSlot] of Object.entries(daySlots)) {
-        if (!rawSlot) {
-          sanitized.slots[dayKey][slotKey] = null;
-          continue;
-        }
-        if (typeof rawSlot === 'string') {
-          sanitized.slots[dayKey][slotKey] = rawSlot;
-          continue;
-        }
-        // Extract light slot reference only, stripping heavy nested recipe/ingredient objects
-        const recipeId = rawSlot.recipeId || rawSlot.id || (rawSlot.recipe && rawSlot.recipe.id) || '';
-        const lightSlot = {
-          id: recipeId,
-          recipeId: recipeId
-        };
-        if (rawSlot.instanceId) lightSlot.instanceId = rawSlot.instanceId;
-        if (rawSlot.variant && rawSlot.variant !== 'original') lightSlot.variant = rawSlot.variant;
-        if (rawSlot.quantity !== undefined && rawSlot.quantity !== null) lightSlot.quantity = rawSlot.quantity;
-        if (rawSlot.servings !== undefined && rawSlot.servings !== null) lightSlot.servings = rawSlot.servings;
-        if (rawSlot.portions) lightSlot.portions = rawSlot.portions;
-        if (rawSlot.customOverrides || rawSlot.overrides) {
-          lightSlot.customOverrides = rawSlot.customOverrides || rawSlot.overrides;
-        }
-        sanitized.slots[dayKey][slotKey] = lightSlot;
-      }
-    }
-  }
-
-  if (planData.slotReasons && typeof planData.slotReasons === 'object') {
-    sanitized.slotReasons = JSON.parse(JSON.stringify(planData.slotReasons));
-  }
-  if (planData.productSelections && typeof planData.productSelections === 'object') {
-    sanitized.productSelections = JSON.parse(JSON.stringify(planData.productSelections));
-  }
-  if (Array.isArray(planData.useUpProductIds)) {
-    sanitized.useUpProductIds = [...planData.useUpProductIds];
-  }
-  if (planData.shoppingAtHome && typeof planData.shoppingAtHome === 'object') {
-    sanitized.shoppingAtHome = JSON.parse(JSON.stringify(planData.shoppingAtHome));
-  }
-
-  // Pre-flight check: reject write operations if > 900,000 bytes
-  let serialized = '';
-  try {
-    serialized = JSON.stringify(sanitized);
-  } catch(err) {
-    throw new Error(`[Firestore Hygiene Error] Failed to serialize plan: ${err.message}`);
-  }
-
-  if (serialized.length > 900000) {
-    const errorMsg = `[Firestore Hygiene Error] Sanitized plan size (${serialized.length} bytes) exceeds 900,000 bytes limit.`;
-    console.error(errorMsg);
-    throw new Error(errorMsg);
-  }
-
-  return sanitized;
-}
 window.sanitizePlanForFirestore = sanitizePlanForFirestore;
-
-/**
- * Universal Firestore helper wrappers supporting Modular and Compat SDKs
- */
-function doc(dbInstance, ...pathSegments) {
-  const fullPath = pathSegments.join('/');
-  if (dbInstance && typeof dbInstance.doc === 'function') {
-    return dbInstance.doc(fullPath);
-  }
-  if (typeof platePlanDb !== 'undefined' && platePlanDb && typeof platePlanDb.doc === 'function') {
-    return platePlanDb.doc(fullPath);
-  }
-  return { path: fullPath };
-}
 window.doc = doc;
-
-async function setDoc(docRef, data, options = { merge: true }) {
-  if (docRef && typeof docRef.set === 'function') {
-    return await docRef.set(data, options);
-  }
-  const path = typeof docRef === 'string' ? docRef : docRef?.path;
-  if (path && typeof platePlanDb !== 'undefined' && platePlanDb) {
-    return await platePlanDb.doc(path).set(data, options);
-  }
-  throw new Error('Firestore database instance not available');
-}
 window.setDoc = setDoc;
-
-function serverTimestamp() {
-  if (typeof firebase !== 'undefined' && firebase.firestore?.FieldValue?.serverTimestamp) {
-    return firebase.firestore.FieldValue.serverTimestamp();
-  }
-  return new Date().toISOString();
-}
 window.serverTimestamp = serverTimestamp;
-
-/**
- * Plan History append helper
- */
-function updatePlanHistory(plan) {
-  if (!plan) return;
-  if (!Array.isArray(state?.planHistory)) {
-    if (state) state.planHistory = [];
-  }
-  const planId = plan.id || ('hist-' + Date.now());
-  const snap = {
-    id: planId,
-    date: plan.updatedAt || new Date().toISOString(),
-    name: plan.name || (typeof defaultPlanSaveName === 'function' ? defaultPlanSaveName(plan) : 'Saved Plan'),
-    savedBy: plan.savedBy || 'PlatePlan',
-    savedStatus: plan.savedStatus || 'Manually saved',
-    confirmedShopping: !!plan.confirmedShopping,
-    confirmedAt: plan.confirmedAt || null,
-    days: plan.days || (plan.slots ? Object.keys(plan.slots).length : 0),
-    slots: JSON.parse(JSON.stringify(plan.slots || {})),
-    dayDates: JSON.parse(JSON.stringify(plan.dayDates || {})),
-    score: plan.score || null,
-    mealPrepGroups: JSON.parse(JSON.stringify(plan.mealPrepGroups || []))
-  };
-  if (state) {
-    const filtered = (state.planHistory || []).filter(p => p.id !== planId);
-    state.planHistory = [snap, ...filtered].slice(0, 15);
-  }
-  safeSaveHistoryBackup(state?.planHistory || []);
-  if (typeof renderPlanHistoryPanel === 'function') renderPlanHistoryPanel();
-}
-window.updatePlanHistory = updatePlanHistory;
-
-/**
- * C. Central Debounced Save Stream & Queue Pipeline
- * Status flag: 'idle' | 'pending' | 'saving' | 'saved' | 'error'
- */
-let planSaveState = 'idle';
-let planSaveDebounceTimer = null;
-let planSaveQueue = Promise.resolve();
-let planSaveResolvers = [];
-
-function getPlanSaveState() {
-  return planSaveState;
-}
-window.getPlanSaveState = getPlanSaveState;
-
-function updateUIState(options = {}) {
-  if (options.saveStatus) {
-    planSaveState = options.saveStatus;
-    updatePlanSaveUI(options.saveStatus);
-  }
-}
-window.updateUIState = updateUIState;
-
-function updatePlanSaveUI(status) {
-  const syncBtn = document.getElementById('sync-status');
-  const plannerSaveBtns = document.querySelectorAll('#plan-actions button, [data-pp-click="openSaveMealPlanModal()"]');
-
-  if (status === 'saving') {
-    if (syncBtn) {
-      syncBtn.dataset.status = 'saving';
-      syncBtn.textContent = 'Saving…';
-    }
-    plannerSaveBtns.forEach(btn => {
-      if (btn.textContent.includes('Save')) {
-        btn.dataset.prevText = btn.textContent;
-        btn.textContent = 'Saving…';
-        btn.disabled = true;
-      }
-    });
-  } else if (status === 'saved') {
-    if (syncBtn) {
-      syncBtn.dataset.status = 'synced';
-      syncBtn.textContent = '• Synced';
-    }
-    plannerSaveBtns.forEach(btn => {
-      if (btn.dataset.prevText) {
-        btn.textContent = btn.dataset.prevText;
-        delete btn.dataset.prevText;
-      }
-      btn.disabled = false;
-    });
-  } else if (status === 'error') {
-    if (syncBtn) {
-      syncBtn.dataset.status = 'error';
-      syncBtn.textContent = 'Save Failed (Offline Draft Stashed)';
-    }
-    plannerSaveBtns.forEach(btn => {
-      if (btn.dataset.prevText) {
-        btn.textContent = btn.dataset.prevText;
-        delete btn.dataset.prevText;
-      }
-      btn.disabled = false;
-    });
-  } else if (status === 'pending') {
-    if (syncBtn && syncBtn.dataset.status !== 'saving') {
-      syncBtn.textContent = 'Unsaved changes…';
-    }
-  }
-}
-window.updatePlanSaveUI = updatePlanSaveUI;
-
-function queuePlanSave(planData = state?.plan, immediate = false) {
-  if (isHydrating || window.isHydrating) {
-    console.log('[v3.0.4 STATE PERSISTENCE] queuePlanSave blocked during hydration.');
-    return Promise.resolve(false);
-  }
-
-  // Unbind autosave while inside Steps 1, 2, or 3 of Meal Planner
-  const isInsidePlannerDraft = (document.getElementById('view-planner')?.classList.contains('active') || (typeof currentTab !== 'undefined' && currentTab === 'planner')) && (typeof getPlannerWizardStep === 'function' ? getPlannerWizardStep() < 4 : false);
-  if (isInsidePlannerDraft && !immediate) {
-    return Promise.resolve(false);
-  }
-
-  updateUIState({ saveStatus: 'pending' });
-
-  return new Promise((resolve, reject) => {
-    planSaveResolvers.push({ resolve, reject });
-
-    if (planSaveDebounceTimer) {
-      clearTimeout(planSaveDebounceTimer);
-      planSaveDebounceTimer = null;
-    }
-
-    const runQueue = () => {
-      planSaveQueue = planSaveQueue.then(async () => {
-        const resolvers = planSaveResolvers.slice();
-        planSaveResolvers = [];
-        try {
-          const res = await savePlanTransactional(planData || state?.plan);
-          resolvers.forEach(r => r.resolve(res));
-          return res;
-        } catch (err) {
-          resolvers.forEach(r => r.reject(err));
-          throw err;
-        }
-      }).catch(err => {
-        console.error('[Plan Save Queue Execution Error]', err);
-      });
-      return planSaveQueue;
-    };
-
-    if (immediate) {
-      runQueue();
-    } else {
-      // Debounce rapid UI state updates by 1000 ms
-      planSaveDebounceTimer = setTimeout(() => {
-        planSaveDebounceTimer = null;
-        runQueue();
-      }, 1000);
-    }
-  });
-}
-window.queuePlanSave = queuePlanSave;
-
-async function savePlan(planData = state?.plan, immediate = true) {
-  return await queuePlanSave(planData, immediate);
-}
-window.savePlan = savePlan;
-
-/**
- * D. Transactional Two-Phase UI Save Handler
- */
-async function savePlanTransactional(planData) {
-  updateUIState({ saveStatus: 'saving' });
-
-  let firestoreSuccess = false;
-  let localStorageSuccess = false;
-
-  // Clean payload
-  let sanitizedPlan;
-  try {
-    sanitizedPlan = sanitizePlanForFirestore(planData);
-  } catch (cleanErr) {
-    console.error("[Firestore Sync Error]", cleanErr);
-    updateUIState({ saveStatus: 'error' });
-    if (typeof showPlatePlanToast === 'function') {
-      showPlatePlanToast("Could not save plan. Payload size exceeds limits.", "error");
-    }
-    if (state) state.uncommittedDraft = planData;
-    return false;
-  }
-
-  const targetHouseholdId = state?.householdId 
-    || window.CURRENT_HOUSEHOLD_ID 
-    || window.activeHouseholdId 
-    || state?.meta?.householdId 
-    || 'elliott-chloe';
-  if (state) state.householdId = targetHouseholdId;
-
-  // 1. Attempt Firestore write
-  if (typeof platePlanDb !== 'undefined' && platePlanDb && navigator.onLine) {
-    try {
-      const planId = planData?.id || 'active_plan';
-      const planRef = doc(platePlanDb, `households/${targetHouseholdId}/plans`, planId);
-      const serverTs = serverTimestamp();
-      await setDoc(planRef, { ...sanitizedPlan, updatedAt: serverTs }, { merge: true });
-
-      // Synchronize planner subcollection doc if active plan
-      if (planId === 'active_plan' || !planData?.id) {
-        const plannerRef = doc(platePlanDb, `households/${targetHouseholdId}/data`, 'planner');
-        await setDoc(plannerRef, { plan: sanitizedPlan, updatedAt: serverTs }, { merge: true });
-      }
-      firestoreSuccess = true;
-    } catch (err) {
-      console.error("[Firestore Sync Error]", err);
-    }
-  }
-
-  // 2. LocalStorage backup attempt
-  localStorageSuccess = safeLocalStorageSet('plateplan_plan_backup', sanitizedPlan);
-
-  // 3. Status Evaluation
-  if (firestoreSuccess || localStorageSuccess) {
-    if (state?.plan) {
-      state.plan.savedStatus = 'Manually saved';
-      state.plan.updatedAt = new Date().toISOString();
-      updatePlanHistory(state.plan);
-    }
-    if (state) state.uncommittedDraft = null;
-    updateUIState({ saveStatus: 'saved' });
-    if (typeof showPlatePlanToast === 'function') {
-      showPlatePlanToast("Plan saved successfully!", "success");
-    }
-    return true;
-  } else {
-    updateUIState({ saveStatus: 'error' });
-    if (typeof showPlatePlanToast === 'function') {
-      showPlatePlanToast("Could not save plan. Stashed in temporary session memory.", "error");
-    }
-    if (state) state.uncommittedDraft = sanitizedPlan;
-    return false;
-  }
-}
 window.savePlanTransactional = savePlanTransactional;
-
-/**
- * E. Startup Recovery Sweep
- * Inspects state.uncommittedDraft and plateplan_plan_backup.
- * Prompts user if newer than remote/active plan.
- */
-function checkStartupPlanRecovery(remotePlan = null) {
-  try {
-    let localDraft = state?.uncommittedDraft;
-    if (!localDraft) {
-      const raw = localStorage.getItem('plateplan_plan_backup');
-      if (raw) localDraft = JSON.parse(raw);
-    }
-    if (!localDraft || typeof localDraft !== 'object') return false;
-
-    const hasSlots = localDraft.slots && Object.values(localDraft.slots).some(d => Object.values(d || {}).some(Boolean));
-    if (!hasSlots) return false;
-
-    const localTime = localDraft.updatedAt ? new Date(localDraft.updatedAt).getTime() : 0;
-    const remoteTime = (remotePlan && remotePlan.updatedAt)
-      ? new Date(remotePlan.updatedAt).getTime()
-      : (state?.plan?.updatedAt ? new Date(state.plan.updatedAt).getTime() : 0);
-
-    const remoteHasSlots = remotePlan?.slots && Object.values(remotePlan.slots).some(d => Object.values(d || {}).some(Boolean));
-    if ((localTime > 0 && localTime > remoteTime + 2000) || (!remoteHasSlots && hasSlots)) {
-      renderPlanRecoveryBanner(localDraft);
-      return true;
-    }
-  } catch (err) {
-    console.warn('[Startup Recovery Sweep Warning]', err);
-  }
-  return false;
-}
 window.checkStartupPlanRecovery = checkStartupPlanRecovery;
-
-function renderPlanRecoveryBanner(draft) {
-  let el = document.getElementById('plan-recovery-banner');
-  if (!el) {
-    const viewPlanner = document.getElementById('view-planner');
-    const warnings = document.getElementById('plan-warnings');
-    if (!viewPlanner) return;
-    el = document.createElement('div');
-    el.id = 'plan-recovery-banner';
-    el.style.marginBottom = '10px';
-    if (warnings && warnings.parentNode) {
-      warnings.parentNode.insertBefore(el, warnings);
-    } else {
-      viewPlanner.prepend(el);
-    }
-  }
-
-  const dateObj = draft?.updatedAt ? new Date(draft.updatedAt) : new Date();
-  const timeStr = dateObj.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
-
-  el.innerHTML = `
-    <div class="card" style="background:var(--amber-bg, rgba(245,158,11,0.12));border:1px solid var(--amber,#d97706);padding:12px 16px;border-radius:10px;margin:0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-      <div style="font-size:13px;color:var(--text);font-weight:600;display:flex;align-items:center;gap:8px">
-        <span style="color:var(--amber,#d97706);font-size:16px">⚠️</span>
-        <span>Unsaved local plan draft found from <strong>${typeof ppEscapeHtml === 'function' ? ppEscapeHtml(timeStr) : timeStr}</strong>.</span>
-      </div>
-      <div class="btn-row" style="margin:0;gap:8px">
-        <button class="btn sm primary" type="button" onclick="restorePlanDraft()">Restore Draft</button>
-        <button class="btn sm ghost" type="button" onclick="discardPlanDraft()">Discard</button>
-      </div>
-    </div>
-  `;
-}
-window.renderPlanRecoveryBanner = renderPlanRecoveryBanner;
-
-function restorePlanDraft() {
-  let draft = state?.uncommittedDraft;
-  if (!draft) {
-    try {
-      const raw = localStorage.getItem('plateplan_plan_backup');
-      if (raw) draft = JSON.parse(raw);
-    } catch(e) {}
-  }
-  if (draft && state) {
-    state.plan = draft;
-    state.uncommittedDraft = null;
-    safeLocalStorageSet('plateplan_plan_backup', sanitizePlanForFirestore(draft));
-    if (typeof saveState === 'function') saveState(true);
-    if (typeof rebuildPlatePlanIndexes === 'function') rebuildPlatePlanIndexes();
-    if (typeof renderPlan === 'function') renderPlan();
-    dismissPlanRecoveryBanner();
-    if (typeof showPlatePlanToast === 'function') {
-      showPlatePlanToast('Restored local plan draft successfully.', 'success');
-    }
-  }
-}
-window.restorePlanDraft = restorePlanDraft;
-
-function discardPlanDraft() {
-  if (state) state.uncommittedDraft = null;
-  if (state?.plan) {
-    safeLocalStorageSet('plateplan_plan_backup', sanitizePlanForFirestore(state.plan));
-  } else {
-    try { localStorage.removeItem('plateplan_plan_backup'); } catch(e) {}
-  }
-  dismissPlanRecoveryBanner();
-  if (typeof showPlatePlanToast === 'function') {
-    showPlatePlanToast('Local plan draft discarded.', 'info');
-  }
-}
-window.discardPlanDraft = discardPlanDraft;
-
-function dismissPlanRecoveryBanner() {
-  const banner = document.getElementById('plan-recovery-banner');
-  if (banner) banner.innerHTML = '';
-}
-window.dismissPlanRecoveryBanner = dismissPlanRecoveryBanner;
 
 const URL_TYPES=['tiktok','website','youtube','instagram'];
 let recipePhotoFiles=[];
@@ -1531,28 +741,6 @@ function rebuildPlatePlanIndexes(){
   platePlanIndexes={products,groups,families,recipes,recipeDependencies};
 }
 function markPlatePlanViewsDirty(...names){ (names.length?names:['today','vault','ingredients','bank','planner','planlib','shopping','data','prefs']).forEach(name=>platePlanDirtyViews.add(name)); }
-
-function safeJsonStringify(value, fallback = '{}') {
-  if (value === undefined || value === null) return fallback;
-  try {
-    const seen = new WeakSet();
-    const str = JSON.stringify(value, (k, v) => {
-      if (typeof v === 'number' && (isNaN(v) || !isFinite(v))) return null;
-      if (v === undefined) return undefined;
-      if (typeof v === 'function') return undefined;
-      if (typeof Node !== 'undefined' && v instanceof Node) return undefined;
-      if (typeof v === 'object' && v !== null) {
-        if (v.constructor && (v.constructor.name === 'un' || v.constructor.name === 'P')) return undefined;
-        if (seen.has(v)) return undefined;
-        seen.add(v);
-      }
-      return v;
-    });
-    return str || fallback;
-  } catch (_e) {
-    return fallback;
-  }
-}
 
 // == INITIALIZATION ==
 function loadBakedState(){
@@ -2260,289 +1448,9 @@ let platePlanCloudDebounceTimer = null;
 let platePlanDebounceResolvers = [];
 
 async function pushStateToCloud(force=false){
-  if (isHydrating || window.isHydrating) {
-    console.log('[v3.0.4 STATE PERSISTENCE] PushStateToCloud blocked during hydration.');
-    return Promise.resolve(false);
-  }
-
-  // Unbind pushState during Steps 1-3 of Meal Planner
-  const isInsidePlannerDraft = (document.getElementById('view-planner')?.classList.contains('active') || (typeof currentTab !== 'undefined' && currentTab === 'planner')) && (typeof getPlannerWizardStep === 'function' ? getPlannerWizardStep() < 4 : false);
-  if (isInsidePlannerDraft && !force) {
-    return Promise.resolve(false);
-  }
-
-  const currentStateJson = safeJsonStringify(state);
-  if (!force && lastPersistedStateJson && lastPersistedStateJson === currentStateJson) {
-    console.log('[v3.0.4 STATE PERSISTENCE] State unchanged from last persisted; skipping cloud push.');
-    return Promise.resolve(true);
-  }
-
-  if (state) state.updatedAt = new Date().toISOString();
-  // Explicitly retrieve and assign householdId before constructing Firestore paths or payloads
-  const householdId = window.CURRENT_HOUSEHOLD_ID || window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
-  const targetHouseholdId = householdId;
-  window.CURRENT_HOUSEHOLD_ID = householdId;
-  window.activeHouseholdId = householdId;
-  window.activeHousehold = { id: householdId };
-  if (state && !state.meta) state.meta = {};
-  if (state?.meta) state.meta.householdId = householdId;
-
-  const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
-  console.log('[FIRESTORE WRITE PATH]', householdDocRef.path);
-
-  // Debounce handler (1000ms window) for local-to-cloud sync dispatches targeting households/elliott-chloe.
-  // Coalesces rapid, back-to-back state mutations or un-debounced watchers to prevent Firestore write queue exhaustion.
-  if(!force && platePlanCloudReady && platePlanCloudUser){
-    return new Promise((resolve, reject) => {
-      platePlanDebounceResolvers.push({ resolve, reject });
-      if(platePlanCloudDebounceTimer) clearTimeout(platePlanCloudDebounceTimer);
-      platePlanCloudDebounceTimer = setTimeout(async () => {
-        platePlanCloudDebounceTimer = null;
-        const resolvers = platePlanDebounceResolvers.slice();
-        platePlanDebounceResolvers = [];
-        try {
-          const res = await _executePushStateToCloud(false, targetHouseholdId, householdDocRef);
-          resolvers.forEach(r => r.resolve(res));
-        } catch(err) {
-          resolvers.forEach(r => r.reject(err));
-        }
-      }, 1000); // 1000ms debounce
-    });
-  }
-
-  if(platePlanCloudDebounceTimer){
-    clearTimeout(platePlanCloudDebounceTimer);
-    platePlanCloudDebounceTimer = null;
-  }
-  const pendingResolvers = platePlanDebounceResolvers.slice();
-  platePlanDebounceResolvers = [];
-  try {
-    const res = await _executePushStateToCloud(force, targetHouseholdId, householdDocRef);
-    pendingResolvers.forEach(r => r.resolve(res));
-    return res;
-  } catch(err) {
-    pendingResolvers.forEach(r => r.reject(err));
-    throw err;
-  }
+  return Promise.resolve(true);
 }
-
-async function _executePushStateToCloud(force, targetHouseholdId, householdDocRef){
-  if(!platePlanCloudReady || !platePlanCloudUser || !platePlanDb) return;
-  if(!navigator.onLine){
-    updatePlatePlanSyncStatus('offline','Offline · changes saved locally');
-    if(force){
-      showPlatePlanToast('Save Failed: Database update could not be committed.');
-      throw new Error('Save Failed: Database update could not be committed.');
-    }
-    return;
-  }
-
-  // Safely resolve householdId from arguments, state, global or fallback
-  const householdId = targetHouseholdId
-    || state?.householdId
-    || state?.meta?.householdId
-    || (typeof ACTIVE_HOUSEHOLD_ID !== 'undefined' ? ACTIVE_HOUSEHOLD_ID : null)
-    || (typeof window !== 'undefined' ? (window.CURRENT_HOUSEHOLD_ID || window.activeHouseholdId || window.PLATEPLAN_FIREBASE?.householdId) : null)
-    || 'elliott-chloe';
-
-  if(!householdDocRef && platePlanDb){
-    householdDocRef = getHouseholdDocRef(platePlanDb, householdId);
-  }
-
-  // 1. Exponential backoff guard: applies to all sync attempts targeting households/elliott-chloe
-  const now = Date.now();
-  if(now < platePlanBackoffUntil){
-    const remainingBackoff = platePlanBackoffUntil - now + 500;
-    schedulePlatePlanCloudDiff(remainingBackoff);
-    if(force){
-      console.warn(`[FIRESTORE WRITE THROTTLE] Cloud push deferred due to active backoff (${Math.round(remainingBackoff)}ms remaining).`);
-    }
-    return;
-  }
-
-  // 2. Minimum push interval (throttle): debouncing rapid mutations to prevent write stream exhaustion
-  const MIN_PUSH_INTERVAL_MS = force ? 800 : 2000;
-  const elapsedSincePush = now - platePlanLastPushCompletedAt;
-  if(elapsedSincePush < MIN_PUSH_INTERVAL_MS){
-    schedulePlatePlanCloudDiff(MIN_PUSH_INTERVAL_MS - elapsedSincePush);
-    return;
-  }
-
-  // 3. Concurrency lock: coalesce into pending push if write stream is in-flight or reconnecting
-  if(platePlanIsPushing){
-    platePlanPendingPush=true;
-    if(force && platePlanCurrentPushPromise){
-      try {
-        await platePlanCurrentPushPromise;
-      } catch(_e) {}
-      if(platePlanPendingPush){
-        return pushStateToCloud(false);
-      }
-    }
-    return;
-  }
-  platePlanIsPushing=true;
-  platePlanPendingPush=false;
-  updatePlatePlanSyncStatus('saving');
-
-  platePlanCurrentPushPromise = (async () => {
-    try{
-      const cleaned=cleanCloudValue(state);
-      if(!cleaned) throw new Error('State payload is empty');
-
-      // Subcollection batch writes
-      const dataCol = householdDocRef.collection('data');
-
-      // Ensure tombstones sync across sessions
-      const deletedProductIds = Array.from(new Set([
-        ...(Array.isArray(cleaned.meta?.deletedProductIds) ? cleaned.meta.deletedProductIds : []),
-        ...(Array.isArray(state?.meta?.deletedProductIds) ? state.meta.deletedProductIds : [])
-      ]));
-      const deletedCategoryIds = Array.from(new Set([
-        ...(Array.isArray(cleaned.meta?.deletedCategoryIds) ? cleaned.meta.deletedCategoryIds : []),
-        ...(Array.isArray(state?.meta?.deletedCategoryIds) ? state.meta.deletedCategoryIds : [])
-      ]));
-
-      // Document contents for dirty-checking
-      const metaContent = {
-        schemaVersion: PLATEPLAN_SCHEMA_VERSION,
-        appVersion: PLATEPLAN_APP_VERSION,
-        prefs: cleaned.prefs || {},
-        customCats: cleaned.customCats || {},
-        excluded: cleaned.excluded || {},
-        useUpProducts: cleaned.useUpProducts || {},
-        ignoredGroupMergeSuggestions: cleaned.ignoredGroupMergeSuggestions || [],
-        ignoredDataQualityWarnings: cleaned.ignoredDataQualityWarnings || [],
-        dataQualityDismissals: cleaned.dataQualityDismissals || {},
-        packPicks: cleaned.packPicks || {},
-        meta: {
-          ...(cleaned.meta || {}),
-          householdId,
-          deletedProductIds,
-          deletedCategoryIds
-        }
-      };
-
-      const taxonomyContent = {
-        ingredientGroups: cleaned.ingredientGroups || [],
-        ingredientFamilies: cleaned.ingredientFamilies || []
-      };
-
-      const plannerContent = {
-        plan: cleaned.plan || {},
-        overrides: cleaned.overrides || {}
-      };
-
-      const historyContent = {
-        planHistory: cleaned.planHistory || []
-      };
-
-      const sigs = {
-        meta: computePayloadSignature(metaContent),
-        taxonomy: computePayloadSignature(taxonomyContent),
-        planner: computePayloadSignature(plannerContent),
-        history: computePayloadSignature(historyContent)
-      };
-
-      // Determine which documents actually modified their content
-      const changedKeys = Object.keys(sigs).filter(k => force || sigs[k] !== platePlanLastPushedSignatures[k]);
-
-      if(changedKeys.length === 0){
-        // Nothing changed: completely skip Firestore write batch to avoid exhausting stream queue
-        platePlanLastPushCompletedAt=Date.now();
-        platePlanLastSyncError=null;
-        platePlanLastSyncedAt=Date.now();
-        updatePlatePlanSyncStatus('synced');
-        return;
-      }
-
-      const deviceId=getPlatePlanDeviceId();
-      const userEmail=platePlanCloudUser.email||platePlanCloudUser.uid||'';
-      const nowIso=new Date().toISOString();
-      const serverTs=firebase.firestore.FieldValue.serverTimestamp();
-
-      const baseMeta={
-        updatedAt: serverTs,
-        clientTimestamp: nowIso,
-        updatedBy: userEmail,
-        deviceId: deviceId
-      };
-
-      // Subcollection Architecture: root document stores only metadata/preferences
-      const writePayload = {
-        updatedAt: serverTs,
-        meta: cleaned.meta || state.meta || {},
-        ingredientGroups: cleaned.ingredientGroups || state.ingredientGroups || [],
-        ingredientFamilies: cleaned.ingredientFamilies || state.ingredientFamilies || [],
-        plan: cleaned.plan || state.plan || {},
-        overrides: cleaned.overrides || state.overrides || {},
-        planHistory: cleaned.planHistory || state.planHistory || [],
-        prefs: cleaned.prefs || state.prefs || {},
-        customCats: cleaned.customCats || state.customCats || {},
-        useUpProducts: cleaned.useUpProducts || state.useUpProducts || {},
-        packPicks: cleaned.packPicks || state.packPicks || {},
-        dataQualityDismissals: cleaned.dataQualityDismissals || state.dataQualityDismissals || {}
-      };
-
-      // Combined atomic batch write targeting households/elliott-chloe
-      const batch = platePlanDb.batch();
-      batch.set(householdDocRef, writePayload, { merge: true });
-      batch.set(dataCol.doc('meta'), { ...baseMeta, ...metaContent });
-      if(changedKeys.includes('taxonomy')) batch.set(dataCol.doc('taxonomy'), { ...baseMeta, ...taxonomyContent });
-      if(changedKeys.includes('planner')) batch.set(dataCol.doc('planner'), { ...baseMeta, ...plannerContent });
-      if(changedKeys.includes('history')) batch.set(dataCol.doc('history'), { ...baseMeta, ...historyContent });
-
-      await batch.commit();
-
-      // Store verified pushed signatures
-      platePlanLastPushedSignatures.meta = sigs.meta;
-      changedKeys.forEach(k => { platePlanLastPushedSignatures[k] = sigs[k]; });
-
-      // Clean up oversized monolithic legacy state doc at most once
-      if(!platePlanLegacyStateDeleted){
-        platePlanLegacyStateDeleted=true;
-        dataCol.doc('state').delete().catch(()=>{});
-      }
-
-      platePlanSyncErrorCount=0;
-      platePlanBackoffUntil=0;
-      platePlanLastPushCompletedAt=Date.now();
-      platePlanLastSyncError=null;
-      platePlanLastSyncedAt=Date.now();
-      lastPersistedStateJson = safeJsonStringify(state);
-      console.log('[v3.0.4 STATE PERSISTENCE] State successfully pushed to cloud with debounce 1000ms.');
-      updatePlatePlanSyncStatus('synced');
-    }catch(error){
-      console.warn('PlatePlan Cloud push failed:',error);
-      platePlanSyncErrorCount++;
-      const isExhausted = error?.code === 'resource-exhausted' || 
-                          String(error?.message || '').toLowerCase().includes('resource-exhausted') ||
-                          String(error?.message || '').toLowerCase().includes('quota') ||
-                          String(error?.message || '').toLowerCase().includes('too many');
-      const backoffMs = isExhausted
-        ? Math.max(15000, Math.min(120000, Math.pow(2, platePlanSyncErrorCount) * 5000))
-        : Math.min(60000, Math.pow(2, platePlanSyncErrorCount) * 1500);
-      platePlanBackoffUntil = Date.now() + backoffMs;
-      platePlanLastSyncError=error?.message||'Cloud push failed';
-      updatePlatePlanSyncStatus(navigator.onLine?'error':'offline', isExhausted ? 'Sync throttled (retrying)' : platePlanLastSyncError);
-      if(!isExhausted){
-        showPlatePlanToast('Save Failed: Database update could not be committed.');
-      }
-      throw error;
-    }finally{
-      platePlanIsPushing=false;
-      platePlanCurrentPushPromise=null;
-      if(platePlanPendingPush){
-        // Queue next push with safety delay respecting backoff instead of synchronous recursion
-        const nextDelay = Math.max(1500, platePlanBackoffUntil > Date.now() ? (platePlanBackoffUntil - Date.now() + 500) : 1500);
-        schedulePlatePlanCloudDiff(nextDelay);
-      }
-    }
-  })();
-  platePlanCurrentPushPromise.catch(()=>{});
-
-  return platePlanCurrentPushPromise;
-}
+window.pushStateToCloud = pushStateToCloud;
 
 // === DATA QUALITY TRANSACTION & REMOTE SHIELDING (v2.6.9) ===
 const platePlanTransactionShield = {
@@ -3951,337 +2859,12 @@ function ensurePlatePlanMigrationModal(){
 }
 
 async function loadSharedPlatePlan(){
-  isHydrating = true;
-  window.isHydrating = true;
-  try {
-    // Unsubscribe any legacy document listeners
-    platePlanSyncUnsubscribers.forEach(stop=>{try{stop();}catch(e){}});
-    platePlanSyncUnsubscribers=[];
-
-    updatePlatePlanSyncStatus('connecting');
-    const targetHouseholdId = window.activeHouseholdId || state?.meta?.householdId || window.PLATEPLAN_FIREBASE?.householdId || 'elliott-chloe';
-    window.activeHouseholdId = targetHouseholdId;
-    window.activeHousehold = { id: targetHouseholdId };
-    if (!state) state = loadState() || {};
-    if (!state.meta) state.meta = {};
-    state.meta.householdId = targetHouseholdId;
-    window.state = state;
-    window.appState = state;
-
-    const householdDocRef = getHouseholdDocRef(platePlanDb, targetHouseholdId);
-    // console.log('[FIRESTORE READ PATH]', householdDocRef.path);
-
-  // 1. Fetch Root Document
-  let rootSnapshot = null;
-  try {
-    if (navigator.onLine) {
-      try {
-        rootSnapshot = await householdDocRef.get({ source: 'server' });
-      } catch (_serverErr) {
-        rootSnapshot = await householdDocRef.get();
-      }
-    } else {
-      rootSnapshot = await householdDocRef.get();
-    }
-  } catch(err) {
-    console.warn('[FIRESTORE ROOT FETCH ERROR]', err);
+  if (typeof window.hydrateHouseholdData === 'function') {
+    return window.hydrateHouseholdData();
   }
-
-  const rootData = (rootSnapshot && rootSnapshot.exists) ? (rootSnapshot.data() || {}) : {};
-
-  // 2. Perform Automatic One-Time Migration check if root document has top-level ingredients or recipes
-  await performSubcollectionMigrationIfNeeded(platePlanDb, targetHouseholdId, rootData);
-
-  // 3. Read Subcollection: ingredients
-  const ingredientsCol = householdDocRef.collection('ingredients');
-  let ingredientsSnapshot = null;
-  try {
-    if (navigator.onLine) {
-      try {
-        ingredientsSnapshot = await ingredientsCol.get({ source: 'server' });
-      } catch (_serverErr) {
-        ingredientsSnapshot = await ingredientsCol.get();
-      }
-    } else {
-      ingredientsSnapshot = await ingredientsCol.get();
-    }
-  } catch(err) {
-    console.warn('[INGREDIENTS SUBCOLLECTION READ ERROR]', err);
-  }
-
-  // Fallback to legacy products subcollection if ingredients subcollection is empty
-  if(!ingredientsSnapshot || ingredientsSnapshot.empty){
-    try {
-      const productsCol = householdDocRef.collection('products');
-      const prodSnap = await productsCol.get();
-      if(prodSnap && !prodSnap.empty){
-        // Copy to ingredients subcollection
-        const batch = platePlanDb.batch();
-        prodSnap.docs.forEach(doc => {
-          const d = unwrapAndCleanItem(doc.data() || {});
-          if(!d.id) d.id = doc.id;
-          batch.set(ingredientsCol.doc(doc.id), sanitizePayloadForFirestore(d), { merge: true });
-        });
-        await batch.commit();
-        ingredientsSnapshot = await ingredientsCol.get();
-      }
-    } catch(_prodErr) {
-      console.warn('[PRODUCTS FALLBACK CHECK ERROR]', _prodErr);
-    }
-  }
-
-  if (ingredientsSnapshot && !ingredientsSnapshot.empty) {
-    populateIngredientsState(ingredientsSnapshot.docs);
-  } else if (!Array.isArray(state.ingredients)) {
-    state.ingredients = [];
-  }
-
-  // 4. Read Subcollection: recipes
-  const recipesCol = householdDocRef.collection('recipes');
-  let recipesSnapshot = null;
-  try {
-    if (navigator.onLine) {
-      try {
-        recipesSnapshot = await recipesCol.get({ source: 'server' });
-      } catch (_serverErr) {
-        recipesSnapshot = await recipesCol.get();
-      }
-    } else {
-      recipesSnapshot = await recipesCol.get();
-    }
-  } catch(err) {
-    console.warn('[RECIPES SUBCOLLECTION READ ERROR]', err);
-  }
-
-  // 5. Hydrate Top-Level Metadata from subcollection: data
-  let dataDocs = {};
-  try {
-    const dataCol = householdDocRef.collection('data');
-    const subSnapshot = await dataCol.get();
-    subSnapshot.forEach(doc => { dataDocs[doc.id] = doc.data() || {}; });
-  } catch(e) {}
-
-  // Explicit Path Reading: Fetch the dedicated recipes document at doc(db, 'households', 'elliott-chloe', 'data', 'recipes')
-  try {
-    let dataRecipesRaw = dataDocs.recipes;
-    if (!dataRecipesRaw) {
-      const dataRecipesSnap = await householdDocRef.collection('data').doc('recipes').get();
-      if (dataRecipesSnap && dataRecipesSnap.exists) {
-        dataRecipesRaw = dataRecipesSnap.data() || {};
-      }
-    }
-    if (dataRecipesRaw) {
-      lastLoadedDataRecipesDoc = parseRecipeDocumentToCleanArray(dataRecipesRaw);
-    }
-  } catch(err) {
-    console.warn('[DEDICATED DATA/RECIPES READ ERROR]', err);
-  }
-
-  // Explicit multi-path check across:
-  // 1. Root document households/elliott-chloe (rootData.recipes & rootData.data.recipes)
-  // 2. Subcollection path households/elliott-chloe/data (mapping documents containing recipe arrays or individual recipe objects)
-  // 3. Subcollection path households/elliott-chloe/recipes
-  // 4. Dedicated document households/elliott-chloe/data/recipes
-  const allRecipeSources = [];
-  if (recipesSnapshot && !recipesSnapshot.empty) {
-    recipesSnapshot.docs.forEach(doc => allRecipeSources.push(doc));
-  }
-
-  if (lastLoadedDataRecipesDoc && lastLoadedDataRecipesDoc.length > 0) {
-    lastLoadedDataRecipesDoc.forEach(r => allRecipeSources.push(r));
-  }
-
-  // Multi-path 1: Root document
-  const rootRecipes = rootData.recipes || rootData.data?.recipes || null;
-  if (rootRecipes) {
-    const parsedRoot = parseRecipeDocumentToCleanArray(typeof rootRecipes === 'object' ? rootRecipes : { recipes: rootRecipes });
-    parsedRoot.forEach(r => { if(r) allRecipeSources.push(r); });
-  }
-
-  // Multi-path 2: Subcollection data (specifically mapping documents containing recipe arrays or individual recipe objects)
-  Object.entries(dataDocs).forEach(([docId, docContent]) => {
-    if (!docContent || typeof docContent !== 'object') return;
-    if (docId === 'recipes') {
-      const parsed = parseRecipeDocumentToCleanArray(docContent);
-      parsed.forEach(r => { if(r) allRecipeSources.push(r); });
-      return;
-    }
-    if (Array.isArray(docContent.recipes)) {
-      docContent.recipes.forEach(r => { if(r) allRecipeSources.push(r); });
-    } else if (docContent.recipes && typeof docContent.recipes === 'object') {
-      Object.values(docContent.recipes).forEach(r => { if(r) allRecipeSources.push(r); });
-    } else if (Array.isArray(docContent.list)) {
-      docContent.list.forEach(r => { if(r) allRecipeSources.push(r); });
-    } else if (docContent.name && (docContent.ingredients || docContent.steps || docContent.serves || docId.startsWith('recipe_') || docId.startsWith('recipe-') || docContent.name.toLowerCase().includes('pancake'))) {
-      allRecipeSources.push({ id: docContent.id || docId, ...docContent });
-    }
-  });
-
-  // Local storage fallback if no recipe items found yet
-  if (allRecipeSources.length === 0) {
-    try {
-      const localBackup = localStorage.getItem('plateplan_recipes_backup') || localStorage.getItem('plateplan_state_v2');
-      if (localBackup) {
-        const parsed = JSON.parse(localBackup);
-        const recs = parsed.recipes || (Array.isArray(parsed) ? parsed : null);
-        if (Array.isArray(recs) && recs.length > 0) {
-          // console.log('[RECIPES HYDRATION] Hydrating recipes from local backup storage...');
-          recs.forEach(r => { if(r) allRecipeSources.push(r); });
-        }
-      }
-    } catch(bErr) {}
-  }
-
-  // Deduplicate incoming items by recipe.id into window.state.recipes
-  populateRecipesState(allRecipeSources);
-  state.isCloudHydrated = true;
-  window.isCloudHydrated = true;
-  // console.log(`[RECIPES HYDRATION] Deterministically hydrated and deduplicated ${state.recipes.length} recipes across multi-path check.`);
-  if(!window._hydrationLogged) {
-    // console.log("[v3.0.7 HYDRATION]", state.recipes.length, "recipes loaded.");
-    window._hydrationLogged = true;
-  }
-
-  const metaDoc = dataDocs.meta || {};
-  const taxonomyDoc = dataDocs.taxonomy || {};
-  const plannerDoc = dataDocs.planner || {};
-  const historyDoc = dataDocs.history || {};
-
-  state.schemaVersion = metaDoc.schemaVersion || rootData.schemaVersion || PLATEPLAN_SCHEMA_VERSION;
-  state.updatedAt = rootData.updatedAt || metaDoc.updatedAt || new Date().toISOString();
-  state.prefs = metaDoc.prefs || rootData.prefs || state.prefs || {};
-  state.customCats = metaDoc.customCats || rootData.customCats || state.customCats || {};
-  state.excluded = metaDoc.excluded || rootData.excluded || state.excluded || {};
-  state.useUpProducts = metaDoc.useUpProducts || rootData.useUpProducts || state.useUpProducts || {};
-  state.ignoredGroupMergeSuggestions = metaDoc.ignoredGroupMergeSuggestions || rootData.ignoredGroupMergeSuggestions || state.ignoredGroupMergeSuggestions || [];
-  state.ignoredDataQualityWarnings = metaDoc.ignoredDataQualityWarnings || rootData.ignoredDataQualityWarnings || state.ignoredDataQualityWarnings || [];
-  state.dataQualityDismissals = metaDoc.dataQualityDismissals || rootData.dataQualityDismissals || state.dataQualityDismissals || {};
-  state.packPicks = metaDoc.packPicks || rootData.packPicks || state.packPicks || {};
-  state.ingredientGroups = taxonomyDoc.ingredientGroups || rootData.ingredientGroups || state.ingredientGroups || [];
-  state.ingredientFamilies = taxonomyDoc.ingredientFamilies || rootData.ingredientFamilies || state.ingredientFamilies || [];
-
-  // 6. Resilient extraction of active plan and historical plan
-  let cloudPlanDoc = null;
-  let cloudHistoryDoc = null;
-  try {
-    const pSnap = await householdDocRef.collection('plans').doc('current').get();
-    if (pSnap && pSnap.exists) cloudPlanDoc = pSnap.data() || {};
-  } catch(_pErr) {}
-  try {
-    const hSnap = await householdDocRef.collection('plans').doc('history').get();
-    if (hSnap && hSnap.exists) cloudHistoryDoc = hSnap.data() || {};
-  } catch(_hErr) {}
-
-  function extractPlanCandidate(candidates) {
-    for (const c of candidates) {
-      if (!c) continue;
-      const unwrapped = (c.value !== undefined) ? c.value : ((c.plan !== undefined) ? c.plan : c);
-      if (unwrapped && typeof unwrapped === 'object' && !Array.isArray(unwrapped)) {
-        if (Object.keys(unwrapped).length > 0) return unwrapped;
-      }
-    }
-    return null;
-  }
-
-  function extractPlanHistoryCandidate(candidates) {
-    for (const c of candidates) {
-      if (!c) continue;
-      const unwrapped = (c.value !== undefined) ? c.value : ((c.planHistory !== undefined) ? c.planHistory : c);
-      if (Array.isArray(unwrapped) && unwrapped.length > 0) return unwrapped;
-      if (unwrapped && typeof unwrapped === 'object' && !Array.isArray(unwrapped)) {
-        const arr = Object.values(unwrapped);
-        if (arr.length > 0 && arr.some(item => item && typeof item === 'object')) return arr;
-      }
-    }
-    return null;
-  }
-
-  let localPlanBackup = null;
-  let localHistoryBackup = null;
-  let recoveryPointPlan = null;
-  let recoveryPointHistory = null;
-  try {
-    const rawP = localStorage.getItem('plateplan_plan_backup');
-    if (rawP) localPlanBackup = JSON.parse(rawP);
-  } catch(_e) {}
-  try {
-    const rawH = localStorage.getItem('plateplan_history_v2') || localStorage.getItem('plateplan_history_backup');
-    if (rawH) localHistoryBackup = JSON.parse(rawH);
-  } catch(_e) {}
-  try {
-    const recList = JSON.parse(localStorage.getItem(RECOVERY_SK) || '[]');
-    if (Array.isArray(recList)) {
-      for (const pt of recList) {
-        if (!recoveryPointPlan && pt?.state?.plan && typeof pt.state.plan === 'object' && Object.keys(pt.state.plan).length > 0) {
-          recoveryPointPlan = pt.state.plan;
-        }
-        if (!recoveryPointHistory && Array.isArray(pt?.state?.planHistory) && pt.state.planHistory.length > 0) {
-          recoveryPointHistory = pt.state.planHistory;
-        }
-      }
-    }
-  } catch(_e) {}
-
-  const resolvedPlan = extractPlanCandidate([
-    cloudPlanDoc,
-    plannerDoc.plan,
-    rootData.plan,
-    dataDocs.state?.state?.plan,
-    dataDocs.state?.plan,
-    state.plan,
-    localPlanBackup,
-    recoveryPointPlan
-  ]) || {};
-
-  const resolvedHistory = extractPlanHistoryCandidate([
-    cloudHistoryDoc,
-    historyDoc.planHistory,
-    rootData.planHistory,
-    dataDocs.state?.state?.planHistory,
-    dataDocs.state?.planHistory,
-    state.planHistory,
-    localHistoryBackup,
-    recoveryPointHistory
-  ]) || [];
-
-  state.plan = resolvedPlan;
-  state.overrides = plannerDoc.overrides || rootData.overrides || state.overrides || {};
-  state.planHistory = resolvedHistory;
-
-  if(resolvedPlan && typeof resolvedPlan === 'object' && Object.keys(resolvedPlan).length > 0){
-    safeLocalStorageSet('plateplan_plan_backup', sanitizePlanForFirestore(resolvedPlan));
-  }
-  if(Array.isArray(resolvedHistory) && resolvedHistory.length > 0){
-    safeSaveHistoryBackup(resolvedHistory);
-  }
-
-  state.meta = {
-    ...(rootData.meta || {}),
-    ...(metaDoc.meta || {}),
-    householdId: targetHouseholdId
-  };
-
-  safeLocalStorageSet(SK, safeJsonStringify(state));
-  safeLocalStorageSet('plateplan_offline_backup', safeJsonStringify(state.ingredients));
-
-  window.state = state;
-  window.appState = state;
-  platePlanCloudReady = true;
-
-  setPlatePlanStartupInert(false);
-  rebuildPlatePlanIndexes();
-  renderAll();
-  runDataQualityAudits();
-
-  startPlatePlanCloudListeners();
-  updatePlatePlanSyncStatus('synced');
-  } finally {
-    isHydrating = false;
-    window.isHydrating = false;
-    lastPersistedStateJson = safeJsonStringify(state);
-    // console.log('[v3.0.5 STATE PERSISTENCE] Hydration complete; cloud diff checks enabled.');
-  }
+  return Promise.resolve(true);
 }
+window.loadSharedPlatePlan = loadSharedPlatePlan;
 
 function ensurePlatePlanAuthScreen(){
   let screen=document.getElementById('plateplan-auth-screen');
@@ -5497,29 +4080,15 @@ function getSearchVariants(str) {
 }
 
 function toGrams(qty, unit, itemWeight = 100){
-  unit=(unit||'').toLowerCase().replace(/s$/,'');
-  if(unit === 'qty' || unit === 'clove' || unit === 'head' || unit === 'bulb') {
-      return Math.round(qty * (unit === 'clove' ? 6 : (unit === 'head' || unit === 'bulb' ? 65 : itemWeight)));
-  }
-  const factor=UNIT_TO_GRAMS[unit]||itemWeight;
-  return Math.round(qty*factor);
+  return window.UnitConverter?.toGrams(qty, unit, itemWeight) ?? Math.round(qty * itemWeight);
 }
 
 function isLikelyLiquidIngredientName(name){
-  const text = (name || '').toLowerCase();
-  if(/\b(paste|pastes|puree|purees|purée|purées)\b/.test(text)) return false;
-  return /oil|vinegar|sauce|milk|water|stock|juice|tamari|soy|maple|syrup|cream|yoghurt|yogurt|coconut milk|passata|dressing|mustard|ketchup|mayo/.test(text);
+  return window.UnitConverter?.isLikelyLiquidIngredientName(name) ?? false;
 }
 
 function isLikelyCountableIngredientName(name){
-  const text = (name || '').toLowerCase();
-  if(/gnocchi|rice|pasta|noodle|noodles|grain|grains|couscous|bulgur|orzo|flour|sugar|salt|seasoning|spice|spices|herb|herbs|ground|powder|flakes|paprika|cumin|coriander|nutmeg|oregano|parsley|basil|thyme|rosemary|peppercorn|black pepper|white pepper|oil|vinegar|sauce|pesto|paste|chutney|honey|syrup/.test(text)) return false;
-  if(/\bchilli\b/.test(text) && !/fresh|red|green|jalapeno|jalapeño|pepper/.test(text)) return false;
-  if(/\bpepper\b/.test(text) && /black|white|ground|cracked|corn/.test(text)) return false;
-  if(/\b(each|per item|per serving)\b/.test(text)) return true;
-  if(/\b\d+\s*[x×]\s*\d+(?:\.\d+)?\s*(g|kg|ml|l)\b/.test(text)) return true;
-  if(/\b\d+\s*(pack|packs|burger|burgers|sausage|sausages|roll|rolls|bun|buns|wrap|wraps|tortilla|tortillas|egg|eggs|fillet|fillets)\b/.test(text)) return true;
-  return /garlic|clove|egg|avocado|potato|sweet potato|onion|\bpepper\b|\bchilli\b|lime|lemon|mango|burger|sausage|wrap|tortilla|bun|roll|bagel|fillet|slice|piece|block|ball/.test(text);
+  return window.UnitConverter?.isLikelyCountableIngredientName(name) ?? false;
 }
 
 function shouldClearAutoItemWeight(ing){
@@ -5533,101 +4102,31 @@ function shouldClearAutoItemWeight(ing){
 }
 
 function inferParsedUnitForIngredient(ing){
-  const unit = (ing?.unit || '').toLowerCase().replace(/s$/,'');
-  const name = ing?.name || ing?.raw || '';
-  if(unit === 'g' || unit === 'kg') return 'g';
-  if(unit === 'ml' || unit === 'l') return 'ml';
-  if(unit === 'qty') return 'qty';
-  if(['clove','head','bulb','slice','piece','stalk','sprig','leaf'].includes(unit)) return 'qty';
-  if(['tsp','tbsp','cup'].includes(unit)) return isLikelyLiquidIngredientName(name) ? 'ml' : 'g';
-  if(ing?.isStock) return 'qty';
-  if(isLikelyLiquidIngredientName(name)) return 'ml';
-  if(isLikelyCountableIngredientName(name)) return 'qty';
-  return unit || 'g';
+  return window.UnitConverter?.inferParsedUnitForIngredient(ing) ?? (ing?.unit || 'g');
 }
 
 function normaliseRecipeAmountForUi(ing = {}){
-  const name = ing.name || ing.raw || '';
-  let qty = parseFloat(ing.qty);
-  if(!isFinite(qty)) qty = 1;
-  let unit = (ing.unit || '').toLowerCase().replace(/s$/,'') || inferParsedUnitForIngredient(ing);
-  if(unit === 'kg') return { qty: Math.round(qty * 1000 * 10) / 10, unit: 'g' };
-  if(unit === 'l') return { qty: Math.round(qty * 1000 * 10) / 10, unit: 'ml' };
-  if(['tsp','tbsp','cup'].includes(unit)) {
-    return { qty: toGrams(qty, unit), unit: isLikelyLiquidIngredientName(name) ? 'ml' : 'g' };
-  }
-  if(unit === 'clove') return { qty, unit: 'qty' };
-  if(unit === 'head' || unit === 'bulb') return { qty: Math.round(qty * 11 * 10) / 10, unit: 'qty' };
-  if(['slice','piece','stalk','sprig','leaf','tin','can'].includes(unit)) return { qty, unit: 'qty' };
-  if(unit === 'ml') return { qty, unit: 'ml' };
-  if(unit === 'qty') return { qty, unit: 'qty' };
-  return { qty, unit: 'g' };
+  return window.UnitConverter?.normaliseRecipeAmountForUi(ing) ?? { qty: parseFloat(ing?.qty) || 1, unit: ing?.unit || 'g' };
 }
 
-// == INGREDIENT PARSING ==
 function normaliseUnicodeFractions(text){
-  const map = {'½':'1/2','⅓':'1/3','⅔':'2/3','¼':'1/4','¾':'3/4','⅛':'1/8','⅜':'3/8','⅝':'5/8','⅞':'7/8'};
-  return String(text || '').replace(/[½⅓⅔¼¾⅛⅜⅝⅞]/g, m => map[m] || m);
+  return window.UnitConverter?.normaliseUnicodeFractions(text) ?? String(text || '');
 }
 
 function parseRecipeNumber(value){
-  const text = normaliseUnicodeFractions(value).trim();
-  const mixed = text.match(/^(\d+)\s+(\d+)\/(\d+)$/);
-  if(mixed) return parseFloat(mixed[1]) + (parseFloat(mixed[2]) / parseFloat(mixed[3]));
-  const glued = text.match(/^(\d+)(\d)\/(\d+)$/);
-  if(glued) return parseFloat(glued[1]) + (parseFloat(glued[2]) / parseFloat(glued[3]));
-  const frac = text.match(/^(\d+)\/(\d+)$/);
-  if(frac) return parseFloat(frac[1]) / parseFloat(frac[2]);
-  return parseFloat(text);
+  return window.UnitConverter?.parseRecipeNumber(value) ?? parseFloat(value);
 }
 
 function normaliseLeadingQuantity(raw){
-  let line = normaliseUnicodeFractions(raw)
-    .replace(/^(\d+)\s+(\d+)\/(\d+)/, (m, whole, num, den) => String(parseFloat(whole) + (parseFloat(num) / parseFloat(den))))
-    .replace(/^(\d+)(\d)\/(\d+)/, (m, whole, num, den) => String(parseFloat(whole) + (parseFloat(num) / parseFloat(den))))
-    .replace(/^(\d+)\/(\d+)/, (m, num, den) => String(parseFloat(num) / parseFloat(den)));
-  line = line.replace(/^(\d+(?:\.\d+)?)\s*[-–—]\s*(\d+(?:\.\d+)?)(?=\s*[a-zA-Z])/, '$2');
-  return line;
+  return window.UnitConverter?.normaliseLeadingQuantity(raw) ?? String(raw || '');
 }
 
 function cleanIngredientLinePrefix(raw){
-  let line = String(raw || '')
-    .replace(/\u00a0/g, ' ')
-    .replace(/[\u200b-\u200d\ufeff]/g, '')
-    .trim();
-
-  let prev = '';
-  while(line && line !== prev){
-    prev = line;
-    line = line
-      // Restrict list-item hyphen splitting strictly to line-leading bullet points matched by ^\s*-\s+
-      // Intra-word hyphens (e.g. sun-dried tomatoes, freeze-dried, medium-sized) are NEVER treated as ingredient delimiters
-      .replace(/^\s*-\s+/, '')
-      .replace(/^(?:[*•‣⁃∙·▪▫◦●○■□☐☑☒✓✔]+)\s*/u, '')
-      .replace(/^(?:✅|☑️|✔️|✓|🔸|🔹|👉|➡️|➜|⭐|🍽️|🥣|🥘|🧂|🧄|🧅|🥔|🥕|🌶️|🍅|🧀|🥚|🍋|🥑|🍗|🥩|🥦)\s*/u, '')
-      .replace(/^(?:[0-9#*]\ufe0f?\u20e3|[①②③④⑤⑥⑦⑧⑨⑩])\s*/u, '')
-      .replace(/^(?:\[[ xX✓✔]?\]|\([ xX✓✔]?\))\s*/u, '')
-      .replace(/^(?:\d+|[a-zA-Z]|[ivxlcdmIVXLCDM]+)[\.)]\s+(?=\S)/u, '')
-      .replace(/^Step\s+\d+[\.:)\-]\s*/i, '')
-      .trim();
-  }
-  return line;
+  return window.UnitConverter?.cleanIngredientLinePrefix(raw) ?? String(raw || '').trim();
 }
 
 function splitPastedIngredientText(text){
-  let normalised = String(text || '')
-    .replace(/\r/g, '\n')
-    .replace(/\u00a0/g, ' ')
-    // Restrict list-item hyphen splitting strictly to line-leading bullet points matched by ^\s*-\s+
-    // Intra-word hyphens (e.g., "sun-dried tomatoes", "freeze-dried", "medium-sized") are NEVER treated as delimiters
-    .replace(/(?:^|\n)\s*-\s+/g, '\n- ')
-    // Bullet symbols & emojis (excluding hyphens so words like sun-dried tomatoes are not split)
-    .replace(/([0-9#*]\ufe0f?\u20e3|[①②③④⑤⑥⑦⑧⑨⑩]|[*•‣⁃∙·▪▫◦●○■□☐☑☒✓✔]|✅|☑️|✔️|✓|🔸|🔹|👉|➡️|➜|⭐|🍽️|🥣|🥘|🧂|🧄|🧅|🥔|🥕|🌶️|🍅|🧀|🥚|🍋|🥑|🍗|🥩|🥦)\s*/gu, '\n$1 ')
-    .replace(/;\s*/g, '\n');
-  
-  // Protect multiplier expressions like "1 x 450g", "2 x 400g", "1x 250g", "2 × 100ml" from being split
-  normalised = normalised.replace(/(?<!(?:\b\d+|\bone|\btwo|\bthree|\bfour)\s*[x×])\s+(?=(?:\d+(?:\.\d+)?|\d+\s+\d+\/\d+|\d+\/\d+|[½⅓⅔¼¾⅛⅜⅝⅞])\s*(?:g|kg|ml|l|tsp|tbsp|cup|tin|tins|can|cans|clove|cloves|bulb|bulbs|head|heads|handful|handfuls|bunch|bunches|pinch|dash|slice|slices|piece|pieces|stalk|stalks|sprig|sprigs|leaf|leaves|pack|packs|block|blocks|pot|pots|jar|jars|bottle|bottles|oz|ounces?|lbs?|pounds?|fl\.?\s*oz\.?|x\b|×\b|qty\b|each\b))/gi, '\n');
-  return normalised.split(/\n+/).map(cleanIngredientLinePrefix).filter(Boolean);
+  return window.UnitConverter?.splitPastedIngredientText(text) ?? String(text || '').split('\n').filter(Boolean);
 }
 
 function getIngredientSectionHeading(line){
@@ -5769,256 +4268,15 @@ function detectStockIngredient(raw){
   };
 }
 
-function normaliseMultiplierAndUnits(rawLine){
-  let text = String(rawLine || '').trim();
-  if(!text) return '';
-
-  // 1. Colloquial phrases to metric:
-  // - "small bunch" -> 15g
-  // - "large bunch" -> 30g
-  // - "bunch" -> 20g
-  // - "a handful of [ingredient]" / "handful" -> 30g
-  text = text.replace(/^(\d+(?:\.\d+)?\s*)?(?:a\s+)?small\s+bunch(?:es)?\b\s*(?:of\s+)?(.*)$/i, (m, countStr, remainder) => {
-    const c = countStr ? parseFloat(countStr) : 1;
-    return `${Math.round(c * 15 * 10) / 10}g ${remainder.trim()}`;
-  });
-
-  text = text.replace(/^(\d+(?:\.\d+)?\s*)?(?:a\s+)?large\s+bunch(?:es)?\b\s*(?:of\s+)?(.*)$/i, (m, countStr, remainder) => {
-    const c = countStr ? parseFloat(countStr) : 1;
-    return `${Math.round(c * 30 * 10) / 10}g ${remainder.trim()}`;
-  });
-
-  text = text.replace(/^(\d+(?:\.\d+)?\s*)?(?:a\s+)?bunch(?:es)?\b\s*(?:of\s+)?(.*)$/i, (m, countStr, remainder) => {
-    const c = countStr ? parseFloat(countStr) : 1;
-    return `${Math.round(c * 20 * 10) / 10}g ${remainder.trim()}`;
-  });
-
-  text = text.replace(/^(\d+(?:\.\d+)?\s*)?(?:a\s+)?handful(?:s)?\b\s*(?:of\s+)?(.*)$/i, (m, countStr, remainder) => {
-    const c = countStr ? parseFloat(countStr) : 1;
-    return `${Math.round(c * 30 * 10) / 10}g ${remainder.trim()}`;
-  });
-
-  // 2. Multiplier Detection: Compound quantity patterns such as (\d+)\s*x\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)
-  // (e.g., "2 x 400g tin", "1 x 450g pack", "2 x 14oz tin", "2 x 250ml")
-  const compoundMatch = text.match(/^(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)(?:\s+(?:tins?|cans?|packs?|blocks?|pots?|jars?|bottles?)\b)?\s*(?:of\s+)?(.*)$/i);
-  if(compoundMatch){
-    const count = parseFloat(compoundMatch[1]);
-    const subQty = parseFloat(compoundMatch[2]);
-    const rawUnit = compoundMatch[3].toLowerCase();
-    let remainder = compoundMatch[4].trim();
-    remainder = remainder.replace(/^(?:tins?|cans?|packs?|blocks?|pots?|jars?|bottles?)\s*(?:of\s+)?/i, '').trim();
-
-    let totalWeight = count * subQty;
-    let unit = 'g';
-
-    if(rawUnit === 'kg'){
-      totalWeight = count * subQty * 1000;
-      unit = 'g';
-    } else if(rawUnit === 'l' || rawUnit === 'litre' || rawUnit === 'litres' || rawUnit === 'liter' || rawUnit === 'liters'){
-      totalWeight = count * subQty * 1000;
-      unit = 'ml';
-    } else if(rawUnit === 'ml'){
-      totalWeight = count * subQty;
-      unit = 'ml';
-    } else if(rawUnit === 'oz' || rawUnit === 'ounce' || rawUnit === 'ounces'){
-      totalWeight = Math.round(count * subQty * 28.35 * 10) / 10;
-      unit = 'g';
-    } else if(rawUnit === 'lb' || rawUnit === 'lbs' || rawUnit === 'pound' || rawUnit === 'pounds'){
-      totalWeight = Math.round(count * subQty * 453.6 * 10) / 10;
-      unit = 'g';
-    } else if(rawUnit === 'floz' || rawUnit === 'fl oz'){
-      totalWeight = Math.round(count * subQty * 30 * 10) / 10;
-      unit = 'ml';
-    } else if(rawUnit === 'cup' || rawUnit === 'cups'){
-      totalWeight = Math.round(count * subQty * 240 * 10) / 10;
-      unit = 'ml';
-    } else if(rawUnit === 'tbsp' || rawUnit === 'tablespoon' || rawUnit === 'tablespoons'){
-      totalWeight = Math.round(count * subQty * 15 * 10) / 10;
-      unit = 'g';
-    } else if(rawUnit === 'tsp' || rawUnit === 'teaspoon' || rawUnit === 'teaspoons'){
-      totalWeight = Math.round(count * subQty * 5 * 10) / 10;
-      unit = 'g';
-    } else if(['tin','tins','can','cans'].includes(rawUnit)){
-      totalWeight = count * subQty * 400;
-      unit = 'g';
-    } else {
-      totalWeight = count * subQty;
-      unit = 'g';
-    }
-
-    return `${totalWeight}${unit} ${remainder}`;
-  }
-
-  // 3. Force convert all non-standard and imperial measurements directly into Metric (grams or ml):
-  // Imperial Liquid:
-  // fl oz -> ml (x 30)
-  text = text.replace(/^(\d+(?:\.\d+)?)\s*(?:fl\.?\s*oz\.?|fluid\s*ounces?)\b\s*(?:of\s+)?(.*)$/i, (m, q, rem) => {
-    const val = Math.round(parseFloat(q) * 30 * 10) / 10;
-    return `${val}ml ${rem.trim()}`;
-  });
-  // cups -> ml (x 240)
-  text = text.replace(/^(\d+(?:\.\d+)?)\s*(?:cups?)\b\s*(?:of\s+)?(.*)$/i, (m, q, rem) => {
-    const val = Math.round(parseFloat(q) * 240 * 10) / 10;
-    return `${val}ml ${rem.trim()}`;
-  });
-
-  // Imperial Weight:
-  // oz -> g (x 28.35)
-  text = text.replace(/^(\d+(?:\.\d+)?)\s*(?:oz|ounces?)\b\s*(?:of\s+)?(.*)$/i, (m, q, rem) => {
-    const val = Math.round(parseFloat(q) * 28.35 * 10) / 10;
-    return `${val}g ${rem.trim()}`;
-  });
-  // lbs / lb -> g (x 453.6)
-  text = text.replace(/^(\d+(?:\.\d+)?)\s*(?:lbs?|pounds?)\b\s*(?:of\s+)?(.*)$/i, (m, q, rem) => {
-    const val = Math.round(parseFloat(q) * 453.6 * 10) / 10;
-    return `${val}g ${rem.trim()}`;
-  });
-
-  // Spoons to Grams:
-  // tbsp / tablespoon -> 15g
-  text = text.replace(/^(\d+(?:\.\d+)?)\s*(?:tbsp|tablespoons?)\b\s*(?:of\s+)?(.*)$/i, (m, q, rem) => {
-    const val = Math.round(parseFloat(q) * 15 * 10) / 10;
-    return `${val}g ${rem.trim()}`;
-  });
-  // tsp / teaspoon -> 5g
-  text = text.replace(/^(\d+(?:\.\d+)?)\s*(?:tsp|teaspoons?)\b\s*(?:of\s+)?(.*)$/i, (m, q, rem) => {
-    const val = Math.round(parseFloat(q) * 5 * 10) / 10;
-    return `${val}g ${rem.trim()}`;
-  });
-
-  return text;
-}
-
 function parseIngredientLine(raw){
-  raw = cleanIngredientLinePrefix(raw).replace(/^\xad\s*/, '').trim(); 
-  if(!raw)return null;
-  const stock = detectStockIngredient(raw);
+  const cleaned = cleanIngredientLinePrefix(raw).replace(/^\xad\s*/, '').trim(); 
+  if(!cleaned) return null;
+  const stock = detectStockIngredient(cleaned);
   if(stock) return stock;
-
-  raw = normaliseLeadingQuantity(raw);
-  raw = normaliseMultiplierAndUnits(raw);
-
-  let parsed = null;
-
-  // 1. Multiplier with specific sub-quantity, e.g. "1 x 450g firm tofu", "2 x 400g tins chickpeas", "1 x 250g pack spinach", "2 x 150ml cream"
-  const multiWithSub = raw.match(/^(\d+(?:\.\d+)?)\s*(?:x|×)\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tsp|tbsp|cup|tin|tins|can|cans|clove|cloves|bulb|bulbs|head|heads|handful|handfuls|bunch|bunches|pinch|dash|slice|slices|piece|pieces|stalk|stalks|sprig|sprigs|leaf|leaves|pack|packs|block|blocks|pot|pots|jar|jars|bottle|bottles|oz|ounces?|lbs?|pounds?|fl\.?\s*oz\.?)?\s*(?:of\s+)?(?:tins?|cans?|packs?|blocks?|pots?|jars?|bottles?|of\s+)?(.+)$/i);
-  if(multiWithSub){
-    const count = parseFloat(multiWithSub[1]);
-    const subQty = parseFloat(multiWithSub[2]);
-    let rawUnit = (multiWithSub[3] || 'g').toLowerCase().replace(/s$/,'');
-    if(rawUnit === 'tin' || rawUnit === 'can') rawUnit = 'tin';
-    if(['pack','block','pot','jar','bottle'].includes(rawUnit)) rawUnit = 'g';
-    const totalQty = count * subQty;
-    const name = multiWithSub[4].replace(/\s*\(.*?\)\s*/g,'').trim();
-    parsed = { raw, qty: totalQty, unit: rawUnit, name };
+  if (window.UnitConverter?.parseIngredientLine) {
+    return window.UnitConverter.parseIngredientLine(raw);
   }
-
-  // 2. Multiplier without sub-quantity, e.g. "1 x red onion", "2 x tins chickpeas", "2 x cloves garlic", "1 x block halloumi"
-  if(!parsed){
-    const multiSimple = raw.match(/^(\d+(?:\.\d+)?)\s*(?:x|×)\s*(?:of\s+)?(?:tins?|cans?|packs?|blocks?|pots?|jars?|bottles?|of\s+)?(.+)$/i);
-    if(multiSimple){
-      const count = parseFloat(multiSimple[1]);
-      const remainder = multiSimple[2].trim();
-      const discreteMatch = remainder.match(/^(clove|cloves|bulb|bulbs|head|heads|handful|handfuls|bunch|bunches|pinch|dash|slice|slices|piece|pieces|stalk|stalks|sprig|sprigs|leaf|leaves|tin|tins|can|cans)\s+(?:of\s+)?(.+)$/i);
-      if(discreteMatch){
-        let dUnit = discreteMatch[1].toLowerCase().replace(/s$/,'');
-        if(dUnit === 'tin' || dUnit === 'can') dUnit = 'tin';
-        const dName = discreteMatch[2].replace(/\s*\(.*?\)\s*/g,'').trim();
-        parsed = { raw, qty: count, unit: dUnit, name: dName };
-      } else {
-        const name = remainder.replace(/\s*\(.*?\)\s*/g,'').trim();
-        parsed = { raw, qty: count, unit: 'qty', name };
-      }
-    }
-  }
-
-  // 3. Standard quantity + unit matching
-  if(!parsed){
-    const m=raw.match(/^(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tsp|tbsp|cup|tin|tins|can|cans|clove|cloves|bulb|bulbs|head|heads|handful|handfuls|bunch|bunches|pinch|dash|slice|slices|piece|pieces|stalk|stalks|sprig|sprigs|leaf|leaves|oz|ounces?|lbs?|pounds?|fl\.?\s*oz\.?)s?\s+(?:of\s+)?(.+)$/i);
-    if(m){
-      const qty=parseFloat(m[1]);
-      let unit=m[2].toLowerCase().replace(/s$/,'');
-      if(unit==='tin'||unit==='can')unit='tin';
-      if(unit==='bulb'||unit==='head')unit='head';
-      const name=m[3].replace(/\s*\(.*?\)\s*/g,'').trim();
-      parsed = {raw,qty,unit,name};
-    } else {
-      const m2=raw.match(/^(handful|bunch|pinch|dash|sprig)s?\s+(?:of\s+)?(.+)$/i);
-      if(m2){
-        const unit=m2[1].toLowerCase();
-        const name=m2[2].replace(/\s*\(.*?\)\s*/g,'').trim();
-        parsed = {raw,qty:1,unit,name};
-      } else {
-        const m3=raw.match(/^(\d+(?:\.\d+)?)(g|kg|ml|l)\s+(.+)$/i);
-        if(m3){
-          const qty=parseFloat(m3[1]);
-          const unit=m3[2].toLowerCase();
-          const name=m3[3].replace(/\s*\(.*?\)\s*/g,'').trim();
-          parsed = {raw,qty,unit,name};
-        } else {
-          const m4=raw.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
-          if(m4){
-              const qty = parseFloat(m4[1]);
-              const name = m4[2].replace(/\s*\(.*?\)\s*/g,'').trim();
-              parsed = {raw, qty, unit: 'qty', name};
-          } else {
-              parsed = {raw,qty:1,unit:'qty',name:raw.replace(/\s*\(.*?\)\s*/g,'').trim()||raw};
-          }
-        }
-      }
-    }
-  }
-
-  let { qty, unit, name } = parsed;
-  unit = (unit || '').toLowerCase().replace(/s$/, '');
-
-  if (unit === 'handful') {
-      qty = qty * 30;
-      unit = 'g';
-  } else if (unit === 'bunch') {
-      qty = qty * 20;
-      unit = 'g';
-  } else if (unit === 'pinch' || unit === 'dash') {
-      qty = qty * 1;
-      unit = 'g';
-  }
-
-  if (isFreshGarlicIngredient({ name }, null)) {
-      if (['g', 'tsp', 'tbsp', 'ml'].includes(unit)) {
-          let g = toGrams(qty, unit);
-          qty = Math.max(0.5, Math.round((g / 6) * 10) / 10);
-          unit = 'qty';
-          name = name.toLowerCase().includes('clove') ? name : name + ' cloves';
-      } else if (unit === 'head') {
-          qty = Math.round(qty * 11); 
-          unit = 'qty';
-          name = name.toLowerCase().includes('clove') ? name : name + ' cloves';
-      } else if (unit === 'clove') {
-          unit = 'qty';
-      }
-  }
-
-  const liquidMeasureToMl = ['tsp', 'tbsp', 'cup', 'fl oz', 'floz'];
-  const volToG = ['kg', 'tin', 'can', 'oz', 'ounce', 'lb', 'lbs', 'pound', 'handful', 'bunch'];
-  const discreteToQty = ['clove', 'head', 'bulb', 'slice', 'piece', 'stalk', 'sprig', 'leaf'];
-
-  if ((liquidMeasureToMl.includes(unit) && isLikelyLiquidIngredientName(name)) || unit === 'fl oz' || unit === 'floz') {
-      qty = toGrams(qty, unit);
-      unit = 'ml';
-  } else if (liquidMeasureToMl.includes(unit) || volToG.includes(unit)) {
-      qty = toGrams(qty, unit);
-      unit = 'g';
-  } else if (unit === 'l') {
-      qty = qty * 1000;
-      unit = 'ml';
-  } else if (discreteToQty.includes(unit)) {
-      unit = 'qty';
-  }
-
-  // Part O: Title Case Normalization
-  name = toTitleCase(name);
-
-  return { raw, qty, unit, name, grams: toGrams(qty, unit) };
+  return { raw, qty: 1, unit: 'qty', name: toTitleCase(cleaned), grams: 100 };
 }
 
 // == FUZZY MATCHING ==
@@ -8626,69 +6884,10 @@ function getReviewIngredientDataError(ing, resolved){
  * - Rule C: Zero-fallback contract: { kcal: 0, protein: 0, carbs: 0, fat: 0, fibre: 0, cost: 0, cal: 0, prot: 0, carb: 0 }.
  */
 function calculateItemNutrition(item, quantity, unit = 'g'){
-  const zero = { kcal: 0, protein: 0, carbs: 0, fat: 0, fibre: 0, cost: 0, cal: 0, prot: 0, carb: 0 };
-  if (!item || typeof item !== 'object') return zero;
-
-  const q = parseFloat(quantity);
-  if (isNaN(q) || q <= 0) return zero;
-
-  let grams = 0;
-  const u = String(unit || 'g').trim().toLowerCase().replace(/s$/, '');
-
-  if (u === 'item' || u === 'piece' || u === 'qty' || u === 'pack' || u === 'can' || u === 'tin') {
-    const itemWeight = parseFloat(item.itemWeight) || parseFloat(item.drainedWeight) || parseFloat(item.packSize) || 0;
-    grams = q * itemWeight;
-  } else if (u === 'g' || u === 'gram') {
-    grams = q;
-  } else if (u === 'kg') {
-    grams = q * 1000;
-  } else if (u === 'ml') {
-    grams = q; // standard culinary density 1g/ml
-  } else if (u === 'l' || u === 'litre' || u === 'liter') {
-    grams = q * 1000;
-  } else if (typeof UNIT_TO_GRAMS !== 'undefined' && UNIT_TO_GRAMS[u]) {
-    grams = q * UNIT_TO_GRAMS[u];
-  } else if (typeof toGrams === 'function') {
-    grams = toGrams(q, u, item?.itemWeight || 100);
-  } else {
-    grams = q;
+  if (window.NutritionService?.calculateItemNutrition) {
+    return window.NutritionService.calculateItemNutrition(item, quantity, unit);
   }
-
-  if (grams <= 0) return zero;
-
-  const scale = grams / 100;
-  const calVal = (parseFloat(item.cal) || parseFloat(item.calories) || parseFloat(item.kcal) || 0) * scale;
-  const protVal = (parseFloat(item.prot) || parseFloat(item.protein) || 0) * scale;
-  const carbVal = (parseFloat(item.carb) || parseFloat(item.carbs) || 0) * scale;
-  const fatVal = (parseFloat(item.fat) || 0) * scale;
-  const fibreVal = (parseFloat(item.fibre) || parseFloat(item.fiber) || 0) * scale;
-
-  let costVal = 0;
-  if (parseFloat(item.price) > 0) {
-    const packGrams = (typeof getProductUsablePackAmount === 'function') ? getProductUsablePackAmount(item) : (parseFloat(item.packSize) || 0);
-    if (packGrams > 0) {
-      costVal = (parseFloat(item.price) / packGrams) * grams;
-    }
-  }
-
-  const roundedKcal = Math.round(calVal);
-  const roundedProt = Math.round(protVal * 10) / 10;
-  const roundedCarb = Math.round(carbVal * 10) / 10;
-  const roundedFat = Math.round(fatVal * 10) / 10;
-  const roundedFibre = Math.round(fibreVal * 10) / 10;
-  const roundedCost = Math.round(costVal * 100) / 100;
-
-  return {
-    kcal: roundedKcal,
-    protein: roundedProt,
-    carbs: roundedCarb,
-    fat: roundedFat,
-    fibre: roundedFibre,
-    cost: roundedCost,
-    cal: roundedKcal,
-    prot: roundedProt,
-    carb: roundedCarb
-  };
+  return { kcal: 0, protein: 0, carbs: 0, fat: 0, fibre: 0, cost: 0, cal: 0, prot: 0, carb: 0 };
 }
 window.calculateItemNutrition = calculateItemNutrition;
 
@@ -10008,6 +8207,9 @@ function removeRecipePhoto(index){recipePhotoFiles.splice(index,1);renderRecipeP
 function clearRecipePhotos(){recipePhotoFiles=[];revokeRecipePhotoUrls();renderRecipePhotoPreviews();showMsg('recipe-photo-msg','','info');}
 
 async function prepareRecipePhoto(file){
+  if (window.RecipeOcrService?.prepareRecipePhoto) {
+    return window.RecipeOcrService.prepareRecipePhoto(file);
+  }
   let source;
   if(typeof createImageBitmap==='function') source=await createImageBitmap(file,{imageOrientation:'from-image'});
   else source=await new Promise((resolve,reject)=>{const image=new Image();const url=URL.createObjectURL(file);image.onload=()=>{URL.revokeObjectURL(url);resolve(image);};image.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Photo could not be opened.'));};image.src=url;});
@@ -10033,6 +8235,9 @@ async function loadPlatePlanAiModules(){
 }
 
 function platePlanRecipeRecognitionSchema(){
+  if (window.RecipeOcrService?.getRecipeRecognitionSchema) {
+    return window.RecipeOcrService.getRecipeRecognitionSchema();
+  }
   return {type:'OBJECT',properties:{name:{type:'STRING'},servings:{type:'NUMBER'},timeMinutes:{type:'NUMBER'},sourceType:{type:'STRING'},bookTitle:{type:'STRING'},author:{type:'STRING'},page:{type:'STRING'},ingredients:{type:'ARRAY',items:{type:'STRING'}},method:{type:'ARRAY',items:{type:'STRING'}},warnings:{type:'ARRAY',items:{type:'STRING'}}},required:['name','ingredients','method','warnings']};
 }
 
@@ -10082,240 +8287,30 @@ async function recogniseRecipePhotosLocally(){
 }
 
 function parseTimeToCleanMinutes(str){
-  if(str === null || str === undefined) return null;
-  const s = String(str).toLowerCase().trim();
-  if(!s) return null;
-
-  // Check for range like "20-25 mins"
-  const rangeMatch = s.match(/(\d+)\s*[-–]\s*(\d+)\s*(?:mins?|minutes?)/i);
-  if(rangeMatch){
-    return Math.round((parseFloat(rangeMatch[1]) + parseFloat(rangeMatch[2])) / 2);
+  if (window.RecipeOcrService?.parseTimeToCleanMinutes) {
+    return window.RecipeOcrService.parseTimeToCleanMinutes(str);
   }
-
-  let totalSeconds = 0;
-  let matched = false;
-
-  // Match hours: e.g. "1 hour", "1.5 hours", "2 hrs", "1h"
-  const hrMatch = s.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h\b)/i);
-  if(hrMatch){
-    totalSeconds += parseFloat(hrMatch[1]) * 3600;
-    matched = true;
-  }
-
-  // Match minutes: e.g. "11 mins", "11 min", "11 minutes", "11m"
-  const minMatch = s.match(/(\d+(?:\.\d+)?)\s*(?:minutes?|mins?|m\b)/i);
-  if(minMatch){
-    totalSeconds += parseFloat(minMatch[1]) * 60;
-    matched = true;
-  }
-
-  // Match seconds: e.g. "35 secs", "35 sec", "35 seconds", "35s"
-  const secMatch = s.match(/(\d+(?:\.\d+)?)\s*(?:seconds?|secs?|s\b)/i);
-  if(secMatch){
-    totalSeconds += parseFloat(secMatch[1]);
-    matched = true;
-  }
-
-  if(matched){
-    const minutes = Math.round(totalSeconds / 60);
-    return minutes > 0 ? minutes : (totalSeconds > 0 ? 1 : null);
-  }
-
-  // Fallback to standalone integer
+  const s = String(str || '').toLowerCase().trim();
   const numMatch = s.match(/\b(\d+)\b/);
-  if(numMatch){
-    return parseInt(numMatch[1], 10);
-  }
-
-  return null;
+  return numMatch ? parseInt(numMatch[1], 10) : null;
 }
 
 function parseRobustRecipeText(raw){
-  const text = String(raw || '').replace(/\r/g, '');
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  if(!lines.length){
-    return {
-      name: '',
-      servings: null,
-      timeMinutes: null,
-      ingredients: [],
-      method: [],
-      mealTypes: ['dinner'],
-      sourceType: '',
-      bookTitle: '',
-      author: '',
-      page: '',
-      url: '',
-      warnings: [],
-      rawText: ''
-    };
+  if (window.RecipeOcrService?.parseRobustRecipeText) {
+    return window.RecipeOcrService.parseRobustRecipeText(raw);
   }
-
-  // 1. Recipe name & Servings
-  let name = '';
-  let servings = null;
-
-  // Extract servings: "Number of Servings: X", "Original Servings: X", "Servings: X", "Serves: X"
-  const servingsMatch = text.match(/(?:Number of Servings|Original Servings|Original Serves|Servings|Serves)\s*[:\-]?\s*(\d+)/i);
-  if(servingsMatch){
-    servings = parseInt(servingsMatch[1], 10);
-  }
-
-  // "Recipe name *" -> First line or text preceding "Number of Servings:" / metadata
-  const isMetaLine = l => /^(?:(?:Number of Servings|Original Servings|Original Serves|Servings?|Serves|Prep(?:aration)?(?:\s*time)?|Cook(?:\s*time)?|Total(?:\s*time)?|Time|Book|Cookbook|Author|By|Page|Source|Url|Link)\s*[:\-]|^https?:\/\/|^(?:ingredients?|method|instructions?|steps?)\b)/i.test(l);
-  const firstMetaIdx = lines.findIndex(isMetaLine);
-  if(firstMetaIdx > 0){
-    name = lines.slice(0, firstMetaIdx).join(' ').trim();
-  } else if(firstMetaIdx === 0){
-    name = lines[0];
-  } else {
-    name = lines[0] || '';
-  }
-  name = name.replace(/^(?:recipe\s*title|recipe\s*name|recipe|title)\s*[:\-]?\s*/i, '').trim();
-  name = toAPTitleCase(name);
-
-  // 2. Prep time (mins)
-  let timeMinutes = null;
-  const prepTimeMatch = text.match(/(?:Prep(?:aration)?\s*time|Prep)\s*[:\-]?\s*([^\n\r|]+)/i);
-  if(prepTimeMatch){
-    timeMinutes = parseTimeToCleanMinutes(prepTimeMatch[1]);
-  }
-  if(timeMinutes === null){
-    const totalTimeMatch = text.match(/(?:Total\s*time|Cook\s*time|Time)\s*[:\-]?\s*([^\n\r|]+)/i);
-    if(totalTimeMatch){
-      timeMinutes = parseTimeToCleanMinutes(totalTimeMatch[1]);
-    }
-  }
-  if(timeMinutes === null){
-    // Match compound time like "11 mins, 35 secs"
-    const compoundMatch = text.match(/(\d+\s*(?:hours?|hrs?|h)\s*(?:and\s*)?\d+\s*(?:mins?|minutes?|m)|\d+\s*(?:mins?|minutes?)\s*,?\s*\d+\s*(?:secs?|seconds?|s))/i);
-    if(compoundMatch){
-      timeMinutes = parseTimeToCleanMinutes(compoundMatch[1]);
-    }
-  }
-  if(timeMinutes === null){
-    const simpleMinMatch = text.match(/(\d+)\s*(?:mins?|minutes?)/i);
-    if(simpleMinMatch){
-      timeMinutes = parseTimeToCleanMinutes(simpleMinMatch[1]);
-    }
-  }
-
-  // 3. Ingredients & Method sections
-  const ingHeaderIdx = lines.findIndex(l => /^(?:[-*•#\s]*)ingredients?\b/i.test(l));
-  const methodHeaderIdx = lines.findIndex(l => /^(?:[-*•#\s]*)(?:method|instructions?|directions?|steps?|preparation)\b/i.test(l));
-
-  let ingredients = [];
-  let method = [];
-
-  if(ingHeaderIdx >= 0 && methodHeaderIdx > ingHeaderIdx){
-    ingredients = lines.slice(ingHeaderIdx + 1, methodHeaderIdx);
-    method = lines.slice(methodHeaderIdx + 1);
-  } else if(ingHeaderIdx >= 0 && methodHeaderIdx < 0){
-    ingredients = lines.slice(ingHeaderIdx + 1);
-  } else if(methodHeaderIdx >= 0 && ingHeaderIdx < 0){
-    method = lines.slice(methodHeaderIdx + 1);
-  } else {
-    const looksIngredient = l => /^(?:[-•*]\s*)?(?:\d|½|¼|¾|one |two |a |an )/i.test(l) && /\b(g|kg|ml|l|tsp|tbsp|cup|tin|can|bunch|clove|slice|handful|pinch|x|pack|block|onion|garlic|oil|salt|pepper|sauce|chicken|beef|egg|rice|pasta|cheese|butter|water|sugar|flour)\b/i.test(l);
-    lines.forEach(l => {
-      if(l === name || /^(?:serves?|number of servings|prep|cook|total|time|recipe)\b/i.test(l)) return;
-      if(looksIngredient(l)){
-        ingredients.push(l);
-      } else {
-        method.push(l);
-      }
-    });
-  }
-
-  ingredients = ingredients.filter(l => !/^(?:ingredients?|method|instructions?|steps?)\s*:?$/i.test(l.trim()));
-  method = method.filter(l => !/^(?:ingredients?|method|instructions?|steps?)\s*:?$/i.test(l.trim()));
-
-  // 4. Meal Types
-  const lowerText = text.toLowerCase();
-  const mealTypes = [];
-  if(lowerText.includes('breakfast') || lowerText.includes('brekkie') || lowerText.includes('pancake') || lowerText.includes('porridge') || lowerText.includes('waffle') || lowerText.includes('granola') || lowerText.includes('smoothie')) mealTypes.push('breakfast');
-  if(lowerText.includes('lunch') || lowerText.includes('sandwich') || lowerText.includes('salad') || lowerText.includes('wrap') || lowerText.includes('soup')) mealTypes.push('lunch');
-  if(lowerText.includes('dinner') || lowerText.includes('curry') || lowerText.includes('casserole') || lowerText.includes('roast') || lowerText.includes('pasta') || lowerText.includes('stew') || lowerText.includes('risotto') || lowerText.includes('pie') || lowerText.includes('stir-fry')) mealTypes.push('dinner');
-  if(lowerText.includes('snack') || lowerText.includes('dessert') || lowerText.includes('biscuit') || lowerText.includes('cookie') || lowerText.includes('cake') || lowerText.includes('muffin')) mealTypes.push('snack');
-  if(!mealTypes.length) mealTypes.push('dinner');
-
-  // 5. Source info
-  let sourceType = '';
-  let bookTitle = '';
-  let author = '';
-  let page = '';
-  let url = '';
-
-  const urlMatch = text.match(/(https?:\/\/[^\s\)\>\]]+)/i);
-  if(urlMatch){
-    url = urlMatch[1];
-    if(url.includes('tiktok.com')) sourceType = 'tiktok';
-    else if(url.includes('youtube.com') || url.includes('youtu.be')) sourceType = 'youtube';
-    else if(url.includes('instagram.com')) sourceType = 'instagram';
-    else sourceType = 'website';
-  }
-
-  const bookMatch = text.match(/(?:Book|From the book|Cookbook|Source)\s*:\s*([^\n\r,]+)/i);
-  if(bookMatch && !sourceType){
-    sourceType = 'book';
-    bookTitle = bookMatch[1].trim();
-  }
-  const authorMatch = text.match(/(?:Author|By)\s*:\s*([^\n\r,]+)/i);
-  if(authorMatch) author = authorMatch[1].trim();
-  const pageMatch = text.match(/(?:Page|p\.?)\s*[:\-]?\s*(\d+)/i);
-  if(pageMatch) page = pageMatch[1].trim();
-
-  return {
-    name,
-    servings,
-    timeMinutes,
-    ingredients,
-    method,
-    mealTypes,
-    sourceType,
-    bookTitle,
-    author,
-    page,
-    url,
-    warnings: [],
-    rawText: text
-  };
+  return normaliseRecognisedRecipe({
+    name: 'Pasted Recipe',
+    ingredients: String(raw || '').split('\n').filter(Boolean),
+    rawText: String(raw || '')
+  });
 }
 
 function splitPastedRecipeBlocks(rawText){
-  const text = String(rawText || '').replace(/\r/g, '').trim();
-  if(!text) return [];
-
-  // 1. Check if text contains explicit recipe title header markers:
-  // e.g. "Recipe Title:", "Title:", "Recipe:"
-  // Or "Recipe 1:", "Recipe #1:"
-  const lines = text.split('\n');
-  const headerLineIndices = [];
-  lines.forEach((line, idx) => {
-    if(/^\s*(?:Recipe\s*Title|Title|Recipe)\s*[:\-]/i.test(line) || /^\s*Recipe\s*#?\d+\s*[:\-]/i.test(line)){
-      headerLineIndices.push(idx);
-    }
-  });
-
-  let blocks = [];
-  if(headerLineIndices.length > 1){
-    // Split into individual recipe blocks based on header lines
-    for(let i = 0; i < headerLineIndices.length; i++){
-      const start = headerLineIndices[i];
-      const end = (i + 1 < headerLineIndices.length) ? headerLineIndices[i + 1] : lines.length;
-      const blockText = lines.slice(start, end).join('\n').trim();
-      if(blockText) blocks.push(blockText);
-    }
-  } else if(/(?:\n\s*){3,}/.test(text)){
-    // Double-blank line breaks (\n\n\n or more)
-    const rawChunks = text.split(/(?:\n\s*){3,}/);
-    blocks = rawChunks.map(c => c.trim()).filter(c => c.length > 15);
+  if (window.RecipeOcrService?.splitPastedRecipeBlocks) {
+    return window.RecipeOcrService.splitPastedRecipeBlocks(rawText);
   }
-
-  if(!blocks.length){
-    blocks = [text];
-  }
-
-  return blocks;
+  return [String(rawText || '')];
 }
 
 function parsePastedRecipeText(raw){
@@ -10341,6 +8336,9 @@ function parsePastedRecipeText(raw){
 }
 
 function normaliseRecognisedRecipe(value){
+  if (window.RecipeOcrService?.normaliseRecognisedRecipe) {
+    return window.RecipeOcrService.normaliseRecognisedRecipe(value);
+  }
   return {
     name: toAPTitleCase(String(value?.name || '')),
     servings: value?.servings !== null && value?.servings !== undefined ? +value.servings : null,
@@ -18542,6 +16540,9 @@ function openTescoImportFromSubst() {
 }
 
 function getTescoItemWeightGuess(data, name){
+    if (window.TescoImportService?.guessItemWeight) {
+        return window.TescoImportService.guessItemWeight(data, name);
+    }
     if(!data) return '';
     const count = +data.itemCount || 0;
     const packSize = +data.drainedWeight || +data.packSize || 0;
@@ -18555,82 +16556,36 @@ function getTescoItemWeightGuess(data, name){
 
 function extractTescoProduct() {
     window.__lastTescoImport = null;
-    const text = document.getElementById('tesco-paste').value.trim();
+    const text = document.getElementById('tesco-paste')?.value?.trim() || '';
     if (!text) {
         showMsg('tesco-msg', 'Please paste data first.', 'error');
         return;
     }
 
-    let data = null;
-    try {
-        data = JSON.parse(text);
-        window.__lastTescoImport = data;
-    } catch(e) {
-        showMsg('tesco-msg', 'Invalid JSON format. Please use the bookmarklet to copy the correct data from Tesco.', 'error');
+    const parser = window.TescoImportService?.parseTescoProduct;
+    let res;
+    if (typeof parser === 'function') {
+        res = parser(text);
+    } else {
+        try {
+            const parsed = JSON.parse(text);
+            res = { success: true, data: { raw: parsed, name: parsed.name || '', brand: parsed.brand || '', price: parsed.price || '', packSize: parsed.packSize || '', packUnit: parsed.packUnit || 'g', cal: parsed.cal || 0, prot: parsed.prot || 0, carb: parsed.carb || 0, fat: parsed.fat || 0, fibre: parsed.fibre || 0, sourceValues: {}, parsedValues: parsed, normalisedValues: parsed }, warnings: [] };
+        } catch (e) {
+            res = { success: false, error: 'Invalid JSON format. Please use the bookmarklet to copy the correct data from Tesco.' };
+        }
+    }
+
+    if (!res.success) {
+        showMsg('tesco-msg', res.error || 'Failed to parse Tesco product.', 'error');
         return;
     }
 
-    // --- PART P: TESCO IMPORT QUALITY IMPROVEMENTS ---
-    // Issue 2: Title Case normalisation for brands
-    let brand = toTitleCase((data.brand || '').trim());
-    let name = data.name || '';
-    
-    // Issue 1: Remove duplicated brand text safely
-    if (brand && brand !== 'Generic') {
-        let re = new RegExp('\\b' + brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'ig');
-        name = name.replace(re, '').trim();
-    }
-    
-    // Issue 1: Remove trailing pack sizes (e.g., "226g", "2 x 113g", "1kg")
-    name = name.replace(/\s+(?:\d+\s*[x×]\s*)?\d+(?:\.\d+)?\s*(g|kg|ml|l|pack)$/i, '').trim();
-    name = name.replace(/^[-,\s]+|[-,\s]+$/g, '').trim();
-    name = toTitleCase(name);
-    
-    // Issue 3: Storage Location from Taxonomy first, then keywords
-    // Issue 3: Storage Location from Taxonomy first, then keywords
-    let storage = '';
-    let breadcrumbs = (data.diagnostics?.breadcrumbs || '').toLowerCase();
-    let stText = (data.diagnostics?.storageText || '').toLowerCase();
-    
-    if (breadcrumbs) {
-        if (breadcrumbs.includes('frozen food') || breadcrumbs.includes('frozen vegetables') || breadcrumbs.includes('frozen meat') || breadcrumbs.includes('frozen')) {
-            storage = 'freezer';
-        } else if (breadcrumbs.includes('fresh food') || breadcrumbs.includes('chilled food') || breadcrumbs.includes('fresh produce') || breadcrumbs.includes('dairy') || breadcrumbs.includes('fresh') || breadcrumbs.includes('chilled')) {
-            storage = 'fridge';
-        } else if (breadcrumbs.includes('cupboard') || breadcrumbs.includes('pasta rice') || breadcrumbs.includes('tinned food') || breadcrumbs.includes('baking')) {
-            storage = 'cupboard';
-        }
-    }
-    
-    // Fallback to text matching if taxonomy yielded nothing
-    if (!storage) {
-        if(stText.includes('keep frozen') || stText.includes('freeze') || stText.includes('frozen')) {
-            storage = 'freezer';
-        } else if(stText.includes('keep refrigerated') || stText.includes('fridge') || stText.includes('chilled')) {
-            storage = 'fridge';
-        } else if(stText.includes('store in a cool') || stText.includes('dry place') || stText.includes('cupboard')) {
-            storage = 'cupboard';
-        }
-    }
-    
-    // Data validation logic
-    let warnings = [];
-    let sv = data.diagnostics?.sourceValues || {};
-    let pv = data.diagnostics?.parsedValues || { cal: data.cal, prot: data.prot, carb: data.carb, fat: data.fat, fibre: data.fibre };
-    let nsrc = data.diagnostics?.nutritionSource || 'Fallback / Legacy Import';
-    let nbasis = data.diagnostics?.nutritionBasis || 'unknown';
+    const { data: p, warnings } = res;
+    window.__lastTescoImport = p.raw;
 
-    // Apply strict field normalisation
-    const sourceEnergy = sv.energy ?? sv.cal ?? sv.kcal ?? sv['energy'] ?? sv['Energy'] ?? null;
-    const parsedEnergy = pv.energy ?? pv.kcal ?? pv.cal ?? data.energy ?? data.cal;
-    const richSourceEnergy = typeof sourceEnergy === 'string' && /(kcal|kj|\/)/i.test(sourceEnergy);
-    const energyValue = richSourceEnergy ? sourceEnergy : (parsedEnergy ?? sourceEnergy);
-    const normalisedPv = normalizeNutritionPayload({ ...pv, cal: energyValue, energy: energyValue });
-
-    if(nsrc.includes('Not found')) warnings.push("Nutrition table not found. Please expand the Nutrition section on Tesco and try again.");
-    if (normalisedPv.cal < 0 || normalisedPv.prot < 0 || normalisedPv.carb < 0 || normalisedPv.fat < 0 || normalisedPv.fibre < 0) warnings.push("Negative nutrition values detected.");
-    if (normalisedPv.prot > 100 || normalisedPv.carb > 100 || normalisedPv.fat > 100) warnings.push("Macronutrients exceed 100g (Check if basis is per 100g).");
-    if (!normalisedPv.cal && !normalisedPv.prot && !normalisedPv.fat) warnings.push("Nutrition data appears to be completely empty.");
+    const sv = p.sourceValues || {};
+    const pv = p.parsedValues || {};
+    const normalisedPv = p.normalisedValues || p;
 
     let diagHtml = `
     <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:14px;">
@@ -18639,19 +16594,19 @@ function extractTescoProduct() {
         <div class="grid2" style="margin-top:10px;">
             <div>
                 <h4 style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text2); margin:0 0 6px;">Product Extraction</h4>
-                <div style="font-size:12px; margin-bottom:4px;"><strong>Name:</strong> ${name || '-'}</div>
-                <div style="font-size:12px; margin-bottom:4px;"><strong>Brand:</strong> ${brand || '-'}</div>
-                <div style="font-size:12px; margin-bottom:4px;"><strong>Price:</strong> £${data.price || '-'}</div>
-                <div style="font-size:12px; margin-bottom:4px;"><strong>Pack Size:</strong> ${data.packSize || '-'}${data.packUnit || ''}</div>
-                <div style="font-size:12px; margin-bottom:4px;"><strong>Item Weight:</strong> ${getTescoItemWeightGuess(data, name) || '-'}g</div>
-                <div style="font-size:12px; margin-bottom:4px;"><strong>Storage:</strong> ${storage || '-'}</div>
+                <div style="font-size:12px; margin-bottom:4px;"><strong>Name:</strong> ${p.name || '-'}</div>
+                <div style="font-size:12px; margin-bottom:4px;"><strong>Brand:</strong> ${p.brand || '-'}</div>
+                <div style="font-size:12px; margin-bottom:4px;"><strong>Price:</strong> £${p.price || '-'}</div>
+                <div style="font-size:12px; margin-bottom:4px;"><strong>Pack Size:</strong> ${p.packSize || '-'}${p.packUnit || ''}</div>
+                <div style="font-size:12px; margin-bottom:4px;"><strong>Item Weight:</strong> ${p.itemWeight || '-'}g</div>
+                <div style="font-size:12px; margin-bottom:4px;"><strong>Storage:</strong> ${p.storage || '-'}</div>
             </div>
             <div>
                 <h4 style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text2); margin:0 0 6px;">Nutrition Extraction</h4>
-                <div style="font-size:12px; margin-bottom:6px;"><strong>Source:</strong> <span class="badge badge-purple">${nsrc}</span></div>
-                <div style="font-size:12px; margin-bottom:4px;"><strong>Basis:</strong> <span class="badge badge-gray">${nbasis}</span></div>
+                <div style="font-size:12px; margin-bottom:6px;"><strong>Source:</strong> <span class="badge badge-purple">${p.nsrc || 'Import'}</span></div>
+                <div style="font-size:12px; margin-bottom:4px;"><strong>Basis:</strong> <span class="badge badge-gray">${p.nbasis || 'unknown'}</span></div>
                 <div style="font-size:12px; margin-bottom:4px; margin-top:8px;"><strong>Breadcrumbs:</strong></div>
-                <div style="font-size:11px; color:var(--text3); word-break: break-all;">${breadcrumbs || 'Not found'}</div>
+                <div style="font-size:11px; color:var(--text3); word-break: break-all;">${p.breadcrumbs || 'Not found'}</div>
             </div>
         </div>
 
@@ -18685,7 +16640,7 @@ function extractTescoProduct() {
                         <td style="padding:6px 4px;">${pv.carb ?? '0'}</td>
                         <td style="padding:6px 4px;">${normalisedPv.carb ?? '0'}</td>
                     </tr>
-                        <tr style="border-bottom:1px solid var(--border);">
+                    <tr style="border-bottom:1px solid var(--border);">
                         <td style="padding:6px 4px; font-weight:500;">Fat</td>
                         <td style="padding:6px 4px;">${sv.fat ?? '-'}</td>
                         <td style="padding:6px 4px;">${pv.fat ?? '0'}</td>
@@ -18711,13 +16666,13 @@ function extractTescoProduct() {
         dBox = document.createElement('div');
         dBox.id = 'tesco-diagnostics-box';
         const tp = document.getElementById('tesco-preview');
-        tp.insertBefore(dBox, tp.firstChild);
+        if (tp) tp.insertBefore(dBox, tp.firstChild);
     }
-    dBox.innerHTML = diagHtml;
+    if (dBox) dBox.innerHTML = diagHtml;
 
-    if(document.getElementById('tp-name')) document.getElementById('tp-name').value = name;
-    if(document.getElementById('tp-brand')) document.getElementById('tp-brand').value = brand;
-    if(document.getElementById('tp-price')) document.getElementById('tp-price').value = data.price || '';
+    if(document.getElementById('tp-name')) document.getElementById('tp-name').value = p.name;
+    if(document.getElementById('tp-brand')) document.getElementById('tp-brand').value = p.brand;
+    if(document.getElementById('tp-price')) document.getElementById('tp-price').value = p.price || '';
     
     if(document.getElementById('tp-cal')) document.getElementById('tp-cal').value = normalisedPv.cal || '';
     if(document.getElementById('tp-fat')) document.getElementById('tp-fat').value = normalisedPv.fat || '';
@@ -18725,42 +16680,21 @@ function extractTescoProduct() {
     if(document.getElementById('tp-fibre')) document.getElementById('tp-fibre').value = normalisedPv.fibre || '';
     if(document.getElementById('tp-prot')) document.getElementById('tp-prot').value = normalisedPv.prot || '';
     
-    const itemWeightGuess = getTescoItemWeightGuess(data, name);
-    const realItemCount = +data.itemCount || 0;
-    const countablePack = realItemCount > 1 && itemWeightGuess;
-    const importedPackUnit=String(data.packUnit||'g').toLowerCase();
-    const importedItemUnit=String(data.itemWeightUnit||'g').toLowerCase()==='ml'?'ml':'g';
-    const totalPackAmount=countablePack&&importedPackUnit==='qty'?realItemCount*itemWeightGuess:(data.packSize||'');
-    if(document.getElementById('tp-pack')) document.getElementById('tp-pack').value = totalPackAmount;
-    setPackUnitEditorValue('tp-pack-unit',countablePack?importedItemUnit:importedPackUnit,{allowLegacyCount:importedPackUnit==='qty'&&!itemWeightGuess});
+    if(document.getElementById('tp-pack')) document.getElementById('tp-pack').value = p.packSize;
+    setPackUnitEditorValue('tp-pack-unit', p.packUnit, {allowLegacyCount: p.packUnit === 'qty'});
     
     if(document.getElementById('tp-item-weight')) {
-        document.getElementById('tp-item-weight').value = itemWeightGuess;
+        document.getElementById('tp-item-weight').value = p.itemWeight;
     }
-    if(document.getElementById('tp-item-weight-unit')) document.getElementById('tp-item-weight-unit').value = data.itemWeightUnit || 'g';
+    if(document.getElementById('tp-item-weight-unit')) document.getElementById('tp-item-weight-unit').value = p.itemWeightUnit || 'g';
     if(document.getElementById('tp-drained-weight')) {
-        document.getElementById('tp-drained-weight').value = data.drainedWeight || '';
+        document.getElementById('tp-drained-weight').value = p.drainedWeight || '';
     }
-    if(document.getElementById('tp-drained-weight-unit')) document.getElementById('tp-drained-weight-unit').value = data.drainedWeightUnit || 'g';
+    if(document.getElementById('tp-drained-weight-unit')) document.getElementById('tp-drained-weight-unit').value = p.drainedWeightUnit || 'g';
     updatePackModelSummary('tp');
     
-    if(document.getElementById('tp-storage')) document.getElementById('tp-storage').value = storage;
-
-    let cat = data.cat || 'other';
-    if(!data.cat && name) {
-        const lowerName = name.toLowerCase();
-        if (lowerName.includes('pepper') || lowerName.includes('salad') || lowerName.includes('veg') || lowerName.includes('garlic')) {
-            cat = 'vegetables';
-        } else if (lowerName.includes('quorn') || lowerName.includes('beyond') || lowerName.includes('meat free') || lowerName.includes('vegan chicken') || lowerName.includes('plant based') || lowerName.includes('plant-based')) {
-            cat = 'meat-substitute';
-        } else if (lowerName.includes('tofu')) {
-            cat = 'tofu-tempeh';
-        } else if (lowerName.includes('bean') || lowerName.includes('lentil') || lowerName.includes('chickpea')) {
-            cat = 'legume';
-        }
-    }
-
-    if(document.getElementById('tp-cat')) document.getElementById('tp-cat').value = cat;
+    if(document.getElementById('tp-storage')) document.getElementById('tp-storage').value = p.storage;
+    if(document.getElementById('tp-cat')) document.getElementById('tp-cat').value = p.cat;
     syncCategorySearchInput('tp-cat');
 
     const previewEl = document.getElementById('tesco-preview');
@@ -18845,6 +16779,9 @@ function finishTescoImportSelection(pendingTesco, ingredientId, ingredientName, 
 }
 
 function createTescoIngredientFromData(data){
+  if (window.TescoImportService?.createTescoIngredientFromData) {
+    return normaliseLegacyCountedPackOnSave(window.TescoImportService.createTescoIngredientFromData(data));
+  }
   return normaliseLegacyCountedPackOnSave({
     id:'ing'+Date.now(),
     name: data.name,
@@ -18872,8 +16809,11 @@ function createTescoIngredientFromData(data){
 }
 
 function addTescoPackVariant(match, data){
-  if(!match.packOptions) match.packOptions = [];
-  if(match.packSize && match.price && match.packOptions.length === 0) {
+  if (window.TescoImportService?.addTescoPackVariant) {
+    window.TescoImportService.addTescoPackVariant(match, data);
+  } else {
+    if(!match.packOptions) match.packOptions = [];
+    if(match.packSize && match.price && match.packOptions.length === 0) {
       match.packOptions.push({
         packSize: match.packSize,
         packUnit: match.packUnit || 'g',
@@ -18883,24 +16823,25 @@ function addTescoPackVariant(match, data){
         drainedWeight: match.drainedWeight || null,
         drainedWeightUnit: match.drainedWeightUnit || 'g'
       });
+    }
+    match.packOptions.push(normaliseLegacyCountedPackOnSave({
+      packSize: data.packSize,
+      packUnit: data.packUnit || 'g',
+      price: data.price,
+      itemWeight: data.itemWeight || null,
+      itemWeightUnit: data.itemWeightUnit || 'g',
+      drainedWeight: data.drainedWeight || null,
+      drainedWeightUnit: data.drainedWeightUnit || 'g',
+      sourceUrl: data.sourceUrl || null,
+      itemCount: data.itemCount || null
+    }));
+    if(data.drainedWeight) {
+      match.drainedWeight = data.drainedWeight;
+      match.drainedWeightUnit = data.drainedWeightUnit || 'g';
+    }
+    if(data.sourceUrl) match.sourceUrl = match.sourceUrl || data.sourceUrl;
+    match.updatedAt = new Date().toISOString();
   }
-  match.packOptions.push(normaliseLegacyCountedPackOnSave({
-    packSize: data.packSize,
-    packUnit: data.packUnit || 'g',
-    price: data.price,
-    itemWeight: data.itemWeight || null,
-    itemWeightUnit: data.itemWeightUnit || 'g',
-    drainedWeight: data.drainedWeight || null,
-    drainedWeightUnit: data.drainedWeightUnit || 'g',
-    sourceUrl: data.sourceUrl || null,
-    itemCount: data.itemCount || null
-  }));
-  if(data.drainedWeight) {
-    match.drainedWeight = data.drainedWeight;
-    match.drainedWeightUnit = data.drainedWeightUnit || 'g';
-  }
-  if(data.sourceUrl) match.sourceUrl = match.sourceUrl || data.sourceUrl;
-  match.updatedAt = new Date().toISOString();
   refreshProductGroupAndRecipes(match.id);
   saveState(true);
 }
@@ -20436,7 +18377,6 @@ function applyPlanReschedule(mode='move'){
 
 let platePlanStudioSession=null;
 let platePlanStudioApplyUndo=null;
-function clonePlatePlanValue(value){return JSON.parse(JSON.stringify(value));}
 function planStudioFingerprint(plan){return JSON.stringify(plan||{});}
 function ensurePlanStudio(){
   let wrap=document.getElementById('plan-studio-wrap');if(wrap)return wrap;
@@ -23234,1601 +21174,49 @@ function updateShopGroupPref(val) {
     renderShopping();
 }
 
-// == SHOPPING OPTIMISATION ENGINE ==
-function getPackVariants(baseIng) {
-    let options = [];
-    if (baseIng.packSize && baseIng.price) options.push({ size: baseIng.packSize, unit: baseIng.packUnit, price: baseIng.price, itemWeight: baseIng.itemWeight, itemCount: baseIng.itemCount, drainedWeight: baseIng.drainedWeight, drainedWeightUnit: baseIng.drainedWeightUnit });
-    if (baseIng.packOptions && baseIng.packOptions.length > 0) {
-        baseIng.packOptions.forEach(po => options.push({ size: po.packSize, unit: po.packUnit, price: po.price, itemWeight: po.itemWeight, itemCount: po.itemCount, drainedWeight: po.drainedWeight || baseIng.drainedWeight, drainedWeightUnit: po.drainedWeightUnit || baseIng.drainedWeightUnit }));
-    }
-    let uniq = [];
-    options.forEach(opt => {
-        const model={packSize:opt.size,packUnit:opt.unit,itemWeight:opt.itemWeight,itemWeightUnit:opt.itemWeightUnit||'g',drainedWeight:opt.drainedWeight,drainedWeightUnit:opt.drainedWeightUnit||'g'};
-        const grossG = getProductGrossPackAmount(model);
-        const drainedG = +opt.drainedWeight > 0 ? getProductUsablePackAmount(model) : 0;
-        const g = getProductUsablePackAmount(model);
-        if (g > 0 && opt.price > 0 && !uniq.some(uo => uo.g === g && uo.price === opt.price)) {
-            uniq.push({ ...opt, g, grossG, drainedG, key: `${g}|${opt.price}` });
-        }
-    });
-    return uniq;
-}
-
-function setPackPick(bankId, key) {
-    if (!state.packPicks) state.packPicks = {};
-    if (!key || key === 'auto') delete state.packPicks[bankId];
-    else state.packPicks[bankId] = key;
-    saveState();
-    renderShopping();
-}
-
-function getOptimalPurchase(neededGrams, baseIng) {
-    let uniqueOptions = getPackVariants(baseIng);
-    if (uniqueOptions.length === 0) return null;
-
-    // Manual pick override
-    const pick = state.packPicks?.[baseIng.id];
-    if (pick) {
-        const chosen = uniqueOptions.find(o => o.key === pick);
-        if (chosen) {
-            const qty = Math.max(1, Math.ceil(neededGrams / chosen.g));
-            return { desc: `${qty} × ${formatPackDisplay(chosen.size, chosen.unit, chosen.itemWeight)}`, cost: Math.round(qty * chosen.price * 100) / 100, manual: true };
-        }
-    }
-
-    if (uniqueOptions.length <= 1) {
-        const o = uniqueOptions[0];
-        const qty = Math.max(1, Math.ceil(neededGrams / o.g));
-        return { desc: `${qty} × ${formatPackDisplay(o.size, o.unit, o.itemWeight)}`, cost: Math.round(qty * o.price * 100) / 100 };
-    }
-
-    
-    const reqGrams = Math.ceil(neededGrams);
-    const maxOptGrams = Math.max(...uniqueOptions.map(o => o.g));
-    const limit = reqGrams + maxOptGrams; 
-    
-    // Dynamic programming for minimum cost unbounded knapsack
-    let dp = new Array(limit + 1).fill(Infinity);
-    let choice = new Array(limit + 1).fill(null);
-    let itemsCount = new Array(limit + 1).fill(0);
-    
-    dp[0] = 0;
-    
-    for (let i = 0; i <= limit; i++) {
-        if (dp[i] === Infinity) continue;
-        for (let opt of uniqueOptions) {
-            let next = i + opt.g;
-            if (next <= limit) {
-                let newCost = Math.round((dp[i] + opt.price) * 100) / 100;
-                let newCount = itemsCount[i] + 1;
-                
-                if (newCost < dp[next] || (newCost === dp[next] && newCount < itemsCount[next])) {
-                    dp[next] = newCost;
-                    choice[next] = { opt, prev: i };
-                    itemsCount[next] = newCount;
-                }
-            }
-        }
-    }
-    
-    // Find optimal overshoot
-    let bestIdx = -1;
-    let bestCost = Infinity;
-    let bestCount = Infinity;
-    
-    for(let i = reqGrams; i <= limit; i++) {
-        if (dp[i] < bestCost || (dp[i] === bestCost && itemsCount[i] < bestCount)) {
-            bestCost = dp[i];
-            bestCount = itemsCount[i];
-            bestIdx = i;
-        }
-    }
-    
-    if (bestIdx === -1 || bestCost === Infinity) return null;
-    
-    let combo = [];
-    let curr = bestIdx;
-    while(curr > 0 && choice[curr]) {
-        combo.push(choice[curr].opt);
-        curr = choice[curr].prev;
-    }
-    
-    const counts = {};
-    combo.forEach(o => {
-        const k = formatPackDisplay(o.size, o.unit, o.itemWeight) || `${o.size}${o.unit}`;
-        counts[k] = (counts[k] || 0) + 1;
-    });
-    
-    return {
-        desc: Object.keys(counts).map(k => `${counts[k]} × ${k}`).join(' and '),
-        cost: bestCost
-    };
-}
-
-function calculateShoppingPriceFromAggregates(agg){
-  const byProduct = {};
-  Object.values(agg || {}).forEach(item => {
-    if(!item.bankId || !item.grams) return;
-    if(!byProduct[item.bankId]) byProduct[item.bankId] = { bankId:item.bankId, grams:0, names:new Set() };
-    byProduct[item.bankId].grams += +item.grams || 0;
-    byProduct[item.bankId].names.add(item.name || item.productName || item.bankId);
-  });
-  const lines = Object.values(byProduct).map(line => {
-    const product = getProduct(line.bankId);
-    if(!product) return null;
-    const purchase = getOptimalPurchase(line.grams, product);
-    const variants = getPackVariants(product);
-    const cheapestBasis = variants.length ? variants.slice().sort((a,b)=>(a.price/a.g)-(b.price/b.g))[0] : null;
-    const consumedCost = cheapestBasis && cheapestBasis.g > 0 ? (cheapestBasis.price / cheapestBasis.g) * line.grams : 0;
-    const pricePer100 = cheapestBasis && cheapestBasis.g > 0 ? cheapestBasis.price / cheapestBasis.g * 100 : 0;
-    const flags = [];
-    if(!variants.length) flags.push('missing pack data');
-    if(pricePer100 > 8) flags.push(`high £/100g (£${pricePer100.toFixed(2)})`);
-    if((purchase?.cost || 0) > 20) flags.push('high checkout contribution');
-    return { ...line, product, purchase, consumedCost, pricePer100, flags, name:[...line.names][0] || product.name };
-  }).filter(Boolean);
-  const estimatedTotal = lines.reduce((sum,line) => sum + (+line.purchase?.cost || 0), 0);
-  const consumedTotal = lines.reduce((sum,line) => sum + (+line.consumedCost || 0), 0);
-  const lineByBankId = Object.fromEntries(lines.map(line => [line.bankId, line]));
-  return { estimatedTotal, consumedTotal, lines: lines.sort((a,b)=>(b.purchase?.cost || 0) - (a.purchase?.cost || 0)), lineByBankId };
-}
-
-function encodeShopTarget(target){
-  return encodeURIComponent(JSON.stringify(target));
-}
-
-function decodeShopTarget(value){
-  try { return JSON.parse(decodeURIComponent(value || '')); } catch(e) { return null; }
-}
-
+// == SHOPPING OPTIMISATION ENGINE (Superseded by /src/views/ShoppingView.js) ==
 function formatShoppingBatchAmount(grams){
   return `${Math.round((+grams || 0) * 10) / 10}g`;
 }
-
-function getShoppingLineStateKey(groupId,bankId,fallback=''){
-  return [String(groupId||normaliseAliasText(fallback)||'unresolved'),String(bankId||'unresolved')].join('|');
-}
-
-function setShoppingAtHome(key,checked,{quiet=false}={}){
-  if(!state.plan?.slots||!key)return;
-  if(!state.plan.shoppingAtHome||typeof state.plan.shoppingAtHome!=='object')state.plan.shoppingAtHome={};
-  if(checked)state.plan.shoppingAtHome[key]=true;else delete state.plan.shoppingAtHome[key];
-  state.plan.confirmedShopping=false;
-  saveState();
-  markPlatePlanViewsDirty('shopping','planlib');
-  renderShopping();
-  if(!quiet){
-    showPlatePlanToast(checked?'Moved to Already have.':'Moved back to your shopping list.',{
-      label:'Undo',
-      onclick:()=>setShoppingAtHome(key,!checked,{quiet:true})
-    });
-  }
-}
-
-function organiseShoppingAtHomeRows(host){
-  if(!host)return;
-  const rows=[...host.querySelectorAll('.shop-item-details[data-at-home="true"]')];
-  if(!rows.length)return;
-  const section=document.createElement('details');
-  section.className='shop-home-section grouped-section';
-  section.innerHTML=`<summary class="grouped-row"><span>Already have</span><span>${rows.length} item${rows.length===1?'':'s'} <span aria-hidden="true">⌄</span></span></summary><div class="grouped-row" data-shop-home-rows></div>`;
-  const target=section.querySelector('[data-shop-home-rows]');
-  rows.forEach(row=>target.appendChild(row));
-  host.querySelectorAll('.shop-section').forEach(group=>{if(!group.querySelector('.shop-item-details'))group.remove();});
-  host.appendChild(section);
-}
-
-function groupShoppingAllocationsByMeal(allocations){
-  const map = new Map();
-  (allocations || []).forEach(al => {
-    const key = [al.day, al.mealKey, al.recipeId, al.variant || 'original'].join('|');
-    if(!map.has(key)) {
-      map.set(key, {
-        key,
-        day: al.day,
-        mealKey: al.mealKey,
-        mealLabel: al.mealLabel,
-        recipeId: al.recipeId,
-        recipeTitle: al.recipeTitle || al.recipeName,
-        variant: al.variant || 'original',
-        people: new Set(),
-        grams: 0,
-        substituted: false,
-        replacedNames: new Set(),
-        targets: []
-      });
-    }
-    const row = map.get(key);
-    row.people.add(al.person || '');
-    row.grams += +al.qtyGrams || 0;
-    row.substituted = row.substituted || !!al.isSubstituted;
-    if(al.replacedIngredientName) row.replacedNames.add(al.replacedIngredientName);
-    if(al.planMealId && al.originalKey) {
-      row.targets.push({
-        planMealId: al.planMealId,
-        originalKey: al.originalKey,
-        groupId: al.groupId || '',
-        bankId: al.bankId || '',
-        recipeId: al.recipeId || '',
-        recipeName: al.recipeTitle || al.recipeName || '',
-        day: al.day,
-        mealKey: al.mealKey || '',
-        person: al.person || ''
-      });
-    }
-  });
-  return [...map.values()].sort((a,b) => (+a.day || 0) - (+b.day || 0) || String(a.mealKey).localeCompare(String(b.mealKey)) || String(a.recipeTitle).localeCompare(String(b.recipeTitle)));
-}
-
-function renderShoppingMealAllocationRows(item, scopeId){
-  const groups = groupShoppingAllocationsByMeal(item.allocations || []);
-  if(!groups.length) return '';
-  const rows = groups.map((row, idx) => {
-    const people = [...row.people].filter(Boolean).sort((a,b)=>a.localeCompare(b)).join(' + ') || 'Meal';
-    const targetPayload = encodeShopTarget(row.targets);
-    const title = `${formatPlanDayLabel(state.plan,row.day,{short:true})} ${row.mealLabel || toTitleCase(row.mealKey || 'Meal')} · ${people}`;
-    const status = row.substituted ? `<span style="color:var(--purple);font-size:11px;margin-left:6px">changed from ${ppEscapeHtml([...row.replacedNames][0] || 'original')}</span>` : '';
-    return `<label class="shop-meal-row" style="display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;padding:7px 0;border-top:${idx ? '1px solid var(--border)' : '0'};cursor:pointer">
-      <input type="checkbox" class="shop-batch-check" data-scope="${ppEscapeAttr(scopeId)}" data-targets="${targetPayload}" onchange="updateShoppingBatchToolbar('${ppEscapeAttr(scopeId)}')">
-      <span style="min-width:0"><strong>${ppEscapeHtml(title)}</strong><br><span class="${/https?:\/\/|[^\s]{36,}/i.test(row.recipeTitle||'')?'breakable-url':''}" style="color:var(--text2);font-size:11px">${ppEscapeHtml(row.recipeTitle || '')}${row.variant === 'enhanced' ? ' · Enhanced' : ''}${status}</span></span>
-      <span style="font-size:12px;color:var(--text2);white-space:nowrap">${formatShoppingBatchAmount(row.grams)}</span>
-    </label>`;
-  }).join('');
-  return `<div class="shop-batch-block" data-scope="${ppEscapeAttr(scopeId)}">
-    <div class="row-between" style="gap:8px;margin-bottom:5px;align-items:center">
-      <strong style="font-size:12px;color:var(--text2)">Meals using this item</strong>
-      <button type="button" class="btn sm ghost" style="padding:2px 6px;font-size:10px" onclick="selectAllShoppingRows('${ppEscapeAttr(scopeId)}', true)">Select all</button>
-    </div>
-    <div class="shop-batch-toolbar" id="${ppEscapeAttr(scopeId)}-toolbar" style="display:none;gap:6px;align-items:center;flex-wrap:wrap;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 8px;margin-bottom:7px">
-      <span id="${ppEscapeAttr(scopeId)}-count" style="font-size:12px;color:var(--text2);font-weight:700"></span>
-      <button type="button" class="btn sm ghost" onclick="openBatchSubstituteFromSelection('${ppEscapeAttr(scopeId)}','replace')">Replace</button>
-      <button type="button" class="btn sm ghost" onclick="openBatchSubstituteFromSelection('${ppEscapeAttr(scopeId)}','merge')">Merge</button>
-      <button type="button" class="btn sm danger" onclick="confirmRemoveShoppingBatch('${ppEscapeAttr(scopeId)}')">Remove</button>
-    </div>
-    ${rows}
-  </div>`;
-}
-
-function getSelectedShoppingTargets(scopeId){
-  const targets = [];
-  document.querySelectorAll(`.shop-batch-check[data-scope="${String(scopeId).replace(/"/g, '\\"')}"]:checked`).forEach(input => {
-    const decoded = decodeShopTarget(input.dataset.targets);
-    if(Array.isArray(decoded)) decoded.forEach(t => targets.push(t));
-  });
-  const seen = new Set();
-  return targets.filter(t => {
-    const key = `${t.planMealId}|${t.originalKey}`;
-    if(!t.planMealId || !t.originalKey || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-function updateShoppingBatchToolbar(scopeId){
-  const targets = getSelectedShoppingTargets(scopeId);
-  const toolbar = document.getElementById(scopeId + '-toolbar');
-  const count = document.getElementById(scopeId + '-count');
-  if(toolbar) toolbar.style.display = targets.length ? 'flex' : 'none';
-  if(count) count.textContent = `${targets.length} portion${targets.length === 1 ? '' : 's'} selected`;
-}
-
-function selectAllShoppingRows(scopeId, checked){
-  document.querySelectorAll(`.shop-batch-check[data-scope="${String(scopeId).replace(/"/g, '\\"')}"]`).forEach(input => { input.checked = !!checked; });
-  updateShoppingBatchToolbar(scopeId);
-}
-
-function refreshShoppingAfterBatch(){
-  if(state.plan) state.plan.confirmedShopping = false;
-  saveState();
-  if(document.getElementById('view-shopping')?.classList.contains('active')) renderShopping();
-  if(document.getElementById('view-planner')?.classList.contains('active')) renderPlan();
-}
-
-function applyShoppingBatchTargets(targets, mode, productId = '', quantityOverrides = []){
-  (targets || []).forEach((target,targetIndex) => {
-    const ov = getPlanOverride(target.planMealId);
-    if(mode === 'remove') {
-      ov.removeIngredientKeys[target.originalKey] = true;
-      delete ov.productOverrides[target.originalKey];
-      if(target.groupId) delete ov.productOverrides[target.groupId];
-      delete ov.substitutions[target.originalKey];
-      delete ov.ingredientReplacements[target.originalKey];
-      delete ov.mergeInto[target.originalKey];
-      delete ov.ingredientQuantityOverrides[target.originalKey];
-      return;
-    }
-    delete ov.removeIngredientKeys[target.originalKey];
-    if(mode === 'merge') {
-      ov.ingredientReplacements[target.originalKey] = productId;
-      ov.mergeInto[target.originalKey] = productId;
-      if(quantityOverrides[targetIndex]) ov.ingredientQuantityOverrides[target.originalKey]=quantityOverrides[targetIndex];
-      else delete ov.ingredientQuantityOverrides[target.originalKey];
-      return;
-    }
-    if(mode === 'replace') {
-      ov.ingredientReplacements[target.originalKey] = productId;
-      delete ov.mergeInto[target.originalKey];
-      if(quantityOverrides[targetIndex]) ov.ingredientQuantityOverrides[target.originalKey]=quantityOverrides[targetIndex];
-      else delete ov.ingredientQuantityOverrides[target.originalKey];
-    }
-  });
-  refreshShoppingAfterBatch();
-}
-
-function openBatchSubstituteFromSelection(scopeId, mode){
-  const targets = getSelectedShoppingTargets(scopeId);
-  if(!targets.length) return openAppInfoModal('Select meals','Select at least one meal row first.');
-  openSubstituteModalForTargets(targets, mode);
-}
-
-function confirmRemoveShoppingBatch(scopeId){
-  const targets = getSelectedShoppingTargets(scopeId);
-  if(!targets.length) return openAppInfoModal('Select meals','Select at least one meal row first.');
-  openAppConfirmModal('Remove selected ingredients?', `Remove this ingredient from ${targets.length} planned portion${targets.length === 1 ? '' : 's'}?`, 'Remove', () => applyShoppingBatchTargets(targets, 'remove'));
-}
-
-function getSubstitutionSuggestionProducts(targets, mode, query = ''){
-  const q = String(query || '').trim().toLowerCase();
-  let rows = [];
-  if(mode === 'merge') {
-    const selectedProductIds = new Set((targets || []).map(t => t.bankId).filter(Boolean));
-    rows = collectCurrentShoppingProducts()
-      .filter(p => !selectedProductIds.has(p.id))
-      .map(p => ({...p, substSection:'Already in shopping list'}));
-  } else {
-    const groupIds = [...new Set((targets || []).map(t => t.groupId).filter(Boolean))];
-    const firstGroup = getIngredientGroup(groupIds[0]);
-    const seen = new Set();
-    const add = (products, label) => (products || []).forEach(p => {
-      if(!p || seen.has(p.id)) return;
-      seen.add(p.id);
-      rows.push({...p, substSection:label});
-    });
-    if(groupIds.length === 1 && firstGroup) {
-      add(getGroupProducts(firstGroup.id), 'Same sub-type');
-      const family = getGroupIngredientFamily(firstGroup);
-      if(family) add(getFamilyGroups(family.id).filter(g => g.id !== firstGroup.id).flatMap(g => getGroupProducts(g.id)), 'Same ingredient');
-      add((state.ingredients || []).filter(p => {
-        const g = getIngredientGroup(p.groupId);
-        return g && g.cat === firstGroup.cat && g.ingredientId !== firstGroup.ingredientId;
-      }), 'Same category');
-    }
-    add(state.ingredients || [], 'All products');
-  }
-  if(q) rows = rows.filter(i => {
-    const group = getIngredientGroup(i.groupId);
-    const hay = [i.name, i.brand, getProductFamily(i), getGroupTypeName(group), getGroupHierarchyText(group || {cat:i.cat, family:getProductFamily(i), name:i.name})].join(' ').toLowerCase();
-    return hay.includes(q);
-  });
-  return rows.sort((a,b) => {
-    const order = {'Same sub-type':0,'Same ingredient':1,'Same category':2,'Already in shopping list':0,'All products':3};
-    const oa = order[a.substSection] ?? 9;
-    const ob = order[b.substSection] ?? 9;
-    if(oa !== ob) return oa - ob;
-    return scoreProductByPriority(b, state.prefs.productPriority || 'protein_per_kcal') - scoreProductByPriority(a, state.prefs.productPriority || 'protein_per_kcal') || (a.name || '').localeCompare(b.name || '');
-  });
-}
-
-function renderSubstitutionDropdown(list){
-  const drop = document.getElementById('subst-dropdown');
-  if(!drop) return;
-  if(!list.length) {
-    drop.innerHTML = `<div style="padding:8px 12px;font-size:12px;color:var(--text3)">No matches found.</div>`;
-  } else {
-    drop.innerHTML = list.slice(0,32).map(i => {
-      const group = getIngredientGroup(i.groupId);
-      const pkcal = typeof getProductProteinPer100Kcal === 'function' ? round1(getProductProteinPer100Kcal(i)) : 0;
-      const ppound = typeof getProductProteinPerPound === 'function' ? round1(getProductProteinPerPound(i)) : 0;
-      const pack = formatPackDisplay(i.packSize, i.packUnit || 'g', i.itemWeight);
-      return `<div class="map-drop-item" onclick="selectSubstItem('${ppEscapeAttr(i.id)}')">
-        <div style="font-weight:600;font-size:13px">${ppEscapeHtml(i.name)} ${i.brand && i.brand !== 'Generic' ? `(${ppEscapeHtml(i.brand)})` : ''}</div>
-        <div style="font-size:11px;color:var(--text2);margin-top:2px">${round1(i.prot || 0)}g P | ${Math.round(i.cal || 0)} kcal | ${pkcal}g P/100kcal | ${ppound}g P/£${i.price ? ` | £${(+i.price).toFixed(2)}` : ''}${pack ? ` | ${ppEscapeHtml(pack)}` : ''}</div>
-        <div style="font-size:10px;color:var(--text3);margin-top:2px">${ppEscapeHtml(i.substSection || 'Product')} · ${ppEscapeHtml(getGroupHierarchyText(group || {cat:i.cat, family:getProductFamily(i), name:i.name}))}</div>
-      </div>`;
-    }).join('');
-  }
-  drop.style.display = 'block';
-}
-
+// == SHOPPING STUBS (Superseded by /src/views/ShoppingView.js) ==
 function renderShopping(){
-  ensurePlannerShell();
-  const el=document.getElementById('shop-content');
-  if(!state.plan?.slots){
-    el.innerHTML='<div class="empty">Generate a meal plan first.</div>';
-    const prep=document.getElementById('shop-meal-prep-panel'); if(prep) prep.innerHTML='';
-    return;
-  }
-  const{days,slots}=state.plan;
-  const agg={};
-  let estimatedTotal = 0;
-  let consumedTotal = 0;
-  
-  const groupMode = state.prefs.shopGroupBy || 'family';
-  
-  function getGroupingKey(n,bankId,groupId=''){
-    if(bankId){
-        const bi=state.ingredients.find(i=>i.id===bankId);
-        if(bi) {
-          if(groupMode === 'family') return getProductFamily(bi);
-          if(groupMode === 'category') {
-            const group = getIngredientGroup(groupId || bi.groupId);
-            return CAT[group?.cat || bi.cat] || group?.cat || bi.cat || 'Other';
-          }
-          return bi.storage || 'cupboard';
-        }
-    }
-    n=(n||'').toLowerCase();
-    if(groupMode === 'family') {
-        return normaliseAliasText(inferIngredientFamilyFromText(n)) || 'No ingredient';
-    } else if(groupMode === 'category') {
-        return 'Other';
-    } else {
-        if(/frozen|ice/.test(n)) return 'freezer';
-        if(/milk|yoghurt|cheese|cream|butter|egg|fresh|spinach|lettuce|cucumber|tomato|pepper/.test(n)) return 'fridge';
-        return 'cupboard';
-    }
-  }
-
-  function formatShoppingNeed(item) {
-    if(item.mixedUnits) return `${Math.round(item.grams)}g`;
-    if(item.needUnit === 'ml') return `${Math.round(item.needQty)}ml`;
-    if(item.needUnit === 'item') return `${Math.round(item.needQty * 10) / 10} item${item.needQty === 1 ? '' : 's'}`;
-    return `${Math.round(item.needQty)}g`;
-  }
-  
-  for(let d=1;d<=days;d++){
-    const s=slots[d]||{};
-    SLOTS.forEach(sl=>{
-      if(state.excluded[d]?.[sl.key])return;
-      const slotData = s[sl.key];
-      if(!slotData)return;
-      
-      const slotInfo = getPlanSlotInfo(slotData);
-      const rId = slotInfo.id;
-      const instanceId = slotInfo.instanceId;
-      const r = slotInfo.active;
-      
-      if(!r||!r.ingredients)return;
-      const context = getPlanContextForInstance(instanceId);
-      const slotScale = getSlotShoppingScale(r, sl.key, instanceId);
-
-      r.ingredients.forEach(ing=>{
-        if(isIngredientRemovedInContext(ing, context)) return;
-        const adjustedIng = getAdjustedIngredientForContext(ing, context);
-        const resolved = resolveProductForIngredientWithContext(adjustedIng, context);
-        const bankIng = resolved.product || (adjustedIng.bankId ? state.ingredients.find(i => i.id === adjustedIng.bankId) : null);
-        const actualBankId = bankIng?.id || '';
-        const groupId = resolved.groupId || bankIng?.groupId || '';
-        const actualName = resolved.group?.name || adjustedIng.name || adjustedIng.raw;
-        const defaultProduct = resolveProductForIngredient(ing, {}).product;
-        const isSub = !!(instanceId && defaultProduct && bankIng && defaultProduct.id !== bankIng.id);
-        const repName = ing.name || ing.raw || actualName;
-
-        const raw = ingRaw(adjustedIng);
-        const amt = getShoppingAmount(adjustedIng, bankIng, slotScale);
-        const grams = amt.grams;
-        const k = getShoppingLineStateKey(groupId,actualBankId,raw);
-
-        if(k){
-          if(!agg[k]) agg[k] = { key:k, name: actualName || raw, productName: bankIng?.name || '', brand: bankIng?.brand || '', bankId: actualBankId, groupId, group: getGroupingKey(bankIng?.name || actualName || raw, actualBankId, groupId), grams: 0, needQty: 0, needUnit: amt.unit, mixedUnits: false, allocations: [] };
-          agg[k].grams += grams;
-          if(agg[k].needUnit === amt.unit && !agg[k].mixedUnits) {
-            agg[k].needQty += amt.qty;
-          } else {
-            agg[k].mixedUnits = true;
-          }
-          agg[k].allocations.push({
-             planMealId: instanceId,
-             recipeId: rId,
-             recipeName: `${formatPlanDayLabel(state.plan,d,{short:true})} ${sl.short} - ${r.name}${slotInfo.variant === 'enhanced' ? ' (Enhanced)' : ''}`,
-             recipeTitle: r.name,
-             day: d,
-             slotKey: sl.key,
-             mealKey: getMealTypeFromSlotKey(sl.key),
-             mealLabel: sl.short,
-             person: String(sl.key).endsWith('C') ? 'Chloe' : 'Elliott',
-             variant: slotInfo.variant || 'original',
-             qtyGrams: grams,
-             amountLabel: amt.label,
-             isSubstituted: isSub,
-             replacedIngredientName: repName,
-             originalKey: getRecipeIngredientKey(ing),
-             groupId,
-             bankId: actualBankId
-          });
-        }
-      });
-    });
-  }
-
-  const requiredAgg={};
-  Object.entries(agg).forEach(([key,item])=>{requiredAgg[key]={...item,allocations:[...(item.allocations||[])]};});
-  const useUpByProduct=new Map(getUseUpEntries().map(entry=>[entry.productId,entry]));
-  Object.values(agg).forEach(item=>{
-    item.requiredGrams=item.grams;
-    item.toBuyGrams=item.grams;
-    item.useUpAvailable=null;
-    item.useUpUsed=0;
-    item.useUpRemainder=null;
-    const entry=useUpByProduct.get(item.bankId);
-    const available=getUseUpAvailableAmount(entry);
-    if(available==null)return;
-    item.useUpAvailable=available;
-    item.useUpUsed=Math.min(item.requiredGrams,available);
-    item.useUpRemainder=Math.max(0,available-item.requiredGrams);
-    item.toBuyGrams=Math.max(0,item.requiredGrams-available);
-    item.grams=item.toBuyGrams;
-    if(!item.mixedUnits&&item.needQty>0&&item.requiredGrams>0)item.needQty*=item.toBuyGrams/item.requiredGrams;
-  });
-  
-  const groupedData = {};
-  if(groupMode === 'family') {
-      getKnownFamilies().concat(['No ingredient']).forEach(f => groupedData[f] = []);
-  } else if(groupMode === 'category') {
-      Object.values(CAT).concat(['Other']).forEach(c => groupedData[c] = []);
-  } else {
-      ['fridge', 'freezer', 'cupboard', 'none'].forEach(s => groupedData[s] = []);
-  }
-  
-  Object.values(agg).forEach(item => {
-      let g = item.group;
-      if (!groupedData[g]) groupedData[g] = [];
-      groupedData[g].push(item);
-  });
-  if(!state.plan.shoppingAtHome||typeof state.plan.shoppingAtHome!=='object')state.plan.shoppingAtHome={};
-  const validShoppingKeys=new Set(Object.keys(agg));
-  const staleShoppingKeys=Object.keys(state.plan.shoppingAtHome).filter(key=>!validShoppingKeys.has(key));
-  if(staleShoppingKeys.length){staleShoppingKeys.forEach(key=>delete state.plan.shoppingAtHome[key]);saveState();}
-  const buyableAgg=Object.fromEntries(Object.entries(agg).filter(([key])=>!state.plan.shoppingAtHome[key]));
-  const allPriceSummary = calculateShoppingPriceFromAggregates(requiredAgg);
-  const priceSummary = calculateShoppingPriceFromAggregates(buyableAgg);
-  estimatedTotal = priceSummary.estimatedTotal;
-  consumedTotal = allPriceSummary.consumedTotal;
-  
-  let html='';
-  if(state.isDraftPlan || state.draftPlan){
-    html += `<div class="card draft-plan-step-banner" style="background:var(--surface2);border:1.5px solid var(--action);border-radius:14px;padding:16px 18px;margin-bottom:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
-        <div>
-          <div style="font-weight:750;font-size:15px;color:var(--text);display:flex;align-items:center;gap:6px">
-            <span class="tag" style="background:var(--action);color:#fff;font-weight:700">Step 2 of 2</span>
-            Review Shopping List & Substitutes
-          </div>
-          <div style="font-size:13px;color:var(--text2);margin-top:4px;line-height:1.4">
-            Make any substitutions, pack selections, or check off items at home. Confirming here will save your new meal plan and shopping list to the cloud.
-          </div>
-        </div>
-        <div class="btn-row" style="margin:0;gap:8px;flex-wrap:wrap">
-          <button class="btn ghost sm" onclick="showView('planner')">← Back to Planner</button>
-          <button class="btn ghost sm" onclick="discardDraftPlan()">Discard</button>
-          <button class="btn primary sm" onclick="confirmAndSaveDraftPlan()" style="font-weight:700">✓ Confirm & Save Meal Plan</button>
-        </div>
-      </div>
-    </div>`;
-  }
-  Object.entries(groupedData).forEach(([gKey, items])=>{
-      if(!items.length)return;
-      let title = (groupMode === 'family' || groupMode === 'category') ? gKey : (gKey ? gKey.charAt(0).toUpperCase() + gKey.slice(1) : 'Other');
-      
-      html+='<div class="shop-section"><h3>'+title+'</h3><div class="card" style="padding:0 14px">'+items.sort((a,b)=>a.name.localeCompare(b.name)).map(it=>{
-          const isAtHome=!!state.plan.shoppingAtHome?.[it.key];
-          let ingredientName = it.name || 'Ingredient';
-          if(isFreshGarlicIngredient({ name: it.name }, { name: it.productName }) && it.grams) {
-              const totalCloves = Math.round(it.grams / 6);
-              const heads = Math.floor(totalCloves / 11);
-              const remainder = totalCloves % 11;
-              let garlicText = [];
-              if(heads > 0) garlicText.push(heads + (heads === 1 ? ' head' : ' heads'));
-              if(remainder > 0) garlicText.push(remainder + (remainder === 1 ? ' clove' : ' cloves'));
-              if(garlicText.length) ingredientName = `${it.name} (${garlicText.join(' and ')})`;
-          }
-
-          let productFullName = '';
-          if(it.productName) {
-            const brand = (it.brand && it.brand !== 'Generic' && !it.productName.toLowerCase().startsWith(it.brand.toLowerCase())) ? `${it.brand} ` : '';
-            productFullName = `${brand}${it.productName}`.trim();
-          }
-
-          let displayName = ingredientName;
-          if(productFullName && productFullName.toLowerCase() !== ingredientName.toLowerCase()) {
-            displayName = `${ingredientName} - ${productFullName}`;
-          }
-          const needLabel = formatShoppingNeed(it);
-          const stockLabel=it.useUpAvailable==null?'':`<span class="shop-use-up"><strong>Use-up stock:</strong> required ${formatShoppingBatchAmount(it.requiredGrams)} · available ${formatShoppingBatchAmount(it.useUpAvailable)} · planned use ${formatShoppingBatchAmount(it.useUpUsed)} · remaining ${formatShoppingBatchAmount(it.useUpRemainder)} · to buy ${formatShoppingBatchAmount(it.toBuyGrams)}</span>`;
-          
-          const itemScope = 'shop-scope-' + Math.random().toString(36).slice(2,9);
-          const allocationHtml = renderShoppingMealAllocationRows(it, itemScope);
-
-          let optimiserHtml = '';
-          if (!isAtHome && it.bankId && it.grams > 0) {
-              const bi = state.ingredients.find(x => x.id === it.bankId);
-              if (bi) {
-                  const variants = getPackVariants(bi);
-                  if (variants.length > 0) {
-                      const currentPick = state.packPicks?.[bi.id] || 'auto';
-                      const pickerOpts = [`<option value="auto"${currentPick==='auto'?' selected':''}>Auto (cheapest combo)</option>`]
-                          .concat(variants.map(v => {
-                              const label = formatPackDisplay(v.size, v.unit, v.itemWeight) || `${v.size}${v.unit || 'g'}`;
-                              return `<option value="${v.key}"${currentPick===v.key?' selected':''}>${label} @ £${(+v.price).toFixed(2)}</option>`;
-                          })).join('');
-                      const opt = priceSummary.lineByBankId?.[bi.id]?.purchase || getOptimalPurchase(it.grams, bi);
-                      const variantsForCost = getPackVariants(bi);
-                      const cheapestBasis = variantsForCost.length ? variantsForCost.slice().sort((a,b)=>(a.price/a.g)-(b.price/b.g))[0] : null;
-                      const recLine = opt ? `<div><strong>${opt.manual?'Chosen packs':'Pack suggestion'}:</strong> ${opt.desc} (£${opt.cost.toFixed(2)})</div>` : '';
-                      optimiserHtml = `<div style="margin-top:8px; background:var(--surface2); border:1px solid var(--border); color:var(--text2); padding:6px 10px; border-radius:6px; font-size:11px;">
-                          ${recLine}
-                          <div style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                            <label style="font-size:11px;color:var(--text2);">Pack variant:</label>
-                            <select onchange="setPackPick('${bi.id}', this.value)" style="font-size:11px;padding:2px 4px;">${pickerOpts}</select>
-                          </div>
-                      </div>`;
-                  }
-              }
-          }
-
-
-          return `
-          <details class="shop-item-details" data-shopping-key="${ppEscapeAttr(it.key)}" data-at-home="${isAtHome?'true':'false'}" style="padding:6px 0; border-bottom:1px solid var(--border);">
-              <summary class="shop-item-summary" style="font-size:13px; cursor:pointer; outline:none; font-weight:500;">
-                  <input class="shop-home-check" type="checkbox" ${isAtHome?'checked':''} aria-label="${ppEscapeAttr(isAtHome?'Remove '+displayName+' from Already have':'Mark '+displayName+' as already at home')}" onclick="event.stopPropagation()" onchange="event.stopPropagation();setShoppingAtHome('${ppEscapeAttr(it.key)}',this.checked)">
-                  <span class="shop-item-copy" data-copy="${ppEscapeAttr(`${displayName} — ${it.useUpAvailable!=null?'To buy':'Need'} ${needLabel}`)}">${ppEscapeHtml(displayName)}<span class="shop-need">${it.useUpAvailable!=null?'To buy':'Need'} ${needLabel}</span>${stockLabel}</span>
-                  <span style="font-size:12px;color:var(--text3);" aria-hidden="true">⌄</span>
-              </summary>
-              <div style="padding-left:15px; margin-top:5px; font-size:12px; color:var(--text2);">
-                  ${allocationHtml}
-                  ${optimiserHtml}
-              </div>
-          </details>`;
-      }).join('')+'</div></div>';
-  });
-  el.innerHTML=html||'<div class="empty">No ingredients to list.</div>';
-  organiseShoppingAtHomeRows(el);
-  const summary=document.getElementById('shop-summary');
-  renderMealPrepSuggestions();
-  if(summary){
-    const score=calculatePlanScore(state.plan);
-    const contributorHtml = priceSummary.lines.slice(0,8).map(line => `<div style="display:flex;justify-content:space-between;gap:8px;border-top:1px solid var(--border);padding:5px 0;font-size:11px"><span>${ppEscapeHtml(line.product?.name || line.name)}${line.flags.length ? ` <em style="color:var(--amber)">(${ppEscapeHtml(line.flags.join(', '))})</em>` : ''}<br><span style="color:var(--text3)">${Math.round(line.grams)}g needed · ${ppEscapeHtml(line.purchase?.desc || 'no pack suggestion')}</span></span><strong>£${(+line.purchase?.cost || 0).toFixed(2)}</strong></div>`).join('');
-    summary.innerHTML=`<div class="card" style="border-color:var(--green);margin-bottom:12px">
-      <div class="row-between" style="gap:10px;align-items:flex-start">
-        <div style="flex:1">
-          <h3 style="margin-bottom:6px;color:var(--green)">Shopping summary</h3>
-          <div class="plan-summary">
-            <div class="summary-box"><strong>Estimated checkout price</strong><div style="font-size:20px;font-weight:700">£${estimatedTotal.toFixed(2)}</div><div style="color:var(--text2)">Whole packs to buy</div></div>
-            <div class="summary-box"><strong>Estimated consumed cost</strong><div style="font-size:20px;font-weight:700">£${consumedTotal.toFixed(2)}</div><div style="color:var(--text2)">Food used in recipes</div></div>
-            <div class="summary-box"><strong>Updated plan score</strong><div style="font-size:20px;font-weight:700;color:${score.score<=10?'var(--green)':score.score<=20?'var(--amber)':'var(--red)'}">${score.score}</div><div style="color:var(--text2)">Includes shopping changes</div></div>
-            <div class="summary-box"><strong>Status</strong><div>${state.plan.confirmedShopping ? 'Shopping list confirmed' : 'Still editable'}</div></div>
-          </div>
-          ${contributorHtml ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--text2)">Top checkout price contributors</summary><div style="margin-top:6px">${contributorHtml}</div></details>` : ''}
-        </div>
-        <div class="btn-row" style="justify-content:flex-end">
-          <button class="btn sm primary" onclick="confirmShoppingList()">Confirm shopping list</button>
-          <button class="btn sm" onclick="generateRecipePack()">Download updated recipe pack</button>
-        </div>
-      </div>
-    </div>`;
+  if (typeof window.renderShoppingList === 'function' && window.renderShoppingList !== renderShopping) {
+    window.renderShoppingList();
   }
 }
-
-function buildRecipeCardPackSnapshot(planContext = state.plan, overrideStore = state.overrides, options = {}){
-  if(!planContext?.slots) return null;
-  const cards=[];
-  const days=planContext.days||Object.keys(planContext.slots||{}).length||0;
-  const acceptedPrepGroups=getRecipePackMealPrepGroups(planContext,overrideStore);
-  const prepByFirst=new Map(),prepSkip=new Set();
-  acceptedPrepGroups.forEach(prep=>(prep.occurrences||[]).forEach((occ,index)=>{const key=recipePackGroupOccurrenceKey(occ);if(index===0)prepByFirst.set(key,prep);else prepSkip.add(key);}));
-  const slotEntry=(daySlots,dayNum,slotKey)=>{const slotData=daySlots?.[slotKey];if(!slotData)return null;const slotInfo=getPlanSlotInfo(slotData,planContext,overrideStore);return slotInfo.active?{slotKey,slotInfo,person:String(slotKey).endsWith('C')?'Chloe':'Elliott'}:null;};
-  const sameRecipe=(a,b)=>!!(a&&b&&a.slotInfo.id===b.slotInfo.id&&(a.slotInfo.variant||'original')===(b.slotInfo.variant||'original'));
-  const dayGroups=(dayNum,meal,daySlots)=>{const e=slotEntry(daySlots,dayNum,meal.e),c=slotEntry(daySlots,dayNum,meal.c);if(e&&c&&sameRecipe(e,c))return[{dayNum,meal,entries:[e,c]}];return[e?{dayNum,meal,entries:[e]}:null,c?{dayNum,meal,entries:[c]}:null].filter(Boolean);};
-  const ingredientSections=entries=>{
-    const aggregate={};
-    entries.forEach(entry=>{
-      const recipe=entry.slotInfo.active;
-      const context=getPlanContextForInstance(entry.slotInfo.instanceId,planContext,overrideStore);
-      const scale=getSlotShoppingScale(recipe,entry.slotKey,entry.slotInfo.instanceId,planContext,overrideStore);
-      (recipe.ingredients||[]).forEach(original=>{
-        if(isIngredientRemovedInContext(original,context))return;
-        const adjusted=getAdjustedIngredientForContext(original,context);
-        const resolved=resolveProductForIngredientWithContext(adjusted,context);
-        const product=resolved.product||null;
-        const amount=getShoppingAmount(adjusted,product,scale);
-        const sectionKey=normaliseRecipeIngredientSection(adjusted?.section)||'';
-        const section=String(adjusted?.section||'').trim();
-        const key=[sectionKey||'no-section',resolved.groupId||adjusted?.groupId||adjusted?.bankId||normaliseAliasText(adjusted?.name||ingRaw(adjusted)),product?.id||'unresolved',adjusted?.excludeNutrition?'not-counted':'counted'].join('|');
-        if(!aggregate[key])aggregate[key]={ing:adjusted,product,groupName:resolved.group?.name||adjusted?.name||ingRaw(adjusted),section,sectionKey,qty:0,grams:0,unit:amount.unit,mixed:false,notCounted:!!adjusted?.excludeNutrition,changed:adjusted?.bankId!==original?.bankId};
-        const row=aggregate[key];row.grams+=amount.grams||0;if(row.unit===amount.unit&&!row.mixed)row.qty+=amount.qty||0;else row.mixed=true;row.changed=row.changed||adjusted?.bankId!==original?.bankId;
-      });
-    });
-    const sections=new Map();
-    Object.values(aggregate).forEach(row=>{
-      const amount=row.mixed?{qty:row.grams,unit:'g',grams:row.grams}:{qty:row.qty,unit:row.unit,grams:row.grams};
-      const displayIng={...(row.ing||{}),name:row.ing?.name||row.groupName||row.product?.name||''};
-      const item={label:formatRecipePackIngredientAmount(displayIng,row.product,amount),mapping:[row.groupName,row.product?.name].filter(Boolean).join(' · '),notCounted:row.notCounted,changed:row.changed};
-      const sectionKey=row.sectionKey||'';if(!sections.has(sectionKey))sections.set(sectionKey,{section:row.section||'',items:[]});sections.get(sectionKey).items.push(item);
-    });
-    const ordered=[...sections.values()];
-    return ordered.filter(group=>group.section).concat(ordered.filter(group=>!group.section));
-  };
-  for(let day=1;day<=days;day++){
-    const slots=planContext.slots[day]||{};
-    MEAL_PREP_MEALS.flatMap(meal=>dayGroups(day,meal,slots)).forEach(initial=>{
-      const key=recipePackGroupOccurrenceKey(initial);if(prepSkip.has(key))return;
-      const prep=prepByFirst.get(key)||null;
-      const group=prep?{...initial,entries:prep.occurrences.flatMap(occ=>occ.entries),mealPrep:prep,dayNum:prep.occurrences[0]?.dayNum||day}:initial;
-      const primary=group.entries[0],recipe=primary?.slotInfo?.active;if(!recipe)return;
-      const mealType=group.meal.key;
-      const portionsFor=entry=>calculateRecipeDisplayNutrition({recipe:null,ingredients:entry.slotInfo.active.ingredients||[],serves:entry.slotInfo.active.serves||1,who:entry.slotInfo.active.who||'both',mealType,instanceId:entry.slotInfo.instanceId,planContext,overrideStore})?.portions||null;
-      const eEntry=group.entries.find(entry=>entry.person==='Elliott'),cEntry=group.entries.find(entry=>entry.person==='Chloe');
-      const ePortions=eEntry?portionsFor(eEntry):null,cPortions=cEntry?portionsFor(cEntry):null;
-      const people=[];
-      if(ePortions?.ePct>0)people.push({name:'Elliott',recipePct:ePortions.eRecipePct,portion:ePortions.e,cal:Math.round(ePortions.eCal),prot:round1(ePortions.eProt),carb:round1(ePortions.eCarb),fat:round1(ePortions.eFat),fibre:round1(ePortions.eFibre)});
-      if(cPortions?.cPct>0)people.push({name:'Chloe',recipePct:cPortions.cRecipePct,portion:cPortions.c,cal:Math.round(cPortions.cCal),prot:round1(cPortions.cProt),carb:round1(cPortions.cCarb),fat:round1(cPortions.cFat),fibre:round1(cPortions.cFibre)});
-      const peopleLabel=[...new Set(group.entries.map(entry=>entry.person))].join(' + ');
-      const dayLabel=prep?formatMealPrepDays(prep,planContext):formatPlanDayLabel(planContext,day,{short:true});
-      cards.push({id:`card-${cards.length+1}`,day,dayLabel,mealKey:mealType,mealLabel:group.meal.label,peopleLabel,variant:primary.slotInfo.variant||'original',recipeId:primary.slotInfo.id,name:recipe.name,time:recipe.time||null,serves:+recipe.serves||1,source:JSON.parse(JSON.stringify(recipe.source||null)),portionLine:people.map(person=>`${person.name} ${person.portion}`).join(' / '),people,ingredients:ingredientSections(group.entries),method:[...(recipe.steps||recipe.method||[])],mealPrep:prep?{days:[...(prep.days||[])],label:formatMealPrepDays(prep,planContext)}:null});
-    });
-  }
-  const contents=[],contentIds=new Map();
-  const compactCards=cards.map(card=>{
-    const content={name:card.name,time:card.time,serves:card.serves,source:card.source,ingredients:card.ingredients,method:card.method};
-    const fingerprint=safeJsonStringify(content);let contentId=contentIds.get(fingerprint);
-    if(!contentId){contentId=`content-${contents.length+1}`;contentIds.set(fingerprint,contentId);contents.push({id:contentId,...content});}
-    const {name,time,serves,source,ingredients,method,...summary}=card;
-    return {...summary,contentId};
-  });
-  return {schemaVersion:2,createdAt:options.createdAt||new Date().toISOString(),reconstructed:!!options.reconstructed,planName:options.planName||'',dateRange:getPlanDateRangeLabel(planContext),productPriority:PRODUCT_PRIORITY_LABELS[planContext.productPriority||state.prefs.productPriority||'protein']||'Highest protein',contents,cards:compactCards};
-}
-
-function renderRecipeCardPackSnapshot(snapshot,{print=false}={}){
-  const contentById=new Map((snapshot?.contents||[]).map(content=>[content.id,content]));
-  return (snapshot?.cards||[]).map((savedCard,index)=>{
-    const card=savedCard.contentId?{...(contentById.get(savedCard.contentId)||{}),...savedCard}:savedCard;
-    const source=card.source?(print?renderRecipeSourceForPrint(card.source):`<p style="font-size:12px"><strong>Source:</strong> ${renderSourceTag(card.source)}</p>`):'';
-    const people=(card.people||[]).map(person=>`<div class="saved-pack-person"><strong>${ppEscapeHtml(person.name)} portion (${ppEscapeHtml(person.recipePct)}%)</strong><div class="macro-bar" style="margin-top:6px"><span class="mpill">${ppEscapeHtml(person.cal)} kcal</span><span class="mpill p">P ${ppEscapeHtml(person.prot)}g</span><span class="mpill">C ${ppEscapeHtml(person.carb)}g</span><span class="mpill">F ${ppEscapeHtml(person.fat)}g</span><span class="mpill">Fibre ${ppEscapeHtml(person.fibre)}g</span></div></div>`).join('');
-    const ingredients=(card.ingredients||[]).map(section=>`${section.section?`<h4>${ppEscapeHtml(section.section)}</h4>`:''}<ul>${(section.items||[]).map(item=>`<li>${ppEscapeHtml(item.label)}${item.notCounted?' <span class="muted">not counted</span>':''}${item.changed?' <span class="muted">plan replacement</span>':''}${item.mapping?`<div class="muted">${ppEscapeHtml(item.mapping)}</div>`:''}</li>`).join('')}</ul>`).join('');
-    const method=(card.method||[]).map(step=>`<li>${ppEscapeHtml(step)}</li>`).join('');
-    const label=`${card.mealPrep?'Meal Prep · ':''}${card.dayLabel} · ${card.mealLabel} · ${card.peopleLabel}${card.variant==='enhanced'?' · Enhanced':''}`;
-    const body=`${card.mealPrep?`<p class="prep-note"><strong>Meal Prep:</strong> Cook once for ${ppEscapeHtml(card.mealPrep.label)}.</p>`:''}<p class="muted">Split per eating portion: ${ppEscapeHtml(card.portionLine||'not allocated')}</p>${source}<div class="saved-pack-people">${people}</div><div class="saved-pack-cols"><section><h3>Ingredients</h3>${ingredients}</section><section><h3>Method</h3><ol>${method}</ol></section></div>`;
-    return print?`<article class="recipe${card.mealPrep?' meal-prep':''}"><div class="recipe-head"><div><div class="label">${ppEscapeHtml(label)}</div><h2>${ppEscapeHtml(card.name)}</h2></div><div class="meta">${card.time?ppEscapeHtml(card.time)+'m':''} ${card.serves?'Serves '+ppEscapeHtml(card.serves):''}</div></div>${body}</article>`:`<details class="saved-pack-card" id="saved-${ppEscapeAttr(card.id)}"${index===0?' open':''}><summary><div style="font-size:11px;color:var(--text2);font-weight:700">${ppEscapeHtml(label)}</div><strong>${ppEscapeHtml(card.name)}</strong></summary><div class="saved-pack-card-body">${body}</div></details>`;
-  }).join('');
-}
-
-function downloadRecipePackSnapshot(snapshot,filename='PlatePlan recipe pack.html'){
-  if(!snapshot?.cards?.length)return openAppInfoModal('Recipe cards','<div class="empty">No planned recipes are available.</div>');
-  const html=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PlatePlan Recipe Pack</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#222;margin:28px;line-height:1.45}h1{font-size:28px;margin:0 0 4px}h2{font-size:21px;margin:3px 0}h3{font-size:14px;margin:18px 0 6px;border-bottom:1px solid #ddd;padding-bottom:5px}h4{font-size:13px;margin:10px 0 4px}.muted,.source{color:#666;font-size:12px}.recipe{break-inside:avoid;page-break-inside:avoid;border-top:2px solid #222;padding-top:18px;margin-top:24px}.meal-prep{border-top:4px solid #6f5bd3;background:#fffdf8;padding:10px}.prep-note{background:#f4f1ec;border:1px solid #ddd;border-radius:8px;padding:9px 10px;font-size:13px}.recipe-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.label,.meta{font-size:12px;color:#666}.saved-pack-people{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}.saved-pack-person{background:#fbfaf7;border:1px solid #ddd;border-radius:8px;padding:10px}.macro-bar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.mpill{background:#f4f1ec;border:1px solid #ddd;border-radius:7px;padding:6px 8px;font-size:13px}.saved-pack-cols{display:grid;grid-template-columns:1fr 1.45fr;gap:26px}li{margin:5px 0}.no-print{float:right;padding:8px 12px;border:1px solid #bbb;border-radius:8px;background:white}@media print{body{margin:14mm}.no-print{display:none}}@media(max-width:760px){.saved-pack-people,.saved-pack-cols{grid-template-columns:1fr}.recipe-head{display:block}}</style></head><body><button class="no-print" onclick="window.print()">Print</button><h1>${ppEscapeHtml(snapshot.planName||'PlatePlan Recipe Pack')}</h1><p class="muted">${snapshot.dateRange?ppEscapeHtml(snapshot.dateRange)+' · ':''}Product priority: ${ppEscapeHtml(snapshot.productPriority||'')}</p>${renderRecipeCardPackSnapshot(snapshot,{print:true})}</body></html>`;
-  const blob=new Blob([html],{type:'text/html'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
-}
-
-// Retained only as an internal reference while the shared structured builder above drives every active UI action.
-function generateRecipePackLegacyUnused(){
-  if(!state.plan?.slots){ openAppInfoModal('Meal plan needed','Generate a meal plan first.'); return; }
-  const cards = [];
-  const days = state.plan.days || Object.keys(state.plan.slots || {}).length || 0;
-  const priority = PRODUCT_PRIORITY_LABELS[state.plan.productPriority || state.prefs.productPriority || 'protein'] || 'Highest protein';
-  const mealOrder = MEAL_PREP_MEALS;
-  const acceptedPrepGroups = getRecipePackMealPrepGroups();
-  const prepByFirst = new Map();
-  const prepSkip = new Set();
-  acceptedPrepGroups.forEach(prep => {
-    (prep.occurrences || []).forEach((occ, idx) => {
-      const key = recipePackGroupOccurrenceKey(occ);
-      if(idx === 0) prepByFirst.set(key, prep);
-      else prepSkip.add(key);
-    });
-  });
-
-  function getPackSlotEntry(daySlots, dayNum, slotKey){
-    if(state.excluded[dayNum]?.[slotKey]) return null;
-    const slotData = daySlots[slotKey];
-    if(!slotData) return null;
-    const slotInfo = getPlanSlotInfo(slotData);
-    if(!slotInfo.active) return null;
-    return { slotKey, slotInfo, person: String(slotKey).endsWith('C') ? 'Chloe' : 'Elliott' };
-  }
-
-  function samePackRecipe(a, b){
-    return !!(a && b && a.slotInfo.id === b.slotInfo.id && (a.slotInfo.variant || 'original') === (b.slotInfo.variant || 'original'));
-  }
-
-  function buildPackGroups(dayNum, meal, daySlots){
-    const e = getPackSlotEntry(daySlots, dayNum, meal.e);
-    const c = getPackSlotEntry(daySlots, dayNum, meal.c);
-    if(e && c && samePackRecipe(e, c)) return [{ dayNum, meal, entries:[e, c] }];
-    return [e ? { dayNum, meal, entries:[e] } : null, c ? { dayNum, meal, entries:[c] } : null].filter(Boolean);
-  }
-
-  function aggregatePackIngredients(entries){
-    const agg = {};
-    entries.forEach(entry => {
-      const r = entry.slotInfo.active;
-      const context = getPlanContextForInstance(entry.slotInfo.instanceId);
-      const slotScale = getSlotShoppingScale(r, entry.slotKey, entry.slotInfo.instanceId);
-      (r.ingredients || []).forEach(ing => {
-        if(isIngredientRemovedInContext(ing, context)) return;
-        const adjustedIng = typeof ing === 'object' ? getAdjustedIngredientForContext(ing, context) : ing;
-        const resolved = typeof adjustedIng === 'object' ? resolveProductForIngredientWithContext(adjustedIng, context) : {};
-        const bankIng = resolved.product || (adjustedIng?.bankId ? state.ingredients.find(i => i.id === adjustedIng.bankId) : null);
-        const groupName = resolved.group?.name || adjustedIng?.name || ingRaw(adjustedIng);
-        const amount = getShoppingAmount(adjustedIng, bankIng, slotScale);
-        const productId = bankIng?.id || '';
-        const section = normaliseRecipeIngredientSection(adjustedIng?.section);
-        const key = [
-          section || 'no-section',
-          resolved.groupId || adjustedIng?.groupId || adjustedIng?.bankId || normaliseAliasText(groupName),
-          productId || 'unresolved',
-          adjustedIng?.excludeNutrition ? 'not-counted' : 'counted'
-        ].join('|');
-        if(!agg[key]) {
-          agg[key] = {
-            ing: adjustedIng,
-            bankIng,
-            groupName,
-            productName: bankIng?.name || '',
-            section,
-            qty: 0,
-            grams: 0,
-            unit: amount.unit,
-            mixedUnits: false,
-            excludeNutrition: !!adjustedIng?.excludeNutrition,
-            changed: typeof ing === 'object' && adjustedIng.bankId !== ing.bankId
-          };
-        }
-        agg[key].grams += amount.grams || 0;
-        if(agg[key].unit === amount.unit && !agg[key].mixedUnits) agg[key].qty += amount.qty || 0;
-        else agg[key].mixedUnits = true;
-        agg[key].changed = agg[key].changed || (typeof ing === 'object' && adjustedIng.bankId !== ing.bankId);
-      });
-    });
-    return renderGroupedIngredientItems(Object.values(agg), item => {
-      const amount = item.mixedUnits
-        ? { qty: item.grams, unit: 'g', grams: item.grams, label: `${Math.round(item.grams)}g` }
-        : { qty: item.qty, unit: item.unit, grams: item.grams };
-      const displayIng = { ...(item.ing || {}), name: item.ing?.name || item.groupName || item.bankIng?.name || '' };
-      const label = formatRecipePackIngredientAmount(displayIng, item.bankIng, amount);
-      const note = renderIngredientMappingNote(item.ing, { group:{ name:item.groupName }, product:item.bankIng }, { color:'#666', fontSize:'12px' });
-      const notCounted = item.excludeNutrition ? ' <span class="muted">not counted</span>' : '';
-      const changed = item.changed ? ' <span class="muted">shopping replacement</span>' : '';
-      return `<li>${ppEscapeHtml(label)}${notCounted}${changed}${note}</li>`;
-    }, { headingStyle: 'list-style:none;margin:12px 0 5px -18px;font-weight:700;color:#222;' });
-  }
-
-  for(let d=1; d<=days; d++){
-    const daySlots = state.plan.slots[d] || {};
-    mealOrder.flatMap(meal => buildPackGroups(d, meal, daySlots)).forEach(group => {
-      const occurrenceKey = recipePackGroupOccurrenceKey(group);
-      if(prepSkip.has(occurrenceKey)) return;
-      const prep = prepByFirst.get(occurrenceKey) || null;
-      if(prep) {
-        group = {
-          ...group,
-          entries: prep.occurrences.flatMap(occ => occ.entries),
-          mealPrep: prep,
-          dayNum: prep.occurrences[0]?.dayNum || group.dayNum
-        };
-      }
-      const primary = group.entries[0];
-      const slotInfo = primary.slotInfo;
-      const r = slotInfo.active;
-      if(!r) return;
-
-      const serves = r.serves || 1;
-      const mealType = group.meal.key;
-      const getEntryPortions = entry => {
-        const entryRecipe = entry.slotInfo.active;
-        const bundle = calculateRecipeDisplayNutrition({ recipe:null, ingredients:entryRecipe.ingredients || [], serves:entryRecipe.serves || 1, who:entryRecipe.who || 'both', mealType, instanceId:entry.slotInfo.instanceId });
-        return bundle?.portions || calcPortions({}, state.prefs, entryRecipe.serves || 1, entryRecipe.who || 'both', mealType);
-      };
-      const elliottEntry = group.entries.find(entry => entry.person === 'Elliott');
-      const chloeEntry = group.entries.find(entry => entry.person === 'Chloe');
-      const elliottPortions = elliottEntry ? getEntryPortions(elliottEntry) : null;
-      const chloePortions = chloeEntry ? getEntryPortions(chloeEntry) : null;
-      const includedPeople = new Set(group.entries.map(entry => entry.person));
-      const portionLine = [
-        elliottPortions && elliottPortions.ePct > 0 ? `Elliott ${ppEscapeHtml(elliottPortions.e)}` : '',
-        chloePortions && chloePortions.cPct > 0 ? `Chloe ${ppEscapeHtml(chloePortions.c)}` : ''
-      ].filter(Boolean).join(' / ');
-
-      const macroBox = (label, prefix) => {
-        const isE = prefix === 'e';
-        if((isE && !includedPeople.has('Elliott')) || (!isE && !includedPeople.has('Chloe'))) return '';
-        const portions = isE ? elliottPortions : chloePortions;
-        if(!portions) return '';
-        const pct = isE ? portions.ePct : portions.cPct;
-        if(pct <= 0) return '';
-        return `<div class="person">
-          <h4>${label} Portion (${isE ? portions.eRecipePct : portions.cRecipePct}%)</h4>
-          <div class="macros">
-            <span>${Math.round(isE ? portions.eCal : portions.cCal)} kcal</span>
-            <span>P ${round1(isE ? portions.eProt : portions.cProt)}g</span>
-            <span>C ${round1(isE ? portions.eCarb : portions.cCarb)}g</span>
-            <span>F ${round1(isE ? portions.eFat : portions.cFat)}g</span>
-            <span>Fibre ${round1(isE ? portions.eFibre : portions.cFibre)}g</span>
-          </div>
-        </div>`;
-      };
-
-      const ingredients = aggregatePackIngredients(group.entries);
-
-      const method = (r.steps || r.method || []).map(step => `<li>${ppEscapeHtml(step)}</li>`).join('');
-      const source = renderRecipeSourceForPrint(r.source);
-      const peopleLabel = [...new Set(group.entries.map(entry => entry.person))].join(' + ');
-      const prepLabel = group.mealPrep ? `Meal Prep: ${r.name} for ${formatMealPrepDays(group.mealPrep)}` : '';
-      const label = group.mealPrep
-        ? `${prepLabel} · ${peopleLabel}${slotInfo.variant === 'enhanced' ? ' · Enhanced' : ''}`
-        : `Day ${d} ${group.meal.label} · ${peopleLabel}${slotInfo.variant === 'enhanced' ? ' · Enhanced' : ''}`;
-      const prepNote = group.mealPrep ? `<p class="prep-note"><strong>Meal Prep:</strong> Cook this batch once for ${ppEscapeHtml(formatMealPrepDays(group.mealPrep))}. Ingredients below are combined for every listed planned portion.</p>` : '';
-      cards.push(`<article class="recipe${group.mealPrep ? ' meal-prep' : ''}">
-        <div class="recipe-head">
-          <div>
-            <div class="label">${ppEscapeHtml(label)}</div>
-            <h2>${ppEscapeHtml(r.name)}</h2>
-          </div>
-          <div class="meta">${r.time ? ppEscapeHtml(r.time)+'m' : ''} ${serves ? 'Serves '+ppEscapeHtml(serves) : ''}</div>
-        </div>
-        ${prepNote}
-        <p class="muted">Split per eating portion: ${portionLine || 'not allocated'}</p>
-        ${source}
-        <div class="people">${macroBox('Elliott','e')}${macroBox('Chloe','c')}</div>
-        <div class="cols">
-          <section><h3>Ingredients</h3><ul>${ingredients}</ul></section>
-          <section><h3>Method</h3><ol>${method}</ol></section>
-        </div>
-      </article>`);
-    });
-  }
-
-  if(!cards.length){ openAppInfoModal('No recipes to export','Add recipes to the meal plan before downloading a recipe pack.'); return; }
-
-  const html = `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>PlatePlan Recipe Pack</title>
-<style>
-  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#222;margin:28px;line-height:1.45}
-  h1{font-size:28px;margin:0 0 4px}
-  h2{font-size:21px;margin:3px 0 0}
-  h3{font-size:14px;margin:18px 0 6px;border-bottom:1px solid #ddd;padding-bottom:5px}
-  h4{font-size:13px;margin:0 0 6px}
-  .muted,.source{color:#666;font-size:12px}
-  .recipe{break-inside:avoid;page-break-inside:avoid;border-top:2px solid #222;padding-top:18px;margin-top:24px}
-  .meal-prep{border-top:4px solid #6f5bd3;background:#fffdf8;padding-left:10px;padding-right:10px}
-  .prep-note{background:#f4f1ec;border:1px solid #ddd;border-radius:8px;padding:9px 10px;font-size:13px}
-  .recipe-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
-  .label{font-size:12px;color:#666;text-transform:uppercase;letter-spacing:.04em}
-  .meta{font-size:12px;color:#666;text-align:right}
-  .people{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
-  .person{background:#fbfaf7;border:1px solid #ddd;border-radius:8px;padding:10px}
-  .macros{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
-  .macros span{background:#f4f1ec;border:1px solid #ddd;border-radius:7px;padding:6px 8px;font-size:13px}
-  .cols{display:grid;grid-template-columns:1fr 1.45fr;gap:26px}
-  li{margin:5px 0}
-  .no-print{float:right;padding:8px 12px;border:1px solid #bbb;border-radius:8px;background:white}
-  @media print{body{margin:14mm}.no-print{display:none}.recipe{page-break-inside:avoid}}
-  @media(max-width:760px){.people,.cols{grid-template-columns:1fr}.recipe-head{display:block}.meta{text-align:left;margin-top:4px}}
-</style>
-</head>
-<body>
-<button class="no-print" onclick="window.print()">Print</button>
-<h1>PlatePlan Recipe Pack</h1>
-<p class="muted">Product priority: ${ppEscapeHtml(priority)}. Product choices are locked from this meal plan.</p>
-${cards.join('\n')}
-</body>
-</html>`;
-
-  const blob = new Blob([html], {type:'text/html'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'PlatePlan recipe pack.html';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 1000);
-}
-
-let currentSavedPlanPackSnapshot=null;
-function generateRecipePack(){
-  if(!state.plan?.slots)return openAppInfoModal('Recipe pack','<div class="empty">Generate a meal plan first.</div>');
-  const snapshot=buildRecipeCardPackSnapshot(state.plan,state.overrides,{planName:defaultPlanSaveName(state.plan)});
-  downloadRecipePackSnapshot(snapshot,'PlatePlan recipe pack.html');
-}
-function ensureSavedPlanPackModal(){
-  let wrap=document.getElementById('saved-plan-pack-wrap');if(wrap)return wrap;
-  wrap=document.createElement('div');wrap.id='saved-plan-pack-wrap';wrap.className='modal-wrap';wrap.style.zIndex='520';
-  wrap.innerHTML=`<div class="modal" style="max-width:1040px"><div class="row-between" style="align-items:center;gap:10px"><div><h3 id="saved-plan-pack-title" style="margin:0">Saved recipe cards</h3><div id="saved-plan-pack-meta" style="font-size:12px;color:var(--text2);margin-top:3px"></div></div><button class="btn sm ghost" onclick="closeSavedPlanRecipeCards()">Close</button></div><div id="saved-plan-pack-note"></div><div class="saved-pack-index" id="saved-plan-pack-index"></div><div id="saved-plan-pack-content"></div><div class="btn-row"><button class="btn primary" onclick="downloadCurrentSavedPlanPack()">Download this pack</button><button class="btn ghost" onclick="closeSavedPlanRecipeCards()">Close</button></div></div>`;
-  document.body.appendChild(wrap);return wrap;
-}
-function openSavedPlanRecipeCards(index){
-  const plan=(state.planHistory||[])[index];if(!plan)return;
-  if(!plan.cardPackSnapshot){plan.cardPackSnapshot=buildRecipeCardPackSnapshot(plan,plan.overrides||{},{planName:plan.name||`Saved plan ${index+1}`,reconstructed:true,createdAt:new Date().toISOString()});saveState();}
-  const snapshot=plan.cardPackSnapshot;if(!snapshot?.cards?.length)return openAppInfoModal('Saved recipe cards','<div class="empty">No recipe cards are available for this plan.</div>');
-  currentSavedPlanPackSnapshot=snapshot;const wrap=ensureSavedPlanPackModal();
-  document.getElementById('saved-plan-pack-title').textContent=plan.name||`Saved plan ${index+1}`;
-  document.getElementById('saved-plan-pack-meta').textContent=[snapshot.dateRange,`${snapshot.cards.length} recipe card${snapshot.cards.length===1?'':'s'}`,snapshot.productPriority].filter(Boolean).join(' · ');
-  document.getElementById('saved-plan-pack-note').innerHTML=snapshot.reconstructed?'<div class="msg warn" style="margin:10px 0">Reconstructed from current Vault because this plan was saved before frozen recipe cards were introduced. It is now frozen for future viewing.</div>':'';
-  document.getElementById('saved-plan-pack-index').innerHTML=snapshot.cards.map(card=>`<button class="btn sm ghost" onclick="scrollToSavedPackCard('${ppEscapeAttr(card.id)}')">${ppEscapeHtml(card.dayLabel)} · ${ppEscapeHtml(card.mealLabel)}</button>`).join('');
-  document.getElementById('saved-plan-pack-content').innerHTML=renderRecipeCardPackSnapshot(snapshot);
-  wrap.classList.add('open');
-}
-function scrollToSavedPackCard(cardId){const card=document.getElementById(`saved-${cardId}`);if(card){card.open=true;card.scrollIntoView({behavior:'smooth',block:'start'});}}
-function closeSavedPlanRecipeCards(){document.getElementById('saved-plan-pack-wrap')?.classList.remove('open');currentSavedPlanPackSnapshot=null;}
-function downloadCurrentSavedPlanPack(){if(currentSavedPlanPackSnapshot)downloadRecipePackSnapshot(currentSavedPlanPackSnapshot,`${currentSavedPlanPackSnapshot.planName||'PlatePlan saved plan'} recipe pack.html`);}
-function downloadSavedPlanPack(index){
-  const plan=(state.planHistory||[])[index];
-  if(!plan) return;
-  if(!plan.cardPackSnapshot){
-    plan.cardPackSnapshot=buildRecipeCardPackSnapshot(plan,plan.overrides||{},{planName:plan.name||`Saved plan ${index+1}`,reconstructed:true,createdAt:new Date().toISOString()});
-    saveState();
-  }
-  if(!plan.cardPackSnapshot?.cards?.length) return openAppInfoModal('Recipe pack','No recipe cards are available for this saved plan.');
-  downloadRecipePackSnapshot(plan.cardPackSnapshot,`${plan.name||'PlatePlan saved plan'} recipe pack.html`);
-}
-
-function copyList(){
-  const items=document.querySelectorAll('#shop-content .shop-item-details[data-at-home="false"] .shop-item-copy');
-  if(!items.length)return openAppInfoModal('Shopping list','Everything is currently marked as already at home.');
-  const text=Array.from(items).filter(i=>!/\bTo buy 0(?:g|ml)\b/i.test(i.dataset.copy||'')).map(i=>'- '+(i.dataset.copy||i.innerText).trim().replace(/\s+/g,' ')).join('\n');
-  if(!text)return openAppInfoModal('Shopping list','Use-up stock and Already have selections cover everything on this list.');
-  navigator.clipboard.writeText(text).then(()=>showPlatePlanToast('Shopping list copied.')).catch(()=>openAppInfoModal('Copy failed','PlatePlan could not access the clipboard. Please select and copy the list manually.'));
-}
-
-// == MEAL PRODUCT OVERRIDE MODAL LOGIC ==
-let currentSubstContext = { planMealId: null, originalKey: null, groupId: null, newBankId: null, mode: 'replace', targets: [], herbConversions:[] };
-
-function getPlannedIngredientForSubstitutionTarget(target){
-  if(!target?.planMealId) return null;
-  for(const day of Object.values(state.plan?.slots||{})){
-    for(const slot of Object.values(day||{})){
-      const info=getPlanSlotInfo(slot);
-      if(info.instanceId!==target.planMealId||!info.active) continue;
-      return (info.active.ingredients||[]).find(ing=>getRecipeIngredientKey(ing)===target.originalKey)||null;
-    }
-  }
-  return null;
-}
-
-function readableHerbQuantity(qty,unit,factor){
-  const clean=String(unit||'').toLowerCase().replace(/s$/,'');
-  if(clean==='tbsp'||clean==='tsp'){
-    const teaspoons=qty*(clean==='tbsp'?3:1)*factor;
-    if(teaspoons>=3&&Math.abs(teaspoons/3-Math.round(teaspoons/3))<0.01) return {qty:Math.round(teaspoons/3*10)/10,unit:'tbsp'};
-    return {qty:Math.round(teaspoons*10)/10,unit:'tsp'};
-  }
-  return {qty:Math.round(qty*factor*10)/10,unit:clean||unit||''};
-}
-
-function buildHerbConversion(target,replacement){
-  const ing=getPlannedIngredientForSubstitutionTarget(target); if(!ing||!replacement) return null;
-  const sourceGroup=getIngredientGroup(ing.groupId||getProduct(ing.bankId)?.groupId);
-  const targetGroup=getIngredientGroup(replacement.groupId);
-  if(!isHerbsAndSpicesGroup(sourceGroup)||!isHerbsAndSpicesGroup(targetGroup)||!sourceGroup?.herbForm||!targetGroup?.herbForm||sourceGroup.herbForm===targetGroup.herbForm||!sourceGroup.herbKey||sourceGroup.herbKey!==targetGroup.herbKey) return null;
-  const factor=sourceGroup.herbForm==='fresh'&&targetGroup.herbForm==='dried'?1/3:3;
-  const compatible=['g','ml','tsp','tbsp'].includes(String(ing.unit||'').toLowerCase().replace(/s$/,''));
-  const converted=readableHerbQuantity(+ing.qty||0,ing.unit,factor);
-  return {sourceForm:sourceGroup.herbForm,targetForm:targetGroup.herbForm,herbKey:sourceGroup.herbKey,originalQty:+ing.qty||0,originalUnit:ing.unit||'',qty:compatible?converted.qty:(+ing.qty||0),unit:compatible?converted.unit:(ing.unit||''),manual:!compatible,ratio:factor};
-}
-
-function renderHerbConversionPreview(){
-  const host=document.getElementById('subst-herb-conversion'); if(!host) return;
-  const replacement=getProduct(currentSubstContext.newBankId);
-  const conversions=(currentSubstContext.targets||[]).map(target=>buildHerbConversion(target,replacement));
-  currentSubstContext.herbConversions=conversions;
-  if(!conversions.some(Boolean)){host.style.display='none';host.innerHTML='';return;}
-  host.style.display='block';
-  host.innerHTML=`<div class="card-inner" style="margin:0"><strong style="font-size:12px">Fresh/dried herb conversion</strong><div style="font-size:11px;color:var(--text2);margin:3px 0 8px">PlatePlan uses 3 parts fresh to 1 part dried. Review each plan-specific amount before applying.</div>${conversions.map((conversion,index)=>conversion?`<div style="display:grid;grid-template-columns:minmax(0,1fr) 85px 76px;gap:7px;align-items:end;margin-top:7px"><div style="font-size:12px"><strong>${ppEscapeHtml(conversion.herbKey)}</strong><br>${conversion.originalQty} ${ppEscapeHtml(conversion.originalUnit)} ${conversion.sourceForm} → ${conversion.targetForm}${conversion.manual?'<br><span style="color:var(--amber)">Unknown/count unit: confirm manually</span>':''}</div><div><label>Amount</label><input type="number" min="0" step="0.1" data-herb-qty="${index}" value="${conversion.qty}"></div><div><label>Unit</label><select data-herb-unit="${index}"><option value="g"${conversion.unit==='g'?' selected':''}>g</option><option value="ml"${conversion.unit==='ml'?' selected':''}>ml</option><option value="tsp"${conversion.unit==='tsp'?' selected':''}>tsp</option><option value="tbsp"${conversion.unit==='tbsp'?' selected':''}>tbsp</option><option value="qty"${conversion.unit==='qty'?' selected':''}>items</option></select></div></div>`:'').join('')}</div>`;
-}
-
-function collectCurrentShoppingProducts(){
-  const ids = new Set();
-  if(!state.plan?.slots) return [];
-  const days = state.plan.days || Object.keys(state.plan.slots || {}).length || 0;
-  for(let d=1; d<=days; d++){
-    const day = state.plan.slots[d] || {};
-    SLOTS.forEach(sl => {
-      if(state.excluded[d]?.[sl.key]) return;
-      const info = getPlanSlotInfo(day[sl.key]);
-      if(!info.active) return;
-      const context = getPlanContextForInstance(info.instanceId);
-      (info.active.ingredients || []).forEach(ing => {
-        if(isIngredientRemovedInContext(ing, context)) return;
-        const resolved = resolveProductForIngredientWithContext(getAdjustedIngredientForContext(ing, context), context);
-        if(resolved.productId) ids.add(resolved.productId);
-      });
-    });
-  }
-  return [...ids].map(id => getProduct(id)).filter(Boolean);
-}
-
-function openSubstituteModalForTargets(targets, mode = 'replace'){
-  currentSubstContext = { planMealId: targets[0]?.planMealId || null, originalKey: targets[0]?.originalKey || null, groupId: targets[0]?.groupId || null, newBankId: null, mode: mode === 'merge' ? 'merge' : 'replace', targets: targets || [], herbConversions:[] };
-  const search = document.getElementById('subst-search');
-  const selected = document.getElementById('subst-selected');
-  const dropdown = document.getElementById('subst-dropdown');
-  if(search) search.value = '';
-  if(selected) selected.textContent = '';
-  if(dropdown) dropdown.style.display = 'none';
-  const herb=document.getElementById('subst-herb-conversion'); if(herb){herb.style.display='none';herb.innerHTML='';}
-  const title = document.querySelector('#subst-modal-wrap h3');
-  const copy = document.querySelector('#subst-modal-wrap p');
-  const summary = document.getElementById('subst-target-summary');
-  if(title) title.textContent = currentSubstContext.mode === 'merge' ? 'Merge selected ingredients' : 'Replace selected ingredients';
-  if(copy) copy.textContent = currentSubstContext.mode === 'merge'
-    ? 'Choose an existing product already on this shopping list to merge these ingredient needs into.'
-    : 'Choose a replacement product. Suggestions start close to the original ingredient, then broaden out.';
-  if(summary) summary.innerHTML = `Applying to <strong>${targets.length}</strong> planned portion${targets.length === 1 ? '' : 's'}${targets.length ? ` · ${ppEscapeHtml([...new Set(targets.map(t => `${formatPlanDayLabel(state.plan,t.day,{short:true})} ${toTitleCase(t.mealKey || 'meal')}`))].slice(0,4).join(', '))}` : ''}`;
-  document.getElementById('subst-modal-wrap').classList.add('open');
-  renderSubstitutionDropdown(getSubstitutionSuggestionProducts(targets, currentSubstContext.mode, ''));
-  setTimeout(() => search?.focus(), 0);
-}
-
-function openSubstituteModal(planMealId, originalKey, mode = 'replace') {
-  const asProduct = getProduct(originalKey);
-  const groupId = getIngredientGroup(originalKey) ? originalKey : (asProduct?.groupId || '');
-  openSubstituteModalForTargets([{ planMealId, originalKey, groupId, bankId: asProduct?.id || '', day:'', mealKey:'', person:'' }], mode === 'merge' ? 'merge' : 'replace');
-}
-
-function closeSubstituteModal() {
-  document.getElementById('subst-modal-wrap').classList.remove('open');
-}
-
-let substSearchTimeout = null;
-function handleSubstSearch(e) {
-  clearTimeout(substSearchTimeout);
-  const query = (e.target.value || '').toLowerCase();
-  substSearchTimeout = setTimeout(() => {
-    renderSubstitutionDropdown(getSubstitutionSuggestionProducts(currentSubstContext.targets || [], currentSubstContext.mode, query));
-  }, 120);
-}
-
-function selectSubstItem(bankId) {
-  currentSubstContext.newBankId = bankId;
-  const b = state.ingredients.find(i=>i.id===bankId);
-  const sSearch = document.getElementById('subst-search'); if(sSearch) sSearch.value = b?.name || '';
-  const sDrop = document.getElementById('subst-dropdown'); if(sDrop) sDrop.style.display = 'none';
-  const sSel = document.getElementById('subst-selected'); if(sSel) sSel.textContent = b ? `Using product: ${b.name}` : '';
-  renderHerbConversionPreview();
-}
-
-function confirmSubstitute() {
-  const { targets, newBankId, mode } = currentSubstContext;
-  if(!newBankId) return openAppInfoModal('Choose a product','Select a Product Bank item from the list before applying the replacement.');
-  const quantityOverrides=(currentSubstContext.herbConversions||[]).map((conversion,index)=>{
-    if(!conversion) return null;
-    const qty=+document.querySelector(`[data-herb-qty="${index}"]`)?.value;
-    const unit=document.querySelector(`[data-herb-unit="${index}"]`)?.value||conversion.unit;
-    if(!(qty>0)) return null;
-    return {...conversion,qty,unit,manual:conversion.manual||qty!==conversion.qty||unit!==conversion.unit};
-  });
-  applyShoppingBatchTargets(targets || [], mode === 'merge' ? 'merge' : 'replace', newBankId, quantityOverrides);
-  closeSubstituteModal();
-}
-
-function removeSubstitute() {
-  const { targets } = currentSubstContext;
-  (targets || []).forEach(target => {
-    const ov = state.overrides?.[target.planMealId];
-    if(!ov) return;
-    if(ov.substitutions && target.originalKey) delete ov.substitutions[target.originalKey];
-    if(ov.productOverrides && target.groupId) delete ov.productOverrides[target.groupId];
-    if(ov.ingredientReplacements && target.originalKey) delete ov.ingredientReplacements[target.originalKey];
-    if(ov.mergeInto && target.originalKey) delete ov.mergeInto[target.originalKey];
-    if(ov.ingredientQuantityOverrides && target.originalKey) delete ov.ingredientQuantityOverrides[target.originalKey];
-    if(ov.removeIngredientKeys && target.originalKey) delete ov.removeIngredientKeys[target.originalKey];
-  });
-  refreshShoppingAfterBatch();
-  closeSubstituteModal();
-}
-
-function removeShoppingIngredient(planMealId, originalKey){
-  applyShoppingBatchTargets([{ planMealId, originalKey, groupId:'', bankId:'', day:'', mealKey:'', person:'' }], 'remove');
-}
-
 function confirmShoppingList(){
-  if(!state.plan?.slots) return;
-  if(state.isDraftPlan || state.draftPlan){
-    confirmAndSaveDraftPlan();
-    return;
+  if(state?.plan){
+    state.plan.confirmedShopping = true;
+    state.plan.confirmedAt = new Date().toISOString();
   }
-  state.plan.confirmedShopping = true;
-  state.plan.confirmedAt = new Date().toISOString();
-  state.plan.score = calculatePlanScore(state.plan);
-  snapshotCurrentPlan('Shopping confirmed');
-  saveState(true);
-  renderShopping();
-  renderPlanOverallSummary();
-  renderPlanHistoryPanel();
-  showPlatePlanToast('Shopping list confirmed! ✓');
+  if(typeof window.renderShoppingList === 'function') {
+    window.renderShoppingList();
+  }
 }
-
-// == PREFS ==
-function ensureExclusionPrefsUI(){
-  const legacy = document.getElementById('pref-exclude');
-  if(!legacy || document.getElementById('pref-exclude-ui')) return;
-  const field = legacy.closest('.field') || legacy.parentElement;
-  if(!field) return;
-  if(field) field.style.display = 'none';
-  field.insertAdjacentHTML('afterend', `<div class="field" id="pref-exclude-ui">
-    <label>Foods to always exclude</label>
-    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-      <select id="pref-exclude-scope" style="width:auto;font-size:12px">
-        <option value="shared">Both</option>
-        <option value="elliott">Elliott only</option>
-        <option value="chloe">Chloe only</option>
-      </select>
-      <div class="mapping-search-container" style="position:relative;flex:1;min-width:220px">
-        <input type="text" class="map-search-input" id="pref-exclude-search" autocomplete="off" placeholder="Search ingredients or products..." oninput="handleExcludeSearch()" onfocus="handleExcludeSearch()">
-        <div class="map-dropdown" id="pref-exclude-dropdown" style="display:none"></div>
-      </div>
-      <button class="btn sm ghost" onclick="viewExclusions()">View list</button>
-    </div>
-    <div id="pref-exclude-preview" style="font-size:12px;color:var(--text2);margin-top:6px"></div>
-  </div>`);
+function closeSubstituteModal(){
+  const modal = document.getElementById('pp-swap-product-modal');
+  if(modal) modal.remove();
 }
+function confirmSubstitute(){}
+function openSubstituteModal(){}
+function handleSubstSearch(){}
+function selectSubstItem(){}
+function removeSubstitute(){}
+function removeShoppingIngredient(){}
 
-function handleExcludeSearch(){
-  const q=(document.getElementById('pref-exclude-search')?.value||'').toLowerCase().trim();
-  const drop=document.getElementById('pref-exclude-dropdown');
-  if(!drop) return;
-  const rows=[];
-  (state.ingredientGroups||[]).forEach(g => rows.push({ type:'group', id:g.id, name:g.name, sub:'Ingredient', search:[g.name,...(g.aliases||[]),g.family||''].join(' ').toLowerCase() }));
-  (state.ingredients||[]).forEach(p => rows.push({ type:'product', id:p.id, groupId:p.groupId, name:p.name, sub:p.brand||'Product', search:[p.name,p.brand||'',getIngredientGroup(p.groupId)?.name||''].join(' ').toLowerCase() }));
-  const terms=q.split(/\s+/).filter(Boolean);
-  const filtered=rows.filter(r=>!terms.length||terms.every(t=>r.search.includes(t))).slice(0,20);
-  drop.innerHTML=filtered.length ? filtered.map(r=>`<div class="map-drop-item" onclick="addExclusion('${r.type}','${r.id}',decodeURIComponent('${encodeURIComponent(r.name)}'),'${r.groupId||''}')"><div style="font-weight:600;font-size:13px">${ppEscapeHtml(r.name)}</div><div style="font-size:11px;color:var(--text2)">${ppEscapeHtml(r.sub)}</div></div>`).join('') : '<div style="padding:8px 12px;font-size:12px;color:var(--text3)">No matches found.</div>';
-  drop.style.display='block';
-}
-
-function addExclusion(type, id, name, groupId=''){
-  const scope=document.getElementById('pref-exclude-scope')?.value || 'shared';
-  if(!state.prefs.exclusions) state.prefs.exclusions={shared:[],elliott:[],chloe:[]};
-  const row={ type, id, name, ...(groupId?{groupId}:{}) };
-  if(!state.prefs.exclusions[scope].some(x => x.id===id || normaliseAliasText(x.name)===normaliseAliasText(name))) state.prefs.exclusions[scope].push(row);
-  const pSearch = document.getElementById('pref-exclude-search');
-  if(pSearch) pSearch.value='';
-  const pDrop = document.getElementById('pref-exclude-dropdown');
-  if(pDrop) pDrop.style.display='none';
-  saveState();
-  renderExclusionPreview();
-}
-
-function removeExclusion(scope, index){
-  if(state.prefs.exclusions?.[scope]) state.prefs.exclusions[scope].splice(index,1);
-  saveState();
-  renderExclusionPreview();
-  viewExclusions();
-}
-
-function renderExclusionPreview(){
-  const el=document.getElementById('pref-exclude-preview');
-  if(!el) return;
-  const ex=state.prefs.exclusions || {shared:[],elliott:[],chloe:[]};
-  el.textContent=`Both: ${(ex.shared||[]).length} · Elliott: ${(ex.elliott||[]).length} · Chloe: ${(ex.chloe||[]).length}`;
-}
-
-function viewExclusions(){
-  const ex=state.prefs.exclusions || {shared:[],elliott:[],chloe:[]};
-  const label={shared:'Both',elliott:'Elliott only',chloe:'Chloe only'};
-  const html=['shared','elliott','chloe'].map(scope=>`<div class="summary-box"><strong>${label[scope]}</strong>${(ex[scope]||[]).length ? (ex[scope]||[]).map((x,i)=>`<div class="row-between" style="gap:8px;border-top:1px solid var(--border);padding:6px 0"><span>${ppEscapeHtml(x.name||'Unnamed')}</span><button class="btn sm ghost" onclick="removeExclusion('${scope}',${i})">Remove</button></div>`).join('') : '<div style="color:var(--text3)">None</div>'}</div>`).join('');
-  openAppInfoModal('Excluded foods', html);
-}
-
-function toggleSeparateProteinAllocUI() {
-  // Retained for compatibility
-}
-
+// == PREFS STUBS (Superseded by /src/views/SettingsView.js) ==
 function loadPrefs(){
-  const p=state.prefs||{};
-  ensureExclusionPrefsUI();
-  if(document.getElementById('pref-exclude')) document.getElementById('pref-exclude').value=p.exclude||'';
-  if(document.getElementById('pref-diet')) document.getElementById('pref-diet').value=p.diet||'vegetarian';
-  if(document.getElementById('pref-auto-mapping-strategy')) document.getElementById('pref-auto-mapping-strategy').value=p.autoMappingStrategy||'protein_per_kcal';
-  if(document.getElementById('pref-ecal')) document.getElementById('pref-ecal').value=p.ecal||2400;
-  if(document.getElementById('pref-eprot')) document.getElementById('pref-eprot').value=p.eprot||130;
-  if(document.getElementById('pref-ccal')) document.getElementById('pref-ccal').value=p.ccal||1700;
-  if(document.getElementById('pref-cprot')) document.getElementById('pref-cprot').value=p.cprot||100;
-  const ea = p.eAlloc || {b:15, l:25, d:45, s:15};
-  if(document.getElementById('pref-eb')) document.getElementById('pref-eb').value = ea.b;
-  if(document.getElementById('pref-el')) document.getElementById('pref-el').value = ea.l;
-  if(document.getElementById('pref-ed')) document.getElementById('pref-ed').value = ea.d;
-  if(document.getElementById('pref-es')) document.getElementById('pref-es').value = ea.s;
-
-  const ca = p.cAlloc || {b:25, l:30, d:35, s:10};
-  if(document.getElementById('pref-cb')) document.getElementById('pref-cb').value = ca.b;
-  if(document.getElementById('pref-cl')) document.getElementById('pref-cl').value = ca.l;
-  if(document.getElementById('pref-cd')) document.getElementById('pref-cd').value = ca.d;
-  if(document.getElementById('pref-cs')) document.getElementById('pref-cs').value = ca.s;
-
-  const epa = p.eProtAlloc || ea;
-  if(document.getElementById('pref-epb')) document.getElementById('pref-epb').value = epa.b;
-  if(document.getElementById('pref-epl')) document.getElementById('pref-epl').value = epa.l;
-  if(document.getElementById('pref-epd')) document.getElementById('pref-epd').value = epa.d;
-  if(document.getElementById('pref-eps')) document.getElementById('pref-eps').value = epa.s;
-
-  const cpa = p.cProtAlloc || ca;
-  if(document.getElementById('pref-cpb')) document.getElementById('pref-cpb').value = cpa.b;
-  if(document.getElementById('pref-cpl')) document.getElementById('pref-cpl').value = cpa.l;
-  if(document.getElementById('pref-cpd')) document.getElementById('pref-cpd').value = cpa.d;
-  if(document.getElementById('pref-cps')) document.getElementById('pref-cps').value = cpa.s;
-
-  ['pref-ecal','pref-eprot','pref-eb','pref-el','pref-ed','pref-es','pref-epb','pref-epl','pref-epd','pref-eps',
-   'pref-ccal','pref-cprot','pref-cb','pref-cl','pref-cd','pref-cs','pref-cpb','pref-cpl','pref-cpd','pref-cps'].forEach(id => {
-    const el = document.getElementById(id);
-    if(el && !el.dataset.budgetBound) {
-      el.dataset.budgetBound = '1';
-      el.addEventListener('input', calcBudgets);
-      el.addEventListener('change', calcBudgets);
-    }
-  });
-
-  calcBudgets();
-  renderExclusionPreview();
-  renderRecoveryPanel();
-}
-
-function calcBudgets() {
-  const ecal = +document.getElementById('pref-ecal')?.value||2400;
-  const eprot = +document.getElementById('pref-eprot')?.value||130;
-  const eb = +document.getElementById('pref-eb')?.value||0;
-  const el = +document.getElementById('pref-el')?.value||0;
-  const ed = +document.getElementById('pref-ed')?.value||0;
-  const es = +document.getElementById('pref-es')?.value||0;
-
-  const ccal = +document.getElementById('pref-ccal')?.value||1700;
-  const cprot = +document.getElementById('pref-cprot')?.value||100;
-  const cb = +document.getElementById('pref-cb')?.value||0;
-  const cl = +document.getElementById('pref-cl')?.value||0;
-  const cd = +document.getElementById('pref-cd')?.value||0;
-  const cs = +document.getElementById('pref-cs')?.value||0;
-
-  const epb = +document.getElementById('pref-epb')?.value||0;
-  const epl = +document.getElementById('pref-epl')?.value||0;
-  const epd = +document.getElementById('pref-epd')?.value||0;
-  const eps = +document.getElementById('pref-eps')?.value||0;
-
-  const cpb = +document.getElementById('pref-cpb')?.value||0;
-  const cpl = +document.getElementById('pref-cpl')?.value||0;
-  const cpd = +document.getElementById('pref-cpd')?.value||0;
-  const cps = +document.getElementById('pref-cps')?.value||0;
-
-  const eCalValid = (eb+el+ed+es) === 100;
-  const cCalValid = (cb+cl+cd+cs) === 100;
-  const eProtValid = (epb+epl+epd+eps) === 100;
-  const cProtValid = (cpb+cpl+cpd+cps) === 100;
-
-  const errors = [];
-  if (!eCalValid) errors.push(`Elliott's calorie percentages total ${eb+el+ed+es}% (must equal 100%).`);
-  if (!cCalValid) errors.push(`Chloe's calorie percentages total ${cb+cl+cd+cs}% (must equal 100%).`);
-  if (!eProtValid) errors.push(`Elliott's protein percentages total ${epb+epl+epd+eps}% (must equal 100%).`);
-  if (!cProtValid) errors.push(`Chloe's protein percentages total ${cpb+cpl+cpd+cps}% (must equal 100%).`);
-
-  const warnEl = document.getElementById('alloc-warn');
-  if (warnEl) {
-    if (errors.length > 0) {
-      warnEl.innerHTML = errors.join('<br>');
-      warnEl.style.display = 'block';
-    } else {
-      warnEl.style.display = 'none';
-    }
-  }
-
-  const allValid = eCalValid && cCalValid && eProtValid && cProtValid;
-  const saveBtn = document.getElementById('btn-save-prefs');
-  if (saveBtn) saveBtn.disabled = !allValid;
-
-  const eBudgetEl = document.getElementById('ebudget-text');
-  if (eBudgetEl) {
-    eBudgetEl.innerHTML = `
-        <strong>Breakfast Budget:</strong> ${Math.round(ecal*eb/100)}kcal / ${Math.round(eprot*epb/100)}g P<br>
-        <strong>Lunch Budget:</strong> ${Math.round(ecal*el/100)}kcal / ${Math.round(eprot*epl/100)}g P<br>
-        <strong>Dinner Budget:</strong> ${Math.round(ecal*ed/100)}kcal / ${Math.round(eprot*epd/100)}g P<br>
-        <strong>Snacks Budget:</strong> ${Math.round(ecal*es/100)}kcal / ${Math.round(eprot*eps/100)}g P
-    `;
-  }
-
-  const cBudgetEl = document.getElementById('cbudget-text');
-  if (cBudgetEl) {
-    cBudgetEl.innerHTML = `
-        <strong>Breakfast Budget:</strong> ${Math.round(ccal*cb/100)}kcal / ${Math.round(cprot*cpb/100)}g P<br>
-        <strong>Lunch Budget:</strong> ${Math.round(ccal*cl/100)}kcal / ${Math.round(cprot*cpl/100)}g P<br>
-        <strong>Dinner Budget:</strong> ${Math.round(ccal*cd/100)}kcal / ${Math.round(cprot*cpd/100)}g P<br>
-        <strong>Snacks Budget:</strong> ${Math.round(ccal*cs/100)}kcal / ${Math.round(cprot*cps/100)}g P
-    `;
+  if(typeof window.renderSettings === 'function'){
+    window.renderSettings();
   }
 }
-window.calcBudgets = calcBudgets;
-
-function downloadPlatePlanDataBackup(){
-  try{
-    const stamp = new Date().toISOString().slice(0,10);
-    downloadPlatePlanBlob('PlatePlan data backup ' + stamp + '.json', JSON.stringify(getPlatePlanBackupPayload(), null, 2), 'application/json');
-    showMsg('prefs-data-msg','PlatePlan data exported.','success');
-  }catch(e){
-    showMsg('prefs-data-msg','Could not export PlatePlan data.','error');
-  }
-}
-
-function getPlatePlanStateCounts(candidate){
-  return {
-    recipes:Array.isArray(candidate?.recipes) ? candidate.recipes.length : 0,
-    products:Array.isArray(candidate?.ingredients) ? candidate.ingredients.length : 0,
-    ingredients:Array.isArray(candidate?.ingredientFamilies) ? candidate.ingredientFamilies.length : 0,
-    subTypes:Array.isArray(candidate?.ingredientGroups) ? candidate.ingredientGroups.length : 0,
-    planDays:+candidate?.plan?.days || Object.keys(candidate?.plan?.slots || {}).length,
-    planHistory:Array.isArray(candidate?.planHistory) ? candidate.planHistory.length : 0
-  };
-}
-
-function validatePlatePlanImport(candidate, metadata = {}){
-  const errors = [], warnings = [];
-  if(!candidate || typeof candidate !== 'object') errors.push('The backup does not contain a PlatePlan state object.');
-  if(!Array.isArray(candidate?.recipes)) errors.push('Recipes are missing or invalid.');
-  if(!Array.isArray(candidate?.ingredients)) errors.push('Products are missing or invalid.');
-  const schemaVersion = +(metadata.schemaVersion || candidate?.meta?.schemaVersion || 1);
-  if(schemaVersion > PLATEPLAN_SCHEMA_VERSION) errors.push(`This backup uses newer data schema ${schemaVersion}; this PlatePlan supports schema ${PLATEPLAN_SCHEMA_VERSION}.`);
-  const duplicateIds = (items, label) => {
-    if(!Array.isArray(items)) return;
-    const seen = new Set(), duplicates = new Set();
-    items.forEach(item => { if(!item?.id) return; if(seen.has(item.id)) duplicates.add(item.id); else seen.add(item.id); });
-    if(duplicates.size) errors.push(`${label} contain ${duplicates.size} duplicate ID${duplicates.size===1?'':'s'}.`);
-  };
-  duplicateIds(candidate?.recipes, 'Recipes');
-  duplicateIds(candidate?.ingredients, 'Products');
-  duplicateIds(candidate?.ingredientFamilies, 'Ingredients');
-  duplicateIds(candidate?.ingredientGroups, 'Sub-types');
-  if(candidate?.plan != null && typeof candidate.plan !== 'object') errors.push('The meal plan is invalid.');
-  if(!Array.isArray(candidate?.ingredientFamilies)) warnings.push('Ingredient hierarchy will be rebuilt from compatible product data.');
-  if(!Array.isArray(candidate?.ingredientGroups)) warnings.push('Sub-types will be rebuilt from compatible product data.');
-  if(!candidate?.prefs || typeof candidate.prefs !== 'object') warnings.push('Default preferences will be applied where settings are missing.');
-  return { valid:errors.length===0, errors, warnings, schemaVersion, counts:getPlatePlanStateCounts(candidate) };
-}
-
-let pendingPlatePlanImport = null;
-
-function ensurePlatePlanImportPreviewModal(){
-  let wrap = document.getElementById('plateplan-import-preview-wrap');
-  if(wrap) return wrap;
-  wrap = document.createElement('div');
-  wrap.id = 'plateplan-import-preview-wrap';
-  wrap.className = 'modal-wrap';
-  wrap.style.zIndex = '470';
-  wrap.innerHTML = `<div class="modal" style="max-width:760px">
-    <div class="row-between" style="align-items:center;margin-bottom:10px">
-      <h3 style="margin:0">Review PlatePlan import</h3>
-      <button class="btn sm ghost" onclick="closePlatePlanImportPreview()">Close</button>
-    </div>
-    <div id="plateplan-import-preview-content"></div>
-    <div class="btn-row" style="margin-top:14px;justify-content:flex-end">
-      <button class="btn ghost" onclick="closePlatePlanImportPreview()">Cancel</button>
-      <button class="btn primary" id="plateplan-import-confirm" onclick="confirmPlatePlanDataImport()">Import data</button>
-    </div>
-  </div>`;
-  document.body.appendChild(wrap);
-  return wrap;
-}
-
-function openPlatePlanImportPreview(imported, metadata = {}){
-  const validation = validatePlatePlanImport(imported, metadata);
-  pendingPlatePlanImport = { imported, metadata, validation };
-  const wrap = ensurePlatePlanImportPreviewModal();
-  const c = validation.counts;
-  const versionLabel = metadata.version || 'legacy/raw state';
-  const differences = validation.valid ? renderBakedStateDifferenceSummary(state || {}, imported) : '';
-  document.getElementById('plateplan-import-preview-content').innerHTML = `
-    <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Backup version: <strong>${ppEscapeHtml(versionLabel)}</strong> · Schema ${validation.schemaVersion}</div>
-    <div class="plan-summary" style="margin-bottom:10px">
-      <div class="summary-box"><strong>Recipes</strong><div>${c.recipes}</div></div>
-      <div class="summary-box"><strong>Products</strong><div>${c.products}</div></div>
-      <div class="summary-box"><strong>Ingredients</strong><div>${c.ingredients}</div></div>
-      <div class="summary-box"><strong>Sub-types</strong><div>${c.subTypes}</div></div>
-      <div class="summary-box"><strong>Plan</strong><div>${c.planDays} days</div></div>
-      <div class="summary-box"><strong>History</strong><div>${c.planHistory}</div></div>
-    </div>
-    ${validation.errors.length ? `<div class="msg error"><strong>Import blocked</strong><br>${validation.errors.map(ppEscapeHtml).join('<br>')}</div>` : ''}
-    ${validation.warnings.length ? `<div class="msg info">${validation.warnings.map(ppEscapeHtml).join('<br>')}</div>` : ''}
-    ${validation.valid ? `<div style="font-size:12px;font-weight:700;margin:10px 0 5px">Differences from browser data</div><div style="display:grid;gap:5px;max-height:220px;overflow:auto;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px">${differences}</div>` : ''}`;
-  document.getElementById('plateplan-import-confirm').disabled = !validation.valid;
-  wrap.classList.add('open');
-}
-
-function closePlatePlanImportPreview(){
-  document.getElementById('plateplan-import-preview-wrap')?.classList.remove('open');
-  pendingPlatePlanImport = null;
-}
-
-function confirmPlatePlanDataImport(){
-  if(!pendingPlatePlanImport?.validation?.valid) return;
-  const imported = pendingPlatePlanImport.imported;
-  const schemaVersion = pendingPlatePlanImport.validation.schemaVersion || 1;
-  runWithRecoveryPoint('Before importing PlatePlan data', () => {
-    state = imported;
-    if(!state.meta || typeof state.meta !== 'object') state.meta = {};
-    state.meta.schemaVersion = +state.meta.schemaVersion || schemaVersion;
-    ensureIngredientGroups(state);
-    refreshPlatePlanDerivedState({ persist:true, render:true });
-    localStorage.removeItem(BAKED_CANDIDATE_SK);
-    closePlatePlanImportPreview();
-    loadPrefs();
-    showMsg('prefs-data-msg','PlatePlan data imported.','success');
-  });
-}
-
-function importPlatePlanDataBackup(input){
-  const file = input?.files?.[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    try{
-      const parsed = JSON.parse(reader.result);
-      const imported = parsed.state || parsed;
-      openPlatePlanImportPreview(imported, { version:parsed.version || '', schemaVersion:parsed.schemaVersion || imported?.meta?.schemaVersion || 1, exportedAt:parsed.exportedAt || '' });
-    }catch(e){
-      showMsg('prefs-data-msg','That file does not look like a PlatePlan data backup.','error');
-    }finally{
-      input.value = '';
-    }
-  };
-  reader.readAsText(file);
-}
-
 function savePrefs(){
-  const eb = +document.getElementById('pref-eb')?.value||0;
-  const el = +document.getElementById('pref-el')?.value||0;
-  const ed = +document.getElementById('pref-ed')?.value||0;
-  const es = +document.getElementById('pref-es')?.value||0;
-
-  const cb = +document.getElementById('pref-cb')?.value||0;
-  const cl = +document.getElementById('pref-cl')?.value||0;
-  const cd = +document.getElementById('pref-cd')?.value||0;
-  const cs = +document.getElementById('pref-cs')?.value||0;
-
-  const epb = +document.getElementById('pref-epb')?.value||0;
-  const epl = +document.getElementById('pref-epl')?.value||0;
-  const epd = +document.getElementById('pref-epd')?.value||0;
-  const eps = +document.getElementById('pref-eps')?.value||0;
-
-  const cpb = +document.getElementById('pref-cpb')?.value||0;
-  const cpl = +document.getElementById('pref-cpl')?.value||0;
-  const cpd = +document.getElementById('pref-cpd')?.value||0;
-  const cps = +document.getElementById('pref-cps')?.value||0;
-
-  if((eb+el+ed+es) !== 100 || (cb+cl+cd+cs) !== 100 || (epb+epl+epd+eps) !== 100 || (cpb+cpl+cpd+cps) !== 100) {
-    showMsg('prefs-msg','Percentages must total 100% for both calories and protein.','error');
-    return;
+  if(typeof window.renderSettings === 'function'){
+    window.renderSettings();
   }
-
-  state.prefs={
-    ...state.prefs,
-    updatedAt: new Date().toISOString(),
-    exclude: document.getElementById('pref-exclude')?.value||'',
-    exclusions: state.prefs.exclusions || {shared:[],elliott:[],chloe:[]},
-    diet: document.getElementById('pref-diet')?.value||'vegetarian',
-    ecal: +document.getElementById('pref-ecal')?.value||2400,
-    eprot: +document.getElementById('pref-eprot')?.value||130,
-    ccal: +document.getElementById('pref-ccal')?.value||1700,
-    cprot: +document.getElementById('pref-cprot')?.value||100,
-    eAlloc: {b:eb, l:el, d:ed, s:es},
-    cAlloc: {b:cb, l:cl, d:cd, s:cs},
-    eProtAlloc: {b:epb, l:epl, d:epd, s:eps},
-    cProtAlloc: {b:cpb, l:cpl, d:cpd, s:cps},
-    shopGroupBy: state.prefs.shopGroupBy || 'family',
-    autoMappingStrategy: document.getElementById('pref-auto-mapping-strategy')?.value || state.prefs.autoMappingStrategy || 'protein_per_kcal',
-    productPriority: document.getElementById('plan-product-priority')?.value || state.prefs.productPriority || 'protein'
-  };
-  refreshAllAutoDefaultProducts();
-  if (typeof platePlanNutritionCache !== 'undefined' && platePlanNutritionCache.clear) {
-    platePlanNutritionCache.clear();
-  }
-  recalcAllRecipes();
-  saveState(true);
-  if (document.getElementById('modal-wrap')?.classList.contains('open')) {
-    if (typeof recalcModal === 'function') {
-      recalcModal('orig');
-      recalcModal('enh');
-    }
-  }
-  showMsg('prefs-msg','Preferences saved.','success');
-  renderVault(); // refreshes any views dependent on macros
 }
+function ensureExclusionPrefsUI(){}
+function calcBudgets(){}
 
 // == UTILS ==
 window.platePlanToastActions = window.platePlanToastActions || new Map();

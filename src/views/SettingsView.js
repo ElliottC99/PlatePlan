@@ -1,5 +1,5 @@
 /**
- * src/views/SettingsView.js (v3.6.0)
+ * src/views/SettingsView.js (v3.7.4)
  * Componentized Settings & Preferences View Function.
  * Quarantined from direct Firebase SDK, using dedicated HouseholdRepository.
  */
@@ -318,7 +318,7 @@ export function renderSettingsView() {
       window.state.settings.mappingStrategy = container.querySelector('#pp-setting-strategy')?.value || 'protein_per_kcal';
       window.state.settings.theme = container.querySelector('#pp-setting-theme')?.value || 'system';
 
-      console.log('[Settings v3.6.0] Saved user preferences to state:', window.state.userPrefs);
+      console.log('[Settings v3.7.4] Saved user preferences to state:', window.state.userPrefs);
       
       // Persist to Firestore
       await savePreferences(window.state.userPrefs, window.state.settings);
@@ -340,7 +340,7 @@ export function renderSettingsView() {
   const refreshBtn = container.querySelector('#pp-refresh-data-btn');
   if (refreshBtn) {
     refreshBtn.onclick = () => {
-      console.log('[Settings v3.6.0] Triggering household data refresh...');
+      console.log('[Settings v3.7.4] Triggering household data refresh...');
       hydrateHouseholdData();
     };
   }

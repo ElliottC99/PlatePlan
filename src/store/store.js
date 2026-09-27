@@ -1,11 +1,11 @@
 /**
- * src/store/store.js (v3.6.0)
+ * src/store/store.js (v3.7.4)
  * Centralized Reactive State Store module using native browser CustomEvents for unidirectional data flow.
  * Provides microtask-wrapped event dispatching, local storage caching for instant offline hydration,
  * and optimistic UI rollbacks.
  */
 
-const CACHE_KEY = 'plateplan_store_cache_v3.6.0';
+const CACHE_KEY = 'plateplan_store_cache_v3.7.4';
 
 const state = {
   recipes: [],
@@ -30,7 +30,7 @@ function readCache() {
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === 'object' ? parsed : null;
   } catch (e) {
-    console.warn('[Store v3.6.0] Failed to read localStorage cache:', e);
+    console.warn('[Store v3.7.4] Failed to read localStorage cache:', e);
     return null;
   }
 }
@@ -56,7 +56,7 @@ export function saveStateCache() {
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
     } catch (e) {
-      console.warn('[Store v3.6.0] Failed to save state cache:', e);
+      console.warn('[Store v3.7.4] Failed to save state cache:', e);
     }
   }, 100);
 }
@@ -83,7 +83,7 @@ if (initialCache) {
   state.currentPlan = initialCache.currentPlan || null;
   state.shoppingList = Array.isArray(initialCache.shoppingList) ? initialCache.shoppingList : [];
   state.isCachedHydrated = true;
-  console.log('[Store v3.6.0] Instant offline state hydrated from local storage cache.');
+  console.log('[Store v3.7.4] Instant offline state hydrated from local storage cache.');
 }
 
 /**
@@ -236,7 +236,7 @@ export async function runOptimisticMutation(domain, mutateFn, persistPromise, ro
     }
     return result;
   } catch (err) {
-    console.error(`[Store v3.6.0] Network failure in domain '${domain}', executing rollback:`, err);
+    console.error(`[Store v3.7.4] Network failure in domain '${domain}', executing rollback:`, err);
     
     if (typeof rollbackFn === 'function') {
       rollbackFn(state, previousStateSnapshot);
