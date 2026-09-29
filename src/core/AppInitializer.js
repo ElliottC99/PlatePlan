@@ -284,7 +284,12 @@ export function initModalDelegation() {
   });
 }
 
+let isPlatePlanAppInitialized = false;
+
 export function initPlatePlanApp() {
+  if (isPlatePlanAppInitialized) return;
+  isPlatePlanAppInitialized = true;
+
   registerServiceWorker();
   initHeaderDelegation();
   initNavigationDelegation();

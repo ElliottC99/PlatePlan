@@ -1,13 +1,26 @@
 /**
- * src/services/AuthService.js (v3.8.1)
+ * src/services/AuthService.js (v3.14.5)
  * Resolves Firebase Auth state safely for household synchronization.
+ * Singleton guarded to eliminate duplicate authentication listeners.
  */
 
+let authPromise = null;
+
 export function waitForAuth() {
-  return new Promise((resolve, reject) => {
+  if (authPromise) return authPromise;
+
+  authPromise = new Promise((resolve, reject) => {
     if (typeof window === 'undefined' || !window.firebase || !window.firebase.auth) {
+      authPromise = null;
       return reject(new Error("[AuthService] Firebase Auth SDK not found."));
     }
+
+    const current = window.firebase.auth().currentUser;
+    if (current) {
+      console.log(`[AuthService] Active user session: ${current.email}`);
+      return resolve(current);
+    }
+
     const unsubscribe = window.firebase.auth().onAuthStateChanged(user => {
       unsubscribe();
       if (user) {
@@ -17,6 +30,11 @@ export function waitForAuth() {
         console.warn('[AuthService] No user session detected.');
         resolve(null);
       }
-    }, error => reject(error));
+    }, error => {
+      authPromise = null;
+      reject(error);
+    });
   });
+
+  return authPromise;
 }
