@@ -6,6 +6,9 @@
  */
 
 import { safeJsonStringify, safeClone } from '../utils/safeJson.js';
+import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
+
+export { getShoppingLineStateKey };
 
 const CACHE_KEY = `plateplan_store_cache_${(typeof window !== 'undefined' && window.APP_VERSION) || 'v3.13.1'}`;
 

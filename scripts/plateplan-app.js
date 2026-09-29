@@ -14270,6 +14270,18 @@ function getSlotShoppingScale(recipe, slotKey, instanceId = null, planContext = 
   const servingShare = String(slotKey || '').endsWith('C') ? portions.cSingleServ : portions.eSingleServ;
   return serves > 0 ? Math.max(servingShare, 0) / serves : 1;
 }
+function getShoppingLineStateKey(groupId, actualBankId, raw) {
+  if (typeof window !== 'undefined' && typeof window.getShoppingLineStateKey === 'function') {
+    return window.getShoppingLineStateKey(groupId, actualBankId, raw);
+  }
+  if (groupId && actualBankId && !raw) {
+    return `${groupId}_${actualBankId}`.toLowerCase().replace(/\s+/g, '_');
+  }
+  if (groupId) return `group_${groupId}`.toLowerCase().replace(/\s+/g, '_');
+  if (actualBankId) return `bank_${actualBankId}`.toLowerCase().replace(/\s+/g, '_');
+  if (raw) return `raw_${String(raw).toLowerCase().replace(/\s+/g, '_')}`;
+  return 'item_unknown';
+}
 function getShoppingAmount(ing, bankIng, scale = 1) {
   if(typeof ing !== 'object') return { qty: 0, unit: 'g', grams: 0, label: '' };
   const unit = (ing.unit || '').toLowerCase().replace(/s$/,'');

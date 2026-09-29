@@ -3,6 +3,10 @@
  * Componentized Weekly Planner, Wizard & Swap Modal View.
  */
 
+import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
+
+export { getShoppingLineStateKey };
+
 export function renderPlanner() {
   if (typeof renderPlannerWizard === 'function') {
     renderPlannerWizard();

@@ -1,9 +1,9 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.13.2';
+  window.APP_VERSION = 'v3.14.0';
 }
 
 /**
- * src/main.js (v3.13.2)
+ * src/main.js (v3.14.0)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronization,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -13,7 +13,7 @@ import { hydrateHouseholdData } from './services/HydrationService.js';
 import { subscribe, getState } from './store/store.js';
 import { setupActionBridge } from './services/ActionBridge.js';
 import { renderSettingsView } from './views/SettingsView.js';
-import { renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired } from './views/ShoppingView.js';
+import { renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired, getShoppingLineStateKey } from './views/ShoppingView.js';
 import { renderPlanner } from './views/PlannerView.js';
 import { renderRecipeVault } from './views/RecipeVaultView.js';
 import * as TescoImportService from './services/TescoImportService.js';
@@ -210,9 +210,10 @@ if (typeof window !== 'undefined') {
 }
 
 // 2. EXPORTS & GLOBAL COMPATIBILITY ALIASES
-export { renderSettingsView, renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired, renderPlanner, renderRecipeVault, setupActionBridge };
+export { renderSettingsView, renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired, renderPlanner, renderRecipeVault, setupActionBridge, getShoppingLineStateKey };
 
 if (typeof window !== 'undefined') {
+  window.getShoppingLineStateKey = getShoppingLineStateKey;
   window.renderSettings = renderSettingsView;
   window.renderShopping = renderShoppingListUI;
   window.renderShoppingList = renderShoppingListUI;
@@ -315,7 +316,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.13.2 (ES6 Modern)';
+    footerEl.textContent = 'v3.14.0 (ES6 Modern)';
   }
 }
 

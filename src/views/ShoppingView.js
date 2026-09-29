@@ -6,8 +6,9 @@
  */
 
 import { renderScrollableSwapModal, executeSwapInState, resolveTargetItem, calculateMetrics } from '../components/ProductSwapModal.js';
+import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
 
-export { renderScrollableSwapModal, executeSwapInState, resolveTargetItem, calculateMetrics };
+export { renderScrollableSwapModal, executeSwapInState, resolveTargetItem, calculateMetrics, getShoppingLineStateKey };
 
 /**
  * Renders the top summary banner of the shopping list.
