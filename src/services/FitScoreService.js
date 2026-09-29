@@ -1,5 +1,5 @@
 /**
- * src/services/FitScoreService.js (v3.7.4)
+ * src/services/FitScoreService.js (v3.8.1)
  * Pure macro target resolver, dual-profile fit score calculation,
  * and recipe ranking/sorting engine.
  * Quarantined from page DOM queries and direct database operations.

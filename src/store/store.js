@@ -1,11 +1,13 @@
 /**
- * src/store/store.js (v3.7.4)
+ * src/store/store.js (v3.8.1)
  * Centralized Reactive State Store module using native browser CustomEvents for unidirectional data flow.
  * Provides microtask-wrapped event dispatching, local storage caching for instant offline hydration,
  * and optimistic UI rollbacks.
  */
 
-const CACHE_KEY = 'plateplan_store_cache_v3.7.4';
+import { safeJsonStringify, safeClone } from '../utils/safeJson.js';
+
+const CACHE_KEY = 'plateplan_store_cache_v3.8.1';
 
 const state = {
   recipes: [],
@@ -30,7 +32,7 @@ function readCache() {
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === 'object' ? parsed : null;
   } catch (e) {
-    console.warn('[Store v3.7.4] Failed to read localStorage cache:', e);
+    console.warn('[Store v3.8.1] Failed to read localStorage cache:', e);
     return null;
   }
 }
@@ -54,9 +56,10 @@ export function saveStateCache() {
         shoppingList: state.shoppingList,
         cachedAt: Date.now()
       };
-      localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+      const serialized = safeJsonStringify(payload, null, '');
+      if (serialized) localStorage.setItem(CACHE_KEY, serialized);
     } catch (e) {
-      console.warn('[Store v3.7.4] Failed to save state cache:', e);
+      console.warn('[Store v3.8.1] Failed to save state cache:', e);
     }
   }, 100);
 }
@@ -83,7 +86,7 @@ if (initialCache) {
   state.currentPlan = initialCache.currentPlan || null;
   state.shoppingList = Array.isArray(initialCache.shoppingList) ? initialCache.shoppingList : [];
   state.isCachedHydrated = true;
-  console.log('[Store v3.7.4] Instant offline state hydrated from local storage cache.');
+  console.log('[Store v3.8.1] Instant offline state hydrated from local storage cache.');
 }
 
 /**
@@ -221,7 +224,7 @@ export function setShoppingList(newShoppingList) {
  * @returns {Promise<any>}
  */
 export async function runOptimisticMutation(domain, mutateFn, persistPromise, rollbackFn, errorMessage) {
-  const previousStateSnapshot = JSON.parse(JSON.stringify(state[domain] || null));
+  const previousStateSnapshot = safeClone(state[domain] || null);
   
   if (typeof mutateFn === 'function') {
     mutateFn(state);
@@ -236,7 +239,7 @@ export async function runOptimisticMutation(domain, mutateFn, persistPromise, ro
     }
     return result;
   } catch (err) {
-    console.error(`[Store v3.7.4] Network failure in domain '${domain}', executing rollback:`, err);
+    console.error(`[Store v3.8.1] Network failure in domain '${domain}', executing rollback:`, err);
     
     if (typeof rollbackFn === 'function') {
       rollbackFn(state, previousStateSnapshot);
@@ -255,15 +258,35 @@ export async function runOptimisticMutation(domain, mutateFn, persistPromise, ro
 }
 
 /**
- * Subscribe to state changes on a specific domain.
- * @param {string} domain 'recipes' | 'ingredients' | 'preferences' | 'plan' | 'shopping'
- * @param {Function} callback 
+ * Update global state with a partial patch object.
+ * @param {Object} patch 
+ */
+export function updateState(patch) {
+  if (!patch || typeof patch !== 'object') return;
+  Object.assign(state, patch);
+  saveStateCache();
+  dispatchStateEvent('plateplan:state:patch', patch);
+}
+
+/**
+ * Subscribe to state changes on a specific domain or globally.
+ * @param {string|Function} domainOrCallback Domain name ('recipes', 'plan', etc.) or global listener callback
+ * @param {Function} [maybeCallback] Optional callback if domain is specified
  * @returns {Function} Unsubscribe function
  */
-export function subscribe(domain, callback) {
-  if (typeof document === 'undefined' || typeof callback !== 'function') {
-    return () => {};
+export function subscribe(domainOrCallback, maybeCallback) {
+  if (typeof document === 'undefined') return () => {};
+  if (typeof domainOrCallback === 'function') {
+    const listener = domainOrCallback;
+    const handler = (e) => listener(state, e.detail);
+    document.addEventListener('plateplan:state:patch', handler);
+    return () => {
+      document.removeEventListener('plateplan:state:patch', handler);
+    };
   }
+  const domain = domainOrCallback;
+  const callback = maybeCallback;
+  if (typeof callback !== 'function') return () => {};
   const eventName = `plateplan:state:${domain}`;
   const handler = (e) => callback(e.detail);
   document.addEventListener(eventName, handler);

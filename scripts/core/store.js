@@ -183,7 +183,9 @@ export function createPlatePlanStore(adapter) {
  */
 export async function deletePlan(planId) {
   if (!window.state) window.state = {};
-  const previousPlan = window.state.plan ? JSON.parse(JSON.stringify(window.state.plan)) : {};
+  const previousPlan = window.state.plan
+    ? (typeof window.clonePlatePlanValue === 'function' ? window.clonePlatePlanValue(window.state.plan) : (window.state.plan || {}))
+    : {};
 
   // Synchronously remove backup key
   localStorage.removeItem('plateplan_plan_backup');
@@ -213,7 +215,23 @@ export async function deletePlan(planId) {
   }
 
   // Persist state locally
-  localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+  try {
+    if (typeof window.safeJsonStringify === 'function') {
+      localStorage.setItem('plateplan_v2', window.safeJsonStringify(window.state));
+    } else {
+      const seen = new WeakSet();
+      const str = JSON.stringify(window.state, (k, v) => {
+        if (typeof v === 'object' && v !== null) {
+          if (seen.has(v)) return undefined;
+          seen.add(v);
+        }
+        return v;
+      });
+      localStorage.setItem('plateplan_v2', str);
+    }
+  } catch (e) {
+    console.warn('Failed to persist state locally', e);
+  }
 
   // If the modular store exists, publish the update
   if (window.PlatePlanModules?.store) {

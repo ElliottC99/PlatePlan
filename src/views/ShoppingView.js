@@ -1,5 +1,5 @@
 /**
- * src/views/ShoppingView.js (v3.7.4)
+ * src/views/ShoppingView.js (v3.8.1)
  * Componentized Shopping List View with reactive store subscription.
  * Real-time state synchronization with Household Meal Plan and Reactive Store.
  * Uses optimized DOM rendering for high performance.
@@ -196,4 +196,28 @@ if (typeof window !== 'undefined') {
   window.toggleInlineShoppingSubst = renderScrollableSwapModal;
   window.toggleShoppingItemAcquired = toggleShoppingItemAcquired;
   window.toggleShoppingAtHome = toggleShoppingItemAcquired;
+}
+
+import { subscribe } from '../store/store.js';
+
+let shoppingUnsub = null;
+
+export function mount(container) {
+  if (typeof renderShoppingListUI === 'function') {
+    renderShoppingListUI();
+  } else if (typeof renderShoppingSummary === 'function') {
+    renderShoppingSummary();
+  }
+  shoppingUnsub = subscribe('shopping', (list) => {
+    if (typeof renderShoppingListUI === 'function') {
+      renderShoppingListUI();
+    }
+  });
+}
+
+export function unmount() {
+  if (typeof shoppingUnsub === 'function') {
+    shoppingUnsub();
+    shoppingUnsub = null;
+  }
 }

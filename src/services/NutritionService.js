@@ -1,5 +1,5 @@
 /**
- * src/services/NutritionService.js (v3.7.4)
+ * src/services/NutritionService.js (v3.8.1)
  * Pure macro calculation, calorie normalization, and nutritional rollup service.
  * Quarantined from page DOM queries and direct database operations.
  */

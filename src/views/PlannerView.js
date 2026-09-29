@@ -1,5 +1,5 @@
 /**
- * src/views/PlannerView.js (v3.7.4)
+ * src/views/PlannerView.js (v3.8.4)
  * Componentized Weekly Planner, Wizard & Swap Modal View.
  */
 
@@ -19,157 +19,32 @@ export function renderPlannerWizard() {
   const currentStep = typeof getPlannerWizardStep === 'function' ? getPlannerWizardStep() : 1;
   const hasActivePlan = !!(window.state?.plan?.slots && Object.keys(window.state.plan.slots).length > 0);
 
-  let html = `<div class="planner-wizard-container">`;
-
-  html += `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--border)">
-      <div>
-        <h1 style="margin:0;font-size:20px;font-weight:750;color:var(--text);letter-spacing:-0.02em">Meal Planner</h1>
-        <div style="font-size:12.5px;color:var(--text2);margin-top:2px">Configure household requests, review daily macro scores, customize shopping, and commit.</div>
-      </div>
-      <button type="button" class="btn ghost sm" style="display:flex;align-items:center;gap:6px;color:var(--red,#dc2626);border-color:var(--red,#dc2626);font-weight:600" onclick="resetPlannerStartFresh()">
-        <span>↺</span> Start Fresh
-      </button>
-    </div>
-  `;
-
-  html += `
-    <div class="planner-wizard-stepper">
-      <button type="button" class="wizard-step-btn ${currentStep === 1 ? 'active' : currentStep > 1 ? 'completed' : ''}" onclick="setPlannerWizardStep(1)">
-        <span class="wizard-step-badge">1</span>
-        <span>Configure Requests</span>
-      </button>
-      <span style="color:var(--border-strong);font-weight:bold">→</span>
-      <button type="button" class="wizard-step-btn ${currentStep === 2 ? 'active' : currentStep > 2 ? 'completed' : ''}" ${!hasActivePlan ? 'disabled' : ''} onclick="setPlannerWizardStep(2)">
-        <span class="wizard-step-badge">2</span>
-        <span>Review Plan</span>
-      </button>
-      <span style="color:var(--border-strong);font-weight:bold">→</span>
-      <button type="button" class="wizard-step-btn ${currentStep === 3 ? 'active' : currentStep > 3 ? 'completed' : ''}" ${!hasActivePlan ? 'disabled' : ''} onclick="setPlannerWizardStep(3)">
-        <span class="wizard-step-badge">3</span>
-        <span>Shopping & Substitutions</span>
-      </button>
-      <span style="color:var(--border-strong);font-weight:bold">→</span>
-      <button type="button" class="wizard-step-btn ${currentStep === 4 ? 'active' : ''}" ${!hasActivePlan ? 'disabled' : ''} onclick="setPlannerWizardStep(4)">
-        <span class="wizard-step-badge">4</span>
-        <span>Commit Plan</span>
-      </button>
-    </div>
-  `;
+  let stepContentHtml = '';
 
   if (currentStep === 1) {
     const daysVal = window.state.plannerDays || window.state.plan?.days || 10;
     const today = new Date().toISOString().split('T')[0];
     const startVal = window.state.plannerStartDate || window.state.plan?.dayDates?.[1] || today;
     const cadence = window.state.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
+    const minFitScore = window.state.prefs?.minFitScore || 0;
     const activeExclusions = typeof getActiveWizardExclusions === 'function' ? getActiveWizardExclusions() : [];
     const rawPinned = window.state?.planOptions?.pinnedMeals || window.state?.pinnedRecipes || [];
     const pinned = Array.isArray(rawPinned) ? rawPinned : [];
     const rawUseUp = window.state?.planOptions?.useUp || window.state?.useUpProducts || [];
     const useUp = Array.isArray(rawUseUp) ? rawUseUp : (rawUseUp && typeof rawUseUp === 'object' ? Object.keys(rawUseUp) : []);
 
-    html += `
-      <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:18px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-          <div>
-            <h2 style="margin:0;font-size:18px;font-weight:700">Step 1: Configure Plan Requests</h2>
-            <div style="font-size:13px;color:var(--text2);margin-top:4px">Define days, meal repeat cadence, skips, and pinned recipes before generating.</div>
-          </div>
-          <button type="button" class="btn primary" style="font-weight:700;padding:8px 18px" onclick="generatePlan()">✨ Generate Plan</button>
-        </div>
-
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:14px;background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border)">
-          <div>
-            <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">PLAN LENGTH</label>
-            <select id="wizard-plan-days" class="select" style="width:100%" onchange="window.state.plannerDays=parseInt(this.value)||10;saveState();">
-              ${[1,2,3,4,5,6,7,8,9,10,11,12,13,14].map(n => `<option value="${n}" ${n === daysVal ? 'selected' : ''}>${n} day${n>1?'s':''}</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">START DATE</label>
-            <input type="date" id="wizard-plan-start" class="input" style="width:100%" value="${startVal}" onchange="window.state.plannerStartDate=this.value;saveState();">
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">BREAKFAST REPEAT</label>
-            <select class="select" style="width:100%" onchange="window.state.prefs.mealRepeatCadence=window.state.prefs.mealRepeatCadence||{};window.state.prefs.mealRepeatCadence.breakfast=parseInt(this.value)||1;saveState();">
-              ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${n === cadence.breakfast ? 'selected' : ''}>${n} day${n>1?'s':''}</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">LUNCH REPEAT</label>
-            <select class="select" style="width:100%" onchange="window.state.prefs.mealRepeatCadence=window.state.prefs.mealRepeatCadence||{};window.state.prefs.mealRepeatCadence.lunch=parseInt(this.value)||2;saveState();">
-              ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${n === cadence.lunch ? 'selected' : ''}>${n} day${n>1?'s':''}</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">DINNER REPEAT</label>
-            <select class="select" style="width:100%" onchange="window.state.prefs.mealRepeatCadence=window.state.prefs.mealRepeatCadence||{};window.state.prefs.mealRepeatCadence.dinner=parseInt(this.value)||2;saveState();">
-              ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${n === cadence.dinner ? 'selected' : ''}>${n} day${n>1?'s':''}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-
-        <div style="background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border)">
-          <div class="field" style="margin:0">
-            <label for="wizard-fit-score-filter" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">MINIMUM RECIPE FIT SCORE</label>
-            <select id="wizard-fit-score-filter" class="select" style="width:100%" onchange="window.state.prefs.minFitScore = parseInt(this.value, 10) || 0; saveState();">
-              <option value="0" ${(!window.state.prefs?.minFitScore || window.state.prefs.minFitScore === 0) ? 'selected' : ''}>All Recipes (0–100)</option>
-              <option value="85" ${window.state.prefs?.minFitScore === 85 ? 'selected' : ''}>Ideal Fit Only (85–100)</option>
-              <option value="65" ${window.state.prefs?.minFitScore === 65 ? 'selected' : ''}>Acceptable Fit+ (65–100)</option>
-              <option value="40" ${window.state.prefs?.minFitScore === 40 ? 'selected' : ''}>Suboptimal Fit+ (40–100)</option>
-            </select>
-          </div>
-        </div>
-
-        <div style="background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
-            <div>
-              <div style="font-size:13px;font-weight:700;color:var(--text)">Slot Exclusions (${activeExclusions.length})</div>
-              <div style="font-size:12px;color:var(--text2)">Skip specific meal slots (eating out, travel, etc.).</div>
-            </div>
-            <div style="display:flex;gap:8px">
-              <button type="button" class="btn sm ghost" onclick="skipAllWizardDinners()">+ Skip All Dinners</button>
-              <button type="button" class="btn sm ghost" onclick="clearAllWizardExclusions()">Clear Skips</button>
-            </div>
-          </div>
-
-          <div id="wizard-exclusions-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
-            ${activeExclusions.length === 0 ? '<span style="font-size:12px;color:var(--text3)">No meal slots excluded. All slots will be planned.</span>' : ''}
-            ${activeExclusions.map(ex => `
-              <span class="exclusion-chip">
-                ${typeof ppEscapeHtml === 'function' ? ppEscapeHtml(ex.label) : ex.label}
-                <button type="button" onclick="removeWizardExclusion(${ex.day}, ${JSON.stringify(ex.keys)})" title="Remove exclusion">✕</button>
-              </span>
-            `).join('')}
-          </div>
-
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <select id="wizard-excl-day" class="select sm" style="width:auto">
-              ${Array.from({length: daysVal}, (_, i) => i + 1).map(d => `<option value="${d}">Day ${d}</option>`).join('')}
-            </select>
-            <select id="wizard-excl-meal" class="select sm" style="width:auto">
-              <option value="all">All meals</option>
-              <option value="breakfast">Breakfast</option>
-              <option value="lunch">Lunch</option>
-              <option value="dinner">Dinner</option>
-            </select>
-            <select id="wizard-excl-person" class="select sm" style="width:auto">
-              <option value="both">Both (Elliott & Chloe)</option>
-              <option value="elliott">Elliott only</option>
-              <option value="chloe">Chloe only</option>
-            </select>
-            <button type="button" class="btn sm primary" onclick="addWizardExclusionFromUI()">+ Skip Slot</button>
-          </div>
-        </div>
-
-        <div style="display:flex;justify-content:flex-end;margin-top:6px">
-          <button type="button" class="btn primary" style="font-weight:700;padding:10px 24px;font-size:14px" onclick="generatePlan()">✨ Generate Meal Plan →</button>
-        </div>
-      </div>
-    `;
+    stepContentHtml = window.GeneratorConstraintsForm?.renderConstraintsForm?.({
+      daysVal,
+      startVal,
+      cadence,
+      minFitScore,
+      activeExclusions,
+      pinned,
+      useUp
+    }) || '';
   } else if (currentStep === 2) {
     if (!hasActivePlan) {
-      html += `
+      stepContentHtml = window.GeneratorWizardModal?.renderWizardEmptyPlanCard?.(2) || `
         <div class="card" style="padding:24px;text-align:center">
           <h3>No Meal Plan Generated Yet</h3>
           <p style="color:var(--text2);font-size:13px;margin-bottom:14px">Configure your days and requests in Step 1 to generate your meal plan.</p>
@@ -183,22 +58,7 @@ export function renderPlannerWizard() {
       const days = plan.days || safeSlots.length || 0;
       const prepGroups = Array.isArray(plan.mealPrepGroups) ? plan.mealPrepGroups : [];
 
-      html += `
-        <div style="display:flex;flex-direction:column;gap:16px">
-          <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-            <div>
-              <h2 style="margin:0;font-size:18px;font-weight:700">Step 2: Review Generated Meal Plan</h2>
-              <div style="font-size:13px;color:var(--text2);margin-top:4px">Review daily macro fits and swap any meal directly inline.</div>
-            </div>
-            <div style="display:flex;gap:8px">
-              <button type="button" class="btn ghost sm" onclick="setPlannerWizardStep(1)">← Edit Requests</button>
-              <button type="button" class="btn primary sm" style="font-weight:700" onclick="setPlannerWizardStep(3)">Proceed to Shopping List →</button>
-            </div>
-          </div>
-
-          <div class="dense-plan-grid">
-      `;
-
+      let cardsHtml = '';
       for (let d = 1; d <= days; d++) {
         const dateLabel = typeof formatPlanDayLabel === 'function' ? formatPlanDayLabel(plan, d, { short: true }) : `Day ${d}`;
         const daySlots = plan.slots?.[d] || {};
@@ -221,87 +81,44 @@ export function renderPlannerWizard() {
 
         const dayPreps = prepGroups.filter(g => (Array.isArray(g?.days) ? g.days : []).includes(d));
 
-        html += `
-          <div class="dense-plan-day-card">
-            <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:8px">
-              <div>
-                <span style="font-weight:750;font-size:14px;color:var(--text)">Day ${d}</span>
-                <span style="font-size:12px;color:var(--text2);margin-left:6px">${typeof ppEscapeHtml === 'function' ? ppEscapeHtml(dateLabel) : dateLabel}</span>
-              </div>
-              <div style="font-size:11px;font-weight:650;color:var(--text2)">
-                E: ${Math.round(eCal)} kcal · ${Math.round(eProt)}g | C: ${Math.round(cCal)} kcal · ${Math.round(cProt)}g
-              </div>
-            </div>
+        const mealsHtml = ['breakfast', 'lunch', 'dinner'].map(meal => {
+          const slotKeyE = meal + 'E';
+          const slotKeyC = meal + 'C';
+          const sE = daySlots[slotKeyE];
+          const sC = daySlots[slotKeyC];
+          const infoE = sE && typeof getPlanSlotInfo === 'function' ? getPlanSlotInfo(sE) : null;
+          const infoC = sC && typeof getPlanSlotInfo === 'function' ? getPlanSlotInfo(sC) : null;
+          const rE = infoE?.active;
+          const rC = infoC?.active;
+          const isShared = rE && rC && infoE.id === infoC.id && infoE.variant === infoC.variant;
+          return window.PlannerMealSlot?.renderDensePlanMealRow({ meal, isShared, rE, rC, infoE, infoC, day: d, slotKeyE, slotKeyC }) || '';
+        }).join('');
 
-            ${dayPreps.map(p => `
-              <div class="batch-prep-badge">
-                🍱 Batch Prep (${p.days.length} days: Day ${p.days.join(', ')})
-              </div>
-            `).join('')}
-
-            <div style="display:flex;flex-direction:column;gap:8px">
-              ${['breakfast', 'lunch', 'dinner'].map(meal => {
-                const slotKeyE = meal + 'E';
-                const slotKeyC = meal + 'C';
-                const sE = daySlots[slotKeyE];
-                const sC = daySlots[slotKeyC];
-                const infoE = sE && typeof getPlanSlotInfo === 'function' ? getPlanSlotInfo(sE) : null;
-                const infoC = sC && typeof getPlanSlotInfo === 'function' ? getPlanSlotInfo(sC) : null;
-                const rE = infoE?.active;
-                const rC = infoC?.active;
-                const isShared = rE && rC && infoE.id === infoC.id && infoE.variant === infoC.variant;
-
-                if (!rE && !rC) {
-                  return `
-                    <div class="dense-plan-person-row" style="opacity:0.6">
-                      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase">${meal}</div>
-                      <div style="font-size:12px;color:var(--text3);font-style:italic">Excluded / Not planned</div>
-                    </div>
-                  `;
-                }
-
-                if (isShared) {
-                  return `
-                    <div class="dense-plan-person-row">
-                      <div style="display:flex;align-items:center;justify-content:space-between">
-                        <span style="font-size:11px;font-weight:750;color:var(--text2);text-transform:uppercase">${meal} (Both)</span>
-                        <button type="button" class="dense-plan-swap-btn" onclick="openSearchableRecipeSwapModal(${d}, '${slotKeyE}', true)">Swap ▾</button>
-                      </div>
-                      <div class="dense-plan-slot">
-                        <span style="font-weight:600;color:var(--text)">${typeof ppEscapeHtml === 'function' ? ppEscapeHtml(rE.name) : rE.name} ${infoE.variant === 'enhanced' ? '<span style="font-size:10px;color:var(--action);font-weight:700">ENHANCED</span>' : ''}</span>
-                      </div>
-                    </div>
-                  `;
-                }
-
-                return `
-                  <div class="dense-plan-person-row">
-                    <div style="font-size:11px;font-weight:750;color:var(--text2);text-transform:uppercase">${meal}</div>
-                    
-                    ${rE ? `
-                      <div class="dense-plan-slot">
-                        <span><strong style="color:var(--text2)">E:</strong> ${typeof ppEscapeHtml === 'function' ? ppEscapeHtml(rE.name) : rE.name} ${infoE.variant === 'enhanced' ? '<span style="font-size:10px;color:var(--action)">[Enh]</span>' : ''}</span>
-                        <button type="button" class="dense-plan-swap-btn" onclick="openSearchableRecipeSwapModal(${d}, '${slotKeyE}', false)">Swap ▾</button>
-                      </div>
-                    ` : ''}
-
-                    ${rC ? `
-                      <div class="dense-plan-slot" style="margin-top:4px">
-                        <span><strong style="color:var(--text2)">C:</strong> ${typeof ppEscapeHtml === 'function' ? ppEscapeHtml(rC.name) : rC.name} ${infoC.variant === 'enhanced' ? '<span style="font-size:10px;color:var(--action)">[Enh]</span>' : ''}</span>
-                        <button type="button" class="dense-plan-swap-btn" onclick="openSearchableRecipeSwapModal(${d}, '${slotKeyC}', false)">Swap ▾</button>
-                      </div>
-                    ` : ''}
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          </div>
-        `;
+        cardsHtml += window.PlannerDayCard?.renderDenseDayCard({
+          day: d,
+          dateLabel,
+          eCal,
+          eProt,
+          cCal,
+          cProt,
+          dayPreps,
+          mealsHtml
+        }) || '';
       }
 
-      html += `
+      stepContentHtml = `
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <h2 style="margin:0;font-size:18px;font-weight:700">Step 2: Review Generated Meal Plan</h2>
+              <div style="font-size:13px;color:var(--text2);margin-top:4px">Review daily macro fits and swap any meal directly inline.</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button type="button" class="btn ghost sm" onclick="setPlannerWizardStep(1)">← Edit Requests</button>
+              <button type="button" class="btn primary sm" style="font-weight:700" onclick="setPlannerWizardStep(3)">Proceed to Shopping List →</button>
+            </div>
           </div>
-          
+          <div class="dense-plan-grid">${cardsHtml}</div>
           <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
             <button type="button" class="btn ghost" onclick="setPlannerWizardStep(1)">← Back to Configure</button>
             <button type="button" class="btn primary" style="font-weight:700;padding:10px 24px" onclick="setPlannerWizardStep(3)">Proceed to Shopping List & Substitutions →</button>
@@ -311,7 +128,7 @@ export function renderPlannerWizard() {
     }
   } else if (currentStep === 3) {
     if (!hasActivePlan) {
-      html += `
+      stepContentHtml = window.GeneratorWizardModal?.renderWizardEmptyPlanCard?.(3) || `
         <div class="card" style="padding:24px;text-align:center">
           <h3>No Meal Plan Active</h3>
           <p style="color:var(--text2);font-size:13px;margin-bottom:14px">Generate a meal plan first before viewing the shopping list.</p>
@@ -322,59 +139,13 @@ export function renderPlannerWizard() {
       const agg = typeof computeWizardShoppingAgg === 'function' ? computeWizardShoppingAgg(window.state.plan) : { items: [], totalCost: 0 };
       const items = agg.items || [];
       const totalCost = agg.totalCost || 0;
-      const categories = {};
-      items.forEach(item => {
-        (categories[item.cat] = categories[item.cat] || []).push(item);
-      });
+      const topToolbarHtml = window.ShoppingBatchToolbar?.renderShoppingBatchToolbar?.({ totalCost, items }) || '';
+      const listHtml = window.ShoppingCategoryGroup?.renderShoppingCategoriesList?.(items) || '';
 
-      html += `
+      stepContentHtml = `
         <div style="display:flex;flex-direction:column;gap:16px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',sans-serif">
-          <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-            <div>
-              <h2 style="margin:0;font-size:18px;font-weight:700">Step 3: Shopping List &amp; Substitutions</h2>
-              <div style="font-size:13px;color:var(--text2);margin-top:4px">
-                Total Estimated Cost: <strong style="color:var(--action)">£${totalCost.toFixed(2)}</strong> (${items.filter(x => !x.isAtHome).length} items to buy)
-              </div>
-            </div>
-            <div style="display:flex;gap:8px">
-              <button type="button" class="btn ghost sm" onclick="setPlannerWizardStep(2)">← Back to Plan</button>
-              <button type="button" class="btn primary sm" style="font-weight:700" onclick="commitPlannerWizardPlan()">✓ Save Shopping List &amp; Commit Plan →</button>
-            </div>
-          </div>
-
-          <div style="display:flex;flex-direction:column;gap:14px">
-            ${Object.entries(categories).map(([cat, catItems]) => `
-              <div class="card" style="padding:16px;background:var(--surface,#fff)">
-                <div style="font-weight:750;font-size:14px;color:var(--text);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
-                  <span>${typeof ppEscapeHtml === 'function' ? ppEscapeHtml(cat) : cat}</span>
-                  <span style="font-size:12px;color:var(--text2)">${catItems.length} item${catItems.length>1?'s':''}</span>
-                </div>
-                <div style="display:flex;flex-direction:column;gap:1px;border-radius:10px;overflow:hidden;border:1px solid #E5E5EA">
-                  ${catItems.map(item => {
-                    const brandTitle = item.bankIng ? ((item.bankIng.brand ? item.bankIng.brand + ' - ' : '') + (item.bankIng.name || item.name)) : (item.name || 'Store product');
-                    return `
-                      <div class="shopping-list-row" style="display: flex; align-items: center; background: #FFFFFF; border-bottom: 1px solid #E5E5EA; padding: 12px 16px;">
-                        <input type="checkbox" class="acquired-checkbox" style="width: 24px; height: 24px; accent-color: #007AFF; margin-right: 12px; cursor: pointer; flex-shrink: 0;" ${item.isAtHome ? 'checked' : ''} onchange="toggleShoppingAtHome('${typeof ppEscapeAttr === 'function' ? ppEscapeAttr(item.key) : item.key}')" />
-                        ${item.bankIng?.photo ? `<img src="${item.bankIng.photo}" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover; margin-right: 12px; flex-shrink: 0;" alt="${typeof ppEscapeAttr === 'function' ? ppEscapeAttr(item.name) : item.name}" onerror="this.style.display='none'" />` : ''}
-                        <div class="title-block" style="flex: 1; display: flex; flex-direction: column; min-width: 0; padding-right: 12px;">
-                          <span class="primary-subtype" style="${item.isAtHome ? 'text-decoration: line-through; opacity: 0.6;' : 'font-weight: 600; color: #1C1C1E;'}; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${typeof ppEscapeHtml === 'function' ? ppEscapeHtml(item.name) : item.name}</span>
-                          <span class="secondary-brand-title" style="font-size: 13px; color: #8E8E93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">${typeof ppEscapeHtml === 'function' ? ppEscapeHtml(brandTitle) : brandTitle}</span>
-                        </div>
-                        <div class="qty-cost" style="text-align: right; font-size: 13px; color: var(--text2); flex-shrink: 0; margin-right: 14px;">
-                          <div style="font-weight: 500">${item.needUnit === 'item' ? `${item.needQty} item${item.needQty>1?'s':''}` : `${Math.round(item.grams)}g`}</div>
-                          ${item.bankIng && item.cost > 0 ? `<div style="font-weight: 600; color: var(--action); margin-top: 2px;">£${item.cost.toFixed(2)}</div>` : ''}
-                        </div>
-                        <div class="swap-dropdown" style="flex-shrink: 0;">
-                          <button type="button" class="btn sm ghost" style="font-size: 11px; padding: 4px 8px;" onclick="toggleInlineShoppingSubst('${typeof ppEscapeAttr === 'function' ? ppEscapeAttr(item.key) : item.key}', '${typeof ppEscapeAttr === 'function' ? ppEscapeAttr(item.groupId) : item.groupId}')">Swap Brand ▾</button>
-                        </div>
-                      </div>
-                    `;
-                  }).join('')}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-
+          ${topToolbarHtml}
+          ${listHtml}
           <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
             <button type="button" class="btn ghost" onclick="setPlannerWizardStep(2)">← Back to Review Plan</button>
             <button type="button" class="btn primary" style="font-weight:700;padding:10px 24px" onclick="commitPlannerWizardPlan()">✓ Save Shopping List &amp; Plan (Commit to Today) →</button>
@@ -383,17 +154,20 @@ export function renderPlannerWizard() {
       `;
     }
   } else if (currentStep === 4) {
-    html += `
+    stepContentHtml = window.GeneratorWizardModal?.renderWizardStep4Commit?.('v3.8.4') || `
       <div class="card" style="padding:28px;text-align:center">
-        <h2 style="margin-top:0">Committing Meal Plan v3.0.6...</h2>
+        <h2 style="margin-top:0">Committing Meal Plan v3.8.4...</h2>
         <p style="color:var(--text2);font-size:13px;margin-bottom:18px">Finalizing plan metadata, locking shopping quantities, and synchronizing with your live dashboard.</p>
         <button type="button" class="btn primary" onclick="commitPlannerWizardPlan()">Commit Plan Now</button>
       </div>
     `;
   }
 
-  html += `</div>`;
-  host.innerHTML = html;
+  host.innerHTML = window.GeneratorWizardModal?.renderPlannerWizardView?.({
+    currentStep,
+    hasActivePlan,
+    stepContentHtml
+  }) || `<div class="planner-wizard-container">${stepContentHtml}</div>`;
 }
 
 export function renderPlan() {
@@ -1046,7 +820,7 @@ export function renderPlanOverallSummary() {
 
 // Bind Global Aliases for Action Bridge and Legacy Compatibility
 if (typeof window !== 'undefined') {
-  console.log('[PlannerView v3.7.4] Initializing PlannerView & recipe modal aliases...');
+  console.log('[PlannerView v3.8.1] Initializing PlannerView & recipe modal aliases...');
   window.renderPlanner = renderPlanner;
   window.renderPlannerWizard = renderPlannerWizard;
   window.renderPlan = renderPlan;
@@ -1068,8 +842,30 @@ if (typeof window !== 'undefined') {
 
   window.openRecipeModal = function(id, instanceId, variant) {
     if (typeof window.viewRecipe === 'function') return window.viewRecipe(id, instanceId, variant);
-    console.warn('[PlannerView v3.7.4] viewRecipe not found on window');
+    console.warn('[PlannerView v3.8.1] viewRecipe not found on window');
   };
   window.showRecipeModal = window.openRecipeModal;
   window.openRecipeDetailModal = window.openRecipeModal;
+}
+
+import { subscribe, getState } from '../store/store.js';
+
+let plannerUnsub = null;
+
+export function mount(container) {
+  if (typeof renderPlanner === 'function') {
+    renderPlanner();
+  }
+  plannerUnsub = subscribe('plan', (plan) => {
+    if (typeof renderPlanner === 'function') {
+      renderPlanner();
+    }
+  });
+}
+
+export function unmount() {
+  if (typeof plannerUnsub === 'function') {
+    plannerUnsub();
+    plannerUnsub = null;
+  }
 }

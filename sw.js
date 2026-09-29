@@ -1,12 +1,12 @@
 /**
- * sw.js (v3.7.4)
+ * sw.js (v3.9.0)
  * Service Worker for PlatePlan PWA offline support & asset caching.
  * Caches core app shell, modern ES6 modules, stylesheets, and icons.
  */
 
-const PLATEPLAN_CACHE = 'plateplan-shell-v3.7.4';
-const PLATEPLAN_APP_VERSION = '3.7.4';
-const PLATEPLAN_BUILD_ID = '3.7.4-v100';
+const PLATEPLAN_CACHE = 'plateplan-shell-v3.12.2';
+const PLATEPLAN_APP_VERSION = '3.12.2';
+const PLATEPLAN_BUILD_ID = '3.12.2-v133';
 
 const PLATEPLAN_PRECACHE_ASSETS = [
   '/',
@@ -27,6 +27,69 @@ const PLATEPLAN_PRECACHE_ASSETS = [
   '/src/services/RecipeOcrService.js',
   '/src/services/NutritionService.js',
   '/src/services/FitScoreService.js',
+  '/src/services/DataQualityService.js',
+  '/src/services/TodayViewService.js',
+  '/src/services/RecipeAuthoringService.js',
+  '/src/components/analytics/MacroTrendChart.js',
+  '/src/components/analytics/NutriScoreBadgeCard.js',
+  '/src/components/analytics/WeeklySummaryToolbar.js',
+  '/src/components/prep/PrepStepCard.js',
+  '/src/components/prep/PrepContainerPlanner.js',
+  '/src/components/prep/PrepSummaryToolbar.js',
+  '/src/components/data-quality/DataQualityDrawer.js',
+  '/src/components/data-quality/DataQualityIssueRow.js',
+  '/src/components/data-quality/DataQualityFixModal.js',
+  '/src/components/recipe-editor/RecipeEditorModal.js',
+  '/src/components/recipe-editor/RecipeIngredientRow.js',
+  '/src/components/recipe-editor/RecipeStepRow.js',
+  '/src/components/recipe-editor/IngredientEditorRows.js',
+  '/src/components/recipe-editor/RecipeImportParserForm.js',
+  '/src/components/shopping/ShoppingBatchToolbar.js',
+  '/src/components/shopping/ShoppingCategoryGroup.js',
+  '/src/components/shopping/ShoppingItemRow.js',
+  '/src/components/shopping/ShoppingAisleGroup.js',
+  '/src/components/shopping/ShoppingListToolbar.js',
+  '/src/components/planner/PlannerDayCard.js',
+  '/src/components/planner/PlannerMealSlot.js',
+  '/src/components/planner/PlannerGridToolbar.js',
+  '/src/components/profile/ProfileMacroEditor.js',
+  '/src/components/profile/ProfilePreferencesForm.js',
+  '/src/components/profile/ProfileSettingsModal.js',
+  '/src/components/generator/GeneratorWizardModal.js',
+  '/src/components/generator/GeneratorConstraintsForm.js',
+  '/src/components/generator/GeneratorCandidateDrawer.js',
+  '/src/components/analytics/RecipeNutritionCard.js',
+  '/src/components/analytics/RecipePortionScaler.js',
+  '/src/components/analytics/RecipeCostBreakdown.js',
+  '/src/components/vault/VaultFilterToolbar.js',
+  '/src/components/vault/VaultRecipeCard.js',
+  '/src/components/vault/VaultGridContainer.js',
+  '/src/components/vault/VaultGridUI.js',
+  '/src/components/recipe/RecipeDetailModalUI.js',
+  '/src/components/recipe/RecipeEditorModalUI.js',
+  '/src/components/pantry/PantryItemRow.js',
+  '/src/components/pantry/PantryCategoryGroup.js',
+  '/src/components/pantry/PantryToolbar.js',
+  '/src/components/pantry/PantryInventoryUI.js',
+  '/src/components/shopping/ShoppingListUI.js',
+  '/src/components/shopping/ShoppingSubstUI.js',
+  '/src/components/pantry/UseUpEditorUI.js',
+  '/src/components/pantry/UseUpFinderModalUI.js',
+  '/src/components/planner/PlannerGridUI.js',
+  '/src/components/planner/PlannerModalsUI.js',
+  '/src/components/planner/PlannerWizardUI.js',
+  '/src/components/planner/PlannerSwapModalUI.js',
+  '/src/components/settings/SettingsMacroUI.js',
+  '/src/components/settings/SettingsExclusionsUI.js',
+  '/src/components/profile/SettingsHouseholdUI.js',
+  '/src/components/settings/DietaryExclusionManager.js',
+  '/src/components/settings/HouseholdSyncCard.js',
+  '/src/components/settings/ProfileAllocationCard.js',
+  '/src/utils/safeJson.js',
+  '/src/components/shell/HeaderUI.js',
+  '/src/components/shell/NavigationUI.js',
+  '/src/core/AppRouter.js',
+  '/src/core/AppInitializer.js',
   '/src/utils/unitConverter.js',
   '/src/services/ActionBridge.js',
   '/src/views/SettingsView.js',

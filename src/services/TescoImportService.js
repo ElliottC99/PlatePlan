@@ -1,5 +1,5 @@
 /**
- * src/services/TescoImportService.js (v3.7.4)
+ * src/services/TescoImportService.js (v3.8.1)
  * Isolated pure data parsing service for Tesco bookmarklet imports.
  * Quarantined from the DOM and direct database operations.
  */

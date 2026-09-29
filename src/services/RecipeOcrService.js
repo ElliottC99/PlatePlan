@@ -1,5 +1,5 @@
 /**
- * src/services/RecipeOcrService.js (v3.7.4)
+ * src/services/RecipeOcrService.js (v3.8.1)
  * Pure data parsing & image preprocessing service for Recipe OCR.
  * Quarantined from page DOM queries and direct database operations.
  */

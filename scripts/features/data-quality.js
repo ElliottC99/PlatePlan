@@ -108,7 +108,15 @@ export default createLegacyView({
           if (context && context.store && typeof context.store.save === 'function') {
             await context.store.save({ reason: 'data-quality-tesco-fix' });
           } else {
-            localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+            try {
+              if (typeof window.safeJsonStringify === 'function') {
+                localStorage.setItem('plateplan_v2', window.safeJsonStringify(window.state));
+              } else {
+                localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+              }
+            } catch (e) {
+              console.warn('Failed to save state in data-quality-fix', e);
+            }
             if (typeof window.renderAll === 'function') {
               window.renderAll();
             }

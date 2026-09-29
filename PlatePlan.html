@@ -12,6 +12,38 @@
 <title>PlatePlan — Elliott &amp; Chloe</title>
 <script>
 try{
+  if (typeof JSON !== 'undefined' && JSON.stringify && !JSON.stringify._isPlatePlanGuarded) {
+    const _origStringify = JSON.stringify;
+    const guardedStringify = function(value, replacer, space) {
+      try {
+        return _origStringify(value, replacer, space);
+      } catch (err) {
+        if (err instanceof TypeError && /circular|cyclic/i.test(err.message)) {
+          const seen = new WeakSet();
+          const safeReplacer = (k, v) => {
+            let current = typeof replacer === 'function' ? replacer(k, v) : v;
+            if (typeof current === 'object' && current !== null) {
+              if (k === 'src' || k === 'target' || k === 'view' || k === '_delegate' || k === 'firestore' || k === 'auth' || k === 'i') {
+                if (seen.has(current)) return undefined;
+              }
+              if (current.constructor && (current.constructor.name === 'un' || current.constructor.name === 'P')) return undefined;
+              if (seen.has(current)) return undefined;
+              seen.add(current);
+            }
+            return current;
+          };
+          try {
+            return _origStringify(value, safeReplacer, space);
+          } catch (_fallbackErr) {
+            return Array.isArray(value) ? '[]' : '{}';
+          }
+        }
+        throw err;
+      }
+    };
+    guardedStringify._isPlatePlanGuarded = true;
+    JSON.stringify = guardedStringify;
+  }
   const platePlanAppearance=localStorage.getItem('plateplan_appearance')||'system';
   if(platePlanAppearance==='light'||platePlanAppearance==='dark') document.documentElement.dataset.theme=platePlanAppearance;
   document.documentElement.style.colorScheme=platePlanAppearance==='system'?'light dark':platePlanAppearance;
@@ -39,7 +71,7 @@ try{
 <div class="app">
 
 <header class="app-header">
-  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span id="app-version" style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v3.7.4 (ES6 Modern)</span></div>
+  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span id="app-version" style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v3.12.2 (ES6 Modern)</span></div>
   <div class="app-header-actions">
     <button class="btn primary app-create-button" type="button" data-pp-click="openCreateActionSheet()" aria-label="Add to PlatePlan"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span class="app-create-label">Add</span></button>
     <button class="btn ghost app-menu-button" type="button" data-pp-click="openMobileMore()" aria-label="Open PlatePlan menu"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="19" cy="12" r="1.3"></circle></svg><span>Menu</span></button>
@@ -417,130 +449,7 @@ try{
     </div>
 </div>
 
-<div id="view-prefs" class="view">
-  <h2>Preferences</h2>
-  <div class="card grouped-section">
-    <h3>Appearance</h3>
-    <p style="font-size:14px;color:var(--text2);margin-bottom:10px">Use your device appearance automatically or choose a local override for this device.</p>
-    <div class="appearance-control" role="group" aria-label="PlatePlan appearance">
-      <button type="button" data-appearance="system" data-pp-click="setPlatePlanAppearance('system')">System</button>
-      <button type="button" data-appearance="light" data-pp-click="setPlatePlanAppearance('light')">Light</button>
-      <button type="button" data-appearance="dark" data-pp-click="setPlatePlanAppearance('dark')">Dark</button>
-    </div>
-  </div>
-  <div class="card grouped-section plateplan-update-settings">
-    <div class="row-between plateplan-update-settings-head">
-      <div>
-        <h3>Application updates</h3>
-        <p>PlatePlan updates seamlessly in the background.</p>
-      </div>
-      <button class="btn ghost" type="button" id="plateplan-check-update" data-pp-click="globalThis.PlatePlanModules?.updates.check({manual:true})">Check for updates</button>
-    </div>
-    <dl class="plateplan-update-meta">
-      <div><dt>Version</dt><dd id="plateplan-update-version">v3.7.4 (ES6 Modern)</dd></div>
-      <div><dt>Offline cache</dt><dd id="plateplan-update-cache">plateplan-shell-v87</dd></div>
-      <div><dt>Status</dt><dd id="plateplan-update-status" aria-live="polite">Up to date</dd></div>
-    </dl>
-  </div>
-  <div class="card">
-    <h3>Dietary constraints</h3>
-    <div class="field" style="display: none;"><label>Foods to always exclude</label><input type="text" id="pref-exclude" placeholder="mushrooms, courgette"></div><div class="field" id="pref-exclude-ui">
-    <label>Foods to always exclude</label>
-    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-      <select id="pref-exclude-scope" style="width:auto;font-size:12px">
-        <option value="shared">Both</option>
-        <option value="elliott">Elliott only</option>
-        <option value="chloe">Chloe only</option>
-      </select>
-      <div class="mapping-search-container" style="position:relative;flex:1;min-width:220px">
-        <input type="text" class="map-search-input" id="pref-exclude-search" autocomplete="off" placeholder="Search ingredients or products..." data-pp-input="handleExcludeSearch()" data-pp-focus="handleExcludeSearch()">
-        <div class="map-dropdown" id="pref-exclude-dropdown" style="display:none"></div>
-      </div>
-      <button class="btn sm ghost" data-pp-click="viewExclusions()">View list</button>
-    </div>
-    <div id="pref-exclude-preview" style="font-size:12px;color:var(--text2);margin-top:6px"></div>
-  </div>
-    <div class="field"><label>Diet type</label><select id="pref-diet"><option value="vegetarian">Vegetarian</option><option value="vegan">Vegan</option><option value="none">No restriction</option></select></div>
-    <div class="field">
-      <label>Default Product Auto-Mapping Strategy</label>
-      <select id="pref-auto-mapping-strategy">
-        <option value="protein_per_kcal">Protein per kcal (Default)</option>
-        <option value="protein_per_pound">Protein per £</option>
-        <option value="lowest_cost_per_g">Lowest £ per Gram</option>
-        <option value="lowest_cost_per_unit">Lowest £ per Unit / Portion</option>
-      </select>
-    </div>
-    <hr class="divider">
-    <h3>Nutritional Targets &amp; Meal Allocation</h3>
-    <div class="grid2" style="margin-top:10px">
-      <div class="prefs-person">
-        <div class="prefs-person-label">Elliott</div>
-        <label>Daily calories</label><input type="number" id="pref-ecal" style="margin-bottom:8px" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()">
-        <label>Daily protein (g)</label><input type="number" id="pref-eprot" style="margin-bottom:8px" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()">
-        <h4 style="margin-top:14px;font-size:11px;color:var(--text2)">CALORIE MEAL ALLOCATION (%)</h4>
-        <div class="grid2" style="margin-top:6px;gap:6px">
-          <div><label>Breakfast</label><input type="number" id="pref-eb" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()"></div>
-          <div><label>Lunch</label><input type="number" id="pref-el" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()"></div>
-          <div><label>Dinner</label><input type="number" id="pref-ed" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()"></div>
-          <div><label>Snacks</label><input type="number" id="pref-es" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()"></div>
-        </div>
-        <div id="eprot-alloc-wrap" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)">
-          <h4 style="font-size:11px;color:var(--text2)">PROTEIN MEAL ALLOCATION (%)</h4>
-          <div class="grid2" style="margin-top:6px;gap:6px">
-            <div><label>Breakfast P%</label><input type="number" id="pref-epb" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()"></div>
-            <div><label>Lunch P%</label><input type="number" id="pref-epl" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()"></div>
-            <div><label>Dinner P%</label><input type="number" id="pref-epd" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()"></div>
-            <div><label>Snacks P%</label><input type="number" id="pref-eps" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()"></div>
-          </div>
-        </div>
-        <div id="ebudget-text" style="font-size:11px;color:var(--text2);margin-top:8px;line-height:1.4">
-        <strong>Breakfast Budget:</strong> 440kcal / 26g P<br>
-        <strong>Lunch Budget:</strong> 550kcal / 33g P<br>
-        <strong>Dinner Budget:</strong> 880kcal / 52g P<br>
-        <strong>Snacks Budget:</strong> 330kcal / 20g P
-    </div>
-      </div>
-      <div class="prefs-person">
-        <div class="prefs-person-label">Chloe</div>
-        <label>Daily calories</label><input type="number" id="pref-ccal" style="margin-bottom:8px" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()">
-        <label>Daily protein (g)</label><input type="number" id="pref-cprot" style="margin-bottom:8px" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()">
-        <h4 style="margin-top:14px;font-size:11px;color:var(--text2)">CALORIE MEAL ALLOCATION (%)</h4>
-        <div class="grid2" style="margin-top:6px;gap:6px">
-          <div><label>Breakfast</label><input type="number" id="pref-cb" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()"></div>
-          <div><label>Lunch</label><input type="number" id="pref-cl" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()"></div>
-          <div><label>Dinner</label><input type="number" id="pref-cd" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()"></div>
-          <div><label>Snacks</label><input type="number" id="pref-cs" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()"></div>
-        </div>
-        <div id="cprot-alloc-wrap" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)">
-          <h4 style="font-size:11px;color:var(--text2)">PROTEIN MEAL ALLOCATION (%)</h4>
-          <div class="grid2" style="margin-top:6px;gap:6px">
-            <div><label>Breakfast P%</label><input type="number" id="pref-cpb" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()"></div>
-            <div><label>Lunch P%</label><input type="number" id="pref-cpl" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()"></div>
-            <div><label>Dinner P%</label><input type="number" id="pref-cpd" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()"></div>
-            <div><label>Snacks P%</label><input type="number" id="pref-cps" oninput="calcBudgets()" onchange="calcBudgets()" data-pp-input="calcBudgets()" data-pp-change="calcBudgets()"></div>
-          </div>
-        </div>
-        <div id="cbudget-text" style="font-size:11px;color:var(--text2);margin-top:8px;line-height:1.4">
-        <strong>Breakfast Budget:</strong> 240kcal / 15g P<br>
-        <strong>Lunch Budget:</strong> 400kcal / 25g P<br>
-        <strong>Dinner Budget:</strong> 640kcal / 40g P<br>
-        <strong>Snacks Budget:</strong> 320kcal / 20g P
-    </div>
-      </div>
-    </div>
-    <div id="alloc-warn" class="msg error" style="display: none; margin-top: 10px;">Percentages must total 100%.</div>
-    <hr class="divider">
-    <h3>Data backup and recovery</h3>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Use this before switching files or after doing lots of data fixes. It exports the live browser-saved PlatePlan data, not just the baked data inside the HTML file.</p>
-    <div class="btn-row">
-      <button class="btn sm ghost" data-pp-click="downloadPlatePlanDataBackup()">Export PlatePlan Data</button>
-      <label class="btn sm ghost" style="cursor:pointer">Import PlatePlan Data<input type="file" accept="application/json,.json" style="display:none" data-pp-change="importPlatePlanDataBackup(this)"></label>
-    </div>
-    <div id="prefs-data-msg"></div>
-    <div id="prefs-recovery-list" style="margin-top:12px"></div>
-    <div style="margin-top:14px"><button class="btn primary" id="btn-save-prefs" data-pp-click="savePrefs()">Save preferences</button><div id="prefs-msg"></div></div>
-  </div>
-</div>
+<div id="view-prefs" class="view"></div>
 
 </main>
 </div>

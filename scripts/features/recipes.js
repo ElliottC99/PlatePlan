@@ -18,7 +18,9 @@ export async function replaceRecipeIngredient(recipeId, ingredientIndex, newProd
   const target = variant.ingredients[ingredientIndex];
   
   // Clone the state for potential rollback
-  const previousStateStr = JSON.stringify(window.state);
+  const previousStateStr = typeof window.safeJsonStringify === 'function'
+    ? window.safeJsonStringify(window.state)
+    : '{}';
 
   // 1. Ensure the link action assigns the product ID to the recipe ingredient (ingredient.id = productId)
   target.id = newProductId;
@@ -31,7 +33,15 @@ export async function replaceRecipeIngredient(recipeId, ingredientIndex, newProd
   recipe.updatedAt = nowIso;
 
   // 3. Save state locally (localStorage.setItem('plateplan_v2', ...))
-  localStorage.setItem('plateplan_v2', JSON.stringify(window.state));
+  try {
+    if (typeof window.safeJsonStringify === 'function') {
+      localStorage.setItem('plateplan_v2', window.safeJsonStringify(window.state));
+    } else {
+      localStorage.setItem('plateplan_v2', previousStateStr);
+    }
+  } catch (e) {
+    console.warn('Failed to persist state locally', e);
+  }
 
   // 4. Synchronously force a UI re-render
   if (typeof window.rehydrateActiveRecipeAndStateCache === 'function') {

@@ -1,5 +1,5 @@
 /**
- * src/services/ActionBridge.js (v3.7.4)
+ * src/services/ActionBridge.js (v3.8.1)
  * Centralized Action Bridge & Event Dispatcher for Atomic Modular Architecture.
  * Idempotently handles delegated events, data-action parsing, shopping toggles, and modal routing.
  */
@@ -158,7 +158,7 @@ export function routeAction(actionName, target, event) {
 export function setupActionBridge() {
   if (typeof window === 'undefined') return;
   if (isBridgeInitialized || window.__plateplan_action_bridge_attached) {
-    console.log('[ActionBridge v3.7.4] Action bridge already registered. Skipping redundant attachment.');
+    console.log('[ActionBridge v3.8.1] Action bridge already registered. Skipping redundant attachment.');
     return;
   }
 

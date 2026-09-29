@@ -1,5 +1,5 @@
 /**
- * src/utils/unitConverter.js (v3.7.4)
+ * src/utils/unitConverter.js (v3.8.1)
  * Pure unit conversion matrices, culinary measurement helpers,
  * and ingredient text parsing regex engine.
  * Quarantined from page DOM queries and UI mutations.

@@ -1,5 +1,5 @@
 /**
- * src/main.js (v3.7.4)
+ * src/main.js (v3.8.9)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronization,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -17,14 +17,187 @@ import * as RecipeOcrService from './services/RecipeOcrService.js';
 import * as UnitConverter from './utils/unitConverter.js';
 import * as NutritionService from './services/NutritionService.js';
 import * as FitScoreService from './services/FitScoreService.js';
+import * as DataQualityService from './services/DataQualityService.js';
+import * as TodayViewService from './services/TodayViewService.js';
+import * as RecipeAuthoringService from './services/RecipeAuthoringService.js';
+import * as DataQualityDrawer from './components/data-quality/DataQualityDrawer.js';
+import * as DataQualityIssueRow from './components/data-quality/DataQualityIssueRow.js';
+import * as DataQualityFixModal from './components/data-quality/DataQualityFixModal.js';
+import * as RecipeEditorModal from './components/recipe-editor/RecipeEditorModal.js';
+import * as RecipeIngredientRow from './components/recipe-editor/RecipeIngredientRow.js';
+import * as RecipeStepRow from './components/recipe-editor/RecipeStepRow.js';
+import * as IngredientEditorRows from './components/recipe-editor/IngredientEditorRows.js';
+import * as RecipeImportParserForm from './components/recipe-editor/RecipeImportParserForm.js';
+import * as ShoppingBatchToolbar from './components/shopping/ShoppingBatchToolbar.js';
+import * as ShoppingCategoryGroup from './components/shopping/ShoppingCategoryGroup.js';
+import * as ShoppingItemRow from './components/shopping/ShoppingItemRow.js';
+import * as ShoppingAisleGroup from './components/shopping/ShoppingAisleGroup.js';
+import * as ShoppingListToolbar from './components/shopping/ShoppingListToolbar.js';
+import * as PlannerDayCard from './components/planner/PlannerDayCard.js';
+import * as PlannerMealSlot from './components/planner/PlannerMealSlot.js';
+import * as PlannerGridToolbar from './components/planner/PlannerGridToolbar.js';
+import * as ProfileMacroEditor from './components/profile/ProfileMacroEditor.js';
+import * as ProfilePreferencesForm from './components/profile/ProfilePreferencesForm.js';
+import * as ProfileSettingsModal from './components/profile/ProfileSettingsModal.js';
+import * as GeneratorWizardModal from './components/generator/GeneratorWizardModal.js';
+import * as GeneratorConstraintsForm from './components/generator/GeneratorConstraintsForm.js';
+import * as GeneratorCandidateDrawer from './components/generator/GeneratorCandidateDrawer.js';
+import * as RecipeNutritionCard from './components/analytics/RecipeNutritionCard.js';
+import * as RecipePortionScaler from './components/analytics/RecipePortionScaler.js';
+import * as RecipeCostBreakdown from './components/analytics/RecipeCostBreakdown.js';
+import * as MacroTrendChart from './components/analytics/MacroTrendChart.js';
+import * as NutriScoreBadgeCard from './components/analytics/NutriScoreBadgeCard.js';
+import * as WeeklySummaryToolbar from './components/analytics/WeeklySummaryToolbar.js';
+import * as VaultFilterToolbar from './components/vault/VaultFilterToolbar.js';
+import * as VaultRecipeCard from './components/vault/VaultRecipeCard.js';
+import * as VaultGridContainer from './components/vault/VaultGridContainer.js';
+import * as VaultGridUI from './components/vault/VaultGridUI.js';
+import * as RecipeDetailModalUI from './components/recipe/RecipeDetailModalUI.js';
+import * as RecipeEditorModalUI from './components/recipe/RecipeEditorModalUI.js';
+import * as PantryItemRow from './components/pantry/PantryItemRow.js';
+import * as PantryCategoryGroup from './components/pantry/PantryCategoryGroup.js';
+import * as PantryToolbar from './components/pantry/PantryToolbar.js';
+import * as PantryInventoryUI from './components/pantry/PantryInventoryUI.js';
+import * as ShoppingListUI from './components/shopping/ShoppingListUI.js';
+import * as ShoppingSubstUI from './components/shopping/ShoppingSubstUI.js';
+import * as UseUpEditorUI from './components/pantry/UseUpEditorUI.js';
+import * as UseUpFinderModalUI from './components/pantry/UseUpFinderModalUI.js';
+import * as PlannerGridUI from './components/planner/PlannerGridUI.js';
+import * as PlannerModalsUI from './components/planner/PlannerModalsUI.js';
+import * as PlannerWizardUI from './components/planner/PlannerWizardUI.js';
+import * as PlannerSwapModalUI from './components/planner/PlannerSwapModalUI.js';
+import * as PrepStepCard from './components/prep/PrepStepCard.js';
+import * as PrepContainerPlanner from './components/prep/PrepContainerPlanner.js';
+import * as PrepSummaryToolbar from './components/prep/PrepSummaryToolbar.js';
+import * as ProfileAllocationCard from './components/settings/ProfileAllocationCard.js';
+import * as DietaryExclusionManager from './components/settings/DietaryExclusionManager.js';
+import * as HouseholdSyncCard from './components/settings/HouseholdSyncCard.js';
+import * as SettingsMacroUI from './components/settings/SettingsMacroUI.js';
+import * as SettingsExclusionsUI from './components/settings/SettingsExclusionsUI.js';
+import * as SettingsHouseholdUI from './components/profile/SettingsHouseholdUI.js';
+import * as HeaderUI from './components/shell/HeaderUI.js';
+import * as NavigationUI from './components/shell/NavigationUI.js';
+import * as AppRouter from './core/AppRouter.js';
+import * as AppInitializer from './core/AppInitializer.js';
+import { safeClone, safeJsonStringify } from './utils/safeJson.js';
+
+// Global Sync Status State Machine
+let inSyncStatusTransition = false;
+export function setSyncStatus(status, detail = '') {
+  if (typeof window === 'undefined') return;
+  if (inSyncStatusTransition) return;
+  inSyncStatusTransition = true;
+  try {
+    if (typeof window.updatePlatePlanSyncStatus === 'function' && window.updatePlatePlanSyncStatus !== setSyncStatus) {
+      window.updatePlatePlanSyncStatus(status, detail);
+    }
+  } catch(e) {}
+
+  const el = document.getElementById('sync-status');
+  if (el) {
+    let label = '• Synced';
+    if (status === 'synced') label = '• Synced';
+    else if (status === 'saving') label = 'Saving…';
+    else if (status === 'offline') label = 'Offline';
+    else if (status === 'connecting') label = 'Connecting…';
+    else if (status === 'local' || status === 'local-only') label = 'Local only';
+    else if (status === 'error') label = 'Sync error';
+
+    el.dataset.status = status === 'synced' ? 'synced' : (status === 'offline' ? 'offline' : (status === 'connecting' ? 'connecting' : 'local'));
+    el.textContent = label;
+    if (detail) el.title = detail;
+  }
+  inSyncStatusTransition = false;
+}
 
 // Expose services globally for seamless classic script interop
 if (typeof window !== 'undefined') {
+  window.setSyncStatus = setSyncStatus;
+  window.updateSyncStatus = setSyncStatus;
   window.TescoImportService = TescoImportService;
   window.RecipeOcrService = RecipeOcrService;
   window.UnitConverter = UnitConverter;
   window.NutritionService = NutritionService;
   window.FitScoreService = FitScoreService;
+  window.DataQualityService = DataQualityService;
+  window.TodayViewService = TodayViewService;
+  window.RecipeAuthoringService = RecipeAuthoringService;
+  window.DataQualityDrawer = DataQualityDrawer;
+  window.DataQualityIssueRow = DataQualityIssueRow;
+  window.DataQualityFixModal = DataQualityFixModal;
+  window.RecipeEditorModal = RecipeEditorModal;
+  window.RecipeIngredientRow = RecipeIngredientRow;
+  window.RecipeStepRow = RecipeStepRow;
+  window.IngredientEditorRows = IngredientEditorRows;
+  window.RecipeImportParserForm = RecipeImportParserForm;
+  window.ShoppingBatchToolbar = ShoppingBatchToolbar;
+  window.ShoppingCategoryGroup = ShoppingCategoryGroup;
+  window.ShoppingItemRow = ShoppingItemRow;
+  window.ShoppingAisleGroup = ShoppingAisleGroup;
+  window.ShoppingListToolbar = ShoppingListToolbar;
+  window.PlannerDayCard = PlannerDayCard;
+  window.PlannerMealSlot = PlannerMealSlot;
+  window.PlannerGridToolbar = PlannerGridToolbar;
+  window.ProfileMacroEditor = ProfileMacroEditor;
+  window.ProfilePreferencesForm = ProfilePreferencesForm;
+  window.ProfileSettingsModal = ProfileSettingsModal;
+  window.GeneratorWizardModal = GeneratorWizardModal;
+  window.GeneratorConstraintsForm = GeneratorConstraintsForm;
+  window.GeneratorCandidateDrawer = GeneratorCandidateDrawer;
+  window.RecipeNutritionCard = RecipeNutritionCard;
+  window.RecipePortionScaler = RecipePortionScaler;
+  window.RecipeCostBreakdown = RecipeCostBreakdown;
+  window.MacroTrendChart = MacroTrendChart;
+  window.NutriScoreBadgeCard = NutriScoreBadgeCard;
+  window.WeeklySummaryToolbar = WeeklySummaryToolbar;
+  window.renderMacroTrendChart = MacroTrendChart.renderMacroTrendChart;
+  window.renderNutriScoreBadgeCard = NutriScoreBadgeCard.renderNutriScoreBadgeCard;
+  window.renderWeeklySummaryToolbar = WeeklySummaryToolbar.renderWeeklySummaryToolbar;
+  window.VaultFilterToolbar = VaultFilterToolbar;
+  window.VaultRecipeCard = VaultRecipeCard;
+  window.VaultGridContainer = VaultGridContainer;
+  window.VaultGridUI = VaultGridUI;
+  window.RecipeDetailModalUI = RecipeDetailModalUI;
+  window.RecipeEditorModalUI = RecipeEditorModalUI;
+  window.PantryItemRow = PantryItemRow;
+  window.PantryCategoryGroup = PantryCategoryGroup;
+  window.PantryToolbar = PantryToolbar;
+  window.PantryInventoryUI = PantryInventoryUI;
+  window.ShoppingListUI = ShoppingListUI;
+  window.ShoppingSubstUI = ShoppingSubstUI;
+  window.UseUpEditorUI = UseUpEditorUI;
+  window.UseUpFinderModalUI = UseUpFinderModalUI;
+  window.PlannerGridUI = PlannerGridUI;
+  window.PlannerModalsUI = PlannerModalsUI;
+  window.PlannerWizardUI = PlannerWizardUI;
+  window.PlannerSwapModalUI = PlannerSwapModalUI;
+  window.PrepStepCard = PrepStepCard;
+  window.PrepContainerPlanner = PrepContainerPlanner;
+  window.PrepSummaryToolbar = PrepSummaryToolbar;
+  window.renderPrepStepCard = PrepStepCard.renderPrepStepCard;
+  window.renderPrepContainerPlanner = PrepContainerPlanner.renderPrepContainerPlanner;
+  window.renderPrepSummaryToolbar = PrepSummaryToolbar.renderPrepSummaryToolbar;
+  window.ProfileAllocationCard = ProfileAllocationCard;
+  window.DietaryExclusionManager = DietaryExclusionManager;
+  window.HouseholdSyncCard = HouseholdSyncCard;
+  window.SettingsMacroUI = SettingsMacroUI;
+  window.SettingsExclusionsUI = SettingsExclusionsUI;
+  window.SettingsHouseholdUI = SettingsHouseholdUI;
+  window.HeaderUI = HeaderUI;
+  window.NavigationUI = NavigationUI;
+  window.AppRouter = AppRouter;
+  window.AppInitializer = AppInitializer;
+  window.showView = window.showView || AppRouter.showView;
+  window.syncMobileNavigation = window.syncMobileNavigation || AppRouter.syncMobileNavigation;
+  window.requestPlatePlanViewRender = window.requestPlatePlanViewRender || AppRouter.requestPlatePlanViewRender;
+  window.showPlatePlanToast = window.showPlatePlanToast || AppInitializer.showPlatePlanToast;
+  window.renderProfileAllocationCard = ProfileAllocationCard.renderProfileAllocationCard;
+  window.renderDietaryExclusionManager = DietaryExclusionManager.renderDietaryExclusionManager;
+  window.renderHouseholdSyncCard = HouseholdSyncCard.renderHouseholdSyncCard;
+  window.openSearchableRecipeSwapModal = PlannerMealSlot.openSearchableRecipeSwapModal;
+  window.closeSearchableRecipeSwapModal = PlannerMealSlot.closeSearchableRecipeSwapModal;
+  window.filterSearchableRecipeSwapModal = PlannerMealSlot.filterSearchableRecipeSwapModal;
+  window.selectAndSwapRecipe = PlannerMealSlot.selectAndSwapRecipe;
 }
 
 // 1. STRICT STATE INITIALIZATION & SANITIZATION
@@ -66,7 +239,7 @@ if (typeof window !== 'undefined') {
     if (typeof window.viewRecipe === 'function') {
       return window.viewRecipe(id, instanceId, variant, targetPerson);
     }
-    console.warn('[main.js v3.7.4] viewRecipe not found on window');
+    console.warn('[main.js v3.8.1] viewRecipe not found on window');
   };
   window.showRecipeModal = window.openRecipeModal;
   window.openRecipeDetailModal = window.openRecipeModal;
@@ -82,7 +255,7 @@ function reportAppError(message, type = 'error') {
   lastErrorMessage = message;
   lastErrorTime = now;
 
-  console.error(`[PlatePlan Error Telemetry v3.7.4]`, message);
+  console.error(`[PlatePlan Error Telemetry v3.12.2]`, message);
   if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
     window.showPlatePlanToast(message, type);
   }
@@ -91,20 +264,32 @@ function reportAppError(message, type = 'error') {
 if (typeof window !== 'undefined') {
   window.addEventListener('error', (event) => {
     if (event.message) {
+      if (/Converting circular structure to JSON/i.test(event.message)) {
+        console.warn('[PlatePlan Error Telemetry v3.9.4] Intercepted circular JSON error:', event.message);
+        return;
+      }
       reportAppError(`App Error: ${event.message}`);
     }
   });
 
   window.addEventListener('unhandledrejection', (event) => {
     const reason = event.reason?.message || event.reason || 'Network or asynchronous error';
-    reportAppError(`Async Error: ${reason}`);
+    const reasonStr = typeof reason === 'string' ? reason : (reason?.message || String(reason || ''));
+    if (/client is offline|Failed to get document because the client is offline|Could not reach Cloud Firestore backend|offline mode/i.test(reasonStr)) {
+      console.warn('[PlatePlan Offline Handler]', reasonStr);
+      setSyncStatus('offline', 'Offline mode');
+      return;
+    }
+    reportAppError(`Async Error: ${reasonStr}`);
   });
 
   window.addEventListener('offline', () => {
+    setSyncStatus('offline', 'Offline mode');
     reportAppError('Offline mode active. Using local cached data.', 'warning');
   });
 
   window.addEventListener('online', () => {
+    setSyncStatus('connecting', 'Restoring connection...');
     reportAppError('Online connection restored. Syncing with cloud...', 'success');
     hydrateHouseholdData();
   });
@@ -116,10 +301,10 @@ function registerServiceWorker() {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js')
         .then(reg => {
-          console.log('[SW v3.7.4] Service worker registered successfully with scope:', reg.scope);
+          console.log('[SW v3.9.4] Service worker registered successfully with scope:', reg.scope);
         })
         .catch(err => {
-          console.warn('[SW v3.7.4] Service worker registration failed:', err);
+          console.warn('[SW v3.9.4] Service worker registration failed:', err);
         });
     });
   }
@@ -147,13 +332,13 @@ function deepMutate(obj) {
 
 function sanitizeRecipes(recipes) {
   if (!Array.isArray(recipes)) return [];
-  return recipes.map(recipe => deepMutate(JSON.parse(JSON.stringify(recipe))));
+  return recipes.map(recipe => deepMutate(safeClone(recipe)));
 }
 
 export function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.7.4 (ES6 Modern)';
+    footerEl.textContent = 'v3.12.2 (ES6 Modern)';
   }
 }
 
@@ -202,11 +387,12 @@ async function initApp() {
   if (isAppInitialized) return;
   isAppInitialized = true;
 
-  console.log('[Modern Bridge v3.7.4] Initializing secure ES6 bridge & authenticating...');
+  console.log('[Modern Bridge v3.9.4] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupActionBridge();
   setupSubscriptions();
   registerServiceWorker();
+  AppInitializer.initPlatePlanApp();
   
   // Fast initial render from cached state if available
   if (window.state?.recipes?.length) {
@@ -216,8 +402,19 @@ async function initApp() {
     renderShoppingListUI();
   }
 
-  await waitForAuth();
-  await hydrateHouseholdData();
+  setSyncStatus('connecting', 'Connecting to Cloud...');
+  try {
+    const user = await waitForAuth();
+    const hydrationRes = await hydrateHouseholdData();
+    if (hydrationRes && hydrationRes.success) {
+      setSyncStatus(navigator.onLine ? 'synced' : 'offline', navigator.onLine ? 'Synced with Cloud' : 'Offline Mode');
+    } else {
+      setSyncStatus(navigator.onLine ? 'synced' : 'offline', 'Local Cache Active');
+    }
+  } catch (err) {
+    console.warn('[initApp] Auth or Hydration fallback:', err);
+    setSyncStatus(navigator.onLine ? 'synced' : 'offline', 'Local Cache Active');
+  }
 }
 
 initApp();
