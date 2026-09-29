@@ -142,12 +142,42 @@ export function calculateShoppingItemCost(item, bankIng = null) {
   };
 }
 
+export function formatShoppingItemQuantity(item) {
+  if (!item) return '1x';
+  if (item.quantity && item.quantity !== '0g' && item.quantity !== '0' && item.quantity !== '0 g' && !item.quantity.startsWith('0')) {
+    return item.quantity;
+  }
+  const qty = Number(item.needQty ?? item.qty ?? item.count ?? 0);
+  const unit = String(item.needUnit ?? item.unit ?? '').toLowerCase().trim();
+  const grams = Number(item.grams ?? item.weight ?? 0);
+
+  if (['qty', 'item', 'count', 'piece', 'clove', 'cube', 'bulb', 'head', 'tin', 'can', 'pack', 'stalk', 'sprig', 'slice'].includes(unit) || !unit) {
+    if (qty > 0) {
+      const unitLabel = (unit === 'qty' || unit === 'item' || !unit) ? 'x' : ` ${unit}${qty > 1 ? 's' : ''}`;
+      return (unit === 'qty' || unit === 'item' || !unit) ? `${qty}x` : `${qty}${unitLabel}`;
+    }
+  }
+
+  if (grams > 0) {
+    return grams >= 1000 ? `${(grams / 1000).toFixed(1).replace(/\.0$/, '')}kg` : `${Math.round(grams)}g`;
+  }
+
+  if (qty > 0) {
+    if (['g', 'ml', 'kg', 'l'].includes(unit)) return `${qty}${unit}`;
+    return `${qty}x`;
+  }
+
+  return '1x';
+}
+
 if (typeof window !== 'undefined') {
   window.ShoppingCalculationService = {
     normalizeProductPackGrams,
     calculateShoppingItemCost,
-    getFallbackProductData
+    getFallbackProductData,
+    formatShoppingItemQuantity
   };
   window.calculateShoppingItemCost = calculateShoppingItemCost;
   window.normalizeProductPackGrams = normalizeProductPackGrams;
+  window.formatShoppingItemQuantity = formatShoppingItemQuantity;
 }

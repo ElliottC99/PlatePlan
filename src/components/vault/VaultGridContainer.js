@@ -10,6 +10,7 @@ import { renderVaultRecipeCard } from './VaultRecipeCard.js';
 export function renderVaultGridContainer({
   recipes = [],
   mealType = 'dinner',
+  activeProfile = 'everyone',
   isLoading = false,
   progressiveBtn = ''
 } = {}) {
@@ -31,7 +32,7 @@ export function renderVaultGridContainer({
     `;
   }
 
-  const cardsHtml = recipes.map(r => renderVaultRecipeCard(r, { mealType })).join('');
+  const cardsHtml = recipes.map(r => renderVaultRecipeCard(r, { mealType, activeProfile })).join('');
   return `
     <div class="vault-grid" style="display:flex;flex-direction:column;gap:12px">
       ${cardsHtml}

@@ -31,7 +31,7 @@ export function renderFinderWrap() {
         <h2 id="use-up-finder-title">Use up ingredients</h2>
         <p>Find eligible recipes that make the best use of your shared list.</p>
       </div>
-      <button class="btn ghost" type="button" onclick="closeUseUpRecipeFinder()">Close</button>
+      <button class="modal-close-btn" type="button" onclick="closeUseUpRecipeFinder()" aria-label="Close">&times;</button>
     </div>
     <div class="workspace-scroll">
       <div id="use-up-finder-controls"></div>
@@ -138,9 +138,9 @@ export function renderAssignModal(recipeName = '', planDays = 7, activeMeal = 'd
   }).join('');
 
   return `<div class="modal">
-    <div class="row-between">
+    <div class="row-between" style="align-items:center;">
       <h3 style="margin:0">Assign ${escapeHtml(recipeName)}</h3>
-      <button class="btn ghost" onclick="closeUseUpAssign()">Close</button>
+      <button class="modal-close-btn" type="button" onclick="closeUseUpAssign()" aria-label="Close">&times;</button>
     </div>
     <div class="grid2" style="margin-top:14px">
       <label>Day<select id="use-up-assign-day">${dayOptions}</select></label>

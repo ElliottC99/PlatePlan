@@ -1,7 +1,9 @@
 /**
- * src/components/recipe/RecipeDetailModalUI.js (v3.9.6)
+ * src/components/recipe/RecipeDetailModalUI.js (v3.16.1)
  * Modular Presentation Component for Recipe Detail & Scaling Preview Modal
  */
+
+import { renderFitScoreBadge } from '../FitScoreBadge.js';
 
 function escapeHtml(str) {
   if (typeof window !== 'undefined' && window.ppEscapeHtml) {
@@ -46,6 +48,11 @@ export function renderRecipeDetailModalContent({
   const name = escapeHtml(activeR.name || r.name || 'Untitled Recipe');
   const favBtnClass = isFav ? 'active' : '';
 
+  const fitScoreBadgeHtml = renderFitScoreBadge(activeR || r, mealType || 'dinner', {
+    activeProfile: servingMode || 'everyone',
+    variant: variantKey
+  });
+
   return `
     <div class="recipe-view-sheet">
       <div class="recipe-view-nav">
@@ -59,6 +66,7 @@ export function renderRecipeDetailModalContent({
             <span>·</span>
             <span>Serves ${activeR.serves || 1} baseline</span>
             ${instanceId ? '<span class="tag" style="background:var(--purple-bg);color:var(--purple);font-size:11px">Planned Meal</span>' : ''}
+            ${fitScoreBadgeHtml}
           </div>
         </div>
         <div class="recipe-view-nav-actions" style="display:flex;align-items:center;gap:8px">
@@ -67,7 +75,7 @@ export function renderRecipeDetailModalContent({
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
             </svg>
           </button>
-          <button type="button" class="recipe-view-close-btn" onclick="closeRecipePreview()" aria-label="Close recipe">✕</button>
+          <button type="button" class="modal-close-btn recipe-view-close-btn" onclick="closeRecipePreview()" aria-label="Close">&times;</button>
         </div>
       </div>
       <div class="recipe-view-body">

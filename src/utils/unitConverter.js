@@ -20,15 +20,32 @@ export const UNIT_TO_GRAMS = {
   bunch: 20, bunches: 20,
   pinch: 1, dash: 1,
   slice: 30, slices: 30, piece: 100, pieces: 100, stalk: 50, stalks: 50,
-  sprig: 2, sprigs: 2, leaf: 1, leaves: 2
+  sprig: 2, sprigs: 2, leaf: 1, leaves: 2,
+  cube: 10, cubes: 10, pod: 5, pods: 5
 };
 
-export function toGrams(qty, unit, itemWeight = 100) {
-  const u = String(unit || '').toLowerCase().replace(/s$/, '');
-  if (u === 'qty' || u === 'clove' || u === 'head' || u === 'bulb') {
-    return Math.round(qty * (u === 'clove' ? 6 : (u === 'head' || u === 'bulb' ? 65 : itemWeight)));
+export const COMMON_DISCRETE_WEIGHTS = {
+  lime: 60, lemon: 90, cucumber: 350, onion: 150, shallot: 35,
+  garlic: 6, clove: 6, bulb: 65, head: 65, carrot: 100, potato: 180,
+  avocado: 170, egg: 60, tomato: 100, pepper: 160, chilli: 15,
+  apple: 150, banana: 120, mushroom: 30, stock: 10, cube: 10
+};
+
+export function inferIngredientWeightByName(name = '', fallback = 100) {
+  const text = String(name || '').toLowerCase();
+  for (const [kw, g] of Object.entries(COMMON_DISCRETE_WEIGHTS)) {
+    if (text.includes(kw)) return g;
   }
-  const factor = UNIT_TO_GRAMS[u] || itemWeight;
+  return fallback;
+}
+
+export function toGrams(qty, unit, itemWeight = 0, name = '') {
+  const u = String(unit || '').toLowerCase().replace(/s$/, '');
+  const baseWeight = itemWeight > 0 ? itemWeight : inferIngredientWeightByName(name, 100);
+  if (u === 'qty' || u === 'item' || u === 'count' || u === 'clove' || u === 'head' || u === 'bulb') {
+    return Math.round(qty * (u === 'clove' ? 6 : (u === 'head' || u === 'bulb' ? 65 : baseWeight)));
+  }
+  const factor = UNIT_TO_GRAMS[u] || baseWeight;
   return Math.round(qty * factor);
 }
 

@@ -1,10 +1,12 @@
 /**
- * src/components/vault/VaultRecipeCard.js (v3.8.6)
+ * src/components/vault/VaultRecipeCard.js (v3.16.1)
  * Modular UI component for Recipe Vault Card:
  * - Individual recipe card templates & layout
  * - Macro badges, fit score breakdown, and cooking time tags
  * - Action buttons for viewing, editing, duplication, and favoriting
  */
+
+import { renderFitScoreBadge } from '../FitScoreBadge.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -58,8 +60,13 @@ export function renderVaultRecipeCard(r, options = {}) {
       parts.push(`<button type="button" class="fit-detail-button" data-action="open-fit-details" data-recipe-id="${escapeAttr(r.id)}" data-variant="${useEnhanced ? 'enhanced' : 'original'}" data-person="c" onclick="openVaultFitDetails(this,'${escapeAttr(r.id)}','${useEnhanced ? 'enhanced' : 'original'}','c')">Chloe ${(fitC.label || '').split(' ')[0]} ${escapeHtml(portions.c || '')}</button>`);
     }
 
-    const { score, color, label } = typeof window.calculateMacroFitTierAndScore === 'function' ? window.calculateMacroFitTierAndScore({ recipe: r, variant: useEnhanced ? 'enhanced' : 'original', portions }, mealType) : { score: '80', color: '#10b981', label: 'Good' };
-    const fitTag = `<span class="tag" style="background-color:${color};color:#FFFFFF;border-color:${color};font-weight:600" title="${escapeAttr(label)}">Fit score ${score}${useEnhanced ? ' · enhanced' : ''}</span>`;
+    const fitTag = renderFitScoreBadge(r, mealType, {
+      activeProfile: options.activeProfile || (whoKey === 'elliott' || whoKey === 'e' ? 'elliott' : (whoKey === 'chloe' || whoKey === 'c' ? 'chloe' : 'everyone')),
+      variant: useEnhanced ? 'enhanced' : 'original',
+      portions,
+      portionScaled: true,
+      showLabel: true
+    });
     return { portions, html: `<div class="recipe-fit">${parts.join('')} ${fitTag}</div>` };
   };
 

@@ -1,9 +1,9 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.14.5';
+  window.APP_VERSION = 'v3.16.2';
 }
 
 /**
- * src/main.js (v3.14.5)
+ * src/main.js (v3.16.2)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronization,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -16,6 +16,9 @@ import { renderSettingsView } from './views/SettingsView.js';
 import { renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired, getShoppingLineStateKey } from './views/ShoppingView.js';
 import { renderPlanner } from './views/PlannerView.js';
 import { renderRecipeVault } from './views/RecipeVaultView.js';
+import { calculateMealFitScore } from './utils/fitScoreCalculator.js';
+import { renderFitScoreBadge } from './components/FitScoreBadge.js';
+import * as PortionCalculationService from './services/PortionCalculationService.js';
 import * as TescoImportService from './services/TescoImportService.js';
 import * as ShoppingCalculationService from './services/ShoppingCalculationService.js';
 import * as UnitConverter from './utils/unitConverter.js';
@@ -118,79 +121,34 @@ export function setSyncStatus(status, detail = '') {
 if (typeof window !== 'undefined') {
   window.setSyncStatus = setSyncStatus;
   window.updateSyncStatus = setSyncStatus;
-  window.TescoImportService = TescoImportService;
-  window.ShoppingCalculationService = ShoppingCalculationService;
-  window.UnitConverter = UnitConverter;
-  window.NutritionService = NutritionService;
-  window.FitScoreService = FitScoreService;
-  window.DataQualityService = DataQualityService;
-  window.TodayViewService = TodayViewService;
-  window.RecipeAuthoringService = RecipeAuthoringService;
-  window.DataQualityDrawer = DataQualityDrawer;
-  window.DataQualityIssueRow = DataQualityIssueRow;
-  window.DataQualityFixModal = DataQualityFixModal;
-  window.RecipeEditorModal = RecipeEditorModal;
-  window.RecipeIngredientRow = RecipeIngredientRow;
-  window.RecipeStepRow = RecipeStepRow;
-  window.IngredientEditorRows = IngredientEditorRows;
-  window.RecipeImportParserForm = RecipeImportParserForm;
-  window.ShoppingBatchToolbar = ShoppingBatchToolbar;
-  window.ShoppingCategoryGroup = ShoppingCategoryGroup;
-  window.ShoppingItemRow = ShoppingItemRow;
-  window.ShoppingAisleGroup = ShoppingAisleGroup;
-  window.ShoppingListToolbar = ShoppingListToolbar;
-  window.PlannerDayCard = PlannerDayCard;
-  window.PlannerMealSlot = PlannerMealSlot;
-  window.PlannerGridToolbar = PlannerGridToolbar;
-  window.ProfileMacroEditor = ProfileMacroEditor;
-  window.ProfilePreferencesForm = ProfilePreferencesForm;
-  window.ProfileSettingsModal = ProfileSettingsModal;
-  window.GeneratorWizardModal = GeneratorWizardModal;
-  window.GeneratorConstraintsForm = GeneratorConstraintsForm;
-  window.GeneratorCandidateDrawer = GeneratorCandidateDrawer;
-  window.RecipeNutritionCard = RecipeNutritionCard;
-  window.RecipePortionScaler = RecipePortionScaler;
-  window.RecipeCostBreakdown = RecipeCostBreakdown;
-  window.MacroTrendChart = MacroTrendChart;
-  window.NutriScoreBadgeCard = NutriScoreBadgeCard;
-  window.WeeklySummaryToolbar = WeeklySummaryToolbar;
+  window.calculateMealFitScore = calculateMealFitScore;
+  window.renderFitScoreBadge = renderFitScoreBadge;
+
+  Object.assign(window, {
+    PortionCalculationService, TescoImportService, ShoppingCalculationService, UnitConverter, NutritionService,
+    FitScoreService, DataQualityService, TodayViewService, RecipeAuthoringService,
+    DataQualityDrawer, DataQualityIssueRow, DataQualityFixModal, RecipeEditorModal,
+    RecipeIngredientRow, RecipeStepRow, IngredientEditorRows, RecipeImportParserForm,
+    ShoppingBatchToolbar, ShoppingCategoryGroup, ShoppingItemRow, ShoppingAisleGroup,
+    ShoppingListToolbar, PlannerDayCard, PlannerMealSlot, PlannerGridToolbar,
+    ProfileMacroEditor, ProfilePreferencesForm, ProfileSettingsModal, GeneratorWizardModal,
+    GeneratorConstraintsForm, GeneratorCandidateDrawer, RecipeNutritionCard, RecipePortionScaler,
+    RecipeCostBreakdown, MacroTrendChart, NutriScoreBadgeCard, WeeklySummaryToolbar,
+    VaultFilterToolbar, VaultRecipeCard, VaultGridContainer, VaultGridUI,
+    RecipeDetailModalUI, RecipeEditorModalUI, PantryItemRow, PantryCategoryGroup,
+    PantryToolbar, PantryInventoryUI, ShoppingListUI, ShoppingSubstUI, UseUpEditorUI,
+    UseUpFinderModalUI, PlannerGridUI, PlannerModalsUI, PlannerWizardUI, PlannerSwapModalUI,
+    PrepStepCard, PrepContainerPlanner, PrepSummaryToolbar, ProfileAllocationCard,
+    DietaryExclusionManager, HouseholdSyncCard, SettingsMacroUI, SettingsExclusionsUI,
+    SettingsHouseholdUI, HeaderUI, NavigationUI, AppRouter, AppInitializer
+  });
+
   window.renderMacroTrendChart = MacroTrendChart.renderMacroTrendChart;
   window.renderNutriScoreBadgeCard = NutriScoreBadgeCard.renderNutriScoreBadgeCard;
   window.renderWeeklySummaryToolbar = WeeklySummaryToolbar.renderWeeklySummaryToolbar;
-  window.VaultFilterToolbar = VaultFilterToolbar;
-  window.VaultRecipeCard = VaultRecipeCard;
-  window.VaultGridContainer = VaultGridContainer;
-  window.VaultGridUI = VaultGridUI;
-  window.RecipeDetailModalUI = RecipeDetailModalUI;
-  window.RecipeEditorModalUI = RecipeEditorModalUI;
-  window.PantryItemRow = PantryItemRow;
-  window.PantryCategoryGroup = PantryCategoryGroup;
-  window.PantryToolbar = PantryToolbar;
-  window.PantryInventoryUI = PantryInventoryUI;
-  window.ShoppingListUI = ShoppingListUI;
-  window.ShoppingSubstUI = ShoppingSubstUI;
-  window.UseUpEditorUI = UseUpEditorUI;
-  window.UseUpFinderModalUI = UseUpFinderModalUI;
-  window.PlannerGridUI = PlannerGridUI;
-  window.PlannerModalsUI = PlannerModalsUI;
-  window.PlannerWizardUI = PlannerWizardUI;
-  window.PlannerSwapModalUI = PlannerSwapModalUI;
-  window.PrepStepCard = PrepStepCard;
-  window.PrepContainerPlanner = PrepContainerPlanner;
-  window.PrepSummaryToolbar = PrepSummaryToolbar;
   window.renderPrepStepCard = PrepStepCard.renderPrepStepCard;
   window.renderPrepContainerPlanner = PrepContainerPlanner.renderPrepContainerPlanner;
   window.renderPrepSummaryToolbar = PrepSummaryToolbar.renderPrepSummaryToolbar;
-  window.ProfileAllocationCard = ProfileAllocationCard;
-  window.DietaryExclusionManager = DietaryExclusionManager;
-  window.HouseholdSyncCard = HouseholdSyncCard;
-  window.SettingsMacroUI = SettingsMacroUI;
-  window.SettingsExclusionsUI = SettingsExclusionsUI;
-  window.SettingsHouseholdUI = SettingsHouseholdUI;
-  window.HeaderUI = HeaderUI;
-  window.NavigationUI = NavigationUI;
-  window.AppRouter = AppRouter;
-  window.AppInitializer = AppInitializer;
   window.showView = window.showView || AppRouter.showView;
   window.syncMobileNavigation = window.syncMobileNavigation || AppRouter.syncMobileNavigation;
   window.requestPlatePlanViewRender = window.requestPlatePlanViewRender || AppRouter.requestPlatePlanViewRender;
@@ -210,7 +168,7 @@ if (typeof window !== 'undefined') {
 }
 
 // 2. EXPORTS & GLOBAL COMPATIBILITY ALIASES
-export { renderSettingsView, renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired, renderPlanner, renderRecipeVault, setupActionBridge, getShoppingLineStateKey };
+export { renderSettingsView, renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired, renderPlanner, renderRecipeVault, setupActionBridge, getShoppingLineStateKey, calculateMealFitScore, renderFitScoreBadge, PortionCalculationService };
 
 if (typeof window !== 'undefined') {
   window.getShoppingLineStateKey = getShoppingLineStateKey;
@@ -317,7 +275,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.14.5 (ES6 Modern)';
+    footerEl.textContent = 'v3.16.2 (ES6 Modern)';
   }
 }
 

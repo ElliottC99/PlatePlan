@@ -1,5 +1,5 @@
 /**
- * src/views/RecipeVaultView.js (v3.8.6)
+ * src/views/RecipeVaultView.js (v3.16.2)
  * Atomic Recipe Vault Component & Actions Module.
  * Decoupled from direct Firestore SDK, pure reactive Store interactions.
  * Features optimized DocumentFragment rendering and instant offline caching.
@@ -8,8 +8,9 @@ import { savePreferences } from '../services/HouseholdRepository.js';
 import { renderVaultRecipeCard } from '../components/vault/VaultRecipeCard.js';
 import { renderVaultGridContainer } from '../components/vault/VaultGridContainer.js';
 import * as VaultFilterToolbar from '../components/vault/VaultFilterToolbar.js';
+import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
 
-export { renderVaultRecipeCard, renderVaultGridContainer, VaultFilterToolbar };
+export { renderVaultRecipeCard, renderVaultGridContainer, VaultFilterToolbar, calculateMealFitScore };
 
 export function hasVariantFavoritingInitialized() {
   const prefs = window.state?.userPrefs || window.state?.prefs || {};
@@ -143,6 +144,9 @@ export function renderRecipeVault() {
   }
 
   ensureVariantFavoritingPrefs();
+  const fwNorm = String(fw || 'all').toLowerCase();
+  const activeProfile = (fwNorm === 'elliott' || fwNorm === 'chloe') ? fwNorm : 'everyone';
+
   const recipes = (window.state.recipes || []).filter(r => {
     const hasAnyFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
     if (isFavOnly && !hasAnyFav) return false;
@@ -154,11 +158,39 @@ export function renderRecipeVault() {
       ...(types || []),
       ...(r.ingredients || []).map(ing => (typeof window.ingRaw === 'function' ? window.ingRaw(ing) : String(ing)))
     ].join(' ').toLowerCase();
-    return (ft === 'all' || types.includes(ft)) && (fw === 'all' || r.who === fw) && (!q || searchable.includes(q));
+
+    const rWhoNorm = String(r.who || 'both').toLowerCase();
+    const matchesWho = fwNorm === 'all' || rWhoNorm === fwNorm || (fwNorm === 'both' && (rWhoNorm === 'both' || !r.who));
+
+    return (ft === 'all' || types.includes(ft)) && matchesWho && (!q || searchable.includes(q));
   });
 
   const selectedMealType = ft !== 'all' ? ft : 'dinner';
-  const sortedRecipes = typeof window.getSortedRecipes === 'function' ? window.getSortedRecipes(recipes, sort, selectedMealType) : recipes;
+  let sortedRecipes = recipes;
+
+  if (sort === 'fitScore' || sort === 'fit' || sort === 'best_fit') {
+    // Dynamic real-time calculation based on selected activeProfile and meal type
+    const scoreMap = new Map();
+    recipes.forEach(r => {
+      const res = calculateMealFitScore(r, selectedMealType, {
+        activeProfile,
+        portionScaled: true
+      });
+      scoreMap.set(r.id, res.score);
+      r._computedFitScore = res.score;
+      r._computedFitResult = res;
+    });
+
+    sortedRecipes = [...recipes].sort((a, b) => {
+      const aF = isRecipeVariantFavourite(a.id, 'original') || isRecipeVariantFavourite(a.id, 'enhanced') || a.isFavourite;
+      const bF = isRecipeVariantFavourite(b.id, 'original') || isRecipeVariantFavourite(b.id, 'enhanced') || b.isFavourite;
+      if (!!bF !== !!aF) return bF ? 1 : -1;
+      const diff = (scoreMap.get(b.id) ?? 0) - (scoreMap.get(a.id) ?? 0);
+      return diff || (a.name || '').localeCompare(b.name || '');
+    });
+  } else if (typeof window.getSortedRecipes === 'function') {
+    sortedRecipes = window.getSortedRecipes(recipes, sort, selectedMealType);
+  }
 
   if (!list) return;
   if (!sortedRecipes.length) {
@@ -175,7 +207,7 @@ export function renderRecipeVault() {
   const visibleRecipes = sortedRecipes.slice(0, limit);
   const progressiveBtn = typeof window.progressiveListButton === 'function' ? window.progressiveListButton('vault', totalRecipes, visibleRecipes.length) : '';
 
-  list.innerHTML = renderVaultGridContainer({ recipes: visibleRecipes, mealType: selectedMealType, progressiveBtn });
+  list.innerHTML = renderVaultGridContainer({ recipes: visibleRecipes, mealType: selectedMealType, activeProfile, progressiveBtn });
 }
 
 // Global Aliases Mount

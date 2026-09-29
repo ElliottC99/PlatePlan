@@ -1,9 +1,11 @@
 /**
- * src/views/PlannerView.js (v3.8.4)
+ * src/views/PlannerView.js (v3.16.1)
  * Componentized Weekly Planner, Wizard & Swap Modal View.
  */
 
 import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
+import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
+import { renderFitScoreBadge } from '../components/FitScoreBadge.js';
 
 export { getShoppingLineStateKey };
 
@@ -519,7 +521,13 @@ export function openSwapMealModal(day, slotKey) {
         ingredientsText = (info.recipe.ingredients || []).map(i => i.name || i.ingredient || '').join(' ');
         const bundle = typeof calculateRecipeDisplayNutrition === 'function' ? calculateRecipeDisplayNutrition({ recipe: info.recipe, variant: info.variant, mealType }) : null;
         const portions = bundle?.portions || null;
-        fitRes = typeof calculateMacroFitTierAndScore === 'function' ? calculateMacroFitTierAndScore({ recipe: info.recipe, variant: info.variant, portions }, mealType) : null;
+        const activeProf = isBoth ? 'everyone' : (personKey === 'c' ? 'chloe' : 'elliott');
+        fitRes = calculateMealFitScore(info.recipe, mealType, {
+          activeProfile: activeProf,
+          variant: info.variant,
+          portions,
+          portionScaled: true
+        });
         if (isBoth) {
           cal = Math.round(((portions?.eCal || 0) + (portions?.cCal || 0)) / 2);
           prot = typeof round1 === 'function' ? round1(((portions?.eProt || 0) + (portions?.cProt || 0)) / 2) : 0;
@@ -545,9 +553,11 @@ export function openSwapMealModal(day, slotKey) {
       prot: typeof round1 === 'function' ? round1(prot || 0) : prot,
       serves,
       ingredientsText,
+      fitRes,
       fitScore: fitRes?.score ?? 0,
-      fitColor: fitRes?.color ?? '#10B981',
-      fitLabel: fitRes?.label ?? 'Fit',
+      fitTier: fitRes?.tier ?? 'amber',
+      fitColor: fitRes?.tier === 'green' ? '#10B981' : (fitRes?.tier === 'red' ? '#EF4444' : '#F59E0B'),
+      fitLabel: fitRes?.tierLabel ?? 'Fit',
       searchHaystack: `${opt.label} ${opt.variant || ''} ${Math.round(cal || 0)}kcal ${typeof round1 === 'function' ? round1(prot || 0) : prot}g ${ingredientsText}`.toLowerCase()
     };
   });
@@ -752,7 +762,7 @@ export function renderSwapModalOptionsList() {
           <span>🔥 <strong>${item.cal}</strong> kcal</span>
           <span>💪 <strong>${item.prot}</strong>g protein</span>
           ${item.serves ? `<span>🍽️ Serves ${item.serves}</span>` : ''}
-          <span class="tag" style="background-color:${fitColor};color:#FFFFFF;border-color:${fitColor};font-weight:600">Fit score ${fitScoreVal}${isEnhancedFit ? ' · Enhanced' : ''}</span>
+          ${renderFitScoreBadge(item.fitRes || fitScoreVal, { showLabel: true })}
         </div>
       </div>
       <div style="flex-shrink:0;display:flex;align-items:center;gap:8px">
@@ -854,7 +864,14 @@ if (typeof window !== 'undefined') {
 import { subscribe, getState } from '../store/store.js';
 
 let plannerUnsub = null;
+let prefsUnsub = null;
 let plannerTimer = null;
+
+function handlePreferencesUpdated() {
+  if (typeof renderPlanner === 'function') {
+    renderPlanner();
+  }
+}
 
 export function mount(container) {
   if (typeof renderPlanner === 'function') {
@@ -865,6 +882,12 @@ export function mount(container) {
       renderPlanner();
     }
   });
+  prefsUnsub = subscribe('preferences', () => {
+    if (typeof renderPlanner === 'function') {
+      renderPlanner();
+    }
+  });
+  document.addEventListener('plateplan:state:preferences', handlePreferencesUpdated);
 }
 
 export function unmount() {
@@ -872,6 +895,11 @@ export function unmount() {
     plannerUnsub();
     plannerUnsub = null;
   }
+  if (typeof prefsUnsub === 'function') {
+    prefsUnsub();
+    prefsUnsub = null;
+  }
+  document.removeEventListener('plateplan:state:preferences', handlePreferencesUpdated);
   if (plannerTimer) {
     clearTimeout(plannerTimer);
     plannerTimer = null;

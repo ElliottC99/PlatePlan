@@ -181,9 +181,11 @@ export async function savePreferences(userPrefs, settings = {}) {
     const prefRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences');
     const rootRef = db.collection('households').doc(HOUSEHOLD_ID);
 
+    const profiles = userPrefs?.profiles || (typeof window !== 'undefined' && window.state?.preferences?.profiles) || {};
     const payload = {
       userPrefs: userPrefs || {},
       nutritionTargets: userPrefs?.nutritionTargets || {},
+      profiles,
       settings: settings || {},
       updatedAt: new Date().toISOString()
     };

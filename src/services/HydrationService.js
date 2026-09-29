@@ -6,6 +6,7 @@
 
 import { getRecipes, getIngredients, getPreferences, getCurrentPlan } from './HouseholdRepository.js';
 import { setRecipes, setIngredients, setPreferences, setCurrentPlan, saveStateCache } from '../store/store.js';
+import { calculateMealSplit } from '../utils/nutritionCalculator.js';
 
 let inFlightHydration = null;
 
@@ -48,42 +49,110 @@ export async function hydrateHouseholdData() {
           favourites: Array.isArray(userPrefs.favourites) ? userPrefs.favourites : (window.state.userPrefs?.favourites || [])
         };
 
-        // Map nutritionTargets from canonical Firestore docData and userPrefs
+        // Map user profile data from Firestore into state.preferences.profiles
+        const rawProfiles = docData.profiles || userPrefs.profiles || {};
         const docTargets = docData.nutritionTargets || userPrefs.nutritionTargets || {};
-        
-        const elliottDailyKcal = Number(docTargets.elliott?.dailyKcal || docTargets.elliott?.dailyCal || userPrefs.elliottCal || userPrefs.calE || userPrefs.eDailyKcal || 2200);
-        const elliottDailyProt = Number(docTargets.elliott?.dailyProtein || docTargets.elliott?.dailyProt || userPrefs.elliottProt || userPrefs.protE || userPrefs.eDailyProt || 140);
-        
-        const chloeDailyKcal = Number(docTargets.chloe?.dailyKcal || docTargets.chloe?.dailyCal || userPrefs.chloeCal || userPrefs.calC || userPrefs.cDailyKcal || 1800);
-        const chloeDailyProt = Number(docTargets.chloe?.dailyProtein || docTargets.chloe?.dailyProt || userPrefs.chloeProt || userPrefs.protC || userPrefs.cDailyProt || 110);
+        const docMealSplits = docData.mealSplits || userPrefs.mealSplits || {};
 
-        const nutritionTargets = {
-          elliott: {
-            dailyKcal: elliottDailyKcal,
-            dailyProtein: elliottDailyProt,
-            meals: docTargets.elliott?.meals || {
-              breakfast: { kcal: Math.round(elliottDailyKcal * 0.25), protein: Math.round(elliottDailyProt * 0.25) },
-              lunch: { kcal: Math.round(elliottDailyKcal * 0.30), protein: Math.round(elliottDailyProt * 0.30) },
-              dinner: { kcal: Math.round(elliottDailyKcal * 0.35), protein: Math.round(elliottDailyProt * 0.35) },
-              snacking: { kcal: Math.round(elliottDailyKcal * 0.10), protein: Math.round(elliottDailyProt * 0.10) }
+        const profileIds = Array.from(new Set([
+          ...Object.keys(rawProfiles),
+          ...Object.keys(docTargets),
+          'elliott',
+          'chloe'
+        ]));
+
+        const profiles = {};
+        for (const profileId of profileIds) {
+          const rawProf = rawProfiles[profileId] || {};
+          const rawTarget = docTargets[profileId] || {};
+          const legacyCal = profileId === 'elliott'
+            ? (userPrefs.elliottCal ?? userPrefs.calE ?? userPrefs.eDailyKcal)
+            : (userPrefs.chloeCal ?? userPrefs.calC ?? userPrefs.cDailyKcal);
+          const legacyProt = profileId === 'elliott'
+            ? (userPrefs.elliottProt ?? userPrefs.protE ?? userPrefs.eDailyProt)
+            : (userPrefs.chloeProt ?? userPrefs.protC ?? userPrefs.cDailyProt);
+
+          const dailyKcal = Number(rawProf.dailyKcal ?? rawTarget.dailyKcal ?? rawTarget.dailyCal ?? legacyCal ?? 0);
+          const dailyProtein = Number(rawProf.dailyProtein ?? rawTarget.dailyProtein ?? rawTarget.dailyProt ?? legacyProt ?? 0);
+
+          const pSplits = docMealSplits[profileId] || docMealSplits || {};
+          const calSplits = rawProf.calorieSplits || pSplits.calories || pSplits || {};
+          const protSplits = rawProf.proteinSplits || pSplits.protein || pSplits || {};
+
+          const extractMealSplit = (src, meal, targetVal, mealsObj) => {
+            if (src[meal] !== undefined && src[meal] !== null) return Number(src[meal]) || 0;
+            if (meal === 'snack' && src.snacking !== undefined) return Number(src.snacking) || 0;
+            if (meal === 'snacking' && src.snack !== undefined) return Number(src.snack) || 0;
+            const m = mealsObj?.[meal] || (meal === 'snack' ? mealsObj?.snacking : null);
+            const val = Number(m?.kcal ?? m?.protein ?? 0);
+            return (targetVal > 0 && val > 0) ? Math.round((val / targetVal) * 100) : 0;
+          };
+
+          const calBf = extractMealSplit(calSplits, 'breakfast', dailyKcal, rawTarget.meals);
+          const calLu = extractMealSplit(calSplits, 'lunch', dailyKcal, rawTarget.meals);
+          const calSn = extractMealSplit(calSplits, 'snack', dailyKcal, rawTarget.meals);
+          const calDi = calSplits.dinner !== undefined ? Number(calSplits.dinner) || 0 : Math.max(0, 100 - (calBf + calLu + calSn));
+
+          const protBf = extractMealSplit(protSplits, 'breakfast', dailyProtein, rawTarget.meals);
+          const protLu = extractMealSplit(protSplits, 'lunch', dailyProtein, rawTarget.meals);
+          const protSn = extractMealSplit(protSplits, 'snack', dailyProtein, rawTarget.meals);
+          const protDi = protSplits.dinner !== undefined ? Number(protSplits.dinner) || 0 : Math.max(0, 100 - (protBf + protLu + protSn));
+
+          profiles[profileId] = {
+            enabled: rawProf.enabled !== undefined ? Boolean(rawProf.enabled) : true,
+            name: rawProf.name || (profileId.charAt(0).toUpperCase() + profileId.slice(1)),
+            dailyKcal,
+            dailyProtein,
+            calorieSplits: {
+              breakfast: calBf,
+              lunch: calLu,
+              snack: calSn,
+              dinner: calDi
+            },
+            proteinSplits: {
+              breakfast: protBf,
+              lunch: protLu,
+              snack: protSn,
+              dinner: protDi
             }
-          },
-          chloe: {
-            dailyKcal: chloeDailyKcal,
-            dailyProtein: chloeDailyProt,
-            meals: docTargets.chloe?.meals || {
-              breakfast: { kcal: Math.round(chloeDailyKcal * 0.25), protein: Math.round(chloeDailyProt * 0.25) },
-              lunch: { kcal: Math.round(chloeDailyKcal * 0.30), protein: Math.round(chloeDailyProt * 0.30) },
-              dinner: { kcal: Math.round(chloeDailyKcal * 0.35), protein: Math.round(chloeDailyProt * 0.35) },
-              snacking: { kcal: Math.round(chloeDailyKcal * 0.10), protein: Math.round(chloeDailyProt * 0.10) }
+          };
+        }
+
+        window.state.preferences = window.state.preferences || {};
+        window.state.preferences.profiles = profiles;
+        window.state.userPrefs = window.state.userPrefs || {};
+        window.state.userPrefs.profiles = profiles;
+
+        // Bridge to nutritionTargets for existing reactive components
+        const nutritionTargets = {};
+        for (const [pId, pData] of Object.entries(profiles)) {
+          const bfKcal = Math.round((pData.calorieSplits.breakfast / 100) * pData.dailyKcal);
+          const luKcal = Math.round((pData.calorieSplits.lunch / 100) * pData.dailyKcal);
+          const snKcal = Math.round((pData.calorieSplits.snack / 100) * pData.dailyKcal);
+          const diKcal = Math.max(0, pData.dailyKcal - (bfKcal + luKcal + snKcal));
+
+          const bfProt = Math.round((pData.proteinSplits.breakfast / 100) * pData.dailyProtein);
+          const luProt = Math.round((pData.proteinSplits.lunch / 100) * pData.dailyProtein);
+          const snProt = Math.round((pData.proteinSplits.snack / 100) * pData.dailyProtein);
+          const diProt = Math.max(0, pData.dailyProtein - (bfProt + luProt + snProt));
+
+          nutritionTargets[pId] = {
+            dailyKcal: pData.dailyKcal,
+            dailyProtein: pData.dailyProtein,
+            meals: {
+              breakfast: { kcal: bfKcal, protein: bfProt },
+              lunch: { kcal: luKcal, protein: luProt },
+              dinner: { kcal: diKcal, protein: diProt },
+              snacking: { kcal: snKcal, protein: snProt }
             }
-          }
-        };
+          };
+        }
 
         window.state.userPrefs.nutritionTargets = nutritionTargets;
+        window.state.preferences.nutritionTargets = nutritionTargets;
         window.state.settings = docData.settings || window.state.settings || {};
 
-        console.log('[HydrationService] Core user data mapped to state.');
+        console.log('[HydrationService] Core user data and decoupled profiles mapped to state.');
       }
 
       saveStateCache();

@@ -10,11 +10,37 @@ import { renderProfileAllocationCard } from '../components/settings/ProfileAlloc
 import { renderDietaryExclusionManager } from '../components/settings/DietaryExclusionManager.js';
 import { renderHouseholdSyncCard } from '../components/settings/HouseholdSyncCard.js';
 import { renderSystemDisplayCard, renderSettingsContainer } from '../components/profile/ProfileSettingsModal.js';
+import { calculateMealSplit } from '../utils/nutritionCalculator.js';
+import { getProfileMealTargets } from '../models/StateModel.js';
 
 // Setup global helpers for Settings interactive elements
 if (typeof window !== 'undefined') {
   window.calcBudgets = function() {
-    console.info('[Settings] Calculating macro splits dynamically...');
+    ['elliott', 'chloe'].forEach(pId => {
+      const legacyPrefix = pId === 'elliott' ? 'e' : 'c';
+
+      // Dynamic Calorie splits & remainder
+      const calBf = Number(document.getElementById(`pp-profile-${pId}-cal-bf`)?.value ?? document.getElementById(`pp-macro-${legacyPrefix}-bf-cal`)?.value ?? 0);
+      const calLu = Number(document.getElementById(`pp-profile-${pId}-cal-lu`)?.value ?? document.getElementById(`pp-macro-${legacyPrefix}-lu-cal`)?.value ?? 0);
+      const calSn = Number(document.getElementById(`pp-profile-${pId}-cal-sn`)?.value ?? document.getElementById(`pp-macro-${legacyPrefix}-sn-cal`)?.value ?? 0);
+      const calDi = Math.max(0, 100 - (calBf + calLu + calSn));
+      
+      const calDiEl = document.getElementById(`pp-profile-${pId}-cal-di`) || document.getElementById(`pp-macro-${legacyPrefix}-di-cal`);
+      if (calDiEl) calDiEl.value = calDi;
+      const calSumEl = document.getElementById(`pp-profile-${pId}-cal-sum`);
+      if (calSumEl) calSumEl.textContent = `Sum: ${calBf + calLu + calSn + calDi}%`;
+
+      // Dynamic Protein splits & remainder
+      const protBf = Number(document.getElementById(`pp-profile-${pId}-prot-bf`)?.value ?? 0);
+      const protLu = Number(document.getElementById(`pp-profile-${pId}-prot-lu`)?.value ?? 0);
+      const protSn = Number(document.getElementById(`pp-profile-${pId}-prot-sn`)?.value ?? 0);
+      const protDi = Math.max(0, 100 - (protBf + protLu + protSn));
+
+      const protDiEl = document.getElementById(`pp-profile-${pId}-prot-di`);
+      if (protDiEl) protDiEl.value = protDi;
+      const protSumEl = document.getElementById(`pp-profile-${pId}-prot-sum`);
+      if (protSumEl) protSumEl.textContent = `Sum: ${protBf + protLu + protSn + protDi}%`;
+    });
   };
 
   window.handleAddExclusionFromInput = function() {
@@ -71,7 +97,7 @@ export function renderSettingsView() {
   const householdHtml = renderHouseholdSyncCard(settings);
   const dietaryHtml = renderDietaryExclusionManager(prefs, settings);
   const profileHtml = renderProfileAllocationCard(prefs);
-  const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.14.5 (ES6 Modern)');
+  const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.16.2 (ES6 Modern)');
 
   container.innerHTML = renderSettingsContainer(householdHtml, dietaryHtml, profileHtml, systemHtml);
 
@@ -88,75 +114,92 @@ export function renderSettingsView() {
       window.state.userPrefs.dairyFree = !!container.querySelector('#pp-setting-df')?.checked;
       window.state.userPrefs.nutFree = !!container.querySelector('#pp-setting-nutfree')?.checked;
 
-      const eDailyCal = Number(container.querySelector('#pp-macro-e-cal')?.value || 2200);
-      const eDailyProt = Number(container.querySelector('#pp-macro-e-prot')?.value || 140);
-      const cDailyCal = Number(container.querySelector('#pp-macro-c-cal')?.value || 1800);
-      const cDailyProt = Number(container.querySelector('#pp-macro-c-prot')?.value || 110);
+      const profiles = {};
+      ['elliott', 'chloe'].forEach(pId => {
+        const legacyPrefix = pId === 'elliott' ? 'e' : 'c';
+        const calInput = container.querySelector(`#pp-profile-${pId}-cal`) || container.querySelector(`#pp-macro-${legacyPrefix}-cal`);
+        const protInput = container.querySelector(`#pp-profile-${pId}-prot`) || container.querySelector(`#pp-macro-${legacyPrefix}-prot`);
+        
+        const dailyKcal = Number(calInput?.value || 0);
+        const dailyProtein = Number(protInput?.value || 0);
 
-      window.state.userPrefs.elliottCal = eDailyCal;
-      window.state.userPrefs.elliottProt = eDailyProt;
-      window.state.userPrefs.chloeCal = cDailyCal;
-      window.state.userPrefs.chloeProt = cDailyProt;
+        const calBf = Number(container.querySelector(`#pp-profile-${pId}-cal-bf`)?.value ?? container.querySelector(`#pp-macro-${legacyPrefix}-bf-cal`)?.value ?? 0);
+        const calLu = Number(container.querySelector(`#pp-profile-${pId}-cal-lu`)?.value ?? container.querySelector(`#pp-macro-${legacyPrefix}-lu-cal`)?.value ?? 0);
+        const calSn = Number(container.querySelector(`#pp-profile-${pId}-cal-sn`)?.value ?? container.querySelector(`#pp-macro-${legacyPrefix}-sn-cal`)?.value ?? 0);
+        const calDi = Math.max(0, 100 - (calBf + calLu + calSn));
 
-      window.state.userPrefs.nutritionTargets = {
-        elliott: {
-          dailyKcal: eDailyCal,
-          dailyProtein: eDailyProt,
+        const protBf = Number(container.querySelector(`#pp-profile-${pId}-prot-bf`)?.value ?? 0);
+        const protLu = Number(container.querySelector(`#pp-profile-${pId}-prot-lu`)?.value ?? 0);
+        const protSn = Number(container.querySelector(`#pp-profile-${pId}-prot-sn`)?.value ?? 0);
+        const protDi = Math.max(0, 100 - (protBf + protLu + protSn));
+
+        profiles[pId] = {
+          enabled: true,
+          name: pId.charAt(0).toUpperCase() + pId.slice(1),
+          dailyKcal,
+          dailyProtein,
+          calorieSplits: { breakfast: calBf, lunch: calLu, snack: calSn, dinner: calDi },
+          proteinSplits: { breakfast: protBf, lunch: protLu, snack: protSn, dinner: protDi }
+        };
+      });
+
+      window.state.preferences = window.state.preferences || {};
+      window.state.preferences.profiles = profiles;
+      window.state.userPrefs = window.state.userPrefs || {};
+      window.state.userPrefs.profiles = profiles;
+
+      // Legacy backwards-compatibility
+      window.state.userPrefs.elliottCal = profiles.elliott.dailyKcal;
+      window.state.userPrefs.elliottProt = profiles.elliott.dailyProtein;
+      window.state.userPrefs.chloeCal = profiles.chloe.dailyKcal;
+      window.state.userPrefs.chloeProt = profiles.chloe.dailyProtein;
+
+      const nutritionTargets = {};
+      for (const [pId, pData] of Object.entries(profiles)) {
+        const bfK = Math.round((pData.calorieSplits.breakfast / 100) * pData.dailyKcal);
+        const luK = Math.round((pData.calorieSplits.lunch / 100) * pData.dailyKcal);
+        const snK = Math.round((pData.calorieSplits.snack / 100) * pData.dailyKcal);
+        const diK = Math.max(0, pData.dailyKcal - (bfK + luK + snK));
+
+        const bfP = Math.round((pData.proteinSplits.breakfast / 100) * pData.dailyProtein);
+        const luP = Math.round((pData.proteinSplits.lunch / 100) * pData.dailyProtein);
+        const snP = Math.round((pData.proteinSplits.snack / 100) * pData.dailyProtein);
+        const diP = Math.max(0, pData.dailyProtein - (bfP + luP + snP));
+
+        nutritionTargets[pId] = {
+          dailyKcal: pData.dailyKcal,
+          dailyProtein: pData.dailyProtein,
           meals: {
-            breakfast: {
-              kcal: Math.round(eDailyCal * (Number(container.querySelector('#pp-macro-e-bf-cal')?.value || 25) / 100)),
-              protein: Math.round(eDailyProt * (Number(container.querySelector('#pp-macro-e-bf-cal')?.value || 25) / 100))
-            },
-            lunch: {
-              kcal: Math.round(eDailyCal * (Number(container.querySelector('#pp-macro-e-lu-cal')?.value || 30) / 100)),
-              protein: Math.round(eDailyProt * (Number(container.querySelector('#pp-macro-e-lu-cal')?.value || 30) / 100))
-            },
-            dinner: {
-              kcal: Math.round(eDailyCal * (Number(container.querySelector('#pp-macro-e-di-cal')?.value || 35) / 100)),
-              protein: Math.round(eDailyProt * (Number(container.querySelector('#pp-macro-e-di-cal')?.value || 35) / 100))
-            },
-            snacking: {
-              kcal: Math.round(eDailyCal * (Number(container.querySelector('#pp-macro-e-sn-cal')?.value || 10) / 100)),
-              protein: Math.round(eDailyProt * (Number(container.querySelector('#pp-macro-e-sn-cal')?.value || 10) / 100))
-            }
+            breakfast: { kcal: bfK, protein: bfP },
+            lunch: { kcal: luK, protein: luP },
+            dinner: { kcal: diK, protein: diP },
+            snacking: { kcal: snK, protein: snP }
           }
-        },
-        chloe: {
-          dailyKcal: cDailyCal,
-          dailyProtein: cDailyProt,
-          meals: {
-            breakfast: {
-              kcal: Math.round(cDailyCal * (Number(container.querySelector('#pp-macro-c-bf-cal')?.value || 25) / 100)),
-              protein: Math.round(cDailyProt * (Number(container.querySelector('#pp-macro-c-bf-cal')?.value || 25) / 100))
-            },
-            lunch: {
-              kcal: Math.round(cDailyCal * (Number(container.querySelector('#pp-macro-c-lu-cal')?.value || 30) / 100)),
-              protein: Math.round(cDailyProt * (Number(container.querySelector('#pp-macro-c-lu-cal')?.value || 30) / 100))
-            },
-            dinner: {
-              kcal: Math.round(cDailyCal * (Number(container.querySelector('#pp-macro-c-di-cal')?.value || 35) / 100)),
-              protein: Math.round(cDailyProt * (Number(container.querySelector('#pp-macro-c-di-cal')?.value || 35) / 100))
-            },
-            snacking: {
-              kcal: Math.round(cDailyCal * (Number(container.querySelector('#pp-macro-c-sn-cal')?.value || 10) / 100)),
-              protein: Math.round(cDailyProt * (Number(container.querySelector('#pp-macro-c-sn-cal')?.value || 10) / 100))
-            }
-          }
-        }
-      };
+        };
+      }
+
+      window.state.userPrefs.nutritionTargets = nutritionTargets;
+      window.state.preferences.nutritionTargets = nutritionTargets;
 
       window.state.settings = window.state.settings || {};
       const newTheme = container.querySelector('#pp-setting-theme')?.value || 'system';
       window.state.settings.theme = newTheme;
       applyTheme(newTheme);
 
-      console.log('[Settings v3.14.3] Saved user preferences to state:', window.state.userPrefs);
+      console.log('[Settings v3.16.0] Saved user profiles & decoupled splits to state:', window.state.userPrefs.profiles);
       
       // Persist to Firestore
       await savePreferences(window.state.userPrefs, window.state.settings);
 
-      // Dispatch CustomEvent
+      // Dispatch CustomEvent to notify PlannerView and all reactive listeners
       document.dispatchEvent(new CustomEvent('plateplan:state:preferences', { detail: window.state.userPrefs }));
+      document.dispatchEvent(new CustomEvent('plateplan:state-changed', { detail: { type: 'preferences', data: window.state.userPrefs } }));
+
+      if (typeof window.renderPlanner === 'function') {
+        try { window.renderPlanner(); } catch(_e) {}
+      } else if (typeof window.renderPlan === 'function') {
+        try { window.renderPlan(); } catch(_e) {}
+      }
 
       saveBtn.disabled = false;
       saveBtn.textContent = '✓ Preferences Saved';

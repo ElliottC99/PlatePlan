@@ -38,10 +38,10 @@ export function renderVaultFilterToolbar({
         </div>
       </div>
 
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <div style="display:flex;align-items:center;gap:6px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:nowrap;overflow-x:auto;">
+        <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto;white-space:nowrap;">
           <label style="font-size:11px;font-weight:700;color:var(--text2)">MEAL:</label>
-          <select id="filter-type" class="select" style="font-size:12px" onchange="renderVault()">
+          <select id="filter-type" class="select" style="font-size:12px;white-space:nowrap;" onchange="renderVault()">
             <option value="all" ${selectedType === 'all' ? 'selected' : ''}>All Meals</option>
             <option value="breakfast" ${selectedType === 'breakfast' ? 'selected' : ''}>Breakfast</option>
             <option value="lunch" ${selectedType === 'lunch' ? 'selected' : ''}>Lunch</option>
@@ -50,9 +50,9 @@ export function renderVaultFilterToolbar({
           </select>
         </div>
 
-        <div style="display:flex;align-items:center;gap:6px">
+        <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto;white-space:nowrap;">
           <label style="font-size:11px;font-weight:700;color:var(--text2)">WHO:</label>
-          <select id="filter-who" class="select" style="font-size:12px" onchange="renderVault()">
+          <select id="filter-who" class="select" style="font-size:12px;white-space:nowrap;" onchange="renderVault()">
             <option value="all" ${selectedWho === 'all' ? 'selected' : ''}>Everyone</option>
             <option value="elliott" ${selectedWho === 'elliott' ? 'selected' : ''}>Elliott</option>
             <option value="chloe" ${selectedWho === 'chloe' ? 'selected' : ''}>Chloe</option>
@@ -60,9 +60,10 @@ export function renderVaultFilterToolbar({
           </select>
         </div>
 
-        <div style="display:flex;align-items:center;gap:6px">
+        <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto;white-space:nowrap;">
           <label style="font-size:11px;font-weight:700;color:var(--text2)">SORT:</label>
-          <select id="vault-sort" class="select" style="font-size:12px" onchange="renderVault()">
+          <select id="vault-sort" class="select" style="font-size:12px;white-space:nowrap;" onchange="renderVault()">
+            <option value="fitScore" ${sortBy === 'fitScore' ? 'selected' : ''}>Sort: Fit Score (Best Alignment)</option>
             <option value="name" ${sortBy === 'name' ? 'selected' : ''}>Recipe Name (A-Z)</option>
             <option value="fit" ${sortBy === 'fit' ? 'selected' : ''}>Macro Fit Score</option>
             <option value="protein" ${sortBy === 'protein' ? 'selected' : ''}>Protein (High-Low)</option>

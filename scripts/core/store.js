@@ -214,24 +214,14 @@ export async function deletePlan(planId) {
     state.plans = (state.plans || []).filter(p => p && p.id !== planId && p.planId !== planId);
   }
 
-  // Persist state locally
-  try {
-    if (typeof window.safeJsonStringify === 'function') {
-      localStorage.setItem('plateplan_v2', window.safeJsonStringify(window.state));
-    } else {
-      const seen = new WeakSet();
-      const str = JSON.stringify(window.state, (k, v) => {
-        if (typeof v === 'object' && v !== null) {
-          if (seen.has(v)) return undefined;
-          seen.add(v);
-        }
-        return v;
-      });
-      localStorage.setItem('plateplan_v2', str);
-    }
-  } catch (e) {
-    console.warn('Failed to persist state locally', e);
+  // Persist state locally using safe modular cache
+  if (typeof window.saveStateCache === 'function') {
+    window.saveStateCache();
   }
+
+  // Dispatch modern custom events
+  document.dispatchEvent(new CustomEvent('plateplan:state:plan', { detail: {} }));
+  document.dispatchEvent(new CustomEvent('plateplan:state-changed', { detail: { type: 'plan', data: {} } }));
 
   // If the modular store exists, publish the update
   if (window.PlatePlanModules?.store) {

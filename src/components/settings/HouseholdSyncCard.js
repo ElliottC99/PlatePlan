@@ -58,7 +58,7 @@ export function renderHouseholdSyncCard(settings = {}) {
               </div>
               <span style="font-size:11px;font-weight:700;color:var(--text2)">${localStoragePct}%</span>
             </div>
-            <div style="font-size:10px;color:var(--text3);margin-top:2px">Indexed offline caches: plateplan-shell-v3.14.5</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px">Indexed offline caches: plateplan-shell-v3.16.2</div>
           </div>
 
           <div style="display:flex;gap:6px;margin-top:4px">

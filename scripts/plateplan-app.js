@@ -8978,6 +8978,9 @@ function renderRecipePreview(targetServes = 2) {
     if (!content) return;
     const variantKey = isEnh ? 'enhanced' : 'original';
     const isFav = (typeof window.isRecipeVariantFavourite === 'function' ? window.isRecipeVariantFavourite(r.id, variantKey) : (typeof isRecipeVariantFavourite === 'function' ? isRecipeVariantFavourite(r.id, variantKey) : false)) || ((r.isFavourite || r.isFavorite) && !isEnh);
+    const fitBadgeHtml = typeof window.renderFitScoreBadge === 'function'
+      ? window.renderFitScoreBadge(activeR || r, mealType || 'dinner', { activeProfile: currentPreviewServingMode || 'everyone', variant: variantKey })
+      : '';
     content.innerHTML = `
       <div class="recipe-view-sheet">
         <div class="recipe-view-nav">
@@ -8991,6 +8994,7 @@ function renderRecipePreview(targetServes = 2) {
               <span>·</span>
               <span>Serves ${activeR.serves || 1} baseline</span>
               ${currentPreviewInstanceId ? '<span class="tag" style="background:var(--purple-bg);color:var(--purple);font-size:11px">Planned Meal</span>' : ''}
+              ${fitBadgeHtml}
             </div>
           </div>
           <div class="recipe-view-nav-actions" style="display:flex;align-items:center;gap:8px">
@@ -8999,7 +9003,7 @@ function renderRecipePreview(targetServes = 2) {
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
               </svg>
             </button>
-            <button type="button" class="recipe-view-close-btn" onclick="closeRecipePreview()" aria-label="Close recipe">✕</button>
+            <button type="button" class="modal-close-btn recipe-view-close-btn" onclick="closeRecipePreview()" aria-label="Close">&times;</button>
           </div>
         </div>
         <div class="recipe-view-body">
@@ -9049,10 +9053,11 @@ function renderRecipePreview(targetServes = 2) {
                   const defaultProduct = typeof i === 'object' ? resolveProductForIngredient(i, {}).product : null;
                   const selectedProduct = resolved.product;
                   const productNote = renderIngredientMappingNote(i, resolved);
-                  const subBadge = (i.isSubstituted || (currentPreviewInstanceId && defaultProduct && selectedProduct && defaultProduct.id !== selectedProduct.id)) ? ` <span style="color:var(--purple);font-style:italic;font-size:11px;">(product changed)</span>` : '';
+                  const isSubbed = i.isSubstituted || (currentPreviewInstanceId && defaultProduct && selectedProduct && defaultProduct.id !== selectedProduct.id);
+                  const subBadge = isSubbed ? ` <span class="subst-badge" style="background:#e0e7ff;color:#3730a3;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:6px;border:1px solid #c7d2fe;display:inline-flex;align-items:center;gap:3px;">🔄 ${selectedProduct?.name ? ppEscapeHtml(selectedProduct.name) : 'Substituted'}</span>` : '';
                   const notCountedBadge = i.excludeNutrition ? ` <span class="tag">not counted</span>` : '';
                   const originalKey = typeof i === 'object' ? (getRecipeIngredientGroupId(i) || i.originalBankId || i.bankId) : '';
-                  const subAction = (currentPreviewInstanceId && originalKey) ? ` <button class="btn sm ghost" style="padding:0px 4px;font-size:10px;margin-left:6px;" onclick="openSubstituteModal('${currentPreviewInstanceId}', '${originalKey}')">Product</button>` : '';
+                  const subAction = (currentPreviewInstanceId && originalKey) ? ` <button class="btn sm ghost" style="padding:0px 4px;font-size:10px;margin-left:6px;" onclick="openSubstituteModal('${currentPreviewInstanceId}', '${originalKey}')">Swap</button>` : '';
                   const title = typeof i === 'object' ? ingredientContributionTitle(i, activeR, targetServes) : '';
                   return `<li style="${title?'cursor:help;':''}" title="${ppEscapeHtml(title)}">${ppEscapeHtml(text)}${notCountedBadge}${productNote}${subBadge}${subAction}</li>`;
                 })}
@@ -14540,6 +14545,11 @@ async function deletePlan(planId) {
     state.plan = {};
   }
   localStorage.removeItem('plateplan_plan_backup');
+  if (typeof window.saveStateCache === 'function') {
+    window.saveStateCache();
+  }
+  document.dispatchEvent(new CustomEvent('plateplan:state:plan', { detail: {} }));
+  document.dispatchEvent(new CustomEvent('plateplan:state-changed', { detail: { type: 'plan', data: {} } }));
   if (typeof renderPlanHistory === 'function') renderPlanHistory();
   if (typeof renderPlan === 'function') renderPlan();
   renderAll();
