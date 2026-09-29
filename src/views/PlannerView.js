@@ -820,7 +820,7 @@ export function renderPlanOverallSummary() {
 
 // Bind Global Aliases for Action Bridge and Legacy Compatibility
 if (typeof window !== 'undefined') {
-  console.log('[PlannerView v3.8.1] Initializing PlannerView & recipe modal aliases...');
+  console.log('[PlannerView] Initializing PlannerView & recipe modal aliases...');
   window.renderPlanner = renderPlanner;
   window.renderPlannerWizard = renderPlannerWizard;
   window.renderPlan = renderPlan;
@@ -842,7 +842,7 @@ if (typeof window !== 'undefined') {
 
   window.openRecipeModal = function(id, instanceId, variant) {
     if (typeof window.viewRecipe === 'function') return window.viewRecipe(id, instanceId, variant);
-    console.warn('[PlannerView v3.8.1] viewRecipe not found on window');
+    console.warn('[PlannerView] viewRecipe not found on window');
   };
   window.showRecipeModal = window.openRecipeModal;
   window.openRecipeDetailModal = window.openRecipeModal;

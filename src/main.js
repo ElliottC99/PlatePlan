@@ -281,20 +281,8 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// 4. SERVICE WORKER REGISTRATION FOR PWA OFFLINE CAPABILITY
-function registerServiceWorker() {
-  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(reg => {
-          console.log('[SW v3.9.4] Service worker registered successfully with scope:', reg.scope);
-        })
-        .catch(err => {
-          console.warn('[SW v3.9.4] Service worker registration failed:', err);
-        });
-    });
-  }
-}
+// 4. SERVICE WORKER REGISTRATION HANDLED BY AppInitializer
+// (Duplicate definition removed)
 
 // 5. SANITIZATION HELPERS
 function deepMutate(obj) {
@@ -324,7 +312,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.12.3 (ES6 Modern)';
+    footerEl.textContent = 'v3.13.0 (ES6 Modern)';
   }
 }
 
@@ -373,11 +361,11 @@ async function initApp() {
   if (isAppInitialized) return;
   isAppInitialized = true;
 
-  console.log('[Modern Bridge v3.9.4] Initializing secure ES6 bridge & authenticating...');
+  console.log('[PlatePlan Main] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupActionBridge();
   setupSubscriptions();
-  registerServiceWorker();
+  AppInitializer.registerServiceWorker();
   AppInitializer.initPlatePlanApp();
   
   // Fast initial render from cached state if available

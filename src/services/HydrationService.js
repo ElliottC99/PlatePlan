@@ -67,14 +67,14 @@ export async function hydrateHouseholdData() {
       window.state.userPrefs.nutritionTargets = nutritionTargets;
       window.state.settings = docData.settings || window.state.settings || {};
 
-      console.log('[HydrationService v3.8.1] Mapped userPrefs and nutritionTargets to window.state', window.state.userPrefs);
+      console.log('[HydrationService] Mapped userPrefs and nutritionTargets to window.state', window.state.userPrefs);
     }
 
     saveStateCache();
-    console.log('[HydrationService v3.8.1] Household data hydrated successfully into Store and persisted to local cache.');
+    console.log('[HydrationService] Household data hydrated successfully into Store and persisted to local cache.');
     return { success: true, timestamp: Date.now() };
   } catch (err) {
-    console.error('[HydrationService v3.8.1] Hydration failed:', err);
+    console.error('[HydrationService] Hydration failed:', err);
     return { success: false, error: err };
   }
 }

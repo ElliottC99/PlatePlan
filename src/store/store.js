@@ -47,8 +47,6 @@ export function saveStateCache() {
   saveTimer = setTimeout(() => {
     try {
       const payload = {
-        recipes: state.recipes,
-        ingredients: state.ingredients,
         preferences: state.preferences,
         userPrefs: state.userPrefs,
         settings: state.settings,
@@ -59,7 +57,7 @@ export function saveStateCache() {
       const serialized = safeJsonStringify(payload, null, '');
       if (serialized) localStorage.setItem(CACHE_KEY, serialized);
     } catch (e) {
-      console.warn('[Store v3.8.1] Failed to save state cache:', e);
+      console.warn('[Store] Failed to save state cache (Quota exceeded or restricted):', e);
     }
   }, 100);
 }
@@ -86,7 +84,7 @@ if (initialCache) {
   state.currentPlan = initialCache.currentPlan || null;
   state.shoppingList = Array.isArray(initialCache.shoppingList) ? initialCache.shoppingList : [];
   state.isCachedHydrated = true;
-  console.log('[Store v3.8.1] Instant offline state hydrated from local storage cache.');
+  console.log('[Store] Instant offline state hydrated from local storage cache.');
 }
 
 /**
