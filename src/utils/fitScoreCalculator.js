@@ -35,7 +35,23 @@ function evaluatePortionScaledProfileFit(recipe, profileId, kcalTarget, proteinT
   const scaledProtein = Math.round((perServing.protein * multiplier) * 10) / 10;
   const sanityPenalty = calculatePortionSanityPenalty(multiplier);
 
-  const proteinRatio = proteinTarget > 0 ? (scaledProtein / proteinTarget) : 1.0;
+  if (!proteinTarget || proteinTarget <= 0) {
+    return {
+      score: 0,
+      tier: 'red',
+      tierIcon: '⚪',
+      tierLabel: 'Awaiting Data',
+      multiplier,
+      scaledKcal,
+      scaledProtein,
+      sanityPenalty,
+      deltaKcal: 0,
+      proteinRatio: 0,
+      error: 'Missing Macro Targets'
+    };
+  }
+
+  const proteinRatio = scaledProtein / proteinTarget;
 
   // Base score from protein hit ratio
   let baseScore = 50;
@@ -130,8 +146,18 @@ function extractRecipeMacros(recipe, profileId, options = {}) {
  * @returns {{ score: number, tier: string, tierIcon: string, tierLabel: string, deltaKcal: number, proteinRatio: number }}
  */
 function evaluateProfileFit(recipeKcal, recipeProtein, kcalTarget, proteinTarget) {
-  const deltaKcal = kcalTarget > 0 ? (recipeKcal - kcalTarget) / kcalTarget : 0;
-  const proteinRatio = proteinTarget > 0 ? (recipeProtein / proteinTarget) : 1;
+  if (!kcalTarget || kcalTarget <= 0 || !proteinTarget || proteinTarget <= 0) {
+    return {
+      tier: 'red',
+      tierIcon: '⚪',
+      tierLabel: 'Awaiting Data',
+      score: 0,
+      error: 'Missing Macro Targets'
+    };
+  }
+
+  const deltaKcal = (recipeKcal - kcalTarget) / kcalTarget;
+  const proteinRatio = recipeProtein / proteinTarget;
 
   // 1. RED TIER (Score 0 - 39): Over calories OR severe protein deficit
   if (deltaKcal > 0.10 || (deltaKcal > 0.00 && proteinRatio < 0.90) || proteinRatio < 0.50) {
@@ -198,8 +224,8 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
       return {
         score: 0,
         tier: 'red',
-        tierIcon: '🔴',
-        tierLabel: 'Needs Work',
+        tierIcon: '⚪',
+        tierLabel: 'Awaiting Data',
         error: 'Missing Macro Targets',
         activeProfile,
         mealType: normMeal
@@ -220,6 +246,8 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
     eFit = evaluateProfileFit(eMacros.kcal, eMacros.protein, eTargets.kcal, eTargets.protein);
     cFit = evaluateProfileFit(cMacros.kcal, cMacros.protein, cTargets.kcal, cTargets.protein);
   }
+
+  const hasError = eFit.error || cFit.error;
 
   const details = {
     elliott: {
@@ -255,6 +283,18 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
     finalLabel = cFit.tierLabel;
   } else {
     // 50/50 Household Weighting
+    if (hasError) {
+      return {
+        score: 0,
+        tier: 'red',
+        tierIcon: '⚪',
+        tierLabel: 'Awaiting Data',
+        error: 'Missing Macro Targets',
+        activeProfile,
+        mealType: normMeal,
+        details
+      };
+    }
     finalScore = Math.round((0.5 * eFit.score) + (0.5 * cFit.score));
     if (finalScore >= 80) {
       finalTier = 'green';
@@ -282,7 +322,36 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
   };
 }
 
+/**
+ * Modern alias for calculateMealFitScore.
+ */
+export function calculateRecipeFit(recipe, mealType = 'dinner', options = {}) {
+  return calculateMealFitScore(recipe, mealType, options);
+}
+
+/**
+ * Resolves dynamic meal targets for both profiles.
+ * Strictly reads from StateModel/Preferences.
+ */
+export function getVaultTargetMacros(mealType = 'dinner', userPrefs = null) {
+  const mt = (mealType || 'dinner').toLowerCase();
+  const eTargets = getProfileMealTargets('elliott', mt, userPrefs?.profiles);
+  const cTargets = getProfileMealTargets('chloe', mt, userPrefs?.profiles);
+
+  return {
+    mealType: mt,
+    targetCal_E: eTargets.kcal,
+    targetProt_E: eTargets.protein,
+    targetCal_C: cTargets.kcal,
+    targetProt_C: cTargets.protein,
+    e: { cal: eTargets.kcal, prot: eTargets.protein },
+    c: { cal: cTargets.kcal, prot: cTargets.protein }
+  };
+}
+
 // Global browser registration
 if (typeof window !== 'undefined') {
   window.calculateMealFitScore = calculateMealFitScore;
+  window.calculateRecipeFit = calculateRecipeFit;
+  window.getVaultTargetMacros = getVaultTargetMacros;
 }

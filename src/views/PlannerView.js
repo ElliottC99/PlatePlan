@@ -543,6 +543,7 @@ export function openSwapMealModal(day, slotKey) {
     const isFav = (typeof isRecipeVariantFavourite === 'function' ? isRecipeVariantFavourite(opt.id, opt.variant || 'original') : false) || !!(rec?.isFavourite || rec?.isFavorite);
     return {
       id: opt.id,
+      recipe: rec,
       variant: opt.variant || 'original',
       value,
       label: opt.label || 'Untitled Recipe',
@@ -762,7 +763,7 @@ export function renderSwapModalOptionsList() {
           <span>🔥 <strong>${item.cal}</strong> kcal</span>
           <span>💪 <strong>${item.prot}</strong>g protein</span>
           ${item.serves ? `<span>🍽️ Serves ${item.serves}</span>` : ''}
-          ${renderFitScoreBadge(item.fitRes || fitScoreVal, { showLabel: true })}
+          ${renderFitScoreBadge(item.fitRes || item.recipe || item, targetSlot, { showLabel: true })}
         </div>
       </div>
       <div style="flex-shrink:0;display:flex;align-items:center;gap:8px">

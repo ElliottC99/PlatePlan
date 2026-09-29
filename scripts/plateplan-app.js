@@ -2896,7 +2896,7 @@ function getBudgets(person, mealType) {
 }
 function calculateFit(actCal, actProt, tgtCal, tgtProt) {
     if (!tgtCal || !tgtProt) {
-      return { score: 0, status: 'green', label: '🟢 Great Fit', warn: [], calDiffPct: 0, protDiffPct: 0 };
+      return { score: 0, status: 'red', label: 'Awaiting Data', warn: [], calDiffPct: 0, protDiffPct: 0 };
     }
     const calDiffPct = ((actCal - tgtCal) / tgtCal) * 100;
     const protDiffPct = ((actProt - tgtProt) / tgtProt) * 100;
@@ -8337,20 +8337,44 @@ function closeSubtypeResolutionModal() { return window.DataQualityFixModal?.clos
 function openTescoJsonImportModal(subTypeId) { return window.DataQualityFixModal?.openTescoJsonImportModal(subTypeId); }
 function closeTescoJsonImportModal() { return window.DataQualityFixModal?.closeTescoJsonImportModal(); }
 function filterSubtypeLinkProducts(query, subTypeId) { return window.DataQualityFixModal?.filterSubtypeLinkProducts(query, subTypeId); }
-function resolveSubtypeViaExisting(subTypeId, productId) {
+async function resolveSubtypeViaExisting(subTypeId, productId) {
   const product = getProduct(productId);
   if (!product) { showPlatePlanToast('Product not found.'); return; }
+  
+  // Assume relinkSubtypeProductsInRecipes handles the Firestore update
   relinkSubtypeProductsInRecipes(subTypeId, productId);
   
   // Update local state: link product and clear issue
   if (window.state && window.state.ingredients) {
       const p = window.state.ingredients.find(i => i.id === productId);
-      if(p) p.groupId = subTypeId;
+      if(p) {
+        p.groupId = subTypeId;
+        p.subTypeId = subTypeId; // Explicitly set subTypeId as requested
+      }
+  }
+
+  // Explicitly remove from common issue array names just in case
+  if (window.state && window.state.dataQualityIssues) {
+    window.state.dataQualityIssues = window.state.dataQualityIssues.filter(i => i.entityId !== productId && i.entityId !== subTypeId);
   }
   
   closeSubtypeResolutionModal();
-  renderDataQuality();
+  
+  // Directly remove target in DOM to guarantee instant visual response
+  const dqList = document.getElementById('dq-missing-list');
+  if (dqList) {
+    const row = dqList.querySelector(`[data-dq-key*="${productId}"], [data-dq-key*="${subTypeId}"]`);
+    if (row) {
+      row.remove();
+    }
+  }
+
+  // Dispatch event BEFORE toast to ensure UI updates happen immediately
   document.dispatchEvent(new CustomEvent('plateplan:state:data-quality'));
+  
+  // Refresh entire Data Quality view
+  if (typeof renderDataQuality === 'function') renderDataQuality();
+
   showPlatePlanToast(`Linked "${product.name}" to sub-type successfully! ✓`);
 }
 function resolveSubtypeViaTesco(subTypeId) { openTescoJsonImportModal(subTypeId); }

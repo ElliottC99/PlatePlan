@@ -1,9 +1,9 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.16.5';
+  window.APP_VERSION = 'v3.17.0';
 }
 
 /**
- * src/main.js (v3.16.5)
+ * src/main.js (v3.17.0)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronization,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -275,7 +275,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.16.5 (ES6 Modern)';
+    footerEl.textContent = 'v3.17.0 (ES6 Modern)';
   }
 }
 
@@ -331,18 +331,15 @@ async function initApp() {
   AppInitializer.registerServiceWorker();
   AppInitializer.initPlatePlanApp();
   
-  // Fast initial render from cached state if available
-  if (window.state?.recipes?.length) {
-    renderRecipeVault();
-  }
-  if (window.state?.ingredients?.length) {
-    renderShoppingListUI();
-  }
-
   setSyncStatus('connecting', 'Connecting to Cloud...');
   try {
     const user = await waitForAuth();
     const hydrationRes = await hydrateHouseholdData();
+    
+    // Perform initial render ONLY AFTER hydration is complete
+    renderRecipeVault();
+    renderShoppingListUI();
+    
     if (hydrationRes && hydrationRes.success) {
       setSyncStatus(navigator.onLine ? 'synced' : 'offline', navigator.onLine ? 'Synced with Cloud' : 'Offline Mode');
     } else {
@@ -350,6 +347,9 @@ async function initApp() {
     }
   } catch (err) {
     console.warn('[initApp] Auth or Hydration fallback:', err);
+    // Even if hydration fails, try to render with cached data
+    renderRecipeVault();
+    renderShoppingListUI();
     setSyncStatus(navigator.onLine ? 'synced' : 'offline', 'Local Cache Active');
   }
 }

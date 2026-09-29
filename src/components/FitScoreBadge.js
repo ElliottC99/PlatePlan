@@ -31,6 +31,13 @@ export function renderFitScoreBadge(fitScoreOrRecipe, mealTypeOrOptions = 'dinne
     fitResult = fitScoreOrRecipe;
   } else if (typeof fitScoreOrRecipe === 'number') {
     const score = Math.max(0, Math.min(100, Math.round(fitScoreOrRecipe)));
+    
+    // Safety: If targets are missing in global state, force neutral badge even if a number is passed
+    const profiles = window.state?.preferences?.profiles || window.state?.prefs?.profiles;
+    if (!profiles || Object.keys(profiles).length === 0) {
+       return `<span class="pp-fit-badge pp-fit-neutral" title="Awaiting Data">--</span>`;
+    }
+
     const tier = score >= 80 ? 'green' : (score >= 40 ? 'amber' : 'red');
     const tierIcon = score >= 80 ? '🟢' : (score >= 40 ? '🟡' : '🔴');
     const tierLabel = score >= 80 ? 'Ideal Fit' : (score >= 40 ? 'Moderate Fit' : 'Needs Work');
@@ -46,6 +53,11 @@ export function renderFitScoreBadge(fitScoreOrRecipe, mealTypeOrOptions = 'dinne
   }
 
   const { score, tier, tierIcon, tierLabel, details } = fitResult;
+
+  if (fitResult.error === 'Missing Macro Targets' || tierLabel === 'Awaiting Data' || (score === 0 && tier === 'red')) {
+    return `<span class="pp-fit-badge pp-fit-neutral" title="Awaiting Data">--</span>`;
+  }
+
   const options = (typeof mealTypeOrOptions === 'object' && !extraOptions.showLabel) ? mealTypeOrOptions : extraOptions;
 
   let title = `Fit Score: ${score}/100 (${tierLabel})`;

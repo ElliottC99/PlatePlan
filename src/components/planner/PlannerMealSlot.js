@@ -216,7 +216,7 @@ export function filterSearchableRecipeSwapModal(query = '') {
   candidates.forEach(r => {
     const cal = Math.round(r.cal || 0);
     const prot = Math.round(r.prot || 0);
-    let fitScorePercent = 85;
+    let fitScorePercent = 0;
     try {
       if (stateObj.plan?.slots?.[day] && window.getPlanDaySummary && window.makePlanSlot) {
         const simPlan = {
@@ -225,6 +225,12 @@ export function filterSearchableRecipeSwapModal(query = '') {
         };
         const summary = window.getPlanDaySummary(day, simPlan);
         fitScorePercent = Math.max(0, Math.min(100, Math.round(100 - (summary?.score || 0))));
+      } else {
+        // Fallback to recipe fit score if plan summary is unavailable
+        const mealType = window.getMealTypeFromSlotKey?.(slotKey) || 'dinner';
+        const person = isShared ? 'everyone' : (slotKey.endsWith('C') ? 'chloe' : 'elliott');
+        const res = window.calculateMealFitScore?.(r, mealType, { activeProfile: person, portionScaled: true }) || { score: 0 };
+        fitScorePercent = res.score;
       }
     } catch (_) {}
 
