@@ -71,7 +71,7 @@ export function renderSettingsView() {
   const householdHtml = renderHouseholdSyncCard(settings);
   const dietaryHtml = renderDietaryExclusionManager(prefs, settings);
   const profileHtml = renderProfileAllocationCard(prefs);
-  const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.14.2 (ES6 Modern)');
+  const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.14.4 (ES6 Modern)');
 
   container.innerHTML = renderSettingsContainer(householdHtml, dietaryHtml, profileHtml, systemHtml);
 
@@ -146,9 +146,11 @@ export function renderSettingsView() {
       };
 
       window.state.settings = window.state.settings || {};
-      window.state.settings.theme = container.querySelector('#pp-setting-theme')?.value || 'system';
+      const newTheme = container.querySelector('#pp-setting-theme')?.value || 'system';
+      window.state.settings.theme = newTheme;
+      applyTheme(newTheme);
 
-      console.log('[Settings v3.9.4] Saved user preferences to state:', window.state.userPrefs);
+      console.log('[Settings v3.14.3] Saved user preferences to state:', window.state.userPrefs);
       
       // Persist to Firestore
       await savePreferences(window.state.userPrefs, window.state.settings);
@@ -166,14 +168,41 @@ export function renderSettingsView() {
     };
   }
 
+  // Attach immediate theme change listener
+  const themeSelect = container.querySelector('#pp-setting-theme');
+  if (themeSelect) {
+    themeSelect.onchange = (e) => {
+      const selectedTheme = e.target.value || 'system';
+      applyTheme(selectedTheme);
+      window.state.settings = window.state.settings || {};
+      window.state.settings.theme = selectedTheme;
+    };
+  }
+
   // Attach Refresh Data listener
   const refreshBtn = container.querySelector('#pp-refresh-data-btn');
   if (refreshBtn) {
     refreshBtn.onclick = () => {
-      console.log('[Settings v3.9.4] Triggering household data refresh...');
+      console.log('[Settings v3.14.3] Triggering household data refresh...');
       hydrateHouseholdData();
     };
   }
+}
+
+export function applyTheme(theme = 'system') {
+  if (typeof document === 'undefined') return;
+  if (theme === 'system') {
+    delete document.documentElement.dataset.theme;
+    document.documentElement.classList.remove('theme-dark', 'theme-light');
+  } else {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.classList.remove('theme-dark', 'theme-light');
+    document.documentElement.classList.add(`theme-${theme}`);
+  }
+  try {
+    localStorage.setItem('plateplan-appearance', theme);
+    localStorage.setItem('plateplan-theme', theme);
+  } catch (_e) {}
 }
 
 import { subscribe } from '../store/store.js';

@@ -214,24 +214,42 @@ export async function getCurrentPlan() {
   }
 }
 
+let pendingPlanPayload = null;
+let planDebounceTimer = null;
+let planResolveQueue = [];
+
 /**
- * Persist current meal plan document to Firestore.
+ * Persist current meal plan document to Firestore with 600ms debounce queue.
  */
 export async function saveCurrentPlan(plan) {
-  try {
-    if (!isDbAvailable()) return false;
-    if (!plan || typeof plan !== 'object') return false;
+  if (!plan || typeof plan !== 'object') return false;
+  pendingPlanPayload = {
+    ...plan,
+    updatedAt: new Date().toISOString()
+  };
 
-    const payload = {
-      ...plan,
-      updatedAt: new Date().toISOString()
-    };
+  return new Promise((resolve) => {
+    planResolveQueue.push(resolve);
+    if (planDebounceTimer) clearTimeout(planDebounceTimer);
 
-    await db.collection('households').doc(HOUSEHOLD_ID).collection('plans').doc('current').set(payload, { merge: true });
-    return true;
-  } catch (err) {
-    console.warn('[HouseholdRepository v3.8.3] Unable to save current plan to cloud (offline):', err.message || err);
-    return false;
-  }
+    planDebounceTimer = setTimeout(async () => {
+      planDebounceTimer = null;
+      const payload = pendingPlanPayload;
+      const resolvers = [...planResolveQueue];
+      planResolveQueue = [];
+
+      try {
+        if (!isDbAvailable()) {
+          resolvers.forEach(res => res(false));
+          return;
+        }
+        await db.collection('households').doc(HOUSEHOLD_ID).collection('plans').doc('current').set(payload, { merge: true });
+        resolvers.forEach(res => res(true));
+      } catch (err) {
+        console.warn('[HouseholdRepository v3.14.3] Unable to save current plan to cloud (offline):', err.message || err);
+        resolvers.forEach(res => res(false));
+      }
+    }, 600);
+  });
 }
 

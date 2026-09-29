@@ -6,10 +6,10 @@
  */
 
 export const FIT_SCORE_TIERS = {
-  IDEAL: { min: 85, tier: 'green', label: 'Ideal Fit', color: '#10B981', colors: 'background-color:#10B981;color:#FFFFFF;' },
-  ACCEPTABLE: { min: 65, tier: 'amber-green', label: 'Acceptable Fit', color: '#84CC16', colors: 'background-color:#84CC16;color:#FFFFFF;' },
-  SUBOPTIMAL: { min: 40, tier: 'amber-red', label: 'Suboptimal Fit', color: '#F59E0B', colors: 'background-color:#F59E0B;color:#FFFFFF;' },
-  POOR: { min: 0, tier: 'red', label: 'Poor Fit', color: '#EF4444', colors: 'background-color:#EF4444;color:#FFFFFF;' }
+  IDEAL: { min: 80, tier: 'green', label: 'Ideal Fit', color: '#16a34a', bg: '#dcfce7', colors: 'background-color:#dcfce7;color:#15803d;border:1px solid #bbf7d0;' },
+  ACCEPTABLE: { min: 60, tier: 'amber-green', label: 'Good Fit', color: '#65a30d', bg: '#ecfccb', colors: 'background-color:#ecfccb;color:#4d7c0f;border:1px solid #d9f99d;' },
+  SUBOPTIMAL: { min: 40, tier: 'amber', label: 'Fair Fit', color: '#d97706', bg: '#fef3c7', colors: 'background-color:#fef3c7;color:#b45309;border:1px solid #fde68a;' },
+  POOR: { min: 0, tier: 'red', label: 'Needs Work', color: '#dc2626', bg: '#fee2e2', colors: 'background-color:#fee2e2;color:#b91c1c;border:1px solid #fecaca;' }
 };
 
 export function getMealTypeTargets(mealType = 'dinner', userPrefs = {}) {
@@ -26,6 +26,8 @@ export function getMealTypeTargets(mealType = 'dinner', userPrefs = {}) {
     const nt = userPrefs.nutritionTargets;
     if (nt.e && nt.e[mt]) eTgt = nt.e[mt];
     if (nt.c && nt.c[mt]) cTgt = nt.c[mt];
+    if (nt.elliott?.meals && nt.elliott.meals[mt]) eTgt = { cal: nt.elliott.meals[mt].kcal, prot: nt.elliott.meals[mt].protein };
+    if (nt.chloe?.meals && nt.chloe.meals[mt]) cTgt = { cal: nt.chloe.meals[mt].kcal, prot: nt.chloe.meals[mt].protein };
   }
 
   return {
@@ -52,17 +54,21 @@ export function computeProfileFitScore(actualCal, targetCal, actualProt, targetP
   let calScore = 100;
   if (tCal > 0) {
     const calError = Math.abs(aCal - tCal) / tCal;
-    calScore = Math.max(0, 100 - (calError * 100));
+    calScore = Math.max(0, 100 - (calError * 110));
   }
 
   let protScore = 100;
   if (tProt > 0) {
-    protScore = aProt >= tProt
-      ? 100
-      : Math.max(0, 100 - (((tProt - aProt) / tProt) * 100));
+    if (aProt >= tProt) {
+      const surplus = (aProt - tProt) / tProt;
+      protScore = surplus > 0.6 ? Math.max(80, 100 - ((surplus - 0.6) * 50)) : 100;
+    } else {
+      const deficit = (tProt - aProt) / tProt;
+      protScore = Math.max(0, 100 - (deficit * 125));
+    }
   }
 
-  return (calScore * 0.50) + (protScore * 0.50);
+  return (calScore * 0.45) + (protScore * 0.55);
 }
 
 export function calculateMacroFitTierAndScore(calActualOrRecipe, mealTypeOrTargets, protAct, protTgt, context = {}) {

@@ -7,8 +7,9 @@
 
 import { renderScrollableSwapModal, executeSwapInState, resolveTargetItem, calculateMetrics } from '../components/ProductSwapModal.js';
 import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
+import { calculateShoppingItemCost, normalizeProductPackGrams, getFallbackProductData } from '../services/ShoppingCalculationService.js';
 
-export { renderScrollableSwapModal, executeSwapInState, resolveTargetItem, calculateMetrics, getShoppingLineStateKey };
+export { renderScrollableSwapModal, executeSwapInState, resolveTargetItem, calculateMetrics, getShoppingLineStateKey, calculateShoppingItemCost };
 
 /**
  * Renders the top summary banner of the shopping list.
@@ -31,7 +32,11 @@ export function renderShoppingSummary() {
         group.items.forEach(item => {
           if (item) {
             totalItemCount += 1;
-            totalPrice += Number(item.price || item.cost || 2.50);
+            const costObj = calculateShoppingItemCost(item, item.bankIng);
+            const isAtHome = !!(item.isAtHome || item.checked);
+            if (!isAtHome) {
+              totalPrice += costObj.cost;
+            }
           }
         });
       }
@@ -146,6 +151,8 @@ export function renderShoppingListUI() {
             const groupKey = item.groupKey || catName;
             const ingName = item.name || '';
             const isChecked = !!(item.isAtHome || item.checked);
+            const costObj = calculateShoppingItemCost(item, item.bankIng);
+            const displayCost = Number(item.cost || costObj.cost || item.price || costObj.price || 1.85).toFixed(2);
             return `
             <div class="pp-shop-item" data-group-key="${groupKey}" data-item-key="${itemKey}" data-ingredient-name="${ingName}" style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;gap:12px;">
               <div style="display:flex;align-items:center;gap:12px;flex:1;">
@@ -156,7 +163,7 @@ export function renderShoppingListUI() {
                     ${item.brand ? `<span style="font-size:11px;font-weight:600;background:#f1f5f9;color:#64748b;padding:1px 6px;border-radius:4px;">${item.brand}</span>` : ''}
                   </div>
                   <div style="font-size:12px;color:#64748b;margin-top:2px;">
-                    Qty: <strong>${item.quantity || '1'}</strong> &bull; Est. £${Number(item.price || 1.85).toFixed(2)}
+                    Qty: <strong>${item.quantity || (item.grams ? Math.round(item.grams) + 'g' : '1')}</strong> &bull; Est. £${displayCost}
                   </div>
                 </div>
               </div>

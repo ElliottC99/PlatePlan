@@ -14769,13 +14769,21 @@ function computeWizardShoppingAgg(plan = state.plan) {
   const items = Object.values(agg).map(item => {
     let cost = 0;
     let packsNeeded = 1;
-    if (item.bankIng && item.bankIng.price) {
-      const price = +item.bankIng.price || 0;
-      const packSize = +item.bankIng.packSize || 100;
-      const qty = item.needUnit === 'item' ? item.needQty : item.grams;
-      packsNeeded = Math.ceil(qty / Math.max(1, packSize));
+
+    if (typeof window !== 'undefined' && typeof window.calculateShoppingItemCost === 'function') {
+      const calc = window.calculateShoppingItemCost(item, item.bankIng);
+      cost = calc.cost;
+      packsNeeded = calc.packsNeeded;
+    } else {
+      const price = +(item.bankIng?.price || 1.25);
+      const packSize = +(item.bankIng?.packSize || 250);
+      const qty = item.needUnit === 'item' ? (item.needQty || 1) : (item.grams || 250);
+      const safePackSize = packSize < 10 && item.needUnit !== 'item' ? 250 : packSize;
+      packsNeeded = Math.max(1, Math.ceil(qty / Math.max(1, safePackSize)));
       cost = price * packsNeeded;
+      if (cost > 45) { cost = price * Math.max(1, Math.ceil((item.grams || 250) / 250)); }
     }
+
     const isAtHome = !!(plan.shoppingAtHome && plan.shoppingAtHome[item.key]);
     if (!isAtHome) { totalCost += cost; }
     return {

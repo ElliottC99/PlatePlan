@@ -40,26 +40,34 @@ export async function hydrateHouseholdData() {
         favourites: Array.isArray(userPrefs.favourites) ? userPrefs.favourites : (window.state.userPrefs?.favourites || [])
       };
 
-      // Map nutritionTargets with full fallback structure
-      const nutritionTargets = docData.nutritionTargets || userPrefs.nutritionTargets || {
+      // Map nutritionTargets from canonical Firestore docData and userPrefs
+      const docTargets = docData.nutritionTargets || userPrefs.nutritionTargets || {};
+      
+      const elliottDailyKcal = Number(docTargets.elliott?.dailyKcal || docTargets.elliott?.dailyCal || userPrefs.elliottCal || userPrefs.calE || userPrefs.eDailyKcal || 2200);
+      const elliottDailyProt = Number(docTargets.elliott?.dailyProtein || docTargets.elliott?.dailyProt || userPrefs.elliottProt || userPrefs.protE || userPrefs.eDailyProt || 140);
+      
+      const chloeDailyKcal = Number(docTargets.chloe?.dailyKcal || docTargets.chloe?.dailyCal || userPrefs.chloeCal || userPrefs.calC || userPrefs.cDailyKcal || 1800);
+      const chloeDailyProt = Number(docTargets.chloe?.dailyProtein || docTargets.chloe?.dailyProt || userPrefs.chloeProt || userPrefs.protC || userPrefs.cDailyProt || 110);
+
+      const nutritionTargets = {
         elliott: {
-          dailyKcal: userPrefs.elliottCal || 2200,
-          dailyProtein: userPrefs.elliottProt || 140,
-          meals: {
-            breakfast: { kcal: 550, protein: 35 },
-            lunch: { kcal: 650, protein: 40 },
-            dinner: { kcal: 750, protein: 45 },
-            snacking: { kcal: 250, protein: 20 }
+          dailyKcal: elliottDailyKcal,
+          dailyProtein: elliottDailyProt,
+          meals: docTargets.elliott?.meals || {
+            breakfast: { kcal: Math.round(elliottDailyKcal * 0.25), protein: Math.round(elliottDailyProt * 0.25) },
+            lunch: { kcal: Math.round(elliottDailyKcal * 0.30), protein: Math.round(elliottDailyProt * 0.30) },
+            dinner: { kcal: Math.round(elliottDailyKcal * 0.35), protein: Math.round(elliottDailyProt * 0.35) },
+            snacking: { kcal: Math.round(elliottDailyKcal * 0.10), protein: Math.round(elliottDailyProt * 0.10) }
           }
         },
         chloe: {
-          dailyKcal: userPrefs.chloeCal || 1800,
-          dailyProtein: userPrefs.chloeProt || 110,
-          meals: {
-            breakfast: { kcal: 450, protein: 25 },
-            lunch: { kcal: 500, protein: 30 },
-            dinner: { kcal: 650, protein: 40 },
-            snacking: { kcal: 200, protein: 15 }
+          dailyKcal: chloeDailyKcal,
+          dailyProtein: chloeDailyProt,
+          meals: docTargets.chloe?.meals || {
+            breakfast: { kcal: Math.round(chloeDailyKcal * 0.25), protein: Math.round(chloeDailyProt * 0.25) },
+            lunch: { kcal: Math.round(chloeDailyKcal * 0.30), protein: Math.round(chloeDailyProt * 0.30) },
+            dinner: { kcal: Math.round(chloeDailyKcal * 0.35), protein: Math.round(chloeDailyProt * 0.35) },
+            snacking: { kcal: Math.round(chloeDailyKcal * 0.10), protein: Math.round(chloeDailyProt * 0.10) }
           }
         }
       };
