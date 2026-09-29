@@ -201,6 +201,7 @@ if (typeof window !== 'undefined') {
 import { subscribe } from '../store/store.js';
 
 let shoppingUnsub = null;
+let shoppingTimer = null;
 
 export function mount(container) {
   if (typeof renderShoppingListUI === 'function') {
@@ -219,5 +220,9 @@ export function unmount() {
   if (typeof shoppingUnsub === 'function') {
     shoppingUnsub();
     shoppingUnsub = null;
+  }
+  if (shoppingTimer) {
+    clearTimeout(shoppingTimer);
+    shoppingTimer = null;
   }
 }

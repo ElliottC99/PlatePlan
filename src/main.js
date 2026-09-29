@@ -200,24 +200,10 @@ if (typeof window !== 'undefined') {
   window.selectAndSwapRecipe = PlannerMealSlot.selectAndSwapRecipe;
 }
 
-// 1. STRICT STATE INITIALIZATION & SANITIZATION
+// 1. STATE INITIALIZATION VIA ENCAPSULATED STORE
 if (typeof window !== 'undefined') {
-  if (typeof window.state !== 'object' || window.state === null) window.state = {};
-  if (typeof window.state.userPrefs !== 'object' || window.state.userPrefs === null) window.state.userPrefs = {};
-  if (typeof window.state.settings !== 'object' || window.state.settings === null) window.state.settings = {};
-
   const storeState = getState();
-  window.state.recipes = Array.isArray(window.state.recipes) && window.state.recipes.length ? window.state.recipes : (storeState.recipes || []);
-  window.state.favourites = Array.isArray(window.state.favourites) ? window.state.favourites : [];
-  window.state.userFavourites = Array.isArray(window.state.userFavourites) ? window.state.userFavourites : [];
-  window.state.ingredients = Array.isArray(window.state.ingredients) && window.state.ingredients.length ? window.state.ingredients : (storeState.ingredients || []);
-  window.state.confirmedShopping = Array.isArray(window.state.confirmedShopping) ? window.state.confirmedShopping : [];
-
-  window.state.userPrefs.favouriteVariantIds = Array.isArray(window.state.userPrefs.favouriteVariantIds) ? window.state.userPrefs.favouriteVariantIds : [];
-  window.state.userPrefs.favourites = Array.isArray(window.state.userPrefs.favourites) ? window.state.userPrefs.favourites : [];
-
-  window.favourites = window.state.favourites;
-  window.userFavourites = window.state.userFavourites;
+  console.info('[PlatePlan Main v3.12.2] State encapsulated via AppState store. Recipes:', storeState.recipes?.length || 0);
 }
 
 // 2. EXPORTS & GLOBAL COMPATIBILITY ALIASES
@@ -255,7 +241,7 @@ function reportAppError(message, type = 'error') {
   lastErrorMessage = message;
   lastErrorTime = now;
 
-  console.error(`[PlatePlan Error Telemetry v3.12.2]`, message);
+  console.error(`[PlatePlan Error Telemetry v3.12.3]`, message);
   if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
     window.showPlatePlanToast(message, type);
   }
@@ -338,7 +324,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.12.2 (ES6 Modern)';
+    footerEl.textContent = 'v3.12.3 (ES6 Modern)';
   }
 }
 

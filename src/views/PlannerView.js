@@ -851,6 +851,7 @@ if (typeof window !== 'undefined') {
 import { subscribe, getState } from '../store/store.js';
 
 let plannerUnsub = null;
+let plannerTimer = null;
 
 export function mount(container) {
   if (typeof renderPlanner === 'function') {
@@ -867,5 +868,9 @@ export function unmount() {
   if (typeof plannerUnsub === 'function') {
     plannerUnsub();
     plannerUnsub = null;
+  }
+  if (plannerTimer) {
+    clearTimeout(plannerTimer);
+    plannerTimer = null;
   }
 }

@@ -200,6 +200,7 @@ console.log('[RecipeVaultView v3.12.1] Loaded successfully.');
 import { subscribe } from '../store/store.js';
 
 let vaultUnsub = null;
+let vaultTimer = null;
 
 export function mount(container) {
   if (typeof renderRecipeVault === 'function') {
@@ -216,5 +217,9 @@ export function unmount() {
   if (typeof vaultUnsub === 'function') {
     vaultUnsub();
     vaultUnsub = null;
+  }
+  if (vaultTimer) {
+    clearTimeout(vaultTimer);
+    vaultTimer = null;
   }
 }

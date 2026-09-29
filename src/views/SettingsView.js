@@ -71,7 +71,7 @@ export function renderSettingsView() {
   const householdHtml = renderHouseholdSyncCard(settings);
   const dietaryHtml = renderDietaryExclusionManager(prefs, settings);
   const profileHtml = renderProfileAllocationCard(prefs);
-  const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.12.2 (ES6 Modern)');
+  const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.12.3 (ES6 Modern)');
 
   container.innerHTML = renderSettingsContainer(householdHtml, dietaryHtml, profileHtml, systemHtml);
 
@@ -179,6 +179,7 @@ export function renderSettingsView() {
 import { subscribe } from '../store/store.js';
 
 let settingsUnsub = null;
+let settingsTimer = null;
 
 export function mount(container) {
   if (typeof renderSettingsView === 'function') {
@@ -195,5 +196,9 @@ export function unmount() {
   if (typeof settingsUnsub === 'function') {
     settingsUnsub();
     settingsUnsub = null;
+  }
+  if (settingsTimer) {
+    clearTimeout(settingsTimer);
+    settingsTimer = null;
   }
 }
