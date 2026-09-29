@@ -9,7 +9,9 @@ import { installDelegatedActions } from './ui/actions.js?v=3.3.0';
 import { installNavigation } from './ui/navigation.js?v=3.3.0';
 import { createWorkspaceService } from './ui/workspaces.js?v=3.3.0';
 
-window.APP_VERSION = '3.3.0';
+if (!window.APP_VERSION) {
+  window.APP_VERSION = 'v3.14.1';
+}
 
 const legacy = globalThis.PlatePlanLegacy;
 assertAuthoritativeInterfaces(legacy);
@@ -19,8 +21,8 @@ const workspaces = createWorkspaceService();
 const updates = createUpdateService({
   legacy,
   workspaces,
-  appVersion: '3.3.0',
-  expectedCache: 'plateplan-shell-v90',
+  appVersion: '3.14.1',
+  expectedCache: 'plateplan-shell-v3.14.1',
 });
 const context = Object.freeze({
   legacy,

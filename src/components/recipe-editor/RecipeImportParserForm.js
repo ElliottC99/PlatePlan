@@ -1,8 +1,8 @@
 /**
- * src/components/recipe-editor/RecipeImportParserForm.js (v3.8.9)
+ * src/components/recipe-editor/RecipeImportParserForm.js (v3.14.1)
  * Modular UI component for Recipe Import & Text/URL Scraper:
  * - URL recipe scraper forms & web import inputs
- * - Raw text parser inputs & OCR/paste review cards
+ * - Raw text parser inputs & review cards
  * - Parsed recipe preview card generation
  */
 
@@ -36,11 +36,8 @@ export function renderRecipeImportParserForm() {
         </div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          <button type="button" class="btn primary sm" onclick="reviewPastedRecipeText()" style="font-weight:700">
+          <button type="button" class="btn primary sm" data-pp-click="reviewPastedRecipeText()" style="font-weight:700">
             ✨ Parse & Structure Recipe
-          </button>
-          <button type="button" class="btn ghost sm" onclick="openRecipePhotoPicker('library')">
-            📷 Upload Recipe Photo / OCR
           </button>
         </div>
       </div>

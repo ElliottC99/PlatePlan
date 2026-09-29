@@ -107,17 +107,20 @@ export function routeAction(actionName, target, event) {
   }
 
   // 4. Shopping Product Substitution
-  if (normalizedAction === 'swap-product' || normalizedAction === 'toggleinlineshoppingsubst' || normalizedAction.includes('toggleinlineshoppingsubst')) {
-    const groupKey = ds.groupKey || ds.groupId || parseFunctionArgs(actionName)[0] || '';
-    const itemKey = ds.itemKey || parseFunctionArgs(actionName)[1] || '';
-    renderScrollableSwapModal(groupKey, itemKey);
+  if (normalizedAction === 'swap-product' || normalizedAction === 'toggle-inline-subst' || normalizedAction === 'toggleinlineshoppingsubst' || normalizedAction.includes('toggleinlineshoppingsubst')) {
+    const containerEl = target.closest('[data-item-key], [data-group-key], [data-group-id], [data-ingredient-name], .pp-shop-item, .shopping-list-row, .item-row') || target;
+    const groupKey = ds.groupKey || ds.groupId || containerEl.dataset?.groupKey || containerEl.dataset?.groupId || parseFunctionArgs(actionName)[0] || '';
+    const itemKey = ds.itemKey || containerEl.dataset?.itemKey || parseFunctionArgs(actionName)[1] || parseFunctionArgs(actionName)[0] || '';
+    const ingredientName = ds.ingredientName || containerEl.dataset?.ingredientName || '';
+    renderScrollableSwapModal(groupKey, itemKey, ingredientName);
     return true;
   }
 
   // 5. Shopping Item Acquired Checkbox
-  if (normalizedAction === 'toggle-shopping-item' || normalizedAction === 'toggleshoppingathome' || normalizedAction.includes('toggleshoppingathome')) {
-    const groupKey = ds.groupKey || ds.groupId || parseFunctionArgs(actionName)[0] || '';
-    const itemKey = ds.itemKey || parseFunctionArgs(actionName)[1] || '';
+  if (normalizedAction === 'toggle-shopping-item' || normalizedAction === 'toggle-shopping-at-home' || normalizedAction === 'toggleshoppingathome' || normalizedAction.includes('toggleshoppingathome')) {
+    const containerEl = target.closest('[data-item-key], [data-group-key], [data-group-id], .pp-shop-item, .shopping-list-row, .item-row') || target;
+    const groupKey = ds.groupKey || ds.groupId || containerEl.dataset?.groupKey || containerEl.dataset?.groupId || parseFunctionArgs(actionName)[0] || '';
+    const itemKey = ds.itemKey || containerEl.dataset?.itemKey || parseFunctionArgs(actionName)[1] || parseFunctionArgs(actionName)[0] || '';
     toggleShoppingItemAcquired(groupKey, itemKey);
     return true;
   }

@@ -1,9 +1,9 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.14.0';
+  window.APP_VERSION = 'v3.14.2';
 }
 
 /**
- * src/main.js (v3.14.0)
+ * src/main.js (v3.14.2)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronization,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -17,7 +17,6 @@ import { renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcqu
 import { renderPlanner } from './views/PlannerView.js';
 import { renderRecipeVault } from './views/RecipeVaultView.js';
 import * as TescoImportService from './services/TescoImportService.js';
-import * as RecipeOcrService from './services/RecipeOcrService.js';
 import * as UnitConverter from './utils/unitConverter.js';
 import * as NutritionService from './services/NutritionService.js';
 import * as FitScoreService from './services/FitScoreService.js';
@@ -119,7 +118,6 @@ if (typeof window !== 'undefined') {
   window.setSyncStatus = setSyncStatus;
   window.updateSyncStatus = setSyncStatus;
   window.TescoImportService = TescoImportService;
-  window.RecipeOcrService = RecipeOcrService;
   window.UnitConverter = UnitConverter;
   window.NutritionService = NutritionService;
   window.FitScoreService = FitScoreService;
@@ -217,6 +215,7 @@ if (typeof window !== 'undefined') {
   window.renderSettings = renderSettingsView;
   window.renderShopping = renderShoppingListUI;
   window.renderShoppingList = renderShoppingListUI;
+  window.renderScrollableSwapModal = renderScrollableSwapModal;
   window.toggleInlineShoppingSubst = renderScrollableSwapModal;
   window.toggleShoppingItemAcquired = toggleShoppingItemAcquired;
   window.toggleShoppingAtHome = toggleShoppingItemAcquired;
@@ -316,7 +315,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.14.0 (ES6 Modern)';
+    footerEl.textContent = 'v3.14.2 (ES6 Modern)';
   }
 }
 

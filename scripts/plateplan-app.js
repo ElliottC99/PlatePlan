@@ -6575,13 +6575,13 @@ function handleRecipePhotoSelection(event){
 function removeRecipePhoto(index) { recipePhotoFiles.splice(index,1);renderRecipePhotoPreviews(); }
 function clearRecipePhotos() { recipePhotoFiles=[];revokeRecipePhotoUrls();renderRecipePhotoPreviews();showMsg('recipe-photo-msg','','info'); }
 async function prepareRecipePhoto(file){
-  return window.RecipeOcrService?.prepareRecipePhoto?.(file) || { blob: file, mimeType: file.type };
+  return { blob: file, mimeType: file?.type || 'image/jpeg' };
 }
 async function recogniseRecipePhotos(){
-  if (window.RecipeOcrService?.recogniseRecipePhotos) { return window.RecipeOcrService.recogniseRecipePhotos(); }
+  return null;
 }
 async function recogniseRecipePhotosLocally(){
-  if (window.RecipeOcrService?.recogniseRecipePhotosLocally) { return window.RecipeOcrService.recogniseRecipePhotosLocally(); }
+  return null;
 }
 function ensureRecipeRecognitionModal(){
   let wrap=document.getElementById('recipe-recognition-wrap');if(wrap)return wrap;
@@ -14626,6 +14626,9 @@ function toggleShoppingAtHome(itemKey) {
 }
 window.toggleShoppingAtHome = toggleShoppingAtHome;
 function toggleInlineShoppingSubst(itemKey, groupId) {
+  if (typeof window.renderScrollableSwapModal === 'function') {
+    return window.renderScrollableSwapModal(itemKey, groupId);
+  }
   const panel = document.getElementById(`subst-drawer-${itemKey}`);
   if (!panel) return;
   if (panel.style.display !== 'none') {

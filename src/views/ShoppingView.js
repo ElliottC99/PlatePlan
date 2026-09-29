@@ -141,13 +141,18 @@ export function renderShoppingListUI() {
         </div>
 
         <div>
-          ${items.map(item => `
-            <div class="pp-shop-item" style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          ${items.map(item => {
+            const itemKey = item.key || item.id || item.name;
+            const groupKey = item.groupKey || catName;
+            const ingName = item.name || '';
+            const isChecked = !!(item.isAtHome || item.checked);
+            return `
+            <div class="pp-shop-item" data-group-key="${groupKey}" data-item-key="${itemKey}" data-ingredient-name="${ingName}" style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;gap:12px;">
               <div style="display:flex;align-items:center;gap:12px;flex:1;">
-                <input type="checkbox" style="width:18px;height:18px;cursor:pointer;accent-color:#2563eb;" ${item.isAtHome || item.checked ? 'checked' : ''} onchange="toggleShoppingItemAcquired('${item.groupKey || catName}', '${item.key || item.name}')">
+                <input type="checkbox" data-action="toggle-shopping-item" data-group-key="${groupKey}" data-item-key="${itemKey}" style="width:18px;height:18px;cursor:pointer;accent-color:#2563eb;" ${isChecked ? 'checked' : ''} onchange="toggleShoppingItemAcquired('${groupKey}', '${itemKey}')">
                 <div>
                   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                    <span style="font-weight:600;font-size:14px;color:#1e293b;${item.isAtHome || item.checked ? 'text-decoration:line-through;opacity:0.6;' : ''}">${item.name}</span>
+                    <span style="font-weight:600;font-size:14px;color:#1e293b;${isChecked ? 'text-decoration:line-through;opacity:0.6;' : ''}">${item.name}</span>
                     ${item.brand ? `<span style="font-size:11px;font-weight:600;background:#f1f5f9;color:#64748b;padding:1px 6px;border-radius:4px;">${item.brand}</span>` : ''}
                   </div>
                   <div style="font-size:12px;color:#64748b;margin-top:2px;">
@@ -157,12 +162,13 @@ export function renderShoppingListUI() {
               </div>
 
               <div>
-                <button class="btn sm ghost" style="font-size:11px;padding:4px 8px;font-weight:600;" onclick="toggleInlineShoppingSubst('${item.groupKey || catName}', '${item.key || item.name}')">
+                <button type="button" class="btn sm ghost" data-action="swap-product" data-group-key="${groupKey}" data-item-key="${itemKey}" data-ingredient-name="${ingName}" style="font-size:11px;padding:4px 8px;font-weight:600;" onclick="toggleInlineShoppingSubst('${groupKey}', '${itemKey}')">
                   🔁 Swap Product
                 </button>
               </div>
             </div>
-          `).join('')}
+            `;
+          }).join('')}
         </div>
       </div>
     `;
@@ -180,9 +186,13 @@ export function toggleShoppingItemAcquired(groupKey, itemKey) {
   if (item) {
     item.isAtHome = !item.isAtHome;
     item.checked = item.isAtHome;
+    if (window.state?.plan && typeof window.state.plan === 'object') {
+      window.state.plan.shoppingAtHome = window.state.plan.shoppingAtHome || {};
+      window.state.plan.shoppingAtHome[item.key || itemKey] = item.isAtHome;
+    }
   }
 
-  document.dispatchEvent(new CustomEvent('plateplan:state:shopping', { detail: window.state?.confirmedShopping }));
+  document.dispatchEvent(new CustomEvent('plateplan:state:shopping', { detail: window.state?.confirmedShopping || window.state?.shoppingList }));
   renderShoppingListUI();
 
   if (typeof window.showPlatePlanToast === 'function' && item) {

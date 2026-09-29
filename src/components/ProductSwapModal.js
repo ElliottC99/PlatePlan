@@ -1,23 +1,49 @@
 /**
- * src/components/ProductSwapModal.js (v3.8.1)
- * Granular modal component for ingredient & product substitution.
- * Quarantined from direct database operations, handles state update dispatching cleanly.
+ * src/components/ProductSwapModal.js (v3.14.2)
+ * Robust modal component for 3-tier product & brand substitution.
+ * Handles polymorphic key lookups, persistent subtype mapping,
+ * state mutations, Firestore persistence, and reactive re-rendering.
  */
 
 import { saveCurrentPlan } from '../services/HouseholdRepository.js';
 
-export function calculateMetrics(item) {
-  const protein = Number(item.protein || item.macros?.protein || 0);
-  const kcal = Number(item.calories || item.kcal || item.macros?.calories || 0);
-  const price = Number(item.price || item.cost || 0);
+const DEFAULT_SUBTYPE_MAP = {
+  onion: 'Alliums', garlic: 'Alliums', shallot: 'Alliums', leek: 'Alliums',
+  carrot: 'Root Vegetables', potato: 'Root Vegetables', parsnip: 'Root Vegetables',
+  broccoli: 'Brassicas', cauliflower: 'Brassicas', cabbage: 'Brassicas', kale: 'Brassicas',
+  spinach: 'Leafy Greens', lettuce: 'Leafy Greens', rocket: 'Leafy Greens', salad: 'Leafy Greens',
+  tomato: 'Nightshades & Peppers', pepper: 'Nightshades & Peppers', chilli: 'Nightshades & Peppers',
+  mushroom: 'Fungi', lemon: 'Citrus & Fruit', lime: 'Citrus & Fruit', apple: 'Citrus & Fruit',
+  chicken: 'Poultry', turkey: 'Poultry', beef: 'Red Meat', mince: 'Red Meat',
+  pork: 'Red Meat', lamb: 'Red Meat', bacon: 'Red Meat', sausage: 'Red Meat',
+  salmon: 'Fish & Seafood', cod: 'Fish & Seafood', tuna: 'Fish & Seafood', prawn: 'Fish & Seafood',
+  tofu: 'Plant Protein', tempeh: 'Plant Protein', lentils: 'Beans & Legumes', chickpeas: 'Beans & Legumes',
+  egg: 'Eggs', milk: 'Milk & Creams', cream: 'Milk & Creams', yogurt: 'Yogurt', cheese: 'Cheese',
+  rice: 'Grains & Rice', pasta: 'Pasta & Noodles', noodles: 'Pasta & Noodles', bread: 'Bakery & Bread',
+  oil: 'Oils & Fats', butter: 'Butter & Fats'
+};
 
+export function inferSubtype(item) {
+  if (!item) return 'General Products';
+  if (item.subtype) return item.subtype;
+  const name = String(item.name || item.ingredient || item.raw || '').toLowerCase();
+  for (const [kw, sub] of Object.entries(DEFAULT_SUBTYPE_MAP)) {
+    if (name.includes(kw)) return sub;
+  }
+  return item.cat || item.category || 'General Products';
+}
+
+export function calculateMetrics(item) {
+  const protein = Number(item?.protein || item?.macros?.protein || 0);
+  const kcal = Number(item?.calories || item?.kcal || item?.macros?.calories || 0);
+  const price = Number(item?.price || item?.cost || 0);
   const proteinPerKcal = kcal > 0 ? (protein / kcal) : 0;
   const proteinPerPound = price > 0 ? (protein / price) : 0;
-
   return { protein, kcal, price, proteinPerKcal, proteinPerPound };
 }
 
-export function resolveTargetItem(groupKey, itemKey) {
+export function resolveTargetItem(param1, param2, param3) {
+  const keys = [param1, param2, param3].filter(k => k && typeof k === 'string' && k.trim() !== '');
   const sources = [
     window.state?.confirmedShopping,
     window.state?.shoppingList,
@@ -28,78 +54,74 @@ export function resolveTargetItem(groupKey, itemKey) {
     if (!Array.isArray(source)) continue;
     for (const group of source) {
       if (!group) continue;
-      if (group.key === groupKey || group.id === groupKey || group.name === groupKey) {
-        const item = group.items?.find(i => i.key === itemKey || i.id === itemKey || i.name === itemKey);
-        if (item) return { item, group, source };
+      const items = Array.isArray(group.items) ? group.items : (Array.isArray(group) ? group : []);
+      for (const item of items) {
+        if (!item) continue;
+        for (const k of keys) {
+          if (item.key === k || item.id === k || item.name === k || item.groupId === k || item.ingredientId === k || String(item.name).toLowerCase() === k.toLowerCase()) {
+            return { item, group, source };
+          }
+        }
       }
-      const item = group.items?.find(i => i.key === itemKey || i.id === itemKey);
-      if (item) return { item, group, source };
     }
   }
 
-  const ing = (Array.isArray(window.state?.ingredients) ? window.state.ingredients : []).find(
-    i => i.id === itemKey || i.key === itemKey || i.name === itemKey
-  );
-  if (ing) return { item: ing, group: null, source: null };
+  const ingredients = Array.isArray(window.state?.ingredients) ? window.state.ingredients : [];
+  for (const k of keys) {
+    const ing = ingredients.find(i => i.id === k || i.key === k || i.name === k || i.groupId === k || String(i.name).toLowerCase() === k.toLowerCase());
+    if (ing) return { item: ing, group: null, source: null };
+  }
 
-  return { item: { name: itemKey || 'Selected Item' }, group: null, source: null };
+  const fallbackName = keys[0] || 'Selected Product';
+  return { item: { name: fallbackName, id: keys[0] || 'item_unknown' }, group: null, source: null };
 }
 
-export function renderScrollableSwapModal(groupKey, itemKey) {
+export function renderScrollableSwapModal(param1, param2, param3) {
   const existing = document.getElementById('pp-swap-product-modal');
   if (existing) existing.remove();
 
-  const { item: targetItem, group: targetGroup } = resolveTargetItem(groupKey, itemKey);
+  const { item: targetItem, group: targetGroup } = resolveTargetItem(param1, param2, param3);
   const ingredients = Array.isArray(window.state?.ingredients) ? window.state.ingredients : [];
+  const targetSubtype = inferSubtype(targetItem);
+  const targetName = String(targetItem?.name || '').toLowerCase();
+  const targetGroupId = targetItem?.groupId || targetGroup?.groupId || '';
 
-  const targetSubtype = targetItem?.subtype || targetItem?.category || '';
-  const targetName = targetItem?.name || targetItem?.ingredient || '';
+  const tier1SameSubtype = ingredients.filter(i => {
+    if ((i.id && i.id === targetItem?.id) || (i.name && i.name.toLowerCase() === targetName)) return false;
+    return inferSubtype(i) === targetSubtype;
+  });
 
-  const tier1SameSubtype = ingredients.filter(i => 
-    targetSubtype && (i.subtype === targetSubtype || i.category === targetSubtype) && i.name !== targetName
-  );
-
-  const tier2SameIngredient = ingredients.filter(i => 
-    targetName && (i.name?.toLowerCase().includes(targetName.toLowerCase()) || i.ingredient?.toLowerCase().includes(targetName.toLowerCase())) &&
-    !tier1SameSubtype.includes(i)
-  );
+  const tier2SameIngredient = ingredients.filter(i => {
+    if ((i.id && i.id === targetItem?.id) || (i.name && i.name.toLowerCase() === targetName)) return false;
+    if (tier1SameSubtype.includes(i)) return false;
+    if (targetGroupId && (i.groupId === targetGroupId || i.id === targetGroupId)) return true;
+    return targetName.length > 2 && (i.name?.toLowerCase().includes(targetName) || targetName.includes(i.name?.toLowerCase()));
+  });
 
   let currentSort = 'relevance';
   let currentScope = 'global';
 
   const overlay = document.createElement('div');
   overlay.id = 'pp-swap-product-modal';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);backdrop-filter:blur(3px);z-index:999999;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);z-index:999999;display:flex;align-items:center;justify-content:center;';
 
   const container = document.createElement('div');
-  container.style.cssText = 'background:#fff;width:94%;max-width:620px;max-height:88vh;border-radius:16px;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,0.2);overflow:hidden;';
+  container.style.cssText = 'background:#fff;width:94%;max-width:620px;max-height:88vh;border-radius:16px;display:flex;flex-direction:column;box-shadow:0 24px 48px rgba(0,0,0,0.22);overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
 
   container.innerHTML = `
-    <div style="padding:18px 20px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;background:#fafafa;">
+    <div style="padding:16px 20px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;background:#fafafa;">
       <div>
-        <h3 style="margin:0;font-size:17px;font-weight:700;color:#0f172a;">Swap Product</h3>
-        <p style="margin:2px 0 0 0;font-size:13px;color:#64748b;">
-          Swapping: <strong style="color:#2563eb;">${targetItem?.brand ? targetItem.brand + ' - ' : ''}${targetItem?.name || 'Item'}</strong>
+        <h3 style="margin:0;font-size:16px;font-weight:700;color:#0f172a;">Swap Product / Brand</h3>
+        <p style="margin:2px 0 0;font-size:13px;color:#64748b;">
+          Swapping: <strong style="color:#2563eb;">${targetItem?.brand ? targetItem.brand + ' - ' : ''}${targetItem?.name || 'Item'}</strong> <span style="font-size:11px;background:#e2e8f0;padding:2px 6px;border-radius:6px;color:#475569;margin-left:4px;">${targetSubtype}</span>
         </p>
       </div>
       <button id="pp-modal-close" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;line-height:1;">&times;</button>
     </div>
 
     <div style="padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;flex-direction:column;gap:10px;">
-      ${targetGroup?.recipeName ? `
-      <div style="display:flex;gap:10px;align-items:center;font-size:12px;background:#fff;padding:6px 10px;border-radius:8px;border:1px solid #cbd5e1;">
-        <span style="font-weight:600;color:#334155;">Swap Scope:</span>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;">
-          <input type="radio" name="pp-swap-scope" value="global" checked> All recipes
-        </label>
-        <label style="cursor:pointer;display:flex;align-items:center;gap:4px;margin-left:10px;">
-          <input type="radio" name="pp-swap-scope" value="recipe"> Only for "${targetGroup.recipeName}"
-        </label>
-      </div>
-      ` : ''}
-
       <div style="display:flex;gap:10px;">
-        <input type="text" id="pp-product-search" placeholder="🔍 Search catalog..." style="flex:1;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;">
+        <input type="text" id="pp-product-search" placeholder="🔍 Search substitute products..." style="flex:1;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;">
         <select id="pp-product-sort" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;background:#fff;cursor:pointer;">
           <option value="relevance">Sort: Default</option>
           <option value="name">Sort: Name (A-Z)</option>
@@ -120,10 +142,6 @@ export function renderScrollableSwapModal(groupKey, itemKey) {
   const searchInput = container.querySelector('#pp-product-search');
   const sortSelect = container.querySelector('#pp-product-sort');
 
-  container.querySelectorAll('input[name="pp-swap-scope"]').forEach(radio => {
-    radio.addEventListener('change', (e) => { currentScope = e.target.value; });
-  });
-
   function sortItems(items) {
     const sorted = [...items];
     switch (currentSort) {
@@ -135,7 +153,7 @@ export function renderScrollableSwapModal(groupKey, itemKey) {
     }
   }
 
-  function renderCardHTML(item, badgeText) {
+  function renderCardHTML(item, badgeText, badgeColor = '#dbeafe', textColor = '#1e40af') {
     const metrics = calculateMetrics(item);
     return `
       <div class="pp-swap-card" data-ing-id="${item.id || item.name}" style="padding:12px 14px;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:8px;cursor:pointer;transition:all 0.15s ease;background:#fff;">
@@ -144,11 +162,11 @@ export function renderScrollableSwapModal(groupKey, itemKey) {
             <span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">${item.brand || 'Generic'}</span>
             <div style="font-weight:600;color:#1e293b;font-size:14px;margin-top:1px;">${item.name}</div>
           </div>
-          ${badgeText ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#dbeafe;color:#1e40af;">${badgeText}</span>` : ''}
+          ${badgeText ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:${badgeColor};color:${textColor};">${badgeText}</span>` : ''}
         </div>
-        <div style="margin-top:8px;display:flex;flex-wrap:gap:4px;">
-          ${metrics.price ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;margin-right:4px;">£${metrics.price.toFixed(2)}</span>` : ''}
-          ${metrics.protein ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;margin-right:4px;">${metrics.protein}g protein</span>` : ''}
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">
+          ${metrics.price ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">£${metrics.price.toFixed(2)}</span>` : ''}
+          ${metrics.protein ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">${metrics.protein}g protein</span>` : ''}
           ${metrics.proteinPerKcal ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">${(metrics.proteinPerKcal * 100).toFixed(1)}g prot/100kcal</span>` : ''}
         </div>
       </div>`;
@@ -162,27 +180,28 @@ export function renderScrollableSwapModal(groupKey, itemKey) {
       const sortedT1 = sortItems(tier1SameSubtype);
       if (sortedT1.length > 0) {
         html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#2563eb;margin-bottom:8px;">Tier 1: Same Subtype (${targetSubtype})</div>`;
-        sortedT1.forEach(item => { html += renderCardHTML(item, 'Subtype Match'); });
+        sortedT1.forEach(item => { html += renderCardHTML(item, 'Subtype Match', '#dbeafe', '#1e40af'); });
       }
 
       const sortedT2 = sortItems(tier2SameIngredient);
       if (sortedT2.length > 0) {
-        html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#475569;margin:16px 0 8px 0;">Tier 2: Same Ingredient Family</div>`;
-        sortedT2.forEach(item => { html += renderCardHTML(item, 'Ingredient Match'); });
+        html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#059669;margin:16px 0 8px 0;">Tier 2: Same Ingredient Family</div>`;
+        sortedT2.forEach(item => { html += renderCardHTML(item, 'Family Match', '#d1fae5', '#065f46'); });
       }
     }
 
-    const globalList = ingredients.filter(i => 
-      !cleanQ ? (!tier1SameSubtype.includes(i) && !tier2SameIngredient.includes(i)) :
-      (i.name?.toLowerCase().includes(cleanQ) || i.brand?.toLowerCase().includes(cleanQ) || i.subtype?.toLowerCase().includes(cleanQ))
-    );
+    const globalList = ingredients.filter(i => {
+      if ((i.id && i.id === targetItem?.id) || (i.name && i.name.toLowerCase() === targetName)) return false;
+      return !cleanQ ? (!tier1SameSubtype.includes(i) && !tier2SameIngredient.includes(i)) :
+        (i.name?.toLowerCase().includes(cleanQ) || i.brand?.toLowerCase().includes(cleanQ) || inferSubtype(i).toLowerCase().includes(cleanQ));
+    });
 
-    const sortedT3 = sortItems(globalList).slice(0, 30);
+    const sortedT3 = sortItems(globalList).slice(0, 35);
     if (sortedT3.length > 0) {
       html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;margin:16px 0 8px 0;">
-        ${cleanQ ? 'Search Results' : 'Tier 3: Full Product Catalog'} (${sortedT3.length})
+        ${cleanQ ? 'Search Results' : 'Tier 3: Catalog Substitutes'} (${sortedT3.length})
       </div>`;
-      sortedT3.forEach(item => { html += renderCardHTML(item, item.subtype || ''); });
+      sortedT3.forEach(item => { html += renderCardHTML(item, inferSubtype(item), '#f1f5f9', '#475569'); });
     }
 
     if (!html) {
@@ -195,7 +214,7 @@ export function renderScrollableSwapModal(groupKey, itemKey) {
       card.onclick = () => {
         const selectedId = card.dataset.ingId;
         const selectedProduct = ingredients.find(i => (i.id || i.name) === selectedId) || { name: selectedId };
-        executeSwapInState(groupKey, itemKey, selectedProduct, currentScope);
+        executeSwapInState(param1, param2, selectedProduct, currentScope, targetItem);
         overlay.remove();
       };
     });
@@ -211,46 +230,48 @@ export function renderScrollableSwapModal(groupKey, itemKey) {
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 }
 
-export async function executeSwapInState(groupKey, itemKey, newProduct, scope) {
-  console.log(`[Swap Executed v3.8.1] Scope: ${scope}, Target Group: ${groupKey}, Item: ${itemKey}, Replacement:`, newProduct);
+export async function executeSwapInState(param1, param2, newProduct, scope = 'global', resolvedTarget = null) {
+  const targetItem = resolvedTarget || resolveTargetItem(param1, param2).item;
+  const targetName = targetItem?.name || '';
+  const targetKey = targetItem?.key || targetItem?.id || param1 || param2;
 
   const shoppingLists = ['confirmedShopping', 'shoppingList', 'generatedList'];
-
   shoppingLists.forEach(listKey => {
     if (!Array.isArray(window.state?.[listKey])) return;
-
     window.state[listKey].forEach(group => {
       if (!group) return;
-      if (scope === 'recipe' && group.key !== groupKey && group.id !== groupKey) return;
-
-      if (Array.isArray(group.items)) {
-        group.items.forEach(item => {
-          if (!item) return;
-          const { item: targetItem } = resolveTargetItem(groupKey, itemKey);
-          if (item.key === itemKey || item.id === itemKey || (targetItem && item.name === targetItem.name)) {
-            item.name = newProduct.name;
-            item.brand = newProduct.brand || '';
-            item.ingredientId = newProduct.id || item.ingredientId;
-            item.price = newProduct.price || item.price;
-            item.protein = newProduct.protein || item.protein;
-            item.calories = newProduct.calories || item.calories;
-          }
-        });
-      }
+      const items = Array.isArray(group.items) ? group.items : (Array.isArray(group) ? group : []);
+      items.forEach(item => {
+        if (!item) return;
+        if (item.key === targetKey || item.id === targetKey || (targetName && item.name === targetName)) {
+          item.name = newProduct.name;
+          item.brand = newProduct.brand || '';
+          item.ingredientId = newProduct.id || item.ingredientId;
+          item.bankIng = newProduct;
+          item.price = Number(newProduct.price || newProduct.cost || item.price || 0);
+          item.cost = Number(newProduct.price || newProduct.cost || item.cost || 0);
+          item.protein = Number(newProduct.protein || item.protein || 0);
+          item.calories = Number(newProduct.calories || newProduct.kcal || item.calories || 0);
+          if (newProduct.subtype) item.subtype = newProduct.subtype;
+        }
+      });
     });
   });
 
   if (window.state?.plan && typeof window.state.plan === 'object') {
     window.state.plan.productSelections = window.state.plan.productSelections || {};
-    window.state.plan.productSelections[itemKey] = newProduct.id || newProduct.name;
-    saveCurrentPlan(window.state.plan).catch(e => console.warn('[ProductSwapModal v3.8.1] Error updating plan with swapped product:', e));
+    if (targetKey) window.state.plan.productSelections[targetKey] = newProduct.id || newProduct.name;
+    if (targetItem?.id) window.state.plan.productSelections[targetItem.id] = newProduct.id || newProduct.name;
+    saveCurrentPlan(window.state.plan).catch(e => console.warn('[ProductSwapModal] Plan save error:', e));
   }
 
-  document.dispatchEvent(new CustomEvent('plateplan:state:shopping', { detail: window.state?.confirmedShopping }));
+  document.dispatchEvent(new CustomEvent('plateplan:state:shopping', { detail: window.state?.confirmedShopping || window.state?.shoppingList }));
   document.dispatchEvent(new CustomEvent('plateplan:state:plan', { detail: window.state?.plan }));
 
   if (typeof window.renderShoppingList === 'function') {
     window.renderShoppingList();
+  } else if (typeof window.renderShopping === 'function') {
+    window.renderShopping();
   }
 
   if (typeof window.showPlatePlanToast === 'function') {
