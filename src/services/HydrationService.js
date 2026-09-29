@@ -67,7 +67,7 @@ export async function hydrateHouseholdData() {
       window.state.userPrefs.nutritionTargets = nutritionTargets;
       window.state.settings = docData.settings || window.state.settings || {};
 
-      console.log('[HydrationService] Mapped userPrefs and nutritionTargets to window.state', window.state.userPrefs);
+      console.log('[HydrationService] Core user data mapped to state.');
     }
 
     saveStateCache();

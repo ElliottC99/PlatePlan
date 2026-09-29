@@ -82,7 +82,6 @@ if (initialCache) {
   state.currentPlan = initialCache.currentPlan || null;
   state.shoppingList = Array.isArray(initialCache.shoppingList) ? initialCache.shoppingList : [];
   state.isCachedHydrated = true;
-  console.log('[Store] Instant offline state hydrated from local storage cache.');
 }
 
 /**

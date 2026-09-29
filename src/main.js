@@ -1,9 +1,9 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.13.1';
+  window.APP_VERSION = 'v3.13.2';
 }
 
 /**
- * src/main.js (v3.13.1)
+ * src/main.js (v3.13.2)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronization,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -207,7 +207,6 @@ if (typeof window !== 'undefined') {
 // 1. STATE INITIALIZATION VIA ENCAPSULATED STORE
 if (typeof window !== 'undefined') {
   const storeState = getState();
-  console.info('[PlatePlan Main] State encapsulated via AppState store. Recipes:', storeState.recipes?.length || 0);
 }
 
 // 2. EXPORTS & GLOBAL COMPATIBILITY ALIASES
@@ -316,7 +315,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.13.1 (ES6 Modern)';
+    footerEl.textContent = 'v3.13.2 (ES6 Modern)';
   }
 }
 
@@ -365,7 +364,6 @@ async function initApp() {
   if (isAppInitialized) return;
   isAppInitialized = true;
 
-  console.log('[PlatePlan Main] Initializing secure ES6 bridge & authenticating...');
   updateVersionBadge();
   setupActionBridge();
   setupSubscriptions();

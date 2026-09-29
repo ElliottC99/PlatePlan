@@ -820,7 +820,6 @@ export function renderPlanOverallSummary() {
 
 // Bind Global Aliases for Action Bridge and Legacy Compatibility
 if (typeof window !== 'undefined') {
-  console.log('[PlannerView] Initializing PlannerView & recipe modal aliases...');
   window.renderPlanner = renderPlanner;
   window.renderPlannerWizard = renderPlannerWizard;
   window.renderPlan = renderPlan;

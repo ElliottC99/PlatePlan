@@ -208,6 +208,4 @@ export function setupActionBridge() {
       }
     }
   }, true);
-
-  console.log('[ActionBridge] Centralized Action Bridge installed successfully.');
 }
