@@ -24,8 +24,10 @@ export function showPlatePlanToast(msg, type = 'info') {
   }, 3000);
 }
 
+let isSwRegistered = false;
 export function registerServiceWorker() {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator) || isSwRegistered) return;
+  isSwRegistered = true;
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').then(reg => {
       console.info('[PlatePlan PWA] Service Worker registered with scope:', reg.scope);

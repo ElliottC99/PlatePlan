@@ -7,7 +7,7 @@
 
 import { safeJsonStringify, safeClone } from '../utils/safeJson.js';
 
-const CACHE_KEY = 'plateplan_store_cache_v3.8.1';
+const CACHE_KEY = `plateplan_store_cache_${(typeof window !== 'undefined' && window.APP_VERSION) || 'v3.13.1'}`;
 
 const state = {
   recipes: [],
@@ -32,13 +32,13 @@ function readCache() {
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === 'object' ? parsed : null;
   } catch (e) {
-    console.warn('[Store v3.8.1] Failed to read localStorage cache:', e);
+    console.warn('[Store] Failed to read localStorage cache:', e);
     return null;
   }
 }
 
 /**
- * Debounced persistence of state cache to localStorage.
+ * Debounced persistence of state cache to localStorage using strict allowlist.
  */
 let saveTimer = null;
 export function saveStateCache() {
@@ -47,11 +47,9 @@ export function saveStateCache() {
   saveTimer = setTimeout(() => {
     try {
       const payload = {
-        preferences: state.preferences,
-        userPrefs: state.userPrefs,
-        settings: state.settings,
-        currentPlan: state.currentPlan,
-        shoppingList: state.shoppingList,
+        userPrefs: state.userPrefs || {},
+        preferences: state.preferences ? { nutritionTargets: state.preferences.nutritionTargets } : null,
+        settings: state.settings || {},
         cachedAt: Date.now()
       };
       const serialized = safeJsonStringify(payload, null, '');
