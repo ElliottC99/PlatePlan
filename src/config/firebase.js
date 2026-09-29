@@ -23,13 +23,18 @@ if (typeof window !== 'undefined' && window.firebase) {
 
   // Enable Firestore offline persistence if available
   if (typeof window.firebase.firestore === 'function') {
-    window.firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch((err) => {
-      if (err.code === 'failed-precondition') {
-        console.warn('[Firebase] Multiple tabs open; persistence active in primary tab only.');
-      } else if (err.code === 'unimplemented') {
-        console.warn('[Firebase] Current browser environment does not support offline persistence.');
-      }
-    });
+    const firestoreRef = window.firebase.firestore();
+    if (typeof firestoreRef.enableMultiTabIndexedDbPersistence === 'function') {
+      firestoreRef.enableMultiTabIndexedDbPersistence().catch((err) => {
+        if (err.code === 'failed-precondition') {
+          console.warn('[Firebase] Multiple tabs open; persistence active in primary tab only.');
+        } else if (err.code === 'unimplemented') {
+          console.warn('[Firebase] Current browser environment does not support offline persistence.');
+        }
+      });
+    } else if (typeof firestoreRef.enablePersistence === 'function') {
+      firestoreRef.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+    }
   }
 }
 

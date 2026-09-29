@@ -195,7 +195,7 @@ if (typeof window !== 'undefined') {
   window.VaultGridContainer = { renderVaultGridContainer };
 }
 
-console.log('[RecipeVaultView v3.12.1] Loaded successfully.');
+console.log('[RecipeVaultView] Loaded successfully.');
 
 import { subscribe } from '../store/store.js';
 

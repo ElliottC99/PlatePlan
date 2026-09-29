@@ -207,7 +207,7 @@ if (typeof window !== 'undefined') {
 // 1. STATE INITIALIZATION VIA ENCAPSULATED STORE
 if (typeof window !== 'undefined') {
   const storeState = getState();
-  console.info('[PlatePlan Main v3.12.2] State encapsulated via AppState store. Recipes:', storeState.recipes?.length || 0);
+  console.info('[PlatePlan Main] State encapsulated via AppState store. Recipes:', storeState.recipes?.length || 0);
 }
 
 // 2. EXPORTS & GLOBAL COMPATIBILITY ALIASES

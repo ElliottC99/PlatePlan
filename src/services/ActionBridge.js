@@ -158,7 +158,7 @@ export function routeAction(actionName, target, event) {
 export function setupActionBridge() {
   if (typeof window === 'undefined') return;
   if (isBridgeInitialized || window.__plateplan_action_bridge_attached) {
-    console.log('[ActionBridge v3.8.1] Action bridge already registered. Skipping redundant attachment.');
+    console.log('[ActionBridge] Action bridge already registered. Skipping redundant attachment.');
     return;
   }
 
@@ -203,11 +203,11 @@ export function setupActionBridge() {
           const execFn = new Function('event', `with(window) { ${ppClickStr || dataAction} }`);
           execFn.call(target, event);
         } catch (err) {
-          console.warn('[ActionBridge v3.5.0] Error evaluating delegated action:', err);
+          console.warn('[ActionBridge] Error evaluating delegated action:', err);
         }
       }
     }
   }, true);
 
-  console.log('[ActionBridge v3.5.0] Centralized Action Bridge installed successfully.');
+  console.log('[ActionBridge] Centralized Action Bridge installed successfully.');
 }

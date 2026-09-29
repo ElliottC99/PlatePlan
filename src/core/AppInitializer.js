@@ -285,7 +285,7 @@ export function initModalDelegation() {
 }
 
 export function initPlatePlanApp() {
-  console.info('[PlatePlan Core v3.11.4] Initializing ES6 Modern Application Shell & Event Delegation...');
+  console.info('[PlatePlan Core] Initializing ES6 Modern Application Shell & Event Delegation...');
   registerServiceWorker();
   initHeaderDelegation();
   initNavigationDelegation();
