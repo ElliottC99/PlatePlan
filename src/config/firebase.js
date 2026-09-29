@@ -20,22 +20,6 @@ if (typeof window !== 'undefined' && window.firebase) {
     const config = (window.PLATEPLAN_FIREBASE && window.PLATEPLAN_FIREBASE.config) || FIREBASE_CONFIG;
     window.firebase.initializeApp(config);
   }
-
-  // Enable Firestore offline persistence if available
-  if (typeof window.firebase.firestore === 'function') {
-    const firestoreRef = window.firebase.firestore();
-    if (typeof firestoreRef.enableMultiTabIndexedDbPersistence === 'function') {
-      firestoreRef.enableMultiTabIndexedDbPersistence().catch((err) => {
-        if (err.code === 'failed-precondition') {
-          console.warn('[Firebase] Multiple tabs open; persistence active in primary tab only.');
-        } else if (err.code === 'unimplemented') {
-          console.warn('[Firebase] Current browser environment does not support offline persistence.');
-        }
-      });
-    } else if (typeof firestoreRef.enablePersistence === 'function') {
-      firestoreRef.enablePersistence({ synchronizeTabs: true }).catch(() => {});
-    }
-  }
 }
 
 export const db = (typeof window !== 'undefined' && window.firebase && typeof window.firebase.firestore === 'function')
