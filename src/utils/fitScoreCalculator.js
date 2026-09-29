@@ -133,58 +133,39 @@ function evaluateProfileFit(recipeKcal, recipeProtein, kcalTarget, proteinTarget
   const deltaKcal = kcalTarget > 0 ? (recipeKcal - kcalTarget) / kcalTarget : 0;
   const proteinRatio = proteinTarget > 0 ? (recipeProtein / proteinTarget) : 1;
 
-  let tier = 'amber';
-  let tierIcon = '🟡';
-  let tierLabel = 'Moderate Fit';
-  let score = 50;
+  // 1. RED TIER (Score 0 - 39): Over calories OR severe protein deficit
+  if (deltaKcal > 0.10 || (deltaKcal > 0.00 && proteinRatio < 0.90) || proteinRatio < 0.50) {
+    const calculatedRedScore = Math.max(0, Math.round(39 - (Math.max(0, deltaKcal) * 50) - (Math.max(0, 0.9 - proteinRatio) * 50)));
+    return {
+      tier: 'red',
+      tierIcon: '🔴',
+      tierLabel: 'Needs Work',
+      score: Math.max(0, Math.min(39, calculatedRedScore))
+    };
+  }
 
-  // 1. GREEN (Ideal - Score 80-100):
-  // deltaKcal in [-0.10, 0.00] AND proteinRatio >= 1.0
+  // 2. GREEN TIER (Score 80 - 100): Ideal range
   if (deltaKcal >= -0.10 && deltaKcal <= 0.00 && proteinRatio >= 1.0) {
-    tier = 'green';
-    tierIcon = '🟢';
-    tierLabel = 'Ideal Fit';
-
-    const calProximity = 1 - (Math.abs(deltaKcal) / 0.10); // 1.0 when delta is 0
-    const proteinBonus = Math.min(1, Math.max(0, (proteinRatio - 1.0) / 0.25)); // +surplus bonus
-    score = Math.min(100, Math.max(80, 80 + Math.round((10 * calProximity) + (10 * proteinBonus))));
-  }
-  // 2. RED (Worst - Score 0-39):
-  // deltaKcal > +0.10 OR (deltaKcal > 0.00 AND proteinRatio < 0.90) OR proteinRatio < 0.50
-  else if (deltaKcal > 0.10 || (deltaKcal > 0.00 && proteinRatio < 0.90) || proteinRatio < 0.50) {
-    tier = 'red';
-    tierIcon = '🔴';
-    tierLabel = 'Needs Work';
-
-    if (proteinRatio < 0.50) {
-      score = Math.round((proteinRatio / 0.50) * 25);
-    } else if (deltaKcal > 0.10) {
-      const excess = deltaKcal - 0.10;
-      score = Math.max(0, Math.round(38 - (excess * 75)));
-    } else {
-      score = Math.max(0, Math.min(39, Math.round(20 + ((proteinRatio / 0.90) * 16) - (deltaKcal * 35))));
-    }
-    score = Math.max(0, Math.min(39, score));
-  }
-  // 3. AMBER (Moderate - Score 40-79):
-  // All other states
-  else {
-    tier = 'amber';
-    tierIcon = '🟡';
-    tierLabel = 'Moderate Fit';
-
-    const protPart = Math.min(1, Math.max(0, (proteinRatio - 0.50) / 0.50));
-    const calPart = Math.max(0, 1 - (Math.abs(deltaKcal) / 0.40));
-    score = Math.min(79, Math.max(40, 40 + Math.round((20 * protPart) + (19 * calPart))));
+    const calProximity = 1 - (Math.abs(deltaKcal) / 0.10);
+    const proteinBonus = Math.min(1, Math.max(0, (proteinRatio - 1.0) / 0.25));
+    const calculatedGreenScore = 80 + Math.round((10 * calProximity) + (10 * proteinBonus));
+    return {
+      tier: 'green',
+      tierIcon: '🟢',
+      tierLabel: 'Ideal Fit',
+      score: Math.max(80, Math.min(100, calculatedGreenScore))
+    };
   }
 
+  // 3. AMBER TIER (Score 40 - 79): Moderate alignment
+  const protPart = Math.min(1, Math.max(0, (proteinRatio - 0.50) / 0.50));
+  const calPart = Math.max(0, 1 - (Math.abs(deltaKcal) / 0.40));
+  const calculatedAmberScore = 40 + Math.round((20 * protPart) + (19 * calPart));
   return {
-    score,
-    tier,
-    tierIcon,
-    tierLabel,
-    deltaKcal: Math.round(deltaKcal * 1000) / 1000,
-    proteinRatio: Math.round(proteinRatio * 100) / 100
+    tier: 'amber',
+    tierIcon: '🟡',
+    tierLabel: 'Moderate Fit',
+    score: Math.max(40, Math.min(79, calculatedAmberScore))
   };
 }
 

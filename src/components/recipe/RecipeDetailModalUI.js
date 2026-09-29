@@ -49,8 +49,10 @@ export function renderRecipeDetailModalContent({
   const favBtnClass = isFav ? 'active' : '';
 
   const fitScoreBadgeHtml = renderFitScoreBadge(activeR || r, mealType || 'dinner', {
-    activeProfile: servingMode || 'everyone',
-    variant: variantKey
+    activeProfile: servingMode === 'both' ? 'everyone' : servingMode,
+    variant: variantKey,
+    portionScaled: true,
+    showLabel: true
   });
 
   return `

@@ -10,7 +10,7 @@ import { installNavigation } from './ui/navigation.js?v=3.3.0';
 import { createWorkspaceService } from './ui/workspaces.js?v=3.3.0';
 
 if (!window.APP_VERSION) {
-  window.APP_VERSION = 'v3.16.2';
+  window.APP_VERSION = 'v3.16.3';
 }
 
 const legacy = globalThis.PlatePlanLegacy;
@@ -21,8 +21,8 @@ const workspaces = createWorkspaceService();
 const updates = createUpdateService({
   legacy,
   workspaces,
-  appVersion: '3.16.2',
-  expectedCache: 'plateplan-shell-v3.16.2',
+  appVersion: '3.16.3',
+  expectedCache: 'plateplan-shell-v3.16.3',
 });
 const context = Object.freeze({
   legacy,

@@ -8341,8 +8341,16 @@ function resolveSubtypeViaExisting(subTypeId, productId) {
   const product = getProduct(productId);
   if (!product) { showPlatePlanToast('Product not found.'); return; }
   relinkSubtypeProductsInRecipes(subTypeId, productId);
+  
+  // Update local state: link product and clear issue
+  if (window.state && window.state.ingredients) {
+      const p = window.state.ingredients.find(i => i.id === productId);
+      if(p) p.groupId = subTypeId;
+  }
+  
   closeSubtypeResolutionModal();
   renderDataQuality();
+  document.dispatchEvent(new CustomEvent('plateplan:state:data-quality'));
   showPlatePlanToast(`Linked "${product.name}" to sub-type successfully! ✓`);
 }
 function resolveSubtypeViaTesco(subTypeId) { openTescoJsonImportModal(subTypeId); }
