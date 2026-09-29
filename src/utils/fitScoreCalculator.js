@@ -189,6 +189,23 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
   const eTargets = getProfileMealTargets('elliott', normMeal);
   const cTargets = getProfileMealTargets('chloe', normMeal);
 
+  if (!eTargets.kcal || !cTargets.kcal) {
+    console.warn(`[FitScoreEngine] Missing macro targets for meal: ${normMeal}`, { eTargets, cTargets });
+  }
+
+  // If no targets, return error tier instead of falling back to 100/green
+  if (eTargets.kcal === 0 && cTargets.kcal === 0) {
+      return {
+        score: 0,
+        tier: 'red',
+        tierIcon: '🔴',
+        tierLabel: 'Needs Work',
+        error: 'Missing Macro Targets',
+        activeProfile,
+        mealType: normMeal
+      };
+  }
+
   let eFit, cFit;
   let eMacros, cMacros;
 
