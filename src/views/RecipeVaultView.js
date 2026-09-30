@@ -1,5 +1,5 @@
 /**
- * src/views/RecipeVaultView.js (v3.17.6)
+ * src/views/RecipeVaultView.js (v3.17.7)
  * Atomic Recipe Vault Component & Actions Module.
  * Decoupled from direct Firestore SDK, pure reactive Store interactions.
  * Features optimized DocumentFragment rendering and instant offline caching.
