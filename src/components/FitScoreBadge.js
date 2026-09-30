@@ -54,8 +54,9 @@ export function renderFitScoreBadge(fitScoreOrRecipe, mealTypeOrOptions = 'dinne
 
   const { score, tier, tierIcon, tierLabel, details } = fitResult;
 
-  if (fitResult.error === 'Missing Macro Targets' || tierLabel === 'Awaiting Data' || (score === 0 && tier === 'red')) {
-    return `<span class="pp-fit-badge pp-fit-neutral" title="Awaiting Data">--</span>`;
+  if (fitResult.error === 'Missing Macro Targets' || fitResult.error === 'Zero Macro Data' || tierLabel === 'Awaiting Data' || tierLabel === 'Missing Macros' || (score === 0 && tier === 'red')) {
+    const title = fitResult.error || tierLabel || 'Awaiting Data';
+    return `<span class="pp-fit-badge pp-fit-neutral" title="${escapeHtml(title)}">--</span>`;
   }
 
   const options = (typeof mealTypeOrOptions === 'object' && !extraOptions.showLabel) ? mealTypeOrOptions : extraOptions;

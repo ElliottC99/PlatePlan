@@ -35,7 +35,7 @@ function evaluatePortionScaledProfileFit(recipe, profileId, kcalTarget, proteinT
   const scaledProtein = Math.round((perServing.protein * multiplier) * 10) / 10;
   const sanityPenalty = calculatePortionSanityPenalty(multiplier);
 
-  if (!proteinTarget || proteinTarget <= 0) {
+  if (!kcalTarget || kcalTarget <= 0 || !proteinTarget || proteinTarget <= 0) {
     return {
       score: 0,
       tier: 'red',
@@ -207,6 +207,29 @@ function evaluateProfileFit(recipeKcal, recipeProtein, kcalTarget, proteinTarget
  * @returns {{ score: number, tier: string, tierIcon: string, tierLabel: string, activeProfile: string, mealType: string, details: Object }}
  */
 export function calculateMealFitScore(recipe, mealType = 'dinner', options = {}) {
+  const r = recipe?.recipe || recipe;
+  const nutrition = r?.nutrition || r?.perServing || r?.macros || r;
+  
+  const totalKcal = Number(
+    nutrition?.cal ?? nutrition?.calories ?? nutrition?.kcal ?? 
+    r?.cal ?? r?.calories ?? r?.kcal ?? 0
+  );
+  
+  const totalProt = Number(
+    nutrition?.prot ?? nutrition?.protein ?? 
+    r?.prot ?? r?.protein ?? 0
+  );
+
+  if (totalKcal <= 0 && totalProt <= 0) {
+    return {
+      score: 0,
+      tier: 'red',
+      tierIcon: '🔴',
+      tierLabel: 'Missing Macros',
+      error: 'Zero Macro Data'
+    };
+  }
+
   const normMeal = String(mealType || 'dinner').toLowerCase();
   const rawProfile = String(options.activeProfile || 'everyone').toLowerCase();
   const activeProfile = (rawProfile === 'both' || rawProfile === 'all') ? 'everyone' : rawProfile;
