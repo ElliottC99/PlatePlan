@@ -30,9 +30,11 @@ export function renderPantryStockToolbar(state = {}) {
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
         <!-- Search and Filters -->
         <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:280px;flex-wrap:wrap">
-          <input type="text" id="pantry-search-input" value="${escapeHtml(query)}" placeholder="Search stock (e.g. Garlic, Eggs)..." style="flex:1;min-width:180px;padding:8px 12px;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)" oninput="handlePantrySearchFilter()">
+          <label for="pantry-search-input" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Search stock</label>
+          <input type="text" id="pantry-search-input" name="pantryStockSearch" aria-label="Search stock" value="${escapeHtml(query)}" placeholder="Search stock (e.g. Garlic, Eggs)..." style="flex:1;min-width:180px;padding:8px 12px;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)" oninput="handlePantrySearchFilter()">
           
-          <select id="pantry-zone-select" style="padding:8px 12px;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);outline:none;font-weight:600" onchange="handlePantryZoneChange()">
+          <label for="pantry-zone-select" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Storage zones</label>
+          <select id="pantry-zone-select" name="pantryZone" aria-label="Storage zones" style="padding:8px 12px;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);outline:none;font-weight:600" onchange="handlePantryZoneChange()">
             <option value="all" ${activeZone === 'all' ? 'selected' : ''}>All Storage Zones</option>
             <option value="fridge" ${activeZone === 'fridge' ? 'selected' : ''}>Fridge Only</option>
             <option value="freezer" ${activeZone === 'freezer' ? 'selected' : ''}>Freezer Only</option>

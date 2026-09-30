@@ -14094,37 +14094,41 @@ function generatePlan(){
     });
   }
   const scoreCandidateOption = (opt, type, who) => {
-    let baseScore = 0;
+    let bestScore = 0;
     try {
-      const bundle = calculateRecipeDisplayNutrition({ recipe: opt.recipe, variant: opt.variant, mealType: type });
-      const portions = bundle?.portions;
-      if(portions) {
-        let cal = 0, prot = 0;
-        if(who === 'Elliott' || who === 'elliott') {
-          const fit = calculateFit(portions.eCal, portions.eProt, getTarget('e', 'cal') / 3, getTarget('e', 'prot') / 3);
-          baseScore = fit?.score || 0;
-          cal = portions.eCal || 0;
-          prot = portions.eProt || 0;
-        } else if(who === 'Chloe' || who === 'chloe') {
-          const fit = calculateFit(portions.cCal, portions.cProt, getTarget('c', 'cal') / 3, getTarget('c', 'prot') / 3);
-          baseScore = fit?.score || 0;
-          cal = portions.cCal || 0;
-          prot = portions.cProt || 0;
-        } else {
-          const fitE = calculateFit(portions.eCal, portions.eProt, getTarget('e', 'cal') / 3, getTarget('e', 'prot') / 3);
-          const fitC = calculateFit(portions.cCal, portions.cProt, getTarget('c', 'cal') / 3, getTarget('c', 'prot') / 3);
-          baseScore = ((fitE?.score || 0) + (fitC?.score || 0)) / 2;
-          cal = ((portions.eCal || 0) + (portions.cCal || 0)) / 2;
-          prot = ((portions.eProt || 0) + (portions.cProt || 0)) / 2;
-        }
-        const proteinDensity = cal > 0 ? (prot / cal) * 100 : 0;
-        baseScore -= Math.min(2.0, proteinDensity * 0.1);
+      const activeProfile = (who === 'Elliott' || who === 'elliott') ? 'elliott' :
+                            (who === 'Chloe' || who === 'chloe') ? 'chloe' : 'everyone';
+
+      const calcFn = window.calculateMealFitScore || calculateMealFitScore;
+
+      // Evaluate original variant
+      const resOrig = calcFn(opt.recipe, type, { 
+        activeProfile, 
+        portionScaled: true, 
+        variant: 'original' 
+      });
+      const scoreOrig = resOrig?.score || 0;
+
+      // Evaluate enhanced variant
+      const resEnh = calcFn(opt.recipe, type, { 
+        activeProfile, 
+        portionScaled: true, 
+        variant: 'enhanced' 
+      });
+      const scoreEnh = resEnh?.score || 0;
+
+      // Find maximum score and set corresponding variant on option
+      if (scoreEnh > scoreOrig) {
+        bestScore = scoreEnh;
+        opt.variant = 'enhanced';
+      } else {
+        bestScore = scoreOrig;
+        opt.variant = 'original';
       }
-    } catch(e){}
-    if(opt.variant === 'enhanced') {
-      baseScore -= 0.5; // Natural bonus for enhanced variants
+    } catch(e) {
+      console.warn('Error scoring candidate option:', e);
     }
-    return baseScore;
+    return bestScore;
   };
   const choose = (type, who, shared=false) => {
     let p = getPlannerRecipeOptions(type, shared ? 'any' : who, { applyExclusions:true, avoidHistory:true, trafficRules });
@@ -14137,7 +14141,7 @@ function generatePlan(){
       fresh = fresh.map(opt => ({
         opt,
         score: scoreCandidateOption(opt, type, shared ? 'both' : who) + (Math.random() * 0.12)
-      })).sort((a, b) => a.score - b.score).map(item => item.opt);
+      })).sort((a, b) => b.score - a.score).map(item => item.opt);
     }
     let picked = null;
     if (prioritiseUseUp) { picked = fresh[0] || null; } else if(fresh.length > 0) {

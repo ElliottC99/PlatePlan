@@ -97,12 +97,12 @@ export function renderRecipeDetailModalContent({
             ${servingMode === 'both' ? `
               <div style="display:flex;align-items:center;gap:8px;font-size:13px;">
                 <label for="preview-serves" style="font-weight:650;color:var(--text)">Servings:</label>
-                <input type="number" id="preview-serves" value="${targetServes}" oninput="updateRecipePreviewScale(this.value)" style="width:70px;min-height:36px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);font-weight:700;text-align:center" min="1" step="1">
+                <input type="number" id="preview-serves" name="previewServes" value="${targetServes}" oninput="updateRecipePreviewScale(this.value)" style="width:70px;min-height:36px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);font-weight:700;text-align:center" min="1" step="1">
               </div>
             ` : `
               <div style="display:flex;align-items:center;gap:8px;font-size:13px;">
                 <label for="preview-single-serves" style="font-weight:650;color:var(--text)">Servings:</label>
-                <input type="number" id="preview-single-serves" value="${singleServes}" oninput="updateSinglePersonServes(this.value)" style="width:70px;min-height:36px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);font-weight:700;text-align:center" min="1" step="1">
+                <input type="number" id="preview-single-serves" name="previewSingleServes" value="${singleServes}" oninput="updateSinglePersonServes(this.value)" style="width:70px;min-height:36px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);font-weight:700;text-align:center" min="1" step="1">
               </div>
             `}
           </div>

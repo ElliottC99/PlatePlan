@@ -52,30 +52,30 @@ export function renderConstraintsForm({
       <!-- Parameters Grid -->
       <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:14px;background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border)">
         <div>
-          <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">PLAN LENGTH</label>
-          <select id="wizard-plan-days" class="select" style="width:100%" onchange="state.plannerDays=parseInt(this.value)||10;if(window.state)window.state.plannerDays=state.plannerDays;saveState();">
+          <label for="wizard-plan-days" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;cursor:pointer">PLAN LENGTH</label>
+          <select id="wizard-plan-days" name="plannerDays" aria-label="Plan duration in days" class="select" style="width:100%" onchange="state.plannerDays=parseInt(this.value)||10;if(window.state)window.state.plannerDays=state.plannerDays;saveState();">
             ${[1,2,3,4,5,6,7,8,9,10,11,12,13,14].map(n => `<option value="${n}" ${n === daysVal ? 'selected' : ''}>${n} day${n > 1 ? 's' : ''}</option>`).join('')}
           </select>
         </div>
         <div>
-          <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">START DATE</label>
-          <input type="date" id="wizard-plan-start" class="input" style="width:100%" value="${escapeAttr(startVal)}" onchange="state.plannerStartDate=this.value;if(window.state)window.state.plannerStartDate=this.value;saveState();">
+          <label for="wizard-plan-start" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;cursor:pointer">START DATE</label>
+          <input type="date" id="wizard-plan-start" name="plannerStartDate" aria-label="Plan start date" class="input" style="width:100%" value="${escapeAttr(startVal)}" onchange="state.plannerStartDate=this.value;if(window.state)window.state.plannerStartDate=this.value;saveState();">
         </div>
         <div>
-          <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">BREAKFAST REPEAT</label>
-          <select class="select" style="width:100%" onchange="state.prefs.mealRepeatCadence=state.prefs.mealRepeatCadence||{};state.prefs.mealRepeatCadence.breakfast=parseInt(this.value)||1;saveState();">
+          <label for="wizard-cadence-breakfast" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;cursor:pointer">BREAKFAST REPEAT</label>
+          <select id="wizard-cadence-breakfast" name="cadenceBreakfast" aria-label="Breakfast repeat cadence" class="select" style="width:100%" onchange="state.prefs.mealRepeatCadence=state.prefs.mealRepeatCadence||{};state.prefs.mealRepeatCadence.breakfast=parseInt(this.value)||1;saveState();">
             ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${n === cadence.breakfast ? 'selected' : ''}>${n} day${n > 1 ? 's' : ''}</option>`).join('')}
           </select>
         </div>
         <div>
-          <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">LUNCH REPEAT</label>
-          <select class="select" style="width:100%" onchange="state.prefs.mealRepeatCadence=state.prefs.mealRepeatCadence||{};state.prefs.mealRepeatCadence.lunch=parseInt(this.value)||2;saveState();">
+          <label for="wizard-cadence-lunch" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;cursor:pointer">LUNCH REPEAT</label>
+          <select id="wizard-cadence-lunch" name="cadenceLunch" aria-label="Lunch repeat cadence" class="select" style="width:100%" onchange="state.prefs.mealRepeatCadence=state.prefs.mealRepeatCadence||{};state.prefs.mealRepeatCadence.lunch=parseInt(this.value)||2;saveState();">
             ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${n === cadence.lunch ? 'selected' : ''}>${n} day${n > 1 ? 's' : ''}</option>`).join('')}
           </select>
         </div>
         <div>
-          <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">DINNER REPEAT</label>
-          <select class="select" style="width:100%" onchange="state.prefs.mealRepeatCadence=state.prefs.mealRepeatCadence||{};state.prefs.mealRepeatCadence.dinner=parseInt(this.value)||2;saveState();">
+          <label for="wizard-cadence-dinner" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;cursor:pointer">DINNER REPEAT</label>
+          <select id="wizard-cadence-dinner" name="cadenceDinner" aria-label="Dinner repeat cadence" class="select" style="width:100%" onchange="state.prefs.mealRepeatCadence=state.prefs.mealRepeatCadence||{};state.prefs.mealRepeatCadence.dinner=parseInt(this.value)||2;saveState();">
             ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${n === cadence.dinner ? 'selected' : ''}>${n} day${n > 1 ? 's' : ''}</option>`).join('')}
           </select>
         </div>
@@ -84,8 +84,8 @@ export function renderConstraintsForm({
       <!-- Minimum Fit Score Filter -->
       <div style="background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border)">
         <div class="field" style="margin:0">
-          <label for="wizard-fit-score-filter" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">MINIMUM RECIPE FIT SCORE</label>
-          <select id="wizard-fit-score-filter" class="select" style="width:100%" onchange="state.prefs.minFitScore = parseInt(this.value, 10) || 0; saveState();">
+          <label for="wizard-fit-score-filter" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;cursor:pointer">MINIMUM RECIPE FIT SCORE</label>
+          <select id="wizard-fit-score-filter" name="minFitScore" aria-label="Minimum recipe fit score" class="select" style="width:100%" onchange="state.prefs.minFitScore = parseInt(this.value, 10) || 0; saveState();">
             <option value="0" ${(!minFitScore || minFitScore === 0) ? 'selected' : ''}>All Recipes (0–100)</option>
             <option value="85" ${minFitScore === 85 ? 'selected' : ''}>Ideal Fit Only (85–100)</option>
             <option value="65" ${minFitScore === 65 ? 'selected' : ''}>Acceptable Fit+ (65–100)</option>
@@ -140,16 +140,16 @@ export function renderExclusionsPanel(activeExclusions, daysVal) {
 
       <!-- Inline Add Exclusion Control -->
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <select id="wizard-excl-day" class="select sm" style="width:auto">
+        <select id="wizard-excl-day" name="exclusionDay" aria-label="Exclusion target day" class="select sm" style="width:auto">
           ${Array.from({ length: daysVal }, (_, i) => i + 1).map(d => `<option value="${d}">Day ${d}</option>`).join('')}
         </select>
-        <select id="wizard-excl-meal" class="select sm" style="width:auto">
+        <select id="wizard-excl-meal" name="exclusionMeal" aria-label="Exclusion target meal" class="select sm" style="width:auto">
           <option value="all">All meals</option>
           <option value="breakfast">Breakfast</option>
           <option value="lunch">Lunch</option>
           <option value="dinner">Dinner</option>
         </select>
-        <select id="wizard-excl-person" class="select sm" style="width:auto">
+        <select id="wizard-excl-person" name="exclusionPerson" aria-label="Exclusion target person" class="select sm" style="width:auto">
           <option value="both">Both (Elliott & Chloe)</option>
           <option value="elliott">Elliott only</option>
           <option value="chloe">Chloe only</option>
@@ -183,10 +183,11 @@ export function renderPinnedPanel(pinned, daysVal) {
       </div>
 
       <div style="display:flex;gap:6px">
-        <select id="wizard-pin-day" class="select sm" style="width:auto">
+        <select id="wizard-pin-day" name="pinDay" aria-label="Day to pin recipe to" class="select sm" style="width:auto">
           ${Array.from({ length: daysVal }, (_, i) => i + 1).map(d => `<option value="${d}">Day ${d}</option>`).join('')}
         </select>
-        <input type="search" class="input sm" placeholder="Search recipe to pin..." style="flex:1" oninput="filterWizardPinRecipes(this.value)">
+        <label for="wizard-pin-search" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Search recipe to pin</label>
+        <input type="search" id="wizard-pin-search" name="pinRecipeSearch" aria-label="Search recipe to pin" class="input sm" placeholder="Search recipe to pin..." style="flex:1" oninput="filterWizardPinRecipes(this.value)">
       </div>
       <div id="wizard-pin-search-results" style="margin-top:6px;max-height:140px;overflow-y:auto;display:none;background:var(--surface);border:1px solid var(--border);border-radius:8px"></div>
     </div>
@@ -215,7 +216,8 @@ export function renderUseUpPanel(useUp) {
         }).join('')}
       </div>
 
-      <input type="search" class="input sm" placeholder="Search product to use up..." style="width:100%" oninput="filterWizardUseUpProducts(this.value)">
+      <label for="wizard-useup-search" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Search product to use up</label>
+      <input type="search" id="wizard-useup-search" name="useUpProductSearch" aria-label="Search product to use up" class="input sm" placeholder="Search product to use up..." style="width:100%" oninput="filterWizardUseUpProducts(this.value)">
       <div id="wizard-useup-search-results" style="margin-top:6px;max-height:140px;overflow-y:auto;display:none;background:var(--surface);border:1px solid var(--border);border-radius:8px"></div>
     </div>
   `;

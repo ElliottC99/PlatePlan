@@ -44,22 +44,31 @@ export function calculateProteinScore(actual, target) {
   return Math.max(0, (r / 0.70) * 40);
 }
 
+export function extractRecipeMacros(recipe, variant = 'original') {
+  if (!recipe) return { cal: 0, prot: 0 };
+  const r = recipe.recipe || recipe;
+
+  if (variant === 'enhanced' && r.enhanced) {
+    const e = r.enhanced;
+    const cal = Number(e.nutrition?.perServing?.calories ?? e.perServing?.calories ?? e.macros?.calories ?? e.calories ?? e.cal ?? 0);
+    const prot = Number(e.nutrition?.perServing?.protein ?? e.perServing?.protein ?? e.macros?.protein ?? e.protein ?? e.prot ?? 0);
+    if (cal > 0) return { cal, prot };
+  }
+
+  // Fallback / Original Variant
+  const cal = Number(r.nutrition?.perServing?.calories ?? r.perServing?.calories ?? r.macros?.calories ?? r.calories ?? r.cal ?? 0);
+  const prot = Number(r.nutrition?.perServing?.protein ?? r.perServing?.protein ?? r.macros?.protein ?? r.protein ?? r.prot ?? 0);
+  return { cal, prot };
+}
+
 /**
  * Calculates meal fit score for a recipe and meal type across active profile or 50/50 household.
  */
 export function calculateMealFitScore(recipe, mealType = 'dinner', options = {}) {
   const r = recipe?.recipe || recipe || {};
-  const nutrition = r?.nutrition || r?.perServing || r?.macros || r;
-  
-  const totalKcal = Number(
-    nutrition?.cal ?? nutrition?.calories ?? nutrition?.kcal ?? 
-    r?.cal ?? r?.calories ?? r?.kcal ?? 0
-  );
-  
-  const totalProt = Number(
-    nutrition?.prot ?? nutrition?.protein ?? 
-    r?.prot ?? r?.protein ?? 0
-  );
+  const macros = extractRecipeMacros(r, options.variant || 'original');
+  const totalKcal = macros.cal;
+  const totalProt = macros.prot;
 
   // Top-Level Calorie Circuit Breaker Guard
   if (totalKcal <= 0) {
@@ -262,4 +271,5 @@ if (typeof window !== 'undefined') {
   window.calculateMealFitScore = calculateMealFitScore;
   window.calculateRecipeFit = calculateRecipeFit;
   window.getVaultTargetMacros = getVaultTargetMacros;
+  window.extractRecipeMacros = extractRecipeMacros;
 }

@@ -143,7 +143,8 @@ export function renderCandidateDrawerModal({
 
       <div style="margin-bottom:12px;display:flex;flex-direction:column;gap:8px;flex-shrink:0">
         <div style="position:relative">
-          <input type="text" id="swap-modal-search-input" class="input" placeholder="Search candidate recipes (e.g. Chicken, Omelette, 500kcal)..." style="width:100%;font-size:13px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text)" oninput="renderSwapModalOptionsList()" autocomplete="off" spellcheck="false">
+          <label for="swap-modal-search-input" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Search candidate recipes</label>
+          <input type="text" id="swap-modal-search-input" name="candidateSearch" aria-label="Search candidate recipes" class="input" placeholder="Search candidate recipes (e.g. Chicken, Omelette, 500kcal)..." style="width:100%;font-size:13px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text)" oninput="renderSwapModalOptionsList()" autocomplete="off" spellcheck="false">
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:space-between">
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
@@ -154,8 +155,8 @@ export function renderCandidateDrawerModal({
             <button type="button" class="btn sm ghost" id="swap-filter-original" onclick="setSwapModalFilter('original')">Original</button>
           </div>
           <div style="display:flex;gap:6px;align-items:center">
-            <span style="font-size:11px;color:var(--text3);font-weight:600">Sort:</span>
-            <select id="swap-modal-sort-select" class="input sm" style="font-size:12px;padding:3px 8px;border-radius:6px;background:var(--surface);color:var(--text);border:1px solid var(--border)" onchange="renderSwapModalOptionsList()">
+            <label for="swap-modal-sort-select" style="font-size:11px;color:var(--text3);font-weight:600;cursor:pointer">Sort:</label>
+            <select id="swap-modal-sort-select" name="candidateSort" aria-label="Sort options" class="input sm" style="font-size:12px;padding:3px 8px;border-radius:6px;background:var(--surface);color:var(--text);border:1px solid var(--border)" onchange="renderSwapModalOptionsList()">
               <option value="best-fit" selected>Best Fit</option>
               <option value="needs-work">Needs Work</option>
               <option value="name">Name</option>

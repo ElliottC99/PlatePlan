@@ -28,7 +28,8 @@ export function renderVaultFilterToolbar({
     <div class="card pp-vault-filter-toolbar" style="padding:16px;margin-bottom:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;gap:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div style="flex:1;min-width:240px">
-          <input type="text" id="vault-search" class="input" style="width:100%" placeholder="Search recipes by name, ingredient, or tag..." value="${escapeHtml(searchVal)}" oninput="renderVault()">
+          <label for="vault-search" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Search recipes</label>
+          <input type="text" id="vault-search" name="vaultSearch" aria-label="Search recipes" class="input" style="width:100%" placeholder="Search recipes by name, ingredient, or tag..." value="${escapeHtml(searchVal)}" oninput="renderVault()">
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <button type="button" id="vault-filter-fav" class="btn ghost sm ${isFavOnly ? 'active' : ''}" data-action="toggle-favourites-filter" onclick="toggleVaultFavouritesFilter()" style="font-weight:600">
@@ -40,8 +41,8 @@ export function renderVaultFilterToolbar({
 
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:nowrap;overflow-x:auto;">
         <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto;white-space:nowrap;">
-          <label style="font-size:11px;font-weight:700;color:var(--text2)">MEAL:</label>
-          <select id="filter-type" class="select" style="font-size:12px;white-space:nowrap;" onchange="renderVault()">
+          <label for="filter-type" style="font-size:11px;font-weight:700;color:var(--text2);cursor:pointer">MEAL:</label>
+          <select id="filter-type" name="filterType" aria-label="Filter by meal type" class="select" style="font-size:12px;white-space:nowrap;" onchange="renderVault()">
             <option value="all" ${selectedType === 'all' ? 'selected' : ''}>All Meals</option>
             <option value="breakfast" ${selectedType === 'breakfast' ? 'selected' : ''}>Breakfast</option>
             <option value="lunch" ${selectedType === 'lunch' ? 'selected' : ''}>Lunch</option>
@@ -51,8 +52,8 @@ export function renderVaultFilterToolbar({
         </div>
 
         <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto;white-space:nowrap;">
-          <label style="font-size:11px;font-weight:700;color:var(--text2)">WHO:</label>
-          <select id="filter-who" class="select" style="font-size:12px;white-space:nowrap;" onchange="renderVault()">
+          <label for="filter-who" style="font-size:11px;font-weight:700;color:var(--text2);cursor:pointer">WHO:</label>
+          <select id="filter-who" name="filterWho" aria-label="Filter by person" class="select" style="font-size:12px;white-space:nowrap;" onchange="renderVault()">
             <option value="all" ${selectedWho === 'all' ? 'selected' : ''}>Everyone</option>
             <option value="elliott" ${selectedWho === 'elliott' ? 'selected' : ''}>Elliott</option>
             <option value="chloe" ${selectedWho === 'chloe' ? 'selected' : ''}>Chloe</option>
@@ -61,14 +62,12 @@ export function renderVaultFilterToolbar({
         </div>
 
         <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto;white-space:nowrap;">
-          <label style="font-size:11px;font-weight:700;color:var(--text2)">SORT:</label>
-          <select id="vault-sort" class="select" style="font-size:12px;white-space:nowrap;" onchange="renderVault()">
-            <option value="fitScore" ${sortBy === 'fitScore' ? 'selected' : ''}>Sort: Fit Score (Best Alignment)</option>
-            <option value="name" ${sortBy === 'name' ? 'selected' : ''}>Recipe Name (A-Z)</option>
-            <option value="fit" ${sortBy === 'fit' ? 'selected' : ''}>Macro Fit Score</option>
-            <option value="protein" ${sortBy === 'protein' ? 'selected' : ''}>Protein (High-Low)</option>
-            <option value="calories" ${sortBy === 'calories' ? 'selected' : ''}>Calories (Low-High)</option>
-            <option value="time" ${sortBy === 'time' ? 'selected' : ''}>Prep Time</option>
+          <label for="vault-sort" style="font-size:11px;font-weight:700;color:var(--text2);cursor:pointer">SORT:</label>
+          <select id="vault-sort" name="vaultSort" aria-label="Sort options" class="select" style="font-size:12px;white-space:nowrap;" onchange="handleVaultSortChange(this.value)">
+            <option value="fit-desc" ${sortBy === 'fit-desc' ? 'selected' : ''}>Fit Score: High to Low</option>
+            <option value="fit-asc" ${sortBy === 'fit-asc' ? 'selected' : ''}>Fit Score: Low to High</option>
+            <option value="name-asc" ${sortBy === 'name-asc' ? 'selected' : ''}>Name: A to Z</option>
+            <option value="name-desc" ${sortBy === 'name-desc' ? 'selected' : ''}>Name: Z to A</option>
           </select>
         </div>
       </div>

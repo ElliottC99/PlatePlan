@@ -284,7 +284,7 @@ export function renderPlan() {
       const s = slots[d] || {};
       const allEx = typeof SLOTS !== 'undefined' ? SLOTS.every(sl => window.state.excluded[d]?.[sl.key]) : false;
       if (allEx) {
-        html += '<div class="day-plan-card skipped"><div style="display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap"><strong>' + (typeof ppEscapeHtml === 'function' ? ppEscapeHtml(formatPlanDayLabel(window.state.plan, d, { short: true })) : `Day ${d}`) + '</strong><input type="date" aria-label="Date for day ' + d + '" value="' + (typeof ppEscapeAttr === 'function' ? ppEscapeAttr(window.state.plan.dayDates?.[d] || '') : '') + '" onchange="setPlanDayDate(' + d + ',this.value)" style="width:auto"><span style="color:var(--text3)">-- no meals planned</span></div></div>';
+        html += '<div class="day-plan-card skipped"><div style="display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap"><strong>' + (typeof ppEscapeHtml === 'function' ? ppEscapeHtml(formatPlanDayLabel(window.state.plan, d, { short: true })) : `Day ${d}`) + '</strong><input type="date" id="plan-day-date-skipped-' + d + '" name="planDayDateSkipped-' + d + '" aria-label="Date for day ' + d + '" value="' + (typeof ppEscapeAttr === 'function' ? ppEscapeAttr(window.state.plan.dayDates?.[d] || '') : '') + '" onchange="setPlanDayDate(' + d + ',this.value)" style="width:auto"><span style="color:var(--text3)">-- no meals planned</span></div></div>';
         continue;
       }
 
@@ -338,7 +338,7 @@ export function renderPlan() {
       const summaryHtml = ['e', 'c'].map(p => `<div class="summary-box">${typeof renderPlannerPersonSummaryBox === 'function' ? renderPlannerPersonSummaryBox(p, daySummary) : ''}</div>`).join('');
       const dayLabelFormatted = typeof formatPlanDayLabel === 'function' ? formatPlanDayLabel(window.state.plan, d, { short: true }) : `Day ${d}`;
       const dayDateVal = window.state.plan.dayDates?.[d] || '';
-      html += '<div class="day-plan-card"><div class="row-between" style="margin-bottom:10px;gap:8px;flex-wrap:wrap"><div class="plan-date-control"><div style="font-size:13px;font-weight:600">' + (typeof ppEscapeHtml === 'function' ? ppEscapeHtml(dayLabelFormatted) : dayLabelFormatted) + '</div><input type="date" aria-label="Date for day ' + d + '" value="' + (typeof ppEscapeAttr === 'function' ? ppEscapeAttr(dayDateVal) : dayDateVal) + '" onchange="setPlanDayDate(' + d + ',this.value)"></div><span class="tag" title="Lower is better. Calories miss plus protein shortfall.">Score ' + daySummary.score + '</span></div><div class="plan-summary">' + summaryHtml + '</div>' + dayRowsHtml + '</div>';
+      html += '<div class="day-plan-card"><div class="row-between" style="margin-bottom:10px;gap:8px;flex-wrap:wrap"><div class="plan-date-control"><label for="plan-day-date-' + d + '" style="font-size:13px;font-weight:600;display:block">' + (typeof ppEscapeHtml === 'function' ? ppEscapeHtml(dayLabelFormatted) : dayLabelFormatted) + '</label><input type="date" id="plan-day-date-' + d + '" name="planDayDate-' + d + '" aria-label="Date for day ' + d + '" value="' + (typeof ppEscapeAttr === 'function' ? ppEscapeAttr(dayDateVal) : dayDateVal) + '" onchange="setPlanDayDate(' + d + ',this.value)"></div><span class="tag" title="Lower is better. Calories miss plus protein shortfall.">Score ' + daySummary.score + '</span></div><div class="plan-summary">' + summaryHtml + '</div>' + dayRowsHtml + '</div>';
     }
 
     el.innerHTML = html;
@@ -610,7 +610,8 @@ export function openSwapMealModal(day, slotKey) {
 
     <div style="margin-bottom:12px;display:flex;flex-direction:column;gap:8px;flex-shrink:0">
       <div style="position:relative">
-        <input type="text" id="swap-modal-search-input" class="input" placeholder="Type to filter recipes (e.g. Chicken, Omelette, 500kcal)..." style="width:100%;font-size:13px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text)" oninput="renderSwapModalOptionsList()" autocomplete="off" spellcheck="false">
+        <label for="swap-modal-search-input" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Search recipes</label>
+        <input type="text" id="swap-modal-search-input" name="swapModalSearch" aria-label="Search recipes" class="input" placeholder="Type to filter recipes (e.g. Chicken, Omelette, 500kcal)..." style="width:100%;font-size:13px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text)" oninput="renderSwapModalOptionsList()" autocomplete="off" spellcheck="false">
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:space-between">
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
@@ -621,8 +622,8 @@ export function openSwapMealModal(day, slotKey) {
           <button type="button" class="btn sm ghost" id="swap-filter-original" onclick="setSwapModalFilter('original')">Original</button>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <span style="font-size:11px;color:var(--text3);font-weight:600">Sort:</span>
-          <select id="swap-modal-sort-select" class="input sm" style="font-size:12px;padding:3px 8px;border-radius:6px;background:var(--surface);color:var(--text);border:1px solid var(--border)" onchange="renderSwapModalOptionsList()">
+          <label for="swap-modal-sort-select" style="font-size:11px;color:var(--text3);font-weight:600;cursor:pointer">Sort:</label>
+          <select id="swap-modal-sort-select" name="swapModalSort" aria-label="Sort options" class="input sm" style="font-size:12px;padding:3px 8px;border-radius:6px;background:var(--surface);color:var(--text);border:1px solid var(--border)" onchange="renderSwapModalOptionsList()">
             <option value="best-fit" selected>Best Fit</option>
             <option value="needs-work">Needs Work</option>
             <option value="name">Name</option>

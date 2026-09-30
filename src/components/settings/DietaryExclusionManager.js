@@ -34,8 +34,8 @@ export function renderDietaryExclusionManager(prefs = {}, settings = {}) {
 
       <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;margin-bottom:14px">
         <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:12px;font-weight:600;color:var(--text2)">Dietary Patterns</label>
-          <select id="pp-setting-diet" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);color:var(--text);outline:none">
+          <label for="pp-setting-diet" style="font-size:12px;font-weight:600;color:var(--text2);cursor:pointer">Dietary Patterns</label>
+          <select id="pp-setting-diet" name="diet" aria-label="Dietary Patterns" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);color:var(--text);outline:none">
             <option value="none" ${diet === 'none' ? 'selected' : ''}>No Restrictions</option>
             <option value="vegetarian" ${diet === 'vegetarian' ? 'selected' : ''}>Vegetarian Only</option>
             <option value="vegan" ${diet === 'vegan' ? 'selected' : ''}>Vegan Only</option>
@@ -46,24 +46,24 @@ export function renderDietaryExclusionManager(prefs = {}, settings = {}) {
         <div style="display:flex;flex-direction:column;gap:5px">
           <label style="font-size:12px;font-weight:600;color:var(--text2)">Allergen Safety Switches</label>
           <div style="display:flex;flex-direction:column;gap:6px;margin-top:2px">
-            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-              <input type="checkbox" id="pp-setting-gf" ${prefs.glutenFree ? 'checked' : ''} style="width:15px;height:16px;accent-color:var(--purple)"> Gluten-Free Only
+            <label for="pp-setting-gf" style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="pp-setting-gf" name="glutenFree" ${prefs.glutenFree ? 'checked' : ''} style="width:15px;height:16px;accent-color:var(--purple)"> Gluten-Free Only
             </label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-              <input type="checkbox" id="pp-setting-df" ${prefs.dairyFree ? 'checked' : ''} style="width:15px;height:16px;accent-color:var(--purple)"> Dairy-Free Only
+            <label for="pp-setting-df" style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="pp-setting-df" name="dairyFree" ${prefs.dairyFree ? 'checked' : ''} style="width:15px;height:16px;accent-color:var(--purple)"> Dairy-Free Only
             </label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-              <input type="checkbox" id="pp-setting-nutfree" ${prefs.nutFree ? 'checked' : ''} style="width:15px;height:16px;accent-color:var(--purple)"> Nut-Free Safety
+            <label for="pp-setting-nutfree" style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="pp-setting-nutfree" name="nutFree" ${prefs.nutFree ? 'checked' : ''} style="width:15px;height:16px;accent-color:var(--purple)"> Nut-Free Safety
             </label>
           </div>
         </div>
       </div>
 
       <div style="border-top:1px solid var(--border);padding-top:12px">
-        <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">Active Custom Exclusions (Blacklist)</label>
+        <label for="pref-exclude-search-input" style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">Active Custom Exclusions (Blacklist)</label>
         
         <div style="display:flex;gap:6px;margin-bottom:8px">
-          <input type="text" id="pref-exclude-search-input" placeholder="Type ingredient name (e.g., Mushrooms, Cilantro)..." style="flex:1;padding:8px 10px;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--surface)">
+          <input type="text" id="pref-exclude-search-input" name="prefExcludeSearch" aria-label="Exclude search" placeholder="Type ingredient name (e.g., Mushrooms, Cilantro)..." style="flex:1;padding:8px 10px;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--surface)">
           <button class="btn primary sm" type="button" data-action="add-exclusion" onclick="handleAddExclusionFromInput()" style="font-size:12px;font-weight:700">Add</button>
         </div>
 

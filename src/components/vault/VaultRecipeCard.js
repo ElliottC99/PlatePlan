@@ -52,12 +52,10 @@ export function renderVaultRecipeCard(r, options = {}) {
     const portions = bundle?.portions || { eCal: 0, eProt: 0, cCal: 0, cProt: 0, e: '', c: '' };
     const parts = [];
     if (showE) {
-      const fitE = typeof window.calculateFit === 'function' ? window.calculateFit(portions.eCal, portions.eProt, eTgt.cal, eTgt.prot) : { label: 'Good' };
-      parts.push(`<button type="button" class="fit-detail-button" data-action="open-fit-details" data-recipe-id="${escapeAttr(r.id)}" data-variant="${useEnhanced ? 'enhanced' : 'original'}" data-person="e" onclick="openVaultFitDetails(this,'${escapeAttr(r.id)}','${useEnhanced ? 'enhanced' : 'original'}','e')">Elliott ${(fitE.label || '').split(' ')[0]} ${escapeHtml(portions.e || '')}</button>`);
+      parts.push(`<button type="button" class="fit-detail-button" data-action="open-fit-details" data-recipe-id="${escapeAttr(r.id)}" data-variant="${useEnhanced ? 'enhanced' : 'original'}" data-person="e" onclick="openVaultFitDetails(this,'${escapeAttr(r.id)}','${useEnhanced ? 'enhanced' : 'original'}','e')">Elliott ${escapeHtml(portions.e || '')}</button>`);
     }
     if (showC) {
-      const fitC = typeof window.calculateFit === 'function' ? window.calculateFit(portions.cCal, portions.cProt, cTgt.cal, cTgt.prot) : { label: 'Good' };
-      parts.push(`<button type="button" class="fit-detail-button" data-action="open-fit-details" data-recipe-id="${escapeAttr(r.id)}" data-variant="${useEnhanced ? 'enhanced' : 'original'}" data-person="c" onclick="openVaultFitDetails(this,'${escapeAttr(r.id)}','${useEnhanced ? 'enhanced' : 'original'}','c')">Chloe ${(fitC.label || '').split(' ')[0]} ${escapeHtml(portions.c || '')}</button>`);
+      parts.push(`<button type="button" class="fit-detail-button" data-action="open-fit-details" data-recipe-id="${escapeAttr(r.id)}" data-variant="${useEnhanced ? 'enhanced' : 'original'}" data-person="c" onclick="openVaultFitDetails(this,'${escapeAttr(r.id)}','${useEnhanced ? 'enhanced' : 'original'}','c')">Chloe ${escapeHtml(portions.c || '')}</button>`);
     }
 
     const fitTag = renderFitScoreBadge(r, mealType, {

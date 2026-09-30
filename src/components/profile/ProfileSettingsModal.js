@@ -25,8 +25,8 @@ export function renderSystemDisplayCard(theme = 'system', version = 'v3.8.3 (ES6
       </div>
       <div class="pp-settings-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px">
         <div class="pp-input-group" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
-          <label style="font-size:12px;font-weight:600;color:#475569">Appearance Theme</label>
-          <select id="pp-setting-theme" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;background:#fff">
+          <label for="pp-setting-theme" style="font-size:12px;font-weight:600;color:#475569;cursor:pointer">Appearance Theme</label>
+          <select id="pp-setting-theme" name="theme" aria-label="Appearance Theme" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;background:#fff">
             <option value="system" ${theme === 'system' ? 'selected' : ''}>System Default</option>
             <option value="light" ${theme === 'light' ? 'selected' : ''}>Light Theme</option>
             <option value="dark" ${theme === 'dark' ? 'selected' : ''}>Dark Theme</option>
@@ -34,8 +34,8 @@ export function renderSystemDisplayCard(theme = 'system', version = 'v3.8.3 (ES6
         </div>
 
         <div class="pp-input-group" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
-          <label style="font-size:12px;font-weight:600;color:#475569">Active Architecture Version</label>
-          <input type="text" value="${escapeHtml(version)}" readonly style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc;color:#475569;font-weight:600">
+          <label for="pp-setting-version" style="font-size:12px;font-weight:600;color:#475569;cursor:pointer">Active Architecture Version</label>
+          <input type="text" id="pp-setting-version" name="activeArchitectureVersion" value="${escapeHtml(version)}" readonly style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc;color:#475569;font-weight:600">
         </div>
       </div>
 

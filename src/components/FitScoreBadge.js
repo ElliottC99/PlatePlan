@@ -39,23 +39,27 @@ export function renderFitScoreBadge(fitScoreOrRecipe, mealTypeOrOptions = 'dinne
     return `<span class="pp-fit-badge pp-fit-neutral" title="${escapeHtml(fitResult?.error || 'Awaiting Data')}">--</span>`;
   }
 
-  const { score, tier, tierIcon, tierLabel, details } = fitResult;
+  const { score, details } = fitResult;
 
-  const options = (typeof mealTypeOrOptions === 'object' && !extraOptions.showLabel) ? mealTypeOrOptions : extraOptions;
-
-  let title = `Fit Score: ${score}/100 (${tierLabel})`;
+  let title = `Fit Score: ${score}%`;
   if (details) {
     const e = details.elliott;
     const c = details.chloe;
     if (e && c) {
-      title += ` | Elliott: ${e.score}/100 (${e.recipeKcal}kcal, ${e.recipeProtein}g prot) | Chloe: ${c.score}/100 (${c.recipeKcal}kcal, ${c.recipeProtein}g prot)`;
+      title += ` | Elliott: ${e.score}% (${e.recipeKcal}kcal, ${e.recipeProtein}g prot) | Chloe: ${c.score}% (${c.recipeKcal}kcal, ${c.recipeProtein}g prot)`;
     }
   }
 
-  const showLabel = options.showLabel ? ` <span class="pp-fit-label">${escapeHtml(tierLabel)}</span>` : '';
-  const extraClass = options.className ? ` ${options.className}` : '';
+  const hue = Math.round(score * 1.2); 
+  // 0 = Red, 60 = Yellow, 120 = Green
 
-  return `<span class="pp-fit-badge pp-fit-${escapeHtml(tier)}${extraClass}" title="${escapeHtml(title)}" data-fit-score="${score}" data-fit-tier="${escapeHtml(tier)}">${score} ${tierIcon}${showLabel}</span>`;
+  return `<span class="pp-fit-badge gradient-badge" 
+    style="background-color: hsl(${hue}, 85%, 92%); 
+           color: hsl(${hue}, 90%, 25%); 
+           border: 1px solid hsl(${hue}, 80%, 45%);" 
+    title="${escapeHtml(title)}" data-fit-score="${score}">
+    ${score}%
+  </span>`;
 }
 
 if (typeof window !== 'undefined') {

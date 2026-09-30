@@ -135,68 +135,43 @@ export function attachComputedFitScores(recipes = [], targetSlot = 'dinner', con
   return recipes.map(recipe => {
     if (!recipe) return recipe;
     
-    const result = calculateMealFitScore(recipe, targetSlot, { activeProfile, portionScaled: true });
-    recipe._computedFitScore = result.score;
-    recipe._computedFitResult = result;
+    const scoreOrig = calculateMealFitScore(recipe, targetSlot, { ...context, activeProfile, portionScaled: true, variant: 'original' }).score;
+    const scoreEnh = calculateMealFitScore(recipe, targetSlot, { ...context, activeProfile, portionScaled: true, variant: 'enhanced' }).score;
     
-    if (recipe.enhanced || (recipe.recipe && recipe.recipe.enhanced)) {
-        const enhanced = calculateMealFitScore(recipe, targetSlot, { activeProfile, portionScaled: true, variant: 'enhanced' });
-        if (enhanced.score > result.score) {
-            recipe._computedFitScore = enhanced.score;
-            recipe._computedFitResult = enhanced;
-            recipe._bestVariant = 'enhanced';
-        } else {
-            recipe._bestVariant = 'original';
-        }
-    } else {
-        recipe._bestVariant = 'original';
-    }
+    recipe._computedFitScore = Math.max(scoreOrig, scoreEnh);
+    recipe._bestVariant = scoreEnh > scoreOrig ? 'enhanced' : 'original';
+    recipe._computedFitResult = calculateMealFitScore(recipe, targetSlot, { ...context, activeProfile, portionScaled: true, variant: recipe._bestVariant });
 
     return recipe;
   });
 }
 
 /**
- * Sorts recipes by fit score.
+ * Sorts recipes by fit score or name.
  */
-export function getSortedRecipes(recipes = [], sortOption = 'name', activeSlotTargets = 'dinner', context = {}) {
-  const scoredRecipes = attachComputedFitScores([...recipes], activeSlotTargets, context);
+export function getSortedRecipes(recipes = [], sortOption = 'fit-desc', activeSlotTargets = 'dinner', context = {}) {
+  const scoredRecipes = recipes.map(recipe => {
+    const scoreOrig = calculateMealFitScore(recipe, activeSlotTargets, { ...context, variant: 'original', portionScaled: true }).score;
+    const scoreEnh = calculateMealFitScore(recipe, activeSlotTargets, { ...context, variant: 'enhanced', portionScaled: true }).score;
+    return {
+      ...recipe,
+      _computedFitScore: Math.max(scoreOrig, scoreEnh)
+    };
+  });
 
-  const isFav = (r) => {
-    if (!r) return false;
-    if (typeof window !== 'undefined' && typeof window.isRecipeVariantFavourite === 'function') {
-      return window.isRecipeVariantFavourite(r.id, 'original') || window.isRecipeVariantFavourite(r.id, 'enhanced') || r.isFavourite || r.isFavorite;
+  return scoredRecipes.sort((a, b) => {
+    if (sortOption === 'fit-desc') {
+      return (b._computedFitScore || 0) - (a._computedFitScore || 0);
     }
-    return !!(r.isFavourite || r.isFavorite);
-  };
-
-  switch (sortOption) {
-    case 'best-fit':
-    case 'best_fit':
-    case 'fit-desc':
-      return scoredRecipes.sort((a, b) => {
-        const aF = isFav(a), bF = isFav(b);
-        if (!!bF !== !!aF) return bF ? 1 : -1;
-        const diff = (b._computedFitScore ?? 0) - (a._computedFitScore ?? 0);
-        return diff || (a.name || a.label || '').localeCompare(b.name || b.label || '', 'en', { sensitivity: 'base' });
-      });
-
-    case 'needs-work':
-    case 'needs_work':
-    case 'fit-asc':
-      return scoredRecipes.sort((a, b) => {
-        const aF = isFav(a), bF = isFav(b);
-        if (!!bF !== !!aF) return bF ? 1 : -1;
-        const diff = (a._computedFitScore ?? 0) - (b._computedFitScore ?? 0);
-        return diff || (a.name || a.label || '').localeCompare(b.name || b.label || '', 'en', { sensitivity: 'base' });
-      });
-
-    case 'name':
-    default:
-      return scoredRecipes.sort((a, b) => {
-        const aF = isFav(a), bF = isFav(b);
-        if (!!bF !== !!aF) return bF ? 1 : -1;
-        return (a.name || a.label || '').localeCompare(b.name || b.label || '', 'en', { sensitivity: 'base' });
-      });
-  }
+    if (sortOption === 'fit-asc') {
+      return (a._computedFitScore || 0) - (b._computedFitScore || 0);
+    }
+    if (sortOption === 'name-asc') {
+      return (a.title || a.name || '').localeCompare(b.title || b.name || '');
+    }
+    if (sortOption === 'name-desc') {
+      return (b.title || b.name || '').localeCompare(a.title || a.name || '');
+    }
+    return 0;
+  });
 }

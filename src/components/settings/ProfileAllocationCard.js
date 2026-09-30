@@ -59,14 +59,14 @@ function renderSingleProfileCard(profileId, profile = {}) {
       <!-- Daily Targets -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div>
-          <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">Daily Calories (kcal)</label>
-          <input type="number" id="pp-profile-${pId}-cal" class="pp-profile-cal-input" data-profile="${pId}" value="${dailyKcal}" style="width:100%" oninput="calcBudgets()">
-          <input type="hidden" id="pp-macro-${legacyPrefix}-cal" value="${dailyKcal}">
+          <label for="pp-profile-${pId}-cal" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;cursor:pointer">Daily Calories (kcal)</label>
+          <input type="number" id="pp-profile-${pId}-cal" name="profileCal-${pId}" aria-label="${escapeHtml(name)} Daily Calories" class="pp-profile-cal-input" data-profile="${pId}" value="${dailyKcal}" style="width:100%" oninput="calcBudgets()">
+          <input type="hidden" id="pp-macro-${legacyPrefix}-cal" name="macroCal-${legacyPrefix}" value="${dailyKcal}">
         </div>
         <div>
-          <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">Daily Protein (g)</label>
-          <input type="number" id="pp-profile-${pId}-prot" class="pp-profile-prot-input" data-profile="${pId}" value="${dailyProtein}" style="width:100%" oninput="calcBudgets()">
-          <input type="hidden" id="pp-macro-${legacyPrefix}-prot" value="${dailyProtein}">
+          <label for="pp-profile-${pId}-prot" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;cursor:pointer">Daily Protein (g)</label>
+          <input type="number" id="pp-profile-${pId}-prot" name="profileProt-${pId}" aria-label="${escapeHtml(name)} Daily Protein" class="pp-profile-prot-input" data-profile="${pId}" value="${dailyProtein}" style="width:100%" oninput="calcBudgets()">
+          <input type="hidden" id="pp-macro-${legacyPrefix}-prot" name="macroProt-${legacyPrefix}" value="${dailyProtein}">
         </div>
       </div>
 
@@ -78,24 +78,24 @@ function renderSingleProfileCard(profileId, profile = {}) {
         </div>
         <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:6px">
           <div>
-            <label style="font-size:10px;color:var(--text2)">Breakfast</label>
-            <input type="number" id="pp-profile-${pId}-cal-bf" value="${calBf}" min="0" max="100" style="width:100%;font-size:11px" oninput="calcBudgets()">
-            <input type="hidden" id="pp-macro-${legacyPrefix}-bf-cal" value="${calBf}">
+            <label for="pp-profile-${pId}-cal-bf" style="font-size:10px;color:var(--text2);display:block;cursor:pointer">Breakfast</label>
+            <input type="number" id="pp-profile-${pId}-cal-bf" name="profileCalBf-${pId}" aria-label="${escapeHtml(name)} Calorie Split Breakfast" value="${calBf}" min="0" max="100" style="width:100%;font-size:11px" oninput="calcBudgets()">
+            <input type="hidden" id="pp-macro-${legacyPrefix}-bf-cal" name="macroCalBf-${legacyPrefix}" value="${calBf}">
           </div>
           <div>
-            <label style="font-size:10px;color:var(--text2)">Lunch</label>
-            <input type="number" id="pp-profile-${pId}-cal-lu" value="${calLu}" min="0" max="100" style="width:100%;font-size:11px" oninput="calcBudgets()">
-            <input type="hidden" id="pp-macro-${legacyPrefix}-lu-cal" value="${calLu}">
+            <label for="pp-profile-${pId}-cal-lu" style="font-size:10px;color:var(--text2);display:block;cursor:pointer">Lunch</label>
+            <input type="number" id="pp-profile-${pId}-cal-lu" name="profileCalLu-${pId}" aria-label="${escapeHtml(name)} Calorie Split Lunch" value="${calLu}" min="0" max="100" style="width:100%;font-size:11px" oninput="calcBudgets()">
+            <input type="hidden" id="pp-macro-${legacyPrefix}-lu-cal" name="macroCalLu-${legacyPrefix}" value="${calLu}">
           </div>
           <div>
-            <label style="font-size:10px;color:var(--text2)">Snack</label>
-            <input type="number" id="pp-profile-${pId}-cal-sn" value="${calSn}" min="0" max="100" style="width:100%;font-size:11px" oninput="calcBudgets()">
-            <input type="hidden" id="pp-macro-${legacyPrefix}-sn-cal" value="${calSn}">
+            <label for="pp-profile-${pId}-cal-sn" style="font-size:10px;color:var(--text2);display:block;cursor:pointer">Snack</label>
+            <input type="number" id="pp-profile-${pId}-cal-sn" name="profileCalSn-${pId}" aria-label="${escapeHtml(name)} Calorie Split Snack" value="${calSn}" min="0" max="100" style="width:100%;font-size:11px" oninput="calcBudgets()">
+            <input type="hidden" id="pp-macro-${legacyPrefix}-sn-cal" name="macroCalSn-${legacyPrefix}" value="${calSn}">
           </div>
           <div>
-            <label style="font-size:10px;color:var(--text2)">Dinner (Remainder)</label>
-            <input type="number" id="pp-profile-${pId}-cal-di" value="${calDi}" readonly style="width:100%;font-size:11px;background:rgba(0,0,0,0.04);font-weight:700;color:var(--primary, #2563eb)">
-            <input type="hidden" id="pp-macro-${legacyPrefix}-di-cal" value="${calDi}">
+            <label for="pp-profile-${pId}-cal-di" style="font-size:10px;color:var(--text2);display:block;cursor:pointer">Dinner (Rem)</label>
+            <input type="number" id="pp-profile-${pId}-cal-di" name="profileCalDi-${pId}" aria-label="${escapeHtml(name)} Calorie Split Dinner" value="${calDi}" readonly style="width:100%;font-size:11px;background:rgba(0,0,0,0.04);font-weight:700;color:var(--primary, #2563eb)">
+            <input type="hidden" id="pp-macro-${legacyPrefix}-di-cal" name="macroCalDi-${legacyPrefix}" value="${calDi}">
           </div>
         </div>
       </div>
@@ -108,20 +108,20 @@ function renderSingleProfileCard(profileId, profile = {}) {
         </div>
         <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:6px">
           <div>
-            <label style="font-size:10px;color:var(--text2)">Breakfast</label>
-            <input type="number" id="pp-profile-${pId}-prot-bf" value="${protBf}" min="0" max="100" style="width:100%;font-size:11px" oninput="calcBudgets()">
+            <label for="pp-profile-${pId}-prot-bf" style="font-size:10px;color:var(--text2);display:block;cursor:pointer">Breakfast</label>
+            <input type="number" id="pp-profile-${pId}-prot-bf" name="profileProtBf-${pId}" aria-label="${escapeHtml(name)} Protein Split Breakfast" value="${protBf}" min="0" max="100" style="width:100%;font-size:11px" oninput="calcBudgets()">
           </div>
           <div>
-            <label style="font-size:10px;color:var(--text2)">Lunch</label>
-            <input type="number" id="pp-profile-${pId}-prot-lu" value="${protLu}" min="0" max="100" style="width:100%;font-size:11px" oninput="calcBudgets()">
+            <label for="pp-profile-${pId}-prot-lu" style="font-size:10px;color:var(--text2);display:block;cursor:pointer">Lunch</label>
+            <input type="number" id="pp-profile-${pId}-prot-lu" name="profileProtLu-${pId}" aria-label="${escapeHtml(name)} Protein Split Lunch" value="${protLu}" min="0" max="100" style="width:100%;font-size:11px" oninput="calcBudgets()">
           </div>
           <div>
-            <label style="font-size:10px;color:var(--text2)">Snack</label>
-            <input type="number" id="pp-profile-${pId}-prot-sn" value="${protSn}" min="0" max="100" style="width:100%;font-size:11px" oninput="calcBudgets()">
+            <label for="pp-profile-${pId}-prot-sn" style="font-size:10px;color:var(--text2);display:block;cursor:pointer">Snack</label>
+            <input type="number" id="pp-profile-${pId}-prot-sn" name="profileProtSn-${pId}" aria-label="${escapeHtml(name)} Protein Split Snack" value="${protSn}" min="0" max="100" style="width:100%;font-size:11px" oninput="calcBudgets()">
           </div>
           <div>
-            <label style="font-size:10px;color:var(--text2)">Dinner (Remainder)</label>
-            <input type="number" id="pp-profile-${pId}-prot-di" value="${protDi}" readonly style="width:100%;font-size:11px;background:rgba(0,0,0,0.04);font-weight:700;color:var(--primary, #2563eb)">
+            <label for="pp-profile-${pId}-prot-di" style="font-size:10px;color:var(--text2);display:block;cursor:pointer">Dinner (Rem)</label>
+            <input type="number" id="pp-profile-${pId}-prot-di" name="profileProtDi-${pId}" aria-label="${escapeHtml(name)} Protein Split Dinner" value="${protDi}" readonly style="width:100%;font-size:11px;background:rgba(0,0,0,0.04);font-weight:700;color:var(--primary, #2563eb)">
           </div>
         </div>
       </div>

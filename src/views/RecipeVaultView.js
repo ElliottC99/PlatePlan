@@ -1,5 +1,5 @@
 /**
- * src/views/RecipeVaultView.js (v3.18.0)
+ * src/views/RecipeVaultView.js (v3.19.3)
  * Atomic Recipe Vault Component & Actions Module.
  * Decoupled from direct Firestore SDK, pure reactive Store interactions.
  * Features optimized DocumentFragment rendering and instant offline caching.
@@ -9,8 +9,9 @@ import { renderVaultRecipeCard } from '../components/vault/VaultRecipeCard.js';
 import { renderVaultGridContainer } from '../components/vault/VaultGridContainer.js';
 import * as VaultFilterToolbar from '../components/vault/VaultFilterToolbar.js';
 import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
+import { getSortedRecipes } from '../services/FitScoreService.js';
 
-export { renderVaultRecipeCard, renderVaultGridContainer, VaultFilterToolbar, calculateMealFitScore };
+export { renderVaultRecipeCard, renderVaultGridContainer, VaultFilterToolbar, calculateMealFitScore, getSortedRecipes };
 
 export function hasVariantFavoritingInitialized() {
   const prefs = window.state?.userPrefs || window.state?.prefs || {};
@@ -125,7 +126,7 @@ export function renderRecipeVault() {
   const ft = ftEl ? ftEl.value : 'all';
   const fw = fwEl ? fwEl.value : 'all';
   const q = (document.getElementById('vault-search')?.value || '').trim().toLowerCase();
-  const sort = document.getElementById('vault-sort')?.value || 'name';
+  const sort = document.getElementById('vault-sort')?.value || 'fit-desc';
   const list = document.getElementById('vault-list');
 
   const hasData = (window.state?.recipes?.length > 0) || window.state?.isCachedHydrated;
@@ -166,31 +167,7 @@ export function renderRecipeVault() {
   });
 
   const selectedMealType = ft !== 'all' ? ft : 'dinner';
-  let sortedRecipes = recipes;
-
-  if (sort === 'fitScore' || sort === 'fit' || sort === 'best_fit') {
-    // Dynamic real-time calculation based on selected activeProfile and meal type
-    const scoreMap = new Map();
-    recipes.forEach(r => {
-      const res = calculateMealFitScore(r, selectedMealType, {
-        activeProfile,
-        portionScaled: true
-      });
-      scoreMap.set(r.id, res.score);
-      r._computedFitScore = res.score;
-      r._computedFitResult = res;
-    });
-
-    sortedRecipes = [...recipes].sort((a, b) => {
-      const aF = isRecipeVariantFavourite(a.id, 'original') || isRecipeVariantFavourite(a.id, 'enhanced') || a.isFavourite;
-      const bF = isRecipeVariantFavourite(b.id, 'original') || isRecipeVariantFavourite(b.id, 'enhanced') || b.isFavourite;
-      if (!!bF !== !!aF) return bF ? 1 : -1;
-      const diff = (scoreMap.get(b.id) ?? 0) - (scoreMap.get(a.id) ?? 0);
-      return diff || (a.name || '').localeCompare(b.name || '');
-    });
-  } else if (typeof window.getSortedRecipes === 'function') {
-    sortedRecipes = window.getSortedRecipes(recipes, sort, selectedMealType);
-  }
+  const sortedRecipes = getSortedRecipes(recipes, sort, selectedMealType, { activeProfile });
 
   if (!list) return;
   if (!sortedRecipes.length) {
@@ -222,6 +199,11 @@ if (typeof window !== 'undefined') {
   window.isRecipeVariantFavorite = isRecipeVariantFavourite;
   window.toggleVaultFavouritesFilter = toggleVaultFavouritesFilter;
   window.toggleVaultFavoritesFilter = toggleVaultFavouritesFilter;
+  window.handleVaultSortChange = function(val) {
+    const el = document.getElementById('vault-sort');
+    if (el) el.value = val;
+    renderRecipeVault();
+  };
   window.VaultFilterToolbar = VaultFilterToolbar;
   window.VaultRecipeCard = { renderVaultRecipeCard };
   window.VaultGridContainer = { renderVaultGridContainer };
