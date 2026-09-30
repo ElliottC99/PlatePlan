@@ -30,6 +30,22 @@ function evaluatePortionScaledProfileFit(recipe, profileId, kcalTarget, proteinT
   const variant = options.variant || (recipe?.enhanced ? 'enhanced' : 'original');
   const perServing = getRecipePerServingNutrition(recipe, variant);
 
+  if (perServing.kcal <= 0) {
+    return {
+      score: 0,
+      tier: 'red',
+      tierIcon: '🔴',
+      tierLabel: 'Missing Macros',
+      multiplier: 0,
+      scaledKcal: 0,
+      scaledProtein: 0,
+      sanityPenalty: 0,
+      deltaKcal: 0,
+      proteinRatio: 0,
+      error: 'Zero Calorie Data'
+    };
+  }
+
   const multiplier = calculatePortionMultiplier(kcalTarget, perServing.kcal);
   const scaledKcal = Math.round(perServing.kcal * multiplier);
   const scaledProtein = Math.round((perServing.protein * multiplier) * 10) / 10;
@@ -221,13 +237,13 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
     r?.prot ?? r?.protein ?? 0
   );
 
-  if (totalKcal <= 0 && totalProt <= 0) {
+  if (totalKcal <= 0) {
     return {
       score: 0,
       tier: 'red',
       tierIcon: '🔴',
       tierLabel: 'Missing Macros',
-      error: 'Zero Macro Data'
+      error: 'Zero Calorie Data'
     };
   }
 

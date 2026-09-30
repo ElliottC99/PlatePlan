@@ -1,9 +1,9 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.17.4';
+  window.APP_VERSION = 'v3.17.6';
 }
 
 /**
- * src/main.js (v3.17.4)
+ * src/main.js (v3.17.6)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronization,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -275,7 +275,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.17.4 (ES6 Modern)';
+    footerEl.textContent = 'v3.17.6 (ES6 Modern)';
   }
 }
 
