@@ -194,6 +194,7 @@ export function renderSettingsView() {
       // Dispatch CustomEvent to notify PlannerView and all reactive listeners
       document.dispatchEvent(new CustomEvent('plateplan:state:preferences', { detail: window.state.userPrefs }));
       document.dispatchEvent(new CustomEvent('plateplan:state-changed', { detail: { type: 'preferences', data: window.state.userPrefs } }));
+      window.dispatchEvent(new CustomEvent('plateplan:preferences-updated', { detail: window.state.userPrefs }));
 
       if (typeof window.renderPlanner === 'function') {
         try { window.renderPlanner(); } catch(_e) {}

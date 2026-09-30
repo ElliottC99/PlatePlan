@@ -232,6 +232,18 @@ import { subscribe } from '../store/store.js';
 let vaultUnsub = null;
 let vaultTimer = null;
 
+function handlePreferencesUpdated() {
+  if (window.state?.recipes) {
+    window.state.recipes.forEach(r => {
+      delete r._computedFitScore;
+      delete r._computedFitResult;
+    });
+  }
+  if (typeof renderRecipeVault === 'function') {
+    renderRecipeVault();
+  }
+}
+
 export function mount(container) {
   if (typeof renderRecipeVault === 'function') {
     renderRecipeVault();
@@ -243,8 +255,9 @@ export function mount(container) {
   });
 
   // Re-render on hydration or preference changes
-  document.addEventListener('plateplan:state:preferences', () => renderRecipeVault());
-  document.addEventListener('plateplan:state:hydrated', () => renderRecipeVault());
+  document.addEventListener('plateplan:state:preferences', handlePreferencesUpdated);
+  document.addEventListener('plateplan:state:hydrated', handlePreferencesUpdated);
+  window.addEventListener('plateplan:preferences-updated', handlePreferencesUpdated);
 }
 
 export function unmount() {
@@ -252,6 +265,9 @@ export function unmount() {
     vaultUnsub();
     vaultUnsub = null;
   }
+  document.removeEventListener('plateplan:state:preferences', handlePreferencesUpdated);
+  document.removeEventListener('plateplan:state:hydrated', handlePreferencesUpdated);
+  window.removeEventListener('plateplan:preferences-updated', handlePreferencesUpdated);
   if (vaultTimer) {
     clearTimeout(vaultTimer);
     vaultTimer = null;

@@ -889,6 +889,7 @@ export function mount(container) {
     }
   });
   document.addEventListener('plateplan:state:preferences', handlePreferencesUpdated);
+  window.addEventListener('plateplan:preferences-updated', handlePreferencesUpdated);
 }
 
 export function unmount() {
@@ -901,6 +902,7 @@ export function unmount() {
     prefsUnsub = null;
   }
   document.removeEventListener('plateplan:state:preferences', handlePreferencesUpdated);
+  window.removeEventListener('plateplan:preferences-updated', handlePreferencesUpdated);
   if (plannerTimer) {
     clearTimeout(plannerTimer);
     plannerTimer = null;

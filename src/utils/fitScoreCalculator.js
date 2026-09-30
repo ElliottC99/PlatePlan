@@ -78,7 +78,20 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
 
   // Retrieve targets for Elliott and Chloe
   const profiles = options?.userPrefs?.profiles || 
-                   (typeof window !== 'undefined' ? (window.state?.preferences?.profiles || window.state?.userPrefs?.profiles) : {}) || {};
+                   (typeof window !== 'undefined' ? (window.state?.preferences?.profiles || window.state?.userPrefs?.profiles) : {}) || null;
+  
+  if (!profiles) {
+    return {
+      score: 0,
+      tier: 'neutral',
+      tierIcon: '⚪',
+      tierLabel: 'Awaiting Data',
+      error: 'Missing Macro Targets',
+      activeProfile,
+      mealType: normMeal
+    };
+  }
+
   const profileE = profiles.elliott || profiles.e || {};
   const profileC = profiles.chloe || profiles.c || {};
 
@@ -90,7 +103,7 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
   if (!profileE.dailyKcal || !profileC.dailyKcal) {
     return {
       score: 0,
-      tier: 'red',
+      tier: 'neutral',
       tierIcon: '⚪',
       tierLabel: 'Awaiting Data',
       error: 'Missing Macro Targets',
@@ -104,7 +117,7 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
   if (totalHH <= 0) {
     return {
       score: 0,
-      tier: 'red',
+      tier: 'neutral',
       tierIcon: '⚪',
       tierLabel: 'Awaiting Data',
       error: 'Missing Macro Targets',
@@ -116,10 +129,19 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
   const shareE = (Number(profileE.dailyKcal) || 0) / totalHH;
   const shareC = (Number(profileC.dailyKcal) || 0) / totalHH;
 
-  const actualKcalE = totalKcal * (2 * shareE);
-  const actualProtE = totalProt * (2 * shareE);
-  const actualKcalC = totalKcal * (2 * shareC);
-  const actualProtC = totalProt * (2 * shareC);
+  const serves = Number(r.serves || r.yield || 2);
+  const isSnack = normMeal === 'snack' || String(r.type || '').toLowerCase() === 'snack' || (r.types || []).some(t => String(t).toLowerCase() === 'snack');
+  
+  // If single-serving or snack, scale from batch of 1 instead of 2
+  const batchSize = (serves === 1 || isSnack) ? 1 : 2;
+
+  const multE = Number.isFinite(batchSize * shareE) ? (batchSize * shareE) : 1;
+  const multC = Number.isFinite(batchSize * shareC) ? (batchSize * shareC) : 1;
+
+  const actualKcalE = totalKcal * multE;
+  const actualProtE = totalProt * multE;
+  const actualKcalC = totalKcal * multC;
+  const actualProtC = totalProt * multC;
 
   const calScoreE = calculateCalorieScore(actualKcalE, targetCal_E);
   const protScoreE = calculateProteinScore(actualProtE, targetProt_E);
@@ -171,7 +193,7 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
       proteinTarget: Math.round(targetProt_E * 10) / 10,
       recipeKcal: Math.round(actualKcalE),
       recipeProtein: Math.round(actualProtE * 10) / 10,
-      multiplier: 2 * shareE,
+      multiplier: multE,
       scaledKcal: Math.round(actualKcalE),
       scaledProtein: Math.round(actualProtE * 10) / 10,
       proteinRatio: targetProt_E > 0 ? (actualProtE / targetProt_E) : 0
@@ -185,7 +207,7 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
       proteinTarget: Math.round(targetProt_C * 10) / 10,
       recipeKcal: Math.round(actualKcalC),
       recipeProtein: Math.round(actualProtC * 10) / 10,
-      multiplier: 2 * shareC,
+      multiplier: multC,
       scaledKcal: Math.round(actualKcalC),
       scaledProtein: Math.round(actualProtC * 10) / 10,
       proteinRatio: targetProt_C > 0 ? (actualProtC / targetProt_C) : 0
