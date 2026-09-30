@@ -4,9 +4,9 @@
  * Caches core app shell, modern ES6 modules, stylesheets, and icons.
  */
 
-const PLATEPLAN_CACHE = 'plateplan-shell-v3.17.3';
-const PLATEPLAN_APP_VERSION = '3.17.3';
-const PLATEPLAN_BUILD_ID = '3.17.3-v160';
+const PLATEPLAN_CACHE = 'plateplan-shell-v3.17.4';
+const PLATEPLAN_APP_VERSION = '3.17.4';
+const PLATEPLAN_BUILD_ID = '3.17.4-v161';
 
 const PLATEPLAN_PRECACHE_ASSETS = [
   '/',
@@ -117,9 +117,9 @@ self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(PLATEPLAN_CACHE).then(async cache => {
-      console.log(`[SW v3.17.3] Precaching shell and core ES6 modules...`);
+      console.log(`[SW v3.17.4] Precaching shell and core ES6 modules...`);
       await cache.addAll(PLATEPLAN_PRECACHE_ASSETS).catch(err => {
-        console.warn('[SW v3.17.3] Non-fatal precache warning:', err);
+        console.warn('[SW v3.17.4] Non-fatal precache warning:', err);
       });
       await Promise.allSettled(PLATEPLAN_OPTIONAL_SHELL.map(url => cache.add(url)));
     })
@@ -133,7 +133,7 @@ self.addEventListener('activate', event => {
         keys
           .filter(key => key !== PLATEPLAN_CACHE)
           .map(key => {
-            console.log('[SW v3.17.3] Purging previous shell cache:', key);
+            console.log('[SW v3.17.4] Purging previous shell cache:', key);
             return caches.delete(key);
           })
       );

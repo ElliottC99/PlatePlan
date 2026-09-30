@@ -36,13 +36,18 @@ export function getProfileMealTargets(profileId, mealType, customProfiles = null
   const calSplitPct = Number(calSplits[mealKey] ?? calSplits[normMeal] ?? 0);
   const protSplitPct = Number(protSplits[mealKey] ?? protSplits[normMeal] ?? 0);
 
-  // Exact formulas as specified
-  const kcal = Math.round((calSplitPct / 100) * dailyKcal);
-  const protein = Math.round((protSplitPct / 100) * dailyProtein);
+  // Core Data Mapping: Prefer absolute meal targets if they exist, otherwise calculate from splits
+  const kcal = profile?.meals?.[mealKey]?.kcal ?? 
+               profile?.meals?.[normMeal]?.kcal ?? 
+               Math.round((calSplitPct / 100) * dailyKcal);
+               
+  const protein = profile?.meals?.[mealKey]?.protein ?? 
+                  profile?.meals?.[normMeal]?.protein ?? 
+                  Math.round((protSplitPct / 100) * dailyProtein);
 
   return {
-    kcal,
-    protein,
+    kcal: Number(kcal) || 0,
+    protein: Number(protein) || 0,
     calorieSplitPct: calSplitPct,
     proteinSplitPct: protSplitPct,
     dailyKcal,

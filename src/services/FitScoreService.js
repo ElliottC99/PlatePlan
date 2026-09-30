@@ -9,7 +9,7 @@ import {
   calculateRecipeFit,
   getVaultTargetMacros as modernGetVaultTargetMacros
 } from '../utils/fitScoreCalculator.js';
-import { getProfileMealTargets } from '../models/StateModel.js';
+import { getProfileMealTargets, getProfilesFromState } from '../models/StateModel.js';
 
 /**
  * Re-export modern engine features.
@@ -29,17 +29,29 @@ export const FIT_SCORE_TIERS = {
  */
 export function getMealTypeTargets(mealType = 'dinner', userPrefs = null) {
   const mt = (mealType || 'dinner').toLowerCase();
-  const eTargets = getProfileMealTargets('elliott', mt, userPrefs?.profiles);
-  const cTargets = getProfileMealTargets('chloe', mt, userPrefs?.profiles);
+  const profiles = userPrefs?.profiles || getProfilesFromState();
+  const elliott = profiles.elliott || profiles.e || {};
+  const chloe = profiles.chloe || profiles.c || {};
+
+  // Core Data Mapping: prefer absolute meals[mt].kcal if it exists, otherwise calculate from daily * splits
+  const targetCal_E = elliott.meals?.[mt]?.kcal || 
+                      ((Number(elliott.dailyKcal) || 0) * ((Number(elliott.calorieSplits?.[mt]) || 0) / 100));
+  const targetProt_E = elliott.meals?.[mt]?.protein || 
+                       ((Number(elliott.dailyProtein) || 0) * ((Number(elliott.proteinSplits?.[mt]) || 0) / 100));
+
+  const targetCal_C = chloe.meals?.[mt]?.kcal || 
+                      ((Number(chloe.dailyKcal) || 0) * ((Number(chloe.calorieSplits?.[mt]) || 0) / 100));
+  const targetProt_C = chloe.meals?.[mt]?.protein || 
+                       ((Number(chloe.dailyProtein) || 0) * ((Number(chloe.proteinSplits?.[mt]) || 0) / 100));
 
   return {
     mealType: mt,
-    targetCal_E: eTargets.kcal,
-    targetProt_E: eTargets.protein,
-    targetCal_C: cTargets.kcal,
-    targetProt_C: cTargets.protein,
-    e: { cal: eTargets.kcal, prot: eTargets.protein },
-    c: { cal: cTargets.kcal, prot: cTargets.protein }
+    targetCal_E: Math.round(targetCal_E),
+    targetProt_E: Math.round(targetProt_E * 10) / 10,
+    targetCal_C: Math.round(targetCal_C),
+    targetProt_C: Math.round(targetProt_C * 10) / 10,
+    e: { cal: Math.round(targetCal_E), prot: Math.round(targetProt_E * 10) / 10 },
+    c: { cal: Math.round(targetCal_C), prot: Math.round(targetProt_C * 10) / 10 }
   };
 }
 

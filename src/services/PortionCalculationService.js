@@ -57,8 +57,9 @@ export function getRecipePerServingNutrition(recipe, variant = 'original') {
   const source = useEnhanced ? (r.enhanced || r) : r;
   const ps = source.perServing || source.nutrition || source;
 
-  const kcal = Number(ps.calories ?? ps.kcal ?? ps.cal ?? source.calories ?? source.kcal ?? 0);
-  const protein = Number(ps.protein ?? ps.prot ?? source.protein ?? source.prot ?? 0);
+  // Use correct raw keys as requested: cal, prot aliases
+  const kcal = Number(ps.cal ?? ps.kcal ?? ps.calories ?? source.cal ?? source.kcal ?? source.calories ?? 0);
+  const protein = Number(ps.prot ?? ps.protein ?? source.prot ?? source.protein ?? 0);
 
   return {
     kcal: Math.max(0, Math.round(kcal)),
