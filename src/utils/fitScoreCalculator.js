@@ -1,230 +1,54 @@
 /**
- * src/utils/fitScoreCalculator.js (v3.16.2)
- * Traffic Light Fit Score Engine with 50/50 Household Weighting & Portion-Aware Scaling.
- * Evaluates recipes against dynamically hydrated profile meal targets
- * (calorieSplits vs proteinSplits), supports portion scaling with sanity volume penalties,
- * and maps macro deltas into Green, Amber, Red tiers.
+ * src/utils/fitScoreCalculator.js (v3.18.0)
+ * Deterministic 50/50 Household Fit Score Engine utilizing Piecewise Linear Interpolation (Lerp).
+ * Strictly maps user profiles and scales macros dynamically using consumption shares.
  */
-
-import { getProfileMealTargets } from '../models/StateModel.js';
-import {
-  calculatePortionMultiplier,
-  calculatePortionSanityPenalty,
-  getRecipePerServingNutrition
-} from '../services/PortionCalculationService.js';
 
 /**
- * Evaluates portion-scaled fit for a single profile.
- * m = Kcal Target / recipe.perServing.kcal
- * Scaled Protein = recipe.perServing.protein * m
- * Portion Sanity Penalty if m > 2.5 or m < 0.3
- *
- * @param {Object} recipe
- * @param {string} profileId
- * @param {number} kcalTarget
- * @param {number} proteinTarget
- * @param {Object} options
- * @returns {{ score: number, tier: string, tierIcon: string, tierLabel: string, multiplier: number, scaledKcal: number, scaledProtein: number, sanityPenalty: number, proteinRatio: number }}
+ * Resolves specific meal target for a given profile, type, and meal.
+ * Prefers absolute overrides first, then daily budget & split percentage.
  */
-function evaluatePortionScaledProfileFit(recipe, profileId, kcalTarget, proteinTarget, options = {}) {
-  const variant = options.variant || (recipe?.enhanced ? 'enhanced' : 'original');
-  const perServing = getRecipePerServingNutrition(recipe, variant);
+export const getTarget = (profile, type, meal) => {
+  if (!profile) return 0;
+  const override = profile.meals?.[meal]?.[type];
+  if (override !== undefined && override !== null) return Number(override);
+  const daily = type === 'kcal' ? (Number(profile.dailyKcal) || 0) : (Number(profile.dailyProtein) || 0);
+  const splitStr = type === 'kcal' ? 'calorieSplits' : 'proteinSplits';
+  const split = Number(profile[splitStr]?.[meal]) || 0;
+  return daily * (split / 100);
+};
 
-  if (perServing.kcal <= 0) {
-    return {
-      score: 0,
-      tier: 'red',
-      tierIcon: '🔴',
-      tierLabel: 'Missing Macros',
-      multiplier: 0,
-      scaledKcal: 0,
-      scaledProtein: 0,
-      sanityPenalty: 0,
-      deltaKcal: 0,
-      proteinRatio: 0,
-      error: 'Zero Calorie Data'
-    };
-  }
-
-  const multiplier = calculatePortionMultiplier(kcalTarget, perServing.kcal);
-  const scaledKcal = Math.round(perServing.kcal * multiplier);
-  const scaledProtein = Math.round((perServing.protein * multiplier) * 10) / 10;
-  const sanityPenalty = calculatePortionSanityPenalty(multiplier);
-
-  if (!kcalTarget || kcalTarget <= 0 || !proteinTarget || proteinTarget <= 0) {
-    return {
-      score: 0,
-      tier: 'red',
-      tierIcon: '⚪',
-      tierLabel: 'Awaiting Data',
-      multiplier,
-      scaledKcal,
-      scaledProtein,
-      sanityPenalty,
-      deltaKcal: 0,
-      proteinRatio: 0,
-      error: 'Missing Macro Targets'
-    };
-  }
-
-  const proteinRatio = scaledProtein / proteinTarget;
-
-  // Base score from protein hit ratio
-  let baseScore = 50;
-  if (proteinRatio >= 1.0) {
-    const surplusBonus = Math.min(1, Math.max(0, (proteinRatio - 1.0) / 0.25));
-    baseScore = 80 + Math.round(20 * surplusBonus); // 80 - 100
-  } else if (proteinRatio >= 0.90) {
-    baseScore = 70 + Math.round(((proteinRatio - 0.90) / 0.10) * 9); // 70 - 79
-  } else if (proteinRatio >= 0.50) {
-    baseScore = 40 + Math.round(((proteinRatio - 0.50) / 0.40) * 29); // 40 - 69
-  } else {
-    baseScore = Math.max(0, Math.round((proteinRatio / 0.50) * 35)); // 0 - 35
-  }
-
-  // Combined score after sanity penalty
-  const finalScore = Math.max(0, Math.min(100, baseScore - sanityPenalty));
-
-  let tier = 'amber';
-  let tierIcon = '🟡';
-  let tierLabel = 'Moderate Fit';
-
-  if (finalScore >= 80) {
-    tier = 'green';
-    tierIcon = '🟢';
-    tierLabel = 'Ideal Fit';
-  } else if (finalScore < 40) {
-    tier = 'red';
-    tierIcon = '🔴';
-    tierLabel = 'Needs Work';
-  }
-
-  return {
-    score: finalScore,
-    tier,
-    tierIcon,
-    tierLabel,
-    multiplier,
-    scaledKcal,
-    scaledProtein,
-    sanityPenalty,
-    deltaKcal: 0,
-    proteinRatio: Math.round(proteinRatio * 100) / 100
-  };
+/**
+ * Piecewise Linear Interpolation (Lerp) for Calorie Score
+ */
+export function calculateCalorieScore(actual, budget) {
+  if (!budget || budget <= 0) return 0;
+  const r = actual / budget;
+  if (r >= 0.90 && r <= 1.00) return 100;
+  if (r >= 0.75 && r < 0.90) return 80 + ((r - 0.75) / 0.15) * 20;
+  if (r < 0.75) return Math.max(0, (r / 0.75) * 80);
+  if (r > 1.00 && r <= 1.10) return 100 - ((r - 1.00) / 0.10) * 30;
+  if (r > 1.10 && r <= 1.25) return 70 - ((r - 1.10) / 0.15) * 40;
+  return Math.max(0, 30 - ((r - 1.25) / 0.15) * 30);
 }
 
 /**
- * Extracts per-serving or portion-scaled macros from a recipe.
- *
- * @param {Object} recipe
- * @param {string} profileId
- * @param {Object} options
- * @returns {{ kcal: number, protein: number }}
+ * Piecewise Linear Interpolation (Lerp) for Protein Score
  */
-function extractRecipeMacros(recipe, profileId, options = {}) {
-  const r = recipe?.recipe || recipe || {};
-  const variant = options.variant || recipe?.variant || 'original';
-  const useEnhanced = variant === 'enhanced' && r.enhanced;
-
-  const source = useEnhanced ? (r.enhanced || r) : r;
-  const perServing = source.perServing || source.nutrition || source;
-
-  // Key Resolution: Use correct raw keys as requested
-  let kcal = Number(perServing.cal ?? perServing.kcal ?? perServing.calories ?? source.cal ?? source.kcal ?? source.calories ?? 0);
-  let protein = Number(perServing.prot ?? perServing.protein ?? source.prot ?? source.protein ?? 0);
-
-  if (options.portionScaled) {
-    const portions = options.portions || r.portions;
-    const isE = profileId === 'elliott' || profileId === 'e';
-    if (portions) {
-      if (isE && (portions.elliott || portions.eCal !== undefined)) {
-        kcal = Number(portions.elliott?.kcal ?? portions.elliott?.calories ?? portions.eCal ?? kcal);
-        protein = Number(portions.elliott?.protein ?? portions.eProt ?? protein);
-      } else if (!isE && (portions.chloe || portions.cCal !== undefined)) {
-        kcal = Number(portions.chloe?.kcal ?? portions.chloe?.calories ?? portions.cCal ?? kcal);
-        protein = Number(portions.chloe?.protein ?? portions.cProt ?? protein);
-      }
-    }
-  }
-
-  return {
-    kcal: Math.max(0, Math.round(kcal)),
-    protein: Math.max(0, Math.round(protein * 10) / 10)
-  };
-}
-
-/**
- * Evaluates a single profile's macro delta against targets and computes Traffic Light tier & continuous score.
- *
- * @param {number} recipeKcal
- * @param {number} recipeProtein
- * @param {number} kcalTarget
- * @param {number} proteinTarget
- * @returns {{ score: number, tier: string, tierIcon: string, tierLabel: string, deltaKcal: number, proteinRatio: number }}
- */
-function evaluateProfileFit(recipeKcal, recipeProtein, kcalTarget, proteinTarget) {
-  if (!kcalTarget || kcalTarget <= 0 || !proteinTarget || proteinTarget <= 0) {
-    return {
-      tier: 'red',
-      tierIcon: '⚪',
-      tierLabel: 'Awaiting Data',
-      score: 0,
-      error: 'Missing Macro Targets'
-    };
-  }
-
-  const deltaKcal = (recipeKcal - kcalTarget) / kcalTarget;
-  const proteinRatio = recipeProtein / proteinTarget;
-
-  // 1. RED TIER (Score 0 - 39): Over calories OR severe protein deficit
-  if (deltaKcal > 0.10 || (deltaKcal > 0.00 && proteinRatio < 0.90) || proteinRatio < 0.50) {
-    const calculatedRedScore = Math.max(0, Math.round(39 - (Math.max(0, deltaKcal) * 50) - (Math.max(0, 0.9 - proteinRatio) * 50)));
-    return {
-      tier: 'red',
-      tierIcon: '🔴',
-      tierLabel: 'Needs Work',
-      score: Math.max(0, Math.min(39, calculatedRedScore))
-    };
-  }
-
-  // 2. GREEN TIER (Score 80 - 100): Ideal range
-  if (deltaKcal >= -0.10 && deltaKcal <= 0.00 && proteinRatio >= 1.0) {
-    const calProximity = 1 - (Math.abs(deltaKcal) / 0.10);
-    const proteinBonus = Math.min(1, Math.max(0, (proteinRatio - 1.0) / 0.25));
-    const calculatedGreenScore = 80 + Math.round((10 * calProximity) + (10 * proteinBonus));
-    return {
-      tier: 'green',
-      tierIcon: '🟢',
-      tierLabel: 'Ideal Fit',
-      score: Math.max(80, Math.min(100, calculatedGreenScore))
-    };
-  }
-
-  // 3. AMBER TIER (Score 40 - 79): Moderate alignment
-  const protPart = Math.min(1, Math.max(0, (proteinRatio - 0.50) / 0.50));
-  const calPart = Math.max(0, 1 - (Math.abs(deltaKcal) / 0.40));
-  const calculatedAmberScore = 40 + Math.round((20 * protPart) + (19 * calPart));
-  return {
-    tier: 'amber',
-    tierIcon: '🟡',
-    tierLabel: 'Moderate Fit',
-    score: Math.max(40, Math.min(79, calculatedAmberScore))
-  };
+export function calculateProteinScore(actual, target) {
+  if (!target || target <= 0) return 0;
+  const r = actual / target;
+  if (r >= 1.00) return 100;
+  if (r >= 0.90 && r < 1.00) return 80 + ((r - 0.90) / 0.10) * 20;
+  if (r >= 0.70 && r < 0.90) return 40 + ((r - 0.70) / 0.20) * 40;
+  return Math.max(0, (r / 0.70) * 40);
 }
 
 /**
  * Calculates meal fit score for a recipe and meal type across active profile or 50/50 household.
- *
- * @param {Object} recipe Recipe object or container
- * @param {string} mealType 'breakfast' | 'lunch' | 'dinner' | 'snack'
- * @param {Object} [options={}] Configuration options
- * @param {string} [options.activeProfile='everyone'] 'everyone' | 'elliott' | 'chloe'
- * @param {boolean} [options.portionScaled=false] Whether to scale by person portions
- * @param {string} [options.variant='original'] 'original' | 'enhanced'
- * @returns {{ score: number, tier: string, tierIcon: string, tierLabel: string, activeProfile: string, mealType: string, details: Object }}
  */
 export function calculateMealFitScore(recipe, mealType = 'dinner', options = {}) {
-  const r = recipe?.recipe || recipe;
+  const r = recipe?.recipe || recipe || {};
   const nutrition = r?.nutrition || r?.perServing || r?.macros || r;
   
   const totalKcal = Number(
@@ -237,6 +61,7 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
     r?.prot ?? r?.protein ?? 0
   );
 
+  // Top-Level Calorie Circuit Breaker Guard
   if (totalKcal <= 0) {
     return {
       score: 0,
@@ -252,104 +77,120 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
   const activeProfile = (rawProfile === 'both' || rawProfile === 'all') ? 'everyone' : rawProfile;
 
   // Retrieve targets for Elliott and Chloe
-  const eTargets = getProfileMealTargets('elliott', normMeal);
-  const cTargets = getProfileMealTargets('chloe', normMeal);
+  const profiles = options?.userPrefs?.profiles || 
+                   (typeof window !== 'undefined' ? (window.state?.preferences?.profiles || window.state?.userPrefs?.profiles) : {}) || {};
+  const profileE = profiles.elliott || profiles.e || {};
+  const profileC = profiles.chloe || profiles.c || {};
 
-  if (!eTargets.kcal || !cTargets.kcal) {
-    console.warn(`[FitScoreEngine] Missing macro targets for meal: ${normMeal}`, { eTargets, cTargets });
+  const targetCal_E = getTarget(profileE, 'kcal', normMeal);
+  const targetProt_E = getTarget(profileE, 'protein', normMeal);
+  const targetCal_C = getTarget(profileC, 'kcal', normMeal);
+  const targetProt_C = getTarget(profileC, 'protein', normMeal);
+
+  if (!profileE.dailyKcal || !profileC.dailyKcal) {
+    return {
+      score: 0,
+      tier: 'red',
+      tierIcon: '⚪',
+      tierLabel: 'Awaiting Data',
+      error: 'Missing Macro Targets',
+      activeProfile,
+      mealType: normMeal
+    };
   }
 
-  // If no targets, return error tier instead of falling back to 100/green
-  if (eTargets.kcal === 0 && cTargets.kcal === 0) {
-      return {
-        score: 0,
-        tier: 'red',
-        tierIcon: '⚪',
-        tierLabel: 'Awaiting Data',
-        error: 'Missing Macro Targets',
-        activeProfile,
-        mealType: normMeal
-      };
+  // Household Portion Scaling
+  const totalHH = (Number(profileE.dailyKcal) || 0) + (Number(profileC.dailyKcal) || 0);
+  if (totalHH <= 0) {
+    return {
+      score: 0,
+      tier: 'red',
+      tierIcon: '⚪',
+      tierLabel: 'Awaiting Data',
+      error: 'Missing Macro Targets',
+      activeProfile,
+      mealType: normMeal
+    };
   }
 
-  let eFit, cFit;
-  let eMacros, cMacros;
+  const shareE = (Number(profileE.dailyKcal) || 0) / totalHH;
+  const shareC = (Number(profileC.dailyKcal) || 0) / totalHH;
 
-  if (options.portionScaled) {
-    eFit = evaluatePortionScaledProfileFit(recipe, 'elliott', eTargets.kcal, eTargets.protein, options);
-    cFit = evaluatePortionScaledProfileFit(recipe, 'chloe', cTargets.kcal, cTargets.protein, options);
-    eMacros = { kcal: eFit.scaledKcal, protein: eFit.scaledProtein };
-    cMacros = { kcal: cFit.scaledKcal, protein: cFit.scaledProtein };
-  } else {
-    eMacros = extractRecipeMacros(recipe, 'elliott', options);
-    cMacros = extractRecipeMacros(recipe, 'chloe', options);
-    eFit = evaluateProfileFit(eMacros.kcal, eMacros.protein, eTargets.kcal, eTargets.protein);
-    cFit = evaluateProfileFit(cMacros.kcal, cMacros.protein, cTargets.kcal, cTargets.protein);
-  }
+  const actualKcalE = totalKcal * (2 * shareE);
+  const actualProtE = totalProt * (2 * shareE);
+  const actualKcalC = totalKcal * (2 * shareC);
+  const actualProtC = totalProt * (2 * shareC);
 
-  const hasError = eFit.error || cFit.error;
+  const calScoreE = calculateCalorieScore(actualKcalE, targetCal_E);
+  const protScoreE = calculateProteinScore(actualProtE, targetProt_E);
+  const calScoreC = calculateCalorieScore(actualKcalC, targetCal_C);
+  const protScoreC = calculateProteinScore(actualProtC, targetProt_C);
 
-  const details = {
-    elliott: {
-      ...eFit,
-      kcalTarget: eTargets.kcal,
-      proteinTarget: eTargets.protein,
-      recipeKcal: eMacros.kcal,
-      recipeProtein: eMacros.protein
-    },
-    chloe: {
-      ...cFit,
-      kcalTarget: cTargets.kcal,
-      proteinTarget: cTargets.protein,
-      recipeKcal: cMacros.kcal,
-      recipeProtein: cMacros.protein
-    }
-  };
+  const scoreE = Math.round((calScoreE * 0.5) + (protScoreE * 0.5));
+  const scoreC = Math.round((calScoreC * 0.5) + (protScoreC * 0.5));
 
   let finalScore = 0;
+  if (activeProfile === 'elliott' || activeProfile === 'e') {
+    finalScore = scoreE;
+  } else if (activeProfile === 'chloe' || activeProfile === 'c') {
+    finalScore = scoreC;
+  } else {
+    finalScore = Math.round((scoreE * 0.5) + (scoreC * 0.5));
+  }
+
   let finalTier = 'amber';
   let finalIcon = '🟡';
   let finalLabel = 'Moderate Fit';
 
-  if (activeProfile === 'elliott' || activeProfile === 'e') {
-    finalScore = eFit.score;
-    finalTier = eFit.tier;
-    finalIcon = eFit.tierIcon;
-    finalLabel = eFit.tierLabel;
-  } else if (activeProfile === 'chloe' || activeProfile === 'c') {
-    finalScore = cFit.score;
-    finalTier = cFit.tier;
-    finalIcon = cFit.tierIcon;
-    finalLabel = cFit.tierLabel;
-  } else {
-    // 50/50 Household Weighting
-    if (hasError) {
-      return {
-        score: 0,
-        tier: 'red',
-        tierIcon: '⚪',
-        tierLabel: 'Awaiting Data',
-        error: 'Missing Macro Targets',
-        activeProfile,
-        mealType: normMeal,
-        details
-      };
-    }
-    finalScore = Math.round((0.5 * eFit.score) + (0.5 * cFit.score));
-    if (finalScore >= 80) {
-      finalTier = 'green';
-      finalIcon = '🟢';
-      finalLabel = 'Ideal Fit';
-    } else if (finalScore >= 40) {
-      finalTier = 'amber';
-      finalIcon = '🟡';
-      finalLabel = 'Moderate Fit';
-    } else {
-      finalTier = 'red';
-      finalIcon = '🔴';
-      finalLabel = 'Needs Work';
-    }
+  if (finalScore >= 80) {
+    finalTier = 'green';
+    finalIcon = '🟢';
+    finalLabel = 'Ideal Fit';
+  } else if (finalScore < 40) {
+    finalTier = 'red';
+    finalIcon = '🔴';
+    finalLabel = 'Needs Work';
   }
+
+  const getTierInfo = (score) => {
+    if (score >= 80) return { tier: 'green', icon: '🟢', label: 'Ideal Fit' };
+    if (score < 40) return { tier: 'red', icon: '🔴', label: 'Needs Work' };
+    return { tier: 'amber', icon: '🟡', label: 'Moderate Fit' };
+  };
+
+  const infoE = getTierInfo(scoreE);
+  const infoC = getTierInfo(scoreC);
+
+  const details = {
+    elliott: {
+      score: scoreE,
+      tier: infoE.tier,
+      tierIcon: infoE.icon,
+      tierLabel: infoE.label,
+      kcalTarget: Math.round(targetCal_E),
+      proteinTarget: Math.round(targetProt_E * 10) / 10,
+      recipeKcal: Math.round(actualKcalE),
+      recipeProtein: Math.round(actualProtE * 10) / 10,
+      multiplier: 2 * shareE,
+      scaledKcal: Math.round(actualKcalE),
+      scaledProtein: Math.round(actualProtE * 10) / 10,
+      proteinRatio: targetProt_E > 0 ? (actualProtE / targetProt_E) : 0
+    },
+    chloe: {
+      score: scoreC,
+      tier: infoC.tier,
+      tierIcon: infoC.icon,
+      tierLabel: infoC.label,
+      kcalTarget: Math.round(targetCal_C),
+      proteinTarget: Math.round(targetProt_C * 10) / 10,
+      recipeKcal: Math.round(actualKcalC),
+      recipeProtein: Math.round(actualProtC * 10) / 10,
+      multiplier: 2 * shareC,
+      scaledKcal: Math.round(actualKcalC),
+      scaledProtein: Math.round(actualProtC * 10) / 10,
+      proteinRatio: targetProt_C > 0 ? (actualProtC / targetProt_C) : 0
+    }
+  };
 
   return {
     score: finalScore,
@@ -371,7 +212,6 @@ export function calculateRecipeFit(recipe, mealType = 'dinner', options = {}) {
 
 /**
  * Resolves dynamic meal targets for both profiles.
- * Strictly reads from StateModel/Preferences.
  */
 export function getVaultTargetMacros(mealType = 'dinner', userPrefs = null) {
   const mt = (mealType || 'dinner').toLowerCase();
@@ -379,16 +219,10 @@ export function getVaultTargetMacros(mealType = 'dinner', userPrefs = null) {
   const elliott = profiles.elliott || profiles.e || {};
   const chloe = profiles.chloe || profiles.c || {};
 
-  // Core Data Mapping: prefer absolute meals[mt].kcal if it exists, otherwise calculate from daily * splits
-  const targetCal_E = elliott.meals?.[mt]?.kcal || 
-                      ((Number(elliott.dailyKcal) || 0) * ((Number(elliott.calorieSplits?.[mt]) || 0) / 100));
-  const targetProt_E = elliott.meals?.[mt]?.protein || 
-                       ((Number(elliott.dailyProtein) || 0) * ((Number(elliott.proteinSplits?.[mt]) || 0) / 100));
-
-  const targetCal_C = chloe.meals?.[mt]?.kcal || 
-                      ((Number(chloe.dailyKcal) || 0) * ((Number(chloe.calorieSplits?.[mt]) || 0) / 100));
-  const targetProt_C = chloe.meals?.[mt]?.protein || 
-                       ((Number(chloe.dailyProtein) || 0) * ((Number(chloe.proteinSplits?.[mt]) || 0) / 100));
+  const targetCal_E = getTarget(elliott, 'kcal', mt);
+  const targetProt_E = getTarget(elliott, 'protein', mt);
+  const targetCal_C = getTarget(chloe, 'kcal', mt);
+  const targetProt_C = getTarget(chloe, 'protein', mt);
 
   return {
     mealType: mt,

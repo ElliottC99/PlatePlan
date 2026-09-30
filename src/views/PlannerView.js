@@ -733,7 +733,7 @@ export function renderSwapModalOptionsList() {
     const isSelected = selectedRecipeValue === item.value;
     const isFav = item.isFavourite || item.isFavorite;
 
-    const fitScoreVal = item._computedFitScore !== undefined ? item._computedFitScore : (item.fitScore ?? 0);
+    const fitScoreVal = item._computedFitScore !== undefined ? item._computedFitScore : 0;
     const bestVar = item._bestVariant || (item.variant === 'enhanced' ? 'enhanced' : 'original');
     const isEnhancedFit = bestVar === 'enhanced';
 
