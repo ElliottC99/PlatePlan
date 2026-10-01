@@ -1,7 +1,7 @@
 /**
  * src/views/PantryBankView.js (v3.19.21)
  * Modular ES6 View for Category ➔ Ingredient ➔ Sub-type Hierarchy Bank.
- * Features Aliasing, Merging, Sub-type creation, Promoting/demoting, Re-parenting, and Auto-default product previews.
+ * Features Aliasing, Merging, Sub-type creation, Promoting/demoting, and Auto-default product previews.
  * Fully responsive and optimized to remain under 350 lines.
  */
 
@@ -133,13 +133,20 @@ export async function promptMerge(sourceIngId) {
 
 export async function promptDemote(ingId) {
   const state = getState() || {}, ings = (state.ingredients || []).filter(i => String(i.id) !== String(ingId));
-  if (!ings.length) return alert('No parents available.');
-  const num = parseInt(prompt(`Select parent index:\n` + ings.map((i, idx) => `${idx + 1}. ${i.name}`).join('\n')), 10);
-  if (!isNaN(num) && num >= 1 && num <= ings.length) { await demoteToSubtype(ingId, ings[num - 1].id); renderIngredientBank(); }
+  if (!ings.length) return alert('No parent ingredients available.');
+  const num = parseInt(prompt(`Select target parent core ingredient:\n` + ings.map((i, idx) => `${idx + 1}. ${i.name}`).join('\n')), 10);
+  if (!isNaN(num) && num >= 1 && num <= ings.length) { 
+    const targetParent = ings[num - 1];
+    await reparentSubtype(ingId, targetParent.id); 
+    renderIngredientBank(); 
+  }
 }
 
 export async function handlePromoteSubtype(subId, parentId) {
-  if (confirm('Promote sub-type to top-level ingredient?')) { await promoteToIngredient(subId, parentId); renderIngredientBank(); }
+  if (confirm('Promote to Core Ingredient (detaches sub-type as a standalone parent card)?')) { 
+    await promoteToIngredient(subId, parentId); 
+    renderIngredientBank(); 
+  }
 }
 
 export async function handleDeleteIngredient(ingId, ingName) {
@@ -210,7 +217,7 @@ export function renderIngredientBank() {
                     <div id="card-more-menu-${escapeAttr(ing.id)}" class="card-more-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:8px;box-shadow:0 6px 16px rgba(0,0,0,0.08);z-index:100;min-width:130px;flex-direction:column;padding:4px">
                       <button type="button" class="btn xs ghost" onclick="promptAddAlias('${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🏷️ + Alias</button>
                       <button type="button" class="btn xs ghost" onclick="promptMerge('${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🔀 Merge</button>
-                      <button type="button" class="btn xs ghost" onclick="promptDemote('${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">⬇️ Make Sub-type</button>
+                      <button type="button" class="btn xs ghost" onclick="promptDemote('${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">⬇️ Move / Set as Sub-type of...</button>
                       <div style="height:1px;background:var(--border,#e7e5e4);margin:4px 0"></div>
                       <button type="button" class="btn xs ghost" onclick="handleDeleteIngredient('${escapeAttr(ing.id)}', '${escapeAttr(ing.name)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;color:var(--red,#ef4444);font-size:12px;text-align:left">🗑️ Delete</button>
                     </div>
@@ -235,10 +242,7 @@ export function renderIngredientBank() {
                           <span style="font-size:12px;font-weight:650">↳ ${escapeHtml(st.name)}</span>
                           ${st.defaultProduct ? `<span class="tag" style="font-size:10px;background:rgba(79,70,229,0.08);color:var(--primary)">⭐ ${escapeHtml(st.defaultProduct.name)}</span>` : ''}
                         </div>
-                        <div style="display:flex;gap:4px">
-                          <button type="button" class="btn xs ghost" onclick="handlePromoteSubtype('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" title="Promote to top-level ingredient">Make Ingredient</button>
-                          <button type="button" class="btn xs ghost" onclick="handleReparentSubtype('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" title="Move sub-type to another parent ingredient">Re-parent</button>
-                        </div>
+                        <button type="button" class="btn xs ghost" onclick="handlePromoteSubtype('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" title="Promote to Core Ingredient">Promote to Core Ingredient</button>
                       </div>
                     `).join('')}
                   </div>
@@ -282,46 +286,6 @@ if (typeof window !== 'undefined') {
     renderIngredientBank, openIngredientFamilyDetailsModal, closeIngredientFamilyDetailsModal,
     saveIngredientFamilyDetailsModal, handleSetDefaultProduct, promptAddAlias, promptRemoveAlias,
     promptAddSubtype, promptMerge, promptDemote, handlePromoteSubtype, handleDeleteIngredient,
-    handleReparentSubtype: async (stId, oldParentId) => {
-      const state = getState() || {};
-      const rootIngs = (state.ingredients || []).filter(i => String(i.id) !== String(oldParentId) && String(i.id) !== String(stId));
-      if (rootIngs.length === 0) return;
-
-      let modal = document.getElementById('reparent-subtype-modal');
-      if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'reparent-subtype-modal';
-        modal.className = 'modal-wrap';
-        modal.style = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:1;pointer-events:all;';
-        document.body.appendChild(modal);
-      }
-
-      modal.innerHTML = `
-        <div class="card" style="width:100%;max-width:380px;background:var(--surface,#fff);padding:20px;border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,0.15)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-            <h3 style="margin:0;font-size:15px;font-weight:750">Re-parent Sub-type</h3>
-            <button type="button" class="btn sm ghost" onclick="document.getElementById('reparent-subtype-modal')?.remove()">&times;</button>
-          </div>
-          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">Select New Parent Ingredient</label>
-          <select id="reparent-target-select" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:8px;font-size:13px;margin-bottom:16px;background:var(--surface,#fff)">
-            ${rootIngs.map(i => `<option value="${escapeAttr(i.id)}">${escapeHtml(i.name)} (${escapeHtml(i.category || 'Other')})</option>`).join('')}
-          </select>
-          <div style="display:flex;gap:8px;justify-content:flex-end">
-            <button type="button" class="btn ghost sm" onclick="document.getElementById('reparent-subtype-modal')?.remove()">Cancel</button>
-            <button type="button" class="btn primary sm" id="reparent-confirm-btn">Confirm Re-parent</button>
-          </div>
-        </div>
-      `;
-
-      document.getElementById('reparent-confirm-btn')?.addEventListener('click', async () => {
-        const newParentId = document.getElementById('reparent-target-select')?.value;
-        if (newParentId) {
-          await reparentSubtype(stId, oldParentId, newParentId);
-          renderIngredientBank();
-        }
-        document.getElementById('reparent-subtype-modal')?.remove();
-      });
-    },
     openCategoryManager, openCategoryManagerModal: openCategoryManager,
     createIngredientFamilyPrompt: () => openIngredientFamilyDetailsModal(null),
     

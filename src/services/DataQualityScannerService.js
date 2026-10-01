@@ -1,5 +1,5 @@
 /**
- * src/services/DataQualityScannerService.js (v3.19.20)
+ * src/services/DataQualityScannerService.js (v3.19.21)
  * Automated catalog data quality auditor, anomaly scanner, and advisor.
  * Pure service layer with zero DOM references.
  */
@@ -8,13 +8,14 @@ import { getState } from '../store/store.js';
 import { buildPantryHierarchy } from '../models/PantryHierarchyModel.js';
 
 let scanTimer = null;
+let lastChecksum = '';
 let cachedScanResult = null;
 
 export function runDataQualityScanDebounced(state = {}, callback) {
   if (scanTimer) clearTimeout(scanTimer);
   scanTimer = setTimeout(() => {
-    cachedScanResult = runDataQualityScan(state);
-    if (typeof callback === 'function') callback(cachedScanResult);
+    const res = runDataQualityScan(state);
+    if (typeof callback === 'function') callback(res);
   }, 250);
   return cachedScanResult || runDataQualityScan(state);
 }
@@ -23,6 +24,12 @@ export function runDataQualityScan(state = {}) {
   const ingredientsList = Array.isArray(state.ingredients) ? state.ingredients : Object.values(state.ingredients || {});
   const productsList = Array.isArray(state.products) ? state.products : Object.values(state.products || {});
   const recipes = Array.isArray(state.recipes) ? state.recipes : Object.values(state.recipes || {});
+
+  const checksum = `${ingredientsList.length}_${productsList.length}_${recipes.length}`;
+  if (checksum === lastChecksum && cachedScanResult) {
+    return cachedScanResult;
+  }
+  lastChecksum = checksum;
 
   // Diagnostic telemetry log
   console.log(`[DataQualityScanner] Auditing ${ingredientsList.length} ingredients against ${productsList.length} products.`);

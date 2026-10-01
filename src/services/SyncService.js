@@ -16,7 +16,7 @@ export function getCounts(stateInput) {
 
   const hierarchy = buildPantryHierarchy(ingredients, products);
   const totalSubtypes = hierarchy.reduce((acc, cat) => {
-    return acc + (Array.isArray(cat.ingredients) ? cat.ingredients.reduce((iAcc, ing) => iAcc + (Array.isArray(ing.subtypes) ? ing.subtypes.length : 0), 0) : 0);
+    return acc + (cat.ingredients || []).reduce((iAcc, ing) => iAcc + (ing.subtypes?.length || 0), 0);
   }, 0);
 
   return {
