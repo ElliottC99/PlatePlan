@@ -1,5 +1,5 @@
 /**
- * src/components/sync/SyncPanelUI.js (v3.19.22)
+ * src/components/sync/SyncPanelUI.js (v3.19.23)
  * Enriched Cloud Sync Diagnostic Telemetry Modal.
  */
 

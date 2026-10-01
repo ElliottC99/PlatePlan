@@ -1,5 +1,5 @@
 /**
- * src/services/SyncService.js (v3.19.22)
+ * src/services/SyncService.js (v3.19.23)
  * Cloud Sync Diagnostics & Operational Telemetry Service.
  * Aggregates collection items, embedded sub-types, products, and meal plan slots.
  */

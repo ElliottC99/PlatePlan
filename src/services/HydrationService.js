@@ -1,5 +1,5 @@
 /**
- * src/services/HydrationService.js (v3.19.22)
+ * src/services/HydrationService.js (v3.19.23)
  * Orchestrates concurrent fetching from HouseholdRepository, invalidating/updating cache,
  * and populating the centralized Store and window.state.
  */

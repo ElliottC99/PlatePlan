@@ -1,5 +1,5 @@
 /**
- * src/store/store.js (v3.19.22)
+ * src/store/store.js (v3.19.23)
  * Centralized Reactive State Store module using native browser CustomEvents for unidirectional data flow.
  * Provides microtask-wrapped event dispatching, local storage caching for instant offline hydration,
  * batch mutation execution, and optimistic UI rollbacks.
@@ -10,7 +10,7 @@ import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
 
 export { getShoppingLineStateKey };
 
-const CACHE_KEY = `plateplan_store_cache_${(typeof window !== 'undefined' && window.APP_VERSION) || 'v3.19.22'}`;
+const CACHE_KEY = `plateplan_store_cache_${(typeof window !== 'undefined' && window.APP_VERSION) || 'v3.19.23'}`;
 
 const state = {
   recipes: [],

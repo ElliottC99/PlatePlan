@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.19.22)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.19.23)
  * In-App Multi-Step Category Operations Wizard & Fine-Grained Reassignment Modal.
  * Replaces all native browser calls (prompt, confirm, alert) with accessible DOM views.
  */
@@ -16,7 +16,17 @@ let wizardStep = 'list', activeCat = null, reassignMode = 'mass', reassignSearch
 export function closeCategoryManagerModal() {
   const modal = document.getElementById('category-manager-modal');
   if (modal) { modal.style.opacity = '0'; modal.style.pointerEvents = 'none'; modal.classList.remove('open'); }
-  wizardStep = 'list'; activeCat = null;
+  wizardStep = 'list'; activeCat = null; reassignSearch = '';
+}
+
+function dedupeCategories(cats) {
+  const seen = new Set(), res = [];
+  for (const c of cats) {
+    const name = typeof c === 'string' ? c : (c?.name || '');
+    const slug = slugCategory(name);
+    if (slug && !seen.has(slug)) { seen.add(slug); res.push(name); }
+  }
+  return res;
 }
 
 export function renderCategoryManagerModal() {
@@ -163,17 +173,20 @@ export function renderCategoryManagerModal() {
   modal.style.opacity = '1'; modal.style.pointerEvents = 'all'; modal.classList.add('open');
 
   window.closeCategoryManagerModal = closeCategoryManagerModal;
-  window.navCatStep = (step) => { wizardStep = step; renderCurrentStep(); };
+  window.navCatStep = (step) => { wizardStep = step; reassignSearch = ''; renderCurrentStep(); };
 
   window.submitAddCat = () => {
     const input = document.getElementById('cat-manager-add-input');
     const val = input ? input.value.trim() : '';
     if (!val) return;
     const state = getState() || {};
-    const current = Array.isArray(state.categories) ? [...state.categories] : [];
-    if (!current.some(c => slugCategory(typeof c === 'string' ? c : c.name) === slugCategory(val))) {
-      current.push(val); state.categories = current; setIngredients([...(state.ingredients || [])]);
+    const allCats = getActiveCategories(state);
+    if (!allCats.some(c => slugCategory(c) === slugCategory(val))) {
+      allCats.push(val);
+      state.categories = dedupeCategories(allCats);
+      setIngredients([...(state.ingredients || [])]);
     }
+    wizardStep = 'list'; activeCat = null; reassignSearch = '';
     renderCurrentStep();
   };
 
@@ -181,15 +194,22 @@ export function renderCategoryManagerModal() {
   window.submitRenameCat = async () => {
     const input = document.getElementById('cat-rename-input');
     const newName = input ? input.value.trim() : '';
-    if (!newName || !activeCat || slugCategory(newName) === slugCategory(activeCat)) { wizardStep = 'list'; renderCurrentStep(); return; }
+    if (!newName || !activeCat || slugCategory(newName) === slugCategory(activeCat)) {
+      wizardStep = 'list'; activeCat = null; reassignSearch = ''; renderCurrentStep(); return;
+    }
 
     const targetSlug = slugCategory(activeCat), newCatKebab = slugifyToKebab(newName);
-    const state = getState() || {}, ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [], prods = Array.isArray(state.products) ? [...state.products] : [], cats = Array.isArray(state.categories) ? [...state.categories] : [];
+    const state = getState() || {};
+    const ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
+    const prods = Array.isArray(state.products) ? [...state.products] : [];
+    const allCats = getActiveCategories(state);
 
     await batchMutate(async () => {
+      const persistPromises = [];
       ings.forEach(i => {
         if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
-          i.category = newName; i.cat = newCatKebab; saveIngredient(i).catch(() => {});
+          i.category = newName; i.cat = newCatKebab;
+          persistPromises.push(saveIngredient(i).catch(() => {}));
         }
         if (Array.isArray(i.subtypes)) i.subtypes.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = newName; st.cat = newCatKebab; } });
         if (Array.isArray(i.sub_types)) i.sub_types.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = newName; st.cat = newCatKebab; } });
@@ -197,17 +217,20 @@ export function renderCategoryManagerModal() {
 
       prods.forEach(p => {
         if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
-          p.category = newName; p.cat = newCatKebab; saveProduct(p).catch(() => {});
+          p.category = newName; p.cat = newCatKebab;
+          persistPromises.push(saveProduct(p).catch(() => {}));
         }
       });
 
-      const newCats = cats.filter(c => slugCategory(typeof c === 'string' ? c : c.name) !== targetSlug);
-      if (!newCats.some(c => slugCategory(typeof c === 'string' ? c : c.name) === slugCategory(newName))) newCats.push(newName);
-
-      state.categories = newCats; setIngredients(ings); setProducts(prods);
+      const updatedCats = allCats.map(c => slugCategory(c) === targetSlug ? newName : c);
+      state.categories = dedupeCategories(updatedCats);
+      setIngredients(ings);
+      setProducts(prods);
+      await Promise.all(persistPromises);
     });
 
-    wizardStep = 'list'; renderCurrentStep();
+    wizardStep = 'list'; activeCat = null; reassignSearch = '';
+    renderCurrentStep();
   };
 
   window.startMergeCat = (cat) => { activeCat = cat; wizardStep = 'merge'; renderCurrentStep(); };
@@ -217,28 +240,38 @@ export function renderCategoryManagerModal() {
     if (!targetCat || !activeCat) return;
 
     const targetSlug = slugCategory(activeCat), targetKebab = slugifyToKebab(targetCat);
-    const state = getState() || {}, ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [], prods = Array.isArray(state.products) ? [...state.products] : [];
+    const state = getState() || {};
+    const ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
+    const prods = Array.isArray(state.products) ? [...state.products] : [];
+    const allCats = getActiveCategories(state);
 
     await batchMutate(async () => {
+      const persistPromises = [];
       ings.forEach(i => {
         if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
-          i.category = targetCat; i.cat = targetKebab; saveIngredient(i).catch(() => {});
+          i.category = targetCat; i.cat = targetKebab;
+          persistPromises.push(saveIngredient(i).catch(() => {}));
         }
         if (Array.isArray(i.subtypes)) i.subtypes.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = targetCat; st.cat = targetKebab; } });
+        if (Array.isArray(i.sub_types)) i.sub_types.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = targetCat; st.cat = targetKebab; } });
       });
 
       prods.forEach(p => {
         if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
-          p.category = targetCat; p.cat = targetKebab; saveProduct(p).catch(() => {});
+          p.category = targetCat; p.cat = targetKebab;
+          persistPromises.push(saveProduct(p).catch(() => {}));
         }
       });
 
-      const cats = Array.isArray(state.categories) ? [...state.categories] : [];
-      state.categories = cats.filter(c => slugCategory(typeof c === 'string' ? c : c.name) !== targetSlug);
-      setIngredients(ings); setProducts(prods);
+      const updatedCats = allCats.filter(c => slugCategory(c) !== targetSlug);
+      state.categories = dedupeCategories(updatedCats);
+      setIngredients(ings);
+      setProducts(prods);
+      await Promise.all(persistPromises);
     });
 
-    wizardStep = 'list'; renderCurrentStep();
+    wizardStep = 'list'; activeCat = null; reassignSearch = '';
+    renderCurrentStep();
   };
 
   window.startDeleteCat = (cat) => {
@@ -260,9 +293,12 @@ export function renderCategoryManagerModal() {
     if (!activeCat) return;
     const targetSlug = slugCategory(activeCat);
     const state = getState() || {};
-    const cats = Array.isArray(state.categories) ? [...state.categories] : [];
-    state.categories = cats.filter(c => slugCategory(typeof c === 'string' ? c : c.name) !== targetSlug);
-    setIngredients([...(state.ingredients || [])]); wizardStep = 'list'; renderCurrentStep();
+    const allCats = getActiveCategories(state);
+    const updatedCats = allCats.filter(c => slugCategory(c) !== targetSlug);
+    state.categories = dedupeCategories(updatedCats);
+    setIngredients([...(state.ingredients || [])]);
+    wizardStep = 'list'; activeCat = null; reassignSearch = '';
+    renderCurrentStep();
   };
 
   window.setCatReassignMode = (mode) => { reassignMode = mode; renderCurrentStep(); };
@@ -274,15 +310,26 @@ export function renderCategoryManagerModal() {
     const targetSlug = slugCategory(activeCat);
     const state = getState() || {}, ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [], prods = Array.isArray(state.products) ? [...state.products] : [];
     const massTarget = document.getElementById('cat-mass-target-select')?.value || massTargetCat || 'Uncategorized';
+    const allCats = getActiveCategories(state);
 
     await batchMutate(async () => {
+      const persistPromises = [];
       ings.forEach(i => {
         if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
           const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
-          i.category = dest; i.cat = slugifyToKebab(dest); saveIngredient(i).catch(() => {});
+          i.category = dest; i.cat = slugifyToKebab(dest);
+          persistPromises.push(saveIngredient(i).catch(() => {}));
         }
         if (Array.isArray(i.subtypes)) {
           i.subtypes.forEach(st => {
+            if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) {
+              const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
+              st.category = dest; st.cat = slugifyToKebab(dest);
+            }
+          });
+        }
+        if (Array.isArray(i.sub_types)) {
+          i.sub_types.forEach(st => {
             if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) {
               const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
               st.category = dest; st.cat = slugifyToKebab(dest);
@@ -294,15 +341,19 @@ export function renderCategoryManagerModal() {
       prods.forEach(p => {
         if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
           const dest = reassignMode === 'mass' ? massTarget : 'Uncategorized';
-          p.category = dest; p.cat = slugifyToKebab(dest); saveProduct(p).catch(() => {});
+          p.category = dest; p.cat = slugifyToKebab(dest);
+          persistPromises.push(saveProduct(p).catch(() => {}));
         }
       });
 
-      const cats = Array.isArray(state.categories) ? [...state.categories] : [];
-      state.categories = cats.filter(c => slugCategory(typeof c === 'string' ? c : c.name) !== targetSlug);
-      setIngredients(ings); setProducts(prods);
+      const updatedCats = allCats.filter(c => slugCategory(c) !== targetSlug);
+      state.categories = dedupeCategories(updatedCats);
+      setIngredients(ings);
+      setProducts(prods);
+      await Promise.all(persistPromises);
     });
 
-    wizardStep = 'list'; renderCurrentStep();
+    wizardStep = 'list'; activeCat = null; reassignSearch = '';
+    renderCurrentStep();
   };
 }
