@@ -15,6 +15,7 @@ const CACHE_KEY = `plateplan_store_cache_${(typeof window !== 'undefined' && win
 const state = {
   recipes: [],
   ingredients: [],
+  products: [],
   preferences: null,
   userPrefs: {},
   settings: {},
@@ -210,6 +211,16 @@ export function setShoppingList(newShoppingList) {
   state.shoppingList = Array.isArray(newShoppingList) ? newShoppingList : [];
   saveStateCache();
   dispatchStateEvent('plateplan:state:shopping', state.shoppingList);
+}
+
+/**
+ * Update products state domain and dispatch reactive update event.
+ * @param {Array<Object>} newProducts 
+ */
+export function setProducts(newProducts) {
+  state.products = Array.isArray(newProducts) ? newProducts : [];
+  saveStateCache();
+  dispatchStateEvent('plateplan:state:products', state.products);
 }
 
 /**

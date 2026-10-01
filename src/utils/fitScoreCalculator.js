@@ -1,5 +1,5 @@
 /**
- * src/utils/fitScoreCalculator.js (v3.18.0)
+ * src/utils/fitScoreCalculator.js (v3.19.5)
  * Deterministic 50/50 Household Fit Score Engine utilizing Piecewise Linear Interpolation (Lerp).
  * Strictly maps user profiles and scales macros dynamically using consumption shares.
  */
@@ -21,27 +21,44 @@ export const getTarget = (profile, type, meal) => {
 /**
  * Piecewise Linear Interpolation (Lerp) for Calorie Score
  */
-export function calculateCalorieScore(actual, budget) {
-  if (!budget || budget <= 0) return 0;
-  const r = actual / budget;
-  if (r >= 0.90 && r <= 1.00) return 100;
-  if (r >= 0.75 && r < 0.90) return 80 + ((r - 0.75) / 0.15) * 20;
-  if (r < 0.75) return Math.max(0, (r / 0.75) * 80);
-  if (r > 1.00 && r <= 1.10) return 100 - ((r - 1.00) / 0.10) * 30;
-  if (r > 1.10 && r <= 1.25) return 70 - ((r - 1.10) / 0.15) * 40;
-  return Math.max(0, 30 - ((r - 1.25) / 0.15) * 30);
+export function calculateCalorieScore(actual, target) {
+  if (!target || target <= 0 || !actual || actual <= 0) return 0;
+  const r = actual / target;
+
+  // Evaluate lower-bound deficits sequentially upwards
+  if (r < 0.75) {
+    return Math.max(0, (r / 0.75) * 60); // 0 to 60
+  }
+  if (r < 0.90) {
+    return 60 + ((r - 0.75) / 0.15) * 20; // 60 to 80
+  }
+  if (r <= 1.05) {
+    return 100; // Ideal window: -10% to +5%
+  }
+  if (r <= 1.15) {
+    return 100 - ((r - 1.05) / 0.10) * 30; // 100 down to 70
+  }
+  return Math.max(0, 70 - ((r - 1.15) / 0.15) * 70); // > 1.15
 }
 
 /**
  * Piecewise Linear Interpolation (Lerp) for Protein Score
  */
 export function calculateProteinScore(actual, target) {
-  if (!target || target <= 0) return 0;
+  if (!target || target <= 0 || !actual || actual <= 0) return 0;
   const r = actual / target;
-  if (r >= 1.00) return 100;
-  if (r >= 0.90 && r < 1.00) return 80 + ((r - 0.90) / 0.10) * 20;
-  if (r >= 0.70 && r < 0.90) return 40 + ((r - 0.70) / 0.20) * 40;
-  return Math.max(0, (r / 0.70) * 40);
+
+  // Evaluate upper-tier matches down to lower deficits
+  if (r >= 0.95) {
+    return 100; // Meets or exceeds target (up to 5% under tolerance)
+  }
+  if (r >= 0.80) {
+    return 80 + ((r - 0.80) / 0.15) * 20; // 80 to 100
+  }
+  if (r >= 0.60) {
+    return 50 + ((r - 0.60) / 0.20) * 30; // 50 to 80
+  }
+  return Math.max(0, (r / 0.60) * 50); // 0 to 50
 }
 
 export function extractRecipeMacros(recipe, variant = 'original') {

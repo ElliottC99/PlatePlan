@@ -1,9 +1,9 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.19.3';
+  window.APP_VERSION = 'v3.19.15';
 }
 
 /**
- * src/main.js (v3.19.3)
+ * src/main.js (v3.19.15)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronization,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -12,12 +12,35 @@ import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
 import { subscribe, getState } from './store/store.js';
 import { setupActionBridge } from './services/ActionBridge.js';
+import { saveCurrentPlan } from './services/HouseholdRepository.js';
+import { AppState } from './state/AppState.js';
+import { renderToday } from './views/TodayView.js';
+import { renderIngredientBank, renderProductBank } from './views/PantryBankView.js';
 import { renderSettingsView } from './views/SettingsView.js';
 import { renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired, getShoppingLineStateKey } from './views/ShoppingView.js';
 import { renderPlanner } from './views/PlannerView.js';
 import { renderRecipeVault } from './views/RecipeVaultView.js';
+import { renderDataQualityView } from './views/DataQualityView.js';
+import './components/data-quality/ResolveUnlinkedModalUI.js';
 import { calculateMealFitScore } from './utils/fitScoreCalculator.js';
 import { renderFitScoreBadge } from './components/FitScoreBadge.js';
+
+// Global Compatibility Shims for Legacy References
+if (typeof window !== 'undefined') {
+  window.saveState = window.saveState || function(stateData) {
+    console.warn('[Compatibility] Global saveState() invoked. Delegating to persistence layer.');
+    if (typeof saveCurrentPlan === 'function') {
+      saveCurrentPlan(stateData || AppState.getState());
+    }
+  };
+
+  window.loadState = window.loadState || function() {
+    console.warn('[Compatibility] Global loadState() invoked.');
+    return AppState.getState();
+  };
+}
+import * as MealPlanGeneratorService from './services/MealPlanGeneratorService.js';
+import * as RecipeDetailModalService from './services/RecipeDetailModalService.js';
 import * as PortionCalculationService from './services/PortionCalculationService.js';
 import * as TescoImportService from './services/TescoImportService.js';
 import * as ShoppingCalculationService from './services/ShoppingCalculationService.js';
@@ -27,63 +50,7 @@ import * as FitScoreService from './services/FitScoreService.js';
 import * as DataQualityService from './services/DataQualityService.js';
 import * as TodayViewService from './services/TodayViewService.js';
 import * as RecipeAuthoringService from './services/RecipeAuthoringService.js';
-import * as DataQualityDrawer from './components/data-quality/DataQualityDrawer.js';
-import * as DataQualityIssueRow from './components/data-quality/DataQualityIssueRow.js';
-import * as DataQualityFixModal from './components/data-quality/DataQualityFixModal.js';
-import * as RecipeEditorModal from './components/recipe-editor/RecipeEditorModal.js';
-import * as RecipeIngredientRow from './components/recipe-editor/RecipeIngredientRow.js';
-import * as RecipeStepRow from './components/recipe-editor/RecipeStepRow.js';
-import * as IngredientEditorRows from './components/recipe-editor/IngredientEditorRows.js';
-import * as RecipeImportParserForm from './components/recipe-editor/RecipeImportParserForm.js';
-import * as ShoppingBatchToolbar from './components/shopping/ShoppingBatchToolbar.js';
-import * as ShoppingCategoryGroup from './components/shopping/ShoppingCategoryGroup.js';
-import * as ShoppingItemRow from './components/shopping/ShoppingItemRow.js';
-import * as ShoppingAisleGroup from './components/shopping/ShoppingAisleGroup.js';
-import * as ShoppingListToolbar from './components/shopping/ShoppingListToolbar.js';
-import * as PlannerDayCard from './components/planner/PlannerDayCard.js';
-import * as PlannerMealSlot from './components/planner/PlannerMealSlot.js';
-import * as PlannerGridToolbar from './components/planner/PlannerGridToolbar.js';
-import * as ProfileMacroEditor from './components/profile/ProfileMacroEditor.js';
-import * as ProfilePreferencesForm from './components/profile/ProfilePreferencesForm.js';
-import * as ProfileSettingsModal from './components/profile/ProfileSettingsModal.js';
-import * as GeneratorWizardModal from './components/generator/GeneratorWizardModal.js';
-import * as GeneratorConstraintsForm from './components/generator/GeneratorConstraintsForm.js';
-import * as GeneratorCandidateDrawer from './components/generator/GeneratorCandidateDrawer.js';
-import * as RecipeNutritionCard from './components/analytics/RecipeNutritionCard.js';
-import * as RecipePortionScaler from './components/analytics/RecipePortionScaler.js';
-import * as RecipeCostBreakdown from './components/analytics/RecipeCostBreakdown.js';
-import * as MacroTrendChart from './components/analytics/MacroTrendChart.js';
-import * as NutriScoreBadgeCard from './components/analytics/NutriScoreBadgeCard.js';
-import * as WeeklySummaryToolbar from './components/analytics/WeeklySummaryToolbar.js';
-import * as VaultFilterToolbar from './components/vault/VaultFilterToolbar.js';
-import * as VaultRecipeCard from './components/vault/VaultRecipeCard.js';
-import * as VaultGridContainer from './components/vault/VaultGridContainer.js';
-import * as VaultGridUI from './components/vault/VaultGridUI.js';
-import * as RecipeDetailModalUI from './components/recipe/RecipeDetailModalUI.js';
-import * as RecipeEditorModalUI from './components/recipe/RecipeEditorModalUI.js';
-import * as PantryItemRow from './components/pantry/PantryItemRow.js';
-import * as PantryCategoryGroup from './components/pantry/PantryCategoryGroup.js';
-import * as PantryToolbar from './components/pantry/PantryToolbar.js';
-import * as PantryInventoryUI from './components/pantry/PantryInventoryUI.js';
-import * as ShoppingListUI from './components/shopping/ShoppingListUI.js';
-import * as ShoppingSubstUI from './components/shopping/ShoppingSubstUI.js';
-import * as UseUpEditorUI from './components/pantry/UseUpEditorUI.js';
-import * as UseUpFinderModalUI from './components/pantry/UseUpFinderModalUI.js';
-import * as PlannerGridUI from './components/planner/PlannerGridUI.js';
-import * as PlannerModalsUI from './components/planner/PlannerModalsUI.js';
-import * as PlannerWizardUI from './components/planner/PlannerWizardUI.js';
-import * as PlannerSwapModalUI from './components/planner/PlannerSwapModalUI.js';
-import * as PrepStepCard from './components/prep/PrepStepCard.js';
-import * as PrepContainerPlanner from './components/prep/PrepContainerPlanner.js';
-import * as PrepSummaryToolbar from './components/prep/PrepSummaryToolbar.js';
-import * as ProfileAllocationCard from './components/settings/ProfileAllocationCard.js';
-import * as DietaryExclusionManager from './components/settings/DietaryExclusionManager.js';
-import * as HouseholdSyncCard from './components/settings/HouseholdSyncCard.js';
-import * as SettingsMacroUI from './components/settings/SettingsMacroUI.js';
-import * as SettingsExclusionsUI from './components/settings/SettingsExclusionsUI.js';
-import * as SettingsHouseholdUI from './components/profile/SettingsHouseholdUI.js';
-import * as HeaderUI from './components/shell/HeaderUI.js';
-import * as NavigationUI from './components/shell/NavigationUI.js';
+import { registeredComponents } from './components/componentRegistry.js';
 import * as AppRouter from './core/AppRouter.js';
 import * as AppInitializer from './core/AppInitializer.js';
 import { safeClone, safeJsonStringify } from './utils/safeJson.js';
@@ -125,41 +92,106 @@ if (typeof window !== 'undefined') {
   window.renderFitScoreBadge = renderFitScoreBadge;
 
   Object.assign(window, {
+    MealPlanGeneratorService, RecipeDetailModalService,
     PortionCalculationService, TescoImportService, ShoppingCalculationService, UnitConverter, NutritionService,
     FitScoreService, DataQualityService, TodayViewService, RecipeAuthoringService,
-    DataQualityDrawer, DataQualityIssueRow, DataQualityFixModal, RecipeEditorModal,
-    RecipeIngredientRow, RecipeStepRow, IngredientEditorRows, RecipeImportParserForm,
-    ShoppingBatchToolbar, ShoppingCategoryGroup, ShoppingItemRow, ShoppingAisleGroup,
-    ShoppingListToolbar, PlannerDayCard, PlannerMealSlot, PlannerGridToolbar,
-    ProfileMacroEditor, ProfilePreferencesForm, ProfileSettingsModal, GeneratorWizardModal,
-    GeneratorConstraintsForm, GeneratorCandidateDrawer, RecipeNutritionCard, RecipePortionScaler,
-    RecipeCostBreakdown, MacroTrendChart, NutriScoreBadgeCard, WeeklySummaryToolbar,
-    VaultFilterToolbar, VaultRecipeCard, VaultGridContainer, VaultGridUI,
-    RecipeDetailModalUI, RecipeEditorModalUI, PantryItemRow, PantryCategoryGroup,
-    PantryToolbar, PantryInventoryUI, ShoppingListUI, ShoppingSubstUI, UseUpEditorUI,
-    UseUpFinderModalUI, PlannerGridUI, PlannerModalsUI, PlannerWizardUI, PlannerSwapModalUI,
-    PrepStepCard, PrepContainerPlanner, PrepSummaryToolbar, ProfileAllocationCard,
-    DietaryExclusionManager, HouseholdSyncCard, SettingsMacroUI, SettingsExclusionsUI,
-    SettingsHouseholdUI, HeaderUI, NavigationUI, AppRouter, AppInitializer
+    ...registeredComponents,
+    AppRouter, AppInitializer,
+
+    // Core Router & View Helpers
+    showView: window.showView || AppRouter.showView,
+    syncMobileNavigation: window.syncMobileNavigation || AppRouter.syncMobileNavigation,
+    requestPlatePlanViewRender: window.requestPlatePlanViewRender || AppRouter.requestPlatePlanViewRender,
+    showPlatePlanToast: window.showPlatePlanToast || AppInitializer.showPlatePlanToast,
+
+    // View Renders
+    renderToday,
+    renderPlanner,
+    renderVault: renderRecipeVault,
+    renderRecipeVault,
+    renderVaultGrid: renderRecipeVault,
+    renderSettings: renderSettingsView,
+    renderSettingsView,
+    renderShopping: renderShoppingListUI,
+    renderShoppingList: renderShoppingListUI,
+    renderShoppingListUI,
+    renderIngredientBank,
+    renderProductBank,
+    renderBank: renderProductBank,
+    renderPlatePlanView(viewId) {
+      switch (viewId) {
+        case 'today': return renderToday();
+        case 'vault': case 'recipes': return renderRecipeVault();
+        case 'planner': case 'plan': return renderPlanner();
+        case 'shopping': return renderShoppingListUI();
+        case 'settings': case 'prefs': return renderSettingsView();
+        case 'ingredients': return renderIngredientBank();
+        case 'bank': return renderProductBank();
+        default: {
+          const viewEl = document.getElementById('view-' + viewId);
+          if (viewEl && AppRouter.viewModuleMap?.[viewId]?.mount) {
+            return AppRouter.viewModuleMap[viewId].mount(viewEl);
+          }
+        }
+      }
+    },
+
+    // Actions & Modal Handlers
+    viewRecipe: RecipeDetailModalService.viewRecipe,
+    closeRecipePreview: RecipeDetailModalService.closeRecipePreview,
+    switchViewTab: RecipeDetailModalService.switchViewTab,
+    switchPreviewServingMode: RecipeDetailModalService.switchPreviewServingMode,
+    updateRecipePreviewScale: RecipeDetailModalService.updateRecipePreviewScale,
+    updateSinglePersonServes: RecipeDetailModalService.updateSinglePersonServes,
+    renderRecipePreview: RecipeDetailModalService.renderRecipePreview,
+    generatePlan: MealPlanGeneratorService.generatePlan,
+    generateMealPlan: MealPlanGeneratorService.generateMealPlan,
+    getPlanSlotInfo: MealPlanGeneratorService.getPlanSlotInfo,
+    getPlannedSlotNutrition: MealPlanGeneratorService.getPlannedSlotNutrition,
+    getShoppingLineStateKey,
+    renderScrollableSwapModal,
+    toggleInlineShoppingSubst: renderScrollableSwapModal,
+    toggleShoppingItemAcquired,
+    toggleShoppingAtHome: toggleShoppingItemAcquired,
+    openSearchableRecipeSwapModal: registeredComponents.PlannerMealSlot.openSearchableRecipeSwapModal,
+    closeSearchableRecipeSwapModal: registeredComponents.PlannerMealSlot.closeSearchableRecipeSwapModal,
+    filterSearchableRecipeSwapModal: registeredComponents.PlannerMealSlot.filterSearchableRecipeSwapModal,
+    selectAndSwapRecipe: registeredComponents.PlannerMealSlot.selectAndSwapRecipe,
+
+    openRecipeModal(id, instanceId, variant, targetPerson) {
+      if (typeof window.viewRecipe === 'function') {
+        return window.viewRecipe(id, instanceId, variant, targetPerson);
+      }
+      console.warn('[main.js] viewRecipe not found on window');
+    },
+
+    logout() {
+      if (window.firebase && window.firebase.auth) {
+        try { window.firebase.auth().signOut(); } catch(e) {}
+      }
+      try { localStorage.clear(); } catch(e) {}
+      try { sessionStorage.clear(); } catch(e) {}
+      window.location.href = window.location.origin + window.location.pathname + '?reload=' + Date.now();
+    },
+
+    async syncNow() {
+      console.log('[MANUAL SYNC TRIGGERED]');
+      setSyncStatus('connecting', 'Syncing...');
+      try {
+        await hydrateHouseholdData();
+        setSyncStatus(navigator.onLine ? 'synced' : 'offline', 'Synced with Cloud');
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast('Synced with Cloud! ☁️', 'success');
+        }
+      } catch(e) {
+        setSyncStatus('error', 'Sync Failed');
+      }
+    }
   });
 
-  window.renderMacroTrendChart = MacroTrendChart.renderMacroTrendChart;
-  window.renderNutriScoreBadgeCard = NutriScoreBadgeCard.renderNutriScoreBadgeCard;
-  window.renderWeeklySummaryToolbar = WeeklySummaryToolbar.renderWeeklySummaryToolbar;
-  window.renderPrepStepCard = PrepStepCard.renderPrepStepCard;
-  window.renderPrepContainerPlanner = PrepContainerPlanner.renderPrepContainerPlanner;
-  window.renderPrepSummaryToolbar = PrepSummaryToolbar.renderPrepSummaryToolbar;
-  window.showView = window.showView || AppRouter.showView;
-  window.syncMobileNavigation = window.syncMobileNavigation || AppRouter.syncMobileNavigation;
-  window.requestPlatePlanViewRender = window.requestPlatePlanViewRender || AppRouter.requestPlatePlanViewRender;
-  window.showPlatePlanToast = window.showPlatePlanToast || AppInitializer.showPlatePlanToast;
-  window.renderProfileAllocationCard = ProfileAllocationCard.renderProfileAllocationCard;
-  window.renderDietaryExclusionManager = DietaryExclusionManager.renderDietaryExclusionManager;
-  window.renderHouseholdSyncCard = HouseholdSyncCard.renderHouseholdSyncCard;
-  window.openSearchableRecipeSwapModal = PlannerMealSlot.openSearchableRecipeSwapModal;
-  window.closeSearchableRecipeSwapModal = PlannerMealSlot.closeSearchableRecipeSwapModal;
-  window.filterSearchableRecipeSwapModal = PlannerMealSlot.filterSearchableRecipeSwapModal;
-  window.selectAndSwapRecipe = PlannerMealSlot.selectAndSwapRecipe;
+  window.renderPlatePlanLegacyView = window.renderPlatePlanView;
+  window.showRecipeModal = window.openRecipeModal;
+  window.openRecipeDetailModal = window.openRecipeModal;
 }
 
 // 1. STATE INITIALIZATION VIA ENCAPSULATED STORE
@@ -168,31 +200,8 @@ if (typeof window !== 'undefined') {
 }
 
 // 2. EXPORTS & GLOBAL COMPATIBILITY ALIASES
-export { renderSettingsView, renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired, renderPlanner, renderRecipeVault, setupActionBridge, getShoppingLineStateKey, calculateMealFitScore, renderFitScoreBadge, PortionCalculationService };
+export { renderToday, renderSettingsView, renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired, renderPlanner, renderRecipeVault, setupActionBridge, getShoppingLineStateKey, calculateMealFitScore, renderFitScoreBadge, PortionCalculationService };
 
-if (typeof window !== 'undefined') {
-  window.getShoppingLineStateKey = getShoppingLineStateKey;
-  window.renderSettings = renderSettingsView;
-  window.renderShopping = renderShoppingListUI;
-  window.renderShoppingList = renderShoppingListUI;
-  window.renderScrollableSwapModal = renderScrollableSwapModal;
-  window.toggleInlineShoppingSubst = renderScrollableSwapModal;
-  window.toggleShoppingItemAcquired = toggleShoppingItemAcquired;
-  window.toggleShoppingAtHome = toggleShoppingItemAcquired;
-  window.renderPlanner = renderPlanner;
-  window.renderVault = renderRecipeVault;
-  window.renderRecipeVault = renderRecipeVault;
-  window.renderVaultGrid = renderRecipeVault;
-
-  window.openRecipeModal = function(id, instanceId, variant, targetPerson) {
-    if (typeof window.viewRecipe === 'function') {
-      return window.viewRecipe(id, instanceId, variant, targetPerson);
-    }
-    console.warn('[main.js v3.8.1] viewRecipe not found on window');
-  };
-  window.showRecipeModal = window.openRecipeModal;
-  window.openRecipeDetailModal = window.openRecipeModal;
-}
 
 // 3. GLOBAL ERROR TELEMETRY & TOAST BRIDGE
 let lastErrorMessage = '';
@@ -275,7 +284,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.19.3 (ES6 Modern)';
+    footerEl.textContent = 'v3.19.15 (ES6 Modern)';
   }
 }
 
@@ -292,16 +301,28 @@ function setupSubscriptions() {
       window.allRecipes = cleanRecipes;
     }
     renderRecipeVault();
+    renderToday();
     if (window.state?.plan && typeof renderPlanner === 'function') {
       renderPlanner();
     }
+    renderDataQualityView();
   });
 
   subscribe('ingredients', (ingredients) => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && window.state) {
       window.state.ingredients = Array.isArray(ingredients) ? ingredients : [];
     }
     renderShoppingListUI();
+    renderIngredientBank();
+    renderDataQualityView();
+  });
+
+  subscribe('products', (products) => {
+    if (typeof window !== 'undefined' && window.state) {
+      window.state.products = Array.isArray(products) ? products : [];
+    }
+    renderProductBank();
+    renderDataQualityView();
   });
 
   subscribe('shopping', () => {
@@ -310,9 +331,11 @@ function setupSubscriptions() {
 
   subscribe('preferences', () => {
     renderSettingsView();
+    renderToday();
   });
 
   subscribe('plan', () => {
+    renderToday();
     renderPlanner();
     renderShoppingListUI();
   });
@@ -336,9 +359,14 @@ async function initApp() {
     const user = await waitForAuth();
     const hydrationRes = await hydrateHouseholdData();
     
-    // Perform initial render ONLY AFTER hydration is complete
+    // Perform initial render of active modular views
+    renderToday();
     renderRecipeVault();
+    renderPlanner();
     renderShoppingListUI();
+    renderIngredientBank();
+    renderProductBank();
+    renderDataQualityView();
     
     if (hydrationRes && hydrationRes.success) {
       setSyncStatus(navigator.onLine ? 'synced' : 'offline', navigator.onLine ? 'Synced with Cloud' : 'Offline Mode');
@@ -347,9 +375,12 @@ async function initApp() {
     }
   } catch (err) {
     console.warn('[initApp] Auth or Hydration fallback:', err);
-    // Even if hydration fails, try to render with cached data
+    renderToday();
     renderRecipeVault();
+    renderPlanner();
     renderShoppingListUI();
+    renderIngredientBank();
+    renderProductBank();
     setSyncStatus(navigator.onLine ? 'synced' : 'offline', 'Local Cache Active');
   }
 }

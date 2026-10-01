@@ -7,6 +7,8 @@
 import { 
   calculateMealFitScore, 
   calculateRecipeFit,
+  calculateCalorieScore,
+  calculateProteinScore,
   getVaultTargetMacros as modernGetVaultTargetMacros
 } from '../utils/fitScoreCalculator.js';
 import { getProfileMealTargets, getProfilesFromState } from '../models/StateModel.js';
@@ -64,19 +66,10 @@ export function getVaultTargetMacros(mealType = 'dinner', userPrefs = {}) {
  * Formerly computeProfileFitScore.
  */
 export function computeProfileFitScore(actualCal, targetCal, actualProt, targetProt) {
-  // Mock a recipe for the modern engine
-  const mockRecipe = { perServing: { kcal: actualCal, protein: actualProt } };
-  
-  // We can't easily use calculateMealFitScore here without profile targets in state,
-  // so we'll use a standard evaluation that mimics the engine's thresholds if targets were provided.
-  if (!targetCal || targetCal <= 0 || !targetProt || targetProt <= 0) return 0;
-
-  const deltaKcal = (actualCal - targetCal) / targetCal;
-  const proteinRatio = actualProt / targetProt;
-
-  if (deltaKcal > 0.10 || (deltaKcal > 0.00 && proteinRatio < 0.90) || proteinRatio < 0.50) return 30; // Red
-  if (deltaKcal >= -0.10 && deltaKcal <= 0.00 && proteinRatio >= 1.0) return 90; // Green
-  return 60; // Amber
+  if (!targetCal || targetCal <= 0 || !targetProt || targetProt <= 0 || !actualCal || actualCal <= 0 || !actualProt || actualProt <= 0) return 0;
+  const calScore = calculateCalorieScore(actualCal, targetCal);
+  const protScore = calculateProteinScore(actualProt, targetProt);
+  return Math.round((calScore * 0.5) + (protScore * 0.5));
 }
 
 /**

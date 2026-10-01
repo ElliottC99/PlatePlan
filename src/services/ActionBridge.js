@@ -116,6 +116,60 @@ export function routeAction(actionName, target, event) {
     return true;
   }
 
+  // 4b. Ingredient & Product Bank Modals
+  if (normalizedAction === 'open-ingredient-modal' || normalizedAction.includes('openingredientfamilydetailsmodal')) {
+    const ingId = ds.ingredientId || ds.id || parseFunctionArgs(actionName)[0] || null;
+    if (typeof window.openIngredientFamilyDetailsModal === 'function') {
+      window.openIngredientFamilyDetailsModal(ingId);
+    }
+    return true;
+  }
+
+  if (normalizedAction === 'open-product-modal' || normalizedAction.includes('openproducteditmodal') || normalizedAction.includes('showadding')) {
+    const prodId = ds.productId || ds.id || parseFunctionArgs(actionName)[0] || null;
+    if (typeof window.openProductEditModal === 'function') {
+      window.openProductEditModal(prodId);
+    } else if (typeof window.showAddIng === 'function') {
+      window.showAddIng(prodId);
+    }
+    return true;
+  }
+
+  if (normalizedAction.includes('closeingredientfamilydetailsmodal')) {
+    if (typeof window.closeIngredientFamilyDetailsModal === 'function') {
+      window.closeIngredientFamilyDetailsModal();
+    }
+    return true;
+  }
+
+  if (normalizedAction.includes('saveingredientfamilydetailsmodal')) {
+    if (typeof window.saveIngredientFamilyDetailsModal === 'function') {
+      window.saveIngredientFamilyDetailsModal();
+    }
+    return true;
+  }
+
+  if (normalizedAction.includes('savemanualing')) {
+    if (typeof window.saveManualIng === 'function') {
+      window.saveManualIng();
+    }
+    return true;
+  }
+
+  if (normalizedAction.includes('cancelmanualing')) {
+    if (typeof window.cancelManualIng === 'function') {
+      window.cancelManualIng();
+    }
+    return true;
+  }
+
+  if (normalizedAction.includes('createingredientfamilyprompt')) {
+    if (typeof window.openIngredientFamilyDetailsModal === 'function') {
+      window.openIngredientFamilyDetailsModal(null);
+    }
+    return true;
+  }
+
   // 5. Shopping Item Acquired Checkbox
   if (normalizedAction === 'toggle-shopping-item' || normalizedAction === 'toggle-shopping-at-home' || normalizedAction === 'toggleshoppingathome' || normalizedAction.includes('toggleshoppingathome')) {
     const containerEl = target.closest('[data-item-key], [data-group-key], [data-group-id], .pp-shop-item, .shopping-list-row, .item-row') || target;
@@ -136,6 +190,11 @@ export function routeAction(actionName, target, event) {
       else if (viewName === 'planner') setTimeout(renderPlanner, 30);
       else if (viewName === 'prefs' || viewName === 'settings') setTimeout(renderSettingsView, 30);
       else if (viewName === 'shopping') setTimeout(renderShoppingListUI, 30);
+      else if (viewName === 'data' || viewName === 'quality') {
+        if (typeof window.renderDataQualityView === 'function') {
+          setTimeout(window.renderDataQualityView, 30);
+        }
+      }
     }
     return true;
   }

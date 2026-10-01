@@ -4,9 +4,9 @@
  * Caches core app shell, modern ES6 modules, stylesheets, and icons.
  */
 
-const PLATEPLAN_CACHE = 'plateplan-shell-v3.19.3';
-const PLATEPLAN_APP_VERSION = '3.19.3';
-const PLATEPLAN_BUILD_ID = '3.19.3-v170';
+const PLATEPLAN_CACHE = 'plateplan-shell-v3.19.15';
+const PLATEPLAN_APP_VERSION = '3.19.15';
+const PLATEPLAN_BUILD_ID = '3.19.15-v183';
 
 const PLATEPLAN_PRECACHE_ASSETS = [
   '/',
@@ -96,9 +96,17 @@ const PLATEPLAN_PRECACHE_ASSETS = [
   '/src/views/ShoppingView.js',
   '/src/views/PlannerView.js',
   '/src/views/RecipeVaultView.js',
+  '/src/views/TodayView.js',
+  '/src/views/PantryBankView.js',
+  '/src/views/ProductBankView.js',
+  '/src/views/DataQualityView.js',
+  '/src/services/DataQualityScannerService.js',
+  '/src/components/data-quality/ResolveUnlinkedModalUI.js',
+  '/src/models/PantryHierarchyModel.js',
+  '/src/components/componentRegistry.js',
   '/src/components/ProductSwapModal.js',
-  '/scripts/plateplan-app.js?v=3.3.0',
-  '/scripts/bootstrap.js?v=3.3.0',
+  '/src/services/MealPlanGeneratorService.js',
+  '/src/services/RecipeDetailModalService.js',
   '/icon-192.png',
   '/icon-512.png',
   '/icon-192-maskable.png',
@@ -117,9 +125,9 @@ self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(PLATEPLAN_CACHE).then(async cache => {
-      console.log(`[SW v3.19.3] Precaching shell and core ES6 modules...`);
+      console.log(`[SW v3.19.15] Precaching shell and core ES6 modules...`);
       await cache.addAll(PLATEPLAN_PRECACHE_ASSETS).catch(err => {
-        console.warn('[SW v3.19.3] Non-fatal precache warning:', err);
+        console.warn('[SW v3.19.15] Non-fatal precache warning:', err);
       });
       await Promise.allSettled(PLATEPLAN_OPTIONAL_SHELL.map(url => cache.add(url)));
     })
@@ -133,7 +141,7 @@ self.addEventListener('activate', event => {
         keys
           .filter(key => key !== PLATEPLAN_CACHE)
           .map(key => {
-            console.log('[SW v3.19.3] Purging previous shell cache:', key);
+            console.log('[SW v3.19.15] Purging previous shell cache:', key);
             return caches.delete(key);
           })
       );

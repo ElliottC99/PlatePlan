@@ -4,11 +4,96 @@
  * and populating the centralized Store and window.state.
  */
 
-import { getRecipes, getIngredients, getPreferences, getCurrentPlan } from './HouseholdRepository.js';
-import { setRecipes, setIngredients, setPreferences, setCurrentPlan, saveStateCache } from '../store/store.js';
+import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeIngredients, subscribeProducts } from './HouseholdRepository.js';
+import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache } from '../store/store.js';
 import { calculateMealSplit } from '../utils/nutritionCalculator.js';
 
+export function normalizeProductRecord(p) {
+  if (!p || typeof p !== 'object') return p;
+  
+  const subtypeId = p.subtypeId ?? p.subTypeId ?? p.sub_type_id ?? null;
+  const ingredientId = p.ingredientId ?? p.ingredient_id ?? p.groupId ?? null;
+  const category = p.category ?? p.category_id ?? p.categoryName ?? p.cat ?? 'Other';
+
+  const rawPackSize = p.packSize ?? p.pack_size ?? p.pack_size_g ?? p.pack_weight ?? p.packageSize ?? p.size ?? p.pack ?? 0;
+  let packSize = 0;
+  if (typeof rawPackSize === 'string') {
+    const matched = rawPackSize.match(/[\d\.]+/);
+    packSize = matched ? parseFloat(matched[0]) : 0;
+  } else {
+    packSize = Number(rawPackSize) || 0;
+  }
+
+  const kcal = Number(p.kcal ?? p.calories ?? p.energy_kcal ?? p.cal ?? 0);
+  const protein = Number(p.protein ?? p.protein_g ?? p.prot ?? 0);
+
+  return {
+    ...p,
+    subtypeId,
+    ingredientId,
+    category,
+    packSize,
+    pack: packSize,
+    kcal,
+    cal: kcal,
+    protein,
+    prot: protein
+  };
+}
+
+export function normalizeIngredientRecord(ing) {
+  if (!ing || typeof ing !== 'object') return ing;
+  
+  const category = ing.category ?? ing.category_id ?? ing.categoryName ?? ing.cat ?? 'Other';
+  const kcal = Number(ing.kcal ?? ing.calories ?? ing.energy_kcal ?? ing.cal ?? 0);
+  const protein = Number(ing.protein ?? ing.protein_g ?? ing.prot ?? 0);
+
+  const subtypes = (Array.isArray(ing.subtypes) ? ing.subtypes : []).map(st => {
+    const stKcal = Number(st.kcal ?? st.calories ?? st.energy_kcal ?? st.cal ?? 0);
+    const stProtein = Number(st.protein ?? st.protein_g ?? st.prot ?? 0);
+    return {
+      ...st,
+      kcal: stKcal,
+      cal: stKcal,
+      protein: stProtein,
+      prot: stProtein
+    };
+  });
+
+  return {
+    ...ing,
+    category,
+    kcal,
+    cal: kcal,
+    protein,
+    prot: protein,
+    subtypes
+  };
+}
+
 let inFlightHydration = null;
+let listenersActive = false;
+
+function initRealtimeListeners() {
+  if (listenersActive) return;
+  listenersActive = true;
+  subscribeIngredients((freshIngredients) => {
+    const normalized = (freshIngredients || []).map(normalizeIngredientRecord);
+    setIngredients(normalized);
+    if (typeof window !== 'undefined') {
+      if (window.state) window.state.ingredients = normalized;
+      window.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: normalized }));
+    }
+  });
+  subscribeProducts((freshProducts) => {
+    const normalized = (freshProducts || []).map(normalizeProductRecord);
+    setProducts(normalized);
+    if (typeof window !== 'undefined') {
+      if (window.state) window.state.products = normalized;
+      window.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: normalized }));
+    }
+  });
+}
 
 /**
  * Hydrate all household data domains concurrently into the reactive Store.
@@ -22,22 +107,36 @@ export async function hydrateHouseholdData() {
 
   inFlightHydration = (async () => {
     try {
-      const [recipes, ingredients, preferencesData, plan] = await Promise.all([
+      const [recipes, rawIngredients, rawProducts, preferencesData, plan] = await Promise.all([
         getRecipes(),
         getIngredients(),
+        getProducts(),
         getPreferences(),
         getCurrentPlan()
       ]);
 
+      const ingredients = (rawIngredients || []).map(normalizeIngredientRecord);
+      const products = (rawProducts || []).map(normalizeProductRecord);
+
       setRecipes(recipes);
       setIngredients(ingredients);
+      setProducts(products);
       setPreferences(preferencesData);
       setCurrentPlan(plan);
 
       // Populate window.state directly for legacy/ES6 bridge compatibility
       if (typeof window !== 'undefined') {
-        window.state = window.state || {};
-        window.state.isCloudHydrated = true;
+        if (!window.state) {
+          try { window.state = {}; } catch (e) {}
+        }
+        if (window.state) {
+          window.state.isCloudHydrated = true;
+          window.state.ingredients = ingredients;
+          window.state.products = products;
+        }
+
+        window.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: ingredients }));
+        window.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: products }));
 
         const docData = preferencesData || {};
         const userPrefs = docData.userPrefs || docData;
@@ -155,6 +254,7 @@ export async function hydrateHouseholdData() {
         console.log('[HydrationService] Core user data and decoupled profiles mapped to state.');
       }
 
+      initRealtimeListeners();
       saveStateCache();
       console.log('[HydrationService] Household data hydrated successfully into Store and persisted to local cache.');
       return { success: true, timestamp: Date.now() };

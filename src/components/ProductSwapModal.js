@@ -313,7 +313,9 @@ export async function executeSwapInState(param1, param2, newProduct, scope = 'gl
     timestamp: Date.now()
   };
 
-  if (!window.state) window.state = {};
+  if (!window.state) {
+    try { window.state = {}; } catch (e) {}
+  }
   if (!window.state.plan || typeof window.state.plan !== 'object') window.state.plan = {};
 
   if (scope === 'recipe' && instanceId) {

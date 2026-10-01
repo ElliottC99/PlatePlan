@@ -3,19 +3,28 @@
  * Core Application Router & View Lifecycle Mounting Engine
  */
 
+import * as TodayView from '../views/TodayView.js';
 import * as PlannerView from '../views/PlannerView.js';
 import * as RecipeVaultView from '../views/RecipeVaultView.js';
 import * as ShoppingView from '../views/ShoppingView.js';
 import * as SettingsView from '../views/SettingsView.js';
+import * as PantryBankView from '../views/PantryBankView.js';
+import * as ProductBankView from '../views/ProductBankView.js';
+import * as DataQualityView from '../views/DataQualityView.js';
 
 let activeViewModule = null;
 
 const viewModuleMap = {
+  today: TodayView,
   planner: PlannerView,
   vault: RecipeVaultView,
   shopping: ShoppingView,
   settings: SettingsView,
-  prefs: SettingsView
+  prefs: SettingsView,
+  ingredients: PantryBankView,
+  bank: ProductBankView,
+  data: DataQualityView,
+  quality: DataQualityView
 };
 
 export function syncMobileNavigation(viewId) {

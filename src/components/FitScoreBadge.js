@@ -26,12 +26,24 @@ function escapeHtml(str) {
  */
 export function renderFitScoreBadge(fitScoreOrRecipe, mealTypeOrOptions = 'dinner', extraOptions = {}) {
   let fitResult = null;
+  const mealType = typeof mealTypeOrOptions === 'string' ? mealTypeOrOptions : 'dinner';
+  const opts = typeof mealTypeOrOptions === 'object' ? mealTypeOrOptions : extraOptions;
 
-  if (fitScoreOrRecipe && typeof fitScoreOrRecipe === 'object' && fitScoreOrRecipe.score !== undefined && fitScoreOrRecipe.tier) {
+  // Check if fitScoreOrRecipe is already a valid computed result object from calculateMealFitScore
+  const isComputedResult = fitScoreOrRecipe && 
+                           typeof fitScoreOrRecipe === 'object' && 
+                           typeof fitScoreOrRecipe.score === 'number' && 
+                           fitScoreOrRecipe.tier && 
+                           fitScoreOrRecipe.details && 
+                           !fitScoreOrRecipe.ingredients && 
+                           !fitScoreOrRecipe.nutrition && 
+                           !fitScoreOrRecipe.perServing && 
+                           !fitScoreOrRecipe.id;
+
+  if (isComputedResult) {
     fitResult = fitScoreOrRecipe;
   } else if (fitScoreOrRecipe) {
-    const mealType = typeof mealTypeOrOptions === 'string' ? mealTypeOrOptions : 'dinner';
-    const opts = typeof mealTypeOrOptions === 'object' ? mealTypeOrOptions : extraOptions;
+    // Force live calculation on the recipe object
     fitResult = calculateMealFitScore(fitScoreOrRecipe, mealType, opts);
   }
 

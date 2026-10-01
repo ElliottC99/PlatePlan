@@ -255,3 +255,90 @@ export async function saveCurrentPlan(plan) {
   });
 }
 
+export const savePlan = saveCurrentPlan;
+
+/**
+ * Fetch all products for the shared household.
+ */
+export async function getProducts() {
+  try {
+    if (!isDbAvailable()) return [];
+    const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('products');
+    const snap = await safeFirestoreGet(colRef);
+    if (!snap || !snap.docs) return [];
+    return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  } catch (err) {
+    console.warn('[HouseholdRepository] Offline or unable to fetch products:', err.message || err);
+    return [];
+  }
+}
+
+/**
+ * Persist or update a product document.
+ */
+export async function saveProduct(product) {
+  try {
+    if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
+    if (!product || typeof product !== 'object') return { success: false, error: 'Invalid product data' };
+
+    const prodData = { ...product, updatedAt: new Date().toISOString() };
+    const prodId = product.id || db.collection('households').doc(HOUSEHOLD_ID).collection('products').doc().id;
+    delete prodData.id;
+
+    await db.collection('households').doc(HOUSEHOLD_ID).collection('products').doc(prodId).set(prodData, { merge: true });
+    return { success: true, id: prodId };
+  } catch (err) {
+    console.warn('[HouseholdRepository] Unable to save product to cloud (offline):', err.message || err);
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Delete a product document by ID.
+ */
+export async function deleteProduct(productId) {
+  try {
+    if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
+    if (!productId) return { success: false, error: 'Missing product ID' };
+    await db.collection('households').doc(HOUSEHOLD_ID).collection('products').doc(productId).delete();
+    return { success: true };
+  } catch (err) {
+    console.warn('[HouseholdRepository] Unable to delete product from cloud (offline):', err.message || err);
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Real-time listener for ingredients collection.
+ */
+export function subscribeIngredients(callback) {
+  if (!isDbAvailable() || typeof callback !== 'function') return () => {};
+  try {
+    return db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients')
+      .onSnapshot((snap) => {
+        if (!snap || !snap.docs) return;
+        const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        callback(items);
+      }, (err) => console.warn('[HouseholdRepository] Ingredients listener warning:', err));
+  } catch (e) {
+    return () => {};
+  }
+}
+
+/**
+ * Real-time listener for products collection.
+ */
+export function subscribeProducts(callback) {
+  if (!isDbAvailable() || typeof callback !== 'function') return () => {};
+  try {
+    return db.collection('households').doc(HOUSEHOLD_ID).collection('products')
+      .onSnapshot((snap) => {
+        if (!snap || !snap.docs) return;
+        const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        callback(items);
+      }, (err) => console.warn('[HouseholdRepository] Products listener warning:', err));
+  } catch (e) {
+    return () => {};
+  }
+}
+

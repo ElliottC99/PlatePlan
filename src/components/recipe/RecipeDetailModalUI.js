@@ -1,8 +1,9 @@
 /**
- * src/components/recipe/RecipeDetailModalUI.js (v3.16.1)
+ * src/components/recipe/RecipeDetailModalUI.js (v3.19.15)
  * Modular Presentation Component for Recipe Detail & Scaling Preview Modal
  */
 
+import { calculateMealFitScore } from '../../services/FitScoreService.js';
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
 
 function escapeHtml(str) {
@@ -48,8 +49,11 @@ export function renderRecipeDetailModalContent({
   const name = escapeHtml(activeR.name || r.name || 'Untitled Recipe');
   const favBtnClass = isFav ? 'active' : '';
 
-  const fitScoreBadgeHtml = renderFitScoreBadge(activeR || r, mealType || 'dinner', {
-    activeProfile: servingMode === 'both' ? 'everyone' : servingMode,
+  // Compute live score for active profile and slot
+  const recipe = activeR || r;
+  const slot = mealType || 'dinner';
+  const fitBadgeHtml = renderFitScoreBadge(recipe, slot, { 
+    activeProfile: servingMode === 'both' ? 'everyone' : servingMode, 
     variant: variantKey,
     portionScaled: true,
     showLabel: true
@@ -68,7 +72,7 @@ export function renderRecipeDetailModalContent({
             <span>·</span>
             <span>Serves ${activeR.serves || 1} baseline</span>
             ${instanceId ? '<span class="tag" style="background:var(--purple-bg);color:var(--purple);font-size:11px">Planned Meal</span>' : ''}
-            ${fitScoreBadgeHtml}
+            <span class="tag recipe-header-fit-pill" style="padding:0;border:none;background:transparent">${fitBadgeHtml}</span>
           </div>
         </div>
         <div class="recipe-view-nav-actions" style="display:flex;align-items:center;gap:8px">
@@ -81,44 +85,65 @@ export function renderRecipeDetailModalContent({
         </div>
       </div>
       <div class="recipe-view-body">
-        <div class="recipe-view-controls-bar">
-          ${hasEnh ? `
-            <div class="segmented-control" role="tablist" style="width:fit-content;margin-bottom:4px;">
-              <button type="button" role="tab" class="${!isEnh ? 'active' : ''}" onclick="switchViewTab('original')">Original</button>
-              <button type="button" role="tab" class="${isEnh ? 'active' : ''}" onclick="switchViewTab('enhanced')">✨ Enhanced</button>
-            </div>
-          ` : ''}
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-            <div class="segmented-control" role="tablist">
-              <button type="button" role="tab" class="${servingMode === 'both' ? 'active' : ''}" onclick="switchPreviewServingMode('both')">Shared (${activeR.serves || 2})</button>
-              <button type="button" role="tab" class="${servingMode === 'elliott' ? 'active' : ''}" onclick="switchPreviewServingMode('elliott')">👤 Elliott only</button>
-              <button type="button" role="tab" class="${servingMode === 'chloe' ? 'active' : ''}" onclick="switchPreviewServingMode('chloe')">👤 Chloe only</button>
-            </div>
-            ${servingMode === 'both' ? `
-              <div style="display:flex;align-items:center;gap:8px;font-size:13px;">
-                <label for="preview-serves" style="font-weight:650;color:var(--text)">Servings:</label>
-                <input type="number" id="preview-serves" name="previewServes" value="${targetServes}" oninput="updateRecipePreviewScale(this.value)" style="width:70px;min-height:36px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);font-weight:700;text-align:center" min="1" step="1">
+        <style>
+          .recipe-view-grid-layout {
+            display: grid;
+            grid-template-columns: 40% 60%;
+            gap: 24px;
+            align-items: start;
+          }
+          @media (max-width: 768px) {
+            .recipe-view-grid-layout {
+              grid-template-columns: 1fr;
+              gap: 16px;
+            }
+          }
+        </style>
+        <div class="recipe-view-grid-layout">
+          <!-- Left Column (40%): Portion selector, Macros, Source, Ingredients -->
+          <div class="recipe-view-left-col" style="display:flex;flex-direction:column;gap:14px;min-width:0">
+            <div class="recipe-view-controls-bar">
+              ${hasEnh ? `
+                <div class="segmented-control" role="tablist" style="width:fit-content;margin-bottom:8px;">
+                  <button type="button" role="tab" class="${!isEnh ? 'active' : ''}" onclick="switchViewTab('original')">Original</button>
+                  <button type="button" role="tab" class="${isEnh ? 'active' : ''}" onclick="switchViewTab('enhanced')">✨ Enhanced</button>
+                </div>
+              ` : ''}
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div class="segmented-control" role="tablist">
+                  <button type="button" role="tab" class="${servingMode === 'both' ? 'active' : ''}" onclick="switchPreviewServingMode('both')">Shared (${activeR.serves || 2})</button>
+                  <button type="button" role="tab" class="${servingMode === 'elliott' ? 'active' : ''}" onclick="switchPreviewServingMode('elliott')">👤 Elliott only</button>
+                  <button type="button" role="tab" class="${servingMode === 'chloe' ? 'active' : ''}" onclick="switchPreviewServingMode('chloe')">👤 Chloe only</button>
+                </div>
+                ${servingMode === 'both' ? `
+                  <div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+                    <label for="preview-serves" style="font-weight:650;color:var(--text)">Servings:</label>
+                    <input type="number" id="preview-serves" name="previewServes" value="${targetServes}" oninput="updateRecipePreviewScale(this.value)" style="width:70px;min-height:36px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);font-weight:700;text-align:center" min="1" step="1">
+                  </div>
+                ` : `
+                  <div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+                    <label for="preview-single-serves" style="font-weight:650;color:var(--text)">Servings:</label>
+                    <input type="number" id="preview-single-serves" name="previewSingleServes" value="${singleServes}" oninput="updateSinglePersonServes(this.value)" style="width:70px;min-height:36px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);font-weight:700;text-align:center" min="1" step="1">
+                  </div>
+                `}
               </div>
-            ` : `
-              <div style="display:flex;align-items:center;gap:8px;font-size:13px;">
-                <label for="preview-single-serves" style="font-weight:650;color:var(--text)">Servings:</label>
-                <input type="number" id="preview-single-serves" name="previewSingleServes" value="${singleServes}" oninput="updateSinglePersonServes(this.value)" style="width:70px;min-height:36px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);font-weight:700;text-align:center" min="1" step="1">
-              </div>
-            `}
+            </div>
+            ${servingModeBannerHtml}
+            ${allocationAndTargetHtml}
+            ${sourceHtml}
+            ${macroCardsHtml}
+            <div class="recipe-view-section">
+              <h3 style="margin-bottom:10px;font-size:15px;font-weight:700;color:var(--text)">Ingredients</h3>
+              ${ingredientsHtml}
+            </div>
           </div>
-        </div>
-        ${servingModeBannerHtml}
-        ${allocationAndTargetHtml}
-        ${sourceHtml}
-        ${macroCardsHtml}
-        <div class="recipe-view-sections">
-          <div class="recipe-view-section">
-            <h3 style="margin-bottom:10px;font-size:15px;font-weight:700;color:var(--text)">Ingredients</h3>
-            ${ingredientsHtml}
-          </div>
-          <div class="recipe-view-section">
-            <h3 style="margin-bottom:10px;font-size:15px;font-weight:700;color:var(--text)">Method / Steps</h3>
-            ${methodHtml}
+
+          <!-- Right Column (60%): Method instructions -->
+          <div class="recipe-view-right-col" style="display:flex;flex-direction:column;gap:14px;min-width:0">
+            <div class="recipe-view-section">
+              <h3 style="margin-bottom:10px;font-size:15px;font-weight:700;color:var(--text)">Method</h3>
+              ${methodHtml}
+            </div>
           </div>
         </div>
       </div>
