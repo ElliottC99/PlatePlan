@@ -1,5 +1,5 @@
 /**
- * src/views/PantryBankView.js (v3.19.24)
+ * src/views/PantryBankView.js (v3.19.25)
  * Modular ES6 View for Category ➔ Ingredient ➔ Sub-type Hierarchy Bank.
  * Features Aliasing, Merging, Sub-type creation, Promoting/demoting, and Auto-default product previews.
  * Fully responsive and optimized to remain under 350 lines.
@@ -16,27 +16,46 @@ import { renderProductBank, openProductEditModal } from './ProductBankView.js';
 import { renderCategoryManagerModal } from '../components/pantry/CategoryManagerModalUI.js';
 
 let activeEditingIngredientId = null;
-let activeCategoryFilter = null;
+export let selectedCategoryFilter = null;
+export let activeCategoryFilter = null;
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
 
+export function resetCategoryFilter() {
+  selectedCategoryFilter = null;
+  activeCategoryFilter = null;
+  const searchInput = typeof document !== 'undefined' ? document.getElementById('ingredient-group-search') : null;
+  if (searchInput) searchInput.value = '';
+  invalidateHierarchyCache();
+}
+
 export function setActiveCategoryFilter(cat) {
-  activeCategoryFilter = (cat && cat !== 'all') ? cat : null;
+  selectedCategoryFilter = (cat && cat !== 'all') ? cat : null;
+  activeCategoryFilter = selectedCategoryFilter;
   renderIngredientBank();
+}
+
+export function getFilteredIngredients(items = [], filter = selectedCategoryFilter || activeCategoryFilter) {
+  if (!filter || filter === 'all') return items;
+  const targetSlug = slugCategory(filter);
+  return items.filter(item => 
+    slugCategory(item.category) === targetSlug || 
+    slugCategory(item.cat) === targetSlug
+  );
 }
 
 export function updateActiveCategoryFilter(oldName, newName) {
   if (oldName) {
     const oldSlug = slugCategory(oldName);
-    if (activeCategoryFilter && slugCategory(activeCategoryFilter) === oldSlug) {
-      activeCategoryFilter = (newName && newName !== 'all') ? newName : null;
+    const curFilter = selectedCategoryFilter || activeCategoryFilter;
+    if (curFilter && slugCategory(curFilter) === oldSlug) {
+      selectedCategoryFilter = (newName && newName !== 'all') ? newName : null;
+      activeCategoryFilter = selectedCategoryFilter;
     }
     const searchInput = typeof document !== 'undefined' ? document.getElementById('ingredient-group-search') : null;
-    if (searchInput && searchInput.value) {
-      if (slugCategory(searchInput.value) === oldSlug) {
-        searchInput.value = newName ? newName : '';
-      }
+    if (searchInput && searchInput.value && slugCategory(searchInput.value) === oldSlug) {
+      searchInput.value = newName ? newName : '';
     }
   }
   invalidateHierarchyCache();
@@ -202,21 +221,26 @@ export function renderIngredientBank() {
 
   let hierarchy = buildPantryHierarchy(ingredients, products);
 
-  if (activeCategoryFilter && activeCategoryFilter !== 'all') {
-    const filterSlug = slugCategory(activeCategoryFilter);
-    hierarchy = hierarchy.filter(g => slugCategory(g.category) === filterSlug);
+  const curFilter = selectedCategoryFilter || activeCategoryFilter;
+  if (curFilter && curFilter !== 'all') {
+    const targetSlug = slugCategory(curFilter);
+    hierarchy = hierarchy.filter(g => 
+      slugCategory(g.category) === targetSlug || 
+      slugCategory(g.cat) === targetSlug
+    );
   }
 
   const searchInput = typeof document !== 'undefined' ? document.getElementById('ingredient-group-search') : null;
   const query = (searchInput?.value || '').trim().toLowerCase();
+  const querySlug = slugCategory(query);
   if (query) {
     hierarchy = hierarchy.map(g => {
-      const matchCat = g.category.toLowerCase().includes(query);
+      const matchCat = (g.category || '').toLowerCase().includes(query) || (querySlug && slugCategory(g.category) === querySlug);
       const filteredIngs = g.ingredients.filter(ing => {
         if (matchCat) return true;
-        if ((ing.name || '').toLowerCase().includes(query)) return true;
-        if (Array.isArray(ing.aliases) && ing.aliases.some(a => (a || '').toLowerCase().includes(query))) return true;
-        if (Array.isArray(ing.subtypes) && ing.subtypes.some(st => (st.name || '').toLowerCase().includes(query))) return true;
+        if ((ing.name || '').toLowerCase().includes(query) || (querySlug && slugCategory(ing.name).includes(querySlug))) return true;
+        if (Array.isArray(ing.aliases) && ing.aliases.some(a => (a || '').toLowerCase().includes(query) || (querySlug && slugCategory(a).includes(querySlug)))) return true;
+        if (Array.isArray(ing.subtypes) && ing.subtypes.some(st => (st.name || '').toLowerCase().includes(query) || (querySlug && slugCategory(st.name).includes(querySlug)))) return true;
         return false;
       });
       return { ...g, ingredients: filteredIngs };
@@ -320,34 +344,27 @@ export function mount(container) {
   renderProductBank();
 }
 
+export const renderPantryBankView = renderIngredientBank;
 export { renderProductBank, openProductEditModal };
 
-export function openCategoryManager() {
-  renderCategoryManagerModal();
-}
+export function openCategoryManager() { renderCategoryManagerModal(); }
 
 if (typeof window !== 'undefined') {
   Object.assign(window, {
-    renderIngredientBank, openIngredientFamilyDetailsModal, closeIngredientFamilyDetailsModal,
+    renderIngredientBank, renderPantryBankView, openIngredientFamilyDetailsModal, closeIngredientFamilyDetailsModal,
     saveIngredientFamilyDetailsModal, handleSetDefaultProduct, promptAddAlias, promptRemoveAlias,
     promptAddSubtype, promptMerge, promptDemote, handlePromoteSubtype, handleDeleteIngredient,
     openCategoryManager, openCategoryManagerModal: openCategoryManager,
-    updateActiveCategoryFilter, setActiveCategoryFilter,
+    updateActiveCategoryFilter, setActiveCategoryFilter, resetCategoryFilter, getFilteredIngredients,
     createIngredientFamilyPrompt: () => openIngredientFamilyDetailsModal(null),
     
     toggleSubtypeCollapse(btn, ingId) {
       const container = document.getElementById(`subtypes-container-${ingId}`);
       if (!container) return;
       const isCollapsed = container.style.display === 'none';
-      if (isCollapsed) {
-        container.style.display = 'flex';
-        container.classList.add('is-expanded');
-        btn.textContent = `▲ SUB-TYPES (${container.children.length})`;
-      } else {
-        container.style.display = 'none';
-        container.classList.remove('is-expanded');
-        btn.textContent = `▼ SUB-TYPES (${container.children.length})`;
-      }
+      container.style.display = isCollapsed ? 'flex' : 'none';
+      container.classList.toggle('is-expanded', isCollapsed);
+      btn.textContent = `${isCollapsed ? '▲' : '▼'} SUB-TYPES (${container.children.length})`;
     },
     
     toggleCardMoreMenu(btn, ingId) {

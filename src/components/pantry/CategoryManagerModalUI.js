@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.19.24)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.19.25)
  * In-App Multi-Step Category Operations Wizard & Fine-Grained Reassignment Modal.
  * Replaces all native browser calls (prompt, confirm, alert) with accessible DOM views.
  */
@@ -7,21 +7,34 @@
 import { getState, setIngredients, setProducts, batchMutate } from '../../store/store.js';
 import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
 import { getActiveCategories, slugCategory, slugifyToKebab, invalidateHierarchyCache } from '../../models/PantryHierarchyModel.js';
-import { updateActiveCategoryFilter, renderIngredientBank } from '../../views/PantryBankView.js';
+import { updateActiveCategoryFilter, renderIngredientBank, renderPantryBankView, resetCategoryFilter, setActiveCategoryFilter } from '../../views/PantryBankView.js';
 
 function escapeHtml(str) { return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function escapeAttr(str) { return escapeHtml(str).replace(/`/g, '&#96;'); }
 
 let wizardStep = 'list', activeCat = null, reassignMode = 'mass', reassignSearch = '', massTargetCat = '', individualCatMap = {};
 
+function triggerBankViewRenders() {
+  if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
+  else if (typeof setActiveCategoryFilter === 'function') setActiveCategoryFilter('all');
+  invalidateHierarchyCache();
+  setTimeout(() => {
+    if (typeof renderIngredientBank === 'function') renderIngredientBank();
+    if (typeof renderPantryBankView === 'function') renderPantryBankView();
+    if (typeof window !== 'undefined') {
+      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+      if (typeof window.renderPantryBankView === 'function') window.renderPantryBankView();
+      if (typeof window.renderProductBank === 'function') window.renderProductBank();
+      if (typeof window.requestPlatePlanViewRender === 'function') window.requestPlatePlanViewRender('ingredients');
+    }
+  }, 0);
+}
+
 export function closeCategoryManagerModal() {
   const modal = document.getElementById('category-manager-modal');
   if (modal) { modal.style.opacity = '0'; modal.style.pointerEvents = 'none'; modal.classList.remove('open'); }
   wizardStep = 'list'; activeCat = null; reassignSearch = '';
-  invalidateHierarchyCache();
-  if (typeof renderIngredientBank === 'function') renderIngredientBank();
-  if (typeof window !== 'undefined' && typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-  if (typeof window !== 'undefined' && typeof window.renderProductBank === 'function') window.renderProductBank();
+  triggerBankViewRenders();
 }
 
 function dedupeCategories(cats) {
@@ -235,9 +248,7 @@ export function renderCategoryManagerModal() {
       await Promise.all(persistPromises);
     });
 
-    if (typeof updateActiveCategoryFilter === 'function') updateActiveCategoryFilter(oldCat, newName);
-    if (typeof window !== 'undefined' && typeof window.updateActiveCategoryFilter === 'function') window.updateActiveCategoryFilter(oldCat, newName);
-
+    triggerBankViewRenders();
     wizardStep = 'list'; activeCat = null; reassignSearch = '';
     renderCurrentStep();
   };
@@ -280,9 +291,7 @@ export function renderCategoryManagerModal() {
       await Promise.all(persistPromises);
     });
 
-    if (typeof updateActiveCategoryFilter === 'function') updateActiveCategoryFilter(sourceCat, targetCat || null);
-    if (typeof window !== 'undefined' && typeof window.updateActiveCategoryFilter === 'function') window.updateActiveCategoryFilter(sourceCat, targetCat || null);
-
+    triggerBankViewRenders();
     wizardStep = 'list'; activeCat = null; reassignSearch = '';
     renderCurrentStep();
   };
@@ -312,9 +321,7 @@ export function renderCategoryManagerModal() {
     state.categories = dedupeCategories(updatedCats);
     setIngredients([...(state.ingredients || [])]);
 
-    if (typeof updateActiveCategoryFilter === 'function') updateActiveCategoryFilter(deletedCat, null);
-    if (typeof window !== 'undefined' && typeof window.updateActiveCategoryFilter === 'function') window.updateActiveCategoryFilter(deletedCat, null);
-
+    triggerBankViewRenders();
     wizardStep = 'list'; activeCat = null; reassignSearch = '';
     renderCurrentStep();
   };
@@ -372,9 +379,7 @@ export function renderCategoryManagerModal() {
       await Promise.all(persistPromises);
     });
 
-    if (typeof updateActiveCategoryFilter === 'function') updateActiveCategoryFilter(deletedCat, null);
-    if (typeof window !== 'undefined' && typeof window.updateActiveCategoryFilter === 'function') window.updateActiveCategoryFilter(deletedCat, null);
-
+    triggerBankViewRenders();
     wizardStep = 'list'; activeCat = null; reassignSearch = '';
     renderCurrentStep();
   };

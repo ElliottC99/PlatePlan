@@ -1,5 +1,5 @@
 /**
- * src/models/PantryHierarchyModel.js (v3.19.24)
+ * src/models/PantryHierarchyModel.js (v3.19.25)
  * Relational Model & Operations for Category ➔ Ingredient ➔ Sub-type ➔ Product hierarchy.
  * Encapsulates aliasing, merging, promoting/demoting, and auto-default product resolution.
  */
@@ -19,49 +19,34 @@ export function isSubtypeItem(item) {
 
 export function getActiveCategories(state = {}) {
   const categoryMap = new Map(); // slug -> display string
-  
   if (Array.isArray(state.categories)) {
     state.categories.forEach(c => {
-      const name = typeof c === 'string' ? c : c.name;
+      const name = typeof c === 'string' ? c : c?.name;
       if (name && name.trim()) {
         const slug = slugCategory(name);
-        if (slug && !categoryMap.has(slug)) {
-          categoryMap.set(slug, name.trim());
-        }
+        if (slug && !categoryMap.has(slug)) categoryMap.set(slug, name.trim());
       }
     });
   }
-  
   const ings = Array.isArray(state.ingredients) ? state.ingredients : [];
   ings.forEach(i => {
     const cat = i.category || i.cat;
     if (cat && typeof cat === 'string' && cat.trim()) {
       const slug = slugCategory(cat);
-      if (slug && !categoryMap.has(slug)) {
-        const cap = cat.charAt(0).toUpperCase() + cat.slice(1);
-        categoryMap.set(slug, cap);
-      }
+      if (slug && !categoryMap.has(slug)) categoryMap.set(slug, cat.charAt(0).toUpperCase() + cat.slice(1));
     }
   });
-
   const prods = Array.isArray(state.products) ? state.products : [];
   prods.forEach(p => {
     const cat = p.category || p.cat;
     if (cat && typeof cat === 'string' && cat.trim()) {
       const slug = slugCategory(cat);
-      if (slug && !categoryMap.has(slug)) {
-        const cap = cat.charAt(0).toUpperCase() + cat.slice(1);
-        categoryMap.set(slug, cap);
-      }
+      if (slug && !categoryMap.has(slug)) categoryMap.set(slug, cat.charAt(0).toUpperCase() + cat.slice(1));
     }
   });
-
   if (categoryMap.size === 0) {
-    ['Baking', 'Beverages', 'Carbs', 'Dairy & Eggs', 'Fruit & Vegetables', 'Grains, Legumes & Pulses', 'Herbs & Spices', 'Meat Substitutes', 'Nuts & Seeds', 'Other', 'Produce', 'Proteins', 'Store Cupboard'].forEach(c => {
-      categoryMap.set(slugCategory(c), c);
-    });
+    ['Baking', 'Beverages', 'Carbs', 'Dairy & Eggs', 'Fruit & Vegetables', 'Grains, Legumes & Pulses', 'Herbs & Spices', 'Meat Substitutes', 'Nuts & Seeds', 'Other', 'Produce', 'Proteins', 'Store Cupboard'].forEach(c => categoryMap.set(slugCategory(c), c));
   }
-
   return Array.from(categoryMap.values()).sort((a, b) => a.localeCompare(b));
 }
 
@@ -149,10 +134,14 @@ export function buildPantryHierarchy(ingredients = [], products = [], options = 
 
   const orphanSubtypes = subtypeItems.filter(st => !linkedSubtypeIds.has(String(st.id)));
   const categoryMap = new Map();
+  const activeCats = getActiveCategories(getState() || {});
+  const slugToCatName = new Map();
+  activeCats.forEach(c => slugToCatName.set(slugCategory(c), c));
 
   rootIngredients.forEach(ing => {
     const catRaw = ing.category || ing.cat || 'Other';
-    const cat = catRaw.charAt(0).toUpperCase() + catRaw.slice(1);
+    const cSlug = slugCategory(catRaw);
+    const cat = slugToCatName.get(cSlug) || (catRaw.charAt(0).toUpperCase() + catRaw.slice(1));
     if (!categoryMap.has(cat)) categoryMap.set(cat, []);
 
     const directProducts = prodList.filter(p => {
