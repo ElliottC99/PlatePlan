@@ -1,5 +1,5 @@
 /**
- * src/models/PantryHierarchyModel.js (v3.19.23)
+ * src/models/PantryHierarchyModel.js (v3.19.24)
  * Relational Model & Operations for Category ➔ Ingredient ➔ Sub-type ➔ Product hierarchy.
  * Encapsulates aliasing, merging, promoting/demoting, and auto-default product resolution.
  */
@@ -239,6 +239,10 @@ export function logPantryHierarchyTelemetry(ingredients = [], products = []) {
 
 let buildHierarchyTimer = null;
 let cachedHierarchyResult = null;
+
+export function invalidateHierarchyCache() {
+  cachedHierarchyResult = null;
+}
 
 export function debouncedBuildPantryHierarchy(ingredients = [], products = [], callback) {
   if (buildHierarchyTimer) clearTimeout(buildHierarchyTimer);

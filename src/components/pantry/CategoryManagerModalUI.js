@@ -1,12 +1,13 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.19.23)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.19.24)
  * In-App Multi-Step Category Operations Wizard & Fine-Grained Reassignment Modal.
  * Replaces all native browser calls (prompt, confirm, alert) with accessible DOM views.
  */
 
 import { getState, setIngredients, setProducts, batchMutate } from '../../store/store.js';
 import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
-import { getActiveCategories, slugCategory, slugifyToKebab } from '../../models/PantryHierarchyModel.js';
+import { getActiveCategories, slugCategory, slugifyToKebab, invalidateHierarchyCache } from '../../models/PantryHierarchyModel.js';
+import { updateActiveCategoryFilter, renderIngredientBank } from '../../views/PantryBankView.js';
 
 function escapeHtml(str) { return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function escapeAttr(str) { return escapeHtml(str).replace(/`/g, '&#96;'); }
@@ -17,6 +18,10 @@ export function closeCategoryManagerModal() {
   const modal = document.getElementById('category-manager-modal');
   if (modal) { modal.style.opacity = '0'; modal.style.pointerEvents = 'none'; modal.classList.remove('open'); }
   wizardStep = 'list'; activeCat = null; reassignSearch = '';
+  invalidateHierarchyCache();
+  if (typeof renderIngredientBank === 'function') renderIngredientBank();
+  if (typeof window !== 'undefined' && typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+  if (typeof window !== 'undefined' && typeof window.renderProductBank === 'function') window.renderProductBank();
 }
 
 function dedupeCategories(cats) {
@@ -194,11 +199,12 @@ export function renderCategoryManagerModal() {
   window.submitRenameCat = async () => {
     const input = document.getElementById('cat-rename-input');
     const newName = input ? input.value.trim() : '';
-    if (!newName || !activeCat || slugCategory(newName) === slugCategory(activeCat)) {
+    const oldCat = activeCat;
+    if (!newName || !oldCat || slugCategory(newName) === slugCategory(oldCat)) {
       wizardStep = 'list'; activeCat = null; reassignSearch = ''; renderCurrentStep(); return;
     }
 
-    const targetSlug = slugCategory(activeCat), newCatKebab = slugifyToKebab(newName);
+    const targetSlug = slugCategory(oldCat), newCatKebab = slugifyToKebab(newName);
     const state = getState() || {};
     const ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
     const prods = Array.isArray(state.products) ? [...state.products] : [];
@@ -229,6 +235,9 @@ export function renderCategoryManagerModal() {
       await Promise.all(persistPromises);
     });
 
+    if (typeof updateActiveCategoryFilter === 'function') updateActiveCategoryFilter(oldCat, newName);
+    if (typeof window !== 'undefined' && typeof window.updateActiveCategoryFilter === 'function') window.updateActiveCategoryFilter(oldCat, newName);
+
     wizardStep = 'list'; activeCat = null; reassignSearch = '';
     renderCurrentStep();
   };
@@ -237,9 +246,10 @@ export function renderCategoryManagerModal() {
   window.submitMergeCat = async () => {
     const select = document.getElementById('cat-merge-select');
     const targetCat = select ? select.value : '';
-    if (!targetCat || !activeCat) return;
+    const sourceCat = activeCat;
+    if (!targetCat || !sourceCat) return;
 
-    const targetSlug = slugCategory(activeCat), targetKebab = slugifyToKebab(targetCat);
+    const targetSlug = slugCategory(sourceCat), targetKebab = slugifyToKebab(targetCat);
     const state = getState() || {};
     const ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
     const prods = Array.isArray(state.products) ? [...state.products] : [];
@@ -270,6 +280,9 @@ export function renderCategoryManagerModal() {
       await Promise.all(persistPromises);
     });
 
+    if (typeof updateActiveCategoryFilter === 'function') updateActiveCategoryFilter(sourceCat, targetCat || null);
+    if (typeof window !== 'undefined' && typeof window.updateActiveCategoryFilter === 'function') window.updateActiveCategoryFilter(sourceCat, targetCat || null);
+
     wizardStep = 'list'; activeCat = null; reassignSearch = '';
     renderCurrentStep();
   };
@@ -290,13 +303,18 @@ export function renderCategoryManagerModal() {
   };
 
   window.submitDeleteEmptyCat = () => {
-    if (!activeCat) return;
-    const targetSlug = slugCategory(activeCat);
+    const deletedCat = activeCat;
+    if (!deletedCat) return;
+    const targetSlug = slugCategory(deletedCat);
     const state = getState() || {};
     const allCats = getActiveCategories(state);
     const updatedCats = allCats.filter(c => slugCategory(c) !== targetSlug);
     state.categories = dedupeCategories(updatedCats);
     setIngredients([...(state.ingredients || [])]);
+
+    if (typeof updateActiveCategoryFilter === 'function') updateActiveCategoryFilter(deletedCat, null);
+    if (typeof window !== 'undefined' && typeof window.updateActiveCategoryFilter === 'function') window.updateActiveCategoryFilter(deletedCat, null);
+
     wizardStep = 'list'; activeCat = null; reassignSearch = '';
     renderCurrentStep();
   };
@@ -306,8 +324,9 @@ export function renderCategoryManagerModal() {
   window.updateIndividualCatMap = (ingId, targetCat) => { individualCatMap[ingId] = targetCat; };
 
   window.submitReassignAndDelete = async () => {
-    if (!activeCat) return;
-    const targetSlug = slugCategory(activeCat);
+    const deletedCat = activeCat;
+    if (!deletedCat) return;
+    const targetSlug = slugCategory(deletedCat);
     const state = getState() || {}, ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [], prods = Array.isArray(state.products) ? [...state.products] : [];
     const massTarget = document.getElementById('cat-mass-target-select')?.value || massTargetCat || 'Uncategorized';
     const allCats = getActiveCategories(state);
@@ -352,6 +371,9 @@ export function renderCategoryManagerModal() {
       setProducts(prods);
       await Promise.all(persistPromises);
     });
+
+    if (typeof updateActiveCategoryFilter === 'function') updateActiveCategoryFilter(deletedCat, null);
+    if (typeof window !== 'undefined' && typeof window.updateActiveCategoryFilter === 'function') window.updateActiveCategoryFilter(deletedCat, null);
 
     wizardStep = 'list'; activeCat = null; reassignSearch = '';
     renderCurrentStep();

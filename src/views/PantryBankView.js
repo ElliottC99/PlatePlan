@@ -1,5 +1,5 @@
 /**
- * src/views/PantryBankView.js (v3.19.23)
+ * src/views/PantryBankView.js (v3.19.24)
  * Modular ES6 View for Category ➔ Ingredient ➔ Sub-type Hierarchy Bank.
  * Features Aliasing, Merging, Sub-type creation, Promoting/demoting, and Auto-default product previews.
  * Fully responsive and optimized to remain under 350 lines.
@@ -9,15 +9,39 @@ import { getState, setIngredients, subscribe } from '../store/store.js';
 import { saveIngredient, deleteIngredient } from '../services/HouseholdRepository.js';
 import { 
   buildPantryHierarchy, aliasIngredient, removeAlias, addSubtypeToIngredient, 
-  promoteToIngredient, demoteToSubtype, reparentSubtype, mergeIngredients, setAutoDefaultProduct, getActiveCategories
+  promoteToIngredient, demoteToSubtype, reparentSubtype, mergeIngredients, setAutoDefaultProduct, getActiveCategories,
+  invalidateHierarchyCache, slugCategory
 } from '../models/PantryHierarchyModel.js';
 import { renderProductBank, openProductEditModal } from './ProductBankView.js';
 import { renderCategoryManagerModal } from '../components/pantry/CategoryManagerModalUI.js';
 
 let activeEditingIngredientId = null;
+let activeCategoryFilter = null;
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
+
+export function setActiveCategoryFilter(cat) {
+  activeCategoryFilter = (cat && cat !== 'all') ? cat : null;
+  renderIngredientBank();
+}
+
+export function updateActiveCategoryFilter(oldName, newName) {
+  if (oldName) {
+    const oldSlug = slugCategory(oldName);
+    if (activeCategoryFilter && slugCategory(activeCategoryFilter) === oldSlug) {
+      activeCategoryFilter = (newName && newName !== 'all') ? newName : null;
+    }
+    const searchInput = typeof document !== 'undefined' ? document.getElementById('ingredient-group-search') : null;
+    if (searchInput && searchInput.value) {
+      if (slugCategory(searchInput.value) === oldSlug) {
+        searchInput.value = newName ? newName : '';
+      }
+    }
+  }
+  invalidateHierarchyCache();
+  renderIngredientBank();
+}
 
 export function closeIngredientFamilyDetailsModal() {
   const modalWrap = document.getElementById('ingredient-family-details-wrap');
@@ -176,7 +200,28 @@ export function renderIngredientBank() {
     return;
   }
 
-  const hierarchy = buildPantryHierarchy(ingredients, products);
+  let hierarchy = buildPantryHierarchy(ingredients, products);
+
+  if (activeCategoryFilter && activeCategoryFilter !== 'all') {
+    const filterSlug = slugCategory(activeCategoryFilter);
+    hierarchy = hierarchy.filter(g => slugCategory(g.category) === filterSlug);
+  }
+
+  const searchInput = typeof document !== 'undefined' ? document.getElementById('ingredient-group-search') : null;
+  const query = (searchInput?.value || '').trim().toLowerCase();
+  if (query) {
+    hierarchy = hierarchy.map(g => {
+      const matchCat = g.category.toLowerCase().includes(query);
+      const filteredIngs = g.ingredients.filter(ing => {
+        if (matchCat) return true;
+        if ((ing.name || '').toLowerCase().includes(query)) return true;
+        if (Array.isArray(ing.aliases) && ing.aliases.some(a => (a || '').toLowerCase().includes(query))) return true;
+        if (Array.isArray(ing.subtypes) && ing.subtypes.some(st => (st.name || '').toLowerCase().includes(query))) return true;
+        return false;
+      });
+      return { ...g, ingredients: filteredIngs };
+    }).filter(g => g.ingredients.length > 0);
+  }
 
   container.innerHTML = hierarchy.map(group => `
     <div class="card" style="margin-bottom:16px;padding:16px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:12px">
@@ -287,6 +332,7 @@ if (typeof window !== 'undefined') {
     saveIngredientFamilyDetailsModal, handleSetDefaultProduct, promptAddAlias, promptRemoveAlias,
     promptAddSubtype, promptMerge, promptDemote, handlePromoteSubtype, handleDeleteIngredient,
     openCategoryManager, openCategoryManagerModal: openCategoryManager,
+    updateActiveCategoryFilter, setActiveCategoryFilter,
     createIngredientFamilyPrompt: () => openIngredientFamilyDetailsModal(null),
     
     toggleSubtypeCollapse(btn, ingId) {
