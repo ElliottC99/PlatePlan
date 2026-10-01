@@ -1,8 +1,8 @@
 /**
- * src/store/store.js (v3.8.1)
+ * src/store/store.js (v3.19.22)
  * Centralized Reactive State Store module using native browser CustomEvents for unidirectional data flow.
  * Provides microtask-wrapped event dispatching, local storage caching for instant offline hydration,
- * and optimistic UI rollbacks.
+ * batch mutation execution, and optimistic UI rollbacks.
  */
 
 import { safeJsonStringify, safeClone } from '../utils/safeJson.js';
@@ -10,7 +10,7 @@ import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
 
 export { getShoppingLineStateKey };
 
-const CACHE_KEY = `plateplan_store_cache_${(typeof window !== 'undefined' && window.APP_VERSION) || 'v3.13.1'}`;
+const CACHE_KEY = `plateplan_store_cache_${(typeof window !== 'undefined' && window.APP_VERSION) || 'v3.19.22'}`;
 
 const state = {
   recipes: [],
@@ -24,6 +24,50 @@ const state = {
   isCachedHydrated: false,
   isCloudHydrated: false
 };
+
+let isBatching = false;
+const pendingBatchEvents = new Set();
+
+/**
+ * Start a batch state mutation to suppress intermediate event broadcasts.
+ */
+export function startBatch() {
+  isBatching = true;
+}
+
+/**
+ * End batch state mutation and broadcast coalesced events and a single state:updated event.
+ */
+export function endBatch() {
+  if (!isBatching) return;
+  isBatching = false;
+  saveStateCache();
+  if (pendingBatchEvents.size > 0) {
+    const events = Array.from(pendingBatchEvents);
+    pendingBatchEvents.clear();
+    if (typeof document !== 'undefined') {
+      Promise.resolve().then(() => {
+        events.forEach(evt => document.dispatchEvent(new CustomEvent(evt, { detail: state })));
+        document.dispatchEvent(new CustomEvent('plateplan:state:updated', { detail: state }));
+      });
+    }
+  }
+}
+
+/**
+ * Execute a batch function with suppressed intermediate state broadcasts.
+ * @param {Function} batchFn 
+ * @returns {Promise<any>}
+ */
+export async function batchMutate(batchFn) {
+  startBatch();
+  try {
+    const result = await batchFn();
+    return result;
+  } finally {
+    endBatch();
+  }
+}
 
 /**
  * Safely read cached state from localStorage.
@@ -100,6 +144,10 @@ export const getState = () => state;
  * @param {any} detail 
  */
 function dispatchStateEvent(eventName, detail) {
+  if (isBatching) {
+    pendingBatchEvents.add(eventName);
+    return;
+  }
   if (typeof document !== 'undefined') {
     Promise.resolve().then(() => {
       document.dispatchEvent(new CustomEvent(eventName, { detail }));

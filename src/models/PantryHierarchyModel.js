@@ -1,5 +1,5 @@
 /**
- * src/models/PantryHierarchyModel.js (v3.19.20)
+ * src/models/PantryHierarchyModel.js (v3.19.22)
  * Relational Model & Operations for Category ➔ Ingredient ➔ Sub-type ➔ Product hierarchy.
  * Encapsulates aliasing, merging, promoting/demoting, and auto-default product resolution.
  */
@@ -97,7 +97,7 @@ export function resolveDefaultProduct(item, products = []) {
   return null;
 }
 
-export function buildPantryHierarchy(ingredients = [], products = []) {
+export function buildPantryHierarchy(ingredients = [], products = [], options = {}) {
   const ingList = Array.isArray(ingredients) ? ingredients : Object.values(ingredients || {});
   const prodList = Array.isArray(products) ? products : Object.values(products || {});
   const groupClusters = new Map(), ungrouped = [];
@@ -221,7 +221,9 @@ export function buildPantryHierarchy(ingredients = [], products = []) {
   rootIngredients.forEach(ing => { subtypeCount += (ing.subtypes || []).length; });
   const productsCount = prodList.length;
 
-  console.log(`[PantryHierarchy] Detected ${coreCount} core ingredients and ${subtypeCount} child sub-types across ${productsCount} products.`);
+  if (options && options.verbose) {
+    console.log(`[PantryHierarchy] Detected ${coreCount} core ingredients and ${subtypeCount} child sub-types across ${productsCount} products.`);
+  }
 
   return Array.from(categoryMap.entries())
     .map(([category, items]) => ({
@@ -229,6 +231,10 @@ export function buildPantryHierarchy(ingredients = [], products = []) {
       ingredients: items.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
     }))
     .sort((a, b) => a.category.localeCompare(b.category));
+}
+
+export function logPantryHierarchyTelemetry(ingredients = [], products = []) {
+  return buildPantryHierarchy(ingredients, products, { verbose: true });
 }
 
 let buildHierarchyTimer = null;
@@ -320,18 +326,9 @@ export async function demoteToSubtype(ingredientId, targetParentIngredientId) {
   const targetSubtypes = Array.isArray(targetParent.subtypes) ? [...targetParent.subtypes] : [];
   const newSubtype = { id: source.id, name: source.name, notes: source.notes || '', aliases: Array.isArray(source.aliases) ? source.aliases : [], defaultProductId: source.defaultProductId || null, createdAt: new Date().toISOString() };
   targetSubtypes.push(newSubtype); targetParent.subtypes = targetSubtypes; targetParent.updatedAt = new Date().toISOString();
-  const updatedProds = prods.map(p => {
-    if (String(p.ingredientId) === String(source.id)) {
-      return { ...p, ingredientId: targetParent.id, subtypeId: source.id, updatedAt: new Date().toISOString() };
-    }
-    return p;
-  });
+  const updatedProds = prods.map(p => (String(p.ingredientId) === String(source.id)) ? { ...p, ingredientId: targetParent.id, subtypeId: source.id, updatedAt: new Date().toISOString() } : p);
   setIngredients(ings); setProducts(updatedProds);
-  await Promise.all([
-    deleteIngredient(source.id),
-    saveIngredient(targetParent),
-    ...updatedProds.filter(p => String(p.subtypeId) === String(source.id)).map(p => saveProduct(p))
-  ]);
+  await Promise.all([deleteIngredient(source.id), saveIngredient(targetParent), ...updatedProds.filter(p => String(p.subtypeId) === String(source.id)).map(p => saveProduct(p))]);
   return true;
 }
 
@@ -348,18 +345,9 @@ export async function mergeIngredients(sourceId, targetId) {
   const targetSubtypes = Array.isArray(target.subtypes) ? [...target.subtypes] : [];
   if (Array.isArray(source.subtypes)) source.subtypes.forEach(st => targetSubtypes.push(st));
   target.subtypes = targetSubtypes; target.updatedAt = new Date().toISOString();
-  const updatedProds = prods.map(p => {
-    if (String(p.ingredientId) === String(source.id) || String(p.groupId) === String(source.id)) {
-      return { ...p, ingredientId: target.id, updatedAt: new Date().toISOString() };
-    }
-    return p;
-  });
+  const updatedProds = prods.map(p => (String(p.ingredientId) === String(source.id) || String(p.groupId) === String(source.id)) ? { ...p, ingredientId: target.id, updatedAt: new Date().toISOString() } : p);
   setIngredients(ings); setProducts(updatedProds);
-  await Promise.all([
-    deleteIngredient(source.id),
-    saveIngredient(target),
-    ...updatedProds.filter(p => String(p.ingredientId) === String(target.id)).map(p => saveProduct(p))
-  ]);
+  await Promise.all([deleteIngredient(source.id), saveIngredient(target), ...updatedProds.filter(p => String(p.ingredientId) === String(target.id)).map(p => saveProduct(p))]);
   return true;
 }
 
@@ -386,12 +374,7 @@ export async function setAutoDefaultProduct(productId, parentIngredientId, subty
     } else parent.defaultProductId = productId;
     parent.updatedAt = new Date().toISOString(); await saveIngredient(parent);
   }
-  const updatedProds = prods.map(p => {
-    if (String(p.ingredientId) === String(parentIngredientId) || String(p.subtypeId) === String(subtypeId)) {
-      return { ...p, isAutoDefault: String(p.id) === String(productId), updatedAt: new Date().toISOString() };
-    }
-    return p;
-  });
+  const updatedProds = prods.map(p => (String(p.ingredientId) === String(parentIngredientId) || String(p.subtypeId) === String(subtypeId)) ? { ...p, isAutoDefault: String(p.id) === String(productId), updatedAt: new Date().toISOString() } : p);
   setIngredients(ings); setProducts(updatedProds);
   const targetProd = updatedProds.find(p => String(p.id) === String(productId));
   if (targetProd) await saveProduct(targetProd);

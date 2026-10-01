@@ -1,12 +1,12 @@
 /**
- * src/state/AppState.js (v3.12.2)
+ * src/state/AppState.js (v3.19.22)
  * Centralized State Encapsulation Module.
- * Provides getState(), updateState(patch), and subscribe(listener).
+ * Provides getState(), updateState(patch), subscribe(listener), and batch mutation execution.
  */
-import { getState, updateState, subscribe, saveStateCache, clearStateCache, setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, setShoppingList, runOptimisticMutation } from '../store/store.js';
+import { getState, updateState, subscribe, saveStateCache, clearStateCache, setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, setShoppingList, runOptimisticMutation, startBatch, endBatch, batchMutate } from '../store/store.js';
 
 if (typeof window !== 'undefined') {
-  window.AppState = { getState, updateState, subscribe };
+  window.AppState = { getState, updateState, subscribe, startBatch, endBatch, batchMutate };
   try {
     Object.defineProperty(window, 'state', {
       get() { return getState(); },
@@ -34,7 +34,10 @@ export const AppState = {
   setPreferences,
   setCurrentPlan,
   setShoppingList,
-  runOptimisticMutation
+  runOptimisticMutation,
+  startBatch,
+  endBatch,
+  batchMutate
 };
 
 export {
@@ -49,7 +52,10 @@ export {
   setPreferences,
   setCurrentPlan,
   setShoppingList,
-  runOptimisticMutation
+  runOptimisticMutation,
+  startBatch,
+  endBatch,
+  batchMutate
 };
 
 export default AppState;

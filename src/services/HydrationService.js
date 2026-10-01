@@ -1,5 +1,5 @@
 /**
- * src/services/HydrationService.js (v3.8.1)
+ * src/services/HydrationService.js (v3.19.22)
  * Orchestrates concurrent fetching from HouseholdRepository, invalidating/updating cache,
  * and populating the centralized Store and window.state.
  */
@@ -73,6 +73,7 @@ export function normalizeIngredientRecord(ing) {
 
 let inFlightHydration = null;
 let listenersActive = false;
+let hydrationLogged = false;
 
 function initRealtimeListeners() {
   if (listenersActive) return;
@@ -251,12 +252,17 @@ export async function hydrateHouseholdData() {
         window.state.preferences.nutritionTargets = nutritionTargets;
         window.state.settings = docData.settings || window.state.settings || {};
 
-        console.log('[HydrationService] Core user data and decoupled profiles mapped to state.');
+        if (!hydrationLogged) {
+          console.log('[HydrationService] Core user data and decoupled profiles mapped to state.');
+        }
       }
 
       initRealtimeListeners();
       saveStateCache();
-      console.log('[HydrationService] Household data hydrated successfully into Store and persisted to local cache.');
+      if (!hydrationLogged) {
+        hydrationLogged = true;
+        console.log('[HydrationService] Household data hydrated successfully into Store and persisted to local cache.');
+      }
       return { success: true, timestamp: Date.now() };
     } catch (err) {
       console.error('[HydrationService] Hydration failed:', err);

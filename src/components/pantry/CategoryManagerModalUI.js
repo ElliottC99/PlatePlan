@@ -1,10 +1,10 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.19.20)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.19.22)
  * In-App Multi-Step Category Operations Wizard & Fine-Grained Reassignment Modal.
  * Replaces all native browser calls (prompt, confirm, alert) with accessible DOM views.
  */
 
-import { getState, setIngredients, setProducts } from '../../store/store.js';
+import { getState, setIngredients, setProducts, batchMutate } from '../../store/store.js';
 import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
 import { getActiveCategories, slugCategory, slugifyToKebab } from '../../models/PantryHierarchyModel.js';
 
@@ -186,24 +186,28 @@ export function renderCategoryManagerModal() {
     const targetSlug = slugCategory(activeCat), newCatKebab = slugifyToKebab(newName);
     const state = getState() || {}, ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [], prods = Array.isArray(state.products) ? [...state.products] : [], cats = Array.isArray(state.categories) ? [...state.categories] : [];
 
-    ings.forEach(i => {
-      if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
-        i.category = newName; i.cat = newCatKebab; saveIngredient(i).catch(() => {});
-      }
-      if (Array.isArray(i.subtypes)) i.subtypes.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = newName; st.cat = newCatKebab; } });
-      if (Array.isArray(i.sub_types)) i.sub_types.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = newName; st.cat = newCatKebab; } });
+    await batchMutate(async () => {
+      ings.forEach(i => {
+        if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
+          i.category = newName; i.cat = newCatKebab; saveIngredient(i).catch(() => {});
+        }
+        if (Array.isArray(i.subtypes)) i.subtypes.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = newName; st.cat = newCatKebab; } });
+        if (Array.isArray(i.sub_types)) i.sub_types.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = newName; st.cat = newCatKebab; } });
+      });
+
+      prods.forEach(p => {
+        if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
+          p.category = newName; p.cat = newCatKebab; saveProduct(p).catch(() => {});
+        }
+      });
+
+      const newCats = cats.filter(c => slugCategory(typeof c === 'string' ? c : c.name) !== targetSlug);
+      if (!newCats.some(c => slugCategory(typeof c === 'string' ? c : c.name) === slugCategory(newName))) newCats.push(newName);
+
+      state.categories = newCats; setIngredients(ings); setProducts(prods);
     });
 
-    prods.forEach(p => {
-      if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
-        p.category = newName; p.cat = newCatKebab; saveProduct(p).catch(() => {});
-      }
-    });
-
-    const newCats = cats.filter(c => slugCategory(typeof c === 'string' ? c : c.name) !== targetSlug);
-    if (!newCats.some(c => slugCategory(typeof c === 'string' ? c : c.name) === slugCategory(newName))) newCats.push(newName);
-
-    state.categories = newCats; setIngredients(ings); setProducts(prods); wizardStep = 'list'; renderCurrentStep();
+    wizardStep = 'list'; renderCurrentStep();
   };
 
   window.startMergeCat = (cat) => { activeCat = cat; wizardStep = 'merge'; renderCurrentStep(); };
@@ -215,22 +219,26 @@ export function renderCategoryManagerModal() {
     const targetSlug = slugCategory(activeCat), targetKebab = slugifyToKebab(targetCat);
     const state = getState() || {}, ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [], prods = Array.isArray(state.products) ? [...state.products] : [];
 
-    ings.forEach(i => {
-      if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
-        i.category = targetCat; i.cat = targetKebab; saveIngredient(i).catch(() => {});
-      }
-      if (Array.isArray(i.subtypes)) i.subtypes.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = targetCat; st.cat = targetKebab; } });
+    await batchMutate(async () => {
+      ings.forEach(i => {
+        if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
+          i.category = targetCat; i.cat = targetKebab; saveIngredient(i).catch(() => {});
+        }
+        if (Array.isArray(i.subtypes)) i.subtypes.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = targetCat; st.cat = targetKebab; } });
+      });
+
+      prods.forEach(p => {
+        if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
+          p.category = targetCat; p.cat = targetKebab; saveProduct(p).catch(() => {});
+        }
+      });
+
+      const cats = Array.isArray(state.categories) ? [...state.categories] : [];
+      state.categories = cats.filter(c => slugCategory(typeof c === 'string' ? c : c.name) !== targetSlug);
+      setIngredients(ings); setProducts(prods);
     });
 
-    prods.forEach(p => {
-      if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
-        p.category = targetCat; p.cat = targetKebab; saveProduct(p).catch(() => {});
-      }
-    });
-
-    const cats = Array.isArray(state.categories) ? [...state.categories] : [];
-    state.categories = cats.filter(c => slugCategory(typeof c === 'string' ? c : c.name) !== targetSlug);
-    setIngredients(ings); setProducts(prods); wizardStep = 'list'; renderCurrentStep();
+    wizardStep = 'list'; renderCurrentStep();
   };
 
   window.startDeleteCat = (cat) => {
@@ -267,30 +275,34 @@ export function renderCategoryManagerModal() {
     const state = getState() || {}, ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [], prods = Array.isArray(state.products) ? [...state.products] : [];
     const massTarget = document.getElementById('cat-mass-target-select')?.value || massTargetCat || 'Uncategorized';
 
-    ings.forEach(i => {
-      if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
-        const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
-        i.category = dest; i.cat = slugifyToKebab(dest); saveIngredient(i).catch(() => {});
-      }
-      if (Array.isArray(i.subtypes)) {
-        i.subtypes.forEach(st => {
-          if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) {
-            const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
-            st.category = dest; st.cat = slugifyToKebab(dest);
-          }
-        });
-      }
+    await batchMutate(async () => {
+      ings.forEach(i => {
+        if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
+          const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
+          i.category = dest; i.cat = slugifyToKebab(dest); saveIngredient(i).catch(() => {});
+        }
+        if (Array.isArray(i.subtypes)) {
+          i.subtypes.forEach(st => {
+            if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) {
+              const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
+              st.category = dest; st.cat = slugifyToKebab(dest);
+            }
+          });
+        }
+      });
+
+      prods.forEach(p => {
+        if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
+          const dest = reassignMode === 'mass' ? massTarget : 'Uncategorized';
+          p.category = dest; p.cat = slugifyToKebab(dest); saveProduct(p).catch(() => {});
+        }
+      });
+
+      const cats = Array.isArray(state.categories) ? [...state.categories] : [];
+      state.categories = cats.filter(c => slugCategory(typeof c === 'string' ? c : c.name) !== targetSlug);
+      setIngredients(ings); setProducts(prods);
     });
 
-    prods.forEach(p => {
-      if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
-        const dest = reassignMode === 'mass' ? massTarget : 'Uncategorized';
-        p.category = dest; p.cat = slugifyToKebab(dest); saveProduct(p).catch(() => {});
-      }
-    });
-
-    const cats = Array.isArray(state.categories) ? [...state.categories] : [];
-    state.categories = cats.filter(c => slugCategory(typeof c === 'string' ? c : c.name) !== targetSlug);
-    setIngredients(ings); setProducts(prods); wizardStep = 'list'; renderCurrentStep();
+    wizardStep = 'list'; renderCurrentStep();
   };
 }

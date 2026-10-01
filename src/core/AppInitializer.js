@@ -1,5 +1,5 @@
 /**
- * src/core/AppInitializer.js (v3.10.0)
+ * src/core/AppInitializer.js (v3.19.22)
  * Core Application Bootstrapping, Service Worker & Toast Notifications
  */
 
@@ -25,12 +25,16 @@ export function showPlatePlanToast(msg, type = 'info') {
 }
 
 let isSwRegistered = false;
+let swLogged = false;
 export function registerServiceWorker() {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator) || isSwRegistered) return;
   isSwRegistered = true;
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').then(reg => {
-      console.info('[PlatePlan PWA] Service Worker registered with scope:', reg.scope);
+      if (!swLogged) {
+        swLogged = true;
+        console.info('[PlatePlan PWA] Service Worker registered with scope:', reg.scope);
+      }
       reg.addEventListener('updatefound', () => {
         const installingWorker = reg.installing;
         if (!installingWorker) return;

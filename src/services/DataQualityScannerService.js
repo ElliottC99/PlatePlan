@@ -1,5 +1,5 @@
 /**
- * src/services/DataQualityScannerService.js (v3.19.21)
+ * src/services/DataQualityScannerService.js (v3.19.22)
  * Automated catalog data quality auditor, anomaly scanner, and advisor.
  * Pure service layer with zero DOM references.
  */
@@ -20,19 +20,25 @@ export function runDataQualityScanDebounced(state = {}, callback) {
   return cachedScanResult || runDataQualityScan(state);
 }
 
-export function runDataQualityScan(state = {}) {
+export function runDataQualityDiagnostics(state = {}, verbose = true) {
+  const res = runDataQualityScan(state, { force: true, verbose });
+  return res;
+}
+
+export function runDataQualityScan(state = {}, options = {}) {
   const ingredientsList = Array.isArray(state.ingredients) ? state.ingredients : Object.values(state.ingredients || {});
   const productsList = Array.isArray(state.products) ? state.products : Object.values(state.products || {});
   const recipes = Array.isArray(state.recipes) ? state.recipes : Object.values(state.recipes || {});
 
   const checksum = `${ingredientsList.length}_${productsList.length}_${recipes.length}`;
-  if (checksum === lastChecksum && cachedScanResult) {
+  if (!options.force && checksum === lastChecksum && cachedScanResult) {
     return cachedScanResult;
   }
   lastChecksum = checksum;
 
-  // Diagnostic telemetry log
-  console.log(`[DataQualityScanner] Auditing ${ingredientsList.length} ingredients against ${productsList.length} products.`);
+  if (options.verbose) {
+    console.log(`[DataQualityScanner] Auditing ${ingredientsList.length} ingredients against ${productsList.length} products.`);
+  }
 
   // Scanner Hydration Guard
   if (ingredientsList.length > 0 && productsList.length === 0) {
