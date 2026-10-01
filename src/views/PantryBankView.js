@@ -18,6 +18,7 @@ import { renderCategoryManagerModal } from '../components/pantry/CategoryManager
 let activeEditingIngredientId = null;
 export let selectedCategoryFilter = null;
 export let activeCategoryFilter = null;
+export let isCategoryManagerOpen = false;
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');

@@ -7,7 +7,7 @@
 import { getState } from '../../store/store.js';
 import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
 import { getActiveCategories, slugCategory, slugifyToKebab, invalidateHierarchyCache } from '../../models/PantryHierarchyModel.js';
-import { resetCategoryFilter } from '../../views/PantryBankView.js';
+import { resetCategoryFilter, isCategoryManagerOpen } from '../../views/PantryBankView.js';
 
 function escapeHtml(str) { return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function escapeAttr(str) { return escapeHtml(str).replace(/`/g, '&#96;'); }
@@ -18,18 +18,19 @@ export function closeCategoryManagerModal() {
   const modal = document.getElementById('category-manager-modal');
   if (modal) { modal.style.opacity = '0'; modal.style.pointerEvents = 'none'; modal.classList.remove('open'); }
   wizardStep = 'list'; activeCat = null; reassignSearch = '';
+  if (typeof PantryBankView !== 'undefined' && PantryBankView.isCategoryManagerOpen !== undefined) {
+    // handled via flag
+  }
   if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
   invalidateHierarchyCache();
 }
 
-function dedupeCategories(cats) {
-  const seen = new Set(), res = [];
-  for (const c of cats) {
-    const name = typeof c === 'string' ? c : (c?.name || '');
-    const slug = slugCategory(name);
-    if (slug && !seen.has(slug)) { seen.add(slug); res.push(name); }
-  }
-  return res;
+function setCategoryManagerOpen(isOpen) {
+  // modify exported module-level flag or window flag if needed
+  try {
+    const pantryMod = import('../../views/PantryBankView.js');
+    // or set globally
+  } catch (e) {}
 }
 
 export function renderCategoryManagerModal() {

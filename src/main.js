@@ -1,5 +1,10 @@
+import { openIngredientFamilyDetailsModal } from './components/pantry/CategoryManagerModalUI.js';
+import { openCreateActionSheet } from './components/navigation/ActionSheetUI.js';
+
 if (typeof window !== 'undefined') {
   window.APP_VERSION = 'v3.19.28';
+  window.createIngredientGroupPrompt = () => openIngredientFamilyDetailsModal(null);
+  window.openCreateActionSheet = () => openCreateActionSheet();
 }
 
 /**
