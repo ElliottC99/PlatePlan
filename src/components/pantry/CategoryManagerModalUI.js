@@ -1,40 +1,25 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.19.25)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.19.26)
  * In-App Multi-Step Category Operations Wizard & Fine-Grained Reassignment Modal.
- * Replaces all native browser calls (prompt, confirm, alert) with accessible DOM views.
+ * Replaces all native browser calls with accessible DOM views, relying on native Firestore reactivity.
  */
 
-import { getState, setIngredients, setProducts, batchMutate } from '../../store/store.js';
+import { getState } from '../../store/store.js';
 import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
 import { getActiveCategories, slugCategory, slugifyToKebab, invalidateHierarchyCache } from '../../models/PantryHierarchyModel.js';
-import { updateActiveCategoryFilter, renderIngredientBank, renderPantryBankView, resetCategoryFilter, setActiveCategoryFilter } from '../../views/PantryBankView.js';
+import { resetCategoryFilter } from '../../views/PantryBankView.js';
 
 function escapeHtml(str) { return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function escapeAttr(str) { return escapeHtml(str).replace(/`/g, '&#96;'); }
 
 let wizardStep = 'list', activeCat = null, reassignMode = 'mass', reassignSearch = '', massTargetCat = '', individualCatMap = {};
 
-function triggerBankViewRenders() {
-  if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
-  else if (typeof setActiveCategoryFilter === 'function') setActiveCategoryFilter('all');
-  invalidateHierarchyCache();
-  setTimeout(() => {
-    if (typeof renderIngredientBank === 'function') renderIngredientBank();
-    if (typeof renderPantryBankView === 'function') renderPantryBankView();
-    if (typeof window !== 'undefined') {
-      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-      if (typeof window.renderPantryBankView === 'function') window.renderPantryBankView();
-      if (typeof window.renderProductBank === 'function') window.renderProductBank();
-      if (typeof window.requestPlatePlanViewRender === 'function') window.requestPlatePlanViewRender('ingredients');
-    }
-  }, 0);
-}
-
 export function closeCategoryManagerModal() {
   const modal = document.getElementById('category-manager-modal');
   if (modal) { modal.style.opacity = '0'; modal.style.pointerEvents = 'none'; modal.classList.remove('open'); }
   wizardStep = 'list'; activeCat = null; reassignSearch = '';
-  triggerBankViewRenders();
+  if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
+  invalidateHierarchyCache();
 }
 
 function dedupeCategories(cats) {
@@ -197,13 +182,6 @@ export function renderCategoryManagerModal() {
     const input = document.getElementById('cat-manager-add-input');
     const val = input ? input.value.trim() : '';
     if (!val) return;
-    const state = getState() || {};
-    const allCats = getActiveCategories(state);
-    if (!allCats.some(c => slugCategory(c) === slugCategory(val))) {
-      allCats.push(val);
-      state.categories = dedupeCategories(allCats);
-      setIngredients([...(state.ingredients || [])]);
-    }
     wizardStep = 'list'; activeCat = null; reassignSearch = '';
     renderCurrentStep();
   };
@@ -219,38 +197,36 @@ export function renderCategoryManagerModal() {
 
     const targetSlug = slugCategory(oldCat), newCatKebab = slugifyToKebab(newName);
     const state = getState() || {};
-    const ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
-    const prods = Array.isArray(state.products) ? [...state.products] : [];
-    const allCats = getActiveCategories(state);
+    const ings = Array.isArray(state.ingredients) ? state.ingredients : [];
+    const prods = Array.isArray(state.products) ? state.products : [];
 
-    await batchMutate(async () => {
-      const persistPromises = [];
-      ings.forEach(i => {
-        if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
-          i.category = newName; i.cat = newCatKebab;
-          persistPromises.push(saveIngredient(i).catch(() => {}));
-        }
-        if (Array.isArray(i.subtypes)) i.subtypes.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = newName; st.cat = newCatKebab; } });
-        if (Array.isArray(i.sub_types)) i.sub_types.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = newName; st.cat = newCatKebab; } });
-      });
-
-      prods.forEach(p => {
-        if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
-          p.category = newName; p.cat = newCatKebab;
-          persistPromises.push(saveProduct(p).catch(() => {}));
-        }
-      });
-
-      const updatedCats = allCats.map(c => slugCategory(c) === targetSlug ? newName : c);
-      state.categories = dedupeCategories(updatedCats);
-      setIngredients(ings);
-      setProducts(prods);
-      await Promise.all(persistPromises);
+    const persistPromises = [];
+    ings.forEach(i => {
+      if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
+        const updated = { ...i, category: newName, cat: newCatKebab };
+        persistPromises.push(saveIngredient(updated));
+      }
+      if (Array.isArray(i.subtypes)) {
+        i.subtypes.forEach(st => {
+          if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) {
+            st.category = newName; st.cat = newCatKebab;
+            persistPromises.push(saveIngredient(i));
+          }
+        });
+      }
     });
 
-    triggerBankViewRenders();
-    wizardStep = 'list'; activeCat = null; reassignSearch = '';
-    renderCurrentStep();
+    prods.forEach(p => {
+      if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
+        const updated = { ...p, category: newName, cat: newCatKebab };
+        persistPromises.push(saveProduct(updated));
+      }
+    });
+
+    await Promise.all(persistPromises);
+    if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
+    invalidateHierarchyCache();
+    closeCategoryManagerModal();
   };
 
   window.startMergeCat = (cat) => { activeCat = cat; wizardStep = 'merge'; renderCurrentStep(); };
@@ -262,38 +238,28 @@ export function renderCategoryManagerModal() {
 
     const targetSlug = slugCategory(sourceCat), targetKebab = slugifyToKebab(targetCat);
     const state = getState() || {};
-    const ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
-    const prods = Array.isArray(state.products) ? [...state.products] : [];
-    const allCats = getActiveCategories(state);
+    const ings = Array.isArray(state.ingredients) ? state.ingredients : [];
+    const prods = Array.isArray(state.products) ? state.products : [];
 
-    await batchMutate(async () => {
-      const persistPromises = [];
-      ings.forEach(i => {
-        if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
-          i.category = targetCat; i.cat = targetKebab;
-          persistPromises.push(saveIngredient(i).catch(() => {}));
-        }
-        if (Array.isArray(i.subtypes)) i.subtypes.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = targetCat; st.cat = targetKebab; } });
-        if (Array.isArray(i.sub_types)) i.sub_types.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = targetCat; st.cat = targetKebab; } });
-      });
-
-      prods.forEach(p => {
-        if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
-          p.category = targetCat; p.cat = targetKebab;
-          persistPromises.push(saveProduct(p).catch(() => {}));
-        }
-      });
-
-      const updatedCats = allCats.filter(c => slugCategory(c) !== targetSlug);
-      state.categories = dedupeCategories(updatedCats);
-      setIngredients(ings);
-      setProducts(prods);
-      await Promise.all(persistPromises);
+    const persistPromises = [];
+    ings.forEach(i => {
+      if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
+        const updated = { ...i, category: targetCat, cat: targetKebab };
+        persistPromises.push(saveIngredient(updated));
+      }
     });
 
-    triggerBankViewRenders();
-    wizardStep = 'list'; activeCat = null; reassignSearch = '';
-    renderCurrentStep();
+    prods.forEach(p => {
+      if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
+        const updated = { ...p, category: targetCat, cat: targetKebab };
+        persistPromises.push(saveProduct(updated));
+      }
+    });
+
+    await Promise.all(persistPromises);
+    if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
+    invalidateHierarchyCache();
+    closeCategoryManagerModal();
   };
 
   window.startDeleteCat = (cat) => {
@@ -312,18 +278,9 @@ export function renderCategoryManagerModal() {
   };
 
   window.submitDeleteEmptyCat = () => {
-    const deletedCat = activeCat;
-    if (!deletedCat) return;
-    const targetSlug = slugCategory(deletedCat);
-    const state = getState() || {};
-    const allCats = getActiveCategories(state);
-    const updatedCats = allCats.filter(c => slugCategory(c) !== targetSlug);
-    state.categories = dedupeCategories(updatedCats);
-    setIngredients([...(state.ingredients || [])]);
-
-    triggerBankViewRenders();
-    wizardStep = 'list'; activeCat = null; reassignSearch = '';
-    renderCurrentStep();
+    if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
+    invalidateHierarchyCache();
+    closeCategoryManagerModal();
   };
 
   window.setCatReassignMode = (mode) => { reassignMode = mode; renderCurrentStep(); };
@@ -334,53 +291,29 @@ export function renderCategoryManagerModal() {
     const deletedCat = activeCat;
     if (!deletedCat) return;
     const targetSlug = slugCategory(deletedCat);
-    const state = getState() || {}, ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [], prods = Array.isArray(state.products) ? [...state.products] : [];
+    const state = getState() || {}, ings = Array.isArray(state.ingredients) ? state.ingredients : [], prods = Array.isArray(state.products) ? state.products : [];
     const massTarget = document.getElementById('cat-mass-target-select')?.value || massTargetCat || 'Uncategorized';
-    const allCats = getActiveCategories(state);
 
-    await batchMutate(async () => {
-      const persistPromises = [];
-      ings.forEach(i => {
-        if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
-          const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
-          i.category = dest; i.cat = slugifyToKebab(dest);
-          persistPromises.push(saveIngredient(i).catch(() => {}));
-        }
-        if (Array.isArray(i.subtypes)) {
-          i.subtypes.forEach(st => {
-            if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) {
-              const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
-              st.category = dest; st.cat = slugifyToKebab(dest);
-            }
-          });
-        }
-        if (Array.isArray(i.sub_types)) {
-          i.sub_types.forEach(st => {
-            if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) {
-              const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
-              st.category = dest; st.cat = slugifyToKebab(dest);
-            }
-          });
-        }
-      });
-
-      prods.forEach(p => {
-        if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
-          const dest = reassignMode === 'mass' ? massTarget : 'Uncategorized';
-          p.category = dest; p.cat = slugifyToKebab(dest);
-          persistPromises.push(saveProduct(p).catch(() => {}));
-        }
-      });
-
-      const updatedCats = allCats.filter(c => slugCategory(c) !== targetSlug);
-      state.categories = dedupeCategories(updatedCats);
-      setIngredients(ings);
-      setProducts(prods);
-      await Promise.all(persistPromises);
+    const persistPromises = [];
+    ings.forEach(i => {
+      if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
+        const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
+        const updated = { ...i, category: dest, cat: slugifyToKebab(dest) };
+        persistPromises.push(saveIngredient(updated));
+      }
     });
 
-    triggerBankViewRenders();
-    wizardStep = 'list'; activeCat = null; reassignSearch = '';
-    renderCurrentStep();
+    prods.forEach(p => {
+      if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
+        const dest = reassignMode === 'mass' ? massTarget : 'Uncategorized';
+        const updated = { ...p, category: dest, cat: slugifyToKebab(dest) };
+        persistPromises.push(saveProduct(updated));
+      }
+    });
+
+    await Promise.all(persistPromises);
+    if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
+    invalidateHierarchyCache();
+    closeCategoryManagerModal();
   };
 }
