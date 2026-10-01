@@ -1,5 +1,5 @@
 /**
- * src/services/ActionBridge.js (v3.19.16)
+ * src/services/ActionBridge.js (v3.19.17)
  * Centralized Action Bridge & Event Dispatcher for Atomic Modular Architecture.
  * Idempotently handles delegated events, data-action parsing, shopping toggles, and modal routing.
  */

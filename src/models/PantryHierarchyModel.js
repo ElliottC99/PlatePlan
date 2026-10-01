@@ -1,5 +1,5 @@
 /**
- * src/models/PantryHierarchyModel.js (v3.19.15)
+ * src/models/PantryHierarchyModel.js (v3.19.17)
  * Relational Model & Operations for Category ➔ Ingredient ➔ Sub-type ➔ Product hierarchy.
  * Encapsulates aliasing, merging, promoting/demoting, and auto-default product resolution.
  */
@@ -93,9 +93,47 @@ export function buildPantryHierarchy(ingredients = [], products = []) {
   const ingList = Array.isArray(ingredients) ? ingredients : Object.values(ingredients || {});
   const prodList = Array.isArray(products) ? products : Object.values(products || {});
 
+  // Separate root ingredients and sub-types strictly
+  const rootIngredients = [];
+  const subtypeItems = [];
+
+  ingList.forEach(item => {
+    const isSub = Boolean(item.isSubtype || item.is_subtype || item.parentId || item.parentIngredientId);
+    if (isSub) {
+      subtypeItems.push({ ...item });
+    } else {
+      rootIngredients.push({ ...item });
+    }
+  });
+
+  const linkedSubtypeIds = new Set();
+
+  // Attach standalone sub-types to matching root ingredients
+  rootIngredients.forEach(ing => {
+    const existingSubtypes = Array.isArray(ing.subtypes) ? [...ing.subtypes] : [];
+    const ingSlug = slugify(ing.name);
+
+    subtypeItems.forEach(st => {
+      const parentIdMatch = (st.parentId && String(st.parentId) === String(ing.id)) || 
+                            (st.parentIngredientId && String(st.parentIngredientId) === String(ing.id));
+      const parentNameSlug = slugify(st.parentName || st.ingredient || st.parentIngredientName || '');
+      const nameMatch = Boolean(parentNameSlug && ingSlug && parentNameSlug === ingSlug);
+
+      if (parentIdMatch || nameMatch) {
+        if (!existingSubtypes.some(s => String(s.id) === String(st.id))) {
+          existingSubtypes.push(st);
+        }
+        linkedSubtypeIds.add(String(st.id));
+      }
+    });
+
+    ing.subtypes = existingSubtypes;
+  });
+
+  const orphanSubtypes = subtypeItems.filter(st => !linkedSubtypeIds.has(String(st.id)));
   const categoryMap = new Map();
 
-  ingList.forEach(ing => {
+  rootIngredients.forEach(ing => {
     const catRaw = ing.category || ing.cat || 'Other';
     const cat = catRaw.charAt(0).toUpperCase() + catRaw.slice(1);
     if (!categoryMap.has(cat)) {
@@ -135,7 +173,6 @@ export function buildPantryHierarchy(ingredients = [], products = []) {
         return hasDirectSubtypeId || inSubtypeProductIds || fuzzyMatch;
       });
 
-      // Step 4: Auto-Default Fallback Assignment (st)
       const defaultProd = resolveDefaultProduct(st, stProducts);
 
       return {
@@ -162,7 +199,6 @@ export function buildPantryHierarchy(ingredients = [], products = []) {
       }
     });
 
-    // Step 4: Auto-Default Fallback Assignment (ing)
     const defaultProduct = resolveDefaultProduct(ing, combinedProducts);
 
     categoryMap.get(cat).push({
@@ -174,6 +210,24 @@ export function buildPantryHierarchy(ingredients = [], products = []) {
       defaultProduct
     });
   });
+
+  if (orphanSubtypes.length > 0) {
+    const unlinkedCat = "Unlinked Sub-types";
+    categoryMap.set(unlinkedCat, [{
+      id: 'orphan-subtypes-container',
+      name: 'Unlinked Sub-types',
+      category: unlinkedCat,
+      aliases: [],
+      subtypes: orphanSubtypes.map(st => ({
+        ...st,
+        products: prodList.filter(p => (p.subtypeId && String(p.subtypeId) === String(st.id)) || (p.sub_type_id && String(p.sub_type_id) === String(st.id))),
+        defaultProduct: resolveDefaultProduct(st, prodList)
+      })),
+      directProducts: [],
+      products: [],
+      defaultProduct: null
+    }]);
+  }
 
   return Array.from(categoryMap.entries())
     .map(([category, items]) => ({

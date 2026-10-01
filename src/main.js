@@ -1,9 +1,9 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.19.16';
+  window.APP_VERSION = 'v3.19.17';
 }
 
 /**
- * src/main.js (v3.19.16)
+ * src/main.js (v3.19.17)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronization,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -24,6 +24,7 @@ import { renderDataQualityView } from './views/DataQualityView.js';
 import './components/data-quality/ResolveUnlinkedModalUI.js';
 import { calculateMealFitScore } from './utils/fitScoreCalculator.js';
 import { renderFitScoreBadge } from './components/FitScoreBadge.js';
+import { renderSyncPanelModal, closeSyncPanelModal } from './components/sync/SyncPanelUI.js';
 
 // Global Compatibility Shims for Legacy References
 if (typeof window !== 'undefined') {
@@ -181,52 +182,10 @@ if (typeof window !== 'undefined') {
       }
     },
     openPlatePlanSyncPanel() {
-      let modal = document.getElementById('sync-panel-modal');
-      if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'sync-panel-modal';
-        modal.className = 'modal-wrap';
-        modal.style = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity 0.2s ease;';
-        document.body.appendChild(modal);
-      }
-      const s = getState() || {}, isOnline = navigator.onLine;
-      modal.innerHTML = `
-        <div class="card" style="width:100%;max-width:320px;background:var(--surface,#fff);padding:16px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.1)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <h3 style="margin:0;font-size:15px;font-weight:750">Cloud Sync</h3>
-            <button class="btn sm ghost" onclick="closePlatePlanSyncPanel()" style="padding:2px 6px;font-size:16px">&times;</button>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;font-size:12.5px">
-            <div style="display:flex;justify-content:space-between;padding-bottom:4px;border-bottom:1px solid var(--border,#e7e5e4)">
-              <span style="color:var(--text2,#78716c)">Routing</span>
-              <span style="font-weight:600;font-family:monospace">elliott-chloe</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding-bottom:4px;border-bottom:1px solid var(--border,#e7e5e4)">
-              <span style="color:var(--text2,#78716c)">Network</span>
-              <span style="font-weight:700;color:${isOnline ? 'var(--green,#10b981)' : 'var(--red,#ef4444)'}">${isOnline ? 'Online' : 'Offline'}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding-bottom:4px;border-bottom:1px solid var(--border,#e7e5e4)">
-              <span style="color:var(--text2,#78716c)">Ingredients</span>
-              <span style="font-weight:600">${Array.isArray(s.ingredients) ? s.ingredients.length : 0} items</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding-bottom:4px;border-bottom:1px solid var(--border,#e7e5e4)">
-              <span style="color:var(--text2,#78716c)">Products</span>
-              <span style="font-weight:600">${Array.isArray(s.products) ? s.products.length : 0} items</span>
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;justify-content:flex-end">
-            <button class="btn ghost sm" onclick="closePlatePlanSyncPanel()" style="padding:4px 8px;font-size:12px">Close</button>
-            <button class="btn primary sm" onclick="closePlatePlanSyncPanel(); window.syncNow()" style="padding:4px 8px;font-size:12px">Sync Now</button>
-          </div>
-        </div>
-      `;
-      modal.style.opacity = '1'; modal.style.pointerEvents = 'all'; modal.classList.add('open');
+      renderSyncPanelModal();
     },
     closePlatePlanSyncPanel() {
-      const modal = document.getElementById('sync-panel-modal');
-      if (modal) {
-        modal.style.opacity = '0'; modal.style.pointerEvents = 'none'; modal.classList.remove('open');
-      }
+      closeSyncPanelModal();
     },
 
     logout() {
@@ -314,7 +273,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.19.16 (ES6 Modern)';
+    footerEl.textContent = 'v3.19.17 (ES6 Modern)';
   }
 }
 

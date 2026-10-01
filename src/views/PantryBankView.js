@@ -1,5 +1,5 @@
 /**
- * src/views/PantryBankView.js (v3.19.16)
+ * src/views/PantryBankView.js (v3.19.17)
  * Modular ES6 View for Category ➔ Ingredient ➔ Sub-type Hierarchy Bank.
  * Features Aliasing, Merging, Sub-type creation, Promoting/demoting, and Auto-default product previews.
  * Fully responsive and optimized to remain under 350 lines.
@@ -12,6 +12,7 @@ import {
   promoteToIngredient, demoteToSubtype, mergeIngredients, setAutoDefaultProduct, getActiveCategories
 } from '../models/PantryHierarchyModel.js';
 import { renderProductBank, openProductEditModal } from './ProductBankView.js';
+import { renderCategoryManagerModal } from '../components/pantry/CategoryManagerModalUI.js';
 
 let activeEditingIngredientId = null;
 
@@ -270,58 +271,7 @@ export function mount(container) {
 export { renderProductBank, openProductEditModal };
 
 export function openCategoryManager() {
-  let modal = document.getElementById('category-manager-modal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'category-manager-modal';
-    modal.className = 'modal-wrap';
-    modal.style = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity 0.2s ease;';
-    document.body.appendChild(modal);
-  }
-  const render = () => {
-    const categories = getActiveCategories(getState() || {});
-    modal.innerHTML = `
-      <div class="card" style="width:100%;max-width:320px;background:var(--surface,#fff);padding:16px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.1)">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <h3 style="margin:0;font-size:15px;font-weight:750">Categories</h3>
-          <button class="btn sm ghost" onclick="closeCategoryManager()" style="padding:2px 6px;font-size:16px">&times;</button>
-        </div>
-        <div style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
-          ${categories.map(cat => `
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;background:var(--surface2,#f5f5f4);border-radius:6px;border:1px solid var(--border,#e7e5e4)">
-              <span style="font-size:12px;font-weight:600">${escapeHtml(cat)}</span>
-              <button class="btn xs ghost" style="color:var(--red,#ef4444);font-size:11px;padding:2px 4px" onclick="handleDeleteCategory('${escapeAttr(cat)}')">Delete</button>
-            </div>
-          `).join('')}
-        </div>
-        <div style="display:flex;gap:6px">
-          <input type="text" id="cat-manager-new-input" placeholder="New category..." style="flex:1;padding:4px 8px;border:1px solid var(--border,#e7e5e4);border-radius:6px;font-size:12px">
-          <button class="btn primary sm" onclick="handleCreateCategory()" style="padding:4px 8px;font-size:12px">Add</button>
-        </div>
-      </div>
-    `;
-  };
-  window.handleDeleteCategory = (cat) => {
-    const s = getState() || {}, cur = Array.isArray(s.categories) ? [...s.categories] : [];
-    s.categories = cur.filter(c => (typeof c === 'string' ? c : c.name || '').toLowerCase().trim() !== cat.toLowerCase().trim());
-    const ings = Array.isArray(s.ingredients) ? [...s.ingredients] : [];
-    ings.forEach(i => { if ((i.category || '').toLowerCase().trim() === cat.toLowerCase().trim()) i.category = 'Other'; });
-    setIngredients(ings); render();
-  };
-  window.handleCreateCategory = () => {
-    const input = document.getElementById('cat-manager-new-input'), val = input ? input.value.trim() : '';
-    if (!val) return;
-    const s = getState() || {}, cur = Array.isArray(s.categories) ? [...s.categories] : [];
-    if (!cur.some(c => (typeof c === 'string' ? c : c.name || '').toLowerCase().trim() === val.toLowerCase())) {
-      cur.push(val); s.categories = cur; setIngredients([...(s.ingredients || [])]);
-    }
-    render();
-  };
-  window.closeCategoryManager = () => {
-    modal.style.opacity = '0'; modal.style.pointerEvents = 'none'; modal.classList.remove('open');
-  };
-  render();
-  modal.style.opacity = '1'; modal.style.pointerEvents = 'all'; modal.classList.add('open');
+  renderCategoryManagerModal();
 }
 
 if (typeof window !== 'undefined') {
