@@ -1,5 +1,5 @@
 /**
- * src/services/ActionBridge.js (v3.8.1)
+ * src/services/ActionBridge.js (v3.19.16)
  * Centralized Action Bridge & Event Dispatcher for Atomic Modular Architecture.
  * Idempotently handles delegated events, data-action parsing, shopping toggles, and modal routing.
  */
@@ -208,6 +208,32 @@ export function routeAction(actionName, target, event) {
     if (typeof window.closeRecipePreview === 'function') {
       window.closeRecipePreview();
     }
+    return true;
+  }
+
+  // 8. Mobile Menu & Toolbar Actions
+  if (normalizedAction.includes('opencategorymanagermodal')) {
+    if (typeof window.openCategoryManager === 'function') window.openCategoryManager();
+    return true;
+  }
+
+  if (normalizedAction.includes('openmobilemore')) {
+    if (typeof window.openMobileMore === 'function') window.openMobileMore();
+    return true;
+  }
+
+  if (normalizedAction.includes('closemobilemore')) {
+    if (typeof window.closeMobileMore === 'function') window.closeMobileMore();
+    return true;
+  }
+
+  if (normalizedAction.includes('openplateplansyncpanel')) {
+    if (typeof window.openPlatePlanSyncPanel === 'function') window.openPlatePlanSyncPanel();
+    return true;
+  }
+
+  if (normalizedAction.includes('closeplateplansyncpanel')) {
+    if (typeof window.closePlatePlanSyncPanel === 'function') window.closePlatePlanSyncPanel();
     return true;
   }
 

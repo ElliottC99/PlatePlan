@@ -1,9 +1,9 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.19.15';
+  window.APP_VERSION = 'v3.19.16';
 }
 
 /**
- * src/main.js (v3.19.15)
+ * src/main.js (v3.19.16)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronization,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -165,6 +165,70 @@ if (typeof window !== 'undefined') {
       console.warn('[main.js] viewRecipe not found on window');
     },
 
+    openMobileMore() {
+      const el = document.getElementById('mobile-more-wrap');
+      if (el) el.classList.add('open');
+    },
+    closeMobileMore() {
+      const el = document.getElementById('mobile-more-wrap');
+      if (el) el.classList.remove('open');
+    },
+    mobileMoreView(viewName) {
+      const el = document.getElementById('mobile-more-wrap');
+      if (el) el.classList.remove('open');
+      if (typeof window.showView === 'function') {
+        window.showView(viewName);
+      }
+    },
+    openPlatePlanSyncPanel() {
+      let modal = document.getElementById('sync-panel-modal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'sync-panel-modal';
+        modal.className = 'modal-wrap';
+        modal.style = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity 0.2s ease;';
+        document.body.appendChild(modal);
+      }
+      const s = getState() || {}, isOnline = navigator.onLine;
+      modal.innerHTML = `
+        <div class="card" style="width:100%;max-width:320px;background:var(--surface,#fff);padding:16px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.1)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <h3 style="margin:0;font-size:15px;font-weight:750">Cloud Sync</h3>
+            <button class="btn sm ghost" onclick="closePlatePlanSyncPanel()" style="padding:2px 6px;font-size:16px">&times;</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;font-size:12.5px">
+            <div style="display:flex;justify-content:space-between;padding-bottom:4px;border-bottom:1px solid var(--border,#e7e5e4)">
+              <span style="color:var(--text2,#78716c)">Routing</span>
+              <span style="font-weight:600;font-family:monospace">elliott-chloe</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding-bottom:4px;border-bottom:1px solid var(--border,#e7e5e4)">
+              <span style="color:var(--text2,#78716c)">Network</span>
+              <span style="font-weight:700;color:${isOnline ? 'var(--green,#10b981)' : 'var(--red,#ef4444)'}">${isOnline ? 'Online' : 'Offline'}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding-bottom:4px;border-bottom:1px solid var(--border,#e7e5e4)">
+              <span style="color:var(--text2,#78716c)">Ingredients</span>
+              <span style="font-weight:600">${Array.isArray(s.ingredients) ? s.ingredients.length : 0} items</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding-bottom:4px;border-bottom:1px solid var(--border,#e7e5e4)">
+              <span style="color:var(--text2,#78716c)">Products</span>
+              <span style="font-weight:600">${Array.isArray(s.products) ? s.products.length : 0} items</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn ghost sm" onclick="closePlatePlanSyncPanel()" style="padding:4px 8px;font-size:12px">Close</button>
+            <button class="btn primary sm" onclick="closePlatePlanSyncPanel(); window.syncNow()" style="padding:4px 8px;font-size:12px">Sync Now</button>
+          </div>
+        </div>
+      `;
+      modal.style.opacity = '1'; modal.style.pointerEvents = 'all'; modal.classList.add('open');
+    },
+    closePlatePlanSyncPanel() {
+      const modal = document.getElementById('sync-panel-modal');
+      if (modal) {
+        modal.style.opacity = '0'; modal.style.pointerEvents = 'none'; modal.classList.remove('open');
+      }
+    },
+
     logout() {
       if (window.firebase && window.firebase.auth) {
         try { window.firebase.auth().signOut(); } catch(e) {}
@@ -207,72 +271,38 @@ export { renderToday, renderSettingsView, renderShoppingListUI, renderScrollable
 let lastErrorMessage = '';
 let lastErrorTime = 0;
 
-function reportAppError(message, type = 'error') {
-  const now = Date.now();
-  if (message === lastErrorMessage && now - lastErrorTime < 4000) return;
-  lastErrorMessage = message;
-  lastErrorTime = now;
-
-  console.error(`[PlatePlan Error Telemetry v3.12.3]`, message);
-  if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
-    window.showPlatePlanToast(message, type);
-  }
+function reportAppError(m, type = 'error') {
+  if (m === lastErrorMessage && Date.now() - lastErrorTime < 4000) return;
+  lastErrorMessage = m; lastErrorTime = Date.now();
+  console.error(`[PlatePlan Error Telemetry v3.12.3]`, m);
+  if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(m, type);
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('error', (event) => {
-    if (event.message) {
-      if (/Converting circular structure to JSON/i.test(event.message)) {
-        console.warn('[PlatePlan Error Telemetry v3.9.4] Intercepted circular JSON error:', event.message);
-        return;
-      }
-      reportAppError(`App Error: ${event.message}`);
-    }
+  window.addEventListener('error', e => {
+    if (e.message && !/Converting circular structure/i.test(e.message)) reportAppError(`App Error: ${e.message}`);
   });
-
-  window.addEventListener('unhandledrejection', (event) => {
-    const reason = event.reason?.message || event.reason || 'Network or asynchronous error';
-    const reasonStr = typeof reason === 'string' ? reason : (reason?.message || String(reason || ''));
-    if (/client is offline|Failed to get document because the client is offline|Could not reach Cloud Firestore backend|offline mode/i.test(reasonStr)) {
-      console.warn('[PlatePlan Offline Handler]', reasonStr);
+  window.addEventListener('unhandledrejection', e => {
+    const r = e.reason?.message || String(e.reason || '');
+    if (/client is offline|Failed to get document because the client is offline/i.test(r)) {
       setSyncStatus('offline', 'Offline mode');
-      return;
-    }
-    reportAppError(`Async Error: ${reasonStr}`);
+    } else reportAppError(`Async Error: ${r}`);
   });
-
-  window.addEventListener('offline', () => {
-    setSyncStatus('offline', 'Offline mode');
-    reportAppError('Offline mode active. Using local cached data.', 'warning');
-  });
-
-  window.addEventListener('online', () => {
-    setSyncStatus('connecting', 'Restoring connection...');
-    reportAppError('Online connection restored. Syncing with cloud...', 'success');
-    hydrateHouseholdData();
-  });
+  window.addEventListener('offline', () => { setSyncStatus('offline', 'Offline'); reportAppError('Offline mode active.', 'warning'); });
+  window.addEventListener('online', () => { setSyncStatus('connecting', 'Restoring...'); reportAppError('Connection restored.', 'success'); hydrateHouseholdData(); });
 }
 
 // 4. SERVICE WORKER REGISTRATION HANDLED BY AppInitializer
-// (Duplicate definition removed)
 
 // 5. SANITIZATION HELPERS
 function deepMutate(obj) {
   if (obj === null || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(item => deepMutate(item));
-  
-  const keys = Object.keys(obj);
-  for (const key of keys) {
-    if (obj[key] === undefined || obj[key] === null) {
-      if (['tags', 'categories', 'favourites', 'labels', 'ingredients', 'variants', 'steps', 'allergens', 'favouritedBy', 'userFavourites'].includes(key)) {
-        obj[key] = [];
-      } else {
-        obj[key] = '';
-      }
-    } else {
-      obj[key] = deepMutate(obj[key]);
-    }
-  }
+  if (Array.isArray(obj)) return obj.map(deepMutate);
+  Object.keys(obj).forEach(k => {
+    if (obj[k] === undefined || obj[k] === null) {
+      obj[k] = ['tags', 'categories', 'favourites', 'labels', 'ingredients', 'variants', 'steps', 'allergens', 'favouritedBy', 'userFavourites'].includes(k) ? [] : '';
+    } else obj[k] = deepMutate(obj[k]);
+  });
   return obj;
 }
 
@@ -284,7 +314,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.19.15 (ES6 Modern)';
+    footerEl.textContent = 'v3.19.16 (ES6 Modern)';
   }
 }
 
@@ -295,92 +325,46 @@ function setupSubscriptions() {
   isSubscribed = true;
 
   subscribe('recipes', (recipes) => {
-    const cleanRecipes = sanitizeRecipes(recipes);
-    if (typeof window !== 'undefined') {
-      window.state.recipes = cleanRecipes;
-      window.allRecipes = cleanRecipes;
-    }
-    renderRecipeVault();
-    renderToday();
-    if (window.state?.plan && typeof renderPlanner === 'function') {
-      renderPlanner();
-    }
+    const clean = sanitizeRecipes(recipes);
+    if (typeof window !== 'undefined') { window.state.recipes = clean; window.allRecipes = clean; }
+    renderRecipeVault(); renderToday(); if (window.state?.plan && typeof renderPlanner === 'function') renderPlanner();
     renderDataQualityView();
   });
-
-  subscribe('ingredients', (ingredients) => {
-    if (typeof window !== 'undefined' && window.state) {
-      window.state.ingredients = Array.isArray(ingredients) ? ingredients : [];
-    }
-    renderShoppingListUI();
-    renderIngredientBank();
-    renderDataQualityView();
+  subscribe('ingredients', (ings) => {
+    if (typeof window !== 'undefined' && window.state) window.state.ingredients = Array.isArray(ings) ? ings : [];
+    renderShoppingListUI(); renderIngredientBank(); renderDataQualityView();
   });
-
-  subscribe('products', (products) => {
-    if (typeof window !== 'undefined' && window.state) {
-      window.state.products = Array.isArray(products) ? products : [];
-    }
-    renderProductBank();
-    renderDataQualityView();
+  subscribe('products', (prods) => {
+    if (typeof window !== 'undefined' && window.state) window.state.products = Array.isArray(prods) ? prods : [];
+    renderProductBank(); renderDataQualityView();
   });
-
-  subscribe('shopping', () => {
-    renderShoppingListUI();
-  });
-
-  subscribe('preferences', () => {
-    renderSettingsView();
-    renderToday();
-  });
-
-  subscribe('plan', () => {
-    renderToday();
-    renderPlanner();
-    renderShoppingListUI();
-  });
+  subscribe('shopping', () => renderShoppingListUI());
+  subscribe('preferences', () => { renderSettingsView(); renderToday(); });
+  subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
 }
 
 // 7. APPLICATION BOOTSTRAP
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
-  isAppInitialized = true;
-  if (typeof window !== 'undefined') window.__plateplan_app_booted = true;
-
-  updateVersionBadge();
-  setupActionBridge();
-  setupSubscriptions();
-  AppInitializer.registerServiceWorker();
-  AppInitializer.initPlatePlanApp();
-  
-  setSyncStatus('connecting', 'Connecting to Cloud...');
+  isAppInitialized = true; if (typeof window !== 'undefined') window.__plateplan_app_booted = true;
+  updateVersionBadge(); setupActionBridge(); setupSubscriptions();
+  AppInitializer.registerServiceWorker(); AppInitializer.initPlatePlanApp();
+  setSyncStatus('connecting', 'Connecting...');
+  const initialRender = () => {
+    renderToday(); renderRecipeVault(); renderPlanner(); renderShoppingListUI();
+    renderIngredientBank(); renderProductBank(); renderDataQualityView();
+  };
   try {
-    const user = await waitForAuth();
+    await waitForAuth();
     const hydrationRes = await hydrateHouseholdData();
-    
-    // Perform initial render of active modular views
-    renderToday();
-    renderRecipeVault();
-    renderPlanner();
-    renderShoppingListUI();
-    renderIngredientBank();
-    renderProductBank();
-    renderDataQualityView();
-    
+    initialRender();
     if (hydrationRes && hydrationRes.success) {
       setSyncStatus(navigator.onLine ? 'synced' : 'offline', navigator.onLine ? 'Synced with Cloud' : 'Offline Mode');
-    } else {
-      setSyncStatus(navigator.onLine ? 'synced' : 'offline', 'Local Cache Active');
-    }
+    } else setSyncStatus(navigator.onLine ? 'synced' : 'offline', 'Local Cache Active');
   } catch (err) {
-    console.warn('[initApp] Auth or Hydration fallback:', err);
-    renderToday();
-    renderRecipeVault();
-    renderPlanner();
-    renderShoppingListUI();
-    renderIngredientBank();
-    renderProductBank();
+    console.warn('[initApp] Auth/Hydration fallback:', err);
+    initialRender();
     setSyncStatus(navigator.onLine ? 'synced' : 'offline', 'Local Cache Active');
   }
 }
