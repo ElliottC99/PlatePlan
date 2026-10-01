@@ -1,10 +1,11 @@
 /**
- * src/components/sync/SyncPanelUI.js (v3.19.17)
+ * src/components/sync/SyncPanelUI.js (v3.19.18)
  * Enriched Cloud Sync Diagnostic Telemetry Modal.
  */
 
 import { getState } from '../../store/store.js';
 import { hydrateHouseholdData } from '../../services/HydrationService.js';
+import { isSubtypeItem } from '../../models/PantryHierarchyModel.js';
 
 let lastSyncTime = new Date();
 
@@ -51,8 +52,11 @@ export function renderSyncPanelModal() {
 
   let subTypeCount = 0;
   ingredients.forEach(i => {
-    if (Array.isArray(i.subtypes)) subTypeCount += i.subtypes.length;
-    else if (i.isSubtype || i.is_subtype || i.parentId) subTypeCount++;
+    const embedded = Array.isArray(i.subtypes) ? i.subtypes : (Array.isArray(i.sub_types) ? i.sub_types : []);
+    subTypeCount += embedded.length;
+    if (isSubtypeItem(i)) {
+      subTypeCount++;
+    }
   });
 
   const statusLabel = isOnline ? 'Connected (Live)' : 'Offline';

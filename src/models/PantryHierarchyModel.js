@@ -1,11 +1,18 @@
 /**
- * src/models/PantryHierarchyModel.js (v3.19.17)
+ * src/models/PantryHierarchyModel.js (v3.19.18)
  * Relational Model & Operations for Category ➔ Ingredient ➔ Sub-type ➔ Product hierarchy.
  * Encapsulates aliasing, merging, promoting/demoting, and auto-default product resolution.
  */
 
 import { getState, setIngredients, setProducts } from '../store/store.js';
 import { saveIngredient, deleteIngredient, saveProduct } from '../services/HouseholdRepository.js';
+
+export function isSubtypeItem(item) {
+  if (!item || typeof item !== 'object') return false;
+  if (item.isSubtype === true || item.is_subtype === true || item.type === 'subtype' || item.kind === 'subtype') return true;
+  if (item.parentId || item.parent_id || item.parentIngredientId || item.parent_ingredient_id || item.parentName) return true;
+  return false;
+}
 
 export function getActiveCategories(state = {}) {
   const categories = new Set();
@@ -98,8 +105,7 @@ export function buildPantryHierarchy(ingredients = [], products = []) {
   const subtypeItems = [];
 
   ingList.forEach(item => {
-    const isSub = Boolean(item.isSubtype || item.is_subtype || item.parentId || item.parentIngredientId);
-    if (isSub) {
+    if (isSubtypeItem(item)) {
       subtypeItems.push({ ...item });
     } else {
       rootIngredients.push({ ...item });
@@ -110,24 +116,26 @@ export function buildPantryHierarchy(ingredients = [], products = []) {
 
   // Attach standalone sub-types to matching root ingredients
   rootIngredients.forEach(ing => {
-    const existingSubtypes = Array.isArray(ing.subtypes) ? [...ing.subtypes] : [];
+    const embedded = Array.isArray(ing.subtypes) ? [...ing.subtypes] : (Array.isArray(ing.sub_types) ? [...ing.sub_types] : []);
     const ingSlug = slugify(ing.name);
 
     subtypeItems.forEach(st => {
       const parentIdMatch = (st.parentId && String(st.parentId) === String(ing.id)) || 
-                            (st.parentIngredientId && String(st.parentIngredientId) === String(ing.id));
+                            (st.parent_id && String(st.parent_id) === String(ing.id)) ||
+                            (st.parentIngredientId && String(st.parentIngredientId) === String(ing.id)) ||
+                            (st.parent_ingredient_id && String(st.parent_ingredient_id) === String(ing.id));
       const parentNameSlug = slugify(st.parentName || st.ingredient || st.parentIngredientName || '');
       const nameMatch = Boolean(parentNameSlug && ingSlug && parentNameSlug === ingSlug);
 
       if (parentIdMatch || nameMatch) {
-        if (!existingSubtypes.some(s => String(s.id) === String(st.id))) {
-          existingSubtypes.push(st);
+        if (!embedded.some(s => String(s.id) === String(st.id))) {
+          embedded.push(st);
         }
         linkedSubtypeIds.add(String(st.id));
       }
     });
 
-    ing.subtypes = existingSubtypes;
+    ing.subtypes = embedded;
   });
 
   const orphanSubtypes = subtypeItems.filter(st => !linkedSubtypeIds.has(String(st.id)));
@@ -228,6 +236,13 @@ export function buildPantryHierarchy(ingredients = [], products = []) {
       defaultProduct: null
     }]);
   }
+
+  const coreCount = rootIngredients.length;
+  let subtypeCount = orphanSubtypes.length;
+  rootIngredients.forEach(ing => { subtypeCount += (ing.subtypes || []).length; });
+  const productsCount = prodList.length;
+
+  console.log(`[PantryHierarchy] Detected ${coreCount} core ingredients and ${subtypeCount} child sub-types across ${productsCount} products.`);
 
   return Array.from(categoryMap.entries())
     .map(([category, items]) => ({
