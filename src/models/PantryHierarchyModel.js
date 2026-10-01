@@ -1,7 +1,7 @@
 /**
- * src/models/PantryHierarchyModel.js (v3.19.20)
+ * src/models/PantryHierarchyModel.js (v3.19.21)
  * Relational Model & Operations for Category ➔ Ingredient ➔ Sub-type ➔ Product hierarchy.
- * Encapsulates aliasing, merging, promoting/demoting, and auto-default product resolution.
+ * Encapsulates aliasing, merging, promoting/demoting, re-parenting, and auto-default product resolution.
  */
 
 import { getState, setIngredients, setProducts } from '../store/store.js';
@@ -303,32 +303,46 @@ export async function promoteToIngredient(subtypeId, parentIngredientId) {
 
 export async function demoteToSubtype(ingredientId, targetParentIngredientId) {
   const state = getState() || {}, ings = [...(state.ingredients || [])], prods = [...(state.products || [])];
-  const sourceIdx = ings.findIndex(i => String(i.id) === String(ingredientId));
-  const targetParent = ings.find(i => String(i.id) === String(targetParentIngredientId));
+  const sourceIdx = ings.findIndex(i => String(i.id) === String(ingredientId)), targetParent = ings.find(i => String(i.id) === String(targetParentIngredientId));
   if (sourceIdx < 0 || !targetParent) return false;
   const [source] = ings.splice(sourceIdx, 1);
   const targetSubtypes = Array.isArray(targetParent.subtypes) ? [...targetParent.subtypes] : [];
-  const newSubtype = { id: source.id, name: source.name, notes: source.notes || '', aliases: Array.isArray(source.aliases) ? source.aliases : [], defaultProductId: source.defaultProductId || null, createdAt: new Date().toISOString() };
-  targetSubtypes.push(newSubtype); targetParent.subtypes = targetSubtypes; targetParent.updatedAt = new Date().toISOString();
-  const updatedProds = prods.map(p => {
-    if (String(p.ingredientId) === String(source.id)) {
-      return { ...p, ingredientId: targetParent.id, subtypeId: source.id, updatedAt: new Date().toISOString() };
-    }
-    return p;
-  });
+  targetSubtypes.push({ id: source.id, name: source.name, notes: source.notes || '', aliases: Array.isArray(source.aliases) ? source.aliases : [], defaultProductId: source.defaultProductId || null, createdAt: new Date().toISOString() });
+  targetParent.subtypes = targetSubtypes; targetParent.updatedAt = new Date().toISOString();
+  const updatedProds = prods.map(p => String(p.ingredientId) === String(source.id) ? { ...p, ingredientId: targetParent.id, subtypeId: source.id, updatedAt: new Date().toISOString() } : p);
   setIngredients(ings); setProducts(updatedProds);
-  await Promise.all([
-    deleteIngredient(source.id),
-    saveIngredient(targetParent),
-    ...updatedProds.filter(p => String(p.subtypeId) === String(source.id)).map(p => saveProduct(p))
-  ]);
+  await Promise.all([deleteIngredient(source.id), saveIngredient(targetParent), ...updatedProds.filter(p => String(p.subtypeId) === String(source.id)).map(p => saveProduct(p))]);
+  return true;
+}
+
+export async function reparentSubtype(subtypeId, oldParentId, newParentId) {
+  if (!subtypeId || !newParentId || String(oldParentId) === String(newParentId)) return false;
+  const state = getState() || {}, ings = [...(state.ingredients || [])], prods = [...(state.products || [])];
+  const subItem = ings.find(i => String(i.id) === String(subtypeId));
+  if (subItem) { subItem.parentId = newParentId; subItem.groupId = newParentId; subItem.updatedAt = new Date().toISOString(); await saveIngredient(subItem); }
+
+  const oldParent = ings.find(i => String(i.id) === String(oldParentId)), newParent = ings.find(i => String(i.id) === String(newParentId));
+  if (oldParent && Array.isArray(oldParent.subtypes)) {
+    const stIdx = oldParent.subtypes.findIndex(s => String(s.id) === String(subtypeId));
+    if (stIdx >= 0) {
+      const [st] = oldParent.subtypes.splice(stIdx, 1); oldParent.updatedAt = new Date().toISOString(); await saveIngredient(oldParent);
+      if (newParent) {
+        const newSubtypes = Array.isArray(newParent.subtypes) ? [...newParent.subtypes] : [];
+        if (!newSubtypes.some(s => String(s.id) === String(subtypeId))) newSubtypes.push({ ...st, parentId: newParentId, groupId: newParentId });
+        newParent.subtypes = newSubtypes; newParent.updatedAt = new Date().toISOString(); await saveIngredient(newParent);
+      }
+    }
+  }
+
+  const updatedProds = prods.map(p => (String(p.subtypeId) === String(subtypeId) || String(p.ingredientId) === String(subtypeId)) ? { ...p, ingredientId: newParentId, groupId: newParentId, updatedAt: new Date().toISOString() } : p);
+  setIngredients(ings); setProducts(updatedProds);
+  await Promise.all(updatedProds.filter(p => String(p.subtypeId) === String(subtypeId)).map(p => saveProduct(p)));
   return true;
 }
 
 export async function mergeIngredients(sourceId, targetId) {
   const state = getState() || {}, ings = [...(state.ingredients || [])], prods = [...(state.products || [])];
-  const sourceIdx = ings.findIndex(i => String(i.id) === String(sourceId));
-  const target = ings.find(i => String(i.id) === String(targetId));
+  const sourceIdx = ings.findIndex(i => String(i.id) === String(sourceId)), target = ings.find(i => String(i.id) === String(targetId));
   if (sourceIdx < 0 || !target || String(sourceId) === String(targetId)) return false;
   const [source] = ings.splice(sourceIdx, 1);
   const targetAliases = new Set(Array.isArray(target.aliases) ? target.aliases : []);
@@ -338,18 +352,9 @@ export async function mergeIngredients(sourceId, targetId) {
   const targetSubtypes = Array.isArray(target.subtypes) ? [...target.subtypes] : [];
   if (Array.isArray(source.subtypes)) source.subtypes.forEach(st => targetSubtypes.push(st));
   target.subtypes = targetSubtypes; target.updatedAt = new Date().toISOString();
-  const updatedProds = prods.map(p => {
-    if (String(p.ingredientId) === String(source.id) || String(p.groupId) === String(source.id)) {
-      return { ...p, ingredientId: target.id, updatedAt: new Date().toISOString() };
-    }
-    return p;
-  });
+  const updatedProds = prods.map(p => (String(p.ingredientId) === String(source.id) || String(p.groupId) === String(source.id)) ? { ...p, ingredientId: target.id, updatedAt: new Date().toISOString() } : p);
   setIngredients(ings); setProducts(updatedProds);
-  await Promise.all([
-    deleteIngredient(source.id),
-    saveIngredient(target),
-    ...updatedProds.filter(p => String(p.ingredientId) === String(target.id)).map(p => saveProduct(p))
-  ]);
+  await Promise.all([deleteIngredient(source.id), saveIngredient(target), ...updatedProds.filter(p => String(p.ingredientId) === String(target.id)).map(p => saveProduct(p))]);
   return true;
 }
 
