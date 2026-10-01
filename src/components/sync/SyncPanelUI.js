@@ -1,11 +1,11 @@
 /**
- * src/components/sync/SyncPanelUI.js (v3.19.18)
+ * src/components/sync/SyncPanelUI.js (v3.19.19)
  * Enriched Cloud Sync Diagnostic Telemetry Modal.
  */
 
 import { getState } from '../../store/store.js';
 import { hydrateHouseholdData } from '../../services/HydrationService.js';
-import { isSubtypeItem } from '../../models/PantryHierarchyModel.js';
+import { getCounts } from '../../services/SyncService.js';
 
 let lastSyncTime = new Date();
 
@@ -43,21 +43,8 @@ export function renderSyncPanelModal() {
     document.body.appendChild(modal);
   }
 
-  const state = getState() || {};
   const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
-  const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
-  const products = Array.isArray(state.products) ? state.products : [];
-  const recipes = Array.isArray(state.recipes) ? state.recipes : [];
-  const planSlots = state.plan ? Object.keys(state.plan).length : 0;
-
-  let subTypeCount = 0;
-  ingredients.forEach(i => {
-    const embedded = Array.isArray(i.subtypes) ? i.subtypes : (Array.isArray(i.sub_types) ? i.sub_types : []);
-    subTypeCount += embedded.length;
-    if (isSubtypeItem(i)) {
-      subTypeCount++;
-    }
-  });
+  const counts = getCounts();
 
   const statusLabel = isOnline ? 'Connected (Live)' : 'Offline';
   const statusColor = isOnline ? 'var(--green,#10b981)' : 'var(--red,#ef4444)';
@@ -92,19 +79,19 @@ export function renderSyncPanelModal() {
         </div>
         <div style="display:flex;justify-content:space-between;padding-bottom:6px;border-bottom:1px solid var(--border,#e7e5e4)">
           <span style="color:var(--text2,#78716c)">Ingredients</span>
-          <span style="font-weight:650">${ingredients.length} items</span>
+          <span style="font-weight:650">${counts.ingredientsCount} items</span>
         </div>
         <div style="display:flex;justify-content:space-between;padding-bottom:6px;border-bottom:1px solid var(--border,#e7e5e4)">
           <span style="color:var(--text2,#78716c)">Sub-types</span>
-          <span style="font-weight:650">${subTypeCount} items</span>
+          <span style="font-weight:650">${counts.subtypesCount} items</span>
         </div>
         <div style="display:flex;justify-content:space-between;padding-bottom:6px;border-bottom:1px solid var(--border,#e7e5e4)">
           <span style="color:var(--text2,#78716c)">Products</span>
-          <span style="font-weight:650">${products.length} items</span>
+          <span style="font-weight:650">${counts.productsCount} items</span>
         </div>
         <div style="display:flex;justify-content:space-between;padding-bottom:6px;border-bottom:1px solid var(--border,#e7e5e4)">
           <span style="color:var(--text2,#78716c)">Recipes & Meal Plans</span>
-          <span style="font-weight:650">${recipes.length} recipes (${planSlots} plan slots)</span>
+          <span style="font-weight:650">${counts.recipesCount} recipes (${counts.planSlotsCount} plan slots)</span>
         </div>
         <div style="display:flex;justify-content:space-between;padding-bottom:6px;border-bottom:1px solid var(--border,#e7e5e4)">
           <span style="color:var(--text2,#78716c)">Mutation Queue</span>

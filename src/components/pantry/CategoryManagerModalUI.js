@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.19.18)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.19.19)
  * In-App Multi-Step Category Operations Wizard & Fine-Grained Reassignment Modal.
  * Replaces all native browser calls (prompt, confirm, alert) with accessible DOM views.
  */
@@ -7,6 +7,8 @@
 import { getState, setIngredients, setProducts } from '../../store/store.js';
 import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
 import { getActiveCategories } from '../../models/PantryHierarchyModel.js';
+
+const normalize = (s) => (s || '').trim().toLowerCase();
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -219,37 +221,44 @@ export function renderCategoryManagerModal() {
   window.submitRenameCat = async () => {
     const input = document.getElementById('cat-rename-input');
     const newName = input ? input.value.trim() : '';
-    if (!newName || !activeCat || newName.toLowerCase() === activeCat.toLowerCase()) {
+    if (!newName || !activeCat || normalize(newName) === normalize(activeCat)) {
       wizardStep = 'list';
       renderCurrentStep();
       return;
     }
 
+    const targetOld = normalize(activeCat);
     const state = getState() || {};
     const ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
     const prods = Array.isArray(state.products) ? [...state.products] : [];
     const cats = Array.isArray(state.categories) ? [...state.categories] : [];
 
     ings.forEach(i => {
-      if ((i.category || i.cat || '').toLowerCase().trim() === activeCat.toLowerCase().trim()) {
+      if (normalize(i.category || i.cat) === targetOld) {
         i.category = newName;
         saveIngredient(i).catch(() => {});
+      }
+      if (Array.isArray(i.subtypes)) {
+        i.subtypes.forEach(st => {
+          if (normalize(st.category || st.cat) === targetOld) st.category = newName;
+        });
+      }
+      if (Array.isArray(i.sub_types)) {
+        i.sub_types.forEach(st => {
+          if (normalize(st.category || st.cat) === targetOld) st.category = newName;
+        });
       }
     });
 
     prods.forEach(p => {
-      if ((p.category || p.cat || '').toLowerCase().trim() === activeCat.toLowerCase().trim()) {
+      if (normalize(p.category || p.cat) === targetOld) {
         p.category = newName;
         saveProduct(p).catch(() => {});
       }
     });
 
-    const newCats = cats.map(c => {
-      const name = typeof c === 'string' ? c : c.name;
-      return name.toLowerCase().trim() === activeCat.toLowerCase().trim() ? newName : name;
-    });
-
-    if (!newCats.some(c => (typeof c === 'string' ? c : c.name || '').toLowerCase().trim() === newName.toLowerCase())) {
+    const newCats = cats.filter(c => normalize(typeof c === 'string' ? c : c.name) !== targetOld);
+    if (!newCats.some(c => normalize(typeof c === 'string' ? c : c.name) === normalize(newName))) {
       newCats.push(newName);
     }
 
@@ -266,26 +275,32 @@ export function renderCategoryManagerModal() {
     const targetCat = select ? select.value : '';
     if (!targetCat || !activeCat) return;
 
+    const targetOld = normalize(activeCat);
     const state = getState() || {};
     const ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
     const prods = Array.isArray(state.products) ? [...state.products] : [];
 
     ings.forEach(i => {
-      if ((i.category || i.cat || '').toLowerCase().trim() === activeCat.toLowerCase().trim()) {
+      if (normalize(i.category || i.cat) === targetOld) {
         i.category = targetCat;
         saveIngredient(i).catch(() => {});
+      }
+      if (Array.isArray(i.subtypes)) {
+        i.subtypes.forEach(st => {
+          if (normalize(st.category || st.cat) === targetOld) st.category = targetCat;
+        });
       }
     });
 
     prods.forEach(p => {
-      if ((p.category || p.cat || '').toLowerCase().trim() === activeCat.toLowerCase().trim()) {
+      if (normalize(p.category || p.cat) === targetOld) {
         p.category = targetCat;
         saveProduct(p).catch(() => {});
       }
     });
 
     const cats = Array.isArray(state.categories) ? [...state.categories] : [];
-    state.categories = cats.filter(c => (typeof c === 'string' ? c : c.name || '').toLowerCase().trim() !== activeCat.toLowerCase().trim());
+    state.categories = cats.filter(c => normalize(typeof c === 'string' ? c : c.name) !== targetOld);
 
     setIngredients(ings);
     setProducts(prods);
@@ -297,7 +312,7 @@ export function renderCategoryManagerModal() {
     activeCat = cat;
     const state = getState() || {};
     const ings = Array.isArray(state.ingredients) ? state.ingredients : [];
-    const bound = ings.filter(i => (i.category || i.cat || '').toLowerCase().trim() === cat.toLowerCase().trim());
+    const bound = ings.filter(i => normalize(i.category || i.cat) === normalize(cat));
 
     if (bound.length === 0) {
       wizardStep = 'delete-empty';
@@ -305,7 +320,7 @@ export function renderCategoryManagerModal() {
       wizardStep = 'reassign';
       reassignMode = 'mass';
       reassignSearch = '';
-      const otherCats = getActiveCategories(state).filter(c => c.toLowerCase().trim() !== cat.toLowerCase().trim());
+      const otherCats = getActiveCategories(state).filter(c => normalize(c) !== normalize(cat));
       massTargetCat = otherCats[0] || 'Uncategorized';
       individualCatMap = {};
       bound.forEach(i => { individualCatMap[i.id] = massTargetCat; });
@@ -315,9 +330,10 @@ export function renderCategoryManagerModal() {
 
   window.submitDeleteEmptyCat = () => {
     if (!activeCat) return;
+    const targetOld = normalize(activeCat);
     const state = getState() || {};
     const cats = Array.isArray(state.categories) ? [...state.categories] : [];
-    state.categories = cats.filter(c => (typeof c === 'string' ? c : c.name || '').toLowerCase().trim() !== activeCat.toLowerCase().trim());
+    state.categories = cats.filter(c => normalize(typeof c === 'string' ? c : c.name) !== targetOld);
     setIngredients([...(state.ingredients || [])]);
     wizardStep = 'list';
     renderCurrentStep();
@@ -339,6 +355,7 @@ export function renderCategoryManagerModal() {
 
   window.submitReassignAndDelete = async () => {
     if (!activeCat) return;
+    const targetOld = normalize(activeCat);
     const state = getState() || {};
     const ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
     const prods = Array.isArray(state.products) ? [...state.products] : [];
@@ -346,22 +363,29 @@ export function renderCategoryManagerModal() {
     const massTarget = document.getElementById('cat-mass-target-select')?.value || massTargetCat || 'Uncategorized';
 
     ings.forEach(i => {
-      if ((i.category || i.cat || '').toLowerCase().trim() === activeCat.toLowerCase().trim()) {
+      if (normalize(i.category || i.cat) === targetOld) {
         const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
         i.category = dest;
         saveIngredient(i).catch(() => {});
       }
+      if (Array.isArray(i.subtypes)) {
+        i.subtypes.forEach(st => {
+          if (normalize(st.category || st.cat) === targetOld) {
+            st.category = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
+          }
+        });
+      }
     });
 
     prods.forEach(p => {
-      if ((p.category || p.cat || '').toLowerCase().trim() === activeCat.toLowerCase().trim()) {
+      if (normalize(p.category || p.cat) === targetOld) {
         p.category = reassignMode === 'mass' ? massTarget : 'Uncategorized';
         saveProduct(p).catch(() => {});
       }
     });
 
     const cats = Array.isArray(state.categories) ? [...state.categories] : [];
-    state.categories = cats.filter(c => (typeof c === 'string' ? c : c.name || '').toLowerCase().trim() !== activeCat.toLowerCase().trim());
+    state.categories = cats.filter(c => normalize(typeof c === 'string' ? c : c.name) !== targetOld);
 
     setIngredients(ings);
     setProducts(prods);

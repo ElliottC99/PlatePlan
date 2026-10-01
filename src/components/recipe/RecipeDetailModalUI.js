@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeDetailModalUI.js (v3.19.18)
+ * src/components/recipe/RecipeDetailModalUI.js (v3.19.19)
  * Modular Presentation Component for Recipe Detail & Scaling Preview Modal
  */
 
