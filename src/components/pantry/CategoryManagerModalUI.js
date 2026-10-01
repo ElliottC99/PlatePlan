@@ -1,39 +1,22 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.19.19)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.19.20)
  * In-App Multi-Step Category Operations Wizard & Fine-Grained Reassignment Modal.
  * Replaces all native browser calls (prompt, confirm, alert) with accessible DOM views.
  */
 
 import { getState, setIngredients, setProducts } from '../../store/store.js';
 import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
-import { getActiveCategories } from '../../models/PantryHierarchyModel.js';
+import { getActiveCategories, slugCategory, slugifyToKebab } from '../../models/PantryHierarchyModel.js';
 
-const normalize = (s) => (s || '').trim().toLowerCase();
+function escapeHtml(str) { return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function escapeAttr(str) { return escapeHtml(str).replace(/`/g, '&#96;'); }
 
-function escapeHtml(str) {
-  return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
-function escapeAttr(str) {
-  return escapeHtml(str).replace(/`/g, '&#96;');
-}
-
-let wizardStep = 'list'; // 'list' | 'rename' | 'merge' | 'delete-empty' | 'reassign'
-let activeCat = null;
-let reassignMode = 'mass'; // 'mass' | 'individual'
-let reassignSearch = '';
-let massTargetCat = '';
-let individualCatMap = {}; // ingId -> targetCat
+let wizardStep = 'list', activeCat = null, reassignMode = 'mass', reassignSearch = '', massTargetCat = '', individualCatMap = {};
 
 export function closeCategoryManagerModal() {
   const modal = document.getElementById('category-manager-modal');
-  if (modal) {
-    modal.style.opacity = '0';
-    modal.style.pointerEvents = 'none';
-    modal.classList.remove('open');
-  }
-  wizardStep = 'list';
-  activeCat = null;
+  if (modal) { modal.style.opacity = '0'; modal.style.pointerEvents = 'none'; modal.classList.remove('open'); }
+  wizardStep = 'list'; activeCat = null;
 }
 
 export function renderCategoryManagerModal() {
@@ -51,38 +34,27 @@ export function renderCategoryManagerModal() {
     const categories = getActiveCategories(state);
     const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
     const products = Array.isArray(state.products) ? state.products : [];
-
     let bodyHtml = '';
 
     if (wizardStep === 'list') {
       bodyHtml = `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border,#e7e5e4)">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:18px">🏷️</span>
-            <h3 style="margin:0;font-size:16px;font-weight:750">Category Manager</h3>
-          </div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">🏷️</span><h3 style="margin:0;font-size:16px;font-weight:750">Category Manager</h3></div>
           <button type="button" class="btn sm ghost" onclick="window.closeCategoryManagerModal()" style="padding:2px 8px;font-size:18px">&times;</button>
         </div>
-
         <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
           ${categories.map(cat => {
-            const count = ingredients.filter(i => (i.category || i.cat || '').toLowerCase().trim() === cat.toLowerCase().trim()).length;
-            return `
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2,#f5f5f4);border-radius:8px;border:1px solid var(--border,#e7e5e4)">
-                <div>
-                  <span style="font-size:13px;font-weight:650">${escapeHtml(cat)}</span>
-                  <span style="font-size:11px;color:var(--text2,#78716c);margin-left:6px">(${count} items)</span>
-                </div>
-                <div style="display:flex;gap:4px">
-                  <button type="button" class="btn xs ghost" onclick="window.startRenameCat('${escapeAttr(cat)}')">Rename</button>
-                  <button type="button" class="btn xs ghost" onclick="window.startMergeCat('${escapeAttr(cat)}')">Merge</button>
-                  <button type="button" class="btn xs ghost" style="color:var(--red,#ef4444)" onclick="window.startDeleteCat('${escapeAttr(cat)}')">Delete</button>
-                </div>
+            const count = ingredients.filter(i => slugCategory(i.category) === slugCategory(cat) || slugCategory(i.cat) === slugCategory(cat)).length;
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2,#f5f5f4);border-radius:8px;border:1px solid var(--border,#e7e5e4)">
+              <div><span style="font-size:13px;font-weight:650">${escapeHtml(cat)}</span><span style="font-size:11px;color:var(--text2,#78716c);margin-left:6px">(${count} items)</span></div>
+              <div style="display:flex;gap:4px">
+                <button type="button" class="btn xs ghost" onclick="window.startRenameCat('${escapeAttr(cat)}')">Rename</button>
+                <button type="button" class="btn xs ghost" onclick="window.startMergeCat('${escapeAttr(cat)}')">Merge</button>
+                <button type="button" class="btn xs ghost" style="color:var(--red,#ef4444)" onclick="window.startDeleteCat('${escapeAttr(cat)}')">Delete</button>
               </div>
-            `;
+            </div>`;
           }).join('')}
         </div>
-
         <div style="display:flex;gap:8px">
           <input type="text" id="cat-manager-add-input" placeholder="New category name..." style="flex:1;padding:6px 10px;border:1px solid var(--border,#e7e5e4);border-radius:8px;font-size:13px">
           <button type="button" class="btn primary sm" onclick="window.submitAddCat()">+ Add</button>
@@ -104,7 +76,7 @@ export function renderCategoryManagerModal() {
         </div>
       `;
     } else if (wizardStep === 'merge') {
-      const otherCats = categories.filter(c => c.toLowerCase().trim() !== activeCat.toLowerCase().trim());
+      const otherCats = categories.filter(c => slugCategory(c) !== slugCategory(activeCat));
       bodyHtml = `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border,#e7e5e4)">
           <h3 style="margin:0;font-size:15px;font-weight:750">Merge "${escapeHtml(activeCat)}"</h3>
@@ -134,10 +106,9 @@ export function renderCategoryManagerModal() {
         </div>
       `;
     } else if (wizardStep === 'reassign') {
-      const boundIngs = ingredients.filter(i => (i.category || i.cat || '').toLowerCase().trim() === activeCat.toLowerCase().trim());
-      const otherCats = categories.filter(c => c.toLowerCase().trim() !== activeCat.toLowerCase().trim());
+      const boundIngs = ingredients.filter(i => slugCategory(i.category) === slugCategory(activeCat) || slugCategory(i.cat) === slugCategory(activeCat));
+      const otherCats = categories.filter(c => slugCategory(c) !== slugCategory(activeCat));
       if (!otherCats.includes('Uncategorized')) otherCats.push('Uncategorized');
-
       const filteredIngs = boundIngs.filter(i => (i.name || '').toLowerCase().includes(reassignSearch.toLowerCase().trim()));
 
       bodyHtml = `
@@ -149,7 +120,6 @@ export function renderCategoryManagerModal() {
           <button type="button" class="btn sm ghost" onclick="window.closeCategoryManagerModal()">&times;</button>
         </div>
 
-        <!-- Mode Toggle -->
         <div style="display:flex;gap:6px;margin-bottom:10px">
           <button type="button" class="btn xs ${reassignMode === 'mass' ? 'primary' : 'ghost'}" onclick="window.setCatReassignMode('mass')">Mass Reassign</button>
           <button type="button" class="btn xs ${reassignMode === 'individual' ? 'primary' : 'ghost'}" onclick="window.setCatReassignMode('individual')">Individual Sorting</button>
@@ -169,14 +139,12 @@ export function renderCategoryManagerModal() {
           <div style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
             ${filteredIngs.map(ing => {
               const currentSel = individualCatMap[ing.id] || otherCats[0] || 'Uncategorized';
-              return `
-                <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:var(--surface2,#f5f5f4);border-radius:6px;border:1px solid var(--border,#e7e5e4)">
-                  <span style="font-size:12px;font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ing.name)}</span>
-                  <select onchange="window.updateIndividualCatMap('${escapeAttr(ing.id)}', this.value)" style="padding:4px 6px;font-size:11.5px;border:1px solid var(--border,#e7e5e4);border-radius:6px;background:var(--surface,#fff)">
-                    ${otherCats.map(c => `<option value="${escapeAttr(c)}" ${c === currentSel ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
-                  </select>
-                </div>
-              `;
+              return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:var(--surface2,#f5f5f4);border-radius:6px;border:1px solid var(--border,#e7e5e4)">
+                <span style="font-size:12px;font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ing.name)}</span>
+                <select onchange="window.updateIndividualCatMap('${escapeAttr(ing.id)}', this.value)" style="padding:4px 6px;font-size:11.5px;border:1px solid var(--border,#e7e5e4);border-radius:6px;background:var(--surface,#fff)">
+                  ${otherCats.map(c => `<option value="${escapeAttr(c)}" ${c === currentSel ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+                </select>
+              </div>`;
             }).join('') || '<div style="font-size:12px;color:var(--text2,#78716c);padding:8px">No matching items found.</div>'}
           </div>
         `}
@@ -188,17 +156,11 @@ export function renderCategoryManagerModal() {
       `;
     }
 
-    modal.innerHTML = `
-      <div class="card" style="width:100%;max-width:420px;background:var(--surface,#fff);padding:20px;border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,0.15)">
-        ${bodyHtml}
-      </div>
-    `;
+    modal.innerHTML = `<div class="card" style="width:100%;max-width:420px;background:var(--surface,#fff);padding:20px;border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,0.15)">${bodyHtml}</div>`;
   };
 
   renderCurrentStep();
-  modal.style.opacity = '1';
-  modal.style.pointerEvents = 'all';
-  modal.classList.add('open');
+  modal.style.opacity = '1'; modal.style.pointerEvents = 'all'; modal.classList.add('open');
 
   window.closeCategoryManagerModal = closeCategoryManagerModal;
   window.navCatStep = (step) => { wizardStep = step; renderCurrentStep(); };
@@ -209,10 +171,8 @@ export function renderCategoryManagerModal() {
     if (!val) return;
     const state = getState() || {};
     const current = Array.isArray(state.categories) ? [...state.categories] : [];
-    if (!current.some(c => (typeof c === 'string' ? c : c.name || '').toLowerCase().trim() === val.toLowerCase())) {
-      current.push(val);
-      state.categories = current;
-      setIngredients([...(state.ingredients || [])]);
+    if (!current.some(c => slugCategory(typeof c === 'string' ? c : c.name) === slugCategory(val))) {
+      current.push(val); state.categories = current; setIngredients([...(state.ingredients || [])]);
     }
     renderCurrentStep();
   };
@@ -221,52 +181,29 @@ export function renderCategoryManagerModal() {
   window.submitRenameCat = async () => {
     const input = document.getElementById('cat-rename-input');
     const newName = input ? input.value.trim() : '';
-    if (!newName || !activeCat || normalize(newName) === normalize(activeCat)) {
-      wizardStep = 'list';
-      renderCurrentStep();
-      return;
-    }
+    if (!newName || !activeCat || slugCategory(newName) === slugCategory(activeCat)) { wizardStep = 'list'; renderCurrentStep(); return; }
 
-    const targetOld = normalize(activeCat);
-    const state = getState() || {};
-    const ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
-    const prods = Array.isArray(state.products) ? [...state.products] : [];
-    const cats = Array.isArray(state.categories) ? [...state.categories] : [];
+    const targetSlug = slugCategory(activeCat), newCatKebab = slugifyToKebab(newName);
+    const state = getState() || {}, ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [], prods = Array.isArray(state.products) ? [...state.products] : [], cats = Array.isArray(state.categories) ? [...state.categories] : [];
 
     ings.forEach(i => {
-      if (normalize(i.category || i.cat) === targetOld) {
-        i.category = newName;
-        saveIngredient(i).catch(() => {});
+      if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
+        i.category = newName; i.cat = newCatKebab; saveIngredient(i).catch(() => {});
       }
-      if (Array.isArray(i.subtypes)) {
-        i.subtypes.forEach(st => {
-          if (normalize(st.category || st.cat) === targetOld) st.category = newName;
-        });
-      }
-      if (Array.isArray(i.sub_types)) {
-        i.sub_types.forEach(st => {
-          if (normalize(st.category || st.cat) === targetOld) st.category = newName;
-        });
-      }
+      if (Array.isArray(i.subtypes)) i.subtypes.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = newName; st.cat = newCatKebab; } });
+      if (Array.isArray(i.sub_types)) i.sub_types.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = newName; st.cat = newCatKebab; } });
     });
 
     prods.forEach(p => {
-      if (normalize(p.category || p.cat) === targetOld) {
-        p.category = newName;
-        saveProduct(p).catch(() => {});
+      if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
+        p.category = newName; p.cat = newCatKebab; saveProduct(p).catch(() => {});
       }
     });
 
-    const newCats = cats.filter(c => normalize(typeof c === 'string' ? c : c.name) !== targetOld);
-    if (!newCats.some(c => normalize(typeof c === 'string' ? c : c.name) === normalize(newName))) {
-      newCats.push(newName);
-    }
+    const newCats = cats.filter(c => slugCategory(typeof c === 'string' ? c : c.name) !== targetSlug);
+    if (!newCats.some(c => slugCategory(typeof c === 'string' ? c : c.name) === slugCategory(newName))) newCats.push(newName);
 
-    state.categories = newCats;
-    setIngredients(ings);
-    setProducts(prods);
-    wizardStep = 'list';
-    renderCurrentStep();
+    state.categories = newCats; setIngredients(ings); setProducts(prods); wizardStep = 'list'; renderCurrentStep();
   };
 
   window.startMergeCat = (cat) => { activeCat = cat; wizardStep = 'merge'; renderCurrentStep(); };
@@ -275,54 +212,37 @@ export function renderCategoryManagerModal() {
     const targetCat = select ? select.value : '';
     if (!targetCat || !activeCat) return;
 
-    const targetOld = normalize(activeCat);
-    const state = getState() || {};
-    const ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
-    const prods = Array.isArray(state.products) ? [...state.products] : [];
+    const targetSlug = slugCategory(activeCat), targetKebab = slugifyToKebab(targetCat);
+    const state = getState() || {}, ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [], prods = Array.isArray(state.products) ? [...state.products] : [];
 
     ings.forEach(i => {
-      if (normalize(i.category || i.cat) === targetOld) {
-        i.category = targetCat;
-        saveIngredient(i).catch(() => {});
+      if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
+        i.category = targetCat; i.cat = targetKebab; saveIngredient(i).catch(() => {});
       }
-      if (Array.isArray(i.subtypes)) {
-        i.subtypes.forEach(st => {
-          if (normalize(st.category || st.cat) === targetOld) st.category = targetCat;
-        });
-      }
+      if (Array.isArray(i.subtypes)) i.subtypes.forEach(st => { if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) { st.category = targetCat; st.cat = targetKebab; } });
     });
 
     prods.forEach(p => {
-      if (normalize(p.category || p.cat) === targetOld) {
-        p.category = targetCat;
-        saveProduct(p).catch(() => {});
+      if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
+        p.category = targetCat; p.cat = targetKebab; saveProduct(p).catch(() => {});
       }
     });
 
     const cats = Array.isArray(state.categories) ? [...state.categories] : [];
-    state.categories = cats.filter(c => normalize(typeof c === 'string' ? c : c.name) !== targetOld);
-
-    setIngredients(ings);
-    setProducts(prods);
-    wizardStep = 'list';
-    renderCurrentStep();
+    state.categories = cats.filter(c => slugCategory(typeof c === 'string' ? c : c.name) !== targetSlug);
+    setIngredients(ings); setProducts(prods); wizardStep = 'list'; renderCurrentStep();
   };
 
   window.startDeleteCat = (cat) => {
     activeCat = cat;
-    const state = getState() || {};
-    const ings = Array.isArray(state.ingredients) ? state.ingredients : [];
-    const bound = ings.filter(i => normalize(i.category || i.cat) === normalize(cat));
+    const state = getState() || {}, ings = Array.isArray(state.ingredients) ? state.ingredients : [];
+    const bound = ings.filter(i => slugCategory(i.category) === slugCategory(cat) || slugCategory(i.cat) === slugCategory(cat));
 
-    if (bound.length === 0) {
-      wizardStep = 'delete-empty';
-    } else {
-      wizardStep = 'reassign';
-      reassignMode = 'mass';
-      reassignSearch = '';
-      const otherCats = getActiveCategories(state).filter(c => normalize(c) !== normalize(cat));
-      massTargetCat = otherCats[0] || 'Uncategorized';
-      individualCatMap = {};
+    if (bound.length === 0) { wizardStep = 'delete-empty'; }
+    else {
+      wizardStep = 'reassign'; reassignMode = 'mass'; reassignSearch = '';
+      const otherCats = getActiveCategories(state).filter(c => slugCategory(c) !== slugCategory(cat));
+      massTargetCat = otherCats[0] || 'Uncategorized'; individualCatMap = {};
       bound.forEach(i => { individualCatMap[i.id] = massTargetCat; });
     }
     renderCurrentStep();
@@ -330,66 +250,47 @@ export function renderCategoryManagerModal() {
 
   window.submitDeleteEmptyCat = () => {
     if (!activeCat) return;
-    const targetOld = normalize(activeCat);
+    const targetSlug = slugCategory(activeCat);
     const state = getState() || {};
     const cats = Array.isArray(state.categories) ? [...state.categories] : [];
-    state.categories = cats.filter(c => normalize(typeof c === 'string' ? c : c.name) !== targetOld);
-    setIngredients([...(state.ingredients || [])]);
-    wizardStep = 'list';
-    renderCurrentStep();
+    state.categories = cats.filter(c => slugCategory(typeof c === 'string' ? c : c.name) !== targetSlug);
+    setIngredients([...(state.ingredients || [])]); wizardStep = 'list'; renderCurrentStep();
   };
 
-  window.setCatReassignMode = (mode) => {
-    reassignMode = mode;
-    renderCurrentStep();
-  };
-
-  window.handleReassignSearch = (text) => {
-    reassignSearch = text || '';
-    renderCurrentStep();
-  };
-
-  window.updateIndividualCatMap = (ingId, targetCat) => {
-    individualCatMap[ingId] = targetCat;
-  };
+  window.setCatReassignMode = (mode) => { reassignMode = mode; renderCurrentStep(); };
+  window.handleReassignSearch = (text) => { reassignSearch = text || ''; renderCurrentStep(); };
+  window.updateIndividualCatMap = (ingId, targetCat) => { individualCatMap[ingId] = targetCat; };
 
   window.submitReassignAndDelete = async () => {
     if (!activeCat) return;
-    const targetOld = normalize(activeCat);
-    const state = getState() || {};
-    const ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
-    const prods = Array.isArray(state.products) ? [...state.products] : [];
-
+    const targetSlug = slugCategory(activeCat);
+    const state = getState() || {}, ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [], prods = Array.isArray(state.products) ? [...state.products] : [];
     const massTarget = document.getElementById('cat-mass-target-select')?.value || massTargetCat || 'Uncategorized';
 
     ings.forEach(i => {
-      if (normalize(i.category || i.cat) === targetOld) {
+      if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
         const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
-        i.category = dest;
-        saveIngredient(i).catch(() => {});
+        i.category = dest; i.cat = slugifyToKebab(dest); saveIngredient(i).catch(() => {});
       }
       if (Array.isArray(i.subtypes)) {
         i.subtypes.forEach(st => {
-          if (normalize(st.category || st.cat) === targetOld) {
-            st.category = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
+          if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) {
+            const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
+            st.category = dest; st.cat = slugifyToKebab(dest);
           }
         });
       }
     });
 
     prods.forEach(p => {
-      if (normalize(p.category || p.cat) === targetOld) {
-        p.category = reassignMode === 'mass' ? massTarget : 'Uncategorized';
-        saveProduct(p).catch(() => {});
+      if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
+        const dest = reassignMode === 'mass' ? massTarget : 'Uncategorized';
+        p.category = dest; p.cat = slugifyToKebab(dest); saveProduct(p).catch(() => {});
       }
     });
 
     const cats = Array.isArray(state.categories) ? [...state.categories] : [];
-    state.categories = cats.filter(c => normalize(typeof c === 'string' ? c : c.name) !== targetOld);
-
-    setIngredients(ings);
-    setProducts(prods);
-    wizardStep = 'list';
-    renderCurrentStep();
+    state.categories = cats.filter(c => slugCategory(typeof c === 'string' ? c : c.name) !== targetSlug);
+    setIngredients(ings); setProducts(prods); wizardStep = 'list'; renderCurrentStep();
   };
 }

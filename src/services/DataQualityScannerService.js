@@ -1,11 +1,23 @@
 /**
- * src/services/DataQualityScannerService.js (v3.19.15)
+ * src/services/DataQualityScannerService.js (v3.19.20)
  * Automated catalog data quality auditor, anomaly scanner, and advisor.
  * Pure service layer with zero DOM references.
  */
 
 import { getState } from '../store/store.js';
 import { buildPantryHierarchy } from '../models/PantryHierarchyModel.js';
+
+let scanTimer = null;
+let cachedScanResult = null;
+
+export function runDataQualityScanDebounced(state = {}, callback) {
+  if (scanTimer) clearTimeout(scanTimer);
+  scanTimer = setTimeout(() => {
+    cachedScanResult = runDataQualityScan(state);
+    if (typeof callback === 'function') callback(cachedScanResult);
+  }, 250);
+  return cachedScanResult || runDataQualityScan(state);
+}
 
 export function runDataQualityScan(state = {}) {
   const ingredientsList = Array.isArray(state.ingredients) ? state.ingredients : Object.values(state.ingredients || {});
