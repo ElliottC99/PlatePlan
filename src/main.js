@@ -1,14 +1,27 @@
-import { openIngredientFamilyDetailsModal } from './components/pantry/CategoryManagerModalUI.js';
-import { openCreateActionSheet } from './components/navigation/ActionSheetUI.js';
-
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.19.28';
-  window.createIngredientGroupPrompt = () => openIngredientFamilyDetailsModal(null);
-  window.openCreateActionSheet = () => openCreateActionSheet();
+  window.APP_VERSION = 'v3.19.29';
+  window.createIngredientGroupPrompt = () => {
+    import('./components/pantry/CategoryManagerModalUI.js')
+      .then(m => {
+        if (typeof m.openIngredientFamilyDetailsModal === 'function') {
+          m.openIngredientFamilyDetailsModal(null);
+        }
+      })
+      .catch(err => console.error('[PlatePlan] Error loading IngredientFamilyModalUI:', err));
+  };
+  window.openCreateActionSheet = () => {
+    import('./components/navigation/ActionSheetUI.js')
+      .then(m => {
+        if (typeof m.openCreateActionSheet === 'function') {
+          m.openCreateActionSheet();
+        }
+      })
+      .catch(err => console.error('[PlatePlan] Error loading ActionSheetUI:', err));
+  };
 }
 
 /**
- * src/main.js (v3.19.28)
+ * src/main.js (v3.19.29)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronization,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -278,7 +291,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.19.28 (ES6 Modern)';
+    footerEl.textContent = 'v3.19.29 (ES6 Modern)';
   }
 }
 
