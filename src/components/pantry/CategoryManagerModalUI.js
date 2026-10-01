@@ -69,7 +69,7 @@ export function renderCategoryManagerModal() {
           }).join('')}
         </div>
         <div style="display:flex;gap:8px">
-          <input type="text" id="cat-manager-add-input" placeholder="New category name..." style="flex:1;padding:6px 10px;border:1px solid var(--border,#e7e5e4);border-radius:8px;font-size:13px">
+          <input type="text" id="cat-manager-add-input" placeholder="New category name..." aria-label="New category name" style="flex:1;padding:6px 10px;border:1px solid var(--border,#e7e5e4);border-radius:8px;font-size:13px">
           <button type="button" class="btn primary sm" onclick="window.submitAddCat()">+ Add</button>
         </div>
       `;
@@ -81,7 +81,7 @@ export function renderCategoryManagerModal() {
         </div>
         <div style="margin-bottom:16px">
           <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">New Category Name</label>
-          <input type="text" id="cat-rename-input" value="${escapeAttr(activeCat)}" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:8px;font-size:13.5px;box-sizing:border-box">
+          <input type="text" id="cat-rename-input" value="${escapeAttr(activeCat)}" aria-label="New category name input" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:8px;font-size:13.5px;box-sizing:border-box">
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
           <button type="button" class="btn ghost sm" onclick="window.navCatStep('list')">Back</button>
@@ -147,7 +147,7 @@ export function renderCategoryManagerModal() {
           </div>
         ` : `
           <div style="margin-bottom:8px">
-            <input type="text" placeholder="Filter items by name..." value="${escapeAttr(reassignSearch)}" oninput="window.handleReassignSearch(this.value)" style="width:100%;padding:6px 10px;border:1px solid var(--border,#e7e5e4);border-radius:6px;font-size:12px;box-sizing:border-box">
+            <input type="text" placeholder="Filter items by name..." value="${escapeAttr(reassignSearch)}" aria-label="Filter items by name" oninput="window.handleReassignSearch(this.value)" style="width:100%;padding:6px 10px;border:1px solid var(--border,#e7e5e4);border-radius:6px;font-size:12px;box-sizing:border-box">
           </div>
           <div style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
             ${filteredIngs.map(ing => {

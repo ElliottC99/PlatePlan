@@ -1,9 +1,9 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.19.26';
+  window.APP_VERSION = 'v3.19.27';
 }
 
 /**
- * src/main.js (v3.19.26)
+ * src/main.js (v3.19.27)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronization,
  * instant offline caching, global error telemetry, and PWA service worker registration.

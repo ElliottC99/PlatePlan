@@ -300,9 +300,17 @@ export function renderProductBank() {
   container.innerHTML = html;
 }
 
+export function clearProductGroupFilter() {
+  // Clear any active product filter/search state
+  const searchInput = document.getElementById('product-bank-search');
+  if (searchInput) searchInput.value = '';
+  renderProductBank();
+}
+
 if (typeof window !== 'undefined') {
   window.renderProductBank = renderProductBank;
   window.renderBank = renderProductBank;
+  window.clearProductGroupFilter = clearProductGroupFilter;
   window.openProductEditModal = openProductEditModal;
   window.showAddIng = () => openProductEditModal(null);
   window.saveManualIng = saveManualIng;
