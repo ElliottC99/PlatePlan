@@ -273,7 +273,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (footerEl) {
-    footerEl.textContent = 'v3.19.26 (ES6 Modern)';
+    footerEl.textContent = 'v3.19.27 (ES6 Modern)';
   }
 }
 
