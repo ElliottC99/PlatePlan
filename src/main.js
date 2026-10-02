@@ -1,5 +1,14 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.19.41';
+  window.APP_VERSION = 'v3.19.42';
+  window.showTescoImport = () => {
+    import('./components/pantry/SubtypeActionModalsUI.js')
+      .then(m => {
+        if (typeof m.openTescoImportModal === 'function') {
+          m.openTescoImportModal(null, null);
+        }
+      })
+      .catch(err => console.error('[PlatePlan] Error loading SubtypeActionModalsUI for showTescoImport:', err));
+  };
   window.createIngredientGroupPrompt = () => {
     import('./components/pantry/CategoryManagerModalUI.js')
       .then(m => {
@@ -291,7 +300,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const badgeEl = document.getElementById('app-header-version') || document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (badgeEl) {
-    badgeEl.textContent = 'v3.19.41';
+    badgeEl.textContent = 'v3.19.42';
   }
 }
 

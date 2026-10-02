@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/SubtypeActionModalsUI.js (v3.19.41)
+ * src/components/pantry/SubtypeActionModalsUI.js (v3.19.42)
  * Standardized custom styled dialogs and workflows for nested sub-types.
  * Eliminates all prompt(), alert(), and confirm() browser chrome calls.
  */
@@ -875,8 +875,8 @@ window.handleDeleteProduct = (productId, prodName) => {
 
 window.promptReallocateProduct = (productId) => {
   const state = getState() || {};
-  const currentIngs = state.ingredients || [];
-  const prods = state.products || [];
+  const currentIngs = Array.isArray(state.ingredients) ? state.ingredients : [];
+  const prods = Array.isArray(state.products) ? state.products : [];
   const prod = prods.find(p => String(p.id) === String(productId));
   if (!prod) return;
 
@@ -885,34 +885,23 @@ window.promptReallocateProduct = (productId) => {
     return;
   }
 
-  // Group Core Ingredients by Category for Dropdown 1
-  const groupedCategories = {};
-  currentIngs.forEach(i => {
-    const cat = i.category || 'General';
-    if (!groupedCategories[cat]) groupedCategories[cat] = [];
-    groupedCategories[cat].push(i);
-  });
-
-  const optgroupsHtml = Object.entries(groupedCategories)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([cat, ings]) => `
-      <optgroup label="${escapeHTML(cat)}">
-        ${ings.map(i => `<option value="${escapeHTML(i.id)}" ${String(i.id) === String(prod.ingredientId || prod.groupId) ? 'selected' : ''}>${escapeHTML(i.name)}</option>`).join('')}
-      </optgroup>
-    `).join('');
+  let selectedIngId = prod.ingredientId || prod.groupId || (currentIngs[0]?.id || null);
+  let selectedSubId = prod.subtypeId || null;
 
   const html = `
-    <div style="padding: 24px; max-width: 480px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px;">
-      <h3 style="margin-top:0; margin-bottom: 8px; font-size: 1.15rem; font-weight: 750;">📦 Reallocate Product: ${escapeHTML(prod.name)}</h3>
-      <p style="font-size: 13px; color: var(--text2,#78716c); margin-bottom: 16px;">Choose which parent ingredient and optional sub-type this product belongs to.</p>
+    <div style="padding: 24px; max-width: 500px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px;">
+      <h3 style="margin-top:0; margin-bottom: 6px; font-size: 1.15rem; font-weight: 750;">📦 Reallocate Product: ${escapeHTML(prod.name)}</h3>
+      <p style="font-size: 12.5px; color: var(--text2,#78716c); margin: 0 0 16px 0;">Search and select the target parent ingredient and optional sub-type.</p>
 
+      <!-- 1. Searchable Core Ingredient Filter -->
       <div class="field" style="margin-bottom: 14px;">
         <label style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">1. Target Core Ingredient</label>
-        <select id="realloc-ing-select" style="width:100%; padding:8px 10px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px; background:#fff;">
-          ${optgroupsHtml}
-        </select>
+        <input type="text" id="realloc-ing-search" class="input" placeholder="🔍 Type core ingredient or category name..." style="width:100%; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px; box-sizing:border-box;" />
+        <div id="realloc-ing-results" style="margin-top:6px; max-height:160px; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:8px; background:var(--surface2,#f5f5f4); padding:4px;">
+        </div>
       </div>
 
+      <!-- 2. Target Sub-type Dropdown -->
       <div class="field" id="realloc-subtype-field" style="margin-bottom: 20px;">
         <label style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">2. Target Sub-type (Optional)</label>
         <select id="realloc-subtype-select" style="width:100%; padding:8px 10px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px; background:#fff;">
@@ -927,34 +916,84 @@ window.promptReallocateProduct = (productId) => {
   `;
   showModal(html);
 
-  const ingSelect = document.getElementById('realloc-ing-select');
+  const searchInput = document.getElementById('realloc-ing-search');
+  const resultsContainer = document.getElementById('realloc-ing-results');
   const subSelect = document.getElementById('realloc-subtype-select');
 
-  const updateSubtypes = () => {
-    const ingId = ingSelect.value;
-    const ing = currentIngs.find(i => String(i.id) === String(ingId));
+  const updateSubtypeDropdown = () => {
+    const ing = currentIngs.find(i => String(i.id) === String(selectedIngId));
     if (ing && Array.isArray(ing.subtypes) && ing.subtypes.length > 0) {
-      subSelect.innerHTML = `<option value="">None (Top-level ${escapeHTML(ing.name)})</option>` + 
-        ing.subtypes.map(s => `<option value="${escapeHTML(s.id)}" ${String(s.id) === String(prod.subtypeId) ? 'selected' : ''}>${escapeHTML(s.name)}</option>`).join('');
+      subSelect.innerHTML = `<option value="">None (Top-level ${escapeHTML(ing.name)})</option>` +
+        ing.subtypes.map(s => `<option value="${escapeHTML(s.id)}" ${String(s.id) === String(selectedSubId) ? 'selected' : ''}>${escapeHTML(s.name)}</option>`).join('');
     } else {
       subSelect.innerHTML = `<option value="">None (Top-level ${escapeHTML(ing ? ing.name : 'Ingredient')})</option>`;
     }
   };
 
-  ingSelect.onchange = updateSubtypes;
-  updateSubtypes();
+  const renderIngredientList = (query = '') => {
+    const q = String(query || '').trim().toLowerCase();
+    const filtered = currentIngs.filter(i => {
+      if (!q) return true;
+      const name = String(i.name || '').toLowerCase();
+      const cat = String(i.category || '').toLowerCase();
+      return name.includes(q) || cat.includes(q);
+    });
+
+    if (!filtered.length) {
+      resultsContainer.innerHTML = `<div style="padding:10px; font-size:12px; color:var(--text3,#a8a29e); text-align:center;">No matching ingredients found.</div>`;
+      return;
+    }
+
+    resultsContainer.innerHTML = filtered.map(i => {
+      const isSelected = String(i.id) === String(selectedIngId);
+      return `
+        <div class="realloc-ing-option" data-id="${escapeHTML(i.id)}" style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; margin-bottom:2px; border-radius:6px; cursor:pointer; background:${isSelected ? 'var(--primary,#4f46e5)' : '#fff'}; color:${isSelected ? '#fff' : 'var(--text,#1c1917)'}; border:1px solid ${isSelected ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'};">
+          <span style="font-size:12.5px; font-weight:650;">${escapeHTML(i.name)}</span>
+          <span style="font-size:11px; opacity:0.85;">${escapeHTML(i.category || 'General')}</span>
+        </div>
+      `;
+    }).join('');
+
+    resultsContainer.querySelectorAll('.realloc-ing-option').forEach(el => {
+      el.onclick = () => {
+        selectedIngId = el.dataset.id;
+        selectedSubId = null;
+        renderIngredientList(searchInput.value);
+        updateSubtypeDropdown();
+      };
+    });
+  };
+
+  searchInput.oninput = () => renderIngredientList(searchInput.value);
+
+  // Initial render
+  const initialIng = currentIngs.find(i => String(i.id) === String(selectedIngId));
+  if (initialIng) {
+    searchInput.placeholder = `Current: ${initialIng.name} (type to search...)`;
+  }
+  renderIngredientList();
+  updateSubtypeDropdown();
 
   document.getElementById('btn-confirm-realloc').onclick = async () => {
-    const ingId = ingSelect.value;
+    if (!selectedIngId) return;
     const subtypeId = subSelect.value || null;
-    const ing = currentIngs.find(i => String(i.id) === String(ingId));
+    const ing = currentIngs.find(i => String(i.id) === String(selectedIngId));
     if (!ing) return;
     closeModal();
-    import('../../models/PantryHierarchyModel.js').then(async (model) => {
-      await model.reallocateProduct(productId, ing.id, subtypeId, ing.category);
+
+    const prodsList = [...(state.products || [])];
+    const targetProd = prodsList.find(p => String(p.id) === String(productId));
+    if (targetProd) {
+      targetProd.ingredientId = ing.id;
+      targetProd.subtypeId = subtypeId;
+      targetProd.category = ing.category || 'General';
+      targetProd.updatedAt = new Date().toISOString();
+
+      setProducts(prodsList);
       if (typeof window.renderProductBank === 'function') window.renderProductBank();
       if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-    });
+      await saveProduct(targetProd);
+    }
   };
 };
 

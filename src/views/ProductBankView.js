@@ -1,5 +1,5 @@
 /**
- * src/views/ProductBankView.js (v3.19.41)
+ * src/views/ProductBankView.js (v3.19.42)
  * Modular ES6 View for Product Bank.
  * Displays nutritional pills (P, C, F, Kcal), P/£ efficiency, Tesco links, and Reallocation modal.
  */
@@ -303,16 +303,12 @@ export function renderProductBank() {
               </div>
 
               <!-- Action Toolbar -->
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;padding-top:6px;border-top:1px solid var(--border,#e7e5e4);gap:4px">
-                <div style="display:flex;gap:4px;align-items:center">
-                  <button type="button" class="btn xs ghost" onclick="openProductEditModal('${escapeAttr(p.id)}')" style="padding:2px 6px;font-size:11px">Edit</button>
-                  <button type="button" class="btn xs ghost" onclick="promptReallocateProduct('${escapeAttr(p.id)}')" style="padding:2px 6px;font-size:11px">Reallocate</button>
-                  ${mappedIng && !p.isAutoDefault ? `<button type="button" class="btn xs ghost" onclick="handleMakeAutoDefault('${escapeAttr(p.id)}', '${escapeAttr(mappedIng.id)}')" style="padding:2px 6px;font-size:11px">Default</button>` : ''}
-                </div>
-                <div style="display:flex;gap:4px;align-items:center">
-                  <a href="${escapeAttr(tescoSearchUrl)}" target="_blank" rel="noopener noreferrer" class="btn xs ghost" style="text-decoration:none;font-size:10.5px;color:var(--primary);padding:2px 6px" title="Search on Tesco">Tesco ↗</a>
-                  <button type="button" class="btn xs ghost" onclick="handleDeleteProduct('${escapeAttr(p.id)}', '${escapeAttr(p.name)}')" style="color:var(--red,#ef4444);padding:2px 6px" title="Delete product">🗑️</button>
-                </div>
+              <div style="display:flex;align-items:center;justify-content:flex-start;gap:8px;flex-wrap:wrap;margin-top:4px;padding-top:6px;border-top:1px solid var(--border,#e7e5e4)">
+                <button type="button" class="btn xs ghost" onclick="openProductEditModal('${escapeAttr(p.id)}')" style="padding:2px 8px;font-size:11px">Edit</button>
+                <button type="button" class="btn xs ghost" onclick="promptReallocateProduct('${escapeAttr(p.id)}')" style="padding:2px 8px;font-size:11px">Reallocate</button>
+                ${mappedIng && !p.isAutoDefault ? `<button type="button" class="btn xs ghost" onclick="handleMakeAutoDefault('${escapeAttr(p.id)}', '${escapeAttr(mappedIng.id)}')" style="padding:2px 8px;font-size:11px">Default</button>` : ''}
+                <a href="${escapeAttr(tescoSearchUrl)}" target="_blank" rel="noopener noreferrer" class="btn xs ghost" style="text-decoration:none;font-size:11px;color:var(--primary);padding:2px 8px" title="Search on Tesco">Tesco ↗</a>
+                <button type="button" class="btn xs ghost" onclick="handleDeleteProduct('${escapeAttr(p.id)}', '${escapeAttr(p.name)}')" style="color:var(--red,#ef4444);padding:2px 8px;font-size:11px" title="Delete product">🗑️</button>
               </div>
             </div>
           `;
@@ -331,12 +327,19 @@ export function clearProductGroupFilter() {
   renderProductBank();
 }
 
+export function showTescoImport() {
+  if (typeof window.openTescoImportModal === 'function') {
+    window.openTescoImportModal(null, null);
+  }
+}
+
 if (typeof window !== 'undefined') {
   window.renderProductBank = renderProductBank;
   window.renderBank = renderProductBank;
   window.clearProductGroupFilter = clearProductGroupFilter;
   window.openProductEditModal = openProductEditModal;
   window.showAddIng = () => openProductEditModal(null);
+  window.showTescoImport = showTescoImport;
   window.saveManualIng = saveManualIng;
   window.cancelManualIng = cancelManualIng;
   window.promptReallocateProduct = promptReallocateProduct;
