@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/SubtypeActionModalsUI.js (v3.19.42)
+ * src/components/pantry/SubtypeActionModalsUI.js (v3.19.43)
  * Standardized custom styled dialogs and workflows for nested sub-types.
  * Eliminates all prompt(), alert(), and confirm() browser chrome calls.
  */
@@ -880,32 +880,71 @@ window.promptReallocateProduct = (productId) => {
   const prod = prods.find(p => String(p.id) === String(productId));
   if (!prod) return;
 
-  if (!currentIngs.length) {
-    window.showCustomAlert('No ingredients available to reallocate into.');
-    return;
-  }
-
   let selectedIngId = prod.ingredientId || prod.groupId || (currentIngs[0]?.id || null);
   let selectedSubId = prod.subtypeId || null;
 
   const html = `
-    <div style="padding: 24px; max-width: 500px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px;">
+    <div style="padding: 24px; max-width: 520px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px;">
       <h3 style="margin-top:0; margin-bottom: 6px; font-size: 1.15rem; font-weight: 750;">📦 Reallocate Product: ${escapeHTML(prod.name)}</h3>
-      <p style="font-size: 12.5px; color: var(--text2,#78716c); margin: 0 0 16px 0;">Search and select the target parent ingredient and optional sub-type.</p>
+      <p style="font-size: 12.5px; color: var(--text2,#78716c); margin: 0 0 14px 0;">Search and select the target parent ingredient and optional sub-type.</p>
+
+      <!-- Banner for inline duplicate alerts -->
+      <div id="realloc-duplicate-banner" style="display:none; padding:10px 12px; background:#fee2e2; color:#ef4444; border:1px solid #fca5a5; border-radius:8px; font-weight:600; font-size:12px; margin-bottom:12px;"></div>
 
       <!-- 1. Searchable Core Ingredient Filter -->
       <div class="field" style="margin-bottom: 14px;">
-        <label style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">1. Target Core Ingredient</label>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+          <label style="font-weight: 600; font-size: 0.85rem;">1. Target Core Ingredient</label>
+          <button type="button" class="btn xs ghost" id="btn-toggle-create-ing" style="color:var(--primary,#4f46e5); font-weight:600; font-size:11.5px;">➕ Create New Ingredient</button>
+        </div>
+
+        <!-- Inline Create Ingredient Panel -->
+        <div id="realloc-create-ing-panel" style="display:none; padding:10px; background:var(--surface2,#f5f5f4); border:1px solid var(--border,#e7e5e4); border-radius:8px; margin-bottom:8px;">
+          <div style="font-weight:700; font-size:12px; margin-bottom:6px;">Create New Core Ingredient</div>
+          <div style="display:flex; gap:6px; margin-bottom:6px;">
+            <input type="text" id="new-core-ing-name" placeholder="Ingredient name..." style="flex:1; padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-size:12px;" />
+            <select id="new-core-ing-cat" style="padding:6px; border:1px solid var(--border); border-radius:6px; font-size:12px;">
+              <option value="Produce">Produce</option>
+              <option value="Grains">Grains</option>
+              <option value="Proteins">Proteins</option>
+              <option value="Dairy">Dairy</option>
+              <option value="Pantry">Pantry</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div style="display:flex; gap:6px; justify-content:flex-end;">
+            <button type="button" class="btn xs ghost" id="btn-cancel-create-ing">Cancel</button>
+            <button type="button" class="btn xs primary" id="btn-save-create-ing">Add Ingredient</button>
+          </div>
+        </div>
+
         <input type="text" id="realloc-ing-search" class="input" placeholder="🔍 Type core ingredient or category name..." style="width:100%; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px; box-sizing:border-box;" />
-        <div id="realloc-ing-results" style="margin-top:6px; max-height:160px; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:8px; background:var(--surface2,#f5f5f4); padding:4px;">
+        <div id="realloc-ing-results" style="margin-top:6px; max-height:140px; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:8px; background:var(--surface2,#f5f5f4); padding:4px;">
         </div>
       </div>
 
-      <!-- 2. Target Sub-type Dropdown -->
-      <div class="field" id="realloc-subtype-field" style="margin-bottom: 20px;">
-        <label style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">2. Target Sub-type (Optional)</label>
-        <select id="realloc-subtype-select" style="width:100%; padding:8px 10px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px; background:#fff;">
-        </select>
+      <!-- 2. Searchable Sub-type Filter -->
+      <div class="field" style="margin-bottom: 20px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+          <label style="font-weight: 600; font-size: 0.85rem;">2. Target Sub-type (Optional)</label>
+          <button type="button" class="btn xs ghost" id="btn-toggle-create-sub" style="color:var(--primary,#4f46e5); font-weight:600; font-size:11.5px;">➕ Create New Sub-type</button>
+        </div>
+
+        <!-- Inline Create Sub-type Panel -->
+        <div id="realloc-create-sub-panel" style="display:none; padding:10px; background:var(--surface2,#f5f5f4); border:1px solid var(--border,#e7e5e4); border-radius:8px; margin-bottom:8px;">
+          <div style="font-weight:700; font-size:12px; margin-bottom:6px;">Create Sub-type for Selected Ingredient</div>
+          <div style="display:flex; gap:6px; margin-bottom:6px;">
+            <input type="text" id="new-sub-name-input" placeholder="Sub-type name (e.g. Sourdough)..." style="flex:1; padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-size:12px;" />
+          </div>
+          <div style="display:flex; gap:6px; justify-content:flex-end;">
+            <button type="button" class="btn xs ghost" id="btn-cancel-create-sub">Cancel</button>
+            <button type="button" class="btn xs primary" id="btn-save-create-sub">Add Sub-type</button>
+          </div>
+        </div>
+
+        <input type="text" id="realloc-sub-search" class="input" placeholder="🔍 Filter sub-types..." style="width:100%; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px; box-sizing:border-box;" />
+        <div id="realloc-sub-results" style="margin-top:6px; max-height:120px; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:8px; background:var(--surface2,#f5f5f4); padding:4px;">
+        </div>
       </div>
 
       <div style="display:flex; gap:8px; justify-content: flex-end;">
@@ -916,18 +955,57 @@ window.promptReallocateProduct = (productId) => {
   `;
   showModal(html);
 
-  const searchInput = document.getElementById('realloc-ing-search');
-  const resultsContainer = document.getElementById('realloc-ing-results');
-  const subSelect = document.getElementById('realloc-subtype-select');
+  const ingSearch = document.getElementById('realloc-ing-search');
+  const ingResults = document.getElementById('realloc-ing-results');
+  const subSearch = document.getElementById('realloc-sub-search');
+  const subResults = document.getElementById('realloc-sub-results');
+  const dupBanner = document.getElementById('realloc-duplicate-banner');
 
-  const updateSubtypeDropdown = () => {
+  const showDuplicateWarning = (msg) => {
+    if (!dupBanner) return;
+    dupBanner.textContent = msg;
+    dupBanner.style.display = 'block';
+  };
+
+  const hideDuplicateWarning = () => {
+    if (!dupBanner) return;
+    dupBanner.style.display = 'none';
+  };
+
+  const renderSubtypeList = (query = '') => {
+    const q = String(query || '').trim().toLowerCase();
     const ing = currentIngs.find(i => String(i.id) === String(selectedIngId));
-    if (ing && Array.isArray(ing.subtypes) && ing.subtypes.length > 0) {
-      subSelect.innerHTML = `<option value="">None (Top-level ${escapeHTML(ing.name)})</option>` +
-        ing.subtypes.map(s => `<option value="${escapeHTML(s.id)}" ${String(s.id) === String(selectedSubId) ? 'selected' : ''}>${escapeHTML(s.name)}</option>`).join('');
-    } else {
-      subSelect.innerHTML = `<option value="">None (Top-level ${escapeHTML(ing ? ing.name : 'Ingredient')})</option>`;
-    }
+    const subtypes = (ing && Array.isArray(ing.subtypes)) ? ing.subtypes : [];
+
+    const filtered = subtypes.filter(s => {
+      if (!q) return true;
+      return (s.name || '').toLowerCase().includes(q);
+    });
+
+    const isTopLevelSelected = !selectedSubId;
+    let itemsHtml = `
+      <div class="realloc-sub-option" data-id="" style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; margin-bottom:2px; border-radius:6px; cursor:pointer; background:${isTopLevelSelected ? 'var(--primary,#4f46e5)' : '#fff'}; color:${isTopLevelSelected ? '#fff' : 'var(--text,#1c1917)'}; border:1px solid ${isTopLevelSelected ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'};">
+        <span style="font-size:12.5px; font-weight:650;">None (Top-level ${escapeHTML(ing ? ing.name : 'Ingredient')})</span>
+      </div>
+    `;
+
+    filtered.forEach(s => {
+      const isSelected = String(s.id) === String(selectedSubId);
+      itemsHtml += `
+        <div class="realloc-sub-option" data-id="${escapeHTML(s.id)}" style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; margin-bottom:2px; border-radius:6px; cursor:pointer; background:${isSelected ? 'var(--primary,#4f46e5)' : '#fff'}; color:${isSelected ? '#fff' : 'var(--text,#1c1917)'}; border:1px solid ${isSelected ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'};">
+          <span style="font-size:12.5px; font-weight:650;">${escapeHTML(s.name)}</span>
+        </div>
+      `;
+    });
+
+    subResults.innerHTML = itemsHtml;
+
+    subResults.querySelectorAll('.realloc-sub-option').forEach(el => {
+      el.onclick = () => {
+        selectedSubId = el.dataset.id || null;
+        renderSubtypeList(subSearch.value);
+      };
+    });
   };
 
   const renderIngredientList = (query = '') => {
@@ -940,11 +1018,11 @@ window.promptReallocateProduct = (productId) => {
     });
 
     if (!filtered.length) {
-      resultsContainer.innerHTML = `<div style="padding:10px; font-size:12px; color:var(--text3,#a8a29e); text-align:center;">No matching ingredients found.</div>`;
+      ingResults.innerHTML = `<div style="padding:10px; font-size:12px; color:var(--text3,#a8a29e); text-align:center;">No matching ingredients found.</div>`;
       return;
     }
 
-    resultsContainer.innerHTML = filtered.map(i => {
+    ingResults.innerHTML = filtered.map(i => {
       const isSelected = String(i.id) === String(selectedIngId);
       return `
         <div class="realloc-ing-option" data-id="${escapeHTML(i.id)}" style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; margin-bottom:2px; border-radius:6px; cursor:pointer; background:${isSelected ? 'var(--primary,#4f46e5)' : '#fff'}; color:${isSelected ? '#fff' : 'var(--text,#1c1917)'}; border:1px solid ${isSelected ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'};">
@@ -954,29 +1032,135 @@ window.promptReallocateProduct = (productId) => {
       `;
     }).join('');
 
-    resultsContainer.querySelectorAll('.realloc-ing-option').forEach(el => {
+    ingResults.querySelectorAll('.realloc-ing-option').forEach(el => {
       el.onclick = () => {
         selectedIngId = el.dataset.id;
         selectedSubId = null;
-        renderIngredientList(searchInput.value);
-        updateSubtypeDropdown();
+        renderIngredientList(ingSearch.value);
+        renderSubtypeList(subSearch.value);
       };
     });
   };
 
-  searchInput.oninput = () => renderIngredientList(searchInput.value);
+  ingSearch.oninput = () => renderIngredientList(ingSearch.value);
+  subSearch.oninput = () => renderSubtypeList(subSearch.value);
+
+  // Toggle inline creation panels
+  const createIngPanel = document.getElementById('realloc-create-ing-panel');
+  const createSubPanel = document.getElementById('realloc-create-sub-panel');
+
+  document.getElementById('btn-toggle-create-ing').onclick = () => {
+    hideDuplicateWarning();
+    createIngPanel.style.display = createIngPanel.style.display === 'none' ? 'block' : 'none';
+  };
+  document.getElementById('btn-cancel-create-ing').onclick = () => {
+    createIngPanel.style.display = 'none';
+  };
+
+  document.getElementById('btn-toggle-create-sub').onclick = () => {
+    hideDuplicateWarning();
+    createSubPanel.style.display = createSubPanel.style.display === 'none' ? 'block' : 'none';
+  };
+  document.getElementById('btn-cancel-create-sub').onclick = () => {
+    createSubPanel.style.display = 'none';
+  };
+
+  // Inline Create Ingredient Action with Duplicate Check
+  document.getElementById('btn-save-create-ing').onclick = async () => {
+    const nameInput = document.getElementById('new-core-ing-name');
+    const catInput = document.getElementById('new-core-ing-cat');
+    const newName = (nameInput ? nameInput.value : '').trim();
+    const newCat = (catInput ? catInput.value : 'General') || 'General';
+
+    if (!newName) return;
+
+    // Duplicate Check
+    const existing = currentIngs.find(i => (i.name || '').trim().toLowerCase() === newName.toLowerCase());
+    if (existing) {
+      showDuplicateWarning(`⚠️ An ingredient named "${existing.name}" already exists. Select it from the list above.`);
+      selectedIngId = existing.id;
+      selectedSubId = null;
+      renderIngredientList();
+      renderSubtypeList();
+      createIngPanel.style.display = 'none';
+      return;
+    }
+
+    hideDuplicateWarning();
+    const newIng = {
+      id: `ing_${Date.now()}`,
+      name: newName,
+      category: newCat,
+      aliases: [],
+      subtypes: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    currentIngs.push(newIng);
+    setIngredients([...currentIngs]);
+    selectedIngId = newIng.id;
+    selectedSubId = null;
+    createIngPanel.style.display = 'none';
+    if (nameInput) nameInput.value = '';
+
+    renderIngredientList();
+    renderSubtypeList();
+    if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+    await saveIngredient(newIng);
+  };
+
+  // Inline Create Sub-type Action with Duplicate Check
+  document.getElementById('btn-save-create-sub').onclick = async () => {
+    const subNameInput = document.getElementById('new-sub-name-input');
+    const newSubName = (subNameInput ? subNameInput.value : '').trim();
+    if (!newSubName || !selectedIngId) return;
+
+    const ing = currentIngs.find(i => String(i.id) === String(selectedIngId));
+    if (!ing) return;
+    if (!Array.isArray(ing.subtypes)) ing.subtypes = [];
+
+    // Duplicate Check
+    const existingSub = ing.subtypes.find(s => (s.name || '').trim().toLowerCase() === newSubName.toLowerCase());
+    if (existingSub) {
+      showDuplicateWarning(`⚠️ A sub-type named "${existingSub.name}" already exists for ${ing.name}. Select it from the list above.`);
+      selectedSubId = existingSub.id;
+      renderSubtypeList();
+      createSubPanel.style.display = 'none';
+      return;
+    }
+
+    hideDuplicateWarning();
+    const newSub = {
+      id: `sub_${Date.now()}`,
+      name: newSubName,
+      aliases: [],
+      createdAt: new Date().toISOString()
+    };
+
+    ing.subtypes.push(newSub);
+    ing.updatedAt = new Date().toISOString();
+    setIngredients([...currentIngs]);
+    selectedSubId = newSub.id;
+    createSubPanel.style.display = 'none';
+    if (subNameInput) subNameInput.value = '';
+
+    renderSubtypeList();
+    if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+    await saveIngredient(ing);
+  };
 
   // Initial render
   const initialIng = currentIngs.find(i => String(i.id) === String(selectedIngId));
   if (initialIng) {
-    searchInput.placeholder = `Current: ${initialIng.name} (type to search...)`;
+    ingSearch.placeholder = `Current: ${initialIng.name} (type to search...)`;
   }
   renderIngredientList();
-  updateSubtypeDropdown();
+  renderSubtypeList();
 
   document.getElementById('btn-confirm-realloc').onclick = async () => {
     if (!selectedIngId) return;
-    const subtypeId = subSelect.value || null;
+    const subtypeId = selectedSubId || null;
     const ing = currentIngs.find(i => String(i.id) === String(selectedIngId));
     if (!ing) return;
     closeModal();

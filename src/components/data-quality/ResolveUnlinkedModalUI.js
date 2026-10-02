@@ -72,7 +72,7 @@ export function openResolveUnlinkedModal(targetId, targetType = 'ingredient', pa
   modal.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;backdrop-filter:blur(8px);overflow-y:auto;padding:16px;';
 
   modal.innerHTML = `
-    <div class="card" style="width:100%;max-width:580px;padding:24px;border-radius:14px;background:var(--surface,#fff);box-shadow:0 12px 36px rgba(0,0,0,0.25);position:relative;max-height:90vh;overflow-y:auto;box-sizing:border-box">
+    <div style="width:100%;max-width:580px;max-height:80vh;overflow-y:auto;padding:20px 20px 28px 20px;box-sizing:border-box;background:var(--system-grouped-bg,#f2f2f7);border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,0.25);position:relative">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px">
         <div>
           <h2 style="font-size:18px;font-weight:750;margin:0;color:var(--text,#1c1917)">Resolve Unlinked Item</h2>
@@ -87,9 +87,9 @@ export function openResolveUnlinkedModal(targetId, targetType = 'ingredient', pa
         This catalog item has zero linked products in your Product Bank. Choose one of the resolution paths below to attach grocery items:
       </p>
 
-      <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;flex-direction:column;gap:0">
         <!-- Path 1: Link Existing Product -->
-        <div style="background:var(--card-bg,#ffffff);border:1px solid var(--border-color,#e5e7eb);border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+        <div style="background:#ffffff;border-radius:14px;padding:16px;border:1px solid var(--border-color,#e5e7eb);box-shadow:0 1px 3px rgba(0,0,0,0.04);margin-bottom:16px">
           <div style="font-weight:750;font-size:13.5px;margin-bottom:4px;color:var(--text,#1c1917)">🔗 1. Link Existing Product</div>
           <div style="font-size:12px;color:var(--text2,#78716c);margin-bottom:10px">
             Search your Product Bank and re-bind an existing product to this item.
@@ -99,7 +99,7 @@ export function openResolveUnlinkedModal(targetId, targetType = 'ingredient', pa
         </div>
 
         <!-- Path 2: Import from Tesco -->
-        <div style="background:var(--card-bg,#ffffff);border:1px solid var(--border-color,#e5e7eb);border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+        <div style="background:#ffffff;border-radius:14px;padding:16px;border:1px solid var(--border-color,#e5e7eb);box-shadow:0 1px 3px rgba(0,0,0,0.04);margin-bottom:16px">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
             <div style="font-weight:750;font-size:13.5px;color:var(--text,#1c1917)">🛒 2. Import from Tesco</div>
           </div>
@@ -120,7 +120,7 @@ export function openResolveUnlinkedModal(targetId, targetType = 'ingredient', pa
         </div>
 
         <!-- Path 3: Create New Product -->
-        <div style="background:var(--card-bg,#ffffff);border:1px solid var(--border-color,#e5e7eb);border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);cursor:pointer;transition:border-color 0.15s ease" onclick="submitResolveNewProduct()" onmouseover="this.style.borderColor='var(--primary,#4f46e5)'" onmouseout="this.style.borderColor='var(--border-color,#e5e7eb)'">
+        <div style="background:#ffffff;border-radius:14px;padding:16px;border:1px solid var(--border-color,#e5e7eb);box-shadow:0 1px 3px rgba(0,0,0,0.04);margin-bottom:0;cursor:pointer;transition:border-color 0.15s ease" onclick="submitResolveNewProduct()" onmouseover="this.style.borderColor='var(--primary,#4f46e5)'" onmouseout="this.style.borderColor='var(--border-color,#e5e7eb)'">
           <div style="font-weight:750;font-size:13.5px;margin-bottom:4px;color:var(--text,#1c1917);display:flex;align-items:center;justify-content:space-between">
             <span>✨ 3. Create New Product</span>
             <span class="btn sm ghost" style="pointer-events:none;font-size:11.5px">Open Blank Form &rarr;</span>
