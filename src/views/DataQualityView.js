@@ -1,5 +1,5 @@
 /**
- * src/views/DataQualityView.js (v3.19.44)
+ * src/views/DataQualityView.js (v3.19.45)
  * Modular ES6 View for Data Quality Centre, audit scanner results, and 3-path resolutions.
  */
 
@@ -49,16 +49,43 @@ export async function dismissAdvisory(issueKey) {
   }
 }
 
-export function handleFixIssue(e, entityType, entityId, issueKey, parentId = null) {
+export function handleFixIssue(e, entityType, entityId, issueKey = '', parentId = null) {
   if (e && typeof e.preventDefault === 'function') {
     e.preventDefault();
   }
+  if (e && typeof e.stopPropagation === 'function') {
+    e.stopPropagation();
+  }
+
+  const state = getState() || {};
+
   if (entityType === 'subtype') {
-    openResolveUnlinkedModal(entityId, 'subtype', parentId);
+    const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
+    const sub = parent?.subtypes?.find(s => String(s.id) === String(entityId));
+    const item = {
+      id: entityId,
+      entityId,
+      type: 'subtype',
+      entityType: 'subtype',
+      parentId: parentId,
+      parentIngredientId: parentId,
+      name: sub ? `${parent ? parent.name : 'Ingredient'} ➔ ${sub.name}` : (entityId || 'Sub-type'),
+      gapKey: issueKey
+    };
+    openResolveUnlinkedModal(item, 'subtype', parentId);
   } else if (entityType === 'ingredient') {
     // If it is unlinked, open unlinked modal
-    if (issueKey.startsWith('gap:ingredient')) {
-      openResolveUnlinkedModal(entityId, 'ingredient');
+    if (!issueKey || issueKey.startsWith('gap:ingredient')) {
+      const ing = (state.ingredients || []).find(i => String(i.id) === String(entityId));
+      const item = {
+        id: entityId,
+        entityId,
+        type: 'ingredient',
+        entityType: 'ingredient',
+        name: ing ? ing.name : (entityId || 'Ingredient'),
+        gapKey: issueKey
+      };
+      openResolveUnlinkedModal(item, 'ingredient');
     } else {
       // Direct mapping modal or edit ingredient properties
       if (typeof window.openIngredientFamilyDetailsModal === 'function') {
@@ -94,7 +121,12 @@ export function renderDataQualityView() {
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
           ${dismissible ? `<button type="button" class="btn sm ghost" onclick="dismissAdvisory('${escapeAttr(issue.key)}')">Looks right</button>` : ''}
-          <button type="button" class="btn sm primary dq-fix-btn" onclick="${fixAction}">Fix</button>
+          <button type="button" class="btn sm primary dq-fix-btn" 
+            data-entity-type="${escapeAttr(issue.entityType)}" 
+            data-entity-id="${escapeAttr(issue.entityId)}" 
+            data-issue-key="${escapeAttr(issue.key)}" 
+            data-parent-id="${escapeAttr(issue.parentIngredientId || '')}" 
+            onclick="${fixAction}">Fix</button>
         </div>
       </div>
     `;
@@ -199,10 +231,28 @@ export function mount(container) {
   renderDataQualityView();
 }
 
+// Global window registration and event delegation fallback
 if (typeof window !== 'undefined') {
   window.renderDataQualityView = renderDataQualityView;
   window.renderDataQuality = renderDataQualityView;
   window.dismissAdvisory = dismissAdvisory;
   window.handleFixIssue = handleFixIssue;
   window.updateDataQualityBadge = updateDataQualityBadge;
+
+  // Event Delegation Fallback
+  if (typeof document !== 'undefined' && !window.__dq_fix_delegation_bound) {
+    window.__dq_fix_delegation_bound = true;
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.dq-fix-btn');
+      if (btn && typeof window.handleFixIssue === 'function') {
+        const entityType = btn.getAttribute('data-entity-type');
+        const entityId = btn.getAttribute('data-entity-id');
+        const issueKey = btn.getAttribute('data-issue-key') || '';
+        const parentId = btn.getAttribute('data-parent-id') || null;
+        if (entityType && entityId) {
+          window.handleFixIssue(e, entityType, entityId, issueKey, parentId);
+        }
+      }
+    });
+  }
 }

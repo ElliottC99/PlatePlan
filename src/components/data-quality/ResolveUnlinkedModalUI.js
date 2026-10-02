@@ -1,5 +1,5 @@
 /**
- * src/components/data-quality/ResolveUnlinkedModalUI.js (v3.19.44)
+ * src/components/data-quality/ResolveUnlinkedModalUI.js (v3.19.45)
  * Clean 3-Path Resolution Modal UI component for unlinked ingredients/sub-types.
  * Supports linking existing products, parsing Tesco Bookmarklet JSON, and starting blank creations.
  */
@@ -41,24 +41,34 @@ export function closeResolveUnlinkedModal() {
   activeParentIngredientId = null;
 }
 
-export function openResolveUnlinkedModal(targetId, targetType = 'ingredient', parentIngredientId = null) {
+export function openResolveUnlinkedModal(target, targetType = 'ingredient', parentIngredientId = null) {
+  let targetId = target;
+  let type = targetType;
+  let parentId = parentIngredientId;
+
+  if (target && typeof target === 'object') {
+    targetId = target.id || target.entityId || target.targetId;
+    type = target.type || target.entityType || target.targetType || 'ingredient';
+    parentId = target.parentId || target.parentIngredientId || null;
+  }
+
   activeTargetId = targetId;
-  activeTargetType = targetType;
-  activeParentIngredientId = parentIngredientId;
+  activeTargetType = type;
+  activeParentIngredientId = parentId;
 
   const state = getState() || {};
-  let targetName = 'Unnamed Item';
+  let targetName = (target && typeof target === 'object' && target.name) ? target.name : 'Unnamed Item';
   let searchTerm = '';
 
-  if (targetType === 'subtype') {
-    const parent = (state.ingredients || []).find(i => String(i.id) === String(parentIngredientId));
+  if (type === 'subtype') {
+    const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
     const sub = parent?.subtypes?.find(s => String(s.id) === String(targetId));
-    targetName = sub ? `${parent.name} ➔ ${sub.name}` : (targetId || 'Sub-type');
+    targetName = sub ? `${parent.name} ➔ ${sub.name}` : (target.name || targetId || 'Sub-type');
     searchTerm = sub ? sub.name : (parent ? parent.name : 'grocery');
   } else {
     const ing = (state.ingredients || []).find(i => String(i.id) === String(targetId));
-    targetName = ing ? ing.name : (targetId || 'Ingredient');
-    searchTerm = ing ? ing.name : 'grocery';
+    targetName = ing ? ing.name : (target.name || targetId || 'Ingredient');
+    searchTerm = ing ? ing.name : (target.name || 'grocery');
   }
 
   const tescoSearchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(searchTerm)}`;
