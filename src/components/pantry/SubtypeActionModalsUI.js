@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/SubtypeActionModalsUI.js (v3.19.39)
+ * src/components/pantry/SubtypeActionModalsUI.js (v3.19.40)
  * Standardized custom styled dialogs and workflows for nested sub-types.
  * Eliminates all prompt(), alert(), and confirm() browser chrome calls.
  */
@@ -53,11 +53,14 @@ export function openEditSubtypeModal(subtypeId, parentId) {
 
       <div style="margin-bottom: 20px;">
         <h4 style="font-size: 0.85rem; font-weight: 750; margin: 0 0 8px 0;">Linked Products (${linkedProds.length})</h4>
-        <div style="display:flex; flex-direction:column; gap:6px; max-height:120px; overflow-y:auto; background:var(--surface2,#f5f5f4); padding:8px; border-radius:8px;">
+        <div style="display:flex; flex-direction:column; gap:6px; max-height:140px; overflow-y:auto; background:var(--surface2,#f5f5f4); padding:8px; border-radius:8px;">
           ${linkedProds.map(p => `
             <div style="font-size:12px; display:flex; justify-content:space-between; align-items:center; background:#fff; padding:6px 10px; border-radius:6px; border:1px solid var(--border,#e7e5e4)">
-              <span>${escapeHTML(p.name)}</span>
-              ${p.isAutoDefault ? '<span style="color:var(--green); font-weight:700; font-size:10px;">⭐ Default</span>' : ''}
+              <div>
+                <span style="font-weight:600;">${escapeHTML(p.name)}</span>
+                ${p.brand ? `<span style="color:var(--text2,#78716c); font-size:11px;"> (${escapeHTML(p.brand)})</span>` : ''}
+              </div>
+              <button type="button" class="btn xs ghost" onclick="window.handleUnlinkProductFromSubtype('${escapeHTML(p.id)}', '${escapeHTML(subtypeId)}', '${escapeHTML(parentId)}')" style="color:var(--red,#ef4444); font-weight:bold;" title="Unlink product">&times; Unlink</button>
             </div>
           `).join('') || '<div style="font-size:12px; color:var(--text2); text-align:center; padding:10px 0;">No products linked yet.</div>'}
         </div>
@@ -71,6 +74,21 @@ export function openEditSubtypeModal(subtypeId, parentId) {
   `;
 
   showModal(html);
+
+  window.handleUnlinkProductFromSubtype = async (prodId, subId, pId) => {
+    const prods = [...(state.products || [])];
+    const prod = prods.find(p => String(p.id) === String(prodId));
+    if (prod) {
+      prod.subtypeId = null;
+      prod.isAutoDefault = false;
+      prod.updatedAt = new Date().toISOString();
+      setProducts(prods);
+      openEditSubtypeModal(subId, pId);
+      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+      if (typeof window.renderProductBank === 'function') window.renderProductBank();
+      await saveProduct(prod);
+    }
+  };
 
   document.getElementById('save-edit-sub-btn').onclick = async () => {
     const newName = document.getElementById('edit-sub-name').value.trim();
@@ -86,7 +104,7 @@ export function openEditSubtypeModal(subtypeId, parentId) {
   };
 }
 
-// 2. LINK PRODUCT SELECTOR MODAL
+// 2. LINK PRODUCT SELECTOR MODAL (Sub-type Row Menu Route)
 export function openSubtypeLinkSelectionModal(subtypeId, parentId) {
   const state = getState() || {};
   const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
@@ -272,6 +290,7 @@ export function openSubtypeExistingProductPickerModal(subtypeId, parentId) {
 export function openTescoImportModal(subtypeId, parentId) {
   const state = getState() || {};
   const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
+  const parentCategory = parent?.category || 'General';
   const subName = subtypeId 
     ? parent?.subtypes?.find(s => String(s.id) === String(subtypeId))?.name 
     : (window.__draftSubtypePayload?.name || parent?.name || 'Item');
@@ -340,6 +359,11 @@ export function openTescoImportModal(subtypeId, parentId) {
       return;
     }
 
+    // Auto-fill category from parent ingredient
+    if (parsed) {
+      parsed.category = parentCategory;
+    }
+
     // Successful parse!
     closeModal();
 
@@ -347,6 +371,7 @@ export function openTescoImportModal(subtypeId, parentId) {
       ingredientId: parentId,
       subtypeId: subtypeId || null,
       subtypeDraftName: window.__draftSubtypePayload?.name || null,
+      parentCategory: parentCategory,
       tescoImportData: parsed
     };
 
@@ -385,7 +410,7 @@ export function openSubtypeReorganizeModal(subtypeId, parentId) {
 
       <!-- Option B: Move Parent -->
       <div style="padding: 12px; border: 1px solid var(--border,#e7e5e4); border-radius: 8px; margin-bottom: 12px; background: #fafaf9;">
-        <div style="font-weight: 750; font-size: 13px; margin-bottom: 6px;">📦 Option B: Move to another Parent Ingredient</div>
+        <div style="font-weight: 750; font-size: 13px; margin-bottom: 6px;">📦 Option B: Move to another Parent Core Ingredient</div>
         <div style="display:flex; gap:8px;">
           <select id="reorg-move-select" style="flex:1; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:12px;">
             ${targetParents.map(p => `<option value="${escapeHTML(p.id)}">${escapeHTML(p.name)} (${escapeHTML(p.category || 'Other')})</option>`).join('')}
@@ -396,7 +421,7 @@ export function openSubtypeReorganizeModal(subtypeId, parentId) {
 
       <!-- Option C: Merge Sibling -->
       <div style="padding: 12px; border: 1px solid var(--border,#e7e5e4); border-radius: 8px; margin-bottom: 20px; background: #fafaf9;">
-        <div style="font-weight: 750; font-size: 13px; margin-bottom: 6px;">🔀 Option C: Merge with another Sub-type sibling</div>
+        <div style="font-weight: 750; font-size: 13px; margin-bottom: 6px;">🔀 Option C: Merge into another Sub-type sibling</div>
         <div style="display:flex; gap:8px;">
           <select id="reorg-merge-select" style="flex:1; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:12px;" ${siblingSubtypes.length === 0 ? 'disabled' : ''}>
             ${siblingSubtypes.map(s => `<option value="${escapeHTML(s.id)}">${escapeHTML(s.name)}</option>`).join('') || '<option>No siblings available</option>'}
@@ -451,12 +476,25 @@ export function openSubtypeReorganizeModal(subtypeId, parentId) {
       if (sub.name) targetAliases.add(sub.name);
       if (Array.isArray(sub.aliases)) sub.aliases.forEach(a => targetAliases.add(a));
       target.aliases = Array.from(targetAliases);
+
       parent.subtypes = parent.subtypes.filter(s => String(s.id) !== String(subtypeId));
       parent.updatedAt = new Date().toISOString();
-      const prods = [...(state.products || [])].map(p => (String(p.subtypeId) === String(subtypeId)) ? { ...p, subtypeId: target.id, updatedAt: new Date().toISOString() } : p);
-      setIngredients(currentIngs); setProducts(prods);
+
+      const prods = [...(state.products || [])].map(p => {
+        if (String(p.subtypeId) === String(subtypeId)) {
+          return { ...p, subtypeId: target.id, updatedAt: new Date().toISOString() };
+        }
+        return p;
+      });
+
+      setIngredients([...state.ingredients]);
+      setProducts(prods);
       if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-      await Promise.all([saveIngredient(parent), ...prods.filter(p => String(p.subtypeId) === String(target.id)).map(p => saveProduct(p))]);
+      if (typeof window.renderProductBank === 'function') window.renderProductBank();
+      await Promise.all([
+        saveIngredient(parent),
+        ...prods.filter(p => String(p.subtypeId) === String(target.id)).map(p => saveProduct(p))
+      ]);
     }
   };
 }
@@ -533,7 +571,7 @@ export function openSubtypeDeleteModal(subtypeId, parentId) {
       <div style="font-size: 40px; margin-bottom: 12px;">⚠️</div>
       <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750; color: var(--red,#ef4444)">Delete Sub-type?</h3>
       <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 24px 0; line-height: 1.5;">
-        Are you sure you want to delete <strong>"${escapeHTML(sub.name)}"</strong>? <br />This action cannot be undone and will detach any associated product templates.
+        Are you sure you want to delete <strong>"${escapeHTML(sub.name)}"</strong>? <br /><span style="font-size:12px; color:var(--text2);">Linked products will remain in your Product Bank but will be unlinked.</span>
       </p>
 
       <div style="display:flex; gap:8px; justify-content: center;">
@@ -547,11 +585,31 @@ export function openSubtypeDeleteModal(subtypeId, parentId) {
 
   document.getElementById('btn-confirm-sub-delete').onclick = async () => {
     closeModal();
+
     parent.subtypes = parent.subtypes.filter(s => String(s.id) !== String(subtypeId));
     parent.updatedAt = new Date().toISOString();
+
+    const prods = [...(state.products || [])];
+    const unlinkedProds = [];
+    prods.forEach(p => {
+      if (String(p.subtypeId) === String(subtypeId)) {
+        p.subtypeId = null;
+        p.isAutoDefault = false;
+        p.updatedAt = new Date().toISOString();
+        unlinkedProds.push(p);
+      }
+    });
+
     setIngredients([...state.ingredients]);
+    setProducts(prods);
+
     if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-    await saveIngredient(parent);
+    if (typeof window.renderProductBank === 'function') window.renderProductBank();
+
+    await Promise.all([
+      saveIngredient(parent),
+      ...unlinkedProds.map(p => saveProduct(p))
+    ]);
   };
 }
 

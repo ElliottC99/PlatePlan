@@ -1,5 +1,5 @@
 /**
- * src/views/ProductBankView.js (v3.19.39)
+ * src/views/ProductBankView.js (v3.19.40)
  * Modular ES6 View for Product Bank.
  * Displays nutritional pills (P, C, F, Kcal), P/£ efficiency, Tesco links, and Reallocation modal.
  */
@@ -54,6 +54,7 @@ export function openProductEditModal(productId = null) {
   if (!prod && tescoData) {
     setVal('mi-name', tescoData.title || tescoData.name || binding.subtypeDraftName || '');
     setVal('mi-brand', tescoData.brand || 'Tesco');
+    setVal('mi-cat-search', tescoData.category || binding.parentCategory || 'General');
     setVal('mi-price', tescoData.price || '');
     setVal('mi-pack', tescoData.pack || tescoData.size || '');
     setVal('mi-pack-unit', tescoData.packUnit || tescoData.unit || 'g');

@@ -1,5 +1,5 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.19.39';
+  window.APP_VERSION = 'v3.19.40';
   window.createIngredientGroupPrompt = () => {
     import('./components/pantry/CategoryManagerModalUI.js')
       .then(m => {
@@ -291,7 +291,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const badgeEl = document.getElementById('app-header-version') || document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (badgeEl) {
-    badgeEl.textContent = 'v3.19.39';
+    badgeEl.textContent = 'v3.19.40';
   }
 }
 

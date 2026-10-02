@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/IngredientFamilyModalUI.js (v3.19.39)
+ * src/components/pantry/IngredientFamilyModalUI.js (v3.19.40)
  * Encapsulates presentation, labeling, and real-time Tesco helper search integrations for the Ingredient Family modal.
  */
 
@@ -110,20 +110,23 @@ if (typeof window !== 'undefined') {
       window.closeIngredientFamilyDetailsModal();
     }
 
-    // Launch product linker selector or form pre-bound with draft context
+    // Launch direct product path pre-bound with draft context
+    const editingSubtypeId = wrapEl.dataset.editingIngredientId || null;
+    const parentId = wrapEl.dataset.parentId;
+
     setTimeout(() => {
       if (actionType === 'manual') {
-        window.__prefilledResolveBinding = { parentId: window.__draftSubtypePayload.parentId, subtypeDraftName: window.__draftSubtypePayload.name };
+        window.__prefilledResolveBinding = { parentId, subtypeId: editingSubtypeId, subtypeDraftName: window.__draftSubtypePayload.name };
         if (typeof window.openProductEditModal === 'function') {
           window.openProductEditModal(null);
         }
       } else if (actionType === 'link') {
-        if (typeof window.openSubtypeLinkSelectionModal === 'function') {
-          window.openSubtypeLinkSelectionModal(null, window.__draftSubtypePayload.parentId);
+        if (typeof window.openSubtypeExistingProductPickerModal === 'function') {
+          window.openSubtypeExistingProductPickerModal(editingSubtypeId, parentId);
         }
       } else if (actionType === 'tesco') {
-        if (typeof window.openTescoBookmarkletInstructionsModal === 'function') {
-          window.openTescoBookmarkletInstructionsModal();
+        if (typeof window.openTescoImportModal === 'function') {
+          window.openTescoImportModal(editingSubtypeId, parentId);
         }
       }
     }, 150);
