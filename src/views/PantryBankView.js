@@ -1,5 +1,5 @@
 /**
- * src/views/PantryBankView.js (v3.19.33)
+ * src/views/PantryBankView.js (v3.19.34)
  * Modular ES6 View for Category ➔ Ingredient ➔ Sub-type Hierarchy Bank.
  * Features Aliasing, Merging, Sub-type creation, Promoting/demoting, and Auto-default product previews.
  * Fully responsive and optimized to remain under 350 lines.
@@ -24,16 +24,14 @@ const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
 
 export function resetCategoryFilter() {
-  selectedCategoryFilter = null;
-  activeCategoryFilter = null;
-  const searchInput = typeof document !== 'undefined' ? document.getElementById('ingredient-group-search') : null;
-  if (searchInput) searchInput.value = '';
+  selectedCategoryFilter = activeCategoryFilter = null;
+  const input = typeof document !== 'undefined' ? document.getElementById('ingredient-group-search') : null;
+  if (input) input.value = '';
   invalidateHierarchyCache();
 }
 
 export function setActiveCategoryFilter(cat) {
-  selectedCategoryFilter = (cat && cat !== 'all') ? cat : null;
-  activeCategoryFilter = selectedCategoryFilter;
+  selectedCategoryFilter = activeCategoryFilter = (cat && cat !== 'all') ? cat : null;
   renderIngredientBank();
 }
 
@@ -94,9 +92,13 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
   const msgEl = document.getElementById('ingredient-family-details-msg');
 
   if (titleEl) {
-    if (ing) titleEl.textContent = `Edit ingredient: ${ing.name}`;
-    else if (parent) titleEl.textContent = `Add Sub-type to ${parent.name}`;
-    else titleEl.textContent = 'New Ingredient';
+    if (ing) {
+      titleEl.textContent = `Edit ${ing.name}`;
+    } else if (parent) {
+      titleEl.textContent = `Add Sub-type to ${parent.name}`;
+    } else {
+      titleEl.textContent = 'New Ingredient';
+    }
   }
   if (nameEl) nameEl.value = ing?.name || '';
   if (notesEl) notesEl.value = ing?.notes || '';
@@ -106,6 +108,8 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
     const selectedCat = (ing?.category || parent?.category || '').toLowerCase();
     catEl.innerHTML = categories.map(c => `<option value="${escapeAttr(c.toLowerCase())}" ${selectedCat === c.toLowerCase() ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
     catEl.disabled = Boolean(parent && !ing);
+    const targetCat = ing?.category || parent?.category || '';
+    if (targetCat) catEl.value = targetCat;
   }
 
   if (msgEl && ing) {
@@ -141,9 +145,7 @@ export async function saveIngredientFamilyDetailsModal() {
 
   if (parentId && !activeEditingIngredientId) {
     await addSubtypeToIngredient(parentId, name, notes);
-    closeIngredientFamilyDetailsModal();
-    renderIngredientBank();
-    return;
+    closeIngredientFamilyDetailsModal(); renderIngredientBank(); return;
   }
 
   const state = getState() || {}, currentIngs = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
@@ -155,17 +157,14 @@ export async function saveIngredientFamilyDetailsModal() {
   const existingIdx = currentIngs.findIndex(i => String(i.id) === String(updatedIng.id));
   if (existingIdx >= 0) currentIngs[existingIdx] = updatedIng; else currentIngs.push(updatedIng);
 
-  setIngredients(currentIngs);
-  closeIngredientFamilyDetailsModal();
-  renderIngredientBank();
+  setIngredients(currentIngs); closeIngredientFamilyDetailsModal(); renderIngredientBank();
 
   try { await saveIngredient(updatedIng); } catch (e) { console.warn('[PantryBankView] Sync error:', e); }
 }
 
 export async function handleSetDefaultProduct(prodId, ingId, subtypeId = null) {
   await setAutoDefaultProduct(prodId, ingId, subtypeId);
-  renderIngredientBank();
-  openIngredientFamilyDetailsModal(ingId);
+  renderIngredientBank(); openIngredientFamilyDetailsModal(ingId);
 }
 
 export async function promptAddAlias(ingId) {
@@ -294,7 +293,7 @@ export function renderIngredientBank() {
 
                 <div style="display:flex;align-items:center;gap:6px;position:relative">
                   <button type="button" class="btn xs ghost" onclick="openIngredientFamilyDetailsModal('${escapeAttr(ing.id)}')" title="Edit properties">Edit</button>
-                  <button type="button" class="btn xs ghost subtype-toggle-btn" onclick="openIngredientFamilyDetailsModal(null, '${escapeAttr(ing.id)}')" title="Add child sub-type">+ Sub-type</button>
+                  <button type="button" class="btn xs ghost subtype-toggle-btn" onclick="openAddSubtypeModal('${escapeAttr(ing.id)}')" title="Add child sub-type">+ Sub-type</button>
                   <div style="position:relative;display:inline-block">
                     <button type="button" class="btn xs ghost" onclick="toggleCardMoreMenu(this, '${escapeAttr(ing.id)}')" title="More actions" style="padding:2px 6px;font-weight:700">•••</button>
                     <div id="card-more-menu-${escapeAttr(ing.id)}" class="card-more-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:8px;box-shadow:0 6px 16px rgba(0,0,0,0.08);z-index:100;min-width:130px;flex-direction:column;padding:4px">
@@ -343,28 +342,31 @@ let isSubscribed = false;
 export function initBankSubscriptions() {
   if (isSubscribed) return;
   isSubscribed = true;
-  subscribe('ingredients', () => renderIngredientBank());
-  subscribe('products', () => { renderIngredientBank(); renderProductBank(); });
+  const update = () => { renderIngredientBank(); renderProductBank(); };
+  subscribe('ingredients', update); subscribe('products', update);
   if (typeof document !== 'undefined') {
-    document.addEventListener('plateplan:state:ingredients', () => renderIngredientBank());
-    document.addEventListener('plateplan:state:products', () => { renderIngredientBank(); renderProductBank(); });
+    document.addEventListener('plateplan:state:ingredients', update);
+    document.addEventListener('plateplan:state:products', update);
   }
 }
 
 export function mount(container) {
-  initBankSubscriptions();
-  renderIngredientBank();
-  renderProductBank();
+  initBankSubscriptions(); renderIngredientBank(); renderProductBank();
 }
 
 export const renderPantryBankView = renderIngredientBank;
 export { renderProductBank, openProductEditModal };
+
+export function openAddSubtypeModal(parentId) {
+  openIngredientFamilyDetailsModal(null, parentId);
+}
 
 export function openCategoryManager() { renderCategoryManagerModal(); }
 
 if (typeof window !== 'undefined') {
   Object.assign(window, {
     renderIngredientBank, renderPantryBankView, openIngredientFamilyDetailsModal, closeIngredientFamilyDetailsModal,
+    openAddSubtypeModal,
     saveIngredientFamilyDetailsModal, handleSetDefaultProduct, promptAddAlias, promptRemoveAlias,
     promptAddSubtype, promptMerge, promptDemote, handlePromoteSubtype, handleDeleteIngredient,
     openCategoryManager, openCategoryManagerModal: openCategoryManager,
@@ -375,8 +377,7 @@ if (typeof window !== 'undefined') {
       const container = document.getElementById(`subtypes-container-${ingId}`);
       if (!container) return;
       const isCollapsed = container.style.display === 'none';
-      container.style.display = isCollapsed ? 'flex' : 'none';
-      container.classList.toggle('is-expanded', isCollapsed);
+      container.style.display = isCollapsed ? 'flex' : 'none'; container.classList.toggle('is-expanded', isCollapsed);
       btn.textContent = `${isCollapsed ? '▲' : '▼'} SUB-TYPES (${container.children.length})`;
     },
     toggleCardMoreMenu(btn, ingId) {
