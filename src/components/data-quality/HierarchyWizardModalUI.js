@@ -1,11 +1,11 @@
 /**
- * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.52)
+ * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.54)
  * Core Hierarchy Alignment Wizard with Auto Sub-Type Provisioning.
- * Step-by-step queue & single-batch bulk provisioning for orphan items.
+ * Includes interactive restructuring actions (rename, convert to sub-type) and 3 fix paths.
  */
 
 import { getState, setIngredients } from '../../store/store.js';
-import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
+import { saveIngredient, deleteIngredient, saveProduct } from '../../services/HouseholdRepository.js';
 import { safeGetProducts, commitProductUpdates } from './ResolveUnlinkedModalUI.js';
 import { parseTescoProduct } from '../../services/TescoImportService.js';
 
@@ -61,7 +61,7 @@ export async function ensureDefaultSubtype(ingredientId) {
     if (typeof setIngredients === 'function') setIngredients(ingredients);
     if (window.Store?.setState) window.Store.setState({ ingredients });
     if (window.state) window.state.ingredients = ingredients;
-    try { await saveIngredient(ing); } catch (e) {}
+    try { await (window.PantryRepository?.saveIngredient ? window.PantryRepository.saveIngredient(ing) : saveIngredient(ing)); } catch (e) {}
     document.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: ingredients }));
     return newSub;
   }
@@ -80,7 +80,73 @@ async function resolveContext() {
   return { currentItem, parentId, subtypeId };
 }
 
-export async function resolveStepWithExistingProduct(productId) {
+export async function handleWizardRenameIngredient(ingredientId) {
+  const state = (window.Store && typeof window.Store.getState === 'function') ? window.Store.getState() : (getState() || {});
+  const currentIng = (state.ingredients || []).find(i => String(i.id) === String(ingredientId));
+  if (!currentIng) return;
+
+  const newName = prompt('Enter new simplified name for this Core Ingredient:', currentIng.name);
+  if (!newName || !newName.trim() || newName.trim() === currentIng.name) return;
+
+  const updatedIng = { ...currentIng, name: newName.trim(), updatedAt: new Date().toISOString() };
+  if (window.PantryRepository?.saveIngredient) await window.PantryRepository.saveIngredient(updatedIng);
+  else await saveIngredient(updatedIng);
+
+  const ings = (state.ingredients || []).map(i => String(i.id) === String(ingredientId) ? updatedIng : i);
+  if (typeof setIngredients === 'function') setIngredients(ings);
+  if (window.Store?.setState) window.Store.setState({ ingredients: ings });
+
+  if (wizardQueue[currentIndex]) wizardQueue[currentIndex].name = updatedIng.name;
+  refreshHierarchyWizardStep();
+}
+
+export async function handleWizardConvertToSubtype(ingredientId) {
+  const state = (window.Store && typeof window.Store.getState === 'function') ? window.Store.getState() : (getState() || {});
+  const allIngredients = state.ingredients || [];
+  const currentIng = allIngredients.find(i => String(i.id) === String(ingredientId));
+  if (!currentIng) return;
+
+  const parentCandidates = allIngredients.filter(i => String(i.id) !== String(ingredientId));
+  const optionsList = parentCandidates.map(i => `${i.name} (ID: ${i.id})`).join('\n');
+  const targetName = prompt(`Convert "${currentIng.name}" into a Sub-type under which Parent Core Ingredient?\n\nAvailable Parent Ingredients:\n${optionsList}`);
+  if (!targetName) return;
+
+  const targetParent = parentCandidates.find(i => i.name.toLowerCase() === targetName.trim().toLowerCase());
+  if (!targetParent) { alert(`Parent ingredient "${targetName}" not found. Check spelling or create it first.`); return; }
+
+  const newSubtype = { id: `sub_${Date.now()}`, name: currentIng.name, isDefault: false, createdAt: new Date().toISOString() };
+  targetParent.subtypes = targetParent.subtypes || [];
+  targetParent.subtypes.push(newSubtype);
+
+  const products = safeGetProducts();
+  const updatedProducts = products.map(p => {
+    if (String(p.ingredientId) === String(ingredientId)) {
+      return { ...p, subtypeId: newSubtype.id, subTypeId: newSubtype.id, ingredientId: targetParent.id };
+    }
+    return p;
+  });
+
+  const updatedIngredients = allIngredients.filter(i => String(i.id) !== String(ingredientId));
+  if (typeof setIngredients === 'function') setIngredients(updatedIngredients);
+  if (window.Store?.setState) window.Store.setState({ ingredients: updatedIngredients, products: updatedProducts });
+
+  if (window.PantryRepository) {
+    await window.PantryRepository.saveIngredient(targetParent);
+    await window.PantryRepository.deleteIngredient(ingredientId);
+    await commitProductUpdates(updatedProducts);
+  } else {
+    await saveIngredient(targetParent);
+    await deleteIngredient(ingredientId);
+    await commitProductUpdates(updatedProducts);
+  }
+  advanceHierarchyWizardStep();
+}
+
+export async function handleWizardLinkSelectedProduct() {
+  const select = document.getElementById('wizard-link-select');
+  const productId = select?.value;
+  if (!productId) { alert('Please choose an unlinked product from the dropdown.'); return; }
+  
   const ctx = await resolveContext();
   if (!ctx) return;
   const existingProds = safeGetProducts();
@@ -90,54 +156,71 @@ export async function resolveStepWithExistingProduct(productId) {
     const updated = [...existingProds];
     updated[prodIndex] = updatedProd;
     commitProductUpdates(updated);
-    try { await saveProduct(updatedProd); } catch (e) {}
+    try { await (window.PantryRepository?.saveProduct ? window.PantryRepository.saveProduct(updatedProd) : saveProduct(updatedProd)); } catch (e) {}
   }
-  advanceWizard();
+  advanceHierarchyWizardStep();
 }
 
-export async function resolveStepWithShellProduct() {
-  const ctx = await resolveContext();
-  if (!ctx) return;
-  const shell = {
-    id: `prod_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-    name: ctx.currentItem.name, brand: 'Standard', category: ctx.currentItem.category || 'General', storage: 'cupboard',
-    cal: 100, prot: 5, carb: 10, fat: 2, fibre: 0, price: 1.00, pack: 100, packUnit: 'g',
-    ingredientId: ctx.parentId, subtypeId: ctx.subtypeId, isAutoDefault: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
-  };
-  const prods = [...safeGetProducts(), shell];
-  commitProductUpdates(prods);
-  try { await saveProduct(shell); } catch (e) {}
-  advanceWizard();
+export async function handleWizardTescoImport(subTypeId, ingredientId) {
+  const textarea = document.getElementById('wizard-tesco-json-input') || document.getElementById('wizard-tesco-json');
+  if (!textarea || !textarea.value.trim()) { alert('Please paste Tesco bookmarklet JSON data into the text box.'); return; }
+
+  try {
+    const val = textarea.value.trim();
+    const res = parseTescoProduct(val);
+    const pData = res.success ? res.data : JSON.parse(val);
+    if (!pData || !pData.name) throw new Error('Invalid product structure in pasted JSON.');
+
+    const ctx = await resolveContext();
+    const pId = ingredientId || ctx?.parentId;
+    const sId = subTypeId || ctx?.subtypeId;
+
+    const newProduct = {
+      id: `prod_${Date.now()}`, name: pData.name, brand: pData.brand || 'Tesco', price: Number(pData.price) || 0,
+      pack: Number(pData.packSize || pData.pack || pData.size) || 100, packUnit: pData.packUnit || 'g',
+      category: ctx?.currentItem?.category || pData.cat || 'General', storage: pData.storage || 'cupboard',
+      cal: Number(pData.cal) || 0, prot: Number(pData.prot) || 0, carb: Number(pData.carb) || 0, fat: Number(pData.fat) || 0,
+      subtypeId: sId, subTypeId: sId, ingredientId: pId, isAutoDefault: true, updatedAt: new Date().toISOString()
+    };
+
+    const currentProducts = [...safeGetProducts(), newProduct];
+    await commitProductUpdates(currentProducts);
+    try { await (window.PantryRepository?.saveProduct ? window.PantryRepository.saveProduct(newProduct) : saveProduct(newProduct)); } catch (e) {}
+    advanceHierarchyWizardStep();
+  } catch (err) {
+    alert(`Failed to parse Tesco JSON: ${err.message}`);
+  }
 }
 
-export async function resolveStepWithTescoImport() {
-  const txtArea = document.getElementById('wizard-tesco-json');
-  const errDiv = document.getElementById('wizard-tesco-error');
-  if (!txtArea || !errDiv) return;
-  errDiv.style.display = 'none';
-  const val = txtArea.value.trim();
-  if (!val) { errDiv.textContent = 'Please paste Tesco bookmarklet JSON.'; errDiv.style.display = 'block'; return; }
-  const res = parseTescoProduct(val);
-  if (!res.success) { errDiv.textContent = res.error || 'Parsing error.'; errDiv.style.display = 'block'; return; }
-
+export async function handleWizardQuickAddProduct() {
+  const name = document.getElementById('wizard-quick-name')?.value?.trim();
+  if (!name) { alert('Please enter a product name.'); return; }
   const ctx = await resolveContext();
   if (!ctx) return;
-  const pData = res.data;
-  const newProd = {
-    id: `prod_${Date.now()}`, name: pData.name, brand: pData.brand || 'Tesco', category: ctx.currentItem.category || pData.cat || 'General',
-    storage: pData.storage || 'cupboard', cal: pData.cal || 0, prot: pData.prot || 0, carb: pData.carb || 0, fat: pData.fat || 0, fibre: pData.fibre || 0,
-    price: pData.price || 0, pack: pData.packSize || 0, packUnit: pData.packUnit || 'g', ingredientId: ctx.parentId, subtypeId: ctx.subtypeId, isAutoDefault: true, updatedAt: new Date().toISOString()
+
+  const price = parseFloat(document.getElementById('wizard-quick-price')?.value) || 0;
+  const sizeStr = document.getElementById('wizard-quick-size')?.value?.trim() || '100g';
+  const packMatch = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Z]+)?$/);
+  const pack = packMatch ? parseFloat(packMatch[1]) : 100;
+  const packUnit = (packMatch && packMatch[2]) ? packMatch[2] : 'g';
+
+  const newProduct = {
+    id: `prod_${Date.now()}`, name, brand: document.getElementById('wizard-quick-brand')?.value?.trim() || 'Standard', price,
+    pack, packUnit, category: ctx.currentItem.category || 'General', storage: 'cupboard', cal: 100, prot: 5, carb: 10, fat: 2, fibre: 0,
+    subtypeId: ctx.subtypeId, subTypeId: ctx.subtypeId, ingredientId: ctx.parentId, isAutoDefault: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
   };
-  commitProductUpdates([...safeGetProducts(), newProd]);
-  try { await saveProduct(newProd); } catch (e) {}
-  advanceWizard();
+
+  const prods = [...safeGetProducts(), newProduct];
+  await commitProductUpdates(prods);
+  try { await (window.PantryRepository?.saveProduct ? window.PantryRepository.saveProduct(newProduct) : saveProduct(newProduct)); } catch (e) {}
+  advanceHierarchyWizardStep();
 }
 
 export function skipWizardStep() {
   if (currentIndex < wizardQueue.length - 1) {
     wizardQueue.push(wizardQueue.splice(currentIndex, 1)[0]);
     renderWizardStep();
-  } else advanceWizard();
+  } else advanceHierarchyWizardStep();
 }
 
 export async function bulkProvisionAllDefaults() {
@@ -167,20 +250,21 @@ export async function bulkProvisionAllDefaults() {
 
   if (typeof setIngredients === 'function') setIngredients(ingredients);
   if (window.Store?.setState) window.Store.setState({ ingredients });
-  commitProductUpdates(products);
+  await commitProductUpdates(products);
 
-  for (const ing of modifiedIngredients) { try { await saveIngredient(ing); } catch (e) {} }
-  for (const prod of createdProducts) { try { await saveProduct(prod); } catch (e) {} }
+  for (const ing of modifiedIngredients) { try { await (window.PantryRepository?.saveIngredient ? window.PantryRepository.saveIngredient(ing) : saveIngredient(ing)); } catch (e) {} }
+  for (const prod of createdProducts) { try { await (window.PantryRepository?.saveProduct ? window.PantryRepository.saveProduct(prod) : saveProduct(prod)); } catch (e) {} }
 
   wizardQueue = [];
   renderWizardComplete();
 }
 
-function advanceWizard() {
-  currentIndex++;
-  if (currentIndex >= wizardQueue.length) renderWizardComplete();
+export function advanceHierarchyWizardStep() {
+  if (++currentIndex >= wizardQueue.length) renderWizardComplete();
   else renderWizardStep();
 }
+
+export const refreshHierarchyWizardStep = () => renderWizardStep();
 
 export function renderWizardStep() {
   const content = document.getElementById('hierarchy-wizard-modal-content');
@@ -199,32 +283,56 @@ export function renderWizardStep() {
         <button type="button" class="btn sm ghost" onclick="closeHierarchyWizardModal()">&times;</button>
       </div>
       <div style="width:100%;background:#e5e7eb;height:6px;border-radius:3px;overflow:hidden;margin-bottom:14px"><div style="width:${pct}%;background:var(--primary,#4f46e5);height:100%;transition:width 0.2s"></div></div>
+      
+      <!-- Current Target Card & Restructuring Tools -->
       <div style="background:#fff;border-radius:12px;padding:14px;border:1px solid var(--border,#e7e5e4);margin-bottom:14px">
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;font-weight:700">Unlinked ${item.entityType === 'subtype' ? 'Sub-type' : 'Core Ingredient'}</div>
-        <div style="font-size:16px;font-weight:750;color:var(--text);margin-top:2px">${escapeHtml(item.name)}</div>
-        <div style="font-size:12px;color:var(--text2);margin-top:2px">Category: <strong>${escapeHtml(item.category)}</strong>${item.parentName ? ` · Parent: <strong>${escapeHtml(item.parentName)}</strong>` : ''}</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div>
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;font-weight:700">Unlinked ${item.entityType === 'subtype' ? 'Sub-type' : 'Core Ingredient'}</div>
+            <div style="font-size:16px;font-weight:750;color:var(--text);margin-top:2px">${escapeHtml(item.name)}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px">Category: <strong>${escapeHtml(item.category)}</strong>${item.parentName ? ` · Parent: <strong>${escapeHtml(item.parentName)}</strong>` : ''}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <button type="button" class="btn xs ghost" onclick="handleWizardRenameIngredient('${escapeAttr(item.id)}')">✏️ Rename</button>
+            ${item.entityType === 'ingredient' ? `<button type="button" class="btn xs ghost" onclick="handleWizardConvertToSubtype('${escapeAttr(item.id)}')">⬇️ Reorganise as Sub-type</button>` : ''}
+          </div>
+        </div>
       </div>
+
+      <!-- Interactive Fix Workflows -->
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+        <!-- Option 1: Link Existing Product -->
         <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid var(--border,#e7e5e4)">
           <div style="font-size:13px;font-weight:700;margin-bottom:6px">🔗 1. Link Unallocated Product</div>
-          ${unlinkedProds.length ? `
-            <select id="wizard-link-select" style="width:100%;min-height:38px;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12.5px" onchange="resolveStepWithExistingProduct(this.value)">
+          <div style="display:flex;gap:6px">
+            <select id="wizard-link-select" style="flex:1;min-height:38px;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12.5px">
               <option value="">-- Choose unlinked product (${unlinkedProds.length} available) --</option>
               ${unlinkedProds.map(p => `<option value="${escapeAttr(p.id)}">${escapeHtml(p.name)} (£${Number(p.price||0).toFixed(2)})</option>`).join('')}
             </select>
-          ` : `<div style="font-size:12px;color:var(--text3);font-style:italic">No unallocated products in Product Bank.</div>`}
+            <button type="button" class="btn sm primary" onclick="handleWizardLinkSelectedProduct()">Link Selected</button>
+          </div>
         </div>
-        <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid var(--border,#e7e5e4);display:flex;align-items:center;justify-content:space-between">
-          <div><div style="font-size:13px;font-weight:700">✨ 2. Auto-Generate Product Shell</div><div style="font-size:11.5px;color:var(--text2)">Creates a default baseline product with standard macros.</div></div>
-          <button type="button" class="btn sm primary" onclick="resolveStepWithShellProduct()">Generate</button>
-        </div>
+
+        <!-- Option 2: Import from Tesco -->
         <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid var(--border,#e7e5e4)">
-          <div style="font-size:13px;font-weight:700;margin-bottom:6px">🛒 3. Tesco Bookmarklet Import</div>
-          <textarea id="wizard-tesco-json" placeholder='Paste JSON from bookmarklet...' style="width:100%;height:45px;font-family:monospace;font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box"></textarea>
-          <div id="wizard-tesco-error" style="display:none;color:var(--red);font-size:11px;margin-top:4px"></div>
-          <button type="button" class="btn sm ghost" style="width:100%;margin-top:6px" onclick="resolveStepWithTescoImport()">Parse &amp; Link Product</button>
+          <div style="font-size:13px;font-weight:700;margin-bottom:6px">🛒 2. Import from Tesco</div>
+          <textarea id="wizard-tesco-json-input" placeholder='Paste raw JSON from bookmarklet...' style="width:100%;height:44px;font-family:monospace;font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box"></textarea>
+          <button type="button" class="btn sm ghost" style="width:100%;margin-top:6px" onclick="handleWizardTescoImport()">Parse &amp; Link Product</button>
+        </div>
+
+        <!-- Option 3: Quick Add Product -->
+        <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid var(--border,#e7e5e4)">
+          <div style="font-size:13px;font-weight:700;margin-bottom:6px">✨ 3. Quick Add Product</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+            <input type="text" id="wizard-quick-name" placeholder="Product Name" value="${escapeAttr(item.name)}" style="padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px" />
+            <input type="text" id="wizard-quick-brand" placeholder="Brand (e.g. Tesco)" value="Standard" style="padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px" />
+            <input type="number" id="wizard-quick-price" step="0.01" placeholder="Price (£)" value="1.00" style="padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px" />
+            <input type="text" id="wizard-quick-size" placeholder="Size (e.g. 500g)" value="100g" style="padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px" />
+          </div>
+          <button type="button" class="btn sm primary" style="width:100%" onclick="handleWizardQuickAddProduct()">Create &amp; Link Product</button>
         </div>
       </div>
+
       <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border,#e7e5e4);padding-top:12px">
         <button type="button" class="btn sm" id="wizard-bulk-btn" style="background:rgba(16,185,129,0.1);color:var(--green,#10b981);font-weight:700" onclick="bulkProvisionAllDefaults()">⚡ Bulk Provision All Defaults</button>
         <div style="display:flex;gap:6px">
@@ -259,8 +367,7 @@ export function openHierarchyWizardModal() {
   overlay.id = 'hierarchy-wizard-modal-overlay';
   overlay.className = 'modal active';
   Object.assign(overlay.style, {
-    position: 'fixed', top: '0', left: '0', right: '0', bottom: '0',
-    width: '100vw', height: '100vh', zIndex: '999999',
+    position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', width: '100vw', height: '100vh', zIndex: '999999',
     background: 'rgba(0, 0, 0, 0.55)', backdropFilter: 'blur(8px)', webkitBackdropFilter: 'blur(8px)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', boxSizing: 'border-box'
   });
@@ -271,16 +378,19 @@ export function openHierarchyWizardModal() {
   overlay.appendChild(contentWrap);
   document.body.style.overflow = 'hidden';
   document.body.appendChild(overlay);
-
   renderWizardStep();
 }
 
 if (typeof window !== 'undefined') {
   window.openHierarchyWizardModal = openHierarchyWizardModal;
   window.closeHierarchyWizardModal = closeHierarchyWizardModal;
-  window.resolveStepWithExistingProduct = resolveStepWithExistingProduct;
-  window.resolveStepWithShellProduct = resolveStepWithShellProduct;
-  window.resolveStepWithTescoImport = resolveStepWithTescoImport;
+  window.handleWizardRenameIngredient = handleWizardRenameIngredient;
+  window.handleWizardConvertToSubtype = handleWizardConvertToSubtype;
+  window.handleWizardLinkSelectedProduct = handleWizardLinkSelectedProduct;
+  window.handleWizardTescoImport = handleWizardTescoImport;
+  window.handleWizardQuickAddProduct = handleWizardQuickAddProduct;
+  window.refreshHierarchyWizardStep = refreshHierarchyWizardStep;
+  window.advanceHierarchyWizardStep = advanceHierarchyWizardStep;
   window.skipWizardStep = skipWizardStep;
   window.bulkProvisionAllDefaults = bulkProvisionAllDefaults;
 }

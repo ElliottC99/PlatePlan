@@ -1,5 +1,5 @@
 /**
- * src/views/ProductBankView.js (v3.19.52)
+ * src/views/ProductBankView.js (v3.19.54)
  * Modular ES6 View for Product Bank.
  * Displays nutritional pills (P, C, F, Kcal), P/£ efficiency, Tesco links, and Reallocation modal.
  */
