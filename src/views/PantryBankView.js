@@ -1,5 +1,5 @@
 /**
- * src/views/PantryBankView.js (v3.19.32)
+ * src/views/PantryBankView.js (v3.19.33)
  * Modular ES6 View for Category ➔ Ingredient ➔ Sub-type Hierarchy Bank.
  * Features Aliasing, Merging, Sub-type creation, Promoting/demoting, and Auto-default product previews.
  * Fully responsive and optimized to remain under 350 lines.
@@ -65,7 +65,12 @@ export function updateActiveCategoryFilter(oldName, newName) {
 
 export function closeIngredientFamilyDetailsModal() {
   const modalWrap = document.getElementById('ingredient-family-details-wrap');
-  if (modalWrap) modalWrap.classList.remove('open');
+  if (modalWrap) {
+    modalWrap.classList.remove('open');
+    modalWrap.dataset.parentId = '';
+  }
+  const catEl = document.getElementById('ingredient-family-details-cat');
+  if (catEl) catEl.disabled = false;
   document.body.style.overflow = '';
   activeEditingIngredientId = null;
 }
@@ -76,6 +81,8 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
 
   document.body.style.overflow = 'hidden';
   activeEditingIngredientId = ingredientId;
+  modalWrap.dataset.parentId = parentId || '';
+
   const state = getState() || {}, ingredients = state.ingredients || [], products = state.products || [];
   const ing = ingredientId ? ingredients.find(i => String(i.id) === String(ingredientId)) : null;
   const parent = parentId ? ingredients.find(i => String(i.id) === String(parentId)) : null;
@@ -86,7 +93,11 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
   const notesEl = document.getElementById('ingredient-family-details-notes');
   const msgEl = document.getElementById('ingredient-family-details-msg');
 
-  if (titleEl) titleEl.textContent = ing ? `Edit ingredient: ${ing.name}` : (parent ? `Add Sub-type to ${parent.name}` : 'New Ingredient');
+  if (titleEl) {
+    if (ing) titleEl.textContent = `Edit ingredient: ${ing.name}`;
+    else if (parent) titleEl.textContent = `Add Sub-type to ${parent.name}`;
+    else titleEl.textContent = 'New Ingredient';
+  }
   if (nameEl) nameEl.value = ing?.name || '';
   if (notesEl) notesEl.value = ing?.notes || '';
 
@@ -94,32 +105,26 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
     const categories = getActiveCategories(state);
     const selectedCat = (ing?.category || parent?.category || '').toLowerCase();
     catEl.innerHTML = categories.map(c => `<option value="${escapeAttr(c.toLowerCase())}" ${selectedCat === c.toLowerCase() ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+    catEl.disabled = Boolean(parent && !ing);
   }
 
   if (msgEl && ing) {
     const linked = products.filter(p => String(p.ingredientId) === String(ing.id) || String(p.groupId) === String(ing.id));
-    msgEl.innerHTML = `
-      <div style="margin-top:14px;padding:10px;background:var(--surface2,#f5f5f4);border-radius:8px;border:1px solid var(--border,#e7e5e4)">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <span style="font-size:12px;font-weight:750">Linked Products (${linked.length})</span>
-          <button type="button" class="btn sm ghost" onclick="openProductEditModal(null)" style="font-size:11px">+ Add Product</button>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto">
-          ${linked.map(p => `
-            <div style="padding:6px 8px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:6px;display:flex;align-items:center;justify-content:space-between">
-              <div>
-                <span style="font-size:12px;font-weight:600">${escapeHtml(p.name)}</span>
-                <div style="font-size:11px;color:var(--text2,#78716c)">${escapeHtml(p.brand || '')} · £${Number(p.price || 0).toFixed(2)}</div>
-              </div>
-              <div style="display:flex;gap:4px">
-                ${p.isAutoDefault ? '<span class="tag" style="font-size:10px;background:rgba(16,185,129,0.15);color:var(--green);font-weight:700">Default</span>' : `<button type="button" class="btn xs ghost" onclick="handleSetDefaultProduct('${escapeAttr(p.id)}', '${escapeAttr(ing.id)}')">Default</button>`}
-                <button type="button" class="btn xs ghost" onclick="openProductEditModal('${escapeAttr(p.id)}')">Edit</button>
-              </div>
-            </div>
-          `).join('') || '<div style="font-size:12px;color:var(--text2)">No linked products.</div>'}
-        </div>
+    msgEl.innerHTML = `<div style="margin-top:14px;padding:10px;background:var(--surface2,#f5f5f4);border-radius:8px;border:1px solid var(--border,#e7e5e4)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:12px;font-weight:750">Linked Products (${linked.length})</span>
+        <button type="button" class="btn sm ghost" onclick="openProductEditModal(null)" style="font-size:11px">+ Add Product</button>
       </div>
-    `;
+      <div style="display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto">
+        ${linked.map(p => `<div style="padding:6px 8px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:6px;display:flex;align-items:center;justify-content:space-between">
+          <div><span style="font-size:12px;font-weight:600">${escapeHtml(p.name)}</span><div style="font-size:11px;color:var(--text2,#78716c)">${escapeHtml(p.brand || '')} · £${Number(p.price || 0).toFixed(2)}</div></div>
+          <div style="display:flex;gap:4px">
+            ${p.isAutoDefault ? '<span class="tag" style="font-size:10px;background:rgba(16,185,129,0.15);color:var(--green);font-weight:700">Default</span>' : `<button type="button" class="btn xs ghost" onclick="handleSetDefaultProduct('${escapeAttr(p.id)}', '${escapeAttr(ing.id)}')">Default</button>`}
+            <button type="button" class="btn xs ghost" onclick="openProductEditModal('${escapeAttr(p.id)}')">Edit</button>
+          </div>
+        </div>`).join('') || '<div style="font-size:12px;color:var(--text2)">No linked products.</div>'}
+      </div>
+    </div>`;
   } else if (msgEl) {
     msgEl.innerHTML = '';
   }
@@ -131,6 +136,15 @@ export async function saveIngredientFamilyDetailsModal() {
   if (!name) return;
   const category = document.getElementById('ingredient-family-details-cat')?.value || 'other';
   const notes = (document.getElementById('ingredient-family-details-notes')?.value || '').trim();
+  const modalWrap = document.getElementById('ingredient-family-details-wrap');
+  const parentId = modalWrap?.dataset?.parentId;
+
+  if (parentId && !activeEditingIngredientId) {
+    await addSubtypeToIngredient(parentId, name, notes);
+    closeIngredientFamilyDetailsModal();
+    renderIngredientBank();
+    return;
+  }
 
   const state = getState() || {}, currentIngs = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
   const updatedIng = {
@@ -163,9 +177,8 @@ export async function promptRemoveAlias(ingId, alias) {
   if (confirm(`Remove alias "${alias}"?`)) { await removeAlias(ingId, alias); renderIngredientBank(); }
 }
 
-export async function promptAddSubtype(ingId) {
-  const subName = prompt('Enter sub-type name:');
-  if (subName) { await addSubtypeToIngredient(ingId, subName); renderIngredientBank(); }
+export function promptAddSubtype(ingId) {
+  openIngredientFamilyDetailsModal(null, ingId);
 }
 
 export async function promptMerge(sourceIngId) {
@@ -183,8 +196,7 @@ export async function promptDemote(ingId) {
   if (!ings.length) return alert('No parent ingredients available.');
   const num = parseInt(prompt(`Select target parent core ingredient:\n` + ings.map((i, idx) => `${idx + 1}. ${i.name}`).join('\n')), 10);
   if (!isNaN(num) && num >= 1 && num <= ings.length) { 
-    const targetParent = ings[num - 1];
-    await reparentSubtype(ingId, targetParent.id); 
+    await reparentSubtype(ingId, ings[num - 1].id); 
     renderIngredientBank(); 
   }
 }
@@ -213,13 +225,11 @@ export function renderIngredientBank() {
   const state = getState() || {}, ingredients = state.ingredients || [], products = state.products || [];
 
   if (ingredients.length === 0) {
-    container.innerHTML = `
-      <div class="card" style="padding:32px 20px;text-align:center;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:14px;margin-top:12px;">
-        <div style="font-size:32px;margin-bottom:8px">🥗</div>
-        <h3 style="font-size:16px;font-weight:700;margin:0 0 6px 0">No ingredients in bank</h3>
-        <button class="btn primary sm" type="button" onclick="openIngredientFamilyDetailsModal(null)">+ Add Ingredient</button>
-      </div>
-    `;
+    container.innerHTML = `<div class="card" style="padding:32px 20px;text-align:center;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:14px;margin-top:12px;">
+      <div style="font-size:32px;margin-bottom:8px">🥗</div>
+      <h3 style="font-size:16px;font-weight:700;margin:0 0 6px 0">No ingredients in bank</h3>
+      <button class="btn primary sm" type="button" onclick="openIngredientFamilyDetailsModal(null)">+ Add Ingredient</button>
+    </div>`;
     return;
   }
 
@@ -335,7 +345,6 @@ export function initBankSubscriptions() {
   isSubscribed = true;
   subscribe('ingredients', () => renderIngredientBank());
   subscribe('products', () => { renderIngredientBank(); renderProductBank(); });
-
   if (typeof document !== 'undefined') {
     document.addEventListener('plateplan:state:ingredients', () => renderIngredientBank());
     document.addEventListener('plateplan:state:products', () => { renderIngredientBank(); renderProductBank(); });
@@ -370,11 +379,8 @@ if (typeof window !== 'undefined') {
       container.classList.toggle('is-expanded', isCollapsed);
       btn.textContent = `${isCollapsed ? '▲' : '▼'} SUB-TYPES (${container.children.length})`;
     },
-    
     toggleCardMoreMenu(btn, ingId) {
-      document.querySelectorAll('.card-more-menu').forEach(menu => {
-        if (menu.id !== `card-more-menu-${ingId}`) menu.style.display = 'none';
-      });
+      document.querySelectorAll('.card-more-menu').forEach(m => { if (m.id !== `card-more-menu-${ingId}`) m.style.display = 'none'; });
       const menu = document.getElementById(`card-more-menu-${ingId}`);
       if (!menu) return;
       const isHidden = menu.style.display === 'none';
