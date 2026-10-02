@@ -16,11 +16,11 @@ let wizardStep = 'list', activeCat = null, reassignMode = 'mass', reassignSearch
 
 export function closeCategoryManagerModal() {
   const modal = document.getElementById('category-manager-modal');
-  if (modal) { modal.style.opacity = '0'; modal.style.pointerEvents = 'none'; modal.classList.remove('open'); }
-  wizardStep = 'list'; activeCat = null; reassignSearch = '';
-  if (typeof PantryBankView !== 'undefined' && PantryBankView.isCategoryManagerOpen !== undefined) {
-    // handled via flag
+  if (modal) {
+    modal.dataset.wizardStep = wizardStep;
+    modal.style.opacity = '0'; modal.style.pointerEvents = 'none'; modal.classList.remove('open');
   }
+  wizardStep = 'list'; activeCat = null; reassignSearch = '';
   if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
   invalidateHierarchyCache();
 }
@@ -41,6 +41,8 @@ export function renderCategoryManagerModal() {
     modal.className = 'modal-wrap';
     modal.style = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity 0.2s ease;';
     document.body.appendChild(modal);
+  } else if (modal.dataset.wizardStep) {
+    wizardStep = modal.dataset.wizardStep;
   }
 
   const renderCurrentStep = () => {
@@ -141,21 +143,23 @@ export function renderCategoryManagerModal() {
 
         ${reassignMode === 'mass' ? `
           <div style="margin-bottom:16px">
-            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">Reassign all ${boundIngs.length} items to:</label>
-            <select id="cat-mass-target-select" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:8px;font-size:13px;background:var(--surface,#fff)">
+            <label for="cat-mass-target-select" style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">Reassign all ${boundIngs.length} items to:</label>
+            <select id="cat-mass-target-select" name="cat_mass_target" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:8px;font-size:13px;background:var(--surface,#fff)">
               ${otherCats.map(c => `<option value="${escapeAttr(c)}" ${c === massTargetCat ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
             </select>
           </div>
         ` : `
           <div style="margin-bottom:8px">
-            <input type="text" placeholder="Filter items by name..." value="${escapeAttr(reassignSearch)}" aria-label="Filter items by name" oninput="window.handleReassignSearch(this.value)" style="width:100%;padding:6px 10px;border:1px solid var(--border,#e7e5e4);border-radius:6px;font-size:12px;box-sizing:border-box">
+            <label for="cat-reassign-filter" style="display:none">Filter items by name</label>
+            <input type="text" id="cat-reassign-filter" name="reassign_filter" placeholder="Filter items by name..." value="${escapeAttr(reassignSearch)}" oninput="window.handleReassignSearch(this.value)" style="width:100%;padding:6px 10px;border:1px solid var(--border,#e7e5e4);border-radius:6px;font-size:12px;box-sizing:border-box">
           </div>
           <div style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
             ${filteredIngs.map(ing => {
               const currentSel = individualCatMap[ing.id] || otherCats[0] || 'Uncategorized';
+              const selId = `cat-select-${ing.id}`;
               return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:var(--surface2,#f5f5f4);border-radius:6px;border:1px solid var(--border,#e7e5e4)">
-                <span style="font-size:12px;font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ing.name)}</span>
-                <select onchange="window.updateIndividualCatMap('${escapeAttr(ing.id)}', this.value)" style="padding:4px 6px;font-size:11.5px;border:1px solid var(--border,#e7e5e4);border-radius:6px;background:var(--surface,#fff)">
+                <label for="${selId}" style="font-size:12px;font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ing.name)}</label>
+                <select id="${selId}" name="cat_select_${ing.id}" onchange="window.updateIndividualCatMap('${escapeAttr(ing.id)}', this.value)" style="padding:4px 6px;font-size:11.5px;border:1px solid var(--border,#e7e5e4);border-radius:6px;background:var(--surface,#fff)">
                   ${otherCats.map(c => `<option value="${escapeAttr(c)}" ${c === currentSel ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
                 </select>
               </div>`;

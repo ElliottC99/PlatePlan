@@ -1,5 +1,5 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.19.29';
+  window.APP_VERSION = 'v3.19.30';
   window.createIngredientGroupPrompt = () => {
     import('./components/pantry/CategoryManagerModalUI.js')
       .then(m => {
@@ -21,7 +21,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * src/main.js (v3.19.29)
+ * src/main.js (v3.19.30)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronization,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -289,9 +289,9 @@ function sanitizeRecipes(recipes) {
 }
 
 export function updateVersionBadge() {
-  const footerEl = document.getElementById('app-version') || document.getElementById('plateplan-update-version');
-  if (footerEl) {
-    footerEl.textContent = 'v3.19.29 (ES6 Modern)';
+  const badgeEl = document.getElementById('app-header-version') || document.getElementById('app-version') || document.getElementById('plateplan-update-version');
+  if (badgeEl) {
+    badgeEl.textContent = 'v3.19.30';
   }
 }
 
