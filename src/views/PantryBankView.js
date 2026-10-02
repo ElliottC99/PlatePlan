@@ -1,5 +1,5 @@
 /**
- * src/views/PantryBankView.js (v3.19.37)
+ * src/views/PantryBankView.js (v3.19.38)
  * Modular ES6 View for Category ➔ Ingredient ➔ Sub-type Hierarchy Bank.
  * Features Aliasing, Merging, Sub-type creation, Promoting/demoting, and Auto-default product previews.
  * Fully responsive and optimized to remain under 350 lines.
@@ -16,6 +16,7 @@ import { renderProductBank, openProductEditModal } from './ProductBankView.js';
 import { renderCategoryManagerModal } from '../components/pantry/CategoryManagerModalUI.js';
 import { updateIngredientFamilyModalUI } from '../components/pantry/IngredientFamilyModalUI.js';
 import { buildIngredientBankHTML } from '../components/pantry/PantryBankHTMLTemplate.js';
+import '../components/pantry/SubtypeActionModalsUI.js';
 
 let activeEditingIngredientId = null;
 export let selectedCategoryFilter = null;
@@ -163,9 +164,40 @@ export async function saveIngredientFamilyDetailsModal() {
   const modalWrap = document.getElementById('ingredient-family-details-wrap');
   const parentId = modalWrap?.dataset?.parentId;
 
-  if (parentId && !activeEditingIngredientId) {
-    await addSubtypeToIngredient(parentId, name, notes);
-    closeIngredientFamilyDetailsModal(); renderIngredientBank(); return;
+  if (parentId) {
+    const state = getState() || {}, currentIngs = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
+    const parent = currentIngs.find(p => String(p.id) === String(parentId));
+    if (!parent) return;
+
+    if (!activeEditingIngredientId) {
+      // New Sub-type Mode (A product must be linked using the Product Actions to save)
+      const msgEl = document.getElementById('ingredient-family-details-msg');
+      if (msgEl) {
+        msgEl.innerHTML = `<div style="padding: 10px; background: #fee2e2; color: #ef4444; border-radius: 8px; font-weight: 600; margin-bottom: 12px;">⚠️ A sub-type must have at least one product attached or linked before saving.</div>`;
+      }
+      return;
+    } else {
+      // Editing Existing Sub-type Mode
+      const hasProduct = (state.products || []).some(p => String(p.subtypeId) === String(activeEditingIngredientId));
+      if (!hasProduct) {
+        const msgEl = document.getElementById('ingredient-family-details-msg');
+        if (msgEl) {
+          msgEl.innerHTML = `<div style="padding: 10px; background: #fee2e2; color: #ef4444; border-radius: 8px; font-weight: 600; margin-bottom: 12px;">⚠️ A sub-type must have at least one product attached or linked before saving.</div>`;
+        }
+        return;
+      }
+
+      if (!Array.isArray(parent.subtypes)) parent.subtypes = [];
+      const sub = parent.subtypes.find(s => String(s.id) === String(activeEditingIngredientId));
+      if (sub) {
+        sub.name = name;
+        sub.notes = notes;
+        parent.updatedAt = new Date().toISOString();
+        setIngredients(currentIngs); closeIngredientFamilyDetailsModal(); renderIngredientBank();
+        try { await saveIngredient(parent); } catch (e) {}
+      }
+      return;
+    }
   }
 
   const state = getState() || {}, currentIngs = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
@@ -187,119 +219,7 @@ export async function handleSetDefaultProduct(prodId, ingId, subtypeId = null) {
   renderIngredientBank(); openIngredientFamilyDetailsModal(ingId);
 }
 
-export async function promptAddAlias(ingId, parentId = null) {
-  const alias = prompt('Enter alias:'); if (!alias) return;
-  if (parentId) {
-    const state = getState() || {}, ings = [...(state.ingredients || [])], parent = ings.find(i => String(i.id) === String(parentId));
-    if (parent && Array.isArray(parent.subtypes)) {
-      const sub = parent.subtypes.find(s => String(s.id) === String(ingId));
-      if (sub) {
-        if (!Array.isArray(sub.aliases)) sub.aliases = [];
-        if (!sub.aliases.includes(alias)) sub.aliases.push(alias);
-        parent.updatedAt = new Date().toISOString(); setIngredients(ings); renderIngredientBank(); await saveIngredient(parent);
-      }
-    }
-  } else {
-    await aliasIngredient(ingId, alias); renderIngredientBank();
-  }
-}
-
-export async function promptRemoveAlias(ingId, alias, parentId = null) {
-  if (!confirm(`Remove alias "${alias}"?`)) return;
-  if (parentId) {
-    const state = getState() || {}, ings = [...(state.ingredients || [])], parent = ings.find(i => String(i.id) === String(parentId));
-    if (parent && Array.isArray(parent.subtypes)) {
-      const sub = parent.subtypes.find(s => String(s.id) === String(ingId));
-      if (sub && Array.isArray(sub.aliases)) {
-        sub.aliases = sub.aliases.filter(a => a !== alias);
-        parent.updatedAt = new Date().toISOString(); setIngredients(ings); renderIngredientBank(); await saveIngredient(parent);
-      }
-    }
-  } else {
-    await removeAlias(ingId, alias); renderIngredientBank();
-  }
-}
-
 export function promptAddSubtype(ingId) { openIngredientFamilyDetailsModal(null, ingId); }
-
-export async function promptMerge(sourceId, parentId = null) {
-  const state = getState() || {}, ings = [...(state.ingredients || [])];
-  if (parentId) {
-    const parent = ings.find(p => String(p.id) === String(parentId));
-    if (!parent || !Array.isArray(parent.subtypes)) return;
-    const siblings = parent.subtypes.filter(s => String(s.id) !== String(sourceId));
-    if (!siblings.length) return alert('No other sub-types.');
-    const num = parseInt(prompt(`Select sibling index:\n` + siblings.map((s, idx) => `${idx + 1}. ${s.name}`).join('\n')), 10);
-    if (!isNaN(num) && num >= 1 && num <= siblings.length) {
-      const target = siblings[num - 1];
-      if (confirm(`Merge into "${target.name}"?`)) {
-        const source = parent.subtypes.find(s => String(s.id) === String(sourceId));
-        const targetAliases = new Set(Array.isArray(target.aliases) ? target.aliases : []);
-        if (source.name) targetAliases.add(source.name);
-        if (Array.isArray(source.aliases)) source.aliases.forEach(a => targetAliases.add(a));
-        target.aliases = Array.from(targetAliases);
-        parent.subtypes = parent.subtypes.filter(s => String(s.id) !== String(sourceId));
-        parent.updatedAt = new Date().toISOString();
-        const prods = [...(state.products || [])].map(p => (String(p.subtypeId) === String(sourceId)) ? { ...p, subtypeId: target.id, updatedAt: new Date().toISOString() } : p);
-        setIngredients(ings); setProducts(prods); renderIngredientBank();
-        await Promise.all([saveIngredient(parent), ...prods.filter(p => String(p.subtypeId) === String(target.id)).map(p => saveProduct(p))]);
-      }
-    }
-  } else {
-    const candidates = ings.filter(i => String(i.id) !== String(sourceId)); if (!candidates.length) return alert('No other ingredients.');
-    const num = parseInt(prompt(`Select index:\n` + candidates.map((i, idx) => `${idx + 1}. ${i.name}`).join('\n')), 10);
-    if (!isNaN(num) && num >= 1 && num <= candidates.length) {
-      if (confirm(`Merge into "${candidates[num - 1].name}"?`)) { await mergeIngredients(sourceId, candidates[num - 1].id); renderIngredientBank(); }
-    }
-  }
-}
-
-export async function promptDemote(ingId, parentId = null) {
-  const state = getState() || {}, ings = [...(state.ingredients || [])];
-  if (parentId) {
-    const sourceParent = ings.find(p => String(p.id) === String(parentId));
-    const targetParents = ings.filter(i => String(i.id) !== String(parentId));
-    if (!sourceParent || !targetParents.length) return alert('No other parent core ingredients.');
-    const num = parseInt(prompt(`Select target core ingredient to move this sub-type to:\n` + targetParents.map((i, idx) => `${idx + 1}. ${i.name}`).join('\n')), 10);
-    if (!isNaN(num) && num >= 1 && num <= targetParents.length) {
-      const targetParent = targetParents[num - 1];
-      if (confirm(`Move to parent "${targetParent.name}"?`)) {
-        const subtypeIdx = sourceParent.subtypes.findIndex(s => String(s.id) === String(ingId));
-        if (subtypeIdx >= 0) {
-          const [sub] = sourceParent.subtypes.splice(subtypeIdx, 1);
-          if (!Array.isArray(targetParent.subtypes)) targetParent.subtypes = [];
-          targetParent.subtypes.push(sub); sourceParent.updatedAt = new Date().toISOString(); targetParent.updatedAt = new Date().toISOString();
-          const prods = [...(state.products || [])].map(p => (String(p.subtypeId) === String(ingId)) ? { ...p, ingredientId: targetParent.id, updatedAt: new Date().toISOString() } : p);
-          setIngredients(ings); setProducts(prods); renderIngredientBank();
-          await Promise.all([saveIngredient(sourceParent), saveIngredient(targetParent), ...prods.filter(p => String(p.subtypeId) === String(ingId)).map(p => saveProduct(p))]);
-        }
-      }
-    }
-  } else {
-    const candidates = ings.filter(i => String(i.id) !== String(ingId)); if (!candidates.length) return alert('No parent ingredients.');
-    const num = parseInt(prompt(`Select parent:\n` + candidates.map((i, idx) => `${idx + 1}. ${i.name}`).join('\n')), 10);
-    if (!isNaN(num) && num >= 1 && num <= candidates.length) { await reparentSubtype(ingId, candidates[num - 1].id); renderIngredientBank(); }
-  }
-}
-
-export async function handlePromoteSubtype(subId, parentId) {
-  if (confirm('Promote to Core Ingredient?')) { await promoteToIngredient(subId, parentId); renderIngredientBank(); }
-}
-
-export async function handleDeleteIngredient(ingId, ingName, parentId = null) {
-  if (confirm(`Delete ingredient "${ingName}"?`)) {
-    const state = getState() || {}, ings = [...(state.ingredients || [])];
-    if (parentId) {
-      const parent = ings.find(i => String(i.id) === String(parentId));
-      if (parent && Array.isArray(parent.subtypes)) {
-        parent.subtypes = parent.subtypes.filter(s => String(s.id) !== String(ingId)); parent.updatedAt = new Date().toISOString();
-        setIngredients(ings); renderIngredientBank(); await saveIngredient(parent);
-      }
-    } else {
-      setIngredients(ings.filter(i => String(i.id) !== String(ingId))); renderIngredientBank(); await deleteIngredient(ingId);
-    }
-  }
-}
 
 export function renderIngredientBank() {
   if (typeof document === 'undefined') return;

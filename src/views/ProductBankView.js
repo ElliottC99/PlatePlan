@@ -1,12 +1,12 @@
 /**
- * src/views/ProductBankView.js (v3.19.13)
+ * src/views/ProductBankView.js (v3.19.38)
  * Modular ES6 View for Product Bank.
  * Displays nutritional pills (P, C, F, Kcal), P/£ efficiency, Tesco links, and Reallocation modal.
  */
 
 import { getState, setProducts } from '../store/store.js';
 import { saveProduct, deleteProduct } from '../services/HouseholdRepository.js';
-import { reallocateProduct, setAutoDefaultProduct, getActiveCategories } from '../models/PantryHierarchyModel.js';
+import { reallocateProduct, setAutoDefaultProduct, getActiveCategories, addSubtypeToIngredient } from '../models/PantryHierarchyModel.js';
 
 let activeEditingProductId = null;
 
@@ -87,10 +87,26 @@ export async function saveManualIng() {
   const state = getState() || {};
   const currentProds = Array.isArray(state.products) ? [...state.products] : [];
 
+  let draftSubtypeId = null;
+  if (window.__draftSubtypePayload) {
+    try {
+      const draft = window.__draftSubtypePayload;
+      const newSub = await addSubtypeToIngredient(draft.parentId, draft.name, draft.notes);
+      if (newSub && newSub.id) {
+        draftSubtypeId = newSub.id;
+      }
+    } catch (e) {
+      console.error('[ProductBankView] Error saving draft subtype:', e);
+    }
+  }
+
   const binding = window.__prefilledResolveBinding || {};
-  const ingredientId = binding.ingredientId || null;
-  const subtypeId = binding.subtypeId || null;
+  const ingredientId = window.__draftSubtypePayload?.parentId || binding.ingredientId || null;
+  const subtypeId = draftSubtypeId || binding.subtypeId || null;
   const isAutoDefault = !!ingredientId;
+
+  // Clear draft payload
+  window.__draftSubtypePayload = null;
 
   const updatedProd = {
     ...(activeEditingProductId ? currentProds.find(p => String(p.id) === String(activeEditingProductId)) : {}),
