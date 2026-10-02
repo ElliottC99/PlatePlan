@@ -1,5 +1,5 @@
 /**
- * src/views/PantryBankView.js (v3.19.34)
+ * src/views/PantryBankView.js (v3.19.35)
  * Modular ES6 View for Category ➔ Ingredient ➔ Sub-type Hierarchy Bank.
  * Features Aliasing, Merging, Sub-type creation, Promoting/demoting, and Auto-default product previews.
  * Fully responsive and optimized to remain under 350 lines.
@@ -14,6 +14,7 @@ import {
 } from '../models/PantryHierarchyModel.js';
 import { renderProductBank, openProductEditModal } from './ProductBankView.js';
 import { renderCategoryManagerModal } from '../components/pantry/CategoryManagerModalUI.js';
+import { updateIngredientFamilyModalUI } from '../components/pantry/IngredientFamilyModalUI.js';
 
 let activeEditingIngredientId = null;
 export let selectedCategoryFilter = null;
@@ -69,6 +70,14 @@ export function closeIngredientFamilyDetailsModal() {
   }
   const catEl = document.getElementById('ingredient-family-details-cat');
   if (catEl) catEl.disabled = false;
+  const parentWrap = document.getElementById('parent-ingredient-display-wrap');
+  if (parentWrap) parentWrap.style.display = 'none';
+  const actionsWrap = document.getElementById('subtype-product-actions-wrap');
+  if (actionsWrap) actionsWrap.style.display = 'none';
+  const nameEl = document.getElementById('ingredient-family-details-name');
+  if (nameEl) nameEl.oninput = null;
+  const tescoEl = document.getElementById('tesco-search-helper-link');
+  if (tescoEl) tescoEl.innerHTML = '';
   document.body.style.overflow = '';
   activeEditingIngredientId = null;
 }
@@ -132,6 +141,10 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
   } else if (msgEl) {
     msgEl.innerHTML = '';
   }
+
+  // 3. Apply layout updates and Tesco helper integration
+  updateIngredientFamilyModalUI(ing, parent);
+
   modalWrap.classList.add('open');
 }
 
@@ -168,7 +181,7 @@ export async function handleSetDefaultProduct(prodId, ingId, subtypeId = null) {
 }
 
 export async function promptAddAlias(ingId) {
-  const alias = prompt('Enter alias for matching recipe ingredients:');
+  const alias = prompt('Enter alias:');
   if (alias) { await aliasIngredient(ingId, alias); renderIngredientBank(); }
 }
 
@@ -176,35 +189,26 @@ export async function promptRemoveAlias(ingId, alias) {
   if (confirm(`Remove alias "${alias}"?`)) { await removeAlias(ingId, alias); renderIngredientBank(); }
 }
 
-export function promptAddSubtype(ingId) {
-  openIngredientFamilyDetailsModal(null, ingId);
-}
+export function promptAddSubtype(ingId) { openIngredientFamilyDetailsModal(null, ingId); }
 
 export async function promptMerge(sourceIngId) {
   const state = getState() || {}, ings = (state.ingredients || []).filter(i => String(i.id) !== String(sourceIngId));
   if (!ings.length) return alert('No other ingredients available.');
-  const num = parseInt(prompt(`Select target index:\n` + ings.map((i, idx) => `${idx + 1}. ${i.name}`).join('\n')), 10);
+  const num = parseInt(prompt(`Select index:\n` + ings.map((i, idx) => `${idx + 1}. ${i.name}`).join('\n')), 10);
   if (!isNaN(num) && num >= 1 && num <= ings.length) {
-    const target = ings[num - 1];
-    if (confirm(`Merge this ingredient into "${target.name}"?`)) { await mergeIngredients(sourceIngId, target.id); renderIngredientBank(); }
+    if (confirm(`Merge into "${ings[num - 1].name}"?`)) { await mergeIngredients(sourceIngId, ings[num - 1].id); renderIngredientBank(); }
   }
 }
 
 export async function promptDemote(ingId) {
   const state = getState() || {}, ings = (state.ingredients || []).filter(i => String(i.id) !== String(ingId));
-  if (!ings.length) return alert('No parent ingredients available.');
-  const num = parseInt(prompt(`Select target parent core ingredient:\n` + ings.map((i, idx) => `${idx + 1}. ${i.name}`).join('\n')), 10);
-  if (!isNaN(num) && num >= 1 && num <= ings.length) { 
-    await reparentSubtype(ingId, ings[num - 1].id); 
-    renderIngredientBank(); 
-  }
+  if (!ings.length) return alert('No parent ingredients.');
+  const num = parseInt(prompt(`Select parent:\n` + ings.map((i, idx) => `${idx + 1}. ${i.name}`).join('\n')), 10);
+  if (!isNaN(num) && num >= 1 && num <= ings.length) { await reparentSubtype(ingId, ings[num - 1].id); renderIngredientBank(); }
 }
 
 export async function handlePromoteSubtype(subId, parentId) {
-  if (confirm('Promote to Core Ingredient (detaches sub-type as a standalone parent card)?')) { 
-    await promoteToIngredient(subId, parentId); 
-    renderIngredientBank(); 
-  }
+  if (confirm('Promote to Core Ingredient?')) { await promoteToIngredient(subId, parentId); renderIngredientBank(); }
 }
 
 export async function handleDeleteIngredient(ingId, ingName) {
@@ -350,17 +354,12 @@ export function initBankSubscriptions() {
   }
 }
 
-export function mount(container) {
-  initBankSubscriptions(); renderIngredientBank(); renderProductBank();
-}
+export function mount(container) { initBankSubscriptions(); renderIngredientBank(); renderProductBank(); }
 
 export const renderPantryBankView = renderIngredientBank;
 export { renderProductBank, openProductEditModal };
 
-export function openAddSubtypeModal(parentId) {
-  openIngredientFamilyDetailsModal(null, parentId);
-}
-
+export function openAddSubtypeModal(parentId) { openIngredientFamilyDetailsModal(null, parentId); }
 export function openCategoryManager() { renderCategoryManagerModal(); }
 
 if (typeof window !== 'undefined') {
