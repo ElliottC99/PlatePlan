@@ -7,6 +7,7 @@ import { getState, subscribe, setPreferences } from '../store/store.js';
 import { savePreferences } from '../services/HouseholdRepository.js';
 import { runDataQualityScan } from '../services/DataQualityScannerService.js';
 import { openResolveUnlinkedModal } from '../components/data-quality/ResolveUnlinkedModalUI.js';
+import { openHierarchyWizardModal } from '../components/data-quality/HierarchyWizardModalUI.js';
 import { openProductEditModal } from './ProductBankView.js';
 
 function escapeHtml(str) {
@@ -209,7 +210,8 @@ export function renderDataQualityView() {
         <span style="font-size:20px">🛡️</span>
         <h2 style="margin:0;font-size:18px;font-weight:750">Data Quality Centre</h2>
       </div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn sm primary" type="button" onclick="window.openHierarchyWizardModal?.()">🪄 Run Hierarchy Wizard</button>
         <button class="btn sm ghost" type="button" onclick="window.runGlobalProductRelink?.()">Batch Relink Products</button>
         <button class="btn sm ghost" type="button" onclick="renderDataQualityView()">Refresh Scans</button>
       </div>
@@ -306,6 +308,7 @@ export function mount(container) {
 if (typeof window !== 'undefined') {
   window.renderDataQualityView = renderDataQualityView;
   window.renderDataQuality = renderDataQualityView;
+  window.openHierarchyWizardModal = openHierarchyWizardModal;
   window.dismissAdvisory = dismissAdvisory;
   window.handleFixIssue = handleFixIssue;
   window.runGlobalProductRelink = runGlobalProductRelink;
