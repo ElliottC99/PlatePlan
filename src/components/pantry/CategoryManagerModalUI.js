@@ -5,6 +5,7 @@
  */
 
 import { getState } from '../../store/store.js';
+import { db } from '../../config/firebase.js';
 import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
 import { getActiveCategories, slugCategory, slugifyToKebab, invalidateHierarchyCache } from '../../models/PantryHierarchyModel.js';
 import { resetCategoryFilter, isCategoryManagerOpen } from '../../views/PantryBankView.js';

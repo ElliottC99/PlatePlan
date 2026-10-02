@@ -1,5 +1,5 @@
 /**
- * src/views/PantryBankView.js (v3.19.31)
+ * src/views/PantryBankView.js (v3.19.32)
  * Modular ES6 View for Category ➔ Ingredient ➔ Sub-type Hierarchy Bank.
  * Features Aliasing, Merging, Sub-type creation, Promoting/demoting, and Auto-default product previews.
  * Fully responsive and optimized to remain under 350 lines.
@@ -70,7 +70,7 @@ export function closeIngredientFamilyDetailsModal() {
   activeEditingIngredientId = null;
 }
 
-export function openIngredientFamilyDetailsModal(ingredientId = null) {
+export function openIngredientFamilyDetailsModal(ingredientId = null, parentId = null) {
   const modalWrap = document.getElementById('ingredient-family-details-wrap');
   if (!modalWrap) return;
 
@@ -78,6 +78,7 @@ export function openIngredientFamilyDetailsModal(ingredientId = null) {
   activeEditingIngredientId = ingredientId;
   const state = getState() || {}, ingredients = state.ingredients || [], products = state.products || [];
   const ing = ingredientId ? ingredients.find(i => String(i.id) === String(ingredientId)) : null;
+  const parent = parentId ? ingredients.find(i => String(i.id) === String(parentId)) : null;
 
   const titleEl = document.getElementById('ingredient-family-details-title');
   const nameEl = document.getElementById('ingredient-family-details-name');
@@ -85,12 +86,14 @@ export function openIngredientFamilyDetailsModal(ingredientId = null) {
   const notesEl = document.getElementById('ingredient-family-details-notes');
   const msgEl = document.getElementById('ingredient-family-details-msg');
 
-  if (titleEl) titleEl.textContent = ing ? `Edit ingredient: ${ing.name}` : 'New Ingredient';
+  if (titleEl) titleEl.textContent = ing ? `Edit ingredient: ${ing.name}` : (parent ? `Add Sub-type to ${parent.name}` : 'New Ingredient');
   if (nameEl) nameEl.value = ing?.name || '';
   if (notesEl) notesEl.value = ing?.notes || '';
 
   if (catEl) {
-    catEl.innerHTML = getActiveCategories(state).map(c => `<option value="${escapeAttr(c.toLowerCase())}" ${ing?.category?.toLowerCase() === c.toLowerCase() ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+    const categories = getActiveCategories(state);
+    const selectedCat = (ing?.category || parent?.category || '').toLowerCase();
+    catEl.innerHTML = categories.map(c => `<option value="${escapeAttr(c.toLowerCase())}" ${selectedCat === c.toLowerCase() ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
   }
 
   if (msgEl && ing) {

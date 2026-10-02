@@ -35,9 +35,11 @@ export function createBlankMethodRow(prefix) {
   const div = document.createElement('div');
   div.className = 'rev-method-row';
   div.style.cssText = 'display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;';
-  div.innerHTML = `<span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;"></span>
-     <textarea class="r-step" style="flex:1;min-height:40px;" oninput="updateSaveBothVisibility()"></textarea>
-     <button class="btn sm danger ghost" onclick="this.parentElement.remove(); reindexModalMethod('${escapeAttr(prefix)}'); updateSaveBothVisibility();">&times;</button>`;
+  const stepId = `recipe-step-blank-${Date.now()}`;
+  div.innerHTML = `
+    <label for="${stepId}" class="visually-hidden">Step Description</label>
+    <textarea id="${stepId}" name="${stepId}" class="r-step" style="flex:1;min-height:40px;" oninput="updateSaveBothVisibility()"></textarea>
+    <button class="btn sm danger ghost" onclick="this.parentElement.remove(); reindexModalMethod('${escapeAttr(prefix)}'); updateSaveBothVisibility();">&times;</button>`;
   return div;
 }
 
