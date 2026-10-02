@@ -311,15 +311,21 @@ export async function deleteProduct(productId) {
 /**
  * Real-time listener for ingredients collection.
  */
-export function subscribeIngredients(callback) {
+export function subscribeIngredients(callback, errorCallback) {
   if (!isDbAvailable() || typeof callback !== 'function') return () => {};
   try {
     return db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients')
-      .onSnapshot((snap) => {
-        if (!snap || !snap.docs) return;
-        const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        callback(items);
-      }, (err) => console.warn('[HouseholdRepository] Ingredients listener warning:', err));
+      .onSnapshot(
+        (snap) => {
+          if (!snap || !snap.docs) return;
+          const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          callback(items);
+        },
+        (err) => {
+          console.warn('[Firestore] Connection stream interrupted, auto-reconnecting...', err?.message || err);
+          if (typeof errorCallback === 'function') errorCallback(err);
+        }
+      );
   } catch (e) {
     return () => {};
   }
@@ -328,15 +334,21 @@ export function subscribeIngredients(callback) {
 /**
  * Real-time listener for products collection.
  */
-export function subscribeProducts(callback) {
+export function subscribeProducts(callback, errorCallback) {
   if (!isDbAvailable() || typeof callback !== 'function') return () => {};
   try {
     return db.collection('households').doc(HOUSEHOLD_ID).collection('products')
-      .onSnapshot((snap) => {
-        if (!snap || !snap.docs) return;
-        const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        callback(items);
-      }, (err) => console.warn('[HouseholdRepository] Products listener warning:', err));
+      .onSnapshot(
+        (snap) => {
+          if (!snap || !snap.docs) return;
+          const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          callback(items);
+        },
+        (err) => {
+          console.warn('[Firestore] Connection stream interrupted, auto-reconnecting...', err?.message || err);
+          if (typeof errorCallback === 'function') errorCallback(err);
+        }
+      );
   } catch (e) {
     return () => {};
   }

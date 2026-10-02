@@ -4,9 +4,9 @@
  * Caches core app shell, modern ES6 modules, stylesheets, and icons.
  */
 
-const PLATEPLAN_CACHE = 'plateplan-shell-v3.19.49';
-const PLATEPLAN_APP_VERSION = '3.19.49';
-const PLATEPLAN_BUILD_ID = '3.19.49-v217';
+const PLATEPLAN_CACHE = 'plateplan-shell-v3.19.51';
+const PLATEPLAN_APP_VERSION = '3.19.51';
+const PLATEPLAN_BUILD_ID = '3.19.51-v219';
 
 const PLATEPLAN_PRECACHE_ASSETS = [
   '/',

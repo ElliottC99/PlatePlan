@@ -1,5 +1,5 @@
 /**
- * src/services/HydrationService.js (v3.19.23)
+ * src/services/HydrationService.js (v3.19.50)
  * Orchestrates concurrent fetching from HouseholdRepository, invalidating/updating cache,
  * and populating the centralized Store and window.state.
  */
@@ -78,22 +78,32 @@ let hydrationLogged = false;
 function initRealtimeListeners() {
   if (listenersActive) return;
   listenersActive = true;
-  subscribeIngredients((freshIngredients) => {
-    const normalized = (freshIngredients || []).map(normalizeIngredientRecord);
-    setIngredients(normalized);
-    if (typeof window !== 'undefined') {
-      if (window.state) window.state.ingredients = normalized;
-      window.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: normalized }));
+  subscribeIngredients(
+    (freshIngredients) => {
+      const normalized = (freshIngredients || []).map(normalizeIngredientRecord);
+      setIngredients(normalized);
+      if (typeof window !== 'undefined') {
+        if (window.state) window.state.ingredients = normalized;
+        window.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: normalized }));
+      }
+    },
+    (error) => {
+      console.warn('[HydrationService] Firestore stream transient disconnect (reconnecting):', error?.message || error);
     }
-  });
-  subscribeProducts((freshProducts) => {
-    const normalized = (freshProducts || []).map(normalizeProductRecord);
-    setProducts(normalized);
-    if (typeof window !== 'undefined') {
-      if (window.state) window.state.products = normalized;
-      window.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: normalized }));
+  );
+  subscribeProducts(
+    (freshProducts) => {
+      const normalized = (freshProducts || []).map(normalizeProductRecord);
+      setProducts(normalized);
+      if (typeof window !== 'undefined') {
+        if (window.state) window.state.products = normalized;
+        window.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: normalized }));
+      }
+    },
+    (error) => {
+      console.warn('[HydrationService] Firestore stream transient disconnect (reconnecting):', error?.message || error);
     }
-  });
+  );
 }
 
 /**
