@@ -1,5 +1,5 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.19.55';
+  window.APP_VERSION = 'v3.19.58';
   window.showTescoImport = () => {
     import('./components/pantry/SubtypeActionModalsUI.js')
       .then(m => {
