@@ -1,5 +1,5 @@
 /**
- * src/components/data-quality/ResolveUnlinkedModalUI.js (v3.19.42)
+ * src/components/data-quality/ResolveUnlinkedModalUI.js (v3.19.44)
  * Clean 3-Path Resolution Modal UI component for unlinked ingredients/sub-types.
  * Supports linking existing products, parsing Tesco Bookmarklet JSON, and starting blank creations.
  */
@@ -32,6 +32,9 @@ export function closeResolveUnlinkedModal() {
   const modal = document.getElementById('resolve-unlinked-modal-overlay');
   if (modal) {
     modal.style.display = 'none';
+    if (modal.parentNode) {
+      modal.parentNode.removeChild(modal);
+    }
   }
   document.body.style.overflow = '';
   activeTargetId = null;
@@ -60,16 +63,19 @@ export function openResolveUnlinkedModal(targetId, targetType = 'ingredient', pa
 
   const tescoSearchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(searchTerm)}`;
 
+  const portalRoot = document.getElementById('view-modal-wrap') || document.body;
   let modal = document.getElementById('resolve-unlinked-modal-overlay');
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'resolve-unlinked-modal-overlay';
-    document.body.appendChild(modal);
+    portalRoot.appendChild(modal);
+  } else if (modal.parentElement !== portalRoot) {
+    portalRoot.appendChild(modal);
   }
 
   modal.className = 'modal active';
   document.body.style.overflow = 'hidden';
-  modal.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;backdrop-filter:blur(8px);overflow-y:auto;padding:16px;';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;inset:0;z-index:99999;background:rgba(0,0,0,0.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;overflow-y:auto;';
 
   modal.innerHTML = `
     <div style="width:100%;max-width:580px;max-height:80vh;overflow-y:auto;padding:20px 20px 28px 20px;box-sizing:border-box;background:var(--system-grouped-bg,#f2f2f7);border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,0.25);position:relative">
