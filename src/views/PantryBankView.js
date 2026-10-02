@@ -119,6 +119,10 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
     catEl.disabled = Boolean(parent && !ing);
     const targetCat = ing?.category || parent?.category || '';
     if (targetCat) catEl.value = targetCat;
+    if (parent && !ing) {
+      catEl.value = parent.category ? parent.category.toLowerCase() : '';
+      catEl.disabled = true;
+    }
   }
 
   if (msgEl && ing) {
@@ -181,8 +185,7 @@ export async function handleSetDefaultProduct(prodId, ingId, subtypeId = null) {
 }
 
 export async function promptAddAlias(ingId) {
-  const alias = prompt('Enter alias:');
-  if (alias) { await aliasIngredient(ingId, alias); renderIngredientBank(); }
+  const alias = prompt('Enter alias:'); if (alias) { await aliasIngredient(ingId, alias); renderIngredientBank(); }
 }
 
 export async function promptRemoveAlias(ingId, alias) {
@@ -356,9 +359,7 @@ export function initBankSubscriptions() {
 
 export function mount(container) { initBankSubscriptions(); renderIngredientBank(); renderProductBank(); }
 
-export const renderPantryBankView = renderIngredientBank;
-export { renderProductBank, openProductEditModal };
-
+export const renderPantryBankView = renderIngredientBank; export { renderProductBank, openProductEditModal };
 export function openAddSubtypeModal(parentId) { openIngredientFamilyDetailsModal(null, parentId); }
 export function openCategoryManager() { renderCategoryManagerModal(); }
 

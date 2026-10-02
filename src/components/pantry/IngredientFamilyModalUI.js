@@ -3,6 +3,8 @@
  * Encapsulates presentation, labeling, and real-time Tesco helper search integrations for the Ingredient Family modal.
  */
 
+import { addSubtypeToIngredient } from '../../models/PantryHierarchyModel.js';
+
 export function updateIngredientFamilyModalUI(ing, parent) {
   const labelEl = document.getElementById('ingredient-family-details-name-label');
   const nameEl = document.getElementById('ingredient-family-details-name');
@@ -22,7 +24,11 @@ export function updateIngredientFamilyModalUI(ing, parent) {
     }
     if (parentWrap) {
       parentWrap.style.display = 'block';
-      parentWrap.innerHTML = `<span>Parent Ingredient:</span> <span style="font-weight:700;color:var(--primary,#4f46e5)">${parent.name}</span>`;
+      parentWrap.style.padding = '10px';
+      parentWrap.style.background = '#f3f4f6';
+      parentWrap.style.borderRadius = '8px';
+      parentWrap.style.marginBottom = '12px';
+      parentWrap.innerHTML = `<strong>Parent Ingredient:</strong> <span style="color:#4f46e5;">${parent.name}</span>`;
     }
     if (actionsWrap) actionsWrap.style.display = 'flex';
 
@@ -32,9 +38,9 @@ export function updateIngredientFamilyModalUI(ing, parent) {
         const val = nameEl.value.trim();
         const query = `${parent.name} ${val}`.trim();
         tescoEl.innerHTML = `
-          <a href="https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(query)}" 
+          <a id="tesco-dynamic-link" href="https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(query)}" 
              target="_blank" rel="noopener" 
-             style="color:var(--primary,#4f46e5);font-weight:600;text-decoration:underline;display:inline-flex;align-items:center;gap:4px">
+             style="font-size: 0.85em; display: inline-block; margin-top: 4px; color:var(--primary,#4f46e5); font-weight: 600;">
             🔍 Search Tesco for "${query}" ↗
           </a>
         `;
@@ -49,4 +55,48 @@ export function updateIngredientFamilyModalUI(ing, parent) {
     if (parentWrap) parentWrap.style.display = 'none';
     if (actionsWrap) actionsWrap.style.display = 'none';
   }
+}
+
+if (typeof window !== 'undefined') {
+  window.transitionFromSubtypeToProduct = async function(actionType) {
+    const nameEl = document.getElementById('ingredient-family-details-name');
+    const wrapEl = document.getElementById('ingredient-family-details-wrap');
+    if (!wrapEl) return;
+    const parentId = wrapEl.dataset.parentId;
+    const subtypeName = nameEl ? nameEl.value.trim() : '';
+
+    if (!subtypeName) {
+      alert("Please enter a Sub-type Name first.");
+      return;
+    }
+
+    const notesEl = document.getElementById('ingredient-family-details-notes');
+    const subtypeNotes = notesEl ? notesEl.value.trim() : '';
+
+    // 1. Save the Sub-Type first so the product has a valid ID to link to
+    const sub = await addSubtypeToIngredient(parentId, subtypeName, subtypeNotes);
+    const newSubtypeId = sub ? sub.id : 'sub_' + Date.now();
+
+    // 2. CLOSE the current modal to prevent the dark background z-index collision
+    if (typeof window.closeIngredientFamilyDetailsModal === 'function') {
+      window.closeIngredientFamilyDetailsModal();
+    }
+
+    // 3. Set the global context binding for the Product flow
+    window.__prefilledResolveBinding = {
+      ingredientId: parentId,
+      subtypeId: newSubtypeId
+    };
+
+    // 4. Launch Native Flows
+    setTimeout(() => {
+      if (actionType === 'manual') {
+        if (typeof window.openProductEditModal === 'function') {
+          window.openProductEditModal(null);
+        }
+      } else if (actionType === 'link') {
+        alert("Sub-type saved. Ready to link existing product.");
+      }
+    }, 150); // slight delay to ensure DOM clears the first modal backdrop
+  };
 }
