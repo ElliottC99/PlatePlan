@@ -1,5 +1,5 @@
 /**
- * src/views/DataQualityView.js (v3.19.45)
+ * src/views/DataQualityView.js (v3.19.46)
  * Modular ES6 View for Data Quality Centre, audit scanner results, and 3-path resolutions.
  */
 
@@ -50,54 +50,58 @@ export async function dismissAdvisory(issueKey) {
 }
 
 export function handleFixIssue(e, entityType, entityId, issueKey = '', parentId = null) {
-  if (e && typeof e.preventDefault === 'function') {
-    e.preventDefault();
-  }
-  if (e && typeof e.stopPropagation === 'function') {
-    e.stopPropagation();
-  }
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
 
-  const state = getState() || {};
+  // Tier 1: Try PantryHierarchyModel
+  let item = (window.PantryHierarchyModel && typeof window.PantryHierarchyModel.getItemById === 'function')
+    ? window.PantryHierarchyModel.getItemById(entityId)
+    : null;
 
-  if (entityType === 'subtype') {
-    const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
-    const sub = parent?.subtypes?.find(s => String(s.id) === String(entityId));
-    const item = {
-      id: entityId,
-      entityId,
-      type: 'subtype',
-      entityType: 'subtype',
-      parentId: parentId,
-      parentIngredientId: parentId,
-      name: sub ? `${parent ? parent.name : 'Ingredient'} ➔ ${sub.name}` : (entityId || 'Sub-type'),
-      gapKey: issueKey
-    };
-    openResolveUnlinkedModal(item, 'subtype', parentId);
-  } else if (entityType === 'ingredient') {
-    // If it is unlinked, open unlinked modal
-    if (!issueKey || issueKey.startsWith('gap:ingredient')) {
-      const ing = (state.ingredients || []).find(i => String(i.id) === String(entityId));
-      const item = {
-        id: entityId,
-        entityId,
-        type: 'ingredient',
-        entityType: 'ingredient',
-        name: ing ? ing.name : (entityId || 'Ingredient'),
-        gapKey: issueKey
-      };
-      openResolveUnlinkedModal(item, 'ingredient');
-    } else {
-      // Direct mapping modal or edit ingredient properties
-      if (typeof window.openIngredientFamilyDetailsModal === 'function') {
-        window.openIngredientFamilyDetailsModal(entityId);
+  // Tier 2: Try Store State
+  if (!item) {
+    const state = getState() || (window.Store ? window.Store.getState() : {});
+    const ingredients = state.ingredients || state.pantry?.ingredients || [];
+    const directIng = ingredients.find(i => String(i.id) === String(entityId));
+    if (directIng) {
+      item = { ...directIng, type: 'ingredient' };
+    } else if (entityType === 'subtype' || parentId) {
+      for (const ing of ingredients) {
+        const sub = (ing.subtypes || []).find(s => String(s.id) === String(entityId));
+        if (sub) {
+          item = { ...sub, parentId: ing.id, parentIngredientId: ing.id, parentName: ing.name, category: ing.category, type: 'subtype' };
+          break;
+        }
       }
     }
-  } else if (entityType === 'product') {
+  }
+
+  // Tier 3: Hard Fallback object (Guarantees modal opens under ALL conditions)
+  if (!item) {
+    const rowEl = e?.target?.closest ? e.target.closest('.dq-issue-row, tr, .card') : null;
+    const nameEl = rowEl ? rowEl.querySelector('strong, h4, .item-name, td') : null;
+    const fallbackName = nameEl ? nameEl.textContent.trim() : 'Unlinked Catalog Item';
+
+    item = {
+      id: entityId,
+      name: fallbackName,
+      type: entityType,
+      parentId: parentId || null,
+      parentIngredientId: parentId || null
+    };
+  }
+
+  item.gapKey = issueKey;
+
+  if (entityType === 'product') {
     openProductEditModal(entityId);
   } else if (entityType === 'recipe') {
     if (typeof window.viewRecipe === 'function') {
       window.viewRecipe(entityId);
     }
+  } else {
+    // Sub-type or Core Ingredient
+    openResolveUnlinkedModal(item, entityType, parentId || item.parentId);
   }
 }
 

@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/IngredientFamilyModalUI.js (v3.19.45)
+ * src/components/pantry/IngredientFamilyModalUI.js (v3.19.46)
  * Encapsulates presentation, labeling, and real-time Tesco helper search integrations for the Ingredient Family modal.
  */
 
