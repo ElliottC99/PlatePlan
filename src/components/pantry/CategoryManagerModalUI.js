@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.19.40)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.19.41)
  * In-App Multi-Step Category Operations Wizard & Fine-Grained Reassignment Modal.
  * Replaces all native browser calls with accessible DOM views, relying on native Firestore reactivity.
  */
@@ -329,4 +329,96 @@ export function renderCategoryManagerModal() {
     invalidateHierarchyCache();
     closeCategoryManagerModal();
   };
+}
+
+export function openIngredientReorganiseModal(ingredientId) {
+  const state = getState() || {};
+  const currentIngs = Array.isArray(state.ingredients) ? state.ingredients : [];
+  const ing = currentIngs.find(i => String(i.id) === String(ingredientId));
+  if (!ing) return;
+
+  const targetCandidates = currentIngs.filter(i => String(i.id) !== String(ingredientId));
+
+  const showModal = (html) => {
+    const wrap = document.getElementById('view-modal-wrap');
+    const content = document.getElementById('view-modal-content');
+    if (wrap && content) {
+      content.innerHTML = html;
+      wrap.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+  };
+
+  const closeModal = () => {
+    const wrap = document.getElementById('view-modal-wrap');
+    if (wrap) {
+      wrap.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+  };
+
+  const html = `
+    <div style="padding: 24px; max-width: 500px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px;">
+      <h3 style="margin-top:0; margin-bottom: 6px; font-size: 1.15rem; font-weight: 750;">🔀 Reorganise Ingredient: ${escapeHtml(ing.name)}</h3>
+      <p style="font-size: 12.5px; color: var(--text2,#78716c); margin: 0 0 18px 0;">Select how you want to restructure or consolidate this ingredient.</p>
+
+      <!-- Option A: Merge into another Ingredient -->
+      <div style="padding: 14px; border: 1px solid var(--border,#e7e5e4); border-radius: 10px; margin-bottom: 14px; background: var(--surface2,#fafaf9);">
+        <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">🔀 Option A: Merge into another Ingredient</div>
+        <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Transfers all sub-types, linked products, and aliases to the target ingredient before removing this source.</p>
+        <div style="display:flex; gap:8px;">
+          <select id="reorg-core-merge-select" style="flex:1; padding:7px; border:1px solid var(--border,#e7e5e4); border-radius:6px; font-size:12px; background:#fff;" ${targetCandidates.length === 0 ? 'disabled' : ''}>
+            ${targetCandidates.map(c => `<option value="${escapeAttr(c.id)}">${escapeHtml(c.name)} (${escapeHtml(c.category || 'Other')})</option>`).join('') || '<option>No other ingredients available</option>'}
+          </select>
+          <button type="button" class="btn primary sm" id="btn-reorg-core-merge" ${targetCandidates.length === 0 ? 'disabled' : ''}>Merge</button>
+        </div>
+      </div>
+
+      <!-- Option B: Convert to Sub-type of... -->
+      <div style="padding: 14px; border: 1px solid var(--border,#e7e5e4); border-radius: 10px; margin-bottom: 20px; background: var(--surface2,#fafaf9);">
+        <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">⬇️ Option B: Convert to Sub-type of...</div>
+        <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Nests this ingredient as a child sub-type under the chosen parent, preserving all linked products.</p>
+        <div style="display:flex; gap:8px;">
+          <select id="reorg-core-demote-select" style="flex:1; padding:7px; border:1px solid var(--border,#e7e5e4); border-radius:6px; font-size:12px; background:#fff;" ${targetCandidates.length === 0 ? 'disabled' : ''}>
+            ${targetCandidates.map(c => `<option value="${escapeAttr(c.id)}">${escapeHtml(c.name)} (${escapeHtml(c.category || 'Other')})</option>`).join('') || '<option>No parent ingredients available</option>'}
+          </select>
+          <button type="button" class="btn primary sm" id="btn-reorg-core-demote" ${targetCandidates.length === 0 ? 'disabled' : ''}>Convert</button>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content: flex-end;">
+        <button type="button" class="btn" id="btn-cancel-reorg-core">Cancel</button>
+      </div>
+    </div>
+  `;
+
+  showModal(html);
+
+  document.getElementById('btn-cancel-reorg-core').onclick = closeModal;
+
+  document.getElementById('btn-reorg-core-merge').onclick = async () => {
+    const targetId = document.getElementById('reorg-core-merge-select').value;
+    if (!targetId) return;
+    closeModal();
+    import('../../models/PantryHierarchyModel.js').then(async (model) => {
+      await model.mergeIngredients(ingredientId, targetId);
+      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+      if (typeof window.renderProductBank === 'function') window.renderProductBank();
+    });
+  };
+
+  document.getElementById('btn-reorg-core-demote').onclick = async () => {
+    const targetParentId = document.getElementById('reorg-core-demote-select').value;
+    if (!targetParentId) return;
+    closeModal();
+    import('../../models/PantryHierarchyModel.js').then(async (model) => {
+      await model.demoteToSubtype(ingredientId, targetParentId);
+      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+      if (typeof window.renderProductBank === 'function') window.renderProductBank();
+    });
+  };
+}
+
+if (typeof window !== 'undefined') {
+  window.openIngredientReorganiseModal = openIngredientReorganiseModal;
 }

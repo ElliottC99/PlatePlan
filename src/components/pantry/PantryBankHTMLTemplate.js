@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/PantryBankHTMLTemplate.js (v3.19.40)
+ * src/components/pantry/PantryBankHTMLTemplate.js (v3.19.41)
  * Extracted HTML UI renderer for the Category -> Ingredient -> Sub-type Hierarchy.
  * Helps keep PantryBankView.js compact and focused strictly under the 400-line limit.
  */
@@ -43,8 +43,7 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr) {
                     <button type="button" class="btn xs ghost" onclick="toggleCardMoreMenu(this, '${escapeAttr(ing.id)}')" title="More actions" style="padding:2px 6px;font-weight:700">•••</button>
                     <div id="card-more-menu-${escapeAttr(ing.id)}" class="card-more-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:8px;box-shadow:0 6px 16px rgba(0,0,0,0.08);z-index:100;min-width:130px;flex-direction:column;padding:4px">
                       <button type="button" class="btn xs ghost" onclick="promptAddAlias('${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🏷️ + Alias</button>
-                      <button type="button" class="btn xs ghost" onclick="promptMerge('${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🔀 Merge</button>
-                      <button type="button" class="btn xs ghost" onclick="promptDemote('${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">⬇️ Move / Set as Sub-type of...</button>
+                      <button type="button" class="btn xs ghost" onclick="window.openIngredientReorganiseModal('${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🔄 Reorganise</button>
                       <div style="height:1px;background:var(--border,#e7e5e4);margin:4px 0"></div>
                       <button type="button" class="btn xs ghost" onclick="handleDeleteIngredient('${escapeAttr(ing.id)}', '${escapeAttr(ing.name)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;color:var(--red,#ef4444);font-size:12px;text-align:left">🗑️ Delete</button>
                     </div>
