@@ -67,6 +67,7 @@ export function closeIngredientFamilyDetailsModal() {
   if (modalWrap) {
     modalWrap.classList.remove('open');
     modalWrap.dataset.parentId = '';
+    modalWrap.dataset.editingIngredientId = '';
   }
   const catEl = document.getElementById('ingredient-family-details-cat');
   if (catEl) catEl.disabled = false;
@@ -89,6 +90,7 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
   document.body.style.overflow = 'hidden';
   activeEditingIngredientId = ingredientId;
   modalWrap.dataset.parentId = parentId || '';
+  modalWrap.dataset.editingIngredientId = ingredientId || '';
 
   const state = getState() || {}, ingredients = state.ingredients || [], products = state.products || [];
   const ing = ingredientId ? ingredients.find(i => String(i.id) === String(ingredientId)) : null;
@@ -331,7 +333,11 @@ export function renderIngredientBank() {
                           <span style="font-size:12px;font-weight:650">↳ ${escapeHtml(st.name)}</span>
                           ${st.defaultProduct ? `<span class="tag" style="font-size:10px;background:rgba(79,70,229,0.08);color:var(--primary)">⭐ ${escapeHtml(st.defaultProduct.name)}</span>` : ''}
                         </div>
-                        <button type="button" class="btn xs ghost" onclick="handlePromoteSubtype('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" title="Promote to Core Ingredient">Promote to Core Ingredient</button>
+                        <div class="subtype-row-actions" style="display:flex;gap:4px">
+                          <button type="button" class="btn xs ghost" onclick="openIngredientFamilyDetailsModal('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')">Edit</button>
+                          <button type="button" class="btn xs ghost" onclick="linkProductToSubtype('${escapeAttr(ing.id)}', '${escapeAttr(st.id)}')" title="Link Product">Link Product</button>
+                          <button type="button" class="btn xs ghost" onclick="handlePromoteSubtype('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" title="Promote to Core Ingredient">Promote</button>
+                        </div>
                       </div>
                     `).join('')}
                   </div>
@@ -362,11 +368,14 @@ export function mount(container) { initBankSubscriptions(); renderIngredientBank
 export const renderPantryBankView = renderIngredientBank; export { renderProductBank, openProductEditModal };
 export function openAddSubtypeModal(parentId) { openIngredientFamilyDetailsModal(null, parentId); }
 export function openCategoryManager() { renderCategoryManagerModal(); }
+export function linkProductToSubtype(parentId, subtypeId) {
+  window.__prefilledResolveBinding = { ingredientId: parentId, subtypeId: subtypeId }; if (typeof openProductEditModal === 'function') openProductEditModal(null);
+}
 
 if (typeof window !== 'undefined') {
   Object.assign(window, {
     renderIngredientBank, renderPantryBankView, openIngredientFamilyDetailsModal, closeIngredientFamilyDetailsModal,
-    openAddSubtypeModal,
+    openAddSubtypeModal, linkProductToSubtype,
     saveIngredientFamilyDetailsModal, handleSetDefaultProduct, promptAddAlias, promptRemoveAlias,
     promptAddSubtype, promptMerge, promptDemote, handlePromoteSubtype, handleDeleteIngredient,
     openCategoryManager, openCategoryManagerModal: openCategoryManager,
@@ -374,25 +383,16 @@ if (typeof window !== 'undefined') {
     createIngredientFamilyPrompt: () => openIngredientFamilyDetailsModal(null),
     
     toggleSubtypeCollapse(btn, ingId) {
-      const container = document.getElementById(`subtypes-container-${ingId}`);
-      if (!container) return;
-      const isCollapsed = container.style.display === 'none';
-      container.style.display = isCollapsed ? 'flex' : 'none'; container.classList.toggle('is-expanded', isCollapsed);
-      btn.textContent = `${isCollapsed ? '▲' : '▼'} SUB-TYPES (${container.children.length})`;
+      const el = document.getElementById(`subtypes-container-${ingId}`); if (!el) return;
+      const collapsed = el.style.display === 'none'; el.style.display = collapsed ? 'flex' : 'none'; el.classList.toggle('is-expanded', collapsed);
+      btn.textContent = `${collapsed ? '▲' : '▼'} SUB-TYPES (${el.children.length})`;
     },
     toggleCardMoreMenu(btn, ingId) {
       document.querySelectorAll('.card-more-menu').forEach(m => { if (m.id !== `card-more-menu-${ingId}`) m.style.display = 'none'; });
-      const menu = document.getElementById(`card-more-menu-${ingId}`);
-      if (!menu) return;
-      const isHidden = menu.style.display === 'none';
-      menu.style.display = isHidden ? 'flex' : 'none';
-      const closeListener = (e) => {
-        if (!btn.contains(e.target) && !menu.contains(e.target)) {
-          menu.style.display = 'none';
-          document.removeEventListener('click', closeListener);
-        }
-      };
-      if (isHidden) setTimeout(() => document.addEventListener('click', closeListener), 10);
+      const menu = document.getElementById(`card-more-menu-${ingId}`); if (!menu) return;
+      const isHidden = menu.style.display === 'none'; menu.style.display = isHidden ? 'flex' : 'none';
+      const close = (e) => { if (!btn.contains(e.target) && !menu.contains(e.target)) { menu.style.display = 'none'; document.removeEventListener('click', close); } };
+      if (isHidden) setTimeout(() => document.addEventListener('click', close), 10);
     }
   });
 }

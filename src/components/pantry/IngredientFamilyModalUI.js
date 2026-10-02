@@ -1,9 +1,11 @@
 /**
- * src/components/pantry/IngredientFamilyModalUI.js (v3.19.35)
+ * src/components/pantry/IngredientFamilyModalUI.js (v3.19.36)
  * Encapsulates presentation, labeling, and real-time Tesco helper search integrations for the Ingredient Family modal.
  */
 
 import { addSubtypeToIngredient } from '../../models/PantryHierarchyModel.js';
+
+const escapeHTML = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export function updateIngredientFamilyModalUI(ing, parent) {
   const labelEl = document.getElementById('ingredient-family-details-name-label');
@@ -11,39 +13,110 @@ export function updateIngredientFamilyModalUI(ing, parent) {
   const parentWrap = document.getElementById('parent-ingredient-display-wrap');
   const actionsWrap = document.getElementById('subtype-product-actions-wrap');
   const tescoEl = document.getElementById('tesco-search-helper-link');
+  const catEl = document.getElementById('ingredient-family-details-cat');
 
-  // 1. Reset dynamic fields
+  // 1. Reset dynamic fields & listeners
   if (tescoEl) tescoEl.innerHTML = '';
-  if (nameEl) nameEl.oninput = null; // Clear previous listener
+  if (nameEl) nameEl.oninput = null;
+  if (catEl && catEl.parentNode) {
+    catEl.parentNode.style.display = 'block'; // Restore default visibility
+  }
 
   // 2. Handle sub-type vs standard ingredient mode
   if (parent && !ing) {
+    // 2a. Hierarchy banners in sub-type mode
+    if (catEl && catEl.parentNode) {
+      catEl.parentNode.style.display = 'none'; // Hide/remove the Category dropdown
+    }
+
+    if (parentWrap) {
+      parentWrap.style.display = 'block';
+      parentWrap.style.padding = '0';
+      parentWrap.style.background = 'transparent';
+      parentWrap.style.border = 'none';
+      parentWrap.style.marginBottom = '12px';
+      parentWrap.innerHTML = `
+        <div class="hierarchy-banner-stack" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
+          <div class="cat-hierarchy-badge" style="background: #eef2ff; color: #3730a3; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">
+            🏷️ ${escapeHTML(parent.category || 'Uncategorized')}
+          </div>
+          <div class="parent-hierarchy-badge" style="background: #f3f4f6; color: #4b5563; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem;">
+            <strong>Parent Ingredient:</strong> <span style="color: #111827; font-weight: 500;">${escapeHTML(parent.name)}</span>
+          </div>
+        </div>
+      `;
+    }
+
     if (labelEl) labelEl.textContent = 'Sub-type Name';
     if (nameEl) {
       nameEl.placeholder = 'e.g. Mini 4 Pack, Sourdough, Frozen';
     }
+
+    // New Sub-type Mode: Hide product action buttons
+    if (actionsWrap) actionsWrap.style.display = 'none';
+
+    // Real-time Tesco search helper
+    if (nameEl && tescoEl) {
+      tescoEl.innerHTML = `<a id="tesco-dynamic-link" href="#" target="_blank" rel="noopener"></a>`;
+      const tescoLinkEl = document.getElementById('tesco-dynamic-link');
+      const updateTescoLink = () => {
+        const subVal = nameEl.value.trim();
+        const query = subVal || parent.name;
+        tescoLinkEl.textContent = `🔍 Search Tesco for "${query}" ↗`;
+        tescoLinkEl.href = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(query)}`;
+        tescoLinkEl.style.fontSize = '0.85em';
+        tescoLinkEl.style.display = 'inline-block';
+        tescoLinkEl.style.marginTop = '4px';
+        tescoLinkEl.style.color = 'var(--primary,#4f46e5)';
+        tescoLinkEl.style.fontWeight = '600';
+      };
+      nameEl.oninput = updateTescoLink;
+      updateTescoLink();
+    }
+  } else if (parent && ing) {
+    // 2b. Edit Sub-type Mode
+    if (catEl && catEl.parentNode) {
+      catEl.parentNode.style.display = 'none'; // Hide category dropdown
+    }
+
     if (parentWrap) {
       parentWrap.style.display = 'block';
-      parentWrap.style.padding = '10px';
-      parentWrap.style.background = '#f3f4f6';
-      parentWrap.style.borderRadius = '8px';
+      parentWrap.style.padding = '0';
+      parentWrap.style.background = 'transparent';
+      parentWrap.style.border = 'none';
       parentWrap.style.marginBottom = '12px';
-      parentWrap.innerHTML = `<strong>Parent Ingredient:</strong> <span style="color:#4f46e5;">${parent.name}</span>`;
+      parentWrap.innerHTML = `
+        <div class="hierarchy-banner-stack" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
+          <div class="cat-hierarchy-badge" style="background: #eef2ff; color: #3730a3; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">
+            🏷️ ${escapeHTML(parent.category || 'Uncategorized')}
+          </div>
+          <div class="parent-hierarchy-badge" style="background: #f3f4f6; color: #4b5563; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem;">
+            <strong>Parent Ingredient:</strong> <span style="color: #111827; font-weight: 500;">${escapeHTML(parent.name)}</span>
+          </div>
+        </div>
+      `;
     }
+
+    if (labelEl) labelEl.textContent = 'Sub-type Name';
+    if (nameEl) nameEl.placeholder = 'e.g. Mini 4 Pack, Sourdough, Frozen';
+
+    // Edit Sub-type Mode: Enable product action buttons
     if (actionsWrap) actionsWrap.style.display = 'flex';
 
     // Real-time Tesco search helper
     if (nameEl && tescoEl) {
+      tescoEl.innerHTML = `<a id="tesco-dynamic-link" href="#" target="_blank" rel="noopener"></a>`;
+      const tescoLinkEl = document.getElementById('tesco-dynamic-link');
       const updateTescoLink = () => {
-        const val = nameEl.value.trim();
-        const query = `${parent.name} ${val}`.trim();
-        tescoEl.innerHTML = `
-          <a id="tesco-dynamic-link" href="https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(query)}" 
-             target="_blank" rel="noopener" 
-             style="font-size: 0.85em; display: inline-block; margin-top: 4px; color:var(--primary,#4f46e5); font-weight: 600;">
-            🔍 Search Tesco for "${query}" ↗
-          </a>
-        `;
+        const subVal = nameEl.value.trim();
+        const query = subVal || parent.name;
+        tescoLinkEl.textContent = `🔍 Search Tesco for "${query}" ↗`;
+        tescoLinkEl.href = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(query)}`;
+        tescoLinkEl.style.fontSize = '0.85em';
+        tescoLinkEl.style.display = 'inline-block';
+        tescoLinkEl.style.marginTop = '4px';
+        tescoLinkEl.style.color = 'var(--primary,#4f46e5)';
+        tescoLinkEl.style.fontWeight = '600';
       };
       nameEl.oninput = updateTescoLink;
       updateTescoLink();
@@ -58,45 +131,39 @@ export function updateIngredientFamilyModalUI(ing, parent) {
 }
 
 if (typeof window !== 'undefined') {
-  window.transitionFromSubtypeToProduct = async function(actionType) {
-    const nameEl = document.getElementById('ingredient-family-details-name');
+  window.transitionFromSubtypeToProduct = function(actionType) {
     const wrapEl = document.getElementById('ingredient-family-details-wrap');
     if (!wrapEl) return;
     const parentId = wrapEl.dataset.parentId;
-    const subtypeName = nameEl ? nameEl.value.trim() : '';
+    const existingSubtypeId = wrapEl.dataset.editingIngredientId || '';
 
-    if (!subtypeName) {
-      alert("Please enter a Sub-type Name first.");
+    if (!existingSubtypeId) {
+      alert("Product actions are only available after saving the sub-type.");
       return;
     }
 
-    const notesEl = document.getElementById('ingredient-family-details-notes');
-    const subtypeNotes = notesEl ? notesEl.value.trim() : '';
-
-    // 1. Save the Sub-Type first so the product has a valid ID to link to
-    const sub = await addSubtypeToIngredient(parentId, subtypeName, subtypeNotes);
-    const newSubtypeId = sub ? sub.id : 'sub_' + Date.now();
-
-    // 2. CLOSE the current modal to prevent the dark background z-index collision
+    // 1. Close current modal to prevent stacked overlay backdrop issues
     if (typeof window.closeIngredientFamilyDetailsModal === 'function') {
       window.closeIngredientFamilyDetailsModal();
     }
 
-    // 3. Set the global context binding for the Product flow
+    // 2. Set global context binding
     window.__prefilledResolveBinding = {
       ingredientId: parentId,
-      subtypeId: newSubtypeId
+      subtypeId: existingSubtypeId
     };
 
-    // 4. Launch Native Flows
+    // 3. Launch Native Product Flows after short clearing delay
     setTimeout(() => {
       if (actionType === 'manual') {
         if (typeof window.openProductEditModal === 'function') {
           window.openProductEditModal(null);
         }
       } else if (actionType === 'link') {
-        alert("Sub-type saved. Ready to link existing product.");
+        if (typeof window.linkProductToSubtype === 'function') {
+          window.linkProductToSubtype(parentId, existingSubtypeId);
+        }
       }
-    }, 150); // slight delay to ensure DOM clears the first modal backdrop
+    }, 150);
   };
 }
