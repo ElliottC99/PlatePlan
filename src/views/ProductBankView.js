@@ -155,53 +155,22 @@ export async function saveManualIng() {
 }
 
 export async function promptReallocateProduct(productId) {
-  const state = getState() || {};
-  const prods = Array.isArray(state.products) ? state.products : [];
-  const ings = Array.isArray(state.ingredients) ? state.ingredients : [];
-
-  const prod = prods.find(p => String(p.id) === String(productId));
-  if (!prod) return;
-
-  if (!ings.length) {
-    alert('No ingredients available to reallocate into.');
-    return;
-  }
-
-  const promptText = `Reallocate "${prod.name}" to which Ingredient?\n` + ings.map((i, idx) => `${idx + 1}. ${i.name} (${i.category || 'Other'})`).join('\n') + `\nEnter number:`;
-  const selectedIdx = prompt(promptText);
-  const num = parseInt(selectedIdx, 10);
-  if (!isNaN(num) && num >= 1 && num <= ings.length) {
-    const targetIng = ings[num - 1];
-    
-    // Check if target has subtypes
-    let targetSubtypeId = null;
-    if (Array.isArray(targetIng.subtypes) && targetIng.subtypes.length > 0) {
-      const subPrompt = `Choose Sub-type under "${targetIng.name}" (or 0 for top-level):\n0. Top-level ${targetIng.name}\n` + targetIng.subtypes.map((s, idx) => `${idx + 1}. ${s.name}`).join('\n');
-      const subChoice = prompt(subPrompt);
-      const subNum = parseInt(subChoice, 10);
-      if (!isNaN(subNum) && subNum >= 1 && subNum <= targetIng.subtypes.length) {
-        targetSubtypeId = targetIng.subtypes[subNum - 1].id;
-      }
-    }
-
-    await reallocateProduct(productId, targetIng.id, targetSubtypeId, targetIng.category);
-    renderProductBank();
+  if (typeof window.promptReallocateProduct === 'function') {
+    window.promptReallocateProduct(productId);
   }
 }
 
 export async function handleDeleteProduct(productId, prodName) {
-  if (confirm(`Delete product "${prodName}" from bank?`)) {
-    const state = getState() || {};
-    const prods = (state.products || []).filter(p => String(p.id) !== String(productId));
-    setProducts(prods);
-    renderProductBank();
-    await deleteProduct(productId);
+  if (typeof window.handleDeleteProduct === 'function') {
+    window.handleDeleteProduct(productId, prodName);
   }
 }
 
 export async function handleMakeAutoDefault(productId, ingredientId) {
   if (!ingredientId) {
-    alert('Please reallocate this product to an ingredient before setting as auto-default.');
+    if (typeof window.showCustomAlert === 'function') {
+      window.showCustomAlert('Please reallocate this product to an ingredient before setting as auto-default.');
+    }
     return;
   }
   await setAutoDefaultProduct(productId, ingredientId);

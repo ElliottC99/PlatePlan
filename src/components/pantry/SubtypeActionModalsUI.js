@@ -582,6 +582,125 @@ window.promptMerge = (sourceId, parentId = null) => {
   };
 };
 
+// 8. PRODUCT MANAGEMENT ZERO POPUP DIALOGS
+window.handleDeleteProduct = (productId, prodName) => {
+  const html = `
+    <div style="padding: 24px; max-width: 440px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">🗑️</div>
+      <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750; color: var(--red,#ef4444)">Delete Product?</h3>
+      <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 24px 0; line-height: 1.5;">
+        Are you sure you want to delete <strong>"${escapeHTML(prodName)}"</strong> from your bank?
+      </p>
+
+      <div style="display:flex; gap:8px; justify-content: center;">
+        <button type="button" class="btn" style="padding: 8px 16px;" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn danger" style="padding: 8px 16px;" id="btn-confirm-prod-delete">Confirm Delete</button>
+      </div>
+    </div>
+  `;
+  showModal(html);
+
+  document.getElementById('btn-confirm-prod-delete').onclick = async () => {
+    closeModal();
+    const state = getState() || {};
+    const prods = (state.products || []).filter(p => String(p.id) !== String(productId));
+    setProducts(prods);
+    if (typeof window.renderProductBank === 'function') window.renderProductBank();
+    import('../../services/HouseholdRepository.js').then(async (repo) => {
+      await repo.deleteProduct(productId);
+    });
+  };
+};
+
+window.promptReallocateProduct = (productId) => {
+  const state = getState() || {};
+  const currentIngs = state.ingredients || [];
+  const prods = state.products || [];
+  const prod = prods.find(p => String(p.id) === String(productId));
+  if (!prod) return;
+
+  if (!currentIngs.length) {
+    window.showCustomAlert('No ingredients available to reallocate into.');
+    return;
+  }
+
+  const html = `
+    <div style="padding: 24px; max-width: 480px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 12px;">
+      <h3 style="margin-top:0; margin-bottom: 12px; font-size: 1.15rem; font-weight: 750;">📦 Reallocate: ${escapeHTML(prod.name)}</h3>
+      <p style="font-size: 13px; color: var(--text2); margin-bottom: 16px;">Choose which parent ingredient and optional sub-type this product belongs to.</p>
+
+      <div class="field" style="margin-bottom: 16px;">
+        <label style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">Target Ingredient</label>
+        <select id="realloc-ing-select" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:6px; font-size:12px;">
+          ${currentIngs.map(i => `<option value="${escapeHTML(i.id)}">${escapeHTML(i.name)} (${escapeHTML(i.category || 'Other')})</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="field" id="realloc-subtype-field" style="margin-bottom: 20px; display:none;">
+        <label style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">Sub-type (Optional)</label>
+        <select id="realloc-subtype-select" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:6px; font-size:12px;">
+        </select>
+      </div>
+
+      <div style="display:flex; gap:8px; justify-content: flex-end;">
+        <button type="button" class="btn" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn primary" id="btn-confirm-realloc">Reallocate</button>
+      </div>
+    </div>
+  `;
+  showModal(html);
+
+  const ingSelect = document.getElementById('realloc-ing-select');
+  const subField = document.getElementById('realloc-subtype-field');
+  const subSelect = document.getElementById('realloc-subtype-select');
+
+  const updateSubtypes = () => {
+    const ingId = ingSelect.value;
+    const ing = currentIngs.find(i => String(i.id) === String(ingId));
+    if (ing && Array.isArray(ing.subtypes) && ing.subtypes.length > 0) {
+      subSelect.innerHTML = `<option value="">None (Top-level ${escapeHTML(ing.name)})</option>` + 
+        ing.subtypes.map(s => `<option value="${escapeHTML(s.id)}">${escapeHTML(s.name)}</option>`).join('');
+      subField.style.display = 'block';
+    } else {
+      subSelect.innerHTML = '';
+      subField.style.display = 'none';
+    }
+  };
+
+  ingSelect.onchange = updateSubtypes;
+  updateSubtypes();
+
+  document.getElementById('btn-confirm-realloc').onclick = async () => {
+    const ingId = ingSelect.value;
+    const subtypeId = subSelect.value || null;
+    const ing = currentIngs.find(i => String(i.id) === String(ingId));
+    if (!ing) return;
+    closeModal();
+    import('../../models/PantryHierarchyModel.js').then(async (model) => {
+      await model.reallocateProduct(productId, ing.id, subtypeId, ing.category);
+      if (typeof window.renderProductBank === 'function') window.renderProductBank();
+      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+    });
+  };
+};
+
+window.showCustomAlert = (message) => {
+  const html = `
+    <div style="padding: 24px; max-width: 400px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">⚠️</div>
+      <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750;">Notification</h3>
+      <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 20px 0; line-height: 1.5;">
+        ${escapeHTML(message)}
+      </p>
+
+      <div style="display:flex; justify-content: center;">
+        <button type="button" class="btn primary" style="padding: 8px 24px;" onclick="window.closeSubtypeActionModal()">OK</button>
+      </div>
+    </div>
+  `;
+  showModal(html);
+};
+
 // Global window linkages
 if (typeof window !== 'undefined') {
   window.closeSubtypeActionModal = closeModal;
