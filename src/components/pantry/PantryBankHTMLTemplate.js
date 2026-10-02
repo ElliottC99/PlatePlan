@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/PantryBankHTMLTemplate.js (v3.19.55)
+ * src/components/pantry/PantryBankHTMLTemplate.js (v3.19.58)
  * Extracted HTML UI renderer for the Category -> Ingredient -> Sub-type Hierarchy.
  * Helps keep PantryBankView.js compact and focused strictly under the 400-line limit.
  */

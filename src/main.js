@@ -300,7 +300,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const badgeEl = document.getElementById('app-header-version') || document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (badgeEl) {
-    badgeEl.textContent = 'v3.19.55';
+    badgeEl.textContent = window.APP_VERSION || 'v3.19.58';
   }
 }
 
