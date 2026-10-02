@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/SubtypeActionModalsUI.js (v3.19.38)
+ * src/components/pantry/SubtypeActionModalsUI.js (v3.19.39)
  * Standardized custom styled dialogs and workflows for nested sub-types.
  * Eliminates all prompt(), alert(), and confirm() browser chrome calls.
  */
@@ -101,7 +101,7 @@ export function openSubtypeLinkSelectionModal(subtypeId, parentId) {
 
       <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">
         <!-- Card 1: Link Existing Product -->
-        <div onclick="window.handleSubtypeLinkRoute('link', '${subtypeId}', '${parentId}')" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:#fff; transition: background 0.15s;" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='#fff'">
+        <div onclick="window.handleSubtypeLinkRoute('link', '${subtypeId || ''}', '${parentId}')" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:#fff; transition: background 0.15s;" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='#fff'">
           <div style="font-size: 24px;">🔗</div>
           <div>
             <div style="font-weight: 750; font-size: 13.5px;">1. Link Existing Product(s)</div>
@@ -110,7 +110,7 @@ export function openSubtypeLinkSelectionModal(subtypeId, parentId) {
         </div>
 
         <!-- Card 2: Add Product Manually -->
-        <div onclick="window.handleSubtypeLinkRoute('manual', '${subtypeId}', '${parentId}')" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:#fff; transition: background 0.15s;" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='#fff'">
+        <div onclick="window.handleSubtypeLinkRoute('manual', '${subtypeId || ''}', '${parentId}')" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:#fff; transition: background 0.15s;" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='#fff'">
           <div style="font-size: 24px;">➕</div>
           <div>
             <div style="font-weight: 750; font-size: 13.5px;">2. Add Product Manually</div>
@@ -119,7 +119,7 @@ export function openSubtypeLinkSelectionModal(subtypeId, parentId) {
         </div>
 
         <!-- Card 3: Import from Tesco -->
-        <div onclick="window.handleSubtypeLinkRoute('tesco', '${subtypeId}', '${parentId}')" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:#fff; transition: background 0.15s;" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='#fff'">
+        <div onclick="window.handleSubtypeLinkRoute('tesco', '${subtypeId || ''}', '${parentId}')" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:#fff; transition: background 0.15s;" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='#fff'">
           <div style="font-size: 24px;">🛒</div>
           <div>
             <div style="font-weight: 750; font-size: 13.5px;">3. Import from Tesco</div>
@@ -135,6 +135,227 @@ export function openSubtypeLinkSelectionModal(subtypeId, parentId) {
   `;
 
   showModal(html);
+}
+
+// 2a. PATH 1: EXISTING PRODUCT PICKER MODAL
+export function openSubtypeExistingProductPickerModal(subtypeId, parentId) {
+  const state = getState() || {};
+  const products = Array.isArray(state.products) ? state.products : [];
+  const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
+  const subName = subtypeId 
+    ? parent?.subtypes?.find(s => String(s.id) === String(subtypeId))?.name 
+    : (window.__draftSubtypePayload?.name || 'New Sub-type');
+
+  const html = `
+    <div style="padding: 20px; max-width: 500px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 12px;">
+      <h3 style="margin-top:0; margin-bottom: 6px; font-size: 1.15rem; font-weight: 750;">🔗 Select Existing Products for "${escapeHTML(subName)}"</h3>
+      <p style="font-size: 12.5px; color: var(--text2,#78716c); margin: 0 0 14px 0;">Search your product bank and check one or more items to attach.</p>
+
+      <div style="margin-bottom: 12px;">
+        <input type="text" id="picker-search-input" placeholder="🔍 Search products by title or brand..." style="width:100%; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px;" />
+      </div>
+
+      <div id="picker-product-list" style="display:flex; flex-direction:column; gap:6px; max-height:220px; overflow-y:auto; padding:6px; background:var(--surface2,#f5f5f4); border:1px solid var(--border,#e7e5e4); border-radius:8px; margin-bottom: 18px;">
+      </div>
+
+      <div style="display:flex; gap:8px; justify-content: flex-end; align-items:center;">
+        <span id="picker-selected-count" style="font-size:12px; color:var(--text2); margin-right:auto; font-weight:600;">0 selected</span>
+        <button type="button" class="btn" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn primary" id="btn-confirm-picker-link" disabled style="opacity:0.5; pointer-events:none;">Link Selected Product(s)</button>
+      </div>
+    </div>
+  `;
+
+  showModal(html);
+
+  const searchInput = document.getElementById('picker-search-input');
+  const listContainer = document.getElementById('picker-product-list');
+  const confirmBtn = document.getElementById('btn-confirm-picker-link');
+  const countEl = document.getElementById('picker-selected-count');
+
+  const checkedIds = new Set(window.__draftSubtypePayload?.linkedProductIds || []);
+
+  const renderList = (filterText = '') => {
+    const query = filterText.toLowerCase().trim();
+    const filtered = products.filter(p => {
+      if (!query) return true;
+      return (p.name || '').toLowerCase().includes(query) || (p.brand || '').toLowerCase().includes(query);
+    });
+
+    if (!filtered.length) {
+      listContainer.innerHTML = `<div style="text-align:center; padding:16px; font-size:12px; color:var(--text2);">No products found matching "${escapeHTML(query)}".</div>`;
+      return;
+    }
+
+    listContainer.innerHTML = filtered.map(p => {
+      const isChecked = checkedIds.has(String(p.id));
+      return `
+        <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:#fff; border:1px solid var(--border,#e7e5e4); border-radius:6px; cursor:pointer;">
+          <input type="checkbox" class="product-picker-cb" value="${escapeHTML(p.id)}" ${isChecked ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--primary,#4f46e5); cursor:pointer;" />
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:12.5px; font-weight:650; color:var(--text,#1c1917); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${escapeHTML(p.name)}</div>
+            <div style="font-size:11px; color:var(--text2,#78716c);">${escapeHTML(p.brand || 'No brand')} · £${Number(p.price || 0).toFixed(2)}</div>
+          </div>
+        </label>
+      `;
+    }).join('');
+
+    listContainer.querySelectorAll('.product-picker-cb').forEach(cb => {
+      cb.onchange = () => {
+        if (cb.checked) {
+          checkedIds.add(cb.value);
+        } else {
+          checkedIds.delete(cb.value);
+        }
+        updateBtnState();
+      };
+    });
+  };
+
+  const updateBtnState = () => {
+    const count = checkedIds.size;
+    countEl.textContent = `${count} selected`;
+    if (count >= 1) {
+      confirmBtn.disabled = false;
+      confirmBtn.style.opacity = '1';
+      confirmBtn.style.pointerEvents = 'auto';
+    } else {
+      confirmBtn.disabled = true;
+      confirmBtn.style.opacity = '0.5';
+      confirmBtn.style.pointerEvents = 'none';
+    }
+  };
+
+  searchInput.oninput = () => renderList(searchInput.value);
+  renderList();
+  updateBtnState();
+
+  confirmBtn.onclick = async () => {
+    const selectedArray = Array.from(checkedIds);
+    if (!selectedArray.length) return;
+
+    closeModal();
+
+    if (subtypeId && parentId) {
+      // Existing sub-type mode: link directly
+      const updatedProds = products.map(p => {
+        if (selectedArray.includes(String(p.id))) {
+          return { ...p, ingredientId: parentId, subtypeId: subtypeId, updatedAt: new Date().toISOString() };
+        }
+        return p;
+      });
+      setProducts(updatedProds);
+      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+      if (typeof window.renderProductBank === 'function') window.renderProductBank();
+      await Promise.all(updatedProds.filter(p => selectedArray.includes(String(p.id))).map(p => saveProduct(p)));
+    } else {
+      // Draft sub-type mode: store linkedProductIds in payload and re-open add subtype modal
+      if (!window.__draftSubtypePayload) {
+        window.__draftSubtypePayload = { parentId, name: subName, notes: '' };
+      }
+      window.__draftSubtypePayload.linkedProductIds = selectedArray;
+
+      if (typeof window.openIngredientFamilyDetailsModal === 'function') {
+        window.openIngredientFamilyDetailsModal(null, parentId);
+        setTimeout(() => {
+          const nameInput = document.getElementById('ingredient-family-details-name');
+          const notesInput = document.getElementById('ingredient-family-details-notes');
+          if (nameInput && window.__draftSubtypePayload.name) nameInput.value = window.__draftSubtypePayload.name;
+          if (notesInput && window.__draftSubtypePayload.notes) notesInput.value = window.__draftSubtypePayload.notes;
+        }, 50);
+      }
+    }
+  };
+}
+
+// 2b. PATH 3: TESCO JSON IMPORT MODAL
+export function openTescoImportModal(subtypeId, parentId) {
+  const state = getState() || {};
+  const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
+  const subName = subtypeId 
+    ? parent?.subtypes?.find(s => String(s.id) === String(subtypeId))?.name 
+    : (window.__draftSubtypePayload?.name || parent?.name || 'Item');
+
+  const tescoSearchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(subName)}`;
+
+  const html = `
+    <div style="padding: 24px; max-width: 520px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px;">
+      <h3 style="margin-top:0; margin-bottom: 8px; font-size: 1.15rem; font-weight: 750;">🛒 Import Product from Tesco</h3>
+      
+      <!-- Dynamic Search Button directly under Title -->
+      <div style="margin-bottom: 16px;">
+        <a href="${tescoSearchUrl}" target="_blank" rel="noopener" class="btn sm ghost" style="display:inline-flex; align-items:center; gap:6px; color:var(--primary,#4f46e5); font-weight:600; font-size:12.5px; padding:6px 12px; border:1px solid rgba(79,70,229,0.2); background:rgba(79,70,229,0.05); border-radius:8px; text-decoration:none;">
+          🔍 Search Tesco for "${escapeHTML(subName)}" ↗
+        </a>
+      </div>
+
+      <!-- Bookmarklet Helper -->
+      <div style="padding:10px 12px; background:var(--surface2,#f5f5f4); border:1px solid var(--border,#e7e5e4); border-radius:8px; margin-bottom: 16px; font-size:12px; color:var(--text2,#78716c);">
+        <div style="font-weight:750; color:var(--text,#1c1917); margin-bottom:3px;">🔖 Tesco to PlatePlan Bookmarklet</div>
+        <div>Drag the bookmarklet from Settings to your browser bar. Click it on any Tesco product page, copy the generated JSON string, and paste it below.</div>
+      </div>
+
+      <div class="field" style="margin-bottom: 12px;">
+        <label style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:6px;">Paste Tesco Bookmarklet JSON Output</label>
+        <textarea id="tesco-json-input" placeholder='{"title":"Tesco Bagels 4 Pack","price":1.50,"brand":"Tesco",...}' style="width:100%; min-height:110px; font-family:monospace; font-size:11.5px; padding:10px; border:1px solid var(--border,#e7e5e4); border-radius:8px; outline:none; background:#fff;"></textarea>
+      </div>
+
+      <div id="tesco-import-error-msg" style="display:none; margin-bottom:14px;"></div>
+
+      <div style="display:flex; gap:8px; justify-content: flex-end;">
+        <button type="button" class="btn" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn primary" id="btn-review-tesco-import">Review Import Data</button>
+      </div>
+    </div>
+  `;
+
+  showModal(html);
+
+  const jsonInput = document.getElementById('tesco-json-input');
+  const errorMsg = document.getElementById('tesco-import-error-msg');
+  const reviewBtn = document.getElementById('btn-review-tesco-import');
+
+  reviewBtn.onclick = () => {
+    const raw = (jsonInput ? jsonInput.value : '').trim();
+    if (!raw) {
+      if (errorMsg) {
+        errorMsg.style.display = 'block';
+        errorMsg.innerHTML = `<div style="padding:10px; background:#fee2e2; color:#ef4444; border-radius:8px; font-weight:600; font-size:12px;">⚠️ Invalid Tesco JSON string. Please copy directly from the bookmarklet output.</div>`;
+      }
+      return;
+    }
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      parsed = null;
+    }
+
+    if (!parsed || typeof parsed !== 'object') {
+      if (errorMsg) {
+        errorMsg.style.display = 'block';
+        errorMsg.innerHTML = `<div style="padding:10px; background:#fee2e2; color:#ef4444; border-radius:8px; font-weight:600; font-size:12px;">⚠️ Invalid Tesco JSON string. Please copy directly from the bookmarklet output.</div>`;
+      }
+      return;
+    }
+
+    // Successful parse!
+    closeModal();
+
+    window.__prefilledResolveBinding = {
+      ingredientId: parentId,
+      subtypeId: subtypeId || null,
+      subtypeDraftName: window.__draftSubtypePayload?.name || null,
+      tescoImportData: parsed
+    };
+
+    setTimeout(() => {
+      if (typeof window.openProductEditModal === 'function') {
+        window.openProductEditModal(null);
+      }
+    }, 150);
+  };
 }
 
 // 3. CONSOLIDATED REORGANIZE MODAL (Promote, Move, Merge)
@@ -192,7 +413,6 @@ export function openSubtypeReorganizeModal(subtypeId, parentId) {
 
   showModal(html);
 
-  // Bind option clicks
   document.getElementById('btn-reorg-promote').onclick = async () => {
     closeModal();
     if (typeof window.handlePromoteSubtype === 'function') {
@@ -281,7 +501,7 @@ export function openSubtypeAliasModal(subtypeId, parentId) {
     sub.aliases = aliases.filter(a => a !== alias);
     parent.updatedAt = new Date().toISOString();
     setIngredients([...state.ingredients]);
-    openSubtypeAliasModal(subtypeId, parentId); // Re-render
+    openSubtypeAliasModal(subtypeId, parentId);
     if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
     await saveIngredient(parent);
   };
@@ -294,7 +514,7 @@ export function openSubtypeAliasModal(subtypeId, parentId) {
     if (!sub.aliases.includes(val)) sub.aliases.push(val);
     parent.updatedAt = new Date().toISOString();
     setIngredients([...state.ingredients]);
-    openSubtypeAliasModal(subtypeId, parentId); // Re-render
+    openSubtypeAliasModal(subtypeId, parentId);
     if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
     await saveIngredient(parent);
   };
@@ -337,26 +557,7 @@ export function openSubtypeDeleteModal(subtypeId, parentId) {
 
 // 6. INSTRUCTIONS/BOOKMARKLET DIALOG
 export function openTescoBookmarkletInstructionsModal() {
-  const html = `
-    <div style="padding: 24px; max-width: 500px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 12px;">
-      <h3 style="margin-top:0; margin-bottom: 12px; font-size: 1.15rem; font-weight: 750;">🛒 Tesco Bookmarklet Import</h3>
-      <p style="font-size: 13px; color: var(--text2); line-height: 1.5; margin: 0 0 16px 0;">
-        To easily import and sync products directly from the Tesco Groceries website:
-      </p>
-      
-      <ol style="font-size: 12.5px; color: var(--text); padding-left: 20px; margin-bottom: 20px; line-height: 1.6;">
-        <li>Drag the <strong>Tesco to PlatePlan</strong> bookmarklet from the Settings area to your browser bookmarks bar.</li>
-        <li>Visit <a href="https://www.tesco.com/groceries" target="_blank" style="color:var(--primary); font-weight:600">Tesco Groceries ↗</a> and find your desired item.</li>
-        <li>Click the bookmarklet in your bar. It will instantly forward and attach the product to this sub-type!</li>
-      </ol>
-
-      <div style="display:flex; justify-content: flex-end;">
-        <button type="button" class="btn primary" onclick="window.closeSubtypeActionModal()">Got it</button>
-      </div>
-    </div>
-  `;
-
-  showModal(html);
+  openTescoImportModal(null, null);
 }
 
 // 7. UNIVERSAL ZERO POPUP CORES LINK
@@ -444,40 +645,6 @@ window.promptRemoveAlias = (ingId, alias, parentId = null) => {
   }
 };
 
-window.handleDeleteIngredient = (ingId, ingName, parentId = null) => {
-  if (parentId) {
-    openSubtypeDeleteModal(ingId, parentId);
-    return;
-  }
-
-  const html = `
-    <div style="padding: 24px; max-width: 440px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
-      <div style="font-size: 40px; margin-bottom: 12px;">⚠️</div>
-      <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750; color: var(--red,#ef4444)">Delete Ingredient?</h3>
-      <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 24px 0; line-height: 1.5;">
-        Are you sure you want to delete <strong>"${escapeHTML(ingName)}"</strong>? <br />This will remove it from the pantry bank and clear all relationships.
-      </p>
-
-      <div style="display:flex; gap:8px; justify-content: center;">
-        <button type="button" class="btn" style="padding: 8px 16px;" onclick="window.closeSubtypeActionModal()">Cancel</button>
-        <button type="button" class="btn danger" style="padding: 8px 16px;" id="btn-confirm-core-delete">Confirm Delete</button>
-      </div>
-    </div>
-  `;
-  showModal(html);
-
-  document.getElementById('btn-confirm-core-delete').onclick = async () => {
-    closeModal();
-    const state = getState() || {};
-    const ings = (state.ingredients || []).filter(i => String(i.id) !== String(ingId));
-    setIngredients(ings);
-    if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-    import('../../services/HouseholdRepository.js').then(async (repo) => {
-      await repo.deleteIngredient(ingId);
-    });
-  };
-};
-
 window.handlePromoteSubtype = async (subId, parentId) => {
   const html = `
     <div style="padding: 24px; max-width: 440px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
@@ -497,8 +664,10 @@ window.handlePromoteSubtype = async (subId, parentId) => {
 
   document.getElementById('btn-confirm-sub-promote').onclick = async () => {
     closeModal();
-    await promoteToIngredient(subId, parentId);
-    if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+    import('../../models/PantryHierarchyModel.js').then(async (model) => {
+      await model.promoteToIngredient(subId, parentId);
+      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+    });
   };
 };
 
@@ -578,6 +747,40 @@ window.promptMerge = (sourceId, parentId = null) => {
     import('../../models/PantryHierarchyModel.js').then(async (model) => {
       await model.mergeIngredients(sourceId, targetId);
       if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+    });
+  };
+};
+
+window.handleDeleteIngredient = (ingId, ingName, parentId = null) => {
+  if (parentId) {
+    openSubtypeDeleteModal(ingId, parentId);
+    return;
+  }
+
+  const html = `
+    <div style="padding: 24px; max-width: 440px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">⚠️</div>
+      <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750; color: var(--red,#ef4444)">Delete Ingredient?</h3>
+      <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 24px 0; line-height: 1.5;">
+        Are you sure you want to delete <strong>"${escapeHTML(ingName)}"</strong>? <br />This will remove it from the pantry bank and clear all relationships.
+      </p>
+
+      <div style="display:flex; gap:8px; justify-content: center;">
+        <button type="button" class="btn" style="padding: 8px 16px;" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn danger" style="padding: 8px 16px;" id="btn-confirm-core-delete">Confirm Delete</button>
+      </div>
+    </div>
+  `;
+  showModal(html);
+
+  document.getElementById('btn-confirm-core-delete').onclick = async () => {
+    closeModal();
+    const state = getState() || {};
+    const ings = (state.ingredients || []).filter(i => String(i.id) !== String(ingId));
+    setIngredients(ings);
+    if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+    import('../../services/HouseholdRepository.js').then(async (repo) => {
+      await repo.deleteIngredient(ingId);
     });
   };
 };
@@ -706,6 +909,8 @@ if (typeof window !== 'undefined') {
   window.closeSubtypeActionModal = closeModal;
   window.openEditSubtypeModal = openEditSubtypeModal;
   window.openSubtypeLinkSelectionModal = openSubtypeLinkSelectionModal;
+  window.openSubtypeExistingProductPickerModal = openSubtypeExistingProductPickerModal;
+  window.openTescoImportModal = openTescoImportModal;
   window.openSubtypeReorganizeModal = openSubtypeReorganizeModal;
   window.openSubtypeAliasModal = openSubtypeAliasModal;
   window.openSubtypeDeleteModal = openSubtypeDeleteModal;
@@ -724,11 +929,9 @@ if (typeof window !== 'undefined') {
           window.openProductEditModal(null);
         }
       } else if (action === 'link') {
-        if (typeof window.linkProductToSubtype === 'function') {
-          window.linkProductToSubtype(parentId, subtypeId);
-        }
+        openSubtypeExistingProductPickerModal(subtypeId, parentId);
       } else if (action === 'tesco') {
-        openTescoBookmarkletInstructionsModal();
+        openTescoImportModal(subtypeId, parentId);
       }
     }, 150);
   };

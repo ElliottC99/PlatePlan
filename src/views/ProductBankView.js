@@ -1,5 +1,5 @@
 /**
- * src/views/ProductBankView.js (v3.19.38)
+ * src/views/ProductBankView.js (v3.19.39)
  * Modular ES6 View for Product Bank.
  * Displays nutritional pills (P, C, F, Kcal), P/£ efficiency, Tesco links, and Reallocation modal.
  */
@@ -48,21 +48,54 @@ export function openProductEditModal(productId = null) {
   const titleEl = document.getElementById('mi-title');
   if (titleEl) titleEl.textContent = prod ? `Edit product: ${prod.name}` : 'Add product';
 
-  setVal('mi-name', prod?.name);
-  setVal('mi-brand', prod?.brand);
-  setVal('mi-cat-search', prod?.category || prod?.cat || 'General');
-  setVal('mi-storage', prod?.storage || 'cupboard');
-  setVal('mi-cal', prod?.cal ?? prod?.calories);
-  setVal('mi-fat', prod?.fat);
-  setVal('mi-carb', prod?.carb ?? prod?.carbs);
-  setVal('mi-fibre', prod?.fibre);
-  setVal('mi-prot', prod?.prot ?? prod?.protein);
-  setVal('mi-price', prod?.price);
-  setVal('mi-pack', prod?.pack);
-  setVal('mi-pack-unit', prod?.packUnit || 'g');
-  setVal('mi-item-weight', prod?.itemWeight);
-  setVal('mi-drained-weight', prod?.drainedWeight);
-  setVal('mi-notes', prod?.notes);
+  const binding = window.__prefilledResolveBinding || {};
+  const tescoData = binding.tescoImportData;
+
+  if (!prod && tescoData) {
+    setVal('mi-name', tescoData.title || tescoData.name || binding.subtypeDraftName || '');
+    setVal('mi-brand', tescoData.brand || 'Tesco');
+    setVal('mi-price', tescoData.price || '');
+    setVal('mi-pack', tescoData.pack || tescoData.size || '');
+    setVal('mi-pack-unit', tescoData.packUnit || tescoData.unit || 'g');
+    setVal('mi-cal', tescoData.cal ?? tescoData.calories ?? '');
+    setVal('mi-fat', tescoData.fat ?? '');
+    setVal('mi-carb', tescoData.carb ?? tescoData.carbs ?? '');
+    setVal('mi-fibre', tescoData.fibre ?? '');
+    setVal('mi-prot', tescoData.prot ?? tescoData.protein ?? '');
+    setVal('mi-notes', tescoData.url || tescoData.tescoUrl ? `Tesco: ${tescoData.url || tescoData.tescoUrl}` : (tescoData.notes || ''));
+  } else if (!prod) {
+    setVal('mi-name', prod?.name || binding.subtypeDraftName || '');
+    setVal('mi-brand', prod?.brand || '');
+    setVal('mi-cat-search', prod?.category || prod?.cat || 'General');
+    setVal('mi-storage', prod?.storage || 'cupboard');
+    setVal('mi-cal', prod?.cal ?? prod?.calories);
+    setVal('mi-fat', prod?.fat);
+    setVal('mi-carb', prod?.carb ?? prod?.carbs);
+    setVal('mi-fibre', prod?.fibre);
+    setVal('mi-prot', prod?.prot ?? prod?.protein);
+    setVal('mi-price', prod?.price);
+    setVal('mi-pack', prod?.pack);
+    setVal('mi-pack-unit', prod?.packUnit || 'g');
+    setVal('mi-item-weight', prod?.itemWeight);
+    setVal('mi-drained-weight', prod?.drainedWeight);
+    setVal('mi-notes', prod?.notes);
+  } else {
+    setVal('mi-name', prod.name);
+    setVal('mi-brand', prod.brand);
+    setVal('mi-cat-search', prod.category || prod.cat || 'General');
+    setVal('mi-storage', prod.storage || 'cupboard');
+    setVal('mi-cal', prod.cal ?? prod.calories);
+    setVal('mi-fat', prod.fat);
+    setVal('mi-carb', prod.carb ?? prod.carbs);
+    setVal('mi-fibre', prod.fibre);
+    setVal('mi-prot', prod.prot ?? prod.protein);
+    setVal('mi-price', prod.price);
+    setVal('mi-pack', prod.pack);
+    setVal('mi-pack-unit', prod.packUnit || 'g');
+    setVal('mi-item-weight', prod.itemWeight);
+    setVal('mi-drained-weight', prod.drainedWeight);
+    setVal('mi-notes', prod.notes);
+  }
 
   const catOptsEl = document.getElementById('mi-cat-category-options');
   if (catOptsEl) {
