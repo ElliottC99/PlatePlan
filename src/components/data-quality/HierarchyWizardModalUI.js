@@ -1,7 +1,6 @@
 /**
- * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.56)
- * Hierarchy Wizard with Searchable Parent Picker, Inline Parent Creation & Scroll Fix.
- * Strictly under 400 lines; Apple HIG touch targets; British English "Reorganise".
+ * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.57)
+ * Hierarchy Wizard with Searchable Parent Picker, Dual-Mode DOM Containers & Scroll Fix.
  */
 
 import { getState, setIngredients } from '../../store/store.js';
@@ -9,7 +8,7 @@ import { saveIngredient, deleteIngredient, saveProduct } from '../../services/Ho
 import { safeGetProducts, commitProductUpdates } from './ResolveUnlinkedModalUI.js';
 import { parseTescoProduct } from '../../services/TescoImportService.js';
 
-let wizardQueue = [], currentIndex = 0, isRenaming = false, isReorganising = false, isCreatingParent = false;
+let wizardQueue = [], currentIndex = 0, isRenaming = false, isReorganising = false;
 let selectedProductIdToLink = null, selectedParentIdToAssign = null, productSearchQuery = '', parentSearchQuery = '';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -19,16 +18,15 @@ export function closeHierarchyWizardModal() {
   const overlay = document.getElementById('hierarchy-wizard-modal-overlay');
   if (overlay) overlay.remove();
   document.body.style.overflow = '';
-  wizardQueue = []; currentIndex = 0; isRenaming = false; isReorganising = false; isCreatingParent = false;
+  wizardQueue = []; currentIndex = 0; isRenaming = false; isReorganising = false;
   selectedProductIdToLink = null; selectedParentIdToAssign = null; productSearchQuery = ''; parentSearchQuery = '';
   if (typeof window.renderDataQualityView === 'function') window.renderDataQualityView();
 }
 
 export function buildWizardQueue() {
-  const state = (window.Store && typeof window.Store.getState === 'function') ? window.Store.getState() : (getState() || {});
+  const state = window.Store?.getState?.() || getState() || {};
   const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
   const products = safeGetProducts(), queue = [];
-
   ingredients.forEach(ing => {
     const ingProds = products.filter(p => String(p.ingredientId) === String(ing.id));
     const subtypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
@@ -47,13 +45,11 @@ export async function ensureDefaultSubtype(ingredientId) {
   const ingredients = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
   const idx = ingredients.findIndex(i => String(i.id) === String(ingredientId));
   if (idx === -1) return null;
-
   const ing = { ...ingredients[idx] };
   if (!Array.isArray(ing.subtypes)) ing.subtypes = [];
   if (ing.subtypes.length === 0) {
     const newSub = { id: `sub_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`, name: ing.name, isDefault: true, parentId: ing.id, aliases: [], createdAt: new Date().toISOString() };
-    ing.subtypes = [newSub]; ing.updatedAt = new Date().toISOString();
-    ingredients[idx] = ing;
+    ing.subtypes = [newSub]; ing.updatedAt = new Date().toISOString(); ingredients[idx] = ing;
     if (typeof setIngredients === 'function') setIngredients(ingredients);
     if (window.Store?.setState) window.Store.setState({ ingredients });
     try { await (window.PantryRepository?.saveIngredient ? window.PantryRepository.saveIngredient(ing) : saveIngredient(ing)); } catch (e) {}
@@ -76,20 +72,18 @@ async function resolveContext() {
 }
 
 export function startWizardInlineRename() { isRenaming = true; isReorganising = false; renderWizardStep(); }
-export function startWizardInlineReorganise() { isReorganising = true; isRenaming = false; isCreatingParent = false; renderWizardStep(); }
-export function cancelWizardInlineAction() { isRenaming = false; isReorganising = false; isCreatingParent = false; renderWizardStep(); }
+export function startWizardInlineReorganise() { isReorganising = true; isRenaming = false; renderWizardStep(); }
+export function cancelWizardInlineAction() { isRenaming = false; isReorganising = false; renderWizardStep(); }
 
 export async function submitWizardInlineRename() {
   const newName = document.getElementById('wizard-inline-rename-input')?.value?.trim();
   const currentItem = wizardQueue[currentIndex];
   if (!currentItem || !newName || newName === currentItem.name) { cancelWizardInlineAction(); return; }
-
-  const state = (window.Store && typeof window.Store.getState === 'function') ? window.Store.getState() : (getState() || {});
+  const state = window.Store?.getState?.() || getState() || {};
   const ings = (state.ingredients || []).map(i => {
     if (String(i.id) === String(currentItem.id)) {
       const updated = { ...i, name: newName, updatedAt: new Date().toISOString() };
-      if (window.PantryRepository?.saveIngredient) window.PantryRepository.saveIngredient(updated);
-      else saveIngredient(updated);
+      if (window.PantryRepository?.saveIngredient) window.PantryRepository.saveIngredient(updated); else saveIngredient(updated);
       return updated;
     }
     return i;
@@ -99,12 +93,19 @@ export async function submitWizardInlineRename() {
   currentItem.name = newName; isRenaming = false; renderWizardStep();
 }
 
+export function toggleCreateParentMode(show) {
+  const searchBox = document.getElementById('wizard-parent-search-box');
+  const createBox = document.getElementById('wizard-create-parent-box');
+  if (searchBox) searchBox.style.display = show ? 'none' : 'block';
+  if (createBox) createBox.style.display = show ? 'flex' : 'none';
+}
+
 export function handleWizardParentSearch(query) {
   parentSearchQuery = String(query || '').toLowerCase().trim();
   const container = document.getElementById('wizard-parent-search-results');
   if (!container) return;
   const currentItem = wizardQueue[currentIndex];
-  const state = (window.Store && typeof window.Store.getState === 'function') ? window.Store.getState() : (getState() || {});
+  const state = window.Store?.getState?.() || getState() || {};
   const candidates = (state.ingredients || []).filter(i => String(i.id) !== String(currentItem?.id));
   const filtered = candidates.filter(i => !parentSearchQuery || String(i.name || '').toLowerCase().includes(parentSearchQuery) || String(i.category || '').toLowerCase().includes(parentSearchQuery)).slice(0, 8);
 
@@ -127,7 +128,7 @@ export function handleWizardParentSearch(query) {
 export async function submitWizardInlineReorganise() {
   const currentItem = wizardQueue[currentIndex];
   if (!currentItem || !selectedParentIdToAssign) { cancelWizardInlineAction(); return; }
-  const state = (window.Store && typeof window.Store.getState === 'function') ? window.Store.getState() : (getState() || {});
+  const state = window.Store?.getState?.() || getState() || {};
   const allIngredients = state.ingredients || [];
   const targetParent = allIngredients.find(i => String(i.id) === String(selectedParentIdToAssign));
   if (!targetParent) return;
@@ -152,28 +153,28 @@ export async function submitWizardInlineReorganise() {
   advanceHierarchyWizardStep();
 }
 
-export async function submitWizardCreateAndAssignParent() {
+export async function handleCreateParentAndAssignSubtype(currentIngId) {
   const parentName = document.getElementById('wizard-new-parent-name')?.value?.trim();
-  const parentCat = document.getElementById('wizard-new-parent-cat')?.value?.trim() || 'General';
-  const currentItem = wizardQueue[currentIndex];
-  if (!currentItem || !parentName) return;
+  const parentCat = document.getElementById('wizard-new-parent-category')?.value?.trim() || 'General';
+  if (!parentName) { alert('Please enter a parent ingredient name.'); return; }
 
+  const currentItem = wizardQueue[currentIndex] || { id: currentIngId, name: 'Item', entityType: 'ingredient' };
   const newSubtype = { id: `sub_${Date.now()}`, name: currentItem.name, isDefault: false, createdAt: new Date().toISOString() };
   const newParent = { id: `ing_${Date.now()}`, name: parentName, category: parentCat, subtypes: [newSubtype], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
 
-  const state = (window.Store && typeof window.Store.getState === 'function') ? window.Store.getState() : (getState() || {});
-  const updatedIngredients = [...(state.ingredients || []).filter(i => String(i.id) !== String(currentItem.id)), newParent];
-  const updatedProducts = safeGetProducts().map(p => String(p.ingredientId) === String(currentItem.id) ? { ...p, subtypeId: newSubtype.id, subTypeId: newSubtype.id, ingredientId: newParent.id } : p);
+  const state = window.Store?.getState?.() || getState() || {};
+  const updatedIngredients = [...(state.ingredients || []).filter(i => String(i.id) !== String(currentIngId)), newParent];
+  const updatedProducts = safeGetProducts().map(p => String(p.ingredientId) === String(currentIngId) ? { ...p, subtypeId: newSubtype.id, subTypeId: newSubtype.id, ingredientId: newParent.id } : p);
 
   if (typeof setIngredients === 'function') setIngredients(updatedIngredients);
   if (window.Store?.setState) window.Store.setState({ ingredients: updatedIngredients, products: updatedProducts });
 
   if (window.PantryRepository) {
     await window.PantryRepository.saveIngredient(newParent);
-    if (currentItem.entityType === 'ingredient') await window.PantryRepository.deleteIngredient(currentItem.id);
+    await window.PantryRepository.deleteIngredient(currentIngId);
   } else {
     await saveIngredient(newParent);
-    if (currentItem.entityType === 'ingredient') await deleteIngredient(currentItem.id);
+    await deleteIngredient(currentIngId);
   }
   await commitProductUpdates(updatedProducts);
   advanceHierarchyWizardStep();
@@ -210,13 +211,11 @@ export async function handleWizardLinkSelectedProduct() {
   const prodIndex = existingProds.findIndex(p => String(p.id) === String(selectedProductIdToLink));
   if (prodIndex >= 0) {
     const updatedProd = { ...existingProds[prodIndex], ingredientId: ctx.parentId, subtypeId: ctx.subtypeId, isAutoDefault: true, updatedAt: new Date().toISOString() };
-    const updated = [...existingProds];
-    updated[prodIndex] = updatedProd;
+    const updated = [...existingProds]; updated[prodIndex] = updatedProd;
     commitProductUpdates(updated);
     try { await (window.PantryRepository?.saveProduct ? window.PantryRepository.saveProduct(updatedProd) : saveProduct(updatedProd)); } catch (e) {}
   }
-  selectedProductIdToLink = null;
-  advanceHierarchyWizardStep();
+  selectedProductIdToLink = null; advanceHierarchyWizardStep();
 }
 
 export async function handleWizardTescoImport(subTypeId, ingredientId) {
@@ -226,7 +225,6 @@ export async function handleWizardTescoImport(subTypeId, ingredientId) {
     const res = parseTescoProduct(val);
     const pData = res.success ? res.data : JSON.parse(val);
     if (!pData || !pData.name) throw new Error('Invalid product structure.');
-
     const ctx = await resolveContext();
     const newProduct = {
       id: `prod_${Date.now()}`, name: pData.name, brand: pData.brand || 'Tesco', price: Number(pData.price) || 0,
@@ -262,21 +260,19 @@ export async function handleWizardOpenAddProduct() {
 }
 
 export function skipWizardStep() {
-  if (currentIndex < wizardQueue.length - 1) {
-    wizardQueue.push(wizardQueue.splice(currentIndex, 1)[0]);
-    renderWizardStep();
-  } else advanceHierarchyWizardStep();
+  if (currentIndex < wizardQueue.length - 1) { wizardQueue.push(wizardQueue.splice(currentIndex, 1)[0]); renderWizardStep(); }
+  else advanceHierarchyWizardStep();
 }
 
 export async function bulkProvisionAllDefaults() {
   const btn = document.getElementById('wizard-bulk-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Bulk Provisioning...'; }
-  const state = (window.Store && typeof window.Store.getState === 'function') ? window.Store.getState() : (getState() || {});
+  const state = window.Store?.getState?.() || getState() || {};
   const ingredients = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
   let products = safeGetProducts();
   const createdProducts = [], modifiedIngredients = [];
 
-  ingredients.forEach((ing, i) => {
+  ingredients.forEach((ing) => {
     let changed = false;
     if (!Array.isArray(ing.subtypes) || !ing.subtypes.length) {
       ing.subtypes = [{ id: `sub_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`, name: ing.name, isDefault: true, parentId: ing.id, aliases: [], createdAt: new Date().toISOString() }];
@@ -286,7 +282,7 @@ export async function bulkProvisionAllDefaults() {
       const shell = { id: `prod_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`, name: ing.name, brand: 'Standard', category: ing.category || 'General', storage: 'cupboard', cal: 100, prot: 5, carb: 10, fat: 2, price: 1.00, pack: 100, packUnit: 'g', ingredientId: ing.id, subtypeId: ing.subtypes[0]?.id || null, isAutoDefault: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
       products.push(shell); createdProducts.push(shell);
     }
-    if (changed) { ingredients[i] = { ...ing }; modifiedIngredients.push(ingredients[i]); }
+    if (changed) { modifiedIngredients.push(ing); }
   });
 
   if (typeof setIngredients === 'function') setIngredients(ingredients);
@@ -298,10 +294,9 @@ export async function bulkProvisionAllDefaults() {
 }
 
 export function advanceHierarchyWizardStep() {
-  isRenaming = false; isReorganising = false; isCreatingParent = false;
+  isRenaming = false; isReorganising = false;
   selectedProductIdToLink = null; selectedParentIdToAssign = null; productSearchQuery = ''; parentSearchQuery = '';
-  if (++currentIndex >= wizardQueue.length) renderWizardComplete();
-  else renderWizardStep();
+  if (++currentIndex >= wizardQueue.length) renderWizardComplete(); else renderWizardStep();
 }
 
 export const refreshHierarchyWizardStep = () => renderWizardStep();
@@ -313,48 +308,72 @@ export function renderWizardStep() {
 
   const item = wizardQueue[currentIndex], total = wizardQueue.length, stepNum = currentIndex + 1;
   const pct = Math.round((stepNum / total) * 100);
-  const state = (window.Store && typeof window.Store.getState === 'function') ? window.Store.getState() : (getState() || {});
+  const state = window.Store?.getState?.() || getState() || {};
   const categories = Array.isArray(state.categories) && state.categories.length ? state.categories : ['Produce', 'Meat & Seafood', 'Dairy & Eggs', 'Bakery', 'Pantry', 'Frozen', 'Drinks', 'General'];
 
   card.innerHTML = `
     <div style="flex-shrink:0;padding:14px 18px 10px;border-bottom:1px solid var(--border,#e7e5e4);display:flex;align-items:center;justify-content:space-between">
       <div><h3 style="margin:0;font-size:16.5px;font-weight:750">🪄 Hierarchy Alignment Wizard</h3><div style="font-size:11.5px;color:var(--text2);margin-top:2px">Step ${stepNum} of ${total}</div></div>
-      <button type="button" class="btn sm ghost" onclick="closeHierarchyWizardModal()" style="font-size:18px;line-height:1">&times;</button>
+      <button type="button" class="btn sm ghost" onclick="window.closeHierarchyWizardModal()" style="font-size:18px;line-height:1">&times;</button>
     </div>
     <div style="flex-shrink:0;width:100%;background:#e5e7eb;height:4px;overflow:hidden"><div style="width:${pct}%;background:var(--primary,#4f46e5);height:100%;transition:width 0.2s"></div></div>
     <div class="wizard-modal-body" style="flex:1 1 auto;overflow-y:auto;min-height:0;padding:16px">
       <div style="background:var(--surface2,#f5f5f4);border-radius:12px;padding:12px;border:1px solid var(--border,#e7e5e4);margin-bottom:14px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
           <div style="flex:1"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;font-weight:700">Unlinked ${item.entityType === 'subtype' ? 'Sub-type' : 'Core Ingredient'}</div><div style="font-size:15.5px;font-weight:750;color:var(--text);margin-top:1px">${escapeHtml(item.name)}</div><div style="font-size:11.5px;color:var(--text2);margin-top:2px">Category: <strong>${escapeHtml(item.category)}</strong>${item.parentName ? ` · Parent: <strong>${escapeHtml(item.parentName)}</strong>` : ''}</div></div>
-          <div style="display:flex;gap:4px"><button type="button" class="btn xs ghost" onclick="startWizardInlineRename()">✏️ Rename</button>${item.entityType === 'ingredient' ? `<button type="button" class="btn xs ghost" onclick="startWizardInlineReorganise()">⬇️ Reorganise as Sub-type</button>` : ''}</div>
+          <div style="display:flex;gap:4px"><button type="button" class="btn xs ghost" onclick="window.startWizardInlineRename()">✏️ Rename</button>${item.entityType === 'ingredient' ? `<button type="button" class="btn xs ghost" onclick="window.startWizardInlineReorganise()">⬇️ Reorganise as Sub-type</button>` : ''}</div>
         </div>
-        ${isRenaming ? `<div style="display:flex;gap:6px;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border,#ccc)"><input type="text" id="wizard-inline-rename-input" value="${escapeAttr(item.name)}" style="flex:1;min-height:36px;padding:4px 8px;border:1px solid var(--border,#ccc);border-radius:6px;font-size:12.5px;" /><button type="button" class="btn sm primary" onclick="submitWizardInlineRename()">Save</button><button type="button" class="btn sm ghost" onclick="cancelWizardInlineAction()">Cancel</button></div>` : ''}
-        ${isReorganising ? `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border,#ccc)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:11.5px;font-weight:650">Select or Create Parent Core Ingredient:</span><button type="button" class="btn xs ${isCreatingParent ? 'primary' : 'ghost'}" onclick="isCreatingParent = !isCreatingParent; renderWizardStep();">➕ New Parent</button></div>${isCreatingParent ? `<div id="wizard-create-parent-box" style="background:#fff;border:1px solid var(--border,#ccc);border-radius:8px;padding:8px;margin-bottom:6px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px"><input type="text" id="wizard-new-parent-name" placeholder="Parent Name (e.g. Pasta)" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px" /><select id="wizard-new-parent-cat" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px">${categories.map(c => `<option value="${escapeAttr(c)}" ${c === item.category ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}</select></div><div style="display:flex;gap:6px"><button type="button" class="btn sm primary" style="flex:1" onclick="submitWizardCreateAndAssignParent()">Create &amp; Assign</button><button type="button" class="btn sm ghost" onclick="isCreatingParent = false; renderWizardStep();">Cancel</button></div></div>` : `<input type="text" id="wizard-parent-search-input" placeholder="🔍 Search parent core ingredients..." style="width:100%;min-height:34px;padding:0 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box" oninput="handleWizardParentSearch(this.value)" /><div id="wizard-parent-search-results" style="max-height:100px;overflow-y:auto;margin:6px 0;display:flex;flex-direction:column;gap:3px"></div><div style="display:flex;gap:6px"><button type="button" class="btn sm primary" id="wizard-assign-parent-btn" style="flex:1" onclick="submitWizardInlineReorganise()" ${selectedParentIdToAssign ? '' : 'disabled'}>Assign Sub-type</button><button type="button" class="btn sm ghost" onclick="cancelWizardInlineAction()">Cancel</button></div>`}</div>` : ''}
+        ${isRenaming ? `<div style="display:flex;gap:6px;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border,#ccc)"><input type="text" id="wizard-inline-rename-input" value="${escapeAttr(item.name)}" style="flex:1;min-height:36px;padding:4px 8px;border:1px solid var(--border,#ccc);border-radius:6px;font-size:12.5px;" /><button type="button" class="btn sm primary" onclick="window.submitWizardInlineRename()">Save</button><button type="button" class="btn sm ghost" onclick="window.cancelWizardInlineAction()">Cancel</button></div>` : ''}
+        ${isReorganising ? `
+          <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border,#ccc)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="font-size:11.5px;font-weight:650">Select or Create Parent Core Ingredient:</span>
+              <button type="button" class="btn xs ghost" onclick="window.toggleCreateParentMode(true)">➕ New Parent</button>
+            </div>
+            <div id="wizard-parent-search-box" style="display:block">
+              <input type="text" id="wizard-parent-search-input" placeholder="🔍 Search parent core ingredients..." style="width:100%;min-height:34px;padding:0 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box" oninput="window.handleWizardParentSearch(this.value)" />
+              <div id="wizard-parent-search-results" style="max-height:100px;overflow-y:auto;margin:6px 0;display:flex;flex-direction:column;gap:3px"></div>
+              <div style="display:flex;gap:6px">
+                <button type="button" class="btn sm primary" id="wizard-assign-parent-btn" style="flex:1" onclick="window.submitWizardInlineReorganise()" ${selectedParentIdToAssign ? '' : 'disabled'}>Assign Sub-type</button>
+                <button type="button" class="btn sm ghost" onclick="window.cancelWizardInlineAction()">Cancel</button>
+              </div>
+            </div>
+            <div id="wizard-create-parent-box" style="display:none;flex-direction:column;gap:10px;background:#fff;border:1px solid var(--border,#ccc);border-radius:8px;padding:10px;margin-top:6px">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                <input type="text" id="wizard-new-parent-name" placeholder="Parent Name (e.g. Pasta)" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px" />
+                <select id="wizard-new-parent-category" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:12px">${categories.map(c => `<option value="${escapeAttr(c)}" ${c === item.category ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}</select>
+              </div>
+              <div style="display:flex;gap:6px">
+                <button type="button" class="btn sm primary" style="flex:1" onclick="window.handleCreateParentAndAssignSubtype('${escapeAttr(item.id)}')">Create &amp; Assign</button>
+                <button type="button" class="btn sm ghost" onclick="window.toggleCreateParentMode(false)">Cancel</button>
+              </div>
+            </div>
+          </div>` : ''}
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
-        <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid var(--border,#e7e5e4)"><div style="font-size:13px;font-weight:700;margin-bottom:4px">🔗 1. Link Product from Product Bank</div><input type="text" id="wizard-product-search-input" placeholder="🔍 Search product name or brand..." style="width:100%;min-height:36px;padding:0 8px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;box-sizing:border-box" oninput="handleWizardProductSearch(this.value)" /><div id="wizard-product-results-list" style="max-height:110px;overflow-y:auto;margin:6px 0;display:flex;flex-direction:column;gap:3px"></div><button type="button" class="btn sm primary" id="wizard-link-selected-btn" style="width:100%" onclick="handleWizardLinkSelectedProduct()" ${selectedProductIdToLink ? '' : 'disabled'}>Link Selected Product</button></div>
-        <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid var(--border,#e7e5e4)"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:13px;font-weight:700">🛒 2. Import from Tesco</span><a href="https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(item.name)}" target="_blank" rel="noopener noreferrer" style="color:#007aff;text-decoration:underline;font-weight:500;font-size:12.5px;">🔍 Search "${escapeHtml(item.name)}" on Tesco ↗</a></div><textarea id="wizard-tesco-json-input" placeholder='Paste raw JSON from bookmarklet...' style="width:100%;height:40px;font-family:monospace;font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box"></textarea><button type="button" class="btn sm ghost" style="width:100%;margin-top:4px" onclick="handleWizardTescoImport()">Parse &amp; Link Product</button></div>
-        <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid var(--border,#e7e5e4);display:flex;align-items:center;justify-content:space-between;gap:8px"><div><div style="font-size:13px;font-weight:700">✨ 3. Create Custom Product</div><div style="font-size:11.5px;color:var(--text2)">Opens product creation form pre-filled with this item.</div></div><button type="button" class="btn sm primary" onclick="handleWizardOpenAddProduct()">➕ Open Add Product Modal</button></div>
+        <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid var(--border,#e7e5e4)"><div style="font-size:13px;font-weight:700;margin-bottom:4px">🔗 1. Link Product from Product Bank</div><input type="text" id="wizard-product-search-input" placeholder="🔍 Search product name or brand..." style="width:100%;min-height:36px;padding:0 8px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;box-sizing:border-box" oninput="window.handleWizardProductSearch(this.value)" /><div id="wizard-product-results-list" style="max-height:110px;overflow-y:auto;margin:6px 0;display:flex;flex-direction:column;gap:3px"></div><button type="button" class="btn sm primary" id="wizard-link-selected-btn" style="width:100%" onclick="window.handleWizardLinkSelectedProduct()" ${selectedProductIdToLink ? '' : 'disabled'}>Link Selected Product</button></div>
+        <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid var(--border,#e7e5e4)"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:13px;font-weight:700">🛒 2. Import from Tesco</span><a href="https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(item.name)}" target="_blank" rel="noopener noreferrer" style="color:#007aff;text-decoration:underline;font-weight:500;font-size:12.5px;">🔍 Search "${escapeHtml(item.name)}" on Tesco ↗</a></div><textarea id="wizard-tesco-json-input" placeholder='Paste raw JSON from bookmarklet...' style="width:100%;height:40px;font-family:monospace;font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box"></textarea><button type="button" class="btn sm ghost" style="width:100%;margin-top:4px" onclick="window.handleWizardTescoImport()">Parse &amp; Link Product</button></div>
+        <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid var(--border,#e7e5e4);display:flex;align-items:center;justify-content:space-between;gap:8px"><div><div style="font-size:13px;font-weight:700">✨ 3. Create Custom Product</div><div style="font-size:11.5px;color:var(--text2)">Opens product creation form pre-filled with this item.</div></div><button type="button" class="btn sm primary" onclick="window.handleWizardOpenAddProduct()">➕ Open Add Product Modal</button></div>
       </div>
     </div>
     <div style="flex-shrink:0;padding:12px 18px;border-top:1px solid var(--border,#e7e5e4);display:flex;justify-content:space-between;align-items:center;background:#fff">
-      <button type="button" class="btn sm" id="wizard-bulk-btn" style="background:rgba(16,185,129,0.1);color:var(--green,#10b981);font-weight:700" onclick="bulkProvisionAllDefaults()">⚡ Bulk Provision All Defaults</button>
-      <div style="display:flex;gap:6px"><button type="button" class="btn sm ghost" onclick="skipWizardStep()">Skip &rarr;</button><button type="button" class="btn sm" onclick="closeHierarchyWizardModal()">Exit</button></div>
+      <button type="button" class="btn sm" id="wizard-bulk-btn" style="background:rgba(16,185,129,0.1);color:var(--green,#10b981);font-weight:700" onclick="window.bulkProvisionAllDefaults()">⚡ Bulk Provision All Defaults</button>
+      <div style="display:flex;gap:6px"><button type="button" class="btn sm ghost" onclick="window.skipWizardStep()">Skip &rarr;</button><button type="button" class="btn sm" onclick="window.closeHierarchyWizardModal()">Exit</button></div>
     </div>
   `;
-  handleWizardProductSearch('');
-  if (isReorganising && !isCreatingParent) handleWizardParentSearch('');
+  window.handleWizardProductSearch('');
+  if (isReorganising) window.handleWizardParentSearch('');
 }
 
 function renderWizardComplete() {
   const card = document.getElementById('hierarchy-wizard-modal-card');
   if (!card) return;
-  card.innerHTML = `<div style="padding:28px 20px;text-align:center"><div style="font-size:44px;margin-bottom:10px">🎉</div><h3 style="font-size:18px;font-weight:750;margin:0 0 6px 0">All Items Aligned!</h3><p style="font-size:13px;color:var(--text2);margin:0 0 20px 0;line-height:1.5">All core ingredients and sub-types are now provisioned with mapped grocery products.</p><button type="button" class="btn primary" style="min-height:42px;padding:0 24px;font-weight:700;font-size:13.5px" onclick="closeHierarchyWizardModal()">Done</button></div>`;
+  card.innerHTML = `<div style="padding:28px 20px;text-align:center"><div style="font-size:44px;margin-bottom:10px">🎉</div><h3 style="font-size:18px;font-weight:750;margin:0 0 6px 0">All Items Aligned!</h3><p style="font-size:13px;color:var(--text2);margin:0 0 20px 0;line-height:1.5">All core ingredients and sub-types are now provisioned with mapped grocery products.</p><button type="button" class="btn primary" style="min-height:42px;padding:0 24px;font-weight:700;font-size:13.5px" onclick="window.closeHierarchyWizardModal()">Done</button></div>`;
 }
 
 export function openHierarchyWizardModal() {
   wizardQueue = buildWizardQueue();
-  currentIndex = 0; isRenaming = false; isReorganising = false; isCreatingParent = false;
+  currentIndex = 0; isRenaming = false; isReorganising = false;
   selectedProductIdToLink = null; selectedParentIdToAssign = null; productSearchQuery = ''; parentSearchQuery = '';
   const existing = document.getElementById('hierarchy-wizard-modal-overlay');
   if (existing) existing.remove();
@@ -376,8 +395,9 @@ export function openHierarchyWizardModal() {
 if (typeof window !== 'undefined') {
   Object.assign(window, {
     openHierarchyWizardModal, closeHierarchyWizardModal, startWizardInlineRename, submitWizardInlineRename,
-    startWizardInlineReorganise, submitWizardInlineReorganise, submitWizardCreateAndAssignParent, cancelWizardInlineAction,
-    handleWizardParentSearch, handleWizardProductSearch, handleWizardLinkSelectedProduct, handleWizardTescoImport,
-    handleWizardOpenAddProduct, refreshHierarchyWizardStep, advanceHierarchyWizardStep, skipWizardStep, bulkProvisionAllDefaults
+    startWizardInlineReorganise, submitWizardInlineReorganise, toggleCreateParentMode, handleCreateParentAndAssignSubtype,
+    cancelWizardInlineAction, handleWizardParentSearch, handleWizardProductSearch, handleWizardLinkSelectedProduct,
+    handleWizardTescoImport, handleWizardOpenAddProduct, refreshHierarchyWizardStep, advanceHierarchyWizardStep,
+    skipWizardStep, bulkProvisionAllDefaults
   });
 }
