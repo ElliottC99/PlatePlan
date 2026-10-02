@@ -1,10 +1,10 @@
 /**
- * src/views/DataQualityView.js (v3.19.47)
+ * src/views/DataQualityView.js (v3.19.48)
  * Modular ES6 View for Data Quality Centre, audit scanner results, and 3-path resolutions.
  */
 
-import { getState, subscribe, setPreferences } from '../store/store.js';
-import { savePreferences } from '../services/HouseholdRepository.js';
+import { getState, subscribe, setPreferences, setProducts } from '../store/store.js';
+import { savePreferences, saveProduct } from '../services/HouseholdRepository.js';
 import { runDataQualityScan } from '../services/DataQualityScannerService.js';
 import { openResolveUnlinkedModal } from '../components/data-quality/ResolveUnlinkedModalUI.js';
 import { openProductEditModal } from './ProductBankView.js';
@@ -46,6 +46,47 @@ export async function dismissAdvisory(issueKey) {
     await savePreferences(updatedPrefs);
   } catch (e) {
     console.warn('[DataQualityView] Cloud sync fallback for dismissed advisory:', e);
+  }
+}
+
+export async function runGlobalProductRelink() {
+  if (typeof window !== 'undefined' && typeof window.batchRelinkProducts === 'function' && window.batchRelinkProducts !== runGlobalProductRelink) {
+    return window.batchRelinkProducts();
+  }
+  const state = getState() || (typeof window !== 'undefined' && window.Store ? window.Store.getState() : {});
+  if (typeof window !== 'undefined' && typeof window.relinkOrphanedProducts === 'function') {
+    await window.relinkOrphanedProducts();
+  } else {
+    // Smart relink fallback: match unlinked products by name/brand to ingredients or sub-types
+    const prods = Array.isArray(state.products) ? [...state.products] : [];
+    const ings = Array.isArray(state.ingredients) ? state.ingredients : [];
+    let modified = false;
+    for (const prod of prods) {
+      if (!prod.ingredientId) {
+        const prodNameLower = String(prod.name || '').toLowerCase();
+        const match = ings.find(i => {
+          const ingName = String(i.name || '').toLowerCase();
+          return prodNameLower.includes(ingName) || (Array.isArray(i.aliases) && i.aliases.some(a => prodNameLower.includes(String(a).toLowerCase())));
+        });
+        if (match) {
+          prod.ingredientId = match.id;
+          if (!prod.category && match.category) prod.category = match.category;
+          prod.updatedAt = new Date().toISOString();
+          modified = true;
+        }
+      }
+    }
+    if (modified) {
+      setProducts(prods);
+      try {
+        await Promise.all(prods.filter(p => p.ingredientId).map(p => saveProduct(p)));
+      } catch (err) {
+        console.warn('[DataQualityView] Batch relink sync warning:', err);
+      }
+    }
+  }
+  if (typeof renderDataQualityView === 'function') {
+    renderDataQualityView();
   }
 }
 
@@ -241,6 +282,8 @@ if (typeof window !== 'undefined') {
   window.renderDataQuality = renderDataQualityView;
   window.dismissAdvisory = dismissAdvisory;
   window.handleFixIssue = handleFixIssue;
+  window.runGlobalProductRelink = runGlobalProductRelink;
+  window.batchRelinkProducts = runGlobalProductRelink;
   window.updateDataQualityBadge = updateDataQualityBadge;
 
   // Event Delegation Fallback
