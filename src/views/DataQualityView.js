@@ -1,10 +1,10 @@
 /**
- * src/views/DataQualityView.js (v3.19.48)
+ * src/views/DataQualityView.js (v3.19.49)
  * Modular ES6 View for Data Quality Centre, audit scanner results, and 3-path resolutions.
  */
 
-import { getState, subscribe, setPreferences, setProducts } from '../store/store.js';
-import { savePreferences, saveProduct } from '../services/HouseholdRepository.js';
+import { getState, subscribe, setPreferences } from '../store/store.js';
+import { savePreferences } from '../services/HouseholdRepository.js';
 import { runDataQualityScan } from '../services/DataQualityScannerService.js';
 import { openResolveUnlinkedModal } from '../components/data-quality/ResolveUnlinkedModalUI.js';
 import { openProductEditModal } from './ProductBankView.js';
@@ -24,125 +24,149 @@ function escapeAttr(str) {
 }
 
 export async function dismissAdvisory(issueKey) {
-  const state = getState() || {};
-  const currentPrefs = state.preferences || state.userPrefs || {};
-  const currentDismissed = Array.isArray(currentPrefs.dismissedQualityAdvisories) 
-    ? [...currentPrefs.dismissedQualityAdvisories] 
-    : [];
-
-  if (!currentDismissed.includes(issueKey)) {
-    currentDismissed.push(issueKey);
-  }
-
-  const updatedPrefs = {
-    ...currentPrefs,
-    dismissedQualityAdvisories: currentDismissed
-  };
-
-  setPreferences(updatedPrefs);
-  renderDataQualityView();
-
   try {
-    await savePreferences(updatedPrefs);
-  } catch (e) {
-    console.warn('[DataQualityView] Cloud sync fallback for dismissed advisory:', e);
+    const state = (window.Store && typeof window.Store.getState === 'function') 
+      ? window.Store.getState() 
+      : (typeof getState === 'function' ? getState() : {});
+    const currentPrefs = state.preferences || state.userPrefs || {};
+    const currentDismissed = Array.isArray(currentPrefs.dismissedQualityAdvisories) 
+      ? [...currentPrefs.dismissedQualityAdvisories] 
+      : [];
+
+    if (!currentDismissed.includes(issueKey)) {
+      currentDismissed.push(issueKey);
+    }
+
+    const updatedPrefs = {
+      ...currentPrefs,
+      dismissedQualityAdvisories: currentDismissed
+    };
+
+    if (typeof setPreferences === 'function') {
+      setPreferences(updatedPrefs);
+    } else if (window.Store && typeof window.Store.setState === 'function') {
+      window.Store.setState({ preferences: updatedPrefs });
+    }
+
+    renderDataQualityView();
+
+    if (typeof savePreferences === 'function') {
+      await savePreferences(updatedPrefs);
+    } else if (window.PantryRepository && typeof window.PantryRepository.savePreferences === 'function') {
+      await window.PantryRepository.savePreferences(updatedPrefs);
+    }
+  } catch (err) {
+    console.error('[DataQualityView] dismissAdvisory caught error:', err);
   }
 }
 
 export async function runGlobalProductRelink() {
-  if (typeof window !== 'undefined' && typeof window.batchRelinkProducts === 'function' && window.batchRelinkProducts !== runGlobalProductRelink) {
-    return window.batchRelinkProducts();
-  }
-  const state = getState() || (typeof window !== 'undefined' && window.Store ? window.Store.getState() : {});
-  if (typeof window !== 'undefined' && typeof window.relinkOrphanedProducts === 'function') {
-    await window.relinkOrphanedProducts();
-  } else {
-    // Smart relink fallback: match unlinked products by name/brand to ingredients or sub-types
-    const prods = Array.isArray(state.products) ? [...state.products] : [];
-    const ings = Array.isArray(state.ingredients) ? state.ingredients : [];
-    let modified = false;
-    for (const prod of prods) {
-      if (!prod.ingredientId) {
-        const prodNameLower = String(prod.name || '').toLowerCase();
-        const match = ings.find(i => {
-          const ingName = String(i.name || '').toLowerCase();
-          return prodNameLower.includes(ingName) || (Array.isArray(i.aliases) && i.aliases.some(a => prodNameLower.includes(String(a).toLowerCase())));
-        });
-        if (match) {
-          prod.ingredientId = match.id;
-          if (!prod.category && match.category) prod.category = match.category;
-          prod.updatedAt = new Date().toISOString();
-          modified = true;
+  try {
+    const state = (window.Store && typeof window.Store.getState === 'function') 
+      ? window.Store.getState() 
+      : (typeof getState === 'function' ? getState() : {});
+
+    if (typeof window.relinkOrphanedProducts === 'function') {
+      await window.relinkOrphanedProducts();
+    } else {
+      const prods = Array.isArray(state.products) ? JSON.parse(JSON.stringify(state.products)) : [];
+      const ings = Array.isArray(state.ingredients) ? state.ingredients : [];
+      let modified = false;
+
+      for (const prod of prods) {
+        if (!prod.ingredientId) {
+          const prodNameLower = String(prod.name || '').toLowerCase();
+          const match = ings.find(i => {
+            const ingName = String(i.name || '').toLowerCase();
+            return prodNameLower.includes(ingName) || (Array.isArray(i.aliases) && i.aliases.some(a => prodNameLower.includes(String(a).toLowerCase())));
+          });
+          if (match) {
+            prod.ingredientId = match.id;
+            if (!prod.category && match.category) prod.category = match.category;
+            prod.updatedAt = new Date().toISOString();
+            modified = true;
+          }
+        }
+      }
+
+      if (modified) {
+        if (window.Store && typeof window.Store.setState === 'function') {
+          window.Store.setState({ products: prods });
+        }
+        if (window.PantryRepository && typeof window.PantryRepository.saveProduct === 'function') {
+          await Promise.all(prods.filter(p => p.ingredientId).map(p => window.PantryRepository.saveProduct(p)));
         }
       }
     }
-    if (modified) {
-      setProducts(prods);
-      try {
-        await Promise.all(prods.filter(p => p.ingredientId).map(p => saveProduct(p)));
-      } catch (err) {
-        console.warn('[DataQualityView] Batch relink sync warning:', err);
-      }
+
+    if (typeof window.renderDataQualityView === 'function') {
+      window.renderDataQualityView();
+    } else if (window.DataQualityView && typeof window.DataQualityView.render === 'function') {
+      window.DataQualityView.render();
     }
-  }
-  if (typeof renderDataQualityView === 'function') {
-    renderDataQualityView();
+  } catch (err) {
+    console.error('[DataQualityView] runGlobalProductRelink caught error:', err);
   }
 }
 
 export function handleFixIssue(e, entityType, entityId, issueKey = '', parentId = null) {
-  if (e && typeof e.preventDefault === 'function') e.preventDefault();
-  if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+  try {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
 
-  // Tier 1: Try PantryHierarchyModel
-  let item = (window.PantryHierarchyModel && typeof window.PantryHierarchyModel.getItemById === 'function')
-    ? window.PantryHierarchyModel.getItemById(entityId)
-    : null;
+    let item = (window.PantryHierarchyModel && typeof window.PantryHierarchyModel.getItemById === 'function')
+      ? window.PantryHierarchyModel.getItemById(entityId)
+      : null;
 
-  // Tier 2: Try Store State
-  if (!item) {
-    const state = getState() || (window.Store ? window.Store.getState() : {});
-    const ingredients = state.ingredients || state.pantry?.ingredients || [];
-    const directIng = ingredients.find(i => String(i.id) === String(entityId));
-    if (directIng) {
-      item = { ...directIng, type: 'ingredient' };
-    } else if (entityType === 'subtype' || parentId) {
-      for (const ing of ingredients) {
-        const sub = (ing.subtypes || []).find(s => String(s.id) === String(entityId));
-        if (sub) {
-          item = { ...sub, parentId: ing.id, parentIngredientId: ing.id, parentName: ing.name, category: ing.category, type: 'subtype' };
-          break;
+    if (!item && window.Store && typeof window.Store.getState === 'function') {
+      const state = window.Store.getState() || {};
+      const ingredients = state.ingredients || state.pantry?.ingredients || [];
+      const directIng = ingredients.find(i => String(i.id) === String(entityId));
+      if (directIng) {
+        item = { ...directIng, type: 'ingredient' };
+      } else if (entityType === 'subtype' || parentId) {
+        for (const ing of ingredients) {
+          const sub = (ing.subtypes || []).find(s => String(s.id) === String(entityId));
+          if (sub) {
+            item = { ...sub, parentId: ing.id, parentIngredientId: ing.id, parentName: ing.name, category: ing.category, type: 'subtype' };
+            break;
+          }
         }
       }
     }
-  }
 
-  // Tier 3: Hard Fallback object (Guarantees modal opens under ALL conditions)
-  if (!item) {
-    const rowEl = e?.target?.closest ? e.target.closest('.dq-issue-row, tr, .card') : null;
-    const nameEl = rowEl ? rowEl.querySelector('strong, h4, .item-name, td') : null;
-    const fallbackName = nameEl ? nameEl.textContent.trim() : 'Unlinked Catalog Item';
-
-    item = {
-      id: entityId,
-      name: fallbackName,
-      type: entityType,
-      parentId: parentId || null,
-      parentIngredientId: parentId || null
-    };
-  }
-
-  item.gapKey = issueKey;
-
-  if (entityType === 'product') {
-    openProductEditModal(entityId);
-  } else if (entityType === 'recipe') {
-    if (typeof window.viewRecipe === 'function') {
-      window.viewRecipe(entityId);
+    if (!item) {
+      const rowEl = e?.target?.closest ? e.target.closest('.dq-issue-row, tr, .card') : null;
+      const nameEl = rowEl ? rowEl.querySelector('strong, h4, .item-name, td') : null;
+      item = {
+        id: entityId,
+        name: nameEl ? nameEl.textContent.trim() : 'Unlinked Catalog Item',
+        type: entityType,
+        parentId: parentId || null
+      };
     }
-  } else {
-    // Sub-type or Core Ingredient
-    openResolveUnlinkedModal(item, entityType, parentId || item.parentId);
+
+    item.gapKey = issueKey;
+
+    if (entityType === 'product') {
+      if (typeof window.openProductEditModal === 'function') {
+        window.openProductEditModal(entityId);
+      } else if (typeof openProductEditModal === 'function') {
+        openProductEditModal(entityId);
+      }
+    } else if (entityType === 'recipe') {
+      if (typeof window.viewRecipe === 'function') {
+        window.viewRecipe(entityId);
+      }
+    } else {
+      if (typeof window.openResolveUnlinkedModal === 'function') {
+        window.openResolveUnlinkedModal(item, entityType, parentId || item.parentId);
+      } else if (typeof openResolveUnlinkedModal === 'function') {
+        openResolveUnlinkedModal(item, entityType, parentId || item.parentId);
+      }
+    }
+  } catch (err) {
+    console.error('[DataQualityView] handleFixIssue caught error:', err);
   }
 }
 
@@ -151,7 +175,9 @@ export function renderDataQualityView() {
   const container = document.getElementById('view-data');
   if (!container) return;
 
-  const state = getState() || {};
+  const state = (window.Store && typeof window.Store.getState === 'function') 
+    ? window.Store.getState() 
+    : (typeof getState === 'function' ? getState() : {});
   const scan = runDataQualityScan(state);
 
   const renderIssueRow = (issue, dismissible = false) => {
