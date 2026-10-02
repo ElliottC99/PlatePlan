@@ -1,5 +1,5 @@
 /**
- * src/views/PantryBankView.js (v3.19.30)
+ * src/views/PantryBankView.js (v3.19.31)
  * Modular ES6 View for Category ➔ Ingredient ➔ Sub-type Hierarchy Bank.
  * Features Aliasing, Merging, Sub-type creation, Promoting/demoting, and Auto-default product previews.
  * Fully responsive and optimized to remain under 350 lines.
@@ -281,7 +281,7 @@ export function renderIngredientBank() {
 
                 <div style="display:flex;align-items:center;gap:6px;position:relative">
                   <button type="button" class="btn xs ghost" onclick="openIngredientFamilyDetailsModal('${escapeAttr(ing.id)}')" title="Edit properties">Edit</button>
-                  <button type="button" class="btn xs ghost subtype-toggle-btn" onclick="openIngredientFamilyDetailsModal('${escapeAttr(ing.id)}')" title="Add child sub-type">+ Sub-type</button>
+                  <button type="button" class="btn xs ghost subtype-toggle-btn" onclick="openIngredientFamilyDetailsModal(null, '${escapeAttr(ing.id)}')" title="Add child sub-type">+ Sub-type</button>
                   <div style="position:relative;display:inline-block">
                     <button type="button" class="btn xs ghost" onclick="toggleCardMoreMenu(this, '${escapeAttr(ing.id)}')" title="More actions" style="padding:2px 6px;font-weight:700">•••</button>
                     <div id="card-more-menu-${escapeAttr(ing.id)}" class="card-more-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:8px;box-shadow:0 6px 16px rgba(0,0,0,0.08);z-index:100;min-width:130px;flex-direction:column;padding:4px">

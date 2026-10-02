@@ -205,33 +205,40 @@ export function renderCategoryManagerModal() {
     const ings = Array.isArray(state.ingredients) ? state.ingredients : [];
     const prods = Array.isArray(state.products) ? state.products : [];
 
-    const persistPromises = [];
+    const batch = window.firebase.firestore().batch();
+    const householdRef = db.collection('households').doc(HOUSEHOLD_ID);
+
     ings.forEach(i => {
+      let isIngChanged = false;
       if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
-        const updated = { ...i, category: newName, cat: newCatKebab };
-        persistPromises.push(saveIngredient(updated));
+        i.category = newName; i.cat = newCatKebab;
+        isIngChanged = true;
       }
       if (Array.isArray(i.subtypes)) {
         i.subtypes.forEach(st => {
           if (slugCategory(st.category) === targetSlug || slugCategory(st.cat) === targetSlug) {
             st.category = newName; st.cat = newCatKebab;
-            persistPromises.push(saveIngredient(i));
+            isIngChanged = true;
           }
         });
+      }
+      if (isIngChanged) {
+        const updated = { ...i, updatedAt: new Date().toISOString() };
+        delete updated.id;
+        batch.set(householdRef.collection('ingredients').doc(String(i.id)), updated, { merge: true });
       }
     });
 
     prods.forEach(p => {
       if (slugCategory(p.category) === targetSlug || slugCategory(p.cat) === targetSlug) {
-        const updated = { ...p, category: newName, cat: newCatKebab };
-        persistPromises.push(saveProduct(updated));
+        const updated = { ...p, category: newName, cat: newCatKebab, updatedAt: new Date().toISOString() };
+        delete updated.id;
+        batch.set(householdRef.collection('products').doc(String(p.id)), updated, { merge: true });
       }
     });
 
-    await Promise.all(persistPromises);
-    if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
-    invalidateHierarchyCache();
-    closeCategoryManagerModal();
+    await batch.commit();
+    wizardStep = 'list'; activeCat = null; reassignSearch = ''; renderCurrentStep();
   };
 
   window.startMergeCat = (cat) => { activeCat = cat; wizardStep = 'merge'; renderCurrentStep(); };
