@@ -194,6 +194,8 @@ export async function promptReallocateProduct(productId) {
   }
 }
 
+export const openProductReallocateModal = promptReallocateProduct;
+
 export async function handleDeleteProduct(productId, prodName) {
   if (typeof window.handleDeleteProduct === 'function') {
     window.handleDeleteProduct(productId, prodName);

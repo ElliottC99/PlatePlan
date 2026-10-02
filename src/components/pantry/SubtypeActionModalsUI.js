@@ -885,34 +885,49 @@ window.promptReallocateProduct = (productId) => {
     return;
   }
 
-  const html = `
-    <div style="padding: 24px; max-width: 480px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 12px;">
-      <h3 style="margin-top:0; margin-bottom: 12px; font-size: 1.15rem; font-weight: 750;">📦 Reallocate: ${escapeHTML(prod.name)}</h3>
-      <p style="font-size: 13px; color: var(--text2); margin-bottom: 16px;">Choose which parent ingredient and optional sub-type this product belongs to.</p>
+  // Group Core Ingredients by Category for Dropdown 1
+  const groupedCategories = {};
+  currentIngs.forEach(i => {
+    const cat = i.category || 'General';
+    if (!groupedCategories[cat]) groupedCategories[cat] = [];
+    groupedCategories[cat].push(i);
+  });
 
-      <div class="field" style="margin-bottom: 16px;">
-        <label style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">Target Ingredient</label>
-        <select id="realloc-ing-select" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:6px; font-size:12px;">
-          ${currentIngs.map(i => `<option value="${escapeHTML(i.id)}">${escapeHTML(i.name)} (${escapeHTML(i.category || 'Other')})</option>`).join('')}
+  const optgroupsHtml = Object.entries(groupedCategories)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([cat, ings]) => `
+      <optgroup label="${escapeHTML(cat)}">
+        ${ings.map(i => `<option value="${escapeHTML(i.id)}" ${String(i.id) === String(prod.ingredientId || prod.groupId) ? 'selected' : ''}>${escapeHTML(i.name)}</option>`).join('')}
+      </optgroup>
+    `).join('');
+
+  const html = `
+    <div style="padding: 24px; max-width: 480px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px;">
+      <h3 style="margin-top:0; margin-bottom: 8px; font-size: 1.15rem; font-weight: 750;">📦 Reallocate Product: ${escapeHTML(prod.name)}</h3>
+      <p style="font-size: 13px; color: var(--text2,#78716c); margin-bottom: 16px;">Choose which parent ingredient and optional sub-type this product belongs to.</p>
+
+      <div class="field" style="margin-bottom: 14px;">
+        <label style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">1. Target Core Ingredient</label>
+        <select id="realloc-ing-select" style="width:100%; padding:8px 10px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px; background:#fff;">
+          ${optgroupsHtml}
         </select>
       </div>
 
-      <div class="field" id="realloc-subtype-field" style="margin-bottom: 20px; display:none;">
-        <label style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">Sub-type (Optional)</label>
-        <select id="realloc-subtype-select" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:6px; font-size:12px;">
+      <div class="field" id="realloc-subtype-field" style="margin-bottom: 20px;">
+        <label style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">2. Target Sub-type (Optional)</label>
+        <select id="realloc-subtype-select" style="width:100%; padding:8px 10px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px; background:#fff;">
         </select>
       </div>
 
       <div style="display:flex; gap:8px; justify-content: flex-end;">
         <button type="button" class="btn" onclick="window.closeSubtypeActionModal()">Cancel</button>
-        <button type="button" class="btn primary" id="btn-confirm-realloc">Reallocate</button>
+        <button type="button" class="btn primary" id="btn-confirm-realloc">Reallocate Product</button>
       </div>
     </div>
   `;
   showModal(html);
 
   const ingSelect = document.getElementById('realloc-ing-select');
-  const subField = document.getElementById('realloc-subtype-field');
   const subSelect = document.getElementById('realloc-subtype-select');
 
   const updateSubtypes = () => {
@@ -920,11 +935,9 @@ window.promptReallocateProduct = (productId) => {
     const ing = currentIngs.find(i => String(i.id) === String(ingId));
     if (ing && Array.isArray(ing.subtypes) && ing.subtypes.length > 0) {
       subSelect.innerHTML = `<option value="">None (Top-level ${escapeHTML(ing.name)})</option>` + 
-        ing.subtypes.map(s => `<option value="${escapeHTML(s.id)}">${escapeHTML(s.name)}</option>`).join('');
-      subField.style.display = 'block';
+        ing.subtypes.map(s => `<option value="${escapeHTML(s.id)}" ${String(s.id) === String(prod.subtypeId) ? 'selected' : ''}>${escapeHTML(s.name)}</option>`).join('');
     } else {
-      subSelect.innerHTML = '';
-      subField.style.display = 'none';
+      subSelect.innerHTML = `<option value="">None (Top-level ${escapeHTML(ing ? ing.name : 'Ingredient')})</option>`;
     }
   };
 
@@ -944,6 +957,8 @@ window.promptReallocateProduct = (productId) => {
     });
   };
 };
+
+window.openProductReallocateModal = window.promptReallocateProduct;
 
 window.showCustomAlert = (message) => {
   const html = `
