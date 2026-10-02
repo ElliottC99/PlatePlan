@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.19.51)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.19.52)
  * In-App Multi-Step Category Operations Wizard & Fine-Grained Reassignment Modal.
  * Replaces all native browser calls with accessible DOM views, relying on native Firestore reactivity.
  */

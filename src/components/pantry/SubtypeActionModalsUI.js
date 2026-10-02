@@ -1,11 +1,14 @@
 /**
- * src/components/pantry/SubtypeActionModalsUI.js (v3.19.51)
+ * src/components/pantry/SubtypeActionModalsUI.js (v3.19.52)
  * Standardized custom styled dialogs and workflows for nested sub-types.
  * Eliminates all prompt(), alert(), and confirm() browser chrome calls.
  */
 
 import { getState, setIngredients, setProducts } from '../../store/store.js';
 import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
+import { promptReallocateProduct, openProductReallocateModal } from './ReallocateProductModalUI.js';
+
+export { promptReallocateProduct, openProductReallocateModal };
 
 const escapeHTML = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -873,7 +876,10 @@ window.handleDeleteProduct = (productId, prodName) => {
   };
 };
 
-window.promptReallocateProduct = (productId) => {
+window.promptReallocateProduct = promptReallocateProduct;
+window.openProductReallocateModal = openProductReallocateModal;
+
+const _legacyPromptReallocate = (productId) => {
   const state = getState() || {};
   const currentIngs = Array.isArray(state.ingredients) ? state.ingredients : [];
   const prods = Array.isArray(state.products) ? state.products : [];

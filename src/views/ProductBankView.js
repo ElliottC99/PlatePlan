@@ -1,5 +1,5 @@
 /**
- * src/views/ProductBankView.js (v3.19.51)
+ * src/views/ProductBankView.js (v3.19.52)
  * Modular ES6 View for Product Bank.
  * Displays nutritional pills (P, C, F, Kcal), P/£ efficiency, Tesco links, and Reallocation modal.
  */
@@ -7,6 +7,7 @@
 import { getState, setProducts } from '../store/store.js';
 import { saveProduct, deleteProduct } from '../services/HouseholdRepository.js';
 import { reallocateProduct, setAutoDefaultProduct, getActiveCategories, addSubtypeToIngredient } from '../models/PantryHierarchyModel.js';
+import { promptReallocateProduct as openReallocateModal } from '../components/pantry/ReallocateProductModalUI.js';
 
 let activeEditingProductId = null;
 
@@ -189,7 +190,9 @@ export async function saveManualIng() {
 }
 
 export async function promptReallocateProduct(productId) {
-  if (typeof window.promptReallocateProduct === 'function') {
+  if (typeof openReallocateModal === 'function') {
+    openReallocateModal(productId);
+  } else if (typeof window.promptReallocateProduct === 'function') {
     window.promptReallocateProduct(productId);
   }
 }
