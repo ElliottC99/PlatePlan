@@ -1,5 +1,5 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.19.65';
+  window.APP_VERSION = 'v3.19.66';
   window.showTescoImport = () => {
     import('./components/pantry/SubtypeActionModalsUI.js')
       .then(m => {
@@ -39,7 +39,7 @@ import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
 import { subscribe, getState } from './store/store.js';
 import { setupActionBridge } from './services/ActionBridge.js';
-import { saveCurrentPlan } from './services/HouseholdRepository.js';
+import { saveCurrentPlan, getCategories, saveCategories, saveIngredient, saveProduct, getIngredients, getProducts } from './services/HouseholdRepository.js';
 import { AppState } from './state/AppState.js';
 import { renderToday } from './views/TodayView.js';
 import { renderIngredientBank, renderProductBank } from './views/PantryBankView.js';
@@ -118,6 +118,29 @@ if (typeof window !== 'undefined') {
   window.updateSyncStatus = setSyncStatus;
   window.calculateMealFitScore = calculateMealFitScore;
   window.renderFitScoreBadge = renderFitScoreBadge;
+
+  window.PantryRepository = {
+    getCategories,
+    saveCategories,
+    saveIngredient,
+    saveProduct,
+    getIngredients,
+    getProducts,
+    deleteCategory: async (categoryId) => {
+      const current = await getCategories();
+      const slugCategory = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const updated = current.filter(c => {
+        if (typeof c === 'string') {
+          return c !== categoryId && slugCategory(c) !== slugCategory(categoryId);
+        } else if (c && typeof c === 'object') {
+          return String(c.id) !== String(categoryId) && String(c.name) !== String(categoryId);
+        }
+        return true;
+      });
+      await saveCategories(updated);
+      return { success: true };
+    }
+  };
 
   Object.assign(window, {
     MealPlanGeneratorService, RecipeDetailModalService,
@@ -300,7 +323,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const badgeEl = document.getElementById('app-header-version') || document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (badgeEl) {
-    badgeEl.textContent = window.APP_VERSION || 'v3.19.65';
+    badgeEl.textContent = window.APP_VERSION || 'v3.19.66';
   }
 }
 
