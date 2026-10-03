@@ -1,6 +1,6 @@
 /**
- * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.62)
- * Progressive Cascading Hierarchy Alignment Wizard (Category → Ingredient → Sub-type).
+ * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.63)
+ * Progressive Cascading Hierarchy Alignment Wizard with Title Case Normalisation.
  */
 import { getState, setIngredients } from '../../store/store.js';
 import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
@@ -12,6 +12,15 @@ let newSubtypeName = '', newIngredientName = '';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
+
+function toTitleCase(str) {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
 
 export function closeHierarchyWizardModal() {
   const overlay = document.getElementById('hierarchy-wizard-modal-overlay');
@@ -63,7 +72,7 @@ export function handleWizardSubtypeSearch(query) {
     </div>
   `).join('');
 
-  const displayQuery = q || wizardQueue[currentIndex]?.name || 'Item';
+  const displayQuery = toTitleCase(q || wizardQueue[currentIndex]?.name || 'Item');
   html += `
     <div class="wizard-st-create" data-name="${escapeAttr(displayQuery)}" style="padding:8px 10px;font-size:12px;cursor:pointer;background:#eff6ff;color:var(--primary);font-weight:700;display:flex;align-items:center;gap:6px">
       <span>➕ Create new sub-type "${escapeHtml(displayQuery)}"</span>
@@ -88,7 +97,7 @@ export function handleWizardSubtypeSearch(query) {
 
   container.querySelectorAll('.wizard-st-create').forEach(el => {
     el.onclick = () => {
-      newSubtypeName = el.dataset.name;
+      newSubtypeName = toTitleCase(el.dataset.name);
       container.style.display = 'none';
       wizardStage = 2;
       renderWizardStep();
@@ -134,7 +143,7 @@ export function handleWizardIngredientSearch(query) {
     </div>
   `).join('');
 
-  const displayQuery = q || newSubtypeName || 'Ingredient';
+  const displayQuery = toTitleCase(q || newSubtypeName || 'Ingredient');
   html += `
     <div class="wizard-ing-create" data-name="${escapeAttr(displayQuery)}" style="padding:8px 10px;font-size:12px;cursor:pointer;background:#eff6ff;color:var(--primary);font-weight:700;display:flex;align-items:center;gap:6px">
       <span>➕ Create new ingredient "${escapeHtml(displayQuery)}"</span>
@@ -159,7 +168,7 @@ export function handleWizardIngredientSearch(query) {
 
   container.querySelectorAll('.wizard-ing-create').forEach(el => {
     el.onclick = () => {
-      newIngredientName = el.dataset.name;
+      newIngredientName = toTitleCase(el.dataset.name);
       container.style.display = 'none';
       wizardStage = 3;
       renderWizardStep();
@@ -179,7 +188,7 @@ export function handleWizardCategorySearch(query) {
   container.style.display = 'block';
   container.querySelectorAll('.wizard-cat-opt').forEach(el => {
     el.onclick = () => {
-      selectedCategory = el.dataset.cat;
+      selectedCategory = toTitleCase(el.dataset.cat);
       const input = document.getElementById('wizard-category-search-input');
       if (input) input.value = selectedCategory;
       container.style.display = 'none';
@@ -195,9 +204,13 @@ export async function handleWizardCreateAndLink() {
   const state = window.Store?.getState?.() || getState() || {};
   let parentIng = null;
 
-  if (newIngredientName) {
-    const newSub = { id: `sub_${Date.now()}`, name: newSubtypeName || currentItem.name, isDefault: false, createdAt: new Date().toISOString() };
-    parentIng = { id: `ing_${Date.now()}`, name: newIngredientName, category: selectedCategory, subtypes: [newSub], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  const normalizedSubName = toTitleCase(newSubtypeName || currentItem.name);
+  const normalizedIngName = toTitleCase(newIngredientName);
+  const normalizedCat = toTitleCase(selectedCategory);
+
+  if (normalizedIngName) {
+    const newSub = { id: `sub_${Date.now()}`, name: normalizedSubName, isDefault: false, createdAt: new Date().toISOString() };
+    parentIng = { id: `ing_${Date.now()}`, name: normalizedIngName, category: normalizedCat, subtypes: [newSub], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     const updatedIngredients = [...(state.ingredients || []), parentIng];
     if (typeof setIngredients === 'function') setIngredients(updatedIngredients);
     if (window.Store?.setState) window.Store.setState({ ingredients: updatedIngredients });
@@ -206,7 +219,7 @@ export async function handleWizardCreateAndLink() {
   } else if (selectedIngredientId) {
     parentIng = (state.ingredients || []).find(i => String(i.id) === String(selectedIngredientId));
     if (!parentIng) return;
-    const newSub = { id: `sub_${Date.now()}`, name: newSubtypeName || currentItem.name, isDefault: false, createdAt: new Date().toISOString() };
+    const newSub = { id: `sub_${Date.now()}`, name: normalizedSubName, isDefault: false, createdAt: new Date().toISOString() };
     parentIng.subtypes = [...(parentIng.subtypes || []), newSub];
     saveIngredient(parentIng);
   } else {
@@ -283,7 +296,7 @@ export function renderWizardStep() {
             <div style="font-size:12.5px;font-weight:750;margin-bottom:4px">Stage 1: Search Sub-type</div>
             ${newSubtypeName ? `<div style="display:inline-block;background:#e0e7ff;color:var(--primary);padding:2px 8px;border-radius:6px;font-size:12px;font-weight:650;margin-bottom:6px">Sub-type: ${escapeHtml(newSubtypeName)}</div>` : ''}
             <div style="position:relative">
-              <input type="text" id="wizard-subtype-search-input" value="${escapeAttr(newSubtypeName)}" placeholder="Search sub-type..." style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box" oninput="window.handleWizardSubtypeSearch(this.value)" onfocus="window.handleWizardSubtypeSearch(this.value)" autocomplete="off" ${wizardStage > 1 ? 'disabled style="background:#f9fafb"' : ''} />
+              <input type="text" id="wizard-subtype-search-input" value="${escapeAttr(newSubtypeName)}" placeholder="Search sub-type..." style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box;text-transform:capitalize" oninput="window.handleWizardSubtypeSearch(this.value)" onfocus="window.handleWizardSubtypeSearch(this.value)" autocomplete="off" ${wizardStage > 1 ? 'disabled style="background:#f9fafb"' : ''} />
               <div id="wizard-subtype-search-results" style="display:none;position:absolute;z-index:1000;background:#fff;border:1px solid #d1d1d6;border-radius:8px;max-height:160px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);left:0;top:100%"></div>
             </div>
             ${wizardStage === 1 ? `<button type="button" class="btn sm primary" id="wizard-link-subtype-btn" style="width:100%;margin-top:8px" onclick="window.handleWizardLinkSubtype()" disabled>Link Product</button>` : ''}
@@ -295,7 +308,7 @@ export function renderWizardStep() {
             <div style="font-size:12.5px;font-weight:750;margin-bottom:4px">Stage 2: Search Ingredient</div>
             ${newIngredientName ? `<div style="display:inline-block;background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:650;margin-bottom:6px">Ingredient: ${escapeHtml(newIngredientName)}</div>` : ''}
             <div style="position:relative">
-              <input type="text" id="wizard-ingredient-search-input" value="${escapeAttr(newIngredientName)}" placeholder="Search parent ingredient to link..." style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box" oninput="window.handleWizardIngredientSearch(this.value)" onfocus="window.handleWizardIngredientSearch(this.value)" autocomplete="off" ${wizardStage > 2 ? 'disabled style="background:#f9fafb"' : ''} />
+              <input type="text" id="wizard-ingredient-search-input" value="${escapeAttr(newIngredientName)}" placeholder="Search parent ingredient to link..." style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box;text-transform:capitalize" oninput="window.handleWizardIngredientSearch(this.value)" onfocus="window.handleWizardIngredientSearch(this.value)" autocomplete="off" ${wizardStage > 2 ? 'disabled style="background:#f9fafb"' : ''} />
               <div id="wizard-ingredient-search-results" style="display:none;position:absolute;z-index:1000;background:#fff;border:1px solid #d1d1d6;border-radius:8px;max-height:160px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);left:0;top:100%"></div>
             </div>
             ${wizardStage === 2 ? `<button type="button" class="btn sm primary" id="wizard-create-link-btn" style="width:100%;margin-top:8px" onclick="window.handleWizardCreateAndLink()" disabled>Create Sub-type &amp; Link Product</button>` : ''}
@@ -306,7 +319,7 @@ export function renderWizardStep() {
           <div style="border-top:1px dashed var(--border);padding-top:8px">
             <div style="font-size:12.5px;font-weight:750;margin-bottom:4px">Stage 3: Assign Category</div>
             <div style="position:relative">
-              <input type="text" id="wizard-category-search-input" value="${escapeAttr(selectedCategory)}" placeholder="Search category for new ingredient..." style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box" oninput="window.handleWizardCategorySearch(this.value)" onfocus="window.handleWizardCategorySearch(this.value)" autocomplete="off" />
+              <input type="text" id="wizard-category-search-input" value="${escapeAttr(selectedCategory)}" placeholder="Search category for new ingredient..." style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box;text-transform:capitalize" oninput="window.handleWizardCategorySearch(this.value)" onfocus="window.handleWizardCategorySearch(this.value)" autocomplete="off" />
               <div id="wizard-category-search-results" style="display:none;position:absolute;z-index:1000;background:#fff;border:1px solid #d1d1d6;border-radius:8px;max-height:150px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);left:0;top:100%"></div>
             </div>
             <button type="button" class="btn sm primary" id="wizard-create-link-btn" style="width:100%;margin-top:8px" onclick="window.handleWizardCreateAndLink()">Create Hierarchy &amp; Link Product</button>
