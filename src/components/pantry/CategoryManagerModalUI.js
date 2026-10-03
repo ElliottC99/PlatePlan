@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.19.63)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.19.65)
  * In-App Multi-Step Category Operations Wizard & Fine-Grained Reassignment Modal.
  * Replaces all native browser calls with accessible DOM views, relying on native Firestore reactivity.
  */
@@ -184,10 +184,19 @@ export function renderCategoryManagerModal() {
   window.closeCategoryManagerModal = closeCategoryManagerModal;
   window.navCatStep = (step) => { wizardStep = step; reassignSearch = ''; renderCurrentStep(); };
 
-  window.submitAddCat = () => {
+  window.submitAddCat = async () => {
     const input = document.getElementById('cat-manager-add-input');
     const val = input ? input.value.trim() : '';
     if (!val) return;
+    const state = getState() || {};
+    const categories = Array.isArray(state.categories) ? [...state.categories] : [];
+    if (!categories.some(c => slugCategory(c) === slugCategory(val))) {
+      categories.push(val);
+      const { setCategories } = await import('../../store/store.js');
+      const { saveCategories } = await import('../../services/HouseholdRepository.js');
+      setCategories(categories);
+      await saveCategories(categories);
+    }
     wizardStep = 'list'; activeCat = null; reassignSearch = '';
     renderCurrentStep();
   };
@@ -238,6 +247,13 @@ export function renderCategoryManagerModal() {
       }
     });
 
+    // Also rename in state categories
+    const categories = (state.categories || []).map(c => slugCategory(c) === targetSlug ? newName : c);
+    const { setCategories } = await import('../../store/store.js');
+    const { saveCategories } = await import('../../services/HouseholdRepository.js');
+    setCategories(categories);
+    batch.set(householdRef.collection('settings').doc('categories'), { categories, updatedAt: new Date().toISOString() }, { merge: true });
+
     await batch.commit();
     wizardStep = 'list'; activeCat = null; reassignSearch = ''; renderCurrentStep();
   };
@@ -269,6 +285,13 @@ export function renderCategoryManagerModal() {
       }
     });
 
+    // Remove merged category from state categories
+    const categories = (state.categories || []).filter(c => slugCategory(c) !== targetSlug);
+    const { setCategories } = await import('../../store/store.js');
+    const { saveCategories } = await import('../../services/HouseholdRepository.js');
+    setCategories(categories);
+    persistPromises.push(saveCategories(categories));
+
     await Promise.all(persistPromises);
     if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
     invalidateHierarchyCache();
@@ -290,7 +313,17 @@ export function renderCategoryManagerModal() {
     renderCurrentStep();
   };
 
-  window.submitDeleteEmptyCat = () => {
+  window.submitDeleteEmptyCat = async () => {
+    const deletedCat = activeCat;
+    if (deletedCat) {
+      const state = getState() || {};
+      const targetSlug = slugCategory(deletedCat);
+      const categories = (state.categories || []).filter(c => slugCategory(c) !== targetSlug);
+      const { setCategories } = await import('../../store/store.js');
+      const { saveCategories } = await import('../../services/HouseholdRepository.js');
+      setCategories(categories);
+      await saveCategories(categories);
+    }
     if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
     invalidateHierarchyCache();
     closeCategoryManagerModal();
@@ -323,6 +356,12 @@ export function renderCategoryManagerModal() {
         persistPromises.push(saveProduct(updated));
       }
     });
+
+    const categories = (state.categories || []).filter(c => slugCategory(c) !== targetSlug);
+    const { setCategories } = await import('../../store/store.js');
+    const { saveCategories } = await import('../../services/HouseholdRepository.js');
+    setCategories(categories);
+    persistPromises.push(saveCategories(categories));
 
     await Promise.all(persistPromises);
     if (typeof resetCategoryFilter === 'function') resetCategoryFilter();

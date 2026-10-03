@@ -4,8 +4,8 @@
  * and populating the centralized Store and window.state.
  */
 
-import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeIngredients, subscribeProducts } from './HouseholdRepository.js';
-import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache } from '../store/store.js';
+import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeIngredients, subscribeProducts, getCategories } from './HouseholdRepository.js';
+import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache, setCategories } from '../store/store.js';
 import { calculateMealSplit } from '../utils/nutritionCalculator.js';
 
 export function normalizeProductRecord(p) {
@@ -118,12 +118,13 @@ export async function hydrateHouseholdData() {
 
   inFlightHydration = (async () => {
     try {
-      const [recipes, rawIngredients, rawProducts, preferencesData, plan] = await Promise.all([
+      const [recipes, rawIngredients, rawProducts, preferencesData, plan, categories] = await Promise.all([
         getRecipes(),
         getIngredients(),
         getProducts(),
         getPreferences(),
-        getCurrentPlan()
+        getCurrentPlan(),
+        getCategories()
       ]);
 
       const ingredients = (rawIngredients || []).map(normalizeIngredientRecord);
@@ -134,6 +135,7 @@ export async function hydrateHouseholdData() {
       setProducts(products);
       setPreferences(preferencesData);
       setCurrentPlan(plan);
+      setCategories(categories);
 
       // Populate window.state directly for legacy/ES6 bridge compatibility
       if (typeof window !== 'undefined') {
@@ -144,6 +146,7 @@ export async function hydrateHouseholdData() {
           window.state.isCloudHydrated = true;
           window.state.ingredients = ingredients;
           window.state.products = products;
+          window.state.categories = categories;
         }
 
         window.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: ingredients }));

@@ -1,5 +1,5 @@
 /**
- * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.63)
+ * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.65)
  * Progressive Cascading Hierarchy Alignment Wizard with Title Case Normalisation.
  */
 import { getState, setIngredients } from '../../store/store.js';
@@ -181,7 +181,7 @@ export function handleWizardCategorySearch(query) {
   const container = document.getElementById('wizard-category-search-results');
   if (!container) return;
   const state = window.Store?.getState?.() || getState() || {};
-  const cats = Array.isArray(state.categories) && state.categories.length ? state.categories : ['Produce', 'Meat & Seafood', 'Dairy & Eggs', 'Bakery', 'Pantry', 'Frozen', 'Drinks', 'General'];
+  const cats = Array.isArray(state.categories) ? state.categories : [];
   const filtered = cats.filter(c => !q || String(c).toLowerCase().includes(q));
   if (!filtered.length) { container.innerHTML = `<div style="font-size:11.5px;color:var(--text3);padding:6px;text-align:center;">No matching categories.</div>`; container.style.display = 'block'; return; }
   container.innerHTML = filtered.map(c => `<div class="wizard-cat-opt" data-cat="${escapeAttr(c)}" style="padding:6px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border)">${escapeHtml(c)}</div>`).join('');

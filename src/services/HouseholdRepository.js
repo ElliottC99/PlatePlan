@@ -354,3 +354,47 @@ export function subscribeProducts(callback, errorCallback) {
   }
 }
 
+/**
+ * Fetch categories with database seeding on initial app setup.
+ */
+export async function getCategories() {
+  try {
+    if (!isDbAvailable()) return [];
+    const docRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('categories');
+    const snap = await safeFirestoreGet(docRef);
+    if (snap && snap.exists) {
+      const data = snap.data();
+      if (Array.isArray(data?.categories) && data.categories.length > 0) {
+        return data.categories;
+      }
+    }
+    // Database seeding on initial app setup if 0 existing categories
+    const defaultCategories = [
+      'Bakery', 'Baking', 'Beverages', 'Carbs', 'Dairy & Eggs', 'Drinks', 'Frozen',
+      'Fruit & Vegetables', 'General', 'Grains, Legumes & Pulses', 'Herbs & Spices',
+      'Meat & Seafood', 'Meat Substitutes', 'Nuts & Seeds', 'Other', 'Pantry',
+      'Produce', 'Proteins', 'Store Cupboard'
+    ];
+    await docRef.set({ categories: defaultCategories, updatedAt: new Date().toISOString() });
+    return defaultCategories;
+  } catch (err) {
+    console.warn('[HouseholdRepository] Error fetching categories, using minimal fallback:', err);
+    return ['Produce', 'Meat & Seafood', 'Dairy & Eggs', 'Bakery', 'Pantry', 'Frozen', 'Drinks', 'General'];
+  }
+}
+
+/**
+ * Save categories back to Firestore.
+ */
+export async function saveCategories(categories) {
+  try {
+    if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
+    const docRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('categories');
+    await docRef.set({ categories: categories || [], updatedAt: new Date().toISOString() }, { merge: true });
+    return { success: true };
+  } catch (err) {
+    console.warn('[HouseholdRepository] Error saving categories:', err);
+    return { success: false, error: err };
+  }
+}
+

@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/ReallocateProductModalUI.js (v3.19.63)
+ * src/components/pantry/ReallocateProductModalUI.js (v3.19.65)
  * Clean Reallocate Product Modal with Stacked Column Layout & Searchable Category Control.
  * Apple HIG compliant touch targets (min 44px) and free-text category creation.
  */
@@ -59,7 +59,6 @@ export function populateReallocateCategoryDatalist() {
   if (Array.isArray(state.categories)) {
     state.categories.forEach(c => categoriesSet.add(typeof c === 'string' ? c : c.name));
   }
-  ['Produce', 'Pantry', 'Dairy & Eggs', 'Meat & Seafood', 'Bakery', 'Frozen', 'Baking', 'Spices & Condiments'].forEach(c => categoriesSet.add(c));
 
   datalist.innerHTML = Array.from(categoriesSet)
     .sort()

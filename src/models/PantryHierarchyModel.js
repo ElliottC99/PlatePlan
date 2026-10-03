@@ -1,5 +1,5 @@
 /**
- * src/models/PantryHierarchyModel.js (v3.19.63)
+ * src/models/PantryHierarchyModel.js (v3.19.65)
  * Relational Model & Operations for Category ➔ Ingredient ➔ Sub-type ➔ Product hierarchy.
  * Encapsulates aliasing, merging, promoting/demoting, and auto-default product resolution.
  */
@@ -31,9 +31,6 @@ export function getActiveCategories(state = {}) {
     const cat = p.category || p.cat;
     if (cat && typeof cat === 'string' && cat.trim()) { const slug = slugCategory(cat); if (slug && !categoryMap.has(slug)) categoryMap.set(slug, cat.charAt(0).toUpperCase() + cat.slice(1)); }
   });
-  if (categoryMap.size === 0) {
-    ['Baking', 'Beverages', 'Carbs', 'Dairy & Eggs', 'Fruit & Vegetables', 'Grains, Legumes & Pulses', 'Herbs & Spices', 'Meat Substitutes', 'Nuts & Seeds', 'Other', 'Produce', 'Proteins', 'Store Cupboard'].forEach(c => categoryMap.set(slugCategory(c), c));
-  }
   return Array.from(categoryMap.values()).sort((a, b) => a.localeCompare(b));
 }
 

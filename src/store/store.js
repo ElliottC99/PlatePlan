@@ -15,6 +15,7 @@ const state = {
   recipes: [],
   ingredients: [],
   products: [],
+  categories: [],
   preferences: null,
   userPrefs: {},
   settings: {},
@@ -53,6 +54,7 @@ export function saveStateCache() {
         userPrefs: state.userPrefs || {},
         preferences: state.preferences ? { nutritionTargets: state.preferences.nutritionTargets } : null,
         settings: state.settings || {},
+        categories: state.categories || [],
         cachedAt: Date.now()
       };
       const serialized = safeJsonStringify(payload, null, '');
@@ -79,6 +81,7 @@ const initialCache = readCache();
 if (initialCache) {
   state.recipes = Array.isArray(initialCache.recipes) ? initialCache.recipes : [];
   state.ingredients = Array.isArray(initialCache.ingredients) ? initialCache.ingredients : [];
+  state.categories = Array.isArray(initialCache.categories) ? initialCache.categories : [];
   state.preferences = initialCache.preferences || null;
   state.userPrefs = initialCache.userPrefs || {};
   state.settings = initialCache.settings || {};
@@ -220,6 +223,16 @@ export function setProducts(newProducts) {
   state.products = Array.isArray(newProducts) ? newProducts : [];
   saveStateCache();
   dispatchStateEvent('plateplan:state:products', state.products);
+}
+
+/**
+ * Update categories state domain and dispatch reactive update event.
+ * @param {Array<string>} newCategories
+ */
+export function setCategories(newCategories) {
+  state.categories = Array.isArray(newCategories) ? newCategories : [];
+  saveStateCache();
+  dispatchStateEvent('plateplan:state:categories', state.categories);
 }
 
 /**
