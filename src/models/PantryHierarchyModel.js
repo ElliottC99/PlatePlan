@@ -1,5 +1,5 @@
 /**
- * src/models/PantryHierarchyModel.js (v3.19.59)
+ * src/models/PantryHierarchyModel.js (v3.19.60)
  * Relational Model & Operations for Category ➔ Ingredient ➔ Sub-type ➔ Product hierarchy.
  * Encapsulates aliasing, merging, promoting/demoting, and auto-default product resolution.
  */
