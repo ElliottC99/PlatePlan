@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.19.66)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.19.67)
  * In-App Multi-Step Category Operations Wizard & Fine-Grained Reassignment Modal.
  */
 
@@ -275,13 +275,33 @@ window.closeDeleteCategoryModal = function closeDeleteCategoryModal() {
   if (overlay) overlay.remove();
 };
 
-window.handleDeleteCategory = async function handleDeleteCategory(categoryId) {
-  if (!categoryId) return;
+window.handleDeleteCategory = async function handleDeleteCategory(identifier) {
+  if (!identifier) return;
+  const category = resolveCategory(identifier);
+  if (!category || (!category.id && !category.name)) return;
+  const targetId = category.id;
+  const targetName = category.name;
+
   try {
-    await window.PantryRepository.deleteCategory(categoryId);
+    await window.PantryRepository.deleteCategory(targetId || targetName);
+
+    const state = window.Store.getState() || {};
+    const targetSlug = slugCategory(targetName);
+    const ingsToUpdate = (state.ingredients || []).filter(i => slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug);
+    for (const ing of ingsToUpdate) {
+      await window.PantryRepository.saveIngredient({ ...ing, category: 'Uncategorised', cat: 'uncategorised', updatedAt: new Date().toISOString() });
+    }
+    const updatedIngs = (state.ingredients || []).map(i => {
+      if (slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug) {
+        return { ...i, category: 'Uncategorised', cat: 'uncategorised' };
+      }
+      return i;
+    });
+    window.Store.setState({ ingredients: updatedIngs });
+
     const updatedCategories = (window.Store.getState().categories || []).filter(c => {
-      if (typeof c === 'string') return c !== categoryId && slugCategory(c) !== slugCategory(categoryId);
-      return c.id !== categoryId && c.name !== categoryId;
+      if (typeof c === 'string') return c !== targetId && slugCategory(c) !== slugCategory(targetName);
+      return c.id !== targetId && c.name !== targetName;
     });
     window.Store.setState({ categories: updatedCategories });
   } catch (err) {
@@ -332,5 +352,8 @@ window.promptDeleteCategory = function promptDeleteCategory(categoryId) {
 };
 
 if (typeof window !== 'undefined') {
-  window.openCategoryManagerModal = renderCategoryManagerModal;
+  window.openCategoryManagerModal = () => {
+    wizardStep = 'list';
+    renderCategoryManagerModal();
+  };
 }

@@ -315,3 +315,13 @@ export function subscribe(domainOrCallback, maybeCallback) {
     document.removeEventListener(eventName, handler);
   };
 }
+
+if (typeof window !== 'undefined') {
+  window.Store = {
+    getState,
+    setState: (patch) => {
+      updateState(patch);
+    },
+    subscribe
+  };
+}
