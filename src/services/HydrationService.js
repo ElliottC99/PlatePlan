@@ -4,7 +4,7 @@
  * and populating the centralized Store and window.state.
  */
 
-import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeIngredients, subscribeProducts, getCategories, saveCategories } from './HouseholdRepository.js';
+import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeIngredients, subscribeProducts, getCategories, saveCategories, saveIngredient } from './HouseholdRepository.js';
 import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache, setCategories } from '../store/store.js';
 import { calculateMealSplit } from '../utils/nutritionCalculator.js';
 
@@ -28,6 +28,52 @@ export function getCategoryName(cat) {
   if (!cat) return '';
   if (typeof cat === 'string') return cat;
   return cat.name || cat.categoryName || cat.id || '';
+}
+
+export async function sweepAndRecalibrateIngredientDefaults() {
+  const state = window.Store?.getState?.() || {};
+  const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
+  const products = Array.isArray(state.products) ? state.products : [];
+  let updatedCount = 0;
+
+  const updatedIngredients = ingredients.map(ing => {
+    const currentDefaultId = ing.defaultProductId || ing.autoDefaultProductId || ing.autoDefaultProduct;
+    const currentValid = currentDefaultId && products.some(p => String(p.id) === String(currentDefaultId));
+
+    if (!currentValid) {
+      const childSubtypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
+      const childSubtypeIds = childSubtypes.map(s => String(s.id || s.name || ''));
+
+      const candidateProduct = products.find(p => 
+        String(p.ingredientId) === String(ing.id) ||
+        childSubtypeIds.includes(String(p.subtypeId || p.subTypeId || p.subtype || ''))
+      );
+
+      if (candidateProduct) {
+        updatedCount++;
+        return {
+          ...ing,
+          defaultProductId: candidateProduct.id,
+          autoDefault: candidateProduct.name || candidateProduct.title || '',
+          autoDefaultProduct: candidateProduct.id,
+          updatedAt: new Date().toISOString()
+        };
+      }
+    }
+    return ing;
+  });
+
+  if (updatedCount > 0) {
+    console.log(`[HydrationService] Recalibrated defaults for ${updatedCount} ingredients.`);
+    setIngredients(updatedIngredients);
+    if (window.Store?.setState) window.Store.setState({ ingredients: updatedIngredients });
+    try {
+      const changed = updatedIngredients.filter((i, idx) => ingredients[idx] !== i);
+      await Promise.all(changed.map(i => saveIngredient(i)));
+    } catch (err) {
+      console.warn('[HydrationService] Failed persisting recalibrated ingredient defaults:', err);
+    }
+  }
 }
 
 export function mergeCanonicalCategories(rawCategories) {
@@ -181,6 +227,8 @@ export async function hydrateHouseholdData() {
       if (mutated) {
         saveCategories(mergedCategories).catch(err => console.warn('[HydrationService] Failed to persist merged canonical categories:', err));
       }
+
+      await sweepAndRecalibrateIngredientDefaults();
 
       // Populate window.state directly for legacy/ES6 bridge compatibility
       if (typeof window !== 'undefined') {

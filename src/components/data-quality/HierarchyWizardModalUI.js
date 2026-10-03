@@ -1,6 +1,6 @@
 /**
- * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.70)
- * Progressive Cascading Hierarchy Alignment Wizard with Title Case Normalisation.
+ * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.71)
+ * Progressive Cascading Hierarchy Alignment Wizard with Title Case Normalisation & Auto-Default Sync.
  */
 import { getState, setIngredients } from '../../store/store.js';
 import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
@@ -15,13 +15,34 @@ const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
 
 export function getCategoryName(cat) {
   if (!cat) return '';
-  if (typeof cat === 'string') return cat;
-  return cat.name || cat.categoryName || cat.id || '';
+  return typeof cat === 'string' ? cat : (cat.name || cat.categoryName || cat.id || '');
 }
 
 function toTitleCase(str) {
   if (!str) return '';
   return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+export function syncIngredientAutoDefault(parentIng, linkedProduct) {
+  if (!parentIng || !linkedProduct) return false;
+  const state = window.Store?.getState?.() || getState() || {};
+  const products = state.products || safeGetProducts() || [];
+  const currentDefaultId = parentIng.defaultProductId || parentIng.autoDefaultProductId || parentIng.autoDefaultProduct;
+  const currentValid = currentDefaultId && products.some(p => String(p.id) === String(currentDefaultId));
+
+  if (!currentValid) {
+    parentIng.defaultProductId = linkedProduct.id;
+    parentIng.autoDefault = linkedProduct.name || linkedProduct.title || '';
+    parentIng.autoDefaultProduct = linkedProduct.id;
+    parentIng.updatedAt = new Date().toISOString();
+    
+    const ingredients = (state.ingredients || []).map(i => String(i.id) === String(parentIng.id) ? parentIng : i);
+    if (typeof setIngredients === 'function') setIngredients(ingredients);
+    if (window.Store?.setState) window.Store.setState({ ingredients });
+    saveIngredient(parentIng);
+    return true;
+  }
+  return false;
 }
 
 export function closeHierarchyWizardModal() {
@@ -55,12 +76,8 @@ export function handleWizardSubtypeSearch(query) {
   const options = [];
   (state.ingredients || []).forEach(ing => {
     const subTypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
-    if (!subTypes.length) {
-      options.push({ id: ing.id, name: `${ing.name} (Ingredient)`, ingredientId: ing.id, subtypeId: null, category: ing.category });
-    }
-    subTypes.forEach(st => {
-      options.push({ id: st.id, name: `${ing.name} › ${st.name}`, ingredientId: ing.id, subtypeId: st.id, category: ing.category });
-    });
+    if (!subTypes.length) options.push({ id: ing.id, name: `${ing.name} (Ingredient)`, ingredientId: ing.id, subtypeId: null, category: ing.category });
+    subTypes.forEach(st => options.push({ id: st.id, name: `${ing.name} › ${st.name}`, ingredientId: ing.id, subtypeId: st.id, category: ing.category }));
   });
   const filtered = options.filter(o => !q || String(o.name).toLowerCase().includes(q) || String(o.category).toLowerCase().includes(q)).slice(0, 7);
   
@@ -74,8 +91,7 @@ export function handleWizardSubtypeSearch(query) {
   const displayQuery = toTitleCase(q || wizardQueue[currentIndex]?.name || 'Item');
   html += `<div class="wizard-st-create" data-name="${escapeAttr(displayQuery)}" style="padding:8px 10px;font-size:12px;cursor:pointer;background:#eff6ff;color:var(--primary);font-weight:700;display:flex;align-items:center;gap:6px"><span>➕ Create new sub-type "${escapeHtml(displayQuery)}"</span></div>`;
 
-  container.innerHTML = html;
-  container.style.display = 'block';
+  container.innerHTML = html; container.style.display = 'block';
 
   container.querySelectorAll('.wizard-st-item').forEach(el => {
     el.onclick = () => {
@@ -89,10 +105,7 @@ export function handleWizardSubtypeSearch(query) {
   });
 
   container.querySelectorAll('.wizard-st-create').forEach(el => {
-    el.onclick = () => {
-      newSubtypeName = toTitleCase(el.dataset.name);
-      container.style.display = 'none'; wizardStage = 2; renderWizardStep();
-    };
+    el.onclick = () => { newSubtypeName = toTitleCase(el.dataset.name); container.style.display = 'none'; wizardStage = 2; renderWizardStep(); };
   });
 }
 
@@ -115,7 +128,9 @@ export async function handleWizardLinkSubtype() {
     ...p, ingredientId: selectedIngredientId, subtypeId, subTypeId: subtypeId, isAutoDefault: false, updatedAt: new Date().toISOString()
   } : p);
   commitProductUpdates(products);
-  try { await saveProduct(products.find(p => String(p.id) === String(currentItem.id))); } catch (e) {}
+  const updatedProd = products.find(p => String(p.id) === String(currentItem.id));
+  try { await saveProduct(updatedProd); } catch (e) {}
+  if (parentIng && updatedProd) syncIngredientAutoDefault(parentIng, updatedProd);
   advanceHierarchyWizardStep();
 }
 
@@ -136,8 +151,7 @@ export function handleWizardIngredientSearch(query) {
   const displayQuery = toTitleCase(q || newSubtypeName || 'Ingredient');
   html += `<div class="wizard-ing-create" data-name="${escapeAttr(displayQuery)}" style="padding:8px 10px;font-size:12px;cursor:pointer;background:#eff6ff;color:var(--primary);font-weight:700;display:flex;align-items:center;gap:6px"><span>➕ Create new ingredient "${escapeHtml(displayQuery)}"</span></div>`;
 
-  container.innerHTML = html;
-  container.style.display = 'block';
+  container.innerHTML = html; container.style.display = 'block';
 
   container.querySelectorAll('.wizard-ing-item').forEach(el => {
     el.onclick = () => {
@@ -151,10 +165,7 @@ export function handleWizardIngredientSearch(query) {
   });
 
   container.querySelectorAll('.wizard-ing-create').forEach(el => {
-    el.onclick = () => {
-      newIngredientName = toTitleCase(el.dataset.name);
-      container.style.display = 'none'; wizardStage = 3; renderWizardStep();
-    };
+    el.onclick = () => { newIngredientName = toTitleCase(el.dataset.name); container.style.display = 'none'; wizardStage = 3; renderWizardStep(); };
   });
 }
 
@@ -162,20 +173,14 @@ export function handleWizardCategorySearch(query) {
   const cleanQuery = String(query || '').toLowerCase().trim();
   const container = document.getElementById('wizard-category-search-results');
   if (!container) return;
-  
   const state = window.Store?.getState?.() || getState() || {};
   const activeCategories = Array.isArray(state.categories) ? state.categories : [];
-  
-  const matches = activeCategories.filter(cat => {
-    const catName = getCategoryName(cat).toLowerCase();
-    return !cleanQuery || catName.includes(cleanQuery);
-  });
+  const matches = activeCategories.filter(cat => getCategoryName(cat).toLowerCase().includes(cleanQuery));
 
   container.innerHTML = '';
-
   if (!matches.length) { 
     container.innerHTML = `<div style="font-size:11.5px;color:var(--text2,#78716c);padding:8px;text-align:center;">No matching category in Category Bank. Please manage categories in Category Manager.</div>`; 
-    container.style.display = 'block'; 
+    container.style.display = 'block';
     const btn = document.getElementById('wizard-create-link-btn');
     if (btn) btn.disabled = true;
     return; 
@@ -183,20 +188,16 @@ export function handleWizardCategorySearch(query) {
 
   matches.forEach(cat => {
     const catName = getCategoryName(cat);
-
     const div = document.createElement('div');
     div.className = 'wizard-category-option';
     div.style.cssText = 'padding:6px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border,#e7e5e4);display:flex;justify-content:space-between;align-items:center;';
-
     const span = document.createElement('span');
     span.style.fontWeight = '600';
-    span.textContent = catName; // Uses getCategoryName(cat) for textContent
-
+    span.textContent = catName;
     div.appendChild(span);
     div.onclick = () => window.selectWizardCategory(catName);
     container.appendChild(div);
   });
-
   container.style.display = 'block';
 }
 
@@ -218,17 +219,10 @@ export async function handleWizardCreateAndLink() {
 
   const normalizedSubName = toTitleCase(newSubtypeName || currentItem.name);
   const normalizedIngName = toTitleCase(newIngredientName);
-  
   const activeCategories = Array.isArray(state.categories) ? state.categories : [];
-  let categoryObj = activeCategories.find(c => {
-    const name = getCategoryName(c);
-    return name && name.toLowerCase() === (selectedCategory || '').toLowerCase();
-  });
+  let categoryObj = activeCategories.find(c => getCategoryName(c).toLowerCase() === (selectedCategory || '').toLowerCase());
 
-  if (!categoryObj && activeCategories.length > 0) {
-    categoryObj = activeCategories[0];
-  }
-
+  if (!categoryObj && activeCategories.length > 0) categoryObj = activeCategories[0];
   const finalCatName = getCategoryName(categoryObj) || selectedCategory || 'Uncategorised';
 
   if (normalizedIngName) {
@@ -245,17 +239,16 @@ export async function handleWizardCreateAndLink() {
     const newSub = { id: `sub_${Date.now()}`, name: normalizedSubName, isDefault: false, createdAt: new Date().toISOString() };
     parentIng.subtypes = [...(parentIng.subtypes || []), newSub];
     saveIngredient(parentIng);
-  } else {
-    alert('Please select or create an ingredient.');
-    return;
-  }
+  } else { alert('Please select or create an ingredient.'); return; }
 
   const parentSub = parentIng.subtypes[parentIng.subtypes.length - 1];
   const products = safeGetProducts().map(p => String(p.id) === String(currentItem.id) ? {
     ...p, ingredientId: parentIng.id, subtypeId: parentSub.id, subTypeId: parentSub.id, isAutoDefault: false, updatedAt: new Date().toISOString()
   } : p);
   commitProductUpdates(products);
-  try { await saveProduct(products.find(p => String(p.id) === String(currentItem.id))); } catch (e) {}
+  const updatedProd = products.find(p => String(p.id) === String(currentItem.id));
+  try { await saveProduct(updatedProd); } catch (e) {}
+  if (parentIng && updatedProd) syncIngredientAutoDefault(parentIng, updatedProd);
   advanceHierarchyWizardStep();
 }
 
@@ -301,9 +294,7 @@ export function renderWizardStep() {
 
   if (wizardStage === 3 && !selectedCategory) {
     const activeCategories = window.Store?.getState?.()?.categories || getState()?.categories || [];
-    if (activeCategories.length > 0) {
-      selectedCategory = getCategoryName(activeCategories[0]) || 'Uncategorised';
-    } else selectedCategory = 'Uncategorised';
+    selectedCategory = activeCategories.length > 0 ? (getCategoryName(activeCategories[0]) || 'Uncategorised') : 'Uncategorised';
   }
 
   card.innerHTML = `
@@ -392,6 +383,6 @@ if (typeof window !== 'undefined') {
   Object.assign(window, {
     openHierarchyWizardModal, closeHierarchyWizardModal, handleWizardSubtypeSearch, handleWizardLinkSubtype,
     handleWizardIngredientSearch, handleWizardCategorySearch, selectWizardCategory, handleWizardCreateAndLink,
-    skipWizardStep, bulkProvisionAllDefaults, refreshHierarchyWizardStep, advanceHierarchyWizardStep
+    skipWizardStep, bulkProvisionAllDefaults, refreshHierarchyWizardStep, advanceHierarchyWizardStep, syncIngredientAutoDefault
   });
 }

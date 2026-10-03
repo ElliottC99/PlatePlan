@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.19.70)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.19.71)
  * In-App Multi-Step Category Operations Wizard & Fine-Grained Reassignment Modal.
  */
 

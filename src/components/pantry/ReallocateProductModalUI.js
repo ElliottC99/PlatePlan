@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/ReallocateProductModalUI.js (v3.19.70)
+ * src/components/pantry/ReallocateProductModalUI.js (v3.19.71)
  * Clean Reallocate Product Modal with Stacked Column Layout & Searchable Category Control.
  * Apple HIG compliant touch targets (min 44px) and free-text category creation.
  */
@@ -322,6 +322,13 @@ export function promptReallocateProduct(productId) {
       targetProd.updatedAt = new Date().toISOString();
 
       setProducts(prodsList);
+      if (!ing.defaultProductId && !ing.autoDefault) {
+        ing.defaultProductId = targetProd.id;
+        ing.autoDefault = targetProd.name || targetProd.title || '';
+        ing.autoDefaultProduct = targetProd.id;
+        ing.updatedAt = new Date().toISOString();
+        saveIngredient(ing);
+      }
       if (typeof window.renderProductBank === 'function') window.renderProductBank();
       if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
       await saveProduct(targetProd);
