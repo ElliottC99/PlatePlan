@@ -1,6 +1,6 @@
 /**
- * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.61)
- * Progressive Cascading Hierarchy Alignment Wizard (3-Stage Drill-Down).
+ * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.62)
+ * Progressive Cascading Hierarchy Alignment Wizard (Category → Ingredient → Sub-type).
  */
 import { getState, setIngredients } from '../../store/store.js';
 import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
@@ -8,7 +8,7 @@ import { safeGetProducts, commitProductUpdates } from './ResolveUnlinkedModalUI.
 
 let wizardQueue = [], currentIndex = 0, wizardStage = 1;
 let selectedSubtypeId = null, selectedIngredientId = null, selectedCategory = 'General';
-let newSubtypeName = '', newCoreName = '';
+let newSubtypeName = '', newIngredientName = '';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
@@ -19,7 +19,7 @@ export function closeHierarchyWizardModal() {
   document.body.style.overflow = '';
   wizardQueue = []; currentIndex = 0; wizardStage = 1;
   selectedSubtypeId = null; selectedIngredientId = null; selectedCategory = 'General';
-  newSubtypeName = ''; newCoreName = '';
+  newSubtypeName = ''; newIngredientName = '';
   if (typeof window.renderDataQualityView === 'function') window.renderDataQualityView();
 }
 
@@ -48,7 +48,7 @@ export function handleWizardSubtypeSearch(query) {
   (state.ingredients || []).forEach(ing => {
     const subTypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
     if (!subTypes.length) {
-      options.push({ id: ing.id, name: `${ing.name} (Core)`, ingredientId: ing.id, subtypeId: null, category: ing.category });
+      options.push({ id: ing.id, name: `${ing.name} (Ingredient)`, ingredientId: ing.id, subtypeId: null, category: ing.category });
     }
     subTypes.forEach(st => {
       options.push({ id: st.id, name: `${ing.name} › ${st.name}`, ingredientId: ing.id, subtypeId: st.id, category: ing.category });
@@ -120,36 +120,36 @@ export async function handleWizardLinkSubtype() {
   advanceHierarchyWizardStep();
 }
 
-export function handleWizardCoreSearch(query) {
+export function handleWizardIngredientSearch(query) {
   const q = String(query || '').toLowerCase().trim();
-  const container = document.getElementById('wizard-core-search-results');
+  const container = document.getElementById('wizard-ingredient-search-results');
   if (!container) return;
   const state = window.Store?.getState?.() || getState() || {};
   const filtered = (state.ingredients || []).filter(i => !q || String(i.name).toLowerCase().includes(q)).slice(0, 7);
 
   let html = filtered.map(i => `
-    <div class="wizard-core-item" data-id="${escapeAttr(i.id)}" data-name="${escapeAttr(i.name)}" style="padding:6px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+    <div class="wizard-ing-item" data-id="${escapeAttr(i.id)}" data-name="${escapeAttr(i.name)}" style="padding:6px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
       <span style="font-weight:600">${escapeHtml(i.name)}</span>
       <span style="font-size:10.5px;background:#f3f4f6;padding:1px 5px;border-radius:4px;color:var(--text2)">${escapeHtml(i.category || 'General')}</span>
     </div>
   `).join('');
 
-  const displayQuery = q || newSubtypeName || 'Core';
+  const displayQuery = q || newSubtypeName || 'Ingredient';
   html += `
-    <div class="wizard-core-create" data-name="${escapeAttr(displayQuery)}" style="padding:8px 10px;font-size:12px;cursor:pointer;background:#eff6ff;color:var(--primary);font-weight:700;display:flex;align-items:center;gap:6px">
-      <span>➕ Create new core ingredient "${escapeHtml(displayQuery)}"</span>
+    <div class="wizard-ing-create" data-name="${escapeAttr(displayQuery)}" style="padding:8px 10px;font-size:12px;cursor:pointer;background:#eff6ff;color:var(--primary);font-weight:700;display:flex;align-items:center;gap:6px">
+      <span>➕ Create new ingredient "${escapeHtml(displayQuery)}"</span>
     </div>
   `;
 
   container.innerHTML = html;
   container.style.display = 'block';
 
-  container.querySelectorAll('.wizard-core-item').forEach(el => {
+  container.querySelectorAll('.wizard-ing-item').forEach(el => {
     el.onclick = () => {
       selectedIngredientId = el.dataset.id;
       selectedSubtypeId = null;
-      newCoreName = '';
-      const input = document.getElementById('wizard-core-search-input');
+      newIngredientName = '';
+      const input = document.getElementById('wizard-ingredient-search-input');
       if (input) input.value = el.dataset.name;
       container.style.display = 'none';
       const btn = document.getElementById('wizard-create-link-btn');
@@ -157,9 +157,9 @@ export function handleWizardCoreSearch(query) {
     };
   });
 
-  container.querySelectorAll('.wizard-core-create').forEach(el => {
+  container.querySelectorAll('.wizard-ing-create').forEach(el => {
     el.onclick = () => {
-      newCoreName = el.dataset.name;
+      newIngredientName = el.dataset.name;
       container.style.display = 'none';
       wizardStage = 3;
       renderWizardStep();
@@ -195,9 +195,9 @@ export async function handleWizardCreateAndLink() {
   const state = window.Store?.getState?.() || getState() || {};
   let parentIng = null;
 
-  if (newCoreName) {
+  if (newIngredientName) {
     const newSub = { id: `sub_${Date.now()}`, name: newSubtypeName || currentItem.name, isDefault: false, createdAt: new Date().toISOString() };
-    parentIng = { id: `ing_${Date.now()}`, name: newCoreName, category: selectedCategory, subtypes: [newSub], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    parentIng = { id: `ing_${Date.now()}`, name: newIngredientName, category: selectedCategory, subtypes: [newSub], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     const updatedIngredients = [...(state.ingredients || []), parentIng];
     if (typeof setIngredients === 'function') setIngredients(updatedIngredients);
     if (window.Store?.setState) window.Store.setState({ ingredients: updatedIngredients });
@@ -210,7 +210,7 @@ export async function handleWizardCreateAndLink() {
     parentIng.subtypes = [...(parentIng.subtypes || []), newSub];
     saveIngredient(parentIng);
   } else {
-    alert('Please select or create a core ingredient.');
+    alert('Please select or create an ingredient.');
     return;
   }
 
@@ -251,7 +251,7 @@ export async function bulkProvisionAllDefaults() {
 
 export function advanceHierarchyWizardStep() {
   wizardStage = 1; selectedSubtypeId = null; selectedIngredientId = null; selectedCategory = 'General';
-  newSubtypeName = ''; newCoreName = '';
+  newSubtypeName = ''; newIngredientName = '';
   if (++currentIndex >= wizardQueue.length) renderWizardComplete(); else renderWizardStep();
 }
 
@@ -292,11 +292,11 @@ export function renderWizardStep() {
 
         ${wizardStage >= 2 ? `
           <div style="border-top:1px dashed var(--border);padding-top:8px">
-            <div style="font-size:12.5px;font-weight:750;margin-bottom:4px">Stage 2: Search Core Ingredient</div>
-            ${newCoreName ? `<div style="display:inline-block;background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:650;margin-bottom:6px">Core: ${escapeHtml(newCoreName)}</div>` : ''}
+            <div style="font-size:12.5px;font-weight:750;margin-bottom:4px">Stage 2: Search Ingredient</div>
+            ${newIngredientName ? `<div style="display:inline-block;background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:650;margin-bottom:6px">Ingredient: ${escapeHtml(newIngredientName)}</div>` : ''}
             <div style="position:relative">
-              <input type="text" id="wizard-core-search-input" value="${escapeAttr(newCoreName)}" placeholder="Search parent core ingredient to link..." style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box" oninput="window.handleWizardCoreSearch(this.value)" onfocus="window.handleWizardCoreSearch(this.value)" autocomplete="off" ${wizardStage > 2 ? 'disabled style="background:#f9fafb"' : ''} />
-              <div id="wizard-core-search-results" style="display:none;position:absolute;z-index:1000;background:#fff;border:1px solid #d1d1d6;border-radius:8px;max-height:160px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);left:0;top:100%"></div>
+              <input type="text" id="wizard-ingredient-search-input" value="${escapeAttr(newIngredientName)}" placeholder="Search parent ingredient to link..." style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box" oninput="window.handleWizardIngredientSearch(this.value)" onfocus="window.handleWizardIngredientSearch(this.value)" autocomplete="off" ${wizardStage > 2 ? 'disabled style="background:#f9fafb"' : ''} />
+              <div id="wizard-ingredient-search-results" style="display:none;position:absolute;z-index:1000;background:#fff;border:1px solid #d1d1d6;border-radius:8px;max-height:160px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);left:0;top:100%"></div>
             </div>
             ${wizardStage === 2 ? `<button type="button" class="btn sm primary" id="wizard-create-link-btn" style="width:100%;margin-top:8px" onclick="window.handleWizardCreateAndLink()" disabled>Create Sub-type &amp; Link Product</button>` : ''}
           </div>
@@ -306,7 +306,7 @@ export function renderWizardStep() {
           <div style="border-top:1px dashed var(--border);padding-top:8px">
             <div style="font-size:12.5px;font-weight:750;margin-bottom:4px">Stage 3: Assign Category</div>
             <div style="position:relative">
-              <input type="text" id="wizard-category-search-input" value="${escapeAttr(selectedCategory)}" placeholder="Search category to assign..." style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box" oninput="window.handleWizardCategorySearch(this.value)" onfocus="window.handleWizardCategorySearch(this.value)" autocomplete="off" />
+              <input type="text" id="wizard-category-search-input" value="${escapeAttr(selectedCategory)}" placeholder="Search category for new ingredient..." style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box" oninput="window.handleWizardCategorySearch(this.value)" onfocus="window.handleWizardCategorySearch(this.value)" autocomplete="off" />
               <div id="wizard-category-search-results" style="display:none;position:absolute;z-index:1000;background:#fff;border:1px solid #d1d1d6;border-radius:8px;max-height:150px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);left:0;top:100%"></div>
             </div>
             <button type="button" class="btn sm primary" id="wizard-create-link-btn" style="width:100%;margin-top:8px" onclick="window.handleWizardCreateAndLink()">Create Hierarchy &amp; Link Product</button>
@@ -320,7 +320,7 @@ export function renderWizardStep() {
     </div>
   `;
   if (wizardStage === 1) window.handleWizardSubtypeSearch('');
-  if (wizardStage === 2) window.handleWizardCoreSearch('');
+  if (wizardStage === 2) window.handleWizardIngredientSearch('');
   if (wizardStage === 3) window.handleWizardCategorySearch('');
 }
 
@@ -334,7 +334,7 @@ export function openHierarchyWizardModal() {
   wizardQueue = buildWizardQueue();
   currentIndex = 0; wizardStage = 1;
   selectedSubtypeId = null; selectedIngredientId = null; selectedCategory = 'General';
-  newSubtypeName = ''; newCoreName = '';
+  newSubtypeName = ''; newIngredientName = '';
   const existing = document.getElementById('hierarchy-wizard-modal-overlay');
   if (existing) existing.remove();
   const overlay = document.createElement('div');
@@ -352,7 +352,7 @@ export function openHierarchyWizardModal() {
 if (typeof window !== 'undefined') {
   Object.assign(window, {
     openHierarchyWizardModal, closeHierarchyWizardModal, handleWizardSubtypeSearch, handleWizardLinkSubtype,
-    handleWizardCoreSearch, handleWizardCategorySearch, handleWizardCreateAndLink,
+    handleWizardIngredientSearch, handleWizardCategorySearch, handleWizardCreateAndLink,
     skipWizardStep, bulkProvisionAllDefaults, refreshHierarchyWizardStep, advanceHierarchyWizardStep
   });
 }
