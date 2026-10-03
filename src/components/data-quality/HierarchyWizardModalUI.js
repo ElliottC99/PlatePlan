@@ -1,5 +1,5 @@
 /**
- * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.68)
+ * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.69)
  * Progressive Cascading Hierarchy Alignment Wizard with Title Case Normalisation.
  */
 import { getState, setIngredients } from '../../store/store.js';
@@ -7,7 +7,7 @@ import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.
 import { safeGetProducts, commitProductUpdates } from './ResolveUnlinkedModalUI.js';
 
 let wizardQueue = [], currentIndex = 0, wizardStage = 1;
-let selectedSubtypeId = null, selectedIngredientId = null, selectedCategory = '';
+let selectedSubtypeId = null, selectedIngredientId = null, selectedCategory = '', selectedCategoryId = '';
 let newSubtypeName = '', newIngredientName = '';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -23,7 +23,7 @@ export function closeHierarchyWizardModal() {
   if (overlay) overlay.remove();
   document.body.style.overflow = '';
   wizardQueue = []; currentIndex = 0; wizardStage = 1;
-  selectedSubtypeId = null; selectedIngredientId = null; selectedCategory = '';
+  selectedSubtypeId = null; selectedIngredientId = null; selectedCategory = ''; selectedCategoryId = '';
   newSubtypeName = ''; newIngredientName = '';
   if (typeof window.renderDataQualityView === 'function') window.renderDataQualityView();
 }
@@ -153,19 +153,21 @@ export function handleWizardIngredientSearch(query) {
 }
 
 export function handleWizardCategorySearch(query) {
-  const q = String(query || '').toLowerCase().trim();
+  const cleanQuery = String(query || '').toLowerCase().trim();
   const container = document.getElementById('wizard-category-search-results');
   if (!container) return;
   
   const state = window.Store?.getState?.() || getState() || {};
   const activeCategories = Array.isArray(state.categories) ? state.categories : [];
   
-  const filtered = activeCategories.filter(c => {
-    const catName = typeof c === 'string' ? c : (c?.name || '');
-    return !q || String(catName).toLowerCase().includes(q);
+  const matches = activeCategories.filter(cat => {
+    const catName = (typeof cat === 'string' ? cat : (cat?.name || '')).toLowerCase();
+    return !cleanQuery || catName.includes(cleanQuery);
   });
 
-  if (!filtered.length) { 
+  container.innerHTML = '';
+
+  if (!matches.length) { 
     container.innerHTML = `<div style="font-size:11.5px;color:var(--text2,#78716c);padding:8px;text-align:center;">No matching category in Category Bank. Please manage categories in Category Manager.</div>`; 
     container.style.display = 'block'; 
     const btn = document.getElementById('wizard-create-link-btn');
@@ -173,24 +175,35 @@ export function handleWizardCategorySearch(query) {
     return; 
   }
 
-  container.innerHTML = filtered.map(c => {
-    const catName = typeof c === 'string' ? c : (c?.name || '');
-    const catId = (typeof c === 'object' && c?.id) ? c.id : catName;
-    return `<div class="wizard-cat-opt" data-id="${escapeAttr(catId)}" data-cat="${escapeAttr(catName)}" style="padding:6px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border,#e7e5e4);display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:600">${escapeHtml(catName)}</span></div>`;
-  }).join('');
+  matches.forEach(cat => {
+    const catName = typeof cat === 'string' ? cat : (cat?.name || '');
+    const catId = (typeof cat === 'object' && cat?.id) ? cat.id : catName;
+
+    const div = document.createElement('div');
+    div.className = 'wizard-category-option';
+    div.style.cssText = 'padding:6px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border,#e7e5e4);display:flex;justify-content:space-between;align-items:center;';
+
+    const span = document.createElement('span');
+    span.style.fontWeight = '600';
+    span.textContent = catName; // Safe textContent avoids HTML syntax corruption from &, commas, or quotes
+
+    div.appendChild(span);
+    div.onclick = () => window.selectWizardCategory(catId, catName);
+    container.appendChild(div);
+  });
 
   container.style.display = 'block';
-  
-  container.querySelectorAll('.wizard-cat-opt').forEach(el => {
-    el.onclick = () => {
-      selectedCategory = el.dataset.cat;
-      const input = document.getElementById('wizard-category-search-input');
-      if (input) input.value = selectedCategory;
-      container.style.display = 'none';
-      const btn = document.getElementById('wizard-create-link-btn');
-      if (btn) btn.disabled = false;
-    };
-  });
+}
+
+export function selectWizardCategory(catId, catName) {
+  selectedCategory = catName;
+  selectedCategoryId = catId;
+  const input = document.getElementById('wizard-category-search-input');
+  if (input) input.value = catName;
+  const container = document.getElementById('wizard-category-search-results');
+  if (container) container.style.display = 'none';
+  const btn = document.getElementById('wizard-create-link-btn');
+  if (btn) btn.disabled = false;
 }
 
 export async function handleWizardCreateAndLink() {
@@ -205,14 +218,15 @@ export async function handleWizardCreateAndLink() {
   const activeCategories = Array.isArray(state.categories) ? state.categories : [];
   let categoryObj = activeCategories.find(c => {
     const name = typeof c === 'string' ? c : c?.name;
-    return name && name.toLowerCase() === (selectedCategory || '').toLowerCase();
+    const id = typeof c === 'object' && c?.id ? c.id : name;
+    return (id && String(id) === String(selectedCategoryId)) || (name && name.toLowerCase() === (selectedCategory || '').toLowerCase());
   });
 
   if (!categoryObj && activeCategories.length > 0) {
     categoryObj = activeCategories[0];
   }
 
-  const finalCatName = typeof categoryObj === 'string' ? categoryObj : (categoryObj?.name || 'Uncategorised');
+  const finalCatName = typeof categoryObj === 'string' ? categoryObj : (categoryObj?.name || selectedCategory || 'Uncategorised');
 
   if (normalizedIngName) {
     const newSub = { id: `sub_${Date.now()}`, name: normalizedSubName, isDefault: false, createdAt: new Date().toISOString() };
@@ -269,7 +283,7 @@ export async function bulkProvisionAllDefaults() {
 }
 
 export function advanceHierarchyWizardStep() {
-  wizardStage = 1; selectedSubtypeId = null; selectedIngredientId = null; selectedCategory = '';
+  wizardStage = 1; selectedSubtypeId = null; selectedIngredientId = null; selectedCategory = ''; selectedCategoryId = '';
   newSubtypeName = ''; newIngredientName = '';
   if (++currentIndex >= wizardQueue.length) renderWizardComplete(); else renderWizardStep();
 }
@@ -287,6 +301,7 @@ export function renderWizardStep() {
     if (activeCategories.length > 0) {
       const first = activeCategories[0];
       selectedCategory = typeof first === 'string' ? first : (first?.name || 'Uncategorised');
+      selectedCategoryId = typeof first === 'object' && first?.id ? first.id : selectedCategory;
     } else selectedCategory = 'Uncategorised';
   }
 
@@ -333,7 +348,7 @@ export function renderWizardStep() {
             <div style="font-size:12.5px;font-weight:750;margin-bottom:4px">Stage 3: Assign Category</div>
             <div style="position:relative">
               <input type="text" id="wizard-category-search-input" value="${escapeAttr(selectedCategory)}" placeholder="Search category from Category Bank..." style="width:100%;padding:6px 8px;border:1px solid var(--border,#e7e5e4);border-radius:6px;font-size:12px;box-sizing:border-box;text-transform:capitalize" oninput="window.handleWizardCategorySearch(this.value)" onkeyup="window.handleWizardCategorySearch(this.value)" onfocus="window.handleWizardCategorySearch(this.value)" autocomplete="off" />
-              <div id="wizard-category-search-results" style="display:none;position:absolute;z-index:1000;background:#fff;border:1px solid #d1d1d6;border-radius:8px;max-height:150px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);left:0;top:100%"></div>
+              <div id="wizard-category-search-results" style="display:none;position:absolute;z-index:1050;background:#fff;border:1px solid #d1d1d6;border-radius:8px;max-height:220px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);left:0;top:100%"></div>
             </div>
             <button type="button" class="btn sm primary" id="wizard-create-link-btn" style="width:100%;margin-top:8px" onclick="window.handleWizardCreateAndLink()">Create Hierarchy &amp; Link Product</button>
           </div>
@@ -357,9 +372,8 @@ function renderWizardComplete() {
 }
 
 export function openHierarchyWizardModal() {
-  wizardQueue = buildWizardQueue();
-  currentIndex = 0; wizardStage = 1;
-  selectedSubtypeId = null; selectedIngredientId = null; selectedCategory = '';
+  wizardQueue = buildWizardQueue(); currentIndex = 0; wizardStage = 1;
+  selectedSubtypeId = null; selectedIngredientId = null; selectedCategory = ''; selectedCategoryId = '';
   newSubtypeName = ''; newIngredientName = '';
   const existing = document.getElementById('hierarchy-wizard-modal-overlay');
   if (existing) existing.remove();
@@ -378,7 +392,7 @@ export function openHierarchyWizardModal() {
 if (typeof window !== 'undefined') {
   Object.assign(window, {
     openHierarchyWizardModal, closeHierarchyWizardModal, handleWizardSubtypeSearch, handleWizardLinkSubtype,
-    handleWizardIngredientSearch, handleWizardCategorySearch, handleWizardCreateAndLink,
+    handleWizardIngredientSearch, handleWizardCategorySearch, selectWizardCategory, handleWizardCreateAndLink,
     skipWizardStep, bulkProvisionAllDefaults, refreshHierarchyWizardStep, advanceHierarchyWizardStep
   });
 }
