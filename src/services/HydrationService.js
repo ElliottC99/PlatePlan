@@ -4,9 +4,48 @@
  * and populating the centralized Store and window.state.
  */
 
-import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeIngredients, subscribeProducts, getCategories } from './HouseholdRepository.js';
+import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeIngredients, subscribeProducts, getCategories, saveCategories } from './HouseholdRepository.js';
 import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache, setCategories } from '../store/store.js';
 import { calculateMealSplit } from '../utils/nutritionCalculator.js';
+
+export const CANONICAL_CATEGORIES = [
+  'Baking, Chocolate and Sweets',
+  'Beverages',
+  'Carbs',
+  'Dairy',
+  'Fruit & Vegetables',
+  'Grains, Nuts and Seeds',
+  'Herbs & Spices',
+  'Meat Substitutes',
+  'Other',
+  'Sauces, Condiments & Pastes',
+  'Store Cupboard',
+  'Supplements',
+  'Tofu, Tempeh and Seitan'
+];
+
+export function getCategoryName(cat) {
+  if (!cat) return '';
+  if (typeof cat === 'string') return cat;
+  return cat.name || cat.categoryName || cat.id || '';
+}
+
+export function mergeCanonicalCategories(rawCategories) {
+  const categories = Array.isArray(rawCategories) ? [...rawCategories] : [];
+  const slugCat = str => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const existingSlugs = new Set(categories.map(c => slugCat(getCategoryName(c))));
+  
+  let mutated = false;
+  CANONICAL_CATEGORIES.forEach(canon => {
+    if (!existingSlugs.has(slugCat(canon))) {
+      categories.push(canon);
+      existingSlugs.add(slugCat(canon));
+      mutated = true;
+    }
+  });
+
+  return { categories, mutated };
+}
 
 export function normalizeProductRecord(p) {
   if (!p || typeof p !== 'object') return p;
@@ -118,7 +157,7 @@ export async function hydrateHouseholdData() {
 
   inFlightHydration = (async () => {
     try {
-      const [recipes, rawIngredients, rawProducts, preferencesData, plan, categories] = await Promise.all([
+      const [recipes, rawIngredients, rawProducts, preferencesData, plan, rawCategories] = await Promise.all([
         getRecipes(),
         getIngredients(),
         getProducts(),
@@ -130,12 +169,18 @@ export async function hydrateHouseholdData() {
       const ingredients = (rawIngredients || []).map(normalizeIngredientRecord);
       const products = (rawProducts || []).map(normalizeProductRecord);
 
+      const { categories: mergedCategories, mutated } = mergeCanonicalCategories(rawCategories);
+
       setRecipes(recipes);
       setIngredients(ingredients);
       setProducts(products);
       setPreferences(preferencesData);
       setCurrentPlan(plan);
-      setCategories(categories);
+      setCategories(mergedCategories);
+
+      if (mutated) {
+        saveCategories(mergedCategories).catch(err => console.warn('[HydrationService] Failed to persist merged canonical categories:', err));
+      }
 
       // Populate window.state directly for legacy/ES6 bridge compatibility
       if (typeof window !== 'undefined') {
@@ -146,7 +191,7 @@ export async function hydrateHouseholdData() {
           window.state.isCloudHydrated = true;
           window.state.ingredients = ingredients;
           window.state.products = products;
-          window.state.categories = categories;
+          window.state.categories = mergedCategories;
         }
 
         window.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: ingredients }));

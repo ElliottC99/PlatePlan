@@ -1,5 +1,5 @@
 /**
- * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.69)
+ * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.70)
  * Progressive Cascading Hierarchy Alignment Wizard with Title Case Normalisation.
  */
 import { getState, setIngredients } from '../../store/store.js';
@@ -7,11 +7,17 @@ import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.
 import { safeGetProducts, commitProductUpdates } from './ResolveUnlinkedModalUI.js';
 
 let wizardQueue = [], currentIndex = 0, wizardStage = 1;
-let selectedSubtypeId = null, selectedIngredientId = null, selectedCategory = '', selectedCategoryId = '';
+let selectedSubtypeId = null, selectedIngredientId = null, selectedCategory = '';
 let newSubtypeName = '', newIngredientName = '';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
+
+export function getCategoryName(cat) {
+  if (!cat) return '';
+  if (typeof cat === 'string') return cat;
+  return cat.name || cat.categoryName || cat.id || '';
+}
 
 function toTitleCase(str) {
   if (!str) return '';
@@ -23,7 +29,7 @@ export function closeHierarchyWizardModal() {
   if (overlay) overlay.remove();
   document.body.style.overflow = '';
   wizardQueue = []; currentIndex = 0; wizardStage = 1;
-  selectedSubtypeId = null; selectedIngredientId = null; selectedCategory = ''; selectedCategoryId = '';
+  selectedSubtypeId = null; selectedIngredientId = null; selectedCategory = '';
   newSubtypeName = ''; newIngredientName = '';
   if (typeof window.renderDataQualityView === 'function') window.renderDataQualityView();
 }
@@ -161,7 +167,7 @@ export function handleWizardCategorySearch(query) {
   const activeCategories = Array.isArray(state.categories) ? state.categories : [];
   
   const matches = activeCategories.filter(cat => {
-    const catName = (typeof cat === 'string' ? cat : (cat?.name || '')).toLowerCase();
+    const catName = getCategoryName(cat).toLowerCase();
     return !cleanQuery || catName.includes(cleanQuery);
   });
 
@@ -176,8 +182,7 @@ export function handleWizardCategorySearch(query) {
   }
 
   matches.forEach(cat => {
-    const catName = typeof cat === 'string' ? cat : (cat?.name || '');
-    const catId = (typeof cat === 'object' && cat?.id) ? cat.id : catName;
+    const catName = getCategoryName(cat);
 
     const div = document.createElement('div');
     div.className = 'wizard-category-option';
@@ -185,19 +190,18 @@ export function handleWizardCategorySearch(query) {
 
     const span = document.createElement('span');
     span.style.fontWeight = '600';
-    span.textContent = catName; // Safe textContent avoids HTML syntax corruption from &, commas, or quotes
+    span.textContent = catName; // Uses getCategoryName(cat) for textContent
 
     div.appendChild(span);
-    div.onclick = () => window.selectWizardCategory(catId, catName);
+    div.onclick = () => window.selectWizardCategory(catName);
     container.appendChild(div);
   });
 
   container.style.display = 'block';
 }
 
-export function selectWizardCategory(catId, catName) {
+export function selectWizardCategory(catName) {
   selectedCategory = catName;
-  selectedCategoryId = catId;
   const input = document.getElementById('wizard-category-search-input');
   if (input) input.value = catName;
   const container = document.getElementById('wizard-category-search-results');
@@ -217,16 +221,15 @@ export async function handleWizardCreateAndLink() {
   
   const activeCategories = Array.isArray(state.categories) ? state.categories : [];
   let categoryObj = activeCategories.find(c => {
-    const name = typeof c === 'string' ? c : c?.name;
-    const id = typeof c === 'object' && c?.id ? c.id : name;
-    return (id && String(id) === String(selectedCategoryId)) || (name && name.toLowerCase() === (selectedCategory || '').toLowerCase());
+    const name = getCategoryName(c);
+    return name && name.toLowerCase() === (selectedCategory || '').toLowerCase();
   });
 
   if (!categoryObj && activeCategories.length > 0) {
     categoryObj = activeCategories[0];
   }
 
-  const finalCatName = typeof categoryObj === 'string' ? categoryObj : (categoryObj?.name || selectedCategory || 'Uncategorised');
+  const finalCatName = getCategoryName(categoryObj) || selectedCategory || 'Uncategorised';
 
   if (normalizedIngName) {
     const newSub = { id: `sub_${Date.now()}`, name: normalizedSubName, isDefault: false, createdAt: new Date().toISOString() };
@@ -283,7 +286,7 @@ export async function bulkProvisionAllDefaults() {
 }
 
 export function advanceHierarchyWizardStep() {
-  wizardStage = 1; selectedSubtypeId = null; selectedIngredientId = null; selectedCategory = ''; selectedCategoryId = '';
+  wizardStage = 1; selectedSubtypeId = null; selectedIngredientId = null; selectedCategory = '';
   newSubtypeName = ''; newIngredientName = '';
   if (++currentIndex >= wizardQueue.length) renderWizardComplete(); else renderWizardStep();
 }
@@ -299,9 +302,7 @@ export function renderWizardStep() {
   if (wizardStage === 3 && !selectedCategory) {
     const activeCategories = window.Store?.getState?.()?.categories || getState()?.categories || [];
     if (activeCategories.length > 0) {
-      const first = activeCategories[0];
-      selectedCategory = typeof first === 'string' ? first : (first?.name || 'Uncategorised');
-      selectedCategoryId = typeof first === 'object' && first?.id ? first.id : selectedCategory;
+      selectedCategory = getCategoryName(activeCategories[0]) || 'Uncategorised';
     } else selectedCategory = 'Uncategorised';
   }
 
@@ -360,9 +361,7 @@ export function renderWizardStep() {
       <div style="display:flex;gap:6px"><button type="button" class="btn sm ghost" onclick="window.skipWizardStep()">Skip &rarr;</button><button type="button" class="btn sm" onclick="window.closeHierarchyWizardModal()">Exit</button></div>
     </div>
   `;
-  if (wizardStage === 1) window.handleWizardSubtypeSearch('');
-  if (wizardStage === 2) window.handleWizardIngredientSearch('');
-  if (wizardStage === 3) window.handleWizardCategorySearch('');
+  if (wizardStage === 1) window.handleWizardSubtypeSearch(''); else if (wizardStage === 2) window.handleWizardIngredientSearch(''); else if (wizardStage === 3) window.handleWizardCategorySearch('');
 }
 
 function renderWizardComplete() {
@@ -373,7 +372,7 @@ function renderWizardComplete() {
 
 export function openHierarchyWizardModal() {
   wizardQueue = buildWizardQueue(); currentIndex = 0; wizardStage = 1;
-  selectedSubtypeId = null; selectedIngredientId = null; selectedCategory = ''; selectedCategoryId = '';
+  selectedSubtypeId = null; selectedIngredientId = null; selectedCategory = '';
   newSubtypeName = ''; newIngredientName = '';
   const existing = document.getElementById('hierarchy-wizard-modal-overlay');
   if (existing) existing.remove();

@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.19.69)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.19.70)
  * In-App Multi-Step Category Operations Wizard & Fine-Grained Reassignment Modal.
  */
 
@@ -14,11 +14,18 @@ const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
 
 let wizardStep = 'list', activeCat = null, reassignMode = 'mass', reassignSearch = '', massTargetCat = '', individualCatMap = {};
 
+export function getCategoryName(cat) {
+  if (!cat) return '';
+  if (typeof cat === 'string') return cat;
+  return cat.name || cat.categoryName || cat.id || '';
+}
+
 const resolveCategory = (id) => {
   const cats = getState()?.categories || [];
   for (const c of cats) {
+    const cName = getCategoryName(c);
     if (typeof c === 'string' && (c === id || slugCategory(c) === slugCategory(id))) return { id: c, name: c };
-    if (c && typeof c === 'object' && (String(c.id) === String(id) || String(c.name) === String(id) || slugCategory(c.name) === slugCategory(id))) return c;
+    if (c && typeof c === 'object' && (String(c.id) === String(id) || String(cName) === String(id) || slugCategory(cName) === slugCategory(id))) return { id: c.id || cName, name: cName };
   }
   return { id, name: id };
 };
