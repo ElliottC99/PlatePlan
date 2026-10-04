@@ -106,7 +106,7 @@ export function generateMealPlan(options = {}) {
       for (let s = 0; s < span; s++) {
         const curDay = d + s;
         if (!slots[curDay]) slots[curDay] = {};
-        const slotData = { id: recipe.id, variant, instanceId };
+        const slotData = { id: recipe.id, variant, instanceId, isSkipped: false, skipped: false };
         slots[curDay][`${mealType}E`] = slotData;
         slots[curDay][`${mealType}C`] = slotData;
         assignedDays.push(curDay);

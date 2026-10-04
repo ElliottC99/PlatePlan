@@ -40,8 +40,8 @@ export function renderShoppingListToolbar({
 
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="display:flex;align-items:center;gap:6px">
-          <label style="font-size:11px;font-weight:700;color:var(--text2)">STORE ROUTE:</label>
-          <select id="supermarket-store-select" class="select" style="font-size:12px" data-action="switch-supermarket-store" onchange="switchSupermarketStore(this.value)">
+          <label for="supermarket-store-select" style="font-size:11px;font-weight:700;color:var(--text2)">STORE ROUTE:</label>
+          <select id="supermarket-store-select" name="supermarketStoreSelect" aria-label="Select supermarket store route" class="select" style="font-size:12px" data-action="switch-supermarket-store" onchange="switchSupermarketStore(this.value)">
             <option value="tesco" ${storeName === 'tesco' ? 'selected' : ''}>Tesco Superstore</option>
             <option value="sainsburys" ${storeName === 'sainsburys' ? 'selected' : ''}>Sainsbury's</option>
             <option value="aldi" ${storeName === 'aldi' ? 'selected' : ''}>Aldi</option>

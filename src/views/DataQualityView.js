@@ -1,5 +1,5 @@
 /**
- * src/views/DataQualityView.js (v3.19.73)
+ * src/views/DataQualityView.js (v3.19.74)
  * Modular ES6 View for Data Quality Centre, audit scanner results, and 3-path resolutions.
  */
 

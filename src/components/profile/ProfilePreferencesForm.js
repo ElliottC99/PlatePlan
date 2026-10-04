@@ -55,7 +55,7 @@ export function renderDietaryPreferencesSection(userPrefs = {}, settings = {}) {
       <div class="pp-settings-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px">
         <div class="pp-input-group" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
           <label for="pp-setting-diet" style="font-size:12px;font-weight:600;color:#475569">Dietary Pattern</label>
-          <select id="pp-setting-diet" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;background:#fff">
+          <select id="pp-setting-diet" name="ppSettingDiet" aria-label="Dietary Pattern" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;background:#fff">
             <option value="none" ${diet === 'none' ? 'selected' : ''}>No Restrictions</option>
             <option value="vegetarian" ${diet === 'vegetarian' ? 'selected' : ''}>Vegetarian</option>
             <option value="vegan" ${diet === 'vegan' ? 'selected' : ''}>Vegan</option>
@@ -65,7 +65,7 @@ export function renderDietaryPreferencesSection(userPrefs = {}, settings = {}) {
 
         <div class="pp-input-group" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
           <label for="pp-setting-strategy" style="font-size:12px;font-weight:600;color:#475569">Default Product Auto-Mapping Strategy</label>
-          <select id="pp-setting-strategy" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;background:#fff">
+          <select id="pp-setting-strategy" name="ppSettingStrategy" aria-label="Default Product Auto-Mapping Strategy" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;background:#fff">
             <option value="protein_per_kcal" ${mappingStrategy === 'protein_per_kcal' ? 'selected' : ''}>Protein per kcal (Recommended)</option>
             <option value="protein_per_pound" ${mappingStrategy === 'protein_per_pound' ? 'selected' : ''}>Protein per £</option>
             <option value="lowest_cost_per_g" ${mappingStrategy === 'lowest_cost_per_g' ? 'selected' : ''}>Lowest £ per Gram</option>
@@ -75,14 +75,14 @@ export function renderDietaryPreferencesSection(userPrefs = {}, settings = {}) {
       </div>
 
       <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:16px">
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;cursor:pointer">
-          <input type="checkbox" id="pp-setting-gf" ${userPrefs.glutenFree ? 'checked' : ''} style="width:16px;height:16px;accent-color:#2563eb"> Gluten-Free Only
+        <label for="pp-setting-gf" style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;cursor:pointer">
+          <input type="checkbox" id="pp-setting-gf" name="ppSettingGf" aria-label="Gluten-Free Only" ${userPrefs.glutenFree ? 'checked' : ''} style="width:16px;height:16px;accent-color:#2563eb"> Gluten-Free Only
         </label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;cursor:pointer">
-          <input type="checkbox" id="pp-setting-df" ${userPrefs.dairyFree ? 'checked' : ''} style="width:16px;height:16px;accent-color:#2563eb"> Dairy-Free Only
+        <label for="pp-setting-df" style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;cursor:pointer">
+          <input type="checkbox" id="pp-setting-df" name="ppSettingDf" aria-label="Dairy-Free Only" ${userPrefs.dairyFree ? 'checked' : ''} style="width:16px;height:16px;accent-color:#2563eb"> Dairy-Free Only
         </label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;cursor:pointer">
-          <input type="checkbox" id="pp-setting-nutfree" ${userPrefs.nutFree ? 'checked' : ''} style="width:16px;height:16px;accent-color:#2563eb"> Nut-Free
+        <label for="pp-setting-nutfree" style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;cursor:pointer">
+          <input type="checkbox" id="pp-setting-nutfree" name="ppSettingNutfree" aria-label="Nut-Free" ${userPrefs.nutFree ? 'checked' : ''} style="width:16px;height:16px;accent-color:#2563eb"> Nut-Free
         </label>
       </div>
     </div>

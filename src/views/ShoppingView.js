@@ -182,7 +182,7 @@ export function renderShoppingListUI() {
             return `
             <div class="pp-shop-item" data-group-key="${escapeHtml(groupKey)}" data-item-key="${escapeHtml(itemKey)}" data-ingredient-name="${escapeHtml(ingName)}" style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;gap:12px;">
               <div style="display:flex;align-items:center;gap:12px;flex:1;">
-                <input type="checkbox" data-action="toggle-shopping-item" data-group-key="${escapeHtml(groupKey)}" data-item-key="${escapeHtml(itemKey)}" style="width:18px;height:18px;cursor:pointer;accent-color:#2563eb;" onchange="toggleShoppingItemAcquired('${escapeHtml(groupKey)}', '${escapeHtml(itemKey)}', '${escapeHtml(ingName)}')">
+                <input type="checkbox" id="chk-shop-view-${escapeHtml(groupKey)}-${escapeHtml(itemKey)}" name="chkShopView-${escapeHtml(groupKey)}-${escapeHtml(itemKey)}" aria-label="Acquire ${escapeHtml(item.name)}" data-action="toggle-shopping-item" data-group-key="${escapeHtml(groupKey)}" data-item-key="${escapeHtml(itemKey)}" style="width:18px;height:18px;cursor:pointer;accent-color:#2563eb;" onchange="toggleShoppingItemAcquired('${escapeHtml(groupKey)}', '${escapeHtml(itemKey)}', '${escapeHtml(ingName)}')">
                 <div>
                   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                     <span style="font-weight:600;font-size:14px;color:#1e293b;">${escapeHtml(item.name)}</span>
@@ -227,7 +227,7 @@ export function renderShoppingListUI() {
             return `
             <div class="pp-shop-item at-home" data-group-key="${escapeHtml(groupKey)}" data-item-key="${escapeHtml(itemKey)}" data-ingredient-name="${escapeHtml(ingName)}" style="padding:10px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f8fafc;opacity:0.85;">
               <div style="display:flex;align-items:center;gap:12px;flex:1;">
-                <input type="checkbox" checked data-action="toggle-shopping-item" data-group-key="${escapeHtml(groupKey)}" data-item-key="${escapeHtml(itemKey)}" style="width:18px;height:18px;cursor:pointer;accent-color:#059669;" onchange="toggleShoppingItemAcquired('${escapeHtml(groupKey)}', '${escapeHtml(itemKey)}', '${escapeHtml(ingName)}')">
+                <input type="checkbox" id="chk-shop-athome-${escapeHtml(groupKey)}-${escapeHtml(itemKey)}" name="chkShopAthome-${escapeHtml(groupKey)}-${escapeHtml(itemKey)}" aria-label="Mark ${escapeHtml(item.name)} as needed" checked data-action="toggle-shopping-item" data-group-key="${escapeHtml(groupKey)}" data-item-key="${escapeHtml(itemKey)}" style="width:18px;height:18px;cursor:pointer;accent-color:#059669;" onchange="toggleShoppingItemAcquired('${escapeHtml(groupKey)}', '${escapeHtml(itemKey)}', '${escapeHtml(ingName)}')">
                 <div>
                   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                     <span style="font-weight:600;font-size:13px;color:#64748b;text-decoration:line-through;">${escapeHtml(item.name)}</span>

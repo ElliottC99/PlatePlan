@@ -43,8 +43,8 @@ export function renderPrepStepCard(step = {}, index = 0) {
     <div class="prep-step-checklist" style="margin-top:8px;padding-top:6px;border-top:1px solid var(--border);font-size:12px;color:var(--text2)">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:4px">Ingredients for this step:</div>
       ${ingredients.map((ing, i) => `
-        <label style="display:flex;align-items:center;gap:6px;margin-bottom:3px;cursor:pointer">
-          <input type="checkbox" onchange="togglePrepStepIngredient(${index}, ${i}, this.checked)" ${ing.checked ? 'checked' : ''}>
+        <label style="display:flex;align-items:center;gap:6px;margin-bottom:3px;cursor:pointer" for="chk-prep-step-${index}-${i}">
+          <input type="checkbox" id="chk-prep-step-${index}-${i}" name="chkPrepStep-${index}-${i}" aria-label="Ingredient ${escapeAttr(ing.name || ing)}" onchange="togglePrepStepIngredient(${index}, ${i}, this.checked)" ${ing.checked ? 'checked' : ''}>
           <span style="${ing.checked ? 'text-decoration:line-through;color:var(--text3)' : ''}">${escapeHtml(ing.name || ing)}</span>
         </label>
       `).join('')}

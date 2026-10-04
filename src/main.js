@@ -1,5 +1,5 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.19.73';
+  window.APP_VERSION = 'v3.19.74';
   window.showTescoImport = () => {
     import('./components/pantry/SubtypeActionModalsUI.js')
       .then(m => {
@@ -323,7 +323,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const badgeEl = document.getElementById('app-header-version') || document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (badgeEl) {
-    badgeEl.textContent = window.APP_VERSION || 'v3.19.73';
+    badgeEl.textContent = window.APP_VERSION || 'v3.19.74';
   }
 }
 

@@ -39,7 +39,7 @@ export function renderShoppingItemRow(item) {
 
   return `
     <div class="shopping-list-row" style="display: flex; align-items: center; background: #FFFFFF; border-bottom: 1px solid #E5E5EA; padding: 12px 16px;">
-      <input type="checkbox" class="acquired-checkbox" style="width: 24px; height: 24px; accent-color: #007AFF; margin-right: 12px; cursor: pointer; flex-shrink: 0;" ${isChecked ? 'checked' : ''} data-action="toggle-shopping-at-home" data-item-key="${escapeAttr(item.key)}" onchange="toggleShoppingAtHome('${escapeAttr(item.key)}')" />
+      <input type="checkbox" id="chk-shop-item-${escapeAttr(item.key)}" name="chkShopItem-${escapeAttr(item.key)}" aria-label="Mark ${escapeAttr(item.name)} as acquired" class="acquired-checkbox" style="width: 24px; height: 24px; accent-color: #007AFF; margin-right: 12px; cursor: pointer; flex-shrink: 0;" ${isChecked ? 'checked' : ''} data-action="toggle-shopping-at-home" data-item-key="${escapeAttr(item.key)}" onchange="toggleShoppingAtHome('${escapeAttr(item.key)}')" />
       ${photoHtml}
       <div class="title-block" style="flex: 1; display: flex; flex-direction: column; min-width: 0; padding-right: 12px;">
         <span class="primary-subtype" style="${isChecked ? 'text-decoration: line-through; opacity: 0.6;' : 'font-weight: 600; color: #1C1C1E;'}; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(item.name)}</span>

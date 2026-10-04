@@ -1,5 +1,5 @@
 /**
- * src/views/PlannerView.js (v3.16.1)
+ * src/views/PlannerView.js (v3.19.74)
  * Componentized Weekly Planner, Wizard & Swap Modal View.
  */
 
@@ -834,8 +834,25 @@ export function renderPlanOverallSummary() {
   if (typeof renderPlanOverallSummaryHtml === 'function') renderPlanOverallSummaryHtml(score);
 }
 
+export function setPlannerWizardStep(step) {
+  const nextStep = Math.max(1, Math.min(4, step));
+  if (typeof window !== 'undefined' && window.state) {
+    window.state.plannerStep = nextStep;
+  }
+  if (typeof window !== 'undefined' && typeof window.renderPlannerWizard === 'function') {
+    window.renderPlannerWizard();
+  }
+}
+
+export function resetPlannerStartFresh() {
+  clearPlan();
+  setPlannerWizardStep(1);
+}
+
 // Bind Global Aliases for Action Bridge and Legacy Compatibility
 if (typeof window !== 'undefined') {
+  window.setPlannerWizardStep = setPlannerWizardStep;
+  window.resetPlannerStartFresh = resetPlannerStartFresh;
   window.renderPlanner = renderPlanner;
   window.renderPlannerWizard = renderPlannerWizard;
   window.renderPlan = renderPlan;
