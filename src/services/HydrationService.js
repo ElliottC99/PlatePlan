@@ -32,30 +32,41 @@ export function getCategoryName(cat) {
 
 export async function sweepAndRecalibrateIngredientDefaults() {
   const state = window.Store?.getState?.() || {};
-  const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
-  const products = Array.isArray(state.products) ? state.products : [];
+  const ingredients = state.ingredients || [];
+  const products = state.products || [];
   let updatedCount = 0;
 
   const updatedIngredients = ingredients.map(ing => {
-    const currentDefaultId = ing.defaultProductId || ing.autoDefaultProductId || ing.autoDefaultProduct;
-    const currentValid = currentDefaultId && products.some(p => String(p.id) === String(currentDefaultId));
+    // Gather all child subtype IDs/names nested inside ingredient.subtypes
+    const nestedSubtypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
+    const subtypeIdentifiers = nestedSubtypes.flatMap(s => [
+      String(s.id || ''),
+      String(s.name || ''),
+      String(s.subtypeId || '')
+    ].filter(Boolean));
 
-    if (!currentValid) {
-      const childSubtypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
-      const childSubtypeIds = childSubtypes.map(s => String(s.id || s.name || ''));
+    // Find matching product by ingredientId or nested subtype match
+    const candidateProduct = products.find(p => {
+      const pIngId = String(p.ingredientId || p.ingredient || '');
+      const pSubId = String(p.subtypeId || p.subTypeId || p.subtype || '');
 
-      const candidateProduct = products.find(p => 
-        String(p.ingredientId) === String(ing.id) ||
-        childSubtypeIds.includes(String(p.subtypeId || p.subTypeId || p.subtype || ''))
-      );
+      const matchesDirectIng = pIngId && (pIngId === String(ing.id) || pIngId === String(ing.name));
+      const matchesSubtype = subtypeIdentifiers.some(subId => subId.toLowerCase() === pSubId.toLowerCase());
+      
+      return matchesDirectIng || matchesSubtype || p.isAutoDefault === true;
+    });
 
-      if (candidateProduct) {
+    if (candidateProduct) {
+      const pId = candidateProduct.id || candidateProduct.productId;
+      const pName = candidateProduct.name || candidateProduct.productName;
+
+      if (ing.defaultProductId !== pId || !ing.autoDefault) {
         updatedCount++;
         return {
           ...ing,
-          defaultProductId: candidateProduct.id,
-          autoDefault: candidateProduct.name || candidateProduct.title || '',
-          autoDefaultProduct: candidateProduct.id,
+          defaultProductId: pId,
+          autoDefault: pName,
+          autoDefaultProduct: pId,
           updatedAt: new Date().toISOString()
         };
       }
@@ -74,6 +85,11 @@ export async function sweepAndRecalibrateIngredientDefaults() {
       console.warn('[HydrationService] Failed persisting recalibrated ingredient defaults:', err);
     }
   }
+  return updatedCount;
+}
+
+if (typeof window !== 'undefined') {
+  window.sweepAndRecalibrateIngredientDefaults = sweepAndRecalibrateIngredientDefaults;
 }
 
 export function mergeCanonicalCategories(rawCategories) {

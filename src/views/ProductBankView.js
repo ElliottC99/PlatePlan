@@ -1,5 +1,5 @@
 /**
- * src/views/ProductBankView.js (v3.19.71)
+ * src/views/ProductBankView.js (v3.19.72)
  * Modular ES6 View for Product Bank.
  * Displays nutritional pills (P, C, F, Kcal), P/£ efficiency, Tesco links, and Reallocation modal.
  */
@@ -287,12 +287,14 @@ export function renderProductBank() {
               </div>
 
               <!-- Hierarchy / Parent Mapping Badge -->
-              <div style="display:flex;align-items:center;gap:6px;font-size:11px">
+              <div style="display:flex;align-items:center;gap:6px;font-size:11px;flex-wrap:wrap">
                 <span style="color:var(--text3);font-weight:600">Maps to:</span>
                 ${mappedIng ? `
                   <span class="tag" style="background:var(--surface,#fff);font-weight:600">↳ ${escapeHtml(mappedIng.name)}</span>
                 ` : '<span style="color:var(--amber,#f59e0b);font-style:italic">Unallocated</span>'}
-                ${p.isAutoDefault ? '<span class="tag" style="background:rgba(16,185,129,0.15);color:var(--green,#10b981);font-weight:700">⭐ Default</span>' : ''}
+                ${(p.isAutoDefault || (mappedIng && (mappedIng.defaultProductId === p.id || mappedIng.autoDefaultProduct === p.id))) ? `
+                  <span class="badge badge-success" style="background:rgba(16,185,129,0.15);color:var(--green,#10b981);font-weight:700;padding:2px 8px;border-radius:6px">Auto default for: ${escapeHtml(mappedIng ? mappedIng.name : 'Ingredient')}</span>
+                ` : ''}
               </div>
 
               <!-- Nutritional Pills Grid (P, C, F, Kcal) -->

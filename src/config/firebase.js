@@ -25,3 +25,11 @@ if (typeof window !== 'undefined' && window.firebase) {
 export const db = (typeof window !== 'undefined' && window.firebase && typeof window.firebase.firestore === 'function')
   ? window.firebase.firestore()
   : null;
+
+if (db && typeof db.settings === 'function') {
+  try {
+    db.settings({ experimentalAutoDetectLongPolling: true, merge: true });
+  } catch (e) {
+    // Settings may already be configured
+  }
+}

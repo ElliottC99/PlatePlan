@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/PantryBankHTMLTemplate.js (v3.19.71)
+ * src/components/pantry/PantryBankHTMLTemplate.js (v3.19.72)
  * Extracted HTML UI renderer for the Category -> Ingredient -> Sub-type Hierarchy.
  * Helps keep PantryBankView.js compact and focused strictly under the 400-line limit.
  */
@@ -29,8 +29,8 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr) {
                   <div style="margin-top:4px;display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text2,#78716c)">
                     <span style="font-weight:600">Auto default:</span>
                     ${defProd ? `
-                      <span class="tag" style="background:rgba(79,70,229,0.1);color:var(--primary,#4f46e5);font-weight:700;font-size:11px">
-                        ⭐ ${escapeHtml(defProd.brand ? `${defProd.brand} - ` : '')}${escapeHtml(defProd.name)} (£${Number(defProd.price || 0).toFixed(2)})
+                      <span class="badge badge-success" style="background:rgba(16,185,129,0.15);color:var(--green,#10b981);font-weight:700;padding:2px 8px;border-radius:6px;font-size:11px">
+                        Auto default for: ${escapeHtml(ing.name)} (${escapeHtml(defProd.brand ? `${defProd.brand} - ` : '')}${escapeHtml(defProd.name)})
                       </span>
                     ` : '<span style="font-style:italic">None linked</span>'}
                   </div>
