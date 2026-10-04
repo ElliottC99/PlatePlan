@@ -1,5 +1,5 @@
 /**
- * src/services/MealPlanGeneratorService.js (v3.19.7)
+ * src/services/MealPlanGeneratorService.js (v3.19.77)
  * ES6 Meal Plan Generator Engine & Slot Resolver.
  * Generates balanced multi-day meal plans matching household macro targets,
  * cadence repeats, and dietary exclusions without external legacy monolith dependencies.
@@ -93,35 +93,54 @@ export function generateMealPlan(options = {}) {
   const slots = {};
   const mealPrepGroups = [];
 
-  // Pre-fill pinned recipes and skipped slots from skeletonGrid
+  const createPinnedSlot = (recipeId, dayNum, suffix = '') => {
+    const r = allRecipes.find(item => item.id === recipeId);
+    const variant = r && r.enhanced ? 'enhanced' : 'original';
+    const instanceId = `inst_pinned_${recipeId}_d${dayNum}${suffix}_${Math.random().toString(36).substr(2, 5)}`;
+    return { id: recipeId, variant, instanceId, isSkipped: false, skipped: false, isPinned: true };
+  };
+
+  // Pre-fill pinned recipes and skipped slots from skeletonGrid (supports both shared and split household state)
   for (let d = 1; d <= days; d++) {
     if (!slots[d]) slots[d] = {};
     ['breakfast', 'lunch', 'dinner'].forEach(mealType => {
-      const slotKey = `${d}_${mealType}`;
-      const config = skeletonGrid[slotKey];
-      if (config) {
-        if (config.status === 'skipped') {
-          const skipData = { isSkipped: true, skipped: true };
-          slots[d][`${mealType}E`] = skipData;
-          slots[d][`${mealType}C`] = skipData;
-        } else if (config.status === 'pinned' && config.recipeId) {
-          const r = allRecipes.find(item => item.id === config.recipeId);
-          const variant = r && r.enhanced ? 'enhanced' : 'original';
-          const instanceId = `inst_pinned_${config.recipeId}_d${d}_${Math.random().toString(36).substr(2, 5)}`;
-          const pinData = { id: config.recipeId, variant, instanceId, isSkipped: false, skipped: false, isPinned: true };
-          slots[d][`${mealType}E`] = pinData;
-          slots[d][`${mealType}C`] = pinData;
+      const config = skeletonGrid[`${d}_${mealType}`] || skeletonGrid[d]?.[mealType];
+      if (!config) return;
+
+      if (config.isSplit) {
+        if (config.elliott?.isSkipped) {
+          slots[d][`${mealType}E`] = { isSkipped: true, skipped: true };
+        } else if (config.elliott?.recipeId) {
+          slots[d][`${mealType}E`] = createPinnedSlot(config.elliott.recipeId, d, '_E');
         }
+        if (config.chloe?.isSkipped) {
+          slots[d][`${mealType}C`] = { isSkipped: true, skipped: true };
+        } else if (config.chloe?.recipeId) {
+          slots[d][`${mealType}C`] = createPinnedSlot(config.chloe.recipeId, d, '_C');
+        }
+      } else if (config.isSkipped || config.status === 'skipped') {
+        const skipData = { isSkipped: true, skipped: true };
+        slots[d][`${mealType}E`] = skipData;
+        slots[d][`${mealType}C`] = skipData;
+      } else if (config.recipeId) {
+        const pinData = createPinnedSlot(config.recipeId, d);
+        slots[d][`${mealType}E`] = pinData;
+        slots[d][`${mealType}C`] = pinData;
       }
     });
   }
+
+  const isSlotAnchored = (slot) => Boolean(slot?.isPinned || slot?.isSkipped);
 
   const fillMealType = (mealType, pool, repeatCount) => {
     let poolIdx = 0;
     let d = 1;
     while (d <= days) {
-      // Check if starting day already has an anchor (pinned/skipped)
-      if (slots[d]?.[`${mealType}E`]?.isPinned || slots[d]?.[`${mealType}E`]?.isSkipped) {
+      const eAnchored = isSlotAnchored(slots[d]?.[`${mealType}E`]);
+      const cAnchored = isSlotAnchored(slots[d]?.[`${mealType}C`]);
+
+      // Skip day if both individuals already have an anchor (pinned or skipped)
+      if (eAnchored && cAnchored) {
         d++;
         continue;
       }
@@ -136,15 +155,16 @@ export function generateMealPlan(options = {}) {
       for (let s = 0; s < span; s++) {
         const curDay = d + s;
         if (!slots[curDay]) slots[curDay] = {};
-        
-        // Stop repeat span if we hit a pinned or skipped slot
-        if (slots[curDay][`${mealType}E`]?.isPinned || slots[curDay][`${mealType}E`]?.isSkipped) {
+
+        const curEAnchored = isSlotAnchored(slots[curDay][`${mealType}E`]);
+        const curCAnchored = isSlotAnchored(slots[curDay][`${mealType}C`]);
+        if (curEAnchored && curCAnchored) {
           break;
         }
 
         const slotData = { id: recipe.id, variant, instanceId, isSkipped: false, skipped: false };
-        slots[curDay][`${mealType}E`] = slotData;
-        slots[curDay][`${mealType}C`] = slotData;
+        if (!curEAnchored) slots[curDay][`${mealType}E`] = slotData;
+        if (!curCAnchored) slots[curDay][`${mealType}C`] = slotData;
         assignedDays.push(curDay);
       }
 

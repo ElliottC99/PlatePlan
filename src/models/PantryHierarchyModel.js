@@ -1,5 +1,5 @@
 /**
- * src/models/PantryHierarchyModel.js (v3.19.75)
+ * src/models/PantryHierarchyModel.js (v3.19.77)
  * Relational Model & Operations for Category ➔ Ingredient ➔ Sub-type ➔ Product hierarchy.
  * Encapsulates aliasing, merging, promoting/demoting, and auto-default product resolution.
  */
@@ -45,22 +45,31 @@ export function slugify(str) {
 export function resolveDefaultProduct(item, products = []) {
   if (!item) return null;
   const list = Array.isArray(products) ? products : Object.values(products || {});
-  if (item.defaultProductId) {
-    const matched = list.find(p => String(p.id) === String(item.defaultProductId));
-    if (matched) return { ...matched, isAutoDefault: true };
-  }
-  const autoDefault = list.find(p => 
+  const autoDefault = list.find(p =>
     (String(p.ingredientId) === String(item.id) || String(p.subtypeId) === String(item.id) || String(p.groupId) === String(item.id)) &&
     (p.isAutoDefault === true || p.is_default === true)
   );
   if (autoDefault) return { ...autoDefault, isAutoDefault: true };
-  const linked = list.find(p => String(p.ingredientId) === String(item.id) || String(p.subtypeId) === String(item.id) || String(p.groupId) === String(item.id));
-  if (linked) return { ...linked, isAutoDefault: true };
-  if (list.length > 0) return { ...list[0], isAutoDefault: true };
-  const itemNameLower = (item.name || '').toLowerCase().trim();
-  if (itemNameLower) {
-    const matchedName = list.find(p => (p.name || '').toLowerCase().includes(itemNameLower));
-    if (matchedName) return { ...matchedName, isAutoDefault: true };
+  if (item.defaultProductId) {
+    const matched = list.find(p => String(p.id) === String(item.defaultProductId));
+    if (matched) return { ...matched, isAutoDefault: true };
+  }
+  const linked = list.filter(p => String(p.ingredientId) === String(item.id) || String(p.subtypeId) === String(item.id) || String(p.groupId) === String(item.id));
+  const pool = linked.length > 0 ? linked : list;
+  if (pool.length > 0) {
+    const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
+    const criterion = state.settings?.autoDefaultCriterion || state.userPrefs?.autoDefaultCriterion || 'lowest-price';
+    const sorted = [...pool].sort((a, b) => {
+      const priceA = Number(a.price || Infinity), priceB = Number(b.price || Infinity);
+      const sizeA = Number(a.packSize || a.pack || a.itemWeight || 1), sizeB = Number(b.packSize || b.pack || b.itemWeight || 1);
+      const protA = Number(a.prot || a.protein || 0), protB = Number(b.prot || b.protein || 0);
+      const kcalA = Number(a.kcal || a.cal || Infinity), kcalB = Number(b.kcal || b.cal || Infinity);
+      if (criterion === 'lowest-unit-price') return (priceA / sizeA) - (priceB / sizeB);
+      if (criterion === 'highest-protein') return protB - protA;
+      if (criterion === 'lowest-calories') return kcalA - kcalB;
+      return priceA - priceB;
+    });
+    return { ...sorted[0], isAutoDefault: true };
   }
   return null;
 }

@@ -1,5 +1,5 @@
 /**
- * src/components/generator/GeneratorConstraintsForm.js (v3.8.4)
+ * src/components/generator/GeneratorConstraintsForm.js (v3.19.77)
  * Modular UI component for Meal Plan Generator Constraint Controls:
  * - Target plan duration & start date selectors
  * - Meal repeat cadence & batch prep frequency toggles

@@ -1,5 +1,5 @@
 /**
- * src/views/SettingsView.js (v3.19.75)
+ * src/views/SettingsView.js (v3.19.77)
  * Componentized Settings & Preferences View Function.
  * Composes modular profile components and handles persistence through HouseholdRepository.
  */
@@ -71,6 +71,52 @@ if (typeof window !== 'undefined') {
     renderSettingsView();
   };
 
+  window.handleAutoDefaultCriterionChange = async function(val) {
+    if (!window.state) window.state = {};
+    if (!window.state.settings) window.state.settings = {};
+    if (!window.state.userPrefs) window.state.userPrefs = {};
+
+    window.state.settings.autoDefaultCriterion = val;
+    window.state.userPrefs.autoDefaultCriterion = val;
+    if (window.Store?.setState) {
+      window.Store.setState({ settings: { ...(window.Store.getState()?.settings || {}), autoDefaultCriterion: val } });
+    }
+    if (typeof window.saveState === 'function') window.saveState();
+
+    try {
+      await savePreferences({ ...window.state.userPrefs, settings: window.state.settings });
+    } catch (err) {
+      console.warn('[SettingsView] Failed saving auto-default criterion preference:', err);
+    }
+
+    const labelMap = {
+      'lowest-price': 'Lowest Price',
+      'lowest-unit-price': 'Lowest Unit Price',
+      'highest-protein': 'High Protein',
+      'lowest-calories': 'Lowest Calories'
+    };
+    const label = labelMap[val] || val;
+
+    if (typeof window.sweepAndRecalibrateIngredientDefaults === 'function') {
+      await window.sweepAndRecalibrateIngredientDefaults();
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast(`Pantry defaults recalibrated to prioritise ${label}`);
+      }
+    }
+  };
+
+  window.handleManualRecalibrateDefaults = async function() {
+    const btn = document.getElementById('btn-recalibrate-defaults');
+    if (btn) { btn.disabled = true; btn.textContent = 'Recalibrating...'; }
+    if (typeof window.sweepAndRecalibrateIngredientDefaults === 'function') {
+      const updatedCount = await window.sweepAndRecalibrateIngredientDefaults();
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast(`Pantry defaults recalibrated (${updatedCount} updated).`);
+      }
+    }
+    if (btn) { btn.disabled = false; btn.textContent = '⚡ Recalibrate All Defaults Now'; }
+  };
+
   window.generateHouseholdInviteLink = function() {
     const householdId = window.activeHouseholdId || 'elliott-chloe';
     const url = `${window.location.origin}${window.location.pathname}?household=${encodeURIComponent(householdId)}`;
@@ -97,7 +143,7 @@ export function renderSettingsView() {
   const householdHtml = renderHouseholdSyncCard(settings);
   const dietaryHtml = renderDietaryExclusionManager(prefs, settings);
   const profileHtml = renderProfileAllocationCard(prefs);
-  const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.19.75 (ES6 Modern)');
+  const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.19.77 (ES6 Modern)');
 
   container.innerHTML = renderSettingsContainer(householdHtml, dietaryHtml, profileHtml, systemHtml);
 
@@ -113,6 +159,10 @@ export function renderSettingsView() {
       window.state.userPrefs.glutenFree = !!container.querySelector('#pp-setting-gf')?.checked;
       window.state.userPrefs.dairyFree = !!container.querySelector('#pp-setting-df')?.checked;
       window.state.userPrefs.nutFree = !!container.querySelector('#pp-setting-nutfree')?.checked;
+      const autoDefCrit = container.querySelector('#pp-setting-auto-default-criterion')?.value || 'lowest-price';
+      window.state.userPrefs.autoDefaultCriterion = autoDefCrit;
+      if (!window.state.settings) window.state.settings = {};
+      window.state.settings.autoDefaultCriterion = autoDefCrit;
 
       const profiles = {};
       ['elliott', 'chloe'].forEach(pId => {
