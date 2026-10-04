@@ -58,7 +58,9 @@ export function generateMealPlan(options = {}) {
   const days = Number(options.days || window.state?.plannerDays || window.state?.plan?.days || 7);
   const startDateStr = options.startDate || window.state?.plannerStartDate || new Date().toISOString().split('T')[0];
   const cadence = options.cadence || window.state?.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
-  const minFitScore = Number(options.minFitScore || window.state?.prefs?.minFitScore || 0);
+  const minFitScore = Number(options.minFitScore !== undefined ? options.minFitScore : (window.state?.prefs?.minFitScore || 0));
+  const maxFitScore = Number(options.maxFitScore !== undefined ? options.maxFitScore : (window.state?.prefs?.maxFitScore || 100));
+  const skeletonGrid = options.skeletonGrid || window.state?.skeletonGrid || {};
   const allRecipes = Array.isArray(options.recipes) ? options.recipes : (window.state?.recipes || []);
 
   if (!allRecipes.length) {
@@ -77,10 +79,9 @@ export function generateMealPlan(options = {}) {
     return allRecipes.filter(r => {
       const types = (r.types || [r.type || 'dinner']).map(t => String(t).toLowerCase());
       if (!types.includes(type)) return false;
-      if (minFitScore > 0) {
-        const score = calculateMealFitScore(r, type, { activeProfile: 'everyone' }).score;
-        if (score < minFitScore) return false;
-      }
+      const scoreObj = calculateMealFitScore(r, type, { activeProfile: 'everyone' });
+      const score = Number(scoreObj?.score || 0);
+      if (score < minFitScore || score > maxFitScore) return false;
       return true;
     });
   };
@@ -92,10 +93,39 @@ export function generateMealPlan(options = {}) {
   const slots = {};
   const mealPrepGroups = [];
 
+  // Pre-fill pinned recipes and skipped slots from skeletonGrid
+  for (let d = 1; d <= days; d++) {
+    if (!slots[d]) slots[d] = {};
+    ['breakfast', 'lunch', 'dinner'].forEach(mealType => {
+      const slotKey = `${d}_${mealType}`;
+      const config = skeletonGrid[slotKey];
+      if (config) {
+        if (config.status === 'skipped') {
+          const skipData = { isSkipped: true, skipped: true };
+          slots[d][`${mealType}E`] = skipData;
+          slots[d][`${mealType}C`] = skipData;
+        } else if (config.status === 'pinned' && config.recipeId) {
+          const r = allRecipes.find(item => item.id === config.recipeId);
+          const variant = r && r.enhanced ? 'enhanced' : 'original';
+          const instanceId = `inst_pinned_${config.recipeId}_d${d}_${Math.random().toString(36).substr(2, 5)}`;
+          const pinData = { id: config.recipeId, variant, instanceId, isSkipped: false, skipped: false, isPinned: true };
+          slots[d][`${mealType}E`] = pinData;
+          slots[d][`${mealType}C`] = pinData;
+        }
+      }
+    });
+  }
+
   const fillMealType = (mealType, pool, repeatCount) => {
     let poolIdx = 0;
     let d = 1;
     while (d <= days) {
+      // Check if starting day already has an anchor (pinned/skipped)
+      if (slots[d]?.[`${mealType}E`]?.isPinned || slots[d]?.[`${mealType}E`]?.isSkipped) {
+        d++;
+        continue;
+      }
+
       const recipe = pool[poolIdx % pool.length];
       poolIdx++;
       const variant = recipe.enhanced ? 'enhanced' : 'original';
@@ -106,6 +136,12 @@ export function generateMealPlan(options = {}) {
       for (let s = 0; s < span; s++) {
         const curDay = d + s;
         if (!slots[curDay]) slots[curDay] = {};
+        
+        // Stop repeat span if we hit a pinned or skipped slot
+        if (slots[curDay][`${mealType}E`]?.isPinned || slots[curDay][`${mealType}E`]?.isSkipped) {
+          break;
+        }
+
         const slotData = { id: recipe.id, variant, instanceId, isSkipped: false, skipped: false };
         slots[curDay][`${mealType}E`] = slotData;
         slots[curDay][`${mealType}C`] = slotData;
@@ -123,7 +159,7 @@ export function generateMealPlan(options = {}) {
         });
       }
 
-      d += span;
+      d += Math.max(1, assignedDays.length);
     }
   };
 
