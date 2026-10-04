@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/ReallocateProductModalUI.js (v3.19.72)
+ * src/components/pantry/ReallocateProductModalUI.js (v3.19.73)
  * Clean Reallocate Product Modal with Stacked Column Layout & Searchable Category Control.
  * Apple HIG compliant touch targets (min 44px) and free-text category creation.
  */

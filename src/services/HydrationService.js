@@ -37,52 +37,55 @@ export async function sweepAndRecalibrateIngredientDefaults() {
   let updatedCount = 0;
 
   const updatedIngredients = ingredients.map(ing => {
-    // Gather all child subtype IDs/names nested inside ingredient.subtypes
     const nestedSubtypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
     const subtypeIdentifiers = nestedSubtypes.flatMap(s => [
-      String(s.id || ''),
-      String(s.name || ''),
-      String(s.subtypeId || '')
+      String(s.id || ''), String(s.name || ''), String(s.subtypeId || '')
     ].filter(Boolean));
 
-    // Find matching product by ingredientId or nested subtype match
-    const candidateProduct = products.find(p => {
+    // 1. STRICTLY filter products that belong to this exact ingredient or its nested subtypes
+    const strictlyMatchingProducts = products.filter(p => {
       const pIngId = String(p.ingredientId || p.ingredient || '');
       const pSubId = String(p.subtypeId || p.subTypeId || p.subtype || '');
 
       const matchesDirectIng = pIngId && (pIngId === String(ing.id) || pIngId === String(ing.name));
-      const matchesSubtype = subtypeIdentifiers.some(subId => subId.toLowerCase() === pSubId.toLowerCase());
-      
-      return matchesDirectIng || matchesSubtype || p.isAutoDefault === true;
+      const matchesSubtype = pSubId && subtypeIdentifiers.some(subId => subId.toLowerCase() === pSubId.toLowerCase());
+
+      return matchesDirectIng || matchesSubtype;
     });
 
-    if (candidateProduct) {
-      const pId = candidateProduct.id || candidateProduct.productId;
-      const pName = candidateProduct.name || candidateProduct.productName;
+    let targetDefaultId = null;
+    let targetDefaultName = null;
 
-      if (ing.defaultProductId !== pId || !ing.autoDefault) {
-        updatedCount++;
-        return {
-          ...ing,
-          defaultProductId: pId,
-          autoDefault: pName,
-          autoDefaultProduct: pId,
-          updatedAt: new Date().toISOString()
-        };
-      }
+    if (strictlyMatchingProducts.length > 0) {
+      // Prefer a product explicitly marked as auto-default, otherwise take the first linked product
+      const preferredProduct = strictlyMatchingProducts.find(p => p.isAutoDefault === true) || strictlyMatchingProducts[0];
+      targetDefaultId = preferredProduct.id || preferredProduct.productId;
+      targetDefaultName = preferredProduct.name || preferredProduct.productName;
+    }
+
+    // Update if changed OR if repairing corrupted data
+    if (ing.defaultProductId !== targetDefaultId || ing.autoDefault !== targetDefaultName) {
+      updatedCount++;
+      return {
+        ...ing,
+        defaultProductId: targetDefaultId,
+        autoDefault: targetDefaultName,
+        autoDefaultProduct: targetDefaultName,
+        updatedAt: new Date().toISOString()
+      };
     }
     return ing;
   });
 
   if (updatedCount > 0) {
-    console.log(`[HydrationService] Recalibrated defaults for ${updatedCount} ingredients.`);
+    console.log(`[HydrationService] Repaired and recalibrated defaults for ${updatedCount} ingredients.`);
     setIngredients(updatedIngredients);
     if (window.Store?.setState) window.Store.setState({ ingredients: updatedIngredients });
     try {
       const changed = updatedIngredients.filter((i, idx) => ingredients[idx] !== i);
       await Promise.all(changed.map(i => saveIngredient(i)));
     } catch (err) {
-      console.warn('[HydrationService] Failed persisting recalibrated ingredient defaults:', err);
+      console.warn('[HydrationService] Failed persisting repaired ingredient defaults:', err);
     }
   }
   return updatedCount;
