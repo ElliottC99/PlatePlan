@@ -1,5 +1,5 @@
 /**
- * src/views/SettingsView.js (v3.19.77)
+ * src/views/SettingsView.js (v3.19.78)
  * Componentized Settings & Preferences View Function.
  * Composes modular profile components and handles persistence through HouseholdRepository.
  */
@@ -143,7 +143,7 @@ export function renderSettingsView() {
   const householdHtml = renderHouseholdSyncCard(settings);
   const dietaryHtml = renderDietaryExclusionManager(prefs, settings);
   const profileHtml = renderProfileAllocationCard(prefs);
-  const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.19.77 (ES6 Modern)');
+  const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.19.78 (ES6 Modern)');
 
   container.innerHTML = renderSettingsContainer(householdHtml, dietaryHtml, profileHtml, systemHtml);
 

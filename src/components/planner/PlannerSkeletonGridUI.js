@@ -1,28 +1,25 @@
 /**
- * src/components/planner/PlannerSkeletonGridUI.js (v3.19.77)
+ * src/components/planner/PlannerSkeletonGridUI.js (v3.19.78)
  * Dual-Dot Fit Score Scope Timeline, Pre-Generation Interactive Skeleton Grid,
  * and Split Household Slot Configurator (Elliott & Chloe) with Fit & Duplication Badges.
  */
 
 import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
 
-function escapeHtml(str) {
-  return String(str ?? '').replace(/[&<>"']/g, ch => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[ch]));
+function resolveRecipeName(recipeId, fallback = '') {
+  if (!recipeId) return fallback || '';
+  const recipes = (typeof window !== 'undefined' && Array.isArray(window.state?.recipes)) ? window.state.recipes : [];
+  const found = recipes.find(r => String(r.id) === String(recipeId));
+  return found?.name || fallback || 'Pinned Recipe';
 }
 
-function escapeAttr(str) {
-  return escapeHtml(str);
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
+const escapeAttr = escapeHtml;
 
 export function getSkeletonSlotConfig(skeletonGrid, dayIndex, mealType) {
-  if (!skeletonGrid) return null;
-  return skeletonGrid[`${dayIndex}_${mealType}`] || skeletonGrid[dayIndex]?.[mealType] || null;
+  return skeletonGrid ? (skeletonGrid[`${dayIndex}_${mealType}`] || skeletonGrid[dayIndex]?.[mealType] || null) : null;
 }
 
 export function isRecipeInSkeletonGrid(recipeId, skeletonGrid = {}) {
@@ -30,14 +27,10 @@ export function isRecipeInSkeletonGrid(recipeId, skeletonGrid = {}) {
   for (const key of Object.keys(skeletonGrid)) {
     const val = skeletonGrid[key];
     if (!val || typeof val !== 'object') continue;
-    if (val.recipeId === recipeId || val.elliott?.recipeId === recipeId || val.chloe?.recipeId === recipeId) {
-      return true;
-    }
+    if (val.recipeId === recipeId || val.elliott?.recipeId === recipeId || val.chloe?.recipeId === recipeId) return true;
     for (const m of ['breakfast', 'lunch', 'dinner']) {
       const sub = val[m];
-      if (sub && (sub.recipeId === recipeId || sub.elliott?.recipeId === recipeId || sub.chloe?.recipeId === recipeId)) {
-        return true;
-      }
+      if (sub && (sub.recipeId === recipeId || sub.elliott?.recipeId === recipeId || sub.chloe?.recipeId === recipeId)) return true;
     }
   }
   return false;
@@ -110,8 +103,10 @@ function renderSlotCardSummary(day, meal, config) {
     `;
   }
   if (config.isSplit) {
-    const eSummary = config.elliott?.isSkipped ? '🚫 Skipped' : (config.elliott?.recipeName ? `📌 ${escapeHtml(config.elliott.recipeName)}` : '⚡ Auto');
-    const cSummary = config.chloe?.isSkipped ? '🚫 Skipped' : (config.chloe?.recipeName ? `📌 ${escapeHtml(config.chloe.recipeName)}` : '⚡ Auto');
+    const eName = config.elliott?.recipeId ? resolveRecipeName(config.elliott.recipeId, config.elliott.recipeName) : '';
+    const cName = config.chloe?.recipeId ? resolveRecipeName(config.chloe.recipeId, config.chloe.recipeName) : '';
+    const eSummary = config.elliott?.isSkipped ? '🚫 Skipped' : (eName ? `📌 ${escapeHtml(eName)}` : '⚡ Auto');
+    const cSummary = config.chloe?.isSkipped ? '🚫 Skipped' : (cName ? `📌 ${escapeHtml(cName)}` : '⚡ Auto');
     return `
       <div class="skeleton-slot split" onclick="window.openSlotConfigurator(${day}, '${meal.key}')" style="padding:8px 10px;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;cursor:pointer;display:flex;flex-direction:column;gap:3px" title="Tap to modify split slot">
         <div style="display:flex;align-items:center;justify-content:space-between">
@@ -131,12 +126,13 @@ function renderSlotCardSummary(day, meal, config) {
       </div>
     `;
   }
-  if (config.recipeName) {
+  const sharedName = config.recipeId ? resolveRecipeName(config.recipeId, config.recipeName) : config.recipeName;
+  if (sharedName) {
     return `
       <div class="skeleton-slot pinned" onclick="window.openSlotConfigurator(${day}, '${meal.key}')" style="padding:8px 10px;border:1px solid #bbf7d0;border-radius:8px;background:#f0fdf4;cursor:pointer;display:flex;align-items:center;justify-content:space-between" title="Tap to modify">
         <div style="min-width:0;flex:1;padding-right:6px">
           <div style="font-size:10px;font-weight:700;color:#166534;text-transform:uppercase">${meal.icon} ${meal.label}</div>
-          <div style="font-size:12px;font-weight:700;color:#14532d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📌 ${escapeHtml(config.recipeName)}</div>
+          <div style="font-size:12px;font-weight:700;color:#14532d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📌 ${escapeHtml(sharedName)}</div>
         </div>
         <span class="badge" style="font-size:10px;background:#dcfce7;color:#15803d;font-weight:700;padding:2px 6px;border-radius:4px;flex-shrink:0">Pinned</span>
       </div>
@@ -187,7 +183,7 @@ export function renderSkeletonGridUI({ days = 7, startDate = '', skeletonGrid = 
 
 function renderPersonSplitColumn(personKey, personLabel, dayIndex, mealType, personConfig = {}, recipes = [], skeletonGrid = {}) {
   const isSkipped = Boolean(personConfig.isSkipped);
-  const pinnedName = personConfig.recipeName || '';
+  const pinnedName = personConfig.recipeId ? resolveRecipeName(personConfig.recipeId, personConfig.recipeName) : '';
   const statusText = isSkipped ? '🚫 Skipped' : (pinnedName ? `📌 ${escapeHtml(pinnedName)}` : '⚡ Auto-Generate (Unassigned)');
 
   return `
@@ -287,7 +283,7 @@ export function closeSlotConfigurator() {
   if (el) el.remove();
 }
 
-export function setSlotConfiguredStatus(dayIndex, mealType, status, recipeId = null, recipeName = null) {
+export function setSlotConfiguredStatus(dayIndex, mealType, status, recipeId = null) {
   if (!window.state) window.state = {};
   if (!window.state.skeletonGrid) window.state.skeletonGrid = {};
 
@@ -307,10 +303,10 @@ export function setSlotConfiguredStatus(dayIndex, mealType, status, recipeId = n
       status: 'pinned',
       isSkipped: false,
       isSplit: false,
+      pinned: true,
       recipeId: recipeId || null,
-      recipeName: recipeName || null,
-      elliott: { recipeId: recipeId || null, recipeName: recipeName || null, isSkipped: false },
-      chloe: { recipeId: recipeId || null, recipeName: recipeName || null, isSkipped: false }
+      elliott: { recipeId: recipeId || null, isSkipped: false, pinned: true },
+      chloe: { recipeId: recipeId || null, isSkipped: false, pinned: true }
     };
   }
 
@@ -319,18 +315,20 @@ export function setSlotConfiguredStatus(dayIndex, mealType, status, recipeId = n
   if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
 }
 
-export function setSplitPersonSlotStatus(dayIndex, mealType, personKey, status, recipeId = null, recipeName = null) {
+export function setSplitPersonSlotStatus(dayIndex, mealType, personKey, status, recipeId = null) {
   if (!window.state) window.state = {};
   if (!window.state.skeletonGrid) window.state.skeletonGrid = {};
 
   const slotKey = `${dayIndex}_${mealType}`;
   const existing = getSkeletonSlotConfig(window.state.skeletonGrid, dayIndex, mealType) || {};
-  const elliott = { ...(existing.elliott || (existing.recipeId ? { recipeId: existing.recipeId, recipeName: existing.recipeName } : (existing.isSkipped ? { isSkipped: true } : {}))) };
-  const chloe = { ...(existing.chloe || (existing.recipeId ? { recipeId: existing.recipeId, recipeName: existing.recipeName } : (existing.isSkipped ? { isSkipped: true } : {}))) };
+  const elliott = { ...(existing.elliott || (existing.recipeId ? { recipeId: existing.recipeId, pinned: true } : (existing.isSkipped ? { isSkipped: true } : {}))) };
+  const chloe = { ...(existing.chloe || (existing.recipeId ? { recipeId: existing.recipeId, pinned: true } : (existing.isSkipped ? { isSkipped: true } : {}))) };
+  delete elliott.recipeName;
+  delete chloe.recipeName;
 
   const targetObj = status === 'skipped'
     ? { isSkipped: true }
-    : (status === 'pinned' && recipeId ? { recipeId, recipeName, isSkipped: false } : {});
+    : (status === 'pinned' && recipeId ? { recipeId, isSkipped: false, pinned: true } : {});
 
   const nextElliott = personKey === 'elliott' ? targetObj : elliott;
   const nextChloe = personKey === 'chloe' ? targetObj : chloe;

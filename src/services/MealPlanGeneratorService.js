@@ -1,5 +1,5 @@
 /**
- * src/services/MealPlanGeneratorService.js (v3.19.77)
+ * src/services/MealPlanGeneratorService.js (v3.19.78)
  * ES6 Meal Plan Generator Engine & Slot Resolver.
  * Generates balanced multi-day meal plans matching household macro targets,
  * cadence repeats, and dietary exclusions without external legacy monolith dependencies.
@@ -7,14 +7,14 @@
 
 import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
 import { setCurrentPlan } from '../store/store.js';
-import { saveCurrentPlan } from './HouseholdRepository.js';
+import { saveCurrentPlan, stripPlanPayload } from './HouseholdRepository.js';
 
 /**
  * Resolves planned slot data into full recipe information.
  */
 export function getPlanSlotInfo(slotData) {
   if (!slotData) return null;
-  const id = typeof slotData === 'string' ? slotData : slotData.id;
+  const id = typeof slotData === 'string' ? slotData : (slotData.recipeId || slotData.id);
   const variant = (typeof slotData === 'object' && slotData.variant) ? slotData.variant : 'original';
   const instanceId = typeof slotData === 'object' ? (slotData.instanceId || `${id}_${Date.now()}`) : `${id}_${Date.now()}`;
   
@@ -93,11 +93,11 @@ export function generateMealPlan(options = {}) {
   const slots = {};
   const mealPrepGroups = [];
 
-  const createPinnedSlot = (recipeId, dayNum, suffix = '') => {
+  const createPinnedSlot = (recipeId, dayNum, suffix = '', isSplit = false) => {
     const r = allRecipes.find(item => item.id === recipeId);
     const variant = r && r.enhanced ? 'enhanced' : 'original';
     const instanceId = `inst_pinned_${recipeId}_d${dayNum}${suffix}_${Math.random().toString(36).substr(2, 5)}`;
-    return { id: recipeId, variant, instanceId, isSkipped: false, skipped: false, isPinned: true };
+    return { id: recipeId, recipeId, variant, instanceId, isSkipped: false, skipped: false, isSplit, pinned: true, isPinned: true };
   };
 
   // Pre-fill pinned recipes and skipped slots from skeletonGrid (supports both shared and split household state)
@@ -109,28 +109,28 @@ export function generateMealPlan(options = {}) {
 
       if (config.isSplit) {
         if (config.elliott?.isSkipped) {
-          slots[d][`${mealType}E`] = { isSkipped: true, skipped: true };
+          slots[d][`${mealType}E`] = { isSkipped: true, skipped: true, isSplit: true };
         } else if (config.elliott?.recipeId) {
-          slots[d][`${mealType}E`] = createPinnedSlot(config.elliott.recipeId, d, '_E');
+          slots[d][`${mealType}E`] = createPinnedSlot(config.elliott.recipeId, d, '_E', true);
         }
         if (config.chloe?.isSkipped) {
-          slots[d][`${mealType}C`] = { isSkipped: true, skipped: true };
+          slots[d][`${mealType}C`] = { isSkipped: true, skipped: true, isSplit: true };
         } else if (config.chloe?.recipeId) {
-          slots[d][`${mealType}C`] = createPinnedSlot(config.chloe.recipeId, d, '_C');
+          slots[d][`${mealType}C`] = createPinnedSlot(config.chloe.recipeId, d, '_C', true);
         }
       } else if (config.isSkipped || config.status === 'skipped') {
-        const skipData = { isSkipped: true, skipped: true };
+        const skipData = { isSkipped: true, skipped: true, isSplit: false };
         slots[d][`${mealType}E`] = skipData;
         slots[d][`${mealType}C`] = skipData;
       } else if (config.recipeId) {
-        const pinData = createPinnedSlot(config.recipeId, d);
+        const pinData = createPinnedSlot(config.recipeId, d, '', false);
         slots[d][`${mealType}E`] = pinData;
         slots[d][`${mealType}C`] = pinData;
       }
     });
   }
 
-  const isSlotAnchored = (slot) => Boolean(slot?.isPinned || slot?.isSkipped);
+  const isSlotAnchored = (slot) => Boolean(slot?.isPinned || slot?.pinned || slot?.isSkipped);
 
   const fillMealType = (mealType, pool, repeatCount) => {
     let poolIdx = 0;
@@ -162,7 +162,7 @@ export function generateMealPlan(options = {}) {
           break;
         }
 
-        const slotData = { id: recipe.id, variant, instanceId, isSkipped: false, skipped: false };
+        const slotData = { id: recipe.id, recipeId: recipe.id, variant, instanceId, isSkipped: false, skipped: false, isSplit: false, pinned: false };
         if (!curEAnchored) slots[curDay][`${mealType}E`] = slotData;
         if (!curCAnchored) slots[curDay][`${mealType}C`] = slotData;
         assignedDays.push(curDay);
@@ -172,7 +172,6 @@ export function generateMealPlan(options = {}) {
         mealPrepGroups.push({
           id: `prep_${instanceId}`,
           recipeId: recipe.id,
-          recipeName: recipe.name || 'Recipe',
           mealType,
           days: assignedDays,
           servings: assignedDays.length * 2
@@ -187,14 +186,15 @@ export function generateMealPlan(options = {}) {
   fillMealType('lunch', lunches, cadence.lunch || 2);
   fillMealType('dinner', dinners, cadence.dinner || 2);
 
-  return {
+  return stripPlanPayload({
     days,
     startDate: startDateStr,
     dayDates,
     slots,
+    skeletonGrid,
     mealPrepGroups,
     createdAt: new Date().toISOString()
-  };
+  });
 }
 
 /**

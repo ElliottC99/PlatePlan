@@ -1,5 +1,5 @@
 /**
- * src/services/HydrationService.js (v3.19.77)
+ * src/services/HydrationService.js (v3.19.78)
  * Orchestrates concurrent fetching from HouseholdRepository, invalidating/updating cache,
  * and populating the centralized Store and window.state.
  */
@@ -234,6 +234,12 @@ export async function hydrateHouseholdData() {
         window.state.ingredients = ingredients;
         window.state.products = products;
         window.state.categories = mergedCategories;
+        if (plan && typeof plan === 'object') {
+          window.state.plan = plan;
+          if (plan.skeletonGrid && typeof plan.skeletonGrid === 'object') {
+            window.state.skeletonGrid = plan.skeletonGrid;
+          }
+        }
 
         await sweepAndRecalibrateIngredientDefaults();
 

@@ -1,5 +1,5 @@
 /**
- * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.77)
+ * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.78)
  * Progressive Cascading Hierarchy Alignment Wizard with Title Case Normalisation & Auto-Default Sync.
  */
 import { getState, setIngredients } from '../../store/store.js';

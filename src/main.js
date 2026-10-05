@@ -1,5 +1,5 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.19.77';
+  window.APP_VERSION = 'v3.19.78';
   window.showTescoImport = () => {
     import('./components/pantry/SubtypeActionModalsUI.js')
       .then(m => {
@@ -39,7 +39,7 @@ import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
 import { subscribe, getState } from './store/store.js';
 import { setupActionBridge } from './services/ActionBridge.js';
-import { saveCurrentPlan, getCategories, saveCategories, saveIngredient, saveProduct, getIngredients, getProducts } from './services/HouseholdRepository.js';
+import { saveCurrentPlan, stripPlanPayload, getCategories, saveCategories, saveIngredient, saveProduct, getIngredients, getProducts } from './services/HouseholdRepository.js';
 import { AppState } from './state/AppState.js';
 import { renderToday } from './views/TodayView.js';
 import { renderIngredientBank, renderProductBank } from './views/PantryBankView.js';
@@ -55,10 +55,11 @@ import { renderSyncPanelModal, closeSyncPanelModal } from './components/sync/Syn
 
 // Global Compatibility Shims for Legacy References
 if (typeof window !== 'undefined') {
+  window.stripPlanPayload = stripPlanPayload;
   window.saveState = window.saveState || function(stateData) {
-    console.warn('[Compatibility] Global saveState() invoked. Delegating to persistence layer.');
+    console.warn('[Compatibility] Global saveState() invoked. Delegating sanitised plan to persistence layer.');
     if (typeof saveCurrentPlan === 'function') {
-      saveCurrentPlan(stateData || AppState.getState());
+      saveCurrentPlan(stateData || window.state?.plan || AppState.getState());
     }
   };
 
@@ -323,7 +324,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const badgeEl = document.getElementById('app-header-version') || document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (badgeEl) {
-    badgeEl.textContent = window.APP_VERSION || 'v3.19.77';
+    badgeEl.textContent = window.APP_VERSION || 'v3.19.78';
   }
 }
 
