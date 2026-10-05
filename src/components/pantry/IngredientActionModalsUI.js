@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/IngredientActionModalsUI.js (v3.20.02)
+ * src/components/pantry/IngredientActionModalsUI.js (v3.20.03)
  * Standardised custom styled dialogues and workflows for Pantry Ingredients & Products.
  * Strictly modular (< 400 lines), British English, and free of legacy terminology.
  */

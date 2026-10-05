@@ -1,5 +1,5 @@
 /**
- * src/services/DataQualityScannerService.js (v3.20.02)
+ * src/services/DataQualityScannerService.js (v3.20.03)
  * Automated catalogue data quality auditor, anomaly scanner, and advisor.
  * Pure service layer with zero DOM references.
  */
@@ -92,14 +92,15 @@ export function runDataQualityScan(state = {}, options = {}) {
                           (ing.subtypes || []).reduce((acc, st) => acc + (st.products?.length || 0), 0);
     const autoDefault = ing.defaultProduct;
     const hasBaseNutrition = (ing.cal && ing.cal > 0) || (ing.prot && ing.prot > 0);
+    const hasSubtypeDefault = (ing.subtypes || []).some(st => !!st.defaultProduct);
 
-    if (totalProducts > 0 && !autoDefault && !hasBaseNutrition) {
+    if (totalProducts > 0 && !autoDefault && !hasBaseNutrition && !hasSubtypeDefault) {
       blockers.push({
         key: `blocker:ingredient:${ing.id}:no-default`,
         entityType: 'ingredient',
         entityId: ing.id,
         title: ing.name,
-        message: `Has products in catalog but lacks an designated "Auto default" product for calorie/protein estimates.`,
+        message: `Has products in catalogue but lacks a designated "Auto default" product for calorie/protein estimates.`,
         severity: 'blocker',
         fixTarget: { entityType: 'ingredient', entityId: ing.id }
       });
@@ -197,7 +198,7 @@ export function runDataQualityScan(state = {}, options = {}) {
         entityType: 'ingredient',
         entityId: ing.id,
         title: `${ing.name} & ${match.name}`,
-        message: `These ingredients have highly identical normalized names. Consider merging to avoid recipe estimation splitting.`,
+        message: `These ingredients have highly identical normalised names. Consider merging to avoid recipe estimation splitting.`,
         severity: 'advisory',
         fixTarget: { entityType: 'ingredient', entityId: ing.id },
         duplicateIngredientId: match.id

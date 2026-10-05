@@ -1,5 +1,5 @@
 /**
- * src/models/PantryHierarchyModel.js (v3.20.02)
+ * src/models/PantryHierarchyModel.js (v3.20.03)
  * Relational Model & Operations for Category ➔ Ingredient ➔ Sub-type ➔ Product hierarchy.
  * Encapsulates aliasing, merging, promoting/demoting, and auto-default product resolution strategies.
  */
@@ -65,14 +65,12 @@ export function compareProductsByStrategy(a, b, criterion = 'lowest_absolute_pri
       return safeProtB !== safeProtA ? safeProtB - safeProtA : safePriceA - safePriceB;
     case 'highest_protein_per_kcal': {
       const ratioA = safeKcalA > 0 ? (safeProtA / safeKcalA) : 0, ratioB = safeKcalB > 0 ? (safeProtB / safeKcalB) : 0;
-      if (Math.abs(ratioB - ratioA) > 1e-6) return ratioB - ratioA;
-      return safeKcalA !== safeKcalB ? safeKcalA - safeKcalB : safePriceA - safePriceB;
+      return Math.abs(ratioB - ratioA) > 1e-6 ? ratioB - ratioA : (safeKcalA !== safeKcalB ? safeKcalA - safeKcalB : safePriceA - safePriceB);
     }
     case 'highest_protein_per_pound': {
       const yieldA = safePriceA > 0 ? (((safeProtA / 100) * safeSizeA) / safePriceA) : 0;
       const yieldB = safePriceB > 0 ? (((safeProtB / 100) * safeSizeB) / safePriceB) : 0;
-      if (Math.abs(yieldB - yieldA) > 1e-6) return yieldB - yieldA;
-      return safePriceA !== safePriceB ? safePriceA - safePriceB : safeKcalA - safeKcalB;
+      return Math.abs(yieldB - yieldA) > 1e-6 ? yieldB - yieldA : (safePriceA !== safePriceB ? safePriceA - safePriceB : safeKcalA - safeKcalB);
     }
     case 'lowest_calorie_count': case 'lowest_calories':
       return safeKcalA !== safeKcalB ? safeKcalA - safeKcalB : safePriceA - safePriceB;
@@ -154,8 +152,7 @@ export function buildPantryHierarchy(ingredients = [], products = [], options = 
     }
   });
 
-  const categoryMap = new Map();
-  const orphanSubtypes = [];
+  const categoryMap = new Map(), orphanSubtypes = [];
 
   rootIngredients.forEach(root => {
     const cat = root.category || 'General';
@@ -163,9 +160,15 @@ export function buildPantryHierarchy(ingredients = [], products = [], options = 
     const directProducts = productMap.get(root.id) || [];
     const childSubtypes = [...(Array.isArray(root.subtypes) ? root.subtypes : []), ...(subtypeMap.get(root.id) || [])];
     const uniqueSubtypes = Array.from(new Map(childSubtypes.map(s => [s.id || s.name, s])).values());
+    const subtypeProducts = uniqueSubtypes.flatMap(st => productMap.get(st.id) || []);
+    const allIngredientProducts = [...directProducts, ...subtypeProducts];
+
+    const rootDefaultProduct = resolveDefaultProduct(root, allIngredientProducts);
+
     const enrichedSubtypes = uniqueSubtypes.map(st => {
       const stProducts = productMap.get(st.id) || [];
-      return { ...st, parentId: root.id, parentName: root.name, products: stProducts, defaultProduct: resolveDefaultProduct(st, stProducts.length ? stProducts : directProducts) };
+      const stDefault = resolveDefaultProduct(st, stProducts.length ? stProducts : allIngredientProducts) || rootDefaultProduct;
+      return { ...st, parentId: root.id, parentName: root.name, products: stProducts, defaultProduct: stDefault };
     });
 
     categoryMap.get(cat).push({
@@ -173,7 +176,7 @@ export function buildPantryHierarchy(ingredients = [], products = [], options = 
       subtypes: enrichedSubtypes,
       directProducts,
       products: directProducts,
-      defaultProduct: resolveDefaultProduct(root, directProducts)
+      defaultProduct: rootDefaultProduct
     });
   });
 
@@ -207,9 +210,7 @@ export function logPantryHierarchyTelemetry(ingredients = [], products = []) {
 let buildHierarchyTimer = null;
 let cachedHierarchyResult = null;
 
-export function invalidateHierarchyCache() {
-  cachedHierarchyResult = null;
-}
+export function invalidateHierarchyCache() { cachedHierarchyResult = null; }
 
 export function debouncedBuildPantryHierarchy(ingredients = [], products = [], callback) {
   if (buildHierarchyTimer) clearTimeout(buildHierarchyTimer);

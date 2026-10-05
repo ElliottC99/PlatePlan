@@ -1,5 +1,5 @@
 /**
- * src/components/planner/PlannerSwapModalUI.js (v3.20.02)
+ * src/components/planner/PlannerSwapModalUI.js (v3.20.03)
  * Interactive Swap Meal Modal UI for the Weekly Meal Planner.
  * Extracted from PlannerView.js to maintain strict <400 line modularity.
  */

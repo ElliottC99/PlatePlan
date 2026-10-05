@@ -1,5 +1,5 @@
 /**
- * src/components/data-quality/ResolveUnlinkedModalUI.js (v3.20.02)
+ * src/components/data-quality/ResolveUnlinkedModalUI.js (v3.20.03)
  * Clean 3-Path Resolution Modal UI component for unlinked ingredients/sub-types.
  * Directly mounts to document.body for flawless viewport presentation.
  * Features safe product retrieval & immutable commit to prevent product array wipes.

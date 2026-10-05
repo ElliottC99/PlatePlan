@@ -1,5 +1,5 @@
 /**
- * src/services/HouseholdRepository.js (v3.20.02)
+ * src/services/HouseholdRepository.js (v3.20.03)
  * Dedicated data access repository for household-scoped Firestore operations.
  * Completely isolated from DOM manipulation and UI rendering.
  * All operations target the shared household path 'households/elliott-chloe'.
@@ -12,7 +12,7 @@ export { stripPlanPayload };
 
 function isDbAvailable() {
   if (!db) {
-    console.warn('[HouseholdRepository v3.20.02] Firestore db instance not initialised.');
+    console.warn('[HouseholdRepository v3.20.03] Firestore db instance not initialised.');
     return false;
   }
   return true;

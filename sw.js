@@ -1,12 +1,12 @@
 /**
- * sw.js (v3.20.02)
+ * sw.js (v3.20.03)
  * Service Worker for PlatePlan PWA offline support & asset caching.
  * Caches core app shell, modern ES6 modules, stylesheets, and icons.
  */
 
-const PLATEPLAN_CACHE = 'plateplan-shell-v3.20.02';
-const PLATEPLAN_APP_VERSION = '3.20.02';
-const PLATEPLAN_BUILD_ID = '3.20.02-v253';
+const PLATEPLAN_CACHE = 'plateplan-shell-v3.20.03';
+const PLATEPLAN_APP_VERSION = '3.20.03';
+const PLATEPLAN_BUILD_ID = '3.20.03-v254';
 
 const PLATEPLAN_PRECACHE_ASSETS = [
   '/',
