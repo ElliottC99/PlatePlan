@@ -1,5 +1,5 @@
 /**
- * src/views/RecipeVaultView.js (v3.20.00)
+ * src/views/RecipeVaultView.js (v3.20.01)
  * Atomic Recipe Vault Component & Actions Module.
  * Decoupled from direct Firestore SDK, pure reactive Store interactions.
  * Features optimised DocumentFragment rendering and instant offline caching.
@@ -10,8 +10,9 @@ import { renderVaultGridContainer } from '../components/vault/VaultGridContainer
 import * as VaultFilterToolbar from '../components/vault/VaultFilterToolbar.js';
 import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
 import { getSortedRecipes } from '../services/FitScoreService.js';
+import { formatRecipeIngredientRow, renderRecipeIngredientsListHTML } from '../components/recipe/RecipeDetailModalUI.js';
 
-export { renderVaultRecipeCard, renderVaultGridContainer, VaultFilterToolbar, calculateMealFitScore, getSortedRecipes };
+export { renderVaultRecipeCard, renderVaultGridContainer, VaultFilterToolbar, calculateMealFitScore, getSortedRecipes, formatRecipeIngredientRow, renderRecipeIngredientsListHTML };
 
 let currentRecipeSearchQuery = '';
 
@@ -219,7 +220,7 @@ export function renderRecipeVault() {
       r.who,
       ...(types || []),
       ...(Array.isArray(r.tags) ? r.tags : []),
-      ...(r.ingredients || []).map(ing => (typeof window.ingRaw === 'function' ? window.ingRaw(ing) : (typeof ing === 'object' ? (ing.name || '') : String(ing))))
+      ...(r.ingredients || []).map(ing => formatRecipeIngredientRow(ing, window.state))
     ].join(' ').toLowerCase();
 
     const rWhoNorm = String(r.who || 'both').toLowerCase();
@@ -260,7 +261,9 @@ if (typeof window !== 'undefined') {
   window.RecipeVaultView = {
     render: renderRecipeVault,
     handleSearch: handleRecipeSearch,
-    filterRecipes: handleRecipeSearch
+    filterRecipes: handleRecipeSearch,
+    formatRecipeIngredientRow,
+    renderRecipeIngredientsListHTML
   };
   window.renderVaultGrid = renderRecipeVault;
   window.renderRecipeCard = renderVaultRecipeCard;

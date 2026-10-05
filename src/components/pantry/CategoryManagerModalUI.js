@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.19.79)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.20.00)
  * In-App Multi-Step Category Operations Wizard & Fine-Grained Reassignment Modal.
  */
 
@@ -56,39 +56,39 @@ export function renderCategoryManagerModal() {
       bodyHtml = `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border,#e7e5e4)">
           <div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">🏷️</span><h3 style="margin:0;font-size:16px;font-weight:750">Category Manager</h3></div>
-          <button type="button" class="btn sm ghost" onclick="window.closeCategoryManagerModal()" style="padding:2px 8px;font-size:18px">&times;</button>
+          <button type="button" class="modal-close-btn btn sm btn-ghost ghost" onclick="window.closeCategoryManagerModal()" aria-label="Close modal">✕</button>
         </div>
         <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
           ${categories.map(cat => {
             const count = ingredients.filter(i => slugCategory(i.category) === slugCategory(cat) || slugCategory(i.cat) === slugCategory(cat)).length;
-            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2,#f5f5f4);border-radius:8px;border:1px solid var(--border,#e7e5e4)">
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2,#f5f5f4);border-radius:var(--radius-md,10px);border:1px solid var(--border,#e7e5e4)">
               <div><span style="font-size:13px;font-weight:650">${escapeHtml(cat)}</span><span style="font-size:11px;color:var(--text2,#78716c);margin-left:6px">(${count} items)</span></div>
               <div style="display:flex;gap:4px">
-                <button type="button" class="btn xs ghost" onclick="window.startRenameCat('${escapeAttr(cat)}')">Rename</button>
-                <button type="button" class="btn xs ghost" onclick="window.startMergeCat('${escapeAttr(cat)}')">Merge</button>
-                <button type="button" class="btn xs ghost" style="color:var(--red,#ef4444)" onclick="window.promptDeleteCategory('${escapeAttr(cat)}')">Delete</button>
+                <button type="button" class="btn xs btn-ghost ghost" onclick="window.startRenameCat('${escapeAttr(cat)}')">Rename</button>
+                <button type="button" class="btn xs btn-ghost ghost" onclick="window.startMergeCat('${escapeAttr(cat)}')">Merge</button>
+                <button type="button" class="btn xs btn-ghost ghost" style="color:var(--red,#ef4444)" onclick="window.promptDeleteCategory('${escapeAttr(cat)}')">Delete</button>
               </div>
             </div>`;
           }).join('')}
         </div>
         <div style="display:flex;gap:8px">
-          <input type="text" id="cat-manager-add-input" placeholder="New category name..." aria-label="New category name" style="flex:1;padding:6px 10px;border:1px solid var(--border,#e7e5e4);border-radius:8px;font-size:13px">
-          <button type="button" class="btn primary sm" onclick="window.submitAddCat()">+ Add</button>
+          <input type="text" id="cat-manager-add-input" placeholder="New category name..." aria-label="New category name" style="flex:1;padding:6px 10px;border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);font-size:13px">
+          <button type="button" class="btn btn-primary primary sm" onclick="window.submitAddCat()">+ Add</button>
         </div>
       `;
     } else if (wizardStep === 'rename') {
       bodyHtml = `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border,#e7e5e4)">
           <h3 style="margin:0;font-size:15px;font-weight:750">Rename "${escapeHtml(activeCat)}"</h3>
-          <button type="button" class="btn sm ghost" onclick="window.closeCategoryManagerModal()">&times;</button>
+          <button type="button" class="modal-close-btn btn sm btn-ghost ghost" onclick="window.closeCategoryManagerModal()" aria-label="Close modal">✕</button>
         </div>
         <div style="margin-bottom:16px">
           <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">New Category Name</label>
-          <input type="text" id="cat-rename-input" value="${escapeAttr(activeCat)}" aria-label="New category name input" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:8px;font-size:13.5px;box-sizing:border-box">
+          <input type="text" id="cat-rename-input" value="${escapeAttr(activeCat)}" aria-label="New category name input" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);font-size:13.5px;box-sizing:border-box">
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button type="button" class="btn ghost sm" onclick="window.navCatStep('list')">Back</button>
-          <button type="button" class="btn primary sm" onclick="window.submitRenameCat()">Apply Rename</button>
+          <button type="button" class="btn btn-ghost ghost sm" onclick="window.navCatStep('list')">Back</button>
+          <button type="button" class="btn btn-primary primary sm" onclick="window.submitRenameCat()">Apply Rename</button>
         </div>
       `;
     } else if (wizardStep === 'merge') {
@@ -96,17 +96,17 @@ export function renderCategoryManagerModal() {
       bodyHtml = `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border,#e7e5e4)">
           <h3 style="margin:0;font-size:15px;font-weight:750">Merge "${escapeHtml(activeCat)}"</h3>
-          <button type="button" class="btn sm ghost" onclick="window.closeCategoryManagerModal()">&times;</button>
+          <button type="button" class="modal-close-btn btn sm btn-ghost ghost" onclick="window.closeCategoryManagerModal()" aria-label="Close modal">✕</button>
         </div>
         <div style="margin-bottom:16px">
           <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">Select Target Destination Category</label>
-          <select id="cat-merge-select" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:8px;font-size:13.5px;background:var(--surface,#fff)">
+          <select id="cat-merge-select" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);font-size:13.5px;background:var(--surface,#fff)">
             ${otherCats.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('')}
           </select>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button type="button" class="btn ghost sm" onclick="window.navCatStep('list')">Back</button>
-          <button type="button" class="btn primary sm" onclick="window.submitMergeCat()">Confirm Merge</button>
+          <button type="button" class="btn btn-ghost ghost sm" onclick="window.navCatStep('list')">Back</button>
+          <button type="button" class="btn btn-primary primary sm" onclick="window.submitMergeCat()">Confirm Merge</button>
         </div>
       `;
     } else if (wizardStep === 'reassign') {
@@ -121,11 +121,11 @@ export function renderCategoryManagerModal() {
             <h3 style="margin:0;font-size:15px;font-weight:750">Reassign Items (${boundIngs.length})</h3>
             <p style="margin:2px 0 0 0;font-size:11.5px;color:var(--text2,#78716c)">Reassign ingredients before deleting "${escapeHtml(activeCat)}".</p>
           </div>
-          <button type="button" class="btn sm ghost" onclick="window.closeCategoryManagerModal()">&times;</button>
+          <button type="button" class="modal-close-btn btn sm btn-ghost ghost" onclick="window.closeCategoryManagerModal()" aria-label="Close modal">✕</button>
         </div>
         <div style="display:flex;gap:6px;margin-bottom:10px">
-          <button type="button" class="btn xs ${reassignMode === 'mass' ? 'primary' : 'ghost'}" onclick="window.setCatReassignMode('mass')">Mass Reassign</button>
-          <button type="button" class="btn xs ${reassignMode === 'individual' ? 'primary' : 'ghost'}" onclick="window.setCatReassignMode('individual')">Individual Sorting</button>
+          <button type="button" class="btn xs ${reassignMode === 'mass' ? 'btn-primary primary' : 'btn-ghost ghost'}" onclick="window.setCatReassignMode('mass')">Mass Reassign</button>
+          <button type="button" class="btn xs ${reassignMode === 'individual' ? 'btn-primary primary' : 'btn-ghost ghost'}" onclick="window.setCatReassignMode('individual')">Individual Sorting</button>
         </div>
 
         ${reassignMode === 'mass' ? `

@@ -1,6 +1,8 @@
 /**
- * src/components/recipe/RecipeDetailModalUI.js (v3.19.19)
- * Modular Presentation Component for Recipe Detail & Scaling Preview Modal
+ * src/components/recipe/RecipeDetailModalUI.js (v3.20.01)
+ * Modular Presentation Component for Recipe Detail & Scaling Preview Modal.
+ * Renders Recipe Ingredient rows as: [Ingredient] / [Sub-type] - [Brand Name] [Product Name]
+ * with graceful fallbacks if brand/product are unmapped.
  */
 
 import { calculateMealFitScore } from '../../services/FitScoreService.js';
@@ -25,6 +27,125 @@ function toTitle(str) {
     return window.toTitleCase(str);
   }
   return String(str || '').charAt(0).toUpperCase() + String(str || '').slice(1);
+}
+
+function formatBrandProductPair(product, fallbackBrand = '', fallbackProductName = '') {
+  const brand = String(product?.brand ?? fallbackBrand ?? '').trim();
+  let productName = String(product?.name ?? product?.title ?? fallbackProductName ?? '').trim();
+  if (brand && productName.toLowerCase().startsWith(brand.toLowerCase())) {
+    productName = productName.slice(brand.length).replace(/^[\s\-–—:]+/, '').trim();
+  }
+  if (brand && productName) return `${brand} ${productName}`;
+  return productName || brand || '';
+}
+
+/**
+ * Formats a recipe ingredient row as:
+ * "[Ingredient] / [Sub-type] - [Brand Name] [Product Name]"
+ * (e.g., "Beans / Baked - Heinz Baked Beans") with graceful fallbacks when unmapped.
+ */
+export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1) {
+  if (!ing) return '';
+  if (typeof ing === 'string') return ing.trim();
+
+  const appState = state || (typeof window !== 'undefined' ? (window.Store?.getState?.() || window.state || {}) : {});
+  const pantryIngs = Array.isArray(appState.ingredients) ? appState.ingredients : [];
+  const products = Array.isArray(appState.products) ? appState.products : [];
+
+  const ingId = ing.ingredientId || ing.groupId || ing.familyId || ing.ingId || '';
+  const subId = ing.subtypeId || ing.subTypeId || '';
+  const prodId = ing.productId || ing.mappedProductId || ing.defaultProductId || '';
+
+  let ingObj = ingId ? pantryIngs.find(i => String(i?.id) === String(ingId)) : null;
+  if (!ingObj) {
+    const rawIngName = String(ing.ingredientName || ing.family || ing.name || ing.ingredient || '').trim().toLowerCase();
+    if (rawIngName) {
+      ingObj = pantryIngs.find(i => String(i?.name || '').trim().toLowerCase() === rawIngName) || null;
+    }
+  }
+
+  let prodObj = prodId ? products.find(p => String(p?.id) === String(prodId)) : null;
+
+  let subObj = null;
+  const subtypes = Array.isArray(ingObj?.subtypes) ? ingObj.subtypes : [];
+  if (subId && subtypes.length) {
+    subObj = subtypes.find(s => String(s?.id) === String(subId)) || null;
+  }
+  if (!subObj && (ing.subtypeName || ing.subtype) && subtypes.length) {
+    const targetSub = String(ing.subtypeName || ing.subtype).trim().toLowerCase();
+    subObj = subtypes.find(s => String(s?.name || '').trim().toLowerCase() === targetSub) || null;
+  }
+  if (!subObj && prodObj?.subtypeId && subtypes.length) {
+    subObj = subtypes.find(s => String(s?.id) === String(prodObj.subtypeId)) || null;
+  }
+
+  if (!prodObj) {
+    if (subObj) {
+      const subDefaultId = subObj.defaultProductId || subObj.defaultProduct?.id || '';
+      prodObj = subDefaultId
+        ? products.find(p => String(p?.id) === String(subDefaultId))
+        : products.find(p => String(p?.subtypeId || p?.subTypeId || '') === String(subObj.id));
+    }
+    if (!prodObj && ingObj) {
+      const ingDefaultId = ingObj.defaultProductId || ingObj.autoDefaultProduct || '';
+      prodObj = ingDefaultId
+        ? products.find(p => String(p?.id) === String(ingDefaultId))
+        : (products.find(p => String(p?.ingredientId) === String(ingObj.id) && p?.isAutoDefault) ||
+           products.find(p => String(p?.ingredientId) === String(ingObj.id)));
+    }
+  }
+
+  const ingredientLabel = String(
+    ingObj?.name || ing.ingredientName || ing.family || ing.name || ing.ingredient || ing.title || ing.item || ing.raw || ing.rawText || ''
+  ).trim();
+  const subtypeLabel = String(subObj?.name || ing.subtypeName || ing.subtype || '').trim();
+  const brandProductLabel = formatBrandProductPair(prodObj, ing.brand, ing.productName || (!ingObj && prodObj ? prodObj.name : ''));
+
+  let hierarchyPart = ingredientLabel || 'Unmapped Ingredient';
+  if (subtypeLabel && subtypeLabel.toLowerCase() !== hierarchyPart.toLowerCase()) {
+    hierarchyPart = `${hierarchyPart} / ${subtypeLabel}`;
+  }
+
+  let formattedLine = hierarchyPart;
+  if (brandProductLabel && brandProductLabel.toLowerCase() !== ingredientLabel.toLowerCase() && brandProductLabel.toLowerCase() !== subtypeLabel.toLowerCase()) {
+    formattedLine = `${hierarchyPart} - ${brandProductLabel}`;
+  } else if (!brandProductLabel && ingObj?.autoDefault) {
+    const fallbackAuto = formatBrandProductPair(null, '', ingObj.autoDefault);
+    if (fallbackAuto && fallbackAuto.toLowerCase() !== ingredientLabel.toLowerCase()) {
+      formattedLine = `${hierarchyPart} - ${fallbackAuto}`;
+    }
+  }
+
+  const qty = ing.qty ?? ing.quantity ?? ing.amount;
+  const unit = String(ing.unit || ing.u || '').trim();
+  const comment = String(ing.comment || ing.notes || '').trim();
+
+  let qtyPrefix = '';
+  if (qty !== undefined && qty !== null && qty !== '') {
+    const num = Number(qty);
+    const scaledQty = !isNaN(num) && num > 0
+      ? (Math.round(num * scaleMultiplier * 10) / 10)
+      : qty;
+    qtyPrefix = [scaledQty, unit].filter(Boolean).join('');
+  }
+
+  const fullText = qtyPrefix ? `${formattedLine} (${qtyPrefix})` : formattedLine;
+  return comment ? `${fullText} — ${comment}` : fullText;
+}
+
+export function renderRecipeIngredientsListHTML(ingredients = [], state = null, scaleMultiplier = 1) {
+  const list = Array.isArray(ingredients) ? ingredients : [];
+  if (!list.length) {
+    return `<div style="font-size:12.5px;color:var(--text2);font-style:italic">No ingredients listed.</div>`;
+  }
+  return `
+    <ul class="recipe-view-ingredients-list" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px">
+      ${list.map(ing => {
+        const text = formatRecipeIngredientRow(ing, state, scaleMultiplier);
+        return `<li style="font-size:13px;color:var(--text);padding:5px 0;border-bottom:1px solid var(--border)">• ${escapeHtml(text)}</li>`;
+      }).join('')}
+    </ul>
+  `;
 }
 
 export function renderRecipeDetailModalContent({

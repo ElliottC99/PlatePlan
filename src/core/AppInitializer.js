@@ -1,6 +1,6 @@
 /**
- * src/core/AppInitializer.js (v3.19.23)
- * Core Application Bootstrapping, Service Worker & Toast Notifications
+ * src/core/AppInitializer.js (v3.20.01)
+ * Core Application Bootstrapping, Passive Service Worker & Toast Notifications
  */
 
 export function showPlatePlanToast(msg, type = 'info') {
@@ -26,7 +26,29 @@ export function showPlatePlanToast(msg, type = 'info') {
 
 let isSwRegistered = false;
 let swLogged = false;
-export function registerServiceWorker() {
+
+export function showUpdateBanner(worker) {
+  if (worker && typeof worker.postMessage === 'function') {
+    worker.postMessage({ type: 'SKIP_WAITING' });
+  }
+}
+
+export async function checkAndUpdateApp() {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (reg) {
+      await reg.update();
+      if (reg.waiting) {
+        showUpdateBanner(reg.waiting);
+      }
+    }
+  } catch (err) {
+    console.warn('[PlatePlan PWA] Passive service worker update check warning:', err);
+  }
+}
+
+export function initServiceWorker() {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator) || isSwRegistered) return;
   isSwRegistered = true;
   window.addEventListener('load', () => {
@@ -35,13 +57,15 @@ export function registerServiceWorker() {
         swLogged = true;
         console.info('[PlatePlan PWA] Service Worker registered with scope:', reg.scope);
       }
+      if (reg.waiting) {
+        showUpdateBanner(reg.waiting);
+      }
       reg.addEventListener('updatefound', () => {
         const installingWorker = reg.installing;
         if (!installingWorker) return;
         installingWorker.addEventListener('statechange', () => {
           if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            showPlatePlanToast('✨ PlatePlan updated! Reloading to apply changes...', 'info');
-            setTimeout(() => window.location.reload(), 1500);
+            showUpdateBanner(installingWorker);
           }
         });
       });
@@ -50,6 +74,8 @@ export function registerServiceWorker() {
     });
   });
 }
+
+export const registerServiceWorker = initServiceWorker;
 
 export function initHeaderDelegation() {
   if (typeof document === 'undefined') return;

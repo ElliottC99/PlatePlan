@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/ReallocateProductModalUI.js (v3.19.79)
+ * src/components/pantry/ReallocateProductModalUI.js (v3.20.01)
  * Clean Reallocate Product Modal with Stacked Column Layout & Searchable Category Control.
  * Apple HIG compliant touch targets (min 44px) and free-text category creation.
  */
@@ -33,8 +33,8 @@ export function closeModal() {
   }
 }
 
-export function toggleCreateCoreIngredientBox(show = true) {
-  const box = document.getElementById('create-core-ingredient-box');
+export function toggleCreateIngredientBox(show = true) {
+  const box = document.getElementById('create-ingredient-box');
   if (!box) return;
   const shouldShow = typeof show === 'boolean' ? show : (box.style.display === 'none');
   box.style.display = shouldShow ? 'block' : 'none';
@@ -83,7 +83,7 @@ export function selectTargetParentIngredient(ingId, ingName = '') {
   if (searchInput && ingName) searchInput.placeholder = `Selected: ${ingName} (type to change...)`;
 }
 
-export async function submitCreateNewCoreIngredientFromReallocate() {
+export async function submitCreateNewIngredientFromReallocate() {
   const nameInput = document.getElementById('new-reallocate-ingredient-name');
   const categoryInput = document.getElementById('new-reallocate-ingredient-category');
   
@@ -119,7 +119,7 @@ export async function submitCreateNewCoreIngredientFromReallocate() {
   }
 
   selectTargetParentIngredient(newIng.id, newIng.name);
-  toggleCreateCoreIngredientBox(false);
+  toggleCreateIngredientBox(false);
   nameInput.value = '';
   if (categoryInput) categoryInput.value = '';
 
@@ -142,16 +142,16 @@ export function promptReallocateProduct(productId) {
       <h3 style="margin:0 0 6px 0; font-size: 1.15rem; font-weight: 750;">📦 Reallocate Product: ${escapeHtml(prod.name)}</h3>
       <p style="font-size: 12.5px; color: var(--text2,#78716c); margin: 0 0 14px 0;">Search and select the target parent ingredient and optional sub-type.</p>
 
-      <!-- 1. Searchable Core Ingredient Filter -->
+      <!-- 1. Searchable Ingredient Filter -->
       <div class="field" style="margin-bottom: 14px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-          <label style="font-weight: 600; font-size: 0.85rem;">1. Target Core Ingredient</label>
-          <button type="button" class="btn xs ghost" id="btn-toggle-create-ing" onclick="toggleCreateCoreIngredientBox()" style="color:var(--primary,#4f46e5); font-weight:600; font-size:11.5px;">➕ Create New Ingredient</button>
+          <label style="font-weight: 600; font-size: 0.85rem;">1. Target Ingredient</label>
+          <button type="button" class="btn xs ghost" id="btn-toggle-create-ing" onclick="toggleCreateIngredientBox()" style="color:var(--primary,#4f46e5); font-weight:600; font-size:11.5px;">➕ Create New Ingredient</button>
         </div>
 
-        <!-- Stacked Column Layout: Create New Core Ingredient Sub-panel -->
-        <div id="create-core-ingredient-box" class="subpanel-card" style="display: none; background: var(--system-grouped-bg, #f2f2f7); padding: 16px; border-radius: 12px; margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.08);">
-          <h4 style="margin: 0 0 12px 0; font-size: 15px; font-weight: 600;">Create New Core Ingredient</h4>
+        <!-- Stacked Column Layout: Create New Ingredient Sub-panel -->
+        <div id="create-ingredient-box" class="subpanel-card" style="display: none; background: var(--system-grouped-bg, #f2f2f7); padding: 16px; border-radius: 12px; margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.08);">
+          <h4 style="margin: 0 0 12px 0; font-size: 15px; font-weight: 600;">Create New Ingredient</h4>
           <div style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
             <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
               <label for="new-reallocate-ingredient-name" style="font-size: 12px; font-weight: 600; color: #666;">Ingredient Name</label>
@@ -163,13 +163,13 @@ export function promptReallocateProduct(productId) {
               <datalist id="reallocate-categories-datalist"></datalist>
             </div>
             <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
-              <button type="button" onclick="toggleCreateCoreIngredientBox(false)" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid #ccc; background: #fff; font-weight: 500; cursor: pointer;">Cancel</button>
-              <button type="button" onclick="submitCreateNewCoreIngredientFromReallocate()" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: none; background: #007aff; color: #fff; font-weight: 600; cursor: pointer;">Add Ingredient</button>
+              <button type="button" onclick="toggleCreateIngredientBox(false)" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid #ccc; background: #fff; font-weight: 500; cursor: pointer;">Cancel</button>
+              <button type="button" onclick="submitCreateNewIngredientFromReallocate()" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: none; background: #007aff; color: #fff; font-weight: 600; cursor: pointer;">Add Ingredient</button>
             </div>
           </div>
         </div>
 
-        <input type="text" id="realloc-ing-search" class="input" placeholder="🔍 Type core ingredient or category name..." style="width:100%; min-height:44px; padding:0 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:14px; box-sizing:border-box;" />
+        <input type="text" id="realloc-ing-search" class="input" placeholder="🔍 Type ingredient or category name..." style="width:100%; min-height:44px; padding:0 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:14px; box-sizing:border-box;" />
         <div id="realloc-ing-results" style="margin-top:6px; max-height:140px; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:8px; background:var(--surface2,#f5f5f4); padding:4px;"></div>
       </div>
 
@@ -194,8 +194,8 @@ export function promptReallocateProduct(productId) {
       </div>
 
       <div style="display:flex; gap:8px; justify-content: flex-end;">
-        <button type="button" class="btn" style="min-height:44px; padding:0 16px;" onclick="window.closeSubtypeActionModal()">Cancel</button>
-        <button type="button" class="btn primary" style="min-height:44px; padding:0 16px;" id="btn-confirm-realloc">Reallocate Product</button>
+        <button type="button" class="btn btn-secondary secondary" style="min-height:44px; padding:0 16px;" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn btn-primary primary" style="min-height:44px; padding:0 16px;" id="btn-confirm-realloc">Reallocate Product</button>
       </div>
     </div>
   `;
@@ -323,8 +323,13 @@ export function promptReallocateProduct(productId) {
 
       setProducts(prodsList);
       if (!ing.defaultProductId && !ing.autoDefault) {
+        const brand = String(targetProd.brand || '').trim();
+        let pName = String(targetProd.name || targetProd.title || '').trim();
+        if (brand && pName.toLowerCase().startsWith(brand.toLowerCase())) {
+          pName = pName.slice(brand.length).replace(/^[\s\-–—:]+/, '').trim();
+        }
         ing.defaultProductId = targetProd.id;
-        ing.autoDefault = targetProd.name || targetProd.title || '';
+        ing.autoDefault = (brand && pName) ? `${brand} ${pName}` : (pName || brand);
         ing.autoDefaultProduct = targetProd.id;
         ing.updatedAt = new Date().toISOString();
         saveIngredient(ing);
@@ -339,9 +344,9 @@ export function promptReallocateProduct(productId) {
 export const openProductReallocateModal = promptReallocateProduct;
 
 if (typeof window !== 'undefined') {
-  window.toggleCreateCoreIngredientBox = toggleCreateCoreIngredientBox;
+  window.toggleCreateIngredientBox = toggleCreateIngredientBox;
   window.populateReallocateCategoryDatalist = populateReallocateCategoryDatalist;
-  window.submitCreateNewCoreIngredientFromReallocate = submitCreateNewCoreIngredientFromReallocate;
+  window.submitCreateNewIngredientFromReallocate = submitCreateNewIngredientFromReallocate;
   window.selectTargetParentIngredient = selectTargetParentIngredient;
   window.promptReallocateProduct = promptReallocateProduct;
   window.openProductReallocateModal = promptReallocateProduct;

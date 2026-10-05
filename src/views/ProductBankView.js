@@ -1,5 +1,5 @@
 /**
- * src/views/ProductBankView.js (v3.20.00)
+ * src/views/ProductBankView.js (v3.20.01)
  * Modular ES6 View for Product Bank.
  * Displays nutritional pills (P, C, F, Kcal), P/£ efficiency, Tesco links, and Reallocation modal.
  */
@@ -106,7 +106,7 @@ export function openProductEditModal(productId = null) {
   }
 
   document.body.style.overflow = 'hidden';
-  panel.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;backdrop-filter:blur(8px);overflow-y:auto;';
+  panel.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:9999;backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);overflow-y:auto;padding:16px;box-sizing:border-box;';
 }
 
 export async function saveManualIng() {
@@ -243,8 +243,8 @@ export function renderProductBank() {
         <h3 style="font-size:16px;font-weight:700;margin:0 0 6px 0">No products in product bank</h3>
         <p style="font-size:13px;color:var(--text2,#78716c);margin:0 0 16px 0">Import groceries from Tesco or add products to calculate prices and nutrition.</p>
         <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-          <button class="btn primary sm" type="button" data-pp-click="showAddIng()">+ Add Product</button>
-          <button class="btn sm" type="button" data-pp-click="showTescoImport()" style="background:var(--purple-bg,#f3e8ff);color:var(--purple,#7e22ce)">Import Tesco</button>
+          <button class="btn btn-primary primary sm" type="button" data-pp-click="showAddIng()">+ Add Product</button>
+          <button class="btn btn-outline outline sm" type="button" data-pp-click="showTescoImport()" style="background:var(--purple-bg,#f3e8ff);color:var(--purple,#7e22ce)">Import Tesco</button>
         </div>
       </div>
     `;
@@ -309,11 +309,11 @@ export function renderProductBank() {
 
               <!-- Action Toolbar -->
               <div style="display:flex;align-items:center;justify-content:flex-start;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:6px;border-top:1px solid var(--border,#e7e5e4);width:100%">
-                <button type="button" class="btn xs ghost" onclick="openProductEditModal('${escapeAttr(p.id)}')" style="height:32px;padding:0 10px;border-radius:8px;font-size:13px;font-weight:500">Edit</button>
-                <button type="button" class="btn xs ghost" onclick="promptReallocateProduct('${escapeAttr(p.id)}')" style="height:32px;padding:0 10px;border-radius:8px;font-size:13px;font-weight:500">Reallocate</button>
-                ${mappedIng && !p.isAutoDefault ? `<button type="button" class="btn xs ghost" onclick="handleMakeAutoDefault('${escapeAttr(p.id)}', '${escapeAttr(mappedIng.id)}')" style="height:32px;padding:0 10px;border-radius:8px;font-size:13px;font-weight:500">Default</button>` : ''}
-                <a href="${escapeAttr(tescoSearchUrl)}" target="_blank" rel="noopener noreferrer" class="btn xs ghost" style="text-decoration:none;font-size:13px;font-weight:500;color:var(--primary);height:32px;padding:0 10px;border-radius:8px;display:inline-flex;align-items:center" title="Search on Tesco">Tesco ↗</a>
-                <button type="button" class="btn xs ghost" onclick="handleDeleteProduct('${escapeAttr(p.id)}', '${escapeAttr(p.name)}')" style="color:var(--red,#ef4444);height:32px;padding:0 10px;border-radius:8px;font-size:13px;font-weight:500" title="Delete product">🗑️</button>
+                <button type="button" class="btn xs btn-ghost ghost" onclick="openProductEditModal('${escapeAttr(p.id)}')" style="height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500">Edit</button>
+                <button type="button" class="btn xs btn-ghost ghost" onclick="promptReallocateProduct('${escapeAttr(p.id)}')" style="height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500">Reallocate</button>
+                ${mappedIng && !p.isAutoDefault ? `<button type="button" class="btn xs btn-ghost ghost" onclick="handleMakeAutoDefault('${escapeAttr(p.id)}', '${escapeAttr(mappedIng.id)}')" style="height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500">Default</button>` : ''}
+                <a href="${escapeAttr(tescoSearchUrl)}" target="_blank" rel="noopener noreferrer" class="btn xs btn-ghost ghost" style="text-decoration:none;font-size:13px;font-weight:500;color:var(--primary);height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);display:inline-flex;align-items:center" title="Search on Tesco">Tesco ↗</a>
+                <button type="button" class="btn xs btn-ghost ghost" onclick="handleDeleteProduct('${escapeAttr(p.id)}', '${escapeAttr(p.name)}')" style="color:var(--red,#ef4444);height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500" title="Delete product">🗑️</button>
               </div>
             </div>
           `;

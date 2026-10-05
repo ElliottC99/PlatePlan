@@ -1,6 +1,6 @@
 /**
- * src/services/ShoppingCalculationService.js (v3.14.4)
- * Precision unit pricing, pack weight normalization, and robust fallbacks
+ * src/services/ShoppingCalculationService.js (v3.20.01)
+ * Precision unit pricing, pack weight normalisation, and robust fallbacks
  * for household shopping list generation.
  */
 
@@ -170,14 +170,147 @@ export function formatShoppingItemQuantity(item) {
   return '1x';
 }
 
+export function aggregateShoppingListFromPlan(plan = null, state = null) {
+  const appState = state || (typeof window !== 'undefined' ? (window.Store?.getState?.() || window.state || {}) : {});
+  const activePlan = plan || appState.plan || (typeof window !== 'undefined' ? window.state?.plan : null) || {};
+  const vaultRecipes = (Array.isArray(appState.recipes) && appState.recipes.length ? appState.recipes : null)
+    || (typeof window !== 'undefined' && Array.isArray(window.state?.recipes) && window.state.recipes.length ? window.state.recipes : null)
+    || (typeof window !== 'undefined' && Array.isArray(window.recipes) ? window.recipes : []);
+  const ingredientsBank = Array.isArray(appState.ingredients) ? appState.ingredients : (typeof window !== 'undefined' && Array.isArray(window.state?.ingredients) ? window.state.ingredients : []);
+  const productsBank = Array.isArray(appState.products) ? appState.products : (typeof window !== 'undefined' && Array.isArray(window.state?.products) ? window.state.products : []);
+  const atHomeMap = activePlan.shoppingAtHome || (typeof window !== 'undefined' ? window.state?.plan?.shoppingAtHome : {}) || {};
+
+  const aggregatedMap = new Map();
+  const rawSlots = activePlan.slots && typeof activePlan.slots === 'object' ? activePlan.slots : {};
+
+  const processSlotNode = (slotNode, portionWeight = 0.5) => {
+    if (!slotNode || slotNode.isSkipped || slotNode.skipped) return;
+    if (slotNode.isSplit && (slotNode.elliott || slotNode.chloe)) {
+      if (slotNode.elliott) processSlotNode(slotNode.elliott, 0.5);
+      if (slotNode.chloe) processSlotNode(slotNode.chloe, 0.5);
+      return;
+    }
+    const recipeId = typeof slotNode === 'string' ? slotNode : (slotNode.recipeId || slotNode.id);
+    if (!recipeId) return;
+
+    // Fetch full recipe object from central Recipe Vault using recipeId instead of reading stripped slot ingredients
+    const fullRecipe = vaultRecipes.find(r => r && String(r.id) === String(recipeId));
+    if (!fullRecipe) return;
+
+    const variant = typeof slotNode === 'object' && slotNode.variant ? slotNode.variant : 'original';
+    const rawIngs = (variant === 'enhanced' && fullRecipe.enhanced && Array.isArray(fullRecipe.enhanced.ingredients))
+      ? fullRecipe.enhanced.ingredients
+      : (Array.isArray(fullRecipe.ingredients) ? fullRecipe.ingredients : []);
+
+    rawIngs.forEach(ing => {
+      if (!ing) return;
+      const rawName = typeof ing === 'string' ? ing : (ing.name || ing.ingredient || ing.title || ing.item || ing.raw || '');
+      if (!rawName) return;
+
+      const ingId = typeof ing === 'object' ? (ing.ingredientId || ing.groupId || null) : null;
+      const subId = typeof ing === 'object' ? (ing.subtypeId || ing.subTypeId || null) : null;
+      const prodId = typeof ing === 'object' ? (ing.productId || ing.bankId || null) : null;
+
+      const matchedIng = ingredientsBank.find(i =>
+        (ingId && String(i.id) === String(ingId)) ||
+        String(i.name || '').toLowerCase() === String(rawName).toLowerCase()
+      ) || null;
+
+      const matchedProd = productsBank.find(p =>
+        (prodId && String(p.id) === String(prodId)) ||
+        (subId && String(p.subtypeId) === String(subId) && p.isAutoDefault) ||
+        (matchedIng && String(p.id) === String(matchedIng.defaultProductId)) ||
+        (matchedIng && String(p.ingredientId) === String(matchedIng.id) && p.isAutoDefault) ||
+        (matchedIng && String(p.ingredientId) === String(matchedIng.id))
+      ) || getFallbackProductData(rawName);
+
+      const key = String(prodId || subId || ingId || matchedIng?.id || rawName).toLowerCase().replace(/\s+/g, '_');
+      const rawQty = Number(ing.qty ?? ing.quantity ?? ing.amount ?? 0);
+      const rawGrams = Number(ing.grams ?? ing.weight ?? (['g', 'ml'].includes(String(ing.unit || '').toLowerCase()) ? rawQty : 0));
+      const unit = String(ing.unit || '').toLowerCase().trim();
+      const isItemUnit = ['qty', 'item', 'count', 'piece', 'tin', 'can', 'pack'].includes(unit);
+
+      const existing = aggregatedMap.get(key) || {
+        key,
+        id: key,
+        groupId: matchedIng?.id || ingId || key,
+        name: matchedIng?.name || rawName,
+        brand: matchedProd?.brand || 'Tesco',
+        cat: matchedIng?.category || matchedProd?.category || matchedProd?.cat || 'General Groceries',
+        category: matchedIng?.category || matchedProd?.category || matchedProd?.cat || 'General Groceries',
+        bankIng: matchedProd,
+        grams: 0,
+        needQty: 0,
+        needUnit: isItemUnit ? 'item' : (unit || 'g'),
+        isAtHome: !!atHomeMap[key],
+        checked: !!atHomeMap[key]
+      };
+
+      if (rawGrams > 0) {
+        existing.grams += rawGrams * portionWeight;
+      } else if (rawQty > 0) {
+        if (isItemUnit) existing.needQty += rawQty * portionWeight;
+        else existing.grams += rawQty * 100 * portionWeight;
+      } else {
+        existing.grams += 125 * portionWeight;
+      }
+
+      aggregatedMap.set(key, existing);
+    });
+  };
+
+  Object.values(rawSlots).forEach(dayObj => {
+    if (!dayObj || typeof dayObj !== 'object') return;
+    Object.entries(dayObj).forEach(([slotKey, slotVal]) => {
+      const weight = (slotKey.endsWith('E') || slotKey.endsWith('C')) ? 0.5 : 1;
+      processSlotNode(slotVal, weight);
+    });
+  });
+
+  const items = [];
+  const groupsMap = new Map();
+  let totalCost = 0;
+
+  aggregatedMap.forEach(entry => {
+    if (entry.needUnit === 'item' && entry.needQty > 0) {
+      entry.needQty = Math.max(1, Math.ceil(entry.needQty));
+    } else {
+      entry.grams = Math.max(25, Math.round(entry.grams));
+    }
+    const costInfo = calculateShoppingItemCost(entry, entry.bankIng);
+    entry.cost = costInfo.cost;
+    entry.price = costInfo.price;
+    entry.quantity = formatShoppingItemQuantity(entry);
+    if (!entry.isAtHome) {
+      totalCost += entry.cost;
+    }
+    items.push(entry);
+
+    const cat = entry.category || 'General Groceries';
+    if (!groupsMap.has(cat)) {
+      groupsMap.set(cat, { key: cat, name: cat, category: cat, items: [] });
+    }
+    groupsMap.get(cat).items.push(entry);
+  });
+
+  return {
+    items,
+    groups: Array.from(groupsMap.values()),
+    totalCost: Math.round(totalCost * 100) / 100
+  };
+}
+
 if (typeof window !== 'undefined') {
   window.ShoppingCalculationService = {
     normalizeProductPackGrams,
     calculateShoppingItemCost,
     getFallbackProductData,
-    formatShoppingItemQuantity
+    formatShoppingItemQuantity,
+    aggregateShoppingListFromPlan
   };
   window.calculateShoppingItemCost = calculateShoppingItemCost;
   window.normalizeProductPackGrams = normalizeProductPackGrams;
   window.formatShoppingItemQuantity = formatShoppingItemQuantity;
+  window.aggregateShoppingListFromPlan = aggregateShoppingListFromPlan;
+  window.computeWizardShoppingAgg = aggregateShoppingListFromPlan;
 }

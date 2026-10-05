@@ -1,8 +1,26 @@
 /**
- * src/components/pantry/PantryBankHTMLTemplate.js (v3.20.00)
+ * src/components/pantry/PantryBankHTMLTemplate.js (v3.20.01)
  * Extracted HTML UI renderer for the Category -> Ingredient -> Sub-type Hierarchy.
- * Harmonised with v3.20.00 design system button, badge, and responsive layout tokens.
+ * Harmonised with v3.20.01 design system button, badge, and Auto-Default formatting tokens.
  */
+
+export function formatBrandProductTag(product, fallbackLabel = '') {
+  if (product && typeof product === 'object') {
+    const brand = String(product.brand || '').trim();
+    let productName = String(product.name || product.title || product.productName || '').trim();
+    if (brand && productName.toLowerCase().startsWith(brand.toLowerCase())) {
+      productName = productName.slice(brand.length).replace(/^[\s\-–—:]+/, '').trim();
+    }
+    if (brand && productName) {
+      return `${brand} ${productName}`;
+    }
+    if (productName || brand) {
+      return productName || brand;
+    }
+  }
+  const raw = String(fallbackLabel || '').trim();
+  return raw.replace(/\s*[-–—]\s*/, ' ').replace(/\s+/g, ' ').trim();
+}
 
 export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr) {
   return hierarchy.map(group => `
@@ -18,6 +36,7 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr) {
       <div style="display:flex;flex-direction:column;gap:12px">
         ${group.ingredients.map(ing => {
           const defProd = ing.defaultProduct, subtypes = ing.subtypes || [], aliases = ing.aliases || [];
+          const autoDefaultLabel = formatBrandProductTag(defProd, ing.autoDefault);
           return `
             <div class="ingredient-card-node" style="padding:12px 14px;border-radius:var(--radius-md,10px);background:var(--surface2,#f5f5f4);border:1px solid var(--border,#e7e5e4);display:flex;flex-direction:column;gap:8px">
               <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
@@ -28,9 +47,9 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr) {
                   </div>
                   <div style="margin-top:4px;display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text2,#78716c);flex-wrap:wrap">
                     <span style="font-weight:600">Auto default:</span>
-                    ${(ing.autoDefault || defProd) ? `
+                    ${autoDefaultLabel ? `
                       <span class="badge badge-success" style="background:var(--green-bg,#EAF4EF);color:var(--green,#1A6B4A);border:1px solid rgba(26,107,74,0.25);font-weight:700;padding:2px 8px;border-radius:var(--radius-sm,6px);font-size:11px">
-                        ⭐ ${escapeHtml(ing.autoDefault || (defProd ? (defProd.brand ? `${defProd.brand} - ${defProd.name}` : defProd.name) : ''))}
+                        ⭐ ${escapeHtml(autoDefaultLabel)}
                       </span>
                     ` : '<span style="font-style:italic">None linked</span>'}
                   </div>
@@ -62,11 +81,13 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr) {
                 <div style="margin-top:4px">
                   <button type="button" class="btn xs btn-ghost ghost subtype-toggle-btn" onclick="toggleSubtypeCollapse(this, '${escapeAttr(ing.id)}')" style="font-size:11px;font-weight:700;color:var(--text2,#78716c);display:flex;align-items:center;gap:4px;padding:2px 6px">▼ SUB-TYPES (${subtypes.length})</button>
                   <div id="subtypes-container-${escapeAttr(ing.id)}" class="subtypes-collapsible" style="display:none;margin-top:6px;padding-left:14px;border-left:2px solid var(--border,#e7e5e4);flex-direction:column;gap:6px">
-                    ${subtypes.map(st => `
+                    ${subtypes.map(st => {
+                      const stDefaultLabel = st.defaultProduct ? formatBrandProductTag(st.defaultProduct) : '';
+                      return `
                       <div style="padding:6px 10px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                           <span style="font-size:12px;font-weight:650">↳ ${escapeHtml(st.name)}</span>
-                          ${st.defaultProduct ? `<span class="badge badge-success" style="font-size:10.5px;padding:2px 8px;border-radius:var(--radius-sm,6px);background:var(--green-bg,#EAF4EF);color:var(--green,#1A6B4A)">⭐ ${escapeHtml(st.defaultProduct.name)}</span>` : ''}
+                          ${stDefaultLabel ? `<span class="badge badge-success" style="font-size:10.5px;padding:2px 8px;border-radius:var(--radius-sm,6px);background:var(--green-bg,#EAF4EF);color:var(--green,#1A6B4A)">⭐ ${escapeHtml(stDefaultLabel)}</span>` : ''}
                         </div>
                         <div class="subtype-actions-container" style="position:relative;display:inline-block">
                           <button type="button" class="btn xs btn-ghost ghost dropdown-trigger-btn" onclick="toggleCardMoreMenu(this, '${escapeAttr(st.id)}')" title="More options" style="padding:2px 6px;font-weight:700">•••</button>
@@ -80,7 +101,8 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr) {
                           </div>
                         </div>
                       </div>
-                    `).join('')}
+                    `;
+                    }).join('')}
                   </div>
                 </div>
               ` : ''}

@@ -1,5 +1,5 @@
 /**
- * src/views/DataQualityView.js (v3.20.00)
+ * src/views/DataQualityView.js (v3.20.01)
  * Modular ES6 View for Data Quality Centre, audit scanner results, macro quality sweep, and 3-path resolutions.
  */
 
@@ -196,8 +196,8 @@ export function renderDataQualityView() {
           <div style="font-size:11.5px;color:var(--text2,#78716c);margin-top:2px">${escapeHtml(issue.message)}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
-          ${dismissible ? `<button type="button" class="btn sm ghost" onclick="dismissAdvisory('${escapeAttr(issue.key)}')">Looks right</button>` : ''}
-          <button type="button" class="btn sm primary dq-fix-btn" 
+          ${dismissible ? `<button type="button" class="btn sm btn-ghost ghost" onclick="dismissAdvisory('${escapeAttr(issue.key)}')">Looks right</button>` : ''}
+          <button type="button" class="btn sm btn-primary primary dq-fix-btn" 
             data-entity-type="${escapeAttr(issue.entityType)}" 
             data-entity-id="${escapeAttr(issue.entityId)}" 
             data-issue-key="${escapeAttr(issue.key)}" 
@@ -229,7 +229,7 @@ export function renderDataQualityView() {
                 <div style="font-weight:700;font-size:12.5px;color:#1c1917">${escapeHtml(r.name)}</div>
                 <div style="font-size:11px;color:#78716c">Calories: ${r.calories !== null ? `${r.calories} kcal` : 'missing'} · Protein: ${r.protein !== null ? `${r.protein}g` : 'missing'}</div>
               </div>
-              <button type="button" class="btn sm primary dq-fix-btn" data-entity-type="recipe" data-entity-id="${escapeAttr(r.id)}" onclick="handleFixIssue(event, 'recipe', '${escapeAttr(r.id)}', 'macro:recipe:${escapeAttr(r.id)}')">Inspect Recipe</button>
+              <button type="button" class="btn sm btn-primary primary dq-fix-btn" data-entity-type="recipe" data-entity-id="${escapeAttr(r.id)}" onclick="handleFixIssue(event, 'recipe', '${escapeAttr(r.id)}', 'macro:recipe:${escapeAttr(r.id)}')">Inspect Recipe</button>
             </div>
           `).join('')}
         </div>
@@ -241,12 +241,12 @@ export function renderDataQualityView() {
     <div class="view-toolbar" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:20px">🛡️</span>
-        <h2 style="margin:0;font-size:18px;font-weight:750">Data Quality Centre</h2>
+        <h1 class="view-title" style="margin:0">Data Quality Centre</h1>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn sm primary" type="button" onclick="window.openHierarchyWizardModal?.()">🪄 Run Hierarchy Wizard</button>
-        <button class="btn sm ghost" type="button" onclick="window.runGlobalProductRelink?.()">Batch Relink Products</button>
-        <button class="btn sm ghost" type="button" onclick="renderDataQualityView()">Refresh Scans</button>
+        <button class="btn sm btn-primary primary" type="button" onclick="window.openHierarchyWizardModal?.()">🪄 Run Hierarchy Wizard</button>
+        <button class="btn sm btn-ghost ghost" type="button" onclick="window.runGlobalProductRelink?.()">Batch Relink Products</button>
+        <button class="btn sm btn-ghost ghost" type="button" onclick="renderDataQualityView()">Refresh Scans</button>
       </div>
     </div>
 

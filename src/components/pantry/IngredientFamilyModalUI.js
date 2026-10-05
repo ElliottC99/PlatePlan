@@ -1,6 +1,6 @@
 /**
- * src/components/pantry/IngredientFamilyModalUI.js (v3.19.79)
- * Encapsulates presentation, labeling, and real-time Tesco helper search integrations for the Ingredient Family modal.
+ * src/components/pantry/IngredientFamilyModalUI.js (v3.20.00)
+ * Encapsulates presentation, labelling, and real-time Tesco helper search integrations for the Ingredient Family modal.
  */
 
 import { addSubtypeToIngredient } from '../../models/PantryHierarchyModel.js';

@@ -1,11 +1,11 @@
 /**
- * src/services/RecipeDetailModalService.js (v3.19.19)
+ * src/services/RecipeDetailModalService.js (v3.20.01)
  * ES6 Recipe Detail Modal Coordinator & Lifecycle Manager.
  * Orchestrates recipe inspection, live scaling, enhanced variant switching,
  * and live HSL Lerp fit score badge generation without external legacy scripts.
  */
 
-import { renderRecipeDetailModalContent } from '../components/recipe/RecipeDetailModalUI.js';
+import { renderRecipeDetailModalContent, formatRecipeIngredientRow, renderRecipeIngredientsListHTML } from '../components/recipe/RecipeDetailModalUI.js';
 import { isRecipeVariantFavourite } from '../views/RecipeVaultView.js';
 import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
 import { getState } from '../store/store.js';
@@ -60,29 +60,8 @@ export function updateSinglePersonServes(val) {
 }
 
 function formatIngredientDisplay(ing, scaleMultiplier = 1) {
-  if (!ing) return '';
-  if (typeof ing === 'string') return ing.trim();
-
-  const name = ing.name || ing.ingredient || ing.title || ing.item || '';
-  const qty = ing.qty ?? ing.quantity ?? ing.amount;
-  const unit = ing.unit || ing.u || '';
-  const comment = ing.comment || ing.notes || '';
-  const raw = ing.raw || ing.rawText || ing.text || ing.line || '';
-
-  if (qty !== undefined && qty !== null && (name || raw)) {
-    const num = Number(qty);
-    const scaledQty = !isNaN(num) && num > 0
-      ? (Math.round(num * scaleMultiplier * 10) / 10)
-      : qty;
-    const displayName = name || raw;
-    const parts = [scaledQty, unit, displayName].filter(Boolean);
-    const line = parts.join(' ').replace(/\s+/g, ' ').trim();
-    return comment ? `${line} (${comment})` : line;
-  }
-
-  if (raw && typeof raw === 'string') return raw.trim();
-  if (name) return comment ? `${name} (${comment})` : name;
-  return JSON.stringify(ing);
+  const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
+  return formatRecipeIngredientRow(ing, state, scaleMultiplier);
 }
 
 function renderComparisonBadge(actual, target) {
@@ -126,14 +105,8 @@ export function renderRecipePreview() {
                   r.ingredients || r.parsedIngredients || r.rawIngredients || [];
   const ingredients = Array.isArray(rawIngs) ? rawIngs : (typeof rawIngs === 'object' ? Object.values(rawIngs) : []);
 
-  const ingredientsHtml = `
-    <ul class="recipe-view-ingredients-list" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px">
-      ${ingredients.map(ing => {
-        const text = formatIngredientDisplay(ing, scaleMultiplier);
-        return `<li style="font-size:13px;color:var(--text);padding:4px 0;border-bottom:1px solid var(--border)">• ${text}</li>`;
-      }).join('')}
-    </ul>
-  `;
+  const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
+  const ingredientsHtml = renderRecipeIngredientsListHTML(ingredients, state, scaleMultiplier);
 
   // Render method steps
   const steps = Array.isArray(activeR.method || activeR.steps) ? (activeR.method || activeR.steps) : [];
@@ -147,7 +120,6 @@ export function renderRecipePreview() {
   `;
 
   // Calculate dual-profile per-portion macros & live target comparison badges
-  const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
   const userPrefs = state.preferences || state.userPrefs || {};
   const profiles = userPrefs.profiles || {};
   const eProf = profiles.elliott || profiles.e || {};

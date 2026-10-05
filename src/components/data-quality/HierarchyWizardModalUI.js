@@ -1,5 +1,5 @@
 /**
- * src/components/data-quality/HierarchyWizardModalUI.js (v3.19.79)
+ * src/components/data-quality/HierarchyWizardModalUI.js (v3.20.01)
  * Progressive Cascading Hierarchy Alignment Wizard with Title Case Normalisation & Auto-Default Sync.
  */
 import { getState, setIngredients } from '../../store/store.js';
@@ -31,8 +31,13 @@ export function syncIngredientAutoDefault(parentIng, linkedProduct) {
   const currentValid = currentDefaultId && products.some(p => String(p.id) === String(currentDefaultId));
 
   if (!currentValid) {
+    const brand = String(linkedProduct.brand || '').trim();
+    let pName = String(linkedProduct.name || linkedProduct.title || '').trim();
+    if (brand && pName.toLowerCase().startsWith(brand.toLowerCase())) {
+      pName = pName.slice(brand.length).replace(/^[\s\-–—:]+/, '').trim();
+    }
     parentIng.defaultProductId = linkedProduct.id;
-    parentIng.autoDefault = linkedProduct.name || linkedProduct.title || '';
+    parentIng.autoDefault = (brand && pName) ? `${brand} ${pName}` : (pName || brand);
     parentIng.autoDefaultProduct = linkedProduct.id;
     parentIng.updatedAt = new Date().toISOString();
     
@@ -298,9 +303,9 @@ export function renderWizardStep() {
   }
 
   card.innerHTML = `
-    <div style="flex-shrink:0;padding:12px 16px 8px;border-bottom:1px solid var(--border,#e7e5e4);display:flex;align-items:center;justify-content:space-between">
+    <div style="flex-shrink:0;padding:14px 18px 10px;border-bottom:1px solid var(--border,#e7e5e4);display:flex;align-items:center;justify-content:space-between">
       <div><h3 style="margin:0;font-size:16px;font-weight:750">🪄 Cascading Hierarchy Wizard</h3><div style="font-size:11px;color:var(--text2,#78716c);margin-top:2px">Unlinked Product ${stepNum} of ${total}</div></div>
-      <button type="button" class="btn sm ghost" onclick="window.closeHierarchyWizardModal()" style="font-size:18px;line-height:1">&times;</button>
+      <button type="button" class="modal-close-btn btn sm btn-ghost ghost" onclick="window.closeHierarchyWizardModal()" aria-label="Close modal">✕</button>
     </div>
     <div style="flex-shrink:0;width:100%;background:#e5e7eb;height:4px;overflow:hidden"><div style="width:${pct}%;background:var(--primary);height:100%"></div></div>
     <div class="wizard-modal-body" style="flex:1 1 auto;overflow-y:auto;min-height:0;padding:14px">
@@ -348,8 +353,8 @@ export function renderWizardStep() {
       </div>
     </div>
     <div style="flex-shrink:0;padding:10px 16px;border-top:1px solid var(--border,#e7e5e4);display:flex;justify-content:space-between;align-items:center;background:#fff">
-      <button type="button" class="btn sm" id="wizard-bulk-btn" style="background:rgba(16,185,129,0.1);color:var(--green,#10b981);font-weight:700" onclick="window.bulkProvisionAllDefaults()">⚡ Bulk Bind All</button>
-      <div style="display:flex;gap:6px"><button type="button" class="btn sm ghost" onclick="window.skipWizardStep()">Skip &rarr;</button><button type="button" class="btn sm" onclick="window.closeHierarchyWizardModal()">Exit</button></div>
+      <button type="button" class="btn sm btn-secondary secondary" id="wizard-bulk-btn" style="background:rgba(16,185,129,0.1);color:var(--green,#10b981);font-weight:700" onclick="window.bulkProvisionAllDefaults()">⚡ Bulk Bind All</button>
+      <div style="display:flex;gap:6px"><button type="button" class="btn sm btn-ghost ghost" onclick="window.skipWizardStep()">Skip &rarr;</button><button type="button" class="btn sm btn-outline outline" onclick="window.closeHierarchyWizardModal()">Exit</button></div>
     </div>
   `;
   if (wizardStage === 1) window.handleWizardSubtypeSearch(''); else if (wizardStage === 2) window.handleWizardIngredientSearch(''); else if (wizardStage === 3) window.handleWizardCategorySearch('');
@@ -369,7 +374,8 @@ export function openHierarchyWizardModal() {
   if (existing) existing.remove();
   const overlay = document.createElement('div');
   overlay.id = 'hierarchy-wizard-modal-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:9999;background:rgba(0,0,0,0.45);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+  overlay.className = 'modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:9999;background:rgba(15,23,42,0.45);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
   const card = document.createElement('div');
   card.id = 'hierarchy-wizard-modal-card';
   card.style.cssText = 'background:#ffffff;border-radius:20px;width:100%;max-width:640px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,0.2);overflow:hidden;';

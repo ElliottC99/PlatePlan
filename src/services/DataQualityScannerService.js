@@ -1,6 +1,6 @@
 /**
- * src/services/DataQualityScannerService.js (v3.19.23)
- * Automated catalog data quality auditor, anomaly scanner, and advisor.
+ * src/services/DataQualityScannerService.js (v3.20.01)
+ * Automated catalogue data quality auditor, anomaly scanner, and advisor.
  * Pure service layer with zero DOM references.
  */
 
@@ -116,7 +116,7 @@ export function runDataQualityScan(state = {}, options = {}) {
         entityType: 'ingredient',
         entityId: ing.id,
         title: ing.name,
-        message: `This core ingredient has zero mapped products in the Product Bank.`,
+        message: `This ingredient has zero mapped products in the Product Bank.`,
         severity: 'gap',
         fixTarget: { entityType: 'ingredient', entityId: ing.id }
       });

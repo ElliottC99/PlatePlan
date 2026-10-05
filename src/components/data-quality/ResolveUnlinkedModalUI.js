@@ -1,5 +1,5 @@
 /**
- * src/components/data-quality/ResolveUnlinkedModalUI.js (v3.19.79)
+ * src/components/data-quality/ResolveUnlinkedModalUI.js (v3.20.01)
  * Clean 3-Path Resolution Modal UI component for unlinked ingredients/sub-types.
  * Directly mounts to document.body for flawless viewport presentation.
  * Features safe product retrieval & immutable commit to prevent product array wipes.
@@ -124,7 +124,7 @@ export function buildModalHTML(target, targetType = 'ingredient', parentIngredie
           <h2 style="font-size:18px;font-weight:750;margin:0;color:var(--text,#1c1917)">Resolve Unlinked Item</h2>
           <div style="font-size:13px;color:var(--text2,#78716c);margin-top:4px">Target Item: <strong style="color:var(--text,#1c1917)">${safeEscapeHtml(targetName)}</strong></div>
         </div>
-        <button type="button" class="btn sm ghost" style="padding:4px 8px;font-size:16px;line-height:1" onclick="closeResolveUnlinkedModal()" title="Close">&times;</button>
+        <button type="button" class="modal-close-btn btn sm btn-ghost ghost" onclick="closeResolveUnlinkedModal()" title="Close" aria-label="Close modal">✕</button>
       </div>
       <p style="font-size:12.5px;color:var(--text2,#78716c);line-height:1.5;margin-bottom:16px">This catalog item has zero linked products in your Product Bank. Choose one of the resolution paths below to attach grocery items:</p>
       <div style="display:flex;flex-direction:column;gap:0">
@@ -140,12 +140,12 @@ export function buildModalHTML(target, targetType = 'ingredient', parentIngredie
           <div style="font-size:12px;color:var(--text2,#78716c);margin-bottom:8px">Paste the JSON payload copied from the Tesco bookmarklet below to parse and link this product.</div>
           <textarea id="resolve-tesco-json" placeholder='{"name":"Tesco Bagels 4 Pack","price":1.50,"brand":"Tesco",...}' style="width:100%;height:85px;font-family:monospace;font-size:11.5px;padding:8px;border:1px solid var(--border,#e7e5e4);border-radius:8px;background:#fff;color:var(--text,#1c1917);box-sizing:border-box;resize:vertical"></textarea>
           <div id="resolve-tesco-error" style="display:none;color:var(--red,#ef4444);font-size:12px;margin-top:6px;font-weight:600"></div>
-          <button type="button" class="btn sm primary" style="width:100%;margin-top:8px;font-weight:700" onclick="submitResolveTescoImport()">Parse &amp; Link Product</button>
+          <button type="button" class="btn sm btn-primary primary" style="width:100%;margin-top:8px;font-weight:700" onclick="submitResolveTescoImport()">Parse &amp; Link Product</button>
         </div>
         <div style="background:#ffffff;border-radius:14px;padding:16px;border:1px solid var(--border-color,#e5e7eb);box-shadow:0 1px 3px rgba(0,0,0,0.04);cursor:pointer;transition:border-color 0.15s ease" onclick="submitResolveNewProduct()" onmouseover="this.style.borderColor='var(--primary,#4f46e5)'" onmouseout="this.style.borderColor='var(--border-color,#e5e7eb)'">
           <div style="font-weight:750;font-size:13.5px;margin-bottom:4px;color:var(--text,#1c1917);display:flex;align-items:center;justify-content:space-between">
             <span>✨ 3. Create New Product</span>
-            <span class="btn sm ghost" style="pointer-events:none;font-size:11.5px">Open Blank Form &rarr;</span>
+            <span class="btn sm btn-ghost ghost" style="pointer-events:none;font-size:11.5px">Open Blank Form &rarr;</span>
           </div>
           <div style="font-size:12px;color:var(--text2,#78716c)">Open a clean, pre-populated blank form to manually insert and configure a custom product.</div>
         </div>
@@ -177,7 +177,7 @@ export function openResolveUnlinkedModal(target, targetType = 'ingredient', pare
       position: 'fixed', top: '0', left: '0', right: '0', bottom: '0',
       width: '100vw', height: '100vh', maxWidth: 'none', maxHeight: 'none',
       margin: '0', padding: '16px', zIndex: '999999',
-      background: 'rgba(0, 0, 0, 0.55)', backdropFilter: 'blur(8px)', webkitBackdropFilter: 'blur(8px)',
+      background: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(14px) saturate(160%)', webkitBackdropFilter: 'blur(14px) saturate(160%)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', overflowY: 'auto'
     });
 

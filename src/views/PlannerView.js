@@ -1,5 +1,5 @@
 /**
- * src/views/PlannerView.js (v3.20.00)
+ * src/views/PlannerView.js (v3.20.01)
  * Componentised Weekly Planner, Wizard & Schedule Controller View.
  * Strictly modular (<400 lines) with sanitised reset state persistence.
  */
@@ -7,13 +7,7 @@
 import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
 import { subscribe } from '../store/store.js';
 import { createCleanEmptyPlanSchema } from '../models/MealPlannerModel.js';
-import {
-  renderDraftPlanBanner,
-  renderPlanExpiredBanner,
-  renderEarlierDaysHeading,
-  renderPlannerEmptyError,
-  renderPlanDaySlotRow
-} from '../components/planner/PlannerGridToolbar.js';
+import { renderDraftPlanBanner, renderPlanExpiredBanner, renderEarlierDaysHeading, renderPlannerEmptyError, renderPlanDaySlotRow } from '../components/planner/PlannerGridToolbar.js';
 import {
   openSwapMealModal,
   setSwapModalFilter,
@@ -45,6 +39,24 @@ export {
   openPlannedMealActions,
   swapSlot
 };
+
+function makeRenderedDaySummary() {
+  const totals = { e: { cal: 0, prot: 0 }, c: { cal: 0, prot: 0 } };
+  const assumed = { e: { cal: 0, prot: 0, labels: ['snacks'] }, c: { cal: 0, prot: 0, labels: ['snacks'] } };
+  ['e', 'c'].forEach(person => {
+    const b = typeof window.getBudgets === 'function' ? window.getBudgets(person, 'snack') : { cal: 0, prot: 0 };
+    totals[person].cal += +b.cal || 0;
+    totals[person].prot += +b.prot || 0;
+    assumed[person].cal += +b.cal || 0;
+    assumed[person].prot += +b.prot || 0;
+  });
+  return {
+    totals,
+    targets: { e: { cal: +window.state?.prefs?.ecal || 0, prot: +window.state?.prefs?.eprot || 0 }, c: { cal: +window.state?.prefs?.ccal || 0, prot: +window.state?.prefs?.cprot || 0 } },
+    assumed,
+    score: 0
+  };
+}
 
 export function renderPlanner() {
   renderPlannerWizard();
@@ -84,7 +96,7 @@ export function renderPlannerWizard() {
         </div>
       `;
     } else {
-      const plan = window.state.plan || {};
+      const plan = window.state?.plan || {};
       const rawSlots = plan.slots;
       const safeSlots = Array.isArray(rawSlots) ? rawSlots : (rawSlots && typeof rawSlots === 'object' ? Object.values(rawSlots) : []);
       const days = plan.days || safeSlots.length || 0;
@@ -145,7 +157,7 @@ export function renderPlannerWizard() {
           <div class="dense-plan-grid">${cardsHtml}</div>
           <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
             <button type="button" class="btn ghost" onclick="setPlannerWizardStep(1)">← Back to Configure</button>
-            <button type="button" class="btn primary" style="font-weight:700;padding:10px 24px" onclick="setPlannerWizardStep(3)">Proceed to Shopping List & Substitutions →</button>
+            <button type="button" class="btn primary" style="font-weight:700;padding:10px 24px" onclick="setPlannerWizardStep(3)">Proceed to Shopping List &amp; Substitutions →</button>
           </div>
         </div>
       `;
@@ -154,7 +166,7 @@ export function renderPlannerWizard() {
     if (!hasActivePlan) {
       stepContentHtml = window.GeneratorWizardModal?.renderWizardEmptyPlanCard?.(3) || '';
     } else {
-      const agg = typeof window.computeWizardShoppingAgg === 'function' ? window.computeWizardShoppingAgg(window.state.plan) : { items: [], totalCost: 0 };
+      const agg = typeof window.computeWizardShoppingAgg === 'function' ? window.computeWizardShoppingAgg(window.state?.plan) : { items: [], totalCost: 0 };
       const items = agg.items || [];
       const totalCost = agg.totalCost || 0;
       const topToolbarHtml = window.ShoppingBatchToolbar?.renderShoppingBatchToolbar?.({ totalCost, items }) || '';
@@ -171,7 +183,7 @@ export function renderPlannerWizard() {
       `;
     }
   } else if (currentStep === 4) {
-    stepContentHtml = window.GeneratorWizardModal?.renderWizardStep4Commit?.('v3.20.00') || '';
+    stepContentHtml = window.GeneratorWizardModal?.renderWizardStep4Commit?.('v3.20.01') || '';
   }
 
   host.innerHTML = window.GeneratorWizardModal?.renderPlannerWizardView?.({
@@ -198,24 +210,6 @@ export function renderPlan() {
     const startInput = document.getElementById('plan-start-date');
     if (startInput) startInput.value = window.state.plan.dayDates?.[1] || '';
     let hasValidSlots = false;
-
-function makeRenderedDaySummary() {
-  const totals = { e: { cal: 0, prot: 0 }, c: { cal: 0, prot: 0 } };
-  const assumed = { e: { cal: 0, prot: 0, labels: ['snacks'] }, c: { cal: 0, prot: 0, labels: ['snacks'] } };
-  ['e', 'c'].forEach(person => {
-    const b = typeof window.getBudgets === 'function' ? window.getBudgets(person, 'snack') : { cal: 0, prot: 0 };
-    totals[person].cal += +b.cal || 0;
-    totals[person].prot += +b.prot || 0;
-    assumed[person].cal += +b.cal || 0;
-    assumed[person].prot += +b.prot || 0;
-  });
-  return {
-    totals,
-    targets: { e: { cal: +window.state.prefs?.ecal || 0, prot: +window.state.prefs?.eprot || 0 }, c: { cal: +window.state.prefs?.ccal || 0, prot: +window.state.prefs?.cprot || 0 } },
-    assumed,
-    score: 0
-  };
-}
 
     let html = '';
     if (window.state.isDraftPlan || window.state.draftPlan) {
@@ -360,20 +354,14 @@ export function renderPlanOverallSummary() {
 
 export function setPlannerWizardStep(step) {
   const nextStep = Math.max(1, Math.min(4, step));
-  if (typeof window !== 'undefined' && window.state) {
-    window.state.plannerStep = nextStep;
-  }
+  if (typeof window !== 'undefined' && window.state) window.state.plannerStep = nextStep;
   renderPlannerWizard();
 }
 
 export function resetPlannerStartFresh() {
   const cleanEmptySchema = createCleanEmptyPlanSchema();
-  if (window.state) {
-    window.state.plan = cleanEmptySchema;
-    window.state.skeletonGrid = {};
-  }
-  clearPlan();
-  setPlannerWizardStep(1);
+  if (window.state) { window.state.plan = cleanEmptySchema; window.state.skeletonGrid = {}; }
+  clearPlan(); setPlannerWizardStep(1);
 }
 
 if (typeof window !== 'undefined') {
@@ -383,20 +371,14 @@ if (typeof window !== 'undefined') {
     openSwapMealModal, setSwapModalFilter, selectSwapModalRecipe, confirmSwapMealModal,
     renderSwapModalOptionsList, executeSwapSlotAndClose, closeSwapMealModal, quickRandomizeSwap,
     clearPlan, showPlanSetup, renderPlanOverallSummary,
-    openRecipeModal(id, instanceId, variant) {
-      if (typeof window.viewRecipe === 'function') return window.viewRecipe(id, instanceId, variant);
-    }
+    openRecipeModal: (id, instanceId, variant) => typeof window.viewRecipe === 'function' ? window.viewRecipe(id, instanceId, variant) : undefined
   });
   window.showRecipeModal = window.openRecipeModal;
   window.openRecipeDetailModal = window.openRecipeModal;
 }
 
-let plannerUnsub = null;
-let prefsUnsub = null;
-
-function handlePreferencesUpdated() {
-  renderPlanner();
-}
+let plannerUnsub = null, prefsUnsub = null;
+const handlePreferencesUpdated = () => renderPlanner();
 
 export function mount() {
   renderPlanner();

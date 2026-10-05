@@ -1,5 +1,4 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.20.00';
   window.showTescoImport = () => {
     import('./components/pantry/SubtypeActionModalsUI.js')
       .then(m => {
@@ -30,7 +29,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * src/main.js (v3.20.00)
+ * src/main.js (v3.20.01)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronisation,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -284,7 +283,7 @@ let lastErrorTime = 0;
 function reportAppError(m, type = 'error') {
   if (m === lastErrorMessage && Date.now() - lastErrorTime < 4000) return;
   lastErrorMessage = m; lastErrorTime = Date.now();
-  console.error(`[PlatePlan Error Telemetry v3.12.3]`, m);
+  console.error(`[PlatePlan Error Telemetry v3.20.01]`, m);
   if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(m, type);
 }
 
@@ -321,13 +320,6 @@ function sanitizeRecipes(recipes) {
   return recipes.map(recipe => deepMutate(safeClone(recipe)));
 }
 
-export function updateVersionBadge() {
-  const badgeEl = document.getElementById('app-header-version') || document.getElementById('app-version') || document.getElementById('plateplan-update-version');
-  if (badgeEl) {
-    badgeEl.textContent = window.APP_VERSION || 'v3.20.00';
-  }
-}
-
 // 6. UNIDIRECTIONAL STATE DISPATCH LISTENERS & SUBSCRIPTIONS
 let isSubscribed = false;
 function setupSubscriptions() {
@@ -336,7 +328,7 @@ function setupSubscriptions() {
 
   subscribe('recipes', (recipes) => {
     const clean = sanitizeRecipes(recipes);
-    if (typeof window !== 'undefined') { window.state.recipes = clean; window.allRecipes = clean; }
+    if (typeof window !== 'undefined') { window.state.recipes = clean; window.allRecipes = clean; window.recipes = clean; }
     renderRecipeVault(); renderToday(); if (window.state?.plan && typeof renderPlanner === 'function') renderPlanner();
     renderDataQualityView();
   });
@@ -358,7 +350,7 @@ let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
   isAppInitialized = true; if (typeof window !== 'undefined') window.__plateplan_app_booted = true;
-  updateVersionBadge(); setupActionBridge(); setupSubscriptions();
+  setupActionBridge(); setupSubscriptions();
   AppInitializer.registerServiceWorker(); AppInitializer.initPlatePlanApp();
   setSyncStatus('connecting', 'Connecting...');
   const initialRender = () => {
