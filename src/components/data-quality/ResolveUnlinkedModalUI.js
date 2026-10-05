@@ -1,124 +1,79 @@
 /**
- * src/components/data-quality/ResolveUnlinkedModalUI.js (v3.20.03)
- * Clean 3-Path Resolution Modal UI component for unlinked ingredients/sub-types.
- * Directly mounts to document.body for flawless viewport presentation.
- * Features safe product retrieval & immutable commit to prevent product array wipes.
+ * src/components/data-quality/ResolveUnlinkedModalUI.js (v3.20.04)
+ * Multi-Path Resolution Modal UI component for unlinked ingredients, sub-types, and recipe items.
+ * Mounts directly to document.body for flawless viewport presentation.
+ * Features re-mapping to existing ingredients/subtypes, safe product retrieval & immutable state commits.
  */
 
-import { getState, setProducts } from '../../store/store.js';
-import { saveProduct } from '../../services/HouseholdRepository.js';
-import { reallocateProduct } from '../../models/PantryHierarchyModel.js';
+import { getState, setProducts, setRecipes } from '../../store/store.js';
+import { saveProduct, saveRecipe } from '../../services/HouseholdRepository.js';
+import { reallocateProduct, reparentSubtype, mergeIngredients } from '../../models/PantryHierarchyModel.js';
 import { parseTescoProduct } from '../../services/TescoImportService.js';
 import { openProductEditModal } from '../../views/ProductBankView.js';
 
-let activeTargetId = null;
-let activeTargetType = 'ingredient';
-let activeParentIngredientId = null;
+let activeTargetId = null, activeTargetType = 'ingredient', activeParentIngredientId = null, activeRecipeId = null, activeRecipeItemIndex = null, activeTargetName = '';
 
-const safeEscapeHtml = (str) => {
-  if (typeof escapeHtml === 'function') return escapeHtml(str);
-  if (typeof window !== 'undefined' && window.escapeHtml) return window.escapeHtml(str);
-  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-};
-
-const safeEscapeAttr = (str) => {
-  if (typeof escapeAttr === 'function') return escapeAttr(str);
-  if (typeof window !== 'undefined' && window.escapeAttr) return window.escapeAttr(str);
-  return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-};
-
-const safeGetState = () => {
-  if (typeof getState === 'function') return getState() || {};
-  if (typeof window !== 'undefined' && window.Store && typeof window.Store.getState === 'function') return window.Store.getState() || {};
-  return {};
-};
+const safeEscapeHtml = (str) => String(str || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
+const safeEscapeAttr = (str) => safeEscapeHtml(str).replace(/`/g, '&#96;');
+const safeGetState = () => getState() || (typeof window !== 'undefined' ? (window.Store?.getState?.() || window.state || {}) : {});
 
 export function safeGetProducts() {
-  let prods = null;
-  if (window.Store && typeof window.Store.getState === 'function') {
-    const st = window.Store.getState();
-    if (Array.isArray(st.products) && st.products.length > 0) prods = st.products;
-    else if (Array.isArray(st.pantry?.products) && st.pantry.products.length > 0) prods = st.pantry.products;
-  }
-  if (!prods && typeof getState === 'function') {
-    const st = getState();
-    if (Array.isArray(st?.products) && st.products.length > 0) prods = st.products;
-  }
-  if (!prods && window.state && Array.isArray(window.state.products) && window.state.products.length > 0) {
-    prods = window.state.products;
-  }
-  if (!prods && window.PantryHierarchyModel) {
-    if (typeof window.PantryHierarchyModel.getProducts === 'function') {
-      const p = window.PantryHierarchyModel.getProducts();
-      if (Array.isArray(p) && p.length > 0) prods = p;
-    } else if (Array.isArray(window.PantryHierarchyModel.products) && window.PantryHierarchyModel.products.length > 0) {
-      prods = window.PantryHierarchyModel.products;
-    }
-  }
-  if (!prods) {
-    try {
-      const cached = localStorage.getItem('plateplan_products') || localStorage.getItem('products');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) prods = parsed;
-      }
-    } catch (e) {
-      console.warn('[ResolveUnlinkedModalUI] Cache fallback read error:', e);
-    }
-  }
-  return Array.isArray(prods) ? [...prods] : [];
+  const st = safeGetState();
+  if (Array.isArray(st.products) && st.products.length > 0) return [...st.products];
+  if (Array.isArray(st.pantry?.products) && st.pantry.products.length > 0) return [...st.pantry.products];
+  if (window.state && Array.isArray(window.state.products) && window.state.products.length > 0) return [...window.state.products];
+  try {
+    const cached = localStorage.getItem('plateplan_products') || localStorage.getItem('products');
+    if (cached) { const p = JSON.parse(cached); if (Array.isArray(p)) return p; }
+  } catch (e) {}
+  return [];
 }
 
 export function commitProductUpdates(updatedProducts) {
   if (typeof setProducts === 'function') setProducts(updatedProducts);
-  if (window.Store && typeof window.Store.setState === 'function') window.Store.setState({ products: updatedProducts });
+  if (window.Store?.setState) window.Store.setState({ products: updatedProducts });
   if (window.state) window.state.products = updatedProducts;
-  if (window.PantryHierarchyModel && typeof window.PantryHierarchyModel.setProducts === 'function') {
-    window.PantryHierarchyModel.setProducts(updatedProducts);
-  }
+  if (window.PantryHierarchyModel?.setProducts) window.PantryHierarchyModel.setProducts(updatedProducts);
   try { localStorage.setItem('plateplan_products', JSON.stringify(updatedProducts)); } catch (e) {}
   document.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: updatedProducts }));
 }
 
 export function closeResolveUnlinkedModal() {
-  try {
-    const overlay = document.getElementById('resolve-unlinked-modal-overlay');
-    if (overlay) overlay.remove();
-    document.body.style.overflow = '';
-    activeTargetId = null;
-    activeParentIngredientId = null;
-    if (typeof window.renderDataQualityView === 'function') {
-      window.renderDataQualityView();
-    }
-  } catch (err) {
-    console.error('[ResolveUnlinkedModalUI] Error closing modal:', err);
-  }
+  const overlay = document.getElementById('resolve-unlinked-modal-overlay');
+  if (overlay) overlay.remove();
+  document.body.style.overflow = '';
+  activeTargetId = null; activeParentIngredientId = null; activeRecipeId = null; activeRecipeItemIndex = null; activeTargetName = '';
+  if (typeof window.renderDataQualityView === 'function') window.renderDataQualityView();
 }
 
 export function buildModalHTML(target, targetType = 'ingredient', parentIngredientId = null) {
   let targetId = target, type = targetType, parentId = parentIngredientId;
   if (target && typeof target === 'object') {
-    targetId = target.id || target.entityId || target.targetId;
+    targetId = target.id || target.entityId || target.targetId || target.recipeId;
     type = target.type || target.entityType || target.targetType || 'ingredient';
     parentId = target.parentId || target.parentIngredientId || null;
   }
   const state = safeGetState();
-  let targetName = (target && typeof target === 'object' && target.name) ? target.name : 'Unnamed Item';
-  let searchTerm = '';
-  if (type === 'subtype') {
+  let targetName = target?.name || target?.title || 'Unnamed Item', searchTerm = 'grocery';
+
+  if (type === 'recipe' || type === 'recipe-ingredient' || type === 'recipe_ingredient') {
+    const rec = (state.recipes || []).find(r => String(r.id) === String(targetId));
+    targetName = rec ? `Recipe: ${rec.name || rec.title}` : (target?.name || 'Recipe');
+    searchTerm = rec ? (rec.name || 'recipe') : 'recipe';
+  } else if (type === 'subtype') {
     const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
     const sub = parent?.subtypes?.find(s => String(s.id) === String(targetId));
-    targetName = sub ? `${parent ? parent.name : 'Ingredient'} ➔ ${sub.name}` : (target.name || targetId || 'Sub-type');
+    targetName = sub ? `${parent ? parent.name : 'Ingredient'} ➔ ${sub.name}` : (target?.name || targetId || 'Sub-type');
     searchTerm = sub ? sub.name : (parent ? parent.name : 'grocery');
   } else {
     const ing = (state.ingredients || []).find(i => String(i.id) === String(targetId));
-    targetName = ing ? ing.name : (target.name || targetId || 'Ingredient');
-    searchTerm = ing ? ing.name : (target.name || 'grocery');
+    targetName = ing ? ing.name : (target?.name || targetId || 'Ingredient');
+    searchTerm = ing ? ing.name : (target?.name || 'grocery');
   }
   const tescoSearchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(searchTerm)}`;
 
   return `
-    <div style="width:100%;max-width:580px;max-height:85vh;overflow-y:auto;padding:20px 20px 28px;box-sizing:border-box;background:var(--system-grouped-bg,#f2f2f7);border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,0.25);position:relative">
+    <div style="width:100%;max-width:580px;max-height:85vh;overflow-y:auto;padding:20px;box-sizing:border-box;background:var(--system-grouped-bg,#f2f2f7);border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,0.25);position:relative">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px">
         <div>
           <h2 style="font-size:18px;font-weight:750;margin:0;color:var(--text,#1c1917)">Resolve Unlinked Item</h2>
@@ -126,28 +81,36 @@ export function buildModalHTML(target, targetType = 'ingredient', parentIngredie
         </div>
         <button type="button" class="modal-close-btn btn sm btn-ghost ghost" onclick="closeResolveUnlinkedModal()" title="Close" aria-label="Close modal">✕</button>
       </div>
-      <p style="font-size:12.5px;color:var(--text2,#78716c);line-height:1.5;margin-bottom:16px">This catalog item has zero linked products in your Product Bank. Choose one of the resolution paths below to attach grocery items:</p>
-      <div style="display:flex;flex-direction:column;gap:0">
-        <div style="background:#ffffff;border-radius:14px;padding:16px;border:1px solid var(--border-color,#e5e7eb);box-shadow:0 1px 3px rgba(0,0,0,0.04);margin-bottom:16px">
+      <p style="font-size:12.5px;color:var(--text2,#78716c);line-height:1.5;margin-bottom:16px">Choose one of the resolution paths below to attach grocery items or link directly to an existing Pantry Bank entity:</p>
+      
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="background:#fff;border-radius:14px;padding:14px;border:1px solid var(--border-color,#e5e7eb);box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+          <div style="font-weight:750;font-size:13.5px;margin-bottom:4px;color:var(--text,#1c1917)">🔄 Re-map to Existing Ingredient / Sub-type</div>
+          <div style="font-size:12px;color:var(--text2,#78716c);margin-bottom:8px">Point this item directly to an existing Pantry Bank ingredient or sub-type without creating products.</div>
+          <input type="search" id="resolve-remap-search" class="input" placeholder="Search ingredient or sub-type..." style="font-size:12.5px;padding:7px 10px;width:100%;border-radius:8px;border:1px solid var(--border,#e7e5e4);box-sizing:border-box" oninput="filterResolveRemapOptions(this.value)" onfocus="filterResolveRemapOptions(this.value)">
+          <div id="resolve-remap-results" style="margin-top:6px;max-height:160px;overflow-y:auto;display:none;border:1px solid var(--border,#e7e5e4);border-radius:8px;background:var(--surface,#fff)"></div>
+        </div>
+
+        <div style="background:#fff;border-radius:14px;padding:14px;border:1px solid var(--border-color,#e5e7eb);box-shadow:0 1px 3px rgba(0,0,0,0.04)">
           <div style="font-weight:750;font-size:13.5px;margin-bottom:4px;color:var(--text,#1c1917)">🔗 1. Link Existing Product</div>
-          <div style="font-size:12px;color:var(--text2,#78716c);margin-bottom:10px">Search your Product Bank and re-bind an existing product to this item.</div>
-          <input type="search" id="resolve-link-search" class="input" placeholder="Search product by name or brand..." style="font-size:12.5px;padding:8px 12px;width:100%;border-radius:8px;border:1px solid var(--border,#e7e5e4);box-sizing:border-box" oninput="filterResolveLinkProducts(this.value)">
-          <div id="resolve-link-results" style="margin-top:8px;max-height:160px;overflow-y:auto;display:none;border:1px solid var(--border,#e7e5e4);border-radius:8px;background:var(--surface,#fff)"></div>
+          <div style="font-size:12px;color:var(--text2,#78716c);margin-bottom:8px">Search your Product Bank and re-bind an existing product to this item.</div>
+          <input type="search" id="resolve-link-search" class="input" placeholder="Search product by name or brand..." style="font-size:12.5px;padding:7px 10px;width:100%;border-radius:8px;border:1px solid var(--border,#e7e5e4);box-sizing:border-box" oninput="filterResolveLinkProducts(this.value)">
+          <div id="resolve-link-results" style="margin-top:6px;max-height:160px;overflow-y:auto;display:none;border:1px solid var(--border,#e7e5e4);border-radius:8px;background:var(--surface,#fff)"></div>
         </div>
-        <div style="background:#ffffff;border-radius:14px;padding:16px;border:1px solid var(--border-color,#e5e7eb);box-shadow:0 1px 3px rgba(0,0,0,0.04);margin-bottom:16px">
-          <div style="font-weight:750;font-size:13.5px;color:var(--text,#1c1917);margin-bottom:6px">🛒 2. Import from Tesco</div>
-          <div style="margin-bottom:10px"><a href="${safeEscapeAttr(tescoSearchUrl)}" target="_blank" rel="noopener noreferrer" class="btn sm ghost" style="display:inline-flex;align-items:center;gap:6px;color:var(--primary,#4f46e5);font-weight:600;font-size:12px;padding:5px 10px;border:1px solid rgba(79,70,229,0.2);background:rgba(79,70,229,0.05);border-radius:8px;text-decoration:none">🔍 Search Tesco for "${safeEscapeHtml(searchTerm)}" ↗</a></div>
-          <div style="font-size:12px;color:var(--text2,#78716c);margin-bottom:8px">Paste the JSON payload copied from the Tesco bookmarklet below to parse and link this product.</div>
-          <textarea id="resolve-tesco-json" placeholder='{"name":"Tesco Bagels 4 Pack","price":1.50,"brand":"Tesco",...}' style="width:100%;height:85px;font-family:monospace;font-size:11.5px;padding:8px;border:1px solid var(--border,#e7e5e4);border-radius:8px;background:#fff;color:var(--text,#1c1917);box-sizing:border-box;resize:vertical"></textarea>
-          <div id="resolve-tesco-error" style="display:none;color:var(--red,#ef4444);font-size:12px;margin-top:6px;font-weight:600"></div>
-          <button type="button" class="btn sm btn-primary primary" style="width:100%;margin-top:8px;font-weight:700" onclick="submitResolveTescoImport()">Parse &amp; Link Product</button>
+
+        <div style="background:#fff;border-radius:14px;padding:14px;border:1px solid var(--border-color,#e5e7eb);box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+          <div style="font-weight:750;font-size:13.5px;color:var(--text,#1c1917);margin-bottom:4px">🛒 2. Import from Tesco</div>
+          <div style="margin-bottom:8px"><a href="${safeEscapeAttr(tescoSearchUrl)}" target="_blank" rel="noopener noreferrer" class="btn sm ghost" style="display:inline-flex;align-items:center;gap:6px;color:var(--primary,#4f46e5);font-weight:600;font-size:12px;padding:4px 8px;border:1px solid rgba(79,70,229,0.2);background:rgba(79,70,229,0.05);border-radius:6px;text-decoration:none">🔍 Search Tesco for "${safeEscapeHtml(searchTerm)}" ↗</a></div>
+          <textarea id="resolve-tesco-json" placeholder='{"name":"Tesco Bagels 4 Pack","price":1.50,"brand":"Tesco",...}' style="width:100%;height:75px;font-family:monospace;font-size:11.5px;padding:6px;border:1px solid var(--border,#e7e5e4);border-radius:6px;background:#fff;color:var(--text,#1c1917);box-sizing:border-box;resize:vertical"></textarea>
+          <div id="resolve-tesco-error" style="display:none;color:var(--red,#ef4444);font-size:12px;margin-top:4px;font-weight:600"></div>
+          <button type="button" class="btn sm btn-primary primary" style="width:100%;margin-top:6px;font-weight:700" onclick="submitResolveTescoImport()">Parse &amp; Link Product</button>
         </div>
-        <div style="background:#ffffff;border-radius:14px;padding:16px;border:1px solid var(--border-color,#e5e7eb);box-shadow:0 1px 3px rgba(0,0,0,0.04);cursor:pointer;transition:border-color 0.15s ease" onclick="submitResolveNewProduct()" onmouseover="this.style.borderColor='var(--primary,#4f46e5)'" onmouseout="this.style.borderColor='var(--border-color,#e5e7eb)'">
-          <div style="font-weight:750;font-size:13.5px;margin-bottom:4px;color:var(--text,#1c1917);display:flex;align-items:center;justify-content:space-between">
-            <span>✨ 3. Create New Product</span>
-            <span class="btn sm btn-ghost ghost" style="pointer-events:none;font-size:11.5px">Open Blank Form &rarr;</span>
+
+        <div style="background:#fff;border-radius:14px;padding:14px;border:1px solid var(--border-color,#e5e7eb);box-shadow:0 1px 3px rgba(0,0,0,0.04);cursor:pointer;" onclick="submitResolveNewProduct()">
+          <div style="font-weight:750;font-size:13.5px;margin-bottom:2px;color:var(--text,#1c1917);display:flex;align-items:center;justify-content:space-between">
+            <span>✨ 3. Create New Product</span><span class="btn sm btn-ghost ghost" style="pointer-events:none;font-size:11.5px">Open Blank Form &rarr;</span>
           </div>
-          <div style="font-size:12px;color:var(--text2,#78716c)">Open a clean, pre-populated blank form to manually insert and configure a custom product.</div>
+          <div style="font-size:12px;color:var(--text2,#78716c)">Manually insert and configure a custom grocery product.</div>
         </div>
       </div>
     </div>
@@ -158,13 +121,17 @@ export function openResolveUnlinkedModal(target, targetType = 'ingredient', pare
   try {
     let targetId = target, type = targetType, parentId = parentIngredientId;
     if (target && typeof target === 'object') {
-      targetId = target.id || target.entityId || target.targetId;
+      targetId = target.id || target.entityId || target.targetId || target.recipeId;
       type = target.type || target.entityType || target.targetType || 'ingredient';
       parentId = target.parentId || target.parentIngredientId || null;
+      activeRecipeId = target.recipeId || (type === 'recipe' ? target.id : null);
+      activeRecipeItemIndex = target.itemIndex !== undefined ? target.itemIndex : null;
+      activeTargetName = target.name || target.title || '';
+    } else {
+      activeRecipeId = type === 'recipe' ? targetId : null;
+      activeRecipeItemIndex = null; activeTargetName = '';
     }
-    activeTargetId = targetId;
-    activeTargetType = type;
-    activeParentIngredientId = parentId;
+    activeTargetId = targetId; activeTargetType = type; activeParentIngredientId = parentId;
 
     const existing = document.getElementById('resolve-unlinked-modal-overlay');
     if (existing) existing.remove();
@@ -172,15 +139,11 @@ export function openResolveUnlinkedModal(target, targetType = 'ingredient', pare
     const overlay = document.createElement('div');
     overlay.id = 'resolve-unlinked-modal-overlay';
     overlay.className = 'modal active';
-
     Object.assign(overlay.style, {
-      position: 'fixed', top: '0', left: '0', right: '0', bottom: '0',
-      width: '100vw', height: '100vh', maxWidth: 'none', maxHeight: 'none',
-      margin: '0', padding: '16px', zIndex: '999999',
-      background: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(14px) saturate(160%)', webkitBackdropFilter: 'blur(14px) saturate(160%)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', overflowY: 'auto'
+      position: 'fixed', inset: '0', zIndex: '999999',
+      background: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(14px) saturate(160%)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', boxSizing: 'border-box', overflowY: 'auto'
     });
-
     overlay.innerHTML = buildModalHTML(target, type, parentId);
     document.body.style.overflow = 'hidden';
     document.body.appendChild(overlay);
@@ -189,32 +152,96 @@ export function openResolveUnlinkedModal(target, targetType = 'ingredient', pare
   }
 }
 
+export function filterResolveRemapOptions(query) {
+  const container = document.getElementById('resolve-remap-results');
+  if (!container) return;
+  const q = String(query || '').trim().toLowerCase();
+  const state = safeGetState(), ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
+  const options = [];
+  ingredients.forEach(ing => {
+    if (!ing?.name) return;
+    options.push({ ingredientId: ing.id, subtypeId: '', label: ing.name, type: 'Ingredient' });
+    if (Array.isArray(ing.subtypes)) {
+      ing.subtypes.forEach(st => {
+        if (st?.name) options.push({ ingredientId: ing.id, subtypeId: st.id, label: `${ing.name} ➔ ${st.name}`, type: 'Sub-type' });
+      });
+    }
+  });
+
+  const matches = q ? options.filter(o => o.label.toLowerCase().includes(q)).slice(0, 15) : options.slice(0, 15);
+  container.style.display = 'block';
+  if (!matches.length) {
+    container.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--text3,#a8a29e);text-align:center">No matching ingredients found.</div>';
+    return;
+  }
+  container.innerHTML = matches.map(opt => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border,#e7e5e4)">
+      <div>
+        <div style="font-size:12.5px;font-weight:700;color:var(--text,#1c1917)">${safeEscapeHtml(opt.label)}</div>
+        <div style="font-size:11px;color:var(--text2,#78716c)">${opt.type}</div>
+      </div>
+      <button type="button" class="btn sm primary" style="font-size:11px;padding:3px 8px" onclick="submitResolveRemapTarget('${safeEscapeAttr(opt.ingredientId)}', '${safeEscapeAttr(opt.subtypeId)}')">Re-map</button>
+    </div>
+  `).join('');
+}
+
+export async function submitResolveRemapTarget(ingId, subtypeId = '') {
+  const state = safeGetState();
+  const targetIng = (state.ingredients || []).find(i => String(i.id) === String(ingId));
+  const targetSub = subtypeId ? (targetIng?.subtypes || []).find(s => String(s.id) === String(subtypeId)) : null;
+  const targetRecipeId = activeRecipeId || (activeTargetType === 'recipe' ? activeTargetId : null);
+
+  if (targetRecipeId) {
+    const recipes = Array.isArray(state.recipes) ? [...state.recipes] : [];
+    const recIndex = recipes.findIndex(r => String(r.id) === String(targetRecipeId));
+    if (recIndex >= 0) {
+      const rec = { ...recipes[recIndex] };
+      const ingsList = Array.isArray(rec.ingredients) ? [...rec.ingredients] : [];
+      let itemIdx = activeRecipeItemIndex ?? ingsList.findIndex(item => {
+        const name = String(item?.name || item?.ingredientName || item?.ingredient || '').trim().toLowerCase();
+        return name && activeTargetName && name === activeTargetName.trim().toLowerCase();
+      });
+      if (itemIdx < 0) itemIdx = ingsList.findIndex(item => !item.ingredientId && !item.productId);
+      if (itemIdx >= 0 && itemIdx < ingsList.length) {
+        const item = typeof ingsList[itemIdx] === 'object' ? { ...ingsList[itemIdx] } : { name: String(ingsList[itemIdx]) };
+        item.ingredientId = ingId; item.subtypeId = subtypeId || null;
+        item.ingredientName = targetIng ? targetIng.name : item.ingredientName;
+        item.subtypeName = targetSub ? targetSub.name : '';
+        ingsList[itemIdx] = item;
+      }
+      rec.ingredients = ingsList; rec.updatedAt = new Date().toISOString();
+      recipes[recIndex] = rec;
+      if (typeof setRecipes === 'function') setRecipes(recipes);
+      if (window.Store?.setState) window.Store.setState({ recipes });
+      if (window.state) window.state.recipes = recipes;
+      if (typeof window.recipes !== 'undefined') window.recipes = recipes;
+      try { await saveRecipe(rec); } catch (e) {}
+      document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: recipes }));
+      document.dispatchEvent(new CustomEvent('plateplan:recipes-updated', { detail: recipes }));
+    }
+  } else if (activeTargetType === 'subtype' && targetIng) {
+    try { await reparentSubtype(activeTargetId, targetIng.id); } catch (e) {}
+  } else if (activeTargetType === 'ingredient' && targetIng && String(activeTargetId) !== String(targetIng.id)) {
+    try { await mergeIngredients(activeTargetId, targetIng.id); } catch (e) {}
+  }
+  closeResolveUnlinkedModal();
+}
+
 export function filterResolveLinkProducts(query) {
   const container = document.getElementById('resolve-link-results');
   if (!container) return;
   const q = String(query || '').trim().toLowerCase();
-  if (!q) {
-    container.style.display = 'none';
-    container.innerHTML = '';
-    return;
-  }
-  const products = safeGetProducts();
-  const matches = products.filter(p => {
-    const name = String(p.name || '').toLowerCase();
-    const brand = String(p.brand || '').toLowerCase();
-    return name.includes(q) || brand.includes(q);
-  }).slice(0, 10);
-
+  if (!q) { container.style.display = 'none'; return; }
+  const matches = safeGetProducts().filter(p => String(p.name || '').toLowerCase().includes(q) || String(p.brand || '').toLowerCase().includes(q)).slice(0, 10);
+  container.style.display = 'block';
   if (!matches.length) {
-    container.style.display = 'block';
     container.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--text3,#a8a29e);text-align:center">No matching products found.</div>';
     return;
   }
-  container.style.display = 'block';
   container.innerHTML = matches.map(p => `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border,#e7e5e4);box-sizing:border-box">
-      <div style="min-width:0">
-        <div style="font-size:12.5px;font-weight:700;color:var(--text,#1c1917);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${safeEscapeHtml(p.name)}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border,#e7e5e4)">
+      <div>
+        <div style="font-size:12.5px;font-weight:700;color:var(--text,#1c1917)">${safeEscapeHtml(p.name)}</div>
         <div style="font-size:11px;color:var(--text2,#78716c)">${safeEscapeHtml(p.brand || 'No brand')} · £${Number(p.price || 0).toFixed(2)}</div>
       </div>
       <button type="button" class="btn sm primary" style="font-size:11px;padding:3px 8px" onclick="submitResolveLinkExisting('${safeEscapeAttr(p.id)}')">Link</button>
@@ -225,23 +252,15 @@ export function filterResolveLinkProducts(query) {
 export async function submitResolveLinkExisting(productId) {
   const parentIngId = activeTargetType === 'subtype' ? activeParentIngredientId : activeTargetId;
   const subId = activeTargetType === 'subtype' ? activeTargetId : null;
-  const existingProds = safeGetProducts();
-  const prodIndex = existingProds.findIndex(p => String(p.id) === String(productId));
+  const existingProds = safeGetProducts(), prodIndex = existingProds.findIndex(p => String(p.id) === String(productId));
   if (prodIndex >= 0) {
-    const updatedProd = {
-      ...existingProds[prodIndex],
-      ingredientId: parentIngId,
-      subtypeId: subId,
-      isAutoDefault: true,
-      updatedAt: new Date().toISOString()
-    };
-    const updatedProds = [...existingProds];
-    updatedProds[prodIndex] = updatedProd;
+    const updatedProd = { ...existingProds[prodIndex], ingredientId: parentIngId, subtypeId: subId, isAutoDefault: true, updatedAt: new Date().toISOString() };
+    const updatedProds = [...existingProds]; updatedProds[prodIndex] = updatedProd;
     commitProductUpdates(updatedProds);
-    try { await saveProduct(updatedProd); } catch (e) { console.warn('[ResolveUnlinkedModalUI] saveProduct link warning:', e); }
+    try { await saveProduct(updatedProd); } catch (e) {}
   }
   if (typeof reallocateProduct === 'function') {
-    try { await reallocateProduct(productId, parentIngId, subId); } catch (e) { console.warn('[ResolveUnlinkedModalUI] reallocateProduct fallback warning:', e); }
+    try { await reallocateProduct(productId, parentIngId, subId); } catch (e) {}
   }
   closeResolveUnlinkedModal();
 }
@@ -249,103 +268,53 @@ export async function submitResolveLinkExisting(productId) {
 export const submitResolveLinkProduct = submitResolveLinkExisting;
 
 export async function submitResolveTescoImport() {
-  const txtArea = document.getElementById('resolve-tesco-json');
-  const errDiv = document.getElementById('resolve-tesco-error');
+  const txtArea = document.getElementById('resolve-tesco-json'), errDiv = document.getElementById('resolve-tesco-error');
   if (!txtArea || !errDiv) return;
   errDiv.style.display = 'none';
   const val = txtArea.value.trim();
-  if (!val) {
-    errDiv.textContent = 'Please paste Tesco bookmarklet JSON.';
-    errDiv.style.display = 'block';
-    return;
-  }
+  if (!val) { errDiv.textContent = 'Please paste Tesco bookmarklet JSON.'; errDiv.style.display = 'block'; return; }
   const res = parseTescoProduct(val);
-  if (!res.success) {
-    errDiv.textContent = res.error || 'Parsing error.';
-    errDiv.style.display = 'block';
-    return;
-  }
-  const state = safeGetState();
-  const pData = res.data;
+  if (!res.success) { errDiv.textContent = res.error || 'Parsing error.'; errDiv.style.display = 'block'; return; }
+  const state = safeGetState(), pData = res.data;
   const parentIngId = activeTargetType === 'subtype' ? activeParentIngredientId : activeTargetId;
   const subId = activeTargetType === 'subtype' ? activeTargetId : null;
   const targetIng = (state.ingredients || []).find(i => String(i.id) === String(parentIngId));
 
   const newProd = {
-    id: `prod_${Date.now()}`,
-    name: pData.name,
-    brand: pData.brand || '',
-    category: targetIng?.category || pData.cat || 'General',
-    storage: pData.storage || 'cupboard',
-    cal: pData.cal || 0,
-    prot: pData.prot || 0,
-    carb: pData.carb || 0,
-    fat: pData.fat || 0,
-    fibre: pData.fibre || 0,
-    price: pData.price || 0,
-    pack: pData.packSize || 0,
-    packUnit: pData.packUnit || 'g',
-    itemWeight: pData.itemWeight || null,
-    drainedWeight: pData.drainedWeight || null,
-    ingredientId: parentIngId,
-    subtypeId: subId,
-    isAutoDefault: true,
-    updatedAt: new Date().toISOString()
+    id: `prod_${Date.now()}`, name: pData.name, brand: pData.brand || '',
+    category: targetIng?.category || pData.cat || 'General', storage: pData.storage || 'cupboard',
+    cal: pData.cal || 0, prot: pData.prot || 0, carb: pData.carb || 0, fat: pData.fat || 0, fibre: pData.fibre || 0,
+    price: pData.price || 0, pack: pData.packSize || 0, packUnit: pData.packUnit || 'g',
+    itemWeight: pData.itemWeight || null, drainedWeight: pData.drainedWeight || null,
+    ingredientId: parentIngId, subtypeId: subId, isAutoDefault: true, updatedAt: new Date().toISOString()
   };
 
-  const existingProds = safeGetProducts();
-  const prodIndex = existingProds.findIndex(p => String(p.id) === String(newProd.id));
-  let updatedProds;
-  if (prodIndex >= 0) {
-    updatedProds = [...existingProds];
-    updatedProds[prodIndex] = { ...updatedProds[prodIndex], ...newProd };
-  } else {
-    updatedProds = [...existingProds, newProd];
-  }
-
+  const existingProds = safeGetProducts(), prodIndex = existingProds.findIndex(p => String(p.id) === String(newProd.id));
+  const updatedProds = prodIndex >= 0 ? existingProds.map((p, i) => i === prodIndex ? { ...p, ...newProd } : p) : [...existingProds, newProd];
   commitProductUpdates(updatedProds);
   closeResolveUnlinkedModal();
-
-  try {
-    await saveProduct(newProd);
-  } catch (e) {
-    console.warn('[ResolveUnlinkedModalUI] Tesco Firestore sync warning:', e);
-  }
+  try { await saveProduct(newProd); } catch (e) {}
 }
 
 export function submitResolveNewProduct() {
   const parentIngId = activeTargetType === 'subtype' ? activeParentIngredientId : activeTargetId;
   const subId = activeTargetType === 'subtype' ? activeTargetId : null;
-
   closeResolveUnlinkedModal();
   openProductEditModal(null);
-  
   const targetIng = (safeGetState()?.ingredients || []).find(i => String(i.id) === String(parentIngId));
   const catSearchEl = document.getElementById('mi-cat-search') || document.getElementById('mi-cat');
-  if (catSearchEl && targetIng?.category) {
-    catSearchEl.value = targetIng.category;
-  }
+  if (catSearchEl && targetIng?.category) catSearchEl.value = targetIng.category;
   setTimeout(() => {
     const nameEl = document.getElementById('mi-name');
-    if (nameEl && targetIng) {
-      nameEl.value = targetIng.name;
-    }
+    if (nameEl && targetIng) nameEl.value = targetIng.name;
   }, 100);
-
-  window.__prefilledResolveBinding = {
-    ingredientId: parentIngId,
-    subtypeId: subId
-  };
+  window.__prefilledResolveBinding = { ingredientId: parentIngId, subtypeId: subId };
 }
 
 if (typeof window !== 'undefined') {
-  window.safeGetProducts = safeGetProducts;
-  window.commitProductUpdates = commitProductUpdates;
-  window.openResolveUnlinkedModal = openResolveUnlinkedModal;
-  window.closeResolveUnlinkedModal = closeResolveUnlinkedModal;
-  window.filterResolveLinkProducts = filterResolveLinkProducts;
-  window.submitResolveLinkExisting = submitResolveLinkExisting;
-  window.submitResolveLinkProduct = submitResolveLinkProduct;
-  window.submitResolveTescoImport = submitResolveTescoImport;
-  window.submitResolveNewProduct = submitResolveNewProduct;
+  Object.assign(window, {
+    safeGetProducts, commitProductUpdates, openResolveUnlinkedModal, closeResolveUnlinkedModal,
+    filterResolveRemapOptions, submitResolveRemapTarget, filterResolveLinkProducts,
+    submitResolveLinkExisting, submitResolveLinkProduct, submitResolveTescoImport, submitResolveNewProduct
+  });
 }

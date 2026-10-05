@@ -1,5 +1,5 @@
 /**
- * src/models/PantryHierarchyModel.js (v3.20.03)
+ * src/models/PantryHierarchyModel.js (v3.20.04)
  * Relational Model & Operations for Category ➔ Ingredient ➔ Sub-type ➔ Product hierarchy.
  * Encapsulates aliasing, merging, promoting/demoting, and auto-default product resolution strategies.
  */
@@ -7,8 +7,13 @@
 import { getState, setIngredients, setProducts } from '../store/store.js';
 import { saveIngredient, deleteIngredient, saveProduct } from '../services/HouseholdRepository.js';
 
-export const slugCategory = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+export const slugCategory = (str) => (str || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
 export const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+export function toCanonicalCategoryName(str) {
+  if (!str || typeof str !== 'string') return '';
+  return str.trim().split(/\s+/).map(w => w ? (w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()) : '').join(' ');
+}
 
 export function isSubtypeItem(item) {
   if (!item || typeof item !== 'object') return false;
@@ -18,18 +23,16 @@ export function isSubtypeItem(item) {
 
 export function getActiveCategories(state = {}) {
   const categoryMap = new Map();
-  (Array.isArray(state.categories) ? state.categories : []).forEach(c => {
-    const name = typeof c === 'string' ? c : c?.name;
-    if (name?.trim()) { const slug = slugCategory(name); if (slug && !categoryMap.has(slug)) categoryMap.set(slug, name.trim()); }
-  });
-  (Array.isArray(state.ingredients) ? state.ingredients : []).forEach(i => {
-    const cat = i.category || i.cat;
-    if (cat && typeof cat === 'string' && cat.trim()) { const slug = slugCategory(cat); if (slug && !categoryMap.has(slug)) categoryMap.set(slug, cat.charAt(0).toUpperCase() + cat.slice(1)); }
-  });
-  (Array.isArray(state.products) ? state.products : []).forEach(p => {
-    const cat = p.category || p.cat;
-    if (cat && typeof cat === 'string' && cat.trim()) { const slug = slugCategory(cat); if (slug && !categoryMap.has(slug)) categoryMap.set(slug, cat.charAt(0).toUpperCase() + cat.slice(1)); }
-  });
+  const registerCat = (raw) => {
+    const name = typeof raw === 'string' ? raw : raw?.name;
+    if (name && typeof name === 'string' && name.trim()) {
+      const trimmed = name.trim(), slug = slugCategory(trimmed);
+      if (slug && !categoryMap.has(slug)) categoryMap.set(slug, toCanonicalCategoryName(trimmed));
+    }
+  };
+  (Array.isArray(state.categories) ? state.categories : []).forEach(registerCat);
+  (Array.isArray(state.ingredients) ? state.ingredients : []).forEach(i => registerCat(i.category || i.cat));
+  (Array.isArray(state.products) ? state.products : []).forEach(p => registerCat(p.category || p.cat));
   return Array.from(categoryMap.values()).sort((a, b) => a.localeCompare(b));
 }
 
@@ -380,18 +383,15 @@ export function getSubtypeById(id) {
 export function getItemById(id) {
   if (!id) return null;
   const ing = getIngredientById(id);
-  if (ing) return { ...ing, type: 'ingredient' };
-  const sub = getSubtypeById(id);
-  return sub ? { ...sub, type: 'subtype' } : null;
+  return ing ? { ...ing, type: 'ingredient' } : ((getSubtypeById(id)) ? { ...getSubtypeById(id), type: 'subtype' } : null);
 }
 
 export const PantryHierarchyModel = {
-  getItemById, getIngredientById, getSubtypeById,
-  slugCategory, slugifyToKebab, isSubtypeItem, getActiveCategories, slugify, resolveDefaultProduct,
-  compareProductsByStrategy, buildPantryHierarchy, addAlias: aliasIngredient, removeAlias, addSubtype: addSubtypeToIngredient,
+  getItemById, getIngredientById, getSubtypeById, slugCategory, slugifyToKebab, toCanonicalCategoryName,
+  isSubtypeItem, getActiveCategories, slugify, resolveDefaultProduct, compareProductsByStrategy,
+  buildPantryHierarchy, addAlias: aliasIngredient, removeAlias, addSubtype: addSubtypeToIngredient,
   promoteSubtype: promoteToIngredient, demoteIngredient: demoteToSubtype, reparentSubtype, mergeIngredients,
   reallocateProduct, setAutoDefaultProduct
 };
-export const addAlias = aliasIngredient, addSubtype = addSubtypeToIngredient;
-export const promoteSubtype = promoteToIngredient, demoteIngredient = demoteToSubtype;
+export const addAlias = aliasIngredient, addSubtype = addSubtypeToIngredient, promoteSubtype = promoteToIngredient, demoteIngredient = demoteToSubtype;
 if (typeof window !== 'undefined') window.PantryHierarchyModel = PantryHierarchyModel;

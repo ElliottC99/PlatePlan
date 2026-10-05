@@ -1,5 +1,5 @@
 /**
- * src/services/DataQualityScannerService.js (v3.20.03)
+ * src/services/DataQualityScannerService.js (v3.20.04)
  * Automated catalogue data quality auditor, anomaly scanner, and advisor.
  * Pure service layer with zero DOM references.
  */

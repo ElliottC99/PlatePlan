@@ -1,5 +1,5 @@
 /**
- * src/views/ProductBankView.js (v3.20.03)
+ * src/views/ProductBankView.js (v3.20.04)
  * Modular ES6 View for Product Bank.
  * Displays nutritional pills (P, C, F, Kcal), P/£ efficiency, Tesco links, and Reallocation modal.
  */
@@ -199,7 +199,7 @@ export async function promptReallocateProduct(productId) {
 
 export const openProductReallocateModal = promptReallocateProduct;
 
-export async function handleDeleteProduct(productId, prodName) {
+export async function handleDeleteProduct(productId, prodName = null) {
   if (typeof window.handleDeleteProduct === 'function') {
     window.handleDeleteProduct(productId, prodName);
   }
@@ -313,7 +313,7 @@ export function renderProductBank() {
                 <button type="button" class="btn xs btn-ghost ghost" onclick="promptReallocateProduct('${escapeAttr(p.id)}')" style="height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500">Reallocate</button>
                 ${mappedIng && !p.isAutoDefault ? `<button type="button" class="btn xs btn-ghost ghost" onclick="handleMakeAutoDefault('${escapeAttr(p.id)}', '${escapeAttr(mappedIng.id)}')" style="height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500">Default</button>` : ''}
                 <a href="${escapeAttr(tescoSearchUrl)}" target="_blank" rel="noopener noreferrer" class="btn xs btn-ghost ghost" style="text-decoration:none;font-size:13px;font-weight:500;color:var(--primary);height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);display:inline-flex;align-items:center" title="Search on Tesco">Tesco ↗</a>
-                <button type="button" class="btn xs btn-ghost ghost" onclick="handleDeleteProduct('${escapeAttr(p.id)}', '${escapeAttr(p.name)}')" style="color:var(--red,#ef4444);height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500" title="Delete product">🗑️</button>
+                <button type="button" class="btn xs btn-ghost ghost" onclick="handleDeleteProduct('${escapeAttr(p.id)}')" style="color:var(--red,#ef4444);height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500" title="Delete product">🗑️</button>
               </div>
             </div>
           `;

@@ -1,7 +1,7 @@
 /**
- * src/components/pantry/PantryBankHTMLTemplate.js (v3.20.03)
+ * src/components/pantry/PantryBankHTMLTemplate.js (v3.20.04)
  * Extracted HTML UI renderer for the Category -> Ingredient -> Sub-type Hierarchy.
- * Harmonised with v3.20.03 design system button, badge, and Auto-Default formatting tokens.
+ * Harmonised with v3.20.04 design system button, badge, and Auto-Default formatting tokens.
  */
 
 export function formatBrandProductTag(product, fallbackLabel = '') {
@@ -64,7 +64,7 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr) {
                       <button type="button" class="btn xs btn-ghost ghost" onclick="promptAddAlias('${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🏷️ + Alias</button>
                       <button type="button" class="btn xs btn-ghost ghost" onclick="window.openIngredientReorganiseModal('${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🔄 Reorganise</button>
                       <div style="height:1px;background:var(--border,#e7e5e4);margin:4px 0"></div>
-                      <button type="button" class="btn xs btn-ghost ghost" onclick="handleDeleteIngredient('${escapeAttr(ing.id)}', '${escapeAttr(ing.name)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;color:var(--red,#ef4444);font-size:12px;text-align:left">🗑️ Delete</button>
+                      <button type="button" class="btn xs btn-ghost ghost" onclick="handleDeleteIngredient('${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;color:var(--red,#ef4444);font-size:12px;text-align:left">🗑️ Delete</button>
                     </div>
                   </div>
                 </div>
@@ -73,7 +73,7 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr) {
               ${aliases.length ? `
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px">
                   <span style="color:var(--text3,#a8a29e);font-weight:600">Aliases:</span>
-                  ${aliases.map(a => `<span class="tag" style="font-size:10.5px;padding:2px 8px;border-radius:var(--radius-sm,6px);background:var(--surface,#fff)">${escapeHtml(a)} <span style="cursor:pointer;margin-left:2px" onclick="promptRemoveAlias('${escapeAttr(ing.id)}', '${escapeAttr(a)}')">&times;</span></span>`).join('')}
+                  ${aliases.map(a => `<span class="tag" style="font-size:10.5px;padding:2px 8px;border-radius:var(--radius-sm,6px);background:var(--surface,#fff)">${escapeHtml(a)} <span style="cursor:pointer;margin-left:2px" onclick="promptRemoveAlias('${escapeAttr(ing.id)}', decodeURIComponent('${encodeURIComponent(a)}'))">&times;</span></span>`).join('')}
                 </div>
               ` : ''}
 

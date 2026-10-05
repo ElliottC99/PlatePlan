@@ -1,5 +1,5 @@
 /**
- * src/components/planner/PlannerMealSlot.js (v3.20.03)
+ * src/components/planner/PlannerMealSlot.js (v3.20.04)
  * UI component for meal slot cards, dual-profile portion badges,
  * meal type labels, and recipe swap/clear triggers.
  */

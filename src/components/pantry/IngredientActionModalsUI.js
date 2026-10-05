@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/IngredientActionModalsUI.js (v3.20.03)
+ * src/components/pantry/IngredientActionModalsUI.js (v3.20.04)
  * Standardised custom styled dialogues and workflows for Pantry Ingredients & Products.
  * Strictly modular (< 400 lines), British English, and free of legacy terminology.
  */
@@ -218,10 +218,16 @@ export function promptMerge(sourceId, parentId = null) {
   };
 }
 
-export function handleDeleteIngredient(ingId, ingName, parentId = null) {
+export function handleDeleteIngredient(ingId, ingName = null, parentId = null) {
   if (parentId && typeof window.openSubtypeDeleteModal === 'function') {
     window.openSubtypeDeleteModal(ingId, parentId);
     return;
+  }
+  const state = getState() || {};
+  let targetName = ingName;
+  if (!targetName) {
+    const found = (state.ingredients || []).find(i => String(i.id) === String(ingId));
+    targetName = found?.name || 'Ingredient';
   }
 
   const html = `
@@ -229,7 +235,7 @@ export function handleDeleteIngredient(ingId, ingName, parentId = null) {
       <div style="font-size: 40px; margin-bottom: 12px;">⚠️</div>
       <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750; color: var(--red,#ef4444)">Delete Ingredient?</h3>
       <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 24px 0; line-height: 1.5;">
-        Are you sure you want to delete <strong>"${escapeHTML(ingName)}"</strong>? <br />This will remove it from the pantry bank and clear all relationships.
+        Are you sure you want to delete <strong>"${escapeHTML(targetName)}"</strong>? <br />This will remove it from the pantry bank and clear all relationships.
       </p>
 
       <div style="display:flex; gap:8px; justify-content: center;">
@@ -242,8 +248,8 @@ export function handleDeleteIngredient(ingId, ingName, parentId = null) {
 
   document.getElementById('btn-confirm-ing-delete').onclick = async () => {
     closeModal();
-    const state = getState() || {};
-    const ings = (state.ingredients || []).filter(i => String(i.id) !== String(ingId));
+    const curState = getState() || {};
+    const ings = (curState.ingredients || []).filter(i => String(i.id) !== String(ingId));
     setIngredients(ings);
     if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
     import('../../services/HouseholdRepository.js').then(async (repo) => {
@@ -252,13 +258,20 @@ export function handleDeleteIngredient(ingId, ingName, parentId = null) {
   };
 }
 
-export function handleDeleteProduct(productId, prodName) {
+export function handleDeleteProduct(productId, prodName = null) {
+  const state = getState() || {};
+  let targetName = prodName;
+  if (!targetName) {
+    const found = (state.products || []).find(p => String(p.id) === String(productId));
+    targetName = found?.name || 'Product';
+  }
+
   const html = `
     <div style="padding: 24px; max-width: 440px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
       <div style="font-size: 40px; margin-bottom: 12px;">🗑️</div>
       <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750; color: var(--red,#ef4444)">Delete Product?</h3>
       <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 24px 0; line-height: 1.5;">
-        Are you sure you want to delete <strong>"${escapeHTML(prodName)}"</strong> from your bank?
+        Are you sure you want to delete <strong>"${escapeHTML(targetName)}"</strong> from your bank?
       </p>
 
       <div style="display:flex; gap:8px; justify-content: center;">
@@ -271,8 +284,8 @@ export function handleDeleteProduct(productId, prodName) {
 
   document.getElementById('btn-confirm-prod-delete').onclick = async () => {
     closeModal();
-    const state = getState() || {};
-    const prods = (state.products || []).filter(p => String(p.id) !== String(productId));
+    const curState = getState() || {};
+    const prods = (curState.products || []).filter(p => String(p.id) !== String(productId));
     setProducts(prods);
     if (typeof window.renderProductBank === 'function') window.renderProductBank();
     import('../../services/HouseholdRepository.js').then(async (repo) => {
