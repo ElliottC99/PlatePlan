@@ -6,6 +6,7 @@
 
 import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeIngredients, subscribeProducts, getCategories, saveCategories, saveIngredient } from './HouseholdRepository.js';
 import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache, setCategories } from '../store/store.js';
+import { compareProductsByStrategy } from '../models/PantryHierarchyModel.js';
 
 export const CANONICAL_CATEGORIES = [
   'Baking, Chocolate and Sweets', 'Beverages', 'Carbs', 'Dairy', 'Fruit & Vegetables',
@@ -23,7 +24,7 @@ export async function sweepAndRecalibrateIngredientDefaults() {
   const state = window.Store?.getState?.() || {};
   const ingredients = state.ingredients || (window.state?.ingredients || []);
   const products = state.products || (window.state?.products || []);
-  const criterion = state.settings?.autoDefaultCriterion || state.userPrefs?.autoDefaultCriterion || window.state?.settings?.autoDefaultCriterion || window.state?.userPrefs?.autoDefaultCriterion || 'lowest-price';
+  const criterion = state.settings?.autoDefaultStrategy || state.settings?.autoDefaultCriterion || state.userPrefs?.autoDefaultStrategy || state.userPrefs?.autoDefaultCriterion || window.state?.settings?.autoDefaultStrategy || window.state?.settings?.autoDefaultCriterion || window.state?.userPrefs?.autoDefaultStrategy || window.state?.userPrefs?.autoDefaultCriterion || 'lowest_absolute_price';
   let updatedCount = 0;
 
   const updatedIngredients = ingredients.map(ing => {
@@ -50,31 +51,8 @@ export async function sweepAndRecalibrateIngredientDefaults() {
       let targetProduct = userPinnedProduct;
 
       if (!targetProduct && strictlyMatchingProducts.length > 0) {
-        // 2. Sort candidates based on selected criterion
-        const sorted = [...strictlyMatchingProducts].sort((a, b) => {
-          const priceA = Number(a.price || Infinity);
-          const priceB = Number(b.price || Infinity);
-          // Standardise weight/pack size
-          const sizeA = Number(a.packSize || a.pack || a.itemWeight || 1);
-          const sizeB = Number(b.packSize || b.pack || b.itemWeight || 1);
-          // Standardise macros
-          const protA = Number(a.prot || a.protein || 0);
-          const protB = Number(b.prot || b.protein || 0);
-          const kcalA = Number(a.kcal || a.cal || Infinity);
-          const kcalB = Number(b.kcal || b.cal || Infinity);
-
-          switch (criterion) {
-            case 'lowest-unit-price':
-              return (priceA / sizeA) - (priceB / sizeB);
-            case 'highest-protein':
-              return protB - protA; // Descending
-            case 'lowest-calories':
-              return kcalA - kcalB; // Ascending
-            case 'lowest-price':
-            default:
-              return priceA - priceB; // Ascending
-          }
-        });
+        // 2. Sort candidates based on selected strategy
+        const sorted = [...strictlyMatchingProducts].sort((a, b) => compareProductsByStrategy(a, b, criterion));
         targetProduct = sorted[0];
       }
 
@@ -227,8 +205,13 @@ export async function hydrateHouseholdData() {
         const docData = preferencesData || {};
         const userPrefs = docData.userPrefs || docData;
         window.state.settings = { ...(window.state.settings || {}), ...(docData.settings || {}) };
-        if (userPrefs.autoDefaultCriterion && !window.state.settings.autoDefaultCriterion) {
-          window.state.settings.autoDefaultCriterion = userPrefs.autoDefaultCriterion;
+        const strat = userPrefs.autoDefaultStrategy || userPrefs.autoDefaultCriterion || docData.settings?.autoDefaultStrategy || docData.settings?.autoDefaultCriterion;
+        if (strat) {
+          window.state.settings.autoDefaultStrategy = strat;
+          window.state.settings.autoDefaultCriterion = strat;
+          if (!window.state.userPrefs) window.state.userPrefs = {};
+          window.state.userPrefs.autoDefaultStrategy = strat;
+          window.state.userPrefs.autoDefaultCriterion = strat;
         }
         window.state.isCloudHydrated = true;
         window.state.ingredients = ingredients;

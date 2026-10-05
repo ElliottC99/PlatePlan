@@ -25,7 +25,8 @@ function escapeHtml(str) {
 export function renderDietaryExclusionManager(prefs = {}, settings = {}) {
   const diet = prefs.diet || 'none';
   const customExclusions = Array.isArray(prefs.exclusions?.shared) ? prefs.exclusions.shared : [];
-  const autoDefaultCriterion = settings.autoDefaultCriterion || prefs.autoDefaultCriterion || 'lowest-price';
+  const autoDefaultCriterion = settings.autoDefaultStrategy || settings.autoDefaultCriterion || prefs.autoDefaultStrategy || prefs.autoDefaultCriterion || 'lowest_absolute_price';
+  const normCrit = String(autoDefaultCriterion).toLowerCase().replace(/-/g, '_');
 
   return `
     <div class="card dietary-exclusion-manager" style="margin-bottom:16px;padding:16px 18px;border:1px solid var(--border);border-radius:12px;background:var(--surface)">
@@ -64,18 +65,20 @@ export function renderDietaryExclusionManager(prefs = {}, settings = {}) {
       <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:8px">
           <div>
-            <label for="pp-setting-auto-default-criterion" style="font-size:13px;font-weight:700;color:var(--text);display:block">Auto-Default Strategy</label>
+            <label for="auto-default-strategy" style="font-size:13px;font-weight:700;color:var(--text);display:block">Auto-Default Strategy</label>
             <div style="font-size:12px;color:var(--text2);margin-top:2px">Select metric used to automatically assign default products for ingredients.</div>
           </div>
           <button type="button" id="btn-recalibrate-defaults" class="btn sm secondary" onclick="window.handleManualRecalibrateDefaults()" style="font-weight:700;font-size:12px;padding:6px 12px">
             ⚡ Recalibrate All Defaults Now
           </button>
         </div>
-        <select id="pp-setting-auto-default-criterion" name="autoDefaultCriterion" aria-label="Auto-Default Strategy" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);color:var(--text);outline:none" onchange="window.handleAutoDefaultCriterionChange(this.value)">
-          <option value="lowest-price" ${autoDefaultCriterion === 'lowest-price' ? 'selected' : ''}>Lowest Absolute Price (£)</option>
-          <option value="lowest-unit-price" ${autoDefaultCriterion === 'lowest-unit-price' ? 'selected' : ''}>Lowest Unit Price (Best Value per 100g / ml)</option>
-          <option value="highest-protein" ${autoDefaultCriterion === 'highest-protein' ? 'selected' : ''}>Highest Protein Content (g)</option>
-          <option value="lowest-calories" ${autoDefaultCriterion === 'lowest-calories' ? 'selected' : ''}>Lowest Calorie Count (kcal)</option>
+        <select id="auto-default-strategy" data-legacy-id="pp-setting-auto-default-criterion" name="autoDefaultStrategy" aria-label="Auto-Default Strategy" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);color:var(--text);outline:none" onchange="window.handleAutoDefaultCriterionChange(this.value)">
+          <option value="lowest_absolute_price" ${normCrit === 'lowest_absolute_price' || normCrit === 'lowest_price' ? 'selected' : ''}>Lowest Absolute Price (£)</option>
+          <option value="lowest_unit_price" ${normCrit === 'lowest_unit_price' ? 'selected' : ''}>Lowest Unit Price (Best Value per 100g / ml)</option>
+          <option value="highest_protein_content" ${normCrit === 'highest_protein_content' || normCrit === 'highest_protein' ? 'selected' : ''}>Highest Protein Content (g)</option>
+          <option value="highest_protein_per_kcal" ${normCrit === 'highest_protein_per_kcal' ? 'selected' : ''}>Highest Protein Density (g per 100 kcal)</option>
+          <option value="highest_protein_per_pound" ${normCrit === 'highest_protein_per_pound' ? 'selected' : ''}>Highest Protein Value (g per £)</option>
+          <option value="lowest_calorie_count" ${normCrit === 'lowest_calorie_count' || normCrit === 'lowest_calories' ? 'selected' : ''}>Lowest Calorie Count (kcal)</option>
         </select>
       </div>
 

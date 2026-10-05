@@ -1,7 +1,7 @@
 /**
  * src/models/PantryHierarchyModel.js (v3.20.01)
  * Relational Model & Operations for Category ➔ Ingredient ➔ Sub-type ➔ Product hierarchy.
- * Encapsulates aliasing, merging, promoting/demoting, and auto-default product resolution.
+ * Encapsulates aliasing, merging, promoting/demoting, and auto-default product resolution strategies.
  */
 
 import { getState, setIngredients, setProducts } from '../store/store.js';
@@ -13,8 +13,7 @@ export const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(
 export function isSubtypeItem(item) {
   if (!item || typeof item !== 'object') return false;
   if (item.isSubtype === true || item.is_subtype === true || item.type === 'subtype' || item.kind === 'subtype') return true;
-  if (item.parentId || item.parent_id || item.parentIngredientId || item.parent_ingredient_id || item.parentName) return true;
-  return false;
+  return !!(item.parentId || item.parent_id || item.parentIngredientId || item.parent_ingredient_id || item.parentName);
 }
 
 export function getActiveCategories(state = {}) {
@@ -36,10 +35,53 @@ export function getActiveCategories(state = {}) {
 
 export function slugify(str) {
   if (!str || typeof str !== 'string') return '';
-  let normalized = str.toLowerCase().trim().replace(/[^a-z0-9\s]/g, '');
-  if (normalized.endsWith('oes') && normalized.length > 4) normalized = normalized.slice(0, -2);
-  else if (normalized.endsWith('s') && !normalized.endsWith('ss') && normalized.length > 3) normalized = normalized.slice(0, -1);
-  return normalized;
+  let norm = str.toLowerCase().trim().replace(/[^a-z0-9\s]/g, '');
+  if (norm.endsWith('oes') && norm.length > 4) norm = norm.slice(0, -2);
+  else if (norm.endsWith('s') && !norm.endsWith('ss') && norm.length > 3) norm = norm.slice(0, -1);
+  return norm;
+}
+
+export function compareProductsByStrategy(a, b, criterion = 'lowest_absolute_price') {
+  const normCrit = String(criterion || 'lowest_absolute_price').toLowerCase().replace(/-/g, '_');
+  const priceA = Number(a?.price ?? a?.cost ?? 0), priceB = Number(b?.price ?? b?.cost ?? 0);
+  const safePriceA = isNaN(priceA) || priceA < 0 ? 0 : priceA, safePriceB = isNaN(priceB) || priceB < 0 ? 0 : priceB;
+  const protA = Number(a?.prot ?? a?.protein ?? 0), protB = Number(b?.prot ?? b?.protein ?? 0);
+  const safeProtA = isNaN(protA) || protA < 0 ? 0 : protA, safeProtB = isNaN(protB) || protB < 0 ? 0 : protB;
+  const kcalA = Number(a?.kcal ?? a?.cal ?? a?.calories ?? 0), kcalB = Number(b?.kcal ?? b?.cal ?? b?.calories ?? 0);
+  const safeKcalA = isNaN(kcalA) || kcalA < 0 ? 0 : kcalA, safeKcalB = isNaN(kcalB) || kcalB < 0 ? 0 : kcalB;
+  const unitA = String(a?.packUnit || a?.pack_unit || 'g').toLowerCase().trim(), unitB = String(b?.packUnit || b?.pack_unit || 'g').toLowerCase().trim();
+  const rawSizeA = Number(a?.packSize ?? a?.pack_size ?? a?.pack ?? a?.itemWeight ?? a?.item_weight ?? 100);
+  const rawSizeB = Number(b?.packSize ?? b?.pack_size ?? b?.pack ?? b?.itemWeight ?? b?.item_weight ?? 100);
+  const sizeA = (unitA === 'kg' || unitA === 'l') && rawSizeA > 0 ? rawSizeA * 1000 : (rawSizeA > 0 ? rawSizeA : 100);
+  const sizeB = (unitB === 'kg' || unitB === 'l') && rawSizeB > 0 ? rawSizeB * 1000 : (rawSizeB > 0 ? rawSizeB : 100);
+  const safeSizeA = isNaN(sizeA) || sizeA <= 0 ? 100 : sizeA, safeSizeB = isNaN(sizeB) || sizeB <= 0 ? 100 : sizeB;
+
+  switch (normCrit) {
+    case 'lowest_unit_price': {
+      const upA = safePriceA > 0 ? (safePriceA / safeSizeA) : Infinity, upB = safePriceB > 0 ? (safePriceB / safeSizeB) : Infinity;
+      return upA !== upB ? upA - upB : safePriceA - safePriceB;
+    }
+    case 'highest_protein_content': case 'highest_protein':
+      return safeProtB !== safeProtA ? safeProtB - safeProtA : safePriceA - safePriceB;
+    case 'highest_protein_per_kcal': {
+      const ratioA = safeKcalA > 0 ? (safeProtA / safeKcalA) : 0, ratioB = safeKcalB > 0 ? (safeProtB / safeKcalB) : 0;
+      if (Math.abs(ratioB - ratioA) > 1e-6) return ratioB - ratioA;
+      return safeKcalA !== safeKcalB ? safeKcalA - safeKcalB : safePriceA - safePriceB;
+    }
+    case 'highest_protein_per_pound': {
+      const yieldA = safePriceA > 0 ? (((safeProtA / 100) * safeSizeA) / safePriceA) : 0;
+      const yieldB = safePriceB > 0 ? (((safeProtB / 100) * safeSizeB) / safePriceB) : 0;
+      if (Math.abs(yieldB - yieldA) > 1e-6) return yieldB - yieldA;
+      return safePriceA !== safePriceB ? safePriceA - safePriceB : safeKcalA - safeKcalB;
+    }
+    case 'lowest_calorie_count': case 'lowest_calories':
+      return safeKcalA !== safeKcalB ? safeKcalA - safeKcalB : safePriceA - safePriceB;
+    case 'lowest_absolute_price': case 'lowest_price': default: {
+      const effA = safePriceA > 0 ? safePriceA : (priceA === 0 ? 0 : Infinity);
+      const effB = safePriceB > 0 ? safePriceB : (priceB === 0 ? 0 : Infinity);
+      return effA - effB;
+    }
+  }
 }
 
 export function resolveDefaultProduct(item, products = []) {
@@ -58,17 +100,8 @@ export function resolveDefaultProduct(item, products = []) {
   const pool = linked.length > 0 ? linked : list;
   if (pool.length > 0) {
     const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
-    const criterion = state.settings?.autoDefaultCriterion || state.userPrefs?.autoDefaultCriterion || 'lowest-price';
-    const sorted = [...pool].sort((a, b) => {
-      const priceA = Number(a.price || Infinity), priceB = Number(b.price || Infinity);
-      const sizeA = Number(a.packSize || a.pack || a.itemWeight || 1), sizeB = Number(b.packSize || b.pack || b.itemWeight || 1);
-      const protA = Number(a.prot || a.protein || 0), protB = Number(b.prot || b.protein || 0);
-      const kcalA = Number(a.kcal || a.cal || Infinity), kcalB = Number(b.kcal || b.cal || Infinity);
-      if (criterion === 'lowest-unit-price') return (priceA / sizeA) - (priceB / sizeB);
-      if (criterion === 'highest-protein') return protB - protA;
-      if (criterion === 'lowest-calories') return kcalA - kcalB;
-      return priceA - priceB;
-    });
+    const criterion = state.settings?.autoDefaultStrategy || state.settings?.autoDefaultCriterion || state.userPrefs?.autoDefaultStrategy || state.userPrefs?.autoDefaultCriterion || 'lowest_absolute_price';
+    const sorted = [...pool].sort((a, b) => compareProductsByStrategy(a, b, criterion));
     return { ...sorted[0], isAutoDefault: true };
   }
   return null;
@@ -94,13 +127,7 @@ export function buildPantryHierarchy(ingredients = [], products = [], options = 
     if (!primary && clusterItems.length > 0) primary = clusterItems[0];
     clusterItems.forEach(i => {
       if (primary && i.id === primary.id) rootIngredients.push(i);
-      else {
-        subtypeItems.push({
-          ...i,
-          parentId: primary ? primary.id : i.groupId,
-          parentName: primary ? primary.name : 'Unknown Core'
-        });
-      }
+      else subtypeItems.push({ ...i, parentId: primary ? primary.id : i.groupId, parentName: primary ? primary.name : 'Unknown Core' });
     });
   });
 
@@ -133,23 +160,12 @@ export function buildPantryHierarchy(ingredients = [], products = [], options = 
   rootIngredients.forEach(root => {
     const cat = root.category || 'General';
     if (!categoryMap.has(cat)) categoryMap.set(cat, []);
-
     const directProducts = productMap.get(root.id) || [];
-    const childSubtypes = [
-      ...(Array.isArray(root.subtypes) ? root.subtypes : []),
-      ...(subtypeMap.get(root.id) || [])
-    ];
-
+    const childSubtypes = [...(Array.isArray(root.subtypes) ? root.subtypes : []), ...(subtypeMap.get(root.id) || [])];
     const uniqueSubtypes = Array.from(new Map(childSubtypes.map(s => [s.id || s.name, s])).values());
     const enrichedSubtypes = uniqueSubtypes.map(st => {
       const stProducts = productMap.get(st.id) || [];
-      return {
-        ...st,
-        parentId: root.id,
-        parentName: root.name,
-        products: stProducts,
-        defaultProduct: resolveDefaultProduct(st, stProducts.length ? stProducts : directProducts)
-      };
+      return { ...st, parentId: root.id, parentName: root.name, products: stProducts, defaultProduct: resolveDefaultProduct(st, stProducts.length ? stProducts : directProducts) };
     });
 
     categoryMap.get(cat).push({
@@ -163,8 +179,7 @@ export function buildPantryHierarchy(ingredients = [], products = [], options = 
 
   subtypeItems.forEach(sub => {
     const pId = sub.parentId || sub.parent_id || sub.parentIngredientId || sub.parent_ingredient_id;
-    const isMapped = rootIngredients.some(r => r.id === pId);
-    if (!isMapped) orphanSubtypes.push(sub);
+    if (!rootIngredients.some(r => r.id === pId)) orphanSubtypes.push(sub);
   });
 
   if (orphanSubtypes.length > 0) {
@@ -173,11 +188,7 @@ export function buildPantryHierarchy(ingredients = [], products = [], options = 
       id: 'group_orphan_subtypes',
       name: 'Unassigned Sub-types',
       category: cat,
-      subtypes: orphanSubtypes.map(st => ({
-        ...st,
-        products: productMap.get(st.id) || [],
-        defaultProduct: resolveDefaultProduct(st, prodList)
-      })),
+      subtypes: orphanSubtypes.map(st => ({ ...st, products: productMap.get(st.id) || [], defaultProduct: resolveDefaultProduct(st, prodList) })),
       directProducts: [],
       products: [],
       defaultProduct: null
@@ -185,10 +196,7 @@ export function buildPantryHierarchy(ingredients = [], products = [], options = 
   }
 
   return Array.from(categoryMap.entries())
-    .map(([category, items]) => ({
-      category,
-      ingredients: items.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-    }))
+    .map(([category, items]) => ({ category, ingredients: items.sort((a, b) => (a.name || '').localeCompare(b.name || '')) }))
     .sort((a, b) => a.category.localeCompare(b.category));
 }
 
@@ -286,8 +294,7 @@ export async function reparentSubtype(subtypeId, targetParentIngredientId, sourc
   targetParent.subtypes.push(subtype);
   targetParent.updatedAt = new Date().toISOString();
   const updatedProds = prods.map(p => (String(p.subtypeId) === String(subtypeId)) ? { ...p, ingredientId: targetParent.id, category: targetParent.category || p.category, updatedAt: new Date().toISOString() } : p);
-  setIngredients(ings);
-  setProducts(updatedProds);
+  setIngredients(ings); setProducts(updatedProds);
   await Promise.all([saveIngredient(targetParent), ...updatedProds.filter(p => String(p.subtypeId) === String(subtypeId)).map(p => saveProduct(p))]);
   return true;
 }
@@ -362,8 +369,7 @@ export function getIngredientById(id) {
 
 export function getSubtypeById(id) {
   if (!id) return null;
-  const ings = (getState() || {}).ingredients || [];
-  for (const ing of ings) {
+  for (const ing of ((getState() || {}).ingredients || [])) {
     const sub = (ing.subtypes || []).find(s => String(s.id) === String(id));
     if (sub) return { ...sub, parentIngredientId: ing.id, parentName: ing.name, category: ing.category };
   }
@@ -381,12 +387,10 @@ export function getItemById(id) {
 export const PantryHierarchyModel = {
   getItemById, getIngredientById, getSubtypeById,
   slugCategory, slugifyToKebab, isSubtypeItem, getActiveCategories, slugify, resolveDefaultProduct,
-  buildPantryHierarchy, addAlias: aliasIngredient, removeAlias, addSubtype: addSubtypeToIngredient,
+  compareProductsByStrategy, buildPantryHierarchy, addAlias: aliasIngredient, removeAlias, addSubtype: addSubtypeToIngredient,
   promoteSubtype: promoteToIngredient, demoteIngredient: demoteToSubtype, reparentSubtype, mergeIngredients,
   reallocateProduct, setAutoDefaultProduct
 };
-
 export const addAlias = aliasIngredient, addSubtype = addSubtypeToIngredient;
 export const promoteSubtype = promoteToIngredient, demoteIngredient = demoteToSubtype;
-
 if (typeof window !== 'undefined') window.PantryHierarchyModel = PantryHierarchyModel;

@@ -76,24 +76,32 @@ if (typeof window !== 'undefined') {
     if (!window.state.settings) window.state.settings = {};
     if (!window.state.userPrefs) window.state.userPrefs = {};
 
+    window.state.settings.autoDefaultStrategy = val;
     window.state.settings.autoDefaultCriterion = val;
+    window.state.userPrefs.autoDefaultStrategy = val;
     window.state.userPrefs.autoDefaultCriterion = val;
     if (window.Store?.setState) {
-      window.Store.setState({ settings: { ...(window.Store.getState()?.settings || {}), autoDefaultCriterion: val } });
+      window.Store.setState({ settings: { ...(window.Store.getState()?.settings || {}), autoDefaultStrategy: val, autoDefaultCriterion: val } });
     }
     if (typeof window.saveState === 'function') window.saveState();
 
     try {
       await savePreferences({ ...window.state.userPrefs, settings: window.state.settings });
     } catch (err) {
-      console.warn('[SettingsView] Failed saving auto-default criterion preference:', err);
+      console.warn('[SettingsView] Failed saving auto-default strategy preference:', err);
     }
 
     const labelMap = {
-      'lowest-price': 'Lowest Price',
+      'lowest_absolute_price': 'Lowest Absolute Price (£)',
+      'lowest-price': 'Lowest Absolute Price (£)',
+      'lowest_unit_price': 'Lowest Unit Price',
       'lowest-unit-price': 'Lowest Unit Price',
-      'highest-protein': 'High Protein',
-      'lowest-calories': 'Lowest Calories'
+      'highest_protein_content': 'Highest Protein Content',
+      'highest-protein': 'Highest Protein Content',
+      'highest_protein_per_kcal': 'Highest Protein Density',
+      'highest_protein_per_pound': 'Highest Protein Value',
+      'lowest_calorie_count': 'Lowest Calorie Count',
+      'lowest-calories': 'Lowest Calorie Count'
     };
     const label = labelMap[val] || val;
 
@@ -159,9 +167,11 @@ export function renderSettingsView() {
       window.state.userPrefs.glutenFree = !!container.querySelector('#pp-setting-gf')?.checked;
       window.state.userPrefs.dairyFree = !!container.querySelector('#pp-setting-df')?.checked;
       window.state.userPrefs.nutFree = !!container.querySelector('#pp-setting-nutfree')?.checked;
-      const autoDefCrit = container.querySelector('#pp-setting-auto-default-criterion')?.value || 'lowest-price';
+      const autoDefCrit = container.querySelector('#auto-default-strategy')?.value || container.querySelector('#pp-setting-auto-default-criterion')?.value || 'lowest_absolute_price';
+      window.state.userPrefs.autoDefaultStrategy = autoDefCrit;
       window.state.userPrefs.autoDefaultCriterion = autoDefCrit;
       if (!window.state.settings) window.state.settings = {};
+      window.state.settings.autoDefaultStrategy = autoDefCrit;
       window.state.settings.autoDefaultCriterion = autoDefCrit;
 
       const profiles = {};
