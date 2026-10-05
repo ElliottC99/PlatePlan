@@ -1,5 +1,5 @@
 /**
- * src/services/HouseholdRepository.js (v3.20.05)
+ * src/services/HouseholdRepository.js (v3.20.06)
  * Dedicated data access repository for household-scoped Firestore operations.
  * Completely isolated from DOM manipulation and UI rendering.
  * All operations target the shared household path 'households/elliott-chloe'.
@@ -7,12 +7,13 @@
 
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
 import { stripPlanPayload } from '../models/MealPlannerModel.js';
+import { enforceCategorySSOT } from '../utils/categoryEnforcer.js';
 
 export { stripPlanPayload };
 
 function isDbAvailable() {
   if (!db) {
-    console.warn('[HouseholdRepository v3.20.05] Firestore db instance not initialised.');
+    console.warn('[HouseholdRepository v3.20.06] Firestore db instance not initialised.');
     return false;
   }
   return true;
@@ -75,7 +76,10 @@ export async function getIngredients() {
   try {
     if (!isDbAvailable()) return [];
     const snap = await safeFirestoreGet(db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients'));
-    return (snap && snap.docs) ? snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) : [];
+    const raw = (snap && snap.docs) ? snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) : [];
+    const prods = (typeof window !== 'undefined' && window.state?.products) || [];
+    const enforced = enforceCategorySSOT({ ingredients: raw, products: prods });
+    return enforced.ingredients;
   } catch (err) {
     return [];
   }
@@ -84,7 +88,9 @@ export async function getIngredients() {
 export async function saveIngredient(ingredient) {
   try {
     if (!isDbAvailable() || !ingredient || typeof ingredient !== 'object') return { success: false, error: 'Invalid' };
-    const ingData = { ...ingredient, updatedAt: new Date().toISOString() };
+    const enforced = enforceCategorySSOT({ ingredients: [ingredient], products: (typeof window !== 'undefined' && window.state?.products) || [] });
+    const finalIng = enforced.ingredients[0] || ingredient;
+    const ingData = { ...finalIng, updatedAt: new Date().toISOString() };
     const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');
     const ingId = ingredient.id || colRef.doc().id;
     delete ingData.id;
@@ -214,8 +220,10 @@ export async function getProducts() {
     if (!isDbAvailable()) return [];
     const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('products');
     const snap = await safeFirestoreGet(colRef);
-    if (!snap || !snap.docs) return [];
-    return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const raw = (snap && snap.docs) ? snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) : [];
+    const ings = (typeof window !== 'undefined' && window.state?.ingredients) || [];
+    const enforced = enforceCategorySSOT({ ingredients: ings, products: raw });
+    return enforced.products;
   } catch (err) {
     console.warn('[HouseholdRepository] Offline or unable to fetch products:', err.message || err);
     return [];
@@ -226,7 +234,9 @@ export async function saveProduct(product) {
   try {
     if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
     if (!product || typeof product !== 'object') return { success: false, error: 'Invalid product data' };
-    const prodData = { ...product, updatedAt: new Date().toISOString() };
+    const enforced = enforceCategorySSOT({ ingredients: (typeof window !== 'undefined' && window.state?.ingredients) || [], products: [product] });
+    const finalProd = enforced.products[0] || product;
+    const prodData = { ...finalProd, updatedAt: new Date().toISOString() };
     const prodId = product.id || db.collection('households').doc(HOUSEHOLD_ID).collection('products').doc().id;
     delete prodData.id;
     await db.collection('households').doc(HOUSEHOLD_ID).collection('products').doc(prodId).set(prodData, { merge: true });

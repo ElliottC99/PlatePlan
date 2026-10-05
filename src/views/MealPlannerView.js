@@ -1,5 +1,5 @@
 /**
- * src/views/MealPlannerView.js (v3.20.05)
+ * src/views/MealPlannerView.js (v3.20.06)
  * Modular Meal Planner View Facade.
  * Re-exports core planner lifecycle and sanitised reset handlers from PlannerView.js.
  */

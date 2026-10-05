@@ -1,6 +1,6 @@
 /**
- * src/views/ProductBankView.js (v3.20.05)
- * Modular ES6 View for Product Bank.
+ * src/views/ProductBankView.js (v3.20.06)
+ * Modular ES6 View for Product Bank with real-time search filtering.
  * Displays nutritional pills (P, C, F, Kcal), P/£ efficiency, Tesco links, and Reallocation modal.
  */
 
@@ -157,7 +157,6 @@ export async function saveManualIng() {
   const subtypeId = draftSubtypeId || binding.subtypeId || null;
   const isAutoDefault = !!ingredientId;
 
-  // Clear draft payload
   window.__draftSubtypePayload = null;
 
   const updatedProd = {
@@ -250,11 +249,29 @@ export function renderProductBank() {
   if (!container) return;
 
   const state = getState() || {};
-  const products = Array.isArray(state.products) ? state.products : [];
+  const allProducts = Array.isArray(state.products) ? state.products : [];
   const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
 
-  if (products.length === 0) {
-    container.innerHTML = `
+  const searchInput = document.getElementById('product-bank-search');
+  const query = (searchInput?.value || '').trim().toLowerCase();
+
+  let products = allProducts;
+  if (query) {
+    products = allProducts.filter(p =>
+      (p.name || '').toLowerCase().includes(query) ||
+      (p.brand || '').toLowerCase().includes(query) ||
+      (p.category || p.cat || '').toLowerCase().includes(query)
+    );
+  }
+
+  const searchBarHtml = `
+    <div style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
+      <input type="search" id="product-bank-search" placeholder="Search products, brands, or categories..." value="${escapeAttr(query)}" oninput="renderProductBank()" style="width:100%;padding:8px 12px;border:1px solid var(--border,#e7e5e4);border-radius:8px;font-size:13px;background:var(--surface,#fff);box-sizing:border-box" />
+    </div>
+  `;
+
+  if (allProducts.length === 0) {
+    container.innerHTML = searchBarHtml + `
       <div class="card" style="padding:32px 20px;text-align:center;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:14px;margin-top:12px;">
         <div style="font-size:32px;margin-bottom:8px">📦</div>
         <h3 style="font-size:16px;font-weight:700;margin:0 0 6px 0">No products in product bank</h3>
@@ -268,6 +285,15 @@ export function renderProductBank() {
     return;
   }
 
+  if (products.length === 0) {
+    container.innerHTML = searchBarHtml + `
+      <div class="card" style="padding:24px;text-align:center;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:14px;margin-top:12px;font-size:13.5px;color:var(--text2)">
+        No matching products found for "${escapeHtml(query)}".
+      </div>
+    `;
+    return;
+  }
+
   // Group by category
   const groups = {};
   products.forEach(p => {
@@ -276,7 +302,7 @@ export function renderProductBank() {
     groups[cat].push(p);
   });
 
-  const html = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([cat, items]) => `
+  const cardsHtml = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([cat, items]) => `
     <div class="card" style="margin-bottom:16px;padding:16px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border,#e7e5e4)">
         <h3 style="margin:0;font-size:15px;font-weight:750;text-transform:capitalize">${escapeHtml(cat)}</h3>
@@ -291,7 +317,6 @@ export function renderProductBank() {
 
           return `
             <div class="product-bank-card-item" style="padding:12px;border-radius:10px;background:var(--surface2,#f5f5f4);border:1px solid var(--border,#e7e5e4);display:flex;flex-direction:column;gap:8px">
-              <!-- Top Row: Name, Brand, Price -->
               <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">
                 <div>
                   <div style="font-size:13.5px;font-weight:750;color:var(--text,#1c1917)">${escapeHtml(p.name)}</div>
@@ -303,7 +328,6 @@ export function renderProductBank() {
                 </div>
               </div>
 
-              <!-- Hierarchy / Parent Mapping Badge -->
               <div style="display:flex;align-items:center;gap:6px;font-size:11px;flex-wrap:wrap">
                 <span style="color:var(--text3);font-weight:600">Maps to:</span>
                 ${mappedIng ? `
@@ -314,7 +338,6 @@ export function renderProductBank() {
                 ` : ''}
               </div>
 
-              <!-- Nutritional Pills Grid (P, C, F, Kcal) -->
               <div style="display:flex;gap:4px;flex-wrap:wrap;font-size:11px">
                 <span class="tag" style="background:var(--surface,#fff);font-weight:650">🔥 ${p.cal || 0} kcal</span>
                 <span class="tag" style="background:var(--surface,#fff);font-weight:650;color:var(--primary,#4f46e5)">🫘 ${p.prot || 0}g P</span>
@@ -324,7 +347,6 @@ export function renderProductBank() {
                 ${efficiency ? `<span class="tag" style="background:rgba(16,185,129,0.12);color:var(--green,#10b981);font-weight:700">💪 ${efficiency}</span>` : ''}
               </div>
 
-              <!-- Action Toolbar -->
               <div style="display:flex;align-items:center;justify-content:flex-start;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:6px;border-top:1px solid var(--border,#e7e5e4);width:100%">
                 <button type="button" class="btn xs btn-ghost ghost" onclick="openProductEditModal('${escapeAttr(p.id)}')" style="height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500">Edit</button>
                 <button type="button" class="btn xs btn-ghost ghost" onclick="promptReallocateProduct('${escapeAttr(p.id)}')" style="height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500">Reallocate</button>
@@ -339,11 +361,10 @@ export function renderProductBank() {
     </div>
   `).join('');
 
-  container.innerHTML = html;
+  container.innerHTML = searchBarHtml + cardsHtml;
 }
 
 export function clearProductGroupFilter() {
-  // Clear any active product filter/search state
   const searchInput = document.getElementById('product-bank-search');
   if (searchInput) searchInput.value = '';
   renderProductBank();

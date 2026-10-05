@@ -1,11 +1,11 @@
 /**
- * src/views/DataQualityView.js (v3.20.05)
- * Modular ES6 View for Data Quality Centre, audit scanner results, macro quality sweep, and 3-path resolutions.
+ * src/views/DataQualityView.js (v3.20.06)
+ * Modular ES6 View for Data Quality Centre, audit scanner results, macro quality sweep, and dynamic macro recalibration.
  */
 
 import { getState, subscribe, setPreferences } from '../store/store.js';
-import { savePreferences } from '../services/HouseholdRepository.js';
-import { runDataQualityScan } from '../services/DataQualityScannerService.js';
+import { savePreferences, saveRecipe } from '../services/HouseholdRepository.js';
+import { runDataQualityScan, calculateRecipeDynamicMacros } from '../services/DataQualityScannerService.js';
 import { sweepRecipeMacroQuality } from '../utils/fitScoreCalculator.js';
 import { openResolveUnlinkedModal } from '../components/data-quality/ResolveUnlinkedModalUI.js';
 import { openHierarchyWizardModal } from '../components/data-quality/HierarchyWizardModalUI.js';
@@ -70,46 +70,88 @@ export async function runGlobalProductRelink() {
       ? window.Store.getState() 
       : (typeof getState === 'function' ? getState() : {});
 
-    if (typeof window.relinkOrphanedProducts === 'function') {
-      await window.relinkOrphanedProducts();
-    } else {
-      const prods = Array.isArray(state.products) ? JSON.parse(JSON.stringify(state.products)) : [];
-      const ings = Array.isArray(state.ingredients) ? state.ingredients : [];
-      let modified = false;
+    const prods = Array.isArray(state.products) ? JSON.parse(JSON.stringify(state.products)) : [];
+    const ings = Array.isArray(state.ingredients) ? state.ingredients : [];
+    let modified = false;
 
-      for (const prod of prods) {
-        if (!prod.ingredientId) {
-          const prodNameLower = String(prod.name || '').toLowerCase();
-          const match = ings.find(i => {
-            const ingName = String(i.name || '').toLowerCase();
-            return prodNameLower.includes(ingName) || (Array.isArray(i.aliases) && i.aliases.some(a => prodNameLower.includes(String(a).toLowerCase())));
-          });
-          if (match) {
-            prod.ingredientId = match.id;
-            if (!prod.category && match.category) prod.category = match.category;
-            prod.updatedAt = new Date().toISOString();
-            modified = true;
-          }
+    for (const prod of prods) {
+      if (!prod.ingredientId) {
+        const prodNameLower = String(prod.name || '').toLowerCase();
+        const match = ings.find(i => {
+          const ingName = String(i.name || '').toLowerCase();
+          return prodNameLower.includes(ingName) || (Array.isArray(i.aliases) && i.aliases.some(a => prodNameLower.includes(String(a).toLowerCase())));
+        });
+        if (match) {
+          prod.ingredientId = match.id;
+          if (!prod.category && match.category) prod.category = match.category;
+          prod.updatedAt = new Date().toISOString();
+          modified = true;
         }
       }
+    }
 
-      if (modified) {
-        if (window.Store && typeof window.Store.setState === 'function') {
-          window.Store.setState({ products: prods });
-        }
-        if (window.PantryRepository && typeof window.PantryRepository.saveProduct === 'function') {
-          await Promise.all(prods.filter(p => p.ingredientId).map(p => window.PantryRepository.saveProduct(p)));
-        }
+    if (modified) {
+      if (window.Store && typeof window.Store.setState === 'function') {
+        window.Store.setState({ products: prods });
+      }
+      if (window.PantryRepository && typeof window.PantryRepository.saveProduct === 'function') {
+        await Promise.all(prods.filter(p => p.ingredientId).map(p => window.PantryRepository.saveProduct(p)));
       }
     }
 
     if (typeof window.renderDataQualityView === 'function') {
       window.renderDataQualityView();
-    } else if (window.DataQualityView && typeof window.DataQualityView.render === 'function') {
-      window.DataQualityView.render();
     }
   } catch (err) {
     console.error('[DataQualityView] runGlobalProductRelink caught error:', err);
+  }
+}
+
+export async function autoRecalibrateRecipeMacros(recipeId) {
+  try {
+    const state = (window.Store && typeof window.Store.getState === 'function') 
+      ? window.Store.getState() 
+      : (typeof getState === 'function' ? getState() : {});
+    const recipes = Array.isArray(state.recipes) ? [...state.recipes] : (window.state?.recipes ? [...window.state.recipes] : []);
+    const rIndex = recipes.findIndex(rec => String(rec.id) === String(recipeId));
+    if (rIndex < 0) return;
+
+    const r = { ...recipes[rIndex] };
+    const dynamic = calculateRecipeDynamicMacros(r, state.ingredients || [], state.products || []);
+    if (!dynamic) return;
+
+    r.macros = {
+      calories: dynamic.perServing.cal,
+      protein: dynamic.perServing.prot,
+      carbs: dynamic.perServing.carb,
+      fat: dynamic.perServing.fat,
+      price: dynamic.perServing.cost
+    };
+    r.cal = dynamic.perServing.cal;
+    r.calories = dynamic.perServing.cal;
+    r.prot = dynamic.perServing.prot;
+    r.protein = dynamic.perServing.prot;
+    r.carb = dynamic.perServing.carb;
+    r.carbs = dynamic.perServing.carb;
+    r.fat = dynamic.perServing.fat;
+    r.updatedAt = new Date().toISOString();
+
+    recipes[rIndex] = r;
+    if (window.Store?.setState) window.Store.setState({ recipes });
+    if (window.state) window.state.recipes = recipes;
+    if (typeof window.recipes !== 'undefined') window.recipes = recipes;
+
+    try {
+      await saveRecipe(r);
+    } catch (e) {
+      console.warn('[DataQualityView] Failed to save recalibrated recipe to cloud:', e);
+    }
+
+    document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: recipes }));
+    document.dispatchEvent(new CustomEvent('plateplan:recipes-updated', { detail: recipes }));
+    renderDataQualityView();
+  } catch (err) {
+    console.error('[DataQualityView] autoRecalibrateRecipeMacros error:', err);
   }
 }
 
@@ -159,6 +201,10 @@ export function handleFixIssue(e, entityType, entityId, issueKey = '', parentId 
         openProductEditModal(entityId);
       }
     } else if (entityType === 'recipe') {
+      if (issueKey.includes('macro-sync')) {
+        autoRecalibrateRecipeMacros(entityId);
+        return;
+      }
       if (typeof window.viewRecipe === 'function') {
         window.viewRecipe(entityId);
       }
@@ -197,6 +243,7 @@ export function renderDataQualityView() {
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
           ${dismissible ? `<button type="button" class="btn sm btn-ghost ghost" onclick="dismissAdvisory('${escapeAttr(issue.key)}')">Looks right</button>` : ''}
+          ${issue.isMacroSyncError ? `<button type="button" class="btn sm primary" style="background:var(--primary,#4f46e5);color:#fff" onclick="autoRecalibrateRecipeMacros('${escapeAttr(issue.entityId)}')">Auto-Recalibrate Macros from Ingredients</button>` : ''}
           <button type="button" class="btn sm btn-primary primary dq-fix-btn" 
             data-entity-type="${escapeAttr(issue.entityType)}" 
             data-entity-id="${escapeAttr(issue.entityId)}" 
@@ -229,7 +276,10 @@ export function renderDataQualityView() {
                 <div style="font-weight:700;font-size:12.5px;color:#1c1917">${escapeHtml(r.name)}</div>
                 <div style="font-size:11px;color:#78716c">Calories: ${r.calories !== null ? `${r.calories} kcal` : 'missing'} · Protein: ${r.protein !== null ? `${r.protein}g` : 'missing'}</div>
               </div>
-              <button type="button" class="btn sm btn-primary primary dq-fix-btn" data-entity-type="recipe" data-entity-id="${escapeAttr(r.id)}" onclick="handleFixIssue(event, 'recipe', '${escapeAttr(r.id)}', 'macro:recipe:${escapeAttr(r.id)}')">Inspect Recipe</button>
+              <div style="display:flex;gap:6px">
+                <button type="button" class="btn xs primary" style="background:var(--primary,#4f46e5);color:#fff" onclick="autoRecalibrateRecipeMacros('${escapeAttr(r.id)}')">Auto-Recalibrate</button>
+                <button type="button" class="btn xs ghost" onclick="handleFixIssue(event, 'recipe', '${escapeAttr(r.id)}')">View</button>
+              </div>
             </div>
           `).join('')}
         </div>
@@ -238,100 +288,67 @@ export function renderDataQualityView() {
   `;
 
   container.innerHTML = `
-    <div class="view-toolbar" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:20px">🛡️</span>
-        <h1 class="view-title" style="margin:0">Data Quality Centre</h1>
+    <div style="max-width:900px;margin:0 auto;padding:20px;box-sizing:border-box">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <h2 style="font-size:22px;font-weight:750;margin:0;color:var(--text,#1c1917)">Data Quality Centre</h2>
+          <p style="margin:4px 0 0 0;font-size:13px;color:var(--text2,#78716c)">Catalogue audit scanner, recipe macro validation, and structural health advisory.</p>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn sm secondary" onclick="runGlobalProductRelink()">⚡ Auto-Relink Catalog</button>
+          <button type="button" class="btn sm ghost" onclick="renderDataQualityView()">🔄 Refresh Audit</button>
+        </div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn sm btn-primary primary" type="button" onclick="window.openHierarchyWizardModal?.()">🪄 Run Hierarchy Wizard</button>
-        <button class="btn sm btn-ghost ghost" type="button" onclick="window.runGlobalProductRelink?.()">Batch Relink Products</button>
-        <button class="btn sm btn-ghost ghost" type="button" onclick="renderDataQualityView()">Refresh Scans</button>
+
+      ${macroSweepCardHtml}
+
+      <div style="display:grid;grid-template-columns:1fr;gap:16px">
+        <div class="card" style="background:var(--surface,#fff);border-radius:14px;padding:18px;border:1px solid var(--border,#e7e5e4)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <h3 style="margin:0;font-size:15px;font-weight:750;color:var(--text,#1c1917)">🚨 Calculation Blockers (${scan.blockers.length})</h3>
+            <span style="font-size:12px;color:var(--text2,#78716c)">Must be resolved for accurate meal planning calculations</span>
+          </div>
+          ${scan.blockers.length === 0 ? '<div style="font-size:13px;color:var(--text2,#78716c);padding:10px 0">No calculation blockers detected. Excellent!</div>' : scan.blockers.map(b => renderIssueRow(b)).join('')}
+        </div>
+
+        <div class="card" style="background:var(--surface,#fff);border-radius:14px;padding:18px;border:1px solid var(--border,#e7e5e4)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <h3 style="margin:0;font-size:15px;font-weight:750;color:var(--text,#1c1917)">⚠️ Data Gaps (${scan.gaps.length})</h3>
+            <span style="font-size:12px;color:var(--text2,#78716c)">Ingredients lacking linked grocery products</span>
+          </div>
+          ${scan.gaps.length === 0 ? '<div style="font-size:13px;color:var(--text2,#78716c);padding:10px 0">No data gaps detected.</div>' : scan.gaps.map(g => renderIssueRow(g)).join('')}
+        </div>
+
+        <div class="card" style="background:var(--surface,#fff);border-radius:14px;padding:18px;border:1px solid var(--border,#e7e5e4)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <h3 style="margin:0;font-size:15px;font-weight:750;color:var(--text,#1c1917)">💡 Advisories &amp; Outliers (${scan.advisories.length})</h3>
+            <span style="font-size:12px;color:var(--text2,#78716c)">Recommendations &amp; macro synchronisation checks</span>
+          </div>
+          ${scan.advisories.length === 0 ? '<div style="font-size:13px;color:var(--text2,#78716c);padding:10px 0">No active advisories.</div>' : scan.advisories.map(a => renderIssueRow(a, true)).join('')}
+        </div>
       </div>
     </div>
-
-    ${macroSweepCardHtml}
-
-    <!-- 1. Calculation Blockers Section -->
-    <details open style="margin-bottom:14px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:12px;padding:12px">
-      <summary style="cursor:pointer;font-weight:750;font-size:14px;color:var(--red,#ef4444);display:flex;align-items:center;justify-content:space-between">
-        <span>❌ Calculation Blockers (${scan.blockers.length})</span>
-      </summary>
-      <div style="margin-top:10px">
-        ${scan.blockers.length ? scan.blockers.map(issue => renderIssueRow(issue, false)).join('') : `
-          <div class="msg success" style="margin:0;font-size:12.5px">No calculation blockers detected. Beautiful data!</div>
-        `}
-      </div>
-    </details>
-
-    <!-- 2. Other Data Gaps Section -->
-    <details open style="margin-bottom:14px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:12px;padding:12px">
-      <summary style="cursor:pointer;font-weight:750;font-size:14px;color:var(--amber,#f59e0b);display:flex;align-items:center;justify-content:space-between">
-        <span>⚠️ Other Data Gaps (${scan.gaps.length})</span>
-      </summary>
-      <div style="margin-top:10px">
-        ${scan.gaps.length ? scan.gaps.map(issue => renderIssueRow(issue, false)).join('') : `
-          <div class="msg success" style="margin:0;font-size:12.5px">No other data gaps detected. Products are fully mapped!</div>
-        `}
-      </div>
-    </details>
-
-    <!-- 3. Heuristic Advisories Section -->
-    <details style="margin-bottom:14px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:12px;padding:12px">
-      <summary style="cursor:pointer;font-weight:750;font-size:14px;color:var(--primary,#4f46e5);display:flex;align-items:center;justify-content:space-between">
-        <span>💡 Heuristic Advisories (${scan.advisories.length})</span>
-      </summary>
-      <div style="margin-top:10px">
-        ${scan.advisories.length ? scan.advisories.map(issue => renderIssueRow(issue, true)).join('') : `
-          <div class="msg success" style="margin:0;font-size:12.5px">No active advisories. Everything looks highly realistic.</div>
-        `}
-      </div>
-    </details>
   `;
-
-  // Update dynamic sidebar navigation counters & badges
-  updateDataQualityBadge(scan.totalCount + flaggedMacroRecipes.length, scan.blockers.length + flaggedMacroRecipes.length, scan.gaps.length);
 }
 
-export function updateDataQualityBadge(count = 0, blockers = 0, gaps = 0) {
-  document.querySelectorAll('[data-view="data"], [data-view="quality"]').forEach(el => {
-    let badge = el.querySelector('.dq-nav-badge');
-    if (count > 0) {
-      if (!badge) {
-        badge = document.createElement('span');
-        badge.className = 'dq-nav-badge nav-badge';
-        badge.style.cssText = 'margin-left:6px;font-size:11px;font-weight:700;padding:2px 6px;border-radius:10px;line-height:1;display:inline-block;';
-        el.appendChild(badge);
-      }
-      badge.textContent = count > 99 ? '99+' : count;
-      badge.title = `${blockers} blockers, ${gaps} gaps, ${count} total issues`;
-      if (blockers > 0) {
-        badge.style.background = 'var(--red-bg, rgba(239,68,68,0.15))';
-        badge.style.color = 'var(--red, #dc2626)';
-      } else {
-        badge.style.background = 'var(--amber-bg, rgba(245,158,11,0.15))';
-        badge.style.color = 'var(--amber, #d97706)';
-      }
-    } else if (badge) {
-      badge.remove();
-    }
-  });
+function updateDataQualityBadge() {
+  const badge = document.getElementById('dq-badge-count');
+  if (!badge) return;
+  const state = (window.Store && typeof window.Store.getState === 'function') 
+    ? window.Store.getState() 
+    : (typeof getState === 'function' ? getState() : {});
+  const scan = runDataQualityScan(state);
+  const flaggedMacroRecipes = sweepRecipeMacroQuality(state.recipes || window.state?.recipes || []);
+  const total = scan.totalCount + flaggedMacroRecipes.length;
+  badge.textContent = total;
+  badge.style.display = total > 0 ? 'inline-flex' : 'none';
 }
 
-let isSubscribed = false;
-export function initDataQualitySubscriptions() {
-  if (isSubscribed) return;
-  isSubscribed = true;
-
-  subscribe('ingredients', () => renderDataQualityView());
-  subscribe('products', () => renderDataQualityView());
-  subscribe('recipes', () => renderDataQualityView());
-
-  if (typeof document !== 'undefined') {
-    document.addEventListener('plateplan:state:ingredients', () => renderDataQualityView());
-    document.addEventListener('plateplan:state:products', () => renderDataQualityView());
-    document.addEventListener('plateplan:state:recipes', () => renderDataQualityView());
-  }
+function initDataQualitySubscriptions() {
+  if (typeof document === 'undefined') return;
+  document.addEventListener('plateplan:state:ingredients', () => renderDataQualityView());
+  document.addEventListener('plateplan:state:products', () => renderDataQualityView());
+  document.addEventListener('plateplan:state:recipes', () => renderDataQualityView());
 }
 
 export function mount(container) {
@@ -339,7 +356,6 @@ export function mount(container) {
   renderDataQualityView();
 }
 
-// Global window registration and event delegation fallback
 if (typeof window !== 'undefined') {
   window.renderDataQualityView = renderDataQualityView;
   window.renderDataQuality = renderDataQualityView;
@@ -349,8 +365,8 @@ if (typeof window !== 'undefined') {
   window.runGlobalProductRelink = runGlobalProductRelink;
   window.batchRelinkProducts = runGlobalProductRelink;
   window.updateDataQualityBadge = updateDataQualityBadge;
+  window.autoRecalibrateRecipeMacros = autoRecalibrateRecipeMacros;
 
-  // Event Delegation Fallback
   if (typeof document !== 'undefined' && !window.__dq_fix_delegation_bound) {
     window.__dq_fix_delegation_bound = true;
     document.addEventListener('click', (e) => {

@@ -1,11 +1,12 @@
 /**
- * src/services/DataQualityScannerService.js (v3.20.05)
- * Automated catalogue data quality auditor, anomaly scanner, and advisor.
+ * src/services/DataQualityScannerService.js (v3.20.06)
+ * Automated catalogue data quality auditor, anomaly scanner, and advisor with dynamic macro synchronisation.
  * Pure service layer with zero DOM references.
  */
 
 import { getState } from '../store/store.js';
 import { buildPantryHierarchy } from '../models/PantryHierarchyModel.js';
+import { calculateItemNutrition, rollupNutritionTotals } from './NutritionService.js';
 
 let scanTimer = null;
 let lastChecksum = '';
@@ -23,6 +24,55 @@ export function runDataQualityScanDebounced(state = {}, callback) {
 export function runDataQualityDiagnostics(state = {}, verbose = true) {
   const res = runDataQualityScan(state, { force: true, verbose });
   return res;
+}
+
+export function calculateRecipeDynamicMacros(recipe, ingredientsList = [], productsList = []) {
+  if (!recipe || typeof recipe !== 'object') return null;
+  const rawIngs = recipe.ingredients || recipe.recipe?.ingredients || recipe.parsedIngredients || [];
+  const items = Array.isArray(rawIngs) ? rawIngs : (typeof rawIngs === 'object' ? Object.values(rawIngs) : []);
+  if (!items.length) return null;
+
+  const productMap = new Map();
+  (productsList || []).forEach(p => { if (p?.id) productMap.set(String(p.id), p); });
+
+  const ingredientMap = new Map();
+  (ingredientsList || []).forEach(i => { if (i?.id) ingredientMap.set(String(i.id), i); });
+
+  const nutritionList = [];
+
+  items.forEach(item => {
+    if (item.excludeNutrition) return;
+    let matchedSource = null;
+    if (item.productId && productMap.has(String(item.productId))) {
+      matchedSource = productMap.get(String(item.productId));
+    }
+    if (!matchedSource && item.ingredientId) {
+      const ing = ingredientMap.get(String(item.ingredientId));
+      if (ing) {
+        if (item.subtypeId && Array.isArray(ing.subtypes)) {
+          const sub = ing.subtypes.find(s => String(s.id) === String(item.subtypeId));
+          if (sub && sub.defaultProduct) matchedSource = productMap.get(String(sub.defaultProduct));
+        }
+        if (!matchedSource && ing.defaultProduct) matchedSource = productMap.get(String(ing.defaultProduct));
+        if (!matchedSource && ing.cal !== undefined) matchedSource = ing;
+      }
+    }
+    if (!matchedSource && item.name) {
+      const qName = String(item.name).toLowerCase().trim();
+      matchedSource = (productsList || []).find(p => String(p.name || '').toLowerCase().includes(qName)) ||
+                      (ingredientsList || []).find(i => String(i.name || '').toLowerCase().includes(qName));
+    }
+
+    if (matchedSource) {
+      const qty = Number(item.qty ?? item.amount ?? item.quantity ?? 1) || 1;
+      const unit = item.unit || item.measure || 'g';
+      nutritionList.push(calculateItemNutrition(matchedSource, qty, unit));
+    }
+  });
+
+  if (!nutritionList.length) return null;
+  const serves = Number(recipe.serves ?? recipe.recipe?.serves ?? 2) || 2;
+  return rollupNutritionTotals(nutritionList, serves);
 }
 
 export function runDataQualityScan(state = {}, options = {}) {
@@ -51,7 +101,6 @@ export function runDataQualityScan(state = {}, options = {}) {
     };
   }
 
-  // Use the multidirectional hierarchy builder to resolve all linked direct/subtype products and defaults
   const hierarchy = buildPantryHierarchy(ingredientsList, productsList);
   const ingredients = [];
   hierarchy.forEach(catGroup => {
@@ -60,7 +109,6 @@ export function runDataQualityScan(state = {}, options = {}) {
     }
   });
 
-  // Resolve dismissed advisories from preferences
   const dismissed = state.preferences?.dismissedQualityAdvisories || 
                     state.userPrefs?.dismissedQualityAdvisories || [];
 
@@ -141,7 +189,6 @@ export function runDataQualityScan(state = {}, options = {}) {
   });
 
   // 3. Heuristic Advisories Heuristics
-  // Pack size check
   productsList.forEach(p => {
     if (Number(p.pack) > 5000) {
       advisories.push({
@@ -156,36 +203,51 @@ export function runDataQualityScan(state = {}, options = {}) {
     }
   });
 
-  // Recipe calorie outliers
+  // Recipe calorie outliers with dynamic macro synchronisation
   recipes.forEach(r => {
-    const serves = Number(r.serves) || 1;
-    const rawCal = Number(r.cal) || 0;
-    const calPerServing = rawCal / serves;
+    const serves = Number(r.serves) || 2;
+    const rawCal = Number(r.cal ?? r.calories ?? r.macros?.cal ?? r.macros?.calories ?? 0);
+    const calPerServing = serves > 0 ? (rawCal / serves) : rawCal;
+
+    const dynamic = calculateRecipeDynamicMacros(r, ingredientsList, productsList);
+    const dynamicCalPerServing = dynamic ? dynamic.perServing.cal : null;
 
     if (calPerServing > 1500) {
       advisories.push({
         key: `advisory:recipe-high-cal:${r.id}`,
         entityType: 'recipe',
         entityId: r.id,
-        title: r.name,
+        title: r.name || r.title,
         message: `Unusually high calories per serving detected: ${Math.round(calPerServing)} kcal (baseline serves ${serves}).`,
         severity: 'advisory',
         fixTarget: { entityType: 'recipe', entityId: r.id }
       });
-    } else if (rawCal > 0 && calPerServing < 150) {
-      advisories.push({
-        key: `advisory:recipe-low-cal:${r.id}`,
-        entityType: 'recipe',
-        entityId: r.id,
-        title: r.name,
-        message: `Unusually low calories per serving detected: ${Math.round(calPerServing)} kcal (baseline serves ${serves}).`,
-        severity: 'advisory',
-        fixTarget: { entityType: 'recipe', entityId: r.id }
-      });
+    } else if (rawCal > 0 && calPerServing < 200) {
+      if (dynamicCalPerServing !== null && dynamicCalPerServing >= 200) {
+        advisories.push({
+          key: `advisory:recipe-macro-sync:${r.id}`,
+          entityType: 'recipe',
+          entityId: r.id,
+          title: r.name || r.title,
+          message: `Static recipe macros are out of sync with dynamic ingredient calculation.`,
+          severity: 'advisory',
+          isMacroSyncError: true,
+          fixTarget: { entityType: 'recipe', entityId: r.id }
+        });
+      } else {
+        advisories.push({
+          key: `advisory:recipe-low-cal:${r.id}`,
+          entityType: 'recipe',
+          entityId: r.id,
+          title: r.name || r.title,
+          message: `Unusually low calories per serving detected: ${Math.round(calPerServing)} kcal (baseline serves ${serves}).`,
+          severity: 'advisory',
+          fixTarget: { entityType: 'recipe', entityId: r.id }
+        });
+      }
     }
   });
 
-  // Duplicate ingredient normalized names
   const seenNorms = new Map();
   ingredients.forEach(ing => {
     const norm = String(ing.name || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
@@ -208,15 +270,15 @@ export function runDataQualityScan(state = {}, options = {}) {
     }
   });
 
-  // Filter out any dismissed advisories
   const activeAdvisories = advisories.filter(adv => !dismissed.includes(adv.key));
-
   const totalCount = blockers.length + gaps.length + activeAdvisories.length;
 
-  return {
+  cachedScanResult = {
     blockers,
     gaps,
     advisories: activeAdvisories,
     totalCount
   };
+
+  return cachedScanResult;
 }

@@ -1,5 +1,5 @@
 /**
- * src/components/data-quality/ResolveUnlinkedModalUI.js (v3.20.05)
+ * src/components/data-quality/ResolveUnlinkedModalUI.js (v3.20.06)
  * Multi-Path Resolution Modal UI component for unlinked ingredients, sub-types, and recipe items.
  * Mounts directly to document.body for flawless viewport presentation.
  * Features re-mapping to existing ingredients/subtypes, safe product retrieval & state-driven editor review.
