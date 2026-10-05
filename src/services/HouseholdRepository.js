@@ -1,5 +1,5 @@
 /**
- * src/services/HouseholdRepository.js (v3.19.78)
+ * src/services/HouseholdRepository.js (v3.19.79)
  * Dedicated data access repository for household-scoped Firestore operations.
  * Completely isolated from DOM manipulation and UI rendering.
  * All operations target the shared household path 'households/elliott-chloe'.

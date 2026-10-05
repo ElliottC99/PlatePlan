@@ -1,10 +1,11 @@
 /**
- * src/components/planner/PlannerSwapModalUI.js (v3.19.78)
+ * src/components/planner/PlannerSwapModalUI.js (v3.19.79)
  * Interactive Swap Meal Modal UI for the Weekly Meal Planner.
  * Extracted from PlannerView.js to maintain strict <400 line modularity.
  */
 
-import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
+import { calculateMealFitScore, extractRecipeMacros } from '../../utils/fitScoreCalculator.js';
+import { getSortedRecipes } from '../../services/FitScoreService.js';
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
 
 let currentSwapModalContext = null;
@@ -49,6 +50,11 @@ export function openSwapMealModal(day, slotKey) {
         } else {
           cal = personKey === 'c' ? (portions?.cCal || 0) : (portions?.eCal || 0);
           prot = personKey === 'c' ? (portions?.cProt || 0) : (portions?.eProt || 0);
+        }
+        if (!cal || !prot) {
+          const fallbackMacros = extractRecipeMacros(info.recipe, info.variant);
+          if (!cal && fallbackMacros.cal) cal = Math.round(fallbackMacros.cal);
+          if (!prot && fallbackMacros.prot) prot = Math.round(fallbackMacros.prot * 10) / 10;
         }
       }
     } catch (e) {
@@ -212,7 +218,10 @@ export function renderSwapModalOptionsList() {
 
   const sortOption = document.getElementById('swap-modal-sort-select')?.value || 'best-fit';
   const targetSlot = currentSwapModalContext.mealType || 'dinner';
-  filtered = typeof window.getSortedRecipes === 'function' ? window.getSortedRecipes(filtered, sortOption, targetSlot) : filtered;
+  const activeProfile = currentSwapModalContext.who === 'both'
+    ? 'everyone'
+    : (String(currentSwapModalContext.who || '').toLowerCase().startsWith('c') ? 'chloe' : 'elliott');
+  filtered = getSortedRecipes(filtered, sortOption, targetSlot, { activeProfile });
 
   if (!filtered.length) {
     container.innerHTML = `<div style="padding:28px;text-align:center;color:var(--text3);font-size:13px">No matching recipes found.</div>`;

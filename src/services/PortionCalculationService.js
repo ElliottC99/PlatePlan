@@ -1,11 +1,12 @@
 /**
- * src/services/PortionCalculationService.js (v3.16.2)
+ * src/services/PortionCalculationService.js (v3.19.79)
  * Portion-Aware Scaling Engine.
  * Dynamically scales recipe servings per person based on meal calorie targets,
  * and evaluates protein adequacy and portion realism (sanity penalty).
  */
 
 import { getProfileMealTargets } from '../models/StateModel.js';
+import { extractRecipeMacros } from '../utils/fitScoreCalculator.js';
 
 /**
  * Calculates the required serving multiplier to meet the profile's calorie target.
@@ -52,18 +53,10 @@ export function calculatePortionSanityPenalty(multiplier) {
  * @returns {{ kcal: number, protein: number }}
  */
 export function getRecipePerServingNutrition(recipe, variant = 'original') {
-  const r = recipe?.recipe || recipe || {};
-  const useEnhanced = variant === 'enhanced' && r.enhanced;
-  const source = useEnhanced ? (r.enhanced || r) : r;
-  const ps = source.perServing || source.nutrition || source;
-
-  // Use correct raw keys as requested: cal, prot aliases
-  const kcal = Number(ps.cal ?? ps.kcal ?? ps.calories ?? source.cal ?? source.kcal ?? source.calories ?? 0);
-  const protein = Number(ps.prot ?? ps.protein ?? source.prot ?? source.protein ?? 0);
-
+  const { cal, prot } = extractRecipeMacros(recipe, variant);
   return {
-    kcal: Math.max(0, Math.round(kcal)),
-    protein: Math.max(0, Math.round(protein * 10) / 10)
+    kcal: Math.max(0, Math.round(Number(cal) || 0)),
+    protein: Math.max(0, Math.round((Number(prot) || 0) * 10) / 10)
   };
 }
 

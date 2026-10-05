@@ -1,5 +1,5 @@
 if (typeof window !== 'undefined') {
-  window.APP_VERSION = 'v3.19.78';
+  window.APP_VERSION = 'v3.19.79';
   window.showTescoImport = () => {
     import('./components/pantry/SubtypeActionModalsUI.js')
       .then(m => {
@@ -30,7 +30,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * src/main.js (v3.19.30)
+ * src/main.js (v3.19.79)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronization,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -324,7 +324,7 @@ function sanitizeRecipes(recipes) {
 export function updateVersionBadge() {
   const badgeEl = document.getElementById('app-header-version') || document.getElementById('app-version') || document.getElementById('plateplan-update-version');
   if (badgeEl) {
-    badgeEl.textContent = window.APP_VERSION || 'v3.19.78';
+    badgeEl.textContent = window.APP_VERSION || 'v3.19.79';
   }
 }
 

@@ -1,5 +1,5 @@
 /**
- * src/models/MealPlannerModel.js (v3.19.78)
+ * src/models/MealPlannerModel.js (v3.19.79)
  * Domain Model & Payload Sanitiser for Household Meal Plans & Split Skeleton Grids.
  * Enforces lightweight Firestore payloads by stripping heavy recipe/product fields.
  */

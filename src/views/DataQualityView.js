@@ -1,14 +1,17 @@
 /**
- * src/views/DataQualityView.js (v3.19.78)
- * Modular ES6 View for Data Quality Centre, audit scanner results, and 3-path resolutions.
+ * src/views/DataQualityView.js (v3.19.79)
+ * Modular ES6 View for Data Quality Centre, audit scanner results, macro quality sweep, and 3-path resolutions.
  */
 
 import { getState, subscribe, setPreferences } from '../store/store.js';
 import { savePreferences } from '../services/HouseholdRepository.js';
 import { runDataQualityScan } from '../services/DataQualityScannerService.js';
+import { sweepRecipeMacroQuality } from '../utils/fitScoreCalculator.js';
 import { openResolveUnlinkedModal } from '../components/data-quality/ResolveUnlinkedModalUI.js';
 import { openHierarchyWizardModal } from '../components/data-quality/HierarchyWizardModalUI.js';
 import { openProductEditModal } from './ProductBankView.js';
+
+export { sweepRecipeMacroQuality };
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -180,6 +183,7 @@ export function renderDataQualityView() {
     ? window.Store.getState() 
     : (typeof getState === 'function' ? getState() : {});
   const scan = runDataQualityScan(state);
+  const flaggedMacroRecipes = sweepRecipeMacroQuality(state.recipes || window.state?.recipes || []);
 
   const renderIssueRow = (issue, dismissible = false) => {
     const parentIdAttr = issue.parentIngredientId ? `'${escapeAttr(issue.parentIngredientId)}'` : 'null';
@@ -204,6 +208,35 @@ export function renderDataQualityView() {
     `;
   };
 
+  const macroSweepCardHtml = `
+    <div class="dq-macro-sweep-card" style="margin-bottom:14px;background:${flaggedMacroRecipes.length > 0 ? '#fef2f2' : '#f0fdf4'};border:1px solid ${flaggedMacroRecipes.length > 0 ? '#fecaca' : '#bbf7d0'};border-radius:12px;padding:12px 14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:16px">${flaggedMacroRecipes.length > 0 ? '🔴' : '🟢'}</span>
+          <strong style="font-size:13.5px;color:${flaggedMacroRecipes.length > 0 ? '#991b1b' : '#166534'}">
+            ${flaggedMacroRecipes.length} recipes missing calorie/protein data required for Fit Score calculation.
+          </strong>
+        </div>
+        <span class="badge" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:${flaggedMacroRecipes.length > 0 ? '#fee2e2' : '#dcfce7'};color:${flaggedMacroRecipes.length > 0 ? '#b91c1c' : '#15803d'}">
+          ${flaggedMacroRecipes.length > 0 ? `${flaggedMacroRecipes.length} Action Required` : 'All Recipes Validated'}
+        </span>
+      </div>
+      ${flaggedMacroRecipes.length > 0 ? `
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto">
+          ${flaggedMacroRecipes.map(r => `
+            <div class="dq-issue-row" style="padding:8px 10px;background:#ffffff;border:1px solid #fecaca;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+              <div style="min-width:0">
+                <div style="font-weight:700;font-size:12.5px;color:#1c1917">${escapeHtml(r.name)}</div>
+                <div style="font-size:11px;color:#78716c">Calories: ${r.calories !== null ? `${r.calories} kcal` : 'missing'} · Protein: ${r.protein !== null ? `${r.protein}g` : 'missing'}</div>
+              </div>
+              <button type="button" class="btn sm primary dq-fix-btn" data-entity-type="recipe" data-entity-id="${escapeAttr(r.id)}" onclick="handleFixIssue(event, 'recipe', '${escapeAttr(r.id)}', 'macro:recipe:${escapeAttr(r.id)}')">Inspect Recipe</button>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
+
   container.innerHTML = `
     <div class="view-toolbar" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
       <div style="display:flex;align-items:center;gap:8px">
@@ -216,6 +249,8 @@ export function renderDataQualityView() {
         <button class="btn sm ghost" type="button" onclick="renderDataQualityView()">Refresh Scans</button>
       </div>
     </div>
+
+    ${macroSweepCardHtml}
 
     <!-- 1. Calculation Blockers Section -->
     <details open style="margin-bottom:14px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:12px;padding:12px">
@@ -255,7 +290,7 @@ export function renderDataQualityView() {
   `;
 
   // Update dynamic sidebar navigation counters & badges
-  updateDataQualityBadge(scan.totalCount, scan.blockers.length, scan.gaps.length);
+  updateDataQualityBadge(scan.totalCount + flaggedMacroRecipes.length, scan.blockers.length + flaggedMacroRecipes.length, scan.gaps.length);
 }
 
 export function updateDataQualityBadge(count = 0, blockers = 0, gaps = 0) {

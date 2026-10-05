@@ -1,8 +1,11 @@
 /**
- * src/components/planner/PlannerMealSlot.js (v3.8.1)
+ * src/components/planner/PlannerMealSlot.js (v3.19.79)
  * UI component for meal slot cards, dual-profile portion badges,
  * meal type labels, and recipe swap/clear triggers.
  */
+
+import { calculateMealFitScore, extractRecipeMacros } from '../../utils/fitScoreCalculator.js';
+import { renderFitScoreBadge } from '../FitScoreBadge.js';
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -186,11 +189,13 @@ export function filterSearchableRecipeSwapModal(query = '') {
   const resultsContainer = document.getElementById('swap-modal-results');
   if (!resultsContainer || !currentSearchableSwapContext) return;
 
-  const { day, slotKey } = currentSearchableSwapContext;
+  const { day, slotKey, isShared } = currentSearchableSwapContext;
   const stateObj = window.state || {};
   const currentSlot = stateObj.plan?.slots?.[day]?.[slotKey];
   const currentId = currentSlot?.id;
   const cleanQ = (query || '').toLowerCase().trim();
+  const mealType = window.getMealTypeFromSlotKey?.(slotKey) || (slotKey.includes('breakfast') ? 'breakfast' : slotKey.includes('lunch') ? 'lunch' : 'dinner');
+  const activeProfile = isShared ? 'everyone' : (slotKey.endsWith('C') ? 'chloe' : 'elliott');
 
   const allRecipes = Array.isArray(stateObj.recipes) ? stateObj.recipes : [];
   const candidates = allRecipes.filter(r => {
@@ -214,28 +219,13 @@ export function filterSearchableRecipeSwapModal(query = '') {
   const placeholderImg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44"><rect width="44" height="44" rx="6" fill="%23e5e7eb"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="20">🍲</text></svg>`;
 
   candidates.forEach(r => {
-    const cal = Math.round(r.cal || 0);
-    const prot = Math.round(r.prot || 0);
-    let fitScorePercent = 0;
-    try {
-      if (stateObj.plan?.slots?.[day] && window.getPlanDaySummary && window.makePlanSlot) {
-        const simPlan = {
-          ...stateObj.plan,
-          slots: { ...stateObj.plan.slots, [day]: { ...stateObj.plan.slots[day], [slotKey]: window.makePlanSlot(r.id, 'original') } }
-        };
-        const summary = window.getPlanDaySummary(day, simPlan);
-        fitScorePercent = Math.max(0, Math.min(100, Math.round(100 - (summary?.score || 0))));
-      } else {
-        // Fallback to recipe fit score if plan summary is unavailable
-        const mealType = window.getMealTypeFromSlotKey?.(slotKey) || 'dinner';
-        const person = isShared ? 'everyone' : (slotKey.endsWith('C') ? 'chloe' : 'elliott');
-        const res = window.calculateMealFitScore?.(r, mealType, { activeProfile: person, portionScaled: true }) || { score: 0 };
-        fitScorePercent = res.score;
-      }
-    } catch (_) {}
-
-    const isGood = fitScorePercent >= 75;
-    const tagStyle = `font-size:10.5px;padding:1px 6px;font-weight:700;background:${isGood ? 'var(--green-bg, #dcfce7)' : 'var(--amber-bg, #fef3c7)'};color:${isGood ? 'var(--green, #16a34a)' : 'var(--amber, #d97706)'};border:1px solid currentColor;border-radius:4px;`;
+    const macros = extractRecipeMacros(r, 'original');
+    const cal = Math.round(macros.cal || 0);
+    const prot = Math.round((macros.prot || 0) * 10) / 10;
+    const mealType = window.getMealTypeFromSlotKey?.(slotKey) || (slotKey.includes('breakfast') ? 'breakfast' : slotKey.includes('lunch') ? 'lunch' : 'dinner');
+    const person = currentSearchableSwapContext.isShared ? 'everyone' : (slotKey.endsWith('C') ? 'chloe' : 'elliott');
+    const fitRes = calculateMealFitScore(r, mealType, { activeProfile: person, portionScaled: true });
+    const fitBadgeHtml = renderFitScoreBadge(fitRes, mealType, { activeProfile: person });
 
     const row = document.createElement('div');
     row.className = 'swap-candidate-row';
@@ -245,7 +235,7 @@ export function filterSearchableRecipeSwapModal(query = '') {
       <div style="flex:1;min-width:0">
         <div style="font-weight:650;font-size:13.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(r.name || r.title || 'Untitled Recipe')}</div>
         <div style="font-size:11.5px;color:var(--text2);margin-top:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span><strong>${cal}</strong> kcal</span><span>·</span><span><strong>${prot}g</strong> protein</span><span>·</span><span class="tag" style="${tagStyle}">Fit Score ${fitScorePercent}%</span>
+          <span><strong>${cal}</strong> kcal</span><span>·</span><span><strong>${prot}g</strong> protein</span><span>·</span>${fitBadgeHtml}
         </div>
       </div>
       <button type="button" class="btn sm primary" style="font-size:12px;font-weight:700;padding:6px 12px;white-space:nowrap;flex-shrink:0" onclick="window.PlannerMealSlot?.selectAndSwapRecipe?.('${escapeAttr(r.id)}', 'original') || (window.selectAndSwapRecipe && window.selectAndSwapRecipe('${escapeAttr(r.id)}', 'original'))">Select &amp; Swap</button>

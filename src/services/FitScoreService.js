@@ -1,70 +1,45 @@
 /**
- * src/services/FitScoreService.js (v3.17.0)
- * Thin proxy wrapper for fitScoreCalculator.js modern engine.
- * Deprecates legacy linear math and hardcoded fallback budgets.
+ * src/services/FitScoreService.js (v3.19.79)
+ * Universal Fit Score Service & Sorting Coordinator.
+ * Delegates all macro extraction, asymmetric curve scoring, and 4-tier classification
+ * to src/utils/fitScoreCalculator.js.
  */
 
-import { 
-  calculateMealFitScore, 
+import {
+  calculateMealFitScore,
   calculateRecipeFit,
   calculateCalorieScore,
   calculateProteinScore,
+  extractRecipeMacros,
+  sweepRecipeMacroQuality,
+  getFitScoreTierMeta,
   getVaultTargetMacros as modernGetVaultTargetMacros
 } from '../utils/fitScoreCalculator.js';
-import { getProfileMealTargets, getProfilesFromState } from '../models/StateModel.js';
+import { getProfilesFromState } from '../models/StateModel.js';
 
-/**
- * Re-export modern engine features.
- */
-export { calculateMealFitScore, calculateRecipeFit };
-
-export const FIT_SCORE_TIERS = {
-  IDEAL: { min: 80, tier: 'green', label: 'Ideal Fit', colors: 'background-color:#dcfce7;color:#15803d;border:1px solid #bbf7d0;' },
-  ACCEPTABLE: { min: 60, tier: 'amber-green', label: 'Good Fit', colors: 'background-color:#ecfccb;color:#4d7c0f;border:1px solid #d9f99d;' },
-  SUBOPTIMAL: { min: 40, tier: 'amber', label: 'Fair Fit', colors: 'background-color:#fef3c7;color:#b45309;border:1px solid #fde68a;' },
-  POOR: { min: 0, tier: 'red', label: 'Needs Work', colors: 'background-color:#fee2e2;color:#b91c1c;border:1px solid #fecaca;' }
+export {
+  calculateMealFitScore,
+  calculateRecipeFit,
+  extractRecipeMacros,
+  sweepRecipeMacroQuality,
+  getFitScoreTierMeta
 };
 
-/**
- * Resolves dynamic meal targets for both profiles.
- * Strictly delegates to StateModel.
- */
+export const FIT_SCORE_TIERS = {
+  IDEAL: { min: 85, tier: 'green', icon: '🟢', color: '#22c55e', label: 'Ideal Match', colors: 'background-color:#dcfce7;color:#14532d;border:1px solid #22c55e;' },
+  ACCEPTABLE: { min: 70, tier: 'yellow', icon: '🟡', color: '#eab308', label: 'Needs Work', colors: 'background-color:#fef9c3;color:#713f12;border:1px solid #eab308;' },
+  SUBOPTIMAL: { min: 50, tier: 'orange', icon: '🟠', color: '#f97316', label: 'Suboptimal', colors: 'background-color:#ffedd5;color:#7c2d12;border:1px solid #f97316;' },
+  POOR: { min: 0, tier: 'red', icon: '🔴', color: '#ef4444', label: 'Poor Match', colors: 'background-color:#fee2e2;color:#7f1d1d;border:1px solid #ef4444;' }
+};
+
 export function getMealTypeTargets(mealType = 'dinner', userPrefs = null) {
-  const mt = (mealType || 'dinner').toLowerCase();
-  const profiles = userPrefs?.profiles || getProfilesFromState();
-  const elliott = profiles.elliott || profiles.e || {};
-  const chloe = profiles.chloe || profiles.c || {};
-
-  // Core Data Mapping: prefer absolute meals[mt].kcal if it exists, otherwise calculate from daily * splits
-  const targetCal_E = elliott.meals?.[mt]?.kcal || 
-                      ((Number(elliott.dailyKcal) || 0) * ((Number(elliott.calorieSplits?.[mt]) || 0) / 100));
-  const targetProt_E = elliott.meals?.[mt]?.protein || 
-                       ((Number(elliott.dailyProtein) || 0) * ((Number(elliott.proteinSplits?.[mt]) || 0) / 100));
-
-  const targetCal_C = chloe.meals?.[mt]?.kcal || 
-                      ((Number(chloe.dailyKcal) || 0) * ((Number(chloe.calorieSplits?.[mt]) || 0) / 100));
-  const targetProt_C = chloe.meals?.[mt]?.protein || 
-                       ((Number(chloe.dailyProtein) || 0) * ((Number(chloe.proteinSplits?.[mt]) || 0) / 100));
-
-  return {
-    mealType: mt,
-    targetCal_E: Math.round(targetCal_E),
-    targetProt_E: Math.round(targetProt_E * 10) / 10,
-    targetCal_C: Math.round(targetCal_C),
-    targetProt_C: Math.round(targetProt_C * 10) / 10,
-    e: { cal: Math.round(targetCal_E), prot: Math.round(targetProt_E * 10) / 10 },
-    c: { cal: Math.round(targetCal_C), prot: Math.round(targetProt_C * 10) / 10 }
-  };
+  return modernGetVaultTargetMacros(mealType, userPrefs || { profiles: getProfilesFromState() });
 }
 
-export function getVaultTargetMacros(mealType = 'dinner', userPrefs = {}) {
+export function getVaultTargetMacros(mealType = 'dinner', userPrefs = null) {
   return modernGetVaultTargetMacros(mealType, userPrefs);
 }
 
-/**
- * DEPRECATED: Delegated to Traffic Light Engine.
- * Formerly computeProfileFitScore.
- */
 export function computeProfileFitScore(actualCal, targetCal, actualProt, targetProt) {
   if (!targetCal || targetCal <= 0 || !targetProt || targetProt <= 0 || !actualCal || actualCal <= 0 || !actualProt || actualProt <= 0) return 0;
   const calScore = calculateCalorieScore(actualCal, targetCal);
@@ -72,35 +47,31 @@ export function computeProfileFitScore(actualCal, targetCal, actualProt, targetP
   return Math.round((calScore * 0.5) + (protScore * 0.5));
 }
 
-/**
- * DEPRECATED: Delegated to calculateMealFitScore.
- */
 export function calculateMacroFitTierAndScore(recipe, mealType = 'dinner', protAct, protTgt, context = {}) {
   const result = calculateMealFitScore(recipe, mealType, {
     activeProfile: context.activeProfile || 'everyone',
     portionScaled: true,
     variant: recipe?.variant || 'original'
   });
+  const meta = getFitScoreTierMeta(result.score);
 
   return {
     tier: result.tier,
     score: result.score,
     raw: result.score,
     label: result.tierLabel,
-    colors: result.tier === 'green' ? FIT_SCORE_TIERS.IDEAL.colors : (result.tier === 'amber' ? FIT_SCORE_TIERS.SUBOPTIMAL.colors : FIT_SCORE_TIERS.POOR.colors),
+    color: meta.color,
+    colors: `background-color:${meta.bg};color:${meta.text};border:1px solid ${meta.color};`,
     error: result.error
   };
 }
 
-/**
- * Delegated to calculateMealFitScore for multiple variants.
- */
 export function getEffectiveRecipeFitScore(recipe, targetSlot = 'dinner', context = {}) {
   if (!recipe) return { score: 0, bestVariant: 'original', scoreOriginal: 0, scoreEnhanced: 0 };
-  
+
   const activeProfile = context.activeProfile || 'everyone';
   const resOriginal = calculateMealFitScore(recipe, targetSlot, { activeProfile, portionScaled: true, variant: 'original' });
-  
+
   let scoreEnhanced = 0;
   const hasEnhanced = !!(recipe.enhanced || recipe.recipe?.enhanced);
   if (hasEnhanced) {
@@ -117,54 +88,81 @@ export function getEffectiveRecipeFitScore(recipe, targetSlot = 'dinner', contex
   };
 }
 
-/**
- * Attaches computed fit scores to an array of recipes.
- * Strictly uses the modern engine.
- */
 export function attachComputedFitScores(recipes = [], targetSlot = 'dinner', context = {}) {
   if (!Array.isArray(recipes)) return [];
   const activeProfile = context.activeProfile || 'everyone';
 
   return recipes.map(recipe => {
     if (!recipe) return recipe;
-    
-    const scoreOrig = calculateMealFitScore(recipe, targetSlot, { ...context, activeProfile, portionScaled: true, variant: 'original' }).score;
-    const scoreEnh = calculateMealFitScore(recipe, targetSlot, { ...context, activeProfile, portionScaled: true, variant: 'enhanced' }).score;
-    
+    const baseRecipe = recipe.recipe || recipe;
+    const scoreOrig = calculateMealFitScore(baseRecipe, targetSlot, { ...context, activeProfile, portionScaled: true, variant: 'original' }).score;
+    const hasEnhanced = !!(baseRecipe.enhanced);
+    const scoreEnh = hasEnhanced
+      ? calculateMealFitScore(baseRecipe, targetSlot, { ...context, activeProfile, portionScaled: true, variant: 'enhanced' }).score
+      : 0;
+
     recipe._computedFitScore = Math.max(scoreOrig, scoreEnh);
     recipe._bestVariant = scoreEnh > scoreOrig ? 'enhanced' : 'original';
-    recipe._computedFitResult = calculateMealFitScore(recipe, targetSlot, { ...context, activeProfile, portionScaled: true, variant: recipe._bestVariant });
+    recipe._computedFitResult = calculateMealFitScore(baseRecipe, targetSlot, { ...context, activeProfile, portionScaled: true, variant: recipe._bestVariant });
 
     return recipe;
   });
 }
 
 /**
- * Sorts recipes by fit score or name.
+ * Universal Sorting for Recipe Vault and Swap Modals:
+ * - Maps 'best-fit' and 'fit-desc' to Descending sort
+ * - Maps 'needs-work' and 'fit-asc' to Ascending sort
+ * - Maps 'name' and 'name-asc' to Alphabetical A-Z
+ * - Maps 'name-desc' to Alphabetical Z-A
  */
 export function getSortedRecipes(recipes = [], sortOption = 'fit-desc', activeSlotTargets = 'dinner', context = {}) {
-  const scoredRecipes = recipes.map(recipe => {
-    const scoreOrig = calculateMealFitScore(recipe, activeSlotTargets, { ...context, variant: 'original', portionScaled: true }).score;
-    const scoreEnh = calculateMealFitScore(recipe, activeSlotTargets, { ...context, variant: 'enhanced', portionScaled: true }).score;
+  if (!Array.isArray(recipes)) return [];
+  const slot = typeof activeSlotTargets === 'string' ? activeSlotTargets : (activeSlotTargets?.mealType || 'dinner');
+  const activeProfile = context.activeProfile || 'everyone';
+
+  const scoredRecipes = recipes.map(item => {
+    if (!item) return item;
+    if (typeof item.fitScore === 'number' && item.fitRes) {
+      return {
+        ...item,
+        _computedFitScore: item.fitScore
+      };
+    }
+    const baseRecipe = item.recipe || item;
+    const scoreOrig = calculateMealFitScore(baseRecipe, slot, { ...context, activeProfile, variant: item.variant || 'original', portionScaled: true }).score;
+    const hasEnh = !item.variant && !!(baseRecipe.enhanced);
+    const scoreEnh = hasEnh
+      ? calculateMealFitScore(baseRecipe, slot, { ...context, activeProfile, variant: 'enhanced', portionScaled: true }).score
+      : scoreOrig;
+
     return {
-      ...recipe,
+      ...item,
       _computedFitScore: Math.max(scoreOrig, scoreEnh)
     };
   });
 
+  const normSort = String(sortOption || 'fit-desc').toLowerCase();
+
   return scoredRecipes.sort((a, b) => {
-    if (sortOption === 'fit-desc') {
-      return (b._computedFitScore || 0) - (a._computedFitScore || 0);
+    if (normSort === 'best-fit' || normSort === 'fit-desc') {
+      return (b._computedFitScore ?? b.fitScore ?? 0) - (a._computedFitScore ?? a.fitScore ?? 0);
     }
-    if (sortOption === 'fit-asc') {
-      return (a._computedFitScore || 0) - (b._computedFitScore || 0);
+    if (normSort === 'needs-work' || normSort === 'fit-asc') {
+      return (a._computedFitScore ?? a.fitScore ?? 0) - (b._computedFitScore ?? b.fitScore ?? 0);
     }
-    if (sortOption === 'name-asc') {
-      return (a.title || a.name || '').localeCompare(b.title || b.name || '');
+    if (normSort === 'name' || normSort === 'name-asc') {
+      return String(a.label || a.title || a.name || '').localeCompare(String(b.label || b.title || b.name || ''));
     }
-    if (sortOption === 'name-desc') {
-      return (b.title || b.name || '').localeCompare(a.title || a.name || '');
+    if (normSort === 'name-desc') {
+      return String(b.label || b.title || b.name || '').localeCompare(String(a.label || a.title || a.name || ''));
     }
     return 0;
   });
+}
+
+if (typeof window !== 'undefined') {
+  window.getSortedRecipes = getSortedRecipes;
+  window.attachComputedFitScores = attachComputedFitScores;
+  window.getEffectiveRecipeFitScore = getEffectiveRecipeFitScore;
 }

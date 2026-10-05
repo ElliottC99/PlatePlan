@@ -1,10 +1,11 @@
 /**
- * src/components/planner/PlannerSkeletonGridUI.js (v3.19.78)
+ * src/components/planner/PlannerSkeletonGridUI.js (v3.19.79)
  * Dual-Dot Fit Score Scope Timeline, Pre-Generation Interactive Skeleton Grid,
- * and Split Household Slot Configurator (Elliott & Chloe) with Fit & Duplication Badges.
+ * and Split Household Slot Configurator (Elliott & Chloe) with Unified Fit & Duplication Badges.
  */
 
 import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
+import { renderFitScoreBadge } from '../FitScoreBadge.js';
 
 function resolveRecipeName(recipeId, fallback = '') {
   if (!recipeId) return fallback || '';
@@ -45,7 +46,7 @@ function renderRecipeCandidateRows(recipes, { dayIndex, mealType, person = 'both
   const activeProfile = person === 'both' ? 'everyone' : person;
   return filtered.map(r => {
     const fitObj = calculateMealFitScore(r, mealType, { activeProfile });
-    const fitScore = Math.round(Number(fitObj?.score || 0));
+    const badgeHtml = renderFitScoreBadge(fitObj, mealType, { activeProfile });
     const isDup = isRecipeInSkeletonGrid(r.id, skeletonGrid);
     const clickAction = person === 'both'
       ? `window.setSlotConfiguredStatus(${dayIndex}, '${mealType}', 'pinned', '${escapeAttr(r.id)}', '${escapeAttr(r.name)}')`
@@ -55,7 +56,7 @@ function renderRecipeCandidateRows(recipes, { dayIndex, mealType, person = 'both
       <div onclick="${clickAction}" style="padding:8px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#ffffff;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#ffffff'">
         <div style="min-width:0;flex:1;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span style="font-weight:600;color:#1e293b">${escapeHtml(r.name)}</span>
-          <span class="badge badge-primary" style="font-size:10px;background:#dbeafe;color:#1d4ed8;font-weight:700;padding:2px 6px;border-radius:4px">Fit: ${fitScore}</span>
+          ${badgeHtml}
           ${isDup ? `<span class="badge badge-warning" style="font-size:10px;background:#fef3c7;color:#b45309;font-weight:700;padding:2px 6px;border-radius:4px">🔄 Already in Plan</span>` : ''}
         </div>
         <span style="font-size:11px;color:#2563eb;font-weight:700;flex-shrink:0">Pin →</span>
