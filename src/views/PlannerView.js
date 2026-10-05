@@ -1,5 +1,5 @@
 /**
- * src/views/PlannerView.js (v3.20.01)
+ * src/views/PlannerView.js (v3.20.02)
  * Componentised Weekly Planner, Wizard & Schedule Controller View.
  * Strictly modular (<400 lines) with sanitised reset state persistence.
  */
@@ -183,7 +183,7 @@ export function renderPlannerWizard() {
       `;
     }
   } else if (currentStep === 4) {
-    stepContentHtml = window.GeneratorWizardModal?.renderWizardStep4Commit?.('v3.20.01') || '';
+    stepContentHtml = window.GeneratorWizardModal?.renderWizardStep4Commit?.('v3.20.02') || '';
   }
 
   host.innerHTML = window.GeneratorWizardModal?.renderPlannerWizardView?.({

@@ -1,7 +1,7 @@
 /**
- * src/components/pantry/PantryBankHTMLTemplate.js (v3.20.01)
+ * src/components/pantry/PantryBankHTMLTemplate.js (v3.20.02)
  * Extracted HTML UI renderer for the Category -> Ingredient -> Sub-type Hierarchy.
- * Harmonised with v3.20.01 design system button, badge, and Auto-Default formatting tokens.
+ * Harmonised with v3.20.02 design system button, badge, and Auto-Default formatting tokens.
  */
 
 export function formatBrandProductTag(product, fallbackLabel = '') {

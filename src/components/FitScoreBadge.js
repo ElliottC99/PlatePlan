@@ -1,5 +1,5 @@
 /**
- * src/components/FitScoreBadge.js (v3.20.01)
+ * src/components/FitScoreBadge.js (v3.20.02)
  * Unified 4-Tier Continuous Gradient Fit Score Badge Component.
  * Tiers:
  * - 🟢 85–100 (#22c55e - Ideal Match)
