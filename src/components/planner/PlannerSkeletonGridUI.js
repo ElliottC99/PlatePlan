@@ -1,5 +1,5 @@
 /**
- * src/components/planner/PlannerSkeletonGridUI.js (v3.19.79)
+ * src/components/planner/PlannerSkeletonGridUI.js (v3.20.00)
  * Dual-Dot Fit Score Scope Timeline, Pre-Generation Interactive Skeleton Grid,
  * and Split Household Slot Configurator (Elliott & Chloe) with Unified Fit & Duplication Badges.
  */
@@ -170,12 +170,12 @@ export function renderSkeletonGridUI({ days = 7, startDate = '', skeletonGrid = 
   }
 
   return `
-    <div class="skeleton-grid-panel" style="background:var(--surface2,#f8fafc);padding:16px;border-radius:14px;border:1px solid var(--border,#e2e8f0);margin-bottom:16px">
+    <div class="skeleton-grid-panel" style="background:var(--surface2,#f8fafc);padding:16px;border-radius:var(--radius-lg,14px);border:1px solid var(--border,#e2e8f0);margin-bottom:16px;min-width:0;max-width:100%;overflow:hidden">
       <div style="margin-bottom:12px">
         <h3 style="margin:0;font-size:15px;font-weight:750;color:var(--text,#0f172a)">Pre-Generation Layout Grid</h3>
         <div style="font-size:12px;color:var(--text2,#64748b);margin-top:2px">Tap any slot to pin a shared or split household recipe or mark as skipped before generating.</div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:12px">
+      <div class="skeleton-grid-cards" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(min(100%, 210px), 1fr));gap:12px;min-width:0;width:100%">
         ${gridCardsHtml}
       </div>
     </div>
@@ -195,10 +195,10 @@ function renderPersonSplitColumn(personKey, personLabel, dayIndex, mealType, per
           <div style="font-size:11.5px;color:#475569;margin-top:1px">${statusText}</div>
         </div>
         <div style="display:flex;gap:6px">
-          <button type="button" class="btn sm ${isSkipped ? 'primary' : 'secondary'}" style="font-size:11px;font-weight:700;padding:4px 8px" onclick="window.setSplitPersonSlotStatus(${dayIndex}, '${mealType}', '${personKey}', '${isSkipped ? 'unassigned' : 'skipped'}')">
+          <button type="button" class="btn sm ${isSkipped ? 'btn-primary primary' : 'btn-secondary secondary'}" style="font-size:11px;font-weight:700;padding:4px 8px" onclick="window.setSplitPersonSlotStatus(${dayIndex}, '${mealType}', '${personKey}', '${isSkipped ? 'unassigned' : 'skipped'}')">
             ${isSkipped ? '✓ Skipped' : '🚫 Skip'}
           </button>
-          ${(isSkipped || pinnedName) ? `<button type="button" class="btn sm ghost" style="font-size:11px;padding:4px 6px" onclick="window.setSplitPersonSlotStatus(${dayIndex}, '${mealType}', '${personKey}', 'unassigned')">Reset</button>` : ''}
+          ${(isSkipped || pinnedName) ? `<button type="button" class="btn sm btn-ghost ghost" style="font-size:11px;padding:4px 6px" onclick="window.setSplitPersonSlotStatus(${dayIndex}, '${mealType}', '${personKey}', 'unassigned')">Reset</button>` : ''}
         </div>
       </div>
       <input type="search" id="slot-config-search-${personKey}" aria-label="Search recipe for ${personLabel}" placeholder="Search recipe for ${personLabel}..." class="input sm" style="width:100%;background:#fff" oninput="window.filterSlotConfigRecipes(this.value, '${personKey}')">
@@ -225,24 +225,25 @@ export function openSlotConfigurator(dayIndex, mealType, forceSplitMode = null) 
 
   const overlay = document.createElement('div');
   overlay.id = 'slot-configurator-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:9999;background:rgba(0,0,0,0.45);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+  overlay.className = 'modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:9999;background:rgba(15,23,42,0.45);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
 
   overlay.innerHTML = `
-    <div style="background:#ffffff;border-radius:16px;width:100%;max-width:${isSplit ? '680px' : '500px'};max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,0.2);overflow:hidden">
-      <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;background:#f8fafc">
+    <div style="background:var(--surface,#ffffff);border-radius:var(--radius-lg,14px);width:100%;max-width:${isSplit ? '680px' : '500px'};max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,0.2);border:1px solid var(--border,#e2e8f0);overflow:hidden">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border,#e2e8f0);display:flex;align-items:center;justify-content:space-between;background:var(--surface2,#f8fafc)">
         <div>
-          <h3 style="margin:0;font-size:15px;font-weight:750;color:#0f172a">Configure Day ${dayIndex} - ${mealLabel}</h3>
-          <div style="font-size:11.5px;color:#64748b;margin-top:2px">Organise household anchors for Elliott &amp; Chloe</div>
+          <h3 style="margin:0;font-size:15px;font-weight:750;color:var(--text,#0f172a)">Configure Day ${dayIndex} - ${mealLabel}</h3>
+          <div style="font-size:11.5px;color:var(--text2,#64748b);margin-top:2px">Organise household anchors for Elliott &amp; Chloe</div>
         </div>
-        <button type="button" class="btn sm ghost" onclick="window.closeSlotConfigurator()">✕</button>
+        <button type="button" class="modal-close-btn btn sm btn-ghost ghost" aria-label="Close configurator" onclick="window.closeSlotConfigurator()">✕</button>
       </div>
 
-      <div style="padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px">
+      <div style="padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button type="button" class="btn secondary" style="flex:1;padding:9px 12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px" onclick="window.setSlotConfiguredStatus(${dayIndex}, '${mealType}', 'skipped')">
+          <button type="button" class="btn btn-secondary secondary" style="flex:1;padding:9px 12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px" onclick="window.setSlotConfiguredStatus(${dayIndex}, '${mealType}', 'skipped')">
             🚫 Skip Entire Slot (Both)
           </button>
-          ${hasAnyConfig ? `<button type="button" class="btn" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;font-weight:700;padding:9px 12px" onclick="window.setSlotConfiguredStatus(${dayIndex}, '${mealType}', 'unassigned')">Clear Slot</button>` : ''}
+          ${hasAnyConfig ? `<button type="button" class="btn btn-outline outline danger" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;font-weight:700;padding:9px 12px" onclick="window.setSlotConfiguredStatus(${dayIndex}, '${mealType}', 'unassigned')">Clear Slot</button>` : ''}
         </div>
 
         <!-- Dining Mode Segmented Toggle -->
@@ -269,7 +270,7 @@ export function openSlotConfigurator(dayIndex, mealType, forceSplitMode = null) 
             ${renderPersonSplitColumn('chloe', 'Chloe', dayIndex, mealType, currentConfig.chloe || {}, recipes, skeletonGrid)}
           </div>
           <div style="display:flex;justify-content:flex-end;padding-top:4px">
-            <button type="button" class="btn primary sm" style="font-weight:700;padding:7px 18px" onclick="window.closeSlotConfigurator()">Done</button>
+            <button type="button" class="btn btn-primary primary sm" style="font-weight:700;padding:7px 18px" onclick="window.closeSlotConfigurator()">Done</button>
           </div>
         `}
       </div>

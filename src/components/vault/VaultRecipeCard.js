@@ -1,5 +1,5 @@
 /**
- * src/components/vault/VaultRecipeCard.js (v3.16.1)
+ * src/components/vault/VaultRecipeCard.js (v3.20.00)
  * Modular UI component for Recipe Vault Card:
  * - Individual recipe card templates & layout
  * - Macro badges, fit score breakdown, and cooking time tags
@@ -89,8 +89,8 @@ export function renderVaultRecipeCard(r, options = {}) {
         ${originalFit.html}
       </div>
       <div class="recipe-card-actions">
-        <button class="btn sm primary mobile-primary" data-action="view-recipe" data-recipe-id="${escapeAttr(r.id)}" data-variant="original" onclick="viewRecipe('${escapeAttr(r.id)}', null)">View</button>
-        <button class="btn sm ghost mobile-more" data-action="open-recipe-actions" data-recipe-id="${escapeAttr(r.id)}" data-variant="original" onclick="openRecipeActions('${escapeAttr(r.id)}')">More</button>
+        <button class="btn sm btn-primary primary mobile-primary" data-action="view-recipe" data-recipe-id="${escapeAttr(r.id)}" data-variant="original" onclick="viewRecipe('${escapeAttr(r.id)}', null)">View</button>
+        <button class="btn sm btn-ghost ghost mobile-more" data-action="open-recipe-actions" data-recipe-id="${escapeAttr(r.id)}" data-variant="original" onclick="openRecipeActions('${escapeAttr(r.id)}')">More</button>
       </div>
     </div>
     ${r.enhanced ? `<div class="enhanced-box">
@@ -108,8 +108,8 @@ export function renderVaultRecipeCard(r, options = {}) {
           ${enhancedChanges}
         </div>
         <div class="enhanced-actions">
-          <button class="btn sm primary enhanced-primary-action" data-action="view-recipe" data-recipe-id="${escapeAttr(r.id)}" data-variant="enhanced" onclick="viewRecipe('${escapeAttr(r.id)}', null, 'enhanced')">View</button>
-          <button class="btn sm ghost enhanced-more-action" data-action="open-enhanced-recipe-actions" data-recipe-id="${escapeAttr(r.id)}" data-variant="enhanced" onclick="openEnhancedRecipeActions('${escapeAttr(r.id)}')">More</button>
+          <button class="btn sm btn-primary primary enhanced-primary-action" data-action="view-recipe" data-recipe-id="${escapeAttr(r.id)}" data-variant="enhanced" onclick="viewRecipe('${escapeAttr(r.id)}', null, 'enhanced')">View</button>
+          <button class="btn sm btn-ghost ghost enhanced-more-action" data-action="open-enhanced-recipe-actions" data-recipe-id="${escapeAttr(r.id)}" data-variant="enhanced" onclick="openEnhancedRecipeActions('${escapeAttr(r.id)}')">More</button>
         </div>
       </div>
     </div>` : ''}

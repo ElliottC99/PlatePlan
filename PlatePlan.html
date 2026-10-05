@@ -54,6 +54,12 @@ try{
 <link rel="stylesheet" href="./styles/responsive.css?v=3.3.0">
 <link rel="stylesheet" href="./styles/print.css?v=3.3.0" media="print">
 <style>
+:root {
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+}
 .modal-wrap, .modal-backdrop, .modal-overlay {
   position: fixed !important;
   inset: 0 !important;
@@ -64,42 +70,106 @@ try{
   width: 100vw !important;
   height: 100vh !important;
   z-index: 9999 !important;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
 }
 .modal-close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
+  background: var(--surface2, #f1f5f9);
+  border: 1px solid var(--border, #e2e8f0);
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
   cursor: pointer;
-  color: var(--text3, #94a3b8);
+  color: var(--text2, #64748b);
   line-height: 1;
-  padding: 4px 8px;
-  border-radius: 6px;
+  padding: 0;
+  border-radius: var(--radius-sm, 6px);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
 .modal-close-btn:hover {
   color: var(--text, #0f172a);
-  background-color: var(--surface2, #f1f5f9);
+  background-color: var(--surface, #ffffff);
+  border-color: var(--border-strong, #cbd5e1);
 }
-.pp-fit-badge {
+.btn-primary, .btn.btn-primary, .btn.primary {
+  background: var(--text, #1A1916);
+  color: #ffffff;
+  border: 1px solid transparent;
+  font-weight: 650;
+  border-radius: var(--radius-sm, 6px);
+}
+.btn-primary:hover, .btn.btn-primary:hover, .btn.primary:hover {
+  opacity: 0.9;
+}
+.btn-secondary, .btn.btn-secondary, .btn.secondary {
+  background: var(--surface2, #F0EFE9);
+  color: var(--text, #1A1916);
+  border: 1px solid var(--border, #E2E0D8);
+  font-weight: 600;
+  border-radius: var(--radius-sm, 6px);
+}
+.btn-secondary:hover, .btn.btn-secondary:hover, .btn.secondary:hover {
+  background: var(--surface3, #E6E4DC);
+}
+.btn-outline, .btn.btn-outline, .btn.outline {
+  background: var(--surface, #FFFFFF);
+  color: var(--text, #1A1916);
+  border: 1px solid var(--border-strong, #C8C5BA);
+  font-weight: 600;
+  border-radius: var(--radius-sm, 6px);
+}
+.btn-outline:hover, .btn.btn-outline:hover, .btn.outline:hover {
+  background: var(--surface2, #F0EFE9);
+}
+.btn-ghost, .btn.btn-ghost, .btn.ghost {
+  background: transparent;
+  color: var(--text2, #57544D);
+  border: 1px solid transparent;
+  font-weight: 600;
+  border-radius: var(--radius-sm, 6px);
+}
+.btn-ghost:hover, .btn.btn-ghost:hover, .btn.ghost:hover {
+  background: var(--surface2, #F0EFE9);
+  color: var(--text, #1A1916);
+}
+.pp-fit-badge, .badge, .tag {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm, 6px);
   font-size: 11px;
   font-weight: 700;
-  line-height: 1.4;
-  background: #f1f5f9;
-  color: #0f172a;
-  border: 1px solid #cbd5e1;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
 }
 .pp-fit-badge.pp-fit-neutral {
   background: #f8fafc;
-  color: #94a3b8;
-  border: 1px solid #e2e8f0;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+.skeleton-grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+.skeleton-day-card {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+@media (max-width: 640px) {
+  .skeleton-grid-cards {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
 }
 </style>
 </head>
@@ -107,7 +177,7 @@ try{
 <div class="app">
 
 <header class="app-header">
-  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span id="app-header-version" class="version-badge" style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v3.19.79</span></div>
+  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span id="app-header-version" class="version-badge" style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v3.20.00</span></div>
   <div class="app-header-actions">
     <button class="btn primary app-create-button" type="button" data-pp-click="openCreateActionSheet()" aria-label="Add to PlatePlan"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span class="app-create-label">Add</span></button>
     <button class="btn ghost app-menu-button" type="button" data-pp-click="openMobileMore()" aria-label="Open PlatePlan menu"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="19" cy="12" r="1.3"></circle></svg><span>Menu</span></button>
@@ -198,10 +268,10 @@ try{
 
 <div id="view-vault" class="view">
   <div class="view-toolbar">
-    <h2 style="margin:0">Recipe vault</h2>
+    <h1 class="view-title" style="margin:0">Recipe Vault</h1>
     <div class="vault-filters" style="display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 8px; width: 100%; overflow-x: auto;">
-      <button class="btn primary" type="button" data-pp-click="openUseUpRecipeFinder()" style="flex: 0 0 auto; white-space: nowrap;">Use up ingredients</button>
-      <button type="button" id="vault-filter-fav" class="btn sm ghost fav-filter-btn" data-pp-click="toggleVaultFavouritesFilter()" aria-pressed="false" title="Filter favourites only" style="display:inline-flex;align-items:center;gap:6px;flex: 0 0 auto; white-space: nowrap;">
+      <button class="btn btn-primary primary" type="button" data-pp-click="openUseUpRecipeFinder()" style="flex: 0 0 auto; white-space: nowrap;">Use up ingredients</button>
+      <button type="button" id="vault-filter-fav" class="btn sm btn-ghost ghost fav-filter-btn" data-pp-click="toggleVaultFavouritesFilter()" aria-pressed="false" title="Filter favourites only" style="display:inline-flex;align-items:center;gap:6px;flex: 0 0 auto; white-space: nowrap;">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" class="heart-icon"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
         <span>Favourites Only</span>
       </button>
@@ -324,10 +394,10 @@ try{
 
 <div id="view-ingredients" class="view">
   <div class="view-toolbar">
-    <h2 style="margin:0">Ingredient bank</h2>
+    <h1 class="view-title" style="margin:0">Ingredient Bank</h1>
     <div class="btn-row">
-      <button class="btn sm ghost" data-pp-click="openCategoryManagerModal()">Categories</button>
-      <button class="btn sm" data-pp-click="createIngredientFamilyPrompt()">+ Ingredient</button>
+      <button class="btn sm btn-ghost ghost" data-pp-click="openCategoryManagerModal()">Categories</button>
+      <button class="btn sm btn-secondary secondary" data-pp-click="createIngredientFamilyPrompt()">+ Ingredient</button>
     </div>
   </div>
   <div class="card" style="margin-bottom:12px">
@@ -344,10 +414,10 @@ try{
 
 <div id="view-bank" class="view">
   <div class="view-toolbar">
-    <h2 style="margin:0">Product bank</h2>
+    <h1 class="view-title" style="margin:0">Product Bank</h1>
     <div class="btn-row">
-      <button class="btn sm primary" data-pp-click="showAddIng()">+ Add product</button>
-      <button class="btn sm" data-pp-click="showTescoImport()" style="background:var(--purple-bg);color:var(--purple);border-color:var(--purple)">Import Tesco</button>
+      <button class="btn sm btn-primary primary" data-pp-click="showAddIng()">+ Add product</button>
+      <button class="btn sm btn-outline outline" data-pp-click="showTescoImport()" style="background:var(--purple-bg);color:var(--purple);border-color:var(--purple)">Import Tesco</button>
     </div>
   </div>
   <div id="bank-groups-panel"></div>
@@ -432,10 +502,10 @@ try{
 <div id="view-planlib" class="view">
   <div class="view-toolbar" style="flex-wrap:wrap">
     <div>
-      <h2 style="margin:0">Meal Plan Library</h2>
+      <h1 class="view-title" style="margin:0">Meal Plan Library</h1>
       <p style="font-size:12px;color:var(--text2);margin:5px 0 0">Saved meal plans live here so the planner itself can stay focused on generating and adjusting the current plan.</p>
     </div>
-    <button class="btn sm primary" data-pp-click="openSaveMealPlanModal()">Save current plan</button>
+    <button class="btn sm btn-primary primary" data-pp-click="openSaveMealPlanModal()">Save current plan</button>
   </div>
   <div id="plan-history-panel"></div>
 </div>
@@ -443,14 +513,14 @@ try{
 
 <div id="view-shopping" class="view">
   <div class="view-toolbar">
-    <h2 style="margin:0">Shopping list</h2>
+    <h1 class="view-title" style="margin:0">Shopping List</h1>
     <div class="row-center">
         <select id="shop-group-by" data-pp-change="updateShopGroupPref(this.value)" style="width:auto; font-size:12px;">
             <option value="family">Group by Ingredient</option>
             <option value="category">Group by Category</option>
             <option value="storage">Group by Storage</option>
         </select>
-        <button class="btn sm" data-pp-click="copyList()">Copy list</button>
+        <button class="btn sm btn-secondary secondary" data-pp-click="copyList()">Copy list</button>
     </div>
   </div>
   <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Generated from your current meal plan. Allocations trace back to specific meal instances. Use "Product" to choose the product for one specific recipe occurrence.</p>
@@ -459,10 +529,10 @@ try{
 
 <div id="view-data" class="view">
     <div class="view-toolbar">
-      <h2 style="margin:0">Data Quality Centre</h2>
+      <h1 class="view-title" style="margin:0">Data Quality Centre</h1>
       <div style="display:flex;gap:8px">
-        <button class="btn sm ghost" data-pp-click="runGlobalProductRelink()">Batch Relink Products</button>
-        <button class="btn sm ghost" data-pp-click="renderDataQuality()">Refresh Scans</button>
+        <button class="btn sm btn-ghost ghost" data-pp-click="runGlobalProductRelink()">Batch Relink Products</button>
+        <button class="btn sm btn-ghost ghost" data-pp-click="renderDataQuality()">Refresh Scans</button>
       </div>
     </div>
     

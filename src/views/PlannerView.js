@@ -1,5 +1,5 @@
 /**
- * src/views/PlannerView.js (v3.19.79)
+ * src/views/PlannerView.js (v3.20.00)
  * Componentised Weekly Planner, Wizard & Schedule Controller View.
  * Strictly modular (<400 lines) with sanitised reset state persistence.
  */
@@ -11,7 +11,8 @@ import {
   renderDraftPlanBanner,
   renderPlanExpiredBanner,
   renderEarlierDaysHeading,
-  renderPlannerEmptyError
+  renderPlannerEmptyError,
+  renderPlanDaySlotRow
 } from '../components/planner/PlannerGridToolbar.js';
 import {
   openSwapMealModal,
@@ -170,7 +171,7 @@ export function renderPlannerWizard() {
       `;
     }
   } else if (currentStep === 4) {
-    stepContentHtml = window.GeneratorWizardModal?.renderWizardStep4Commit?.('v3.19.79') || '';
+    stepContentHtml = window.GeneratorWizardModal?.renderWizardStep4Commit?.('v3.20.00') || '';
   }
 
   host.innerHTML = window.GeneratorWizardModal?.renderPlannerWizardView?.({
@@ -198,23 +199,23 @@ export function renderPlan() {
     if (startInput) startInput.value = window.state.plan.dayDates?.[1] || '';
     let hasValidSlots = false;
 
-    const makeRenderedDaySummary = () => {
-      const totals = { e: { cal: 0, prot: 0 }, c: { cal: 0, prot: 0 } };
-      const assumed = { e: { cal: 0, prot: 0, labels: ['snacks'] }, c: { cal: 0, prot: 0, labels: ['snacks'] } };
-      ['e', 'c'].forEach(person => {
-        const b = typeof window.getBudgets === 'function' ? window.getBudgets(person, 'snack') : { cal: 0, prot: 0 };
-        totals[person].cal += +b.cal || 0;
-        totals[person].prot += +b.prot || 0;
-        assumed[person].cal += +b.cal || 0;
-        assumed[person].prot += +b.prot || 0;
-      });
-      return {
-        totals,
-        targets: { e: { cal: +window.state.prefs?.ecal || 0, prot: +window.state.prefs?.eprot || 0 }, c: { cal: +window.state.prefs?.ccal || 0, prot: +window.state.prefs?.cprot || 0 } },
-        assumed,
-        score: 0
-      };
-    };
+function makeRenderedDaySummary() {
+  const totals = { e: { cal: 0, prot: 0 }, c: { cal: 0, prot: 0 } };
+  const assumed = { e: { cal: 0, prot: 0, labels: ['snacks'] }, c: { cal: 0, prot: 0, labels: ['snacks'] } };
+  ['e', 'c'].forEach(person => {
+    const b = typeof window.getBudgets === 'function' ? window.getBudgets(person, 'snack') : { cal: 0, prot: 0 };
+    totals[person].cal += +b.cal || 0;
+    totals[person].prot += +b.prot || 0;
+    assumed[person].cal += +b.cal || 0;
+    assumed[person].prot += +b.prot || 0;
+  });
+  return {
+    totals,
+    targets: { e: { cal: +window.state.prefs?.ecal || 0, prot: +window.state.prefs?.eprot || 0 }, c: { cal: +window.state.prefs?.ccal || 0, prot: +window.state.prefs?.cprot || 0 } },
+    assumed,
+    score: 0
+  };
+}
 
     let html = '';
     if (window.state.isDraftPlan || window.state.draftPlan) {
@@ -287,15 +288,10 @@ export function renderPlan() {
               daySummary.totals[rowPerson].prot += rowProt;
             }
           }
-          const rowAttrs = showRecipe ? ` data-plan-person="${rowPerson}" data-plan-cal="${rowCal}" data-plan-prot="${rowProt}"` : '';
           const slotReason = typeof window.getPlanSlotReason === 'function' ? window.getPlanSlotReason(window.state.plan, d, sl.key) : '';
           const slotReasonLabel = typeof window.formatPlanSlotReason === 'function' ? window.formatPlanSlotReason(slotReason) : slotReason;
-          const slotActionsHtml = showRecipe
-            ? `<div class="slot-actions"><span class="slot-macro">${calStr}</span><button class="btn sm primary" onclick="viewRecipe('${rId}', '${instanceId || ''}', '${slotInfo.variant}')">View</button><button class="btn sm ghost" onclick="openSwapMealModal(${d},'${sl.key}')">Swap</button><button class="btn sm ghost" onclick="openPlannedMealActions(${d},'${sl.key}')">More</button></div>`
-            : `<div class="slot-actions"><button class="btn sm ghost" onclick="openSwapMealModal(${d},'${sl.key}')">Choose Meal</button>${slotReason ? `<button class="btn sm ghost" onclick="clearPlanSlotReason(${d},'${sl.key}')">Clear reason</button>` : ''}</div>`;
-          const emptyContent = slotReason ? `<span class="plan-slot-reason">${slotReasonLabel}</span>` : '<span style="color:var(--text3)">Not set</span>';
           const isPinned = !!(r && (slotData?.pinned || slotData?.isPinned || (typeof window.getPinnedRecipesList === 'function' && window.getPinnedRecipesList().some(p => p.recipeId === rId))));
-          dayRowsHtml += `<div class="slot-row"${rowAttrs}><span class="slot-lbl" style="color:${window.SLOT_COLORS[sl.key]}">${lblLines[0]}<br>${lblLines[1]}</span>${isEx ? '<span class="slot-skipped">Not needed</span>' : `<span class="slot-name">${r ? r.name : emptyContent}${slotInfo?.variant === 'enhanced' ? ' <span class="tag green">Enhanced</span>' : ''}${isPinned ? ' <span class="tag pinned" title="Pre-selected recipe">Pinned</span>' : ''}</span>${slotActionsHtml}`}</div>`;
+          dayRowsHtml += renderPlanDaySlotRow({ d, sl, isEx, showRecipe, r, rId, instanceId, slotInfo, lblLines, calStr, rowPerson, rowCal, rowProt, slotReason, slotReasonLabel, isPinned });
         });
       }
 
