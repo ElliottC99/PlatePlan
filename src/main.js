@@ -29,7 +29,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * src/main.js (v3.20.04)
+ * src/main.js (v3.20.05)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronisation,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -283,7 +283,7 @@ let lastErrorTime = 0;
 function reportAppError(m, type = 'error') {
   if (m === lastErrorMessage && Date.now() - lastErrorTime < 4000) return;
   lastErrorMessage = m; lastErrorTime = Date.now();
-  console.error(`[PlatePlan Error Telemetry v3.20.04]`, m);
+  console.error(`[PlatePlan Error Telemetry v3.20.05]`, m);
   if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(m, type);
 }
 

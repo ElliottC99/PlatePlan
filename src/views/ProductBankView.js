@@ -1,5 +1,5 @@
 /**
- * src/views/ProductBankView.js (v3.20.04)
+ * src/views/ProductBankView.js (v3.20.05)
  * Modular ES6 View for Product Bank.
  * Displays nutritional pills (P, C, F, Kcal), P/£ efficiency, Tesco links, and Reallocation modal.
  */
@@ -32,71 +32,88 @@ export function cancelManualIng() {
   activeEditingProductId = null;
 }
 
-export function openProductEditModal(productId = null) {
+export function openProductEditModal(productIdOrDraft = null) {
   const panel = document.getElementById('manual-ing-panel');
   if (!panel) return;
 
-  activeEditingProductId = productId;
   const state = getState() || {};
   const products = Array.isArray(state.products) ? state.products : [];
-  const prod = productId ? products.find(p => String(p.id) === String(productId)) : null;
+
+  let prod = null;
+  let isDraft = false;
+
+  if (productIdOrDraft && typeof productIdOrDraft === 'object') {
+    prod = productIdOrDraft;
+    isDraft = true;
+    activeEditingProductId = prod.id && !prod.id.startsWith('draft_') && !prod.id.startsWith('prod_draft') ? prod.id : null;
+  } else if (productIdOrDraft) {
+    activeEditingProductId = productIdOrDraft;
+    prod = products.find(p => String(p.id) === String(productIdOrDraft)) || null;
+  } else {
+    activeEditingProductId = null;
+  }
 
   const setVal = (id, val) => {
     const el = document.getElementById(id);
-    if (el) el.value = val ?? '';
+    if (el) el.value = val !== undefined && val !== null ? val : '';
   };
 
   const titleEl = document.getElementById('mi-title');
-  if (titleEl) titleEl.textContent = prod ? `Edit product: ${prod.name}` : 'Add product';
+  if (titleEl) {
+    titleEl.textContent = (!isDraft && prod?.name) ? `Edit product: ${prod.name}` : (isDraft && prod?.name ? `Add product: ${prod.name}` : 'Add product');
+  }
 
   const binding = window.__prefilledResolveBinding || {};
   const tescoData = binding.tescoImportData;
 
-  if (!prod && tescoData) {
+  if (prod) {
+    setVal('mi-name', prod.name || binding.subtypeDraftName || '');
+    setVal('mi-brand', prod.brand || '');
+    setVal('mi-cat-search', prod.category || prod.cat || binding.parentCategory || 'General');
+    setVal('mi-storage', prod.storage || 'cupboard');
+    setVal('mi-cal', prod.cal ?? prod.calories ?? '');
+    setVal('mi-fat', prod.fat ?? '');
+    setVal('mi-carb', prod.carb ?? prod.carbs ?? '');
+    setVal('mi-fibre', prod.fibre ?? '');
+    setVal('mi-prot', prod.prot ?? prod.protein ?? '');
+    setVal('mi-price', prod.price ?? '');
+    setVal('mi-pack', prod.pack ?? prod.packSize ?? '');
+    setVal('mi-pack-unit', prod.packUnit || prod.unit || 'g');
+    setVal('mi-item-weight', prod.itemWeight ?? '');
+    setVal('mi-drained-weight', prod.drainedWeight ?? '');
+    setVal('mi-notes', prod.notes ?? '');
+  } else if (tescoData) {
     setVal('mi-name', tescoData.title || tescoData.name || binding.subtypeDraftName || '');
     setVal('mi-brand', tescoData.brand || 'Tesco');
     setVal('mi-cat-search', tescoData.category || binding.parentCategory || 'General');
+    setVal('mi-storage', tescoData.storage || 'cupboard');
     setVal('mi-price', tescoData.price || '');
-    setVal('mi-pack', tescoData.pack || tescoData.size || '');
+    setVal('mi-pack', tescoData.pack || tescoData.packSize || tescoData.size || '');
     setVal('mi-pack-unit', tescoData.packUnit || tescoData.unit || 'g');
     setVal('mi-cal', tescoData.cal ?? tescoData.calories ?? '');
     setVal('mi-fat', tescoData.fat ?? '');
     setVal('mi-carb', tescoData.carb ?? tescoData.carbs ?? '');
     setVal('mi-fibre', tescoData.fibre ?? '');
     setVal('mi-prot', tescoData.prot ?? tescoData.protein ?? '');
-    setVal('mi-notes', tescoData.url || tescoData.tescoUrl ? `Tesco: ${tescoData.url || tescoData.tescoUrl}` : (tescoData.notes || ''));
-  } else if (!prod) {
-    setVal('mi-name', prod?.name || binding.subtypeDraftName || '');
-    setVal('mi-brand', prod?.brand || '');
-    setVal('mi-cat-search', prod?.category || prod?.cat || 'General');
-    setVal('mi-storage', prod?.storage || 'cupboard');
-    setVal('mi-cal', prod?.cal ?? prod?.calories);
-    setVal('mi-fat', prod?.fat);
-    setVal('mi-carb', prod?.carb ?? prod?.carbs);
-    setVal('mi-fibre', prod?.fibre);
-    setVal('mi-prot', prod?.prot ?? prod?.protein);
-    setVal('mi-price', prod?.price);
-    setVal('mi-pack', prod?.pack);
-    setVal('mi-pack-unit', prod?.packUnit || 'g');
-    setVal('mi-item-weight', prod?.itemWeight);
-    setVal('mi-drained-weight', prod?.drainedWeight);
-    setVal('mi-notes', prod?.notes);
+    setVal('mi-item-weight', tescoData.itemWeight ?? '');
+    setVal('mi-drained-weight', tescoData.drainedWeight ?? '');
+    setVal('mi-notes', tescoData.notes || (tescoData.url || tescoData.tescoUrl ? `Tesco: ${tescoData.url || tescoData.tescoUrl}` : ''));
   } else {
-    setVal('mi-name', prod.name);
-    setVal('mi-brand', prod.brand);
-    setVal('mi-cat-search', prod.category || prod.cat || 'General');
-    setVal('mi-storage', prod.storage || 'cupboard');
-    setVal('mi-cal', prod.cal ?? prod.calories);
-    setVal('mi-fat', prod.fat);
-    setVal('mi-carb', prod.carb ?? prod.carbs);
-    setVal('mi-fibre', prod.fibre);
-    setVal('mi-prot', prod.prot ?? prod.protein);
-    setVal('mi-price', prod.price);
-    setVal('mi-pack', prod.pack);
-    setVal('mi-pack-unit', prod.packUnit || 'g');
-    setVal('mi-item-weight', prod.itemWeight);
-    setVal('mi-drained-weight', prod.drainedWeight);
-    setVal('mi-notes', prod.notes);
+    setVal('mi-name', binding.subtypeDraftName || '');
+    setVal('mi-brand', '');
+    setVal('mi-cat-search', binding.parentCategory || 'General');
+    setVal('mi-storage', 'cupboard');
+    setVal('mi-cal', '');
+    setVal('mi-fat', '');
+    setVal('mi-carb', '');
+    setVal('mi-fibre', '');
+    setVal('mi-prot', '');
+    setVal('mi-price', '');
+    setVal('mi-pack', '');
+    setVal('mi-pack-unit', 'g');
+    setVal('mi-item-weight', '');
+    setVal('mi-drained-weight', '');
+    setVal('mi-notes', '');
   }
 
   const catOptsEl = document.getElementById('mi-cat-category-options');

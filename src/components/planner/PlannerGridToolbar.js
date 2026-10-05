@@ -1,5 +1,5 @@
 /**
- * src/components/planner/PlannerGridToolbar.js (v3.20.04)
+ * src/components/planner/PlannerGridToolbar.js (v3.20.05)
  * UI component for planner week controls, date range selectors,
  * banners, clear plan modal triggers, and target setters.
  */

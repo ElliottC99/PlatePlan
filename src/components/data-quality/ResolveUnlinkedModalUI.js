@@ -1,8 +1,8 @@
 /**
- * src/components/data-quality/ResolveUnlinkedModalUI.js (v3.20.04)
+ * src/components/data-quality/ResolveUnlinkedModalUI.js (v3.20.05)
  * Multi-Path Resolution Modal UI component for unlinked ingredients, sub-types, and recipe items.
  * Mounts directly to document.body for flawless viewport presentation.
- * Features re-mapping to existing ingredients/subtypes, safe product retrieval & immutable state commits.
+ * Features re-mapping to existing ingredients/subtypes, safe product retrieval & state-driven editor review.
  */
 
 import { getState, setProducts, setRecipes } from '../../store/store.js';
@@ -275,40 +275,54 @@ export async function submitResolveTescoImport() {
   if (!val) { errDiv.textContent = 'Please paste Tesco bookmarklet JSON.'; errDiv.style.display = 'block'; return; }
   const res = parseTescoProduct(val);
   if (!res.success) { errDiv.textContent = res.error || 'Parsing error.'; errDiv.style.display = 'block'; return; }
+
   const state = safeGetState(), pData = res.data;
   const parentIngId = activeTargetType === 'subtype' ? activeParentIngredientId : activeTargetId;
   const subId = activeTargetType === 'subtype' ? activeTargetId : null;
   const targetIng = (state.ingredients || []).find(i => String(i.id) === String(parentIngId));
 
-  const newProd = {
-    id: `prod_${Date.now()}`, name: pData.name, brand: pData.brand || '',
-    category: targetIng?.category || pData.cat || 'General', storage: pData.storage || 'cupboard',
-    cal: pData.cal || 0, prot: pData.prot || 0, carb: pData.carb || 0, fat: pData.fat || 0, fibre: pData.fibre || 0,
-    price: pData.price || 0, pack: pData.packSize || 0, packUnit: pData.packUnit || 'g',
-    itemWeight: pData.itemWeight || null, drainedWeight: pData.drainedWeight || null,
-    ingredientId: parentIngId, subtypeId: subId, isAutoDefault: true, updatedAt: new Date().toISOString()
+  const draftProduct = {
+    name: pData.name,
+    brand: pData.brand || 'Tesco',
+    category: targetIng?.category || pData.category || pData.cat || 'General',
+    storage: pData.storage || 'cupboard',
+    cal: pData.cal || 0,
+    prot: pData.prot || 0,
+    carb: pData.carb || 0,
+    fat: pData.fat || 0,
+    fibre: pData.fibre || 0,
+    price: pData.price || 0,
+    pack: pData.packSize || pData.pack || 0,
+    packUnit: pData.packUnit || 'g',
+    itemWeight: pData.itemWeight || null,
+    drainedWeight: pData.drainedWeight || null,
+    notes: pData.notes || (pData.raw?.url ? `Tesco: ${pData.raw.url}` : ''),
+    ingredientId: parentIngId,
+    subtypeId: subId,
+    isAutoDefault: true
   };
 
-  const existingProds = safeGetProducts(), prodIndex = existingProds.findIndex(p => String(p.id) === String(newProd.id));
-  const updatedProds = prodIndex >= 0 ? existingProds.map((p, i) => i === prodIndex ? { ...p, ...newProd } : p) : [...existingProds, newProd];
-  commitProductUpdates(updatedProds);
   closeResolveUnlinkedModal();
-  try { await saveProduct(newProd); } catch (e) {}
+  window.__prefilledResolveBinding = { ingredientId: parentIngId, subtypeId: subId };
+  openProductEditModal(draftProduct);
 }
 
 export function submitResolveNewProduct() {
   const parentIngId = activeTargetType === 'subtype' ? activeParentIngredientId : activeTargetId;
   const subId = activeTargetType === 'subtype' ? activeTargetId : null;
+  const state = safeGetState();
+  const targetIng = (state.ingredients || []).find(i => String(i.id) === String(parentIngId));
+  const targetSub = subId ? (targetIng?.subtypes || []).find(s => String(s.id) === String(subId)) : null;
+
   closeResolveUnlinkedModal();
-  openProductEditModal(null);
-  const targetIng = (safeGetState()?.ingredients || []).find(i => String(i.id) === String(parentIngId));
-  const catSearchEl = document.getElementById('mi-cat-search') || document.getElementById('mi-cat');
-  if (catSearchEl && targetIng?.category) catSearchEl.value = targetIng.category;
-  setTimeout(() => {
-    const nameEl = document.getElementById('mi-name');
-    if (nameEl && targetIng) nameEl.value = targetIng.name;
-  }, 100);
   window.__prefilledResolveBinding = { ingredientId: parentIngId, subtypeId: subId };
+  openProductEditModal({
+    name: targetSub?.name || targetIng?.name || '',
+    category: targetIng?.category || 'General',
+    ingredientId: parentIngId,
+    subtypeId: subId,
+    isAutoDefault: true
+  });
 }
 
 if (typeof window !== 'undefined') {

@@ -1,5 +1,5 @@
 /**
- * src/services/HouseholdRepository.js (v3.20.04)
+ * src/services/HouseholdRepository.js (v3.20.05)
  * Dedicated data access repository for household-scoped Firestore operations.
  * Completely isolated from DOM manipulation and UI rendering.
  * All operations target the shared household path 'households/elliott-chloe'.
@@ -12,7 +12,7 @@ export { stripPlanPayload };
 
 function isDbAvailable() {
   if (!db) {
-    console.warn('[HouseholdRepository v3.20.04] Firestore db instance not initialised.');
+    console.warn('[HouseholdRepository v3.20.05] Firestore db instance not initialised.');
     return false;
   }
   return true;
@@ -301,3 +301,19 @@ export async function saveCategories(categories) {
     return { success: false, error: err };
   }
 }
+
+export async function save(state = {}) {
+  const promises = [];
+  if (Array.isArray(state.ingredients)) {
+    state.ingredients.forEach(i => promises.push(saveIngredient(i)));
+  }
+  if (Array.isArray(state.products)) {
+    state.products.forEach(p => promises.push(saveProduct(p)));
+  }
+  if (Array.isArray(state.categories)) {
+    promises.push(saveCategories(state.categories));
+  }
+  return Promise.all(promises);
+}
+
+export const saveHouseholdState = save;
