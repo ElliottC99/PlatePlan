@@ -1,5 +1,5 @@
 /**
- * src/views/ProductBankView.js (v3.20.10)
+ * src/views/ProductBankView.js (v3.20.11)
  * Modular ES6 View for Product Bank with real-time search filtering.
  * Displays nutritional pills (P, C, F, Kcal), P/£ efficiency, Tesco links, and Reallocation modal.
  */
@@ -256,26 +256,37 @@ export function renderProductBank() {
   const allProducts = Array.isArray(state.products) ? state.products : [];
   const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
 
-  const searchInput = document.getElementById('product-bank-search');
+  let searchInput = document.getElementById('product-bank-search');
   const query = (searchInput?.value || '').trim().toLowerCase();
 
   let products = allProducts;
-  if (query) {
-    products = allProducts.filter(p =>
-      (p.name || '').toLowerCase().includes(query) ||
-      (p.brand || '').toLowerCase().includes(query) ||
-      (p.category || p.cat || '').toLowerCase().includes(query)
-    );
+  if (query.length > 0) {
+    products = allProducts.filter(p => {
+      const pName = (p.name || '').toLowerCase();
+      const pBrand = (p.brand || '').toLowerCase();
+      const pCat = (p.category || p.cat || '').toLowerCase();
+      return pName.includes(query) || pBrand.includes(query) || pCat.includes(query);
+    });
   }
 
-  const searchBarHtml = `
-    <div style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
-      <input type="search" id="product-bank-search" placeholder="Search products, brands, or categories..." value="${escapeAttr(query)}" oninput="renderProductBank()" style="width:100%;padding:8px 12px;border:1px solid var(--border,#e7e5e4);border-radius:8px;font-size:13px;background:var(--surface,#fff);box-sizing:border-box" />
-    </div>
-  `;
+  let cardsWrap = document.getElementById('product-bank-cards-wrap');
+  if (!cardsWrap || !searchInput) {
+    container.innerHTML = `
+      <div style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
+        <label for="product-bank-search" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Search products</label>
+        <input type="search" id="product-bank-search" name="product-bank-search" placeholder="Search products, brands, or categories..." value="${escapeAttr(query)}" style="width:100%;padding:8px 12px;border:1px solid var(--border,#e7e5e4);border-radius:8px;font-size:13px;background:var(--surface,#fff);box-sizing:border-box" />
+      </div>
+      <div id="product-bank-cards-wrap"></div>
+    `;
+    cardsWrap = document.getElementById('product-bank-cards-wrap');
+    searchInput = document.getElementById('product-bank-search');
+    if (searchInput) {
+      searchInput.oninput = () => renderProductBank();
+    }
+  }
 
   if (allProducts.length === 0) {
-    container.innerHTML = searchBarHtml + `
+    cardsWrap.innerHTML = `
       <div class="card" style="padding:32px 20px;text-align:center;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:14px;margin-top:12px;">
         <div style="font-size:32px;margin-bottom:8px">📦</div>
         <h3 style="font-size:16px;font-weight:700;margin:0 0 6px 0">No products in product bank</h3>
@@ -290,7 +301,7 @@ export function renderProductBank() {
   }
 
   if (products.length === 0) {
-    container.innerHTML = searchBarHtml + `
+    cardsWrap.innerHTML = `
       <div class="card" style="padding:24px;text-align:center;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:14px;margin-top:12px;font-size:13.5px;color:var(--text2)">
         No matching products found for "${escapeHtml(query)}".
       </div>
@@ -364,6 +375,8 @@ export function renderProductBank() {
       </div>
     </div>
   `).join('');
+
+  cardsWrap.innerHTML = cardsHtml;
 
   container.onclick = (e) => {
     const btn = e.target.closest('[data-action]');

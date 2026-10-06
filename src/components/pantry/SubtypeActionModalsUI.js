@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/SubtypeActionModalsUI.js (v3.20.10)
+ * src/components/pantry/SubtypeActionModalsUI.js (v3.20.11)
  * Standardised custom styled dialogues and workflows for nested sub-types.
  * Eliminates all prompt(), alert(), and confirm() browser chrome calls.
  * Strictly modular (< 400 lines) and sanitised of legacy terminology.

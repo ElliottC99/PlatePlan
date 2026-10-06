@@ -1,5 +1,5 @@
 /**
- * src/config/firebase.js (v3.20.10)
+ * src/config/firebase.js (v3.20.11)
  * Firebase configuration, safe initialization, log level suppression, and database instance export.
  */
 

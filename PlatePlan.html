@@ -177,7 +177,7 @@ try{
 <div class="app">
 
 <header class="app-header">
-  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span id="app-header-version" class="version-badge" style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v3.20.10</span></div>
+  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span id="app-header-version" class="version-badge" style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v3.20.11</span></div>
   <div class="app-header-actions">
     <button class="btn primary app-create-button" type="button" data-pp-click="openCreateActionSheet()" aria-label="Add to PlatePlan"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span class="app-create-label">Add</span></button>
     <button class="btn ghost app-menu-button" type="button" data-pp-click="openMobileMore()" aria-label="Open PlatePlan menu"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="19" cy="12" r="1.3"></circle></svg><span>Menu</span></button>
@@ -1314,49 +1314,49 @@ try{
     <h3 id="mi-title">Edit product</h3><div id="mi-tesco-actions" style="display: flex; justify-content: flex-end; margin: -4px 0px 12px;"><button type="button" class="btn sm ghost" data-pp-click="openTescoImportForIngredientEdit()">Paste/update from Tesco</button></div>
     <div id="mi-linkage-container" style="margin-bottom: 12px;"></div>
     <div class="grid2">
-      <div><label>Product name</label><input type="text" id="mi-name" placeholder="Product name"></div>
-      <div><label>Brand</label><input type="text" id="mi-brand" placeholder="Quorn"></div>
+      <div><label for="mi-name">Product name</label><input type="text" id="mi-name" name="mi-name" placeholder="Product name"></div>
+      <div><label for="mi-brand">Brand</label><input type="text" id="mi-brand" name="mi-brand" placeholder="Quorn"></div>
     </div>
     <div class="grid2">
-        <div class="field" style="display: none;"><label>Category</label><input type="search" id="mi-cat-search" placeholder="Search category" list="mi-cat-category-options" style="width: 100%;"><select id="mi-cat" style="display: none;"><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option><option value="__add_new__" style="font-weight:bold; color:var(--green)">+ Add new category...</option></select><datalist id="mi-cat-category-options"><option value="Baking"></option><option value="Beverages"></option><option value="Carbs (Pasta/Rice/Potato)"></option><option value="Dairy &amp; Eggs"></option><option value="Fruit &amp; Vegetables"></option><option value="Grains, Legumes &amp; Pulses"></option><option value="Herbs &amp; Spices"></option><option value="Meat Substitutes"></option><option value="Nuts &amp; Seeds"></option><option value="Other"></option><option value="Sauces, Condiments &amp; Pastes"></option><option value="Store Cupboard"></option><option value="Supplements"></option><option value="Tofu, Tempeh &amp; Seitan"></option></datalist></div>
-        <div class="field"><label>Storage</label><select id="mi-storage"><option value="">-- Select --</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="cupboard">Cupboard</option></select></div>
+        <div class="field" style="display: none;"><label for="mi-cat-search">Category</label><input type="search" id="mi-cat-search" name="mi-cat-search" placeholder="Search category" list="mi-cat-category-options" style="width: 100%;"><select id="mi-cat" name="mi-cat" style="display: none;"><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option><option value="__add_new__" style="font-weight:bold; color:var(--green)">+ Add new category...</option></select><datalist id="mi-cat-category-options"><option value="Baking"></option><option value="Beverages"></option><option value="Carbs (Pasta/Rice/Potato)"></option><option value="Dairy &amp; Eggs"></option><option value="Fruit &amp; Vegetables"></option><option value="Grains, Legumes &amp; Pulses"></option><option value="Herbs &amp; Spices"></option><option value="Meat Substitutes"></option><option value="Nuts &amp; Seeds"></option><option value="Other"></option><option value="Sauces, Condiments &amp; Pastes"></option><option value="Store Cupboard"></option><option value="Supplements"></option><option value="Tofu, Tempeh &amp; Seitan"></option></datalist></div>
+        <div class="field"><label for="mi-storage">Storage</label><select id="mi-storage" name="mi-storage"><option value="">-- Select --</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="cupboard">Cupboard</option></select></div>
     </div>
     <p class="section-label">Per 100g</p>
     <div class="grid3">
-      <div><label>Calories (Energy)</label><input type="number" id="mi-cal" placeholder="132"></div>
-      <div><label>Fat (g)</label><input type="number" id="mi-fat" placeholder="5.9"></div>
-      <div><label>Carbs (g)</label><input type="number" id="mi-carb" placeholder="5.4"></div>
-      <div><label>Fibre (g)</label><input type="number" id="mi-fibre" placeholder="4.5"></div>
-      <div><label>Protein (g)</label><input type="number" id="mi-prot" placeholder="14.5"></div>
+      <div><label for="mi-cal">Calories (Energy)</label><input type="number" id="mi-cal" name="mi-cal" placeholder="132"></div>
+      <div><label for="mi-fat">Fat (g)</label><input type="number" id="mi-fat" name="mi-fat" placeholder="5.9"></div>
+      <div><label for="mi-carb">Carbs (g)</label><input type="number" id="mi-carb" name="mi-carb" placeholder="5.4"></div>
+      <div><label for="mi-fibre">Fibre (g)</label><input type="number" id="mi-fibre" name="mi-fibre" placeholder="4.5"></div>
+      <div><label for="mi-prot">Protein (g)</label><input type="number" id="mi-prot" name="mi-prot" placeholder="14.5"></div>
     </div>
     <div id="mi-serving-hint" style="display: none;"></div>
     <div class="grid3">
-      <div><label>Price per pack (£)</label><input type="number" id="mi-price" placeholder="2.50" step="0.01"></div>
+      <div><label for="mi-price">Price per pack (£)</label><input type="number" id="mi-price" name="mi-price" placeholder="2.50" step="0.01"></div>
       <div>
-        <label>Total pack size</label>
+        <label for="mi-pack">Total pack size</label>
         <div style="display:flex; gap:5px;">
-          <input type="number" id="mi-pack" placeholder="500">
-          <select id="mi-pack-unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
+          <input type="number" id="mi-pack" name="mi-pack" placeholder="500">
+          <select id="mi-pack-unit" name="mi-pack-unit" aria-label="Pack unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
             <option value="g">g</option>
             <option value="ml">ml</option>
           </select>
         </div>
       </div>
             <div>
-        <label>Weight / volume of 1 usable item</label>
+        <label for="mi-item-weight">Weight / volume of 1 usable item</label>
         <div style="display:flex; gap:5px;">
-          <input type="number" id="mi-item-weight" placeholder="e.g. 75">
-          <select id="mi-item-weight-unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
+          <input type="number" id="mi-item-weight" name="mi-item-weight" placeholder="e.g. 75">
+          <select id="mi-item-weight-unit" name="mi-item-weight-unit" aria-label="Item weight unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
             <option value="g">g</option>
             <option value="ml">ml</option>
           </select>
         </div>
       </div>
       <div>
-        <label>Drained weight (usable content)</label>
+        <label for="mi-drained-weight">Drained weight (usable content)</label>
         <div style="display:flex; gap:5px;">
-          <input type="number" id="mi-drained-weight" placeholder="e.g. 235">
-          <select id="mi-drained-weight-unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
+          <input type="number" id="mi-drained-weight" name="mi-drained-weight" placeholder="e.g. 235">
+          <select id="mi-drained-weight-unit" name="mi-drained-weight-unit" aria-label="Drained weight unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
             <option value="g">g</option>
             <option value="ml">ml</option>
           </select>

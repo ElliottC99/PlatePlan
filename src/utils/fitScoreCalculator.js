@@ -1,5 +1,5 @@
 /**
- * src/utils/fitScoreCalculator.js (v3.20.10)
+ * src/utils/fitScoreCalculator.js (v3.20.11)
  * Universal Asymmetric Fit Score Engine & Bulletproof Macro Extractor.
  * Evaluates Elliott & Chloe's personal meal targets using continuous asymmetric
  * calorie and protein curves, dynamic split exclusions, and macro quality sweeps.

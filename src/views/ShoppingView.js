@@ -1,5 +1,5 @@
 /**
- * src/views/ShoppingView.js (v3.20.10)
+ * src/views/ShoppingView.js (v3.20.11)
  * Componentised Shopping List View with reactive store subscription.
  * Real-time state synchronisation with Household Meal Plan and Reactive Store.
  * Categorised groceries with clean 'Items I Already Have' separation.

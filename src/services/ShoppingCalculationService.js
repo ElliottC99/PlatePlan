@@ -1,5 +1,5 @@
 /**
- * src/services/ShoppingCalculationService.js (v3.20.10)
+ * src/services/ShoppingCalculationService.js (v3.20.11)
  * Precision unit pricing, pack weight normalisation, and robust fallbacks
  * for household shopping list generation.
  */

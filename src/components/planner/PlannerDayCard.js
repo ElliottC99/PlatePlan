@@ -1,5 +1,5 @@
 /**
- * src/components/planner/PlannerDayCard.js (v3.8.1)
+ * src/components/planner/PlannerDayCard.js (v3.20.11)
  * UI component for day containers, date headers, daily macro target bars,
  * and day action controls in the PlatePlan weekly planner.
  */
@@ -55,8 +55,8 @@ export function renderDayPlanCard({
     return `
       <div class="day-plan-card skipped">
         <div style="display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap">
-          <strong>${escapeHtml(dayLabel)}</strong>
-          <input type="date" aria-label="Date for day ${day}" value="${escapeAttr(dayDate)}" data-action="set-plan-day-date" data-day="${day}" onchange="setPlanDayDate(${day}, this.value)" style="width:auto">
+          <label for="planner-date-day-${day}" style="font-weight:700">${escapeHtml(dayLabel)}</label>
+          <input type="date" id="planner-date-day-${day}" name="planner-date-day-${day}" aria-label="Date for day ${day}" value="${escapeAttr(dayDate)}" data-action="set-plan-day-date" data-day="${day}" style="width:auto">
           <span style="color:var(--text3)">-- no meals planned</span>
         </div>
       </div>
@@ -71,8 +71,8 @@ export function renderDayPlanCard({
     <div class="day-plan-card">
       <div class="row-between" style="margin-bottom:10px;gap:8px;flex-wrap:wrap">
         <div class="plan-date-control">
-          <div style="font-size:13px;font-weight:600">${escapeHtml(dayLabel)}</div>
-          <input type="date" aria-label="Date for day ${day}" value="${escapeAttr(dayDate)}" data-action="set-plan-day-date" data-day="${day}" onchange="setPlanDayDate(${day}, this.value)">
+          <label for="planner-date-day-${day}" style="font-size:13px;font-weight:600;display:block;margin-bottom:2px">${escapeHtml(dayLabel)}</label>
+          <input type="date" id="planner-date-day-${day}" name="planner-date-day-${day}" aria-label="Date for day ${day}" value="${escapeAttr(dayDate)}" data-action="set-plan-day-date" data-day="${day}">
         </div>
         <span class="tag" title="Lower is better. Calories miss plus protein shortfall.">Score ${score}</span>
       </div>

@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/PantryBankHTMLTemplate.js (v3.20.10)
+ * src/components/pantry/PantryBankHTMLTemplate.js (v3.20.11)
  * Extracted HTML UI renderer for the Category -> Ingredient -> Sub-type Hierarchy.
  * Harmonised with v3.20.06 design system button, badge, and Auto-Default formatting tokens.
  */
@@ -92,12 +92,12 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr) {
                         <div class="subtype-actions-container" style="position:relative;display:inline-block">
                           <button type="button" class="btn xs btn-ghost ghost dropdown-trigger-btn" onclick="toggleCardMoreMenu(this, '${escapeAttr(st.id)}')" title="More options" style="padding:2px 6px;font-weight:700">•••</button>
                           <div id="card-more-menu-${escapeAttr(st.id)}" class="card-more-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-md,10px);box-shadow:0 6px 16px rgba(0,0,0,0.08);z-index:100;min-width:140px;flex-direction:column;padding:4px">
-                            <button type="button" class="btn xs btn-ghost ghost" onclick="window.openEditSubtypeModal('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">📝 Edit Details</button>
-                            <button type="button" class="btn xs btn-ghost ghost" onclick="window.openSubtypeLinkSelectionModal('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🔗 Link Product</button>
-                            <button type="button" class="btn xs btn-ghost ghost" onclick="window.openSubtypeReorganizeModal('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🔄 Reorganise</button>
-                            <button type="button" class="btn xs btn-ghost ghost" onclick="window.openSubtypeAliasModal('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🏷️ Manage Aliases</button>
+                            <button type="button" class="btn xs btn-ghost ghost" data-action="edit-subtype" data-subtype-id="${escapeAttr(st.id)}" data-parent-id="${escapeAttr(ing.id)}" onclick="window.openEditSubtypeModal('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">📝 Edit Details</button>
+                            <button type="button" class="btn xs btn-ghost ghost" data-action="link-subtype" data-subtype-id="${escapeAttr(st.id)}" data-parent-id="${escapeAttr(ing.id)}" onclick="window.openSubtypeLinkSelectionModal('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🔗 Link Product</button>
+                            <button type="button" class="btn xs btn-ghost ghost" data-action="reorganize-subtype" data-subtype-id="${escapeAttr(st.id)}" data-parent-id="${escapeAttr(ing.id)}" onclick="window.openSubtypeReorganizeModal('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🔄 Reorganise</button>
+                            <button type="button" class="btn xs btn-ghost ghost" data-action="alias-subtype" data-subtype-id="${escapeAttr(st.id)}" data-parent-id="${escapeAttr(ing.id)}" onclick="window.openSubtypeAliasModal('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🏷️ Manage Aliases</button>
                             <div style="height:1px;background:var(--border,#e7e5e4);margin:4px 0"></div>
-                            <button type="button" class="btn xs btn-ghost ghost" onclick="window.openSubtypeDeleteModal('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;color:var(--red,#ef4444);font-size:12px;text-align:left">🗑️ Delete</button>
+                            <button type="button" class="btn xs btn-ghost ghost" data-action="delete-subtype" data-id="${escapeAttr(st.id)}" data-subtype-id="${escapeAttr(st.id)}" data-parent-id="${escapeAttr(ing.id)}" onclick="window.openSubtypeDeleteModal('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;color:var(--red,#ef4444);font-size:12px;text-align:left">🗑️ Delete</button>
                           </div>
                         </div>
                       </div>
