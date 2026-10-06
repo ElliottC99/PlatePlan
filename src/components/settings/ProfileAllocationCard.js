@@ -61,12 +61,12 @@ function renderSingleProfileCard(profileId, profile = {}) {
         <div>
           <label for="pp-profile-${pId}-cal" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;cursor:pointer">Daily Calories (kcal)</label>
           <input type="number" id="pp-profile-${pId}-cal" name="profileCal-${pId}" aria-label="${escapeHtml(name)} Daily Calories" class="pp-profile-cal-input" data-profile="${pId}" value="${dailyKcal}" style="width:100%" oninput="calcBudgets()">
-          <input type="hidden" id="pp-macro-${legacyPrefix}-cal" name="macroCal-${legacyPrefix}" value="${dailyKcal}">
+          <input type="hidden" id="pp-macro-${legacyPrefix}-cal" aria-label="Legacy Calories ${legacyPrefix}" name="macroCal-${legacyPrefix}" value="${dailyKcal}">
         </div>
         <div>
           <label for="pp-profile-${pId}-prot" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;cursor:pointer">Daily Protein (g)</label>
           <input type="number" id="pp-profile-${pId}-prot" name="profileProt-${pId}" aria-label="${escapeHtml(name)} Daily Protein" class="pp-profile-prot-input" data-profile="${pId}" value="${dailyProtein}" style="width:100%" oninput="calcBudgets()">
-          <input type="hidden" id="pp-macro-${legacyPrefix}-prot" name="macroProt-${legacyPrefix}" value="${dailyProtein}">
+          <input type="hidden" id="pp-macro-${legacyPrefix}-prot" aria-label="Legacy Protein ${legacyPrefix}" name="macroProt-${legacyPrefix}" value="${dailyProtein}">
         </div>
       </div>
 
@@ -80,22 +80,22 @@ function renderSingleProfileCard(profileId, profile = {}) {
           <div>
             <label for="pp-profile-${pId}-cal-bf" style="font-size:10px;color:var(--text2);display:block;cursor:pointer">Breakfast</label>
             <input type="number" id="pp-profile-${pId}-cal-bf" name="profileCalBf-${pId}" aria-label="${escapeHtml(name)} Calorie Split Breakfast" value="${calBf}" min="0" max="100" style="width:100%;font-size:11px" oninput="calcBudgets()">
-            <input type="hidden" id="pp-macro-${legacyPrefix}-bf-cal" name="macroCalBf-${legacyPrefix}" value="${calBf}">
+            <input type="hidden" id="pp-macro-${legacyPrefix}-bf-cal" aria-label="Legacy Breakfast Calories ${legacyPrefix}" name="macroCalBf-${legacyPrefix}" value="${calBf}">
           </div>
           <div>
             <label for="pp-profile-${pId}-cal-lu" style="font-size:10px;color:var(--text2);display:block;cursor:pointer">Lunch</label>
             <input type="number" id="pp-profile-${pId}-cal-lu" name="profileCalLu-${pId}" aria-label="${escapeHtml(name)} Calorie Split Lunch" value="${calLu}" min="0" max="100" style="width:100%;font-size:11px" oninput="calcBudgets()">
-            <input type="hidden" id="pp-macro-${legacyPrefix}-lu-cal" name="macroCalLu-${legacyPrefix}" value="${calLu}">
+            <input type="hidden" id="pp-macro-${legacyPrefix}-lu-cal" aria-label="Legacy Lunch Calories ${legacyPrefix}" name="macroCalLu-${legacyPrefix}" value="${calLu}">
           </div>
           <div>
             <label for="pp-profile-${pId}-cal-sn" style="font-size:10px;color:var(--text2);display:block;cursor:pointer">Snack</label>
             <input type="number" id="pp-profile-${pId}-cal-sn" name="profileCalSn-${pId}" aria-label="${escapeHtml(name)} Calorie Split Snack" value="${calSn}" min="0" max="100" style="width:100%;font-size:11px" oninput="calcBudgets()">
-            <input type="hidden" id="pp-macro-${legacyPrefix}-sn-cal" name="macroCalSn-${legacyPrefix}" value="${calSn}">
+            <input type="hidden" id="pp-macro-${legacyPrefix}-sn-cal" aria-label="Legacy Snack Calories ${legacyPrefix}" name="macroCalSn-${legacyPrefix}" value="${calSn}">
           </div>
           <div>
             <label for="pp-profile-${pId}-cal-di" style="font-size:10px;color:var(--text2);display:block;cursor:pointer">Dinner (Rem)</label>
             <input type="number" id="pp-profile-${pId}-cal-di" name="profileCalDi-${pId}" aria-label="${escapeHtml(name)} Calorie Split Dinner" value="${calDi}" readonly style="width:100%;font-size:11px;background:rgba(0,0,0,0.04);font-weight:700;color:var(--primary, #2563eb)">
-            <input type="hidden" id="pp-macro-${legacyPrefix}-di-cal" name="macroCalDi-${legacyPrefix}" value="${calDi}">
+            <input type="hidden" id="pp-macro-${legacyPrefix}-di-cal" aria-label="Legacy Dinner Calories ${legacyPrefix}" name="macroCalDi-${legacyPrefix}" value="${calDi}">
           </div>
         </div>
       </div>

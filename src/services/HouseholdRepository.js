@@ -181,19 +181,118 @@ export async function getPreferences() {
   }
 }
 
+export function prunePreferences(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+
+  // Safe helper to deep clone so we do not mutate other logic's in-memory references unless desired
+  let cloned;
+  try {
+    cloned = JSON.parse(JSON.stringify(obj));
+  } catch (e) {
+    cloned = obj; // Fallback
+  }
+
+  const clean = (target) => {
+    if (!target || typeof target !== 'object') return;
+
+    for (const key of Object.keys(target)) {
+      const val = target[key];
+
+      // 1. Truncate dismissed Quality Advisories or any dismissed advisory / history arrays to 50 most recent entries
+      if (
+        (key === 'dismissedQualityAdvisories' || 
+         key === 'dismissedAdvisories' || 
+         key === 'dismissed_advisories' || 
+         key === 'advisoryHistory' || 
+         key === 'advisory_history') && 
+        Array.isArray(val)
+      ) {
+        // 2. Removes obsolete advisory keys (advisory:recipe-macro-sync:*, advisory:recipe-low-cal:*) that are no longer active
+        let filtered = val.filter(item => {
+          const itemStr = typeof item === 'string' ? item : (item?.key || item?.id || '');
+          return !itemStr.startsWith('advisory:recipe-macro-sync:') && !itemStr.startsWith('advisory:recipe-low-cal:');
+        });
+        
+        // Truncate to the 50 most recent entries
+        if (filtered.length > 50) {
+          filtered = filtered.slice(-50);
+        }
+        target[key] = filtered;
+      }
+      // 3. Strips out any embedded object logs or heavy state snapshots from the payload before saving
+      else if (
+        key === 'logs' || 
+        key === 'diagnostics' || 
+        key === 'snapshots' || 
+        key === 'stateSnapshots' || 
+        key === 'history' || 
+        key === 'telemetry' ||
+        key === 'cachedState'
+      ) {
+        delete target[key];
+      }
+      else if (val && typeof val === 'object') {
+        clean(val);
+      }
+    }
+  };
+
+  clean(cloned);
+
+  // Check the size of payload, and if it's still too large, let's aggressively delete large arrays/objects
+  let size = 0;
+  try {
+    size = new TextEncoder().encode(JSON.stringify(cloned)).length;
+  } catch (e) {
+    console.warn('[prunePreferences] Size check error:', e);
+  }
+
+  if (size >= 900000) {
+    console.warn('[prunePreferences] Payload size is still too large:', size, 'bytes. Applying aggressive pruning...');
+    const aggressiveClean = (target) => {
+      if (!target || typeof target !== 'object') return;
+      for (const key of Object.keys(target)) {
+        if (key === 'dismissedQualityAdvisories' || key === 'dismissedAdvisories' || key === 'dismissed_advisories') {
+          target[key] = []; // Clear completely
+        } else if (target[key] && typeof target[key] === 'object') {
+          aggressiveClean(target[key]);
+        }
+      }
+    };
+    aggressiveClean(cloned);
+  }
+
+  return cloned;
+}
+
 export async function savePreferences(userPrefs, settings = {}) {
   try {
     if (!isDbAvailable()) return false;
     const prefRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences');
     const rootRef = db.collection('households').doc(HOUSEHOLD_ID);
     const profiles = userPrefs?.profiles || (typeof window !== 'undefined' && window.state?.preferences?.profiles) || {};
-    const payload = {
+    let payload = {
       userPrefs: userPrefs || {},
       nutritionTargets: userPrefs?.nutritionTargets || {},
       profiles,
       settings: settings || userPrefs?.settings || {},
       updatedAt: new Date().toISOString()
     };
+    
+    // Run pruning prior to Firestore write operations
+    payload = prunePreferences(payload);
+
+    // Guard: ensure payload size is under 900,000 bytes
+    let finalSize = 0;
+    try {
+      finalSize = new TextEncoder().encode(JSON.stringify(payload)).length;
+    } catch (e) {}
+
+    if (finalSize >= 900000) {
+      console.error('[HouseholdRepository] Refusing to write payload exceeding 900,000 bytes. Current size:', finalSize);
+      return false; // Prevent crash
+    }
+
     await Promise.all([
       prefRef.set(payload, { merge: true }),
       rootRef.set(payload, { merge: true })

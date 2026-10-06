@@ -588,7 +588,7 @@ try{
     </div>
 
     <div class="field" id="tesco-paste-panel" style="">
-      <label style="font-weight:600">Paste JSON (from Bookmarklet)</label>
+      <label for="tesco-paste" style="font-weight:600">Paste JSON (from Bookmarklet)</label>
       <textarea id="tesco-paste" style="min-height:90px;font-size:12px" placeholder="Paste copied data here..."></textarea>
     </div>
     <div class="btn-row" id="tesco-extract-actions" style="margin-bottom: 10px;">
@@ -599,15 +599,15 @@ try{
     <div id="tesco-preview" style="display: none; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
       <h3 id="tesco-details-heading" style="margin-bottom:8px; font-size:15px;">Review product details</h3>
       <div class="grid2" style="gap:10px; margin-bottom:10px;">
-        <div><label style="font-size:12px; font-weight:600;">Product name</label><input type="text" id="tp-name" placeholder="Product name"></div>
-        <div><label style="font-size:12px; font-weight:600;">Brand</label><input type="text" id="tp-brand" placeholder="Brand"></div>
+        <div><label for="tp-name" style="font-size:12px; font-weight:600;">Product name</label><input type="text" id="tp-name" placeholder="Product name"></div>
+        <div><label for="tp-brand" style="font-size:12px; font-weight:600;">Brand</label><input type="text" id="tp-brand" placeholder="Brand"></div>
       </div>
       <!-- Explicit Import Review Modal Inputs -->
       <div style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:12px;">
         <div style="font-size:12px; font-weight:700; color:var(--text); margin-bottom:8px;">Import Review Inputs</div>
         <div class="grid2" style="gap:10px; margin-bottom:10px;">
           <div>
-            <label style="font-size:12px; font-weight:600;">Category</label>
+            <label for="import-category" style="font-size:12px; font-weight:600;">Category</label>
             <select id="import-category" style="width:100%; padding:6px; border-radius:6px; border:1px solid var(--border);">
               <option value="Produce">Produce</option>
               <option value="Grains">Grains</option>
@@ -618,7 +618,7 @@ try{
             </select>
           </div>
           <div>
-            <label style="font-size:12px; font-weight:600;">Storage (Ambient/Chilled/Frozen)</label>
+            <label for="import-storage" style="font-size:12px; font-weight:600;">Storage (Ambient/Chilled/Frozen)</label>
             <select id="import-storage" style="width:100%; padding:6px; border-radius:6px; border:1px solid var(--border);">
               <option value="Ambient">Ambient</option>
               <option value="Chilled">Chilled</option>
@@ -628,30 +628,30 @@ try{
         </div>
         <div class="grid2" style="gap:10px; margin-bottom:10px;">
           <div>
-            <label style="font-size:12px; font-weight:600;">Drained / Usable weight (g)</label>
+            <label for="import-usable-weight" style="font-size:12px; font-weight:600;">Drained / Usable weight (g)</label>
             <input type="number" id="import-usable-weight" placeholder="e.g. 235" style="width:100%; padding:6px; border-radius:6px; border:1px solid var(--border);">
           </div>
           <div>
-            <label style="font-size:12px; font-weight:600;">Fibre (g)</label>
+            <label for="import-fibre" style="font-size:12px; font-weight:600;">Fibre (g)</label>
             <input type="number" id="import-fibre" step="0.1" placeholder="0.0" style="width:100%; padding:6px; border-radius:6px; border:1px solid var(--border);">
           </div>
         </div>
         <div>
-          <label style="font-size:12px; font-weight:600;">Notes</label>
+          <label for="import-notes" style="font-size:12px; font-weight:600;">Notes</label>
           <textarea id="import-notes" placeholder="Additional notes..." style="width:100%; min-height:48px; padding:6px; border-radius:6px; border:1px solid var(--border);"></textarea>
         </div>
       </div>
       <div class="grid2" style="gap:10px; margin-bottom:10px;">
-        <div class="field" style="display: block; margin:0;"><label style="font-size:12px; font-weight:600;">Category</label><input type="search" id="tp-cat-search" placeholder="Search category" list="tp-cat-category-options" style="width: 100%;"><select id="tp-cat" style="display: none;"></select><datalist id="tp-cat-category-options"></datalist></div>
-        <div class="field" style="margin:0;"><label style="font-size:12px; font-weight:600;">Storage</label><select id="tp-storage"><option value="">-- Select --</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="cupboard">Cupboard</option></select></div>
+        <div class="field" style="display: block; margin:0;"><label for="tp-cat-search" style="font-size:12px; font-weight:600;">Category</label><input type="search" id="tp-cat-search" placeholder="Search category" list="tp-cat-category-options" style="width: 100%;"><select id="tp-cat" aria-label="Tesco Import Category" style="display: none;"></select><datalist id="tp-cat-category-options"></datalist></div>
+        <div class="field" style="margin:0;"><label for="tp-storage" style="font-size:12px; font-weight:600;">Storage</label><select id="tp-storage"><option value="">-- Select --</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="cupboard">Cupboard</option></select></div>
       </div>
       <div class="grid3" style="gap:10px; margin-bottom:10px;">
-        <div><label style="font-size:12px; font-weight:600;">Price per pack (£)</label><input type="number" id="tp-price" placeholder="0.00" step="0.01"></div>
+        <div><label for="tp-price" style="font-size:12px; font-weight:600;">Price per pack (£)</label><input type="number" id="tp-price" placeholder="0.00" step="0.01"></div>
         <div>
-          <label style="font-size:12px; font-weight:600;">Pack size &amp; unit</label>
+          <label for="tp-pack" style="font-size:12px; font-weight:600;">Pack size &amp; unit</label>
           <div style="display:flex;gap:5px">
             <input type="number" id="tp-pack" placeholder="500">
-            <select id="tp-pack-unit" style="width:75px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
+            <select id="tp-pack-unit" aria-label="Tesco Import Pack Unit" style="width:75px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
               <option value="g">g</option>
               <option value="ml">ml</option>
               <option value="qty">qty</option>
@@ -659,10 +659,10 @@ try{
           </div>
         </div>
         <div>
-          <label style="font-size:12px; font-weight:600;">Usable / Drained weight</label>
+          <label for="tp-drained-weight" style="font-size:12px; font-weight:600;">Usable / Drained weight</label>
           <div style="display:flex;gap:5px">
             <input type="number" id="tp-drained-weight" placeholder="e.g. 235">
-            <select id="tp-drained-weight-unit" style="width:75px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
+            <select id="tp-drained-weight-unit" aria-label="Tesco Import Drained Weight Unit" style="width:75px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
               <option value="g">g</option>
               <option value="ml">ml</option>
             </select>
@@ -672,25 +672,25 @@ try{
       <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px; margin-bottom:10px;">
         <div style="font-size:12px; font-weight:700; color:var(--text2); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.04em;">Nutrition per 100g</div>
         <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:8px;">
-          <div><label style="font-size:11px;">Calories (kcal)</label><input type="number" id="tp-cal" placeholder="0"></div>
-          <div><label style="font-size:11px;">Protein (g)</label><input type="number" id="tp-prot" placeholder="0"></div>
-          <div><label style="font-size:11px;">Carbs (g)</label><input type="number" id="tp-carb" placeholder="0"></div>
-          <div><label style="font-size:11px;">Fat (g)</label><input type="number" id="tp-fat" placeholder="0"></div>
-          <div><label style="font-size:11px;">Fibre (g)</label><input type="number" id="tp-fibre" placeholder="0"></div>
+          <div><label for="tp-cal" style="font-size:11px;">Calories (kcal)</label><input type="number" id="tp-cal" placeholder="0"></div>
+          <div><label for="tp-prot" style="font-size:11px;">Protein (g)</label><input type="number" id="tp-prot" placeholder="0"></div>
+          <div><label for="tp-carb" style="font-size:11px;">Carbs (g)</label><input type="number" id="tp-carb" placeholder="0"></div>
+          <div><label for="tp-fat" style="font-size:11px;">Fat (g)</label><input type="number" id="tp-fat" placeholder="0"></div>
+          <div><label for="tp-fibre" style="font-size:11px;">Fibre (g)</label><input type="number" id="tp-fibre" placeholder="0"></div>
         </div>
       </div>
       <div class="grid2" style="gap:10px; margin-bottom:10px;">
         <div>
-          <label style="font-size:12px; font-weight:600;">1 Usable item weight (optional)</label>
+          <label for="tp-item-weight" style="font-size:12px; font-weight:600;">1 Usable item weight (optional)</label>
           <div style="display:flex;gap:5px">
             <input type="number" id="tp-item-weight" placeholder="e.g. 75">
-            <select id="tp-item-weight-unit" style="width:75px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
+            <select id="tp-item-weight-unit" aria-label="Tesco Import Item Weight Unit" style="width:75px;border:1px solid var(--border);border-radius:8px;padding:0 5px">
               <option value="g">g</option>
               <option value="ml">ml</option>
             </select>
           </div>
         </div>
-        <div><label style="font-size:12px; font-weight:600;">Notes</label><input type="text" id="tp-notes" placeholder="e.g. Found in freezer aisle"></div>
+        <div><label for="tp-notes" style="font-size:12px; font-weight:600;">Notes</label><input type="text" id="tp-notes" placeholder="e.g. Found in freezer aisle"></div>
       </div>
       <div id="tp-pack-summary" class="pack-model-summary" aria-live="polite" style="margin-bottom:8px;"></div>
       <div class="field" style="display: none;"><label>Meat substitute for (optional)<input type="text" id="tp-meatsub" placeholder="e.g. mince, chicken, bacon"></label></div>
@@ -1318,7 +1318,7 @@ try{
       <div><label for="mi-brand">Brand</label><input type="text" id="mi-brand" name="mi-brand" placeholder="Quorn"></div>
     </div>
     <div class="grid2">
-        <div class="field" style="display: none;"><label for="mi-cat-search">Category</label><input type="search" id="mi-cat-search" name="mi-cat-search" placeholder="Search category" list="mi-cat-category-options" style="width: 100%;"><select id="mi-cat" name="mi-cat" style="display: none;"><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option><option value="__add_new__" style="font-weight:bold; color:var(--green)">+ Add new category...</option></select><datalist id="mi-cat-category-options"><option value="Baking"></option><option value="Beverages"></option><option value="Carbs (Pasta/Rice/Potato)"></option><option value="Dairy &amp; Eggs"></option><option value="Fruit &amp; Vegetables"></option><option value="Grains, Legumes &amp; Pulses"></option><option value="Herbs &amp; Spices"></option><option value="Meat Substitutes"></option><option value="Nuts &amp; Seeds"></option><option value="Other"></option><option value="Sauces, Condiments &amp; Pastes"></option><option value="Store Cupboard"></option><option value="Supplements"></option><option value="Tofu, Tempeh &amp; Seitan"></option></datalist></div>
+        <div class="field" style="display: none;"><label for="mi-cat-search">Category</label><input type="search" id="mi-cat-search" name="mi-cat-search" placeholder="Search category" list="mi-cat-category-options" style="width: 100%;"><select id="mi-cat" name="mi-cat" aria-label="Category select dropdown" style="display: none;"><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option><option value="__add_new__" style="font-weight:bold; color:var(--green)">+ Add new category...</option></select><datalist id="mi-cat-category-options"><option value="Baking"></option><option value="Beverages"></option><option value="Carbs (Pasta/Rice/Potato)"></option><option value="Dairy &amp; Eggs"></option><option value="Fruit &amp; Vegetables"></option><option value="Grains, Legumes &amp; Pulses"></option><option value="Herbs &amp; Spices"></option><option value="Meat Substitutes"></option><option value="Nuts &amp; Seeds"></option><option value="Other"></option><option value="Sauces, Condiments &amp; Pastes"></option><option value="Store Cupboard"></option><option value="Supplements"></option><option value="Tofu, Tempeh &amp; Seitan"></option></datalist></div>
         <div class="field"><label for="mi-storage">Storage</label><select id="mi-storage" name="mi-storage"><option value="">-- Select --</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="cupboard">Cupboard</option></select></div>
     </div>
     <p class="section-label">Per 100g</p>
@@ -1370,10 +1370,10 @@ try{
     <ul style="margin:6px 0 10px 18px;padding:0;"><li style="margin:3px 0;"><span>4 items × 95g = 380g · £0.86</span> <span class="tag">Current pack</span></li></ul>
     <div class="grid3" style="margin-top:8px;">
       <div><label for="mi-var-pack">Variant size</label><input type="number" id="mi-var-pack" placeholder="400"></div>
-      <div><label for="mi-var-unit">Total unit</label><select id="mi-var-unit"><option value="g">g</option><option value="ml">ml</option></select></div>
+      <div><label for="mi-var-unit">Total unit</label><select id="mi-var-unit" aria-label="Variant Unit"><option value="g">g</option><option value="ml">ml</option></select></div>
       <div><label for="mi-var-price">Price (£)</label><input type="number" id="mi-var-price" placeholder="1.25" step="0.01"></div>
-      <div><label for="mi-var-item-weight">Weight / volume of 1 usable item</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-item-weight" placeholder="75"><select id="mi-var-item-weight-unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option></select></div></div>
-      <div><label for="mi-var-drained-weight">Drained weight (usable content)</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-drained-weight" placeholder="235"><select id="mi-var-drained-weight-unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option></select></div></div>
+      <div><label for="mi-var-item-weight">Weight / volume of 1 usable item</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-item-weight" placeholder="75"><select id="mi-var-item-weight-unit" aria-label="Variant usable item weight unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option></select></div></div>
+      <div><label for="mi-var-drained-weight">Drained weight (usable content)</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-drained-weight" placeholder="235"><select id="mi-var-drained-weight-unit" aria-label="Variant drained weight unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option></select></div></div>
       <div style="display:flex;align-items:flex-end;"><button type="button" class="btn sm secondary" data-pp-click="addManualPackVariant()">Add variant</button></div>
     </div>
   </div>

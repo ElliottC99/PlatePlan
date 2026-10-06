@@ -307,11 +307,61 @@ export function openSubtypeAliasModal(subtypeId, parentId) {
 }
 
 // 4. DELETE CONFIRMATION MODAL
+export async function deleteSubtype(parentId, subtypeId) {
+  const state = getState() || {};
+  let ingredients = (state.ingredients && state.ingredients.length) ? state.ingredients : (window.state?.ingredients || []);
+  
+  // Try finding the parent by parentId first
+  let parent = ingredients.find(i => String(i.id) === String(parentId));
+  // Fallback: search all parent ingredients to find the true parent array containing the subtypeId
+  if (!parent || !Array.isArray(parent.subtypes) || !parent.subtypes.some(s => String(s.id) === String(subtypeId))) {
+    parent = ingredients.find(i => Array.isArray(i.subtypes) && i.subtypes.some(s => String(s.id) === String(subtypeId)));
+  }
+
+  if (!parent || !Array.isArray(parent.subtypes)) {
+    console.warn('[deleteSubtype] Subtype parent not found for subtypeId:', subtypeId, 'parentId:', parentId);
+    return false;
+  }
+
+  // Remove the subtype by strict ID matching
+  parent.subtypes = parent.subtypes.filter(s => String(s.id) !== String(subtypeId));
+  parent.updatedAt = new Date().toISOString();
+
+  // Find and unlink any products linked to subtypeId
+  const prods = [...(state.products || window.state?.products || [])];
+  const unlinkedProds = [];
+  prods.forEach(p => {
+    if (String(p.subtypeId) === String(subtypeId)) {
+      p.subtypeId = null;
+      p.isAutoDefault = false;
+      p.updatedAt = new Date().toISOString();
+      unlinkedProds.push(p);
+    }
+  });
+
+  // Update central store and trigger reactive events
+  setIngredients([...ingredients]);
+  setProducts(prods);
+
+  // Invalidate hierarchy cache
+  invalidateHierarchyCache();
+  if (typeof window.invalidateHierarchyCache === 'function') window.invalidateHierarchyCache();
+  if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+  if (typeof window.renderProductBank === 'function') window.renderProductBank();
+
+  // Save changes to persistence layer
+  await Promise.all([
+    saveIngredient(parent),
+    ...unlinkedProds.map(p => saveProduct(p))
+  ]);
+  return true;
+}
+
 export function openSubtypeDeleteModal(subtypeId, parentId) {
   const state = getState() || {};
   let ingredients = (state.ingredients && state.ingredients.length) ? state.ingredients : (window.state?.ingredients || []);
   let parent = ingredients.find(i => String(i.id) === String(parentId));
-  if (!parent && subtypeId) {
+  if (!parent || !Array.isArray(parent.subtypes) || !parent.subtypes.some(s => String(s.id) === String(subtypeId))) {
     parent = ingredients.find(i => Array.isArray(i.subtypes) && i.subtypes.some(s => String(s.id) === String(subtypeId)));
   }
   if (!parent || !Array.isArray(parent.subtypes)) return;
@@ -336,22 +386,7 @@ export function openSubtypeDeleteModal(subtypeId, parentId) {
   if (confirmBtn) {
     confirmBtn.onclick = async () => {
       closeModal();
-      parent.subtypes = parent.subtypes.filter(s => String(s.id) !== String(subtypeId));
-      parent.updatedAt = new Date().toISOString();
-      const prods = [...(state.products || window.state?.products || [])], unlinkedProds = [];
-      prods.forEach(p => {
-        if (String(p.subtypeId) === String(subtypeId)) {
-          p.subtypeId = null; p.isAutoDefault = false; p.updatedAt = new Date().toISOString();
-          unlinkedProds.push(p);
-        }
-      });
-      setIngredients([...ingredients]);
-      setProducts(prods);
-      invalidateHierarchyCache();
-      if (typeof window.invalidateHierarchyCache === 'function') window.invalidateHierarchyCache();
-      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-      if (typeof window.renderProductBank === 'function') window.renderProductBank();
-      await Promise.all([saveIngredient(parent), ...unlinkedProds.map(p => saveProduct(p))]);
+      await deleteSubtype(parent.id, subtypeId);
     };
   }
 }
@@ -370,6 +405,7 @@ if (typeof window !== 'undefined') {
     openSubtypeReorganizeModal,
     openSubtypeAliasModal,
     openSubtypeDeleteModal,
+    deleteSubtype,
     openTescoBookmarkletInstructionsModal,
     promptAddAlias,
     promptRemoveAlias,
