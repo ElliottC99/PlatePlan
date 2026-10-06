@@ -406,7 +406,7 @@ try{
         <div style="font-weight:700;margin-bottom:3px">Category → Ingredient → Sub-type → Product</div>
         <div style="font-size:12px;color:var(--text2)">Recipes map to ingredients or sub-types. Products stay in the Product Bank and provide the nutrition and shopping data.</div>
       </div>
-      <input type="search" id="ingredient-group-search" placeholder="Search category, ingredient, type, aliases..." data-pp-input="schedulePlatePlanListRender('ingredients')" style="font-size:12px;max-width:260px">
+      <input type="search" id="ingredient-group-search" aria-label="Search category, ingredient, type, or aliases" placeholder="Search category, ingredient, type, aliases..." data-pp-input="schedulePlatePlanListRender('ingredients')" style="font-size:12px;max-width:260px">
     </div>
   </div>
   <div id="ingredient-groups-list"></div>
@@ -425,31 +425,31 @@ try{
   <div id="parse-panel" style="display: none;" class="card">
     <h3>Packet parser</h3>
     <div class="grid2">
-      <div><label>Product name</label><input type="text" id="pp-name" placeholder="e.g. Product name"></div>
-      <div><label>Brand</label><input type="text" id="pp-brand" placeholder="e.g. Quorn"></div>
+      <div><label for="pp-name">Product name</label><input type="text" id="pp-name" placeholder="e.g. Product name"></div>
+      <div><label for="pp-brand">Brand</label><input type="text" id="pp-brand" placeholder="e.g. Quorn"></div>
     </div>
     <div class="grid2">
-        <div class="field" style="display: block;"><label>Category</label><input type="search" id="pp-cat-search" placeholder="Search category" list="pp-cat-category-options" style="width: 100%;"><select id="pp-cat" style="display: none;"><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option><option value="__add_new__" style="font-weight:bold; color:var(--green)">+ Add new category...</option></select><datalist id="pp-cat-category-options"><option value="Baking"></option><option value="Beverages"></option><option value="Carbs (Pasta/Rice/Potato)"></option><option value="Dairy &amp; Eggs"></option><option value="Fruit &amp; Vegetables"></option><option value="Grains, Legumes &amp; Pulses"></option><option value="Herbs &amp; Spices"></option><option value="Meat Substitutes"></option><option value="Nuts &amp; Seeds"></option><option value="Other"></option><option value="Sauces, Condiments &amp; Pastes"></option><option value="Store Cupboard"></option><option value="Supplements"></option><option value="Tofu, Tempeh &amp; Seitan"></option></datalist></div>
-        <div class="field"><label>Storage</label><select id="pp-storage"><option value="">-- Select --</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="cupboard">Cupboard</option></select></div>
+        <div class="field" style="display: block;"><label for="pp-cat-search">Category</label><input type="search" id="pp-cat-search" placeholder="Search category" list="pp-cat-category-options" style="width: 100%;"><select id="pp-cat" aria-label="Product Category Select" style="display: none;"><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option><option value="__add_new__" style="font-weight:bold; color:var(--green)">+ Add new category...</option></select><datalist id="pp-cat-category-options"><option value="Baking"></option><option value="Beverages"></option><option value="Carbs (Pasta/Rice/Potato)"></option><option value="Dairy &amp; Eggs"></option><option value="Fruit &amp; Vegetables"></option><option value="Grains, Legumes &amp; Pulses"></option><option value="Herbs &amp; Spices"></option><option value="Meat Substitutes"></option><option value="Nuts &amp; Seeds"></option><option value="Other"></option><option value="Sauces, Condiments &amp; Pastes"></option><option value="Store Cupboard"></option><option value="Supplements"></option><option value="Tofu, Tempeh &amp; Seitan"></option></datalist></div>
+        <div class="field"><label for="pp-storage">Storage</label><select id="pp-storage"><option value="">-- Select --</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="cupboard">Cupboard</option></select></div>
     </div>
-    <div class="field"><label>Nutritional info</label><textarea id="pp-text" style="min-height:70px" placeholder="Per 100g: Energy 132kcal, Protein 14.5g, Carbohydrate 5.4g, Fat 5.9g, Fibre 4.5g"></textarea></div>
+    <div class="field"><label for="pp-text">Nutritional info</label><textarea id="pp-text" style="min-height:70px" placeholder="Per 100g: Energy 132kcal, Protein 14.5g, Carbohydrate 5.4g, Fat 5.9g, Fibre 4.5g"></textarea></div>
         <div class="grid3">
-      <div><label>Price per pack (£)</label><input type="number" id="pp-price" placeholder="2.50" step="0.01"></div>
+      <div><label for="pp-price">Price per pack (£)</label><input type="number" id="pp-price" placeholder="2.50" step="0.01"></div>
       <div>
-        <label>Pack size</label>
+        <label for="pp-pack">Pack size</label>
         <div style="display:flex; gap:5px;">
-          <input type="number" id="pp-pack" placeholder="500">
-          <select id="pp-pack-unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
+          <input type="number" id="pp-pack" aria-label="Pack size amount" placeholder="500">
+          <select id="pp-pack-unit" aria-label="Pack size unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
             <option value="g">g</option>
             <option value="ml">ml</option>
             <option value="qty">qty</option>
           </select>
         </div>
       </div>
-         <div><label>Weight of 1 item (g)</label><input type="number" id="pp-item-weight" placeholder="e.g. 75"></div>
+         <div><label for="pp-item-weight">Weight of 1 item (g)</label><input type="number" id="pp-item-weight" placeholder="e.g. 75"></div>
     </div>
     <div id="pp-pack-variants" style="display:none;margin:8px 0 12px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);font-size:12px;color:var(--text2);"></div>
-        <div class="field" style="display: none;"><label>Meat substitute for (optional)<input type="text" id="pp-meatsub" placeholder="e.g. mince, chicken, bacon"></label></div>
+        <div class="field" style="display: none;"><label for="pp-meatsub">Meat substitute for (optional)<input type="text" id="pp-meatsub" placeholder="e.g. mince, chicken, bacon"></label></div>
     <div id="pp-msg"></div>
   </div>
 
@@ -460,21 +460,21 @@ try{
     <div class="cf active" data-pp-click="setCat('all')">all</div><div class="cf" data-pp-click="setCat('baking-spices')">Baking</div><div class="cf" data-pp-click="setCat('beverages')">Beverages</div><div class="cf" data-pp-click="setCat('carbs-pasta-rice')">Carbs (Pasta/Rice/Potato)</div><div class="cf" data-pp-click="setCat('dairy-alternative')">Dairy &amp; Eggs</div><div class="cf" data-pp-click="setCat('fruit')">Fruit &amp; Vegetables</div><div class="cf" data-pp-click="setCat('grain')">Grains, Legumes &amp; Pulses</div><div class="cf" data-pp-click="setCat('herbs')">Herbs &amp; Spices</div><div class="cf" data-pp-click="setCat('meat-substitute')">Meat Substitutes</div><div class="cf" data-pp-click="setCat('nuts-seeds')">Nuts &amp; Seeds</div><div class="cf" data-pp-click="setCat('other')">Other</div><div class="cf" data-pp-click="setCat('sauces-condiments')">Sauces, Condiments &amp; Pastes</div><div class="cf" data-pp-click="setCat('store-cupboard')">Store Cupboard</div><div class="cf" data-pp-click="setCat('supplement')">Supplements</div><div class="cf" data-pp-click="setCat('tofu-tempeh')">Tofu, Tempeh &amp; Seitan</div>
     <div style="width:100%;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-top:6px">Ingredient</div>
     <div style="width:100%;display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
-      <input type="search" id="bank-family-search" list="bank-family-options" placeholder="Search ingredient..." data-pp-input="handleProductBankFamilySearch(this.value)" data-pp-change="selectProductBankFamilyFromSearch(this.value)" style="font-size:12px;padding:5px 10px;max-width:260px;flex:1;min-width:180px">
+      <input type="search" id="bank-family-search" aria-label="Search ingredient bank family" list="bank-family-options" placeholder="Search ingredient..." data-pp-input="handleProductBankFamilySearch(this.value)" data-pp-change="selectProductBankFamilyFromSearch(this.value)" style="font-size:12px;padding:5px 10px;max-width:260px;flex:1;min-width:180px">
       <datalist id="bank-family-options"></datalist>
       
     </div>
   </div>
   <div class="row-center" style="margin-bottom:12px">
-    <label style="margin:0;font-size:12px">Sort:</label>
-    <select id="bank-sort" data-pp-change="renderBank()" style="width:auto;font-size:12px">
+    <label for="bank-sort" style="margin:0;font-size:12px">Sort:</label>
+    <select id="bank-sort" aria-label="Sort product bank" data-pp-change="renderBank()" style="width:auto;font-size:12px">
       <option value="name">Name</option>
       <option value="prot">Protein</option>
       <option value="cal">Calories</option>
       <option value="value">Protein per £</option>
       <option value="prot_kcal">Protein per 100 kcal</option>
     </select>
-    <input type="text" id="bank-search" placeholder="Search products or groups..." data-pp-input="schedulePlatePlanListRender('bank')" style="font-size:12px;padding:5px 10px;max-width:210px">
+    <input type="text" id="bank-search" aria-label="Search products or groups" placeholder="Search products or groups..." data-pp-input="schedulePlatePlanListRender('bank')" style="font-size:12px;padding:5px 10px;max-width:210px">
   </div>
   <div id="bank-list"></div>
 </div>
@@ -515,7 +515,7 @@ try{
   <div class="view-toolbar">
     <h1 class="view-title" style="margin:0">Shopping List</h1>
     <div class="row-center">
-        <select id="shop-group-by" data-pp-change="updateShopGroupPref(this.value)" style="width:auto; font-size:12px;">
+        <select id="shop-group-by" aria-label="Group shopping list by" data-pp-change="updateShopGroupPref(this.value)" style="width:auto; font-size:12px;">
             <option value="family">Group by Ingredient</option>
             <option value="category">Group by Category</option>
             <option value="storage">Group by Storage</option>
@@ -778,7 +778,7 @@ try{
       <div id="unified-map-ing-qty-tag" class="tag" style="font-size:12px"></div>
     </div>
     <div class="field" style="margin-bottom:10px">
-      <label style="font-size:12px;font-weight:600">Search Products, Sub-types &amp; Ingredients</label>
+      <label for="unified-map-search" style="font-size:12px;font-weight:600">Search Products, Sub-types &amp; Ingredients</label>
       <div class="mapping-search-container" style="position:relative">
         <input type="text" class="map-search-input" id="unified-map-search" autocomplete="off" placeholder="Search by name, brand, or category..." oninput="handleUnifiedMapSearch(this.value)">
       </div>
@@ -800,7 +800,7 @@ try{
     <p style="font-size:12px; color:var(--text2); margin-bottom:10px;">Choose a product for the selected meal rows.</p>
     <div id="subst-target-summary" style="font-size:12px;color:var(--text2);margin-bottom:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px"></div>
     <div class="mapping-search-container" style="position:relative; margin-bottom: 15px;">
-        <input type="text" class="map-search-input" id="subst-search" autocomplete="off" placeholder="Search products..." data-pp-input="handleSubstSearch(event)" data-pp-focus="handleSubstSearch(event)">
+        <input type="text" class="map-search-input" id="subst-search" aria-label="Search replacement products" autocomplete="off" placeholder="Search products..." data-pp-input="handleSubstSearch(event)" data-pp-focus="handleSubstSearch(event)">
         <div class="map-dropdown" id="subst-dropdown" style="display:none;"></div>
     </div>
     <div id="subst-selected" style="font-size:13px; font-weight:500; margin-bottom: 15px; color:var(--green);"></div>
@@ -844,35 +844,35 @@ try{
    <div class="modal" style="max-width: 580px;">
        <h3 id="mini-ing-title">Create New Ingredient</h3>
        <div class="grid2">
-         <div><label>Product name</label><input type="text" id="mini-name" placeholder="e.g. Product name"></div>
-         <div><label>Brand</label><input type="text" id="mini-brand" placeholder="e.g. Quorn"></div>
+         <div><label for="mini-name">Product name</label><input type="text" id="mini-name" name="mini-name" aria-label="Product name" placeholder="e.g. Product name"></div>
+         <div><label for="mini-brand">Brand</label><input type="text" id="mini-brand" name="mini-brand" aria-label="Brand" placeholder="e.g. Quorn"></div>
        </div>
        <div class="grid2">
-           <div class="field" style="display: block;"><label>Category</label><input type="search" id="mini-cat-search" placeholder="Search category" list="mini-cat-category-options" style="width: 100%;"><select id="mini-cat" style="display: none;"><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option><option value="__add_new__" style="font-weight:bold; color:var(--green)">+ Add new category...</option></select><datalist id="mini-cat-category-options"><option value="Baking"></option><option value="Beverages"></option><option value="Carbs (Pasta/Rice/Potato)"></option><option value="Dairy &amp; Eggs"></option><option value="Fruit &amp; Vegetables"></option><option value="Grains, Legumes &amp; Pulses"></option><option value="Herbs &amp; Spices"></option><option value="Meat Substitutes"></option><option value="Nuts &amp; Seeds"></option><option value="Other"></option><option value="Sauces, Condiments &amp; Pastes"></option><option value="Store Cupboard"></option><option value="Supplements"></option><option value="Tofu, Tempeh &amp; Seitan"></option></datalist></div>
-           <div class="field"><label>Storage</label><select id="mini-storage"><option value="">-- Select --</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="cupboard">Cupboard</option></select></div>
+           <div class="field" style="display: block;"><label for="mini-cat-search">Category</label><input type="search" id="mini-cat-search" name="mini-cat-search" aria-label="Search category" placeholder="Search category" list="mini-cat-category-options" style="width: 100%;"><select id="mini-cat" name="mini-cat" aria-label="Category select" style="display: none;"><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option><option value="__add_new__" style="font-weight:bold; color:var(--green)">+ Add new category...</option></select><datalist id="mini-cat-category-options"><option value="Baking"></option><option value="Beverages"></option><option value="Carbs (Pasta/Rice/Potato)"></option><option value="Dairy &amp; Eggs"></option><option value="Fruit &amp; Vegetables"></option><option value="Grains, Legumes &amp; Pulses"></option><option value="Herbs &amp; Spices"></option><option value="Meat Substitutes"></option><option value="Nuts &amp; Seeds"></option><option value="Other"></option><option value="Sauces, Condiments &amp; Pastes"></option><option value="Store Cupboard"></option><option value="Supplements"></option><option value="Tofu, Tempeh &amp; Seitan"></option></datalist></div>
+           <div class="field"><label for="mini-storage">Storage</label><select id="mini-storage" name="mini-storage" aria-label="Storage"><option value="">-- Select --</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="cupboard">Cupboard</option></select></div>
        </div>
        <p class="section-label">Per 100g</p>
        <div class="grid3">
-         <div><label>Calories</label><input type="number" id="mini-cal" placeholder="0"></div>
-         <div><label>Fat (g)</label><input type="number" id="mini-fat" placeholder="0"></div>
-         <div><label>Carbs (g)</label><input type="number" id="mini-carb" placeholder="0"></div>
-         <div><label>Fibre (g)</label><input type="number" id="mini-fibre" placeholder="0"></div>
-         <div><label>Protein (g)</label><input type="number" id="mini-prot" placeholder="0"></div>
+         <div><label for="mini-cal">Calories</label><input type="number" id="mini-cal" name="mini-cal" aria-label="Calories" placeholder="0"></div>
+         <div><label for="mini-fat">Fat (g)</label><input type="number" id="mini-fat" name="mini-fat" aria-label="Fat (g)" placeholder="0"></div>
+         <div><label for="mini-carb">Carbs (g)</label><input type="number" id="mini-carb" name="mini-carb" aria-label="Carbs (g)" placeholder="0"></div>
+         <div><label for="mini-fibre">Fibre (g)</label><input type="number" id="mini-fibre" name="mini-fibre" aria-label="Fibre (g)" placeholder="0"></div>
+         <div><label for="mini-prot">Protein (g)</label><input type="number" id="mini-prot" name="mini-prot" aria-label="Protein (g)" placeholder="0"></div>
        </div>
        <div class="grid3">
-         <div><label>Price (£)</label><input type="number" id="mini-price" placeholder="0" step="0.01"></div>
+         <div><label for="mini-price">Price (£)</label><input type="number" id="mini-price" name="mini-price" aria-label="Price (£)" placeholder="0" step="0.01"></div>
          <div>
-           <label>Pack size</label>
+           <label for="mini-pack">Pack size</label>
            <div style="display:flex; gap:5px;">
-             <input type="number" id="mini-pack" placeholder="100">
-             <select id="mini-pack-unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
+             <input type="number" id="mini-pack" name="mini-pack" aria-label="Pack size" placeholder="100">
+             <select id="mini-pack-unit" name="mini-pack-unit" aria-label="Pack size unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
                <option value="g">g</option>
                <option value="ml">ml</option>
                <option value="qty">qty</option>
              </select>
            </div>
          </div>
-         <div><label>Item wt (g)</label><input type="number" id="mini-item-weight" placeholder="e.g. 75"></div>
+         <div><label for="mini-item-weight">Item wt (g)</label><input type="number" id="mini-item-weight" name="mini-item-weight" aria-label="Item weight (g)" placeholder="e.g. 75"></div>
        </div>
        <div id="mini-msg"></div>
        <div class="btn-row" style="margin-top:14px">
@@ -1025,11 +1025,11 @@ try{
       <div id="orig-improvements"><div style="margin-top:15px;border-top:1px solid var(--border);padding-top:10px;">
         <h4 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text2);margin-bottom:8px">Nutritional Improvement Suggestions</h4>
         <div style="display:grid;grid-template-columns:1.3fr .9fr .9fr .9fr .9fr;gap:6px;margin-bottom:8px;align-items:center">
-          <input type="search" id="enhance-search-orig" placeholder="Search ingredients or sub-types..." data-pp-input="renderEnhancementFinder('orig')" style="font-size:12px;padding:6px 9px">
-          <select id="enhance-cat-orig" data-pp-change="renderEnhancementFinder('orig')" style="font-size:12px"><option value="all">All categories</option><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option></select>
-          <input type="search" id="enhance-family-orig" placeholder="Ingredient" data-pp-input="renderEnhancementFinder('orig')" style="font-size:12px;padding:6px 9px">
-          <input type="search" id="enhance-type-orig" placeholder="Sub-type" data-pp-input="renderEnhancementFinder('orig')" style="font-size:12px;padding:6px 9px">
-          <select id="enhance-sort-orig" data-pp-change="renderEnhancementFinder('orig')" style="font-size:12px">
+          <input type="search" id="enhance-search-orig" name="enhance-search-orig" aria-label="Search original ingredients" placeholder="Search ingredients or sub-types..." data-pp-input="renderEnhancementFinder('orig')" style="font-size:12px;padding:6px 9px">
+          <select id="enhance-cat-orig" name="enhance-cat-orig" aria-label="Original category filter" data-pp-change="renderEnhancementFinder('orig')" style="font-size:12px"><option value="all">All categories</option><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option></select>
+          <input type="search" id="enhance-family-orig" name="enhance-family-orig" aria-label="Original ingredient family filter" placeholder="Ingredient" data-pp-input="renderEnhancementFinder('orig')" style="font-size:12px;padding:6px 9px">
+          <input type="search" id="enhance-type-orig" name="enhance-type-orig" aria-label="Original sub-type filter" placeholder="Sub-type" data-pp-input="renderEnhancementFinder('orig')" style="font-size:12px;padding:6px 9px">
+          <select id="enhance-sort-orig" name="enhance-sort-orig" aria-label="Original sort option" data-pp-change="renderEnhancementFinder('orig')" style="font-size:12px">
             <option value="protein_per_kcal">Protein per kcal</option>
             <option value="protein_per_pound">Protein per £</option>
             <option value="protein">Highest protein</option>
@@ -1208,11 +1208,11 @@ try{
     </div><div style="margin-top:15px;border-top:1px solid var(--border);padding-top:10px;">
         <h4 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text2);margin-bottom:8px">Nutritional Improvement Suggestions</h4>
         <div style="display:grid;grid-template-columns:1.3fr .9fr .9fr .9fr .9fr;gap:6px;margin-bottom:8px;align-items:center">
-          <input type="search" id="enhance-search-enh" placeholder="Search ingredients or sub-types..." data-pp-input="renderEnhancementFinder('enh')" style="font-size:12px;padding:6px 9px">
-          <select id="enhance-cat-enh" data-pp-change="renderEnhancementFinder('enh')" style="font-size:12px"><option value="all">All categories</option><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option></select>
-          <input type="search" id="enhance-family-enh" placeholder="Ingredient" data-pp-input="renderEnhancementFinder('enh')" style="font-size:12px;padding:6px 9px">
-          <input type="search" id="enhance-type-enh" placeholder="Sub-type" data-pp-input="renderEnhancementFinder('enh')" style="font-size:12px;padding:6px 9px">
-          <select id="enhance-sort-enh" data-pp-change="renderEnhancementFinder('enh')" style="font-size:12px">
+          <input type="search" id="enhance-search-enh" name="enhance-search-enh" aria-label="Search enhanced ingredients" placeholder="Search ingredients or sub-types..." data-pp-input="renderEnhancementFinder('enh')" style="font-size:12px;padding:6px 9px">
+          <select id="enhance-cat-enh" name="enhance-cat-enh" aria-label="Enhanced category filter" data-pp-change="renderEnhancementFinder('enh')" style="font-size:12px"><option value="all">All categories</option><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option></select>
+          <input type="search" id="enhance-family-enh" name="enhance-family-enh" aria-label="Enhanced ingredient family filter" placeholder="Ingredient" data-pp-input="renderEnhancementFinder('enh')" style="font-size:12px;padding:6px 9px">
+          <input type="search" id="enhance-type-enh" name="enhance-type-enh" aria-label="Enhanced sub-type filter" placeholder="Sub-type" data-pp-input="renderEnhancementFinder('enh')" style="font-size:12px;padding:6px 9px">
+          <select id="enhance-sort-enh" name="enhance-sort-enh" aria-label="Enhanced sort option" data-pp-change="renderEnhancementFinder('enh')" style="font-size:12px">
             <option value="protein_per_kcal">Protein per kcal</option>
             <option value="protein_per_pound">Protein per £</option>
             <option value="protein">Highest protein</option>

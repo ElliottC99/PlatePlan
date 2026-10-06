@@ -7,6 +7,7 @@
 
 import { getState, setIngredients, setProducts } from '../../store/store.js';
 import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
+import { invalidateHierarchyCache } from '../../models/PantryHierarchyModel.js';
 import { promptReallocateProduct, openProductReallocateModal } from './ReallocateProductModalUI.js';
 import {
   openSubtypeLinkSelectionModal,
@@ -157,6 +158,7 @@ export function openEditSubtypeModal(subtypeId, parentId) {
     
     setIngredients([...state.ingredients]);
     closeModal();
+    invalidateHierarchyCache();
     if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
     await saveIngredient(parent);
   };
@@ -307,7 +309,11 @@ export function openSubtypeAliasModal(subtypeId, parentId) {
 // 4. DELETE CONFIRMATION MODAL
 export function openSubtypeDeleteModal(subtypeId, parentId) {
   const state = getState() || {};
-  const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
+  let ingredients = (state.ingredients && state.ingredients.length) ? state.ingredients : (window.state?.ingredients || []);
+  let parent = ingredients.find(i => String(i.id) === String(parentId));
+  if (!parent && subtypeId) {
+    parent = ingredients.find(i => Array.isArray(i.subtypes) && i.subtypes.some(s => String(s.id) === String(subtypeId)));
+  }
   if (!parent || !Array.isArray(parent.subtypes)) return;
   const sub = parent.subtypes.find(s => String(s.id) === String(subtypeId));
   if (!sub) return;
@@ -326,22 +332,28 @@ export function openSubtypeDeleteModal(subtypeId, parentId) {
     </div>
   `);
 
-  document.getElementById('btn-confirm-sub-delete').onclick = async () => {
-    closeModal();
-    parent.subtypes = parent.subtypes.filter(s => String(s.id) !== String(subtypeId));
-    parent.updatedAt = new Date().toISOString();
-    const prods = [...(state.products || [])], unlinkedProds = [];
-    prods.forEach(p => {
-      if (String(p.subtypeId) === String(subtypeId)) {
-        p.subtypeId = null; p.isAutoDefault = false; p.updatedAt = new Date().toISOString();
-        unlinkedProds.push(p);
-      }
-    });
-    setIngredients([...state.ingredients]); setProducts(prods);
-    if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-    if (typeof window.renderProductBank === 'function') window.renderProductBank();
-    await Promise.all([saveIngredient(parent), ...unlinkedProds.map(p => saveProduct(p))]);
-  };
+  const confirmBtn = document.getElementById('btn-confirm-sub-delete');
+  if (confirmBtn) {
+    confirmBtn.onclick = async () => {
+      closeModal();
+      parent.subtypes = parent.subtypes.filter(s => String(s.id) !== String(subtypeId));
+      parent.updatedAt = new Date().toISOString();
+      const prods = [...(state.products || window.state?.products || [])], unlinkedProds = [];
+      prods.forEach(p => {
+        if (String(p.subtypeId) === String(subtypeId)) {
+          p.subtypeId = null; p.isAutoDefault = false; p.updatedAt = new Date().toISOString();
+          unlinkedProds.push(p);
+        }
+      });
+      setIngredients([...ingredients]);
+      setProducts(prods);
+      invalidateHierarchyCache();
+      if (typeof window.invalidateHierarchyCache === 'function') window.invalidateHierarchyCache();
+      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+      if (typeof window.renderProductBank === 'function') window.renderProductBank();
+      await Promise.all([saveIngredient(parent), ...unlinkedProds.map(p => saveProduct(p))]);
+    };
+  }
 }
 
 export function openTescoBookmarkletInstructionsModal() {
