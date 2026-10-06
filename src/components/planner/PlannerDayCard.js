@@ -1,5 +1,5 @@
 /**
- * src/components/planner/PlannerDayCard.js (v3.20.12)
+ * src/components/planner/PlannerDayCard.js (v3.20.13)
  * UI component for day containers, date headers, daily macro target bars,
  * and day action controls in the PlatePlan weekly planner.
  */

@@ -1,5 +1,5 @@
 /**
- * src/components/shopping/ShoppingListUI.js (v3.20.12)
+ * src/components/shopping/ShoppingListUI.js (v3.20.13)
  * Modular Presentation Component for Shopping List Cards, Items & Summaries.
  * Hydrates planned slot items by fetching full recipe objects from the central Recipe Vault via recipeId.
  */

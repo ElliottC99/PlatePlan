@@ -1,5 +1,5 @@
 /**
- * src/views/DataQualityView.js (v3.20.12)
+ * src/views/DataQualityView.js (v3.20.13)
  * Modular ES6 View for Data Quality Centre, audit scanner results, macro quality sweep, and dynamic macro recalibration.
  */
 
@@ -344,10 +344,31 @@ export function renderDataQualityView() {
       runGlobalProductRelink();
     } else if (action === 'refresh-audit') {
       renderDataQualityView();
-    } else if (action === 'fix-issue') {
-      handleFixIssue(e, btn.dataset.entityType, btn.dataset.entityId, btn.dataset.issueKey, btn.dataset.parentId);
+    } else if (action === 'fix-issue' || action === 'fix-recipe') {
+      handleFixIssue(e, btn.dataset.entityType, btn.dataset.entityId || id, btn.dataset.issueKey, btn.dataset.parentId);
     }
   };
+}
+
+if (typeof document !== 'undefined' && !window.__dq_action_listener_bound) {
+  window.__dq_action_listener_bound = true;
+  document.addEventListener('plateplan-action', (e) => {
+    const { action, target, id } = e.detail || {};
+    if (action === 'auto-recalibrate') {
+      const recipeId = id || target?.dataset?.recipeId || target?.dataset?.entityId;
+      if (recipeId && typeof autoRecalibrateRecipeMacros === 'function') {
+        autoRecalibrateRecipeMacros(recipeId);
+      }
+    } else if (action === 'fix-recipe' || action === 'fix-issue') {
+      const entityId = id || target?.dataset?.entityId;
+      const entityType = target?.dataset?.entityType || 'recipe';
+      const issueKey = target?.dataset?.issueKey;
+      const parentId = target?.dataset?.parentId;
+      if (typeof handleFixIssue === 'function') {
+        handleFixIssue(e, entityType, entityId, issueKey, parentId);
+      }
+    }
+  });
 }
 
 function updateDataQualityBadge() {

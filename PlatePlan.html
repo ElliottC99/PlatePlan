@@ -177,7 +177,7 @@ try{
 <div class="app">
 
 <header class="app-header">
-  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span id="app-header-version" class="version-badge" style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v3.20.12</span></div>
+  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span id="app-header-version" class="version-badge" style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v3.20.13</span></div>
   <div class="app-header-actions">
     <button class="btn primary app-create-button" type="button" data-pp-click="openCreateActionSheet()" aria-label="Add to PlatePlan"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span class="app-create-label">Add</span></button>
     <button class="btn ghost app-menu-button" type="button" data-pp-click="openMobileMore()" aria-label="Open PlatePlan menu"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="19" cy="12" r="1.3"></circle></svg><span>Menu</span></button>
@@ -482,12 +482,12 @@ try{
 <div id="view-planner" class="view">
   <div id="planner-wizard-host"></div>
   <div id="plan-days-legacy-wrap" style="display:none" aria-hidden="true">
-    <select id="plan-days"><option value="10">10 days</option></select>
-    <input id="plan-start-date" type="date">
-    <select id="plan-product-priority"><option value="protein">Highest protein</option></select>
-    <select id="plan-repeat-breakfast"><option value="1">1 day</option></select>
-    <select id="plan-repeat-lunch"><option value="2">2 days</option></select>
-    <select id="plan-repeat-dinner"><option value="2">2 days</option></select>
+    <label for="plan-days" class="sr-only">Plan Days</label><select id="plan-days"><option value="10">10 days</option></select>
+    <label for="plan-start-date" class="sr-only">Start Date</label><input id="plan-start-date" type="date">
+    <label for="plan-product-priority" class="sr-only">Product Priority</label><select id="plan-product-priority"><option value="protein">Highest protein</option></select>
+    <label for="plan-repeat-breakfast" class="sr-only">Repeat Breakfast</label><select id="plan-repeat-breakfast"><option value="1">1 day</option></select>
+    <label for="plan-repeat-lunch" class="sr-only">Repeat Lunch</label><select id="plan-repeat-lunch"><option value="2">2 days</option></select>
+    <label for="plan-repeat-dinner" class="sr-only">Repeat Dinner</label><select id="plan-repeat-dinner"><option value="2">2 days</option></select>
     <div id="excl-grid"></div>
     <div id="plan-setup-card"></div>
     <div id="plan-recovery-banner"></div>
@@ -903,17 +903,17 @@ try{
 
     <div id="mtab-original" class="mtab">
       <div class="estimated-note" id="orig-note" style="background: var(--green-bg); color: var(--green);">Nutrition calculated from verified bank data</div>
-      <div class="field"><label>Recipe name</label><input type="text" id="orig-name"></div>
+      <div class="field"><label for="orig-name">Recipe name</label><input type="text" id="orig-name"></div>
       <div class="grid3" style="display: none;">
-        <div title=""><label>Calories (Energy)</label><input type="number" id="orig-cal" readonly style="background:var(--surface2)" title=""></div>
-        <div title=""><label>Fat (g)</label><input type="number" id="orig-fat" readonly style="background:var(--surface2)" title=""></div>
-        <div title=""><label>Carbs (g)</label><input type="number" id="orig-carb" readonly style="background:var(--surface2)" title=""></div>
-        <div title=""><label>Fibre (g)</label><input type="number" id="orig-fibre" readonly style="background:var(--surface2)" title=""></div>
-        <div title=""><label>Protein (g)</label><input type="number" id="orig-prot" readonly style="background:var(--surface2)" title=""></div>
+        <div title=""><label for="orig-cal">Calories (Energy)</label><input type="number" id="orig-cal" readonly style="background:var(--surface2)" title=""></div>
+        <div title=""><label for="orig-fat">Fat (g)</label><input type="number" id="orig-fat" readonly style="background:var(--surface2)" title=""></div>
+        <div title=""><label for="orig-carb">Carbs (g)</label><input type="number" id="orig-carb" readonly style="background:var(--surface2)" title=""></div>
+        <div title=""><label for="orig-fibre">Fibre (g)</label><input type="number" id="orig-fibre" readonly style="background:var(--surface2)" title=""></div>
+        <div title=""><label for="orig-prot">Protein (g)</label><input type="number" id="orig-prot" readonly style="background:var(--surface2)" title=""></div>
       </div>
       <div class="grid2" style="display: none;">
-        <div><label>Elliott's portion</label><input type="text" id="orig-pe" readonly style="background:var(--surface2)"></div>
-        <div><label>Chloe's portion</label><input type="text" id="orig-pc" readonly style="background:var(--surface2)"></div>
+        <div><label for="orig-pe">Elliott's portion</label><input type="text" id="orig-pe" readonly style="background:var(--surface2)"></div>
+        <div><label for="orig-pc">Chloe's portion</label><input type="text" id="orig-pc" readonly style="background:var(--surface2)"></div>
       </div>
       <div id="orig-warn" class="msg warn" style="display: none; margin-bottom: 12px;"><strong>Note:</strong> Some ingredients added manually are unmapped. They will count as 0 calories.</div>
       <div id="orig-portion-summary">
@@ -1087,17 +1087,17 @@ try{
     <div id="mtab-enhanced" class="mtab active">
       <div class="estimated-note" id="enh-note" style="background: var(--amber-bg); color: var(--amber);">Manual editing mode -- edit to create your enhanced version. Nutrition will recalculate from the ingredient bank.</div>
       <div id="bank-flags"></div>
-      <div class="field"><label>Recipe name</label><input type="text" id="enh-name" data-pp-input="updateSaveBothVisibility()"></div>
+      <div class="field"><label for="enh-name">Recipe name</label><input type="text" id="enh-name" data-pp-input="updateSaveBothVisibility()"></div>
       <div class="grid3" style="display: none;">
-        <div title=""><label>Calories (Energy)</label><input type="number" id="enh-cal" readonly style="background:var(--surface2)" title=""></div>
-        <div title=""><label>Fat (g)</label><input type="number" id="enh-fat" readonly style="background:var(--surface2)" title=""></div>
-        <div title=""><label>Carbs (g)</label><input type="number" id="enh-carb" readonly style="background:var(--surface2)" title=""></div>
-        <div title=""><label>Fibre (g)</label><input type="number" id="enh-fibre" readonly style="background:var(--surface2)" title=""></div>
-        <div title=""><label>Protein (g)</label><input type="number" id="enh-prot" readonly style="background:var(--surface2)" title=""></div>
+        <div title=""><label for="enh-cal">Calories (Energy)</label><input type="number" id="enh-cal" readonly style="background:var(--surface2)" title=""></div>
+        <div title=""><label for="enh-fat">Fat (g)</label><input type="number" id="enh-fat" readonly style="background:var(--surface2)" title=""></div>
+        <div title=""><label for="enh-carb">Carbs (g)</label><input type="number" id="enh-carb" readonly style="background:var(--surface2)" title=""></div>
+        <div title=""><label for="enh-fibre">Fibre (g)</label><input type="number" id="enh-fibre" readonly style="background:var(--surface2)" title=""></div>
+        <div title=""><label for="enh-prot">Protein (g)</label><input type="number" id="enh-prot" readonly style="background:var(--surface2)" title=""></div>
       </div>
       <div class="grid2" style="display: none;">
-        <div><label>Elliott's portion</label><input type="text" id="enh-pe" readonly style="background:var(--surface2)"></div>
-        <div><label>Chloe's portion</label><input type="text" id="enh-pc" readonly style="background:var(--surface2)"></div>
+        <div><label for="enh-pe">Elliott's portion</label><input type="text" id="enh-pe" readonly style="background:var(--surface2)"></div>
+        <div><label for="enh-pc">Chloe's portion</label><input type="text" id="enh-pc" readonly style="background:var(--surface2)"></div>
       </div>
       <div id="enh-warn" class="msg warn" style="display: none; margin-bottom: 12px;"><strong>Note:</strong> Some ingredients added manually are unmapped. They will count as 0 calories.</div>
       <div id="enh-portion-summary">
@@ -1223,7 +1223,7 @@ try{
         <div id="enhancement-results-enh" data-current-group-ids=""><div style="font-size:12px;color:var(--text2);padding:8px 0">Start typing to search ingredients or sub-types to add.</div></div>
     </div></div>
       
-      <div class="field"><label>Key changes made</label><textarea id="enh-changes" style="min-height:60px" data-pp-input="updateSaveBothVisibility()"></textarea></div>
+      <div class="field"><label for="enh-changes">Key changes made</label><textarea id="enh-changes" style="min-height:60px" data-pp-input="updateSaveBothVisibility()"></textarea></div>
       <div class="review-recipe-sections" style="display:grid; grid-template-columns:1fr; gap:18px;">
         <div class="field">
           <label>Ingredients</label>
@@ -1364,20 +1364,20 @@ try{
       </div>
     </div>
     <div id="mi-pack-summary" class="pack-model-summary" aria-live="polite"></div>
-        <div class="field" style="display: none;"><label>Meat substitute for (optional)<input type="text" id="mi-meatsub" placeholder="e.g. mince, chicken, bacon"></label></div>
+        <div class="field" style="display: none;"><label for="mi-meatsub">Meat substitute for (optional)<input type="text" id="mi-meatsub" placeholder="e.g. mince, chicken, bacon"></label></div>
     <div id="mi-pack-variants" style="display: block; margin: 8px 0px 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); font-size: 12px; color: var(--text2);">
     <strong>Available Tesco Variants</strong>
     <ul style="margin:6px 0 10px 18px;padding:0;"><li style="margin:3px 0;"><span>4 items × 95g = 380g · £0.86</span> <span class="tag">Current pack</span></li></ul>
     <div class="grid3" style="margin-top:8px;">
-      <div><label>Variant size</label><input type="number" id="mi-var-pack" placeholder="400"></div>
-      <div><label>Total unit</label><select id="mi-var-unit"><option value="g">g</option><option value="ml">ml</option></select></div>
-      <div><label>Price (£)</label><input type="number" id="mi-var-price" placeholder="1.25" step="0.01"></div>
-      <div><label>Weight / volume of 1 usable item</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-item-weight" placeholder="75"><select id="mi-var-item-weight-unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option></select></div></div>
-      <div><label>Drained weight (usable content)</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-drained-weight" placeholder="235"><select id="mi-var-drained-weight-unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option></select></div></div>
+      <div><label for="mi-var-pack">Variant size</label><input type="number" id="mi-var-pack" placeholder="400"></div>
+      <div><label for="mi-var-unit">Total unit</label><select id="mi-var-unit"><option value="g">g</option><option value="ml">ml</option></select></div>
+      <div><label for="mi-var-price">Price (£)</label><input type="number" id="mi-var-price" placeholder="1.25" step="0.01"></div>
+      <div><label for="mi-var-item-weight">Weight / volume of 1 usable item</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-item-weight" placeholder="75"><select id="mi-var-item-weight-unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option></select></div></div>
+      <div><label for="mi-var-drained-weight">Drained weight (usable content)</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-drained-weight" placeholder="235"><select id="mi-var-drained-weight-unit" style="width:70px"><option value="g">g</option><option value="ml">ml</option></select></div></div>
       <div style="display:flex;align-items:flex-end;"><button type="button" class="btn sm secondary" data-pp-click="addManualPackVariant()">Add variant</button></div>
     </div>
   </div>
-    <div class="field"><label>Notes</label><input type="text" id="mi-notes" placeholder="e.g. Great in bolognese, buy frozen"></div>
+    <div class="field"><label for="mi-notes">Notes</label><input type="text" id="mi-notes" placeholder="e.g. Great in bolognese, buy frozen"></div>
     <div class="btn-row"><button type="button" class="btn primary" id="mi-save-btn" data-pp-click="saveManualIng()">Save</button><button type="button" class="btn ghost" data-pp-click="cancelManualIng()">Cancel</button></div>
     <div id="mi-msg"></div>
   </div></div>

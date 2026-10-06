@@ -1,5 +1,5 @@
 /**
- * src/views/PantryBankView.js (v3.20.12)
+ * src/views/PantryBankView.js (v3.20.13)
  * Modular ES6 View for Category ➔ Ingredient ➔ Sub-type Hierarchy Bank.
  * Features Aliasing, Merging, Sub-type creation, Promoting/demoting, and Auto-default product previews.
  * Fully responsive and optimised to remain under 350 lines.
@@ -315,6 +315,16 @@ if (typeof window !== 'undefined') {
 
   if (typeof document !== 'undefined' && !window.__subtype_action_delegation_bound) {
     window.__subtype_action_delegation_bound = true;
+    document.addEventListener('plateplan-action', (e) => {
+      const { action, target, id } = e.detail || {};
+      if (action === 'delete-subtype') {
+        const subId = id || target?.dataset?.subtypeId;
+        const parentId = target?.dataset?.parentId;
+        if (subId && parentId && typeof window.openSubtypeDeleteModal === 'function') {
+          window.openSubtypeDeleteModal(subId, parentId);
+        }
+      }
+    });
     document.addEventListener('click', (e) => {
       const deleteBtn = e.target.closest('[data-action="delete-subtype"]');
       if (deleteBtn) {

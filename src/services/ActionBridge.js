@@ -1,8 +1,8 @@
 /**
- * src/services/ActionBridge.js (v3.20.12)
+ * src/services/ActionBridge.js (v3.20.13)
  * Centralized Action Bridge & Event Dispatcher for Atomic Modular Architecture.
- * Idempotently handles delegated events, dataset action parsing, shopping toggles, and modal routing.
- * Eradicates eval() and new Function() in favor of safe AST-free AST parsing and CustomEvent dispatching.
+ * Idempotently handles delegated events and dispatches Custom Events for UI views.
+ * Strictly ZERO eval() or new Function().
  */
 
 import { renderSettingsView } from '../views/SettingsView.js';
@@ -34,9 +34,6 @@ export function patchSwapLabels() {
   });
 }
 
-/**
- * Initialize DOM mutation observer for label consistency.
- */
 function initLabelObserver() {
   if (typeof window === 'undefined' || window.__pp_label_observer_active) return;
   window.__pp_label_observer_active = true;
@@ -47,7 +44,7 @@ function initLabelObserver() {
 }
 
 /**
- * Cleanly parse function argument tokens without dangerous eval().
+ * Clean argument token parser without eval.
  */
 function cleanArgToken(token, event, target) {
   const val = token.trim();
@@ -61,9 +58,6 @@ function cleanArgToken(token, event, target) {
   return val.replace(/^['"`]|['"`]$/g, '');
 }
 
-/**
- * Parse arguments string safely without eval.
- */
 function parseArgsString(rawArgsStr, event, target) {
   if (!rawArgsStr || !rawArgsStr.trim()) return [];
   const args = [];
@@ -97,46 +91,7 @@ function parseArgsString(rawArgsStr, event, target) {
 }
 
 /**
- * Safely invoke function names or expressions (e.g. "showView('today')" or "closeMobileMore(); window.syncNow()") without eval.
- */
-function safeInvokeFunction(expr, event, target) {
-  if (!expr || typeof expr !== 'string') return false;
-  const statements = expr.split(';').map(s => s.trim()).filter(Boolean);
-  let anySuccess = false;
-
-  for (const stmt of statements) {
-    const match = stmt.match(/^([a-zA-Z0-9_\$\.]+)(?:\((.*)\))?$/);
-    if (!match) continue;
-
-    const fullFnPath = match[1];
-    const rawArgsStr = match[2];
-
-    const parts = fullFnPath.split('.');
-    let obj = typeof window !== 'undefined' ? window : {};
-    for (let i = 0; i < parts.length - 1; i++) {
-      obj = obj ? obj[parts[i]] : null;
-      if (!obj) break;
-    }
-    const fn = obj ? obj[parts[parts.length - 1]] : null;
-
-    if (typeof fn === 'function') {
-      const args = rawArgsStr !== undefined ? parseArgsString(rawArgsStr, event, target) : [];
-      try {
-        fn.apply(target, args);
-        anySuccess = true;
-      } catch (err) {
-        console.warn(`[ActionBridge] Error safely invoking ${fullFnPath}:`, err);
-      }
-    }
-  }
-  return anySuccess;
-}
-
-/**
  * Route modular actions to their corresponding ES6 views or handlers.
- * @param {string} actionName 
- * @param {HTMLElement} target 
- * @param {Event} event 
  */
 export function routeAction(actionName, target, event) {
   const ds = target.dataset || {};
@@ -215,9 +170,11 @@ export function routeAction(actionName, target, event) {
 
   // 4b. Subtype Deletion
   if (normalizedAction === 'delete-subtype' || normalizedAction === 'deletesubtype' || normalizedAction.includes('deletesubtype')) {
-    const ingId = ds.ingredientId || ds.id || parseArgsString(actionName)[0];
-    const subtypeId = ds.subtypeId || parseArgsString(actionName)[1];
-    if (typeof window.deleteSubtype === 'function') {
+    const ingId = ds.parentId || ds.ingredientId || parseArgsString(actionName)[0];
+    const subtypeId = ds.subtypeId || ds.id || parseArgsString(actionName)[1];
+    if (typeof window.openSubtypeDeleteModal === 'function' && subtypeId && ingId) {
+      window.openSubtypeDeleteModal(subtypeId, ingId);
+    } else if (typeof window.deleteSubtype === 'function') {
       window.deleteSubtype(ingId, subtypeId);
     }
     return true;
@@ -365,44 +322,29 @@ export function setupActionBridge() {
   document.addEventListener('click', (event) => {
     patchSwapLabels();
 
-    const target = event.target.closest('[data-action], [data-pp-click], [onclick*="toggleInlineShoppingSubst"], [onclick*="viewRecipe"], [onclick*="openRecipeModal"], [onclick*="toggleRecipeFavourite"], button');
+    const target = event.target.closest('[data-action], [data-pp-click], button');
     if (!target) return;
 
-    const dataAction = target.getAttribute('data-action') || target.dataset.action || '';
-    const ppClickStr = target.dataset.ppClick || target.getAttribute('data-pp-click') || '';
-    const onclickStr = target.getAttribute('onclick') || '';
-    const actionDescriptor = dataAction || ppClickStr || onclickStr;
-
-    if (!actionDescriptor) return;
-
-    // Dispatch global CustomEvent for observers
-    if (typeof document !== 'undefined') {
-      document.dispatchEvent(new CustomEvent('plateplan:action', {
-        detail: { action: actionDescriptor, target, event, dataset: target.dataset },
-        bubbles: true
-      }));
+    const actionString = target.getAttribute('data-action');
+    if (actionString) {
+      const actionEvent = new CustomEvent('plateplan-action', { 
+        detail: { 
+          action: actionString, 
+          target: target,
+          id: target.getAttribute('data-id') || target.getAttribute('data-recipe-id') || target.getAttribute('data-ingredient-id')
+        } 
+      });
+      document.dispatchEvent(actionEvent);
+      routeAction(actionString, target, event);
+      return; // STOP execution here. Do not try to eval() the string.
     }
 
-    // Check if intercepted by modern routeAction
-    const wasHandled = routeAction(actionDescriptor, target, event);
-
-    if (wasHandled) {
+    const ppClickStr = target.dataset.ppClick || target.getAttribute('data-pp-click') || '';
+    if (ppClickStr) {
+      routeAction(ppClickStr, target, event);
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      return;
-    }
-
-    // Handle function calls or legacy expressions without eval()
-    if (ppClickStr || dataAction || onclickStr) {
-      const expr = ppClickStr || dataAction || onclickStr;
-      const invoked = safeInvokeFunction(expr, event, target);
-
-      if (invoked) {
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-      }
     }
   }, true);
 }
