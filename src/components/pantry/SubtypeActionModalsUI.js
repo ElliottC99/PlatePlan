@@ -45,21 +45,35 @@ export {
 const escapeHTML = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 function showModal(html) {
-  const wrap = document.getElementById('view-modal-wrap');
-  const content = document.getElementById('view-modal-content');
-  if (wrap && content) {
-    content.innerHTML = html;
-    wrap.classList.add('open');
-    document.body.style.overflow = 'hidden';
+  let wrap = document.getElementById('view-modal-wrap');
+  let content = document.getElementById('view-modal-content');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'view-modal-wrap';
+    wrap.className = 'modal-wrap';
+    document.body.appendChild(wrap);
   }
+  if (!content) {
+    content = document.createElement('div');
+    content.id = 'view-modal-content';
+    content.className = 'modal';
+    wrap.appendChild(content);
+  }
+  content.innerHTML = html;
+  wrap.classList.add('open');
+  wrap.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
 }
 
 export function closeModal() {
   const wrap = document.getElementById('view-modal-wrap');
   if (wrap) {
     wrap.classList.remove('open');
+    wrap.style.display = 'none';
     document.body.style.overflow = '';
   }
+  const content = document.getElementById('view-modal-content');
+  if (content) content.innerHTML = '';
 }
 
 function formatBrandProductLabel(p) {

@@ -316,8 +316,8 @@ try{
       <div id="recipe-photo-msg" style="margin-top:4px"></div>
     </div>
     <div class="grid2">
-      <div><label>Recipe name *</label><input type="text" id="r-name" placeholder="e.g. Smoky lentil dhal"></div>
-      <div><label>Suitable for</label>
+      <div><label for="r-name">Recipe name *</label><input type="text" id="r-name" placeholder="e.g. Smoky lentil dhal"></div>
+      <div><label for="r-who">Suitable for</label>
         <select id="r-who">
           <option value="both">Both</option>
           <option value="Elliott">Elliott only</option>
@@ -326,21 +326,21 @@ try{
       </div>
     </div>
     <div class="field">
-      <label style="margin-bottom:6px">Meal type * <span style="font-weight:400;color:var(--text2)">(select all that apply)</span></label>
+      <label for="mt-breakfast" style="margin-bottom:6px">Meal type * <span style="font-weight:400;color:var(--text2)">(select all that apply)</span></label>
       <div class="meal-type-group">
-        <label class="mt-cb"><input type="checkbox" id="mt-breakfast"> Breakfast</label>
-        <label class="mt-cb"><input type="checkbox" id="mt-lunch"> Lunch</label>
-        <label class="mt-cb"><input type="checkbox" id="mt-dinner"> Dinner</label>
+        <label class="mt-cb" for="mt-breakfast"><input type="checkbox" id="mt-breakfast"> Breakfast</label>
+        <label class="mt-cb" for="mt-lunch"><input type="checkbox" id="mt-lunch"> Lunch</label>
+        <label class="mt-cb" for="mt-dinner"><input type="checkbox" id="mt-dinner"> Dinner</label>
       </div>
     </div>
     <div class="grid3">
-      <div><label>Original Serves *</label><input type="number" id="r-serves-orig" placeholder="e.g. 4" min="1"></div>
-      <div><label>Target Servings *</label><input type="number" id="r-serves" placeholder="e.g. 2" min="1"></div>
-      <div><label>Prep time (mins)</label><input type="number" id="r-time" placeholder="e.g. 30" min="1"></div>
+      <div><label for="r-serves-orig">Original Serves *</label><input type="number" id="r-serves-orig" placeholder="e.g. 4" min="1"></div>
+      <div><label for="r-serves">Target Servings *</label><input type="number" id="r-serves" placeholder="e.g. 2" min="1"></div>
+      <div><label for="r-time">Prep time (mins)</label><input type="number" id="r-time" placeholder="e.g. 30" min="1"></div>
     </div>
     <hr class="divider">
     <div class="field">
-      <label style="margin-bottom:6px">Source <span style="font-weight:400;color:var(--text2)">(optional)</span></label>
+      <label for="r-src-type" style="margin-bottom:6px">Source <span style="font-weight:400;color:var(--text2)">(optional)</span></label>
       <div style="display:flex;gap:8px;align-items:center">
         <select id="r-src-type" data-pp-change="updateSrcFields()" style="width:160px;flex:none">
           <option value="">No source</option>
@@ -354,30 +354,30 @@ try{
         <span id="src-type-hint" style="font-size: 12px; color: var(--text2); display: inline;">Select a source type to add details</span>
       </div>
       <div id="src-url-field" class="src-url-field" style="display: none;">
-        <label id="src-url-label">TikTok URL</label>
+        <label id="src-url-label" for="r-src-url">TikTok URL</label>
         <input type="text" id="r-src-url" placeholder="https://www.tiktok.com/@user/video/...">
       </div>
       <div id="src-book-fields" class="src-book-fields" style="display: none;">
         <div class="grid3">
-          <div><label>Book title</label><input type="text" id="r-src-book" placeholder="e.g. Ottolenghi Simple" data-pp-input="updateSrcPreview()"></div>
-          <div><label>Author</label><input type="text" id="r-src-author" placeholder="e.g. Yotam Ottolenghi" data-pp-input="updateSrcPreview()"></div>
-          <div><label>Page</label><input type="text" id="r-src-page" placeholder="e.g. 142" data-pp-input="updateSrcPreview()"></div>
+          <div><label for="r-src-book">Book title</label><input type="text" id="r-src-book" placeholder="e.g. Ottolenghi Simple" data-pp-input="updateSrcPreview()"></div>
+          <div><label for="r-src-author">Author</label><input type="text" id="r-src-author" placeholder="e.g. Yotam Ottolenghi" data-pp-input="updateSrcPreview()"></div>
+          <div><label for="r-src-page">Page</label><input type="text" id="r-src-page" placeholder="e.g. 142" data-pp-input="updateSrcPreview()"></div>
         </div>
       </div>
       <div id="src-other-field" class="src-other-field" style="display: none;">
-        <label>Description</label>
+        <label for="r-src-other">Description</label>
         <input type="text" id="r-src-other" placeholder="e.g. Mum's recipe card, meal prep app" data-pp-input="updateSrcPreview()">
       </div>
       <div id="src-preview" class="src-preview" style="display: none;"></div>
     </div>
     <hr class="divider">
     <div class="field">
-      <label style="margin-bottom:5px">Ingredients * <span style="font-weight:400;color:var(--text2)">-- paste the full list, one per line</span></label>
-      <textarea id="r-ingredients" placeholder="200g red lentils..."></textarea>
+      <label for="r-ingredients" style="margin-bottom:5px">Ingredients * <span style="font-weight:400;color:var(--text2)">-- paste the full list, one per line</span></label>
+      <textarea id="r-ingredients" name="r-ingredients" placeholder="200g red lentils..."></textarea>
     </div>
     <div class="field">
-      <label style="margin-bottom:5px">Method * <span style="font-weight:400;color:var(--text2)">-- paste the instructions</span></label>
-      <textarea id="r-method" placeholder="Fry the garlic and cumin in oil..."></textarea>
+      <label for="r-method" style="margin-bottom:5px">Method * <span style="font-weight:400;color:var(--text2)">-- paste the instructions</span></label>
+      <textarea id="r-method" name="r-method" placeholder="Fry the garlic and cumin in oil..."></textarea>
     </div>
     <div class="msg info" style="margin-bottom:14px;font-size:12px" id="add-recipe-info">
       Save will structure your inputs, map volumes, and calculate nutrition against your ingredient bank.
@@ -1047,35 +1047,35 @@ try{
           <button type="button" class="btn sm ghost" data-pp-click="addModalIng('orig')">+ Add ingredient</button>
         </div>
         <div class="field" style="border-top:1px solid var(--border);padding-top:14px;">
-          <label>Method</label>
+          <label for="orig-method-list">Method</label>
           <div id="orig-method-list">
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
-           <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">1.</span>
-           <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
+           <label for="recipe-step-orig-1" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">1.</label>
+           <textarea id="recipe-step-orig-1" name="recipe_step_orig_1" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
            <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
-           <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">2.</span>
-           <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
+           <label for="recipe-step-orig-2" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">2.</label>
+           <textarea id="recipe-step-orig-2" name="recipe_step_orig_2" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
            <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
-           <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">3.</span>
-           <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
+           <label for="recipe-step-orig-3" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">3.</label>
+           <textarea id="recipe-step-orig-3" name="recipe_step_orig_3" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
            <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
-           <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">4.</span>
-           <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
+           <label for="recipe-step-orig-4" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">4.</label>
+           <textarea id="recipe-step-orig-4" name="recipe_step_orig_4" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
            <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
-           <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">5.</span>
-           <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
+           <label for="recipe-step-orig-5" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">5.</label>
+           <textarea id="recipe-step-orig-5" name="recipe_step_orig_5" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
            <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     </div>

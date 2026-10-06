@@ -160,75 +160,63 @@ export async function handleFixIssue(e, entityType, entityId, issueKey = '', par
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
     if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
 
-    const typeKey = String(issueType || issueKey || entityType || '').toUpperCase().trim();
+    const key = String(issueKey || issueType || '').trim();
 
-    switch (true) {
-      case typeKey.includes('UNLINKED_INGREDIENT'):
-      case typeKey === 'INGREDIENT_UNLINKED':
-        if (typeof window.openResolveUnlinkedModal === 'function') {
-          window.openResolveUnlinkedModal(entityId, 'ingredient', parentId);
-        } else if (typeof openResolveUnlinkedModal === 'function') {
-          openResolveUnlinkedModal(entityId, 'ingredient', parentId);
-        }
-        break;
+    // 1. Recipe Macro Sync / Low Cal Advisory Keys
+    if (key.startsWith('advisory:recipe-macro-sync:') || key.startsWith('advisory:recipe-low-cal:') || key.includes('recipe-macro-sync') || key.includes('recipe-low-cal') || key.includes('macro-sync')) {
+      const recId = key.split(':')[2] || entityId;
+      await autoRecalibrateRecipeMacros(recId);
+      if (typeof window.showCustomAlert === 'function') {
+        window.showCustomAlert('Recipe macros synchronized', 'Success');
+      }
+      renderDataQualityView();
+      return;
+    }
 
-      case typeKey.includes('UNLINKED_RECIPE_INGREDIENT'):
-      case typeKey.includes('RECIPE_UNLINKED'):
-        if (typeof window.renderScrollableSwapModal === 'function') {
-          window.renderScrollableSwapModal(entityId, parentId || entityId);
-        } else if (typeof window.openResolveUnlinkedModal === 'function') {
-          window.openResolveUnlinkedModal({ recipeId: entityId, ingredientId: parentId }, 'recipe-ingredient');
-        }
-        break;
+    // 2. Gap Ingredient
+    if (key.startsWith('gap:ingredient:')) {
+      const ingId = key.split(':')[2] || entityId;
+      if (typeof window.openResolveUnlinkedModal === 'function') {
+        window.openResolveUnlinkedModal(ingId, 'ingredient', parentId);
+      } else if (typeof openResolveUnlinkedModal === 'function') {
+        openResolveUnlinkedModal(ingId, 'ingredient', parentId);
+      }
+      return;
+    }
 
-      case typeKey.includes('ORPHANED_SUBTYPE'):
-      case typeKey.includes('SUBTYPE'):
-        if (typeof window.openSubtypeReorganizeModal === 'function') {
-          window.openSubtypeReorganizeModal(entityId, parentId);
-        } else if (typeof window.openIngredientReorganiseModal === 'function') {
-          window.openIngredientReorganiseModal(entityId, parentId);
-        } else if (typeof window.openSubtypeDeleteModal === 'function') {
-          window.openSubtypeDeleteModal(entityId, parentId);
-        }
-        break;
+    // 3. Gap Subtype
+    if (key.startsWith('gap:subtype:')) {
+      const subId = key.split(':')[2] || entityId;
+      if (typeof window.openProductEditModal === 'function') {
+        window.openProductEditModal(subId);
+      } else if (typeof window.openResolveUnlinkedModal === 'function') {
+        window.openResolveUnlinkedModal(subId, 'subtype', parentId);
+      }
+      return;
+    }
 
-      case typeKey.includes('STALE_RECIPE_MACROS'):
-      case typeKey.includes('LOW_CALORIES_ANOMALY'):
-      case typeKey.includes('MACRO_SYNC'):
-        await autoRecalibrateRecipeMacros(entityId);
-        if (typeof window.showCustomAlert === 'function') {
-          window.showCustomAlert('Recipe macros auto-recalibrated successfully.', 'Success');
-        }
-        renderDataQualityView();
-        break;
+    // 4. Known gap or advisory prefixes
+    if (key.startsWith('gap:product:')) {
+      const prodId = key.split(':')[2] || entityId;
+      if (typeof window.openProductEditModal === 'function') window.openProductEditModal(prodId);
+      return;
+    }
 
-      case typeKey.includes('PRODUCT_MISSING_PRICE'):
-      case typeKey.includes('PRODUCT_MISSING_MACROS'):
-        if (typeof window.openProductEditModal === 'function') {
-          window.openProductEditModal(entityId);
-        } else if (typeof openProductEditModal === 'function') {
-          openProductEditModal(entityId);
-        }
-        break;
+    if (key.startsWith('advisory:category-mismatch')) {
+      if (typeof window.enforceCategorySSOT === 'function') window.enforceCategorySSOT();
+      renderDataQualityView();
+      return;
+    }
 
-      case typeKey.includes('CATEGORY_MISMATCH'):
-        if (typeof window.enforceCategorySSOT === 'function') {
-          window.enforceCategorySSOT();
-        }
-        renderDataQualityView();
-        break;
-
-      default:
-        if (entityType === 'product') {
-          if (typeof window.openProductEditModal === 'function') window.openProductEditModal(entityId);
-        } else if (entityType === 'recipe') {
-          if (typeof window.viewRecipe === 'function') window.viewRecipe(entityId);
-        } else {
-          if (typeof window.openResolveUnlinkedModal === 'function') {
-            window.openResolveUnlinkedModal(entityId, entityType, parentId);
-          }
-        }
-        break;
+    // 5. Default Fallback
+    if (entityType === 'product') {
+      if (typeof window.openProductEditModal === 'function') window.openProductEditModal(entityId);
+    } else if (entityType === 'recipe') {
+      if (typeof window.viewRecipe === 'function') window.viewRecipe(entityId);
+    } else {
+      if (typeof window.openResolveUnlinkedModal === 'function') {
+        window.openResolveUnlinkedModal(entityId, entityType, parentId);
+      }
     }
   } catch (err) {
     console.error('[DataQualityView] handleFixIssue caught error:', err);
