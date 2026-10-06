@@ -1,5 +1,5 @@
 /**
- * src/components/data-quality/HierarchyWizardModalUI.js (v3.20.13)
+ * src/components/data-quality/HierarchyWizardModalUI.js (v3.20.14)
  * Progressive Cascading Hierarchy Alignment Wizard with Title Case Normalisation & Auto-Default Sync.
  */
 import { getState, setIngredients } from '../../store/store.js';
@@ -321,6 +321,7 @@ export function renderWizardStep() {
             <div style="font-size:12.5px;font-weight:750;margin-bottom:4px">Stage 1: Search Sub-type</div>
             ${newSubtypeName ? `<div style="display:inline-block;background:#e0e7ff;color:var(--primary);padding:2px 8px;border-radius:6px;font-size:12px;font-weight:650;margin-bottom:6px">Sub-type: ${escapeHtml(newSubtypeName)}</div>` : ''}
             <div style="position:relative">
+              <label for="wizard-subtype-search-input" class="sr-only">Search sub-type</label>
               <input type="text" id="wizard-subtype-search-input" value="${escapeAttr(newSubtypeName)}" placeholder="Search sub-type..." style="width:100%;padding:6px 8px;border:1px solid var(--border,#e7e5e4);border-radius:6px;font-size:12px;box-sizing:border-box;text-transform:capitalize" oninput="window.handleWizardSubtypeSearch(this.value)" onfocus="window.handleWizardSubtypeSearch(this.value)" autocomplete="off" ${wizardStage > 1 ? 'disabled style="background:#f9fafb"' : ''} />
               <div id="wizard-subtype-search-results" style="display:none;position:absolute;z-index:1000;background:#fff;border:1px solid #d1d1d6;border-radius:8px;max-height:160px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);left:0;top:100%"></div>
             </div>
@@ -333,6 +334,7 @@ export function renderWizardStep() {
             <div style="font-size:12.5px;font-weight:750;margin-bottom:4px">Stage 2: Search Ingredient</div>
             ${newIngredientName ? `<div style="display:inline-block;background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:650;margin-bottom:6px">Ingredient: ${escapeHtml(newIngredientName)}</div>` : ''}
             <div style="position:relative">
+              <label for="wizard-ingredient-search-input" class="sr-only">Search parent ingredient</label>
               <input type="text" id="wizard-ingredient-search-input" value="${escapeAttr(newIngredientName)}" placeholder="Search parent ingredient to link..." style="width:100%;padding:6px 8px;border:1px solid var(--border,#e7e5e4);border-radius:6px;font-size:12px;box-sizing:border-box;text-transform:capitalize" oninput="window.handleWizardIngredientSearch(this.value)" onfocus="window.handleWizardIngredientSearch(this.value)" autocomplete="off" ${wizardStage > 2 ? 'disabled style="background:#f9fafb"' : ''} />
               <div id="wizard-ingredient-search-results" style="display:none;position:absolute;z-index:1000;background:#fff;border:1px solid #d1d1d6;border-radius:8px;max-height:160px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);left:0;top:100%"></div>
             </div>
@@ -344,6 +346,7 @@ export function renderWizardStep() {
           <div style="border-top:1px dashed var(--border,#e7e5e4);padding-top:8px">
             <div style="font-size:12.5px;font-weight:750;margin-bottom:4px">Stage 3: Assign Category</div>
             <div style="position:relative">
+              <label for="wizard-category-search-input" class="sr-only">Search category</label>
               <input type="text" id="wizard-category-search-input" value="${escapeAttr(selectedCategory)}" placeholder="Search category from Category Bank..." style="width:100%;padding:6px 8px;border:1px solid var(--border,#e7e5e4);border-radius:6px;font-size:12px;box-sizing:border-box;text-transform:capitalize" oninput="window.handleWizardCategorySearch(this.value)" onkeyup="window.handleWizardCategorySearch(this.value)" onfocus="window.handleWizardCategorySearch(this.value)" autocomplete="off" />
               <div id="wizard-category-search-results" style="display:none;position:absolute;z-index:1050;background:#fff;border:1px solid #d1d1d6;border-radius:8px;max-height:220px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);left:0;top:100%"></div>
             </div>

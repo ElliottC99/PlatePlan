@@ -1,5 +1,5 @@
 /**
- * src/views/DataQualityView.js (v3.20.13)
+ * src/views/DataQualityView.js (v3.20.14)
  * Modular ES6 View for Data Quality Centre, audit scanner results, macro quality sweep, and dynamic macro recalibration.
  */
 
@@ -155,65 +155,80 @@ export async function autoRecalibrateRecipeMacros(recipeId) {
   }
 }
 
-export function handleFixIssue(e, entityType, entityId, issueKey = '', parentId = null) {
+export async function handleFixIssue(e, entityType, entityId, issueKey = '', parentId = null, issueType = null) {
   try {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
     if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
 
-    let item = (window.PantryHierarchyModel && typeof window.PantryHierarchyModel.getItemById === 'function')
-      ? window.PantryHierarchyModel.getItemById(entityId)
-      : null;
+    const typeKey = String(issueType || issueKey || entityType || '').toUpperCase().trim();
 
-    if (!item && window.Store && typeof window.Store.getState === 'function') {
-      const state = window.Store.getState() || {};
-      const ingredients = state.ingredients || state.pantry?.ingredients || [];
-      const directIng = ingredients.find(i => String(i.id) === String(entityId));
-      if (directIng) {
-        item = { ...directIng, type: 'ingredient' };
-      } else if (entityType === 'subtype' || parentId) {
-        for (const ing of ingredients) {
-          const sub = (ing.subtypes || []).find(s => String(s.id) === String(entityId));
-          if (sub) {
-            item = { ...sub, parentId: ing.id, parentIngredientId: ing.id, parentName: ing.name, category: ing.category, type: 'subtype' };
-            break;
+    switch (true) {
+      case typeKey.includes('UNLINKED_INGREDIENT'):
+      case typeKey === 'INGREDIENT_UNLINKED':
+        if (typeof window.openResolveUnlinkedModal === 'function') {
+          window.openResolveUnlinkedModal(entityId, 'ingredient', parentId);
+        } else if (typeof openResolveUnlinkedModal === 'function') {
+          openResolveUnlinkedModal(entityId, 'ingredient', parentId);
+        }
+        break;
+
+      case typeKey.includes('UNLINKED_RECIPE_INGREDIENT'):
+      case typeKey.includes('RECIPE_UNLINKED'):
+        if (typeof window.renderScrollableSwapModal === 'function') {
+          window.renderScrollableSwapModal(entityId, parentId || entityId);
+        } else if (typeof window.openResolveUnlinkedModal === 'function') {
+          window.openResolveUnlinkedModal({ recipeId: entityId, ingredientId: parentId }, 'recipe-ingredient');
+        }
+        break;
+
+      case typeKey.includes('ORPHANED_SUBTYPE'):
+      case typeKey.includes('SUBTYPE'):
+        if (typeof window.openSubtypeReorganizeModal === 'function') {
+          window.openSubtypeReorganizeModal(entityId, parentId);
+        } else if (typeof window.openIngredientReorganiseModal === 'function') {
+          window.openIngredientReorganiseModal(entityId, parentId);
+        } else if (typeof window.openSubtypeDeleteModal === 'function') {
+          window.openSubtypeDeleteModal(entityId, parentId);
+        }
+        break;
+
+      case typeKey.includes('STALE_RECIPE_MACROS'):
+      case typeKey.includes('LOW_CALORIES_ANOMALY'):
+      case typeKey.includes('MACRO_SYNC'):
+        await autoRecalibrateRecipeMacros(entityId);
+        if (typeof window.showCustomAlert === 'function') {
+          window.showCustomAlert('Recipe macros auto-recalibrated successfully.', 'Success');
+        }
+        renderDataQualityView();
+        break;
+
+      case typeKey.includes('PRODUCT_MISSING_PRICE'):
+      case typeKey.includes('PRODUCT_MISSING_MACROS'):
+        if (typeof window.openProductEditModal === 'function') {
+          window.openProductEditModal(entityId);
+        } else if (typeof openProductEditModal === 'function') {
+          openProductEditModal(entityId);
+        }
+        break;
+
+      case typeKey.includes('CATEGORY_MISMATCH'):
+        if (typeof window.enforceCategorySSOT === 'function') {
+          window.enforceCategorySSOT();
+        }
+        renderDataQualityView();
+        break;
+
+      default:
+        if (entityType === 'product') {
+          if (typeof window.openProductEditModal === 'function') window.openProductEditModal(entityId);
+        } else if (entityType === 'recipe') {
+          if (typeof window.viewRecipe === 'function') window.viewRecipe(entityId);
+        } else {
+          if (typeof window.openResolveUnlinkedModal === 'function') {
+            window.openResolveUnlinkedModal(entityId, entityType, parentId);
           }
         }
-      }
-    }
-
-    if (!item) {
-      const rowEl = e?.target?.closest ? e.target.closest('.dq-issue-row, tr, .card') : null;
-      const nameEl = rowEl ? rowEl.querySelector('strong, h4, .item-name, td') : null;
-      item = {
-        id: entityId,
-        name: nameEl ? nameEl.textContent.trim() : 'Unlinked Catalog Item',
-        type: entityType,
-        parentId: parentId || null
-      };
-    }
-
-    item.gapKey = issueKey;
-
-    if (entityType === 'product') {
-      if (typeof window.openProductEditModal === 'function') {
-        window.openProductEditModal(entityId);
-      } else if (typeof openProductEditModal === 'function') {
-        openProductEditModal(entityId);
-      }
-    } else if (entityType === 'recipe') {
-      if (issueKey.includes('macro-sync')) {
-        autoRecalibrateRecipeMacros(entityId);
-        return;
-      }
-      if (typeof window.viewRecipe === 'function') {
-        window.viewRecipe(entityId);
-      }
-    } else {
-      if (typeof window.openResolveUnlinkedModal === 'function') {
-        window.openResolveUnlinkedModal(item, entityType, parentId || item.parentId);
-      } else if (typeof openResolveUnlinkedModal === 'function') {
-        openResolveUnlinkedModal(item, entityType, parentId || item.parentId);
-      }
+        break;
     }
   } catch (err) {
     console.error('[DataQualityView] handleFixIssue caught error:', err);

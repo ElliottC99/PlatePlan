@@ -1,7 +1,7 @@
 /**
- * src/services/ActionBridge.js (v3.20.13)
+ * src/services/ActionBridge.js (v3.20.14)
  * Centralized Action Bridge & Event Dispatcher for Atomic Modular Architecture.
- * Idempotently handles delegated events and dispatches Custom Events for UI views.
+ * Idempotently handles delegated events, data-action/data-pp-click, mobile drawer routing, and sub-type deletion.
  * Strictly ZERO eval() or new Function().
  */
 
@@ -168,7 +168,7 @@ export function routeAction(actionName, target, event) {
     return true;
   }
 
-  // 4b. Subtype Deletion
+  // 4b. Explicit Sub-type Deletion Case
   if (normalizedAction === 'delete-subtype' || normalizedAction === 'deletesubtype' || normalizedAction.includes('deletesubtype')) {
     const ingId = ds.parentId || ds.ingredientId || parseArgsString(actionName)[0];
     const subtypeId = ds.subtypeId || ds.id || parseArgsString(actionName)[1];
@@ -243,11 +243,15 @@ export function routeAction(actionName, target, event) {
     return true;
   }
 
-  // 6. View Switcher Navigation
-  if (normalizedAction === 'show-view' || normalizedAction.includes('showview')) {
-    const viewName = ds.view || parseArgsString(actionName)[0];
+  // 6. View Switcher Navigation & Mobile Drawer Routing
+  if (normalizedAction.includes('mobilemoreview') || normalizedAction === 'show-view' || normalizedAction.includes('showview')) {
+    const match = actionName.match(/(?:mobileMoreView|showView)\(['"]?([^'"]+)['"]?\)/i);
+    const viewName = match ? match[1] : (ds.view || parseArgsString(actionName)[0]);
     if (viewName) {
-      if (typeof window.showView === 'function') {
+      if (typeof window.closeMobileMore === 'function') window.closeMobileMore();
+      if (typeof window.mobileMoreView === 'function') {
+        window.mobileMoreView(viewName);
+      } else if (typeof window.showView === 'function') {
         window.showView(viewName);
       }
       if (viewName === 'vault') setTimeout(renderRecipeVault, 30);
@@ -325,26 +329,27 @@ export function setupActionBridge() {
     const target = event.target.closest('[data-action], [data-pp-click], button');
     if (!target) return;
 
-    const actionString = target.getAttribute('data-action');
-    if (actionString) {
+    const actionString = target.getAttribute('data-action') || target.dataset.action || '';
+    const ppClickStr = target.getAttribute('data-pp-click') || target.dataset.ppClick || '';
+    const expr = actionString || ppClickStr;
+
+    if (expr) {
       const actionEvent = new CustomEvent('plateplan-action', { 
         detail: { 
-          action: actionString, 
+          action: expr, 
           target: target,
           id: target.getAttribute('data-id') || target.getAttribute('data-recipe-id') || target.getAttribute('data-ingredient-id')
         } 
       });
       document.dispatchEvent(actionEvent);
-      routeAction(actionString, target, event);
-      return; // STOP execution here. Do not try to eval() the string.
-    }
-
-    const ppClickStr = target.dataset.ppClick || target.getAttribute('data-pp-click') || '';
-    if (ppClickStr) {
-      routeAction(ppClickStr, target, event);
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
+      
+      const handled = routeAction(expr, target, event);
+      if (handled) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+      }
+      return;
     }
   }, true);
 }

@@ -1,5 +1,5 @@
 /**
- * src/services/RecipeDetailModalService.js (v3.20.13)
+ * src/services/RecipeDetailModalService.js (v3.20.14)
  * ES6 Recipe Detail Modal Coordinator & Lifecycle Manager.
  * Orchestrates recipe inspection, live scaling, enhanced variant switching,
  * and live HSL Lerp fit score badge generation without external legacy scripts.

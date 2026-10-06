@@ -1,5 +1,5 @@
 /**
- * src/components/vault/VaultRecipeCard.js (v3.20.13)
+ * src/components/vault/VaultRecipeCard.js (v3.20.14)
  * Modular UI component for Recipe Vault Card:
  * - Individual recipe card templates & layout
  * - Macro badges, fit score breakdown, and cooking time tags

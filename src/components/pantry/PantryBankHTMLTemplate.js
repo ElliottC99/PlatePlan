@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/PantryBankHTMLTemplate.js (v3.20.13)
+ * src/components/pantry/PantryBankHTMLTemplate.js (v3.20.14)
  * Extracted HTML UI renderer for the Category -> Ingredient -> Sub-type Hierarchy.
  * Harmonised with v3.20.06 design system button, badge, and Auto-Default formatting tokens.
  */
