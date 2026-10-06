@@ -1,5 +1,5 @@
 /**
- * src/views/ProductBankView.js (v3.20.06)
+ * src/views/ProductBankView.js (v3.20.10)
  * Modular ES6 View for Product Bank with real-time search filtering.
  * Displays nutritional pills (P, C, F, Kcal), P/£ efficiency, Tesco links, and Reallocation modal.
  */
@@ -159,12 +159,16 @@ export async function saveManualIng() {
 
   window.__draftSubtypePayload = null;
 
+  const finalIngId = activeEditingProductId ? (currentProds.find(p => String(p.id) === String(activeEditingProductId))?.ingredientId || null) : ingredientId;
+  const parentIng = finalIngId ? (state.ingredients || []).find(i => String(i.id) === String(finalIngId)) : null;
+  const inheritedCategory = parentIng?.category || getVal('mi-cat-search') || 'General';
+
   const updatedProd = {
     ...(activeEditingProductId ? currentProds.find(p => String(p.id) === String(activeEditingProductId)) : {}),
     id: activeEditingProductId || `prod_${Date.now()}`,
     name,
     brand: getVal('mi-brand'),
-    category: getVal('mi-cat-search') || 'General',
+    category: inheritedCategory,
     storage: getVal('mi-storage') || 'cupboard',
     cal: getNum('mi-cal') || 0,
     fat: getNum('mi-fat') || 0,
@@ -348,11 +352,11 @@ export function renderProductBank() {
               </div>
 
               <div style="display:flex;align-items:center;justify-content:flex-start;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:6px;border-top:1px solid var(--border,#e7e5e4);width:100%">
-                <button type="button" class="btn xs btn-ghost ghost" onclick="openProductEditModal('${escapeAttr(p.id)}')" style="height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500">Edit</button>
-                <button type="button" class="btn xs btn-ghost ghost" onclick="promptReallocateProduct('${escapeAttr(p.id)}')" style="height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500">Reallocate</button>
-                ${mappedIng && !p.isAutoDefault ? `<button type="button" class="btn xs btn-ghost ghost" onclick="handleMakeAutoDefault('${escapeAttr(p.id)}', '${escapeAttr(mappedIng.id)}')" style="height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500">Default</button>` : ''}
+                <button type="button" class="btn xs btn-ghost ghost" data-action="edit-product" data-product-id="${escapeAttr(p.id)}" style="height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500">Edit</button>
+                <button type="button" class="btn xs btn-ghost ghost" data-action="reallocate-product" data-product-id="${escapeAttr(p.id)}" style="height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500">Reallocate</button>
+                ${mappedIng && !p.isAutoDefault ? `<button type="button" class="btn xs btn-ghost ghost" data-action="make-auto-default" data-product-id="${escapeAttr(p.id)}" data-ingredient-id="${escapeAttr(mappedIng.id)}" style="height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500">Default</button>` : ''}
                 <a href="${escapeAttr(tescoSearchUrl)}" target="_blank" rel="noopener noreferrer" class="btn xs btn-ghost ghost" style="text-decoration:none;font-size:13px;font-weight:500;color:var(--primary);height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);display:inline-flex;align-items:center" title="Search on Tesco">Tesco ↗</a>
-                <button type="button" class="btn xs btn-ghost ghost" onclick="handleDeleteProduct('${escapeAttr(p.id)}')" style="color:var(--red,#ef4444);height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500" title="Delete product">🗑️</button>
+                <button type="button" class="btn xs btn-ghost ghost" data-action="delete-product" data-product-id="${escapeAttr(p.id)}" style="color:var(--red,#ef4444);height:32px;padding:0 10px;border-radius:var(--radius-sm,6px);font-size:13px;font-weight:500" title="Delete product">🗑️</button>
               </div>
             </div>
           `;
@@ -361,7 +365,22 @@ export function renderProductBank() {
     </div>
   `).join('');
 
-  container.innerHTML = searchBarHtml + cardsHtml;
+  container.onclick = (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const pid = btn.dataset.productId;
+    const ingId = btn.dataset.ingredientId;
+    if (action === 'edit-product') {
+      openProductEditModal(pid);
+    } else if (action === 'reallocate-product') {
+      promptReallocateProduct(pid);
+    } else if (action === 'make-auto-default') {
+      handleMakeAutoDefault(pid, ingId);
+    } else if (action === 'delete-product') {
+      handleDeleteProduct(pid);
+    }
+  };
 }
 
 export function clearProductGroupFilter() {

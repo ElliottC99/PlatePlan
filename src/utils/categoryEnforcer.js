@@ -1,5 +1,5 @@
 /**
- * src/utils/categoryEnforcer.js (v3.20.06)
+ * src/utils/categoryEnforcer.js (v3.20.10)
  * Category Single Source of Truth (SSOT) Enforcement Utility.
  * Ensures products and sub-types strictly inherit category strings from their parent ingredients.
  */

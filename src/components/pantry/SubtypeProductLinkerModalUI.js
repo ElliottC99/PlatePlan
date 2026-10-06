@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/SubtypeProductLinkerModalUI.js (v3.20.01)
+ * src/components/pantry/SubtypeProductLinkerModalUI.js (v3.20.10)
  * Extracted Sub-type Product Linker & Tesco Bookmarklet Import Modals.
  * Keeps SubtypeActionModalsUI strictly modular (< 400 lines).
  */

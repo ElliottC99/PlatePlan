@@ -1,5 +1,5 @@
 /**
- * src/services/HouseholdRepository.js (v3.20.06)
+ * src/services/HouseholdRepository.js (v3.20.10)
  * Dedicated data access repository for household-scoped Firestore operations.
  * Completely isolated from DOM manipulation and UI rendering.
  * All operations target the shared household path 'households/elliott-chloe'.
@@ -11,9 +11,48 @@ import { enforceCategorySSOT } from '../utils/categoryEnforcer.js';
 
 export { stripPlanPayload };
 
+/**
+ * Migration & schema normalisation utility to purge legacy root macro shorthands (.cal, .prot)
+ * in favour of the structured recipe.macros object.
+ */
+export function cleanLegacyMacros(target) {
+  if (!target) return target;
+  if (Array.isArray(target)) {
+    return target.map(cleanLegacyMacros);
+  }
+  if (typeof target === 'object') {
+    const r = { ...target };
+    if (r.macros || r.calories !== undefined || r.cal !== undefined || r.protein !== undefined || r.prot !== undefined) {
+      const cal = r.macros?.calories ?? r.macros?.cal ?? r.calories ?? r.cal ?? 0;
+      const prot = r.macros?.protein ?? r.macros?.prot ?? r.protein ?? r.prot ?? 0;
+      const carb = r.macros?.carbs ?? r.macros?.carb ?? r.carbs ?? r.carb ?? 0;
+      const fat = r.macros?.fat ?? r.fat ?? 0;
+      const price = r.macros?.price ?? r.price ?? r.cost ?? 0;
+
+      r.macros = {
+        calories: Number(cal) || 0,
+        protein: Number(prot) || 0,
+        carbs: Number(carb) || 0,
+        fat: Number(fat) || 0,
+        price: Number(price) || 0
+      };
+
+      delete r.cal;
+      delete r.calories;
+      delete r.prot;
+      delete r.protein;
+      delete r.carb;
+      delete r.carbs;
+      delete r.fat;
+    }
+    return r;
+  }
+  return target;
+}
+
 function isDbAvailable() {
   if (!db) {
-    console.warn('[HouseholdRepository v3.20.06] Firestore db instance not initialised.');
+    console.warn('[HouseholdRepository v3.20.09] Firestore db instance not initialised.');
     return false;
   }
   return true;
@@ -40,9 +79,10 @@ export async function getRecipes() {
   try {
     if (!isDbAvailable()) return [];
     const snap = await safeFirestoreGet(db.collection('households').doc(HOUSEHOLD_ID).collection('recipes'));
-    return (snap && snap.docs) ? snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) : [];
+    const raw = (snap && snap.docs) ? snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) : [];
+    return raw.map(r => cleanLegacyMacros(r));
   } catch (err) {
-    console.warn('[HouseholdRepository v3.19.78] Offline or unable to fetch recipes:', err.message || err);
+    console.warn('[HouseholdRepository v3.20.09] Offline or unable to fetch recipes:', err.message || err);
     return [];
   }
 }
@@ -51,7 +91,8 @@ export async function saveRecipe(recipe) {
   try {
     if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
     if (!recipe || typeof recipe !== 'object') return { success: false, error: 'Invalid recipe data' };
-    const recipeData = { ...recipe, updatedAt: new Date().toISOString() };
+    const cleanedRecipe = cleanLegacyMacros(recipe);
+    const recipeData = { ...cleanedRecipe, updatedAt: new Date().toISOString() };
     const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes');
     const recipeId = recipe.id || colRef.doc().id;
     delete recipeData.id;

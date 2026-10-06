@@ -29,7 +29,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * src/main.js (v3.20.08)
+ * src/main.js (v3.20.10)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronisation,
  * instant offline caching, global error telemetry, and PWA service worker registration.

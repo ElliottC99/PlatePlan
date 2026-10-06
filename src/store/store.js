@@ -1,5 +1,5 @@
 /**
- * src/store/store.js (v3.20.08)
+ * src/store/store.js (v3.20.10)
  * Centralized Reactive State Store module using native browser CustomEvents for unidirectional data flow.
  * Provides microtask-wrapped event dispatching and IndexedDB caching for instant offline hydration without localStorage quotas.
  */

@@ -1,5 +1,5 @@
 /**
- * src/views/TodayView.js (v3.20.06)
+ * src/views/TodayView.js (v3.20.10)
  * Modular ES6 View for the Today Dashboard.
  * Renders daily meal timeline, macro snapshots, and meal completion toggles.
  */

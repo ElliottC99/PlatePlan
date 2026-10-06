@@ -1,5 +1,5 @@
 /**
- * src/views/DataQualityView.js (v3.20.06)
+ * src/views/DataQualityView.js (v3.20.10)
  * Modular ES6 View for Data Quality Centre, audit scanner results, macro quality sweep, and dynamic macro recalibration.
  */
 
@@ -242,14 +242,14 @@ export function renderDataQualityView() {
           <div style="font-size:11.5px;color:var(--text2,#78716c);margin-top:2px">${escapeHtml(issue.message)}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
-          ${dismissible ? `<button type="button" class="btn sm btn-ghost ghost" onclick="dismissAdvisory('${escapeAttr(issue.key)}')">Looks right</button>` : ''}
-          ${issue.isMacroSyncError ? `<button type="button" class="btn sm primary" style="background:var(--primary,#4f46e5);color:#fff" onclick="autoRecalibrateRecipeMacros('${escapeAttr(issue.entityId)}')">Auto-Recalibrate Macros from Ingredients</button>` : ''}
+          ${dismissible ? `<button type="button" class="btn sm btn-ghost ghost" data-action="dismiss-advisory" data-issue-key="${escapeAttr(issue.key)}">Looks right</button>` : ''}
+          ${issue.isMacroSyncError ? `<button type="button" class="btn sm primary" style="background:var(--primary,#4f46e5);color:#fff" data-action="auto-recalibrate" data-recipe-id="${escapeAttr(issue.entityId)}">Auto-Recalibrate Macros from Ingredients</button>` : ''}
           <button type="button" class="btn sm btn-primary primary dq-fix-btn" 
             data-entity-type="${escapeAttr(issue.entityType)}" 
             data-entity-id="${escapeAttr(issue.entityId)}" 
             data-issue-key="${escapeAttr(issue.key)}" 
             data-parent-id="${escapeAttr(issue.parentIngredientId || '')}" 
-            onclick="${fixAction}">Fix</button>
+            data-action="fix-issue">Fix</button>
         </div>
       </div>
     `;
@@ -295,8 +295,8 @@ export function renderDataQualityView() {
           <p style="margin:4px 0 0 0;font-size:13px;color:var(--text2,#78716c)">Catalogue audit scanner, recipe macro validation, and structural health advisory.</p>
         </div>
         <div style="display:flex;gap:8px">
-          <button type="button" class="btn sm secondary" onclick="runGlobalProductRelink()">⚡ Auto-Relink Catalog</button>
-          <button type="button" class="btn sm ghost" onclick="renderDataQualityView()">🔄 Refresh Audit</button>
+          <button type="button" class="btn sm secondary" data-action="auto-relink">⚡ Auto-Relink Catalog</button>
+          <button type="button" class="btn sm ghost" data-action="refresh-audit">🔄 Refresh Audit</button>
         </div>
       </div>
 
@@ -329,6 +329,25 @@ export function renderDataQualityView() {
       </div>
     </div>
   `;
+
+  container.onclick = (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const key = btn.dataset.issueKey;
+    const id = btn.dataset.recipeId;
+    if (action === 'dismiss-advisory') {
+      dismissAdvisory(key);
+    } else if (action === 'auto-recalibrate') {
+      autoRecalibrateRecipeMacros(id);
+    } else if (action === 'auto-relink') {
+      runGlobalProductRelink();
+    } else if (action === 'refresh-audit') {
+      renderDataQualityView();
+    } else if (action === 'fix-issue') {
+      handleFixIssue(e, btn.dataset.entityType, btn.dataset.entityId, btn.dataset.issueKey, btn.dataset.parentId);
+    }
+  };
 }
 
 function updateDataQualityBadge() {

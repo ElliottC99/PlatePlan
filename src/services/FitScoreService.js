@@ -1,5 +1,5 @@
 /**
- * src/services/FitScoreService.js (v3.20.06)
+ * src/services/FitScoreService.js (v3.20.10)
  * Universal Fit Score Service & Sorting Coordinator.
  * Delegates all macro extraction, asymmetric curve scoring, and 4-tier classification
  * to src/utils/fitScoreCalculator.js.
