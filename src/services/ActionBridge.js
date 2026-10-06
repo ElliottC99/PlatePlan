@@ -1,5 +1,5 @@
 /**
- * src/services/ActionBridge.js (v3.20.14)
+ * src/services/ActionBridge.js (v3.20.16)
  * Centralized Action Bridge & Event Dispatcher for Atomic Modular Architecture.
  * Idempotently handles delegated events, data-action/data-pp-click, mobile drawer routing, and sub-type deletion.
  * Strictly ZERO eval() or new Function().
@@ -98,6 +98,21 @@ export function routeAction(actionName, target, event) {
   const normalizedAction = actionName.toLowerCase().trim();
 
   // 1. Recipe Modal / View
+  if (normalizedAction === 'fix-issue' || normalizedAction === 'fix-recipe') {
+    const issueKey = ds.issueKey || target.getAttribute('data-issue-key') || '';
+    if (issueKey && (issueKey.startsWith('advisory:') || issueKey.includes('recipe-macro-sync') || issueKey.includes('recipe-low-cal') || issueKey.includes('macro-sync'))) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      const recipeId = issueKey.split(':').pop() || ds.entityId || ds.recipeId || ds.id;
+      if (typeof window.autoRecalibrateRecipeMacros === 'function') {
+        window.autoRecalibrateRecipeMacros(recipeId);
+      }
+      return true; // CRITICAL: Prevent fall-through to ResolveUnlinkedModal
+    }
+  }
+
   if (normalizedAction === 'view-recipe' || normalizedAction === 'viewrecipe' || normalizedAction.includes('viewrecipe') || normalizedAction.includes('openrecipemodal')) {
     const recipeId = ds.recipeId || ds.id || parseArgsString(actionName)[0];
     const instanceId = ds.instanceId || parseArgsString(actionName)[1] || null;

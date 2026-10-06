@@ -1,5 +1,5 @@
 /**
- * src/config/firebase.js (v3.20.15)
+ * src/config/firebase.js (v3.20.16)
  * Firebase configuration, safe initialization, native multi-tab offline persistence, and database instance export.
  */
 

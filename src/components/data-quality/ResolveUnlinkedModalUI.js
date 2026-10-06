@@ -328,6 +328,14 @@ if (typeof document !== 'undefined' && !window.__resolve_unlinked_action_bound) 
   document.addEventListener('plateplan-action', (e) => {
     const { action, target, id } = e.detail || {};
     if (action === 'fix-recipe' || action === 'resolve-unlinked' || action === 'fix-issue') {
+      const issueKey = target?.dataset?.issueKey || target?.getAttribute('data-issue-key') || '';
+      if (issueKey && (issueKey.startsWith('advisory:') || issueKey.includes('recipe-macro-sync') || issueKey.includes('recipe-low-cal') || issueKey.includes('macro-sync'))) {
+        const recipeId = issueKey.split(':').pop() || id || target?.dataset?.entityId;
+        if (typeof window.autoRecalibrateRecipeMacros === 'function') {
+          window.autoRecalibrateRecipeMacros(recipeId);
+        }
+        return; // CRITICAL: Early-return block to catch advisory issue keys before falling through
+      }
       const entityId = id || target?.dataset?.entityId || target?.dataset?.recipeId;
       const type = target?.dataset?.entityType || 'recipe';
       const parentId = target?.dataset?.parentId || null;
