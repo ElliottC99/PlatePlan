@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.20.11)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.20.12)
  * In-App Multi-Step Category Operations Wizard, Raw Exposure & Deep State Merge Modal.
  */
 

@@ -1,7 +1,8 @@
 /**
- * src/services/ActionBridge.js (v3.19.19)
+ * src/services/ActionBridge.js (v3.20.12)
  * Centralized Action Bridge & Event Dispatcher for Atomic Modular Architecture.
- * Idempotently handles delegated events, data-action parsing, shopping toggles, and modal routing.
+ * Idempotently handles delegated events, dataset action parsing, shopping toggles, and modal routing.
+ * Eradicates eval() and new Function() in favor of safe AST-free AST parsing and CustomEvent dispatching.
  */
 
 import { renderSettingsView } from '../views/SettingsView.js';
@@ -46,21 +47,89 @@ function initLabelObserver() {
 }
 
 /**
- * Parse arguments from function call strings like "fn('a', 2, true)".
- * @param {string} str 
- * @returns {Array<any>}
+ * Cleanly parse function argument tokens without dangerous eval().
  */
-function parseFunctionArgs(str) {
-  if (!str || !str.includes('(')) return [];
-  const raw = str.substring(str.indexOf('(') + 1, str.lastIndexOf(')'));
-  return raw.split(',').map(s => {
-    const val = s.trim().replace(/^['"]|['"]$/g, '');
-    if (val === 'null' || val === 'undefined' || val === '') return null;
-    if (val === 'true') return true;
-    if (val === 'false') return false;
-    if (!isNaN(val) && val !== '') return Number(val);
-    return val;
-  });
+function cleanArgToken(token, event, target) {
+  const val = token.trim();
+  if (val === 'this') return target;
+  if (val === 'event') return event;
+  if (val === 'true') return true;
+  if (val === 'false') return false;
+  if (val === 'null') return null;
+  if (val === 'undefined') return undefined;
+  if (/^-?\d+(\.\d+)?$/.test(val)) return Number(val);
+  return val.replace(/^['"`]|['"`]$/g, '');
+}
+
+/**
+ * Parse arguments string safely without eval.
+ */
+function parseArgsString(rawArgsStr, event, target) {
+  if (!rawArgsStr || !rawArgsStr.trim()) return [];
+  const args = [];
+  let current = '';
+  let inQuote = false;
+  let quoteChar = '';
+
+  for (let i = 0; i < rawArgsStr.length; i++) {
+    const char = rawArgsStr[i];
+    if (char === "'" || char === '"' || char === '`') {
+      if (!inQuote) {
+        inQuote = true;
+        quoteChar = char;
+      } else if (char === quoteChar) {
+        inQuote = false;
+        quoteChar = '';
+      } else {
+        current += char;
+      }
+    } else if (char === ',' && !inQuote) {
+      args.push(cleanArgToken(current, event, target));
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim().length > 0) {
+    args.push(cleanArgToken(current, event, target));
+  }
+  return args;
+}
+
+/**
+ * Safely invoke function names or expressions (e.g. "showView('today')" or "closeMobileMore(); window.syncNow()") without eval.
+ */
+function safeInvokeFunction(expr, event, target) {
+  if (!expr || typeof expr !== 'string') return false;
+  const statements = expr.split(';').map(s => s.trim()).filter(Boolean);
+  let anySuccess = false;
+
+  for (const stmt of statements) {
+    const match = stmt.match(/^([a-zA-Z0-9_\$\.]+)(?:\((.*)\))?$/);
+    if (!match) continue;
+
+    const fullFnPath = match[1];
+    const rawArgsStr = match[2];
+
+    const parts = fullFnPath.split('.');
+    let obj = typeof window !== 'undefined' ? window : {};
+    for (let i = 0; i < parts.length - 1; i++) {
+      obj = obj ? obj[parts[i]] : null;
+      if (!obj) break;
+    }
+    const fn = obj ? obj[parts[parts.length - 1]] : null;
+
+    if (typeof fn === 'function') {
+      const args = rawArgsStr !== undefined ? parseArgsString(rawArgsStr, event, target) : [];
+      try {
+        fn.apply(target, args);
+        anySuccess = true;
+      } catch (err) {
+        console.warn(`[ActionBridge] Error safely invoking ${fullFnPath}:`, err);
+      }
+    }
+  }
+  return anySuccess;
 }
 
 /**
@@ -75,10 +144,10 @@ export function routeAction(actionName, target, event) {
 
   // 1. Recipe Modal / View
   if (normalizedAction === 'view-recipe' || normalizedAction === 'viewrecipe' || normalizedAction.includes('viewrecipe') || normalizedAction.includes('openrecipemodal')) {
-    const recipeId = ds.recipeId || ds.id || parseFunctionArgs(actionName)[0];
-    const instanceId = ds.instanceId || parseFunctionArgs(actionName)[1] || null;
-    const variant = ds.variant || parseFunctionArgs(actionName)[2] || 'original';
-    const targetPerson = ds.targetPerson || parseFunctionArgs(actionName)[3] || 'both';
+    const recipeId = ds.recipeId || ds.id || parseArgsString(actionName)[0];
+    const instanceId = ds.instanceId || parseArgsString(actionName)[1] || null;
+    const variant = ds.variant || parseArgsString(actionName)[2] || 'original';
+    const targetPerson = ds.targetPerson || parseArgsString(actionName)[3] || 'both';
 
     if (recipeId) {
       if (typeof window.viewRecipe === 'function') {
@@ -90,10 +159,38 @@ export function routeAction(actionName, target, event) {
     return true;
   }
 
+  // Fit score details modal
+  if (normalizedAction === 'open-fit-details' || normalizedAction.includes('openvaultfitdetails')) {
+    const recipeId = ds.recipeId || ds.id || parseArgsString(actionName)[1];
+    const variant = ds.variant || parseArgsString(actionName)[2] || 'original';
+    const person = ds.person || parseArgsString(actionName)[3] || 'e';
+    if (typeof window.openVaultFitDetails === 'function') {
+      window.openVaultFitDetails(target, recipeId, variant, person);
+    }
+    return true;
+  }
+
+  // Recipe Actions Menu
+  if (normalizedAction === 'open-recipe-actions' || normalizedAction.includes('openrecipeactions')) {
+    const recipeId = ds.recipeId || ds.id || parseArgsString(actionName)[0];
+    if (typeof window.openRecipeActions === 'function') {
+      window.openRecipeActions(recipeId);
+    }
+    return true;
+  }
+
+  if (normalizedAction === 'open-enhanced-recipe-actions' || normalizedAction.includes('openenhancedrecipeactions')) {
+    const recipeId = ds.recipeId || ds.id || parseArgsString(actionName)[0];
+    if (typeof window.openEnhancedRecipeActions === 'function') {
+      window.openEnhancedRecipeActions(recipeId);
+    }
+    return true;
+  }
+
   // 2. Recipe Favourite Toggle
-  if (normalizedAction === 'toggle-fav' || normalizedAction === 'togglefavourite' || normalizedAction.includes('togglerecipefavourite')) {
-    const recipeId = ds.recipeId || ds.id || parseFunctionArgs(actionName)[0];
-    const variant = ds.variant || parseFunctionArgs(actionName)[2] || 'original';
+  if (normalizedAction === 'toggle-favorite' || normalizedAction === 'toggle-fav' || normalizedAction === 'togglefavourite' || normalizedAction.includes('togglerecipefavourite')) {
+    const recipeId = ds.recipeId || ds.id || parseArgsString(actionName)[0];
+    const variant = ds.variant || parseArgsString(actionName)[2] || 'original';
     if (recipeId) {
       toggleRecipeFavourite(recipeId, event, variant);
     }
@@ -109,16 +206,26 @@ export function routeAction(actionName, target, event) {
   // 4. Shopping Product Substitution
   if (normalizedAction === 'swap-product' || normalizedAction === 'toggle-inline-subst' || normalizedAction === 'toggleinlineshoppingsubst' || normalizedAction.includes('toggleinlineshoppingsubst')) {
     const containerEl = target.closest('[data-item-key], [data-group-key], [data-group-id], [data-ingredient-name], .pp-shop-item, .shopping-list-row, .item-row') || target;
-    const groupKey = ds.groupKey || ds.groupId || containerEl.dataset?.groupKey || containerEl.dataset?.groupId || parseFunctionArgs(actionName)[0] || '';
-    const itemKey = ds.itemKey || containerEl.dataset?.itemKey || parseFunctionArgs(actionName)[1] || parseFunctionArgs(actionName)[0] || '';
+    const groupKey = ds.groupKey || ds.groupId || containerEl.dataset?.groupKey || containerEl.dataset?.groupId || parseArgsString(actionName)[0] || '';
+    const itemKey = ds.itemKey || containerEl.dataset?.itemKey || parseArgsString(actionName)[1] || parseArgsString(actionName)[0] || '';
     const ingredientName = ds.ingredientName || containerEl.dataset?.ingredientName || '';
     renderScrollableSwapModal(groupKey, itemKey, ingredientName);
     return true;
   }
 
-  // 4b. Ingredient & Product Bank Modals
+  // 4b. Subtype Deletion
+  if (normalizedAction === 'delete-subtype' || normalizedAction === 'deletesubtype' || normalizedAction.includes('deletesubtype')) {
+    const ingId = ds.ingredientId || ds.id || parseArgsString(actionName)[0];
+    const subtypeId = ds.subtypeId || parseArgsString(actionName)[1];
+    if (typeof window.deleteSubtype === 'function') {
+      window.deleteSubtype(ingId, subtypeId);
+    }
+    return true;
+  }
+
+  // 4c. Ingredient & Product Bank Modals
   if (normalizedAction === 'open-ingredient-modal' || normalizedAction.includes('openingredientfamilydetailsmodal')) {
-    const ingId = ds.ingredientId || ds.id || parseFunctionArgs(actionName)[0] || null;
+    const ingId = ds.ingredientId || ds.id || parseArgsString(actionName)[0] || null;
     if (typeof window.openIngredientFamilyDetailsModal === 'function') {
       window.openIngredientFamilyDetailsModal(ingId);
     }
@@ -126,7 +233,7 @@ export function routeAction(actionName, target, event) {
   }
 
   if (normalizedAction === 'open-product-modal' || normalizedAction.includes('openproducteditmodal') || normalizedAction.includes('showadding')) {
-    const prodId = ds.productId || ds.id || parseFunctionArgs(actionName)[0] || null;
+    const prodId = ds.productId || ds.id || parseArgsString(actionName)[0] || null;
     if (typeof window.openProductEditModal === 'function') {
       window.openProductEditModal(prodId);
     } else if (typeof window.showAddIng === 'function') {
@@ -173,15 +280,15 @@ export function routeAction(actionName, target, event) {
   // 5. Shopping Item Acquired Checkbox
   if (normalizedAction === 'toggle-shopping-item' || normalizedAction === 'toggle-shopping-at-home' || normalizedAction === 'toggleshoppingathome' || normalizedAction.includes('toggleshoppingathome')) {
     const containerEl = target.closest('[data-item-key], [data-group-key], [data-group-id], .pp-shop-item, .shopping-list-row, .item-row') || target;
-    const groupKey = ds.groupKey || ds.groupId || containerEl.dataset?.groupKey || containerEl.dataset?.groupId || parseFunctionArgs(actionName)[0] || '';
-    const itemKey = ds.itemKey || containerEl.dataset?.itemKey || parseFunctionArgs(actionName)[1] || parseFunctionArgs(actionName)[0] || '';
+    const groupKey = ds.groupKey || ds.groupId || containerEl.dataset?.groupKey || containerEl.dataset?.groupId || parseArgsString(actionName)[0] || '';
+    const itemKey = ds.itemKey || containerEl.dataset?.itemKey || parseArgsString(actionName)[1] || parseArgsString(actionName)[0] || '';
     toggleShoppingItemAcquired(groupKey, itemKey);
     return true;
   }
 
   // 6. View Switcher Navigation
   if (normalizedAction === 'show-view' || normalizedAction.includes('showview')) {
-    const viewName = ds.view || parseFunctionArgs(actionName)[0];
+    const viewName = ds.view || parseArgsString(actionName)[0];
     if (viewName) {
       if (typeof window.showView === 'function') {
         window.showView(viewName);
@@ -268,6 +375,14 @@ export function setupActionBridge() {
 
     if (!actionDescriptor) return;
 
+    // Dispatch global CustomEvent for observers
+    if (typeof document !== 'undefined') {
+      document.dispatchEvent(new CustomEvent('plateplan:action', {
+        detail: { action: actionDescriptor, target, event, dataset: target.dataset },
+        bubbles: true
+      }));
+    }
+
     // Check if intercepted by modern routeAction
     const wasHandled = routeAction(actionDescriptor, target, event);
 
@@ -278,21 +393,15 @@ export function setupActionBridge() {
       return;
     }
 
-    // Handle data-pp-click or legacy inline action delegation
-    if (ppClickStr || dataAction) {
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
+    // Handle function calls or legacy expressions without eval()
+    if (ppClickStr || dataAction || onclickStr) {
+      const expr = ppClickStr || dataAction || onclickStr;
+      const invoked = safeInvokeFunction(expr, event, target);
 
-      if (typeof window.runPlatePlanDelegatedAction === 'function') {
-        window.runPlatePlanDelegatedAction(ppClickStr || dataAction, event, target);
-      } else {
-        try {
-          const execFn = new Function('event', `with(window) { ${ppClickStr || dataAction} }`);
-          execFn.call(target, event);
-        } catch (err) {
-          console.warn('[ActionBridge] Error evaluating delegated action:', err);
-        }
+      if (invoked) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
       }
     }
   }, true);

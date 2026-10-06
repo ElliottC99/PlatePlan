@@ -1,5 +1,5 @@
 /**
- * src/views/SettingsView.js (v3.20.11)
+ * src/views/SettingsView.js (v3.20.12)
  * Componentised Settings & Preferences View Function.
  * Composes modular profile components and handles persistence through HouseholdRepository.
  */

@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/TescoImportModalUI.js (v3.20.11)
+ * src/components/pantry/TescoImportModalUI.js (v3.20.12)
  * Sub-type Product Link Modals: Selection, Picker & Tesco JSON Import.
  * Strictly modular (< 400 lines) with clean dialogue lifecycle.
  */

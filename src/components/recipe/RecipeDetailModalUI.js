@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeDetailModalUI.js (v3.20.11)
+ * src/components/recipe/RecipeDetailModalUI.js (v3.20.12)
  * Modular Presentation Component for Recipe Detail & Scaling Preview Modal.
  * Renders Recipe Ingredient rows as: [Ingredient] / [Sub-type] - [Brand Name] [Product Name]
  * with graceful fallbacks if brand/product are unmapped.

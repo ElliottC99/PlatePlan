@@ -177,11 +177,11 @@ try{
 <div class="app">
 
 <header class="app-header">
-  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span id="app-header-version" class="version-badge" style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v3.20.11</span></div>
+  <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span id="app-header-version" class="version-badge" style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">v3.20.12</span></div>
   <div class="app-header-actions">
     <button class="btn primary app-create-button" type="button" data-pp-click="openCreateActionSheet()" aria-label="Add to PlatePlan"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span class="app-create-label">Add</span></button>
     <button class="btn ghost app-menu-button" type="button" data-pp-click="openMobileMore()" aria-label="Open PlatePlan menu"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="19" cy="12" r="1.3"></circle></svg><span>Menu</span></button>
-    <button id="sync-status" class="sync-pill" data-status="local" data-pp-click="openPlatePlanSyncPanel()" title="PlatePlan sync status">Local only</button>
+    <button type="button" id="sync-status" class="sync-pill" data-status="local" data-pp-click="openPlatePlanSyncPanel()" title="PlatePlan sync status">Local only</button>
     <button id="syncNowTopBtn" class="btn ghost sync-now-btn" type="button" data-pp-click="window.syncNow()" title="Sync now with cloud" style="padding:4px 8px;font-size:12px">Sync Now</button>
     <button id="logoutBtn" class="btn ghost" type="button" data-pp-click="window.logout()" title="Log out of PlatePlan" style="padding:4px 8px;font-size:12px">Log Out</button>
     <span id="sync-user" class="sync-user-label" style="font-size:11px;color:var(--text3)"></span>
@@ -190,46 +190,46 @@ try{
 
 <nav class="desktop-sidebar" aria-label="Main navigation">
   <div class="nav-group-label">PlatePlan</div>
-  <button class="ntab active" data-view="today" data-pp-click="showView('today')">Today</button>
-  <button class="ntab" data-view="vault" data-pp-click="showView('vault')">Recipes</button>
-  <button class="ntab" data-view="planner" data-pp-click="showView('planner')">Meal Planner</button>
-  <button class="ntab" data-view="search" data-pp-click="showView('search')">Search</button>
+  <button type="button" class="ntab active" data-view="today" data-pp-click="showView('today')">Today</button>
+  <button type="button" class="ntab" data-view="vault" data-pp-click="showView('vault')">Recipes</button>
+  <button type="button" class="ntab" data-view="planner" data-pp-click="showView('planner')">Meal Planner</button>
+  <button type="button" class="ntab" data-view="search" data-pp-click="showView('search')">Search</button>
   <details class="nav-group" data-sidebar-group="library" open>
     <summary>Library</summary>
-    <button class="ntab" data-view="planlib" data-pp-click="showView('planlib')">Meal Plan Library</button>
+    <button type="button" class="ntab" data-view="planlib" data-pp-click="showView('planlib')">Meal Plan Library</button>
   </details>
   <details class="nav-group" data-sidebar-group="data" open>
     <summary>Data</summary>
-    <button class="ntab" data-view="ingredients" data-pp-click="showView('ingredients')">Ingredient Bank</button>
-    <button class="ntab" data-view="bank" data-pp-click="clearProductGroupFilter();showView('bank')">Product Bank</button>
-    <button class="ntab" data-view="data" data-pp-click="showView('data')">Data Quality</button>
+    <button type="button" class="ntab" data-view="ingredients" data-pp-click="showView('ingredients')">Ingredient Bank</button>
+    <button type="button" class="ntab" data-view="bank" data-pp-click="clearProductGroupFilter();showView('bank')">Product Bank</button>
+    <button type="button" class="ntab" data-view="data" data-pp-click="showView('data')">Data Quality</button>
   </details>
   <details class="nav-group" data-sidebar-group="settings" open>
     <summary>Settings</summary>
-    <button class="ntab" data-view="prefs" data-pp-click="showView('prefs')">Preferences</button>
+    <button type="button" class="ntab" data-view="prefs" data-pp-click="showView('prefs')">Preferences</button>
   </details>
 </nav>
 
 <div class="mobile-nav" id="mobile-nav" aria-label="Main navigation">
-  <button data-view="today" class="active" data-pp-click="showView('today')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5M6.5 10v9h11v-9M10 19v-5h4v5"></path></svg>Today</button>
-  <button data-view="vault" data-pp-click="showView('vault')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M5 4v7M8 4v7M5 8h3M6.5 11v9M16 4c-2 3-2 7 0 9h2V4M18 13v7"></path></svg>Recipes</button>
-  <button data-view="planner" data-pp-click="showView('planner')"><svg aria-hidden="true" viewbox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2"></path></svg>Plan</button>
-  <button data-view="data" data-pp-click="showView('data')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>Data Quality</button>
-  <button data-view="search" data-pp-click="showView('search')"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"></circle><path d="m15 15 4 4"></path></svg>Search</button>
+  <button type="button" data-view="today" class="active" data-pp-click="showView('today')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5M6.5 10v9h11v-9M10 19v-5h4v5"></path></svg>Today</button>
+  <button type="button" data-view="vault" data-pp-click="showView('vault')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M5 4v7M8 4v7M5 8h3M6.5 11v9M16 4c-2 3-2 7 0 9h2V4M18 13v7"></path></svg>Recipes</button>
+  <button type="button" data-view="planner" data-pp-click="showView('planner')"><svg aria-hidden="true" viewbox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2"></path></svg>Plan</button>
+  <button type="button" data-view="data" data-pp-click="showView('data')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>Data Quality</button>
+  <button type="button" data-view="search" data-pp-click="showView('search')"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"></circle><path d="m15 15 4 4"></path></svg>Search</button>
 </div>
 <div class="mobile-more-wrap" id="mobile-more-wrap" data-pp-click="if(event.target===this)closeMobileMore()">
   <div class="mobile-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-more-title">
     <div class="mobile-sheet-handle"></div>
-    <div class="plateplan-sheet-header"><div><h3 id="mobile-more-title">PlatePlan menu</h3><p>Library, data and settings</p></div><button class="btn sm ghost" data-pp-click="closeMobileMore()">Close</button></div>
+    <div class="plateplan-sheet-header"><div><h3 id="mobile-more-title">PlatePlan menu</h3><p>Library, data and settings</p></div><button type="button" class="btn sm ghost" data-pp-click="closeMobileMore()">Close</button></div>
     <div class="plateplan-menu-groups">
       <section><h4>Quick Actions</h4>
-        <button data-pp-click="closeMobileMore();openCreateActionSheet()"><span style="display:flex;align-items:center;gap:6px">➕ Add Recipe / Item</span><span aria-hidden="true">›</span></button>
-        <button data-pp-click="closeMobileMore();window.syncNow()"><span style="display:flex;align-items:center;gap:6px">🔄 Sync Cloud Now</span><span aria-hidden="true">›</span></button>
-        <button data-pp-click="closeMobileMore();window.logout()" style="color:var(--red,#e53e3e)"><span style="display:flex;align-items:center;gap:6px">🚪 Log Out</span><span aria-hidden="true">›</span></button>
+        <button type="button" data-pp-click="closeMobileMore();openCreateActionSheet()"><span style="display:flex;align-items:center;gap:6px">➕ Add Recipe / Item</span><span aria-hidden="true">›</span></button>
+        <button type="button" data-pp-click="closeMobileMore();window.syncNow()"><span style="display:flex;align-items:center;gap:6px">🔄 Sync Cloud Now</span><span aria-hidden="true">›</span></button>
+        <button type="button" data-pp-click="closeMobileMore();window.logout()" style="color:var(--red,#e53e3e)"><span style="display:flex;align-items:center;gap:6px">🚪 Log Out</span><span aria-hidden="true">›</span></button>
       </section>
-      <section><h4>Library</h4><button data-pp-click="mobileMoreView('planlib')"><span>Meal Plan Library</span><span aria-hidden="true">›</span></button></section>
-      <section><h4>Data</h4><button data-pp-click="mobileMoreView('ingredients')"><span>Ingredient Bank</span><span aria-hidden="true">›</span></button><button data-pp-click="clearProductGroupFilter();mobileMoreView('bank')"><span>Product Bank</span><span aria-hidden="true">›</span></button><button data-pp-click="mobileMoreView('data')"><span>Data Quality</span><span aria-hidden="true">›</span></button></section>
-      <section><h4>Settings</h4><button data-pp-click="mobileMoreView('prefs')"><span>Preferences, sync and recovery</span><span aria-hidden="true">›</span></button></section>
+      <section><h4>Library</h4><button type="button" data-pp-click="mobileMoreView('planlib')"><span>Meal Plan Library</span><span aria-hidden="true">›</span></button></section>
+      <section><h4>Data</h4><button type="button" data-pp-click="mobileMoreView('ingredients')"><span>Ingredient Bank</span><span aria-hidden="true">›</span></button><button type="button" data-pp-click="clearProductGroupFilter();mobileMoreView('bank')"><span>Product Bank</span><span aria-hidden="true">›</span></button><button type="button" data-pp-click="mobileMoreView('data')"><span>Data Quality</span><span aria-hidden="true">›</span></button></section>
+      <section><h4>Settings</h4><button type="button" data-pp-click="mobileMoreView('prefs')"><span>Preferences, sync and recovery</span><span aria-hidden="true">›</span></button></section>
     </div>
   </div>
 </div>
@@ -383,10 +383,10 @@ try{
       Save will structure your inputs, map volumes, and calculate nutrition against your ingredient bank.
     </div>
     <div class="btn-row" style="gap:8px;flex-wrap:wrap">
-      <button class="btn primary" data-pp-click="submitRecipe()">Parse &amp; Verify</button>
+      <button type="button" class="btn primary" data-pp-click="submitRecipe()">Parse &amp; Verify</button>
       <button id="batch-skip-add-btn" type="button" class="btn secondary" onclick="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
       <button id="batch-abort-add-btn" type="button" class="btn danger ghost" onclick="abortBatchImport()" style="display:none">Abort Batch Import</button>
-      <button class="btn ghost" data-pp-click="clearForm()">Clear</button>
+      <button type="button" class="btn ghost" data-pp-click="clearForm()">Clear</button>
     </div>
     <div id="form-msg"></div>
   </div>
@@ -396,8 +396,8 @@ try{
   <div class="view-toolbar">
     <h1 class="view-title" style="margin:0">Ingredient Bank</h1>
     <div class="btn-row">
-      <button class="btn sm btn-ghost ghost" data-pp-click="openCategoryManagerModal()">Categories</button>
-      <button class="btn sm btn-secondary secondary" data-pp-click="createIngredientFamilyPrompt()">+ Ingredient</button>
+      <button type="button" class="btn sm btn-ghost ghost" data-pp-click="openCategoryManagerModal()">Categories</button>
+      <button type="button" class="btn sm btn-secondary secondary" data-pp-click="createIngredientFamilyPrompt()">+ Ingredient</button>
     </div>
   </div>
   <div class="card" style="margin-bottom:12px">
@@ -416,8 +416,8 @@ try{
   <div class="view-toolbar">
     <h1 class="view-title" style="margin:0">Product Bank</h1>
     <div class="btn-row">
-      <button class="btn sm btn-primary primary" data-pp-click="showAddIng()">+ Add product</button>
-      <button class="btn sm btn-outline outline" data-pp-click="showTescoImport()" style="background:var(--purple-bg);color:var(--purple);border-color:var(--purple)">Import Tesco</button>
+      <button type="button" class="btn sm btn-primary primary" data-pp-click="showAddIng()">+ Add product</button>
+      <button type="button" class="btn sm btn-outline outline" data-pp-click="showTescoImport()" style="background:var(--purple-bg);color:var(--purple);border-color:var(--purple)">Import Tesco</button>
     </div>
   </div>
   <div id="bank-groups-panel"></div>
@@ -505,7 +505,7 @@ try{
       <h1 class="view-title" style="margin:0">Meal Plan Library</h1>
       <p style="font-size:12px;color:var(--text2);margin:5px 0 0">Saved meal plans live here so the planner itself can stay focused on generating and adjusting the current plan.</p>
     </div>
-    <button class="btn sm btn-primary primary" data-pp-click="openSaveMealPlanModal()">Save current plan</button>
+    <button type="button" class="btn sm btn-primary primary" data-pp-click="openSaveMealPlanModal()">Save current plan</button>
   </div>
   <div id="plan-history-panel"></div>
 </div>
@@ -520,7 +520,7 @@ try{
             <option value="category">Group by Category</option>
             <option value="storage">Group by Storage</option>
         </select>
-        <button class="btn sm btn-secondary secondary" data-pp-click="copyList()">Copy list</button>
+        <button type="button" class="btn sm btn-secondary secondary" data-pp-click="copyList()">Copy list</button>
     </div>
   </div>
   <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Generated from your current meal plan. Allocations trace back to specific meal instances. Use "Product" to choose the product for one specific recipe occurrence.</p>
@@ -531,8 +531,8 @@ try{
     <div class="view-toolbar">
       <h1 class="view-title" style="margin:0">Data Quality Centre</h1>
       <div style="display:flex;gap:8px">
-        <button class="btn sm btn-ghost ghost" data-pp-click="runGlobalProductRelink()">Batch Relink Products</button>
-        <button class="btn sm btn-ghost ghost" data-pp-click="renderDataQuality()">Refresh Scans</button>
+        <button type="button" class="btn sm btn-ghost ghost" data-pp-click="runGlobalProductRelink()">Batch Relink Products</button>
+        <button type="button" class="btn sm btn-ghost ghost" data-pp-click="renderDataQuality()">Refresh Scans</button>
       </div>
     </div>
     
@@ -573,7 +573,7 @@ try{
   <div class="modal" style="max-width: 980px;">
     <div class="row-between" style="margin-bottom:14px;align-items:center">
       <h2 id="tesco-import-title" style="margin:0">Import Tesco product</h2>
-      <button class="btn sm ghost" data-pp-click="closeTescoModal()">Cancel</button>
+      <button type="button" class="btn sm ghost" data-pp-click="closeTescoModal()">Cancel</button>
     </div>
     
     <div id="tesco-search-hint" style="display: none; background: var(--surface2); padding: 10px; border-radius: 8px; margin-bottom: 14px; font-size: 13px;">
@@ -592,7 +592,7 @@ try{
       <textarea id="tesco-paste" style="min-height:90px;font-size:12px" placeholder="Paste copied data here..."></textarea>
     </div>
     <div class="btn-row" id="tesco-extract-actions" style="margin-bottom: 10px;">
-      <button class="btn primary" data-pp-click="extractTescoProduct()">Extract details</button>
+      <button type="button" class="btn primary" data-pp-click="extractTescoProduct()">Extract details</button>
     </div>
     <div id="tesco-msg"></div>
 
@@ -695,7 +695,7 @@ try{
       <div id="tp-pack-summary" class="pack-model-summary" aria-live="polite" style="margin-bottom:8px;"></div>
       <div class="field" style="display: none;"><label>Meat substitute for (optional)<input type="text" id="tp-meatsub" placeholder="e.g. mince, chicken, bacon"></label></div>
       <div class="btn-row" style="margin-top:6px">
-        <button class="btn primary" id="tesco-save-btn" data-pp-click="saveTescoIngredient()">Save to Product Bank</button>
+        <button type="button" class="btn primary" id="tesco-save-btn" data-pp-click="saveTescoIngredient()">Save to Product Bank</button>
       </div>
       <div id="tesco-save-msg"></div>
     </div>
@@ -711,7 +711,7 @@ try{
       </div>
       <div class="btn-row" style="margin:0;gap:6px">
         <button id="batch-abort-parse-btn" type="button" class="btn sm danger ghost" onclick="abortBatchImport()" style="display:none">Abort Batch Import</button>
-        <button class="btn sm ghost" data-pp-click="document.getElementById('parse-modal-wrap').classList.remove('open')">Cancel</button>
+        <button type="button" class="btn sm ghost" data-pp-click="document.getElementById('parse-modal-wrap').classList.remove('open')">Cancel</button>
       </div>
     </div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Please check the extracted amounts, units, and steps before matching against the bank. Nutrition is scaled based on these volumes.</p>
@@ -719,19 +719,19 @@ try{
     <div style="display:grid; grid-template-columns: 1fr; gap:20px; align-items:start;">
       <div>
         <h3 style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">Ingredients</h3>
-        <div id="parse-ing-list" style="display:flex; flex-direction:column; gap:8px;"></div><button id="parse-add-ingredient-btn" class="btn sm ghost" style="margin-top:8px" data-pp-click="addParseIngredientRow()">+ Add ingredient</button>
+        <div id="parse-ing-list" style="display:flex; flex-direction:column; gap:8px;"></div><button type="button" id="parse-add-ingredient-btn" class="btn sm ghost" style="margin-top:8px" data-pp-click="addParseIngredientRow()">+ Add ingredient</button>
       </div>
       <div>
         <h3 style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">Method Steps</h3>
         <div id="parse-method-list" style="display:flex; flex-direction:column; gap:8px;"></div>
-        <button class="btn sm ghost" style="margin-top:8px" data-pp-click="addParseMethodStep()">+ Add step</button>
+        <button type="button" class="btn sm ghost" style="margin-top:8px" data-pp-click="addParseMethodStep()">+ Add step</button>
       </div>
     </div>
     <div class="btn-row" style="margin-top:20px; border-top:1px solid var(--border); padding-top:14px; gap:8px; flex-wrap:wrap">
-      <button class="btn primary" data-pp-click="confirmParseAndMatch()">Confirm &amp; Map Ingredients</button>
+      <button type="button" class="btn primary" data-pp-click="confirmParseAndMatch()">Confirm &amp; Map Ingredients</button>
       <button id="batch-skip-parse-btn" type="button" class="btn secondary" onclick="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
       <button id="batch-abort-parse-btn2" type="button" class="btn danger ghost" onclick="abortBatchImport()" style="display:none">Abort Batch Import</button>
-      <button class="btn ghost" data-pp-click="document.getElementById('parse-modal-wrap').classList.remove('open')">Cancel</button>
+      <button type="button" class="btn ghost" data-pp-click="document.getElementById('parse-modal-wrap').classList.remove('open')">Cancel</button>
     </div>
   </div>
 </div>
@@ -745,17 +745,17 @@ try{
       </div>
       <div class="btn-row" style="margin:0;gap:6px">
         <button id="batch-abort-mapping-top" type="button" class="btn sm danger ghost" onclick="abortBatchImport()" style="display:none">Abort Batch Import</button>
-        <button class="btn sm ghost" data-pp-click="document.getElementById('mapping-modal-wrap').classList.remove('open')">Cancel</button>
+        <button type="button" class="btn sm ghost" data-pp-click="document.getElementById('mapping-modal-wrap').classList.remove('open')">Cancel</button>
       </div>
     </div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Every ingredient must be mapped to your Ingredient Bank. This ensures accurate meal planning calculations. Please review and assign all items below.</p>
     <div id="mapping-list" style="overflow-y: auto; flex: 1; min-height:200px; padding-right:10px;"></div>
     <div id="mapping-msg" style="margin-top: 10px;"></div>
     <div class="btn-row" style="margin-top: 15px; padding-top:15px; border-top:1px solid var(--border); gap:8px; flex-wrap:wrap">
-       <button class="btn primary" data-pp-click="confirmMapping()">Confirm &amp; Calculate</button>
+       <button type="button" class="btn primary" data-pp-click="confirmMapping()">Confirm &amp; Calculate</button>
        <button id="batch-skip-mapping-btn" type="button" class="btn secondary" onclick="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
        <button id="batch-abort-mapping-btn" type="button" class="btn danger ghost" onclick="abortBatchImport()" style="display:none">Abort Batch Import</button>
-       <button class="btn ghost" data-pp-click="document.getElementById('mapping-modal-wrap').classList.remove('open')">Cancel</button>
+       <button type="button" class="btn ghost" data-pp-click="document.getElementById('mapping-modal-wrap').classList.remove('open')">Cancel</button>
     </div>
   </div>
 </div>
@@ -767,7 +767,7 @@ try{
         <h3 id="unified-map-title" style="margin:0;font-size:18px">Map Ingredient</h3>
         <div id="unified-map-subtitle" style="font-size:12px;color:var(--text2);margin-top:2px">Select an existing stored product or import directly via Tesco.</div>
       </div>
-      <button class="btn sm ghost" onclick="closeUnifiedMappingModal()" data-pp-click="closeUnifiedMappingModal()" aria-label="Close mapping modal">Close</button>
+      <button type="button" class="btn sm ghost" onclick="closeUnifiedMappingModal()" data-pp-click="closeUnifiedMappingModal()" aria-label="Close mapping modal">Close</button>
     </div>
     <div id="unified-map-ing-badge" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <div>
@@ -807,9 +807,9 @@ try{
     <div id="subst-herb-conversion" style="display:none;margin-bottom:15px"></div>
     
     <div class="btn-row" style="margin-top: 15px;">
-        <button class="btn primary" data-pp-click="confirmSubstitute()">Apply</button>
-        <button class="btn ghost" style="color:var(--purple); border-color:var(--purple);" data-pp-click="openTescoImportFromSubst()">🛒 Import Tesco</button>
-        <button class="btn ghost" data-pp-click="closeSubstituteModal()">Cancel</button>
+        <button type="button" class="btn primary" data-pp-click="confirmSubstitute()">Apply</button>
+        <button type="button" class="btn ghost" style="color:var(--purple); border-color:var(--purple);" data-pp-click="openTescoImportFromSubst()">🛒 Import Tesco</button>
+        <button type="button" class="btn ghost" data-pp-click="closeSubstituteModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -822,8 +822,8 @@ try{
     <div id="merge-options-container" style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;"></div>
 
     <div class="btn-row">
-        <button class="btn primary" data-pp-click="executeMerge()">Confirm Merge</button>
-        <button class="btn ghost" data-pp-click="closeMergeModal()">Cancel</button>
+        <button type="button" class="btn primary" data-pp-click="executeMerge()">Confirm Merge</button>
+        <button type="button" class="btn ghost" data-pp-click="closeMergeModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -833,8 +833,8 @@ try{
       <h3>Replace before delete</h3>
       <div id="replace-ing-body"></div>
       <div class="btn-row" style="margin-top:14px;">
-          <button class="btn primary" data-pp-click="confirmReplaceAndDelete()">Replace &amp; Delete</button>
-          <button class="btn ghost" data-pp-click="closeReplaceModal()">Cancel</button>
+          <button type="button" class="btn primary" data-pp-click="confirmReplaceAndDelete()">Replace &amp; Delete</button>
+          <button type="button" class="btn ghost" data-pp-click="closeReplaceModal()">Cancel</button>
       </div>
   </div>
 </div>
@@ -876,8 +876,8 @@ try{
        </div>
        <div id="mini-msg"></div>
        <div class="btn-row" style="margin-top:14px">
-         <button class="btn primary" data-pp-click="saveMiniIng()">Save &amp; Map</button>
-         <button class="btn ghost" data-pp-click="document.getElementById('mini-ing-wrap').classList.remove('open')">Cancel</button>
+         <button type="button" class="btn primary" data-pp-click="saveMiniIng()">Save &amp; Map</button>
+         <button type="button" class="btn ghost" data-pp-click="document.getElementById('mini-ing-wrap').classList.remove('open')">Cancel</button>
        </div>
    </div>
 </div>
@@ -891,7 +891,7 @@ try{
       </div>
       <div class="btn-row" style="margin:0;gap:6px">
         <button id="batch-abort-review-top" type="button" class="btn sm danger ghost" onclick="abortBatchImport()" style="display:none">Abort Batch Import</button>
-        <button class="btn sm ghost" data-pp-click="closeModal()">Close</button>
+        <button type="button" class="btn sm ghost" data-pp-click="closeModal()">Close</button>
       </div>
     </div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:12px" id="review-info">Nutrition calculated from mapped ingredient bank items. Edit mapped ingredients if anything looks wrong.</p>
@@ -1044,7 +1044,7 @@ try{
         <div class="field">
           <label>Ingredients</label>
           <div id="orig-ings-list"></div>
-          <button class="btn sm ghost" data-pp-click="addModalIng('orig')">+ Add ingredient</button>
+          <button type="button" class="btn sm ghost" data-pp-click="addModalIng('orig')">+ Add ingredient</button>
         </div>
         <div class="field" style="border-top:1px solid var(--border);padding-top:14px;">
           <label>Method</label>
@@ -1052,34 +1052,34 @@ try{
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">1.</span>
            <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">2.</span>
            <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">3.</span>
            <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">4.</span>
            <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">5.</span>
            <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     </div>
-          <button class="btn sm ghost" data-pp-click="addModalMethod('orig')">+ Add step</button>
+          <button type="button" class="btn sm ghost" data-pp-click="addModalMethod('orig')">+ Add step</button>
         </div>
       </div>
     </div>
@@ -1228,7 +1228,7 @@ try{
         <div class="field">
           <label>Ingredients</label>
           <div id="enh-ings-list"></div>
-          <button class="btn sm ghost" data-pp-click="addModalIng('enh')">+ Add ingredient</button>
+          <button type="button" class="btn sm ghost" data-pp-click="addModalIng('enh')">+ Add ingredient</button>
         </div>
         <div class="field" style="border-top:1px solid var(--border);padding-top:14px;">
           <div class="row-between" style="align-items:center;margin-bottom:4px;">
@@ -1239,39 +1239,39 @@ try{
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">1.</span>
            <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">2.</span>
            <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">3.</span>
            <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">4.</span>
            <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <span class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">5.</span>
            <textarea class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
         </div>
     </div>
-          <button class="btn sm ghost" data-pp-click="addModalMethod('enh')">+ Add step</button>
+          <button type="button" class="btn sm ghost" data-pp-click="addModalMethod('enh')">+ Add step</button>
         </div>
       </div>
       
       <div class="btn-row" style="margin-top:10px; border-top:1px solid var(--border); padding-top:10px;">
-          <button class="btn sm danger" data-pp-click="deleteEnhancedVersion()">Delete Enhanced Version</button>
+          <button type="button" class="btn sm danger" data-pp-click="deleteEnhancedVersion()">Delete Enhanced Version</button>
       </div>
     </div>
 
@@ -1283,12 +1283,12 @@ try{
     </div>
 
     <div class="btn-row" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);gap:8px;flex-wrap:wrap">
-      <button class="btn primary" id="save-both-btn" data-pp-click="saveBoth()" style="">Save Both</button>
-      <button class="btn primary" id="save-temp-plan-btn" data-pp-click="saveTemporaryPlanReview()" style="display:none">Apply to meal plan only</button>
-      <button class="btn" id="save-orig-only-btn" data-pp-click="saveOrigOnly()">Save Original Only</button>
+      <button type="button" class="btn primary" id="save-both-btn" data-pp-click="saveBoth()" style="">Save Both</button>
+      <button type="button" class="btn primary" id="save-temp-plan-btn" data-pp-click="saveTemporaryPlanReview()" style="display:none">Apply to meal plan only</button>
+      <button type="button" class="btn" id="save-orig-only-btn" data-pp-click="saveOrigOnly()">Save Original Only</button>
       <button id="batch-skip-review-btn" type="button" class="btn secondary" onclick="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
       <button id="batch-abort-review-btn" type="button" class="btn danger ghost" onclick="abortBatchImport()" style="display:none">Abort Batch Import</button>
-      <button class="btn danger" data-pp-click="closeModal()">Discard</button>
+      <button type="button" class="btn danger" data-pp-click="closeModal()">Discard</button>
     </div>
   </div>
 </div>
@@ -1378,7 +1378,7 @@ try{
     </div>
   </div>
     <div class="field"><label>Notes</label><input type="text" id="mi-notes" placeholder="e.g. Great in bolognese, buy frozen"></div>
-    <div class="btn-row"><button class="btn primary" id="mi-save-btn" data-pp-click="saveManualIng()">Save</button><button class="btn ghost" data-pp-click="cancelManualIng()">Cancel</button></div>
+    <div class="btn-row"><button type="button" class="btn primary" id="mi-save-btn" data-pp-click="saveManualIng()">Save</button><button type="button" class="btn ghost" data-pp-click="cancelManualIng()">Cancel</button></div>
     <div id="mi-msg"></div>
   </div></div>
 
@@ -1388,7 +1388,7 @@ try{
     <div class="modal" style="max-width:540px">
       <div class="row-between" style="align-items:center;margin-bottom:10px">
         <h3 id="ingredient-family-details-title" style="margin:0">Edit ingredient</h3>
-        <button class="btn sm ghost" data-pp-click="closeIngredientFamilyDetailsModal()">Close</button>
+        <button type="button" class="btn sm ghost" data-pp-click="closeIngredientFamilyDetailsModal()">Close</button>
       </div>
       <div id="parent-ingredient-display-wrap" style="display:none;margin-bottom:12px;padding:8px 10px;background:var(--surface2,#f5f5f4);border-radius:8px;font-size:12px;font-weight:600;border:1px solid var(--border,#e7e5e4)"></div>
       <div class="field">
@@ -1415,7 +1415,7 @@ try{
       </div>
       <div id="ingredient-family-details-msg"></div>
       <div class="btn-row" style="margin-top:14px">
-        <button class="btn primary" id="ingredient-family-save-btn" data-pp-click="saveIngredientFamilyDetailsModal()">Save</button>
-        <button class="btn ghost" data-pp-click="closeIngredientFamilyDetailsModal()">Cancel</button>
+        <button type="button" class="btn primary" id="ingredient-family-save-btn" data-pp-click="saveIngredientFamilyDetailsModal()">Save</button>
+        <button type="button" class="btn ghost" data-pp-click="closeIngredientFamilyDetailsModal()">Cancel</button>
       </div>
     </div></div></body></html>
