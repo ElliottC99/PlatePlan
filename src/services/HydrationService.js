@@ -1,10 +1,10 @@
 /**
- * src/services/HydrationService.js (v3.20.14)
- * Orchestrates concurrent fetching from HouseholdRepository, invalidating/updating cache,
- * and populating the centralized Store and window.state.
+ * src/services/HydrationService.js (v3.20.15)
+ * Orchestrates concurrent fetching and real-time Firebase subscriptions from HouseholdRepository,
+ * updating centralized Store and window.state as single source of truth.
  */
 
-import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeIngredients, subscribeProducts, getCategories, saveCategories, saveIngredient } from './HouseholdRepository.js';
+import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeRecipes, subscribeIngredients, subscribeProducts, subscribePreferences, subscribeCurrentPlan, getCategories, saveCategories, saveIngredient, cleanLegacyMacros } from './HouseholdRepository.js';
 import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache, setCategories } from '../store/store.js';
 import { compareProductsByStrategy } from '../models/PantryHierarchyModel.js';
 
@@ -152,27 +152,74 @@ let hydrationLogged = false;
 function initRealtimeListeners() {
   if (listenersActive) return;
   listenersActive = true;
+
+  subscribeRecipes(
+    (freshRecipes) => {
+      const normalized = (freshRecipes || []).map(cleanLegacyMacros);
+      setRecipes(normalized);
+      if (typeof window !== 'undefined') {
+        if (!window.state) window.state = {};
+        window.state.recipes = normalized;
+        window.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: normalized }));
+        if (typeof window.renderRecipeVault === 'function') {
+          window.renderRecipeVault();
+        }
+      }
+    },
+    (error) => console.warn('[HydrationService] Firestore recipes stream transient disconnect:', error?.message || error)
+  );
+
   subscribeIngredients(
     (freshIngredients) => {
       const normalized = (freshIngredients || []).map(normalizeIngredientRecord);
       setIngredients(normalized);
       if (typeof window !== 'undefined') {
-        if (window.state) window.state.ingredients = normalized;
+        if (!window.state) window.state = {};
+        window.state.ingredients = normalized;
         window.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: normalized }));
       }
     },
-    (error) => console.warn('[HydrationService] Firestore stream transient disconnect:', error?.message || error)
+    (error) => console.warn('[HydrationService] Firestore ingredients stream transient disconnect:', error?.message || error)
   );
+
   subscribeProducts(
     (freshProducts) => {
       const normalized = (freshProducts || []).map(normalizeProductRecord);
       setProducts(normalized);
       if (typeof window !== 'undefined') {
-        if (window.state) window.state.products = normalized;
+        if (!window.state) window.state = {};
+        window.state.products = normalized;
         window.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: normalized }));
       }
     },
-    (error) => console.warn('[HydrationService] Firestore stream transient disconnect:', error?.message || error)
+    (error) => console.warn('[HydrationService] Firestore products stream transient disconnect:', error?.message || error)
+  );
+
+  subscribePreferences(
+    (freshPrefs) => {
+      if (!freshPrefs) return;
+      setPreferences(freshPrefs);
+      if (typeof window !== 'undefined') {
+        if (!window.state) window.state = {};
+        const userPrefs = freshPrefs.userPrefs || freshPrefs;
+        window.state.userPrefs = { ...(window.state.userPrefs || {}), ...userPrefs };
+        window.dispatchEvent(new CustomEvent('plateplan:state:preferences', { detail: freshPrefs }));
+      }
+    },
+    (error) => console.warn('[HydrationService] Firestore prefs stream transient disconnect:', error?.message || error)
+  );
+
+  subscribeCurrentPlan(
+    (freshPlan) => {
+      if (!freshPlan) return;
+      setCurrentPlan(freshPlan);
+      if (typeof window !== 'undefined') {
+        if (!window.state) window.state = {};
+        window.state.plan = freshPlan;
+        window.dispatchEvent(new CustomEvent('plateplan:state:plan', { detail: freshPlan }));
+      }
+    },
+    (error) => console.warn('[HydrationService] Firestore plan stream transient disconnect:', error?.message || error)
   );
 }
 

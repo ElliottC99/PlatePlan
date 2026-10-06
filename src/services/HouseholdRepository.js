@@ -1,5 +1,5 @@
 /**
- * src/services/HouseholdRepository.js (v3.20.14)
+ * src/services/HouseholdRepository.js (v3.20.15)
  * Dedicated data access repository for household-scoped Firestore operations.
  * Completely isolated from DOM manipulation and UI rendering.
  * All operations target the shared household path 'households/elliott-chloe'.
@@ -300,6 +300,21 @@ export async function deleteProduct(productId) {
   }
 }
 
+export function subscribeRecipes(callback, errorCallback) {
+  if (!isDbAvailable() || typeof callback !== 'function') return () => {};
+  try {
+    return db.collection('households').doc(HOUSEHOLD_ID).collection('recipes').onSnapshot(
+      (snap) => {
+        if (snap?.docs) {
+          const raw = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          callback(raw.map(cleanLegacyMacros));
+        }
+      },
+      (err) => { if (typeof errorCallback === 'function') errorCallback(err); }
+    );
+  } catch (e) { return () => {}; }
+}
+
 export function subscribeIngredients(callback, errorCallback) {
   if (!isDbAvailable() || typeof callback !== 'function') return () => {};
   try {
@@ -315,6 +330,34 @@ export function subscribeProducts(callback, errorCallback) {
   try {
     return db.collection('households').doc(HOUSEHOLD_ID).collection('products').onSnapshot(
       (snap) => { if (snap?.docs) callback(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); },
+      (err) => { if (typeof errorCallback === 'function') errorCallback(err); }
+    );
+  } catch (e) { return () => {}; }
+}
+
+export function subscribePreferences(callback, errorCallback) {
+  if (!isDbAvailable() || typeof callback !== 'function') return () => {};
+  try {
+    return db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences').onSnapshot(
+      (docSnap) => {
+        if (docSnap && docSnap.exists) {
+          callback(docSnap.data());
+        }
+      },
+      (err) => { if (typeof errorCallback === 'function') errorCallback(err); }
+    );
+  } catch (e) { return () => {}; }
+}
+
+export function subscribeCurrentPlan(callback, errorCallback) {
+  if (!isDbAvailable() || typeof callback !== 'function') return () => {};
+  try {
+    return db.collection('households').doc(HOUSEHOLD_ID).collection('plans').doc('current').onSnapshot(
+      (docSnap) => {
+        if (docSnap && docSnap.exists) {
+          callback({ id: docSnap.id, ...docSnap.data() });
+        }
+      },
       (err) => { if (typeof errorCallback === 'function') errorCallback(err); }
     );
   } catch (e) { return () => {}; }

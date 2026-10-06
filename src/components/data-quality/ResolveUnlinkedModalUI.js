@@ -22,10 +22,6 @@ export function safeGetProducts() {
   if (Array.isArray(st.products) && st.products.length > 0) return [...st.products];
   if (Array.isArray(st.pantry?.products) && st.pantry.products.length > 0) return [...st.pantry.products];
   if (window.state && Array.isArray(window.state.products) && window.state.products.length > 0) return [...window.state.products];
-  try {
-    const cached = localStorage.getItem('plateplan_products') || localStorage.getItem('products');
-    if (cached) { const p = JSON.parse(cached); if (Array.isArray(p)) return p; }
-  } catch (e) {}
   return [];
 }
 
@@ -34,7 +30,9 @@ export function commitProductUpdates(updatedProducts) {
   if (window.Store?.setState) window.Store.setState({ products: updatedProducts });
   if (window.state) window.state.products = updatedProducts;
   if (window.PantryHierarchyModel?.setProducts) window.PantryHierarchyModel.setProducts(updatedProducts);
-  try { localStorage.setItem('plateplan_products', JSON.stringify(updatedProducts)); } catch (e) {}
+  if (Array.isArray(updatedProducts)) {
+    Promise.all(updatedProducts.map(p => saveProduct(p))).catch(err => console.warn('[ResolveUnlinkedModalUI] Firebase write-through failed:', err));
+  }
   document.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: updatedProducts }));
 }
 

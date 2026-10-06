@@ -1,6 +1,6 @@
 /**
- * src/config/firebase.js (v3.20.14)
- * Firebase configuration, safe initialization, log level suppression, and database instance export.
+ * src/config/firebase.js (v3.20.15)
+ * Firebase configuration, safe initialization, native multi-tab offline persistence, and database instance export.
  */
 
 export const HOUSEHOLD_ID = 'elliott-chloe';
@@ -32,6 +32,17 @@ if (db && typeof db.settings === 'function') {
   } catch (e) {
     // Settings may already be configured
   }
+}
+
+// Enable native Firebase offline persistence with multi-tab synchronization
+if (db && typeof db.enablePersistence === 'function') {
+  db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      db.enablePersistence().catch(() => {});
+    } else if (err.code === 'unimplemented') {
+      console.warn('[Firebase] Native offline persistence is unimplemented in this browser.');
+    }
+  });
 }
 
 if (typeof window !== 'undefined' && window.firebase && typeof window.firebase.firestore === 'function' && typeof window.firebase.firestore.setLogLevel === 'function') {
