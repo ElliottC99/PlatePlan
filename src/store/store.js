@@ -1,7 +1,7 @@
 /**
- * src/store/store.js (v3.19.27)
+ * src/store/store.js (v3.20.08)
  * Centralized Reactive State Store module using native browser CustomEvents for unidirectional data flow.
- * Provides microtask-wrapped event dispatching, local storage caching for instant offline hydration.
+ * Provides microtask-wrapped event dispatching and IndexedDB caching for instant offline hydration without localStorage quotas.
  */
 
 import { safeJsonStringify, safeClone } from '../utils/safeJson.js';
@@ -9,7 +9,10 @@ import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
 
 export { getShoppingLineStateKey };
 
-const CACHE_KEY = `plateplan_store_cache_${(typeof window !== 'undefined' && window.APP_VERSION) || 'v3.19.27'}`;
+const DB_NAME = 'PlatePlanDB';
+const STORE_NAME = 'StateStore';
+const DB_VERSION = 1;
+const CACHE_KEY = 'plateplan_store_cache_v3.20.08';
 
 const state = {
   recipes: [],
@@ -25,69 +28,114 @@ const state = {
   isCloudHydrated: false
 };
 
+function openIDB() {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      return reject(new Error('IndexedDB not supported'));
+    }
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+  });
+}
+
 /**
- * Safely read cached state from localStorage.
+ * Asynchronously read cached state from IndexedDB.
  */
-function readCache() {
-  if (typeof localStorage === 'undefined') return null;
+export async function loadStateCache() {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : null;
+    const db = await openIDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.get(CACHE_KEY);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
   } catch (e) {
-    console.warn('[Store] Failed to read localStorage cache:', e);
+    console.warn('[Store] Failed to read IndexedDB cache:', e);
     return null;
   }
 }
 
 /**
- * Debounced persistence of state cache to localStorage using strict allowlist.
+ * Debounced persistence of state cache to IndexedDB using strict allowlist.
  */
 let saveTimer = null;
 export function saveStateCache() {
-  if (typeof localStorage === 'undefined') return;
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
+  saveTimer = setTimeout(async () => {
     try {
       const payload = {
-        userPrefs: state.userPrefs || {},
-        preferences: state.preferences ? { nutritionTargets: state.preferences.nutritionTargets } : null,
-        settings: state.settings || {},
+        recipes: state.recipes || [],
+        ingredients: state.ingredients || [],
+        products: state.products || [],
         categories: state.categories || [],
+        preferences: state.preferences ? { nutritionTargets: state.preferences.nutritionTargets } : null,
+        userPrefs: state.userPrefs || {},
+        settings: state.settings || {},
+        currentPlan: state.currentPlan || null,
+        shoppingList: state.shoppingList || [],
         cachedAt: Date.now()
       };
-      const serialized = safeJsonStringify(payload, null, '');
-      if (serialized) localStorage.setItem(CACHE_KEY, serialized);
+      const db = await openIDB();
+      await new Promise((resolve, reject) => {
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.put(payload, CACHE_KEY);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
     } catch (e) {
-      console.warn('[Store] Failed to save state cache (Quota exceeded or restricted):', e);
+      console.warn('[Store] Failed to save state cache to IndexedDB:', e);
     }
   }, 100);
 }
 
 /**
- * Clear the local storage cache.
+ * Clear the IndexedDB cache.
  */
-export function clearStateCache() {
-  if (typeof localStorage !== 'undefined') {
-    try {
-      localStorage.removeItem(CACHE_KEY);
-    } catch (e) {}
-  }
+export async function clearStateCache() {
+  try {
+    const db = await openIDB();
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.delete(CACHE_KEY);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (e) {}
 }
 
-// Initialize state from local cache on load for instant offline first paint
-const initialCache = readCache();
-if (initialCache) {
-  state.recipes = Array.isArray(initialCache.recipes) ? initialCache.recipes : [];
-  state.ingredients = Array.isArray(initialCache.ingredients) ? initialCache.ingredients : [];
-  state.categories = Array.isArray(initialCache.categories) ? initialCache.categories : [];
-  state.preferences = initialCache.preferences || null;
-  state.userPrefs = initialCache.userPrefs || {};
-  state.settings = initialCache.settings || {};
-  state.currentPlan = initialCache.currentPlan || null;
-  state.shoppingList = Array.isArray(initialCache.shoppingList) ? initialCache.shoppingList : [];
-  state.isCachedHydrated = true;
+/**
+ * Initialize state from IndexedDB cache on load for instant offline first paint.
+ */
+export async function initStoreCache() {
+  try {
+    const initialCache = await loadStateCache();
+    if (initialCache) {
+      state.recipes = Array.isArray(initialCache.recipes) ? initialCache.recipes : [];
+      state.ingredients = Array.isArray(initialCache.ingredients) ? initialCache.ingredients : [];
+      state.products = Array.isArray(initialCache.products) ? initialCache.products : [];
+      state.categories = Array.isArray(initialCache.categories) ? initialCache.categories : [];
+      state.preferences = initialCache.preferences || null;
+      state.userPrefs = initialCache.userPrefs || {};
+      state.settings = initialCache.settings || {};
+      state.currentPlan = initialCache.currentPlan || null;
+      state.shoppingList = Array.isArray(initialCache.shoppingList) ? initialCache.shoppingList : [];
+      state.isCachedHydrated = true;
+    }
+  } catch (e) {
+    console.warn('[Store] initStoreCache warning:', e);
+  }
+  return state;
 }
 
 /**
@@ -260,7 +308,7 @@ export async function runOptimisticMutation(domain, mutateFn, persistPromise, ro
     }
     return result;
   } catch (err) {
-    console.error(`[Store v3.8.1] Network failure in domain '${domain}', executing rollback:`, err);
+    console.error(`[Store v3.20.08] Network failure in domain '${domain}', executing rollback:`, err);
     
     if (typeof rollbackFn === 'function') {
       rollbackFn(state, previousStateSnapshot);

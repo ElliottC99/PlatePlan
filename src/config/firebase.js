@@ -1,6 +1,6 @@
 /**
- * src/config/firebase.js
- * Firebase configuration, safe initialization, and database instance export.
+ * src/config/firebase.js (v3.20.08)
+ * Firebase configuration, safe initialization, log level suppression, and database instance export.
  */
 
 export const HOUSEHOLD_ID = 'elliott-chloe';
@@ -32,4 +32,10 @@ if (db && typeof db.settings === 'function') {
   } catch (e) {
     // Settings may already be configured
   }
+}
+
+if (typeof window !== 'undefined' && window.firebase && typeof window.firebase.firestore === 'function' && typeof window.firebase.firestore.setLogLevel === 'function') {
+  try {
+    window.firebase.firestore.setLogLevel('error');
+  } catch (e) {}
 }

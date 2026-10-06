@@ -29,14 +29,14 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * src/main.js (v3.20.06)
+ * src/main.js (v3.20.08)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronisation,
  * instant offline caching, global error telemetry, and PWA service worker registration.
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
-import { subscribe, getState } from './store/store.js';
+import { subscribe, getState, initStoreCache } from './store/store.js';
 import { setupActionBridge } from './services/ActionBridge.js';
 import { saveCurrentPlan, stripPlanPayload, getCategories, saveCategories, saveIngredient, saveProduct, getIngredients, getProducts } from './services/HouseholdRepository.js';
 import { AppState } from './state/AppState.js';
@@ -350,6 +350,9 @@ let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
   isAppInitialized = true; if (typeof window !== 'undefined') window.__plateplan_app_booted = true;
+  
+  await initStoreCache();
+
   setupActionBridge(); setupSubscriptions();
   AppInitializer.registerServiceWorker(); AppInitializer.initPlatePlanApp();
   setSyncStatus('connecting', 'Connecting...');
