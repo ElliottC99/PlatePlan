@@ -136,10 +136,23 @@ export async function autoRecalibrateRecipeMacros(recipeId) {
     r.fat = dynamic.perServing.fat;
     r.updatedAt = new Date().toISOString();
 
+    // Re-evaluate data quality status & clear warning flags if macros valid (>0)
+    if (dynamic.perServing.cal > 0 && dynamic.perServing.prot > 0) {
+      delete r.dataQualityWarning;
+      delete r.hasMacroSyncIssue;
+      delete r.hasLowCalIssue;
+      delete r.macroWarning;
+      r.isMacroSynchronized = true;
+    }
+
     recipes[rIndex] = r;
     if (window.Store?.setState) window.Store.setState({ recipes });
     if (window.state) window.state.recipes = recipes;
     if (typeof window.recipes !== 'undefined') window.recipes = recipes;
+
+    // Auto-dismiss advisory keys so the UI warning banner disappears immediately
+    await dismissAdvisory(`advisory:recipe-macro-sync:${recipeId}`);
+    await dismissAdvisory(`advisory:recipe-low-cal:${recipeId}`);
 
     try {
       await saveRecipe(r);
@@ -147,9 +160,12 @@ export async function autoRecalibrateRecipeMacros(recipeId) {
       console.warn('[DataQualityView] Failed to save recalibrated recipe to cloud:', e);
     }
 
-    document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: recipes }));
-    document.dispatchEvent(new CustomEvent('plateplan:recipes-updated', { detail: recipes }));
+    if (typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast('Recipe macros synchronized', 'success');
+    }
+
     renderDataQualityView();
+    updateDataQualityBadge();
   } catch (err) {
     console.error('[DataQualityView] autoRecalibrateRecipeMacros error:', err);
   }

@@ -31,8 +31,8 @@ export function renderIngredientEditorRow(ing = {}, index = 0, prefix = 'orig') 
   return `
     <div class="ingredient-editor-row" data-index="${index}" data-prefix="${prefix}" draggable="true" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
       <span class="drag-handle" style="cursor:grab;color:var(--text3);font-size:16px">⋮⋮</span>
-      <input type="text" class="input input-qty" style="width:70px" placeholder="Qty" value="${escapeAttr(qty)}" onchange="updateIngredientRowField('${prefix}', ${index}, 'amount', this.value)">
-      <select class="select select-unit" style="width:80px" onchange="updateIngredientRowField('${prefix}', ${index}, 'unit', this.value)">
+      <input type="text" id="ing-qty-${prefix}-${index}" name="ing_qty_${prefix}_${index}" aria-label="Quantity for ingredient ${index + 1}" class="input input-qty" style="width:70px" placeholder="Qty" value="${escapeAttr(qty)}" onchange="updateIngredientRowField('${prefix}', ${index}, 'amount', this.value)">
+      <select id="ing-unit-${prefix}-${index}" name="ing_unit_${prefix}_${index}" aria-label="Unit for ingredient ${index + 1}" class="select select-unit" style="width:80px" onchange="updateIngredientRowField('${prefix}', ${index}, 'unit', this.value)">
         <option value="g" ${unit === 'g' ? 'selected' : ''}>g</option>
         <option value="kg" ${unit === 'kg' ? 'selected' : ''}>kg</option>
         <option value="ml" ${unit === 'ml' ? 'selected' : ''}>ml</option>
@@ -44,9 +44,9 @@ export function renderIngredientEditorRow(ing = {}, index = 0, prefix = 'orig') 
         <option value="item" ${unit === 'item' || unit === 'qty' ? 'selected' : ''}>item</option>
         <option value="pinch" ${unit === 'pinch' ? 'selected' : ''}>pinch</option>
       </select>
-      <input type="text" class="input input-name" style="flex:1;min-width:140px" placeholder="Ingredient name" value="${escapeAttr(name)}" oninput="handleReviewIngredientNameInput(this, '${prefix}')">
-      <input type="text" class="input input-section" style="width:110px" placeholder="Section (opt)" value="${escapeAttr(section)}" onchange="updateIngredientRowField('${prefix}', ${index}, 'section', this.value)">
-      <button type="button" class="btn sm danger" onclick="removeReviewIngredientRow(this, '${prefix}')" title="Remove ingredient">×</button>
+      <input type="text" id="ing-name-${prefix}-${index}" name="ing_name_${prefix}_${index}" aria-label="Name for ingredient ${index + 1}" class="input input-name" style="flex:1;min-width:140px" placeholder="Ingredient name" value="${escapeAttr(name)}" oninput="handleReviewIngredientNameInput(this, '${prefix}')">
+      <input type="text" id="ing-section-${prefix}-${index}" name="ing_section_${prefix}_${index}" aria-label="Section for ingredient ${index + 1}" class="input input-section" style="width:110px" placeholder="Section (opt)" value="${escapeAttr(section)}" onchange="updateIngredientRowField('${prefix}', ${index}, 'section', this.value)">
+      <button type="button" class="btn sm danger" onclick="removeReviewIngredientRow(this, '${prefix}')" title="Remove ingredient" aria-label="Remove ingredient ${index + 1}">×</button>
     </div>
   `;
 }

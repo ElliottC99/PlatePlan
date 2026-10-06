@@ -185,12 +185,12 @@ export function routeAction(actionName, target, event) {
 
   // 4b. Explicit Sub-type Deletion Case
   if (normalizedAction === 'delete-subtype' || normalizedAction === 'deletesubtype' || normalizedAction.includes('deletesubtype')) {
-    const ingId = ds.parentId || ds.ingredientId || parseArgsString(actionName)[0];
-    const subtypeId = ds.subtypeId || ds.id || parseArgsString(actionName)[1];
-    if (typeof window.openSubtypeDeleteModal === 'function' && subtypeId && ingId) {
-      window.openSubtypeDeleteModal(subtypeId, ingId);
+    const subtypeId = ds.subtypeId || ds.id || target.getAttribute('data-subtype-id') || target.getAttribute('data-id') || parseArgsString(actionName)[0];
+    const parentId = ds.parentId || ds.ingredientId || ds.parentIngredientId || target.getAttribute('data-parent-id') || parseArgsString(actionName)[1];
+    if (typeof window.openSubtypeDeleteModal === 'function') {
+      window.openSubtypeDeleteModal(subtypeId, parentId);
     } else if (typeof window.deleteSubtype === 'function') {
-      window.deleteSubtype(ingId, subtypeId);
+      window.deleteSubtype(parentId, subtypeId);
     }
     return true;
   }
