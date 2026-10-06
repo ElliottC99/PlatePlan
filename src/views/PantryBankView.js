@@ -83,6 +83,14 @@ export function closeIngredientFamilyDetailsModal() {
   if (tescoEl) tescoEl.innerHTML = '';
   document.body.style.overflow = '';
   activeEditingIngredientId = null;
+
+  if (window.__modalContext && window.__modalContext.returnTo === 'data-quality') {
+    const ctx = window.__modalContext;
+    window.__modalContext = null;
+    if (typeof window.showView === 'function') {
+      window.showView('data');
+    }
+  }
 }
 
 export function openIngredientFamilyDetailsModal(ingredientId = null, parentId = null) {

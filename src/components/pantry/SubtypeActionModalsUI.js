@@ -6,7 +6,7 @@
  */
 
 import { getState, setIngredients, setProducts } from '../../store/store.js';
-import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
+import { saveIngredient, saveProduct, deleteSubtypeInDb } from '../../services/HouseholdRepository.js';
 import { invalidateHierarchyCache } from '../../models/PantryHierarchyModel.js';
 import { promptReallocateProduct, openProductReallocateModal } from './ReallocateProductModalUI.js';
 import {
@@ -98,7 +98,7 @@ export function openEditSubtypeModal(subtypeId, parentId) {
   const linkedProds = (state.products || []).filter(p => String(p.subtypeId) === String(subtypeId));
 
   const html = `
-    <div class="modal-content" style="padding: 20px; max-width: 500px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 12px;">
+    <div class="modal-content" data-modal-type="edit-subtype" data-subtype-id="${escapeHTML(subtypeId)}" data-parent-id="${escapeHTML(parentId)}" style="padding: 20px; max-width: 500px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 12px;">
       <h3 style="margin-top:0; margin-bottom: 16px; font-size: 1.15rem; font-weight: 750;">📝 Edit Sub-type: ${escapeHTML(sub.name)}</h3>
       
       <div class="field" style="margin-bottom: 12px;">
@@ -290,6 +290,7 @@ export function openSubtypeAliasModal(subtypeId, parentId) {
         ${aliases.map(a => `<span style="font-size: 11px; padding: 4px 10px; border-radius: 999px; background: #fff; border: 1px solid var(--border,#e7e5e4); display: flex; align-items: center; gap: 4px;">${escapeHTML(a)}<span style="cursor:pointer; font-weight:bold; color:var(--red,#ef4444);" onclick="window.handleSubtypeAliasRemove('${escapeHTML(a)}')">&times;</span></span>`).join('') || '<span style="font-size:12px; color:var(--text2); font-style:italic; padding:6px 0;">No aliases defined yet</span>'}
       </div>
       <div style="display:flex; gap:6px; margin-bottom: 20px;">
+        <label for="new-alias-input" style="display:none;">Add New Alias</label>
         <input type="text" id="new-alias-input" placeholder="e.g. Sourdough loaf" style="flex:1; padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-size: 12px;" />
         <button type="button" class="btn primary sm" id="btn-add-alias">Add Alias</button>
       </div>
@@ -365,11 +366,8 @@ export async function deleteSubtype(parentId, subtypeId) {
     if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
     if (typeof window.renderProductBank === 'function') window.renderProductBank();
 
-    // Save changes to persistence layer
-    await Promise.all([
-      saveIngredient(parent),
-      ...unlinkedProds.map(p => saveProduct(p))
-    ]);
+    // Save changes atomically to persistence layer
+    await deleteSubtypeInDb(parent, unlinkedProds);
     return true;
   } catch (err) {
     console.error('[deleteSubtype] Exception caught during sub-type deletion:', err);
@@ -389,7 +387,7 @@ export function openSubtypeDeleteModal(subtypeId, parentId) {
   if (!sub) return;
 
   showModal(`
-    <div class="modal-content" style="padding: 24px; max-width: 440px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
+    <div class="modal-content" data-modal-type="delete-subtype" data-subtype-id="${escapeHTML(subtypeId)}" data-parent-id="${escapeHTML(parent.id)}" style="padding: 24px; max-width: 440px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
       <div style="font-size: 40px; margin-bottom: 12px;">⚠️</div>
       <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750; color: var(--red,#ef4444)">Delete Sub-type?</h3>
       <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 24px 0; line-height: 1.5;">
@@ -424,9 +422,91 @@ export function setupModalDelegation() {
   const modalWrap = document.getElementById('view-modal-wrap');
   if (modalWrap && !modalWrap.__delegation_bound) {
     modalWrap.__delegation_bound = true;
-    modalWrap.addEventListener('click', (e) => {
+    modalWrap.addEventListener('click', async (e) => {
       if (e.target === modalWrap) {
         closeModal();
+        return;
+      }
+
+      const target = e.target;
+
+      // 1. Cancel actions fallback
+      if (target.closest('.btn-cancel-delete') || target.closest('.btn-cancel-edit-sub')) {
+        closeModal();
+        return;
+      }
+
+      // 2. Confirm Subtype Delete fallback
+      const confirmDelete = target.closest('#btn-confirm-sub-delete, .btn-confirm-delete');
+      if (confirmDelete) {
+        const modalContent = target.closest('.modal-content');
+        if (modalContent && modalContent.getAttribute('data-modal-type') === 'delete-subtype') {
+          const subtypeId = modalContent.getAttribute('data-subtype-id');
+          const parentId = modalContent.getAttribute('data-parent-id');
+          if (subtypeId && parentId) {
+            closeModal();
+            await deleteSubtype(parentId, subtypeId);
+          }
+        }
+        return;
+      }
+
+      // 3. Save Edit Subtype fallback
+      const saveEdit = target.closest('#save-edit-sub-btn');
+      if (saveEdit) {
+        const modalContent = target.closest('.modal-content');
+        if (modalContent && modalContent.getAttribute('data-modal-type') === 'edit-subtype') {
+          const subtypeId = modalContent.getAttribute('data-subtype-id');
+          const parentId = modalContent.getAttribute('data-parent-id');
+          const nameInput = document.getElementById('edit-sub-name');
+          const notesInput = document.getElementById('edit-sub-notes');
+          if (subtypeId && parentId && nameInput) {
+            const newName = nameInput.value.trim();
+            if (newName) {
+              const state = getState() || {};
+              const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
+              if (parent && Array.isArray(parent.subtypes)) {
+                const sub = parent.subtypes.find(s => String(s.id) === String(subtypeId));
+                if (sub) {
+                  sub.name = newName;
+                  if (notesInput) sub.notes = notesInput.value.trim();
+                  parent.updatedAt = new Date().toISOString();
+                  setIngredients([...state.ingredients]);
+                  closeModal();
+                  invalidateHierarchyCache();
+                  if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+                  await saveIngredient(parent);
+                }
+              }
+            }
+          }
+        }
+        return;
+      }
+
+      // 4. Unlink Product fallback
+      const unlinkBtn = target.closest('.btn-unlink-prod');
+      if (unlinkBtn) {
+        const prodId = unlinkBtn.getAttribute('data-prod-id');
+        const modalContent = target.closest('.modal-content');
+        if (modalContent && prodId) {
+          const subtypeId = modalContent.getAttribute('data-subtype-id');
+          const parentId = modalContent.getAttribute('data-parent-id');
+          const state = getState() || {};
+          const prods = [...(state.products || [])];
+          const prod = prods.find(p => String(p.id) === String(prodId));
+          if (prod) {
+            prod.subtypeId = null;
+            prod.isAutoDefault = false;
+            prod.updatedAt = new Date().toISOString();
+            setProducts(prods);
+            openEditSubtypeModal(subtypeId, parentId);
+            if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+            if (typeof window.renderProductBank === 'function') window.renderProductBank();
+            await saveProduct(prod);
+          }
+        }
+        return;
       }
     });
   }

@@ -678,6 +678,13 @@ try{
           <div><label for="tp-fat" style="font-size:11px;">Fat (g)</label><input type="number" id="tp-fat" placeholder="0"></div>
           <div><label for="tp-fibre" style="font-size:11px;">Fibre (g)</label><input type="number" id="tp-fibre" placeholder="0"></div>
         </div>
+        <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:8px; margin-top:8px;">
+          <div><label for="tp-sat-fat" style="font-size:11px;">Sat Fat (g)</label><input type="number" id="tp-sat-fat" placeholder="0"></div>
+          <div><label for="tp-sugar" style="font-size:11px;">Sugar (g)</label><input type="number" id="tp-sugar" placeholder="0"></div>
+          <div><label for="tp-fiber" style="font-size:11px;">Fiber (g)</label><input type="number" id="tp-fiber" placeholder="0"></div>
+          <div><label for="tp-salt" style="font-size:11px;">Salt (g)</label><input type="number" id="tp-salt" placeholder="0"></div>
+          <div><label for="tp-sodium" style="font-size:11px;">Sodium (mg)</label><input type="number" id="tp-sodium" placeholder="0"></div>
+        </div>
       </div>
       <div class="grid2" style="gap:10px; margin-bottom:10px;">
         <div>
@@ -692,8 +699,21 @@ try{
         </div>
         <div><label for="tp-notes" style="font-size:12px; font-weight:600;">Notes</label><input type="text" id="tp-notes" placeholder="e.g. Found in freezer aisle"></div>
       </div>
+      <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px; margin-bottom:10px;">
+        <div style="font-size:12px; font-weight:700; color:var(--text2); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.04em;">Packaging &amp; Allergens</div>
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:8px;">
+          <div><label for="tp-serving-size" style="font-size:11px;">Serving Size</label><input type="text" id="tp-serving-size" placeholder="e.g. 1/4 pack"></div>
+          <div><label for="tp-unit-size" style="font-size:11px;">Unit Size</label><input type="number" id="tp-unit-size" placeholder="e.g. 250"></div>
+          <div><label for="tp-weight-unit" style="font-size:11px;">Weight Unit</label><input type="text" id="tp-weight-unit" placeholder="e.g. g"></div>
+        </div>
+        <div style="display:flex; gap:16px; margin-top:4px;">
+          <div style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="tp-allergen-peanuts"><label for="tp-allergen-peanuts" style="font-size:11px; margin:0;">Peanuts Free</label></div>
+          <div style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="tp-allergen-milk"><label for="tp-allergen-milk" style="font-size:11px; margin:0;">Milk Free</label></div>
+          <div style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="tp-allergen-egg"><label for="tp-allergen-egg" style="font-size:11px; margin:0;">Egg Free</label></div>
+        </div>
+      </div>
       <div id="tp-pack-summary" class="pack-model-summary" aria-live="polite" style="margin-bottom:8px;"></div>
-      <div class="field" style="display: none;"><label>Meat substitute for (optional)<input type="text" id="tp-meatsub" placeholder="e.g. mince, chicken, bacon"></label></div>
+      <div class="field" style="display: none;"><label for="tp-meatsub">Meat substitute for (optional)</label><input type="text" id="tp-meatsub" placeholder="e.g. mince, chicken, bacon"></div>
       <div class="btn-row" style="margin-top:6px">
         <button type="button" class="btn primary" id="tesco-save-btn" data-pp-click="saveTescoIngredient()">Save to Product Bank</button>
       </div>
@@ -1418,4 +1438,39 @@ try{
         <button type="button" class="btn primary" id="ingredient-family-save-btn" data-pp-click="saveIngredientFamilyDetailsModal()">Save</button>
         <button type="button" class="btn ghost" data-pp-click="closeIngredientFamilyDetailsModal()">Cancel</button>
       </div>
-    </div></div></body></html>
+    </div></div>  <div style="display:none;" aria-hidden="true">
+    <!-- Sub-type Operations fallback inputs -->
+    <label for="new-subtype-name">New Sub-type Name</label>
+    <input type="text" id="new-subtype-name" value="">
+
+    <label for="new-reorg-parent-id">New Reorganisation Parent ID</label>
+    <input type="text" id="new-reorg-parent-id" value="">
+
+    <!-- Profile Macros fallback inputs (12) -->
+    <label for="pp-macro-e-cal">Elliott Calories</label>
+    <input type="number" id="pp-macro-e-cal" value="0">
+    <label for="pp-macro-e-prot">Elliott Protein</label>
+    <input type="number" id="pp-macro-e-prot" value="0">
+    <label for="pp-macro-e-bf-cal">Elliott Breakfast Calories</label>
+    <input type="number" id="pp-macro-e-bf-cal" value="0">
+    <label for="pp-macro-e-lu-cal">Elliott Lunch Calories</label>
+    <input type="number" id="pp-macro-e-lu-cal" value="0">
+    <label for="pp-macro-e-sn-cal">Elliott Snack Calories</label>
+    <input type="number" id="pp-macro-e-sn-cal" value="0">
+    <label for="pp-macro-e-di-cal">Elliott Dinner Calories</label>
+    <input type="number" id="pp-macro-e-di-cal" value="0">
+
+    <label for="pp-macro-c-cal">Chloe Calories</label>
+    <input type="number" id="pp-macro-c-cal" value="0">
+    <label for="pp-macro-c-prot">Chloe Protein</label>
+    <input type="number" id="pp-macro-c-prot" value="0">
+    <label for="pp-macro-c-bf-cal">Chloe Breakfast Calories</label>
+    <input type="number" id="pp-macro-c-bf-cal" value="0">
+    <label for="pp-macro-c-lu-cal">Chloe Lunch Calories</label>
+    <input type="number" id="pp-macro-c-lu-cal" value="0">
+    <label for="pp-macro-c-sn-cal">Chloe Snack Calories</label>
+    <input type="number" id="pp-macro-c-sn-cal" value="0">
+    <label for="pp-macro-c-di-cal">Chloe Dinner Calories</label>
+    <input type="number" id="pp-macro-c-di-cal" value="0">
+  </div>
+</body></html>

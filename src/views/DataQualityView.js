@@ -1,17 +1,16 @@
 /**
- * src/views/DataQualityView.js (v3.20.14)
- * Modular ES6 View for Data Quality Centre, audit scanner results, macro quality sweep, and dynamic macro recalibration.
+ * src/views/DataQualityView.js
+ * Comprehensive, Self-Healing Data Quality Centre View with direct Audit Engine bindings.
+ * Handled via optimistic Store updates, Firestore batching, and context-aware modal routing.
  */
 
-import { getState, subscribe, setPreferences } from '../store/store.js';
-import { savePreferences, saveRecipe } from '../services/HouseholdRepository.js';
-import { runDataQualityScan, calculateRecipeDynamicMacros } from '../services/DataQualityScannerService.js';
-import { sweepRecipeMacroQuality } from '../utils/fitScoreCalculator.js';
-import { openResolveUnlinkedModal } from '../components/data-quality/ResolveUnlinkedModalUI.js';
-import { openHierarchyWizardModal } from '../components/data-quality/HierarchyWizardModalUI.js';
-import { openProductEditModal } from './ProductBankView.js';
-
-export { sweepRecipeMacroQuality };
+import { getState, setPreferences, setIngredients, runOptimisticMutation } from '../store/store.js';
+import { saveIngredient, savePreferences, dismissAdvisoryInDb } from '../services/HouseholdRepository.js';
+import { runAudit } from '../services/DataQualityEngine.js';
+import { openMacroDriftPreviewModal } from '../components/data-quality/MacroDriftPreviewModal.js';
+import { openSubtypeOrphanResolverModal } from '../components/data-quality/SubtypeOrphanResolverModal.js';
+import { openMealPlanSyncWarningModal } from '../components/data-quality/MealPlanSyncWarningModal.js';
+import { openMergeIngredientsModal } from '../components/data-quality/MergeIngredientsModal.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -27,418 +26,539 @@ function escapeAttr(str) {
   return escapeHtml(str).replace(/`/g, '&#96;');
 }
 
+/**
+ * Dismiss an advisory key optimistically with granular server-side arrayUnion updates.
+ */
 export async function dismissAdvisory(issueKey) {
-  try {
-    const state = (window.Store && typeof window.Store.getState === 'function') 
-      ? window.Store.getState() 
-      : (typeof getState === 'function' ? getState() : {});
-    const currentPrefs = state.preferences || state.userPrefs || {};
-    const currentDismissed = Array.isArray(currentPrefs.dismissedQualityAdvisories) 
-      ? [...currentPrefs.dismissedQualityAdvisories] 
+  const state = getState() || {};
+  const currentPrefs = state.preferences || state.userPrefs || {};
+  const previousPrefs = JSON.parse(JSON.stringify(currentPrefs));
+
+  const mutateFn = (currentState) => {
+    const prefs = currentState.preferences || currentState.userPrefs || {};
+    const dismissed = Array.isArray(prefs.dismissedQualityAdvisories)
+      ? [...prefs.dismissedQualityAdvisories]
       : [];
-
-    if (!currentDismissed.includes(issueKey)) {
-      currentDismissed.push(issueKey);
+    if (!dismissed.includes(issueKey)) {
+      dismissed.push(issueKey);
     }
-
-    const updatedPrefs = {
-      ...currentPrefs,
-      dismissedQualityAdvisories: currentDismissed
+    currentState.preferences = {
+      ...prefs,
+      dismissedQualityAdvisories: dismissed
     };
+    currentState.userPrefs = currentState.preferences;
+  };
 
-    if (typeof setPreferences === 'function') {
-      setPreferences(updatedPrefs);
-    } else if (window.Store && typeof window.Store.setState === 'function') {
-      window.Store.setState({ preferences: updatedPrefs });
-    }
+  const rollbackFn = (currentState) => {
+    currentState.preferences = previousPrefs;
+    currentState.userPrefs = previousPrefs;
+  };
 
-    renderDataQualityView();
-
-    if (typeof savePreferences === 'function') {
-      await savePreferences(updatedPrefs);
-    } else if (window.PantryRepository && typeof window.PantryRepository.savePreferences === 'function') {
-      await window.PantryRepository.savePreferences(updatedPrefs);
-    }
-  } catch (err) {
-    console.error('[DataQualityView] dismissAdvisory caught error:', err);
-  }
-}
-
-export async function runGlobalProductRelink() {
   try {
-    const state = (window.Store && typeof window.Store.getState === 'function') 
-      ? window.Store.getState() 
-      : (typeof getState === 'function' ? getState() : {});
-
-    const prods = Array.isArray(state.products) ? JSON.parse(JSON.stringify(state.products)) : [];
-    const ings = Array.isArray(state.ingredients) ? state.ingredients : [];
-    let modified = false;
-
-    for (const prod of prods) {
-      if (!prod.ingredientId) {
-        const prodNameLower = String(prod.name || '').toLowerCase();
-        const match = ings.find(i => {
-          const ingName = String(i.name || '').toLowerCase();
-          return prodNameLower.includes(ingName) || (Array.isArray(i.aliases) && i.aliases.some(a => prodNameLower.includes(String(a).toLowerCase())));
-        });
-        if (match) {
-          prod.ingredientId = match.id;
-          if (!prod.category && match.category) prod.category = match.category;
-          prod.updatedAt = new Date().toISOString();
-          modified = true;
-        }
-      }
-    }
-
-    if (modified) {
-      if (window.Store && typeof window.Store.setState === 'function') {
-        window.Store.setState({ products: prods });
-      }
-      if (window.PantryRepository && typeof window.PantryRepository.saveProduct === 'function') {
-        await Promise.all(prods.filter(p => p.ingredientId).map(p => window.PantryRepository.saveProduct(p)));
-      }
-    }
-
-    if (typeof window.renderDataQualityView === 'function') {
-      window.renderDataQualityView();
-    }
-  } catch (err) {
-    console.error('[DataQualityView] runGlobalProductRelink caught error:', err);
-  }
-}
-
-export async function autoRecalibrateRecipeMacros(recipeId) {
-  try {
-    const state = (window.Store && typeof window.Store.getState === 'function') 
-      ? window.Store.getState() 
-      : (typeof getState === 'function' ? getState() : {});
-    const recipes = Array.isArray(state.recipes) ? [...state.recipes] : (window.state?.recipes ? [...window.state.recipes] : []);
-    const rIndex = recipes.findIndex(rec => String(rec.id) === String(recipeId));
-    if (rIndex < 0) return;
-
-    const r = { ...recipes[rIndex] };
-    const dynamic = calculateRecipeDynamicMacros(r, state.ingredients || [], state.products || []);
-    if (!dynamic) return;
-
-    r.macros = {
-      calories: dynamic.perServing.cal,
-      protein: dynamic.perServing.prot,
-      carbs: dynamic.perServing.carb,
-      fat: dynamic.perServing.fat,
-      price: dynamic.perServing.cost
-    };
-    r.cal = dynamic.perServing.cal;
-    r.calories = dynamic.perServing.cal;
-    r.prot = dynamic.perServing.prot;
-    r.protein = dynamic.perServing.prot;
-    r.carb = dynamic.perServing.carb;
-    r.carbs = dynamic.perServing.carb;
-    r.fat = dynamic.perServing.fat;
-    r.updatedAt = new Date().toISOString();
-
-    // Re-evaluate data quality status & clear warning flags if macros valid (>0)
-    if (dynamic.perServing.cal > 0 && dynamic.perServing.prot > 0) {
-      delete r.dataQualityWarning;
-      delete r.hasMacroSyncIssue;
-      delete r.hasLowCalIssue;
-      delete r.macroWarning;
-      r.isMacroSynchronized = true;
-    }
-
-    recipes[rIndex] = r;
-    if (window.Store?.setState) window.Store.setState({ recipes });
-    if (window.state) window.state.recipes = recipes;
-    if (typeof window.recipes !== 'undefined') window.recipes = recipes;
-
-    // Auto-dismiss advisory keys so the UI warning banner disappears immediately
-    await dismissAdvisory(`advisory:recipe-macro-sync:${recipeId}`);
-    await dismissAdvisory(`advisory:recipe-low-cal:${recipeId}`);
-
-    try {
-      await saveRecipe(r);
-    } catch (e) {
-      console.warn('[DataQualityView] Failed to save recalibrated recipe to cloud:', e);
-    }
-
-    if (typeof window.showPlatePlanToast === 'function') {
-      window.showPlatePlanToast('Recipe macros synchronized', 'success');
-    }
-
+    await runOptimisticMutation(
+      'preferences',
+      mutateFn,
+      dismissAdvisoryInDb(issueKey),
+      rollbackFn,
+      'Failed to dismiss advisory. Reverted.'
+    );
     renderDataQualityView();
     updateDataQualityBadge();
   } catch (err) {
-    console.error('[DataQualityView] autoRecalibrateRecipeMacros error:', err);
+    console.error('[DataQualityView] dismissAdvisory error:', err);
   }
 }
 
-export async function handleFixIssue(e, entityType, entityId, issueKey = '', parentId = null, issueType = null) {
+/**
+ * Perform a global product relinking operation
+ */
+export async function runGlobalProductRelink() {
   try {
-    if (e && typeof e.preventDefault === 'function') e.preventDefault();
-    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+    const state = getState() || {};
+    const products = Array.isArray(state.products) ? [...state.products] : [];
+    const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
 
-    const key = String(issueKey || issueType || '').trim();
+    let modifiedCount = 0;
+    const resolvedProducts = products.map(p => {
+      if (p.ingredientId) return p;
 
-    // 1. Recipe Macro Sync / Low Cal Advisory Keys
-    if (key.startsWith('advisory:recipe-macro-sync:') || key.startsWith('advisory:recipe-low-cal:') || key.includes('recipe-macro-sync') || key.includes('recipe-low-cal') || key.includes('macro-sync')) {
-      const recId = key.split(':')[2] || entityId;
-      await autoRecalibrateRecipeMacros(recId);
-      if (typeof window.showCustomAlert === 'function') {
-        window.showCustomAlert('Recipe macros synchronized', 'Success');
+      // Match by product name substring to any ingredient name
+      const pName = String(p.name || '').toLowerCase().trim();
+      const matchedIng = ingredients.find(ing => {
+        const ingName = String(ing.name || '').toLowerCase().trim();
+        return pName.includes(ingName) || ingName.includes(pName);
+      });
+
+      if (matchedIng) {
+        modifiedCount++;
+        return {
+          ...p,
+          ingredientId: matchedIng.id,
+          updatedAt: new Date().toISOString()
+        };
       }
-      renderDataQualityView();
-      return;
-    }
+      return p;
+    });
 
-    // 2. Gap Ingredient
-    if (key.startsWith('gap:ingredient:')) {
-      const ingId = key.split(':')[2] || entityId;
-      if (typeof window.openResolveUnlinkedModal === 'function') {
-        window.openResolveUnlinkedModal(ingId, 'ingredient', parentId);
-      } else if (typeof openResolveUnlinkedModal === 'function') {
-        openResolveUnlinkedModal(ingId, 'ingredient', parentId);
-      }
-      return;
-    }
-
-    // 3. Gap Subtype
-    if (key.startsWith('gap:subtype:')) {
-      const subId = key.split(':')[2] || entityId;
-      if (typeof window.openProductEditModal === 'function') {
-        window.openProductEditModal(subId);
-      } else if (typeof window.openResolveUnlinkedModal === 'function') {
-        window.openResolveUnlinkedModal(subId, 'subtype', parentId);
+    if (modifiedCount === 0) {
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast('Catalog is already fully linked.', 'info');
       }
       return;
     }
 
-    // 4. Known gap or advisory prefixes
-    if (key.startsWith('gap:product:')) {
-      const prodId = key.split(':')[2] || entityId;
-      if (typeof window.openProductEditModal === 'function') window.openProductEditModal(prodId);
-      return;
+    // Save and notify
+    if (typeof window.Store !== 'undefined' && typeof window.Store.setState === 'function') {
+      window.Store.setState({ products: resolvedProducts });
     }
+    renderDataQualityView();
 
-    if (key.startsWith('advisory:category-mismatch')) {
-      if (typeof window.enforceCategorySSOT === 'function') window.enforceCategorySSOT();
-      renderDataQualityView();
-      return;
-    }
-
-    // 5. Default Fallback
-    if (entityType === 'product') {
-      if (typeof window.openProductEditModal === 'function') window.openProductEditModal(entityId);
-    } else if (entityType === 'recipe') {
-      if (typeof window.viewRecipe === 'function') window.viewRecipe(entityId);
-    } else {
-      if (typeof window.openResolveUnlinkedModal === 'function') {
-        window.openResolveUnlinkedModal(entityId, entityType, parentId);
-      }
+    if (typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast(`Relinked ${modifiedCount} products automatically.`, 'success');
     }
   } catch (err) {
-    console.error('[DataQualityView] handleFixIssue caught error:', err);
+    console.error('[DataQualityView] runGlobalProductRelink error:', err);
   }
 }
 
+/**
+ * Instant self-healing: Verify Zero Calories on an ingredient
+ */
+export async function handleVerifyZeroCal(ingredientId) {
+  const state = getState() || {};
+  const ingredients = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
+  const ingIndex = ingredients.findIndex(i => String(i.id) === String(ingredientId));
+  if (ingIndex < 0) return;
+
+  const originalIng = ingredients[ingIndex];
+  const updatedIng = {
+    ...originalIng,
+    cal: 0,
+    calories: 0,
+    prot: 0,
+    protein: 0,
+    carb: 0,
+    carbs: 0,
+    fat: 0,
+    isVerifiedZero: true,
+    isVerifiedZeroCal: true,
+    updatedAt: new Date().toISOString()
+  };
+
+  ingredients[ingIndex] = updatedIng;
+
+  // 1. Optimistic Local Update
+  setIngredients(ingredients);
+  renderDataQualityView();
+
+  // 2. Persist
+  try {
+    await saveIngredient(updatedIng);
+    if (typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast(`"${updatedIng.name}" verified as zero-cal ingredient.`, 'success');
+    }
+  } catch (e) {
+    console.error('[DataQualityView] Failed to save verified zero-cal:', e);
+    // Rollback
+    ingredients[ingIndex] = originalIng;
+    setIngredients(ingredients);
+    renderDataQualityView();
+  }
+}
+
+/**
+ * Instant self-healing: Ignore Store Mapping for an ingredient
+ */
+export async function handleIgnoreStoreMapping(ingredientId) {
+  const state = getState() || {};
+  const ingredients = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
+  const ingIndex = ingredients.findIndex(i => String(i.id) === String(ingredientId));
+  if (ingIndex < 0) return;
+
+  const originalIng = ingredients[ingIndex];
+  const updatedIng = {
+    ...originalIng,
+    ignoreStoreMapping: true,
+    updatedAt: new Date().toISOString()
+  };
+
+  ingredients[ingIndex] = updatedIng;
+
+  // 1. Optimistic Local Update
+  setIngredients(ingredients);
+  renderDataQualityView();
+
+  // 2. Persist
+  try {
+    await saveIngredient(updatedIng);
+    if (typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast(`Ignored store mapping for "${updatedIng.name}".`, 'info');
+    }
+  } catch (e) {
+    console.error('[DataQualityView] Failed to save ignoreStoreMapping:', e);
+    ingredients[ingIndex] = originalIng;
+    setIngredients(ingredients);
+    renderDataQualityView();
+  }
+}
+
+/**
+ * Instant self-healing: Truncate advisory history & clear snaps
+ */
+export async function handleCleanHistoryCache() {
+  const state = getState() || {};
+  const currentPrefs = state.preferences || state.userPrefs || {};
+  const previousPrefs = JSON.parse(JSON.stringify(currentPrefs));
+
+  const dismissed = Array.isArray(currentPrefs.dismissedQualityAdvisories)
+    ? [...currentPrefs.dismissedQualityAdvisories]
+    : [];
+
+  const prunedDismissed = dismissed.slice(-30); // Truncate to 30 items
+
+  const updatedPrefs = {
+    ...currentPrefs,
+    dismissedQualityAdvisories: prunedDismissed,
+    advisoryHistory: [],
+    snapshots: [],
+    stateSnapshots: []
+  };
+
+  const mutateFn = (currentState) => {
+    currentState.preferences = updatedPrefs;
+    currentState.userPrefs = updatedPrefs;
+  };
+
+  const rollbackFn = (currentState) => {
+    currentState.preferences = previousPrefs;
+    currentState.userPrefs = previousPrefs;
+  };
+
+  try {
+    await runOptimisticMutation(
+      'preferences',
+      mutateFn,
+      savePreferences(updatedPrefs),
+      rollbackFn,
+      'Failed to clean preference history cache.'
+    );
+    if (typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast('Preference storage cleaned successfully (cached snapshots deleted).', 'success');
+    }
+    renderDataQualityView();
+  } catch (err) {
+    console.error('[DataQualityView] handleCleanHistoryCache error:', err);
+  }
+}
+
+/**
+ * Core rendering view
+ */
 export function renderDataQualityView() {
   if (typeof document === 'undefined') return;
   const container = document.getElementById('view-data');
   if (!container) return;
 
-  const state = (window.Store && typeof window.Store.getState === 'function') 
-    ? window.Store.getState() 
-    : (typeof getState === 'function' ? getState() : {});
-  const scan = runDataQualityScan(state);
-  const flaggedMacroRecipes = sweepRecipeMacroQuality(state.recipes || window.state?.recipes || []);
+  const state = getState() || {};
+  const audit = runAudit(state);
 
-  const renderIssueRow = (issue, dismissible = false) => {
-    const parentIdAttr = issue.parentIngredientId ? `'${escapeAttr(issue.parentIngredientId)}'` : 'null';
-    const fixAction = `handleFixIssue(event, '${escapeAttr(issue.entityType)}', '${escapeAttr(issue.entityId)}', '${escapeAttr(issue.key)}', ${parentIdAttr})`;
-    
+  // Helper to render individual audit rows
+  const renderAuditCard = (title, icon, items, renderer) => {
+    const listHtml = items.map(renderer).join('');
+    const count = items.length;
     return `
-      <div class="dq-issue-row" style="padding:10px 12px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px">
-        <div style="min-width:0">
-          <div style="font-weight:700;font-size:13px;color:var(--text,#1c1917)">${escapeHtml(issue.title)}</div>
-          <div style="font-size:11.5px;color:var(--text2,#78716c);margin-top:2px">${escapeHtml(issue.message)}</div>
+      <div class="card" style="background:var(--surface,#fff); border-radius:14px; padding:18px; border:1px solid var(--border,#e7e5e4); margin-bottom:16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:8px;">
+          <h3 style="margin:0; font-size:14.5px; font-weight:750; color:var(--text,#1c1917); display:flex; align-items:center; gap:6px;">
+            <span>${icon}</span> ${title}
+          </h3>
+          <span style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:${count > 0 ? '#fee2e2' : '#dcfce7'}; color:${count > 0 ? '#b91c1c' : '#15803d'}">
+            ${count > 0 ? `${count} Action Required` : 'Healthy'}
+          </span>
         </div>
-        <div style="display:flex;gap:6px;flex-shrink:0">
-          ${dismissible ? `<button type="button" class="btn sm btn-ghost ghost" data-action="dismiss-advisory" data-issue-key="${escapeAttr(issue.key)}">Looks right</button>` : ''}
-          ${issue.isMacroSyncError ? `<button type="button" class="btn sm primary" style="background:var(--primary,#4f46e5);color:#fff" data-action="auto-recalibrate" data-recipe-id="${escapeAttr(issue.entityId)}">Auto-Recalibrate Macros from Ingredients</button>` : ''}
-          <button type="button" class="btn sm btn-primary primary dq-fix-btn" 
-            data-entity-type="${escapeAttr(issue.entityType)}" 
-            data-entity-id="${escapeAttr(issue.entityId)}" 
-            data-issue-key="${escapeAttr(issue.key)}" 
-            data-parent-id="${escapeAttr(issue.parentIngredientId || '')}" 
-            data-action="fix-issue">Fix</button>
-        </div>
+        ${count === 0 
+          ? `<div style="font-size:12.5px; color:var(--text2,#78716c); padding:6px 0;">All checks passed. No issues found.</div>` 
+          : `<div style="display:flex; flex-direction:column; gap:8px;">${listHtml}</div>`
+        }
       </div>
     `;
   };
 
-  const macroSweepCardHtml = `
-    <div class="dq-macro-sweep-card" style="margin-bottom:14px;background:${flaggedMacroRecipes.length > 0 ? '#fef2f2' : '#f0fdf4'};border:1px solid ${flaggedMacroRecipes.length > 0 ? '#fecaca' : '#bbf7d0'};border-radius:12px;padding:12px 14px">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:16px">${flaggedMacroRecipes.length > 0 ? '🔴' : '🟢'}</span>
-          <strong style="font-size:13.5px;color:${flaggedMacroRecipes.length > 0 ? '#991b1b' : '#166534'}">
-            ${flaggedMacroRecipes.length} recipes missing calorie/protein data required for Fit Score calculation.
-          </strong>
-        </div>
-        <span class="badge" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:${flaggedMacroRecipes.length > 0 ? '#fee2e2' : '#dcfce7'};color:${flaggedMacroRecipes.length > 0 ? '#b91c1c' : '#15803d'}">
-          ${flaggedMacroRecipes.length > 0 ? `${flaggedMacroRecipes.length} Action Required` : 'All Recipes Validated'}
-        </span>
-      </div>
-      ${flaggedMacroRecipes.length > 0 ? `
-        <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto">
-          ${flaggedMacroRecipes.map(r => `
-            <div class="dq-issue-row" style="padding:8px 10px;background:#ffffff;border:1px solid #fecaca;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-              <div style="min-width:0">
-                <div style="font-weight:700;font-size:12.5px;color:#1c1917">${escapeHtml(r.name)}</div>
-                <div style="font-size:11px;color:#78716c">Calories: ${r.calories !== null ? `${r.calories} kcal` : 'missing'} · Protein: ${r.protein !== null ? `${r.protein}g` : 'missing'}</div>
-              </div>
-              <div style="display:flex;gap:6px">
-                <button type="button" class="btn xs primary" style="background:var(--primary,#4f46e5);color:#fff" onclick="autoRecalibrateRecipeMacros('${escapeAttr(r.id)}')">Auto-Recalibrate</button>
-                <button type="button" class="btn xs ghost" onclick="handleFixIssue(event, 'recipe', '${escapeAttr(r.id)}')">View</button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      ` : ''}
-    </div>
-  `;
-
   container.innerHTML = `
-    <div style="max-width:900px;margin:0 auto;padding:20px;box-sizing:border-box">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div style="max-width:900px; margin:0 auto; padding:20px; box-sizing:border-box;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
         <div>
-          <h2 style="font-size:22px;font-weight:750;margin:0;color:var(--text,#1c1917)">Data Quality Centre</h2>
-          <p style="margin:4px 0 0 0;font-size:13px;color:var(--text2,#78716c)">Catalogue audit scanner, recipe macro validation, and structural health advisory.</p>
+          <h2 style="font-size:22px; font-weight:750; margin:0; color:var(--text,#1c1917)">Data Quality Overhaul Dashboard</h2>
+          <p style="margin:4px 0 0 0; font-size:13px; color:var(--text2,#78716c)">Catalogue audit scanner, recipe macro validation, and self-healing structural health checks.</p>
         </div>
-        <div style="display:flex;gap:8px">
-          <button type="button" class="btn sm secondary" data-action="auto-relink">⚡ Auto-Relink Catalog</button>
-          <button type="button" class="btn sm ghost" data-action="refresh-audit">🔄 Refresh Audit</button>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="btn sm secondary" id="dq-btn-relink" style="font-weight:600;">⚡ Auto-Relink Catalog</button>
+          <button type="button" class="btn sm ghost" id="dq-btn-refresh" style="font-weight:600;">🔄 Refresh Audit</button>
         </div>
       </div>
 
-      ${macroSweepCardHtml}
-
-      <div style="display:grid;grid-template-columns:1fr;gap:16px">
-        <div class="card" style="background:var(--surface,#fff);border-radius:14px;padding:18px;border:1px solid var(--border,#e7e5e4)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <h3 style="margin:0;font-size:15px;font-weight:750;color:var(--text,#1c1917)">🚨 Calculation Blockers (${scan.blockers.length})</h3>
-            <span style="font-size:12px;color:var(--text2,#78716c)">Must be resolved for accurate meal planning calculations</span>
+      <div style="display:grid; grid-template-columns:1fr; gap:16px;">
+        
+        <!-- 1. RECIPE MACRO DRIFT CARD -->
+        ${renderAuditCard('Recipe Macro Drift Anomaly', '📉', audit.macroDrift, (item) => `
+          <div style="padding:10px 12px; background:#fff; border:1px solid var(--border); border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="min-width:0;">
+              <strong style="font-size:13px; color:#111827;">${escapeHtml(item.recipeName)}</strong>
+              <div style="font-size:11.5px; color:var(--text2); margin-top:2px;">${escapeHtml(item.message)}</div>
+            </div>
+            <div style="display:flex; gap:6px; flex-shrink:0;">
+              <button type="button" class="btn sm primary rec-auto-recal-btn" data-recipe-id="${escapeAttr(item.recipeId)}" style="background:var(--primary,#4f46e5); color:#fff;">Auto-Recalibrate</button>
+              <button type="button" class="btn sm ghost rec-manual-inspect-btn" data-recipe-id="${escapeAttr(item.recipeId)}">Manual Inspect</button>
+            </div>
           </div>
-          ${scan.blockers.length === 0 ? '<div style="font-size:13px;color:var(--text2,#78716c);padding:10px 0">No calculation blockers detected. Excellent!</div>' : scan.blockers.map(b => renderIssueRow(b)).join('')}
-        </div>
+        `)}
 
-        <div class="card" style="background:var(--surface,#fff);border-radius:14px;padding:18px;border:1px solid var(--border,#e7e5e4)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <h3 style="margin:0;font-size:15px;font-weight:750;color:var(--text,#1c1917)">⚠️ Data Gaps (${scan.gaps.length})</h3>
-            <span style="font-size:12px;color:var(--text2,#78716c)">Ingredients lacking linked grocery products</span>
+        <!-- 2. ACTIVE MEAL PLAN DESYNC CARD -->
+        ${renderAuditCard('Active Week Meal Plan Desync', '📅', audit.planDesync, (item) => `
+          <div style="padding:10px 12px; background:#fff; border:1px solid var(--border); border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="min-width:0;">
+              <strong style="font-size:13px; color:#111827;">${escapeHtml(item.recipeName)} (Day ${escapeHtml(item.dayKey)} · ${escapeHtml(item.mealKey)})</strong>
+              <div style="font-size:11.5px; color:var(--text2); margin-top:2px;">${escapeHtml(item.message)}</div>
+            </div>
+            <div style="display:flex; gap:6px; flex-shrink:0;">
+              <button type="button" class="btn sm primary plan-sync-active-btn" 
+                data-day="${escapeAttr(item.dayKey)}" 
+                data-meal="${escapeAttr(item.mealKey)}" 
+                data-recipe-id="${escapeAttr(item.recipeId)}"
+                data-recipe-name="${escapeAttr(item.recipeName)}"
+                data-node-cal="${escapeAttr(item.nodeCal)}"
+                data-node-prot="${escapeAttr(item.nodeProt)}"
+                data-temp-cal="${escapeAttr(item.tempCal)}"
+                data-temp-prot="${escapeAttr(item.tempProt)}"
+                style="background:var(--primary,#4f46e5); color:#fff;">Sync Active Week</button>
+            </div>
           </div>
-          ${scan.gaps.length === 0 ? '<div style="font-size:13px;color:var(--text2,#78716c);padding:10px 0">No data gaps detected.</div>' : scan.gaps.map(g => renderIssueRow(g)).join('')}
-        </div>
+        `)}
 
-        <div class="card" style="background:var(--surface,#fff);border-radius:14px;padding:18px;border:1px solid var(--border,#e7e5e4)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <h3 style="margin:0;font-size:15px;font-weight:750;color:var(--text,#1c1917)">💡 Advisories &amp; Outliers (${scan.advisories.length})</h3>
-            <span style="font-size:12px;color:var(--text2,#78716c)">Recommendations &amp; macro synchronisation checks</span>
+        <!-- 3. INCOMPLETE / ATWATER MATH CARD -->
+        ${renderAuditCard('Incomplete Nutrition & Atwater Discrepancy', '🔬', audit.atwaterMath, (item) => `
+          <div style="padding:10px 12px; background:#fff; border:1px solid var(--border); border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="min-width:0;">
+              <strong style="font-size:13px; color:#111827;">${escapeHtml(item.ingredientName)}</strong>
+              <div style="font-size:11.5px; color:var(--text2); margin-top:2px;">${escapeHtml(item.message)}</div>
+            </div>
+            <div style="display:flex; gap:6px; flex-shrink:0;">
+              <button type="button" class="btn sm primary math-fix-macros-btn" data-ing-id="${escapeAttr(item.ingredientId)}" style="background:var(--primary,#4f46e5); color:#fff;">Fix Macros</button>
+              ${item.type === 'atwater' ? `<button type="button" class="btn sm ghost math-verify-zero-btn" data-ing-id="${escapeAttr(item.ingredientId)}">Verify Zero-Cal</button>` : ''}
+            </div>
           </div>
-          ${scan.advisories.length === 0 ? '<div style="font-size:13px;color:var(--text2,#78716c);padding:10px 0">No active advisories.</div>' : scan.advisories.map(a => renderIssueRow(a, true)).join('')}
-        </div>
+        `)}
+
+        <!-- 4. DENSITY MISMATCH CARD -->
+        ${renderAuditCard('Weight-to-Volume Density Mismatch', '🧪', audit.densityMismatch, (item) => `
+          <div style="padding:10px 12px; background:#fff; border:1px solid var(--border); border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="min-width:0;">
+              <strong style="font-size:13px; color:#111827;">${escapeHtml(item.ingredientName)} (in "${escapeHtml(item.recipeName)}")</strong>
+              <div style="font-size:11.5px; color:var(--text2); margin-top:2px;">${escapeHtml(item.message)}</div>
+            </div>
+            <div style="display:flex; gap:6px; flex-shrink:0;">
+              <button type="button" class="btn sm primary density-add-conversion-btn" data-ing-id="${escapeAttr(item.ingredientId)}" style="background:var(--primary,#4f46e5); color:#fff;">Add Conversion</button>
+            </div>
+          </div>
+        `)}
+
+        <!-- 5. ORPHANED PRODUCT CARD -->
+        ${renderAuditCard('Orphaned Grocery Products', '🔗', audit.orphans, (item) => `
+          <div style="padding:10px 12px; background:#fff; border:1px solid var(--border); border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="min-width:0;">
+              <strong style="font-size:13px; color:#111827;">${escapeHtml(item.productName)}</strong>
+              <div style="font-size:11.5px; color:var(--text2); margin-top:2px;">${escapeHtml(item.message)}</div>
+            </div>
+            <div style="display:flex; gap:6px; flex-shrink:0;">
+              <button type="button" class="btn sm primary orphan-resolve-btn" 
+                data-subtype-id="${escapeAttr(item.subtypeId || '')}" 
+                data-parent-id="${escapeAttr(item.parentId || '')}"
+                style="background:var(--primary,#4f46e5); color:#fff;">Resolve Links</button>
+            </div>
+          </div>
+        `)}
+
+        <!-- 6. UNMAPPED ITEM CARD -->
+        ${renderAuditCard('Unmapped Core Ingredients', '🛒', audit.unmappedItems, (item) => `
+          <div style="padding:10px 12px; background:#fff; border:1px solid var(--border); border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="min-width:0;">
+              <strong style="font-size:13px; color:#111827;">${escapeHtml(item.ingredientName)}</strong>
+              <div style="font-size:11.5px; color:var(--text2); margin-top:2px;">${escapeHtml(item.message)}</div>
+            </div>
+            <div style="display:flex; gap:6px; flex-shrink:0;">
+              <button type="button" class="btn sm primary unmapped-tesco-btn" data-ing-id="${escapeAttr(item.ingredientId)}" style="background:var(--primary,#4f46e5); color:#fff;">Find Tesco Match</button>
+              <button type="button" class="btn sm ghost unmapped-ignore-btn" data-ing-id="${escapeAttr(item.ingredientId)}">Ignore</button>
+            </div>
+          </div>
+        `)}
+
+        <!-- 7. DUPLICATE INGREDIENT CARD -->
+        ${renderAuditCard('Duplicate Ingredient Candidates', '👥', audit.duplicates, (item) => `
+          <div style="padding:10px 12px; background:#fff; border:1px solid var(--border); border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="min-width:0;">
+              <strong style="font-size:13px; color:#111827;">"${escapeHtml(item.ing1Name)}" &amp; "${escapeHtml(item.ing2Name)}"</strong>
+              <div style="font-size:11.5px; color:var(--text2); margin-top:2px;">${escapeHtml(item.message)}</div>
+            </div>
+            <div style="display:flex; gap:6px; flex-shrink:0;">
+              <button type="button" class="btn sm primary duplicate-merge-btn" 
+                data-ing1-id="${escapeAttr(item.ing1Id)}" 
+                data-ing2-id="${escapeAttr(item.ing2Id)}"
+                style="background:var(--primary,#4f46e5); color:#fff;">Review &amp; Merge</button>
+            </div>
+          </div>
+        `)}
+
+        <!-- 8. PAYLOAD SIZE CARD -->
+        ${renderAuditCard('Database Payload Health Warning', '💾', audit.storageHealth, (item) => `
+          <div style="padding:10px 12px; background:#fffbf2; border:1px solid #fef3c7; border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="min-width:0;">
+              <strong style="font-size:13px; color:#92400e;">Preferences Storage Warning (${item.sizeKb} KB)</strong>
+              <div style="font-size:11.5px; color:#b45309; margin-top:2px;">${escapeHtml(item.message)}</div>
+            </div>
+            <div style="display:flex; gap:6px; flex-shrink:0;">
+              <button type="button" class="btn sm primary health-clean-btn" style="background:#d97706; color:#fff; border:none;">Clean History Cache</button>
+            </div>
+          </div>
+        `)}
+
       </div>
     </div>
   `;
 
-  container.onclick = (e) => {
-    const btn = e.target.closest('[data-action]');
-    if (!btn) return;
-    const action = btn.dataset.action;
-    const key = btn.dataset.issueKey;
-    const id = btn.dataset.recipeId;
-    if (action === 'dismiss-advisory') {
-      dismissAdvisory(key);
-    } else if (action === 'auto-recalibrate') {
-      autoRecalibrateRecipeMacros(id);
-    } else if (action === 'auto-relink') {
-      runGlobalProductRelink();
-    } else if (action === 'refresh-audit') {
-      renderDataQualityView();
-    } else if (action === 'fix-issue' || action === 'fix-recipe') {
-      handleFixIssue(e, btn.dataset.entityType, btn.dataset.entityId || id, btn.dataset.issueKey, btn.dataset.parentId);
-    }
-  };
-}
+  // Bind relink & refresh top buttons
+  document.getElementById('dq-btn-relink').onclick = runGlobalProductRelink;
+  document.getElementById('dq-btn-refresh').onclick = () => renderDataQualityView();
 
-if (typeof document !== 'undefined' && !window.__dq_action_listener_bound) {
-  window.__dq_action_listener_bound = true;
-  document.addEventListener('plateplan-action', (e) => {
-    const { action, target, id } = e.detail || {};
-    if (action === 'auto-recalibrate') {
-      const recipeId = id || target?.dataset?.recipeId || target?.dataset?.entityId;
-      if (recipeId && typeof autoRecalibrateRecipeMacros === 'function') {
-        autoRecalibrateRecipeMacros(recipeId);
+  // Wire actions inside audit rows using event delegation
+  container.querySelectorAll('.rec-auto-recal-btn').forEach(btn => {
+    btn.onclick = () => {
+      const rId = btn.dataset.recipeId;
+      const recipes = state.recipes || [];
+      const recipe = recipes.find(r => String(r.id) === String(rId));
+      if (recipe) {
+        openMacroDriftPreviewModal([recipe]);
       }
-    } else if (action === 'fix-recipe' || action === 'fix-issue') {
-      const entityId = id || target?.dataset?.entityId;
-      const entityType = target?.dataset?.entityType || 'recipe';
-      const issueKey = target?.dataset?.issueKey;
-      const parentId = target?.dataset?.parentId;
-      if (typeof handleFixIssue === 'function') {
-        handleFixIssue(e, entityType, entityId, issueKey, parentId);
+    };
+  });
+
+  container.querySelectorAll('.rec-manual-inspect-btn').forEach(btn => {
+    btn.onclick = () => {
+      window.__modalContext = { returnTo: 'data-quality' };
+      if (typeof window.viewRecipe === 'function') {
+        window.viewRecipe(btn.dataset.recipeId);
       }
-    }
+    };
+  });
+
+  container.querySelectorAll('.plan-sync-active-btn').forEach(btn => {
+    btn.onclick = () => {
+      const issue = {
+        dayKey: btn.dataset.day,
+        mealKey: btn.dataset.meal,
+        recipeId: btn.dataset.recipeId,
+        recipeName: btn.dataset.recipeName,
+        nodeCal: Number(btn.dataset.nodeCal),
+        nodeProt: Number(btn.dataset.nodeProt),
+        tempCal: Number(btn.dataset.tempCal),
+        tempProt: Number(btn.dataset.tempProt)
+      };
+      openMealPlanSyncWarningModal(issue);
+    };
+  });
+
+  container.querySelectorAll('.math-fix-macros-btn').forEach(btn => {
+    btn.onclick = () => {
+      window.__modalContext = { returnTo: 'data-quality', targetTab: 'macros' };
+      if (typeof window.openIngredientFamilyDetailsModal === 'function') {
+        window.openIngredientFamilyDetailsModal(btn.dataset.ingId);
+      }
+    };
+  });
+
+  container.querySelectorAll('.math-verify-zero-btn').forEach(btn => {
+    btn.onclick = () => {
+      handleVerifyZeroCal(btn.dataset.ingId);
+    };
+  });
+
+  container.querySelectorAll('.density-add-conversion-btn').forEach(btn => {
+    btn.onclick = () => {
+      window.__modalContext = { returnTo: 'data-quality' };
+      if (typeof window.openIngredientFamilyDetailsModal === 'function') {
+        window.openIngredientFamilyDetailsModal(btn.dataset.ingId);
+      }
+    };
+  });
+
+  container.querySelectorAll('.orphan-resolve-btn').forEach(btn => {
+    btn.onclick = () => {
+      const issue = {
+        subtypeId: btn.dataset.subtypeId,
+        parentId: btn.dataset.parentId
+      };
+      openSubtypeOrphanResolverModal(issue);
+    };
+  });
+
+  container.querySelectorAll('.unmapped-tesco-btn').forEach(btn => {
+    btn.onclick = () => {
+      window.__modalContext = { returnTo: 'data-quality' };
+      if (typeof window.openTescoImportModal === 'function') {
+        window.openTescoImportModal(null, btn.dataset.ingId);
+      }
+    };
+  });
+
+  container.querySelectorAll('.unmapped-ignore-btn').forEach(btn => {
+    btn.onclick = () => {
+      handleIgnoreStoreMapping(btn.dataset.ingId);
+    };
+  });
+
+  container.querySelectorAll('.duplicate-merge-btn').forEach(btn => {
+    btn.onclick = () => {
+      const issue = {
+        ing1Id: btn.dataset.ing1Id,
+        ing2Id: btn.dataset.ing2Id
+      };
+      openMergeIngredientsModal(issue);
+    };
+  });
+
+  container.querySelectorAll('.health-clean-btn').forEach(btn => {
+    btn.onclick = () => {
+      handleCleanHistoryCache();
+    };
   });
 }
 
-function updateDataQualityBadge() {
+export function updateDataQualityBadge() {
   const badge = document.getElementById('dq-badge-count');
   if (!badge) return;
-  const state = (window.Store && typeof window.Store.getState === 'function') 
-    ? window.Store.getState() 
-    : (typeof getState === 'function' ? getState() : {});
-  const scan = runDataQualityScan(state);
-  const flaggedMacroRecipes = sweepRecipeMacroQuality(state.recipes || window.state?.recipes || []);
-  const total = scan.totalCount + flaggedMacroRecipes.length;
+  const state = getState() || {};
+  const audit = runAudit(state);
+  const total = audit.totalCount;
   badge.textContent = total;
   badge.style.display = total > 0 ? 'inline-flex' : 'none';
 }
 
 function initDataQualitySubscriptions() {
   if (typeof document === 'undefined') return;
-  document.addEventListener('plateplan:state:ingredients', () => renderDataQualityView());
-  document.addEventListener('plateplan:state:products', () => renderDataQualityView());
-  document.addEventListener('plateplan:state:recipes', () => renderDataQualityView());
+  document.addEventListener('plateplan:state:ingredients', () => { renderDataQualityView(); updateDataQualityBadge(); });
+  document.addEventListener('plateplan:state:products', () => { renderDataQualityView(); updateDataQualityBadge(); });
+  document.addEventListener('plateplan:state:recipes', () => { renderDataQualityView(); updateDataQualityBadge(); });
+  document.addEventListener('plateplan:state:plan', () => { renderDataQualityView(); updateDataQualityBadge(); });
+  document.addEventListener('plateplan:state:preferences', () => { renderDataQualityView(); updateDataQualityBadge(); });
 }
 
 export function mount(container) {
   initDataQualitySubscriptions();
   renderDataQualityView();
+  updateDataQualityBadge();
 }
 
 if (typeof window !== 'undefined') {
   window.renderDataQualityView = renderDataQualityView;
   window.renderDataQuality = renderDataQualityView;
-  window.openHierarchyWizardModal = openHierarchyWizardModal;
-  window.dismissAdvisory = dismissAdvisory;
-  window.handleFixIssue = handleFixIssue;
-  window.runGlobalProductRelink = runGlobalProductRelink;
-  window.batchRelinkProducts = runGlobalProductRelink;
   window.updateDataQualityBadge = updateDataQualityBadge;
-  window.autoRecalibrateRecipeMacros = autoRecalibrateRecipeMacros;
-
-  if (typeof document !== 'undefined' && !window.__dq_fix_delegation_bound) {
-    window.__dq_fix_delegation_bound = true;
-    document.addEventListener('click', (e) => {
-      const btn = e.target.closest('.dq-fix-btn');
-      if (btn && typeof window.handleFixIssue === 'function') {
-        const entityType = btn.getAttribute('data-entity-type');
-        const entityId = btn.getAttribute('data-entity-id');
-        const issueKey = btn.getAttribute('data-issue-key') || '';
-        const parentId = btn.getAttribute('data-parent-id') || null;
-        if (entityType && entityId) {
-          window.handleFixIssue(e, entityType, entityId, issueKey, parentId);
-        }
-      }
-    });
-  }
 }

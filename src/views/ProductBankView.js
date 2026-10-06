@@ -30,6 +30,14 @@ export function cancelManualIng() {
   if (panel) panel.style.display = 'none';
   document.body.style.overflow = '';
   activeEditingProductId = null;
+
+  if (window.__modalContext && window.__modalContext.returnTo === 'data-quality') {
+    const ctx = window.__modalContext;
+    window.__modalContext = null;
+    if (typeof window.showView === 'function') {
+      window.showView('data');
+    }
+  }
 }
 
 export function openProductEditModal(productIdOrDraft = null) {

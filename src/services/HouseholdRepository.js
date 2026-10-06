@@ -297,32 +297,87 @@ export async function savePreferences(userPrefs, settings = {}) {
     const prefRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences');
     const rootRef = db.collection('households').doc(HOUSEHOLD_ID);
 
-    const storeState = (typeof getStoreState === 'function') ? getStoreState() : {};
-    const storePrefs = storeState.preferences || {};
+    // Strictly declared preference keys to extract
+    const allowedKeys = [
+      'nutritionTargets',
+      'activeView',
+      'dismissedQualityAdvisories',
+      'dismissedAdvisories',
+      'dismissed_advisories',
+      'settings',
+      'profiles',
+      'userPrefs',
+      'theme',
+      'advisoryHistory',
+      'mealPlanSettings'
+    ];
 
-    const mergedUserPrefs = {
-      ...(storePrefs.userPrefs || storePrefs || {}),
-      ...(userPrefs || {})
+    // Helper to sanitize an object to only allow explicit preference keys
+    const sanitizePreferences = (obj) => {
+      if (!obj || typeof obj !== 'object') return {};
+      const res = {};
+      for (const key of allowedKeys) {
+        if (obj[key] !== undefined) {
+          res[key] = JSON.parse(JSON.stringify(obj[key]));
+        }
+      }
+      return res;
     };
 
-    const profiles = mergedUserPrefs?.profiles || settings?.profiles || storePrefs?.profiles || {};
+    // Get store's preference state, NOT the whole state object
+    const storeState = (typeof getStoreState === 'function') ? getStoreState() : {};
+    const storePrefs = storeState.preferences || storeState.userPrefs || {};
+
+    const sanitizedStorePrefs = sanitizePreferences(storePrefs);
+    const sanitizedInputPrefs = sanitizePreferences(userPrefs);
+
+    // Also handle nested userPrefs if it exists as a key
+    if (sanitizedInputPrefs.userPrefs) {
+      sanitizedInputPrefs.userPrefs = sanitizePreferences(sanitizedInputPrefs.userPrefs);
+    }
+    if (sanitizedStorePrefs.userPrefs) {
+      sanitizedStorePrefs.userPrefs = sanitizePreferences(sanitizedStorePrefs.userPrefs);
+    }
+
+    const mergedUserPrefs = {
+      ...(sanitizedStorePrefs.userPrefs || sanitizedStorePrefs || {}),
+      ...(sanitizedInputPrefs.userPrefs || sanitizedInputPrefs || {})
+    };
+
+    // Remove forbidden properties if they exist
+    const forbiddenKeys = ['recipes', 'ingredients', 'products'];
+    for (const key of forbiddenKeys) {
+      delete mergedUserPrefs[key];
+    }
+
+    const profiles = mergedUserPrefs?.profiles || settings?.profiles || sanitizedStorePrefs?.profiles || {};
+    const finalSettings = settings?.settings || settings || mergedUserPrefs?.settings || sanitizedStorePrefs?.settings || {};
 
     let payload = {
       userPrefs: mergedUserPrefs,
-      nutritionTargets: mergedUserPrefs?.nutritionTargets || storePrefs?.nutritionTargets || {},
+      nutritionTargets: mergedUserPrefs?.nutritionTargets || sanitizedStorePrefs?.nutritionTargets || {},
       profiles,
-      settings: settings || mergedUserPrefs?.settings || storePrefs?.settings || {},
+      settings: finalSettings,
       updatedAt: new Date().toISOString()
     };
     
     // Run pruning prior to Firestore write operations
     payload = prunePreferences(payload);
 
+    // Hard Error Guard: throw a hard error if the resulting payload object contains 'recipes', 'ingredients', or 'products'
+    for (const forbidden of forbiddenKeys) {
+      if (payload[forbidden] !== undefined || payload.userPrefs?.[forbidden] !== undefined) {
+        throw new Error(`[HouseholdRepository] State contamination detected! Payload contains forbidden key: ${forbidden}`);
+      }
+    }
+
     // Guard: ensure payload size is under 900,000 bytes
     let finalSize = 0;
     try {
       finalSize = new TextEncoder().encode(JSON.stringify(payload)).length;
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[HouseholdRepository] Error calculating final size:', e);
+    }
 
     if (finalSize >= 900000) {
       console.error('[HouseholdRepository] Refusing to write payload exceeding 900,000 bytes. Current size:', finalSize);
@@ -335,8 +390,234 @@ export async function savePreferences(userPrefs, settings = {}) {
     ]);
     return true;
   } catch (err) {
-    console.warn('[HouseholdRepository v3.19.78] Unable to save preferences to cloud (offline):', err.message || err);
-    return false;
+    console.error('[HouseholdRepository] Unable to save preferences to cloud:', err);
+    throw err; // Re-throw so callers can see the hard error if contaminated
+  }
+}
+
+export async function dismissAdvisoryInDb(issueKey) {
+  if (!isDbAvailable()) return false;
+  try {
+    const prefRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences');
+    const rootRef = db.collection('households').doc(HOUSEHOLD_ID);
+
+    let unionVal;
+    if (typeof window !== 'undefined' && window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue) {
+      unionVal = window.firebase.firestore.FieldValue.arrayUnion(issueKey);
+    } else {
+      unionVal = [issueKey];
+    }
+
+    await Promise.all([
+      prefRef.update({ dismissedQualityAdvisories: unionVal }),
+      rootRef.update({ dismissedQualityAdvisories: unionVal })
+    ]);
+    return true;
+  } catch (err) {
+    console.warn('[HouseholdRepository] Error in dismissAdvisoryInDb update, trying set with merge:', err);
+    try {
+      const prefRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences');
+      const rootRef = db.collection('households').doc(HOUSEHOLD_ID);
+      let unionVal = window.firebase.firestore.FieldValue.arrayUnion(issueKey);
+      await Promise.all([
+        prefRef.set({ dismissedQualityAdvisories: unionVal }, { merge: true }),
+        rootRef.set({ dismissedQualityAdvisories: unionVal }, { merge: true })
+      ]);
+      return true;
+    } catch (e) {
+      console.error('[HouseholdRepository] Failed fallback set for dismissAdvisoryInDb:', e);
+      return false;
+    }
+  }
+}
+
+export async function recalibrateRecipeMacrosAndDismissAdvisoriesInDb(recipe, advisoryKeysToDismiss) {
+  if (!isDbAvailable()) return false;
+  try {
+    const batch = db.batch();
+
+    // 1. Update the recipe document
+    const recipeColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes');
+    const recipeId = recipe.id;
+    const recipeData = { ...recipe, updatedAt: new Date().toISOString() };
+    delete recipeData.id;
+    const recipeDocRef = recipeColRef.doc(recipeId);
+    batch.set(recipeDocRef, recipeData, { merge: true });
+
+    // 2. Add advisory keys to the dismissedQualityAdvisories array of the preferences documents
+    let unionVal;
+    if (typeof window !== 'undefined' && window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue) {
+      unionVal = window.firebase.firestore.FieldValue.arrayUnion(...advisoryKeysToDismiss);
+    } else {
+      unionVal = advisoryKeysToDismiss;
+    }
+
+    const prefRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences');
+    const rootRef = db.collection('households').doc(HOUSEHOLD_ID);
+
+    // Using set with merge: true is robust against document non-existence
+    batch.set(prefRef, { dismissedQualityAdvisories: unionVal }, { merge: true });
+    batch.set(rootRef, { dismissedQualityAdvisories: unionVal }, { merge: true });
+
+    // 3. Commit Atomic Write Batch
+    await batch.commit();
+    return true;
+  } catch (err) {
+    console.error('[HouseholdRepository] Error in recalibrateRecipeMacrosAndDismissAdvisoriesInDb:', err);
+    throw err;
+  }
+}
+
+export async function deleteSubtypeInDb(parentIngredient, unlinkedProducts) {
+  if (!isDbAvailable()) return false;
+  try {
+    const batch = db.batch();
+
+    // 1. Prepare Parent Ingredient Document Update
+    const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');
+    const ingId = parentIngredient.id;
+    const ingData = { ...parentIngredient };
+    delete ingData.id;
+    ingData.updatedAt = new Date().toISOString();
+
+    const ingDocRef = colRef.doc(ingId);
+    batch.set(ingDocRef, ingData, { merge: true });
+
+    // 2. Prepare Unlinked Products Document Updates
+    const prodColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('products');
+    for (const prod of unlinkedProducts) {
+      const prodId = prod.id;
+      const prodData = { ...prod };
+      delete prodData.id;
+      prodData.updatedAt = new Date().toISOString();
+
+      const prodDocRef = prodColRef.doc(prodId);
+      batch.set(prodDocRef, prodData, { merge: true });
+    }
+
+    // 3. Commit Atomic Write Batch
+    await batch.commit();
+    return true;
+  } catch (err) {
+    console.error('[HouseholdRepository] Error in deleteSubtypeInDb writeBatch:', err);
+    throw err;
+  }
+}
+
+export async function batchRecalibrateRecipesInDb(recipeUpdates, advisoryKeysToDismiss) {
+  if (!isDbAvailable()) return false;
+  try {
+    const batch = db.batch();
+    const recipeColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes');
+
+    // 1. Queue all recipe updates
+    recipeUpdates.forEach(r => {
+      const rId = r.id;
+      const rData = { ...r, updatedAt: new Date().toISOString() };
+      delete rData.id;
+      const rDocRef = recipeColRef.doc(rId);
+      batch.set(rDocRef, rData, { merge: true });
+    });
+
+    // 2. Queue preferences update with arrayUnion if there are advisories to dismiss
+    if (advisoryKeysToDismiss && advisoryKeysToDismiss.length > 0) {
+      let unionVal;
+      if (typeof window !== 'undefined' && window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue) {
+        unionVal = window.firebase.firestore.FieldValue.arrayUnion(...advisoryKeysToDismiss);
+      } else {
+        unionVal = advisoryKeysToDismiss;
+      }
+
+      const prefRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences');
+      const rootRef = db.collection('households').doc(HOUSEHOLD_ID);
+
+      batch.set(prefRef, { dismissedQualityAdvisories: unionVal }, { merge: true });
+      batch.set(rootRef, { dismissedQualityAdvisories: unionVal }, { merge: true });
+    }
+
+    // 3. Commit batch
+    await batch.commit();
+    return true;
+  } catch (err) {
+    console.error('[HouseholdRepository] Error in batchRecalibrateRecipesInDb:', err);
+    throw err;
+  }
+}
+
+export async function batchResolveSubtypeOrphansInDb(productUpdates) {
+  if (!isDbAvailable()) return false;
+  try {
+    const batch = db.batch();
+    const prodColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('products');
+
+    productUpdates.forEach(p => {
+      const pId = p.id;
+      const pData = { ...p, updatedAt: new Date().toISOString() };
+      delete pData.id;
+      const pDocRef = prodColRef.doc(pId);
+      if (p._delete === true) {
+        batch.delete(pDocRef);
+      } else {
+        batch.set(pDocRef, pData, { merge: true });
+      }
+    });
+
+    await batch.commit();
+    return true;
+  } catch (err) {
+    console.error('[HouseholdRepository] Error in batchResolveSubtypeOrphansInDb:', err);
+    throw err;
+  }
+}
+
+export async function batchMergeIngredientsInDb(canonicalIngredient, duplicateIngredientId, updatedRecipes, updatedProducts, updatedPlan) {
+  if (!isDbAvailable()) return false;
+  try {
+    const batch = db.batch();
+
+    // 1. Delete duplicate ingredient
+    const ingColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');
+    const dupDocRef = ingColRef.doc(duplicateIngredientId);
+    batch.delete(dupDocRef);
+
+    // 2. Set/Update canonical ingredient
+    const canId = canonicalIngredient.id;
+    const canData = { ...canonicalIngredient, updatedAt: new Date().toISOString() };
+    delete canData.id;
+    const canDocRef = ingColRef.doc(canId);
+    batch.set(canDocRef, canData, { merge: true });
+
+    // 3. Update associated recipes
+    const recipeColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes');
+    updatedRecipes.forEach(r => {
+      const rId = r.id;
+      const rData = { ...r, updatedAt: new Date().toISOString() };
+      delete rData.id;
+      batch.set(recipeColRef.doc(rId), rData, { merge: true });
+    });
+
+    // 4. Update associated products
+    const prodColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('products');
+    updatedProducts.forEach(p => {
+      const pId = p.id;
+      const pData = { ...p, updatedAt: new Date().toISOString() };
+      delete pData.id;
+      batch.set(prodColRef.doc(pId), pData, { merge: true });
+    });
+
+    // 5. Update plan if provided
+    if (updatedPlan) {
+      const planDocRef = db.collection('households').doc(HOUSEHOLD_ID).collection('plans').doc('current');
+      const planData = { ...updatedPlan, updatedAt: new Date().toISOString() };
+      delete planData.id;
+      batch.set(planDocRef, planData);
+    }
+
+    await batch.commit();
+    return true;
+  } catch (err) {
+    console.error('[HouseholdRepository] Error in batchMergeIngredientsInDb:', err);
+    throw err;
   }
 }
 

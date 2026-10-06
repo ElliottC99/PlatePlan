@@ -37,6 +37,13 @@ export function closeModal(preserveEditorReturn = false) {
   if (typeof window.hideReviewTooltip === 'function') window.hideReviewTooltip();
   if (typeof window.closeModalIngredientReplace === 'function') window.closeModalIngredientReplace();
   if (!preserveEditorReturn && typeof window.abandonEditorReturn === 'function') window.abandonEditorReturn();
+
+  if (window.__modalContext && window.__modalContext.returnTo === 'data-quality') {
+    window.__modalContext = null;
+    if (typeof window.showView === 'function') {
+      window.showView('data');
+    }
+  }
 }
 
 export function renderReviewCostSummary(nutrition, portions) {

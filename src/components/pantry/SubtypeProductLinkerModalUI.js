@@ -209,7 +209,7 @@ export function openTescoImportModal(subtypeId, parentId) {
         <div>Drag the bookmarklet from Settings to your browser bar. Click it on any Tesco product page, copy the generated JSON string, and paste it below.</div>
       </div>
       <div class="field" style="margin-bottom: 12px;">
-        <label style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:6px;">Paste Tesco Bookmarklet JSON Output</label>
+        <label for="tesco-json-input" style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:6px;">Paste Tesco Bookmarklet JSON Output</label>
         <textarea id="tesco-json-input" placeholder='{"title":"Tesco Bagels 4 Pack","price":1.50,"brand":"Tesco",...}' style="width:100%; min-height:110px; font-family:monospace; font-size:11.5px; padding:10px; border:1px solid var(--border,#e7e5e4); border-radius:8px; outline:none; background:#fff;"></textarea>
       </div>
       <div id="tesco-import-error-msg" style="display:none; margin-bottom:14px;"></div>
