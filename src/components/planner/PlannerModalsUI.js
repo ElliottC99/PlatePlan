@@ -70,7 +70,7 @@ export function buildPlannedMealActionItems(info, day, slotKey) {
  */
 export function renderSavePlanModalContent(defaultName = '') {
   return `<div style="margin-bottom:10px">Save the current meal plan to the Meal Plan Library.</div>
-   <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Plan name</label>
+   <label for="save-plan-name" style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Plan name</label>
    <input id="save-plan-name" type="text" value="${escapeHtml(defaultName)}" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--surface);color:var(--text)">`;
 }
 

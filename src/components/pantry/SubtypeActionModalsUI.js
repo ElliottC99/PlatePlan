@@ -98,16 +98,16 @@ export function openEditSubtypeModal(subtypeId, parentId) {
   const linkedProds = (state.products || []).filter(p => String(p.subtypeId) === String(subtypeId));
 
   const html = `
-    <div style="padding: 20px; max-width: 500px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 12px;">
+    <div class="modal-content" style="padding: 20px; max-width: 500px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 12px;">
       <h3 style="margin-top:0; margin-bottom: 16px; font-size: 1.15rem; font-weight: 750;">📝 Edit Sub-type: ${escapeHTML(sub.name)}</h3>
       
       <div class="field" style="margin-bottom: 12px;">
-        <label style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">Sub-type Name</label>
+        <label for="edit-sub-name" style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">Sub-type Name</label>
         <input type="text" id="edit-sub-name" class="input" value="${escapeHTML(sub.name)}" style="width:100%;" />
       </div>
 
       <div class="field" style="margin-bottom: 16px;">
-        <label style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">Notes</label>
+        <label for="edit-sub-notes" style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">Notes</label>
         <textarea id="edit-sub-notes" class="input" style="width:100%; min-height: 70px;">${escapeHTML(sub.notes || '')}</textarea>
       </div>
 
@@ -119,49 +119,64 @@ export function openEditSubtypeModal(subtypeId, parentId) {
               <div>
                 <span style="font-weight:600;">${escapeHTML(formatBrandProductLabel(p))}</span>
               </div>
-              <button type="button" class="btn xs ghost" onclick="window.handleUnlinkProductFromSubtype('${escapeHTML(p.id)}', '${escapeHTML(subtypeId)}', '${escapeHTML(parentId)}')" style="color:var(--red,#ef4444); font-weight:bold;" title="Unlink product">&times; Unlink</button>
+              <button type="button" class="btn xs ghost btn-unlink-prod" data-prod-id="${escapeHTML(p.id)}" style="color:var(--red,#ef4444); font-weight:bold;" title="Unlink product">&times; Unlink</button>
             </div>
           `).join('') || '<div style="font-size:12px; color:var(--text2); text-align:center; padding:10px 0;">No products linked yet.</div>'}
         </div>
       </div>
 
       <div style="display:flex; gap:8px; justify-content: flex-end;">
-        <button type="button" class="btn" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn btn-cancel-edit-sub">Cancel</button>
         <button type="button" class="btn primary" id="save-edit-sub-btn">Save Changes</button>
       </div>
     </div>
   `;
 
   showModal(html);
+  setupModalDelegation();
 
-  window.handleUnlinkProductFromSubtype = async (prodId, subId, pId) => {
-    const prods = [...(state.products || [])];
-    const prod = prods.find(p => String(p.id) === String(prodId));
-    if (prod) {
-      prod.subtypeId = null;
-      prod.isAutoDefault = false;
-      prod.updatedAt = new Date().toISOString();
-      setProducts(prods);
-      openEditSubtypeModal(subId, pId);
+  const saveBtn = document.getElementById('save-edit-sub-btn');
+  if (saveBtn) {
+    saveBtn.onclick = async () => {
+      const newName = document.getElementById('edit-sub-name').value.trim();
+      if (!newName) return;
+      sub.name = newName;
+      sub.notes = document.getElementById('edit-sub-notes').value.trim();
+      parent.updatedAt = new Date().toISOString();
+      
+      setIngredients([...state.ingredients]);
+      closeModal();
+      invalidateHierarchyCache();
       if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-      if (typeof window.renderProductBank === 'function') window.renderProductBank();
-      await saveProduct(prod);
-    }
-  };
+      await saveIngredient(parent);
+    };
+  }
 
-  document.getElementById('save-edit-sub-btn').onclick = async () => {
-    const newName = document.getElementById('edit-sub-name').value.trim();
-    if (!newName) return;
-    sub.name = newName;
-    sub.notes = document.getElementById('edit-sub-notes').value.trim();
-    parent.updatedAt = new Date().toISOString();
-    
-    setIngredients([...state.ingredients]);
-    closeModal();
-    invalidateHierarchyCache();
-    if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-    await saveIngredient(parent);
-  };
+  const cancelBtn = document.querySelector('.btn-cancel-edit-sub');
+  if (cancelBtn) {
+    cancelBtn.onclick = () => {
+      closeModal();
+    };
+  }
+
+  const unlinkBtns = document.querySelectorAll('.btn-unlink-prod');
+  unlinkBtns.forEach(btn => {
+    btn.onclick = async () => {
+      const prodId = btn.getAttribute('data-prod-id');
+      const prods = [...(state.products || [])];
+      const prod = prods.find(p => String(p.id) === String(prodId));
+      if (prod) {
+        prod.subtypeId = null;
+        prod.isAutoDefault = false;
+        prod.updatedAt = new Date().toISOString();
+        setProducts(prods);
+        openEditSubtypeModal(subtypeId, parentId);
+        if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+        if (typeof window.renderProductBank === 'function') window.renderProductBank();
+        await saveProduct(prod);
+      }
+    };
+  });
 }
 
 // 2. CONSOLIDATED REORGANISE MODAL (Promote, Move, Merge)
@@ -308,53 +323,58 @@ export function openSubtypeAliasModal(subtypeId, parentId) {
 
 // 4. DELETE CONFIRMATION MODAL
 export async function deleteSubtype(parentId, subtypeId) {
-  const state = getState() || {};
-  let ingredients = (state.ingredients && state.ingredients.length) ? state.ingredients : (window.state?.ingredients || []);
-  
-  // Try finding the parent by parentId first
-  let parent = ingredients.find(i => String(i.id) === String(parentId));
-  // Fallback: search all parent ingredients to find the true parent array containing the subtypeId
-  if (!parent || !Array.isArray(parent.subtypes) || !parent.subtypes.some(s => String(s.id) === String(subtypeId))) {
-    parent = ingredients.find(i => Array.isArray(i.subtypes) && i.subtypes.some(s => String(s.id) === String(subtypeId)));
-  }
-
-  if (!parent || !Array.isArray(parent.subtypes)) {
-    console.warn('[deleteSubtype] Subtype parent not found for subtypeId:', subtypeId, 'parentId:', parentId);
-    return false;
-  }
-
-  // Remove the subtype by strict ID matching
-  parent.subtypes = parent.subtypes.filter(s => String(s.id) !== String(subtypeId));
-  parent.updatedAt = new Date().toISOString();
-
-  // Find and unlink any products linked to subtypeId
-  const prods = [...(state.products || window.state?.products || [])];
-  const unlinkedProds = [];
-  prods.forEach(p => {
-    if (String(p.subtypeId) === String(subtypeId)) {
-      p.subtypeId = null;
-      p.isAutoDefault = false;
-      p.updatedAt = new Date().toISOString();
-      unlinkedProds.push(p);
+  try {
+    const state = getState() || {};
+    let ingredients = (state.ingredients && state.ingredients.length) ? state.ingredients : (window.state?.ingredients || []);
+    
+    // Try finding the parent by parentId first
+    let parent = ingredients.find(i => String(i.id) === String(parentId));
+    // Fallback: search all parent ingredients to find the true parent array containing the subtypeId
+    if (!parent || !Array.isArray(parent.subtypes) || !parent.subtypes.some(s => String(s.id) === String(subtypeId))) {
+      parent = ingredients.find(i => Array.isArray(i.subtypes) && i.subtypes.some(s => String(s.id) === String(subtypeId)));
     }
-  });
 
-  // Update central store and trigger reactive events
-  setIngredients([...ingredients]);
-  setProducts(prods);
+    if (!parent || !Array.isArray(parent.subtypes)) {
+      console.warn('[deleteSubtype] Subtype parent not found for subtypeId:', subtypeId, 'parentId:', parentId);
+      return false;
+    }
 
-  // Invalidate hierarchy cache
-  invalidateHierarchyCache();
-  if (typeof window.invalidateHierarchyCache === 'function') window.invalidateHierarchyCache();
-  if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-  if (typeof window.renderProductBank === 'function') window.renderProductBank();
+    // Remove the subtype by strict ID matching
+    parent.subtypes = parent.subtypes.filter(s => String(s.id) !== String(subtypeId));
+    parent.updatedAt = new Date().toISOString();
 
-  // Save changes to persistence layer
-  await Promise.all([
-    saveIngredient(parent),
-    ...unlinkedProds.map(p => saveProduct(p))
-  ]);
-  return true;
+    // Find and unlink any products linked to subtypeId
+    const prods = [...(state.products || window.state?.products || [])];
+    const unlinkedProds = [];
+    prods.forEach(p => {
+      if (String(p.subtypeId) === String(subtypeId)) {
+        p.subtypeId = null;
+        p.isAutoDefault = false;
+        p.updatedAt = new Date().toISOString();
+        unlinkedProds.push(p);
+      }
+    });
+
+    // Update central store and trigger reactive events
+    setIngredients([...ingredients]);
+    setProducts(prods);
+
+    // Invalidate hierarchy cache
+    invalidateHierarchyCache();
+    if (typeof window.invalidateHierarchyCache === 'function') window.invalidateHierarchyCache();
+    if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+    if (typeof window.renderProductBank === 'function') window.renderProductBank();
+
+    // Save changes to persistence layer
+    await Promise.all([
+      saveIngredient(parent),
+      ...unlinkedProds.map(p => saveProduct(p))
+    ]);
+    return true;
+  } catch (err) {
+    console.error('[deleteSubtype] Exception caught during sub-type deletion:', err);
+    throw err;
+  }
 }
 
 export function openSubtypeDeleteModal(subtypeId, parentId) {
@@ -369,18 +389,20 @@ export function openSubtypeDeleteModal(subtypeId, parentId) {
   if (!sub) return;
 
   showModal(`
-    <div style="padding: 24px; max-width: 440px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
+    <div class="modal-content" style="padding: 24px; max-width: 440px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
       <div style="font-size: 40px; margin-bottom: 12px;">⚠️</div>
       <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750; color: var(--red,#ef4444)">Delete Sub-type?</h3>
       <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 24px 0; line-height: 1.5;">
         Are you sure you want to delete <strong>"${escapeHTML(sub.name)}"</strong>? <br /><span style="font-size:12px; color:var(--text2);">Linked products will remain in your Product Bank but will be unlinked.</span>
       </p>
       <div style="display:flex; gap:8px; justify-content: center;">
-        <button type="button" class="btn" style="padding: 8px 16px;" onclick="window.closeSubtypeActionModal()">Cancel</button>
-        <button type="button" class="btn danger" style="padding: 8px 16px;" id="btn-confirm-sub-delete">Confirm Delete</button>
+        <button type="button" class="btn btn-cancel-delete" style="padding: 8px 16px;">Cancel</button>
+        <button type="button" class="btn danger btn-confirm-delete" id="btn-confirm-sub-delete" style="padding: 8px 16px;">Confirm Delete</button>
       </div>
     </div>
   `);
+
+  setupModalDelegation();
 
   const confirmBtn = document.getElementById('btn-confirm-sub-delete');
   if (confirmBtn) {
@@ -388,6 +410,25 @@ export function openSubtypeDeleteModal(subtypeId, parentId) {
       closeModal();
       await deleteSubtype(parent.id, subtypeId);
     };
+  }
+
+  const cancelBtn = document.querySelector('.btn-cancel-delete');
+  if (cancelBtn) {
+    cancelBtn.onclick = () => {
+      closeModal();
+    };
+  }
+}
+
+export function setupModalDelegation() {
+  const modalWrap = document.getElementById('view-modal-wrap');
+  if (modalWrap && !modalWrap.__delegation_bound) {
+    modalWrap.__delegation_bound = true;
+    modalWrap.addEventListener('click', (e) => {
+      if (e.target === modalWrap) {
+        closeModal();
+      }
+    });
   }
 }
 
@@ -418,6 +459,7 @@ if (typeof window !== 'undefined') {
     openIngredientReorganiseModal,
     promptReallocateProduct,
     openProductReallocateModal,
+    setupModalDelegation,
     handleSubtypeLinkRoute(action, subtypeId, parentId) {
       closeModal();
       window.__prefilledResolveBinding = { ingredientId: parentId, subtypeId: subtypeId || null };

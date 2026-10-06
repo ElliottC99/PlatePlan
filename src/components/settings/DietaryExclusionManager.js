@@ -46,7 +46,7 @@ export function renderDietaryExclusionManager(prefs = {}, settings = {}) {
         </div>
 
         <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:12px;font-weight:600;color:var(--text2)">Allergen Safety Switches</label>
+          <span class="section-label-header" style="font-size:12px;font-weight:600;color:var(--text2)">Allergen Safety Switches</span>
           <div style="display:flex;flex-direction:column;gap:6px;margin-top:2px">
             <label for="pp-setting-gf" style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
               <input type="checkbox" id="pp-setting-gf" name="glutenFree" ${prefs.glutenFree ? 'checked' : ''} style="width:15px;height:16px;accent-color:var(--purple)"> Gluten-Free Only

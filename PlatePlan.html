@@ -1042,7 +1042,7 @@ try{
 
       <div class="review-recipe-sections" style="display:grid; grid-template-columns:1fr; gap:18px; margin-top:15px;">
         <div class="field">
-          <label>Ingredients</label>
+          <span class="section-label-header" style="font-weight:bold;font-size:12px;display:block;margin-bottom:6px">Ingredients</span>
           <div id="orig-ings-list"></div>
           <button type="button" class="btn sm ghost" data-pp-click="addModalIng('orig')">+ Add ingredient</button>
         </div>
@@ -1226,13 +1226,13 @@ try{
       <div class="field"><label for="enh-changes">Key changes made</label><textarea id="enh-changes" style="min-height:60px" data-pp-input="updateSaveBothVisibility()"></textarea></div>
       <div class="review-recipe-sections" style="display:grid; grid-template-columns:1fr; gap:18px;">
         <div class="field">
-          <label>Ingredients</label>
+          <span class="section-label-header" style="font-weight:bold;font-size:12px;display:block;margin-bottom:6px">Ingredients</span>
           <div id="enh-ings-list"></div>
           <button type="button" class="btn sm ghost" data-pp-click="addModalIng('enh')">+ Add ingredient</button>
         </div>
         <div class="field" style="border-top:1px solid var(--border);padding-top:14px;">
           <div class="row-between" style="align-items:center;margin-bottom:4px;">
-            <label style="margin:0">Method</label>
+            <span class="section-label-header" style="font-weight:bold;font-size:12px;margin:0">Method</span>
             <button type="button" class="btn sm ghost" data-pp-click="copyOriginalMethodToEnhanced()">Copy From Original</button>
           </div>
           <div id="enh-method-list">

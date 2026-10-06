@@ -31,7 +31,7 @@ export function renderRecipeImportParserForm() {
 
       <div style="display:flex;flex-direction:column;gap:12px">
         <div>
-          <label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">PASTE RAW TEXT OR RECIPE BODY</label>
+          <label for="recipe-paste-text" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">PASTE RAW TEXT OR RECIPE BODY</label>
           <textarea id="recipe-paste-text" class="input" style="width:100%;height:100px;font-family:inherit;font-size:12.5px" placeholder="Paste ingredients, method, or full recipe block here..."></textarea>
         </div>
 

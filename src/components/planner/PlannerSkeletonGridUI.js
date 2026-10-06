@@ -74,7 +74,7 @@ export function renderFitScoreScopeUI({ minVal = 0, maxVal = 100 } = {}) {
     <div class="fit-score-scope-card" style="background:var(--surface2,#f8fafc);padding:14px;border-radius:12px;border:1px solid var(--border,#e2e8f0);margin-bottom:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
         <div>
-          <label style="font-size:11px;font-weight:700;color:var(--text2,#64748b);display:block;text-transform:uppercase">Fit Score Scope (${min} – ${max})</label>
+          <span class="section-label-header" style="font-size:11px;font-weight:700;color:var(--text2,#64748b);display:block;text-transform:uppercase">Fit Score Scope (${min} – ${max})</span>
           <div style="font-size:12px;color:var(--text2,#64748b);margin-top:2px">Organise and filter recipe candidates by macro fit score range.</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">

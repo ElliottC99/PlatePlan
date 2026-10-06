@@ -8,6 +8,7 @@
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
 import { stripPlanPayload } from '../models/MealPlannerModel.js';
 import { enforceCategorySSOT } from '../utils/categoryEnforcer.js';
+import { getState as getStoreState } from '../store/store.js';
 
 export { stripPlanPayload };
 
@@ -184,6 +185,9 @@ export async function getPreferences() {
 export function prunePreferences(obj) {
   if (!obj || typeof obj !== 'object') return obj;
 
+  const storeState = (typeof getStoreState === 'function') ? getStoreState() : {};
+  const currentPreferences = storeState.preferences || storeState || {};
+
   // Safe helper to deep clone so we do not mutate other logic's in-memory references unless desired
   let cloned;
   try {
@@ -239,6 +243,28 @@ export function prunePreferences(obj) {
 
   clean(cloned);
 
+  // Ensure core preferences (user macros, settings, active views) are preserved from Store state if missing in cloned
+  if (cloned.userPrefs) {
+    if (!cloned.userPrefs.nutritionTargets && currentPreferences.userPrefs?.nutritionTargets) {
+      cloned.userPrefs.nutritionTargets = currentPreferences.userPrefs.nutritionTargets;
+    }
+    if (!cloned.userPrefs.profiles && currentPreferences.userPrefs?.profiles) {
+      cloned.userPrefs.profiles = currentPreferences.userPrefs.profiles;
+    }
+    if (!cloned.userPrefs.activeView && currentPreferences.userPrefs?.activeView) {
+      cloned.userPrefs.activeView = currentPreferences.userPrefs.activeView;
+    }
+  }
+  if (!cloned.profiles && currentPreferences.profiles) {
+    cloned.profiles = currentPreferences.profiles;
+  }
+  if (!cloned.nutritionTargets && currentPreferences.nutritionTargets) {
+    cloned.nutritionTargets = currentPreferences.nutritionTargets;
+  }
+  if (!cloned.settings && currentPreferences.settings) {
+    cloned.settings = currentPreferences.settings;
+  }
+
   // Check the size of payload, and if it's still too large, let's aggressively delete large arrays/objects
   let size = 0;
   try {
@@ -270,12 +296,22 @@ export async function savePreferences(userPrefs, settings = {}) {
     if (!isDbAvailable()) return false;
     const prefRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences');
     const rootRef = db.collection('households').doc(HOUSEHOLD_ID);
-    const profiles = userPrefs?.profiles || (typeof window !== 'undefined' && window.state?.preferences?.profiles) || {};
+
+    const storeState = (typeof getStoreState === 'function') ? getStoreState() : {};
+    const storePrefs = storeState.preferences || {};
+
+    const mergedUserPrefs = {
+      ...(storePrefs.userPrefs || storePrefs || {}),
+      ...(userPrefs || {})
+    };
+
+    const profiles = mergedUserPrefs?.profiles || settings?.profiles || storePrefs?.profiles || {};
+
     let payload = {
-      userPrefs: userPrefs || {},
-      nutritionTargets: userPrefs?.nutritionTargets || {},
+      userPrefs: mergedUserPrefs,
+      nutritionTargets: mergedUserPrefs?.nutritionTargets || storePrefs?.nutritionTargets || {},
       profiles,
-      settings: settings || userPrefs?.settings || {},
+      settings: settings || mergedUserPrefs?.settings || storePrefs?.settings || {},
       updatedAt: new Date().toISOString()
     };
     

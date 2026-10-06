@@ -31,12 +31,12 @@ export function renderDualProfilePortionAllocation(portions = {}, prefix = 'enh'
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div>
-          <label style="font-size:11px;font-weight:600;color:var(--text2);display:block;margin-bottom:3px">Elliott Share (%)</label>
-          <input type="number" min="0" max="100" class="input" style="width:100%" value="${ePct}" onchange="updatePortionAllocationShare('${prefix}', 'e', this.value)">
+          <span style="font-size:11px;font-weight:600;color:var(--text2);display:block;margin-bottom:3px">Elliott Share (%)</span>
+          <input type="number" min="0" max="100" class="input" aria-label="Elliott Share (%)" style="width:100%" value="${ePct}" onchange="updatePortionAllocationShare('${prefix}', 'e', this.value)">
         </div>
         <div>
-          <label style="font-size:11px;font-weight:600;color:var(--text2);display:block;margin-bottom:3px">Chloe Share (%)</label>
-          <input type="number" min="0" max="100" class="input" style="width:100%" value="${cPct}" onchange="updatePortionAllocationShare('${prefix}', 'c', this.value)">
+          <span style="font-size:11px;font-weight:600;color:var(--text2);display:block;margin-bottom:3px">Chloe Share (%)</span>
+          <input type="number" min="0" max="100" class="input" aria-label="Chloe Share (%)" style="width:100%" value="${cPct}" onchange="updatePortionAllocationShare('${prefix}', 'c', this.value)">
         </div>
       </div>
     </div>
@@ -55,7 +55,7 @@ export function renderRecipePortionScaler(portions = {}, currentServes = 2, pref
           <div style="font-size:12px;color:var(--text2);margin-top:2px">Adjust total batch servings and member allocation split</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
-          <label style="font-size:12px;font-weight:600;color:var(--text2)">Serves:</label>
+          <label for="${prefix}-serves-input" style="font-size:12px;font-weight:600;color:var(--text2)">Serves:</label>
           <input type="number" min="1" max="20" class="input" style="width:70px;text-align:center;font-weight:700" value="${currentServes}" id="${prefix}-serves-input" onchange="updateRecipeServings('${prefix}', this.value)">
         </div>
       </div>
