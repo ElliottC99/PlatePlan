@@ -5,7 +5,7 @@
  */
 
 import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeRecipes, subscribeIngredients, subscribeProducts, subscribePreferences, subscribeCurrentPlan, getCategories, saveCategories, saveIngredient, cleanLegacyMacros } from './HouseholdRepository.js';
-import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache, setCategories } from '../store/store.js';
+import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache, setCategories, sanitizePreferences } from '../store/store.js';
 import { compareProductsByStrategy } from '../models/PantryHierarchyModel.js';
 
 export const CANONICAL_CATEGORIES = [
@@ -232,6 +232,34 @@ export async function hydrateHouseholdData() {
         getRecipes(), getIngredients(), getProducts(), getPreferences(), getCurrentPlan(), getCategories()
       ]);
 
+      const sanitizedPrefs = sanitizePreferences(preferencesData);
+
+      // Self-healing check: if original preferencesData has unmigrated keys or is oversized
+      const originalSize = new Blob([JSON.stringify(preferencesData || {})]).size;
+      const hasLegacyKeys = preferencesData && (
+        preferencesData.planHistory !== undefined ||
+        preferencesData.ingredientGroups !== undefined ||
+        preferencesData.ingredientFamilies !== undefined ||
+        (preferencesData.userPrefs && (
+          preferencesData.userPrefs.planHistory !== undefined ||
+          preferencesData.userPrefs.ingredientGroups !== undefined ||
+          preferencesData.userPrefs.ingredientFamilies !== undefined
+        ))
+      );
+
+      if (hasLegacyKeys || originalSize > 50 * 1024) {
+        console.warn(`[HydrationService] Stale/bloated preferences detected on Firestore (${(originalSize / 1024).toFixed(2)} KB). Running automatic self-healing deep-clean on boot...`);
+        import('./HouseholdRepository.js').then(repo => {
+          if (typeof repo.cleanPreferencesBloat === 'function') {
+            repo.cleanPreferencesBloat().then(res => {
+              if (res && res.success) {
+                console.log(`[HydrationService] Self-healing complete. Cleaned size: ${(res.sizeBytes / 1024).toFixed(2)} KB.`);
+              }
+            }).catch(e => console.error('[HydrationService] Self-healing failed:', e));
+          }
+        });
+      }
+
       const ingredients = (rawIngredients || []).map(normalizeIngredientRecord);
       const products = (rawProducts || []).map(normalizeProductRecord);
       const { categories: mergedCategories, mutated } = mergeCanonicalCategories(rawCategories);
@@ -239,7 +267,7 @@ export async function hydrateHouseholdData() {
       setRecipes(recipes);
       setIngredients(ingredients);
       setProducts(products);
-      setPreferences(preferencesData);
+      setPreferences(sanitizedPrefs);
       setCurrentPlan(plan);
       setCategories(mergedCategories);
 
@@ -249,7 +277,7 @@ export async function hydrateHouseholdData() {
 
       if (typeof window !== 'undefined') {
         if (!window.state) { try { window.state = {}; } catch (e) {} }
-        const docData = preferencesData || {};
+        const docData = sanitizedPrefs || {};
         const userPrefs = docData.userPrefs || docData;
         window.state.settings = { ...(window.state.settings || {}), ...(docData.settings || {}) };
         const strat = userPrefs.autoDefaultStrategy || userPrefs.autoDefaultCriterion || docData.settings?.autoDefaultStrategy || docData.settings?.autoDefaultCriterion;

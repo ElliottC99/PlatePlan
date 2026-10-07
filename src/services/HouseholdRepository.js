@@ -51,6 +51,36 @@ export function cleanLegacyMacros(target) {
   return target;
 }
 
+export function whitelistPreferences(preferences) {
+  if (!preferences || typeof preferences !== 'object') return {};
+
+  const whitelisted = {};
+  
+  // Whitelist of allowed top-level keys for preferences
+  const allowedKeys = [
+    'nutritionTargets', 'profiles', 'settings', 'theme', 'mealPlanSettings', 'activeView', 'userPrefs', 'dismissedQualityAdvisories', 'dismissedAdvisories', 'dismissed_advisories', 'updatedAt'
+  ];
+
+  Object.keys(preferences).forEach(key => {
+    // Only allow explicitly allowed configuration keys
+    if (!allowedKeys.includes(key)) {
+      console.warn(`[HouseholdRepository] Omitted non-whitelisted key from preferences: ${key}`);
+      return;
+    }
+
+    const val = preferences[key];
+    const valSizeBytes = new Blob([JSON.stringify(val)]).size;
+    if (valSizeBytes > 10240) {
+      console.warn(`[HouseholdRepository] Omitted key ${key} because its size exceeds the 10 KB safety limit (${(valSizeBytes / 1024).toFixed(2)} KB)`);
+      return;
+    }
+
+    whitelisted[key] = val;
+  });
+
+  return whitelisted;
+}
+
 export function enforcePayloadSafetyValve(payload) {
   if (!payload || typeof payload !== 'object') return payload;
 
@@ -509,6 +539,9 @@ export async function savePreferences(userPrefs, settings = {}) {
     
     // Run pruning prior to Firestore write operations
     payload = prunePreferences(payload);
+
+    // Apply strict whitelist
+    payload = whitelistPreferences(payload);
 
     // Hard Error Guard: throw a hard error if the resulting payload object contains 'recipes', 'ingredients', or 'products'
     for (const forbidden of forbiddenKeys) {
@@ -977,8 +1010,11 @@ export async function savePreferencesWithAutoPrune(preferences) {
     preferences.dismissedQualityAdvisories = preferences.dismissedQualityAdvisories.slice(-20);
   }
 
+  // Apply strict whitelist
+  const whitelistedPrefs = whitelistPreferences(preferences);
+
   // 3. Enforce 0.8 MiB Safety Valve
-  const safePrefs = enforcePayloadSafetyValve(preferences);
+  const safePrefs = enforcePayloadSafetyValve(whitelistedPrefs);
 
   // 4. Persist lightweight preferences to Local Store and Firestore
   if (typeof window !== 'undefined' && window.Store && typeof window.Store.setState === 'function') {

@@ -1,5 +1,5 @@
 /**
- * src/store/store.js (v3.21.11)
+ * src/store/store.js (v3.21.12)
  * Centralized Reactive State Store module using native browser CustomEvents for unidirectional data flow.
  * Provides microtask-wrapped event dispatching and IndexedDB caching for instant offline hydration without localStorage quotas.
  */
@@ -13,7 +13,7 @@ export { getShoppingLineStateKey };
 const DB_NAME = 'PlatePlanDB';
 const STORE_NAME = 'StateStore';
 const DB_VERSION = 1;
-const CACHE_KEY = 'plateplan_store_cache_v3.21.11';
+const CACHE_KEY = 'plateplan_store_cache_v3.21.12';
 
 const state = {
   recipes: [],
@@ -243,14 +243,44 @@ export function removeIngredientFromStore(ingredientId) {
   dispatchStateEvent('plateplan:state:ingredients', state.ingredients);
 }
 
+export function sanitizePreferences(rawPreferences) {
+  if (!rawPreferences || typeof rawPreferences !== 'object') return {};
+  
+  const cleaned = JSON.parse(JSON.stringify(rawPreferences));
+  
+  // a. Deletes top-level legacy duplicates
+  delete cleaned.planHistory;
+  delete cleaned.ingredientGroups;
+  delete cleaned.ingredientFamilies;
+  delete cleaned.userPrefs;
+
+  const keysToPurge = ['snapshots', 'history', 'cache', 'recipeSnapshots', 'ingredientCache', 'productCache', 'advisoryLogs'];
+  const deepClean = (obj) => {
+    if (!obj || typeof obj !== 'object') return;
+    keysToPurge.forEach(k => delete obj[k]);
+    Object.keys(obj).forEach(key => {
+      const lowerKey = key.toLowerCase();
+      if (keysToPurge.includes(key) || lowerKey.includes('cache') || lowerKey.includes('snapshot') || lowerKey.includes('log')) {
+        delete obj[key];
+      } else if (obj[key] && typeof obj[key] === 'object') {
+        deepClean(obj[key]);
+      }
+    });
+  };
+  deepClean(cleaned);
+
+  return cleaned;
+}
+
 /**
  * Update preferences state domain and dispatch reactive update event.
  * @param {Object|null} newPreferences 
  */
 export function setPreferences(newPreferences) {
-  state.preferences = newPreferences || null;
-  state.userPrefs = (newPreferences && newPreferences.userPrefs) ? newPreferences.userPrefs : (newPreferences || {});
-  state.settings = (newPreferences && newPreferences.settings) ? newPreferences.settings : {};
+  const safe = sanitizePreferences(newPreferences);
+  state.preferences = safe || null;
+  state.userPrefs = (safe && safe.userPrefs) ? safe.userPrefs : (safe || {});
+  state.settings = (safe && safe.settings) ? safe.settings : {};
   saveStateCache();
   dispatchStateEvent('plateplan:state:preferences', state.preferences);
 }
@@ -320,7 +350,7 @@ export async function runOptimisticMutation(domain, mutateFn, persistPromise, ro
     }
     return result;
   } catch (err) {
-    console.error(`[Store v3.21.11] Network failure in domain '${domain}', executing rollback:`, err);
+    console.error(`[Store v3.21.12] Network failure in domain '${domain}', executing rollback:`, err);
     
     if (typeof rollbackFn === 'function') {
       rollbackFn(state, previousStateSnapshot);
