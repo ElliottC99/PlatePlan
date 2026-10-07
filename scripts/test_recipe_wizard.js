@@ -1,5 +1,5 @@
 /**
- * scripts/test_recipe_wizard.js (v3.27.3)
+ * scripts/test_recipe_wizard.js (v3.27.4)
  * Automated verification test suite for:
  * 1. Compound stock parsing ("1 stock cube + 400ml water" -> qty: 1, name: "Vegetable Stock Cube")
  * 2. Universal Title Case normalization (Titles, Ingredients, Section Headers)
@@ -10,7 +10,7 @@ import { strict as assert } from 'assert';
 import { parseIngredientString, parseBulkRecipeText, toTitleCase } from '../src/services/RecipeImporter.js';
 import { getSaveButtonLabel, hasDistinctEnhancedVariant } from '../src/components/recipe/RecipeWizardState.js';
 
-console.log('=== RUNNING RECIPE WIZARD v3.27.3 VERIFICATION SUITE ===');
+console.log('=== RUNNING RECIPE WIZARD v3.27.4 VERIFICATION SUITE ===');
 
 // --- Test 1: Compound Stock Parsing ---
 console.log('\n--- Test 1: Compound Stock & Liquid Parsing ---');

@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardViews.js (v3.27.3)
+ * src/components/recipe/RecipeWizardViews.js (v3.27.4)
  * Template view rendering functions for all steps of the Recipe Ingestion Wizard.
  */
 
@@ -118,20 +118,6 @@ export function renderMacroBreakdownCrossbar(recipe, variant = 'original') {
       </div>
     </div>
   `;
-}
-
-function escapeHtml(str) {
-  return String(str ?? '').replace(/[&<>"']/g, ch => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[ch]));
-}
-
-function escapeAttr(str) {
-  return escapeHtml(str).replace(/`/g, '&#96;');
 }
 
 export function renderStepBadge() {
