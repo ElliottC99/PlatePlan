@@ -1,8 +1,8 @@
 /**
- * src/services/RecipeDetailModalService.js (v3.20.14)
+ * src/services/RecipeDetailModalService.js (v3.27.1)
  * ES6 Recipe Detail Modal Coordinator & Lifecycle Manager.
  * Orchestrates recipe inspection, live scaling, enhanced variant switching,
- * and live HSL Lerp fit score badge generation without external legacy scripts.
+ * and live HSL Lerp fit score badge generation with zero layout shifts.
  */
 
 import { renderRecipeDetailModalContent, formatRecipeIngredientRow, renderRecipeIngredientsListHTML } from '../components/recipe/RecipeDetailModalUI.js';
@@ -59,24 +59,19 @@ export function updateSinglePersonServes(val) {
   }
 }
 
-function formatIngredientDisplay(ing, scaleMultiplier = 1) {
-  const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
-  return formatRecipeIngredientRow(ing, state, scaleMultiplier);
-}
-
 function renderComparisonBadge(actual, target) {
   if (!target || target <= 0) return '';
   const diffPct = Math.round(((actual - target) / target) * 100);
   if (Math.abs(diffPct) <= 5) {
-    return `<span class="tag" style="background:rgba(16,185,129,0.12);color:var(--green,#10b981);font-weight:700;font-size:11px">On target</span>`;
+    return `<span class="tag" style="background:rgba(16,185,129,0.12);color:var(--green,#10b981);font-weight:700;font-size:10px;padding:2px 5px">On target</span>`;
   }
   const isBelow = diffPct < 0;
   const absDiff = Math.abs(diffPct);
-  const label = `${absDiff}% ${isBelow ? 'below' : 'above'} target`;
+  const label = `${absDiff}% ${isBelow ? '↓' : '↑'}`;
   const isModerate = absDiff <= 20;
   const color = isModerate ? 'var(--amber,#f59e0b)' : 'var(--red,#ef4444)';
   const bg = isModerate ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)';
-  return `<span class="tag" style="background:${bg};color:${color};font-weight:700;font-size:11px">${label}</span>`;
+  return `<span class="tag" style="background:${bg};color:${color};font-weight:700;font-size:10px;padding:2px 5px">${label}</span>`;
 }
 
 export function renderRecipePreview() {
@@ -100,24 +95,32 @@ export function renderRecipePreview() {
     ? (previewState.targetServes / serves)
     : (previewState.singleServes / serves);
 
-  // Render ingredients list handling all schema variations
+  // Render ingredients list handling all schema variations & sections
   const rawIngs = activeR.ingredients || activeR.parsedIngredients || activeR.rawIngredients ||
                   r.ingredients || r.parsedIngredients || r.rawIngredients || [];
   const ingredients = Array.isArray(rawIngs) ? rawIngs : (typeof rawIngs === 'object' ? Object.values(rawIngs) : []);
+  const sections = Array.isArray(activeR.ingredientSections) && activeR.ingredientSections.length > 0
+    ? activeR.ingredientSections
+    : (Array.isArray(r.ingredientSections) && r.ingredientSections.length > 0 ? r.ingredientSections : []);
 
   const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
-  const ingredientsHtml = renderRecipeIngredientsListHTML(ingredients, state, scaleMultiplier);
+  const ingredientsHtml = renderRecipeIngredientsListHTML(ingredients, state, scaleMultiplier, sections);
 
   // Render method steps
   const steps = Array.isArray(activeR.method || activeR.steps) ? (activeR.method || activeR.steps) : [];
-  const methodHtml = `
-    <ol class="recipe-view-method-list" style="padding-left:20px;margin:0;display:flex;flex-direction:column;gap:8px">
+  const methodHtml = steps.length ? `
+    <div class="recipe-view-method-list" style="display:flex;flex-direction:column;gap:10px">
       ${steps.map((st, i) => {
         const text = typeof st === 'string' ? st : (st.instruction || st.text || JSON.stringify(st));
-        return `<li style="font-size:13px;line-height:1.5;color:var(--text)">${text}</li>`;
+        return `
+          <div class="recipe-method-step-card">
+            <span class="step-num">${i + 1}</span>
+            <div>${text}</div>
+          </div>
+        `;
       }).join('')}
-    </ol>
-  `;
+    </div>
+  ` : `<div style="font-size:12.5px;color:var(--text2);font-style:italic">No method instructions recorded.</div>`;
 
   // Calculate dual-profile per-portion macros & live target comparison badges
   const userPrefs = state.preferences || state.userPrefs || {};
@@ -154,57 +157,46 @@ export function renderRecipePreview() {
   const cTargetCal = cDetails.kcalTarget || 0;
   const cTargetProt = cDetails.proteinTarget || 0;
 
+  // Compact horizontal chips side-by-side for Elliott & Chloe
   const macroCardsHtml = `
-    <div class="per-portion-macro-breakdown" style="display:flex;flex-direction:column;gap:10px;margin:14px 0;">
-      <div style="font-size:13px;font-weight:750;color:var(--text);display:flex;align-items:center;justify-content:space-between">
-        <span>Per-Portion Macro Breakdown</span>
-        <span style="font-size:11px;color:var(--text2);font-weight:600">Elliott (${eSharePct}%) / Chloe (${cSharePct}%)</span>
+    <div class="card portion-macro-card" style="padding:8px 12px;border-radius:10px;background:var(--surface,#fff);border:1px solid ${previewState.servingMode === 'elliott' ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'};min-width:160px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+      <div style="font-weight:700;font-size:12px;color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;">
+        <span>👤 Elliott</span>
+        <span style="font-size:10.5px;font-weight:600;color:var(--text2)">${eSharePct}% split</span>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(230px, 1fr));gap:10px;">
-        <div class="card portion-macro-card" style="padding:12px;border-radius:10px;background:var(--surface2);border:1px solid ${previewState.servingMode === 'elliott' ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'}">
-          <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">
-            <span>👤 Elliott's Portion</span>
-            <span style="font-size:11px;font-weight:600;color:var(--text2)">${eSharePct}% split</span>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:4px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px">
-              <span>🔥 <strong>${eKcal} kcal</strong></span>
-              ${renderComparisonBadge(eKcal, eTargetCal)}
-            </div>
-            ${eTargetCal ? `<div style="font-size:11px;color:var(--text3)">Target: ${eTargetCal} kcal</div>` : ''}
-            <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;margin-top:2px">
-              <span>🥩 <strong>${eProt}g protein</strong></span>
-              ${renderComparisonBadge(eProt, eTargetProt)}
-            </div>
-            ${eTargetProt ? `<div style="font-size:11px;color:var(--text3)">Target: ${eTargetProt}g</div>` : ''}
-          </div>
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;gap:6px">
+          <span>🔥 <strong>${eKcal} kcal</strong></span>
+          ${renderComparisonBadge(eKcal, eTargetCal)}
         </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;gap:6px">
+          <span>🥩 <strong>${eProt}g protein</strong></span>
+          ${renderComparisonBadge(eProt, eTargetProt)}
+        </div>
+      </div>
+    </div>
 
-        <div class="card portion-macro-card" style="padding:12px;border-radius:10px;background:var(--surface2);border:1px solid ${previewState.servingMode === 'chloe' ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'}">
-          <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">
-            <span>👤 Chloe's Portion</span>
-            <span style="font-size:11px;font-weight:600;color:var(--text2)">${cSharePct}% split</span>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:4px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px">
-              <span>🔥 <strong>${cKcal} kcal</strong></span>
-              ${renderComparisonBadge(cKcal, cTargetCal)}
-            </div>
-            ${cTargetCal ? `<div style="font-size:11px;color:var(--text3)">Target: ${cTargetCal} kcal</div>` : ''}
-            <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;margin-top:2px">
-              <span>🥩 <strong>${cProt}g protein</strong></span>
-              ${renderComparisonBadge(cProt, cTargetProt)}
-            </div>
-            ${cTargetProt ? `<div style="font-size:11px;color:var(--text3)">Target: ${cTargetProt}g</div>` : ''}
-          </div>
-        </div>
+    <div class="card portion-macro-card" style="padding:8px 12px;border-radius:10px;background:var(--surface,#fff);border:1px solid ${previewState.servingMode === 'chloe' ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'};min-width:160px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+      <div style="font-weight:700;font-size:12px;color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;">
+        <span>👤 Chloe</span>
+        <span style="font-size:10.5px;font-weight:600;color:var(--text2)">${cSharePct}% split</span>
       </div>
-      <div style="font-size:11.5px;color:var(--text2);display:flex;justify-content:space-between;padding:0 2px">
-        <span>Baseline: ${baselineCal} kcal · ${baselineProt}g protein</span>
-        <span>Serves: ${serves} baseline</span>
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;gap:6px">
+          <span>🔥 <strong>${cKcal} kcal</strong></span>
+          ${renderComparisonBadge(cKcal, cTargetCal)}
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;gap:6px">
+          <span>🥩 <strong>${cProt}g protein</strong></span>
+          ${renderComparisonBadge(cProt, cTargetProt)}
+        </div>
       </div>
     </div>
   `;
+
+  const totalIngredientsCount = sections.length
+    ? sections.reduce((acc, s) => acc + (Array.isArray(s.ingredients) ? s.ingredients.length : 0), 0)
+    : ingredients.length;
 
   const html = renderRecipeDetailModalContent({
     r,
@@ -219,10 +211,12 @@ export function renderRecipePreview() {
     instanceId: previewState.instanceId,
     servingModeBannerHtml: '',
     allocationAndTargetHtml: '',
-    sourceHtml: r.source ? `<div style="font-size:12px;color:var(--text2);margin-bottom:8px">Source: ${r.source}</div>` : '',
+    sourceHtml: r.source ? `<span>Source: <strong>${r.source}</strong></span>` : '',
     ingredientsHtml,
     methodHtml,
-    macroCardsHtml
+    macroCardsHtml,
+    ingredientsCount: totalIngredientsCount,
+    stepsCount: steps.length
   });
 
   modalContent.innerHTML = html;

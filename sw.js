@@ -1,12 +1,13 @@
 /**
- * sw.js (v3.26.0)
+ * sw.js (v3.27.1)
  * Service Worker for PlatePlan PWA offline support & asset caching.
  * Caches core app shell, modern ES6 modules, stylesheets, and icons.
  */
 
-const PLATEPLAN_CACHE = 'plateplan-shell-v3.26.0';
-const PLATEPLAN_APP_VERSION = '3.26.0';
-const PLATEPLAN_BUILD_ID = '3.26.0-v276';
+const PLATEPLAN_CACHE = 'plateplan-cache-v3.27.1';
+const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.27.1';
+const PLATEPLAN_APP_VERSION = '3.27.1';
+const PLATEPLAN_BUILD_ID = '3.27.1-v281';
 
 const PLATEPLAN_PRECACHE_ASSETS = [
   '/',
@@ -125,9 +126,9 @@ self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(PLATEPLAN_CACHE).then(async cache => {
-      console.log(`[SW v3.19.16] Precaching shell and core ES6 modules...`);
+      console.log(`[SW v3.27.0] Precaching shell and core ES6 modules...`);
       await cache.addAll(PLATEPLAN_PRECACHE_ASSETS).catch(err => {
-        console.warn('[SW v3.19.16] Non-fatal precache warning:', err);
+        console.warn('[SW v3.27.0] Non-fatal precache warning:', err);
       });
       await Promise.allSettled(PLATEPLAN_OPTIONAL_SHELL.map(url => cache.add(url)));
     })
@@ -139,9 +140,9 @@ self.addEventListener('activate', event => {
     caches.keys().then(keys => {
       return Promise.all(
         keys
-          .filter(key => key !== PLATEPLAN_CACHE)
+          .filter(key => key !== PLATEPLAN_CACHE && key !== PLATEPLAN_IMAGE_CACHE)
           .map(key => {
-            console.log('[SW v3.19.16] Purging previous shell cache:', key);
+            console.log('[SW v3.27.0] Purging legacy cache:', key);
             return caches.delete(key);
           })
       );
@@ -168,31 +169,66 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (!url.protocol.startsWith('http')) return;
 
-  // Stale-While-Revalidate / Network-First with Cache Fallback for app assets
+  // 1. Bypass SW interception for Firestore / API / Auth database streams
+  if (url.hostname.includes('firestore.googleapis.com') || url.hostname.includes('firebaseio.com') || url.pathname.includes('/__/auth/')) {
+    return; // Network-Only direct pass-through
+  }
+
+  // 2. Stale-While-Revalidate for external images / recipe thumbnails (capped at 50 items)
+  if (url.hostname.includes('unsplash.com') || url.hostname.includes('images') || (url.pathname.match(/\.(png|jpg|jpeg|svg|webp|gif)$/i) && url.origin !== self.location.origin)) {
+    event.respondWith(
+      caches.open(PLATEPLAN_IMAGE_CACHE).then(async cache => {
+        const cachedResponse = await cache.match(event.request);
+        const fetchPromise = fetch(event.request).then(networkResponse => {
+          if (networkResponse && networkResponse.ok) {
+            cache.put(event.request, networkResponse.clone());
+            cache.keys().then(keys => {
+              if (keys.length > 50) {
+                cache.delete(keys[0]);
+              }
+            });
+          }
+          return networkResponse;
+        }).catch(() => cachedResponse);
+
+        return cachedResponse || fetchPromise;
+      })
+    );
+    return;
+  }
+
+  // 3. Cache-First with fallback to network for static core assets (JS, CSS, HTML, origin requests)
   if (url.origin === self.location.origin) {
     event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(PLATEPLAN_CACHE).then(cache => cache.put(event.request, copy)).catch(() => {});
-          }
-          return response;
-        })
-        .catch(() => {
-          return caches.match(event.request).then(cached => {
-            if (cached) return cached;
+      caches.match(event.request).then(cached => {
+        if (cached) {
+          fetch(event.request).then(response => {
+            if (response && response.ok) {
+              caches.open(PLATEPLAN_CACHE).then(cache => cache.put(event.request, response)).catch(() => {});
+            }
+          }).catch(() => {});
+          return cached;
+        }
+        return fetch(event.request)
+          .then(response => {
+            if (response && response.ok) {
+              const copy = response.clone();
+              caches.open(PLATEPLAN_CACHE).then(cache => cache.put(event.request, copy)).catch(() => {});
+            }
+            return response;
+          })
+          .catch(() => {
             if (event.request.mode === 'navigate') {
               return caches.match('/PlatePlan.html') || caches.match('/');
             }
             return new Response('Offline resource not found', { status: 503, statusText: 'Service Unavailable' });
           });
-        })
+      })
     );
     return;
   }
 
-  // Cache-first for external CDN resources (Firebase SDKs, etc.)
+  // 4. Fallback for external CDN resources (Firebase SDKs, fonts, etc.)
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;

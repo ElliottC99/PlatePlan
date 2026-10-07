@@ -1,11 +1,9 @@
 /**
- * src/components/recipe/RecipeDetailModalUI.js (v3.20.14)
+ * src/components/recipe/RecipeDetailModalUI.js (v3.27.1)
  * Modular Presentation Component for Recipe Detail & Scaling Preview Modal.
- * Renders Recipe Ingredient rows as: [Ingredient] / [Sub-type] - [Brand Name] [Product Name]
- * with graceful fallbacks if brand/product are unmapped.
+ * Renders Full-Width Header Crossbar & Two-Column Grid (Ingredients Left, Method Right).
  */
 
-import { calculateMealFitScore } from '../../services/FitScoreService.js';
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
 import { formatGarlicQuantity, UNIT_TO_GRAMS } from '../../utils/unitConverter.js';
 
@@ -41,9 +39,7 @@ function formatBrandProductPair(product, fallbackBrand = '', fallbackProductName
 }
 
 /**
- * Formats a recipe ingredient row as:
- * "[Ingredient] / [Sub-type] - [Brand Name] [Product Name]"
- * (e.g., "Beans / Baked - Heinz Baked Beans") with graceful fallbacks when unmapped.
+ * Formats a recipe ingredient row with hierarchical taxonomy and scaled volumes.
  */
 export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1) {
   if (!ing) return '';
@@ -135,7 +131,6 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
     formattedLine = formatGarlicQuantity(ingObj || { name: ingredientLabel, id: ingObj?.id || 'garlic_fresh' }, weightG);
   }
 
-
   let qtyPrefix = '';
   if (!isFreshGarlic && qty !== undefined && qty !== null && qty !== '') {
     qtyPrefix = [scaledQty, unit].filter(Boolean).join('');
@@ -145,7 +140,32 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
   return comment ? `${fullText} — ${comment}` : fullText;
 }
 
-export function renderRecipeIngredientsListHTML(ingredients = [], state = null, scaleMultiplier = 1) {
+/**
+ * Renders ingredients list with section groupings or flat items.
+ */
+export function renderRecipeIngredientsListHTML(ingredients = [], state = null, scaleMultiplier = 1, sections = []) {
+  if (Array.isArray(sections) && sections.length > 0) {
+    return `
+      <div class="recipe-view-sections-wrapper" style="display:flex;flex-direction:column;gap:14px">
+        ${sections.map(sec => {
+          const secTitle = escapeHtml(sec.sectionTitle || 'Ingredients');
+          const secList = Array.isArray(sec.ingredients) ? sec.ingredients : [];
+          return `
+            <div class="recipe-ingredient-section-group">
+              <h4 style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;margin:0 0 6px 0;padding-bottom:4px;border-bottom:1px solid var(--border)">${secTitle}</h4>
+              <ul class="recipe-view-ingredients-list" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:5px">
+                ${secList.map(ing => {
+                  const text = formatRecipeIngredientRow(ing, state, scaleMultiplier);
+                  return `<li style="font-size:13px;color:var(--text);padding:4px 0;border-bottom:1px solid var(--border-subtle, rgba(0,0,0,0.04))">• ${escapeHtml(text)}</li>`;
+                }).join('')}
+              </ul>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
   const list = Array.isArray(ingredients) ? ingredients : [];
   if (!list.length) {
     return `<div style="font-size:12.5px;color:var(--text2);font-style:italic">No ingredients listed.</div>`;
@@ -160,6 +180,9 @@ export function renderRecipeIngredientsListHTML(ingredients = [], state = null, 
   `;
 }
 
+/**
+ * Main View Recipe Modal Content Renderer with Full-Width Crossbar & Two-Column Grid.
+ */
 export function renderRecipeDetailModalContent({
   r = {},
   activeR = {},
@@ -176,13 +199,14 @@ export function renderRecipeDetailModalContent({
   sourceHtml = '',
   ingredientsHtml = '',
   methodHtml = '',
-  macroCardsHtml = ''
+  macroCardsHtml = '',
+  ingredientsCount = 0,
+  stepsCount = 0
 } = {}) {
   const variantKey = isEnh ? 'enhanced' : 'original';
   const name = escapeHtml(activeR.name || r.name || 'Untitled Recipe');
   const favBtnClass = isFav ? 'active' : '';
 
-  // Compute live score for active profile and slot
   const recipe = activeR || r;
   const slot = mealType || 'dinner';
   const fitBadgeHtml = renderFitScoreBadge(recipe, slot, { 
@@ -217,67 +241,151 @@ export function renderRecipeDetailModalContent({
           <button type="button" class="modal-close-btn recipe-view-close-btn" onclick="closeRecipePreview()" aria-label="Close">&times;</button>
         </div>
       </div>
-      <div class="recipe-view-body">
-        <style>
-          .recipe-view-grid-layout {
-            display: grid;
-            grid-template-columns: 40% 60%;
-            gap: 24px;
-            align-items: start;
-          }
-          @media (max-width: 768px) {
-            .recipe-view-grid-layout {
-              grid-template-columns: 1fr;
-              gap: 16px;
-            }
-          }
-        </style>
-        <div class="recipe-view-grid-layout">
-          <!-- Left Column (40%): Portion selector, Macros, Source, Ingredients -->
-          <div class="recipe-view-left-col" style="display:flex;flex-direction:column;gap:14px;min-width:0">
-            <div class="recipe-view-controls-bar">
-              ${hasEnh ? `
-                <div class="segmented-control" role="tablist" style="width:fit-content;margin-bottom:8px;">
-                  <button type="button" role="tab" class="${!isEnh ? 'active' : ''}" onclick="switchViewTab('original')">Original</button>
-                  <button type="button" role="tab" class="${isEnh ? 'active' : ''}" onclick="switchViewTab('enhanced')">✨ Enhanced</button>
-                </div>
-              ` : ''}
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                <div class="segmented-control" role="tablist">
-                  <button type="button" role="tab" class="${servingMode === 'both' ? 'active' : ''}" onclick="switchPreviewServingMode('both')">Shared (${activeR.serves || 2})</button>
-                  <button type="button" role="tab" class="${servingMode === 'elliott' ? 'active' : ''}" onclick="switchPreviewServingMode('elliott')">👤 Elliott only</button>
-                  <button type="button" role="tab" class="${servingMode === 'chloe' ? 'active' : ''}" onclick="switchPreviewServingMode('chloe')">👤 Chloe only</button>
-                </div>
-                ${servingMode === 'both' ? `
-                  <div style="display:flex;align-items:center;gap:8px;font-size:13px;">
-                    <label for="preview-serves" style="font-weight:650;color:var(--text)">Servings:</label>
-                    <input type="number" id="preview-serves" name="previewServes" value="${targetServes}" oninput="updateRecipePreviewScale(this.value)" style="width:70px;min-height:36px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);font-weight:700;text-align:center" min="1" step="1">
-                  </div>
-                ` : `
-                  <div style="display:flex;align-items:center;gap:8px;font-size:13px;">
-                    <label for="preview-single-serves" style="font-weight:650;color:var(--text)">Servings:</label>
-                    <input type="number" id="preview-single-serves" name="previewSingleServes" value="${singleServes}" oninput="updateSinglePersonServes(this.value)" style="width:70px;min-height:36px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);font-weight:700;text-align:center" min="1" step="1">
-                  </div>
-                `}
-              </div>
-            </div>
-            ${servingModeBannerHtml}
-            ${allocationAndTargetHtml}
-            ${sourceHtml}
-            ${macroCardsHtml}
-            <div class="recipe-view-section">
-              <h3 style="margin-bottom:10px;font-size:15px;font-weight:700;color:var(--text)">Ingredients</h3>
-              ${ingredientsHtml}
-            </div>
-          </div>
 
-          <!-- Right Column (60%): Method instructions -->
-          <div class="recipe-view-right-col" style="display:flex;flex-direction:column;gap:14px;min-width:0">
-            <div class="recipe-view-section">
-              <h3 style="margin-bottom:10px;font-size:15px;font-weight:700;color:var(--text)">Method</h3>
-              ${methodHtml}
+      <style>
+        .recipe-modal-crossbar {
+          width: 100%;
+          background: var(--surface2, #f5f4ee);
+          border: 1px solid var(--border, #e5e5e5);
+          border-radius: 12px;
+          padding: 12px 16px;
+          margin-bottom: 20px;
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: space-between;
+          align-items: center;
+          gap: 14px;
+        }
+        .recipe-modal-crossbar-controls {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 12px;
+          flex: 1 1 300px;
+        }
+        .recipe-modal-crossbar-macros {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 10px;
+          flex: 1 1 360px;
+        }
+        .recipe-modal-body {
+          display: grid;
+          grid-template-columns: 1fr 1.2fr;
+          gap: 22px;
+          align-items: start;
+        }
+        @media (max-width: 768px) {
+          .recipe-modal-crossbar {
+            flex-direction: column;
+            align-items: stretch;
+            padding: 12px;
+            gap: 12px;
+          }
+          .recipe-modal-crossbar-macros {
+            justify-content: stretch;
+          }
+          .recipe-modal-body {
+            grid-template-columns: 1fr;
+            gap: 18px;
+          }
+        }
+        .recipe-modal-col-card {
+          background: var(--surface, #ffffff);
+          border: 1px solid var(--border, #e5e5e5);
+          border-radius: 12px;
+          padding: 16px 18px;
+        }
+        .recipe-method-step-card {
+          position: relative;
+          padding: 12px 14px 12px 42px;
+          margin-bottom: 10px;
+          background: var(--surface2, #faf9f6);
+          border: 1px solid var(--border, #eee);
+          border-radius: 10px;
+          font-size: 13.5px;
+          line-height: 1.6;
+          color: var(--text);
+        }
+        .recipe-method-step-card:last-child {
+          margin-bottom: 0;
+        }
+        .recipe-method-step-card .step-num {
+          position: absolute;
+          left: 12px;
+          top: 12px;
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          background: var(--text, #292524);
+          color: var(--bg, #fff);
+          font-size: 11px;
+          font-weight: 700;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+      </style>
+
+      ${sourceHtml ? `<div class="recipe-source-bar" style="font-size:12px;color:var(--text2);margin-bottom:12px">${sourceHtml}</div>` : ''}
+
+      <!-- Top Full-Width Horizontal Crossbar -->
+      <div class="recipe-modal-crossbar">
+        <!-- Left: Controls -->
+        <div class="recipe-modal-crossbar-controls">
+          ${hasEnh ? `
+            <div class="segmented-control" role="tablist" style="width:fit-content;">
+              <button type="button" role="tab" class="${!isEnh ? 'active' : ''}" onclick="switchViewTab('original')">Original</button>
+              <button type="button" role="tab" class="${isEnh ? 'active' : ''}" onclick="switchViewTab('enhanced')">✨ Enhanced</button>
             </div>
+          ` : ''}
+          <div class="segmented-control" role="tablist">
+            <button type="button" role="tab" class="${servingMode === 'both' ? 'active' : ''}" onclick="switchPreviewServingMode('both')">Shared (${activeR.serves || 2})</button>
+            <button type="button" role="tab" class="${servingMode === 'elliott' ? 'active' : ''}" onclick="switchPreviewServingMode('elliott')">👤 Elliott</button>
+            <button type="button" role="tab" class="${servingMode === 'chloe' ? 'active' : ''}" onclick="switchPreviewServingMode('chloe')">👤 Chloe</button>
           </div>
+          ${servingMode === 'both' ? `
+            <div style="display:flex;align-items:center;gap:6px;font-size:13px;">
+              <label for="preview-serves" style="font-weight:650;color:var(--text)">Servings:</label>
+              <input type="number" id="preview-serves" name="previewServes" value="${targetServes}" oninput="updateRecipePreviewScale(this.value)" style="width:62px;min-height:34px;padding:4px 6px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-weight:700;text-align:center" min="1" step="1">
+            </div>
+          ` : `
+            <div style="display:flex;align-items:center;gap:6px;font-size:13px;">
+              <label for="preview-single-serves" style="font-weight:650;color:var(--text)">Servings:</label>
+              <input type="number" id="preview-single-serves" name="previewSingleServes" value="${singleServes}" oninput="updateSinglePersonServes(this.value)" style="width:62px;min-height:34px;padding:4px 6px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-weight:700;text-align:center" min="1" step="1">
+            </div>
+          `}
+        </div>
+
+        <!-- Right: Per-Portion Macro Breakdown Compact Cards -->
+        <div class="recipe-modal-crossbar-macros">
+          ${macroCardsHtml}
+        </div>
+      </div>
+
+      ${servingModeBannerHtml ? `<div style="margin-bottom:12px">${servingModeBannerHtml}</div>` : ''}
+      ${allocationAndTargetHtml ? `<div style="margin-bottom:12px">${allocationAndTargetHtml}</div>` : ''}
+
+      <!-- Main Body: Two-Column Side-by-Side Grid (Ingredients Left, Method Right) -->
+      <div class="recipe-modal-body recipe-view-grid-layout">
+        <!-- Left Column: Ingredients -->
+        <div class="recipe-modal-col-ingredients recipe-modal-col-card" style="min-width:0">
+          <h3 style="margin-top:0;margin-bottom:12px;font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;justify-content:space-between">
+            <span>🥗 Ingredients</span>
+            ${ingredientsCount > 0 ? `<span style="font-size:12px;font-weight:600;color:var(--text2)">${ingredientsCount} items</span>` : ''}
+          </h3>
+          ${ingredientsHtml}
+        </div>
+
+        <!-- Right Column: Method Steps -->
+        <div class="recipe-modal-col-method recipe-modal-col-card" style="min-width:0">
+          <h3 style="margin-top:0;margin-bottom:12px;font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;justify-content:space-between">
+            <span>👨‍🍳 Method</span>
+            ${stepsCount > 0 ? `<span style="font-size:12px;font-weight:600;color:var(--text2)">${stepsCount} steps</span>` : ''}
+          </h3>
+          ${methodHtml}
         </div>
       </div>
     </div>

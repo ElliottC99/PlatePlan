@@ -29,7 +29,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * src/main.js (v3.25.0)
+ * src/main.js (v3.27.1)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronisation,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -53,6 +53,7 @@ import { renderFitScoreBadge } from './components/FitScoreBadge.js';
 import { renderSyncPanelModal, closeSyncPanelModal } from './components/sync/SyncPanelUI.js';
 import './components/recipe/BulkRecipeImporterModal.js';
 import './components/recipe/RecipeWizardModal.js';
+import './components/shell/OfflineBanner.js';
 
 // Global Compatibility Shims for Legacy References
 if (typeof window !== 'undefined') {

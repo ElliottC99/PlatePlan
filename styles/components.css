@@ -374,6 +374,14 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
 .recipe-view-close-btn{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text2);background:var(--surface2);border:1px solid var(--border);cursor:pointer;transition:all 0.15s ease}
 .recipe-view-close-btn:hover{color:var(--text);background:var(--surface)}
 .recipe-view-body{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;padding:18px 20px 24px}
+.recipe-modal-crossbar{width:100%;background:var(--surface2, #f5f4ee);border:1px solid var(--border, #e5e5e5);border-radius:12px;padding:12px 16px;margin-bottom:20px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px}
+.recipe-modal-crossbar-controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px;flex:1 1 300px}
+.recipe-modal-crossbar-macros{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px;flex:1 1 360px}
+.recipe-modal-body{display:grid;grid-template-columns:1fr 1.2fr;gap:22px;align-items:start}
+.recipe-modal-col-card{background:var(--surface, #ffffff);border:1px solid var(--border, #e5e5e5);border-radius:12px;padding:16px 18px}
+.recipe-method-step-card{position:relative;padding:12px 14px 12px 42px;margin-bottom:10px;background:var(--surface2, #faf9f6);border:1px solid var(--border, #eee);border-radius:10px;font-size:13.5px;line-height:1.6;color:var(--text)}
+.recipe-method-step-card:last-child{margin-bottom:0}
+.recipe-method-step-card .step-num{position:absolute;left:12px;top:12px;width:22px;height:22px;border-radius:50%;background:var(--text, #292524);color:var(--bg, #fff);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
 .recipe-view-controls-bar{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
 .recipe-view-serving-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-control, 12px);margin-bottom:16px;flex-wrap:wrap}
 .recipe-view-serving-info{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:650;color:var(--text)}
