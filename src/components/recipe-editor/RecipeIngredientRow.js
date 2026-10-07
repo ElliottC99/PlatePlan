@@ -44,7 +44,7 @@ export function renderIngredientRowHtml(p, prefix, options = {}) {
 
   const stockCheck = checkStockCubeWaterRequirement({ ...p, name: displayName });
   const waterInputHtml = stockCheck.requiresWaterInput ? `
-    <div class="review-stock-water-container" style="grid-column: 1 / -1; display:flex; align-items:center; gap:8px; padding:6px 10px; background:var(--surface2); border-radius:6px; font-size:11.5px; margin-top:4px; border:1px dashed var(--border);">
+    <div class="r-stock-water-wrapper" style="grid-column: 1 / -1; display:flex; align-items:center; gap:8px; padding:6px 10px; background:var(--surface2); border-radius:6px; font-size:11.5px; margin-top:4px; border:1px dashed var(--border);">
       <span style="font-weight:600; color:var(--text);">💧 Required Water Volume for Stock Cube (ml):</span>
       <input type="number" class="r-stock-water" value="${escapeAttr(p.stockWaterMl || stockCheck.defaultWaterMlPerCube || '400')}" style="width:90px; padding:3px 6px; font-size:11.5px;" min="0" step="50" oninput="recalcModal('${escapeAttr(prefix)}')">
       <span style="color:var(--text2);">(ml water needed)</span>
