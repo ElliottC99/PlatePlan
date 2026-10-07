@@ -1,5 +1,5 @@
 /**
- * src/store/store.js (v3.22.1)
+ * src/store/store.js (v3.26.0)
  * Centralized Reactive State Store module using native browser CustomEvents for unidirectional data flow.
  * Provides microtask-wrapped event dispatching and IndexedDB caching for instant offline hydration without localStorage quotas.
  */
@@ -15,7 +15,7 @@ export { getShoppingLineStateKey };
 const DB_NAME = 'PlatePlanDB';
 const STORE_NAME = 'StateStore';
 const DB_VERSION = 1;
-const CACHE_KEY = 'plateplan_store_cache_v3.22.1';
+const CACHE_KEY = 'plateplan_store_cache_v3.26.0';
 
 const state = {
   recipes: [],
@@ -300,12 +300,30 @@ export function setCurrentPlan(newPlan) {
 
 /**
  * Update shopping list state domain and dispatch reactive update event.
- * @param {Array<Object>} newShoppingList 
+ * Supports both raw item arrays and full shopping list objects with persistence.
+ * @param {Array<Object>|Object|null} listOrArray 
  */
-export function setShoppingList(newShoppingList) {
-  state.shoppingList = Array.isArray(newShoppingList) ? newShoppingList : [];
+export async function setShoppingList(listOrArray) {
+  if (Array.isArray(listOrArray)) {
+    state.shoppingList = listOrArray;
+  } else if (listOrArray && typeof listOrArray === 'object') {
+    state.shoppingList = Array.isArray(listOrArray.items) ? listOrArray.items : [];
+  } else {
+    state.shoppingList = [];
+  }
+  
   saveStateCache();
   dispatchStateEvent('plateplan:state:shopping', state.shoppingList);
+  dispatchStateEvent('plateplan:state:shoppingList', state.shoppingList);
+
+  if (listOrArray && !Array.isArray(listOrArray) && listOrArray.id) {
+    try {
+      const { saveShoppingList } = await import('../repositories/ShoppingListRepository.js');
+      await saveShoppingList(listOrArray);
+    } catch (err) {
+      console.warn('[Store] Failed to persist shopping list:', err);
+    }
+  }
 }
 
 /**
@@ -536,6 +554,88 @@ export async function learnIngredientAlias(ingredientId, rawString) {
   }
 }
 
+
+
+/**
+ * Toggle checked status of a shopping item.
+ * @param {string} itemId 
+ */
+export async function toggleShoppingItem(itemId) {
+  const item = state.shoppingList.find(i => i.id === itemId);
+  if (!item) return;
+
+  item.isChecked = !item.isChecked;
+  saveStateCache();
+  dispatchStateEvent('plateplan:state:shoppingList', state.shoppingList);
+
+  // If checked off while shopping, optionally replenish pantry stock
+  if (item.isChecked && item.ingredientId) {
+    try {
+      const invItem = {
+        id: `inv_${item.ingredientId}`,
+        ingredientId: item.ingredientId,
+        customName: item.name,
+        status: 'in_stock',
+        isUseUp: false,
+        quantity: item.buyQty || item.requiredQty || 1,
+        unit: item.unit || 'qty',
+        updatedAt: new Date().toISOString()
+      };
+      const { savePantryItem } = await import('../repositories/InventoryRepository.js');
+      await savePantryItem(invItem);
+      
+      const existingInv = state.inventory.find(i => i.id === invItem.id);
+      if (existingInv) {
+        existingInv.status = 'in_stock';
+        existingInv.quantity = invItem.quantity;
+      } else {
+        state.inventory.push(invItem);
+      }
+      dispatchStateEvent('plateplan:state:inventory', state.inventory);
+    } catch (err) {
+      console.warn('[Store] Failed to replenish pantry stock on shopping checkoff:', err);
+    }
+  }
+}
+
+/**
+ * Add a manual item to the shopping list.
+ * @param {Object} newItem 
+ */
+export async function addManualShoppingItem(newItem) {
+  const item = {
+    id: `item_${Math.random().toString(36).substr(2, 9)}`,
+    ingredientId: newItem.ingredientId || '',
+    name: newItem.name || 'Custom Item',
+    category: newItem.category || 'Uncategorized',
+    requiredQty: Number(newItem.requiredQty) || 1,
+    inStockQty: 0,
+    buyQty: Number(newItem.requiredQty) || 1,
+    unit: newItem.unit || 'qty',
+    isChecked: false,
+    isManualAdd: true,
+    ...newItem
+  };
+
+  state.shoppingList.push(item);
+  saveStateCache();
+  dispatchStateEvent('plateplan:state:shoppingList', state.shoppingList);
+}
+
+/**
+ * Update quantity for a shopping list item.
+ * @param {string} itemId 
+ * @param {number} newQty 
+ */
+export async function updateShoppingItemQty(itemId, newQty) {
+  const item = state.shoppingList.find(i => i.id === itemId);
+  if (!item) return;
+
+  item.buyQty = Math.max(0, Number(newQty) || 0);
+  saveStateCache();
+  dispatchStateEvent('plateplan:state:shoppingList', state.shoppingList);
+}
+
 /**
  * Update global state with a partial patch object.
  * @param {Object} patch 
@@ -585,6 +685,10 @@ if (typeof window !== 'undefined') {
   window.swapPlanRecipe = swapPlanRecipe;
   window.clearPlan = clearPlan;
   window.learnIngredientAlias = learnIngredientAlias;
+  window.setShoppingList = setShoppingList;
+  window.toggleShoppingItem = toggleShoppingItem;
+  window.addManualShoppingItem = addManualShoppingItem;
+  window.updateShoppingItemQty = updateShoppingItemQty;
   window.Store = {
     getState,
     setState: (patch) => {
@@ -597,6 +701,10 @@ if (typeof window !== 'undefined') {
     updatePlanMeal,
     swapPlanRecipe,
     clearPlan,
+    setShoppingList,
+    toggleShoppingItem,
+    addManualShoppingItem,
+    updateShoppingItemQty,
     subscribe,
     learnIngredientAlias
   };

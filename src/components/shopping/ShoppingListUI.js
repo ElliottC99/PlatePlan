@@ -1,73 +1,40 @@
 /**
- * src/components/shopping/ShoppingListUI.js (v3.20.14)
- * Modular Presentation Component for Shopping List Cards, Items & Summaries.
- * Hydrates planned slot items by fetching full recipe objects from the central Recipe Vault via recipeId.
+ * src/components/shopping/ShoppingListUI.js (v3.26.0)
+ * Upgraded Shopping List UI using Smart ShoppingListService consolidation engine.
  */
 
-import { renderShoppingItemRow, renderSubstDrawerContent } from './ShoppingItemRow.js';
-import { renderShoppingCategoriesList } from './ShoppingCategoryGroup.js';
-import { renderShoppingBatchToolbar, exportShoppingListToClipboard, exportShoppingListToText, clearCheckedShoppingItems } from './ShoppingBatchToolbar.js';
-import { calculateShoppingItemCost, formatShoppingItemQuantity, aggregateShoppingListFromPlan } from '../../services/ShoppingCalculationService.js';
+import { getState, toggleShoppingItem, addManualShoppingItem, updateShoppingItemQty, setShoppingList } from '../../store/store.js';
+import { generateShoppingListFromPlan, AISLE_CATEGORIES } from '../../services/ShoppingListService.js';
 
 function escapeHtml(str) {
-  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  return String(str ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
 }
 
-function resolveHydratedShoppingGroups() {
-  const state = (typeof window !== 'undefined' ? (window.Store?.getState?.() || window.state || {}) : {});
-  const rawShopping = typeof window !== 'undefined' ? window.state?.confirmedShopping : null;
-  if (Array.isArray(rawShopping) && rawShopping.length > 0) {
-    return rawShopping;
-  }
-
-  const plan = (typeof window !== 'undefined' ? window.state?.plan : null) || state.plan;
-  const vaultRecipes = (typeof window !== 'undefined' && Array.isArray(window.recipes) && window.recipes.length ? window.recipes : null)
-    || (typeof window !== 'undefined' && Array.isArray(window.state?.recipes) && window.state.recipes.length ? window.state.recipes : null)
-    || (Array.isArray(state.recipes) ? state.recipes : []);
-
-  if (plan && plan.slots && Object.keys(plan.slots).length > 0 && vaultRecipes.length > 0) {
-    const agg = aggregateShoppingListFromPlan(plan, { ...state, recipes: vaultRecipes });
-    if (Array.isArray(agg.groups) && agg.groups.length > 0) {
-      return agg.groups;
-    }
-  }
-
-  const fallbackList = typeof window !== 'undefined'
-    ? (Array.isArray(window.state?.shoppingList) ? window.state.shoppingList : (Array.isArray(window.state?.generatedList) ? window.state.generatedList : []))
-    : [];
-  return fallbackList;
+function escapeAttr(str) {
+  return escapeHtml(str).replace(/`/g, '&#96;');
 }
 
 export function renderShoppingSummary() {
   const summaryContainer = document.getElementById('shop-summary');
   if (!summaryContainer) return;
 
-  const shoppingData = resolveHydratedShoppingGroups();
-  let totalItemCount = 0;
+  const state = getState() || {};
+  const list = state.shoppingList || [];
+  let totalItems = 0;
   let totalPrice = 0;
 
-  if (Array.isArray(shoppingData)) {
-    shoppingData.forEach(group => {
-      if (group && Array.isArray(group.items)) {
-        group.items.forEach(item => {
-          if (item) {
-            const isAtHome = !!(item.isAtHome || item.checked);
-            if (!isAtHome) {
-              totalItemCount += 1;
-              const costObj = calculateShoppingItemCost(item, item.bankIng);
-              totalPrice += costObj.cost;
-            }
-          }
-        });
-      }
-    });
-  }
-
-  const ingredients = Array.isArray(window.state?.ingredients) ? window.state.ingredients : [];
-  if (totalItemCount === 0 && ingredients.length > 0) {
-    totalItemCount = Math.min(24, ingredients.length);
-    totalPrice = totalItemCount * 1.85;
-  }
+  list.forEach(item => {
+    if (!item.isChecked) {
+      totalItems += 1;
+      totalPrice += (Number(item.buyQty) || 1) * 1.85;
+    }
+  });
 
   summaryContainer.innerHTML = `
     <div class="pp-summary-card" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
@@ -80,15 +47,32 @@ export function renderShoppingSummary() {
           <div style="border-left:1px solid #e2e8f0;height:32px;"></div>
           <div>
             <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:0.05em;">Items to Buy</div>
-            <div style="font-size:22px;font-weight:800;color:#0f172a;margin-top:1px;">${totalItemCount} <span style="font-size:13px;font-weight:500;color:#64748b;">items</span></div>
+            <div style="font-size:22px;font-weight:800;color:#0f172a;margin-top:1px;">${totalItems} <span style="font-size:13px;font-weight:500;color:#64748b;">items</span></div>
           </div>
         </div>
-        <div style="font-size:12px;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;padding:8px 12px;border-radius:8px;">
-          🛒 Synchronised live with household meal plan.
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button type="button" id="btn-generate-shopping" class="btn primary sm" style="font-size:12px;">🔄 Generate from Plan</button>
         </div>
       </div>
     </div>
   `;
+
+  const btnGen = summaryContainer.querySelector('#btn-generate-shopping');
+  if (btnGen) {
+    btnGen.onclick = () => {
+      const activePlan = state.currentPlan || state.plan;
+      if (!activePlan) {
+        alert('No active meal plan found. Please create or generate a meal plan first.');
+        return;
+      }
+      const newList = generateShoppingListFromPlan(activePlan, state.inventory || [], state.recipes || [], state.ingredients || []);
+      setShoppingList(newList);
+      renderShoppingListUI();
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast('Generated smart shopping list from active plan!');
+      }
+    };
+  }
 }
 
 export function renderShoppingListUI() {
@@ -97,168 +81,128 @@ export function renderShoppingListUI() {
   const contentContainer = document.getElementById('shop-content');
   if (!contentContainer) return;
 
-  const shoppingList = resolveHydratedShoppingGroups();
-  const ingredients = Array.isArray(window.state?.ingredients) ? window.state.ingredients : [];
-  let categoriesMap = {};
-  let alreadyHaveItems = [];
+  const state = getState() || {};
+  const shoppingList = state.shoppingList || [];
 
-  const checkIsAtHome = (item, key) => {
-    if (item?.isAtHome || item?.checked) return true;
-    if (window.state?.plan?.shoppingAtHome && key) {
-      return !!window.state.plan.shoppingAtHome[key];
-    }
-    return false;
-  };
+  const grouped = {};
+  AISLE_CATEGORIES.forEach(cat => { grouped[cat] = []; });
 
-  if (Array.isArray(shoppingList) && shoppingList.length > 0) {
-    shoppingList.forEach(group => {
-      if (!group) return;
-      const catName = group.name || group.category || 'General Groceries';
-      if (!categoriesMap[catName]) categoriesMap[catName] = [];
-      if (Array.isArray(group.items)) {
-        group.items.forEach(item => {
-          if (!item) return;
-          const itemKey = item.key || item.id || item.name;
-          const isAtHome = checkIsAtHome(item, itemKey);
-          const enriched = { ...item, isAtHome, checked: isAtHome, groupKey: group.key || catName };
-          if (isAtHome) {
-            alreadyHaveItems.push(enriched);
-          } else {
-            categoriesMap[catName].push(enriched);
-          }
-        });
-      }
-    });
-  } else if (ingredients.length > 0) {
-    ingredients.forEach(ing => {
-      if (!ing) return;
-      const cat = ing.category || ing.type || 'Produce & Fresh';
-      const itemKey = ing.id || ing.name;
-      const isAtHome = checkIsAtHome(ing, itemKey);
-      const enriched = {
-        key: itemKey,
-        name: ing.name,
-        brand: ing.brand || 'Tesco',
-        quantity: '1 pack',
-        price: ing.price || 1.85,
-        groupKey: cat,
-        isAtHome,
-        checked: isAtHome
-      };
-      if (isAtHome) {
-        alreadyHaveItems.push(enriched);
-      } else {
-        if (!categoriesMap[cat]) categoriesMap[cat] = [];
-        categoriesMap[cat].push(enriched);
-      }
-    });
-  } else {
-    categoriesMap = {
-      'Fresh Produce': [
-        { key: 'item-1', name: 'Fresh Salad Tomatoes', brand: 'Tesco', quantity: '6 pack', price: 1.25, groupKey: 'Fresh Produce', isAtHome: false },
-        { key: 'item-2', name: 'Organic Brown Onions', brand: 'Tesco Organic', quantity: '1kg', price: 1.10, groupKey: 'Fresh Produce', isAtHome: false }
-      ],
-      'Dairy & Eggs': [
-        { key: 'item-3', name: 'British Semi Skimmed Milk', brand: 'Tesco', quantity: '4 Pints', price: 1.55, groupKey: 'Dairy & Eggs', isAtHome: false }
-      ]
-    };
-  }
+  shoppingList.forEach(item => {
+    const cat = AISLE_CATEGORIES.includes(item.category) ? item.category : 'Uncategorized';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(item);
+  });
 
-  let html = `<div style="display:flex;flex-direction:column;gap:14px;">`;
+  let aislesHtml = '';
+  AISLE_CATEGORIES.forEach(cat => {
+    const items = grouped[cat] || [];
+    if (items.length === 0) return;
 
-  Object.keys(categoriesMap).forEach(catName => {
-    const items = categoriesMap[catName];
-    if (!Array.isArray(items) || items.length === 0) return;
-
-    html += `
-      <div class="pp-shop-category" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+    aislesHtml += `
+      <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,0.04);margin-bottom:14px;">
         <div style="background:#f8fafc;padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
           <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-weight:700;font-size:15px;color:#0f172a;">${escapeHtml(catName)}</span>
+            <span style="font-weight:700;font-size:15px;color:#0f172a;">🛒 ${escapeHtml(cat)}</span>
             <span style="background:#e2e8f0;color:#475569;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;">${items.length}</span>
           </div>
         </div>
         <div>
-          ${items.map(item => {
-            const itemKey = item.key || item.id || item.name;
-            const groupKey = item.groupKey || catName;
-            const ingName = item.name || '';
-            const costObj = calculateShoppingItemCost(item, item.bankIng);
-            const displayCost = Number(item.cost || costObj.cost || item.price || costObj.price || 1.85).toFixed(2);
-            return `
-            <div class="pp-shop-item" data-group-key="${escapeHtml(groupKey)}" data-item-key="${escapeHtml(itemKey)}" data-ingredient-name="${escapeHtml(ingName)}" style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          ${items.map(item => `
+            <div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;gap:12px;background:${item.isChecked ? '#f8fafc' : '#fff'};opacity:${item.isChecked ? '0.7' : '1'};">
               <div style="display:flex;align-items:center;gap:12px;flex:1;">
-                <input type="checkbox" id="chk-shop-view-${escapeHtml(groupKey)}-${escapeHtml(itemKey)}" name="chkShopView-${escapeHtml(groupKey)}-${escapeHtml(itemKey)}" aria-label="Acquire ${escapeHtml(item.name)}" data-action="toggle-shopping-item" data-group-key="${escapeHtml(groupKey)}" data-item-key="${escapeHtml(itemKey)}" style="width:18px;height:18px;cursor:pointer;accent-color:#2563eb;" onchange="toggleShoppingItemAcquired('${escapeHtml(groupKey)}', '${escapeHtml(itemKey)}', '${escapeHtml(ingName)}')">
+                <input type="checkbox" data-action="toggle-shop-item" data-id="${escapeAttr(item.id)}" ${item.isChecked ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;accent-color:#2563eb;" />
                 <div>
-                  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                    <span style="font-weight:600;font-size:14px;color:#1e293b;">${escapeHtml(item.name)}</span>
-                    ${item.brand ? `<span style="font-size:11px;font-weight:600;background:#f1f5f9;color:#64748b;padding:1px 6px;border-radius:4px;">${escapeHtml(item.brand)}</span>` : ''}
+                  <div style="font-weight:600;font-size:14px;color:#1e293b;text-decoration:${item.isChecked ? 'line-through' : 'none'};">
+                    ${escapeHtml(item.buyQty)} ${escapeHtml(item.unit)} ${escapeHtml(item.name)}
                   </div>
-                  <div style="font-size:12px;color:#64748b;margin-top:2px;">
-                    Qty: <strong>${escapeHtml(formatShoppingItemQuantity(item))}</strong> &bull; Est. £${displayCost}
+                  <div style="font-size:11px;color:#64748b;margin-top:2px;">
+                    Need ${escapeHtml(item.requiredQty)}${escapeHtml(item.unit)} &bull; In stock: ${escapeHtml(item.inStockQty)}${escapeHtml(item.unit)} ${item.isManualAdd ? '&bull; (Manual)' : ''}
                   </div>
                 </div>
               </div>
-              <div>
-                <button type="button" class="btn sm btn-ghost ghost" data-action="swap-product" data-group-key="${escapeHtml(groupKey)}" data-item-key="${escapeHtml(itemKey)}" data-ingredient-name="${escapeHtml(ingName)}" style="font-size:11px;padding:4px 8px;font-weight:600;" onclick="toggleInlineShoppingSubst('${escapeHtml(groupKey)}', '${escapeHtml(itemKey)}')">
-                  🔁 Swap Product
-                </button>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <input type="number" step="any" class="shop-item-qty-input" data-id="${escapeAttr(item.id)}" value="${item.buyQty}" style="width:65px;padding:4px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;" />
+                <span style="font-size:11px;color:#64748b;">${escapeHtml(item.unit)}</span>
               </div>
             </div>
-            `;
-          }).join('')}
+          `).join('')}
         </div>
       </div>
     `;
   });
 
-  if (alreadyHaveItems.length > 0) {
-    html += `
-      <div class="pp-shop-athome-section" style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px;overflow:hidden;margin-top:8px;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
-        <div style="background:#e2e8f0;padding:12px 16px;border-bottom:1px solid #cbd5e1;display:flex;justify-content:space-between;align-items:center;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-weight:700;font-size:14px;color:#334155;">✓ Items I Already Have</span>
-            <span style="background:#cbd5e1;color:#1e293b;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;">${alreadyHaveItems.length}</span>
-          </div>
-          <span style="font-size:11px;color:#64748b;">Tap checkbox to uncheck</span>
-        </div>
-        <div>
-          ${alreadyHaveItems.map(item => {
-            const itemKey = item.key || item.id || item.name;
-            const groupKey = item.groupKey || 'General';
-            const ingName = item.name || '';
-            return `
-            <div class="pp-shop-item at-home" data-group-key="${escapeHtml(groupKey)}" data-item-key="${escapeHtml(itemKey)}" data-ingredient-name="${escapeHtml(ingName)}" style="padding:10px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f8fafc;opacity:0.85;">
-              <div style="display:flex;align-items:center;gap:12px;flex:1;">
-                <input type="checkbox" id="chk-shop-athome-${escapeHtml(groupKey)}-${escapeHtml(itemKey)}" name="chkShopAthome-${escapeHtml(groupKey)}-${escapeHtml(itemKey)}" aria-label="Mark ${escapeHtml(item.name)} as needed" checked data-action="toggle-shopping-item" data-group-key="${escapeHtml(groupKey)}" data-item-key="${escapeHtml(itemKey)}" style="width:18px;height:18px;cursor:pointer;accent-color:#059669;" onchange="toggleShoppingItemAcquired('${escapeHtml(groupKey)}', '${escapeHtml(itemKey)}', '${escapeHtml(ingName)}')">
-                <div>
-                  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                    <span style="font-weight:600;font-size:13px;color:#64748b;text-decoration:line-through;">${escapeHtml(item.name)}</span>
-                    ${item.brand ? `<span style="font-size:10px;background:#e2e8f0;color:#64748b;padding:1px 5px;border-radius:4px;">${escapeHtml(item.brand)}</span>` : ''}
-                  </div>
-                  <div style="font-size:11px;color:#94a3b8;margin-top:1px;">
-                    Qty: ${escapeHtml(formatShoppingItemQuantity(item))} (Marked at home)
-                  </div>
-                </div>
-              </div>
-            </div>
-            `;
-          }).join('')}
+  contentContainer.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:6px;">
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#334155;">+ Quick Add Custom Item</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input type="text" id="manual-item-name" placeholder="Item name (e.g. Oat Milk)" style="flex:2;min-width:180px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;" />
+          <input type="number" step="any" id="manual-item-qty" value="1" placeholder="Qty" style="width:70px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;" />
+          <select id="manual-item-unit" style="width:90px;padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;">
+            <option value="qty">qty</option>
+            <option value="g">g</option>
+            <option value="ml">ml</option>
+          </select>
+          <select id="manual-item-category" style="width:150px;padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;">
+            ${AISLE_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+          </select>
+          <button type="button" id="btn-add-manual-item" class="btn secondary sm" style="font-size:12px;">Add</button>
         </div>
       </div>
-    `;
-  }
 
-  html += `</div>`;
-  contentContainer.innerHTML = html;
+      ${aislesHtml || `
+        <div style="padding:40px;text-align:center;color:#64748b;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;">
+          <div style="font-size:16px;font-weight:700;margin-bottom:6px;">Your shopping list is empty</div>
+          <div style="font-size:13px;">Click "Generate from Plan" above to consolidate requirements based on your active meal plan and pantry stock.</div>
+        </div>
+      `}
+    </div>
+  `;
+
+  bindEvents(contentContainer);
 }
 
-export {
-  renderShoppingItemRow,
-  renderSubstDrawerContent,
-  renderShoppingCategoriesList,
-  renderShoppingBatchToolbar,
-  exportShoppingListToClipboard,
-  exportShoppingListToText,
-  clearCheckedShoppingItems
-};
+function bindEvents(container) {
+  const btnAddManual = container.querySelector('#btn-add-manual-item');
+  if (btnAddManual) {
+    btnAddManual.onclick = () => {
+      const name = container.querySelector('#manual-item-name')?.value?.trim();
+      if (!name) {
+        alert('Please enter a custom item name.');
+        return;
+      }
+      const requiredQty = parseFloat(container.querySelector('#manual-item-qty')?.value) || 1;
+      const unit = container.querySelector('#manual-item-unit')?.value || 'qty';
+      const category = container.querySelector('#manual-item-category')?.value || 'Uncategorized';
+
+      addManualShoppingItem({ name, requiredQty, buyQty: requiredQty, unit, category });
+      renderShoppingListUI();
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast(`Added "${name}" to shopping list!`);
+      }
+    };
+  }
+
+  container.querySelectorAll('input[type="checkbox"]').forEach(chk => {
+    chk.onchange = () => {
+      const itemId = chk.dataset.id;
+      if (itemId) {
+        toggleShoppingItem(itemId);
+        renderShoppingListUI();
+      }
+    };
+  });
+
+  container.querySelectorAll('.shop-item-qty-input').forEach(input => {
+    input.onchange = () => {
+      const itemId = input.dataset.id;
+      const newQty = parseFloat(input.value) || 0;
+      if (itemId) updateShoppingItemQty(itemId, newQty);
+    };
+  });
+}
+
+if (typeof window !== 'undefined') {
+  window.renderShoppingListUI = renderShoppingListUI;
+  window.renderShoppingSummary = renderShoppingSummary;
+}
