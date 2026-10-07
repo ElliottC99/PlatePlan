@@ -189,6 +189,32 @@ export function renderRecipeVault() {
   const q = currentRecipeSearchQuery;
   const list = document.getElementById('vault-list');
 
+  // Inject Recipe Actions Bar
+  const actionsBar = document.createElement('div');
+  actionsBar.className = 'recipe-actions-bar';
+  actionsBar.style.display = 'flex';
+  actionsBar.style.gap = '10px';
+  actionsBar.style.marginBottom = '16px';
+  actionsBar.innerHTML = `
+    <button id="btn-manual-recipe" class="btn primary">Create Recipe</button>
+    <button id="btn-import-recipe" class="btn secondary">Paste & Parse Recipes</button>
+  `;
+  
+  // Clear existing before adding if it exists
+  const existingBar = list?.parentElement?.querySelector('.recipe-actions-bar');
+  if (existingBar) existingBar.remove();
+  if (list?.parentElement) list.parentElement.insertBefore(actionsBar, list);
+
+  // Bind actions
+  actionsBar.querySelector('#btn-manual-recipe').addEventListener('click', () => {
+    if (typeof window.openRecipeEditor === 'function') window.openRecipeEditor();
+  });
+  
+  actionsBar.querySelector('#btn-import-recipe').addEventListener('click', () => {
+    // Need to define this function, maybe add to window
+    if (typeof window.openBulkRecipeImporterModal === 'function') window.openBulkRecipeImporterModal();
+  });
+
   const hasData = (window.state?.recipes?.length > 0) || window.state?.isCachedHydrated;
   if (!window.state?.isCloudHydrated && !hasData) {
     if (list) {
