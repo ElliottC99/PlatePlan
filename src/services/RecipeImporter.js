@@ -429,32 +429,86 @@ export function extractRecipeFromHtml(html, sourceUrl = '') {
  * Bulk text parser service for recipe ingestion.
  */
 export function parseBulkRecipeText(rawText) {
-  if (!rawText) return [];
-  const chunks = rawText.split(/\n\s*\n/);
+  if (!rawText || typeof rawText !== 'string') return [];
+  
+  const text = rawText.replace(/\r\n/g, '\n').trim();
+  if (!text) return [];
+
+  let recipeBlocks = [];
+
+  if (/Recipe\s+\d+:/i.test(text)) {
+    const parts = text.split(/Recipe\s+\d+:/i).map(p => p.trim()).filter(Boolean);
+    recipeBlocks = parts;
+  } else {
+    recipeBlocks = text.split(/\n\s*\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    if (recipeBlocks.length === 1) {
+      recipeBlocks = [text];
+    }
+  }
+
   const parsedRecipes = [];
 
-  chunks.forEach(chunk => {
-    const lines = chunk.trim().split('\n');
-    if (lines.length < 2) return;
+  recipeBlocks.forEach(block => {
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return;
 
-    const title = lines[0].trim();
-    const rawIngredients = lines.slice(1);
-    
-    const parsedIngs = rawIngredients.map(line => {
+    let title = 'Imported Recipe';
+    let servings = 4;
+    let ingLines = [];
+    let methodLines = [];
+
+    let currentSection = 'header';
+
+    lines.forEach((line, idx) => {
+      if (/^(Ingredients?|Items?):/i.test(line)) {
+        currentSection = 'ingredients';
+        const rest = line.replace(/^(Ingredients?|Items?):/i, '').trim();
+        if (rest) ingLines.push(rest);
+        return;
+      }
+
+      if (/^(Method|Instructions|Steps|Preparation):/i.test(line)) {
+        currentSection = 'method';
+        const rest = line.replace(/^(Method|Instructions|Steps|Preparation):/i, '').trim();
+        if (rest) methodLines.push(rest);
+        return;
+      }
+
+      if (/^(Serves|Yield|Servings):/i.test(line)) {
+        const match = line.match(/\d+/);
+        if (match) servings = parseInt(match[0], 10);
+        return;
+      }
+
+      if (idx === 0) {
+        title = line.replace(/^Recipe\s*\d*:?\s*/i, '').trim() || 'Imported Recipe';
+        return;
+      }
+
+      if (currentSection === 'ingredients' || (currentSection === 'header' && !/^\d+\.|\b(mix|bake|heat|cook|boil|sauté|simmer)\b/i.test(line))) {
+        ingLines.push(line);
+      } else if (currentSection === 'method' || /^\d+\.|\b(mix|bake|heat|cook|boil|sauté|simmer)\b/i.test(line)) {
+        methodLines.push(line.replace(/^\d+\.\s*/, ''));
+      }
+    });
+
+    const parsedIngs = ingLines.map(line => {
       const parsed = parseIngredientString(line);
       return matchIngredientTaxonomy(parsed);
     }).filter(Boolean);
 
-    parsedRecipes.push({
-      title,
-      servings: 4,
-      prepTimeMinutes: 0,
-      cookTimeMinutes: 0,
-      imageUrl: '',
-      ingredients: parsedIngs,
-      instructions: [],
-      macros: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
-    });
+    if (parsedIngs.length > 0 || methodLines.length > 0) {
+      parsedRecipes.push({
+        title,
+        servings,
+        prepTimeMinutes: 0,
+        cookTimeMinutes: 0,
+        imageUrl: '',
+        ingredients: parsedIngs,
+        instructions: methodLines,
+        macros: { calories: 400, protein: 25, carbs: 45, fat: 15 }
+      });
+    }
   });
 
   return parsedRecipes;

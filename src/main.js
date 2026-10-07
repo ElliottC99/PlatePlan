@@ -52,6 +52,7 @@ import { calculateMealFitScore } from './utils/fitScoreCalculator.js';
 import { renderFitScoreBadge } from './components/FitScoreBadge.js';
 import { renderSyncPanelModal, closeSyncPanelModal } from './components/sync/SyncPanelUI.js';
 import './components/recipe/BulkRecipeImporterModal.js';
+import './components/recipe/RecipeWizardModal.js';
 
 // Global Compatibility Shims for Legacy References
 if (typeof window !== 'undefined') {

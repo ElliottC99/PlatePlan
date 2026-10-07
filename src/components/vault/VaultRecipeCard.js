@@ -1,9 +1,10 @@
 /**
- * src/components/vault/VaultRecipeCard.js (v3.20.14)
+ * src/components/vault/VaultRecipeCard.js (v3.22.0)
  * Modular UI component for Recipe Vault Card:
  * - Individual recipe card templates & layout
  * - Macro badges, fit score breakdown, and cooking time tags
- * - Action buttons for viewing, editing, duplication, and favoriting
+ * - Action buttons for viewing, editing, duplication, favoriting, and deletion
+ * - Fixed "More" menu dropdown with z-index & stopPropagation handling
  */
 
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
@@ -23,11 +24,171 @@ function escapeAttr(str) {
   return escapeHtml(str).replace(/`/g, '&#96;');
 }
 
+export function openRecipeActions(evt, recipeIdParam, variantParam = 'original') {
+  let e = evt;
+  let recipeId = recipeIdParam;
+  let variant = variantParam;
+
+  if (typeof evt === 'string') {
+    recipeId = evt;
+    e = recipeIdParam;
+    variant = variantParam || 'original';
+  }
+
+  if (e && typeof e.stopPropagation === 'function') {
+    e.stopPropagation();
+    e.preventDefault();
+  }
+
+  closeAllRecipeActionMenus();
+
+  const allRecipes = (window.state?.recipes || []).concat(window.Store?.getState()?.recipes || []);
+  const recipe = allRecipes.find(r => r && r.id === recipeId);
+  if (!recipe) return;
+
+  const targetBtn = e?.currentTarget || (e?.target ? e.target.closest('button') : null) || document.querySelector(`[data-recipe-id="${recipeId}"][data-action*="actions"]`);
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'recipe-actions-dropdown-menu';
+  dropdown.style.cssText = `
+    position: fixed;
+    z-index: 99999;
+    background: var(--surface, #ffffff);
+    color: var(--text, #1f2937);
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 10px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    padding: 6px;
+    min-width: 180px;
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  `;
+
+  if (targetBtn) {
+    const rect = targetBtn.getBoundingClientRect();
+    const top = Math.min(rect.bottom + 4, window.innerHeight - 220);
+    const left = Math.max(10, Math.min(rect.right - 180, window.innerWidth - 190));
+    dropdown.style.top = `${top}px`;
+    dropdown.style.left = `${left}px`;
+  } else {
+    dropdown.style.top = '50%';
+    dropdown.style.left = '50%';
+    dropdown.style.transform = 'translate(-50%, -50%)';
+  }
+
+  const isFav = typeof window.isRecipeVariantFavourite === 'function'
+    ? window.isRecipeVariantFavourite(recipeId, variant)
+    : (recipe.isFavourite || recipe.isFavorite);
+
+  dropdown.innerHTML = `
+    <button type="button" class="action-menu-item" data-action="menu-view" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
+      <span>👁️</span> View Details
+    </button>
+    <button type="button" class="action-menu-item" data-action="menu-edit" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
+      <span>✏️</span> Edit Recipe
+    </button>
+    <button type="button" class="action-menu-item" data-action="menu-duplicate" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
+      <span>📋</span> Duplicate Recipe
+    </button>
+    <button type="button" class="action-menu-item" data-action="menu-favorite" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
+      <span>${isFav ? '❤️' : '🤍'}</span> ${isFav ? 'Remove Favourite' : 'Add Favourite'}
+    </button>
+    <div style="height:1px;background:var(--border, #eee);margin:4px 0"></div>
+    <button type="button" class="action-menu-item" data-action="menu-delete" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:#ef4444;">
+      <span>🗑️</span> Delete Recipe
+    </button>
+  `;
+
+  document.body.appendChild(dropdown);
+
+  const dismiss = (event) => {
+    if (!dropdown.contains(event.target)) {
+      dropdown.remove();
+      document.removeEventListener('click', dismiss, true);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', dismiss, true), 10);
+
+  dropdown.querySelector('[data-action="menu-view"]').onclick = (clickEvt) => {
+    clickEvt.stopPropagation();
+    dropdown.remove();
+    if (typeof window.viewRecipe === 'function') {
+      window.viewRecipe(recipeId, null, variant);
+    }
+  };
+
+  dropdown.querySelector('[data-action="menu-edit"]').onclick = (clickEvt) => {
+    clickEvt.stopPropagation();
+    dropdown.remove();
+    if (typeof window.openRecipeWizard === 'function') {
+      window.openRecipeWizard('manual');
+    } else if (typeof window.openRecipeEditor === 'function') {
+      window.openRecipeEditor(recipeId);
+    }
+  };
+
+  dropdown.querySelector('[data-action="menu-duplicate"]').onclick = async (clickEvt) => {
+    clickEvt.stopPropagation();
+    dropdown.remove();
+    const dup = {
+      ...recipe,
+      id: crypto.randomUUID(),
+      name: `${recipe.name || recipe.title} (Copy)`,
+      title: `${recipe.name || recipe.title} (Copy)`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    try {
+      const { saveRecipe } = await import('../../services/HouseholdRepository.js');
+      await saveRecipe(dup);
+      if (window.state?.recipes) window.state.recipes.unshift(dup);
+      if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
+      if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(`Duplicated "${recipe.name}"`);
+    } catch (err) {
+      console.error('[VaultRecipeCard] Error duplicating recipe:', err);
+    }
+  };
+
+  dropdown.querySelector('[data-action="menu-favorite"]').onclick = (clickEvt) => {
+    clickEvt.stopPropagation();
+    dropdown.remove();
+    if (typeof window.toggleRecipeFavourite === 'function') {
+      window.toggleRecipeFavourite(recipeId, clickEvt, variant);
+    }
+  };
+
+  dropdown.querySelector('[data-action="menu-delete"]').onclick = async (clickEvt) => {
+    clickEvt.stopPropagation();
+    dropdown.remove();
+    if (confirm(`Delete "${recipe.name || recipe.title}"?`)) {
+      try {
+        const { deleteRecipe } = await import('../../services/HouseholdRepository.js');
+        await deleteRecipe(recipeId);
+        if (window.state?.recipes) {
+          window.state.recipes = window.state.recipes.filter(r => r.id !== recipeId);
+        }
+        if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
+        if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(`Deleted "${recipe.name}"`);
+      } catch (err) {
+        console.error('[VaultRecipeCard] Error deleting recipe:', err);
+      }
+    }
+  };
+}
+
+export function openEnhancedRecipeActions(evt, recipeId) {
+  return openRecipeActions(evt, recipeId, 'enhanced');
+}
+
+function closeAllRecipeActionMenus() {
+  document.querySelectorAll('.recipe-actions-dropdown-menu').forEach(m => m.remove());
+}
+
 export function renderVaultRecipeCard(r, options = {}) {
   const types = r.types || [r.type || 'dinner'];
   const mealType = options.mealType || (types[0] || 'dinner');
-  const eTgt = options.eTgt || { cal: 500, prot: 35 };
-  const cTgt = options.cTgt || { cal: 500, prot: 35 };
   const whoKey = String(r.who || 'both').toLowerCase();
   const showE = whoKey === 'both' || whoKey === 'elliott' || whoKey === 'e';
   const showC = whoKey === 'both' || whoKey === 'chloe' || whoKey === 'c';
@@ -97,7 +258,7 @@ export function renderVaultRecipeCard(r, options = {}) {
       </div>
       <div class="recipe-card-actions">
         <button class="btn sm btn-primary primary mobile-primary" data-action="view-recipe" data-recipe-id="${escapeAttr(r.id)}" data-variant="original" onclick="viewRecipe('${escapeAttr(r.id)}', null)">View</button>
-        <button class="btn sm btn-ghost ghost mobile-more" data-action="open-recipe-actions" data-recipe-id="${escapeAttr(r.id)}" data-variant="original" onclick="openRecipeActions('${escapeAttr(r.id)}')">More</button>
+        <button class="btn sm btn-ghost ghost mobile-more" data-action="open-recipe-actions" data-recipe-id="${escapeAttr(r.id)}" data-variant="original" onclick="openRecipeActions(event, '${escapeAttr(r.id)}', 'original')">More</button>
       </div>
     </div>
     ${r.enhanced ? `<div class="enhanced-box">
@@ -116,9 +277,14 @@ export function renderVaultRecipeCard(r, options = {}) {
         </div>
         <div class="enhanced-actions">
           <button class="btn sm btn-primary primary enhanced-primary-action" data-action="view-recipe" data-recipe-id="${escapeAttr(r.id)}" data-variant="enhanced" onclick="viewRecipe('${escapeAttr(r.id)}', null, 'enhanced')">View</button>
-          <button class="btn sm btn-ghost ghost enhanced-more-action" data-action="open-enhanced-recipe-actions" data-recipe-id="${escapeAttr(r.id)}" data-variant="enhanced" onclick="openEnhancedRecipeActions('${escapeAttr(r.id)}')">More</button>
+          <button class="btn sm btn-ghost ghost enhanced-more-action" data-action="open-enhanced-recipe-actions" data-recipe-id="${escapeAttr(r.id)}" data-variant="enhanced" onclick="openEnhancedRecipeActions(event, '${escapeAttr(r.id)}')">More</button>
         </div>
       </div>
     </div>` : ''}
   </div>`;
+}
+
+if (typeof window !== 'undefined') {
+  window.openRecipeActions = openRecipeActions;
+  window.openEnhancedRecipeActions = openEnhancedRecipeActions;
 }

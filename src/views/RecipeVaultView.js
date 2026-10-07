@@ -207,12 +207,13 @@ export function renderRecipeVault() {
 
   // Bind actions
   actionsBar.querySelector('#btn-manual-recipe').addEventListener('click', () => {
-    if (typeof window.openRecipeEditor === 'function') window.openRecipeEditor();
+    if (typeof window.openRecipeWizard === 'function') window.openRecipeWizard('manual');
+    else if (typeof window.openRecipeEditor === 'function') window.openRecipeEditor();
   });
   
   actionsBar.querySelector('#btn-import-recipe').addEventListener('click', () => {
-    // Need to define this function, maybe add to window
-    if (typeof window.openBulkRecipeImporterModal === 'function') window.openBulkRecipeImporterModal();
+    if (typeof window.openRecipeWizard === 'function') window.openRecipeWizard('bulk');
+    else if (typeof window.openBulkRecipeImporterModal === 'function') window.openBulkRecipeImporterModal();
   });
 
   const hasData = (window.state?.recipes?.length > 0) || window.state?.isCachedHydrated;
