@@ -246,3 +246,35 @@ export function parseIngredientLine(raw) {
 
   return { raw: line, qty, unit, name, grams: toGrams(qty, unit) };
 }
+
+export function formatGarlicQuantity(ingredient, weightG) {
+  const isFreshGarlic = ingredient.id === 'garlic_fresh' || 
+                        String(ingredient.name || '').trim().toLowerCase() === 'garlic';
+  
+  if (isFreshGarlic) {
+    const cloves = Math.round(weightG / 6.0);
+    const count = cloves < 1 ? 1 : cloves;
+    return `${count} ${count === 1 ? 'clove' : 'cloves'} of garlic`;
+  }
+  return `${weightG}g ${ingredient.name}`;
+}
+
+export function checkStockCubeWaterRequirement(ingredient) {
+  if (!ingredient) return { requiresWaterInput: false };
+  const subType = String(ingredient.subType || ingredient.subtype || '').toLowerCase();
+  const name = String(ingredient.name || ingredient.ingredientName || '').toLowerCase();
+  const isStockCube = subType.includes('stock cube') || subType.includes('stock') || name.includes('stock cube') || name.includes('stock pot');
+  if (isStockCube) {
+    return {
+      requiresWaterInput: true,
+      defaultWaterMlPerCube: 400
+    };
+  }
+  return { requiresWaterInput: false };
+}
+
+if (typeof window !== 'undefined') {
+  window.formatGarlicQuantity = formatGarlicQuantity;
+  window.checkStockCubeWaterRequirement = checkStockCubeWaterRequirement;
+}
+

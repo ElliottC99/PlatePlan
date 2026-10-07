@@ -4,6 +4,8 @@
  * drag-and-drop handles, and quantity inputs.
  */
 
+import { checkStockCubeWaterRequirement } from '../../utils/unitConverter.js';
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&': '&amp;',
@@ -40,6 +42,15 @@ export function renderIngredientRowHtml(p, prefix, options = {}) {
   const product = resolved.product;
   const mappingText = group ? `${window.getGroupHierarchyText ? window.getGroupHierarchyText(group) : group.name}${product?.name ? ` · ${product.name}` : ''}` : (product?.name || 'Not mapped yet');
 
+  const stockCheck = checkStockCubeWaterRequirement({ ...p, name: displayName });
+  const waterInputHtml = stockCheck.requiresWaterInput ? `
+    <div class="review-stock-water-container" style="grid-column: 1 / -1; display:flex; align-items:center; gap:8px; padding:6px 10px; background:var(--surface2); border-radius:6px; font-size:11.5px; margin-top:4px; border:1px dashed var(--border);">
+      <span style="font-weight:600; color:var(--text);">💧 Required Water Volume for Stock Cube (ml):</span>
+      <input type="number" class="r-stock-water" value="${escapeAttr(p.stockWaterMl || stockCheck.defaultWaterMlPerCube || '400')}" style="width:90px; padding:3px 6px; font-size:11.5px;" min="0" step="50" oninput="recalcModal('${escapeAttr(prefix)}')">
+      <span style="color:var(--text2);">(ml water needed)</span>
+    </div>
+  ` : '';
+
   return `<div class="rev-ing-row review-ingredient-row mobile-editor-card" draggable="true" ondragstart="startReviewIngredientDrag(event)" ondragover="overReviewIngredientDrag(event)" ondragend="endReviewIngredientDrag(event, '${escapeAttr(prefix)}')" data-bankid="${escapeAttr(p.bankId || '')}" data-original-bankid="${escapeAttr(p.originalBankId || p.bankId || '')}" data-original-key="${escapeAttr(p.originalKey || p.originalGroupId || p.originalBankId || (window.getRecipeIngredientKey ? window.getRecipeIngredientKey(p) : ''))}" data-groupid="${escapeAttr(groupId)}" data-ingredientid="${escapeAttr(p.ingredientId || '')}" data-mapped-via-ingredient="${p.mappedViaIngredient ? '1' : ''}" data-prefix="${escapeAttr(prefix)}" data-stock-water="${escapeAttr(p.stockWaterMl || '')}">
     <span class="review-drag-handle" title="Drag to reorder" style="cursor:grab;color:var(--text3);font-size:16px;text-align:center;line-height:1;user-select:none;">⋮</span>
     <div class="review-ingredient-qty"><span class="mobile-field-label">Quantity</span><input type="number" class="r-qty" value="${amount.qty || 1}" style="width:100%;min-width:0" step="0.1" min="0" oninput="recalcModal('${escapeAttr(prefix)}')"></div>
@@ -53,6 +64,7 @@ export function renderIngredientRowHtml(p, prefix, options = {}) {
       <button class="btn sm danger ghost" onclick="removeReviewIngredientRow(this, '${escapeAttr(prefix)}')">&times;</button>
     </div>
     <div class="review-mobile-actions"><button type="button" class="btn ghost r-replace-ing" onclick="openModalIngredientReplace(this)">Replace</button><button type="button" class="btn ghost" onclick="openReviewIngredientActions(this, '${escapeAttr(prefix)}')">More</button></div>
+    ${waterInputHtml}
   </div>`;
 }
 

@@ -88,6 +88,8 @@ export function calculateItemNutrition(item, quantity, unit = 'g') {
     grams = toGrams(q, u, item?.itemWeight || 100);
   }
 
+  grams = calculateItemNutritionalWeight(item, grams);
+
   if (grams <= 0) return zero;
 
   const scale = grams / 100;
@@ -168,4 +170,20 @@ export function scaleNutrition(nutrition, targetServings, baseServings = 1) {
     fibre: Math.round((nutrition.fibre || 0) * ratio * 10) / 10,
     cost: Math.round((nutrition.cost || 0) * ratio * 100) / 100
   };
+}
+
+export function calculateItemNutritionalWeight(product, requestedGramWeight) {
+  if (product && product.drainedWeightG && product.netWeightG) {
+    const drainedRatio = product.drainedWeightG / product.netWeightG;
+    return requestedGramWeight * drainedRatio;
+  }
+  if (product && product.drainedWeight && product.netWeight) {
+    const drainedRatio = product.drainedWeight / product.netWeight;
+    return requestedGramWeight * drainedRatio;
+  }
+  return requestedGramWeight;
+}
+
+if (typeof window !== 'undefined') {
+  window.calculateItemNutritionalWeight = calculateItemNutritionalWeight;
 }

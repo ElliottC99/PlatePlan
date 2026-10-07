@@ -7,6 +7,7 @@
 
 import { calculateMealFitScore } from '../../services/FitScoreService.js';
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
+import { formatGarlicQuantity, UNIT_TO_GRAMS } from '../../utils/unitConverter.js';
 
 function escapeHtml(str) {
   if (typeof window !== 'undefined' && window.ppEscapeHtml) {
@@ -126,6 +127,17 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
     const scaledQty = !isNaN(num) && num > 0
       ? (Math.round(num * scaleMultiplier * 10) / 10)
       : qty;
+    
+    const isFreshGarlic = ingObj?.id === 'garlic_fresh' || 
+                          String(ingObj?.name || '').trim().toLowerCase() === 'garlic' ||
+                          String(ingredientLabel).trim().toLowerCase() === 'garlic';
+    if (isFreshGarlic) {
+      const weightG = (unit === 'g' || unit === 'gram' || !unit) ? (scaledQty) : ((scaledQty) * (UNIT_TO_GRAMS[unit] || 6));
+      const garlicFormatted = formatGarlicQuantity(ingObj || { name: ingredientLabel, id: ingObj?.id || 'garlic_fresh' }, weightG);
+      const fullText = garlicFormatted ? `${formattedLine} (${garlicFormatted})` : formattedLine;
+      return comment ? `${fullText} — ${comment}` : fullText;
+    }
+
     qtyPrefix = [scaledQty, unit].filter(Boolean).join('');
   }
 

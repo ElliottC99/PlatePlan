@@ -899,3 +899,27 @@ export async function batchResolveOrphansWithNewSubtypeInDb(parentIngredient, pr
     throw err;
   }
 }
+
+const HouseholdRepository = {
+  cleanLegacyMacros,
+  saveCurrentPlan,
+  getIngredients,
+  saveIngredient,
+  deleteIngredient,
+  getProducts,
+  saveProduct,
+  deleteProduct,
+  getCategories,
+  saveCategories,
+  getPreferences,
+  savePreferences,
+  dismissAdvisoryInDb,
+  savePreferencesWithAutoPrune,
+  batchResolveOrphansWithNewSubtypeInDb,
+  stripPlanPayload
+};
+
+if (typeof window !== 'undefined') {
+  window.HouseholdRepository = HouseholdRepository;
+}
+
