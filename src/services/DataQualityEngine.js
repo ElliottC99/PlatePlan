@@ -333,3 +333,11 @@ export function runAudit(state = {}) {
 
   return results;
 }
+
+if (typeof window !== 'undefined') {
+  window.DataQualityEngine = {
+    getEffectiveIngredientMacros,
+    autoRecalibrateRecipeDrift,
+    runAudit
+  };
+}

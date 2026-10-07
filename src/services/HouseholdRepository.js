@@ -827,3 +827,75 @@ export async function save(state = {}) {
 }
 
 export const saveHouseholdState = save;
+
+export async function savePreferencesWithAutoPrune(preferences) {
+  let serialized = JSON.stringify(preferences);
+  let byteSize = new TextEncoder().encode(serialized).length;
+
+  // Background Auto-Pruner Threshold (400 KB) - Runs automatically
+  if (byteSize > 400 * 1024) {
+    preferences.dismissedQualityAdvisories = (preferences.dismissedQualityAdvisories || []).slice(-20);
+    preferences.cachedSnapshots = {}; // Flush stale historical cache
+    preferences.advisoryHistory = [];
+    preferences.snapshots = [];
+    preferences.stateSnapshots = [];
+    serialized = JSON.stringify(preferences);
+    byteSize = new TextEncoder().encode(serialized).length;
+  }
+
+  // Update Local Store & Persist Payload
+  if (typeof window !== 'undefined' && window.Store && typeof window.Store.setState === 'function') {
+    window.Store.setState({ preferences: preferences, userPrefs: preferences });
+  }
+  const storeState = (typeof getStoreState === 'function') ? getStoreState() : {};
+  if (storeState) {
+    storeState.preferences = preferences;
+    storeState.userPrefs = preferences;
+  }
+
+  if (isDbAvailable()) {
+    const prefRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences');
+    const rootRef = db.collection('households').doc(HOUSEHOLD_ID);
+    await Promise.all([
+      prefRef.set(preferences, { merge: true }),
+      rootRef.set({ preferences, updatedAt: new Date().toISOString() }, { merge: true })
+    ]);
+  }
+
+  return { byteSize, preferences };
+}
+
+export async function batchResolveOrphansWithNewSubtypeInDb(parentIngredient, productUpdates) {
+  if (!isDbAvailable()) return false;
+  try {
+    const batch = db.batch();
+    
+    if (parentIngredient) {
+      const ingColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');
+      const ingId = parentIngredient.id;
+      const ingData = { ...parentIngredient };
+      delete ingData.id;
+      ingData.updatedAt = new Date().toISOString();
+      batch.set(ingColRef.doc(ingId), ingData, { merge: true });
+    }
+
+    const prodColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('products');
+    productUpdates.forEach(p => {
+      const pId = p.id;
+      const pData = { ...p, updatedAt: new Date().toISOString() };
+      delete pData.id;
+      const pDocRef = prodColRef.doc(pId);
+      if (p._delete === true) {
+        batch.delete(pDocRef);
+      } else {
+        batch.set(pDocRef, pData, { merge: true });
+      }
+    });
+
+    await batch.commit();
+    return true;
+  } catch (err) {
+    console.error('[HouseholdRepository] Error in batchResolveOrphansWithNewSubtypeInDb:', err);
+    throw err;
+  }
+}

@@ -5,7 +5,7 @@
  */
 
 import { getState, setPreferences, setIngredients, runOptimisticMutation } from '../store/store.js';
-import { saveIngredient, savePreferences, dismissAdvisoryInDb } from '../services/HouseholdRepository.js';
+import { saveIngredient, savePreferences, dismissAdvisoryInDb, savePreferencesWithAutoPrune } from '../services/HouseholdRepository.js';
 import { runAudit } from '../services/DataQualityEngine.js';
 import { openMacroDriftPreviewModal } from '../components/data-quality/MacroDriftPreviewModal.js';
 import { openSubtypeOrphanResolverModal } from '../components/data-quality/SubtypeOrphanResolverModal.js';
@@ -214,14 +214,15 @@ export async function handleCleanHistoryCache() {
     ? [...currentPrefs.dismissedQualityAdvisories]
     : [];
 
-  const prunedDismissed = dismissed.slice(-30); // Truncate to 30 items
+  const prunedDismissed = dismissed.slice(-20); // Truncate to 20 items
 
   const updatedPrefs = {
     ...currentPrefs,
     dismissedQualityAdvisories: prunedDismissed,
     advisoryHistory: [],
     snapshots: [],
-    stateSnapshots: []
+    stateSnapshots: [],
+    cachedSnapshots: {}
   };
 
   const mutateFn = (currentState) => {
@@ -238,12 +239,12 @@ export async function handleCleanHistoryCache() {
     await runOptimisticMutation(
       'preferences',
       mutateFn,
-      savePreferences(updatedPrefs),
+      savePreferencesWithAutoPrune(updatedPrefs),
       rollbackFn,
       'Failed to clean preference history cache.'
     );
     if (typeof window.showPlatePlanToast === 'function') {
-      window.showPlatePlanToast('Preference storage cleaned successfully (cached snapshots deleted).', 'success');
+      window.showPlatePlanToast('Preference storage cleaned successfully (cached snapshots & history deleted).', 'success');
     }
     renderDataQualityView();
   } catch (err) {
