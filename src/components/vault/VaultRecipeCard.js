@@ -7,6 +7,7 @@
  */
 
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
+import { calculateRecipePantryMatch } from '../../services/InventoryService.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -39,8 +40,14 @@ export function renderVaultRecipeCard(r, options = {}) {
   const isAnyFav = origFav || enhFav;
   const favTag = isAnyFav ? `<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favourite</span>` : '';
 
+  const matchData = r.pantryMatch || calculateRecipePantryMatch(r);
+  const pantryTag = matchData && matchData.totalCount > 0 ? `<span class="tag pantry-tag" style="background:#e0f2fe;color:#0369a1;border-color:#bae6fd;font-weight:600" title="${matchData.matchedCount}/${matchData.totalCount} ingredients in pantry">📦 ${matchData.matchPercentage}% in pantry</span>` : '';
+  const useUpTag = matchData && matchData.useUpMatches && matchData.useUpMatches.length > 0 ? `<span class="tag useup-tag" style="background:#fef3c7;color:#92400e;border-color:#fde68a;font-weight:700" title="Uses ${matchData.useUpMatches.length} use-up item(s)">🔥 ${matchData.useUpMatches.length} Use-Up</span>` : '';
+
   const meta = [
     favTag,
+    useUpTag,
+    pantryTag,
     badges,
     `<span class="tag">${escapeHtml(personLabel)}</span>`,
     r.serves ? `<span class="tag">Serves ${escapeHtml(r.serves)}</span>` : '',

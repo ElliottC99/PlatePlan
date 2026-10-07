@@ -16,6 +16,7 @@ import {
   getVaultTargetMacros as modernGetVaultTargetMacros
 } from '../utils/fitScoreCalculator.js';
 import { getProfilesFromState } from '../models/StateModel.js';
+import { calculateRecipePantryMatch } from './InventoryService.js';
 
 export {
   calculateMealFitScore,
@@ -145,6 +146,18 @@ export function getSortedRecipes(recipes = [], sortOption = 'fit-desc', activeSl
   const normSort = String(sortOption || 'fit-desc').toLowerCase();
 
   return scoredRecipes.sort((a, b) => {
+    if (normSort === 'useup-desc') {
+      const pA = a.pantryMatch || calculateRecipePantryMatch(a.recipe || a);
+      const pB = b.pantryMatch || calculateRecipePantryMatch(b.recipe || b);
+      if (pB.useUpScore !== pA.useUpScore) return pB.useUpScore - pA.useUpScore;
+      return pB.matchPercentage - pA.matchPercentage;
+    }
+    if (normSort === 'pantry-desc') {
+      const pA = a.pantryMatch || calculateRecipePantryMatch(a.recipe || a);
+      const pB = b.pantryMatch || calculateRecipePantryMatch(b.recipe || b);
+      if (pB.matchPercentage !== pA.matchPercentage) return pB.matchPercentage - pA.matchPercentage;
+      return pB.useUpScore - pA.useUpScore;
+    }
     if (normSort === 'best-fit' || normSort === 'fit-desc') {
       return (b._computedFitScore ?? b.fitScore ?? 0) - (a._computedFitScore ?? a.fitScore ?? 0);
     }

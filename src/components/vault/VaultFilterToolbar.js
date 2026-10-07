@@ -64,6 +64,8 @@ export function renderVaultFilterToolbar({
         <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto;white-space:nowrap;">
           <label for="vault-sort" style="font-size:11px;font-weight:700;color:var(--text2);cursor:pointer">SORT:</label>
           <select id="vault-sort" name="vaultSort" aria-label="Sort options" class="select" style="font-size:12px;white-space:nowrap;" onchange="handleVaultSortChange(this.value)">
+            <option value="useup-desc" ${sortBy === 'useup-desc' ? 'selected' : ''}>🔥 Use-Up First</option>
+            <option value="pantry-desc" ${sortBy === 'pantry-desc' ? 'selected' : ''}>📦 Pantry Match: High to Low</option>
             <option value="fit-desc" ${sortBy === 'fit-desc' ? 'selected' : ''}>Fit Score: High to Low</option>
             <option value="fit-asc" ${sortBy === 'fit-asc' ? 'selected' : ''}>Fit Score: Low to High</option>
             <option value="name-asc" ${sortBy === 'name-asc' ? 'selected' : ''}>Name: A to Z</option>

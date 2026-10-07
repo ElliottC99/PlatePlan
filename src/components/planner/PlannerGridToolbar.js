@@ -68,18 +68,26 @@ export function renderEarlierDaysHeading(range, count, isExpanded) {
 }
 
 export function renderPlanOverallSummary(score) {
-  if (!score) return '';
-  const scoreColor = score.score <= 10 ? 'var(--green)' : score.score <= 20 ? 'var(--amber)' : 'var(--red)';
+  const currentPlan = window.Store?.getState()?.currentPlan || window.state?.currentPlan;
+  const targets = currentPlan?.macroTargets || { calories: 2000, protein: 140 };
+  const scoreColor = score && score.score <= 10 ? 'var(--green)' : (score && score.score <= 20 ? 'var(--amber)' : 'var(--red)');
+  
   return `
-    <div class="card" style="border-color:var(--green);margin-bottom:12px">
-      <div>
-        <h3 style="margin-bottom:6px;color:var(--green)">Meal plan summary</h3>
-        <div class="plan-summary">
-          <div class="summary-box"><strong>Elliott average</strong><div>${score.eAvg?.cal || 0} kcal / day</div><div>P ${score.eAvg?.prot || 0}g / day</div></div>
-          <div class="summary-box"><strong>Chloe average</strong><div>${score.cAvg?.cal || 0} kcal / day</div><div>P ${score.cAvg?.prot || 0}g / day</div></div>
-          <div class="summary-box"><strong>Overall score</strong><div style="font-size:22px;font-weight:700;color:${scoreColor}">${score.score}</div><div style="color:var(--text2)">Lower is better</div></div>
+    <div class="card" style="border:1px solid var(--border,#ccc);margin-bottom:16px;padding:16px;background:var(--surface);">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div>
+          <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;">Meal Plan Summary & Macro Targets</h3>
+          <div style="font-size:13px;color:var(--text2);display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px;">
+            <span class="tag" style="background:#e0f2fe;color:#0369a1;font-weight:700;">🎯 Daily Protein Target: ${targets.protein}g</span>
+            <span class="tag" style="background:#fef3c7;color:#92400e;font-weight:700;">⚡ Daily Calories: ${targets.calories} kcal</span>
+            ${currentPlan?.pantrySummary ? `<span class="tag" style="background:#dcfce7;color:#14532d;font-weight:700;">🔥 ${currentPlan.pantrySummary.useUpItemsConsumed} Use-Up Items Consumed</span>` : ''}
+          </div>
         </div>
-        <div style="font-size:12px;color:var(--text2);margin-top:6px">Missing meals and snacks are assumed to be covered outside PlatePlan.</div>
+        <div>
+          <button type="button" class="btn primary" onclick="if(typeof openPlanGeneratorModal==='function')openPlanGeneratorModal()" style="font-weight:700;padding:8px 16px;">
+            ⚡ Auto-Generate Macro Schedule
+          </button>
+        </div>
       </div>
     </div>
   `;

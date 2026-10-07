@@ -5,7 +5,9 @@
  */
 
 import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeRecipes, subscribeIngredients, subscribeProducts, subscribePreferences, subscribeCurrentPlan, getCategories, saveCategories, saveIngredient, cleanLegacyMacros } from './HouseholdRepository.js';
-import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache, setCategories, sanitizePreferences } from '../store/store.js';
+import { getInventory } from './InventoryRepository.js';
+import { getCurrentActivePlan as getActivePlanFromSubcollection } from './PlanRepository.js';
+import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache, setCategories, setInventory, sanitizePreferences } from '../store/store.js';
 import { compareProductsByStrategy } from '../models/PantryHierarchyModel.js';
 
 export const CANONICAL_CATEGORIES = [
@@ -228,9 +230,10 @@ export async function hydrateHouseholdData() {
 
   inFlightHydration = (async () => {
     try {
-      const [recipes, rawIngredients, rawProducts, preferencesData, plan, rawCategories] = await Promise.all([
-        getRecipes(), getIngredients(), getProducts(), getPreferences(), getCurrentPlan(), getCategories()
+      const [recipes, rawIngredients, rawProducts, preferencesData, legacyPlan, rawCategories, inventoryItems, subcollPlan] = await Promise.all([
+        getRecipes(), getIngredients(), getProducts(), getPreferences(), getCurrentPlan(), getCategories(), getInventory(), getActivePlanFromSubcollection()
       ]);
+      const plan = subcollPlan || legacyPlan;
 
       const sanitizedPrefs = sanitizePreferences(preferencesData);
 
@@ -270,6 +273,7 @@ export async function hydrateHouseholdData() {
       setPreferences(sanitizedPrefs);
       setCurrentPlan(plan);
       setCategories(mergedCategories);
+      setInventory(inventoryItems || []);
 
       if (mutated) {
         saveCategories(mergedCategories).catch(err => console.warn('[HydrationService] Failed to persist merged canonical categories:', err));

@@ -1,5 +1,5 @@
 /**
- * src/store/store.js (v3.21.13)
+ * src/store/store.js (v3.25.0)
  * Centralized Reactive State Store module using native browser CustomEvents for unidirectional data flow.
  * Provides microtask-wrapped event dispatching and IndexedDB caching for instant offline hydration without localStorage quotas.
  */
@@ -7,19 +7,22 @@
 import { safeJsonStringify, safeClone } from '../utils/safeJson.js';
 import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
 import { autoRecalibrateRecipeDrift } from '../services/DataQualityEngine.js';
+import { savePantryItem, toggleUseUpStatusInDb } from '../repositories/InventoryRepository.js';
+import { savePlan } from '../repositories/PlanRepository.js';
 
 export { getShoppingLineStateKey };
 
 const DB_NAME = 'PlatePlanDB';
 const STORE_NAME = 'StateStore';
 const DB_VERSION = 1;
-const CACHE_KEY = 'plateplan_store_cache_v3.21.13';
+const CACHE_KEY = 'plateplan_store_cache_v3.25.0';
 
 const state = {
   recipes: [],
   ingredients: [],
   products: [],
   categories: [],
+  inventory: [],
   preferences: null,
   userPrefs: {},
   settings: {},
@@ -326,6 +329,141 @@ export function setCategories(newCategories) {
 }
 
 /**
+  * Update inventory state domain and dispatch reactive update event.
+  * @param {Array<Object>} newInventory 
+  */
+export function setInventory(newInventory) {
+  state.inventory = Array.isArray(newInventory) ? newInventory : [];
+  saveStateCache();
+  dispatchStateEvent('plateplan:state:inventory', state.inventory);
+}
+
+/**
+  * Update or add a single pantry inventory item in state and persist directly to subcollection.
+  * @param {string} itemId 
+  * @param {Object} patch 
+  */
+export function updatePantryItem(itemId, patch = {}) {
+  if (!itemId && !patch.id) return;
+  const targetId = itemId || patch.id;
+  const list = state.inventory || [];
+  const idx = list.findIndex(i => i.id === targetId);
+  let updatedItem;
+  if (idx !== -1) {
+    updatedItem = { ...list[idx], ...patch, id: targetId, updatedAt: new Date().toISOString() };
+    list[idx] = updatedItem;
+  } else {
+    updatedItem = { id: targetId, status: 'in_stock', isUseUp: false, quantity: null, unit: null, expiryDate: null, ...patch, updatedAt: new Date().toISOString() };
+    list.push(updatedItem);
+  }
+  state.inventory = [...list];
+  saveStateCache();
+  dispatchStateEvent('plateplan:state:inventory', state.inventory);
+
+  // Persist directly to inventory subcollection
+  savePantryItem(updatedItem);
+}
+
+/**
+  * Toggle isUseUp flag for a pantry inventory item.
+  * @param {string} itemId 
+  */
+export function toggleUseUpStatus(itemId) {
+  if (!itemId) return;
+  const list = state.inventory || [];
+  const item = list.find(i => i.id === itemId);
+  if (!item) return;
+  const newStatus = !item.isUseUp;
+  updatePantryItem(itemId, { isUseUp: newStatus });
+  toggleUseUpStatusInDb(itemId, newStatus);
+}
+
+/**
+ * Sets active plan state domain and persists to subcollection.
+ * @param {Object} newPlan 
+ */
+export function setActivePlan(newPlan) {
+  state.currentPlan = newPlan || null;
+  saveStateCache();
+  dispatchStateEvent('plateplan:state:plan', state.currentPlan);
+  if (newPlan) {
+    savePlan(newPlan);
+  }
+}
+
+/**
+ * Updates a meal entry in active plan day.
+ */
+export function updatePlanMeal(dayIndex, mealIndex, patch = {}) {
+  if (!state.currentPlan || !Array.isArray(state.currentPlan.days) || !state.currentPlan.days[dayIndex]) return;
+  const day = state.currentPlan.days[dayIndex];
+  if (!Array.isArray(day.meals) || !day.meals[mealIndex]) return;
+
+  day.meals[mealIndex] = { ...day.meals[mealIndex], ...patch };
+
+  // Recalculate daily totals
+  let totalCal = 0, totalProt = 0, totalCarbs = 0, totalFat = 0;
+  day.meals.forEach(m => {
+    if (m && m.macros) {
+      totalCal += Number(m.macros.calories || 0);
+      totalProt += Number(m.macros.protein || 0);
+      totalCarbs += Number(m.macros.carbs || 0);
+      totalFat += Number(m.macros.fat || 0);
+    }
+  });
+
+  day.dailyTotals = {
+    calories: Math.round(totalCal),
+    protein: Math.round(totalProt),
+    carbs: Math.round(totalCarbs),
+    fat: Math.round(totalFat)
+  };
+
+  const targetProt = state.currentPlan.macroTargets?.protein || 140;
+  day.proteinDeltaPct = Math.round(((totalProt - targetProt) / targetProt) * 100);
+
+  state.currentPlan.updatedAt = new Date().toISOString();
+  saveStateCache();
+  dispatchStateEvent('plateplan:state:plan', state.currentPlan);
+  savePlan(state.currentPlan);
+}
+
+/**
+ * Swaps recipe for a specific meal in active plan.
+ */
+export function swapPlanRecipe(dayIndex, mealType, newRecipeId) {
+  if (!state.currentPlan || !Array.isArray(state.currentPlan.days) || !state.currentPlan.days[dayIndex]) return;
+  const day = state.currentPlan.days[dayIndex];
+  const mealIdx = day.meals.findIndex(m => m.mealType === mealType);
+  if (mealIdx === -1) return;
+
+  const recipes = state.recipes || [];
+  const recipe = recipes.find(r => r.id === newRecipeId);
+  if (!recipe) return;
+
+  const cal = Number(recipe.macros?.calories || recipe.calories || 450);
+  const prot = Number(recipe.macros?.protein || recipe.protein || 25);
+  const carbs = Number(recipe.macros?.carbs || recipe.carbs || 45);
+  const fat = Number(recipe.macros?.fat || recipe.fat || 15);
+
+  updatePlanMeal(dayIndex, mealIdx, {
+    recipeId: recipe.id,
+    recipeTitle: recipe.title || recipe.name,
+    servings: recipe.servings || 1,
+    macros: { calories: cal, protein: prot, carbs, fat }
+  });
+}
+
+/**
+ * Clears active plan state.
+ */
+export function clearPlan() {
+  state.currentPlan = null;
+  saveStateCache();
+  dispatchStateEvent('plateplan:state:plan', null);
+}
+
+/**
  * Execute an optimistic state mutation with automatic rollback on network failure.
  * @param {string} domain 'recipes' | 'ingredients' | 'preferences' | 'plan' | 'shopping'
  * @param {Function} mutateFn Function that synchronously mutates local state
@@ -350,7 +488,7 @@ export async function runOptimisticMutation(domain, mutateFn, persistPromise, ro
     }
     return result;
   } catch (err) {
-    console.error(`[Store v3.21.13] Network failure in domain '${domain}', executing rollback:`, err);
+    console.error(`[Store v3.25.0] Network failure in domain '${domain}', executing rollback:`, err);
     
     if (typeof rollbackFn === 'function') {
       rollbackFn(state, previousStateSnapshot);
@@ -378,6 +516,8 @@ export function updateState(patch) {
   saveStateCache();
   dispatchStateEvent('plateplan:state:patch', patch);
 }
+
+export const setState = updateState;
 
 /**
  * Subscribe to state changes on a specific domain or globally.
@@ -407,11 +547,25 @@ export function subscribe(domainOrCallback, maybeCallback) {
 }
 
 if (typeof window !== 'undefined') {
+  window.setInventory = setInventory;
+  window.updatePantryItem = updatePantryItem;
+  window.toggleUseUpStatus = toggleUseUpStatus;
+  window.setActivePlan = setActivePlan;
+  window.updatePlanMeal = updatePlanMeal;
+  window.swapPlanRecipe = swapPlanRecipe;
+  window.clearPlan = clearPlan;
   window.Store = {
     getState,
     setState: (patch) => {
       updateState(patch);
     },
+    setInventory,
+    updatePantryItem,
+    toggleUseUpStatus,
+    setActivePlan,
+    updatePlanMeal,
+    swapPlanRecipe,
+    clearPlan,
     subscribe
   };
 }
