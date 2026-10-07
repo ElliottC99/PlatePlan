@@ -1,10 +1,12 @@
 /**
- * src/services/RecipeImporter.js (v3.22.0)
+ * src/services/RecipeImporter.js (v3.22.1)
  * Modern recipe scraping, JSON-LD microdata extraction,
- * natural language ingredient parsing, and taxonomy matching pipeline.
+ * natural language ingredient parsing with multiplier extraction ("2 x 400g"),
+ * strict density-based unit conversion, section recognition, and alias matching.
  */
 
 import { getState } from '../store/store.js';
+import { convertToStrictUnit } from './UnitConversionService.js';
 
 const UNICODE_FRACTIONS = {
   '½': '1/2', '⅓': '1/3', '⅔': '2/3', '¼': '1/4', '¾': '3/4',
@@ -43,14 +45,23 @@ export function parseQuantity(rawText) {
   let text = String(rawText || '').trim();
   if (!text) return { qty: 1, remainder: '' };
 
-  // Replace unicode fractions
   Object.keys(UNICODE_FRACTIONS).forEach(uf => {
     if (text.includes(uf)) {
       text = text.replace(new RegExp(uf, 'g'), UNICODE_FRACTIONS[uf]);
     }
   });
 
-  // Range e.g. "3-4" or "3 to 4" or "3 – 4"
+  // Multiplier pattern e.g. "2 x 400g" or "2 x 150ml"
+  const multMatch = text.match(/^(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)(.*)/);
+  if (multMatch) {
+    const m1 = parseFloat(multMatch[1]);
+    const m2 = parseFloat(multMatch[2]);
+    const unitStr = multMatch[3];
+    const totalQty = m1 * m2;
+    return { qty: totalQty, remainder: `${unitStr}${multMatch[4]}`.trim() };
+  }
+
+  // Range e.g. "3-4" or "3 to 4"
   const rangeMatch = text.match(/^(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)(.*)/i);
   if (rangeMatch) {
     const q1 = parseFloat(rangeMatch[1]);
@@ -59,7 +70,7 @@ export function parseQuantity(rawText) {
     return { qty: avg, remainder: rangeMatch[3].trim() };
   }
 
-  // Mixed fraction e.g. "1 1/2" or "2 3/4"
+  // Mixed fraction e.g. "1 1/2"
   const mixedMatch = text.match(/^(\d+)\s+(\d+)\/(\d+)(.*)/);
   if (mixedMatch) {
     const whole = parseFloat(mixedMatch[1]);
@@ -69,7 +80,7 @@ export function parseQuantity(rawText) {
     return { qty, remainder: mixedMatch[4].trim() };
   }
 
-  // Simple fraction e.g. "1/2" or "3/4"
+  // Simple fraction e.g. "1/2"
   const fracMatch = text.match(/^(\d+)\/(\d+)(.*)/);
   if (fracMatch) {
     const num = parseFloat(fracMatch[1]);
@@ -78,13 +89,13 @@ export function parseQuantity(rawText) {
     return { qty, remainder: fracMatch[3].trim() };
   }
 
-  // Decimal or integer e.g. "200" or "1.5"
+  // Decimal or integer e.g. "200"
   const numMatch = text.match(/^(\d+(?:\.\d+)?)(.*)/);
   if (numMatch) {
     return { qty: parseFloat(numMatch[1]), remainder: numMatch[2].trim() };
   }
 
-  // Word quantities e.g. "a", "an", "one", "two", "half"
+  // Word quantities e.g. "one", "half"
   const wordMatch = text.match(/^(a|an|one|two|three|four|five|half)\b(.*)/i);
   if (wordMatch) {
     const w = wordMatch[1].toLowerCase();
@@ -100,9 +111,6 @@ export function parseQuantity(rawText) {
   return { qty: 1, remainder: text };
 }
 
-/**
- * Normalizes standard metric and imperial units.
- */
 export function normalizeUnit(rawUnit) {
   if (!rawUnit) return 'qty';
   const clean = String(rawUnit).toLowerCase().trim().replace(/[\.\,]/g, '');
@@ -110,8 +118,8 @@ export function normalizeUnit(rawUnit) {
 }
 
 /**
- * Parses raw ingredient string into structured quantity, unit, name, and notes.
- * Example: "200g firm tofu, drained and cubed" -> { qty: 200, unit: "g", name: "firm tofu", notes: "drained and cubed" }
+ * Parses raw ingredient string into structured quantity, unit, name, and notes,
+ * then converts strictly into 'g', 'ml', or 'qty' via UnitConversionService.
  */
 export function parseIngredientString(rawString) {
   if (!rawString || typeof rawString !== 'string') return null;
@@ -123,7 +131,6 @@ export function parseIngredientString(rawString) {
   let unit = 'qty';
   let ingredientText = remainder;
 
-  // Check if remainder starts with a unit key
   if (remainder) {
     const words = remainder.split(/\s+/);
     const firstWordClean = words[0].toLowerCase().replace(/[\.\,]/g, '');
@@ -140,23 +147,19 @@ export function parseIngredientString(rawString) {
     }
   }
 
-  // Strip leading "of " if present
   if (/^of\b/i.test(ingredientText.trim())) {
     ingredientText = ingredientText.trim().replace(/^of\b/i, '').trim();
   }
 
-  // Separate name and notes (parentheses, commas, hyphens, prep words)
   let name = ingredientText;
   let notes = '';
 
-  // 1. Extract parentheses notes e.g. "diced onion (optional)" or "extra firm tofu (pressed)"
   const parenMatch = name.match(/^(.*?)\((.*?)\)(.*)$/);
   if (parenMatch) {
     name = (parenMatch[1] + ' ' + parenMatch[3]).trim();
     notes = parenMatch[2].trim();
   }
 
-  // 2. Comma separation e.g. "firm tofu, drained and cubed"
   if (name.includes(',')) {
     const parts = name.split(',');
     name = parts[0].trim();
@@ -164,7 +167,6 @@ export function parseIngredientString(rawString) {
     notes = notes ? `${notes}, ${commaNotes}` : commaNotes;
   }
 
-  // 3. Dash separation e.g. "garlic cloves - minced"
   if (name.includes(' - ') || name.includes(' – ')) {
     const parts = name.split(/\s+[-–]\s+/);
     name = parts[0].trim();
@@ -172,7 +174,6 @@ export function parseIngredientString(rawString) {
     notes = notes ? `${notes}, ${dashNotes}` : dashNotes;
   }
 
-  // 4. Clean container descriptors like "can", "tin", "block", "jar", "pack" from start of name
   const containerMatch = name.match(/^(can|tin|block|jar|pack|packet|bottle|head|stalk)\s+(.*)/i);
   if (containerMatch) {
     const descriptor = containerMatch[1].toLowerCase();
@@ -180,7 +181,6 @@ export function parseIngredientString(rawString) {
     notes = notes ? `${descriptor}, ${notes}` : descriptor;
   }
 
-  // 5. Clean leading prep descriptors like "diced", "sliced", "chopped", "minced", "grated", "crushed", "peeled", "cubed"
   const prepLeadMatch = name.match(/^(diced|sliced|chopped|minced|grated|crushed|peeled|cubed|drained|pressed|raw|fresh|organic)\s+(.*)/i);
   if (prepLeadMatch) {
     const prepWord = prepLeadMatch[1].toLowerCase();
@@ -188,21 +188,22 @@ export function parseIngredientString(rawString) {
     notes = notes ? `${prepWord}, ${notes}` : prepWord;
   }
 
-  // Clean title
   name = name.replace(/^[\s,.\-–]+|[\s,.\-–]+$/g, '').trim();
+  const cleanedName = name || original;
+
+  // Apply strict unit conversion (g, ml, qty)
+  const strict = convertToStrictUnit(qty, unit, cleanedName);
 
   return {
     raw: original,
-    qty: Number(qty.toFixed(2)),
-    unit,
-    name: name || original,
-    notes: notes.trim()
+    qty: strict.qty,
+    unit: strict.unit,
+    name: cleanedName,
+    notes: notes.trim(),
+    isFallbackWeight: strict.isFallbackWeight || false
   };
 }
 
-/**
- * Stemming helper to normalize ingredient names for cross-referencing.
- */
 export function stemIngredientName(rawName) {
   if (!rawName) return '';
   let str = String(rawName).toLowerCase().trim();
@@ -214,7 +215,7 @@ export function stemIngredientName(rawName) {
 }
 
 /**
- * Cross-references parsed ingredient against existing Store taxonomy to prevent duplicates.
+ * Cross-references parsed ingredient against existing Store taxonomy including aliases.
  */
 export function matchIngredientTaxonomy(parsedItem, existingIngredients = null) {
   if (!parsedItem) return null;
@@ -227,17 +228,23 @@ export function matchIngredientTaxonomy(parsedItem, existingIngredients = null) 
   let matchedIng = null;
 
   for (const ing of ingredients) {
-    if (!ing || !ing.name) continue;
-    const ingNameLower = String(ing.name).toLowerCase().trim();
-    const ingStemmed = stemIngredientName(ingNameLower);
-
-    if (ingNameLower === rawNameLower || (stemmed && stemmed === ingStemmed)) {
+    if (!ing) continue;
+    const aliases = Array.isArray(ing.aliases) ? ing.aliases.map(a => String(a).toLowerCase().trim()) : [];
+    if (aliases.includes(rawNameLower) || aliases.includes(stemmed) || aliases.some(a => rawNameLower.includes(a) || a.includes(rawNameLower))) {
       matchedIng = ing;
       break;
     }
+
+    if (ing.name) {
+      const ingNameLower = String(ing.name).toLowerCase().trim();
+      const ingStemmed = stemIngredientName(ingNameLower);
+      if (ingNameLower === rawNameLower || (stemmed && stemmed === ingStemmed) || ingNameLower.includes(stemmed) || stemmed.includes(ingNameLower)) {
+        matchedIng = ing;
+        break;
+      }
+    }
   }
 
-  // Substring fallback matching
   if (!matchedIng && stemmed.length > 3) {
     for (const ing of ingredients) {
       if (!ing || !ing.name) continue;
@@ -265,25 +272,19 @@ export function matchIngredientTaxonomy(parsedItem, existingIngredients = null) 
   };
 }
 
-/**
- * Helper to parse ISO8601 duration string e.g. "PT15M", "PT1H30M" -> minutes float.
- */
 export function parseIsoDuration(durationStr) {
-  if (!durationStr || typeof durationStr !== 'string') return 0;
+  if (!durationStr || typeof durationStr !== 'string') return { hours: 0, minutes: 0 };
   const match = durationStr.match(/P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/i);
   if (!match) {
     const simpleMin = durationStr.match(/(\d+)\s*min/i);
-    return simpleMin ? parseInt(simpleMin[1], 10) : 0;
+    const mins = simpleMin ? parseInt(simpleMin[1], 10) : 0;
+    return { hours: Math.floor(mins / 60), minutes: mins % 60 };
   }
-  const days = parseInt(match[1] || 0, 10);
   const hours = parseInt(match[2] || 0, 10);
   const mins = parseInt(match[3] || 0, 10);
-  return (days * 1440) + (hours * 60) + mins;
+  return { hours, minutes: mins };
 }
 
-/**
- * Helper to parse nutrition string e.g. "550 kcal", "18g", "18.5 grams" -> number float.
- */
 export function parseNutritionNumber(val) {
   if (val === undefined || val === null) return 0;
   if (typeof val === 'number') return val;
@@ -291,9 +292,6 @@ export function parseNutritionNumber(val) {
   return match ? parseFloat(match[1]) : 0;
 }
 
-/**
- * Flattens JSON-LD recipeInstructions steps into array of clean string steps.
- */
 export function flattenRecipeInstructions(instructions) {
   if (!instructions) return [];
   if (typeof instructions === 'string') {
@@ -322,14 +320,12 @@ export function flattenRecipeInstructions(instructions) {
 }
 
 /**
- * Extracts schema.org/Recipe JSON-LD or microdata from raw HTML string.
+ * Extracts schema.org/Recipe JSON-LD or microdata with sections and time objects.
  */
 export function extractRecipeFromHtml(html, sourceUrl = '') {
   if (!html || typeof html !== 'string') return null;
 
   let recipeData = null;
-
-  // 1. Scan for <script type="application/ld+json"> blocks
   const scriptRegex = /<script\s+[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   let match;
 
@@ -346,40 +342,15 @@ export function extractRecipeFromHtml(html, sourceUrl = '') {
           break;
         }
       }
-    } catch (e) {
-      // Ignore parse errors for malformed script tags
-    }
+    } catch (e) {}
     if (recipeData) break;
   }
 
-  // If no script tag matched, attempt direct JSON parse if whole input is JSON
-  if (!recipeData && (html.trim().startsWith('{') || html.trim().startsWith('['))) {
-    try {
-      const parsedJson = JSON.parse(html.trim());
-      const items = Array.isArray(parsedJson) ? parsedJson : (parsedJson['@graph'] || [parsedJson]);
-      for (const item of items) {
-        if (!item) continue;
-        const type = Array.isArray(item['@type']) ? item['@type'] : [item['@type']];
-        if (type.some(t => String(t).toLowerCase() === 'recipe')) {
-          recipeData = item;
-          break;
-        }
-      }
-    } catch (e) {}
-  }
-
   if (recipeData) {
-    // Process JSON-LD fields
     const title = recipeData.name || recipeData.headline || 'Imported Recipe';
-    
     let imageUrl = '';
-    if (typeof recipeData.image === 'string') {
-      imageUrl = recipeData.image;
-    } else if (Array.isArray(recipeData.image)) {
-      imageUrl = typeof recipeData.image[0] === 'string' ? recipeData.image[0] : (recipeData.image[0]?.url || '');
-    } else if (recipeData.image && typeof recipeData.image === 'object') {
-      imageUrl = recipeData.image.url || '';
-    }
+    if (typeof recipeData.image === 'string') imageUrl = recipeData.image;
+    else if (Array.isArray(recipeData.image)) imageUrl = recipeData.image[0] || '';
 
     let servings = 4;
     if (recipeData.recipeYield) {
@@ -388,8 +359,8 @@ export function extractRecipeFromHtml(html, sourceUrl = '') {
       if (yieldNum) servings = parseInt(yieldNum[0], 10);
     }
 
-    const prepTimeMinutes = parseIsoDuration(recipeData.prepTime);
-    const cookTimeMinutes = parseIsoDuration(recipeData.cookTime);
+    const prepMinsTotal = parseIsoDuration(recipeData.prepTime);
+    const cookMinsTotal = parseIsoDuration(recipeData.cookTime);
 
     const rawIngredients = Array.isArray(recipeData.recipeIngredient) ? recipeData.recipeIngredient : [];
     const parsedIngredients = rawIngredients.map(ingStr => {
@@ -399,34 +370,25 @@ export function extractRecipeFromHtml(html, sourceUrl = '') {
 
     const instructions = flattenRecipeInstructions(recipeData.recipeInstructions);
 
-    const nut = recipeData.nutrition || {};
-    const macros = {
-      calories: parseNutritionNumber(nut.calories),
-      protein: parseNutritionNumber(nut.proteinContent),
-      carbs: parseNutritionNumber(nut.carbohydrateContent),
-      fat: parseNutritionNumber(nut.fatContent),
-      fiber: parseNutritionNumber(nut.fiberContent)
-    };
-
     return {
       title,
       imageUrl,
       servings,
-      prepTimeMinutes,
-      cookTimeMinutes,
+      prepTime: prepMinsTotal,
+      cookTime: cookMinsTotal,
+      mealSuitability: ['Dinner'],
+      ingredientSections: [{ sectionTitle: 'Main Ingredients', ingredients: parsedIngredients }],
       ingredients: parsedIngredients,
       instructions,
-      macros,
       sourceUrl
     };
   }
 
-  // Fallback to text chunk parsing if HTML contains plain recipe text
   return null;
 }
 
 /**
- * Bulk text parser service for recipe ingestion.
+ * Multi-recipe text splitter supporting "Recipe X" headers, double page breaks, and section recognition.
  */
 export function parseBulkRecipeText(rawText) {
   if (!rawText || typeof rawText !== 'string') return [];
@@ -435,10 +397,8 @@ export function parseBulkRecipeText(rawText) {
   if (!text) return [];
 
   let recipeBlocks = [];
-
   if (/Recipe\s+\d+:/i.test(text)) {
-    const parts = text.split(/Recipe\s+\d+:/i).map(p => p.trim()).filter(Boolean);
-    recipeBlocks = parts;
+    recipeBlocks = text.split(/Recipe\s+\d+:/i).map(p => p.trim()).filter(Boolean);
   } else {
     recipeBlocks = text.split(/\n\s*\n\s*\n/).map(p => p.trim()).filter(Boolean);
     if (recipeBlocks.length === 1) {
@@ -454,21 +414,32 @@ export function parseBulkRecipeText(rawText) {
 
     let title = 'Imported Recipe';
     let servings = 4;
-    let ingLines = [];
+    let currentSectionTitle = 'Main Ingredients';
+    let sectionsMap = { 'Main Ingredients': [] };
     let methodLines = [];
-
-    let currentSection = 'header';
+    let parsingMode = 'header';
 
     lines.forEach((line, idx) => {
+      // Check section header e.g. "For the salsa:" or "Dressing:"
+      if (/^for\s+the\s+.+:|^[a-zA-Z\s]+:$/.test(line) && !/serves|yield|ingredients|method|instructions/i.test(line)) {
+        currentSectionTitle = line.replace(':', '').trim();
+        if (!sectionsMap[currentSectionTitle]) sectionsMap[currentSectionTitle] = [];
+        parsingMode = 'section';
+        return;
+      }
+
       if (/^(Ingredients?|Items?):/i.test(line)) {
-        currentSection = 'ingredients';
+        parsingMode = 'ingredients';
         const rest = line.replace(/^(Ingredients?|Items?):/i, '').trim();
-        if (rest) ingLines.push(rest);
+        if (rest) {
+          const parsed = parseIngredientString(rest);
+          sectionsMap[currentSectionTitle].push(matchIngredientTaxonomy(parsed));
+        }
         return;
       }
 
       if (/^(Method|Instructions|Steps|Preparation):/i.test(line)) {
-        currentSection = 'method';
+        parsingMode = 'method';
         const rest = line.replace(/^(Method|Instructions|Steps|Preparation):/i, '').trim();
         if (rest) methodLines.push(rest);
         return;
@@ -485,38 +456,41 @@ export function parseBulkRecipeText(rawText) {
         return;
       }
 
-      if (currentSection === 'ingredients' || (currentSection === 'header' && !/^\d+\.|\b(mix|bake|heat|cook|boil|sauté|simmer)\b/i.test(line))) {
-        ingLines.push(line);
-      } else if (currentSection === 'method' || /^\d+\.|\b(mix|bake|heat|cook|boil|sauté|simmer)\b/i.test(line)) {
+      if (parsingMode === 'ingredients' || parsingMode === 'section' || (parsingMode === 'header' && !/^\d+\.|\b(mix|bake|heat|cook|boil|sauté|simmer)\b/i.test(line))) {
+        if (!sectionsMap[currentSectionTitle]) sectionsMap[currentSectionTitle] = [];
+        const parsed = parseIngredientString(line);
+        if (parsed) sectionsMap[currentSectionTitle].push(matchIngredientTaxonomy(parsed));
+      } else if (parsingMode === 'method' || /^\d+\.|\b(mix|bake|heat|cook|boil|sauté|simmer)\b/i.test(line)) {
         methodLines.push(line.replace(/^\d+\.\s*/, ''));
       }
     });
 
-    const parsedIngs = ingLines.map(line => {
-      const parsed = parseIngredientString(line);
-      return matchIngredientTaxonomy(parsed);
-    }).filter(Boolean);
+    const ingredientSections = Object.entries(sectionsMap)
+      .filter(([_, ingList]) => ingList.length > 0)
+      .map(([secTitle, ingList]) => ({ sectionTitle: secTitle, ingredients: ingList }));
 
-    if (parsedIngs.length > 0 || methodLines.length > 0) {
-      parsedRecipes.push({
-        title,
-        servings,
-        prepTimeMinutes: 0,
-        cookTimeMinutes: 0,
-        imageUrl: '',
-        ingredients: parsedIngs,
-        instructions: methodLines,
-        macros: { calories: 400, protein: 25, carbs: 45, fat: 15 }
-      });
+    if (ingredientSections.length === 0) {
+      ingredientSections.push({ sectionTitle: 'Main Ingredients', ingredients: [] });
     }
+
+    const flatIngredients = ingredientSections.flatMap(s => s.ingredients);
+
+    parsedRecipes.push({
+      title,
+      servings,
+      prepTime: { hours: 0, minutes: 15 },
+      cookTime: { hours: 0, minutes: 30 },
+      mealSuitability: ['Dinner'],
+      ingredientSections,
+      ingredients: flatIngredients,
+      instructions: methodLines,
+      macros: { calories: 450, protein: 28, carbs: 40, fat: 16 }
+    });
   });
 
   return parsedRecipes;
 }
 
-/**
- * High-level import entry point: Accepts HTML, JSON-LD, or raw text and outputs clean recipe object payload.
- */
 export function importRecipeFromHtml(htmlOrText, sourceUrl = '') {
   const extracted = extractRecipeFromHtml(htmlOrText, sourceUrl);
   if (extracted) {
@@ -534,13 +508,13 @@ export function importRecipeFromHtml(htmlOrText, sourceUrl = '') {
       id: crypto.randomUUID(),
       title: first.title,
       servings: first.servings || 4,
-      prepTimeMinutes: first.prepTimeMinutes || 0,
-      cookTimeMinutes: first.cookTimeMinutes || 0,
-      imageUrl: first.imageUrl || '',
-      sourceUrl,
+      prepTime: first.prepTime || { hours: 0, minutes: 15 },
+      cookTime: first.cookTime || { hours: 0, minutes: 30 },
+      mealSuitability: first.mealSuitability || ['Dinner'],
+      ingredientSections: first.ingredientSections || [{ sectionTitle: 'Main Ingredients', ingredients: first.ingredients }],
       ingredients: first.ingredients,
       instructions: first.instructions || [],
-      macros: first.macros || { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+      macros: first.macros || { calories: 450, protein: 28, carbs: 40, fat: 16 },
       createdAt: new Date().toISOString()
     };
   }

@@ -1,5 +1,5 @@
 /**
- * src/store/store.js (v3.22.0)
+ * src/store/store.js (v3.22.1)
  * Centralized Reactive State Store module using native browser CustomEvents for unidirectional data flow.
  * Provides microtask-wrapped event dispatching and IndexedDB caching for instant offline hydration without localStorage quotas.
  */
@@ -15,7 +15,7 @@ export { getShoppingLineStateKey };
 const DB_NAME = 'PlatePlanDB';
 const STORE_NAME = 'StateStore';
 const DB_VERSION = 1;
-const CACHE_KEY = 'plateplan_store_cache_v3.22.0';
+const CACHE_KEY = 'plateplan_store_cache_v3.22.1';
 
 const state = {
   recipes: [],
@@ -507,6 +507,36 @@ export async function runOptimisticMutation(domain, mutateFn, persistPromise, ro
 }
 
 /**
+ * Learns an alias for an ingredient taxonomy item and persists to repository.
+ * @param {string} ingredientId 
+ * @param {string} rawString 
+ */
+export async function learnIngredientAlias(ingredientId, rawString) {
+  if (!ingredientId || !rawString) return;
+  const ingredientsList = state.ingredients.length > 0 ? state.ingredients : (window.state?.ingredients || []);
+  const ing = ingredientsList.find(i => i.id === ingredientId);
+  if (!ing) return;
+
+  if (!Array.isArray(ing.aliases)) ing.aliases = [];
+  const cleanAlias = String(rawString).trim();
+  const lowerAliases = ing.aliases.map(a => a.toLowerCase());
+
+  if (cleanAlias && !lowerAliases.includes(cleanAlias.toLowerCase())) {
+    ing.aliases.push(cleanAlias);
+    if (!state.ingredients.includes(ing)) state.ingredients.push(ing);
+    saveStateCache();
+    dispatchStateEvent('plateplan:state:ingredients', state.ingredients);
+
+    try {
+      const { saveIngredient } = await import('../repositories/HouseholdRepository.js');
+      await saveIngredient(ing);
+    } catch (err) {
+      console.warn('[Store] Failed to persist learned ingredient alias:', err);
+    }
+  }
+}
+
+/**
  * Update global state with a partial patch object.
  * @param {Object} patch 
  */
@@ -554,6 +584,7 @@ if (typeof window !== 'undefined') {
   window.updatePlanMeal = updatePlanMeal;
   window.swapPlanRecipe = swapPlanRecipe;
   window.clearPlan = clearPlan;
+  window.learnIngredientAlias = learnIngredientAlias;
   window.Store = {
     getState,
     setState: (patch) => {
@@ -566,6 +597,7 @@ if (typeof window !== 'undefined') {
     updatePlanMeal,
     swapPlanRecipe,
     clearPlan,
-    subscribe
+    subscribe,
+    learnIngredientAlias
   };
 }
