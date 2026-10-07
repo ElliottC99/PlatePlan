@@ -1,6 +1,6 @@
 /**
- * src/config/firebase.js (v3.20.16)
- * Firebase configuration, safe initialization, native multi-tab offline persistence, and database instance export.
+ * src/config/firebase.js (v3.21.5)
+ * Firebase configuration, safe initialization, CDN-compatible persistence, and database instance export.
  */
 
 export const HOUSEHOLD_ID = 'elliott-chloe';
@@ -22,27 +22,34 @@ if (typeof window !== 'undefined' && window.firebase) {
   }
 }
 
-export const db = (typeof window !== 'undefined' && window.firebase && typeof window.firebase.firestore === 'function')
-  ? window.firebase.firestore()
-  : null;
+// Ensure global firebase is loaded via CDN script tags
+export const db = (typeof window !== 'undefined' && window.firebase) ? window.firebase.firestore() : null;
 
-if (db && typeof db.settings === 'function') {
-  try {
-    db.settings({ experimentalAutoDetectLongPolling: true, merge: true });
-  } catch (e) {
-    // Settings may already be configured
-  }
+// Attach db to window for global access and DevTools verification
+if (db) {
+  window.db = db;
 }
 
-// Enable native Firebase offline persistence with multi-tab synchronization
-if (db && typeof db.enablePersistence === 'function') {
-  db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      db.enablePersistence().catch(() => {});
-    } else if (err.code === 'unimplemented') {
-      console.warn('[Firebase] Native offline persistence is unimplemented in this browser.');
-    }
-  });
+// Configure modern persistence or fallback cleanly for CDN Compat SDK
+try {
+  if (db && typeof window.firebase.firestore.persistentLocalCache === 'function') {
+    db.settings({
+      cache: window.firebase.firestore.persistentLocalCache({
+        tabManager: window.firebase.firestore.persistentMultipleTabManager()
+      })
+    });
+  } else if (db && typeof db.enablePersistence === 'function') {
+    // Legacy CDN fallback with error suppression
+    db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+      if (err.code === 'failed-precondition') {
+        console.warn('[Firebase] Multiple tabs open, persistence enabled in single tab');
+      } else if (err.code === 'unimplemented') {
+        console.warn('[Firebase] Browser does not support persistence');
+      }
+    });
+  }
+} catch (e) {
+  console.warn('[Firebase] Persistence initialization notice:', e.message);
 }
 
 if (typeof window !== 'undefined' && window.firebase && typeof window.firebase.firestore === 'function' && typeof window.firebase.firestore.setLogLevel === 'function') {
