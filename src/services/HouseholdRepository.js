@@ -51,6 +51,113 @@ export function cleanLegacyMacros(target) {
   return target;
 }
 
+export function enforcePayloadSafetyValve(payload) {
+  if (!payload || typeof payload !== 'object') return payload;
+
+  let byteSize = new Blob([JSON.stringify(payload)]).size;
+
+  if (byteSize > 819200) {
+    console.warn(`[HouseholdRepository] 0.8 MiB Safety Valve Triggered! Payload: ${byteSize} bytes. Performing emergency truncation.`);
+    
+    const aggressivePurge = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      
+      delete obj.cachedSnapshots;
+      delete obj.historyCache;
+      delete obj.mealHistorySnapshots;
+
+      Object.keys(obj).forEach(key => {
+        if (/cache|snapshot|log/i.test(key)) {
+          delete obj[key];
+        } else if (key === 'dismissedQualityAdvisories' && Array.isArray(obj[key])) {
+          obj[key] = obj[key].slice(-10);
+        } else if (obj[key] && typeof obj[key] === 'object') {
+          aggressivePurge(obj[key]);
+        }
+      });
+    };
+
+    aggressivePurge(payload);
+
+    byteSize = new Blob([JSON.stringify(payload)]).size;
+
+    if (byteSize > 819200) {
+      const hardFallbackPurge = (obj) => {
+        if (!obj || typeof obj !== 'object') return;
+        
+        delete obj.dismissedQualityAdvisories;
+        delete obj.dismissedAdvisories;
+        delete obj.dismissed_advisories;
+        delete obj.advisoryHistory;
+        delete obj.mealHistorySnapshots;
+        delete obj.historyCache;
+        delete obj.history;
+        delete obj.logs;
+        
+        Object.keys(obj).forEach(key => {
+          if (['dismissedQualityAdvisories', 'dismissedAdvisories', 'dismissed_advisories', 'advisoryHistory', 'history', 'logs'].includes(key)) {
+            delete obj[key];
+          } else if (obj[key] && typeof obj[key] === 'object') {
+            hardFallbackPurge(obj[key]);
+          }
+        });
+      };
+
+      hardFallbackPurge(payload);
+      byteSize = new Blob([JSON.stringify(payload)]).size;
+      console.warn(`[HouseholdRepository] Hard fallback applied. Final payload size: ${byteSize} bytes.`);
+    }
+
+    if (byteSize > 819200) {
+      throw new Error(`[HouseholdRepository] Emergency Truncation Failed! Payload remains larger than 819,200 bytes (${byteSize} bytes). Refusing write to prevent Firestore quota failure.`);
+    }
+  }
+
+  return payload;
+}
+
+export async function runPayloadAudit() {
+  if (!db) {
+    console.error('[PayloadAudit] db is not initialized.');
+    return;
+  }
+  try {
+    const docRef = db.collection('households').doc(HOUSEHOLD_ID);
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      console.warn('[PayloadAudit] Document households/elliott-chloe does not exist.');
+      return;
+    }
+    const data = snap.data();
+    const totalBytes = new Blob([JSON.stringify(data)]).size;
+    console.log(`[PayloadAudit] Document households/${HOUSEHOLD_ID} total size: ${(totalBytes / 1024).toFixed(2)} KB (${totalBytes} bytes)`);
+
+    const breakdown = [];
+    Object.keys(data).forEach(key => {
+      const valBytes = new Blob([JSON.stringify(data[key])]).size;
+      const sizeKb = (valBytes / 1024).toFixed(2);
+      const percentage = totalBytes > 0 ? ((valBytes / totalBytes) * 100).toFixed(2) : '0.00';
+      breakdown.push({
+        'Key Name': key,
+        'Size (KB)': `${sizeKb} KB`,
+        'Size (Bytes)': valBytes,
+        'Percentage': `${percentage}%`
+      });
+    });
+
+    breakdown.sort((a, b) => b['Size (Bytes)'] - a['Size (Bytes)']);
+    
+    console.table(breakdown);
+    return data;
+  } catch (err) {
+    console.error('[PayloadAudit] Error executing audit:', err);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.runPayloadAudit = runPayloadAudit;
+}
+
 function isDbAvailable() {
   if (!db) {
     console.warn('[HouseholdRepository v3.20.09] Firestore db instance not initialised.');
@@ -373,18 +480,8 @@ export async function savePreferences(userPrefs, settings = {}) {
       }
     }
 
-    // Guard: ensure payload size is under 900,000 bytes
-    let finalSize = 0;
-    try {
-      finalSize = new TextEncoder().encode(JSON.stringify(payload)).length;
-    } catch (e) {
-      console.warn('[HouseholdRepository] Error calculating final size:', e);
-    }
-
-    if (finalSize >= 900000) {
-      console.error('[HouseholdRepository] Refusing to write payload exceeding 900,000 bytes. Current size:', finalSize);
-      return false; // Prevent crash
-    }
+    // Guard: Enforce 0.8 MiB Safety Valve
+    payload = enforcePayloadSafetyValve(payload);
 
     await Promise.all([
       prefRef.set(payload, { merge: true }),
@@ -843,42 +940,34 @@ export async function savePreferencesWithAutoPrune(preferences) {
     preferences.dismissedQualityAdvisories = preferences.dismissedQualityAdvisories.slice(-20);
   }
 
-  // 3. Size check validation (< 400KB target)
-  let payloadString = JSON.stringify(preferences);
-  let byteSize = new TextEncoder().encode(payloadString).length;
-
-  if (byteSize > 400 * 1024) {
-    console.warn(`[HouseholdRepository] Payload still large (${byteSize} bytes), performing deep key purge...`);
-    // Remove non-critical key-value pairs if payload remains oversized
-    Object.keys(preferences).forEach(key => {
-      if (key.toLowerCase().includes('cache') || key.toLowerCase().includes('snapshot') || key.toLowerCase().includes('log')) {
-        delete preferences[key];
-      }
-    });
-    payloadString = JSON.stringify(preferences);
-    byteSize = new TextEncoder().encode(payloadString).length;
-  }
+  // 3. Enforce 0.8 MiB Safety Valve
+  const safePrefs = enforcePayloadSafetyValve(preferences);
 
   // 4. Persist lightweight preferences to Local Store and Firestore
   if (typeof window !== 'undefined' && window.Store && typeof window.Store.setState === 'function') {
-    window.Store.setState({ preferences: preferences, userPrefs: preferences });
+    window.Store.setState({ preferences: safePrefs, userPrefs: safePrefs });
   }
   const storeState = (typeof getStoreState === 'function') ? getStoreState() : {};
   if (storeState) {
-    storeState.preferences = preferences;
-    storeState.userPrefs = preferences;
+    storeState.preferences = safePrefs;
+    storeState.userPrefs = safePrefs;
   }
 
+  let finalSize = 0;
   if (isDbAvailable()) {
     const prefRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences');
     const rootRef = db.collection('households').doc(HOUSEHOLD_ID);
+
+    const rootPayload = enforcePayloadSafetyValve({ preferences: safePrefs, updatedAt: new Date().toISOString() });
+    finalSize = new Blob([JSON.stringify(rootPayload)]).size;
+
     await Promise.all([
-      prefRef.set(preferences, { merge: true }),
-      rootRef.set({ preferences, updatedAt: new Date().toISOString() }, { merge: true })
+      prefRef.set(safePrefs, { merge: true }),
+      rootRef.set(rootPayload, { merge: true })
     ]);
   }
 
-  return { byteSize, preferences };
+  return { byteSize: finalSize, preferences: safePrefs };
 }
 
 export async function batchResolveOrphansWithNewSubtypeInDb(parentIngredient, productUpdates) {
