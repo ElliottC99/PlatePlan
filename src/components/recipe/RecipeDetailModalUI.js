@@ -121,23 +121,23 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
   const unit = String(ing.unit || ing.u || '').trim();
   const comment = String(ing.comment || ing.notes || '').trim();
 
-  let qtyPrefix = '';
-  if (qty !== undefined && qty !== null && qty !== '') {
-    const num = Number(qty);
-    const scaledQty = !isNaN(num) && num > 0
-      ? (Math.round(num * scaleMultiplier * 10) / 10)
-      : qty;
-    
-    const isFreshGarlic = ingObj?.id === 'garlic_fresh' || 
-                          String(ingObj?.name || '').trim().toLowerCase() === 'garlic' ||
-                          String(ingredientLabel).trim().toLowerCase() === 'garlic';
-    if (isFreshGarlic) {
-      const weightG = (unit === 'g' || unit === 'gram' || !unit) ? (scaledQty) : ((scaledQty) * (UNIT_TO_GRAMS[unit] || 6));
-      const garlicFormatted = formatGarlicQuantity(ingObj || { name: ingredientLabel, id: ingObj?.id || 'garlic_fresh' }, weightG);
-      const fullText = garlicFormatted ? `${formattedLine} (${garlicFormatted})` : formattedLine;
-      return comment ? `${fullText} — ${comment}` : fullText;
-    }
+  const num = Number(qty);
+  const scaledQty = !isNaN(num) && num > 0
+    ? (Math.round(num * scaleMultiplier * 10) / 10)
+    : qty;
 
+  const isFreshGarlic = ingObj?.id === 'garlic_fresh' || 
+                        String(ingObj?.name || '').trim().toLowerCase() === 'garlic' ||
+                        String(ingredientLabel).trim().toLowerCase() === 'garlic';
+
+  if (isFreshGarlic) {
+    const weightG = (unit === 'g' || unit === 'gram' || !unit) ? (scaledQty) : ((scaledQty) * (UNIT_TO_GRAMS[unit] || 6));
+    formattedLine = formatGarlicQuantity(ingObj || { name: ingredientLabel, id: ingObj?.id || 'garlic_fresh' }, weightG);
+  }
+
+
+  let qtyPrefix = '';
+  if (!isFreshGarlic && qty !== undefined && qty !== null && qty !== '') {
     qtyPrefix = [scaledQty, unit].filter(Boolean).join('');
   }
 

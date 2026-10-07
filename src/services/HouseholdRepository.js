@@ -829,12 +829,16 @@ export async function save(state = {}) {
 export const saveHouseholdState = save;
 
 export async function savePreferencesWithAutoPrune(preferences) {
+  if (Array.isArray(preferences.dismissedQualityAdvisories)) {
+    // Keep only the 20 most recent advisories to prevent payload bloat
+    preferences.dismissedQualityAdvisories = preferences.dismissedQualityAdvisories.slice(-20);
+  }
+
   let serialized = JSON.stringify(preferences);
   let byteSize = new TextEncoder().encode(serialized).length;
 
   // Background Auto-Pruner Threshold (400 KB) - Runs automatically
   if (byteSize > 400 * 1024) {
-    preferences.dismissedQualityAdvisories = (preferences.dismissedQualityAdvisories || []).slice(-20);
     preferences.cachedSnapshots = {}; // Flush stale historical cache
     preferences.advisoryHistory = [];
     preferences.snapshots = [];
