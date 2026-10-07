@@ -266,12 +266,28 @@ export function renderDataQualityView() {
   // Silent automatic trigger for savePreferencesWithAutoPrune on mount/render if storage health issues exist
   if (audit.storageHealth && audit.storageHealth.length > 0) {
     const currentPrefs = state.preferences || state.userPrefs || {};
-    const clonedPrefs = JSON.parse(JSON.stringify(currentPrefs));
-    savePreferencesWithAutoPrune(clonedPrefs).then(() => {
-      console.log('[DataQualityView] Silently pruned bloated preferences in background.');
-    }).catch(err => {
-      console.error('[DataQualityView] Silent background auto-prune failed:', err);
-    });
+    const hasUnmigratedFields = currentPrefs.planHistory !== undefined || 
+                                currentPrefs.ingredientGroups !== undefined || 
+                                currentPrefs.ingredientFamilies !== undefined;
+
+    // Disable automatic silent background updates if the local store state contains unmigrated legacy fields
+    if (!hasUnmigratedFields) {
+      const clonedPrefs = JSON.parse(JSON.stringify(currentPrefs));
+      
+      // Ensure the background silent prune handler does NOT re-attach legacy or duplicated fields
+      delete clonedPrefs.planHistory;
+      delete clonedPrefs.ingredientGroups;
+      delete clonedPrefs.ingredientFamilies;
+      delete clonedPrefs.userPrefs;
+
+      savePreferencesWithAutoPrune(clonedPrefs).then(() => {
+        console.log('[DataQualityView] Silently pruned bloated preferences in background.');
+      }).catch(err => {
+        console.error('[DataQualityView] Silent background auto-prune failed:', err);
+      });
+    } else {
+      console.warn('[DataQualityView] Silent background auto-prune skipped because unmigrated legacy fields exist. Please run window.cleanPreferencesBloat() manually.');
+    }
   }
 
   // Helper to render individual audit rows

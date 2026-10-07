@@ -1204,6 +1204,11 @@ export async function cleanPreferencesBloat() {
     
     console.log('[CleanPreferencesBloat] Current preferences size: ' + new Blob([JSON.stringify(preferences)]).size + ' bytes');
     
+    // Explicitly delete heavy unmigrated or duplicated sub-arrays from top level preferences
+    delete preferences.planHistory;
+    delete preferences.ingredientGroups;
+    delete preferences.ingredientFamilies;
+    
     const keysToPurge = ['snapshots', 'history', 'cache', 'recipeSnapshots', 'ingredientCache', 'productCache', 'advisoryLogs'];
     const deepClean = (obj) => {
       if (!obj || typeof obj !== 'object') return;
@@ -1219,8 +1224,17 @@ export async function cleanPreferencesBloat() {
     };
 
     deepClean(preferences);
-    if (preferences.userPrefs) {
-      deepClean(preferences.userPrefs);
+
+    // Clean or reset preferences.userPrefs down to essential scalar settings only
+    if (preferences.userPrefs && typeof preferences.userPrefs === 'object') {
+      const allowedUserPrefsKeys = [
+        'theme', 'activeView', 'autoDefaultStrategy', 'autoDefaultCriterion', 'nutritionTargets'
+      ];
+      Object.keys(preferences.userPrefs).forEach(k => {
+        if (!allowedUserPrefsKeys.includes(k)) {
+          delete preferences.userPrefs[k];
+        }
+      });
     }
 
     const allowedConfigKeys = [
@@ -1236,7 +1250,21 @@ export async function cleanPreferencesBloat() {
     console.log(`[CleanPreferencesBloat] Cleaned preferences size: ${cleanedSize} bytes (${(cleanedSize / 1024).toFixed(2)} KB)`);
 
     const batch = db.batch();
-    batch.set(rootDocRef, { preferences, updatedAt: new Date().toISOString() }, { merge: true });
+    
+    // Delete unmigrated keys completely from root using FieldValue.delete if available
+    let deleteVal;
+    if (typeof window !== 'undefined' && window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue) {
+      deleteVal = window.firebase.firestore.FieldValue.delete();
+    }
+    
+    const rootUpdate = { preferences, updatedAt: new Date().toISOString() };
+    if (deleteVal) {
+      rootUpdate.planHistory = deleteVal;
+      rootUpdate.ingredientGroups = deleteVal;
+      rootUpdate.ingredientFamilies = deleteVal;
+    }
+    
+    batch.set(rootDocRef, rootUpdate, { merge: true });
     batch.set(prefDocRef, preferences, { merge: true });
 
     await batch.commit();
