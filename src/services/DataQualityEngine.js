@@ -7,6 +7,52 @@
 import { calculateRecipeDynamicMacros } from './DataQualityScannerService.js';
 
 /**
+ * Fallback Macro Resolution Helper
+ * Resolves effective macros for an ingredient, falling back to defaultProduct if root macros are null/missing.
+ */
+export function getEffectiveIngredientMacros(ingredient, productStore) {
+  if (!ingredient) return null;
+  if (ingredient.calories != null && ingredient.protein != null) {
+    return { calories: Number(ingredient.calories), protein: Number(ingredient.protein), source: 'ingredient' };
+  }
+  if (ingredient.cal != null && ingredient.prot != null) {
+    return { calories: Number(ingredient.cal), protein: Number(ingredient.prot), source: 'ingredient' };
+  }
+  const defaultProductId = ingredient.defaultProductId || ingredient.defaultProduct;
+  const defaultProduct = defaultProductId && productStore ? (typeof productStore.get === 'function' ? productStore.get(defaultProductId) : (Array.isArray(productStore) ? productStore.find(p => String(p.id) === String(defaultProductId)) : null)) : null;
+  if (defaultProduct && (defaultProduct.calories != null || defaultProduct.cal != null)) {
+    return { calories: Number(defaultProduct.calories ?? defaultProduct.cal), protein: Number(defaultProduct.protein ?? defaultProduct.prot), source: 'default_product' };
+  }
+  return null; // Truly missing specs
+}
+
+/**
+ * Automated Macro Drift Recalibration (Replaces manual trigger)
+ */
+export function autoRecalibrateRecipeDrift(recipe, ingredientStore, productStore) {
+  const calculated = calculateRecipeDynamicMacros(recipe, ingredientStore, productStore) || { perServing: { cal: 0, prot: 0, carb: 0, fat: 0 } };
+  const perServing = calculated.perServing || calculated;
+  const calcCalories = perServing.cal ?? perServing.calories ?? 0;
+  const calcProtein = perServing.prot ?? perServing.protein ?? 0;
+  const calcCarbs = perServing.carb ?? perServing.carbs ?? 0;
+  const calcFat = perServing.fat ?? 0;
+
+  const storedCalories = Number(recipe.macros?.calories ?? recipe.macros?.cal ?? recipe.calories ?? recipe.cal ?? 0);
+  const driftRatio = Math.abs(storedCalories - calcCalories) / Math.max(1, storedCalories);
+  
+  if (driftRatio > 0.02) {
+    recipe.macros = {
+      calories: Math.round(calcCalories),
+      protein: Number(calcProtein.toFixed(1)),
+      carbs: Number(calcCarbs.toFixed(1)),
+      fat: Number(calcFat.toFixed(1))
+    };
+    return { updated: true, recipe };
+  }
+  return { updated: false, recipe };
+}
+
+/**
  * Calculates string similarity using Sorensen-Dice coefficient.
  * Returns a value between 0.0 and 1.0.
  */
@@ -37,7 +83,7 @@ function getStringSimilarity(str1, str2) {
 }
 
 /**
- * Run 8 distinct data quality audits across recipes, products, and ingredients.
+ * Run data quality audits across recipes, products, and ingredients.
  * @param {Object} state Current application state
  * @returns {Object} Grouped audit issues
  */
@@ -55,7 +101,7 @@ export function runAudit(state = {}) {
   const results = {
     macroDrift: [],
     planDesync: [],
-    atwaterMath: [],
+    incompleteMacros: [],
     densityMismatch: [],
     orphans: [],
     unmappedItems: [],
@@ -66,8 +112,9 @@ export function runAudit(state = {}) {
 
   const volumeUnits = ['ml', 'l', 'tbsp', 'tsp', 'cup', 'teaspoon', 'tablespoon', 'liquid', 'fl oz'];
 
-  // 1. Recipe Macro Drift (> 2%)
+  // 1. Recipe Macro Drift (> 2%) with auto-recalibration check
   recipes.forEach(r => {
+    autoRecalibrateRecipeDrift(r, ingredients, products);
     const dynamic = calculateRecipeDynamicMacros(r, ingredients, products);
     if (!dynamic) return;
 
@@ -140,45 +187,17 @@ export function runAudit(state = {}) {
     });
   }
 
-  // 3. Incomplete Macros & Atwater Math Validation (> 15% discrepancy)
+  // 3. Incomplete Macros Validation using getEffectiveIngredientMacros (Atwater logic removed)
   ingredients.forEach(ing => {
-    const isMissing = ing.cal === undefined || ing.cal === null || ing.cal === "" ||
-                     ing.prot === undefined || ing.prot === null || ing.prot === "" ||
-                     ing.carb === undefined || ing.carb === null || ing.carb === "" ||
-                     ing.fat === undefined || ing.fat === null || ing.fat === "";
-
-    if (isMissing) {
-      results.atwaterMath.push({
+    const effective = getEffectiveIngredientMacros(ing, products);
+    if (!effective) {
+      results.incompleteMacros.push({
         key: `incomplete:ing:${ing.id}`,
         ingredientId: ing.id,
         ingredientName: ing.name,
         type: 'incomplete',
-        message: `Ingredient "${ing.name}" lacks complete calorie or protein specifications.`,
+        message: `Ingredient "${ing.name}" lacks complete calorie or protein specifications (neither direct nor default product specs available).`,
         severity: 'gap'
-      });
-      return;
-    }
-
-    // Atwater Math: Expected Calories = 4*Protein + 4*Carbs + 9*Fat
-    const rCal = Number(ing.cal);
-    const rProt = Number(ing.prot);
-    const rCarb = Number(ing.carb);
-    const rFat = Number(ing.fat);
-
-    const expectedCal = (4 * rProt) + (4 * rCarb) + (9 * rFat);
-    const deviation = rCal > 0 ? Math.abs(rCal - expectedCal) / rCal : 0;
-
-    const isVerifiedZero = ing.isVerifiedZero === true || ing.isVerifiedZeroCal === true;
-    if (rCal > 5 && !isVerifiedZero && deviation > 0.15) {
-      results.atwaterMath.push({
-        key: `atwater:ing:${ing.id}`,
-        ingredientId: ing.id,
-        ingredientName: ing.name,
-        type: 'atwater',
-        reported: rCal,
-        expected: expectedCal,
-        message: `Macro discrepancy: Reported calories (${rCal} kcal) deviate by > 15% from expected Atwater formula (${Math.round(expectedCal)} kcal).`,
-        severity: 'advisory'
       });
     }
   });
@@ -249,7 +268,6 @@ export function runAudit(state = {}) {
   ingredients.forEach(ing => {
     if (ing.ignoreStoreMapping === true) return;
 
-    // Check if ingredient has any product mapped
     const hasDirectProduct = products.some(p => String(p.ingredientId) === String(ing.id));
     const hasSubtypeProduct = Array.isArray(ing.subtypes) && ing.subtypes.some(st => {
       return products.some(p => String(p.subtypeId) === String(st.id));

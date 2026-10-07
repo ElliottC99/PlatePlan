@@ -6,6 +6,7 @@
 
 import { safeJsonStringify, safeClone } from '../utils/safeJson.js';
 import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
+import { autoRecalibrateRecipeDrift } from '../services/DataQualityEngine.js';
 
 export { getShoppingLineStateKey };
 
@@ -162,7 +163,13 @@ function dispatchStateEvent(eventName, detail) {
  * @param {Array<Object>} newRecipes 
  */
 export function setRecipes(newRecipes) {
-  state.recipes = Array.isArray(newRecipes) ? newRecipes : [];
+  const ingredients = state.ingredients || [];
+  const products = state.products || [];
+  const processed = (Array.isArray(newRecipes) ? newRecipes : []).map(r => {
+    const res = autoRecalibrateRecipeDrift(r, ingredients, products);
+    return res.recipe;
+  });
+  state.recipes = processed;
   saveStateCache();
   dispatchStateEvent('plateplan:state:recipes', state.recipes);
 }
@@ -173,11 +180,16 @@ export function setRecipes(newRecipes) {
  */
 export function updateRecipeInStore(recipe) {
   if (!recipe || !recipe.id) return;
-  const index = state.recipes.findIndex(r => r.id === recipe.id);
+  const ingredients = state.ingredients || [];
+  const products = state.products || [];
+  const res = autoRecalibrateRecipeDrift(recipe, ingredients, products);
+  const processed = res.recipe;
+
+  const index = state.recipes.findIndex(r => r.id === processed.id);
   if (index !== -1) {
-    state.recipes[index] = { ...state.recipes[index], ...recipe };
+    state.recipes[index] = { ...state.recipes[index], ...processed };
   } else {
-    state.recipes.push(recipe);
+    state.recipes.push(processed);
   }
   saveStateCache();
   dispatchStateEvent('plateplan:state:recipes', state.recipes);

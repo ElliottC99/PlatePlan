@@ -264,8 +264,9 @@ export function renderDataQualityView() {
 
   // Helper to render individual audit rows
   const renderAuditCard = (title, icon, items, renderer) => {
-    const listHtml = items.map(renderer).join('');
-    const count = items.length;
+    const safeItems = Array.isArray(items) ? items : [];
+    const listHtml = safeItems.map(renderer).join('');
+    const count = safeItems.length;
     return `
       <div class="card" style="background:var(--surface,#fff); border-radius:14px; padding:18px; border:1px solid var(--border,#e7e5e4); margin-bottom:16px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:8px;">
@@ -288,7 +289,7 @@ export function renderDataQualityView() {
     <div style="max-width:900px; margin:0 auto; padding:20px; box-sizing:border-box;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
         <div>
-          <h2 style="font-size:22px; font-weight:750; margin:0; color:var(--text,#1c1917)">Data Quality Overhaul Dashboard</h2>
+          <h2 style="font-size:22px; font-weight:750; margin:0; color:var(--text,#1c1917)">Data Quality Centre</h2>
           <p style="margin:4px 0 0 0; font-size:13px; color:var(--text2,#78716c)">Catalogue audit scanner, recipe macro validation, and self-healing structural health checks.</p>
         </div>
         <div style="display:flex; gap:8px;">
@@ -335,8 +336,8 @@ export function renderDataQualityView() {
           </div>
         `)}
 
-        <!-- 3. INCOMPLETE / ATWATER MATH CARD -->
-        ${renderAuditCard('Incomplete Nutrition & Atwater Discrepancy', '🔬', audit.atwaterMath, (item) => `
+        <!-- 3. INCOMPLETE MACROS CARD -->
+        ${renderAuditCard('Incomplete Macro Specifications', '🔬', audit.incompleteMacros, (item) => `
           <div style="padding:10px 12px; background:#fff; border:1px solid var(--border); border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
             <div style="min-width:0;">
               <strong style="font-size:13px; color:#111827;">${escapeHtml(item.ingredientName)}</strong>
@@ -344,7 +345,6 @@ export function renderDataQualityView() {
             </div>
             <div style="display:flex; gap:6px; flex-shrink:0;">
               <button type="button" class="btn sm primary math-fix-macros-btn" data-ing-id="${escapeAttr(item.ingredientId)}" style="background:var(--primary,#4f46e5); color:#fff;">Fix Macros</button>
-              ${item.type === 'atwater' ? `<button type="button" class="btn sm ghost math-verify-zero-btn" data-ing-id="${escapeAttr(item.ingredientId)}">Verify Zero-Cal</button>` : ''}
             </div>
           </div>
         `)}
