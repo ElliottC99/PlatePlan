@@ -106,7 +106,7 @@ export function renderPlannerWizardView({
 /**
  * Renders Step 4 (Atomic Commit Plan UI).
  */
-export function renderWizardStep4Commit(version = 'v3.8.4') {
+export function renderWizardStep4Commit(version = 'v3.27.2') {
   return `
     <div class="card" style="padding:28px;text-align:center">
       <h2 style="margin-top:0">Committing Meal Plan ${escapeHtml(version)}...</h2>

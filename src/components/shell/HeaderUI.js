@@ -1,14 +1,14 @@
 /**
- * src/components/shell/HeaderUI.js (v3.10.0)
+ * src/components/shell/HeaderUI.js (v3.27.2)
  * Modular Presentation Component for Application Header & Sync Controls
  */
 
-export function renderHeaderUI({ version = 'v3.10.0 (ES6 Modern)', syncStatus = 'Local only', userEmail = '' } = {}) {
+export function renderHeaderUI({ version = 'v3.27.2', syncStatus = 'Local only', userEmail = '' } = {}) {
   return `
     <header class="app-header">
       <div class="logo" style="display:flex;align-items:center;gap:6px">
         Plate<span>Plan</span>
-        <span id="app-version" style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">${version}</span>
+        <span id="app-header-version" class="version-badge" style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)">${version}</span>
       </div>
       <div class="app-header-actions">
         <button class="btn primary app-create-button" type="button" onclick="openCreateActionSheet()" aria-label="Add to PlatePlan">

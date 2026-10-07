@@ -14,10 +14,10 @@ const PLATEPLAN_PRECACHE_ASSETS = [
   '/PlatePlan.html',
   '/manifest.json',
   '/firebase-config.js',
-  '/styles/tokens.css?v=3.3.0',
-  '/styles/components.css?v=3.3.0',
-  '/styles/responsive.css?v=3.3.0',
-  '/styles/print.css?v=3.3.0',
+  '/styles/tokens.css?v=3.27.2',
+  '/styles/components.css?v=3.27.2',
+  '/styles/responsive.css?v=3.27.2',
+  '/styles/print.css?v=3.27.2',
   '/src/main.js',
   '/src/store/store.js',
   '/src/config/firebase.js',
@@ -126,9 +126,9 @@ self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(PLATEPLAN_CACHE).then(async cache => {
-      console.log(`[SW v3.27.0] Precaching shell and core ES6 modules...`);
+      console.log(`[SW v3.27.2] Precaching shell and core ES6 modules...`);
       await cache.addAll(PLATEPLAN_PRECACHE_ASSETS).catch(err => {
-        console.warn('[SW v3.27.0] Non-fatal precache warning:', err);
+        console.warn('[SW v3.27.2] Non-fatal precache warning:', err);
       });
       await Promise.allSettled(PLATEPLAN_OPTIONAL_SHELL.map(url => cache.add(url)));
     })
@@ -142,7 +142,7 @@ self.addEventListener('activate', event => {
         keys
           .filter(key => key !== PLATEPLAN_CACHE && key !== PLATEPLAN_IMAGE_CACHE)
           .map(key => {
-            console.log('[SW v3.27.0] Purging legacy cache:', key);
+            console.log('[SW v3.27.2] Purging legacy cache:', key);
             return caches.delete(key);
           })
       );
