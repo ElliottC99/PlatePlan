@@ -1,7 +1,7 @@
 /**
  * scripts/test_pwa_build.js
  * Verification test script for PWA service worker caching configuration,
- * Firestore interception bypass, and registration lifecycle emulation for v3.27.2.
+ * Firestore interception bypass, and registration lifecycle emulation for v3.27.3.
  */
 
 import { readFileSync } from 'fs';
@@ -11,26 +11,26 @@ console.log('=== RUNNING PWA BUILD & SERVICE WORKER VERIFICATION SUITE ===');
 
 // 1. Check package.json version
 const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
-assert.equal(pkg.version, '3.27.2', 'Package version must be 3.27.2');
-console.log('✅ Test 1 Passed: package.json version is 3.27.2');
+assert.equal(pkg.version, '3.27.3', 'Package version must be 3.27.3');
+console.log('✅ Test 1 Passed: package.json version is 3.27.3');
 
 // 2. Check PlatePlan.html version badge
 const html = readFileSync('./PlatePlan.html', 'utf8');
-assert(html.includes('v3.27.2'), 'PlatePlan.html must display version badge v3.27.2');
-console.log('✅ Test 2 Passed: PlatePlan.html header displays v3.27.2');
+assert(html.includes('v3.27.3'), 'PlatePlan.html must display version badge v3.27.3');
+console.log('✅ Test 2 Passed: PlatePlan.html header displays v3.27.3');
 
 // 3. Check sw.js cache key & bypass logic
 const swContent = readFileSync('./sw.js', 'utf8');
-assert(swContent.includes("plateplan-cache-v3.27.2"), 'sw.js must contain plateplan-cache-v3.27.2');
+assert(swContent.includes("plateplan-cache-v3.27.3"), 'sw.js must contain plateplan-cache-v3.27.3');
 assert(swContent.includes("firestore.googleapis.com"), 'sw.js must contain Firestore interception bypass');
 assert(swContent.includes("skipWaiting"), 'sw.js must include skipWaiting');
 assert(swContent.includes("clients.claim"), 'sw.js must include clients.claim');
-console.log('✅ Test 3 Passed: sw.js contains correct cache key v3.27.2, activation pruning, and Firestore bypass rules.');
+console.log('✅ Test 3 Passed: sw.js contains correct cache key v3.27.3, activation pruning, and Firestore bypass rules.');
 
 // 4. Check store.js CACHE_KEY
 const storeContent = readFileSync('./src/store/store.js', 'utf8');
-assert(storeContent.includes('plateplan_store_cache_v3.27.2'), 'store.js must contain store cache key v3.27.2');
-console.log('✅ Test 4 Passed: store.js uses store cache key v3.27.2');
+assert(storeContent.includes('plateplan_store_cache_v3.27.3'), 'store.js must contain store cache key v3.27.3');
+console.log('✅ Test 4 Passed: store.js uses store cache key v3.27.3');
 
 // 5. Check manifest.json PWA configuration
 const manifest = JSON.parse(readFileSync('./manifest.json', 'utf8'));

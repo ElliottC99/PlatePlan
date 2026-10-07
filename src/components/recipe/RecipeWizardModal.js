@@ -1,17 +1,17 @@
 /**
- * src/components/recipe/RecipeWizardModal.js (v3.27.2)
+ * src/components/recipe/RecipeWizardModal.js (v3.27.3)
  * Controller Module for Multi-Step Ingestion & Recipe Creation Wizard Modal.
  * Integrates:
  * - State 0: Choice (Manual vs Bulk)
  * - State 1: Ingestion & Input (Timings, Strict Meal Suitability Tags)
  * - State 2: Sections, Scaled Quantities & Searchable Taxonomy Autocomplete Mapping
- * - State 3: Final Inline Review & Persistence
+ * - State 3: Final Inline Review with Macro Crossbar, Variant Switcher & Dynamic Persistence
  */
 
-import { parseIngredientString, matchIngredientTaxonomy, parseBulkRecipeText } from '../../services/RecipeImporter.js';
+import { parseIngredientString, matchIngredientTaxonomy, parseBulkRecipeText, toTitleCase } from '../../services/RecipeImporter.js';
 import { getState, learnIngredientAlias } from '../../store/store.js';
 import { saveRecipe } from '../../services/HouseholdRepository.js';
-import { wizardState, resetWizardState, syncStep2InputsToState, syncStep3InputsToState, MEAL_TAGS } from './RecipeWizardState.js';
+import { wizardState, resetWizardState, syncStep2InputsToState, syncStep3InputsToState, MEAL_TAGS, getSaveButtonLabel, hasDistinctEnhancedVariant } from './RecipeWizardState.js';
 import { renderStepBadge, renderState0Choice, renderState1AManual, renderState1BBulk, renderState2Mapping, renderState3Review } from './RecipeWizardViews.js';
 import { bindTaxonomyAutocompleteEvents } from './RecipeWizardTaxonomySearch.js';
 
@@ -125,7 +125,8 @@ function bindWizardEvents() {
   const btnNext1A = modalWrap.querySelector('#btn-next-step1a');
   if (btnNext1A) {
     btnNext1A.onclick = () => {
-      const title = modalWrap.querySelector('#wiz-title')?.value.trim() || 'Untitled Recipe';
+      const rawTitle = modalWrap.querySelector('#wiz-title')?.value.trim() || 'Untitled Recipe';
+      const title = toTitleCase(rawTitle);
       const curServ = parseInt(modalWrap.querySelector('#wiz-current-servings')?.value, 10) || 4;
       const tgtServ = parseInt(modalWrap.querySelector('#wiz-target-servings')?.value, 10) || 4;
       const prepH = parseInt(modalWrap.querySelector('#wiz-prep-hours')?.value, 10) || 0;
@@ -140,10 +141,10 @@ function bindWizardEvents() {
       const ingredientsBank = storeState.ingredients || [];
 
       const parsedSections = rawSections.map(sec => ({
-        sectionTitle: sec.sectionTitle,
+        sectionTitle: toTitleCase(sec.sectionTitle),
         ingredients: sec.lines.map(line => {
           const parsed = parseIngredientString(line);
-          const matched = matchIngredientTaxonomy(parsed.name, ingredientsBank);
+          const matched = matchIngredientTaxonomy(parsed, ingredientsBank);
           return {
             raw: line,
             qty: parsed.qty,
@@ -306,6 +307,34 @@ function bindWizardEvents() {
 
   // Step 3 Events
   if (wizardState.currentStep === 3) {
+    const tabOrig = modalWrap.querySelector('#wiz-tab-original');
+    if (tabOrig) {
+      tabOrig.onclick = () => {
+        syncStep3InputsToState(modalWrap);
+        wizardState.activeVariant = 'original';
+        renderWizardModal();
+      };
+    }
+
+    const tabEnh = modalWrap.querySelector('#wiz-tab-enhanced');
+    if (tabEnh) {
+      tabEnh.onclick = () => {
+        syncStep3InputsToState(modalWrap);
+        wizardState.activeVariant = 'enhanced';
+        if (!wizardState.activeRecipe.enhanced) {
+          // Initialize enhanced variant with a copy
+          wizardState.activeRecipe.enhanced = {
+            title: `${wizardState.activeRecipe.title} (Enhanced)`,
+            ingredientSections: JSON.parse(JSON.stringify(wizardState.activeRecipe.ingredientSections || [])),
+            ingredients: JSON.parse(JSON.stringify(wizardState.activeRecipe.ingredients || [])),
+            methodSteps: [...(wizardState.activeRecipe.methodSteps || [])],
+            macros: { ...(wizardState.activeRecipe.macros || { calories: 500, protein: 35, carbs: 42, fat: 16 }) }
+          };
+        }
+        renderWizardModal();
+      };
+    }
+
     const btnSave = modalWrap.querySelector('#btn-save-wizard-recipe');
     if (btnSave) {
       btnSave.onclick = async () => {
@@ -342,6 +371,10 @@ function bindWizardEvents() {
           createdAt: new Date().toISOString()
         };
 
+        if (hasDistinctEnhancedVariant(rec)) {
+          recipeToSave.enhanced = rec.enhanced;
+        }
+
         try {
           await saveRecipe(recipeToSave);
 
@@ -366,7 +399,7 @@ function bindWizardEvents() {
           console.error('[RecipeWizard] Error saving recipe:', e);
           alert(`Error saving recipe: ${e.message}`);
           btnSave.disabled = false;
-          btnSave.textContent = '💾 Save Upgraded Recipe to Vault';
+          btnSave.textContent = `💾 ${getSaveButtonLabel(rec)}`;
         }
       };
     }

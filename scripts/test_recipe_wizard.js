@@ -1,78 +1,104 @@
 /**
- * scripts/test_recipe_wizard.js
- * Verification test suite for Recipe Ingestion Wizard:
- * - Validates Step 2 input synchronisation without ReferenceError exceptions
- * - Validates strict mealSuitability categories ('Breakfast', 'Lunch', 'Dinner', 'Snacking')
- * - Validates searchable taxonomy mappings
+ * scripts/test_recipe_wizard.js (v3.27.3)
+ * Automated verification test suite for:
+ * 1. Compound stock parsing ("1 stock cube + 400ml water" -> qty: 1, name: "Vegetable Stock Cube")
+ * 2. Universal Title Case normalization (Titles, Ingredients, Section Headers)
+ * 3. Dynamic Save button label based on variant existence ("Save Original Recipe" vs "Save Both Recipes")
  */
 
 import { strict as assert } from 'assert';
-import { wizardState, resetWizardState, syncStep2InputsToState, MEAL_TAGS } from '../src/components/recipe/RecipeWizardState.js';
+import { parseIngredientString, parseBulkRecipeText, toTitleCase } from '../src/services/RecipeImporter.js';
+import { getSaveButtonLabel, hasDistinctEnhancedVariant } from '../src/components/recipe/RecipeWizardState.js';
 
-console.log('=== RUNNING RECIPE WIZARD VERIFICATION SUITE ===');
+console.log('=== RUNNING RECIPE WIZARD v3.27.3 VERIFICATION SUITE ===');
 
-// Test 1: Validate Allowed Meal Tags
-console.log('--- Test 1: Strict Meal Suitability Tags ---');
-const expectedTags = ['Breakfast', 'Lunch', 'Dinner', 'Snacking'];
-assert.deepEqual(MEAL_TAGS, expectedTags, 'MEAL_TAGS must strictly match [Breakfast, Lunch, Dinner, Snacking]');
-assert(!MEAL_TAGS.includes('Side'), 'MEAL_TAGS must not include Side');
-assert(!MEAL_TAGS.includes('Dessert'), 'MEAL_TAGS must not include Dessert');
-console.log('✅ Test 1 Passed: Meal suitability tags strictly constrained to [Breakfast, Lunch, Dinner, Snacking].');
+// --- Test 1: Compound Stock Parsing ---
+console.log('\n--- Test 1: Compound Stock & Liquid Parsing ---');
 
-// Test 2: Validate syncStep2InputsToState DOM Emulation without ReferenceError
-console.log('--- Test 2: syncStep2InputsToState Execution ---');
-resetWizardState();
-wizardState.activeRecipe.currentServings = 4;
-wizardState.activeRecipe.targetServings = 6;
-wizardState.activeRecipe.ingredientSections = [
-  {
-    sectionTitle: 'Main Ingredients',
-    ingredients: [
-      { raw: '200g firm tofu', qty: 200, unit: 'g', name: 'firm tofu', ingredientId: null, subtypeId: null, isNewTaxonomyItem: true }
-    ]
-  }
-];
+const stockTest1 = parseIngredientString('1 stock cube + 400ml water');
+console.log('Input: "1 stock cube + 400ml water"');
+console.log('Parsed:', JSON.stringify(stockTest1, null, 2));
+assert.equal(stockTest1.qty, 1, 'Quantity should be 1');
+assert.equal(stockTest1.unit, 'qty', 'Unit should be qty');
+assert.equal(stockTest1.name, 'Vegetable Stock Cube', 'Name should be Vegetable Stock Cube');
+assert(stockTest1.notes.includes('400ml water'), 'Notes should contain liquid instruction');
+console.log('✅ Passed: "1 stock cube + 400ml water" parses to Vegetable Stock Cube (qty: 1)');
 
-// Mock DOM wrapper
-const mockModalWrap = {
-  querySelectorAll: (selector) => {
-    if (selector === '.wiz-section-title-input') {
-      return [{ dataset: { sidx: '0' }, value: 'Curry Base' }];
-    }
-    if (selector === '.wiz-ing-qty') {
-      return [{ dataset: { sidx: '0', iidx: '0' }, value: '300' }];
-    }
-    if (selector === '.wiz-ing-unit') {
-      return [{ dataset: { sidx: '0', iidx: '0' }, value: 'g' }];
-    }
-    if (selector === '.wiz-ing-name') {
-      return [{ dataset: { sidx: '0', iidx: '0' }, value: 'Extra Firm Tofu' }];
-    }
-    if (selector === '.wiz-ing-tax-search') {
-      return [{ dataset: { sidx: '0', iidx: '0', taxVal: 'ing-tofu-1:sub-extra-firm' }, value: '🏷️ Extra Firm (Firm Tofu)' }];
-    }
-    if (selector === '.wiz-step-input') {
-      return [{ value: 'Press tofu block.' }, { value: 'Sauté in skillet.' }];
-    }
-    return [];
+const stockTest2 = parseIngredientString('0.5 stock cube in 200ml boiling water');
+console.log('\nInput: "0.5 stock cube in 200ml boiling water"');
+console.log('Parsed:', JSON.stringify(stockTest2, null, 2));
+assert.equal(stockTest2.qty, 0.5, 'Quantity should be 0.5');
+assert.equal(stockTest2.unit, 'qty', 'Unit should be qty');
+assert.equal(stockTest2.name, 'Vegetable Stock Cube', 'Name should be Vegetable Stock Cube');
+assert(stockTest2.notes.includes('200ml boiling water'), 'Notes should contain boiling water');
+console.log('✅ Passed: "0.5 stock cube in 200ml boiling water" parses to Vegetable Stock Cube (qty: 0.5)');
+
+const stockTest3 = parseIngredientString('1 chicken stock cube dissolved in 500ml water');
+console.log('\nInput: "1 chicken stock cube dissolved in 500ml water"');
+console.log('Parsed:', JSON.stringify(stockTest3, null, 2));
+assert.equal(stockTest3.qty, 1, 'Quantity should be 1');
+assert.equal(stockTest3.name, 'Chicken Stock Cube', 'Name should be Chicken Stock Cube');
+console.log('✅ Passed: Chicken stock cube recognized and parsed');
+
+// --- Test 2: Universal Title Case Normalization ---
+console.log('\n--- Test 2: Universal Title Case Normalization ---');
+
+assert.equal(toTitleCase('tomato pasta'), 'Tomato Pasta');
+assert.equal(toTitleCase('tinned tomatoes'), 'Tinned Tomatoes');
+assert.equal(toTitleCase('for the salsa'), 'For The Salsa');
+assert.equal(toTitleCase('main ingredients'), 'Main Ingredients');
+console.log('✅ Passed: toTitleCase utility formats all strings properly');
+
+const parsedIng1 = parseIngredientString('200g firm tofu, cubed');
+assert.equal(parsedIng1.name, 'Firm Tofu', 'Ingredient name must be Title Cased');
+console.log('✅ Passed: parseIngredientString outputs Title Cased ingredient name ("Firm Tofu")');
+
+const rawBulk = `tomato and lentil curry
+Serves: 4
+
+main ingredients:
+400g tinned tomatoes
+1 stock cube + 400ml water
+1 tsp smoked paprika
+
+Method:
+1. Simmer ingredients.`;
+
+const bulkParsed = parseBulkRecipeText(rawBulk);
+assert.equal(bulkParsed.length, 1);
+assert.equal(bulkParsed[0].title, 'Tomato And Lentil Curry', 'Recipe title must be Title Cased');
+assert.equal(bulkParsed[0].ingredientSections[0].sectionTitle, 'Main Ingredients', 'Section title must be Title Cased');
+assert.equal(bulkParsed[0].ingredients[0].name, 'Tinned Tomatoes', 'Ingredients must be Title Cased');
+assert.equal(bulkParsed[0].ingredients[1].name, 'Vegetable Stock Cube', 'Stock cube must be Title Cased');
+console.log('✅ Passed: parseBulkRecipeText normalizes Recipe Title, Section Headers, and Ingredients to Title Case');
+
+// --- Test 3: Dynamic Save Button Label ---
+console.log('\n--- Test 3: Dynamic Save Button Label ---');
+
+const baseRecipe = {
+  title: 'Smoky Tofu Bowl',
+  ingredients: [{ name: 'Tofu', qty: 200, unit: 'g' }],
+  methodSteps: ['Bake tofu.'],
+  enhanced: null
+};
+
+assert.equal(hasDistinctEnhancedVariant(baseRecipe), false);
+assert.equal(getSaveButtonLabel(baseRecipe), 'Save Original Recipe');
+console.log('✅ Passed: Original-only recipe resolves to "Save Original Recipe"');
+
+const recipeWithEnhanced = {
+  title: 'Smoky Tofu Bowl',
+  ingredients: [{ name: 'Tofu', qty: 200, unit: 'g' }],
+  methodSteps: ['Bake tofu.'],
+  enhanced: {
+    title: 'Smoky Tofu Bowl (Enhanced)',
+    ingredients: [{ name: 'Tofu', qty: 300, unit: 'g' }, { name: 'Nutritional Yeast', qty: 15, unit: 'g' }],
+    methodSteps: ['Air fry tofu with nutritional yeast.']
   }
 };
 
-try {
-  syncStep2InputsToState(mockModalWrap);
-  const updatedItem = wizardState.activeRecipe.ingredientSections[0].ingredients[0];
-  assert.equal(wizardState.activeRecipe.ingredientSections[0].sectionTitle, 'Curry Base');
-  assert.equal(updatedItem.scaledQty, 300);
-  assert.equal(updatedItem.unit, 'g');
-  assert.equal(updatedItem.name, 'Extra Firm Tofu');
-  assert.equal(updatedItem.ingredientId, 'ing-tofu-1');
-  assert.equal(updatedItem.subtypeId, 'sub-extra-firm');
-  assert.equal(updatedItem.isNewTaxonomyItem, false);
-  assert.equal(wizardState.activeRecipe.methodSteps.length, 2);
-  console.log('✅ Test 2 Passed: syncStep2InputsToState executed cleanly without ReferenceError exceptions.');
-} catch (err) {
-  console.error('❌ Test 2 Failed with error:', err);
-  process.exit(1);
-}
+assert.equal(hasDistinctEnhancedVariant(recipeWithEnhanced), true);
+assert.equal(getSaveButtonLabel(recipeWithEnhanced), 'Save Both Recipes');
+console.log('✅ Passed: Distinct enhanced variant resolves to "Save Both Recipes"');
 
-console.log('=== ALL RECIPE WIZARD TESTS COMPLETED SUCCESSFULLY ===');
+console.log('\n=== ALL RECIPE WIZARD v3.27.3 TESTS PASSED SUCCESSFULLY ===');

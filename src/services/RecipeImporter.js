@@ -1,12 +1,23 @@
 /**
- * src/services/RecipeImporter.js (v3.22.1)
+ * src/services/RecipeImporter.js (v3.27.3)
  * Modern recipe scraping, JSON-LD microdata extraction,
- * natural language ingredient parsing with multiplier extraction ("2 x 400g"),
- * strict density-based unit conversion, section recognition, and alias matching.
+ * natural language ingredient parsing with compound stock extraction ("1 stock cube + 400ml water"),
+ * multiplier extraction ("2 x 400g"), strict density-based unit conversion,
+ * universal Title Case normalization, section recognition, and alias matching.
  */
 
 import { getState } from '../store/store.js';
 import { convertToStrictUnit } from './UnitConversionService.js';
+
+/**
+ * Universal Title Casing helper for titles, ingredient names, and section headers.
+ * @param {string} str
+ * @returns {string}
+ */
+export function toTitleCase(str) {
+  if (!str || typeof str !== 'string') return '';
+  return str.trim().replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
+}
 
 const UNICODE_FRACTIONS = {
   '½': '1/2', '⅓': '1/3', '⅔': '2/3', '¼': '1/4', '¾': '3/4',
@@ -126,6 +137,32 @@ export function parseIngredientString(rawString) {
   const original = rawString.trim();
   if (!original) return null;
 
+  // Check compound stock patterns (e.g., "1 stock cube + 400ml water", "0.5 stock cube in 200ml boiling water", "1 vegetable stock cube dissolved in 400ml water")
+  const compoundStockMatch = original.match(
+    /^(?:(\d+(?:\.\d+)?|\d+\s*\/\s*\d+|½|¼|¾|a|an|one|two|three|half)\s*)?(?:x\s*)?(?:(vegetable|chicken|beef|fish|lamb|vegan|mushroom|onion)\s+)?(?:stock\s*cubes?|cubes?\s*(?:of\s*)?stock|cubes?\s*(?:vegetable|chicken|beef|fish|lamb|vegan)?\s*stock)\s*(?:\+|\bin\b|,\s*dissolved\s+in\b|\bdissolved\s+in\b|\bmade\s+(?:up\s+)?(?:to\s+)?with\b|\bmixed\s+with\b)\s*([\s\S]*)$/i
+  );
+
+  if (compoundStockMatch) {
+    const rawQty = compoundStockMatch[1] || '1';
+    const { qty: parsedQty } = parseQuantity(rawQty);
+    const stockType = compoundStockMatch[2] ? toTitleCase(compoundStockMatch[2]) : 'Vegetable';
+    const name = `${stockType} Stock Cube`;
+    const liquidPart = (compoundStockMatch[3] || '').trim();
+    let notes = liquidPart;
+    if (notes && !notes.toLowerCase().startsWith('in ') && !notes.toLowerCase().startsWith('with ') && !notes.toLowerCase().startsWith('dissolved')) {
+      notes = `dissolved in ${notes}`;
+    }
+
+    return {
+      raw: original,
+      qty: parsedQty || 1,
+      unit: 'qty',
+      name: toTitleCase(name),
+      notes: notes,
+      isFallbackWeight: false
+    };
+  }
+
   const { qty, remainder } = parseQuantity(original);
 
   let unit = 'qty';
@@ -189,7 +226,15 @@ export function parseIngredientString(rawString) {
   }
 
   name = name.replace(/^[\s,.\-–]+|[\s,.\-–]+$/g, '').trim();
-  const cleanedName = name || original;
+  let cleanedName = name || original;
+
+  if (/^(?:(vegetable|chicken|beef|fish|lamb|vegan|mushroom|onion)\s+)?stock\s*cubes?$/i.test(cleanedName)) {
+    const typeMatch = cleanedName.match(/^(vegetable|chicken|beef|fish|lamb|vegan|mushroom|onion)\b/i);
+    const stockType = typeMatch ? toTitleCase(typeMatch[1]) : 'Vegetable';
+    cleanedName = `${stockType} Stock Cube`;
+  }
+
+  cleanedName = toTitleCase(cleanedName);
 
   // Apply strict unit conversion (g, ml, qty)
   const strict = convertToStrictUnit(qty, unit, cleanedName);
@@ -347,7 +392,8 @@ export function extractRecipeFromHtml(html, sourceUrl = '') {
   }
 
   if (recipeData) {
-    const title = recipeData.name || recipeData.headline || 'Imported Recipe';
+    const rawTitle = recipeData.name || recipeData.headline || 'Imported Recipe';
+    const title = toTitleCase(rawTitle);
     let imageUrl = '';
     if (typeof recipeData.image === 'string') imageUrl = recipeData.image;
     else if (Array.isArray(recipeData.image)) imageUrl = recipeData.image[0] || '';
@@ -420,21 +466,21 @@ export function parseBulkRecipeText(rawText) {
     let parsingMode = 'header';
 
     lines.forEach((line, idx) => {
-      // Check section header e.g. "For the salsa:" or "Dressing:"
-      if (/^for\s+the\s+.+:|^[a-zA-Z\s]+:$/.test(line) && !/serves|yield|ingredients|method|instructions/i.test(line)) {
-        currentSectionTitle = line.replace(':', '').trim();
-        if (!sectionsMap[currentSectionTitle]) sectionsMap[currentSectionTitle] = [];
-        parsingMode = 'section';
-        return;
-      }
-
-      if (/^(Ingredients?|Items?):/i.test(line)) {
+      // Check section header e.g. "For the salsa:" or "Main Ingredients:" or "Dressing:"
+      if (/^(?:main\s+)?ingredients?:/i.test(line)) {
         parsingMode = 'ingredients';
-        const rest = line.replace(/^(Ingredients?|Items?):/i, '').trim();
+        const rest = line.replace(/^(?:main\s+)?ingredients?:/i, '').trim();
         if (rest) {
           const parsed = parseIngredientString(rest);
           sectionsMap[currentSectionTitle].push(matchIngredientTaxonomy(parsed));
         }
+        return;
+      }
+
+      if (/^for\s+the\s+.+:|^[a-zA-Z\s]+:$/i.test(line) && !/serves|yield|method|instructions|steps|preparation/i.test(line)) {
+        currentSectionTitle = toTitleCase(line.replace(':', '').trim());
+        if (!sectionsMap[currentSectionTitle]) sectionsMap[currentSectionTitle] = [];
+        parsingMode = 'section';
         return;
       }
 
@@ -452,7 +498,8 @@ export function parseBulkRecipeText(rawText) {
       }
 
       if (idx === 0) {
-        title = line.replace(/^Recipe\s*\d*:?\s*/i, '').trim() || 'Imported Recipe';
+        const rawTitle = line.replace(/^Recipe\s*\d*:?\s*/i, '').trim() || 'Imported Recipe';
+        title = toTitleCase(rawTitle);
         return;
       }
 
@@ -467,7 +514,7 @@ export function parseBulkRecipeText(rawText) {
 
     const ingredientSections = Object.entries(sectionsMap)
       .filter(([_, ingList]) => ingList.length > 0)
-      .map(([secTitle, ingList]) => ({ sectionTitle: secTitle, ingredients: ingList }));
+      .map(([secTitle, ingList]) => ({ sectionTitle: toTitleCase(secTitle), ingredients: ingList }));
 
     if (ingredientSections.length === 0) {
       ingredientSections.push({ sectionTitle: 'Main Ingredients', ingredients: [] });
@@ -476,7 +523,7 @@ export function parseBulkRecipeText(rawText) {
     const flatIngredients = ingredientSections.flatMap(s => s.ingredients);
 
     parsedRecipes.push({
-      title,
+      title: toTitleCase(title),
       servings,
       prepTime: { hours: 0, minutes: 15 },
       cookTime: { hours: 0, minutes: 30 },
@@ -497,6 +544,7 @@ export function importRecipeFromHtml(htmlOrText, sourceUrl = '') {
     return {
       id: crypto.randomUUID(),
       ...extracted,
+      title: toTitleCase(extracted.title),
       createdAt: new Date().toISOString()
     };
   }
@@ -506,7 +554,7 @@ export function importRecipeFromHtml(htmlOrText, sourceUrl = '') {
     const first = bulk[0];
     return {
       id: crypto.randomUUID(),
-      title: first.title,
+      title: toTitleCase(first.title),
       servings: first.servings || 4,
       prepTime: first.prepTime || { hours: 0, minutes: 15 },
       cookTime: first.cookTime || { hours: 0, minutes: 30 },
@@ -523,11 +571,13 @@ export function importRecipeFromHtml(htmlOrText, sourceUrl = '') {
 }
 
 if (typeof window !== 'undefined') {
+  window.toTitleCase = toTitleCase;
   window.parseIngredientString = parseIngredientString;
   window.extractRecipeFromHtml = extractRecipeFromHtml;
   window.importRecipeFromHtml = importRecipeFromHtml;
   window.matchIngredientTaxonomy = matchIngredientTaxonomy;
   window.RecipeImporter = {
+    toTitleCase,
     parseIngredientString,
     normalizeUnit,
     parseQuantity,

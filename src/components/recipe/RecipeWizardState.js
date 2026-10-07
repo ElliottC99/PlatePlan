@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardState.js (v3.27.2)
+ * src/components/recipe/RecipeWizardState.js (v3.27.3)
  * Manages mutable state and step synchronisation for the Recipe Ingestion Wizard.
  */
 
@@ -8,6 +8,7 @@ export const MEAL_TAGS = ['Breakfast', 'Lunch', 'Dinner', 'Snacking'];
 export const wizardState = {
   currentStep: 0,
   choice: 'manual', // 'manual' | 'bulk'
+  activeVariant: 'original', // 'original' | 'enhanced'
   bulkText: '',
   processingQueue: [],
   currentQueueTotal: 0,
@@ -24,13 +25,33 @@ export const wizardState = {
       { sectionTitle: 'Main Ingredients', ingredients: [] }
     ],
     methodSteps: [],
-    macros: { calories: 450, protein: 28, carbs: 40, fat: 16 }
+    macros: { calories: 450, protein: 28, carbs: 40, fat: 16 },
+    enhanced: null
   }
 };
+
+export function hasDistinctEnhancedVariant(recipe = wizardState.activeRecipe) {
+  if (!recipe || !recipe.enhanced || typeof recipe.enhanced !== 'object') return false;
+  const enh = recipe.enhanced;
+  const hasDistinctIngs = Array.isArray(enh.ingredients) && enh.ingredients.length > 0 &&
+    JSON.stringify(enh.ingredients) !== JSON.stringify(recipe.ingredients);
+  const hasDistinctSections = Array.isArray(enh.ingredientSections) && enh.ingredientSections.length > 0 &&
+    JSON.stringify(enh.ingredientSections) !== JSON.stringify(recipe.ingredientSections);
+  const hasDistinctSteps = (Array.isArray(enh.methodSteps) && enh.methodSteps.length > 0 && JSON.stringify(enh.methodSteps) !== JSON.stringify(recipe.methodSteps)) ||
+    (Array.isArray(enh.instructions) && enh.instructions.length > 0 && JSON.stringify(enh.instructions) !== JSON.stringify(recipe.methodSteps || recipe.instructions));
+  const hasDistinctName = enh.title && enh.title !== recipe.title;
+
+  return !!(hasDistinctIngs || hasDistinctSections || hasDistinctSteps || hasDistinctName);
+}
+
+export function getSaveButtonLabel(recipe = wizardState.activeRecipe) {
+  return hasDistinctEnhancedVariant(recipe) ? 'Save Both Recipes' : 'Save Original Recipe';
+}
 
 export function resetWizardState() {
   wizardState.currentStep = 0;
   wizardState.choice = 'manual';
+  wizardState.activeVariant = 'original';
   wizardState.bulkText = '';
   wizardState.processingQueue = [];
   wizardState.currentQueueTotal = 0;
@@ -47,7 +68,8 @@ export function resetWizardState() {
       { sectionTitle: 'Main Ingredients', ingredients: [] }
     ],
     methodSteps: [],
-    macros: { calories: 450, protein: 28, carbs: 40, fat: 16 }
+    macros: { calories: 450, protein: 28, carbs: 40, fat: 16 },
+    enhanced: null
   };
 }
 

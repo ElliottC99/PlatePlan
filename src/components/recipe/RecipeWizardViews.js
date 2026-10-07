@@ -1,11 +1,124 @@
 /**
- * src/components/recipe/RecipeWizardViews.js (v3.27.2)
+ * src/components/recipe/RecipeWizardViews.js (v3.27.3)
  * Template view rendering functions for all steps of the Recipe Ingestion Wizard.
  */
 
-import { wizardState, MEAL_TAGS } from './RecipeWizardState.js';
+import { wizardState, MEAL_TAGS, getSaveButtonLabel, hasDistinctEnhancedVariant } from './RecipeWizardState.js';
 import { getState } from '../../store/store.js';
 import { renderTaxonomySearchHTML } from './RecipeWizardTaxonomySearch.js';
+import { toTitleCase } from '../../services/RecipeImporter.js';
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
+
+function escapeAttr(str) {
+  return escapeHtml(str).replace(/`/g, '&#96;');
+}
+
+function renderComparisonBadge(actual, target) {
+  if (!target || target <= 0) return '';
+  const diff = actual - target;
+  const pctDiff = Math.round((diff / target) * 100);
+  const isNear = Math.abs(pctDiff) <= 10;
+  const isOver = pctDiff > 10;
+  
+  let bg = 'rgba(16,185,129,0.12)';
+  let color = '#059669';
+  let label = 'On Target';
+
+  if (isOver) {
+    bg = 'rgba(239,68,68,0.12)';
+    color = '#dc2626';
+    label = `+${Math.abs(pctDiff)}%`;
+  } else if (!isNear) {
+    bg = 'rgba(245,158,11,0.12)';
+    color = '#d97706';
+    label = `${pctDiff}%`;
+  }
+
+  return `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${bg};color:${color};line-height:1">${label}</span>`;
+}
+
+export function renderMacroBreakdownCrossbar(recipe, variant = 'original') {
+  const storeState = getState() || {};
+  const userPrefs = storeState.preferences || storeState.userPrefs || {};
+  const profiles = userPrefs.profiles || {};
+  const eProf = profiles.elliott || profiles.e || { dailyKcal: 2400, dailyProtein: 140 };
+  const cProf = profiles.chloe || profiles.c || { dailyKcal: 1650, dailyProtein: 100 };
+
+  const totalKcalBudget = (Number(eProf.dailyKcal) || 0) + (Number(cProf.dailyKcal) || 0);
+  const eShare = totalKcalBudget > 0 ? (Number(eProf.dailyKcal) / totalKcalBudget) : 0.59;
+  const cShare = totalKcalBudget > 0 ? (Number(cProf.dailyKcal) / totalKcalBudget) : 0.41;
+  const eSharePct = Math.round(eShare * 100);
+  const cSharePct = Math.round(cShare * 100);
+
+  const activeRec = (variant === 'enhanced' && recipe.enhanced) ? { ...recipe, ...recipe.enhanced } : recipe;
+  const baselineCal = Number(activeRec.macros?.calories || activeRec.calories || 450);
+  const baselineProt = Number(activeRec.macros?.protein || activeRec.protein || 28);
+
+  const batchServes = 2;
+  const eKcal = Math.round(baselineCal * batchServes * eShare);
+  const eProt = Math.round((baselineProt * batchServes * eShare) * 10) / 10;
+  const cKcal = Math.round(baselineCal * batchServes * cShare);
+  const cProt = Math.round((baselineProt * batchServes * cShare) * 10) / 10;
+
+  const eTargetCal = Math.round((Number(eProf.dailyKcal) || 2400) * 0.35);
+  const eTargetProt = Math.round((Number(eProf.dailyProtein) || 140) * 0.35);
+  const cTargetCal = Math.round((Number(cProf.dailyKcal) || 1650) * 0.35);
+  const cTargetProt = Math.round((Number(cProf.dailyProtein) || 100) * 0.35);
+
+  return `
+    <div class="recipe-modal-crossbar" style="width: 100%; background: var(--surface2, #f5f4ee); border: 1px solid var(--border, #e5e5e5); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size: 13px; font-weight: 700; color: var(--text);">Dual-Profile Per-Portion Split:</span>
+        <span style="font-size: 11px; color: var(--text2);">Servings: ${recipe.targetServings || 4}</span>
+      </div>
+
+      <div class="recipe-modal-crossbar-macros" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px;">
+        <div class="card portion-macro-card" style="padding:8px 12px;border-radius:10px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);min-width:150px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+          <div style="font-weight:700;font-size:12px;color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;">
+            <span>👤 Elliott</span>
+            <span style="font-size:10.5px;font-weight:600;color:var(--text2)">${eSharePct}% split</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;gap:6px">
+              <span>🔥 <strong>${eKcal} kcal</strong></span>
+              ${renderComparisonBadge(eKcal, eTargetCal)}
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;gap:6px">
+              <span>🥩 <strong>${eProt}g protein</strong></span>
+              ${renderComparisonBadge(eProt, eTargetProt)}
+            </div>
+          </div>
+        </div>
+
+        <div class="card portion-macro-card" style="padding:8px 12px;border-radius:10px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);min-width:150px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+          <div style="font-weight:700;font-size:12px;color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;">
+            <span>👤 Chloe</span>
+            <span style="font-size:10.5px;font-weight:600;color:var(--text2)">${cSharePct}% split</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;gap:6px">
+              <span>🔥 <strong>${cKcal} kcal</strong></span>
+              ${renderComparisonBadge(cKcal, cTargetCal)}
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;gap:6px">
+              <span>🥩 <strong>${cProt}g protein</strong></span>
+              ${renderComparisonBadge(cProt, cTargetProt)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -255,9 +368,17 @@ export function renderState2Mapping() {
 
 export function renderState3Review() {
   const recipe = wizardState.activeRecipe;
+  const currentVariant = wizardState.activeVariant || 'original';
+  const isEnhancedTab = currentVariant === 'enhanced';
+  const displayRecipe = (isEnhancedTab && recipe.enhanced) ? { ...recipe, ...recipe.enhanced } : recipe;
+
+  const saveBtnText = getSaveButtonLabel(recipe);
+
+  const macroCrossbarHtml = renderMacroBreakdownCrossbar(recipe, currentVariant);
 
   let sectionsReviewHtml = '';
-  (recipe.ingredientSections || []).forEach(sec => {
+  const activeSections = displayRecipe.ingredientSections || [{ sectionTitle: 'Main Ingredients', ingredients: displayRecipe.ingredients || [] }];
+  activeSections.forEach(sec => {
     let rows = '';
     (sec.ingredients || []).forEach(ing => {
       const taxLabel = ing.ingredientId ? `<span class="badge badge-purple" style="font-size:10px;">Mapped</span>` : `<span class="badge badge-green" style="font-size:10px;">New Item</span>`;
@@ -283,12 +404,13 @@ export function renderState3Review() {
   });
 
   let stepsReviewHtml = '';
-  (recipe.methodSteps || []).forEach((s) => {
+  const activeSteps = displayRecipe.methodSteps || displayRecipe.instructions || [];
+  activeSteps.forEach((s) => {
     stepsReviewHtml += `<li style="margin-bottom: 6px; font-size: 13px; color: var(--text, #333);">${escapeHtml(s)}</li>`;
   });
 
   let mealTagsHtml = MEAL_TAGS.map(tag => {
-    const isSelected = recipe.mealSuitability.includes(tag);
+    const isSelected = (recipe.mealSuitability || []).includes(tag);
     return `<label style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 8px; border: 1px solid var(--border, #ccc); border-radius: 999px; background: ${isSelected ? '#eef2ff' : '#fff'}; color: ${isSelected ? '#4f46e5' : '#333'}; cursor: pointer;">
       <input type="checkbox" class="wiz-review-tag" value="${tag}" ${isSelected ? 'checked' : ''} style="display:none;" />
       ${tag}
@@ -297,23 +419,38 @@ export function renderState3Review() {
 
   return `
     <div>
+      <!-- Macro Breakdown Crossbar -->
+      ${macroCrossbarHtml}
+
       <div style="background: var(--surface2, #f9f8f6); border: 1px solid var(--border, #e5e7eb); padding: 18px; border-radius: 12px; margin-bottom: 18px;">
-        <h3 style="margin: 0 0 12px; font-size: 16px; font-weight: 700; color: var(--text);">Inline Editable Review</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+          <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text);">Inline Editable Review</h3>
+          
+          <!-- Variant Toggle Switcher -->
+          <div class="variant-toggle" style="display: inline-flex; background: var(--surface, #fff); padding: 3px; border-radius: 8px; border: 1px solid var(--border, #ccc);">
+            <button type="button" class="btn sm ${!isEnhancedTab ? 'primary' : 'ghost'}" id="wiz-tab-original" style="padding: 4px 12px; font-size: 12px; font-weight: 600;">
+              Original
+            </button>
+            <button type="button" class="btn sm ${isEnhancedTab ? 'primary' : 'ghost'}" id="wiz-tab-enhanced" style="padding: 4px 12px; font-size: 12px; font-weight: 600;">
+              ✨ Enhanced
+            </button>
+          </div>
+        </div>
 
         <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-bottom: 12px;">
           <div>
             <label style="display:block; font-size:11px; font-weight:600; color:var(--text2);">Recipe Title</label>
-            <input type="text" id="wiz-rev-title" value="${escapeAttr(recipe.title)}" style="width:100%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px;" />
+            <input type="text" id="wiz-rev-title" value="${escapeAttr(recipe.title)}" style="width:100%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
           </div>
           <div>
             <label style="display:block; font-size:11px; font-weight:600; color:var(--text2);">Target Servings</label>
-            <input type="number" id="wiz-rev-servings" value="${recipe.targetServings}" style="width:100%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px;" />
+            <input type="number" id="wiz-rev-servings" value="${recipe.targetServings}" style="width:100%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
           </div>
           <div>
             <label style="display:block; font-size:11px; font-weight:600; color:var(--text2);">Prep / Cook (Mins)</label>
             <div style="display:flex; gap:4px;">
-              <input type="number" id="wiz-rev-prepm" value="${(recipe.prepTime.hours * 60) + recipe.prepTime.minutes}" title="Prep Mins" style="width:50%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px;" />
-              <input type="number" id="wiz-rev-cookm" value="${(recipe.cookTime.hours * 60) + recipe.cookTime.minutes}" title="Cook Mins" style="width:50%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px;" />
+              <input type="number" id="wiz-rev-prepm" value="${(recipe.prepTime.hours * 60) + recipe.prepTime.minutes}" title="Prep Mins" style="width:50%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
+              <input type="number" id="wiz-rev-cookm" value="${(recipe.cookTime.hours * 60) + recipe.cookTime.minutes}" title="Cook Mins" style="width:50%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
             </div>
           </div>
         </div>
@@ -327,18 +464,22 @@ export function renderState3Review() {
 
         <hr style="border:0; border-top:1px solid var(--border); margin:14px 0;" />
 
-        <h4 style="margin: 0 0 8px; font-size: 14px; font-weight: 700;">Ingredient Sections Overview</h4>
+        <h4 style="margin: 0 0 8px; font-size: 14px; font-weight: 700;">
+          ${isEnhancedTab ? '✨ Enhanced Ingredient Sections' : 'Ingredient Sections Overview'}
+        </h4>
         ${sectionsReviewHtml}
 
-        <h4 style="margin: 14px 0 8px; font-size: 14px; font-weight: 700;">Method Steps</h4>
+        <h4 style="margin: 14px 0 8px; font-size: 14px; font-weight: 700;">
+          ${isEnhancedTab ? '✨ Enhanced Method Steps' : 'Method Steps'}
+        </h4>
         <ol style="padding-left: 20px; margin: 0;">
-          ${stepsReviewHtml}
+          ${stepsReviewHtml || '<li style="font-size:12px; color:var(--text2);">No method steps.</li>'}
         </ol>
       </div>
 
       <div style="display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border, #eee); padding-top: 14px;">
         <button type="button" class="btn ghost" onclick="goToWizardStep(2)">← Back to Mapping</button>
-        <button type="button" class="btn primary" id="btn-save-wizard-recipe">💾 Save Upgraded Recipe to Vault</button>
+        <button type="button" class="btn primary" id="btn-save-wizard-recipe">💾 ${escapeHtml(saveBtnText)}</button>
       </div>
     </div>
   `;

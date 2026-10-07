@@ -1,13 +1,15 @@
 /**
- * src/components/recipe/RecipeWizardTaxonomySearch.js (v3.27.2)
+ * src/components/recipe/RecipeWizardTaxonomySearch.js (v3.27.3)
  * Searchable Taxonomy Autocomplete Component for Recipe Ingestion Wizard.
  * Features:
  * - Dynamic substring filtering across ingredients & sub-types
+ * - Interactive Decision Tree Creation Wizard for new taxonomy items
  * - Visual distinction between main categories and indented sub-types
  * - Click & keyboard navigation (Arrow keys, Enter, Escape)
  */
 
 import { getState } from '../../store/store.js';
+import { openTaxonomyCreationModal } from './RecipeWizardTaxonomyModal.js';
 
 export function getTaxonomyLabel(ingredientId, subtypeId, rawName = '', ingredientsBank = []) {
   if (!ingredientId || ingredientId === 'new_item') {
@@ -103,6 +105,29 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
         inputEl.dataset.taxVal = val;
         inputEl.value = label;
         dropdownEl.style.display = 'none';
+
+        if (val === 'new_item') {
+          const rowNameInput = modalWrap.querySelector(`.wiz-ing-name[data-sidx="${sIdx}"][data-iidx="${iIdx}"]`);
+          const currentIngName = rowNameInput ? rowNameInput.value : '';
+          openTaxonomyCreationModal({
+            sIdx,
+            iIdx,
+            initialName: currentIngName,
+            onComplete: (created) => {
+              const combinedKey = `${created.ingredientId}:${created.subtypeId}`;
+              const displayLabel = `🏷️ ${created.subtypeName} (${created.parentName})`;
+              inputEl.dataset.taxVal = combinedKey;
+              inputEl.value = displayLabel;
+              if (rowNameInput) {
+                rowNameInput.value = created.subtypeName;
+              }
+              if (typeof onSelectCallback === 'function') {
+                onSelectCallback(sIdx, iIdx, combinedKey, created);
+              }
+            }
+          });
+          return;
+        }
 
         if (typeof onSelectCallback === 'function') {
           onSelectCallback(sIdx, iIdx, val);
