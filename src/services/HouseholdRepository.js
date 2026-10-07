@@ -1145,8 +1145,118 @@ export async function executeSubcollectionMigration() {
   }
 }
 
+export async function inspectPreferences() {
+  if (!db) {
+    console.error('[InspectPreferences] db is not initialized.');
+    return;
+  }
+  try {
+    const docRef = db.collection('households').doc(HOUSEHOLD_ID);
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      console.warn('[InspectPreferences] households/elliott-chloe does not exist.');
+      return;
+    }
+    const data = snap.data() || {};
+    const preferences = data.preferences || {};
+    const totalPrefBytes = new Blob([JSON.stringify(preferences)]).size;
+    console.log(`[InspectPreferences] households/elliott-chloe preferences total size: ${(totalPrefBytes / 1024).toFixed(2)} KB (${totalPrefBytes} bytes)`);
+
+    const breakdown = [];
+    Object.keys(preferences).forEach(key => {
+      const valBytes = new Blob([JSON.stringify(preferences[key])]).size;
+      const sizeKb = (valBytes / 1024).toFixed(2);
+      const percentage = totalPrefBytes > 0 ? ((valBytes / totalPrefBytes) * 100).toFixed(2) : '0.00';
+      breakdown.push({
+        'Key Name': key,
+        'Size (KB)': `${sizeKb} KB`,
+        'Size (Bytes)': valBytes,
+        'Percentage': `${percentage}%`
+      });
+    });
+
+    breakdown.sort((a, b) => b['Size (Bytes)'] - a['Size (Bytes)']);
+    console.table(breakdown);
+    return preferences;
+  } catch (err) {
+    console.error('[InspectPreferences] Error executing inspect:', err);
+  }
+}
+
+export async function cleanPreferencesBloat() {
+  if (!db) {
+    console.error('[CleanPreferencesBloat] db is not initialized.');
+    return { success: false, error: 'db not initialized' };
+  }
+  try {
+    console.log('[CleanPreferencesBloat] Starting targeted deep-clean of preferences...');
+    const rootDocRef = db.collection('households').doc(HOUSEHOLD_ID);
+    const prefDocRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences');
+    
+    const rootSnap = await rootDocRef.get();
+    if (!rootSnap.exists) {
+      console.warn('[CleanPreferencesBloat] households/elliott-chloe does not exist.');
+      return { success: false, error: 'Document not found' };
+    }
+    
+    const rootData = rootSnap.data() || {};
+    let preferences = rootData.preferences || {};
+    
+    console.log('[CleanPreferencesBloat] Current preferences size: ' + new Blob([JSON.stringify(preferences)]).size + ' bytes');
+    
+    const keysToPurge = ['snapshots', 'history', 'cache', 'recipeSnapshots', 'ingredientCache', 'productCache', 'advisoryLogs'];
+    const deepClean = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      keysToPurge.forEach(k => delete obj[k]);
+      Object.keys(obj).forEach(key => {
+        const lowerKey = key.toLowerCase();
+        if (keysToPurge.includes(key) || lowerKey.includes('cache') || lowerKey.includes('snapshot') || lowerKey.includes('log')) {
+          delete obj[key];
+        } else if (obj[key] && typeof obj[key] === 'object') {
+          deepClean(obj[key]);
+        }
+      });
+    };
+
+    deepClean(preferences);
+    if (preferences.userPrefs) {
+      deepClean(preferences.userPrefs);
+    }
+
+    const allowedConfigKeys = [
+      'nutritionTargets', 'profiles', 'settings', 'theme', 'mealPlanSettings', 'activeView', 'userPrefs', 'dismissedQualityAdvisories', 'dismissedAdvisories', 'dismissed_advisories'
+    ];
+    Object.keys(preferences).forEach(key => {
+      if (!allowedConfigKeys.includes(key)) {
+        delete preferences[key];
+      }
+    });
+
+    const cleanedSize = new Blob([JSON.stringify(preferences)]).size;
+    console.log(`[CleanPreferencesBloat] Cleaned preferences size: ${cleanedSize} bytes (${(cleanedSize / 1024).toFixed(2)} KB)`);
+
+    const batch = db.batch();
+    batch.set(rootDocRef, { preferences, updatedAt: new Date().toISOString() }, { merge: true });
+    batch.set(prefDocRef, preferences, { merge: true });
+
+    await batch.commit();
+    console.log('[CleanPreferencesBloat] Successfully persisted cleaned preferences to Firestore.');
+
+    if (typeof window !== 'undefined' && window.Store && typeof window.Store.setState === 'function') {
+      window.Store.setState({ preferences, userPrefs: preferences });
+    }
+
+    return { success: true, sizeBytes: cleanedSize };
+  } catch (err) {
+    console.error('[CleanPreferencesBloat] Error in cleanPreferencesBloat:', err);
+    return { success: false, error: err.message || err };
+  }
+}
+
 if (typeof window !== 'undefined') {
   window.executeSubcollectionMigration = executeSubcollectionMigration;
+  window.inspectPreferences = inspectPreferences;
+  window.cleanPreferencesBloat = cleanPreferencesBloat;
 }
 
 const HouseholdRepository = {
@@ -1169,7 +1279,9 @@ const HouseholdRepository = {
   getHouseholdData,
   getPlanHistory,
   savePlanHistory,
-  executeSubcollectionMigration
+  executeSubcollectionMigration,
+  inspectPreferences,
+  cleanPreferencesBloat
 };
 
 if (typeof window !== 'undefined') {

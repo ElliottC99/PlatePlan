@@ -1,5 +1,5 @@
 /**
- * src/store/store.js (v3.21.9)
+ * src/store/store.js (v3.21.10)
  * Centralized Reactive State Store module using native browser CustomEvents for unidirectional data flow.
  * Provides microtask-wrapped event dispatching and IndexedDB caching for instant offline hydration without localStorage quotas.
  */
@@ -13,7 +13,7 @@ export { getShoppingLineStateKey };
 const DB_NAME = 'PlatePlanDB';
 const STORE_NAME = 'StateStore';
 const DB_VERSION = 1;
-const CACHE_KEY = 'plateplan_store_cache_v3.21.9';
+const CACHE_KEY = 'plateplan_store_cache_v3.21.10';
 
 const state = {
   recipes: [],
@@ -320,7 +320,7 @@ export async function runOptimisticMutation(domain, mutateFn, persistPromise, ro
     }
     return result;
   } catch (err) {
-    console.error(`[Store v3.21.9] Network failure in domain '${domain}', executing rollback:`, err);
+    console.error(`[Store v3.21.10] Network failure in domain '${domain}', executing rollback:`, err);
     
     if (typeof rollbackFn === 'function') {
       rollbackFn(state, previousStateSnapshot);
