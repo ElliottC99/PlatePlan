@@ -1,7 +1,4 @@
-/**
- * src/config/firebase.js (v3.21.5)
- * Firebase configuration, safe initialization, CDN-compatible persistence, and database instance export.
- */
+// src/config/firebase.js
 
 export const HOUSEHOLD_ID = 'elliott-chloe';
 
@@ -22,38 +19,24 @@ if (typeof window !== 'undefined' && window.firebase) {
   }
 }
 
-// Ensure global firebase is loaded via CDN script tags
+// Initialize Firestore from CDN global
 export const db = (typeof window !== 'undefined' && window.firebase) ? window.firebase.firestore() : null;
 
-// Attach db to window for global access and DevTools verification
+// Expose window.db for global/DevTools access
 if (db) {
   window.db = db;
 }
 
-// Configure modern persistence or fallback cleanly for CDN Compat SDK
+// Modern Firebase v10 CDN Persistence Setup (No deprecated method calls)
 try {
   if (db && typeof window.firebase.firestore.persistentLocalCache === 'function') {
     db.settings({
-      cache: window.firebase.firestore.persistentLocalCache({
+      localCache: window.firebase.firestore.persistentLocalCache({
         tabManager: window.firebase.firestore.persistentMultipleTabManager()
       })
     });
-  } else if (db && typeof db.enablePersistence === 'function') {
-    // Legacy CDN fallback with error suppression
-    db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
-      if (err.code === 'failed-precondition') {
-        console.warn('[Firebase] Multiple tabs open, persistence enabled in single tab');
-      } else if (err.code === 'unimplemented') {
-        console.warn('[Firebase] Browser does not support persistence');
-      }
-    });
   }
-} catch (e) {
-  console.warn('[Firebase] Persistence initialization notice:', e.message);
-}
-
-if (typeof window !== 'undefined' && window.firebase && typeof window.firebase.firestore === 'function' && typeof window.firebase.firestore.setLogLevel === 'function') {
-  try {
-    window.firebase.firestore.setLogLevel('error');
-  } catch (e) {}
+} catch (err) {
+  // Gracefully handle if settings were already configured during hot-reloads
+  console.debug('[Firebase] Cache settings already initialized or deferred:', err.message);
 }
