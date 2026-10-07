@@ -260,19 +260,25 @@ export async function deleteIngredient(ingredientId) {
   }
 }
 
-export async function getPreferences() {
+export async function getHouseholdData() {
+  if (!isDbAvailable()) return null;
   try {
-    if (!isDbAvailable()) return null;
-    const [prefSnap, rootSnap] = await Promise.all([
-      safeFirestoreGet(db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences')),
-      safeFirestoreGet(db.collection('households').doc(HOUSEHOLD_ID))
+    const [rootSnap, taxonomySnap, prefSnap] = await Promise.all([
+      safeFirestoreGet(db.collection('households').doc(HOUSEHOLD_ID)),
+      safeFirestoreGet(db.collection('households').doc(HOUSEHOLD_ID).collection('metadata').doc('taxonomy')),
+      safeFirestoreGet(db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences'))
     ]);
-    const prefData = prefSnap && prefSnap.exists ? prefSnap.data() : {};
+
     const rootData = rootSnap && rootSnap.exists ? rootSnap.data() : {};
+    const taxonomyData = taxonomySnap && taxonomySnap.exists ? taxonomySnap.data() : {};
+    const prefData = prefSnap && prefSnap.exists ? prefSnap.data() : {};
+
     return {
       id: HOUSEHOLD_ID,
       ...rootData,
       ...prefData,
+      ingredientGroups: taxonomyData.ingredientGroups || [],
+      ingredientFamilies: taxonomyData.ingredientFamilies || [],
       userPrefs: {
         ...(rootData.userPrefs || {}),
         ...(prefData.userPrefs || {}),
@@ -284,8 +290,39 @@ export async function getPreferences() {
       }
     };
   } catch (err) {
-    console.warn('[HouseholdRepository v3.19.78] Offline or unable to fetch preferences:', err.message || err);
+    console.warn('[HouseholdRepository] Error fetching household data:', err);
     return null;
+  }
+}
+
+export async function getPreferences() {
+  return getHouseholdData();
+}
+
+export async function getPlanHistory() {
+  if (!isDbAvailable()) return [];
+  try {
+    const snap = await safeFirestoreGet(db.collection('households').doc(HOUSEHOLD_ID).collection('plan_history'));
+    if (snap && snap.docs) {
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }
+    return [];
+  } catch (err) {
+    console.error('[HouseholdRepository] Error fetching plan history on-demand:', err);
+    return [];
+  }
+}
+
+export async function savePlanHistory(planId, plan) {
+  if (!isDbAvailable()) return false;
+  if (!planId || !plan) return false;
+  try {
+    const docRef = db.collection('households').doc(HOUSEHOLD_ID).collection('plan_history').doc(planId);
+    await docRef.set({ ...plan, id: planId, updatedAt: new Date().toISOString() }, { merge: true });
+    return true;
+  } catch (err) {
+    console.error('[HouseholdRepository] Error saving plan history:', err);
+    return false;
   }
 }
 
@@ -1005,6 +1042,113 @@ export async function batchResolveOrphansWithNewSubtypeInDb(parentIngredient, pr
   }
 }
 
+export async function executeSubcollectionMigration() {
+  if (!db) {
+    console.error('[Migration] db is not initialized.');
+    return { success: false, error: 'Database unavailable' };
+  }
+  try {
+    console.log('[Migration] Starting subcollection restructuring & migration...');
+    const rootDocRef = db.collection('households').doc(HOUSEHOLD_ID);
+    const rootSnap = await rootDocRef.get();
+    if (!rootSnap.exists) {
+      console.warn('[Migration] Root document households/elliott-chloe does not exist.');
+      return { success: false, error: 'Root document not found' };
+    }
+    const rootData = rootSnap.data() || {};
+    console.log('[Migration] Successfully fetched root document. Size: ' + new Blob([JSON.stringify(rootData)]).size + ' bytes');
+
+    const batch = db.batch();
+
+    // b. Extract planHistory array elements. Write each plan as an individual document under households/elliott-chloe/plan_history/{planId} using batched writes.
+    const planHistory = Array.isArray(rootData.planHistory) ? rootData.planHistory : [];
+    console.log(`[Migration] Extracted ${planHistory.length} historical plans from root.`);
+    const historyColRef = rootDocRef.collection('plan_history');
+    planHistory.forEach((plan, idx) => {
+      const planId = plan.id || plan.planId || `plan_${idx}_${Date.now()}`;
+      const planDocRef = historyColRef.doc(planId);
+      batch.set(planDocRef, { ...plan, id: planId, updatedAt: plan.updatedAt || new Date().toISOString() });
+    });
+
+    // c. Extract ingredientGroups and ingredientFamilies. Write them to households/elliott-chloe/metadata/taxonomy
+    const ingredientGroups = Array.isArray(rootData.ingredientGroups) ? rootData.ingredientGroups : [];
+    const ingredientFamilies = Array.isArray(rootData.ingredientFamilies) ? rootData.ingredientFamilies : [];
+    console.log(`[Migration] Extracted taxonomy data: ${ingredientGroups.length} groups, ${ingredientFamilies.length} families.`);
+    const taxonomyDocRef = rootDocRef.collection('metadata').doc('taxonomy');
+    batch.set(taxonomyDocRef, {
+      ingredientGroups,
+      ingredientFamilies,
+      updatedAt: new Date().toISOString()
+    });
+
+    // d. Deep-clean preferences: delete all legacy cached snapshots, logs, and history buffers
+    let preferences = rootData.preferences || {};
+    const deepClean = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      delete obj.cachedSnapshots;
+      delete obj.historyCache;
+      delete obj.mealHistorySnapshots;
+      delete obj.planHistory;
+      delete obj.ingredientGroups;
+      delete obj.ingredientFamilies;
+      Object.keys(obj).forEach(key => {
+        if (/cache|snapshot|log/i.test(key)) {
+          delete obj[key];
+        } else if (obj[key] && typeof obj[key] === 'object') {
+          deepClean(obj[key]);
+        }
+      });
+    };
+    deepClean(preferences);
+
+    if (preferences.userPrefs) {
+      deepClean(preferences.userPrefs);
+    }
+
+    // e. Remove planHistory, ingredientGroups, and ingredientFamilies from the root document.
+    const updatedRootData = { ...rootData };
+    delete updatedRootData.planHistory;
+    delete updatedRootData.ingredientGroups;
+    delete updatedRootData.ingredientFamilies;
+
+    let deleteVal;
+    if (typeof window !== 'undefined' && window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue) {
+      deleteVal = window.firebase.firestore.FieldValue.delete();
+    }
+    
+    if (deleteVal) {
+      updatedRootData.planHistory = deleteVal;
+      updatedRootData.ingredientGroups = deleteVal;
+      updatedRootData.ingredientFamilies = deleteVal;
+    }
+
+    updatedRootData.preferences = preferences;
+    if (updatedRootData.userPrefs) {
+      updatedRootData.userPrefs = preferences.userPrefs || preferences;
+    }
+    updatedRootData.updatedAt = new Date().toISOString();
+
+    // f. Commit the cleaned, lightweight root document back to Firestore
+    batch.set(rootDocRef, updatedRootData, { merge: true });
+
+    await batch.commit();
+    console.log('[Migration] Subcollection restructuring & migration completed successfully.');
+
+    if (typeof window !== 'undefined' && window.Store && typeof window.Store.setState === 'function') {
+      window.Store.setState({ preferences, userPrefs: preferences });
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('[Migration] Failed to execute subcollection migration:', err);
+    return { success: false, error: err.message || err };
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.executeSubcollectionMigration = executeSubcollectionMigration;
+}
+
 const HouseholdRepository = {
   cleanLegacyMacros,
   saveCurrentPlan,
@@ -1021,10 +1165,16 @@ const HouseholdRepository = {
   dismissAdvisoryInDb,
   savePreferencesWithAutoPrune,
   batchResolveOrphansWithNewSubtypeInDb,
-  stripPlanPayload
+  stripPlanPayload,
+  getHouseholdData,
+  getPlanHistory,
+  savePlanHistory,
+  executeSubcollectionMigration
 };
 
 if (typeof window !== 'undefined') {
   window.HouseholdRepository = HouseholdRepository;
+  window.getPlanHistory = getPlanHistory;
+  window.savePlanHistory = savePlanHistory;
 }
 
