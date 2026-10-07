@@ -5,12 +5,15 @@
  * All operations target the shared household path 'households/elliott-chloe'.
  */
 
-import { db, HOUSEHOLD_ID } from '../config/firebase.js';
+import { db, HOUSEHOLD_ID, FIREBASE_CONFIG } from '../config/firebase.js';
 import { stripPlanPayload } from '../models/MealPlannerModel.js';
 import { enforceCategorySSOT } from '../utils/categoryEnforcer.js';
 import { getState as getStoreState } from '../store/store.js';
 
+
 export { stripPlanPayload };
+
+
 
 /**
  * Migration & schema normalisation utility to purge legacy root macro shorthands (.cal, .prot)
@@ -152,10 +155,10 @@ export async function runPayloadAudit() {
     return;
   }
   try {
-    const docRef = db.collection('households').doc(HOUSEHOLD_ID);
-    const snap = await docRef.get();
-    if (!snap.exists) {
-      console.warn('[PayloadAudit] Document households/elliott-chloe does not exist.');
+    const householdRef = db.collection('households').doc(HOUSEHOLD_ID);
+    const snap = await householdRef.get({ source: 'server' });
+    if (!snap || !snap.exists) {
+      console.warn('[PayloadAudit] Document households/elliott-chloe does not exist on server.');
       return;
     }
     const data = snap.data();
@@ -1229,8 +1232,8 @@ export async function cleanPreferencesBloat() {
     const rootDocRef = db.collection('households').doc(HOUSEHOLD_ID);
     const prefDocRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences');
     
-    const rootSnap = await rootDocRef.get();
-    if (!rootSnap.exists) {
+    const rootSnap = await rootDocRef.get({ source: 'server' });
+    if (!rootSnap || !rootSnap.exists) {
       console.warn('[CleanPreferencesBloat] households/elliott-chloe does not exist.');
       return { success: false, error: 'Document not found' };
     }
@@ -1285,25 +1288,27 @@ export async function cleanPreferencesBloat() {
     const cleanedSize = new Blob([JSON.stringify(preferences)]).size;
     console.log(`[CleanPreferencesBloat] Cleaned preferences size: ${cleanedSize} bytes (${(cleanedSize / 1024).toFixed(2)} KB)`);
 
-    const batch = db.batch();
-    
-    // Delete unmigrated keys completely from root using FieldValue.delete if available
-    let deleteVal;
-    if (typeof window !== 'undefined' && window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue) {
-      deleteVal = window.firebase.firestore.FieldValue.delete();
-    }
-    
-    const rootUpdate = { preferences, updatedAt: new Date().toISOString() };
-    if (deleteVal) {
-      rootUpdate.planHistory = deleteVal;
-      rootUpdate.ingredientGroups = deleteVal;
-      rootUpdate.ingredientFamilies = deleteVal;
-    }
-    
-    batch.set(rootDocRef, rootUpdate, { merge: true });
-    batch.set(prefDocRef, preferences, { merge: true });
+    // 1. Write to settings/preferences subcollection doc
+    await prefDocRef.set(preferences, { merge: true });
 
-    await batch.commit();
+    // 2. Explicit deleteField() atomic update on root doc
+    const FieldValue = (typeof window !== 'undefined' && window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue) ? window.firebase.firestore.FieldValue : null;
+    
+    const updatePayload = {
+      'preferences': preferences
+    };
+    if (FieldValue) {
+      updatePayload['preferences.planHistory'] = FieldValue.delete();
+      updatePayload['preferences.ingredientGroups'] = FieldValue.delete();
+      updatePayload['preferences.ingredientFamilies'] = FieldValue.delete();
+      updatePayload['preferences.userPrefs'] = FieldValue.delete();
+      updatePayload['preferences.snapshots'] = FieldValue.delete();
+      updatePayload['preferences.history'] = FieldValue.delete();
+      updatePayload['preferences.cache'] = FieldValue.delete();
+    }
+
+    await rootDocRef.update(updatePayload);
+
     console.log('[CleanPreferencesBloat] Successfully persisted cleaned preferences to Firestore.');
 
     if (typeof window !== 'undefined' && window.Store && typeof window.Store.setState === 'function') {
