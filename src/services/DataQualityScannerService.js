@@ -26,6 +26,22 @@ export function runDataQualityDiagnostics(state = {}, verbose = true) {
   return res;
 }
 
+export function getEffectiveIngredientMacros(ingredient, productStore) {
+  if (!ingredient) return null;
+  if (ingredient.calories != null && ingredient.protein != null) {
+    return { calories: Number(ingredient.calories), protein: Number(ingredient.protein), source: 'ingredient' };
+  }
+  if (ingredient.cal != null && ingredient.prot != null) {
+    return { calories: Number(ingredient.cal), protein: Number(ingredient.prot), source: 'ingredient' };
+  }
+  const defaultProductId = ingredient.defaultProductId || ingredient.defaultProduct;
+  const defaultProduct = defaultProductId && productStore ? (typeof productStore.get === 'function' ? productStore.get(defaultProductId) : (Array.isArray(productStore) ? productStore.find(p => String(p.id) === String(defaultProductId)) : null)) : null;
+  if (defaultProduct && (defaultProduct.calories != null || defaultProduct.cal != null)) {
+    return { calories: Number(defaultProduct.calories ?? defaultProduct.cal), protein: Number(defaultProduct.protein ?? defaultProduct.prot), source: 'default_product' };
+  }
+  return null;
+}
+
 export function calculateRecipeDynamicMacros(recipe, ingredientsList = [], productsList = []) {
   if (!recipe || typeof recipe !== 'object') return null;
   const rawIngs = recipe.ingredients || recipe.recipe?.ingredients || recipe.parsedIngredients || [];
@@ -54,7 +70,19 @@ export function calculateRecipeDynamicMacros(recipe, ingredientsList = [], produ
           if (sub && sub.defaultProduct) matchedSource = productMap.get(String(sub.defaultProduct));
         }
         if (!matchedSource && ing.defaultProduct) matchedSource = productMap.get(String(ing.defaultProduct));
-        if (!matchedSource && ing.cal !== undefined) matchedSource = ing;
+        if (!matchedSource) {
+          const effective = getEffectiveIngredientMacros(ing, productsList);
+          if (effective) {
+            matchedSource = {
+              ...ing,
+              cal: effective.calories,
+              prot: effective.protein,
+              carb: ing.carb ?? ing.carbs ?? 0,
+              fat: ing.fat ?? 0,
+              fibre: ing.fibre ?? ing.fiber ?? 0
+            };
+          }
+        }
       }
     }
     if (!matchedSource && item.name) {

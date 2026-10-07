@@ -263,6 +263,17 @@ export function renderDataQualityView() {
   const state = getState() || {};
   const audit = runAudit(state);
 
+  // Silent automatic trigger for savePreferencesWithAutoPrune on mount/render if storage health issues exist
+  if (audit.storageHealth && audit.storageHealth.length > 0) {
+    const currentPrefs = state.preferences || state.userPrefs || {};
+    const clonedPrefs = JSON.parse(JSON.stringify(currentPrefs));
+    savePreferencesWithAutoPrune(clonedPrefs).then(() => {
+      console.log('[DataQualityView] Silently pruned bloated preferences in background.');
+    }).catch(err => {
+      console.error('[DataQualityView] Silent background auto-prune failed:', err);
+    });
+  }
+
   // Helper to render individual audit rows
   const renderAuditCard = (title, icon, items, renderer) => {
     const safeItems = Array.isArray(items) ? items : [];
@@ -308,8 +319,8 @@ export function renderDataQualityView() {
               <strong style="font-size:13px; color:#111827;">${escapeHtml(item.recipeName)}</strong>
               <div style="font-size:11.5px; color:var(--text2); margin-top:2px;">${escapeHtml(item.message)}</div>
             </div>
-            <div style="display:flex; gap:6px; flex-shrink:0;">
-              <button type="button" class="btn sm primary rec-auto-recal-btn" data-recipe-id="${escapeAttr(item.recipeId)}" style="background:var(--primary,#4f46e5); color:#fff;">Auto-Recalibrate</button>
+            <div style="display:flex; gap:8px; align-items:center; flex-shrink:0;">
+              <span class="badge" style="background:#dcfce7; color:#15803d; font-size:11px; font-weight:700; padding:4px 8px; border-radius:999px;">Auto-Calibrated Dynamic</span>
               <button type="button" class="btn sm ghost rec-manual-inspect-btn" data-recipe-id="${escapeAttr(item.recipeId)}">Manual Inspect</button>
             </div>
           </div>

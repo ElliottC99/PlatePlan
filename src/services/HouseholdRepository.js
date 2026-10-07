@@ -273,13 +273,15 @@ export function prunePreferences(obj) {
     console.warn('[prunePreferences] Size check error:', e);
   }
 
-  if (size >= 900000) {
-    console.warn('[prunePreferences] Payload size is still too large:', size, 'bytes. Applying aggressive pruning...');
+  if (size > 400 * 1024) {
+    console.warn('[prunePreferences] Payload size is over 400KB limit:', size, 'bytes. Applying aggressive pruning...');
     const aggressiveClean = (target) => {
       if (!target || typeof target !== 'object') return;
       for (const key of Object.keys(target)) {
         if (key === 'dismissedQualityAdvisories' || key === 'dismissedAdvisories' || key === 'dismissed_advisories') {
-          target[key] = []; // Clear completely
+          target[key] = (target[key] || []).slice(-20);
+        } else if (key.toLowerCase().includes('cache') || key.toLowerCase().includes('snapshot') || key.toLowerCase().includes('log')) {
+          delete target[key];
         } else if (target[key] && typeof target[key] === 'object') {
           aggressiveClean(target[key]);
         }
@@ -829,25 +831,35 @@ export async function save(state = {}) {
 export const saveHouseholdState = save;
 
 export async function savePreferencesWithAutoPrune(preferences) {
+  if (!preferences) return { byteSize: 0, preferences: {} };
+
+  // 1. Hard purge bloated historical cache keys
+  if (preferences.cachedSnapshots) delete preferences.cachedSnapshots;
+  if (preferences.historyCache) preferences.historyCache = [];
+  if (preferences.mealHistorySnapshots) preferences.mealHistorySnapshots = [];
+  
+  // 2. Truncate advisories
   if (Array.isArray(preferences.dismissedQualityAdvisories)) {
-    // Keep only the 20 most recent advisories to prevent payload bloat
     preferences.dismissedQualityAdvisories = preferences.dismissedQualityAdvisories.slice(-20);
   }
 
-  let serialized = JSON.stringify(preferences);
-  let byteSize = new TextEncoder().encode(serialized).length;
+  // 3. Size check validation (< 400KB target)
+  let payloadString = JSON.stringify(preferences);
+  let byteSize = new TextEncoder().encode(payloadString).length;
 
-  // Background Auto-Pruner Threshold (400 KB) - Runs automatically
   if (byteSize > 400 * 1024) {
-    preferences.cachedSnapshots = {}; // Flush stale historical cache
-    preferences.advisoryHistory = [];
-    preferences.snapshots = [];
-    preferences.stateSnapshots = [];
-    serialized = JSON.stringify(preferences);
-    byteSize = new TextEncoder().encode(serialized).length;
+    console.warn(`[HouseholdRepository] Payload still large (${byteSize} bytes), performing deep key purge...`);
+    // Remove non-critical key-value pairs if payload remains oversized
+    Object.keys(preferences).forEach(key => {
+      if (key.toLowerCase().includes('cache') || key.toLowerCase().includes('snapshot') || key.toLowerCase().includes('log')) {
+        delete preferences[key];
+      }
+    });
+    payloadString = JSON.stringify(preferences);
+    byteSize = new TextEncoder().encode(payloadString).length;
   }
 
-  // Update Local Store & Persist Payload
+  // 4. Persist lightweight preferences to Local Store and Firestore
   if (typeof window !== 'undefined' && window.Store && typeof window.Store.setState === 'function') {
     window.Store.setState({ preferences: preferences, userPrefs: preferences });
   }
