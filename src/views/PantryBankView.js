@@ -1,30 +1,44 @@
 /**
- * src/views/PantryBankView.js (v3.20.14)
- * Modular ES6 View for Category ➔ Ingredient ➔ Sub-type Hierarchy Bank.
- * Features Aliasing, Merging, Sub-type creation, Promoting/demoting, and Auto-default product previews.
- * Fully responsive and optimised to remain under 350 lines.
+ * src/views/PantryBankView.js (v3.29.0)
+ * Modular ES6 View for Pantry Active Stock & Master Catalog (Category ➔ Ingredient ➔ Sub-type Hierarchy Bank).
+ * Features dual-tab switching (Active Stock vs Pantry Bank), 1-click "+ Stock" action,
+ * Aliasing, Merging, Sub-type creation, Promoting/demoting, and Auto-default product previews.
  */
 
 import { getState, setIngredients, subscribe, setProducts } from '../store/store.js';
-import { saveIngredient, deleteIngredient, saveProduct } from '../services/HouseholdRepository.js';
+import { saveIngredient } from '../services/HouseholdRepository.js';
 import { 
-  buildPantryHierarchy, aliasIngredient, removeAlias, addSubtypeToIngredient, 
-  promoteToIngredient, demoteToSubtype, reparentSubtype, mergeIngredients, setAutoDefaultProduct, getActiveCategories,
+  buildPantryHierarchy, setAutoDefaultProduct, getActiveCategories,
   invalidateHierarchyCache, slugCategory
 } from '../models/PantryHierarchyModel.js';
 import { renderProductBank, openProductEditModal } from './ProductBankView.js';
 import { renderCategoryManagerModal } from '../components/pantry/CategoryManagerModalUI.js';
 import { updateIngredientFamilyModalUI } from '../components/pantry/IngredientFamilyModalUI.js';
 import { buildIngredientBankHTML } from '../components/pantry/PantryBankHTMLTemplate.js';
+import {
+  activePantryTab, switchPantryTab, renderActiveStockTab, addCatalogItemToActiveStock,
+  adjustPantryStock, removePantryStock, togglePantryUseUp, handlePantrySearchFilter,
+  handlePantryZoneChange, togglePantryUseUpFilter, openAddPantryStockModal as openStockModalUI
+} from '../components/pantry/PantryInventoryUI.js';
 import '../components/pantry/SubtypeActionModalsUI.js';
 
 let activeEditingIngredientId = null;
 export let selectedCategoryFilter = null;
 export let activeCategoryFilter = null;
 export let isCategoryManagerOpen = false;
+export {
+  activePantryTab, switchPantryTab, renderActiveStockTab, addCatalogItemToActiveStock,
+  adjustPantryStock, removePantryStock, togglePantryUseUp, handlePantrySearchFilter,
+  handlePantryZoneChange, togglePantryUseUpFilter
+};
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
+
+export function openAddPantryStockModal() {
+  const state = getState() || {};
+  openStockModalUI(state.ingredients || []);
+}
 
 export function resetCategoryFilter() {
   selectedCategoryFilter = activeCategoryFilter = null;
@@ -85,11 +99,8 @@ export function closeIngredientFamilyDetailsModal() {
   activeEditingIngredientId = null;
 
   if (window.__modalContext && window.__modalContext.returnTo === 'data-quality') {
-    const ctx = window.__modalContext;
     window.__modalContext = null;
-    if (typeof window.showView === 'function') {
-      window.showView('data');
-    }
+    if (typeof window.showView === 'function') window.showView('data');
   }
 }
 
@@ -113,13 +124,7 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
   const msgEl = document.getElementById('ingredient-family-details-msg');
 
   if (titleEl) {
-    if (ing) {
-      titleEl.textContent = `Edit ${ing.name}`;
-    } else if (parent) {
-      titleEl.textContent = `Add Sub-type to ${parent.name}`;
-    } else {
-      titleEl.textContent = 'New Ingredient';
-    }
+    titleEl.textContent = ing ? `Edit ${ing.name}` : (parent ? `Add Sub-type to ${parent.name}` : 'New Ingredient');
   }
   if (nameEl) nameEl.value = ing?.name || '';
   if (notesEl) notesEl.value = ing?.notes || '';
@@ -158,9 +163,7 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
     msgEl.innerHTML = '';
   }
 
-  // 3. Apply layout updates and Tesco helper integration
   updateIngredientFamilyModalUI(ing, parent);
-
   modalWrap.classList.add('open');
 }
 
@@ -177,35 +180,25 @@ export async function saveIngredientFamilyDetailsModal() {
     const parent = currentIngs.find(p => String(p.id) === String(parentId));
     if (!parent) return;
 
-    if (!activeEditingIngredientId) {
-      // New Sub-type Mode (A product must be linked using the Product Actions to save)
+    const hasProduct = activeEditingIngredientId && (state.products || []).some(p => String(p.subtypeId) === String(activeEditingIngredientId));
+    if (!activeEditingIngredientId || !hasProduct) {
       const msgEl = document.getElementById('ingredient-family-details-msg');
       if (msgEl) {
         msgEl.innerHTML = `<div style="padding: 10px; background: #fee2e2; color: #ef4444; border-radius: 8px; font-weight: 600; margin-bottom: 12px;">⚠️ A sub-type must have at least one product attached or linked before saving.</div>`;
       }
       return;
-    } else {
-      // Editing Existing Sub-type Mode
-      const hasProduct = (state.products || []).some(p => String(p.subtypeId) === String(activeEditingIngredientId));
-      if (!hasProduct) {
-        const msgEl = document.getElementById('ingredient-family-details-msg');
-        if (msgEl) {
-          msgEl.innerHTML = `<div style="padding: 10px; background: #fee2e2; color: #ef4444; border-radius: 8px; font-weight: 600; margin-bottom: 12px;">⚠️ A sub-type must have at least one product attached or linked before saving.</div>`;
-        }
-        return;
-      }
-
-      if (!Array.isArray(parent.subtypes)) parent.subtypes = [];
-      const sub = parent.subtypes.find(s => String(s.id) === String(activeEditingIngredientId));
-      if (sub) {
-        sub.name = name;
-        sub.notes = notes;
-        parent.updatedAt = new Date().toISOString();
-        setIngredients(currentIngs); closeIngredientFamilyDetailsModal(); renderIngredientBank();
-        try { await saveIngredient(parent); } catch (e) {}
-      }
-      return;
     }
+
+    if (!Array.isArray(parent.subtypes)) parent.subtypes = [];
+    const sub = parent.subtypes.find(s => String(s.id) === String(activeEditingIngredientId));
+    if (sub) {
+      sub.name = name;
+      sub.notes = notes;
+      parent.updatedAt = new Date().toISOString();
+      setIngredients(currentIngs); closeIngredientFamilyDetailsModal(); renderIngredientBank();
+      try { await saveIngredient(parent); } catch (e) {}
+    }
+    return;
   }
 
   const state = getState() || {}, currentIngs = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
@@ -218,7 +211,6 @@ export async function saveIngredientFamilyDetailsModal() {
   if (existingIdx >= 0) currentIngs[existingIdx] = updatedIng; else currentIngs.push(updatedIng);
 
   setIngredients(currentIngs); closeIngredientFamilyDetailsModal(); renderIngredientBank();
-
   try { await saveIngredient(updatedIng); } catch (e) { console.warn('[PantryBankView] Sync error:', e); }
 }
 
@@ -231,10 +223,12 @@ export function promptAddSubtype(ingId) { openIngredientFamilyDetailsModal(null,
 
 export function renderIngredientBank() {
   if (typeof document === 'undefined') return;
+  renderActiveStockTab();
+
   const container = document.getElementById('ingredient-groups-list');
   if (!container) return;
 
-  const state = getState() || {}, ingredients = state.ingredients || [], products = state.products || [];
+  const state = getState() || {}, ingredients = state.ingredients || [], products = state.products || [], inventory = state.inventory || [];
 
   if (ingredients.length === 0) {
     container.innerHTML = `<div class="card" style="padding:32px 20px;text-align:center;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:14px;margin-top:12px;">
@@ -250,13 +244,10 @@ export function renderIngredientBank() {
   const curFilter = selectedCategoryFilter || activeCategoryFilter;
   if (curFilter && curFilter !== 'all') {
     const targetSlug = slugCategory(curFilter);
-    hierarchy = hierarchy.filter(g => 
-      slugCategory(g.category) === targetSlug || 
-      slugCategory(g.cat) === targetSlug
-    );
+    hierarchy = hierarchy.filter(g => slugCategory(g.category) === targetSlug || slugCategory(g.cat) === targetSlug);
   }
 
-  const searchInput = typeof document !== 'undefined' ? document.getElementById('ingredient-group-search') : null;
+  const searchInput = document.getElementById('ingredient-group-search');
   const query = (searchInput?.value || '').trim().toLowerCase();
   const querySlug = slugCategory(query);
   if (query) {
@@ -273,7 +264,7 @@ export function renderIngredientBank() {
     }).filter(g => g.ingredients.length > 0);
   }
 
-  container.innerHTML = buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr);
+  container.innerHTML = buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inventory);
 }
 
 let isSubscribed = false;
@@ -281,15 +272,15 @@ export function initBankSubscriptions() {
   if (isSubscribed) return;
   isSubscribed = true;
   const update = () => { renderIngredientBank(); renderProductBank(); };
-  subscribe('ingredients', update); subscribe('products', update);
+  subscribe('ingredients', update); subscribe('products', update); subscribe('inventory', update);
   if (typeof document !== 'undefined') {
     document.addEventListener('plateplan:state:ingredients', update);
     document.addEventListener('plateplan:state:products', update);
+    document.addEventListener('plateplan:state:inventory', update);
   }
 }
 
-export function mount(container) { initBankSubscriptions(); renderIngredientBank(); renderProductBank(); }
-
+export function mount() { initBankSubscriptions(); renderIngredientBank(); renderProductBank(); }
 export const renderPantryBankView = renderIngredientBank; export { renderProductBank, openProductEditModal };
 export function openAddSubtypeModal(parentId) { openIngredientFamilyDetailsModal(null, parentId); }
 export function openCategoryManager() { renderCategoryManagerModal(); }
@@ -300,13 +291,13 @@ export function linkProductToSubtype(parentId, subtypeId) {
 if (typeof window !== 'undefined') {
   Object.assign(window, {
     renderIngredientBank, renderPantryBankView, openIngredientFamilyDetailsModal, closeIngredientFamilyDetailsModal,
-    openAddSubtypeModal, linkProductToSubtype,
-    saveIngredientFamilyDetailsModal, handleSetDefaultProduct, promptAddAlias, promptRemoveAlias,
-    promptAddSubtype, promptMerge, promptDemote, handlePromoteSubtype, handleDeleteIngredient,
-    openCategoryManager, openCategoryManagerModal: openCategoryManager,
+    openAddSubtypeModal, linkProductToSubtype, switchPantryTab, renderActiveStockTab, addCatalogItemToActiveStock,
+    adjustPantryStock, removePantryStock, togglePantryUseUp, handlePantrySearchFilter, handlePantryZoneChange,
+    togglePantryUseUpFilter, openAddPantryStockModal,
+    saveIngredientFamilyDetailsModal, handleSetDefaultProduct,
+    promptAddSubtype, openCategoryManager, openCategoryManagerModal: openCategoryManager,
     updateActiveCategoryFilter, setActiveCategoryFilter, resetCategoryFilter, getFilteredIngredients,
     createIngredientFamilyPrompt: () => openIngredientFamilyDetailsModal(null),
-    
     toggleSubtypeCollapse(btn, ingId) {
       const el = document.getElementById(`subtypes-container-${ingId}`); if (!el) return;
       const collapsed = el.style.display === 'none'; el.style.display = collapsed ? 'flex' : 'none'; el.classList.toggle('is-expanded', collapsed);
@@ -320,28 +311,4 @@ if (typeof window !== 'undefined') {
       if (isHidden) setTimeout(() => document.addEventListener('click', close), 10);
     }
   });
-
-  if (typeof document !== 'undefined' && !window.__subtype_action_delegation_bound) {
-    window.__subtype_action_delegation_bound = true;
-    document.addEventListener('plateplan-action', (e) => {
-      const { action, target, id } = e.detail || {};
-      if (action === 'delete-subtype') {
-        const subId = id || target?.dataset?.subtypeId;
-        const parentId = target?.dataset?.parentId;
-        if (subId && parentId && typeof window.openSubtypeDeleteModal === 'function') {
-          window.openSubtypeDeleteModal(subId, parentId);
-        }
-      }
-    });
-    document.addEventListener('click', (e) => {
-      const deleteBtn = e.target.closest('[data-action="delete-subtype"]');
-      if (deleteBtn) {
-        const subId = deleteBtn.dataset.subtypeId || deleteBtn.dataset.id;
-        const parentId = deleteBtn.dataset.parentId;
-        if (subId && parentId && typeof window.openSubtypeDeleteModal === 'function') {
-          window.openSubtypeDeleteModal(subId, parentId);
-        }
-      }
-    });
-  }
 }

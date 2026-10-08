@@ -36,7 +36,11 @@ export async function savePantryItem(item) {
     const itemData = {
       id: itemId,
       ingredientId: item.ingredientId || null,
+      subtypeId: item.subtypeId || null,
+      productId: item.productId || null,
       customName: String(item.customName || item.name || '').trim(),
+      category: item.category || null,
+      storage: item.storage || 'cupboard',
       status: item.status || 'in_stock', // 'in_stock' | 'low_stock' | 'out_of_stock'
       isUseUp: Boolean(item.isUseUp),
       quantity: item.quantity !== undefined ? item.quantity : null,

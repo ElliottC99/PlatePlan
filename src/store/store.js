@@ -1,5 +1,5 @@
 /**
- * src/store/store.js (v3.28.6)
+ * src/store/store.js (v3.29.0)
  * Centralized Reactive State Store module using native browser CustomEvents for unidirectional data flow.
  * Provides microtask-wrapped event dispatching and IndexedDB caching for instant offline hydration without localStorage quotas.
  */
@@ -7,7 +7,7 @@
 import { safeJsonStringify, safeClone } from '../utils/safeJson.js';
 import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
 import { autoRecalibrateRecipeDrift } from '../services/DataQualityEngine.js';
-import { savePantryItem, toggleUseUpStatusInDb } from '../repositories/InventoryRepository.js';
+import { savePantryItem, deletePantryItem, toggleUseUpStatusInDb } from '../repositories/InventoryRepository.js';
 import { savePlan } from '../repositories/PlanRepository.js';
 
 export { getShoppingLineStateKey };
@@ -15,10 +15,10 @@ export { getShoppingLineStateKey };
 const DB_NAME = 'PlatePlanDB';
 const STORE_NAME = 'StateStore';
 const DB_VERSION = 1;
-const CACHE_KEY = 'plateplan_store_cache_v3.28.6';
+const CACHE_KEY = 'plateplan_store_cache_v3.29.0';
 
 const state = {
-  version: 'v3.28.6',
+  version: 'v3.29.0',
   recipes: [],
   ingredients: [],
   products: [],
@@ -82,6 +82,7 @@ export function saveStateCache() {
         ingredients: state.ingredients || [],
         products: state.products || [],
         categories: state.categories || [],
+        inventory: state.inventory || [],
         preferences: state.preferences ? { nutritionTargets: state.preferences.nutritionTargets } : null,
         userPrefs: state.userPrefs || {},
         settings: state.settings || {},
@@ -130,6 +131,7 @@ export async function initStoreCache() {
       state.ingredients = Array.isArray(initialCache.ingredients) ? initialCache.ingredients : [];
       state.products = Array.isArray(initialCache.products) ? initialCache.products : [];
       state.categories = Array.isArray(initialCache.categories) ? initialCache.categories : [];
+      state.inventory = Array.isArray(initialCache.inventory) ? initialCache.inventory : [];
       state.preferences = initialCache.preferences || null;
       state.userPrefs = initialCache.userPrefs || {};
       state.settings = initialCache.settings || {};
@@ -358,29 +360,121 @@ export function setInventory(newInventory) {
 }
 
 /**
+  * Add a new or incremented pantry inventory item to state and persist to subcollection.
+  * @param {Object} item
+  * @returns {Object} The created or updated inventory item
+  */
+export function addPantryItem(item = {}) {
+  if (!item || typeof item !== 'object') return null;
+  const targetId = item.id || (item.subtypeId
+    ? `inv_${item.ingredientId || 'custom'}_${item.subtypeId}`
+    : (item.ingredientId ? `inv_${item.ingredientId}` : `inv_${Date.now()}`));
+
+  const list = Array.isArray(state.inventory) ? [...state.inventory] : [];
+  const idx = list.findIndex(i =>
+    String(i.id) === String(targetId) ||
+    (item.ingredientId &&
+      String(i.ingredientId) === String(item.ingredientId) &&
+      String(i.subtypeId || '') === String(item.subtypeId || '') &&
+      i.status !== 'out_of_stock')
+  );
+
+  const addQty = Number(item.quantity ?? item.qty ?? 1) || 1;
+  let updatedItem;
+
+  if (idx !== -1) {
+    const existing = list[idx];
+    const currentQty = existing.status === 'out_of_stock' ? 0 : (Number(existing.quantity ?? existing.qty ?? 0) || 0);
+    updatedItem = {
+      ...existing,
+      ...item,
+      id: existing.id || targetId,
+      status: 'in_stock',
+      quantity: Number((currentQty + addQty).toFixed(2)),
+      unit: item.unit || existing.unit || 'qty',
+      updatedAt: new Date().toISOString()
+    };
+    list[idx] = updatedItem;
+  } else {
+    updatedItem = {
+      id: targetId,
+      ingredientId: item.ingredientId || null,
+      subtypeId: item.subtypeId || null,
+      productId: item.productId || null,
+      customName: String(item.customName || item.name || 'Pantry Item').trim(),
+      category: item.category || 'Store Cupboard',
+      storage: item.storage || 'cupboard',
+      status: 'in_stock',
+      isUseUp: Boolean(item.isUseUp),
+      quantity: addQty,
+      unit: item.unit || 'qty',
+      expiryDate: item.expiryDate || null,
+      updatedAt: new Date().toISOString()
+    };
+    list.push(updatedItem);
+  }
+
+  state.inventory = list;
+  saveStateCache();
+  dispatchStateEvent('plateplan:state:inventory', state.inventory);
+  savePantryItem(updatedItem);
+  return updatedItem;
+}
+
+/**
   * Update or add a single pantry inventory item in state and persist directly to subcollection.
   * @param {string} itemId 
   * @param {Object} patch 
   */
 export function updatePantryItem(itemId, patch = {}) {
-  if (!itemId && !patch.id) return;
+  if (!itemId && !patch.id) return null;
   const targetId = itemId || patch.id;
-  const list = state.inventory || [];
-  const idx = list.findIndex(i => i.id === targetId);
+  const list = Array.isArray(state.inventory) ? [...state.inventory] : [];
+  const idx = list.findIndex(i => String(i.id) === String(targetId));
   let updatedItem;
   if (idx !== -1) {
     updatedItem = { ...list[idx], ...patch, id: targetId, updatedAt: new Date().toISOString() };
     list[idx] = updatedItem;
   } else {
-    updatedItem = { id: targetId, status: 'in_stock', isUseUp: false, quantity: null, unit: null, expiryDate: null, ...patch, updatedAt: new Date().toISOString() };
+    updatedItem = {
+      id: targetId,
+      ingredientId: patch.ingredientId || null,
+      subtypeId: patch.subtypeId || null,
+      productId: patch.productId || null,
+      customName: patch.customName || patch.name || 'Pantry Item',
+      category: patch.category || 'Store Cupboard',
+      storage: patch.storage || 'cupboard',
+      status: 'in_stock',
+      isUseUp: false,
+      quantity: 1,
+      unit: 'qty',
+      expiryDate: null,
+      ...patch,
+      updatedAt: new Date().toISOString()
+    };
     list.push(updatedItem);
   }
-  state.inventory = [...list];
+  state.inventory = list;
   saveStateCache();
   dispatchStateEvent('plateplan:state:inventory', state.inventory);
 
   // Persist directly to inventory subcollection
   savePantryItem(updatedItem);
+  return updatedItem;
+}
+
+/**
+  * Remove a single pantry inventory item from state and delete from subcollection.
+  * @param {string} itemId
+  */
+export function removePantryItem(itemId) {
+  if (!itemId) return;
+  const list = Array.isArray(state.inventory) ? state.inventory : [];
+  state.inventory = list.filter(i => String(i.id) !== String(itemId));
+  saveStateCache();
+  dispatchStateEvent('plateplan:state:inventory', state.inventory);
+
+  deletePantryItem(itemId);
 }
 
 /**
@@ -688,7 +782,9 @@ export function subscribe(domainOrCallback, maybeCallback) {
 
 if (typeof window !== 'undefined') {
   window.setInventory = setInventory;
+  window.addPantryItem = addPantryItem;
   window.updatePantryItem = updatePantryItem;
+  window.removePantryItem = removePantryItem;
   window.toggleUseUpStatus = toggleUseUpStatus;
   window.setActivePlan = setActivePlan;
   window.updatePlanMeal = updatePlanMeal;
@@ -705,7 +801,9 @@ if (typeof window !== 'undefined') {
       updateState(patch);
     },
     setInventory,
+    addPantryItem,
     updatePantryItem,
+    removePantryItem,
     toggleUseUpStatus,
     setActivePlan,
     updatePlanMeal,

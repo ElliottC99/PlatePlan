@@ -1,24 +1,24 @@
 /**
- * sw.js (v3.28.6)
+ * sw.js (v3.29.0)
  * Service Worker for PlatePlan PWA offline support & asset caching.
  * Caches core app shell, modern ES6 modules, stylesheets, and icons.
  */
 
-const PLATEPLAN_CACHE = 'plateplan-cache-v3.28.6';
-const PLATEPLAN_STORE_CACHE = 'plateplan_store_cache_v3.28.6';
-const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.28.6';
-const PLATEPLAN_APP_VERSION = 'v3.28.6';
-const PLATEPLAN_BUILD_ID = '3.28.6-v288';
+const PLATEPLAN_CACHE = 'plateplan-cache-v3.29.0';
+const PLATEPLAN_STORE_CACHE = 'plateplan_store_cache_v3.29.0';
+const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.29.0';
+const PLATEPLAN_APP_VERSION = 'v3.29.0';
+const PLATEPLAN_BUILD_ID = '3.29.0-v290';
 
 const PLATEPLAN_PRECACHE_ASSETS = [
   '/',
   '/PlatePlan.html',
   '/manifest.json',
   '/firebase-config.js',
-  '/styles/tokens.css?v=3.28.6',
-  '/styles/components.css?v=3.28.6',
-  '/styles/responsive.css?v=3.28.6',
-  '/styles/print.css?v=3.28.6',
+  '/styles/tokens.css?v=3.29.0',
+  '/styles/components.css?v=3.29.0',
+  '/styles/responsive.css?v=3.29.0',
+  '/styles/print.css?v=3.29.0',
   '/src/main.js',
   '/src/store/store.js',
   '/src/config/firebase.js',
@@ -127,9 +127,9 @@ self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(PLATEPLAN_CACHE).then(async cache => {
-      console.log(`[SW v3.28.6] Precaching shell and core ES6 modules...`);
+      console.log(`[SW v3.29.0] Precaching shell and core ES6 modules...`);
       await cache.addAll(PLATEPLAN_PRECACHE_ASSETS).catch(err => {
-        console.warn('[SW v3.28.6] Non-fatal precache warning:', err);
+        console.warn('[SW v3.29.0] Non-fatal precache warning:', err);
       });
       await Promise.allSettled(PLATEPLAN_OPTIONAL_SHELL.map(url => cache.add(url)));
     })
@@ -143,7 +143,7 @@ self.addEventListener('activate', event => {
         keys
           .filter(key => key !== PLATEPLAN_CACHE && key !== PLATEPLAN_IMAGE_CACHE && key !== PLATEPLAN_STORE_CACHE)
           .map(key => {
-            console.log('[SW v3.28.6] Purging legacy cache:', key);
+            console.log('[SW v3.29.0] Purging legacy cache:', key);
             return caches.delete(key);
           })
       );
