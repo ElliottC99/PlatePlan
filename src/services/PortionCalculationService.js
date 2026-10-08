@@ -97,11 +97,36 @@ export function scaleRecipeForProfile(recipe, profileId, mealType = 'dinner', op
   };
 }
 
+/**
+ * Scales embedded parenthetical volume patterns (e.g., "(dissolved in 800ml water)" or "(mixed with 500ml boiling water)")
+ * proportionally by the serving scale factor (targetServings / baseServings).
+ *
+ * @param {string} text String containing parenthetical volumes
+ * @param {number} scaleFactor Serving scale multiplier (targetServings / baseServings)
+ * @returns {string} String with dynamically scaled volumes inside parentheses
+ */
+export function scaleEmbeddedVolume(text, scaleFactor) {
+  if (!text || typeof text !== 'string') return text || '';
+  const factor = Number(scaleFactor);
+  if (isNaN(factor) || factor <= 0) return text;
+
+  return text.replace(/\(([^)]*?)\)/g, (fullParen, innerContent) => {
+    const scaledInner = innerContent.replace(/(\d+(?:\.\d+)?)\s*(ml|l|litres?|liters?|millilitres?)\b/gi, (match, numStr, unitStr) => {
+      const num = parseFloat(numStr);
+      if (isNaN(num)) return match;
+      const scaled = Math.round(num * factor * 10) / 10;
+      return `${scaled}${unitStr}`;
+    });
+    return `(${scaledInner})`;
+  });
+}
+
 if (typeof window !== 'undefined') {
   window.PortionCalculationService = {
     calculatePortionMultiplier,
     calculatePortionSanityPenalty,
     getRecipePerServingNutrition,
-    scaleRecipeForProfile
+    scaleRecipeForProfile,
+    scaleEmbeddedVolume
   };
 }

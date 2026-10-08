@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.28.2-ui)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.28.3)
  * In-App Multi-Step Category Operations Wizard, Raw Exposure & Deep State Merge Modal.
  * Wrapped with Try-Catch-Finally block exception handling and state resets to eliminate screen freezes.
  * Fully accessible Form fields with explicit id, name, and paired labels.
@@ -64,7 +64,7 @@ export function getCategoryObjects(state = {}) {
     }
   });
 
-  return list;
+  return list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'en', { sensitivity: 'base' }));
 }
 
 const resolveCategory = (id) => {
@@ -547,14 +547,22 @@ window.promptDeleteCategory = function promptDeleteCategory(categoryId) {
   if (!categoryId) return;
   const category = resolveCategory(categoryId);
   if (!category?.name) return;
-  const state = getState() || {}, ings = Array.isArray(state.ingredients) ? state.ingredients : [];
-  const bound = ings.filter(i => (i.category === category.name || i.cat === category.name));
+  const state = getState() || {};
+  const ings = Array.isArray(state.ingredients) ? state.ingredients : [];
+  const prods = Array.isArray(state.products) ? state.products : [];
 
-  if (bound.length > 0) {
+  const boundIngs = ings.filter(i => (
+    i.category === category.name || i.cat === category.name || slugCategory(i.category) === slugCategory(category.name) ||
+    (Array.isArray(i.subtypes) && i.subtypes.some(st => st.category === category.name || st.cat === category.name || slugCategory(st.category) === slugCategory(category.name)))
+  ));
+  const boundProds = prods.filter(p => p.category === category.name || p.cat === category.name || slugCategory(p.category) === slugCategory(category.name));
+  const totalBound = boundIngs.length + boundProds.length;
+
+  if (totalBound > 0) {
     activeCat = category.name; wizardStep = 'reassign'; reassignMode = 'mass'; reassignSearch = '';
     const otherCats = getRawCategories(state).filter(c => c !== category.name);
     massTargetCat = otherCats[0] || 'Uncategorised'; individualCatMap = {};
-    bound.forEach(i => { individualCatMap[i.id] = massTargetCat; });
+    boundIngs.forEach(i => { individualCatMap[i.id] = massTargetCat; });
     renderCategoryManagerModal(); return;
   }
 

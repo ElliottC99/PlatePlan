@@ -151,7 +151,7 @@ export function renderSettingsView() {
   const householdHtml = renderHouseholdSyncCard(settings);
   const dietaryHtml = renderDietaryExclusionManager(prefs, settings);
   const profileHtml = renderProfileAllocationCard(prefs);
-  const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.28.2-ui (ES6 Modern)');
+  const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.28.3 (ES6 Modern)');
 
   container.innerHTML = renderSettingsContainer(householdHtml, dietaryHtml, profileHtml, systemHtml);
 

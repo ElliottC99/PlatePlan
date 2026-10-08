@@ -9,10 +9,11 @@
  */
 
 import { strict as assert } from 'assert';
-import { parseIngredientString, parseBulkRecipeText, toTitleCase } from '../src/services/RecipeImporter.js';
+import { parseIngredientString, parseBulkRecipeText, toTitleCase, matchIngredientTaxonomy } from '../src/services/RecipeImporter.js';
 import { getSaveButtonLabel, hasDistinctEnhancedVariant } from '../src/components/recipe/RecipeWizardState.js';
+import { scaleEmbeddedVolume } from '../src/services/PortionCalculationService.js';
 
-console.log('=== RUNNING RECIPE WIZARD v3.28.1 VERIFICATION SUITE ===');
+console.log('=== RUNNING RECIPE WIZARD v3.28.3 VERIFICATION SUITE ===');
 
 // --- Test 1: Compound Stock Parsing ---
 console.log('\n--- Test 1: Compound Stock & Liquid Parsing ---');
@@ -149,4 +150,25 @@ const linkName = getProductLink(categoryItem, dummyProducts);
 assert.equal(linkName, 'Tesco Carrots 1kg');
 console.log('✅ Passed: Lookup successfully resolved the correct default category product from the mock bank');
 
-console.log('\n=== ALL RECIPE WIZARD v3.28.1 TESTS PASSED SUCCESSFULLY ===');
+// --- Test 6: Embedded Parenthetical Stock Volume Scaling ---
+console.log('\n--- Test 6: Embedded Stock Water Volume Scaling ---');
+const scaledVol1 = scaleEmbeddedVolume('(dissolved in 800ml water)', 1.5);
+assert.equal(scaledVol1, '(dissolved in 1200ml water)');
+console.log('✅ Passed: "(dissolved in 800ml water)" scaled by 1.5x to "(dissolved in 1200ml water)"');
+
+const scaledVol2 = scaleEmbeddedVolume('1 stock cube (mixed with 500ml boiling water)', 2);
+assert.equal(scaledVol2, '1 stock cube (mixed with 1000ml boiling water)');
+console.log('✅ Passed: "(mixed with 500ml boiling water)" scaled by 2x to "(mixed with 1000ml boiling water)"');
+
+// --- Test 7: Alias Self-Learning & Taxonomy Matching ---
+console.log('\n--- Test 7: Alias Self-Learning & Taxonomy Matching ---');
+const mockBank = [
+  { id: 'ing_tofu', name: 'Firm Tofu', aliases: ['organic pressed tofu block', 'silk tofu'] }
+];
+
+const matched = matchIngredientTaxonomy({ name: 'organic pressed tofu block' }, mockBank);
+assert.equal(matched.ingredientId, 'ing_tofu');
+assert.equal(matched.isNewTaxonomyItem, false);
+console.log('✅ Passed: matchIngredientTaxonomy matched raw imported text against learned aliases array');
+
+console.log('\n=== ALL RECIPE WIZARD v3.28.3 TESTS PASSED SUCCESSFULLY ===');

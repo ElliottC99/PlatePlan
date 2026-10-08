@@ -1,6 +1,6 @@
 {
   "name": "plateplan",
-  "version": "3.28.2-ui",
+  "version": "3.28.3",
   "type": "module",
   "scripts": {
     "dev": "node server.js",

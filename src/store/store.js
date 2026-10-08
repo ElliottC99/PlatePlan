@@ -1,5 +1,5 @@
 /**
- * src/store/store.js (v3.28.2-ui)
+ * src/store/store.js (v3.28.3)
  * Centralized Reactive State Store module using native browser CustomEvents for unidirectional data flow.
  * Provides microtask-wrapped event dispatching and IndexedDB caching for instant offline hydration without localStorage quotas.
  */
@@ -15,10 +15,10 @@ export { getShoppingLineStateKey };
 const DB_NAME = 'PlatePlanDB';
 const STORE_NAME = 'StateStore';
 const DB_VERSION = 1;
-const CACHE_KEY = 'plateplan_store_cache_v3.28.2-ui';
+const CACHE_KEY = 'plateplan_store_cache_v3.28.3';
 
 const state = {
-  version: 'v3.28.2-ui',
+  version: 'v3.28.3',
   recipes: [],
   ingredients: [],
   products: [],
@@ -526,28 +526,37 @@ export async function runOptimisticMutation(domain, mutateFn, persistPromise, ro
 }
 
 /**
- * Learns an alias for an ingredient taxonomy item and persists to repository.
+ * Learns an alias for an ingredient taxonomy item/sub-type and persists to repository.
  * @param {string} ingredientId 
  * @param {string} rawString 
+ * @param {string} [subtypeId=null]
  */
-export async function learnIngredientAlias(ingredientId, rawString) {
+export async function learnIngredientAlias(ingredientId, rawString, subtypeId = null) {
   if (!ingredientId || !rawString) return;
   const ingredientsList = state.ingredients.length > 0 ? state.ingredients : (window.state?.ingredients || []);
-  const ing = ingredientsList.find(i => i.id === ingredientId);
+  const ing = ingredientsList.find(i => String(i.id) === String(ingredientId));
   if (!ing) return;
 
-  if (!Array.isArray(ing.aliases)) ing.aliases = [];
-  const cleanAlias = String(rawString).trim();
-  const lowerAliases = ing.aliases.map(a => a.toLowerCase());
+  const cleanAlias = String(rawString).trim().toLowerCase();
+  if (!cleanAlias) return;
 
-  if (cleanAlias && !lowerAliases.includes(cleanAlias.toLowerCase())) {
-    ing.aliases.push(cleanAlias);
+  let targetDoc = ing;
+  if (subtypeId && Array.isArray(ing.subtypes)) {
+    const sub = ing.subtypes.find(s => String(s.id) === String(subtypeId));
+    if (sub) targetDoc = sub;
+  }
+
+  if (!Array.isArray(targetDoc.aliases)) targetDoc.aliases = [];
+  const lowerAliases = targetDoc.aliases.map(a => String(a).toLowerCase());
+
+  if (!lowerAliases.includes(cleanAlias)) {
+    targetDoc.aliases.push(cleanAlias);
     if (!state.ingredients.includes(ing)) state.ingredients.push(ing);
     saveStateCache();
     dispatchStateEvent('plateplan:state:ingredients', state.ingredients);
 
     try {
-      const { saveIngredient } = await import('../repositories/HouseholdRepository.js');
+      const { saveIngredient } = await import('../services/HouseholdRepository.js');
       await saveIngredient(ing);
     } catch (err) {
       console.warn('[Store] Failed to persist learned ingredient alias:', err);

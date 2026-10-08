@@ -7,6 +7,7 @@ import { wizardState, MEAL_TAGS, getSaveButtonLabel, hasDistinctEnhancedVariant 
 import { getState } from '../../store/store.js';
 import { renderTaxonomySearchHTML } from './RecipeWizardTaxonomySearch.js';
 import { toTitleCase } from '../../services/RecipeImporter.js';
+import { scaleEmbeddedVolume } from '../../services/PortionCalculationService.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -245,11 +246,15 @@ export function renderState2Mapping() {
         : '';
 
       const isStock = String(item.name || '').toLowerCase().includes('stock') || String(item.name || '').toLowerCase().includes('bouillon') || String(item.name || '').toLowerCase().includes('cube') || String(item.raw || '').toLowerCase().includes('stock') || String(item.raw || '').toLowerCase().includes('bouillon') || String(item.raw || '').toLowerCase().includes('cube');
-      if (isStock && item.waterMl === undefined) {
+      if (isStock) {
         const rawLower = String(item.raw || '').toLowerCase();
         const mlMatch = /(\d+)\s*(?:ml|millilitres|ml\b)/i.exec(rawLower);
-        item.waterMl = mlMatch ? parseInt(mlMatch[1], 10) : 400;
+        if (item.baseWaterMl === undefined) {
+          item.baseWaterMl = mlMatch ? parseInt(mlMatch[1], 10) : (item.waterMl ?? 400);
+        }
+        item.waterMl = Math.round(item.baseWaterMl * scaleFactor);
       }
+      const scaledRaw = scaleEmbeddedVolume(item.raw || '', scaleFactor);
       const waterInputHtml = isStock ? `
         <div style="margin-top: 4px; display: flex; align-items: center; gap: 4px;">
           <span id="wiz-ing-water-label-${sIdx}-${iIdx}" style="font-size: 10px; color: var(--text2, #555); white-space: nowrap;">Water Volume:</span>
@@ -270,7 +275,7 @@ export function renderState2Mapping() {
       rowsHtml += `
         <tr style="border-bottom: 1px solid var(--border, #eee);">
           <td style="padding: 6px;">
-            <div style="font-size: 11px; color: var(--text2, #666); font-style: italic;">Raw: "${escapeHtml(item.raw)}"</div>
+            <div style="font-size: 11px; color: var(--text2, #666); font-style: italic;">Raw: "${escapeHtml(scaledRaw)}"</div>
             ${fallbackBadge}
           </td>
           <td style="padding: 6px; width: 75px;">
@@ -349,9 +354,25 @@ export function renderState2Mapping() {
         ${stepsHtml || '<p style="color:var(--text2);font-size:12px;">No method steps.</p>'}
       </div>
 
+      ${(() => {
+        const allIngs = (recipe.ingredientSections || []).flatMap(s => s.ingredients || []);
+        const unlinkedIngs = allIngs.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
+        if (!unlinkedIngs.length) return '';
+        return `
+          <div class="wiz-gate-warning" id="wiz-gate-warning-banner" style="margin-bottom: 12px; padding: 10px 14px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; color: #9f1239; font-size: 12.5px; display: flex; align-items: center; gap: 8px;">
+            <span>⚠️</span> <span><strong>Action Required:</strong> ${unlinkedIngs.length} ingredient(s) retain an unlinked "✨ New Item" status. Please click the search picker for each item to select or link it to a valid Category, Item, or Sub-Type before proceeding.</span>
+          </div>
+        `;
+      })()}
+
       <div style="display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border, #eee); padding-top: 14px;">
         <button type="button" class="btn ghost" onclick="goToWizardStep(1)">← Back</button>
-        <button type="button" class="btn primary" id="btn-next-step2">Next: Final Inline Review →</button>
+        ${(() => {
+          const allIngs = (recipe.ingredientSections || []).flatMap(s => s.ingredients || []);
+          const unlinked = allIngs.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
+          const isDisabled = unlinked.length > 0;
+          return `<button type="button" class="btn primary" id="btn-next-step2" ${isDisabled ? 'disabled style="opacity:0.6; cursor:not-allowed;" title="All ingredients must be linked before proceeding"' : ''}>Next: Final Inline Review →</button>`;
+        })()}
       </div>
     </div>
   `;

@@ -183,7 +183,7 @@ export function renderPlannerWizard() {
       `;
     }
   } else if (currentStep === 4) {
-    stepContentHtml = window.GeneratorWizardModal?.renderWizardStep4Commit?.('v3.28.2-ui') || '';
+    stepContentHtml = window.GeneratorWizardModal?.renderWizardStep4Commit?.('v3.28.3') || '';
   }
 
   host.innerHTML = window.GeneratorWizardModal?.renderPlannerWizardView?.({

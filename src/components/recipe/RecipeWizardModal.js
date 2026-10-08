@@ -301,6 +301,11 @@ function bindWizardEvents() {
           item.ingredientId = null;
           item.subtypeId = null;
           item.isNewTaxonomyItem = true;
+        } else if (val.startsWith('cat:')) {
+          item.categoryId = val.replace('cat:', '');
+          item.ingredientId = null;
+          item.subtypeId = null;
+          item.isNewTaxonomyItem = false;
         } else if (val.includes(':')) {
           const [ingId, subId] = val.split(':');
           item.ingredientId = ingId;
@@ -312,13 +317,20 @@ function bindWizardEvents() {
           item.isNewTaxonomyItem = false;
         }
       }
+      renderWizardModal();
     });
 
-    // Next to Step 3
+    // Next to Step 3 with strict validation gate
     const btnNext2 = modalWrap.querySelector('#btn-next-step2');
     if (btnNext2) {
       btnNext2.onclick = () => {
         syncStep2InputsToState(modalWrap);
+        const allIngs = (wizardState.activeRecipe.ingredientSections || []).flatMap(s => s.ingredients || []);
+        const unlinked = allIngs.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
+        if (unlinked.length > 0) {
+          alert(`Cannot proceed: ${unlinked.length} ingredient(s) retain an unlinked "✨ New Item" status. Please map each ingredient to a valid Category, Item, or Sub-Type.`);
+          return;
+        }
         wizardState.currentStep = 3;
         renderWizardModal();
       };
@@ -359,11 +371,16 @@ function bindWizardEvents() {
     if (btnSave) {
       btnSave.onclick = async () => {
         syncStep3InputsToState(modalWrap);
-        btnSave.disabled = true;
-        btnSave.textContent = 'Saving...';
-
         const rec = wizardState.activeRecipe;
         const allIngredients = (rec.ingredientSections || []).flatMap(s => s.ingredients);
+        const unlinked = allIngredients.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
+        if (unlinked.length > 0) {
+          alert(`Cannot save recipe: ${unlinked.length} ingredient(s) retain an unlinked "✨ New Item" status. Please map all ingredients to the taxonomy before saving.`);
+          return;
+        }
+
+        btnSave.disabled = true;
+        btnSave.textContent = 'Saving...';
 
         const recipeToSave = {
           id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}`,
