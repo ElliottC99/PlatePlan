@@ -14,6 +14,10 @@ function showModal(html) {
   const content = document.getElementById('view-modal-content');
   if (wrap && content) {
     wrap.style.setProperty('z-index', '25005', 'important');
+    content.style.setProperty('z-index', '25005', 'important');
+    if (wrap.parentElement === document.body) {
+      document.body.appendChild(wrap);
+    }
     content.innerHTML = html;
     wrap.classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -25,6 +29,11 @@ function closeModal() {
   if (wrap) {
     wrap.classList.remove('open');
     document.body.style.overflow = '';
+  }
+  const parentWiz = document.getElementById('new-ingredient-mapping-wizard-modal');
+  if (parentWiz && parentWiz.dataset.temporarilyHidden === 'true') {
+    parentWiz.style.display = '';
+    delete parentWiz.dataset.temporarilyHidden;
   }
 }
 
@@ -198,7 +207,7 @@ export function openTescoImportModal(subtypeId, parentId) {
   const tescoSearchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(subName)}`;
 
   const html = `
-    <div style="padding: 24px; max-width: 520px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px;">
+    <div id="tesco-import-modal-container" style="position: relative; z-index: 25005; padding: 24px; max-width: 520px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px;">
       <h3 style="margin-top:0; margin-bottom: 8px; font-size: 1.15rem; font-weight: 750;">🛒 Import Product from Tesco</h3>
       <div style="margin-bottom: 16px;">
         <a href="${tescoSearchUrl}" target="_blank" rel="noopener" class="btn sm ghost" style="display:inline-flex; align-items:center; gap:6px; color:var(--primary,#4f46e5); font-weight:600; font-size:12.5px; padding:6px 12px; border:1px solid rgba(79,70,229,0.2); background:rgba(79,70,229,0.05); border-radius:8px; text-decoration:none;">
@@ -215,13 +224,16 @@ export function openTescoImportModal(subtypeId, parentId) {
       </div>
       <div id="tesco-import-error-msg" style="display:none; margin-bottom:14px;"></div>
       <div style="display:flex; gap:8px; justify-content: flex-end;">
-        <button type="button" class="btn" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn" id="btn-cancel-tesco-import" onclick="window.closeSubtypeActionModal()">Cancel</button>
         <button type="button" class="btn primary" id="btn-review-tesco-import">Review Import Data</button>
       </div>
     </div>
   `;
 
   showModal(html);
+
+  const cancelBtn = document.getElementById('btn-cancel-tesco-import');
+  if (cancelBtn) cancelBtn.onclick = () => closeModal();
 
   const jsonInput = document.getElementById('tesco-json-input');
   const errorMsg = document.getElementById('tesco-import-error-msg');

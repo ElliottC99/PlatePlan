@@ -80,6 +80,9 @@ try{
   backdrop-filter: blur(14px) saturate(160%);
   -webkit-backdrop-filter: blur(14px) saturate(160%);
 }
+#view-modal-wrap, #tesco-modal-wrap, #manual-ing-panel {
+  z-index: 25005 !important;
+}
 .modal-close-btn {
   background: var(--surface2, #f1f5f9);
   border: 1px solid var(--border, #e2e8f0);
@@ -574,7 +577,7 @@ try{
   </div>
 </div>
 
-<div class="modal-wrap" id="tesco-modal-wrap" style="z-index: 170;">
+<div class="modal-wrap" id="tesco-modal-wrap" style="z-index: 25005 !important;">
   <div class="modal" style="max-width: 980px;">
     <div class="row-between" style="margin-bottom:14px;align-items:center">
       <h2 id="tesco-import-title" style="margin:0">Import Tesco product</h2>
@@ -1318,8 +1321,8 @@ try{
   </div>
 </div>
 
-<div class="modal-wrap" id="view-modal-wrap">
-  <div class="modal" id="view-modal-content" style="max-width: 1040px;"></div>
+<div class="modal-wrap" id="view-modal-wrap" style="z-index: 25005 !important;">
+  <div class="modal" id="view-modal-content" style="max-width: 1040px; z-index: 25005;"></div>
 </div>
 
 <script type="application/json" id="baked-state">{}</script>

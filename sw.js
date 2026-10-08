@@ -5,8 +5,8 @@
  */
 
 const PLATEPLAN_CACHE = 'plateplan-cache-v3.28.6';
-const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.28.6';
 const PLATEPLAN_STORE_CACHE = 'plateplan_store_cache_v3.28.6';
+const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.28.6';
 const PLATEPLAN_APP_VERSION = 'v3.28.6';
 const PLATEPLAN_BUILD_ID = '3.28.6-v288';
 

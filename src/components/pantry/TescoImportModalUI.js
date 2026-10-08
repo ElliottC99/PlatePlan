@@ -14,6 +14,10 @@ function showModal(html) {
   const content = document.getElementById('view-modal-content');
   if (wrap && content) {
     wrap.style.setProperty('z-index', '25005', 'important');
+    content.style.setProperty('z-index', '25005', 'important');
+    if (wrap.parentElement === document.body) {
+      document.body.appendChild(wrap);
+    }
     content.innerHTML = html;
     wrap.classList.add('open');
     document.body.style.overflow = 'hidden';
