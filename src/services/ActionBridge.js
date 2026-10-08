@@ -251,6 +251,14 @@ export function routeAction(actionName, target, event) {
     return true;
   }
 
+  if (normalizedAction.includes('openrecipeauditmodal')) {
+    if (typeof window.openRecipeAuditModal === 'function') {
+      const recId = ds.recipeId || parseArgsString(actionName)[0] || null;
+      window.openRecipeAuditModal(recId);
+    }
+    return true;
+  }
+
   // 5. Shopping Item Acquired Checkbox
   if (normalizedAction === 'toggle-shopping-item' || normalizedAction === 'toggle-shopping-at-home' || normalizedAction === 'toggleshoppingathome' || normalizedAction.includes('toggleshoppingathome')) {
     const containerEl = target.closest('[data-item-key], [data-group-key], [data-group-id], .pp-shop-item, .shopping-list-row, .item-row') || target;

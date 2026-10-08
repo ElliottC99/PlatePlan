@@ -17,7 +17,7 @@ function escapeHtml(value) {
 /**
  * Renders system and display parameters card.
  */
-export function renderSystemDisplayCard(theme = 'system', version = 'v3.29.1 (ES6 Modern)') {
+export function renderSystemDisplayCard(theme = 'system', version = 'v3.30.0 (ES6 Modern)') {
   return `
     <div class="pp-settings-card" id="pp-system-display-card">
       <div class="pp-settings-title" style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 12px 0;display:flex;align-items:center;gap:8px">
@@ -45,6 +45,9 @@ export function renderSystemDisplayCard(theme = 'system', version = 'v3.29.1 (ES
         </button>
         <button id="pp-refresh-data-btn" style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;padding:10px 18px;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer">
           Refresh Household Data
+        </button>
+        <button type="button" id="pp-recipe-audit-btn" style="background:#4f46e5;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer">
+          📖 Recipe Mapping Audit
         </button>
       </div>
     </div>

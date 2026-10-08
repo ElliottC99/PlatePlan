@@ -1,9 +1,9 @@
 /**
- * src/components/shell/HeaderUI.js (v3.29.1)
+ * src/components/shell/HeaderUI.js (v3.30.0)
  * Modular Presentation Component for Application Header & Sync Controls
  */
 
-export function renderHeaderUI({ version = 'v3.29.1', syncStatus = 'Local only', userEmail = '' } = {}) {
+export function renderHeaderUI({ version = 'v3.30.0', syncStatus = 'Local only', userEmail = '' } = {}) {
   return `
     <header class="app-header">
       <div class="logo" style="display:flex;align-items:center;gap:6px">

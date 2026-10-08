@@ -151,9 +151,19 @@ export function renderSettingsView() {
   const householdHtml = renderHouseholdSyncCard(settings);
   const dietaryHtml = renderDietaryExclusionManager(prefs, settings);
   const profileHtml = renderProfileAllocationCard(prefs);
-  const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.29.1 (ES6 Modern)');
+  const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.30.0 (ES6 Modern)');
 
   container.innerHTML = renderSettingsContainer(householdHtml, dietaryHtml, profileHtml, systemHtml);
+
+  // Attach Recipe Audit modal listener
+  const recipeAuditBtn = container.querySelector('#pp-recipe-audit-btn');
+  if (recipeAuditBtn) {
+    recipeAuditBtn.onclick = () => {
+      if (typeof window.openRecipeAuditModal === 'function') {
+        window.openRecipeAuditModal();
+      }
+    };
+  }
 
   // Attach Save listener
   const saveBtn = container.querySelector('#pp-save-settings-btn');
