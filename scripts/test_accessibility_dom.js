@@ -4,16 +4,34 @@
  * in view templates have explicit 'id', 'name', and are properly labeled (via aria-label, aria-labelledby, or <label for="...">).
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { strict as assert } from 'assert';
 
 console.log('=== RUNNING STATIC DOM ACCESSIBILITY REGRESSION TEST ===');
 
+function walkDir(dir) {
+  let results = [];
+  const list = readdirSync(dir);
+  list.forEach(file => {
+    const fullPath = join(dir, file);
+    const stat = statSync(fullPath);
+    if (stat && stat.isDirectory()) {
+      results = results.concat(walkDir(fullPath));
+    } else if (fullPath.endsWith('.js') || fullPath.endsWith('.html')) {
+      results.push(fullPath);
+    }
+  });
+  return results;
+}
+
 const filesToScan = [
   'src/components/recipe/RecipeWizardViews.js',
   'src/components/recipe/RecipeWizardTaxonomySearch.js',
-  'src/components/pantry/CategoryManagerModalUI.js'
+  'src/components/pantry/CategoryManagerModalUI.js',
+  'src/components/recipe/RecipeWizardTaxonomyModal.js',
+  'src/components/recipe-editor/RecipeIngredientRow.js',
+  'PlatePlan.html'
 ];
 
 let totalErrors = 0;
@@ -29,7 +47,7 @@ function escapeHtml(str) {
 }
 
 filesToScan.forEach(file => {
-  const filePath = join(process.cwd(), file);
+  const filePath = file.startsWith(process.cwd()) ? file : join(process.cwd(), file);
   let content;
   try {
     content = readFileSync(filePath, 'utf8');

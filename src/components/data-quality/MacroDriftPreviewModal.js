@@ -72,7 +72,7 @@ export function openMacroDriftPreviewModal(recipesToRecalibrate = []) {
   const tableRows = previewData.map((d, index) => `
     <tr style="border-bottom: 1px solid var(--border,#e7e5e4); font-size:12.5px;">
       <td style="padding:12px 8px; text-align:left;">
-        <input type="checkbox" class="drift-rec-cb" data-index="${index}" checked style="width:16px; height:16px; accent-color:var(--primary,#4f46e5); cursor:pointer;" />
+        <input type="checkbox" class="drift-rec-cb" data-index="${index}" checked style="width:16px; height:16px; accent-color:var(--primary,#4f46e5); cursor:pointer;" name="${index}" />
       </td>
       <td style="padding:12px 8px; font-weight:700; text-align:left; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
         ${escapeHtml(d.recipe.name || d.recipe.title)}
@@ -104,7 +104,7 @@ export function openMacroDriftPreviewModal(recipesToRecalibrate = []) {
           <thead>
             <tr style="background:#e7e5e4; font-size:11px; font-weight:800; color:var(--text2); text-transform:uppercase; border-bottom:2px solid #d6d3d1;">
               <th style="padding:10px 8px; text-align:left; width:40px;">
-                <input type="checkbox" id="drift-select-all" checked style="width:16px; height:16px; cursor:pointer;" />
+                <input type="checkbox" id="drift-select-all" checked style="width:16px; height:16px; cursor:pointer;" name="drift-select-all" />
               </th>
               <th style="padding:10px 8px; text-align:left;">Recipe</th>
               <th style="padding:10px 8px;">Stored Macros</th>

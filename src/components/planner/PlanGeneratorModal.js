@@ -28,15 +28,15 @@ export function openPlanGeneratorModal() {
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:12px; background:var(--surface2, #f8f8f5); padding:16px; border-radius:12px; border:1px solid var(--border,#e0e0e0);">
         <div>
           <label style="font-size:11px; font-weight:700; color:var(--text2); display:block; margin-bottom:4px;">TARGET DAILY PROTEIN (g)</label>
-          <input type="number" id="gen-target-protein" value="${currentTargets.protein}" class="input" style="width:100%; font-weight:700;" min="50" max="250">
+          <input type="number" id="gen-target-protein" value="${currentTargets.protein}" class="input" style="width:100%; font-weight:700;" min="50" max="250" name="gen-target-protein">
         </div>
         <div>
           <label style="font-size:11px; font-weight:700; color:var(--text2); display:block; margin-bottom:4px;">TARGET DAILY CALORIES (kcal)</label>
-          <input type="number" id="gen-target-calories" value="${currentTargets.calories}" class="input" style="width:100%; font-weight:700;" min="1000" max="4000">
+          <input type="number" id="gen-target-calories" value="${currentTargets.calories}" class="input" style="width:100%; font-weight:700;" min="1000" max="4000" name="gen-target-calories">
         </div>
         <div>
           <label style="font-size:11px; font-weight:700; color:var(--text2); display:block; margin-bottom:4px;">DURATION (DAYS)</label>
-          <select id="gen-days" class="select" style="width:100%; font-weight:700;">
+          <select id="gen-days" class="select" style="width:100%; font-weight:700;" name="gen-days">
             <option value="7" selected>7 Days (Weekly)</option>
             <option value="5">5 Days (Weekdays)</option>
             <option value="3">3 Days (Short Rotation)</option>
@@ -46,11 +46,11 @@ export function openPlanGeneratorModal() {
 
       <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap; font-size:13px; font-weight:600;">
         <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-          <input type="checkbox" id="gen-prioritize-pantry" checked style="width:16px; height:16px;">
+          <input type="checkbox" id="gen-prioritize-pantry" checked style="width:16px; height:16px;" name="gen-prioritize-pantry">
           <span>🔥 Prioritize Expiring Pantry Items</span>
         </label>
         <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-          <input type="checkbox" id="gen-protein-rotation" checked style="width:16px; height:16px;">
+          <input type="checkbox" id="gen-protein-rotation" checked style="width:16px; height:16px;" name="gen-protein-rotation">
           <span>🔄 High-Protein Vegetarian Rotation</span>
         </label>
       </div>

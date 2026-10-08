@@ -103,12 +103,12 @@ export function openEditSubtypeModal(subtypeId, parentId) {
       
       <div class="field" style="margin-bottom: 12px;">
         <label for="edit-sub-name" style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">Sub-type Name</label>
-        <input type="text" id="edit-sub-name" class="input" value="${escapeHTML(sub.name)}" style="width:100%;" />
+        <input type="text" id="edit-sub-name" class="input" value="${escapeHTML(sub.name)}" style="width:100%;" name="edit-sub-name" />
       </div>
 
       <div class="field" style="margin-bottom: 16px;">
         <label for="edit-sub-notes" style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">Notes</label>
-        <textarea id="edit-sub-notes" class="input" style="width:100%; min-height: 70px;">${escapeHTML(sub.notes || '')}</textarea>
+        <textarea id="edit-sub-notes" class="input" style="width:100%; min-height: 70px;" name="edit-sub-notes">${escapeHTML(sub.notes || '')}</textarea>
       </div>
 
       <div style="margin-bottom: 20px;">
@@ -204,7 +204,7 @@ export function openSubtypeReorganizeModal(subtypeId, parentId) {
       <div style="padding: 12px; border: 1px solid var(--border,#e7e5e4); border-radius: 8px; margin-bottom: 12px; background: #fafaf9;">
         <div style="font-weight: 750; font-size: 13px; margin-bottom: 6px;">📦 Option B: Move to another Parent Ingredient</div>
         <div style="display:flex; gap:8px;">
-          <select id="reorg-move-select" style="flex:1; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:12px;">
+          <select id="reorg-move-select" style="flex:1; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:12px;" name="reorg-move-select">
             ${targetParents.map(p => `<option value="${escapeHTML(p.id)}">${escapeHTML(p.name)} (${escapeHTML(p.category || 'Other')})</option>`).join('')}
           </select>
           <button type="button" class="btn sm" id="btn-reorg-move">Move</button>
@@ -213,7 +213,7 @@ export function openSubtypeReorganizeModal(subtypeId, parentId) {
       <div style="padding: 12px; border: 1px solid var(--border,#e7e5e4); border-radius: 8px; margin-bottom: 20px; background: #fafaf9;">
         <div style="font-weight: 750; font-size: 13px; margin-bottom: 6px;">🔀 Option C: Merge into another Sub-type sibling</div>
         <div style="display:flex; gap:8px;">
-          <select id="reorg-merge-select" style="flex:1; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:12px;" ${siblingSubtypes.length === 0 ? 'disabled' : ''}>
+          <select id="reorg-merge-select" style="flex:1; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:12px;" ${siblingSubtypes.length === 0 ? 'disabled' : ''} name="reorg-merge-select">
             ${siblingSubtypes.map(s => `<option value="${escapeHTML(s.id)}">${escapeHTML(s.name)}</option>`).join('') || '<option>No siblings available</option>'}
           </select>
           <button type="button" class="btn sm" id="btn-reorg-merge" ${siblingSubtypes.length === 0 ? 'disabled' : ''}>Merge</button>
@@ -291,7 +291,7 @@ export function openSubtypeAliasModal(subtypeId, parentId) {
       </div>
       <div style="display:flex; gap:6px; margin-bottom: 20px;">
         <label for="new-alias-input" style="display:none;">Add New Alias</label>
-        <input type="text" id="new-alias-input" placeholder="e.g. Sourdough loaf" style="flex:1; padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-size: 12px;" />
+        <input type="text" id="new-alias-input" placeholder="e.g. Sourdough loaf" style="flex:1; padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-size: 12px;" name="new-alias-input" />
         <button type="button" class="btn primary sm" id="btn-add-alias">Add Alias</button>
       </div>
       <div style="display:flex; justify-content: flex-end;">

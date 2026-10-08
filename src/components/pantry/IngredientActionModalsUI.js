@@ -52,7 +52,7 @@ export function promptAddAlias(ingId, parentId = null) {
       </div>
 
       <div style="display:flex; gap:6px; margin-bottom: 20px;">
-        <input type="text" id="new-ing-alias-input" placeholder="e.g. Sourdough loaf" style="flex:1; padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-size: 12px;" />
+        <input type="text" id="new-ing-alias-input" placeholder="e.g. Sourdough loaf" style="flex:1; padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-size: 12px;" name="new-ing-alias-input" />
         <button type="button" class="btn primary sm" id="btn-add-ing-alias">Add Alias</button>
       </div>
 
@@ -154,7 +154,7 @@ export function promptDemote(ingId, parentId = null) {
       <p style="font-size: 13px; color: var(--text2); margin-bottom: 16px;">Select which parent ingredient you want to nest this under as a child sub-type.</p>
 
       <div style="display:flex; gap:8px; margin-bottom: 20px;">
-        <select id="demote-parent-select" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:6px; font-size:12px;">
+        <select id="demote-parent-select" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:6px; font-size:12px;" name="demote-parent-select">
           ${candidates.map(c => `<option value="${escapeHTML(c.id)}">${escapeHTML(c.name)} (${escapeHTML(c.category || 'Other')})</option>`).join('')}
         </select>
       </div>
@@ -194,7 +194,7 @@ export function promptMerge(sourceId, parentId = null) {
       <p style="font-size: 13px; color: var(--text2); margin-bottom: 16px;">Select another ingredient to merge into. This will combine all aliases, sub-types, and products into the target.</p>
 
       <div style="display:flex; gap:8px; margin-bottom: 20px;">
-        <select id="merge-target-select" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:6px; font-size:12px;">
+        <select id="merge-target-select" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:6px; font-size:12px;" name="merge-target-select">
           ${candidates.map(c => `<option value="${escapeHTML(c.id)}">${escapeHTML(c.name)} (${escapeHTML(c.category || 'Other')})</option>`).join('')}
         </select>
       </div>
@@ -327,7 +327,7 @@ export function openIngredientReorganiseModal(ingredientId) {
         <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">🔀 Option A: Merge into another Ingredient</div>
         <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Transfers all sub-types, linked products, and aliases to the target ingredient before removing this source.</p>
         <div style="display:flex; gap:8px;">
-          <select id="reorg-ing-merge-select" style="flex:1; padding:7px; border:1px solid var(--border,#e7e5e4); border-radius:6px; font-size:12px; background:#fff;" ${targetCandidates.length === 0 ? 'disabled' : ''}>
+          <select id="reorg-ing-merge-select" style="flex:1; padding:7px; border:1px solid var(--border,#e7e5e4); border-radius:6px; font-size:12px; background:#fff;" ${targetCandidates.length === 0 ? 'disabled' : ''} name="reorg-ing-merge-select">
             ${targetCandidates.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${escapeHTML(c.category || 'Other')})</option>`).join('') || '<option>No other ingredients available</option>'}
           </select>
           <button type="button" class="btn primary sm" id="btn-reorg-ing-merge" ${targetCandidates.length === 0 ? 'disabled' : ''}>Merge</button>
@@ -338,7 +338,7 @@ export function openIngredientReorganiseModal(ingredientId) {
         <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">⬇️ Option B: Convert to Sub-type of...</div>
         <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Nests this ingredient as a child sub-type under the chosen parent, preserving all linked products.</p>
         <div style="display:flex; gap:8px;">
-          <select id="reorg-ing-demote-select" style="flex:1; padding:7px; border:1px solid var(--border,#e7e5e4); border-radius:6px; font-size:12px; background:#fff;" ${targetCandidates.length === 0 ? 'disabled' : ''}>
+          <select id="reorg-ing-demote-select" style="flex:1; padding:7px; border:1px solid var(--border,#e7e5e4); border-radius:6px; font-size:12px; background:#fff;" ${targetCandidates.length === 0 ? 'disabled' : ''} name="reorg-ing-demote-select">
             ${targetCandidates.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${escapeHTML(c.category || 'Other')})</option>`).join('') || '<option>No parent ingredients available</option>'}
           </select>
           <button type="button" class="btn primary sm" id="btn-reorg-ing-demote" ${targetCandidates.length === 0 ? 'disabled' : ''}>Convert</button>

@@ -155,11 +155,11 @@ export function promptReallocateProduct(productId) {
           <div style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
             <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
               <label for="new-reallocate-ingredient-name" style="font-size: 12px; font-weight: 600; color: #666;">Ingredient Name</label>
-              <input type="text" id="new-reallocate-ingredient-name" placeholder="e.g. Granulated Sugar" style="width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; box-sizing: border-box;" />
+              <input type="text" id="new-reallocate-ingredient-name" placeholder="e.g. Granulated Sugar" style="width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; box-sizing: border-box;" name="new-reallocate-ingredient-name" />
             </div>
             <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
               <label for="new-reallocate-ingredient-category" style="font-size: 12px; font-weight: 600; color: #666;">Category</label>
-              <input type="text" id="new-reallocate-ingredient-category" list="reallocate-categories-datalist" placeholder="Search existing or type new category..." style="width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; box-sizing: border-box;" />
+              <input type="text" id="new-reallocate-ingredient-category" list="reallocate-categories-datalist" placeholder="Search existing or type new category..." style="width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; box-sizing: border-box;" name="new-reallocate-ingredient-category" />
               <datalist id="reallocate-categories-datalist"></datalist>
             </div>
             <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
@@ -169,7 +169,7 @@ export function promptReallocateProduct(productId) {
           </div>
         </div>
 
-        <input type="text" id="realloc-ing-search" class="input" placeholder="🔍 Type ingredient or category name..." style="width:100%; min-height:44px; padding:0 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:14px; box-sizing:border-box;" />
+        <input type="text" id="realloc-ing-search" class="input" placeholder="🔍 Type ingredient or category name..." style="width:100%; min-height:44px; padding:0 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:14px; box-sizing:border-box;" name="realloc-ing-search" />
         <div id="realloc-ing-results" style="margin-top:6px; max-height:140px; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:8px; background:var(--surface2,#f5f5f4); padding:4px;"></div>
       </div>
 
@@ -182,14 +182,14 @@ export function promptReallocateProduct(productId) {
         <div id="realloc-create-sub-panel" style="display:none; padding:12px; background:var(--surface2,#f5f5f4); border:1px solid var(--border,#e7e5e4); border-radius:8px; margin-bottom:8px;">
           <div style="font-weight:700; font-size:12px; margin-bottom:6px;">Create Sub-type for Selected Ingredient</div>
           <div style="display:flex; gap:6px; margin-bottom:6px;">
-            <input type="text" id="new-sub-name-input" placeholder="Sub-type name (e.g. Sourdough)..." style="flex:1; min-height:40px; padding:0 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; box-sizing:border-box;" />
+            <input type="text" id="new-sub-name-input" placeholder="Sub-type name (e.g. Sourdough)..." style="flex:1; min-height:40px; padding:0 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; box-sizing:border-box;" name="new-sub-name-input" />
           </div>
           <div style="display:flex; gap:6px; justify-content:flex-end;">
             <button type="button" class="btn xs ghost" id="btn-cancel-create-sub" style="min-height:36px; padding:0 12px;">Cancel</button>
             <button type="button" class="btn xs primary" id="btn-save-create-sub" style="min-height:36px; padding:0 12px;">Add Sub-type</button>
           </div>
         </div>
-        <input type="text" id="realloc-sub-search" class="input" placeholder="🔍 Filter sub-types..." style="width:100%; min-height:44px; padding:0 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:14px; box-sizing:border-box;" />
+        <input type="text" id="realloc-sub-search" class="input" placeholder="🔍 Filter sub-types..." style="width:100%; min-height:44px; padding:0 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:14px; box-sizing:border-box;" name="realloc-sub-search" />
         <div id="realloc-sub-results" style="margin-top:6px; max-height:120px; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:8px; background:var(--surface2,#f5f5f4); padding:4px;"></div>
       </div>
 

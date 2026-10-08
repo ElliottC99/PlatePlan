@@ -79,12 +79,12 @@ export function renderFitScoreScopeUI({ minVal = 0, maxVal = 100 } = {}) {
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <div style="display:flex;align-items:center;gap:4px">
-            <span style="font-size:11px;font-weight:600;color:var(--text2,#64748b)">Min:</span>
+            <label for="wizard-fit-score-min" style="font-size:11px;font-weight:600;color:var(--text2,#64748b);cursor:pointer">Min:</label>
             <input type="number" id="wizard-fit-score-min" name="minFitScore" aria-label="Minimum Fit Score" min="0" max="100" value="${min}" style="width:58px;padding:4px 6px;font-size:12px;border:1px solid var(--border,#cbd5e1);border-radius:6px;background:#fff;font-weight:600" onchange="window.handleFitScoreMinChange(this.value)">
           </div>
           <span style="font-size:12px;color:var(--text2,#64748b)">–</span>
           <div style="display:flex;align-items:center;gap:4px">
-            <span style="font-size:11px;font-weight:600;color:var(--text2,#64748b)">Max:</span>
+            <label for="wizard-fit-score-max" style="font-size:11px;font-weight:600;color:var(--text2,#64748b);cursor:pointer">Max:</label>
             <input type="number" id="wizard-fit-score-max" name="maxFitScore" aria-label="Maximum Fit Score" min="0" max="100" value="${max}" style="width:58px;padding:4px 6px;font-size:12px;border:1px solid var(--border,#cbd5e1);border-radius:6px;background:#fff;font-weight:600" onchange="window.handleFitScoreMaxChange(this.value)">
           </div>
         </div>
@@ -201,7 +201,8 @@ function renderPersonSplitColumn(personKey, personLabel, dayIndex, mealType, per
           ${(isSkipped || pinnedName) ? `<button type="button" class="btn sm btn-ghost ghost" style="font-size:11px;padding:4px 6px" onclick="window.setSplitPersonSlotStatus(${dayIndex}, '${mealType}', '${personKey}', 'unassigned')">Reset</button>` : ''}
         </div>
       </div>
-      <input type="search" id="slot-config-search-${personKey}" aria-label="Search recipe for ${personLabel}" placeholder="Search recipe for ${personLabel}..." class="input sm" style="width:100%;background:#fff" oninput="window.filterSlotConfigRecipes(this.value, '${personKey}')">
+      <label for="slot-config-search-${personKey}" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Search recipe for ${personLabel}</label>
+      <input type="search" id="slot-config-search-${personKey}" aria-label="Search recipe for ${personLabel}" placeholder="Search recipe for ${personLabel}..." class="input sm" style="width:100%;background:#fff" oninput="window.filterSlotConfigRecipes(this.value, '${personKey}')" name="slot-config-search-personKey">
       <div id="slot-config-recipe-list-${personKey}" style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
         ${renderRecipeCandidateRows(recipes, { dayIndex, mealType, person: personKey, query: '', skeletonGrid })}
       </div>
@@ -259,7 +260,7 @@ export function openSlotConfigurator(dayIndex, mealType, forceSplitMode = null) 
         ${!isSplit ? `
           <div style="border-top:1px solid #e2e8f0;padding-top:10px">
             <label for="slot-config-recipe-search" style="font-size:12px;font-weight:700;color:#334155;display:block;margin-bottom:6px">📌 Pin Shared Recipe (Applies to Both)</label>
-            <input type="search" id="slot-config-recipe-search" aria-label="Search recipe to pin" placeholder="Search recipe name..." class="input sm" style="width:100%;margin-bottom:8px" oninput="window.filterSlotConfigRecipes(this.value, 'both')">
+            <input type="search" id="slot-config-recipe-search" aria-label="Search recipe to pin" placeholder="Search recipe name..." class="input sm" style="width:100%;margin-bottom:8px" oninput="window.filterSlotConfigRecipes(this.value, 'both')" name="slot-config-recipe-search">
             <div id="slot-config-recipe-list-both" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
               ${renderRecipeCandidateRows(recipes, { dayIndex, mealType, person: 'both', query: '', skeletonGrid })}
             </div>

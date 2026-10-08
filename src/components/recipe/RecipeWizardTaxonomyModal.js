@@ -71,10 +71,10 @@ export function openTaxonomyCreationModal({ sIdx, iIdx, initialName = '', onComp
       <form id="wizard-tax-form" style="display: flex; flex-direction: column; gap: 14px;">
         <!-- 1. Sub-Type Name -->
         <div>
-          <label style="display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 4px; color: var(--text);">
+          <label for="tax-sub-name" style="display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 4px; color: var(--text);">
             1) Sub-Type / Item Name <span style="color:#dc2626">*</span>
           </label>
-          <input type="text" id="tax-sub-name" value="${escapeAttr(cleanInitialName)}" required placeholder="e.g. Extra Firm Tofu, Smoked Paprika" style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface); color: var(--text);" />
+          <input type="text" id="tax-sub-name" value="${escapeAttr(cleanInitialName)}" required placeholder="e.g. Extra Firm Tofu, Smoked Paprika" style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface); color: var(--text);" name="tax-sub-name" />
           <small style="font-size: 11px; color: var(--text2, #666);">Normalized to Title Case upon saving.</small>
         </div>
 
@@ -84,38 +84,41 @@ export function openTaxonomyCreationModal({ sIdx, iIdx, initialName = '', onComp
             2) Parent Ingredient Family
           </label>
           <div style="display: flex; gap: 16px; margin-bottom: 10px;">
-            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; cursor: pointer;">
-              <input type="radio" name="tax-parent-type" value="existing" ${ingredients.length ? 'checked' : ''} />
+            <label for="tax-parent-type-existing" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; cursor: pointer;">
+              <input type="radio" id="tax-parent-type-existing" name="tax-parent-type" value="existing" ${ingredients.length ? 'checked' : ''} />
               <span>Link to Existing Parent</span>
             </label>
-            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; cursor: pointer;">
-              <input type="radio" name="tax-parent-type" value="new" ${!ingredients.length ? 'checked' : ''} />
+            <label for="tax-parent-type-new" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; cursor: pointer;">
+              <input type="radio" id="tax-parent-type-new" name="tax-parent-type" value="new" ${!ingredients.length ? 'checked' : ''} />
               <span>Create New Parent</span>
             </label>
           </div>
 
           <div id="tax-parent-existing-box" style="${ingredients.length ? 'display: block;' : 'display: none;'}">
-            <select id="tax-parent-select" style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface);">
+            <label for="tax-parent-select" class="sr-only">Parent Ingredient Select</label>
+            <select id="tax-parent-select" style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface);" name="tax-parent-select">
               ${parentOptionsHtml || '<option value="">No existing ingredients</option>'}
             </select>
           </div>
 
           <div id="tax-parent-new-box" style="${!ingredients.length ? 'display: block;' : 'display: none;'}">
-            <input type="text" id="tax-new-parent-name" placeholder="e.g. Tofu, Paprika, Stock Cubes" value="${escapeAttr(cleanInitialName)}" style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface);" />
+            <label for="tax-new-parent-name" class="sr-only">New Parent Ingredient Name</label>
+            <input type="text" id="tax-new-parent-name" placeholder="e.g. Tofu, Paprika, Stock Cubes" value="${escapeAttr(cleanInitialName)}" style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface);" name="tax-new-parent-name" />
           </div>
         </div>
 
         <!-- 3. Supermarket Category / Aisle -->
         <div>
-          <label style="display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 4px; color: var(--text);">
+          <label for="tax-cat-select" style="display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 4px; color: var(--text);">
             3) Supermarket Category / Aisle <span style="color:#dc2626">*</span>
           </label>
           <div style="display: flex; gap: 8px;">
-            <select id="tax-cat-select" style="flex: 1; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface);">
+            <select id="tax-cat-select" style="flex: 1; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface);" name="tax-cat-select">
               ${categoryOptionsHtml}
               <option value="__custom__">+ Add Custom Category...</option>
             </select>
-            <input type="text" id="tax-custom-cat" placeholder="Category Name" style="display:none; flex: 1; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface);" />
+            <label for="tax-custom-cat" class="sr-only">Custom Category Name</label>
+            <input type="text" id="tax-custom-cat" placeholder="Category Name" style="display:none; flex: 1; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface);" name="tax-custom-cat" />
           </div>
         </div>
 
@@ -126,17 +129,17 @@ export function openTaxonomyCreationModal({ sIdx, iIdx, initialName = '', onComp
           </label>
           <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-bottom: 8px;">
             <div>
-              <label style="display: block; font-size: 11px; color: var(--text2); margin-bottom: 2px;">Product Title</label>
-              <input type="text" id="tax-prod-name" value="${escapeAttr(cleanInitialName)}" placeholder="e.g. Organic Firm Tofu 400g" style="width: 100%; padding: 7px 9px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px; background: var(--surface);" />
+              <label for="tax-prod-name" style="display: block; font-size: 11px; color: var(--text2); margin-bottom: 2px;">Product Title</label>
+              <input type="text" id="tax-prod-name" value="${escapeAttr(cleanInitialName)}" placeholder="e.g. Organic Firm Tofu 400g" style="width: 100%; padding: 7px 9px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px; background: var(--surface);" name="tax-prod-name" />
             </div>
             <div>
-              <label style="display: block; font-size: 11px; color: var(--text2); margin-bottom: 2px;">Store / Brand</label>
-              <input type="text" id="tax-prod-brand" value="Tesco" placeholder="e.g. Tesco, Kallo" style="width: 100%; padding: 7px 9px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px; background: var(--surface);" />
+              <label for="tax-prod-brand" style="display: block; font-size: 11px; color: var(--text2); margin-bottom: 2px;">Store / Brand</label>
+              <input type="text" id="tax-prod-brand" value="Tesco" placeholder="e.g. Tesco, Kallo" style="width: 100%; padding: 7px 9px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px; background: var(--surface);" name="tax-prod-brand" />
             </div>
           </div>
           <div>
-            <label style="display: block; font-size: 11px; color: var(--text2); margin-bottom: 2px;">Pack Size / Quantity</label>
-            <input type="text" id="tax-prod-size" value="1 pack" placeholder="e.g. 400g, 1 pack, 6 pack" style="width: 100%; padding: 7px 9px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px; background: var(--surface);" />
+            <label for="tax-prod-size" style="display: block; font-size: 11px; color: var(--text2); margin-bottom: 2px;">Pack Size / Quantity</label>
+            <input type="text" id="tax-prod-size" value="1 pack" placeholder="e.g. 400g, 1 pack, 6 pack" style="width: 100%; padding: 7px 9px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px; background: var(--surface);" name="tax-prod-size" />
           </div>
         </div>
 

@@ -18,6 +18,7 @@ const DB_VERSION = 1;
 const CACHE_KEY = 'plateplan_store_cache_v3.28.2-ui';
 
 const state = {
+  version: 'v3.28.2-ui',
   recipes: [],
   ingredients: [],
   products: [],
@@ -708,4 +709,5 @@ if (typeof window !== 'undefined') {
     subscribe,
     learnIngredientAlias
   };
+  window.store = window.Store;
 }

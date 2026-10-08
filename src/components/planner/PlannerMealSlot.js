@@ -148,7 +148,7 @@ export function ensureSearchableRecipeSwapModalDom() {
           <button type="button" class="btn ghost sm" onclick="window.PlannerMealSlot?.closeSearchableRecipeSwapModal?.() || (window.closeSearchableRecipeSwapModal && window.closeSearchableRecipeSwapModal())" style="font-size: 18px; line-height: 1; padding: 4px 8px;">✕</button>
         </div>
         <div style="padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--surface);">
-          <input type="search" id="swap-modal-search" class="input" placeholder="Type recipe name, ingredient (e.g. chicken, tofu), or tag..." style="width: 100%; font-size: 14px; padding: 8px 12px;" oninput="window.PlannerMealSlot?.filterSearchableRecipeSwapModal?.(this.value) || (window.filterSearchableRecipeSwapModal && window.filterSearchableRecipeSwapModal(this.value))" autofocus>
+          <input type="search" id="swap-modal-search" aria-label="Search recipe to swap" class="input" placeholder="Type recipe name, ingredient (e.g. chicken, tofu), or tag..." style="width: 100%; font-size: 14px; padding: 8px 12px;" oninput="window.PlannerMealSlot?.filterSearchableRecipeSwapModal?.(this.value) || (window.filterSearchableRecipeSwapModal && window.filterSearchableRecipeSwapModal(this.value))" autofocus name="swap-modal-search">
         </div>
         <div id="swap-modal-results" style="flex: 1; overflow-y: auto; padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; max-height: 55vh;"></div>
         <div style="padding: 12px 20px; border-top: 1px solid var(--border); background: var(--surface2); display: flex; justify-content: flex-end;">

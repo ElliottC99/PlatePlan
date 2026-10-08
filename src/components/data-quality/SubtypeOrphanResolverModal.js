@@ -51,14 +51,14 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
           ${escapeHtml(p.name)} <br /><span style="font-size:10.5px; font-weight:normal; color:var(--text2);">${escapeHtml(p.brand || 'No Brand')}</span>
         </td>
         <td style="padding:10px 8px; text-align:center;">
-          <select class="orphan-action-select" data-index="${idx}" data-prod-id="${escapeHtml(p.id)}" style="padding:6px; font-size:11.5px; border-radius:6px; border:1px solid var(--border); background:#fff; width:100%; max-width:200px; margin-bottom:4px;">
+          <select class="orphan-action-select" data-index="${idx}" data-prod-id="${escapeHtml(p.id)}" style="padding:6px; font-size:11.5px; border-radius:6px; border:1px solid var(--border); background:#fff; width:100%; max-width:200px; margin-bottom:4px;" name="escapeHtml(p.id)">
             <option value="convert" selected>Convert to Parent-level (${escapeHtml(parent?.name || 'Ingredient')})</option>
             ${subtypeOptions}
             <option value="NEW_SUBTYPE">+ Create New Sub-Type...</option>
             <option value="delete">🗑️ Delete Product from Catalog</option>
           </select>
           <div class="new-subtype-container" style="display:none; margin-top:4px;">
-            <input type="text" class="new-subtype-name-input" placeholder="New sub-type name..." style="width:100%; padding:4px 6px; font-size:11px; border:1px solid var(--border); border-radius:4px;" />
+            <input type="text" class="new-subtype-name-input" placeholder="New sub-type name..." style="width:100%; padding:4px 6px; font-size:11px; border:1px solid var(--border); border-radius:4px;" name="new-sub-type-name" />
           </div>
         </td>
       </tr>
@@ -81,7 +81,7 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
       <div style="background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px; padding:10px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
         <span style="font-size:11.5px; font-weight:700; color:#3730a3;">⚡ Apply Batch Resolution:</span>
         <div style="display:flex; gap:6px;">
-          <select id="batch-resolution-select" style="padding:5px; font-size:11.5px; border-radius:6px; border:1px solid #a5b4fc; background:#fff;">
+          <select id="batch-resolution-select" style="padding:5px; font-size:11.5px; border-radius:6px; border:1px solid #a5b4fc; background:#fff;" name="batch-resolution-select">
             <option value="convert">Convert all to Parent-level</option>
             ${availableSubtypes.map(st => `<option value="reassign:${st.id}">Reassign all to: ${escapeHtml(st.name)}</option>`).join('')}
             <option value="NEW_SUBTYPE">+ Create New Sub-Type...</option>

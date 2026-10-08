@@ -32,7 +32,7 @@ export function renderWeeklySummaryToolbar(options = {}) {
         <div>
           <label for="pp-analytics-range" style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:4px">Analysis Range</label>
           <div style="display:flex;align-items:center;gap:6px">
-            <select id="pp-analytics-range" style="padding:6px 10px;font-size:12.5px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);outline:none;font-weight:600">
+            <select id="pp-analytics-range" style="padding:6px 10px;font-size:12.5px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);outline:none;font-weight:600" name="pp-analytics-range">
               <option value="this_week">${escapeHtml(currentRange)}</option>
               <option value="last_week">Last Week</option>
               <option value="last_month">Last 30 Days</option>

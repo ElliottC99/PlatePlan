@@ -59,7 +59,7 @@ export function openSubtypeResolutionModal(subTypeId, issueKey = '') {
             Search your Product Bank and assign an existing product to this sub-type.
           </div>
           <label for="subtype-link-search" class="sr-only">Search products by name or brand</label>
-          <input type="search" id="subtype-link-search" class="input" placeholder="Search product by name or brand..." style="font-size:13px;padding:8px 12px;width:100%;border-radius:8px;box-sizing:border-box" oninput="filterSubtypeLinkProducts(this.value, '${escapeAttr(subTypeId)}')">
+          <input type="search" id="subtype-link-search" class="input" placeholder="Search product by name or brand..." style="font-size:13px;padding:8px 12px;width:100%;border-radius:8px;box-sizing:border-box" oninput="filterSubtypeLinkProducts(this.value, '${escapeAttr(subTypeId)}')" name="subtype-link-search">
           <div id="subtype-link-results" style="margin-top:8px;max-height:160px;overflow-y:auto;display:none;border:1px solid var(--border);border-radius:8px;background:var(--surface)"></div>
         </div>
 
@@ -163,7 +163,7 @@ export function openTescoJsonImportModal(subTypeId) {
       </div>
 
       <label for="tesco-json-payload" class="sr-only">Paste Tesco Bookmarklet JSON payload</label>
-      <textarea id="tesco-json-payload" placeholder="Paste Tesco Bookmarklet JSON payload here..." style="width:100%;height:140px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;padding:12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);box-sizing:border-box;resize:vertical" autofocus></textarea>
+      <textarea id="tesco-json-payload" placeholder="Paste Tesco Bookmarklet JSON payload here..." style="width:100%;height:140px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;padding:12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);box-sizing:border-box;resize:vertical" autofocus name="tesco-json-payload"></textarea>
       
       <div id="tesco-json-error" style="display:none;color:var(--red,#dc2626);font-size:12px;margin-top:8px"></div>
 

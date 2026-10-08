@@ -58,12 +58,12 @@ export function renderFinderControls(entries = [], activeMeal = 'dinner', active
     const pAttr = escapeAttr(entry.productId);
     const pName = escapeHtml(entry.product.name);
     const qtyLabel = typeof window !== 'undefined' && window.useUpQuantityLabel ? window.useUpQuantityLabel(entry) : '';
-    return `<label><input type="checkbox" ${checked} onchange="toggleUseUpFinderProduct('${pAttr}',this.checked)"> ${pName} <small>${escapeHtml(qtyLabel)}</small></label>`;
+    return `<label><input type="checkbox" ${checked} onchange="toggleUseUpFinderProduct('${pAttr}',this.checked)" name="input-field"> ${pName} <small>${escapeHtml(qtyLabel)}</small></label>`;
   }).join('');
 
   return `<div class="use-up-finder-filters">
-    <label>Meal<select onchange="setUseUpFinderFilter('meal',this.value)">${mealOptions}</select></label>
-    <label>For<select onchange="setUseUpFinderFilter('who',this.value)">${whoOptions}</select></label>
+    <label>Meal<select onchange="setUseUpFinderFilter('meal',this.value)" name="select-field">${mealOptions}</select></label>
+    <label>For<select onchange="setUseUpFinderFilter('who',this.value)" name="select-field">${whoOptions}</select></label>
   </div>
   <fieldset class="use-up-product-filter">
     <legend>Products to match</legend>
@@ -143,13 +143,13 @@ export function renderAssignModal(recipeName = '', planDays = 7, activeMeal = 'd
       <button class="modal-close-btn" type="button" onclick="closeUseUpAssign()" aria-label="Close">&times;</button>
     </div>
     <div class="grid2" style="margin-top:14px">
-      <label>Day<select id="use-up-assign-day">${dayOptions}</select></label>
-      <label>For<select id="use-up-assign-person">
+      <label>Day<select id="use-up-assign-day" name="use-up-assign-day">${dayOptions}</select></label>
+      <label>For<select id="use-up-assign-person" name="use-up-assign-person">
         <option value="both"${activeWho === 'both' ? ' selected' : ''}>Both (Shared)</option>
         <option value="E"${activeWho === 'Elliott' ? ' selected' : ''}>Elliott</option>
         <option value="C"${activeWho === 'Chloe' ? ' selected' : ''}>Chloe</option>
       </select></label>
-      <label>Meal<select id="use-up-assign-meal">
+      <label>Meal<select id="use-up-assign-meal" name="use-up-assign-meal">
         <option value="breakfast"${activeMeal === 'breakfast' ? ' selected' : ''}>Breakfast</option>
         <option value="lunch"${activeMeal === 'lunch' ? ' selected' : ''}>Lunch</option>
         <option value="dinner"${activeMeal === 'dinner' ? ' selected' : ''}>Dinner</option>

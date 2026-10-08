@@ -88,7 +88,7 @@ export function openSubtypeExistingProductPickerModal(subtypeId, parentId) {
       <p style="font-size: 12.5px; color: var(--text2,#78716c); margin: 0 0 14px 0;">Search your product bank and check one or more items to attach.</p>
 
       <div style="margin-bottom: 12px;">
-        <input type="text" id="picker-search-input" placeholder="🔍 Search products by title or brand..." style="width:100%; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px;" />
+        <input type="text" id="picker-search-input" placeholder="🔍 Search products by title or brand..." style="width:100%; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px;" name="picker-search-input" />
       </div>
 
       <div id="picker-product-list" style="display:flex; flex-direction:column; gap:6px; max-height:220px; overflow-y:auto; padding:6px; background:var(--surface2,#f5f5f4); border:1px solid var(--border,#e7e5e4); border-radius:8px; margin-bottom: 18px;"></div>
@@ -134,7 +134,7 @@ export function openSubtypeExistingProductPickerModal(subtypeId, parentId) {
       const displayLabel = pBrand && pName && !pName.toLowerCase().startsWith(pBrand.toLowerCase()) ? `${pBrand} ${pName}` : pName;
       return `
         <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:#fff; border:1px solid var(--border,#e7e5e4); border-radius:6px; cursor:pointer;">
-          <input type="checkbox" class="product-picker-cb" value="${escapeHTML(p.id)}" ${isChecked ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--primary,#4f46e5); cursor:pointer;" />
+          <input type="checkbox" class="product-picker-cb" value="${escapeHTML(p.id)}" ${isChecked ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--primary,#4f46e5); cursor:pointer;" name="input-field" />
           <div style="flex:1; min-width:0;">
             <div style="font-size:12.5px; font-weight:650; color:var(--text,#1c1917); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${escapeHTML(displayLabel)}</div>
             <div style="font-size:11px; color:var(--text2,#78716c);">${escapeHTML(p.brand || 'No brand')} · £${Number(p.price || 0).toFixed(2)}</div>
@@ -210,7 +210,7 @@ export function openTescoImportModal(subtypeId, parentId) {
       </div>
       <div class="field" style="margin-bottom: 12px;">
         <label for="tesco-json-input" style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:6px;">Paste Tesco Bookmarklet JSON Output</label>
-        <textarea id="tesco-json-input" placeholder='{"title":"Tesco Bagels 4 Pack","price":1.50,"brand":"Tesco",...}' style="width:100%; min-height:110px; font-family:monospace; font-size:11.5px; padding:10px; border:1px solid var(--border,#e7e5e4); border-radius:8px; outline:none; background:#fff;"></textarea>
+        <textarea id="tesco-json-input" placeholder='{"title":"Tesco Bagels 4 Pack","price":1.50,"brand":"Tesco",...}' style="width:100%; min-height:110px; font-family:monospace; font-size:11.5px; padding:10px; border:1px solid var(--border,#e7e5e4); border-radius:8px; outline:none; background:#fff;" name="tesco-json-input"></textarea>
       </div>
       <div id="tesco-import-error-msg" style="display:none; margin-bottom:14px;"></div>
       <div style="display:flex; gap:8px; justify-content: flex-end;">

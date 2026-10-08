@@ -50,8 +50,8 @@ export function renderEditor(entries = []) {
             <strong>${pName}</strong>
             <small>${hierarchy}</small>
           </div>
-          <input type="number" min="0" step="0.1" value="${qtyVal}" aria-label="Available quantity for ${escapeAttr(entry.product.name)}" oninput="updateUseUpProduct('${pAttr}','quantity',this.value,false)">
-          <select aria-label="Available unit for ${escapeAttr(entry.product.name)}" onchange="updateUseUpProduct('${pAttr}','unit',this.value,false)">
+          <input type="number" min="0" step="0.1" value="${qtyVal}" aria-label="Available quantity for ${escapeAttr(entry.product.name)}" oninput="updateUseUpProduct('${pAttr}','quantity',this.value,false)" name="input-field">
+          <select aria-label="Available unit for ${escapeAttr(entry.product.name)}" onchange="updateUseUpProduct('${pAttr}','unit',this.value,false)" name="select-field">
             ${unitOptions}
           </select>
           <button class="btn sm ghost" type="button" onclick="removeUseUpProduct('${pAttr}')">Remove</button>
@@ -61,7 +61,7 @@ export function renderEditor(entries = []) {
 
   return `<div class="use-up-add">
     <div class="mapping-search-container">
-      <input id="use-up-product-search" type="search" placeholder="Search Product Bank…" autocomplete="off" oninput="renderUseUpProductSuggestions(this.value)" onfocus="renderUseUpProductSuggestions(this.value)">
+      <input id="use-up-product-search" type="search" placeholder="Search Product Bank…" autocomplete="off" oninput="renderUseUpProductSuggestions(this.value)" onfocus="renderUseUpProductSuggestions(this.value)" name="use-up-product-search">
       <div class="map-dropdown" id="use-up-product-suggestions" style="display:none"></div>
     </div>
   </div>

@@ -85,21 +85,21 @@ export function buildModalHTML(target, targetType = 'ingredient', parentIngredie
         <div style="background:#fff;border-radius:14px;padding:14px;border:1px solid var(--border-color,#e5e7eb);box-shadow:0 1px 3px rgba(0,0,0,0.04)">
           <label for="resolve-remap-search" style="font-weight:750;font-size:13.5px;margin-bottom:4px;color:var(--text,#1c1917);display:block">🔄 Re-map to Existing Ingredient / Sub-type</label>
           <div style="font-size:12px;color:var(--text2,#78716c);margin-bottom:8px">Point this item directly to an existing Pantry Bank ingredient or sub-type without creating products.</div>
-          <input type="search" id="resolve-remap-search" class="input" placeholder="Search ingredient or sub-type..." style="font-size:12.5px;padding:7px 10px;width:100%;border-radius:8px;border:1px solid var(--border,#e7e5e4);box-sizing:border-box" oninput="filterResolveRemapOptions(this.value)" onfocus="filterResolveRemapOptions(this.value)">
+          <input type="search" id="resolve-remap-search" class="input" placeholder="Search ingredient or sub-type..." style="font-size:12.5px;padding:7px 10px;width:100%;border-radius:8px;border:1px solid var(--border,#e7e5e4);box-sizing:border-box" oninput="filterResolveRemapOptions(this.value)" onfocus="filterResolveRemapOptions(this.value)" name="resolve-remap-search">
           <div id="resolve-remap-results" style="margin-top:6px;max-height:160px;overflow-y:auto;display:none;border:1px solid var(--border,#e7e5e4);border-radius:8px;background:var(--surface,#fff)"></div>
         </div>
 
         <div style="background:#fff;border-radius:14px;padding:14px;border:1px solid var(--border-color,#e5e7eb);box-shadow:0 1px 3px rgba(0,0,0,0.04)">
           <label for="resolve-link-search" style="font-weight:750;font-size:13.5px;margin-bottom:4px;color:var(--text,#1c1917);display:block">🔗 1. Link Existing Product</label>
           <div style="font-size:12px;color:var(--text2,#78716c);margin-bottom:8px">Search your Product Bank and re-bind an existing product to this item.</div>
-          <input type="search" id="resolve-link-search" class="input" placeholder="Search product by name or brand..." style="font-size:12.5px;padding:7px 10px;width:100%;border-radius:8px;border:1px solid var(--border,#e7e5e4);box-sizing:border-box" oninput="filterResolveLinkProducts(this.value)">
+          <input type="search" id="resolve-link-search" class="input" placeholder="Search product by name or brand..." style="font-size:12.5px;padding:7px 10px;width:100%;border-radius:8px;border:1px solid var(--border,#e7e5e4);box-sizing:border-box" oninput="filterResolveLinkProducts(this.value)" name="resolve-link-search">
           <div id="resolve-link-results" style="margin-top:6px;max-height:160px;overflow-y:auto;display:none;border:1px solid var(--border,#e7e5e4);border-radius:8px;background:var(--surface,#fff)"></div>
         </div>
 
         <div style="background:#fff;border-radius:14px;padding:14px;border:1px solid var(--border-color,#e5e7eb);box-shadow:0 1px 3px rgba(0,0,0,0.04)">
           <label for="resolve-tesco-json" style="font-weight:750;font-size:13.5px;color:var(--text,#1c1917);margin-bottom:4px;display:block">🛒 2. Import from Tesco</label>
           <div style="margin-bottom:8px"><a href="${safeEscapeAttr(tescoSearchUrl)}" target="_blank" rel="noopener noreferrer" class="btn sm ghost" style="display:inline-flex;align-items:center;gap:6px;color:var(--primary,#4f46e5);font-weight:600;font-size:12px;padding:4px 8px;border:1px solid rgba(79,70,229,0.2);background:rgba(79,70,229,0.05);border-radius:6px;text-decoration:none">🔍 Search Tesco for "${safeEscapeHtml(searchTerm)}" ↗</a></div>
-          <textarea id="resolve-tesco-json" placeholder='{"name":"Tesco Bagels 4 Pack","price":1.50,"brand":"Tesco",...}' style="width:100%;height:75px;font-family:monospace;font-size:11.5px;padding:6px;border:1px solid var(--border,#e7e5e4);border-radius:6px;background:#fff;color:var(--text,#1c1917);box-sizing:border-box;resize:vertical"></textarea>
+          <textarea id="resolve-tesco-json" placeholder='{"name":"Tesco Bagels 4 Pack","price":1.50,"brand":"Tesco",...}' style="width:100%;height:75px;font-family:monospace;font-size:11.5px;padding:6px;border:1px solid var(--border,#e7e5e4);border-radius:6px;background:#fff;color:var(--text,#1c1917);box-sizing:border-box;resize:vertical" name="resolve-tesco-json"></textarea>
           <div id="resolve-tesco-error" style="display:none;color:var(--red,#ef4444);font-size:12px;margin-top:4px;font-weight:600"></div>
           <button type="button" class="btn sm btn-primary primary" style="width:100%;margin-top:6px;font-weight:700" onclick="submitResolveTescoImport()">Parse &amp; Link Product</button>
         </div>
