@@ -223,6 +223,26 @@ function bindWizardEvents() {
       };
     }
 
+    // Add ingredient line to section
+    modalWrap.querySelectorAll('.wiz-add-line-btn').forEach(btn => {
+      btn.onclick = () => {
+        syncStep2InputsToState(modalWrap);
+        const sIdx = parseInt(btn.dataset.sidx, 10);
+        if (!isNaN(sIdx) && wizardState.activeRecipe.ingredientSections[sIdx]) {
+          if (!wizardState.activeRecipe.ingredientSections[sIdx].ingredients) {
+            wizardState.activeRecipe.ingredientSections[sIdx].ingredients = [];
+          }
+          wizardState.activeRecipe.ingredientSections[sIdx].ingredients.push({
+            raw: '',
+            name: '',
+            qty: 1,
+            unit: 'g'
+          });
+          renderWizardModal();
+        }
+      };
+    });
+
     // Delete section header
     modalWrap.querySelectorAll('.wiz-del-section-btn').forEach(btn => {
       btn.onclick = () => {

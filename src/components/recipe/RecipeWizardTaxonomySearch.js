@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardTaxonomySearch.js (v3.28.0)
+ * src/components/recipe/RecipeWizardTaxonomySearch.js (v3.28.2-ui)
  * Searchable Taxonomy Autocomplete Component for Recipe Ingestion Wizard.
  * Features:
  * - Dynamic substring filtering across ingredients & sub-types
@@ -13,7 +13,7 @@ import { openTaxonomyCreationModal } from './RecipeWizardTaxonomyModal.js';
 
 export function getTaxonomyLabel(ingredientId, subtypeId, rawName = '', ingredientsBank = [], categoryId = null) {
   if (categoryId) {
-    return `[Category] ${categoryId}`;
+    return `📂 [Category] ${categoryId}`;
   }
   if (!ingredientId || ingredientId === 'new_item') {
     return `✨ New Item: ${rawName || 'Custom'}`;
@@ -35,6 +35,8 @@ export function getTaxonomyLabel(ingredientId, subtypeId, rawName = '', ingredie
 export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = []) {
   const selectedVal = item.categoryId ? `cat:${item.categoryId}` : (item.subtypeId ? `${item.ingredientId}:${item.subtypeId}` : (item.ingredientId || 'new_item'));
   const selectedLabel = getTaxonomyLabel(item.ingredientId, item.subtypeId, item.name, ingredientsBank, item.categoryId);
+  const isCat = Boolean(item.categoryId) || selectedVal.startsWith('cat:');
+  const catInputStyle = isCat ? 'background:#eef2ff; border:1px solid #818cf8; color:#4338ca; font-weight:600;' : 'background:var(--surface,#fff); border:1px solid var(--border,#ccc); color:var(--text);';
 
   return `
     <div class="wiz-tax-autocomplete-container" style="position:relative; width:100%;">
@@ -49,7 +51,7 @@ export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [])
              value="${escapeAttr(selectedLabel)}"
              placeholder="Search taxonomy..."
              autocomplete="off"
-             style="width:100%; padding:6px 8px; border:1px solid var(--border,#ccc); border-radius:6px; font-size:12px; background:var(--surface,#fff); color:var(--text);" />
+             style="width:100%; padding:6px 8px; border-radius:6px; font-size:12px; ${catInputStyle}" />
       <div class="wiz-tax-dropdown"
            id="wiz-tax-dropdown-${sIdx}-${iIdx}"
            style="display:none; position:absolute; top:100%; left:0; right:0; max-height:220px; overflow-y:auto; background:var(--surface,#fff); border:1px solid var(--border,#ddd); border-radius:6px; box-shadow:0 8px 24px rgba(0,0,0,0.18); z-index:1050; margin-top:2px;">
@@ -89,8 +91,8 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
       const catLower = cat.toLowerCase();
       if (!query || catLower.includes(query) || '[category]'.includes(query)) {
         html += `
-          <div class="wiz-tax-opt wiz-tax-category" data-val="cat:${escapeAttr(cat)}" data-label="[Category] ${escapeAttr(cat)}" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--purple,#4f46e5); background:var(--surface2,#f5f4ee); border-bottom:1px solid var(--border,#eee);">
-            🗂️ <span class="badge" style="background:#eef2ff; color:#4f46e5; font-size:10px; padding:1px 5px; border-radius:4px; margin-right:4px;">[Category]</span> ${escapeHtml(cat)}
+          <div class="wiz-tax-opt wiz-tax-category" data-val="cat:${escapeAttr(cat)}" data-label="📂 [Category] ${escapeAttr(cat)}" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--purple,#4f46e5); background:var(--surface2,#f5f4ee); border-bottom:1px solid var(--border,#eee);">
+            📂 <span class="badge" style="background:#eef2ff; color:#4f46e5; font-size:10px; padding:1px 5px; border-radius:4px; margin-right:4px;">[Category]</span> ${escapeHtml(cat)}
           </div>
         `;
       }
@@ -134,6 +136,18 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
         inputEl.dataset.taxVal = val;
         inputEl.value = label;
         dropdownEl.style.display = 'none';
+
+        if (val.startsWith('cat:')) {
+          inputEl.style.background = '#eef2ff';
+          inputEl.style.border = '1px solid #818cf8';
+          inputEl.style.color = '#4338ca';
+          inputEl.style.fontWeight = '600';
+        } else {
+          inputEl.style.background = 'var(--surface,#fff)';
+          inputEl.style.border = '1px solid var(--border,#ccc)';
+          inputEl.style.color = 'var(--text)';
+          inputEl.style.fontWeight = 'normal';
+        }
 
         if (val === 'new_item') {
           const rowNameInput = modalWrap.querySelector(`.wiz-ing-name[data-sidx="${sIdx}"][data-iidx="${iIdx}"]`);

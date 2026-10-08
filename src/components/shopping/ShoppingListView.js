@@ -55,7 +55,7 @@ export function renderShoppingListView(container) {
       itemsHtml += `
         <div class="shopping-item-row" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border, #eee); background: ${item.isChecked ? 'var(--surface2, #f9f8f6)' : 'var(--surface, #fff)'}; opacity: ${item.isChecked ? '0.65' : '1'}; transition: all 0.2s;">
           <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
-            <input type="checkbox" data-action="toggle-shop-item" data-id="${escapeAttr(item.id)}" ${item.isChecked ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;" />
+            <input type="checkbox" id="shop-item-cb-${escapeAttr(item.id)}" name="shop_item_cb_${escapeAttr(item.id)}" aria-label="Toggle ${escapeAttr(item.name)}" data-action="toggle-shop-item" data-id="${escapeAttr(item.id)}" ${item.isChecked ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;" />
             <div>
               <div style="font-weight: 600; font-size: 14px; text-decoration: ${item.isChecked ? 'line-through' : 'none'}; color: var(--text, #111);">
                 ${escapeHtml(item.buyQty)} ${escapeHtml(item.unit)} ${escapeHtml(item.name)}
@@ -66,7 +66,7 @@ export function renderShoppingListView(container) {
             </div>
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <input type="number" step="any" class="shop-item-qty-input" data-id="${escapeAttr(item.id)}" value="${item.buyQty}" style="width: 65px; padding: 4px 8px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px;" />
+            <input type="number" step="any" id="shop-item-qty-${escapeAttr(item.id)}" name="shop_item_qty_${escapeAttr(item.id)}" aria-label="Quantity for ${escapeAttr(item.name)}" class="shop-item-qty-input" data-id="${escapeAttr(item.id)}" value="${item.buyQty}" style="width: 65px; padding: 4px 8px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px;" />
             <span style="font-size: 12px; color: var(--text2);">${escapeHtml(item.unit)}</span>
           </div>
         </div>
@@ -101,14 +101,14 @@ export function renderShoppingListView(container) {
       <div style="background: var(--surface2, #f9f8f6); border: 1px solid var(--border, #e5e7eb); padding: 16px; border-radius: 12px; margin-bottom: 24px;">
         <h4 style="margin: 0 0 10px; font-size: 14px; font-weight: 700;">+ Quick Add Custom Item</h4>
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-          <input type="text" id="manual-item-name" placeholder="Item name (e.g. Oat Milk)" style="flex: 2; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px;" />
-          <input type="number" step="any" id="manual-item-qty" value="1" placeholder="Qty" style="width: 80px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px;" />
-          <select id="manual-item-unit" style="width: 100px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px;">
+          <input type="text" id="manual-item-name" name="manual_item_name" aria-label="Manual item name" placeholder="Item name (e.g. Oat Milk)" style="flex: 2; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px;" />
+          <input type="number" step="any" id="manual-item-qty" name="manual_item_qty" aria-label="Manual item quantity" value="1" placeholder="Qty" style="width: 80px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px;" />
+          <select id="manual-item-unit" name="manual_item_unit" aria-label="Manual item unit" style="width: 100px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px;">
             <option value="qty">qty</option>
             <option value="g">g</option>
             <option value="ml">ml</option>
           </select>
-          <select id="manual-item-category" style="width: 160px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px;">
+          <select id="manual-item-category" name="manual_item_category" aria-label="Manual item category" style="width: 160px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px;">
             ${AISLE_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
           </select>
           <button type="button" id="btn-add-manual-item" class="btn secondary">Add Item</button>

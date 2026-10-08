@@ -75,45 +75,23 @@ export function renderMacroBreakdownCrossbar(recipe, variant = 'original') {
   const cTargetProt = Math.round((Number(cProf.dailyProtein) || 100) * 0.35);
 
   return `
-    <div class="recipe-modal-crossbar" style="width: 100%; background: var(--surface2, #f5f4ee); border: 1px solid var(--border, #e5e5e5); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px;">
-      <div style="display:flex; align-items:center; gap:8px;">
-        <span style="font-size: 13px; font-weight: 700; color: var(--text);">Dual-Profile Per-Portion Split:</span>
-        <span style="font-size: 11px; color: var(--text2);">Servings: ${recipe.targetServings || 4}</span>
+    <div class="recipe-modal-crossbar" style="width: 100%; background: var(--surface2, #f5f4ee); border: 1px solid var(--border, #e5e5e5); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px;">
+      <div style="display:flex; align-items:center; gap:6px;">
+        <span style="font-size: 12px; font-weight: 700; color: var(--text);">Dual-Profile Per-Portion Split</span>
+        <span style="font-size: 11px; color: var(--text2);">(${recipe.targetServings || 4} servings)</span>
       </div>
 
-      <div class="recipe-modal-crossbar-macros" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px;">
-        <div class="card portion-macro-card" style="padding:8px 12px;border-radius:10px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);min-width:150px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
-          <div style="font-weight:700;font-size:12px;color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;">
-            <span>👤 Elliott</span>
-            <span style="font-size:10.5px;font-weight:600;color:var(--text2)">${eSharePct}% split</span>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:2px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;gap:6px">
-              <span>🔥 <strong>${eKcal} kcal</strong></span>
-              ${renderComparisonBadge(eKcal, eTargetCal)}
-            </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;gap:6px">
-              <span>🥩 <strong>${eProt}g protein</strong></span>
-              ${renderComparisonBadge(eProt, eTargetProt)}
-            </div>
-          </div>
+      <div class="recipe-modal-crossbar-macros" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4); font-size: 11.5px;">
+          <span style="font-weight:700;">👤 Elliott (${eSharePct}%):</span>
+          <span>🔥 <strong>${eKcal} kcal</strong> ${renderComparisonBadge(eKcal, eTargetCal)}</span>
+          <span>🥩 <strong>${eProt}g</strong> ${renderComparisonBadge(eProt, eTargetProt)}</span>
         </div>
 
-        <div class="card portion-macro-card" style="padding:8px 12px;border-radius:10px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);min-width:150px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
-          <div style="font-weight:700;font-size:12px;color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;">
-            <span>👤 Chloe</span>
-            <span style="font-size:10.5px;font-weight:600;color:var(--text2)">${cSharePct}% split</span>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:2px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;gap:6px">
-              <span>🔥 <strong>${cKcal} kcal</strong></span>
-              ${renderComparisonBadge(cKcal, cTargetCal)}
-            </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;gap:6px">
-              <span>🥩 <strong>${cProt}g protein</strong></span>
-              ${renderComparisonBadge(cProt, cTargetProt)}
-            </div>
-          </div>
+        <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4); font-size: 11.5px;">
+          <span style="font-weight:700;">👤 Chloe (${cSharePct}%):</span>
+          <span>🔥 <strong>${cKcal} kcal</strong> ${renderComparisonBadge(cKcal, cTargetCal)}</span>
+          <span>🥩 <strong>${cProt}g</strong> ${renderComparisonBadge(cProt, cTargetProt)}</span>
         </div>
       </div>
     </div>
@@ -321,7 +299,10 @@ export function renderState2Mapping() {
       <div style="background: var(--surface2, #f9f8f6); border: 1px solid var(--border, #e5e7eb); padding: 12px; border-radius: 10px; margin-bottom: 14px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <input type="text" id="wiz-section-title-input-${sIdx}" name="wiz_section_title_input_${sIdx}" aria-label="Section title for section ${sIdx}" class="wiz-section-title-input" data-sidx="${sIdx}" value="${escapeAttr(sec.sectionTitle)}" style="font-weight: 700; font-size: 14px; padding: 4px 8px; border: 1px solid var(--border, #ccc); border-radius: 6px; width: 60%; background: var(--surface);" />
-          <button type="button" class="btn sm ghost wiz-del-section-btn" data-sidx="${sIdx}" style="color: #ef4444;">Remove Section</button>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button type="button" class="btn sm secondary wiz-add-line-btn" data-sidx="${sIdx}">+ Add Line</button>
+            <button type="button" class="btn sm ghost wiz-del-section-btn" data-sidx="${sIdx}" style="color: #ef4444;">Remove Section</button>
+          </div>
         </div>
         <table style="width: 100%; border-collapse: collapse;">
           <tbody>
@@ -349,7 +330,7 @@ export function renderState2Mapping() {
       <div style="background: var(--purple-bg, #eef2ff); border: 1px solid rgba(79,70,229,0.2); padding: 12px 16px; border-radius: 10px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
         <span style="font-size: 14px; font-weight: 600; color: var(--purple, #4f46e5);">Scaling & Density Normalization</span>
         <span style="font-size: 13px; font-weight: 700;">
-          ${currServ} servings ➔ ${tgtServ} servings (${scaleFactor.toFixed(2)}x) | Units: g, ml, qty
+          ${currServ} servings ➔ ${tgtServ} servings (${scaleFactor.toFixed(2)}x)
         </span>
       </div>
 
@@ -392,20 +373,25 @@ export function renderState3Review() {
     let rows = '';
     (sec.ingredients || []).forEach(ing => {
       let taxLabel = '';
-      if (ing.ingredientId) {
+      if (ing.ingredientId || ing.isCategoryDefault || ing.categoryId) {
         taxLabel = `<span class="badge badge-purple" style="font-size:10px;">Mapped</span>`;
-      } else if (ing.isCategoryDefault || ing.categoryId) {
-        taxLabel = `<span class="badge badge-purple" style="font-size:10px;" title="Linked Default Category Product">[Category] Generic</span>`;
       } else {
         taxLabel = `<span class="badge badge-green" style="font-size:10px;">New Item</span>`;
       }
 
-      let notesHtml = ing.notes ? ` (${escapeHtml(ing.notes)})` : '';
+      let notesHtml = '';
+      const cleanNotes = (ing.notes || '').replace(/dissolved in \d+\s*ml water/gi, '').replace(/\b\d+\s*ml water\b/gi, '').trim().replace(/^[\(\s,]+|[\)\s,]+$/g, '');
       if (ing.waterMl) {
-        notesHtml += ` <span style="color:var(--purple,#4f46e5); font-size:11px; font-weight:600;">[dissolved in ${ing.waterMl}ml water]</span>`;
+        notesHtml = ` (dissolved in ${ing.waterMl}ml water)`;
+        if (cleanNotes) {
+          notesHtml = ` (${escapeHtml(cleanNotes)})` + notesHtml;
+        }
+      } else if (cleanNotes) {
+        notesHtml = ` (${escapeHtml(cleanNotes)})`;
       }
 
-      let productLinkHtml = '';
+      let mainLineText = `${escapeHtml(ing.name)}${notesHtml}`;
+
       if (ing.isCategoryDefault || ing.categoryId) {
         const storeState = getState() || {};
         const products = storeState.products || [];
@@ -416,20 +402,31 @@ export function renderState3Review() {
         }
 
         if (defaultProduct) {
-          const prodName = defaultProduct.name || defaultProduct.title || '';
-          const searchUrl = defaultProduct.tescoUrl || `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(prodName)}`;
-          productLinkHtml = `<span style="font-size:11px; margin-top:2px; display:block; color:var(--purple,#4f46e5); font-weight:600;">🔗 Link: <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(prodName)}</a></span>`;
+          const brandStr = defaultProduct.brand ? `${defaultProduct.brand} ` : '';
+          const prodTitle = `${brandStr}${defaultProduct.name || defaultProduct.title || ''}`.trim();
+          const searchUrl = defaultProduct.tescoUrl || `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(prodTitle)}`;
+          mainLineText = `${escapeHtml(ing.name)}${notesHtml} - <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(prodTitle)}</a>`;
         } else {
           const fallbackQuery = `Tesco Generic ${catName}`;
           const searchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(fallbackQuery)}`;
-          productLinkHtml = `<span style="font-size:11px; margin-top:2px; display:block; color:var(--text2,#78716c);">🔗 Link: <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--text2,#78716c); text-decoration:underline;">Tesco ${escapeHtml(catName)} Generic</a></span>`;
+          mainLineText = `${escapeHtml(ing.name)}${notesHtml} - <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--text2,#78716c); text-decoration:underline;">Tesco ${escapeHtml(catName)} Generic</a>`;
+        }
+      } else if (ing.ingredientId) {
+        const storeState = getState() || {};
+        const products = storeState.products || [];
+        const linkedProduct = products.find(p => String(p.ingredientId) === String(ing.ingredientId));
+        if (linkedProduct) {
+          const brandStr = linkedProduct.brand ? `${linkedProduct.brand} ` : '';
+          const prodTitle = `${brandStr}${linkedProduct.name || linkedProduct.title || ''}`.trim();
+          const searchUrl = linkedProduct.tescoUrl || `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(prodTitle)}`;
+          mainLineText = `${escapeHtml(ing.name)}${notesHtml} - <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(prodTitle)}</a>`;
         }
       }
 
       rows += `
         <tr style="border-bottom: 1px solid var(--border, #eee); font-size: 13px;">
           <td style="padding: 6px 8px; font-weight: 600; width: 100px;">${ing.scaledQty || ing.qty} ${ing.unit}</td>
-          <td style="padding: 6px 8px;">${escapeHtml(ing.name)}${notesHtml}${productLinkHtml}</td>
+          <td style="padding: 6px 8px;">${mainLineText}</td>
           <td style="padding: 6px 8px; text-align: right;">${taxLabel}</td>
         </tr>
       `;

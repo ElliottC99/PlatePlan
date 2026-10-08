@@ -1,23 +1,23 @@
 /**
- * sw.js (v3.28.1)
+ * sw.js (v3.28.2-ui)
  * Service Worker for PlatePlan PWA offline support & asset caching.
  * Caches core app shell, modern ES6 modules, stylesheets, and icons.
  */
 
-const PLATEPLAN_CACHE = 'plateplan-cache-v3.28.1';
-const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.28.1';
-const PLATEPLAN_APP_VERSION = '3.28.1';
-const PLATEPLAN_BUILD_ID = '3.28.1-v284';
+const PLATEPLAN_CACHE = 'plateplan-cache-v3.28.2-ui';
+const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.28.2-ui';
+const PLATEPLAN_APP_VERSION = '3.28.2-ui';
+const PLATEPLAN_BUILD_ID = '3.28.2-ui-v284';
 
 const PLATEPLAN_PRECACHE_ASSETS = [
   '/',
   '/PlatePlan.html',
   '/manifest.json',
   '/firebase-config.js',
-  '/styles/tokens.css?v=3.28.1',
-  '/styles/components.css?v=3.28.1',
-  '/styles/responsive.css?v=3.28.1',
-  '/styles/print.css?v=3.28.1',
+  '/styles/tokens.css?v=3.28.2-ui',
+  '/styles/components.css?v=3.28.2-ui',
+  '/styles/responsive.css?v=3.28.2-ui',
+  '/styles/print.css?v=3.28.2-ui',
   '/src/main.js',
   '/src/store/store.js',
   '/src/config/firebase.js',
@@ -126,9 +126,9 @@ self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(PLATEPLAN_CACHE).then(async cache => {
-      console.log(`[SW v3.28.1] Precaching shell and core ES6 modules...`);
+      console.log(`[SW v3.28.2-data] Precaching shell and core ES6 modules...`);
       await cache.addAll(PLATEPLAN_PRECACHE_ASSETS).catch(err => {
-        console.warn('[SW v3.28.1] Non-fatal precache warning:', err);
+        console.warn('[SW v3.28.2-data] Non-fatal precache warning:', err);
       });
       await Promise.allSettled(PLATEPLAN_OPTIONAL_SHELL.map(url => cache.add(url)));
     })
@@ -142,7 +142,7 @@ self.addEventListener('activate', event => {
         keys
           .filter(key => key !== PLATEPLAN_CACHE && key !== PLATEPLAN_IMAGE_CACHE)
           .map(key => {
-            console.log('[SW v3.28.1] Purging legacy cache:', key);
+            console.log('[SW v3.28.2-data] Purging legacy cache:', key);
             return caches.delete(key);
           })
       );

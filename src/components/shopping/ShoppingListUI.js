@@ -110,7 +110,7 @@ export function renderShoppingListUI() {
           ${items.map(item => `
             <div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;gap:12px;background:${item.isChecked ? '#f8fafc' : '#fff'};opacity:${item.isChecked ? '0.7' : '1'};">
               <div style="display:flex;align-items:center;gap:12px;flex:1;">
-                <input type="checkbox" data-action="toggle-shop-item" data-id="${escapeAttr(item.id)}" ${item.isChecked ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;accent-color:#2563eb;" />
+                <input type="checkbox" id="shop-item-cb-${escapeAttr(item.id)}" name="shop_item_cb_${escapeAttr(item.id)}" aria-label="Toggle ${escapeAttr(item.name)}" data-action="toggle-shop-item" data-id="${escapeAttr(item.id)}" ${item.isChecked ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;accent-color:#2563eb;" />
                 <div>
                   <div style="font-weight:600;font-size:14px;color:#1e293b;text-decoration:${item.isChecked ? 'line-through' : 'none'};">
                     ${escapeHtml(item.buyQty)} ${escapeHtml(item.unit)} ${escapeHtml(item.name)}
@@ -121,7 +121,7 @@ export function renderShoppingListUI() {
                 </div>
               </div>
               <div style="display:flex;align-items:center;gap:6px;">
-                <input type="number" step="any" class="shop-item-qty-input" data-id="${escapeAttr(item.id)}" value="${item.buyQty}" style="width:65px;padding:4px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;" />
+                <input type="number" step="any" id="shop-item-qty-${escapeAttr(item.id)}" name="shop_item_qty_${escapeAttr(item.id)}" aria-label="Quantity for ${escapeAttr(item.name)}" class="shop-item-qty-input" data-id="${escapeAttr(item.id)}" value="${item.buyQty}" style="width:65px;padding:4px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;" />
                 <span style="font-size:11px;color:#64748b;">${escapeHtml(item.unit)}</span>
               </div>
             </div>
@@ -136,14 +136,14 @@ export function renderShoppingListUI() {
       <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:6px;">
         <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#334155;">+ Quick Add Custom Item</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <input type="text" id="manual-item-name" placeholder="Item name (e.g. Oat Milk)" style="flex:2;min-width:180px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;" />
-          <input type="number" step="any" id="manual-item-qty" value="1" placeholder="Qty" style="width:70px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;" />
-          <select id="manual-item-unit" style="width:90px;padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;">
+          <input type="text" id="manual-item-name" name="manual_item_name" aria-label="Manual item name" placeholder="Item name (e.g. Oat Milk)" style="flex:2;min-width:180px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;" />
+          <input type="number" step="any" id="manual-item-qty" name="manual_item_qty" aria-label="Manual item quantity" value="1" placeholder="Qty" style="width:70px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;" />
+          <select id="manual-item-unit" name="manual_item_unit" aria-label="Manual item unit" style="width:90px;padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;">
             <option value="qty">qty</option>
             <option value="g">g</option>
             <option value="ml">ml</option>
           </select>
-          <select id="manual-item-category" style="width:150px;padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;">
+          <select id="manual-item-category" name="manual_item_category" aria-label="Manual item category" style="width:150px;padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;">
             ${AISLE_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
           </select>
           <button type="button" id="btn-add-manual-item" class="btn secondary sm" style="font-size:12px;">Add</button>

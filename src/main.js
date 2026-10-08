@@ -29,7 +29,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * src/main.js (v3.28.1)
+ * src/main.js (v3.28.2-ui)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronisation,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -130,18 +130,8 @@ if (typeof window !== 'undefined') {
     getIngredients,
     getProducts,
     deleteCategory: async (categoryId) => {
-      const current = await getCategories();
-      const slugCategory = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const updated = current.filter(c => {
-        if (typeof c === 'string') {
-          return c !== categoryId && slugCategory(c) !== slugCategory(categoryId);
-        } else if (c && typeof c === 'object') {
-          return String(c.id) !== String(categoryId) && String(c.name) !== String(categoryId);
-        }
-        return true;
-      });
-      await saveCategories(updated);
-      return { success: true };
+      const { deleteCategory } = await import('./services/HouseholdRepository.js');
+      return deleteCategory(categoryId);
     }
   };
 

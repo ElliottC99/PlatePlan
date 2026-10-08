@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.28.1)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.28.2-data)
  * In-App Multi-Step Category Operations Wizard, Raw Exposure & Deep State Merge Modal.
  * Wrapped with Try-Catch-Finally block exception handling and state resets to eliminate screen freezes.
  * Fully accessible Form fields with explicit id, name, and paired labels.
@@ -37,6 +37,34 @@ export function getRawCategories(state = {}) {
     if (p?.category !== undefined && p?.category !== null && String(p.category).length > 0) rawSet.add(String(p.category));
   });
   return Array.from(rawSet).sort((a, b) => a.localeCompare(b));
+}
+
+export function getCategoryObjects(state = {}) {
+  const cats = state.categories || [];
+  const list = [];
+  
+  cats.forEach(c => {
+    if (typeof c === 'string') {
+      if (!list.some(item => item.id === c)) {
+        list.push({ id: c, name: c });
+      }
+    } else if (c && typeof c === 'object') {
+      const name = c.name || c.categoryName || c.id || '';
+      const id = c.id || name;
+      if (!list.some(item => item.id === id)) {
+        list.push({ id, name });
+      }
+    }
+  });
+
+  const stateRaw = getRawCategories(state);
+  stateRaw.forEach(raw => {
+    if (!list.some(c => c.id === raw)) {
+      list.push({ id: raw, name: raw });
+    }
+  });
+
+  return list;
 }
 
 const resolveCategory = (id) => {
@@ -90,7 +118,7 @@ export function renderCategoryManagerModal() {
   } else if (modal.dataset.wizardStep) wizardStep = modal.dataset.wizardStep;
 
   const renderCurrentStep = () => {
-    const state = getState() || {}, rawCategories = getRawCategories(state), ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
+    const state = getState() || {}, catObjects = getCategoryObjects(state), ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
     let bodyHtml = '';
 
     if (wizardStep === 'list') {
@@ -100,18 +128,20 @@ export function renderCategoryManagerModal() {
           <button type="button" class="modal-close-btn btn sm btn-ghost ghost" onclick="window.closeCategoryManagerModal()" aria-label="Close modal">✕</button>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <span style="font-size:12px;color:var(--text2,#78716c)">${rawCategories.length} raw database entries</span>
+          <span style="font-size:12px;color:var(--text2,#78716c)">${catObjects.length} raw database entries</span>
           <button id="btn-merge-duplicates" type="button" class="btn xs btn-secondary secondary" onclick="window.submitMergeDuplicateCategories()" title="Deduplicate and standardise category names across database">✨ Merge Duplicates</button>
         </div>
         <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
-          ${rawCategories.map(cat => {
-            const count = ingredients.filter(i => (i.category === cat || i.cat === cat || (Array.isArray(i.subtypes) && i.subtypes.some(st => st.category === cat || st.cat === cat)))).length;
+          ${catObjects.map(cat => {
+            const ingCount = ingredients.filter(i => (i.category === cat.name || i.cat === cat.id || slugCategory(i.category) === slugCategory(cat.name) || (Array.isArray(i.subtypes) && i.subtypes.some(st => st.category === cat.name || st.cat === cat.id || slugCategory(st.category) === slugCategory(cat.name))))).length;
+            const prodCount = (state.products || []).filter(p => p.category === cat.name || p.cat === cat.id || slugCategory(p.category) === slugCategory(cat.name)).length;
+            const count = ingCount + prodCount;
             return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2,#f5f5f4);border-radius:var(--radius-md,10px);border:1px solid var(--border,#e7e5e4)">
-              <div><span style="font-size:13px;font-weight:650">${escapeHtml(cat)}</span><span style="font-size:11px;color:var(--text2,#78716c);margin-left:6px">(${count} items)</span></div>
+              <div><span style="font-size:13px;font-weight:650">${escapeHtml(cat.name)}</span><span style="font-size:11px;color:var(--text2,#78716c);margin-left:6px">(${count} items)</span></div>
               <div style="display:flex;gap:4px">
-                <button type="button" class="btn xs btn-ghost ghost" onclick="window.startRenameCat('${escapeAttr(cat)}')">Rename</button>
-                <button type="button" class="btn xs btn-ghost ghost" onclick="window.startMergeCat('${escapeAttr(cat)}')">Merge</button>
-                <button type="button" class="btn xs btn-ghost ghost" style="color:var(--red,#ef4444)" onclick="window.promptDeleteCategory('${escapeAttr(cat)}')">Delete</button>
+                <button type="button" class="btn xs btn-ghost ghost" onclick="window.startRenameCat('${escapeAttr(cat.name)}')">Rename</button>
+                <button type="button" class="btn xs btn-ghost ghost" onclick="window.startMergeCat('${escapeAttr(cat.name)}')">Merge</button>
+                <button type="button" class="btn xs btn-ghost ghost" style="color:var(--red,#ef4444)" onclick="window.promptDeleteCategory('${escapeAttr(cat.name)}')">Delete</button>
               </div>
             </div>`;
           }).join('')}
@@ -212,18 +242,23 @@ export function renderCategoryManagerModal() {
     if (!listDiv) return;
 
     const state = getState() || {};
-    const rawCategories = getRawCategories(state);
-    const otherCats = rawCategories.filter(c => slugCategory(c) !== slugCategory(activeCat));
-    const filtered = otherCats.filter(c => String(c).toLowerCase().includes(String(query || '').toLowerCase()));
+    const catObjects = getCategoryObjects(state);
+    const otherCats = catObjects.filter(c => c.id !== activeCat && slugCategory(c.name) !== slugCategory(activeCat));
+    const filtered = otherCats.filter(c => String(c.name).toLowerCase().includes(String(query || '').toLowerCase()));
 
     if (filtered.length === 0) {
       listDiv.innerHTML = `<div style="padding:8px 10px; font-size:12px; color:var(--text2,#78716c); font-style:italic;">No matching categories</div>`;
     } else {
-      listDiv.innerHTML = filtered.map(c => `
-        <div class="cat-merge-search-option" data-cat="${escapeAttr(c)}" style="padding:8px 10px; font-size:13px; cursor:pointer; font-weight:550; color:var(--text);" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='transparent'" onmousedown="window.selectCatMergeOption('${escapeAttr(c)}')">
-          ${escapeHtml(c)}
-        </div>
-      `).join('');
+      listDiv.innerHTML = filtered.map(c => {
+        const ingCount = (state.ingredients || []).filter(i => slugCategory(i.category) === slugCategory(c.name)).length;
+        const prodCount = (state.products || []).filter(p => slugCategory(p.category) === slugCategory(c.name)).length;
+        const total = ingCount + prodCount;
+        return `
+          <div class="cat-merge-search-option" data-cat="${escapeAttr(c.name)}" style="padding:8px 10px; font-size:13px; cursor:pointer; font-weight:550; color:var(--text);" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='transparent'" onmousedown="window.selectCatMergeOption('${escapeAttr(c.name)}')">
+            ${escapeHtml(c.name)} (${total} items)
+          </div>
+        `;
+      }).join('');
     }
     listDiv.style.display = 'block';
   };
@@ -272,51 +307,46 @@ export function renderCategoryManagerModal() {
     if (btn) { btn.disabled = true; btn.textContent = 'Merging...'; }
 
     try {
-      const state = getState() || {}, ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [], prods = Array.isArray(state.products) ? [...state.products] : [], rawList = getRawCategories(state);
-      const canonicalMap = new Map();
-      rawList.forEach(raw => {
-        const normKey = String(raw).trim().toLowerCase();
-        if (normKey && !canonicalMap.has(normKey)) canonicalMap.set(normKey, toCanonicalCategoryName(raw.trim()));
-      });
+      const repo = await import('../../services/HouseholdRepository.js');
+      const res = await repo.mergeAllDuplicates();
 
-      ings.forEach(i => {
-        let changed = false;
-        if (i.category) {
-          const canon = canonicalMap.get(String(i.category).trim().toLowerCase()) || toCanonicalCategoryName(i.category.trim());
-          if (i.category !== canon || i.cat !== slugifyToKebab(canon)) { i.category = canon; i.cat = slugifyToKebab(canon); changed = true; }
-        }
-        if (Array.isArray(i.subtypes)) {
-          i.subtypes.forEach(st => {
-            if (st.category) {
-              const canon = canonicalMap.get(String(st.category).trim().toLowerCase()) || toCanonicalCategoryName(st.category.trim());
-              if (st.category !== canon || st.cat !== slugifyToKebab(canon)) { st.category = canon; st.cat = slugifyToKebab(canon); changed = true; }
-            }
+      if (res && res.success) {
+        // Hydrate local state store with the fresh deduplicated list
+        const state = getState() || {};
+        const freshIngredients = await repo.getIngredients();
+        const freshProducts = await repo.getProducts();
+
+        setCategories(res.categories); 
+        setIngredients(freshIngredients); 
+        setProducts(freshProducts);
+
+        if (window.Store?.setState) {
+          window.Store.setState({ 
+            categories: res.categories, 
+            ingredients: freshIngredients, 
+            products: freshProducts 
           });
         }
-        if (changed) i.updatedAt = new Date().toISOString();
-      });
 
-      prods.forEach(p => {
-        if (p.category) {
-          const canon = canonicalMap.get(String(p.category).trim().toLowerCase()) || toCanonicalCategoryName(p.category.trim());
-          if (p.category !== canon || p.cat !== slugifyToKebab(canon)) { p.category = canon; p.cat = slugifyToKebab(canon); p.updatedAt = new Date().toISOString(); }
+        invalidateHierarchyCache();
+        
+        document.dispatchEvent(new CustomEvent('plateplan:state:categories', { detail: res.categories }));
+        document.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: freshIngredients }));
+        document.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: freshProducts }));
+
+        if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
+        if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+        if (typeof window.renderProductBank === 'function') window.renderProductBank();
+
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast('Successfully merged duplicate categories!', 'success');
         }
-      });
-
-      const updatedCategories = Array.from(new Set(canonicalMap.values())).sort((a, b) => a.localeCompare(b));
-      setCategories(updatedCategories); setIngredients(ings); setProducts(prods);
-      if (window.Store?.setState) window.Store.setState({ categories: updatedCategories, ingredients: ings, products: prods });
-
-      await saveHouseholdState({ categories: updatedCategories, ingredients: ings, products: prods });
-      invalidateHierarchyCache();
-      document.dispatchEvent(new CustomEvent('plateplan:state:categories', { detail: updatedCategories }));
-      document.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: ings }));
-      document.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: prods }));
-      if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
-      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-      if (typeof window.renderProductBank === 'function') window.renderProductBank();
+      }
     } catch (err) {
       console.error('Failed to merge duplicate categories:', err);
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast('Network error occurred while merging duplicates. Please try again.', 'error');
+      }
     } finally {
       resetModalState();
       renderCurrentStep();
@@ -458,13 +488,53 @@ window.handleDeleteCategory = async function handleDeleteCategory(identifier) {
   if (!category?.name) return;
   const targetId = category.id, targetName = category.name;
   try {
-    if (window.PantryRepository?.deleteCategory) await window.PantryRepository.deleteCategory(targetId || targetName);
-    const state = getState() || {}, ingsToUpdate = (state.ingredients || []).filter(i => i.category === targetName || i.cat === targetName);
-    for (const ing of ingsToUpdate) {
-      await saveIngredient({ ...ing, category: 'Uncategorised', cat: 'uncategorised', updatedAt: new Date().toISOString() });
-    }
-    const categories = (state.categories || []).filter(c => (typeof c === 'string' ? c : c?.name) !== targetName);
-    setCategories(categories); await saveCategories(categories);
+    const { deleteCategory } = await import('../../services/HouseholdRepository.js');
+    await deleteCategory(targetId || targetName);
+    
+    // Also update local state to reflect the delete and re-parent
+    const state = getState() || {};
+    const fallbackCatName = 'Uncategorised';
+    const fallbackKebab = slugifyToKebab(fallbackCatName);
+
+    const ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
+    ings.forEach(i => {
+      let changed = false;
+      if (i.category === targetName || i.cat === slugifyToKebab(targetName)) {
+        i.category = fallbackCatName;
+        i.cat = fallbackKebab;
+        changed = true;
+      }
+      if (Array.isArray(i.subtypes)) {
+        i.subtypes.forEach(st => {
+          if (st.category === targetName || st.cat === slugifyToKebab(targetName)) {
+            st.category = fallbackCatName;
+            st.cat = fallbackKebab;
+            changed = true;
+          }
+        });
+      }
+      if (changed) i.updatedAt = new Date().toISOString();
+    });
+
+    const prods = Array.isArray(state.products) ? [...state.products] : [];
+    prods.forEach(p => {
+      if (p.category === targetName || p.cat === slugifyToKebab(targetName)) {
+        p.category = fallbackCatName;
+        p.cat = fallbackKebab;
+        p.updatedAt = new Date().toISOString();
+      }
+    });
+
+    const categories = (state.categories || []).filter(c => {
+      const cName = typeof c === 'string' ? c : c?.name;
+      return cName !== targetName && slugCategory(cName) !== slugCategory(targetName);
+    });
+
+    setCategories(categories); 
+    setIngredients(ings); 
+    setProducts(prods);
+
+    invalidateHierarchyCache();
   } catch (err) {
     console.error('Failed to delete category:', err);
   } finally {

@@ -1355,8 +1355,340 @@ const HouseholdRepository = {
   savePlanHistory,
   executeSubcollectionMigration,
   inspectPreferences,
-  cleanPreferencesBloat
+  cleanPreferencesBloat,
+  deleteCategory,
+  mergeCategory,
+  mergeAllDuplicates
 };
+
+export async function deleteCategory(categoryName, fallbackCatName = 'Uncategorised') {
+  if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
+  if (!categoryName) return { success: false, error: 'Missing category name' };
+
+  const strictNormalize = (str) => {
+    return String(str || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]+$/, '');
+  };
+  const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^a-z0-9\-]/g);
+
+  try {
+    const batch = db.batch();
+    const householdRef = db.collection('households').doc(HOUSEHOLD_ID);
+
+    const deleteNormalized = strictNormalize(categoryName);
+
+    // 1. Fetch ingredients/items with this category from Firestore
+    const ingSnap = await householdRef.collection('ingredients').get();
+    ingSnap.docs.forEach(doc => {
+      const ing = doc.data();
+      let changed = false;
+      if (strictNormalize(ing.category) === deleteNormalized) {
+        ing.category = fallbackCatName;
+        ing.cat = slugifyToKebab(fallbackCatName);
+        changed = true;
+      }
+      if (Array.isArray(ing.subtypes)) {
+        ing.subtypes.forEach(st => {
+          if (strictNormalize(st.category) === deleteNormalized) {
+            st.category = fallbackCatName;
+            st.cat = slugifyToKebab(fallbackCatName);
+            changed = true;
+          }
+        });
+      }
+      if (changed) {
+        batch.update(doc.ref, { 
+          category: ing.category || fallbackCatName,
+          cat: ing.cat || slugifyToKebab(fallbackCatName),
+          subtypes: ing.subtypes || [],
+          updatedAt: new Date().toISOString()
+        });
+      }
+    });
+
+    // 2. Fetch products with this category from Firestore
+    const prodSnap = await householdRef.collection('products').get();
+    prodSnap.docs.forEach(doc => {
+      const prod = doc.data();
+      if (strictNormalize(prod.category) === deleteNormalized) {
+        batch.update(doc.ref, {
+          category: fallbackCatName,
+          cat: slugifyToKebab(fallbackCatName),
+          updatedAt: new Date().toISOString()
+        });
+      }
+    });
+
+    // 3. Delete the category document or update categories array in Settings doc
+    const catsDocRef = householdRef.collection('settings').doc('categories');
+    const catsSnap = await catsDocRef.get();
+    if (catsSnap.exists) {
+      const data = catsSnap.data();
+      const updatedCats = (data.categories || []).filter(c => {
+        const cName = typeof c === 'string' ? c : c?.name;
+        return strictNormalize(cName) !== deleteNormalized;
+      });
+      batch.set(catsDocRef, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true });
+    }
+
+    await batch.commit();
+    return { success: true };
+  } catch (err) {
+    console.error('[HouseholdRepository] deleteCategory error:', err);
+    throw err;
+  }
+}
+
+export async function mergeCategory(sourceCat, targetCat) {
+  if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
+  if (!sourceCat || !targetCat) return { success: false, error: 'Missing source or target' };
+
+  const strictNormalize = (str) => {
+    return String(str || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]+$/, '');
+  };
+  const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^a-z0-9\-]/g);
+
+  try {
+    const batch = db.batch();
+    const householdRef = db.collection('households').doc(HOUSEHOLD_ID);
+
+    const sourceNormalized = strictNormalize(sourceCat);
+    const targetNormalized = strictNormalize(targetCat);
+
+    // 1. Fetch ingredients/items with source category from Firestore
+    const ingSnap = await householdRef.collection('ingredients').get();
+    ingSnap.docs.forEach(doc => {
+      const ing = doc.data();
+      let changed = false;
+      if (strictNormalize(ing.category) === sourceNormalized) {
+        ing.category = targetCat;
+        ing.cat = slugifyToKebab(targetCat);
+        changed = true;
+      }
+      if (Array.isArray(ing.subtypes)) {
+        ing.subtypes.forEach(st => {
+          if (strictNormalize(st.category) === sourceNormalized) {
+            st.category = targetCat;
+            st.cat = slugifyToKebab(targetCat);
+            changed = true;
+          }
+        });
+      }
+      if (changed) {
+        batch.update(doc.ref, { 
+          category: ing.category,
+          cat: ing.cat,
+          subtypes: ing.subtypes || [],
+          updatedAt: new Date().toISOString()
+        });
+      }
+    });
+
+    // 2. Fetch products with source category from Firestore
+    const prodSnap = await householdRef.collection('products').get();
+    prodSnap.docs.forEach(doc => {
+      const prod = doc.data();
+      if (strictNormalize(prod.category) === sourceNormalized) {
+        batch.update(doc.ref, {
+          category: targetCat,
+          cat: slugifyToKebab(targetCat),
+          updatedAt: new Date().toISOString()
+        });
+      }
+    });
+
+    // 3. Update the categories array in Settings doc
+    const catsDocRef = householdRef.collection('settings').doc('categories');
+    const catsSnap = await catsDocRef.get();
+    if (catsSnap.exists) {
+      const data = catsSnap.data();
+      const updatedCats = (data.categories || []).filter(c => {
+        const cName = typeof c === 'string' ? c : c?.name;
+        return strictNormalize(cName) !== sourceNormalized;
+      });
+      // Ensure targetCat is in the list
+      if (!updatedCats.some(c => strictNormalize(typeof c === 'string' ? c : c?.name) === targetNormalized)) {
+        updatedCats.push(targetCat);
+      }
+      batch.set(catsDocRef, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true });
+    }
+
+    await batch.commit();
+    return { success: true };
+  } catch (err) {
+    console.error('[HouseholdRepository] mergeCategory error:', err);
+    throw err;
+  }
+}
+
+export async function mergeAllDuplicates() {
+  if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
+  
+  const slugCategory = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^a-z0-9\-]/g, '');
+
+  try {
+    const batch = db.batch();
+    const householdRef = db.collection('households').doc(HOUSEHOLD_ID);
+
+    // Fetch existing data
+    const categoriesDocRef = householdRef.collection('settings').doc('categories');
+    const categoriesSnap = await categoriesDocRef.get();
+    let categoriesList = [];
+    if (categoriesSnap.exists) {
+      categoriesList = categoriesSnap.data().categories || [];
+    }
+
+    const ingSnap = await householdRef.collection('ingredients').get();
+    const prodSnap = await householdRef.collection('products').get();
+
+    const ingredients = ingSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+    const products = prodSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+
+    // Let's gather all unique raw category strings present in the system
+    const rawCategoriesSet = new Set();
+    categoriesList.forEach(c => {
+      const name = typeof c === 'string' ? c : c?.name;
+      if (name) rawCategoriesSet.add(name);
+    });
+    ingredients.forEach(i => {
+      if (i.category) rawCategoriesSet.add(i.category);
+      if (Array.isArray(i.subtypes)) {
+        i.subtypes.forEach(st => {
+          if (st.category) rawCategoriesSet.add(st.category);
+        });
+      }
+    });
+    products.forEach(p => {
+      if (p.category) rawCategoriesSet.add(p.category);
+    });
+
+    const rawList = Array.from(rawCategoriesSet);
+
+    // Group categories using strict string normalisation (lowercase, .trim(), stripping trailing punctuation)
+    const strictNormalize = (str) => {
+      return String(str || '')
+        .toLowerCase()
+        .trim()
+        .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]+$/, '');
+    };
+
+    const groups = new Map(); // strictNormalized -> Array of raw names
+    rawList.forEach(raw => {
+      const norm = strictNormalize(raw);
+      if (norm) {
+        if (!groups.has(norm)) {
+          groups.set(norm, []);
+        }
+        groups.get(norm).push(raw);
+      }
+    });
+
+    const canonicalMap = new Map(); // originalName -> masterName
+    const updatedCategoriesList = [];
+
+    // Identify master category for each group
+    for (const [norm, names] of groups.entries()) {
+      if (names.length === 1) {
+        canonicalMap.set(names[0], names[0]);
+        updatedCategoriesList.push(names[0]);
+        continue;
+      }
+
+      // Count child items (ingredients + products) for each name
+      let masterName = names[0];
+      let maxCount = -1;
+
+      names.forEach(name => {
+        const ingCount = ingredients.filter(i => {
+          const matchDirect = i.category === name || slugCategory(i.category) === slugCategory(name);
+          const matchSub = Array.isArray(i.subtypes) && i.subtypes.some(st => st.category === name || slugCategory(st.category) === slugCategory(name));
+          return matchDirect || matchSub;
+        }).length;
+
+        const prodCount = products.filter(p => p.category === name || slugCategory(p.category) === slugCategory(name)).length;
+        const total = ingCount + prodCount;
+
+        if (total > maxCount) {
+          maxCount = total;
+          masterName = name;
+        }
+      });
+
+      // Map all names in this group to the masterName
+      names.forEach(name => {
+        canonicalMap.set(name, masterName);
+      });
+
+      updatedCategoriesList.push(masterName);
+    }
+
+    // Now execute a batch transaction to re-point all duplicates to master
+    let ingredientsChanged = 0;
+    ingredients.forEach(i => {
+      let changed = false;
+      let newCat = i.category;
+      if (i.category && canonicalMap.has(i.category)) {
+        const mapped = canonicalMap.get(i.category);
+        if (i.category !== mapped) {
+          newCat = mapped;
+          changed = true;
+        }
+      }
+      const subtypes = Array.isArray(i.subtypes) ? [...i.subtypes] : [];
+      subtypes.forEach(st => {
+        if (st.category && canonicalMap.has(st.category)) {
+          const mapped = canonicalMap.get(st.category);
+          if (st.category !== mapped) {
+            st.category = mapped;
+            st.cat = slugifyToKebab(mapped);
+            changed = true;
+          }
+        }
+      });
+
+      if (changed) {
+        batch.update(i.ref, {
+          category: newCat,
+          cat: slugifyToKebab(newCat),
+          subtypes,
+          updatedAt: new Date().toISOString()
+        });
+        ingredientsChanged++;
+      }
+    });
+
+    let productsChanged = 0;
+    products.forEach(p => {
+      if (p.category && canonicalMap.has(p.category)) {
+        const mapped = canonicalMap.get(p.category);
+        if (p.category !== mapped) {
+          batch.update(p.ref, {
+            category: mapped,
+            cat: slugifyToKebab(mapped),
+            updatedAt: new Date().toISOString()
+          });
+          productsChanged++;
+        }
+      }
+    });
+
+    // Save the deduplicated categories list in Settings categories doc
+    const finalUniqueCats = Array.from(new Set(updatedCategoriesList)).sort((a, b) => a.localeCompare(b));
+    batch.set(categoriesDocRef, { categories: finalUniqueCats, updatedAt: new Date().toISOString() }, { merge: true });
+
+    await batch.commit();
+    return { success: true, ingredientsChanged, productsChanged, categories: finalUniqueCats };
+  } catch (err) {
+    console.error('[HouseholdRepository] mergeAllDuplicates error:', err);
+    throw err;
+  }
+}
 
 if (typeof window !== 'undefined') {
   window.HouseholdRepository = HouseholdRepository;
