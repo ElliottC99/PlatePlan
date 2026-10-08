@@ -1,5 +1,5 @@
 /**
- * scripts/test_accessibility_dom.js (v3.28.0)
+ * scripts/test_accessibility_dom.js (v3.28.1)
  * Static regression prevention test scanner to enforce that all form controls (input, select, textarea)
  * in view templates have explicit 'id', 'name', and are properly labeled (via aria-label, aria-labelledby, or <label for="...">).
  */

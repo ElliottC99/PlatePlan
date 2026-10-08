@@ -1,5 +1,5 @@
 /**
- * src/services/HouseholdRepository.js (v3.20.15)
+ * src/services/HouseholdRepository.js (v3.28.1)
  * Dedicated data access repository for household-scoped Firestore operations.
  * Completely isolated from DOM manipulation and UI rendering.
  * All operations target the shared household path 'households/elliott-chloe'.
@@ -995,7 +995,12 @@ export async function save(state = {}) {
   if (Array.isArray(state.categories)) {
     promises.push(saveCategories(state.categories));
   }
-  return Promise.all(promises);
+  const results = await Promise.all(promises);
+  const failure = results.find(r => r && r.success === false && r.error);
+  if (failure) {
+    throw typeof failure.error === 'string' ? new Error(failure.error) : failure.error;
+  }
+  return results;
 }
 
 export const saveHouseholdState = save;

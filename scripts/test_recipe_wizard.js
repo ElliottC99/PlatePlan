@@ -1,5 +1,5 @@
 /**
- * scripts/test_recipe_wizard.js (v3.28.0)
+ * scripts/test_recipe_wizard.js (v3.28.1)
  * Automated verification test suite for:
  * 1. Compound stock parsing ("1 stock cube + 400ml water" -> qty: 1, name: "Vegetable Stock Cube")
  * 2. Universal Title Case normalization (Titles, Ingredients, Section Headers)
@@ -12,7 +12,7 @@ import { strict as assert } from 'assert';
 import { parseIngredientString, parseBulkRecipeText, toTitleCase } from '../src/services/RecipeImporter.js';
 import { getSaveButtonLabel, hasDistinctEnhancedVariant } from '../src/components/recipe/RecipeWizardState.js';
 
-console.log('=== RUNNING RECIPE WIZARD v3.28.0 VERIFICATION SUITE ===');
+console.log('=== RUNNING RECIPE WIZARD v3.28.1 VERIFICATION SUITE ===');
 
 // --- Test 1: Compound Stock Parsing ---
 console.log('\n--- Test 1: Compound Stock & Liquid Parsing ---');
@@ -149,4 +149,4 @@ const linkName = getProductLink(categoryItem, dummyProducts);
 assert.equal(linkName, 'Tesco Carrots 1kg');
 console.log('✅ Passed: Lookup successfully resolved the correct default category product from the mock bank');
 
-console.log('\n=== ALL RECIPE WIZARD v3.28.0 TESTS PASSED SUCCESSFULLY ===');
+console.log('\n=== ALL RECIPE WIZARD v3.28.1 TESTS PASSED SUCCESSFULLY ===');

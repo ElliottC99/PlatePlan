@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.28.0)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.28.1)
  * In-App Multi-Step Category Operations Wizard, Raw Exposure & Deep State Merge Modal.
  * Wrapped with Try-Catch-Finally block exception handling and state resets to eliminate screen freezes.
  * Fully accessible Form fields with explicit id, name, and paired labels.
@@ -135,17 +135,18 @@ export function renderCategoryManagerModal() {
           <button id="btn-submit-rename-cat" type="button" class="btn btn-primary primary sm" onclick="window.submitRenameCat()">Apply Rename</button>
         </div>`;
     } else if (wizardStep === 'merge') {
-      const otherCats = rawCategories.filter(c => c !== activeCat);
       bodyHtml = `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border,#e7e5e4)">
           <h3 style="margin:0;font-size:15px;font-weight:750">Merge "${escapeHtml(activeCat)}"</h3>
           <button type="button" class="modal-close-btn btn sm btn-ghost ghost" onclick="window.closeCategoryManagerModal()" aria-label="Close modal">✕</button>
         </div>
         <div style="margin-bottom:16px">
-          <label for="cat-merge-select" style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">Select Target Destination Category</label>
-          <select id="cat-merge-select" name="cat_merge_select" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);font-size:13.5px;background:var(--surface,#fff)">
-            ${otherCats.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('')}
-          </select>
+          <label for="cat-merge-search-input" style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">Select Target Destination Category</label>
+          <div style="position:relative;">
+            <input type="text" id="cat-merge-search-input" name="cat_merge_search_input" placeholder="Search target category..." autocomplete="off" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);font-size:13.5px;box-sizing:border-box" oninput="window.filterCatMergeOptions(this.value)" onfocus="window.filterCatMergeOptions(this.value)" onblur="setTimeout(() => { const listDiv = document.getElementById('cat-merge-dropdown-list'); if (listDiv) listDiv.style.display = 'none'; }, 200)">
+            <div id="cat-merge-dropdown-list" style="position:absolute;top:100%;left:0;right:0;max-height:150px;overflow-y:auto;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);box-shadow:0 4px 12px rgba(0,0,0,0.08);z-index:9999;display:none;margin-top:4px;"></div>
+          </div>
+          <div id="cat-merge-validation-warning" style="display:none; color:var(--red,#ef4444); font-size:12.5px; font-weight:600; margin-top:8px; line-height:1.4;"></div>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
           <button type="button" class="btn btn-ghost ghost sm" onclick="window.navCatStep('list')">Back</button>
@@ -205,6 +206,44 @@ export function renderCategoryManagerModal() {
 
   window.closeCategoryManagerModal = closeCategoryManagerModal;
   window.navCatStep = (step) => { wizardStep = step; reassignSearch = ''; renderCurrentStep(); };
+
+  window.filterCatMergeOptions = (query) => {
+    const listDiv = document.getElementById('cat-merge-dropdown-list');
+    if (!listDiv) return;
+
+    const state = getState() || {};
+    const rawCategories = getRawCategories(state);
+    const otherCats = rawCategories.filter(c => slugCategory(c) !== slugCategory(activeCat));
+    const filtered = otherCats.filter(c => String(c).toLowerCase().includes(String(query || '').toLowerCase()));
+
+    if (filtered.length === 0) {
+      listDiv.innerHTML = `<div style="padding:8px 10px; font-size:12px; color:var(--text2,#78716c); font-style:italic;">No matching categories</div>`;
+    } else {
+      listDiv.innerHTML = filtered.map(c => `
+        <div class="cat-merge-search-option" data-cat="${escapeAttr(c)}" style="padding:8px 10px; font-size:13px; cursor:pointer; font-weight:550; color:var(--text);" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='transparent'" onmousedown="window.selectCatMergeOption('${escapeAttr(c)}')">
+          ${escapeHtml(c)}
+        </div>
+      `).join('');
+    }
+    listDiv.style.display = 'block';
+  };
+
+  window.selectCatMergeOption = (cat) => {
+    const input = document.getElementById('cat-merge-search-input');
+    if (input) {
+      input.value = cat;
+      input.dataset.selectedVal = cat;
+    }
+    const listDiv = document.getElementById('cat-merge-dropdown-list');
+    if (listDiv) listDiv.style.display = 'none';
+
+    // Hide any previous warning when they select a valid category
+    const warning = document.getElementById('cat-merge-validation-warning');
+    if (warning) {
+      warning.style.display = 'none';
+      warning.textContent = '';
+    }
+  };
 
   window.submitAddCat = async () => {
     const input = document.getElementById('cat-manager-add-input'), val = input ? input.value.trim() : '';
@@ -326,30 +365,48 @@ export function renderCategoryManagerModal() {
   window.startMergeCat = (cat) => { activeCat = cat; wizardStep = 'merge'; renderCurrentStep(); };
   
   window.submitMergeCat = async () => {
-    const select = document.getElementById('cat-merge-select'), targetCat = select ? select.value : '', sourceCat = activeCat;
-    if (!targetCat || !sourceCat) return;
+    const input = document.getElementById('cat-merge-search-input');
+    const targetCat = input ? (input.dataset.selectedVal || input.value.trim()) : '';
+    const sourceCat = activeCat;
+
+    const warning = document.getElementById('cat-merge-validation-warning');
+
+    if (!targetCat || !sourceCat) {
+      if (warning) {
+        warning.textContent = 'Please select a valid destination category.';
+        warning.style.display = 'block';
+      }
+      return;
+    }
+
+    if (slugCategory(targetCat) === slugCategory(sourceCat)) {
+      if (warning) {
+        warning.textContent = 'Source and target categories must be different';
+        warning.style.display = 'block';
+      }
+      return;
+    }
 
     const btn = document.getElementById('btn-submit-merge-cat');
     if (btn) { btn.disabled = true; btn.textContent = 'Merging...'; }
 
+    let success = false;
     try {
-      const targetKebab = slugifyToKebab(targetCat), state = getState() || {};
-      const ings = Array.isArray(state.ingredients) ? state.ingredients : [], prods = Array.isArray(state.products) ? state.products : [];
-      ings.forEach(i => {
-        if (i.category === sourceCat || i.cat === sourceCat) { i.category = targetCat; i.cat = targetKebab; i.updatedAt = new Date().toISOString(); }
-      });
-      prods.forEach(p => {
-        if (p.category === sourceCat || p.cat === sourceCat) { p.category = targetCat; p.cat = targetKebab; p.updatedAt = new Date().toISOString(); }
-      });
-      const categories = (state.categories || []).filter(c => c !== sourceCat);
-      setCategories(categories); setIngredients(ings); setProducts(prods);
-      await saveHouseholdState({ categories, ingredients: ings, products: prods });
-      if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
-      invalidateHierarchyCache();
+      await mergeCategory(sourceCat, targetCat);
+      success = true;
     } catch (err) {
       console.error('Failed to merge categories:', err);
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast('Network error occurred while merging categories. Please try again.', 'error');
+      }
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Confirm Merge';
+      }
     } finally {
-      closeCategoryManagerModal();
+      if (success) {
+        closeCategoryManagerModal();
+      }
     }
   };
 
@@ -454,4 +511,41 @@ if (typeof window !== 'undefined') {
     resetModalState(); 
     renderCategoryManagerModal(); 
   };
+}
+
+export async function mergeCategory(sourceCat, targetCat) {
+  if (!sourceCat || !targetCat) {
+    throw new Error('Missing source or target category');
+  }
+  if (slugCategory(sourceCat) === slugCategory(targetCat)) {
+    throw new Error('Source and target categories must be different');
+  }
+
+  const targetKebab = slugifyToKebab(targetCat), state = getState() || {};
+  const ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
+  const prods = Array.isArray(state.products) ? [...state.products] : [];
+  
+  ings.forEach(i => {
+    if (i.category === sourceCat || i.cat === sourceCat) { 
+      i.category = targetCat; 
+      i.cat = targetKebab; 
+      i.updatedAt = new Date().toISOString(); 
+    }
+  });
+  prods.forEach(p => {
+    if (p.category === sourceCat || p.cat === sourceCat) { 
+      p.category = targetCat; 
+      p.cat = targetKebab; 
+      p.updatedAt = new Date().toISOString(); 
+    }
+  });
+  
+  const categories = (state.categories || []).filter(c => c !== sourceCat);
+  setCategories(categories); 
+  setIngredients(ings); 
+  setProducts(prods);
+  
+  await saveHouseholdState({ categories, ingredients: ings, products: prods });
+  if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
+  invalidateHierarchyCache();
 }
