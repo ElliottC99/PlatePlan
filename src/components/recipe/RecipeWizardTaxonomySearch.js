@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardTaxonomySearch.js (v3.28.5)
+ * src/components/recipe/RecipeWizardTaxonomySearch.js (v3.28.6)
  * Searchable Category & Item Autocomplete Component for Recipe Ingestion Wizard.
  * Features:
  * - Dynamic substring filtering across ingredients & sub-types

@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardTaxonomyModal.js (v3.28.5)
+ * src/components/recipe/RecipeWizardTaxonomyModal.js (v3.28.6)
  * New Ingredient Mapping Wizard Modal component.
  * 3-step wizard for mapping raw recipe ingredients into Category -> Item -> Sub-Type hierarchy.
  */
@@ -134,6 +134,14 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
         </div>
       `;
     } else if (currentStep === 2) {
+      const selectedItemObj = (wizardData.entityType === 'subtype' && wizardData.selectedItemId)
+        ? ingredients.find(i => String(i.id) === String(wizardData.selectedItemId))
+        : null;
+
+      if (selectedItemObj && selectedItemObj.category) {
+        wizardData.selectedCategory = selectedItemObj.category;
+      }
+
       stepHtml = `
         <div style="display: flex; flex-direction: column; gap: 16px;">
           <div style="background: #eef2ff; border: 1px solid #c7d2fe; padding: 10px 12px; border-radius: 8px; font-size: 12.5px; color: #3730a3;">
@@ -149,7 +157,7 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
                 <input type="text" 
                        id="map-item-search-input" 
                        name="map_item_search_input"
-                       value="${escapeAttr(wizardData.newItemName || wizardData.name)}" 
+                       value="${escapeAttr(wizardData.newItemName)}" 
                        placeholder="Type to search existing items..." 
                        autocomplete="off"
                        style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface);" />
@@ -157,9 +165,38 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
               </div>
             </div>
 
+            ${selectedItemObj ? `
+              <div style="background: #f8fafc; border: 1.5px dashed #cbd5e1; padding: 10px 14px; border-radius: 8px; font-size: 12.5px; color: #334155; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 16px;">🔒</span>
+                  <div>
+                    <span style="color: #64748b; font-size: 11.5px; display: block;">Parent Category (Auto-Locked)</span>
+                    <strong style="font-size: 13px; color: var(--primary, #4f46e5);">${escapeHtml(wizardData.selectedCategory)}</strong>
+                  </div>
+                </div>
+                <button type="button" class="btn sm ghost" id="btn-unlock-category" style="font-size: 11.5px; padding: 3px 8px; color: #64748b;">Change Item</button>
+              </div>
+            ` : `
+              <div>
+                <label for="map-cat-search-input" style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--text);">
+                  2) Select or Create Parent Category <span style="color:#dc2626">*</span>
+                </label>
+                <div style="position: relative;">
+                  <input type="text" 
+                         id="map-cat-search-input" 
+                         name="map_cat_search_input"
+                         value="${escapeAttr(wizardData.selectedCategory)}" 
+                         placeholder="Type to search existing categories..." 
+                         autocomplete="off"
+                         style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface);" />
+                  <div id="map-cat-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:160px; overflow-y:auto; background:var(--surface,#fff); border:1px solid var(--border,#ccc); border-radius:6px; box-shadow:0 8px 24px rgba(0,0,0,0.15); z-index:1100; margin-top:2px;"></div>
+                </div>
+              </div>
+            `}
+          ` : wizardData.entityType === 'item' ? `
             <div>
               <label for="map-cat-search-input" style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--text);">
-                2) Select or Create Parent Category <span style="color:#dc2626">*</span>
+                1) Select or Create Parent Category <span style="color:#dc2626">*</span>
               </label>
               <div style="position: relative;">
                 <input type="text" 
@@ -172,45 +209,29 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
                 <div id="map-cat-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:160px; overflow-y:auto; background:var(--surface,#fff); border:1px solid var(--border,#ccc); border-radius:6px; box-shadow:0 8px 24px rgba(0,0,0,0.15); z-index:1100; margin-top:2px;"></div>
               </div>
             </div>
-          ` : wizardData.entityType === 'item' ? `
+
             <div>
               <label for="map-sub-name-input" style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--text);">
-                1) Sub-Type Name underneath Item <span style="color:#dc2626">*</span>
+                2) Child Sub-Type Name underneath Item <span style="color:#dc2626">*</span>
               </label>
               <input type="text" 
                      id="map-sub-name-input" 
                      name="map_sub_name_input"
                      value="${escapeAttr(wizardData.subTypeName)}" 
-                     placeholder="e.g. Standard / Generic" 
+                     placeholder="Auto-filled with item name..." 
                      style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface);" />
-            </div>
-
-            <div>
-              <label for="map-cat-search-input" style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--text);">
-                2) Select or Create Category <span style="color:#dc2626">*</span>
-              </label>
-              <div style="position: relative;">
-                <input type="text" 
-                       id="map-cat-search-input" 
-                       name="map_cat_search_input"
-                       value="${escapeAttr(wizardData.selectedCategory)}" 
-                       placeholder="Type to search existing categories..." 
-                       autocomplete="off"
-                       style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface);" />
-                <div id="map-cat-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:160px; overflow-y:auto; background:var(--surface,#fff); border:1px solid var(--border,#ccc); border-radius:6px; box-shadow:0 8px 24px rgba(0,0,0,0.15); z-index:1100; margin-top:2px;"></div>
-              </div>
             </div>
           ` : `
             <div>
               <label for="map-item-search-input" style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--text);">
-                1) Assign or Create Item under Category <span style="color:#dc2626">*</span>
+                1) Assign or Create Child Item under Category <span style="color:#dc2626">*</span>
               </label>
               <div style="position: relative;">
                 <input type="text" 
                        id="map-item-search-input" 
                        name="map_item_search_input"
-                       value="${escapeAttr(wizardData.newItemName || wizardData.name)}" 
-                       placeholder="Type or search Item..." 
+                       value="${escapeAttr(wizardData.newItemName)}" 
+                       placeholder="Auto-filled with category name..." 
                        autocomplete="off"
                        style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface);" />
                 <div id="map-item-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:160px; overflow-y:auto; background:var(--surface,#fff); border:1px solid var(--border,#ccc); border-radius:6px; box-shadow:0 8px 24px rgba(0,0,0,0.15); z-index:1100; margin-top:2px;"></div>
@@ -219,13 +240,13 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
 
             <div>
               <label for="map-sub-name-input" style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--text);">
-                2) Assign Sub-Type Name <span style="color:#dc2626">*</span>
+                2) Assign Child Sub-Type Name <span style="color:#dc2626">*</span>
               </label>
               <input type="text" 
                      id="map-sub-name-input" 
                      name="map_sub_name_input"
                      value="${escapeAttr(wizardData.subTypeName)}" 
-                     placeholder="e.g. Standard" 
+                     placeholder="Auto-filled with category name..." 
                      style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface);" />
             </div>
           `}
@@ -352,9 +373,22 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
             alert('Please enter an Entity Name');
             return;
           }
-          wizardData.name = toTitleCase(nameVal);
-          wizardData.subTypeName = wizardData.name;
-          wizardData.newItemName = wizardData.name;
+          const cleanName = toTitleCase(nameVal);
+          wizardData.name = cleanName;
+
+          if (wizardData.entityType === 'subtype') {
+            wizardData.subTypeName = cleanName;
+            wizardData.newItemName = '';
+            wizardData.selectedItemId = '';
+          } else if (wizardData.entityType === 'item') {
+            wizardData.newItemName = cleanName;
+            wizardData.subTypeName = cleanName;
+          } else if (wizardData.entityType === 'category') {
+            wizardData.selectedCategory = cleanName;
+            wizardData.newItemName = cleanName;
+            wizardData.subTypeName = cleanName;
+          }
+
           currentStep = 2;
           renderWizard();
         };
@@ -364,6 +398,15 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
         currentStep = 1;
         renderWizard();
       };
+
+      const unlockBtn = modalEl.querySelector('#btn-unlock-category');
+      if (unlockBtn) {
+        unlockBtn.onclick = () => {
+          wizardData.selectedItemId = '';
+          wizardData.newItemName = '';
+          renderWizard();
+        };
+      }
 
       const itemInput = modalEl.querySelector('#map-item-search-input');
       const itemDropdown = modalEl.querySelector('#map-item-dropdown');
@@ -382,10 +425,22 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
 
           itemDropdown.querySelectorAll('.map-item-opt').forEach(opt => {
             opt.onclick = () => {
-              wizardData.selectedItemId = opt.dataset.id || '';
-              wizardData.newItemName = opt.dataset.name || query;
+              const matched = ingredients.find(i => String(i.id) === String(opt.dataset.id));
+              if (matched) {
+                wizardData.selectedItemId = matched.id;
+                wizardData.newItemName = matched.name;
+                if (matched.category) {
+                  wizardData.selectedCategory = matched.category;
+                }
+              } else {
+                wizardData.selectedItemId = '';
+                wizardData.newItemName = opt.dataset.name || query;
+              }
               itemInput.value = wizardData.newItemName;
               itemDropdown.style.display = 'none';
+              if (wizardData.entityType === 'subtype') {
+                renderWizard();
+              }
             };
           });
         };
@@ -393,6 +448,7 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
         itemInput.onfocus = () => filterItems(itemInput.value);
         itemInput.oninput = (e) => {
           wizardData.newItemName = e.target.value;
+          wizardData.selectedItemId = '';
           filterItems(e.target.value);
         };
       }
@@ -486,6 +542,10 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
       const btnTesco = modalEl.querySelector('#btn-wiz-open-tesco-import');
       if (btnTesco) {
         btnTesco.onclick = () => {
+          const viewWrap = document.getElementById('view-modal-wrap');
+          if (viewWrap) {
+            viewWrap.style.setProperty('z-index', '25005', 'important');
+          }
           if (typeof openTescoImportModal === 'function') {
             openTescoImportModal(wizardData.createdSubtypeId, wizardData.createdIngredientId);
           } else if (typeof window.openTescoImportModal === 'function') {
@@ -562,14 +622,17 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
             const currentStoreState = getState() || {};
             const currentIngredients = [...(currentStoreState.ingredients || [])];
 
-            let targetParent = currentIngredients.find(i => String(i.id) === String(wizardData.selectedItemId) || i.name.toLowerCase() === wizardData.newItemName.toLowerCase());
+            let targetParent = currentIngredients.find(i => 
+              (wizardData.selectedItemId && String(i.id) === String(wizardData.selectedItemId)) || 
+              i.name.toLowerCase() === wizardData.newItemName.toLowerCase()
+            );
 
             const subtypeId = `sub_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
             const newSubtype = {
               id: subtypeId,
               name: wizardData.subTypeName,
               defaultProductId: wizardData.linkedProduct ? wizardData.linkedProduct.id : null,
-              aliases: [wizardData.subTypeName.toLowerCase()]
+              aliases: Array.from(new Set([wizardData.subTypeName.toLowerCase(), wizardData.name.toLowerCase()]))
             };
 
             if (!targetParent) {
@@ -580,13 +643,25 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
                 category: wizardData.selectedCategory,
                 cat: wizardData.selectedCategory.toLowerCase().replace(/\s+/g, '_'),
                 subtypes: [newSubtype],
-                aliases: [wizardData.newItemName.toLowerCase(), wizardData.subTypeName.toLowerCase()],
+                aliases: Array.from(new Set([
+                  wizardData.newItemName.toLowerCase(), 
+                  wizardData.subTypeName.toLowerCase(),
+                  wizardData.name.toLowerCase()
+                ])),
                 updatedAt: new Date().toISOString()
               };
               currentIngredients.push(targetParent);
             } else {
+              if (wizardData.selectedCategory) {
+                targetParent.category = wizardData.selectedCategory;
+                targetParent.cat = wizardData.selectedCategory.toLowerCase().replace(/\s+/g, '_');
+              }
               targetParent.subtypes = [...(targetParent.subtypes || []), newSubtype];
-              targetParent.aliases = Array.from(new Set([...(targetParent.aliases || []), wizardData.subTypeName.toLowerCase()]));
+              targetParent.aliases = Array.from(new Set([
+                ...(targetParent.aliases || []), 
+                wizardData.subTypeName.toLowerCase(),
+                wizardData.name.toLowerCase()
+              ]));
               targetParent.updatedAt = new Date().toISOString();
             }
 
