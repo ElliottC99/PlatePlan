@@ -84,7 +84,7 @@ export function generateShoppingListFromPlan(plan, inventory = [], recipes = [],
         const currentTotal = aggregatedRequirements.get(key) || {
           ingredientId: ing.ingredientId || '',
           name: ing.name || 'Ingredient',
-          category: ingredientMap.get(ing.ingredientId)?.category || 'Pantry',
+          category: ingredientMap.get(ing.ingredientId)?.category || ing.categoryId || ing.category || 'Pantry',
           unit,
           requiredQty: 0
         };

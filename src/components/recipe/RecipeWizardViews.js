@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardViews.js (v3.27.4)
+ * src/components/recipe/RecipeWizardViews.js (v3.27.5)
  * Template view rendering functions for all steps of the Recipe Ingestion Wizard.
  */
 
@@ -367,7 +367,11 @@ export function renderState3Review() {
   activeSections.forEach(sec => {
     let rows = '';
     (sec.ingredients || []).forEach(ing => {
-      const taxLabel = ing.ingredientId ? `<span class="badge badge-purple" style="font-size:10px;">Mapped</span>` : `<span class="badge badge-green" style="font-size:10px;">New Item</span>`;
+      const taxLabel = ing.ingredientId 
+        ? `<span class="badge badge-purple" style="font-size:10px;">Mapped</span>` 
+        : (ing.categoryId 
+            ? `<span class="badge badge-purple" style="font-size:10px;">[Category] ${escapeHtml(ing.categoryId)}</span>` 
+            : `<span class="badge badge-green" style="font-size:10px;">New Item</span>`);
       rows += `
         <tr style="border-bottom: 1px solid var(--border, #eee); font-size: 13px;">
           <td style="padding: 6px 8px; font-weight: 600; width: 100px;">${ing.scaledQty || ing.qty} ${ing.unit}</td>

@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardState.js (v3.27.3)
+ * src/components/recipe/RecipeWizardState.js (v3.27.5)
  * Manages mutable state and step synchronisation for the Recipe Ingestion Wizard.
  */
 
@@ -32,16 +32,24 @@ export const wizardState = {
 
 export function hasDistinctEnhancedVariant(recipe = wizardState.activeRecipe) {
   if (!recipe || !recipe.enhanced || typeof recipe.enhanced !== 'object') return false;
-  const enh = recipe.enhanced;
-  const hasDistinctIngs = Array.isArray(enh.ingredients) && enh.ingredients.length > 0 &&
-    JSON.stringify(enh.ingredients) !== JSON.stringify(recipe.ingredients);
-  const hasDistinctSections = Array.isArray(enh.ingredientSections) && enh.ingredientSections.length > 0 &&
-    JSON.stringify(enh.ingredientSections) !== JSON.stringify(recipe.ingredientSections);
-  const hasDistinctSteps = (Array.isArray(enh.methodSteps) && enh.methodSteps.length > 0 && JSON.stringify(enh.methodSteps) !== JSON.stringify(recipe.methodSteps)) ||
-    (Array.isArray(enh.instructions) && enh.instructions.length > 0 && JSON.stringify(enh.instructions) !== JSON.stringify(recipe.methodSteps || recipe.instructions));
-  const hasDistinctName = enh.title && enh.title !== recipe.title;
+  
+  const originalRecipe = {
+    ingredients: recipe.ingredients || (recipe.ingredientSections || []).flatMap(s => s.ingredients).map(i => ({ name: i.name, qty: i.scaledQty || i.qty, unit: i.unit })),
+    method: recipe.methodSteps || recipe.instructions || recipe.method || []
+  };
+  
+  const enhancedRecipe = {
+    ingredients: recipe.enhanced.ingredients || (recipe.enhanced.ingredientSections || []).flatMap(s => s.ingredients).map(i => ({ name: i.name, qty: i.scaledQty || i.qty, unit: i.unit })),
+    method: recipe.enhanced.methodSteps || recipe.enhanced.instructions || recipe.enhanced.method || []
+  };
 
-  return !!(hasDistinctIngs || hasDistinctSections || hasDistinctSteps || hasDistinctName);
+  const hasDistinctEnhanced = Boolean(
+    enhancedRecipe &&
+    (JSON.stringify(enhancedRecipe.ingredients) !== JSON.stringify(originalRecipe.ingredients) ||
+     JSON.stringify(enhancedRecipe.method) !== JSON.stringify(originalRecipe.method))
+  );
+
+  return hasDistinctEnhanced;
 }
 
 export function getSaveButtonLabel(recipe = wizardState.activeRecipe) {
@@ -125,15 +133,23 @@ export function syncStep2InputsToState(modalWrap) {
         if (!val || val === 'new_item') {
           item.ingredientId = null;
           item.subtypeId = null;
+          item.categoryId = null;
           item.isNewTaxonomyItem = true;
+        } else if (val.startsWith('cat:')) {
+          item.categoryId = val.slice(4);
+          item.ingredientId = null;
+          item.subtypeId = null;
+          item.isNewTaxonomyItem = false;
         } else if (val.includes(':')) {
           const [ingId, subId] = val.split(':');
           item.ingredientId = ingId;
           item.subtypeId = subId;
+          item.categoryId = null;
           item.isNewTaxonomyItem = false;
         } else {
           item.ingredientId = val;
           item.subtypeId = null;
+          item.categoryId = null;
           item.isNewTaxonomyItem = false;
         }
       }

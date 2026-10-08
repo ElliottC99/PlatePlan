@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardTaxonomySearch.js (v3.27.3)
+ * src/components/recipe/RecipeWizardTaxonomySearch.js (v3.27.5)
  * Searchable Taxonomy Autocomplete Component for Recipe Ingestion Wizard.
  * Features:
  * - Dynamic substring filtering across ingredients & sub-types
@@ -11,7 +11,10 @@
 import { getState } from '../../store/store.js';
 import { openTaxonomyCreationModal } from './RecipeWizardTaxonomyModal.js';
 
-export function getTaxonomyLabel(ingredientId, subtypeId, rawName = '', ingredientsBank = []) {
+export function getTaxonomyLabel(ingredientId, subtypeId, rawName = '', ingredientsBank = [], categoryId = null) {
+  if (categoryId) {
+    return `[Category] ${categoryId}`;
+  }
   if (!ingredientId || ingredientId === 'new_item') {
     return `✨ New Item: ${rawName || 'Custom'}`;
   }
@@ -30,8 +33,8 @@ export function getTaxonomyLabel(ingredientId, subtypeId, rawName = '', ingredie
 }
 
 export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = []) {
-  const selectedVal = item.subtypeId ? `${item.ingredientId}:${item.subtypeId}` : (item.ingredientId || 'new_item');
-  const selectedLabel = getTaxonomyLabel(item.ingredientId, item.subtypeId, item.name, ingredientsBank);
+  const selectedVal = item.categoryId ? `cat:${item.categoryId}` : (item.subtypeId ? `${item.ingredientId}:${item.subtypeId}` : (item.ingredientId || 'new_item'));
+  const selectedLabel = getTaxonomyLabel(item.ingredientId, item.subtypeId, item.name, ingredientsBank, item.categoryId);
 
   return `
     <div class="wiz-tax-autocomplete-container" style="position:relative; width:100%;">
@@ -55,6 +58,17 @@ export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [])
 export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
   const storeState = getState() || {};
   const ingredientsBank = storeState.ingredients || [];
+  const STANDARD_CATEGORIES = [
+    'Store Cupboard',
+    'Produce',
+    'Refrigerated & Dairy',
+    'Frozen',
+    'Bakery',
+    'Spices & Oils'
+  ];
+  const existingCategories = Array.from(
+    new Set([...STANDARD_CATEGORIES, ...(storeState.categories || []), ...ingredientsBank.map(i => i.category).filter(Boolean)])
+  );
 
   const filterAndRenderDropdown = (inputEl, dropdownEl) => {
     const query = (inputEl.value || '').toLowerCase().trim();
@@ -66,6 +80,18 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
         ✨ New Taxonomy Item
       </div>
     `;
+
+    // Render category mappings with high visibility
+    existingCategories.forEach(cat => {
+      const catLower = cat.toLowerCase();
+      if (!query || catLower.includes(query) || '[category]'.includes(query)) {
+        html += `
+          <div class="wiz-tax-opt wiz-tax-category" data-val="cat:${escapeAttr(cat)}" data-label="[Category] ${escapeAttr(cat)}" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--purple,#4f46e5); background:var(--surface2,#f5f4ee); border-bottom:1px solid var(--border,#eee);">
+            🗂️ <span class="badge" style="background:#eef2ff; color:#4f46e5; font-size:10px; padding:1px 5px; border-radius:4px; margin-right:4px;">[Category]</span> ${escapeHtml(cat)}
+          </div>
+        `;
+      }
+    });
 
     ingredientsBank.forEach(ing => {
       const ingName = String(ing.name || '').toLowerCase();
