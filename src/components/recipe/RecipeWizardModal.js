@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardModal.js (v3.27.5)
+ * src/components/recipe/RecipeWizardModal.js (v3.28.0)
  * Controller Module for Multi-Step Ingestion & Recipe Creation Wizard Modal.
  * Integrates:
  * - State 0: Choice (Manual vs Bulk)
@@ -364,6 +364,9 @@ function bindWizardEvents() {
             ingredientId: i.ingredientId || null,
             subtypeId: i.subtypeId || null,
             categoryId: i.categoryId || null,
+            isCategoryDefault: i.isCategoryDefault || false,
+            displayName: i.displayName || null,
+            waterMl: i.waterMl || null,
             isNewTaxonomyItem: !!i.isNewTaxonomyItem
           })),
           instructions: rec.methodSteps,

@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardState.js (v3.27.5)
+ * src/components/recipe/RecipeWizardState.js (v3.28.0)
  * Manages mutable state and step synchronisation for the Recipe Ingestion Wizard.
  */
 
@@ -134,24 +134,44 @@ export function syncStep2InputsToState(modalWrap) {
           item.ingredientId = null;
           item.subtypeId = null;
           item.categoryId = null;
+          item.isCategoryDefault = false;
+          item.displayName = null;
           item.isNewTaxonomyItem = true;
         } else if (val.startsWith('cat:')) {
           item.categoryId = val.slice(4);
           item.ingredientId = null;
           item.subtypeId = null;
+          item.isCategoryDefault = true;
+          item.displayName = `Generic ${item.categoryId}`;
           item.isNewTaxonomyItem = false;
         } else if (val.includes(':')) {
           const [ingId, subId] = val.split(':');
           item.ingredientId = ingId;
           item.subtypeId = subId;
           item.categoryId = null;
+          item.isCategoryDefault = false;
+          item.displayName = null;
           item.isNewTaxonomyItem = false;
         } else {
           item.ingredientId = val;
           item.subtypeId = null;
           item.categoryId = null;
+          item.isCategoryDefault = false;
+          item.displayName = null;
           item.isNewTaxonomyItem = false;
         }
+      }
+    }
+  });
+
+  // Water Volume inputs
+  modalWrap.querySelectorAll('.wiz-ing-water-ml').forEach(input => {
+    const sIdx = parseInt(input.dataset.sidx, 10);
+    const iIdx = parseInt(input.dataset.iidx, 10);
+    if (!isNaN(sIdx) && !isNaN(iIdx)) {
+      const item = wizardState.activeRecipe.ingredientSections[sIdx]?.ingredients[iIdx];
+      if (item) {
+        item.waterMl = parseInt(input.value, 10) || 400;
       }
     }
   });

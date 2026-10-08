@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardTaxonomySearch.js (v3.27.5)
+ * src/components/recipe/RecipeWizardTaxonomySearch.js (v3.28.0)
  * Searchable Taxonomy Autocomplete Component for Recipe Ingestion Wizard.
  * Features:
  * - Dynamic substring filtering across ingredients & sub-types
@@ -39,6 +39,9 @@ export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [])
   return `
     <div class="wiz-tax-autocomplete-container" style="position:relative; width:100%;">
       <input type="text"
+             id="wiz-ing-tax-search-${sIdx}-${iIdx}"
+             name="wiz_ing_tax_search_${sIdx}_${iIdx}"
+             aria-label="Search taxonomy for ingredient section ${sIdx} item ${iIdx}"
              class="wiz-ing-tax-search"
              data-sidx="${sIdx}"
              data-iidx="${iIdx}"

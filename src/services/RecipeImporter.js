@@ -153,12 +153,16 @@ export function parseIngredientString(rawString) {
       notes = `dissolved in ${notes}`;
     }
 
+    const mlMatch = /(\d+)\s*(?:ml|millilitres|ml\b)/i.exec(liquidPart);
+    const waterMl = mlMatch ? parseInt(mlMatch[1], 10) : 400;
+
     return {
       raw: original,
       qty: parsedQty || 1,
       unit: 'qty',
       name: toTitleCase(name),
       notes: notes,
+      waterMl: waterMl,
       isFallbackWeight: false
     };
   }

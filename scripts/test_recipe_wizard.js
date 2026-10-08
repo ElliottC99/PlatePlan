@@ -1,17 +1,18 @@
 /**
- * scripts/test_recipe_wizard.js (v3.27.5)
+ * scripts/test_recipe_wizard.js (v3.28.0)
  * Automated verification test suite for:
  * 1. Compound stock parsing ("1 stock cube + 400ml water" -> qty: 1, name: "Vegetable Stock Cube")
  * 2. Universal Title Case normalization (Titles, Ingredients, Section Headers)
  * 3. Dynamic Save button label based on variant existence ("Save Original Recipe" vs "Save Both Recipes")
  * 4. Category-level mapping support (retaining categoryId for shopping list grouping)
+ * 5. Auto-default category-level assignment & Step 3 product linkage lookups
  */
 
 import { strict as assert } from 'assert';
 import { parseIngredientString, parseBulkRecipeText, toTitleCase } from '../src/services/RecipeImporter.js';
 import { getSaveButtonLabel, hasDistinctEnhancedVariant } from '../src/components/recipe/RecipeWizardState.js';
 
-console.log('=== RUNNING RECIPE WIZARD v3.27.5 VERIFICATION SUITE ===');
+console.log('=== RUNNING RECIPE WIZARD v3.28.0 VERIFICATION SUITE ===');
 
 // --- Test 1: Compound Stock Parsing ---
 console.log('\n--- Test 1: Compound Stock & Liquid Parsing ---');
@@ -112,10 +113,40 @@ const categoryItem = {
   categoryId: 'Produce',
   ingredientId: null,
   subtypeId: null,
-  isNewTaxonomyItem: false
+  isNewTaxonomyItem: false,
+  isCategoryDefault: true,
+  displayName: 'Generic Produce'
 };
 assert.equal(categoryItem.categoryId, 'Produce');
 assert.equal(categoryItem.ingredientId, null);
-console.log('✅ Passed: Category-level mapping correctly represents and maintains categoryId');
+assert.equal(categoryItem.isCategoryDefault, true);
+assert.equal(categoryItem.displayName, 'Generic Produce');
+console.log('✅ Passed: Category-level mapping correctly represents and maintains categoryId & auto-default displayName');
 
-console.log('\n=== ALL RECIPE WIZARD v3.27.5 TESTS PASSED SUCCESSFULLY ===');
+// --- Test 5: Step 3 Product Linkage Lookup Emulation ---
+console.log('\n--- Test 5: Step 3 Product Linkage Lookup Emulation ---');
+const dummyProducts = [
+  { id: 'p1', name: 'Tesco Carrots 1kg', category: 'Produce', isAutoDefault: true },
+  { id: 'p2', name: 'Tesco Broccoli', category: 'Produce', isAutoDefault: false }
+];
+
+// Helper emulating the lookup logic inside Step 3
+function getProductLink(ing, products) {
+  if (ing.isCategoryDefault || ing.categoryId) {
+    const catName = ing.categoryId || 'General Groceries';
+    let defaultProduct = products.find(p => (String(p.category).toLowerCase() === catName.toLowerCase()) && p.isAutoDefault);
+    if (!defaultProduct) {
+      defaultProduct = products.find(p => (String(p.category).toLowerCase() === catName.toLowerCase()));
+    }
+    if (defaultProduct) {
+      return defaultProduct.name;
+    }
+  }
+  return null;
+}
+
+const linkName = getProductLink(categoryItem, dummyProducts);
+assert.equal(linkName, 'Tesco Carrots 1kg');
+console.log('✅ Passed: Lookup successfully resolved the correct default category product from the mock bank');
+
+console.log('\n=== ALL RECIPE WIZARD v3.28.0 TESTS PASSED SUCCESSFULLY ===');

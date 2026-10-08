@@ -1,6 +1,8 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.20.14)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.28.0)
  * In-App Multi-Step Category Operations Wizard, Raw Exposure & Deep State Merge Modal.
+ * Wrapped with Try-Catch-Finally block exception handling and state resets to eliminate screen freezes.
+ * Fully accessible Form fields with explicit id, name, and paired labels.
  */
 
 import { getState, setCategories, setIngredients, setProducts } from '../../store/store.js';
@@ -47,10 +49,32 @@ const resolveCategory = (id) => {
   return { id, name: id };
 };
 
+export function resetModalState() {
+  wizardStep = 'list';
+  activeCat = null;
+  reassignSearch = '';
+  massTargetCat = '';
+  individualCatMap = {};
+  
+  // Clean up any potential loading states, overlays, or confirm modals
+  const confirmModal = document.getElementById('category-delete-confirm-modal');
+  if (confirmModal) confirmModal.remove();
+  
+  const modal = document.getElementById('category-manager-modal');
+  if (modal) {
+    const spinner = modal.querySelector('.loading-spinner, .spinner');
+    if (spinner) spinner.remove();
+  }
+}
+
 export function closeCategoryManagerModal() {
   const el = document.getElementById('category-manager-modal');
-  if (el) { el.dataset.wizardStep = wizardStep; Object.assign(el.style, { opacity: '0', pointerEvents: 'none' }); el.classList.remove('open'); }
-  wizardStep = 'list'; activeCat = null; reassignSearch = '';
+  if (el) {
+    el.dataset.wizardStep = 'list';
+    Object.assign(el.style, { opacity: '0', pointerEvents: 'none' });
+    el.classList.remove('open');
+  }
+  resetModalState();
   if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
   invalidateHierarchyCache();
 }
@@ -77,7 +101,7 @@ export function renderCategoryManagerModal() {
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
           <span style="font-size:12px;color:var(--text2,#78716c)">${rawCategories.length} raw database entries</span>
-          <button type="button" class="btn xs btn-secondary secondary" onclick="window.submitMergeDuplicateCategories()" title="Deduplicate and standardise category names across database">✨ Merge Duplicates</button>
+          <button id="btn-merge-duplicates" type="button" class="btn xs btn-secondary secondary" onclick="window.submitMergeDuplicateCategories()" title="Deduplicate and standardise category names across database">✨ Merge Duplicates</button>
         </div>
         <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
           ${rawCategories.map(cat => {
@@ -93,8 +117,8 @@ export function renderCategoryManagerModal() {
           }).join('')}
         </div>
         <div style="display:flex;gap:8px">
-          <input type="text" id="cat-manager-add-input" placeholder="New category name..." aria-label="New category name" style="flex:1;padding:6px 10px;border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);font-size:13px">
-          <button type="button" class="btn btn-primary primary sm" onclick="window.submitAddCat()">+ Add</button>
+          <input type="text" id="cat-manager-add-input" name="cat_manager_add_input" placeholder="New category name..." aria-label="New category name" style="flex:1;padding:6px 10px;border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);font-size:13px">
+          <button id="btn-submit-add-cat" type="button" class="btn btn-primary primary sm" onclick="window.submitAddCat()">+ Add</button>
         </div>`;
     } else if (wizardStep === 'rename') {
       bodyHtml = `
@@ -103,12 +127,12 @@ export function renderCategoryManagerModal() {
           <button type="button" class="modal-close-btn btn sm btn-ghost ghost" onclick="window.closeCategoryManagerModal()" aria-label="Close modal">✕</button>
         </div>
         <div style="margin-bottom:16px">
-          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">New Category Name</label>
-          <input type="text" id="cat-rename-input" value="${escapeAttr(activeCat)}" aria-label="New category name input" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);font-size:13.5px;box-sizing:border-box">
+          <label for="cat-rename-input" style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">New Category Name</label>
+          <input type="text" id="cat-rename-input" name="cat_rename_input" value="${escapeAttr(activeCat)}" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);font-size:13.5px;box-sizing:border-box">
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
           <button type="button" class="btn btn-ghost ghost sm" onclick="window.navCatStep('list')">Back</button>
-          <button type="button" class="btn btn-primary primary sm" onclick="window.submitRenameCat()">Apply Rename</button>
+          <button id="btn-submit-rename-cat" type="button" class="btn btn-primary primary sm" onclick="window.submitRenameCat()">Apply Rename</button>
         </div>`;
     } else if (wizardStep === 'merge') {
       const otherCats = rawCategories.filter(c => c !== activeCat);
@@ -118,14 +142,14 @@ export function renderCategoryManagerModal() {
           <button type="button" class="modal-close-btn btn sm btn-ghost ghost" onclick="window.closeCategoryManagerModal()" aria-label="Close modal">✕</button>
         </div>
         <div style="margin-bottom:16px">
-          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">Select Target Destination Category</label>
-          <select id="cat-merge-select" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);font-size:13.5px;background:var(--surface,#fff)">
+          <label for="cat-merge-select" style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">Select Target Destination Category</label>
+          <select id="cat-merge-select" name="cat_merge_select" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);font-size:13.5px;background:var(--surface,#fff)">
             ${otherCats.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('')}
           </select>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
           <button type="button" class="btn btn-ghost ghost sm" onclick="window.navCatStep('list')">Back</button>
-          <button type="button" class="btn btn-primary primary sm" onclick="window.submitMergeCat()">Confirm Merge</button>
+          <button id="btn-submit-merge-cat" type="button" class="btn btn-primary primary sm" onclick="window.submitMergeCat()">Confirm Merge</button>
         </div>`;
     } else if (wizardStep === 'reassign') {
       const boundIngs = ingredients.filter(i => (i.category === activeCat || i.cat === activeCat || slugCategory(i.category) === slugCategory(activeCat)));
@@ -153,7 +177,7 @@ export function renderCategoryManagerModal() {
             </select>
           </div>` : `
           <div style="margin-bottom:8px">
-            <input type="text" id="cat-reassign-filter" name="reassign_filter" placeholder="Filter items by name..." value="${escapeAttr(reassignSearch)}" oninput="window.handleReassignSearch(this.value)" style="width:100%;padding:6px 10px;border:1px solid var(--border,#e7e5e4);border-radius:6px;font-size:12px;box-sizing:border-box">
+            <input type="text" id="cat-reassign-filter" name="reassign_filter" aria-label="Filter items by name" placeholder="Filter items by name..." value="${escapeAttr(reassignSearch)}" oninput="window.handleReassignSearch(this.value)" style="width:100%;padding:6px 10px;border:1px solid var(--border,#e7e5e4);border-radius:6px;font-size:12px;box-sizing:border-box">
           </div>
           <div style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
             ${filteredIngs.map(ing => {
@@ -169,7 +193,7 @@ export function renderCategoryManagerModal() {
           </div>`}
         <div style="display:flex;gap:8px;justify-content:flex-end">
           <button type="button" class="btn ghost sm" onclick="window.navCatStep('list')">Cancel</button>
-          <button type="button" class="btn primary sm" style="background:var(--red,#ef4444)" onclick="window.submitReassignAndDelete()">Reassign & Delete</button>
+          <button id="btn-submit-reassign-delete" type="button" class="btn primary sm" style="background:var(--red,#ef4444)" onclick="window.submitReassignAndDelete()">Reassign & Delete</button>
         </div>`;
     }
 
@@ -185,106 +209,148 @@ export function renderCategoryManagerModal() {
   window.submitAddCat = async () => {
     const input = document.getElementById('cat-manager-add-input'), val = input ? input.value.trim() : '';
     if (!val) return;
-    const state = getState() || {}, categories = Array.isArray(state.categories) ? [...state.categories] : [];
-    if (!categories.some(c => slugCategory(c) === slugCategory(val))) {
-      categories.push(toCanonicalCategoryName(val));
-      setCategories(categories); await saveCategories(categories);
+    
+    const btn = document.getElementById('btn-submit-add-cat');
+    if (btn) { btn.disabled = true; btn.textContent = '...'; }
+
+    try {
+      const state = getState() || {}, categories = Array.isArray(state.categories) ? [...state.categories] : [];
+      if (!categories.some(c => slugCategory(c) === slugCategory(val))) {
+        categories.push(toCanonicalCategoryName(val));
+        setCategories(categories); 
+        await saveCategories(categories);
+      }
+    } catch (err) {
+      console.error('Failed to add category:', err);
+    } finally {
+      resetModalState();
+      renderCurrentStep();
     }
-    wizardStep = 'list'; activeCat = null; reassignSearch = ''; renderCurrentStep();
   };
 
   window.submitMergeDuplicateCategories = async () => {
-    const state = getState() || {}, ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [], prods = Array.isArray(state.products) ? [...state.products] : [], rawList = getRawCategories(state);
-    const canonicalMap = new Map();
-    rawList.forEach(raw => {
-      const normKey = String(raw).trim().toLowerCase();
-      if (normKey && !canonicalMap.has(normKey)) canonicalMap.set(normKey, toCanonicalCategoryName(raw.trim()));
-    });
+    const btn = document.getElementById('btn-merge-duplicates');
+    if (btn) { btn.disabled = true; btn.textContent = 'Merging...'; }
 
-    ings.forEach(i => {
-      let changed = false;
-      if (i.category) {
-        const canon = canonicalMap.get(String(i.category).trim().toLowerCase()) || toCanonicalCategoryName(i.category.trim());
-        if (i.category !== canon || i.cat !== slugifyToKebab(canon)) { i.category = canon; i.cat = slugifyToKebab(canon); changed = true; }
-      }
-      if (Array.isArray(i.subtypes)) {
-        i.subtypes.forEach(st => {
-          if (st.category) {
-            const canon = canonicalMap.get(String(st.category).trim().toLowerCase()) || toCanonicalCategoryName(st.category.trim());
-            if (st.category !== canon || st.cat !== slugifyToKebab(canon)) { st.category = canon; st.cat = slugifyToKebab(canon); changed = true; }
-          }
-        });
-      }
-      if (changed) i.updatedAt = new Date().toISOString();
-    });
+    try {
+      const state = getState() || {}, ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [], prods = Array.isArray(state.products) ? [...state.products] : [], rawList = getRawCategories(state);
+      const canonicalMap = new Map();
+      rawList.forEach(raw => {
+        const normKey = String(raw).trim().toLowerCase();
+        if (normKey && !canonicalMap.has(normKey)) canonicalMap.set(normKey, toCanonicalCategoryName(raw.trim()));
+      });
 
-    prods.forEach(p => {
-      if (p.category) {
-        const canon = canonicalMap.get(String(p.category).trim().toLowerCase()) || toCanonicalCategoryName(p.category.trim());
-        if (p.category !== canon || p.cat !== slugifyToKebab(canon)) { p.category = canon; p.cat = slugifyToKebab(canon); p.updatedAt = new Date().toISOString(); }
-      }
-    });
+      ings.forEach(i => {
+        let changed = false;
+        if (i.category) {
+          const canon = canonicalMap.get(String(i.category).trim().toLowerCase()) || toCanonicalCategoryName(i.category.trim());
+          if (i.category !== canon || i.cat !== slugifyToKebab(canon)) { i.category = canon; i.cat = slugifyToKebab(canon); changed = true; }
+        }
+        if (Array.isArray(i.subtypes)) {
+          i.subtypes.forEach(st => {
+            if (st.category) {
+              const canon = canonicalMap.get(String(st.category).trim().toLowerCase()) || toCanonicalCategoryName(st.category.trim());
+              if (st.category !== canon || st.cat !== slugifyToKebab(canon)) { st.category = canon; st.cat = slugifyToKebab(canon); changed = true; }
+            }
+          });
+        }
+        if (changed) i.updatedAt = new Date().toISOString();
+      });
 
-    const updatedCategories = Array.from(new Set(canonicalMap.values())).sort((a, b) => a.localeCompare(b));
-    setCategories(updatedCategories); setIngredients(ings); setProducts(prods);
-    if (window.Store?.setState) window.Store.setState({ categories: updatedCategories, ingredients: ings, products: prods });
+      prods.forEach(p => {
+        if (p.category) {
+          const canon = canonicalMap.get(String(p.category).trim().toLowerCase()) || toCanonicalCategoryName(p.category.trim());
+          if (p.category !== canon || p.cat !== slugifyToKebab(canon)) { p.category = canon; p.cat = slugifyToKebab(canon); p.updatedAt = new Date().toISOString(); }
+        }
+      });
 
-    await saveHouseholdState({ categories: updatedCategories, ingredients: ings, products: prods });
-    invalidateHierarchyCache();
-    document.dispatchEvent(new CustomEvent('plateplan:state:categories', { detail: updatedCategories }));
-    document.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: ings }));
-    document.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: prods }));
-    if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
-    if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-    if (typeof window.renderProductBank === 'function') window.renderProductBank();
-    renderCurrentStep();
+      const updatedCategories = Array.from(new Set(canonicalMap.values())).sort((a, b) => a.localeCompare(b));
+      setCategories(updatedCategories); setIngredients(ings); setProducts(prods);
+      if (window.Store?.setState) window.Store.setState({ categories: updatedCategories, ingredients: ings, products: prods });
+
+      await saveHouseholdState({ categories: updatedCategories, ingredients: ings, products: prods });
+      invalidateHierarchyCache();
+      document.dispatchEvent(new CustomEvent('plateplan:state:categories', { detail: updatedCategories }));
+      document.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: ings }));
+      document.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: prods }));
+      if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
+      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+      if (typeof window.renderProductBank === 'function') window.renderProductBank();
+    } catch (err) {
+      console.error('Failed to merge duplicate categories:', err);
+    } finally {
+      resetModalState();
+      renderCurrentStep();
+    }
   };
 
   window.startRenameCat = (cat) => { activeCat = cat; wizardStep = 'rename'; renderCurrentStep(); };
+  
   window.submitRenameCat = async () => {
     const input = document.getElementById('cat-rename-input'), newName = input ? toCanonicalCategoryName(input.value) : '', oldCat = activeCat;
-    if (!newName || !oldCat || newName === oldCat) { wizardStep = 'list'; activeCat = null; reassignSearch = ''; renderCurrentStep(); return; }
+    if (!newName || !oldCat || newName === oldCat) { resetModalState(); renderCurrentStep(); return; }
 
-    const targetOld = oldCat, newCatKebab = slugifyToKebab(newName), state = getState() || {};
-    const ings = Array.isArray(state.ingredients) ? state.ingredients : [], prods = Array.isArray(state.products) ? state.products : [];
-    ings.forEach(i => {
-      let changed = false;
-      if (i.category === targetOld || i.cat === targetOld) { i.category = newName; i.cat = newCatKebab; changed = true; }
-      if (Array.isArray(i.subtypes)) {
-        i.subtypes.forEach(st => {
-          if (st.category === targetOld || st.cat === targetOld) { st.category = newName; st.cat = newCatKebab; changed = true; }
-        });
-      }
-      if (changed) i.updatedAt = new Date().toISOString();
-    });
+    const btn = document.getElementById('btn-submit-rename-cat');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
 
-    prods.forEach(p => {
-      if (p.category === targetOld || p.cat === targetOld) { p.category = newName; p.cat = newCatKebab; p.updatedAt = new Date().toISOString(); }
-    });
+    try {
+      const targetOld = oldCat, newCatKebab = slugifyToKebab(newName), state = getState() || {};
+      const ings = Array.isArray(state.ingredients) ? state.ingredients : [], prods = Array.isArray(state.products) ? state.products : [];
+      ings.forEach(i => {
+        let changed = false;
+        if (i.category === targetOld || i.cat === targetOld) { i.category = newName; i.cat = newCatKebab; changed = true; }
+        if (Array.isArray(i.subtypes)) {
+          i.subtypes.forEach(st => {
+            if (st.category === targetOld || st.cat === targetOld) { st.category = newName; st.cat = newCatKebab; changed = true; }
+          });
+        }
+        if (changed) i.updatedAt = new Date().toISOString();
+      });
 
-    const categories = (state.categories || []).map(c => c === targetOld ? newName : c);
-    setCategories(categories); setIngredients(ings); setProducts(prods);
-    await saveHouseholdState({ categories, ingredients: ings, products: prods });
-    invalidateHierarchyCache(); wizardStep = 'list'; activeCat = null; reassignSearch = ''; renderCurrentStep();
+      prods.forEach(p => {
+        if (p.category === targetOld || p.cat === targetOld) { p.category = newName; p.cat = newCatKebab; p.updatedAt = new Date().toISOString(); }
+      });
+
+      const categories = (state.categories || []).map(c => c === targetOld ? newName : c);
+      setCategories(categories); setIngredients(ings); setProducts(prods);
+      await saveHouseholdState({ categories, ingredients: ings, products: prods });
+      invalidateHierarchyCache();
+    } catch (err) {
+      console.error('Failed to rename category:', err);
+    } finally {
+      resetModalState();
+      renderCurrentStep();
+    }
   };
 
   window.startMergeCat = (cat) => { activeCat = cat; wizardStep = 'merge'; renderCurrentStep(); };
+  
   window.submitMergeCat = async () => {
     const select = document.getElementById('cat-merge-select'), targetCat = select ? select.value : '', sourceCat = activeCat;
     if (!targetCat || !sourceCat) return;
-    const targetKebab = slugifyToKebab(targetCat), state = getState() || {};
-    const ings = Array.isArray(state.ingredients) ? state.ingredients : [], prods = Array.isArray(state.products) ? state.products : [];
-    ings.forEach(i => {
-      if (i.category === sourceCat || i.cat === sourceCat) { i.category = targetCat; i.cat = targetKebab; i.updatedAt = new Date().toISOString(); }
-    });
-    prods.forEach(p => {
-      if (p.category === sourceCat || p.cat === sourceCat) { p.category = targetCat; p.cat = targetKebab; p.updatedAt = new Date().toISOString(); }
-    });
-    const categories = (state.categories || []).filter(c => c !== sourceCat);
-    setCategories(categories); setIngredients(ings); setProducts(prods);
-    await saveHouseholdState({ categories, ingredients: ings, products: prods });
-    if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
-    invalidateHierarchyCache(); closeCategoryManagerModal();
+
+    const btn = document.getElementById('btn-submit-merge-cat');
+    if (btn) { btn.disabled = true; btn.textContent = 'Merging...'; }
+
+    try {
+      const targetKebab = slugifyToKebab(targetCat), state = getState() || {};
+      const ings = Array.isArray(state.ingredients) ? state.ingredients : [], prods = Array.isArray(state.products) ? state.products : [];
+      ings.forEach(i => {
+        if (i.category === sourceCat || i.cat === sourceCat) { i.category = targetCat; i.cat = targetKebab; i.updatedAt = new Date().toISOString(); }
+      });
+      prods.forEach(p => {
+        if (p.category === sourceCat || p.cat === sourceCat) { p.category = targetCat; p.cat = targetKebab; p.updatedAt = new Date().toISOString(); }
+      });
+      const categories = (state.categories || []).filter(c => c !== sourceCat);
+      setCategories(categories); setIngredients(ings); setProducts(prods);
+      await saveHouseholdState({ categories, ingredients: ings, products: prods });
+      if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
+      invalidateHierarchyCache();
+    } catch (err) {
+      console.error('Failed to merge categories:', err);
+    } finally {
+      closeCategoryManagerModal();
+    }
   };
 
   window.setCatReassignMode = (mode) => { reassignMode = mode; renderCurrentStep(); };
@@ -293,24 +359,34 @@ export function renderCategoryManagerModal() {
 
   window.submitReassignAndDelete = async () => {
     const deletedCat = activeCat; if (!deletedCat) return;
-    const state = getState() || {}, ings = Array.isArray(state.ingredients) ? state.ingredients : [], prods = Array.isArray(state.products) ? state.products : [];
-    const massTarget = document.getElementById('cat-mass-target-select')?.value || massTargetCat || 'Uncategorised';
-    ings.forEach(i => {
-      if (i.category === deletedCat || i.cat === deletedCat) {
-        const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
-        i.category = dest; i.cat = slugifyToKebab(dest); i.updatedAt = new Date().toISOString();
-      }
-    });
-    prods.forEach(p => {
-      if (p.category === deletedCat || p.cat === deletedCat) {
-        p.category = reassignMode === 'mass' ? massTarget : 'Uncategorised'; p.cat = slugifyToKebab(massTarget); p.updatedAt = new Date().toISOString();
-      }
-    });
-    const categories = (state.categories || []).filter(c => c !== deletedCat);
-    setCategories(categories); setIngredients(ings); setProducts(prods);
-    await saveHouseholdState({ categories, ingredients: ings, products: prods });
-    if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
-    invalidateHierarchyCache(); closeCategoryManagerModal();
+
+    const btn = document.getElementById('btn-submit-reassign-delete');
+    if (btn) { btn.disabled = true; btn.textContent = 'Deleting...'; }
+
+    try {
+      const state = getState() || {}, ings = Array.isArray(state.ingredients) ? state.ingredients : [], prods = Array.isArray(state.products) ? state.products : [];
+      const massTarget = document.getElementById('cat-mass-target-select')?.value || massTargetCat || 'Uncategorised';
+      ings.forEach(i => {
+        if (i.category === deletedCat || i.cat === deletedCat) {
+          const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
+          i.category = dest; i.cat = slugifyToKebab(dest); i.updatedAt = new Date().toISOString();
+        }
+      });
+      prods.forEach(p => {
+        if (p.category === deletedCat || p.cat === deletedCat) {
+          p.category = reassignMode === 'mass' ? massTarget : 'Uncategorised'; p.cat = slugifyToKebab(massTarget); p.updatedAt = new Date().toISOString();
+        }
+      });
+      const categories = (state.categories || []).filter(c => c !== deletedCat);
+      setCategories(categories); setIngredients(ings); setProducts(prods);
+      await saveHouseholdState({ categories, ingredients: ings, products: prods });
+      if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
+      invalidateHierarchyCache();
+    } catch (err) {
+      console.error('Failed to reassign and delete category:', err);
+    } finally {
+      closeCategoryManagerModal();
+    }
   };
 }
 
@@ -335,8 +411,7 @@ window.handleDeleteCategory = async function handleDeleteCategory(identifier) {
   } catch (err) {
     console.error('Failed to delete category:', err);
   } finally {
-    const confirmModal = document.getElementById('category-delete-confirm-modal');
-    if (confirmModal) confirmModal.remove();
+    resetModalState();
     if (typeof window.openCategoryManagerModal === 'function') window.openCategoryManagerModal();
   }
 };
@@ -375,5 +450,8 @@ window.promptDeleteCategory = function promptDeleteCategory(categoryId) {
 };
 
 if (typeof window !== 'undefined') {
-  window.openCategoryManagerModal = () => { wizardStep = 'list'; renderCategoryManagerModal(); };
+  window.openCategoryManagerModal = () => { 
+    resetModalState(); 
+    renderCategoryManagerModal(); 
+  };
 }
