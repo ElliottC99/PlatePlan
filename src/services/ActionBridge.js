@@ -243,7 +243,9 @@ export function routeAction(actionName, target, event) {
   }
 
   if (normalizedAction.includes('createingredientfamilyprompt')) {
-    if (typeof window.openIngredientFamilyDetailsModal === 'function') {
+    if (typeof window.createIngredientFamilyPrompt === 'function') {
+      window.createIngredientFamilyPrompt();
+    } else if (typeof window.openIngredientFamilyDetailsModal === 'function') {
       window.openIngredientFamilyDetailsModal(null);
     }
     return true;

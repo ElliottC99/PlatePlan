@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/PantryInventoryUI.js (v3.29.0)
+ * src/components/pantry/PantryInventoryUI.js (v3.29.1)
  * Modular Presentation Component for Pantry Stock Items & Inventory Wrappers
  */
 
@@ -70,7 +70,7 @@ export function renderPantryInventoryList(items = []) {
     return `<div class="card pantry-empty" style="padding:32px 20px;text-align:center;color:var(--text2,#78716c);font-size:13px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:14px">
       <div style="font-size:30px;margin-bottom:8px">📦</div>
       <h3 style="margin:0 0 6px 0;font-size:16px;font-weight:750;color:var(--text,#1c1917)">No Active Stock Recorded</h3>
-      <p style="margin:0 0 14px 0;font-size:12.5px;color:var(--text2,#78716c)">Add items from your Pantry Bank (Master Catalog) with 1 click or add a stock item directly.</p>
+      <p style="margin:0 0 14px 0;font-size:12.5px;color:var(--text2,#78716c)">Add Items or Sub-types from your Pantry Bank (Master Catalog) with 1 click, or record a stock item directly.</p>
       <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap">
         <button type="button" class="btn sm secondary" onclick="window.switchPantryTab('master-catalog')">🏛️ Browse Master Catalog</button>
         <button type="button" class="btn sm primary" onclick="window.openAddPantryStockModal()">+ Add Stock Item</button>
@@ -121,7 +121,7 @@ export function openAddPantryStockModal(ingredients = []) {
       </div>
       <div style="display:flex;flex-direction:column;gap:12px">
         <div>
-          <label for="stock-modal-ing-select" style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Link to Catalog Ingredient (Optional)</label>
+          <label for="stock-modal-ing-select" style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Link to Pantry Bank Item (Optional)</label>
           <select id="stock-modal-ing-select" name="stockModalIngSelect" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:8px;font-size:13px;background:var(--surface,#fff)">
             <option value="">-- Custom / Unlinked Item --</option>
             ${ingOptions}

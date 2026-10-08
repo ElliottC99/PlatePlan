@@ -1,6 +1,6 @@
 /**
- * src/views/PantryBankView.js (v3.29.0)
- * Modular ES6 View for Pantry Active Stock & Master Catalog (Category ➔ Ingredient ➔ Sub-type Hierarchy Bank).
+ * src/views/PantryBankView.js (v3.29.1)
+ * Modular ES6 View for Pantry Active Stock & Master Catalog (Category ➔ Item ➔ Sub-type Hierarchy Bank).
  * Features dual-tab switching (Active Stock vs Pantry Bank), 1-click "+ Stock" action,
  * Aliasing, Merging, Sub-type creation, Promoting/demoting, and Auto-default product previews.
  */
@@ -15,6 +15,7 @@ import { renderProductBank, openProductEditModal } from './ProductBankView.js';
 import { renderCategoryManagerModal } from '../components/pantry/CategoryManagerModalUI.js';
 import { updateIngredientFamilyModalUI } from '../components/pantry/IngredientFamilyModalUI.js';
 import { buildIngredientBankHTML } from '../components/pantry/PantryBankHTMLTemplate.js';
+import { openNewIngredientMappingWizardModal } from '../components/recipe/RecipeWizardTaxonomyModal.js';
 import {
   activePantryTab, switchPantryTab, renderActiveStockTab, addCatalogItemToActiveStock,
   adjustPantryStock, removePantryStock, togglePantryUseUp, handlePantrySearchFilter,
@@ -124,7 +125,7 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
   const msgEl = document.getElementById('ingredient-family-details-msg');
 
   if (titleEl) {
-    titleEl.textContent = ing ? `Edit ${ing.name}` : (parent ? `Add Sub-type to ${parent.name}` : 'New Ingredient');
+    titleEl.textContent = ing ? `Edit ${ing.name}` : (parent ? `Add Sub-type to ${parent.name}` : 'New Catalog Item');
   }
   if (nameEl) nameEl.value = ing?.name || '';
   if (notesEl) notesEl.value = ing?.notes || '';
@@ -232,9 +233,10 @@ export function renderIngredientBank() {
 
   if (ingredients.length === 0) {
     container.innerHTML = `<div class="card" style="padding:32px 20px;text-align:center;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:14px;margin-top:12px;">
-      <div style="font-size:32px;margin-bottom:8px">🥗</div>
-      <h3 style="font-size:16px;font-weight:700;margin:0 0 6px 0">No ingredients in bank</h3>
-      <button class="btn primary sm" type="button" onclick="openIngredientFamilyDetailsModal(null)">+ Add Ingredient</button>
+      <div style="font-size:32px;margin-bottom:8px">🏛️</div>
+      <h3 style="font-size:16px;font-weight:700;margin:0 0 6px 0">No items in Pantry Bank</h3>
+      <p style="font-size:12.5px;color:var(--text2,#78716c);margin:0 0 12px 0">Add Categories, Items, and Sub-types to build your master Pantry Bank catalog.</p>
+      <button class="btn primary sm" type="button" onclick="createIngredientFamilyPrompt()">+ Add Item</button>
     </div>`;
     return;
   }
@@ -297,7 +299,8 @@ if (typeof window !== 'undefined') {
     saveIngredientFamilyDetailsModal, handleSetDefaultProduct,
     promptAddSubtype, openCategoryManager, openCategoryManagerModal: openCategoryManager,
     updateActiveCategoryFilter, setActiveCategoryFilter, resetCategoryFilter, getFilteredIngredients,
-    createIngredientFamilyPrompt: () => openIngredientFamilyDetailsModal(null),
+    createIngredientFamilyPrompt: () => openNewIngredientMappingWizardModal({ initialName: '', onComplete: () => renderIngredientBank() }),
+    openNewIngredientMappingWizardModal,
     toggleSubtypeCollapse(btn, ingId) {
       const el = document.getElementById(`subtypes-container-${ingId}`); if (!el) return;
       const collapsed = el.style.display === 'none'; el.style.display = collapsed ? 'flex' : 'none'; el.classList.toggle('is-expanded', collapsed);

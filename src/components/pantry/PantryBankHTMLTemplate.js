@@ -1,6 +1,6 @@
 /**
- * src/components/pantry/PantryBankHTMLTemplate.js (v3.29.0)
- * Extracted HTML UI renderer for the Category -> Ingredient -> Sub-type Hierarchy.
+ * src/components/pantry/PantryBankHTMLTemplate.js (v3.29.1)
+ * Extracted HTML UI renderer for the Category -> Item -> Sub-type Hierarchy.
  * Enriched with live Active Stock status badges and 1-click "+ Stock" action buttons.
  */
 

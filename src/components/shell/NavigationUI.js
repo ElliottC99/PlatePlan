@@ -1,5 +1,5 @@
 /**
- * src/components/shell/NavigationUI.js (v3.10.0)
+ * src/components/shell/NavigationUI.js (v3.29.1)
  * Modular Presentation Component for Desktop Sidebar & Mobile Navigation
  */
 
@@ -25,8 +25,8 @@ export function renderDesktopSidebarUI(activeView = 'today') {
       </details>
       <details class="nav-group" data-sidebar-group="data" open>
         <summary>Data</summary>
-        <button class="ntab ${activeView === 'ingredients' ? 'active' : ''}" data-view="ingredients" data-action="navigate-view">Ingredient Bank</button>
-        <button class="ntab ${activeView === 'bank' ? 'active' : ''}" data-view="bank" data-action="navigate-view" onclick="clearProductGroupFilter()">Product Bank</button>
+        <button class="ntab ${(activeView === 'ingredients' || activeView === 'pantry') ? 'active' : ''}" data-view="ingredients" data-action="navigate-view">Pantry</button>
+        <button class="ntab ${activeView === 'bank' ? 'active' : ''}" data-view="bank" data-action="navigate-view" onclick="clearProductGroupFilter()" style="padding-left:22px;font-size:12px;color:var(--text2)">↳ Product Bank</button>
         <button class="ntab ${activeView === 'data' ? 'active' : ''}" data-view="data" data-action="navigate-view">Data Quality</button>
       </details>
       <details class="nav-group" data-sidebar-group="settings" open>

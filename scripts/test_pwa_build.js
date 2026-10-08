@@ -1,7 +1,7 @@
 /**
  * scripts/test_pwa_build.js
  * Verification test script for PWA service worker caching configuration,
- * Firestore interception bypass, and registration lifecycle emulation for v3.29.0.
+ * Firestore interception bypass, and registration lifecycle emulation for v3.29.1.
  */
 
 import { readFileSync } from 'fs';
@@ -11,26 +11,28 @@ console.log('=== RUNNING PWA BUILD & SERVICE WORKER VERIFICATION SUITE ===');
 
 // 1. Check package.json version
 const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
-assert.equal(pkg.version, '3.29.0', 'Package version must be 3.29.0');
-console.log('✅ Test 1 Passed: package.json version is 3.29.0');
+assert.equal(pkg.version, '3.29.1', 'Package version must be 3.29.1');
+console.log('✅ Test 1 Passed: package.json version is 3.29.1');
 
-// 2. Check PlatePlan.html version badge
+// 2. Check PlatePlan.html version badge & Pantry UI labels
 const html = readFileSync('./PlatePlan.html', 'utf8');
-assert(html.includes('v3.29.0') || html.includes('3.29.0'), 'PlatePlan.html must display version badge v3.29.0');
-console.log('✅ Test 2 Passed: PlatePlan.html header displays v3.29.0');
+assert(html.includes('v3.29.1') || html.includes('3.29.1'), 'PlatePlan.html must display version badge v3.29.1');
+assert(html.includes('data-view="ingredients" data-pp-click="showView(\'ingredients\')">Pantry</button>'), 'Sidebar must display Pantry');
+assert(html.includes('+ Add Item</button>'), 'Pantry header must display + Add Item');
+console.log('✅ Test 2 Passed: PlatePlan.html header displays v3.29.1, sidebar reads "Pantry", and header action reads "+ Add Item"');
 
 // 3. Check sw.js cache key & bypass logic
 const swContent = readFileSync('./sw.js', 'utf8');
-assert(swContent.includes("plateplan-cache-v3.29.0"), 'sw.js must contain plateplan-cache-v3.29.0');
+assert(swContent.includes("plateplan-cache-v3.29.1"), 'sw.js must contain plateplan-cache-v3.29.1');
 assert(swContent.includes("firestore.googleapis.com"), 'sw.js must contain Firestore interception bypass');
 assert(swContent.includes("skipWaiting"), 'sw.js must include skipWaiting');
 assert(swContent.includes("clients.claim"), 'sw.js must include clients.claim');
-console.log('✅ Test 3 Passed: sw.js contains correct cache key v3.29.0, activation pruning, and Firestore bypass rules.');
+console.log('✅ Test 3 Passed: sw.js contains correct cache key v3.29.1, activation pruning, and Firestore bypass rules.');
 
 // 4. Check store.js CACHE_KEY
 const storeContent = readFileSync('./src/store/store.js', 'utf8');
-assert(storeContent.includes('plateplan_store_cache_v3.29.0'), 'store.js must contain store cache key v3.29.0');
-console.log('✅ Test 4 Passed: store.js uses store cache key v3.29.0');
+assert(storeContent.includes('plateplan_store_cache_v3.29.1'), 'store.js must contain store cache key v3.29.1');
+console.log('✅ Test 4 Passed: store.js uses store cache key v3.29.1');
 
 // 5. Check manifest.json PWA configuration
 const manifest = JSON.parse(readFileSync('./manifest.json', 'utf8'));

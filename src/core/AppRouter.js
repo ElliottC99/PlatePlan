@@ -22,6 +22,7 @@ const viewModuleMap = {
   settings: SettingsView,
   prefs: SettingsView,
   ingredients: PantryBankView,
+  pantry: PantryBankView,
   bank: ProductBankView,
   data: DataQualityView,
   quality: DataQualityView
@@ -58,13 +59,14 @@ export function showView(viewId) {
   }
 
   // Update desktop sidebar tabs
+  const normalizedViewId = viewId === 'pantry' ? 'ingredients' : viewId;
   document.querySelectorAll('.desktop-sidebar .ntab').forEach(tab => {
-    tab.classList.toggle('active', tab.dataset.view === viewId);
+    tab.classList.toggle('active', tab.dataset.view === normalizedViewId || tab.dataset.view === viewId);
   });
 
   // Activate view container
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  const viewEl = document.getElementById('view-' + viewId);
+  const viewEl = document.getElementById('view-' + normalizedViewId) || document.getElementById('view-' + viewId);
   if (viewEl) {
     viewEl.classList.add('active');
   }

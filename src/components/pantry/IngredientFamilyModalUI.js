@@ -1,6 +1,6 @@
 /**
- * src/components/pantry/IngredientFamilyModalUI.js (v3.20.14)
- * Encapsulates presentation, labelling, and real-time Tesco helper search integrations for the Ingredient Family modal.
+ * src/components/pantry/IngredientFamilyModalUI.js (v3.29.1)
+ * Encapsulates presentation, labelling, and real-time Tesco helper search integrations for the Catalog Item modal.
  */
 
 import { addSubtypeToIngredient } from '../../models/PantryHierarchyModel.js';
@@ -45,7 +45,7 @@ export function updateIngredientFamilyModalUI(ing, parent) {
             🏷️ ${escapeHTML(parent.category || 'Uncategorized')}
           </div>
           <div class="parent-hierarchy-badge" style="background: #f3f4f6; color: #4b5563; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem;">
-            <strong>Parent Ingredient:</strong> <span style="color: #111827; font-weight: 500;">${escapeHTML(parent.name)}</span>
+            <strong>Parent Item:</strong> <span style="color: #111827; font-weight: 500;">${escapeHTML(parent.name)}</span>
           </div>
         </div>
       `;
@@ -74,8 +74,8 @@ export function updateIngredientFamilyModalUI(ing, parent) {
       updateTescoLink();
     }
   } else {
-    // Standard Core Ingredient Mode
-    if (labelEl) labelEl.textContent = 'Ingredient name';
+    // Standard Core Item Mode
+    if (labelEl) labelEl.textContent = 'Item Name';
     if (nameEl) nameEl.placeholder = 'e.g. Pasta, Asparagus, Tofu';
     if (parentWrap) parentWrap.style.display = 'none';
     if (actionsWrap) actionsWrap.style.display = 'none';
