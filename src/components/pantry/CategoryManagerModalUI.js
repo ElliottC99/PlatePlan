@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.28.2-data)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.28.2-ui)
  * In-App Multi-Step Category Operations Wizard, Raw Exposure & Deep State Merge Modal.
  * Wrapped with Try-Catch-Finally block exception handling and state resets to eliminate screen freezes.
  * Fully accessible Form fields with explicit id, name, and paired labels.

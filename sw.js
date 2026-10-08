@@ -126,9 +126,9 @@ self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(PLATEPLAN_CACHE).then(async cache => {
-      console.log(`[SW v3.28.2-data] Precaching shell and core ES6 modules...`);
+      console.log(`[SW v3.28.2-ui] Precaching shell and core ES6 modules...`);
       await cache.addAll(PLATEPLAN_PRECACHE_ASSETS).catch(err => {
-        console.warn('[SW v3.28.2-data] Non-fatal precache warning:', err);
+        console.warn('[SW v3.28.2-ui] Non-fatal precache warning:', err);
       });
       await Promise.allSettled(PLATEPLAN_OPTIONAL_SHELL.map(url => cache.add(url)));
     })
@@ -142,7 +142,7 @@ self.addEventListener('activate', event => {
         keys
           .filter(key => key !== PLATEPLAN_CACHE && key !== PLATEPLAN_IMAGE_CACHE)
           .map(key => {
-            console.log('[SW v3.28.2-data] Purging legacy cache:', key);
+            console.log('[SW v3.28.2-ui] Purging legacy cache:', key);
             return caches.delete(key);
           })
       );
