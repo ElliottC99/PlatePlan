@@ -131,7 +131,7 @@ export function openProductEditModal(productIdOrDraft = null) {
   }
 
   document.body.style.overflow = 'hidden';
-  panel.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:9999;backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);overflow-y:auto;padding:16px;box-sizing:border-box;';
+  panel.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:25000;backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);overflow-y:auto;padding:16px;box-sizing:border-box;';
 }
 
 export async function saveManualIng() {

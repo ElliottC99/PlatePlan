@@ -1,13 +1,14 @@
 /**
- * src/components/recipe/RecipeWizardTaxonomyModal.js (v3.28.4)
+ * src/components/recipe/RecipeWizardTaxonomyModal.js (v3.28.5)
  * New Ingredient Mapping Wizard Modal component.
  * 3-step wizard for mapping raw recipe ingredients into Category -> Item -> Sub-Type hierarchy.
  */
 
 import { getState, setIngredients, setProducts } from '../../store/store.js';
-import { saveIngredient } from '../../services/HouseholdRepository.js';
+import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
 import { toTitleCase } from '../../services/RecipeImporter.js';
 import { openSubtypeProductLinkerModal, openTescoImportModal } from '../pantry/SubtypeProductLinkerModalUI.js';
+import { openProductEditModal } from '../../views/ProductBankView.js';
 
 const STANDARD_CATEGORIES = [
   'Store Cupboard',
@@ -42,6 +43,9 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
   const cleanInitialName = toTitleCase(initialName || 'New Item');
 
   let currentStep = 1;
+  let showProductSearch = false;
+  let productSearchQuery = '';
+
   let wizardData = {
     entityType: 'subtype', // 'subtype' | 'item' | 'category'
     name: cleanInitialName,
@@ -50,7 +54,8 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
     selectedCategory: existingCategories[0] || 'Store Cupboard',
     subTypeName: cleanInitialName,
     createdIngredientId: null,
-    createdSubtypeId: null
+    createdSubtypeId: null,
+    linkedProduct: null
   };
 
   let modalEl = document.getElementById('new-ingredient-mapping-wizard-modal');
@@ -58,7 +63,7 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
     modalEl = document.createElement('div');
     modalEl.id = 'new-ingredient-mapping-wizard-modal';
     modalEl.className = 'modal-wrap';
-    modalEl.style.zIndex = '1200';
+    modalEl.style.zIndex = '12000';
     document.body.appendChild(modalEl);
   }
 
@@ -81,32 +86,43 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
           </div>
 
           <div>
-            <label style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--text);">
+            <label style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 10px; color: var(--text);">
               Define Entity Type <span style="color:#dc2626">*</span>
             </label>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <label for="type-subtype" style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border, #e5e7eb); border-radius: 8px; background: ${wizardData.entityType === 'subtype' ? '#eef2ff' : 'var(--surface)'}; cursor: pointer;">
-                <input type="radio" id="type-subtype" name="wiz-entity-type" value="subtype" ${wizardData.entityType === 'subtype' ? 'checked' : ''} style="margin-top: 3px;" />
-                <div>
-                  <div style="font-size: 13px; font-weight: 700;">Sub-Type (Specific Variant)</div>
-                  <div style="font-size: 11.5px; color: var(--text2, #666);">e.g. Extra Firm Tofu, Smoked Paprika, Oat Milk</div>
+
+            <!-- Unified Space-Efficient Clickable Card Layout -->
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <label for="type-subtype" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border: 1.5px solid ${wizardData.entityType === 'subtype' ? 'var(--primary, #4f46e5)' : 'var(--border, #e5e7eb)'}; border-radius: 10px; background: ${wizardData.entityType === 'subtype' ? 'rgba(79, 70, 229, 0.05)' : 'var(--surface, #fff)'}; cursor: pointer; transition: all 0.15s ease; box-shadow: ${wizardData.entityType === 'subtype' ? '0 2px 8px rgba(79, 70, 229, 0.1)' : 'none'};">
+                <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
+                  <input type="radio" id="type-subtype" name="wiz-entity-type" value="subtype" ${wizardData.entityType === 'subtype' ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--primary, #4f46e5); cursor: pointer; flex-shrink: 0;" />
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 13.5px; font-weight: 750; color: var(--text, #111827); line-height: 1.3;">Sub-Type <span style="font-size: 12px; font-weight: 500; color: var(--text2, #6b7280);">(Specific Variant / Brand)</span></div>
+                    <div style="font-size: 11.5px; color: var(--text2, #6b7280); margin-top: 2px;">e.g. Extra Firm Tofu, Smoked Paprika, Oat Milk</div>
+                  </div>
                 </div>
+                <span style="font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: ${wizardData.entityType === 'subtype' ? '#e0e7ff' : '#f3f4f6'}; color: ${wizardData.entityType === 'subtype' ? '#3730a3' : '#4b5563'}; flex-shrink: 0; margin-left: 8px;">Variant Level</span>
               </label>
 
-              <label for="type-item" style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border, #e5e7eb); border-radius: 8px; background: ${wizardData.entityType === 'item' ? '#eef2ff' : 'var(--surface)'}; cursor: pointer;">
-                <input type="radio" id="type-item" name="wiz-entity-type" value="item" ${wizardData.entityType === 'item' ? 'checked' : ''} style="margin-top: 3px;" />
-                <div>
-                  <div style="font-size: 13px; font-weight: 700;">Item (Primary Food Entity)</div>
-                  <div style="font-size: 11.5px; color: var(--text2, #666);">e.g. Tofu, Paprika, Milk</div>
+              <label for="type-item" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border: 1.5px solid ${wizardData.entityType === 'item' ? 'var(--primary, #4f46e5)' : 'var(--border, #e5e7eb)'}; border-radius: 10px; background: ${wizardData.entityType === 'item' ? 'rgba(79, 70, 229, 0.05)' : 'var(--surface, #fff)'}; cursor: pointer; transition: all 0.15s ease; box-shadow: ${wizardData.entityType === 'item' ? '0 2px 8px rgba(79, 70, 229, 0.1)' : 'none'};">
+                <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
+                  <input type="radio" id="type-item" name="wiz-entity-type" value="item" ${wizardData.entityType === 'item' ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--primary, #4f46e5); cursor: pointer; flex-shrink: 0;" />
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 13.5px; font-weight: 750; color: var(--text, #111827); line-height: 1.3;">Item <span style="font-size: 12px; font-weight: 500; color: var(--text2, #6b7280);">(Primary Food Entity)</span></div>
+                    <div style="font-size: 11.5px; color: var(--text2, #6b7280); margin-top: 2px;">e.g. Tofu, Paprika, Milk</div>
+                  </div>
                 </div>
+                <span style="font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: ${wizardData.entityType === 'item' ? '#e0e7ff' : '#f3f4f6'}; color: ${wizardData.entityType === 'item' ? '#3730a3' : '#4b5563'}; flex-shrink: 0; margin-left: 8px;">Primary Item</span>
               </label>
 
-              <label for="type-category" style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border, #e5e7eb); border-radius: 8px; background: ${wizardData.entityType === 'category' ? '#eef2ff' : 'var(--surface)'}; cursor: pointer;">
-                <input type="radio" id="type-category" name="wiz-entity-type" value="category" ${wizardData.entityType === 'category' ? 'checked' : ''} style="margin-top: 3px;" />
-                <div>
-                  <div style="font-size: 13px; font-weight: 700;">Category (High-Level Group)</div>
-                  <div style="font-size: 11.5px; color: var(--text2, #666);">e.g. Produce, Store Cupboard, Refrigerated & Dairy</div>
+              <label for="type-category" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border: 1.5px solid ${wizardData.entityType === 'category' ? 'var(--primary, #4f46e5)' : 'var(--border, #e5e7eb)'}; border-radius: 10px; background: ${wizardData.entityType === 'category' ? 'rgba(79, 70, 229, 0.05)' : 'var(--surface, #fff)'}; cursor: pointer; transition: all 0.15s ease; box-shadow: ${wizardData.entityType === 'category' ? '0 2px 8px rgba(79, 70, 229, 0.1)' : 'none'};">
+                <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
+                  <input type="radio" id="type-category" name="wiz-entity-type" value="category" ${wizardData.entityType === 'category' ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--primary, #4f46e5); cursor: pointer; flex-shrink: 0;" />
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 13.5px; font-weight: 750; color: var(--text, #111827); line-height: 1.3;">Category <span style="font-size: 12px; font-weight: 500; color: var(--text2, #6b7280);">(High-Level Group)</span></div>
+                    <div style="font-size: 11.5px; color: var(--text2, #6b7280); margin-top: 2px;">e.g. Produce, Store Cupboard, Refrigerated & Dairy</div>
+                  </div>
                 </div>
+                <span style="font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: ${wizardData.entityType === 'category' ? '#e0e7ff' : '#f3f4f6'}; color: ${wizardData.entityType === 'category' ? '#3730a3' : '#4b5563'}; flex-shrink: 0; margin-left: 8px;">Top Level</span>
               </label>
             </div>
           </div>
@@ -125,7 +141,6 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
           </div>
 
           ${wizardData.entityType === 'subtype' ? `
-            <!-- Sub-Type: Searchable Item & Category Selection -->
             <div>
               <label for="map-item-search-input" style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--text);">
                 1) Select or Create Parent Item <span style="color:#dc2626">*</span>
@@ -158,7 +173,6 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
               </div>
             </div>
           ` : wizardData.entityType === 'item' ? `
-            <!-- Item: Sub-Type Name & Category Selection -->
             <div>
               <label for="map-sub-name-input" style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--text);">
                 1) Sub-Type Name underneath Item <span style="color:#dc2626">*</span>
@@ -187,7 +201,6 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
               </div>
             </div>
           ` : `
-            <!-- Category: Item Search & Sub-Type Input -->
             <div>
               <label for="map-item-search-input" style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--text);">
                 1) Assign or Create Item under Category <span style="color:#dc2626">*</span>
@@ -226,19 +239,67 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
     } else if (currentStep === 3) {
       stepHtml = `
         <div style="display: flex; flex-direction: column; gap: 16px;">
-          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 8px; font-size: 13px; color: #166534;">
-            ✅ <strong>Hierarchy Structured:</strong> Category ➔ <strong>${escapeHtml(wizardData.selectedCategory)}</strong> | Item ➔ <strong>${escapeHtml(wizardData.newItemName || wizardData.name)}</strong> | Sub-Type ➔ <strong>${escapeHtml(wizardData.subTypeName)}</strong>
+          <!-- Hierarchy Summary Header -->
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px 14px; border-radius: 10px; font-size: 12.5px; color: #166534; display: flex; align-items: flex-start; gap: 8px;">
+            <span style="font-size: 16px; margin-top: -1px;">✅</span>
+            <div style="flex: 1; min-width: 0;">
+              <strong style="font-size: 13px;">Hierarchy Structured:</strong>
+              <div style="font-size: 12px; color: #15803d; margin-top: 3px; line-height: 1.4;">
+                Category ➔ <strong>${escapeHtml(wizardData.selectedCategory)}</strong> | Item ➔ <strong>${escapeHtml(wizardData.newItemName || wizardData.name)}</strong> | Sub-Type ➔ <strong>${escapeHtml(wizardData.subTypeName)}</strong>
+              </div>
+            </div>
           </div>
 
-          <div style="background: var(--surface2, #f9f8f6); padding: 14px; border-radius: 10px; border: 1px solid var(--border, #e5e7eb);">
-            <div style="font-size: 13.5px; font-weight: 700; margin-bottom: 6px;">Linked Store Product</div>
-            <p style="font-size: 12px; color: var(--text2, #666); margin: 0 0 12px 0;">
-              No store products currently linked to this sub-type. You can use existing product management tools below or complete mapping without a linked product.
-            </p>
+          <!-- Store Product Section -->
+          <div style="background: var(--surface2, #f9f8f6); padding: 16px; border-radius: 12px; border: 1px solid var(--border, #e5e7eb);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <div style="font-size: 13.5px; font-weight: 750; color: var(--text);">Linked Store Product</div>
+              ${wizardData.linkedProduct ? `<span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: #dcfce7; color: #15803d;">Product Attached</span>` : `<span style="font-size: 11px; color: var(--text2);">Optional</span>`}
+            </div>
 
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <button type="button" class="btn sm secondary" id="btn-wiz-open-add-product">+ Add Product</button>
-              <button type="button" class="btn sm ghost" id="btn-wiz-open-tesco-import">🛒 Import from Tesco</button>
+            ${wizardData.linkedProduct ? `
+              <div style="background: #fff; border: 1px solid #a7f3d0; border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                  <span style="font-size: 18px;">🛒</span>
+                  <div style="min-width: 0;">
+                    <div style="font-size: 13px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(wizardData.linkedProduct.name)}</div>
+                    <div style="font-size: 11.5px; color: var(--text2);">${escapeHtml(wizardData.linkedProduct.brand || 'No Brand')} · £${Number(wizardData.linkedProduct.price || 0).toFixed(2)}</div>
+                  </div>
+                </div>
+                <button type="button" class="btn sm ghost" id="btn-remove-linked-product" style="color: #dc2626; font-size: 12px; padding: 4px 8px;">✕ Remove</button>
+              </div>
+            ` : `
+              <p style="font-size: 12px; color: var(--text2, #666); margin: 0 0 12px 0; line-height: 1.4;">
+                No store product currently linked to this sub-type. You can attach a product or complete mapping without a linked product.
+              </p>
+            `}
+
+            <!-- 3 Clear Action Buttons -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: 8px;">
+              <button type="button" class="btn sm secondary" id="btn-wiz-open-add-product" style="display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 650; font-size: 12px; padding: 8px 10px;">
+                <span>+</span> Add Product
+              </button>
+              <button type="button" class="btn sm ghost" id="btn-wiz-open-tesco-import" style="display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 650; font-size: 12px; padding: 8px 10px; border: 1px solid var(--border, #e5e7eb);">
+                <span>🛒</span> Import Tesco
+              </button>
+              <button type="button" class="btn sm" id="btn-wiz-toggle-link-existing" style="display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 650; font-size: 12px; padding: 8px 10px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0;">
+                <span>🔍</span> Link Existing
+              </button>
+            </div>
+
+            <!-- Interactive Searchable Input Container for Existing Product Linker -->
+            <div id="wiz-product-search-container" style="display: ${showProductSearch ? 'block' : 'none'}; margin-top: 12px; position: relative;">
+              <label for="wiz-product-search-input" style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 4px; color: #047857;">
+                🔍 Search Product to Reassign / Move
+              </label>
+              <input type="text" 
+                     id="wiz-product-search-input" 
+                     name="wiz_product_search_input"
+                     value="${escapeAttr(productSearchQuery)}" 
+                     placeholder="Type product name or brand..." 
+                     autocomplete="off"
+                     style="width: 100%; padding: 8px 12px; border: 1.5px solid #a7f3d0; border-radius: 8px; font-size: 12.5px; background: #fff; box-sizing: border-box;" />
+              <div id="wiz-product-search-dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 180px; overflow-y: auto; background: #fff; border: 1px solid #a7f3d0; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); z-index: 13000; margin-top: 2px;"></div>
             </div>
           </div>
 
@@ -304,7 +365,6 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
         renderWizard();
       };
 
-      // Bind searchable item input with live autocomplete dropdown
       const itemInput = modalEl.querySelector('#map-item-search-input');
       const itemDropdown = modalEl.querySelector('#map-item-dropdown');
       if (itemInput && itemDropdown) {
@@ -337,7 +397,6 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
         };
       }
 
-      // Bind searchable category input with live autocomplete dropdown
       const catInput = modalEl.querySelector('#map-cat-search-input');
       const catDropdown = modalEl.querySelector('#map-cat-dropdown');
       if (catInput && catDropdown) {
@@ -395,19 +454,35 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
         renderWizard();
       };
 
+      const btnRemoveLinked = modalEl.querySelector('#btn-remove-linked-product');
+      if (btnRemoveLinked) {
+        btnRemoveLinked.onclick = () => {
+          wizardData.linkedProduct = null;
+          renderWizard();
+        };
+      }
+
+      // Action 1: + Add Product
       const btnAddProd = modalEl.querySelector('#btn-wiz-open-add-product');
       if (btnAddProd) {
         btnAddProd.onclick = () => {
-          if (typeof openSubtypeProductLinkerModal === 'function') {
-            openSubtypeProductLinkerModal(wizardData.createdSubtypeId, wizardData.createdIngredientId);
-          } else if (typeof window.openSubtypeProductLinkerModal === 'function') {
-            window.openSubtypeProductLinkerModal(wizardData.createdSubtypeId, wizardData.createdIngredientId);
+          window.__prefilledResolveBinding = {
+            ingredientId: wizardData.createdIngredientId,
+            subtypeId: wizardData.createdSubtypeId,
+            parentCategory: wizardData.selectedCategory,
+            subtypeDraftName: wizardData.subTypeName
+          };
+          if (typeof openProductEditModal === 'function') {
+            openProductEditModal(null);
+          } else if (typeof window.openProductEditModal === 'function') {
+            window.openProductEditModal(null);
           } else {
-            alert('Store product management tools are ready.');
+            alert('Add product editor ready.');
           }
         };
       }
 
+      // Action 2: 🛒 Import from Tesco
       const btnTesco = modalEl.querySelector('#btn-wiz-open-tesco-import');
       if (btnTesco) {
         btnTesco.onclick = () => {
@@ -419,6 +494,64 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
         };
       }
 
+      // Action 3: 🔍 Link Existing Product
+      const btnToggleExisting = modalEl.querySelector('#btn-wiz-toggle-link-existing');
+      if (btnToggleExisting) {
+        btnToggleExisting.onclick = () => {
+          showProductSearch = !showProductSearch;
+          renderWizard();
+          if (showProductSearch) {
+            setTimeout(() => {
+              const input = modalEl.querySelector('#wiz-product-search-input');
+              if (input) input.focus();
+            }, 50);
+          }
+        };
+      }
+
+      // Searchable Product Input Handler
+      const searchInput = modalEl.querySelector('#wiz-product-search-input');
+      const searchDropdown = modalEl.querySelector('#wiz-product-search-dropdown');
+      if (searchInput && searchDropdown) {
+        const products = getState()?.products || [];
+        const filterProducts = (query) => {
+          productSearchQuery = query;
+          const q = (query || '').toLowerCase().trim();
+          const filtered = products.filter(p => !q || (p.name || '').toLowerCase().includes(q) || (p.brand || '').toLowerCase().includes(q));
+
+          if (!filtered.length) {
+            searchDropdown.innerHTML = `<div style="padding: 10px; font-size: 12px; color: var(--text2); text-align: center;">No products found matching "${escapeHtml(q)}".</div>`;
+          } else {
+            searchDropdown.innerHTML = filtered.slice(0, 20).map(p => `
+              <div class="wiz-prod-opt" data-id="${escapeAttr(p.id)}" style="padding: 8px 10px; font-size: 12.5px; cursor: pointer; border-bottom: 1px solid #f0fdf4; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <strong style="color: var(--text);">${escapeHtml(p.name)}</strong>
+                  <div style="font-size: 11px; color: var(--text2);">${escapeHtml(p.brand || 'No brand')} · £${Number(p.price || 0).toFixed(2)}</div>
+                </div>
+                <span style="font-size: 11px; font-weight: 600; color: #047857;">Link →</span>
+              </div>
+            `).join('');
+          }
+          searchDropdown.style.display = 'block';
+
+          searchDropdown.querySelectorAll('.wiz-prod-opt').forEach(opt => {
+            opt.onclick = () => {
+              const p = products.find(prod => String(prod.id) === String(opt.dataset.id));
+              if (p) {
+                wizardData.linkedProduct = p;
+                showProductSearch = false;
+                productSearchQuery = '';
+                renderWizard();
+              }
+            };
+          });
+        };
+
+        searchInput.onfocus = () => filterProducts(searchInput.value);
+        searchInput.oninput = (e) => filterProducts(e.target.value);
+      }
+
+      // Complete & Link Button
       const btnComplete = modalEl.querySelector('#btn-complete-map-wiz');
       if (btnComplete) {
         btnComplete.onclick = async () => {
@@ -435,7 +568,7 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
             const newSubtype = {
               id: subtypeId,
               name: wizardData.subTypeName,
-              defaultProductId: null,
+              defaultProductId: wizardData.linkedProduct ? wizardData.linkedProduct.id : null,
               aliases: [wizardData.subTypeName.toLowerCase()]
             };
 
@@ -460,6 +593,23 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
             setIngredients(currentIngredients);
             await saveIngredient(targetParent);
 
+            // Reassign / Move linked existing product to this new subtype hierarchy
+            if (wizardData.linkedProduct) {
+              const allProducts = [...(currentStoreState.products || [])];
+              const pIdx = allProducts.findIndex(p => String(p.id) === String(wizardData.linkedProduct.id));
+              const updatedProduct = {
+                ...wizardData.linkedProduct,
+                ingredientId: targetParent.id,
+                subtypeId: subtypeId,
+                updatedAt: new Date().toISOString()
+              };
+              if (pIdx >= 0) allProducts[pIdx] = updatedProduct;
+              else allProducts.push(updatedProduct);
+
+              setProducts(allProducts);
+              await saveProduct(updatedProduct);
+            }
+
             closeModal();
 
             if (typeof onComplete === 'function') {
@@ -469,6 +619,7 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
                 category: wizardData.selectedCategory,
                 parentName: targetParent.name,
                 subtypeName: wizardData.subTypeName,
+                productId: wizardData.linkedProduct ? wizardData.linkedProduct.id : null,
                 sIdx,
                 iIdx
               });

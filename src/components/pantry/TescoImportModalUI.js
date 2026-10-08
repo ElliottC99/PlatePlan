@@ -13,6 +13,7 @@ function showModal(html) {
   const wrap = document.getElementById('view-modal-wrap');
   const content = document.getElementById('view-modal-content');
   if (wrap && content) {
+    wrap.style.zIndex = '25000';
     content.innerHTML = html;
     wrap.classList.add('open');
     document.body.style.overflow = 'hidden';
