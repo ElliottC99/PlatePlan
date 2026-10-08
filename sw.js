@@ -1,23 +1,23 @@
 /**
- * sw.js (v3.28.3)
+ * sw.js (v3.28.4)
  * Service Worker for PlatePlan PWA offline support & asset caching.
  * Caches core app shell, modern ES6 modules, stylesheets, and icons.
  */
 
-const PLATEPLAN_CACHE = 'plateplan-cache-v3.28.3';
-const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.28.3';
-const PLATEPLAN_APP_VERSION = 'v3.28.3';
-const PLATEPLAN_BUILD_ID = '3.28.3-v285';
+const PLATEPLAN_CACHE = 'plateplan-cache-v3.28.4';
+const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.28.4';
+const PLATEPLAN_APP_VERSION = 'v3.28.4';
+const PLATEPLAN_BUILD_ID = '3.28.4-v286';
 
 const PLATEPLAN_PRECACHE_ASSETS = [
   '/',
   '/PlatePlan.html',
   '/manifest.json',
   '/firebase-config.js',
-  '/styles/tokens.css?v=3.28.3',
-  '/styles/components.css?v=3.28.3',
-  '/styles/responsive.css?v=3.28.3',
-  '/styles/print.css?v=3.28.3',
+  '/styles/tokens.css?v=3.28.4',
+  '/styles/components.css?v=3.28.4',
+  '/styles/responsive.css?v=3.28.4',
+  '/styles/print.css?v=3.28.4',
   '/src/main.js',
   '/src/store/store.js',
   '/src/config/firebase.js',
@@ -126,9 +126,9 @@ self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(PLATEPLAN_CACHE).then(async cache => {
-      console.log(`[SW v3.28.3] Precaching shell and core ES6 modules...`);
+      console.log(`[SW v3.28.4] Precaching shell and core ES6 modules...`);
       await cache.addAll(PLATEPLAN_PRECACHE_ASSETS).catch(err => {
-        console.warn('[SW v3.28.3] Non-fatal precache warning:', err);
+        console.warn('[SW v3.28.4] Non-fatal precache warning:', err);
       });
       await Promise.allSettled(PLATEPLAN_OPTIONAL_SHELL.map(url => cache.add(url)));
     })
@@ -142,7 +142,7 @@ self.addEventListener('activate', event => {
         keys
           .filter(key => key !== PLATEPLAN_CACHE && key !== PLATEPLAN_IMAGE_CACHE)
           .map(key => {
-            console.log('[SW v3.28.3] Purging legacy cache:', key);
+            console.log('[SW v3.28.4] Purging legacy cache:', key);
             return caches.delete(key);
           })
       );

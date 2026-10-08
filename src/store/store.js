@@ -1,5 +1,5 @@
 /**
- * src/store/store.js (v3.28.3)
+ * src/store/store.js (v3.28.4)
  * Centralized Reactive State Store module using native browser CustomEvents for unidirectional data flow.
  * Provides microtask-wrapped event dispatching and IndexedDB caching for instant offline hydration without localStorage quotas.
  */
@@ -15,10 +15,10 @@ export { getShoppingLineStateKey };
 const DB_NAME = 'PlatePlanDB';
 const STORE_NAME = 'StateStore';
 const DB_VERSION = 1;
-const CACHE_KEY = 'plateplan_store_cache_v3.28.3';
+const CACHE_KEY = 'plateplan_store_cache_v3.28.4';
 
 const state = {
-  version: 'v3.28.3',
+  version: 'v3.28.4',
   recipes: [],
   ingredients: [],
   products: [],
@@ -526,7 +526,7 @@ export async function runOptimisticMutation(domain, mutateFn, persistPromise, ro
 }
 
 /**
- * Learns an alias for an ingredient taxonomy item/sub-type and persists to repository.
+ * Learns an alias for an ingredient item/sub-type and persists to repository.
  * @param {string} ingredientId 
  * @param {string} rawString 
  * @param {string} [subtypeId=null]

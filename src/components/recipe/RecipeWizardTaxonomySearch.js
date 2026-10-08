@@ -1,9 +1,9 @@
 /**
- * src/components/recipe/RecipeWizardTaxonomySearch.js (v3.28.3)
- * Searchable Taxonomy Autocomplete Component for Recipe Ingestion Wizard.
+ * src/components/recipe/RecipeWizardTaxonomySearch.js (v3.28.4)
+ * Searchable Category & Item Autocomplete Component for Recipe Ingestion Wizard.
  * Features:
  * - Dynamic substring filtering across ingredients & sub-types
- * - Interactive Decision Tree Creation Wizard for new taxonomy items
+ * - Interactive New Ingredient Mapping Wizard for new items
  * - Visual distinction between main categories and indented sub-types
  * - Click & keyboard navigation (Arrow keys, Enter, Escape)
  */
@@ -43,13 +43,13 @@ export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [])
       <input type="text"
              id="wiz-ing-tax-search-${sIdx}-${iIdx}"
              name="wiz_ing_tax_search_${sIdx}_${iIdx}"
-             aria-label="Search taxonomy for ingredient section ${sIdx} item ${iIdx}"
+             aria-label="Search category or item for ingredient section ${sIdx} item ${iIdx}"
              class="wiz-ing-tax-search"
              data-sidx="${sIdx}"
              data-iidx="${iIdx}"
              data-tax-val="${escapeAttr(selectedVal)}"
              value="${escapeAttr(selectedLabel)}"
-             placeholder="Search taxonomy..."
+             placeholder="Search category or item..."
              autocomplete="off"
              style="width:100%; padding:6px 8px; border-radius:6px; font-size:12px; ${catInputStyle}" />
       <div class="wiz-tax-dropdown"
@@ -81,8 +81,8 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
     const iIdx = inputEl.dataset.iidx;
 
     let html = `
-      <div class="wiz-tax-opt" data-val="new_item" data-label="✨ New Taxonomy Item" style="padding:7px 10px; font-size:12px; cursor:pointer; font-weight:600; color:var(--green,#059669); border-bottom:1px solid var(--border,#eee);">
-        ✨ New Taxonomy Item
+      <div class="wiz-tax-opt" data-val="new_item" data-label="✨ New Item" style="padding:7px 10px; font-size:12px; cursor:pointer; font-weight:600; color:var(--green,#059669); border-bottom:1px solid var(--border,#eee);">
+        ✨ New Item
       </div>
     `;
 

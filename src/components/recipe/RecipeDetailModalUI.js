@@ -39,7 +39,7 @@ function formatBrandProductPair(product, fallbackBrand = '', fallbackProductName
 }
 
 /**
- * Formats a recipe ingredient row with hierarchical taxonomy and scaled volumes.
+ * Formats a recipe ingredient row with hierarchical category/item structure and scaled volumes.
  */
 export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1) {
   if (!ing) return '';

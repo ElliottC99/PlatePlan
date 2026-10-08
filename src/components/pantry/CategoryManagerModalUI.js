@@ -183,6 +183,7 @@ export function renderCategoryManagerModal() {
           <button id="btn-submit-merge-cat" type="button" class="btn btn-primary primary sm" onclick="window.submitMergeCat()">Confirm Merge</button>
         </div>`;
     } else if (wizardStep === 'reassign') {
+      const rawCategories = getRawCategories(state);
       const boundIngs = ingredients.filter(i => (i.category === activeCat || i.cat === activeCat || slugCategory(i.category) === slugCategory(activeCat)));
       const otherCats = rawCategories.filter(c => c !== activeCat);
       if (!otherCats.includes('Uncategorised')) otherCats.push('Uncategorised');

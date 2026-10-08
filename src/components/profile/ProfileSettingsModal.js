@@ -17,7 +17,7 @@ function escapeHtml(value) {
 /**
  * Renders system and display parameters card.
  */
-export function renderSystemDisplayCard(theme = 'system', version = 'v3.28.3 (ES6 Modern)') {
+export function renderSystemDisplayCard(theme = 'system', version = 'v3.28.4 (ES6 Modern)') {
   return `
     <div class="pp-settings-card" id="pp-system-display-card">
       <div class="pp-settings-title" style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 12px 0;display:flex;align-items:center;gap:8px">

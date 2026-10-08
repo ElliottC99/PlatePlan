@@ -257,3 +257,13 @@ export function openTescoImportModal(subtypeId, parentId) {
 export function openTescoBookmarkletInstructionsModal() {
   openTescoImportModal(null, null);
 }
+
+export const openSubtypeProductLinkerModal = openSubtypeLinkSelectionModal;
+
+if (typeof window !== 'undefined') {
+  window.openSubtypeLinkSelectionModal = openSubtypeLinkSelectionModal;
+  window.openSubtypeProductLinkerModal = openSubtypeLinkSelectionModal;
+  window.openSubtypeExistingProductPickerModal = openSubtypeExistingProductPickerModal;
+  window.openTescoImportModal = openTescoImportModal;
+  window.openTescoBookmarkletInstructionsModal = openTescoBookmarkletInstructionsModal;
+}

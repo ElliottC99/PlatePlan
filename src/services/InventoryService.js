@@ -1,7 +1,7 @@
 /**
  * src/services/InventoryService.js (v3.23.0)
  * Pantry Match & "Use-Up" Calculation Engine for PlatePlan.
- * Cross-references recipe ingredients against inventory taxonomy items.
+ * Cross-references recipe ingredients against inventory items.
  */
 
 import { getState } from '../store/store.js';

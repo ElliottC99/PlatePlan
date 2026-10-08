@@ -264,7 +264,7 @@ export function stemIngredientName(rawName) {
 }
 
 /**
- * Cross-references parsed ingredient against existing Store taxonomy including aliases.
+ * Cross-references parsed ingredient against existing Store items including aliases.
  */
 export function matchIngredientTaxonomy(parsedItem, existingIngredients = null) {
   if (!parsedItem) return null;

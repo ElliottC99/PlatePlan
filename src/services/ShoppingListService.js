@@ -32,7 +32,7 @@ export function mapCategoryToAisle(categoryName) {
  * @param {Object} plan Active meal plan document
  * @param {Array} inventory Active household inventory items
  * @param {Array} recipes All available recipes in store
- * @param {Array} ingredientsBank All available ingredients taxonomy items
+ * @param {Array} ingredientsBank All available ingredients/items in bank
  */
 export function generateShoppingListFromPlan(plan, inventory = [], recipes = [], ingredientsBank = []) {
   if (!plan || !Array.isArray(plan.days)) {
