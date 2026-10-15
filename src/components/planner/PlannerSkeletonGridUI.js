@@ -6,6 +6,7 @@
 
 import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
+import { saveCurrentPlan } from '../../repositories/HouseholdRepository.js';
 
 function resolveRecipeName(recipeId, fallback = '') {
   if (!recipeId) return fallback || '';
@@ -313,7 +314,7 @@ export function setSlotConfiguredStatus(dayIndex, mealType, status, recipeId = n
     };
   }
 
-  if (typeof window.saveState === 'function') window.saveState();
+  if (typeof saveCurrentPlan === 'function') saveCurrentPlan(window.state.plan);
   closeSlotConfigurator();
   if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
 }
