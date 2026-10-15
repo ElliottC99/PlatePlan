@@ -89,7 +89,7 @@ export function updateSinglePersonServes(val, person = 'elliott') {
         ? (totalKcalBudget > 0 ? (Number(eProf.dailyKcal) / totalKcalBudget) : 0.59)
         : (totalKcalBudget > 0 ? (Number(cProf.dailyKcal) / totalKcalBudget) : 0.41);
       
-      const scaleMultiplier = serves * profileShare;
+      const scaleMultiplier = (previewState.singleServes / serves) * profileShare;
       const rawIngs = activeR.ingredients || activeR.parsedIngredients || activeR.rawIngredients || r.ingredients || [];
       const ingredients = Array.isArray(rawIngs) ? rawIngs : Object.values(rawIngs);
       const sections = Array.isArray(activeR.ingredientSections) && activeR.ingredientSections.length > 0 ? activeR.ingredientSections : (r.ingredientSections || []);
