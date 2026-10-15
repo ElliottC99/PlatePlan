@@ -108,22 +108,41 @@ export function renderShoppingListUI() {
         </div>
         <div>
           ${items.map(item => `
-            <div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;gap:12px;background:${item.isChecked ? '#f8fafc' : '#fff'};opacity:${item.isChecked ? '0.7' : '1'};">
-              <div style="display:flex;align-items:center;gap:12px;flex:1;">
-                <input type="checkbox" id="shop-item-cb-${escapeAttr(item.id)}" name="shop_item_cb_${escapeAttr(item.id)}" aria-label="Toggle ${escapeAttr(item.name)}" data-action="toggle-shop-item" data-id="${escapeAttr(item.id)}" ${item.isChecked ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;accent-color:#2563eb;" />
-                <div>
-                  <div style="font-weight:600;font-size:14px;color:#1e293b;text-decoration:${item.isChecked ? 'line-through' : 'none'};">
-                    ${escapeHtml(item.buyQty)} ${escapeHtml(item.unit)} ${escapeHtml(item.name)}
-                  </div>
-                  <div style="font-size:11px;color:#64748b;margin-top:2px;">
-                    Need ${escapeHtml(item.requiredQty)}${escapeHtml(item.unit)} &bull; In stock: ${escapeHtml(item.inStockQty)}${escapeHtml(item.unit)} ${item.isManualAdd ? '&bull; (Manual)' : ''}
+            <div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;flex-direction:column;gap:6px;background:${item.isChecked ? '#f8fafc' : '#fff'};opacity:${item.isChecked ? '0.7' : '1'};">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                <div style="display:flex;align-items:center;gap:12px;flex:1;">
+                  <input type="checkbox" id="shop-item-cb-${escapeAttr(item.id)}" name="shop_item_cb_${escapeAttr(item.id)}" aria-label="Toggle ${escapeAttr(item.name)}" data-action="toggle-shop-item" data-id="${escapeAttr(item.id)}" ${item.isChecked ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;accent-color:#2563eb;" />
+                  <div>
+                    <div style="font-weight:600;font-size:14px;color:#1e293b;text-decoration:${item.isChecked ? 'line-through' : 'none'};">
+                      ${escapeHtml(item.buyQty)} ${escapeHtml(item.unit)} ${escapeHtml(item.name)}
+                    </div>
+                    <div style="font-size:11px;color:#64748b;margin-top:2px;">
+                      Need ${escapeHtml(item.requiredQty)}${escapeHtml(item.unit)} &bull; In stock: ${escapeHtml(item.inStockQty)}${escapeHtml(item.unit)} ${item.isManualAdd ? '&bull; (Manual)' : ''}
+                    </div>
                   </div>
                 </div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <input type="number" step="any" id="shop-item-qty-${escapeAttr(item.id)}" name="shop_item_qty_${escapeAttr(item.id)}" aria-label="Quantity for ${escapeAttr(item.name)}" class="shop-item-qty-input" data-id="${escapeAttr(item.id)}" value="${item.buyQty}" style="width:65px;padding:4px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;" />
+                  <span style="font-size:11px;color:#64748b;">${escapeHtml(item.unit)}</span>
+                  <button type="button" class="btn sm ghost" style="font-size:11px;padding:4px 8px;" onclick="if(window.renderScrollableSwapModal) window.renderScrollableSwapModal('${escapeAttr(item.id)}', '${escapeAttr(item.name)}')">Swap Brand ▾</button>
+                </div>
               </div>
-              <div style="display:flex;align-items:center;gap:6px;">
-                <input type="number" step="any" id="shop-item-qty-${escapeAttr(item.id)}" name="shop_item_qty_${escapeAttr(item.id)}" aria-label="Quantity for ${escapeAttr(item.name)}" class="shop-item-qty-input" data-id="${escapeAttr(item.id)}" value="${item.buyQty}" style="width:65px;padding:4px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;" />
-                <span style="font-size:11px;color:#64748b;">${escapeHtml(item.unit)}</span>
-              </div>
+              ${Array.isArray(item.recipeBreakdown) && item.recipeBreakdown.length > 0 ? `
+                <div style="font-size:11px;background:#f8fafc;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;margin-top:2px;">
+                  <div style="font-weight:700;color:#334155;margin-bottom:3px;display:flex;justify-content:space-between;align-items:center;">
+                    <span>Recipe Usage (${item.recipeBreakdown.length})</span>
+                    <button type="button" class="btn sm ghost" style="font-size:9px;padding:1px 5px;" onclick="const el=document.getElementById('breakdown-${escapeAttr(item.id)}');if(el)el.style.display=el.style.display==='none'?'block':'none';">Toggle ▾</button>
+                  </div>
+                  <div id="breakdown-${escapeAttr(item.id)}" style="display:none;margin-top:4px;display:flex;flex-direction:column;gap:2px;">
+                    ${item.recipeBreakdown.map(b => `
+                      <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid #edf2f7;">
+                        <span>Day ${b.day} (${b.mealType}): <strong>${escapeHtml(b.recipeName)}</strong> (${b.serves} serves)</span>
+                        <span><strong>${b.qty}${escapeHtml(item.unit)}</strong></span>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
             </div>
           `).join('')}
         </div>

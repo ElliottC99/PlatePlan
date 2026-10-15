@@ -1,5 +1,5 @@
 /**
- * src/views/PantryBankView.js (v3.29.1)
+ * src/views/PantryBankView.js (v3.30.0)
  * Modular ES6 View for Pantry Active Stock & Master Catalog (Category ➔ Item ➔ Sub-type Hierarchy Bank).
  * Features dual-tab switching (Active Stock vs Pantry Bank), 1-click "+ Stock" action,
  * Aliasing, Merging, Sub-type creation, Promoting/demoting, and Auto-default product previews.

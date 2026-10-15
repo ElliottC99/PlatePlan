@@ -1,5 +1,5 @@
 /**
- * src/components/shell/NavigationUI.js (v3.29.1)
+ * src/components/shell/NavigationUI.js (v3.30.0)
  * Modular Presentation Component for Desktop Sidebar & Mobile Navigation
  */
 

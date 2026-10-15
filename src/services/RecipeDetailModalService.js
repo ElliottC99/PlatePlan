@@ -47,15 +47,56 @@ export function updateRecipePreviewScale(val) {
   const parsed = parseInt(val, 10);
   if (!isNaN(parsed) && parsed > 0) {
     previewState.targetServes = parsed;
-    renderRecipePreview();
+    // Update ingredients DOM list directly without wiping modalContent to preserve input focus
+    const ingListEl = document.getElementById('recipe-modal-ingredients-list');
+    if (ingListEl && previewState.recipe) {
+      const r = previewState.recipe;
+      const isEnh = previewState.currentTab === 'enhanced' && !!r.enhanced;
+      const activeR = isEnh ? { ...r, ...r.enhanced, ingredients: r.enhanced.ingredients || r.ingredients } : r;
+      const serves = Number(activeR.serves ?? r.serves ?? 2) || 2;
+      const scaleMultiplier = previewState.servingMode === 'both'
+        ? (previewState.targetServes / serves)
+        : (previewState.singleServes / serves);
+      const rawIngs = activeR.ingredients || activeR.parsedIngredients || activeR.rawIngredients || r.ingredients || [];
+      const ingredients = Array.isArray(rawIngs) ? rawIngs : Object.values(rawIngs);
+      const sections = Array.isArray(activeR.ingredientSections) && activeR.ingredientSections.length > 0 ? activeR.ingredientSections : (r.ingredientSections || []);
+      const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
+      ingListEl.innerHTML = renderRecipeIngredientsListHTML(ingredients, state, scaleMultiplier, sections);
+    } else {
+      renderRecipePreview();
+    }
   }
 }
 
-export function updateSinglePersonServes(val) {
+export function updateSinglePersonServes(val, person = 'elliott') {
   const parsed = parseInt(val, 10);
   if (!isNaN(parsed) && parsed > 0) {
     previewState.singleServes = parsed;
-    renderRecipePreview();
+    previewState.servingMode = person;
+    const ingListEl = document.getElementById('recipe-modal-ingredients-list');
+    if (ingListEl && previewState.recipe) {
+      const r = previewState.recipe;
+      const isEnh = previewState.currentTab === 'enhanced' && !!r.enhanced;
+      const activeR = isEnh ? { ...r, ...r.enhanced, ingredients: r.enhanced.ingredients || r.ingredients } : r;
+      const serves = Number(activeR.serves ?? r.serves ?? 2) || 2;
+      const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
+      const userPrefs = state.preferences || state.userPrefs || {};
+      const profiles = userPrefs.profiles || {};
+      const eProf = profiles.elliott || profiles.e || {};
+      const cProf = profiles.chloe || profiles.c || {};
+      const totalKcalBudget = (Number(eProf.dailyKcal) || 0) + (Number(cProf.dailyKcal) || 0);
+      const profileShare = person === 'elliott'
+        ? (totalKcalBudget > 0 ? (Number(eProf.dailyKcal) / totalKcalBudget) : 0.59)
+        : (totalKcalBudget > 0 ? (Number(cProf.dailyKcal) / totalKcalBudget) : 0.41);
+      
+      const scaleMultiplier = (previewState.singleServes / serves) * profileShare * 2;
+      const rawIngs = activeR.ingredients || activeR.parsedIngredients || activeR.rawIngredients || r.ingredients || [];
+      const ingredients = Array.isArray(rawIngs) ? rawIngs : Object.values(rawIngs);
+      const sections = Array.isArray(activeR.ingredientSections) && activeR.ingredientSections.length > 0 ? activeR.ingredientSections : (r.ingredientSections || []);
+      ingListEl.innerHTML = renderRecipeIngredientsListHTML(ingredients, state, scaleMultiplier, sections);
+    } else {
+      renderRecipePreview();
+    }
   }
 }
 

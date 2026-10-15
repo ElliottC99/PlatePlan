@@ -1,12 +1,13 @@
 /**
- * src/components/ProductSwapModal.js (v3.15.4)
+ * src/components/ProductSwapModal.js (v3.31.0)
  * Robust modal component for 3-tier product & brand substitution.
- * Features tabbed tier navigation, responsive toolbar layout,
- * standardized close buttons, recipe vs global scoping, and reactive re-renders.
+ * Features tabbed tier navigation, "Apply Substitution" bottom-right button,
+ * cleaned tag/brand fallbacks, and instant reactive state sync.
  */
 
 import { saveCurrentPlan } from '../services/HouseholdRepository.js';
 import { calculateShoppingItemCost } from '../services/ShoppingCalculationService.js';
+import { setShoppingList } from '../store/store.js';
 
 const DEFAULT_SUBTYPE_MAP = {
   onion: 'Alliums', garlic: 'Alliums', shallot: 'Alliums', leek: 'Alliums',
@@ -25,13 +26,13 @@ const DEFAULT_SUBTYPE_MAP = {
 };
 
 export function inferSubtype(item) {
-  if (!item) return 'General Products';
+  if (!item) return 'Produce & Staples';
   if (item.subtype) return item.subtype;
   const name = String(item.name || item.ingredient || item.raw || '').toLowerCase();
   for (const [kw, sub] of Object.entries(DEFAULT_SUBTYPE_MAP)) {
     if (name.includes(kw)) return sub;
   }
-  return item.cat || item.category || 'General Products';
+  return item.cat || item.category || 'Produce & Staples';
 }
 
 export function calculateMetrics(item) {
@@ -87,21 +88,22 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   const targetName = String(targetItem?.name || '').toLowerCase();
   const targetGroupId = targetItem?.groupId || targetGroup?.groupId || '';
 
-  const tier1SameSubtype = ingredients.filter(i => {
+  const tier1Subtypes = ingredients.filter(i => {
     if ((i.id && i.id === targetItem?.id) || (i.name && i.name.toLowerCase() === targetName)) return false;
     return inferSubtype(i) === targetSubtype;
   });
 
-  const tier2SameIngredient = ingredients.filter(i => {
+  const tier2Items = ingredients.filter(i => {
     if ((i.id && i.id === targetItem?.id) || (i.name && i.name.toLowerCase() === targetName)) return false;
-    if (tier1SameSubtype.includes(i)) return false;
+    if (tier1Subtypes.includes(i)) return false;
     if (targetGroupId && (i.groupId === targetGroupId || i.id === targetGroupId)) return true;
     return targetName.length > 2 && (i.name?.toLowerCase().includes(targetName) || targetName.includes(i.name?.toLowerCase()));
   });
 
   let currentSort = 'relevance';
   let currentScope = (optionalContext?.instanceId || window.currentPreviewInstanceId) ? 'recipe' : 'global';
-  let currentTierTab = 'all';
+  let currentTierTab = 'tier1';
+  let selectedSubstituteProduct = null;
 
   const overlay = document.createElement('div');
   overlay.id = 'pp-swap-product-modal';
@@ -110,12 +112,14 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   const container = document.createElement('div');
   container.style.cssText = 'background:#fff;width:94%;max-width:620px;max-height:88vh;border-radius:16px;display:flex;flex-direction:column;box-shadow:0 24px 48px rgba(0,0,0,0.22);overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
 
+  const currentProductName = targetItem?.brand ? `${targetItem.brand} - ${targetItem.name}` : (targetItem?.name || 'Item');
+
   container.innerHTML = `
     <div style="padding:16px 20px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;background:#fafafa;">
       <div>
         <h3 style="margin:0;font-size:16px;font-weight:700;color:#0f172a;">Swap Product / Brand</h3>
         <p style="margin:2px 0 0;font-size:13px;color:#64748b;">
-          Swapping: <strong style="color:#2563eb;">${targetItem?.brand ? targetItem.brand + ' - ' : ''}${targetItem?.name || 'Item'}</strong> <span style="font-size:11px;background:#e2e8f0;padding:2px 6px;border-radius:6px;color:#475569;margin-left:4px;">${targetSubtype}</span>
+          Swapping ${targetSubtype} &rarr; <strong style="color:#2563eb;">${currentProductName}</strong>
         </p>
       </div>
       <button id="pp-modal-close" class="modal-close-btn" aria-label="Close" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;line-height:1;padding:4px 8px;border-radius:6px;">&times;</button>
@@ -125,15 +129,15 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
         <span style="font-size:12px;font-weight:600;color:#475569;">Apply Substitution:</span>
         <div style="display:flex;gap:4px;background:#e2e8f0;padding:2px;border-radius:8px;">
-          <button type="button" id="pp-scope-recipe" class="pp-scope-btn ${currentScope === 'recipe' ? 'active' : ''}" style="border:none;background:${currentScope === 'recipe' ? '#fff' : 'transparent'};color:${currentScope === 'recipe' ? '#2563eb' : '#64748b'};padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:${currentScope === 'recipe' ? '700' : '600'};box-shadow:${currentScope === 'recipe' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none'};">Recipe Specific</button>
-          <button type="button" id="pp-scope-global" class="pp-scope-btn ${currentScope === 'global' ? 'active' : ''}" style="border:none;background:${currentScope === 'global' ? '#fff' : 'transparent'};color:${currentScope === 'global' ? '#2563eb' : '#64748b'};padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:${currentScope === 'global' ? '700' : '600'};box-shadow:${currentScope === 'global' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none'};">Global Shopping List</button>
+          <button type="button" id="pp-scope-recipe" class="pp-scope-btn ${currentScope === 'recipe' ? 'active' : ''}" style="border:none;background:${currentScope === 'recipe' ? '#fff' : 'transparent'};color:${currentScope === 'recipe' ? '#2563eb' : '#64748b'};padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:${currentScope === 'recipe' ? '700' : '600'};">Recipe Specific</button>
+          <button type="button" id="pp-scope-global" class="pp-scope-btn ${currentScope === 'global' ? 'active' : ''}" style="border:none;background:${currentScope === 'global' ? '#fff' : 'transparent'};color:${currentScope === 'global' ? '#2563eb' : '#64748b'};padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:${currentScope === 'global' ? '700' : '600'};">Global Shopping List</button>
         </div>
       </div>
 
       <div style="display:flex;gap:10px;align-items:center;">
         <label for="pp-product-search" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Search substitute products</label>
         <input type="text" id="pp-product-search" name="productSubstituteSearch" aria-label="Search substitute products" placeholder="🔍 Search substitute products..." style="flex:1;min-width:0;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;">
-        <select id="pp-product-sort" name="productSubstituteSort" aria-label="Sort options" style="flex:0 0 140px;max-width:140px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;background:#fff;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+        <select id="pp-product-sort" name="productSubstituteSort" aria-label="Sort options" style="flex:0 0 140px;max-width:140px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;background:#fff;cursor:pointer;">
           <option value="relevance">Sort: Default</option>
           <option value="name">Sort: Name (A-Z)</option>
           <option value="proteinPerKcal">Sort: Protein / kcal</option>
@@ -144,13 +148,17 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     </div>
 
     <div id="pp-tier-tabs" style="display:flex;gap:4px;padding:8px 20px 0 20px;border-bottom:1px solid #e2e8f0;background:#fff;overflow-x:auto;">
-      <button type="button" class="pp-tier-tab" data-tier="all" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:700;color:#2563eb;border-bottom:2px solid #2563eb;cursor:pointer;white-space:nowrap;">All</button>
-      <button type="button" class="pp-tier-tab" data-tier="tier1" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Tier 1: Subtype</button>
-      <button type="button" class="pp-tier-tab" data-tier="tier2" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Tier 2: Family</button>
-      <button type="button" class="pp-tier-tab" data-tier="tier3" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Tier 3: All Catalog</button>
+      <button type="button" class="pp-tier-tab" data-tier="tier1" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:700;color:#2563eb;border-bottom:2px solid #2563eb;cursor:pointer;white-space:nowrap;">Tier 1: Sub-Types</button>
+      <button type="button" class="pp-tier-tab" data-tier="tier2" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Tier 2: Items</button>
+      <button type="button" class="pp-tier-tab" data-tier="tier3" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Tier 3: Global</button>
     </div>
 
-    <div id="pp-product-list" style="padding:16px 20px;overflow-y:auto;flex-grow:1;"></div>
+    <div id="pp-product-list" style="padding:16px 20px;overflow-y:auto;flex-grow:1;max-height:40vh;"></div>
+
+    <div style="padding:14px 20px;border-top:1px solid #e2e8f0;background:#fafafa;display:flex;justify-content:space-between;align-items:center;">
+      <div id="pp-selected-preview" style="font-size:12px;color:#64748b;">No substitute selected</div>
+      <button type="button" id="pp-apply-substitution" class="btn primary" disabled style="opacity:0.5;cursor:not-allowed;font-weight:700;padding:8px 18px;border-radius:8px;">Apply Substitution</button>
+    </div>
   `;
 
   overlay.appendChild(container);
@@ -161,18 +169,15 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   const sortSelect = container.querySelector('#pp-product-sort');
   const scopeRecipeBtn = container.querySelector('#pp-scope-recipe');
   const scopeGlobalBtn = container.querySelector('#pp-scope-global');
+  const applyBtn = container.querySelector('#pp-apply-substitution');
+  const selectedPreviewEl = container.querySelector('#pp-selected-preview');
 
   const updateScopeButtons = () => {
     if (scopeRecipeBtn && scopeGlobalBtn) {
       scopeRecipeBtn.style.background = currentScope === 'recipe' ? '#fff' : 'transparent';
       scopeRecipeBtn.style.color = currentScope === 'recipe' ? '#2563eb' : '#64748b';
-      scopeRecipeBtn.style.fontWeight = currentScope === 'recipe' ? '700' : '600';
-      scopeRecipeBtn.style.boxShadow = currentScope === 'recipe' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none';
-
       scopeGlobalBtn.style.background = currentScope === 'global' ? '#fff' : 'transparent';
       scopeGlobalBtn.style.color = currentScope === 'global' ? '#2563eb' : '#64748b';
-      scopeGlobalBtn.style.fontWeight = currentScope === 'global' ? '700' : '600';
-      scopeGlobalBtn.style.boxShadow = currentScope === 'global' ? '0 1px 2px rgba(0,0,0,0.08)' : 'none';
     }
   };
 
@@ -203,72 +208,46 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     }
   }
 
-  function renderCardHTML(item, badgeText, badgeColor = '#dbeafe', textColor = '#1e40af') {
-    const metrics = calculateMetrics(item);
-    return `
-      <div class="pp-swap-card" data-ing-id="${item.id || item.name}" style="padding:12px 14px;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:8px;cursor:pointer;transition:all 0.15s ease;background:#fff;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-          <div>
-            <span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">${item.brand || 'Generic'}</span>
-            <div style="font-weight:600;color:#1e293b;font-size:14px;margin-top:1px;">${item.name}</div>
-          </div>
-          ${badgeText ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:${badgeColor};color:${textColor};">${badgeText}</span>` : ''}
-        </div>
-        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">
-          ${metrics.price ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">£${metrics.price.toFixed(2)}</span>` : ''}
-          ${metrics.protein ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">${metrics.protein}g protein</span>` : ''}
-          ${metrics.proteinPerKcal ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">${(metrics.proteinPerKcal * 100).toFixed(1)}g prot/100kcal</span>` : ''}
-        </div>
-      </div>`;
-  }
-
   function renderList(query = '') {
     let html = '';
     const cleanQ = query.toLowerCase().trim();
-
     const matchesQuery = (item) => !cleanQ || (item.name?.toLowerCase().includes(cleanQ) || item.brand?.toLowerCase().includes(cleanQ) || inferSubtype(item).toLowerCase().includes(cleanQ));
 
-    const filteredT1 = sortItems(tier1SameSubtype.filter(matchesQuery));
-    const filteredT2 = sortItems(tier2SameIngredient.filter(matchesQuery));
-
-    const globalCatalog = ingredients.filter(i => {
-      if ((i.id && i.id === targetItem?.id) || (i.name && i.name.toLowerCase() === targetName)) return false;
-      if (!cleanQ && (tier1SameSubtype.includes(i) || tier2SameIngredient.includes(i))) return false;
-      return matchesQuery(i);
-    });
-    const filteredT3 = sortItems(globalCatalog).slice(0, 40);
-
-    if (currentTierTab === 'tier1' || currentTierTab === 'all') {
-      if (filteredT1.length > 0) {
-        if (currentTierTab === 'all') html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#2563eb;margin-bottom:8px;">Tier 1: Same Subtype (${targetSubtype})</div>`;
-        filteredT1.forEach(item => { html += renderCardHTML(item, 'Subtype Match', '#dbeafe', '#1e40af'); });
-      } else if (currentTierTab === 'tier1') {
-        html += `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;">No subtype matches found.</div>`;
-      }
+    let displayItems = [];
+    if (currentTierTab === 'tier1') {
+      displayItems = sortItems(tier1Subtypes.filter(matchesQuery));
+    } else if (currentTierTab === 'tier2') {
+      displayItems = sortItems(tier2Items.filter(matchesQuery));
+    } else {
+      const globalCatalog = ingredients.filter(i => {
+        if ((i.id && i.id === targetItem?.id) || (i.name && i.name.toLowerCase() === targetName)) return false;
+        return matchesQuery(i);
+      });
+      displayItems = sortItems(globalCatalog).slice(0, 50);
     }
 
-    if (currentTierTab === 'tier2' || currentTierTab === 'all') {
-      if (filteredT2.length > 0) {
-        if (currentTierTab === 'all') html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#059669;margin:16px 0 8px 0;">Tier 2: Same Ingredient Family</div>`;
-        filteredT2.forEach(item => { html += renderCardHTML(item, 'Family Match', '#d1fae5', '#065f46'); });
-      } else if (currentTierTab === 'tier2') {
-        html += `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;">No family matches found.</div>`;
-      }
-    }
-
-    if (currentTierTab === 'tier3' || currentTierTab === 'all') {
-      if (filteredT3.length > 0) {
-        if (currentTierTab === 'all') {
-          html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;margin:16px 0 8px 0;">Tier 3: Catalog Substitutes (${filteredT3.length})</div>`;
-        }
-        filteredT3.forEach(item => { html += renderCardHTML(item, inferSubtype(item), '#f1f5f9', '#475569'); });
-      } else if (currentTierTab === 'tier3') {
-        html += `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;">No catalog substitutes found.</div>`;
-      }
-    }
-
-    if (!html) {
-      html = `<div style="text-align:center;padding:30px;color:#94a3b8;font-size:14px;">No matching substitute products found.</div>`;
+    if (displayItems.length === 0) {
+      html = `<div style="text-align:center;padding:28px;color:#94a3b8;font-size:13px;">No substitute products found in this tier.</div>`;
+    } else {
+      displayItems.forEach(item => {
+        const metrics = calculateMetrics(item);
+        const isSelected = selectedSubstituteProduct && (selectedSubstituteProduct.id === item.id || selectedSubstituteProduct.name === item.name);
+        html += `
+          <div class="pp-swap-card" data-ing-id="${escapeAttr(item.id || item.name)}" style="padding:12px 14px;border:2px solid ${isSelected ? '#2563eb' : '#e2e8f0'};border-radius:10px;margin-bottom:8px;cursor:pointer;transition:all 0.15s ease;background:${isSelected ? '#eff6ff' : '#fff'};">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">${escapeAttr(item.brand || '')}</span>
+                <div style="font-weight:650;color:#1e293b;font-size:14px;margin-top:1px;">${escapeHtml(item.name)}</div>
+              </div>
+              <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#e0f2fe;color:#0369a1;">${escapeHtml(inferSubtype(item))}</span>
+            </div>
+            <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">
+              ${metrics.price ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">£${metrics.price.toFixed(2)}</span>` : ''}
+              ${metrics.protein ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">${metrics.protein}g protein</span>` : ''}
+            </div>
+          </div>
+        `;
+      });
     }
 
     listEl.innerHTML = html;
@@ -276,9 +255,23 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     listEl.querySelectorAll('.pp-swap-card').forEach(card => {
       card.onclick = () => {
         const selectedId = card.dataset.ingId;
-        const selectedProduct = ingredients.find(i => (i.id || i.name) === selectedId) || { name: selectedId };
-        executeSwapInState(param1, param2, selectedProduct, currentScope, targetItem, optionalContext);
-        overlay.remove();
+        selectedSubstituteProduct = ingredients.find(i => (i.id || i.name) === selectedId) || { name: selectedId };
+        
+        listEl.querySelectorAll('.pp-swap-card').forEach(c => {
+          c.style.borderColor = '#e2e8f0';
+          c.style.background = '#fff';
+        });
+        card.style.borderColor = '#2563eb';
+        card.style.background = '#eff6ff';
+
+        if (selectedPreviewEl) {
+          selectedPreviewEl.innerHTML = `Selected: <strong style="color:#0f172a;">${escapeHtml(selectedSubstituteProduct.brand ? selectedSubstituteProduct.brand + ' - ' : '')}${escapeHtml(selectedSubstituteProduct.name)}</strong>`;
+        }
+        if (applyBtn) {
+          applyBtn.disabled = false;
+          applyBtn.style.opacity = '1';
+          applyBtn.style.cursor = 'pointer';
+        }
       };
     });
   }
@@ -287,7 +280,15 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
 
   if (searchInput) searchInput.oninput = (e) => renderList(e.target.value);
   if (sortSelect) sortSelect.onchange = (e) => { currentSort = e.target.value; renderList(searchInput?.value || ''); };
-  
+
+  if (applyBtn) {
+    applyBtn.onclick = () => {
+      if (!selectedSubstituteProduct) return;
+      executeSwapInState(param1, param2, selectedSubstituteProduct, currentScope, targetItem, optionalContext);
+      overlay.remove();
+    };
+  }
+
   const closeBtn = container.querySelector('#pp-modal-close');
   if (closeBtn) closeBtn.onclick = () => overlay.remove();
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
@@ -296,7 +297,7 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
 export async function executeSwapInState(param1, param2, newProduct, scope = 'global', resolvedTarget = null, context = {}) {
   const targetItem = resolvedTarget || resolveTargetItem(param1, param2).item;
   const targetName = targetItem?.name || '';
-  const targetKey = targetItem?.key || targetItem?.id || param1 || param2;
+  const targetKey = targetItem?.key || targetItem?.id || targetItem?.ingredientId || param1 || param2;
   const instanceId = context?.instanceId || window.currentPreviewInstanceId || targetItem?.instanceId || null;
 
   const priceDelta = Math.round((Number(newProduct.price || newProduct.cost || 0) - Number(targetItem?.price || targetItem?.cost || 0)) * 100) / 100;
@@ -305,7 +306,7 @@ export async function executeSwapInState(param1, param2, newProduct, scope = 'gl
     id: newProduct.id || newProduct.name,
     productId: newProduct.id,
     name: newProduct.name,
-    brand: newProduct.brand || 'Generic',
+    brand: newProduct.brand || '',
     price: Number(newProduct.price || newProduct.cost || 0),
     priceDelta,
     scope,
@@ -313,9 +314,7 @@ export async function executeSwapInState(param1, param2, newProduct, scope = 'gl
     timestamp: Date.now()
   };
 
-  if (!window.state) {
-    try { window.state = {}; } catch (e) {}
-  }
+  if (!window.state) window.state = {};
   if (!window.state.plan || typeof window.state.plan !== 'object') window.state.plan = {};
 
   if (scope === 'recipe' && instanceId) {
@@ -335,6 +334,7 @@ export async function executeSwapInState(param1, param2, newProduct, scope = 'gl
     window.state.plan.substitutions[targetKey || targetName] = subPayload;
   }
 
+  // Update shopping lists in state and trigger reactive store dispatch
   const shoppingLists = ['confirmedShopping', 'shoppingList', 'generatedList'];
   shoppingLists.forEach(listKey => {
     if (!Array.isArray(window.state?.[listKey])) return;
@@ -343,7 +343,7 @@ export async function executeSwapInState(param1, param2, newProduct, scope = 'gl
       const items = Array.isArray(group.items) ? group.items : (Array.isArray(group) ? group : []);
       items.forEach(item => {
         if (!item) return;
-        if (item.key === targetKey || item.id === targetKey || (targetName && item.name === targetName)) {
+        if (item.id === targetKey || item.key === targetKey || item.ingredientId === targetKey || (targetName && item.name === targetName)) {
           item.name = newProduct.name;
           item.brand = newProduct.brand || '';
           item.ingredientId = newProduct.id || item.ingredientId;
@@ -364,13 +364,15 @@ export async function executeSwapInState(param1, param2, newProduct, scope = 'gl
     });
   });
 
+  if (Array.isArray(window.state.shoppingList)) {
+    setShoppingList(window.state.shoppingList);
+  }
+
   saveCurrentPlan(window.state.plan).catch(e => console.warn('[ProductSwapModal] Plan save error:', e));
 
-  // Dispatch shopping and plan state change events
   document.dispatchEvent(new CustomEvent('plateplan:state:shopping', { detail: window.state?.confirmedShopping || window.state?.shoppingList }));
   document.dispatchEvent(new CustomEvent('plateplan:state:plan', { detail: window.state?.plan }));
 
-  // Immediately invoke active shopping list rendering routines
   if (typeof window.renderShoppingListUI === 'function') {
     window.renderShoppingListUI();
   } else if (typeof window.renderShoppingList === 'function') {

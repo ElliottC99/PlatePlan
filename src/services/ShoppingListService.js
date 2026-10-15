@@ -62,17 +62,21 @@ export function generateShoppingListFromPlan(plan, inventory = [], recipes = [],
     }
   });
 
-  // Aggregate required ingredients across plan days & meals
+  // Aggregate required ingredients across plan days & meals with recipe breakdown
   const aggregatedRequirements = new Map(); // key: `${ingredientId}_${unit}`
 
-  plan.days.forEach(day => {
-    if (!Array.isArray(day.meals)) return;
-    day.meals.forEach(meal => {
-      const recipe = recipeMap.get(meal.recipeId);
+  plan.days.forEach((day, dayIndex) => {
+    // Support both day.meals object or array format
+    const mealsList = Array.isArray(day.meals) ? day.meals : (day.meals && typeof day.meals === 'object' ? Object.values(day.meals) : []);
+    mealsList.forEach(meal => {
+      if (!meal) return;
+      // Handle slots format if day.meals is a map of slots
+      const recipeId = meal.recipeId || meal.id;
+      const recipe = recipeMap.get(recipeId);
       if (!recipe || !Array.isArray(recipe.ingredients)) return;
 
       const baseServings = Number(recipe.serves || recipe.servings || 4) || 4;
-      const targetServings = Number(meal.servings || baseServings) || 4;
+      const targetServings = Number(meal.servings || meal.targetServes || baseServings) || 4;
       const scaleMultiplier = targetServings / baseServings;
 
       recipe.ingredients.forEach(ing => {
@@ -80,16 +84,29 @@ export function generateShoppingListFromPlan(plan, inventory = [], recipes = [],
         const unit = ing.unit || 'qty';
         const key = `${ingId}_${unit}`;
 
-        const reqQty = (Number(ing.qty) || 1) * scaleMultiplier;
-        const currentTotal = aggregatedRequirements.get(key) || {
-          ingredientId: ing.ingredientId || '',
-          name: ing.name || 'Ingredient',
-          category: ingredientMap.get(ing.ingredientId)?.category || ing.categoryId || ing.category || 'Pantry',
-          unit,
-          requiredQty: 0
-        };
+        const reqQty = (Number(ing.qty) || Number(ing.quantity) || 1) * scaleMultiplier;
+        let currentTotal = aggregatedRequirements.get(key);
+        if (!currentTotal) {
+          currentTotal = {
+            ingredientId: ing.ingredientId || '',
+            name: ing.name || 'Ingredient',
+            category: ingredientMap.get(ing.ingredientId)?.category || ing.categoryId || ing.category || 'Pantry',
+            unit,
+            requiredQty: 0,
+            recipeBreakdown: []
+          };
+        }
 
         currentTotal.requiredQty += reqQty;
+        currentTotal.recipeBreakdown.push({
+          recipeId: recipe.id,
+          recipeName: recipe.name || recipe.title || 'Recipe',
+          day: day.day || dayIndex + 1,
+          mealType: meal.mealType || meal.slot || 'meal',
+          servings: targetServings,
+          qty: Math.round(reqQty * 10) / 10
+        });
+
         aggregatedRequirements.set(key, currentTotal);
       });
     });
@@ -112,8 +129,9 @@ export function generateShoppingListFromPlan(plan, inventory = [], recipes = [],
       inStockQty: Math.round(stockQty * 10) / 10,
       buyQty: Math.round(netBuyQty * 10) / 10,
       unit: req.unit,
-      isChecked: netBuyQty <= 0, // Fully stocked items checked by default
-      isManualAdd: false
+      isChecked: netBuyQty <= 0,
+      isManualAdd: false,
+      recipeBreakdown: req.recipeBreakdown || []
     });
   });
 

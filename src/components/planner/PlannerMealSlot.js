@@ -198,12 +198,23 @@ export function filterSearchableRecipeSwapModal(query = '') {
   const activeProfile = isShared ? 'everyone' : (slotKey.endsWith('C') ? 'chloe' : 'elliott');
 
   const allRecipes = Array.isArray(stateObj.recipes) ? stateObj.recipes : [];
-  const candidates = allRecipes.filter(r => {
-    if (!r || !r.id || r.id === currentId) return false;
+  const flattenedCandidates = [];
+  allRecipes.forEach(r => {
+    if (!r || !r.id) return;
+    flattenedCandidates.push({ recipe: r, variant: 'original', name: r.name || r.title || 'Untitled Recipe' });
+    if (r.enhanced) {
+      flattenedCandidates.push({ recipe: r, variant: 'enhanced', name: (r.enhanced.name || r.name || r.title || 'Untitled Recipe') + ' (Enhanced)' });
+    }
+  });
+
+  const candidates = flattenedCandidates.filter(item => {
+    const r = item.recipe;
+    if (r.id === currentId && item.variant === 'original') return false;
     if (!cleanQ) return true;
-    const nameMatch = (r.name || r.title || '').toLowerCase().includes(cleanQ);
-    if (nameMatch) return true;
-    const ingMatch = Array.isArray(r.ingredients) && r.ingredients.some(i => (i?.name || i?.raw || '').toLowerCase().includes(cleanQ));
+    const searchTarget = item.name.toLowerCase();
+    if (searchTarget.includes(cleanQ)) return true;
+    const ingList = item.variant === 'enhanced' ? (r.enhanced.ingredients || r.ingredients) : r.ingredients;
+    const ingMatch = Array.isArray(ingList) && ingList.some(i => (i?.name || i?.raw || '').toLowerCase().includes(cleanQ));
     if (ingMatch) return true;
     const tagMatch = Array.isArray(r.tags) && r.tags.some(t => String(t).toLowerCase().includes(cleanQ));
     if (tagMatch) return true;
@@ -218,27 +229,30 @@ export function filterSearchableRecipeSwapModal(query = '') {
 
   const placeholderImg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44"><rect width="44" height="44" rx="6" fill="%23e5e7eb"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="20">🍲</text></svg>`;
 
-  candidates.forEach(r => {
-    const macros = extractRecipeMacros(r, 'original');
+  candidates.forEach(item => {
+    const r = item.recipe;
+    const variant = item.variant;
+    const activeR = variant === 'enhanced' ? { ...r, ...r.enhanced } : r;
+    const macros = extractRecipeMacros(activeR, variant);
     const cal = Math.round(macros.cal || 0);
     const prot = Math.round((macros.prot || 0) * 10) / 10;
     const mealType = window.getMealTypeFromSlotKey?.(slotKey) || (slotKey.includes('breakfast') ? 'breakfast' : slotKey.includes('lunch') ? 'lunch' : 'dinner');
     const person = currentSearchableSwapContext.isShared ? 'everyone' : (slotKey.endsWith('C') ? 'chloe' : 'elliott');
-    const fitRes = calculateMealFitScore(r, mealType, { activeProfile: person, portionScaled: true });
+    const fitRes = calculateMealFitScore(activeR, mealType, { activeProfile: person, variant, portionScaled: true });
     const fitBadgeHtml = renderFitScoreBadge(fitRes, mealType, { activeProfile: person });
 
     const row = document.createElement('div');
     row.className = 'swap-candidate-row';
     row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;';
     row.innerHTML = `
-      <img src="${escapeAttr(r.photo || r.img || r.image || placeholderImg)}" alt="${escapeAttr(r.name || 'Recipe')}" style="width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.src='${placeholderImg}'">
+      <img src="${escapeAttr(activeR.photo || activeR.img || activeR.image || placeholderImg)}" alt="${escapeAttr(item.name)}" style="width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.src='${placeholderImg}'">
       <div style="flex:1;min-width:0">
-        <div style="font-weight:650;font-size:13.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(r.name || r.title || 'Untitled Recipe')}</div>
+        <div style="font-weight:650;font-size:13.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.name)}</div>
         <div style="font-size:11.5px;color:var(--text2);margin-top:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span><strong>${cal}</strong> kcal</span><span>·</span><span><strong>${prot}g</strong> protein</span><span>·</span>${fitBadgeHtml}
         </div>
       </div>
-      <button type="button" class="btn sm primary" style="font-size:12px;font-weight:700;padding:6px 12px;white-space:nowrap;flex-shrink:0" onclick="window.PlannerMealSlot?.selectAndSwapRecipe?.('${escapeAttr(r.id)}', 'original') || (window.selectAndSwapRecipe && window.selectAndSwapRecipe('${escapeAttr(r.id)}', 'original'))">Select &amp; Swap</button>
+      <button type="button" class="btn sm primary" style="font-size:12px;font-weight:700;padding:6px 12px;white-space:nowrap;flex-shrink:0" onclick="window.PlannerMealSlot?.selectAndSwapRecipe?.('${escapeAttr(r.id)}', '${escapeAttr(variant)}') || (window.selectAndSwapRecipe && window.selectAndSwapRecipe('${escapeAttr(r.id)}', '${escapeAttr(variant)}'))">Select &amp; Swap</button>
     `;
     resultsContainer.appendChild(row);
   });

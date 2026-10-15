@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/PantryInventoryUI.js (v3.29.1)
+ * src/components/pantry/PantryInventoryUI.js (v3.30.0)
  * Modular Presentation Component for Pantry Stock Items & Inventory Wrappers
  */
 
