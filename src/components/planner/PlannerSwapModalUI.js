@@ -23,15 +23,8 @@ export function openSwapMealModal(day, slotKey) {
   const dayLabel = typeof window.formatPlanDayLabel === 'function' ? window.formatPlanDayLabel(window.state.plan, dayNum, { short: true }) : `Day ${dayNum}`;
   const typeTitle = typeof window.toTitleCase === 'function' ? window.toTitleCase(mealType) : mealType;
 
-  const baseOptions = typeof window.getPlannerRecipeOptions === 'function' ? window.getPlannerRecipeOptions(mealType, who === 'both' ? 'any' : who) : [];
-  const options = [];
-  baseOptions.forEach(opt => {
-    options.push(opt);
-    if (opt.enhanced) {
-      options.push({ ...opt, variant: 'enhanced', label: opt.label + ' (Enhanced)' });
-    }
-  });
-  const curValue = slotInfo.id + (slotInfo.variant === 'enhanced' ? '::enhanced' : '');
+  const options = typeof window.getPlannerRecipeOptions === 'function' ? window.getPlannerRecipeOptions(mealType, who === 'both' ? 'any' : who) : [];
+  const curValue = slotInfo.id ? slotInfo.id + (slotInfo.variant === 'enhanced' ? '::enhanced' : '') : '';
 
   const isBoth = who === 'both';
   const personKey = isBoth ? 'both' : (String(who || '').toLowerCase().startsWith('c') ? 'c' : 'e');
