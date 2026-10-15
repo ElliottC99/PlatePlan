@@ -128,10 +128,6 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     <div style="padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;flex-direction:column;gap:10px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
         <span style="font-size:12px;font-weight:600;color:#475569;">Apply Substitution:</span>
-        <div style="display:flex;gap:4px;background:#e2e8f0;padding:2px;border-radius:8px;">
-          <button type="button" id="pp-scope-recipe" class="pp-scope-btn ${currentScope === 'recipe' ? 'active' : ''}" style="border:none;background:${currentScope === 'recipe' ? '#fff' : 'transparent'};color:${currentScope === 'recipe' ? '#2563eb' : '#64748b'};padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:${currentScope === 'recipe' ? '700' : '600'};">Recipe Specific</button>
-          <button type="button" id="pp-scope-global" class="pp-scope-btn ${currentScope === 'global' ? 'active' : ''}" style="border:none;background:${currentScope === 'global' ? '#fff' : 'transparent'};color:${currentScope === 'global' ? '#2563eb' : '#64748b'};padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:${currentScope === 'global' ? '700' : '600'};">Global Shopping List</button>
-        </div>
       </div>
 
       <div style="display:flex;gap:10px;align-items:center;">
@@ -167,22 +163,9 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   const listEl = container.querySelector('#pp-product-list');
   const searchInput = container.querySelector('#pp-product-search');
   const sortSelect = container.querySelector('#pp-product-sort');
-  const scopeRecipeBtn = container.querySelector('#pp-scope-recipe');
-  const scopeGlobalBtn = container.querySelector('#pp-scope-global');
   const applyBtn = container.querySelector('#pp-apply-substitution');
   const selectedPreviewEl = container.querySelector('#pp-selected-preview');
 
-  const updateScopeButtons = () => {
-    if (scopeRecipeBtn && scopeGlobalBtn) {
-      scopeRecipeBtn.style.background = currentScope === 'recipe' ? '#fff' : 'transparent';
-      scopeRecipeBtn.style.color = currentScope === 'recipe' ? '#2563eb' : '#64748b';
-      scopeGlobalBtn.style.background = currentScope === 'global' ? '#fff' : 'transparent';
-      scopeGlobalBtn.style.color = currentScope === 'global' ? '#2563eb' : '#64748b';
-    }
-  };
-
-  if (scopeRecipeBtn) scopeRecipeBtn.onclick = () => { currentScope = 'recipe'; updateScopeButtons(); };
-  if (scopeGlobalBtn) scopeGlobalBtn.onclick = () => { currentScope = 'global'; updateScopeButtons(); };
 
   container.querySelectorAll('.pp-tier-tab').forEach(tab => {
     tab.onclick = () => {
