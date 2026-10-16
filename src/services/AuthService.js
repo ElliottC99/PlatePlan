@@ -1,10 +1,8 @@
 /**
- * src/services/AuthService.js (v3.31.10)
+ * src/services/AuthService.js (v3.31.11)
  * Resolves Firebase Auth state safely for household synchronization.
  * Singleton guarded to eliminate duplicate authentication listeners.
  */
-
-import { auth, onAuthStateChanged } from './firebase.js';
 
 let authPromise = null;
 let authLogged = false;
@@ -13,18 +11,18 @@ export function waitForAuth(timeoutMs = 5000) {
   if (authPromise) return authPromise;
 
   authPromise = new Promise((resolve) => {
-    const targetAuth = auth || (typeof window !== 'undefined' && window.firebase?.auth?.());
-    if (!targetAuth) {
+    if (typeof window === 'undefined' || !window.firebase || typeof window.firebase.auth !== 'function') {
       authPromise = null;
       return resolve(null);
     }
 
-    if (targetAuth.currentUser) {
+    const authInstance = window.firebase.auth();
+    if (authInstance.currentUser) {
       if (!authLogged) {
         authLogged = true;
-        console.log(`[AuthService] Active user session: ${targetAuth.currentUser.email || targetAuth.currentUser.uid}`);
+        console.log(`[AuthService] Active user session: ${authInstance.currentUser.email || authInstance.currentUser.uid}`);
       }
-      return resolve(targetAuth.currentUser);
+      return resolve(authInstance.currentUser);
     }
 
     let resolved = false;
@@ -33,18 +31,18 @@ export function waitForAuth(timeoutMs = 5000) {
     const timer = setTimeout(() => {
       if (!resolved) {
         resolved = true;
-        unsubscribe();
+        if (typeof unsubscribe === 'function') unsubscribe();
         console.warn('[Auth] Auth state resolution timed out.');
-        resolve(null);
+        resolve(window.firebase?.auth()?.currentUser || null);
       }
     }, timeoutMs);
 
-    unsubscribe = onAuthStateChanged(targetAuth, async (user) => {
+    unsubscribe = authInstance.onAuthStateChanged(async (user) => {
       if (!resolved) {
         if (user) {
           resolved = true;
           clearTimeout(timer);
-          unsubscribe();
+          if (typeof unsubscribe === 'function') unsubscribe();
           if (!authLogged) {
             authLogged = true;
             console.log(`[AuthService] Authenticated as: ${user.email || user.uid}`);
@@ -56,11 +54,11 @@ export function waitForAuth(timeoutMs = 5000) {
             console.warn('[AuthService] No user session detected. Signing in anonymously...');
           }
           try {
-            if (typeof targetAuth.signInAnonymously === 'function') {
-              const cred = await targetAuth.signInAnonymously();
+            if (typeof authInstance.signInAnonymously === 'function') {
+              const cred = await authInstance.signInAnonymously();
               resolved = true;
               clearTimeout(timer);
-              unsubscribe();
+              if (typeof unsubscribe === 'function') unsubscribe();
               resolve(cred.user);
               return;
             }
@@ -69,7 +67,7 @@ export function waitForAuth(timeoutMs = 5000) {
           }
           resolved = true;
           clearTimeout(timer);
-          unsubscribe();
+          if (typeof unsubscribe === 'function') unsubscribe();
           resolve(null);
         }
       }
@@ -77,7 +75,7 @@ export function waitForAuth(timeoutMs = 5000) {
       if (!resolved) {
         resolved = true;
         clearTimeout(timer);
-        unsubscribe();
+        if (typeof unsubscribe === 'function') unsubscribe();
         authPromise = null;
         console.warn('[AuthService] onAuthStateChanged error:', error);
         resolve(null);
@@ -87,3 +85,4 @@ export function waitForAuth(timeoutMs = 5000) {
 
   return authPromise;
 }
+
