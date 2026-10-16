@@ -1,5 +1,7 @@
+import { convertToStrictUnit } from './UnitConversionService.js';
+
 /**
- * src/services/ShoppingCalculationService.js (v3.20.14)
+ * src/services/ShoppingCalculationService.js (v3.31.18)
  * Precision unit pricing, pack weight normalisation, and robust fallbacks
  * for household shopping list generation.
  */
@@ -110,7 +112,7 @@ export function calculateShoppingItemCost(item, bankIng = null) {
   const price = rawPrice > 0 ? rawPrice : Number(getFallbackProductData(item?.name).price);
 
   const isItemUnit = item?.needUnit === 'item' || String(item?.unit || '').toLowerCase().includes('qty') || String(item?.unit || '').toLowerCase().includes('item');
-  const requiredQty = Number(item?.needQty ?? item?.qty ?? 1);
+  const requiredQty = Number(item?.needQty ?? item?.buyQty ?? item?.qty ?? 1);
   const requiredGrams = Number(item?.grams ?? item?.weight ?? 0);
 
   let packsNeeded = 1;
@@ -147,27 +149,18 @@ export function formatShoppingItemQuantity(item) {
   if (item.quantity && item.quantity !== '0g' && item.quantity !== '0' && item.quantity !== '0 g' && !item.quantity.startsWith('0')) {
     return item.quantity;
   }
-  const qty = Number(item.needQty ?? item.qty ?? item.count ?? 0);
-  const unit = String(item.needUnit ?? item.unit ?? '').toLowerCase().trim();
+  const qty = Number(item.buyQty ?? item.needQty ?? item.qty ?? item.count ?? 0);
+  const unit = String(item.unit ?? item.needUnit ?? '').toLowerCase().trim();
   const grams = Number(item.grams ?? item.weight ?? 0);
 
-  if (['qty', 'item', 'count', 'piece', 'clove', 'cube', 'bulb', 'head', 'tin', 'can', 'pack', 'stalk', 'sprig', 'slice'].includes(unit) || !unit) {
-    if (qty > 0) {
-      const unitLabel = (unit === 'qty' || unit === 'item' || !unit) ? 'x' : ` ${unit}${qty > 1 ? 's' : ''}`;
-      return (unit === 'qty' || unit === 'item' || !unit) ? `${qty}x` : `${qty}${unitLabel}`;
-    }
-  }
-
-  if (grams > 0) {
-    return grams >= 1000 ? `${(grams / 1000).toFixed(1).replace(/\.0$/, '')}kg` : `${Math.round(grams)}g`;
-  }
-
-  if (qty > 0) {
-    if (['g', 'ml', 'kg', 'l'].includes(unit)) return `${qty}${unit}`;
+  if (unit === 'qty' || unit === 'item' || unit === 'x' || !unit) {
     return `${qty}x`;
   }
+  if (['g', 'ml', 'kg', 'l'].includes(unit)) {
+    return `${qty}${unit}`;
+  }
 
-  return '1x';
+  return `${qty} ${unit}`;
 }
 
 export function aggregateShoppingListFromPlan(plan = null, state = null) {
@@ -183,17 +176,16 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
   const aggregatedMap = new Map();
   const rawSlots = activePlan.slots && typeof activePlan.slots === 'object' ? activePlan.slots : {};
 
-  const processSlotNode = (slotNode, portionWeight = 0.5) => {
+  const processSlotNode = (slotNode, portionWeight = 0.5, dayNum = 1, mealType = 'meal') => {
     if (!slotNode || slotNode.isSkipped || slotNode.skipped) return;
     if (slotNode.isSplit && (slotNode.elliott || slotNode.chloe)) {
-      if (slotNode.elliott) processSlotNode(slotNode.elliott, 0.5);
-      if (slotNode.chloe) processSlotNode(slotNode.chloe, 0.5);
+      if (slotNode.elliott) processSlotNode(slotNode.elliott, 0.5, dayNum, mealType);
+      if (slotNode.chloe) processSlotNode(slotNode.chloe, 0.5, dayNum, mealType);
       return;
     }
     const recipeId = typeof slotNode === 'string' ? slotNode : (slotNode.recipeId || slotNode.id);
     if (!recipeId) return;
 
-    // Fetch full recipe object from central Recipe Vault using recipeId instead of reading stripped slot ingredients
     const fullRecipe = vaultRecipes.find(r => r && String(r.id) === String(recipeId));
     if (!fullRecipe) return;
 
@@ -201,6 +193,8 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
     const rawIngs = (variant === 'enhanced' && fullRecipe.enhanced && Array.isArray(fullRecipe.enhanced.ingredients))
       ? fullRecipe.enhanced.ingredients
       : (Array.isArray(fullRecipe.ingredients) ? fullRecipe.ingredients : []);
+
+    const recipeName = fullRecipe.title || fullRecipe.name || 'Recipe';
 
     rawIngs.forEach(ing => {
       if (!ing) return;
@@ -225,10 +219,13 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
       ) || getFallbackProductData(rawName);
 
       const key = String(prodId || subId || ingId || matchedIng?.id || rawName).toLowerCase().replace(/\s+/g, '_');
-      const rawQty = Number(ing.qty ?? ing.quantity ?? ing.amount ?? 0);
-      const rawGrams = Number(ing.grams ?? ing.weight ?? (['g', 'ml'].includes(String(ing.unit || '').toLowerCase()) ? rawQty : 0));
-      const unit = String(ing.unit || '').toLowerCase().trim();
-      const isItemUnit = ['qty', 'item', 'count', 'piece', 'tin', 'can', 'pack'].includes(unit);
+      
+      const rawQty = Number(ing.qty ?? ing.quantity ?? ing.amount ?? 1);
+      const rawUnit = String(ing.unit || '').trim();
+
+      const strict = convertToStrictUnit(rawQty, rawUnit, rawName);
+      const convertedAmount = Math.round((strict.qty * portionWeight) * 10) / 10;
+      const canonicalUnit = strict.unit; // 'g', 'ml', or 'qty'
 
       const existing = aggregatedMap.get(key) || {
         key,
@@ -239,31 +236,40 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
         cat: matchedIng?.category || ing.categoryId || ing.category || matchedProd?.category || matchedProd?.cat || 'General Groceries',
         category: matchedIng?.category || ing.categoryId || ing.category || matchedProd?.category || matchedProd?.cat || 'General Groceries',
         bankIng: matchedProd,
-        grams: 0,
-        needQty: 0,
-        needUnit: isItemUnit ? 'item' : (unit || 'g'),
+        buyQty: 0,
+        requiredQty: 0,
+        inStockQty: 0,
+        unit: canonicalUnit,
+        recipeBreakdown: [],
         isAtHome: !!atHomeMap[key],
         checked: !!atHomeMap[key]
       };
 
-      if (rawGrams > 0) {
-        existing.grams += rawGrams * portionWeight;
-      } else if (rawQty > 0) {
-        if (isItemUnit) existing.needQty += rawQty * portionWeight;
-        else existing.grams += rawQty * 100 * portionWeight;
-      } else {
-        existing.grams += 125 * portionWeight;
+      if (!existing.unit && canonicalUnit) {
+        existing.unit = canonicalUnit;
       }
+
+      existing.buyQty += convertedAmount;
+      existing.requiredQty += convertedAmount;
+      existing.recipeBreakdown.push({
+        recipeName,
+        day: dayNum,
+        mealType,
+        servings: slotNode.servings || fullRecipe.serves || 4,
+        qty: convertedAmount
+      });
 
       aggregatedMap.set(key, existing);
     });
   };
 
-  Object.values(rawSlots).forEach(dayObj => {
+  Object.entries(rawSlots).forEach(([dayKey, dayObj], dayIdx) => {
     if (!dayObj || typeof dayObj !== 'object') return;
+    const dayNum = dayIdx + 1;
     Object.entries(dayObj).forEach(([slotKey, slotVal]) => {
       const weight = (slotKey.endsWith('E') || slotKey.endsWith('C')) ? 0.5 : 1;
-      processSlotNode(slotVal, weight);
+      const mealType = slotKey.replace(/[EC]$/, '');
+      processSlotNode(slotVal, weight, dayNum, mealType);
     });
   });
 
@@ -272,11 +278,34 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
   let totalCost = 0;
 
   aggregatedMap.forEach(entry => {
-    if (entry.needUnit === 'item' && entry.needQty > 0) {
-      entry.needQty = Math.max(1, Math.ceil(entry.needQty));
+    entry.buyQty = Math.round(entry.buyQty * 10) / 10;
+    entry.requiredQty = Math.round(entry.requiredQty * 10) / 10;
+
+    const recipeSummaryMap = new Map();
+    (entry.recipeBreakdown || []).forEach(b => {
+      const rKey = b.recipeName || 'Recipe';
+      if (!recipeSummaryMap.has(rKey)) {
+        recipeSummaryMap.set(rKey, { recipeName: b.recipeName, totalQty: 0, usages: [] });
+      }
+      const sumEntry = recipeSummaryMap.get(rKey);
+      sumEntry.totalQty += b.qty;
+      sumEntry.usages.push({ day: b.day, mealType: b.mealType, servings: b.servings, qty: b.qty });
+    });
+    entry.recipeSummary = Array.from(recipeSummaryMap.values()).map(rs => ({
+      ...rs,
+      totalQty: Math.round(rs.totalQty * 10) / 10
+    }));
+
+    entry.needQty = entry.buyQty;
+    entry.needUnit = entry.unit;
+    if (entry.unit === 'g') {
+      entry.grams = entry.buyQty;
+    } else if (entry.unit === 'ml') {
+      entry.grams = entry.buyQty;
     } else {
-      entry.grams = Math.max(25, Math.round(entry.grams));
+      entry.grams = entry.buyQty * 100;
     }
+
     const costInfo = calculateShoppingItemCost(entry, entry.bankIng);
     entry.cost = costInfo.cost;
     entry.price = costInfo.price;

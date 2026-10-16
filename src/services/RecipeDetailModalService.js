@@ -1,13 +1,14 @@
 /**
- * src/services/RecipeDetailModalService.js (v3.27.1)
+ * src/services/RecipeDetailModalService.js (v3.31.18)
  * ES6 Recipe Detail Modal Coordinator & Lifecycle Manager.
- * Orchestrates recipe inspection, live scaling, enhanced variant switching,
+ * Orchestrates recipe inspection, calorie-driven portion scaling, enhanced variant switching,
  * and live HSL Lerp fit score badge generation with zero layout shifts.
  */
 
 import { renderRecipeDetailModalContent, formatRecipeIngredientRow, renderRecipeIngredientsListHTML } from '../components/recipe/RecipeDetailModalUI.js';
 import { isRecipeVariantFavourite } from '../views/RecipeVaultView.js';
 import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
+import { resolveMealSplitPercentages } from '../utils/nutritionCalculator.js';
 import { getState } from '../store/store.js';
 
 let previewState = {
@@ -43,6 +44,37 @@ export function switchPreviewServingMode(mode = 'both') {
   renderRecipePreview();
 }
 
+function computeRecipeScaleMultiplier(activeR, mode, targetServes = 2, singleServes = 1) {
+  const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
+  const userPrefs = state.preferences || state.userPrefs || {};
+  const profiles = userPrefs.profiles || {};
+  const eProf = profiles.elliott || profiles.e || { dailyKcal: 1950 };
+  const cProf = profiles.chloe || profiles.c || { dailyKcal: 1350 };
+  const eDaily = Number(eProf.dailyKcal) || 1950;
+  const cDaily = Number(cProf.dailyKcal) || 1350;
+
+  const mealType = String(activeR.types?.[0] || activeR.type || 'dinner').toLowerCase();
+  const eSplits = resolveMealSplitPercentages ? resolveMealSplitPercentages(userPrefs, 'elliott').calories : { breakfast: 25, lunch: 30, snacking: 10, dinner: 35 };
+  const cSplits = resolveMealSplitPercentages ? resolveMealSplitPercentages(userPrefs, 'chloe').calories : { breakfast: 25, lunch: 30, snacking: 10, dinner: 35 };
+  const ePct = Number(eSplits[mealType] ?? eSplits.dinner ?? 35) / 100;
+  const cPct = Number(cSplits[mealType] ?? cSplits.dinner ?? 35) / 100;
+
+  const eMealTarget = eDaily * ePct;
+  const cMealTarget = cDaily * cPct;
+
+  const baseKcalTotal = Number(activeR.calories || activeR.kcal || activeR.totalCalories || 500);
+  const baseServes = Number(activeR.serves ?? 2) || 2;
+  const baseKcalPerServing = baseKcalTotal > 0 ? (baseKcalTotal / baseServes) : 500;
+
+  if (mode === 'elliott' || mode === 'e') {
+    return eMealTarget / Math.max(100, baseKcalPerServing);
+  }
+  if (mode === 'chloe' || mode === 'c') {
+    return cMealTarget / Math.max(100, baseKcalPerServing);
+  }
+  return ((eMealTarget + cMealTarget) / Math.max(100, baseKcalPerServing)) * (targetServes / baseServes);
+}
+
 export function updateRecipePreviewScale(val) {
   const parsed = parseInt(val, 10);
   if (!isNaN(parsed) && parsed > 0) {
@@ -53,10 +85,7 @@ export function updateRecipePreviewScale(val) {
       const r = previewState.recipe;
       const isEnh = previewState.currentTab === 'enhanced' && !!r.enhanced;
       const activeR = isEnh ? { ...r, ...r.enhanced, ingredients: r.enhanced.ingredients || r.ingredients } : r;
-      const serves = Number(activeR.serves ?? r.serves ?? 2) || 2;
-      const scaleMultiplier = previewState.servingMode === 'both'
-        ? (previewState.targetServes / serves)
-        : (previewState.singleServes / serves);
+      const scaleMultiplier = computeRecipeScaleMultiplier(activeR, previewState.servingMode, previewState.targetServes, previewState.singleServes);
       const rawIngs = activeR.ingredients || activeR.parsedIngredients || activeR.rawIngredients || r.ingredients || [];
       const ingredients = Array.isArray(rawIngs) ? rawIngs : Object.values(rawIngs);
       const sections = Array.isArray(activeR.ingredientSections) && activeR.ingredientSections.length > 0 ? activeR.ingredientSections : (r.ingredientSections || []);
@@ -78,18 +107,8 @@ export function updateSinglePersonServes(val, person = 'elliott') {
       const r = previewState.recipe;
       const isEnh = previewState.currentTab === 'enhanced' && !!r.enhanced;
       const activeR = isEnh ? { ...r, ...r.enhanced, ingredients: r.enhanced.ingredients || r.ingredients } : r;
-      const serves = Number(activeR.serves ?? r.serves ?? 2) || 2;
       const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
-      const userPrefs = state.preferences || state.userPrefs || {};
-      const profiles = userPrefs.profiles || {};
-      const eProf = profiles.elliott || profiles.e || {};
-      const cProf = profiles.chloe || profiles.c || {};
-      const totalKcalBudget = (Number(eProf.dailyKcal) || 0) + (Number(cProf.dailyKcal) || 0);
-      const profileShare = person === 'elliott'
-        ? (totalKcalBudget > 0 ? (Number(eProf.dailyKcal) / totalKcalBudget) : 0.59)
-        : (totalKcalBudget > 0 ? (Number(cProf.dailyKcal) / totalKcalBudget) : 0.41);
-      
-      const scaleMultiplier = (previewState.singleServes / serves) * profileShare;
+      const scaleMultiplier = computeRecipeScaleMultiplier(activeR, person, previewState.targetServes, previewState.singleServes);
       const rawIngs = activeR.ingredients || activeR.parsedIngredients || activeR.rawIngredients || r.ingredients || [];
       const ingredients = Array.isArray(rawIngs) ? rawIngs : Object.values(rawIngs);
       const sections = Array.isArray(activeR.ingredientSections) && activeR.ingredientSections.length > 0 ? activeR.ingredientSections : (r.ingredientSections || []);
@@ -129,12 +148,10 @@ export function renderRecipePreview() {
   const isFav = isRecipeVariantFavourite(r.id, previewState.currentTab);
   const types = r.types || [r.type || 'dinner'];
   const mealType = types[0] || 'dinner';
-  const serves = Number(activeR.serves ?? r.serves ?? 2) || 2;
+  const baseServes = Number(activeR?.serves || activeR?.servings || r?.serves || r?.servings || 2) || 2;
 
-  // Scale multiplier for ingredients
-  const scaleMultiplier = previewState.servingMode === 'both'
-    ? (previewState.targetServes / serves)
-    : (previewState.singleServes / serves);
+  // Calorie-driven scale multiplier for ingredients
+  const scaleMultiplier = computeRecipeScaleMultiplier(activeR, previewState.servingMode, previewState.targetServes, previewState.singleServes);
 
   // Render ingredients list handling all schema variations & sections
   const rawIngs = activeR.ingredients || activeR.parsedIngredients || activeR.rawIngredients ||
@@ -161,132 +178,44 @@ export function renderRecipePreview() {
         `;
       }).join('')}
     </div>
-  ` : `<div style="font-size:12.5px;color:var(--text2);font-style:italic">No method instructions recorded.</div>`;
+  ` : '<div style="color:var(--text3);font-size:13px">No method steps specified.</div>';
 
-  // Calculate dual-profile per-portion macros & live target comparison badges
-  const userPrefs = state.preferences || state.userPrefs || {};
-  const profiles = userPrefs.profiles || {};
-  const eProf = profiles.elliott || profiles.e || {};
-  const cProf = profiles.chloe || profiles.c || {};
+  const baseKcal = Number(activeR.calories ?? activeR.kcal ?? 0);
+  const baseProt = Number(activeR.protein ?? activeR.prot ?? 0);
+  const eProf = state.preferences?.profiles?.elliott || state.userPrefs?.profiles?.elliott || { dailyKcal: 1950 };
+  const cProf = state.preferences?.profiles?.chloe || state.userPrefs?.profiles?.chloe || { dailyKcal: 1350 };
+  const eSplits = resolveMealSplitPercentages ? resolveMealSplitPercentages(state.preferences || state.userPrefs, 'elliott').calories : { dinner: 35 };
+  const cSplits = resolveMealSplitPercentages ? resolveMealSplitPercentages(state.preferences || state.userPrefs, 'chloe').calories : { dinner: 35 };
+  const ePct = Number(eSplits[mealType] ?? eSplits.dinner ?? 35) / 100;
+  const cPct = Number(cSplits[mealType] ?? cSplits.dinner ?? 35) / 100;
+  const eTargetKcal = Number(eProf.dailyKcal || 1950) * ePct;
+  const cTargetKcal = Number(cProf.dailyKcal || 1350) * cPct;
 
-  const totalKcalBudget = (Number(eProf.dailyKcal) || 0) + (Number(cProf.dailyKcal) || 0);
-  const eShare = totalKcalBudget > 0 ? (Number(eProf.dailyKcal) / totalKcalBudget) : 0.59;
-  const cShare = totalKcalBudget > 0 ? (Number(cProf.dailyKcal) / totalKcalBudget) : 0.41;
-  const eSharePct = Math.round(eShare * 100);
-  const cSharePct = Math.round(cShare * 100);
+  const totalKcalBudget = eTargetKcal + cTargetKcal;
+  const eShare = totalKcalBudget > 0 ? (eTargetKcal / totalKcalBudget) : 0.59;
+  const cShare = totalKcalBudget > 0 ? (cTargetKcal / totalKcalBudget) : 0.41;
 
-  const fitScoreResult = calculateMealFitScore(activeR, mealType, {
-    variant: previewState.currentTab,
-    activeProfile: previewState.servingMode,
-    userPrefs
-  });
+  const batchServes = previewState.servingMode === 'both' ? previewState.targetServes : previewState.singleServes;
+  const eKcal = Math.round(baseKcalTotalVal(baseKcal, baseServes, batchServes) * eShare);
+  const cKcal = Math.round(baseKcalTotalVal(baseKcal, baseServes, batchServes) * cShare);
 
-  const eDetails = fitScoreResult.details?.elliott || {};
-  const cDetails = fitScoreResult.details?.chloe || {};
-
-  const baselineCal = Number(activeR.calories ?? activeR.cal ?? 0);
-  const baselineProt = Number(activeR.protein ?? activeR.prot ?? 0);
-
-  const batchServes = (serves === 1) ? 1 : 2;
-  const eKcal = Math.round(eDetails.scaledKcal ?? (baselineCal * batchServes * eShare));
-  const eProt = Math.round((eDetails.scaledProtein ?? (baselineProt * batchServes * eShare)) * 10) / 10;
-  const eTargetCal = eDetails.kcalTarget || 0;
-  const eTargetProt = eDetails.proteinTarget || 0;
-
-  const cKcal = Math.round(cDetails.scaledKcal ?? (baselineCal * batchServes * cShare));
-  const cProt = Math.round((cDetails.scaledProtein ?? (baselineProt * batchServes * cShare)) * 10) / 10;
-  const cTargetCal = cDetails.kcalTarget || 0;
-  const cTargetProt = cDetails.proteinTarget || 0;
-
-  // Compact horizontal chips side-by-side for Elliott & Chloe
-  const macroCardsHtml = `
-    <div class="card portion-macro-card" style="padding:8px 12px;border-radius:10px;background:var(--surface,#fff);border:1px solid ${previewState.servingMode === 'elliott' ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'};min-width:160px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
-      <div style="font-weight:700;font-size:12px;color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;">
-        <span>👤 Elliott</span>
-        <span style="font-size:10.5px;font-weight:600;color:var(--text2)">${eSharePct}% split</span>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:2px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;gap:6px">
-          <span>🔥 <strong>${eKcal} kcal</strong></span>
-          ${renderComparisonBadge(eKcal, eTargetCal)}
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;gap:6px">
-          <span>🥩 <strong>${eProt}g protein</strong></span>
-          ${renderComparisonBadge(eProt, eTargetProt)}
-        </div>
-      </div>
-    </div>
-
-    <div class="card portion-macro-card" style="padding:8px 12px;border-radius:10px;background:var(--surface,#fff);border:1px solid ${previewState.servingMode === 'chloe' ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'};min-width:160px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
-      <div style="font-weight:700;font-size:12px;color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;">
-        <span>👤 Chloe</span>
-        <span style="font-size:10.5px;font-weight:600;color:var(--text2)">${cSharePct}% split</span>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:2px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;gap:6px">
-          <span>🔥 <strong>${cKcal} kcal</strong></span>
-          ${renderComparisonBadge(cKcal, cTargetCal)}
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;gap:6px">
-          <span>🥩 <strong>${cProt}g protein</strong></span>
-          ${renderComparisonBadge(cProt, cTargetProt)}
-        </div>
-      </div>
-    </div>
-  `;
-
-  const totalIngredientsCount = sections.length
-    ? sections.reduce((acc, s) => acc + (Array.isArray(s.ingredients) ? s.ingredients.length : 0), 0)
-    : ingredients.length;
-
-  const html = renderRecipeDetailModalContent({
-    r,
-    activeR,
-    hasEnh,
-    isEnh,
-    isFav,
-    mealType,
+  modalContent.innerHTML = renderRecipeDetailModalContent({
+    recipe: activeR,
+    variantTab: previewState.currentTab,
+    hasEnhanced: hasEnh,
+    isFavourite: isFav,
     servingMode: previewState.servingMode,
     targetServes: previewState.targetServes,
     singleServes: previewState.singleServes,
-    instanceId: previewState.instanceId,
-    servingModeBannerHtml: '',
-    allocationAndTargetHtml: '',
-    sourceHtml: r.source ? `<span>Source: <strong>${r.source}</strong></span>` : '',
     ingredientsHtml,
     methodHtml,
-    macroCardsHtml,
-    ingredientsCount: totalIngredientsCount,
-    stepsCount: steps.length
+    eKcal,
+    cKcal,
+    eTargetKcal: Math.round(eTargetKcal),
+    cTargetKcal: Math.round(cTargetKcal),
+    eBadge: renderComparisonBadge(eKcal, Math.round(eTargetKcal)),
+    cBadge: renderComparisonBadge(cKcal, Math.round(cTargetKcal))
   });
-
-  modalContent.innerHTML = html;
-}
-
-export function viewRecipe(recipeId, instanceId = null, variant = 'original', targetPerson = 'both') {
-  if (!recipeId) return;
-  const recipes = window.state?.recipes || [];
-  const recipe = recipes.find(r => r && r.id === recipeId);
-  if (!recipe) {
-    console.warn(`[RecipeDetailModalService] Recipe not found for id: ${recipeId}`);
-    return;
-  }
-
-  previewState = {
-    recipe,
-    instanceId,
-    currentTab: (variant === 'enhanced' && recipe.enhanced) ? 'enhanced' : 'original',
-    servingMode: (targetPerson === 'elliott' || targetPerson === 'chloe') ? targetPerson : 'both',
-    targetServes: Number(recipe.serves) || 2,
-    singleServes: 1
-  };
-
-  if (typeof window !== 'undefined') {
-    window.previewBaseRecipe = recipe;
-    window.currentViewTab = previewState.currentTab;
-  }
-
-  renderRecipePreview();
 
   const modalWrap = document.getElementById('view-modal-wrap');
   if (modalWrap) {
@@ -294,14 +223,45 @@ export function viewRecipe(recipeId, instanceId = null, variant = 'original', ta
   }
 }
 
-// Global browser registration
+function baseKcalTotalVal(baseKcal, baseServes, batchServes) {
+  if (baseKcal > 0) return baseKcal * (batchServes / baseServes);
+  return 500 * batchServes;
+}
+
+export function openRecipePreview(recipeId, initialTab = 'original') {
+  const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
+  const recipes = Array.isArray(state.recipes) ? state.recipes : [];
+  const found = recipes.find(rec => String(rec.id) === String(recipeId));
+  if (!found) return;
+
+  previewState.recipe = found;
+  previewState.currentTab = initialTab;
+  previewState.servingMode = 'both';
+  previewState.targetServes = Number(found.serves ?? 2) || 2;
+  previewState.singleServes = 1;
+
+  if (typeof window !== 'undefined') {
+    window.previewBaseRecipe = found;
+    window.currentViewTab = initialTab;
+  }
+
+  renderRecipePreview();
+}
+
+export function openRecipeModal(recipeId, instanceId, variant, targetPerson) {
+  return openRecipePreview(recipeId, variant || 'original');
+}
+export const viewRecipe = openRecipePreview;
+
 if (typeof window !== 'undefined') {
-  window.viewRecipe = viewRecipe;
-  window.closeRecipePreview = closeRecipePreview;
-  window.switchViewTab = switchViewTab;
-  window.switchPreviewServingMode = switchPreviewServingMode;
-  window.updateRecipePreviewScale = updateRecipePreviewScale;
-  window.updateSinglePersonServes = updateSinglePersonServes;
-  window.renderRecipePreview = renderRecipePreview;
-  window.openRecipeModal = viewRecipe;
+  Object.assign(window, {
+    closeRecipePreview,
+    switchViewTab,
+    switchPreviewServingMode,
+    updateRecipePreviewScale,
+    updateSinglePersonServes,
+    openRecipePreview,
+    openRecipeModal,
+    viewRecipe
+  });
 }
