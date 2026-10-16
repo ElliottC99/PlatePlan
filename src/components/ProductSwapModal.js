@@ -1,7 +1,7 @@
 /**
- * src/components/ProductSwapModal.js (v3.31.22)
+ * src/components/ProductSwapModal.js (v3.31.24)
  * Robust modal component for 3-tier product & brand substitution.
- * Features relational tier filtering using window.state.products with keyword clustering,
+ * Features relational tier filtering using window.state.products with database loading fallbacks,
  * tabbed tier navigation, "Apply Substitution" button, and reactive UI refresh.
  */
 
@@ -17,19 +17,19 @@ function escapeAttr(str) { return escapeHtml(str); }
 
 export function inferSubtype(item) {
   if (!item) return 'Produce & Staples';
-  const ingredients = Array.isArray(window.state?.ingredients) ? window.state.ingredients : [];
+  const appState = window.store?.getState?.() || window.state || {};
+  const ingredients = Array.isArray(appState.ingredients) ? appState.ingredients : Object.values(appState.ingredientsBank || {});
 
-  // Safely drill into bankIng if the item is a shopping list wrapper
   const target = item.bankIng || item;
-  const prodIngId = target.ingredientId || target.groupId || target.familyId;
-  const prodSubId = target.subtypeId || target.subTypeId;
+  const ingId = target.ingredientId || target.groupId || target.familyId;
+  const subId = target.subTypeId || target.subtypeId;
 
-  let parentIng = prodIngId ? ingredients.find(i => String(i.id) === String(prodIngId)) : null;
-  if (!parentIng && prodSubId) {
-    parentIng = ingredients.find(i => Array.isArray(i.subtypes) && i.subtypes.some(s => String(s.id) === String(prodSubId))) || null;
+  let parentIng = ingId ? ingredients.find(i => String(i.id) === String(ingId)) : null;
+  if (!parentIng && subId) {
+    parentIng = ingredients.find(i => Array.isArray(i.subtypes) && i.subtypes.some(s => String(s.id) === String(subId))) || null;
   }
 
-  const subObj = (parentIng?.subtypes || []).find(s => String(s.id) === String(prodSubId));
+  const subObj = (parentIng?.subtypes || []).find(s => String(s.id) === String(subId));
   return subObj?.name || parentIng?.name || target.subtype || target.category || target.cat || 'Produce & Staples';
 }
 
@@ -80,8 +80,9 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   }
 
   const { item: targetItem, group: targetGroup } = resolveTargetItem(param1, param2, param3);
-  const products = Array.isArray(window.state?.products) ? window.state.products : [];
-  const ingredients = Array.isArray(window.state?.ingredients) ? window.state.ingredients : [];
+  const appState = window.store?.getState?.() || window.state || {};
+  const products = Array.isArray(appState.products) ? appState.products : Object.values(appState.productsBank || {});
+  const ingredients = Array.isArray(appState.ingredients) ? appState.ingredients : Object.values(appState.ingredientsBank || {});
 
   const targetIngId = targetItem?.groupId || targetItem?.ingredientId || targetItem?.bankIng?.ingredientId;
 
