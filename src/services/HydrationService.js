@@ -235,7 +235,7 @@ export async function hydrateHouseholdData() {
     // 1. Gate Cloud Hydration Behind Auth
     const user = await waitForAuth();
     if (!user) {
-      console.warn('[Sync] Cloud sync paused: Unauthenticated state detected.');
+      console.error('[Sync] Universal sync aborted: User unauthenticated after auth barrier timeout.');
       return { success: false, unauthenticated: true, fallback: true };
     }
 
