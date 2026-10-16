@@ -416,6 +416,13 @@ export async function hydrateHouseholdData() {
         runDeferredMaintenance(preferencesData, mergedCategories, mutated);
       }, 3000);
 
+      const cloudHasData = Boolean(
+        (Array.isArray(recipes) && recipes.length > 0) ||
+        (Array.isArray(ingredients) && ingredients.length > 0) ||
+        (Array.isArray(products) && products.length > 0) ||
+        preferencesData || plan
+      );
+
       if (!hydrationLogged) {
         hydrationLogged = true;
         console.log('[HydrationService] Household data hydrated successfully into Store and persisted to local cache.');
