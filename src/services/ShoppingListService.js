@@ -1,5 +1,5 @@
 /**
- * src/services/ShoppingListService.js (v3.31.16)
+ * src/services/ShoppingListService.js (v3.31.14)
  * Smart Shopping List Consolidation Engine:
  * - Aggregates required ingredients across all meals in active meal plan with deduplication for split slots.
  * - Subtracts active in_stock pantry quantities matching by ingredientId and units (g, ml, qty).
