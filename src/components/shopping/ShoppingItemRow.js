@@ -1,5 +1,5 @@
 /**
- * src/components/shopping/ShoppingItemRow.js (v3.31.14)
+ * src/components/shopping/ShoppingItemRow.js (v3.31.15)
  * UI component for individual shopping list items, quantity adjustments,
  * check-off toggles, recipe usage breakdown accordion drawers, and inline product brand substitution drawers.
  */
