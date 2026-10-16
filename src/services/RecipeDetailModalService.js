@@ -1,5 +1,5 @@
 /**
- * src/services/RecipeDetailModalService.js (v3.31.16)
+ * src/services/RecipeDetailModalService.js (v3.31.17)
  * ES6 Recipe Detail Modal Coordinator & Lifecycle Manager.
  * Orchestrates recipe inspection, calorie-driven portion scaling, enhanced variant switching,
  * and live HSL Lerp fit score badge generation with zero layout shifts.
@@ -248,6 +248,11 @@ export function openRecipePreview(recipeId, initialTab = 'original') {
   renderRecipePreview();
 }
 
+export function openRecipeModal(recipeId, instanceId, variant, targetPerson) {
+  return openRecipePreview(recipeId, variant || 'original');
+}
+export const viewRecipe = openRecipePreview;
+
 if (typeof window !== 'undefined') {
   Object.assign(window, {
     closeRecipePreview,
@@ -255,6 +260,8 @@ if (typeof window !== 'undefined') {
     switchPreviewServingMode,
     updateRecipePreviewScale,
     updateSinglePersonServes,
-    openRecipePreview
+    openRecipePreview,
+    openRecipeModal,
+    viewRecipe
   });
 }

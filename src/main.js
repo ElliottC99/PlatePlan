@@ -31,7 +31,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * src/main.js (v3.31.16)
+ * src/main.js (v3.31.17)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronisation,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -184,7 +184,7 @@ if (typeof window !== 'undefined') {
     },
 
     // Actions & Modal Handlers
-    viewRecipe: RecipeDetailModalService.viewRecipe,
+    viewRecipe: RecipeDetailModalService.openRecipePreview,
     closeRecipePreview: RecipeDetailModalService.closeRecipePreview,
     switchViewTab: RecipeDetailModalService.switchViewTab,
     switchPreviewServingMode: RecipeDetailModalService.switchPreviewServingMode,
@@ -214,10 +214,7 @@ if (typeof window !== 'undefined') {
     },
 
     openRecipeModal(id, instanceId, variant, targetPerson) {
-      if (typeof window.viewRecipe === 'function') {
-        return window.viewRecipe(id, instanceId, variant, targetPerson);
-      }
-      console.warn('[main.js] viewRecipe not found on window');
+      return RecipeDetailModalService.openRecipePreview(id, variant || 'original');
     },
 
     openMobileMore() {
@@ -350,12 +347,16 @@ function setupSubscriptions() {
 }
 
 // 7. APPLICATION BOOTSTRAP
-export const APP_VERSION = 'v3.31.16';
+export const APP_VERSION = 'v3.31.17';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
   isAppInitialized = true;
-  if (typeof window !== 'undefined') window.__plateplan_app_booted = true;
+  if (typeof window !== 'undefined') {
+    window.__plateplan_app_booted = true;
+    window.viewRecipe = RecipeDetailModalService.openRecipePreview;
+    window.openRecipeModal = RecipeDetailModalService.openRecipePreview;
+  }
 
   const initialRender = () => {
     try {
