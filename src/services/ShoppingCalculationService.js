@@ -277,7 +277,8 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
       ) || getFallbackProductData(rawName);
 
       const effectiveProdId = overriddenProductId || prodId;
-      const key = String(effectiveProdId || subId || ingId || matchedIng?.id || rawName).toLowerCase().replace(/\s+/g, '_');
+      const stableKeyBase = ingId || matchedIng?.id || subId || rawName;
+      const key = String(stableKeyBase).toLowerCase().replace(/\s+/g, '_');
       
       const rawQty = Number(ing.qty ?? ing.quantity ?? ing.amount ?? 1);
       const rawUnit = String(ing.unit || '').trim();
