@@ -31,7 +31,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * src/main.js (v3.31.4)
+ * src/main.js (v3.31.6)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronisation,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -200,10 +200,18 @@ if (typeof window !== 'undefined') {
     toggleInlineShoppingSubst: renderScrollableSwapModal,
     toggleShoppingItemAcquired,
     toggleShoppingAtHome: toggleShoppingItemAcquired,
-    openSearchableRecipeSwapModal: registeredComponents.PlannerMealSlot.openSearchableRecipeSwapModal,
-    closeSearchableRecipeSwapModal: registeredComponents.PlannerMealSlot.closeSearchableRecipeSwapModal,
-    filterSearchableRecipeSwapModal: registeredComponents.PlannerMealSlot.filterSearchableRecipeSwapModal,
-    selectAndSwapRecipe: registeredComponents.PlannerMealSlot.selectAndSwapRecipe,
+    openSearchableRecipeSwapModal(...args) {
+      return registeredComponents.PlannerMealSlot?.openSearchableRecipeSwapModal?.(...args);
+    },
+    closeSearchableRecipeSwapModal(...args) {
+      return registeredComponents.PlannerMealSlot?.closeSearchableRecipeSwapModal?.(...args);
+    },
+    filterSearchableRecipeSwapModal(...args) {
+      return registeredComponents.PlannerMealSlot?.filterSearchableRecipeSwapModal?.(...args);
+    },
+    selectAndSwapRecipe(...args) {
+      return registeredComponents.PlannerMealSlot?.selectAndSwapRecipe?.(...args);
+    },
 
     openRecipeModal(id, instanceId, variant, targetPerson) {
       if (typeof window.viewRecipe === 'function') {
@@ -342,10 +350,16 @@ function setupSubscriptions() {
 }
 
 // 7. APPLICATION BOOTSTRAP
+export const APP_VERSION = 'v3.31.6';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
   isAppInitialized = true; if (typeof window !== 'undefined') window.__plateplan_app_booted = true;
+  
+  const versionEl = document.getElementById('app-header-version');
+  if (versionEl) {
+    versionEl.textContent = APP_VERSION;
+  }
   
   await initStoreCache();
 
@@ -370,4 +384,4 @@ async function initApp() {
   }
 }
 
-initApp();
+initApp().catch(err => console.error('[PlatePlan Bootstrapper Error]:', err));
