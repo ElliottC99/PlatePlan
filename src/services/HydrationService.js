@@ -9,6 +9,9 @@ import { getInventory } from './InventoryRepository.js';
 import { getCurrentActivePlan as getActivePlanFromSubcollection } from './PlanRepository.js';
 import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache, setCategories, setInventory, sanitizePreferences } from '../store/store.js';
 import { compareProductsByStrategy } from '../models/PantryHierarchyModel.js';
+import { waitForAuth } from './AuthService.js';
+
+export { waitForAuth };
 
 export const CANONICAL_CATEGORIES = [
   'Baking, Chocolate and Sweets', 'Beverages', 'Carbs', 'Dairy', 'Fruit & Vegetables',
@@ -229,6 +232,13 @@ export async function hydrateHouseholdData() {
   if (inFlightHydration) return inFlightHydration;
 
   inFlightHydration = (async () => {
+    // 1. Gate Cloud Hydration Behind Auth
+    const user = await waitForAuth();
+    if (!user) {
+      console.warn('[Sync] Cloud sync paused: Unauthenticated state detected.');
+      return { success: false, unauthenticated: true, fallback: true };
+    }
+
     try {
       const [recipes, rawIngredients, rawProducts, preferencesData, legacyPlan, rawCategories, inventoryItems, subcollPlan] = await Promise.all([
         getRecipes().catch(e => { console.warn('[HydrationService] getRecipes fallback:', e?.message || e); return []; }),
@@ -243,32 +253,6 @@ export async function hydrateHouseholdData() {
       const plan = subcollPlan || legacyPlan;
 
       const sanitizedPrefs = sanitizePreferences(preferencesData);
-
-      // Self-healing check: if original preferencesData has unmigrated keys or is oversized
-      const originalSize = new Blob([JSON.stringify(preferencesData || {})]).size;
-      const hasLegacyKeys = preferencesData && (
-        preferencesData.planHistory !== undefined ||
-        preferencesData.ingredientGroups !== undefined ||
-        preferencesData.ingredientFamilies !== undefined ||
-        (preferencesData.userPrefs && (
-          preferencesData.userPrefs.planHistory !== undefined ||
-          preferencesData.userPrefs.ingredientGroups !== undefined ||
-          preferencesData.userPrefs.ingredientFamilies !== undefined
-        ))
-      );
-
-      if (hasLegacyKeys || originalSize > 50 * 1024) {
-        console.warn(`[HydrationService] Stale/bloated preferences detected on Firestore (${(originalSize / 1024).toFixed(2)} KB). Running automatic self-healing deep-clean on boot...`);
-        import('./HouseholdRepository.js').then(repo => {
-          if (typeof repo.cleanPreferencesBloat === 'function') {
-            repo.cleanPreferencesBloat().then(res => {
-              if (res && res.success) {
-                console.log(`[HydrationService] Self-healing complete. Cleaned size: ${(res.sizeBytes / 1024).toFixed(2)} KB.`);
-              }
-            }).catch(e => console.error('[HydrationService] Self-healing failed:', e));
-          }
-        });
-      }
 
       const ingredients = (rawIngredients || []).map(normalizeIngredientRecord);
       const products = (rawProducts || []).map(normalizeProductRecord);
@@ -311,10 +295,6 @@ export async function hydrateHouseholdData() {
         setInventory(inventoryItems);
       }
 
-      if (mutated) {
-        saveCategories(mergedCategories).catch(err => console.warn('[HydrationService] Failed to persist merged canonical categories:', err));
-      }
-
       if (typeof window !== 'undefined') {
         if (!window.state) { try { window.state = {}; } catch (e) {} }
         const docData = sanitizedPrefs || {};
@@ -341,8 +321,6 @@ export async function hydrateHouseholdData() {
             window.state.skeletonGrid = plan.skeletonGrid;
           }
         }
-
-        await sweepAndRecalibrateIngredientDefaults().catch(() => {});
 
         window.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: window.state.ingredients }));
         window.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: products }));
@@ -432,6 +410,12 @@ export async function hydrateHouseholdData() {
 
       initRealtimeListeners();
       saveStateCache();
+
+      // Defer non-critical self-healing writes away from boot
+      setTimeout(() => {
+        runDeferredMaintenance(preferencesData, mergedCategories, mutated);
+      }, 3000);
+
       if (!hydrationLogged) {
         hydrationLogged = true;
         console.log('[HydrationService] Household data hydrated successfully into Store and persisted to local cache.');
@@ -446,4 +430,68 @@ export async function hydrateHouseholdData() {
   })();
 
   return inFlightHydration;
+}
+
+/**
+ * Isolated post-hydration maintenance routines deferred away from critical application startup.
+ */
+async function runDeferredMaintenance(preferencesData, mergedCategories, mutated) {
+  try {
+    const authInstance = (typeof window !== 'undefined' && window.firebase && typeof window.firebase.auth === 'function')
+      ? window.firebase.auth()
+      : null;
+
+    if (!authInstance || !authInstance.currentUser) {
+      console.warn('[Maintenance] Deferred maintenance skipped: unauthenticated session.');
+      return;
+    }
+
+    // 1. Defer categories persistence
+    if (mutated && Array.isArray(mergedCategories)) {
+      try {
+        await saveCategories(mergedCategories);
+      } catch (err) {
+        console.warn('[Maintenance] Deferred saveCategories error:', err);
+      }
+    }
+
+    // 2. Defer sweep & recalibrate ingredient defaults
+    try {
+      await sweepAndRecalibrateIngredientDefaults();
+    } catch (err) {
+      console.warn('[Maintenance] Deferred sweepAndRecalibrate error:', err);
+    }
+
+    // 3. Defer cleanPreferencesBloat
+    if (preferencesData) {
+      const originalSize = new Blob([JSON.stringify(preferencesData || {})]).size;
+      const hasLegacyKeys = preferencesData && (
+        preferencesData.planHistory !== undefined ||
+        preferencesData.ingredientGroups !== undefined ||
+        preferencesData.ingredientFamilies !== undefined ||
+        (preferencesData.userPrefs && (
+          preferencesData.userPrefs.planHistory !== undefined ||
+          preferencesData.userPrefs.ingredientGroups !== undefined ||
+          preferencesData.userPrefs.ingredientFamilies !== undefined
+        ))
+      );
+
+      if (hasLegacyKeys || originalSize > 50 * 1024) {
+        console.log(`[Maintenance] Stale/bloated preferences detected (${(originalSize / 1024).toFixed(2)} KB). Running deferred clean...`);
+        try {
+          const repo = await import('./HouseholdRepository.js');
+          if (typeof repo.cleanPreferencesBloat === 'function') {
+            const res = await repo.cleanPreferencesBloat();
+            if (res && res.success) {
+              console.log(`[Maintenance] Preferences cleaned: ${(res.sizeBytes / 1024).toFixed(2)} KB.`);
+            }
+          }
+        } catch (e) {
+          console.warn('[Maintenance] cleanPreferencesBloat failed:', e);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Maintenance] Deferred maintenance skipped:', err);
+  }
 }

@@ -27,6 +27,31 @@ if (db) {
   window.db = db;
 }
 
+/**
+ * Configure and enforce local browser persistence for Firebase Auth
+ */
+export async function ensureAuthPersistence(authInstance) {
+  try {
+    const targetAuth = authInstance || (typeof window !== 'undefined' && window.firebase?.auth?.());
+    if (!targetAuth) return;
+    if (typeof targetAuth.setPersistence === 'function') {
+      const persistence = window.firebase?.auth?.Auth?.Persistence?.LOCAL || 'local';
+      await targetAuth.setPersistence(persistence);
+    }
+  } catch (error) {
+    console.error('[Auth] Failed to set local persistence:', error);
+  }
+}
+
+// Initialize Auth from CDN global
+export const auth = (typeof window !== 'undefined' && window.firebase && typeof window.firebase.auth === 'function')
+  ? window.firebase.auth()
+  : null;
+
+if (auth) {
+  ensureAuthPersistence(auth);
+}
+
 // Modern Firebase v10 CDN Persistence Setup (No deprecated method calls)
 try {
   if (db && typeof window.firebase.firestore.persistentLocalCache === 'function') {
