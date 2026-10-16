@@ -1,5 +1,5 @@
 /**
- * src/components/shopping/ShoppingItemRow.js (v3.31.18)
+ * src/components/shopping/ShoppingItemRow.js (v3.31.19)
  * UI component for individual shopping list items, quantity adjustments,
  * check-off toggles, recipe usage breakdown accordion drawers, and inline product brand substitution drawers.
  */
@@ -62,9 +62,18 @@ export function renderShoppingItemRow(item) {
       <div id="breakdown-drawer-${escapeAttr(item.key)}" style="display:none; background: #F8FAFC; border-bottom: 1px solid #E5E5EA; padding: 10px 16px 12px 52px; flex-direction: column; gap: 6px;">
         <div style="font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.03em;">Recipe Usage Breakdown:</div>
         ${recipeSummary.map(r => `
-          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #1E293B;">
-            <span><strong>${escapeHtml(r.recipeName)}</strong> <span style="color: #64748B; font-size: 11px;">(${r.usages.map(u => `Day ${u.day} ${u.mealType}`).join(', ')})</span></span>
-            <span style="font-weight: 600; color: #0969da;">${r.totalQty}${item.unit || ''}</span>
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #1E293B; margin-bottom: 4px;">
+            <span><strong>${escapeHtml(r.recipeName)}</strong></span>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-weight: 600; color: #0969da;">${r.totalQty}${item.unit || ''}</span>
+              <button type="button" class="btn sm ghost" style="font-size: 10px; padding: 2px 6px;" 
+                data-action="toggle-inline-subst" 
+                data-item-key="${escapeAttr(item.key)}" 
+                data-instance-id="${escapeAttr(r.cookingEventId)}"
+                onclick="toggleInlineShoppingSubst('${escapeAttr(item.key)}', '${escapeAttr(item.groupId || '')}', '${escapeAttr(r.cookingEventId)}')">
+                Swap Product ▾
+              </button>
+            </div>
           </div>
         `).join('')}
       </div>

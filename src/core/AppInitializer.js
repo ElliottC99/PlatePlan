@@ -232,7 +232,7 @@ export function initShoppingDelegation() {
       }
     } else if (action === 'toggle-inline-subst' && ds.itemKey) {
       if (typeof window.toggleInlineShoppingSubst === 'function') {
-        window.toggleInlineShoppingSubst(ds.itemKey, ds.groupId || '');
+        window.toggleInlineShoppingSubst(ds.itemKey, ds.groupId || '', ds.instanceId || null);
       }
     } else if (action === 'select-shopping-product-override' && ds.groupId && ds.productId) {
       if (typeof window.selectShoppingProductOverride === 'function') {

@@ -1,5 +1,5 @@
 /**
- * src/components/ProductSwapModal.js (v3.31.0)
+ * src/components/ProductSwapModal.js (v3.31.19)
  * Robust modal component for 3-tier product & brand substitution.
  * Features tabbed tier navigation, "Apply Substitution" bottom-right button,
  * cleaned tag/brand fallbacks, and instant reactive state sync.
@@ -95,6 +95,15 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   const existing = document.getElementById('pp-swap-product-modal');
   if (existing) existing.remove();
 
+  let ctx = optionalContext || {};
+  if (typeof param3 === 'object' && param3 !== null) {
+    ctx = { ...ctx, ...param3 };
+    param3 = null;
+  } else if (typeof param3 === 'string' && !ctx.instanceId && (param3.startsWith('prep_') || param3.startsWith('instance_') || param3.includes('_') || param3.includes(':'))) {
+    ctx = { ...ctx, instanceId: param3 };
+    param3 = null;
+  }
+
   const { item: targetItem, group: targetGroup } = resolveTargetItem(param1, param2, param3);
   const ingredients = Array.isArray(window.state?.ingredients) ? window.state.ingredients : [];
   const targetSubtype = inferSubtype(targetItem);
@@ -114,7 +123,7 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   });
 
   let currentSort = 'relevance';
-  let currentScope = (optionalContext?.instanceId || window.currentPreviewInstanceId) ? 'recipe' : 'global';
+  let currentScope = (ctx?.instanceId || window.currentPreviewInstanceId) ? 'recipe' : 'global';
   let currentTierTab = 'tier1';
   let selectedSubstituteProduct = null;
 
@@ -297,7 +306,7 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   if (applyBtn) {
     applyBtn.onclick = () => {
       if (!selectedSubstituteProduct) return;
-      executeSwapInState(param1, param2, selectedSubstituteProduct, currentScope, targetItem, optionalContext);
+      executeSwapInState(param1, param2, selectedSubstituteProduct, currentScope, targetItem, ctx);
       overlay.remove();
     };
   }
@@ -402,4 +411,12 @@ export async function executeSwapInState(param1, param2, newProduct, scope = 'gl
     const scopeLabel = scope === 'recipe' ? 'for this recipe' : 'across shopping list';
     window.showPlatePlanToast(`Swapped to "${newProduct.name}" ${scopeLabel}`);
   }
+}
+
+export function toggleInlineShoppingSubst(itemKey, groupId = '', instanceId = null) {
+  renderScrollableSwapModal(itemKey, groupId, null, { instanceId });
+}
+
+if (typeof window !== 'undefined') {
+  window.toggleInlineShoppingSubst = toggleInlineShoppingSubst;
 }

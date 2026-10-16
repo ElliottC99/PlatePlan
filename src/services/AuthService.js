@@ -1,5 +1,5 @@
 /**
- * src/services/AuthService.js (v3.31.18)
+ * src/services/AuthService.js (v3.31.19)
  * Resolves Firebase Auth state safely for household synchronization.
  * Singleton guarded to eliminate duplicate authentication listeners.
  */

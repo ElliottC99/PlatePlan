@@ -1,7 +1,7 @@
 import { convertToStrictUnit } from './UnitConversionService.js';
 
 /**
- * src/services/ShoppingCalculationService.js (v3.31.18)
+ * src/services/ShoppingCalculationService.js (v3.31.20)
  * Precision unit pricing, pack weight normalisation, and robust fallbacks
  * for household shopping list generation.
  */
@@ -172,6 +172,7 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
   const ingredientsBank = Array.isArray(appState.ingredients) ? appState.ingredients : (typeof window !== 'undefined' && Array.isArray(window.state?.ingredients) ? window.state.ingredients : []);
   const productsBank = Array.isArray(appState.products) ? appState.products : (typeof window !== 'undefined' && Array.isArray(window.state?.products) ? window.state.products : []);
   const atHomeMap = activePlan.shoppingAtHome || (typeof window !== 'undefined' ? window.state?.plan?.shoppingAtHome : {}) || {};
+  const prepGroups = Array.isArray(activePlan.mealPrepGroups) ? activePlan.mealPrepGroups : [];
 
   const aggregatedMap = new Map();
   const rawSlots = activePlan.slots && typeof activePlan.slots === 'object' ? activePlan.slots : {};
@@ -196,21 +197,78 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
 
     const recipeName = fullRecipe.title || fullRecipe.name || 'Recipe';
 
+    // 1. Determine cookingEventId: If slot is part of a meal prep batch, use prepGroupId; if standalone, use slot's instanceId
+    const matchedPrep = prepGroups.find(g =>
+      String(g.recipeId) === String(recipeId) &&
+      Array.isArray(g.days) &&
+      g.days.some(d => Number(d) === Number(dayNum))
+    );
+    const prepGroupId = matchedPrep?.id || matchedPrep?.prepGroupId || matchedPrep?.key || (matchedPrep ? `prep_${matchedPrep.recipeId}` : null);
+    const slotInstanceId = (typeof slotNode === 'object' && slotNode.instanceId) ? slotNode.instanceId : `instance_${recipeId}_d${dayNum}_${mealType}`;
+    const cookingEventId = prepGroupId || slotInstanceId;
+
     rawIngs.forEach(ing => {
       if (!ing) return;
       const rawName = typeof ing === 'string' ? ing : (ing.name || ing.ingredient || ing.title || ing.item || ing.raw || '');
       if (!rawName) return;
 
-      const ingId = typeof ing === 'object' ? (ing.ingredientId || ing.groupId || null) : null;
+      const ingId = typeof ing === 'object' ? (ing.id || ing.ingredientId || ing.groupId || null) : null;
       const subId = typeof ing === 'object' ? (ing.subtypeId || ing.subTypeId || null) : null;
       const prodId = typeof ing === 'object' ? (ing.productId || ing.bankId || null) : null;
+
+      // Check if an instance-specific override exists: window.state?.overrides?.[cookingEventId]?.productOverrides?.[ing.id]
+      const stateOverrides = (typeof window !== 'undefined' && window.state?.overrides) ? window.state.overrides : (appState.overrides || {});
+      const instanceProductOverrides = stateOverrides?.[cookingEventId]?.productOverrides || stateOverrides?.[cookingEventId]?.substitutions || {};
+      const planSubstitutions = (typeof window !== 'undefined' && window.state?.plan?.substitutions) ? window.state.plan.substitutions : (activePlan.substitutions || {});
+      const planProductSelections = (typeof window !== 'undefined' && window.state?.plan?.productSelections) ? window.state.plan.productSelections : (activePlan.productSelections || {});
+
+      const lookupKeys = [ing.id, ing.ingredientId, ingId, rawName].filter(Boolean);
+      let overriddenProductId = null;
+
+      for (const k of lookupKeys) {
+        if (instanceProductOverrides?.[k]) {
+          overriddenProductId = instanceProductOverrides[k];
+          break;
+        }
+        const scopedSub = planSubstitutions?.[`${cookingEventId}:${k}`];
+        if (scopedSub) {
+          overriddenProductId = typeof scopedSub === 'object' ? (scopedSub.productId || scopedSub.id) : scopedSub;
+          break;
+        }
+      }
+
+      // If not, check for a global override: window.state?.plan?.substitutions?.[ing.id]
+      if (!overriddenProductId) {
+        for (const k of lookupKeys) {
+          const globalSub = planSubstitutions?.[k];
+          if (globalSub) {
+            overriddenProductId = typeof globalSub === 'object' ? (globalSub.productId || globalSub.id) : globalSub;
+            break;
+          }
+        }
+      }
+      if (!overriddenProductId) {
+        for (const k of lookupKeys) {
+          if (planProductSelections?.[k]) {
+            overriddenProductId = planProductSelections[k];
+            break;
+          }
+        }
+      }
 
       const matchedIng = ingredientsBank.find(i =>
         (ingId && String(i.id) === String(ingId)) ||
         String(i.name || '').toLowerCase() === String(rawName).toLowerCase()
       ) || null;
 
-      const matchedProd = productsBank.find(p =>
+      // Use the overridden product ID to fetch the bankIng instead of the default
+      let overriddenProduct = null;
+      if (overriddenProductId) {
+        overriddenProduct = productsBank.find(p => String(p.id) === String(overriddenProductId) || String(p.name).toLowerCase() === String(overriddenProductId).toLowerCase())
+          || ingredientsBank.find(i => String(i.id) === String(overriddenProductId) || String(i.name).toLowerCase() === String(overriddenProductId).toLowerCase());
+      }
+
+      const matchedProd = overriddenProduct || productsBank.find(p =>
         (prodId && String(p.id) === String(prodId)) ||
         (subId && String(p.subtypeId) === String(subId) && p.isAutoDefault) ||
         (matchedIng && String(p.id) === String(matchedIng.defaultProductId)) ||
@@ -218,7 +276,8 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
         (matchedIng && String(p.ingredientId) === String(matchedIng.id))
       ) || getFallbackProductData(rawName);
 
-      const key = String(prodId || subId || ingId || matchedIng?.id || rawName).toLowerCase().replace(/\s+/g, '_');
+      const effectiveProdId = overriddenProductId || prodId;
+      const key = String(effectiveProdId || subId || ingId || matchedIng?.id || rawName).toLowerCase().replace(/\s+/g, '_');
       
       const rawQty = Number(ing.qty ?? ing.quantity ?? ing.amount ?? 1);
       const rawUnit = String(ing.unit || '').trim();
@@ -252,6 +311,7 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
       existing.buyQty += convertedAmount;
       existing.requiredQty += convertedAmount;
       existing.recipeBreakdown.push({
+        cookingEventId,
         recipeName,
         day: dayNum,
         mealType,
@@ -281,13 +341,19 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
     entry.buyQty = Math.round(entry.buyQty * 10) / 10;
     entry.requiredQty = Math.round(entry.requiredQty * 10) / 10;
 
+    // Group existing.recipeBreakdown by cookingEventId rather than just recipeName
     const recipeSummaryMap = new Map();
     (entry.recipeBreakdown || []).forEach(b => {
-      const rKey = b.recipeName || 'Recipe';
-      if (!recipeSummaryMap.has(rKey)) {
-        recipeSummaryMap.set(rKey, { recipeName: b.recipeName, totalQty: 0, usages: [] });
+      const groupKey = b.cookingEventId || b.recipeName || 'Recipe';
+      if (!recipeSummaryMap.has(groupKey)) {
+        recipeSummaryMap.set(groupKey, {
+          cookingEventId: b.cookingEventId || '',
+          recipeName: b.recipeName,
+          totalQty: 0,
+          usages: []
+        });
       }
-      const sumEntry = recipeSummaryMap.get(rKey);
+      const sumEntry = recipeSummaryMap.get(groupKey);
       sumEntry.totalQty += b.qty;
       sumEntry.usages.push({ day: b.day, mealType: b.mealType, servings: b.servings, qty: b.qty });
     });

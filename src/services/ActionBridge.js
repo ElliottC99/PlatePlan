@@ -178,8 +178,12 @@ export function routeAction(actionName, target, event) {
     const containerEl = target.closest('[data-item-key], [data-group-key], [data-group-id], [data-ingredient-name], .pp-shop-item, .shopping-list-row, .item-row') || target;
     const groupKey = ds.groupKey || ds.groupId || containerEl.dataset?.groupKey || containerEl.dataset?.groupId || parseArgsString(actionName)[0] || '';
     const itemKey = ds.itemKey || containerEl.dataset?.itemKey || parseArgsString(actionName)[1] || parseArgsString(actionName)[0] || '';
-    const ingredientName = ds.ingredientName || containerEl.dataset?.ingredientName || '';
-    renderScrollableSwapModal(groupKey, itemKey, ingredientName);
+    const instanceId = ds.instanceId || containerEl.dataset?.instanceId || parseArgsString(actionName)[2] || null;
+    if (typeof window.toggleInlineShoppingSubst === 'function') {
+      window.toggleInlineShoppingSubst(itemKey, groupKey, instanceId);
+    } else {
+      renderScrollableSwapModal(itemKey, groupKey, null, { instanceId });
+    }
     return true;
   }
 

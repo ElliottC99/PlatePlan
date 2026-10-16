@@ -31,7 +31,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * src/main.js (v3.31.18)
+ * src/main.js (v3.31.20)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronisation,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -197,7 +197,7 @@ if (typeof window !== 'undefined') {
     getPlannedSlotNutrition: MealPlanGeneratorService.getPlannedSlotNutrition,
     getShoppingLineStateKey,
     renderScrollableSwapModal,
-    toggleInlineShoppingSubst: renderScrollableSwapModal,
+    toggleInlineShoppingSubst,
     toggleShoppingItemAcquired,
     toggleShoppingAtHome: toggleShoppingItemAcquired,
     openSearchableRecipeSwapModal(...args) {
@@ -269,6 +269,10 @@ if (typeof window !== 'undefined') {
   window.renderPlatePlanLegacyView = window.renderPlatePlanView;
   window.showRecipeModal = window.openRecipeModal;
   window.openRecipeDetailModal = window.openRecipeModal;
+}
+
+export function toggleInlineShoppingSubst(itemKey, groupId = '', instanceId = null) {
+  renderScrollableSwapModal(itemKey, groupId, null, { instanceId });
 }
 
 // 1. STATE INITIALIZATION VIA ENCAPSULATED STORE
@@ -350,7 +354,7 @@ function setupSubscriptions() {
 }
 
 // 7. APPLICATION BOOTSTRAP
-export const APP_VERSION = 'v3.31.18';
+export const APP_VERSION = 'v3.31.20';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;

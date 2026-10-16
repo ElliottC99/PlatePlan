@@ -47,10 +47,14 @@ export function toggleShoppingItemAcquired(groupKey, itemKey, explicitName = '')
 }
 
 // Bind Global Aliases for Action Bridge and Legacy Compatibility
+export function toggleInlineShoppingSubst(itemKey, groupId = '', instanceId = null) {
+  renderScrollableSwapModal(itemKey, groupId, null, { instanceId });
+}
+
 if (typeof window !== 'undefined') {
   window.renderShopping = renderShoppingListUI;
   window.renderShoppingList = renderShoppingListUI;
-  window.toggleInlineShoppingSubst = renderScrollableSwapModal;
+  window.toggleInlineShoppingSubst = toggleInlineShoppingSubst;
   window.toggleShoppingItemAcquired = toggleShoppingItemAcquired;
   window.toggleShoppingAtHome = toggleShoppingItemAcquired;
 }
