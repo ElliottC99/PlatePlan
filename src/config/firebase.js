@@ -54,11 +54,15 @@ if (auth) {
 
 // Modern Firebase v10 CDN Persistence Setup (No deprecated method calls)
 try {
+  if (db && typeof db.settings === 'function') {
+    db.settings({ experimentalForceLongPolling: true });
+  }
   if (db && typeof window.firebase.firestore.persistentLocalCache === 'function') {
     db.settings({
       localCache: window.firebase.firestore.persistentLocalCache({
         tabManager: window.firebase.firestore.persistentMultipleTabManager()
-      })
+      }),
+      experimentalForceLongPolling: true
     });
   }
 } catch (err) {

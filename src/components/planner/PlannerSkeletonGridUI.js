@@ -1,5 +1,5 @@
 /**
- * src/components/planner/PlannerSkeletonGridUI.js (v3.31.13)
+ * src/components/planner/PlannerSkeletonGridUI.js (v3.31.14)
  * Dual-Dot Fit Score Scope Timeline, Pre-Generation Interactive Skeleton Grid,
  * and Split Household Slot Configurator (Elliott & Chloe) with Unified Fit & Duplication Badges.
  */

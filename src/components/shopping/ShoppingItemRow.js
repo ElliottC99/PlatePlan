@@ -1,5 +1,5 @@
 /**
- * src/components/shopping/ShoppingItemRow.js (v3.31.13)
+ * src/components/shopping/ShoppingItemRow.js (v3.31.14)
  * UI component for individual shopping list items, quantity adjustments,
  * check-off toggles, recipe usage breakdown accordion drawers, and inline product brand substitution drawers.
  */
@@ -45,8 +45,8 @@ export function renderShoppingItemRow(item) {
         <span class="primary-subtype" style="${isChecked ? 'text-decoration: line-through; opacity: 0.6;' : 'font-weight: 600; color: #1C1C1E;'}; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(item.name)}</span>
         <span class="secondary-brand-title" style="font-size: 13px; color: #8E8E93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">${escapeHtml(brandTitle)}</span>
         ${hasBreakdown ? `
-          <button type="button" class="btn sm ghost" style="font-size: 11px; padding: 2px 6px; margin-top: 4px; align-self: flex-start; color: #007AFF;" onclick="toggleItemBreakdown('${escapeAttr(item.key)}')">
-            ▼ View Recipe Breakdown (${recipeSummary.length})
+          <button type="button" id="breakdown-btn-${escapeAttr(item.key)}" class="btn sm ghost btn-recipe-breakdown" style="font-size: 11px; padding: 2px 6px; margin-top: 4px; align-self: flex-start; color: #007AFF;" onclick="toggleItemBreakdown('${escapeAttr(item.key)}')">
+            ▼ Recipe Breakdown
           </button>
         ` : ''}
       </div>
@@ -96,8 +96,13 @@ export function renderSubstDrawerContent(groupId, products = []) {
 if (typeof window !== 'undefined') {
   window.toggleItemBreakdown = function(key) {
     const el = document.getElementById(`breakdown-drawer-${key}`);
+    const btn = document.getElementById(`breakdown-btn-${key}`);
     if (el) {
-      el.style.display = el.style.display === 'none' || el.style.display === '' ? 'flex' : 'none';
+      const isHidden = el.style.display === 'none' || el.style.display === '';
+      el.style.display = isHidden ? 'flex' : 'none';
+      if (btn) {
+        btn.textContent = isHidden ? '▲ Hide Breakdown' : '▼ Recipe Breakdown';
+      }
     }
   };
 }
