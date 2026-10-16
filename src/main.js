@@ -1,3 +1,5 @@
+import './config/firebase.js';
+
 if (typeof window !== 'undefined') {
   window.showTescoImport = () => {
     import('./components/pantry/SubtypeActionModalsUI.js')
