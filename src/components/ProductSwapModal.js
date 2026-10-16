@@ -42,30 +42,53 @@ export function calculateMetrics(item) {
 
 export function resolveTargetItem(param1, param2, param3) {
   const keys = [param1, param2, param3].filter(k => k && typeof k === 'string' && k.trim() !== '');
-  const sources = [window.state?.confirmedShopping, window.state?.shoppingList, window.state?.generatedList];
+  const state = window.store?.getState?.() || window.state || {};
+  
+  let activeItems = [];
+  if (typeof window.computeWizardShoppingAgg === 'function' && state.plan) {
+    const agg = window.computeWizardShoppingAgg(state.plan);
+    if (agg && Array.isArray(agg.items)) {
+      activeItems = agg.items;
+    } else if (agg && Array.isArray(agg.groups)) {
+      activeItems = agg.groups.flatMap(g => g.items || []);
+    }
+  }
 
-  for (const source of sources) {
-    if (!Array.isArray(source)) continue;
-    for (const group of source) {
-      if (!group) continue;
-      const items = Array.isArray(group.items) ? group.items : (Array.isArray(group) ? group : []);
-      for (const item of items) {
-        if (!item) continue;
-        for (const k of keys) {
-          if (item.key === k || item.id === k || item.name === k || item.groupId === k || item.ingredientId === k || String(item.name).toLowerCase() === k.toLowerCase()) {
-            return { item, group, source };
-          }
+  const sources = [
+    activeItems,
+    state.shoppingList,
+    state.confirmedShopping,
+    state.generatedList
+  ];
+
+  for (const items of sources) {
+    if (!Array.isArray(items)) continue;
+    for (const item of items) {
+      if (!item) continue;
+      for (const k of keys) {
+        if (
+          item.key === k || 
+          item.id === k || 
+          item.name === k || 
+          item.groupId === k || 
+          item.ingredientId === k || 
+          String(item.name).toLowerCase() === k.toLowerCase()
+        ) {
+          return { item, group: null, source: items };
         }
       }
     }
   }
 
-  const ingredients = Array.isArray(window.state?.ingredients) ? window.state.ingredients : [];
-  for (const k of keys) {
-    const ing = ingredients.find(i => i.id === k || i.key === k || i.name === k || i.groupId === k || String(i.name).toLowerCase() === k.toLowerCase());
-    if (ing) return { item: ing, group: null, source: null };
+  for (const items of sources) {
+    if (Array.isArray(items) && items.length > 0 && items[0]) {
+      return { item: items[0], group: null, source: items };
+    }
   }
-  return { item: { name: keys[0] || 'Selected Product', id: keys[0] || 'item_unknown' }, group: null, source: null };
+
+  const products = Array.isArray(state.products) ? state.products : Object.values(state.productsBank || {});
+  const fallbackProd = products[0] || { name: keys[0] || 'Selected Product', id: 'item_unknown', groupId: 'ing_1791021416243' };
+  return { item: fallbackProd, group: null, source: null };
 }
 
 export function renderScrollableSwapModal(param1, param2, param3, optionalContext = {}) {
