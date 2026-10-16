@@ -1,7 +1,7 @@
 /**
- * src/components/ProductSwapModal.js (v3.31.21)
+ * src/components/ProductSwapModal.js (v3.31.22)
  * Robust modal component for 3-tier product & brand substitution.
- * Features relational tier filtering using window.state.products,
+ * Features relational tier filtering using window.state.products with keyword clustering,
  * tabbed tier navigation, "Apply Substitution" button, and reactive UI refresh.
  */
 
@@ -83,10 +83,33 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   const products = Array.isArray(window.state?.products) ? window.state.products : [];
   const targetSubId = targetItem?.bankIng?.subTypeId || targetItem?.bankIng?.subtypeId || targetItem?.subTypeId || targetItem?.subtypeId;
   const targetIngId = targetItem?.bankIng?.ingredientId || targetItem?.groupId || targetItem?.ingredientId;
-
-  const tier1Subtypes = products.filter(p => p.id !== targetItem?.id && targetSubId && (p.subTypeId === targetSubId || p.subtypeId === targetSubId));
-  const tier2Items = products.filter(p => p.id !== targetItem?.id && !tier1Subtypes.some(t => t.id === p.id) && targetIngId && (p.ingredientId === targetIngId || p.groupId === targetIngId));
   const targetSubtype = inferSubtype(targetItem);
+  const targetName = String(targetItem?.name || targetItem?.bankIng?.name || '').toLowerCase();
+
+  // Keyword clustering tokens from target item name
+  const targetWords = targetName
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !['organic', 'fresh', 'tesco', 'british', 'sliced', 'diced', 'chopped', 'whole', 'pack'].includes(w));
+
+  // Tier 1 (Exact Same Sub-Type): Filter for products sharing exact sub-type ID or inferSubtype match
+  const tier1Subtypes = products.filter(p => {
+    if (p.id === targetItem?.id || p.id === targetItem?.bankIng?.id) return false;
+    if (targetSubId && (p.subTypeId === targetSubId || p.subtypeId === targetSubId)) return true;
+    if (targetSubtype && inferSubtype(p) === targetSubtype) return true;
+    return false;
+  });
+
+  // Tier 2 (Item Family): Filter for products sharing ingredient/item family ID or keyword cluster, excluding Tier 1
+  const tier2Items = products.filter(p => {
+    if (p.id === targetItem?.id || p.id === targetItem?.bankIng?.id) return false;
+    if (tier1Subtypes.some(t => t.id === p.id)) return false;
+    if (targetIngId && (p.ingredientId === targetIngId || p.groupId === targetIngId)) return true;
+    const pName = (p.name || '').toLowerCase();
+    if (targetWords.length > 0 && targetWords.some(w => pName.includes(w))) return true;
+    if (targetName.length > 2 && (pName.includes(targetName) || targetName.includes(pName))) return true;
+    return false;
+  });
 
   let currentSort = 'relevance', currentScope = (ctx?.instanceId || window.currentPreviewInstanceId) ? 'recipe' : 'global', currentTierTab = 'tier1', selectedSubstituteProduct = null;
 
@@ -107,14 +130,7 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
       </div>
       <button id="pp-modal-close" class="modal-close-btn" aria-label="Close" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;line-height:1;padding:4px 8px;border-radius:6px;">&times;</button>
     </div>
-    <div style="padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;flex-direction:column;gap:10px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-        <span style="font-size:12px;font-weight:600;color:#475569;">Apply Substitution:</span>
-        <div style="display:flex;gap:4px;background:#e2e8f0;padding:2px;border-radius:8px;">
-          <button type="button" id="pp-scope-recipe" class="pp-scope-btn" style="border:none;background:${currentScope === 'recipe' ? '#fff' : 'transparent'};color:${currentScope === 'recipe' ? '#2563eb' : '#64748b'};padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:${currentScope === 'recipe' ? '700' : '600'};">Recipe Specific</button>
-          <button type="button" id="pp-scope-global" class="pp-scope-btn" style="border:none;background:${currentScope === 'global' ? '#fff' : 'transparent'};color:${currentScope === 'global' ? '#2563eb' : '#64748b'};padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:${currentScope === 'global' ? '700' : '600'};">Global Shopping List</button>
-        </div>
-      </div>
+    <div style="padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
       <div style="display:flex;gap:10px;align-items:center;">
         <label for="pp-product-search" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Search substitute products</label>
         <input type="text" id="pp-product-search" name="productSubstituteSearch" aria-label="Search substitute products" placeholder="🔍 Search substitute products..." style="flex:1;min-width:0;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;">
@@ -129,8 +145,8 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     </div>
     <div id="pp-tier-tabs" style="display:flex;gap:4px;padding:8px 20px 0 20px;border-bottom:1px solid #e2e8f0;background:#fff;overflow-x:auto;">
       <button type="button" class="pp-tier-tab" data-tier="tier1" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:700;color:#2563eb;border-bottom:2px solid #2563eb;cursor:pointer;white-space:nowrap;">Tier 1: Sub-Types</button>
-      <button type="button" class="pp-tier-tab" data-tier="tier2" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Tier 2: Items</button>
-      <button type="button" class="pp-tier-tab" data-tier="tier3" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Tier 3: Global</button>
+      <button type="button" class="pp-tier-tab" data-tier="tier2" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Tier 2: Item Family</button>
+      <button type="button" class="pp-tier-tab" data-tier="tier3" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Tier 3: Global Catalog</button>
     </div>
     <div id="pp-product-list" style="padding:16px 20px;overflow-y:auto;flex-grow:1;max-height:40vh;"></div>
     <div style="padding:14px 20px;border-top:1px solid #e2e8f0;background:#fafafa;display:flex;justify-content:space-between;align-items:center;">
@@ -144,21 +160,8 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   const listEl = container.querySelector('#pp-product-list');
   const searchInput = container.querySelector('#pp-product-search');
   const sortSelect = container.querySelector('#pp-product-sort');
-  const scopeRecipeBtn = container.querySelector('#pp-scope-recipe');
-  const scopeGlobalBtn = container.querySelector('#pp-scope-global');
   const applyBtn = container.querySelector('#pp-apply-substitution');
   const selectedPreviewEl = container.querySelector('#pp-selected-preview');
-
-  const updateScopeButtons = () => {
-    if (!scopeRecipeBtn || !scopeGlobalBtn) return;
-    scopeRecipeBtn.style.background = currentScope === 'recipe' ? '#fff' : 'transparent';
-    scopeRecipeBtn.style.color = currentScope === 'recipe' ? '#2563eb' : '#64748b';
-    scopeGlobalBtn.style.background = currentScope === 'global' ? '#fff' : 'transparent';
-    scopeGlobalBtn.style.color = currentScope === 'global' ? '#2563eb' : '#64748b';
-  };
-
-  if (scopeRecipeBtn) scopeRecipeBtn.onclick = () => { currentScope = 'recipe'; updateScopeButtons(); };
-  if (scopeGlobalBtn) scopeGlobalBtn.onclick = () => { currentScope = 'global'; updateScopeButtons(); };
 
   container.querySelectorAll('.pp-tier-tab').forEach(tab => {
     tab.onclick = () => {
@@ -204,7 +207,7 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     listEl.innerHTML = displayItems.map(item => {
       const metrics = calculateMetrics(item);
       const isSelected = selectedSubstituteProduct && (selectedSubstituteProduct.id === item.id || selectedSubstituteProduct.name === item.name);
-      return `<div class="pp-swap-card" data-ing-id="${escapeAttr(item.id || item.name)}" style="padding:12px 14px;border:2px solid ${isSelected ? '#2563eb' : '#e2e8f0'};border-radius:10px;margin-bottom:8px;cursor:pointer;transition:all 0.15s ease;background:${isSelected ? '#eff6ff' : '#fff'};"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div><span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">${escapeAttr(item.brand || '')}</span><div style="font-weight:650;color:#1e293b;font-size:14px;margin-top:1px;">${escapeHtml(item.name)}</div></div><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#e0f2fe;color:#0369a1;">${escapeHtml(inferSubtype(item))}</span></div><div style="margin-top:8px;display:flex;flex-wrap:gap:6px;">${metrics.price ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">£${metrics.price.toFixed(2)}</span>` : ''}${metrics.protein ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">${metrics.protein}g protein</span>` : ''}</div></div>`;
+      return `<div class="pp-swap-card" data-ing-id="${escapeAttr(item.id || item.name)}" style="padding:12px 14px;border:2px solid ${isSelected ? '#2563eb' : '#e2e8f0'};border-radius:10px;margin-bottom:8px;cursor:pointer;transition:all 0.15s ease;background:${isSelected ? '#eff6ff' : '#fff'};"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div><span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">${escapeAttr(item.brand || '')}</span><div style="font-weight:650;color:#1e293b;font-size:14px;margin-top:1px;">${escapeHtml(item.name)}</div></div><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#e0f2fe;color:#0369a1;">${escapeHtml(inferSubtype(item))}</span></div><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${metrics.price ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">£${metrics.price.toFixed(2)}</span>` : ''}${metrics.protein ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">${metrics.protein}g protein</span>` : ''}</div></div>`;
     }).join('');
 
     listEl.querySelectorAll('.pp-swap-card').forEach(card => {
@@ -241,7 +244,7 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
 export async function executeSwapInState(param1, param2, newProduct, scope = 'global', resolvedTarget = null, context = {}) {
   const targetItem = resolvedTarget || resolveTargetItem(param1, param2).item;
   const targetName = targetItem?.name || '';
-  const targetKey = targetItem?.key || targetItem?.id || targetItem?.ingredientId || param1 || param2;
+  const targetKey = targetItem?.groupId || targetItem?.ingredientId || param2 || targetItem?.key || targetItem?.id || param1;
   const instanceId = context?.instanceId || window.currentPreviewInstanceId || targetItem?.instanceId || null;
 
   const priceDelta = Math.round((Number(newProduct.price || newProduct.cost || 0) - Number(targetItem?.price || targetItem?.cost || 0)) * 100) / 100;
