@@ -7,7 +7,7 @@
 import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeRecipes, subscribeIngredients, subscribeProducts, subscribePreferences, subscribeCurrentPlan, getCategories, saveCategories, saveIngredient, cleanLegacyMacros } from './HouseholdRepository.js';
 import { getInventory } from './InventoryRepository.js';
 import { getCurrentActivePlan as getActivePlanFromSubcollection } from './PlanRepository.js';
-import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache, setCategories, setInventory, sanitizePreferences } from '../store/store.js';
+import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache, setCategories, setInventory, sanitizePreferences, updateState } from '../store/store.js';
 import { compareProductsByStrategy } from '../models/PantryHierarchyModel.js';
 import { waitForAuth } from './AuthService.js';
 
@@ -422,6 +422,8 @@ export async function hydrateHouseholdData() {
         (Array.isArray(products) && products.length > 0) ||
         preferencesData || plan
       );
+
+      updateState({ isCloudHydrated: true, isCachedHydrated: true });
 
       if (!hydrationLogged) {
         hydrationLogged = true;
