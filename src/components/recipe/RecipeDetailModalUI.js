@@ -5,6 +5,7 @@
  */
 
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
+import { calculateMealFitScore, getFitScoreTierMeta } from '../../utils/fitScoreCalculator.js';
 import { formatGarlicQuantity, UNIT_TO_GRAMS } from '../../utils/unitConverter.js';
 
 function escapeHtml(str) {
@@ -183,38 +184,44 @@ export function renderRecipeIngredientsListHTML(ingredients = [], state = null, 
 /**
  * Main View Recipe Modal Content Renderer with Full-Width Crossbar & Two-Column Grid.
  */
-export function renderRecipeDetailModalContent({
-  r = {},
-  activeR = {},
-  hasEnh = false,
-  isEnh = false,
-  isFav = false,
-  mealType = 'dinner',
-  servingMode = 'both',
-  targetServes = 2,
-  singleServes = 1,
-  instanceId = null,
-  servingModeBannerHtml = '',
-  allocationAndTargetHtml = '',
-  sourceHtml = '',
-  ingredientsHtml = '',
-  methodHtml = '',
-  macroCardsHtml = '',
-  ingredientsCount = 0,
-  stepsCount = 0
-} = {}) {
+export function renderRecipeDetailModalContent(props = {}) {
+  const r = props.r || props.recipe || {};
+  const isEnh = Boolean(props.isEnh ?? (props.variantTab === 'enhanced'));
+  const hasEnh = Boolean(props.hasEnh ?? props.hasEnhanced ?? r.enhanced ?? (r.variants && r.variants.enhanced));
+  const activeR = props.activeR || (isEnh && r.enhanced ? { ...r, ...r.enhanced, ingredients: r.enhanced.ingredients || r.ingredients } : r);
+  const isFav = Boolean(props.isFav ?? props.isFavourite);
+  const mealType = props.mealType || (activeR.types?.[0] || activeR.type || 'dinner');
+  const servingMode = props.servingMode || 'both';
+  const baseServes = Number(props.baseServes || activeR.serves || activeR.servings || r.serves || r.servings || 2) || 2;
+  const targetServes = Number(props.targetServes) || baseServes;
+  const singleServes = Number(props.singleServes) || 1;
+  const instanceId = props.instanceId || null;
+  const sourceHtml = props.sourceHtml || '';
+  const ingredientsHtml = props.ingredientsHtml || '';
+  const methodHtml = props.methodHtml || '';
+  const ingredientsCount = props.ingredientsCount || 0;
+  const stepsCount = props.stepsCount || 0;
+  const servingModeBannerHtml = props.servingModeBannerHtml || '';
+  const allocationAndTargetHtml = props.allocationAndTargetHtml || '';
+
   const variantKey = isEnh ? 'enhanced' : 'original';
   const name = escapeHtml(activeR.name || r.name || 'Untitled Recipe');
   const favBtnClass = isFav ? 'active' : '';
 
-  const recipe = activeR || r;
-  const slot = mealType || 'dinner';
-  const fitBadgeHtml = renderFitScoreBadge(recipe, slot, { 
-    activeProfile: servingMode === 'both' ? 'everyone' : servingMode, 
-    variant: variantKey,
-    portionScaled: true,
-    showLabel: true
-  });
+  // 1. Title & Fit Score Pill: The header must show the recipe title, meal type, baseline servings, and Fit Score / Match pill (e.g., <span class="badge red">49% - Poor Match</span>)
+  let fitPillHtml = props.fitPillHtml || props.fitBadgeHtml;
+  if (!fitPillHtml) {
+    const fitResult = calculateMealFitScore(activeR, mealType, { 
+      activeProfile: servingMode === 'both' ? 'everyone' : servingMode, 
+      variant: variantKey,
+      portionScaled: true
+    });
+    const fitScore = Math.round(Number(fitResult?.score) || 0);
+    const meta = getFitScoreTierMeta(fitScore);
+    fitPillHtml = `<span class="badge ${meta.tier}" style="background:${meta.bg};color:${meta.text};border:1px solid ${meta.border}">${meta.icon} ${fitScore}% - ${meta.label}</span>`;
+  }
+
+  const macroCrossbarHtml = props.macroSplitHtml || props.macroCardsHtml || '';
 
   return `
     <div class="recipe-view-sheet">
@@ -227,9 +234,9 @@ export function renderRecipeDetailModalContent({
             ${activeR.time ? `<span>⏱ ${activeR.time}m prep</span> · ` : ''}
             <span>${toTitle(mealType || 'Dinner')}</span>
             <span>·</span>
-            <span>Serves ${activeR.serves || 1} baseline</span>
+            <span>Serves ${baseServes} baseline</span>
             ${instanceId ? '<span class="tag" style="background:var(--purple-bg);color:var(--purple);font-size:11px">Planned Meal</span>' : ''}
-            <span class="tag recipe-header-fit-pill" style="padding:0;border:none;background:transparent">${fitBadgeHtml}</span>
+            ${fitPillHtml}
           </div>
         </div>
         <div class="recipe-view-nav-actions" style="display:flex;align-items:center;gap:8px">
@@ -243,90 +250,15 @@ export function renderRecipeDetailModalContent({
       </div>
 
       <style>
-        .recipe-modal-crossbar {
-          width: 100%;
-          background: var(--surface2, #f5f4ee);
-          border: 1px solid var(--border, #e5e5e5);
-          border-radius: 12px;
-          padding: 12px 16px;
-          margin-bottom: 20px;
-          display: flex;
-          flex-wrap: wrap;
-          justify-content: space-between;
-          align-items: center;
-          gap: 14px;
-        }
-        .recipe-modal-crossbar-controls {
-          display: flex;
-          flex-wrap: wrap;
-          align-items: center;
-          gap: 12px;
-          flex: 1 1 300px;
-        }
-        .recipe-modal-crossbar-macros {
-          display: flex;
-          flex-wrap: wrap;
-          align-items: center;
-          justify-content: flex-end;
-          gap: 10px;
-          flex: 1 1 360px;
-        }
-        .recipe-modal-body {
-          display: grid;
-          grid-template-columns: 1fr 1.2fr;
-          gap: 22px;
-          align-items: start;
-        }
-        @media (max-width: 768px) {
-          .recipe-modal-crossbar {
-            flex-direction: column;
-            align-items: stretch;
-            padding: 12px;
-            gap: 12px;
-          }
-          .recipe-modal-crossbar-macros {
-            justify-content: stretch;
-          }
-          .recipe-modal-body {
-            grid-template-columns: 1fr;
-            gap: 18px;
-          }
-        }
-        .recipe-modal-col-card {
-          background: var(--surface, #ffffff);
-          border: 1px solid var(--border, #e5e5e5);
-          border-radius: 12px;
-          padding: 16px 18px;
-        }
-        .recipe-method-step-card {
-          position: relative;
-          padding: 12px 14px 12px 42px;
-          margin-bottom: 10px;
-          background: var(--surface2, #faf9f6);
-          border: 1px solid var(--border, #eee);
-          border-radius: 10px;
-          font-size: 13.5px;
-          line-height: 1.6;
-          color: var(--text);
-        }
-        .recipe-method-step-card:last-child {
-          margin-bottom: 0;
-        }
-        .recipe-method-step-card .step-num {
-          position: absolute;
-          left: 12px;
-          top: 12px;
-          width: 22px;
-          height: 22px;
-          border-radius: 50%;
-          background: var(--text, #292524);
-          color: var(--bg, #fff);
-          font-size: 11px;
-          font-weight: 700;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
+        .recipe-modal-crossbar{width:100%;background:var(--surface2,#f5f4ee);border:1px solid var(--border,#e5e5e5);border-radius:12px;padding:12px 16px;margin-bottom:20px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px}
+        .recipe-modal-crossbar-controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px;flex:1 1 300px}
+        .recipe-modal-crossbar-macros{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px;flex:1 1 360px}
+        .recipe-modal-body{display:grid;grid-template-columns:1fr 1.2fr;gap:22px;align-items:start}
+        @media(max-width:768px){.recipe-modal-crossbar{flex-direction:column;align-items:stretch;padding:12px;gap:12px}.recipe-modal-crossbar-macros{justify-content:stretch}.recipe-modal-body{grid-template-columns:1fr;gap:18px}}
+        .recipe-modal-col-card{background:var(--surface,#ffffff);border:1px solid var(--border,#e5e5e5);border-radius:12px;padding:16px 18px}
+        .recipe-method-step-card{position:relative;padding:12px 14px 12px 42px;margin-bottom:10px;background:var(--surface2,#faf9f6);border:1px solid var(--border,#eee);border-radius:10px;font-size:13.5px;line-height:1.6;color:var(--text)}
+        .recipe-method-step-card:last-child{margin-bottom:0}
+        .recipe-method-step-card .step-num{position:absolute;left:12px;top:12px;width:22px;height:22px;border-radius:50%;background:var(--text,#292524);color:var(--bg,#fff);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
       </style>
 
       ${sourceHtml ? `<div class="recipe-source-bar" style="font-size:12px;color:var(--text2);margin-bottom:12px">${sourceHtml}</div>` : ''}
@@ -342,7 +274,7 @@ export function renderRecipeDetailModalContent({
             </div>
           ` : ''}
           <div class="segmented-control" role="tablist">
-            <button type="button" role="tab" class="${servingMode === 'both' ? 'active' : ''}" onclick="switchPreviewServingMode('both')">Shared (${activeR.serves || 2})</button>
+            <button type="button" role="tab" class="${servingMode === 'both' ? 'active' : ''}" onclick="switchPreviewServingMode('both')">Shared (${baseServes})</button>
             <button type="button" role="tab" class="${servingMode === 'elliott' ? 'active' : ''}" onclick="switchPreviewServingMode('elliott')">👤 Elliott</button>
             <button type="button" role="tab" class="${servingMode === 'chloe' ? 'active' : ''}" onclick="switchPreviewServingMode('chloe')">👤 Chloe</button>
           </div>
@@ -354,14 +286,14 @@ export function renderRecipeDetailModalContent({
           ` : `
             <div style="display:flex;align-items:center;gap:6px;font-size:13px;">
               <label for="preview-single-serves" style="font-weight:650;color:var(--text)">Servings:</label>
-              <input type="number" id="preview-single-serves" name="previewSingleServes" value="${singleServes}" oninput="updateSinglePersonServes(this.value)" style="width:62px;min-height:34px;padding:4px 6px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-weight:700;text-align:center" min="1" step="1">
+              <input type="number" id="preview-single-serves" name="previewSingleServes" value="${singleServes}" oninput="updateSinglePersonServes(this.value, '${servingMode}')" style="width:62px;min-height:34px;padding:4px 6px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-weight:700;text-align:center" min="1" step="1">
             </div>
           `}
         </div>
 
         <!-- Right: Per-Portion Macro Breakdown Compact Cards -->
         <div class="recipe-modal-crossbar-macros">
-          ${macroCardsHtml}
+          ${macroCrossbarHtml}
         </div>
       </div>
 
@@ -376,7 +308,9 @@ export function renderRecipeDetailModalContent({
             <span>🥗 Ingredients</span>
             ${ingredientsCount > 0 ? `<span style="font-size:12px;font-weight:600;color:var(--text2)">${ingredientsCount} items</span>` : ''}
           </h3>
-          ${ingredientsHtml}
+          <div id="recipe-modal-ingredients-list">
+            ${ingredientsHtml}
+          </div>
         </div>
 
         <!-- Right Column: Method Steps -->

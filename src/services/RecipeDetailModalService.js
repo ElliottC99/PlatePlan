@@ -7,7 +7,7 @@
 
 import { renderRecipeDetailModalContent, formatRecipeIngredientRow, renderRecipeIngredientsListHTML } from '../components/recipe/RecipeDetailModalUI.js';
 import { isRecipeVariantFavourite } from '../views/RecipeVaultView.js';
-import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
+import { calculateMealFitScore, getFitScoreTierMeta, extractRecipeMacros } from '../utils/fitScoreCalculator.js';
 import { resolveMealSplitPercentages } from '../utils/nutritionCalculator.js';
 import { getState } from '../store/store.js';
 
@@ -45,34 +45,37 @@ export function switchPreviewServingMode(mode = 'both') {
 }
 
 function computeRecipeScaleMultiplier(activeR, mode, targetServes = 2, singleServes = 1) {
-  const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
-  const userPrefs = state.preferences || state.userPrefs || {};
-  const profiles = userPrefs.profiles || {};
-  const eProf = profiles.elliott || profiles.e || { dailyKcal: 1950 };
-  const cProf = profiles.chloe || profiles.c || { dailyKcal: 1350 };
-  const eDaily = Number(eProf.dailyKcal) || 1950;
-  const cDaily = Number(cProf.dailyKcal) || 1350;
+  const baseServes = Number(activeR.serves ?? activeR.servings ?? 2) || 2;
+  const targetServings = Number(targetServes) || baseServes;
+  const single = Number(singleServes) || 1;
 
-  const mealType = String(activeR.types?.[0] || activeR.type || 'dinner').toLowerCase();
-  const eSplits = resolveMealSplitPercentages ? resolveMealSplitPercentages(userPrefs, 'elliott').calories : { breakfast: 25, lunch: 30, snacking: 10, dinner: 35 };
-  const cSplits = resolveMealSplitPercentages ? resolveMealSplitPercentages(userPrefs, 'chloe').calories : { breakfast: 25, lunch: 30, snacking: 10, dinner: 35 };
-  const ePct = Number(eSplits[mealType] ?? eSplits.dinner ?? 35) / 100;
-  const cPct = Number(cSplits[mealType] ?? cSplits.dinner ?? 35) / 100;
+  if (mode === 'elliott' || mode === 'e' || mode === 'chloe' || mode === 'c') {
+    const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
+    const userPrefs = state.preferences || state.userPrefs || {};
+    const profiles = userPrefs.profiles || {};
+    const eProf = profiles.elliott || profiles.e || { dailyKcal: 1950 };
+    const cProf = profiles.chloe || profiles.c || { dailyKcal: 1350 };
+    const eDaily = Number(eProf.dailyKcal) || 1950;
+    const cDaily = Number(cProf.dailyKcal) || 1350;
 
-  const eMealTarget = eDaily * ePct;
-  const cMealTarget = cDaily * cPct;
+    const mealType = String(activeR.types?.[0] || activeR.type || 'dinner').toLowerCase();
+    const eSplits = typeof resolveMealSplitPercentages === 'function' ? resolveMealSplitPercentages(userPrefs, 'elliott').calories : { breakfast: 25, lunch: 30, snacking: 10, dinner: 35 };
+    const cSplits = typeof resolveMealSplitPercentages === 'function' ? resolveMealSplitPercentages(userPrefs, 'chloe').calories : { breakfast: 25, lunch: 30, snacking: 10, dinner: 35 };
+    const ePct = Number(eSplits[mealType] ?? eSplits.dinner ?? 35) / 100;
+    const cPct = Number(cSplits[mealType] ?? cSplits.dinner ?? 35) / 100;
 
-  const baseKcalTotal = Number(activeR.calories || activeR.kcal || activeR.totalCalories || 500);
-  const baseServes = Number(activeR.serves ?? 2) || 2;
-  const baseKcalPerServing = baseKcalTotal > 0 ? (baseKcalTotal / baseServes) : 500;
+    const eMealTarget = eDaily * ePct;
+    const cMealTarget = cDaily * cPct;
+    const totalKcalBudget = eMealTarget + cMealTarget;
+    const eShare = totalKcalBudget > 0 ? (eMealTarget / totalKcalBudget) : 0.59;
+    const cShare = totalKcalBudget > 0 ? (cMealTarget / totalKcalBudget) : 0.41;
 
-  if (mode === 'elliott' || mode === 'e') {
-    return eMealTarget / Math.max(100, baseKcalPerServing);
+    const splitRatio = (mode === 'elliott' || mode === 'e') ? eShare : cShare;
+    return (splitRatio * 2 / baseServes) * single;
   }
-  if (mode === 'chloe' || mode === 'c') {
-    return cMealTarget / Math.max(100, baseKcalPerServing);
-  }
-  return ((eMealTarget + cMealTarget) / Math.max(100, baseKcalPerServing)) * (targetServes / baseServes);
+
+  // When "Shared (2)" is selected, the multiplier should strictly be (targetServings / baselineServings).
+  return targetServings / baseServes;
 }
 
 export function updateRecipePreviewScale(val) {
@@ -121,17 +124,26 @@ export function updateSinglePersonServes(val, person = 'elliott') {
 
 function renderComparisonBadge(actual, target) {
   if (!target || target <= 0) return '';
-  const diffPct = Math.round(((actual - target) / target) * 100);
-  if (Math.abs(diffPct) <= 5) {
-    return `<span class="tag" style="background:rgba(16,185,129,0.12);color:var(--green,#10b981);font-weight:700;font-size:10px;padding:2px 5px">On target</span>`;
+  const diff = actual - target;
+  const pctDiff = Math.round((diff / target) * 100);
+  const isNear = Math.abs(pctDiff) <= 10;
+  const isOver = pctDiff > 10;
+
+  let bg = 'rgba(16,185,129,0.12)';
+  let color = '#059669';
+  let label = 'On Target';
+
+  if (isOver) {
+    bg = 'rgba(239,68,68,0.12)';
+    color = '#dc2626';
+    label = `+${Math.abs(pctDiff)}%`;
+  } else if (!isNear) {
+    bg = 'rgba(245,158,11,0.12)';
+    color = '#d97706';
+    label = `${pctDiff}%`;
   }
-  const isBelow = diffPct < 0;
-  const absDiff = Math.abs(diffPct);
-  const label = `${absDiff}% ${isBelow ? '↓' : '↑'}`;
-  const isModerate = absDiff <= 20;
-  const color = isModerate ? 'var(--amber,#f59e0b)' : 'var(--red,#ef4444)';
-  const bg = isModerate ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)';
-  return `<span class="tag" style="background:${bg};color:${color};font-weight:700;font-size:10px;padding:2px 5px">${label}</span>`;
+
+  return `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${bg};color:${color};line-height:1">${label}</span>`;
 }
 
 export function renderRecipePreview() {
@@ -140,7 +152,7 @@ export function renderRecipePreview() {
 
   const r = previewState.recipe;
   const isEnh = previewState.currentTab === 'enhanced' && !!r.enhanced;
-  const hasEnh = !!r.enhanced;
+  const hasEnh = Boolean(r.enhanced || (r.variants && r.variants.enhanced));
   const activeR = isEnh 
     ? { ...r, ...r.enhanced, ingredients: r.enhanced.ingredients || r.ingredients }
     : r;
@@ -150,7 +162,7 @@ export function renderRecipePreview() {
   const mealType = types[0] || 'dinner';
   const baseServes = Number(activeR?.serves || activeR?.servings || r?.serves || r?.servings || 2) || 2;
 
-  // Calorie-driven scale multiplier for ingredients
+  // Multiplier for ingredients
   const scaleMultiplier = computeRecipeScaleMultiplier(activeR, previewState.servingMode, previewState.targetServes, previewState.singleServes);
 
   // Render ingredients list handling all schema variations & sections
@@ -180,52 +192,115 @@ export function renderRecipePreview() {
     </div>
   ` : '<div style="color:var(--text3);font-size:13px">No method steps specified.</div>';
 
-  const baseKcal = Number(activeR.calories ?? activeR.kcal ?? 0);
-  const baseProt = Number(activeR.protein ?? activeR.prot ?? 0);
-  const eProf = state.preferences?.profiles?.elliott || state.userPrefs?.profiles?.elliott || { dailyKcal: 1950 };
-  const cProf = state.preferences?.profiles?.chloe || state.userPrefs?.profiles?.chloe || { dailyKcal: 1350 };
-  const eSplits = resolveMealSplitPercentages ? resolveMealSplitPercentages(state.preferences || state.userPrefs, 'elliott').calories : { dinner: 35 };
-  const cSplits = resolveMealSplitPercentages ? resolveMealSplitPercentages(state.preferences || state.userPrefs, 'chloe').calories : { dinner: 35 };
-  const ePct = Number(eSplits[mealType] ?? eSplits.dinner ?? 35) / 100;
-  const cPct = Number(cSplits[mealType] ?? cSplits.dinner ?? 35) / 100;
-  const eTargetKcal = Number(eProf.dailyKcal || 1950) * ePct;
-  const cTargetKcal = Number(cProf.dailyKcal || 1350) * cPct;
+  // Dual Macro Split Calculations
+  const userPrefs = state.preferences || state.userPrefs || {};
+  const profiles = userPrefs.profiles || {};
+  const eProf = profiles.elliott || profiles.e || { dailyKcal: 1950, dailyProtein: 140 };
+  const cProf = profiles.chloe || profiles.c || { dailyKcal: 1350, dailyProtein: 100 };
+  const eDailyKcal = Number(eProf.dailyKcal) || 1950;
+  const cDailyKcal = Number(cProf.dailyKcal) || 1350;
+  const eDailyProt = Number(eProf.dailyProtein) || 140;
+  const cDailyProt = Number(cProf.dailyProtein) || 100;
 
-  const totalKcalBudget = eTargetKcal + cTargetKcal;
-  const eShare = totalKcalBudget > 0 ? (eTargetKcal / totalKcalBudget) : 0.59;
-  const cShare = totalKcalBudget > 0 ? (cTargetKcal / totalKcalBudget) : 0.41;
+  const eSplits = typeof resolveMealSplitPercentages === 'function' ? resolveMealSplitPercentages(userPrefs, 'elliott') : { calories: { dinner: 35 }, protein: { dinner: 35 } };
+  const cSplits = typeof resolveMealSplitPercentages === 'function' ? resolveMealSplitPercentages(userPrefs, 'chloe') : { calories: { dinner: 35 }, protein: { dinner: 35 } };
+  const eCalPct = Number(eSplits.calories?.[mealType] ?? eSplits.calories?.dinner ?? 35) / 100;
+  const cCalPct = Number(cSplits.calories?.[mealType] ?? cSplits.calories?.dinner ?? 35) / 100;
+  const eProtPct = Number(eSplits.protein?.[mealType] ?? eSplits.protein?.dinner ?? 35) / 100;
+  const cProtPct = Number(cSplits.protein?.[mealType] ?? cSplits.protein?.dinner ?? 35) / 100;
 
-  const batchServes = previewState.servingMode === 'both' ? previewState.targetServes : previewState.singleServes;
-  const eKcal = Math.round(baseKcalTotalVal(baseKcal, baseServes, batchServes) * eShare);
-  const cKcal = Math.round(baseKcalTotalVal(baseKcal, baseServes, batchServes) * cShare);
+  const eMealTargetKcal = Math.round(eDailyKcal * eCalPct);
+  const cMealTargetKcal = Math.round(cDailyKcal * cCalPct);
+  const eMealTargetProt = Math.round(eDailyProt * eProtPct);
+  const cMealTargetProt = Math.round(cDailyProt * cProtPct);
+
+  const totalKcalBudget = eMealTargetKcal + cMealTargetKcal;
+  const eShare = totalKcalBudget > 0 ? (eMealTargetKcal / totalKcalBudget) : 0.59;
+  const cShare = totalKcalBudget > 0 ? (cMealTargetKcal / totalKcalBudget) : 0.41;
+  const eSharePct = Math.round(eShare * 100);
+  const cSharePct = Math.round(cShare * 100);
+
+  const macros = typeof extractRecipeMacros === 'function' ? extractRecipeMacros(r, isEnh ? 'enhanced' : 'original') : {};
+  const perServCal = Number(macros.cal ?? macros.calories ?? activeR.calories ?? 450);
+  const perServProt = Number(macros.prot ?? macros.protein ?? activeR.protein ?? 28);
+
+  const batchServings = previewState.servingMode === 'both' ? previewState.targetServes : 2;
+  const batchCal = perServCal * batchServings;
+  const batchProt = perServProt * batchServings;
+
+  const eKcal = Math.round(batchCal * eShare);
+  const eProt = Math.round((batchProt * eShare) * 10) / 10;
+  const cKcal = Math.round(batchCal * cShare);
+  const cProt = Math.round((batchProt * cShare) * 10) / 10;
+
+  const eCalBadge = renderComparisonBadge(eKcal, eMealTargetKcal);
+  const eProtBadge = renderComparisonBadge(eProt, eMealTargetProt);
+  const cCalBadge = renderComparisonBadge(cKcal, cMealTargetKcal);
+  const cProtBadge = renderComparisonBadge(cProt, cMealTargetProt);
+
+  const macroSplitHtml = `
+    <div class="recipe-modal-crossbar-macros" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4); font-size: 11.5px;">
+        <span style="font-weight:700;">👤 Elliott (${eSharePct}%):</span>
+        <span>🔥 <strong>${eKcal} kcal</strong> ${eCalBadge}</span>
+        <span>🥩 <strong>${eProt}g</strong> ${eProtBadge}</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4); font-size: 11.5px;">
+        <span style="font-weight:700;">👤 Chloe (${cSharePct}%):</span>
+        <span>🔥 <strong>${cKcal} kcal</strong> ${cCalBadge}</span>
+        <span>🥩 <strong>${cProt}g</strong> ${cProtBadge}</span>
+      </div>
+    </div>
+  `;
+
+  // Fit score calculation
+  const fitResult = typeof calculateMealFitScore === 'function' ? calculateMealFitScore(activeR, mealType, {
+    activeProfile: previewState.servingMode === 'both' ? 'everyone' : previewState.servingMode,
+    variant: isEnh ? 'enhanced' : 'original',
+    portionScaled: true
+  }) : null;
+  const fitScore = Math.round(Number(fitResult?.score) || 0);
+  const meta = typeof getFitScoreTierMeta === 'function' ? getFitScoreTierMeta(fitScore) : { tier: 'red', icon: '🔴', label: 'Poor Match', color: '#ef4444', bg: '#fee2e2', text: '#7f1d1d', border: '#fca5a5' };
+  const fitPillHtml = `<span class="badge ${meta.tier}" style="background:${meta.bg};color:${meta.text};border:1px solid ${meta.border}">${meta.icon} ${fitScore}% - ${meta.label}</span>`;
 
   modalContent.innerHTML = renderRecipeDetailModalContent({
+    r,
     recipe: activeR,
-    variantTab: previewState.currentTab,
+    activeR,
+    hasEnh,
     hasEnhanced: hasEnh,
+    isEnh,
+    isFav,
     isFavourite: isFav,
+    variantTab: previewState.currentTab,
     servingMode: previewState.servingMode,
     targetServes: previewState.targetServes,
     singleServes: previewState.singleServes,
+    mealType,
+    baseServes,
     ingredientsHtml,
     methodHtml,
+    macroSplitHtml,
+    macroCardsHtml: macroSplitHtml,
+    fitPillHtml,
+    fitBadgeHtml: fitPillHtml,
     eKcal,
     cKcal,
-    eTargetKcal: Math.round(eTargetKcal),
-    cTargetKcal: Math.round(cTargetKcal),
-    eBadge: renderComparisonBadge(eKcal, Math.round(eTargetKcal)),
-    cBadge: renderComparisonBadge(cKcal, Math.round(cTargetKcal))
+    eProt,
+    cProt,
+    eSharePct,
+    cSharePct,
+    eTargetKcal: eMealTargetKcal,
+    cTargetKcal: cMealTargetKcal,
+    eTargetProt: eMealTargetProt,
+    cTargetProt: cMealTargetProt
   });
 
   const modalWrap = document.getElementById('view-modal-wrap');
   if (modalWrap) {
     modalWrap.classList.add('open');
   }
-}
-
-function baseKcalTotalVal(baseKcal, baseServes, batchServes) {
-  if (baseKcal > 0) return baseKcal * (batchServes / baseServes);
-  return 500 * batchServes;
 }
 
 export function openRecipePreview(recipeId, initialTab = 'original') {
