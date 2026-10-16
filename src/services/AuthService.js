@@ -38,6 +38,11 @@ export function waitForAuth() {
           authLogged = true;
           console.warn('[AuthService] No user session detected.');
         }
+        try {
+          window.firebase.auth().signInAnonymously();
+        } catch (e) {
+          console.warn('[AuthService] Anonymous login failed:', e);
+        }
         resolve(null);
       }
     }, error => {
