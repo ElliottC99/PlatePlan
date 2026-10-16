@@ -1,12 +1,12 @@
 /**
- * src/components/planner/PlannerSkeletonGridUI.js (v3.20.14)
+ * src/components/planner/PlannerSkeletonGridUI.js (v3.31.12)
  * Dual-Dot Fit Score Scope Timeline, Pre-Generation Interactive Skeleton Grid,
  * and Split Household Slot Configurator (Elliott & Chloe) with Unified Fit & Duplication Badges.
  */
 
 import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
-import { saveCurrentPlan } from '../../repositories/HouseholdRepository.js';
+import { saveCurrentPlan } from '../../services/HouseholdRepository.js';
 
 function resolveRecipeName(recipeId, fallback = '') {
   if (!recipeId) return fallback || '';
