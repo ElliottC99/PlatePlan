@@ -102,11 +102,12 @@ export function initNavigationDelegation() {
   navContainer.dataset.navDelegated = 'true';
 
   navContainer.addEventListener('click', (e) => {
+    const actionEl = e.target.closest('[data-action="navigate-view"]');
     const viewEl = e.target.closest('[data-view]');
-    if (!viewEl) return;
-    const actionEl = e.target.closest('[data-action]');
-    const isNavAction = actionEl && actionEl.dataset.action === 'navigate-view';
-    if (isNavAction || viewEl.classList.contains('ntab') || viewEl.closest('#mobile-nav')) {
+    
+    if (actionEl && viewEl) {
+      e.preventDefault();
+      e.stopPropagation();
       const viewId = viewEl.dataset.view;
       if (viewId && viewId !== 'more') {
         if (typeof window.showView === 'function') {

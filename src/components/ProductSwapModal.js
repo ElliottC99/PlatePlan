@@ -9,6 +9,19 @@ import { saveCurrentPlan } from '../services/HouseholdRepository.js';
 import { calculateShoppingItemCost } from '../services/ShoppingCalculationService.js';
 import { setShoppingList } from '../store/store.js';
 
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+function escapeAttr(str) {
+    return escapeHtml(str);
+}
+
 const DEFAULT_SUBTYPE_MAP = {
   onion: 'Alliums', garlic: 'Alliums', shallot: 'Alliums', leek: 'Alliums',
   carrot: 'Root Vegetables', potato: 'Root Vegetables', parsnip: 'Root Vegetables',
