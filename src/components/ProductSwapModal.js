@@ -111,6 +111,7 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     targetIngId && 
     (p.ingredientId === targetIngId || p.groupId === targetIngId)
   );
+  const tier3Items = products;
   const targetSubtype = inferSubtype(targetItem);
 
   let currentSort = 'relevance', currentScope = (ctx?.instanceId || window.currentPreviewInstanceId) ? 'recipe' : 'global', currentTierTab = 'tier1', selectedSubstituteProduct = null;
@@ -194,11 +195,11 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     const matchesQuery = (item) => !cleanQ || (item.name?.toLowerCase().includes(cleanQ) || item.brand?.toLowerCase().includes(cleanQ) || inferSubtype(item).toLowerCase().includes(cleanQ));
     let displayItems = [];
     if (currentTierTab === 'tier1') {
-      displayItems = sortItems((tier1Items || tier1Subtypes).filter(matchesQuery));
+      displayItems = sortItems(tier1Items.filter(matchesQuery));
     } else if (currentTierTab === 'tier2') {
       displayItems = sortItems(tier2Items.filter(matchesQuery));
     } else {
-      displayItems = sortItems(products.filter(p => p.id !== targetItem?.id && matchesQuery(p))).slice(0, 50);
+      displayItems = sortItems(tier3Items.filter(p => p.id !== targetItem?.id && matchesQuery(p))).slice(0, 50);
     }
 
     if (displayItems.length === 0) {
