@@ -23,6 +23,11 @@ app.get('/', (req, res) => {
 });
 
 app.get('*', (req, res) => {
+  // Return clean 404 for missing asset/module files to prevent HTML fallback SyntaxErrors
+  const ext = path.extname(req.path);
+  if (ext && ext !== '.html') {
+    return res.status(404).send('Asset Not Found');
+  }
   res.sendFile(path.join(staticDir, 'PlatePlan.html'));
 });
 

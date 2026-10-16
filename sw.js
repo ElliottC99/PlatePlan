@@ -4,21 +4,21 @@
  * Caches core app shell, modern ES6 modules, stylesheets, and icons.
  */
 
-const PLATEPLAN_CACHE = 'plateplan-cache-v3.31.24';
-const PLATEPLAN_STORE_CACHE = 'plateplan_store_cache_v3.31.24';
-const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.31.24';
-const PLATEPLAN_APP_VERSION = 'v3.31.24';
-const PLATEPLAN_BUILD_ID = '3.31.24-v3124';
+const PLATEPLAN_CACHE = 'plateplan-cache-v3.31.25';
+const PLATEPLAN_STORE_CACHE = 'plateplan_store_cache_v3.31.25';
+const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.31.25';
+const PLATEPLAN_APP_VERSION = 'v3.31.25';
+const PLATEPLAN_BUILD_ID = '3.31.25-v3125';
 
 const PLATEPLAN_PRECACHE_ASSETS = [
   '/',
   '/PlatePlan.html',
   '/manifest.json',
   '/firebase-config.js',
-  '/styles/tokens.css?v=3.31.24',
-  '/styles/components.css?v=3.31.24',
-  '/styles/responsive.css?v=3.31.24',
-  '/styles/print.css?v=3.31.24',
+  '/styles/tokens.css?v=3.31.25',
+  '/styles/components.css?v=3.31.25',
+  '/styles/responsive.css?v=3.31.25',
+  '/styles/print.css?v=3.31.25',
   '/src/main.js',
   '/src/store/store.js',
   '/src/config/firebase.js',
@@ -26,7 +26,6 @@ const PLATEPLAN_PRECACHE_ASSETS = [
   '/src/services/HydrationService.js',
   '/src/services/HouseholdRepository.js',
   '/src/services/TescoImportService.js',
-  '/src/services/RecipeOcrService.js',
   '/src/services/NutritionService.js',
   '/src/services/FitScoreService.js',
   '/src/services/DataQualityService.js',

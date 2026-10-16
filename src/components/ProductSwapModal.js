@@ -97,16 +97,17 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   }
 
   // Tier 1: Exact Same Sub-Type (Must match targetSubId strictly)
-  const tier1Subtypes = products.filter(p => 
+  const tier1Items = products.filter(p => 
     p.id !== targetItem?.id && 
     targetSubId && 
     (p.subTypeId === targetSubId || p.subtypeId === targetSubId)
   );
+  const tier1Subtypes = tier1Items;
 
   // Tier 2: Same Item Family, Different Sub-Type. Explicitly EXCLUDE Tier 1 matches.
   const tier2Items = products.filter(p => 
     p.id !== targetItem?.id && 
-    !tier1Subtypes.some(t => t.id === p.id) && 
+    !tier1Items.some(t => t.id === p.id) && 
     targetIngId && 
     (p.ingredientId === targetIngId || p.groupId === targetIngId)
   );
@@ -193,7 +194,7 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     const matchesQuery = (item) => !cleanQ || (item.name?.toLowerCase().includes(cleanQ) || item.brand?.toLowerCase().includes(cleanQ) || inferSubtype(item).toLowerCase().includes(cleanQ));
     let displayItems = [];
     if (currentTierTab === 'tier1') {
-      displayItems = sortItems(tier1Subtypes.filter(matchesQuery));
+      displayItems = sortItems((tier1Items || tier1Subtypes).filter(matchesQuery));
     } else if (currentTierTab === 'tier2') {
       displayItems = sortItems(tier2Items.filter(matchesQuery));
     } else {
