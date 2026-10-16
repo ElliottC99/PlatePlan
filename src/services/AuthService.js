@@ -16,6 +16,15 @@ export function waitForAuth() {
       return reject(new Error("[AuthService] Firebase Auth SDK not found."));
     }
 
+    if (!window.firebase.apps || window.firebase.apps.length === 0) {
+      if (window.PLATEPLAN_FIREBASE && window.PLATEPLAN_FIREBASE.config) {
+        window.firebase.initializeApp(window.PLATEPLAN_FIREBASE.config);
+      } else {
+        authPromise = null;
+        return reject(new Error("[AuthService] Firebase not initialized."));
+      }
+    }
+
     const current = window.firebase.auth().currentUser;
     if (current) {
       if (!authLogged) {
