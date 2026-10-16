@@ -1,5 +1,5 @@
 /**
- * src/services/RecipeDetailModalService.js (v3.31.17)
+ * src/services/RecipeDetailModalService.js (v3.31.18)
  * ES6 Recipe Detail Modal Coordinator & Lifecycle Manager.
  * Orchestrates recipe inspection, calorie-driven portion scaling, enhanced variant switching,
  * and live HSL Lerp fit score badge generation with zero layout shifts.
@@ -148,7 +148,7 @@ export function renderRecipePreview() {
   const isFav = isRecipeVariantFavourite(r.id, previewState.currentTab);
   const types = r.types || [r.type || 'dinner'];
   const mealType = types[0] || 'dinner';
-  const serves = Number(activeR.serves ?? r.serves ?? 2) || 2;
+  const baseServes = Number(activeR?.serves || activeR?.servings || r?.serves || r?.servings || 2) || 2;
 
   // Calorie-driven scale multiplier for ingredients
   const scaleMultiplier = computeRecipeScaleMultiplier(activeR, previewState.servingMode, previewState.targetServes, previewState.singleServes);
