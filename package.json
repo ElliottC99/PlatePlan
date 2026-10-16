@@ -1,6 +1,6 @@
 {
   "name": "plateplan",
-  "version": "3.31.15",
+  "version": "3.31.16",
   "type": "module",
   "scripts": {
     "dev": "node server.js",

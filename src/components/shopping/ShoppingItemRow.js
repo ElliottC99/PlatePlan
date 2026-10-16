@@ -1,5 +1,5 @@
 /**
- * src/components/shopping/ShoppingItemRow.js (v3.31.15)
+ * src/components/shopping/ShoppingItemRow.js (v3.31.16)
  * UI component for individual shopping list items, quantity adjustments,
  * check-off toggles, recipe usage breakdown accordion drawers, and inline product brand substitution drawers.
  */
@@ -23,7 +23,9 @@ export function renderShoppingItemRow(item) {
     ? ((item.bankIng.brand ? item.bankIng.brand + ' - ' : '') + (item.bankIng.name || item.name))
     : (item.name || 'Store product');
 
-  const formattedQty = (item.buyQty !== undefined ? item.buyQty : (item.needQty || item.qty || 1)) + (item.unit ? ` ${item.unit}` : 'x');
+  const formattedQty = item.requiredQty !== undefined && item.requiredQty !== null
+    ? `${item.requiredQty}${item.unit || ''}`
+    : `${item.buyQty || item.needQty || 1}${item.unit || ''}`;
 
   const costDisplay = (item.bankIng && item.cost > 0)
     ? `<div style="font-weight: 600; color: var(--action, #0969da); margin-top: 2px;">£${Number(item.cost).toFixed(2)}</div>`
@@ -45,7 +47,7 @@ export function renderShoppingItemRow(item) {
         <span class="primary-subtype" style="${isChecked ? 'text-decoration: line-through; opacity: 0.6;' : 'font-weight: 600; color: #1C1C1E;'}; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(item.name)}</span>
         <span class="secondary-brand-title" style="font-size: 13px; color: #8E8E93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">${escapeHtml(brandTitle)}</span>
         ${hasBreakdown ? `
-          <button type="button" id="breakdown-btn-${escapeAttr(item.key)}" class="btn sm ghost btn-recipe-breakdown" style="font-size: 11px; padding: 2px 6px; margin-top: 4px; align-self: flex-start; color: #007AFF;" onclick="toggleItemBreakdown('${escapeAttr(item.key)}')">
+          <button type="button" id="breakdown-btn-${escapeAttr(item.key)}" class="btn xs ghost btn-recipe-breakdown" data-action="toggle-recipe-breakdown" style="font-size: 11px; padding: 4px 8px; margin-top: 4px; align-self: flex-start; color: #007AFF;" onclick="toggleItemBreakdown('${escapeAttr(item.key)}')">
             ▼ Recipe Breakdown
           </button>
         ` : ''}
@@ -59,7 +61,7 @@ export function renderShoppingItemRow(item) {
       </div>
     </div>
     ${hasBreakdown ? `
-      <div id="breakdown-drawer-${escapeAttr(item.key)}" style="display:none; background: #F8FAFC; border-bottom: 1px solid #E5E5EA; padding: 10px 16px 12px 52px; flex-direction: column; gap: 6px;">
+      <div id="breakdown-drawer-${escapeAttr(item.key)}" class="recipe-breakdown-drawer" style="display:none; background: #F8FAFC; border-bottom: 1px solid #E5E5EA; padding: 10px 16px 12px 52px; flex-direction: column; gap: 6px;">
         <div style="font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.03em;">Recipe Usage Breakdown:</div>
         ${recipeSummary.map(r => `
           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #1E293B;">
