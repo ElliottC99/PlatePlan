@@ -81,35 +81,35 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
 
   const { item: targetItem, group: targetGroup } = resolveTargetItem(param1, param2, param3);
   const products = Array.isArray(window.state?.products) ? window.state.products : [];
-  const targetSubId = targetItem?.bankIng?.subTypeId || targetItem?.bankIng?.subtypeId || targetItem?.subTypeId || targetItem?.subtypeId;
-  const targetIngId = targetItem?.bankIng?.ingredientId || targetItem?.groupId || targetItem?.ingredientId;
+  const ingredients = Array.isArray(window.state?.ingredients) ? window.state.ingredients : [];
+
+  const targetIngId = targetItem?.groupId || targetItem?.ingredientId || targetItem?.bankIng?.ingredientId;
+
+  // Bulletproof subTypeId resolution
+  let targetSubId = targetItem?.bankIng?.subTypeId || targetItem?.bankIng?.subtypeId || targetItem?.subTypeId || targetItem?.subtypeId;
+  if (!targetSubId && targetIngId) {
+    const parentIng = ingredients.find(i => String(i.id) === String(targetIngId));
+    if (parentIng && Array.isArray(parentIng.subtypes)) {
+      const matchedSub = parentIng.subtypes.find(s => s.name === targetItem.name) || parentIng.subtypes[0];
+      targetSubId = matchedSub?.id;
+    }
+  }
+
+  // Tier 1: Exact Same Sub-Type (Must match targetSubId strictly)
+  const tier1Subtypes = products.filter(p => 
+    p.id !== targetItem?.id && 
+    targetSubId && 
+    (p.subTypeId === targetSubId || p.subtypeId === targetSubId)
+  );
+
+  // Tier 2: Same Item Family, Different Sub-Type. Explicitly EXCLUDE Tier 1 matches.
+  const tier2Items = products.filter(p => 
+    p.id !== targetItem?.id && 
+    !tier1Subtypes.some(t => t.id === p.id) && 
+    targetIngId && 
+    (p.ingredientId === targetIngId || p.groupId === targetIngId)
+  );
   const targetSubtype = inferSubtype(targetItem);
-  const targetName = String(targetItem?.name || targetItem?.bankIng?.name || '').toLowerCase();
-
-  // Keyword clustering tokens from target item name
-  const targetWords = targetName
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length > 2 && !['organic', 'fresh', 'tesco', 'british', 'sliced', 'diced', 'chopped', 'whole', 'pack'].includes(w));
-
-  // Tier 1 (Exact Same Sub-Type): Filter for products sharing exact sub-type ID or inferSubtype match
-  const tier1Subtypes = products.filter(p => {
-    if (p.id === targetItem?.id || p.id === targetItem?.bankIng?.id) return false;
-    if (targetSubId && (p.subTypeId === targetSubId || p.subtypeId === targetSubId)) return true;
-    if (targetSubtype && inferSubtype(p) === targetSubtype) return true;
-    return false;
-  });
-
-  // Tier 2 (Item Family): Filter for products sharing ingredient/item family ID or keyword cluster, excluding Tier 1
-  const tier2Items = products.filter(p => {
-    if (p.id === targetItem?.id || p.id === targetItem?.bankIng?.id) return false;
-    if (tier1Subtypes.some(t => t.id === p.id)) return false;
-    if (targetIngId && (p.ingredientId === targetIngId || p.groupId === targetIngId)) return true;
-    const pName = (p.name || '').toLowerCase();
-    if (targetWords.length > 0 && targetWords.some(w => pName.includes(w))) return true;
-    if (targetName.length > 2 && (pName.includes(targetName) || targetName.includes(pName))) return true;
-    return false;
-  });
 
   let currentSort = 'relevance', currentScope = (ctx?.instanceId || window.currentPreviewInstanceId) ? 'recipe' : 'global', currentTierTab = 'tier1', selectedSubstituteProduct = null;
 
@@ -290,10 +290,11 @@ export async function executeSwapInState(param1, param2, newProduct, scope = 'gl
       const items = Array.isArray(group.items) ? group.items : (Array.isArray(group) ? group : []);
       items.forEach(item => {
         if (!item) return;
-        if (item.id === targetKey || item.key === targetKey || item.ingredientId === targetKey || (targetName && item.name === targetName)) {
+        if (item.id === targetKey || item.key === targetKey || item.groupId === targetKey || item.ingredientId === targetKey || (targetName && item.name === targetName)) {
           item.name = newProduct.name;
           item.brand = newProduct.brand || '';
-          item.ingredientId = newProduct.id || item.ingredientId;
+          item.ingredientId = newProduct.ingredientId || item.ingredientId;
+          item.groupId = newProduct.ingredientId || item.groupId || item.groupId;
           item.bankIng = newProduct;
           const costCalc = calculateShoppingItemCost(item, newProduct);
           item.price = Number(costCalc.price);

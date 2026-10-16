@@ -31,7 +31,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * src/main.js (v3.31.22)
+ * src/main.js (v3.31.23)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  * Manages unidirectional state subscriptions, cross-view reactive synchronisation,
  * instant offline caching, global error telemetry, and PWA service worker registration.
@@ -354,7 +354,7 @@ function setupSubscriptions() {
 }
 
 // 7. APPLICATION BOOTSTRAP
-export const APP_VERSION = 'v3.31.22';
+export const APP_VERSION = 'v3.31.23';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
