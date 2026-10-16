@@ -18,7 +18,13 @@ export async function getInventory() {
   try {
     if (!isDbAvailable()) return [];
     const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('inventory');
-    const snap = await colRef.get();
+    const snapPromise = colRef.get();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Inventory fetch timeout')), 2500)
+    );
+    const snap = await Promise.race([snapPromise, timeoutPromise]).catch(async () => {
+      try { return await colRef.get({ source: 'cache' }); } catch (_e) { return null; }
+    });
     if (!snap || !snap.docs) return [];
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (err) {

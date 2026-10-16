@@ -231,7 +231,14 @@ export async function hydrateHouseholdData() {
   inFlightHydration = (async () => {
     try {
       const [recipes, rawIngredients, rawProducts, preferencesData, legacyPlan, rawCategories, inventoryItems, subcollPlan] = await Promise.all([
-        getRecipes(), getIngredients(), getProducts(), getPreferences(), getCurrentPlan(), getCategories(), getInventory(), getActivePlanFromSubcollection()
+        getRecipes().catch(e => { console.warn('[HydrationService] getRecipes fallback:', e?.message || e); return []; }),
+        getIngredients().catch(e => { console.warn('[HydrationService] getIngredients fallback:', e?.message || e); return []; }),
+        getProducts().catch(e => { console.warn('[HydrationService] getProducts fallback:', e?.message || e); return []; }),
+        getPreferences().catch(e => { console.warn('[HydrationService] getPreferences fallback:', e?.message || e); return null; }),
+        getCurrentPlan().catch(e => { console.warn('[HydrationService] getCurrentPlan fallback:', e?.message || e); return null; }),
+        getCategories().catch(e => { console.warn('[HydrationService] getCategories fallback:', e?.message || e); return []; }),
+        getInventory().catch(e => { console.warn('[HydrationService] getInventory fallback:', e?.message || e); return []; }),
+        getActivePlanFromSubcollection().catch(e => { console.warn('[HydrationService] getActivePlan fallback:', e?.message || e); return null; })
       ]);
       const plan = subcollPlan || legacyPlan;
 
@@ -267,13 +274,42 @@ export async function hydrateHouseholdData() {
       const products = (rawProducts || []).map(normalizeProductRecord);
       const { categories: mergedCategories, mutated } = mergeCanonicalCategories(rawCategories);
 
-      setRecipes(recipes);
-      setIngredients(ingredients);
-      setProducts(products);
-      setPreferences(sanitizedPrefs);
-      setCurrentPlan(plan);
-      setCategories(mergedCategories);
-      setInventory(inventoryItems || []);
+      // Preserve local state if cloud returned empty/failed
+      const currentStoreState = (typeof window !== 'undefined' && window.Store?.getState?.()) || {};
+
+      if (Array.isArray(recipes) && recipes.length > 0) {
+        setRecipes(recipes);
+      } else if (!currentStoreState.recipes || currentStoreState.recipes.length === 0) {
+        setRecipes([]);
+      }
+
+      if (Array.isArray(ingredients) && ingredients.length > 0) {
+        setIngredients(ingredients);
+      } else if (!currentStoreState.ingredients || currentStoreState.ingredients.length === 0) {
+        setIngredients([]);
+      }
+
+      if (Array.isArray(products) && products.length > 0) {
+        setProducts(products);
+      } else if (!currentStoreState.products || currentStoreState.products.length === 0) {
+        setProducts([]);
+      }
+
+      if (sanitizedPrefs && Object.keys(sanitizedPrefs).length > 0) {
+        setPreferences(sanitizedPrefs);
+      }
+
+      if (plan) {
+        setCurrentPlan(plan);
+      }
+
+      if (Array.isArray(mergedCategories) && mergedCategories.length > 0) {
+        setCategories(mergedCategories);
+      }
+
+      if (Array.isArray(inventoryItems) && inventoryItems.length > 0) {
+        setInventory(inventoryItems);
+      }
 
       if (mutated) {
         saveCategories(mergedCategories).catch(err => console.warn('[HydrationService] Failed to persist merged canonical categories:', err));
@@ -292,7 +328,10 @@ export async function hydrateHouseholdData() {
           window.state.userPrefs.autoDefaultStrategy = strat;
           window.state.userPrefs.autoDefaultCriterion = strat;
         }
-        window.state.isCloudHydrated = true;
+        const cloudHasData = (Array.isArray(recipes) && recipes.length > 0) || (Array.isArray(ingredients) && ingredients.length > 0) || Boolean(plan);
+        if (cloudHasData) {
+          window.state.isCloudHydrated = true;
+        }
         window.state.ingredients = ingredients;
         window.state.products = products;
         window.state.categories = mergedCategories;
@@ -303,7 +342,7 @@ export async function hydrateHouseholdData() {
           }
         }
 
-        await sweepAndRecalibrateIngredientDefaults();
+        await sweepAndRecalibrateIngredientDefaults().catch(() => {});
 
         window.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: window.state.ingredients }));
         window.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: products }));
@@ -397,7 +436,7 @@ export async function hydrateHouseholdData() {
         hydrationLogged = true;
         console.log('[HydrationService] Household data hydrated successfully into Store and persisted to local cache.');
       }
-      return { success: true, timestamp: Date.now() };
+      return { success: Boolean(cloudHasData), timestamp: Date.now() };
     } catch (err) {
       console.error('[HydrationService] Hydration failed:', err);
       return { success: false, error: err };

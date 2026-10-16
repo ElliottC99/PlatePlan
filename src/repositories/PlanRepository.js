@@ -45,7 +45,14 @@ export async function savePlan(plan) {
 export async function getPlan(planId) {
   try {
     if (!isDbAvailable() || !planId) return null;
-    const docSnap = await db.collection('households').doc(HOUSEHOLD_ID).collection('plans').doc(planId).get();
+    const docRef = db.collection('households').doc(HOUSEHOLD_ID).collection('plans').doc(planId);
+    const snapPromise = docRef.get();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Plan fetch timeout')), 2500)
+    );
+    const docSnap = await Promise.race([snapPromise, timeoutPromise]).catch(async () => {
+      try { return await docRef.get({ source: 'cache' }); } catch (_e) { return null; }
+    });
     return (docSnap && docSnap.exists) ? { id: docSnap.id, ...docSnap.data() } : null;
   } catch (err) {
     console.warn('[PlanRepository] Error fetching plan:', err.message || err);

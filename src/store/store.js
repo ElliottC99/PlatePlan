@@ -57,17 +57,56 @@ function openIDB() {
 export async function loadStateCache() {
   try {
     const db = await openIDB();
-    return new Promise((resolve, reject) => {
+    const idbData = await new Promise((resolve, reject) => {
       const transaction = db.transaction(STORE_NAME, 'readonly');
       const store = transaction.objectStore(STORE_NAME);
       const request = store.get(CACHE_KEY);
       request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
     });
+
+    if (idbData && (Array.isArray(idbData.recipes) && idbData.recipes.length > 0)) {
+      return idbData;
+    }
   } catch (e) {
-    console.warn('[Store] Failed to read IndexedDB cache:', e);
-    return null;
+    console.warn('[Store] IndexedDB cache read failed, attempting LocalStorage fallback:', e);
   }
+
+  // LocalStorage Fallback for monolithic vaults & legacy keys
+  try {
+    const recipes = JSON.parse(localStorage.getItem('plateplan_recipes') || '[]');
+    const ingredients = JSON.parse(localStorage.getItem('plateplan_ingredients') || '[]');
+    const products = JSON.parse(localStorage.getItem('plateplan_products') || '[]');
+    const shoppingList = JSON.parse(localStorage.getItem('plateplan_shopping') || '[]');
+    const inventory = JSON.parse(localStorage.getItem('plateplan_inventory') || '[]');
+    
+    let v2Blob = null;
+    if (recipes.length === 0) {
+      const rawV2 = localStorage.getItem('plateplan_v2') || localStorage.getItem('plateplan_v2_recovery');
+      if (rawV2) v2Blob = JSON.parse(rawV2);
+    }
+
+    const fallbackCache = {
+      recipes: recipes.length > 0 ? recipes : (v2Blob?.recipes || []),
+      ingredients: ingredients.length > 0 ? ingredients : (v2Blob?.ingredients || []),
+      products: products.length > 0 ? products : (v2Blob?.products || []),
+      categories: v2Blob?.categories || [],
+      inventory: inventory.length > 0 ? inventory : (v2Blob?.inventory || []),
+      shoppingList: shoppingList.length > 0 ? shoppingList : (v2Blob?.shoppingList || []),
+      preferences: v2Blob?.preferences || null,
+      userPrefs: v2Blob?.userPrefs || {},
+      settings: v2Blob?.settings || {}
+    };
+
+    if (fallbackCache.recipes.length > 0) {
+      console.info(`[Store] Successfully recovered ${fallbackCache.recipes.length} recipes from LocalStorage fallback.`);
+      return fallbackCache;
+    }
+  } catch (err) {
+    console.error('[Store] LocalStorage fallback recovery error:', err);
+  }
+
+  return null;
 }
 
 /**
@@ -139,6 +178,19 @@ export async function initStoreCache() {
       state.currentPlan = initialCache.currentPlan || null;
       state.shoppingList = Array.isArray(initialCache.shoppingList) ? initialCache.shoppingList : [];
       state.isCachedHydrated = true;
+
+      if (typeof window !== 'undefined') {
+        if (!window.state) window.state = {};
+        window.state.recipes = state.recipes;
+        window.state.ingredients = state.ingredients;
+        window.state.products = state.products;
+        window.state.categories = state.categories;
+        window.state.inventory = state.inventory;
+        window.state.shoppingList = state.shoppingList;
+        window.state.plan = state.currentPlan;
+        window.allRecipes = state.recipes;
+        window.recipes = state.recipes;
+      }
     }
   } catch (e) {
     console.warn('[Store] initStoreCache warning:', e);

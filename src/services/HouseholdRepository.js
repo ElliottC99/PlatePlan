@@ -952,24 +952,25 @@ export function subscribeCurrentPlan(callback, errorCallback) {
 }
 
 export async function getCategories() {
+  const defaultCategories = [
+    'Bakery', 'Baking', 'Beverages', 'Carbs', 'Dairy & Eggs', 'Drinks', 'Frozen',
+    'Fruit & Vegetables', 'General', 'Grains, Legumes & Pulses', 'Herbs & Spices',
+    'Meat & Seafood', 'Meat Substitutes', 'Nuts & Seeds', 'Other', 'Pantry',
+    'Produce', 'Proteins', 'Store Cupboard'
+  ];
   try {
-    if (!isDbAvailable()) return [];
+    if (!isDbAvailable()) return defaultCategories;
     const docRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('categories');
     const snap = await safeFirestoreGet(docRef);
     if (snap && snap.exists) {
       const data = snap.data();
       if (Array.isArray(data?.categories) && data.categories.length > 0) return data.categories;
     }
-    const defaultCategories = [
-      'Bakery', 'Baking', 'Beverages', 'Carbs', 'Dairy & Eggs', 'Drinks', 'Frozen',
-      'Fruit & Vegetables', 'General', 'Grains, Legumes & Pulses', 'Herbs & Spices',
-      'Meat & Seafood', 'Meat Substitutes', 'Nuts & Seeds', 'Other', 'Pantry',
-      'Produce', 'Proteins', 'Store Cupboard'
-    ];
-    await docRef.set({ categories: defaultCategories, updatedAt: new Date().toISOString() });
+    docRef.set({ categories: defaultCategories, updatedAt: new Date().toISOString() }).catch(() => {});
     return defaultCategories;
   } catch (err) {
-    return ['Produce', 'Meat & Seafood', 'Dairy & Eggs', 'Bakery', 'Pantry', 'Frozen', 'Drinks', 'General'];
+    console.warn('[HouseholdRepository] Error fetching categories, using defaults:', err.message || err);
+    return defaultCategories;
   }
 }
 

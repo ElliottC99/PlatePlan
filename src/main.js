@@ -354,33 +354,73 @@ export const APP_VERSION = 'v3.31.6';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
-  isAppInitialized = true; if (typeof window !== 'undefined') window.__plateplan_app_booted = true;
-  
-  const versionEl = document.getElementById('app-header-version');
-  if (versionEl) {
-    versionEl.textContent = APP_VERSION;
-  }
-  
-  await initStoreCache();
+  isAppInitialized = true;
+  if (typeof window !== 'undefined') window.__plateplan_app_booted = true;
 
-  setupActionBridge(); setupSubscriptions();
-  AppInitializer.registerServiceWorker(); AppInitializer.initPlatePlanApp();
-  setSyncStatus('connecting', 'Connecting...');
   const initialRender = () => {
-    renderToday(); renderRecipeVault(); renderPlanner(); renderShoppingListUI();
-    renderIngredientBank(); renderProductBank(); renderDataQualityView();
+    try {
+      renderToday();
+      renderRecipeVault();
+      renderPlanner();
+      renderShoppingListUI();
+      renderIngredientBank();
+      renderProductBank();
+      renderDataQualityView();
+    } catch (renderErr) {
+      console.warn('[initApp] initialRender warning:', renderErr);
+    }
   };
+
   try {
-    await waitForAuth();
-    const hydrationRes = await hydrateHouseholdData();
+    const versionEl = document.getElementById('app-header-version');
+    if (versionEl) {
+      versionEl.textContent = APP_VERSION;
+    }
+
+    try {
+      await initStoreCache();
+    } catch (cacheErr) {
+      console.warn('[initApp] initStoreCache error:', cacheErr);
+    }
+
+    try {
+      setupActionBridge();
+      setupSubscriptions();
+    } catch (bridgeErr) {
+      console.warn('[initApp] ActionBridge/Subscriptions error:', bridgeErr);
+    }
+
+    try {
+      AppInitializer.registerServiceWorker();
+      AppInitializer.initPlatePlanApp();
+    } catch (initErr) {
+      console.warn('[initApp] AppInitializer error:', initErr);
+    }
+
+    setSyncStatus('connecting', 'Connecting...');
     initialRender();
+
+    let hydrationRes = null;
+    try {
+      await waitForAuth();
+      hydrationRes = await hydrateHouseholdData();
+    } catch (syncErr) {
+      console.warn('[initApp] Auth/Hydration fallback:', syncErr);
+    }
+
     if (hydrationRes && hydrationRes.success) {
       setSyncStatus(navigator.onLine ? 'synced' : 'offline', navigator.onLine ? 'Synced with Cloud' : 'Offline Mode');
-    } else setSyncStatus(navigator.onLine ? 'synced' : 'offline', 'Local Cache Active');
+    } else {
+      setSyncStatus(navigator.onLine ? 'synced' : 'offline', 'Local Cache Active');
+    }
   } catch (err) {
-    console.warn('[initApp] Auth/Hydration fallback:', err);
-    initialRender();
+    console.error('[initApp] Top-level bootstrap error, falling back to local cache:', err);
     setSyncStatus(navigator.onLine ? 'synced' : 'offline', 'Local Cache Active');
+  } finally {
+    if (typeof window !== 'undefined') {
+      window.__plateplan_app_booted = true;
+    }
+    initialRender();
   }
 }
 
