@@ -34,7 +34,7 @@ export function waitForAuth() {
       return resolve(current);
     }
 
-    const unsubscribe = window.firebase.auth().onAuthStateChanged(user => {
+    const unsubscribe = window.firebase.auth().onAuthStateChanged(async user => {
       unsubscribe();
       if (user) {
         if (!authLogged) {
@@ -48,11 +48,12 @@ export function waitForAuth() {
           console.warn('[AuthService] No user session detected.');
         }
         try {
-          window.firebase.auth().signInAnonymously();
+          const cred = await window.firebase.auth().signInAnonymously();
+          resolve(cred.user);
         } catch (e) {
           console.warn('[AuthService] Anonymous login failed:', e);
+          resolve(null);
         }
-        resolve(null);
       }
     }, error => {
       authPromise = null;
