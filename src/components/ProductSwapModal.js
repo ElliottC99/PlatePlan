@@ -4,7 +4,7 @@ import { getEffectiveRecipeFitScore } from '../services/FitScoreService.js';
 import { UnitConverter } from '../services/UnitConverter.js';
 
 /**
- * src/components/ProductSwapModal.js (v3.31.32)
+ * src/components/ProductSwapModal.js (v3.31.33)
  * Relational 3-tier product swap modal with native Fit Score delta calculations,
  * Store action dispatching, and pure ES6 module architecture.
  */
@@ -92,6 +92,19 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
   }
 
   setActivePlan(updatedPlan);
+
+  // Re-run the shopping aggregator to catch the new substitutions
+  if (typeof window.computeWizardShoppingAgg === 'function') {
+    window.computeWizardShoppingAgg(updatedPlan);
+  }
+
+  // Dispatch DOM events
+  document.dispatchEvent(new CustomEvent('plateplan:state:plan', { detail: updatedPlan }));
+  document.dispatchEvent(new CustomEvent('plateplan:state:shopping'));
+
+  // Trigger UI repaints
+  if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
+  if (typeof window.renderShoppingListUI === 'function') window.renderShoppingListUI();
 }
 
 export function renderScrollableSwapModal(param1, param2, param3, optionalContext = {}) {
@@ -238,18 +251,25 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
 
       let diffBadge = '';
       if (recipe && typeof getEffectiveRecipeFitScore === 'function') {
-        const baseScore = Math.round(getEffectiveRecipeFitScore(recipe, 'dinner').score || 0);
-        const servingGrams = (UnitConverter.toGrams(targetItem?.needQty || targetItem?.grams || 100, targetItem?.unit || 'g') || 100) / (recipe.serves || 4);
-        const deltaProt = ((Number(item.protein || item.prot || 0) - Number(targetItem?.protein || targetItem?.bankIng?.protein || 0)) / 100) * servingGrams;
-        const deltaCal = ((Number(item.calories || item.kcal || item.cal || 0) - Number(targetItem?.calories || targetItem?.bankIng?.kcal || 0)) / 100) * servingGrams;
+        const clonedRecipe = JSON.parse(JSON.stringify(recipe));
+        const baseGrams = UnitConverter.toGrams(targetItem?.needQty || targetItem?.grams || 100, targetItem?.unit || 'g') || 100;
+        const servingGrams = baseGrams / (recipe.serves || 4);
 
-        const baseProt = Number(recipe.perServing?.protein || recipe.protein || 0);
-        const baseCal = Number(recipe.perServing?.calories || recipe.calories || 0);
-        const simulatedRecipe = {
-          ...recipe,
-          perServing: { ...recipe.perServing, protein: Math.max(0, baseProt + deltaProt), calories: Math.max(0, baseCal + deltaCal) }
-        };
-        const newScore = Math.round(getEffectiveRecipeFitScore(simulatedRecipe, 'dinner').score || 0);
+        const targetProt = Number(targetItem?.protein || targetItem?.bankIng?.protein || 0);
+        const targetCal = Number(targetItem?.calories || targetItem?.bankIng?.kcal || 0);
+        const newProt = Number(item.protein || item.prot || 0);
+        const newCal = Number(item.calories || item.kcal || item.cal || 0);
+
+        const deltaProt = ((newProt - targetProt) / 100) * servingGrams;
+        const deltaCal = ((newCal - targetCal) / 100) * servingGrams;
+
+        clonedRecipe.nutrition = clonedRecipe.nutrition || {};
+        clonedRecipe.nutrition.perServing = clonedRecipe.nutrition.perServing || {};
+        clonedRecipe.nutrition.perServing.protein = (clonedRecipe.nutrition.perServing.protein || Number(clonedRecipe.perServing?.protein || clonedRecipe.protein || 0)) + deltaProt;
+        clonedRecipe.nutrition.perServing.calories = (clonedRecipe.nutrition.perServing.calories || Number(clonedRecipe.perServing?.calories || clonedRecipe.calories || 0)) + deltaCal;
+
+        const baseScore = Math.round(getEffectiveRecipeFitScore(recipe, 'dinner').score || 0);
+        const newScore = Math.round(getEffectiveRecipeFitScore(clonedRecipe, 'dinner').score || 0);
         const diff = newScore - baseScore;
         diffBadge = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:${diff >= 0 ? '#dcfce7' : '#fef3c7'};color:${diff >= 0 ? '#15803d' : '#b45309'};margin-left:auto;">[${diff >= 0 ? '+' + diff : diff} - ${baseScore} &rarr; ${newScore}]</span>`;
       }
