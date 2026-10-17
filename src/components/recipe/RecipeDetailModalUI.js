@@ -99,18 +99,22 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
   const subtypeLabel = String(subObj?.name || ing.subtypeName || ing.subtype || '').trim();
   const brandProductLabel = formatBrandProductPair(prodObj, ing.brand, ing.productName || (!ingObj && prodObj ? prodObj.name : ''));
 
-  let hierarchyPart = ingredientLabel || 'Unmapped Ingredient';
-  if (subtypeLabel && subtypeLabel.toLowerCase() !== hierarchyPart.toLowerCase()) {
-    hierarchyPart = `${hierarchyPart} / ${subtypeLabel}`;
+  let hierarchyPart = escapeHtml(ingredientLabel || 'Unmapped Ingredient');
+  if (subtypeLabel && subtypeLabel.toLowerCase() !== ingredientLabel.toLowerCase()) {
+    hierarchyPart = `${hierarchyPart} / ${escapeHtml(subtypeLabel)}`;
   }
 
   let formattedLine = hierarchyPart;
-  if (brandProductLabel && brandProductLabel.toLowerCase() !== ingredientLabel.toLowerCase() && brandProductLabel.toLowerCase() !== subtypeLabel.toLowerCase()) {
-    formattedLine = `${hierarchyPart} - ${brandProductLabel}`;
-  } else if (!brandProductLabel && ingObj?.autoDefault) {
+  if (prodObj) {
+    const prodName = brandProductLabel || prodObj.name || prodObj.title;
+    const prodId = prodObj.id || prodObj.productId;
+    formattedLine = `${hierarchyPart} - <a class="product-link" href="#" data-product-id="${prodId}" style="color:var(--primary,#4f46e5); text-decoration:none; border-bottom:1px dashed var(--primary);">${escapeHtml(prodName)}</a>`;
+  } else if (brandProductLabel && brandProductLabel.toLowerCase() !== ingredientLabel.toLowerCase() && brandProductLabel.toLowerCase() !== subtypeLabel.toLowerCase()) {
+    formattedLine = `${hierarchyPart} - ${escapeHtml(brandProductLabel)}`;
+  } else if (ingObj?.autoDefault) {
     const fallbackAuto = formatBrandProductPair(null, '', ingObj.autoDefault);
     if (fallbackAuto && fallbackAuto.toLowerCase() !== ingredientLabel.toLowerCase()) {
-      formattedLine = `${hierarchyPart} - ${fallbackAuto}`;
+      formattedLine = `${hierarchyPart} - ${escapeHtml(fallbackAuto)}`;
     }
   }
 
@@ -137,8 +141,8 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
     qtyPrefix = [scaledQty, unit].filter(Boolean).join('');
   }
 
-  const fullText = qtyPrefix ? `${formattedLine} (${qtyPrefix})` : formattedLine;
-  return comment ? `${fullText} — ${comment}` : fullText;
+  const fullText = qtyPrefix ? `${formattedLine} (${escapeHtml(qtyPrefix)})` : formattedLine;
+  return comment ? `${fullText} — <span style="font-style:italic; color:var(--text2);">${escapeHtml(comment)}</span>` : fullText;
 }
 
 /**
@@ -156,8 +160,8 @@ export function renderRecipeIngredientsListHTML(ingredients = [], state = null, 
               <h4 style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;margin:0 0 6px 0;padding-bottom:4px;border-bottom:1px solid var(--border)">${secTitle}</h4>
               <ul class="recipe-view-ingredients-list" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:5px">
                 ${secList.map(ing => {
-                  const text = formatRecipeIngredientRow(ing, state, scaleMultiplier);
-                  return `<li style="font-size:13px;color:var(--text);padding:4px 0;border-bottom:1px solid var(--border-subtle, rgba(0,0,0,0.04))">• ${escapeHtml(text)}</li>`;
+                  const html = formatRecipeIngredientRow(ing, state, scaleMultiplier);
+                  return `<li style="font-size:13px;color:var(--text);padding:4px 0;border-bottom:1px solid var(--border-subtle, rgba(0,0,0,0.04))">• ${html}</li>`;
                 }).join('')}
               </ul>
             </div>
@@ -174,8 +178,8 @@ export function renderRecipeIngredientsListHTML(ingredients = [], state = null, 
   return `
     <ul class="recipe-view-ingredients-list" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px">
       ${list.map(ing => {
-        const text = formatRecipeIngredientRow(ing, state, scaleMultiplier);
-        return `<li style="font-size:13px;color:var(--text);padding:5px 0;border-bottom:1px solid var(--border)">• ${escapeHtml(text)}</li>`;
+        const html = formatRecipeIngredientRow(ing, state, scaleMultiplier);
+        return `<li style="font-size:13px;color:var(--text);padding:5px 0;border-bottom:1px solid var(--border)">• ${html}</li>`;
       }).join('')}
     </ul>
   `;

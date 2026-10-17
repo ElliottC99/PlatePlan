@@ -79,6 +79,8 @@ export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice
           unit: i.unit,
           raw: i.raw,
           ingredientId: i.ingredientId || null,
+          productId: i.productId || i.mappedItemId || i.productMatch?.id || null,
+          productMatch: i.productMatch || null,
           subtypeId: i.subtypeId || null,
           categoryId: i.categoryId || null,
           isCategoryDefault: i.isCategoryDefault || false,

@@ -1,7 +1,9 @@
 /**
- * src/components/recipe/RecipeWizardState.js (v3.32.6)
+ * src/components/recipe/RecipeWizardState.js (v3.35.2)
  * Manages mutable state and step synchronisation for the Recipe Ingestion Wizard.
  */
+
+import { toTitleCase } from '../../utils/stringUtils.js';
 
 export const MEAL_TAGS = ['Breakfast', 'Lunch', 'Dinner', 'Snacking'];
 
@@ -92,7 +94,7 @@ export function syncStep2InputsToState(modalWrap) {
   modalWrap.querySelectorAll('.wiz-section-title-input').forEach(input => {
     const sIdx = parseInt(input.dataset.sidx, 10);
     if (!isNaN(sIdx) && wizardState.activeRecipe.ingredientSections[sIdx]) {
-      wizardState.activeRecipe.ingredientSections[sIdx].sectionTitle = input.value.trim() || 'Section';
+      wizardState.activeRecipe.ingredientSections[sIdx].sectionTitle = toTitleCase(input.value.trim() || 'Section');
     }
   });
 
