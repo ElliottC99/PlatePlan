@@ -4,6 +4,7 @@
  */
 
 import { getState } from '../store/store.js';
+import { normaliseUnitAndQty } from './RecipeUnitConverter.js';
 import { convertToStrictUnit } from './UnitConversionService.js';
 
 export function toTitleCase(str) {
@@ -164,32 +165,36 @@ export function parseIngredientString(rawStr) {
     const mult = parseFloat(parenMult[1]) || 1;
     const innerWeight = parseFloat(parenMult[3]) || 0;
     const nameClean = parenMult[2].trim();
+    const normalised = normaliseUnitAndQty(mult * innerWeight, parenMult[4], nameClean);
     return {
       raw: s,
-      qty: mult * innerWeight,
-      unit: parenMult[4].toLowerCase(),
+      qty: normalised.qty,
+      unit: normalised.unit,
+      isEstimated: normalised.isEstimated,
       name: toTitleCase(nameClean),
-      notes: `${mult} pack (${innerWeight}${parenMult[4]})`
+      notes: normalised.isEstimated ? 'Est. Weight' : `${mult} pack (${innerWeight}${parenMult[4]})`
     };
   }
 
   // 2. Explicit unit multiplier e.g. "2 x 280g blocks extra-firm tofu", "1 x 400g tin black beans"
-  const compMatch = s.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tbsp|tsp|oz|lb)\b\s*(?:(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s*(?:of\s*)?)?(.*)/i);
+  const compMatch = s.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tbsp|tablespoons?|tsp|teaspoons?|cups?|oz|fl\s*oz|lbs?|pinch|cm)\b\s*(?:(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s*(?:of\s*)?)?(.*)/i);
   if (compMatch) {
     const multComp = parseFloat(compMatch[1]) || 1;
     const baseWeight = parseFloat(compMatch[2]) || 0;
     const rawName = (compMatch[4] || '').replace(/^(?:blocks?|packs?|tins?|cans?)\s*(?:of\s*)?/i, '').trim();
+    const normalised = normaliseUnitAndQty(multComp * baseWeight, compMatch[3], rawName);
     return {
       raw: s,
-      qty: multComp * baseWeight,
-      unit: compMatch[3].toLowerCase(),
+      qty: normalised.qty,
+      unit: normalised.unit,
+      isEstimated: normalised.isEstimated,
       name: toTitleCase(rawName),
-      notes: `${multComp} x ${baseWeight}${compMatch[3]}`
+      notes: normalised.isEstimated ? 'Est. Weight' : `${multComp} x ${baseWeight}${compMatch[3]}`
     };
   }
 
   // 3. Standard match with strict word boundary on unit
-  const stdMatch = s.match(/^(\d+(?:\.\d+)?(?:\s*[-–]\s*\d+(?:\.\d+)?)?)\s*(g|kg|ml|l|tbsp|tsp|cm)\b\s*(.*)/i);
+  const stdMatch = s.match(/^(\d+(?:\.\d+)?(?:\s*[-–]\s*\d+(?:\.\d+)?)?)\s*(g|kg|ml|l|tbsp|tablespoons?|tsp|teaspoons?|cups?|oz|fl\s*oz|lbs?|pinch|cm)\b\s*(.*)/i);
   if (stdMatch) {
     let rawQty = stdMatch[1];
     let qtyStd = parseFloat(rawQty);
@@ -197,12 +202,15 @@ export function parseIngredientString(rawStr) {
       const parts = rawQty.split(/[-–]/).map(p => parseFloat(p.trim()));
       qtyStd = (parts[0] + parts[1]) / 2;
     }
+    const rawName = (stdMatch[3] || '').trim();
+    const normalised = normaliseUnitAndQty(qtyStd, stdMatch[2], rawName);
     return {
       raw: s,
-      qty: qtyStd || 1,
-      unit: stdMatch[2].toLowerCase(),
-      name: toTitleCase((stdMatch[3] || '').trim()),
-      notes: ''
+      qty: normalised.qty,
+      unit: normalised.unit,
+      isEstimated: normalised.isEstimated,
+      name: toTitleCase(rawName),
+      notes: normalised.isEstimated ? 'Est. Weight' : ''
     };
   }
 
