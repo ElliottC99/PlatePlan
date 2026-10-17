@@ -1,12 +1,13 @@
 /**
  * src/services/RecipeParserService.js (v3.32.0)
- * Multi-Recipe Batch Parsing, Token Normalisation & Recipe Block Chunking.
+ * Multi-Recipe Batch Parsing, Token Normalisation, Block Chunking,
+ * Collapsed Ingredient Unpacking & Method Step Splitting.
  */
 
 import { toTitleCase, parseIngredientString, matchIngredientTaxonomy } from './RecipeIngredientParser.js';
 
 /**
- * Unpacks glued header tokens and splits raw multi-recipe text into distinct recipe block chunks.
+ * Unpacks glued header tokens, eliminates ghost duplicate headers, and splits raw multi-recipe text.
  * @param {string} rawText
  * @returns {string[]}
  */
@@ -37,18 +38,68 @@ export function unpackAndSplitRecipeBlocks(rawText) {
   clean = clean.replace(/([^\n])(\d+\.\s+[A-Z0-9\s-]{3,})/g, '$1\n\n$2');
   clean = clean.replace(/([^\n])((?:Dish|Recipe)\s+\d+[:\.])/gi, '$1\n\n$2');
 
+  // Merge "X. TITLE\nRecipe Title: TITLE" into a single header boundary before splitting to eliminate ghost duplicates
+  clean = clean.replace(/((?:Dish|Recipe|\d+[\.\)])\s*[^\n]+)\s*\n+\s*Recipe Title:\s*/gi, '$1 - ');
+
   // Split on numbered recipe headers OR standalone Recipe Title occurrences
   const blocks = clean
-    .split(/(?:^|\n\n|\n(?=(?:Recipe\s+Title:|(?:Dish|Recipe)\s+\d+[:\.]|\d+[\.\)]\s+[A-Z0-9\s-]{4,})))/g)
+    .split(/(?:^|\n\n+)(?=(?:\d+[\.\)]\s+[A-Z0-9\s-]{3,}|Recipe Title:|(?:Dish|Recipe)\s+\d+[:\.]))/i)
     .map(c => c.trim())
-    .filter(c => c.length > 30);
+    .filter(c => c.length > 40 && /(?:Ingredients:|Method|Instructions)/i.test(c));
 
   return blocks.length > 0 ? blocks : [rawText.trim()];
 }
 
 /**
+ * Unpacks collapsed ingredient text by inserting newlines before section sub-headings,
+ * glued quantities, and fraction/unit descriptors.
+ * @param {string} rawIngText
+ * @returns {string}
+ */
+export function unpackCollapsedIngredients(rawIngText) {
+  if (!rawIngText) return '';
+  let text = rawIngText.replace(/\r\n/g, '\n').trim();
+
+  // 1. Insert newline before subsection headers like "FOR THE SAUCE", "FOR THE PASTA", "TO SERVE"
+  text = text.replace(/([^\n])\s*(FOR THE [A-Z\s]+|TO SERVE)/gi, '$1\n\n$2\n');
+
+  // 2. Insert newline before quantities glued to previous text (e.g. "onions2 garlic", "cloves160-200g", "pieces2 packs", "oil2 tbsp")
+  text = text.replace(/([a-zA-Z\)\/])\s*(?=(\d+(?:[.,]\d+)?(?:\s*[-–]\s*\d+)?\s*(?:x\s*\d+|g|kg|ml|l|tbsp|tsp|packs?|cloves?|spring|tin|pot|large|medium|small|handful|bunch|drizzle|piece|\bx\b|[a-zA-Z]+)))/g, '$1\n');
+
+  // 3. Insert newline before items starting with fractions or words like "handful", "bunch", "drizzle"
+  text = text.replace(/([a-zA-Z\)])\s*(?=(?:handful|bunch|drizzle|pinch|juice of|zest of)\b)/gi, '$1\n');
+
+  return text;
+}
+
+/**
+ * Unpacks collapsed method instructions into individual steps.
+ * Inserts newlines before step headers ending in colons or numbered steps.
+ * @param {string} rawMethodText
+ * @returns {string[]}
+ */
+export function unpackCollapsedSteps(rawMethodText) {
+  if (!rawMethodText) return [];
+  let text = rawMethodText.replace(/\r\n/g, '\n').trim();
+
+  // Insert newline before step headers ending in colon (e.g. "...shreds.Cook the noodles:")
+  text = text.replace(/([\.!?])\s*(?=[A-Z][a-zA-Z0-9\s,'–-]{2,45}:)/g, '$1\n\n');
+
+  // Insert newline before numbered step markers on the same line (e.g. "...40C. 2. Toss in sauce")
+  text = text.replace(/([\.!?])\s*(?=\d+[\.\)]\s+)/g, '$1\n\n');
+
+  // Split on double newlines or numbered steps (1., 2., etc.)
+  const steps = text
+    .split(/(?:\n\s*\n|\n(?=\d+[\.\)]\s+))/g)
+    .map(s => s.trim())
+    .filter(s => s.length > 5);
+
+  return steps.length > 0 ? steps : [text];
+}
+
+/**
  * Parses a single recipe text block into a complete recipe object.
- * Strips leading numbering/delimiters from titles.
+ * Strips leading numbering/delimiters from titles and unpacks collapsed sections.
  * @param {string} block
  * @param {Array} ingredientsBank
  * @returns {Object|null}
@@ -56,20 +107,37 @@ export function unpackAndSplitRecipeBlocks(rawText) {
 export function parseSingleRecipeText(block, ingredientsBank = []) {
   if (!block || typeof block !== 'string') return null;
 
-  const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
-  if (!lines.length) return null;
+  const ingRegex = /(?:^|\n)\s*(?:main\s+)?ingredients?:\s*/i;
+  const methodRegex = /(?:^|\n)\s*(?:Method\s+Instructions|Method|Instructions|Steps|Preparation):\s*/i;
 
+  const ingMatch = block.match(ingRegex);
+  const methodMatch = block.match(methodRegex);
+
+  let headerText = block;
+  let rawIngText = '';
+  let rawMethodText = '';
+
+  if (ingMatch) {
+    headerText = block.slice(0, ingMatch.index);
+    if (methodMatch && methodMatch.index > ingMatch.index) {
+      rawIngText = block.slice(ingMatch.index + ingMatch[0].length, methodMatch.index);
+      rawMethodText = block.slice(methodMatch.index + methodMatch[0].length);
+    } else {
+      rawIngText = block.slice(ingMatch.index + ingMatch[0].length);
+    }
+  } else if (methodMatch) {
+    headerText = block.slice(0, methodMatch.index);
+    rawMethodText = block.slice(methodMatch.index + methodMatch[0].length);
+  }
+
+  // Parse Header Information
   let title = 'Imported Recipe';
   let servings = 4;
   let prepMinutes = 15;
   let cookMinutes = 30;
-  let currentSectionTitle = 'Main Ingredients';
-  const sectionsMap = { 'Main Ingredients': [] };
-  const methodLines = [];
-  let parsingMode = 'header';
 
-  lines.forEach((line, idx) => {
-    // Title match
+  const headerLines = headerText.split('\n').map(l => l.trim()).filter(Boolean);
+  headerLines.forEach((line, idx) => {
     if (/^(?:Recipe\s*)?(?:Title|Name):/i.test(line)) {
       let extracted = line.replace(/^(?:Recipe\s*)?(?:Title|Name):/i, '').trim();
       extracted = cleanRecipeTitle(extracted);
@@ -84,14 +152,12 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
       return;
     }
 
-    // Servings match
     if (/^(?:Serves|Yield|Servings|Total\s+Servings):/i.test(line)) {
       const match = line.match(/\d+/);
       if (match) servings = parseInt(match[0], 10);
       return;
     }
 
-    // Timings
     if (/^Prep\s+Time(?:\s*\(Hours\s*&\s*Mins\))?:/i.test(line)) {
       prepMinutes = parseDurationMinutes(line);
       return;
@@ -102,49 +168,29 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
       return;
     }
 
-    // Ingredients section header
-    if (/^(?:main\s+)?ingredients?:/i.test(line)) {
-      parsingMode = 'ingredients';
-      const rest = line.replace(/^(?:main\s+)?ingredients?:/i, '').trim();
-      if (rest) {
-        parseIngredientLine(rest, currentSectionTitle, sectionsMap, ingredientsBank);
-      }
-      return;
-    }
-
-    // Sub-section header (e.g., "For the sauce:")
-    if (/^for\s+the\s+.+:|^[a-zA-Z\s]+:$/i.test(line) && !/serves|yield|servings|method|instructions|steps|preparation|prep|cook/i.test(line)) {
-      currentSectionTitle = toTitleCase(line.replace(':', '').trim());
-      if (!sectionsMap[currentSectionTitle]) sectionsMap[currentSectionTitle] = [];
-      parsingMode = 'section';
-      return;
-    }
-
-    // Method header
-    if (/^(?:Method\s+Instructions|Method|Instructions|Steps|Preparation):/i.test(line)) {
-      parsingMode = 'method';
-      const rest = line.replace(/^(?:Method\s+Instructions|Method|Instructions|Steps|Preparation):/i, '').trim();
-      if (rest) {
-        pushMethodSteps(rest, methodLines);
-      }
-      return;
-    }
-
-    // Fallback title on first non-header line
     if (idx === 0) {
       const rawTitle = cleanRecipeTitle(line);
       if (rawTitle) title = toTitleCase(rawTitle);
-      return;
-    }
-
-    const cleanLine = line.replace(/^[•\-\*]\s*/, '').trim();
-
-    if (parsingMode === 'ingredients' || parsingMode === 'section' || (parsingMode === 'header' && !/^\d+\.|\b(mix|bake|heat|cook|boil|sauté|simmer)\b/i.test(cleanLine))) {
-      parseIngredientLine(cleanLine, currentSectionTitle, sectionsMap, ingredientsBank);
-    } else if (parsingMode === 'method' || /^\d+\.|\b(mix|bake|heat|cook|boil|sauté|simmer)\b/i.test(cleanLine)) {
-      pushMethodSteps(cleanLine, methodLines);
     }
   });
+
+  // Parse Ingredients with Collapsed Section & Quantity Unpacking
+  const sectionsMap = { 'Main Ingredients': [] };
+  let currentSectionTitle = 'Main Ingredients';
+
+  if (rawIngText) {
+    const unpackedIngText = unpackCollapsedIngredients(rawIngText);
+    const ingLines = unpackedIngText.split('\n').map(l => l.trim()).filter(Boolean);
+
+    ingLines.forEach(line => {
+      if (/^(?:for\s+the\s+[a-zA-Z\s]+:?|to\s+serve:?|[a-zA-Z\s]+:)$/i.test(line) && !/^\d+\b|serves|yield|prep|cook/i.test(line)) {
+        currentSectionTitle = toTitleCase(line.replace(':', '').trim());
+        if (!sectionsMap[currentSectionTitle]) sectionsMap[currentSectionTitle] = [];
+        return;
+      }
+      parseIngredientLine(line, currentSectionTitle, sectionsMap, ingredientsBank);
+    });
+  }
 
   const ingredientSections = Object.entries(sectionsMap)
     .filter(([_, ingList]) => ingList.length > 0)
@@ -156,6 +202,12 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
 
   const flatIngredients = ingredientSections.flatMap(s => s.ingredients);
 
+  // Parse Method Steps with Step Header & Inline Number Unpacking
+  const rawSteps = unpackCollapsedSteps(rawMethodText);
+  const methodSteps = rawSteps
+    .map(s => s.replace(/^\d+[\.\)]\s*/, '').trim())
+    .filter(Boolean);
+
   return {
     title: toTitleCase(title),
     servings: servings || 4,
@@ -164,8 +216,8 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
     mealSuitability: ['Dinner'],
     ingredientSections,
     ingredients: flatIngredients,
-    instructions: methodLines,
-    methodSteps: methodLines,
+    instructions: methodSteps,
+    methodSteps,
     macros: { calories: 450, protein: 28, carbs: 40, fat: 16 }
   };
 }
@@ -186,11 +238,21 @@ export function parseBulkRecipeText(text, ingredientsBank = []) {
 
 function cleanRecipeTitle(raw) {
   if (!raw) return '';
-  return String(raw)
+  let str = String(raw)
     .replace(/^\d+[\.\)]\s*/, '') // Strip leading enumeration numbering e.g. "2. CRISPY..."
     .replace(/^(?:Dish|Recipe)\s*\d*:?\s*/i, '')
     .replace(/^Title:\s*/i, '')
     .trim();
+
+  // If merged from duplicate header: "TITLE - TITLE"
+  if (str.includes(' - ')) {
+    const parts = str.split(' - ');
+    if (parts.length === 2 && parts[0].trim().toLowerCase() === parts[1].trim().toLowerCase()) {
+      str = parts[0].trim();
+    }
+  }
+
+  return str.trim();
 }
 
 function parseDurationMinutes(line) {
@@ -215,13 +277,5 @@ function parseIngredientLine(line, currentSectionTitle, sectionsMap, ingredients
       const matched = matchIngredientTaxonomy(parsed, ingredientsBank);
       if (matched) sectionsMap[currentSectionTitle].push(matched);
     }
-  });
-}
-
-function pushMethodSteps(line, methodLines) {
-  const subSteps = line.split(/(?<=[^\n])\s+(?=\d+\.\s*)/gi);
-  subSteps.forEach(s => {
-    const stepText = s.replace(/^\d+\.\s*/, '').trim();
-    if (stepText) methodLines.push(stepText);
   });
 }
