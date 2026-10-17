@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardStep15View.js (v3.32.0)
+ * src/components/recipe/RecipeWizardStep15View.js (v3.33.1)
  * View rendering for Step 1.5: Multi-Recipe Batch Review Queue.
  */
 
@@ -44,33 +44,64 @@ export function renderStep1Point5() {
     const title = toTitleCase(recipe.title || 'Untitled Recipe');
 
     return `
-      <div class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; margin-bottom: 12px; background: var(--surface, #fff); border: 1px solid var(--border, #e5e7eb); border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+      <div class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; margin-bottom: 10px; background: var(--surface, #fff); border: 1px solid var(--border, #e5e7eb); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: transform 0.1s ease;">
         <div style="flex: 1; min-width: 0; padding-right: 14px;">
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-            <span style="font-size: 12px; font-weight: 700; color: var(--purple, #6366f1); background: #eef2ff; padding: 2px 8px; border-radius: 4px;">#${idx + 1}</span>
-            <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text, #111); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+            <span style="font-size: 11px; font-weight: 700; color: var(--purple, #6366f1); background: #eef2ff; padding: 1px 6px; border-radius: 4px; letter-spacing: 0.02em;">#${idx + 1}</span>
+            <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text, #111); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.01em;">
               ${escapeHtml(title)}
             </h4>
           </div>
-          <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px;">
-            <span style="background: var(--surface2, #f3f4f6); color: var(--text2, #4b5563); padding: 2px 8px; border-radius: 4px; font-weight: 500;">
-              🍽️ Servings: ${servings}
-            </span>
-            <span style="background: #ecfdf5; color: #047857; padding: 2px 8px; border-radius: 4px; font-weight: 500;">
-              🥗 ${ingCount} ingredient${ingCount === 1 ? '' : 's'}
-            </span>
-            <span style="background: #eff6ff; color: #1d4ed8; padding: 2px 8px; border-radius: 4px; font-weight: 500;">
-              📋 ${stepCount} step${stepCount === 1 ? '' : 's'}
-            </span>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px;">
+            <span style="color: var(--text2, #64748b); font-weight: 500;">🍽️ ${servings} serves</span>
+            <span style="color: var(--text2, #64748b); opacity: 0.5;">•</span>
+            <span style="color: var(--text2, #64748b); font-weight: 500;">🥗 ${ingCount} ingr.</span>
+            <span style="color: var(--text2, #64748b); opacity: 0.5;">•</span>
+            <span style="color: var(--text2, #64748b); font-weight: 500;">📋 ${stepCount} step${stepCount === 1 ? '' : 's'}</span>
           </div>
         </div>
-        <div style="display: flex; align-items: center; gap: 4px;">
-          <div style="display: flex; flex-direction: column; gap: 2px;">
-            <button type="button" class="btn-icon move-up" data-index="${idx}" aria-label="Move Up" ${idx === 0 ? 'disabled' : ''} style="cursor: ${idx === 0 ? 'not-allowed' : 'pointer'}; opacity: ${idx === 0 ? '0.3' : '1'};">▲</button>
-            <button type="button" class="btn-icon move-down" data-index="${idx}" aria-label="Move Down" ${idx === queueCount - 1 ? 'disabled' : ''} style="cursor: ${idx === queueCount - 1 ? 'not-allowed' : 'pointer'}; opacity: ${idx === queueCount - 1 ? '0.3' : '1'};">▼</button>
+
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <!-- HIG Segmented Stepper Pill -->
+          <div class="queue-reorder-stepper" style="display: flex; flex-direction: column; background: var(--surface2, #f1f5f9); border: 1px solid var(--border, #e2e8f0); border-radius: 8px; overflow: hidden; width: 28px;">
+            <button 
+              type="button" 
+              class="move-up" 
+              data-index="${idx}" 
+              ${idx === 0 ? 'disabled' : ''} 
+              style="background: transparent; border: none; padding: 5px 0; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-muted, #64748b); font-size: 9px; line-height: 1; transition: all 0.15s ease;"
+              title="Move dish up"
+              aria-label="Move dish up"
+            >
+              ▲
+            </button>
+            <div style="height: 1px; background: var(--border, #e2e8f0); width: 100%;"></div>
+            <button 
+              type="button" 
+              class="move-down" 
+              data-index="${idx}" 
+              ${idx === queueCount - 1 ? 'disabled' : ''} 
+              style="background: transparent; border: none; padding: 5px 0; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-muted, #64748b); font-size: 9px; line-height: 1; transition: all 0.15s ease;"
+              title="Move dish down"
+              aria-label="Move dish down"
+            >
+              ▼
+            </button>
           </div>
-          <button type="button" class="btn ghost sm wiz-queue-remove-btn" data-qidx="${idx}" aria-label="Remove recipe from queue" title="Remove recipe" style="color: #9ca3af; padding: 6px 10px; border-radius: 6px; font-size: 16px; cursor: pointer; border: none; background: transparent;">
-            🗑️
+
+          <!-- Delete Action Icon Button -->
+          <button 
+            type="button" 
+            class="wiz-queue-remove-btn" 
+            data-qidx="${idx}" 
+            style="background: transparent; border: 1px solid transparent; border-radius: 8px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text2, #94a3b8); transition: all 0.15s ease;"
+            title="Remove recipe from queue"
+            aria-label="Remove recipe from queue"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
           </button>
         </div>
       </div>
@@ -78,6 +109,11 @@ export function renderStep1Point5() {
   }).join('');
 
   return `
+    <style>
+      .queue-reorder-stepper button:hover:not(:disabled) { background: rgba(0, 0, 0, 0.05); color: var(--text, #0f172a) !important; }
+      .queue-reorder-stepper button:disabled { opacity: 0.2; cursor: not-allowed; }
+      .wiz-queue-remove-btn:hover { color: var(--danger, #ef4444) !important; background: #fef2f2 !important; border-color: #fecdd3 !important; }
+    </style>
     <div style="padding: 4px 2px;">
       <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px;">
         <div>
