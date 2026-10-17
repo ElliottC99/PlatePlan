@@ -4,6 +4,8 @@
  */
 
 import { wizardState } from './RecipeWizardState.js';
+import { toTitleCase } from '../../utils/stringUtils.js';
+import { getState } from '../../store/store.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -20,7 +22,8 @@ function escapeHtml(str) {
  * @returns {string} HTML markup
  */
 export function renderStep1Point5() {
-  const queue = wizardState.processingQueue || [];
+  const state = getState() || {};
+  const queue = state.draftRecipes || wizardState.processingQueue || [];
   const queueCount = queue.length;
 
   if (queueCount === 0) {
@@ -38,6 +41,7 @@ export function renderStep1Point5() {
     const steps = recipe.instructions || recipe.methodSteps || [];
     const stepCount = steps.length;
     const servings = recipe.servings || 4;
+    const title = toTitleCase(recipe.title || 'Untitled Recipe');
 
     return `
       <div class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; margin-bottom: 12px; background: var(--surface, #fff); border: 1px solid var(--border, #e5e7eb); border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
@@ -45,7 +49,7 @@ export function renderStep1Point5() {
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
             <span style="font-size: 12px; font-weight: 700; color: var(--purple, #6366f1); background: #eef2ff; padding: 2px 8px; border-radius: 4px;">#${idx + 1}</span>
             <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text, #111); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-              ${escapeHtml(recipe.title || 'Untitled Recipe')}
+              ${escapeHtml(title)}
             </h4>
           </div>
           <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px;">
@@ -60,9 +64,15 @@ export function renderStep1Point5() {
             </span>
           </div>
         </div>
-        <button type="button" class="btn ghost sm wiz-queue-remove-btn" data-qidx="${idx}" aria-label="Remove recipe from queue" title="Remove recipe" style="color: #9ca3af; padding: 6px 10px; border-radius: 6px; font-size: 16px; cursor: pointer; border: none; background: transparent;">
-          🗑️
-        </button>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <button type="button" class="btn-icon move-up" data-index="${idx}" aria-label="Move Up" ${idx === 0 ? 'disabled' : ''} style="cursor: ${idx === 0 ? 'not-allowed' : 'pointer'}; opacity: ${idx === 0 ? '0.3' : '1'};">▲</button>
+            <button type="button" class="btn-icon move-down" data-index="${idx}" aria-label="Move Down" ${idx === queueCount - 1 ? 'disabled' : ''} style="cursor: ${idx === queueCount - 1 ? 'not-allowed' : 'pointer'}; opacity: ${idx === queueCount - 1 ? '0.3' : '1'};">▼</button>
+          </div>
+          <button type="button" class="btn ghost sm wiz-queue-remove-btn" data-qidx="${idx}" aria-label="Remove recipe from queue" title="Remove recipe" style="color: #9ca3af; padding: 6px 10px; border-radius: 6px; font-size: 16px; cursor: pointer; border: none; background: transparent;">
+            🗑️
+          </button>
+        </div>
       </div>
     `;
   }).join('');

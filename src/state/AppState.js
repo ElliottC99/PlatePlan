@@ -3,7 +3,7 @@
  * Centralized State Encapsulation Module.
  * Provides getState(), updateState(patch), and subscribe(listener).
  */
-import { getState, updateState, subscribe, saveStateCache, clearStateCache, setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, setShoppingList, runOptimisticMutation } from '../store/store.js';
+import { getState, updateState, subscribe, saveStateCache, clearStateCache, setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, setShoppingList, runOptimisticMutation, reorderDraftRecipes } from '../store/store.js';
 
 if (typeof window !== 'undefined') {
   window.AppState = { getState, updateState, subscribe };
@@ -34,7 +34,8 @@ export const AppState = {
   setPreferences,
   setCurrentPlan,
   setShoppingList,
-  runOptimisticMutation
+  runOptimisticMutation,
+  reorderDraftRecipes
 };
 
 export {
@@ -49,7 +50,8 @@ export {
   setPreferences,
   setCurrentPlan,
   setShoppingList,
-  runOptimisticMutation
+  runOptimisticMutation,
+  reorderDraftRecipes
 };
 
 export default AppState;

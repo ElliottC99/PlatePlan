@@ -5,7 +5,7 @@
 
 import { unpackAndSplitRecipeBlocks, parseSingleRecipeText } from '../../services/RecipeParserService.js';
 import { parseIngredientString, matchIngredientTaxonomy, toTitleCase } from '../../services/RecipeImporter.js';
-import { getState } from '../../store/store.js';
+import { getState, updateState, reorderDraftRecipes } from '../../state/AppState.js';
 import { saveRecipe } from '../../services/HouseholdRepository.js';
 import { wizardState } from './RecipeWizardState.js';
 
@@ -126,6 +126,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
       wizardState.processingQueue = parsedRecipes;
       wizardState.currentQueueTotal = parsedRecipes.length;
       wizardState.currentQueueIndex = 0;
+      updateState({ draftRecipes: parsedRecipes });
 
       if (parsedRecipes.length > 1) {
         wizardState.currentStep = 1.5;
@@ -146,6 +147,34 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
         if (!isNaN(qIdx) && wizardState.processingQueue[qIdx]) {
           wizardState.processingQueue.splice(qIdx, 1);
           wizardState.currentQueueTotal = wizardState.processingQueue.length;
+          updateState({ draftRecipes: [...wizardState.processingQueue] });
+          renderWizardModal();
+        }
+      };
+    });
+
+    // Move Up
+    modalWrap.querySelectorAll('.move-up').forEach(btn => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.dataset.index, 10);
+        if (idx > 0) {
+          reorderDraftRecipes(idx, idx - 1);
+          // Sync back to wizardState for internal logic
+          wizardState.processingQueue = [...getState().draftRecipes];
+          renderWizardModal();
+        }
+      };
+    });
+
+    // Move Down
+    modalWrap.querySelectorAll('.move-down').forEach(btn => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.dataset.index, 10);
+        const recipes = getState().draftRecipes || [];
+        if (idx < recipes.length - 1) {
+          reorderDraftRecipes(idx, idx + 1);
+          // Sync back to wizardState for internal logic
+          wizardState.processingQueue = [...getState().draftRecipes];
           renderWizardModal();
         }
       };

@@ -194,7 +194,7 @@ export function renderState2Mapping() {
       })()}
 
       <div style="display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border, #eee); padding-top: 14px;">
-        <button type="button" class="btn ghost" onclick="goToWizardStep(1)">← Back</button>
+        <button type="button" class="btn ghost" id="wizard-back-btn">← Back</button>
         ${(() => {
           const allIngs = (recipe.ingredientSections || []).flatMap(s => s.ingredients || []);
           const unlinked = allIngs.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));

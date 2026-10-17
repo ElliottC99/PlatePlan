@@ -192,4 +192,15 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       });
     };
   }
+
+  const btnBack = modalWrap.querySelector('#wizard-back-btn');
+  if (btnBack) {
+    btnBack.onclick = () => {
+      if (wizardState.currentStep === 2) {
+        syncStep2InputsToState(modalWrap);
+      }
+      wizardState.currentStep = 1.5;
+      renderWizardModal();
+    };
+  }
 }

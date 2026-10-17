@@ -1,5 +1,5 @@
 /**
- * src/store/store.js (v3.32.7)
+ * src/store/store.js (v3.33.0)
  * Centralized Reactive State Store module using native browser CustomEvents for unidirectional data flow.
  * Provides microtask-wrapped event dispatching and IndexedDB caching for instant offline hydration without localStorage quotas.
  */
@@ -15,12 +15,13 @@ export { getShoppingLineStateKey };
 const DB_NAME = 'PlatePlanDB';
 const STORE_NAME = 'StateStore';
 const DB_VERSION = 1;
-const CACHE_KEY = 'plateplan_store_cache_v3.32.7';
-export const STORE_CACHE_KEY = 'plateplan_store_cache_v3.32.7';
+const CACHE_KEY = 'plateplan_store_cache_v3.33.0';
+export const STORE_CACHE_KEY = 'plateplan_store_cache_v3.33.0';
 
 const state = {
-  version: 'v3.32.7',
+  version: 'v3.33.0',
   recipes: [],
+  draftRecipes: [],
   ingredients: [],
   products: [],
   categories: [],
@@ -805,6 +806,23 @@ export function updateState(patch) {
   dispatchStateEvent('plateplan:state:patch', patch);
 }
 
+/**
+ * Reorders recipes in the draft (wizard) queue.
+ * @param {number} oldIndex 
+ * @param {number} newIndex 
+ */
+export function reorderDraftRecipes(oldIndex, newIndex) {
+  const recipes = state.draftRecipes || [];
+  if (oldIndex < 0 || oldIndex >= recipes.length || newIndex < 0 || newIndex >= recipes.length) return;
+  
+  const [movedItem] = recipes.splice(oldIndex, 1);
+  recipes.splice(newIndex, 0, movedItem);
+  
+  saveStateCache();
+  dispatchStateEvent('plateplan:recipes-updated', recipes);
+  dispatchStateEvent('plateplan:state:patch', { draftRecipes: recipes });
+}
+
 export const setState = updateState;
 
 /**
@@ -849,6 +867,7 @@ if (typeof window !== 'undefined') {
   window.toggleShoppingItem = toggleShoppingItem;
   window.addManualShoppingItem = addManualShoppingItem;
   window.updateShoppingItemQty = updateShoppingItemQty;
+  window.reorderDraftRecipes = reorderDraftRecipes;
   window.Store = {
     getState,
     setState: (patch) => {
@@ -868,7 +887,8 @@ if (typeof window !== 'undefined') {
     addManualShoppingItem,
     updateShoppingItemQty,
     subscribe,
-    learnIngredientAlias
+    learnIngredientAlias,
+    reorderDraftRecipes
   };
   window.store = window.Store;
 }
