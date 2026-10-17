@@ -15,11 +15,11 @@ export { getShoppingLineStateKey };
 const DB_NAME = 'PlatePlanDB';
 const STORE_NAME = 'StateStore';
 const DB_VERSION = 1;
-const CACHE_KEY = 'plateplan_store_cache_v3.31.31';
-export const STORE_CACHE_KEY = 'plateplan_store_cache_v3.31.31';
+const CACHE_KEY = 'plateplan_store_cache_v3.31.32';
+export const STORE_CACHE_KEY = 'plateplan_store_cache_v3.31.32';
 
 const state = {
-  version: 'v3.31.31',
+  version: 'v3.31.32',
   recipes: [],
   ingredients: [],
   products: [],
@@ -203,6 +203,7 @@ export async function initStoreCache() {
  * @returns {Object} Current state snapshot.
  */
 export const getState = () => state;
+export const store = { getState: () => state, setState: (patch) => updateState(patch), subscribe: (domain, cb) => subscribe(domain, cb) };
 
 /**
  * Dispatch a custom event on the document in a safe microtask.

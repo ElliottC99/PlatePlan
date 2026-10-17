@@ -1,13 +1,13 @@
-/**
- * src/components/ProductSwapModal.js (v3.31.24)
- * Robust modal component for 3-tier product & brand substitution.
- * Features relational tier filtering using window.state.products with database loading fallbacks,
- * tabbed tier navigation, "Apply Substitution" button, and reactive UI refresh.
- */
+import { getCanonicalIngredientId, calculateShoppingItemCost } from '../services/ShoppingCalculationService.js';
+import { store, setActivePlan, setShoppingList } from '../store/store.js';
+import { getEffectiveRecipeFitScore } from '../services/FitScoreService.js';
+import { UnitConverter } from '../services/UnitConverter.js';
 
-import { saveCurrentPlan } from '../services/HouseholdRepository.js';
-import { calculateShoppingItemCost } from '../services/ShoppingCalculationService.js';
-import { setShoppingList } from '../store/store.js';
+/**
+ * src/components/ProductSwapModal.js (v3.31.32)
+ * Relational 3-tier product swap modal with native Fit Score delta calculations,
+ * Store action dispatching, and pure ES6 module architecture.
+ */
 
 function escapeHtml(str) {
   if (str == null) return '';
@@ -17,9 +17,8 @@ function escapeAttr(str) { return escapeHtml(str); }
 
 export function inferSubtype(item) {
   if (!item) return 'Produce & Staples';
-  const appState = window.store?.getState?.() || window.state || {};
-  const ingredients = Array.isArray(appState.ingredients) ? appState.ingredients : Object.values(appState.ingredientsBank || {});
-
+  const state = store.getState();
+  const ingredients = Array.isArray(state.ingredients) ? state.ingredients : Object.values(state.ingredientsBank || {});
   const target = item.bankIng || item;
   const ingId = target.ingredientId || target.groupId || target.familyId;
   const subId = target.subTypeId || target.subtypeId;
@@ -28,7 +27,6 @@ export function inferSubtype(item) {
   if (!parentIng && subId) {
     parentIng = ingredients.find(i => Array.isArray(i.subtypes) && i.subtypes.some(s => String(s.id) === String(subId))) || null;
   }
-
   const subObj = (parentIng?.subtypes || []).find(s => String(s.id) === String(subId));
   return subObj?.name || parentIng?.name || target.subtype || target.category || target.cat || 'Produce & Staples';
 }
@@ -42,20 +40,9 @@ export function calculateMetrics(item) {
 
 export function resolveTargetItem(param1, param2, param3) {
   const keys = [param1, param2, param3].filter(k => k && typeof k === 'string' && k.trim() !== '');
-  const state = window.store?.getState?.() || window.state || {};
-  
-  let activeItems = [];
-  if (typeof window.computeWizardShoppingAgg === 'function' && state.plan) {
-    const agg = window.computeWizardShoppingAgg(state.plan);
-    if (agg && Array.isArray(agg.items)) {
-      activeItems = agg.items;
-    } else if (agg && Array.isArray(agg.groups)) {
-      activeItems = agg.groups.flatMap(g => g.items || []);
-    }
-  }
+  const state = store.getState();
 
   const sources = [
-    activeItems,
     state.shoppingList,
     state.confirmedShopping,
     state.generatedList
@@ -66,23 +53,10 @@ export function resolveTargetItem(param1, param2, param3) {
     for (const item of items) {
       if (!item) continue;
       for (const k of keys) {
-        if (
-          item.key === k || 
-          item.id === k || 
-          item.name === k || 
-          item.groupId === k || 
-          item.ingredientId === k || 
-          String(item.name).toLowerCase() === k.toLowerCase()
-        ) {
+        if (item.key === k || item.id === k || item.name === k || item.groupId === k || item.ingredientId === k || String(item.name).toLowerCase() === k.toLowerCase()) {
           return { item, group: null, source: items };
         }
       }
-    }
-  }
-
-  for (const items of sources) {
-    if (Array.isArray(items) && items.length > 0 && items[0]) {
-      return { item: items[0], group: null, source: items };
     }
   }
 
@@ -91,25 +65,48 @@ export function resolveTargetItem(param1, param2, param3) {
   return { item: fallbackProd, group: null, source: null };
 }
 
+export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
+  if (!targetItem || !newProduct) return;
+  const state = store.getState();
+  const canonicalIngId = getCanonicalIngredientId(targetItem, state.ingredients || []);
+  const updatedPlan = JSON.parse(JSON.stringify(state.currentPlan || state.plan || {}));
+
+  updatedPlan.substitutions = updatedPlan.substitutions || {};
+  updatedPlan.productSelections = updatedPlan.productSelections || {};
+
+  const subPayload = {
+    productId: newProduct.id,
+    productName: newProduct.name,
+    brand: newProduct.brand || '',
+    price: newProduct.price || 0,
+    timestamp: Date.now()
+  };
+
+  if (ctx.cookingEventId && canonicalIngId) {
+    updatedPlan.substitutions[`${ctx.cookingEventId}:${canonicalIngId}`] = subPayload;
+  } else if (canonicalIngId) {
+    updatedPlan.substitutions[canonicalIngId] = subPayload;
+  }
+  if (canonicalIngId) {
+    updatedPlan.productSelections[canonicalIngId] = newProduct.id;
+  }
+
+  setActivePlan(updatedPlan);
+}
+
 export function renderScrollableSwapModal(param1, param2, param3, optionalContext = {}) {
   const existing = document.getElementById('pp-swap-product-modal');
   if (existing) existing.remove();
 
-  let ctx = optionalContext || {};
-  if (typeof param3 === 'object' && param3 !== null) {
-    ctx = { ...ctx, ...param3 }; param3 = null;
-  } else if (typeof param3 === 'string' && !ctx.instanceId && (param3.startsWith('prep_') || param3.startsWith('instance_') || param3.includes('_') || param3.includes(':'))) {
-    ctx = { ...ctx, instanceId: param3 }; param3 = null;
-  }
+  const ctx = optionalContext || {};
+  const state = store.getState();
+  const { item: targetItem } = resolveTargetItem(param1, param2, param3);
+  const products = Array.isArray(state.products) ? state.products : Object.values(state.productsBank || {});
+  const ingredients = Array.isArray(state.ingredients) ? state.ingredients : Object.values(state.ingredientsBank || {});
 
-  const { item: targetItem, group: targetGroup } = resolveTargetItem(param1, param2, param3);
-  const appState = window.store?.getState?.() || window.state || {};
-  const products = Array.isArray(appState.products) ? appState.products : Object.values(appState.productsBank || {});
-  const ingredients = Array.isArray(appState.ingredients) ? appState.ingredients : Object.values(appState.ingredientsBank || {});
+  const canonicalIngId = getCanonicalIngredientId(targetItem, ingredients);
+  const targetIngId = canonicalIngId || targetItem?.groupId || targetItem?.ingredientId;
 
-  const targetIngId = targetItem?.groupId || targetItem?.ingredientId || targetItem?.bankIng?.ingredientId;
-
-  // Bulletproof subTypeId resolution
   let targetSubId = targetItem?.bankIng?.subTypeId || targetItem?.bankIng?.subtypeId || targetItem?.subTypeId || targetItem?.subtypeId;
   if (!targetSubId && targetIngId) {
     const parentIng = ingredients.find(i => String(i.id) === String(targetIngId));
@@ -119,25 +116,12 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     }
   }
 
-  // Tier 1: Exact Same Sub-Type (Must match targetSubId strictly)
-  const tier1Items = products.filter(p => 
-    p.id !== targetItem?.id && 
-    targetSubId && 
-    (p.subTypeId === targetSubId || p.subtypeId === targetSubId)
-  );
-  const tier1Subtypes = tier1Items;
-
-  // Tier 2: Same Item Family, Different Sub-Type. Explicitly EXCLUDE Tier 1 matches.
-  const tier2Items = products.filter(p => 
-    p.id !== targetItem?.id && 
-    !tier1Items.some(t => t.id === p.id) && 
-    targetIngId && 
-    (p.ingredientId === targetIngId || p.groupId === targetIngId)
-  );
+  const tier1Items = products.filter(p => p.id !== targetItem?.id && targetSubId && (p.subTypeId === targetSubId || p.subtypeId === targetSubId));
+  const tier2Items = products.filter(p => p.id !== targetItem?.id && !tier1Items.some(t => t.id === p.id) && targetIngId && (p.ingredientId === targetIngId || p.groupId === targetIngId));
   const tier3Items = products;
   const targetSubtype = inferSubtype(targetItem);
 
-  let currentSort = 'relevance', currentScope = (ctx?.instanceId || window.currentPreviewInstanceId) ? 'recipe' : 'global', currentTierTab = 'tier1', selectedSubstituteProduct = null;
+  let currentSort = 'relevance', currentTierTab = 'tier1', selectedSubstituteProduct = null;
 
   const overlay = document.createElement('div');
   overlay.id = 'pp-swap-product-modal';
@@ -187,10 +171,13 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   const searchInput = container.querySelector('#pp-product-search');
   const sortSelect = container.querySelector('#pp-product-sort');
   const applyBtn = container.querySelector('#pp-apply-substitution');
+  const closeBtn = container.querySelector('#pp-modal-close');
   const selectedPreviewEl = container.querySelector('#pp-selected-preview');
 
+  closeBtn.addEventListener('click', () => overlay.remove());
+
   container.querySelectorAll('.pp-tier-tab').forEach(tab => {
-    tab.onclick = () => {
+    tab.addEventListener('click', () => {
       currentTierTab = tab.dataset.tier;
       container.querySelectorAll('.pp-tier-tab').forEach(t => {
         const isActive = t === tab;
@@ -199,7 +186,19 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
         t.style.borderBottom = isActive ? '2px solid #2563eb' : '2px solid transparent';
       });
       renderList(searchInput?.value || '');
-    };
+    });
+  });
+
+  searchInput.addEventListener('input', () => renderList(searchInput.value));
+  sortSelect.addEventListener('change', () => {
+    currentSort = sortSelect.value;
+    renderList(searchInput.value);
+  });
+
+  applyBtn.addEventListener('click', async () => {
+    if (!selectedSubstituteProduct) return;
+    await executeSwapInState(targetItem, selectedSubstituteProduct, ctx);
+    overlay.remove();
   });
 
   function sortItems(items) {
@@ -230,151 +229,51 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
       return;
     }
 
+    const recipes = Array.isArray(state.recipes) ? state.recipes : [];
+    const recipe = recipes.find(r => r && (String(r.id) === String(targetItem?.recipeId) || String(r.id) === String(ctx?.recipeId))) || recipes[0] || null;
+
     listEl.innerHTML = displayItems.map(item => {
       const metrics = calculateMetrics(item);
       const isSelected = selectedSubstituteProduct && (selectedSubstituteProduct.id === item.id || selectedSubstituteProduct.name === item.name);
-      return `<div class="pp-swap-card" data-ing-id="${escapeAttr(item.id || item.name)}" style="padding:12px 14px;border:2px solid ${isSelected ? '#2563eb' : '#e2e8f0'};border-radius:10px;margin-bottom:8px;cursor:pointer;transition:all 0.15s ease;background:${isSelected ? '#eff6ff' : '#fff'};"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div><span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">${escapeAttr(item.brand || '')}</span><div style="font-weight:650;color:#1e293b;font-size:14px;margin-top:1px;">${escapeHtml(item.name)}</div></div><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#e0f2fe;color:#0369a1;">${escapeHtml(inferSubtype(item))}</span></div><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${metrics.price ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">£${metrics.price.toFixed(2)}</span>` : ''}${metrics.protein ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">${metrics.protein}g protein</span>` : ''}</div></div>`;
+
+      let diffBadge = '';
+      if (recipe && typeof getEffectiveRecipeFitScore === 'function') {
+        const baseScore = Math.round(getEffectiveRecipeFitScore(recipe, 'dinner').score || 0);
+        const servingGrams = (UnitConverter.toGrams(targetItem?.needQty || targetItem?.grams || 100, targetItem?.unit || 'g') || 100) / (recipe.serves || 4);
+        const deltaProt = ((Number(item.protein || item.prot || 0) - Number(targetItem?.protein || targetItem?.bankIng?.protein || 0)) / 100) * servingGrams;
+        const deltaCal = ((Number(item.calories || item.kcal || item.cal || 0) - Number(targetItem?.calories || targetItem?.bankIng?.kcal || 0)) / 100) * servingGrams;
+
+        const baseProt = Number(recipe.perServing?.protein || recipe.protein || 0);
+        const baseCal = Number(recipe.perServing?.calories || recipe.calories || 0);
+        const simulatedRecipe = {
+          ...recipe,
+          perServing: { ...recipe.perServing, protein: Math.max(0, baseProt + deltaProt), calories: Math.max(0, baseCal + deltaCal) }
+        };
+        const newScore = Math.round(getEffectiveRecipeFitScore(simulatedRecipe, 'dinner').score || 0);
+        const diff = newScore - baseScore;
+        diffBadge = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:${diff >= 0 ? '#dcfce7' : '#fef3c7'};color:${diff >= 0 ? '#15803d' : '#b45309'};margin-left:auto;">[${diff >= 0 ? '+' + diff : diff} - ${baseScore} &rarr; ${newScore}]</span>`;
+      }
+
+      return `<div class="pp-swap-card" data-ing-id="${escapeAttr(item.id || item.name)}" style="padding:12px 14px;border:2px solid ${isSelected ? '#2563eb' : '#e2e8f0'};border-radius:10px;margin-bottom:8px;cursor:pointer;transition:all 0.15s ease;background:${isSelected ? '#eff6ff' : '#fff'};"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div><span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">${escapeAttr(item.brand || '')}</span><div style="font-weight:650;color:#1e293b;font-size:14px;margin-top:1px;">${escapeHtml(item.name)}</div></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#e0f2fe;color:#0369a1;">${escapeHtml(inferSubtype(item))}</span>${diffBadge}</div></div><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${metrics.price ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">£${metrics.price.toFixed(2)}</span>` : ''}${metrics.protein ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">${metrics.protein}g protein</span>` : ''}</div></div>`;
     }).join('');
 
     listEl.querySelectorAll('.pp-swap-card').forEach(card => {
-      card.onclick = () => {
-        const selectedId = card.dataset.ingId;
-        selectedSubstituteProduct = products.find(p => String(p.id) === String(selectedId) || p.name === selectedId) || { name: selectedId };
-        listEl.querySelectorAll('.pp-swap-card').forEach(c => { c.style.borderColor = '#e2e8f0'; c.style.background = '#fff'; });
-        card.style.borderColor = '#2563eb'; card.style.background = '#eff6ff';
-        if (selectedPreviewEl) {
-          selectedPreviewEl.innerHTML = `Selected: <strong style="color:#0f172a;">${escapeHtml(selectedSubstituteProduct.brand ? selectedSubstituteProduct.brand + ' - ' : '')}${escapeHtml(selectedSubstituteProduct.name)}</strong>`;
-        }
-        if (applyBtn) { applyBtn.disabled = false; applyBtn.style.opacity = '1'; applyBtn.style.cursor = 'pointer'; }
-      };
+      card.addEventListener('click', () => {
+        const item = displayItems.find(p => String(p.id || p.name) === String(card.dataset.ingId));
+        if (!item) return;
+        selectedSubstituteProduct = item;
+        selectedPreviewEl.innerHTML = `<strong style="color:#0f172a;">${escapeHtml(item.brand ? item.brand + ' - ' + item.name : item.name)}</strong> selected`;
+        applyBtn.disabled = false;
+        applyBtn.style.opacity = '1';
+        applyBtn.style.cursor = 'pointer';
+        renderList(searchInput.value);
+      });
     });
   }
 
   renderList();
-  if (searchInput) searchInput.oninput = (e) => renderList(e.target.value);
-  if (sortSelect) sortSelect.onchange = (e) => { currentSort = e.target.value; renderList(searchInput?.value || ''); };
-
-  if (applyBtn) {
-    applyBtn.onclick = () => {
-      if (!selectedSubstituteProduct) return;
-      executeSwapInState(param1, param2, selectedSubstituteProduct, currentScope, targetItem, ctx);
-      overlay.remove();
-    };
-  }
-
-  const closeBtn = container.querySelector('#pp-modal-close');
-  if (closeBtn) closeBtn.onclick = () => overlay.remove();
-  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 }
 
-export async function executeSwapInState(param1, param2, newProduct, scope = 'global', resolvedTarget = null, context = {}) {
-  const targetItem = resolvedTarget || resolveTargetItem(param1, param2).item;
-  const targetName = targetItem?.name || '';
-  const targetKey = targetItem?.groupId || targetItem?.ingredientId || param2 || targetItem?.key || targetItem?.id || param1;
-  const instanceId = context?.instanceId || window.currentPreviewInstanceId || targetItem?.instanceId || null;
-
-  const priceDelta = Math.round((Number(newProduct.price || newProduct.cost || 0) - Number(targetItem?.price || targetItem?.cost || 0)) * 100) / 100;
-
-  const subPayload = {
-    id: newProduct.id || newProduct.name,
-    productId: newProduct.id,
-    name: newProduct.name,
-    brand: newProduct.brand || '',
-    price: Number(newProduct.price || newProduct.cost || 0),
-    priceDelta,
-    scope,
-    instanceId,
-    timestamp: Date.now()
-  };
-
-  if (!window.state) window.state = {};
-  if (!window.state.plan || typeof window.state.plan !== 'object') window.state.plan = {};
-
-  if (scope === 'recipe' && instanceId) {
-    window.state.plan.substitutions = window.state.plan.substitutions || {};
-    window.state.plan.substitutions[`${instanceId}:${targetKey}`] = subPayload;
-    window.state.overrides = window.state.overrides || {};
-    window.state.overrides[instanceId] = window.state.overrides[instanceId] || { substitutions: {}, productOverrides: {} };
-    window.state.overrides[instanceId].substitutions[targetKey] = newProduct.id || newProduct.name;
-    window.state.overrides[instanceId].productOverrides[targetKey] = newProduct.id || newProduct.name;
-  } else {
-    window.state.plan.productSelections = window.state.plan.productSelections || {};
-    if (targetKey) window.state.plan.productSelections[targetKey] = newProduct.id || newProduct.name;
-    if (targetItem?.id) window.state.plan.productSelections[targetItem.id] = newProduct.id || newProduct.name;
-    if (targetName) window.state.plan.productSelections[targetName] = newProduct.id || newProduct.name;
-
-    window.state.plan.substitutions = window.state.plan.substitutions || {};
-    window.state.plan.substitutions[targetKey || targetName] = subPayload;
-  }
-
-  // Update shopping lists in state and trigger reactive store dispatch
-  const shoppingLists = ['confirmedShopping', 'shoppingList', 'generatedList'];
-  shoppingLists.forEach(listKey => {
-    if (!Array.isArray(window.state?.[listKey])) return;
-    window.state[listKey].forEach(group => {
-      if (!group) return;
-      const items = Array.isArray(group.items) ? group.items : (Array.isArray(group) ? group : []);
-      items.forEach(item => {
-        if (!item) return;
-        if (item.id === targetKey || item.key === targetKey || item.groupId === targetKey || item.ingredientId === targetKey || (targetName && item.name === targetName)) {
-          item.name = newProduct.name;
-          item.brand = newProduct.brand || '';
-          item.ingredientId = newProduct.ingredientId || item.ingredientId;
-          item.groupId = newProduct.ingredientId || item.groupId || item.groupId;
-          item.bankIng = newProduct;
-          const costCalc = calculateShoppingItemCost(item, newProduct);
-          item.price = Number(costCalc.price);
-          item.cost = Number(costCalc.cost);
-          item.packsNeeded = costCalc.packsNeeded;
-          item.protein = Number(newProduct.protein || item.protein || 0);
-          item.calories = Number(newProduct.calories || newProduct.kcal || item.calories || 0);
-          if (newProduct.subtype) item.subtype = newProduct.subtype;
-          if (newProduct.packSize && newProduct.packUnit) {
-            item.quantity = `${costCalc.packsNeeded > 1 ? costCalc.packsNeeded + 'x ' : ''}${newProduct.packSize}${newProduct.packUnit}`;
-          }
-        }
-      });
-    });
-  });
-
-  if (Array.isArray(window.state.shoppingList)) {
-    setShoppingList(window.state.shoppingList);
-  }
-
-  saveCurrentPlan(window.state.plan).catch(e => console.warn('[ProductSwapModal] Plan save error:', e));
-
-  document.dispatchEvent(new CustomEvent('plateplan:state:shopping', { detail: window.state?.confirmedShopping || window.state?.shoppingList }));
-  document.dispatchEvent(new CustomEvent('plateplan:state:plan', { detail: window.state?.plan }));
-
-  if (typeof window.renderPlannerWizard === 'function') {
-    window.renderPlannerWizard();
-  }
-
-  if (typeof window.renderShoppingListUI === 'function') {
-    window.renderShoppingListUI();
-  } else if (typeof window.renderShoppingList === 'function') {
-    window.renderShoppingList();
-  } else if (typeof window.renderShopping === 'function') {
-    window.renderShopping();
-  }
-
-  if (typeof window.renderPlan === 'function') {
-    window.renderPlan();
-  }
-  if (typeof window.renderRecipePreview === 'function' && window.previewBaseRecipe) {
-    try { window.renderRecipePreview(); } catch (_e) {}
-  }
-
-  if (typeof window.showPlatePlanToast === 'function') {
-    const scopeLabel = scope === 'recipe' ? 'for this recipe' : 'across shopping list';
-    window.showPlatePlanToast(`Swapped to "${newProduct.name}" ${scopeLabel}`);
-  }
-}
-
-export function toggleInlineShoppingSubst(itemKey, groupId = '', instanceId = null) {
-  renderScrollableSwapModal(itemKey, groupId, null, { instanceId });
-}
-
-if (typeof window !== 'undefined') {
-  window.toggleInlineShoppingSubst = toggleInlineShoppingSubst;
+export function toggleInlineShoppingSubst(itemId) {
+  renderScrollableSwapModal(itemId);
 }
