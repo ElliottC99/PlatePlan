@@ -1,5 +1,5 @@
 /**
- * src/services/RecipeParserService.js (v3.32.4)
+ * src/services/RecipeParserService.js (v3.32.5)
  * Multi-Recipe Batch Parsing, Token Normalisation, Block Chunking,
  * Collapsed Ingredient Unpacking & Method Step Splitting.
  */
@@ -63,46 +63,24 @@ export function unpackCollapsedIngredients(rawIngText) {
   // 1. Separate subsection headers (e.g. FOR THE SAUCE, FOR THE PASTA, TO SERVE)
   text = text.replace(/([^\n])\s*(FOR THE [A-Z\s]+|TO SERVE)/gi, '$1\n\n$2\n');
 
-  // 2. Unconditionally protect composite multipliers: "2 x 280g", "1 x pack", "2x"
-  text = text.replace(/(\b\d+(?:\.\d+)?)\s*[xX]\s+/g, '$1_MULTX_');
-
-  // 3. Mask parentheticals to protect inner weights like (about 160g) or (approx. 200ml)
-  const parens = [];
-  text = text.replace(/\([^)]*\)/g, match => {
-    parens.push(match);
-    return `__PAREN_${parens.length - 1}__`;
-  });
-
-  // 4. Separate closing brackets/parentheses followed immediately by letters or digits
+  // 2. Separate closing parenthesis followed immediately by digits or words: ")1" -> ")\n1"
   text = text.replace(/([\)\]])\s*(?=[0-9a-zA-Z])/g, '$1\n');
 
-  // 5. Separate a letter followed immediately by ANY number (integer, decimal, or range) - never inside parens
-  text = text.replace(/([a-zA-Z])\s+(?=(?:0\.\d+|[1-9]\d*(?:\.\d+)?)(?:\s*[-–]\s*\d+(?:\.\d+)?)?\s*(?:g|kg|ml|l|tbsp|tsp|cm|packs?|cloves?|spring|tin|pot|large|medium|small|pieces?|blocks?|handful|bunch|drizzle|pinch|aubergine|onion|[a-zA-Z]+))/gi, '$1\n');
+  // 3. Separate a letter followed immediately by ANY quantity (integer, decimal, range)
+  // Ensures words glued to numbers split: "onions2 garlic" -> "onions\n2 garlic", "cloves160-200g" -> "cloves\n160-200g"
+  // Negative lookahead: do NOT split if the letter is 'x' followed by space and digit (e.g. "1 x 280g")
+  text = text.replace(/([a-zA-Z])(?=(?:0\.\d+|[1-9]\d*(?:\.\d+)?)(?:\s*[-–]\s*\d+(?:\.\d+)?)?\s*(?:x\s*\d+|g|kg|ml|l|tbsp|tsp|cm|packs?|cloves?|spring|tin|pot|large|medium|small|pieces?|blocks?|handful|bunch|drizzle|pinch|aubergine|onion|[a-zA-Z]+))/gi, '$1\n');
 
-  // 6. Separate known descriptor phrases glued to words without numbers (including 'a few')
+  // 4. Separate known descriptor phrases glued to words without numbers
   const unspacedTokens = [
-    'bunch of',
-    'handful of',
-    'a few',
-    'nooch',
-    'flat-leaf',
-    'drizzle of',
-    'pinch of',
-    'vegetable oil',
-    'olive oil',
-    'sun-dried tomatoes',
-    'cornflour'
+    'bunch of', 'handful of', 'a few', 'nooch', 'flat-leaf',
+    'drizzle of', 'pinch of', 'vegetable oil', 'olive oil',
+    'sun-dried tomatoes', 'cornflour'
   ];
   unspacedTokens.forEach(token => {
     const reg = new RegExp(`([a-zA-Z])(${token})`, 'gi');
     text = text.replace(reg, '$1\n$2');
   });
-
-  // 7. Restore parentheticals
-  text = text.replace(/__PAREN_(\d+)__/g, (_, idx) => parens[Number(idx)]);
-
-  // 8. Restore multipliers cleanly
-  text = text.replace(/_MULTX_/g, ' x ');
 
   return text;
 }
@@ -215,7 +193,16 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
 
   if (rawIngText) {
     const unpackedIngText = unpackCollapsedIngredients(rawIngText);
-    const ingLines = unpackedIngText.split('\n').map(l => l.trim()).filter(Boolean);
+    const rawIngLines = unpackedIngText.split('\n').map(l => l.trim()).filter(Boolean);
+    const ingLines = [];
+    for (let i = 0; i < rawIngLines.length; i++) {
+      let line = rawIngLines[i];
+      if (/^\d+\s*x$/i.test(line) && i + 1 < rawIngLines.length) {
+        line = `${line} ${rawIngLines[i + 1]}`;
+        i++;
+      }
+      ingLines.push(line);
+    }
 
     ingLines.forEach(line => {
       if (/^(?:for\s+the\s+[a-zA-Z\s]+:?|to\s+serve:?|[a-zA-Z\s]+:)$/i.test(line) && !/^\d+\b|serves|yield|prep|cook/i.test(line)) {
