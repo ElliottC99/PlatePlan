@@ -1,5 +1,5 @@
 /**
- * src/services/RecipeParserService.js (v3.32.2)
+ * src/services/RecipeParserService.js (v3.32.3)
  * Multi-Recipe Batch Parsing, Token Normalisation, Block Chunking,
  * Collapsed Ingredient Unpacking & Method Step Splitting.
  */
@@ -60,23 +60,38 @@ export function unpackCollapsedIngredients(rawIngText) {
   if (!rawIngText || typeof rawIngText !== 'string') return '';
   let text = rawIngText.replace(/\r\n/g, '\n').trim();
 
-  // 1. Separate section headers like "FOR THE SAUCE", "FOR THE PASTA", "TO SERVE"
+  // 1. Separate subsection headers (e.g. FOR THE SAUCE, FOR THE PASTA, TO SERVE)
   text = text.replace(/([^\n])\s*(FOR THE [A-Z\s]+|TO SERVE)/gi, '$1\n\n$2\n');
 
-  // 2. Separate parenthetical notes followed immediately by a digit or letter: ")1" -> ")\n1"
-  text = text.replace(/\)\s*(?=\d|[a-zA-Z])/g, ')\n');
+  // 2. Unconditionally protect composite multipliers: "2 x 280g", "1 x pack", "2x"
+  text = text.replace(/(\b\d+(?:\.\d+)?)\s*[xX]\s+/g, '$1_MULTX_');
 
-  // 3. Separate letter/word ending followed immediately by a NEW quantity:
-  // e.g. "cloves160" -> "cloves\n160", "peppers0.5" -> "peppers\n0.5", "cashews200ml" -> "cashews\n200ml"
-  // Does not split composite multipliers like "1 x 280g" or "2 x 280g"
-  text = text.replace(/([a-zA-Z])(?=(?:[1-9]\d*(?:\.\d+)?|0\.\d+)(?:\s*[-–]\s*\d+(?:\.\d+)?)?\s*(?:x\s*\d+|g|kg|ml|l|tbsp|tsp|cm|packs?|cloves?|spring|tin|pot|large|medium|small|pieces?|blocks?|handful|bunch|drizzle|pinch|\b[a-zA-Z]+\b))/gi, '$1\n');
+  // 3. Separate closing brackets/parentheses followed immediately by letters or digits: ")3" -> ")\n3"
+  text = text.replace(/([\)\]])\s*(?=[0-9a-zA-Z])/g, '$1\n');
 
-  // 4. Separate known unspaced ingredients without numbers
-  const unspacedWords = ['vegetable oil', 'olive oil', 'drizzle of olive oil', 'sun-dried tomatoes', 'cornflour', 'pinch of', 'handful of', 'a few'];
-  unspacedWords.forEach(w => {
-    const reg = new RegExp(`([a-zA-Z])(${w})`, 'gi');
+  // 4. Separate a letter followed immediately by ANY number (integer, decimal, or range)
+  text = text.replace(/([a-zA-Z])(?=(?:0\.\d+|[1-9]\d*(?:\.\d+)?)(?:\s*[-–]\s*\d+(?:\.\d+)?)?\s*(?:g|kg|ml|l|tbsp|tsp|cm|packs?|cloves?|spring|tin|pot|large|medium|small|pieces?|blocks?|handful|bunch|drizzle|pinch|aubergine|onion|[a-zA-Z]+))/gi, '$1\n');
+
+  // 5. Separate known descriptor phrases glued to words without numbers
+  const unspacedTokens = [
+    'bunch of',
+    'handful of',
+    'nooch',
+    'flat-leaf',
+    'drizzle of',
+    'pinch of',
+    'vegetable oil',
+    'olive oil',
+    'sun-dried tomatoes',
+    'cornflour'
+  ];
+  unspacedTokens.forEach(token => {
+    const reg = new RegExp(`([a-zA-Z])(${token})`, 'gi');
     text = text.replace(reg, '$1\n$2');
   });
+
+  // 6. Restore multipliers cleanly
+  text = text.replace(/_MULTX_/g, ' x ');
 
   return text;
 }
