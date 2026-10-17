@@ -13,7 +13,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * src/main.js (v3.31.35)
+ * src/main.js (v3.31.36)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  */
 import { waitForAuth } from './services/AuthService.js';
@@ -52,6 +52,15 @@ import * as RecipeAuthoringService from './services/RecipeAuthoringService.js';
 import { registeredComponents } from './components/componentRegistry.js';
 import * as AppRouter from './core/AppRouter.js';
 import * as AppInitializer from './core/AppInitializer.js';
+
+const safeClone = (obj) => {
+  if (!obj) return obj;
+  try {
+    return structuredClone(obj);
+  } catch (e) {
+    return JSON.parse(JSON.stringify(obj));
+  }
+};
 
 // Global Compatibility Shims & Persistence Delegation
 if (typeof window !== 'undefined') {
@@ -271,7 +280,7 @@ function setupSubscriptions() {
   subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
 }
 
-export const APP_VERSION = 'v3.31.35';
+export const APP_VERSION = 'v3.31.36';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
