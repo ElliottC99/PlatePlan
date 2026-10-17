@@ -67,9 +67,13 @@ export function resolveTargetItem(param1, param2, param3) {
 
 export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
   if (!targetItem || !newProduct) return;
-  const state = store.getState();
-  const canonicalIngId = getCanonicalIngredientId(targetItem, state.ingredients || []);
-  const updatedPlan = JSON.parse(JSON.stringify(state.currentPlan || state.plan || {}));
+  const storeState = store.getState();
+  const canonicalIngId = getCanonicalIngredientId(targetItem, storeState.ingredients || []);
+
+  const activePlanKey = storeState.isDraftPlan ? 'draftPlan' : (storeState.plan ? 'plan' : 'currentPlan');
+  const basePlan = storeState[activePlanKey] || storeState.currentPlan || storeState.plan || {};
+
+  const updatedPlan = JSON.parse(JSON.stringify(basePlan));
 
   updatedPlan.substitutions = updatedPlan.substitutions || {};
   updatedPlan.productSelections = updatedPlan.productSelections || {};
@@ -91,18 +95,27 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
     updatedPlan.productSelections[canonicalIngId] = newProduct.id;
   }
 
-  setActivePlan(updatedPlan);
+  // 1. Sync across all active plan keys in the modern Store
+  if (typeof store.setState === 'function') {
+    store.setState({
+      [activePlanKey]: updatedPlan,
+      currentPlan: updatedPlan,
+      plan: updatedPlan
+    });
+  }
 
-  // Re-run the shopping aggregator to catch the new substitutions
+  // 2. Dispatch through official action for persistent cache
+  if (typeof setActivePlan === 'function') {
+    setActivePlan(updatedPlan);
+  }
+
+  // 3. Re-run aggregator and force legacy DOM repaints
   if (typeof window.computeWizardShoppingAgg === 'function') {
     window.computeWizardShoppingAgg(updatedPlan);
   }
-
-  // Dispatch DOM events
   document.dispatchEvent(new CustomEvent('plateplan:state:plan', { detail: updatedPlan }));
   document.dispatchEvent(new CustomEvent('plateplan:state:shopping'));
 
-  // Trigger UI repaints
   if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
   if (typeof window.renderShoppingListUI === 'function') window.renderShoppingListUI();
 }
