@@ -15,11 +15,11 @@ export { getShoppingLineStateKey };
 const DB_NAME = 'PlatePlanDB';
 const STORE_NAME = 'StateStore';
 const DB_VERSION = 1;
-const CACHE_KEY = 'plateplan_store_cache_v3.31.39';
-export const STORE_CACHE_KEY = 'plateplan_store_cache_v3.31.39';
+const CACHE_KEY = 'plateplan_store_cache_v3.31.40';
+export const STORE_CACHE_KEY = 'plateplan_store_cache_v3.31.40';
 
 const state = {
-  version: 'v3.31.39',
+  version: 'v3.31.40',
   recipes: [],
   ingredients: [],
   products: [],

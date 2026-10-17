@@ -4,9 +4,9 @@ import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
 import { UnitConverter } from '../services/UnitConverter.js';
 
 /**
- * src/components/ProductSwapModal.js (v3.31.39)
- * Relational 3-tier product swap modal with strict Tier 2 family filtering,
- * scope-aware substitution persistence, and dynamic Fit Score delta badges.
+ * src/components/ProductSwapModal.js (v3.31.40)
+ * Relational 3-tier product swap modal with robust target item resolution,
+ * strict Fit Score delta badge formatting, and Tier 2 family isolation.
  */
 
 function escapeHtml(str) { return str == null ? '' : String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
@@ -34,24 +34,48 @@ export function calculateMetrics(item) {
 }
 
 export function resolveTargetItem(param1, param2, param3) {
-  const keys = [param1, param2, param3].filter(k => k && typeof k === 'string' && k.trim() !== '');
-  const state = (typeof store !== 'undefined' && store.getState) ? store.getState() : {};
-  const sources = [state.shoppingList, state.confirmedShopping, state.generatedList];
+  if (param1 && typeof param1 === 'object') return { item: param1 };
+  const state = (typeof store !== 'undefined' && store.getState) ? store.getState() : (window.state || {});
+  const list = Array.isArray(state.shoppingList) ? state.shoppingList : [];
+  const products = Array.isArray(state.products) ? state.products : Object.values(state.productsBank || {});
+  const ingredients = Array.isArray(state.ingredients) ? state.ingredients : Object.values(state.ingredientsBank || {});
 
-  for (const items of sources) {
-    if (!Array.isArray(items)) continue;
-    for (const item of items) {
-      if (!item) continue;
-      for (const k of keys) {
-        if (item.key === k || item.id === k || item.name === k || item.groupId === k || item.ingredientId === k || String(item.name).toLowerCase() === k.toLowerCase()) {
-          return { item, group: null, source: items };
-        }
-      }
+  const idQuery = String(param1 || '').trim().toLowerCase();
+  const nameQuery = String(param2 || '').trim().toLowerCase();
+
+  let matched = list.find(item => {
+    if (!item) return false;
+    const itemId = String(item.id || '').toLowerCase();
+    const itemKey = String(item.key || '').toLowerCase();
+    const bankId = String(item.bankIng?.id || '').toLowerCase();
+    const ingId = String(item.ingredientId || item.groupId || '').toLowerCase();
+    const itemName = String(item.name || '').toLowerCase();
+    const prodName = String(item.productName || item.bankIng?.name || '').toLowerCase();
+
+    if (idQuery && (itemId === idQuery || itemKey === idQuery || bankId === idQuery || ingId === idQuery)) return true;
+    if (nameQuery && (itemName === nameQuery || prodName === nameQuery)) return true;
+    if (idQuery && itemName === idQuery) return true;
+    return false;
+  });
+
+  if (!matched && idQuery) {
+    const prod = products.find(p => String(p.id).toLowerCase() === idQuery || String(p.name).toLowerCase() === nameQuery);
+    if (prod) matched = { id: prod.id, key: prod.id, name: prod.name, bankIng: prod, ingredientId: prod.ingredientId || prod.groupId, buyQty: 1, recipeBreakdown: [] };
+  }
+
+  if (!matched && (idQuery || nameQuery)) {
+    const ing = ingredients.find(i => String(i.id).toLowerCase() === idQuery || String(i.name).toLowerCase() === nameQuery);
+    if (ing) {
+      const defaultProd = products.find(p => String(p.id) === String(ing.defaultProductId)) || products.find(p => String(p.ingredientId) === String(ing.id));
+      matched = { id: ing.id, key: ing.id, name: ing.name, bankIng: defaultProd || ing, ingredientId: ing.id, buyQty: 1, recipeBreakdown: [] };
     }
   }
 
-  const products = Array.isArray(state.products) ? state.products : Object.values(state.productsBank || {});
-  return { item: products[0] || { name: keys[0] || 'Selected Product', id: 'item_unknown', groupId: 'ing_1791021416243' }, group: null, source: null };
+  if (!matched) {
+    matched = { id: param1 || 'unknown', key: param1 || 'unknown', name: param2 || param1 || 'Item', bankIng: null, buyQty: 1, recipeBreakdown: [] };
+  }
+
+  return { item: matched };
 }
 
 export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
@@ -74,9 +98,7 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
   const subPayload = { productId: newProduct.id, productName: newProduct.name, brand: newProduct.brand || '', price: newProduct.price || 0, timestamp: Date.now() };
 
   if (ctx && ctx.cookingEventId) {
-    candidateKeys.forEach(k => {
-      updatedPlan.substitutions[`${ctx.cookingEventId}:${k}`] = subPayload;
-    });
+    candidateKeys.forEach(k => { updatedPlan.substitutions[`${ctx.cookingEventId}:${k}`] = subPayload; });
   } else {
     candidateKeys.forEach(k => {
       updatedPlan.substitutions[k] = subPayload;
@@ -135,7 +157,8 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     if (p.id === targetItem?.id || tier1Items.some(t => t.id === p.id)) return false;
     return Boolean(
       (p.ingredientId && currentBank.ingredientId && String(p.ingredientId) === String(currentBank.ingredientId)) ||
-      (p.groupId && currentBank.groupId && String(p.groupId) === String(currentBank.groupId))
+      (p.groupId && currentBank.groupId && String(p.groupId) === String(currentBank.groupId)) ||
+      (targetIngId && (String(p.ingredientId) === String(targetIngId) || String(p.groupId) === String(targetIngId)))
     );
   });
 
@@ -286,20 +309,10 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
         const newScore = typeof newScoreResult === 'number' ? newScoreResult : (newScoreResult?.score || baseScore);
         const delta = newScore - baseScore;
 
-        if (delta !== 0) {
-          const sign = delta > 0 ? '+' : '';
-          const badgeBg = delta > 0 ? '#dcfce7' : '#ffe4e6';
-          const badgeFg = delta > 0 ? '#15803d' : '#be123c';
-          badgeHtml = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:${badgeBg};color:${badgeFg};margin-left:auto;">[${sign}${delta} - ${baseScore} &rarr; ${newScore}]</span>`;
-        } else {
-          const pDeltaRounded = Math.round(deltaProt * 10) / 10;
-          const cDeltaRounded = Math.round(deltaCal);
-          const protSign = pDeltaRounded >= 0 ? '+' : '';
-          const calSign = cDeltaRounded >= 0 ? '+' : '';
-          const badgeBg = pDeltaRounded >= 0 ? '#dcfce7' : '#f1f5f9';
-          const badgeFg = pDeltaRounded >= 0 ? '#15803d' : '#475569';
-          badgeHtml = `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;background:${badgeBg};color:${badgeFg};margin-left:auto;">[${protSign}${pDeltaRounded}g prot • ${calSign}${cDeltaRounded} kcal]</span>`;
-        }
+        const sign = delta > 0 ? '+' : '';
+        const badgeBg = delta > 0 ? '#dcfce7' : (delta < 0 ? '#ffe4e6' : '#f1f5f9');
+        const badgeFg = delta > 0 ? '#15803d' : (delta < 0 ? '#be123c' : '#475569');
+        badgeHtml = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:${badgeBg};color:${badgeFg};margin-left:auto;">[${sign}${delta} - ${baseScore} &rarr; ${newScore}]</span>`;
       } else {
         const packDisplay = item.packSize ? `${item.packSize}${item.packUnit || 'g'}` : '';
         const protDisplay = (item.protein || item.prot) ? `${item.protein || item.prot}g protein` : '';

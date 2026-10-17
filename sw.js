@@ -4,21 +4,21 @@
  * Caches core app shell, modern ES6 modules, stylesheets, and icons.
  */
 
-const PLATEPLAN_CACHE = 'plateplan-cache-v3.31.39';
-const PLATEPLAN_STORE_CACHE = 'plateplan_store_cache_v3.31.39';
-const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.31.39';
-const PLATEPLAN_APP_VERSION = 'v3.31.39';
-const PLATEPLAN_BUILD_ID = '3.31.39-v3139';
+const PLATEPLAN_CACHE = 'plateplan-cache-v3.31.40';
+const PLATEPLAN_STORE_CACHE = 'plateplan_store_cache_v3.31.40';
+const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.31.40';
+const PLATEPLAN_APP_VERSION = 'v3.31.40';
+const PLATEPLAN_BUILD_ID = '3.31.40-v3140';
 
 const PLATEPLAN_PRECACHE_ASSETS = [
   '/',
   '/PlatePlan.html',
   '/manifest.json',
   '/firebase-config.js',
-  '/styles/tokens.css?v=3.31.39',
-  '/styles/components.css?v=3.31.39',
-  '/styles/responsive.css?v=3.31.39',
-  '/styles/print.css?v=3.31.39',
+  '/styles/tokens.css?v=3.31.40',
+  '/styles/components.css?v=3.31.40',
+  '/styles/responsive.css?v=3.31.40',
+  '/styles/print.css?v=3.31.40',
   '/src/main.js',
   '/src/store/store.js',
   '/src/config/firebase.js',
