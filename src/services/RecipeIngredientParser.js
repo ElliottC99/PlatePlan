@@ -1,5 +1,5 @@
 /**
- * src/services/RecipeIngredientParser.js (v3.32.5)
+ * src/services/RecipeIngredientParser.js (v3.32.7)
  * Core ingredient string parsing, units, quantities, fractions, and taxonomy matching.
  */
 
@@ -7,8 +7,8 @@ import { getState } from '../store/store.js';
 import { convertToStrictUnit } from './UnitConversionService.js';
 
 export function toTitleCase(str) {
-  if (!str || typeof str !== 'string') return '';
-  return str.trim().replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
+  if (!str) return '';
+  return str.replace(/\b\w/g, c => c.toUpperCase());
 }
 
 export const UNICODE_FRACTIONS = {
@@ -150,164 +150,87 @@ export function normalizeUnit(rawUnit) {
  * Parses raw ingredient string into structured quantity, unit, name, and notes,
  * then converts strictly into 'g', 'ml', or 'qty' via UnitConversionService.
  */
-export function parseIngredientString(rawString) {
-  if (!rawString || typeof rawString !== 'string') return null;
-  const original = rawString.trim();
-  if (!original) return null;
+export function parseIngredientString(rawStr) {
+  if (!rawStr || typeof rawStr !== 'string') return null;
+  const s = rawStr.trim();
+  if (!s || /^(?:FOR THE\b|TO SERVE\b)/i.test(s)) return null;
 
-  // Check compound stock patterns
-  const compoundStockMatch = original.match(
-    /^(?:(\d+(?:\.\d+)?|\d+\s*\/\s*\d+|½|¼|¾|a|an|one|two|three|half)\s*)?(?:x\s*)?(?:(vegetable|chicken|beef|fish|lamb|vegan|mushroom|onion)\s+)?(?:stock\s*cubes?|cubes?\s*(?:of\s*)?stock|cubes?\s*(?:vegetable|chicken|beef|fish|lamb|vegan)?\s*stock)\s*(?:\+|\bin\b|,\s*dissolved\s+in\b|\bdissolved\s+in\b|\bmade\s+(?:up\s+)?(?:to\s+)?with\b|\bmixed\s+with\b)\s*([\s\S]*)$/i
-  );
+  // Standalone multiplier guard: never allow orphaned multiplier rows
+  if (/^\d+(?:\.\d+)?\s*[xX]$/.test(s)) return null;
 
-  if (compoundStockMatch) {
-    const rawQty = compoundStockMatch[1] || '1';
-    const { qty: parsedQty } = parseQuantity(rawQty);
-    const stockType = compoundStockMatch[2] ? toTitleCase(compoundStockMatch[2]) : 'Vegetable';
-    const name = `${stockType} Stock Cube`;
-    const liquidPart = (compoundStockMatch[3] || '').trim();
-    let notes = liquidPart;
-    if (notes && !notes.toLowerCase().startsWith('in ') && !notes.toLowerCase().startsWith('with ') && !notes.toLowerCase().startsWith('dissolved')) {
-      notes = `dissolved in ${notes}`;
-    }
-    const mlMatch = /(\d+)\s*(?:ml|millilitres|ml\b)/i.exec(liquidPart);
-    const waterMl = mlMatch ? parseInt(mlMatch[1], 10) : 400;
+  // 1. Package multiplier with parenthetical weight e.g. "1 x pack plant-based chicken pieces (about 160g)"
+  const parenMult = s.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s+(?:of\s+)?(.*?)\s*\((?:about|approx\.?)?\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l)\)/i);
+  if (parenMult) {
+    const mult = parseFloat(parenMult[1]) || 1;
+    const innerWeight = parseFloat(parenMult[3]) || 0;
+    const nameClean = parenMult[2].trim();
     return {
-      raw: original,
-      qty: parsedQty || 1,
-      unit: 'qty',
-      name: toTitleCase(name),
-      notes: notes,
-      waterMl: waterMl,
-      isFallbackWeight: false
+      raw: s,
+      qty: mult * innerWeight,
+      unit: parenMult[4].toLowerCase(),
+      name: toTitleCase(nameClean),
+      notes: `${mult} pack (${innerWeight}${parenMult[4]})`
     };
   }
 
-  let qty = 1;
-  let unit = 'qty';
-  let ingredientText = original;
-  let initialNotes = '';
+  // 2. Explicit unit multiplier e.g. "2 x 280g blocks extra-firm tofu", "1 x 400g tin black beans"
+  const compMatch = s.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tbsp|tsp|oz|lb)\b\s*(?:(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s*(?:of\s*)?)?(.*)/i);
+  if (compMatch) {
+    const multComp = parseFloat(compMatch[1]) || 1;
+    const baseWeight = parseFloat(compMatch[2]) || 0;
+    const rawName = (compMatch[4] || '').replace(/^(?:blocks?|packs?|tins?|cans?)\s*(?:of\s*)?/i, '').trim();
+    return {
+      raw: s,
+      qty: multComp * baseWeight,
+      unit: compMatch[3].toLowerCase(),
+      name: toTitleCase(rawName),
+      notes: `${multComp} x ${baseWeight}${compMatch[3]}`
+    };
+  }
 
-  // 1. Handle composite package multipliers with parenthetical weights: "2 x pack extra-firm tofu (about 160g)"
-  const parenMultMatch = original.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s+(?:of\s+)?(.*?)\s*\((?:about|approx\.?)?\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l)\)/i);
-  if (parenMultMatch) {
-    const mult = parseFloat(parenMultMatch[1]) || 1;
-    const innerWeight = parseFloat(parenMultMatch[3]) || 0;
-    unit = parenMultMatch[4].toLowerCase();
-    qty = mult * innerWeight;
-    ingredientText = parenMultMatch[2].trim();
-    initialNotes = `(${mult} x ${innerWeight}${unit})`;
-  } else {
-    // 2. Handle composite multipliers with explicit units: "2 x 280g blocks extra-firm tofu"
-    const compMatch = original.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tbsp|tsp|oz|lb)\b\s*(?:(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s*(?:of\s*)?)?(.*)/i);
-    if (compMatch) {
-      const mult = parseFloat(compMatch[1]) || 1;
-      const baseWeight = parseFloat(compMatch[2]) || 0;
-      unit = compMatch[3].toLowerCase();
-      qty = mult * baseWeight;
-      ingredientText = (compMatch[4] || '').replace(/^(?:blocks?|packs?|tins?|cans?)\s*(?:of\s*)?/i, '').trim();
-      initialNotes = `${mult} x ${baseWeight}${unit}`;
-    } else {
-      // 3. Handle standard unit matches with strict boundaries
-      const stdMatch = original.match(/^(\d+(?:\.\d+)?(?:\s*[-–]\s*\d+(?:\.\d+)?)?)\s*(g|kg|ml|l|tbsp|tsp|cm)\b\s*(.*)/i);
-      if (stdMatch) {
-        const parsed = parseQuantity(stdMatch[1]);
-        qty = parsed.qty;
-        unit = stdMatch[2].toLowerCase();
-        ingredientText = stdMatch[3].trim();
-      } else {
-        const parsed = parseQuantity(original);
-        qty = parsed.qty;
-        let rem = parsed.remainder;
-        if (rem) {
-          const words = rem.split(/\s+/);
-          const firstWordClean = words[0].toLowerCase().replace(/[\.\,]/g, '');
-          if (UNIT_MAP[firstWordClean]) {
-            unit = UNIT_MAP[firstWordClean];
-            rem = words.slice(1).join(' ');
-          } else if (words.length > 1) {
-            const twoWordsClean = (words[0] + ' ' + words[1]).toLowerCase().replace(/[\.\,]/g, '');
-            if (UNIT_MAP[twoWordsClean]) {
-              unit = UNIT_MAP[twoWordsClean];
-              rem = words.slice(2).join(' ');
-            }
-          }
-        }
-        ingredientText = rem;
-      }
+  // 3. Standard match with strict word boundary on unit
+  const stdMatch = s.match(/^(\d+(?:\.\d+)?(?:\s*[-–]\s*\d+(?:\.\d+)?)?)\s*(g|kg|ml|l|tbsp|tsp|cm)\b\s*(.*)/i);
+  if (stdMatch) {
+    let rawQty = stdMatch[1];
+    let qtyStd = parseFloat(rawQty);
+    if (rawQty.includes('-') || rawQty.includes('–')) {
+      const parts = rawQty.split(/[-–]/).map(p => parseFloat(p.trim()));
+      qtyStd = (parts[0] + parts[1]) / 2;
     }
+    return {
+      raw: s,
+      qty: qtyStd || 1,
+      unit: stdMatch[2].toLowerCase(),
+      name: toTitleCase((stdMatch[3] || '').trim()),
+      notes: ''
+    };
   }
 
-  ingredientText = (ingredientText || '').trim().replace(/^[xX]\s+/, '');
-  if (!ingredientText || ingredientText.toLowerCase() === 'x') {
-    ingredientText = 'Ingredient';
+  // 4. Count quantity e.g. "2 garlic cloves", "1 lemon", "2 peppers"
+  const countMatch = s.match(/^(\d+(?:\.\d+)?(?:\s*[-–]\s*\d+(?:\.\d+)?)?)\s+(.*)/i);
+  if (countMatch) {
+    let rawCountQty = countMatch[1];
+    let qtyCount = parseFloat(rawCountQty);
+    if (rawCountQty.includes('-') || rawCountQty.includes('–')) {
+      const parts = rawCountQty.split(/[-–]/).map(p => parseFloat(p.trim()));
+      qtyCount = (parts[0] + parts[1]) / 2;
+    }
+    return {
+      raw: s,
+      qty: qtyCount || 1,
+      unit: 'qty',
+      name: toTitleCase((countMatch[2] || '').trim()),
+      notes: ''
+    };
   }
 
-  if (/^of\b/i.test(ingredientText.trim())) {
-    ingredientText = ingredientText.trim().replace(/^of\b/i, '').trim();
-  }
-
-  let name = ingredientText;
-  let notes = initialNotes;
-
-  const parenMatch = name.match(/^(.*?)\((.*?)\)(.*)$/);
-  if (parenMatch) {
-    name = (parenMatch[1] + ' ' + parenMatch[3]).trim();
-    const parenContent = parenMatch[2].trim();
-    notes = notes ? `${notes}, ${parenContent}` : parenContent;
-  }
-
-  if (name.includes(',')) {
-    const parts = name.split(',');
-    name = parts[0].trim();
-    const commaNotes = parts.slice(1).join(', ').trim();
-    notes = notes ? `${notes}, ${commaNotes}` : commaNotes;
-  }
-
-  if (name.includes(' - ') || name.includes(' – ')) {
-    const parts = name.split(/\s+[-–]\s+/);
-    name = parts[0].trim();
-    const dashNotes = parts.slice(1).join(' ').trim();
-    notes = notes ? `${notes}, ${dashNotes}` : dashNotes;
-  }
-
-  const containerMatch = name.match(/^(cans?|tins?|blocks?|jars?|packs?|packets?|bottles?|heads?|stalks?|sachets?|tubs?|pots?|bags?|box(?:es)?)\s+(?:of\s+)?(.*)/i);
-  if (containerMatch) {
-    const descriptor = containerMatch[1].toLowerCase();
-    name = containerMatch[2].trim();
-    notes = notes ? `${descriptor}, ${notes}` : descriptor;
-  }
-  if (/^of\b/i.test(name.trim())) name = name.trim().replace(/^of\b/i, '').trim();
-
-  const prepLeadMatch = name.match(/^(diced|sliced|chopped|minced|grated|crushed|peeled|cubed|drained|pressed|raw|fresh|organic)\s+(.*)/i);
-  if (prepLeadMatch) {
-    const prepWord = prepLeadMatch[1].toLowerCase();
-    name = prepLeadMatch[2].trim();
-    notes = notes ? `${prepWord}, ${notes}` : prepWord;
-  }
-  if (/^of\b/i.test(name.trim())) name = name.trim().replace(/^of\b/i, '').trim();
-
-  name = name.replace(/^[\s,.\-–]+|[\s,.\-–]+$/g, '').trim();
-  let cleanedName = name || original;
-
-  if (/^(?:(vegetable|chicken|beef|fish|lamb|vegan|mushroom|onion)\s+)?stock\s*cubes?$/i.test(cleanedName)) {
-    const typeMatch = cleanedName.match(/^(vegetable|chicken|beef|fish|lamb|vegan|mushroom|onion)\b/i);
-    const stockType = typeMatch ? toTitleCase(typeMatch[1]) : 'Vegetable';
-    cleanedName = `${stockType} Stock Cube`;
-  }
-
-  cleanedName = toTitleCase(cleanedName);
-
-  // Apply strict unit conversion (g, ml, qty)
-  const strict = convertToStrictUnit(qty, unit, cleanedName);
-
+  // 5. Unquantified descriptor fallback
   return {
-    raw: original,
-    qty: strict.qty,
-    unit: strict.unit,
-    name: cleanedName,
-    notes: notes.trim(),
-    isFallbackWeight: strict.isFallbackWeight || false
+    raw: s,
+    qty: 1,
+    unit: 'qty',
+    name: toTitleCase(s),
+    notes: ''
   };
 }
 
