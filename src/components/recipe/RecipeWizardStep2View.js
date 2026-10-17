@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardStep2View.js (v3.32.1)
+ * src/components/recipe/RecipeWizardStep2View.js (v3.32.2)
  * View rendering for Step 2: Sections, Interactive Target Servings Scaling & Taxonomy Autocomplete Mapping.
  */
 
@@ -23,10 +23,11 @@ function escapeAttr(str) {
 }
 
 export function renderState2Mapping() {
-  const recipe = wizardState.activeRecipe;
-  const baseServings = Number(recipe.servings || recipe.currentServings) || 4;
-  const targetServings = Number(wizardState.targetServings || recipe.targetServings) || baseServings;
-  const scaleFactor = targetServings / baseServings;
+  const activeRecipe = wizardState.activeRecipe || {};
+  const recipe = activeRecipe;
+  const baseServings = Number(activeRecipe.servings || activeRecipe.currentServings) || 2;
+  const targetServings = Number(wizardState.targetServings || activeRecipe.targetServings || baseServings);
+  const scaleFactor = baseServings > 0 ? (targetServings / baseServings) : 1;
 
   const storeState = getState() || {};
   const ingredientsBank = storeState.ingredients || [];
@@ -136,7 +137,7 @@ export function renderState2Mapping() {
 
   return `
     <div>
-      <div class="wiz-scaling-banner" style="background: var(--purple-bg, #eef2ff); border: 1px solid rgba(79,70,229,0.2); padding: 10px 16px; border-radius: 10px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+      <div class="wiz-scaling-banner" id="wiz-scaling-banner" style="background: var(--purple-bg, #eef2ff); border: 1px solid rgba(79,70,229,0.2); padding: 10px 16px; border-radius: 10px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 14px; font-weight: 600; color: var(--purple, #4f46e5);">Scaling &amp; Density Normalization</span>
           <span style="font-size: 12px; color: var(--text2, #666);">(Base: <strong id="wiz-base-servings-label">${baseServings}</strong> servings)</span>

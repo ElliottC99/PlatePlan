@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardStep2Handlers.js (v3.32.1)
+ * src/components/recipe/RecipeWizardStep2Handlers.js (v3.32.2)
  * Event bindings for Wizard Step 2: Interactive Servings Scaling, Section Editing, Line Editing & Taxonomy Linking.
  */
 
@@ -16,8 +16,8 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
   const scaleFactorBadge = modalWrap.querySelector('#wiz-scale-factor-badge');
 
   const updateServingsScale = (newServings) => {
-    const rec = wizardState.activeRecipe;
-    const baseServings = Number(rec.servings || rec.currentServings) || 4;
+    const rec = wizardState.activeRecipe || {};
+    const baseServings = Number(rec.servings || rec.currentServings) || 2;
     const targetServings = Math.max(1, Math.min(24, parseInt(newServings, 10) || baseServings));
 
     wizardState.targetServings = targetServings;
