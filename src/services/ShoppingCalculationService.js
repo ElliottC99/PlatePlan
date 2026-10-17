@@ -218,7 +218,8 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
         (matchedIng && String(p.ingredientId) === String(matchedIng.id))
       ) || getFallbackProductData(rawName);
 
-      const key = String(canonicalIngId || rawName).toLowerCase().replace(/\s+/g, '_');
+      const resolvedId = overriddenProductId || matchedProd?.id || canonicalIngId || rawName;
+      const key = String(resolvedId).toLowerCase().replace(/\s+/g, '_');
       const rawQty = Number(ing.qty ?? ing.quantity ?? ing.amount ?? 1);
       const rawUnit = String(ing.unit || '').trim();
 
@@ -231,7 +232,7 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
         id: key,
         groupId: canonicalIngId || matchedIng?.id || ingId || key,
         ingredientId: canonicalIngId || matchedIng?.id || ingId,
-        name: matchedIng?.name || rawName,
+        name: matchedProd?.name || matchedIng?.name || rawName,
         brand: matchedProd?.brand || 'Tesco',
         cat: matchedIng?.category || ing.categoryId || ing.category || matchedProd?.category || matchedProd?.cat || 'General Groceries',
         category: matchedIng?.category || ing.categoryId || ing.category || matchedProd?.category || matchedProd?.cat || 'General Groceries',

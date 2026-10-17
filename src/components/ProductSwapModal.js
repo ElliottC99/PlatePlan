@@ -4,9 +4,9 @@ import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
 import { UnitConverter } from '../services/UnitConverter.js';
 
 /**
- * src/components/ProductSwapModal.js (v3.31.38)
- * Relational 3-tier product swap modal with candidate key alignment,
- * dynamic Fit Score badges, and full pipeline persistence.
+ * src/components/ProductSwapModal.js (v3.31.39)
+ * Relational 3-tier product swap modal with strict Tier 2 family filtering,
+ * scope-aware substitution persistence, and dynamic Fit Score delta badges.
  */
 
 function escapeHtml(str) { return str == null ? '' : String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
@@ -73,15 +73,14 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
   updatedPlan.productSelections = updatedPlan.productSelections || {};
   const subPayload = { productId: newProduct.id, productName: newProduct.name, brand: newProduct.brand || '', price: newProduct.price || 0, timestamp: Date.now() };
 
-  candidateKeys.forEach(k => {
-    updatedPlan.substitutions[k] = subPayload;
-    updatedPlan.productSelections[k] = newProduct.id;
-    if (ctx.cookingEventId) updatedPlan.substitutions[`${ctx.cookingEventId}:${k}`] = subPayload;
-  });
-
-  if (!ctx.cookingEventId && Array.isArray(targetItem.recipeBreakdown)) {
-    targetItem.recipeBreakdown.forEach(b => {
-      if (b.cookingEventId) candidateKeys.forEach(k => { updatedPlan.substitutions[`${b.cookingEventId}:${k}`] = subPayload; });
+  if (ctx && ctx.cookingEventId) {
+    candidateKeys.forEach(k => {
+      updatedPlan.substitutions[`${ctx.cookingEventId}:${k}`] = subPayload;
+    });
+  } else {
+    candidateKeys.forEach(k => {
+      updatedPlan.substitutions[k] = subPayload;
+      updatedPlan.productSelections[k] = newProduct.id;
     });
   }
 
@@ -131,13 +130,12 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   }
 
   const tier1Items = products.filter(p => p.id !== targetItem?.id && targetSubId && (p.subTypeId === targetSubId || p.subtypeId === targetSubId));
+
   const tier2Items = products.filter(p => {
     if (p.id === targetItem?.id || tier1Items.some(t => t.id === p.id)) return false;
     return Boolean(
       (p.ingredientId && currentBank.ingredientId && String(p.ingredientId) === String(currentBank.ingredientId)) ||
-      (p.groupId && currentBank.groupId && String(p.groupId) === String(currentBank.groupId)) ||
-      (targetIngId && (String(p.ingredientId) === String(targetIngId) || String(p.groupId) === String(targetIngId))) ||
-      (p.category && currentBank.category && String(p.category).toLowerCase() === String(currentBank.category).toLowerCase())
+      (p.groupId && currentBank.groupId && String(p.groupId) === String(currentBank.groupId))
     );
   });
 
@@ -288,10 +286,20 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
         const newScore = typeof newScoreResult === 'number' ? newScoreResult : (newScoreResult?.score || baseScore);
         const delta = newScore - baseScore;
 
-        const sign = delta > 0 ? '+' : '';
-        const badgeBg = delta > 0 ? '#dcfce7' : (delta < 0 ? '#ffe4e6' : '#f1f5f9');
-        const badgeFg = delta > 0 ? '#15803d' : (delta < 0 ? '#be123c' : '#475569');
-        badgeHtml = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:${badgeBg};color:${badgeFg};margin-left:auto;">[${sign}${delta} - ${baseScore} &rarr; ${newScore}]</span>`;
+        if (delta !== 0) {
+          const sign = delta > 0 ? '+' : '';
+          const badgeBg = delta > 0 ? '#dcfce7' : '#ffe4e6';
+          const badgeFg = delta > 0 ? '#15803d' : '#be123c';
+          badgeHtml = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:${badgeBg};color:${badgeFg};margin-left:auto;">[${sign}${delta} - ${baseScore} &rarr; ${newScore}]</span>`;
+        } else {
+          const pDeltaRounded = Math.round(deltaProt * 10) / 10;
+          const cDeltaRounded = Math.round(deltaCal);
+          const protSign = pDeltaRounded >= 0 ? '+' : '';
+          const calSign = cDeltaRounded >= 0 ? '+' : '';
+          const badgeBg = pDeltaRounded >= 0 ? '#dcfce7' : '#f1f5f9';
+          const badgeFg = pDeltaRounded >= 0 ? '#15803d' : '#475569';
+          badgeHtml = `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;background:${badgeBg};color:${badgeFg};margin-left:auto;">[${protSign}${pDeltaRounded}g prot • ${calSign}${cDeltaRounded} kcal]</span>`;
+        }
       } else {
         const packDisplay = item.packSize ? `${item.packSize}${item.packUnit || 'g'}` : '';
         const protDisplay = (item.protein || item.prot) ? `${item.protein || item.prot}g protein` : '';
