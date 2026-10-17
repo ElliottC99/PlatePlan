@@ -103,6 +103,7 @@ export function renderStepBadge() {
   const step = wizardState.currentStep;
   if (step === 0) return `<span class="badge" style="background:var(--surface2, #e8e6df);color:var(--text2, #555);">Choice</span>`;
   if (step === 1) return `<span class="badge badge-purple" style="background:#eef2ff;color:#4f46e5;">Step 1: Ingestion</span>`;
+  if (step === 1.5) return `<span class="badge badge-amber" style="background:#fef3c7;color:#b45309;font-weight:600;">Step 1.5: Recipe Review Queue (${wizardState.processingQueue.length} Detected)</span>`;
   if (step === 2) return `<span class="badge badge-green" style="background:#ecfdf5;color:#059669;">Step 2: Sections & Mapping</span>`;
   if (step === 3) return `<span class="badge badge-coral" style="background:#fef2f2;color:#dc2626;">Step 3: Inline Review & Save</span>`;
   return '';

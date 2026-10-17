@@ -1,19 +1,19 @@
 /**
- * src/components/recipe/RecipeWizardModal.js (v3.28.0)
+ * src/components/recipe/RecipeWizardModal.js (v3.32.0)
  * Controller Module for Multi-Step Ingestion & Recipe Creation Wizard Modal.
  * Integrates:
  * - State 0: Choice (Manual vs Bulk)
- * - State 1: Ingestion & Input (Timings, Strict Meal Suitability Tags)
+ * - State 1: Ingestion & Input (Timings, Meal Tags)
+ * - State 1.5: Batch Queue Review (Pills, Trash Removal, Direct Bulk Import)
  * - State 2: Sections, Scaled Quantities & Searchable Taxonomy Autocomplete Mapping
- * - State 3: Final Inline Review with Macro Crossbar, Variant Switcher & Dynamic Persistence
+ * - State 3: Final Inline Review with Macro Crossbar, Variant Switcher & Queue Navigation
  */
 
-import { parseIngredientString, matchIngredientTaxonomy, parseBulkRecipeText, toTitleCase } from '../../services/RecipeImporter.js';
-import { getState, learnIngredientAlias } from '../../store/store.js';
-import { saveRecipe } from '../../services/HouseholdRepository.js';
-import { wizardState, resetWizardState, syncStep2InputsToState, syncStep3InputsToState, MEAL_TAGS, getSaveButtonLabel, hasDistinctEnhancedVariant } from './RecipeWizardState.js';
+import { wizardState, resetWizardState, syncStep2InputsToState } from './RecipeWizardState.js';
 import { renderStepBadge, renderState0Choice, renderState1AManual, renderState1BBulk, renderState2Mapping, renderState3Review } from './RecipeWizardViews.js';
-import { bindTaxonomyAutocompleteEvents } from './RecipeWizardTaxonomySearch.js';
+import { renderStep1Point5 } from './RecipeWizardStep15View.js';
+import { bindStep01Events } from './RecipeWizardStep1Handlers.js';
+import { bindStep23Events } from './RecipeWizardStep23Handlers.js';
 
 export function openRecipeWizard(initialMode = 'manual') {
   resetWizardState();
@@ -50,7 +50,7 @@ function ensureModalDOM() {
   modalWrap.classList.add('open');
 }
 
-function showWizardNotice(msg, type = 'error') {
+export function showWizardNotice(msg, type = 'error') {
   if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
     window.showPlatePlanToast(msg, type);
     return;
@@ -70,6 +70,33 @@ function showWizardNotice(msg, type = 'error') {
   }
 }
 
+export function loadNextRecipeFromQueue() {
+  if (!wizardState.processingQueue.length) return;
+  const next = wizardState.processingQueue.shift();
+
+  const ingRawText = (next.ingredientSections || []).map(sec => {
+    const header = sec.sectionTitle && sec.sectionTitle !== 'Main Ingredients' ? `${sec.sectionTitle}:\n` : '';
+    const items = sec.ingredients.map(i => i.raw || `${i.qty} ${i.unit} ${i.name}`).join('\n');
+    return `${header}${items}`;
+  }).join('\n\n');
+
+  const methodRawText = (next.instructions || next.methodSteps || []).join('\n');
+
+  wizardState.activeRecipe = {
+    title: next.title || 'Imported Recipe',
+    currentServings: next.servings || 4,
+    targetServings: next.servings || 4,
+    prepTime: next.prepTime || { hours: 0, minutes: 15 },
+    cookTime: next.cookTime || { hours: 0, minutes: 30 },
+    mealSuitability: next.mealSuitability || ['Dinner'],
+    ingredientsRaw: ingRawText,
+    methodRaw: methodRawText,
+    ingredientSections: next.ingredientSections || [{ sectionTitle: 'Main Ingredients', ingredients: next.ingredients || [] }],
+    methodSteps: next.instructions || next.methodSteps || [],
+    macros: next.macros || { calories: 450, protein: 28, carbs: 40, fat: 16 }
+  };
+}
+
 export function renderWizardModal() {
   const modalWrap = document.getElementById('recipe-wizard-modal-wrap');
   if (!modalWrap) return;
@@ -80,6 +107,8 @@ export function renderWizardModal() {
     bodyContent = renderState0Choice();
   } else if (wizardState.currentStep === 1) {
     bodyContent = wizardState.choice === 'bulk' ? renderState1BBulk() : renderState1AManual();
+  } else if (wizardState.currentStep === 1.5) {
+    bodyContent = renderStep1Point5();
   } else if (wizardState.currentStep === 2) {
     bodyContent = renderState2Mapping();
   } else if (wizardState.currentStep === 3) {
@@ -109,510 +138,15 @@ function bindWizardEvents() {
   const modalWrap = document.getElementById('recipe-wizard-modal-wrap');
   if (!modalWrap) return;
 
-  // Choice buttons
-  const btnManual = modalWrap.querySelector('#btn-choice-manual');
-  if (btnManual) {
-    btnManual.onclick = () => {
-      wizardState.choice = 'manual';
-      wizardState.currentStep = 1;
-      renderWizardModal();
-    };
-  }
-
-  const btnBulk = modalWrap.querySelector('#btn-choice-bulk');
-  if (btnBulk) {
-    btnBulk.onclick = () => {
-      wizardState.choice = 'bulk';
-      wizardState.currentStep = 1;
-      renderWizardModal();
-    };
-  }
-
-  // Meal tag toggles in Step 1A
-  modalWrap.querySelectorAll('.wiz-meal-tag').forEach(cb => {
-    cb.onchange = () => {
-      const selected = Array.from(modalWrap.querySelectorAll('.wiz-meal-tag:checked')).map(i => i.value);
-      wizardState.activeRecipe.mealSuitability = selected.length ? selected : ['Dinner'];
-      const parentLabel = cb.closest('label');
-      if (parentLabel) {
-        parentLabel.style.background = cb.checked ? 'var(--purple-bg, #eef2ff)' : 'var(--surface, #fff)';
-        parentLabel.style.color = cb.checked ? 'var(--purple, #4f46e5)' : 'var(--text, #333)';
-      }
-    };
-  });
-
-  // Step 1A -> Next
-  const btnNext1A = modalWrap.querySelector('#btn-next-step1a');
-  if (btnNext1A) {
-    btnNext1A.onclick = () => {
-      const rawTitle = modalWrap.querySelector('#wiz-title')?.value.trim() || 'Untitled Recipe';
-      const title = toTitleCase(rawTitle);
-      const curServ = parseInt(modalWrap.querySelector('#wiz-current-servings')?.value, 10) || 4;
-      const tgtServ = parseInt(modalWrap.querySelector('#wiz-target-servings')?.value, 10) || 4;
-      const prepH = parseInt(modalWrap.querySelector('#wiz-prep-hours')?.value, 10) || 0;
-      const prepM = parseInt(modalWrap.querySelector('#wiz-prep-mins')?.value, 10) || 0;
-      const cookH = parseInt(modalWrap.querySelector('#wiz-cook-hours')?.value, 10) || 0;
-      const cookM = parseInt(modalWrap.querySelector('#wiz-cook-mins')?.value, 10) || 0;
-      const ingRaw = modalWrap.querySelector('#wiz-ingredients-raw')?.value.trim() || '';
-      const metRaw = modalWrap.querySelector('#wiz-method-raw')?.value.trim() || '';
-
-      const rawSections = parseSectionedIngredients(ingRaw);
-      const storeState = getState() || {};
-      const ingredientsBank = storeState.ingredients || [];
-
-      const parsedSections = rawSections.map(sec => ({
-        sectionTitle: toTitleCase(sec.sectionTitle),
-        ingredients: sec.lines.map(line => {
-          const parsed = parseIngredientString(line);
-          const matched = matchIngredientTaxonomy(parsed, ingredientsBank);
-          return {
-            raw: line,
-            qty: parsed.qty,
-            scaledQty: parsed.qty,
-            unit: parsed.unit,
-            name: parsed.name,
-            notes: parsed.notes,
-            isFallbackWeight: parsed.isFallbackWeight,
-            ingredientId: matched?.ingredientId || null,
-            subtypeId: matched?.subtypeId || null,
-            isNewTaxonomyItem: !matched
-          };
-        })
-      }));
-
-      const methodSteps = metRaw.split('\n')
-        .map(l => l.replace(/^\d+[\.\)]\s*/, '').trim())
-        .filter(Boolean);
-
-      wizardState.activeRecipe.title = title;
-      wizardState.activeRecipe.currentServings = curServ;
-      wizardState.activeRecipe.targetServings = tgtServ;
-      wizardState.activeRecipe.prepTime = { hours: prepH, minutes: prepM };
-      wizardState.activeRecipe.cookTime = { hours: cookH, minutes: cookM };
-      wizardState.activeRecipe.ingredientsRaw = ingRaw;
-      wizardState.activeRecipe.methodRaw = metRaw;
-      wizardState.activeRecipe.ingredientSections = parsedSections.length ? parsedSections : [{ sectionTitle: 'Main Ingredients', ingredients: [] }];
-      wizardState.activeRecipe.methodSteps = methodSteps;
-
-      wizardState.currentStep = 2;
-      renderWizardModal();
-    };
-  }
-
-  // Step 1B -> Next
-  const btnNext1B = modalWrap.querySelector('#btn-next-step1b');
-  if (btnNext1B) {
-    btnNext1B.onclick = () => {
-      const text = modalWrap.querySelector('#wiz-bulk-text')?.value.trim() || '';
-      wizardState.bulkText = text;
-      if (!text) {
-        showWizardNotice('Please paste recipe text before proceeding.', 'warning');
-        return;
-      }
-
-      const storeState = getState() || {};
-      const ingredientsBank = storeState.ingredients || [];
-      const parsedRecipes = parseBulkRecipeText(text, ingredientsBank);
-
-      if (!parsedRecipes.length) {
-        showWizardNotice('Could not detect any valid recipes in text. Please check format.', 'error');
-        return;
-      }
-
-      wizardState.processingQueue = parsedRecipes;
-      wizardState.currentQueueTotal = parsedRecipes.length;
-      loadNextRecipeFromQueue();
-
-      wizardState.currentStep = 2;
-      renderWizardModal();
-    };
-  }
-
-  // Step 2 Events
-  if (wizardState.currentStep === 2) {
-    // Add section header
-    const btnAddSection = modalWrap.querySelector('#wiz-add-section-btn');
-    if (btnAddSection) {
-      btnAddSection.onclick = () => {
-        syncStep2InputsToState(modalWrap);
-        wizardState.activeRecipe.ingredientSections.push({
-          sectionTitle: 'New Section',
-          ingredients: []
-        });
-        renderWizardModal();
-      };
-    }
-
-    // Add ingredient line to section
-    modalWrap.querySelectorAll('.wiz-add-line-btn').forEach(btn => {
-      btn.onclick = () => {
-        syncStep2InputsToState(modalWrap);
-        const sIdx = parseInt(btn.dataset.sidx, 10);
-        if (!isNaN(sIdx) && wizardState.activeRecipe.ingredientSections[sIdx]) {
-          if (!wizardState.activeRecipe.ingredientSections[sIdx].ingredients) {
-            wizardState.activeRecipe.ingredientSections[sIdx].ingredients = [];
-          }
-          wizardState.activeRecipe.ingredientSections[sIdx].ingredients.push({
-            raw: '',
-            name: '',
-            qty: 1,
-            unit: 'g'
-          });
-          renderWizardModal();
-        }
-      };
-    });
-
-    // Delete section header
-    modalWrap.querySelectorAll('.wiz-del-section-btn').forEach(btn => {
-      btn.onclick = () => {
-        syncStep2InputsToState(modalWrap);
-        const sIdx = parseInt(btn.dataset.sidx, 10);
-        if (!isNaN(sIdx)) {
-          wizardState.activeRecipe.ingredientSections.splice(sIdx, 1);
-          if (!wizardState.activeRecipe.ingredientSections.length) {
-            wizardState.activeRecipe.ingredientSections = [{ sectionTitle: 'Main Ingredients', ingredients: [] }];
-          }
-          renderWizardModal();
-        }
-      };
-    });
-
-    // Delete ingredient item
-    modalWrap.querySelectorAll('.wiz-del-ing-btn').forEach(btn => {
-      btn.onclick = () => {
-        syncStep2InputsToState(modalWrap);
-        const sIdx = parseInt(btn.dataset.sidx, 10);
-        const iIdx = parseInt(btn.dataset.iidx, 10);
-        if (!isNaN(sIdx) && !isNaN(iIdx)) {
-          wizardState.activeRecipe.ingredientSections[sIdx]?.ingredients.splice(iIdx, 1);
-          renderWizardModal();
-        }
-      };
-    });
-
-    // Add step button
-    const btnAddStep = modalWrap.querySelector('#wiz-add-step-btn');
-    if (btnAddStep) {
-      btnAddStep.onclick = () => {
-        syncStep2InputsToState(modalWrap);
-        wizardState.activeRecipe.methodSteps.push('New step instruction');
-        renderWizardModal();
-      };
-    }
-
-    // Delete step button
-    modalWrap.querySelectorAll('.wiz-del-step-btn').forEach(btn => {
-      btn.onclick = () => {
-        syncStep2InputsToState(modalWrap);
-        const idx = parseInt(btn.dataset.idx, 10);
-        if (!isNaN(idx)) {
-          wizardState.activeRecipe.methodSteps.splice(idx, 1);
-          renderWizardModal();
-        }
-      };
-    });
-
-    // Bind Searchable Taxonomy Autocomplete
-    bindTaxonomyAutocompleteEvents(modalWrap, (sIdx, iIdx, val) => {
-      const item = wizardState.activeRecipe.ingredientSections[sIdx]?.ingredients[iIdx];
-      if (item) {
-        if (!val || val === 'new_item') {
-          item.ingredientId = null;
-          item.subtypeId = null;
-          item.isNewTaxonomyItem = true;
-        } else if (val.startsWith('cat:')) {
-          item.categoryId = val.replace('cat:', '');
-          item.ingredientId = null;
-          item.subtypeId = null;
-          item.isNewTaxonomyItem = false;
-        } else if (val.includes(':')) {
-          const [ingId, subId] = val.split(':');
-          item.ingredientId = ingId;
-          item.subtypeId = subId;
-          item.isNewTaxonomyItem = false;
-        } else {
-          item.ingredientId = val;
-          item.subtypeId = null;
-          item.isNewTaxonomyItem = false;
-        }
-      }
-      renderWizardModal();
-    });
-
-    // Next to Step 3 with strict validation gate and alias prompt
-    const btnNext2 = modalWrap.querySelector('#btn-next-step2');
-    if (btnNext2) {
-      btnNext2.onclick = () => {
-        syncStep2InputsToState(modalWrap);
-        const allIngs = (wizardState.activeRecipe.ingredientSections || []).flatMap(s => s.ingredients || []);
-        const unlinked = allIngs.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
-        if (unlinked.length > 0) {
-          showWizardNotice(`Cannot proceed: ${unlinked.length} ingredient(s) retain an unlinked "✨ New Item" status. Please map each ingredient to a valid Category, Item, or Sub-Type.`, 'warning');
-          return;
-        }
-
-        promptRecipeWizardAliases(allIngs, () => {
-          wizardState.currentStep = 3;
-          renderWizardModal();
-        });
-      };
-    }
-  }
-
-  // Step 3 Events
-  if (wizardState.currentStep === 3) {
-    const tabOrig = modalWrap.querySelector('#wiz-tab-original');
-    if (tabOrig) {
-      tabOrig.onclick = () => {
-        syncStep3InputsToState(modalWrap);
-        wizardState.activeVariant = 'original';
-        renderWizardModal();
-      };
-    }
-
-    const tabEnh = modalWrap.querySelector('#wiz-tab-enhanced');
-    if (tabEnh) {
-      tabEnh.onclick = () => {
-        syncStep3InputsToState(modalWrap);
-        wizardState.activeVariant = 'enhanced';
-        if (!wizardState.activeRecipe.enhanced) {
-          // Initialize enhanced variant with a copy
-          wizardState.activeRecipe.enhanced = {
-            title: `${wizardState.activeRecipe.title} (Enhanced)`,
-            ingredientSections: JSON.parse(JSON.stringify(wizardState.activeRecipe.ingredientSections || [])),
-            ingredients: JSON.parse(JSON.stringify(wizardState.activeRecipe.ingredients || [])),
-            methodSteps: [...(wizardState.activeRecipe.methodSteps || [])],
-            macros: { ...(wizardState.activeRecipe.macros || { calories: 500, protein: 35, carbs: 42, fat: 16 }) }
-          };
-        }
-        renderWizardModal();
-      };
-    }
-
-    const btnSave = modalWrap.querySelector('#btn-save-wizard-recipe');
-    if (btnSave) {
-      btnSave.onclick = async () => {
-        syncStep3InputsToState(modalWrap);
-        const rec = wizardState.activeRecipe;
-        const allIngredients = (rec.ingredientSections || []).flatMap(s => s.ingredients);
-        const unlinked = allIngredients.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
-        if (unlinked.length > 0) {
-          showWizardNotice(`Cannot save recipe: ${unlinked.length} ingredient(s) retain an unlinked "✨ New Item" status. Please map all ingredients to a valid Category, Item, or Sub-Type before saving.`, 'warning');
-          return;
-        }
-
-        btnSave.disabled = true;
-        btnSave.textContent = 'Saving...';
-
-        const recipeToSave = {
-          id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}`,
-          name: rec.title,
-          title: rec.title,
-          servings: rec.targetServings,
-          serves: rec.targetServings,
-          prepTime: rec.prepTime,
-          cookTime: rec.cookTime,
-          time: (rec.prepTime.hours * 60 + rec.prepTime.minutes) + (rec.cookTime.hours * 60 + rec.cookTime.minutes),
-          mealSuitability: rec.mealSuitability,
-          ingredientSections: rec.ingredientSections,
-          ingredients: allIngredients.map(i => ({
-            name: i.name,
-            qty: i.scaledQty || i.qty,
-            unit: i.unit,
-            raw: i.raw,
-            ingredientId: i.ingredientId || null,
-            subtypeId: i.subtypeId || null,
-            categoryId: i.categoryId || null,
-            isCategoryDefault: i.isCategoryDefault || false,
-            displayName: i.displayName || null,
-            waterMl: i.waterMl || null,
-            isNewTaxonomyItem: !!i.isNewTaxonomyItem
-          })),
-          instructions: rec.methodSteps,
-          method: rec.methodSteps,
-          macros: rec.macros,
-          createdAt: new Date().toISOString()
-        };
-
-        if (hasDistinctEnhancedVariant(rec)) {
-          recipeToSave.enhanced = rec.enhanced;
-        }
-
-        try {
-          await saveRecipe(recipeToSave);
-
-          // Learn aliases for mapped items
-          for (const ing of allIngredients) {
-            if (ing.ingredientId && ing.raw) {
-              await learnIngredientAlias(ing.ingredientId, ing.raw);
-            }
-          }
-
-          if (wizardState.processingQueue.length > 0) {
-            loadNextRecipeFromQueue();
-            wizardState.currentStep = 2;
-            renderWizardModal();
-          } else {
-            closeRecipeWizard();
-            if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
-              window.showPlatePlanToast(`Recipe "${rec.title}" saved successfully!`, 'success');
-            }
-          }
-        } catch (e) {
-          console.error('[RecipeWizard] Error saving recipe:', e);
-          showWizardNotice(`Error saving recipe: ${e.message}`, 'error');
-          btnSave.disabled = false;
-          btnSave.textContent = `💾 ${getSaveButtonLabel(rec)}`;
-        }
-      };
-    }
-  }
-}
-
-function parseSectionedIngredients(rawText) {
-  if (!rawText) return [];
-  const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
-  const sections = [];
-  let currentSection = { sectionTitle: 'Main Ingredients', lines: [] };
-
-  lines.forEach(line => {
-    if (line.endsWith(':') || line.startsWith('#') || line.startsWith('For ')) {
-      if (currentSection.lines.length > 0) {
-        sections.push(currentSection);
-      }
-      currentSection = {
-        sectionTitle: line.replace(/[:#]/g, '').trim(),
-        lines: []
-      };
-    } else {
-      currentSection.lines.push(line);
-    }
-  });
-
-  if (currentSection.lines.length > 0) {
-    sections.push(currentSection);
-  }
-
-  return sections;
-}
-
-function loadNextRecipeFromQueue() {
-  if (!wizardState.processingQueue.length) return;
-  const next = wizardState.processingQueue.shift();
-
-  const ingRawText = (next.ingredientSections || []).map(sec => {
-    const header = sec.sectionTitle && sec.sectionTitle !== 'Main Ingredients' ? `${sec.sectionTitle}:\n` : '';
-    const items = sec.ingredients.map(i => i.raw || `${i.qty} ${i.unit} ${i.name}`).join('\n');
-    return `${header}${items}`;
-  }).join('\n\n');
-
-  const methodRawText = (next.instructions || []).join('\n');
-
-  wizardState.activeRecipe = {
-    title: next.title || 'Imported Recipe',
-    currentServings: next.servings || 4,
-    targetServings: next.servings || 4,
-    prepTime: next.prepTime || { hours: 0, minutes: 15 },
-    cookTime: next.cookTime || { hours: 0, minutes: 30 },
-    mealSuitability: next.mealSuitability || ['Dinner'],
-    ingredientsRaw: ingRawText,
-    methodRaw: methodRawText,
-    ingredientSections: next.ingredientSections || [{ sectionTitle: 'Main Ingredients', ingredients: next.ingredients || [] }],
-    methodSteps: next.instructions || [],
-    macros: next.macros || { calories: 450, protein: 28, carbs: 40, fat: 16 }
-  };
-}
-
-function promptRecipeWizardAliases(allIngs, onProceed) {
-  const storeState = getState() || {};
-  const bank = storeState.ingredients || [];
-
-  const candidates = [];
-  allIngs.forEach(ing => {
-    if (!ing.raw || !ing.ingredientId) return;
-    const targetIng = bank.find(i => String(i.id) === String(ing.ingredientId));
-    if (!targetIng) return;
-
-    let targetName = targetIng.name;
-    let targetDoc = targetIng;
-    if (ing.subtypeId && Array.isArray(targetIng.subtypes)) {
-      const sub = targetIng.subtypes.find(s => String(s.id) === String(ing.subtypeId));
-      if (sub) {
-        targetName = `${targetIng.name} (${sub.name})`;
-        targetDoc = sub;
-      }
-    }
-
-    const rawClean = String(ing.raw).trim().toLowerCase();
-    const existingAliases = (targetDoc.aliases || []).map(a => String(a).toLowerCase());
-    const isAlreadyKnown = rawClean === targetName.toLowerCase() || existingAliases.includes(rawClean);
-
-    if (!isAlreadyKnown && rawClean.length > 2) {
-      candidates.push({ ing, targetName, rawClean });
-    }
-  });
-
-  if (candidates.length === 0) {
-    onProceed();
-    return;
-  }
-
-  let promptEl = document.getElementById('wiz-alias-prompt-modal');
-  if (!promptEl) {
-    promptEl = document.createElement('div');
-    promptEl.id = 'wiz-alias-prompt-modal';
-    promptEl.className = 'modal-wrap open';
-    promptEl.style.zIndex = '1300';
-    document.body.appendChild(promptEl);
-  }
-
-  promptEl.innerHTML = `
-    <div class="modal-backdrop" id="wiz-alias-backdrop"></div>
-    <div class="modal" style="max-width: 480px; width: 90%; padding: 22px; background: var(--surface, #fff); border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,0.3); border: 1px solid var(--border, #ddd);">
-      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-        <span style="font-size: 20px;">💡</span>
-        <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text);">Save Raw Text as Learned Aliases?</h3>
-      </div>
-      <p style="font-size: 12.5px; color: var(--text2, #555); margin: 0 0 14px 0; line-height: 1.4;">
-        Would you like to save these raw ingredient text strings as aliases to their mapped Category / Item / Sub-Type for future auto-matching?
-      </p>
-
-      <div style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; background: var(--surface2, #f9f8f6); padding: 10px; border-radius: 8px; border: 1px solid var(--border, #e5e7eb);">
-        ${candidates.map((c, idx) => `
-          <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 12px; cursor: pointer;">
-            <input type="checkbox" class="wiz-alias-check" data-idx="${idx}" checked style="margin-top: 2px;" />
-            <span>"${escapeHtml(c.ing.raw)}" ➔ <strong>${escapeHtml(c.targetName)}</strong></span>
-          </label>
-        `).join('')}
-      </div>
-
-      <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border, #eee); padding-top: 12px;">
-        <button type="button" class="btn ghost sm" id="btn-skip-aliases">Skip & Continue →</button>
-        <button type="button" class="btn primary sm" id="btn-save-aliases">Save Selected Aliases & Continue →</button>
-      </div>
-    </div>
-  `;
-
-  const closePrompt = () => promptEl.remove();
-
-  promptEl.querySelector('#btn-skip-aliases').onclick = () => {
-    closePrompt();
-    onProceed();
+  const handlersContext = {
+    renderWizardModal,
+    showWizardNotice,
+    loadNextRecipeFromQueue,
+    closeRecipeWizard
   };
 
-  promptEl.querySelector('#btn-save-aliases').onclick = async () => {
-    const checks = promptEl.querySelectorAll('.wiz-alias-check:checked');
-    for (const chk of checks) {
-      const idx = parseInt(chk.dataset.idx, 10);
-      const item = candidates[idx];
-      if (item && item.ing.ingredientId) {
-        await learnIngredientAlias(item.ing.ingredientId, item.ing.raw, item.ing.subtypeId);
-      }
-    }
-    closePrompt();
-    onProceed();
-  };
+  bindStep01Events(modalWrap, handlersContext);
+  bindStep23Events(modalWrap, handlersContext);
 }
 
 if (typeof window !== 'undefined') {
