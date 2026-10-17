@@ -14,11 +14,10 @@ import { toTitleCase } from '../../utils/stringUtils.js';
 /**
  * Recalculates per-serving macros and fit score for the active wizard recipe.
  */
-function recalculateWizardMacros() {
-  const rec = wizardState.activeRecipe;
+function recalculateWizardMacros(rec) {
   if (!rec) return;
 
-  const targetServings = Number(wizardState.targetServings || rec.targetServings || 2);
+  const targetServings = Number(rec.targetServings || rec.serves || 2);
   const storeState = getState() || {};
   const products = storeState.products || [];
 
@@ -49,7 +48,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
   if (!modalWrap || wizardState.currentStep !== 2) return;
 
   const safeRender = () => {
-    recalculateWizardMacros();
+    recalculateWizardMacros(wizardState.activeRecipe);
     const wb = document.getElementById('wizard-modal-body') || document.querySelector('.modal-body');
     const st = wb ? wb.scrollTop : 0;
     renderWizardModal();
@@ -100,7 +99,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       }
     });
 
-    recalculateWizardMacros();
+    recalculateWizardMacros(wizardState.activeRecipe);
   };
 
   if (targetServingsInput) {
@@ -244,7 +243,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       }
 
       // Live recalculation before entering Step 3 review
-      recalculateWizardMacros();
+      recalculateWizardMacros(wizardState.activeRecipe);
 
       promptRecipeWizardAliases(allIngs, () => {
         wizardState.currentStep = 3;

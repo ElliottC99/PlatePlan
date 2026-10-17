@@ -148,32 +148,24 @@ export function renderState3Review() {
 
         if (defaultProduct) {
           const brandStr = defaultProduct.brand ? `${defaultProduct.brand} ` : '';
-          const prodTitle = `${brandStr}${defaultProduct.name || defaultProduct.title || ''}`.trim();
-          const productId = defaultProduct.id || defaultProduct.productId;
-          mainLineText = `${escapeHtml(ing.name)}${notesHtml} - <a class="product-link" href="#" data-product-id="${productId}" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(prodTitle)}</a>`;
-          taxLabel = ''; 
+          const matchName = typeof ing.productMatch === 'object' ? ing.productMatch?.name : null;
+          const displayName = ing.productName || matchName || getState()?.items?.[ing.mappedItemId]?.name || ing.name;
+          const productId = ing.productId || ing.mappedItemId || ing.productMatch?.id;
+
+          let mainLineText = `${escapeHtml(ing.name)}${notesHtml}`;
+          if (productId) {
+             mainLineText += ` - <a class="product-link" href="#" data-product-id="${productId}" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(displayName)}</a>`;
+          } else if (!ing.ingredientId && !ing.categoryId) {
+             mainLineText += ` <span class="badge badge-purple" style="font-size:10px;">Mapped</span>`;
+          }
+          
+          taxLabel = '';
         } else {
-          const fallbackQuery = `Tesco Generic ${catName}`;
-          const searchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(fallbackQuery)}`;
-          mainLineText = `${escapeHtml(ing.name)}${notesHtml} - <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--text2,#78716c); text-decoration:underline;">Tesco ${escapeHtml(catName)} Generic</a>`;
-          taxLabel = `<span class="badge badge-purple" style="font-size:10px;">Mapped</span>`;
+            const fallbackQuery = `Tesco Generic ${catName}`;
+            const searchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(fallbackQuery)}`;
+            mainLineText = `${escapeHtml(ing.name)}${notesHtml} - <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--text2,#78716c); text-decoration:underline;">Tesco ${escapeHtml(catName)} Generic</a>`;
+            taxLabel = `<span class="badge badge-purple" style="font-size:10px;">Mapped</span>`;
         }
-      } else if (ing.ingredientId) {
-        const storeState = getState() || {};
-        const products = storeState.products || [];
-        const linkedProduct = ing.productMatch || products.find(p => String(p.ingredientId) === String(ing.ingredientId) || String(p.id) === String(ing.productId));
-        if (linkedProduct) {
-          const brandStr = linkedProduct.brand ? `${linkedProduct.brand} ` : '';
-          const prodTitle = `${brandStr}${linkedProduct.name || linkedProduct.title || ''}`.trim();
-          const productId = linkedProduct.id || linkedProduct.productId;
-          mainLineText = `${escapeHtml(ing.name)}${notesHtml} - <a class="product-link" href="#" data-product-id="${productId}" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(prodTitle)}</a>`;
-          taxLabel = ''; 
-        } else {
-          taxLabel = `<span class="badge badge-purple" style="font-size:10px;">Mapped</span>`;
-        }
-      } else {
-        taxLabel = `<span class="badge badge-green" style="font-size:10px;">New Item</span>`;
-      }
 
       rows += `
         <tr style="border-bottom: 1px solid var(--border, #eee); font-size: 13px;">
@@ -232,11 +224,11 @@ export function renderState3Review() {
         <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-bottom: 12px;">
           <div>
             <label for="wiz-rev-title" style="display:block; font-size:11px; font-weight:600; color:var(--text2);">Recipe Title</label>
-            <input type="text" id="wiz-rev-title" name="rev_title" value="${escapeAttr(toTitleCase(recipe.title))}" style="width:100%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
+            <input type="text" id="wiz-rev-title" name="rev_title" value="${escapeAttr(toTitleCase(recipe.title || recipe.name))}" style="width:100%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
           </div>
           <div>
-            <label for="wiz-rev-servings" style="display:block; font-size:11px; font-weight:600; color:var(--text2);">Servings</label>
-            <input type="number" id="wiz-rev-servings" name="rev_servings" value="${recipe.targetServings}" style="width:100%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
+            <label for="tp-serving-size" style="display:block; font-size:11px; font-weight:600; color:var(--text2);">Servings</label>
+            <input type="number" id="tp-serving-size" name="rev_servings" value="${recipe.servings || recipe.serves || 2}" style="width:100%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
           </div>
           <div>
             <label for="wiz-rev-prepm" style="display:block; font-size:11px; font-weight:600; color:var(--text2);">Prep / Cook (Mins)</label>
