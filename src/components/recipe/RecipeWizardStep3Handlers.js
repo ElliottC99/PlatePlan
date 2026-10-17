@@ -5,7 +5,32 @@
 
 import { wizardState, syncStep3InputsToState, getSaveButtonLabel, hasDistinctEnhancedVariant } from './RecipeWizardState.js';
 import { saveRecipe } from '../../services/HouseholdRepository.js';
-import { learnIngredientAlias } from '../../store/store.js';
+import { learnIngredientAlias, getState } from '../../store/store.js';
+import { toTitleCase } from '../../utils/stringUtils.js';
+import * as NutritionService from '../../services/NutritionService.js';
+import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
+
+function recalculateWizardMacros(recipeObj) {
+  if (!recipeObj) return;
+  const targetServings = Number(recipeObj.servings || recipeObj.targetServings || 2);
+  const storeState = getState() || {};
+  const products = storeState.products || [];
+  const allIngredients = (recipeObj.ingredientSections || []).flatMap(s => s.ingredients || []);
+  const nutritionList = allIngredients.map(ing => {
+    const prodId = ing.productId || ing.mappedItemId || ing.productMatch?.id;
+    const product = prodId ? products.find(p => String(p.id) === String(prodId)) : null;
+    if (!product) return { kcal: 0, prot: 0, carb: 0, fat: 0 };
+    return NutritionService.calculateItemNutrition(product, ing.scaledQty || ing.qty, ing.unit);
+  });
+  const rolled = NutritionService.rollupNutritionTotals(nutritionList, targetServings);
+  recipeObj.macros = {
+    calories: Math.round(rolled.perServing?.cal || rolled.perServing?.kcal || 0),
+    protein: Math.round((rolled.perServing?.prot || rolled.perServing?.protein || 0) * 10) / 10,
+    carbs: Math.round((rolled.perServing?.carb || rolled.perServing?.carbs || 0) * 10) / 10,
+    fat: Math.round((rolled.perServing?.fat || 0) * 10) / 10
+  };
+  recipeObj._computedFitScore = calculateMealFitScore(recipeObj, recipeObj.mealSuitability?.[0] || 'dinner').score;
+}
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -51,54 +76,33 @@ export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice
   if (btnSave) {
     btnSave.onclick = async () => {
       const rec = wizardState.activeRecipe;
-      const cleanTitle = toTitleCase(document.getElementById('wiz-rev-title')?.value || rec.title);
-      const cleanServes = parseInt(document.getElementById('wiz-rev-servings')?.value || rec.serves || rec.targetServings, 10) || 2;
-      
-      rec.name = cleanTitle;
-      rec.title = cleanTitle;
-      rec.serves = cleanServes;
-      rec.servings = cleanServes;
-      rec.targetServings = cleanServes;
+      recalculateWizardMacros(rec);
 
-      const allIngredients = (rec.ingredientSections || []).flatMap(s => s.ingredients);
-      const unlinked = allIngredients.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
-      if (unlinked.length > 0) {
-        showWizardNotice(`Cannot save recipe: ${unlinked.length} ingredient(s) retain an unlinked "✨ New Item" status. Please map all ingredients to a valid Category, Item, or Sub-Type before saving.`, 'warning');
-        return;
-      }
+      const uiTitleInput = document.getElementById('wiz-rev-title');
+      const uiServingsInput = document.getElementById('tp-serving-size');
 
-      btnSave.disabled = true;
-      btnSave.textContent = 'Saving...';
+      const safeTitle = toTitleCase(uiTitleInput?.value || rec.title || rec.name || 'Untitled Recipe');
+      const safeServings = parseInt(uiServingsInput?.value, 10) || rec.servings || rec.serves || 2;
 
       const recipeToSave = {
+        ...rec,
         id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}`,
-        name: rec.name,
-        title: rec.title,
-        servings: rec.servings,
-        serves: rec.serves,
-        prepTime: rec.prepTime,
-        cookTime: rec.cookTime,
-        time: (rec.prepTime.hours * 60 + rec.prepTime.minutes) + (rec.cookTime.hours * 60 + rec.cookTime.minutes),
-        mealSuitability: rec.mealSuitability,
-        ingredientSections: rec.ingredientSections,
-        ingredients: allIngredients.map(i => ({
-          name: i.name,
-          qty: i.scaledQty || i.qty,
-          unit: i.unit,
-          raw: i.raw,
-          ingredientId: i.ingredientId || null,
-          productId: i.productId || i.mappedItemId || i.productMatch?.id || null,
-          productMatch: i.productMatch || null,
-          subtypeId: i.subtypeId || null,
-          categoryId: i.categoryId || null,
-          isCategoryDefault: i.isCategoryDefault || false,
-          displayName: i.displayName || null,
-          waterMl: i.waterMl || null,
-          isNewTaxonomyItem: !!i.isNewTaxonomyItem
+        name: safeTitle,
+        title: safeTitle,
+        servings: safeServings,
+        serves: safeServings,
+        macros: rec.macros,
+        _computedFitScore: rec._computedFitScore || calculateMealFitScore(rec, rec.mealSuitability?.[0] || 'dinner').score,
+        ingredientSections: rec.ingredientSections.map(s => ({
+          ...s,
+          sectionTitle: toTitleCase(s.sectionTitle)
         })),
+        ingredients: (rec.ingredientSections || []).flatMap(s => s.ingredients.map(i => ({
+          ...i,
+          productId: i.productId || i.mappedItemId || i.productMatch?.id || null
+        }))),
         instructions: rec.methodSteps,
         method: rec.methodSteps,
-        macros: rec.macros,
         createdAt: new Date().toISOString()
       };
 
@@ -106,6 +110,7 @@ export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice
         recipeToSave.enhanced = rec.enhanced;
       }
 
+      const allIngredients = (rec.ingredientSections || []).flatMap(s => s.ingredients);
       try {
         await saveRecipe(recipeToSave);
 
