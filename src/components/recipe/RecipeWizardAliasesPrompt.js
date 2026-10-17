@@ -1,6 +1,7 @@
 /**
- * src/components/recipe/RecipeWizardAliasesPrompt.js (v3.32.0)
+ * src/components/recipe/RecipeWizardAliasesPrompt.js (v3.34.0)
  * Modal prompt to optionally learn raw ingredient text as taxonomy aliases.
+ * Redesigned for Apple HIG with inset grouped cards and refined typography.
  */
 
 import { getState, learnIngredientAlias } from '../../store/store.js';
@@ -65,27 +66,30 @@ export function promptRecipeWizardAliases(allIngs, onProceed) {
 
   promptEl.innerHTML = `
     <div class="modal-backdrop" id="wiz-alias-backdrop"></div>
-    <div class="modal" style="max-width: 480px; width: 90%; padding: 22px; background: var(--surface, #fff); border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,0.3); border: 1px solid var(--border, #ddd);">
-      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-        <span style="font-size: 20px;">💡</span>
-        <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text);">Save Raw Text as Learned Aliases?</h3>
+    <div class="modal" style="max-width: 480px; width: 92%; padding: 24px; background: var(--surface, #fff); border-radius: 16px; box-shadow: 0 16px 48px rgba(0,0,0,0.2); border: 1px solid var(--border, #ddd); display: flex; flex-direction: column;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+        <div style="width: 32px; height: 32px; background: #e0f2fe; color: #0284c7; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px;">💡</div>
+        <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--text); letter-spacing: -0.01em;">Learn Ingredient Aliases?</h3>
       </div>
-      <p style="font-size: 12.5px; color: var(--text2, #555); margin: 0 0 14px 0; line-height: 1.4;">
-        Would you like to save these raw ingredient text strings as aliases to their mapped Category / Item / Sub-Type for future auto-matching?
+      <p style="font-size: 13px; color: var(--text2, #64748b); margin: 0 0 18px 0; line-height: 1.5;">
+        Save these phrases to auto-match them in the future.
       </p>
 
-      <div style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; background: var(--surface2, #f9f8f6); padding: 10px; border-radius: 8px; border: 1px solid var(--border, #e5e7eb);">
+      <div class="wiz-alias-inset-card" style="background: var(--surface2, #f8fafc); border: 1px solid var(--border, #e2e8f0); border-radius: 12px; padding: 4px 14px; max-height: 260px; overflow-y: auto; margin-bottom: 20px;">
         ${candidates.map((c, idx) => `
-          <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 12px; cursor: pointer;">
-            <input type="checkbox" class="wiz-alias-check" data-idx="${idx}" checked style="margin-top: 2px;" />
-            <span>"${escapeHtml(c.ing.raw)}" ➔ <strong>${escapeHtml(c.targetName)}</strong></span>
+          <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: ${idx === candidates.length - 1 ? 'none' : '1px solid var(--border, #f1f5f9)'}; cursor: pointer;">
+            <div style="flex: 1; min-width: 0; padding-right: 12px;">
+              <div style="font-size: 12.5px; color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">"${escapeHtml(c.ing.raw)}"</div>
+              <div style="font-size: 11px; color: var(--text2); opacity: 0.7;">➔ ${escapeHtml(c.targetName)}</div>
+            </div>
+            <input type="checkbox" class="wiz-alias-check" data-idx="${idx}" checked style="width: 18px; height: 18px; border-radius: 5px; accent-color: var(--primary, #0284c7); cursor: pointer;" />
           </label>
         `).join('')}
       </div>
 
-      <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border, #eee); padding-top: 12px;">
-        <button type="button" class="btn ghost sm" id="btn-skip-aliases">Skip & Continue →</button>
-        <button type="button" class="btn primary sm" id="btn-save-aliases">Save Selected Aliases & Continue →</button>
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="button" class="btn sm" id="btn-skip-aliases" style="padding: 8px 16px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--text2); font-weight: 500;">Skip</button>
+        <button type="button" class="btn primary sm" id="btn-save-aliases" style="padding: 8px 20px; border-radius: 10px; background: var(--primary, #0284c7); color: #fff; font-weight: 600;">Save Selected</button>
       </div>
     </div>
   `;
@@ -104,11 +108,13 @@ export function promptRecipeWizardAliases(allIngs, onProceed) {
   if (btnSave) {
     btnSave.onclick = async () => {
       const checks = promptEl.querySelectorAll('.wiz-alias-check:checked');
-      for (const chk of checks) {
-        const idx = parseInt(chk.dataset.idx, 10);
-        const item = candidates[idx];
-        if (item && item.ing.ingredientId) {
-          await learnIngredientAlias(item.ing.ingredientId, item.ing.raw, item.ing.subtypeId);
+      if (checks.length > 0) {
+        for (const chk of checks) {
+          const idx = parseInt(chk.dataset.idx, 10);
+          const item = candidates[idx];
+          if (item && item.ing.ingredientId) {
+            await learnIngredientAlias(item.ing.ingredientId, item.ing.raw, item.ing.subtypeId);
+          }
         }
       }
       closePrompt();

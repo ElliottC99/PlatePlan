@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardStep2Handlers.js (v3.32.2)
+ * src/components/recipe/RecipeWizardStep2Handlers.js (v3.34.0)
  * Event bindings for Wizard Step 2: Interactive Servings Scaling, Section Editing, Line Editing & Taxonomy Linking.
  */
 
@@ -9,6 +9,14 @@ import { promptRecipeWizardAliases } from './RecipeWizardAliasesPrompt.js';
 
 export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice }) {
   if (!modalWrap || wizardState.currentStep !== 2) return;
+
+  const safeRender = () => {
+    const wb = document.getElementById('wizard-modal-body') || document.querySelector('.modal-body');
+    const st = wb ? wb.scrollTop : 0;
+    renderWizardModal();
+    const newWb = document.getElementById('wizard-modal-body') || document.querySelector('.modal-body');
+    if (newWb) newWb.scrollTop = st;
+  };
 
   const targetServingsInput = modalWrap.querySelector('#wiz-target-servings-input');
   const scaleDownBtn = modalWrap.querySelector('#wiz-scale-down-btn');
@@ -32,7 +40,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       const sIdx = parseInt(input.dataset.sidx, 10);
       const iIdx = parseInt(input.dataset.iidx, 10);
       const baseQty = parseFloat(input.dataset.baseQty) || parseFloat(input.value) || 1;
-      const scaledQty = Math.round(baseQty * newScale * 10) / 10;
+      const scaledQty = Math.round(baseQty * newScale * 100) / 100;
       input.value = scaledQty;
 
       const item = rec.ingredientSections[sIdx]?.ingredients[iIdx];
@@ -80,7 +88,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
         sectionTitle: 'New Section',
         ingredients: []
       });
-      renderWizardModal();
+      safeRender();
     };
   }
 
@@ -98,7 +106,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
           qty: 1,
           unit: 'g'
         });
-        renderWizardModal();
+        safeRender();
       }
     };
   });
@@ -112,7 +120,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
         if (!wizardState.activeRecipe.ingredientSections.length) {
           wizardState.activeRecipe.ingredientSections = [{ sectionTitle: 'Main Ingredients', ingredients: [] }];
         }
-        renderWizardModal();
+        safeRender();
       }
     };
   });
@@ -124,7 +132,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       const iIdx = parseInt(btn.dataset.iidx, 10);
       if (!isNaN(sIdx) && !isNaN(iIdx)) {
         wizardState.activeRecipe.ingredientSections[sIdx]?.ingredients.splice(iIdx, 1);
-        renderWizardModal();
+        safeRender();
       }
     };
   });
@@ -134,7 +142,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
     btnAddStep.onclick = () => {
       syncStep2InputsToState(modalWrap);
       wizardState.activeRecipe.methodSteps.push('New step instruction');
-      renderWizardModal();
+      safeRender();
     };
   }
 
@@ -144,7 +152,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       const idx = parseInt(btn.dataset.idx, 10);
       if (!isNaN(idx)) {
         wizardState.activeRecipe.methodSteps.splice(idx, 1);
-        renderWizardModal();
+        safeRender();
       }
     };
   });
@@ -172,7 +180,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
         item.isNewTaxonomyItem = false;
       }
     }
-    renderWizardModal();
+    safeRender();
   });
 
   const btnNext2 = modalWrap.querySelector('#btn-next-step2');
@@ -195,12 +203,12 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
 
   const btnBack = modalWrap.querySelector('#wizard-back-btn');
   if (btnBack) {
-    btnBack.onclick = () => {
+    btnBack.addEventListener('click', () => {
       if (wizardState.currentStep === 2) {
         syncStep2InputsToState(modalWrap);
       }
       wizardState.currentStep = 1.5;
       renderWizardModal();
-    };
+    });
   }
 }

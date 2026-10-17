@@ -37,7 +37,7 @@ export function normaliseUnitAndQty(rawQty, rawUnit, ingredientName) {
     case 'kilogram':
     case 'kilograms':
       unit = 'g';
-      qty = Math.round(qty * 1000 * 10) / 10;
+      qty = Math.round(qty * 1000 * 100) / 100;
       break;
 
     case 'ml':
@@ -54,7 +54,7 @@ export function normaliseUnitAndQty(rawQty, rawUnit, ingredientName) {
     case 'liter':
     case 'liters':
       unit = 'ml';
-      qty = Math.round(qty * 1000 * 10) / 10;
+      qty = Math.round(qty * 1000 * 100) / 100;
       break;
 
     case 'tbsp':
@@ -62,10 +62,10 @@ export function normaliseUnitAndQty(rawQty, rawUnit, ingredientName) {
     case 'tablespoons':
       if (isLiquid) {
         unit = 'ml';
-        qty = Math.round(qty * 15 * 10) / 10;
+        qty = Math.round(qty * 15 * 100) / 100;
       } else {
         unit = 'g';
-        qty = Math.round(qty * 14 * 10) / 10;
+        qty = Math.round(qty * 14 * 100) / 100;
         isEstimated = true;
       }
       break;
@@ -75,11 +75,11 @@ export function normaliseUnitAndQty(rawQty, rawUnit, ingredientName) {
     case 'teaspoons':
       if (isLiquid) {
         unit = 'ml';
-        qty = Math.round(qty * 5 * 10) / 10;
+        qty = Math.round(qty * 5 * 100) / 100;
       } else {
         // Exact fraction support for 0.25 tsp -> 0.9g
         if (Math.abs(qty - 0.25) < 0.01) qty = 0.9;
-        else qty = Math.round(qty * 3.5 * 10) / 10;
+        else qty = Math.round(qty * 3.5 * 100) / 100;
         unit = 'g';
         isEstimated = true;
       }
@@ -101,12 +101,12 @@ export function normaliseUnitAndQty(rawQty, rawUnit, ingredientName) {
     case 'ounce':
     case 'ounces':
       unit = 'g';
-      qty = Math.round(qty * 28.35 * 10) / 10;
+      qty = Math.round(qty * 28.35 * 100) / 100;
       break;
 
     case 'fl oz':
       unit = 'ml';
-      qty = Math.round(qty * 29.57 * 10) / 10;
+      qty = Math.round(qty * 29.57 * 100) / 100;
       break;
 
     case 'lb':
@@ -114,13 +114,13 @@ export function normaliseUnitAndQty(rawQty, rawUnit, ingredientName) {
     case 'pound':
     case 'pounds':
       unit = 'g';
-      qty = Math.round(qty * 453.6 * 10) / 10;
+      qty = Math.round(qty * 453.6 * 100) / 100;
       break;
 
     case 'pinch':
     case 'pinches':
       unit = 'g';
-      qty = Math.round(qty * 0.5 * 10) / 10;
+      qty = Math.round(qty * 0.5 * 100) / 100;
       isEstimated = true;
       break;
 
@@ -142,6 +142,7 @@ export function normaliseUnitAndQty(rawQty, rawUnit, ingredientName) {
     case 'handfuls':
     default:
       unit = 'qty';
+      qty = Math.round(qty * 100) / 100;
       break;
   }
 

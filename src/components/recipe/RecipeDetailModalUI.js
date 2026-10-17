@@ -250,10 +250,12 @@ export function renderRecipeDetailModalContent(props = {}) {
       </div>
 
       <style>
+        #view-modal-content { max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; }
+        .recipe-view-sheet { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
         .recipe-modal-crossbar{width:100%;background:var(--surface2,#f5f4ee);border:1px solid var(--border,#e5e5e5);border-radius:12px;padding:12px 16px;margin-bottom:20px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px}
         .recipe-modal-crossbar-controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px;flex:1 1 300px}
         .recipe-modal-crossbar-macros{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px;flex:1 1 360px}
-        .recipe-modal-body{display:grid;grid-template-columns:1fr 1.2fr;gap:22px;align-items:start}
+        .recipe-modal-body{display:grid;grid-template-columns:1fr 1.2fr;gap:22px;align-items:start; overflow-y: auto; flex: 1 1 auto; min-height: 0; padding-right: 8px; -webkit-overflow-scrolling: touch;}
         @media(max-width:768px){.recipe-modal-crossbar{flex-direction:column;align-items:stretch;padding:12px;gap:12px}.recipe-modal-crossbar-macros{justify-content:stretch}.recipe-modal-body{grid-template-columns:1fr;gap:18px}}
         .recipe-modal-col-card{background:var(--surface,#ffffff);border:1px solid var(--border,#e5e5e5);border-radius:12px;padding:16px 18px}
         .recipe-method-step-card{position:relative;padding:12px 14px 12px 42px;margin-bottom:10px;background:var(--surface2,#faf9f6);border:1px solid var(--border,#eee);border-radius:10px;font-size:13.5px;line-height:1.6;color:var(--text)}

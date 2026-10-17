@@ -142,7 +142,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
   if (wizardState.currentStep === 1.5) {
     // Remove individual dish from queue
     modalWrap.querySelectorAll('.wiz-queue-remove-btn').forEach(btn => {
-      btn.onclick = () => {
+      btn.addEventListener('click', () => {
         const qIdx = parseInt(btn.dataset.qidx, 10);
         if (!isNaN(qIdx) && wizardState.processingQueue[qIdx]) {
           wizardState.processingQueue.splice(qIdx, 1);
@@ -150,12 +150,12 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
           updateState({ draftRecipes: [...wizardState.processingQueue] });
           renderWizardModal();
         }
-      };
+      });
     });
 
     // Move Up
     modalWrap.querySelectorAll('.move-up').forEach(btn => {
-      btn.onclick = () => {
+      btn.addEventListener('click', () => {
         const idx = parseInt(btn.dataset.index, 10);
         if (idx > 0) {
           reorderDraftRecipes(idx, idx - 1);
@@ -163,12 +163,12 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
           wizardState.processingQueue = [...getState().draftRecipes];
           renderWizardModal();
         }
-      };
+      });
     });
 
     // Move Down
     modalWrap.querySelectorAll('.move-down').forEach(btn => {
-      btn.onclick = () => {
+      btn.addEventListener('click', () => {
         const idx = parseInt(btn.dataset.index, 10);
         const recipes = getState().draftRecipes || [];
         if (idx < recipes.length - 1) {
@@ -177,7 +177,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
           wizardState.processingQueue = [...getState().draftRecipes];
           renderWizardModal();
         }
-      };
+      });
     });
 
     // Re-paste text
