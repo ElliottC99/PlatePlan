@@ -1,5 +1,5 @@
 /**
- * src/services/RecipeIngredientParser.js (v3.32.1)
+ * src/services/RecipeIngredientParser.js (v3.32.4)
  * Core ingredient string parsing, units, quantities, fractions, and taxonomy matching.
  */
 
@@ -180,6 +180,48 @@ export function parseIngredientString(rawString) {
       notes: notes,
       waterMl: waterMl,
       isFallbackWeight: false
+    };
+  }
+
+  // Check composite package multipliers e.g. "2 x 280g blocks", "1 x pack (about 160g)", "1 x 400g tin"
+  const multPattern = /^(\d+(?:\.\d+)?)\s*[xX]\s*(?:(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tbsp|tsp|oz|lb)\b\s*)?(?:(packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s*(?:of\s*)?)?/i;
+  const multMatch = original.match(multPattern);
+  if (multMatch && multMatch[2] && multMatch[3]) {
+    const packCount = parseFloat(multMatch[1]);
+    const itemWeight = parseFloat(multMatch[2]);
+    const unitStr = multMatch[3].toLowerCase();
+    const totalQty = packCount * itemWeight;
+    const remainder = original.replace(multMatch[0], '').trim();
+    
+    // Check if remainder or parenthetical contains alternate weight e.g. "(about 160g)"
+    let parsedNotes = '';
+    let parsedName = remainder;
+    const parenMatch = parsedName.match(/^(.*?)\((.*?)\)(.*)$/);
+    if (parenMatch) {
+      parsedName = (parenMatch[1] + ' ' + parenMatch[3]).trim();
+      parsedNotes = parenMatch[2].trim();
+      const altWeightMatch = parsedNotes.match(/(?:about|approx\.?|approx)?\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l|oz|lb)\b/i);
+      if (altWeightMatch) {
+        // If parenthetical specifies an item weight like (about 160g) for a pack
+        // Keep packCount * itemWeight or alt weight if appropriate. Here totalQty = packCount * itemWeight or altWeight
+      }
+    }
+
+    parsedName = parsedName.replace(/^[\s,.\-–]+|[\s,.\-–]+$/g, '').trim();
+    if (!parsedName || parsedName.toLowerCase() === 'x') {
+      parsedName = 'Ingredient';
+    }
+
+    const strictUnit = normalizeUnit(unitStr);
+    const converted = convertToStrictUnit(totalQty, strictUnit, parsedName);
+
+    return {
+      raw: original,
+      qty: converted.qty,
+      unit: converted.unit,
+      name: toTitleCase(parsedName),
+      notes: parsedNotes,
+      isFallbackWeight: converted.isFallbackWeight
     };
   }
 

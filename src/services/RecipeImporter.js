@@ -1,5 +1,5 @@
 /**
- * src/services/RecipeImporter.js (v3.32.1)
+ * src/services/RecipeImporter.js (v3.32.4)
  * Modern recipe scraping, JSON-LD microdata extraction,
  * HTML microdata normalization, and facade re-exports for RecipeIngredientParser and RecipeParserService.
  */
@@ -16,6 +16,7 @@ import {
 } from './RecipeIngredientParser.js';
 
 import {
+  unpackCollapsedIngredients,
   unpackAndSplitRecipeBlocks,
   parseSingleRecipeText,
   parseBulkRecipeText
@@ -30,6 +31,7 @@ export {
   parseIngredientString,
   stemIngredientName,
   matchIngredientTaxonomy,
+  unpackCollapsedIngredients,
   unpackAndSplitRecipeBlocks,
   parseSingleRecipeText,
   parseBulkRecipeText

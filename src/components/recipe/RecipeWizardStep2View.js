@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardStep2View.js (v3.32.2)
+ * src/components/recipe/RecipeWizardStep2View.js (v3.32.4)
  * View rendering for Step 2: Sections, Interactive Target Servings Scaling & Taxonomy Autocomplete Mapping.
  */
 
@@ -137,6 +137,17 @@ export function renderState2Mapping() {
 
   return `
     <div>
+      <div style="background: var(--surface2, #f8fafc); border-bottom: 1px solid var(--border, #e2e8f0); padding: 10px 18px; margin: -18px -24px 16px -24px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px;">
+            Dish ${wizardState.currentQueueIndex + 1} of ${wizardState.currentQueueTotal || wizardState.processingQueue?.length || 1}
+          </span>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text, #0f172a);">
+            ${escapeHtml(activeRecipe.title || 'Untitled Recipe')}
+          </h3>
+        </div>
+      </div>
+
       <div class="wiz-scaling-banner" id="wiz-scaling-banner" style="background: var(--purple-bg, #eef2ff); border: 1px solid rgba(79,70,229,0.2); padding: 10px 16px; border-radius: 10px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 14px; font-weight: 600; color: var(--purple, #4f46e5);">Scaling &amp; Density Normalization</span>

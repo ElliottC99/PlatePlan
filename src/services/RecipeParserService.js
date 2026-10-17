@@ -1,5 +1,5 @@
 /**
- * src/services/RecipeParserService.js (v3.32.3)
+ * src/services/RecipeParserService.js (v3.32.4)
  * Multi-Recipe Batch Parsing, Token Normalisation, Block Chunking,
  * Collapsed Ingredient Unpacking & Method Step Splitting.
  */
@@ -66,16 +66,24 @@ export function unpackCollapsedIngredients(rawIngText) {
   // 2. Unconditionally protect composite multipliers: "2 x 280g", "1 x pack", "2x"
   text = text.replace(/(\b\d+(?:\.\d+)?)\s*[xX]\s+/g, '$1_MULTX_');
 
-  // 3. Separate closing brackets/parentheses followed immediately by letters or digits: ")3" -> ")\n3"
+  // 3. Mask parentheticals to protect inner weights like (about 160g) or (approx. 200ml)
+  const parens = [];
+  text = text.replace(/\([^)]*\)/g, match => {
+    parens.push(match);
+    return `__PAREN_${parens.length - 1}__`;
+  });
+
+  // 4. Separate closing brackets/parentheses followed immediately by letters or digits
   text = text.replace(/([\)\]])\s*(?=[0-9a-zA-Z])/g, '$1\n');
 
-  // 4. Separate a letter followed immediately by ANY number (integer, decimal, or range)
-  text = text.replace(/([a-zA-Z])(?=(?:0\.\d+|[1-9]\d*(?:\.\d+)?)(?:\s*[-–]\s*\d+(?:\.\d+)?)?\s*(?:g|kg|ml|l|tbsp|tsp|cm|packs?|cloves?|spring|tin|pot|large|medium|small|pieces?|blocks?|handful|bunch|drizzle|pinch|aubergine|onion|[a-zA-Z]+))/gi, '$1\n');
+  // 5. Separate a letter followed immediately by ANY number (integer, decimal, or range) - never inside parens
+  text = text.replace(/([a-zA-Z])\s+(?=(?:0\.\d+|[1-9]\d*(?:\.\d+)?)(?:\s*[-–]\s*\d+(?:\.\d+)?)?\s*(?:g|kg|ml|l|tbsp|tsp|cm|packs?|cloves?|spring|tin|pot|large|medium|small|pieces?|blocks?|handful|bunch|drizzle|pinch|aubergine|onion|[a-zA-Z]+))/gi, '$1\n');
 
-  // 5. Separate known descriptor phrases glued to words without numbers
+  // 6. Separate known descriptor phrases glued to words without numbers (including 'a few')
   const unspacedTokens = [
     'bunch of',
     'handful of',
+    'a few',
     'nooch',
     'flat-leaf',
     'drizzle of',
@@ -90,7 +98,10 @@ export function unpackCollapsedIngredients(rawIngText) {
     text = text.replace(reg, '$1\n$2');
   });
 
-  // 6. Restore multipliers cleanly
+  // 7. Restore parentheticals
+  text = text.replace(/__PAREN_(\d+)__/g, (_, idx) => parens[Number(idx)]);
+
+  // 8. Restore multipliers cleanly
   text = text.replace(/_MULTX_/g, ' x ');
 
   return text;
