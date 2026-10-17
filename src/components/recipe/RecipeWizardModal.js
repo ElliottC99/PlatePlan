@@ -50,6 +50,26 @@ function ensureModalDOM() {
   modalWrap.classList.add('open');
 }
 
+function showWizardNotice(msg, type = 'error') {
+  if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
+    window.showPlatePlanToast(msg, type);
+    return;
+  }
+  const modalWrap = document.getElementById('recipe-wizard-modal-wrap');
+  if (modalWrap) {
+    let banner = modalWrap.querySelector('.wiz-notice-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.className = 'wiz-notice-banner';
+      banner.style.cssText = 'background:#fee2e2;color:#991b1b;padding:10px 14px;border-radius:8px;margin:12px 16px 0;font-size:14px;font-weight:500;border:1px solid #fca5a5;';
+      const container = modalWrap.querySelector('.modal-card') || modalWrap;
+      container.prepend(banner);
+    }
+    banner.textContent = msg;
+    setTimeout(() => { if (banner && banner.parentNode) banner.remove(); }, 4000);
+  }
+}
+
 export function renderWizardModal() {
   const modalWrap = document.getElementById('recipe-wizard-modal-wrap');
   if (!modalWrap) return;
@@ -186,7 +206,7 @@ function bindWizardEvents() {
       const text = modalWrap.querySelector('#wiz-bulk-text')?.value.trim() || '';
       wizardState.bulkText = text;
       if (!text) {
-        alert('Please paste recipe text before proceeding.');
+        showWizardNotice('Please paste recipe text before proceeding.', 'warning');
         return;
       }
 
@@ -195,7 +215,7 @@ function bindWizardEvents() {
       const parsedRecipes = parseBulkRecipeText(text, ingredientsBank);
 
       if (!parsedRecipes.length) {
-        alert('Could not detect any valid recipes in text. Please check format.');
+        showWizardNotice('Could not detect any valid recipes in text. Please check format.', 'error');
         return;
       }
 
@@ -328,7 +348,7 @@ function bindWizardEvents() {
         const allIngs = (wizardState.activeRecipe.ingredientSections || []).flatMap(s => s.ingredients || []);
         const unlinked = allIngs.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
         if (unlinked.length > 0) {
-          alert(`Cannot proceed: ${unlinked.length} ingredient(s) retain an unlinked "✨ New Item" status. Please map each ingredient to a valid Category, Item, or Sub-Type.`);
+          showWizardNotice(`Cannot proceed: ${unlinked.length} ingredient(s) retain an unlinked "✨ New Item" status. Please map each ingredient to a valid Category, Item, or Sub-Type.`, 'warning');
           return;
         }
 
@@ -378,7 +398,7 @@ function bindWizardEvents() {
         const allIngredients = (rec.ingredientSections || []).flatMap(s => s.ingredients);
         const unlinked = allIngredients.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
         if (unlinked.length > 0) {
-          alert(`Cannot save recipe: ${unlinked.length} ingredient(s) retain an unlinked "✨ New Item" status. Please map all ingredients to a valid Category, Item, or Sub-Type before saving.`);
+          showWizardNotice(`Cannot save recipe: ${unlinked.length} ingredient(s) retain an unlinked "✨ New Item" status. Please map all ingredients to a valid Category, Item, or Sub-Type before saving.`, 'warning');
           return;
         }
 
@@ -441,7 +461,7 @@ function bindWizardEvents() {
           }
         } catch (e) {
           console.error('[RecipeWizard] Error saving recipe:', e);
-          alert(`Error saving recipe: ${e.message}`);
+          showWizardNotice(`Error saving recipe: ${e.message}`, 'error');
           btnSave.disabled = false;
           btnSave.textContent = `💾 ${getSaveButtonLabel(rec)}`;
         }

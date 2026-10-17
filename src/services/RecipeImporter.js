@@ -440,17 +440,20 @@ export function extractRecipeFromHtml(html, sourceUrl = '') {
 /**
  * Multi-recipe text splitter supporting "Recipe X" headers, double page breaks, and section recognition.
  */
-export function parseBulkRecipeText(rawText) {
+export function parseBulkRecipeText(rawText, ingredientsBank = []) {
   if (!rawText || typeof rawText !== 'string') return [];
   
-  const text = rawText.replace(/\r\n/g, '\n').trim();
+  let text = rawText.replace(/\r\n/g, '\n').trim();
   if (!text) return [];
 
+  // Pre-process collapsed text where newlines were stripped or lost
+  text = text.replace(/(?<=[^\n])\s*(?=(?:Recipe\s+(?:Title|\d+):|(?<!\bRecipe\s+)Title:|(?:Total\s+Servings):|(?<!\bTotal\s+)Servings:|Serves:|Yield:|Prep\s+Time:|Cook\s+Time:|(?:Main\s+)?Ingredients:|Method:|Instructions:|Steps:|Preparation:))/gi, '\n');
+
   let recipeBlocks = [];
-  if (/Recipe\s+\d+:/i.test(text)) {
-    recipeBlocks = text.split(/Recipe\s+\d+:/i).map(p => p.trim()).filter(Boolean);
+  if (/(?:Recipe\s+\d+:|Recipe\s+Title:)/i.test(text)) {
+    recipeBlocks = text.split(/(?=(?:Recipe\s+\d+:|Recipe\s+Title:))/i).map(p => p.trim()).filter(Boolean);
   } else {
-    recipeBlocks = text.split(/\n\s*\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    recipeBlocks = text.split(/\n\s*\n\s*\n|\n\s*---\s*\n/).map(p => p.trim()).filter(Boolean);
     if (recipeBlocks.length === 1) {
       recipeBlocks = [text];
     }
@@ -464,24 +467,37 @@ export function parseBulkRecipeText(rawText) {
 
     let title = 'Imported Recipe';
     let servings = 4;
+    let prepMinutes = 15;
+    let cookMinutes = 30;
     let currentSectionTitle = 'Main Ingredients';
     let sectionsMap = { 'Main Ingredients': [] };
     let methodLines = [];
     let parsingMode = 'header';
 
     lines.forEach((line, idx) => {
-      // Check section header e.g. "For the salsa:" or "Main Ingredients:" or "Dressing:"
+      if (/^(?:Recipe\s*)?(?:Title|Name):/i.test(line)) {
+        const extracted = line.replace(/^(?:Recipe\s*)?(?:Title|Name):/i, '').trim();
+        if (extracted) title = extracted;
+        return;
+      }
+
       if (/^(?:main\s+)?ingredients?:/i.test(line)) {
         parsingMode = 'ingredients';
         const rest = line.replace(/^(?:main\s+)?ingredients?:/i, '').trim();
         if (rest) {
-          const parsed = parseIngredientString(rest);
-          sectionsMap[currentSectionTitle].push(matchIngredientTaxonomy(parsed));
+          const rawSubLines = rest.split(/(?<=[^\n])\s+(?=\d+(?:\.\d+)?\s*(?:g|kg|ml|l|tbsp|tsp|cup|cloves?|cans?|packs?|pinches?|slices?|handfuls?|bunches?|stalks?)\b)/gi);
+          rawSubLines.forEach(subLine => {
+            const parsed = parseIngredientString(subLine.trim());
+            if (parsed) {
+              const matched = matchIngredientTaxonomy(parsed, ingredientsBank);
+              if (matched) sectionsMap[currentSectionTitle].push(matched);
+            }
+          });
         }
         return;
       }
 
-      if (/^for\s+the\s+.+:|^[a-zA-Z\s]+:$/i.test(line) && !/serves|yield|method|instructions|steps|preparation/i.test(line)) {
+      if (/^for\s+the\s+.+:|^[a-zA-Z\s]+:$/i.test(line) && !/serves|yield|servings|method|instructions|steps|preparation|prep|cook/i.test(line)) {
         currentSectionTitle = toTitleCase(line.replace(':', '').trim());
         if (!sectionsMap[currentSectionTitle]) sectionsMap[currentSectionTitle] = [];
         parsingMode = 'section';
@@ -491,13 +507,31 @@ export function parseBulkRecipeText(rawText) {
       if (/^(Method|Instructions|Steps|Preparation):/i.test(line)) {
         parsingMode = 'method';
         const rest = line.replace(/^(Method|Instructions|Steps|Preparation):/i, '').trim();
-        if (rest) methodLines.push(rest);
+        if (rest) {
+          const subSteps = rest.split(/(?<=[^\n])\s+(?=\d+\.\s*)/gi);
+          subSteps.forEach(s => {
+            const stepText = s.replace(/^\d+\.\s*/, '').trim();
+            if (stepText) methodLines.push(stepText);
+          });
+        }
         return;
       }
 
-      if (/^(Serves|Yield|Servings):/i.test(line)) {
+      if (/^(Serves|Yield|Servings|Total\s+Servings):/i.test(line)) {
         const match = line.match(/\d+/);
         if (match) servings = parseInt(match[0], 10);
+        return;
+      }
+
+      if (/^Prep\s+Time:/i.test(line)) {
+        const match = line.match(/\d+/);
+        if (match) prepMinutes = parseInt(match[0], 10);
+        return;
+      }
+
+      if (/^Cook\s+Time:/i.test(line)) {
+        const match = line.match(/\d+/);
+        if (match) cookMinutes = parseInt(match[0], 10);
         return;
       }
 
@@ -507,12 +541,24 @@ export function parseBulkRecipeText(rawText) {
         return;
       }
 
-      if (parsingMode === 'ingredients' || parsingMode === 'section' || (parsingMode === 'header' && !/^\d+\.|\b(mix|bake|heat|cook|boil|sauté|simmer)\b/i.test(line))) {
+      const cleanLine = line.replace(/^[•\-\*]\s*/, '').trim();
+
+      if (parsingMode === 'ingredients' || parsingMode === 'section' || (parsingMode === 'header' && !/^\d+\.|\b(mix|bake|heat|cook|boil|sauté|simmer)\b/i.test(cleanLine))) {
         if (!sectionsMap[currentSectionTitle]) sectionsMap[currentSectionTitle] = [];
-        const parsed = parseIngredientString(line);
-        if (parsed) sectionsMap[currentSectionTitle].push(matchIngredientTaxonomy(parsed));
-      } else if (parsingMode === 'method' || /^\d+\.|\b(mix|bake|heat|cook|boil|sauté|simmer)\b/i.test(line)) {
-        methodLines.push(line.replace(/^\d+\.\s*/, ''));
+        const rawSubLines = cleanLine.split(/(?<=[^\n])\s+(?=\d+(?:\.\d+)?\s*(?:g|kg|ml|l|tbsp|tsp|cup|cloves?|cans?|packs?|pinches?|slices?|handfuls?|bunches?|stalks?)\b)/gi);
+        rawSubLines.forEach(subLine => {
+          const parsed = parseIngredientString(subLine.trim());
+          if (parsed) {
+            const matched = matchIngredientTaxonomy(parsed, ingredientsBank);
+            if (matched) sectionsMap[currentSectionTitle].push(matched);
+          }
+        });
+      } else if (parsingMode === 'method' || /^\d+\.|\b(mix|bake|heat|cook|boil|sauté|simmer)\b/i.test(cleanLine)) {
+        const subSteps = cleanLine.split(/(?<=[^\n])\s+(?=\d+\.\s*)/gi);
+        subSteps.forEach(s => {
+          const stepText = s.replace(/^\d+\.\s*/, '').trim();
+          if (stepText) methodLines.push(stepText);
+        });
       }
     });
 
@@ -529,8 +575,8 @@ export function parseBulkRecipeText(rawText) {
     parsedRecipes.push({
       title: toTitleCase(title),
       servings,
-      prepTime: { hours: 0, minutes: 15 },
-      cookTime: { hours: 0, minutes: 30 },
+      prepTime: { hours: Math.floor(prepMinutes / 60), minutes: prepMinutes % 60 },
+      cookTime: { hours: Math.floor(cookMinutes / 60), minutes: cookMinutes % 60 },
       mealSuitability: ['Dinner'],
       ingredientSections,
       ingredients: flatIngredients,

@@ -514,7 +514,9 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
         btnNext1.onclick = () => {
           const nameVal = modalEl.querySelector('#map-wiz-name')?.value.trim();
           if (!nameVal) {
-            alert('Please enter an Entity Name');
+            if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
+              window.showPlatePlanToast('Please enter an Entity Name', 'warning');
+            }
             return;
           }
           syncTierStateFromStep1(nameVal, wizardData.entityType);
@@ -920,7 +922,9 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
             }
           } catch (err) {
             console.error('[NewIngredientMappingWizardModal] Save failed:', err);
-            alert(`Could not save item: ${err.message}`);
+            if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
+              window.showPlatePlanToast(`Could not save item: ${err.message}`, 'error');
+            }
             btnComplete.disabled = false;
             btnComplete.textContent = '✨ Complete & Link Item';
           }
