@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardState.js (v3.28.0)
+ * src/components/recipe/RecipeWizardState.js (v3.32.6)
  * Manages mutable state and step synchronisation for the Recipe Ingestion Wizard.
  */
 
@@ -12,6 +12,8 @@ export const wizardState = {
   bulkText: '',
   processingQueue: [],
   currentQueueTotal: 0,
+  initialQueueTotal: 0,
+  currentQueueIndex: 0,
   activeRecipe: {
     title: '',
     currentServings: 4,
@@ -63,6 +65,8 @@ export function resetWizardState() {
   wizardState.bulkText = '';
   wizardState.processingQueue = [];
   wizardState.currentQueueTotal = 0;
+  wizardState.initialQueueTotal = 0;
+  wizardState.currentQueueIndex = 0;
   wizardState.activeRecipe = {
     title: '',
     currentServings: 4,

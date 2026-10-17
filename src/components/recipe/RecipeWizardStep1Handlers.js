@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardStep1Handlers.js (v3.32.0)
+ * src/components/recipe/RecipeWizardStep1Handlers.js (v3.32.6)
  * Event bindings for Wizard Step 0, Step 1A (Manual), Step 1B (Bulk), and Step 1.5 (Queue Review).
  */
 
@@ -222,6 +222,8 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
     const btnStartReview = modalWrap.querySelector('#btn-start-queue-review');
     if (btnStartReview) {
       btnStartReview.onclick = () => {
+        wizardState.initialQueueTotal = wizardState.processingQueue.length;
+        wizardState.currentQueueIndex = 0;
         loadNextRecipeFromQueue();
         wizardState.currentStep = 2;
         renderWizardModal();

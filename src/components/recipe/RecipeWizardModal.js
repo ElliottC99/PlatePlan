@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardModal.js (v3.32.1)
+ * src/components/recipe/RecipeWizardModal.js (v3.32.6)
  * Controller Module for Multi-Step Ingestion & Recipe Creation Wizard Modal.
  * Integrates:
  * - State 0: Choice (Manual vs Bulk)
@@ -74,6 +74,7 @@ export function showWizardNotice(msg, type = 'error') {
 
 export function loadNextRecipeFromQueue() {
   if (!wizardState.processingQueue.length) return;
+  wizardState.currentQueueIndex++;
   const next = wizardState.processingQueue.shift();
 
   const ingRawText = (next.ingredientSections || []).map(sec => {

@@ -1,5 +1,5 @@
 /**
- * src/services/RecipeParserService.js (v3.32.5)
+ * src/services/RecipeParserService.js (v3.32.6)
  * Multi-Recipe Batch Parsing, Token Normalisation, Block Chunking,
  * Collapsed Ingredient Unpacking & Method Step Splitting.
  */
@@ -60,18 +60,27 @@ export function unpackCollapsedIngredients(rawIngText) {
   if (!rawIngText || typeof rawIngText !== 'string') return '';
   let text = rawIngText.replace(/\r\n/g, '\n').trim();
 
-  // 1. Separate subsection headers (e.g. FOR THE SAUCE, FOR THE PASTA, TO SERVE)
+  // 1. Stitch standalone multiplier lines ("1 x", "2 x") to the trailing line
+  text = text.replace(/^(\d+(?:\.\d+)?\s*[xX])\s*\n\s*/gm, '$1 ');
+
+  // 2. Separate subsection headers (e.g. FOR THE SAUCE, FOR THE PASTA, TO SERVE)
   text = text.replace(/([^\n])\s*(FOR THE [A-Z\s]+|TO SERVE)/gi, '$1\n\n$2\n');
 
-  // 2. Separate closing parenthesis followed immediately by digits or words: ")1" -> ")\n1"
+  // 3. Protect parenthetical weights to prevent splitting numbers inside them
+  const parens = [];
+  text = text.replace(/\([^)]*\)/g, match => {
+    parens.push(match);
+    return `__PAREN_${parens.length - 1}__`;
+  });
+
+  // 4. Separate closing parenthesis/bracket followed immediately by digits or words
   text = text.replace(/([\)\]])\s*(?=[0-9a-zA-Z])/g, '$1\n');
 
-  // 3. Separate a letter followed immediately by ANY quantity (integer, decimal, range)
-  // Ensures words glued to numbers split: "onions2 garlic" -> "onions\n2 garlic", "cloves160-200g" -> "cloves\n160-200g"
+  // 5. Separate a letter followed immediately by ANY quantity (integer, decimal, range)
   // Negative lookahead: do NOT split if the letter is 'x' followed by space and digit (e.g. "1 x 280g")
   text = text.replace(/([a-zA-Z])(?=(?:0\.\d+|[1-9]\d*(?:\.\d+)?)(?:\s*[-–]\s*\d+(?:\.\d+)?)?\s*(?:x\s*\d+|g|kg|ml|l|tbsp|tsp|cm|packs?|cloves?|spring|tin|pot|large|medium|small|pieces?|blocks?|handful|bunch|drizzle|pinch|aubergine|onion|[a-zA-Z]+))/gi, '$1\n');
 
-  // 4. Separate known descriptor phrases glued to words without numbers
+  // 6. Separate known descriptor phrases glued to words without numbers
   const unspacedTokens = [
     'bunch of', 'handful of', 'a few', 'nooch', 'flat-leaf',
     'drizzle of', 'pinch of', 'vegetable oil', 'olive oil',
@@ -81,6 +90,9 @@ export function unpackCollapsedIngredients(rawIngText) {
     const reg = new RegExp(`([a-zA-Z])(${token})`, 'gi');
     text = text.replace(reg, '$1\n$2');
   });
+
+  // 7. Restore protected parentheticals
+  text = text.replace(/__PAREN_(\d+)__/g, (_, idx) => parens[Number(idx)]);
 
   return text;
 }

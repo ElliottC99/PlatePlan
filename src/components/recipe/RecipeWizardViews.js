@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardViews.js (v3.28.0)
+ * src/components/recipe/RecipeWizardViews.js (v3.32.6)
  * Template view rendering functions for all steps of the Recipe Ingestion Wizard.
  */
 
@@ -134,9 +134,9 @@ export function renderState0Choice() {
 
 export function renderState1AManual() {
   const recipe = wizardState.activeRecipe;
-  const queueInfo = wizardState.processingQueue.length > 0
+  const queueInfo = wizardState.initialQueueTotal > 1
     ? `<div style="background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; margin-bottom: 16px;">
-        📌 Batch Queue: Recipe ${wizardState.currentQueueTotal - wizardState.processingQueue.length + 1} of ${wizardState.currentQueueTotal} (${wizardState.processingQueue.length} remaining)
+        📌 Batch Queue: Recipe ${wizardState.currentQueueIndex || 1} of ${wizardState.initialQueueTotal} (${wizardState.processingQueue.length} remaining)
        </div>`
     : '';
 
@@ -233,6 +233,19 @@ export function renderState3Review() {
   const currentVariant = wizardState.activeVariant || 'original';
   const isEnhancedTab = currentVariant === 'enhanced';
   const displayRecipe = (isEnhancedTab && recipe.enhanced) ? { ...recipe, ...recipe.enhanced } : recipe;
+
+  const identityBanner = `
+    <div style="background: var(--surface2, #f8fafc); border: 1px solid var(--border, #e2e8f0); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px;">
+          Dish ${wizardState.currentQueueIndex || 1} of ${wizardState.initialQueueTotal || wizardState.processingQueue?.length || 1}
+        </span>
+        <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text, #0f172a);">
+          ${escapeHtml(recipe.title || 'Untitled Recipe')}
+        </h3>
+      </div>
+    </div>
+  `;
 
   const saveBtnText = getSaveButtonLabel(recipe);
 
@@ -331,16 +344,7 @@ export function renderState3Review() {
 
   return `
     <div>
-      <div style="background: var(--surface2, #f8fafc); border-bottom: 1px solid var(--border, #e2e8f0); padding: 10px 18px; margin: -18px -24px 16px -24px; display: flex; align-items: center; justify-content: space-between;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px;">
-            Dish ${wizardState.currentQueueIndex + 1} of ${wizardState.currentQueueTotal || wizardState.processingQueue?.length || 1}
-          </span>
-          <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text, #0f172a);">
-            ${escapeHtml(activeRecipe.title || recipe.title || 'Untitled Recipe')}
-          </h3>
-        </div>
-      </div>
+      ${identityBanner}
 
       <!-- Macro Breakdown Crossbar -->
       ${macroCrossbarHtml}

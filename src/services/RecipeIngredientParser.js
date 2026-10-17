@@ -183,66 +183,64 @@ export function parseIngredientString(rawString) {
     };
   }
 
-  // Check composite package multipliers e.g. "2 x 280g blocks", "1 x pack (about 160g)", "1 x 400g tin"
-  const multPattern = /^(\d+(?:\.\d+)?)\s*[xX]\s*(?:(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tbsp|tsp|oz|lb)\b\s*)?(?:(packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s*(?:of\s*)?)?/i;
-  const multMatch = original.match(multPattern);
-  if (multMatch && multMatch[2] && multMatch[3]) {
-    const packCount = parseFloat(multMatch[1]);
-    const itemWeight = parseFloat(multMatch[2]);
-    const unitStr = multMatch[3].toLowerCase();
-    const totalQty = packCount * itemWeight;
-    const remainder = original.replace(multMatch[0], '').trim();
-    
-    // Check if remainder or parenthetical contains alternate weight e.g. "(about 160g)"
-    let parsedNotes = '';
-    let parsedName = remainder;
-    const parenMatch = parsedName.match(/^(.*?)\((.*?)\)(.*)$/);
-    if (parenMatch) {
-      parsedName = (parenMatch[1] + ' ' + parenMatch[3]).trim();
-      parsedNotes = parenMatch[2].trim();
-      const altWeightMatch = parsedNotes.match(/(?:about|approx\.?|approx)?\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l|oz|lb)\b/i);
-      if (altWeightMatch) {
-        // If parenthetical specifies an item weight like (about 160g) for a pack
-        // Keep packCount * itemWeight or alt weight if appropriate. Here totalQty = packCount * itemWeight or altWeight
+  let qty = 1;
+  let unit = 'qty';
+  let ingredientText = original;
+  let initialNotes = '';
+
+  // 1. Handle composite package multipliers with parenthetical weights: "2 x pack extra-firm tofu (about 160g)"
+  const parenMultMatch = original.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s+(?:of\s+)?(.*?)\s*\((?:about|approx\.?)?\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l)\)/i);
+  if (parenMultMatch) {
+    const mult = parseFloat(parenMultMatch[1]) || 1;
+    const innerWeight = parseFloat(parenMultMatch[3]) || 0;
+    unit = parenMultMatch[4].toLowerCase();
+    qty = mult * innerWeight;
+    ingredientText = parenMultMatch[2].trim();
+    initialNotes = `(${mult} x ${innerWeight}${unit})`;
+  } else {
+    // 2. Handle composite multipliers with explicit units: "2 x 280g blocks extra-firm tofu"
+    const compMatch = original.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tbsp|tsp|oz|lb)\b\s*(?:(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s*(?:of\s*)?)?(.*)/i);
+    if (compMatch) {
+      const mult = parseFloat(compMatch[1]) || 1;
+      const baseWeight = parseFloat(compMatch[2]) || 0;
+      unit = compMatch[3].toLowerCase();
+      qty = mult * baseWeight;
+      ingredientText = (compMatch[4] || '').replace(/^(?:blocks?|packs?|tins?|cans?)\s*(?:of\s*)?/i, '').trim();
+      initialNotes = `${mult} x ${baseWeight}${unit}`;
+    } else {
+      // 3. Handle standard unit matches with strict boundaries
+      const stdMatch = original.match(/^(\d+(?:\.\d+)?(?:\s*[-–]\s*\d+(?:\.\d+)?)?)\s*(g|kg|ml|l|tbsp|tsp|cm)\b\s*(.*)/i);
+      if (stdMatch) {
+        const parsed = parseQuantity(stdMatch[1]);
+        qty = parsed.qty;
+        unit = stdMatch[2].toLowerCase();
+        ingredientText = stdMatch[3].trim();
+      } else {
+        const parsed = parseQuantity(original);
+        qty = parsed.qty;
+        let rem = parsed.remainder;
+        if (rem) {
+          const words = rem.split(/\s+/);
+          const firstWordClean = words[0].toLowerCase().replace(/[\.\,]/g, '');
+          if (UNIT_MAP[firstWordClean]) {
+            unit = UNIT_MAP[firstWordClean];
+            rem = words.slice(1).join(' ');
+          } else if (words.length > 1) {
+            const twoWordsClean = (words[0] + ' ' + words[1]).toLowerCase().replace(/[\.\,]/g, '');
+            if (UNIT_MAP[twoWordsClean]) {
+              unit = UNIT_MAP[twoWordsClean];
+              rem = words.slice(2).join(' ');
+            }
+          }
+        }
+        ingredientText = rem;
       }
     }
-
-    parsedName = parsedName.replace(/^[\s,.\-–]+|[\s,.\-–]+$/g, '').trim();
-    if (!parsedName || parsedName.toLowerCase() === 'x') {
-      parsedName = 'Ingredient';
-    }
-
-    const strictUnit = normalizeUnit(unitStr);
-    const converted = convertToStrictUnit(totalQty, strictUnit, parsedName);
-
-    return {
-      raw: original,
-      qty: converted.qty,
-      unit: converted.unit,
-      name: toTitleCase(parsedName),
-      notes: parsedNotes,
-      isFallbackWeight: converted.isFallbackWeight
-    };
   }
 
-  const { qty, remainder } = parseQuantity(original);
-  let unit = 'qty';
-  let ingredientText = remainder;
-
-  if (remainder) {
-    const words = remainder.split(/\s+/);
-    const firstWordClean = words[0].toLowerCase().replace(/[\.\,]/g, '');
-    
-    if (UNIT_MAP[firstWordClean]) {
-      unit = UNIT_MAP[firstWordClean];
-      ingredientText = words.slice(1).join(' ');
-    } else if (words.length > 1) {
-      const twoWordsClean = (words[0] + ' ' + words[1]).toLowerCase().replace(/[\.\,]/g, '');
-      if (UNIT_MAP[twoWordsClean]) {
-        unit = UNIT_MAP[twoWordsClean];
-        ingredientText = words.slice(2).join(' ');
-      }
-    }
+  ingredientText = (ingredientText || '').trim().replace(/^[xX]\s+/, '');
+  if (!ingredientText || ingredientText.toLowerCase() === 'x') {
+    ingredientText = 'Ingredient';
   }
 
   if (/^of\b/i.test(ingredientText.trim())) {
@@ -250,12 +248,13 @@ export function parseIngredientString(rawString) {
   }
 
   let name = ingredientText;
-  let notes = '';
+  let notes = initialNotes;
 
   const parenMatch = name.match(/^(.*?)\((.*?)\)(.*)$/);
   if (parenMatch) {
     name = (parenMatch[1] + ' ' + parenMatch[3]).trim();
-    notes = parenMatch[2].trim();
+    const parenContent = parenMatch[2].trim();
+    notes = notes ? `${notes}, ${parenContent}` : parenContent;
   }
 
   if (name.includes(',')) {
