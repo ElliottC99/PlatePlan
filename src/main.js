@@ -2,43 +2,23 @@ import './config/firebase.js';
 
 if (typeof window !== 'undefined') {
   window.showTescoImport = () => {
-    import('./components/pantry/SubtypeActionModalsUI.js')
-      .then(m => {
-        if (typeof m.openTescoImportModal === 'function') {
-          m.openTescoImportModal(null, null);
-        }
-      })
-      .catch(err => console.error('[PlatePlan] Error loading SubtypeActionModalsUI for showTescoImport:', err));
+    import('./components/pantry/SubtypeActionModalsUI.js').then(m => m.openTescoImportModal?.(null, null)).catch(err => console.error('[PlatePlan]', err));
   };
   window.createIngredientGroupPrompt = () => {
-    import('./components/pantry/CategoryManagerModalUI.js')
-      .then(m => {
-        if (typeof m.openIngredientFamilyDetailsModal === 'function') {
-          m.openIngredientFamilyDetailsModal(null);
-        }
-      })
-      .catch(err => console.error('[PlatePlan] Error loading IngredientFamilyModalUI:', err));
+    import('./components/pantry/CategoryManagerModalUI.js').then(m => m.openIngredientFamilyDetailsModal?.(null)).catch(err => console.error('[PlatePlan]', err));
   };
   window.openCreateActionSheet = () => {
-    import('./components/navigation/ActionSheetUI.js')
-      .then(m => {
-        if (typeof m.openCreateActionSheet === 'function') {
-          m.openCreateActionSheet();
-        }
-      })
-      .catch(err => console.error('[PlatePlan] Error loading ActionSheetUI:', err));
+    import('./components/navigation/ActionSheetUI.js').then(m => m.openCreateActionSheet?.()).catch(err => console.error('[PlatePlan]', err));
   };
 }
 
 /**
- * src/main.js (v3.31.34)
+ * src/main.js (v3.31.35)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
- * Manages unidirectional state subscriptions, cross-view reactive synchronisation,
- * instant offline caching, global error telemetry, and PWA service worker registration.
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
-import { subscribe, getState, initStoreCache } from './store/store.js';
+import { subscribe, getState, initStoreCache, setActivePlan } from './store/store.js';
 import { setupActionBridge } from './services/ActionBridge.js';
 import { saveCurrentPlan, stripPlanPayload, getCategories, saveCategories, saveIngredient, saveProduct, getIngredients, getProducts } from './services/HouseholdRepository.js';
 import { AppState } from './state/AppState.js';
@@ -58,21 +38,6 @@ import './components/recipe/RecipeWizardModal.js';
 import './components/recipe/RecipeAuditModal.js';
 import './components/shell/OfflineBanner.js';
 
-// Global Compatibility Shims for Legacy References
-if (typeof window !== 'undefined') {
-  window.stripPlanPayload = stripPlanPayload;
-  window.saveState = window.saveState || function(stateData) {
-    console.warn('[Compatibility] Global saveState() invoked. Delegating sanitised plan to persistence layer.');
-    if (typeof saveCurrentPlan === 'function') {
-      saveCurrentPlan(stateData || window.state?.plan || AppState.getState());
-    }
-  };
-
-  window.loadState = window.loadState || function() {
-    console.warn('[Compatibility] Global loadState() invoked.');
-    return AppState.getState();
-  };
-}
 import * as MealPlanGeneratorService from './services/MealPlanGeneratorService.js';
 import * as RecipeDetailModalService from './services/RecipeDetailModalService.js';
 import * as PortionCalculationService from './services/PortionCalculationService.js';
@@ -87,13 +52,39 @@ import * as RecipeAuthoringService from './services/RecipeAuthoringService.js';
 import { registeredComponents } from './components/componentRegistry.js';
 import * as AppRouter from './core/AppRouter.js';
 import * as AppInitializer from './core/AppInitializer.js';
-import { safeClone, safeJsonStringify } from './utils/safeJson.js';
+
+// Global Compatibility Shims & Persistence Delegation
+if (typeof window !== 'undefined') {
+  window.stripPlanPayload = stripPlanPayload;
+  window.saveState = function(stateData) {
+    const rawPlan = stateData?.plan || stateData?.currentPlan || stateData || window.state?.plan || window.state?.currentPlan;
+    if (!rawPlan) return;
+
+    // 1. Dispatch into official store orchestrator
+    if (typeof setActivePlan === 'function') {
+      setActivePlan(rawPlan);
+    } else if (window.store && typeof window.store.setActivePlan === 'function') {
+      window.store.setActivePlan(rawPlan);
+    }
+
+    // 2. Commit directly to repository if available
+    if (window.HouseholdRepository && typeof window.HouseholdRepository.saveCurrentPlan === 'function') {
+      window.HouseholdRepository.saveCurrentPlan(rawPlan).catch(err => {
+        console.error('[Persistence] Error delegating plan to HouseholdRepository:', err);
+      });
+    }
+  };
+
+  window.loadState = window.loadState || function() {
+    console.warn('[Compatibility] Global loadState() invoked.');
+    return AppState.getState();
+  };
+}
 
 // Global Sync Status State Machine
 let inSyncStatusTransition = false;
 export function setSyncStatus(status, detail = '') {
-  if (typeof window === 'undefined') return;
-  if (inSyncStatusTransition) return;
+  if (typeof window === 'undefined' || inSyncStatusTransition) return;
   inSyncStatusTransition = true;
   try {
     if (typeof window.updatePlatePlanSyncStatus === 'function' && window.updatePlatePlanSyncStatus !== setSyncStatus) {
@@ -126,45 +117,23 @@ if (typeof window !== 'undefined') {
   window.renderFitScoreBadge = renderFitScoreBadge;
 
   window.PantryRepository = {
-    getCategories,
-    saveCategories,
-    saveIngredient,
-    saveProduct,
-    getIngredients,
-    getProducts,
-    deleteCategory: async (categoryId) => {
-      const { deleteCategory } = await import('./services/HouseholdRepository.js');
-      return deleteCategory(categoryId);
-    }
+    getCategories, saveCategories, saveIngredient, saveProduct, getIngredients, getProducts,
+    deleteCategory: async (id) => (await import('./services/HouseholdRepository.js')).deleteCategory(id)
   };
 
   Object.assign(window, {
-    MealPlanGeneratorService, RecipeDetailModalService,
-    PortionCalculationService, TescoImportService, ShoppingCalculationService, UnitConverter, NutritionService,
-    FitScoreService, DataQualityService, TodayViewService, RecipeAuthoringService,
-    ...registeredComponents,
-    AppRouter, AppInitializer,
+    MealPlanGeneratorService, RecipeDetailModalService, PortionCalculationService, TescoImportService,
+    ShoppingCalculationService, UnitConverter, NutritionService, FitScoreService, DataQualityService,
+    TodayViewService, RecipeAuthoringService, ...registeredComponents, AppRouter, AppInitializer,
 
-    // Core Router & View Helpers
     showView: window.showView || AppRouter.showView,
     syncMobileNavigation: window.syncMobileNavigation || AppRouter.syncMobileNavigation,
     requestPlatePlanViewRender: window.requestPlatePlanViewRender || AppRouter.requestPlatePlanViewRender,
     showPlatePlanToast: window.showPlatePlanToast || AppInitializer.showPlatePlanToast,
 
-    // View Renders
-    renderToday,
-    renderPlanner,
-    renderVault: renderRecipeVault,
-    renderRecipeVault,
-    renderVaultGrid: renderRecipeVault,
-    renderSettings: renderSettingsView,
-    renderSettingsView,
-    renderShopping: renderShoppingListUI,
-    renderShoppingList: renderShoppingListUI,
-    renderShoppingListUI,
-    renderIngredientBank,
-    renderProductBank,
-    renderBank: renderProductBank,
+    renderToday, renderPlanner, renderVault: renderRecipeVault, renderRecipeVault, renderVaultGrid: renderRecipeVault,
+    renderSettings: renderSettingsView, renderSettingsView, renderShopping: renderShoppingListUI, renderShoppingList: renderShoppingListUI,
+    renderShoppingListUI, renderIngredientBank, renderProductBank, renderBank: renderProductBank,
     renderPlatePlanView(viewId) {
       switch (viewId) {
         case 'today': return renderToday();
@@ -174,16 +143,10 @@ if (typeof window !== 'undefined') {
         case 'settings': case 'prefs': return renderSettingsView();
         case 'ingredients': return renderIngredientBank();
         case 'bank': return renderProductBank();
-        default: {
-          const viewEl = document.getElementById('view-' + viewId);
-          if (viewEl && AppRouter.viewModuleMap?.[viewId]?.mount) {
-            return AppRouter.viewModuleMap[viewId].mount(viewEl);
-          }
-        }
+        default: return AppRouter.viewModuleMap?.[viewId]?.mount?.(document.getElementById('view-' + viewId));
       }
     },
 
-    // Actions & Modal Handlers
     viewRecipe: RecipeDetailModalService.viewRecipe,
     closeRecipePreview: RecipeDetailModalService.closeRecipePreview,
     switchViewTab: RecipeDetailModalService.switchViewTab,
@@ -195,71 +158,39 @@ if (typeof window !== 'undefined') {
     generateMealPlan: MealPlanGeneratorService.generateMealPlan,
     getPlanSlotInfo: MealPlanGeneratorService.getPlanSlotInfo,
     getPlannedSlotNutrition: MealPlanGeneratorService.getPlannedSlotNutrition,
-    getShoppingLineStateKey,
-    renderScrollableSwapModal,
-    toggleInlineShoppingSubst,
-    toggleShoppingItemAcquired,
-    toggleShoppingAtHome: toggleShoppingItemAcquired,
-    openSearchableRecipeSwapModal(...args) {
-      return registeredComponents.PlannerMealSlot?.openSearchableRecipeSwapModal?.(...args);
-    },
-    closeSearchableRecipeSwapModal(...args) {
-      return registeredComponents.PlannerMealSlot?.closeSearchableRecipeSwapModal?.(...args);
-    },
-    filterSearchableRecipeSwapModal(...args) {
-      return registeredComponents.PlannerMealSlot?.filterSearchableRecipeSwapModal?.(...args);
-    },
-    selectAndSwapRecipe(...args) {
-      return registeredComponents.PlannerMealSlot?.selectAndSwapRecipe?.(...args);
-    },
+    getShoppingLineStateKey, renderScrollableSwapModal, toggleInlineShoppingSubst,
+    toggleShoppingItemAcquired, toggleShoppingAtHome: toggleShoppingItemAcquired,
+
+    openSearchableRecipeSwapModal: (...a) => registeredComponents.PlannerMealSlot?.openSearchableRecipeSwapModal?.(...a),
+    closeSearchableRecipeSwapModal: (...a) => registeredComponents.PlannerMealSlot?.closeSearchableRecipeSwapModal?.(...a),
+    filterSearchableRecipeSwapModal: (...a) => registeredComponents.PlannerMealSlot?.filterSearchableRecipeSwapModal?.(...a),
+    selectAndSwapRecipe: (...a) => registeredComponents.PlannerMealSlot?.selectAndSwapRecipe?.(...a),
 
     openRecipeModal(id, instanceId, variant, targetPerson) {
-      if (typeof window.viewRecipe === 'function') {
-        return window.viewRecipe(id, instanceId, variant, targetPerson);
-      }
-      console.warn('[main.js] viewRecipe not found on window');
+      if (typeof window.viewRecipe === 'function') return window.viewRecipe(id, instanceId, variant, targetPerson);
     },
-
-    openMobileMore() {
-      const el = document.getElementById('mobile-more-wrap');
-      if (el) el.classList.add('open');
+    openMobileMore: () => document.getElementById('mobile-more-wrap')?.classList.add('open'),
+    closeMobileMore: () => document.getElementById('mobile-more-wrap')?.classList.remove('open'),
+    mobileMoreView(v) {
+      document.getElementById('mobile-more-wrap')?.classList.remove('open');
+      if (typeof window.showView === 'function') window.showView(v);
     },
-    closeMobileMore() {
-      const el = document.getElementById('mobile-more-wrap');
-      if (el) el.classList.remove('open');
-    },
-    mobileMoreView(viewName) {
-      const el = document.getElementById('mobile-more-wrap');
-      if (el) el.classList.remove('open');
-      if (typeof window.showView === 'function') {
-        window.showView(viewName);
-      }
-    },
-    openPlatePlanSyncPanel() {
-      renderSyncPanelModal();
-    },
-    closePlatePlanSyncPanel() {
-      closeSyncPanelModal();
-    },
+    openPlatePlanSyncPanel: renderSyncPanelModal,
+    closePlatePlanSyncPanel: closeSyncPanelModal,
 
     logout() {
-      if (window.firebase && window.firebase.auth) {
-        try { window.firebase.auth().signOut(); } catch(e) {}
-      }
+      if (window.firebase && window.firebase.auth) { try { window.firebase.auth().signOut(); } catch(e) {} }
       try { localStorage.clear(); } catch(e) {}
       try { sessionStorage.clear(); } catch(e) {}
       window.location.href = window.location.origin + window.location.pathname + '?reload=' + Date.now();
     },
 
     async syncNow() {
-      console.log('[MANUAL SYNC TRIGGERED]');
       setSyncStatus('connecting', 'Syncing...');
       try {
         await hydrateHouseholdData();
         setSyncStatus(navigator.onLine ? 'synced' : 'offline', 'Synced with Cloud');
-        if (typeof window.showPlatePlanToast === 'function') {
-          window.showPlatePlanToast('Synced with Cloud! ☁️', 'success');
-        }
+        if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Synced with Cloud! ☁️', 'success');
       } catch(e) {
         setSyncStatus('error', 'Sync Failed');
       }
@@ -275,23 +206,14 @@ export function toggleInlineShoppingSubst(itemKey, groupId = '', instanceId = nu
   renderScrollableSwapModal(itemKey, groupId, null, { instanceId });
 }
 
-// 1. STATE INITIALIZATION VIA ENCAPSULATED STORE
-if (typeof window !== 'undefined') {
-  const storeState = getState();
-}
-
-// 2. EXPORTS & GLOBAL COMPATIBILITY ALIASES
 export { renderToday, renderSettingsView, renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired, renderPlanner, renderRecipeVault, setupActionBridge, getShoppingLineStateKey, calculateMealFitScore, renderFitScoreBadge, PortionCalculationService };
 
-
-// 3. GLOBAL ERROR TELEMETRY & TOAST BRIDGE
 let lastErrorMessage = '';
 let lastErrorTime = 0;
-
 function reportAppError(m, type = 'error') {
   if (m === lastErrorMessage && Date.now() - lastErrorTime < 4000) return;
   lastErrorMessage = m; lastErrorTime = Date.now();
-  console.error(`[PlatePlan Error Telemetry v3.20.06]`, m);
+  console.error(`[PlatePlan Error Telemetry]`, m);
   if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(m, type);
 }
 
@@ -309,9 +231,6 @@ if (typeof window !== 'undefined') {
   window.addEventListener('online', () => { setSyncStatus('connecting', 'Restoring...'); reportAppError('Connection restored.', 'success'); hydrateHouseholdData(); });
 }
 
-// 4. SERVICE WORKER REGISTRATION HANDLED BY AppInitializer
-
-// 5. SANITIZATION HELPERS
 function deepMutate(obj) {
   if (obj === null || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map(deepMutate);
@@ -328,7 +247,6 @@ function sanitizeRecipes(recipes) {
   return recipes.map(recipe => deepMutate(safeClone(recipe)));
 }
 
-// 6. UNIDIRECTIONAL STATE DISPATCH LISTENERS & SUBSCRIPTIONS
 let isSubscribed = false;
 function setupSubscriptions() {
   if (isSubscribed) return;
@@ -353,8 +271,7 @@ function setupSubscriptions() {
   subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
 }
 
-// 7. APPLICATION BOOTSTRAP
-export const APP_VERSION = 'v3.31.34';
+export const APP_VERSION = 'v3.31.35';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
@@ -363,13 +280,8 @@ async function initApp() {
 
   const initialRender = () => {
     try {
-      renderToday();
-      renderRecipeVault();
-      renderPlanner();
-      renderShoppingListUI();
-      renderIngredientBank();
-      renderProductBank();
-      renderDataQualityView();
+      renderToday(); renderRecipeVault(); renderPlanner(); renderShoppingListUI();
+      renderIngredientBank(); renderProductBank(); renderDataQualityView();
     } catch (renderErr) {
       console.warn('[initApp] initialRender warning:', renderErr);
     }
@@ -377,29 +289,11 @@ async function initApp() {
 
   try {
     const versionEl = document.getElementById('app-header-version');
-    if (versionEl) {
-      versionEl.textContent = APP_VERSION;
-    }
+    if (versionEl) versionEl.textContent = APP_VERSION;
 
-    try {
-      await initStoreCache();
-    } catch (cacheErr) {
-      console.warn('[initApp] initStoreCache error:', cacheErr);
-    }
-
-    try {
-      setupActionBridge();
-      setupSubscriptions();
-    } catch (bridgeErr) {
-      console.warn('[initApp] ActionBridge/Subscriptions error:', bridgeErr);
-    }
-
-    try {
-      AppInitializer.registerServiceWorker();
-      AppInitializer.initPlatePlanApp();
-    } catch (initErr) {
-      console.warn('[initApp] AppInitializer error:', initErr);
-    }
+    try { await initStoreCache(); } catch (cacheErr) {}
+    try { setupActionBridge(); setupSubscriptions(); } catch (bridgeErr) {}
+    try { AppInitializer.registerServiceWorker(); AppInitializer.initPlatePlanApp(); } catch (initErr) {}
 
     setSyncStatus('connecting', 'Connecting...');
     initialRender();
@@ -408,9 +302,7 @@ async function initApp() {
     try {
       await waitForAuth();
       hydrationRes = await hydrateHouseholdData();
-    } catch (syncErr) {
-      console.warn('[initApp] Auth/Hydration fallback:', syncErr);
-    }
+    } catch (syncErr) {}
 
     if (hydrationRes && hydrationRes.success) {
       setSyncStatus(navigator.onLine ? 'synced' : 'offline', navigator.onLine ? 'Synced with Cloud' : 'Offline Mode');
@@ -420,12 +312,9 @@ async function initApp() {
       setSyncStatus(navigator.onLine ? 'synced' : 'offline', 'Local Cache Active');
     }
   } catch (err) {
-    console.error('[initApp] Top-level bootstrap error, falling back to local cache:', err);
     setSyncStatus(navigator.onLine ? 'synced' : 'offline', 'Local Cache Active');
   } finally {
-    if (typeof window !== 'undefined') {
-      window.__plateplan_app_booted = true;
-    }
+    if (typeof window !== 'undefined') window.__plateplan_app_booted = true;
     initialRender();
   }
 }
