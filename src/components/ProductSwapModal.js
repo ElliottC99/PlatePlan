@@ -1,16 +1,15 @@
 import { getCanonicalIngredientId, calculateShoppingItemCost } from '../services/ShoppingCalculationService.js';
 import { store, setActivePlan, setShoppingList } from '../store/store.js';
+import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
+import { UnitConverter } from '../services/UnitConverter.js';
 
 /**
- * src/components/ProductSwapModal.js (v3.31.37)
- * Relational 3-tier product swap modal with multi-key candidate alignment,
- * full pipeline persistence, clean store dispatches, and pure ES6 architecture.
+ * src/components/ProductSwapModal.js (v3.31.38)
+ * Relational 3-tier product swap modal with candidate key alignment,
+ * dynamic Fit Score badges, and full pipeline persistence.
  */
 
-function escapeHtml(str) {
-  if (str == null) return '';
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-}
+function escapeHtml(str) { return str == null ? '' : String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
 function escapeAttr(str) { return escapeHtml(str); }
 
 export function inferSubtype(item) {
@@ -22,9 +21,7 @@ export function inferSubtype(item) {
   const subId = target.subTypeId || target.subtypeId;
 
   let parentIng = ingId ? ingredients.find(i => String(i.id) === String(ingId)) : null;
-  if (!parentIng && subId) {
-    parentIng = ingredients.find(i => Array.isArray(i.subtypes) && i.subtypes.some(s => String(s.id) === String(subId))) || null;
-  }
+  if (!parentIng && subId) parentIng = ingredients.find(i => Array.isArray(i.subtypes) && i.subtypes.some(s => String(s.id) === String(subId))) || null;
   const subObj = (parentIng?.subtypes || []).find(s => String(s.id) === String(subId));
   return subObj?.name || parentIng?.name || target.subtype || target.category || target.cat || 'Produce & Staples';
 }
@@ -39,12 +36,7 @@ export function calculateMetrics(item) {
 export function resolveTargetItem(param1, param2, param3) {
   const keys = [param1, param2, param3].filter(k => k && typeof k === 'string' && k.trim() !== '');
   const state = (typeof store !== 'undefined' && store.getState) ? store.getState() : {};
-
-  const sources = [
-    state.shoppingList,
-    state.confirmedShopping,
-    state.generatedList
-  ];
+  const sources = [state.shoppingList, state.confirmedShopping, state.generatedList];
 
   for (const items of sources) {
     if (!Array.isArray(items)) continue;
@@ -59,23 +51,14 @@ export function resolveTargetItem(param1, param2, param3) {
   }
 
   const products = Array.isArray(state.products) ? state.products : Object.values(state.productsBank || {});
-  const fallbackProd = products[0] || { name: keys[0] || 'Selected Product', id: 'item_unknown', groupId: 'ing_1791021416243' };
-  return { item: fallbackProd, group: null, source: null };
+  return { item: products[0] || { name: keys[0] || 'Selected Product', id: 'item_unknown', groupId: 'ing_1791021416243' }, group: null, source: null };
 }
 
 export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
   if (!targetItem || !newProduct) return;
   const storeState = (typeof store !== 'undefined' && store.getState) ? store.getState() : (window.state || {});
-
   const bank = targetItem.bankIng || {};
-  const candidateKeys = [
-    targetItem.canonicalIngId,
-    bank.ingredientId,
-    bank.groupId,
-    bank.id,
-    targetItem.ingredientId !== targetItem.id ? targetItem.ingredientId : null,
-    targetItem.name
-  ].filter(Boolean).map(String);
+  const candidateKeys = [targetItem.canonicalIngId, bank.ingredientId, bank.groupId, bank.id, targetItem.ingredientId !== targetItem.id ? targetItem.ingredientId : null, targetItem.name].filter(Boolean).map(String);
 
   if (candidateKeys.length === 0) {
     if (targetItem.id) candidateKeys.push(String(targetItem.id));
@@ -88,38 +71,26 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
 
   updatedPlan.substitutions = updatedPlan.substitutions || {};
   updatedPlan.productSelections = updatedPlan.productSelections || {};
-
-  const subPayload = {
-    productId: newProduct.id,
-    productName: newProduct.name,
-    brand: newProduct.brand || '',
-    price: newProduct.price || 0,
-    timestamp: Date.now()
-  };
+  const subPayload = { productId: newProduct.id, productName: newProduct.name, brand: newProduct.brand || '', price: newProduct.price || 0, timestamp: Date.now() };
 
   candidateKeys.forEach(k => {
     updatedPlan.substitutions[k] = subPayload;
     updatedPlan.productSelections[k] = newProduct.id;
-    if (ctx.cookingEventId) {
-      updatedPlan.substitutions[`${ctx.cookingEventId}:${k}`] = subPayload;
-    }
+    if (ctx.cookingEventId) updatedPlan.substitutions[`${ctx.cookingEventId}:${k}`] = subPayload;
   });
 
-  // 1. Commit plan to modern store
-  if (typeof store !== 'undefined' && typeof store.setState === 'function') {
-    store.setState({
-      [activePlanKey]: updatedPlan,
-      currentPlan: updatedPlan,
-      plan: updatedPlan
+  if (!ctx.cookingEventId && Array.isArray(targetItem.recipeBreakdown)) {
+    targetItem.recipeBreakdown.forEach(b => {
+      if (b.cookingEventId) candidateKeys.forEach(k => { updatedPlan.substitutions[`${b.cookingEventId}:${k}`] = subPayload; });
     });
   }
-  if (typeof setActivePlan === 'function') {
-    setActivePlan(updatedPlan);
-  } else if (window.store && typeof window.store.setActivePlan === 'function') {
-    window.store.setActivePlan(updatedPlan);
-  }
 
-  // 2. Run aggregator and commit returned items to state.shoppingList
+  if (typeof store !== 'undefined' && typeof store.setState === 'function') {
+    store.setState({ [activePlanKey]: updatedPlan, currentPlan: updatedPlan, plan: updatedPlan });
+  }
+  if (typeof setActivePlan === 'function') setActivePlan(updatedPlan);
+  else if (window.store?.setActivePlan) window.store.setActivePlan(updatedPlan);
+
   let updatedItems = [];
   if (typeof window.computeWizardShoppingAgg === 'function') {
     const aggResult = window.computeWizardShoppingAgg(updatedPlan);
@@ -127,14 +98,10 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
   }
 
   if (updatedItems.length > 0) {
-    if (typeof setShoppingList === 'function') {
-      setShoppingList(updatedItems);
-    } else if (window.store && typeof window.store.setShoppingList === 'function') {
-      window.store.setShoppingList(updatedItems);
-    }
+    if (typeof setShoppingList === 'function') setShoppingList(updatedItems);
+    else if (window.store?.setShoppingList) window.store.setShoppingList(updatedItems);
   }
 
-  // 3. Trigger UI repaints
   document.dispatchEvent(new CustomEvent('plateplan:state:plan', { detail: updatedPlan }));
   document.dispatchEvent(new CustomEvent('plateplan:state:shopping', { detail: updatedItems }));
   if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
@@ -153,21 +120,29 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
 
   const canonicalIngId = getCanonicalIngredientId(targetItem, ingredients);
   const targetIngId = canonicalIngId || targetItem?.groupId || targetItem?.ingredientId;
+  const currentBank = targetItem?.bankIng || {};
 
-  let targetSubId = targetItem?.bankIng?.subTypeId || targetItem?.bankIng?.subtypeId || targetItem?.subTypeId || targetItem?.subtypeId;
+  let targetSubId = currentBank.subTypeId || currentBank.subtypeId || targetItem?.subTypeId || targetItem?.subtypeId;
   if (!targetSubId && targetIngId) {
     const parentIng = ingredients.find(i => String(i.id) === String(targetIngId));
     if (parentIng && Array.isArray(parentIng.subtypes)) {
-      const matchedSub = parentIng.subtypes.find(s => s.name === targetItem.name) || parentIng.subtypes[0];
-      targetSubId = matchedSub?.id;
+      targetSubId = (parentIng.subtypes.find(s => s.name === targetItem.name) || parentIng.subtypes[0])?.id;
     }
   }
 
   const tier1Items = products.filter(p => p.id !== targetItem?.id && targetSubId && (p.subTypeId === targetSubId || p.subtypeId === targetSubId));
-  const tier2Items = products.filter(p => p.id !== targetItem?.id && !tier1Items.some(t => t.id === p.id) && targetIngId && (p.ingredientId === targetIngId || p.groupId === targetIngId));
+  const tier2Items = products.filter(p => {
+    if (p.id === targetItem?.id || tier1Items.some(t => t.id === p.id)) return false;
+    return Boolean(
+      (p.ingredientId && currentBank.ingredientId && String(p.ingredientId) === String(currentBank.ingredientId)) ||
+      (p.groupId && currentBank.groupId && String(p.groupId) === String(currentBank.groupId)) ||
+      (targetIngId && (String(p.ingredientId) === String(targetIngId) || String(p.groupId) === String(targetIngId))) ||
+      (p.category && currentBank.category && String(p.category).toLowerCase() === String(currentBank.category).toLowerCase())
+    );
+  });
+
   const tier3Items = products;
   const targetSubtype = inferSubtype(targetItem);
-
   let currentSort = 'relevance', currentTierTab = 'tier1', selectedSubstituteProduct = null;
 
   const overlay = document.createElement('div');
@@ -176,15 +151,11 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
 
   const container = document.createElement('div');
   container.style.cssText = 'background:#fff;width:94%;max-width:620px;max-height:88vh;border-radius:16px;display:flex;flex-direction:column;box-shadow:0 24px 48px rgba(0,0,0,0.22);overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
-
   const currentProductName = targetItem?.brand ? `${targetItem.brand} - ${targetItem.name}` : (targetItem?.name || 'Item');
 
   container.innerHTML = `
     <div style="padding:16px 20px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;background:#fafafa;">
-      <div>
-        <h3 style="margin:0;font-size:16px;font-weight:700;color:#0f172a;">Swap Product / Brand</h3>
-        <p style="margin:2px 0 0;font-size:13px;color:#64748b;">Swapping ${escapeHtml(targetSubtype)} &rarr; <strong style="color:#2563eb;">${escapeHtml(currentProductName)}</strong></p>
-      </div>
+      <div><h3 style="margin:0;font-size:16px;font-weight:700;color:#0f172a;">Swap Product / Brand</h3><p style="margin:2px 0 0;font-size:13px;color:#64748b;">Swapping ${escapeHtml(targetSubtype)} &rarr; <strong style="color:#2563eb;">${escapeHtml(currentProductName)}</strong></p></div>
       <button id="pp-modal-close" class="modal-close-btn" aria-label="Close" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;line-height:1;padding:4px 8px;border-radius:6px;">&times;</button>
     </div>
     <div style="padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
@@ -237,11 +208,7 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   });
 
   searchInput.addEventListener('input', () => renderList(searchInput.value));
-  sortSelect.addEventListener('change', () => {
-    currentSort = sortSelect.value;
-    renderList(searchInput.value);
-  });
-
+  sortSelect.addEventListener('change', () => { currentSort = sortSelect.value; renderList(searchInput.value); });
   applyBtn.addEventListener('click', async () => {
     if (!selectedSubstituteProduct) return;
     await executeSwapInState(targetItem, selectedSubstituteProduct, ctx);
@@ -263,30 +230,78 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     const cleanQ = query.toLowerCase().trim();
     const matchesQuery = (item) => !cleanQ || (item.name?.toLowerCase().includes(cleanQ) || item.brand?.toLowerCase().includes(cleanQ) || inferSubtype(item).toLowerCase().includes(cleanQ));
     let displayItems = [];
-    if (currentTierTab === 'tier1') {
-      displayItems = sortItems(tier1Items.filter(matchesQuery));
-    } else if (currentTierTab === 'tier2') {
-      displayItems = sortItems(tier2Items.filter(matchesQuery));
-    } else {
-      displayItems = sortItems(tier3Items.filter(p => p.id !== targetItem?.id && matchesQuery(p))).slice(0, 50);
-    }
+    if (currentTierTab === 'tier1') displayItems = sortItems(tier1Items.filter(matchesQuery));
+    else if (currentTierTab === 'tier2') displayItems = sortItems(tier2Items.filter(matchesQuery));
+    else displayItems = sortItems(tier3Items.filter(p => p.id !== targetItem?.id && matchesQuery(p))).slice(0, 50);
 
     if (displayItems.length === 0) {
       listEl.innerHTML = `<div style="text-align:center;padding:28px;color:#94a3b8;font-size:13px;">No substitute products found in this tier.</div>`;
       return;
     }
 
+    const breakdown = targetItem?.recipeBreakdown || [];
+    const primaryUsage = breakdown[0] || {};
+    const mealType = primaryUsage.mealType || 'dinner';
+    const targetRecipe = (state.recipes || []).find(r => 
+      (r.id && primaryUsage.recipeId && String(r.id) === String(primaryUsage.recipeId)) ||
+      (r.id && ctx?.recipeId && String(r.id) === String(ctx.recipeId)) ||
+      (r.title && primaryUsage.recipeName && r.title.toLowerCase() === primaryUsage.recipeName.toLowerCase()) ||
+      (r.name && primaryUsage.recipeName && r.name.toLowerCase() === primaryUsage.recipeName.toLowerCase())
+    );
+
+    let baseScore = 50;
+    let hasValidRecipe = false;
+    if (targetRecipe && typeof calculateMealFitScore === 'function') {
+      hasValidRecipe = true;
+      const baseScoreResult = calculateMealFitScore(targetRecipe, mealType, { activeProfile: 'everyone', preferences: state.preferences || state.userPrefs });
+      baseScore = typeof baseScoreResult === 'number' ? baseScoreResult : (baseScoreResult?.score || 50);
+    }
+
     listEl.innerHTML = displayItems.map(item => {
       const metrics = calculateMetrics(item);
       const isSelected = selectedSubstituteProduct && (selectedSubstituteProduct.id === item.id || selectedSubstituteProduct.name === item.name);
 
-      const priceDisplay = item.price ? `£${Number(item.price).toFixed(2)}` : '';
-      const protDisplay = (item.protein || item.prot) ? `${item.protein || item.prot}g protein` : '';
-      const packDisplay = item.packSize ? `${item.packSize}${item.packUnit || 'g'}` : '';
-      const subInfo = [packDisplay, protDisplay].filter(Boolean).join(' • ');
-      const subInfoBadge = subInfo ? `<span class="badge-sub-info" style="font-size:11px;color:#64748b;margin-left:auto;">${escapeHtml(subInfo)}</span>` : '';
+      let badgeHtml = '';
+      if (hasValidRecipe && targetRecipe) {
+        const currentProd = targetItem?.bankIng || targetItem || {};
+        const baseGrams = (UnitConverter?.toGrams ? UnitConverter.toGrams(targetItem?.needQty || targetItem?.grams || 100, targetItem?.unit || 'g') : 100) || 100;
+        const servingGrams = baseGrams / (targetRecipe.serves || 4);
 
-      return `<div class="pp-swap-card" data-ing-id="${escapeAttr(item.id || item.name)}" style="padding:12px 14px;border:2px solid ${isSelected ? '#2563eb' : '#e2e8f0'};border-radius:10px;margin-bottom:8px;cursor:pointer;transition:all 0.15s ease;background:${isSelected ? '#eff6ff' : '#fff'};"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div><span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">${escapeAttr(item.brand || '')}</span><div style="font-weight:650;color:#1e293b;font-size:14px;margin-top:1px;">${escapeHtml(item.name)}</div></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#e0f2fe;color:#0369a1;">${escapeHtml(inferSubtype(item))}</span>${subInfoBadge}</div></div><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${priceDisplay ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">${priceDisplay}</span>` : ''}</div></div>`;
+        const deltaProt = ((Number(item.protein || item.prot || 0) - Number(currentProd.protein || currentProd.prot || 0)) / 100) * servingGrams;
+        const deltaCal = ((Number(item.calories || item.kcal || item.cal || 0) - Number(currentProd.calories || currentProd.kcal || currentProd.cal || 0)) / 100) * servingGrams;
+
+        const clonedRecipe = JSON.parse(JSON.stringify(targetRecipe));
+        clonedRecipe.perServing = clonedRecipe.perServing || {};
+        clonedRecipe.perServing.protein = (clonedRecipe.perServing.protein || 0) + deltaProt;
+        clonedRecipe.perServing.calories = (clonedRecipe.perServing.calories || 0) + deltaCal;
+
+        clonedRecipe.macros = clonedRecipe.macros || {};
+        clonedRecipe.macros.protein = (clonedRecipe.macros.protein || 0) + deltaProt;
+        clonedRecipe.macros.calories = (clonedRecipe.macros.calories || 0) + deltaCal;
+
+        clonedRecipe.nutrition = clonedRecipe.nutrition || {};
+        clonedRecipe.nutrition.perServing = clonedRecipe.nutrition.perServing || {};
+        clonedRecipe.nutrition.perServing.protein = (clonedRecipe.nutrition.perServing.protein || 0) + deltaProt;
+        clonedRecipe.nutrition.perServing.calories = (clonedRecipe.nutrition.perServing.calories || 0) + deltaCal;
+
+        const newScoreResult = calculateMealFitScore(clonedRecipe, mealType, { activeProfile: 'everyone', preferences: state.preferences || state.userPrefs });
+        const newScore = typeof newScoreResult === 'number' ? newScoreResult : (newScoreResult?.score || baseScore);
+        const delta = newScore - baseScore;
+
+        const sign = delta > 0 ? '+' : '';
+        const badgeBg = delta > 0 ? '#dcfce7' : (delta < 0 ? '#ffe4e6' : '#f1f5f9');
+        const badgeFg = delta > 0 ? '#15803d' : (delta < 0 ? '#be123c' : '#475569');
+        badgeHtml = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:${badgeBg};color:${badgeFg};margin-left:auto;">[${sign}${delta} - ${baseScore} &rarr; ${newScore}]</span>`;
+      } else {
+        const packDisplay = item.packSize ? `${item.packSize}${item.packUnit || 'g'}` : '';
+        const protDisplay = (item.protein || item.prot) ? `${item.protein || item.prot}g protein` : '';
+        const subInfo = [packDisplay, protDisplay].filter(Boolean).join(' • ');
+        if (subInfo) badgeHtml = `<span style="font-size:11px;color:#64748b;margin-left:auto;">${escapeHtml(subInfo)}</span>`;
+      }
+
+      const priceDisplay = item.price ? `£${Number(item.price).toFixed(2)}` : '';
+
+      return `<div class="pp-swap-card" data-ing-id="${escapeAttr(item.id || item.name)}" style="padding:12px 14px;border:2px solid ${isSelected ? '#2563eb' : '#e2e8f0'};border-radius:10px;margin-bottom:8px;cursor:pointer;transition:all 0.15s ease;background:${isSelected ? '#eff6ff' : '#fff'};"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div><span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">${escapeAttr(item.brand || '')}</span><div style="font-weight:650;color:#1e293b;font-size:14px;margin-top:1px;">${escapeHtml(item.name)}</div></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#e0f2fe;color:#0369a1;">${escapeHtml(inferSubtype(item))}</span>${badgeHtml}</div></div><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${priceDisplay ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">${priceDisplay}</span>` : ''}</div></div>`;
     }).join('');
 
     listEl.querySelectorAll('.pp-swap-card').forEach(card => {
