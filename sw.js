@@ -1,24 +1,24 @@
 /**
- * sw.js (v3.35.3)
+ * sw.js (v3.35.4)
  * Service Worker for PlatePlan PWA offline support & asset caching.
  * Caches core app shell, modern ES6 modules, stylesheets, and icons.
  */
 
-const PLATEPLAN_CACHE = 'plateplan-cache-v3.35.3';
-const PLATEPLAN_STORE_CACHE = 'plateplan_store_cache_v3.35.3';
-const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.35.3';
-const PLATEPLAN_APP_VERSION = 'v3.35.3';
-const PLATEPLAN_BUILD_ID = '3.35.3-v353';
+const PLATEPLAN_CACHE = 'plateplan-cache-v3.35.4';
+const PLATEPLAN_STORE_CACHE = 'plateplan_store_cache_v3.35.4';
+const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.35.4';
+const PLATEPLAN_APP_VERSION = 'v3.35.4';
+const PLATEPLAN_BUILD_ID = '3.35.4-v354';
 
 const PLATEPLAN_PRECACHE_ASSETS = [
   '/',
   '/PlatePlan.html',
   '/manifest.json',
   '/firebase-config.js',
-  '/styles/tokens.css?v=3.35.3',
-  '/styles/components.css?v=3.35.3',
-  '/styles/responsive.css?v=3.35.3',
-  '/styles/print.css?v=3.35.3',
+  '/styles/tokens.css?v=3.35.4',
+  '/styles/components.css?v=3.35.4',
+  '/styles/responsive.css?v=3.35.4',
+  '/styles/print.css?v=3.35.4',
   '/src/main.js',
   '/src/store/store.js',
   '/src/config/firebase.js',

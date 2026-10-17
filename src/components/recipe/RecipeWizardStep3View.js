@@ -161,7 +161,8 @@ export function renderState3Review() {
       } else if (ing.ingredientId) {
         const storeState = getState() || {};
         const products = storeState.products || [];
-        const linkedProduct = ing.productMatch || products.find(p => String(p.ingredientId) === String(ing.ingredientId) || String(p.id) === String(ing.productId));
+        const displayName = ing.displayName || ing.productName || ing.productMatch?.name || (appState.products || []).find(p => String(p.id) === String(ing.mappedItemId))?.name || ing.name;
+
         if (linkedProduct) {
           const brandStr = linkedProduct.brand ? `${linkedProduct.brand} ` : '';
           const prodTitle = `${brandStr}${linkedProduct.name || linkedProduct.title || ''}`.trim();
@@ -169,6 +170,8 @@ export function renderState3Review() {
           mainLineText = `${escapeHtml(ing.name)}${notesHtml} - <a class="product-link" href="#" data-product-id="${productId}" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(prodTitle)}</a>`;
           taxLabel = ''; 
         } else {
+          // Fallback to displayName if no product linked but is mapped
+          mainLineText = `${escapeHtml(ing.name)}${notesHtml} - <span style="color:var(--text2);text-decoration:underline;">${escapeHtml(displayName)}</span>`;
           taxLabel = `<span class="badge badge-purple" style="font-size:10px;">Mapped</span>`;
         }
       } else {
