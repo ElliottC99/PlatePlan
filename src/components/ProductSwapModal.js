@@ -1,12 +1,10 @@
 import { getCanonicalIngredientId, calculateShoppingItemCost } from '../services/ShoppingCalculationService.js';
 import { store, setActivePlan, setShoppingList } from '../store/store.js';
-import { getEffectiveRecipeFitScore } from '../services/FitScoreService.js';
-import { UnitConverter } from '../services/UnitConverter.js';
 
 /**
- * src/components/ProductSwapModal.js (v3.31.33)
- * Relational 3-tier product swap modal with native Fit Score delta calculations,
- * Store action dispatching, and pure ES6 module architecture.
+ * src/components/ProductSwapModal.js (v3.31.37)
+ * Relational 3-tier product swap modal with multi-key candidate alignment,
+ * full pipeline persistence, clean store dispatches, and pure ES6 architecture.
  */
 
 function escapeHtml(str) {
@@ -17,7 +15,7 @@ function escapeAttr(str) { return escapeHtml(str); }
 
 export function inferSubtype(item) {
   if (!item) return 'Produce & Staples';
-  const state = store.getState();
+  const state = (typeof store !== 'undefined' && store.getState) ? store.getState() : {};
   const ingredients = Array.isArray(state.ingredients) ? state.ingredients : Object.values(state.ingredientsBank || {});
   const target = item.bankIng || item;
   const ingId = target.ingredientId || target.groupId || target.familyId;
@@ -40,7 +38,7 @@ export function calculateMetrics(item) {
 
 export function resolveTargetItem(param1, param2, param3) {
   const keys = [param1, param2, param3].filter(k => k && typeof k === 'string' && k.trim() !== '');
-  const state = store.getState();
+  const state = (typeof store !== 'undefined' && store.getState) ? store.getState() : {};
 
   const sources = [
     state.shoppingList,
@@ -67,12 +65,25 @@ export function resolveTargetItem(param1, param2, param3) {
 
 export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
   if (!targetItem || !newProduct) return;
-  const storeState = store.getState();
-  const canonicalIngId = getCanonicalIngredientId(targetItem, storeState.ingredients || []);
+  const storeState = (typeof store !== 'undefined' && store.getState) ? store.getState() : (window.state || {});
+
+  const bank = targetItem.bankIng || {};
+  const candidateKeys = [
+    targetItem.canonicalIngId,
+    bank.ingredientId,
+    bank.groupId,
+    bank.id,
+    targetItem.ingredientId !== targetItem.id ? targetItem.ingredientId : null,
+    targetItem.name
+  ].filter(Boolean).map(String);
+
+  if (candidateKeys.length === 0) {
+    if (targetItem.id) candidateKeys.push(String(targetItem.id));
+    if (targetItem.key && targetItem.key !== targetItem.id) candidateKeys.push(String(targetItem.key));
+  }
 
   const activePlanKey = storeState.isDraftPlan ? 'draftPlan' : (storeState.plan ? 'plan' : 'currentPlan');
   const basePlan = storeState[activePlanKey] || storeState.currentPlan || storeState.plan || {};
-
   const updatedPlan = JSON.parse(JSON.stringify(basePlan));
 
   updatedPlan.substitutions = updatedPlan.substitutions || {};
@@ -86,36 +97,46 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
     timestamp: Date.now()
   };
 
-  if (ctx.cookingEventId && canonicalIngId) {
-    updatedPlan.substitutions[`${ctx.cookingEventId}:${canonicalIngId}`] = subPayload;
-  } else if (canonicalIngId) {
-    updatedPlan.substitutions[canonicalIngId] = subPayload;
-  }
-  if (canonicalIngId) {
-    updatedPlan.productSelections[canonicalIngId] = newProduct.id;
-  }
+  candidateKeys.forEach(k => {
+    updatedPlan.substitutions[k] = subPayload;
+    updatedPlan.productSelections[k] = newProduct.id;
+    if (ctx.cookingEventId) {
+      updatedPlan.substitutions[`${ctx.cookingEventId}:${k}`] = subPayload;
+    }
+  });
 
-  // 1. Sync across all active plan keys in the modern Store
-  if (typeof store.setState === 'function') {
+  // 1. Commit plan to modern store
+  if (typeof store !== 'undefined' && typeof store.setState === 'function') {
     store.setState({
       [activePlanKey]: updatedPlan,
       currentPlan: updatedPlan,
       plan: updatedPlan
     });
   }
-
-  // 2. Dispatch through official action for persistent cache
   if (typeof setActivePlan === 'function') {
     setActivePlan(updatedPlan);
+  } else if (window.store && typeof window.store.setActivePlan === 'function') {
+    window.store.setActivePlan(updatedPlan);
   }
 
-  // 3. Re-run aggregator and force legacy DOM repaints
+  // 2. Run aggregator and commit returned items to state.shoppingList
+  let updatedItems = [];
   if (typeof window.computeWizardShoppingAgg === 'function') {
-    window.computeWizardShoppingAgg(updatedPlan);
+    const aggResult = window.computeWizardShoppingAgg(updatedPlan);
+    updatedItems = Array.isArray(aggResult) ? aggResult : (aggResult?.items || []);
   }
-  document.dispatchEvent(new CustomEvent('plateplan:state:plan', { detail: updatedPlan }));
-  document.dispatchEvent(new CustomEvent('plateplan:state:shopping'));
 
+  if (updatedItems.length > 0) {
+    if (typeof setShoppingList === 'function') {
+      setShoppingList(updatedItems);
+    } else if (window.store && typeof window.store.setShoppingList === 'function') {
+      window.store.setShoppingList(updatedItems);
+    }
+  }
+
+  // 3. Trigger UI repaints
+  document.dispatchEvent(new CustomEvent('plateplan:state:plan', { detail: updatedPlan }));
+  document.dispatchEvent(new CustomEvent('plateplan:state:shopping', { detail: updatedItems }));
   if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
   if (typeof window.renderShoppingListUI === 'function') window.renderShoppingListUI();
 }
@@ -125,7 +146,7 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   if (existing) existing.remove();
 
   const ctx = optionalContext || {};
-  const state = store.getState();
+  const state = (typeof store !== 'undefined' && store.getState) ? store.getState() : {};
   const { item: targetItem } = resolveTargetItem(param1, param2, param3);
   const products = Array.isArray(state.products) ? state.products : Object.values(state.productsBank || {});
   const ingredients = Array.isArray(state.ingredients) ? state.ingredients : Object.values(state.ingredientsBank || {});
@@ -255,39 +276,17 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
       return;
     }
 
-    const recipes = Array.isArray(state.recipes) ? state.recipes : [];
-    const recipe = recipes.find(r => r && (String(r.id) === String(targetItem?.recipeId) || String(r.id) === String(ctx?.recipeId))) || recipes[0] || null;
-
     listEl.innerHTML = displayItems.map(item => {
       const metrics = calculateMetrics(item);
       const isSelected = selectedSubstituteProduct && (selectedSubstituteProduct.id === item.id || selectedSubstituteProduct.name === item.name);
 
-      let diffBadge = '';
-      if (recipe && typeof getEffectiveRecipeFitScore === 'function') {
-        const clonedRecipe = JSON.parse(JSON.stringify(recipe));
-        const baseGrams = UnitConverter.toGrams(targetItem?.needQty || targetItem?.grams || 100, targetItem?.unit || 'g') || 100;
-        const servingGrams = baseGrams / (recipe.serves || 4);
+      const priceDisplay = item.price ? `£${Number(item.price).toFixed(2)}` : '';
+      const protDisplay = (item.protein || item.prot) ? `${item.protein || item.prot}g protein` : '';
+      const packDisplay = item.packSize ? `${item.packSize}${item.packUnit || 'g'}` : '';
+      const subInfo = [packDisplay, protDisplay].filter(Boolean).join(' • ');
+      const subInfoBadge = subInfo ? `<span class="badge-sub-info" style="font-size:11px;color:#64748b;margin-left:auto;">${escapeHtml(subInfo)}</span>` : '';
 
-        const targetProt = Number(targetItem?.protein || targetItem?.bankIng?.protein || 0);
-        const targetCal = Number(targetItem?.calories || targetItem?.bankIng?.kcal || 0);
-        const newProt = Number(item.protein || item.prot || 0);
-        const newCal = Number(item.calories || item.kcal || item.cal || 0);
-
-        const deltaProt = ((newProt - targetProt) / 100) * servingGrams;
-        const deltaCal = ((newCal - targetCal) / 100) * servingGrams;
-
-        clonedRecipe.nutrition = clonedRecipe.nutrition || {};
-        clonedRecipe.nutrition.perServing = clonedRecipe.nutrition.perServing || {};
-        clonedRecipe.nutrition.perServing.protein = (clonedRecipe.nutrition.perServing.protein || Number(clonedRecipe.perServing?.protein || clonedRecipe.protein || 0)) + deltaProt;
-        clonedRecipe.nutrition.perServing.calories = (clonedRecipe.nutrition.perServing.calories || Number(clonedRecipe.perServing?.calories || clonedRecipe.calories || 0)) + deltaCal;
-
-        const baseScore = Math.round(getEffectiveRecipeFitScore(recipe, 'dinner').score || 0);
-        const newScore = Math.round(getEffectiveRecipeFitScore(clonedRecipe, 'dinner').score || 0);
-        const diff = newScore - baseScore;
-        diffBadge = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:${diff >= 0 ? '#dcfce7' : '#fef3c7'};color:${diff >= 0 ? '#15803d' : '#b45309'};margin-left:auto;">[${diff >= 0 ? '+' + diff : diff} - ${baseScore} &rarr; ${newScore}]</span>`;
-      }
-
-      return `<div class="pp-swap-card" data-ing-id="${escapeAttr(item.id || item.name)}" style="padding:12px 14px;border:2px solid ${isSelected ? '#2563eb' : '#e2e8f0'};border-radius:10px;margin-bottom:8px;cursor:pointer;transition:all 0.15s ease;background:${isSelected ? '#eff6ff' : '#fff'};"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div><span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">${escapeAttr(item.brand || '')}</span><div style="font-weight:650;color:#1e293b;font-size:14px;margin-top:1px;">${escapeHtml(item.name)}</div></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#e0f2fe;color:#0369a1;">${escapeHtml(inferSubtype(item))}</span>${diffBadge}</div></div><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${metrics.price ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">£${metrics.price.toFixed(2)}</span>` : ''}${metrics.protein ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">${metrics.protein}g protein</span>` : ''}</div></div>`;
+      return `<div class="pp-swap-card" data-ing-id="${escapeAttr(item.id || item.name)}" style="padding:12px 14px;border:2px solid ${isSelected ? '#2563eb' : '#e2e8f0'};border-radius:10px;margin-bottom:8px;cursor:pointer;transition:all 0.15s ease;background:${isSelected ? '#eff6ff' : '#fff'};"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div><span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">${escapeAttr(item.brand || '')}</span><div style="font-weight:650;color:#1e293b;font-size:14px;margin-top:1px;">${escapeHtml(item.name)}</div></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#e0f2fe;color:#0369a1;">${escapeHtml(inferSubtype(item))}</span>${subInfoBadge}</div></div><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${priceDisplay ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">${priceDisplay}</span>` : ''}</div></div>`;
     }).join('');
 
     listEl.querySelectorAll('.pp-swap-card').forEach(card => {
