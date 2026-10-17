@@ -5,32 +5,7 @@
 
 import { wizardState, syncStep3InputsToState, getSaveButtonLabel, hasDistinctEnhancedVariant } from './RecipeWizardState.js';
 import { saveRecipe } from '../../services/HouseholdRepository.js';
-import { learnIngredientAlias, getState } from '../../store/store.js';
-import { toTitleCase } from '../../utils/stringUtils.js';
-import * as NutritionService from '../../services/NutritionService.js';
-import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
-
-function recalculateWizardMacros(recipeObj) {
-  if (!recipeObj) return;
-  const targetServings = Number(recipeObj.servings || recipeObj.targetServings || 2);
-  const storeState = getState() || {};
-  const products = storeState.products || [];
-  const allIngredients = (recipeObj.ingredientSections || []).flatMap(s => s.ingredients || []);
-  const nutritionList = allIngredients.map(ing => {
-    const prodId = ing.productId || ing.mappedItemId || ing.productMatch?.id;
-    const product = prodId ? products.find(p => String(p.id) === String(prodId)) : null;
-    if (!product) return { kcal: 0, prot: 0, carb: 0, fat: 0 };
-    return NutritionService.calculateItemNutrition(product, ing.scaledQty || ing.qty, ing.unit);
-  });
-  const rolled = NutritionService.rollupNutritionTotals(nutritionList, targetServings);
-  recipeObj.macros = {
-    calories: Math.round(rolled.perServing?.cal || rolled.perServing?.kcal || 0),
-    protein: Math.round((rolled.perServing?.prot || rolled.perServing?.protein || 0) * 10) / 10,
-    carbs: Math.round((rolled.perServing?.carb || rolled.perServing?.carbs || 0) * 10) / 10,
-    fat: Math.round((rolled.perServing?.fat || 0) * 10) / 10
-  };
-  recipeObj._computedFitScore = calculateMealFitScore(recipeObj, recipeObj.mealSuitability?.[0] || 'dinner').score;
-}
+import { learnIngredientAlias } from '../../store/store.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -40,6 +15,24 @@ function escapeHtml(str) {
     '"': '&quot;',
     "'": '&#39;'
   }[ch]));
+}
+
+function buildFinalRecipePayload(draftRecipe, activeState) {
+  const cleanTitle = toTitleCase(document.getElementById('wiz-rev-title')?.value || draftRecipe.title || draftRecipe.name || 'Untitled Recipe');
+  const cleanServes = parseInt(document.getElementById('wiz-rev-servings')?.value || draftRecipe.serves || draftRecipe.servings || 2, 10) || 2;
+  
+  return {
+    ...draftRecipe,
+    name: cleanTitle,
+    title: cleanTitle,
+    serves: cleanServes,
+    servings: cleanServes,
+    targetServings: cleanServes,
+    macros: activeState.macros,
+    _computedFitScore: activeState._computedFitScore || calculateMealFitScore(activeState, activeState.mealSuitability?.[0] || 'dinner'),
+    ingredients: activeState.ingredients,
+    ingredientSections: activeState.ingredientSections
+  };
 }
 
 export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice, loadNextRecipeFromQueue, closeRecipeWizard }) {
@@ -75,45 +68,20 @@ export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice
   const btnSave = modalWrap.querySelector('#btn-save-wizard-recipe');
   if (btnSave) {
     btnSave.onclick = async () => {
-      const rec = wizardState.activeRecipe;
-      recalculateWizardMacros(rec);
+      const recipeToSave = buildFinalRecipePayload(wizardState.activeRecipe, wizardState.activeRecipe);
 
-      const uiTitleInput = document.getElementById('wiz-rev-title');
-      const uiServingsInput = document.getElementById('tp-serving-size');
-
-      const safeTitle = toTitleCase(uiTitleInput?.value || rec.title || rec.name || 'Untitled Recipe');
-      const safeServings = parseInt(uiServingsInput?.value, 10) || rec.servings || rec.serves || 2;
-
-      const recipeToSave = {
-        ...rec,
-        id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}`,
-        name: safeTitle,
-        title: safeTitle,
-        servings: safeServings,
-        serves: safeServings,
-        macros: rec.macros,
-        _computedFitScore: rec._computedFitScore || calculateMealFitScore(rec, rec.mealSuitability?.[0] || 'dinner').score,
-        ingredientSections: rec.ingredientSections.map(s => ({
-          ...s,
-          sectionTitle: toTitleCase(s.sectionTitle)
-        })),
-        ingredients: (rec.ingredientSections || []).flatMap(s => s.ingredients.map(i => ({
-          ...i,
-          productId: i.productId || i.mappedItemId || i.productMatch?.id || null
-        }))),
-        instructions: rec.methodSteps,
-        method: rec.methodSteps,
-        createdAt: new Date().toISOString()
-      };
-
-      if (hasDistinctEnhancedVariant(rec)) {
-        recipeToSave.enhanced = rec.enhanced;
+      const allIngredients = (recipeToSave.ingredientSections || []).flatMap(s => s.ingredients);
+      const unlinked = allIngredients.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
+      if (unlinked.length > 0) {
+        showWizardNotice(`Cannot save recipe: ${unlinked.length} ingredient(s) retain an unlinked "✨ New Item" status. Please map all ingredients to a valid Category, Item, or Sub-Type before saving.`, 'warning');
+        return;
       }
 
-      const allIngredients = (rec.ingredientSections || []).flatMap(s => s.ingredients);
+      btnSave.disabled = true;
+      btnSave.textContent = 'Saving...';
+
       try {
         await saveRecipe(recipeToSave);
-
         for (const ing of allIngredients) {
           if (ing.ingredientId && ing.raw) {
             await learnIngredientAlias(ing.ingredientId, ing.raw);
@@ -139,6 +107,8 @@ export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice
           const mapNextBtn = banner.querySelector('#btn-wiz-map-next-recipe');
           if (mapNextBtn) {
             mapNextBtn.onclick = () => {
+              // Capture final state of CURRENT recipe before loading next
+              wizardState.processingQueue[wizardState.currentQueueIndex] = recipeToSave;
               loadNextRecipeFromQueue();
               wizardState.currentStep = 2;
               renderWizardModal();
@@ -147,14 +117,14 @@ export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice
         } else {
           closeRecipeWizard();
           if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
-            window.showPlatePlanToast(`Recipe "${rec.title}" saved successfully!`, 'success');
+            window.showPlatePlanToast(`Recipe "${recipeToSave.title}" saved successfully!`, 'success');
           }
         }
       } catch (e) {
         console.error('[RecipeWizard] Error saving recipe:', e);
         showWizardNotice(`Error saving recipe: ${e.message}`, 'error');
         btnSave.disabled = false;
-        btnSave.textContent = `💾 ${getSaveButtonLabel(rec)}`;
+        btnSave.textContent = `💾 ${getSaveButtonLabel(recipeToSave)}`;
       }
     };
   }
