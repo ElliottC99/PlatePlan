@@ -13,7 +13,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * src/main.js (v3.31.40)
+ * src/main.js (v3.31.41)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  */
 import { waitForAuth } from './services/AuthService.js';
@@ -280,7 +280,7 @@ function setupSubscriptions() {
   subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
 }
 
-export const APP_VERSION = 'v3.31.40';
+export const APP_VERSION = 'v3.31.41';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;

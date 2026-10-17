@@ -4,9 +4,9 @@ import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
 import { UnitConverter } from '../services/UnitConverter.js';
 
 /**
- * src/components/ProductSwapModal.js (v3.31.40)
- * Relational 3-tier product swap modal with robust target item resolution,
- * strict Fit Score delta badge formatting, and Tier 2 family isolation.
+ * src/components/ProductSwapModal.js (v3.31.41)
+ * Relational 3-tier product swap modal with unified scope identifiers,
+ * root and .enhanced macro delta injection, and strict fit score badge formatting.
  */
 
 function escapeHtml(str) { return str == null ? '' : String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
@@ -51,11 +51,7 @@ export function resolveTargetItem(param1, param2, param3) {
     const ingId = String(item.ingredientId || item.groupId || '').toLowerCase();
     const itemName = String(item.name || '').toLowerCase();
     const prodName = String(item.productName || item.bankIng?.name || '').toLowerCase();
-
-    if (idQuery && (itemId === idQuery || itemKey === idQuery || bankId === idQuery || ingId === idQuery)) return true;
-    if (nameQuery && (itemName === nameQuery || prodName === nameQuery)) return true;
-    if (idQuery && itemName === idQuery) return true;
-    return false;
+    return (idQuery && (itemId === idQuery || itemKey === idQuery || bankId === idQuery || ingId === idQuery)) || (nameQuery && (itemName === nameQuery || prodName === nameQuery)) || (idQuery && itemName === idQuery);
   });
 
   if (!matched && idQuery) {
@@ -71,11 +67,7 @@ export function resolveTargetItem(param1, param2, param3) {
     }
   }
 
-  if (!matched) {
-    matched = { id: param1 || 'unknown', key: param1 || 'unknown', name: param2 || param1 || 'Item', bankIng: null, buyQty: 1, recipeBreakdown: [] };
-  }
-
-  return { item: matched };
+  return { item: matched || { id: param1 || 'unknown', key: param1 || 'unknown', name: param2 || param1 || 'Item', bankIng: null, buyQty: 1, recipeBreakdown: [] } };
 }
 
 export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
@@ -97,18 +89,18 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
   updatedPlan.productSelections = updatedPlan.productSelections || {};
   const subPayload = { productId: newProduct.id, productName: newProduct.name, brand: newProduct.brand || '', price: newProduct.price || 0, timestamp: Date.now() };
 
-  if (ctx && ctx.cookingEventId) {
-    candidateKeys.forEach(k => { updatedPlan.substitutions[`${ctx.cookingEventId}:${k}`] = subPayload; });
+  const eventId = ctx?.cookingEventId || ctx?.instanceId || ctx?.prepEventId || null;
+  if (eventId) {
+    candidateKeys.forEach(k => { updatedPlan.substitutions[`${eventId}:${k}`] = subPayload; });
   } else {
     candidateKeys.forEach(k => {
       updatedPlan.substitutions[k] = subPayload;
+      if (!updatedPlan.productSelections) updatedPlan.productSelections = {};
       updatedPlan.productSelections[k] = newProduct.id;
     });
   }
 
-  if (typeof store !== 'undefined' && typeof store.setState === 'function') {
-    store.setState({ [activePlanKey]: updatedPlan, currentPlan: updatedPlan, plan: updatedPlan });
-  }
+  if (typeof store !== 'undefined' && typeof store.setState === 'function') store.setState({ [activePlanKey]: updatedPlan, currentPlan: updatedPlan, plan: updatedPlan });
   if (typeof setActivePlan === 'function') setActivePlan(updatedPlan);
   else if (window.store?.setActivePlan) window.store.setActivePlan(updatedPlan);
 
@@ -152,14 +144,9 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   }
 
   const tier1Items = products.filter(p => p.id !== targetItem?.id && targetSubId && (p.subTypeId === targetSubId || p.subtypeId === targetSubId));
-
   const tier2Items = products.filter(p => {
     if (p.id === targetItem?.id || tier1Items.some(t => t.id === p.id)) return false;
-    return Boolean(
-      (p.ingredientId && currentBank.ingredientId && String(p.ingredientId) === String(currentBank.ingredientId)) ||
-      (p.groupId && currentBank.groupId && String(p.groupId) === String(currentBank.groupId)) ||
-      (targetIngId && (String(p.ingredientId) === String(targetIngId) || String(p.groupId) === String(targetIngId)))
-    );
+    return Boolean((p.ingredientId && currentBank.ingredientId && String(p.ingredientId) === String(currentBank.ingredientId)) || (p.groupId && currentBank.groupId && String(p.groupId) === String(currentBank.groupId)) || (targetIngId && (String(p.ingredientId) === String(targetIngId) || String(p.groupId) === String(targetIngId))));
   });
 
   const tier3Items = products;
@@ -260,15 +247,16 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
       return;
     }
 
-    const breakdown = targetItem?.recipeBreakdown || [];
-    const primaryUsage = breakdown[0] || {};
+    const breakdowns = Array.isArray(targetItem?.recipeBreakdown) ? targetItem.recipeBreakdown : [];
+    const primaryUsage = breakdowns[0] || {};
     const mealType = primaryUsage.mealType || 'dinner';
-    const targetRecipe = (state.recipes || []).find(r => 
-      (r.id && primaryUsage.recipeId && String(r.id) === String(primaryUsage.recipeId)) ||
-      (r.id && ctx?.recipeId && String(r.id) === String(ctx.recipeId)) ||
-      (r.title && primaryUsage.recipeName && r.title.toLowerCase() === primaryUsage.recipeName.toLowerCase()) ||
-      (r.name && primaryUsage.recipeName && r.name.toLowerCase() === primaryUsage.recipeName.toLowerCase())
-    );
+    const targetRecipe = (state.recipes || []).find(r => {
+      const rName = String(r.title || r.name || '').toLowerCase().trim();
+      return breakdowns.some(b => {
+        const bName = String(b.recipeName || b.title || '').toLowerCase().trim();
+        return bName && (rName === bName || rName.includes(bName) || bName.includes(rName));
+      });
+    }) || (state.recipes || [])[0];
 
     let baseScore = 50;
     let hasValidRecipe = false;
@@ -284,26 +272,39 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
 
       let badgeHtml = '';
       if (hasValidRecipe && targetRecipe) {
-        const currentProd = targetItem?.bankIng || targetItem || {};
-        const baseGrams = (UnitConverter?.toGrams ? UnitConverter.toGrams(targetItem?.needQty || targetItem?.grams || 100, targetItem?.unit || 'g') : 100) || 100;
-        const servingGrams = baseGrams / (targetRecipe.serves || 4);
+        const currentProt = Number(targetItem.bankIng?.protein || targetItem.bankIng?.prot || 0);
+        const currentCal = Number(targetItem.bankIng?.calories || targetItem.bankIng?.cal || targetItem.bankIng?.kcal || 0);
+        const candProt = Number(item.protein || item.prot || 0);
+        const candCal = Number(item.calories || item.cal || item.kcal || 0);
 
-        const deltaProt = ((Number(item.protein || item.prot || 0) - Number(currentProd.protein || currentProd.prot || 0)) / 100) * servingGrams;
-        const deltaCal = ((Number(item.calories || item.kcal || item.cal || 0) - Number(currentProd.calories || currentProd.kcal || currentProd.cal || 0)) / 100) * servingGrams;
+        const protDiff = Math.round((candProt - currentProt) * 10) / 10;
+        const calDiff = Math.round(candCal - currentCal);
 
         const clonedRecipe = JSON.parse(JSON.stringify(targetRecipe));
-        clonedRecipe.perServing = clonedRecipe.perServing || {};
-        clonedRecipe.perServing.protein = (clonedRecipe.perServing.protein || 0) + deltaProt;
-        clonedRecipe.perServing.calories = (clonedRecipe.perServing.calories || 0) + deltaCal;
 
-        clonedRecipe.macros = clonedRecipe.macros || {};
-        clonedRecipe.macros.protein = (clonedRecipe.macros.protein || 0) + deltaProt;
-        clonedRecipe.macros.calories = (clonedRecipe.macros.calories || 0) + deltaCal;
+        const applyDeltasToNode = (node) => {
+          if (!node || typeof node !== 'object') return;
+          if (node.perServing) {
+            if (typeof node.perServing.prot === 'number') node.perServing.prot += protDiff;
+            if (typeof node.perServing.protein === 'number') node.perServing.protein += protDiff;
+            if (typeof node.perServing.cal === 'number') node.perServing.cal += calDiff;
+            if (typeof node.perServing.calories === 'number') node.perServing.calories += calDiff;
+          }
+          if (node.nutrition?.perServing) {
+            if (typeof node.nutrition.perServing.prot === 'number') node.nutrition.perServing.prot += protDiff;
+            if (typeof node.nutrition.perServing.protein === 'number') node.nutrition.perServing.protein += protDiff;
+            if (typeof node.nutrition.perServing.cal === 'number') node.nutrition.perServing.cal += calDiff;
+            if (typeof node.nutrition.perServing.calories === 'number') node.nutrition.perServing.calories += calDiff;
+          }
+          if (typeof node.prot === 'number') node.prot += protDiff;
+          if (typeof node.protein === 'number') node.protein += protDiff;
+          if (typeof node.cal === 'number') node.cal += calDiff;
+          if (typeof node.calories === 'number') node.calories += calDiff;
+          if (typeof node.kcal === 'number') node.kcal += calDiff;
+        };
 
-        clonedRecipe.nutrition = clonedRecipe.nutrition || {};
-        clonedRecipe.nutrition.perServing = clonedRecipe.nutrition.perServing || {};
-        clonedRecipe.nutrition.perServing.protein = (clonedRecipe.nutrition.perServing.protein || 0) + deltaProt;
-        clonedRecipe.nutrition.perServing.calories = (clonedRecipe.nutrition.perServing.calories || 0) + deltaCal;
+        applyDeltasToNode(clonedRecipe);
+        if (clonedRecipe.enhanced) applyDeltasToNode(clonedRecipe.enhanced);
 
         const newScoreResult = calculateMealFitScore(clonedRecipe, mealType, { activeProfile: 'everyone', preferences: state.preferences || state.userPrefs });
         const newScore = typeof newScoreResult === 'number' ? newScoreResult : (newScoreResult?.score || baseScore);
