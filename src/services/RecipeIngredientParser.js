@@ -1,49 +1,35 @@
 /**
- * src/services/RecipeIngredientParser.js (v3.32.0)
+ * src/services/RecipeIngredientParser.js (v3.32.1)
  * Core ingredient string parsing, units, quantities, fractions, and taxonomy matching.
  */
 
 import { getState } from '../store/store.js';
 import { convertToStrictUnit } from './UnitConversionService.js';
 
-/**
- * Universal Title Casing helper for titles, ingredient names, and section headers.
- * @param {string} str
- * @returns {string}
- */
 export function toTitleCase(str) {
   if (!str || typeof str !== 'string') return '';
   return str.trim().replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
 }
 
 export const UNICODE_FRACTIONS = {
-  '½': '1/2', '⅓': '1/3', '⅔': '2/3', '¼': '1/4', '¾': '3/4',
-  '⅕': '1/5', '⅖': '2/5', '⅗': '3/5', '⅘': '4/5', '⅙': '1/6',
-  '⅚': '5/6', '⅛': '1/8', '⅜': '3/8', '⅝': '5/8', '⅞': '7/8'
+  '½': '1/2', '⅓': '1/3', '⅔': '2/3', '¼': '1/4', '¾': '3/4', '⅕': '1/5',
+  '⅖': '2/5', '⅗': '3/5', '⅘': '4/5', '⅙': '1/6', '⅚': '5/6', '⅛': '1/8',
+  '⅜': '3/8', '⅝': '5/8', '⅞': '7/8'
 };
 
 export const UNIT_MAP = {
-  g: 'g', gram: 'g', grams: 'g',
-  kg: 'kg', kilogram: 'kg', kilograms: 'kg', kilo: 'kg', kilos: 'kg',
+  g: 'g', gram: 'g', grams: 'g', kg: 'kg', kilogram: 'kg', kilograms: 'kg', kilo: 'kg', kilos: 'kg',
   ml: 'ml', milliliter: 'ml', milliliters: 'ml', millilitre: 'ml', millilitres: 'ml', mls: 'ml',
   l: 'l', liter: 'l', liters: 'l', litre: 'l', litres: 'l',
   tbsp: 'tbsp', tablespoon: 'tbsp', tablespoons: 'tbsp', tbl: 'tbsp', tbs: 'tbsp', tb: 'tbsp',
   tsp: 'tsp', teaspoon: 'tsp', teaspoons: 'tsp', t: 'tsp',
-  cup: 'cup', cups: 'cup',
-  clove: 'clove', cloves: 'clove',
-  can: 'can', cans: 'can', tin: 'can', tins: 'can',
-  pinch: 'pinch', pinches: 'pinch',
-  block: 'block', blocks: 'block',
-  slice: 'slice', slices: 'slice',
-  handful: 'handful', handfuls: 'handful',
-  bunch: 'bunch', bunches: 'bunch',
+  cup: 'cup', cups: 'cup', clove: 'clove', cloves: 'clove', can: 'can', cans: 'can', tin: 'can', tins: 'can',
+  pinch: 'pinch', pinches: 'pinch', block: 'block', blocks: 'block', slice: 'slice', slices: 'slice',
+  handful: 'handful', handfuls: 'handful', bunch: 'bunch', bunches: 'bunch',
   pack: 'pack', packet: 'pack', packets: 'pack', package: 'pack', packages: 'pack', pkg: 'pack',
-  head: 'head', heads: 'head',
-  stalk: 'stalk', stalks: 'stalk', stick: 'stalk', sticks: 'stalk',
-  sprig: 'sprig', sprigs: 'sprig',
-  dash: 'dash', dashes: 'dash', drizzle: 'dash', splash: 'dash', drop: 'dash', drops: 'dash',
-  oz: 'oz', ounce: 'oz', ounces: 'oz',
-  lb: 'lb', lbs: 'lb', pound: 'lb', pounds: 'lb'
+  head: 'head', heads: 'head', stalk: 'stalk', stalks: 'stalk', stick: 'stalk', sticks: 'stalk',
+  sprig: 'sprig', sprigs: 'sprig', dash: 'dash', dashes: 'dash', drizzle: 'dash', splash: 'dash',
+  drop: 'dash', drops: 'dash', oz: 'oz', ounce: 'oz', ounces: 'oz', lb: 'lb', lbs: 'lb', pound: 'lb', pounds: 'lb'
 };
 
 /**
@@ -59,7 +45,28 @@ export function parseQuantity(rawText) {
     }
   });
 
-  // Multiplier pattern e.g. "2 x 400g" or "2 x 150ml"
+  // 1. Multiplier pattern with fraction: e.g. "2 x 1/2 wraps"
+  const multFracMatch = text.match(/^(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+)\/(\d+)\s*(.*)/);
+  if (multFracMatch) {
+    const m1 = parseFloat(multFracMatch[1]);
+    const num = parseFloat(multFracMatch[2]);
+    const den = parseFloat(multFracMatch[3]);
+    const totalQty = den > 0 ? m1 * (num / den) : m1;
+    return { qty: totalQty, remainder: multFracMatch[4].trim() };
+  }
+
+  // 2. Multiplier pattern with range e.g. "1 x 160-200g" or "2 x 150-200ml"
+  const multRangeMatch = text.match(/^(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)(.*)/i);
+  if (multRangeMatch) {
+    const m1 = parseFloat(multRangeMatch[1]);
+    const r1 = parseFloat(multRangeMatch[2]);
+    const r2 = parseFloat(multRangeMatch[3]);
+    const avg = (r1 + r2) / 2;
+    const unitStr = multRangeMatch[4];
+    return { qty: m1 * avg, remainder: `${unitStr}${multRangeMatch[5]}`.trim() };
+  }
+
+  // 3. Multiplier pattern with unit e.g. "2 x 400g" or "2 x 150ml"
   const multMatch = text.match(/^(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)(.*)/);
   if (multMatch) {
     const m1 = parseFloat(multMatch[1]);
@@ -67,6 +74,20 @@ export function parseQuantity(rawText) {
     const unitStr = multMatch[3];
     const totalQty = m1 * m2;
     return { qty: totalQty, remainder: `${unitStr}${multMatch[4]}`.trim() };
+  }
+
+  // 4. Multiplier with number only e.g. "2 x 2 wraps"
+  const multNumOnlyMatch = text.match(/^(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)\s+([a-zA-Z].*)/);
+  if (multNumOnlyMatch) {
+    const m1 = parseFloat(multNumOnlyMatch[1]);
+    const m2 = parseFloat(multNumOnlyMatch[2]);
+    return { qty: m1 * m2, remainder: multNumOnlyMatch[3].trim() };
+  }
+
+  // 5. Multiplier count only e.g. "4 x chicken breasts" or "1x lime"
+  const countMultMatch = text.match(/^(\d+(?:\.\d+)?)\s*[xX×]\s*(.*)/);
+  if (countMultMatch && countMultMatch[2] && !/^\d/.test(countMultMatch[2])) {
+    return { qty: parseFloat(countMultMatch[1]), remainder: countMultMatch[2].trim() };
   }
 
   // Range e.g. "3-4" or "3 to 4"
@@ -209,12 +230,13 @@ export function parseIngredientString(rawString) {
     notes = notes ? `${notes}, ${dashNotes}` : dashNotes;
   }
 
-  const containerMatch = name.match(/^(can|tin|block|jar|pack|packet|bottle|head|stalk)\s+(.*)/i);
+  const containerMatch = name.match(/^(cans?|tins?|blocks?|jars?|packs?|packets?|bottles?|heads?|stalks?|sachets?|tubs?|pots?|bags?|box(?:es)?)\s+(?:of\s+)?(.*)/i);
   if (containerMatch) {
     const descriptor = containerMatch[1].toLowerCase();
     name = containerMatch[2].trim();
     notes = notes ? `${descriptor}, ${notes}` : descriptor;
   }
+  if (/^of\b/i.test(name.trim())) name = name.trim().replace(/^of\b/i, '').trim();
 
   const prepLeadMatch = name.match(/^(diced|sliced|chopped|minced|grated|crushed|peeled|cubed|drained|pressed|raw|fresh|organic)\s+(.*)/i);
   if (prepLeadMatch) {
@@ -222,6 +244,7 @@ export function parseIngredientString(rawString) {
     name = prepLeadMatch[2].trim();
     notes = notes ? `${prepWord}, ${notes}` : prepWord;
   }
+  if (/^of\b/i.test(name.trim())) name = name.trim().replace(/^of\b/i, '').trim();
 
   name = name.replace(/^[\s,.\-–]+|[\s,.\-–]+$/g, '').trim();
   let cleanedName = name || original;

@@ -1,5 +1,5 @@
 /**
- * src/components/recipe/RecipeWizardModal.js (v3.32.0)
+ * src/components/recipe/RecipeWizardModal.js (v3.32.1)
  * Controller Module for Multi-Step Ingestion & Recipe Creation Wizard Modal.
  * Integrates:
  * - State 0: Choice (Manual vs Bulk)
@@ -10,10 +10,12 @@
  */
 
 import { wizardState, resetWizardState, syncStep2InputsToState } from './RecipeWizardState.js';
-import { renderStepBadge, renderState0Choice, renderState1AManual, renderState1BBulk, renderState2Mapping, renderState3Review } from './RecipeWizardViews.js';
+import { renderStepBadge, renderState0Choice, renderState1AManual, renderState1BBulk, renderState3Review } from './RecipeWizardViews.js';
+import { renderState2Mapping } from './RecipeWizardStep2View.js';
 import { renderStep1Point5 } from './RecipeWizardStep15View.js';
 import { bindStep01Events } from './RecipeWizardStep1Handlers.js';
-import { bindStep23Events } from './RecipeWizardStep23Handlers.js';
+import { bindStep2Events } from './RecipeWizardStep2Handlers.js';
+import { bindStep3Events } from './RecipeWizardStep3Handlers.js';
 
 export function openRecipeWizard(initialMode = 'manual') {
   resetWizardState();
@@ -146,7 +148,8 @@ function bindWizardEvents() {
   };
 
   bindStep01Events(modalWrap, handlersContext);
-  bindStep23Events(modalWrap, handlersContext);
+  bindStep2Events(modalWrap, handlersContext);
+  bindStep3Events(modalWrap, handlersContext);
 }
 
 if (typeof window !== 'undefined') {

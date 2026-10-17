@@ -1,5 +1,5 @@
 /**
- * src/services/RecipeParserService.js (v3.32.0)
+ * src/services/RecipeParserService.js (v3.32.1)
  * Multi-Recipe Batch Parsing, Token Normalisation, Block Chunking,
  * Collapsed Ingredient Unpacking & Method Step Splitting.
  */
@@ -60,14 +60,36 @@ export function unpackCollapsedIngredients(rawIngText) {
   if (!rawIngText) return '';
   let text = rawIngText.replace(/\r\n/g, '\n').trim();
 
-  // 1. Insert newline before subsection headers like "FOR THE SAUCE", "FOR THE PASTA", "TO SERVE"
+  // 1. Protect parentheticals e.g. (about 160g), (drained) to prevent splitting into separate lines
+  const parens = [];
+  text = text.replace(/\([^)]+\)/g, m => {
+    parens.push(m);
+    return `__PAREN_${parens.length - 1}__`;
+  });
+
+  // 2. Protect package multipliers: replace "x " temporarily so "1 x 280g" remains intact
+  text = text.replace(/(\d+)\s*[xX]\s*(\d+)/g, '$1__X__$2');
+  text = text.replace(/(\d+)\s*[xX]\s*([a-zA-Z]+)/g, '$1__X__$2');
+
+  // 3. Fix glued common ingredient names (e.g. peppervegetable oil)
+  const commonBreakWords = ['vegetable oil', 'olive oil', 'sun-dried tomatoes', 'cornflour', 'sesame oil'];
+  commonBreakWords.forEach(w => {
+    const reg = new RegExp(`([a-z])(${w})`, 'gi');
+    text = text.replace(reg, '$1\n$2');
+  });
+
+  // 4. Insert newline before subsection headers like "FOR THE SAUCE", "FOR THE PASTA", "TO SERVE"
   text = text.replace(/([^\n])\s*(FOR THE [A-Z\s]+|TO SERVE)/gi, '$1\n\n$2\n');
 
-  // 2. Insert newline before quantities glued to previous text (e.g. "onions2 garlic", "cloves160-200g", "pieces2 packs", "oil2 tbsp")
-  text = text.replace(/([a-zA-Z\)\/])\s*(?=(\d+(?:[.,]\d+)?(?:\s*[-–]\s*\d+)?\s*(?:x\s*\d+|g|kg|ml|l|tbsp|tsp|packs?|cloves?|spring|tin|pot|large|medium|small|handful|bunch|drizzle|piece|\bx\b|[a-zA-Z]+)))/g, '$1\n');
+  // 5. Insert newline before glued quantities and multipliers, avoiding splitting internal multiplier "x"
+  text = text.replace(/(?:[a-wA-Wy-zY-Z\)\/]|(?<=\w{2,})[xX])\s*(?=(\d+(?:[.,]\d+)?\s*(?:__X__|[xX×]|g|kg|ml|l|tbsp|tsp|packs?|cloves?|spring|tin|tins|pot|pots|large|medium|small|handful|bunch|drizzle|piece|\b[a-zA-Z]+\b)))/g, '$&\n');
 
-  // 3. Insert newline before items starting with fractions or words like "handful", "bunch", "drizzle"
+  // 6. Insert newline before items starting with fractions or words like "handful", "bunch", "drizzle"
   text = text.replace(/([a-zA-Z\)])\s*(?=(?:handful|bunch|drizzle|pinch|juice of|zest of)\b)/gi, '$1\n');
+
+  // 7. Restore multiplier tokens & parentheticals
+  text = text.replace(/__X__/g, ' x ');
+  text = text.replace(/__PAREN_(\d+)__/g, (_, idx) => parens[parseInt(idx, 10)]);
 
   return text;
 }

@@ -1,5 +1,5 @@
 /**
- * src/services/RecipeImporter.js (v3.32.0)
+ * src/services/RecipeImporter.js (v3.32.1)
  * Modern recipe scraping, JSON-LD microdata extraction,
  * HTML microdata normalization, and facade re-exports for RecipeIngredientParser and RecipeParserService.
  */
