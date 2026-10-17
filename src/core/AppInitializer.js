@@ -1,5 +1,5 @@
 /**
- * src/core/AppInitializer.js (v3.20.15)
+ * src/core/AppInitializer.js (v3.35.1)
  * Core Application Bootstrapping, Passive Service Worker & Toast Notifications
  */
 
