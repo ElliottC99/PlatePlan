@@ -220,7 +220,7 @@ self.addEventListener('fetch', event => {
           })
           .catch(() => {
             if (event.request.mode === 'navigate') {
-              return caches.match('/PlatePlan.html') || caches.match('/');
+              return caches.match('PlatePlan.html') || caches.match('/');
             }
             return new Response('Offline resource not found', { status: 503, statusText: 'Service Unavailable' });
           });
