@@ -50,8 +50,16 @@ export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice
   const btnSave = modalWrap.querySelector('#btn-save-wizard-recipe');
   if (btnSave) {
     btnSave.onclick = async () => {
-      syncStep3InputsToState(modalWrap);
       const rec = wizardState.activeRecipe;
+      const cleanTitle = toTitleCase(document.getElementById('wiz-rev-title')?.value || rec.title);
+      const cleanServes = parseInt(document.getElementById('wiz-rev-servings')?.value || rec.serves || rec.targetServings, 10) || 2;
+      
+      rec.name = cleanTitle;
+      rec.title = cleanTitle;
+      rec.serves = cleanServes;
+      rec.servings = cleanServes;
+      rec.targetServings = cleanServes;
+
       const allIngredients = (rec.ingredientSections || []).flatMap(s => s.ingredients);
       const unlinked = allIngredients.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
       if (unlinked.length > 0) {
@@ -64,10 +72,10 @@ export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice
 
       const recipeToSave = {
         id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}`,
-        name: rec.title,
+        name: rec.name,
         title: rec.title,
-        servings: rec.targetServings,
-        serves: rec.targetServings,
+        servings: rec.servings,
+        serves: rec.serves,
         prepTime: rec.prepTime,
         cookTime: rec.cookTime,
         time: (rec.prepTime.hours * 60 + rec.prepTime.minutes) + (rec.cookTime.hours * 60 + rec.cookTime.minutes),
