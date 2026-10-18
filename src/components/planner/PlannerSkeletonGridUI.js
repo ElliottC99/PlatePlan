@@ -40,7 +40,19 @@ export function isRecipeInSkeletonGrid(recipeId, skeletonGrid = {}) {
 
 function renderRecipeCandidateRows(recipes, { dayIndex, mealType, person = 'both', query = '', skeletonGrid = {} }) {
   const q = (query || '').toLowerCase().trim();
-  const filtered = recipes.filter(r => !q || (r.name || '').toLowerCase().includes(q)).slice(0, 15);
+  const expandedRecipes = [];
+  recipes.forEach(r => {
+    expandedRecipes.push(r);
+    if (r.enhanced && typeof r.enhanced === 'object') {
+      expandedRecipes.push({
+        ...r,
+        ...r.enhanced,
+        id: r.id + '::enhanced',
+        name: r.enhanced.name || r.name + ' (Enhanced)'
+      });
+    }
+  });
+  const filtered = expandedRecipes.filter(r => !q || (r.name || '').toLowerCase().includes(q)).slice(0, 15);
   if (!filtered.length) {
     return '<div style="font-size:12px;color:#94a3b8;padding:8px;text-align:center">No matching recipes found</div>';
   }
@@ -303,14 +315,18 @@ export function setSlotConfiguredStatus(dayIndex, mealType, status, recipeId = n
       chloe: { isSkipped: true }
     };
   } else {
+    const [baseRecipeId, variantStr] = (recipeId || '').split('::');
+    const finalVariant = variantStr || 'original';
+
     window.state.skeletonGrid[slotKey] = {
       status: 'pinned',
       isSkipped: false,
       isSplit: false,
       pinned: true,
-      recipeId: recipeId || null,
-      elliott: { recipeId: recipeId || null, isSkipped: false, pinned: true },
-      chloe: { recipeId: recipeId || null, isSkipped: false, pinned: true }
+      recipeId: baseRecipeId || null,
+      variant: finalVariant,
+      elliott: { recipeId: baseRecipeId || null, variant: finalVariant, isSkipped: false, pinned: true },
+      chloe: { recipeId: baseRecipeId || null, variant: finalVariant, isSkipped: false, pinned: true }
     };
   }
 
@@ -330,9 +346,12 @@ export function setSplitPersonSlotStatus(dayIndex, mealType, personKey, status, 
   delete elliott.recipeName;
   delete chloe.recipeName;
 
+  const [baseSplitId, variantSplitStr] = (recipeId || '').split('::');
+  const finalSplitVariant = variantSplitStr || 'original';
+
   const targetObj = status === 'skipped'
     ? { isSkipped: true }
-    : (status === 'pinned' && recipeId ? { recipeId, isSkipped: false, pinned: true } : {});
+    : (status === 'pinned' && baseSplitId ? { recipeId: baseSplitId, variant: finalSplitVariant, isSkipped: false, pinned: true } : {});
 
   const nextElliott = personKey === 'elliott' ? targetObj : elliott;
   const nextChloe = personKey === 'chloe' ? targetObj : chloe;
