@@ -1,24 +1,24 @@
 /**
- * sw.js (v3.35.1)
+ * sw.js (v3.35.0)
  * Service Worker for PlatePlan PWA offline support & asset caching.
  * Caches core app shell, modern ES6 modules, stylesheets, and icons.
  */
 
-const PLATEPLAN_CACHE = 'plateplan-cache-v3.35.1';
-const PLATEPLAN_STORE_CACHE = 'plateplan_store_cache_v3.35.1';
-const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.35.1';
-const PLATEPLAN_APP_VERSION = 'v3.35.1';
-const PLATEPLAN_BUILD_ID = '3.35.1-v351';
+const PLATEPLAN_CACHE = 'plateplan-cache-v3.35.0';
+const PLATEPLAN_STORE_CACHE = 'plateplan_store_cache_v3.35.0';
+const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.35.0';
+const PLATEPLAN_APP_VERSION = 'v3.35.0';
+const PLATEPLAN_BUILD_ID = '3.35.0-v350';
 
 const PLATEPLAN_PRECACHE_ASSETS = [
   '/',
   '/PlatePlan.html',
   '/manifest.json',
   '/firebase-config.js',
-  '/styles/tokens.css?v=3.35.1',
-  '/styles/components.css?v=3.35.1',
-  '/styles/responsive.css?v=3.35.1',
-  '/styles/print.css?v=3.35.1',
+  '/styles/tokens.css?v=3.35.0',
+  '/styles/components.css?v=3.35.0',
+  '/styles/responsive.css?v=3.35.0',
+  '/styles/print.css?v=3.35.0',
   '/src/main.js',
   '/src/store/store.js',
   '/src/config/firebase.js',
@@ -126,9 +126,9 @@ self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(PLATEPLAN_CACHE).then(async cache => {
-      console.log(`[SW ${PLATEPLAN_APP_VERSION}] Precaching shell and core ES6 modules...`);
+      console.log(`[SW v3.29.0] Precaching shell and core ES6 modules...`);
       await cache.addAll(PLATEPLAN_PRECACHE_ASSETS).catch(err => {
-        console.warn(`[SW ${PLATEPLAN_APP_VERSION}] Non-fatal precache warning:`, err);
+        console.warn('[SW v3.29.0] Non-fatal precache warning:', err);
       });
       await Promise.allSettled(PLATEPLAN_OPTIONAL_SHELL.map(url => cache.add(url)));
     })
@@ -136,16 +136,15 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  const currentCaches = [PLATEPLAN_CACHE, PLATEPLAN_STORE_CACHE, PLATEPLAN_IMAGE_CACHE];
   event.waitUntil(
-    caches.keys().then(cacheNames => {
+    caches.keys().then(keys => {
       return Promise.all(
-        cacheNames.map(cacheName => {
-          if (!currentCaches.includes(cacheName)) {
-            console.log(`[SW ${PLATEPLAN_APP_VERSION}] Purging legacy cache:`, cacheName);
-            return caches.delete(cacheName);
-          }
-        })
+        keys
+          .filter(key => key !== PLATEPLAN_CACHE && key !== PLATEPLAN_IMAGE_CACHE && key !== PLATEPLAN_STORE_CACHE)
+          .map(key => {
+            console.log('[SW v3.29.0] Purging legacy cache:', key);
+            return caches.delete(key);
+          })
       );
     })
       .then(() => self.clients.claim())
