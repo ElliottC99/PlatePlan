@@ -159,10 +159,10 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
     }
   };
 
-  dropdown.querySelector('[data-action="menu-delete"]').onclick = async (clickEvt) => {
+  dropdown.querySelector('[data-action="menu-delete"]').onclick = (clickEvt) => {
     clickEvt.stopPropagation();
     dropdown.remove();
-    if (confirm(`Delete "${recipe.name || recipe.title}"?`)) {
+    confirmDeleteVaultRecipe(recipe, async () => {
       try {
         const { deleteRecipe } = await import('../../services/HouseholdRepository.js');
         await deleteRecipe(recipeId);
@@ -170,12 +170,62 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
           window.state.recipes = window.state.recipes.filter(r => r.id !== recipeId);
         }
         if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
-        if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(`Deleted "${recipe.name}"`);
+        if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(`Deleted "${recipe.name || recipe.title}"`);
       } catch (err) {
         console.error('[VaultRecipeCard] Error deleting recipe:', err);
       }
-    }
+    });
   };
+}
+
+function confirmDeleteVaultRecipe(recipe, onConfirm) {
+  let wrap = document.getElementById('view-modal-wrap');
+  let content = document.getElementById('view-modal-content');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'view-modal-wrap';
+    wrap.className = 'modal-wrap';
+    document.body.appendChild(wrap);
+  }
+  if (!content) {
+    content = document.createElement('div');
+    content.id = 'view-modal-content';
+    content.className = 'modal';
+    wrap.appendChild(content);
+  }
+
+  const recipeTitle = escapeHtml(recipe.name || recipe.title || 'this recipe');
+  content.innerHTML = `
+    <div style="padding: 24px; max-width: 440px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">🗑️</div>
+      <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750; color: var(--red,#ef4444)">Delete Recipe?</h3>
+      <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 24px 0; line-height: 1.5;">
+        Are you sure you want to delete <strong>"${recipeTitle}"</strong>?
+      </p>
+      <div style="display:flex; gap:8px; justify-content: center;">
+        <button type="button" class="btn" style="padding: 8px 16px;" id="btn-cancel-vault-del">Cancel</button>
+        <button type="button" class="btn danger" style="padding: 8px 16px;" id="btn-confirm-vault-del">Confirm Delete</button>
+      </div>
+    </div>
+  `;
+  wrap.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  const close = () => {
+    wrap.classList.remove('open');
+    document.body.style.overflow = '';
+  };
+
+  const cancelBtn = content.querySelector('#btn-cancel-vault-del');
+  if (cancelBtn) cancelBtn.onclick = close;
+
+  const confirmBtn = content.querySelector('#btn-confirm-vault-del');
+  if (confirmBtn) {
+    confirmBtn.onclick = async () => {
+      close();
+      if (typeof onConfirm === 'function') await onConfirm();
+    };
+  }
 }
 
 export function openEnhancedRecipeActions(evt, recipeId) {

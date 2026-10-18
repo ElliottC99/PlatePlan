@@ -108,13 +108,22 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
   if (prodObj) {
     const prodName = brandProductLabel || prodObj.name || prodObj.title;
     const prodId = prodObj.id || prodObj.productId;
-    formattedLine = `${hierarchyPart} - <a class="product-link" href="#" data-product-id="${prodId}" style="color:var(--primary,#4f46e5); text-decoration:none; border-bottom:1px dashed var(--primary);">${escapeHtml(prodName)}</a>`;
+    const prodUrl = prodObj.tescoUrl || `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(prodName)}`;
+    formattedLine = `${hierarchyPart} - <a class="product-link" href="${prodUrl}" target="_blank" rel="noopener noreferrer" data-product-id="${prodId}" style="color:var(--primary,#4f46e5); text-decoration:none; border-bottom:1px dashed var(--primary);">${escapeHtml(prodName)}</a>`;
   } else if (brandProductLabel && brandProductLabel.toLowerCase() !== ingredientLabel.toLowerCase() && brandProductLabel.toLowerCase() !== subtypeLabel.toLowerCase()) {
-    formattedLine = `${hierarchyPart} - ${escapeHtml(brandProductLabel)}`;
+    const searchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(brandProductLabel)}`;
+    formattedLine = `${hierarchyPart} - <a class="product-link" href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(brandProductLabel)}</a>`;
   } else if (ingObj?.autoDefault) {
     const fallbackAuto = formatBrandProductPair(null, '', ingObj.autoDefault);
     if (fallbackAuto && fallbackAuto.toLowerCase() !== ingredientLabel.toLowerCase()) {
-      formattedLine = `${hierarchyPart} - ${escapeHtml(fallbackAuto)}`;
+      const searchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(fallbackAuto)}`;
+      formattedLine = `${hierarchyPart} - <a class="product-link" href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(fallbackAuto)}</a>`;
+    }
+  } else if (ing.ingredientId || ingObj || ing.matchedName) {
+    const searchName = ing.matchedName || ingObj?.name || ingredientLabel;
+    if (searchName) {
+      const searchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(searchName)}`;
+      formattedLine = `${hierarchyPart} - <a class="product-link" href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(searchName)}</a>`;
     }
   }
 

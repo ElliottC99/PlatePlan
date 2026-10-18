@@ -167,12 +167,15 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
   // Force live macro recalculation
   recalculateWizardMacros(rec);
 
-  // Compute live fit score
-  const targetSlot = (rec.mealSuitability && rec.mealSuitability[0]) ? String(rec.mealSuitability[0]).toLowerCase() : 'dinner';
-  const fitRes = (typeof window !== 'undefined' && typeof window.calculateMealFitScore === 'function')
-    ? window.calculateMealFitScore(rec, targetSlot, { activeProfile: 'everyone', portionScaled: true, variant: 'original' })
-    : calculateMealFitScore(rec, targetSlot, { activeProfile: 'everyone', portionScaled: true, variant: 'original' });
-  const computedScore = fitRes?.score ?? 0;
+  // Force strict sync between nutrition keys
+  const finalMacros = (rec.nutrition && rec.nutrition.calories > (rec.macros?.calories || 0)) ? rec.nutrition : rec.macros;
+  rec.macros = finalMacros;
+  rec.nutrition = finalMacros;
+
+  // Immediately recalculate computedScore using synced object so Vault saves real score
+  const computedScore = typeof window.calculateMealFitScore === 'function' 
+    ? window.calculateMealFitScore(rec, rec.mealSuitability?.[0] || 'dinner')?.score || rec.fitScore 
+    : (calculateMealFitScore ? (calculateMealFitScore(rec, rec.mealSuitability?.[0] || 'dinner', { activeProfile: 'everyone', portionScaled: true, variant: 'original' })?.score ?? rec.fitScore) : rec.fitScore);
 
   const recipeToSave = {
     id: rec.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}`),
@@ -201,15 +204,19 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
     })),
     instructions: rec.methodSteps,
     method: rec.methodSteps,
-    macros: rec.macros,
-    nutrition: rec.nutrition || rec.macros,
+    macros: finalMacros,
+    nutrition: finalMacros,
     fitScore: computedScore,
     _computedFitScore: computedScore,
     createdAt: rec.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
 
-  if (hasDistinctEnhancedVariant(rec)) {
+  if (hasDistinctEnhancedVariant(rec) && rec.enhanced) {
+    recalculateWizardMacros(rec.enhanced);
+    const finalEnhMacros = (rec.enhanced.nutrition && rec.enhanced.nutrition.calories > (rec.enhanced.macros?.calories || 0)) ? rec.enhanced.nutrition : rec.enhanced.macros;
+    rec.enhanced.macros = finalEnhMacros;
+    rec.enhanced.nutrition = finalEnhMacros;
     recipeToSave.enhanced = rec.enhanced;
   }
 

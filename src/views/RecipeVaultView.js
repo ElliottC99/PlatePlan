@@ -11,6 +11,7 @@ import * as VaultFilterToolbar from '../components/vault/VaultFilterToolbar.js';
 import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
 import { getSortedRecipes } from '../services/FitScoreService.js';
 import { formatRecipeIngredientRow, renderRecipeIngredientsListHTML } from '../components/recipe/RecipeDetailModalUI.js';
+import { subscribe } from '../store/store.js';
 
 export { renderVaultRecipeCard, renderVaultGridContainer, VaultFilterToolbar, calculateMealFitScore, getSortedRecipes, formatRecipeIngredientRow, renderRecipeIngredientsListHTML };
 
@@ -23,23 +24,15 @@ export function hasVariantFavoritingInitialized() {
 }
 
 export function ensureVariantFavoritingPrefs() {
-  if (!window.state) {
-    try { window.state = {}; } catch (e) {}
-  }
+  if (!window.state) try { window.state = {}; } catch (e) {}
   if (!window.state.prefs) window.state.prefs = {};
   if (!window.state.userPrefs) window.state.userPrefs = window.state.prefs;
   const prefs = window.state.userPrefs;
   const existing = prefs.favouriteVariantIds || prefs.favoriteVariantIds;
   if (!Array.isArray(existing)) {
-    prefs.favouriteVariantIds = [];
-    (window.state.recipes || []).forEach(r => {
-      if (r && r.id && (r.isFavourite || r.isFavorite)) {
-        const key = `${r.id}_original`;
-        if (!prefs.favouriteVariantIds.includes(key)) {
-          prefs.favouriteVariantIds.push(key);
-        }
-      }
-    });
+    prefs.favouriteVariantIds = (window.state.recipes || [])
+      .filter(r => r?.id && (r.isFavourite || r.isFavorite))
+      .map(r => `${r.id}_original`);
   } else {
     prefs.favouriteVariantIds = existing;
   }
@@ -171,7 +164,11 @@ export function handleRecipeSearch(query) {
     const catMatch = String(recipe.category || '').toLowerCase().includes(currentRecipeSearchQuery);
     const tagMatch = Array.isArray(recipe.tags) && recipe.tags.some(t => String(t).toLowerCase().includes(currentRecipeSearchQuery));
     const ingMatch = Array.isArray(recipe.ingredients) && recipe.ingredients.some(i => String(i.name || i).toLowerCase().includes(currentRecipeSearchQuery));
-    return nameMatch || catMatch || tagMatch || ingMatch;
+    const enh = recipe.enhanced;
+    const enhNameMatch = enh && String(enh.name || enh.title || '').toLowerCase().includes(currentRecipeSearchQuery);
+    const enhChangesMatch = enh && String(enh.changes || '').toLowerCase().includes(currentRecipeSearchQuery);
+    const enhIngMatch = enh && Array.isArray(enh.ingredients) && enh.ingredients.some(i => String(i.name || i).toLowerCase().includes(currentRecipeSearchQuery));
+    return nameMatch || catMatch || tagMatch || ingMatch || enhNameMatch || enhChangesMatch || enhIngMatch;
   });
 
   renderRecipeGrid(filtered);
@@ -239,6 +236,7 @@ export function renderRecipeVault() {
     const hasAnyFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
     if (isFavOnly && !hasAnyFav) return false;
     const types = r.types || [r.type];
+    const enh = r.enhanced;
     const searchable = [
       r.name,
       r.title,
@@ -247,8 +245,12 @@ export function renderRecipeVault() {
       r.who,
       ...(types || []),
       ...(Array.isArray(r.tags) ? r.tags : []),
-      ...(r.ingredients || []).map(ing => formatRecipeIngredientRow(ing, window.state))
-    ].join(' ').toLowerCase();
+      ...(r.ingredients || []).map(ing => formatRecipeIngredientRow(ing, window.state)),
+      enh?.name,
+      enh?.title,
+      enh?.changes,
+      ...(enh?.ingredients || []).map(ing => formatRecipeIngredientRow(ing, window.state))
+    ].filter(Boolean).join(' ').toLowerCase();
 
     const rWhoNorm = String(r.who || 'both').toLowerCase();
     const matchesWho = fwNorm === 'all' || rWhoNorm === fwNorm || (fwNorm === 'both' && (rWhoNorm === 'both' || !r.who));
@@ -275,43 +277,27 @@ function bindSearchListeners() {
 
 // Global Aliases Mount
 if (typeof window !== 'undefined') {
-  window.handleRecipeSearch = handleRecipeSearch;
-  window.renderVault = renderRecipeVault;
-  window.renderRecipeVault = renderRecipeVault;
-  window.renderRecipeVaultView = function renderRecipeVaultView() {
-    if (window.RecipeVaultView && typeof window.RecipeVaultView.render === 'function') {
-      window.RecipeVaultView.render();
-    } else {
-      renderRecipeVault();
-    }
-  };
-  window.RecipeVaultView = {
-    render: renderRecipeVault,
-    handleSearch: handleRecipeSearch,
-    filterRecipes: handleRecipeSearch,
-    formatRecipeIngredientRow,
-    renderRecipeIngredientsListHTML
-  };
-  window.renderVaultGrid = renderRecipeVault;
-  window.renderRecipeCard = renderVaultRecipeCard;
-  window.renderRecipeGrid = renderRecipeGrid;
-  window.toggleRecipeFavourite = toggleRecipeFavourite;
-  window.toggleRecipeFavorite = toggleRecipeFavourite;
-  window.isRecipeVariantFavourite = isRecipeVariantFavourite;
-  window.isRecipeVariantFavorite = isRecipeVariantFavourite;
-  window.toggleVaultFavouritesFilter = toggleVaultFavouritesFilter;
-  window.toggleVaultFavoritesFilter = toggleVaultFavouritesFilter;
-  window.handleVaultSortChange = function(val) {
-    const el = document.getElementById('vault-sort');
-    if (el) el.value = val;
-    renderRecipeVault();
-  };
-  window.VaultFilterToolbar = VaultFilterToolbar;
-  window.VaultRecipeCard = { renderVaultRecipeCard };
-  window.VaultGridContainer = { renderVaultGridContainer };
+  Object.assign(window, {
+    handleRecipeSearch,
+    renderVault: renderRecipeVault,
+    renderRecipeVault,
+    renderRecipeVaultView: () => (window.RecipeVaultView?.render ? window.RecipeVaultView.render() : renderRecipeVault()),
+    RecipeVaultView: { render: renderRecipeVault, handleSearch: handleRecipeSearch, filterRecipes: handleRecipeSearch, formatRecipeIngredientRow, renderRecipeIngredientsListHTML },
+    renderVaultGrid: renderRecipeVault,
+    renderRecipeCard: renderVaultRecipeCard,
+    renderRecipeGrid,
+    toggleRecipeFavourite,
+    toggleRecipeFavorite: toggleRecipeFavourite,
+    isRecipeVariantFavourite,
+    isRecipeVariantFavorite: isRecipeVariantFavourite,
+    toggleVaultFavouritesFilter,
+    toggleVaultFavoritesFilter: toggleVaultFavouritesFilter,
+    handleVaultSortChange: (val) => { const el = document.getElementById('vault-sort'); if (el) el.value = val; renderRecipeVault(); },
+    VaultFilterToolbar,
+    VaultRecipeCard: { renderVaultRecipeCard },
+    VaultGridContainer: { renderVaultGridContainer }
+  });
 }
-
-import { subscribe } from '../store/store.js';
 
 let vaultUnsub = null;
 let vaultTimer = null;
