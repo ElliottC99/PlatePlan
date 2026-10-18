@@ -284,7 +284,7 @@ export function renderVaultRecipeCard(r, options = {}) {
     }
 
     const fitTag = renderFitScoreBadge(r, mealType, {
-      activeProfile: options.activeProfile || (whoKey === 'elliott' || whoKey === 'e' ? 'elliott' : (whoKey === 'chloe' || whoKey === 'c' ? 'chloe' : 'everyone')),
+      activeProfile: 'everyone',
       variant: useEnhanced ? 'enhanced' : 'original',
       portions,
       portionScaled: true,
