@@ -173,8 +173,9 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
   rec.nutrition = finalMacros;
 
   let finalComputedScore = rec.fitScore || 0;
+  const targetMealType = rec.types?.[0] || rec.type || 'dinner';
   if (typeof window.calculateMealFitScore === 'function') {
-    const fitData = window.calculateMealFitScore(rec, rec.mealSuitability?.[0] || 'dinner');
+    const fitData = window.calculateMealFitScore(rec, targetMealType);
     if (fitData && typeof fitData.score === 'number') finalComputedScore = fitData.score;
   }
   rec.fitScore = finalComputedScore;

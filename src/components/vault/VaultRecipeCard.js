@@ -276,12 +276,11 @@ export function renderVaultRecipeCard(r, options = {}) {
       parts.push(`<button type="button" class="fit-detail-button" data-action="open-fit-details" data-recipe-id="${escapeAttr(r.id)}" data-variant="${useEnhanced ? 'enhanced' : 'original'}" data-person="c" onclick="openVaultFitDetails(this,'${escapeAttr(r.id)}','${useEnhanced ? 'enhanced' : 'original'}','c')">Chloe ${escapeHtml(portions.c || '')}</button>`);
     }
 
-    if (typeof window.calculateMealFitScore === 'function') {
-      const liveFitData = window.calculateMealFitScore(r, r.mealSuitability?.[0] || 'dinner');
-      if (liveFitData && typeof liveFitData.score === 'number') {
-        r.fitScore = liveFitData.score; // Override stale DB value in memory
-        r._computedFitScore = liveFitData.score;
-      }
+    const targetMealType = r.types?.[0] || r.type || 'dinner';
+    const liveFitData = typeof window.calculateMealFitScore === 'function' ? window.calculateMealFitScore(r, targetMealType) : null;
+    if (liveFitData && typeof liveFitData.score === 'number') {
+      r.fitScore = liveFitData.score;
+      r._computedFitScore = liveFitData.score;
     }
 
     const fitTag = renderFitScoreBadge(r, mealType, {
