@@ -151,17 +151,17 @@ export function calculateCalorieScore(actual, target) {
   if (!target || target <= 0 || actual === null || actual === undefined || actual <= 0) return 0;
   const r = actual / target;
 
-  if (r >= 0.95 && r <= 1.00) {
+  if (r >= 0.95 && r <= 1.05) {
     return 100;
   }
   if (r >= 0.90 && r < 0.95) {
-    return 90 + ((r - 0.90) / 0.05) * 9;
+    return 90 + ((r - 0.90) / 0.05) * 10;
   }
-  if (r > 1.00 && r <= 1.05) {
-    return 99 - ((r - 1.00) / 0.05) * 14;
+  if (r > 1.05 && r <= 1.10) {
+    return 100 - ((r - 1.05) / 0.05) * 10;
   }
-  if (r > 1.05) {
-    return Math.max(0, 70 * (1 - ((r - 1.05) / 0.20)));
+  if (r > 1.10) {
+    return Math.max(0, 90 * (1 - ((r - 1.10) / 0.20)));
   }
   if (r <= 0.40) {
     return 0;
@@ -171,20 +171,15 @@ export function calculateCalorieScore(actual, target) {
 
 /**
  * Universal Asymmetric Protein Score Curve (50% Weight):
- * - 100%–110%: 100 pts
- * - >110%: Plateau lerp 95–100 pts (heavily rewards meeting/exceeding protein)
- * - <100%: Progressive quadratic penalty 100 * (actual / target)^2
+ * - >= 100%: 100 pts (full score for meeting or exceeding target)
+ * - < 100%: Progressive quadratic penalty 100 * (actual / target)^2
  */
 export function calculateProteinScore(actual, target) {
   if (!target || target <= 0 || actual === null || actual === undefined || actual <= 0) return 0;
   const r = actual / target;
 
-  if (r >= 1.00 && r <= 1.10) {
+  if (r >= 1.00) {
     return 100;
-  }
-  if (r > 1.10) {
-    const decay = Math.min(1, (r - 1.10) / 0.90);
-    return 100 - (decay * 5);
   }
   return Math.max(0, 100 * Math.pow(r, 2));
 }
