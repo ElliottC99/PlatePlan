@@ -164,6 +164,10 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
   rec.servings = safeServings;
   rec.serves = safeServings;
 
+  rec.ingredients = allIngredients;
+  rec.types = (rec.mealSuitability && rec.mealSuitability.length > 0) ? rec.mealSuitability.map(t => t.toLowerCase()) : ['dinner'];
+  rec.mealType = rec.types[0];
+
   // Force live macro recalculation
   recalculateWizardMacros(rec);
 
@@ -192,6 +196,8 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
     cookTime: rec.cookTime,
     time: (rec.prepTime.hours * 60 + rec.prepTime.minutes) + (rec.cookTime.hours * 60 + rec.cookTime.minutes),
     mealSuitability: rec.mealSuitability,
+    types: rec.types,
+    mealType: rec.mealType,
     ingredientSections: rec.ingredientSections,
     ingredients: allIngredients.map(i => ({
       name: i.name,
@@ -204,7 +210,8 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
       isCategoryDefault: i.isCategoryDefault || false,
       displayName: i.displayName || null,
       waterMl: i.waterMl || null,
-      isNewTaxonomyItem: !!i.isNewTaxonomyItem
+      isNewTaxonomyItem: !!i.isNewTaxonomyItem,
+      productId: i.productId || i.mappedItemId || i.productMatch?.id || null
     })),
     instructions: rec.methodSteps,
     method: rec.methodSteps,
