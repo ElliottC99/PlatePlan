@@ -172,10 +172,13 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
   rec.macros = finalMacros;
   rec.nutrition = finalMacros;
 
-  // Immediately recalculate computedScore using synced object so Vault saves real score
-  const computedScore = typeof window.calculateMealFitScore === 'function' 
-    ? window.calculateMealFitScore(rec, rec.mealSuitability?.[0] || 'dinner')?.score || rec.fitScore 
-    : (calculateMealFitScore ? (calculateMealFitScore(rec, rec.mealSuitability?.[0] || 'dinner', { activeProfile: 'everyone', portionScaled: true, variant: 'original' })?.score ?? rec.fitScore) : rec.fitScore);
+  let finalComputedScore = rec.fitScore || 0;
+  if (typeof window.calculateMealFitScore === 'function') {
+    const fitData = window.calculateMealFitScore(rec, rec.mealSuitability?.[0] || 'dinner');
+    if (fitData && typeof fitData.score === 'number') finalComputedScore = fitData.score;
+  }
+  rec.fitScore = finalComputedScore;
+  rec._computedFitScore = finalComputedScore;
 
   const recipeToSave = {
     id: rec.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}`),
@@ -206,8 +209,8 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
     method: rec.methodSteps,
     macros: finalMacros,
     nutrition: finalMacros,
-    fitScore: computedScore,
-    _computedFitScore: computedScore,
+    fitScore: finalComputedScore,
+    _computedFitScore: finalComputedScore,
     createdAt: rec.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };

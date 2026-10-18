@@ -279,8 +279,8 @@ export function renderVaultRecipeCard(r, options = {}) {
     if (typeof window.calculateMealFitScore === 'function') {
       const liveFitData = window.calculateMealFitScore(r, r.mealSuitability?.[0] || 'dinner');
       if (liveFitData && typeof liveFitData.score === 'number') {
+        r.fitScore = liveFitData.score; // Override stale DB value in memory
         r._computedFitScore = liveFitData.score;
-        r.fitScore = liveFitData.score;
       }
     }
 
