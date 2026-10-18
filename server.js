@@ -26,10 +26,8 @@ app.get('*', (req, res) => {
   // Return clean 404 for missing asset/module files to prevent HTML fallback SyntaxErrors
   const ext = path.extname(req.path);
   if (ext && ext !== '.html') {
-    console.log(`[Server] Returning 404 for asset: ${req.path}`);
     return res.status(404).send('Asset Not Found');
   }
-  console.log(`[Server] Serving HTML fallback for path: ${req.path}`);
   res.sendFile(path.join(staticDir, 'PlatePlan.html'));
 });
 
