@@ -1,10 +1,10 @@
 {
-  "id": "/",
+  "id": "./",
   "name": "PlatePlan — Elliott & Chloe",
   "short_name": "PlatePlan",
   "description": "Shared recipes, meal planning and shopping for Elliott and Chloe.",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#F7F6F2",
   "theme_color": "#F7F6F2",

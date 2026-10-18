@@ -11,7 +11,6 @@ const PLATEPLAN_APP_VERSION = 'v3.35.4';
 const PLATEPLAN_BUILD_ID = '3.35.4-v354';
 
 const PLATEPLAN_PRECACHE_ASSETS = [
-  '/',
   'PlatePlan.html',
   'manifest.json',
   'firebase-config.js',
@@ -220,7 +219,7 @@ self.addEventListener('fetch', event => {
           })
           .catch(() => {
             if (event.request.mode === 'navigate') {
-              return caches.match('PlatePlan.html') || caches.match('/');
+              return caches.match('PlatePlan.html') || caches.match('./');
             }
             return new Response('Offline resource not found', { status: 503, statusText: 'Service Unavailable' });
           });
