@@ -4,7 +4,8 @@
  */
 
 import { unpackAndSplitRecipeBlocks, parseSingleRecipeText } from '../../services/RecipeParserService.js';
-import { parseIngredientString, matchIngredientTaxonomy, toTitleCase } from '../../services/RecipeImporter.js';
+import { parseIngredientString, matchIngredientTaxonomy } from '../../services/RecipeImporter.js';
+import { toTitleCase } from '../../utils/stringUtils.js';
 import { getState, updateState, reorderDraftRecipes } from '../../state/AppState.js';
 import { saveRecipe } from '../../services/HouseholdRepository.js';
 import { wizardState } from './RecipeWizardState.js';

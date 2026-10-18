@@ -13,7 +13,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * src/main.js (v3.35.0)
+ * src/main.js (v3.35.3)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  */
 import { waitForAuth } from './services/AuthService.js';
@@ -280,7 +280,7 @@ function setupSubscriptions() {
   subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
 }
 
-export const APP_VERSION = 'v3.34.0';
+export const APP_VERSION = 'v3.35.4';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
@@ -299,6 +299,12 @@ async function initApp() {
   try {
     const versionEl = document.getElementById('app-header-version');
     if (versionEl) versionEl.textContent = APP_VERSION;
+    
+    // Explicitly sync store version to runtime version
+    const currentState = getState();
+    if (currentState && currentState.version !== APP_VERSION) {
+      AppState.updateState({ version: APP_VERSION });
+    }
 
     try { await initStoreCache(); } catch (cacheErr) {}
     try { setupActionBridge(); setupSubscriptions(); } catch (bridgeErr) {}
@@ -322,10 +328,15 @@ async function initApp() {
     }
   } catch (err) {
     setSyncStatus(navigator.onLine ? 'synced' : 'offline', 'Local Cache Active');
-  } finally {
-    if (typeof window !== 'undefined') window.__plateplan_app_booted = true;
-    initialRender();
   }
+}
+
+// Service Worker Update Listener
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    console.info('[PlatePlan PWA] New Service Worker controller detected. Reloading for fresh assets...');
+    window.location.reload();
+  });
 }
 
 initApp().catch(err => console.error('[PlatePlan Bootstrapper Error]:', err));

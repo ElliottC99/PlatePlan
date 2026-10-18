@@ -226,7 +226,10 @@ export function renderVaultRecipeCard(r, options = {}) {
       parts.push(`<button type="button" class="fit-detail-button" data-action="open-fit-details" data-recipe-id="${escapeAttr(r.id)}" data-variant="${useEnhanced ? 'enhanced' : 'original'}" data-person="c" onclick="openVaultFitDetails(this,'${escapeAttr(r.id)}','${useEnhanced ? 'enhanced' : 'original'}','c')">Chloe ${escapeHtml(portions.c || '')}</button>`);
     }
 
-    const fitTag = renderFitScoreBadge(r, mealType, {
+    const liveScore = typeof window.calculateMealFitScore === 'function' ? window.calculateMealFitScore(r, r.mealSuitability?.[0] || 'dinner') : r.fitScore;
+    r.fitScore = liveScore;
+
+    const fitTag = renderFitScoreBadge(liveScore || r, mealType, {
       activeProfile: options.activeProfile || (whoKey === 'elliott' || whoKey === 'e' ? 'elliott' : (whoKey === 'chloe' || whoKey === 'c' ? 'chloe' : 'everyone')),
       variant: useEnhanced ? 'enhanced' : 'original',
       portions,

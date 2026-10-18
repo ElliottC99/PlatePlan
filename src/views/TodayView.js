@@ -79,17 +79,7 @@ export function renderToday() {
   const dayPlan = dayKey && plan.slots ? plan.slots[dayKey] : null;
 
   if (!dayPlan || Object.keys(dayPlan).length === 0) {
-    contentEl.innerHTML = `
-      <div style="background:var(--card,#fff);border:1px solid var(--border,#e7e5e4);border-radius:16px;padding:32px 20px;text-align:center;margin-top:16px;">
-        <div style="font-size:36px;margin-bottom:12px;">📅</div>
-        <h3 style="font-size:18px;font-weight:700;margin:0 0 8px 0;color:var(--text,#1c1917);">No meals planned for this day</h3>
-        <p style="font-size:14px;color:var(--muted,#78716c);margin:0 0 20px 0;max-width:320px;margin-inline:auto;">Generate a balanced multi-day meal plan or browse the recipe vault to get started.</p>
-        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-          <button class="btn primary" type="button" data-pp-click="showView('planner')" style="padding:10px 20px;font-weight:600;">Open Meal Planner</button>
-          <button class="btn ghost" type="button" data-pp-click="showView('vault')" style="padding:10px 20px;font-weight:600;">Browse Recipes</button>
-        </div>
-      </div>
-    `;
+    contentEl.innerHTML = `<div class="empty-state-container" style="padding: 2rem; text-align: center; color: var(--text-secondary);">No meals assigned to this day in your active plan.</div>`;
     return;
   }
 
@@ -147,11 +137,7 @@ export function renderToday() {
     `;
   }).filter(Boolean).join('');
 
-  contentEl.innerHTML = cardsHtml || `
-    <div style="background:var(--card,#fff);border:1px solid var(--border,#e7e5e4);border-radius:14px;padding:24px;text-align:center;margin-top:12px;">
-      <p style="color:var(--muted,#78716c);margin:0;">No meals assigned to this day in your active plan.</p>
-    </div>
-  `;
+  contentEl.innerHTML = cardsHtml || `<div class="empty-state-container" style="padding: 2rem; text-align: center; color: var(--text-secondary);">No meals assigned to this day in your active plan.</div>`;
 }
 
 export function mount(container) {

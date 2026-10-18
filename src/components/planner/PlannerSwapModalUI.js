@@ -27,8 +27,8 @@ export function openSwapMealModal(day, slotKey) {
   const options = [];
   baseOptions.forEach(opt => {
     options.push(opt);
-    if (opt.enhanced) {
-      options.push({ ...opt, variant: 'enhanced', label: opt.label + ' (Enhanced)' });
+    if (opt.enhanced && typeof opt.enhanced === 'object') {
+      options.push({ ...opt, ...opt.enhanced, variant: 'enhanced', label: (opt.enhanced.name || opt.label + ' (Enhanced)') });
     }
   });
   const curValue = slotInfo.id + (slotInfo.variant === 'enhanced' ? '::enhanced' : '');
