@@ -7,6 +7,7 @@ import { wizardState } from './RecipeWizardState.js';
 import { getState } from '../../store/store.js';
 import { renderTaxonomySearchHTML } from './RecipeWizardTaxonomySearch.js';
 import { scaleEmbeddedVolume } from '../../services/PortionCalculationService.js';
+import { toTitleCase } from '../../utils/stringUtils.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -148,7 +149,7 @@ export function renderState2Mapping() {
             Dish ${wizardState.currentQueueIndex || 1} of ${wizardState.initialQueueTotal || wizardState.processingQueue?.length || 1}
           </span>
           <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text, #0f172a);">
-            ${escapeHtml(activeRecipe.title || 'Untitled Recipe')}
+            ${escapeHtml(toTitleCase(activeRecipe.title || 'Untitled Recipe'))}
           </h3>
         </div>
       </div>

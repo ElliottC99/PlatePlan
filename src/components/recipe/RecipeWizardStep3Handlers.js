@@ -73,7 +73,8 @@ export function recalculateWizardMacros(recipeObj) {
           matchedSource = productMap.get(String(ing.defaultProduct));
         }
         if (!matchedSource) {
-          matchedSource = ing;
+          matchedSource = globalProducts.find(p => String(p.ingredientId) === String(item.ingredientId) && p.isAutoDefault) 
+                       || globalProducts.find(p => String(p.ingredientId) === String(item.ingredientId));
         }
       }
     }

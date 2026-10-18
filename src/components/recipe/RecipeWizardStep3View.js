@@ -107,7 +107,10 @@ export function renderState3Review() {
     <div style="background: var(--surface2, #f8fafc); border: 1px solid var(--border, #e2e8f0); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
       <div style="display: flex; align-items: center; gap: 8px;">
         <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px;">
-          Dish ${wizardState.currentQueueIndex || 1} of ${wizardState.initialQueueTotal || wizardState.processingQueue?.length || 1}: ${toTitleCase(recipe.title || 'Untitled Recipe')}
+          Dish ${wizardState.currentQueueIndex || 1} of ${wizardState.initialQueueTotal || wizardState.processingQueue?.length || 1}:
+        </span>
+        <span style="font-size: 14px; font-weight: 700; color: var(--text, #0f172a);">
+          ${escapeHtml(toTitleCase(recipe.title || 'Untitled Recipe'))}
         </span>
       </div>
     </div>
@@ -173,6 +176,10 @@ export function renderState3Review() {
           const prodTitle = `${brandStr}${linkedProduct.name || linkedProduct.title || ''}`.trim();
           const searchUrl = linkedProduct.tescoUrl || `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(prodTitle)}`;
           mainLineText = `${escapeHtml(ing.name)}${notesHtml} - <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(prodTitle)}</a>`;
+        } else if (ing.ingredientId || ing.matchedName) {
+          const searchName = ing.matchedName || ing.name;
+          const fallbackUrl = 'https://www.tesco.com/groceries/en-GB/search?query=' + encodeURIComponent(searchName);
+          mainLineText = `${escapeHtml(ing.name)}${notesHtml} - <a href="${fallbackUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(searchName)}</a>`;
         }
       }
 
