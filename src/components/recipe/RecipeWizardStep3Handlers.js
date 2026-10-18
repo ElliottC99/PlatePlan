@@ -164,7 +164,15 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
   rec.servings = safeServings;
   rec.serves = safeServings;
 
-  rec.ingredients = allIngredients;
+  rec.ingredients = allIngredients.map(i => {
+    const resolvedId = i.productId || i.bankId || i.mappedItemId || i.productMatch?.id || i.ingredientId || null;
+    return { 
+      ...i, 
+      productId: resolvedId, 
+      bankId: resolvedId, 
+      ingredientId: resolvedId 
+    };
+  });
   rec.types = (rec.mealSuitability && rec.mealSuitability.length > 0) ? rec.mealSuitability.map(t => t.toLowerCase()) : ['dinner'];
   rec.mealType = rec.types[0];
 
@@ -199,19 +207,20 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
     types: rec.types,
     mealType: rec.mealType,
     ingredientSections: rec.ingredientSections,
-    ingredients: allIngredients.map(i => ({
+    ingredients: rec.ingredients.map(i => ({
       name: i.name,
       qty: i.scaledQty || i.qty,
       unit: i.unit,
       raw: i.raw,
-      ingredientId: i.ingredientId || null,
+      ingredientId: i.ingredientId,
+      productId: i.productId,
+      bankId: i.bankId,
       subtypeId: i.subtypeId || null,
       categoryId: i.categoryId || null,
       isCategoryDefault: i.isCategoryDefault || false,
       displayName: i.displayName || null,
       waterMl: i.waterMl || null,
-      isNewTaxonomyItem: !!i.isNewTaxonomyItem,
-      productId: i.productId || i.mappedItemId || i.productMatch?.id || null
+      isNewTaxonomyItem: !!i.isNewTaxonomyItem
     })),
     instructions: rec.methodSteps,
     method: rec.methodSteps,
