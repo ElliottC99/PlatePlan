@@ -224,8 +224,24 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
     })),
     instructions: rec.methodSteps,
     method: rec.methodSteps,
-    macros: finalMacros,
-    nutrition: finalMacros,
+    macros: {
+      calories: finalMacros.calories || finalMacros.cal || 0,
+      protein: finalMacros.protein || finalMacros.prot || 0,
+      carbs: finalMacros.carbs || 0,
+      fat: finalMacros.fat || 0
+    },
+    nutrition: {
+      perServing: {
+        calories: finalMacros.calories || finalMacros.cal || 0,
+        protein: finalMacros.protein || finalMacros.prot || 0,
+        carbs: finalMacros.carbs || 0,
+        fat: finalMacros.fat || 0
+      },
+      calories: finalMacros.calories || finalMacros.cal || 0,
+      protein: finalMacros.protein || finalMacros.prot || 0,
+      carbs: finalMacros.carbs || 0,
+      fat: finalMacros.fat || 0
+    },
     fitScore: finalComputedScore,
     _computedFitScore: finalComputedScore,
     createdAt: rec.createdAt || new Date().toISOString(),

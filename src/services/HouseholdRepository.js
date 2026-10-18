@@ -48,6 +48,63 @@ export function cleanLegacyMacros(target) {
       delete r.carb;
       delete r.carbs;
       delete r.fat;
+    } else {
+      // Defensive Hydration Auto-Repair: if recipe has no macros or is falling back to 0/18 kcal with ingredients, recalculate
+      const hasIngredients = Array.isArray(r.ingredientSections) && r.ingredientSections.length > 0 && r.ingredientSections.some(s => (s.ingredients || []).length > 0);
+      const currentCal = Number(r.macros?.calories || r.macros?.cal || r.calories || r.cal || 0);
+      if (hasIngredients && (currentCal === 0 || currentCal === 18)) {
+        try {
+          const globalProducts = Array.isArray(window.state?.products) ? window.state.products : [];
+          const globalIngredients = Array.isArray(window.state?.ingredients) ? window.state.ingredients : [];
+          const productMap = new Map();
+          globalProducts.forEach(p => { if (p?.id) productMap.set(String(p.id), p); });
+          const ingredientMap = new Map();
+          globalIngredients.forEach(i => { if (i?.id) ingredientMap.set(String(i.id), i); });
+
+          let totalCal = 0;
+          let totalProt = 0;
+          let totalCarb = 0;
+          let totalFat = 0;
+          const allIngs = r.ingredientSections.flatMap(s => s.ingredients || []);
+          const calcFn = window.NutritionService?.calculateItemNutrition || ((prod, qty, unit) => ({ kcal: prod.kcal || 100, protein: prod.protein || 5, carbs: 10, fat: 5 }));
+
+          allIngs.forEach(item => {
+            if (!item || item.excludeNutrition) return;
+            let matchedSource = null;
+            if (item.productId && productMap.has(String(item.productId))) {
+              matchedSource = productMap.get(String(item.productId));
+            } else if (item.ingredientId && ingredientMap.has(String(item.ingredientId))) {
+              const ing = ingredientMap.get(String(item.ingredientId));
+              if (ing?.defaultProduct && productMap.has(String(ing.defaultProduct))) {
+                matchedSource = productMap.get(String(ing.defaultProduct));
+              }
+            }
+            if (matchedSource) {
+              const qty = Number(item.scaledQty ?? item.qty ?? item.amount ?? 1) || 1;
+              const unit = item.unit || 'g';
+              const nut = calcFn(matchedSource, qty, unit);
+              totalCal += (nut.kcal ?? nut.cal ?? 0);
+              totalProt += (nut.protein ?? nut.prot ?? 0);
+              totalCarb += (nut.carbs ?? nut.carb ?? 0);
+              totalFat += (nut.fat ?? 0);
+            }
+          });
+
+          const serves = Number(r.serves || r.targetServings || r.servings || 2) || 2;
+          if (totalCal > 0) {
+            const perServing = {
+              calories: Math.round(totalCal / serves),
+              protein: Math.round((totalProt / serves) * 10) / 10,
+              carbs: Math.round((totalCarb / serves) * 10) / 10,
+              fat: Math.round((totalFat / serves) * 10) / 10
+            };
+            r.macros = perServing;
+            r.nutrition = { perServing, ...perServing };
+          }
+        } catch (repairErr) {
+          console.warn('[Hydration Auto-Repair] Failed to recalculate macros for recipe:', r.id, repairErr);
+        }
+      }
     }
     return r;
   }
