@@ -123,7 +123,7 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
     clickEvt.stopPropagation();
     dropdown.remove();
     if (typeof window.openRecipeWizard === 'function') {
-      window.openRecipeWizard('manual');
+      window.openRecipeWizard('manual', recipeId);
     } else if (typeof window.openRecipeEditor === 'function') {
       window.openRecipeEditor(recipeId);
     }
