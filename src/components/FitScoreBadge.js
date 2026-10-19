@@ -31,7 +31,9 @@ function escapeHtml(str) {
 export function renderFitScoreBadge(fitScoreOrRecipe, mealTypeOrOptions = 'dinner', extraOptions = {}) {
   let fitResult = null;
   const mealType = typeof mealTypeOrOptions === 'string' ? mealTypeOrOptions : 'dinner';
-  const opts = typeof mealTypeOrOptions === 'object' && mealTypeOrOptions !== null ? mealTypeOrOptions : (extraOptions || {});
+  const opts = typeof mealTypeOrOptions === 'object' && mealTypeOrOptions !== null
+    ? { ...mealTypeOrOptions, ...(extraOptions || {}) }
+    : (extraOptions || {});
 
   if (typeof fitScoreOrRecipe === 'number') {
     const numericScore = Math.round(fitScoreOrRecipe);

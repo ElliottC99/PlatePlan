@@ -282,6 +282,7 @@ export function renderCategoryManagerModal() {
       warning.style.display = 'none';
       warning.textContent = '';
     }
+  };
   window.filterCatMassOptions = (query) => {
     const listDiv = document.getElementById('cat-mass-dropdown-list');
     if (!listDiv) return;
