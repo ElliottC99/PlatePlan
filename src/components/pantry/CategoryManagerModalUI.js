@@ -133,9 +133,7 @@ export function renderCategoryManagerModal() {
         </div>
         <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
           ${catObjects.map(cat => {
-            const ingCount = ingredients.filter(i => (i.category === cat.name || i.cat === cat.id || slugCategory(i.category) === slugCategory(cat.name) || (Array.isArray(i.subtypes) && i.subtypes.some(st => st.category === cat.name || st.cat === cat.id || slugCategory(st.category) === slugCategory(cat.name))))).length;
-            const prodCount = (state.products || []).filter(p => p.category === cat.name || p.cat === cat.id || slugCategory(p.category) === slugCategory(cat.name)).length;
-            const count = ingCount + prodCount;
+            const count = ingredients.filter(i => (i.category === cat.name || (i.category || '').trim() === (cat.name || '').trim())).length;
             return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2,#f5f5f4);border-radius:var(--radius-md,10px);border:1px solid var(--border,#e7e5e4)">
               <div><span style="font-size:13px;font-weight:650">${escapeHtml(cat.name)}</span><span style="font-size:11px;color:var(--text2,#78716c);margin-left:6px">(${count} items)</span></div>
               <div style="display:flex;gap:4px">
@@ -244,7 +242,7 @@ export function renderCategoryManagerModal() {
 
     const state = getState() || {};
     const catObjects = getCategoryObjects(state);
-    const otherCats = catObjects.filter(c => c.id !== activeCat && slugCategory(c.name) !== slugCategory(activeCat));
+    const otherCats = catObjects.filter(c => String(c.name || '').trim() !== String(activeCat || '').trim());
     const filtered = otherCats.filter(c => String(c.name).toLowerCase().includes(String(query || '').toLowerCase()));
 
     if (filtered.length === 0) {
@@ -410,7 +408,7 @@ export function renderCategoryManagerModal() {
       return;
     }
 
-    if (slugCategory(targetCat) === slugCategory(sourceCat)) {
+    if (String(targetCat).trim() === String(sourceCat).trim()) {
       if (warning) {
         warning.textContent = 'Source and target categories must be different';
         warning.style.display = 'block';
@@ -596,7 +594,7 @@ export async function mergeCategory(sourceCat, targetCat) {
   if (!sourceCat || !targetCat) {
     throw new Error('Missing source or target category');
   }
-  if (slugCategory(sourceCat) === slugCategory(targetCat)) {
+  if (String(sourceCat).trim() === String(targetCat).trim()) {
     throw new Error('Source and target categories must be different');
   }
 
