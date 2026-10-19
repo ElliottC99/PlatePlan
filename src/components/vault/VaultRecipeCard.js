@@ -89,6 +89,9 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
     <button type="button" class="action-menu-item" data-action="menu-edit" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
       <span>✏️</span> Edit Recipe
     </button>
+    <button type="button" class="action-menu-item" data-action="menu-review" data-id="${escapeAttr(recipeId)}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
+      <span>🔍</span> Review Recipe
+    </button>
     <button type="button" class="action-menu-item" data-action="menu-duplicate" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
       <span>📋</span> Duplicate Recipe
     </button>
@@ -126,6 +129,14 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
       window.openRecipeWizard('manual', recipeId);
     } else if (typeof window.openRecipeEditor === 'function') {
       window.openRecipeEditor(recipeId);
+    }
+  };
+
+  dropdown.querySelector('[data-action="menu-review"]').onclick = (clickEvt) => {
+    clickEvt.stopPropagation();
+    dropdown.remove();
+    if (typeof window.openRecipeWizard === 'function') {
+      window.openRecipeWizard('review', recipeId);
     }
   };
 

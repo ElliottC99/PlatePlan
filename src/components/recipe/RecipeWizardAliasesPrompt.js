@@ -41,12 +41,14 @@ export function promptRecipeWizardAliases(allIngs, onProceed) {
       }
     }
 
-    const rawClean = String(ing.raw).trim().toLowerCase();
+    const rawPhrase = String(ing.raw || '').trim();
+    const cleanedPhrase = rawPhrase.replace(/^[\d\s\/\.\-\u00BC-\u00BE\u2150-\u215E]+(?:g|kg|ml|l|oz|lb|tbsp|tsp|cup|cups|scoop|scoops|pinch|can|clove|slice|slices)?\s+(?:of\s+)?/i, '').trim();
+    const rawClean = (cleanedPhrase || rawPhrase).toLowerCase();
     const existingAliases = (targetDoc.aliases || []).map(a => String(a).toLowerCase());
     const isAlreadyKnown = rawClean === targetName.toLowerCase() || existingAliases.includes(rawClean);
 
     if (!isAlreadyKnown && rawClean.length > 2) {
-      candidates.push({ ing, targetName, rawClean });
+      candidates.push({ ing, targetName, rawClean, cleanedPhrase: cleanedPhrase || rawPhrase });
     }
   });
 
@@ -79,7 +81,7 @@ export function promptRecipeWizardAliases(allIngs, onProceed) {
         ${candidates.map((c, idx) => `
           <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: ${idx === candidates.length - 1 ? 'none' : '1px solid var(--border, #f1f5f9)'}; cursor: pointer;">
             <div style="flex: 1; min-width: 0; padding-right: 12px;">
-              <div style="font-size: 12.5px; color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">"${escapeHtml(c.ing.raw)}"</div>
+              <div style="font-size: 12.5px; color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">"${escapeHtml(c.cleanedPhrase)}" <span style="font-size:11px; color:var(--text2); opacity:0.6; font-weight:normal;">(from "${escapeHtml(c.ing.raw)}")</span></div>
               <div style="font-size: 11px; color: var(--text2); opacity: 0.7;">➔ ${escapeHtml(c.targetName)}</div>
             </div>
             <input type="checkbox" class="wiz-alias-check" data-idx="${idx}" checked style="width: 18px; height: 18px; border-radius: 5px; accent-color: var(--primary, #0284c7); cursor: pointer;" />
@@ -113,7 +115,7 @@ export function promptRecipeWizardAliases(allIngs, onProceed) {
           const idx = parseInt(chk.dataset.idx, 10);
           const item = candidates[idx];
           if (item && item.ing.ingredientId) {
-            await learnIngredientAlias(item.ing.ingredientId, item.ing.raw, item.ing.subtypeId);
+            await learnIngredientAlias(item.ing.ingredientId, item.cleanedPhrase, item.ing.subtypeId);
           }
         }
       }

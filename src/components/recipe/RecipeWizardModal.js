@@ -54,6 +54,9 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
   if (initialMode === 'bulk' || initialMode === 'parse') {
     wizardState.choice = 'bulk';
     wizardState.currentStep = 1;
+  } else if (initialMode === 'review') {
+    wizardState.choice = 'manual';
+    wizardState.currentStep = 3;
   } else if (initialMode === 'manual') {
     wizardState.choice = 'manual';
     wizardState.currentStep = 1;
