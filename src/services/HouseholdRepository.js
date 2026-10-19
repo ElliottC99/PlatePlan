@@ -1032,6 +1032,31 @@ export function subscribeCurrentPlan(callback, errorCallback) {
   } catch (e) { return () => {}; }
 }
 
+export function getUnifiedCategories(state = {}) {
+  const catSet = new Set();
+  const addCategoryStr = (raw) => {
+    if (!raw) return;
+    const name = typeof raw === 'string' ? raw : (raw.name || raw.categoryName || raw.id || '');
+    if (typeof name === 'string') {
+      const trimmed = name.trim();
+      if (trimmed.length > 0) catSet.add(trimmed);
+    }
+  };
+
+  (Array.isArray(state.categories) ? state.categories : []).forEach(addCategoryStr);
+  (Array.isArray(state.ingredients) ? state.ingredients : []).forEach(i => {
+    addCategoryStr(i?.category || i?.cat);
+    if (Array.isArray(i?.subtypes)) {
+      i.subtypes.forEach(st => addCategoryStr(st?.category || st?.cat));
+    }
+  });
+  (Array.isArray(state.products) ? state.products : []).forEach(p => {
+    addCategoryStr(p?.category || p?.cat);
+  });
+
+  return Array.from(catSet).sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+}
+
 export async function getCategories() {
   const defaultCategories = [
     'Bakery', 'Baking', 'Beverages', 'Carbs', 'Dairy & Eggs', 'Drinks', 'Frozen',

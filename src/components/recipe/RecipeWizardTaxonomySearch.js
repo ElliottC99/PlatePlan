@@ -9,6 +9,7 @@
  */
 
 import { getState } from '../../store/store.js';
+import { getUnifiedCategories } from '../../services/HouseholdRepository.js';
 import { openTaxonomyCreationModal } from './RecipeWizardTaxonomyModal.js';
 
 export function getTaxonomyLabel(ingredientId, subtypeId, rawName = '', ingredientsBank = [], categoryId = null) {
@@ -63,17 +64,7 @@ export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [])
 export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
   const storeState = getState() || {};
   const ingredientsBank = storeState.ingredients || [];
-  const STANDARD_CATEGORIES = [
-    'Store Cupboard',
-    'Produce',
-    'Refrigerated & Dairy',
-    'Frozen',
-    'Bakery',
-    'Spices & Oils'
-  ];
-  const existingCategories = Array.from(
-    new Set([...STANDARD_CATEGORIES, ...(storeState.categories || []), ...ingredientsBank.map(i => i.category).filter(Boolean)])
-  );
+  const existingCategories = getUnifiedCategories(storeState);
 
   const filterAndRenderDropdown = (inputEl, dropdownEl) => {
     const query = (inputEl.value || '').toLowerCase().trim();

@@ -6,7 +6,7 @@
  */
 
 import { getState, setCategories, setIngredients, setProducts } from '../../store/store.js';
-import { saveIngredient, saveCategories, saveHouseholdState } from '../../services/HouseholdRepository.js';
+import { saveIngredient, saveCategories, saveHouseholdState, getUnifiedCategories } from '../../services/HouseholdRepository.js';
 import { slugCategory, slugifyToKebab, invalidateHierarchyCache, toCanonicalCategoryName } from '../../models/PantryHierarchyModel.js';
 import { resetCategoryFilter } from '../../views/PantryBankView.js';
 
@@ -19,52 +19,13 @@ export function getCategoryName(cat) {
   return !cat ? '' : typeof cat === 'string' ? cat : (cat.name || cat.categoryName || cat.id || '');
 }
 
-export function getRawCategories(state = {}) {
-  const rawSet = new Set();
-  (Array.isArray(state.categories) ? state.categories : []).forEach(c => {
-    const name = typeof c === 'string' ? c : c?.name;
-    if (name !== undefined && name !== null && String(name).length > 0) rawSet.add(String(name));
-  });
-  (Array.isArray(state.ingredients) ? state.ingredients : []).forEach(i => {
-    if (i?.category !== undefined && i?.category !== null && String(i.category).length > 0) rawSet.add(String(i.category));
-    if (Array.isArray(i?.subtypes)) {
-      i.subtypes.forEach(st => {
-        if (st?.category !== undefined && st?.category !== null && String(st.category).length > 0) rawSet.add(String(st.category));
-      });
-    }
-  });
-  (Array.isArray(state.products) ? state.products : []).forEach(p => {
-    if (p?.category !== undefined && p?.category !== null && String(p.category).length > 0) rawSet.add(String(p.category));
-  });
-  return Array.from(rawSet).sort((a, b) => a.localeCompare(b));
+export function getCategoryObjects(state = {}) {
+  const unified = getUnifiedCategories(state);
+  return unified.map(name => ({ id: name, name }));
 }
 
-export function getCategoryObjects(state = {}) {
-  const cats = state.categories || [];
-  const list = [];
-  
-  cats.forEach(c => {
-    if (typeof c === 'string') {
-      if (!list.some(item => item.id === c)) {
-        list.push({ id: c, name: c });
-      }
-    } else if (c && typeof c === 'object') {
-      const name = c.name || c.categoryName || c.id || '';
-      const id = c.id || name;
-      if (!list.some(item => item.id === id)) {
-        list.push({ id, name });
-      }
-    }
-  });
-
-  const stateRaw = getRawCategories(state);
-  stateRaw.forEach(raw => {
-    if (!list.some(c => c.id === raw)) {
-      list.push({ id: raw, name: raw });
-    }
-  });
-
-  return list.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'en', { sensitivity: 'base' }));
+export function getRawCategories(state = {}) {
+  return getUnifiedCategories(state);
 }
 
 const resolveCategory = (id) => {
@@ -133,13 +94,12 @@ export function renderCategoryManagerModal() {
         </div>
         <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
           ${catObjects.map(cat => {
-            const catNorm = (cat.name || '').trim().toLowerCase();
-            const ingCount = ingredients.filter(i => (i.category || '').trim().toLowerCase() === catNorm).length;
-            const subCount = ingredients.flatMap(i => Array.isArray(i.subtypes) ? i.subtypes : []).filter(st => (st.category || '').trim().toLowerCase() === catNorm).length;
-            const prodCount = (state.products || []).filter(p => (p.category || '').trim().toLowerCase() === catNorm).length;
-            const count = ingCount + subCount + prodCount;
+            const catName = (cat.name || '').trim();
+            const ingCount = ingredients.filter(i => (i.category || '').trim() === catName).length;
+            const subCount = ingredients.flatMap(i => Array.isArray(i.subtypes) ? i.subtypes : []).filter(s => (s.category || '').trim() === catName).length;
+            const prodCount = (state.products || []).filter(p => (p.category || '').trim() === catName).length;
             return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2,#f5f5f4);border-radius:var(--radius-md,10px);border:1px solid var(--border,#e7e5e4)">
-              <div><span style="font-size:13px;font-weight:650">${escapeHtml(cat.name)}</span><span style="font-size:11px;color:var(--text2,#78716c);margin-left:6px">(${count} items)</span></div>
+              <div><span style="font-size:13px;font-weight:650">${escapeHtml(cat.name)}</span><span style="font-size:11px;color:var(--text2,#78716c);margin-left:6px">(${ingCount} Items, ${subCount} Sub-types, ${prodCount} Products)</span></div>
               <div style="display:flex;gap:4px">
                 <button type="button" class="btn xs btn-ghost ghost" onclick="window.startRenameCat('${escapeAttr(cat.name)}')">Rename</button>
                 <button type="button" class="btn xs btn-ghost ghost" onclick="window.startMergeCat('${escapeAttr(cat.name)}')">Merge</button>
@@ -388,7 +348,10 @@ export function renderCategoryManagerModal() {
   window.startRenameCat = (cat) => { activeCat = cat; wizardStep = 'rename'; renderCurrentStep(); };
   
   window.submitRenameCat = async () => {
-    const input = document.getElementById('cat-rename-input'), newName = input ? toCanonicalCategoryName(input.value) : '', oldCat = activeCat;
+    const input = document.getElementById('cat-rename-input');
+    const rawName = input ? input.value : '';
+    const newName = toCanonicalCategoryName(rawName.trim());
+    const oldCat = (activeCat || '').trim();
     if (!newName || !oldCat || newName === oldCat) { resetModalState(); renderCurrentStep(); return; }
 
     const btn = document.getElementById('btn-submit-rename-cat');
