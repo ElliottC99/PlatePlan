@@ -17,8 +17,38 @@ import { bindStep01Events } from './RecipeWizardStep1Handlers.js';
 import { bindStep2Events } from './RecipeWizardStep2Handlers.js';
 import { bindStep3Events } from './RecipeWizardStep3Handlers.js';
 
-export function openRecipeWizard(initialMode = 'manual') {
+export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
   resetWizardState();
+  if (editRecipeId) {
+    const allRecipes = (typeof window !== 'undefined' ? (window.Store?.getState?.()?.recipes || window.state?.recipes || []) : []);
+    const found = allRecipes.find(r => r && String(r.id) === String(editRecipeId));
+    if (found) {
+      const ingRawText = (found.ingredientSections || []).map(sec => {
+        const header = sec.sectionTitle && sec.sectionTitle !== 'Main Ingredients' ? `${sec.sectionTitle}:\n` : '';
+        const items = (sec.ingredients || []).map(i => i.raw || `${i.qty || ''} ${i.unit || ''} ${i.name || ''}`.trim()).join('\n');
+        return `${header}${items}`;
+      }).join('\n\n') || (found.ingredients || []).map(i => i.raw || `${i.qty || ''} ${i.unit || ''} ${i.name || ''}`.trim()).join('\n');
+
+      const methodRawText = (found.methodSteps || found.instructions || found.method || []).join('\n');
+
+      wizardState.activeRecipe = {
+        id: found.id,
+        title: found.title || found.name || '',
+        currentServings: found.servings || found.serves || 4,
+        targetServings: found.targetServings || found.servings || found.serves || 4,
+        prepTime: found.prepTime || { hours: 0, minutes: 15 },
+        cookTime: found.cookTime || { hours: 0, minutes: 30 },
+        mealSuitability: found.mealSuitability || (found.types ? found.types.map(t => t.charAt(0).toUpperCase() + t.slice(1)) : ['Dinner']),
+        ingredientsRaw: ingRawText,
+        methodRaw: methodRawText,
+        ingredientSections: found.ingredientSections || [{ sectionTitle: 'Main Ingredients', ingredients: found.ingredients || [] }],
+        methodSteps: found.methodSteps || found.instructions || found.method || [],
+        macros: found.macros || found.nutrition || { calories: 450, protein: 28, carbs: 40, fat: 16 },
+        enhanced: found.enhanced || null
+      };
+    }
+  }
+
   if (initialMode === 'bulk' || initialMode === 'parse') {
     wizardState.choice = 'bulk';
     wizardState.currentStep = 1;
