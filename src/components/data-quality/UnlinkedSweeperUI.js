@@ -1,10 +1,10 @@
 /**
- * src/components/data-quality/UnlinkedSweeperUI.js (v3.35.25)
+ * src/components/data-quality/UnlinkedSweeperUI.js (v3.35.26)
  * "Unlinked Ingredient Sweeper" Wizard UI Component.
  *
  * Scans store.recipes for unlinked ingredients (where pantryItemId / ingredientId is missing or null),
  * strictly strips leading amounts and measurement units to prevent fragmentation,
- * and provides live-filtering autocomplete search inputs hooked up to the master Pantry Bank.
+ * and replicates the Recipe Wizard's hierarchical taxonomy search (categories, main ingredients, sub-types).
  */
 
 import { getState, setRecipes } from '../../store/store.js';
@@ -25,8 +25,7 @@ export function normaliseIngredientString(str) {
 export function cleanDisplayPhrase(str) {
   if (!str) return '';
   const cleaned = String(str).replace(PREFIX_REGEX, '').trim();
-  if (!cleaned) return '';
-  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  return cleaned ? cleaned.charAt(0).toUpperCase() + cleaned.slice(1) : '';
 }
 
 export function scanUnlinkedRecipeIngredients() {
@@ -40,19 +39,11 @@ export function scanUnlinkedRecipeIngredients() {
 
     const checkItem = (item, sectionIdx, itemIdx) => {
       if (!item) return;
-      const hasLink = Boolean(
-        item.pantryItemId ||
-        item.ingredientId ||
-        item.targetId ||
-        (item.id && typeof item.id === 'string' && item.id.length > 3)
-      );
+      const hasLink = Boolean(item.pantryItemId || item.ingredientId || item.targetId || (item.id && typeof item.id === 'string' && item.id.length > 3));
 
       if (!hasLink) {
-        const rawPhrase = typeof item === 'string'
-          ? item
-          : (item.raw || item.name || item.ingredient || item.ingredientName || '');
+        const rawPhrase = typeof item === 'string' ? item : (item.raw || item.name || item.ingredient || item.ingredientName || '');
         if (!rawPhrase) return;
-
         const groupKey = normaliseIngredientString(rawPhrase).toLowerCase();
         if (!groupKey) return;
 
@@ -64,7 +55,6 @@ export function scanUnlinkedRecipeIngredients() {
             occurrences: []
           });
         }
-
         const group = groups.get(groupKey);
         group.count++;
         group.occurrences.push({ recipeId: recipe.id, recipeName, sectionIdx, itemIdx });
@@ -117,9 +107,9 @@ export function openUnlinkedSweeperModal() {
             Used in: ${escapeHtml(g.occurrences.map(o => o.recipeName).slice(0, 3).join(', '))}${g.occurrences.length > 3 ? ` +${g.occurrences.length - 3} more` : ''}
           </div>
         </div>
-        <div style="flex:1;min-width:240px;max-width:320px;" class="pantry-search-container relative" style="position:relative;">
+        <div style="flex:1;min-width:240px;max-width:320px;position:relative;" class="pantry-search-container relative">
           <input type="text" class="pantry-search-input" placeholder="Search Master Pantry..." data-idx="${idx}" data-phrase="${escapeAttr(g.normalisedKey)}" data-selected-id="" data-selected-sub-id="" autocomplete="off" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border,#cbd5e1);font-size:13px;background:var(--surface,#fff);color:var(--text,#1e293b);box-sizing:border-box;" />
-          <div class="pantry-search-dropdown hidden absolute bg-white shadow-lg w-full z-10 max-h-48 overflow-y-auto" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:190px;overflow-y:auto;background:#fff;border:1px solid var(--border,#e2e8f0);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:20;margin-top:2px;"></div>
+          <div class="pantry-search-dropdown hidden absolute bg-white shadow-lg w-full z-10 max-h-48 overflow-y-auto" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:220px;overflow-y:auto;background:#fff;border:1px solid var(--border,#e2e8f0);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.18);z-index:20;margin-top:2px;"></div>
         </div>
       </div>
     `).join('');
@@ -179,6 +169,8 @@ export function openUnlinkedSweeperModal() {
 
 function attachSweeperSearchEvents(container) {
   const inputs = container.querySelectorAll('.pantry-search-input');
+  const STANDARD_CATS = ['Store Cupboard', 'Produce', 'Refrigerated & Dairy', 'Frozen', 'Bakery', 'Spices & Oils'];
+
   inputs.forEach(input => {
     const parent = input.closest('.pantry-search-container');
     const dropdown = parent?.querySelector('.pantry-search-dropdown');
@@ -186,13 +178,23 @@ function attachSweeperSearchEvents(container) {
 
     const renderFilteredOptions = () => {
       const query = (input.value || '').toLowerCase().trim();
-      const masterItems = (window.Store?.getState?.() || window.state || getState()).ingredients || [];
+      const st = window.Store?.getState?.() || window.state || getState() || {};
+      const masterItems = st.ingredients || [];
+      const masterCategories = Array.from(new Set([...STANDARD_CATS, ...(st.categories || []), ...masterItems.map(i => i.category).filter(Boolean)]));
 
       let matchCount = 0;
       let html = '';
 
+      masterCategories.forEach(cat => {
+        const catStr = String(cat || '');
+        if (!query || catStr.toLowerCase().includes(query) || '[category]'.includes(query)) {
+          matchCount++;
+          html += `<div class="wiz-tax-opt wiz-tax-category" data-val="cat:${escapeAttr(catStr)}" data-label="📂 [Category] ${escapeAttr(catStr)}" style="padding:6px 10px;font-size:12px;cursor:pointer;font-weight:700;color:var(--purple,#4f46e5);background:var(--surface2,#f5f4ee);border-bottom:1px solid #eee;">📂 <span class="badge" style="background:#eef2ff;color:#4f46e5;font-size:10px;padding:1px 5px;border-radius:4px;margin-right:4px;">[Category]</span> ${escapeHtml(catStr)}</div>`;
+        }
+      });
+
       masterItems.forEach(ing => {
-        if (!ing || !ing.id) return;
+        if (!ing?.id) return;
         const ingName = String(ing.name || '').toLowerCase();
         const ingCat = String(ing.category || '').toLowerCase();
         const subTypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
@@ -201,11 +203,11 @@ function attachSweeperSearchEvents(container) {
 
         if (matchesMain || matchingSubs.length > 0) {
           matchCount++;
-          html += `<div class="sweeper-search-opt" data-ing-id="${escapeAttr(ing.id)}" data-sub-id="" data-label="${escapeAttr(ing.name)}" style="padding:6px 10px;font-size:12.5px;cursor:pointer;font-weight:600;color:var(--text,#0f172a);border-bottom:1px solid #f1f5f9;background:#fff;">📦 ${escapeHtml(ing.name)} <span style="font-size:10.5px;font-weight:normal;color:#64748b;">[${escapeHtml(ing.category || 'Pantry')}]</span></div>`;
+          html += `<div class="wiz-tax-opt wiz-tax-main" data-val="${escapeAttr(ing.id)}" data-label="📦 ${escapeAttr(ing.name)} [${escapeAttr(ing.category || 'General')}]" style="padding:6px 10px;font-size:12px;cursor:pointer;font-weight:700;color:var(--text);background:var(--surface2,#fbfbf9);border-bottom:1px solid rgba(0,0,0,0.03);">📦 ${escapeHtml(ing.name)} <span style="font-size:10.5px;font-weight:normal;color:var(--text2,#64748b);">[${escapeHtml(ing.category || 'General')}]</span></div>`;
 
           (matchesMain ? subTypes : matchingSubs).forEach(sub => {
             matchCount++;
-            html += `<div class="sweeper-search-opt" data-ing-id="${escapeAttr(ing.id)}" data-sub-id="${escapeAttr(sub.id)}" data-label="${escapeAttr(`${ing.name} (${sub.name})`)}" style="padding:5px 10px 5px 22px;font-size:12px;cursor:pointer;color:#334155;border-bottom:1px solid #f8fafc;background:#fbfbfb;">↳ 🏷️ ${escapeHtml(sub.name)}</div>`;
+            html += `<div class="wiz-tax-opt wiz-tax-sub" data-val="${escapeAttr(`${ing.id}:${sub.id || sub.name}`)}" data-label="🏷️ ${escapeAttr(sub.name)} (${escapeAttr(ing.name)})" style="padding:5px 10px 5px 24px;font-size:11.5px;cursor:pointer;color:var(--text);border-bottom:1px solid rgba(0,0,0,0.03);">↳ 🏷️ ${escapeHtml(sub.name)}</div>`;
           });
         }
       });
@@ -215,14 +217,26 @@ function attachSweeperSearchEvents(container) {
       dropdown.classList.remove('hidden');
       dropdown.style.display = 'block';
 
-      dropdown.querySelectorAll('.sweeper-search-opt').forEach(opt => {
+      dropdown.querySelectorAll('.wiz-tax-opt').forEach(opt => {
         opt.addEventListener('click', (e) => {
           e.stopPropagation();
-          input.value = opt.dataset.label;
-          input.dataset.selectedId = opt.dataset.ingId;
-          input.dataset.selectedSubId = opt.dataset.subId || '';
-          input.style.borderColor = '#10b981';
-          input.style.backgroundColor = '#ecfdf5';
+          const val = opt.dataset.val || '';
+          input.value = opt.dataset.label || '';
+
+          if (val.includes(':') && !val.startsWith('cat:')) {
+            const [ingId, subId] = val.split(':');
+            input.dataset.selectedId = ingId;
+            input.dataset.selectedSubId = subId;
+            if (parent) { parent.dataset.selectedId = ingId; parent.dataset.selectedSubId = subId; }
+          } else {
+            input.dataset.selectedId = val;
+            input.dataset.selectedSubId = '';
+            if (parent) { parent.dataset.selectedId = val; parent.dataset.selectedSubId = ''; }
+          }
+
+          input.style.borderColor = val.startsWith('cat:') ? '#818cf8' : '#10b981';
+          input.style.backgroundColor = val.startsWith('cat:') ? '#eef2ff' : '#ecfdf5';
+          input.style.color = val.startsWith('cat:') ? '#4338ca' : 'var(--text,#1e293b)';
           dropdown.classList.add('hidden');
           dropdown.style.display = 'none';
         });
@@ -257,8 +271,10 @@ async function applySweeperBatchMappings(assignments = []) {
   const modifiedRecipeIds = new Set();
 
   assignments.forEach(({ group, ingId, subId }) => {
-    const masterIng = pantryMap.get(String(ingId));
-    const masterName = masterIng?.name || group.displayName;
+    const isCat = String(ingId).startsWith('cat:');
+    const catName = isCat ? String(ingId).replace('cat:', '') : '';
+    const masterIng = !isCat ? pantryMap.get(String(ingId)) : null;
+    const masterName = masterIng?.name || catName || group.displayName;
     let subName = '';
     if (subId && masterIng && Array.isArray(masterIng.subtypes)) {
       const foundSub = masterIng.subtypes.find(s => String(s.id) === String(subId));
@@ -271,13 +287,21 @@ async function applySweeperBatchMappings(assignments = []) {
 
       const updateTarget = (item) => {
         if (!item) return;
-        item.pantryItemId = String(ingId);
-        item.ingredientId = String(ingId);
-        if (subId) {
-          item.subtypeId = String(subId);
-          item.subtypeName = subName;
+        if (isCat) {
+          item.categoryId = catName;
+          item.pantryItemId = null;
+          item.ingredientId = null;
+          item.subtypeId = null;
+          item.name = masterName;
+        } else {
+          item.pantryItemId = String(ingId);
+          item.ingredientId = String(ingId);
+          if (subId) {
+            item.subtypeId = String(subId);
+            item.subtypeName = subName;
+          }
+          item.name = subName ? `${masterName} (${subName})` : masterName;
         }
-        item.name = subName ? `${masterName} (${subName})` : masterName;
         totalUpdatedItems++;
         modifiedRecipeIds.add(String(recipe.id));
       };
