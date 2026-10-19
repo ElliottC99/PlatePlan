@@ -141,47 +141,72 @@ export const getTarget = (profile, type, meal) => {
 
 /**
  * Universal Asymmetric Calorie Score Curve (50% Weight):
- * - 95%–100%: 100 pts
- * - 90%–95%: Linear lerp 90–99 pts
- * - 100%–105%: Linear lerp 85–99 pts
- * - >105%: Steep continuous decay 70 * (1 - (r - 1.05) / 0.20)
- * - <90%: Moderate continuous decay down to 0 pts at <=40% calories
+ * - 100 if ratio between 0.95 and 1.00.
+ * - Interpolate 86-99 for [0.85, 0.95) and (1.00, 1.05].
+ * - Interpolate 0-85 for <0.85 (down to 0.5) and >1.05 (down to 1.4).
  */
 export function calculateCalorieScore(actual, target) {
   if (!target || target <= 0 || actual === null || actual === undefined || actual <= 0) return 0;
   const r = actual / target;
 
-  if (r >= 0.95 && r <= 1.05) {
+  // 100 if ratio between 0.95 and 1.00
+  if (r >= 0.95 && r <= 1.00) {
     return 100;
   }
-  if (r >= 0.90 && r < 0.95) {
-    return 90 + ((r - 0.90) / 0.05) * 10;
+  // Interpolate 86-99 for [0.85, 0.95)
+  if (r >= 0.85 && r < 0.95) {
+    return 86 + ((r - 0.85) / (0.95 - 0.85)) * (99 - 86);
   }
-  if (r > 1.05 && r <= 1.10) {
-    return 100 - ((r - 1.05) / 0.05) * 10;
+  // Interpolate 86-99 for (1.00, 1.05]
+  if (r > 1.00 && r <= 1.05) {
+    return 99 - ((r - 1.00) / (1.05 - 1.00)) * (99 - 86);
   }
-  if (r > 1.10) {
-    return Math.max(0, 90 * (1 - ((r - 1.10) / 0.20)));
+  // Interpolate 0-85 for <0.85 (down to 0.5)
+  if (r < 0.85) {
+    if (r <= 0.50) return 0;
+    return ((r - 0.50) / (0.85 - 0.50)) * 85;
   }
-  if (r <= 0.40) {
-    return 0;
+  // Interpolate 0-85 for >1.05 (down to 1.4)
+  if (r > 1.05) {
+    if (r >= 1.40) return 0;
+    return (1 - ((r - 1.05) / (1.40 - 1.05))) * 85;
   }
-  return Math.max(0, ((r - 0.40) / 0.50) * 90);
+  return 0;
 }
 
 /**
  * Universal Asymmetric Protein Score Curve (50% Weight):
- * - >= 100%: 100 pts (full score for meeting or exceeding target)
- * - < 100%: Progressive quadratic penalty 100 * (actual / target)^2
+ * - 100 if ratio between 1.00 and 1.20.
+ * - Interpolate 86-99 for [0.95, 1.00) and (1.20, 1.30].
+ * - Steep penalty <0.95 (0 at 0.70); gentle penalty >1.30 (0 at 2.00).
  */
 export function calculateProteinScore(actual, target) {
   if (!target || target <= 0 || actual === null || actual === undefined || actual <= 0) return 0;
   const r = actual / target;
 
-  if (r >= 1.00) {
+  // 100 if ratio between 1.00 and 1.20
+  if (r >= 1.00 && r <= 1.20) {
     return 100;
   }
-  return Math.max(0, 100 * Math.pow(r, 2));
+  // Interpolate 86-99 for [0.95, 1.00)
+  if (r >= 0.95 && r < 1.00) {
+    return 86 + ((r - 0.95) / (1.00 - 0.95)) * (99 - 86);
+  }
+  // Interpolate 86-99 for (1.20, 1.30]
+  if (r > 1.20 && r <= 1.30) {
+    return 99 - ((r - 1.20) / (1.30 - 1.20)) * (99 - 86);
+  }
+  // Steep penalty <0.95 (0 at 0.70): interpolate 0-85 for [0.70, 0.95)
+  if (r < 0.95) {
+    if (r <= 0.70) return 0;
+    return ((r - 0.70) / (0.95 - 0.70)) * 85;
+  }
+  // Gentle penalty >1.30 (0 at 2.00): interpolate 0-85 for (1.30, 2.00]
+  if (r > 1.30) {
+    if (r >= 2.00) return 0;
+    return (1 - ((r - 1.30) / (2.00 - 1.30))) * 85;
+  }
+  return 0;
 }
 
 /**

@@ -772,6 +772,31 @@ export async function batchRecalibrateRecipesInDb(recipeUpdates, advisoryKeysToD
     throw err;
   }
 }
+export async function batchUpdateRecipesInDb(recipeUpdates) {
+  if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
+  if (!Array.isArray(recipeUpdates) || recipeUpdates.length === 0) return { success: true, count: 0 };
+  try {
+    const recipeColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes');
+    // Chunk in batches of 400 to respect Firestore 500 operations per batch limit
+    const chunkSize = 400;
+    for (let i = 0; i < recipeUpdates.length; i += chunkSize) {
+      const chunk = recipeUpdates.slice(i, i + chunkSize);
+      const batch = db.batch();
+      chunk.forEach(r => {
+        const rId = r.id;
+        const rData = { ...r, updatedAt: new Date().toISOString() };
+        delete rData.id;
+        const rDocRef = recipeColRef.doc(rId);
+        batch.set(rDocRef, rData, { merge: true });
+      });
+      await batch.commit();
+    }
+    return { success: true, count: recipeUpdates.length };
+  } catch (err) {
+    console.error('[HouseholdRepository] Error in batchUpdateRecipesInDb:', err);
+    throw err;
+  }
+}
 
 export async function batchResolveSubtypeOrphansInDb(productUpdates) {
   if (!isDbAvailable()) return false;
@@ -1416,7 +1441,8 @@ const HouseholdRepository = {
   cleanPreferencesBloat,
   deleteCategory,
   mergeCategory,
-  mergeAllDuplicates
+  mergeAllDuplicates,
+  batchUpdateRecipesInDb
 };
 
 export async function deleteCategory(categoryName, fallbackCatName = 'Uncategorised') {

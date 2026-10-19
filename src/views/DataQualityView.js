@@ -12,6 +12,7 @@ import { openSubtypeOrphanResolverModal } from '../components/data-quality/Subty
 import { openMealPlanSyncWarningModal } from '../components/data-quality/MealPlanSyncWarningModal.js';
 import { openMergeIngredientsModal } from '../components/data-quality/MergeIngredientsModal.js';
 import { openRecipeAuditModal } from '../components/recipe/RecipeAuditModal.js';
+import { openUnlinkedSweeperModal } from '../components/data-quality/UnlinkedSweeperUI.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -321,7 +322,8 @@ export function renderDataQualityView() {
           <h2 style="font-size:22px; font-weight:750; margin:0; color:var(--text,#1c1917)">Data Quality Centre</h2>
           <p style="margin:4px 0 0 0; font-size:13px; color:var(--text2,#78716c)">Catalogue audit scanner, recipe macro validation, and self-healing structural health checks.</p>
         </div>
-        <div style="display:flex; gap:8px;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="button" class="btn sm" id="dq-btn-sweeper" style="font-weight:600; background:#059669; color:#fff;">🧹 Unlinked Sweeper</button>
           <button type="button" class="btn sm primary" id="dq-btn-recipe-audit" style="font-weight:600; background:var(--primary,#4f46e5); color:#fff;">📖 Recipe Mapping Audit</button>
           <button type="button" class="btn sm secondary" id="dq-btn-relink" style="font-weight:600;">⚡ Auto-Relink Catalog</button>
           <button type="button" class="btn sm ghost" id="dq-btn-refresh" style="font-weight:600;">🔄 Refresh Audit</button>
@@ -456,6 +458,8 @@ export function renderDataQualityView() {
   `;
 
   // Bind relink & refresh top buttons
+  const sweeperBtn = document.getElementById('dq-btn-sweeper');
+  if (sweeperBtn) sweeperBtn.onclick = () => openUnlinkedSweeperModal();
   const auditBtn = document.getElementById('dq-btn-recipe-audit');
   if (auditBtn) auditBtn.onclick = () => openRecipeAuditModal();
   document.getElementById('dq-btn-relink').onclick = runGlobalProductRelink;

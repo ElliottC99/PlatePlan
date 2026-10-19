@@ -30,6 +30,7 @@ import { renderPlanner } from './views/PlannerView.js';
 import { renderRecipeVault } from './views/RecipeVaultView.js';
 import { renderDataQualityView } from './views/DataQualityView.js';
 import './components/data-quality/ResolveUnlinkedModalUI.js';
+import './components/data-quality/UnlinkedSweeperUI.js';
 import { calculateMealFitScore } from './utils/fitScoreCalculator.js';
 import { renderFitScoreBadge } from './components/FitScoreBadge.js';
 import { renderSyncPanelModal, closeSyncPanelModal } from './components/sync/SyncPanelUI.js';
@@ -49,6 +50,8 @@ import * as FitScoreService from './services/FitScoreService.js';
 import * as DataQualityService from './services/DataQualityService.js';
 import * as TodayViewService from './services/TodayViewService.js';
 import * as RecipeAuthoringService from './services/RecipeAuthoringService.js';
+import * as MaintenanceService from './services/MaintenanceService.js';
+import { alignAllFitScores } from './services/MaintenanceService.js';
 import { registeredComponents } from './components/componentRegistry.js';
 import * as AppRouter from './core/AppRouter.js';
 import * as AppInitializer from './core/AppInitializer.js';
@@ -133,7 +136,7 @@ if (typeof window !== 'undefined') {
   Object.assign(window, {
     MealPlanGeneratorService, RecipeDetailModalService, PortionCalculationService, TescoImportService,
     ShoppingCalculationService, UnitConverter, NutritionService, FitScoreService, DataQualityService,
-    TodayViewService, RecipeAuthoringService, ...registeredComponents, AppRouter, AppInitializer,
+    TodayViewService, RecipeAuthoringService, MaintenanceService, alignAllFitScores, ...registeredComponents, AppRouter, AppInitializer,
 
     showView: window.showView || AppRouter.showView,
     syncMobileNavigation: window.syncMobileNavigation || AppRouter.syncMobileNavigation,
@@ -280,7 +283,7 @@ function setupSubscriptions() {
   subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
 }
 
-export const APP_VERSION = 'v3.35.21';
+export const APP_VERSION = 'v3.35.23';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
