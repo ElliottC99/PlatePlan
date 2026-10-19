@@ -283,7 +283,7 @@ function setupSubscriptions() {
   subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
 }
 
-export const APP_VERSION = 'v3.35.23';
+export const APP_VERSION = 'v3.35.24';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
