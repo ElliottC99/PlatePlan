@@ -207,8 +207,10 @@ export function buildPantryHierarchy(ingredients = [], products = [], options = 
   const categoryMap = new Map(), orphanSubtypes = [];
 
   rootIngredients.forEach(root => {
-    const cat = root.category || 'General';
-    if (!categoryMap.has(cat)) categoryMap.set(cat, []);
+    const rawCat = (root.category || 'General').trim();
+    const existingKey = Array.from(categoryMap.keys()).find(k => k.toLowerCase() === rawCat.toLowerCase());
+    const catKey = existingKey || rawCat;
+    if (!categoryMap.has(catKey)) categoryMap.set(catKey, []);
     const directProducts = productMap.get(root.id) || [];
     const childSubtypes = [...(Array.isArray(root.subtypes) ? root.subtypes : []), ...(subtypeMap.get(root.id) || [])];
     const uniqueSubtypes = Array.from(new Map(childSubtypes.map(s => [s.id || s.name, s])).values());
@@ -223,7 +225,7 @@ export function buildPantryHierarchy(ingredients = [], products = [], options = 
       return { ...st, parentId: root.id, parentName: root.name, products: stProducts, defaultProduct: stDefault };
     });
 
-    categoryMap.get(cat).push({
+    categoryMap.get(catKey).push({
       ...root,
       subtypes: enrichedSubtypes,
       directProducts,

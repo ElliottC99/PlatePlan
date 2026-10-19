@@ -165,13 +165,21 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
 export async function saveIngredientFamilyDetailsModal() {
   const name = (document.getElementById('ingredient-family-details-name')?.value || '').trim();
   if (!name) return;
-  const category = document.getElementById('ingredient-family-details-cat')?.value || 'other';
+  const rawCat = (document.getElementById('ingredient-family-details-cat')?.value || 'other').trim();
+  const state = getState() || {};
+  const existingCats = state.categories || [];
+  const matchedCat = existingCats.find(c => {
+    const cName = typeof c === 'string' ? c : c?.name;
+    return (cName || '').trim().toLowerCase() === rawCat.toLowerCase();
+  });
+  const category = matchedCat ? (typeof matchedCat === 'string' ? matchedCat : matchedCat.name) : rawCat;
+
   const notes = (document.getElementById('ingredient-family-details-notes')?.value || '').trim();
   const modalWrap = document.getElementById('ingredient-family-details-wrap');
   const parentId = modalWrap?.dataset?.parentId;
 
   if (parentId) {
-    const state = getState() || {}, currentIngs = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
+    const currentIngs = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
     const parent = currentIngs.find(p => String(p.id) === String(parentId));
     if (!parent) return;
 
@@ -194,7 +202,7 @@ export async function saveIngredientFamilyDetailsModal() {
     return;
   }
 
-  const state = getState() || {}, currentIngs = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
+  const currentIngs = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
   const updatedIng = {
     ...(activeEditingIngredientId ? currentIngs.find(i => String(i.id) === String(activeEditingIngredientId)) : {}),
     id: activeEditingIngredientId || `ing_${Date.now()}`, name, category, notes, updatedAt: new Date().toISOString()

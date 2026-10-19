@@ -8,7 +8,7 @@
 import { db, HOUSEHOLD_ID, FIREBASE_CONFIG } from '../config/firebase.js';
 import { stripPlanPayload } from '../models/MealPlannerModel.js';
 import { enforceCategorySSOT } from '../utils/categoryEnforcer.js';
-import { getState as getStoreState, setIngredients, setRecipes } from '../store/store.js';
+import { getState as getStoreState, setIngredients, setRecipes, setCategories, setProducts } from '../store/store.js';
 
 export { stripPlanPayload };
 
@@ -1445,7 +1445,6 @@ const HouseholdRepository = {
 };
 
 export async function deleteCategory(categoryName, fallbackCatName = 'Uncategorised') {
-  if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
   if (!categoryName) return { success: false, error: 'Missing category name' };
 
   const strictNormalize = (str) => {
@@ -1456,27 +1455,71 @@ export async function deleteCategory(categoryName, fallbackCatName = 'Uncategori
   };
   const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^a-z0-9\-]/g);
 
+  const deleteNormalized = strictNormalize(categoryName);
+  const fallbackKebab = slugifyToKebab(fallbackCatName);
+
+  // 1. Update in-memory Store state
+  const state = getStoreState() || {};
+  const categories = (state.categories || []).filter(c => {
+    const cName = typeof c === 'string' ? c : c?.name;
+    return strictNormalize(cName) !== deleteNormalized;
+  });
+
+  const ingredients = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
+  ingredients.forEach(i => {
+    let changed = false;
+    if (strictNormalize(i.category) === deleteNormalized) {
+      i.category = fallbackCatName;
+      i.cat = fallbackKebab;
+      changed = true;
+    }
+    if (Array.isArray(i.subtypes)) {
+      i.subtypes.forEach(st => {
+        if (strictNormalize(st.category) === deleteNormalized) {
+          st.category = fallbackCatName;
+          st.cat = fallbackKebab;
+          changed = true;
+        }
+      });
+    }
+    if (changed) i.updatedAt = new Date().toISOString();
+  });
+
+  const products = Array.isArray(state.products) ? [...state.products] : [];
+  products.forEach(p => {
+    if (strictNormalize(p.category) === deleteNormalized) {
+      p.category = fallbackCatName;
+      p.cat = fallbackKebab;
+      p.updatedAt = new Date().toISOString();
+    }
+  });
+
+  setCategories(categories);
+  setIngredients(ingredients);
+  setProducts(products);
+
+  // 2. Persist to Firestore
+  if (!isDbAvailable()) return { success: true };
+
   try {
     const batch = db.batch();
     const householdRef = db.collection('households').doc(HOUSEHOLD_ID);
 
-    const deleteNormalized = strictNormalize(categoryName);
-
-    // 1. Fetch ingredients/items with this category from Firestore
+    // Fetch and update ingredients
     const ingSnap = await householdRef.collection('ingredients').get();
     ingSnap.docs.forEach(doc => {
       const ing = doc.data();
       let changed = false;
       if (strictNormalize(ing.category) === deleteNormalized) {
         ing.category = fallbackCatName;
-        ing.cat = slugifyToKebab(fallbackCatName);
+        ing.cat = fallbackKebab;
         changed = true;
       }
       if (Array.isArray(ing.subtypes)) {
         ing.subtypes.forEach(st => {
           if (strictNormalize(st.category) === deleteNormalized) {
             st.category = fallbackCatName;
-            st.cat = slugifyToKebab(fallbackCatName);
+            st.cat = fallbackKebab;
             changed = true;
           }
         });
@@ -1484,27 +1527,27 @@ export async function deleteCategory(categoryName, fallbackCatName = 'Uncategori
       if (changed) {
         batch.update(doc.ref, { 
           category: ing.category || fallbackCatName,
-          cat: ing.cat || slugifyToKebab(fallbackCatName),
+          cat: ing.cat || fallbackKebab,
           subtypes: ing.subtypes || [],
           updatedAt: new Date().toISOString()
         });
       }
     });
 
-    // 2. Fetch products with this category from Firestore
+    // Fetch and update products
     const prodSnap = await householdRef.collection('products').get();
     prodSnap.docs.forEach(doc => {
       const prod = doc.data();
       if (strictNormalize(prod.category) === deleteNormalized) {
         batch.update(doc.ref, {
           category: fallbackCatName,
-          cat: slugifyToKebab(fallbackCatName),
+          cat: fallbackKebab,
           updatedAt: new Date().toISOString()
         });
       }
     });
 
-    // 3. Delete the category document or update categories array in Settings doc
+    // Update categories array in Settings doc
     const catsDocRef = householdRef.collection('settings').doc('categories');
     const catsSnap = await catsDocRef.get();
     if (catsSnap.exists) {
