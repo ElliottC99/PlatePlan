@@ -133,7 +133,11 @@ export function renderCategoryManagerModal() {
         </div>
         <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
           ${catObjects.map(cat => {
-            const count = ingredients.filter(i => (i.category === cat.name || (i.category || '').trim() === (cat.name || '').trim())).length;
+            const catNorm = (cat.name || '').trim().toLowerCase();
+            const ingCount = ingredients.filter(i => (i.category || '').trim().toLowerCase() === catNorm).length;
+            const subCount = ingredients.flatMap(i => Array.isArray(i.subtypes) ? i.subtypes : []).filter(st => (st.category || '').trim().toLowerCase() === catNorm).length;
+            const prodCount = (state.products || []).filter(p => (p.category || '').trim().toLowerCase() === catNorm).length;
+            const count = ingCount + subCount + prodCount;
             return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2,#f5f5f4);border-radius:var(--radius-md,10px);border:1px solid var(--border,#e7e5e4)">
               <div><span style="font-size:13px;font-weight:650">${escapeHtml(cat.name)}</span><span style="font-size:11px;color:var(--text2,#78716c);margin-left:6px">(${count} items)</span></div>
               <div style="display:flex;gap:4px">
@@ -201,10 +205,11 @@ export function renderCategoryManagerModal() {
         </div>
         ${reassignMode === 'mass' ? `
           <div style="margin-bottom:16px">
-            <label for="cat-mass-target-select" style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">Reassign all ${boundIngs.length} items to:</label>
-            <select id="cat-mass-target-select" name="cat_mass_target" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:8px;font-size:13px;background:var(--surface,#fff)">
-              ${otherCats.map(c => `<option value="${escapeAttr(c)}" ${c === massTargetCat ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
-            </select>
+            <label for="cat-mass-search-input" style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">Reassign all ${boundIngs.length} items to:</label>
+            <div style="position:relative;">
+              <input type="text" id="cat-mass-search-input" name="cat_mass_search_input" placeholder="Search target category..." value="${escapeAttr(massTargetCat)}" autocomplete="off" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);font-size:13.5px;box-sizing:border-box" oninput="window.filterCatMassOptions(this.value)" onfocus="window.filterCatMassOptions(this.value)" onblur="setTimeout(() => { const listDiv = document.getElementById('cat-mass-dropdown-list'); if (listDiv) listDiv.style.display = 'none'; }, 200)">
+              <div id="cat-mass-dropdown-list" style="position:absolute;top:100%;left:0;right:0;max-height:150px;overflow-y:auto;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);box-shadow:0 4px 12px rgba(0,0,0,0.08);z-index:9999;display:none;margin-top:4px;"></div>
+            </div>
           </div>` : `
           <div style="margin-bottom:8px">
             <input type="text" id="cat-reassign-filter" name="reassign_filter" aria-label="Filter items by name" placeholder="Filter items by name..." value="${escapeAttr(reassignSearch)}" oninput="window.handleReassignSearch(this.value)" style="width:100%;padding:6px 10px;border:1px solid var(--border,#e7e5e4);border-radius:6px;font-size:12px;box-sizing:border-box">
@@ -277,6 +282,33 @@ export function renderCategoryManagerModal() {
       warning.style.display = 'none';
       warning.textContent = '';
     }
+  window.filterCatMassOptions = (query) => {
+    const listDiv = document.getElementById('cat-mass-dropdown-list');
+    if (!listDiv) return;
+    const state = getState() || {};
+    const catObjects = getCategoryObjects(state);
+    const otherCats = catObjects.filter(c => String(c.name || '').trim() !== String(activeCat || '').trim());
+    if (!otherCats.some(c => c.name === 'Uncategorised')) otherCats.push({ id: 'Uncategorised', name: 'Uncategorised' });
+    const filtered = otherCats.filter(c => String(c.name).toLowerCase().includes(String(query || '').toLowerCase()));
+
+    if (filtered.length === 0) {
+      listDiv.innerHTML = `<div style="padding:8px 10px; font-size:12px; color:var(--text2,#78716c); font-style:italic;">No matching categories</div>`;
+    } else {
+      listDiv.innerHTML = filtered.map(c => `
+        <div class="cat-mass-search-option" data-cat="${escapeAttr(c.name)}" style="padding:8px 10px; font-size:13px; cursor:pointer; font-weight:550; color:var(--text);" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='transparent'" onmousedown="window.selectCatMassOption('${escapeAttr(c.name)}')">
+          📂 [Category] ${escapeHtml(c.name)}
+        </div>
+      `).join('');
+    }
+    listDiv.style.display = 'block';
+  };
+
+  window.selectCatMassOption = (cat) => {
+    massTargetCat = cat;
+    const input = document.getElementById('cat-mass-search-input');
+    if (input) input.value = cat;
+    const listDiv = document.getElementById('cat-mass-dropdown-list');
+    if (listDiv) listDiv.style.display = 'none';
   };
 
   window.submitAddCat = async () => {
@@ -451,7 +483,8 @@ export function renderCategoryManagerModal() {
 
     try {
       const state = getState() || {}, ings = Array.isArray(state.ingredients) ? state.ingredients : [], prods = Array.isArray(state.products) ? state.products : [];
-      const massTarget = document.getElementById('cat-mass-target-select')?.value || massTargetCat || 'Uncategorised';
+      const massInput = document.getElementById('cat-mass-search-input');
+      const massTarget = (massInput ? massInput.value.trim() : '') || massTargetCat || 'Uncategorised';
       ings.forEach(i => {
         if (i.category === deletedCat || i.cat === deletedCat) {
           const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
