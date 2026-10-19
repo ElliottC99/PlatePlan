@@ -49,7 +49,7 @@ function getStockStatusForEntry(inventory = [], ingredientId, subtypeId = null) 
 
 export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inventory = []) {
   return hierarchy.map(group => `
-    <div class="card" style="margin-bottom:16px;padding:16px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-lg,14px)">
+    <div class="card pantry-category-card" data-category="${escapeAttr(group.category || '')}" style="margin-bottom:16px;padding:16px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-lg,14px)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border,#e7e5e4)">
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:16px">🏷️</span>
@@ -58,7 +58,7 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inven
         <span class="badge badge-gray" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:var(--radius-sm,6px);background:var(--surface2,#f5f5f4)">${group.ingredients.length} items</span>
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="pantry-category-items" style="display:flex;flex-direction:column;gap:12px">
         ${group.ingredients.map(ing => {
           const defProd = ing.defaultProduct, subtypes = ing.subtypes || [], aliases = ing.aliases || [];
           const autoDefaultLabel = formatBrandProductTag(defProd, ing.autoDefault);
@@ -68,7 +68,7 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inven
             : `<span class="badge badge-stock-out" style="background:var(--surface,#fff);color:var(--text3,#a8a29e);border:1px solid var(--border,#e7e5e4);font-weight:600;padding:2px 8px;border-radius:999px;font-size:10.5px">Out of Stock</span>`;
 
           return `
-            <div class="ingredient-card-node" style="padding:12px 14px;border-radius:var(--radius-md,10px);background:var(--surface2,#f5f5f4);border:1px solid var(--border,#e7e5e4);display:flex;flex-direction:column;gap:8px">
+            <div class="ingredient-card-node" data-ingredient-id="${escapeAttr(ing.id)}" data-ingredient-name="${escapeAttr(ing.name || '')}" data-aliases="${escapeAttr(aliases.join(','))}" style="padding:12px 14px;border-radius:var(--radius-md,10px);background:var(--surface2,#f5f5f4);border:1px solid var(--border,#e7e5e4);display:flex;flex-direction:column;gap:8px">
               <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
                 <div>
                   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -120,7 +120,7 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inven
                         ? `<span class="badge badge-stock-in" style="background:#dcfce7;color:#15803d;border:1px solid #86efac;font-weight:700;padding:1px 7px;border-radius:999px;font-size:10px">✓ In Stock (${stStock.totalQty} ${escapeHtml(stStock.unit)})</span>`
                         : `<span class="badge badge-stock-out" style="background:var(--surface2,#f5f5f4);color:var(--text3,#a8a29e);border:1px solid var(--border,#e7e5e4);font-weight:600;padding:1px 7px;border-radius:999px;font-size:10px">Out of Stock</span>`;
                       return `
-                      <div style="padding:6px 10px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                      <div class="pantry-subtype-row" data-subtype-id="${escapeAttr(st.id)}" data-subtype-name="${escapeAttr(st.name || '')}" style="padding:6px 10px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                           <span style="font-size:12px;font-weight:650">↳ ${escapeHtml(st.name)}</span>
                           ${stStockBadgeHtml}

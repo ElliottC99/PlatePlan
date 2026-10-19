@@ -6,7 +6,10 @@
  */
 
 import { getState, setIngredients, setProducts } from '../../store/store.js';
-import { saveIngredient, saveProduct, deleteSubtypeInDb } from '../../services/HouseholdRepository.js';
+import { 
+  saveIngredient, saveProduct, deleteSubtypeInDb,
+  promoteSubtype, moveSubtype, mergeSubtype
+} from '../../services/HouseholdRepository.js';
 import { invalidateHierarchyCache } from '../../models/PantryHierarchyModel.js';
 import { promptReallocateProduct, openProductReallocateModal } from './ReallocateProductModalUI.js';
 import {
@@ -229,27 +232,35 @@ export function openSubtypeReorganizeModal(subtypeId, parentId) {
 
   document.getElementById('btn-reorg-promote').onclick = async () => {
     closeModal();
-    await handlePromoteSubtype(subtypeId, parentId);
+    try {
+      const res = await promoteSubtype(parentId, subtypeId);
+      invalidateHierarchyCache();
+      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+      if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast(`Promoted to standalone ingredient (${res.modifiedRecipesCount || 0} recipes updated)`, 'success');
+      }
+    } catch (err) {
+      console.error('[SubtypeActionModalsUI] Promote failed:', err);
+      if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Failed to promote sub-type.', 'error');
+    }
   };
 
   document.getElementById('btn-reorg-move').onclick = async () => {
     const targetParentId = document.getElementById('reorg-move-select').value;
     if (!targetParentId) return;
     closeModal();
-    const targetParent = currentIngs.find(i => String(i.id) === String(targetParentId));
-    if (targetParent) {
-      const subtypeIdx = parent.subtypes.findIndex(s => String(s.id) === String(subtypeId));
-      if (subtypeIdx >= 0) {
-        const [movedSub] = parent.subtypes.splice(subtypeIdx, 1);
-        if (!Array.isArray(targetParent.subtypes)) targetParent.subtypes = [];
-        targetParent.subtypes.push(movedSub);
-        parent.updatedAt = new Date().toISOString();
-        targetParent.updatedAt = new Date().toISOString();
-        const prods = [...(state.products || [])].map(p => (String(p.subtypeId) === String(subtypeId)) ? { ...p, ingredientId: targetParent.id, updatedAt: new Date().toISOString() } : p);
-        setIngredients(currentIngs); setProducts(prods);
-        if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-        await Promise.all([saveIngredient(parent), saveIngredient(targetParent), ...prods.filter(p => String(p.subtypeId) === String(subtypeId)).map(p => saveProduct(p))]);
+    try {
+      const res = await moveSubtype(parentId, subtypeId, targetParentId);
+      invalidateHierarchyCache();
+      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+      if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast(`Moved sub-type to new parent (${res.modifiedRecipesCount || 0} recipes updated)`, 'success');
       }
+    } catch (err) {
+      console.error('[SubtypeActionModalsUI] Move failed:', err);
+      if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Failed to move sub-type.', 'error');
     }
   };
 
@@ -257,19 +268,18 @@ export function openSubtypeReorganizeModal(subtypeId, parentId) {
     const targetSubtypeId = document.getElementById('reorg-merge-select').value;
     if (!targetSubtypeId) return;
     closeModal();
-    const target = parent.subtypes.find(s => String(s.id) === String(targetSubtypeId));
-    if (target) {
-      const targetAliases = new Set(Array.isArray(target.aliases) ? target.aliases : []);
-      if (sub.name) targetAliases.add(sub.name);
-      if (Array.isArray(sub.aliases)) sub.aliases.forEach(a => targetAliases.add(a));
-      target.aliases = Array.from(targetAliases);
-      parent.subtypes = parent.subtypes.filter(s => String(s.id) !== String(subtypeId));
-      parent.updatedAt = new Date().toISOString();
-      const prods = [...(state.products || [])].map(p => String(p.subtypeId) === String(subtypeId) ? { ...p, subtypeId: target.id, updatedAt: new Date().toISOString() } : p);
-      setIngredients([...state.ingredients]); setProducts(prods);
+    try {
+      const res = await mergeSubtype(parentId, subtypeId, targetSubtypeId);
+      invalidateHierarchyCache();
       if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
       if (typeof window.renderProductBank === 'function') window.renderProductBank();
-      await Promise.all([saveIngredient(parent), ...prods.filter(p => String(p.subtypeId) === String(target.id)).map(p => saveProduct(p))]);
+      if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast(`Merged sub-type into sibling (${res.modifiedRecipesCount || 0} recipes updated)`, 'success');
+      }
+    } catch (err) {
+      console.error('[SubtypeActionModalsUI] Merge failed:', err);
+      if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Failed to merge sub-type.', 'error');
     }
   };
 }

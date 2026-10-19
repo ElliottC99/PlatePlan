@@ -56,10 +56,7 @@ export function setActiveCategoryFilter(cat) {
 export function getFilteredIngredients(items = [], filter = selectedCategoryFilter || activeCategoryFilter) {
   if (!filter || filter === 'all') return items;
   const targetSlug = slugCategory(filter);
-  return items.filter(item => 
-    slugCategory(item.category) === targetSlug || 
-    slugCategory(item.cat) === targetSlug
-  );
+  return items.filter(i => slugCategory(i.category) === targetSlug || slugCategory(i.cat) === targetSlug);
 }
 
 export function updateActiveCategoryFilter(oldName, newName) {
@@ -67,13 +64,10 @@ export function updateActiveCategoryFilter(oldName, newName) {
     const oldSlug = slugCategory(oldName);
     const curFilter = selectedCategoryFilter || activeCategoryFilter;
     if (curFilter && slugCategory(curFilter) === oldSlug) {
-      selectedCategoryFilter = (newName && newName !== 'all') ? newName : null;
-      activeCategoryFilter = selectedCategoryFilter;
+      selectedCategoryFilter = activeCategoryFilter = (newName && newName !== 'all') ? newName : null;
     }
     const searchInput = typeof document !== 'undefined' ? document.getElementById('ingredient-group-search') : null;
-    if (searchInput && searchInput.value && slugCategory(searchInput.value) === oldSlug) {
-      searchInput.value = newName ? newName : '';
-    }
+    if (searchInput?.value && slugCategory(searchInput.value) === oldSlug) searchInput.value = newName || '';
   }
   invalidateHierarchyCache();
   renderIngredientBank();
@@ -193,9 +187,7 @@ export async function saveIngredientFamilyDetailsModal() {
     if (!Array.isArray(parent.subtypes)) parent.subtypes = [];
     const sub = parent.subtypes.find(s => String(s.id) === String(activeEditingIngredientId));
     if (sub) {
-      sub.name = name;
-      sub.notes = notes;
-      parent.updatedAt = new Date().toISOString();
+      sub.name = name; sub.notes = notes; parent.updatedAt = new Date().toISOString();
       setIngredients(currentIngs); closeIngredientFamilyDetailsModal(); renderIngredientBank();
       try { await saveIngredient(parent); } catch (e) {}
     }
@@ -207,7 +199,6 @@ export async function saveIngredientFamilyDetailsModal() {
     ...(activeEditingIngredientId ? currentIngs.find(i => String(i.id) === String(activeEditingIngredientId)) : {}),
     id: activeEditingIngredientId || `ing_${Date.now()}`, name, category, notes, updatedAt: new Date().toISOString()
   };
-
   const existingIdx = currentIngs.findIndex(i => String(i.id) === String(updatedIng.id));
   if (existingIdx >= 0) currentIngs[existingIdx] = updatedIng; else currentIngs.push(updatedIng);
 
@@ -242,31 +233,65 @@ export function renderIngredientBank() {
   }
 
   let hierarchy = buildPantryHierarchy(ingredients, products);
-
   const curFilter = selectedCategoryFilter || activeCategoryFilter;
   if (curFilter && curFilter !== 'all') {
     const targetSlug = slugCategory(curFilter);
     hierarchy = hierarchy.filter(g => slugCategory(g.category) === targetSlug || slugCategory(g.cat) === targetSlug);
   }
 
-  const searchInput = document.getElementById('ingredient-group-search');
-  const query = (searchInput?.value || '').trim().toLowerCase();
-  const querySlug = slugCategory(query);
-  if (query) {
-    hierarchy = hierarchy.map(g => {
-      const matchCat = (g.category || '').toLowerCase().includes(query) || (querySlug && slugCategory(g.category) === querySlug);
-      const filteredIngs = g.ingredients.filter(ing => {
-        if (matchCat) return true;
-        if ((ing.name || '').toLowerCase().includes(query) || (querySlug && slugCategory(ing.name).includes(querySlug))) return true;
-        if (Array.isArray(ing.aliases) && ing.aliases.some(a => (a || '').toLowerCase().includes(query) || (querySlug && slugCategory(a).includes(querySlug)))) return true;
-        if (Array.isArray(ing.subtypes) && ing.subtypes.some(st => (st.name || '').toLowerCase().includes(query) || (querySlug && slugCategory(st.name).includes(querySlug)))) return true;
-        return false;
-      });
-      return { ...g, ingredients: filteredIngs };
-    }).filter(g => g.ingredients.length > 0);
-  }
-
   container.innerHTML = buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inventory);
+  attachPantryBankSearchListener();
+  const searchInput = document.getElementById('ingredient-group-search');
+  if (searchInput?.value) filterPantryBankDOM(searchInput.value);
+}
+
+/**
+ * Live DOM Filtering for Pantry Bank Search:
+ * Toggles 'hidden' class on ingredient rows, sub-types, and category cards without rebuilding DOM.
+ */
+export function filterPantryBankDOM(rawQuery = '') {
+  if (typeof document === 'undefined') return;
+  const q = String(rawQuery || '').trim().toLowerCase();
+  const categoryCards = document.querySelectorAll('.pantry-category-card');
+
+  categoryCards.forEach(catCard => {
+    let visibleIngsInCat = 0;
+    const ingRows = catCard.querySelectorAll('.ingredient-card-node');
+
+    ingRows.forEach(ingRow => {
+      const ingName = (ingRow.dataset.ingredientName || '').toLowerCase();
+      const aliases = (ingRow.dataset.aliases || '').toLowerCase();
+      const matchMain = !q || ingName.includes(q) || aliases.includes(q);
+
+      let visibleSubtypes = 0;
+      const subtypeRows = ingRow.querySelectorAll('.pantry-subtype-row');
+      subtypeRows.forEach(stRow => {
+        const stName = (stRow.dataset.subtypeName || '').toLowerCase();
+        const matchSub = !q || stName.includes(q) || matchMain;
+        stRow.classList.toggle('hidden', !matchSub);
+        if (matchSub) visibleSubtypes++;
+      });
+
+      const showIng = matchMain || visibleSubtypes > 0;
+      ingRow.classList.toggle('hidden', !showIng);
+      if (showIng) visibleIngsInCat++;
+
+      // If a sub-type matched, auto-expand the collapsible container for visibility
+      const subContainer = ingRow.querySelector('.subtypes-collapsible');
+      if (subContainer && q && visibleSubtypes > 0) {
+        subContainer.style.display = 'flex';
+      }
+    });
+
+    catCard.classList.toggle('hidden', q ? visibleIngsInCat === 0 : false);
+  });
+}
+
+export function attachPantryBankSearchListener() {
+  const searchInput = document.getElementById('ingredient-group-search');
+  if (!searchInput || searchInput.__hasLivePantryListener) return;
+  searchInput.__hasLivePantryListener = true;
+  searchInput.addEventListener('input', (e) => filterPantryBankDOM(e.target.value));
 }
 
 let isSubscribed = false;
@@ -282,7 +307,12 @@ export function initBankSubscriptions() {
   }
 }
 
-export function mount() { initBankSubscriptions(); renderIngredientBank(); renderProductBank(); }
+export function mount() {
+  initBankSubscriptions();
+  renderIngredientBank();
+  renderProductBank();
+  attachPantryBankSearchListener();
+}
 export const renderPantryBankView = renderIngredientBank; export { renderProductBank, openProductEditModal };
 export function openAddSubtypeModal(parentId) { openIngredientFamilyDetailsModal(null, parentId); }
 export function openCategoryManager() { renderCategoryManagerModal(); }
