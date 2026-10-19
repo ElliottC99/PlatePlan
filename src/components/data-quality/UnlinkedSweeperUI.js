@@ -1,5 +1,5 @@
 /**
- * src/components/data-quality/UnlinkedSweeperUI.js (v3.35.24)
+ * src/components/data-quality/UnlinkedSweeperUI.js (v3.35.25)
  * "Unlinked Ingredient Sweeper" Wizard UI Component.
  *
  * Scans store.recipes for unlinked ingredients (where pantryItemId / ingredientId is missing or null),
@@ -15,7 +15,7 @@ let activeModalOverlay = null;
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
 
-const PREFIX_REGEX = /^[\d\s\/\.\-\u00BC-\u00BE\u2150-\u215E]+(?:g|kg|ml|l|oz|lb|tbsp|tsp|cup|cups|scoop|scoops|pinch|can|clove|cloves|slice|slices)?\s+(?:of\s+)?/i;
+const PREFIX_REGEX = /^[\d\s\/\.\-\u00BC-\u00BE\u2150-\u215E]+(?:g|kg|ml|l|oz|lb|tbsp|tsp|cup|cups|scoop|scoops|pinch|can|cans|clove|cloves|slice|slices|packet|packets|bunch|bunches|piece|pieces|head|heads)?\s+(?:of\s+)?/i;
 
 export function normaliseIngredientString(str) {
   if (!str) return '';
@@ -24,11 +24,13 @@ export function normaliseIngredientString(str) {
 
 export function cleanDisplayPhrase(str) {
   if (!str) return '';
-  return String(str).replace(PREFIX_REGEX, '').trim();
+  const cleaned = String(str).replace(PREFIX_REGEX, '').trim();
+  if (!cleaned) return '';
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 }
 
 export function scanUnlinkedRecipeIngredients() {
-  const state = getState() || {};
+  const state = getState() || (typeof window !== 'undefined' ? (window.Store?.getState?.() || window.state || {}) : {});
   const recipes = Array.isArray(state.recipes) ? state.recipes : [];
   const groups = new Map();
 
@@ -46,22 +48,24 @@ export function scanUnlinkedRecipeIngredients() {
       );
 
       if (!hasLink) {
-        const rawText = typeof item === 'string'
+        const rawPhrase = typeof item === 'string'
           ? item
           : (item.raw || item.name || item.ingredient || item.ingredientName || '');
-        const norm = normaliseIngredientString(rawText);
-        if (!norm) return;
+        if (!rawPhrase) return;
 
-        if (!groups.has(norm)) {
-          groups.set(norm, {
-            normalisedKey: norm,
-            displayName: cleanDisplayPhrase(rawText) || norm,
+        const groupKey = normaliseIngredientString(rawPhrase).toLowerCase();
+        if (!groupKey) return;
+
+        if (!groups.has(groupKey)) {
+          groups.set(groupKey, {
+            normalisedKey: groupKey,
+            displayName: cleanDisplayPhrase(rawPhrase) || groupKey,
             count: 0,
             occurrences: []
           });
         }
 
-        const group = groups.get(norm);
+        const group = groups.get(groupKey);
         group.count++;
         group.occurrences.push({ recipeId: recipe.id, recipeName, sectionIdx, itemIdx });
       }
@@ -89,8 +93,6 @@ export function closeUnlinkedSweeperModal() {
 
 export function openUnlinkedSweeperModal() {
   closeUnlinkedSweeperModal();
-  const state = getState() || {};
-  const pantryIngredients = Array.isArray(state.ingredients) ? state.ingredients : [];
   const unlinkedGroups = scanUnlinkedRecipeIngredients();
 
   activeModalOverlay = document.createElement('div');
@@ -147,7 +149,7 @@ export function openUnlinkedSweeperModal() {
 
   document.getElementById('sweeper-close-btn').addEventListener('click', closeUnlinkedSweeperModal);
   document.getElementById('sweeper-cancel-btn').addEventListener('click', closeUnlinkedSweeperModal);
-  attachSweeperSearchEvents(activeModalOverlay, pantryIngredients);
+  attachSweeperSearchEvents(activeModalOverlay);
 
   const saveBtn = document.getElementById('sweeper-save-all-btn');
   if (saveBtn) {
@@ -175,7 +177,7 @@ export function openUnlinkedSweeperModal() {
   }
 }
 
-function attachSweeperSearchEvents(container, pantryIngredients) {
+function attachSweeperSearchEvents(container) {
   const inputs = container.querySelectorAll('.pantry-search-input');
   inputs.forEach(input => {
     const parent = input.closest('.pantry-search-container');
@@ -184,10 +186,12 @@ function attachSweeperSearchEvents(container, pantryIngredients) {
 
     const renderFilteredOptions = () => {
       const query = (input.value || '').toLowerCase().trim();
+      const masterItems = (window.Store?.getState?.() || window.state || getState()).ingredients || [];
+
       let matchCount = 0;
       let html = '';
 
-      pantryIngredients.forEach(ing => {
+      masterItems.forEach(ing => {
         if (!ing || !ing.id) return;
         const ingName = String(ing.name || '').toLowerCase();
         const ingCat = String(ing.category || '').toLowerCase();
@@ -208,6 +212,7 @@ function attachSweeperSearchEvents(container, pantryIngredients) {
 
       if (matchCount === 0) html = `<div style="padding:10px;font-size:12px;color:#94a3b8;text-align:center;">No pantry items matching "${escapeHtml(query)}"</div>`;
       dropdown.innerHTML = html;
+      dropdown.classList.remove('hidden');
       dropdown.style.display = 'block';
 
       dropdown.querySelectorAll('.sweeper-search-opt').forEach(opt => {
@@ -218,6 +223,7 @@ function attachSweeperSearchEvents(container, pantryIngredients) {
           input.dataset.selectedSubId = opt.dataset.subId || '';
           input.style.borderColor = '#10b981';
           input.style.backgroundColor = '#ecfdf5';
+          dropdown.classList.add('hidden');
           dropdown.style.display = 'none';
         });
       });
@@ -229,20 +235,23 @@ function attachSweeperSearchEvents(container, pantryIngredients) {
 
   container.addEventListener('click', (e) => {
     if (!e.target.closest('.pantry-search-container')) {
-      container.querySelectorAll('.pantry-search-dropdown').forEach(d => { d.style.display = 'none'; });
+      container.querySelectorAll('.pantry-search-dropdown').forEach(d => {
+        d.classList.add('hidden');
+        d.style.display = 'none';
+      });
     }
   });
 }
 
 async function applySweeperBatchMappings(assignments = []) {
-  const state = getState() || {};
+  const state = getState() || (typeof window !== 'undefined' ? (window.Store?.getState?.() || window.state || {}) : {});
   const recipes = Array.isArray(state.recipes) ? [...state.recipes] : [];
-  const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
+  const masterItems = (window.Store?.getState?.() || window.state || state).ingredients || [];
 
   const recipeMap = new Map();
   recipes.forEach(r => { if (r?.id) recipeMap.set(String(r.id), JSON.parse(JSON.stringify(r))); });
   const pantryMap = new Map();
-  ingredients.forEach(i => { if (i?.id) pantryMap.set(String(i.id), i); });
+  masterItems.forEach(i => { if (i?.id) pantryMap.set(String(i.id), i); });
 
   let totalUpdatedItems = 0;
   const modifiedRecipeIds = new Set();
