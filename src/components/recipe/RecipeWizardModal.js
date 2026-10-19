@@ -29,20 +29,22 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
         return `${header}${items}`;
       }).join('\n\n') || (found.ingredients || []).map(i => i.raw || `${i.qty || ''} ${i.unit || ''} ${i.name || ''}`.trim()).join('\n');
 
-      const methodRawText = (found.methodSteps || found.instructions || found.method || []).join('\n');
+      const methodRawText = Array.isArray(found.steps) 
+        ? found.steps.join('\n\n') 
+        : (Array.isArray(found.methodSteps) ? found.methodSteps.join('\n\n') : (found.method || found.instructions || ''));
 
       wizardState.activeRecipe = {
         id: found.id,
         title: found.title || found.name || '',
         currentServings: found.servings || found.serves || 4,
         targetServings: found.targetServings || found.servings || found.serves || 4,
-        prepTime: found.prepTime || { hours: 0, minutes: 15 },
-        cookTime: found.cookTime || { hours: 0, minutes: 30 },
+        prepTime: found.prepTime !== undefined && found.prepTime !== null ? found.prepTime : { hours: '', minutes: '' },
+        cookTime: found.cookTime !== undefined && found.cookTime !== null ? found.cookTime : { hours: '', minutes: '' },
         mealSuitability: found.mealSuitability || (found.types ? found.types.map(t => t.charAt(0).toUpperCase() + t.slice(1)) : ['Dinner']),
         ingredientsRaw: ingRawText,
         methodRaw: methodRawText,
         ingredientSections: found.ingredientSections || [{ sectionTitle: 'Main Ingredients', ingredients: found.ingredients || [] }],
-        methodSteps: found.methodSteps || found.instructions || found.method || [],
+        methodSteps: found.steps || found.methodSteps || found.instructions || (typeof found.method === 'string' ? found.method.split('\n') : found.method) || [],
         macros: found.macros || found.nutrition || { calories: 450, protein: 28, carbs: 40, fat: 16 },
         enhanced: found.enhanced || null
       };
