@@ -1472,56 +1472,103 @@ const HouseholdRepository = {
 export async function deleteCategory(categoryName, fallbackCatName = 'Uncategorised') {
   if (!categoryName) return { success: false, error: 'Missing category name' };
 
-  const strictNormalize = (str) => {
-    return String(str || '')
-      .toLowerCase()
-      .trim()
-      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]+$/, '');
-  };
-  const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^a-z0-9\-]/g);
+  const strictNorm = (str) => String(str || '').toLowerCase().trim();
+  const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^a-z0-9\-]/g, '');
 
-  const deleteNormalized = strictNormalize(categoryName);
-  const fallbackKebab = slugifyToKebab(fallbackCatName);
+  const sourceNorm = strictNorm(categoryName);
+  const targetCat = (fallbackCatName || 'Uncategorised').trim();
+  const targetKebab = slugifyToKebab(targetCat);
+
+  // Apply Cascading Reassignment Logic to State / Memory Data
+  const cascadeCategoryReassignment = (ingList = [], prodList = []) => {
+    const updatedIngs = Array.isArray(ingList) ? ingList.map(i => ({ ...i, subtypes: Array.isArray(i.subtypes) ? [...i.subtypes] : [] })) : [];
+    const updatedProds = Array.isArray(prodList) ? prodList.map(p => ({ ...p })) : [];
+
+    const changedIngIds = new Set();
+    const changedSubtypeIds = new Set();
+    const changedProdIds = new Set();
+
+    // Step A (Root Level Cascade):
+    updatedIngs.forEach(ing => {
+      if (strictNorm(ing.category) === sourceNorm) {
+        ing.category = targetCat;
+        ing.cat = targetKebab;
+        ing.updatedAt = new Date().toISOString();
+        changedIngIds.add(String(ing.id));
+
+        // Cascade to all child subtypes of this root ingredient
+        if (Array.isArray(ing.subtypes)) {
+          ing.subtypes.forEach(st => {
+            st.category = targetCat;
+            st.cat = targetKebab;
+            if (st.id) changedSubtypeIds.add(String(st.id));
+          });
+        }
+
+        // Cascade to all products linked directly or via groupId to this root ingredient
+        updatedProds.forEach(prod => {
+          const ingRefId = String(prod.ingredientId || prod.groupId || '');
+          if (ingRefId && ingRefId === String(ing.id)) {
+            prod.category = targetCat;
+            prod.cat = targetKebab;
+            prod.updatedAt = new Date().toISOString();
+            changedProdIds.add(String(prod.id));
+          }
+        });
+      }
+    });
+
+    // Step B (Sub-type Level Cascade):
+    updatedIngs.forEach(ing => {
+      if (Array.isArray(ing.subtypes)) {
+        ing.subtypes.forEach(st => {
+          if (strictNorm(st.category) === sourceNorm) {
+            st.category = targetCat;
+            st.cat = targetKebab;
+            if (st.id) changedSubtypeIds.add(String(st.id));
+            changedIngIds.add(String(ing.id));
+            ing.updatedAt = new Date().toISOString();
+
+            // Cascade to all products linked to this specific sub-type
+            updatedProds.forEach(prod => {
+              const subRefId = String(prod.subtypeId || prod.subTypeId || '');
+              if (subRefId && st.id && subRefId === String(st.id)) {
+                prod.category = targetCat;
+                prod.cat = targetKebab;
+                prod.updatedAt = new Date().toISOString();
+                changedProdIds.add(String(prod.id));
+              }
+            });
+          }
+        });
+      }
+    });
+
+    // Step C (Product Level Cascade for remaining orphaned products):
+    updatedProds.forEach(prod => {
+      if (strictNorm(prod.category) === sourceNorm) {
+        prod.category = targetCat;
+        prod.cat = targetKebab;
+        prod.updatedAt = new Date().toISOString();
+        changedProdIds.add(String(prod.id));
+      }
+    });
+
+    return { updatedIngs, updatedProds, changedIngIds, changedSubtypeIds, changedProdIds };
+  };
 
   // 1. Update in-memory Store state
   const state = getStoreState() || {};
   const categories = (state.categories || []).filter(c => {
     const cName = typeof c === 'string' ? c : c?.name;
-    return strictNormalize(cName) !== deleteNormalized;
+    return strictNorm(cName) !== sourceNorm;
   });
 
-  const ingredients = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
-  ingredients.forEach(i => {
-    let changed = false;
-    if (strictNormalize(i.category) === deleteNormalized) {
-      i.category = fallbackCatName;
-      i.cat = fallbackKebab;
-      changed = true;
-    }
-    if (Array.isArray(i.subtypes)) {
-      i.subtypes.forEach(st => {
-        if (strictNormalize(st.category) === deleteNormalized) {
-          st.category = fallbackCatName;
-          st.cat = fallbackKebab;
-          changed = true;
-        }
-      });
-    }
-    if (changed) i.updatedAt = new Date().toISOString();
-  });
-
-  const products = Array.isArray(state.products) ? [...state.products] : [];
-  products.forEach(p => {
-    if (strictNormalize(p.category) === deleteNormalized) {
-      p.category = fallbackCatName;
-      p.cat = fallbackKebab;
-      p.updatedAt = new Date().toISOString();
-    }
-  });
+  const { updatedIngs, updatedProds } = cascadeCategoryReassignment(state.ingredients, state.products);
 
   setCategories(categories);
-  setIngredients(ingredients);
-  setProducts(products);
+  setIngredients(updatedIngs);
+  setProducts(updatedProds);
 
   // 2. Persist to Firestore
   if (!isDbAvailable()) return { success: true };
@@ -1530,43 +1577,32 @@ export async function deleteCategory(categoryName, fallbackCatName = 'Uncategori
     const batch = db.batch();
     const householdRef = db.collection('households').doc(HOUSEHOLD_ID);
 
-    // Fetch and update ingredients
+    // Fetch and update ingredients with cascading logic
     const ingSnap = await householdRef.collection('ingredients').get();
-    ingSnap.docs.forEach(doc => {
-      const ing = doc.data();
-      let changed = false;
-      if (strictNormalize(ing.category) === deleteNormalized) {
-        ing.category = fallbackCatName;
-        ing.cat = fallbackKebab;
-        changed = true;
-      }
-      if (Array.isArray(ing.subtypes)) {
-        ing.subtypes.forEach(st => {
-          if (strictNormalize(st.category) === deleteNormalized) {
-            st.category = fallbackCatName;
-            st.cat = fallbackKebab;
-            changed = true;
-          }
-        });
-      }
-      if (changed) {
-        batch.update(doc.ref, { 
-          category: ing.category || fallbackCatName,
-          cat: ing.cat || fallbackKebab,
+    const dbIngs = ingSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+
+    // Fetch products
+    const prodSnap = await householdRef.collection('products').get();
+    const dbProds = prodSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+
+    const { updatedIngs: dbCascadeIngs, updatedProds: dbCascadeProds, changedIngIds, changedProdIds } = cascadeCategoryReassignment(dbIngs, dbProds);
+
+    dbCascadeIngs.forEach(ing => {
+      if (changedIngIds.has(String(ing.id))) {
+        batch.update(ing.ref, {
+          category: ing.category,
+          cat: ing.cat,
           subtypes: ing.subtypes || [],
           updatedAt: new Date().toISOString()
         });
       }
     });
 
-    // Fetch and update products
-    const prodSnap = await householdRef.collection('products').get();
-    prodSnap.docs.forEach(doc => {
-      const prod = doc.data();
-      if (strictNormalize(prod.category) === deleteNormalized) {
-        batch.update(doc.ref, {
-          category: fallbackCatName,
-          cat: fallbackKebab,
+    dbCascadeProds.forEach(prod => {
+      if (changedProdIds.has(String(prod.id))) {
+        batch.update(prod.ref, {
+          category: prod.category,
+          cat: prod.cat,
           updatedAt: new Date().toISOString()
         });
       }
@@ -1579,7 +1615,7 @@ export async function deleteCategory(categoryName, fallbackCatName = 'Uncategori
       const data = catsSnap.data();
       const updatedCats = (data.categories || []).filter(c => {
         const cName = typeof c === 'string' ? c : c?.name;
-        return strictNormalize(cName) !== deleteNormalized;
+        return strictNorm(cName) !== sourceNorm;
       });
       batch.set(catsDocRef, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true });
     }
@@ -1593,45 +1629,127 @@ export async function deleteCategory(categoryName, fallbackCatName = 'Uncategori
 }
 
 export async function mergeCategory(sourceCat, targetCat) {
-  if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
   if (!sourceCat || !targetCat) return { success: false, error: 'Missing source or target' };
 
-  const strictNormalize = (str) => {
-    return String(str || '')
-      .toLowerCase()
-      .trim()
-      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]+$/, '');
+  const strictNorm = (str) => String(str || '').toLowerCase().trim();
+  const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^a-z0-9\-]/g, '');
+
+  const sourceNorm = strictNorm(sourceCat);
+  const targetNorm = strictNorm(targetCat);
+  const cleanTargetCat = String(targetCat).trim();
+  const targetKebab = slugifyToKebab(cleanTargetCat);
+
+  // Apply Cascading Merge Logic
+  const cascadeCategoryReassignment = (ingList = [], prodList = []) => {
+    const updatedIngs = Array.isArray(ingList) ? ingList.map(i => ({ ...i, subtypes: Array.isArray(i.subtypes) ? [...i.subtypes] : [] })) : [];
+    const updatedProds = Array.isArray(prodList) ? prodList.map(p => ({ ...p })) : [];
+
+    const changedIngIds = new Set();
+    const changedSubtypeIds = new Set();
+    const changedProdIds = new Set();
+
+    // Step A (Root Level Cascade):
+    updatedIngs.forEach(ing => {
+      if (strictNorm(ing.category) === sourceNorm) {
+        ing.category = cleanTargetCat;
+        ing.cat = targetKebab;
+        ing.updatedAt = new Date().toISOString();
+        changedIngIds.add(String(ing.id));
+
+        // Cascade to all child subtypes of this root ingredient
+        if (Array.isArray(ing.subtypes)) {
+          ing.subtypes.forEach(st => {
+            st.category = cleanTargetCat;
+            st.cat = targetKebab;
+            if (st.id) changedSubtypeIds.add(String(st.id));
+          });
+        }
+
+        // Cascade to all products linked directly or via groupId to this root ingredient
+        updatedProds.forEach(prod => {
+          const ingRefId = String(prod.ingredientId || prod.groupId || '');
+          if (ingRefId && ingRefId === String(ing.id)) {
+            prod.category = cleanTargetCat;
+            prod.cat = targetKebab;
+            prod.updatedAt = new Date().toISOString();
+            changedProdIds.add(String(prod.id));
+          }
+        });
+      }
+    });
+
+    // Step B (Sub-type Level Cascade):
+    updatedIngs.forEach(ing => {
+      if (Array.isArray(ing.subtypes)) {
+        ing.subtypes.forEach(st => {
+          if (strictNorm(st.category) === sourceNorm) {
+            st.category = cleanTargetCat;
+            st.cat = targetKebab;
+            if (st.id) changedSubtypeIds.add(String(st.id));
+            changedIngIds.add(String(ing.id));
+            ing.updatedAt = new Date().toISOString();
+
+            // Cascade to all products linked to this specific sub-type
+            updatedProds.forEach(prod => {
+              const subRefId = String(prod.subtypeId || prod.subTypeId || '');
+              if (subRefId && st.id && subRefId === String(st.id)) {
+                prod.category = cleanTargetCat;
+                prod.cat = targetKebab;
+                prod.updatedAt = new Date().toISOString();
+                changedProdIds.add(String(prod.id));
+              }
+            });
+          }
+        });
+      }
+    });
+
+    // Step C (Product Level Cascade for remaining orphaned products):
+    updatedProds.forEach(prod => {
+      if (strictNorm(prod.category) === sourceNorm) {
+        prod.category = cleanTargetCat;
+        prod.cat = targetKebab;
+        prod.updatedAt = new Date().toISOString();
+        changedProdIds.add(String(prod.id));
+      }
+    });
+
+    return { updatedIngs, updatedProds, changedIngIds, changedSubtypeIds, changedProdIds };
   };
-  const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^a-z0-9\-]/g);
+
+  // Update in-memory Store state first
+  const state = getStoreState() || {};
+  const categories = (state.categories || []).filter(c => {
+    const cName = typeof c === 'string' ? c : c?.name;
+    return strictNorm(cName) !== sourceNorm;
+  });
+  if (!categories.some(c => strictNorm(typeof c === 'string' ? c : c?.name) === targetNorm)) {
+    categories.push(cleanTargetCat);
+  }
+
+  const { updatedIngs, updatedProds } = cascadeCategoryReassignment(state.ingredients, state.products);
+
+  setCategories(categories);
+  setIngredients(updatedIngs);
+  setProducts(updatedProds);
+
+  if (!isDbAvailable()) return { success: true };
 
   try {
     const batch = db.batch();
     const householdRef = db.collection('households').doc(HOUSEHOLD_ID);
 
-    const sourceNormalized = strictNormalize(sourceCat);
-    const targetNormalized = strictNormalize(targetCat);
-
-    // 1. Fetch ingredients/items with source category from Firestore
     const ingSnap = await householdRef.collection('ingredients').get();
-    ingSnap.docs.forEach(doc => {
-      const ing = doc.data();
-      let changed = false;
-      if (strictNormalize(ing.category) === sourceNormalized) {
-        ing.category = targetCat;
-        ing.cat = slugifyToKebab(targetCat);
-        changed = true;
-      }
-      if (Array.isArray(ing.subtypes)) {
-        ing.subtypes.forEach(st => {
-          if (strictNormalize(st.category) === sourceNormalized) {
-            st.category = targetCat;
-            st.cat = slugifyToKebab(targetCat);
-            changed = true;
-          }
-        });
-      }
-      if (changed) {
-        batch.update(doc.ref, { 
+    const dbIngs = ingSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+
+    const prodSnap = await householdRef.collection('products').get();
+    const dbProds = prodSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+
+    const { updatedIngs: dbCascadeIngs, updatedProds: dbCascadeProds, changedIngIds, changedProdIds } = cascadeCategoryReassignment(dbIngs, dbProds);
+
+    dbCascadeIngs.forEach(ing => {
+      if (changedIngIds.has(String(ing.id))) {
+        batch.update(ing.ref, {
           category: ing.category,
           cat: ing.cat,
           subtypes: ing.subtypes || [],
@@ -1640,31 +1758,27 @@ export async function mergeCategory(sourceCat, targetCat) {
       }
     });
 
-    // 2. Fetch products with source category from Firestore
-    const prodSnap = await householdRef.collection('products').get();
-    prodSnap.docs.forEach(doc => {
-      const prod = doc.data();
-      if (strictNormalize(prod.category) === sourceNormalized) {
-        batch.update(doc.ref, {
-          category: targetCat,
-          cat: slugifyToKebab(targetCat),
+    dbCascadeProds.forEach(prod => {
+      if (changedProdIds.has(String(prod.id))) {
+        batch.update(prod.ref, {
+          category: prod.category,
+          cat: prod.cat,
           updatedAt: new Date().toISOString()
         });
       }
     });
 
-    // 3. Update the categories array in Settings doc
+    // Update the categories array in Settings doc
     const catsDocRef = householdRef.collection('settings').doc('categories');
     const catsSnap = await catsDocRef.get();
     if (catsSnap.exists) {
       const data = catsSnap.data();
       const updatedCats = (data.categories || []).filter(c => {
         const cName = typeof c === 'string' ? c : c?.name;
-        return strictNormalize(cName) !== sourceNormalized;
+        return strictNorm(cName) !== sourceNorm;
       });
-      // Ensure targetCat is in the list
-      if (!updatedCats.some(c => strictNormalize(typeof c === 'string' ? c : c?.name) === targetNormalized)) {
-        updatedCats.push(targetCat);
+      if (!updatedCats.some(c => strictNorm(typeof c === 'string' ? c : c?.name) === targetNorm)) {
+        updatedCats.push(cleanTargetCat);
       }
       batch.set(catsDocRef, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true });
     }
