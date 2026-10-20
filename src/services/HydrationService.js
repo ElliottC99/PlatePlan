@@ -1,7 +1,7 @@
 /**
- * src/services/HydrationService.js (v3.38.2)
+ * src/services/HydrationService.js (v3.38.5)
  * Orchestrates concurrent fetching and real-time Firebase subscriptions.
- * Respects user category deletions and never resurrects deleted canonical categories on boot.
+ * Delegates maintenance routines to CacheMaintenanceService.js.
  */
 
 import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeRecipes, subscribeIngredients, subscribeProducts, subscribePreferences, subscribeCurrentPlan, getCategories, saveCategories, saveIngredient, cleanLegacyMacros } from './HouseholdRepository.js';
@@ -10,6 +10,7 @@ import { getCurrentActivePlan as getActivePlanFromSubcollection } from './PlanRe
 import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache, setCategories, setInventory, sanitizePreferences, updateState } from '../store/store.js';
 import { compareProductsByStrategy } from '../models/PantryHierarchyModel.js';
 import { waitForAuth } from './AuthService.js';
+import { runDeferredMaintenance } from './CacheMaintenanceService.js';
 
 export { waitForAuth };
 
@@ -77,8 +78,6 @@ if (typeof window !== 'undefined') {
 
 export function mergeCanonicalCategories(rawCategories) {
   const categories = Array.isArray(rawCategories) ? [...rawCategories] : [];
-  // Do NOT auto-inject canonical categories if rawCategories was explicitly retrieved from Firestore/store.
-  // This prevents resurrection of user-deleted categories on boot hydration.
   return { categories, mutated: false };
 }
 
@@ -122,22 +121,23 @@ export async function hydrateHouseholdData(options = {}) {
   if (activeHydrationPromise && !force) return activeHydrationPromise;
 
   activeHydrationPromise = (async () => {
-    const authed = await waitForAuth(6000);
+    const authed = await waitForAuth(15000);
     if (!authed) {
       console.error('[Sync] Universal sync aborted: User unauthenticated after auth barrier timeout.');
-      return { success: false, unauthenticated: true, fallback: true };
+      return { success: false, unauthenticated: true };
     }
+    const uid = authed.uid;
 
     try {
       const [recipes, rawIngredients, rawProducts, preferencesData, legacyPlan, rawCategories, inventoryItems, subcollPlan] = await Promise.all([
-        getRecipes().catch(e => { console.warn('[HydrationService] getRecipes fallback:', e?.message || e); return []; }),
-        getIngredients().catch(e => { console.warn('[HydrationService] getIngredients fallback:', e?.message || e); return []; }),
-        getProducts().catch(e => { console.warn('[HydrationService] getProducts fallback:', e?.message || e); return []; }),
-        getPreferences().catch(e => { console.warn('[HydrationService] getPreferences fallback:', e?.message || e); return null; }),
-        getCurrentPlan().catch(e => { console.warn('[HydrationService] getCurrentPlan fallback:', e?.message || e); return null; }),
-        getCategories().catch(e => { console.warn('[HydrationService] getCategories fallback:', e?.message || e); return []; }),
-        getInventory().catch(e => { console.warn('[HydrationService] getInventory fallback:', e?.message || e); return []; }),
-        getActivePlanFromSubcollection().catch(e => { console.warn('[HydrationService] getActivePlan fallback:', e?.message || e); return null; })
+        getRecipes(uid).catch(e => { console.warn('[HydrationService] getRecipes fallback:', e?.message || e); return []; }),
+        getIngredients(uid).catch(e => { console.warn('[HydrationService] getIngredients fallback:', e?.message || e); return []; }),
+        getProducts(uid).catch(e => { console.warn('[HydrationService] getProducts fallback:', e?.message || e); return []; }),
+        getPreferences(uid).catch(e => { console.warn('[HydrationService] getPreferences fallback:', e?.message || e); return null; }),
+        getCurrentPlan(uid).catch(e => { console.warn('[HydrationService] getCurrentPlan fallback:', e?.message || e); return null; }),
+        getCategories(uid).catch(e => { console.warn('[HydrationService] getCategories fallback:', e?.message || e); return []; }),
+        getInventory(uid).catch(e => { console.warn('[HydrationService] getInventory fallback:', e?.message || e); return []; }),
+        getActivePlanFromSubcollection(uid).catch(e => { console.warn('[HydrationService] getActivePlan fallback:', e?.message || e); return null; })
       ]);
       const plan = subcollPlan || legacyPlan;
 
@@ -241,11 +241,11 @@ export async function hydrateHouseholdData(options = {}) {
       setupRealtimeSubscriptions();
       saveStateCache();
 
-      runDeferredMaintenance(preferencesData, mergedCategories, mutated);
+      runDeferredMaintenance(preferencesData, mergedCategories, mutated, saveCategories);
 
       return { success: true, recipesCount: recipes.length, ingredientsCount: ingredients.length, productsCount: products.length };
     } catch (err) {
-      console.error('[HydrationService] Critical hydration failure:', err);
+      console.error('[HydrationService] Critical hydration failure (detailed):', err, err.stack);
       return { success: false, error: err };
     } finally {
       activeHydrationPromise = null;
@@ -301,34 +301,5 @@ function setupRealtimeSubscriptions() {
     }));
   } catch (err) {
     console.warn('[HydrationService] Realtime subscription setup warning:', err);
-  }
-}
-
-async function runDeferredMaintenance(preferencesData, mergedCategories, mutated) {
-  try {
-    const authInstance = (typeof window !== 'undefined' && window.firebase && typeof window.firebase.auth === 'function')
-      ? window.firebase.auth()
-      : null;
-
-    if (!authInstance || !authInstance.currentUser) {
-      console.warn('[Maintenance] Deferred maintenance skipped: unauthenticated session.');
-      return;
-    }
-
-    if (mutated && Array.isArray(mergedCategories)) {
-      try {
-        await saveCategories(mergedCategories);
-      } catch (err) {
-        console.warn('[Maintenance] Deferred saveCategories error:', err);
-      }
-    }
-
-    try {
-      await sweepAndRecalibrateIngredientDefaults();
-    } catch (e) {
-      console.warn('[Maintenance] sweepAndRecalibrateIngredientDefaults failed:', e);
-    }
-  } catch (err) {
-    console.warn('[Maintenance] Deferred maintenance skipped:', err);
   }
 }

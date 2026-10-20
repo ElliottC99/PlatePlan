@@ -4,9 +4,7 @@
  * Handled via optimistic Store updates, Firestore batching, and context-aware modal routing.
  */
 
-import { getState, setPreferences, setIngredients, runOptimisticMutation } from '../store/store.js';
-import { savePreferences, dismissAdvisoryInDb, savePreferencesWithAutoPrune } from '../services/HouseholdRepository.js';
-import { saveIngredient } from '../services/IngredientRepository.js';
+import { dismissDataQualityAdvisory, performGlobalProductRelink, verifyZeroCalorieIngredient } from '../services/DataQualityService.js';
 import { runAudit } from '../services/DataQualityEngine.js';
 import { openMacroDriftPreviewModal } from '../components/data-quality/MacroDriftPreviewModal.js';
 import { openSubtypeOrphanResolverModal } from '../components/data-quality/SubtypeOrphanResolverModal.js';
@@ -14,6 +12,7 @@ import { openMealPlanSyncWarningModal } from '../components/data-quality/MealPla
 import { openMergeIngredientsModal } from '../components/data-quality/MergeIngredientsModal.js';
 import { openRecipeAuditModal } from '../components/recipe/RecipeAuditModal.js';
 import { openUnlinkedSweeperModal } from '../components/data-quality/UnlinkedSweeperUI.js';
+import { getState } from '../store/store.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -33,75 +32,19 @@ function escapeAttr(str) {
  * Dismiss an advisory key optimistically with granular server-side arrayUnion updates.
  */
 export async function dismissAdvisory(issueKey) {
-  const state = getState() || {};
-  const currentPrefs = state.preferences || state.userPrefs || {};
-  const previousPrefs = JSON.parse(JSON.stringify(currentPrefs));
-
-  const mutateFn = (currentState) => {
-    const prefs = currentState.preferences || currentState.userPrefs || {};
-    const dismissed = Array.isArray(prefs.dismissedQualityAdvisories)
-      ? [...prefs.dismissedQualityAdvisories]
-      : [];
-    if (!dismissed.includes(issueKey)) {
-      dismissed.push(issueKey);
-    }
-    currentState.preferences = {
-      ...prefs,
-      dismissedQualityAdvisories: dismissed
-    };
-    currentState.userPrefs = currentState.preferences;
-  };
-
-  const rollbackFn = (currentState) => {
-    currentState.preferences = previousPrefs;
-    currentState.userPrefs = previousPrefs;
-  };
-
-  try {
-    await runOptimisticMutation(
-      'preferences',
-      mutateFn,
-      dismissAdvisoryInDb(issueKey),
-      rollbackFn,
-      'Failed to dismiss advisory. Reverted.'
-    );
+  await dismissDataQualityAdvisory(issueKey, () => {
     renderDataQualityView();
     updateDataQualityBadge();
-  } catch (err) {
-    console.error('[DataQualityView] dismissAdvisory error:', err);
-  }
+  });
 }
 
-/**
- * Perform a global product relinking operation
- */
 export async function runGlobalProductRelink() {
   try {
     const state = getState() || {};
     const products = Array.isArray(state.products) ? [...state.products] : [];
     const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
 
-    let modifiedCount = 0;
-    const resolvedProducts = products.map(p => {
-      if (p.ingredientId) return p;
-
-      // Match by product name substring to any ingredient name
-      const pName = String(p.name || '').toLowerCase().trim();
-      const matchedIng = ingredients.find(ing => {
-        const ingName = String(ing.name || '').toLowerCase().trim();
-        return pName.includes(ingName) || ingName.includes(pName);
-      });
-
-      if (matchedIng) {
-        modifiedCount++;
-        return {
-          ...p,
-          ingredientId: matchedIng.id,
-          updatedAt: new Date().toISOString()
-        };
-      }
-      return p;
-    });
+    const { resolvedProducts, modifiedCount } = await performGlobalProductRelink(ingredients, products);
 
     if (modifiedCount === 0) {
       if (typeof window.showPlatePlanToast === 'function') {
@@ -110,7 +53,6 @@ export async function runGlobalProductRelink() {
       return;
     }
 
-    // Save and notify
     if (typeof window.Store !== 'undefined' && typeof window.Store.setState === 'function') {
       window.Store.setState({ products: resolvedProducts });
     }
@@ -124,47 +66,19 @@ export async function runGlobalProductRelink() {
   }
 }
 
-/**
- * Instant self-healing: Verify Zero Calories on an ingredient
- */
 export async function handleVerifyZeroCal(ingredientId) {
   const state = getState() || {};
   const ingredients = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
-  const ingIndex = ingredients.findIndex(i => String(i.id) === String(ingredientId));
-  if (ingIndex < 0) return;
-
-  const originalIng = ingredients[ingIndex];
-  const updatedIng = {
-    ...originalIng,
-    cal: 0,
-    calories: 0,
-    prot: 0,
-    protein: 0,
-    carb: 0,
-    carbs: 0,
-    fat: 0,
-    isVerifiedZero: true,
-    isVerifiedZeroCal: true,
-    updatedAt: new Date().toISOString()
-  };
-
-  ingredients[ingIndex] = updatedIng;
-
-  // 1. Optimistic Local Update
-  setIngredients(ingredients);
-  renderDataQualityView();
-
-  // 2. Persist
   try {
-    await saveIngredient(updatedIng);
-    if (typeof window.showPlatePlanToast === 'function') {
-      window.showPlatePlanToast(`"${updatedIng.name}" verified as zero-cal ingredient.`, 'success');
+    const updated = await verifyZeroCalorieIngredient(ingredientId, ingredients);
+    if (updated) {
+      renderDataQualityView();
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast(`"${updated.name}" verified as zero-cal ingredient.`, 'success');
+      }
     }
   } catch (e) {
     console.error('[DataQualityView] Failed to save verified zero-cal:', e);
-    // Rollback
-    ingredients[ingIndex] = originalIng;
-    setIngredients(ingredients);
     renderDataQualityView();
   }
 }

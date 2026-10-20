@@ -1,5 +1,10 @@
 // src/config/firebase.js
 
+// Cleanup local-only flags
+if (typeof window !== 'undefined') {
+  ['localOnly', 'offlineMode'].forEach(k => localStorage.removeItem(k));
+}
+
 export const HOUSEHOLD_ID = 'elliott-chloe';
 
 export const FIREBASE_CONFIG = {
@@ -55,17 +60,18 @@ if (auth) {
 // Modern Firebase v10 CDN Persistence Setup (No deprecated method calls)
 try {
   if (db && typeof db.settings === 'function') {
-    db.settings({ experimentalForceLongPolling: true });
+    db.settings({ experimentalForceLongPolling: true, merge: true });
   }
   if (db && typeof window.firebase.firestore.persistentLocalCache === 'function') {
     db.settings({
       localCache: window.firebase.firestore.persistentLocalCache({
         tabManager: window.firebase.firestore.persistentMultipleTabManager()
       }),
-      experimentalForceLongPolling: true
+      experimentalForceLongPolling: true,
+      merge: true
     });
   }
 } catch (err) {
   // Gracefully handle if settings were already configured during hot-reloads
-  console.debug('[Firebase] Cache settings already initialized or deferred:', err.message);
+  console.error('[Firebase] Cache settings initialization failed:', err);
 }

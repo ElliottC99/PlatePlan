@@ -18,3 +18,17 @@ export function toTitleCase(str) {
     return word.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join('-');
   });
 }
+
+export function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
+
+export function escapeAttr(str) {
+  return escapeHtml(str).replace(/`/g, '&#96;');
+}

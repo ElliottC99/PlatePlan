@@ -44,7 +44,7 @@ function remapRecipeIngredients(recipes = [], predicateRemap) {
   return { allRecipes: clonedRecipes, modifiedRecipes: modified };
 }
 
-export async function getIngredients() {
+export async function getIngredients(uid) {
   try {
     if (!isDbAvailable()) return [];
     const snap = await safeFirestoreGet(db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients'));
@@ -54,7 +54,7 @@ export async function getIngredients() {
   } catch (err) { return []; }
 }
 
-export async function saveIngredient(ingredient) {
+export async function saveIngredient(ingredient, uid) {
   try {
     if (!isDbAvailable() || !ingredient || typeof ingredient !== 'object') return { success: false, error: 'Invalid' };
     const enforced = enforceCategorySSOT({ ingredients: [ingredient], products: (typeof window !== 'undefined' && window.state?.products) || [] });
@@ -65,15 +65,15 @@ export async function saveIngredient(ingredient) {
     delete ingData.id;
     await colRef.doc(ingId).set(ingData, { merge: true });
     return { success: true, id: ingId };
-  } catch (err) { return { success: false, error: err }; }
+  } catch (err) { console.error('[IngredientRepository] Save Error:', err); return { success: false, error: err }; }
 }
 
-export async function deleteIngredient(ingredientId) {
+export async function deleteIngredient(ingredientId, uid) {
   try {
     if (!isDbAvailable() || !ingredientId) return { success: false, error: 'Unavailable or missing ID' };
     await db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients').doc(ingredientId).delete();
     return { success: true };
-  } catch (err) { return { success: false, error: err }; }
+  } catch (err) { console.error('[IngredientRepository] Delete Error:', err); return { success: false, error: err }; }
 }
 
 export async function deleteSubtypeInDb(parentIngredient, unlinkedProducts) {

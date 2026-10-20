@@ -9,6 +9,8 @@ import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
 import { autoRecalibrateRecipeDrift } from '../services/DataQualityEngine.js';
 import { savePantryItem, deletePantryItem, toggleUseUpStatusInDb } from '../repositories/InventoryRepository.js';
 import { savePlan } from '../repositories/PlanRepository.js';
+import { setIngredients as setPantryIngredients, setProducts as setPantryProducts, setCategories as setPantryCategories } from './pantryStore.js';
+import { setRecipes as setRecipeSliceRecipes, updateRecipeInStore as updateRecipeInRecipeStore, removeRecipeFromStore as removeRecipeFromRecipeStore, setCurrentPlan as setRecipeSliceCurrentPlan, getRecipeState } from './recipeStore.js';
 
 export { getShoppingLineStateKey };
 
@@ -226,45 +228,20 @@ function dispatchStateEvent(eventName, detail) {
 export function setRecipes(newRecipes) {
   const ingredients = state.ingredients || [];
   const products = state.products || [];
-  const processed = (Array.isArray(newRecipes) ? newRecipes : []).map(r => {
-    const res = autoRecalibrateRecipeDrift(r, ingredients, products);
-    return res.recipe;
-  });
-  state.recipes = processed;
-  saveStateCache();
-  dispatchStateEvent('plateplan:state:recipes', state.recipes);
+  setRecipeSliceRecipes(newRecipes, ingredients, products);
+  state.recipes = getRecipeState().recipes;
 }
 
-/**
- * Upsert a single recipe in the state domain.
- * @param {Object} recipe 
- */
 export function updateRecipeInStore(recipe) {
-  if (!recipe || !recipe.id) return;
   const ingredients = state.ingredients || [];
   const products = state.products || [];
-  const res = autoRecalibrateRecipeDrift(recipe, ingredients, products);
-  const processed = res.recipe;
-
-  const index = state.recipes.findIndex(r => r.id === processed.id);
-  if (index !== -1) {
-    state.recipes[index] = { ...state.recipes[index], ...processed };
-  } else {
-    state.recipes.push(processed);
-  }
-  saveStateCache();
-  dispatchStateEvent('plateplan:state:recipes', state.recipes);
+  updateRecipeInRecipeStore(recipe, ingredients, products);
+  state.recipes = getRecipeState().recipes;
 }
 
-/**
- * Remove a recipe from the state domain by ID.
- * @param {string} recipeId 
- */
 export function removeRecipeFromStore(recipeId) {
-  if (!recipeId) return;
-  state.recipes = state.recipes.filter(r => r.id !== recipeId);
-  saveStateCache();
-  dispatchStateEvent('plateplan:state:recipes', state.recipes);
+  removeRecipeFromRecipeStore(recipeId);
+  state.recipes = getRecipeState().recipes;
 }
 
 /**
@@ -272,9 +249,15 @@ export function removeRecipeFromStore(recipeId) {
  * @param {Array<Object>} newIngredients 
  */
 export function setIngredients(newIngredients) {
-  state.ingredients = Array.isArray(newIngredients) ? newIngredients : [];
-  saveStateCache();
-  dispatchStateEvent('plateplan:state:ingredients', state.ingredients);
+  setPantryIngredients(newIngredients);
+}
+
+export function setProducts(newProducts) {
+  setPantryProducts(newProducts);
+}
+
+export function setCategories(newCategories) {
+  setPantryCategories(newCategories);
 }
 
 /**
@@ -351,9 +334,8 @@ export function setPreferences(newPreferences) {
  * @param {Object|null} newPlan 
  */
 export function setCurrentPlan(newPlan) {
-  state.currentPlan = newPlan || null;
-  saveStateCache();
-  dispatchStateEvent('plateplan:state:plan', state.currentPlan);
+  setRecipeSliceCurrentPlan(newPlan);
+  state.currentPlan = getRecipeState().currentPlan;
 }
 
 /**
@@ -384,25 +366,7 @@ export async function setShoppingList(listOrArray) {
   }
 }
 
-/**
- * Update products state domain and dispatch reactive update event.
- * @param {Array<Object>} newProducts 
- */
-export function setProducts(newProducts) {
-  state.products = Array.isArray(newProducts) ? newProducts : [];
-  saveStateCache();
-  dispatchStateEvent('plateplan:state:products', state.products);
-}
 
-/**
- * Update categories state domain and dispatch reactive update event.
- * @param {Array<string>} newCategories
- */
-export function setCategories(newCategories) {
-  state.categories = Array.isArray(newCategories) ? newCategories : [];
-  saveStateCache();
-  dispatchStateEvent('plateplan:state:categories', state.categories);
-}
 
 /**
   * Update inventory state domain and dispatch reactive update event.

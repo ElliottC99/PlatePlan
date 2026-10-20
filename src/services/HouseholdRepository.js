@@ -9,6 +9,7 @@ import { db, HOUSEHOLD_ID, FIREBASE_CONFIG } from '../config/firebase.js';
 import { stripPlanPayload } from '../models/MealPlannerModel.js';
 import { enforceCategorySSOT } from '../utils/categoryEnforcer.js';
 import { getState as getStoreState, setIngredients, setRecipes, setCategories, setProducts } from '../store/store.js';
+import { getPlanHistory, savePlanHistory } from './PreferenceRepository.js';
 
 export { stripPlanPayload };
 
@@ -255,7 +256,7 @@ function isDbAvailable() {
   return true;
 }
 
-async function safeFirestoreGet(ref, timeoutMs = 2500) {
+export async function safeFirestoreGet(ref, timeoutMs = 2500) {
   if (!ref || typeof ref.get !== 'function') return null;
   try {
     const netPromise = ref.get();
@@ -272,43 +273,7 @@ async function safeFirestoreGet(ref, timeoutMs = 2500) {
   }
 }
 
-export async function getRecipes() {
-  try {
-    if (!isDbAvailable()) return [];
-    const snap = await safeFirestoreGet(db.collection('households').doc(HOUSEHOLD_ID).collection('recipes'));
-    const raw = (snap && snap.docs) ? snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) : [];
-    return raw.map(r => cleanLegacyMacros(r));
-  } catch (err) {
-    console.warn('[HouseholdRepository v3.20.09] Offline or unable to fetch recipes:', err.message || err);
-    return [];
-  }
-}
-
-export async function saveRecipe(recipe) {
-  try {
-    if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
-    if (!recipe || typeof recipe !== 'object') return { success: false, error: 'Invalid recipe data' };
-    const cleanedRecipe = cleanLegacyMacros(recipe);
-    const recipeData = { ...cleanedRecipe, updatedAt: new Date().toISOString() };
-    const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes');
-    const recipeId = recipe.id || colRef.doc().id;
-    delete recipeData.id;
-    await colRef.doc(recipeId).set(recipeData, { merge: true });
-    return { success: true, id: recipeId };
-  } catch (err) {
-    return { success: false, error: err };
-  }
-}
-
-export async function deleteRecipe(recipeId) {
-  try {
-    if (!isDbAvailable() || !recipeId) return { success: false, error: 'Unavailable or missing ID' };
-    await db.collection('households').doc(HOUSEHOLD_ID).collection('recipes').doc(recipeId).delete();
-    return { success: true };
-  } catch (err) {
-    return { success: false, error: err };
-  }
-}
+export { getRecipes, saveRecipe, deleteRecipe } from './RecipeRepository.js';
 
 export async function getIngredients() {
   try {
@@ -388,32 +353,7 @@ export async function getPreferences() {
   return getHouseholdData();
 }
 
-export async function getPlanHistory() {
-  if (!isDbAvailable()) return [];
-  try {
-    const snap = await safeFirestoreGet(db.collection('households').doc(HOUSEHOLD_ID).collection('plan_history'));
-    if (snap && snap.docs) {
-      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    }
-    return [];
-  } catch (err) {
-    console.error('[HouseholdRepository] Error fetching plan history on-demand:', err);
-    return [];
-  }
-}
-
-export async function savePlanHistory(planId, plan) {
-  if (!isDbAvailable()) return false;
-  if (!planId || !plan) return false;
-  try {
-    const docRef = db.collection('households').doc(HOUSEHOLD_ID).collection('plan_history').doc(planId);
-    await docRef.set({ ...plan, id: planId, updatedAt: new Date().toISOString() }, { merge: true });
-    return true;
-  } catch (err) {
-    console.error('[HouseholdRepository] Error saving plan history:', err);
-    return false;
-  }
-}
+export { getPlanHistory, savePlanHistory } from './PreferenceRepository.js';
 
 export function prunePreferences(obj) {
   if (!obj || typeof obj !== 'object') return obj;
