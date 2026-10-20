@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerOperations.js (v3.35.36)
+ * src/components/pantry/CategoryManagerOperations.js (v3.35.37)
  * Async Category Operations Pipeline (CRUD, Merge, Deduplication, Reassignment).
  * Isolated from direct view rendering to maintain single-responsibility separation.
  */
@@ -65,20 +65,20 @@ export async function submitRenameCat(oldCat, rawName) {
   const ings = Array.isArray(state.ingredients) ? state.ingredients : [], prods = Array.isArray(state.products) ? state.products : [];
   ings.forEach(i => {
     let changed = false;
-    if (i.category === targetOld || i.cat === targetOld) { i.category = newName; i.cat = newCatKebab; changed = true; }
+    if (slugCategory(i.category) === slugCategory(targetOld) || i.cat === targetOld) { i.category = newName; i.cat = newCatKebab; changed = true; }
     if (Array.isArray(i.subtypes)) {
       i.subtypes.forEach(st => {
-        if (st.category === targetOld || st.cat === targetOld) { st.category = newName; st.cat = newCatKebab; changed = true; }
+        if (slugCategory(st.category) === slugCategory(targetOld) || st.cat === targetOld) { st.category = newName; st.cat = newCatKebab; changed = true; }
       });
     }
     if (changed) i.updatedAt = new Date().toISOString();
   });
 
   prods.forEach(p => {
-    if (p.category === targetOld || p.cat === targetOld) { p.category = newName; p.cat = newCatKebab; p.updatedAt = new Date().toISOString(); }
+    if (slugCategory(p.category) === slugCategory(targetOld) || p.cat === targetOld) { p.category = newName; p.cat = newCatKebab; p.updatedAt = new Date().toISOString(); }
   });
 
-  const categories = (state.categories || []).map(c => c === targetOld ? newName : c);
+  const categories = (state.categories || []).map(c => slugCategory(c) === slugCategory(targetOld) ? newName : c);
   setCategories(categories); setIngredients(ings); setProducts(prods);
   await saveHouseholdState({ categories, ingredients: ings, products: prods });
   invalidateHierarchyCache();
@@ -94,18 +94,30 @@ export async function submitReassignAndDelete(deletedCat, reassignMode, massTarg
   if (!deletedCat) return;
   const state = getState() || {}, ings = Array.isArray(state.ingredients) ? state.ingredients : [], prods = Array.isArray(state.products) ? state.products : [];
   const massInput = document.getElementById('cat-mass-search-input'), massTarget = (massInput ? massInput.value.trim() : '') || massTargetCat || 'Uncategorised';
+  
   ings.forEach(i => {
-    if (i.category === deletedCat || i.cat === deletedCat) {
+    if (slugCategory(i.category) === slugCategory(deletedCat) || i.cat === deletedCat) {
       const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
       i.category = dest; i.cat = slugifyToKebab(dest); i.updatedAt = new Date().toISOString();
     }
-  });
-  prods.forEach(p => {
-    if (p.category === deletedCat || p.cat === deletedCat) {
-      p.category = reassignMode === 'mass' ? massTarget : 'Uncategorised'; p.cat = slugifyToKebab(massTarget); p.updatedAt = new Date().toISOString();
+    if (Array.isArray(i.subtypes)) {
+      i.subtypes.forEach(st => {
+        if (slugCategory(st.category) === slugCategory(deletedCat) || st.cat === deletedCat) {
+          const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[st.id] || massTarget);
+          st.category = dest; st.cat = slugifyToKebab(dest);
+        }
+      });
     }
   });
-  const categories = (state.categories || []).filter(c => c !== deletedCat);
+
+  prods.forEach(p => {
+    if (slugCategory(p.category) === slugCategory(deletedCat) || p.cat === deletedCat) {
+      const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[p.id] || massTarget);
+      p.category = dest; p.cat = slugifyToKebab(dest); p.updatedAt = new Date().toISOString();
+    }
+  });
+
+  const categories = (state.categories || []).filter(c => slugCategory(c) !== slugCategory(deletedCat));
   setCategories(categories); setIngredients(ings); setProducts(prods);
   await saveHouseholdState({ categories, ingredients: ings, products: prods });
   if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
@@ -123,10 +135,10 @@ export async function handleDeleteCategory(identifier) {
   const ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
   ings.forEach(i => {
     let changed = false;
-    if (i.category === targetName || i.cat === slugifyToKebab(targetName)) { i.category = fallbackCatName; i.cat = fallbackKebab; changed = true; }
+    if (slugCategory(i.category) === slugCategory(targetName) || i.cat === slugifyToKebab(targetName)) { i.category = fallbackCatName; i.cat = fallbackKebab; changed = true; }
     if (Array.isArray(i.subtypes)) {
       i.subtypes.forEach(st => {
-        if (st.category === targetName || st.cat === slugifyToKebab(targetName)) { st.category = fallbackCatName; st.cat = fallbackKebab; changed = true; }
+        if (slugCategory(st.category) === slugCategory(targetName) || st.cat === slugifyToKebab(targetName)) { st.category = fallbackCatName; st.cat = fallbackKebab; changed = true; }
       });
     }
     if (changed) i.updatedAt = new Date().toISOString();
@@ -134,7 +146,7 @@ export async function handleDeleteCategory(identifier) {
 
   const prods = Array.isArray(state.products) ? [...state.products] : [];
   prods.forEach(p => {
-    if (p.category === targetName || p.cat === slugifyToKebab(targetName)) { p.category = fallbackCatName; p.cat = fallbackKebab; p.updatedAt = new Date().toISOString(); }
+    if (slugCategory(p.category) === slugCategory(targetName) || p.cat === slugifyToKebab(targetName)) { p.category = fallbackCatName; p.cat = fallbackKebab; p.updatedAt = new Date().toISOString(); }
   });
 
   const categories = (state.categories || []).filter(c => {

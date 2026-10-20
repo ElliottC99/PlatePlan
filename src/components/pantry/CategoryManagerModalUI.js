@@ -1,7 +1,7 @@
 /**
- * src/components/pantry/CategoryManagerModalUI.js (v3.35.36)
+ * src/components/pantry/CategoryManagerModalUI.js (v3.35.37)
  * In-App Multi-Step Category Operations Wizard, Raw Exposure & Deep State Merge Modal.
- * Completely purged of inline DOM event handlers in favour of robust async HTML5 data-action event delegation.
+ * Unified allBound item handling across root ingredients, subtypes, and products.
  */
 
 import { getState } from '../../store/store.js';
@@ -96,17 +96,16 @@ export function promptDeleteCategory(categoryId) {
   const category = resolveCategory(categoryId); if (!category?.name) return;
   const state = getState() || {}, ings = Array.isArray(state.ingredients) ? state.ingredients : [], prods = Array.isArray(state.products) ? state.products : [];
 
-  const boundIngs = ings.filter(i => (
-    i.category === category.name || i.cat === category.name || slugCategory(i.category) === slugCategory(category.name) ||
-    (Array.isArray(i.subtypes) && i.subtypes.some(st => st.category === category.name || st.cat === category.name || slugCategory(st.category) === slugCategory(category.name)))
-  ));
-  const boundProds = prods.filter(p => p.category === category.name || p.cat === category.name || slugCategory(p.category) === slugCategory(category.name));
+  const boundIngs = ings.filter(i => slugCategory(i.category) === slugCategory(category.name));
+  const boundSubtypes = ings.flatMap(i => i.subtypes || []).filter(s => slugCategory(s.category) === slugCategory(category.name));
+  const boundProds = prods.filter(p => slugCategory(p.category) === slugCategory(category.name));
+  const allBound = [...boundIngs, ...boundSubtypes, ...boundProds];
 
-  if (boundIngs.length + boundProds.length > 0) {
+  if (allBound.length > 0) {
     activeCat = category.name; wizardStep = 'reassign'; reassignMode = 'mass'; reassignSearch = '';
     const otherCats = getRawCategories(state).filter(c => c !== category.name);
     massTargetCat = otherCats[0] || 'Uncategorised'; individualCatMap = {};
-    boundIngs.forEach(i => { individualCatMap[i.id] = massTargetCat; });
+    allBound.forEach(item => { if (item?.id) individualCatMap[item.id] = massTargetCat; });
     renderCategoryManagerModal();
     return;
   }
@@ -166,10 +165,14 @@ export function renderCategoryManagerModal() {
       bodyHtml = renderMergeStepHtml(activeCat);
     } else if (wizardStep === 'reassign') {
       const rawCategories = getRawCategories(state);
-      const boundIngs = ingredients.filter(i => (i.category === activeCat || i.cat === activeCat || slugCategory(i.category) === slugCategory(activeCat)));
+      const boundIngs = ingredients.filter(i => slugCategory(i.category) === slugCategory(activeCat));
+      const boundSubtypes = ingredients.flatMap(i => i.subtypes || []).filter(s => slugCategory(s.category) === slugCategory(activeCat));
+      const boundProds = (state.products || []).filter(p => slugCategory(p.category) === slugCategory(activeCat));
+      const allBound = [...boundIngs, ...boundSubtypes, ...boundProds];
+
       const otherCats = rawCategories.filter(c => c !== activeCat);
       if (!otherCats.includes('Uncategorised')) otherCats.push('Uncategorised');
-      bodyHtml = renderReassignStepHtml(activeCat, reassignMode, boundIngs, otherCats, reassignSearch, massTargetCat, individualCatMap);
+      bodyHtml = renderReassignStepHtml(activeCat, reassignMode, allBound, otherCats, reassignSearch, massTargetCat, individualCatMap);
     }
 
     modal.innerHTML = `<div class="card" style="width:100%;max-width:420px;background:var(--surface,#fff);padding:20px;border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,0.15)">${bodyHtml}</div>`;
