@@ -1,5 +1,5 @@
 /**
- * src/services/CategoryRepository.js (v3.35.41)
+ * src/services/CategoryRepository.js (v3.35.42)
  * Dedicated Micro-Repository for Category Mutations (Merge, Rename, Reassign & Delete).
  * Implements the Strangler Fig Pattern: isolated chunked-batch cascade operations with strict SSOT state syncing.
  */

@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerTemplates.js (v3.35.40)
+ * src/components/pantry/CategoryManagerTemplates.js (v3.35.42)
  * Pure Template Builder Functions for Category Manager Modal UI.
  */
 
