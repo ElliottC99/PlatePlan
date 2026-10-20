@@ -1,8 +1,7 @@
 /**
- * src/views/PantryBankView.js (v3.30.0)
- * Modular ES6 View for Pantry Active Stock & Master Catalog (Category ➔ Item ➔ Sub-type Hierarchy Bank).
- * Features dual-tab switching (Active Stock vs Pantry Bank), 1-click "+ Stock" action,
- * Aliasing, Merging, Sub-type creation, Promoting/demoting, and Auto-default product previews.
+ * src/views/PantryBankView.js (v3.38.74)
+ * Modular ES6 View for Pantry Active Stock & Master Catalog.
+ * Strictly modular (<350 lines).
  */
 
 import { getState, setIngredients, subscribe, setProducts } from '../store/store.js';
@@ -13,7 +12,6 @@ import {
 } from '../models/PantryHierarchyModel.js';
 import { renderProductBank, openProductEditModal } from './ProductBankView.js';
 import { renderCategoryManagerModal } from '../components/pantry/CategoryManagerModalUI.js';
-import { updateIngredientFamilyModalUI } from '../components/pantry/IngredientFamilyModalUI.js';
 import { buildIngredientBankHTML } from '../components/pantry/PantryBankHTMLTemplate.js';
 import { openNewIngredientMappingWizardModal } from '../components/recipe/RecipeWizardTaxonomyModal.js';
 import {
@@ -21,9 +19,11 @@ import {
   adjustPantryStock, removePantryStock, togglePantryUseUp, handlePantrySearchFilter,
   handlePantryZoneChange, togglePantryUseUpFilter, openAddPantryStockModal as openStockModalUI
 } from '../components/pantry/PantryInventoryUI.js';
+import {
+  openIngredientFamilyDetailsModal, closeIngredientFamilyDetailsModal, saveIngredientFamilyDetailsModal
+} from './PantryBankModalService.js';
 import '../components/pantry/SubtypeActionModalsUI.js';
 
-let activeEditingIngredientId = null;
 export let selectedCategoryFilter = null;
 export let activeCategoryFilter = null;
 export let isCategoryManagerOpen = false;
@@ -71,147 +71,6 @@ export function updateActiveCategoryFilter(oldName, newName) {
   }
   invalidateHierarchyCache();
   renderIngredientBank();
-}
-
-export function closeIngredientFamilyDetailsModal() {
-  const modalWrap = document.getElementById('ingredient-family-details-wrap');
-  if (modalWrap) {
-    modalWrap.classList.remove('open');
-    modalWrap.dataset.parentId = '';
-    modalWrap.dataset.editingIngredientId = '';
-  }
-  const catEl = document.getElementById('ingredient-family-details-cat');
-  if (catEl) catEl.disabled = false;
-  const parentWrap = document.getElementById('parent-ingredient-display-wrap');
-  if (parentWrap) parentWrap.style.display = 'none';
-  const actionsWrap = document.getElementById('subtype-product-actions-wrap');
-  if (actionsWrap) actionsWrap.style.display = 'none';
-  const nameEl = document.getElementById('ingredient-family-details-name');
-  if (nameEl) nameEl.oninput = null;
-  const tescoEl = document.getElementById('tesco-search-helper-link');
-  if (tescoEl) tescoEl.innerHTML = '';
-  document.body.style.overflow = '';
-  activeEditingIngredientId = null;
-
-  if (window.__modalContext && window.__modalContext.returnTo === 'data-quality') {
-    window.__modalContext = null;
-    if (typeof window.showView === 'function') window.showView('data');
-  }
-}
-
-export function openIngredientFamilyDetailsModal(ingredientId = null, parentId = null) {
-  const modalWrap = document.getElementById('ingredient-family-details-wrap');
-  if (!modalWrap) return;
-
-  document.body.style.overflow = 'hidden';
-  activeEditingIngredientId = ingredientId;
-  modalWrap.dataset.parentId = parentId || '';
-  modalWrap.dataset.editingIngredientId = ingredientId || '';
-
-  const state = getState() || {}, ingredients = state.ingredients || [], products = state.products || [];
-  const ing = ingredientId ? ingredients.find(i => String(i.id) === String(ingredientId)) : null;
-  const parent = parentId ? ingredients.find(i => String(i.id) === String(parentId)) : null;
-
-  const titleEl = document.getElementById('ingredient-family-details-title');
-  const nameEl = document.getElementById('ingredient-family-details-name');
-  const catEl = document.getElementById('ingredient-family-details-cat');
-  const notesEl = document.getElementById('ingredient-family-details-notes');
-  const msgEl = document.getElementById('ingredient-family-details-msg');
-
-  if (titleEl) {
-    titleEl.textContent = ing ? `Edit ${ing.name}` : (parent ? `Add Sub-type to ${parent.name}` : 'New Catalog Item');
-  }
-  if (nameEl) nameEl.value = ing?.name || '';
-  if (notesEl) notesEl.value = ing?.notes || '';
-
-  if (catEl) {
-    const categories = getActiveCategories(state);
-    const selectedCat = (ing?.category || parent?.category || '').toLowerCase();
-    catEl.innerHTML = categories.map(c => `<option value="${escapeAttr(c.toLowerCase())}" ${selectedCat === c.toLowerCase() ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
-    catEl.disabled = Boolean(parent && !ing);
-    const targetCat = ing?.category || parent?.category || '';
-    if (targetCat) catEl.value = targetCat;
-    if (parent && !ing) {
-      catEl.value = parent.category ? parent.category.toLowerCase() : '';
-      catEl.disabled = true;
-    }
-  }
-
-  if (msgEl && ing) {
-    const linked = products.filter(p => String(p.ingredientId) === String(ing.id) || String(p.groupId) === String(ing.id));
-    msgEl.innerHTML = `<div style="margin-top:14px;padding:10px;background:var(--surface2,#f5f5f4);border-radius:8px;border:1px solid var(--border,#e7e5e4)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <span style="font-size:12px;font-weight:750">Linked Products (${linked.length})</span>
-        <button type="button" class="btn sm ghost" onclick="openProductEditModal(null)" style="font-size:11px">+ Add Product</button>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto">
-        ${linked.map(p => `<div style="padding:6px 8px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:6px;display:flex;align-items:center;justify-content:space-between">
-          <div><span style="font-size:12px;font-weight:600">${escapeHtml(p.name)}</span><div style="font-size:11px;color:var(--text2,#78716c)">${escapeHtml(p.brand || '')} · £${Number(p.price || 0).toFixed(2)}</div></div>
-          <div style="display:flex;gap:4px">
-            ${p.isAutoDefault ? '<span class="tag" style="font-size:10px;background:rgba(16,185,129,0.15);color:var(--green);font-weight:700">Default</span>' : `<button type="button" class="btn xs ghost" onclick="handleSetDefaultProduct('${escapeAttr(p.id)}', '${escapeAttr(ing.id)}')">Default</button>`}
-            <button type="button" class="btn xs ghost" onclick="openProductEditModal('${escapeAttr(p.id)}')">Edit</button>
-          </div>
-        </div>`).join('') || '<div style="font-size:12px;color:var(--text2)">No linked products.</div>'}
-      </div>
-    </div>`;
-  } else if (msgEl) {
-    msgEl.innerHTML = '';
-  }
-
-  updateIngredientFamilyModalUI(ing, parent);
-  modalWrap.classList.add('open');
-}
-
-export async function saveIngredientFamilyDetailsModal() {
-  const name = (document.getElementById('ingredient-family-details-name')?.value || '').trim();
-  if (!name) return;
-  const rawCat = (document.getElementById('ingredient-family-details-cat')?.value || 'other').trim();
-  const state = getState() || {};
-  const existingCats = state.categories || [];
-  const matchedCat = existingCats.find(c => {
-    const cName = typeof c === 'string' ? c : c?.name;
-    return (cName || '').trim().toLowerCase() === rawCat.toLowerCase();
-  });
-  const category = matchedCat ? (typeof matchedCat === 'string' ? matchedCat : matchedCat.name) : rawCat;
-
-  const notes = (document.getElementById('ingredient-family-details-notes')?.value || '').trim();
-  const modalWrap = document.getElementById('ingredient-family-details-wrap');
-  const parentId = modalWrap?.dataset?.parentId;
-
-  if (parentId) {
-    const currentIngs = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
-    const parent = currentIngs.find(p => String(p.id) === String(parentId));
-    if (!parent) return;
-
-    const hasProduct = activeEditingIngredientId && (state.products || []).some(p => String(p.subtypeId) === String(activeEditingIngredientId));
-    if (!activeEditingIngredientId || !hasProduct) {
-      const msgEl = document.getElementById('ingredient-family-details-msg');
-      if (msgEl) {
-        msgEl.innerHTML = `<div style="padding: 10px; background: #fee2e2; color: #ef4444; border-radius: 8px; font-weight: 600; margin-bottom: 12px;">⚠️ A sub-type must have at least one product attached or linked before saving.</div>`;
-      }
-      return;
-    }
-
-    if (!Array.isArray(parent.subtypes)) parent.subtypes = [];
-    const sub = parent.subtypes.find(s => String(s.id) === String(activeEditingIngredientId));
-    if (sub) {
-      sub.name = name; sub.notes = notes; parent.updatedAt = new Date().toISOString();
-      setIngredients(currentIngs); closeIngredientFamilyDetailsModal(); renderIngredientBank();
-      try { await saveIngredient(parent); } catch (e) {}
-    }
-    return;
-  }
-
-  const currentIngs = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
-  const updatedIng = {
-    ...(activeEditingIngredientId ? currentIngs.find(i => String(i.id) === String(activeEditingIngredientId)) : {}),
-    id: activeEditingIngredientId || `ing_${Date.now()}`, name, category, notes, updatedAt: new Date().toISOString()
-  };
-  const existingIdx = currentIngs.findIndex(i => String(i.id) === String(updatedIng.id));
-  if (existingIdx >= 0) currentIngs[existingIdx] = updatedIng; else currentIngs.push(updatedIng);
-
-  setIngredients(currentIngs); closeIngredientFamilyDetailsModal(); renderIngredientBank();
-  try { await saveIngredient(updatedIng); } catch (e) { console.warn('[PantryBankView] Sync error:', e); }
 }
 
 export async function handleSetDefaultProduct(prodId, ingId, subtypeId = null) {
@@ -329,7 +188,8 @@ if (typeof window !== 'undefined') {
     openAddSubtypeModal, linkProductToSubtype, switchPantryTab, renderActiveStockTab, addCatalogItemToActiveStock,
     adjustPantryStock, removePantryStock, togglePantryUseUp, handlePantrySearchFilter, handlePantryZoneChange,
     togglePantryUseUpFilter, openAddPantryStockModal,
-    saveIngredientFamilyDetailsModal, handleSetDefaultProduct,
+    saveIngredientFamilyDetailsModal: () => saveIngredientFamilyDetailsModal(renderIngredientBank),
+    handleSetDefaultProduct,
     promptAddSubtype, openCategoryManager, openCategoryManagerModal: openCategoryManager,
     updateActiveCategoryFilter, setActiveCategoryFilter, resetCategoryFilter, getFilteredIngredients,
     createIngredientFamilyPrompt: () => openNewIngredientMappingWizardModal({ initialName: '', onComplete: () => renderIngredientBank() }),

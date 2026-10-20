@@ -1,47 +1,19 @@
 /**
- * src/services/ActionBridge.js (v3.20.16)
+ * src/services/ActionBridge.js (v3.38.69)
  * Centralized Action Bridge & Event Dispatcher for Atomic Modular Architecture.
  * Idempotently handles delegated events, data-action/data-pp-click, mobile drawer routing, and sub-type deletion.
- * Strictly ZERO eval() or new Function().
+ * Strictly modular (<350 lines).
  */
 
 import { renderSettingsView } from '../views/SettingsView.js';
 import { renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired } from '../views/ShoppingView.js';
 import { renderPlanner } from '../views/PlannerView.js';
-import { renderRecipeVault, toggleRecipeFavourite, toggleVaultFavouritesFilter } from '../views/RecipeVaultView.js';
+import { renderRecipeVault } from '../views/RecipeVaultView.js';
+import { routeRecipeAction } from './RecipeActionBridge.js';
+import { patchSwapLabels, initLabelObserver } from '../utils/LabelPatcher.js';
 
 let isBridgeInitialized = false;
 
-/**
- * Patch legacy labels like "Swap Brand" to "Swap Product" across DOM nodes.
- */
-export function patchSwapLabels() {
-  if (typeof document === 'undefined') return;
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
-  let node;
-  while ((node = walker.nextNode())) {
-    if (node.nodeValue && node.nodeValue.includes('Swap Brand')) {
-      node.nodeValue = node.nodeValue.replace(/Swap Brand/g, 'Swap Product');
-    }
-  }
-  document.querySelectorAll('button, a, span, label, div').forEach(el => {
-    if (el.title && el.title.includes('Swap Brand')) {
-      el.title = el.title.replace(/Swap Brand/g, 'Swap Product');
-    }
-    if (el.placeholder && el.placeholder.includes('Swap Brand')) {
-      el.placeholder = el.placeholder.replace(/Swap Brand/g, 'Swap Product');
-    }
-  });
-}
-
-function initLabelObserver() {
-  if (typeof window === 'undefined' || window.__pp_label_observer_active) return;
-  window.__pp_label_observer_active = true;
-
-  const observer = new MutationObserver(() => patchSwapLabels());
-  observer.observe(document.body, { childList: true, subtree: true });
-  patchSwapLabels();
-}
 
 /**
  * Clean argument token parser without eval.
@@ -97,79 +69,8 @@ export function routeAction(actionName, target, event) {
   const ds = target.dataset || {};
   const normalizedAction = actionName.toLowerCase().trim();
 
-  // 1. Recipe Modal / View
-  if (normalizedAction === 'fix-issue' || normalizedAction === 'fix-recipe') {
-    const issueKey = ds.issueKey || target.getAttribute('data-issue-key') || '';
-    if (issueKey && (issueKey.startsWith('advisory:') || issueKey.includes('recipe-macro-sync') || issueKey.includes('recipe-low-cal') || issueKey.includes('macro-sync'))) {
-      if (event) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-      const recipeId = issueKey.split(':').pop() || ds.entityId || ds.recipeId || ds.id;
-      if (typeof window.autoRecalibrateRecipeMacros === 'function') {
-        window.autoRecalibrateRecipeMacros(recipeId);
-      }
-      return true; // CRITICAL: Prevent fall-through to ResolveUnlinkedModal
-    }
-  }
-
-  if (normalizedAction === 'view-recipe' || normalizedAction === 'viewrecipe' || normalizedAction.includes('viewrecipe') || normalizedAction.includes('openrecipemodal')) {
-    const recipeId = ds.recipeId || ds.id || parseArgsString(actionName)[0];
-    const instanceId = ds.instanceId || parseArgsString(actionName)[1] || null;
-    const variant = ds.variant || parseArgsString(actionName)[2] || 'original';
-    const targetPerson = ds.targetPerson || parseArgsString(actionName)[3] || 'both';
-
-    if (recipeId) {
-      if (typeof window.viewRecipe === 'function') {
-        window.viewRecipe(recipeId, instanceId, variant, targetPerson);
-      } else if (typeof window.openRecipeModal === 'function') {
-        window.openRecipeModal(recipeId, instanceId, variant, targetPerson);
-      }
-    }
-    return true;
-  }
-
-  // Fit score details modal
-  if (normalizedAction === 'open-fit-details' || normalizedAction.includes('openvaultfitdetails')) {
-    const recipeId = ds.recipeId || ds.id || parseArgsString(actionName)[1];
-    const variant = ds.variant || parseArgsString(actionName)[2] || 'original';
-    const person = ds.person || parseArgsString(actionName)[3] || 'e';
-    if (typeof window.openVaultFitDetails === 'function') {
-      window.openVaultFitDetails(target, recipeId, variant, person);
-    }
-    return true;
-  }
-
-  // Recipe Actions Menu
-  if (normalizedAction === 'open-recipe-actions' || normalizedAction.includes('openrecipeactions')) {
-    const recipeId = ds.recipeId || ds.id || parseArgsString(actionName)[0];
-    if (typeof window.openRecipeActions === 'function') {
-      window.openRecipeActions(recipeId);
-    }
-    return true;
-  }
-
-  if (normalizedAction === 'open-enhanced-recipe-actions' || normalizedAction.includes('openenhancedrecipeactions')) {
-    const recipeId = ds.recipeId || ds.id || parseArgsString(actionName)[0];
-    if (typeof window.openEnhancedRecipeActions === 'function') {
-      window.openEnhancedRecipeActions(recipeId);
-    }
-    return true;
-  }
-
-  // 2. Recipe Favourite Toggle
-  if (normalizedAction === 'toggle-favorite' || normalizedAction === 'toggle-fav' || normalizedAction === 'togglefavourite' || normalizedAction.includes('togglerecipefavourite')) {
-    const recipeId = ds.recipeId || ds.id || parseArgsString(actionName)[0];
-    const variant = ds.variant || parseArgsString(actionName)[2] || 'original';
-    if (recipeId) {
-      toggleRecipeFavourite(recipeId, event, variant);
-    }
-    return true;
-  }
-
-  // 3. Vault Favourites Filter
-  if (normalizedAction === 'toggle-vault-fav-filter' || normalizedAction.includes('togglevaultfavouritesfilter')) {
-    toggleVaultFavouritesFilter();
+  // 1. Recipe & Vault Actions (Delegated to RecipeActionBridge)
+  if (routeRecipeAction(actionName, target, event, parseArgsString)) {
     return true;
   }
 
@@ -255,13 +156,6 @@ export function routeAction(actionName, target, event) {
     return true;
   }
 
-  if (normalizedAction.includes('openrecipeauditmodal')) {
-    if (typeof window.openRecipeAuditModal === 'function') {
-      const recId = ds.recipeId || parseArgsString(actionName)[0] || null;
-      window.openRecipeAuditModal(recId);
-    }
-    return true;
-  }
 
   // 5. Shopping Item Acquired Checkbox
   if (normalizedAction === 'toggle-shopping-item' || normalizedAction === 'toggle-shopping-at-home' || normalizedAction === 'toggleshoppingathome' || normalizedAction.includes('toggleshoppingathome')) {

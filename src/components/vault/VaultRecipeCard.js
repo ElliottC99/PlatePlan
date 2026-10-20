@@ -1,14 +1,17 @@
 /**
- * src/components/vault/VaultRecipeCard.js (v3.22.0)
- * Modular UI component for Recipe Vault Card:
- * - Individual recipe card templates & layout
- * - Macro badges, fit score breakdown, and cooking time tags
- * - Action buttons for viewing, editing, duplication, favoriting, and deletion
- * - Fixed "More" menu dropdown with z-index & stopPropagation handling
+ * src/components/vault/VaultRecipeCard.js (v3.38.71)
+ * Modular UI component for Recipe Vault Card.
+ * Strictly modular (<350 lines).
  */
 
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
 import { calculateRecipePantryMatch } from '../../services/InventoryService.js';
+import { 
+  renderFitBlock, 
+  renderRecipeCardShell, 
+  renderRecipeActionsItems, 
+  renderDeleteConfirmationContent 
+} from './VaultRecipeCardRenderService.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -82,27 +85,7 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
     ? window.isRecipeVariantFavourite(recipeId, variant)
     : (recipe.isFavourite || recipe.isFavorite);
 
-  dropdown.innerHTML = `
-    <button type="button" class="action-menu-item" data-action="menu-view" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
-      <span>👁️</span> View Details
-    </button>
-    <button type="button" class="action-menu-item" data-action="menu-edit" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
-      <span>✏️</span> Edit Recipe
-    </button>
-    <button type="button" class="action-menu-item" data-action="menu-review" data-id="${escapeAttr(recipeId)}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
-      <span>🔍</span> Review Recipe
-    </button>
-    <button type="button" class="action-menu-item" data-action="menu-duplicate" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
-      <span>📋</span> Duplicate Recipe
-    </button>
-    <button type="button" class="action-menu-item" data-action="menu-favorite" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
-      <span>${isFav ? '❤️' : '🤍'}</span> ${isFav ? 'Remove Favourite' : 'Add Favourite'}
-    </button>
-    <div style="height:1px;background:var(--border, #eee);margin:4px 0"></div>
-    <button type="button" class="action-menu-item" data-action="menu-delete" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:#ef4444;">
-      <span>🗑️</span> Delete Recipe
-    </button>
-  `;
+  dropdown.innerHTML = renderRecipeActionsItems(recipeId, isFav);
 
   document.body.appendChild(dropdown);
 
@@ -205,20 +188,8 @@ function confirmDeleteVaultRecipe(recipe, onConfirm) {
     wrap.appendChild(content);
   }
 
-  const recipeTitle = escapeHtml(recipe.name || recipe.title || 'this recipe');
-  content.innerHTML = `
-    <div style="padding: 24px; max-width: 440px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
-      <div style="font-size: 40px; margin-bottom: 12px;">🗑️</div>
-      <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750; color: var(--red,#ef4444)">Delete Recipe?</h3>
-      <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 24px 0; line-height: 1.5;">
-        Are you sure you want to delete <strong>"${recipeTitle}"</strong>?
-      </p>
-      <div style="display:flex; gap:8px; justify-content: center;">
-        <button type="button" class="btn" style="padding: 8px 16px;" id="btn-cancel-vault-del">Cancel</button>
-        <button type="button" class="btn danger" style="padding: 8px 16px;" id="btn-confirm-vault-del">Confirm Delete</button>
-      </div>
-    </div>
-  `;
+  const recipeTitle = recipe.name || recipe.title || 'this recipe';
+  content.innerHTML = renderDeleteConfirmationContent(recipeTitle);
   wrap.classList.add('open');
   document.body.style.overflow = 'hidden';
 
@@ -279,13 +250,6 @@ export function renderVaultRecipeCard(r, options = {}) {
   const buildFit = (active, useEnhanced = false) => {
     const bundle = typeof window.calculateRecipeDisplayNutrition === 'function' ? window.calculateRecipeDisplayNutrition({ recipe: r, variant: useEnhanced ? 'enhanced' : 'original', mealType }) : null;
     const portions = bundle?.portions || { eCal: 0, eProt: 0, cCal: 0, cProt: 0, e: '', c: '' };
-    const parts = [];
-    if (showE) {
-      parts.push(`<button type="button" class="fit-detail-button" data-action="open-fit-details" data-recipe-id="${escapeAttr(r.id)}" data-variant="${useEnhanced ? 'enhanced' : 'original'}" data-person="e" onclick="openVaultFitDetails(this,'${escapeAttr(r.id)}','${useEnhanced ? 'enhanced' : 'original'}','e')">Elliott ${escapeHtml(portions.e || '')}</button>`);
-    }
-    if (showC) {
-      parts.push(`<button type="button" class="fit-detail-button" data-action="open-fit-details" data-recipe-id="${escapeAttr(r.id)}" data-variant="${useEnhanced ? 'enhanced' : 'original'}" data-person="c" onclick="openVaultFitDetails(this,'${escapeAttr(r.id)}','${useEnhanced ? 'enhanced' : 'original'}','c')">Chloe ${escapeHtml(portions.c || '')}</button>`);
-    }
 
     const targetMealType = r.types?.[0] || r.type || 'dinner';
     const liveFitData = typeof window.calculateMealFitScore === 'function' ? window.calculateMealFitScore(r, targetMealType) : null;
@@ -294,14 +258,15 @@ export function renderVaultRecipeCard(r, options = {}) {
       r._computedFitScore = liveFitData.score;
     }
 
-    const fitTag = renderFitScoreBadge(r, mealType, {
+    const fitTagHtml = renderFitScoreBadge(r, mealType, {
       activeProfile: 'everyone',
       variant: useEnhanced ? 'enhanced' : 'original',
       portions,
       portionScaled: true,
       showLabel: true
     });
-    return { portions, html: `<div class="recipe-fit">${parts.join('')} ${fitTag}</div>` };
+    const html = renderFitBlock({ showE, showC, portions, recipeId: r.id, variant: useEnhanced ? 'enhanced' : 'original', fitTagHtml });
+    return { portions, html };
   };
 
   const originalFit = buildFit(r, false);
@@ -310,46 +275,17 @@ export function renderVaultRecipeCard(r, options = {}) {
   const enhancedChanges = r.enhanced?.changes ? `<div style="font-size:12px;color:var(--text2);margin-top:6px">${escapeHtml(r.enhanced.changes)}</div>` : '';
   const expandableName = typeof window.renderExpandableText === 'function' ? window.renderExpandableText(r.name, `recipe-${r.id}`, 'recipe-card-name') : escapeHtml(r.name);
 
-  return `<div class="recipe-card ${isAnyFav ? 'is-favorite' : ''}">
-    <div class="recipe-card-layout">
-      <div class="recipe-card-main">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-          ${expandableName}
-          <button type="button" class="recipe-fav-btn ${origFav ? 'active' : ''}" data-action="toggle-favorite" data-recipe-id="${escapeAttr(r.id)}" data-variant="original" onclick="toggleRecipeFavourite('${escapeAttr(r.id)}', event, 'original')" aria-label="${origFav ? 'Remove original from favourites' : 'Add original to favourites'}">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="${origFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-            </svg>
-          </button>
-        </div>
-        <div class="recipe-card-meta">${meta}</div>
-        ${originalFit.html}
-      </div>
-      <div class="recipe-card-actions">
-        <button class="btn sm btn-primary primary mobile-primary" data-action="view-recipe" data-recipe-id="${escapeAttr(r.id)}" data-variant="original" onclick="viewRecipe('${escapeAttr(r.id)}', null)">View</button>
-        <button class="btn sm btn-ghost ghost mobile-more" data-action="open-recipe-actions" data-recipe-id="${escapeAttr(r.id)}" data-variant="original" onclick="openRecipeActions(event, '${escapeAttr(r.id)}', 'original')">More</button>
-      </div>
-    </div>
-    ${r.enhanced ? `<div class="enhanced-box">
-      <div class="enhanced-layout">
-        <div style="min-width:0;flex:1">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
-            <div class="enhanced-lbl" style="margin-bottom:0">Enhanced version</div>
-            <button type="button" class="recipe-fav-btn sm ${enhFav ? 'active' : ''}" data-action="toggle-favorite" data-recipe-id="${escapeAttr(r.id)}" data-variant="enhanced" onclick="toggleRecipeFavourite('${escapeAttr(r.id)}', event, 'enhanced')" style="padding:2px">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="${enhFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-              </svg>
-            </button>
-          </div>
-          ${enhancedFit.html}
-          ${enhancedChanges}
-        </div>
-        <div class="enhanced-actions">
-          <button class="btn sm btn-primary primary enhanced-primary-action" data-action="view-recipe" data-recipe-id="${escapeAttr(r.id)}" data-variant="enhanced" onclick="viewRecipe('${escapeAttr(r.id)}', null, 'enhanced')">View</button>
-          <button class="btn sm btn-ghost ghost enhanced-more-action" data-action="open-enhanced-recipe-actions" data-recipe-id="${escapeAttr(r.id)}" data-variant="enhanced" onclick="openEnhancedRecipeActions(event, '${escapeAttr(r.id)}')">More</button>
-        </div>
-      </div>
-    </div>` : ''}
-  </div>`;
+  return renderRecipeCardShell({
+    recipe: r,
+    isAnyFav,
+    origFav,
+    enhFav,
+    expandableName,
+    meta,
+    originalFitHtml: originalFit.html,
+    enhancedFitHtml: enhancedFit ? enhancedFit.html : '',
+    enhancedChangesHtml: enhancedChanges
+  });
 }
 
 if (typeof window !== 'undefined') {

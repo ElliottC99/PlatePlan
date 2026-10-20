@@ -1,45 +1,18 @@
 /**
- * src/components/recipe/RecipeAuditModal.js (v3.30.0)
+ * src/components/recipe/RecipeAuditModal.js (v3.38.73)
  * Modal UI component for Recipe Mapping Audit & Data Integrity.
- * Displays flagged recipes, orphaned IDs, legacy strings, and enables instant inline relinking.
+ * Strictly modular (<350 lines).
  */
 
 import { getState } from '../../store/store.js';
 import { auditRecipeMappings, relinkRecipeIngredient, batchRelinkRecipeMappings } from '../../utils/RecipeAuditService.js';
+import { renderKPIBadge, renderIssueCard, renderEmptyState } from './RecipeAuditModalRenderService.js';
 
 let modalOverlay = null;
 let currentFilter = 'all';
 let currentSearch = '';
 let targetRecipeFilter = null;
 
-function escapeHtml(str) {
-  return String(str ?? '').replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
-}
-
-function escapeAttr(str) {
-  return escapeHtml(str).replace(/`/g, '&#96;');
-}
-
-function buildCatalogOptions(ingredients = [], selectedIngId = null, selectedSubId = null) {
-  const sorted = [...ingredients].sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || ''));
-  const html = ['<option value="">-- Select Master Catalog Target --</option>'];
-
-  sorted.forEach(ing => {
-    const isIngSelected = String(ing.id) === String(selectedIngId) && !selectedSubId;
-    html.push(`<option value="${escapeAttr(ing.id)}:" ${isIngSelected ? 'selected' : ''}>[${escapeHtml(ing.category || 'Pantry')}] ${escapeHtml(ing.name)} (Item-level)</option>`);
-
-    if (Array.isArray(ing.subtypes) && ing.subtypes.length > 0) {
-      ing.subtypes.forEach(sub => {
-        const isSubSelected = String(ing.id) === String(selectedIngId) && String(sub.id) === String(selectedSubId);
-        html.push(`<option value="${escapeAttr(ing.id)}:${escapeAttr(sub.id)}" ${isSubSelected ? 'selected' : ''}>&nbsp;&nbsp;↳ ${escapeHtml(ing.name)} ➔ ${escapeHtml(sub.name)} (Sub-type)</option>`);
-      });
-    }
-  });
-
-  return html.join('');
-}
 
 function renderModalContent() {
   if (!modalOverlay) return;
@@ -77,7 +50,7 @@ function renderModalContent() {
             <span>📖</span> Recipe Mapping Audit &amp; Data Integrity
           </h2>
           <p style="margin:4px 0 0 0; font-size:12.5px; color:var(--text2,#64748b);">
-            Audits recipe ingredients against Master Catalog hierarchy (Categories ➔ Items ➔ Sub-types).
+            Audits recipe ingredients against Master Catalog hierarchy.
           </p>
         </div>
         <button type="button" id="ram-close-btn" class="btn sm ghost" style="font-size:18px; padding:4px 8px; border-radius:8px; line-height:1; cursor:pointer;" aria-label="Close Recipe Audit Modal">✕</button>
@@ -86,10 +59,10 @@ function renderModalContent() {
       <!-- KPI Summary -->
       <div style="padding:12px 24px; background:#fff; border-bottom:1px solid var(--border,#e2e8f0); display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          ${countBadge('all', summary.totalIssues, 'All Issues')}
-          ${countBadge('orphaned', summary.orphanedCount, '⚠️ Orphaned IDs')}
-          ${countBadge('unlinked', summary.unlinkedCount, '🛒 Unlinked Items')}
-          ${countBadge('legacy_string', summary.legacyCount, '📜 Legacy Strings')}
+          ${renderKPIBadge('all', summary.totalIssues, 'All Issues', currentFilter)}
+          ${renderKPIBadge('orphaned', summary.orphanedCount, '⚠️ Orphaned IDs', currentFilter)}
+          ${renderKPIBadge('unlinked', summary.unlinkedCount, '🛒 Unlinked Items', currentFilter)}
+          ${renderKPIBadge('legacy_string', summary.legacyCount, '📜 Legacy Strings', currentFilter)}
         </div>
         <div style="display:flex; gap:8px;">
           ${summary.totalIssues > 0 ? `
@@ -106,82 +79,18 @@ function renderModalContent() {
       <!-- Search & Filters -->
       <div style="padding:10px 24px; background:var(--surface2,#f8fafc); border-bottom:1px solid var(--border,#e2e8f0); display:flex; gap:12px; align-items:center;">
         <div style="position:relative; flex:1;">
-          <input type="search" id="ram-search-input" name="recipe_audit_search" aria-label="Search recipes or ingredients" placeholder="Filter by recipe name or ingredient text..." value="${escapeAttr(currentSearch)}" style="width:100%; padding:7px 12px; font-size:12.5px; border:1px solid var(--border,#cbd5e1); border-radius:8px; outline:none; box-sizing:border-box; background:#fff;" />
+          <input type="search" id="ram-search-input" name="recipe_audit_search" aria-label="Search recipes or ingredients" placeholder="Filter by recipe name or ingredient text..." value="${String(currentSearch || '').replace(/"/g, '&quot;')}" style="width:100%; padding:7px 12px; font-size:12.5px; border:1px solid var(--border,#cbd5e1); border-radius:8px; outline:none; box-sizing:border-box; background:#fff;" />
         </div>
         <div style="font-size:12px; color:var(--text2,#64748b); white-space:nowrap;">
-          Showing <strong>${filteredIssues.length}</strong> of ${summary.totalIssues} issue(s) (${summary.cleanRecipesCount}/${summary.totalRecipes} recipes clean)
+          Showing <strong>${filteredIssues.length}</strong> of ${summary.totalIssues} issue(s)
         </div>
       </div>
 
       <!-- Issues Table -->
       <div style="flex:1; overflow-y:auto; padding:16px 24px; box-sizing:border-box;">
-        ${filteredIssues.length === 0 ? `
-          <div style="text-align:center; padding:48px 16px; color:var(--text2,#64748b);">
-            <div style="font-size:36px; margin-bottom:8px;">🎉</div>
-            <h3 style="margin:0; font-size:16px; font-weight:750; color:var(--text,#0f172a);">
-              ${summary.totalIssues === 0 ? 'All Recipes Perfectly Mapped!' : 'No issues match your current filters.'}
-            </h3>
-            <p style="margin:6px 0 0 0; font-size:13px;">
-              ${summary.totalIssues === 0 ? 'All ingredients link to valid Master Catalog entries and sub-types.' : 'Try adjusting the search query or issue category filter.'}
-            </p>
-          </div>
-        ` : `
+        ${filteredIssues.length === 0 ? renderEmptyState(summary.totalIssues === 0) : `
           <div style="display:flex; flex-direction:column; gap:12px;">
-            ${filteredIssues.map((issue) => {
-              const rowId = `ram-issue-${issue.id}`;
-              const suggested = issue.suggestedMatch;
-              const preSelectIng = suggested ? suggested.ingredientId : issue.currentIngredientId;
-              const preSelectSub = suggested ? suggested.subtypeId : issue.currentSubtypeId;
-              const optionsHtml = buildCatalogOptions(ingredients, preSelectIng, preSelectSub);
-
-              let badgeStyle = 'background:#fef3c7; color:#b45309;';
-              let badgeText = 'Unlinked';
-              if (issue.issueType === 'orphaned') { badgeStyle = 'background:#fee2e2; color:#b91c1c;'; badgeText = 'Orphaned ID'; }
-              if (issue.issueType === 'legacy_string') { badgeStyle = 'background:#e0e7ff; color:#3730a3;'; badgeText = 'Legacy String'; }
-
-              return `
-                <div class="ram-issue-card" id="${rowId}" style="background:#fff; border:1px solid var(--border,#e2e8f0); border-radius:12px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.03); display:flex; flex-direction:column; gap:10px;">
-                  
-                  <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-                    <div>
-                      <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-size:13.5px; font-weight:750; color:var(--text,#0f172a);">${escapeHtml(issue.recipeName)}</span>
-                        <span style="font-size:10.5px; font-weight:750; padding:2px 8px; border-radius:12px; ${badgeStyle}">${badgeText}</span>
-                      </div>
-                      <div style="font-size:12px; color:var(--text2,#64748b); margin-top:2px;">
-                        Ingredient text: <strong style="color:#0f172a;">"${escapeHtml(issue.itemName)}"</strong> &bull; ${escapeHtml(issue.message)}
-                      </div>
-                    </div>
-                    ${suggested ? `
-                      <span style="font-size:11px; background:#dcfce7; color:#15803d; font-weight:700; padding:2px 8px; border-radius:8px;">
-                        💡 Suggestion: ${escapeHtml(suggested.displayName)}
-                      </span>
-                    ` : ''}
-                  </div>
-
-                  <!-- Inline Fix Form -->
-                  <div style="display:grid; grid-template-columns:1fr 70px 70px auto; gap:8px; align-items:center;">
-                    <div>
-                      <select id="ram-select-${issue.id}" name="ram_target_catalog_${issue.id}" aria-label="Select Master Catalog entry for ${escapeAttr(issue.itemName)}" style="width:100%; padding:7px 10px; font-size:12px; border:1px solid var(--border,#cbd5e1); border-radius:8px; background:#fff; outline:none;">
-                        ${optionsHtml}
-                      </select>
-                    </div>
-                    <div>
-                      <input type="text" id="ram-qty-${issue.id}" name="ram_qty_${issue.id}" aria-label="Quantity for ${escapeAttr(issue.itemName)}" value="${escapeAttr(issue.qty)}" placeholder="Qty" style="width:100%; padding:7px 8px; font-size:12px; border:1px solid var(--border,#cbd5e1); border-radius:8px; outline:none; box-sizing:border-box; text-align:center;" />
-                    </div>
-                    <div>
-                      <input type="text" id="ram-unit-${issue.id}" name="ram_unit_${issue.id}" aria-label="Unit for ${escapeAttr(issue.itemName)}" value="${escapeAttr(issue.unit)}" placeholder="Unit" style="width:100%; padding:7px 8px; font-size:12px; border:1px solid var(--border,#cbd5e1); border-radius:8px; outline:none; box-sizing:border-box; text-align:center;" />
-                    </div>
-                    <div>
-                      <button type="button" class="btn sm primary ram-save-fix-btn" data-recipe-id="${escapeAttr(issue.recipeId)}" data-item-index="${issue.itemIndex}" data-issue-id="${escapeAttr(issue.id)}" style="background:var(--primary,#4f46e5); color:#fff; font-weight:700; padding:7px 14px; border-radius:8px; cursor:pointer; white-space:nowrap;">
-                        Save &amp; Fix
-                      </button>
-                    </div>
-                  </div>
-
-                </div>
-              `;
-            }).join('')}
+            ${filteredIssues.map(issue => renderIssueCard(issue, ingredients)).join('')}
           </div>
         `}
       </div>
@@ -190,7 +99,6 @@ function renderModalContent() {
       <div style="padding:14px 24px; border-top:1px solid var(--border,#e2e8f0); display:flex; justify-content:flex-end; gap:10px; background:var(--surface2,#f8fafc);">
         <button type="button" id="ram-done-btn" class="btn sm secondary" style="font-weight:700; padding:8px 18px; border-radius:8px; cursor:pointer;">Done</button>
       </div>
-
     </div>
   `;
 
