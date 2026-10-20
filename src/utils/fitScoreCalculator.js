@@ -1,113 +1,25 @@
 /**
- * src/utils/fitScoreCalculator.js (v3.20.14)
- * Universal Asymmetric Fit Score Engine & Bulletproof Macro Extractor.
- * Evaluates Elliott & Chloe's personal meal targets using continuous asymmetric
- * calorie and protein curves, dynamic split exclusions, and macro quality sweeps.
+ * src/utils/fitScoreCalculator.js (v3.38.63)
+ * Universal Asymmetric Fit Score Engine Orchestrator.
+ * Decomposed: Weights and Macro utilities moved to dedicated modules.
  */
 
-const DEFAULT_SPLITS = {
-  breakfast: 25,
-  lunch: 30,
-  snack: 10,
-  snacking: 10,
-  dinner: 35
+import { saveCurrentPlan } from '../services/HouseholdRepository.js';
+import { DEFAULT_SPLITS, getFitScoreTierMeta } from './fitScoreWeights.js';
+import { 
+  extractRecipeMacros, 
+  sweepRecipeMacroQuality, 
+  calculateCalorieScore, 
+  calculateProteinScore 
+} from './macroScoringUtils.js';
+
+export { 
+  extractRecipeMacros, 
+  sweepRecipeMacroQuality, 
+  getFitScoreTierMeta,
+  calculateCalorieScore,
+  calculateProteinScore
 };
-
-function parsePositiveNumberOrNull(val) {
-  if (val === undefined || val === null || val === '') return null;
-  if (typeof val === 'number') {
-    return Number.isFinite(val) ? val : null;
-  }
-  const num = Number(String(val).replace(/[^0-9.-]/g, ''));
-  return Number.isFinite(num) ? num : null;
-}
-
-function pickFirstValidMacro(candidates = []) {
-  for (const c of candidates) {
-    const parsed = parsePositiveNumberOrNull(c);
-    if (parsed !== null && parsed > 0) return parsed;
-  }
-  for (const c of candidates) {
-    const parsed = parsePositiveNumberOrNull(c);
-    if (parsed !== null) return parsed;
-  }
-  return null;
-}
-
-/**
- * Exhaustively extracts per-serving calories and protein across all supported schema keys.
- * Strictly returns `null` (not 0) when a macro is missing so missing data can be explicitly flagged.
- */
-export function extractRecipeMacros(recipe, variant = 'original') {
-  if (!recipe || typeof recipe !== 'object') {
-    return { cal: null, prot: null, calories: null, protein: null };
-  }
-  const r = recipe.recipe || recipe;
-
-  const extractFromNode = (node) => {
-    if (!node || typeof node !== 'object') return { cal: null, prot: null };
-    const cal = pickFirstValidMacro([
-      node.nutrition?.perServing?.cal,
-      node.nutrition?.perServing?.calories,
-      node.perServing?.cal,
-      node.perServing?.calories,
-      node.macros?.cal,
-      node.macros?.calories,
-      node.cal,
-      node.calories,
-      node.kcal
-    ]);
-    const prot = pickFirstValidMacro([
-      node.nutrition?.perServing?.prot,
-      node.nutrition?.perServing?.protein,
-      node.perServing?.prot,
-      node.perServing?.protein,
-      node.macros?.prot,
-      node.macros?.protein,
-      node.prot,
-      node.protein
-    ]);
-    return { cal, prot };
-  };
-
-  if (variant === 'enhanced' && r.enhanced && typeof r.enhanced === 'object') {
-    const enh = extractFromNode(r.enhanced);
-    const base = extractFromNode(r);
-    const cal = (enh.cal !== null && enh.cal > 0) ? enh.cal : base.cal;
-    const prot = (enh.prot !== null && enh.prot > 0) ? enh.prot : base.prot;
-    return { cal, prot, calories: cal, protein: prot };
-  }
-
-  const base = extractFromNode(r);
-  return { cal: base.cal, prot: base.prot, calories: base.cal, protein: base.prot };
-}
-
-/**
- * Sweeps the active recipe database for missing or non-positive calorie/protein macros.
- */
-export function sweepRecipeMacroQuality(recipes = []) {
-  const list = Array.isArray(recipes) ? recipes : Object.values(recipes || {});
-  const flagged = [];
-
-  list.forEach(r => {
-    if (!r || typeof r !== 'object') return;
-    const { cal, prot } = extractRecipeMacros(r, 'original');
-    const missingCal = cal === null || cal <= 0;
-    const missingProt = prot === null || prot <= 0;
-    if (missingCal || missingProt) {
-      flagged.push({
-        id: r.id || '',
-        name: r.name || r.title || 'Untitled Recipe',
-        calories: cal,
-        protein: prot,
-        missingCal,
-        missingProt
-      });
-    }
-  });
-
-  return flagged;
-}
 
 /**
  * Resolves specific meal target for a given profile, type ('kcal' | 'protein'), and meal slot.
@@ -138,97 +50,6 @@ export const getTarget = (profile, type, meal) => {
 
   return daily * (splitPct / 100);
 };
-
-/**
- * Universal Asymmetric Calorie Score Curve (50% Weight):
- * - 100 if ratio between 0.95 and 1.00.
- * - Interpolate 86-99 for [0.85, 0.95) and (1.00, 1.05].
- * - Interpolate 0-85 for <0.85 (down to 0.5) and >1.05 (down to 1.4).
- */
-export function calculateCalorieScore(actual, target) {
-  if (!target || target <= 0 || actual === null || actual === undefined || actual <= 0) return 0;
-  const r = actual / target;
-
-  // 100 if ratio between 0.95 and 1.00
-  if (r >= 0.95 && r <= 1.00) {
-    return 100;
-  }
-  // Interpolate 86-99 for [0.85, 0.95)
-  if (r >= 0.85 && r < 0.95) {
-    return 86 + ((r - 0.85) / (0.95 - 0.85)) * (99 - 86);
-  }
-  // Interpolate 86-99 for (1.00, 1.05]
-  if (r > 1.00 && r <= 1.05) {
-    return 99 - ((r - 1.00) / (1.05 - 1.00)) * (99 - 86);
-  }
-  // Interpolate 0-85 for <0.85 (down to 0.5)
-  if (r < 0.85) {
-    if (r <= 0.50) return 0;
-    return ((r - 0.50) / (0.85 - 0.50)) * 85;
-  }
-  // Interpolate 0-85 for >1.05 (down to 1.4)
-  if (r > 1.05) {
-    if (r >= 1.40) return 0;
-    return (1 - ((r - 1.05) / (1.40 - 1.05))) * 85;
-  }
-  return 0;
-}
-
-/**
- * Universal Asymmetric Protein Score Curve (50% Weight):
- * - 100 if ratio between 1.00 and 1.20.
- * - Interpolate 86-99 for [0.95, 1.00) and (1.20, 1.30].
- * - Steep penalty <0.95 (0 at 0.70); gentle penalty >1.30 (0 at 2.00).
- */
-export function calculateProteinScore(actual, target) {
-  if (!target || target <= 0 || actual === null || actual === undefined || actual <= 0) return 0;
-  const r = actual / target;
-
-  // 100 if ratio between 1.00 and 1.20
-  if (r >= 1.00 && r <= 1.20) {
-    return 100;
-  }
-  // Interpolate 86-99 for [0.95, 1.00)
-  if (r >= 0.95 && r < 1.00) {
-    return 86 + ((r - 0.95) / (1.00 - 0.95)) * (99 - 86);
-  }
-  // Interpolate 86-99 for (1.20, 1.30]
-  if (r > 1.20 && r <= 1.30) {
-    return 99 - ((r - 1.20) / (1.30 - 1.20)) * (99 - 86);
-  }
-  // Steep penalty <0.95 (0 at 0.70): interpolate 0-85 for [0.70, 0.95)
-  if (r < 0.95) {
-    if (r <= 0.70) return 0;
-    return ((r - 0.70) / (0.95 - 0.70)) * 85;
-  }
-  // Gentle penalty >1.30 (0 at 2.00): interpolate 0-85 for (1.30, 2.00]
-  if (r > 1.30) {
-    if (r >= 2.00) return 0;
-    return (1 - ((r - 1.30) / (2.00 - 1.30))) * 85;
-  }
-  return 0;
-}
-
-/**
- * Resolves 4-tier badge metadata for a given numeric Fit Score (0–100).
- * - 🟢 85–100 (#22c55e - Ideal Match)
- * - 🟡 70–84 (#eab308 - Needs Work)
- * - 🟠 50–69 (#f97316 - Suboptimal)
- * - 🔴 < 50 (#ef4444 - Poor Match)
- */
-export function getFitScoreTierMeta(score) {
-  const s = Math.round(Number(score) || 0);
-  if (s >= 85) {
-    return { tier: 'green', icon: '🟢', label: 'Ideal Match', color: '#22c55e', bg: '#dcfce7', text: '#14532d', border: '#86efac' };
-  }
-  if (s >= 70) {
-    return { tier: 'yellow', icon: '🟡', label: 'Needs Work', color: '#eab308', bg: '#fef9c3', text: '#713f12', border: '#fde047' };
-  }
-  if (s >= 50) {
-    return { tier: 'orange', icon: '🟠', label: 'Suboptimal', color: '#f97316', bg: '#ffedd5', text: '#7c2d12', border: '#fdba74' };
-  }
-  return { tier: 'red', icon: '🔴', label: 'Poor Match', color: '#ef4444', bg: '#fee2e2', text: '#7f1d1d', border: '#fca5a5' };
-}
 
 function resolveHouseholdProfiles(options = {}) {
   const winState = typeof window !== 'undefined' ? (window.state || {}) : {};
@@ -404,9 +225,11 @@ export function getVaultTargetMacros(mealType = 'dinner', userPrefs = null) {
 }
 
 if (typeof window !== 'undefined') {
-  window.calculateMealFitScore = calculateMealFitScore;
-  window.calculateRecipeFit = calculateRecipeFit;
-  window.getVaultTargetMacros = getVaultTargetMacros;
-  window.extractRecipeMacros = extractRecipeMacros;
-  window.sweepRecipeMacroQuality = sweepRecipeMacroQuality;
+  Object.assign(window, {
+    calculateMealFitScore,
+    calculateRecipeFit,
+    getVaultTargetMacros,
+    extractRecipeMacros,
+    sweepRecipeMacroQuality
+  });
 }

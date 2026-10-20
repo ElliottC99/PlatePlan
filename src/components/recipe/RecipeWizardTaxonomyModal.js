@@ -1,13 +1,12 @@
 /**
- * src/components/recipe/RecipeWizardTaxonomyModal.js (v3.38.15)
+ * src/components/recipe/RecipeWizardTaxonomyModal.js (v3.38.56)
  * New Ingredient Mapping Wizard Modal component.
  * 3-step wizard for mapping raw recipe ingredients into Category -> Item -> Sub-Type hierarchy.
  * Fully decomposed and compliant with the 350-line file limit.
  */
 
-import { getState, setIngredients, setProducts, setCategories } from '../../store/store.js';
-import { toTitleCase } from '../../services/RecipeImporter.js';
-import { STANDARD_CATEGORIES, formatTaxonomyName, buildExistingSubtypesCatalog, computeAvailableCategories } from '../../services/RecipeTaxonomyManager.js';
+import { getState } from '../../store/store.js';
+import { formatTaxonomyName, buildExistingSubtypesCatalog, computeAvailableCategories } from '../../services/RecipeTaxonomyManager.js';
 import { renderStep1Template } from '../../services/RecipeWizardStepRenderService.js';
 import { renderStep2SubtypeFields } from '../../services/RecipeWizardStep2RenderService.js';
 import { renderStep2ItemFields, renderStep2CategoryFields } from '../../services/RecipeWizardStep2FieldsRenderService.js';
@@ -15,6 +14,7 @@ import { renderStep3Template } from '../../services/RecipeWizardStep3RenderServi
 import { bindNavigationHandlers } from '../../services/RecipeWizardNavigationService.js';
 import { handleWizardSubmission } from '../../services/RecipeWizardSubmissionService.js';
 import { escapeHtml } from '../../utils/stringUtils.js';
+import { createInitialWizardData, syncTierStateFromStep1 } from '../../services/TaxonomyMapper.js';
 
 export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = '', onComplete = null } = {}) {
   const storeState = getState() || {};
@@ -30,23 +30,7 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
   let showProductSearch = false;
   let productSearchQuery = '';
 
-  let wizardData = {
-    entityType: 'subtype',
-    name: cleanInitialName,
-    category: defaultCat,
-    item: cleanInitialName,
-    subType: cleanInitialName,
-    selectedItemId: '',
-    isExistingParentItem: false,
-    selectedSubtypeId: '',
-    isExistingChildSubtype: false,
-    newItemName: cleanInitialName,
-    selectedCategory: defaultCat,
-    subTypeName: cleanInitialName,
-    createdIngredientId: null,
-    createdSubtypeId: null,
-    linkedProduct: null
-  };
+  const wizardData = createInitialWizardData(cleanInitialName, defaultCat);
 
   let modalEl = document.getElementById('new-ingredient-mapping-wizard-modal');
   if (!modalEl) {
@@ -57,56 +41,8 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
     document.body.appendChild(modalEl);
   }
 
-  const syncTierStateFromStep1 = (rawName, type) => {
-    const cleanName = toTitleCase(rawName || wizardData.name || 'New Item');
-    wizardData.name = cleanName;
-    wizardData.entityType = type;
-
-    if (type === 'subtype') {
-      wizardData.subType = cleanName;
-      wizardData.subTypeName = cleanName;
-      wizardData.selectedSubtypeId = '';
-      wizardData.isExistingChildSubtype = false;
-      const matchedItem = ingredients.find(i => (i.name || '').toLowerCase() === cleanName.toLowerCase());
-      if (matchedItem) {
-        wizardData.selectedItemId = matchedItem.id;
-        wizardData.isExistingParentItem = true;
-        wizardData.item = matchedItem.name;
-        wizardData.newItemName = matchedItem.name;
-        wizardData.category = matchedItem.category || defaultCat;
-        wizardData.selectedCategory = wizardData.category;
-      } else {
-        wizardData.selectedItemId = '';
-        wizardData.isExistingParentItem = false;
-        wizardData.item = cleanName;
-        wizardData.newItemName = cleanName;
-        wizardData.category = wizardData.selectedCategory || defaultCat;
-        wizardData.selectedCategory = wizardData.category;
-      }
-    } else if (type === 'item') {
-      wizardData.item = cleanName;
-      wizardData.newItemName = cleanName;
-      wizardData.subType = cleanName;
-      wizardData.subTypeName = cleanName;
-      wizardData.selectedSubtypeId = '';
-      wizardData.isExistingChildSubtype = false;
-      const matchedItem = ingredients.find(i => (i.name || '').toLowerCase() === cleanName.toLowerCase());
-      wizardData.selectedItemId = matchedItem ? matchedItem.id : '';
-      wizardData.isExistingParentItem = Boolean(matchedItem);
-      wizardData.category = matchedItem?.category || wizardData.selectedCategory || defaultCat;
-      wizardData.selectedCategory = wizardData.category;
-    } else if (type === 'category') {
-      wizardData.category = cleanName;
-      wizardData.selectedCategory = cleanName;
-      wizardData.item = cleanName;
-      wizardData.newItemName = cleanName;
-      wizardData.subType = cleanName;
-      wizardData.subTypeName = cleanName;
-      wizardData.selectedItemId = '';
-      wizardData.isExistingParentItem = false;
-      wizardData.selectedSubtypeId = '';
-      wizardData.isExistingChildSubtype = false;
-    }
+  const syncTierState = (rawName, type) => {
+    syncTierStateFromStep1(wizardData, rawName, type, ingredients, defaultCat);
   };
 
   const renderWizard = () => {
@@ -168,7 +104,7 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
       existingSubtypes,
       ingredients,
       defaultCat,
-      syncTierStateFromStep1,
+      syncTierStateFromStep1: syncTierState,
       showProductSearch: { get: () => showProductSearch, set: (v) => { showProductSearch = v; } },
       productSearchQuery: { get: () => productSearchQuery, set: (v) => { productSearchQuery = v; } }
     });
@@ -179,7 +115,7 @@ export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = 
     }
   };
 
-  syncTierStateFromStep1(cleanInitialName, wizardData.entityType);
+  syncTierState(cleanInitialName, wizardData.entityType);
   renderWizard();
   modalEl.classList.add('open');
 }

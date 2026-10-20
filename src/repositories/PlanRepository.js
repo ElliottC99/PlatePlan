@@ -90,12 +90,26 @@ export async function getPlanHistory() {
   }
 }
 
+export async function savePlanHistory(planId, plan) {
+  try {
+    if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
+    if (!planId || !plan) return { success: false, error: 'Invalid parameters' };
+    const docRef = db.collection('households').doc(HOUSEHOLD_ID).collection('plans').doc(planId);
+    await docRef.set({ ...plan, id: planId, updatedAt: new Date().toISOString() }, { merge: true });
+    return { success: true };
+  } catch (err) {
+    console.error('[PlanRepository] Error saving plan history:', err);
+    return { success: false, error: err.message || err };
+  }
+}
+
 const PlanRepository = {
   savePlan,
   getPlan,
   getCurrentActivePlan,
   deletePlan,
-  getPlanHistory
+  getPlanHistory,
+  savePlanHistory
 };
 
 if (typeof window !== 'undefined') {

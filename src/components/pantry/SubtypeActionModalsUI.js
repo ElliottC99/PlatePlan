@@ -1,13 +1,14 @@
 /**
- * src/components/pantry/SubtypeActionModalsUI.js (v3.20.14)
+ * src/components/pantry/SubtypeActionModalsUI.js (v3.38.57)
  * Standardised custom styled dialogues and workflows for nested sub-types.
  * Eliminates all prompt(), alert(), and confirm() browser chrome calls.
- * Strictly modular (< 400 lines) and sanitised of legacy terminology.
+ * Strictly modular (< 350 lines) and sanitised of legacy terminology.
  */
 
 import { getState, setIngredients, setProducts } from '../../store/store.js';
 import { deleteSubtype } from '../../services/SubtypeActionService.js';
 import { saveProduct } from '../../services/ProductRepository.js';
+import { saveIngredient } from '../../services/IngredientRepository.js';
 import { invalidateHierarchyCache } from '../../models/PantryHierarchyModel.js';
 import { promptReallocateProduct, openProductReallocateModal } from './ReallocateProductModalUI.js';
 import {
@@ -27,6 +28,23 @@ import {
   openIngredientReorganiseModal
 } from './IngredientActionModalsUI.js';
 
+import {
+  openEditSubtypeModal,
+  openSubtypeReorganizeModal,
+  openSubtypeAliasModal,
+  openSubtypeDeleteModal
+} from './SubtypeActionModalsRenderService.js';
+
+import {
+  renderEditSubtypeModalHTML,
+  renderReorganizeModalHTML,
+  renderManageAliasesModalHTML,
+  renderDeleteSubtypeModalHTML,
+  buildSubtypeDropdownOptions,
+  buildParentIngredientDropdownOptions,
+  escapeHTML
+} from '../../views/SubtypeModalRenderService.js';
+
 export {
   promptReallocateProduct,
   openProductReallocateModal,
@@ -41,12 +59,21 @@ export {
   handleDeleteIngredient,
   handleDeleteProduct,
   showCustomAlert,
-  openIngredientReorganiseModal
+  openIngredientReorganiseModal,
+  openEditSubtypeModal,
+  openSubtypeReorganizeModal,
+  openSubtypeAliasModal,
+  openSubtypeDeleteModal,
+  renderEditSubtypeModalHTML,
+  renderReorganizeModalHTML,
+  renderManageAliasesModalHTML,
+  renderDeleteSubtypeModalHTML,
+  buildSubtypeDropdownOptions,
+  buildParentIngredientDropdownOptions,
+  escapeHTML
 };
 
-const escapeHTML = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-function showModal(html) {
+export function showModal(html) {
   let wrap = document.getElementById('view-modal-wrap');
   let content = document.getElementById('view-modal-content');
   if (!wrap) {
@@ -78,7 +105,7 @@ export function closeModal() {
   if (content) content.innerHTML = '';
 }
 
-function formatBrandProductLabel(p) {
+export function formatBrandProductLabel(p) {
   if (!p) return '';
   const brand = String(p.brand || '').trim();
   let pName = String(p.name || p.title || '').trim();
@@ -86,293 +113,6 @@ function formatBrandProductLabel(p) {
     pName = pName.slice(brand.length).replace(/^[\s\-–—:]+/, '').trim();
   }
   return (brand && pName) ? `${brand} ${pName}` : (pName || brand || 'Unnamed Product');
-}
-
-// 1. EDIT SUB-TYPE MODAL
-export function openEditSubtypeModal(subtypeId, parentId) {
-  const state = getState() || {};
-  const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
-  if (!parent || !Array.isArray(parent.subtypes)) return;
-  const sub = parent.subtypes.find(s => String(s.id) === String(subtypeId));
-  if (!sub) return;
-
-  const linkedProds = (state.products || []).filter(p => String(p.subtypeId) === String(subtypeId));
-
-  const html = `
-    <div class="modal-content" data-modal-type="edit-subtype" data-subtype-id="${escapeHTML(subtypeId)}" data-parent-id="${escapeHTML(parentId)}" style="padding: 20px; max-width: 500px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 12px;">
-      <h3 style="margin-top:0; margin-bottom: 16px; font-size: 1.15rem; font-weight: 750;">📝 Edit Sub-type: ${escapeHTML(sub.name)}</h3>
-      
-      <div class="field" style="margin-bottom: 12px;">
-        <label for="edit-sub-name" style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">Sub-type Name</label>
-        <input type="text" id="edit-sub-name" class="input" value="${escapeHTML(sub.name)}" style="width:100%;" name="edit-sub-name" />
-      </div>
-
-      <div class="field" style="margin-bottom: 16px;">
-        <label for="edit-sub-notes" style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">Notes</label>
-        <textarea id="edit-sub-notes" class="input" style="width:100%; min-height: 70px;" name="edit-sub-notes">${escapeHTML(sub.notes || '')}</textarea>
-      </div>
-
-      <div style="margin-bottom: 20px;">
-        <h4 style="font-size: 0.85rem; font-weight: 750; margin: 0 0 8px 0;">Linked Products (${linkedProds.length})</h4>
-        <div style="display:flex; flex-direction:column; gap:6px; max-height:140px; overflow-y:auto; background:var(--surface2,#f5f5f4); padding:8px; border-radius:8px;">
-          ${linkedProds.map(p => `
-            <div style="font-size:12px; display:flex; justify-content:space-between; align-items:center; background:#fff; padding:6px 10px; border-radius:6px; border:1px solid var(--border,#e7e5e4)">
-              <div>
-                <span style="font-weight:600;">${escapeHTML(formatBrandProductLabel(p))}</span>
-              </div>
-              <button type="button" class="btn xs ghost btn-unlink-prod" data-prod-id="${escapeHTML(p.id)}" style="color:var(--red,#ef4444); font-weight:bold;" title="Unlink product">&times; Unlink</button>
-            </div>
-          `).join('') || '<div style="font-size:12px; color:var(--text2); text-align:center; padding:10px 0;">No products linked yet.</div>'}
-        </div>
-      </div>
-
-      <div style="display:flex; gap:8px; justify-content: flex-end;">
-        <button type="button" class="btn btn-cancel-edit-sub">Cancel</button>
-        <button type="button" class="btn primary" id="save-edit-sub-btn">Save Changes</button>
-      </div>
-    </div>
-  `;
-
-  showModal(html);
-  setupModalDelegation();
-
-  const saveBtn = document.getElementById('save-edit-sub-btn');
-  if (saveBtn) {
-    saveBtn.onclick = async () => {
-      const newName = document.getElementById('edit-sub-name').value.trim();
-      if (!newName) return;
-      sub.name = newName;
-      sub.notes = document.getElementById('edit-sub-notes').value.trim();
-      parent.updatedAt = new Date().toISOString();
-      
-      setIngredients([...state.ingredients]);
-      closeModal();
-      invalidateHierarchyCache();
-      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-      await saveIngredient(parent);
-    };
-  }
-
-  const cancelBtn = document.querySelector('.btn-cancel-edit-sub');
-  if (cancelBtn) {
-    cancelBtn.onclick = () => {
-      closeModal();
-    };
-  }
-
-  const unlinkBtns = document.querySelectorAll('.btn-unlink-prod');
-  unlinkBtns.forEach(btn => {
-    btn.onclick = async () => {
-      const prodId = btn.getAttribute('data-prod-id');
-      const prods = [...(state.products || [])];
-      const prod = prods.find(p => String(p.id) === String(prodId));
-      if (prod) {
-        prod.subtypeId = null;
-        prod.isAutoDefault = false;
-        prod.updatedAt = new Date().toISOString();
-        setProducts(prods);
-        openEditSubtypeModal(subtypeId, parentId);
-        if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-        if (typeof window.renderProductBank === 'function') window.renderProductBank();
-        await saveProduct(prod);
-      }
-    };
-  });
-}
-
-// 2. CONSOLIDATED REORGANISE MODAL (Promote, Move, Merge)
-export function openSubtypeReorganizeModal(subtypeId, parentId) {
-  const state = getState() || {};
-  const currentIngs = state.ingredients || [];
-  const parent = currentIngs.find(i => String(i.id) === String(parentId));
-  if (!parent || !Array.isArray(parent.subtypes)) return;
-  const sub = parent.subtypes.find(s => String(s.id) === String(subtypeId));
-  if (!sub) return;
-
-  const targetParents = currentIngs.filter(i => String(i.id) !== String(parentId));
-  const siblingSubtypes = parent.subtypes.filter(s => String(s.id) !== String(subtypeId));
-
-  const html = `
-    <div style="padding: 24px; max-width: 500px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 12px;">
-      <h3 style="margin-top:0; margin-bottom: 16px; font-size: 1.15rem; font-weight: 750;">🔀 Reorganise: ${escapeHTML(sub.name)}</h3>
-      <div style="padding: 12px; border: 1px solid var(--border,#e7e5e4); border-radius: 8px; margin-bottom: 12px; background: #fafaf9;">
-        <div style="font-weight: 750; font-size: 13px; display:flex; align-items:center; justify-content:space-between">
-          <span>🚀 Option A: Promote to Standalone Ingredient</span>
-          <button type="button" class="btn sm" id="btn-reorg-promote">Promote</button>
-        </div>
-        <p style="margin:4px 0 0 0; font-size:11px; color:var(--text2)">Ejects this sub-type from parent "${escapeHTML(parent.name)}" into a standalone card.</p>
-      </div>
-      <div style="padding: 12px; border: 1px solid var(--border,#e7e5e4); border-radius: 8px; margin-bottom: 12px; background: #fafaf9;">
-        <div style="font-weight: 750; font-size: 13px; margin-bottom: 6px;">📦 Option B: Move to another Parent Ingredient</div>
-        <div style="display:flex; gap:8px;">
-          <select id="reorg-move-select" style="flex:1; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:12px;" name="reorg-move-select">
-            ${targetParents.map(p => `<option value="${escapeHTML(p.id)}">${escapeHTML(p.name)} (${escapeHTML(p.category || 'Other')})</option>`).join('')}
-          </select>
-          <button type="button" class="btn sm" id="btn-reorg-move">Move</button>
-        </div>
-      </div>
-      <div style="padding: 12px; border: 1px solid var(--border,#e7e5e4); border-radius: 8px; margin-bottom: 20px; background: #fafaf9;">
-        <div style="font-weight: 750; font-size: 13px; margin-bottom: 6px;">🔀 Option C: Merge into another Sub-type sibling</div>
-        <div style="display:flex; gap:8px;">
-          <select id="reorg-merge-select" style="flex:1; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:12px;" ${siblingSubtypes.length === 0 ? 'disabled' : ''} name="reorg-merge-select">
-            ${siblingSubtypes.map(s => `<option value="${escapeHTML(s.id)}">${escapeHTML(s.name)}</option>`).join('') || '<option>No siblings available</option>'}
-          </select>
-          <button type="button" class="btn sm" id="btn-reorg-merge" ${siblingSubtypes.length === 0 ? 'disabled' : ''}>Merge</button>
-        </div>
-      </div>
-      <div style="display:flex; justify-content: flex-end;">
-        <button type="button" class="btn" onclick="window.closeSubtypeActionModal()">Cancel</button>
-      </div>
-    </div>
-  `;
-
-  showModal(html);
-
-  document.getElementById('btn-reorg-promote').onclick = async () => {
-    closeModal();
-    try {
-      const res = await promoteSubtype(parentId, subtypeId);
-      invalidateHierarchyCache();
-      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-      if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
-      if (typeof window.showPlatePlanToast === 'function') {
-        window.showPlatePlanToast(`Promoted to standalone ingredient (${res.modifiedRecipesCount || 0} recipes updated)`, 'success');
-      }
-    } catch (err) {
-      console.error('[SubtypeActionModalsUI] Promote failed:', err);
-      if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Failed to promote sub-type.', 'error');
-    }
-  };
-
-  document.getElementById('btn-reorg-move').onclick = async () => {
-    const targetParentId = document.getElementById('reorg-move-select').value;
-    if (!targetParentId) return;
-    closeModal();
-    try {
-      const res = await moveSubtype(parentId, subtypeId, targetParentId);
-      invalidateHierarchyCache();
-      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-      if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
-      if (typeof window.showPlatePlanToast === 'function') {
-        window.showPlatePlanToast(`Moved sub-type to new parent (${res.modifiedRecipesCount || 0} recipes updated)`, 'success');
-      }
-    } catch (err) {
-      console.error('[SubtypeActionModalsUI] Move failed:', err);
-      if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Failed to move sub-type.', 'error');
-    }
-  };
-
-  document.getElementById('btn-reorg-merge').onclick = async () => {
-    const targetSubtypeId = document.getElementById('reorg-merge-select').value;
-    if (!targetSubtypeId) return;
-    closeModal();
-    try {
-      const res = await mergeSubtype(parentId, subtypeId, targetSubtypeId);
-      invalidateHierarchyCache();
-      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-      if (typeof window.renderProductBank === 'function') window.renderProductBank();
-      if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
-      if (typeof window.showPlatePlanToast === 'function') {
-        window.showPlatePlanToast(`Merged sub-type into sibling (${res.modifiedRecipesCount || 0} recipes updated)`, 'success');
-      }
-    } catch (err) {
-      console.error('[SubtypeActionModalsUI] Merge failed:', err);
-      if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Failed to merge sub-type.', 'error');
-    }
-  };
-}
-
-// 3. MANAGE ALIASES MODAL
-export function openSubtypeAliasModal(subtypeId, parentId) {
-  const state = getState() || {};
-  const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
-  if (!parent || !Array.isArray(parent.subtypes)) return;
-  const sub = parent.subtypes.find(s => String(s.id) === String(subtypeId));
-  if (!sub) return;
-  const aliases = Array.isArray(sub.aliases) ? sub.aliases : [];
-
-  showModal(`
-    <div style="padding: 20px; max-width: 480px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 12px;">
-      <h3 style="margin-top:0; margin-bottom: 12px; font-size: 1.15rem; font-weight: 750;">🏷️ Manage Aliases: ${escapeHTML(sub.name)}</h3>
-      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom: 16px; padding: 10px; background: var(--surface2,#f5f5f4); border-radius:8px; min-height: 50px;">
-        ${aliases.map(a => `<span style="font-size: 11px; padding: 4px 10px; border-radius: 999px; background: #fff; border: 1px solid var(--border,#e7e5e4); display: flex; align-items: center; gap: 4px;">${escapeHTML(a)}<span style="cursor:pointer; font-weight:bold; color:var(--red,#ef4444);" onclick="window.handleSubtypeAliasRemove('${escapeHTML(a)}')">&times;</span></span>`).join('') || '<span style="font-size:12px; color:var(--text2); font-style:italic; padding:6px 0;">No aliases defined yet</span>'}
-      </div>
-      <div style="display:flex; gap:6px; margin-bottom: 20px;">
-        <label for="new-alias-input" style="display:none;">Add New Alias</label>
-        <input type="text" id="new-alias-input" placeholder="e.g. Sourdough loaf" style="flex:1; padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-size: 12px;" name="new-alias-input" />
-        <button type="button" class="btn primary sm" id="btn-add-alias">Add Alias</button>
-      </div>
-      <div style="display:flex; justify-content: flex-end;">
-        <button type="button" class="btn" onclick="window.closeSubtypeActionModal()">Close</button>
-      </div>
-    </div>
-  `);
-
-  window.handleSubtypeAliasRemove = async (alias) => {
-    sub.aliases = aliases.filter(a => a !== alias);
-    parent.updatedAt = new Date().toISOString();
-    setIngredients([...state.ingredients]);
-    openSubtypeAliasModal(subtypeId, parentId);
-    if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-    await saveIngredient(parent);
-  };
-
-  document.getElementById('btn-add-alias').onclick = async () => {
-    const val = (document.getElementById('new-alias-input')?.value || '').trim();
-    if (!val) return;
-    if (!sub.aliases) sub.aliases = [];
-    if (!sub.aliases.includes(val)) sub.aliases.push(val);
-    parent.updatedAt = new Date().toISOString();
-    setIngredients([...state.ingredients]);
-    openSubtypeAliasModal(subtypeId, parentId);
-    if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-    await saveIngredient(parent);
-  };
-}
-
-
-
-export function openSubtypeDeleteModal(subtypeId, parentId) {
-  const state = getState() || {};
-  let ingredients = (state.ingredients && state.ingredients.length) ? state.ingredients : (window.state?.ingredients || []);
-  let parent = ingredients.find(i => String(i.id) === String(parentId));
-  if (!parent || !Array.isArray(parent.subtypes) || !parent.subtypes.some(s => String(s.id) === String(subtypeId))) {
-    parent = ingredients.find(i => Array.isArray(i.subtypes) && i.subtypes.some(s => String(s.id) === String(subtypeId)));
-  }
-  if (!parent || !Array.isArray(parent.subtypes)) return;
-  const sub = parent.subtypes.find(s => String(s.id) === String(subtypeId));
-  if (!sub) return;
-
-  showModal(`
-    <div class="modal-content" data-modal-type="delete-subtype" data-subtype-id="${escapeHTML(subtypeId)}" data-parent-id="${escapeHTML(parent.id)}" style="padding: 24px; max-width: 440px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
-      <div style="font-size: 40px; margin-bottom: 12px;">⚠️</div>
-      <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750; color: var(--red,#ef4444)">Delete Sub-type?</h3>
-      <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 24px 0; line-height: 1.5;">
-        Are you sure you want to delete <strong>"${escapeHTML(sub.name)}"</strong>? <br /><span style="font-size:12px; color:var(--text2);">Linked products will remain in your Product Bank but will be unlinked.</span>
-      </p>
-      <div style="display:flex; gap:8px; justify-content: center;">
-        <button type="button" class="btn btn-cancel-delete" style="padding: 8px 16px;">Cancel</button>
-        <button type="button" class="btn danger btn-confirm-delete" id="btn-confirm-sub-delete" style="padding: 8px 16px;">Confirm Delete</button>
-      </div>
-    </div>
-  `);
-
-  setupModalDelegation();
-
-  const confirmBtn = document.getElementById('btn-confirm-sub-delete');
-  if (confirmBtn) {
-    confirmBtn.onclick = async () => {
-      closeModal();
-      await deleteSubtype(parent.id, subtypeId);
-    };
-  }
-
-  const cancelBtn = document.querySelector('.btn-cancel-delete');
-  if (cancelBtn) {
-    cancelBtn.onclick = () => {
-      closeModal();
-    };
-  }
 }
 
 export function setupModalDelegation() {

@@ -7,7 +7,8 @@
 import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeRecipes, subscribeIngredients, subscribeProducts, subscribePreferences, subscribeCurrentPlan, getCategories, saveCategories, saveIngredient, cleanLegacyMacros } from './HouseholdRepository.js';
 import { getInventory } from './InventoryRepository.js';
 import { getCurrentActivePlan as getActivePlanFromSubcollection } from './PlanRepository.js';
-import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache, setCategories, setInventory, sanitizePreferences, updateState } from '../store/store.js';
+import { setRecipes, setPreferences, setCurrentPlan, saveStateCache, setInventory, sanitizePreferences, updateState } from '../store/store.js';
+import { setIngredients, setProducts, setCategories } from '../store/pantryStore.js';
 import { compareProductsByStrategy } from '../models/PantryHierarchyModel.js';
 import { waitForAuth } from './AuthService.js';
 import { runDeferredMaintenance } from './CacheMaintenanceService.js';

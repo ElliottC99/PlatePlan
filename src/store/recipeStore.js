@@ -4,7 +4,7 @@
  * Provides reactive setters and microtask-debounced event dispatching.
  */
 
-import { saveStateCache } from './store.js';
+import { saveStateCache } from './cacheSlice.js';
 import { autoRecalibrateRecipeDrift } from '../services/DataQualityEngine.js';
 
 let recipeState = {
@@ -38,7 +38,7 @@ export function setRecipes(newRecipes, ingredients = [], products = []) {
     if (!window.state) window.state = {};
     window.state.recipes = recipeState.recipes;
   }
-  saveStateCache();
+  saveStateCache(recipeState);
   dispatchStateEvent('plateplan:state:recipes', recipeState.recipes);
 }
 
@@ -57,7 +57,7 @@ export function updateRecipeInStore(recipe, ingredients = [], products = []) {
     if (!window.state) window.state = {};
     window.state.recipes = recipeState.recipes;
   }
-  saveStateCache();
+  saveStateCache(recipeState);
   dispatchStateEvent('plateplan:state:recipes', recipeState.recipes);
 }
 
@@ -68,7 +68,7 @@ export function removeRecipeFromStore(recipeId) {
     if (!window.state) window.state = {};
     window.state.recipes = recipeState.recipes;
   }
-  saveStateCache();
+  saveStateCache(recipeState);
   dispatchStateEvent('plateplan:state:recipes', recipeState.recipes);
 }
 
@@ -78,7 +78,7 @@ export function setCurrentPlan(newPlan) {
     if (!window.state) window.state = {};
     window.state.plan = recipeState.currentPlan;
   }
-  saveStateCache();
+  saveStateCache(recipeState);
   dispatchStateEvent('plateplan:state:plan', recipeState.currentPlan);
 }
 
