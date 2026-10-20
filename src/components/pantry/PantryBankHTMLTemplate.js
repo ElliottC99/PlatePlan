@@ -102,12 +102,7 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inven
                 </div>
               </div>
 
-              ${aliases.length ? `
-                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px">
-                  <span style="color:var(--text3,#a8a29e);font-weight:600">Aliases:</span>
-                  ${aliases.map(a => `<span class="tag" style="font-size:10.5px;padding:2px 8px;border-radius:var(--radius-sm,6px);background:var(--surface,#fff)">${escapeHtml(a)} <span style="cursor:pointer;margin-left:2px" onclick="promptRemoveAlias('${escapeAttr(ing.id)}', decodeURIComponent('${encodeURIComponent(a)}'))">&times;</span></span>`).join('')}
-                </div>
-              ` : ''}
+
 
               ${subtypes.length ? `
                 <div style="margin-top:4px">

@@ -1585,26 +1585,38 @@ export async function deleteCategory(categoryName, fallbackCatName = 'Uncategori
     const prodSnap = await householdRef.collection('products').get();
     const dbProds = prodSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
 
-    const { updatedIngs: dbCascadeIngs, updatedProds: dbCascadeProds, changedIngIds, changedProdIds } = cascadeCategoryReassignment(dbIngs, dbProds);
+    // Helper for chunked batch commits (max 400 operations per batch)
+    const commitChunkedOps = async (ops) => {
+      if (ops.length === 0) return;
+      const CHUNK_SIZE = 400;
+      for (let i = 0; i < ops.length; i += CHUNK_SIZE) {
+        const chunkBatch = db.batch();
+        const chunk = ops.slice(i, i + CHUNK_SIZE);
+        chunk.forEach(op => op(chunkBatch));
+        await chunkBatch.commit();
+      }
+    };
+
+    const deleteOps = [];
 
     dbCascadeIngs.forEach(ing => {
       if (changedIngIds.has(String(ing.id))) {
-        batch.update(ing.ref, {
+        deleteOps.push((b) => b.update(ing.ref, {
           category: ing.category,
           cat: ing.cat,
           subtypes: ing.subtypes || [],
           updatedAt: new Date().toISOString()
-        });
+        }));
       }
     });
 
     dbCascadeProds.forEach(prod => {
       if (changedProdIds.has(String(prod.id))) {
-        batch.update(prod.ref, {
+        deleteOps.push((b) => b.update(prod.ref, {
           category: prod.category,
           cat: prod.cat,
           updatedAt: new Date().toISOString()
-        });
+        }));
       }
     });
 
@@ -1617,10 +1629,10 @@ export async function deleteCategory(categoryName, fallbackCatName = 'Uncategori
         const cName = typeof c === 'string' ? c : c?.name;
         return strictNorm(cName) !== sourceNorm;
       });
-      batch.set(catsDocRef, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true });
+      deleteOps.push((b) => b.set(catsDocRef, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true }));
     }
 
-    await batch.commit();
+    await commitChunkedOps(deleteOps);
     return { success: true };
   } catch (err) {
     console.error('[HouseholdRepository] deleteCategory error:', err);
@@ -1736,7 +1748,6 @@ export async function mergeCategory(sourceCat, targetCat) {
   if (!isDbAvailable()) return { success: true };
 
   try {
-    const batch = db.batch();
     const householdRef = db.collection('households').doc(HOUSEHOLD_ID);
 
     const ingSnap = await householdRef.collection('ingredients').get();
@@ -1747,24 +1758,37 @@ export async function mergeCategory(sourceCat, targetCat) {
 
     const { updatedIngs: dbCascadeIngs, updatedProds: dbCascadeProds, changedIngIds, changedProdIds } = cascadeCategoryReassignment(dbIngs, dbProds);
 
+    const commitChunkedOps = async (ops) => {
+      if (ops.length === 0) return;
+      const CHUNK_SIZE = 400;
+      for (let i = 0; i < ops.length; i += CHUNK_SIZE) {
+        const chunkBatch = db.batch();
+        const chunk = ops.slice(i, i + CHUNK_SIZE);
+        chunk.forEach(op => op(chunkBatch));
+        await chunkBatch.commit();
+      }
+    };
+
+    const mergeOps = [];
+
     dbCascadeIngs.forEach(ing => {
       if (changedIngIds.has(String(ing.id))) {
-        batch.update(ing.ref, {
+        mergeOps.push((b) => b.update(ing.ref, {
           category: ing.category,
           cat: ing.cat,
           subtypes: ing.subtypes || [],
           updatedAt: new Date().toISOString()
-        });
+        }));
       }
     });
 
     dbCascadeProds.forEach(prod => {
       if (changedProdIds.has(String(prod.id))) {
-        batch.update(prod.ref, {
+        mergeOps.push((b) => b.update(prod.ref, {
           category: prod.category,
           cat: prod.cat,
           updatedAt: new Date().toISOString()
-        });
+        }));
       }
     });
 
@@ -1780,10 +1804,10 @@ export async function mergeCategory(sourceCat, targetCat) {
       if (!updatedCats.some(c => strictNorm(typeof c === 'string' ? c : c?.name) === targetNorm)) {
         updatedCats.push(cleanTargetCat);
       }
-      batch.set(catsDocRef, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true });
+      mergeOps.push((b) => b.set(catsDocRef, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true }));
     }
 
-    await batch.commit();
+    await commitChunkedOps(mergeOps);
     return { success: true };
   } catch (err) {
     console.error('[HouseholdRepository] mergeCategory error:', err);

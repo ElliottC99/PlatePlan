@@ -415,23 +415,16 @@ export function renderCategoryManagerModal() {
     const btn = document.getElementById('btn-submit-merge-cat');
     if (btn) { btn.disabled = true; btn.textContent = 'Merging...'; }
 
-    let success = false;
     try {
       await mergeCategory(sourceCat, targetCat);
-      success = true;
     } catch (err) {
       console.error('Failed to merge categories:', err);
       if (typeof window.showPlatePlanToast === 'function') {
         window.showPlatePlanToast('Network error occurred while merging categories. Please try again.', 'error');
       }
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = 'Confirm Merge';
-      }
     } finally {
-      if (success) {
-        closeCategoryManagerModal();
-      }
+      resetModalState();
+      renderCategoryManagerModal();
     }
   };
 
