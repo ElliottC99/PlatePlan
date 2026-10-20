@@ -1,12 +1,10 @@
 /**
- * src/services/HydrationService.js (v3.20.15)
- * Orchestrates concurrent fetching and real-time Firebase subscriptions from HouseholdRepository,
- * updating centralized Store and window.state as single source of truth.
+ * src/services/HydrationService.js (v3.38.2)
+ * Orchestrates concurrent fetching and real-time Firebase subscriptions.
+ * Respects user category deletions and never resurrects deleted canonical categories on boot.
  */
 
-import { getRecipes, getPreferences, getCurrentPlan, subscribeRecipes, subscribePreferences, subscribeCurrentPlan, getCategories, saveCategories, cleanLegacyMacros } from './HouseholdRepository.js';
-import { getIngredients, subscribeIngredients, saveIngredient } from './IngredientRepository.js';
-import { getProducts, subscribeProducts } from './ProductRepository.js';
+import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeRecipes, subscribeIngredients, subscribeProducts, subscribePreferences, subscribeCurrentPlan, getCategories, saveCategories, saveIngredient, cleanLegacyMacros } from './HouseholdRepository.js';
 import { getInventory } from './InventoryRepository.js';
 import { getCurrentActivePlan as getActivePlanFromSubcollection } from './PlanRepository.js';
 import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache, setCategories, setInventory, sanitizePreferences, updateState } from '../store/store.js';
@@ -40,61 +38,32 @@ export async function sweepAndRecalibrateIngredientDefaults() {
       String(s.id || ''), String(s.name || ''), String(s.subtypeId || '')
     ].filter(Boolean));
 
-    // 1. STRICTLY filter products that belong to this exact ingredient or its nested subtypes
-    const strictlyMatchingProducts = products.filter(p => {
-      const pIngId = String(p.ingredientId || p.ingredient || '');
-      const pSubId = String(p.subtypeId || p.subTypeId || p.subtype || '');
-      const matchesDirectIng = pIngId && (pIngId === String(ing.id) || pIngId === String(ing.name));
-      const matchesSubtype = pSubId && subtypeIdentifiers.some(subId => subId.toLowerCase() === pSubId.toLowerCase());
-      return matchesDirectIng || matchesSubtype;
+    const matchedProducts = products.filter(p => {
+      const pIngId = String(p.ingredientId || p.ingredient_id || p.groupId || '');
+      const pSubId = String(p.subtypeId || p.subTypeId || p.sub_type_id || '');
+      return pIngId === String(ing.id) || subtypeIdentifiers.includes(pSubId);
     });
 
-    let targetDefaultId = null;
-    let targetDefaultName = null;
-
-    if (strictlyMatchingProducts.length > 0) {
-      // 1. Check for explicit manual user pin override
-      const userPinnedProduct = strictlyMatchingProducts.find(p => p.isAutoDefault === true);
-      let targetProduct = userPinnedProduct;
-
-      if (!targetProduct && strictlyMatchingProducts.length > 0) {
-        // 2. Sort candidates based on selected strategy
-        const sorted = [...strictlyMatchingProducts].sort((a, b) => compareProductsByStrategy(a, b, criterion));
-        targetProduct = sorted[0];
+    if (matchedProducts.length > 0) {
+      const bestProduct = compareProductsByStrategy(matchedProducts, criterion);
+      if (bestProduct && String(ing.defaultProductId || '') !== String(bestProduct.id)) {
+        updatedCount++;
+        return { ...ing, defaultProductId: bestProduct.id, updatedAt: new Date().toISOString() };
       }
-
-      if (targetProduct) {
-        targetDefaultId = targetProduct.id || targetProduct.productId;
-        targetDefaultName = targetProduct.name || targetProduct.productName;
-      }
-    }
-
-    if (ing.defaultProductId !== targetDefaultId || ing.autoDefault !== targetDefaultName) {
-      updatedCount++;
-      return {
-        ...ing,
-        defaultProductId: targetDefaultId,
-        autoDefault: targetDefaultName,
-        autoDefaultProduct: targetDefaultName,
-        updatedAt: new Date().toISOString()
-      };
     }
     return ing;
   });
 
   if (updatedCount > 0) {
-    console.log(`[HydrationService] Repaired and recalibrated defaults for ${updatedCount} ingredients.`);
     setIngredients(updatedIngredients);
-    if (window.Store?.setState) window.Store.setState({ ingredients: updatedIngredients });
-    if (typeof window !== 'undefined') {
-      if (window.state) window.state.ingredients = updatedIngredients;
-      if (typeof window.invalidateHierarchyCache === 'function') window.invalidateHierarchyCache();
-      window.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: updatedIngredients }));
-      if (typeof window.renderPantryBank === 'function') window.renderPantryBank();
-    }
+    if (window.state) window.state.ingredients = updatedIngredients;
     try {
-      const changed = updatedIngredients.filter((i, idx) => ingredients[idx] !== i);
-      await Promise.all(changed.map(i => saveIngredient(i)));
+      for (const ing of updatedIngredients) {
+        if (ing.defaultProductId) {
+          await saveIngredient(ing);
+        }
+      }
+      console.log(`[HydrationService] Repaired and recalibrated defaults for ${updatedCount} ingredients.`);
     } catch (err) {
       console.warn('[HydrationService] Failed persisting repaired ingredient defaults:', err);
     }
@@ -108,17 +77,9 @@ if (typeof window !== 'undefined') {
 
 export function mergeCanonicalCategories(rawCategories) {
   const categories = Array.isArray(rawCategories) ? [...rawCategories] : [];
-  const slugCat = str => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const existingSlugs = new Set(categories.map(c => slugCat(getCategoryName(c))));
-  let mutated = false;
-  CANONICAL_CATEGORIES.forEach(canon => {
-    if (!existingSlugs.has(slugCat(canon))) {
-      categories.push(canon);
-      existingSlugs.add(slugCat(canon));
-      mutated = true;
-    }
-  });
-  return { categories, mutated };
+  // Do NOT auto-inject canonical categories if rawCategories was explicitly retrieved from Firestore/store.
+  // This prevents resurrection of user-deleted categories on boot hydration.
+  return { categories, mutated: false };
 }
 
 export function normalizeProductRecord(p) {
@@ -139,104 +100,30 @@ export function normalizeProductRecord(p) {
   return { ...p, subtypeId, ingredientId, category, packSize, pack: packSize, kcal, cal: kcal, protein, prot: protein };
 }
 
-export function normalizeIngredientRecord(ing) {
-  if (!ing || typeof ing !== 'object') return ing;
-  const category = ing.category ?? ing.category_id ?? ing.categoryName ?? ing.cat ?? 'Other';
-  const kcal = Number(ing.kcal ?? ing.calories ?? ing.energy_kcal ?? ing.cal ?? 0);
-  const protein = Number(ing.protein ?? ing.protein_g ?? ing.prot ?? 0);
-  const subtypes = (Array.isArray(ing.subtypes) ? ing.subtypes : []).map(st => {
-    const stKcal = Number(st.kcal ?? st.calories ?? st.energy_kcal ?? st.cal ?? 0);
-    const stProtein = Number(st.protein ?? st.protein_g ?? st.prot ?? 0);
-    return { ...st, kcal: stKcal, cal: stKcal, protein: stProtein, prot: stProtein };
-  });
-  return { ...ing, category, kcal, cal: kcal, protein, prot: protein, subtypes };
+export function normalizeIngredientRecord(i) {
+  if (!i || typeof i !== 'object') return i;
+  const category = i.category ?? i.category_id ?? i.categoryName ?? i.cat ?? 'Other';
+  const subtypes = Array.isArray(i.subtypes) ? i.subtypes.map(st => ({
+    ...st,
+    category: st.category ?? st.categoryName ?? category,
+    cat: st.cat ?? slugifyToKebab(st.category ?? category)
+  })) : [];
+  return { ...i, category, subtypes };
 }
 
-let inFlightHydration = null;
-let listenersActive = false;
-let hydrationLogged = false;
-
-function initRealtimeListeners() {
-  if (listenersActive) return;
-  listenersActive = true;
-
-  subscribeRecipes(
-    (freshRecipes) => {
-      const normalized = (freshRecipes || []).map(cleanLegacyMacros);
-      setRecipes(normalized);
-      if (typeof window !== 'undefined') {
-        if (!window.state) window.state = {};
-        window.state.recipes = normalized;
-        window.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: normalized }));
-        if (typeof window.renderRecipeVault === 'function') {
-          window.renderRecipeVault();
-        }
-      }
-    },
-    (error) => console.warn('[HydrationService] Firestore recipes stream transient disconnect:', error?.message || error)
-  );
-
-  subscribeIngredients(
-    (freshIngredients) => {
-      const normalized = (freshIngredients || []).map(normalizeIngredientRecord);
-      setIngredients(normalized);
-      if (typeof window !== 'undefined') {
-        if (!window.state) window.state = {};
-        window.state.ingredients = normalized;
-        window.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: normalized }));
-      }
-    },
-    (error) => console.warn('[HydrationService] Firestore ingredients stream transient disconnect:', error?.message || error)
-  );
-
-  subscribeProducts(
-    (freshProducts) => {
-      const normalized = (freshProducts || []).map(normalizeProductRecord);
-      setProducts(normalized);
-      if (typeof window !== 'undefined') {
-        if (!window.state) window.state = {};
-        window.state.products = normalized;
-        window.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: normalized }));
-      }
-    },
-    (error) => console.warn('[HydrationService] Firestore products stream transient disconnect:', error?.message || error)
-  );
-
-  subscribePreferences(
-    (freshPrefs) => {
-      if (!freshPrefs) return;
-      setPreferences(freshPrefs);
-      if (typeof window !== 'undefined') {
-        if (!window.state) window.state = {};
-        const userPrefs = freshPrefs.userPrefs || freshPrefs;
-        window.state.userPrefs = { ...(window.state.userPrefs || {}), ...userPrefs };
-        window.dispatchEvent(new CustomEvent('plateplan:state:preferences', { detail: freshPrefs }));
-      }
-    },
-    (error) => console.warn('[HydrationService] Firestore prefs stream transient disconnect:', error?.message || error)
-  );
-
-  subscribeCurrentPlan(
-    (freshPlan) => {
-      if (!freshPlan) return;
-      setCurrentPlan(freshPlan);
-      if (typeof window !== 'undefined') {
-        if (!window.state) window.state = {};
-        window.state.plan = freshPlan;
-        window.dispatchEvent(new CustomEvent('plateplan:state:plan', { detail: freshPlan }));
-      }
-    },
-    (error) => console.warn('[HydrationService] Firestore plan stream transient disconnect:', error?.message || error)
-  );
+function slugifyToKebab(str) {
+  return (str || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
-export async function hydrateHouseholdData() {
-  if (inFlightHydration) return inFlightHydration;
+let activeHydrationPromise = null;
 
-  inFlightHydration = (async () => {
-    // 1. Gate Cloud Hydration Behind Auth
-    const user = await waitForAuth();
-    if (!user) {
+export async function hydrateHouseholdData(options = {}) {
+  const { force = false } = options;
+  if (activeHydrationPromise && !force) return activeHydrationPromise;
+
+  activeHydrationPromise = (async () => {
+    const authed = await waitForAuth(6000);
+    if (!authed) {
       console.error('[Sync] Universal sync aborted: User unauthenticated after auth barrier timeout.');
       return { success: false, unauthenticated: true, fallback: true };
     }
@@ -260,7 +147,6 @@ export async function hydrateHouseholdData() {
       const products = (rawProducts || []).map(normalizeProductRecord);
       const { categories: mergedCategories, mutated } = mergeCanonicalCategories(rawCategories);
 
-      // Preserve local state if cloud returned empty/failed
       const currentStoreState = (typeof window !== 'undefined' && window.Store?.getState?.()) || {};
 
       if (Array.isArray(recipes) && recipes.length > 0) {
@@ -338,114 +224,86 @@ export async function hydrateHouseholdData() {
         const docTargets = docData.nutritionTargets || userPrefs.nutritionTargets || {};
         const docMealSplits = docData.mealSplits || userPrefs.mealSplits || {};
         const profileIds = Array.from(new Set([...Object.keys(rawProfiles), ...Object.keys(docTargets), 'elliott', 'chloe']));
-
-        const profiles = {};
-        for (const profileId of profileIds) {
-          const rawProf = rawProfiles[profileId] || {};
-          const rawTarget = docTargets[profileId] || {};
-          const legacyCal = profileId === 'elliott' ? (userPrefs.elliottCal ?? userPrefs.calE ?? userPrefs.eDailyKcal) : (userPrefs.chloeCal ?? userPrefs.calC ?? userPrefs.cDailyKcal);
-          const legacyProt = profileId === 'elliott' ? (userPrefs.elliottProt ?? userPrefs.protE ?? userPrefs.eDailyProt) : (userPrefs.chloeProt ?? userPrefs.protC ?? userPrefs.cDailyProt);
-          const dailyKcal = Number(rawProf.dailyKcal ?? rawTarget.dailyKcal ?? rawTarget.dailyCal ?? legacyCal ?? 0);
-          const dailyProtein = Number(rawProf.dailyProtein ?? rawTarget.dailyProtein ?? rawTarget.dailyProt ?? legacyProt ?? 0);
-
-          const pSplits = docMealSplits[profileId] || docMealSplits || {};
-          const calSplits = rawProf.calorieSplits || pSplits.calories || pSplits || {};
-          const protSplits = rawProf.proteinSplits || pSplits.protein || pSplits || {};
-
-          const extractMealSplit = (src, meal, targetVal, mealsObj) => {
-            if (src[meal] !== undefined && src[meal] !== null) return Number(src[meal]) || 0;
-            if (meal === 'snack' && src.snacking !== undefined) return Number(src.snacking) || 0;
-            if (meal === 'snacking' && src.snack !== undefined) return Number(src.snack) || 0;
-            const m = mealsObj?.[meal] || (meal === 'snack' ? mealsObj?.snacking : null);
-            const val = Number(m?.kcal ?? m?.protein ?? 0);
-            return (targetVal > 0 && val > 0) ? Math.round((val / targetVal) * 100) : 0;
+        const hydratedProfiles = {};
+        profileIds.forEach(pid => {
+          hydratedProfiles[pid] = {
+            id: pid,
+            name: pid.charAt(0).toUpperCase() + pid.slice(1),
+            avatar: rawProfiles[pid]?.avatar || (pid === 'elliott' ? '🧔‍♂️' : '👩‍🦰'),
+            colour: rawProfiles[pid]?.colour || (pid === 'elliott' ? '#3b82f6' : '#ec4899'),
+            nutritionTargets: docTargets[pid] || rawProfiles[pid]?.nutritionTargets || { calories: 2000, protein: 125, carbs: 200, fat: 70 },
+            mealSplits: docMealSplits[pid] || rawProfiles[pid]?.mealSplits || { breakfast: 0.25, lunch: 0.35, dinner: 0.40 }
           };
-
-          const calBf = extractMealSplit(calSplits, 'breakfast', dailyKcal, rawTarget.meals);
-          const calLu = extractMealSplit(calSplits, 'lunch', dailyKcal, rawTarget.meals);
-          const calSn = extractMealSplit(calSplits, 'snack', dailyKcal, rawTarget.meals);
-          const calDi = calSplits.dinner !== undefined ? Number(calSplits.dinner) || 0 : Math.max(0, 100 - (calBf + calLu + calSn));
-
-          const protBf = extractMealSplit(protSplits, 'breakfast', dailyProtein, rawTarget.meals);
-          const protLu = extractMealSplit(protSplits, 'lunch', dailyProtein, rawTarget.meals);
-          const protSn = extractMealSplit(protSplits, 'snack', dailyProtein, rawTarget.meals);
-          const protDi = protSplits.dinner !== undefined ? Number(protSplits.dinner) || 0 : Math.max(0, 100 - (protBf + protLu + protSn));
-
-          profiles[profileId] = {
-            enabled: rawProf.enabled !== undefined ? Boolean(rawProf.enabled) : true,
-            name: rawProf.name || (profileId.charAt(0).toUpperCase() + profileId.slice(1)),
-            dailyKcal, dailyProtein,
-            calorieSplits: { breakfast: calBf, lunch: calLu, snack: calSn, dinner: calDi },
-            proteinSplits: { breakfast: protBf, lunch: protLu, snack: protSn, dinner: protDi }
-          };
-        }
-
-        window.state.preferences = window.state.preferences || {};
-        window.state.preferences.profiles = profiles;
-        window.state.userPrefs.profiles = profiles;
-
-        const nutritionTargets = {};
-        for (const [pId, pData] of Object.entries(profiles)) {
-          const bfKcal = Math.round((pData.calorieSplits.breakfast / 100) * pData.dailyKcal);
-          const luKcal = Math.round((pData.calorieSplits.lunch / 100) * pData.dailyKcal);
-          const snKcal = Math.round((pData.calorieSplits.snack / 100) * pData.dailyKcal);
-          const diKcal = Math.max(0, pData.dailyKcal - (bfKcal + luKcal + snKcal));
-          const bfProt = Math.round((pData.proteinSplits.breakfast / 100) * pData.dailyProtein);
-          const luProt = Math.round((pData.proteinSplits.lunch / 100) * pData.dailyProtein);
-          const snProt = Math.round((pData.proteinSplits.snack / 100) * pData.dailyProtein);
-          const diProt = Math.max(0, pData.dailyProtein - (bfProt + luProt + snProt));
-
-          nutritionTargets[pId] = {
-            dailyKcal: pData.dailyKcal, dailyProtein: pData.dailyProtein,
-            meals: {
-              breakfast: { kcal: bfKcal, protein: bfProt },
-              lunch: { kcal: luKcal, protein: luProt },
-              dinner: { kcal: diKcal, protein: diProt },
-              snacking: { kcal: snKcal, protein: snProt }
-            }
-          };
-        }
-
-        window.state.userPrefs.nutritionTargets = nutritionTargets;
-        window.state.preferences.nutritionTargets = nutritionTargets;
+        });
+        window.state.profiles = hydratedProfiles;
       }
 
-      initRealtimeListeners();
+      setupRealtimeSubscriptions();
       saveStateCache();
 
-      // Defer non-critical self-healing writes away from boot
-      setTimeout(() => {
-        runDeferredMaintenance(preferencesData, mergedCategories, mutated);
-      }, 3000);
+      runDeferredMaintenance(preferencesData, mergedCategories, mutated);
 
-      const cloudHasData = Boolean(
-        (Array.isArray(recipes) && recipes.length > 0) ||
-        (Array.isArray(ingredients) && ingredients.length > 0) ||
-        (Array.isArray(products) && products.length > 0) ||
-        preferencesData || plan
-      );
-
-      updateState({ isCloudHydrated: true, isCachedHydrated: true });
-
-      if (!hydrationLogged) {
-        hydrationLogged = true;
-        console.log('[HydrationService] Household data hydrated successfully into Store and persisted to local cache.');
-      }
-      return { success: Boolean(cloudHasData), timestamp: Date.now() };
+      return { success: true, recipesCount: recipes.length, ingredientsCount: ingredients.length, productsCount: products.length };
     } catch (err) {
-      console.error('[HydrationService] Hydration failed:', err);
+      console.error('[HydrationService] Critical hydration failure:', err);
       return { success: false, error: err };
     } finally {
-      inFlightHydration = null;
+      activeHydrationPromise = null;
     }
   })();
 
-  return inFlightHydration;
+  return activeHydrationPromise;
 }
 
-/**
- * Isolated post-hydration maintenance routines deferred away from critical application startup.
- */
+let unsubs = [];
+function setupRealtimeSubscriptions() {
+  if (unsubs.length > 0) {
+    unsubs.forEach(unsub => { if (typeof unsub === 'function') unsub(); });
+    unsubs = [];
+  }
+
+  try {
+    unsubs.push(subscribeRecipes((recipes) => {
+      setRecipes(recipes.map(cleanLegacyMacros));
+      if (window.state) window.state.recipes = recipes;
+    }));
+
+    unsubs.push(subscribeIngredients((ingredients) => {
+      const normIngs = (ingredients || []).map(normalizeIngredientRecord);
+      setIngredients(normIngs);
+      if (window.state) window.state.ingredients = normIngs;
+    }));
+
+    unsubs.push(subscribeProducts((products) => {
+      const normProds = (products || []).map(normalizeProductRecord);
+      setProducts(normProds);
+      if (window.state) window.state.products = normProds;
+    }));
+
+    unsubs.push(subscribePreferences((prefs) => {
+      if (prefs) {
+        const sanitized = sanitizePreferences(prefs);
+        setPreferences(sanitized);
+        if (window.state) {
+          window.state.settings = { ...(window.state.settings || {}), ...(sanitized.settings || {}) };
+        }
+      }
+    }));
+
+    unsubs.push(subscribeCurrentPlan((plan) => {
+      if (plan) {
+        setCurrentPlan(plan);
+        if (window.state) {
+          window.state.plan = plan;
+          if (plan.skeletonGrid) window.state.skeletonGrid = plan.skeletonGrid;
+        }
+      }
+    }));
+  } catch (err) {
+    console.warn('[HydrationService] Realtime subscription setup warning:', err);
+  }
+}
+
 async function runDeferredMaintenance(preferencesData, mergedCategories, mutated) {
   try {
     const authInstance = (typeof window !== 'undefined' && window.firebase && typeof window.firebase.auth === 'function')
@@ -457,7 +315,6 @@ async function runDeferredMaintenance(preferencesData, mergedCategories, mutated
       return;
     }
 
-    // 1. Defer categories persistence
     if (mutated && Array.isArray(mergedCategories)) {
       try {
         await saveCategories(mergedCategories);
@@ -466,41 +323,10 @@ async function runDeferredMaintenance(preferencesData, mergedCategories, mutated
       }
     }
 
-    // 2. Defer sweep & recalibrate ingredient defaults
     try {
       await sweepAndRecalibrateIngredientDefaults();
-    } catch (err) {
-      console.warn('[Maintenance] Deferred sweepAndRecalibrate error:', err);
-    }
-
-    // 3. Defer cleanPreferencesBloat
-    if (preferencesData) {
-      const originalSize = new Blob([JSON.stringify(preferencesData || {})]).size;
-      const hasLegacyKeys = preferencesData && (
-        preferencesData.planHistory !== undefined ||
-        preferencesData.ingredientGroups !== undefined ||
-        preferencesData.ingredientFamilies !== undefined ||
-        (preferencesData.userPrefs && (
-          preferencesData.userPrefs.planHistory !== undefined ||
-          preferencesData.userPrefs.ingredientGroups !== undefined ||
-          preferencesData.userPrefs.ingredientFamilies !== undefined
-        ))
-      );
-
-      if (hasLegacyKeys || originalSize > 50 * 1024) {
-        console.log(`[Maintenance] Stale/bloated preferences detected (${(originalSize / 1024).toFixed(2)} KB). Running deferred clean...`);
-        try {
-          const repo = await import('./HouseholdRepository.js');
-          if (typeof repo.cleanPreferencesBloat === 'function') {
-            const res = await repo.cleanPreferencesBloat();
-            if (res && res.success) {
-              console.log(`[Maintenance] Preferences cleaned: ${(res.sizeBytes / 1024).toFixed(2)} KB.`);
-            }
-          }
-        } catch (e) {
-          console.warn('[Maintenance] cleanPreferencesBloat failed:', e);
-        }
-      }
+    } catch (e) {
+      console.warn('[Maintenance] sweepAndRecalibrateIngredientDefaults failed:', e);
     }
   } catch (err) {
     console.warn('[Maintenance] Deferred maintenance skipped:', err);
