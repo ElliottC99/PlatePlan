@@ -1,7 +1,7 @@
 /**
- * src/services/CategoryRepository.js (v3.38.0)
+ * src/services/CategoryRepository.js (v3.38.1)
  * Dedicated Micro-Repository for Category Mutations (Merge, Rename, Reassign & Delete).
- * Implements strict case-insensitive normalization and chunked-batch cascade operations.
+ * Implements strict case-insensitive normalization and chunked-batch cascade operations with detailed logging.
  */
 
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
@@ -70,6 +70,7 @@ export async function mergeCategory(sourceCat, targetCat) {
       }
     });
 
+    console.log(`[CategoryRepository] Cascade Merge (${sourceCat} -> ${cleanTargetCat}): Updated ${changedIngIds.size} ingredients and ${changedProdIds.size} products.`);
     return { updatedIngs, updatedProds, changedIngIds, changedProdIds };
   };
 
@@ -179,6 +180,7 @@ export async function renameCategory(oldName, newName) {
       }
     });
 
+    console.log(`[CategoryRepository] Cascade Rename (${oldName} -> ${cleanNewName}): Updated ${changedIngIds.size} ingredients and ${changedProdIds.size} products.`);
     return { updatedIngs, updatedProds, changedIngIds, changedProdIds };
   };
 
@@ -237,11 +239,11 @@ export async function renameCategory(oldName, newName) {
   }
 }
 
-export async function reassignAndDeleteCategory(deletedCat, reassignMode = 'mass', massTargetCat = 'Uncategorised', individualCatMap = {}) {
+export async function reassignAndDeleteCategory(deletedCat, reassignMode = 'mass', massTargetCat = 'Other', individualCatMap = {}) {
   if (!deletedCat) return { success: false, error: 'Missing category to delete' };
 
   const deletedNorm = strictNorm(deletedCat);
-  const massTarget = toCanonicalCategoryName((massTargetCat || '').trim() || 'Uncategorised');
+  const massTarget = toCanonicalCategoryName((massTargetCat || '').trim() || 'Other');
 
   const cascadeReassign = (ingList = [], prodList = []) => {
     const updatedIngs = Array.isArray(ingList) ? ingList.map(i => ({ ...i, subtypes: Array.isArray(i.subtypes) ? [...i.subtypes] : [] })) : [];
@@ -281,6 +283,7 @@ export async function reassignAndDeleteCategory(deletedCat, reassignMode = 'mass
       }
     });
 
+    console.log(`[CategoryRepository] Cascade Reassign & Delete (${deletedCat} -> ${massTarget}): Reassigned ${changedIngIds.size} ingredients and ${changedProdIds.size} products.`);
     return { updatedIngs, updatedProds, changedIngIds, changedProdIds };
   };
 
@@ -341,6 +344,6 @@ export async function reassignAndDeleteCategory(deletedCat, reassignMode = 'mass
   }
 }
 
-export async function deleteCategory(categoryName, fallbackCatName = 'Uncategorised') {
+export async function deleteCategory(categoryName, fallbackCatName = 'Other') {
   return reassignAndDeleteCategory(categoryName, 'mass', fallbackCatName, {});
 }
