@@ -1634,9 +1634,11 @@ export async function deleteCategory(categoryName, fallbackCatName = 'Uncategori
     const catsSnap = await catsDocRef.get();
     if (catsSnap.exists) {
       const data = catsSnap.data();
+      const strictNorm = (str) => String(str || '').toLowerCase().trim();
+      const sourceNorm = strictNorm(categoryName);
       const updatedCats = (data.categories || []).filter(c => {
         const cName = typeof c === 'string' ? c : c?.name;
-        return strictNorm(cName) !== sourceNorm;
+        return strictNorm(cName) !== sourceNorm && slugCategory(cName) !== sourceNorm;
       });
       deleteOps.push((b) => b.set(catsDocRef, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true }));
     }
@@ -1705,7 +1707,12 @@ export async function reassignAndDeleteCategory(deletedCat, reassignMode = 'mass
   // 1. In-memory Store update
   const state = getStoreState() || {};
   const { updatedIngs, updatedProds } = reassignHierarchy(state.ingredients, state.products);
-  const categories = (state.categories || []).filter(c => slugCategory(c) !== deletedSlug);
+  const strictNorm = (str) => String(str || '').toLowerCase().trim();
+  const deletedNorm = strictNorm(deletedCat);
+  const categories = (state.categories || []).filter(c => {
+    const cName = typeof c === 'string' ? c : c?.name;
+    return strictNorm(cName) !== deletedNorm && slugCategory(cName) !== deletedSlug;
+  });
 
   setCategories(categories);
   setIngredients(updatedIngs);
@@ -1763,7 +1770,10 @@ export async function reassignAndDeleteCategory(deletedCat, reassignMode = 'mass
     const catsSnap = await catsDocRef.get();
     if (catsSnap.exists) {
       const data = catsSnap.data();
-      const updatedCats = (data.categories || []).filter(c => slugCategory(c) !== deletedSlug);
+      const updatedCats = (data.categories || []).filter(c => {
+        const cName = typeof c === 'string' ? c : c?.name;
+        return strictNorm(cName) !== deletedNorm && slugCategory(cName) !== deletedSlug;
+      });
       deleteOps.push((b) => b.set(catsDocRef, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true }));
     }
 

@@ -1,5 +1,5 @@
 /**
- * src/components/pantry/CategoryManagerTemplates.js (v3.35.37)
+ * src/components/pantry/CategoryManagerTemplates.js (v3.35.40)
  * Pure Template Builder Functions for Category Manager Modal UI.
  */
 
@@ -107,12 +107,13 @@ export function renderReassignStepHtml(activeCat, reassignMode, allBound, otherC
           const selId = `cat-select-${item.id}`;
           const labelText = item.name || item.title || 'Item';
           return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:var(--surface2,#f5f5f4);border-radius:6px;border:1px solid var(--border,#e7e5e4)">
-            <label for="${selId}" style="font-size:12px;font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(labelText)}</label>
-            <select id="${selId}" name="cat_select_${item.id}" data-action="individual-cat-select" data-ing-id="${escapeAttr(item.id)}" style="padding:4px 6px;font-size:11.5px;border:1px solid var(--border,#e7e5e4);border-radius:6px;background:var(--surface,#fff)">
-              ${otherCats.map(c => `<option value="${escapeAttr(c)}" ${c === currentSel ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
-            </select>
+            <label for="${selId}" style="font-size:12px;font-weight:600;flex:1;margin-right:8px;word-break:break-word;">${escapeHtml(labelText)}</label>
+            <input type="text" id="${selId}" list="cat-options-datalist" data-action="individual-cat-select" data-ing-id="${escapeAttr(item.id)}" value="${escapeAttr(currentSel)}" style="padding:4px 6px;font-size:11.5px;border:1px solid var(--border,#e7e5e4);border-radius:6px;background:var(--surface,#fff);width:140px;">
           </div>`;
         }).join('') || '<div style="font-size:12px;color:var(--text2,#78716c);padding:8px">No matching items found.</div>'}
+        <datalist id="cat-options-datalist">
+          ${otherCats.map(c => `<option value="${escapeAttr(c)}">`).join('')}
+        </datalist>
       </div>`}
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button type="button" class="btn ghost sm" data-action="nav-step" data-step="list">Cancel</button>
