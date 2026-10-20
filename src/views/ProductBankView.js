@@ -5,7 +5,7 @@
  */
 
 import { getState, setProducts } from '../store/store.js';
-import { saveProduct, deleteProduct } from '../services/HouseholdRepository.js';
+import { saveProduct, deleteProduct } from '../services/ProductRepository.js';
 import { reallocateProduct, setAutoDefaultProduct, getActiveCategories, addSubtypeToIngredient } from '../models/PantryHierarchyModel.js';
 import { promptReallocateProduct as openReallocateModal } from '../components/pantry/ReallocateProductModalUI.js';
 

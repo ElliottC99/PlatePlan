@@ -5,7 +5,8 @@
  */
 
 import { getState, setIngredients, setProducts } from '../store/store.js';
-import { saveIngredient, deleteIngredient, saveProduct } from '../services/HouseholdRepository.js';
+import { saveIngredient, deleteIngredient } from '../services/IngredientRepository.js';
+import { saveProduct } from '../services/ProductRepository.js';
 
 export const slugCategory = (str) => (str || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
 export const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');

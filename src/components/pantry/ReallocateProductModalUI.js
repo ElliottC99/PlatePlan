@@ -5,7 +5,8 @@
  */
 
 import { getState, setIngredients, setProducts } from '../../store/store.js';
-import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
+import { saveIngredient } from '../../services/IngredientRepository.js';
+import { saveProduct } from '../../services/ProductRepository.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

@@ -5,7 +5,7 @@
  */
 
 import { getState, setProducts, setIngredients } from '../../store/store.js';
-import { batchResolveOrphansWithNewSubtypeInDb } from '../../services/HouseholdRepository.js';
+import { batchResolveOrphansWithNewSubtypeInDb } from '../../services/IngredientRepository.js';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 

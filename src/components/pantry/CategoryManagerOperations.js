@@ -7,6 +7,8 @@
 import { getState, setCategories, setIngredients, setProducts } from '../../store/store.js';
 import { saveCategories } from '../../services/HouseholdRepository.js';
 import { mergeCategory, renameCategory, reassignAndDeleteCategory, deleteCategory } from '../../services/CategoryRepository.js';
+import { getIngredients } from '../../services/IngredientRepository.js';
+import { getProducts } from '../../services/ProductRepository.js';
 import { slugCategory, invalidateHierarchyCache, toCanonicalCategoryName } from '../../models/PantryHierarchyModel.js';
 import { resetCategoryFilter } from '../../views/PantryBankView.js';
 
@@ -41,7 +43,7 @@ export async function submitMergeDuplicateCategories() {
   const res = await repo.mergeAllDuplicates();
 
   if (res && res.success) {
-    const freshIngredients = await repo.getIngredients(), freshProducts = await repo.getProducts();
+    const freshIngredients = await getIngredients(), freshProducts = await getProducts();
     setCategories(res.categories); setIngredients(freshIngredients); setProducts(freshProducts);
 
     if (window.Store?.setState) window.Store.setState({ categories: res.categories, ingredients: freshIngredients, products: freshProducts });

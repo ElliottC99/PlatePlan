@@ -6,7 +6,7 @@
  */
 
 import { getState, setIngredients, subscribe, setProducts } from '../store/store.js';
-import { saveIngredient } from '../services/HouseholdRepository.js';
+import { saveIngredient } from '../services/IngredientRepository.js';
 import { 
   buildPantryHierarchy, setAutoDefaultProduct, getActiveCategories,
   invalidateHierarchyCache, slugCategory

@@ -20,7 +20,9 @@ import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData } from './services/HydrationService.js';
 import { subscribe, getState, initStoreCache, setActivePlan } from './store/store.js';
 import { setupActionBridge } from './services/ActionBridge.js';
-import { saveCurrentPlan, stripPlanPayload, getCategories, saveCategories, saveIngredient, saveProduct, getIngredients, getProducts } from './services/HouseholdRepository.js';
+import { saveCurrentPlan, stripPlanPayload, getCategories, saveCategories } from './services/HouseholdRepository.js';
+import { saveIngredient, getIngredients } from './services/IngredientRepository.js';
+import { saveProduct, getProducts } from './services/ProductRepository.js';
 import { AppState } from './state/AppState.js';
 import { renderToday } from './views/TodayView.js';
 import { renderIngredientBank, renderProductBank } from './views/PantryBankView.js';
@@ -283,7 +285,7 @@ function setupSubscriptions() {
   subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
 }
 
-export const APP_VERSION = 'v3.35.42';
+export const APP_VERSION = 'v3.38.0';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;

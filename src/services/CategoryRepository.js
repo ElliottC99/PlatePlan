@@ -1,7 +1,7 @@
 /**
- * src/services/CategoryRepository.js (v3.35.42)
+ * src/services/CategoryRepository.js (v3.38.0)
  * Dedicated Micro-Repository for Category Mutations (Merge, Rename, Reassign & Delete).
- * Implements the Strangler Fig Pattern: isolated chunked-batch cascade operations with strict SSOT state syncing.
+ * Implements strict case-insensitive normalization and chunked-batch cascade operations.
  */
 
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
@@ -75,8 +75,12 @@ export async function mergeCategory(sourceCat, targetCat) {
 
   const state = getStoreState() || {};
   const { updatedIngs, updatedProds } = cascadeMerge(state.ingredients, state.products);
-  const categories = (state.categories || []).filter(c => strictNorm(c) !== sourceNorm && slugCategory(c) !== slugCategory(sourceCat));
-  if (!categories.some(c => strictNorm(c) === strictNorm(cleanTargetCat))) {
+  const categories = (state.categories || []).filter(c => {
+    const cName = typeof c === 'string' ? c : c?.name;
+    const cNorm = strictNorm(cName);
+    return cNorm !== sourceNorm && slugCategory(cNorm) !== slugCategory(sourceCat);
+  });
+  if (!categories.some(c => strictNorm(typeof c === 'string' ? c : c?.name) === strictNorm(cleanTargetCat))) {
     categories.push(cleanTargetCat);
   }
 
@@ -113,7 +117,11 @@ export async function mergeCategory(sourceCat, targetCat) {
     const catsSnap = await catsDocRef.get();
     if (catsSnap.exists) {
       const data = catsSnap.data();
-      const updatedCats = (data.categories || []).filter(c => strictNorm(typeof c === 'string' ? c : c?.name) !== sourceNorm);
+      const updatedCats = (data.categories || []).filter(c => {
+        const cName = typeof c === 'string' ? c : c?.name;
+        const cNorm = strictNorm(cName);
+        return cNorm !== sourceNorm && slugCategory(cNorm) !== slugCategory(sourceCat);
+      });
       if (!updatedCats.some(c => strictNorm(typeof c === 'string' ? c : c?.name) === strictNorm(cleanTargetCat))) {
         updatedCats.push(cleanTargetCat);
       }
@@ -280,7 +288,8 @@ export async function reassignAndDeleteCategory(deletedCat, reassignMode = 'mass
   const { updatedIngs, updatedProds } = cascadeReassign(state.ingredients, state.products);
   const categories = (state.categories || []).filter(c => {
     const cName = typeof c === 'string' ? c : c?.name;
-    return strictNorm(cName) !== deletedNorm && slugCategory(cName) !== slugCategory(deletedCat);
+    const cNorm = strictNorm(cName);
+    return cNorm !== deletedNorm && slugCategory(cNorm) !== slugCategory(deletedCat);
   });
 
   setCategories(categories);
@@ -318,7 +327,8 @@ export async function reassignAndDeleteCategory(deletedCat, reassignMode = 'mass
       const data = catsSnap.data();
       const updatedCats = (data.categories || []).filter(c => {
         const cName = typeof c === 'string' ? c : c?.name;
-        return strictNorm(cName) !== deletedNorm && slugCategory(cName) !== slugCategory(deletedCat);
+        const cNorm = strictNorm(cName);
+        return cNorm !== deletedNorm && slugCategory(cNorm) !== slugCategory(deletedCat);
       });
       ops.push((b) => b.set(catsDocRef, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true }));
     }

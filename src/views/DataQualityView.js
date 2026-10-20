@@ -5,7 +5,8 @@
  */
 
 import { getState, setPreferences, setIngredients, runOptimisticMutation } from '../store/store.js';
-import { saveIngredient, savePreferences, dismissAdvisoryInDb, savePreferencesWithAutoPrune } from '../services/HouseholdRepository.js';
+import { savePreferences, dismissAdvisoryInDb, savePreferencesWithAutoPrune } from '../services/HouseholdRepository.js';
+import { saveIngredient } from '../services/IngredientRepository.js';
 import { runAudit } from '../services/DataQualityEngine.js';
 import { openMacroDriftPreviewModal } from '../components/data-quality/MacroDriftPreviewModal.js';
 import { openSubtypeOrphanResolverModal } from '../components/data-quality/SubtypeOrphanResolverModal.js';

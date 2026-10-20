@@ -5,7 +5,7 @@
  */
 
 import { getState, setIngredients, setProducts } from '../../store/store.js';
-import { saveIngredient } from '../../services/HouseholdRepository.js';
+import { saveIngredient } from '../../services/IngredientRepository.js';
 
 const escapeHTML = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -252,7 +252,7 @@ export function handleDeleteIngredient(ingId, ingName = null, parentId = null) {
     const ings = (curState.ingredients || []).filter(i => String(i.id) !== String(ingId));
     setIngredients(ings);
     if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-    import('../../services/HouseholdRepository.js').then(async (repo) => {
+    import('../../services/IngredientRepository.js').then(async (repo) => {
       await repo.deleteIngredient(ingId);
     });
   };
@@ -288,7 +288,7 @@ export function handleDeleteProduct(productId, prodName = null) {
     const prods = (curState.products || []).filter(p => String(p.id) !== String(productId));
     setProducts(prods);
     if (typeof window.renderProductBank === 'function') window.renderProductBank();
-    import('../../services/HouseholdRepository.js').then(async (repo) => {
+    import('../../services/ProductRepository.js').then(async (repo) => {
       await repo.deleteProduct(productId);
     });
   };

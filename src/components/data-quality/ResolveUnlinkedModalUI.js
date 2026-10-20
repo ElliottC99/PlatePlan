@@ -6,7 +6,8 @@
  */
 
 import { getState, setProducts, setRecipes } from '../../store/store.js';
-import { saveProduct, saveRecipe } from '../../services/HouseholdRepository.js';
+import { saveRecipe } from '../../services/HouseholdRepository.js';
+import { saveProduct } from '../../services/ProductRepository.js';
 import { reallocateProduct, reparentSubtype, mergeIngredients } from '../../models/PantryHierarchyModel.js';
 import { parseTescoProduct } from '../../services/TescoImportService.js';
 import { openProductEditModal } from '../../views/ProductBankView.js';

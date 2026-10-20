@@ -3,7 +3,8 @@
  * Progressive Cascading Hierarchy Alignment Wizard with Title Case Normalisation & Auto-Default Sync.
  */
 import { getState, setIngredients } from '../../store/store.js';
-import { saveIngredient, saveProduct } from '../../services/HouseholdRepository.js';
+import { saveIngredient } from '../../services/IngredientRepository.js';
+import { saveProduct } from '../../services/ProductRepository.js';
 import { safeGetProducts, commitProductUpdates } from './ResolveUnlinkedModalUI.js';
 
 let wizardQueue = [], currentIndex = 0, wizardStage = 1;

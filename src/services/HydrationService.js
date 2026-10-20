@@ -4,7 +4,9 @@
  * updating centralized Store and window.state as single source of truth.
  */
 
-import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeRecipes, subscribeIngredients, subscribeProducts, subscribePreferences, subscribeCurrentPlan, getCategories, saveCategories, saveIngredient, cleanLegacyMacros } from './HouseholdRepository.js';
+import { getRecipes, getPreferences, getCurrentPlan, subscribeRecipes, subscribePreferences, subscribeCurrentPlan, getCategories, saveCategories, cleanLegacyMacros } from './HouseholdRepository.js';
+import { getIngredients, subscribeIngredients, saveIngredient } from './IngredientRepository.js';
+import { getProducts, subscribeProducts } from './ProductRepository.js';
 import { getInventory } from './InventoryRepository.js';
 import { getCurrentActivePlan as getActivePlanFromSubcollection } from './PlanRepository.js';
 import { setRecipes, setIngredients, setProducts, setPreferences, setCurrentPlan, saveStateCache, setCategories, setInventory, sanitizePreferences, updateState } from '../store/store.js';

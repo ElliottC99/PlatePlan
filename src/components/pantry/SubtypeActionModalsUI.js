@@ -7,9 +7,10 @@
 
 import { getState, setIngredients, setProducts } from '../../store/store.js';
 import { 
-  saveIngredient, saveProduct, deleteSubtypeInDb,
+  saveIngredient, deleteSubtypeInDb,
   promoteSubtype, moveSubtype, mergeSubtype
-} from '../../services/HouseholdRepository.js';
+} from '../../services/IngredientRepository.js';
+import { saveProduct } from '../../services/ProductRepository.js';
 import { invalidateHierarchyCache } from '../../models/PantryHierarchyModel.js';
 import { promptReallocateProduct, openProductReallocateModal } from './ReallocateProductModalUI.js';
 import {
