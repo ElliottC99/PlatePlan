@@ -1564,7 +1564,7 @@ export async function deleteCategory(categoryName, fallbackCatName = 'Uncategori
     return strictNorm(cName) !== sourceNorm;
   });
 
-  const { updatedIngs, updatedProds } = cascadeCategoryReassignment(state.ingredients, state.products);
+  const { updatedIngs, updatedProds, changedIngIds, changedProdIds } = cascadeCategoryReassignment(state.ingredients, state.products);
 
   setCategories(categories);
   setIngredients(updatedIngs);
@@ -1584,6 +1584,8 @@ export async function deleteCategory(categoryName, fallbackCatName = 'Uncategori
     // Fetch products
     const prodSnap = await householdRef.collection('products').get();
     const dbProds = prodSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+
+    const { updatedIngs: dbCascadeIngs, updatedProds: dbCascadeProds } = cascadeCategoryReassignment(dbIngs, dbProds);
 
     // Helper for chunked batch commits (max 400 operations per batch)
     const commitChunkedOps = async (ops) => {
