@@ -1464,6 +1464,7 @@ const HouseholdRepository = {
   inspectPreferences,
   cleanPreferencesBloat,
   deleteCategory,
+  reassignAndDeleteCategory,
   renameCategory,
   mergeCategory,
   mergeAllDuplicates,
@@ -1644,6 +1645,132 @@ export async function deleteCategory(categoryName, fallbackCatName = 'Uncategori
     return { success: true };
   } catch (err) {
     console.error('[HouseholdRepository] deleteCategory error:', err);
+    throw err;
+  }
+}
+
+export async function reassignAndDeleteCategory(deletedCat, reassignMode = 'mass', massTargetCat = 'Uncategorised', individualCatMap = {}) {
+  if (!deletedCat) return { success: false, error: 'Missing category to delete' };
+
+  const slugCategory = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^a-z0-9\-]/g, '');
+
+  const deletedSlug = slugCategory(deletedCat);
+  const massTarget = (massTargetCat || '').trim() || 'Uncategorised';
+
+  const reassignHierarchy = (ingList = [], prodList = []) => {
+    const updatedIngs = Array.isArray(ingList) ? ingList.map(i => ({ ...i, subtypes: Array.isArray(i.subtypes) ? [...i.subtypes] : [] })) : [];
+    const updatedProds = Array.isArray(prodList) ? prodList.map(p => ({ ...p })) : [];
+
+    const changedIngIds = new Set();
+    const changedProdIds = new Set();
+
+    updatedIngs.forEach(i => {
+      let changed = false;
+      if (slugCategory(i.category) === deletedSlug || i.cat === deletedCat) {
+        const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
+        i.category = dest;
+        i.cat = slugifyToKebab(dest);
+        i.updatedAt = new Date().toISOString();
+        changed = true;
+      }
+      if (Array.isArray(i.subtypes)) {
+        i.subtypes.forEach(st => {
+          if (slugCategory(st.category) === deletedSlug || st.cat === deletedCat) {
+            const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[st.id] || massTarget);
+            st.category = dest;
+            st.cat = slugifyToKebab(dest);
+            changed = true;
+          }
+        });
+      }
+      if (changed) {
+        changedIngIds.add(String(i.id));
+      }
+    });
+
+    updatedProds.forEach(p => {
+      if (slugCategory(p.category) === deletedSlug || p.cat === deletedCat) {
+        const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[p.id] || massTarget);
+        p.category = dest;
+        p.cat = slugifyToKebab(dest);
+        p.updatedAt = new Date().toISOString();
+        changedProdIds.add(String(p.id));
+      }
+    });
+
+    return { updatedIngs, updatedProds, changedIngIds, changedProdIds };
+  };
+
+  // 1. In-memory Store update
+  const state = getStoreState() || {};
+  const { updatedIngs, updatedProds } = reassignHierarchy(state.ingredients, state.products);
+  const categories = (state.categories || []).filter(c => slugCategory(c) !== deletedSlug);
+
+  setCategories(categories);
+  setIngredients(updatedIngs);
+  setProducts(updatedProds);
+
+  if (!isDbAvailable()) return { success: true };
+
+  try {
+    const householdRef = db.collection('households').doc(HOUSEHOLD_ID);
+
+    const ingSnap = await householdRef.collection('ingredients').get();
+    const dbIngs = ingSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+
+    const prodSnap = await householdRef.collection('products').get();
+    const dbProds = prodSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+
+    const { updatedIngs: dbCascadeIngs, updatedProds: dbCascadeProds, changedIngIds, changedProdIds } = reassignHierarchy(dbIngs, dbProds);
+
+    const commitChunkedOps = async (ops) => {
+      if (ops.length === 0) return;
+      const CHUNK_SIZE = 400;
+      for (let i = 0; i < ops.length; i += CHUNK_SIZE) {
+        const chunkBatch = db.batch();
+        const chunk = ops.slice(i, i + CHUNK_SIZE);
+        chunk.forEach(op => op(chunkBatch));
+        await chunkBatch.commit();
+      }
+    };
+
+    const deleteOps = [];
+
+    dbCascadeIngs.forEach(ing => {
+      if (changedIngIds.has(String(ing.id))) {
+        deleteOps.push((b) => b.update(ing.ref, {
+          category: ing.category,
+          cat: ing.cat,
+          subtypes: ing.subtypes || [],
+          updatedAt: new Date().toISOString()
+        }));
+      }
+    });
+
+    dbCascadeProds.forEach(prod => {
+      if (changedProdIds.has(String(prod.id))) {
+        deleteOps.push((b) => b.update(prod.ref, {
+          category: prod.category,
+          cat: prod.cat,
+          updatedAt: new Date().toISOString()
+        }));
+      }
+    });
+
+    // Update settings/categories
+    const catsDocRef = householdRef.collection('settings').doc('categories');
+    const catsSnap = await catsDocRef.get();
+    if (catsSnap.exists) {
+      const data = catsSnap.data();
+      const updatedCats = (data.categories || []).filter(c => slugCategory(c) !== deletedSlug);
+      deleteOps.push((b) => b.set(catsDocRef, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true }));
+    }
+
+    await commitChunkedOps(deleteOps);
+    return { success: true };
+  } catch (err) {
+    console.error('[HouseholdRepository] reassignAndDeleteCategory error:', err);
     throw err;
   }
 }

@@ -5,7 +5,7 @@
  */
 
 import { getState, setCategories, setIngredients, setProducts } from '../../store/store.js';
-import { saveCategories, saveHouseholdState, mergeCategory, deleteCategory, renameCategory } from '../../services/HouseholdRepository.js';
+import { saveCategories, saveHouseholdState, mergeCategory, deleteCategory, renameCategory, reassignAndDeleteCategory } from '../../services/HouseholdRepository.js';
 import { slugCategory, slugifyToKebab, invalidateHierarchyCache, toCanonicalCategoryName } from '../../models/PantryHierarchyModel.js';
 import { resetCategoryFilter } from '../../views/PantryBankView.js';
 
@@ -73,34 +73,10 @@ export async function submitMergeCat(sourceCat, targetCat) {
 
 export async function submitReassignAndDelete(deletedCat, reassignMode, massTargetCat, individualCatMap) {
   if (!deletedCat) return;
-  const state = getState() || {}, ings = Array.isArray(state.ingredients) ? state.ingredients : [], prods = Array.isArray(state.products) ? state.products : [];
-  const massInput = document.getElementById('cat-mass-search-input'), massTarget = (massInput ? massInput.value.trim() : '') || massTargetCat || 'Uncategorised';
-  
-  ings.forEach(i => {
-    if (slugCategory(i.category) === slugCategory(deletedCat) || i.cat === deletedCat) {
-      const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[i.id] || massTarget);
-      i.category = dest; i.cat = slugifyToKebab(dest); i.updatedAt = new Date().toISOString();
-    }
-    if (Array.isArray(i.subtypes)) {
-      i.subtypes.forEach(st => {
-        if (slugCategory(st.category) === slugCategory(deletedCat) || st.cat === deletedCat) {
-          const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[st.id] || massTarget);
-          st.category = dest; st.cat = slugifyToKebab(dest);
-        }
-      });
-    }
-  });
+  const massInput = document.getElementById('cat-mass-search-input');
+  const massTarget = (massInput ? massInput.value.trim() : '') || massTargetCat || 'Uncategorised';
 
-  prods.forEach(p => {
-    if (slugCategory(p.category) === slugCategory(deletedCat) || p.cat === deletedCat) {
-      const dest = reassignMode === 'mass' ? massTarget : (individualCatMap[p.id] || massTarget);
-      p.category = dest; p.cat = slugifyToKebab(dest); p.updatedAt = new Date().toISOString();
-    }
-  });
-
-  const categories = (state.categories || []).filter(c => slugCategory(c) !== slugCategory(deletedCat));
-  setCategories(categories); setIngredients(ings); setProducts(prods);
-  await saveHouseholdState({ categories, ingredients: ings, products: prods });
+  await reassignAndDeleteCategory(deletedCat, reassignMode, massTarget, individualCatMap);
   if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
   invalidateHierarchyCache();
 }
