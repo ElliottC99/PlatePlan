@@ -1464,6 +1464,7 @@ const HouseholdRepository = {
   inspectPreferences,
   cleanPreferencesBloat,
   deleteCategory,
+  renameCategory,
   mergeCategory,
   mergeAllDuplicates,
   batchUpdateRecipesInDb
@@ -1643,6 +1644,171 @@ export async function deleteCategory(categoryName, fallbackCatName = 'Uncategori
     return { success: true };
   } catch (err) {
     console.error('[HouseholdRepository] deleteCategory error:', err);
+    throw err;
+  }
+}
+
+export async function renameCategory(oldCat, newName) {
+  if (!oldCat || !newName) return { success: false, error: 'Missing source or new category name' };
+
+  const strictNorm = (str) => String(str || '').toLowerCase().trim();
+  const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^a-z0-9\-]/g, '');
+
+  const sourceNorm = strictNorm(oldCat);
+  const cleanNewName = String(newName).trim();
+  const targetKebab = slugifyToKebab(cleanNewName);
+
+  // Apply Cascading Rename Logic
+  const cascadeCategoryReassignment = (ingList = [], prodList = []) => {
+    const updatedIngs = Array.isArray(ingList) ? ingList.map(i => ({ ...i, subtypes: Array.isArray(i.subtypes) ? [...i.subtypes] : [] })) : [];
+    const updatedProds = Array.isArray(prodList) ? prodList.map(p => ({ ...p })) : [];
+
+    const changedIngIds = new Set();
+    const changedSubtypeIds = new Set();
+    const changedProdIds = new Set();
+
+    // Step A (Root Level Cascade):
+    updatedIngs.forEach(ing => {
+      if (strictNorm(ing.category) === sourceNorm) {
+        ing.category = cleanNewName;
+        ing.cat = targetKebab;
+        ing.updatedAt = new Date().toISOString();
+        changedIngIds.add(String(ing.id));
+
+        if (Array.isArray(ing.subtypes)) {
+          ing.subtypes.forEach(st => {
+            st.category = cleanNewName;
+            st.cat = targetKebab;
+            if (st.id) changedSubtypeIds.add(String(st.id));
+          });
+        }
+
+        updatedProds.forEach(prod => {
+          const ingRefId = String(prod.ingredientId || prod.groupId || '');
+          if (ingRefId && ingRefId === String(ing.id)) {
+            prod.category = cleanNewName;
+            prod.cat = targetKebab;
+            prod.updatedAt = new Date().toISOString();
+            changedProdIds.add(String(prod.id));
+          }
+        });
+      }
+    });
+
+    // Step B (Sub-type Level Cascade):
+    updatedIngs.forEach(ing => {
+      if (Array.isArray(ing.subtypes)) {
+        ing.subtypes.forEach(st => {
+          if (strictNorm(st.category) === sourceNorm) {
+            st.category = cleanNewName;
+            st.cat = targetKebab;
+            if (st.id) changedSubtypeIds.add(String(st.id));
+            changedIngIds.add(String(ing.id));
+            ing.updatedAt = new Date().toISOString();
+
+            updatedProds.forEach(prod => {
+              const subRefId = String(prod.subtypeId || prod.subTypeId || '');
+              if (subRefId && st.id && subRefId === String(st.id)) {
+                prod.category = cleanNewName;
+                prod.cat = targetKebab;
+                prod.updatedAt = new Date().toISOString();
+                changedProdIds.add(String(prod.id));
+              }
+            });
+          }
+        });
+      }
+    });
+
+    // Step C (Product Level Cascade for remaining orphaned products):
+    updatedProds.forEach(prod => {
+      if (strictNorm(prod.category) === sourceNorm) {
+        prod.category = cleanNewName;
+        prod.cat = targetKebab;
+        prod.updatedAt = new Date().toISOString();
+        changedProdIds.add(String(prod.id));
+      }
+    });
+
+    return { updatedIngs, updatedProds, changedIngIds, changedSubtypeIds, changedProdIds };
+  };
+
+  // 1. Update in-memory Store state
+  const state = getStoreState() || {};
+  const categories = (state.categories || []).map(c => {
+    const cName = typeof c === 'string' ? c : c?.name;
+    return strictNorm(cName) === sourceNorm ? cleanNewName : c;
+  });
+
+  const { updatedIngs, updatedProds } = cascadeCategoryReassignment(state.ingredients, state.products);
+
+  setCategories(categories);
+  setIngredients(updatedIngs);
+  setProducts(updatedProds);
+
+  if (!isDbAvailable()) return { success: true };
+
+  try {
+    const householdRef = db.collection('households').doc(HOUSEHOLD_ID);
+
+    const ingSnap = await householdRef.collection('ingredients').get();
+    const dbIngs = ingSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+
+    const prodSnap = await householdRef.collection('products').get();
+    const dbProds = prodSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+
+    const { updatedIngs: dbCascadeIngs, updatedProds: dbCascadeProds, changedIngIds, changedProdIds } = cascadeCategoryReassignment(dbIngs, dbProds);
+
+    const commitChunkedOps = async (ops) => {
+      if (ops.length === 0) return;
+      const CHUNK_SIZE = 400;
+      for (let i = 0; i < ops.length; i += CHUNK_SIZE) {
+        const chunkBatch = db.batch();
+        const chunk = ops.slice(i, i + CHUNK_SIZE);
+        chunk.forEach(op => op(chunkBatch));
+        await chunkBatch.commit();
+      }
+    };
+
+    const renameOps = [];
+
+    dbCascadeIngs.forEach(ing => {
+      if (changedIngIds.has(String(ing.id))) {
+        renameOps.push((b) => b.update(ing.ref, {
+          category: ing.category,
+          cat: ing.cat,
+          subtypes: ing.subtypes || [],
+          updatedAt: new Date().toISOString()
+        }));
+      }
+    });
+
+    dbCascadeProds.forEach(prod => {
+      if (changedProdIds.has(String(prod.id))) {
+        renameOps.push((b) => b.update(prod.ref, {
+          category: prod.category,
+          cat: prod.cat,
+          updatedAt: new Date().toISOString()
+        }));
+      }
+    });
+
+    // Update the categories array in Settings doc
+    const catsDocRef = householdRef.collection('settings').doc('categories');
+    const catsSnap = await catsDocRef.get();
+    if (catsSnap.exists) {
+      const data = catsSnap.data();
+      const updatedCats = (data.categories || []).map(c => {
+        const cName = typeof c === 'string' ? c : c?.name;
+        return strictNorm(cName) === sourceNorm ? cleanNewName : c;
+      });
+      renameOps.push((b) => b.set(catsDocRef, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true }));
+    }
+
+    await commitChunkedOps(renameOps);
+    return { success: true };
+  } catch (err) {
+    console.error('[HouseholdRepository] renameCategory error:', err);
     throw err;
   }
 }

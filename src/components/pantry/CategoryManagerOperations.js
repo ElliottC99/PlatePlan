@@ -5,7 +5,7 @@
  */
 
 import { getState, setCategories, setIngredients, setProducts } from '../../store/store.js';
-import { saveCategories, saveHouseholdState, mergeCategory, deleteCategory } from '../../services/HouseholdRepository.js';
+import { saveCategories, saveHouseholdState, mergeCategory, deleteCategory, renameCategory } from '../../services/HouseholdRepository.js';
 import { slugCategory, slugifyToKebab, invalidateHierarchyCache, toCanonicalCategoryName } from '../../models/PantryHierarchyModel.js';
 import { resetCategoryFilter } from '../../views/PantryBankView.js';
 
@@ -61,26 +61,7 @@ export async function submitRenameCat(oldCat, rawName) {
   const newName = toCanonicalCategoryName(rawName.trim()), targetOld = (oldCat || '').trim();
   if (!newName || !targetOld || newName === targetOld) return;
 
-  const newCatKebab = slugifyToKebab(newName), state = getState() || {};
-  const ings = Array.isArray(state.ingredients) ? state.ingredients : [], prods = Array.isArray(state.products) ? state.products : [];
-  ings.forEach(i => {
-    let changed = false;
-    if (slugCategory(i.category) === slugCategory(targetOld) || i.cat === targetOld) { i.category = newName; i.cat = newCatKebab; changed = true; }
-    if (Array.isArray(i.subtypes)) {
-      i.subtypes.forEach(st => {
-        if (slugCategory(st.category) === slugCategory(targetOld) || st.cat === targetOld) { st.category = newName; st.cat = newCatKebab; changed = true; }
-      });
-    }
-    if (changed) i.updatedAt = new Date().toISOString();
-  });
-
-  prods.forEach(p => {
-    if (slugCategory(p.category) === slugCategory(targetOld) || p.cat === targetOld) { p.category = newName; p.cat = newCatKebab; p.updatedAt = new Date().toISOString(); }
-  });
-
-  const categories = (state.categories || []).map(c => slugCategory(c) === slugCategory(targetOld) ? newName : c);
-  setCategories(categories); setIngredients(ings); setProducts(prods);
-  await saveHouseholdState({ categories, ingredients: ings, products: prods });
+  await renameCategory(targetOld, newName);
   invalidateHierarchyCache();
 }
 
