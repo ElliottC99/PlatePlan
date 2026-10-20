@@ -1,12 +1,13 @@
 /**
- * src/components/pantry/CategoryManagerOperations.js (v3.35.37)
+ * src/components/pantry/CategoryManagerOperations.js (v3.35.41)
  * Async Category Operations Pipeline (CRUD, Merge, Deduplication, Reassignment).
- * Isolated from direct view rendering to maintain single-responsibility separation.
+ * Routed directly to CategoryRepository micro-service.
  */
 
 import { getState, setCategories, setIngredients, setProducts } from '../../store/store.js';
-import { saveCategories, saveHouseholdState, mergeCategory, deleteCategory, renameCategory, reassignAndDeleteCategory } from '../../services/HouseholdRepository.js';
-import { slugCategory, slugifyToKebab, invalidateHierarchyCache, toCanonicalCategoryName } from '../../models/PantryHierarchyModel.js';
+import { saveCategories } from '../../services/HouseholdRepository.js';
+import { mergeCategory, renameCategory, reassignAndDeleteCategory, deleteCategory } from '../../services/CategoryRepository.js';
+import { slugCategory, invalidateHierarchyCache, toCanonicalCategoryName } from '../../models/PantryHierarchyModel.js';
 import { resetCategoryFilter } from '../../views/PantryBankView.js';
 
 export { resolveCategory };
@@ -62,13 +63,17 @@ export async function submitRenameCat(oldCat, rawName) {
   if (!newName || !targetOld || newName === targetOld) return;
 
   await renameCategory(targetOld, newName);
+  if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
   invalidateHierarchyCache();
 }
 
 export async function submitMergeCat(sourceCat, targetCat) {
   if (!sourceCat || !targetCat) throw new Error('Missing source or target category');
   if (String(sourceCat).trim() === String(targetCat).trim()) throw new Error('Source and target categories must be different');
+  
   await mergeCategory(sourceCat, targetCat);
+  if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
+  invalidateHierarchyCache();
 }
 
 export async function submitReassignAndDelete(deletedCat, reassignMode, massTargetCat, individualCatMap) {
@@ -84,33 +89,8 @@ export async function submitReassignAndDelete(deletedCat, reassignMode, massTarg
 export async function handleDeleteCategory(identifier) {
   if (!identifier) return;
   const category = resolveCategory(identifier); if (!category?.name) return;
-  const targetId = category.id, targetName = category.name;
-  
-  await deleteCategory(targetId || targetName);
-  const state = getState() || {}, fallbackCatName = 'Uncategorised', fallbackKebab = slugifyToKebab(fallbackCatName);
 
-  const ings = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
-  ings.forEach(i => {
-    let changed = false;
-    if (slugCategory(i.category) === slugCategory(targetName) || i.cat === slugifyToKebab(targetName)) { i.category = fallbackCatName; i.cat = fallbackKebab; changed = true; }
-    if (Array.isArray(i.subtypes)) {
-      i.subtypes.forEach(st => {
-        if (slugCategory(st.category) === slugCategory(targetName) || st.cat === slugifyToKebab(targetName)) { st.category = fallbackCatName; st.cat = fallbackKebab; changed = true; }
-      });
-    }
-    if (changed) i.updatedAt = new Date().toISOString();
-  });
-
-  const prods = Array.isArray(state.products) ? [...state.products] : [];
-  prods.forEach(p => {
-    if (slugCategory(p.category) === slugCategory(targetName) || p.cat === slugifyToKebab(targetName)) { p.category = fallbackCatName; p.cat = fallbackKebab; p.updatedAt = new Date().toISOString(); }
-  });
-
-  const categories = (state.categories || []).filter(c => {
-    const cName = typeof c === 'string' ? c : c?.name;
-    return cName !== targetName && slugCategory(cName) !== slugCategory(targetName);
-  });
-
-  setCategories(categories); setIngredients(ings); setProducts(prods);
+  await deleteCategory(category.id || category.name);
+  if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
   invalidateHierarchyCache();
 }
