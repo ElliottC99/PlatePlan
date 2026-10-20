@@ -101,16 +101,16 @@ export function renderCategoryManagerModal() {
             return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2,#f5f5f4);border-radius:var(--radius-md,10px);border:1px solid var(--border,#e7e5e4)">
               <div><span style="font-size:13px;font-weight:650">${escapeHtml(cat.name)}</span><span style="font-size:11px;color:var(--text2,#78716c);margin-left:6px">(${ingCount} Items, ${subCount} Sub-types, ${prodCount} Products)</span></div>
               <div style="display:flex;gap:4px">
-                <button type="button" class="btn xs btn-ghost ghost" onclick="window.startRenameCat('${escapeAttr(cat.name)}')">Rename</button>
-                <button type="button" class="btn xs btn-ghost ghost" onclick="window.startMergeCat('${escapeAttr(cat.name)}')">Merge</button>
-                <button type="button" class="btn xs btn-ghost ghost" style="color:var(--red,#ef4444)" onclick="window.promptDeleteCategory('${escapeAttr(cat.name)}')">Delete</button>
+                <button type="button" class="btn xs btn-ghost ghost" onclick="window.startRenameCat('${escapeAttr(cat.name)}', event)">Rename</button>
+                <button type="button" class="btn xs btn-ghost ghost" onclick="window.startMergeCat('${escapeAttr(cat.name)}', event)">Merge</button>
+                <button type="button" class="btn xs btn-ghost ghost" style="color:var(--red,#ef4444)" onclick="window.promptDeleteCategory('${escapeAttr(cat.name)}', event)">Delete</button>
               </div>
             </div>`;
           }).join('')}
         </div>
         <div style="display:flex;gap:8px">
           <input type="text" id="cat-manager-add-input" name="cat_manager_add_input" placeholder="New category name..." aria-label="New category name" style="flex:1;padding:6px 10px;border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);font-size:13px">
-          <button id="btn-submit-add-cat" type="button" class="btn btn-primary primary sm" onclick="window.submitAddCat()">+ Add</button>
+          <button id="btn-submit-add-cat" type="button" class="btn btn-primary primary sm" onclick="window.submitAddCat(event)">+ Add</button>
         </div>`;
     } else if (wizardStep === 'rename') {
       bodyHtml = `
@@ -123,14 +123,14 @@ export function renderCategoryManagerModal() {
           <input type="text" id="cat-rename-input" name="cat_rename_input" value="${escapeAttr(activeCat)}" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);font-size:13.5px;box-sizing:border-box">
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button type="button" class="btn btn-ghost ghost sm" onclick="window.navCatStep('list')">Back</button>
-          <button id="btn-submit-rename-cat" type="button" class="btn btn-primary primary sm" onclick="window.submitRenameCat()">Apply Rename</button>
+          <button type="button" class="btn btn-ghost ghost sm" onclick="window.navCatStep('list', event)">Back</button>
+          <button id="btn-submit-rename-cat" type="button" class="btn btn-primary primary sm" onclick="window.submitRenameCat(event)">Apply Rename</button>
         </div>`;
     } else if (wizardStep === 'merge') {
       bodyHtml = `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border,#e7e5e4)">
           <h3 style="margin:0;font-size:15px;font-weight:750">Merge "${escapeHtml(activeCat)}"</h3>
-          <button type="button" class="modal-close-btn btn sm btn-ghost ghost" onclick="window.closeCategoryManagerModal()" aria-label="Close modal">✕</button>
+          <button type="button" class="modal-close-btn btn sm btn-ghost ghost" onclick="window.closeCategoryManagerModal(event)" aria-label="Close modal">✕</button>
         </div>
         <div style="margin-bottom:16px">
           <label for="cat-merge-search-input" style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">Select Target Destination Category</label>
@@ -141,8 +141,8 @@ export function renderCategoryManagerModal() {
           <div id="cat-merge-validation-warning" style="display:none; color:var(--red,#ef4444); font-size:12.5px; font-weight:600; margin-top:8px; line-height:1.4;"></div>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button type="button" class="btn btn-ghost ghost sm" onclick="window.navCatStep('list')">Back</button>
-          <button id="btn-submit-merge-cat" type="button" class="btn btn-primary primary sm" onclick="window.submitMergeCat()">Confirm Merge</button>
+          <button type="button" class="btn btn-ghost ghost sm" onclick="window.navCatStep('list', event)">Back</button>
+          <button id="btn-submit-merge-cat" type="button" class="btn btn-primary primary sm" onclick="window.submitMergeCat(event)">Confirm Merge</button>
         </div>`;
     } else if (wizardStep === 'reassign') {
       const rawCategories = getRawCategories(state);
@@ -157,11 +157,11 @@ export function renderCategoryManagerModal() {
             <h3 style="margin:0;font-size:15px;font-weight:750">Reassign Items (${boundIngs.length})</h3>
             <p style="margin:2px 0 0 0;font-size:11.5px;color:var(--text2,#78716c)">Reassign ingredients before deleting "${escapeHtml(activeCat)}".</p>
           </div>
-          <button type="button" class="modal-close-btn btn sm btn-ghost ghost" onclick="window.closeCategoryManagerModal()" aria-label="Close modal">✕</button>
+          <button type="button" class="modal-close-btn btn sm btn-ghost ghost" onclick="window.closeCategoryManagerModal(event)" aria-label="Close modal">✕</button>
         </div>
         <div style="display:flex;gap:6px;margin-bottom:10px">
-          <button type="button" class="btn xs ${reassignMode === 'mass' ? 'btn-primary primary' : 'btn-ghost ghost'}" onclick="window.setCatReassignMode('mass')">Mass Reassign</button>
-          <button type="button" class="btn xs ${reassignMode === 'individual' ? 'btn-primary primary' : 'btn-ghost ghost'}" onclick="window.setCatReassignMode('individual')">Individual Sorting</button>
+          <button type="button" class="btn xs ${reassignMode === 'mass' ? 'btn-primary primary' : 'btn-ghost ghost'}" onclick="window.setCatReassignMode('mass', event)">Mass Reassign</button>
+          <button type="button" class="btn xs ${reassignMode === 'individual' ? 'btn-primary primary' : 'btn-ghost ghost'}" onclick="window.setCatReassignMode('individual', event)">Individual Sorting</button>
         </div>
         ${reassignMode === 'mass' ? `
           <div style="margin-bottom:16px">
@@ -187,8 +187,8 @@ export function renderCategoryManagerModal() {
             }).join('') || '<div style="font-size:12px;color:var(--text2,#78716c);padding:8px">No matching items found.</div>'}
           </div>`}
         <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button type="button" class="btn ghost sm" onclick="window.navCatStep('list')">Cancel</button>
-          <button id="btn-submit-reassign-delete" type="button" class="btn primary sm" style="background:var(--red,#ef4444)" onclick="window.submitReassignAndDelete()">Reassign & Delete</button>
+          <button type="button" class="btn ghost sm" onclick="window.navCatStep('list', event)">Cancel</button>
+          <button id="btn-submit-reassign-delete" type="button" class="btn primary sm" style="background:var(--red,#ef4444)" onclick="window.submitReassignAndDelete(event)">Reassign & Delete</button>
         </div>`;
     }
 
@@ -198,8 +198,14 @@ export function renderCategoryManagerModal() {
   renderCurrentStep();
   Object.assign(modal.style, { opacity: '1', pointerEvents: 'all' }); modal.classList.add('open');
 
-  window.closeCategoryManagerModal = closeCategoryManagerModal;
-  window.navCatStep = (step) => { wizardStep = step; reassignSearch = ''; renderCurrentStep(); };
+  window.closeCategoryManagerModal = (e) => {
+    if (e && typeof e.preventDefault === 'function') { e.preventDefault(); e.stopPropagation(); }
+    closeCategoryManagerModal();
+  };
+  window.navCatStep = (step, e) => {
+    if (e && typeof e.preventDefault === 'function') { e.preventDefault(); e.stopPropagation(); }
+    wizardStep = step; reassignSearch = ''; renderCurrentStep();
+  };
 
   window.filterCatMergeOptions = (query) => {
     const listDiv = document.getElementById('cat-merge-dropdown-list');
@@ -218,7 +224,7 @@ export function renderCategoryManagerModal() {
         const prodCount = (state.products || []).filter(p => slugCategory(p.category) === slugCategory(c.name)).length;
         const total = ingCount + prodCount;
         return `
-          <div class="cat-merge-search-option" data-cat="${escapeAttr(c.name)}" style="padding:8px 10px; font-size:13px; cursor:pointer; font-weight:550; color:var(--text);" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='transparent'" onmousedown="window.selectCatMergeOption('${escapeAttr(c.name)}')">
+          <div class="cat-merge-search-option" data-cat="${escapeAttr(c.name)}" style="padding:8px 10px; font-size:13px; cursor:pointer; font-weight:550; color:var(--text);" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='transparent'" onmousedown="window.selectCatMergeOption('${escapeAttr(c.name)}', event)">
             ${escapeHtml(c.name)} (${total} items)
           </div>
         `;
@@ -227,7 +233,8 @@ export function renderCategoryManagerModal() {
     listDiv.style.display = 'block';
   };
 
-  window.selectCatMergeOption = (cat) => {
+  window.selectCatMergeOption = (cat, e) => {
+    if (e && typeof e.preventDefault === 'function') { e.preventDefault(); e.stopPropagation(); }
     const input = document.getElementById('cat-merge-search-input');
     if (input) {
       input.value = cat;
@@ -256,7 +263,7 @@ export function renderCategoryManagerModal() {
       listDiv.innerHTML = `<div style="padding:8px 10px; font-size:12px; color:var(--text2,#78716c); font-style:italic;">No matching categories</div>`;
     } else {
       listDiv.innerHTML = filtered.map(c => `
-        <div class="cat-mass-search-option" data-cat="${escapeAttr(c.name)}" style="padding:8px 10px; font-size:13px; cursor:pointer; font-weight:550; color:var(--text);" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='transparent'" onmousedown="window.selectCatMassOption('${escapeAttr(c.name)}')">
+        <div class="cat-mass-search-option" data-cat="${escapeAttr(c.name)}" style="padding:8px 10px; font-size:13px; cursor:pointer; font-weight:550; color:var(--text);" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='transparent'" onmousedown="window.selectCatMassOption('${escapeAttr(c.name)}', event)">
           📂 [Category] ${escapeHtml(c.name)}
         </div>
       `).join('');
@@ -264,7 +271,8 @@ export function renderCategoryManagerModal() {
     listDiv.style.display = 'block';
   };
 
-  window.selectCatMassOption = (cat) => {
+  window.selectCatMassOption = (cat, e) => {
+    if (e && typeof e.preventDefault === 'function') { e.preventDefault(); e.stopPropagation(); }
     massTargetCat = cat;
     const input = document.getElementById('cat-mass-search-input');
     if (input) input.value = cat;
@@ -272,7 +280,8 @@ export function renderCategoryManagerModal() {
     if (listDiv) listDiv.style.display = 'none';
   };
 
-  window.submitAddCat = async () => {
+  window.submitAddCat = async (e) => {
+    if (e && typeof e.preventDefault === 'function') { e.preventDefault(); e.stopPropagation(); }
     const input = document.getElementById('cat-manager-add-input'), val = input ? input.value.trim() : '';
     if (!val) return;
     
@@ -294,7 +303,8 @@ export function renderCategoryManagerModal() {
     }
   };
 
-  window.submitMergeDuplicateCategories = async () => {
+  window.submitMergeDuplicateCategories = async (e) => {
+    if (e && typeof e.preventDefault === 'function') { e.preventDefault(); e.stopPropagation(); }
     const btn = document.getElementById('btn-merge-duplicates');
     if (btn) { btn.disabled = true; btn.textContent = 'Merging...'; }
 
@@ -345,9 +355,13 @@ export function renderCategoryManagerModal() {
     }
   };
 
-  window.startRenameCat = (cat) => { activeCat = cat; wizardStep = 'rename'; renderCurrentStep(); };
+  window.startRenameCat = (cat, e) => {
+    if (e && typeof e.preventDefault === 'function') { e.preventDefault(); e.stopPropagation(); }
+    activeCat = cat; wizardStep = 'rename'; renderCurrentStep();
+  };
   
-  window.submitRenameCat = async () => {
+  window.submitRenameCat = async (e) => {
+    if (e && typeof e.preventDefault === 'function') { e.preventDefault(); e.stopPropagation(); }
     const input = document.getElementById('cat-rename-input');
     const rawName = input ? input.value : '';
     const newName = toCanonicalCategoryName(rawName.trim());
@@ -387,9 +401,13 @@ export function renderCategoryManagerModal() {
     }
   };
 
-  window.startMergeCat = (cat) => { activeCat = cat; wizardStep = 'merge'; renderCurrentStep(); };
+  window.startMergeCat = (cat, e) => {
+    if (e && typeof e.preventDefault === 'function') { e.preventDefault(); e.stopPropagation(); }
+    activeCat = cat; wizardStep = 'merge'; renderCurrentStep();
+  };
   
-  window.submitMergeCat = async () => {
+  window.submitMergeCat = async (e) => {
+    if (e && typeof e.preventDefault === 'function') { e.preventDefault(); e.stopPropagation(); }
     const input = document.getElementById('cat-merge-search-input');
     const targetCat = input ? (input.dataset.selectedVal || input.value.trim()) : '';
     const sourceCat = activeCat;
@@ -428,11 +446,15 @@ export function renderCategoryManagerModal() {
     }
   };
 
-  window.setCatReassignMode = (mode) => { reassignMode = mode; renderCurrentStep(); };
+  window.setCatReassignMode = (mode, e) => {
+    if (e && typeof e.preventDefault === 'function') { e.preventDefault(); e.stopPropagation(); }
+    reassignMode = mode; renderCurrentStep();
+  };
   window.handleReassignSearch = (text) => { reassignSearch = text || ''; renderCurrentStep(); };
   window.updateIndividualCatMap = (ingId, targetCat) => { individualCatMap[ingId] = targetCat; };
 
-  window.submitReassignAndDelete = async () => {
+  window.submitReassignAndDelete = async (e) => {
+    if (e && typeof e.preventDefault === 'function') { e.preventDefault(); e.stopPropagation(); }
     const deletedCat = activeCat; if (!deletedCat) return;
 
     const btn = document.getElementById('btn-submit-reassign-delete');
@@ -466,12 +488,14 @@ export function renderCategoryManagerModal() {
   };
 }
 
-window.closeDeleteCategoryModal = function closeDeleteCategoryModal() {
+window.closeDeleteCategoryModal = function closeDeleteCategoryModal(e) {
+  if (e && typeof e.preventDefault === 'function') { e.preventDefault(); e.stopPropagation(); }
   const overlay = document.getElementById('category-delete-confirm-modal');
   if (overlay) overlay.remove();
 };
 
-window.handleDeleteCategory = async function handleDeleteCategory(identifier) {
+window.handleDeleteCategory = async function handleDeleteCategory(identifier, e) {
+  if (e && typeof e.preventDefault === 'function') { e.preventDefault(); e.stopPropagation(); }
   if (!identifier) return;
   const category = resolveCategory(identifier);
   if (!category?.name) return;
@@ -532,7 +556,8 @@ window.handleDeleteCategory = async function handleDeleteCategory(identifier) {
   }
 };
 
-window.promptDeleteCategory = function promptDeleteCategory(categoryId) {
+window.promptDeleteCategory = function promptDeleteCategory(categoryId, e) {
+  if (e && typeof e.preventDefault === 'function') { e.preventDefault(); e.stopPropagation(); }
   if (!categoryId) return;
   const category = resolveCategory(categoryId);
   if (!category?.name) return;
@@ -564,13 +589,13 @@ window.promptDeleteCategory = function promptDeleteCategory(categoryId) {
       <h3 style="margin-top:0; margin-bottom:10px; font-size:1.15rem; font-weight:750; color:var(--red,#ef4444);">Delete "${escapeHtml(category.name)}"</h3>
       <p style="font-size:13px; color:var(--text2,#78716c); margin:0 0 16px 0; line-height:1.4">Are you sure you want to delete this category? This action is permanent.</p>
       <div style="display:flex; gap:8px; justify-content:flex-end">
-        <button type="button" class="btn sm" onclick="window.closeDeleteCategoryModal()">Cancel</button>
+        <button type="button" class="btn sm" onclick="window.closeDeleteCategoryModal(event)">Cancel</button>
         <button type="button" class="btn sm primary" style="background:var(--red,#ef4444); color:#fff;" id="btn-confirm-delete-cat">Delete</button>
       </div>
     </div>
   `;
   document.body.appendChild(overlay);
-  document.getElementById('btn-confirm-delete-cat').onclick = () => window.handleDeleteCategory(category.id || category.name);
+  document.getElementById('btn-confirm-delete-cat').onclick = (e) => window.handleDeleteCategory(category.id || category.name, e);
 };
 
 if (typeof window !== 'undefined') {
