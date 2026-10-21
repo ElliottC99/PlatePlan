@@ -53,20 +53,20 @@ export function renderPlannerWizard() {
   const host = document.getElementById('planner-wizard-host');
   if (!host) return;
 
-  const currentStep = typeof window.getPlannerWizardStep === 'function' ? window.getPlannerWizardStep() : (store.getState().currentPlannerStep || 1);
-  const hasActivePlan = !!(store.getState().currentPlan?.slots && Object.keys(store.getState().currentPlan.slots).length > 0);
+  const currentStep = typeof window.getPlannerWizardStep === 'function' ? window.getPlannerWizardStep() : (getState().currentPlannerStep || 1);
+  const hasActivePlan = !!(getState().currentPlan?.slots && Object.keys(getState().currentPlan.slots).length > 0);
   let stepContentHtml = '';
 
   if (currentStep === 1) {
-    const daysVal = store.getState().currentPlannerDays .currentPlan?.days || 10;
+    const daysVal = getState().currentPlannerDays .currentPlan?.days || 10;
     const today = new Date().toISOString().split('T')[0];
-    const startVal = store.getState().currentPlannerStartDate .currentPlan?.dayDates?.[1] || today;
-    const cadence = store.getState()?.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
-    const minFitScore = store.getState()?.prefs?.minFitScore || 0;
+    const startVal = getState().currentPlannerStartDate .currentPlan?.dayDates?.[1] || today;
+    const cadence = getState()?.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
+    const minFitScore = getState()?.prefs?.minFitScore || 0;
     const activeExclusions = typeof window.getActiveWizardExclusions === 'function' ? window.getActiveWizardExclusions() : [];
-    const rawPinned = store.getState().currentPlanOptions?.pinnedMeals ?.pinnedRecipes || [];
+    const rawPinned = getState().currentPlanOptions?.pinnedMeals ?.pinnedRecipes || [];
     const pinned = Array.isArray(rawPinned) ? rawPinned : [];
-    const rawUseUp = store.getState().currentPlanOptions?.useUp ?.useUpProducts || [];
+    const rawUseUp = getState().currentPlanOptions?.useUp ?.useUpProducts || [];
     const useUp = Array.isArray(rawUseUp) ? rawUseUp : (rawUseUp && typeof rawUseUp === 'object' ? Object.keys(rawUseUp) : []);
 
     stepContentHtml = GeneratorConstraintsForm.renderConstraintsForm({
@@ -82,13 +82,13 @@ export function renderPlannerWizard() {
         </div>
       `;
     } else {
-      stepContentHtml = renderWizardStep2(store.getState().currentPlan || {});
+      stepContentHtml = renderWizardStep2(getState().currentPlan || {});
     }
   } else if (currentStep === 3) {
     if (!hasActivePlan) {
       stepContentHtml = window.GeneratorWizardModal?.renderWizardEmptyPlanCard?.(3) || '';
     } else {
-      stepContentHtml = renderWizardStep3(store.getState().currentPlan || {});
+      stepContentHtml = renderWizardStep3(getState().currentPlan || {});
     }
   } else if (currentStep === 4) {
     stepContentHtml = window.GeneratorWizardModal?.renderWizardStep4Commit?.('v3.30.0') || '';
@@ -130,7 +130,7 @@ export function renderPlan() {
   const el = document.getElementById('plan-content');
   if (!el) return;
   try {
-    if (!store.getState().currentPlan || !store.getState().currentPlan.slots) {
+    if (!getState().currentPlan || !getState().currentPlan.slots) {
       el.innerHTML = '';
       const actions = document.getElementById('plan-actions'); if (actions) actions.style.display = 'none';
       const overall = document.getElementById('plan-overall-summary'); if (overall) overall.innerHTML = '';
@@ -138,21 +138,21 @@ export function renderPlan() {
       return;
     }
 
-    const { days, slots } = store.getState().currentPlan;
+    const { days, slots } = getState().currentPlan;
     const startInput = document.getElementById('plan-start-date');
-    if (startInput) startInput.value = store.getState().currentPlan.dayDates?.[1] || '';
+    if (startInput) startInput.value = getState().currentPlan.dayDates?.[1] || '';
     let hasValidSlots = false;
 
     let html = '';
-    if (store.getState().isDraftPlan .draftPlan) {
+    if (getState().isDraftPlan .draftPlan) {
       html += renderDraftPlanBanner();
     }
 
     const localToday = typeof window.getPlatePlanLocalToday === 'function' ? window.getPlatePlanLocalToday() : new Date().toISOString().split('T')[0];
-    const isPlanExpired = typeof window.checkIsPlanExpired === 'function' ? window.checkIsPlanExpired(store.getState().currentPlan, localToday) : false;
+    const isPlanExpired = typeof window.checkIsPlanExpired === 'function' ? window.checkIsPlanExpired(getState().currentPlan, localToday) : false;
     if (isPlanExpired) {
       const tomorrow = typeof window.getTomorrowLocalDate === 'function' ? window.getTomorrowLocalDate() : localToday;
-      const datedEntries = Object.entries(store.getState().currentPlan.dayDates || {}).filter(([, v]) => typeof window.parsePlanLocalDate === 'function' ? !!window.parsePlanLocalDate(v) : !!v);
+      const datedEntries = Object.entries(getState().currentPlan.dayDates || {}).filter(([, v]) => typeof window.parsePlanLocalDate === 'function' ? !!window.parsePlanLocalDate(v) : !!v);
       const dates = datedEntries.map(([, v]) => v).sort();
       const maxDate = dates[dates.length - 1] || localToday;
       const endLabel = typeof window.parsePlanLocalDate === 'function' && window.parsePlanLocalDate(maxDate) ? window.formatPlanDateShort(maxDate) : maxDate;
@@ -161,13 +161,13 @@ export function renderPlan() {
     }
 
     const earlierDays = Array.from({ length: days }, (_, index) => index + 1).filter(day => {
-      const value = store.getState().currentPlan.dayDates?.[day] || '';
+      const value = getState().currentPlan.dayDates?.[day] || '';
       return typeof window.parsePlanLocalDate === 'function' ? !!window.parsePlanLocalDate(value) && value < localToday : false;
     });
 
     if (earlierDays.length) {
-      const firstLabel = typeof window.formatPlanDayLabel === 'function' ? window.formatPlanDayLabel(store.getState().currentPlan, earlierDays[0], { short: true }) : `Day ${earlierDays[0]}`;
-      const lastLabel = typeof window.formatPlanDayLabel === 'function' ? window.formatPlanDayLabel(store.getState().currentPlan, earlierDays[earlierDays.length - 1], { short: true }) : `Day ${earlierDays[earlierDays.length - 1]}`;
+      const firstLabel = typeof window.formatPlanDayLabel === 'function' ? window.formatPlanDayLabel(getState().currentPlan, earlierDays[0], { short: true }) : `Day ${earlierDays[0]}`;
+      const lastLabel = typeof window.formatPlanDayLabel === 'function' ? window.formatPlanDayLabel(getState().currentPlan, earlierDays[earlierDays.length - 1], { short: true }) : `Day ${earlierDays[earlierDays.length - 1]}`;
       const range = earlierDays.length > 1 ? `${firstLabel} – ${lastLabel}` : firstLabel;
       const isExpanded = typeof window.platePlanEarlierDaysExpanded !== 'undefined' ? window.platePlanEarlierDaysExpanded : false;
       html += renderEarlierDaysHeading(range, earlierDays.length, isExpanded);
@@ -177,22 +177,22 @@ export function renderPlan() {
       const isExpanded = typeof window.platePlanEarlierDaysExpanded !== 'undefined' ? window.platePlanEarlierDaysExpanded : false;
       if (earlierDays.includes(d) && !isExpanded) continue;
       const s = slots[d] || {};
-      const allEx = typeof window.SLOTS !== 'undefined' ? window.SLOTS.every(sl => store.getState().excluded?.[d]?.[sl.key]) : false;
-      const dayLabelFormatted = typeof window.formatPlanDayLabel === 'function' ? window.formatPlanDayLabel(store.getState().currentPlan, d, { short: true }) : `Day ${d}`;
-      const dayDateVal = store.getState().currentPlan.dayDates?.[d] || '';
+      const allEx = typeof window.SLOTS !== 'undefined' ? window.SLOTS.every(sl => getState().excluded?.[d]?.[sl.key]) : false;
+      const dayLabelFormatted = typeof window.formatPlanDayLabel === 'function' ? window.formatPlanDayLabel(getState().currentPlan, d, { short: true }) : `Day ${d}`;
+      const dayDateVal = getState().currentPlan.dayDates?.[d] || '';
 
       if (allEx) {
         html += window.PlannerDayCard?.renderDayPlanCard?.({ day: d, dayLabel: dayLabelFormatted, dayDate: dayDateVal, isAllExcluded: true }) || '';
         continue;
       }
 
-      const daySlotInfos = typeof window.buildPlanDaySlotInfos === 'function' ? window.buildPlanDaySlotInfos(store.getState().currentPlan, d) : [];
+      const daySlotInfos = typeof window.buildPlanDaySlotInfos === 'function' ? window.buildPlanDaySlotInfos(getState().currentPlan, d) : [];
       const daySummary = makeRenderedDaySummary();
       let dayRowsHtml = '';
 
       if (typeof window.SLOTS !== 'undefined' && typeof window.SLOT_LABELS !== 'undefined' && typeof window.SLOT_COLORS !== 'undefined') {
         window.SLOTS.forEach(sl => {
-          const isEx = store.getState().excluded?.[d]?.[sl.key];
+          const isEx = getState().excluded?.[d]?.[sl.key];
           const slotData = s[sl.key];
           const slotInfo = typeof window.getPlanSlotInfo === 'function' ? window.getPlanSlotInfo(slotData) : { active: null, id: null, variant: 'original', instanceId: null };
           const r = slotInfo?.active;
@@ -202,7 +202,7 @@ export function renderPlan() {
           const showRecipe = !!r && !isEx;
           if (showRecipe) hasValidSlots = true;
 
-          const slotNutrition = daySlotInfos.find(info => info.slotKey === sl.key) || (typeof window.getPlannerSlotNutritionInfo === 'function' ? window.getPlannerSlotNutritionInfo(store.getState().currentPlan, d, sl.key) : { cal: 0, prot: 0 });
+          const slotNutrition = daySlotInfos.find(info => info.slotKey === sl.key) || (typeof window.getPlannerSlotNutritionInfo === 'function' ? window.getPlannerSlotNutritionInfo(getState().currentPlan, d, sl.key) : { cal: 0, prot: 0 });
           let calStr = '', rowCal = 0, rowProt = 0;
           const rowPerson = sl.key.endsWith('E') ? 'e' : sl.key.endsWith('C') ? 'c' : '';
           if (showRecipe) {
@@ -214,7 +214,7 @@ export function renderPlan() {
               daySummary.totals[rowPerson].prot += rowProt;
             }
           }
-          const slotReason = typeof window.getPlanSlotReason === 'function' ? window.getPlanSlotReason(store.getState().currentPlan, d, sl.key) : '';
+          const slotReason = typeof window.getPlanSlotReason === 'function' ? window.getPlanSlotReason(getState().currentPlan, d, sl.key) : '';
           const slotReasonLabel = typeof window.formatPlanSlotReason === 'function' ? window.formatPlanSlotReason(slotReason) : slotReason;
           const isPinned = !!(r && (slotData?.pinned || slotData?.isPinned || (typeof window.getPinnedRecipesList === 'function' && window.getPinnedRecipesList().some(p => p.recipeId === rId))));
           dayRowsHtml += renderPlanDaySlotRow({ d, sl, isEx, showRecipe, r, rId, instanceId, slotInfo, lblLines, calStr, rowPerson, rowCal, rowProt, slotReason, slotReasonLabel, isPinned });
@@ -242,13 +242,13 @@ export function renderPlan() {
 
 export function clearPlan() {
   const cleanEmptySchema = createCleanEmptyPlanSchema();
-  if (store.getState()) {
-    store.getState().currentPlan = cleanEmptySchema;
-    store.getState().skeletonGrid = {};
-    store.getState().overrides = {};
-    store.getState().currentPlannerStep = 1;
-    store.getState().isDraftPlan = false;
-    store.getState().draftPlan = null;
+  if (getState()) {
+    getState().currentPlan = cleanEmptySchema;
+    getState().skeletonGrid = {};
+    getState().overrides = {};
+    getState().currentPlannerStep = 1;
+    getState().isDraftPlan = false;
+    getState().draftPlan = null;
   }
   if (typeof window.Store?.setState === 'function') {
     window.Store.setState({ plan: cleanEmptySchema, skeletonGrid: {} });
@@ -274,25 +274,25 @@ export function showPlanSetup() {
 
 export function renderPlanOverallSummary() {
   const el = document.getElementById('plan-overall-summary');
-  if (!el || !store.getState().currentPlan?.slots) { if (el) el.innerHTML = ''; return; }
+  if (!el || !getState().currentPlan?.slots) { if (el) el.innerHTML = ''; return; }
   if (document.querySelector('#plan-content .day-plan-card:not(.skipped)')) {
     if (typeof window.reconcileVisiblePlanSummaries === 'function') window.reconcileVisiblePlanSummaries();
     return;
   }
-  const score = typeof window.calculatePlanScore === 'function' ? window.calculatePlanScore(store.getState().currentPlan) : 0;
-  store.getState().currentPlan.score = score;
+  const score = typeof window.calculatePlanScore === 'function' ? window.calculatePlanScore(getState().currentPlan) : 0;
+  getState().currentPlan.score = score;
   if (typeof window.renderPlanOverallSummaryHtml === 'function') window.renderPlanOverallSummaryHtml(score);
 }
 
 export function setPlannerWizardStep(step) {
   const nextStep = Math.max(1, Math.min(4, step));
-  if (typeof window !== 'undefined' && store.getState()) store.getState().currentPlannerStep = nextStep;
+  if (typeof window !== 'undefined' && getState()) getState().currentPlannerStep = nextStep;
   renderPlannerWizard();
 }
 
 export function resetPlannerStartFresh() {
   const cleanEmptySchema = createCleanEmptyPlanSchema();
-  if (store.getState()) { store.getState().currentPlan = cleanEmptySchema; store.getState().skeletonGrid = {}; }
+  if (getState()) { getState().currentPlan = cleanEmptySchema; getState().skeletonGrid = {}; }
   clearPlan(); setPlannerWizardStep(1);
 }
 

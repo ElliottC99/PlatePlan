@@ -282,12 +282,18 @@ function setupSubscriptions() {
   subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
 }
 
-export const APP_VERSION = 'v3.40.24';
+export const APP_VERSION = 'v3.40.26';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
   isAppInitialized = true;
   if (typeof window !== 'undefined') window.__plateplan_app_booted = true;
+
+  try {
+    setupActionBridge();
+  } catch (e) {
+    console.error('[ActionBridge] Early attachment failed:', e);
+  }
 
   const initialRender = () => {
     try {
