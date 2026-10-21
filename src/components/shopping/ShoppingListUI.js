@@ -79,8 +79,8 @@ export function renderShoppingSummary() {
   }
 
   // Delegation
-  if (!container.hasAttribute('data-delegated')) {
-    container.addEventListener('click', (e) => {
+  if (!summaryContainer.hasAttribute('data-delegated')) {
+    summaryContainer.addEventListener('click', (e) => {
       const target = e.target.closest('[data-action]');
       if (!target) return;
       const action = target.dataset.action;
@@ -99,7 +99,7 @@ export function renderShoppingSummary() {
         if (typeof window.commitPlannerWizardPlan === 'function') window.commitPlannerWizardPlan();
       }
     });
-    container.setAttribute('data-delegated', 'true');
+    summaryContainer.setAttribute('data-delegated', 'true');
   }
 }
 

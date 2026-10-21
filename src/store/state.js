@@ -3,7 +3,8 @@
  * Centralized application state and event handling.
  */
 
-export { state, getState } from './coreState.js';
+import { state, getState } from './coreState.js';
+export { state, getState };
 
 /**
  * Dispatch a custom event on the document in a safe microtask.
