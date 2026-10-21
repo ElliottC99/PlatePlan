@@ -243,13 +243,7 @@ export function renderRecipeVault() {
     else if (typeof window.openBulkRecipeImporterModal === 'function') window.openBulkRecipeImporterModal();
   });
 
-  const hasData = (getState()?.recipes?.length > 0) ?.isCachedHydrated;
-  if (!getState()?.isCloudHydrated && !hasData) {
-    if (list) {
-      list.innerHTML = renderVaultGridContainer({ isLoading: true });
-    }
-    return;
-  }
+
 
   const favFilterBtn = document.getElementById('vault-filter-fav');
   const isFavOnly = typeof window.vaultFilterFavouritesOnly !== 'undefined' ? window.vaultFilterFavouritesOnly : false;

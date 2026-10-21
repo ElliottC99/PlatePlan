@@ -277,6 +277,10 @@ export async function hydrateHouseholdData(options = {}) {
 
       runDeferredMaintenance(preferencesData, mergedCategories, mutated, saveCategories);
 
+      if (typeof updateState === 'function') {
+        updateState({ isCloudHydrated: true, isCachedHydrated: true });
+      }
+
       return { success: true, recipesCount: recipes.length, ingredientsCount: ingredients.length, productsCount: products.length };
     } catch (err) {
       console.error('[HydrationService] Critical hydration failure (detailed):', err, err.stack);
