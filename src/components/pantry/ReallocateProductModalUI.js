@@ -14,6 +14,8 @@ import {
   escapeHtml,
   escapeAttr
 } from './ReallocateProductModalRenderService.js';
+import { showCustomAlert } from './IngredientActionModalsUI.js';
+
 
 function showModal(html) {
   const wrap = document.getElementById('view-modal-wrap');
@@ -88,10 +90,10 @@ export async function submitCreateNewIngredientFromReallocate() {
   const categoryInput = document.getElementById('new-reallocate-ingredient-category');
   
   if (!nameInput || !nameInput.value.trim()) {
-    if (typeof window.showCustomAlert === 'function') window.showCustomAlert('Please enter an ingredient name.');
-    else alert('Please enter an ingredient name.');
+    if (typeof showCustomAlert === 'function') showCustomAlert('Please enter an ingredient name.');
     return;
   }
+
 
   const name = nameInput.value.trim();
   const category = (categoryInput && categoryInput.value.trim()) ? categoryInput.value.trim() : 'General';
@@ -105,7 +107,7 @@ export async function submitCreateNewIngredientFromReallocate() {
     updatedAt: new Date().toISOString()
   };
 
-  const state = (window.Store && typeof window.Store.getState === 'function') ? window.Store.getState() : (getState() || {});
+  const state = (window.Store && typeof window.Store.getState === 'function') ? window.Store.getState() : (getState());
   const currentIngs = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
   currentIngs.push(newIng);
 
@@ -127,7 +129,7 @@ export async function submitCreateNewIngredientFromReallocate() {
 }
 
 export function promptReallocateProduct(productId) {
-  const state = (window.Store && typeof window.Store.getState === 'function') ? window.Store.getState() : (getState() || {});
+  const state = (window.Store && typeof window.Store.getState === 'function') ? window.Store.getState() : (getState());
   const currentIngs = Array.isArray(state.ingredients) ? state.ingredients : [];
   const prods = Array.isArray(state.products) ? state.products : [];
   const prod = prods.find(p => String(p.id) === String(productId));
@@ -147,7 +149,7 @@ export function promptReallocateProduct(productId) {
 
   const renderSubtypeList = (query = '') => {
     const q = String(query || '').trim().toLowerCase();
-    const st = getState() || {};
+    const st = getState();
     const ings = Array.isArray(st.ingredients) ? st.ingredients : currentIngs;
     const ing = ings.find(i => String(i.id) === String(activeReallocateState.selectedIngId));
     const subtypes = (ing && Array.isArray(ing.subtypes)) ? ing.subtypes : [];
@@ -161,7 +163,7 @@ export function promptReallocateProduct(productId) {
 
   const renderIngredientList = (query = '') => {
     const q = String(query || '').trim().toLowerCase();
-    const st = getState() || {};
+    const st = getState();
     const ings = Array.isArray(st.ingredients) ? st.ingredients : currentIngs;
     const filtered = ings.filter(i => !q || (i.name || '').toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q));
 
@@ -193,7 +195,7 @@ export function promptReallocateProduct(productId) {
       const newSubName = (subNameInput ? subNameInput.value : '').trim();
       if (!newSubName || !activeReallocateState.selectedIngId) return;
 
-      const st = getState() || {};
+      const st = getState();
       const ings = Array.isArray(st.ingredients) ? st.ingredients : currentIngs;
       const ing = ings.find(i => String(i.id) === String(activeReallocateState.selectedIngId));
       if (!ing) return;
@@ -222,7 +224,7 @@ export function promptReallocateProduct(productId) {
     document.getElementById('btn-confirm-realloc').onclick = async () => {
       if (!activeReallocateState.selectedIngId) return;
       const subtypeId = activeReallocateState.selectedSubId || null;
-      const st = getState() || {};
+      const st = getState();
       const ings = Array.isArray(st.ingredients) ? st.ingredients : currentIngs;
       const ing = ings.find(i => String(i.id) === String(activeReallocateState.selectedIngId));
       if (!ing) return;

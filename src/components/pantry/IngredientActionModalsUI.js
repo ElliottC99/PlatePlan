@@ -14,6 +14,8 @@ import {
   renderDeleteIngredientTemplate, 
   renderDeleteProductTemplate, 
   renderCustomAlertTemplate, 
+  renderCustomConfirmTemplate,
+  renderCopyTextModalTemplate,
   renderReorganiseTemplate 
 } from './IngredientActionModalsRenderService.js';
 
@@ -42,7 +44,7 @@ export function promptAddAlias(ingId, parentId = null) {
     window.openSubtypeAliasModal(ingId, parentId);
     return;
   }
-  const state = getState() || {};
+  const state = getState();
   const currentIngs = state.ingredients || [];
   const ing = currentIngs.find(i => String(i.id) === String(ingId));
   if (!ing) return;
@@ -76,7 +78,7 @@ export function promptAddAlias(ingId, parentId = null) {
 
 export function promptRemoveAlias(ingId, alias, parentId = null) {
   if (parentId) {
-    const state = getState() || {}, ings = [...(state.ingredients || [])], parent = ings.find(i => String(i.id) === String(parentId));
+    const state = getState(), ings = [...(state.ingredients || [])], parent = ings.find(i => String(i.id) === String(parentId));
     if (parent && Array.isArray(parent.subtypes)) {
       const sub = parent.subtypes.find(s => String(s.id) === String(ingId));
       if (sub && Array.isArray(sub.aliases)) {
@@ -89,7 +91,7 @@ export function promptRemoveAlias(ingId, alias, parentId = null) {
     }
     return;
   }
-  const state = getState() || {}, currentIngs = state.ingredients || [];
+  const state = getState(), currentIngs = state.ingredients || [];
   const ing = currentIngs.find(i => String(i.id) === String(ingId));
   if (ing && Array.isArray(ing.aliases)) {
     ing.aliases = ing.aliases.filter(a => a !== alias);
@@ -119,7 +121,7 @@ export function promptDemote(ingId, parentId = null) {
     return;
   }
 
-  const state = getState() || {};
+  const state = getState();
   const currentIngs = state.ingredients || [];
   const candidates = currentIngs.filter(i => String(i.id) !== String(ingId));
 
@@ -143,7 +145,7 @@ export function promptMerge(sourceId, parentId = null) {
     return;
   }
 
-  const state = getState() || {};
+  const state = getState();
   const currentIngs = state.ingredients || [];
   const candidates = currentIngs.filter(i => String(i.id) !== String(sourceId));
 
@@ -166,7 +168,7 @@ export function handleDeleteIngredient(ingId, ingName = null, parentId = null) {
     window.openSubtypeDeleteModal(ingId, parentId);
     return;
   }
-  const state = getState() || {};
+  const state = getState();
   let targetName = ingName;
   if (!targetName) {
     const found = (state.ingredients || []).find(i => String(i.id) === String(ingId));
@@ -178,7 +180,7 @@ export function handleDeleteIngredient(ingId, ingName = null, parentId = null) {
 
   document.getElementById('btn-confirm-ing-delete').onclick = async () => {
     closeModal();
-    const curState = getState() || {};
+    const curState = getState();
     const ings = (curState.ingredients || []).filter(i => String(i.id) !== String(ingId));
     setIngredients(ings);
     if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
@@ -189,7 +191,7 @@ export function handleDeleteIngredient(ingId, ingName = null, parentId = null) {
 }
 
 export function handleDeleteProduct(productId, prodName = null) {
-  const state = getState() || {};
+  const state = getState();
   let targetName = prodName;
   if (!targetName) {
     const found = (state.products || []).find(p => String(p.id) === String(productId));
@@ -201,7 +203,7 @@ export function handleDeleteProduct(productId, prodName = null) {
 
   document.getElementById('btn-confirm-prod-delete').onclick = async () => {
     closeModal();
-    const curState = getState() || {};
+    const curState = getState();
     const prods = (curState.products || []).filter(p => String(p.id) !== String(productId));
     setProducts(prods);
     if (typeof window.renderProductBank === 'function') window.renderProductBank();
@@ -216,8 +218,38 @@ export function showCustomAlert(message) {
   showModal(html);
 }
 
+export function showCustomConfirm(message, title, onConfirm) {
+  const html = renderCustomConfirmTemplate(message, title);
+  showModal(html);
+  const btn = document.getElementById('btn-confirm-custom');
+  if (btn) {
+    btn.onclick = () => {
+      closeModal();
+      if (typeof onConfirm === 'function') onConfirm();
+    };
+  }
+}
+
+export function showCustomCopyModal(title, text) {
+  const html = renderCopyTextModalTemplate(title, text);
+  showModal(html);
+  const btn = document.getElementById('btn-copy-modal-text');
+  if (btn) {
+    btn.onclick = () => {
+      const textarea = document.getElementById('copy-modal-textarea');
+      if (textarea) {
+        textarea.select();
+        document.execCommand('copy');
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast('Copied to clipboard! 📋', 'success');
+        }
+      }
+    };
+  }
+}
+
 export function openIngredientReorganiseModal(ingredientId) {
-  const state = getState() || {};
+  const state = getState();
   const currentIngs = Array.isArray(state.ingredients) ? state.ingredients : [];
   const ing = currentIngs.find(i => String(i.id) === String(ingredientId));
   if (!ing) return;

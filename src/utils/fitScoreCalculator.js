@@ -1,3 +1,4 @@
+import store from "../store/store.js";
 /**
  * src/utils/fitScoreCalculator.js (v3.38.63)
  * Universal Asymmetric Fit Score Engine Orchestrator.
@@ -52,7 +53,7 @@ export const getTarget = (profile, type, meal) => {
 };
 
 function resolveHouseholdProfiles(options = {}) {
-  const winState = typeof window !== 'undefined' ? (window.state || {}) : {};
+  const winState = typeof window !== 'undefined' ? (store.getState()) : {};
   const rawProfiles = options?.userPrefs?.profiles
     || winState.prefs?.profiles
     || winState.preferences?.profiles

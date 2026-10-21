@@ -1,3 +1,4 @@
+import store from "../store/store.js";
 /**
  * src/models/StateModel.js (v3.16.0)
  * Data model helpers and getters for decoupled profile preferences.
@@ -17,8 +18,8 @@
 export function getProfileMealTargets(profileId, mealType, customProfiles = null) {
   const profiles = customProfiles ||
     (typeof window !== 'undefined' && (
-      window.state?.preferences?.profiles ||
-      window.state?.userPrefs?.profiles
+      store.getState()?.preferences?.profiles ||
+      store.getState()?.userPrefs?.profiles
     )) || {};
 
   const profile = profiles[profileId] || null;
@@ -117,8 +118,8 @@ export function normalizeProfileData(profileId, rawData = {}) {
 export function getProfilesFromState() {
   if (typeof window === 'undefined') return {};
   return (
-    window.state?.preferences?.profiles ||
-    window.state?.userPrefs?.profiles ||
+    store.getState()?.preferences?.profiles ||
+    store.getState()?.userPrefs?.profiles ||
     {}
   );
 }

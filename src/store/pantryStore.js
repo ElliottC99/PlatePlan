@@ -29,30 +29,18 @@ export function getPantryState() {
 
 export function setIngredients(newIngredients) {
   pantryState.ingredients = Array.isArray(newIngredients) ? newIngredients : [];
-  if (typeof window !== 'undefined') {
-    if (!window.state) window.state = {};
-    window.state.ingredients = pantryState.ingredients;
-  }
   dispatchStateEvent('plateplan:state:ingredients', pantryState.ingredients);
   saveStateCache();
 }
 
 export function setProducts(newProducts) {
   pantryState.products = Array.isArray(newProducts) ? newProducts : [];
-  if (typeof window !== 'undefined') {
-    if (!window.state) window.state = {};
-    window.state.products = pantryState.products;
-  }
   dispatchStateEvent('plateplan:state:products', pantryState.products);
   saveStateCache();
 }
 
 export function setCategories(newCategories) {
   pantryState.categories = Array.isArray(newCategories) ? newCategories : [];
-  if (typeof window !== 'undefined') {
-    if (!window.state) window.state = {};
-    window.state.categories = pantryState.categories;
-  }
   dispatchStateEvent('plateplan:state:categories', pantryState.categories);
   saveStateCache();
 }

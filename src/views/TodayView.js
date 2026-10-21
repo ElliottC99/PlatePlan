@@ -1,10 +1,12 @@
+
 /**
  * src/views/TodayView.js (v3.20.14)
  * Modular ES6 View for the Today Dashboard.
  * Renders daily meal timeline, macro snapshots, and meal completion toggles.
  */
 
-import { getState, subscribe } from '../store/store.js';
+import { subscribe } from '../store/store.js';
+import { getState } from '../store/coreState.js';
 import {
   getPlatePlanLocalToday,
   formatTodayDateLabel,
@@ -38,15 +40,15 @@ export function resetTodayDate() {
 }
 
 export function toggleMealEaten(mealType, person = 'both') {
-  const state = getState() || window.state || {};
+  const state = store.store.getState();
   const plan = state.plan || {};
   const currentEaten = plan.eatenMeals || {};
 
   const { nextEaten, toastMessage } = calculateMealEatenUpdates(currentEaten, currentDateStr, mealType, person);
   plan.eatenMeals = nextEaten;
   
-  if (typeof window !== 'undefined' && window.state?.plan) {
-    window.state.plan.eatenMeals = nextEaten;
+  if (typeof window !== 'undefined' && store.store.getState().currentPlan) {
+    store.store.getState().currentPlan.eatenMeals = nextEaten;
   }
 
   saveCurrentPlan(plan).catch(err => {
@@ -70,7 +72,7 @@ export function renderToday() {
     labelEl.textContent = formatTodayDateLabel(currentDateStr) || currentDateStr;
   }
 
-  const state = getState() || window.state || {};
+  const state = store.store.getState();
   const plan = state.plan || {};
   const recipes = state.recipes || [];
   const planContext = { dayDates: plan.dayDates || {} };

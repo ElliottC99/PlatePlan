@@ -14,6 +14,10 @@ import {
   renderWizardStepTemplate, 
   renderWizardCompleteTemplate 
 } from './HierarchyWizardRenderService.js';
+import { showCustomAlert } from '../pantry/IngredientActionModalsUI.js';
+
+
+const MAX_DROPDOWN_ITEMS = 7;
 
 let wizardQueue = [], currentIndex = 0, wizardStage = 1;
 let selectedSubtypeId = null, selectedIngredientId = null, selectedCategory = '';
@@ -26,7 +30,7 @@ export function getCategoryName(cat) {
 
 export function syncIngredientAutoDefault(parentIng, linkedProduct) {
   if (!parentIng || !linkedProduct) return false;
-  const state = window.Store?.getState?.() || getState() || {};
+  const state = window.Store?.getState?.() ;
   const products = state.products || safeGetProducts() || [];
   const currentDefaultId = parentIng.defaultProductId || parentIng.autoDefaultProductId || parentIng.autoDefaultProduct;
   const currentValid = currentDefaultId && products.some(p => String(p.id) === String(currentDefaultId));
@@ -78,14 +82,14 @@ export function handleWizardSubtypeSearch(query) {
   const q = String(query || '').toLowerCase().trim();
   const container = document.getElementById('wizard-subtype-search-results');
   if (!container) return;
-  const state = window.Store?.getState?.() || getState() || {};
+  const state = window.Store?.getState?.() ;
   const options = [];
   (state.ingredients || []).forEach(ing => {
     const subTypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
     if (!subTypes.length) options.push({ id: ing.id, name: `${ing.name} (Ingredient)`, ingredientId: ing.id, subtypeId: null, category: ing.category });
     subTypes.forEach(st => options.push({ id: st.id, name: `${ing.name} › ${st.name}`, ingredientId: ing.id, subtypeId: st.id, category: ing.category }));
   });
-  const filtered = options.filter(o => !q || String(o.name).toLowerCase().includes(q) || String(o.category).toLowerCase().includes(q)).slice(0, 7);
+  const filtered = options.filter(o => !q || String(o.name).toLowerCase().includes(q) || String(o.category).toLowerCase().includes(q)).slice(0, MAX_DROPDOWN_ITEMS);
   
   const displayQuery = q || wizardQueue[currentIndex]?.name || 'Item';
   container.innerHTML = renderSubtypeOptions(filtered, displayQuery);
@@ -109,8 +113,12 @@ export function handleWizardSubtypeSearch(query) {
 
 export async function handleWizardLinkSubtype() {
   const currentItem = wizardQueue[currentIndex];
-  if (!currentItem || !selectedIngredientId) { alert('Please select a sub-type first.'); return; }
-  const state = window.Store?.getState?.() || getState() || {};
+  if (!currentItem || !selectedIngredientId) { 
+    if (typeof showCustomAlert === 'function') showCustomAlert('Please select a sub-type first.'); 
+    return; 
+  }
+
+  const state = window.Store?.getState?.() ;
   const parentIng = (state.ingredients || []).find(i => String(i.id) === String(selectedIngredientId));
   if (!parentIng) return;
 
@@ -136,8 +144,8 @@ export function handleWizardIngredientSearch(query) {
   const q = String(query || '').toLowerCase().trim();
   const container = document.getElementById('wizard-ingredient-search-results');
   if (!container) return;
-  const state = window.Store?.getState?.() || getState() || {};
-  const filtered = (state.ingredients || []).filter(i => !q || String(i.name).toLowerCase().includes(q)).slice(0, 7);
+  const state = window.Store?.getState?.() ;
+  const filtered = (state.ingredients || []).filter(i => !q || String(i.name).toLowerCase().includes(q)).slice(0, MAX_DROPDOWN_ITEMS);
 
   const displayQuery = q || newSubtypeName || 'Ingredient';
   container.innerHTML = renderIngredientOptions(filtered, displayQuery);
@@ -163,7 +171,7 @@ export function handleWizardCategorySearch(query) {
   const cleanQuery = String(query || '').toLowerCase().trim();
   const container = document.getElementById('wizard-category-search-results');
   if (!container) return;
-  const state = window.Store?.getState?.() || getState() || {};
+  const state = window.Store?.getState?.() ;
   const activeCategories = Array.isArray(state.categories) ? state.categories : [];
   const matches = activeCategories.filter(cat => getCategoryName(cat).toLowerCase().includes(cleanQuery));
 
@@ -204,7 +212,7 @@ export function selectWizardCategory(catName) {
 export async function handleWizardCreateAndLink() {
   const currentItem = wizardQueue[currentIndex];
   if (!currentItem) return;
-  const state = window.Store?.getState?.() || getState() || {};
+  const state = window.Store?.getState?.() ;
   let parentIng = null;
 
   const normalizedSubName = toTitleCase(newSubtypeName || currentItem.name);
@@ -229,7 +237,11 @@ export async function handleWizardCreateAndLink() {
     const newSub = { id: `sub_${Date.now()}`, name: normalizedSubName, isDefault: false, createdAt: new Date().toISOString() };
     parentIng.subtypes = [...(parentIng.subtypes || []), newSub];
     saveIngredient(parentIng);
-  } else { alert('Please select or create an ingredient.'); return; }
+  } else { 
+    if (typeof showCustomAlert === 'function') showCustomAlert('Please select or create an ingredient.'); 
+    return; 
+  }
+
 
   const parentSub = parentIng.subtypes[parentIng.subtypes.length - 1];
   const products = safeGetProducts().map(p => String(p.id) === String(currentItem.id) ? {
@@ -250,7 +262,7 @@ export function skipWizardStep() {
 export async function bulkProvisionAllDefaults() {
   const btn = document.getElementById('wizard-bulk-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Bulk Binding...'; }
-  const state = window.Store?.getState?.() || getState() || {};
+  const state = window.Store?.getState?.() ;
   const ingredients = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
   let products = safeGetProducts();
   products.forEach((p) => {
@@ -283,7 +295,7 @@ export function renderWizardStep() {
   const item = wizardQueue[currentIndex], total = wizardQueue.length, stepNum = currentIndex + 1, pct = Math.round((stepNum / total) * 100);
 
   if (wizardStage === 3 && !selectedCategory) {
-    const activeCategories = window.Store?.getState?.()?.categories || getState()?.categories || [];
+    const activeCategories = window.Store?.getState?.()?.categories ?.categories || [];
     selectedCategory = activeCategories.length > 0 ? (getCategoryName(activeCategories[0]) || 'Uncategorised') : 'Uncategorised';
   }
 

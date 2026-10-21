@@ -50,7 +50,7 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
   modalWrap.dataset.parentId = parentId || '';
   modalWrap.dataset.editingIngredientId = ingredientId || '';
 
-  const state = getState() || {}, ingredients = state.ingredients || [], products = state.products || [];
+  const state = getState(), ingredients = state.ingredients || [], products = state.products || [];
   const ing = ingredientId ? ingredients.find(i => String(i.id) === String(ingredientId)) : null;
   const parent = parentId ? ingredients.find(i => String(i.id) === String(parentId)) : null;
 
@@ -84,14 +84,14 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
     msgEl.innerHTML = `<div style="margin-top:14px;padding:10px;background:var(--surface2,#f5f5f4);border-radius:8px;border:1px solid var(--border,#e7e5e4)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <span style="font-size:12px;font-weight:750">Linked Products (${linked.length})</span>
-        <button type="button" class="btn sm ghost" onclick="openProductEditModal(null)" style="font-size:11px">+ Add Product</button>
+        <button type="button" class="btn sm ghost" data-action="add-product" data-product-id="" style="font-size:11px">+ Add Product</button>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto">
         ${linked.map(p => `<div style="padding:6px 8px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:6px;display:flex;align-items:center;justify-content:space-between">
           <div><span style="font-size:12px;font-weight:600">${escapeHtml(p.name)}</span><div style="font-size:11px;color:var(--text2,#78716c)">${escapeHtml(p.brand || '')} · £${Number(p.price || 0).toFixed(2)}</div></div>
           <div style="display:flex;gap:4px">
-            ${p.isAutoDefault ? '<span class="tag" style="font-size:10px;background:rgba(16,185,129,0.15);color:var(--green);font-weight:700">Default</span>' : `<button type="button" class="btn xs ghost" onclick="handleSetDefaultProduct('${escapeAttr(p.id)}', '${escapeAttr(ing.id)}')">Default</button>`}
-            <button type="button" class="btn xs ghost" onclick="openProductEditModal('${escapeAttr(p.id)}')">Edit</button>
+            ${p.isAutoDefault ? '<span class="tag" style="font-size:10px;background:rgba(16,185,129,0.15);color:var(--green);font-weight:700">Default</span>' : `<button type="button" class="btn xs ghost" data-action="set-default-product" data-product-id="${escapeAttr(p.id)}" data-ingredient-id="${escapeAttr(ing.id)}">Default</button>`}
+            <button type="button" class="btn xs ghost" data-action="edit-product" data-product-id="${escapeAttr(p.id)}">Edit</button>
           </div>
         </div>`).join('') || '<div style="font-size:12px;color:var(--text2)">No linked products.</div>'}
       </div>
@@ -102,13 +102,30 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
 
   updateIngredientFamilyModalUI(ing, parent);
   modalWrap.classList.add('open');
+
+  if (!modalWrap.hasAttribute('data-delegated')) {
+    modalWrap.addEventListener('click', (e) => {
+      const target = e.target.closest('[data-action]');
+      if (!target) return;
+      const action = target.dataset.action;
+      
+      if (action === 'add-product') {
+        if (typeof openProductEditModal === 'function') openProductEditModal(null);
+      } else if (action === 'set-default-product') {
+        if (typeof window.handleSetDefaultProduct === 'function') window.handleSetDefaultProduct(target.dataset.productId, target.dataset.ingredientId);
+      } else if (action === 'edit-product') {
+        if (typeof openProductEditModal === 'function') openProductEditModal(target.dataset.productId);
+      }
+    });
+    modalWrap.setAttribute('data-delegated', 'true');
+  }
 }
 
 export async function saveIngredientFamilyDetailsModal(renderIngredientBank) {
   const name = (document.getElementById('ingredient-family-details-name')?.value || '').trim();
   if (!name) return;
   const rawCat = (document.getElementById('ingredient-family-details-cat')?.value || 'other').trim();
-  const state = getState() || {};
+  const state = getState();
   const existingCats = state.categories || [];
   const matchedCat = existingCats.find(c => {
     const cName = typeof c === 'string' ? c : c?.name;

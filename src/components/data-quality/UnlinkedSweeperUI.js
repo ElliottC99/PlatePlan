@@ -26,7 +26,7 @@ export function cleanDisplayPhrase(str) {
 }
 
 export function scanUnlinkedRecipeIngredients() {
-  const state = getState() || (typeof window !== 'undefined' ? (window.Store?.getState?.() || window.state || {}) : {});
+  const state = (typeof window !== 'undefined' ? (window.Store?.getState?.() ) : {});
   const recipes = Array.isArray(state.recipes) ? state.recipes : [];
   const groups = new Map();
 
@@ -151,7 +151,7 @@ function attachSweeperSearchEvents(container, unlinkedGroups = []) {
 
     const renderFilteredOptions = () => {
       const query = (input.value || '').toLowerCase().trim();
-      const st = window.Store?.getState?.() || window.state || getState() || {};
+      const st = window.Store?.getState?.() ;
       const masterItems = st.ingredients || [];
       const masterCategories = Array.from(new Set([...STANDARD_CATS, ...(st.categories || []), ...masterItems.map(i => i.category).filter(Boolean)]));
 
@@ -248,9 +248,9 @@ function attachSweeperSearchEvents(container, unlinkedGroups = []) {
 }
 
 async function applySweeperBatchMappings(assignments = []) {
-  const state = getState() || (typeof window !== 'undefined' ? (window.Store?.getState?.() || window.state || {}) : {});
+  const state = (typeof window !== 'undefined' ? (window.Store?.getState?.() ) : {});
   const recipes = Array.isArray(state.recipes) ? [...state.recipes] : [];
-  const masterItems = (window.Store?.getState?.() || window.state || state).ingredients || [];
+  const masterItems = (window.Store?.getState?.()  || state).ingredients || [];
 
   const recipeMap = new Map();
   recipes.forEach(r => { if (r?.id) recipeMap.set(String(r.id), JSON.parse(JSON.stringify(r))); });
@@ -307,7 +307,7 @@ async function applySweeperBatchMappings(assignments = []) {
   setRecipes(updatedAllRecipes);
 
   if (typeof window !== 'undefined') {
-    if (window.state) window.state.recipes = updatedAllRecipes;
+    if (getState()) getState().recipes = updatedAllRecipes;
     if (typeof window.renderDataQualityView === 'function') window.renderDataQualityView();
   }
 

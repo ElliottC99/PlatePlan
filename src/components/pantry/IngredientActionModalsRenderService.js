@@ -195,3 +195,38 @@ export function renderReorganiseTemplate(ing, targetCandidates) {
     </div>
   `;
 }
+
+/**
+ * Renders a custom confirmation modal.
+ */
+export function renderCustomConfirmTemplate(message, title = 'Confirm Action') {
+  return `
+    <div style="padding: 24px; max-width: 400px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">❓</div>
+      <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750;">${escapeHTML(title)}</h3>
+      <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 20px 0; line-height: 1.5;">
+        ${escapeHTML(message)}
+      </p>
+      <div style="display:flex; gap:8px; justify-content: center;">
+        <button type="button" class="btn" style="padding: 8px 24px;" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn primary" style="padding: 8px 24px;" id="btn-confirm-custom">Confirm</button>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Renders a modal for copying text.
+ */
+export function renderCopyTextModalTemplate(title, text) {
+  return `
+    <div style="padding: 24px; max-width: 480px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px;">
+      <h3 style="margin-top:0; margin-bottom: 12px; font-size: 1.15rem; font-weight: 750;">${escapeHTML(title)}</h3>
+      <textarea id="copy-modal-textarea" readonly style="width:100%; height: 200px; padding: 12px; border: 1px solid var(--border,#e7e5e4); border-radius: 8px; font-size: 12px; font-family: monospace; background: var(--surface2,#fafaf9); margin-bottom: 16px; resize: none;">${escapeHTML(text)}</textarea>
+      <div style="display:flex; justify-content: flex-end; gap:8px;">
+        <button type="button" class="btn" onclick="window.closeSubtypeActionModal()">Close</button>
+        <button type="button" class="btn primary" id="btn-copy-modal-text">Copy to Clipboard</button>
+      </div>
+    </div>
+  `;
+}

@@ -5,6 +5,7 @@
  */
 
 import { renderShoppingCategoriesList } from './ShoppingCategoryGroup.js';
+import { showCustomCopyModal } from '../pantry/IngredientActionModalsUI.js';
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -30,9 +31,9 @@ export function renderShoppingBatchToolbar({ totalCost = 0, items = [], onBack =
         </div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button type="button" class="btn ghost sm" onclick="${onBack}">← Back to Plan</button>
-        <button type="button" class="btn ghost sm" onclick="exportShoppingListToClipboard()">📋 Copy List</button>
-        <button type="button" class="btn primary sm" style="font-weight:700" onclick="${onCommit}">✓ Save Shopping List &amp; Commit Plan →</button>
+        <button type="button" class="btn ghost sm" data-action="back-to-plan">← Back to Plan</button>
+        <button type="button" class="btn ghost sm" data-action="copy-list">📋 Copy List</button>
+        <button type="button" class="btn primary sm" style="font-weight:700" data-action="commit-plan">✓ Save Shopping List &amp; Commit Plan →</button>
       </div>
     </div>
   `;
@@ -71,16 +72,16 @@ export function clearCheckedShoppingItems(state) {
 }
 
 export function exportShoppingListToClipboard() {
-  const plan = window.state?.plan;
+  const plan = getState()?.plan;
   const { items = [] } = window.computeWizardShoppingAgg ? window.computeWizardShoppingAgg(plan) : { items: [] };
   const text = exportShoppingListToText(items);
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => {
       if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Shopping list copied to clipboard! 📋');
     }).catch(() => {
-      prompt('Copy your shopping list:', text);
+      if (typeof showCustomCopyModal === 'function') showCustomCopyModal('Copy Shopping List', text);
     });
   } else {
-    prompt('Copy your shopping list:', text);
+    if (typeof showCustomCopyModal === 'function') showCustomCopyModal('Copy Shopping List', text);
   }
 }

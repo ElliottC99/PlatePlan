@@ -24,6 +24,8 @@ function round1(val) {
   return Math.round((val || 0) * 10) / 10;
 }
 
+const MAX_EFFICIENCY_ITEMS = 5;
+
 /**
  * Render Protein Efficiency Analysis Section HTML
  */
@@ -55,8 +57,8 @@ export function renderProteinEfficiencyAnalysisSection(modalIngs = [], recipe = 
   if (!items.length) return '';
   const sortedWorst = [...items].sort((a, b) => a.pPer100 - b.pPer100);
   const sortedBest = [...items].sort((a, b) => b.pPer100 - a.pPer100);
-  const topBest = sortedBest.slice(0, 5);
-  const topWorst = sortedWorst.slice(0, 5);
+  const topBest = sortedBest.slice(0, MAX_EFFICIENCY_ITEMS);
+  const topWorst = sortedWorst.slice(0, MAX_EFFICIENCY_ITEMS);
 
   const renderItemRow = (item, rank, isBest) => {
     const tagClass = isBest

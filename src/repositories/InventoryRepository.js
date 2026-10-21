@@ -5,6 +5,7 @@
  */
 
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
+import { NETWORK_TIMEOUT_MS } from '../config/systemConfig.js';
 
 function isDbAvailable() {
   if (!db) {
@@ -20,7 +21,7 @@ export async function getInventory() {
     const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('inventory');
     const snapPromise = colRef.get();
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Inventory fetch timeout')), 2500)
+      setTimeout(() => reject(new Error('Inventory fetch timeout')), NETWORK_TIMEOUT_MS)
     );
     const snap = await Promise.race([snapPromise, timeoutPromise]).catch(async () => {
       try { return await colRef.get({ source: 'cache' }); } catch (_e) { return null; }

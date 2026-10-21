@@ -3,6 +3,8 @@
  * Presentation Component for Use-Up Recipe Finder & Assignment Modals
  */
 
+const MAX_USE_UP_RESULTS = 48;
+
 function escapeHtml(str) {
   if (typeof window !== 'undefined' && window.ppEscapeHtml) {
     return window.ppEscapeHtml(str);
@@ -76,7 +78,7 @@ export function renderFinderResults(rows = [], entries = [], activeMeal = 'dinne
     return '<div class="empty">No eligible recipe uses the selected products with these meal, exclusion and traffic-light settings.</div>';
   }
 
-  const cardsHtml = rows.slice(0, 48).map(row => {
+  const cardsHtml = rows.slice(0, MAX_USE_UP_RESULTS).map(row => {
     const coverage = row.useUpCoverage;
     const bundle = typeof window !== 'undefined' && window.calculateRecipeDisplayNutrition
       ? window.calculateRecipeDisplayNutrition({ recipe: row.recipe, variant: row.variant, mealType: activeMeal })

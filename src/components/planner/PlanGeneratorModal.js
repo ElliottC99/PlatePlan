@@ -6,6 +6,8 @@
 
 import { generateWeeklyPlan } from '../../services/PlanGeneratorService.js';
 import { setActivePlan, getState } from '../../store/store.js';
+import { showCustomAlert } from '../pantry/IngredientActionModalsUI.js';
+
 
 export function openPlanGeneratorModal() {
   const existingModal = document.getElementById('plan-generator-modal');
@@ -141,7 +143,8 @@ export function openPlanGeneratorModal() {
 
       renderPreview(currentGeneratedPlan);
     } catch (err) {
-      alert(`Error generating plan: ${err.message || err}`);
+      if (typeof showCustomAlert === 'function') showCustomAlert(`Error generating plan: ${err.message || err}`);
+
     }
   });
 

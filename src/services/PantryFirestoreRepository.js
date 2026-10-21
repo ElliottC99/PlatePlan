@@ -1,3 +1,4 @@
+import store from "../store/store.js";
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
 import { enforceCategorySSOT } from '../utils/categoryEnforcer.js';
 import { isDbAvailable } from './FirestoreUtils.js';
@@ -8,7 +9,7 @@ export async function getIngredients() {
     if (!isDbAvailable()) return [];
     const snap = await safeFirestoreGet(db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients'));
     const raw = (snap && snap.docs) ? snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) : [];
-    const prods = (typeof window !== 'undefined' && window.state?.products) || [];
+    const prods = (typeof window !== 'undefined' && store.getState()?.products) || [];
     const enforced = enforceCategorySSOT({ ingredients: raw, products: prods });
     return enforced.ingredients;
   } catch (err) {
@@ -19,7 +20,7 @@ export async function getIngredients() {
 export async function saveIngredient(ingredient) {
   try {
     if (!isDbAvailable() || !ingredient || typeof ingredient !== 'object') return { success: false, error: 'Invalid' };
-    const enforced = enforceCategorySSOT({ ingredients: [ingredient], products: (typeof window !== 'undefined' && window.state?.products) || [] });
+    const enforced = enforceCategorySSOT({ ingredients: [ingredient], products: (typeof window !== 'undefined' && store.getState()?.products) || [] });
     const finalIng = enforced.ingredients[0] || ingredient;
     const ingData = { ...finalIng, updatedAt: new Date().toISOString() };
     const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');

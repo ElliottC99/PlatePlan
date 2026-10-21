@@ -3,6 +3,8 @@
  * Core Application Bootstrapping, Passive Service Worker & Toast Notifications
  */
 
+const TOAST_FADE_OUT_MS = 200;
+
 export function showPlatePlanToast(msg, type = 'info') {
   if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function' && window.showPlatePlanToast !== showPlatePlanToast) {
     return window.showPlatePlanToast(msg, type);
@@ -20,7 +22,7 @@ export function showPlatePlanToast(msg, type = 'info') {
   requestAnimationFrame(() => { toast.style.opacity = '1'; });
   setTimeout(() => {
     toast.style.opacity = '0';
-    setTimeout(() => toast.remove(), 200);
+    setTimeout(() => toast.remove(), TOAST_FADE_OUT_MS);
   }, 3000);
 }
 

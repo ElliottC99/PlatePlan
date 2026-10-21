@@ -6,6 +6,8 @@
 import { toTitleCase } from './RecipeImporter.js';
 import { escapeHtml, escapeAttr } from '../utils/stringUtils.js';
 
+const MAX_RECIPE_WIZARD_PRODUCTS = 20;
+
 export function bindCategoryAutocomplete({
   modalEl,
   wizardData,
@@ -167,7 +169,7 @@ export function filterProducts({
   if (!filtered.length) {
     searchDropdown.innerHTML = `<div style="padding: 10px; font-size: 12px; color: var(--text2); text-align: center;">No products found matching "${escapeHtml(q)}".</div>`;
   } else {
-    searchDropdown.innerHTML = filtered.slice(0, 20).map(p => `
+    searchDropdown.innerHTML = filtered.slice(0, MAX_RECIPE_WIZARD_PRODUCTS).map(p => `
       <div class="wiz-prod-opt" data-id="${escapeAttr(p.id)}" style="padding: 8px 10px; font-size: 12.5px; cursor: pointer; border-bottom: 1px solid #f0fdf4; display: flex; justify-content: space-between; align-items: center;">
         <div>
           <strong style="color: var(--text);">${escapeHtml(p.name)}</strong>

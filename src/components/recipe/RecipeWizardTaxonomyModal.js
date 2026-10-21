@@ -17,7 +17,7 @@ import { escapeHtml } from '../../utils/stringUtils.js';
 import { createInitialWizardData, syncTierStateFromStep1 } from '../../services/TaxonomyMapper.js';
 
 export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = '', onComplete = null } = {}) {
-  const storeState = getState() || {};
+  const storeState = getState();
   const ingredients = storeState.ingredients || [];
   const existingCategories = computeAvailableCategories(storeState.categories || [], ingredients);
 

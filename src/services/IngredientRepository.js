@@ -49,7 +49,7 @@ export async function getIngredients(uid) {
     if (!isDbAvailable()) return [];
     const snap = await safeFirestoreGet(db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients'));
     const raw = (snap && snap.docs) ? snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) : [];
-    const prods = (typeof window !== 'undefined' && window.state?.products) || [];
+    const prods = (typeof window !== 'undefined' && getState()?.products) || [];
     return enforceCategorySSOT({ ingredients: raw, products: prods }).ingredients;
   } catch (err) { return []; }
 }
@@ -57,7 +57,7 @@ export async function getIngredients(uid) {
 export async function saveIngredient(ingredient, uid) {
   try {
     if (!isDbAvailable() || !ingredient || typeof ingredient !== 'object') return { success: false, error: 'Invalid' };
-    const enforced = enforceCategorySSOT({ ingredients: [ingredient], products: (typeof window !== 'undefined' && window.state?.products) || [] });
+    const enforced = enforceCategorySSOT({ ingredients: [ingredient], products: (typeof window !== 'undefined' && getState()?.products) || [] });
     const finalIng = enforced.ingredients[0] || ingredient;
     const ingData = { ...finalIng, updatedAt: new Date().toISOString() };
     const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');

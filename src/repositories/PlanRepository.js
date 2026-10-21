@@ -5,6 +5,7 @@
  */
 
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
+import { NETWORK_TIMEOUT_MS } from '../config/systemConfig.js';
 
 function isDbAvailable() {
   if (!db) {
@@ -48,7 +49,7 @@ export async function getPlan(planId) {
     const docRef = db.collection('households').doc(HOUSEHOLD_ID).collection('plans').doc(planId);
     const snapPromise = docRef.get();
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Plan fetch timeout')), 2500)
+      setTimeout(() => reject(new Error('Plan fetch timeout')), NETWORK_TIMEOUT_MS)
     );
     const docSnap = await Promise.race([snapPromise, timeoutPromise]).catch(async () => {
       try { return await docRef.get({ source: 'cache' }); } catch (_e) { return null; }

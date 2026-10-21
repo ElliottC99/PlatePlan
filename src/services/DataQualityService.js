@@ -8,7 +8,7 @@ import { dismissAdvisoryInDb } from './HouseholdRepository.js';
 import { saveIngredient } from './IngredientRepository.js';
 
 export async function dismissDataQualityAdvisory(issueKey, rerenderCallback) {
-  const state = getState() || {};
+  const state = getState();
   const currentPrefs = state.preferences || state.userPrefs || {};
   const previousPrefs = JSON.parse(JSON.stringify(currentPrefs));
 

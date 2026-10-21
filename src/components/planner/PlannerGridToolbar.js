@@ -68,7 +68,7 @@ export function renderEarlierDaysHeading(range, count, isExpanded) {
 }
 
 export function renderPlanOverallSummary(score) {
-  const currentPlan = window.Store?.getState()?.currentPlan || window.state?.currentPlan;
+  const currentPlan = window.Store?.getState()?.currentPlan ?.currentPlan;
   const targets = currentPlan?.macroTargets || { calories: 2000, protein: 140 };
   const scoreColor = score && score.score <= 10 ? 'var(--green)' : (score && score.score <= 20 ? 'var(--amber)' : 'var(--red)');
   

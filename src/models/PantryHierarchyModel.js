@@ -44,7 +44,7 @@ export function getActiveCategories(state = {}) {
 export async function aliasIngredient(ingredientId, aliasName) {
   const cleanAlias = (aliasName || '').trim();
   if (!ingredientId || !cleanAlias) return false;
-  const state = getState() || {}, ings = [...(state.ingredients || [])], ing = ings.find(i => String(i.id) === String(ingredientId));
+  const state = getState(), ings = [...(state.ingredients || [])], ing = ings.find(i => String(i.id) === String(ingredientId));
   if (!ing) return false;
   const existing = Array.isArray(ing.aliases) ? [...ing.aliases] : (ing.alias ? [ing.alias] : []);
   if (!existing.some(a => a.toLowerCase() === cleanAlias.toLowerCase())) existing.push(cleanAlias);
@@ -54,7 +54,7 @@ export async function aliasIngredient(ingredientId, aliasName) {
 }
 
 export async function removeAlias(ingredientId, aliasToRemove) {
-  const state = getState() || {}, ings = [...(state.ingredients || [])], ing = ings.find(i => String(i.id) === String(ingredientId));
+  const state = getState(), ings = [...(state.ingredients || [])], ing = ings.find(i => String(i.id) === String(ingredientId));
   if (!ing || !Array.isArray(ing.aliases)) return false;
   ing.aliases = ing.aliases.filter(a => a.toLowerCase() !== (aliasToRemove || '').toLowerCase());
   ing.updatedAt = new Date().toISOString();
@@ -65,7 +65,7 @@ export async function removeAlias(ingredientId, aliasToRemove) {
 export async function addSubtypeToIngredient(parentIngredientId, subtypeName, subtypeNotes = '') {
   const cleanName = (subtypeName || '').trim();
   if (!parentIngredientId || !cleanName) return false;
-  const state = getState() || {}, ings = [...(state.ingredients || [])], ing = ings.find(i => String(i.id) === String(parentIngredientId));
+  const state = getState(), ings = [...(state.ingredients || [])], ing = ings.find(i => String(i.id) === String(parentIngredientId));
   if (!ing) return false;
   const currentSubtypes = Array.isArray(ing.subtypes) ? [...ing.subtypes] : [];
   const newSubtype = { id: `sub_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`, name: cleanName, notes: subtypeNotes.trim(), aliases: [], defaultProductId: null, createdAt: new Date().toISOString() };
@@ -75,7 +75,7 @@ export async function addSubtypeToIngredient(parentIngredientId, subtypeName, su
 }
 
 export async function promoteToIngredient(subtypeId, parentIngredientId) {
-  const state = getState() || {}, ings = [...(state.ingredients || [])];
+  const state = getState(), ings = [...(state.ingredients || [])];
   const existingIng = ings.find(i => String(i.id) === String(subtypeId));
   if (existingIng) {
     delete existingIng.groupId; delete existingIng.group_id; delete existingIng.parentId; delete existingIng.parent_id;
@@ -95,7 +95,7 @@ export async function promoteToIngredient(subtypeId, parentIngredientId) {
 }
 
 export async function reparentSubtype(subtypeId, targetParentIngredientId, sourceParentIngredientId = null) {
-  const state = getState() || {}, ings = [...(state.ingredients || [])], prods = [...(state.products || [])];
+  const state = getState(), ings = [...(state.ingredients || [])], prods = [...(state.products || [])];
   const targetParent = ings.find(i => String(i.id) === String(targetParentIngredientId));
   if (!targetParent) return false;
   let subtype = null;
@@ -121,7 +121,7 @@ export async function reparentSubtype(subtypeId, targetParentIngredientId, sourc
 }
 
 export async function demoteToSubtype(ingredientId, targetParentIngredientId) {
-  const state = getState() || {}, ings = [...(state.ingredients || [])], prods = [...(state.products || [])];
+  const state = getState(), ings = [...(state.ingredients || [])], prods = [...(state.products || [])];
   const sourceIdx = ings.findIndex(i => String(i.id) === String(ingredientId));
   const targetParent = ings.find(i => String(i.id) === String(targetParentIngredientId));
   if (sourceIdx < 0 || !targetParent) return false;
@@ -136,7 +136,7 @@ export async function demoteToSubtype(ingredientId, targetParentIngredientId) {
 }
 
 export async function mergeIngredients(sourceId, targetId) {
-  const state = getState() || {}, ings = [...(state.ingredients || [])], prods = [...(state.products || [])];
+  const state = getState(), ings = [...(state.ingredients || [])], prods = [...(state.products || [])];
   const sourceIdx = ings.findIndex(i => String(i.id) === String(sourceId));
   const target = ings.find(i => String(i.id) === String(targetId));
   if (sourceIdx < 0 || !target || String(sourceId) === String(targetId)) return false;
@@ -155,7 +155,7 @@ export async function mergeIngredients(sourceId, targetId) {
 }
 
 export async function reallocateProduct(productId, newIngredientId, newSubtypeId = null, newCategory = null) {
-  const state = getState() || {}, prods = [...(state.products || [])], ings = state.ingredients || [];
+  const state = getState(), prods = [...(state.products || [])], ings = state.ingredients || [];
   const prod = prods.find(p => String(p.id) === String(productId));
   if (!prod) return false;
   const targetIng = ings.find(i => String(i.id) === String(newIngredientId));
@@ -168,7 +168,7 @@ export async function reallocateProduct(productId, newIngredientId, newSubtypeId
 }
 
 export async function setAutoDefaultProduct(productId, parentIngredientId, subtypeId = null) {
-  const state = getState() || {}, prods = [...(state.products || [])], ings = [...(state.ingredients || [])];
+  const state = getState(), prods = [...(state.products || [])], ings = [...(state.ingredients || [])];
   const parent = ings.find(i => String(i.id) === String(parentIngredientId));
   if (parent) {
     if (subtypeId && Array.isArray(parent.subtypes)) {
@@ -185,12 +185,12 @@ export async function setAutoDefaultProduct(productId, parentIngredientId, subty
 }
 
 export function getIngredientById(id) {
-  return !id ? null : ((getState() || {}).ingredients || []).find(i => String(i.id) === String(id)) || null;
+  return !id ? null : ((getState()).ingredients || []).find(i => String(i.id) === String(id)) || null;
 }
 
 export function getSubtypeById(id) {
   if (!id) return null;
-  for (const ing of ((getState() || {}).ingredients || [])) {
+  for (const ing of ((getState()).ingredients || [])) {
     const sub = (ing.subtypes || []).find(s => String(s.id) === String(id));
     if (sub) return { ...sub, parentIngredientId: ing.id, parentName: ing.name, category: ing.category };
   }

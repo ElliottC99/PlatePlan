@@ -61,7 +61,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
       const metRaw = modalWrap.querySelector('#wiz-method-raw')?.value.trim() || '';
 
       const rawSections = parseSectionedIngredients(ingRaw);
-      const storeState = getState() || {};
+      const storeState = getState();
       const ingredientsBank = storeState.ingredients || [];
 
       const parsedSections = rawSections.map(sec => ({
@@ -114,7 +114,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
         return;
       }
 
-      const storeState = getState() || {};
+      const storeState = getState();
       const ingredientsBank = storeState.ingredients || [];
       const blocks = unpackAndSplitRecipeBlocks(text);
       const parsedRecipes = blocks.map(b => parseSingleRecipeText(b, ingredientsBank)).filter(r => r && (r.title || (r.ingredientSections && r.ingredientSections.length)));

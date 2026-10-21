@@ -8,6 +8,7 @@
  */
 
 import { renderFitScoreScopeUI, renderSkeletonGridUI } from '../planner/PlannerSkeletonGridUI.js';
+import store from '../../store/store.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -40,9 +41,9 @@ export function renderConstraintsForm({
   maxFitScore = 100,
   skeletonGrid = {}
 } = {}) {
-  const currentMin = typeof window !== 'undefined' && window.state?.prefs?.minFitScore !== undefined ? window.state.prefs.minFitScore : minFitScore;
-  const currentMax = typeof window !== 'undefined' && window.state?.prefs?.maxFitScore !== undefined ? window.state.prefs.maxFitScore : maxFitScore;
-  const currentGrid = typeof window !== 'undefined' && window.state?.skeletonGrid ? window.state.skeletonGrid : skeletonGrid;
+  const currentMin = typeof window !== 'undefined' && getState()?.prefs?.minFitScore !== undefined ? getState().prefs.minFitScore : minFitScore;
+  const currentMax = typeof window !== 'undefined' && getState()?.prefs?.maxFitScore !== undefined ? getState().prefs.maxFitScore : maxFitScore;
+  const currentGrid = typeof window !== 'undefined' && getState()?.skeletonGrid ? getState().skeletonGrid : skeletonGrid;
 
   return `
     <div class="card pp-generator-constraints-card" style="padding:20px;display:flex;flex-direction:column;gap:18px">
@@ -51,20 +52,20 @@ export function renderConstraintsForm({
           <h2 style="margin:0;font-size:18px;font-weight:700">Step 1: Configure Plan Requests</h2>
           <div style="font-size:13px;color:var(--text2);margin-top:4px">Define days, cadence, fit score scope, and anchor slots before generating.</div>
         </div>
-        <button type="button" class="btn primary" style="font-weight:700;padding:8px 18px" onclick="generatePlan()">✨ Generate Plan</button>
+        <button type="button" class="btn primary pp-gen-plan-btn" style="font-weight:700;padding:8px 18px">✨ Generate Plan</button>
       </div>
 
       <!-- Parameters Grid -->
       <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:14px;background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border)">
         <div>
           <label for="wizard-plan-days" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;cursor:pointer">PLAN LENGTH</label>
-          <select id="wizard-plan-days" name="plannerDays" aria-label="Plan duration in days" class="select" style="width:100%" onchange="state.plannerDays=parseInt(this.value)||7;if(window.state)window.state.plannerDays=state.plannerDays;saveState();if(typeof renderPlannerWizard==='function')renderPlannerWizard();">
+          <select id="wizard-plan-days" name="plannerDays" aria-label="Plan duration in days" class="select pp-constraint-input" style="width:100%" data-key="plannerDays">
             ${[1,2,3,4,5,6,7,8,9,10,11,12,13,14].map(n => `<option value="${n}" ${n === daysVal ? 'selected' : ''}>${n} day${n > 1 ? 's' : ''}</option>`).join('')}
           </select>
         </div>
         <div>
           <label for="wizard-plan-start" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;cursor:pointer">START DATE</label>
-          <input type="date" id="wizard-plan-start" name="plannerStartDate" aria-label="Plan start date" class="input" style="width:100%" value="${escapeAttr(startVal)}" onchange="state.plannerStartDate=this.value;if(window.state)window.state.plannerStartDate=this.value;saveState();if(typeof renderPlannerWizard==='function')renderPlannerWizard();">
+          <input type="date" id="wizard-plan-start" name="plannerStartDate" aria-label="Plan start date" class="input pp-constraint-input" style="width:100%" value="${escapeAttr(startVal)}" data-key="plannerStartDate">
         </div>
         <div>
           <label for="wizard-cadence-breakfast" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;cursor:pointer">BREAKFAST REPEAT</label>
@@ -93,7 +94,7 @@ export function renderConstraintsForm({
       ${renderSkeletonGridUI({ days: daysVal, startDate: startVal, skeletonGrid: currentGrid })}
 
       <div style="display:flex;justify-content:flex-end;margin-top:6px">
-        <button type="button" class="btn primary" style="font-weight:700;padding:10px 24px;font-size:14px" onclick="generatePlan()">✨ Generate Meal Plan →</button>
+        <button type="button" class="btn primary pp-gen-plan-btn" style="font-weight:700;padding:10px 24px;font-size:14px">✨ Generate Meal Plan →</button>
       </div>
     </div>
   `;
@@ -126,4 +127,26 @@ export function renderUseUpPanel(useUp) {
       <div id="wizard-useup-search-results" style="margin-top:6px;max-height:140px;overflow-y:auto;display:none;background:var(--surface);border:1px solid var(--border);border-radius:8px"></div>
     </div>
   `;
+}
+
+
+
+export function bindConstraintEvents(container, onRender) {
+  const inputs = container.querySelectorAll('.pp-constraint-input');
+  inputs.forEach(input => {
+    input.onchange = (e) => {
+      const key = e.target.dataset.key;
+      const val = e.target.value;
+      const state = store.getState();
+      if (key === 'plannerDays') state.currentPlannerDays = parseInt(val) || 7;
+      if (key === 'plannerStartDate') state.currentPlannerStartDate = val;
+      if (typeof window.saveState === 'function') window.saveState();
+      if (onRender) onRender();
+    };
+  });
+  container.querySelectorAll('.pp-gen-plan-btn').forEach(btn => {
+    btn.onclick = () => {
+      if (typeof window.generatePlan === 'function') window.generatePlan();
+    };
+  });
 }

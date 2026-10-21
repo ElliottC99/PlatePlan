@@ -18,7 +18,7 @@ export { getSkeletonSlotConfig, renderFitScoreScopeUI, renderSkeletonGridUI };
 
 export function openSlotConfigurator(dayIndex, mealType, forceSplitMode = null) {
   if (typeof window === 'undefined') return;
-  const state = window.state || {};
+  const state = getState();
   const skeletonGrid = state.skeletonGrid || {};
   const currentConfig = getSkeletonSlotConfig(skeletonGrid, dayIndex, mealType) || { status: 'unassigned', isSkipped: false, isSplit: false };
   const isSplit = forceSplitMode !== null ? Boolean(forceSplitMode) : Boolean(currentConfig.isSplit);
@@ -56,14 +56,14 @@ export function closeSlotConfigurator() {
 }
 
 export function setSlotConfiguredStatus(dayIndex, mealType, status, recipeId = null) {
-  if (!window.state) window.state = {};
-  if (!window.state.skeletonGrid) window.state.skeletonGrid = {};
+  if (!getState()) getState() = {};
+  if (!getState().skeletonGrid) getState().skeletonGrid = {};
 
   const slotKey = `${dayIndex}_${mealType}`;
   if (status === 'unassigned') {
-    delete window.state.skeletonGrid[slotKey];
+    delete getState().skeletonGrid[slotKey];
   } else if (status === 'skipped') {
-    window.state.skeletonGrid[slotKey] = {
+    getState().skeletonGrid[slotKey] = {
       status: 'skipped',
       isSkipped: true,
       isSplit: false,
@@ -74,7 +74,7 @@ export function setSlotConfiguredStatus(dayIndex, mealType, status, recipeId = n
     const [baseRecipeId, variantStr] = (recipeId || '').split('::');
     const finalVariant = variantStr || 'original';
 
-    window.state.skeletonGrid[slotKey] = {
+    getState().skeletonGrid[slotKey] = {
       status: 'pinned',
       isSkipped: false,
       isSplit: false,
@@ -86,17 +86,17 @@ export function setSlotConfiguredStatus(dayIndex, mealType, status, recipeId = n
     };
   }
 
-  if (typeof saveCurrentPlan === 'function') saveCurrentPlan(window.state.plan);
+  if (typeof saveCurrentPlan === 'function') saveCurrentPlan(getState().currentPlan);
   closeSlotConfigurator();
   if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
 }
 
 export function setSplitPersonSlotStatus(dayIndex, mealType, personKey, status, recipeId = null) {
-  if (!window.state) window.state = {};
-  if (!window.state.skeletonGrid) window.state.skeletonGrid = {};
+  if (!getState()) getState() = {};
+  if (!getState().skeletonGrid) getState().skeletonGrid = {};
 
   const slotKey = `${dayIndex}_${mealType}`;
-  const existing = getSkeletonSlotConfig(window.state.skeletonGrid, dayIndex, mealType) || {};
+  const existing = getSkeletonSlotConfig(getState().skeletonGrid, dayIndex, mealType) || {};
   const elliott = { ...(existing.elliott || (existing.recipeId ? { recipeId: existing.recipeId, pinned: true } : (existing.isSkipped ? { isSkipped: true } : {}))) };
   const chloe = { ...(existing.chloe || (existing.recipeId ? { recipeId: existing.recipeId, pinned: true } : (existing.isSkipped ? { isSkipped: true } : {}))) };
   delete elliott.recipeName;
@@ -112,7 +112,7 @@ export function setSplitPersonSlotStatus(dayIndex, mealType, personKey, status, 
   const nextElliott = personKey === 'elliott' ? targetObj : elliott;
   const nextChloe = personKey === 'chloe' ? targetObj : chloe;
 
-  window.state.skeletonGrid[slotKey] = {
+  getState().skeletonGrid[slotKey] = {
     status: 'split',
     isSkipped: Boolean(nextElliott.isSkipped && nextChloe.isSkipped),
     isSplit: true,
@@ -138,16 +138,16 @@ if (typeof window !== 'undefined') {
       openSlotConfigurator(ctx.day, ctx.meal, Boolean(isSplit));
     },
     handleFitScoreMinChange(val) {
-      if (!window.state) window.state = {};
-      if (!window.state.prefs) window.state.prefs = {};
-      window.state.prefs.minFitScore = parseInt(val, 10) || 0;
+      if (!getState()) getState() = {};
+      if (!getState().prefs) getState().prefs = {};
+      getState().prefs.minFitScore = parseInt(val, 10) || 0;
       if (typeof window.saveState === 'function') window.saveState();
       if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
     },
     handleFitScoreMaxChange(val) {
-      if (!window.state) window.state = {};
-      if (!window.state.prefs) window.state.prefs = {};
-      window.state.prefs.maxFitScore = parseInt(val, 10) || 100;
+      if (!getState()) getState() = {};
+      if (!getState().prefs) getState().prefs = {};
+      getState().prefs.maxFitScore = parseInt(val, 10) || 100;
       if (typeof window.saveState === 'function') window.saveState();
       if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
     },
@@ -155,8 +155,8 @@ if (typeof window !== 'undefined') {
       const ctx = window.__slotConfigContext || { day: 1, meal: 'dinner' };
       const listEl = document.getElementById(`slot-config-recipe-list-${person}`) || document.getElementById('slot-config-recipe-list-both');
       if (!listEl) return;
-      const recipes = Array.isArray(window.state?.recipes) ? window.state.recipes : [];
-      const skeletonGrid = window.state?.skeletonGrid || {};
+      const recipes = Array.isArray(getState()?.recipes) ? getState().recipes : [];
+      const skeletonGrid = getState()?.skeletonGrid || {};
       listEl.innerHTML = renderRecipeCandidateRows(recipes, {
         dayIndex: ctx.day,
         mealType: ctx.meal,

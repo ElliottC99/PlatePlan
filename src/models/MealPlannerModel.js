@@ -1,3 +1,4 @@
+import store from "../store/store.js";
 /**
  * src/models/MealPlannerModel.js (v3.20.14)
  * Domain Model & Payload Sanitiser for Household Meal Plans & Split Skeleton Grids.
@@ -53,7 +54,7 @@ export function sanitizeSlotNode(node) {
  * Returns a clean, empty meal plan schema with no recipe attachments.
  */
 export function createCleanEmptyPlanSchema(daysOverride = null) {
-  const days = Number(daysOverride || (typeof window !== 'undefined' ? window.state?.plannerDays : 7) || 7);
+  const days = Number(daysOverride || (typeof window !== 'undefined' ? store.getState()?.plannerDays : 7) || 7);
   return {
     days,
     startDate: '',
@@ -83,7 +84,7 @@ export function stripPlanPayload(rawInput) {
 
   const rawSkeleton = rawInput.skeletonGrid
     || planData.skeletonGrid
-    || (typeof window !== 'undefined' ? window.state?.skeletonGrid : {})
+    || (typeof window !== 'undefined' ? store.getState()?.skeletonGrid : {})
     || {};
 
   const cleanSlots = {};

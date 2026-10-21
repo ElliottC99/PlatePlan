@@ -1,3 +1,4 @@
+
 /**
  * src/services/SubtypeActionService.js (v3.38.7)
  * Handles subtype promotion, merging, reassignment, and database write operations.
@@ -9,8 +10,8 @@ import { invalidateHierarchyCache } from '../models/PantryHierarchyModel.js';
 
 export async function deleteSubtype(parentId, subtypeId) {
   try {
-    const state = getState() || {};
-    let ingredients = (state.ingredients && state.ingredients.length) ? state.ingredients : (window.state?.ingredients || []);
+    const state = store.getState();
+    let ingredients = (state.ingredients && state.ingredients.length) ? state.ingredients : (store.getState()?.ingredients || []);
     
     // Try finding the parent by parentId first
     let parent = ingredients.find(i => String(i.id) === String(parentId));
@@ -29,7 +30,7 @@ export async function deleteSubtype(parentId, subtypeId) {
     parent.updatedAt = new Date().toISOString();
 
     // Find and unlink any products linked to subtypeId
-    const prods = [...(state.products || window.state?.products || [])];
+    const prods = [...(state.products ?.products || [])];
     const unlinkedProds = [];
     prods.forEach(p => {
       if (String(p.subtypeId) === String(subtypeId)) {

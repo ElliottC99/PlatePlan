@@ -14,20 +14,22 @@ import { renderResolveModalShell, renderRemapMatchRow, renderLinkProductRow } fr
 
 let activeTargetId = null, activeTargetType = 'ingredient', activeParentIngredientId = null, activeRecipeId = null, activeRecipeItemIndex = null, activeTargetName = '';
 
-const safeGetState = () => getState() || (typeof window !== 'undefined' ? (window.Store?.getState?.() || window.state || {}) : {});
+const MAX_MATCHES = 15;
+
+const safeGetState = () => (typeof window !== 'undefined' ? (window.Store?.getState?.() ) : {});
 
 export function safeGetProducts() {
   const st = safeGetState();
   if (Array.isArray(st.products) && st.products.length > 0) return [...st.products];
   if (Array.isArray(st.pantry?.products) && st.pantry.products.length > 0) return [...st.pantry.products];
-  if (window.state && Array.isArray(window.state.products) && window.state.products.length > 0) return [...window.state.products];
+  if (getState() && Array.isArray(getState().products) && getState().products.length > 0) return [...getState().products];
   return [];
 }
 
 export function commitProductUpdates(updatedProducts) {
   if (typeof setProducts === 'function') setProducts(updatedProducts);
   if (window.Store?.setState) window.Store.setState({ products: updatedProducts });
-  if (window.state) window.state.products = updatedProducts;
+  if (getState()) getState().products = updatedProducts;
   if (window.PantryHierarchyModel?.setProducts) window.PantryHierarchyModel.setProducts(updatedProducts);
   if (Array.isArray(updatedProducts)) {
     Promise.all(updatedProducts.map(p => saveProduct(p))).catch(err => console.warn('[ResolveUnlinkedModalUI] Firebase write-through failed:', err));
@@ -123,7 +125,7 @@ export function filterResolveRemapOptions(query) {
     }
   });
 
-  const matches = q ? options.filter(o => o.label.toLowerCase().includes(q)).slice(0, 15) : options.slice(0, 15);
+  const matches = q ? options.filter(o => o.label.toLowerCase().includes(q)).slice(0, MAX_MATCHES) : options.slice(0, MAX_MATCHES);
   container.style.display = 'block';
   if (!matches.length) {
     container.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--text3,#a8a29e);text-align:center">No matching ingredients found.</div>';
@@ -160,7 +162,7 @@ export async function submitResolveRemapTarget(ingId, subtypeId = '') {
       recipes[recIndex] = rec;
       if (typeof setRecipes === 'function') setRecipes(recipes);
       if (window.Store?.setState) window.Store.setState({ recipes });
-      if (window.state) window.state.recipes = recipes;
+      if (getState()) getState().recipes = recipes;
       if (typeof window.recipes !== 'undefined') window.recipes = recipes;
       try { await saveRecipe(rec); } catch (e) {}
       document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: recipes }));

@@ -25,6 +25,8 @@ import {
   handleDeleteIngredient,
   handleDeleteProduct,
   showCustomAlert,
+  showCustomConfirm,
+  showCustomCopyModal,
   openIngredientReorganiseModal
 } from './IngredientActionModalsUI.js';
 
@@ -59,6 +61,8 @@ export {
   handleDeleteIngredient,
   handleDeleteProduct,
   showCustomAlert,
+  showCustomConfirm,
+  showCustomCopyModal,
   openIngredientReorganiseModal,
   openEditSubtypeModal,
   openSubtypeReorganizeModal,
@@ -160,7 +164,7 @@ export function setupModalDelegation() {
           if (subtypeId && parentId && nameInput) {
             const newName = nameInput.value.trim();
             if (newName) {
-              const state = getState() || {};
+              const state = getState();
               const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
               if (parent && Array.isArray(parent.subtypes)) {
                 const sub = parent.subtypes.find(s => String(s.id) === String(subtypeId));
@@ -189,7 +193,7 @@ export function setupModalDelegation() {
         if (modalContent && prodId) {
           const subtypeId = modalContent.getAttribute('data-subtype-id');
           const parentId = modalContent.getAttribute('data-parent-id');
-          const state = getState() || {};
+          const state = getState();
           const prods = [...(state.products || [])];
           const prod = prods.find(p => String(p.id) === String(prodId));
           if (prod) {
@@ -232,7 +236,6 @@ if (typeof window !== 'undefined') {
     promptMerge,
     handleDeleteIngredient,
     handleDeleteProduct,
-    showCustomAlert,
     openIngredientReorganiseModal,
     promptReallocateProduct,
     openProductReallocateModal,

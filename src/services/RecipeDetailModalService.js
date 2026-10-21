@@ -50,7 +50,7 @@ function computeRecipeScaleMultiplier(activeR, mode, targetServes = 2, singleSer
   const single = Number(singleServes) || 1;
 
   if (mode === 'elliott' || mode === 'e' || mode === 'chloe' || mode === 'c') {
-    const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
+    const state = (typeof window !== 'undefined' ? getState() : {}) || {};
     const userPrefs = state.preferences || state.userPrefs || {};
     const profiles = userPrefs.profiles || {};
     const eProf = profiles.elliott || profiles.e || { dailyKcal: 1950 };
@@ -92,7 +92,7 @@ export function updateRecipePreviewScale(val) {
       const rawIngs = activeR.ingredients || activeR.parsedIngredients || activeR.rawIngredients || r.ingredients || [];
       const ingredients = Array.isArray(rawIngs) ? rawIngs : Object.values(rawIngs);
       const sections = Array.isArray(activeR.ingredientSections) && activeR.ingredientSections.length > 0 ? activeR.ingredientSections : (r.ingredientSections || []);
-      const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
+      const state = (typeof window !== 'undefined' ? getState() : {}) || {};
       ingListEl.innerHTML = renderRecipeIngredientsListHTML(ingredients, state, scaleMultiplier, sections);
     } else {
       renderRecipePreview();
@@ -110,7 +110,7 @@ export function updateSinglePersonServes(val, person = 'elliott') {
       const r = previewState.recipe;
       const isEnh = previewState.currentTab === 'enhanced' && !!r.enhanced;
       const activeR = isEnh ? { ...r, ...r.enhanced, ingredients: r.enhanced.ingredients || r.ingredients } : r;
-      const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
+      const state = (typeof window !== 'undefined' ? getState() : {}) || {};
       const scaleMultiplier = computeRecipeScaleMultiplier(activeR, person, previewState.targetServes, previewState.singleServes);
       const rawIngs = activeR.ingredients || activeR.parsedIngredients || activeR.rawIngredients || r.ingredients || [];
       const ingredients = Array.isArray(rawIngs) ? rawIngs : Object.values(rawIngs);
@@ -173,7 +173,7 @@ export function renderRecipePreview() {
     ? activeR.ingredientSections
     : (Array.isArray(r.ingredientSections) && r.ingredientSections.length > 0 ? r.ingredientSections : []);
 
-  const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
+  const state = (typeof window !== 'undefined' ? getState() : {}) || {};
   const ingredientsHtml = renderRecipeIngredientsListHTML(ingredients, state, scaleMultiplier, sections);
 
   // Render method steps
@@ -304,7 +304,7 @@ export function renderRecipePreview() {
 }
 
 export function openRecipePreview(recipeId, initialTab = 'original') {
-  const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
+  const state = (typeof window !== 'undefined' ? getState() : {}) || {};
   const recipes = Array.isArray(state.recipes) ? state.recipes : [];
   const found = recipes.find(rec => String(rec.id) === String(recipeId));
   if (!found) return;

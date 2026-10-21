@@ -89,7 +89,7 @@ export function findBestCatalogMatch(rawName, ingredients = []) {
  *  c. Mismatched or unlinked items.
  */
 export function auditRecipeMappings(stateData = null) {
-  const state = stateData || getState() || {};
+  const state = stateData ;
   const recipes = Array.isArray(state.recipes) ? state.recipes : [];
   const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
 
@@ -198,7 +198,7 @@ export function auditRecipeMappings(stateData = null) {
  * Relinks a single recipe ingredient item to the Master Catalog.
  */
 export async function relinkRecipeIngredient({ recipeId, itemIndex, newIngredientId, newSubtypeId = null, newIngredientName = '', newSubtypeName = '', qty = null, unit = null }) {
-  const state = getState() || {};
+  const state = getState();
   const recipes = Array.isArray(state.recipes) ? [...state.recipes] : [];
   const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
 

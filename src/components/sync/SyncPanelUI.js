@@ -6,6 +6,7 @@
 import { getState } from '../../store/store.js';
 import { hydrateHouseholdData } from '../../services/HydrationService.js';
 import { getCounts } from '../../services/SyncService.js';
+import { showCustomConfirm, showCustomCopyModal } from '../pantry/IngredientActionModalsUI.js';
 
 let lastSyncTime = new Date();
 
@@ -57,7 +58,7 @@ export function renderSyncPanelModal() {
           <span style="font-size:18px">☁️</span>
           <h3 style="margin:0;font-size:16px;font-weight:750">Cloud Sync Diagnostics</h3>
         </div>
-        <button type="button" class="btn sm ghost" onclick="window.closePlatePlanSyncPanel()" style="padding:2px 6px;font-size:18px">&times;</button>
+        <button type="button" class="btn sm ghost" data-action="close-sync-panel" style="padding:2px 6px;font-size:18px">&times;</button>
       </div>
 
       <!-- Status & Timestamp -->
@@ -100,32 +101,49 @@ export function renderSyncPanelModal() {
       </div>
 
       <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button type="button" class="btn ghost sm" onclick="window.handleRehydrateCatalog()" style="padding:6px 10px;font-size:12px">Re-hydrate Catalog</button>
-        <button type="button" class="btn primary sm" onclick="window.closePlatePlanSyncPanel(); window.syncNow()" style="padding:6px 12px;font-size:12px">Sync Now</button>
+        <button type="button" class="btn ghost sm" data-action="rehydrate-catalog" style="padding:6px 10px;font-size:12px">Re-hydrate Catalog</button>
+        <button type="button" class="btn primary sm" data-action="sync-now" style="padding:6px 12px;font-size:12px">Sync Now</button>
       </div>
     </div>
   `;
+  
+  if (!modal.hasAttribute('data-delegated')) {
+    modal.addEventListener('click', (e) => {
+      const target = e.target.closest('[data-action]');
+      if (!target) return;
+      const action = target.dataset.action;
+      
+      if (action === 'close-sync-panel') {
+        closeSyncPanelModal();
+      } else if (action === 'rehydrate-catalog') {
+        handleRehydrateCatalog();
+      } else if (action === 'sync-now') {
+        closeSyncPanelModal();
+        if (typeof window.syncNow === 'function') window.syncNow();
+      }
+    });
+    modal.setAttribute('data-delegated', 'true');
+  }
 
   modal.style.opacity = '1';
   modal.style.pointerEvents = 'all';
   modal.classList.add('open');
+}
 
-  window.closePlatePlanSyncPanel = closeSyncPanelModal;
-  window.handleRehydrateCatalog = async () => {
+export async function handleRehydrateCatalog() {
+  if (typeof window.showPlatePlanToast === 'function') {
+    window.showPlatePlanToast('Re-hydrating catalog from Cloud...', 'info');
+  }
+  try {
+    await hydrateHouseholdData();
+    updateLastSyncTime();
+    renderSyncPanelModal();
     if (typeof window.showPlatePlanToast === 'function') {
-      window.showPlatePlanToast('Re-hydrating catalog from Cloud...', 'info');
+      window.showPlatePlanToast('Catalog re-hydrated successfully!', 'success');
     }
-    try {
-      await hydrateHouseholdData();
-      updateLastSyncTime();
-      renderSyncPanelModal();
-      if (typeof window.showPlatePlanToast === 'function') {
-        window.showPlatePlanToast('Catalog re-hydrated successfully!', 'success');
-      }
-    } catch (e) {
-      if (typeof window.showPlatePlanToast === 'function') {
-        window.showPlatePlanToast('Catalog re-hydration failed.', 'error');
-      }
+  } catch (e) {
+    if (typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast('Catalog re-hydration failed.', 'error');
     }
-  };
+  }
 }

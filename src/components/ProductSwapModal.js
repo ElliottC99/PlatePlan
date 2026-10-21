@@ -9,6 +9,8 @@ import { UnitConverter } from '../services/UnitConverter.js';
  * root and .enhanced macro delta injection, and strict fit score badge formatting.
  */
 
+const MAX_SWAP_RESULTS = 50;
+
 function escapeHtml(str) { return str == null ? '' : String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
 function escapeAttr(str) { return escapeHtml(str); }
 
@@ -35,7 +37,7 @@ export function calculateMetrics(item) {
 
 export function resolveTargetItem(param1, param2, param3) {
   if (param1 && typeof param1 === 'object') return { item: param1 };
-  const state = (typeof store !== 'undefined' && store.getState) ? store.getState() : (window.state || {});
+  const state = (typeof store !== 'undefined' && store.getState) ? store.getState() : (getState());
   const list = Array.isArray(state.shoppingList) ? state.shoppingList : [];
   const products = Array.isArray(state.products) ? state.products : Object.values(state.productsBank || {});
   const ingredients = Array.isArray(state.ingredients) ? state.ingredients : Object.values(state.ingredientsBank || {});
@@ -72,7 +74,7 @@ export function resolveTargetItem(param1, param2, param3) {
 
 export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
   if (!targetItem || !newProduct) return;
-  const storeState = (typeof store !== 'undefined' && store.getState) ? store.getState() : (window.state || {});
+  const storeState = (typeof store !== 'undefined' && store.getState) ? store.getState() : (getState());
   const bank = targetItem.bankIng || {};
   const candidateKeys = [targetItem.canonicalIngId, bank.ingredientId, bank.groupId, bank.id, targetItem.ingredientId !== targetItem.id ? targetItem.ingredientId : null, targetItem.name].filter(Boolean).map(String);
 
@@ -240,7 +242,7 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     let displayItems = [];
     if (currentTierTab === 'tier1') displayItems = sortItems(tier1Items.filter(matchesQuery));
     else if (currentTierTab === 'tier2') displayItems = sortItems(tier2Items.filter(matchesQuery));
-    else displayItems = sortItems(tier3Items.filter(p => p.id !== targetItem?.id && matchesQuery(p))).slice(0, 50);
+    else displayItems = sortItems(tier3Items.filter(p => p.id !== targetItem?.id && matchesQuery(p))).slice(0, MAX_SWAP_RESULTS);
 
     if (displayItems.length === 0) {
       listEl.innerHTML = `<div style="text-align:center;padding:28px;color:#94a3b8;font-size:13px;">No substitute products found in this tier.</div>`;

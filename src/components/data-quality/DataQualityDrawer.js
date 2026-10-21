@@ -116,7 +116,7 @@ let isAuditing = false;
 export function renderDataQualityView() {
   const missingTarget = document.getElementById('dq-missing-list');
   const advisoryTarget = document.getElementById('dq-duplicate-list');
-  const state = window.state || {};
+  const state = getState();
 
   if (!state.isCloudHydrated) {
     const skeletonHtml = `<div class="ios-activity-skeleton">

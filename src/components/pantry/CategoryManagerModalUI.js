@@ -27,6 +27,8 @@ import {
   handleDeleteCategory 
 } from './CategoryManagerOperations.js';
 
+const DROPDOWN_BLUR_DELAY_MS = 200;
+
 let wizardStep = 'list', activeCat = null, reassignMode = 'mass', reassignSearch = '', massTargetCat = '', individualCatMap = {};
 
 export function getCategoryName(cat) {
@@ -62,7 +64,7 @@ export function closeCategoryManagerModal() {
 function filterCatMergeOptions(query) {
   const listDiv = document.getElementById('cat-merge-dropdown-list');
   if (!listDiv) return;
-  const state = getState() || {};
+  const state = getState();
   const catObjects = getCategoryObjects(state);
   const otherCats = catObjects.filter(c => String(c.name || '').trim() !== String(activeCat || '').trim());
   const filtered = otherCats.filter(c => String(c.name).toLowerCase().includes(String(query || '').toLowerCase()));
@@ -79,7 +81,7 @@ function filterCatMergeOptions(query) {
 function filterCatMassOptions(query) {
   const listDiv = document.getElementById('cat-mass-dropdown-list');
   if (!listDiv) return;
-  const state = getState() || {};
+  const state = getState();
   const catObjects = getCategoryObjects(state);
   const otherCats = catObjects.filter(c => String(c.name || '').trim() !== String(activeCat || '').trim());
   if (!otherCats.some(c => c.name === 'Uncategorised')) otherCats.push({ id: 'Uncategorised', name: 'Uncategorised' });
@@ -94,7 +96,7 @@ function filterCatMassOptions(query) {
 export function promptDeleteCategory(categoryId) {
   if (!categoryId) return;
   const category = resolveCategory(categoryId); if (!category?.name) return;
-  const state = getState() || {}, ings = Array.isArray(state.ingredients) ? state.ingredients : [], prods = Array.isArray(state.products) ? state.products : [];
+  const state = getState(), ings = Array.isArray(state.ingredients) ? state.ingredients : [], prods = Array.isArray(state.products) ? state.products : [];
 
   const boundIngs = ings.filter(i => slugCategory(i.category) === slugCategory(category.name));
   const boundSubtypes = ings.flatMap(i => i.subtypes || []).filter(s => slugCategory(s.category) === slugCategory(category.name));
@@ -154,7 +156,7 @@ export function renderCategoryManagerModal() {
   }
 
   const renderCurrentStep = () => {
-    const state = getState() || {}, catObjects = getCategoryObjects(state), ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
+    const state = getState(), catObjects = getCategoryObjects(state), ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
     let bodyHtml = '';
 
     if (wizardStep === 'list') {
@@ -285,9 +287,9 @@ export function renderCategoryManagerModal() {
     modal.addEventListener('focusout', (e) => {
       const action = e.target?.dataset?.action;
       if (action === 'merge-search-input') {
-        setTimeout(() => { const listDiv = document.getElementById('cat-merge-dropdown-list'); if (listDiv) listDiv.style.display = 'none'; }, 200);
+        setTimeout(() => { const listDiv = document.getElementById('cat-merge-dropdown-list'); if (listDiv) listDiv.style.display = 'none'; }, DROPDOWN_BLUR_DELAY_MS);
       } else if (action === 'mass-search-input') {
-        setTimeout(() => { const listDiv = document.getElementById('cat-mass-dropdown-list'); if (listDiv) listDiv.style.display = 'none'; }, 200);
+        setTimeout(() => { const listDiv = document.getElementById('cat-mass-dropdown-list'); if (listDiv) listDiv.style.display = 'none'; }, DROPDOWN_BLUR_DELAY_MS);
       }
     });
 

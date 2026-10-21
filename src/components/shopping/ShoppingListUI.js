@@ -6,6 +6,8 @@
 
 import { getState, toggleShoppingItem, addManualShoppingItem, updateShoppingItemQty, setShoppingList } from '../../store/store.js';
 import { generateShoppingListFromPlan, AISLE_CATEGORIES } from '../../services/ShoppingListService.js';
+import { showCustomAlert } from '../pantry/IngredientActionModalsUI.js';
+
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -25,7 +27,7 @@ export function renderShoppingSummary() {
   const summaryContainer = document.getElementById('shop-summary');
   if (!summaryContainer) return;
 
-  const state = getState() || {};
+  const state = getState();
   const list = state.shoppingList || [];
   let totalItems = 0;
   let totalPrice = 0;
@@ -63,9 +65,10 @@ export function renderShoppingSummary() {
     btnGen.onclick = () => {
       const activePlan = state.currentPlan || state.plan;
       if (!activePlan) {
-        alert('No active meal plan found. Please create or generate a meal plan first.');
+        if (typeof showCustomAlert === 'function') showCustomAlert('No active meal plan found. Please create or generate a meal plan first.');
         return;
       }
+
       const newList = generateShoppingListFromPlan(activePlan, state.inventory || [], state.recipes || [], state.ingredients || []);
       setShoppingList(newList);
       renderShoppingListUI();
@@ -73,6 +76,30 @@ export function renderShoppingSummary() {
         window.showPlatePlanToast('Generated smart shopping list from active plan!');
       }
     };
+  }
+
+  // Delegation
+  if (!container.hasAttribute('data-delegated')) {
+    container.addEventListener('click', (e) => {
+      const target = e.target.closest('[data-action]');
+      if (!target) return;
+      const action = target.dataset.action;
+      const itemId = target.dataset.itemId;
+      
+      if (action === 'toggle-breakdown') {
+        if (typeof window.toggleShoppingItemBreakdown === 'function') window.toggleShoppingItemBreakdown(itemId);
+      } else if (action === 'swap-product') {
+        const itemName = target.dataset.itemName;
+        if (typeof window.renderScrollableSwapModal === 'function') window.renderScrollableSwapModal(itemId, itemName);
+      } else if (action === 'back-to-plan') {
+        if (typeof window.setPlannerWizardStep === 'function') window.setPlannerWizardStep(2);
+      } else if (action === 'copy-list') {
+        import('./ShoppingBatchToolbar.js').then(m => m.exportShoppingListToClipboard());
+      } else if (action === 'commit-plan') {
+        if (typeof window.commitPlannerWizardPlan === 'function') window.commitPlannerWizardPlan();
+      }
+    });
+    container.setAttribute('data-delegated', 'true');
   }
 }
 
@@ -82,7 +109,7 @@ export function renderShoppingListUI() {
   const contentContainer = document.getElementById('shop-content');
   if (!contentContainer) return;
 
-  const state = getState() || {};
+  const state = getState();
   const shoppingList = state.shoppingList || [];
 
   const grouped = {};
@@ -124,7 +151,7 @@ export function renderShoppingListUI() {
                         Buy: ${escapeHtml(item.buyQty)}${escapeHtml(item.unit)} &bull; In stock: ${escapeHtml(item.inStockQty)}${escapeHtml(item.unit)} ${item.isManualAdd ? '&bull; (Manual)' : ''}
                       </div>
                       ${hasBreakdown ? `
-                        <button type="button" id="breakdown-btn-${escapeAttr(item.id)}" class="btn sm ghost btn-recipe-breakdown" style="font-size:11px;padding:2px 6px;margin-top:4px;align-self:flex-start;color:#2563eb;" onclick="toggleShoppingItemBreakdown('${escapeAttr(item.id)}')">
+                        <button type="button" class="btn sm ghost btn-recipe-breakdown" data-action="toggle-breakdown" data-item-id="${escapeAttr(item.id)}" style="font-size:11px;padding:2px 6px;margin-top:4px;align-self:flex-start;color:#2563eb;">
                           ▼ Recipe Breakdown
                         </button>
                       ` : ''}
@@ -133,7 +160,7 @@ export function renderShoppingListUI() {
                   <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
                     <input type="number" step="any" id="shop-item-qty-${escapeAttr(item.id)}" name="shop_item_qty_${escapeAttr(item.id)}" aria-label="Quantity for ${escapeAttr(item.name)}" class="shop-item-qty-input" data-id="${escapeAttr(item.id)}" value="${item.buyQty}" style="width:65px;padding:4px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;" />
                     <span style="font-size:11px;color:#64748b;">${escapeHtml(item.unit)}</span>
-                    <button type="button" class="btn sm ghost" style="font-size:11px;padding:4px 8px;" onclick="if(window.renderScrollableSwapModal) window.renderScrollableSwapModal('${escapeAttr(item.id)}', '${escapeAttr(item.name)}')">Swap Brand ▾</button>
+                    <button type="button" class="btn sm ghost" data-action="swap-product" data-item-id="${escapeAttr(item.id)}" data-item-name="${escapeAttr(item.name)}" style="font-size:11px;padding:4px 8px;">Swap Product ▾</button>
                   </div>
                 </div>
                 ${hasBreakdown ? `
@@ -154,32 +181,30 @@ export function renderShoppingListUI() {
       </div>
     `;
   });
-
   contentContainer.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:14px;">
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:6px;">
-        <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#334155;">+ Quick Add Custom Item</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <input type="text" id="manual-item-name" name="manual_item_name" aria-label="Manual item name" placeholder="Item name (e.g. Oat Milk)" style="flex:2;min-width:180px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;" />
-          <input type="number" step="any" id="manual-item-qty" name="manual_item_qty" aria-label="Manual item quantity" value="1" placeholder="Qty" style="width:70px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;" />
-          <select id="manual-item-unit" name="manual_item_unit" aria-label="Manual item unit" style="width:90px;padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;">
-            <option value="qty">qty</option>
-            <option value="g">g</option>
-            <option value="ml">ml</option>
-          </select>
-          <select id="manual-item-category" name="manual_item_category" aria-label="Manual item category" style="width:150px;padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;">
-            ${AISLE_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
-          </select>
-          <button type="button" id="btn-add-manual-item" class="btn secondary sm" style="font-size:12px;">Add</button>
-        </div>
-      </div>
-
+    <div style="display:flex;flex-direction:column;gap:14px;"> 
       ${aislesHtml || `
         <div style="padding:40px;text-align:center;color:#64748b;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;">
           <div style="font-size:16px;font-weight:700;margin-bottom:6px;">Your shopping list is empty</div>
           <div style="font-size:13px;">Click "Generate from Plan" above to consolidate requirements based on your active meal plan and pantry stock.</div>
         </div>
       `}
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:6px;">
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#334155;">+ Quick Add Custom Item</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input type="text" id="manual-item-name" placeholder="Item name" style="flex:1;min-width:150px;padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;" />
+          <input type="number" id="manual-item-qty" placeholder="Qty" style="width:60px;padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;" />
+          <select id="manual-item-unit" style="padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;">
+            <option value="item">item</option>
+            <option value="g">g</option>
+            <option value="ml">ml</option>
+          </select>
+          <select id="manual-item-category" style="width:150px;padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;">
+            ${AISLE_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+          </select>
+          <button type="button" id="btn-add-manual-item" class="btn secondary sm" style="font-size:12px;">Add</button>
+        </div>
+      </div>
     </div>
   `;
 
@@ -192,9 +217,10 @@ function bindEvents(container) {
     btnAddManual.onclick = () => {
       const name = container.querySelector('#manual-item-name')?.value?.trim();
       if (!name) {
-        alert('Please enter a custom item name.');
+        if (typeof showCustomAlert === 'function') showCustomAlert('Please enter a custom item name.');
         return;
       }
+
       const requiredQty = parseFloat(container.querySelector('#manual-item-qty')?.value) || 1;
       const unit = container.querySelector('#manual-item-unit')?.value || 'qty';
       const category = container.querySelector('#manual-item-category')?.value || 'Uncategorized';

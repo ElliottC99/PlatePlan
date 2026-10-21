@@ -18,7 +18,7 @@ export function getPlanSlotInfo(slotData) {
   const variant = (typeof slotData === 'object' && slotData.variant) ? slotData.variant : 'original';
   const instanceId = typeof slotData === 'object' ? (slotData.instanceId || `${id}_${Date.now()}`) : `${id}_${Date.now()}`;
   
-  const recipes = window.state?.recipes || [];
+  const recipes = getState()?.recipes || [];
   const recipe = recipes.find(r => r && r.id === id) || null;
   if (!recipe) {
     return { id, variant, instanceId, recipe: null, active: null };
@@ -55,13 +55,13 @@ export function getPlannedSlotNutrition(activeRecipe, slotKey = 'dinnerE', insta
  * Generates an automated household meal plan adhering to cadence, macros, and preferences.
  */
 export function generateMealPlan(options = {}) {
-  const days = Number(options.days || window.state?.plannerDays || window.state?.plan?.days || 7);
-  const startDateStr = options.startDate || window.state?.plannerStartDate || new Date().toISOString().split('T')[0];
-  const cadence = options.cadence || window.state?.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
-  const minFitScore = Number(options.minFitScore !== undefined ? options.minFitScore : (window.state?.prefs?.minFitScore || 0));
-  const maxFitScore = Number(options.maxFitScore !== undefined ? options.maxFitScore : (window.state?.prefs?.maxFitScore || 100));
-  const skeletonGrid = options.skeletonGrid || window.state?.skeletonGrid || {};
-  const allRecipes = Array.isArray(options.recipes) ? options.recipes : (window.state?.recipes || []);
+  const days = Number(options.days ?.plannerDays ?.plan?.days || 7);
+  const startDateStr = options.startDate ?.plannerStartDate || new Date().toISOString().split('T')[0];
+  const cadence = options.cadence ?.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
+  const minFitScore = Number(options.minFitScore !== undefined ? options.minFitScore : (getState()?.prefs?.minFitScore || 0));
+  const maxFitScore = Number(options.maxFitScore !== undefined ? options.maxFitScore : (getState()?.prefs?.maxFitScore || 100));
+  const skeletonGrid = options.skeletonGrid ?.skeletonGrid || {};
+  const allRecipes = Array.isArray(options.recipes) ? options.recipes : (getState()?.recipes || []);
 
   if (!allRecipes.length) {
     throw new Error('No recipes available in the Recipe Vault to generate plan.');
@@ -204,9 +204,9 @@ export async function generatePlan() {
   if (typeof window === 'undefined') return;
   try {
     const plan = generateMealPlan();
-    if (window.state) {
-      window.state.plan = plan;
-      window.state.plannerStep = 2;
+    if (getState()) {
+      getState().currentPlan = plan;
+      getState().currentPlannerStep = 2;
     }
 
     setCurrentPlan(plan);

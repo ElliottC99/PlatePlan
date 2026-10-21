@@ -22,7 +22,7 @@ function escapeHtml(str) {
  * @returns {string} HTML markup
  */
 export function renderStep1Point5() {
-  const state = getState() || {};
+  const state = getState();
   const queue = state.draftRecipes || wizardState.processingQueue || [];
   const queueCount = queue.length;
 

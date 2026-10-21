@@ -19,7 +19,7 @@ export { renderScrollableSwapModal, executeSwapInState, resolveTargetItem, calcu
 export function toggleShoppingItemAcquired(groupKey, itemKey, explicitName = '') {
   const { item } = resolveTargetItem(groupKey, itemKey);
   const targetKey = item?.key || itemKey;
-  const currentAtHome = !!(item?.isAtHome || (window.state?.plan?.shoppingAtHome && window.state.plan.shoppingAtHome[targetKey]));
+  const currentAtHome = !!(item?.isAtHome || (getState()?.plan?.shoppingAtHome && getState().currentPlan.shoppingAtHome[targetKey]));
   const nextAtHome = !currentAtHome;
 
   if (item) {
@@ -27,9 +27,9 @@ export function toggleShoppingItemAcquired(groupKey, itemKey, explicitName = '')
     item.checked = nextAtHome;
   }
 
-  if (window.state?.plan && typeof window.state.plan === 'object') {
-    window.state.plan.shoppingAtHome = window.state.plan.shoppingAtHome || {};
-    window.state.plan.shoppingAtHome[targetKey] = nextAtHome;
+  if (getState()?.plan && typeof getState().currentPlan === 'object') {
+    getState().currentPlan.shoppingAtHome = getState().currentPlan.shoppingAtHome || {};
+    getState().currentPlan.shoppingAtHome[targetKey] = nextAtHome;
   }
 
   // Determine human-readable item name for toast
@@ -38,7 +38,7 @@ export function toggleShoppingItemAcquired(groupKey, itemKey, explicitName = '')
     cleanName = explicitName || item?.ingredient || item?.productName || item?.bankIng?.name || 'Item';
   }
 
-  document.dispatchEvent(new CustomEvent('plateplan:state:shopping', { detail: window.state?.confirmedShopping || window.state?.shoppingList }));
+  document.dispatchEvent(new CustomEvent('plateplan:state:shopping', { detail: getState()?.confirmedShopping ?.shoppingList }));
   renderShoppingListUI();
 
   if (typeof window.showPlatePlanToast === 'function') {

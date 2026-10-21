@@ -21,7 +21,7 @@ import {
 
 // 1. EDIT SUB-TYPE MODAL
 export function openEditSubtypeModal(subtypeId, parentId) {
-  const state = getState() || {};
+  const state = getState();
   const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
   if (!parent || !Array.isArray(parent.subtypes)) return;
   const sub = parent.subtypes.find(s => String(s.id) === String(subtypeId));
@@ -89,7 +89,7 @@ export function openEditSubtypeModal(subtypeId, parentId) {
 
 // 2. CONSOLIDATED REORGANISE MODAL (Promote, Move, Merge)
 export function openSubtypeReorganizeModal(subtypeId, parentId) {
-  const state = getState() || {};
+  const state = getState();
   const currentIngs = state.ingredients || [];
   const parent = currentIngs.find(i => String(i.id) === String(parentId));
   if (!parent || !Array.isArray(parent.subtypes)) return;
@@ -180,7 +180,7 @@ export function openSubtypeReorganizeModal(subtypeId, parentId) {
 
 // 3. MANAGE ALIASES MODAL
 export function openSubtypeAliasModal(subtypeId, parentId) {
-  const state = getState() || {};
+  const state = getState();
   const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
   if (!parent || !Array.isArray(parent.subtypes)) return;
   const sub = parent.subtypes.find(s => String(s.id) === String(subtypeId));
@@ -228,8 +228,8 @@ export function openSubtypeAliasModal(subtypeId, parentId) {
 
 // 4. DELETE SUB-TYPE MODAL
 export function openSubtypeDeleteModal(subtypeId, parentId) {
-  const state = getState() || {};
-  const ingredients = (state.ingredients && state.ingredients.length) ? state.ingredients : (window.state?.ingredients || []);
+  const state = getState();
+  const ingredients = (state.ingredients && state.ingredients.length) ? state.ingredients : (getState()?.ingredients || []);
   let parent = ingredients.find(i => String(i.id) === String(parentId));
   if (!parent || !Array.isArray(parent.subtypes) || !parent.subtypes.some(s => String(s.id) === String(subtypeId))) {
     parent = ingredients.find(i => Array.isArray(i.subtypes) && i.subtypes.some(s => String(s.id) === String(subtypeId)));

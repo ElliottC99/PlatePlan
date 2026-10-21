@@ -101,7 +101,7 @@ export function filterSubtypeLinkProducts(query, subTypeId) {
     container.innerHTML = '';
     return;
   }
-  const ingredients = window.state?.ingredients || [];
+  const ingredients = getState()?.ingredients || [];
   const matches = ingredients.filter(p => {
     const name = String(p?.name || '').toLowerCase();
     const brand = String(p?.brand || '').toLowerCase();
@@ -181,7 +181,7 @@ export function closeTescoJsonImportModal() {
 }
 
 export function openMergeModal(primaryId, groupKey) {
-  const ingredients = window.state?.ingredients || [];
+  const ingredients = getState()?.ingredients || [];
   const group = ingredients.filter(i => String(i.name || '').toLowerCase().replace(/[^a-z0-9]/g, '') === groupKey);
   const primary = group.find(i => i.id === primaryId);
   const others = group.filter(i => i.id !== primaryId);

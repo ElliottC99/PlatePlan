@@ -21,10 +21,10 @@ export function renderFitBlock({ showE, showC, portions, recipeId, variant, fitT
   const v = escapeAttr(variant);
 
   if (showE) {
-    parts.push(`<button type="button" class="fit-detail-button" data-action="open-fit-details" data-recipe-id="${rId}" data-variant="${v}" data-person="e" onclick="openVaultFitDetails(this,'${rId}','${v}','e')">Elliott ${escapeHtml(portions.e || '')}</button>`);
+    parts.push(`<button type="button" class="fit-detail-button" data-action="open-fit-details" data-recipe-id="${rId}" data-variant="${v}" data-person="e">Elliott ${escapeHtml(portions.e || '')}</button>`);
   }
   if (showC) {
-    parts.push(`<button type="button" class="fit-detail-button" data-action="open-fit-details" data-recipe-id="${rId}" data-variant="${v}" data-person="c" onclick="openVaultFitDetails(this,'${rId}','${v}','c')">Chloe ${escapeHtml(portions.c || '')}</button>`);
+    parts.push(`<button type="button" class="fit-detail-button" data-action="open-fit-details" data-recipe-id="${rId}" data-variant="${v}" data-person="c">Chloe ${escapeHtml(portions.c || '')}</button>`);
   }
 
   return `<div class="recipe-fit">${parts.join('')} ${fitTagHtml}</div>`;
@@ -46,7 +46,7 @@ export function renderRecipeCardShell({
         <div style="min-width:0;flex:1">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
             <div class="enhanced-lbl" style="margin-bottom:0">Enhanced version</div>
-            <button type="button" class="recipe-fav-btn sm ${enhFav ? 'active' : ''}" data-action="toggle-favorite" data-recipe-id="${rId}" data-variant="enhanced" onclick="toggleRecipeFavourite('${rId}', event, 'enhanced')" style="padding:2px">
+            <button type="button" class="recipe-fav-btn sm ${enhFav ? 'active' : ''}" data-action="toggle-favorite" data-recipe-id="${rId}" data-variant="enhanced" style="padding:2px">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="${enhHeartFill}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
               </svg>
@@ -56,8 +56,8 @@ export function renderRecipeCardShell({
           ${enhancedChangesHtml}
         </div>
         <div class="enhanced-actions">
-          <button class="btn sm btn-primary primary enhanced-primary-action" data-action="view-recipe" data-recipe-id="${rId}" data-variant="enhanced" onclick="viewRecipe('${rId}', null, 'enhanced')">View</button>
-          <button class="btn sm btn-ghost ghost enhanced-more-action" data-action="open-enhanced-recipe-actions" data-recipe-id="${rId}" data-variant="enhanced" onclick="openEnhancedRecipeActions(event, '${rId}')">More</button>
+          <button class="btn sm btn-primary primary enhanced-primary-action" data-action="view-recipe" data-recipe-id="${rId}" data-variant="enhanced">View</button>
+          <button class="btn sm btn-ghost ghost enhanced-more-action" data-action="open-enhanced-recipe-actions" data-recipe-id="${rId}">More</button>
         </div>
       </div>
     </div>
@@ -69,7 +69,7 @@ export function renderRecipeCardShell({
         <div class="recipe-card-main">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
             ${expandableName}
-            <button type="button" class="recipe-fav-btn ${origFav ? 'active' : ''}" data-action="toggle-favorite" data-recipe-id="${rId}" data-variant="original" onclick="toggleRecipeFavourite('${rId}', event, 'original')" aria-label="${origFav ? 'Remove original from favourites' : 'Add original to favourites'}">
+            <button type="button" class="recipe-fav-btn ${origFav ? 'active' : ''}" data-action="toggle-favorite" data-recipe-id="${rId}" data-variant="original" aria-label="${origFav ? 'Remove original from favourites' : 'Add original to favourites'}">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="${heartFill}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
               </svg>
@@ -79,8 +79,8 @@ export function renderRecipeCardShell({
           ${originalFitHtml}
         </div>
         <div class="recipe-card-actions">
-          <button class="btn sm btn-primary primary mobile-primary" data-action="view-recipe" data-recipe-id="${rId}" data-variant="original" onclick="viewRecipe('${rId}', null)">View</button>
-          <button class="btn sm btn-ghost ghost mobile-more" data-action="open-recipe-actions" data-recipe-id="${rId}" data-variant="original" onclick="openRecipeActions(event, '${rId}', 'original')">More</button>
+          <button class="btn sm btn-primary primary mobile-primary" data-action="view-recipe" data-recipe-id="${rId}" data-variant="original">View</button>
+          <button class="btn sm btn-ghost ghost mobile-more" data-action="open-recipe-actions" data-recipe-id="${rId}" data-variant="original">More</button>
         </div>
       </div>
       ${enhancedBox}

@@ -3,22 +3,7 @@
  * Centralized application state and event handling.
  */
 
-export const state = {
-  version: 'v3.35.3', // Needs updating later
-  recipes: [],
-  draftRecipes: [],
-  ingredients: [],
-  products: [],
-  categories: [],
-  inventory: [],
-  preferences: null,
-  userPrefs: {},
-  settings: {},
-  currentPlan: null,
-  shoppingList: [],
-  isCachedHydrated: false,
-  isCloudHydrated: false
-};
+export { state, getState } from './coreState.js';
 
 /**
  * Dispatch a custom event on the document in a safe microtask.
@@ -55,10 +40,8 @@ export function subscribe(domainOrCallback, maybeCallback) {
   };
 }
 
-export const getState = () => state;
 export function updateState(patch) {
   if (!patch || typeof patch !== 'object') return;
   Object.assign(state, patch);
-  // Need to import saveStateCache here, but that causes circular dependency.
-  // Maybe move saveStateCache to a separate utility or accept that some functions need to be passed in.
 }
+

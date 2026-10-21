@@ -93,9 +93,5 @@ export function safeClone(value) {
   }
 }
 
-// Attach globally for universal script interop
-if (typeof window !== 'undefined') {
-  window.safeJsonStringify = safeJsonStringify;
-  window.clonePlatePlanValue = safeClone;
-}
+
 

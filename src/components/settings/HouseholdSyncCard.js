@@ -23,7 +23,7 @@ function escapeHtml(str) {
  */
 export function renderHouseholdSyncCard(settings = {}) {
   const currentHousehold = window.activeHouseholdId || 'elliott-chloe';
-  const lastSynced = window.state?.lastSyncedTime || 'Just now';
+  const lastSynced = getState()?.lastSyncedTime || 'Just now';
   const connectionState = navigator.onLine ? 'Cloud Sync Connected' : 'Offline Cache Mode';
 
   // Calculate local capacity utilization

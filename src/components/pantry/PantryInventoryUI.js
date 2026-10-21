@@ -166,7 +166,7 @@ export function switchPantryTab(tabName = 'master-catalog') {
 
 export function renderActiveStockTab() {
   if (typeof document === 'undefined') return;
-  const state = getState() || {};
+  const state = getState();
   const inventory = state.inventory || [];
   const ingredients = state.ingredients || [];
   const products = state.products || [];
@@ -212,7 +212,7 @@ export function renderActiveStockTab() {
 
 export function addCatalogItemToActiveStock(ingredientId, subtypeId = '') {
   if (!ingredientId) return null;
-  const state = getState() || {};
+  const state = getState();
   const ingredients = state.ingredients || [];
   const products = state.products || [];
 
@@ -261,7 +261,7 @@ export function addCatalogItemToActiveStock(ingredientId, subtypeId = '') {
 }
 
 export function adjustPantryStock(itemId, delta = 1) {
-  const state = getState() || {};
+  const state = getState();
   const item = (state.inventory || []).find(i => String(i.id) === String(itemId));
   if (!item) return;
   const currentQty = Number(item.quantity ?? item.qty ?? 1) || 1;

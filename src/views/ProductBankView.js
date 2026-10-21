@@ -8,7 +8,9 @@ import { getState, setProducts } from '../store/store.js';
 import { saveProduct, deleteProduct } from '../services/ProductRepository.js';
 import { reallocateProduct, setAutoDefaultProduct, getActiveCategories, addSubtypeToIngredient } from '../models/PantryHierarchyModel.js';
 import { promptReallocateProduct as openReallocateModal } from '../components/pantry/ReallocateProductModalUI.js';
+import { showCustomAlert } from '../components/pantry/IngredientActionModalsUI.js';
 import { escapeHtml, escapeAttr } from '../utils/stringUtils.js';
+
 import { 
   renderProductBankBase, 
   renderEmptyProductBank, 
@@ -38,7 +40,7 @@ export function openProductEditModal(productIdOrDraft = null) {
   const panel = document.getElementById('manual-ing-panel');
   if (!panel) return;
 
-  const state = getState() || {};
+  const state = getState();
   const products = Array.isArray(state.products) ? state.products : [];
 
   let prod = null;
@@ -141,7 +143,7 @@ export async function saveManualIng() {
   const name = getVal('mi-name');
   if (!name) return;
 
-  const state = getState() || {};
+  const state = getState();
   const currentProds = Array.isArray(state.products) ? [...state.products] : [];
 
   let draftSubtypeId = null;
@@ -229,11 +231,12 @@ export async function handleDeleteProduct(productId, prodName = null) {
 
 export async function handleMakeAutoDefault(productId, ingredientId) {
   if (!ingredientId) {
-    if (typeof window.showCustomAlert === 'function') {
-      window.showCustomAlert('Please reallocate this product to an ingredient before setting as auto-default.');
+    if (typeof showCustomAlert === 'function') {
+      showCustomAlert('Please reallocate this product to an ingredient before setting as auto-default.');
     }
     return;
   }
+
   await setAutoDefaultProduct(productId, ingredientId);
   renderProductBank();
 }
@@ -254,7 +257,7 @@ export function renderProductBank() {
   const container = document.getElementById('bank-groups-panel');
   if (!container) return;
 
-  const state = getState() || {};
+  const state = getState();
   const allProducts = Array.isArray(state.products) ? state.products : [];
   const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
 

@@ -30,7 +30,7 @@ export function renderState2Mapping() {
   const targetServings = Number(wizardState.targetServings || activeRecipe.targetServings || baseServings);
   const scaleFactor = baseServings > 0 ? (targetServings / baseServings) : 1;
 
-  const storeState = getState() || {};
+  const storeState = getState();
   const ingredientsBank = storeState.ingredients || [];
 
   let sectionsHtml = '';

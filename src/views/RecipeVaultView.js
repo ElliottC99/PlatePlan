@@ -1,3 +1,4 @@
+import store from "../store/store.js";
 /**
  * src/views/RecipeVaultView.js (v3.20.15)
  * Atomic Recipe Vault Component & Actions Module.
@@ -18,27 +19,27 @@ export { renderVaultRecipeCard, renderVaultGridContainer, VaultFilterToolbar, ca
 let currentRecipeSearchQuery = '';
 
 export function hasVariantFavoritingInitialized() {
-  const prefs = window.state?.userPrefs || window.state?.prefs || {};
+  const prefs = store.getState()?.userPrefs ?.prefs || {};
   const list = prefs.favouriteVariantIds || prefs.favoriteVariantIds;
   return Array.isArray(list);
 }
 
 export function ensureVariantFavoritingPrefs() {
-  if (!window.state) try { window.state = {}; } catch (e) {}
-  if (!window.state.prefs) window.state.prefs = {};
-  if (!window.state.userPrefs) window.state.userPrefs = window.state.prefs;
-  const prefs = window.state.userPrefs;
+  if (!store.getState()) try { store.getState() = {}; } catch (e) {}
+  if (!store.getState().prefs) store.getState().prefs = {};
+  if (!store.getState().userPrefs) store.getState().userPrefs = store.getState().prefs;
+  const prefs = store.getState().userPrefs;
   const existing = prefs.favouriteVariantIds || prefs.favoriteVariantIds;
   if (!Array.isArray(existing)) {
-    prefs.favouriteVariantIds = (window.state.recipes || [])
+    prefs.favouriteVariantIds = (store.getState().recipes || [])
       .filter(r => r?.id && (r.isFavourite || r.isFavorite))
       .map(r => `${r.id}_original`);
   } else {
     prefs.favouriteVariantIds = existing;
   }
-  window.state.prefs.favouriteVariantIds = prefs.favouriteVariantIds;
-  window.state.userPrefs.favoriteVariantIds = prefs.favouriteVariantIds;
-  window.state.prefs.favoriteVariantIds = prefs.favouriteVariantIds;
+  store.getState().prefs.favouriteVariantIds = prefs.favouriteVariantIds;
+  store.getState().userPrefs.favoriteVariantIds = prefs.favouriteVariantIds;
+  store.getState().prefs.favoriteVariantIds = prefs.favouriteVariantIds;
   return prefs.favouriteVariantIds;
 }
 
@@ -53,7 +54,7 @@ export async function toggleRecipeFavourite(recipeId, event, variantKey = 'origi
     event.stopPropagation();
     event.preventDefault();
   }
-  const r = (window.state?.recipes || []).find(x => x.id === recipeId);
+  const r = (store.getState()?.recipes || []).find(x => x.id === recipeId);
   if (!r) return;
   const list = ensureVariantFavoritingPrefs();
   const key = `${recipeId}_${variantKey}`;
@@ -69,15 +70,15 @@ export async function toggleRecipeFavourite(recipeId, event, variantKey = 'origi
   r.isFavorite = isNowFav;
   r.updatedAt = new Date().toISOString();
 
-  if (window.state?.userPrefs) {
+  if (store.getState()?.userPrefs) {
     try {
-      await savePreferences(window.state.userPrefs, window.state.settings || {});
+      await savePreferences(store.getState().userPrefs, store.getState().settings || {});
     } catch (e) {
       console.warn('[RecipeVault v3.8.6] Failed to save favorite preferences:', e);
     }
   }
 
-  document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: window.state?.recipes }));
+  document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: store.getState()?.recipes }));
   renderRecipeVault();
 
   if (typeof window.previewBaseRecipe !== 'undefined' && window.previewBaseRecipe && window.previewBaseRecipe.id === recipeId) {
@@ -148,15 +149,39 @@ export function renderRecipeGrid(recipesToRender) {
   const progressiveBtn = typeof window.progressiveListButton === 'function' ? window.progressiveListButton('vault', totalRecipes, visibleRecipes.length) : '';
 
   list.innerHTML = renderVaultGridContainer({ recipes: visibleRecipes, mealType: selectedMealType, activeProfile, progressiveBtn });
+
+  if (!list.hasAttribute('data-delegated')) {
+    list.addEventListener('click', (e) => {
+      const target = e.target.closest('[data-action]');
+      if (!target) return;
+      const action = target.dataset.action;
+      const recipeId = target.dataset.recipeId;
+      const variant = target.dataset.variant || 'original';
+      
+      if (action === 'view-recipe') {
+        if (typeof window.viewRecipe === 'function') window.viewRecipe(recipeId, null, variant);
+      } else if (action === 'toggle-favorite') {
+        if (typeof window.toggleRecipeFavourite === 'function') window.toggleRecipeFavourite(recipeId, e, variant);
+      } else if (action === 'open-recipe-actions') {
+        if (typeof window.openRecipeActions === 'function') window.openRecipeActions(e, recipeId, variant);
+      } else if (action === 'open-enhanced-recipe-actions') {
+        if (typeof window.openEnhancedRecipeActions === 'function') window.openEnhancedRecipeActions(e, recipeId);
+      } else if (action === 'open-fit-details') {
+        const person = target.dataset.person;
+        if (typeof window.openVaultFitDetails === 'function') window.openVaultFitDetails(target, recipeId, variant, person);
+      }
+    });
+    list.setAttribute('data-delegated', 'true');
+  }
 }
 
 export function handleRecipeSearch(query) {
   currentRecipeSearchQuery = (query || '').toLowerCase().trim();
 
   const state = (window.Store && typeof window.Store.getState === 'function')
-    ? window.Store.getState()
+    ? window.Store.store.getState()
     : {};
-  const recipes = Array.isArray(state.recipes) ? state.recipes : (window.state?.recipes || []);
+  const recipes = Array.isArray(state.recipes) ? state.recipes : (store.getState()?.recipes || []);
 
   const filtered = recipes.filter(recipe => {
     if (!currentRecipeSearchQuery) return true;
@@ -213,8 +238,8 @@ export function renderRecipeVault() {
     else if (typeof window.openBulkRecipeImporterModal === 'function') window.openBulkRecipeImporterModal();
   });
 
-  const hasData = (window.state?.recipes?.length > 0) || window.state?.isCachedHydrated;
-  if (!window.state?.isCloudHydrated && !hasData) {
+  const hasData = (store.getState()?.recipes?.length > 0) ?.isCachedHydrated;
+  if (!store.getState()?.isCloudHydrated && !hasData) {
     if (list) {
       list.innerHTML = renderVaultGridContainer({ isLoading: true });
     }
@@ -231,7 +256,7 @@ export function renderRecipeVault() {
   ensureVariantFavoritingPrefs();
   const fwNorm = String(fw || 'all').toLowerCase();
 
-  const allRecipes = window.state?.recipes || (window.Store && typeof window.Store.getState === 'function' ? window.Store.getState().recipes : []) || [];
+  const allRecipes = store.getState()?.recipes || (window.Store && typeof window.Store.getState === 'function' ? window.Store.store.getState().recipes : []) || [];
   const recipes = allRecipes.filter(r => {
     const hasAnyFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
     if (isFavOnly && !hasAnyFav) return false;
@@ -245,11 +270,11 @@ export function renderRecipeVault() {
       r.who,
       ...(types || []),
       ...(Array.isArray(r.tags) ? r.tags : []),
-      ...(r.ingredients || []).map(ing => formatRecipeIngredientRow(ing, window.state)),
+      ...(r.ingredients || []).map(ing => formatRecipeIngredientRow(ing, store.getState())),
       enh?.name,
       enh?.title,
       enh?.changes,
-      ...(enh?.ingredients || []).map(ing => formatRecipeIngredientRow(ing, window.state))
+      ...(enh?.ingredients || []).map(ing => formatRecipeIngredientRow(ing, store.getState()))
     ].filter(Boolean).join(' ').toLowerCase();
 
     const rWhoNorm = String(r.who || 'both').toLowerCase();
@@ -260,6 +285,29 @@ export function renderRecipeVault() {
 
   renderRecipeGrid(recipes);
   bindSearchListeners();
+  
+  const toolbar = document.querySelector('.pp-vault-filter-toolbar');
+  if (toolbar && !toolbar.hasAttribute('data-delegated')) {
+    toolbar.addEventListener('change', (e) => {
+      if (e.target.classList.contains('pp-vault-filter-input')) {
+        renderRecipeVault();
+      }
+    });
+    toolbar.addEventListener('input', (e) => {
+      if (e.target.classList.contains('pp-vault-filter-input')) {
+        renderRecipeVault();
+      }
+    });
+    toolbar.addEventListener('click', (e) => {
+      const target = e.target.closest('[data-action]');
+      if (!target) return;
+      const action = target.dataset.action;
+      if (action === 'toggle-favourites-filter') {
+        if (typeof window.toggleVaultFavouritesFilter === 'function') window.toggleVaultFavouritesFilter();
+      }
+    });
+    toolbar.setAttribute('data-delegated', 'true');
+  }
 }
 
 function bindSearchListeners() {
@@ -275,36 +323,15 @@ function bindSearchListeners() {
   }
 }
 
-// Global Aliases Mount
-if (typeof window !== 'undefined') {
-  Object.assign(window, {
-    handleRecipeSearch,
-    renderVault: renderRecipeVault,
-    renderRecipeVault,
-    renderRecipeVaultView: () => (window.RecipeVaultView?.render ? window.RecipeVaultView.render() : renderRecipeVault()),
-    RecipeVaultView: { render: renderRecipeVault, handleSearch: handleRecipeSearch, filterRecipes: handleRecipeSearch, formatRecipeIngredientRow, renderRecipeIngredientsListHTML },
-    renderVaultGrid: renderRecipeVault,
-    renderRecipeCard: renderVaultRecipeCard,
-    renderRecipeGrid,
-    toggleRecipeFavourite,
-    toggleRecipeFavorite: toggleRecipeFavourite,
-    isRecipeVariantFavourite,
-    isRecipeVariantFavorite: isRecipeVariantFavourite,
-    toggleVaultFavouritesFilter,
-    toggleVaultFavoritesFilter: toggleVaultFavouritesFilter,
-    handleVaultSortChange: (val) => { const el = document.getElementById('vault-sort'); if (el) el.value = val; renderRecipeVault(); },
-    VaultFilterToolbar,
-    VaultRecipeCard: { renderVaultRecipeCard },
-    VaultGridContainer: { renderVaultGridContainer }
-  });
-}
+// Global Aliases Mount removed for migration to module-based interaction
+
 
 let vaultUnsub = null;
 let vaultTimer = null;
 
 function handlePreferencesUpdated() {
-  if (window.state?.recipes) {
-    window.state.recipes.forEach(r => {
+  if (store.getState()?.recipes) {
+    store.getState().recipes.forEach(r => {
       delete r._computedFitScore;
       delete r._computedFitResult;
     });
@@ -329,6 +356,14 @@ export function mount(container) {
   document.addEventListener('plateplan:state:preferences', handlePreferencesUpdated);
   document.addEventListener('plateplan:state:hydrated', handlePreferencesUpdated);
   window.addEventListener('plateplan:preferences-updated', handlePreferencesUpdated);
+}
+
+export function handleVaultSortChange(val) {
+  const sortSelect = document.getElementById('vault-sort');
+  if (sortSelect && val) {
+    sortSelect.value = val;
+  }
+  renderRecipeVault();
 }
 
 export function unmount() {

@@ -1,11 +1,20 @@
 <!DOCTYPE html>
 <html lang="en"><head>
+<script>
+  window.addEventListener('error', function(e) {
+    console.error("GHOST CRASH TRACE: ", e.message, e.filename, e.lineno);
+    const errUI = document.createElement('div');
+    errUI.style.cssText = 'background:red;color:white;padding:20px;z-index:99999;position:fixed;top:0;left:0;width:100%;font-family:monospace;';
+    errUI.innerHTML = '<h2>CRASH TRACE</h2><p>' + e.message + '</p><p>File: ' + e.filename + '</p><p>Line: ' + e.lineno + '</p>';
+    document.body.appendChild(errUI);
+  });
+</script>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#F7F6F2">
 <meta name="description" content="PlatePlan — shared meal planning for Elliott and Chloe">
-<meta name="app-version" content="v3.38.75">
-<meta name="version" content="v3.38.75">
+<meta name="app-version" content="v3.40.2">
+<meta name="version" content="v3.40.2">
 <meta name="application-name" content="PlatePlan">
 <meta property="og:title" content="PlatePlan — Elliott &amp; Chloe">
 <meta property="og:description" content="PlatePlan — shared meal planning for Elliott and Chloe">
@@ -285,7 +294,7 @@ try{
         <span>Favourites Only</span>
       </button>
       <input type="search" id="recipe-search-input" name="vaultSearch" aria-label="Search recipes" placeholder="Search recipes..." data-pp-input="handleRecipeSearch(this.value)" style="flex: 1 1 140px; min-width: 120px; font-size: 12px;">
-      <select id="vault-sort" name="vaultSort" aria-label="Sort options" class="select" onchange="handleVaultSortChange(this.value)" style="flex: 0 0 auto; width: auto; min-width: 110px; white-space: nowrap; font-size: 12px;">
+      <select id="vault-sort" name="vaultSort" aria-label="Sort options" class="select" data-pp-change="handleVaultSortChange(this.value)" style="flex: 0 0 auto; width: auto; min-width: 110px; white-space: nowrap; font-size: 12px;">
         <option value="fit-desc">Fit Score: High to Low</option>
         <option value="fit-asc">Fit Score: Low to High</option>
         <option value="name-asc">Name: A to Z</option>
@@ -393,8 +402,8 @@ try{
     </div>
     <div class="btn-row" style="gap:8px;flex-wrap:wrap">
       <button type="button" class="btn primary" data-pp-click="submitRecipe()">Parse &amp; Verify</button>
-      <button id="batch-skip-add-btn" type="button" class="btn secondary" onclick="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
-      <button id="batch-abort-add-btn" type="button" class="btn danger ghost" onclick="abortBatchImport()" style="display:none">Abort Batch Import</button>
+      <button id="batch-skip-add-btn" type="button" class="btn secondary" data-pp-click="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
+      <button id="batch-abort-add-btn" type="button" class="btn danger ghost" data-pp-click="abortBatchImport()" style="display:none">Abort Batch Import</button>
       <button type="button" class="btn ghost" data-pp-click="clearForm()">Clear</button>
     </div>
     <div id="form-msg"></div>
@@ -763,7 +772,7 @@ try{
         <span id="batch-banner-parse" class="batch-import-badge" style="display:none;background:var(--purple-bg, #EEF2FF);color:var(--purple, #4F46E5);font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px;border:1px solid rgba(79,70,229,0.25)"></span>
       </div>
       <div class="btn-row" style="margin:0;gap:6px">
-        <button id="batch-abort-parse-btn" type="button" class="btn sm danger ghost" onclick="abortBatchImport()" style="display:none">Abort Batch Import</button>
+        <button id="batch-abort-parse-btn" type="button" class="btn sm danger ghost" data-pp-click="abortBatchImport()" style="display:none">Abort Batch Import</button>
         <button type="button" class="btn sm ghost" data-pp-click="document.getElementById('parse-modal-wrap').classList.remove('open')">Cancel</button>
       </div>
     </div>
@@ -782,8 +791,8 @@ try{
     </div>
     <div class="btn-row" style="margin-top:20px; border-top:1px solid var(--border); padding-top:14px; gap:8px; flex-wrap:wrap">
       <button type="button" class="btn primary" data-pp-click="confirmParseAndMatch()">Confirm &amp; Map Ingredients</button>
-      <button id="batch-skip-parse-btn" type="button" class="btn secondary" onclick="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
-      <button id="batch-abort-parse-btn2" type="button" class="btn danger ghost" onclick="abortBatchImport()" style="display:none">Abort Batch Import</button>
+      <button id="batch-skip-parse-btn" type="button" class="btn secondary" data-pp-click="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
+      <button id="batch-abort-parse-btn2" type="button" class="btn danger ghost" data-pp-click="abortBatchImport()" style="display:none">Abort Batch Import</button>
       <button type="button" class="btn ghost" data-pp-click="document.getElementById('parse-modal-wrap').classList.remove('open')">Cancel</button>
     </div>
   </div>
@@ -797,7 +806,7 @@ try{
         <span id="batch-banner-mapping" class="batch-import-badge" style="display:none;background:var(--purple-bg, #EEF2FF);color:var(--purple, #4F46E5);font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px;border:1px solid rgba(79,70,229,0.25)"></span>
       </div>
       <div class="btn-row" style="margin:0;gap:6px">
-        <button id="batch-abort-mapping-top" type="button" class="btn sm danger ghost" onclick="abortBatchImport()" style="display:none">Abort Batch Import</button>
+        <button id="batch-abort-mapping-top" type="button" class="btn sm danger ghost" data-pp-click="abortBatchImport()" style="display:none">Abort Batch Import</button>
         <button type="button" class="btn sm ghost" data-pp-click="document.getElementById('mapping-modal-wrap').classList.remove('open')">Cancel</button>
       </div>
     </div>
@@ -806,8 +815,8 @@ try{
     <div id="mapping-msg" style="margin-top: 10px;"></div>
     <div class="btn-row" style="margin-top: 15px; padding-top:15px; border-top:1px solid var(--border); gap:8px; flex-wrap:wrap">
        <button type="button" class="btn primary" data-pp-click="confirmMapping()">Confirm &amp; Calculate</button>
-       <button id="batch-skip-mapping-btn" type="button" class="btn secondary" onclick="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
-       <button id="batch-abort-mapping-btn" type="button" class="btn danger ghost" onclick="abortBatchImport()" style="display:none">Abort Batch Import</button>
+       <button id="batch-skip-mapping-btn" type="button" class="btn secondary" data-pp-click="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
+       <button id="batch-abort-mapping-btn" type="button" class="btn danger ghost" data-pp-click="abortBatchImport()" style="display:none">Abort Batch Import</button>
        <button type="button" class="btn ghost" data-pp-click="document.getElementById('mapping-modal-wrap').classList.remove('open')">Cancel</button>
     </div>
   </div>
@@ -820,7 +829,7 @@ try{
         <h3 id="unified-map-title" style="margin:0;font-size:18px">Map Ingredient</h3>
         <div id="unified-map-subtitle" style="font-size:12px;color:var(--text2);margin-top:2px">Select an existing stored product or import directly via Tesco.</div>
       </div>
-      <button type="button" class="btn sm ghost" onclick="closeUnifiedMappingModal()" data-pp-click="closeUnifiedMappingModal()" aria-label="Close mapping modal">Close</button>
+      <button type="button" class="btn sm ghost" data-pp-click="closeUnifiedMappingModal()" aria-label="Close mapping modal">Close</button>
     </div>
     <div id="unified-map-ing-badge" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <div>
@@ -833,16 +842,16 @@ try{
     <div class="field" style="margin-bottom:10px">
       <label for="unified-map-search" style="font-size:12px;font-weight:600">Search Products, Sub-types &amp; Ingredients</label>
       <div class="mapping-search-container" style="position:relative">
-        <input type="text" class="map-search-input" id="unified-map-search" autocomplete="off" placeholder="Search by name, brand, or category..." oninput="handleUnifiedMapSearch(this.value)" name="unified-map-search">
+        <input type="text" class="map-search-input" id="unified-map-search" autocomplete="off" placeholder="Search by name, brand, or category..." data-pp-input="handleUnifiedMapSearch(this.value)" name="unified-map-search">
       </div>
     </div>
     <div id="unified-map-results" style="overflow-y:auto;flex:1;min-height:220px;max-height:340px;border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:6px"></div>
     <div class="btn-row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center">
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button type="button" class="btn ghost" id="btn-unified-import-tesco" style="color:var(--purple);border-color:var(--purple)" onclick="showTescoSearchModal((window.activeUnifiedMappingContext && window.activeUnifiedMappingContext.ingredientId) || '')" data-pp-click="showTescoSearchModal((window.activeUnifiedMappingContext && window.activeUnifiedMappingContext.ingredientId) || '')">🛒 Import Tesco</button>
-        <button type="button" class="btn ghost" id="btn-unified-add-product" onclick="openAddProductModal((window.activeUnifiedMappingContext && window.activeUnifiedMappingContext.ingredientId) || '')" data-pp-click="openAddProductModal((window.activeUnifiedMappingContext && window.activeUnifiedMappingContext.ingredientId) || '')">+ Add Product</button>
+        <button type="button" class="btn ghost" id="btn-unified-import-tesco" style="color:var(--purple);border-color:var(--purple)" data-pp-click="showTescoSearchModal((window.activeUnifiedMappingContext && window.activeUnifiedMappingContext.ingredientId) || '')">🛒 Import Tesco</button>
+        <button type="button" class="btn ghost" id="btn-unified-add-product" data-pp-click="openAddProductModal((window.activeUnifiedMappingContext && window.activeUnifiedMappingContext.ingredientId) || '')">+ Add Product</button>
       </div>
-      <button type="button" class="btn ghost" id="btn-unified-cancel" onclick="closeUnifiedMappingModal()" data-pp-click="closeUnifiedMappingModal()">Cancel</button>
+      <button type="button" class="btn ghost" id="btn-unified-cancel" data-pp-click="closeUnifiedMappingModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -943,7 +952,7 @@ try{
         <span id="batch-banner-review" class="batch-import-badge" style="display:none;background:var(--purple-bg, #EEF2FF);color:var(--purple, #4F46E5);font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px;border:1px solid rgba(79,70,229,0.25)"></span>
       </div>
       <div class="btn-row" style="margin:0;gap:6px">
-        <button id="batch-abort-review-top" type="button" class="btn sm danger ghost" onclick="abortBatchImport()" style="display:none">Abort Batch Import</button>
+        <button id="batch-abort-review-top" type="button" class="btn sm danger ghost" data-pp-click="abortBatchImport()" style="display:none">Abort Batch Import</button>
         <button type="button" class="btn sm ghost" data-pp-click="closeModal()">Close</button>
       </div>
     </div>
@@ -1339,8 +1348,8 @@ try{
       <button type="button" class="btn primary" id="save-both-btn" data-pp-click="saveBoth()" style="">Save Both</button>
       <button type="button" class="btn primary" id="save-temp-plan-btn" data-pp-click="saveTemporaryPlanReview()" style="display:none">Apply to meal plan only</button>
       <button type="button" class="btn" id="save-orig-only-btn" data-pp-click="saveOrigOnly()">Save Original Only</button>
-      <button id="batch-skip-review-btn" type="button" class="btn secondary" onclick="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
-      <button id="batch-abort-review-btn" type="button" class="btn danger ghost" onclick="abortBatchImport()" style="display:none">Abort Batch Import</button>
+      <button id="batch-skip-review-btn" type="button" class="btn secondary" data-pp-click="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
+      <button id="batch-abort-review-btn" type="button" class="btn danger ghost" data-pp-click="abortBatchImport()" style="display:none">Abort Batch Import</button>
       <button type="button" class="btn danger" data-pp-click="closeModal()">Discard</button>
     </div>
   </div>
@@ -1354,7 +1363,7 @@ try{
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js" crossorigin="anonymous"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js" crossorigin="anonymous"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js" crossorigin="anonymous"></script>
-<script src="firebase-config.js?v=3.31.41"></script>
+<script src="src/config/firebase-config.js?v=3.31.41"></script>
 
 <!-- Modern ES6 Architecture Entry Point -->
 <script type="module" src="src/main.js?v=3.38.18"></script>
@@ -1460,9 +1469,9 @@ try{
       <div id="subtype-product-actions-wrap" style="display:none;margin-bottom:12px;flex-direction:column;gap:8px;padding:10px;background:var(--surface2,#f5f5f4);border-radius:8px;border:1px solid var(--border,#e7e5e4)">
         <div style="font-size:12px;font-weight:750">Sub-type Product Actions</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-          <button type="button" class="btn sm ghost" onclick="handleSubtypeProductAction('link')">🔗 Link Existing Product(s)</button>
-          <button type="button" class="btn sm ghost" onclick="handleSubtypeProductAction('manual')">➕ Add Product Manually</button>
-          <button type="button" class="btn sm ghost" onclick="handleSubtypeProductAction('tesco')">🛒 Import from Tesco</button>
+          <button type="button" class="btn sm ghost" data-pp-click="handleSubtypeProductAction('link')">🔗 Link Existing Product(s)</button>
+          <button type="button" class="btn sm ghost" data-pp-click="handleSubtypeProductAction('manual')">➕ Add Product Manually</button>
+          <button type="button" class="btn sm ghost" data-pp-click="handleSubtypeProductAction('tesco')">🛒 Import from Tesco</button>
         </div>
         <a id="tesco-search-link" href="#" target="_blank" style="font-size: 0.85em; display: none; margin-top: 4px; color: var(--primary,#4f46e5); font-weight: 600;"></a>
       </div>

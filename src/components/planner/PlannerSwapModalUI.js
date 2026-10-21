@@ -14,13 +14,13 @@ let currentSwapModalFilter = 'all';
 
 export function openSwapMealModal(day, slotKey) {
   const dayNum = +day;
-  const slotInfo = typeof window.getPlanSlotInfo === 'function' ? window.getPlanSlotInfo(window.state.plan?.slots?.[dayNum]?.[slotKey]) : { active: null, id: null, variant: 'original' };
+  const slotInfo = typeof window.getPlanSlotInfo === 'function' ? window.getPlanSlotInfo(getState().currentPlan?.slots?.[dayNum]?.[slotKey]) : { active: null, id: null, variant: 'original' };
   const mealType = slotKey.includes('breakfast') ? 'breakfast' : slotKey.includes('lunch') ? 'lunch' : 'dinner';
   const slotMealMode = typeof window.getSlotMealMode === 'function' ? window.getSlotMealMode(dayNum, mealType) : 'both';
   const filterWhoVal = document.getElementById('filter-who')?.value;
   const isDualView = slotMealMode === 'both' || filterWhoVal === 'both' || (window.activeHouseholdId && slotMealMode !== 'elliott' && slotMealMode !== 'chloe');
   const who = isDualView ? 'both' : (slotKey.endsWith('E') ? 'Elliott' : slotKey.endsWith('C') ? 'Chloe' : 'any');
-  const dayLabel = typeof window.formatPlanDayLabel === 'function' ? window.formatPlanDayLabel(window.state.plan, dayNum, { short: true }) : `Day ${dayNum}`;
+  const dayLabel = typeof window.formatPlanDayLabel === 'function' ? window.formatPlanDayLabel(getState().currentPlan, dayNum, { short: true }) : `Day ${dayNum}`;
   const typeTitle = typeof window.toTitleCase === 'function' ? window.toTitleCase(mealType) : mealType;
 
   const baseOptions = typeof window.getPlannerRecipeOptions === 'function' ? window.getPlannerRecipeOptions(mealType, who === 'both' ? 'any' : who) : [];
@@ -70,7 +70,7 @@ export function openSwapMealModal(day, slotKey) {
     } catch (e) {
       console.warn('Error calculating recipe nutrition for option:', e);
     }
-    const rec = (window.state.recipes || []).find(r => r.id === opt.id);
+    const rec = (getState().recipes || []).find(r => r.id === opt.id);
     const isFav = (typeof window.isRecipeVariantFavourite === 'function' ? window.isRecipeVariantFavourite(opt.id, opt.variant || 'original') : false) || !!(rec?.isFavourite || rec?.isFavorite);
     return {
       id: opt.id,
@@ -210,22 +210,22 @@ export function quickRandomizeSwap(day, slotKey) {
 }
 
 export function toggleSlotVariant(day, slotKey) {
-  const info = typeof window.getPlanSlotInfo === 'function' ? window.getPlanSlotInfo(window.state.plan?.slots?.[day]?.[slotKey]) : { recipe: null };
+  const info = typeof window.getPlanSlotInfo === 'function' ? window.getPlanSlotInfo(getState().currentPlan?.slots?.[day]?.[slotKey]) : { recipe: null };
   if (!info?.recipe) return;
   const newVariant = (info.variant || 'original') === 'enhanced' ? 'original' : 'enhanced';
-  window.state.plan.slots[day][slotKey] = typeof window.makePlanSlot === 'function' ? window.makePlanSlot(info.id, newVariant) : { id: info.id, recipeId: info.id, variant: newVariant };
-  const priority = window.state.plan.productPriority || window.state.prefs?.productPriority || 'protein';
-  window.state.plan.productSelections = typeof window.lockProductSelectionsForSlots === 'function' ? window.lockProductSelectionsForSlots(window.state.plan.slots, priority) : {};
-  window.state.plan.score = typeof window.calculatePlanScore === 'function' ? window.calculatePlanScore(window.state.plan) : 0;
-  if (typeof window.saveState === 'function') window.saveState(window.state.plan);
+  getState().currentPlan.slots[day][slotKey] = typeof window.makePlanSlot === 'function' ? window.makePlanSlot(info.id, newVariant) : { id: info.id, recipeId: info.id, variant: newVariant };
+  const priority = getState().currentPlan.productPriority .prefs?.productPriority || 'protein';
+  getState().currentPlan.productSelections = typeof window.lockProductSelectionsForSlots === 'function' ? window.lockProductSelectionsForSlots(getState().currentPlan.slots, priority) : {};
+  getState().currentPlan.score = typeof window.calculatePlanScore === 'function' ? window.calculatePlanScore(getState().currentPlan) : 0;
+  if (typeof window.saveState === 'function') window.saveState(getState().currentPlan);
   if (typeof window.renderPlan === 'function') window.renderPlan();
   if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(`Switched to ${newVariant === 'enhanced' ? '✨ Enhanced' : 'Original'} variant for ${info.recipe.name}`);
 }
 
 export function prioritiseAllPlannedEnhancedRecipes() {
-  if (!window.state.plan?.slots) return typeof window.showPlatePlanToast === 'function' ? window.showPlatePlanToast('No active meal plan to prioritise.') : null;
+  if (!getState().currentPlan?.slots) return typeof window.showPlatePlanToast === 'function' ? window.showPlatePlanToast('No active meal plan to prioritise.') : null;
   let upgradedCount = 0;
-  Object.entries(window.state.plan.slots).forEach(([day, daySlots]) => {
+  Object.entries(getState().currentPlan.slots).forEach(([day, daySlots]) => {
     Object.entries(daySlots || {}).forEach(([slotKey, slotVal]) => {
       if (!slotVal) return;
       const info = typeof window.getPlanSlotInfo === 'function' ? window.getPlanSlotInfo(slotVal) : { recipe: null };
@@ -233,17 +233,17 @@ export function prioritiseAllPlannedEnhancedRecipes() {
       const r = info.recipe;
       const hasEnhanced = r.enhanced && ((r.enhanced.ingredients?.length) || (r.enhanced.method?.length) || (r.enhanced.steps?.length) || r.enhanced.name || r.enhanced.changes || r.enhancedPortions);
       if (hasEnhanced) {
-        window.state.plan.slots[day][slotKey] = typeof window.makePlanSlot === 'function' ? window.makePlanSlot(info.id, 'enhanced') : { id: info.id, recipeId: info.id, variant: 'enhanced' };
+        getState().currentPlan.slots[day][slotKey] = typeof window.makePlanSlot === 'function' ? window.makePlanSlot(info.id, 'enhanced') : { id: info.id, recipeId: info.id, variant: 'enhanced' };
         upgradedCount++;
       }
     });
   });
 
   if (upgradedCount > 0) {
-    const priority = window.state.plan.productPriority || window.state.prefs?.productPriority || 'protein';
-    window.state.plan.productSelections = typeof window.lockProductSelectionsForSlots === 'function' ? window.lockProductSelectionsForSlots(window.state.plan.slots, priority) : {};
-    window.state.plan.score = typeof window.calculatePlanScore === 'function' ? window.calculatePlanScore(window.state.plan) : 0;
-    if (typeof window.saveState === 'function') window.saveState(window.state.plan);
+    const priority = getState().currentPlan.productPriority .prefs?.productPriority || 'protein';
+    getState().currentPlan.productSelections = typeof window.lockProductSelectionsForSlots === 'function' ? window.lockProductSelectionsForSlots(getState().currentPlan.slots, priority) : {};
+    getState().currentPlan.score = typeof window.calculatePlanScore === 'function' ? window.calculatePlanScore(getState().currentPlan) : 0;
+    if (typeof window.saveState === 'function') window.saveState(getState().currentPlan);
     if (typeof window.renderPlan === 'function') window.renderPlan();
     if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(`✨ Prioritised ${upgradedCount} meal(s) to Enhanced variants!`);
   } else if (typeof window.showPlatePlanToast === 'function') {
@@ -252,7 +252,7 @@ export function prioritiseAllPlannedEnhancedRecipes() {
 }
 
 export function openPlannedMealActions(day, slotKey) {
-  const info = typeof window.getPlanSlotInfo === 'function' ? window.getPlanSlotInfo(window.state.plan?.slots?.[day]?.[slotKey]) : { recipe: null };
+  const info = typeof window.getPlanSlotInfo === 'function' ? window.getPlanSlotInfo(getState().currentPlan?.slots?.[day]?.[slotKey]) : { recipe: null };
   if (!info?.active && !info?.recipe) return typeof window.showPlatePlanToast === 'function' ? window.showPlatePlanToast('That planned meal is no longer available.') : null;
   const actions = buildPlannedMealActionItems(info, day, slotKey);
   if (typeof window.openMobileActionSheet === 'function') {
@@ -261,7 +261,7 @@ export function openPlannedMealActions(day, slotKey) {
 }
 
 export function swapSlot(day, slot, id) {
-  if (!window.state.plan.slots[day]) window.state.plan.slots[day] = {};
+  if (!getState().currentPlan.slots[day]) getState().currentPlan.slots[day] = {};
   let swappedName = '';
   const mealType = slot.includes('breakfast') ? 'breakfast' : slot.includes('lunch') ? 'lunch' : 'dinner';
   const slotMealMode = typeof window.getSlotMealMode === 'function' ? window.getSlotMealMode(day, mealType) : 'both';
@@ -271,30 +271,30 @@ export function swapSlot(day, slot, id) {
   if (id) {
     const parsed = typeof window.parsePlanRecipeValue === 'function' ? window.parsePlanRecipeValue(id) : { id, variant: 'original' };
     const slotObj = typeof window.makePlanSlot === 'function' ? window.makePlanSlot(parsed.id, parsed.variant) : { id: parsed.id, recipeId: parsed.id, variant: parsed.variant };
-    window.state.plan.slots[day][slot] = slotObj;
+    getState().currentPlan.slots[day][slot] = slotObj;
     if (typeof window.setPlanSlotReason === 'function') window.setPlanSlotReason(day, slot, '');
     if (isDualView && counterpartKey) {
-      window.state.plan.slots[day][counterpartKey] = { ...slotObj };
+      getState().currentPlan.slots[day][counterpartKey] = { ...slotObj };
       if (typeof window.setPlanSlotReason === 'function') window.setPlanSlotReason(day, counterpartKey, '');
     }
-    const info = typeof window.getPlanSlotInfo === 'function' ? window.getPlanSlotInfo(window.state.plan.slots[day][slot]) : { active: null };
+    const info = typeof window.getPlanSlotInfo === 'function' ? window.getPlanSlotInfo(getState().currentPlan.slots[day][slot]) : { active: null };
     swappedName = info?.active?.name || info?.recipe?.name || '';
   } else {
-    window.state.plan.slots[day][slot] = null;
+    getState().currentPlan.slots[day][slot] = null;
     if (typeof window.setPlanSlotReason === 'function') window.setPlanSlotReason(day, slot, '');
     if (isDualView && counterpartKey) {
-      window.state.plan.slots[day][counterpartKey] = null;
+      getState().currentPlan.slots[day][counterpartKey] = null;
       if (typeof window.setPlanSlotReason === 'function') window.setPlanSlotReason(day, counterpartKey, '');
     }
   }
-  const priority = window.state.plan.productPriority || window.state.prefs?.productPriority || 'protein';
-  window.state.plan.productSelections = typeof window.lockProductSelectionsForSlots === 'function' ? window.lockProductSelectionsForSlots(window.state.plan.slots, priority) : {};
-  window.state.plan.productPriority = priority;
-  window.state.plan.confirmedShopping = false;
-  window.state.plan.mealPrepGroups = [];
-  window.state.plan.declinedMealPrepGroups = [];
-  window.state.plan.score = typeof window.calculatePlanScore === 'function' ? window.calculatePlanScore(window.state.plan) : 0;
-  if (typeof window.saveState === 'function') window.saveState(window.state.plan);
+  const priority = getState().currentPlan.productPriority .prefs?.productPriority || 'protein';
+  getState().currentPlan.productSelections = typeof window.lockProductSelectionsForSlots === 'function' ? window.lockProductSelectionsForSlots(getState().currentPlan.slots, priority) : {};
+  getState().currentPlan.productPriority = priority;
+  getState().currentPlan.confirmedShopping = false;
+  getState().currentPlan.mealPrepGroups = [];
+  getState().currentPlan.declinedMealPrepGroups = [];
+  getState().currentPlan.score = typeof window.calculatePlanScore === 'function' ? window.calculatePlanScore(getState().currentPlan) : 0;
+  if (typeof window.saveState === 'function') window.saveState(getState().currentPlan);
   if (typeof window.renderPlan === 'function') window.renderPlan();
   const toastMsg = swappedName
     ? (isDualView ? `Assigned ${swappedName} for Elliott & Chloe` : `Swapped meal to ${swappedName}`)

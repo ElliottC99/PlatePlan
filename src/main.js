@@ -13,7 +13,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * src/main.js (v3.35.3)
+ * src/main.js (v3.39.2)
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  */
 import { waitForAuth } from './services/AuthService.js';
@@ -71,7 +71,7 @@ const safeClone = (obj) => {
 if (typeof window !== 'undefined') {
   window.stripPlanPayload = stripPlanPayload;
   window.saveState = function(stateData) {
-    const rawPlan = stateData?.plan || stateData?.currentPlan || stateData || window.state?.plan || window.state?.currentPlan;
+    const rawPlan = stateData?.plan || stateData?.currentPlan || stateData .currentPlan ?.currentPlan;
     if (!rawPlan) return;
 
     // 1. Dispatch into official store orchestrator
@@ -130,10 +130,7 @@ if (typeof window !== 'undefined') {
   window.calculateMealFitScore = calculateMealFitScore;
   window.renderFitScoreBadge = renderFitScoreBadge;
 
-  window.PantryRepository = {
-    getCategories, saveCategories, saveIngredient, saveProduct, getIngredients, getProducts,
-    deleteCategory: async (id) => (await import('./services/HouseholdRepository.js')).deleteCategory(id)
-  };
+
 
   Object.assign(window, {
     MealPlanGeneratorService, RecipeDetailModalService, PortionCalculationService, TescoImportService,
@@ -268,16 +265,16 @@ function setupSubscriptions() {
 
   subscribe('recipes', (recipes) => {
     const clean = sanitizeRecipes(recipes);
-    if (typeof window !== 'undefined') { window.state.recipes = clean; window.allRecipes = clean; window.recipes = clean; }
-    renderRecipeVault(); renderToday(); if (window.state?.plan && typeof renderPlanner === 'function') renderPlanner();
+    if (typeof window !== 'undefined') { getState().recipes = clean; window.allRecipes = clean; window.recipes = clean; }
+    renderRecipeVault(); renderToday(); if (getState().currentPlan && typeof renderPlanner === 'function') renderPlanner();
     renderDataQualityView();
   });
   subscribe('ingredients', (ings) => {
-    if (typeof window !== 'undefined' && window.state) window.state.ingredients = Array.isArray(ings) ? ings : [];
+    if (typeof window !== 'undefined' && getState()) getState().ingredients = Array.isArray(ings) ? ings : [];
     renderShoppingListUI(); renderIngredientBank(); renderDataQualityView();
   });
   subscribe('products', (prods) => {
-    if (typeof window !== 'undefined' && window.state) window.state.products = Array.isArray(prods) ? prods : [];
+    if (typeof window !== 'undefined' && getState()) getState().products = Array.isArray(prods) ? prods : [];
     renderProductBank(); renderDataQualityView();
   });
   subscribe('shopping', () => renderShoppingListUI());
@@ -285,7 +282,7 @@ function setupSubscriptions() {
   subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
 }
 
-export const APP_VERSION = 'v3.38.75';
+export const APP_VERSION = 'v3.40.24';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
@@ -338,9 +335,19 @@ async function initApp() {
 
 // Service Worker Update Listener
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+    for(let registration of registrations) {
+      registration.unregister();
+    }
+  });
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     console.info('[PlatePlan PWA] New Service Worker controller detected. Reloading for fresh assets...');
     window.location.reload();
+  });
+}
+if ('caches' in window) {
+  caches.keys().then((keyList) => {
+    return Promise.all(keyList.map((key) => caches.delete(key)));
   });
 }
 

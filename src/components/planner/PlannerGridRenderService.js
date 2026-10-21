@@ -13,7 +13,7 @@ import { escapeHtml, escapeAttr } from '../../utils/stringUtils.js';
  */
 export function resolveRecipeName(recipeId, fallback = '') {
   if (!recipeId) return fallback || '';
-  const recipes = (typeof window !== 'undefined' && Array.isArray(window.state?.recipes)) ? window.state.recipes : [];
+  const recipes = (typeof window !== 'undefined' && Array.isArray(getState()?.recipes)) ? getState().recipes : [];
   const found = recipes.find(r => String(r.id) === String(recipeId));
   return found?.name || fallback || 'Pinned Recipe';
 }

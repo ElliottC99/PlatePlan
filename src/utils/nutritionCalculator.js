@@ -1,3 +1,4 @@
+import store from "../store/store.js";
 /**
  * src/utils/nutritionCalculator.js (v3.15.3)
  * Preference-driven macro division and zero-drift remainder engine.
@@ -23,10 +24,10 @@ export const DEFAULT_MEAL_SPLITS = Object.freeze({
  */
 export function resolveMealSplitPercentages(userPreferences = {}, person = null) {
   const globalStatePrefs = (typeof window !== 'undefined' && (
-    window.state?.preferences?.mealSplits ||
-    window.state?.userPrefs?.mealSplits ||
-    window.state?.preferences ||
-    window.state?.userPrefs
+    store.getState()?.preferences?.mealSplits ||
+    store.getState()?.userPrefs?.mealSplits ||
+    store.getState()?.preferences ||
+    store.getState()?.userPrefs
   )) || {};
 
   const passedSplits = userPreferences?.mealSplits || userPreferences?.splits || userPreferences || {};
@@ -35,7 +36,7 @@ export function resolveMealSplitPercentages(userPreferences = {}, person = null)
   const profile = (person && (
     passedSplits.profiles?.[person] ||
     globalStatePrefs.profiles?.[person] ||
-    (typeof window !== 'undefined' && (window.state?.preferences?.profiles?.[person] || window.state?.userPrefs?.profiles?.[person]))
+    (typeof window !== 'undefined' && (store.getState()?.preferences?.profiles?.[person] ?.userPrefs?.profiles?.[person]))
   )) || null;
 
   if (profile) {
@@ -132,7 +133,4 @@ export function calculateMealSplit(dailyKcal, dailyProtein, userPreferences = {}
   };
 }
 
-if (typeof window !== 'undefined') {
-  window.calculateMealSplit = calculateMealSplit;
-  window.resolveMealSplitPercentages = resolveMealSplitPercentages;
-}
+

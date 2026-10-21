@@ -17,10 +17,12 @@ import { bindStep01Events } from './RecipeWizardStep1Handlers.js';
 import { bindStep2Events } from './RecipeWizardStep2Handlers.js';
 import { bindStep3Events } from './RecipeWizardStep3Handlers.js';
 
+const TOAST_DURATION_MS = 4000;
+
 export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
   resetWizardState();
   if (editRecipeId) {
-    const allRecipes = (typeof window !== 'undefined' ? (window.Store?.getState?.()?.recipes || window.state?.recipes || []) : []);
+    const allRecipes = (typeof window !== 'undefined' ? (window.Store?.getState?.()?.recipes ?.recipes || []) : []);
     const found = allRecipes.find(r => r && String(r.id) === String(editRecipeId));
     if (found) {
       const ingRawText = (found.ingredientSections || []).map(sec => {
@@ -103,7 +105,7 @@ export function showWizardNotice(msg, type = 'error') {
       container.prepend(banner);
     }
     banner.textContent = msg;
-    setTimeout(() => { if (banner && banner.parentNode) banner.remove(); }, 4000);
+    setTimeout(() => { if (banner && banner.parentNode) banner.remove(); }, TOAST_DURATION_MS);
   }
 }
 

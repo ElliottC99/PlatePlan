@@ -22,7 +22,7 @@ function escapeHtml(str) {
  * @param {Function} onProceed
  */
 export function promptRecipeWizardAliases(allIngs, onProceed) {
-  const storeState = getState() || {};
+  const storeState = getState();
   const bank = storeState.ingredients || [];
 
   const candidates = [];

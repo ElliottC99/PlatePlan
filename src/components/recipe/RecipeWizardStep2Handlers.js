@@ -18,7 +18,7 @@ function recalculateWizardMacros(rec) {
   if (!rec) return;
 
   const targetServings = Number(rec.targetServings || rec.serves || 2);
-  const storeState = getState() || {};
+  const storeState = getState();
   const products = storeState.products || [];
 
   const allIngredients = (rec.ingredientSections || []).flatMap(s => s.ingredients || []);

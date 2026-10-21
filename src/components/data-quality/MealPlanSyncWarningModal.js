@@ -10,7 +10,7 @@ import { saveCurrentPlan } from '../../services/HouseholdRepository.js';
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export function openMealPlanSyncWarningModal(issue = {}) {
-  const state = getState() || {};
+  const state = getState();
   const currentPlan = state.currentPlan || null;
 
   if (!currentPlan) {

@@ -45,7 +45,7 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
 
   closeAllRecipeActionMenus();
 
-  const allRecipes = (window.state?.recipes || []).concat(window.Store?.getState()?.recipes || []);
+  const allRecipes = (getState()?.recipes || []).concat(window.Store?.getState()?.recipes || []);
   const recipe = allRecipes.find(r => r && r.id === recipeId);
   if (!recipe) return;
 
@@ -137,7 +137,7 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
     try {
       const { saveRecipe } = await import('../../services/HouseholdRepository.js');
       await saveRecipe(dup);
-      if (window.state?.recipes) window.state.recipes.unshift(dup);
+      if (getState()?.recipes) getState().recipes.unshift(dup);
       if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
       if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(`Duplicated "${recipe.name}"`);
     } catch (err) {
@@ -160,8 +160,8 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
       try {
         const { deleteRecipe } = await import('../../services/HouseholdRepository.js');
         await deleteRecipe(recipeId);
-        if (window.state?.recipes) {
-          window.state.recipes = window.state.recipes.filter(r => r.id !== recipeId);
+        if (getState()?.recipes) {
+          getState().recipes = getState().recipes.filter(r => r.id !== recipeId);
         }
         if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
         if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(`Deleted "${recipe.name || recipe.title}"`);

@@ -52,7 +52,7 @@ export function renderDataQualityView() {
   const container = document.getElementById('view-data');
   if (!container) return;
 
-  const state = getState() || {};
+  const state = getState();
   const audit = runAudit(state);
   
   if (audit.storageHealth && audit.storageHealth.length > 0) {
@@ -234,7 +234,7 @@ export function renderDataQualityView() {
 }
 
 export async function handleVerifyZeroCal(ingredientId) {
-  const state = getState() || {};
+  const state = getState();
   const ingredients = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
   try {
     const updated = await verifyZeroCalorieIngredient(ingredientId, ingredients);
@@ -251,7 +251,7 @@ export async function handleVerifyZeroCal(ingredientId) {
 }
 
 export async function handleIgnoreStoreMapping(ingredientId) {
-  const state = getState() || {};
+  const state = getState();
   const ingredients = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
   const ingIndex = ingredients.findIndex(i => String(i.id) === String(ingredientId));
   if (ingIndex < 0) return;
@@ -282,7 +282,7 @@ export async function handleIgnoreStoreMapping(ingredientId) {
 }
 
 export async function handleCleanHistoryCache() {
-  const state = getState() || {};
+  const state = getState();
   const currentPrefs = state.preferences || state.userPrefs || {};
   const previousPrefs = JSON.parse(JSON.stringify(currentPrefs));
 

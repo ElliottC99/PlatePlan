@@ -63,14 +63,14 @@ export function renderWizardStep2(plan) {
           <div style="font-size:13px;color:var(--text2);margin-top:4px">Review daily macro fits and swap any meal directly inline.</div>
         </div>
         <div style="display:flex;gap:8px">
-          <button type="button" class="btn ghost sm" onclick="setPlannerWizardStep(1)">← Edit Requests</button>
-          <button type="button" class="btn primary sm" style="font-weight:700" onclick="setPlannerWizardStep(3)">Proceed to Shopping List →</button>
+          <button type="button" class="btn ghost sm" data-action="set-step" data-step="1">← Edit Requests</button>
+          <button type="button" class="btn primary sm" style="font-weight:700" data-action="set-step" data-step="3">Proceed to Shopping List →</button>
         </div>
       </div>
       <div class="dense-plan-grid">${cardsHtml}</div>
       <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-        <button type="button" class="btn ghost" onclick="setPlannerWizardStep(1)">← Back to Configure</button>
-        <button type="button" class="btn primary" style="font-weight:700;padding:10px 24px" onclick="setPlannerWizardStep(3)">Proceed to Shopping List &amp; Substitutions →</button>
+        <button type="button" class="btn ghost" data-action="set-step" data-step="1">← Back to Configure</button>
+        <button type="button" class="btn primary" style="font-weight:700;padding:10px 24px" data-action="set-step" data-step="3">Proceed to Shopping List &amp; Substitutions →</button>
       </div>
     </div>
   `;
@@ -92,8 +92,8 @@ export function renderWizardStep3(plan) {
       ${topToolbarHtml}
       ${listHtml}
       <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-        <button type="button" class="btn ghost" onclick="setPlannerWizardStep(2)">← Back to Review Plan</button>
-        <button type="button" class="btn primary" style="font-weight:700;padding:10px 24px" onclick="commitPlannerWizardPlan()">✓ Save Shopping List &amp; Plan (Commit to Today) →</button>
+        <button type="button" class="btn ghost" data-action="set-step" data-step="2">← Back to Review Plan</button>
+        <button type="button" class="btn primary" style="font-weight:700;padding:10px 24px" data-action="commit-plan">✓ Save Shopping List &amp; Plan (Commit to Today) →</button>
       </div>
     </div>
   `;
@@ -115,7 +115,7 @@ export function makeRenderedDaySummary() {
   });
   return {
     totals,
-    targets: { e: { cal: +window.state?.prefs?.ecal || 0, prot: +window.state?.prefs?.eprot || 0 }, c: { cal: +window.state?.prefs?.ccal || 0, prot: +window.state?.prefs?.cprot || 0 } },
+    targets: { e: { cal: +getState()?.prefs?.ecal || 0, prot: +getState()?.prefs?.eprot || 0 }, c: { cal: +getState()?.prefs?.ccal || 0, prot: +getState()?.prefs?.cprot || 0 } },
     assumed,
     score: 0
   };

@@ -9,13 +9,14 @@ import { db, HOUSEHOLD_ID } from '../config/firebase.js';
 import { getState as getStoreState, setIngredients, setProducts, setCategories } from '../store/store.js';
 import { isDbAvailable } from './RecipeFirestoreRepository.js';
 
+import { CHUNK_SIZE } from '../config/systemConfig.js';
+
 const strictNorm = (str) => String(str || '').toLowerCase().trim();
 const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^a-z0-9\-]/g, '');
 const slugCategory = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 async function commitChunkedOps(ops) {
   if (!ops || ops.length === 0) return;
-  const CHUNK_SIZE = 400;
   for (let i = 0; i < ops.length; i += CHUNK_SIZE) {
     const chunkBatch = db.batch();
     ops.slice(i, i + CHUNK_SIZE).forEach(op => op(chunkBatch));

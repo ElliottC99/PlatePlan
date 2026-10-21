@@ -34,10 +34,7 @@ export function setRecipes(newRecipes, ingredients = [], products = []) {
     return res.recipe;
   });
   recipeState.recipes = processed;
-  if (typeof window !== 'undefined') {
-    if (!window.state) window.state = {};
-    window.state.recipes = recipeState.recipes;
-  }
+
   saveStateCache(recipeState);
   dispatchStateEvent('plateplan:state:recipes', recipeState.recipes);
 }
@@ -53,10 +50,7 @@ export function updateRecipeInStore(recipe, ingredients = [], products = []) {
   } else {
     recipeState.recipes.push(processed);
   }
-  if (typeof window !== 'undefined') {
-    if (!window.state) window.state = {};
-    window.state.recipes = recipeState.recipes;
-  }
+
   saveStateCache(recipeState);
   dispatchStateEvent('plateplan:state:recipes', recipeState.recipes);
 }
@@ -64,20 +58,13 @@ export function updateRecipeInStore(recipe, ingredients = [], products = []) {
 export function removeRecipeFromStore(recipeId) {
   if (!recipeId) return;
   recipeState.recipes = recipeState.recipes.filter(r => r.id !== recipeId);
-  if (typeof window !== 'undefined') {
-    if (!window.state) window.state = {};
-    window.state.recipes = recipeState.recipes;
-  }
+
   saveStateCache(recipeState);
   dispatchStateEvent('plateplan:state:recipes', recipeState.recipes);
 }
 
 export function setCurrentPlan(newPlan) {
   recipeState.currentPlan = newPlan || null;
-  if (typeof window !== 'undefined') {
-    if (!window.state) window.state = {};
-    window.state.plan = recipeState.currentPlan;
-  }
   saveStateCache(recipeState);
   dispatchStateEvent('plateplan:state:plan', recipeState.currentPlan);
 }

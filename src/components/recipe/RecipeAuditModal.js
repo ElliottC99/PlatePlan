@@ -7,6 +7,7 @@
 import { getState } from '../../store/store.js';
 import { auditRecipeMappings, relinkRecipeIngredient, batchRelinkRecipeMappings } from '../../utils/RecipeAuditService.js';
 import { renderKPIBadge, renderIssueCard, renderEmptyState } from './RecipeAuditModalRenderService.js';
+import { AUDIT_SUGGESTION_THRESHOLD } from '../../config/businessRules.js';
 
 let modalOverlay = null;
 let currentFilter = 'all';
@@ -16,7 +17,7 @@ let targetRecipeFilter = null;
 
 function renderModalContent() {
   if (!modalOverlay) return;
-  const state = getState() || {};
+  const state = getState();
   const auditReport = auditRecipeMappings(state);
   const ingredients = state.ingredients || [];
   const { summary, issues } = auditReport;

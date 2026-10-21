@@ -10,7 +10,7 @@ import { batchResolveOrphansWithNewSubtypeInDb } from '../../services/Ingredient
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
-  const state = getState() || {};
+  const state = getState();
   const products = state.products || [];
   const ingredients = state.ingredients || [];
 

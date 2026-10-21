@@ -46,7 +46,7 @@ function renderComparisonBadge(actual, target) {
 }
 
 export function renderMacroBreakdownCrossbar(recipe, variant = 'original') {
-  const storeState = getState() || {};
+  const storeState = getState();
   const userPrefs = storeState.preferences || storeState.userPrefs || {};
   const profiles = userPrefs.profiles || {};
   const eProf = profiles.elliott || profiles.e || { dailyKcal: 2400, dailyProtein: 140 };
@@ -141,7 +141,7 @@ export function renderState3Review() {
       let mainLineText = `${escapeHtml(ing.name)}${notesHtml}`;
 
       if (ing.isCategoryDefault || ing.categoryId) {
-        const storeState = getState() || {};
+        const storeState = getState();
         const products = storeState.products || [];
         const catName = ing.categoryId || 'General Groceries';
         let defaultProduct = products.find(p => (String(p.category).toLowerCase() === catName.toLowerCase() || String(p.cat).toLowerCase() === catName.toLowerCase()) && p.isAutoDefault);
@@ -152,7 +152,7 @@ export function renderState3Review() {
         if (defaultProduct) {
           const brandStr = defaultProduct.brand ? `${defaultProduct.brand} ` : '';
           const matchName = typeof ing.productMatch === 'object' ? ing.productMatch?.name : null;
-          const displayName = ing.productName || matchName || getState()?.items?.[ing.mappedItemId]?.name || ing.name;
+          const displayName = ing.productName || matchName ?.items?.[ing.mappedItemId]?.name || ing.name;
           const productId = ing.productId || ing.mappedItemId || ing.productMatch?.id;
 
           if (productId) {
@@ -168,7 +168,7 @@ export function renderState3Review() {
             taxLabel = `<span class="badge badge-purple" style="font-size:10px;">Mapped</span>`;
         }
       } else if (ing.ingredientId) {
-        const storeState = getState() || {};
+        const storeState = getState();
         const products = storeState.products || [];
         const linkedProduct = products.find(p => String(p.ingredientId) === String(ing.ingredientId));
         if (linkedProduct) {

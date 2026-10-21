@@ -1,11 +1,13 @@
 import { convertToStrictUnit } from './UnitConversionService.js';
 import { getState } from '../store/store.js';
+import { showCustomConfirm, showCustomCopyModal } from '../components/pantry/IngredientActionModalsUI.js';
 
 /**
  * src/services/ShoppingCalculationService.js (v3.31.31)
  * Precision unit pricing, pack weight normalisation, and robust fallbacks
  * for household shopping list generation.
  */
+
 
 const DEFAULT_ITEM_PACK_GRAMS = {
   tofu: 350, tempeh: 200, cucumber: 350, onion: 150, shallot: 250, garlic: 60,
@@ -16,24 +18,11 @@ const DEFAULT_ITEM_PACK_GRAMS = {
   cod: 260, tuna: 145, prawn: 180, noodles: 300, pasta: 500, rice: 500, stock: 80, sauce: 150, oil: 500
 };
 
-const DEFAULT_FALLBACK_PRODUCTS = [
-  { match: 'vegetable stock', name: 'Vegetable Stock Cubes', brand: 'Knorr', price: 1.45, packSize: 80, packUnit: 'g', cat: 'Store Cupboard' },
-  { match: 'chicken stock', name: 'Chicken Stock Cubes', brand: 'Knorr', price: 1.45, packSize: 80, packUnit: 'g', cat: 'Store Cupboard' },
-  { match: 'beef stock', name: 'Beef Stock Cubes', brand: 'Knorr', price: 1.45, packSize: 80, packUnit: 'g', cat: 'Store Cupboard' },
-  { match: 'instant noodles', name: 'Egg Noodles / Instant Noodles', brand: 'Amoy', price: 1.25, packSize: 300, packUnit: 'g', cat: 'Grains & Pasta' },
-  { match: 'noodles', name: 'Medium Egg Noodles', brand: 'Amoy', price: 1.35, packSize: 300, packUnit: 'g', cat: 'Grains & Pasta' },
-  { match: 'shallot', name: 'Echalion Shallots', brand: 'Tesco', price: 1.35, packSize: 300, packUnit: 'g', cat: 'Fresh Produce' },
-  { match: 'celery', name: 'Celery Sticks', brand: 'Tesco', price: 0.89, packSize: 350, packUnit: 'g', cat: 'Fresh Produce' },
-  { match: 'spring onion', name: 'Spring Onions', brand: 'Tesco', price: 0.65, packSize: 100, packUnit: 'g', cat: 'Fresh Produce' },
-  { match: 'ginger', name: 'Fresh Root Ginger', brand: 'Tesco', price: 0.70, packSize: 100, packUnit: 'g', cat: 'Fresh Produce' },
-  { match: 'garlic', name: 'Garlic Bulbs 3 Pack', brand: 'Tesco', price: 0.95, packSize: 150, packUnit: 'g', cat: 'Fresh Produce' },
-  { match: 'tofu', name: 'Organic Firm Tofu', brand: 'Tofoo Co', price: 2.30, packSize: 280, packUnit: 'g', cat: 'Meat & Protein' },
-  { match: 'cucumber', name: 'Whole Cucumber', brand: 'Tesco', price: 0.89, packSize: 350, packUnit: 'g', cat: 'Fresh Produce' }
-];
-
 export function getFallbackProductData(rawName = '') {
   const clean = String(rawName || '').toLowerCase().trim();
-  for (const item of DEFAULT_FALLBACK_PRODUCTS) {
+  const state = getState();
+  const fallbackProducts = state.preferences?.fallbackProducts || [];
+  for (const item of fallbackProducts) {
     if (clean.includes(item.match)) return { ...item };
   }
   return { name: rawName || 'Pantry Essential', brand: 'Generic', price: 1.25, packSize: 250, packUnit: 'g', cat: 'Store Cupboard' };
@@ -124,7 +113,7 @@ export function getCanonicalIngredientId(item, ingredientsBank = []) {
 
 export function aggregateShoppingListFromPlan(plan = null, state = null) {
   const storeState = getState ? getState() : {};
-  const appState = state || storeState || (typeof window !== 'undefined' ? window.state : {}) || {};
+  const appState = state || storeState || (typeof window !== 'undefined' ? getState() : {}) || {};
   const activePlan = plan || appState.plan || {};
   const vaultRecipes = (Array.isArray(appState.recipes) && appState.recipes.length ? appState.recipes : null)
     || (typeof window !== 'undefined' && Array.isArray(window.recipes) ? window.recipes : []);

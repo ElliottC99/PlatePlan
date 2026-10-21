@@ -8,9 +8,9 @@
 import { renderSettingsView } from '../views/SettingsView.js';
 import { renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired } from '../views/ShoppingView.js';
 import { renderPlanner } from '../views/PlannerView.js';
-import { renderRecipeVault } from '../views/RecipeVaultView.js';
+import { renderRecipeVault, handleVaultSortChange } from '../views/RecipeVaultView.js';
 import { routeRecipeAction } from './RecipeActionBridge.js';
-import { patchSwapLabels, initLabelObserver } from '../utils/LabelPatcher.js';
+
 
 let isBridgeInitialized = false;
 
@@ -228,6 +228,28 @@ export function routeAction(actionName, target, event) {
     return true;
   }
 
+  if (normalizedAction.includes('vaultsort') || normalizedAction.includes('handlevaultsortchange')) {
+    const val = target.value || parseArgsString(actionName)[0];
+    if (typeof handleVaultSortChange === 'function') handleVaultSortChange(val);
+    return true;
+  }
+
+  if (normalizedAction.includes('skipbatchimportrecipe')) {
+    if (typeof window.skipBatchImportRecipe === 'function') window.skipBatchImportRecipe();
+    return true;
+  }
+
+  if (normalizedAction.includes('abortbatchimport')) {
+    if (typeof window.abortBatchImport === 'function') window.abortBatchImport();
+    return true;
+  }
+
+  if (normalizedAction.includes('handlesubtypeproductaction')) {
+    const arg = parseArgsString(actionName)[0];
+    if (typeof window.handleSubtypeProductAction === 'function') window.handleSubtypeProductAction(arg);
+    return true;
+  }
+
   return false;
 }
 
@@ -243,12 +265,9 @@ export function setupActionBridge() {
 
   isBridgeInitialized = true;
   window.__plateplan_action_bridge_attached = true;
-  initLabelObserver();
 
-  // Delegated capture listener on document
+  // Delegated capture listener on document for click
   document.addEventListener('click', (event) => {
-    patchSwapLabels();
-
     const target = event.target.closest('[data-action], [data-pp-click], button');
     if (!target) return;
 
@@ -273,6 +292,32 @@ export function setupActionBridge() {
         event.stopImmediatePropagation();
       }
       return;
+    }
+  }, true);
+
+  // Delegated capture listener for change (data-pp-change)
+  document.addEventListener('change', (event) => {
+    const target = event.target.closest('[data-pp-change]');
+    if (!target) return;
+    const expr = target.getAttribute('data-pp-change') || target.dataset.ppChange || '';
+    if (expr) {
+      const handled = routeAction(expr, target, event);
+      if (handled) {
+        event.preventDefault();
+      }
+    }
+  }, true);
+
+  // Delegated capture listener for input (data-pp-input)
+  document.addEventListener('input', (event) => {
+    const target = event.target.closest('[data-pp-input]');
+    if (!target) return;
+    const expr = target.getAttribute('data-pp-input') || target.dataset.ppInput || '';
+    if (expr) {
+      const handled = routeAction(expr, target, event);
+      if (handled) {
+        event.preventDefault();
+      }
     }
   }, true);
 }

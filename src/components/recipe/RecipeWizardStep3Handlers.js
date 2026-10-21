@@ -30,7 +30,7 @@ function escapeHtml(str) {
 export function recalculateWizardMacros(recipeObj) {
   if (!recipeObj || typeof recipeObj !== 'object') return null;
 
-  const state = getState() || (typeof window !== 'undefined' ? window.state : {}) || {};
+  const state = (typeof window !== 'undefined' ? getState() : {}) || {};
   const globalProducts = Array.isArray(state.products) ? state.products : [];
   const globalIngredients = Array.isArray(state.ingredients) ? state.ingredients : [];
 

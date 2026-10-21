@@ -8,7 +8,7 @@ import { getState } from '../store/store.js';
 import { buildPantryHierarchy } from '../models/PantryHierarchyModel.js';
 
 export function getCounts(stateInput) {
-  const state = stateInput || getState() || {};
+  const state = stateInput ;
   const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
   const products = Array.isArray(state.products) ? state.products : [];
   const recipes = Array.isArray(state.recipes) ? state.recipes : [];

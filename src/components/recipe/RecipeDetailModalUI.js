@@ -46,7 +46,7 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
   if (!ing) return '';
   if (typeof ing === 'string') return ing.trim();
 
-  const appState = state || (typeof window !== 'undefined' ? (window.Store?.getState?.() || window.state || {}) : {});
+  const appState = state || (typeof window !== 'undefined' ? (window.Store?.getState?.() ) : {});
   const pantryIngs = Array.isArray(appState.ingredients) ? appState.ingredients : [];
   const products = Array.isArray(appState.products) ? appState.products : [];
 

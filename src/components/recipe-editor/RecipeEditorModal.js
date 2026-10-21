@@ -65,7 +65,7 @@ export function renderReviewCostSummary(nutrition, portions) {
 
 export function openModal(name, result, isFallback = false, options = {}) {
   const { instanceId = null, tab = 'original' } = options;
-  const existing = window.editId ? (window.state?.recipes || []).find(x => x.id === window.editId) : null;
+  const existing = window.editId ? (getState()?.recipes || []).find(x => x.id === window.editId) : null;
   const isTemporaryReview = !!instanceId;
   const o = result.original || existing || {};
   const e = result.enhanced || existing?.enhanced || {};

@@ -190,7 +190,7 @@ export function filterSearchableRecipeSwapModal(query = '') {
   if (!resultsContainer || !currentSearchableSwapContext) return;
 
   const { day, slotKey, isShared } = currentSearchableSwapContext;
-  const stateObj = window.state || {};
+  const stateObj = getState();
   const currentSlot = stateObj.plan?.slots?.[day]?.[slotKey];
   const currentId = currentSlot?.id;
   const cleanQ = (query || '').toLowerCase().trim();
@@ -259,7 +259,7 @@ export function filterSearchableRecipeSwapModal(query = '') {
 }
 
 export function selectAndSwapRecipe(recipeId, variant = 'original') {
-  const stateObj = window.state;
+  const stateObj = getState();
   if (!currentSearchableSwapContext || !stateObj?.plan?.slots) return;
   const { day, slotKey, isShared } = currentSearchableSwapContext;
   if (!stateObj.plan.slots[day]) stateObj.plan.slots[day] = {};

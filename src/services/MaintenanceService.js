@@ -18,7 +18,7 @@ import { batchUpdateRecipesInDb } from './HouseholdRepository.js';
  */
 export async function alignAllFitScores(options = {}) {
   const isDryRun = Boolean(options.dryRun);
-  const state = getState() || {};
+  const state = getState();
   const recipes = Array.isArray(state.recipes) ? state.recipes : [];
 
   if (recipes.length === 0) {

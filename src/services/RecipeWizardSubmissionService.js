@@ -22,7 +22,7 @@ export async function handleWizardSubmission({
   btnComplete.textContent = 'Saving...';
 
   try {
-    const currentStoreState = getState() || {};
+    const currentStoreState = getState();
     const currentIngredients = [...(currentStoreState.ingredients || [])];
     const currentCategories = Array.isArray(currentStoreState.categories) ? [...currentStoreState.categories] : [];
 

@@ -1,3 +1,4 @@
+import store from "../store/store.js";
 /**
  * src/services/HydrationService.js (v3.38.5)
  * Orchestrates concurrent fetching and real-time Firebase subscriptions.
@@ -21,6 +22,24 @@ export const CANONICAL_CATEGORIES = [
   'Sauces, Condiments & Pastes', 'Store Cupboard', 'Supplements', 'Tofu, Tempeh and Seitan'
 ];
 
+export const DEFAULT_PREFERENCES = {
+  macroTargets: { calories: 2000, protein: 125, carbs: 200, fat: 70 },
+  fallbackProducts: [
+    { match: 'vegetable stock', name: 'Vegetable Stock Cubes', brand: 'Knorr', price: 1.45, packSize: 80, packUnit: 'g', cat: 'Store Cupboard' },
+    { match: 'chicken stock', name: 'Chicken Stock Cubes', brand: 'Knorr', price: 1.45, packSize: 80, packUnit: 'g', cat: 'Store Cupboard' },
+    { match: 'beef stock', name: 'Beef Stock Cubes', brand: 'Knorr', price: 1.45, packSize: 80, packUnit: 'g', cat: 'Store Cupboard' },
+    { match: 'instant noodles', name: 'Egg Noodles / Instant Noodles', brand: 'Amoy', price: 1.25, packSize: 300, packUnit: 'g', cat: 'Grains & Pasta' },
+    { match: 'noodles', name: 'Medium Egg Noodles', brand: 'Amoy', price: 1.35, packSize: 300, packUnit: 'g', cat: 'Grains & Pasta' },
+    { match: 'shallot', name: 'Echalion Shallots', brand: 'Tesco', price: 1.35, packSize: 300, packUnit: 'g', cat: 'Fresh Produce' },
+    { match: 'celery', name: 'Celery Sticks', brand: 'Tesco', price: 0.89, packSize: 350, packUnit: 'g', cat: 'Fresh Produce' },
+    { match: 'spring onion', name: 'Spring Onions', brand: 'Tesco', price: 0.65, packSize: 100, packUnit: 'g', cat: 'Fresh Produce' },
+    { match: 'ginger', name: 'Fresh Root Ginger', brand: 'Tesco', price: 0.70, packSize: 100, packUnit: 'g', cat: 'Fresh Produce' },
+    { match: 'garlic', name: 'Garlic Bulbs 3 Pack', brand: 'Tesco', price: 0.95, packSize: 150, packUnit: 'g', cat: 'Fresh Produce' },
+    { match: 'tofu', name: 'Organic Firm Tofu', brand: 'Tofoo Co', price: 2.30, packSize: 280, packUnit: 'g', cat: 'Meat & Protein' },
+    { match: 'cucumber', name: 'Whole Cucumber', brand: 'Tesco', price: 0.89, packSize: 350, packUnit: 'g', cat: 'Fresh Produce' }
+  ]
+};
+
 export function getCategoryName(cat) {
   if (!cat) return '';
   if (typeof cat === 'string') return cat;
@@ -29,9 +48,9 @@ export function getCategoryName(cat) {
 
 export async function sweepAndRecalibrateIngredientDefaults() {
   const state = window.Store?.getState?.() || {};
-  const ingredients = state.ingredients || (window.state?.ingredients || []);
-  const products = state.products || (window.state?.products || []);
-  const criterion = state.settings?.autoDefaultStrategy || state.settings?.autoDefaultCriterion || state.userPrefs?.autoDefaultStrategy || state.userPrefs?.autoDefaultCriterion || window.state?.settings?.autoDefaultStrategy || window.state?.settings?.autoDefaultCriterion || window.state?.userPrefs?.autoDefaultStrategy || window.state?.userPrefs?.autoDefaultCriterion || 'lowest_absolute_price';
+  const ingredients = state.ingredients || (store.getState()?.ingredients || []);
+  const products = state.products || (store.getState()?.products || []);
+  const criterion = state.settings?.autoDefaultStrategy || state.settings?.autoDefaultCriterion || state.userPrefs?.autoDefaultStrategy || state.userPrefs?.autoDefaultCriterion ?.settings?.autoDefaultStrategy ?.settings?.autoDefaultCriterion ?.userPrefs?.autoDefaultStrategy ?.userPrefs?.autoDefaultCriterion || 'lowest_absolute_price';
   let updatedCount = 0;
 
   const updatedIngredients = ingredients.map(ing => {
@@ -58,7 +77,7 @@ export async function sweepAndRecalibrateIngredientDefaults() {
 
   if (updatedCount > 0) {
     setIngredients(updatedIngredients);
-    if (window.state) window.state.ingredients = updatedIngredients;
+    if (store.getState()) store.getState().ingredients = updatedIngredients;
     try {
       for (const ing of updatedIngredients) {
         if (ing.defaultProductId) {
@@ -142,7 +161,20 @@ export async function hydrateHouseholdData(options = {}) {
       ]);
       const plan = subcollPlan || legacyPlan;
 
-      const sanitizedPrefs = sanitizePreferences(preferencesData);
+      const sanitizedPrefs = sanitizePreferences(preferencesData || {});
+      const finalPrefs = {
+        ...DEFAULT_PREFERENCES,
+        ...sanitizedPrefs,
+        settings: {
+          ...DEFAULT_PREFERENCES.settings,
+          ...(sanitizedPrefs.settings || {})
+        },
+        macroTargets: {
+          ...DEFAULT_PREFERENCES.macroTargets,
+          ...(sanitizedPrefs.macroTargets || {})
+        },
+        fallbackProducts: Array.isArray(sanitizedPrefs.fallbackProducts) ? sanitizedPrefs.fallbackProducts : DEFAULT_PREFERENCES.fallbackProducts
+      };
 
       const ingredients = (rawIngredients || []).map(normalizeIngredientRecord);
       const products = (rawProducts || []).map(normalizeProductRecord);
@@ -168,8 +200,8 @@ export async function hydrateHouseholdData(options = {}) {
         setProducts([]);
       }
 
-      if (sanitizedPrefs && Object.keys(sanitizedPrefs).length > 0) {
-        setPreferences(sanitizedPrefs);
+      if (finalPrefs && Object.keys(finalPrefs).length > 0) {
+        setPreferences(finalPrefs);
       }
 
       if (plan) {
@@ -185,40 +217,40 @@ export async function hydrateHouseholdData(options = {}) {
       }
 
       if (typeof window !== 'undefined') {
-        if (!window.state) { try { window.state = {}; } catch (e) {} }
+        if (!store.getState()) { try { store.getState() = {}; } catch (e) {} }
         const docData = sanitizedPrefs || {};
         const userPrefs = docData.userPrefs || docData;
-        window.state.settings = { ...(window.state.settings || {}), ...(docData.settings || {}) };
+        store.getState().settings = { ...(store.getState().settings || {}), ...(docData.settings || {}) };
         const strat = userPrefs.autoDefaultStrategy || userPrefs.autoDefaultCriterion || docData.settings?.autoDefaultStrategy || docData.settings?.autoDefaultCriterion;
         if (strat) {
-          window.state.settings.autoDefaultStrategy = strat;
-          window.state.settings.autoDefaultCriterion = strat;
-          if (!window.state.userPrefs) window.state.userPrefs = {};
-          window.state.userPrefs.autoDefaultStrategy = strat;
-          window.state.userPrefs.autoDefaultCriterion = strat;
+          store.getState().settings.autoDefaultStrategy = strat;
+          store.getState().settings.autoDefaultCriterion = strat;
+          if (!store.getState().userPrefs) store.getState().userPrefs = {};
+          store.getState().userPrefs.autoDefaultStrategy = strat;
+          store.getState().userPrefs.autoDefaultCriterion = strat;
         }
         const cloudHasData = (Array.isArray(recipes) && recipes.length > 0) || (Array.isArray(ingredients) && ingredients.length > 0) || Boolean(plan);
         if (cloudHasData) {
-          window.state.isCloudHydrated = true;
+          store.getState().isCloudHydrated = true;
         }
-        window.state.ingredients = ingredients;
-        window.state.products = products;
-        window.state.categories = mergedCategories;
+        store.getState().ingredients = ingredients;
+        store.getState().products = products;
+        store.getState().categories = mergedCategories;
         if (plan && typeof plan === 'object') {
-          window.state.plan = plan;
+          store.getState().currentPlan = plan;
           if (plan.skeletonGrid && typeof plan.skeletonGrid === 'object') {
-            window.state.skeletonGrid = plan.skeletonGrid;
+            store.getState().skeletonGrid = plan.skeletonGrid;
           }
         }
 
-        window.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: window.state.ingredients }));
+        window.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: store.getState().ingredients }));
         window.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: products }));
 
-        window.state.userPrefs = {
-          ...window.state.userPrefs,
+        store.getState().userPrefs = {
+          ...store.getState().userPrefs,
           ...userPrefs,
-          favouriteVariantIds: Array.isArray(userPrefs.favouriteVariantIds) ? userPrefs.favouriteVariantIds : (window.state.userPrefs?.favouriteVariantIds || []),
-          favourites: Array.isArray(userPrefs.favourites) ? userPrefs.favourites : (window.state.userPrefs?.favourites || [])
+          favouriteVariantIds: Array.isArray(userPrefs.favouriteVariantIds) ? userPrefs.favouriteVariantIds : (store.getState().userPrefs?.favouriteVariantIds || []),
+          favourites: Array.isArray(userPrefs.favourites) ? userPrefs.favourites : (store.getState().userPrefs?.favourites || [])
         };
 
         const rawProfiles = docData.profiles || userPrefs.profiles || {};
@@ -236,7 +268,7 @@ export async function hydrateHouseholdData(options = {}) {
             mealSplits: docMealSplits[pid] || rawProfiles[pid]?.mealSplits || { breakfast: 0.25, lunch: 0.35, dinner: 0.40 }
           };
         });
-        window.state.profiles = hydratedProfiles;
+        store.getState().profiles = hydratedProfiles;
       }
 
       setupRealtimeSubscriptions();
@@ -266,27 +298,27 @@ function setupRealtimeSubscriptions() {
   try {
     unsubs.push(subscribeRecipes((recipes) => {
       setRecipes(recipes.map(cleanLegacyMacros));
-      if (window.state) window.state.recipes = recipes;
+      if (store.getState()) store.getState().recipes = recipes;
     }));
 
     unsubs.push(subscribeIngredients((ingredients) => {
       const normIngs = (ingredients || []).map(normalizeIngredientRecord);
       setIngredients(normIngs);
-      if (window.state) window.state.ingredients = normIngs;
+      if (store.getState()) store.getState().ingredients = normIngs;
     }));
 
     unsubs.push(subscribeProducts((products) => {
       const normProds = (products || []).map(normalizeProductRecord);
       setProducts(normProds);
-      if (window.state) window.state.products = normProds;
+      if (store.getState()) store.getState().products = normProds;
     }));
 
     unsubs.push(subscribePreferences((prefs) => {
       if (prefs) {
         const sanitized = sanitizePreferences(prefs);
         setPreferences(sanitized);
-        if (window.state) {
-          window.state.settings = { ...(window.state.settings || {}), ...(sanitized.settings || {}) };
+        if (store.getState()) {
+          store.getState().settings = { ...(store.getState().settings || {}), ...(sanitized.settings || {}) };
         }
       }
     }));
@@ -294,9 +326,9 @@ function setupRealtimeSubscriptions() {
     unsubs.push(subscribeCurrentPlan((plan) => {
       if (plan) {
         setCurrentPlan(plan);
-        if (window.state) {
-          window.state.plan = plan;
-          if (plan.skeletonGrid) window.state.skeletonGrid = plan.skeletonGrid;
+        if (store.getState()) {
+          store.getState().currentPlan = plan;
+          if (plan.skeletonGrid) store.getState().skeletonGrid = plan.skeletonGrid;
         }
       }
     }));

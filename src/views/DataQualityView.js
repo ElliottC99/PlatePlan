@@ -6,6 +6,7 @@
 import { dismissDataQualityAdvisory } from '../services/DataQualityService.js';
 import { getState } from '../store/store.js';
 import { runAudit, scanDataQualitySummary } from '../services/DataQualityScanner.js';
+import { showCustomConfirm, showCustomCopyModal } from '../components/pantry/IngredientActionModalsUI.js';
 import {
   renderDataQualityView as _render,
   handleVerifyZeroCal,
@@ -29,7 +30,7 @@ export function renderDataQualityView() {
 export function updateDataQualityBadge() {
   const badge = document.getElementById('dq-badge-count');
   if (!badge) return;
-  const state = getState() || {};
+  const state = getState();
   const summary = scanDataQualitySummary(state);
   const total = summary.totalCount;
   badge.textContent = total;

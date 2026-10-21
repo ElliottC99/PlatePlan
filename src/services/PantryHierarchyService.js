@@ -121,7 +121,7 @@ export function resolveDefaultProduct(item, products = []) {
   const linked = list.filter(p => String(p.ingredientId) === String(item.id) || String(p.subtypeId) === String(item.id) || String(p.groupId) === String(item.id));
   const pool = linked.length > 0 ? linked : list;
   if (pool.length > 0) {
-    const state = getState() || {};
+    const state = getState();
     const criterion = state.settings?.autoDefaultStrategy || state.settings?.autoDefaultCriterion || state.userPrefs?.autoDefaultStrategy || state.userPrefs?.autoDefaultCriterion || 'lowest_absolute_price';
     const sorted = [...pool].sort((a, b) => compareProductsByStrategy(a, b, criterion));
     return { ...sorted[0], isAutoDefault: true };

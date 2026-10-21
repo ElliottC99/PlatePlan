@@ -10,7 +10,7 @@ import { batchMergeIngredientsInDb } from '../../services/IngredientRepository.j
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export function openMergeIngredientsModal(issue = {}) {
-  const state = getState() || {};
+  const state = getState();
   const ingredients = state.ingredients || [];
   const products = state.products || [];
   const recipes = state.recipes || [];

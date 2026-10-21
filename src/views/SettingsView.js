@@ -1,5 +1,6 @@
+import store from "../store/store.js";
 /**
- * src/views/SettingsView.js (v3.20.14)
+ * src/views/SettingsView.js (v3.39.3)
  * Componentised Settings & Preferences View Function.
  * Composes modular profile components and handles persistence through HouseholdRepository.
  */
@@ -10,8 +11,11 @@ import { renderProfileAllocationCard } from '../components/settings/ProfileAlloc
 import { renderDietaryExclusionManager } from '../components/settings/DietaryExclusionManager.js';
 import { renderHouseholdSyncCard } from '../components/settings/HouseholdSyncCard.js';
 import { renderSystemDisplayCard, renderSettingsContainer } from '../components/profile/ProfileSettingsModal.js';
+import { renderMacroTargetsForm, renderFallbackProductsTable } from './SettingsRenderService.js';
 import { calculateMealSplit } from '../utils/nutritionCalculator.js';
 import { getProfileMealTargets } from '../models/StateModel.js';
+import { showCustomAlert, showCustomCopyModal } from '../components/pantry/IngredientActionModalsUI.js';
+
 
 // Setup global helpers for Settings interactive elements
 if (typeof window !== 'undefined') {
@@ -49,44 +53,44 @@ if (typeof window !== 'undefined') {
     const val = input.value.trim();
     if (!val) return;
     
-    window.state.userPrefs = window.state.userPrefs || {};
-    window.state.userPrefs.exclusions = window.state.userPrefs.exclusions || {};
-    window.state.userPrefs.exclusions.shared = window.state.userPrefs.exclusions.shared || [];
+    store.getState().userPrefs = store.getState().userPrefs || {};
+    store.getState().userPrefs.exclusions = store.getState().userPrefs.exclusions || {};
+    store.getState().userPrefs.exclusions.shared = store.getState().userPrefs.exclusions.shared || [];
     
-    const exists = window.state.userPrefs.exclusions.shared.some(x => {
+    const exists = store.getState().userPrefs.exclusions.shared.some(x => {
       const name = typeof x === 'string' ? x : (x.name || '');
       return name.toLowerCase() === val.toLowerCase();
     });
 
     if (!exists) {
-      window.state.userPrefs.exclusions.shared.push({ name: val });
+      store.getState().userPrefs.exclusions.shared.push({ name: val });
       input.value = '';
       renderSettingsView();
     }
   };
 
   window.handleRemoveExclusion = function(idx) {
-    if (!window.state?.userPrefs?.exclusions?.shared) return;
-    window.state.userPrefs.exclusions.shared.splice(idx, 1);
+    if (!store.getState()?.userPrefs?.exclusions?.shared) return;
+    store.getState().userPrefs.exclusions.shared.splice(idx, 1);
     renderSettingsView();
   };
 
   window.handleAutoDefaultCriterionChange = async function(val) {
-    if (!window.state) window.state = {};
-    if (!window.state.settings) window.state.settings = {};
-    if (!window.state.userPrefs) window.state.userPrefs = {};
+    if (!store.getState()) store.getState() = {};
+    if (!store.getState().settings) store.getState().settings = {};
+    if (!store.getState().userPrefs) store.getState().userPrefs = {};
 
-    window.state.settings.autoDefaultStrategy = val;
-    window.state.settings.autoDefaultCriterion = val;
-    window.state.userPrefs.autoDefaultStrategy = val;
-    window.state.userPrefs.autoDefaultCriterion = val;
+    store.getState().settings.autoDefaultStrategy = val;
+    store.getState().settings.autoDefaultCriterion = val;
+    store.getState().userPrefs.autoDefaultStrategy = val;
+    store.getState().userPrefs.autoDefaultCriterion = val;
     if (window.Store?.setState) {
-      window.Store.setState({ settings: { ...(window.Store.getState()?.settings || {}), autoDefaultStrategy: val, autoDefaultCriterion: val } });
+      window.Store.setState({ settings: { ...(window.Store.store.getState()?.settings || {}), autoDefaultStrategy: val, autoDefaultCriterion: val } });
     }
     if (typeof window.saveState === 'function') window.saveState();
 
     try {
-      await savePreferences({ ...window.state.userPrefs, settings: window.state.settings });
+      await savePreferences({ ...store.getState().userPrefs, settings: store.getState().settings });
     } catch (err) {
       console.warn('[SettingsView] Failed saving auto-default strategy preference:', err);
     }
@@ -125,35 +129,40 @@ if (typeof window !== 'undefined') {
     if (btn) { btn.disabled = false; btn.textContent = '⚡ Recalibrate All Defaults Now'; }
   };
 
-  window.generateHouseholdInviteLink = function() {
-    const householdId = window.activeHouseholdId || 'elliott-chloe';
-    const url = `${window.location.origin}${window.location.pathname}?household=${encodeURIComponent(householdId)}`;
-    navigator.clipboard.writeText(url).then(() => {
-      if (typeof window.showPlatePlanToast === 'function') {
-        window.showPlatePlanToast('Household invite link copied to clipboard!');
-      } else {
-        alert('Household invite link copied to clipboard!');
-      }
-    }).catch(() => {
-      alert(`Household Invite Link:\n${url}`);
-    });
-  };
+}
+  
+export function generateHouseholdInviteLink() {
+  const householdId = window.activeHouseholdId || 'elliott-chloe';
+  const url = `${window.location.origin}${window.location.pathname}?household=${encodeURIComponent(householdId)}`;
+  navigator.clipboard.writeText(url).then(() => {
+    if (typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast('Household invite link copied to clipboard!');
+    } else if (typeof showCustomAlert === 'function') {
+      showCustomAlert('Household invite link copied to clipboard!');
+    }
+  }).catch(() => {
+    if (typeof showCustomCopyModal === 'function') {
+      showCustomCopyModal('Household Invite Link', url);
+    }
+  });
 }
 
 export function renderSettingsView() {
   const container = document.getElementById('view-prefs') || document.getElementById('view-settings');
   if (!container) return;
 
-  const prefs = window.state?.userPrefs || {};
-  const settings = window.state?.settings || {};
+  const prefs = store.getState()?.userPrefs || {};
+  const settings = store.getState()?.settings || {};
 
   // Delegate directly to ES6 modular components
   const householdHtml = renderHouseholdSyncCard(settings);
   const dietaryHtml = renderDietaryExclusionManager(prefs, settings);
   const profileHtml = renderProfileAllocationCard(prefs);
-  const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.30.0 (ES6 Modern)');
+  const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.39.6 (ES6 Modern)');
+  const macrosHtml = renderMacroTargetsForm(prefs.macroTargets);
+  const fallbackHtml = renderFallbackProductsTable(prefs.fallbackProducts);
 
-  container.innerHTML = renderSettingsContainer(householdHtml, dietaryHtml, profileHtml, systemHtml);
+  container.innerHTML = renderSettingsContainer(householdHtml, dietaryHtml, profileHtml, systemHtml, macrosHtml, fallbackHtml);
 
   // Attach Recipe Audit modal listener
   const recipeAuditBtn = container.querySelector('#pp-recipe-audit-btn');
@@ -172,17 +181,17 @@ export function renderSettingsView() {
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving...';
 
-      window.state.userPrefs = window.state.userPrefs || {};
-      window.state.userPrefs.diet = container.querySelector('#pp-setting-diet')?.value || 'none';
-      window.state.userPrefs.glutenFree = !!container.querySelector('#pp-setting-gf')?.checked;
-      window.state.userPrefs.dairyFree = !!container.querySelector('#pp-setting-df')?.checked;
-      window.state.userPrefs.nutFree = !!container.querySelector('#pp-setting-nutfree')?.checked;
+      store.getState().userPrefs = store.getState().userPrefs || {};
+      store.getState().userPrefs.diet = container.querySelector('#pp-setting-diet')?.value || 'none';
+      store.getState().userPrefs.glutenFree = !!container.querySelector('#pp-setting-gf')?.checked;
+      store.getState().userPrefs.dairyFree = !!container.querySelector('#pp-setting-df')?.checked;
+      store.getState().userPrefs.nutFree = !!container.querySelector('#pp-setting-nutfree')?.checked;
       const autoDefCrit = container.querySelector('#auto-default-strategy')?.value || container.querySelector('#pp-setting-auto-default-criterion')?.value || 'lowest_absolute_price';
-      window.state.userPrefs.autoDefaultStrategy = autoDefCrit;
-      window.state.userPrefs.autoDefaultCriterion = autoDefCrit;
-      if (!window.state.settings) window.state.settings = {};
-      window.state.settings.autoDefaultStrategy = autoDefCrit;
-      window.state.settings.autoDefaultCriterion = autoDefCrit;
+      store.getState().userPrefs.autoDefaultStrategy = autoDefCrit;
+      store.getState().userPrefs.autoDefaultCriterion = autoDefCrit;
+      if (!store.getState().settings) store.getState().settings = {};
+      store.getState().settings.autoDefaultStrategy = autoDefCrit;
+      store.getState().settings.autoDefaultCriterion = autoDefCrit;
 
       const profiles = {};
       ['elliott', 'chloe'].forEach(pId => {
@@ -213,16 +222,16 @@ export function renderSettingsView() {
         };
       });
 
-      window.state.preferences = window.state.preferences || {};
-      window.state.preferences.profiles = profiles;
-      window.state.userPrefs = window.state.userPrefs || {};
-      window.state.userPrefs.profiles = profiles;
+      store.getState().preferences = store.getState().preferences || {};
+      store.getState().preferences.profiles = profiles;
+      store.getState().userPrefs = store.getState().userPrefs || {};
+      store.getState().userPrefs.profiles = profiles;
 
       // Legacy backwards-compatibility
-      window.state.userPrefs.elliottCal = profiles.elliott.dailyKcal;
-      window.state.userPrefs.elliottProt = profiles.elliott.dailyProtein;
-      window.state.userPrefs.chloeCal = profiles.chloe.dailyKcal;
-      window.state.userPrefs.chloeProt = profiles.chloe.dailyProtein;
+      store.getState().userPrefs.elliottCal = profiles.elliott.dailyKcal;
+      store.getState().userPrefs.elliottProt = profiles.elliott.dailyProtein;
+      store.getState().userPrefs.chloeCal = profiles.chloe.dailyKcal;
+      store.getState().userPrefs.chloeProt = profiles.chloe.dailyProtein;
 
       const nutritionTargets = {};
       for (const [pId, pData] of Object.entries(profiles)) {
@@ -248,23 +257,23 @@ export function renderSettingsView() {
         };
       }
 
-      window.state.userPrefs.nutritionTargets = nutritionTargets;
-      window.state.preferences.nutritionTargets = nutritionTargets;
+      store.getState().userPrefs.nutritionTargets = nutritionTargets;
+      store.getState().preferences.nutritionTargets = nutritionTargets;
 
-      window.state.settings = window.state.settings || {};
+      store.getState().settings = store.getState().settings || {};
       const newTheme = container.querySelector('#pp-setting-theme')?.value || 'system';
-      window.state.settings.theme = newTheme;
+      store.getState().settings.theme = newTheme;
       applyTheme(newTheme);
 
-      console.log('[Settings v3.16.0] Saved user profiles & decoupled splits to state:', window.state.userPrefs.profiles);
+      console.log('[Settings v3.16.0] Saved user profiles & decoupled splits to state:', store.getState().userPrefs.profiles);
       
       // Persist to Firestore
-      await savePreferences(window.state.userPrefs, window.state.settings);
+      await savePreferences(store.getState().userPrefs, store.getState().settings);
 
       // Dispatch CustomEvent to notify PlannerView and all reactive listeners
-      document.dispatchEvent(new CustomEvent('plateplan:state:preferences', { detail: window.state.userPrefs }));
-      document.dispatchEvent(new CustomEvent('plateplan:state-changed', { detail: { type: 'preferences', data: window.state.userPrefs } }));
-      window.dispatchEvent(new CustomEvent('plateplan:preferences-updated', { detail: window.state.userPrefs }));
+      document.dispatchEvent(new CustomEvent('plateplan:state:preferences', { detail: store.getState().userPrefs }));
+      document.dispatchEvent(new CustomEvent('plateplan:state-changed', { detail: { type: 'preferences', data: store.getState().userPrefs } }));
+      window.dispatchEvent(new CustomEvent('plateplan:preferences-updated', { detail: store.getState().userPrefs }));
 
       if (typeof window.renderPlanner === 'function') {
         try { window.renderPlanner(); } catch(_e) {}
@@ -288,8 +297,8 @@ export function renderSettingsView() {
     themeSelect.onchange = (e) => {
       const selectedTheme = e.target.value || 'system';
       applyTheme(selectedTheme);
-      window.state.settings = window.state.settings || {};
-      window.state.settings.theme = selectedTheme;
+      store.getState().settings = store.getState().settings || {};
+      store.getState().settings.theme = selectedTheme;
     };
   }
 
@@ -300,6 +309,12 @@ export function renderSettingsView() {
       console.log('[Settings v3.14.3] Triggering household data refresh...');
       hydrateHouseholdData();
     };
+  }
+
+  // Attach Invite Link listener
+  const inviteBtn = container.querySelector('[data-action="generate-invite-link"]');
+  if (inviteBtn) {
+    inviteBtn.onclick = () => generateHouseholdInviteLink();
   }
 }
 

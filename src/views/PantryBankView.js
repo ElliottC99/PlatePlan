@@ -37,7 +37,7 @@ const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
 
 export function openAddPantryStockModal() {
-  const state = getState() || {};
+  const state = getState();
   openStockModalUI(state.ingredients || []);
 }
 
@@ -87,15 +87,27 @@ export function renderIngredientBank() {
   const container = document.getElementById('ingredient-groups-list');
   if (!container) return;
 
-  const state = getState() || {}, ingredients = state.ingredients || [], products = state.products || [], inventory = state.inventory || [];
+  const state = getState(), ingredients = state.ingredients || [], products = state.products || [], inventory = state.inventory || [];
 
   if (ingredients.length === 0) {
     container.innerHTML = `<div class="card" style="padding:32px 20px;text-align:center;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:14px;margin-top:12px;">
       <div style="font-size:32px;margin-bottom:8px">🏛️</div>
       <h3 style="font-size:16px;font-weight:700;margin:0 0 6px 0">No items in Pantry Bank</h3>
       <p style="font-size:12.5px;color:var(--text2,#78716c);margin:0 0 12px 0">Add Categories, Items, and Sub-types to build your master Pantry Bank catalog.</p>
-      <button class="btn primary sm" type="button" onclick="createIngredientFamilyPrompt()">+ Add Item</button>
+      <button class="btn primary sm" type="button" data-action="create-ingredient-family">+ Add Item</button>
     </div>`;
+
+    if (!container.hasAttribute('data-delegated')) {
+      container.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-action]');
+        if (!target) return;
+        const action = target.dataset.action;
+        if (action === 'create-ingredient-family') {
+          if (typeof window.createIngredientFamilyPrompt === 'function') window.createIngredientFamilyPrompt();
+        }
+      });
+      container.setAttribute('data-delegated', 'true');
+    }
     return;
   }
 
@@ -116,7 +128,7 @@ let searchDebounceTimer = null;
 
 export function filterPantryBankDOM(rawQuery = '') {
   const q = String(rawQuery || '').trim().toLowerCase();
-  const state = getState() || {};
+  const state = getState();
   const ingredients = state.ingredients || [];
   const products = state.products || [];
   const inventory = state.inventory || [];

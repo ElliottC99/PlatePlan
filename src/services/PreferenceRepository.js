@@ -198,7 +198,7 @@ export async function getHouseholdData() {
       try {
         const netPromise = ref.get();
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Firestore timeout')), 2500)
+          setTimeout(() => reject(new Error('Firestore timeout')), NETWORK_TIMEOUT_MS)
         );
         return await Promise.race([netPromise, timeoutPromise]);
       } catch (_e) {

@@ -10,6 +10,8 @@
 import { getState, toggleShoppingItem, addManualShoppingItem, updateShoppingItemQty, setShoppingList } from '../../store/store.js';
 import { generateShoppingListFromPlan, AISLE_CATEGORIES } from '../../services/ShoppingListService.js';
 import { getShoppingLists } from '../../repositories/ShoppingListRepository.js';
+import { showCustomAlert } from '../pantry/IngredientActionModalsUI.js';
+
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -28,7 +30,7 @@ function escapeAttr(str) {
 export function renderShoppingListView(container) {
   if (!container) return;
 
-  const state = getState() || {};
+  const state = getState();
   const shoppingList = state.shoppingList || [];
   const activePlan = state.currentPlan || state.plan;
   const inventory = state.inventory || [];
@@ -134,10 +136,11 @@ function bindShoppingListEvents(container) {
   const btnGen = container.querySelector('#btn-generate-shopping');
   if (btnGen) {
     btnGen.onclick = () => {
-      const state = getState() || {};
+      const state = getState();
       const activePlan = state.currentPlan || state.plan;
       if (!activePlan) {
-        alert('No active meal plan found. Please create or generate a meal plan first.');
+        if (typeof showCustomAlert === 'function') showCustomAlert('No active meal plan found. Please create or generate a meal plan first.');
+
         return;
       }
       const newList = generateShoppingListFromPlan(activePlan, state.inventory || [], state.recipes || [], state.ingredients || []);
@@ -160,7 +163,8 @@ function bindShoppingListEvents(container) {
 
       const name = nameInput?.value?.trim();
       if (!name) {
-        alert('Please enter a custom item name.');
+        if (typeof showCustomAlert === 'function') showCustomAlert('Please enter a custom item name.');
+
         return;
       }
 

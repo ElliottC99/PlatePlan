@@ -3,9 +3,10 @@
  * IndexedDB cache management for application state.
  */
 
+import { DB_VERSION } from '../config/systemConfig.js';
+
 const DB_NAME = 'PlatePlanDB';
 const STORE_NAME = 'StateStore';
-const DB_VERSION = 1;
 export const CACHE_KEY = 'plateplan_store_cache_v3.35.4';
 
 function openIDB() {

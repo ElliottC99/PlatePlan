@@ -273,8 +273,5 @@ export function checkStockCubeWaterRequirement(ingredient) {
   return { requiresWaterInput: false };
 }
 
-if (typeof window !== 'undefined') {
-  window.formatGarlicQuantity = formatGarlicQuantity;
-  window.checkStockCubeWaterRequirement = checkStockCubeWaterRequirement;
-}
+
 

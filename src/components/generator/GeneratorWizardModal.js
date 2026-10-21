@@ -23,7 +23,7 @@ function escapeHtml(str) {
  * Returns the current active wizard step (1 to 4).
  */
 export function getPlannerWizardStep(stateObj = null) {
-  const current = stateObj || (typeof window !== 'undefined' ? window.state : null);
+  const current = stateObj || (typeof window !== 'undefined' ? getState() : null);
   if (current?.plannerStep && [1, 2, 3, 4].includes(current.plannerStep)) {
     return current.plannerStep;
   }
@@ -39,7 +39,7 @@ export function getPlannerWizardStep(stateObj = null) {
 export function setPlannerWizardStep(step) {
   const nextStep = Math.max(1, Math.min(4, step));
   if (typeof state !== 'undefined' && state) state.plannerStep = nextStep;
-  if (typeof window !== 'undefined' && window.state) window.state.plannerStep = nextStep;
+  if (typeof window !== 'undefined' && getState()) getState().currentPlannerStep = nextStep;
   if (typeof window !== 'undefined' && typeof window.renderPlannerWizard === 'function') {
     window.renderPlannerWizard();
   }

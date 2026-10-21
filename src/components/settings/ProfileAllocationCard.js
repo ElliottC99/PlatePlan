@@ -137,8 +137,8 @@ function renderSingleProfileCard(profileId, profile = {}) {
  */
 export function renderProfileAllocationCard(prefs = {}) {
   const profiles = prefs.profiles ||
-    window.state?.preferences?.profiles ||
-    window.state?.userPrefs?.profiles || {};
+    getState()?.preferences?.profiles ||
+    getState()?.userPrefs?.profiles || {};
 
   const elliottProf = profiles.elliott || {
     name: 'Elliott',

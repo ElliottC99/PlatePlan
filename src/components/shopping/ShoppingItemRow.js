@@ -55,7 +55,7 @@ export function renderShoppingItemRow(item) {
         ${costDisplay}
       </div>
       <div class="swap-dropdown" style="flex-shrink: 0;">
-        <button type="button" class="btn sm ghost" style="font-size: 11px; padding: 4px 8px;" data-action="toggle-inline-subst" data-item-key="${escapeAttr(item.key)}" data-group-id="${escapeAttr(item.groupId || '')}" onclick="toggleInlineShoppingSubst('${escapeAttr(item.key)}', '${escapeAttr(item.groupId || '')}')">Swap Brand ▾</button>
+        <button type="button" class="btn sm ghost" style="font-size: 11px; padding: 4px 8px;" data-action="toggle-inline-subst" data-item-key="${escapeAttr(item.key)}" data-group-id="${escapeAttr(item.groupId || '')}" onclick="toggleInlineShoppingSubst('${escapeAttr(item.key)}', '${escapeAttr(item.groupId || '')}')">Swap Product ▾</button>
       </div>
     </div>
     ${hasBreakdown ? `

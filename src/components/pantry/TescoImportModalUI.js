@@ -43,7 +43,7 @@ function formatBrandProductLabel(p) {
 }
 
 export function openSubtypeLinkSelectionModal(subtypeId, parentId) {
-  const state = getState() || {};
+  const state = getState();
   const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
   const subName = subtypeId 
     ? parent?.subtypes?.find(s => String(s.id) === String(subtypeId))?.name 
@@ -90,7 +90,7 @@ export function openSubtypeLinkSelectionModal(subtypeId, parentId) {
 }
 
 export function openSubtypeExistingProductPickerModal(subtypeId, parentId) {
-  const state = getState() || {};
+  const state = getState();
   const products = Array.isArray(state.products) ? state.products : [];
   const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
   const subName = subtypeId 
@@ -191,7 +191,7 @@ export function openSubtypeExistingProductPickerModal(subtypeId, parentId) {
 }
 
 export function openTescoImportModal(subtypeId, parentId) {
-  const state = getState() || {};
+  const state = getState();
   const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
   const parentCategory = parent?.category || 'General';
   const subName = subtypeId 

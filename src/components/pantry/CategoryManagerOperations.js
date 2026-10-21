@@ -30,7 +30,7 @@ function resolveCategory(id) {
 
 export async function submitAddCat(val) {
   if (!val) return;
-  const state = getState() || {}, categories = Array.isArray(state.categories) ? [...state.categories] : [];
+  const state = getState(), categories = Array.isArray(state.categories) ? [...state.categories] : [];
   if (!categories.some(c => slugCategory(c) === slugCategory(val))) {
     categories.push(toCanonicalCategoryName(val));
     setCategories(categories);

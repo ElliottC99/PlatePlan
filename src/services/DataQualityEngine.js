@@ -5,6 +5,7 @@
  */
 
 import { calculateRecipeDynamicMacros } from './DataQualityScannerService.js';
+import { DQ_CONFIDENCE_THRESHOLD } from '../config/businessRules.js';
 
 /**
  * Fallback Macro Resolution Helper
@@ -290,7 +291,7 @@ export function runAudit(state = {}) {
       const ing1 = ingredients[i];
       const ing2 = ingredients[j];
       const score = getStringSimilarity(ing1.name, ing2.name);
-      if (score > 0.85) {
+      if (score > DQ_CONFIDENCE_THRESHOLD) {
         results.duplicates.push({
           key: `duplicate:ing:${ing1.id}:${ing2.id}`,
           ing1Id: ing1.id,
