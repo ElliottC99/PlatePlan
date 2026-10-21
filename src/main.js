@@ -287,7 +287,7 @@ function setupSubscriptions() {
   subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
 }
 
-export const APP_VERSION = 'v3.40.32';
+export const APP_VERSION = 'v3.40.33';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
@@ -328,7 +328,7 @@ async function initApp() {
     let hydrationRes = null;
     try {
       await waitForAuth();
-      hydrationRes = await hydrateHouseholdData();
+      hydrationRes = await hydrateHouseholdData({ force: true });
     } catch (syncErr) {
       console.error('[Boot] Hydration sequence failed:', syncErr);
     }
