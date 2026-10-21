@@ -1,10 +1,9 @@
 /**
  * src/components/settings/HouseholdSyncCard.js (v3.9.2)
  * Modular ES6 component for household account sync.
- * - Handles active member badges and sync telemetry status
- * - Multi-device invitations and secure link copy triggers
- * - Offline localStorage & index cache capacity gauge meter
  */
+
+import { getState } from '../../store/coreState.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({

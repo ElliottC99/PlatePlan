@@ -58,9 +58,9 @@ export function renderPlannerWizard() {
   let stepContentHtml = '';
 
   if (currentStep === 1) {
-    const daysVal = getState().currentPlannerDays .currentPlan?.days || 10;
+    const daysVal = getState().currentPlan?.days || 10;
     const today = new Date().toISOString().split('T')[0];
-    const startVal = getState().currentPlannerStartDate .currentPlan?.dayDates?.[1] || today;
+    const startVal = getState().currentPlan?.dayDates?.[1] || today;
     const cadence = getState()?.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
     const minFitScore = getState()?.prefs?.minFitScore || 0;
     const activeExclusions = typeof window.getActiveWizardExclusions === 'function' ? window.getActiveWizardExclusions() : [];
