@@ -144,7 +144,7 @@ export function renderPlan() {
     let hasValidSlots = false;
 
     let html = '';
-    if (getState().isDraftPlan .draftPlan) {
+    if (getState().isDraftPlan || getState().draftPlan) {
       html += renderDraftPlanBanner();
     }
 

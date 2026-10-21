@@ -1,3 +1,4 @@
+import { getState } from '../store/coreState.js';
 import store from "../store/store.js";
 /**
  * src/services/HydrationService.js (v3.38.5)
@@ -48,8 +49,8 @@ export function getCategoryName(cat) {
 
 export async function sweepAndRecalibrateIngredientDefaults() {
   const state = window.Store?.getState?.() || {};
-  const ingredients = state.ingredients || (store.getState()?.ingredients || []);
-  const products = state.products || (store.getState()?.products || []);
+  const ingredients = state.ingredients || (getState()?.ingredients || []);
+  const products = state.products || (getState()?.products || []);
   const criterion = state.settings?.autoDefaultStrategy || state.settings?.autoDefaultCriterion || state.userPrefs?.autoDefaultStrategy || state.userPrefs?.autoDefaultCriterion ?.settings?.autoDefaultStrategy ?.settings?.autoDefaultCriterion ?.userPrefs?.autoDefaultStrategy ?.userPrefs?.autoDefaultCriterion || 'lowest_absolute_price';
   let updatedCount = 0;
 
@@ -77,7 +78,7 @@ export async function sweepAndRecalibrateIngredientDefaults() {
 
   if (updatedCount > 0) {
     setIngredients(updatedIngredients);
-    if (store.getState()) store.getState().ingredients = updatedIngredients;
+    if (getState()) getState().ingredients = updatedIngredients;
     try {
       for (const ing of updatedIngredients) {
         if (ing.defaultProductId) {
@@ -217,40 +218,40 @@ export async function hydrateHouseholdData(options = {}) {
       }
 
       if (typeof window !== 'undefined') {
-        if (!store.getState()) { try { store.getState() = {}; } catch (e) {} }
+        if (!getState()) { try { getState() = {}; } catch (e) {} }
         const docData = sanitizedPrefs || {};
         const userPrefs = docData.userPrefs || docData;
-        store.getState().settings = { ...(store.getState().settings || {}), ...(docData.settings || {}) };
+        getState().settings = { ...(getState().settings || {}), ...(docData.settings || {}) };
         const strat = userPrefs.autoDefaultStrategy || userPrefs.autoDefaultCriterion || docData.settings?.autoDefaultStrategy || docData.settings?.autoDefaultCriterion;
         if (strat) {
-          store.getState().settings.autoDefaultStrategy = strat;
-          store.getState().settings.autoDefaultCriterion = strat;
-          if (!store.getState().userPrefs) store.getState().userPrefs = {};
-          store.getState().userPrefs.autoDefaultStrategy = strat;
-          store.getState().userPrefs.autoDefaultCriterion = strat;
+          getState().settings.autoDefaultStrategy = strat;
+          getState().settings.autoDefaultCriterion = strat;
+          if (!getState().userPrefs) getState().userPrefs = {};
+          getState().userPrefs.autoDefaultStrategy = strat;
+          getState().userPrefs.autoDefaultCriterion = strat;
         }
         const cloudHasData = (Array.isArray(recipes) && recipes.length > 0) || (Array.isArray(ingredients) && ingredients.length > 0) || Boolean(plan);
         if (cloudHasData) {
-          store.getState().isCloudHydrated = true;
+          getState().isCloudHydrated = true;
         }
-        store.getState().ingredients = ingredients;
-        store.getState().products = products;
-        store.getState().categories = mergedCategories;
+        getState().ingredients = ingredients;
+        getState().products = products;
+        getState().categories = mergedCategories;
         if (plan && typeof plan === 'object') {
-          store.getState().currentPlan = plan;
+          getState().currentPlan = plan;
           if (plan.skeletonGrid && typeof plan.skeletonGrid === 'object') {
-            store.getState().skeletonGrid = plan.skeletonGrid;
+            getState().skeletonGrid = plan.skeletonGrid;
           }
         }
 
-        window.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: store.getState().ingredients }));
+        window.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: getState().ingredients }));
         window.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: products }));
 
-        store.getState().userPrefs = {
-          ...store.getState().userPrefs,
+        getState().userPrefs = {
+          ...getState().userPrefs,
           ...userPrefs,
-          favouriteVariantIds: Array.isArray(userPrefs.favouriteVariantIds) ? userPrefs.favouriteVariantIds : (store.getState().userPrefs?.favouriteVariantIds || []),
-          favourites: Array.isArray(userPrefs.favourites) ? userPrefs.favourites : (store.getState().userPrefs?.favourites || [])
+          favouriteVariantIds: Array.isArray(userPrefs.favouriteVariantIds) ? userPrefs.favouriteVariantIds : (getState().userPrefs?.favouriteVariantIds || []),
+          favourites: Array.isArray(userPrefs.favourites) ? userPrefs.favourites : (getState().userPrefs?.favourites || [])
         };
 
         const rawProfiles = docData.profiles || userPrefs.profiles || {};
@@ -268,7 +269,7 @@ export async function hydrateHouseholdData(options = {}) {
             mealSplits: docMealSplits[pid] || rawProfiles[pid]?.mealSplits || { breakfast: 0.25, lunch: 0.35, dinner: 0.40 }
           };
         });
-        store.getState().profiles = hydratedProfiles;
+        getState().profiles = hydratedProfiles;
       }
 
       setupRealtimeSubscriptions();
@@ -298,27 +299,27 @@ function setupRealtimeSubscriptions() {
   try {
     unsubs.push(subscribeRecipes((recipes) => {
       setRecipes(recipes.map(cleanLegacyMacros));
-      if (store.getState()) store.getState().recipes = recipes;
+      if (getState()) getState().recipes = recipes;
     }));
 
     unsubs.push(subscribeIngredients((ingredients) => {
       const normIngs = (ingredients || []).map(normalizeIngredientRecord);
       setIngredients(normIngs);
-      if (store.getState()) store.getState().ingredients = normIngs;
+      if (getState()) getState().ingredients = normIngs;
     }));
 
     unsubs.push(subscribeProducts((products) => {
       const normProds = (products || []).map(normalizeProductRecord);
       setProducts(normProds);
-      if (store.getState()) store.getState().products = normProds;
+      if (getState()) getState().products = normProds;
     }));
 
     unsubs.push(subscribePreferences((prefs) => {
       if (prefs) {
         const sanitized = sanitizePreferences(prefs);
         setPreferences(sanitized);
-        if (store.getState()) {
-          store.getState().settings = { ...(store.getState().settings || {}), ...(sanitized.settings || {}) };
+        if (getState()) {
+          getState().settings = { ...(getState().settings || {}), ...(sanitized.settings || {}) };
         }
       }
     }));
@@ -326,9 +327,9 @@ function setupRealtimeSubscriptions() {
     unsubs.push(subscribeCurrentPlan((plan) => {
       if (plan) {
         setCurrentPlan(plan);
-        if (store.getState()) {
-          store.getState().currentPlan = plan;
-          if (plan.skeletonGrid) store.getState().skeletonGrid = plan.skeletonGrid;
+        if (getState()) {
+          getState().currentPlan = plan;
+          if (plan.skeletonGrid) getState().skeletonGrid = plan.skeletonGrid;
         }
       }
     }));

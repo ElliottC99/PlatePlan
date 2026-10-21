@@ -10,8 +10,8 @@ import { invalidateHierarchyCache } from '../models/PantryHierarchyModel.js';
 
 export async function deleteSubtype(parentId, subtypeId) {
   try {
-    const state = store.getState();
-    let ingredients = (state.ingredients && state.ingredients.length) ? state.ingredients : (store.getState()?.ingredients || []);
+    const state = getState();
+    let ingredients = (state.ingredients && state.ingredients.length) ? state.ingredients : (getState()?.ingredients || []);
     
     // Try finding the parent by parentId first
     let parent = ingredients.find(i => String(i.id) === String(parentId));

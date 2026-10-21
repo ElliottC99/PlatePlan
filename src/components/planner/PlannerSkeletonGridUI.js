@@ -4,6 +4,7 @@
  * and Split Household Slot Configurator (Elliott & Chloe) with Unified Fit & Duplication Badges.
  * Decomposed: Rendering factories moved to PlannerGridRenderService.js.
  */
+import { getState } from '../../store/coreState.js';
 
 import { saveCurrentPlan } from '../../services/HouseholdRepository.js';
 import { 

@@ -1,3 +1,4 @@
+import { getState } from '../store/coreState.js';
 import store from "../store/store.js";
 /**
  * src/utils/nutritionCalculator.js (v3.15.3)
@@ -24,10 +25,10 @@ export const DEFAULT_MEAL_SPLITS = Object.freeze({
  */
 export function resolveMealSplitPercentages(userPreferences = {}, person = null) {
   const globalStatePrefs = (typeof window !== 'undefined' && (
-    store.getState()?.preferences?.mealSplits ||
-    store.getState()?.userPrefs?.mealSplits ||
-    store.getState()?.preferences ||
-    store.getState()?.userPrefs
+    getState()?.preferences?.mealSplits ||
+    getState()?.userPrefs?.mealSplits ||
+    getState()?.preferences ||
+    getState()?.userPrefs
   )) || {};
 
   const passedSplits = userPreferences?.mealSplits || userPreferences?.splits || userPreferences || {};
@@ -36,7 +37,7 @@ export function resolveMealSplitPercentages(userPreferences = {}, person = null)
   const profile = (person && (
     passedSplits.profiles?.[person] ||
     globalStatePrefs.profiles?.[person] ||
-    (typeof window !== 'undefined' && (store.getState()?.preferences?.profiles?.[person] ?.userPrefs?.profiles?.[person]))
+    (typeof window !== 'undefined' && (getState()?.preferences?.profiles?.[person] ?.userPrefs?.profiles?.[person]))
   )) || null;
 
   if (profile) {

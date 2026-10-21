@@ -3,6 +3,7 @@
  * UI component for meal slot cards, dual-profile portion badges,
  * meal type labels, and recipe swap/clear triggers.
  */
+import { getState } from '../../store/coreState.js';
 
 import { calculateMealFitScore, extractRecipeMacros } from '../../utils/fitScoreCalculator.js';
 import { renderFitScoreBadge } from '../FitScoreBadge.js';

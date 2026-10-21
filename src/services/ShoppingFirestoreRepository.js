@@ -1,3 +1,4 @@
+import { getState } from '../store/coreState.js';
 import store from "../store/store.js";
 /**
  * src/services/ShoppingFirestoreRepository.js (v3.38.52)
@@ -121,7 +122,7 @@ export async function getProducts() {
     const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('products');
     const snap = await safeFirestoreGet(colRef);
     const raw = (snap && snap.docs) ? snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) : [];
-    const ings = (typeof window !== 'undefined' && store.getState()?.ingredients) || [];
+    const ings = (typeof window !== 'undefined' && getState()?.ingredients) || [];
     const enforced = enforceCategorySSOT({ ingredients: ings, products: raw });
     return enforced.products;
   } catch (err) {
@@ -134,7 +135,7 @@ export async function saveProduct(product) {
   try {
     if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
     if (!product || typeof product !== 'object') return { success: false, error: 'Invalid product data' };
-    const enforced = enforceCategorySSOT({ ingredients: (typeof window !== 'undefined' && store.getState()?.ingredients) || [], products: [product] });
+    const enforced = enforceCategorySSOT({ ingredients: (typeof window !== 'undefined' && getState()?.ingredients) || [], products: [product] });
     const finalProd = enforced.products[0] || product;
     const prodData = { ...finalProd, updatedAt: new Date().toISOString() };
     const prodId = product.id || db.collection('households').doc(HOUSEHOLD_ID).collection('products').doc().id;

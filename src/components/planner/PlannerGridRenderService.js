@@ -3,6 +3,7 @@
  * Pure rendering service for the Planner Skeleton Grid UI.
  * Isolates HTML template factories from event handling logic.
  */
+import { getState } from '../../store/coreState.js';
 
 import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
 import { renderFitScoreBadge } from '../FitScoreBadge.js';

@@ -6,6 +6,7 @@
  * - Macro target fit score tolerance & filter options
  * - Slot exclusions, pinned recipes, and pantry use-up ingredient tags
  */
+import { getState } from '../../store/coreState.js';
 
 import { renderFitScoreScopeUI, renderSkeletonGridUI } from '../planner/PlannerSkeletonGridUI.js';
 import store from '../../store/store.js';
@@ -137,7 +138,7 @@ export function bindConstraintEvents(container, onRender) {
     input.onchange = (e) => {
       const key = e.target.dataset.key;
       const val = e.target.value;
-      const state = store.getState();
+      const state = getState();
       if (key === 'plannerDays') state.currentPlannerDays = parseInt(val) || 7;
       if (key === 'plannerStartDate') state.currentPlannerStartDate = val;
       if (typeof window.saveState === 'function') window.saveState();

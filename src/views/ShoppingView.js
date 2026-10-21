@@ -4,6 +4,7 @@
  * Real-time state synchronisation with Household Meal Plan and Reactive Store.
  * Categorised groceries with clean 'Items I Already Have' separation.
  */
+import { getState } from '../store/coreState.js';
 
 import { renderScrollableSwapModal, executeSwapInState, resolveTargetItem, calculateMetrics } from '../components/ProductSwapModal.js';
 import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';

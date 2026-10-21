@@ -1,3 +1,4 @@
+import { getState } from '../store/coreState.js';
 import store from "../store/store.js";
 /**
  * src/views/RecipeVaultView.js (v3.20.15)
@@ -19,27 +20,27 @@ export { renderVaultRecipeCard, renderVaultGridContainer, VaultFilterToolbar, ca
 let currentRecipeSearchQuery = '';
 
 export function hasVariantFavoritingInitialized() {
-  const prefs = store.getState()?.userPrefs ?.prefs || {};
+  const prefs = getState()?.userPrefs ?.prefs || {};
   const list = prefs.favouriteVariantIds || prefs.favoriteVariantIds;
   return Array.isArray(list);
 }
 
 export function ensureVariantFavoritingPrefs() {
-  if (!store.getState()) try { store.getState() = {}; } catch (e) {}
-  if (!store.getState().prefs) store.getState().prefs = {};
-  if (!store.getState().userPrefs) store.getState().userPrefs = store.getState().prefs;
-  const prefs = store.getState().userPrefs;
+  if (!getState()) try { getState() = {}; } catch (e) {}
+  if (!getState().prefs) getState().prefs = {};
+  if (!getState().userPrefs) getState().userPrefs = getState().prefs;
+  const prefs = getState().userPrefs;
   const existing = prefs.favouriteVariantIds || prefs.favoriteVariantIds;
   if (!Array.isArray(existing)) {
-    prefs.favouriteVariantIds = (store.getState().recipes || [])
+    prefs.favouriteVariantIds = (getState().recipes || [])
       .filter(r => r?.id && (r.isFavourite || r.isFavorite))
       .map(r => `${r.id}_original`);
   } else {
     prefs.favouriteVariantIds = existing;
   }
-  store.getState().prefs.favouriteVariantIds = prefs.favouriteVariantIds;
-  store.getState().userPrefs.favoriteVariantIds = prefs.favouriteVariantIds;
-  store.getState().prefs.favoriteVariantIds = prefs.favouriteVariantIds;
+  getState().prefs.favouriteVariantIds = prefs.favouriteVariantIds;
+  getState().userPrefs.favoriteVariantIds = prefs.favouriteVariantIds;
+  getState().prefs.favoriteVariantIds = prefs.favouriteVariantIds;
   return prefs.favouriteVariantIds;
 }
 
@@ -54,7 +55,7 @@ export async function toggleRecipeFavourite(recipeId, event, variantKey = 'origi
     event.stopPropagation();
     event.preventDefault();
   }
-  const r = (store.getState()?.recipes || []).find(x => x.id === recipeId);
+  const r = (getState()?.recipes || []).find(x => x.id === recipeId);
   if (!r) return;
   const list = ensureVariantFavoritingPrefs();
   const key = `${recipeId}_${variantKey}`;
@@ -70,15 +71,15 @@ export async function toggleRecipeFavourite(recipeId, event, variantKey = 'origi
   r.isFavorite = isNowFav;
   r.updatedAt = new Date().toISOString();
 
-  if (store.getState()?.userPrefs) {
+  if (getState()?.userPrefs) {
     try {
-      await savePreferences(store.getState().userPrefs, store.getState().settings || {});
+      await savePreferences(getState().userPrefs, getState().settings || {});
     } catch (e) {
       console.warn('[RecipeVault v3.8.6] Failed to save favorite preferences:', e);
     }
   }
 
-  document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: store.getState()?.recipes }));
+  document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: getState()?.recipes }));
   renderRecipeVault();
 
   if (typeof window.previewBaseRecipe !== 'undefined' && window.previewBaseRecipe && window.previewBaseRecipe.id === recipeId) {
@@ -179,9 +180,9 @@ export function handleRecipeSearch(query) {
   currentRecipeSearchQuery = (query || '').toLowerCase().trim();
 
   const state = (window.Store && typeof window.Store.getState === 'function')
-    ? window.Store.store.getState()
+    ? window.Store.getState()
     : {};
-  const recipes = Array.isArray(state.recipes) ? state.recipes : (store.getState()?.recipes || []);
+  const recipes = Array.isArray(state.recipes) ? state.recipes : (getState()?.recipes || []);
 
   const filtered = recipes.filter(recipe => {
     if (!currentRecipeSearchQuery) return true;
@@ -238,8 +239,8 @@ export function renderRecipeVault() {
     else if (typeof window.openBulkRecipeImporterModal === 'function') window.openBulkRecipeImporterModal();
   });
 
-  const hasData = (store.getState()?.recipes?.length > 0) ?.isCachedHydrated;
-  if (!store.getState()?.isCloudHydrated && !hasData) {
+  const hasData = (getState()?.recipes?.length > 0) ?.isCachedHydrated;
+  if (!getState()?.isCloudHydrated && !hasData) {
     if (list) {
       list.innerHTML = renderVaultGridContainer({ isLoading: true });
     }
@@ -256,7 +257,7 @@ export function renderRecipeVault() {
   ensureVariantFavoritingPrefs();
   const fwNorm = String(fw || 'all').toLowerCase();
 
-  const allRecipes = store.getState()?.recipes || (window.Store && typeof window.Store.getState === 'function' ? window.Store.store.getState().recipes : []) || [];
+  const allRecipes = getState()?.recipes || (window.Store && typeof window.Store.getState === 'function' ? window.Store.getState().recipes : []) || [];
   const recipes = allRecipes.filter(r => {
     const hasAnyFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
     if (isFavOnly && !hasAnyFav) return false;
@@ -270,11 +271,11 @@ export function renderRecipeVault() {
       r.who,
       ...(types || []),
       ...(Array.isArray(r.tags) ? r.tags : []),
-      ...(r.ingredients || []).map(ing => formatRecipeIngredientRow(ing, store.getState())),
+      ...(r.ingredients || []).map(ing => formatRecipeIngredientRow(ing, getState())),
       enh?.name,
       enh?.title,
       enh?.changes,
-      ...(enh?.ingredients || []).map(ing => formatRecipeIngredientRow(ing, store.getState()))
+      ...(enh?.ingredients || []).map(ing => formatRecipeIngredientRow(ing, getState()))
     ].filter(Boolean).join(' ').toLowerCase();
 
     const rWhoNorm = String(r.who || 'both').toLowerCase();
@@ -330,8 +331,8 @@ let vaultUnsub = null;
 let vaultTimer = null;
 
 function handlePreferencesUpdated() {
-  if (store.getState()?.recipes) {
-    store.getState().recipes.forEach(r => {
+  if (getState()?.recipes) {
+    getState().recipes.forEach(r => {
       delete r._computedFitScore;
       delete r._computedFitResult;
     });

@@ -1,3 +1,4 @@
+import { getState } from '../store/coreState.js';
 import store from "../store/store.js";
 /**
  * src/models/MealPlannerModel.js (v3.20.14)
@@ -54,7 +55,7 @@ export function sanitizeSlotNode(node) {
  * Returns a clean, empty meal plan schema with no recipe attachments.
  */
 export function createCleanEmptyPlanSchema(daysOverride = null) {
-  const days = Number(daysOverride || (typeof window !== 'undefined' ? store.getState()?.plannerDays : 7) || 7);
+  const days = Number(daysOverride || (typeof window !== 'undefined' ? getState()?.plannerDays : 7) || 7);
   return {
     days,
     startDate: '',
@@ -84,7 +85,7 @@ export function stripPlanPayload(rawInput) {
 
   const rawSkeleton = rawInput.skeletonGrid
     || planData.skeletonGrid
-    || (typeof window !== 'undefined' ? store.getState()?.skeletonGrid : {})
+    || (typeof window !== 'undefined' ? getState()?.skeletonGrid : {})
     || {};
 
   const cleanSlots = {};

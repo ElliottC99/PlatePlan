@@ -2,6 +2,7 @@
  * src/components/data-quality/DataQualityFixModal.js (v3.8.1)
  * Resolution modals for Data Quality issues (subtype linking, Tesco JSON imports, product merges, category reassignments).
  */
+import { getState } from '../../store/coreState.js';
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({

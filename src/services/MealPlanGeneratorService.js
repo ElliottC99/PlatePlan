@@ -4,6 +4,7 @@
  * Generates balanced multi-day meal plans matching household macro targets,
  * cadence repeats, and dietary exclusions without external legacy monolith dependencies.
  */
+import { getState } from '../store/coreState.js';
 
 import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
 import { setCurrentPlan } from '../store/store.js';

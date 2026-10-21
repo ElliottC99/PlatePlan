@@ -6,6 +6,7 @@
  * - Step progress indicators & transitions
  * - Plan commit, reset, and confirmation handlers
  */
+import { getState } from '../../store/coreState.js';
 
 import { renderConstraintsForm } from './GeneratorConstraintsForm.js';
 

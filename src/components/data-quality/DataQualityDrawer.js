@@ -2,6 +2,7 @@
  * src/components/data-quality/DataQualityDrawer.js (v3.8.1)
  * Main Data Quality view shell, navigation return stack, and badge controller.
  */
+import { getState } from '../../store/coreState.js';
 
 import { renderIssueSection, renderAdvisorySection } from './DataQualityIssueRow.js';
 

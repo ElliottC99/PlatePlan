@@ -3,6 +3,7 @@
  * UI component for shopping list batch action toolbar, aisle filters,
  * export formatters, and checked-item clearance.
  */
+import { getState } from '../../store/coreState.js';
 
 import { renderShoppingCategoriesList } from './ShoppingCategoryGroup.js';
 import { showCustomCopyModal } from '../pantry/IngredientActionModalsUI.js';

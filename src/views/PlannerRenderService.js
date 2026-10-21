@@ -3,6 +3,7 @@
  * Pure template generation service for the Meal Planner Wizard.
  * Isolates HTML string building from the main PlannerView controller.
  */
+import { getState } from '../store/coreState.js';
 
 /**
  * Renders the Step 2 review screen for the planner wizard.

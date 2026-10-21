@@ -1,3 +1,4 @@
+import { getState } from '../store/coreState.js';
 import { getCanonicalIngredientId, calculateShoppingItemCost } from '../services/ShoppingCalculationService.js';
 import { store, setActivePlan, setShoppingList } from '../store/store.js';
 import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';

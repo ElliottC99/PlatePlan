@@ -1,3 +1,4 @@
+import { getState } from '../store/coreState.js';
 import store from "../store/store.js";
 /**
  * src/models/StateModel.js (v3.16.0)
@@ -18,8 +19,8 @@ import store from "../store/store.js";
 export function getProfileMealTargets(profileId, mealType, customProfiles = null) {
   const profiles = customProfiles ||
     (typeof window !== 'undefined' && (
-      store.getState()?.preferences?.profiles ||
-      store.getState()?.userPrefs?.profiles
+      getState()?.preferences?.profiles ||
+      getState()?.userPrefs?.profiles
     )) || {};
 
   const profile = profiles[profileId] || null;
@@ -118,8 +119,8 @@ export function normalizeProfileData(profileId, rawData = {}) {
 export function getProfilesFromState() {
   if (typeof window === 'undefined') return {};
   return (
-    store.getState()?.preferences?.profiles ||
-    store.getState()?.userPrefs?.profiles ||
+    getState()?.preferences?.profiles ||
+    getState()?.userPrefs?.profiles ||
     {}
   );
 }

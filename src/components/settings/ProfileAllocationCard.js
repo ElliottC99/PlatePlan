@@ -5,6 +5,7 @@
  * Calorie Meal Splits (%) and Protein Meal Splits (%).
  * Zero hardcoded default numbers in source code.
  */
+import { getState } from '../../store/coreState.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({

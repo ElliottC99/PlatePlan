@@ -40,15 +40,15 @@ export function resetTodayDate() {
 }
 
 export function toggleMealEaten(mealType, person = 'both') {
-  const state = store.store.getState();
+  const state = store.getState();
   const plan = state.plan || {};
   const currentEaten = plan.eatenMeals || {};
 
   const { nextEaten, toastMessage } = calculateMealEatenUpdates(currentEaten, currentDateStr, mealType, person);
   plan.eatenMeals = nextEaten;
   
-  if (typeof window !== 'undefined' && store.store.getState().currentPlan) {
-    store.store.getState().currentPlan.eatenMeals = nextEaten;
+  if (typeof window !== 'undefined' && store.getState().currentPlan) {
+    store.getState().currentPlan.eatenMeals = nextEaten;
   }
 
   saveCurrentPlan(plan).catch(err => {
@@ -72,7 +72,7 @@ export function renderToday() {
     labelEl.textContent = formatTodayDateLabel(currentDateStr) || currentDateStr;
   }
 
-  const state = store.store.getState();
+  const state = store.getState();
   const plan = state.plan || {};
   const recipes = state.recipes || [];
   const planContext = { dayDates: plan.dayDates || {} };

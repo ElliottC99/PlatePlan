@@ -1,3 +1,4 @@
+import { getState } from '../store/coreState.js';
 import store from "../store/store.js";
 /**
  * src/utils/fitScoreCalculator.js (v3.38.63)
@@ -53,7 +54,7 @@ export const getTarget = (profile, type, meal) => {
 };
 
 function resolveHouseholdProfiles(options = {}) {
-  const winState = typeof window !== 'undefined' ? (store.getState()) : {};
+  const winState = typeof window !== 'undefined' ? (getState()) : {};
   const rawProfiles = options?.userPrefs?.profiles
     || winState.prefs?.profiles
     || winState.preferences?.profiles

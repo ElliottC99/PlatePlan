@@ -3,6 +3,7 @@
  * Recipe editor modal lifecycle, tab switching, cost summaries,
  * protein efficiency analysis, and recalculation coordinator.
  */
+import { getState } from '../../store/coreState.js';
 
 import { renderModalIngredientsList } from './RecipeIngredientRow.js';
 import { renderModalMethodList } from './RecipeStepRow.js';

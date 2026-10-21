@@ -3,6 +3,7 @@
  * Modular UI component for Recipe Vault Card.
  * Strictly modular (<350 lines).
  */
+import { getState } from '../../store/coreState.js';
 
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
 import { calculateRecipePantryMatch } from '../../services/InventoryService.js';

@@ -13,7 +13,7 @@ function cleanString(str) {
 /**
  * Calculates Pantry Match Score, missing ingredients, and Use-Up priority boosts for a recipe.
  * @param {Object} recipe Recipe object containing ingredients list
- * @param {Array<Object>} [inventory] Inventory items list (defaults to store.getState().inventory)
+ * @param {Array<Object>} [inventory] Inventory items list (defaults to getState().inventory)
  * @returns {Object} Pantry match analysis result
  */
 export function calculateRecipePantryMatch(recipe, inventory = null) {

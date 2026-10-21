@@ -3,6 +3,7 @@
  * UI component for planner week controls, date range selectors,
  * banners, clear plan modal triggers, and target setters.
  */
+import { getState } from '../../store/coreState.js';
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({

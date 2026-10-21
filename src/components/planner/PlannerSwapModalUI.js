@@ -3,6 +3,7 @@
  * Interactive Swap Meal Modal UI for the Weekly Meal Planner.
  * Strictly modular (<350 lines).
  */
+import { getState } from '../../store/coreState.js';
 
 import { calculateMealFitScore, extractRecipeMacros } from '../../utils/fitScoreCalculator.js';
 import { getSortedRecipes } from '../../services/FitScoreService.js';
@@ -214,7 +215,7 @@ export function toggleSlotVariant(day, slotKey) {
   if (!info?.recipe) return;
   const newVariant = (info.variant || 'original') === 'enhanced' ? 'original' : 'enhanced';
   getState().currentPlan.slots[day][slotKey] = typeof window.makePlanSlot === 'function' ? window.makePlanSlot(info.id, newVariant) : { id: info.id, recipeId: info.id, variant: newVariant };
-  const priority = getState().currentPlan.productPriority .prefs?.productPriority || 'protein';
+  const priority = getState().currentPlan?.productPriority || getState().prefs?.productPriority || 'protein';
   getState().currentPlan.productSelections = typeof window.lockProductSelectionsForSlots === 'function' ? window.lockProductSelectionsForSlots(getState().currentPlan.slots, priority) : {};
   getState().currentPlan.score = typeof window.calculatePlanScore === 'function' ? window.calculatePlanScore(getState().currentPlan) : 0;
   if (typeof window.saveState === 'function') window.saveState(getState().currentPlan);
@@ -240,7 +241,7 @@ export function prioritiseAllPlannedEnhancedRecipes() {
   });
 
   if (upgradedCount > 0) {
-    const priority = getState().currentPlan.productPriority .prefs?.productPriority || 'protein';
+    const priority = getState().currentPlan?.productPriority || getState().prefs?.productPriority || 'protein';
     getState().currentPlan.productSelections = typeof window.lockProductSelectionsForSlots === 'function' ? window.lockProductSelectionsForSlots(getState().currentPlan.slots, priority) : {};
     getState().currentPlan.score = typeof window.calculatePlanScore === 'function' ? window.calculatePlanScore(getState().currentPlan) : 0;
     if (typeof window.saveState === 'function') window.saveState(getState().currentPlan);
@@ -287,7 +288,7 @@ export function swapSlot(day, slot, id) {
       if (typeof window.setPlanSlotReason === 'function') window.setPlanSlotReason(day, counterpartKey, '');
     }
   }
-  const priority = getState().currentPlan.productPriority .prefs?.productPriority || 'protein';
+  const priority = getState().currentPlan?.productPriority || getState().prefs?.productPriority || 'protein';
   getState().currentPlan.productSelections = typeof window.lockProductSelectionsForSlots === 'function' ? window.lockProductSelectionsForSlots(getState().currentPlan.slots, priority) : {};
   getState().currentPlan.productPriority = priority;
   getState().currentPlan.confirmedShopping = false;
