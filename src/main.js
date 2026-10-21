@@ -202,6 +202,11 @@ if (typeof window !== 'undefined') {
         await hydrateHouseholdData();
         setSyncStatus(navigator.onLine ? 'synced' : 'offline', 'Synced with Cloud');
         if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Synced with Cloud! ☁️', 'success');
+        
+        // Force UI redraw after manual sync
+        import('./core/AppRouter.js').then(router => {
+          if (typeof router.mountCurrentView === 'function') router.mountCurrentView();
+        });
       } catch(e) {
         setSyncStatus('error', 'Sync Failed');
       }
@@ -282,7 +287,7 @@ function setupSubscriptions() {
   subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
 }
 
-export const APP_VERSION = 'v3.40.31';
+export const APP_VERSION = 'v3.40.32';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
@@ -332,6 +337,15 @@ async function initApp() {
 
     if (hydrationRes && hydrationRes.success) {
       setSyncStatus(navigator.onLine ? 'synced' : 'offline', navigator.onLine ? 'Synced with Cloud' : 'Offline Mode');
+      
+      // Force the UI to consume the newly hydrated data
+      import('./core/AppRouter.js')
+        .then(router => {
+          if (typeof router.mountCurrentView === 'function') {
+            router.mountCurrentView();
+          }
+        })
+        .catch(err => console.error('[Boot] Failed to load AppRouter for redraw:', err));
     } else if (hydrationRes && hydrationRes.unauthenticated) {
       setSyncStatus('local', 'Local only (Sign in to sync)');
     } else {
