@@ -108,73 +108,49 @@ if (typeof window !== 'undefined') {
   window.closePlatePlanLogin = closeLoginUI;
 }
 
-export function waitForAuth(timeoutMs = 5000) {
+export function waitForAuth(timeoutMs = 8000) {
   if (authPromise) return authPromise;
-
+  
   authPromise = new Promise((resolve) => {
-    if (typeof window === 'undefined' || !window.firebase || typeof window.firebase.auth !== 'function') {
-      authPromise = null;
-      return resolve(null);
-    }
-
-    const authInstance = window.firebase.auth();
-    if (authInstance.currentUser) {
-      closeLoginUI();
-      if (!authLogged) {
-        authLogged = true;
-        console.log(`[AuthService] Active user session: ${authInstance.currentUser.email || authInstance.currentUser.uid}`);
-      }
-      return resolve(authInstance.currentUser);
-    }
-
     let resolved = false;
-    let unsubscribe = () => {};
+    let unsubscribe = null;
+    
+    const finish = (user) => {
+      if (resolved) return;
+      resolved = true;
+      if (unsubscribe) unsubscribe();
+      
+      if (user && !authLogged) {
+        authLogged = true;
+        console.log(`[AuthService] Active user session: ${user.email || user.uid}`);
+        closeLoginUI();
+      }
+      resolve(user);
+    };
 
     const timer = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        if (typeof unsubscribe === 'function') unsubscribe();
-        console.warn('[Auth] Auth state resolution timed out.');
-        resolve(window.firebase?.auth()?.currentUser || null);
-      }
+      console.warn('[Auth] Auth state resolution timed out.');
+      finish(window.firebase?.auth()?.currentUser || null);
     }, timeoutMs);
 
-    unsubscribe = authInstance.onAuthStateChanged(async (user) => {
-      if (!resolved) {
-        if (user) {
-          resolved = true;
+    const checkFirebase = setInterval(() => {
+      if (typeof window !== 'undefined' && window.firebase && typeof window.firebase.auth === 'function') {
+        clearInterval(checkFirebase);
+        const authInstance = window.firebase.auth();
+        
+        if (authInstance.currentUser) {
           clearTimeout(timer);
-          if (typeof unsubscribe === 'function') unsubscribe();
-          closeLoginUI();
-          if (!authLogged) {
-            authLogged = true;
-            console.log(`[AuthService] Authenticated as: ${user.email || user.uid}`);
-          }
-          resolve(user);
-        } else {
-          if (!authLogged) {
-            authLogged = true;
-            console.log('[AuthService] No user session detected. Prompting authentication...');
-          }
-          showLoginUI();
-          resolved = true;
-          clearTimeout(timer);
-          if (typeof unsubscribe === 'function') unsubscribe();
-          resolve(null);
+          return finish(authInstance.currentUser);
         }
+        
+        unsubscribe = authInstance.onAuthStateChanged((user) => {
+          clearTimeout(timer);
+          finish(user);
+        });
       }
-    }, (error) => {
-      if (!resolved) {
-        resolved = true;
-        clearTimeout(timer);
-        if (typeof unsubscribe === 'function') unsubscribe();
-        authPromise = null;
-        console.warn('[AuthService] onAuthStateChanged error:', error);
-        resolve(null);
-      }
-    });
+    }, 50); // Poll every 50ms for the Firebase SDK
   });
-
+  
   return authPromise;
 }
 
