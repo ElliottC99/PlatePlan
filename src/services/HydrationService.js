@@ -10,7 +10,7 @@ import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan
 import { getInventory } from './InventoryRepository.js';
 import { getCurrentActivePlan as getActivePlanFromSubcollection } from './PlanRepository.js';
 import { setRecipes, setPreferences, setCurrentPlan, saveStateCache, setInventory, sanitizePreferences, updateState } from '../store/store.js';
-import { setIngredients, setProducts, setCategories } from '../store/pantryStore.js';
+import { setIngredients, setProducts, setCategories } from '../store/store.js';
 import { compareProductsByStrategy } from '../models/PantryHierarchyModel.js';
 import { waitForAuth } from './AuthService.js';
 import { runDeferredMaintenance } from './CacheMaintenanceService.js';

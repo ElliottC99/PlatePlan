@@ -20,27 +20,31 @@ export { renderVaultRecipeCard, renderVaultGridContainer, VaultFilterToolbar, ca
 let currentRecipeSearchQuery = '';
 
 export function hasVariantFavoritingInitialized() {
-  const prefs = getState()?.userPrefs ?.prefs || {};
+  const state = getState() || {};
+  const prefs = state.userPrefs || state.prefs || {};
   const list = prefs.favouriteVariantIds || prefs.favoriteVariantIds;
   return Array.isArray(list);
 }
 
 export function ensureVariantFavoritingPrefs() {
-  if (!getState()) try { getState() = {}; } catch (e) {}
-  if (!getState().prefs) getState().prefs = {};
-  if (!getState().userPrefs) getState().userPrefs = getState().prefs;
-  const prefs = getState().userPrefs;
+  const state = getState() || {};
+  if (!state.prefs) state.prefs = {};
+  if (!state.userPrefs) state.userPrefs = state.prefs;
+  
+  const prefs = state.userPrefs;
   const existing = prefs.favouriteVariantIds || prefs.favoriteVariantIds;
+  
   if (!Array.isArray(existing)) {
-    prefs.favouriteVariantIds = (getState().recipes || [])
+    prefs.favouriteVariantIds = (state.recipes || [])
       .filter(r => r?.id && (r.isFavourite || r.isFavorite))
       .map(r => `${r.id}_original`);
   } else {
     prefs.favouriteVariantIds = existing;
   }
-  getState().prefs.favouriteVariantIds = prefs.favouriteVariantIds;
-  getState().userPrefs.favoriteVariantIds = prefs.favouriteVariantIds;
-  getState().prefs.favoriteVariantIds = prefs.favouriteVariantIds;
+  
+  state.prefs.favouriteVariantIds = prefs.favouriteVariantIds;
+  state.prefs.favoriteVariantIds = prefs.favouriteVariantIds;
+  
   return prefs.favouriteVariantIds;
 }
 
