@@ -282,7 +282,7 @@ function setupSubscriptions() {
   subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
 }
 
-export const APP_VERSION = 'v3.40.28';
+export const APP_VERSION = 'v3.40.29';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
@@ -319,13 +319,16 @@ async function initApp() {
     try { AppInitializer.registerServiceWorker(); AppInitializer.initPlatePlanApp(); } catch (initErr) {}
 
     setSyncStatus('connecting', 'Connecting...');
-    initialRender();
 
     let hydrationRes = null;
     try {
       await waitForAuth();
       hydrationRes = await hydrateHouseholdData();
-    } catch (syncErr) {}
+    } catch (syncErr) {
+      console.error('[Boot] Hydration sequence failed:', syncErr);
+    }
+
+    initialRender();
 
     if (hydrationRes && hydrationRes.success) {
       setSyncStatus(navigator.onLine ? 'synced' : 'offline', navigator.onLine ? 'Synced with Cloud' : 'Offline Mode');
