@@ -13,8 +13,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#F7F6F2">
 <meta name="description" content="PlatePlan — shared meal planning for Elliott and Chloe">
-<meta name="app-version" content="v3.41.14">
-<meta name="version" content="v3.41.14">
+<meta name="app-version" content="v3.42.0">
+<meta name="version" content="v3.42.0">
 <meta name="application-name" content="PlatePlan">
 <meta property="og:title" content="PlatePlan — Elliott &amp; Chloe">
 <meta property="og:description" content="PlatePlan — shared meal planning for Elliott and Chloe">
@@ -1469,9 +1469,9 @@ try{
       <div id="subtype-product-actions-wrap" style="display:none;margin-bottom:12px;flex-direction:column;gap:8px;padding:10px;background:var(--surface2,#f5f5f4);border-radius:8px;border:1px solid var(--border,#e7e5e4)">
         <div style="font-size:12px;font-weight:750">Sub-type Product Actions</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-          <button type="button" class="btn sm ghost" data-pp-click="handleSubtypeProductAction('link')">🔗 Link Existing Product(s)</button>
-          <button type="button" class="btn sm ghost" data-pp-click="handleSubtypeProductAction('manual')">➕ Add Product Manually</button>
-          <button type="button" class="btn sm ghost" data-pp-click="handleSubtypeProductAction('tesco')">🛒 Import from Tesco</button>
+          <button type="button" onclick="window.handleSubtypeProductAction('link')" class="action-btn btn sm ghost" data-pp-click="handleSubtypeProductAction('link')">🔗 Link Existing Product(s)</button>
+          <button type="button" onclick="window.handleSubtypeProductAction('manual')" class="action-btn btn sm ghost" data-pp-click="handleSubtypeProductAction('manual')">➕ Add Product Manually</button>
+          <button type="button" onclick="window.handleSubtypeProductAction('tesco')" class="action-btn btn sm ghost" data-pp-click="handleSubtypeProductAction('tesco')">🛒 Import from Tesco</button>
         </div>
         <a id="tesco-search-link" href="#" target="_blank" style="font-size: 0.85em; display: none; margin-top: 4px; color: var(--primary,#4f46e5); font-weight: 600;"></a>
       </div>

@@ -220,32 +220,28 @@ export function renderRecipePreview() {
   const eSharePct = Math.round(eShare * 100);
   const cSharePct = Math.round(cShare * 100);
 
-  const servings = Number(activeR.servings) || 1;
-  const singleKcal = Math.round((activeR.macros?.calories || activeR.cal || 450) / servings);
-  const singleProt = Math.round((activeR.macros?.protein || activeR.prot || 28) / servings);
-  
   const prefs = typeof getState === 'function' ? (getState()?.userPrefs?.fitScoreParams || {}) : {};
   const eTargetKcal = prefs.elliott?.calories || 800;
   const cTargetKcal = prefs.chloe?.calories || 600;
   const eTargetProt = prefs.elliott?.protein || 40;
   const cTargetProt = prefs.chloe?.protein || 30;
 
-  // Variables for template literal (Lines ~250-254)
-  const singleKcalE = singleKcal;
-  const singleProtE = singleProt;
-  const singleKcalC = singleKcal;
-  const singleProtC = singleProt;
-  const kcalDiffE = singleKcal - eTargetKcal;
-  const protDiffE = singleProt - eTargetProt;
-  const kcalDiffC = singleKcal - cTargetKcal;
-  const protDiffC = singleProt - cTargetProt;
+  const singleKcal = (activeR.nutritionalTotals?.calories || activeR.cal || 0) / (activeR.serves || 2);
+  const singleProt = (activeR.nutritionalTotals?.protein || activeR.prot || 0) / (activeR.serves || 2);
+  const singleKcalE = Math.round(singleKcal * 2 * (eSharePct / 100));
+  const singleProtE = Math.round(singleProt * 2 * (eSharePct / 100));
+  const singleKcalC = Math.round(singleKcal * 2 * (cSharePct / 100));
+  const singleProtC = Math.round(singleProt * 2 * (cSharePct / 100));
+  const kcalDiffE = singleKcalE - eTargetKcal;
+  const protDiffE = singleProtE - eTargetProt;
+  const kcalDiffC = singleKcalC - cTargetKcal;
+  const protDiffC = singleProtC - cTargetProt;
   const formatDiffStr = (val) => val > 0 ? `+${val}` : `${val}`;
 
-  // Variables for render payload (Lines ~289-299)
-  const eKcal = singleKcal;
-  const cKcal = singleKcal; 
-  const eProt = singleProt;
-  const cProt = singleProt;
+  const eKcal = singleKcalE;
+  const cKcal = singleKcalC; 
+  const eProt = singleProtE;
+  const cProt = singleProtC;
 
   const macroSplitHtml = `
     <div class="recipe-modal-crossbar-macros" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px;">

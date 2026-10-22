@@ -73,12 +73,59 @@ export function updateIngredientFamilyModalUI(ing, parent) {
       nameEl.oninput = updateTescoLink;
       updateTescoLink();
     }
+
+    // Sub-type empty-state save validation
+    const saveBtn = document.getElementById('save-ingredient-family-btn') || document.getElementById('ingredient-family-save-btn');
+    if (saveBtn) {
+      const state = (typeof window !== 'undefined' && window.Store?.getState) ? window.Store.getState() : {};
+      const products = state?.products || [];
+      const targetId = ing?.id;
+      const linkedProds = targetId ? products.filter(p => String(p.ingredientId) === String(targetId) || String(p.groupId) === String(targetId)) : [];
+      if (linkedProds.length === 0) {
+        saveBtn.disabled = true;
+        saveBtn.title = "You must link at least one product before saving.";
+        saveBtn.style.opacity = '0.5';
+      } else {
+        saveBtn.disabled = false;
+        saveBtn.title = "";
+        saveBtn.style.opacity = '1';
+      }
+    }
   } else {
     // Standard Core Item Mode
     if (labelEl) labelEl.textContent = 'Item Name';
     if (nameEl) nameEl.placeholder = 'e.g. Pasta, Asparagus, Tofu';
     if (parentWrap) parentWrap.style.display = 'none';
     if (actionsWrap) actionsWrap.style.display = 'none';
+    const saveBtn = document.getElementById('save-ingredient-family-btn') || document.getElementById('ingredient-family-save-btn');
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.title = "";
+      saveBtn.style.opacity = '1';
+    }
+  }
+}
+
+export function openIngredientFamilyDetailsModal(ingredientId = null, parentId = null) {
+  if (typeof window !== 'undefined' && typeof window.openIngredientFamilyDetailsModal === 'function' && window.openIngredientFamilyDetailsModal !== openIngredientFamilyDetailsModal) {
+    window.openIngredientFamilyDetailsModal(ingredientId, parentId);
+  }
+  const state = (typeof window !== 'undefined' && window.Store?.getState) ? window.Store.getState() : {};
+  const products = state?.products || [];
+  if (parentId) {
+    const saveBtn = document.getElementById('save-ingredient-family-btn') || document.getElementById('ingredient-family-save-btn');
+    if (saveBtn) {
+      const linkedProds = products.filter(p => String(p.ingredientId) === String(ingredientId) || String(p.groupId) === String(ingredientId));
+      if (linkedProds.length === 0) {
+        saveBtn.disabled = true;
+        saveBtn.title = "You must link at least one product before saving.";
+        saveBtn.style.opacity = '0.5';
+      } else {
+        saveBtn.disabled = false;
+        saveBtn.title = "";
+        saveBtn.style.opacity = '1';
+      }
+    }
   }
 }
 

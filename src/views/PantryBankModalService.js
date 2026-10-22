@@ -101,6 +101,23 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
   }
 
   updateIngredientFamilyModalUI(ing, parent);
+
+  if (parentId) {
+    const saveBtn = document.getElementById('save-ingredient-family-btn') || document.getElementById('ingredient-family-save-btn');
+    if (saveBtn) {
+      const linkedProds = products.filter(p => String(p.ingredientId) === String(ingredientId) || String(p.groupId) === String(ingredientId));
+      if (linkedProds.length === 0) {
+        saveBtn.disabled = true;
+        saveBtn.title = "You must link at least one product before saving.";
+        saveBtn.style.opacity = '0.5';
+      } else {
+        saveBtn.disabled = false;
+        saveBtn.title = "";
+        saveBtn.style.opacity = '1';
+      }
+    }
+  }
+
   modalWrap.classList.add('open');
 
   if (!modalWrap.hasAttribute('data-delegated')) {
