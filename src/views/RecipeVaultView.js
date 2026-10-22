@@ -260,7 +260,8 @@ export function renderRecipeVault() {
   const recipes = allRecipes.filter(r => {
     const hasAnyFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
     if (isFavOnly && !hasAnyFav) return false;
-    const types = r.types || [r.type];
+    const ftNorm = String(ft || 'all').toLowerCase();
+    const types = (r.types || [r.type]).map(t => String(t || '').toLowerCase());
     const enh = r.enhanced;
     const searchable = [
       r.name,
@@ -280,33 +281,40 @@ export function renderRecipeVault() {
     const rWhoNorm = String(r.who || 'both').toLowerCase();
     const matchesWho = fwNorm === 'all' || rWhoNorm === fwNorm || (fwNorm === 'both' && (rWhoNorm === 'both' || !r.who));
 
-    return (ft === 'all' || types.includes(ft)) && matchesWho && (!q || searchable.includes(q));
+    return (ftNorm === 'all' || types.includes(ftNorm)) && matchesWho && (!q || searchable.includes(q));
   });
 
   renderRecipeGrid(recipes);
   bindSearchListeners();
   
-  const toolbar = document.querySelector('.pp-vault-filter-toolbar');
-  if (toolbar && !toolbar.hasAttribute('data-delegated')) {
-    toolbar.addEventListener('change', (e) => {
-      if (e.target.classList.contains('pp-vault-filter-input')) {
-        renderRecipeVault();
+  if (!window.__vaultGlobalListener) {
+    window.__vaultGlobalListener = true;
+    
+    // Handle Filter Changes
+    document.addEventListener('change', (e) => {
+      if (e.target.matches('#filter-type, #filter-who, #vault-sort, .pp-vault-filter-input')) {
+        if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
       }
     });
-    toolbar.addEventListener('input', (e) => {
-      if (e.target.classList.contains('pp-vault-filter-input')) {
-        renderRecipeVault();
+
+    // Handle Dropdown Clipping (Bottom Viewport Collision)
+    document.addEventListener('click', (e) => {
+      const moreBtn = e.target.closest('.btn-more, [data-action="toggle-menu"]');
+      if (moreBtn) {
+        const menu = moreBtn.parentElement.querySelector('.dropdown-menu, .menu-options');
+        if (menu) {
+          const rect = moreBtn.getBoundingClientRect();
+          // If button is within 150px of the bottom of the screen, pop upwards
+          if (rect.bottom > window.innerHeight - 150) {
+            menu.style.top = 'auto';
+            menu.style.bottom = '100%';
+          } else {
+            menu.style.top = '100%';
+            menu.style.bottom = 'auto';
+          }
+        }
       }
     });
-    toolbar.addEventListener('click', (e) => {
-      const target = e.target.closest('[data-action]');
-      if (!target) return;
-      const action = target.dataset.action;
-      if (action === 'toggle-favourites-filter') {
-        if (typeof window.toggleVaultFavouritesFilter === 'function') window.toggleVaultFavouritesFilter();
-      }
-    });
-    toolbar.setAttribute('data-delegated', 'true');
   }
 }
 
