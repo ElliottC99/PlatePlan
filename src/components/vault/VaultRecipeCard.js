@@ -71,6 +71,12 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
     gap: 2px;
   `;
 
+  const isFav = typeof window.isRecipeVariantFavourite === 'function'
+    ? window.isRecipeVariantFavourite(recipeId, variant)
+    : (recipe.isFavourite || recipe.isFavorite);
+
+  dropdown.innerHTML = renderRecipeActionsItems(recipeId, isFav);
+
   if (targetBtn) {
     const rect = targetBtn.getBoundingClientRect();
     const left = Math.max(10, Math.min(rect.right - 180, window.innerWidth - 190));
@@ -94,12 +100,6 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
     dropdown.style.left = '50%';
     dropdown.style.transform = 'translate(-50%, -50%)';
   }
-
-  const isFav = typeof window.isRecipeVariantFavourite === 'function'
-    ? window.isRecipeVariantFavourite(recipeId, variant)
-    : (recipe.isFavourite || recipe.isFavorite);
-
-  dropdown.innerHTML = renderRecipeActionsItems(recipeId, isFav);
 
   document.body.appendChild(dropdown);
 
