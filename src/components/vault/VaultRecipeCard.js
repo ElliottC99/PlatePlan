@@ -56,7 +56,8 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
   dropdown.className = 'recipe-actions-dropdown-menu';
   dropdown.style.cssText = `
     position: fixed;
-    z-index: 99999;
+    z-index: 9999;
+    pointer-events: auto;
     background: var(--surface, #ffffff);
     color: var(--text, #1f2937);
     border: 1px solid var(--border, #e5e7eb);
@@ -72,10 +73,22 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
 
   if (targetBtn) {
     const rect = targetBtn.getBoundingClientRect();
-    const top = Math.min(rect.bottom + 4, window.innerHeight - 220);
     const left = Math.max(10, Math.min(rect.right - 180, window.innerWidth - 190));
-    dropdown.style.top = `${top}px`;
     dropdown.style.left = `${left}px`;
+    
+    // Append temporarily to measure height
+    document.body.appendChild(dropdown);
+    const dropdownHeight = dropdown.offsetHeight || 200;
+    dropdown.remove();
+
+    if (rect.bottom + dropdownHeight > window.innerHeight) {
+      // Open upwards
+      dropdown.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+      dropdown.style.top = 'auto';
+    } else {
+      dropdown.style.top = `${rect.bottom + 4}px`;
+      dropdown.style.bottom = 'auto';
+    }
   } else {
     dropdown.style.top = '50%';
     dropdown.style.left = '50%';

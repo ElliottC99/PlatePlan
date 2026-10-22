@@ -171,7 +171,7 @@ export function renderReorganiseTemplate(ing, targetCandidates) {
         <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">🔀 Option A: Merge into another Ingredient</div>
         <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Transfers all sub-types, linked products, and aliases to the target ingredient before removing this source.</p>
         <div style="display:flex; gap:8px;">
-          <input type="text" list="pantry-items-list-ing-merge" id="reorg-ing-merge-select" style="flex:1; padding:7px; border:1px solid var(--border,#e7e5e4); border-radius:6px; font-size:12px; background:#fff;" placeholder="Search or select target ingredient..." ${targetCandidates.length === 0 ? 'disabled' : ''} name="reorgIngMergeSelect">
+          <input type="text" list="pantry-items-list-ing-merge" id="reorg-ing-merge-select" style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff); outline:none;" placeholder="Search or select target ingredient..." ${targetCandidates.length === 0 ? 'disabled' : ''} name="reorgIngMergeSelect">
           <datalist id="pantry-items-list-ing-merge">
             ${targetCandidates.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${escapeHTML(c.category || 'Other')})</option>`).join('') || '<option value="">No other ingredients available</option>'}
           </datalist>
@@ -183,7 +183,7 @@ export function renderReorganiseTemplate(ing, targetCandidates) {
         <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">⬇️ Option B: Convert to Sub-type of...</div>
         <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Nests this ingredient as a child sub-type under the chosen parent, preserving all linked products.</p>
         <div style="display:flex; gap:8px;">
-          <input type="text" list="pantry-items-list-ing-demote" id="reorg-ing-demote-select" style="flex:1; padding:7px; border:1px solid var(--border,#e7e5e4); border-radius:6px; font-size:12px; background:#fff;" placeholder="Search or select parent ingredient..." ${targetCandidates.length === 0 ? 'disabled' : ''} name="reorgIngDemoteSelect">
+          <input type="text" list="pantry-items-list-ing-demote" id="reorg-ing-demote-select" style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff); outline:none;" placeholder="Search or select parent ingredient..." ${targetCandidates.length === 0 ? 'disabled' : ''} name="reorgIngDemoteSelect">
           <datalist id="pantry-items-list-ing-demote">
             ${targetCandidates.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${escapeHTML(c.category || 'Other')})</option>`).join('') || '<option value="">No parent ingredients available</option>'}
           </datalist>

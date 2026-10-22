@@ -6,6 +6,7 @@
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
 import { enforceCategorySSOT } from '../utils/categoryEnforcer.js';
 import { getState as getStoreState, setIngredients, setRecipes } from '../store/store.js';
+import { getState } from '../store/coreState.js';
 
 function isDbAvailable() {
   if (!db) { console.warn('[IngredientRepository] Firestore db instance not initialised.'); return false; }

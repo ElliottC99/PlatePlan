@@ -103,7 +103,7 @@ export function renderReorganizeModalHTML({ sub, parent, targetParents = [], sib
       <div style="padding: 12px; border: 1px solid var(--border,#e7e5e4); border-radius: 8px; margin-bottom: 12px; background: #fafaf9;">
         <div style="font-weight: 750; font-size: 13px; margin-bottom: 6px;">📦 Option B: Move to another Parent Ingredient</div>
         <div style="display:flex; gap:8px;">
-          <input type="text" list="pantry-items-list" id="reorg-move-select" style="flex:1; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:12px;" placeholder="Search or select parent ingredient..." name="reorgMoveSelect">
+          <input type="text" list="pantry-items-list" id="reorg-move-select" style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff); outline:none;" placeholder="Search or select parent ingredient..." name="reorgMoveSelect">
           <datalist id="pantry-items-list">
             ${buildParentIngredientDropdownOptions(targetParents)}
           </datalist>
@@ -114,7 +114,7 @@ export function renderReorganizeModalHTML({ sub, parent, targetParents = [], sib
       <div style="padding: 12px; border: 1px solid var(--border,#e7e5e4); border-radius: 8px; margin-bottom: 20px; background: #fafaf9;">
         <div style="font-weight: 750; font-size: 13px; margin-bottom: 6px;">🔀 Option C: Merge into another Sub-type sibling</div>
         <div style="display:flex; gap:8px;">
-          <input type="text" list="pantry-items-list-sibling" id="reorg-merge-select" style="flex:1; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:12px;" placeholder="Search or select sibling..." ${siblingSubtypes.length === 0 ? 'disabled' : ''} name="reorgMergeSelect">
+          <input type="text" list="pantry-items-list-sibling" id="reorg-merge-select" style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff); outline:none;" placeholder="Search or select sibling..." ${siblingSubtypes.length === 0 ? 'disabled' : ''} name="reorgMergeSelect">
           <datalist id="pantry-items-list-sibling">
             ${buildSubtypeDropdownOptions(siblingSubtypes)}
           </datalist>

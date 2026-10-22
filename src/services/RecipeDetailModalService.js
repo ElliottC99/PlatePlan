@@ -224,35 +224,34 @@ export function renderRecipePreview() {
   const macros = typeof extractRecipeMacros === 'function' ? extractRecipeMacros(r, isEnh ? 'enhanced' : 'original') : {};
   const rawBatchCal = Number(macros.cal ?? macros.calories ?? activeR.calories ?? 450);
   const rawBatchProt = Number(macros.prot ?? macros.protein ?? activeR.protein ?? 28);
-  const perServCal = rawBatchCal / serves;
-  const perServProt = rawBatchProt / serves;
 
-  const batchServings = previewState.servingMode === 'both' ? previewState.targetServes : 2;
-  const batchCal = perServCal * batchServings;
-  const batchProt = perServProt * batchServings;
+  const totalKcal = rawBatchCal;
+  const totalProt = rawBatchProt;
 
-  const eKcal = Math.round(batchCal * eShare);
-  const eProt = Math.round((batchProt * eShare) * 10) / 10;
-  const cKcal = Math.round(batchCal * cShare);
-  const cProt = Math.round((batchProt * cShare) * 10) / 10;
+  const singleKcalE = Math.round((totalKcal / serves) * eShare);
+  const singleProtE = Math.round(((totalProt / serves) * eShare) * 10) / 10;
+  const singleKcalC = Math.round((totalKcal / serves) * cShare);
+  const singleProtC = Math.round(((totalProt / serves) * cShare) * 10) / 10;
 
-  const eCalBadge = renderComparisonBadge(eKcal, eMealTargetKcal);
-  const eProtBadge = renderComparisonBadge(eProt, eMealTargetProt);
-  const cCalBadge = renderComparisonBadge(cKcal, cMealTargetKcal);
-  const cProtBadge = renderComparisonBadge(cProt, cMealTargetProt);
+  const kcalDiffE = Math.round(singleKcalE - eMealTargetKcal);
+  const protDiffE = Math.round((singleProtE - eMealTargetProt) * 10) / 10;
+  const kcalDiffC = Math.round(singleKcalC - cMealTargetKcal);
+  const protDiffC = Math.round((singleProtC - cMealTargetProt) * 10) / 10;
+
+  const formatDiffStr = (diff) => `${diff >= 0 ? '+' : ''}${diff}`;
 
   const macroSplitHtml = `
     <div class="recipe-modal-crossbar-macros" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px;">
       <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4); font-size: 11.5px;">
         <span style="font-weight:700;">👤 Elliott (${eSharePct}%):</span>
-        <span>🔥 <strong>${eKcal} kcal</strong> ${eCalBadge}</span>
-        <span>💪 <strong>${eProt}g</strong> ${eProtBadge}</span>
+        <span>🔥 <strong>${singleKcalE} kcal (${formatDiffStr(kcalDiffE)})</strong></span>
+        <span>💪 <strong>${singleProtE}g (${formatDiffStr(protDiffE)})</strong></span>
       </div>
 
       <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4); font-size: 11.5px;">
         <span style="font-weight:700;">👤 Chloe (${cSharePct}%):</span>
-        <span>🔥 <strong>${cKcal} kcal</strong> ${cCalBadge}</span>
-        <span>💪 <strong>${cProt}g</strong> ${cProtBadge}</span>
+        <span>🔥 <strong>${singleKcalC} kcal (${formatDiffStr(kcalDiffC)})</strong></span>
+        <span>💪 <strong>${singleProtC}g (${formatDiffStr(protDiffC)})</strong></span>
       </div>
     </div>
   `;
