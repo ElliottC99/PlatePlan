@@ -42,7 +42,7 @@ export function renderVaultFilterToolbar({
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:nowrap;overflow-x:auto;">
         <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto;white-space:nowrap;">
           <label for="filter-type" style="font-size:11px;font-weight:700;color:var(--text2);cursor:pointer">MEAL:</label>
-          <select id="filter-type" name="filterType" aria-label="Filter by meal type" class="select pp-vault-filter-input" style="font-size:12px;white-space:nowrap;">
+          <select id="filter-type" name="filterType" aria-label="Filter by meal type" class="select pp-vault-filter-input" style="font-size:12px;white-space:nowrap;" onchange="if(typeof window.renderRecipeVault==='function') window.renderRecipeVault()">
             <option value="all" ${selectedType === 'all' ? 'selected' : ''}>All Meals</option>
             <option value="breakfast" ${selectedType === 'breakfast' ? 'selected' : ''}>Breakfast</option>
             <option value="lunch" ${selectedType === 'lunch' ? 'selected' : ''}>Lunch</option>
@@ -53,7 +53,7 @@ export function renderVaultFilterToolbar({
 
         <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto;white-space:nowrap;">
           <label for="filter-who" style="font-size:11px;font-weight:700;color:var(--text2);cursor:pointer">WHO:</label>
-          <select id="filter-who" name="filterWho" aria-label="Filter by person" class="select pp-vault-filter-input" style="font-size:12px;white-space:nowrap;">
+          <select id="filter-who" name="filterWho" aria-label="Filter by person" class="select pp-vault-filter-input" style="font-size:12px;white-space:nowrap;" onchange="if(typeof window.renderRecipeVault==='function') window.renderRecipeVault()">
             <option value="all" ${selectedWho === 'all' ? 'selected' : ''}>Everyone</option>
             <option value="elliott" ${selectedWho === 'elliott' ? 'selected' : ''}>Elliott</option>
             <option value="chloe" ${selectedWho === 'chloe' ? 'selected' : ''}>Chloe</option>
@@ -63,7 +63,7 @@ export function renderVaultFilterToolbar({
 
         <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto;white-space:nowrap;">
           <label for="vault-sort" style="font-size:11px;font-weight:700;color:var(--text2);cursor:pointer">SORT:</label>
-          <select id="vault-sort" name="vaultSort" aria-label="Sort options" class="select pp-vault-filter-input" style="font-size:12px;white-space:nowrap;">
+          <select id="vault-sort" name="vaultSort" aria-label="Sort options" class="select pp-vault-filter-input" style="font-size:12px;white-space:nowrap;" onchange="if(typeof window.renderRecipeVault==='function') window.renderRecipeVault()">
             <option value="useup-desc" ${sortBy === 'useup-desc' ? 'selected' : ''}>🔥 Use-Up First</option>
             <option value="pantry-desc" ${sortBy === 'pantry-desc' ? 'selected' : ''}>📦 Pantry Match: High to Low</option>
             <option value="fit-desc" ${sortBy === 'fit-desc' ? 'selected' : ''}>Fit Score: High to Low</option>
