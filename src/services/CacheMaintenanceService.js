@@ -40,7 +40,9 @@ export async function runDeferredMaintenance(preferencesData, mergedCategories, 
           if (typeof repo.cleanPreferencesBloat === 'function') {
             const res = await repo.cleanPreferencesBloat();
             if (res && res.success) {
-              console.log(`[Maintenance] Preferences cleaned: ${(res.sizeBytes / 1024).toFixed(2)} KB.`);
+              const bytes = res.sizeBytes ?? res.bytes ?? res.size ?? 0;
+              const msg = bytes > 0 ? `${(bytes / 1024).toFixed(2)} KB` : 'Successfully';
+              console.log(`[Maintenance] Preferences cleaned: ${msg}.`);
             }
           }
         }
