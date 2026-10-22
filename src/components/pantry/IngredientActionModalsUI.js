@@ -214,13 +214,11 @@ export function handleDeleteProduct(productId, prodName = null) {
 }
 
 export function showCustomAlert(message) {
-  const html = renderCustomAlertTemplate(message);
-  showModal(html);
+  showModal(renderCustomAlertTemplate(message));
 }
 
 export function showCustomConfirm(message, title, onConfirm) {
-  const html = renderCustomConfirmTemplate(message, title);
-  showModal(html);
+  showModal(renderCustomConfirmTemplate(message, title));
   const btn = document.getElementById('btn-confirm-custom');
   if (btn) {
     btn.onclick = () => {
@@ -231,8 +229,7 @@ export function showCustomConfirm(message, title, onConfirm) {
 }
 
 export function showCustomCopyModal(title, text) {
-  const html = renderCopyTextModalTemplate(title, text);
-  showModal(html);
+  showModal(renderCopyTextModalTemplate(title, text));
   const btn = document.getElementById('btn-copy-modal-text');
   if (btn) {
     btn.onclick = () => {
@@ -248,6 +245,67 @@ export function showCustomCopyModal(title, text) {
   }
 }
 
+function bindDropdown(inputId, targetCandidates) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  let drop = input.parentElement.querySelector('.reorg-custom-dropdown');
+  if (!drop) {
+    input.parentElement.style.position = 'relative';
+    drop = document.createElement('div');
+    drop.className = 'reorg-custom-dropdown';
+    drop.style.cssText = 'position:absolute; top:100%; left:0; right:0; z-index:9999; background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); max-height:220px; overflow-y:auto; margin-top:4px; display:none;';
+    input.parentElement.appendChild(drop);
+  }
+
+  const renderOptions = () => {
+    const q = (input.value || '').trim();
+    const filtered = targetCandidates.filter(c => !q || c.name.toLowerCase().includes(q.toLowerCase()));
+    if (!filtered.length && !q) {
+      drop.style.display = 'none';
+      return;
+    }
+
+    const optionsHtml = filtered.map(c => 
+      `<div class="custom-dd-item" data-id="${c.id}" data-name="${escapeHTML(c.name)}" style="padding:10px 14px; cursor:pointer; display:flex; align-items:center; gap:8px; border-bottom:1px solid #f1f5f9; transition: background 0.1s ease;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+         <div style="font-size:16px; color:#94a3b8; line-height:1;">📁</div>
+         <div style="display:flex; flex-direction:column; gap:2px;">
+           <span style="font-weight:600; color:#1e293b; font-size:13px">${escapeHTML(c.name)}</span>
+           <span style="font-size:11px; color:#64748b; font-weight:500;">[${escapeHTML(c.category || 'Other')}]</span>
+         </div>
+       </div>`
+    ).join('');
+    
+    // Prepend the "New Item" aesthetic block at the top if no exact match exists
+    const exactMatch = filtered.some(c => c.name.toLowerCase() === q.toLowerCase());
+    const newItemHtml = (exactMatch || !q) ? '' : 
+      `<div class="custom-dd-item new-item-trigger" data-id="NEW" data-name="${escapeHTML(q)}" style="padding:10px 14px; cursor:pointer; display:flex; align-items:center; gap:8px; border-bottom:1px solid #e2e8f0; background:#f0fdf4; transition: background 0.1s ease;" onmouseover="this.style.background='#dcfce7'" onmouseout="this.style.background='#f0fdf4'">
+         <div style="font-size:14px; line-height:1;">✨</div>
+         <span style="font-weight:700; color:#15803d; font-size:13px">New Item: "${escapeHTML(q)}"</span>
+       </div>`;
+
+    drop.innerHTML = newItemHtml + optionsHtml;
+    drop.style.display = 'block';
+
+    drop.querySelectorAll('.custom-dd-item').forEach(item => {
+      item.onclick = (e) => {
+        e.stopPropagation();
+        input.value = item.dataset.name || '';
+        drop.style.display = 'none';
+      };
+    });
+  };
+
+  input.addEventListener('input', renderOptions);
+  input.addEventListener('focus', renderOptions);
+
+  document.addEventListener('click', (e) => {
+    if (!input.contains(e.target) && !drop.contains(e.target)) {
+      drop.style.display = 'none';
+    }
+  });
+}
+
 export function openIngredientReorganiseModal(ingredientId) {
   const state = getState();
   const currentIngs = Array.isArray(state.ingredients) ? state.ingredients : [];
@@ -259,26 +317,30 @@ export function openIngredientReorganiseModal(ingredientId) {
   const html = renderReorganiseTemplate(ing, targetCandidates);
 
   showModal(html);
+  bindDropdown('reorg-ing-merge-select', targetCandidates);
+  bindDropdown('reorg-ing-demote-select', targetCandidates);
 
   document.getElementById('btn-reorg-ing-merge').onclick = async () => {
-    const targetId = document.getElementById('reorg-ing-merge-select').value;
-    if (!targetId) return;
+    const typedName = document.getElementById('reorg-ing-merge-select')?.value;
+    if (!typedName) return;
+    const target = targetCandidates.find(c => c.name.toLowerCase() === typedName.toLowerCase());
+    if (!target) { alert('Please select a valid ingredient from the list.'); return; }
     closeModal();
-    import('../../models/PantryHierarchyModel.js').then(async (model) => {
-      await model.mergeIngredients(ingredientId, targetId);
-      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-      if (typeof window.renderProductBank === 'function') window.renderProductBank();
-    });
+    const model = await import('../../models/PantryHierarchyModel.js');
+    await model.mergeIngredients(ingredientId, target.id);
+    if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+    if (typeof window.renderProductBank === 'function') window.renderProductBank();
   };
 
   document.getElementById('btn-reorg-ing-demote').onclick = async () => {
-    const targetParentId = document.getElementById('reorg-ing-demote-select').value;
-    if (!targetParentId) return;
+    const typedName = document.getElementById('reorg-ing-demote-select')?.value;
+    if (!typedName) return;
+    const target = targetCandidates.find(c => c.name.toLowerCase() === typedName.toLowerCase());
+    if (!target) { alert('Please select a valid parent ingredient from the list.'); return; }
     closeModal();
-    import('../../models/PantryHierarchyModel.js').then(async (model) => {
-      await model.demoteToSubtype(ingredientId, targetParentId);
-      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-      if (typeof window.renderProductBank === 'function') window.renderProductBank();
-    });
+    const model = await import('../../models/PantryHierarchyModel.js');
+    await model.demoteToSubtype(ingredientId, target.id);
+    if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+    if (typeof window.renderProductBank === 'function') window.renderProductBank();
   };
 }
