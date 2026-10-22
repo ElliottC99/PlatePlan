@@ -346,6 +346,16 @@ export function mount(container) {
     renderRecipeVault();
   }
   bindSearchListeners();
+
+  if (container && !container.__vaultFilterDelegated) {
+    container.__vaultFilterDelegated = true;
+    container.addEventListener('change', (e) => {
+      if (e.target.matches('.pp-vault-filter-input')) {
+        renderRecipeVault();
+      }
+    });
+  }
+
   vaultUnsub = subscribe('recipes', (recipes) => {
     if (typeof renderRecipeVault === 'function') {
       renderRecipeVault();

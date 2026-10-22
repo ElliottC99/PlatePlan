@@ -220,25 +220,32 @@ export function renderRecipePreview() {
   const eSharePct = Math.round(eShare * 100);
   const cSharePct = Math.round(cShare * 100);
 
-  const serves = Number(activeR.servings || activeR.serves || r.servings || r.serves || 1) || 1;
-  const macros = typeof extractRecipeMacros === 'function' ? extractRecipeMacros(r, isEnh ? 'enhanced' : 'original') : {};
-  const rawBatchCal = Number(macros.cal ?? macros.calories ?? activeR.calories ?? 450);
-  const rawBatchProt = Number(macros.prot ?? macros.protein ?? activeR.protein ?? 28);
+  const servings = Number(activeR.servings) || 1;
+  const singleKcal = Math.round((activeR.macros?.calories || activeR.cal || 450) / servings);
+  const singleProt = Math.round((activeR.macros?.protein || activeR.prot || 28) / servings);
+  
+  const prefs = typeof getState === 'function' ? (getState()?.userPrefs?.fitScoreParams || {}) : {};
+  const eTargetKcal = prefs.elliott?.calories || 800;
+  const cTargetKcal = prefs.chloe?.calories || 600;
+  const eTargetProt = prefs.elliott?.protein || 40;
+  const cTargetProt = prefs.chloe?.protein || 30;
 
-  const totalKcal = rawBatchCal;
-  const totalProt = rawBatchProt;
+  // Variables for template literal (Lines ~250-254)
+  const singleKcalE = singleKcal;
+  const singleProtE = singleProt;
+  const singleKcalC = singleKcal;
+  const singleProtC = singleProt;
+  const kcalDiffE = singleKcal - eTargetKcal;
+  const protDiffE = singleProt - eTargetProt;
+  const kcalDiffC = singleKcal - cTargetKcal;
+  const protDiffC = singleProt - cTargetProt;
+  const formatDiffStr = (val) => val > 0 ? `+${val}` : `${val}`;
 
-  const singleKcalE = Math.round((totalKcal / serves) * eShare);
-  const singleProtE = Math.round(((totalProt / serves) * eShare) * 10) / 10;
-  const singleKcalC = Math.round((totalKcal / serves) * cShare);
-  const singleProtC = Math.round(((totalProt / serves) * cShare) * 10) / 10;
-
-  const kcalDiffE = Math.round(singleKcalE - eMealTargetKcal);
-  const protDiffE = Math.round((singleProtE - eMealTargetProt) * 10) / 10;
-  const kcalDiffC = Math.round(singleKcalC - cMealTargetKcal);
-  const protDiffC = Math.round((singleProtC - cMealTargetProt) * 10) / 10;
-
-  const formatDiffStr = (diff) => `${diff >= 0 ? '+' : ''}${diff}`;
+  // Variables for render payload (Lines ~289-299)
+  const eKcal = singleKcal;
+  const cKcal = singleKcal; 
+  const eProt = singleProt;
+  const cProt = singleProt;
 
   const macroSplitHtml = `
     <div class="recipe-modal-crossbar-macros" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px;">
