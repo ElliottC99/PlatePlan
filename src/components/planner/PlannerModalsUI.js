@@ -78,7 +78,7 @@ export function renderSavePlanModalContent(defaultName = '') {
  * Returns HTML template string for #searchable-recipe-swap-modal
  */
 export function renderSearchableRecipeSwapModalDom() {
-  return `<div class="modal-card" style="max-width: 680px; width: 92%; max-height: 85vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 16px; background: var(--surface); box-shadow: 0 10px 30px rgba(0,0,0,0.2); border: 1px solid var(--border);">
+  return `<div class="modal-card" style="max-width: 680px; width: 92%; max-height: 85vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 16px; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); border: 1px solid var(--border,#e2e8f0);">
     <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface2);">
       <div>
         <h3 id="swap-modal-title" style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text);">Swap Recipe</h3>

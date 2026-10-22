@@ -89,41 +89,41 @@ export function renderEditSubtypeModalHTML({ sub, parentId, subtypeId, linkedPro
  */
 export function renderReorganizeModalHTML({ sub, parent, targetParents = [], siblingSubtypes = [] }) {
   return `
-    <div style="padding: 24px; max-width: 500px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 12px;">
+    <div style="padding: 24px; max-width: 500px; width: 100%; margin: 0 auto; background: #ffffff; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
       <h3 style="margin-top:0; margin-bottom: 16px; font-size: 1.15rem; font-weight: 750;">🔀 Reorganise: ${escapeHTML(sub.name)}</h3>
       
-      <div style="padding: 12px; border: 1px solid var(--border,#e7e5e4); border-radius: 8px; margin-bottom: 12px; background: #fafaf9;">
+      <div style="padding: 14px; border: 1px solid #f1f5f9; border-radius: 10px; margin-bottom: 12px; background: #fafaf9; transition: background 0.15s ease;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#fafaf9'">
         <div style="font-weight: 750; font-size: 13px; display:flex; align-items:center; justify-content:space-between">
           <span>🚀 Option A: Promote to Standalone Ingredient</span>
-          <button type="button" class="btn sm" id="btn-reorg-promote">Promote</button>
+          <button type="button" class="btn sm" id="btn-reorg-promote" style="font-weight:600">Promote</button>
         </div>
         <p style="margin:4px 0 0 0; font-size:11px; color:var(--text2)">Ejects this sub-type from parent "${escapeHTML(parent.name)}" into a standalone card.</p>
       </div>
 
-      <div style="padding: 12px; border: 1px solid var(--border,#e7e5e4); border-radius: 8px; margin-bottom: 12px; background: #fafaf9;">
+      <div style="padding: 14px; border: 1px solid #f1f5f9; border-radius: 10px; margin-bottom: 12px; background: #fafaf9; transition: background 0.15s ease;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#fafaf9'">
         <div style="font-weight: 750; font-size: 13px; margin-bottom: 6px;">📦 Option B: Move to another Parent Ingredient</div>
         <div style="display:flex; gap:8px;">
           <input type="text" list="pantry-items-list" id="reorg-move-select" style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff); outline:none;" placeholder="Search or select parent ingredient..." name="reorgMoveSelect">
           <datalist id="pantry-items-list">
             ${buildParentIngredientDropdownOptions(targetParents)}
           </datalist>
-          <button type="button" class="btn sm" id="btn-reorg-move">Move</button>
+          <button type="button" class="btn sm" id="btn-reorg-move" style="font-weight:600">Move</button>
         </div>
       </div>
 
-      <div style="padding: 12px; border: 1px solid var(--border,#e7e5e4); border-radius: 8px; margin-bottom: 20px; background: #fafaf9;">
+      <div style="padding: 14px; border: 1px solid #f1f5f9; border-radius: 10px; margin-bottom: 20px; background: #fafaf9; transition: background 0.15s ease;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#fafaf9'">
         <div style="font-weight: 750; font-size: 13px; margin-bottom: 6px;">🔀 Option C: Merge into another Sub-type sibling</div>
         <div style="display:flex; gap:8px;">
           <input type="text" list="pantry-items-list-sibling" id="reorg-merge-select" style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff); outline:none;" placeholder="Search or select sibling..." ${siblingSubtypes.length === 0 ? 'disabled' : ''} name="reorgMergeSelect">
           <datalist id="pantry-items-list-sibling">
             ${buildSubtypeDropdownOptions(siblingSubtypes)}
           </datalist>
-          <button type="button" class="btn sm" id="btn-reorg-merge" ${siblingSubtypes.length === 0 ? 'disabled' : ''}>Merge</button>
+          <button type="button" class="btn sm" id="btn-reorg-merge" style="font-weight:600" ${siblingSubtypes.length === 0 ? 'disabled' : ''}>Merge</button>
         </div>
       </div>
 
       <div style="display:flex; justify-content: flex-end;">
-        <button type="button" class="btn" id="btn-reorg-cancel">Cancel</button>
+        <button type="button" class="btn" id="btn-reorg-cancel" style="font-weight:600">Cancel</button>
       </div>
     </div>
   `;

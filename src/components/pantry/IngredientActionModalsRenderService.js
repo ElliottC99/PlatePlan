@@ -163,11 +163,11 @@ export function renderCustomAlertTemplate(message) {
  */
 export function renderReorganiseTemplate(ing, targetCandidates) {
   return `
-    <div style="padding: 24px; max-width: 500px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px;">
+    <div style="padding: 24px; max-width: 500px; width: 100%; margin: 0 auto; background: #ffffff; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
       <h3 style="margin-top:0; margin-bottom: 6px; font-size: 1.15rem; font-weight: 750;">🔀 Reorganise Ingredient: ${escapeHTML(ing.name)}</h3>
       <p style="font-size: 12.5px; color: var(--text2,#78716c); margin: 0 0 18px 0;">Select how you want to restructure or consolidate this ingredient.</p>
 
-      <div style="padding: 14px; border: 1px solid var(--border,#e7e5e4); border-radius: 10px; margin-bottom: 14px; background: var(--surface2,#fafaf9);">
+      <div style="padding: 14px; border: 1px solid #f1f5f9; border-radius: 10px; margin-bottom: 14px; background: #fafaf9; transition: background 0.15s ease;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#fafaf9'">
         <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">🔀 Option A: Merge into another Ingredient</div>
         <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Transfers all sub-types, linked products, and aliases to the target ingredient before removing this source.</p>
         <div style="display:flex; gap:8px;">
@@ -175,11 +175,11 @@ export function renderReorganiseTemplate(ing, targetCandidates) {
           <datalist id="pantry-items-list-ing-merge">
             ${targetCandidates.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${escapeHTML(c.category || 'Other')})</option>`).join('') || '<option value="">No other ingredients available</option>'}
           </datalist>
-          <button type="button" class="btn primary sm" id="btn-reorg-ing-merge" ${targetCandidates.length === 0 ? 'disabled' : ''}>Merge</button>
+          <button type="button" class="btn primary sm" id="btn-reorg-ing-merge" style="font-weight:600" ${targetCandidates.length === 0 ? 'disabled' : ''}>Merge</button>
         </div>
       </div>
 
-      <div style="padding: 14px; border: 1px solid var(--border,#e7e5e4); border-radius: 10px; margin-bottom: 20px; background: var(--surface2,#fafaf9);">
+      <div style="padding: 14px; border: 1px solid #f1f5f9; border-radius: 10px; margin-bottom: 20px; background: #fafaf9; transition: background 0.15s ease;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#fafaf9'">
         <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">⬇️ Option B: Convert to Sub-type of...</div>
         <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Nests this ingredient as a child sub-type under the chosen parent, preserving all linked products.</p>
         <div style="display:flex; gap:8px;">
@@ -187,12 +187,12 @@ export function renderReorganiseTemplate(ing, targetCandidates) {
           <datalist id="pantry-items-list-ing-demote">
             ${targetCandidates.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${escapeHTML(c.category || 'Other')})</option>`).join('') || '<option value="">No parent ingredients available</option>'}
           </datalist>
-          <button type="button" class="btn primary sm" id="btn-reorg-ing-demote" ${targetCandidates.length === 0 ? 'disabled' : ''}>Convert</button>
+          <button type="button" class="btn primary sm" id="btn-reorg-ing-demote" style="font-weight:600" ${targetCandidates.length === 0 ? 'disabled' : ''}>Convert</button>
         </div>
       </div>
 
       <div style="display:flex; justify-content: flex-end;">
-        <button type="button" class="btn" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn" onclick="window.closeSubtypeActionModal()" style="font-weight:600">Cancel</button>
       </div>
     </div>
   `;
