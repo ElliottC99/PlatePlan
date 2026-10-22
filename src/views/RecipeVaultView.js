@@ -205,6 +205,7 @@ export function handleRecipeSearch(query) {
 }
 
 export function renderRecipeVault() {
+  if (typeof window !== 'undefined') window.renderRecipeVault = renderRecipeVault;
   const ftEl = document.getElementById('filter-type');
   const fwEl = document.getElementById('filter-who');
   const ft = ftEl ? ftEl.value : 'all';
