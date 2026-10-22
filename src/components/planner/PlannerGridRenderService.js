@@ -51,12 +51,11 @@ export function renderRecipeCandidateRows(recipes, { dayIndex, mealType, person 
   const expandedRecipes = [];
   recipes.forEach(r => {
     expandedRecipes.push(r);
-    if (r.enhanced && typeof r.enhanced === 'object') {
+    if (r.enhanced) {
       expandedRecipes.push({
         ...r,
-        ...r.enhanced,
         id: r.id + '::enhanced',
-        name: r.enhanced.name || r.name + ' (Enhanced)'
+        name: r.enhanced.name || r.name
       });
     }
   });
@@ -66,20 +65,22 @@ export function renderRecipeCandidateRows(recipes, { dayIndex, mealType, person 
   }
   const activeProfile = person === 'both' ? 'everyone' : person;
   return filtered.map(r => {
-    const variant = (r.id && r.id.includes('::enhanced')) ? 'enhanced' : 'original';
+    const isEnhanced = r.id && r.id.includes('::enhanced');
+    const variant = isEnhanced ? 'enhanced' : 'original';
     const baseId = (r.id && r.id.includes('::')) ? r.id.split('::')[0] : r.id;
     // The score calculator needs the recipe, the badge needs the recipe.
     const fitObj = typeof window.calculateMealFitScore === 'function' ? window.calculateMealFitScore(r, mealType, { activeProfile, variant }) : null;
     const badgeHtml = typeof window.renderFitScoreBadge === 'function' ? window.renderFitScoreBadge(r, mealType, { activeProfile, variant, precomputedFit: fitObj, showLabel: true }) : '';
     const isDup = isRecipeInSkeletonGrid(baseId, skeletonGrid) || isRecipeInSkeletonGrid(r.id, skeletonGrid);
     const clickAction = person === 'both'
-      ? `window.setSlotConfiguredStatus(${dayIndex}, '${mealType}', 'pinned', '${escapeAttr(baseId)}', '${escapeAttr(r.name)}')`
-      : `window.setSplitPersonSlotStatus(${dayIndex}, '${mealType}', '${person}', 'pinned', '${escapeAttr(baseId)}', '${escapeAttr(r.name)}')`;
+      ? `window.setSlotConfiguredStatus(${dayIndex}, '${mealType}', 'pinned', '${escapeAttr(r.id)}', '${escapeAttr(r.name)}')`
+      : `window.setSplitPersonSlotStatus(${dayIndex}, '${mealType}', '${person}', 'pinned', '${escapeAttr(r.id)}', '${escapeAttr(r.name)}')`;
 
     return `
       <div onclick="${clickAction}" style="padding:8px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#ffffff;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#ffffff'">
         <div style="min-width:0;flex:1;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span style="font-weight:600;color:#1e293b">${escapeHtml(r.name)}</span>
+          ${isEnhanced ? '<span class="tag green" style="background:#dcfce7;color:#16a34a;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700;margin-left:4px">Enhanced</span>' : ''}
           ${badgeHtml}
           ${isDup ? `<span class="badge badge-warning" style="font-size:10px;background:#fef3c7;color:#b45309;font-weight:700;padding:2px 6px;border-radius:4px">🔄 Already in Plan</span>` : ''}
         </div>
