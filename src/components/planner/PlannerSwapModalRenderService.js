@@ -107,7 +107,7 @@ export function renderSwapModalItem(item, { isCurrent, isSelected, day, slotKey,
           <span>🔥 <strong>${item.cal}</strong> kcal</span>
           <span>💪 <strong>${item.prot}</strong>g protein</span>
           ${item.serves ? `<span>🍽️ Serves ${item.serves}</span>` : ''}
-          ${renderFitScoreBadge(item.fitRes || item.recipe || item, targetSlot, { showLabel: true })}
+          ${typeof window.renderFitScoreBadge === 'function' ? window.renderFitScoreBadge(item.recipe, targetSlot, { showLabel: true, variant: item.variant, precomputedFit: item.fitRes }) : ''}
         </div>
       </div>
       <div style="flex-shrink:0;display:flex;align-items:center;gap:8px">
