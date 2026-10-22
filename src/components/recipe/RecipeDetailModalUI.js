@@ -253,6 +253,12 @@ export function renderRecipeDetailModalContent(props = {}) {
           </div>
         </div>
         <div class="recipe-view-nav-actions" style="display:flex;align-items:center;gap:8px">
+          ${hasEnh ? `
+            <div class="segmented-control" role="tablist" style="width:fit-content;transform:scale(0.9);transform-origin:right center;">
+              <button type="button" role="tab" class="${!isEnh ? 'active' : ''}" onclick="switchViewTab('original')">Original</button>
+              <button type="button" role="tab" class="${isEnh ? 'active' : ''}" onclick="switchViewTab('enhanced')">✨ Enhanced</button>
+            </div>
+          ` : ''}
           <button type="button" id="modal-recipe-fav-btn" class="recipe-fav-btn ${favBtnClass}" onclick="toggleRecipeFavourite('${escapeAttr(r.id)}', event, '${variantKey}')" aria-label="${isFav ? 'Remove from favourites' : 'Add to favourites'}" title="${isFav ? 'Favourited' : 'Add to favourites'}">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
@@ -265,29 +271,23 @@ export function renderRecipeDetailModalContent(props = {}) {
       <style>
         #view-modal-content { max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; }
         .recipe-view-sheet { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-        .recipe-modal-crossbar{width:100%;background:var(--surface2,#f5f4ee);border:1px solid var(--border,#e5e5e5);border-radius:12px;padding:12px 16px;margin-bottom:20px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px}
-        .recipe-modal-crossbar-controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px;flex:1 1 300px}
-        .recipe-modal-crossbar-macros{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px;flex:1 1 360px}
-        .recipe-modal-body{display:grid;grid-template-columns:1fr 1.2fr;gap:22px;align-items:start; overflow-y: auto; flex: 1 1 auto; min-height: 0; padding-right: 8px; -webkit-overflow-scrolling: touch;}
-        @media(max-width:768px){.recipe-modal-crossbar{flex-direction:column;align-items:stretch;padding:12px;gap:12px}.recipe-modal-crossbar-macros{justify-content:stretch}.recipe-modal-body{grid-template-columns:1fr;gap:18px}}
-        .recipe-modal-col-card{background:var(--surface,#ffffff);border:1px solid var(--border,#e5e5e5);border-radius:12px;padding:16px 18px}
-        .recipe-method-step-card{position:relative;padding:12px 14px 12px 42px;margin-bottom:10px;background:var(--surface2,#faf9f6);border:1px solid var(--border,#eee);border-radius:10px;font-size:13.5px;line-height:1.6;color:var(--text)}
+        .recipe-modal-crossbar{width:100%;background:var(--surface2,#f5f4ee);border:1px solid var(--border,#e5e5e5);border-radius:10px;padding:8px 12px;margin-bottom:10px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px}
+        .recipe-modal-crossbar-controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;flex:1 1 300px}
+        .recipe-modal-crossbar-macros{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;flex:1 1 360px}
+        .recipe-modal-body{display:grid;grid-template-columns:1fr 1.2fr;gap:18px;align-items:start; overflow-y: auto; flex: 1 1 auto; min-height: 0; padding-right: 8px; -webkit-overflow-scrolling: touch;}
+        @media(max-width:768px){.recipe-modal-crossbar{flex-direction:column;align-items:stretch;padding:10px;gap:10px}.recipe-modal-crossbar-macros{justify-content:stretch}.recipe-modal-body{grid-template-columns:1fr;gap:14px}}
+        .recipe-modal-col-card{background:var(--surface,#ffffff);border:1px solid var(--border,#e5e5e5);border-radius:12px;padding:14px 16px}
+        .recipe-method-step-card{position:relative;padding:10px 12px 10px 38px;margin-bottom:8px;background:var(--surface2,#faf9f6);border:1px solid var(--border,#eee);border-radius:10px;font-size:13.5px;line-height:1.5;color:var(--text)}
         .recipe-method-step-card:last-child{margin-bottom:0}
-        .recipe-method-step-card .step-num{position:absolute;left:12px;top:12px;width:22px;height:22px;border-radius:50%;background:var(--text,#292524);color:var(--bg,#fff);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+        .recipe-method-step-card .step-num{position:absolute;left:10px;top:10px;width:20px;height:20px;border-radius:50%;background:var(--text,#292524);color:var(--bg,#fff);font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
       </style>
 
-      ${sourceHtml ? `<div class="recipe-source-bar" style="font-size:12px;color:var(--text2);margin-bottom:12px">${sourceHtml}</div>` : ''}
+      ${sourceHtml ? `<div class="recipe-source-bar" style="font-size:12px;color:var(--text2);margin-bottom:8px">${sourceHtml}</div>` : ''}
 
       <!-- Top Full-Width Horizontal Crossbar -->
       <div class="recipe-modal-crossbar">
         <!-- Left: Controls -->
         <div class="recipe-modal-crossbar-controls">
-          ${hasEnh ? `
-            <div class="segmented-control" role="tablist" style="width:fit-content;">
-              <button type="button" role="tab" class="${!isEnh ? 'active' : ''}" onclick="switchViewTab('original')">Original</button>
-              <button type="button" role="tab" class="${isEnh ? 'active' : ''}" onclick="switchViewTab('enhanced')">✨ Enhanced</button>
-            </div>
-          ` : ''}
           <div class="segmented-control" role="tablist">
             <button type="button" role="tab" class="${servingMode === 'both' ? 'active' : ''}" onclick="switchPreviewServingMode('both')">Shared (${baseServes})</button>
             <button type="button" role="tab" class="${servingMode === 'elliott' ? 'active' : ''}" onclick="switchPreviewServingMode('elliott')">👤 Elliott</button>

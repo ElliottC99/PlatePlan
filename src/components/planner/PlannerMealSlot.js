@@ -204,7 +204,7 @@ export function filterSearchableRecipeSwapModal(query = '') {
     if (!r || !r.id) return;
     flattenedCandidates.push({ recipe: r, variant: 'original', name: r.name || r.title || 'Untitled Recipe' });
     if (r.enhanced) {
-      flattenedCandidates.push({ recipe: r, variant: 'enhanced', name: (r.enhanced.name || r.name || r.title || 'Untitled Recipe') + ' (Enhanced)' });
+      flattenedCandidates.push({ recipe: r, variant: 'enhanced', name: (r.enhanced.name || r.name || r.title || 'Untitled Recipe') });
     }
   });
 
@@ -248,7 +248,7 @@ export function filterSearchableRecipeSwapModal(query = '') {
     row.innerHTML = `
       <img src="${escapeAttr(activeR.photo || activeR.img || activeR.image || placeholderImg)}" alt="${escapeAttr(item.name)}" style="width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.src='${placeholderImg}'">
       <div style="flex:1;min-width:0">
-        <div style="font-weight:650;font-size:13.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.name)}</div>
+        <div style="font-weight:650;font-size:13.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.name)}${variant === 'enhanced' ? ' <span class="badge badge-enhanced" style="background:#dcfce7;color:#15803d;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700">Enhanced</span>' : ''}</div>
         <div style="font-size:11.5px;color:var(--text2);margin-top:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span><strong>${cal}</strong> kcal</span><span>·</span><span><strong>${prot}g</strong> protein</span><span>·</span>${fitBadgeHtml}
         </div>

@@ -115,7 +115,7 @@ export function sweepRecipeMacroQuality(recipes = []) {
 export function calculateCalorieScore(actual, target) {
   if (!target || target <= 0 || actual === null || actual === undefined || actual <= 0) return 0;
   const state = typeof getState === 'function' ? getState() : {};
-  const params = state?.prefs?.fitScoreParams || state?.userPrefs?.fitScoreParams || {};
+  const params = state?.userPrefs?.fitScoreParams || state?.prefs?.fitScoreParams || {};
   const minOpt = params.calMinOpt ?? 0.95;
   const maxOpt = params.calMaxOpt ?? 1.00;
   const lowFloor = params.calLowFloor ?? 0.50;
@@ -143,7 +143,7 @@ export function calculateCalorieScore(actual, target) {
 export function calculateProteinScore(actual, target) {
   if (!target || target <= 0 || actual === null || actual === undefined || actual <= 0) return 0;
   const state = typeof getState === 'function' ? getState() : {};
-  const params = state?.prefs?.fitScoreParams || state?.userPrefs?.fitScoreParams || {};
+  const params = state?.userPrefs?.fitScoreParams || state?.prefs?.fitScoreParams || {};
   const protMinOpt = params.protMinOpt ?? 1.00;
   const protMaxOpt = params.protMaxOpt ?? 1.20;
   const protLowFloor = params.protLowFloor ?? 0.70;

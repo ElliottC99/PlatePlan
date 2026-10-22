@@ -220,9 +220,12 @@ export function renderRecipePreview() {
   const eSharePct = Math.round(eShare * 100);
   const cSharePct = Math.round(cShare * 100);
 
+  const serves = Number(activeR.servings || activeR.serves || r.servings || r.serves || 1) || 1;
   const macros = typeof extractRecipeMacros === 'function' ? extractRecipeMacros(r, isEnh ? 'enhanced' : 'original') : {};
-  const perServCal = Number(macros.cal ?? macros.calories ?? activeR.calories ?? 450);
-  const perServProt = Number(macros.prot ?? macros.protein ?? activeR.protein ?? 28);
+  const rawBatchCal = Number(macros.cal ?? macros.calories ?? activeR.calories ?? 450);
+  const rawBatchProt = Number(macros.prot ?? macros.protein ?? activeR.protein ?? 28);
+  const perServCal = rawBatchCal / serves;
+  const perServProt = rawBatchProt / serves;
 
   const batchServings = previewState.servingMode === 'both' ? previewState.targetServes : 2;
   const batchCal = perServCal * batchServings;
