@@ -170,18 +170,42 @@ export async function promoteSubtype(parentId, subtypeId) {
 
   const [removedSub] = parent.subtypes.splice(subIdx, 1);
   const newRootId = removedSub.id || `ing_${Date.now()}`;
+  const newSubId = `sub_${Date.now()}`;
   const newRoot = {
     id: newRootId,
     name: removedSub.name,
     category: parent.category || 'Store Cupboard',
     notes: removedSub.notes || '',
     aliases: Array.isArray(removedSub.aliases) ? removedSub.aliases : [],
-    subtypes: [],
+    subtypes: [
+      {
+        id: newSubId,
+        name: removedSub.name,
+        aliases: Array.isArray(removedSub.aliases) ? removedSub.aliases : [],
+        defaultProductId: removedSub.defaultProductId || null,
+        createdAt: new Date().toISOString()
+      }
+    ],
     defaultProductId: removedSub.defaultProductId || null,
     updatedAt: new Date().toISOString()
   };
   parent.updatedAt = new Date().toISOString();
   ings.push(newRoot);
+
+  const products = state.products || [];
+  const updatedProds = products.map(p => {
+    if (String(p.subtypeId) === String(subtypeId)) {
+      return {
+        ...p,
+        ingredientId: String(newRootId),
+        subtypeId: String(newSubId),
+        category: newRoot.category,
+        updatedAt: new Date().toISOString()
+      };
+    }
+    return p;
+  });
+  setProducts(updatedProds);
 
   const { allRecipes, modifiedRecipes } = remapRecipeIngredients(recipes, (item) => {
     const isMatch = (String(item.pantryItemId || item.ingredientId || '') === String(parentId) && String(item.subtypeId || '') === String(subtypeId))

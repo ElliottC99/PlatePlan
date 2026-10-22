@@ -243,13 +243,13 @@ export function renderRecipePreview() {
       <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4); font-size: 11.5px;">
         <span style="font-weight:700;">👤 Elliott (${eSharePct}%):</span>
         <span>🔥 <strong>${eKcal} kcal</strong> ${eCalBadge}</span>
-        <span>🥩 <strong>${eProt}g</strong> ${eProtBadge}</span>
+        <span>💪 <strong>${eProt}g</strong> ${eProtBadge}</span>
       </div>
 
       <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4); font-size: 11.5px;">
         <span style="font-weight:700;">👤 Chloe (${cSharePct}%):</span>
         <span>🔥 <strong>${cKcal} kcal</strong> ${cCalBadge}</span>
-        <span>🥩 <strong>${cProt}g</strong> ${cProtBadge}</span>
+        <span>💪 <strong>${cProt}g</strong> ${cProtBadge}</span>
       </div>
     </div>
   `;

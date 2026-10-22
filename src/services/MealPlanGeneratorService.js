@@ -62,7 +62,23 @@ export function generateMealPlan(options = {}) {
   const minFitScore = Number(options.minFitScore !== undefined ? options.minFitScore : (getState()?.prefs?.minFitScore || 0));
   const maxFitScore = Number(options.maxFitScore !== undefined ? options.maxFitScore : (getState()?.prefs?.maxFitScore || 100));
   const skeletonGrid = options.skeletonGrid ?.skeletonGrid || {};
-  const allRecipes = Array.isArray(options.recipes) ? options.recipes : (getState()?.recipes || []);
+  const rawRecipes = Array.isArray(options.recipes) ? options.recipes : (getState()?.recipes || []);
+  const allRecipes = [];
+  rawRecipes.forEach(r => {
+    if (!r || !r.id) return;
+    allRecipes.push({ ...r, _variant: 'original' });
+    if (r.enhanced && typeof r.enhanced === 'object') {
+      allRecipes.push({
+        ...r,
+        ...r.enhanced,
+        id: r.id,
+        originalId: r.id,
+        _variant: 'enhanced',
+        name: r.enhanced.name || r.name + ' (Enhanced)',
+        enhanced: r.enhanced
+      });
+    }
+  });
 
   if (!allRecipes.length) {
     throw new Error('No recipes available in the Recipe Vault to generate plan.');

@@ -220,11 +220,11 @@ export function renderRecipeVault() {
   const actionsBar = document.createElement('div');
   actionsBar.className = 'recipe-actions-bar';
   actionsBar.style.display = 'flex';
-  actionsBar.style.gap = '10px';
-  actionsBar.style.marginBottom = '16px';
+  actionsBar.style.gap = '6px';
+  actionsBar.style.marginBottom = '10px';
   actionsBar.innerHTML = `
-    <button id="btn-manual-recipe" class="btn primary">Create Recipe</button>
-    <button id="btn-import-recipe" class="btn secondary">Paste & Parse Recipes</button>
+    <button id="btn-manual-recipe" class="btn primary sm">Create Recipe</button>
+    <button id="btn-import-recipe" class="btn secondary sm">Paste & Parse Recipes</button>
   `;
   
   // Clear existing before adding if it exists

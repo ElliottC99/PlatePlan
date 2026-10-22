@@ -55,7 +55,7 @@ export function renderNutriScoreBadgeCard(stats = {}) {
         <div style="display:flex;flex-direction:column;gap:8px">
           <div>
             <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;margin-bottom:3px">
-              <span style="color:var(--text2)">🥩 Protein Safety Ratio</span>
+              <span style="color:var(--text2)">💪 Protein Safety Ratio</span>
               <span style="color:var(--blue)">${proteinScore}%</span>
             </div>
             <div style="width:100%;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;border:1px solid var(--border)">

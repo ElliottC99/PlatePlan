@@ -10,7 +10,7 @@ const app = express();
 const PORT = 3000;
 
 const distDir = path.join(__dirname, 'dist');
-const hasDist = fs.existsSync(distDir) && fs.existsSync(path.join(distDir, 'PlatePlan.html'));
+const hasDist = fs.existsSync(distDir) && fs.existsSync(path.join(distDir, 'index.html'));
 const staticDir = hasDist ? distDir : __dirname;
 
 app.use(express.static(staticDir));
@@ -19,7 +19,7 @@ if (staticDir !== __dirname) {
 }
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(staticDir, 'PlatePlan.html'));
+  res.sendFile(path.join(staticDir, 'index.html'));
 });
 
 app.get('*', (req, res) => {
@@ -30,7 +30,7 @@ app.get('*', (req, res) => {
     return res.status(404).send('Asset Not Found');
   }
   console.log(`[Server] Serving HTML fallback for path: ${req.path}`);
-  res.sendFile(path.join(staticDir, 'PlatePlan.html'));
+  res.sendFile(path.join(staticDir, 'index.html'));
 });
 
 app.listen(PORT, '0.0.0.0', () => {
