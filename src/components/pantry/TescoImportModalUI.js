@@ -183,9 +183,17 @@ export function openSubtypeExistingProductPickerModal(subtypeId, parentId) {
     } else {
       if (!window.__draftSubtypePayload) window.__draftSubtypePayload = { parentId, name: subName, notes: '' };
       window.__draftSubtypePayload.linkedProductIds = selectedArray;
-      if (typeof window.openIngredientFamilyDetailsModal === 'function') {
-        window.openIngredientFamilyDetailsModal(null, parentId);
-      }
+      import('../../views/PantryBankModalService.js').then((module) => {
+        if (typeof module.openIngredientFamilyDetailsModal === 'function') {
+          module.openIngredientFamilyDetailsModal(null, parentId);
+          setTimeout(() => {
+            const nameInput = document.getElementById('ingredient-family-details-name');
+            const notesInput = document.getElementById('ingredient-family-details-notes');
+            if (nameInput && window.__draftSubtypePayload?.name) nameInput.value = window.__draftSubtypePayload.name;
+            if (notesInput && window.__draftSubtypePayload?.notes) notesInput.value = window.__draftSubtypePayload.notes;
+          }, 50);
+        }
+      });
     }
   };
 }

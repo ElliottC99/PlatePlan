@@ -159,8 +159,10 @@ export async function saveIngredientFamilyDetailsModal(renderIngredientBank) {
     const parent = currentIngs.find(p => String(p.id) === String(parentId));
     if (!parent) return;
 
-    const hasProduct = activeEditingIngredientId && (state.products || []).some(p => String(p.subtypeId) === String(activeEditingIngredientId));
-    if (!activeEditingIngredientId || !hasProduct) {
+    const hasDraftProducts = window.__draftSubtypePayload?.linkedProductIds?.length > 0;
+    const hasExistingProduct = activeEditingIngredientId && (state.products || []).some(p => String(p.subtypeId) === String(activeEditingIngredientId));
+    
+    if (!hasExistingProduct && !hasDraftProducts) {
       const msgEl = document.getElementById('ingredient-family-details-msg');
       if (msgEl) {
         msgEl.innerHTML = `<div style="padding: 10px; background: #fee2e2; color: #ef4444; border-radius: 8px; font-weight: 600; margin-bottom: 12px;">⚠️ A sub-type must have at least one product attached or linked before saving.</div>`;
@@ -169,13 +171,40 @@ export async function saveIngredientFamilyDetailsModal(renderIngredientBank) {
     }
 
     if (!Array.isArray(parent.subtypes)) parent.subtypes = [];
-    const sub = parent.subtypes.find(s => String(s.id) === String(activeEditingIngredientId));
-    if (sub) {
-      sub.name = name; sub.notes = notes; parent.updatedAt = new Date().toISOString();
-      setIngredients(currentIngs); closeIngredientFamilyDetailsModal(); 
-      if (typeof renderIngredientBank === 'function') renderIngredientBank();
-      try { await saveIngredient(parent); } catch (e) {}
+    
+    let newOrExistingId = activeEditingIngredientId;
+    if (activeEditingIngredientId) {
+      const sub = parent.subtypes.find(s => String(s.id) === String(activeEditingIngredientId));
+      if (sub) { sub.name = name; sub.notes = notes; }
+    } else {
+      newOrExistingId = `sub_${Date.now()}`;
+      parent.subtypes.push({ id: newOrExistingId, name, notes, category: parent.category });
     }
+    
+    parent.updatedAt = new Date().toISOString();
+    setIngredients(currentIngs); 
+    closeIngredientFamilyDetailsModal(); 
+    if (typeof renderIngredientBank === 'function') renderIngredientBank();
+    
+    try { 
+      const { saveIngredient } = await import('../services/IngredientRepository.js');
+      await saveIngredient(parent); 
+      
+      // Bind draft products to the new sub-type
+      if (hasDraftProducts && !activeEditingIngredientId) {
+          const { getProducts, saveProduct } = await import('../services/ProductRepository.js');
+          const allProds = await getProducts();
+          for (const pid of window.__draftSubtypePayload.linkedProductIds) {
+              const prod = allProds.find(p => String(p.id) === String(pid));
+              if (prod) {
+                  prod.subtypeId = newOrExistingId;
+                  prod.ingredientId = parent.id;
+                  await saveProduct(prod);
+              }
+          }
+      }
+      window.__draftSubtypePayload = null; 
+    } catch (e) { console.error('Subtype save error:', e); }
     return;
   }
 
