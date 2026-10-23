@@ -93,7 +93,7 @@ export function renderIngredientBank() {
       <div style="font-size:32px;margin-bottom:8px">🏛️</div>
       <h3 style="font-size:16px;font-weight:700;margin:0 0 6px 0">No items in Pantry Bank</h3>
       <p style="font-size:12.5px;color:var(--text2,#78716c);margin:0 0 12px 0">Add Categories, Items, and Sub-types to build your master Pantry Bank catalog.</p>
-      <button class="btn primary sm" type="button" data-action="create-ingredient-family">+ Add to Bank</button>
+      <button class="btn primary sm" type="button" data-action="add-to-bank">+ Add to Bank</button>
     </div>`;
 
     if (!container.hasAttribute('data-delegated')) {
@@ -187,6 +187,11 @@ export function attachPantryBankDelegation() {
     if (action === 'link-product') import('../components/pantry/SubtypeProductLinkerModalUI.js').then(m => m.openSubtypeLinkSelectionModal(subtypeId, parentId));
     if (action === 'alias-item') import('../components/pantry/IngredientActionModalsUI.js').then(m => m.promptAddAlias(id));
     if (action === 'reorganise-item') import('../components/pantry/IngredientActionModalsUI.js').then(m => m.openIngredientReorganiseModal(id));
+    if (action === 'add-to-bank' || action === 'create-ingredient-family') {
+      import('../components/pantry/AddToBankModalUI.js')
+        .then(m => m.openAddToBankModal())
+        .catch(err => console.error('Delegation Error [add-to-bank]:', err));
+    }
   });
 }
 
