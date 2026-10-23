@@ -294,50 +294,77 @@ export async function hydrateHouseholdData(options = {}) {
 }
 
 let unsubs = [];
-function setupRealtimeSubscriptions() {
+let isSubscriptionsInitialized = false;
+let subscriptionDebounceTimer = null;
+
+export function teardownRealtimeSubscriptions() {
+  if (subscriptionDebounceTimer) {
+    clearTimeout(subscriptionDebounceTimer);
+    subscriptionDebounceTimer = null;
+  }
   if (unsubs.length > 0) {
     unsubs.forEach(unsub => { if (typeof unsub === 'function') unsub(); });
     unsubs = [];
   }
+  isSubscriptionsInitialized = false;
+}
 
-  try {
-    unsubs.push(subscribeRecipes((recipes) => {
-      setRecipes(recipes.map(cleanLegacyMacros));
-      if (getState()) getState().recipes = recipes;
-    }));
-
-    unsubs.push(subscribeIngredients((ingredients) => {
-      const normIngs = (ingredients || []).map(normalizeIngredientRecord);
-      setIngredients(normIngs);
-      if (getState()) getState().ingredients = normIngs;
-    }));
-
-    unsubs.push(subscribeProducts((products) => {
-      const normProds = (products || []).map(normalizeProductRecord);
-      setProducts(normProds);
-      if (getState()) getState().products = normProds;
-    }));
-
-    unsubs.push(subscribePreferences((prefs) => {
-      if (prefs) {
-        const sanitized = sanitizePreferences(prefs);
-        setPreferences(sanitized);
-        if (getState()) {
-          getState().settings = { ...(getState().settings || {}), ...(sanitized.settings || {}) };
-        }
-      }
-    }));
-
-    unsubs.push(subscribeCurrentPlan((plan) => {
-      if (plan) {
-        setCurrentPlan(plan);
-        if (getState()) {
-          getState().currentPlan = plan;
-          if (plan.skeletonGrid) getState().skeletonGrid = plan.skeletonGrid;
-        }
-      }
-    }));
-  } catch (err) {
-    console.warn('[HydrationService] Realtime subscription setup warning:', err);
+function setupRealtimeSubscriptions() {
+  if (isSubscriptionsInitialized && unsubs.length > 0) {
+    return;
   }
+
+  if (subscriptionDebounceTimer) {
+    clearTimeout(subscriptionDebounceTimer);
+  }
+
+  subscriptionDebounceTimer = setTimeout(() => {
+    if (unsubs.length > 0) {
+      unsubs.forEach(unsub => { if (typeof unsub === 'function') unsub(); });
+      unsubs = [];
+    }
+
+    try {
+      unsubs.push(subscribeRecipes((recipes) => {
+        setRecipes(recipes.map(cleanLegacyMacros));
+        if (getState()) getState().recipes = recipes;
+      }));
+
+      unsubs.push(subscribeIngredients((ingredients) => {
+        const normIngs = (ingredients || []).map(normalizeIngredientRecord);
+        setIngredients(normIngs);
+        if (getState()) getState().ingredients = normIngs;
+      }));
+
+      unsubs.push(subscribeProducts((products) => {
+        const normProds = (products || []).map(normalizeProductRecord);
+        setProducts(normProds);
+        if (getState()) getState().products = normProds;
+      }));
+
+      unsubs.push(subscribePreferences((prefs) => {
+        if (prefs) {
+          const sanitized = sanitizePreferences(prefs);
+          setPreferences(sanitized);
+          if (getState()) {
+            getState().settings = { ...(getState().settings || {}), ...(sanitized.settings || {}) };
+          }
+        }
+      }));
+
+      unsubs.push(subscribeCurrentPlan((plan) => {
+        if (plan) {
+          setCurrentPlan(plan);
+          if (getState()) {
+            getState().currentPlan = plan;
+            if (plan.skeletonGrid) getState().skeletonGrid = plan.skeletonGrid;
+          }
+        }
+      }));
+
+      isSubscriptionsInitialized = true;
+    } catch (err) {
+      console.warn('[HydrationService] Realtime subscription setup warning:', err);
+    }
+  }, 300);
 }

@@ -17,7 +17,7 @@ if (typeof window !== 'undefined') {
  * Modern ES6 Architecture Entry Point & Atomic Lifecycle Coordinator.
  */
 import { waitForAuth } from './services/AuthService.js';
-import { hydrateHouseholdData } from './services/HydrationService.js';
+import { hydrateHouseholdData, teardownRealtimeSubscriptions } from './services/HydrationService.js';
 import { subscribe, getState, initStoreCache, setActivePlan } from './store/store.js';
 import { setupActionBridge } from './services/ActionBridge.js';
 import { saveCurrentPlan, stripPlanPayload, getCategories, saveCategories } from './services/HouseholdRepository.js';
@@ -190,6 +190,7 @@ if (typeof window !== 'undefined') {
     closePlatePlanSyncPanel: closeSyncPanelModal,
 
     logout() {
+      teardownRealtimeSubscriptions();
       if (window.firebase && window.firebase.auth) { try { window.firebase.auth().signOut(); } catch(e) {} }
       try { localStorage.clear(); } catch(e) {}
       try { sessionStorage.clear(); } catch(e) {}
@@ -287,7 +288,7 @@ function setupSubscriptions() {
   subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
 }
 
-export const APP_VERSION = 'v3.42.21';
+export const APP_VERSION = 'v3.42.22';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
