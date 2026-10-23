@@ -131,6 +131,12 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
 
 if (typeof window !== 'undefined') {
   window.handleSubtypeProductAction = function(actionType) {
+    const rawAction = String(actionType || '').toLowerCase();
+    let normalizedAction = '';
+    if (rawAction.includes('manual')) normalizedAction = 'manual';
+    else if (rawAction.includes('link')) normalizedAction = 'link';
+    else if (rawAction.includes('tesco')) normalizedAction = 'tesco';
+
     const nameEl = document.getElementById('ingredient-family-details-name');
     const notesEl = document.getElementById('ingredient-family-details-notes');
     const wrapEl = document.getElementById('ingredient-family-details-wrap');
@@ -162,7 +168,7 @@ if (typeof window !== 'undefined') {
     const parentId = wrapEl.dataset.parentId;
 
     setTimeout(() => {
-      if (actionType === 'manual') {
+      if (normalizedAction === 'manual') {
         import('../../views/ProductBankView.js').then((module) => {
           window.__prefilledResolveBinding = { parentId, subtypeId: editingSubtypeId, subtypeDraftName: window.__draftSubtypePayload.name };
           if (typeof module.openProductEditModal === 'function') {
@@ -171,7 +177,7 @@ if (typeof window !== 'undefined') {
             console.error('Decision Tree Failure: Function not exported in module.', module);
           }
         }).catch(err => console.error('Failed to load manual product modal', err));
-      } else if (actionType === 'link') {
+      } else if (normalizedAction === 'link') {
         import('./SubtypeProductLinkerModalUI.js').then((module) => {
           if (typeof module.openSubtypeExistingProductPickerModal === 'function') {
             module.openSubtypeExistingProductPickerModal(editingSubtypeId, parentId);
@@ -179,7 +185,7 @@ if (typeof window !== 'undefined') {
             console.error('Decision Tree Failure: Function not exported in module.', module);
           }
         }).catch(err => console.error('Failed to load link modal', err));
-      } else if (actionType === 'tesco') {
+      } else if (normalizedAction === 'tesco') {
         import('./TescoImportModalUI.js').then((module) => {
           if (typeof module.openTescoImportModal === 'function') {
             module.openTescoImportModal(editingSubtypeId, parentId);
