@@ -13,8 +13,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#F7F6F2">
 <meta name="description" content="PlatePlan — shared meal planning for Elliott and Chloe">
-<meta name="app-version" content="v3.42.6">
-<meta name="version" content="v3.42.6">
+<meta name="app-version" content="v3.42.7">
+<meta name="version" content="v3.42.7">
 <meta name="application-name" content="PlatePlan">
 <meta property="og:title" content="PlatePlan — Elliott &amp; Chloe">
 <meta property="og:description" content="PlatePlan — shared meal planning for Elliott and Chloe">
@@ -1455,7 +1455,8 @@ try{
       <div id="parent-ingredient-display-wrap" style="display:none;margin-bottom:12px;padding:8px 10px;background:var(--surface2,#f5f5f4);border-radius:8px;font-size:12px;font-weight:600;border:1px solid var(--border,#e7e5e4)"></div>
       <div class="field">
         <label for="ingredient-family-details-cat">Category</label>
-        <select id="ingredient-family-details-cat" name="ingredientFamilyDetailsCat"></select>
+        <input type="text" id="ingredient-family-details-cat" list="category-options" placeholder="Search or type category..." class="form-control" autocomplete="off" name="ingredientFamilyDetailsCat">
+        <datalist id="category-options"></datalist>
       </div>
       <div class="field">
         <label id="ingredient-family-details-name-label" for="ingredient-family-details-name">Item Name</label>

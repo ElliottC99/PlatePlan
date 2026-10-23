@@ -60,22 +60,39 @@ export function openIngredientFamilyDetailsModal(ingredientId = null, parentId =
   const notesEl = document.getElementById('ingredient-family-details-notes');
   const msgEl = document.getElementById('ingredient-family-details-msg');
 
-  if (titleEl) {
-    titleEl.textContent = ing ? `Edit ${ing.name}` : (parent ? `Add Sub-type to ${parent.name}` : 'New Catalog Item');
-  }
-  if (nameEl) nameEl.value = ing?.name || '';
-  if (notesEl) notesEl.value = ing?.notes || '';
+  const parentItem = parent;
+  const categories = state.categories || getActiveCategories(state) || [];
 
-  if (catEl) {
-    const categories = getActiveCategories(state);
-    const selectedCat = (ing?.category || parent?.category || '').toLowerCase();
-    catEl.innerHTML = categories.map(c => `<option value="${escapeAttr(c.toLowerCase())}" ${selectedCat === c.toLowerCase() ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
-    catEl.disabled = Boolean(parent && !ing);
-    const targetCat = ing?.category || parent?.category || '';
-    if (targetCat) catEl.value = targetCat;
-    if (parent && !ing) {
-      catEl.value = parent.category ? parent.category.toLowerCase() : '';
-      catEl.disabled = true;
+  if (parentId && parentItem) {
+    if (titleEl) titleEl.textContent = `Add Sub-type to ${parentItem.name}`;
+    const parentWrap = document.getElementById('parent-ingredient-display-wrap');
+    if (parentWrap) {
+      parentWrap.style.display = 'block';
+      parentWrap.innerHTML = `<div class="locked-parent-badge" style="background:#f3f4f6;color:#4b5563;padding:6px 12px;border-radius:6px;font-size:0.85rem;margin-bottom:12px;">🔗 Parent Item: <strong>${escapeHtml(parentItem.name)}</strong></div>`;
+    }
+    const catField = catEl?.closest('.field') || catEl?.parentNode;
+    if (catField) catField.style.display = 'none';
+    if (catEl) catEl.value = parentItem.category || '';
+  } else {
+    if (titleEl) titleEl.textContent = ing ? `Edit ${ing.name}` : 'New Catalog Item';
+    const parentWrap = document.getElementById('parent-ingredient-display-wrap');
+    if (parentWrap) {
+      parentWrap.style.display = 'none';
+      parentWrap.innerHTML = '';
+    }
+    const catField = catEl?.closest('.field') || catEl?.parentNode;
+    if (catField) catField.style.display = 'block';
+
+    const datalist = document.getElementById('category-options');
+    if (datalist) {
+      datalist.innerHTML = categories.map(c => {
+        const cName = typeof c === 'string' ? c : (c.name || '');
+        return `<option value="${escapeAttr(cName)}"></option>`;
+      }).join('');
+    }
+    if (catEl) {
+      catEl.value = ing?.category || '';
+      catEl.disabled = false;
     }
   }
 
@@ -209,9 +226,20 @@ export async function saveIngredientFamilyDetailsModal(renderIngredientBank) {
   }
 
   const currentIngs = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
+  const newRootId = activeEditingIngredientId || `ing_${Date.now()}`;
   const updatedIng = {
     ...(activeEditingIngredientId ? currentIngs.find(i => String(i.id) === String(activeEditingIngredientId)) : {}),
-    id: activeEditingIngredientId || `ing_${Date.now()}`, name, category, notes, updatedAt: new Date().toISOString()
+    id: newRootId,
+    name,
+    category,
+    notes,
+    subtypes: activeEditingIngredientId ? (currentIngs.find(i => String(i.id) === String(activeEditingIngredientId))?.subtypes || []) : [{
+      id: `sub_${Date.now()}`,
+      name: 'Default',
+      notes: 'Auto-generated base sub-type',
+      category
+    }],
+    updatedAt: new Date().toISOString()
   };
   const existingIdx = currentIngs.findIndex(i => String(i.id) === String(updatedIng.id));
   if (existingIdx >= 0) currentIngs[existingIdx] = updatedIng; else currentIngs.push(updatedIng);

@@ -40,13 +40,8 @@ export function updateIngredientFamilyModalUI(ing, parent) {
       parentWrap.style.border = 'none';
       parentWrap.style.marginBottom = '12px';
       parentWrap.innerHTML = `
-        <div class="hierarchy-banner-stack" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
-          <div class="cat-hierarchy-badge" style="background: #eef2ff; color: #3730a3; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem;">
-            🏷️ ${escapeHTML(parent.category || 'Uncategorized')}
-          </div>
-          <div class="parent-hierarchy-badge" style="background: #f3f4f6; color: #4b5563; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem;">
-            <strong>Parent Item:</strong> <span style="color: #111827; font-weight: 500;">${escapeHTML(parent.name)}</span>
-          </div>
+        <div class="locked-parent-badge" style="background: #f3f4f6; color: #4b5563; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; margin-bottom: 12px;">
+          🔗 Parent Item: <strong>${escapeHTML(parent.name)}</strong>
         </div>
       `;
     }
