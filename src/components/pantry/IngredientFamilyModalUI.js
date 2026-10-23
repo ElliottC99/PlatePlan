@@ -163,20 +163,22 @@ if (typeof window !== 'undefined') {
 
     setTimeout(() => {
       if (actionType === 'manual') {
-        import('../../views/ProductBankView.js').then(() => {
+        import('../../views/ProductBankView.js').then((module) => {
           window.__prefilledResolveBinding = { parentId, subtypeId: editingSubtypeId, subtypeDraftName: window.__draftSubtypePayload.name };
-          if (typeof window.openProductEditModal === 'function') window.openProductEditModal(null);
+          if (typeof module.openProductEditModal === 'function') {
+            module.openProductEditModal(null);
+          }
         }).catch(err => console.error('Failed to load manual product modal', err));
       } else if (actionType === 'link') {
-        import('./SubtypeProductLinkerModalUI.js').then(() => {
-          if (typeof window.openSubtypeExistingProductPickerModal === 'function') {
-            window.openSubtypeExistingProductPickerModal(editingSubtypeId, parentId);
+        import('./SubtypeProductLinkerModalUI.js').then((module) => {
+          if (typeof module.openSubtypeExistingProductPickerModal === 'function') {
+            module.openSubtypeExistingProductPickerModal(editingSubtypeId, parentId);
           }
         }).catch(err => console.error('Failed to load link modal', err));
       } else if (actionType === 'tesco') {
-        import('./TescoImportModalUI.js').then(() => {
-          if (typeof window.openTescoImportModal === 'function') {
-            window.openTescoImportModal(editingSubtypeId, parentId);
+        import('./TescoImportModalUI.js').then((module) => {
+          if (typeof module.openTescoImportModal === 'function') {
+            module.openTescoImportModal(editingSubtypeId, parentId);
           }
         }).catch(err => console.error('Failed to load tesco modal', err));
       }
