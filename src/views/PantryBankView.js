@@ -119,6 +119,7 @@ export function renderIngredientBank() {
 
   container.innerHTML = buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inventory);
   attachPantryBankSearchListener();
+  attachPantryBankDelegation();
   const searchInput = document.getElementById('ingredient-group-search');
   if (searchInput?.value) filterPantryBankDOM(searchInput.value);
 }
@@ -167,10 +168,33 @@ export function attachPantryBankSearchListener() {
   });
 }
 
+export function attachPantryBankDelegation() {
+  const container = document.getElementById('pantry-bank-container') || document.getElementById('ingredient-groups-list');
+  if (!container || container.__hasPantryDelegation) return;
+  container.__hasPantryDelegation = true;
+
+  container.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action], a[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const id = btn.dataset.id;
+    const subtypeId = btn.dataset.subtypeId;
+    const parentId = btn.dataset.parentId;
+
+    if (action === 'edit-subtype') import('../components/pantry/SubtypeActionModalsUI.js').then(m => m.openEditSubtypeModal(subtypeId, parentId));
+    if (action === 'alias-subtype') import('../components/pantry/SubtypeActionModalsUI.js').then(m => m.openSubtypeAliasModal(subtypeId, parentId));
+    if (action === 'reorganise-subtype') import('../components/pantry/SubtypeActionModalsUI.js').then(m => m.openSubtypeReorganizeModal(subtypeId, parentId));
+    if (action === 'link-product') import('../components/pantry/SubtypeProductLinkerModalUI.js').then(m => m.openSubtypeLinkSelectionModal(subtypeId, parentId));
+    if (action === 'alias-item') import('../components/pantry/IngredientActionModalsUI.js').then(m => m.promptAddAlias(id));
+    if (action === 'reorganise-item') import('../components/pantry/IngredientActionModalsUI.js').then(m => m.openIngredientReorganiseModal(id));
+  });
+}
+
 let isSubscribed = false;
 export function initBankSubscriptions() {
   if (isSubscribed) return;
   isSubscribed = true;
+  attachPantryBankDelegation();
   const update = () => { renderIngredientBank(); renderProductBank(); };
   subscribe('ingredients', update); subscribe('products', update); subscribe('inventory', update);
   if (typeof document !== 'undefined') {
@@ -185,6 +209,7 @@ export function mount() {
   renderIngredientBank();
   renderProductBank();
   attachPantryBankSearchListener();
+  attachPantryBankDelegation();
 }
 export const renderPantryBankView = renderIngredientBank; export { renderProductBank, openProductEditModal };
 export function openAddSubtypeModal(parentId) { openIngredientFamilyDetailsModal(null, parentId); }

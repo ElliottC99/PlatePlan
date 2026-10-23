@@ -31,10 +31,10 @@ import {
 } from './IngredientActionModalsUI.js';
 
 import {
-  openEditSubtypeModal,
-  openSubtypeReorganizeModal,
-  openSubtypeAliasModal,
-  openSubtypeDeleteModal
+  openEditSubtypeModal as renderOpenEditSubtypeModal,
+  openSubtypeReorganizeModal as renderOpenSubtypeReorganizeModal,
+  openSubtypeAliasModal as renderOpenSubtypeAliasModal,
+  openSubtypeDeleteModal as renderOpenSubtypeDeleteModal
 } from './SubtypeActionModalsRenderService.js';
 
 import {
@@ -46,6 +46,22 @@ import {
   buildParentIngredientDropdownOptions,
   escapeHTML
 } from '../../views/SubtypeModalRenderService.js';
+
+export function openEditSubtypeModal(subtypeId, parentId) {
+  return renderOpenEditSubtypeModal(subtypeId, parentId);
+}
+
+export function openSubtypeReorganizeModal(subtypeId, parentId) {
+  return renderOpenSubtypeReorganizeModal(subtypeId, parentId);
+}
+
+export function openSubtypeAliasModal(subtypeId, parentId) {
+  return renderOpenSubtypeAliasModal(subtypeId, parentId);
+}
+
+export function openSubtypeDeleteModal(subtypeId, parentId) {
+  return renderOpenSubtypeDeleteModal(subtypeId, parentId);
+}
 
 export {
   promptReallocateProduct,
@@ -64,10 +80,6 @@ export {
   showCustomConfirm,
   showCustomCopyModal,
   openIngredientReorganiseModal,
-  openEditSubtypeModal,
-  openSubtypeReorganizeModal,
-  openSubtypeAliasModal,
-  openSubtypeDeleteModal,
   renderEditSubtypeModalHTML,
   renderReorganizeModalHTML,
   renderManageAliasesModalHTML,
@@ -217,37 +229,17 @@ export function openTescoBookmarkletInstructionsModal() {
   openTescoImportModal(null, null);
 }
 
+export function handleSubtypeLinkRoute(action, subtypeId, parentId) {
+  closeModal();
+  window.__prefilledResolveBinding = { ingredientId: parentId, subtypeId: subtypeId || null };
+  setTimeout(() => {
+    if (action === 'manual' && typeof window.openProductEditModal === 'function') window.openProductEditModal(null);
+    else if (action === 'link') openSubtypeExistingProductPickerModal(subtypeId, parentId);
+    else if (action === 'tesco') openTescoImportModal(subtypeId, parentId);
+  }, 150);
+}
+
 if (typeof window !== 'undefined') {
-  Object.assign(window, {
-    closeSubtypeActionModal: closeModal,
-    openEditSubtypeModal,
-    openSubtypeLinkSelectionModal,
-    openSubtypeExistingProductPickerModal,
-    openTescoImportModal,
-    openSubtypeReorganizeModal,
-    openSubtypeAliasModal,
-    openSubtypeDeleteModal,
-    deleteSubtype,
-    openTescoBookmarkletInstructionsModal,
-    promptAddAlias,
-    promptRemoveAlias,
-    handlePromoteSubtype,
-    promptDemote,
-    promptMerge,
-    handleDeleteIngredient,
-    handleDeleteProduct,
-    openIngredientReorganiseModal,
-    promptReallocateProduct,
-    openProductReallocateModal,
-    setupModalDelegation,
-    handleSubtypeLinkRoute(action, subtypeId, parentId) {
-      closeModal();
-      window.__prefilledResolveBinding = { ingredientId: parentId, subtypeId: subtypeId || null };
-      setTimeout(() => {
-        if (action === 'manual' && typeof window.openProductEditModal === 'function') window.openProductEditModal(null);
-        else if (action === 'link') openSubtypeExistingProductPickerModal(subtypeId, parentId);
-        else if (action === 'tesco') openTescoImportModal(subtypeId, parentId);
-      }, 150);
-    }
-  });
+  window.handleSubtypeLinkRoute = handleSubtypeLinkRoute;
+  window.closeSubtypeActionModal = closeModal;
 }
