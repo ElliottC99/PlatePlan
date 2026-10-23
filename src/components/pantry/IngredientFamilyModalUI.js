@@ -163,12 +163,12 @@ if (typeof window !== 'undefined') {
 
     setTimeout(() => {
       if (actionType === 'manual') {
-        window.__prefilledResolveBinding = { parentId, subtypeId: editingSubtypeId, subtypeDraftName: window.__draftSubtypePayload.name };
-        if (typeof window.openProductEditModal === 'function') {
-          window.openProductEditModal(null);
-        }
+        import('../../views/ProductBankView.js').then(() => {
+          window.__prefilledResolveBinding = { parentId, subtypeId: editingSubtypeId, subtypeDraftName: window.__draftSubtypePayload.name };
+          if (typeof window.openProductEditModal === 'function') window.openProductEditModal(null);
+        }).catch(err => console.error('Failed to load manual product modal', err));
       } else if (actionType === 'link') {
-        import('./SubtypeActionModalsUI.js').then(() => {
+        import('./SubtypeProductLinkerModalUI.js').then(() => {
           if (typeof window.openSubtypeExistingProductPickerModal === 'function') {
             window.openSubtypeExistingProductPickerModal(editingSubtypeId, parentId);
           }

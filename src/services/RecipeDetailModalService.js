@@ -197,10 +197,8 @@ export function renderRecipePreview() {
   const profiles = userPrefs.profiles || {};
   const eProf = profiles.elliott || profiles.e || { dailyKcal: 1950, dailyProtein: 140 };
   const cProf = profiles.chloe || profiles.c || { dailyKcal: 1350, dailyProtein: 100 };
-  const eDailyKcal = Number(eProf.dailyKcal) || 1950;
-  const cDailyKcal = Number(cProf.dailyKcal) || 1350;
-  const eDailyProt = Number(eProf.dailyProtein) || 140;
-  const cDailyProt = Number(cProf.dailyProtein) || 100;
+  const eDailyKcal = Number(eProf.dailyKcal) || 1950, cDailyKcal = Number(cProf.dailyKcal) || 1350;
+  const eDailyProt = Number(eProf.dailyProtein) || 140, cDailyProt = Number(cProf.dailyProtein) || 100;
 
   const eSplits = typeof resolveMealSplitPercentages === 'function' ? resolveMealSplitPercentages(userPrefs, 'elliott') : { calories: { dinner: 35 }, protein: { dinner: 35 } };
   const cSplits = typeof resolveMealSplitPercentages === 'function' ? resolveMealSplitPercentages(userPrefs, 'chloe') : { calories: { dinner: 35 }, protein: { dinner: 35 } };
@@ -209,22 +207,17 @@ export function renderRecipePreview() {
   const eProtPct = Number(eSplits.protein?.[mealType] ?? eSplits.protein?.dinner ?? 35) / 100;
   const cProtPct = Number(cSplits.protein?.[mealType] ?? cSplits.protein?.dinner ?? 35) / 100;
 
-  const eMealTargetKcal = Math.round(eDailyKcal * eCalPct);
-  const cMealTargetKcal = Math.round(cDailyKcal * cCalPct);
-  const eMealTargetProt = Math.round(eDailyProt * eProtPct);
-  const cMealTargetProt = Math.round(cDailyProt * cProtPct);
+  const eMealTargetKcal = Math.round(eDailyKcal * eCalPct), cMealTargetKcal = Math.round(cDailyKcal * cCalPct);
+  const eMealTargetProt = Math.round(eDailyProt * eProtPct), cMealTargetProt = Math.round(cDailyProt * cProtPct);
 
   const totalKcalBudget = eMealTargetKcal + cMealTargetKcal;
   const eShare = totalKcalBudget > 0 ? (eMealTargetKcal / totalKcalBudget) : 0.59;
   const cShare = totalKcalBudget > 0 ? (cMealTargetKcal / totalKcalBudget) : 0.41;
-  const eSharePct = Math.round(eShare * 100);
-  const cSharePct = Math.round(cShare * 100);
+  const eSharePct = Math.round(eShare * 100), cSharePct = Math.round(cShare * 100);
 
   const prefs = typeof getState === 'function' ? (getState()?.userPrefs?.fitScoreParams || {}) : {};
-  const eTargetKcal = prefs.elliott?.calories || 800;
-  const cTargetKcal = prefs.chloe?.calories || 600;
-  const eTargetProt = prefs.elliott?.protein || 40;
-  const cTargetProt = prefs.chloe?.protein || 30;
+  const eTargetKcal = prefs.elliott?.calories || 800, cTargetKcal = prefs.chloe?.calories || 600;
+  const eTargetProt = prefs.elliott?.protein || 40, cTargetProt = prefs.chloe?.protein || 30;
 
   // 1. Calculate Fit Score & Dynamic Macros first
   const fitResult = typeof calculateMealFitScore === 'function' ? calculateMealFitScore(activeR, mealType, {
@@ -239,33 +232,38 @@ export function renderRecipePreview() {
   const singleKcalC = Math.round(fitResult?.details?.chloe?.recipeKcal || 0);
   const singleProtC = Math.round(fitResult?.details?.chloe?.recipeProtein || 0);
 
-  const kcalDiffE = singleKcalE - eTargetKcal;
-  const protDiffE = singleProtE - eTargetProt;
-  const kcalDiffC = singleKcalC - cTargetKcal;
-  const protDiffC = singleProtC - cTargetProt;
-  const formatDiffStr = (val) => val > 0 ? `+${val}` : `${val}`;
-
-  const eKcal = singleKcalE;
-  const cKcal = singleKcalC; 
-  const eProt = singleProtE;
-  const cProt = singleProtC;
+  const kcalDiffE = singleKcalE - eTargetKcal, protDiffE = singleProtE - eTargetProt;
+  const kcalDiffC = singleKcalC - cTargetKcal, protDiffC = singleProtC - cTargetProt;
+  const eKcal = singleKcalE, cKcal = singleKcalC, eProt = singleProtE, cProt = singleProtC;
 
   const fitScore = Math.round(Number(fitResult?.score) || 0);
   const meta = typeof getFitScoreTierMeta === 'function' ? getFitScoreTierMeta(fitScore) : { tier: 'red', icon: '🔴', label: 'Poor Match', color: '#ef4444', bg: '#fee2e2', text: '#7f1d1d', border: '#fca5a5' };
   const fitPillHtml = `<span class="badge ${meta.tier}" style="background:${meta.bg};color:${meta.text};border:1px solid ${meta.border}">${meta.icon} ${fitScore}% - ${meta.label}</span>`;
 
+  const renderMacroBadge = (type, diff) => {
+    const isKcal = type === 'kcal';
+    // Calories: Negative/Zero is Good (Green), Positive is Bad (Red)
+    // Protein: Positive/Zero is Good (Green), Negative is Bad (Red)
+    const isGood = isKcal ? diff <= 0 : diff >= 0;
+    const sign = diff > 0 ? '+' : '';
+    const bg = isGood ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)';
+    const color = isGood ? '#166534' : '#991b1b';
+    const border = isGood ? '#86efac' : '#fca5a5';
+    return `<span style="display:inline-flex; align-items:center; justify-content:center; padding: 2px 6px; border-radius: 6px; background: ${bg}; color: ${color}; border: 1px solid ${border}; font-size: 10px; font-weight: 800; margin-left: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">${sign}${diff}${isKcal ? '' : 'g'}</span>`;
+  };
+
   const macroSplitHtml = `
     <div class="recipe-modal-crossbar-macros" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px;">
       <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4); font-size: 11.5px;">
         <span style="font-weight:700;">👤 Elliott (${eSharePct}%):</span>
-        <span>🔥 <strong>${singleKcalE} kcal (${formatDiffStr(kcalDiffE)})</strong></span>
-        <span>💪 <strong>${singleProtE}g (${formatDiffStr(protDiffE)})</strong></span>
+        <span>🔥 <strong>${singleKcalE} kcal</strong> ${renderMacroBadge('kcal', kcalDiffE)}</span>
+        <span>💪 <strong>${singleProtE}g</strong> ${renderMacroBadge('prot', protDiffE)}</span>
       </div>
 
       <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4); font-size: 11.5px;">
         <span style="font-weight:700;">👤 Chloe (${cSharePct}%):</span>
-        <span>🔥 <strong>${singleKcalC} kcal (${formatDiffStr(kcalDiffC)})</strong></span>
-        <span>💪 <strong>${singleProtC}g (${formatDiffStr(protDiffC)})</strong></span>
+        <span>🔥 <strong>${singleKcalC} kcal</strong> ${renderMacroBadge('kcal', kcalDiffC)}</span>
+        <span>💪 <strong>${singleProtC}g</strong> ${renderMacroBadge('prot', protDiffC)}</span>
       </div>
     </div>
   `;
