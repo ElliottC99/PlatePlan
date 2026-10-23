@@ -1,7 +1,7 @@
 /**
- * src/components/pantry/AddToBankModalUI.js (v3.42.17)
+ * src/components/pantry/AddToBankModalUI.js (v3.42.21)
  * Master Modal for adding Categories, Items, Sub-types, and Products
- * enforcing Apple HIG, custom search dropdown patterns, and product module routing.
+ * with Atomic Draft Pipeline & crash-proof button bindings.
  */
 
 import { getState, setIngredients, setProducts, setCategories } from '../../store/store.js';
@@ -9,6 +9,9 @@ import { getUnifiedCategories, saveCategories } from '../../services/CategoryRep
 import { saveIngredient } from '../../services/IngredientRepository.js';
 import { invalidateHierarchyCache } from '../../models/PantryHierarchyModel.js';
 import { openSubtypeLinkSelectionModal, openTescoImportModal } from './SubtypeActionModalsUI.js';
+
+let draftCategory = '';
+let draftItemName = '';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
@@ -82,11 +85,11 @@ function renderFormBody(type, categories, ingredients) {
       <div style="display:flex; flex-direction:column; gap:12px;">
         <div>
           <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">Category Name</label>
-          <input type="text" id="add-bank-cat-name" placeholder="e.g. Condiments" style="width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:13.5px;" autofocus />
+          <input type="text" id="add-bank-cat-name" value="${escapeAttr(draftCategory)}" placeholder="e.g. Condiments" style="width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:13.5px;" autofocus />
         </div>
         <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
           <button type="button" class="btn" id="cancel-add-bank">Cancel</button>
-          <button type="button" class="btn primary" id="submit-add-bank">Create Category</button>
+          <button type="button" class="btn primary" id="submit-add-bank">Next: Add Item</button>
         </div>
       </div>
     `;
@@ -118,10 +121,16 @@ function renderFormBody(type, categories, ingredients) {
   }
 
   if (type === 'product') {
+    const hierarchyPath = (draftCategory && draftItemName) 
+      ? `${draftCategory} > ${draftItemName} > Default Sub-type`
+      : 'Select anchor or complete previous steps';
     return `
       <div style="display:flex; flex-direction:column; gap:16px; position:relative;">
+        <div style="padding:10px 14px; background:var(--surface2,#f5f5f4); border-radius:8px; font-size:12.5px; font-weight:600; color:var(--text2);">
+          📍 Draft Path: <span style="color:var(--text);">${escapeHtml(hierarchyPath)}</span>
+        </div>
         <div style="position:relative;">
-          <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">Select Sub-type Anchor</label>
+          <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">Or Select Existing Anchor</label>
           <input type="text" id="add-bank-prod-anchor-search" placeholder="Search sub-type or item..." autocomplete="off" style="width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:13.5px; background:#fff;" />
           <input type="hidden" id="add-bank-prod-subtype-id" value="" />
           <input type="hidden" id="add-bank-prod-parent-id" value="" />
@@ -145,16 +154,16 @@ function renderFormBody(type, categories, ingredients) {
     <div style="display:flex; flex-direction:column; gap:12px; position:relative;">
       <div>
         <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">Item Name</label>
-        <input type="text" id="add-bank-item-name" placeholder="e.g. Cheddar Cheese" style="width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:13.5px;" autofocus />
+        <input type="text" id="add-bank-item-name" value="${escapeAttr(draftItemName)}" placeholder="e.g. Cheddar Cheese" style="width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:13.5px;" autofocus />
       </div>
       <div style="position:relative;">
         <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">Category</label>
-        <input type="text" id="add-bank-item-cat-search" placeholder="Search or select category..." autocomplete="off" style="width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:13.5px; background:#fff;" />
+        <input type="text" id="add-bank-item-cat-search" value="${escapeAttr(draftCategory)}" placeholder="Search or select category..." autocomplete="off" style="width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:13.5px; background:#fff;" />
         <div id="cat-search-dropdown" style="position:absolute; top:100%; left:0; right:0; z-index:9999; background:#fff; border:1px solid var(--border); border-radius:8px; max-height:180px; overflow-y:auto; display:none; margin-top:4px; box-shadow:0 8px 20px rgba(0,0,0,0.08);"></div>
       </div>
       <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
         <button type="button" class="btn" id="cancel-add-bank">Cancel</button>
-        <button type="button" class="btn primary" id="submit-add-bank">Create Item</button>
+        <button type="button" class="btn primary" id="submit-add-bank">Next: Add Product</button>
       </div>
     </div>
   `;
@@ -200,11 +209,12 @@ function bindAddToBankEvents(currentType, categories, ingredients) {
         dropdown.querySelectorAll('.dd-item').forEach(el => {
           el.onclick = () => {
             input.value = el.dataset.val;
+            draftCategory = el.dataset.val;
             dropdown.style.display = 'none';
           };
         });
       };
-      input.addEventListener('input', renderCatOptions);
+      input.addEventListener('input', () => { draftCategory = input.value; renderCatOptions(); });
       input.addEventListener('focus', renderCatOptions);
       document.addEventListener('click', (e) => {
         if (!input.contains(e.target) && !dropdown.contains(e.target)) dropdown.style.display = 'none';
@@ -290,59 +300,87 @@ function bindAddToBankEvents(currentType, categories, ingredients) {
       });
     }
 
+    const finalizeDraftAndRoute = async (actionRoute) => {
+      const state = getState();
+      const currentCats = getUnifiedCategories(state);
+      const currentIngs = state.ingredients || [];
+
+      let parentId = document.getElementById('add-bank-prod-parent-id')?.value;
+      let subtypeId = document.getElementById('add-bank-prod-subtype-id')?.value;
+
+      if (!parentId && (!draftItemName || !draftCategory)) {
+        showError('⚠️ Please complete Item & Category steps or select an existing anchor.');
+        return;
+      }
+
+      if (!parentId && draftItemName && draftCategory) {
+        // 1. Ensure category exists
+        const normalizedCat = draftCategory.toLowerCase();
+        if (!currentCats.some(c => String(c).trim().toLowerCase() === normalizedCat)) {
+          const newCats = [...currentCats, draftCategory].sort((a,b) => a.localeCompare(b));
+          setCategories(newCats);
+          await saveCategories(newCats);
+        }
+
+        // 2. Create Root Item & default subtype
+        parentId = 'ing_' + Date.now() + Math.random().toString(36).substring(2, 6);
+        subtypeId = 'sub_' + Date.now() + Math.random().toString(36).substring(2, 6);
+
+        const newIng = {
+          id: parentId,
+          name: draftItemName,
+          category: draftCategory,
+          unit: '',
+          subtypes: [{
+            id: subtypeId,
+            name: draftItemName,
+            updatedAt: new Date().toISOString()
+          }],
+          aliases: [],
+          updatedAt: new Date().toISOString()
+        };
+
+        setIngredients([...currentIngs, newIng]);
+        invalidateHierarchyCache();
+        if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+        await saveIngredient(newIng);
+
+        // Reset drafts
+        draftCategory = '';
+        draftItemName = '';
+      }
+
+      closeModal();
+      if (actionRoute === 'tesco') {
+        openTescoImportModal(subtypeId || null, parentId);
+      } else {
+        openSubtypeLinkSelectionModal(subtypeId || null, parentId);
+      }
+    };
+
     const btnTesco = document.getElementById('btn-prod-tesco');
     const btnManual = document.getElementById('btn-prod-manual');
 
     if (btnTesco) {
-      btnTesco.onclick = () => {
-        const parentId = document.getElementById('add-bank-prod-parent-id')?.value;
-        const subtypeId = document.getElementById('add-bank-prod-subtype-id')?.value;
-        if (!parentId) { showError('⚠️ Please select a sub-type or item anchor first.'); return; }
-        closeModal();
-        openTescoImportModal(subtypeId || null, parentId);
-      };
+      btnTesco.type = 'button';
+      btnTesco.onclick = () => finalizeDraftAndRoute('tesco');
     }
 
     if (btnManual) {
-      btnManual.onclick = () => {
-        const parentId = document.getElementById('add-bank-prod-parent-id')?.value;
-        const subtypeId = document.getElementById('add-bank-prod-subtype-id')?.value;
-        if (!parentId) { showError('⚠️ Please select a sub-type or item anchor first.'); return; }
-        closeModal();
-        openSubtypeLinkSelectionModal(subtypeId || null, parentId);
-      };
+      btnManual.type = 'button';
+      btnManual.onclick = () => finalizeDraftAndRoute('manual');
     }
   }
 
   const submitBtn = document.getElementById('submit-add-bank');
   if (submitBtn) {
     submitBtn.onclick = async () => {
-      const state = getState();
-      const currentCats = getUnifiedCategories(state);
-      const currentIngs = state.ingredients || [];
-
       if (currentType === 'category') {
         const input = document.getElementById('add-bank-cat-name');
         const rawName = input ? input.value.trim() : '';
         if (!rawName) { showError('⚠️ Please enter a category name.'); return; }
-        const normalized = rawName.toLowerCase();
-
-        const exists = currentCats.some(c => String(c).trim().toLowerCase() === normalized);
-        if (exists) {
-          showError('⚠️ This category already exists.');
-          return;
-        }
-
-        const newCats = [...currentCats, rawName].sort((a,b) => a.localeCompare(b));
-        setCategories(newCats);
-        invalidateHierarchyCache();
-        if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-        await saveCategories(newCats);
+        draftCategory = rawName;
         openAddToBankModal('item');
-        setTimeout(() => {
-          const catInput = document.getElementById('add-bank-item-cat-search');
-          if (catInput) catInput.value = rawName;
-        }, 50);
       } 
       else if (currentType === 'item') {
         const nameInput = document.getElementById('add-bank-item-name');
@@ -352,44 +390,10 @@ function bindAddToBankEvents(currentType, categories, ingredients) {
         const rawCat = catInput ? catInput.value.trim() : 'Pantry';
 
         if (!rawName) { showError('⚠️ Please enter an item name.'); return; }
-        const normalized = rawName.toLowerCase();
+        draftItemName = rawName;
+        draftCategory = rawCat || 'Pantry';
 
-        const exists = currentIngs.some(i => String(i.name || '').trim().toLowerCase() === normalized);
-        if (exists) {
-          showError('⚠️ This item already exists in the catalog.');
-          return;
-        }
-
-        const newIngId = 'ing_' + Date.now() + Math.random().toString(36).substring(2, 6);
-        const newSubId = 'sub_' + Date.now() + Math.random().toString(36).substring(2, 6);
-        const newIng = {
-          id: newIngId,
-          name: rawName,
-          category: rawCat || 'Pantry',
-          unit: '',
-          subtypes: [{
-            id: newSubId,
-            name: rawName,
-            updatedAt: new Date().toISOString()
-          }],
-          aliases: [],
-          updatedAt: new Date().toISOString()
-        };
-
-        const updatedIngs = [...currentIngs, newIng];
-        setIngredients(updatedIngs);
-        invalidateHierarchyCache();
-        if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-        await saveIngredient(newIng);
         openAddToBankModal('product');
-        setTimeout(() => {
-          const anchorInput = document.getElementById('add-bank-prod-anchor-search');
-          const hiddenParent = document.getElementById('add-bank-prod-parent-id');
-          const hiddenSub = document.getElementById('add-bank-prod-subtype-id');
-          if (anchorInput) anchorInput.value = `Item: ${rawName} (${rawCat || 'Pantry'})`;
-          if (hiddenParent) hiddenParent.value = newIngId;
-          if (hiddenSub) hiddenSub.value = newSubId;
-        }, 50);
       }
       else if (currentType === 'subtype') {
         const parentId = document.getElementById('add-bank-subtype-parent-id')?.value;
@@ -402,7 +406,7 @@ function bindAddToBankEvents(currentType, categories, ingredients) {
         if (!parentId) { showError('⚠️ Please select a parent item.'); return; }
         if (!rawName) { showError('⚠️ Please enter a sub-type name.'); return; }
 
-        const parent = currentIngs.find(i => String(i.id) === String(parentId));
+        const parent = ingredients.find(i => String(i.id) === String(parentId));
         if (!parent) { showError('⚠️ Selected parent item not found.'); return; }
 
         const subtypes = Array.isArray(parent.subtypes) ? parent.subtypes : [];
@@ -424,7 +428,7 @@ function bindAddToBankEvents(currentType, categories, ingredients) {
         parent.subtypes = [...subtypes, newSub];
         parent.updatedAt = new Date().toISOString();
 
-        setIngredients([...currentIngs]);
+        setIngredients([...ingredients]);
         closeModal();
         invalidateHierarchyCache();
         if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
