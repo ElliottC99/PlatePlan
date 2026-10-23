@@ -168,13 +168,17 @@ if (typeof window !== 'undefined') {
           window.openProductEditModal(null);
         }
       } else if (actionType === 'link') {
-        if (typeof window.openSubtypeExistingProductPickerModal === 'function') {
-          window.openSubtypeExistingProductPickerModal(editingSubtypeId, parentId);
-        }
+        import('./SubtypeActionModalsUI.js').then(() => {
+          if (typeof window.openSubtypeExistingProductPickerModal === 'function') {
+            window.openSubtypeExistingProductPickerModal(editingSubtypeId, parentId);
+          }
+        }).catch(err => console.error('Failed to load link modal', err));
       } else if (actionType === 'tesco') {
-        if (typeof window.openTescoImportModal === 'function') {
-          window.openTescoImportModal(editingSubtypeId, parentId);
-        }
+        import('./TescoImportModalUI.js').then(() => {
+          if (typeof window.openTescoImportModal === 'function') {
+            window.openTescoImportModal(editingSubtypeId, parentId);
+          }
+        }).catch(err => console.error('Failed to load tesco modal', err));
       }
     }, 150);
   };

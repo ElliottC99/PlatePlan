@@ -226,12 +226,19 @@ export function renderRecipePreview() {
   const eTargetProt = prefs.elliott?.protein || 40;
   const cTargetProt = prefs.chloe?.protein || 30;
 
-  const singleKcal = (activeR.nutritionalTotals?.calories || activeR.cal || 0) / (activeR.serves || 2);
-  const singleProt = (activeR.nutritionalTotals?.protein || activeR.prot || 0) / (activeR.serves || 2);
-  const singleKcalE = Math.round(singleKcal * 2 * (eSharePct / 100));
-  const singleProtE = Math.round(singleProt * 2 * (eSharePct / 100));
-  const singleKcalC = Math.round(singleKcal * 2 * (cSharePct / 100));
-  const singleProtC = Math.round(singleProt * 2 * (cSharePct / 100));
+  // 1. Calculate Fit Score & Dynamic Macros first
+  const fitResult = typeof calculateMealFitScore === 'function' ? calculateMealFitScore(activeR, mealType, {
+    activeProfile: previewState.servingMode === 'both' ? 'everyone' : previewState.servingMode,
+    variant: isEnh ? 'enhanced' : 'original',
+    portionScaled: true
+  }) : null;
+
+  // 2. Extract live summed macros directly from fitResult
+  const singleKcalE = Math.round(fitResult?.details?.elliott?.recipeKcal || 0);
+  const singleProtE = Math.round(fitResult?.details?.elliott?.recipeProtein || 0);
+  const singleKcalC = Math.round(fitResult?.details?.chloe?.recipeKcal || 0);
+  const singleProtC = Math.round(fitResult?.details?.chloe?.recipeProtein || 0);
+
   const kcalDiffE = singleKcalE - eTargetKcal;
   const protDiffE = singleProtE - eTargetProt;
   const kcalDiffC = singleKcalC - cTargetKcal;
@@ -242,6 +249,10 @@ export function renderRecipePreview() {
   const cKcal = singleKcalC; 
   const eProt = singleProtE;
   const cProt = singleProtC;
+
+  const fitScore = Math.round(Number(fitResult?.score) || 0);
+  const meta = typeof getFitScoreTierMeta === 'function' ? getFitScoreTierMeta(fitScore) : { tier: 'red', icon: '🔴', label: 'Poor Match', color: '#ef4444', bg: '#fee2e2', text: '#7f1d1d', border: '#fca5a5' };
+  const fitPillHtml = `<span class="badge ${meta.tier}" style="background:${meta.bg};color:${meta.text};border:1px solid ${meta.border}">${meta.icon} ${fitScore}% - ${meta.label}</span>`;
 
   const macroSplitHtml = `
     <div class="recipe-modal-crossbar-macros" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px;">
@@ -258,16 +269,6 @@ export function renderRecipePreview() {
       </div>
     </div>
   `;
-
-  // Fit score calculation
-  const fitResult = typeof calculateMealFitScore === 'function' ? calculateMealFitScore(activeR, mealType, {
-    activeProfile: previewState.servingMode === 'both' ? 'everyone' : previewState.servingMode,
-    variant: isEnh ? 'enhanced' : 'original',
-    portionScaled: true
-  }) : null;
-  const fitScore = Math.round(Number(fitResult?.score) || 0);
-  const meta = typeof getFitScoreTierMeta === 'function' ? getFitScoreTierMeta(fitScore) : { tier: 'red', icon: '🔴', label: 'Poor Match', color: '#ef4444', bg: '#fee2e2', text: '#7f1d1d', border: '#fca5a5' };
-  const fitPillHtml = `<span class="badge ${meta.tier}" style="background:${meta.bg};color:${meta.text};border:1px solid ${meta.border}">${meta.icon} ${fitScore}% - ${meta.label}</span>`;
 
   modalContent.innerHTML = renderRecipeDetailModalContent({
     r,
