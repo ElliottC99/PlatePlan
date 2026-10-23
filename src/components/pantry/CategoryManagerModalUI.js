@@ -13,7 +13,6 @@ import {
   renderRenameStepHtml, 
   renderMergeStepHtml, 
   renderReassignStepHtml, 
-  renderDeleteConfirmModalHtml, 
   escapeHtml, 
   escapeAttr 
 } from './CategoryManagerTemplates.js';
@@ -23,8 +22,7 @@ import {
   submitMergeDuplicateCategories, 
   submitRenameCat, 
   submitMergeCat, 
-  submitReassignAndDelete, 
-  handleDeleteCategory 
+  submitReassignAndDelete
 } from './CategoryManagerOperations.js';
 
 const DROPDOWN_BLUR_DELAY_MS = 200;
@@ -103,44 +101,13 @@ export function promptDeleteCategory(categoryId) {
   const boundProds = prods.filter(p => slugCategory(p.category) === slugCategory(category.name));
   const allBound = [...boundIngs, ...boundSubtypes, ...boundProds];
 
-  if (allBound.length > 0) {
-    activeCat = category.name; wizardStep = 'reassign'; reassignMode = 'mass'; reassignSearch = '';
-    const otherCats = getRawCategories(state).filter(c => c !== category.name);
-    massTargetCat = otherCats[0] || 'Uncategorised'; individualCatMap = {};
-    allBound.forEach(item => { if (item?.id) individualCatMap[item.id] = massTargetCat; });
-    renderCategoryManagerModal();
-    return;
-  }
-
-  const existingOverlay = document.getElementById('category-delete-confirm-modal');
-  if (existingOverlay) existingOverlay.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'category-delete-confirm-modal';
-  overlay.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:10000;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
-  overlay.innerHTML = renderDeleteConfirmModalHtml(category.name, category.id);
-  document.body.appendChild(overlay);
-
-  overlay.addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-action]'); if (!btn) return;
-    e.preventDefault(); e.stopPropagation();
-
-    const action = btn.dataset.action;
-    if (action === 'close-delete-confirm') { overlay.remove(); return; }
-    if (action === 'confirm-delete') {
-      const catVal = btn.dataset.category;
-      btn.disabled = true; btn.textContent = 'Deleting...';
-      try {
-        await handleDeleteCategory(catVal);
-      } catch (err) {
-        console.error('[CategoryManager] Delete confirm error:', err);
-      } finally {
-        overlay.remove();
-        resetModalState();
-        renderCategoryManagerModal();
-      }
-    }
-  });
+  activeCat = category.name; wizardStep = 'reassign'; reassignMode = 'mass'; reassignSearch = '';
+  const rawCategories = getRawCategories(state);
+  const otherCats = rawCategories.filter(c => c !== category.name);
+  if (!otherCats.includes('Uncategorised')) otherCats.push('Uncategorised');
+  massTargetCat = otherCats[0] || 'Uncategorised'; individualCatMap = {};
+  allBound.forEach(item => { if (item?.id) individualCatMap[item.id] = massTargetCat; });
+  renderCategoryManagerModal();
 }
 
 export function renderCategoryManagerModal() {
@@ -298,6 +265,8 @@ export function renderCategoryManagerModal() {
       if (action === 'individual-cat-select') {
         const ingId = e.target.dataset.ingId;
         if (ingId) individualCatMap[ingId] = e.target.value;
+      } else if (action === 'mass-search-select') {
+        massTargetCat = e.target.value;
       }
     });
   }

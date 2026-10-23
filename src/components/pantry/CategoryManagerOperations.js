@@ -88,11 +88,4 @@ export async function submitReassignAndDelete(deletedCat, reassignMode, massTarg
   invalidateHierarchyCache();
 }
 
-export async function handleDeleteCategory(identifier) {
-  if (!identifier) return;
-  const category = resolveCategory(identifier); if (!category?.name) return;
 
-  await deleteCategory(category.id || category.name);
-  if (typeof resetCategoryFilter === 'function') resetCategoryFilter();
-  invalidateHierarchyCache();
-}

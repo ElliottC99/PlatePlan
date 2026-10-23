@@ -6,6 +6,7 @@
 
 import { getState, setIngredients, setProducts } from '../../store/store.js';
 import { saveIngredient } from '../../services/IngredientRepository.js';
+import { getUnifiedCategories } from '../../services/HouseholdRepository.js';
 import { 
   renderAddAliasTemplate, 
   renderPromoteSubtypeTemplate, 
@@ -306,6 +307,26 @@ function bindDropdown(inputId, targetCandidates) {
   });
 }
 
+export async function executePromoteItemToCategory(ingredientId) {
+  const op = await import('./IngredientReorganiseOperations.js');
+  return await op.executePromoteItemToCategory(ingredientId);
+}
+
+export async function executeMoveItemCategory(ingredientId, newCategory) {
+  const op = await import('./IngredientReorganiseOperations.js');
+  return await op.executeMoveItemCategory(ingredientId, newCategory);
+}
+
+export async function executeMergeItem(sourceId, targetId) {
+  const op = await import('./IngredientReorganiseOperations.js');
+  return await op.executeMergeItem(sourceId, targetId);
+}
+
+export async function executeDemoteItemToSubtype(sourceId, parentId) {
+  const op = await import('./IngredientReorganiseOperations.js');
+  return await op.executeDemoteItemToSubtype(sourceId, parentId);
+}
+
 export function openIngredientReorganiseModal(ingredientId) {
   const state = getState();
   const currentIngs = Array.isArray(state.ingredients) ? state.ingredients : [];
@@ -313,34 +334,51 @@ export function openIngredientReorganiseModal(ingredientId) {
   if (!ing) return;
 
   const targetCandidates = currentIngs.filter(i => String(i.id) !== String(ingredientId));
+  const categories = getUnifiedCategories(state);
 
-  const html = renderReorganiseTemplate(ing, targetCandidates);
-
+  const html = renderReorganiseTemplate(ing, targetCandidates, categories);
   showModal(html);
-  bindDropdown('reorg-ing-merge-select', targetCandidates);
-  bindDropdown('reorg-ing-demote-select', targetCandidates);
 
-  document.getElementById('btn-reorg-ing-merge').onclick = async () => {
-    const typedName = document.getElementById('reorg-ing-merge-select')?.value;
-    if (!typedName) return;
-    const target = targetCandidates.find(c => c.name.toLowerCase() === typedName.toLowerCase());
-    if (!target) { alert('Please select a valid ingredient from the list.'); return; }
-    closeModal();
-    const model = await import('../../models/PantryHierarchyModel.js');
-    await model.mergeIngredients(ingredientId, target.id);
-    if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-    if (typeof window.renderProductBank === 'function') window.renderProductBank();
-  };
+  const promoteBtn = document.getElementById('btn-reorg-promote');
+  if (promoteBtn) {
+    promoteBtn.onclick = async () => {
+      closeModal();
+      await executePromoteItemToCategory(ingredientId);
+    };
+  }
 
-  document.getElementById('btn-reorg-ing-demote').onclick = async () => {
-    const typedName = document.getElementById('reorg-ing-demote-select')?.value;
-    if (!typedName) return;
-    const target = targetCandidates.find(c => c.name.toLowerCase() === typedName.toLowerCase());
-    if (!target) { alert('Please select a valid parent ingredient from the list.'); return; }
-    closeModal();
-    const model = await import('../../models/PantryHierarchyModel.js');
-    await model.demoteToSubtype(ingredientId, target.id);
-    if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-    if (typeof window.renderProductBank === 'function') window.renderProductBank();
-  };
+  const moveBtn = document.getElementById('btn-reorg-move');
+  if (moveBtn) {
+    moveBtn.onclick = async () => {
+      const input = document.getElementById('reorg-move-cat-input');
+      const val = input ? input.value.trim() : '';
+      if (!val) { alert('Please select or enter a target category.'); return; }
+      closeModal();
+      await executeMoveItemCategory(ingredientId, val);
+    };
+  }
+
+  const mergeBtn = document.getElementById('btn-reorg-merge');
+  if (mergeBtn) {
+    mergeBtn.onclick = async () => {
+      const input = document.getElementById('reorg-merge-item-input');
+      const val = input ? input.value.trim() : '';
+      const target = targetCandidates.find(t => String(t.name).trim().toLowerCase() === val.toLowerCase());
+      if (!target) { alert('Please select a valid target item from the list.'); return; }
+      closeModal();
+      await executeMergeItem(ingredientId, target.id);
+    };
+  }
+
+  const demoteBtn = document.getElementById('btn-reorg-demote');
+  if (demoteBtn) {
+    demoteBtn.onclick = async () => {
+      const input = document.getElementById('reorg-demote-item-input');
+      const val = input ? input.value.trim() : '';
+      const target = targetCandidates.find(t => String(t.name).trim().toLowerCase() === val.toLowerCase());
+      if (!target) { alert('Please select a valid parent item from the list.'); return; }
+      closeModal();
+      await executeDemoteItemToSubtype(ingredientId, target.id);
+    };
+  }
 }

@@ -161,27 +161,52 @@ export function renderCustomAlertTemplate(message) {
 /**
  * Renders the Reorganise Ingredient modal.
  */
-export function renderReorganiseTemplate(ing, targetCandidates) {
+export function renderReorganiseTemplate(ing, targetCandidates, categories = []) {
   return `
     <div style="padding: 24px; max-width: 500px; width: 100%; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);">
-      <h3 style="margin-top:0; margin-bottom: 6px; font-size: 1.15rem; font-weight: 750;">🔀 Reorganise Ingredient: ${escapeHTML(ing.name)}</h3>
-      <p style="font-size: 12.5px; color: var(--text2,#78716c); margin: 0 0 18px 0;">Select how you want to restructure or consolidate this ingredient.</p>
+      <h3 style="margin-top:0; margin-bottom: 6px; font-size: 1.15rem; font-weight: 750;">Reorganise: ${escapeHTML(ing.name)}</h3>
+      <p style="font-size: 12.5px; color: var(--text2,#78716c); margin: 0 0 18px 0;">Select how you want to restructure or consolidate this item.</p>
 
-      <div style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 16px; background: #f8fafc;">
-        <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">🔀 Option A: Merge into another Ingredient</div>
-        <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Transfers all sub-types, linked products, and aliases to the target ingredient before removing this source.</p>
+      <!-- Option 1: Promote to Category -->
+      <div style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 14px; background: #f8fafc;">
+        <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">🚀 Option 1: Promote to Category</div>
+        <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Promotes this item into a standalone top-level Category.</p>
+        <button type="button" class="btn primary sm" id="btn-reorg-promote" style="font-weight:600">Promote to Category</button>
+      </div>
+
+      <!-- Option 2: Move Category -->
+      <div style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 14px; background: #f8fafc;">
+        <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">📂 Option 2: Move Category</div>
+        <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Moves this item into a different existing Category.</p>
         <div style="display:flex; gap:8px;">
-          <input type="text" id="reorg-ing-merge-select" autocomplete="off" style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff); outline:none; transition: border-color 0.15s ease, box-shadow 0.15s ease;" onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.1)'" onblur="this.style.borderColor='#e7e5e4'; this.style.boxShadow='none'" placeholder="Search or select target ingredient..." ${targetCandidates.length === 0 ? 'disabled' : ''} name="reorgIngMergeSelect">
-          <button type="button" class="btn primary sm" id="btn-reorg-ing-merge" style="font-weight:600" ${targetCandidates.length === 0 ? 'disabled' : ''}>Merge</button>
+          <input type="text" id="reorg-move-cat-input" list="reorg-categories-datalist" autocomplete="off" placeholder="Select or type category..." style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff);" />
+          <datalist id="reorg-categories-datalist">
+            ${categories.map(c => `<option value="${escapeHTML(c)}">`).join('')}
+          </datalist>
+          <button type="button" class="btn primary sm" id="btn-reorg-move" style="font-weight:600">Move Category</button>
         </div>
       </div>
 
-      <div style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 16px; background: #f8fafc;">
-        <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">⬇️ Option B: Convert to Sub-type of...</div>
-        <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Nests this ingredient as a child sub-type under the chosen parent, preserving all linked products.</p>
+      <!-- Option 3: Merge Item -->
+      <div style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 14px; background: #f8fafc;">
+        <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">🔀 Option 3: Merge Item</div>
+        <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Merges this item into another item in your pantry bank.</p>
         <div style="display:flex; gap:8px;">
-          <input type="text" id="reorg-ing-demote-select" autocomplete="off" style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff); outline:none; transition: border-color 0.15s ease, box-shadow 0.15s ease;" onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.1)'" onblur="this.style.borderColor='#e7e5e4'; this.style.boxShadow='none'" placeholder="Search or select parent ingredient..." ${targetCandidates.length === 0 ? 'disabled' : ''} name="reorgIngDemoteSelect">
-          <button type="button" class="btn primary sm" id="btn-reorg-ing-demote" style="font-weight:600" ${targetCandidates.length === 0 ? 'disabled' : ''}>Convert</button>
+          <input type="text" id="reorg-merge-item-input" list="reorg-candidates-datalist" autocomplete="off" placeholder="Select target item..." style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff);" ${targetCandidates.length === 0 ? 'disabled' : ''} />
+          <datalist id="reorg-candidates-datalist">
+            ${targetCandidates.map(t => `<option value="${escapeHTML(t.name)}">`).join('')}
+          </datalist>
+          <button type="button" class="btn primary sm" id="btn-reorg-merge" style="font-weight:600" ${targetCandidates.length === 0 ? 'disabled' : ''}>Merge Item</button>
+        </div>
+      </div>
+
+      <!-- Option 4: Demote to Sub-type -->
+      <div style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 16px; background: #f8fafc;">
+        <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">⬇️ Option 4: Demote to Sub-type</div>
+        <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Nests this item as a child sub-type under another parent item.</p>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="reorg-demote-item-input" list="reorg-candidates-datalist" autocomplete="off" placeholder="Select parent item..." style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff);" ${targetCandidates.length === 0 ? 'disabled' : ''} />
+          <button type="button" class="btn primary sm" id="btn-reorg-demote" style="font-weight:600" ${targetCandidates.length === 0 ? 'disabled' : ''}>Demote to Sub-type</button>
         </div>
       </div>
 

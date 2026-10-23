@@ -81,8 +81,8 @@ export function renderReassignStepHtml(activeCat, reassignMode, allBound, otherC
   return `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border,#e7e5e4)">
       <div>
-        <h3 style="margin:0;font-size:15px;font-weight:750">Reassign Items (${allBound.length})</h3>
-        <p style="margin:2px 0 0 0;font-size:11.5px;color:var(--text2,#78716c)">Reassign items before deleting "${escapeHtml(activeCat)}".</p>
+        <h3 style="margin:0;font-size:15px;font-weight:750">Delete "${escapeHtml(activeCat)}"</h3>
+        <p style="margin:2px 0 0 0;font-size:11.5px;color:var(--text2,#78716c)">Where should we move the existing items? (${allBound.length} items affected)</p>
       </div>
       <button type="button" class="modal-close-btn btn sm btn-ghost ghost" data-action="close" aria-label="Close modal">✕</button>
     </div>
@@ -92,11 +92,10 @@ export function renderReassignStepHtml(activeCat, reassignMode, allBound, otherC
     </div>
     ${reassignMode === 'mass' ? `
       <div style="margin-bottom:16px">
-        <label for="cat-mass-search-input" style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">Reassign all ${allBound.length} items to:</label>
-        <div style="position:relative;">
-          <input type="text" id="cat-mass-search-input" name="cat_mass_search_input" placeholder="Search target category..." value="${escapeAttr(massTargetCat)}" autocomplete="off" data-action="mass-search-input" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);font-size:13.5px;box-sizing:border-box">
-          <div id="cat-mass-dropdown-list" style="position:absolute;top:100%;left:0;right:0;max-height:150px;overflow-y:auto;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);box-shadow:0 4px 12px rgba(0,0,0,0.08);z-index:9999;display:none;margin-top:4px;"></div>
-        </div>
+        <label for="cat-mass-search-input" style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2,#78716c)">Target Destination Category:</label>
+        <select id="cat-mass-search-input" name="cat_mass_search_input" data-action="mass-search-select" style="width:100%;padding:8px 10px;border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);font-size:13.5px;box-sizing:border-box;background:#fff;">
+          ${otherCats.map(c => `<option value="${escapeAttr(c)}" ${c === massTargetCat ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+        </select>
       </div>` : `
       <div style="margin-bottom:8px">
         <input type="text" id="cat-reassign-filter" name="reassign_filter" aria-label="Filter items by name" placeholder="Filter items by name..." value="${escapeAttr(reassignSearch)}" data-action="reassign-filter-input" style="width:100%;padding:6px 10px;border:1px solid var(--border,#e7e5e4);border-radius:6px;font-size:12px;box-sizing:border-box">
@@ -108,28 +107,14 @@ export function renderReassignStepHtml(activeCat, reassignMode, allBound, otherC
           const labelText = item.name || item.title || 'Item';
           return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:var(--surface2,#f5f5f4);border-radius:6px;border:1px solid var(--border,#e7e5e4)">
             <label for="${selId}" style="font-size:12px;font-weight:600;flex:1;margin-right:8px;word-break:break-word;">${escapeHtml(labelText)}</label>
-            <input type="text" id="${selId}" list="cat-options-datalist" data-action="individual-cat-select" data-ing-id="${escapeAttr(item.id)}" value="${escapeAttr(currentSel)}" style="padding:4px 6px;font-size:11.5px;border:1px solid var(--border,#e7e5e4);border-radius:6px;background:var(--surface,#fff);width:140px;">
+            <select id="${selId}" data-action="individual-cat-select" data-ing-id="${escapeAttr(item.id)}" style="padding:4px 6px;font-size:11.5px;border:1px solid var(--border,#e7e5e4);border-radius:6px;background:var(--surface,#fff);width:140px;">
+              ${otherCats.map(c => `<option value="${escapeAttr(c)}" ${c === currentSel ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+            </select>
           </div>`;
         }).join('') || '<div style="font-size:12px;color:var(--text2,#78716c);padding:8px">No matching items found.</div>'}
-        <datalist id="cat-options-datalist">
-          ${otherCats.map(c => `<option value="${escapeAttr(c)}">`).join('')}
-        </datalist>
       </div>`}
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button type="button" class="btn ghost sm" data-action="nav-step" data-step="list">Cancel</button>
       <button id="btn-submit-reassign-delete" type="button" class="btn primary sm" style="background:var(--red,#ef4444)" data-action="submit-reassign-delete">Reassign & Delete</button>
     </div>`;
-}
-
-export function renderDeleteConfirmModalHtml(categoryName, categoryId) {
-  return `
-    <div style="background:#ffffff; border-radius:16px; padding:20px; width:100%; max-width:400px; box-shadow:0 10px 25px rgba(0,0,0,0.25);">
-      <h3 style="margin-top:0; margin-bottom:10px; font-size:1.15rem; font-weight:750; color:var(--red,#ef4444);">Delete "${escapeHtml(categoryName)}"</h3>
-      <p style="font-size:13px; color:var(--text2,#78716c); margin:0 0 16px 0; line-height:1.4">Are you sure you want to delete this category? This action is permanent.</p>
-      <div style="display:flex; gap:8px; justify-content:flex-end">
-        <button type="button" class="btn sm" data-action="close-delete-confirm">Cancel</button>
-        <button type="button" class="btn sm primary" style="background:var(--red,#ef4444); color:#fff;" id="btn-confirm-delete-cat" data-action="confirm-delete" data-category="${escapeAttr(categoryId || categoryName)}">Delete</button>
-      </div>
-    </div>
-  `;
 }
