@@ -167,18 +167,24 @@ if (typeof window !== 'undefined') {
           window.__prefilledResolveBinding = { parentId, subtypeId: editingSubtypeId, subtypeDraftName: window.__draftSubtypePayload.name };
           if (typeof module.openProductEditModal === 'function') {
             module.openProductEditModal(null);
+          } else {
+            console.error('Decision Tree Failure: Function not exported in module.', module);
           }
         }).catch(err => console.error('Failed to load manual product modal', err));
       } else if (actionType === 'link') {
         import('./SubtypeProductLinkerModalUI.js').then((module) => {
           if (typeof module.openSubtypeExistingProductPickerModal === 'function') {
             module.openSubtypeExistingProductPickerModal(editingSubtypeId, parentId);
+          } else {
+            console.error('Decision Tree Failure: Function not exported in module.', module);
           }
         }).catch(err => console.error('Failed to load link modal', err));
       } else if (actionType === 'tesco') {
         import('./TescoImportModalUI.js').then((module) => {
           if (typeof module.openTescoImportModal === 'function') {
             module.openTescoImportModal(editingSubtypeId, parentId);
+          } else {
+            console.error('Decision Tree Failure: Function not exported in module.', module);
           }
         }).catch(err => console.error('Failed to load tesco modal', err));
       }
