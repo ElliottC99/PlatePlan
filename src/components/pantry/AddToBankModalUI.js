@@ -335,10 +335,14 @@ function bindAddToBankEvents(currentType, categories, ingredients) {
 
         const newCats = [...currentCats, rawName].sort((a,b) => a.localeCompare(b));
         setCategories(newCats);
-        closeModal();
         invalidateHierarchyCache();
         if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
         await saveCategories(newCats);
+        openAddToBankModal('item');
+        setTimeout(() => {
+          const catInput = document.getElementById('add-bank-item-cat-search');
+          if (catInput) catInput.value = rawName;
+        }, 50);
       } 
       else if (currentType === 'item') {
         const nameInput = document.getElementById('add-bank-item-name');
@@ -356,22 +360,36 @@ function bindAddToBankEvents(currentType, categories, ingredients) {
           return;
         }
 
+        const newIngId = 'ing_' + Date.now() + Math.random().toString(36).substring(2, 6);
+        const newSubId = 'sub_' + Date.now() + Math.random().toString(36).substring(2, 6);
         const newIng = {
-          id: 'ing_' + Date.now() + Math.random().toString(36).substring(2, 6),
+          id: newIngId,
           name: rawName,
           category: rawCat || 'Pantry',
           unit: '',
-          subtypes: [],
+          subtypes: [{
+            id: newSubId,
+            name: rawName,
+            updatedAt: new Date().toISOString()
+          }],
           aliases: [],
           updatedAt: new Date().toISOString()
         };
 
         const updatedIngs = [...currentIngs, newIng];
         setIngredients(updatedIngs);
-        closeModal();
         invalidateHierarchyCache();
         if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
         await saveIngredient(newIng);
+        openAddToBankModal('product');
+        setTimeout(() => {
+          const anchorInput = document.getElementById('add-bank-prod-anchor-search');
+          const hiddenParent = document.getElementById('add-bank-prod-parent-id');
+          const hiddenSub = document.getElementById('add-bank-prod-subtype-id');
+          if (anchorInput) anchorInput.value = `Item: ${rawName} (${rawCat || 'Pantry'})`;
+          if (hiddenParent) hiddenParent.value = newIngId;
+          if (hiddenSub) hiddenSub.value = newSubId;
+        }, 50);
       }
       else if (currentType === 'subtype') {
         const parentId = document.getElementById('add-bank-subtype-parent-id')?.value;

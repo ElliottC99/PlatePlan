@@ -10,7 +10,7 @@ import { saveProduct } from '../../services/ProductRepository.js';
 import { saveIngredient } from '../../services/IngredientRepository.js';
 import { invalidateHierarchyCache } from '../../models/PantryHierarchyModel.js';
 import { promoteSubtype, moveSubtype, mergeSubtype } from '../../services/SubtypeRepository.js';
-import { closeModal, showModal, formatBrandProductLabel, setupModalDelegation } from './SubtypeActionModalsUI.js';
+import { closeModal, showModal, formatBrandProductLabel, setupModalDelegation, executePromoteSubtypeToItem, executeMoveSubtypeToParent, executeMergeSubtype } from './SubtypeActionModalsUI.js';
 import {
   renderEditSubtypeModalHTML,
   renderReorganizeModalHTML,
@@ -113,67 +113,86 @@ export function openSubtypeReorganizeModal(subtypeId, parentId) {
     btnCancel.onclick = () => closeModal();
   }
 
+  // Move dropdown binding
+  const moveInput = document.getElementById('reorg-move-input');
+  const moveHidden = document.getElementById('reorg-move-target-id');
+  const moveDropdown = document.getElementById('reorg-move-dropdown');
+  if (moveInput && moveHidden && moveDropdown) {
+    const renderMoveOpts = () => {
+      const q = moveInput.value.trim().toLowerCase();
+      const filtered = targetParents.filter(p => !q || p.name.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q));
+      moveDropdown.innerHTML = filtered.map(p => `
+        <div class="dd-item" data-id="${escapeHTML(p.id)}" data-name="${escapeHTML(p.name)}" style="padding:10px 14px; cursor:pointer; font-size:13px; border-bottom:1px solid #f1f5f9;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">
+          <div style="font-weight:600;">${escapeHTML(p.name)}</div>
+          <div style="font-size:11px; color:var(--text2);">Category: ${escapeHTML(p.category || 'Pantry')}</div>
+        </div>
+      `).join('') || `<div style="padding:10px; font-size:12px; color:var(--text2); font-style:italic;">No matching parent item</div>`;
+      moveDropdown.style.display = 'block';
+
+      moveDropdown.querySelectorAll('.dd-item').forEach(el => {
+        el.onclick = () => {
+          moveHidden.value = el.dataset.id;
+          moveInput.value = el.dataset.name;
+          moveDropdown.style.display = 'none';
+        };
+      });
+    };
+    moveInput.addEventListener('input', renderMoveOpts);
+    moveInput.addEventListener('focus', renderMoveOpts);
+  }
+
+  // Merge dropdown binding
+  const mergeInput = document.getElementById('reorg-merge-input');
+  const mergeHidden = document.getElementById('reorg-merge-target-id');
+  const mergeDropdown = document.getElementById('reorg-merge-dropdown');
+  if (mergeInput && mergeHidden && mergeDropdown) {
+    const renderMergeOpts = () => {
+      const q = mergeInput.value.trim().toLowerCase();
+      const filtered = siblingSubtypes.filter(s => !q || s.name.toLowerCase().includes(q));
+      mergeDropdown.innerHTML = filtered.map(s => `
+        <div class="dd-item" data-id="${escapeHTML(s.id)}" data-name="${escapeHTML(s.name)}" style="padding:10px 14px; cursor:pointer; font-size:13px; border-bottom:1px solid #f1f5f9;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">
+          <div style="font-weight:600;">${escapeHTML(s.name)}</div>
+        </div>
+      `).join('') || `<div style="padding:10px; font-size:12px; color:var(--text2); font-style:italic;">No matching sibling sub-type</div>`;
+      mergeDropdown.style.display = 'block';
+
+      mergeDropdown.querySelectorAll('.dd-item').forEach(el => {
+        el.onclick = () => {
+          mergeHidden.value = el.dataset.id;
+          mergeInput.value = el.dataset.name;
+          mergeDropdown.style.display = 'none';
+        };
+      });
+    };
+    mergeInput.addEventListener('input', renderMergeOpts);
+    mergeInput.addEventListener('focus', renderMergeOpts);
+  }
+
   const btnPromote = document.getElementById('btn-reorg-promote');
   if (btnPromote) {
     btnPromote.onclick = async () => {
       closeModal();
-      try {
-        const res = await promoteSubtype(parentId, subtypeId);
-        invalidateHierarchyCache();
-        if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-        if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
-        if (typeof window.showPlatePlanToast === 'function') {
-          window.showPlatePlanToast(`Promoted to standalone ingredient (${res.modifiedRecipesCount || 0} recipes updated)`, 'success');
-        }
-      } catch (err) {
-        console.error('[SubtypeActionModalsUI] Promote failed:', err);
-        if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Failed to promote sub-type.', 'error');
-      }
+      await executePromoteSubtypeToItem(subtypeId, parentId);
     };
   }
 
   const btnMove = document.getElementById('btn-reorg-move');
   if (btnMove) {
     btnMove.onclick = async () => {
-      const moveSelect = document.getElementById('reorg-move-select');
-      const targetParentId = moveSelect ? moveSelect.value : '';
-      if (!targetParentId) return;
+      const targetParentId = document.getElementById('reorg-move-target-id')?.value;
+      if (!targetParentId) { alert('Please select a target parent item from the list.'); return; }
       closeModal();
-      try {
-        const res = await moveSubtype(parentId, subtypeId, targetParentId);
-        invalidateHierarchyCache();
-        if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-        if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
-        if (typeof window.showPlatePlanToast === 'function') {
-          window.showPlatePlanToast(`Moved sub-type to new parent (${res.modifiedRecipesCount || 0} recipes updated)`, 'success');
-        }
-      } catch (err) {
-        console.error('[SubtypeActionModalsUI] Move failed:', err);
-        if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Failed to move sub-type.', 'error');
-      }
+      await executeMoveSubtypeToParent(subtypeId, parentId, targetParentId);
     };
   }
 
   const btnMerge = document.getElementById('btn-reorg-merge');
   if (btnMerge) {
     btnMerge.onclick = async () => {
-      const mergeSelect = document.getElementById('reorg-merge-select');
-      const targetSubtypeId = mergeSelect ? mergeSelect.value : '';
-      if (!targetSubtypeId) return;
+      const targetSubtypeId = document.getElementById('reorg-merge-target-id')?.value;
+      if (!targetSubtypeId) { alert('Please select a target sibling sub-type from the list.'); return; }
       closeModal();
-      try {
-        const res = await mergeSubtype(parentId, subtypeId, targetSubtypeId);
-        invalidateHierarchyCache();
-        if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-        if (typeof window.renderProductBank === 'function') window.renderProductBank();
-        if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
-        if (typeof window.showPlatePlanToast === 'function') {
-          window.showPlatePlanToast(`Merged sub-type into sibling (${res.modifiedRecipesCount || 0} recipes updated)`, 'success');
-        }
-      } catch (err) {
-        console.error('[SubtypeActionModalsUI] Merge failed:', err);
-        if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Failed to merge sub-type.', 'error');
-      }
+      await executeMergeSubtype(subtypeId, targetSubtypeId, parentId);
     };
   }
 }

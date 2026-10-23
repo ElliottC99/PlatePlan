@@ -89,36 +89,38 @@ export function renderEditSubtypeModalHTML({ sub, parentId, subtypeId, linkedPro
  */
 export function renderReorganizeModalHTML({ sub, parent, targetParents = [], siblingSubtypes = [] }) {
   return `
-    <div style="padding: 24px; max-width: 500px; width: 100%; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);">
-      <h3 style="margin-top:0; margin-bottom: 16px; font-size: 1.15rem; font-weight: 750;">🔀 Reorganise: ${escapeHTML(sub.name)}</h3>
+    <div style="padding: 24px; max-width: 500px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; border: 1px solid var(--border,#e7e5e4);">
+      <h3 style="margin-top:0; margin-bottom: 6px; font-size: 1.15rem; font-weight: 750;">Reorganise: ${escapeHTML(sub.name)}</h3>
+      <p style="font-size: 12.5px; color: var(--text2,#78716c); margin: 0 0 18px 0;">Select how you want to restructure or consolidate this sub-type.</p>
       
-      <div style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 16px; background: #f8fafc;">
-        <div style="font-weight: 750; font-size: 13px; display:flex; align-items:center; justify-content:space-between">
-          <span>🚀 Option A: Promote to Standalone Ingredient</span>
-          <button type="button" class="btn primary sm" id="btn-reorg-promote" style="font-weight:600">Promote</button>
-        </div>
-        <p style="margin:4px 0 0 0; font-size:11px; color:var(--text2)">Ejects this sub-type from parent "${escapeHTML(parent.name)}" into a standalone card.</p>
+      <!-- Option 1: Promote to Item -->
+      <div style="padding: 16px; border: 1px solid var(--border,#e7e5e4); border-radius: 12px; margin-bottom: 14px; background: var(--surface2,#f5f5f4);">
+        <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px;">🚀 Option 1: Promote to Item</div>
+        <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Ejects this sub-type from parent "${escapeHTML(parent.name)}" into a standalone Item card.</p>
+        <button type="button" class="btn primary sm" id="btn-reorg-promote" style="font-weight:600">Promote to Item</button>
       </div>
 
-      <div style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 16px; background: #f8fafc;">
-        <div style="font-weight: 750; font-size: 13px; margin-bottom: 6px;">📦 Option B: Move to another Parent Ingredient</div>
-        <div style="display:flex; gap:8px;">
-          <input type="text" list="pantry-items-list" id="reorg-move-select" style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff); outline:none;" placeholder="Search or select parent ingredient..." name="reorgMoveSelect">
-          <datalist id="pantry-items-list">
-            ${buildParentIngredientDropdownOptions(targetParents)}
-          </datalist>
-          <button type="button" class="btn primary sm" id="btn-reorg-move" style="font-weight:600">Move</button>
+      <!-- Option 2: Move Parent -->
+      <div style="padding: 16px; border: 1px solid var(--border,#e7e5e4); border-radius: 12px; margin-bottom: 14px; background: var(--surface2,#f5f5f4); position:relative;">
+        <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px;">📦 Option 2: Move to different Parent Item</div>
+        <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Nests this sub-type under a different parent item.</p>
+        <div style="display:flex; gap:8px; position:relative;">
+          <input type="text" id="reorg-move-input" autocomplete="off" placeholder="Search parent item..." style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff); outline:none;" />
+          <input type="hidden" id="reorg-move-target-id" value="" />
+          <button type="button" class="btn primary sm" id="btn-reorg-move" style="font-weight:600">Move to different Parent Item</button>
+          <div id="reorg-move-dropdown" style="position:absolute; top:100%; left:0; right:110px; z-index:9999; background:#fff; border:1px solid var(--border); border-radius:8px; max-height:160px; overflow-y:auto; display:none; margin-top:4px; box-shadow:0 8px 20px rgba(0,0,0,0.08);"></div>
         </div>
       </div>
 
-      <div style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 20px; background: #f8fafc;">
-        <div style="font-weight: 750; font-size: 13px; margin-bottom: 6px;">🔀 Option C: Merge into another Sub-type sibling</div>
-        <div style="display:flex; gap:8px;">
-          <input type="text" list="pantry-items-list-sibling" id="reorg-merge-select" style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff); outline:none;" placeholder="Search or select sibling..." ${siblingSubtypes.length === 0 ? 'disabled' : ''} name="reorgMergeSelect">
-          <datalist id="pantry-items-list-sibling">
-            ${buildSubtypeDropdownOptions(siblingSubtypes)}
-          </datalist>
-          <button type="button" class="btn primary sm" id="btn-reorg-merge" style="font-weight:600" ${siblingSubtypes.length === 0 ? 'disabled' : ''}>Merge</button>
+      <!-- Option 3: Merge Sibling -->
+      <div style="padding: 16px; border: 1px solid var(--border,#e7e5e4); border-radius: 12px; margin-bottom: 16px; background: var(--surface2,#f5f5f4); position:relative;">
+        <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px;">🔀 Option 3: Merge with another Sub-type</div>
+        <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Merges this sub-type into another sibling sub-type under this parent.</p>
+        <div style="display:flex; gap:8px; position:relative;">
+          <input type="text" id="reorg-merge-input" autocomplete="off" placeholder="Search sibling sub-type..." style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff); outline:none;" ${siblingSubtypes.length === 0 ? 'disabled' : ''} />
+          <input type="hidden" id="reorg-merge-target-id" value="" />
+          <button type="button" class="btn primary sm" id="btn-reorg-merge" style="font-weight:600" ${siblingSubtypes.length === 0 ? 'disabled' : ''}>Merge with another Sub-type</button>
+          <div id="reorg-merge-dropdown" style="position:absolute; top:100%; left:0; right:110px; z-index:9999; background:#fff; border:1px solid var(--border); border-radius:8px; max-height:160px; overflow-y:auto; display:none; margin-top:4px; box-shadow:0 8px 20px rgba(0,0,0,0.08);"></div>
         </div>
       </div>
 

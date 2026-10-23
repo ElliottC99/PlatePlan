@@ -239,6 +239,21 @@ export function handleSubtypeLinkRoute(action, subtypeId, parentId) {
   }, 150);
 }
 
+export async function executePromoteSubtypeToItem(subtypeId, parentId) {
+  const op = await import('./SubtypeReorganiseOperations.js');
+  return await op.executePromoteSubtypeToItem(subtypeId, parentId);
+}
+
+export async function executeMoveSubtypeToParent(subtypeId, oldParentId, newParentId) {
+  const op = await import('./SubtypeReorganiseOperations.js');
+  return await op.executeMoveSubtypeToParent(subtypeId, oldParentId, newParentId);
+}
+
+export async function executeMergeSubtype(sourceSubtypeId, targetSubtypeId, parentId) {
+  const op = await import('./SubtypeReorganiseOperations.js');
+  return await op.executeMergeSubtype(sourceSubtypeId, targetSubtypeId, parentId);
+}
+
 if (typeof window !== 'undefined') {
   window.handleSubtypeLinkRoute = handleSubtypeLinkRoute;
   window.closeSubtypeActionModal = closeModal;
