@@ -13,8 +13,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#F7F6F2">
 <meta name="description" content="PlatePlan — shared meal planning for Elliott and Chloe">
-<meta name="app-version" content="v3.42.7">
-<meta name="version" content="v3.42.7">
+<meta name="app-version" content="v3.42.8">
+<meta name="version" content="v3.42.8">
 <meta name="application-name" content="PlatePlan">
 <meta property="og:title" content="PlatePlan — Elliott &amp; Chloe">
 <meta property="og:description" content="PlatePlan — shared meal planning for Elliott and Chloe">
@@ -414,29 +414,13 @@ try{
   <div class="view-toolbar" style="flex-wrap:wrap;gap:10px">
     <div>
       <h1 class="view-title" style="margin:0">Pantry</h1>
-      <div style="font-size:12px;color:var(--text2);margin-top:2px">Manage Active Stock and your Pantry Bank (Categories, Items &amp; Sub-types)</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">Manage your Pantry Bank (Categories, Items &amp; Sub-types)</div>
     </div>
     <div class="btn-row">
       <button type="button" class="btn sm btn-ghost ghost" data-pp-click="openCategoryManagerModal()">Categories</button>
       <button type="button" class="btn sm btn-ghost ghost" data-pp-click="clearProductGroupFilter();showView('bank')">Product Bank</button>
-      <button type="button" class="btn sm btn-primary primary" data-pp-click="createIngredientFamilyPrompt()">+ Add Item</button>
+      <button type="button" class="btn sm btn-primary primary" data-pp-click="createIngredientFamilyPrompt()">+ Add to Bank</button>
     </div>
-  </div>
-
-  <div id="pantry-tabs-nav" role="tablist" aria-label="Pantry views" style="display:flex;gap:8px;margin-bottom:14px;padding:4px;background:var(--surface2,#f5f5f4);border:1px solid var(--border,#e7e5e4);border-radius:10px;width:fit-content;max-width:100%;flex-wrap:wrap">
-    <button type="button" role="tab" id="btn-pantry-tab-active-stock" data-pantry-tab="active-stock" aria-selected="false" data-pp-click="switchPantryTab('active-stock')" style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2,#78716c);transition:all 0.15s ease">
-      <span>📦 Active Stock</span>
-      <span id="pantry-active-stock-badge" style="font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--surface,#fff);color:var(--text2,#78716c);border:1px solid var(--border,#e7e5e4)">0</span>
-    </button>
-    <button type="button" role="tab" id="btn-pantry-tab-master-catalog" data-pantry-tab="master-catalog" aria-selected="true" data-pp-click="switchPantryTab('master-catalog')" style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer;background:var(--surface,#fff);color:var(--text,#1c1917);box-shadow:0 1px 3px rgba(0,0,0,0.08);transition:all 0.15s ease">
-      <span>🏛️ Pantry Bank (Master Catalog)</span>
-      <span id="pantry-master-catalog-badge" style="font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--green-bg,#EAF4EF);color:var(--green,#1A6B4A)">0</span>
-    </button>
-  </div>
-
-  <div id="pantry-tab-active-stock" role="tabpanel" aria-labelledby="btn-pantry-tab-active-stock" style="display:none">
-    <div id="pantry-stock-toolbar-host"></div>
-    <div id="pantry-active-stock-list"></div>
   </div>
 
   <div id="pantry-tab-master-catalog" role="tabpanel" aria-labelledby="btn-pantry-tab-master-catalog" style="display:block">
@@ -444,7 +428,7 @@ try{
       <div class="row-between" style="gap:12px;align-items:center;flex-wrap:wrap">
         <div>
           <div style="font-weight:700;margin-bottom:3px">Pantry Bank: Categories → Items → Sub-types → Products</div>
-          <div style="font-size:12px;color:var(--text2)">Recipes map to Items or Sub-types in your Pantry Bank. Click "+ Stock" on any Item or Sub-type to add it directly to Active Stock.</div>
+          <div style="font-size:12px;color:var(--text2)">Recipes map to Items or Sub-types in your Pantry Bank.</div>
         </div>
         <input type="search" id="ingredient-group-search" aria-label="Search categories, items, sub-types, or aliases" placeholder="Search categories, items, sub-types, aliases..." data-pp-input="schedulePlatePlanListRender('ingredients')" style="font-size:12px;max-width:260px" name="ingredient-group-search">
       </div>

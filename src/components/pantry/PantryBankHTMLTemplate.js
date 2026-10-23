@@ -22,31 +22,6 @@ export function formatBrandProductTag(product, fallbackLabel = '') {
   return raw.replace(/\s*[-–—]\s*/, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function getStockStatusForEntry(inventory = [], ingredientId, subtypeId = null) {
-  const activeMatches = (Array.isArray(inventory) ? inventory : []).filter(item => {
-    if (!item || item.status === 'out_of_stock') return false;
-    const qty = Number(item.quantity ?? item.qty ?? 1);
-    if (qty <= 0) return false;
-    if (String(item.ingredientId || '') !== String(ingredientId || '')) return false;
-    if (subtypeId) {
-      return String(item.subtypeId || '') === String(subtypeId);
-    }
-    return true;
-  });
-
-  if (activeMatches.length === 0) {
-    return { inStock: false, totalQty: 0, unit: 'qty' };
-  }
-
-  const totalQty = activeMatches.reduce((acc, cur) => acc + (Number(cur.quantity ?? cur.qty ?? 1) || 1), 0);
-  const unit = activeMatches[0]?.unit || 'qty';
-  return {
-    inStock: true,
-    totalQty: Number(totalQty.toFixed(2)),
-    unit
-  };
-}
-
 export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inventory = []) {
   return hierarchy.map(group => `
     <div class="card pantry-category-card" data-category="${escapeAttr(group.category || '')}" style="margin-bottom:16px;padding:16px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-lg,14px)">
@@ -62,10 +37,6 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inven
         ${group.ingredients.map(ing => {
           const defProd = ing.defaultProduct, subtypes = ing.subtypes || [], aliases = ing.aliases || [];
           const autoDefaultLabel = formatBrandProductTag(defProd, ing.autoDefault);
-          const ingStock = getStockStatusForEntry(inventory, ing.id, null);
-          const stockBadgeHtml = ingStock.inStock
-            ? `<span class="badge badge-stock-in" style="background:#dcfce7;color:#15803d;border:1px solid #86efac;font-weight:700;padding:2px 8px;border-radius:999px;font-size:10.5px">✓ In Stock (${ingStock.totalQty} ${escapeHtml(ingStock.unit)})</span>`
-            : `<span class="badge badge-stock-out" style="background:var(--surface,#fff);color:var(--text3,#a8a29e);border:1px solid var(--border,#e7e5e4);font-weight:600;padding:2px 8px;border-radius:999px;font-size:10.5px">Out of Stock</span>`;
 
           return `
             <div class="ingredient-card-node" data-ingredient-id="${escapeAttr(ing.id)}" data-ingredient-name="${escapeAttr(ing.name || '')}" data-aliases="${escapeAttr(aliases.join(','))}" style="padding:12px 14px;border-radius:var(--radius-md,10px);background:var(--surface2,#f5f5f4);border:1px solid var(--border,#e7e5e4);display:flex;flex-direction:column;gap:8px">
@@ -74,7 +45,6 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inven
                   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                     <span style="font-size:14px;font-weight:750;color:var(--text,#1c1917)">${escapeHtml(ing.name)}</span>
                     ${ing.unit ? `<span style="font-size:11px;color:var(--text2,#78716c)">(${escapeHtml(ing.unit)})</span>` : ''}
-                    ${stockBadgeHtml}
                   </div>
                   <div style="margin-top:4px;display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text2,#78716c);flex-wrap:wrap">
                     <span style="font-weight:600">Auto default:</span>
@@ -87,7 +57,6 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inven
                 </div>
 
                 <div style="display:flex;align-items:center;gap:6px;position:relative;flex-wrap:wrap">
-                  <button type="button" class="btn xs" data-action="add-to-active-stock" data-ingredient-id="${escapeAttr(ing.id)}" data-subtype-id="" onclick="window.addCatalogItemToActiveStock('${escapeAttr(ing.id)}', '')" title="Add to Active Stock" style="background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;font-weight:700;padding:3px 9px">+ Stock</button>
                   <button type="button" class="btn xs btn-outline outline" onclick="openIngredientFamilyDetailsModal('${escapeAttr(ing.id)}')" title="Edit properties">Edit</button>
                   <button type="button" class="btn xs btn-secondary secondary subtype-toggle-btn" onclick="openAddSubtypeModal('${escapeAttr(ing.id)}')" title="Add child sub-type">+ Sub-type</button>
                   <div style="position:relative;display:inline-block">
@@ -102,30 +71,22 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inven
                 </div>
               </div>
 
-
-
               ${subtypes.length ? `
                 <div style="margin-top:4px">
                   <button type="button" class="btn xs btn-ghost ghost subtype-toggle-btn" onclick="toggleSubtypeCollapse(this, '${escapeAttr(ing.id)}')" style="font-size:11px;font-weight:700;color:var(--text2,#78716c);display:flex;align-items:center;gap:4px;padding:2px 6px">▼ SUB-TYPES (${subtypes.length})</button>
                   <div id="subtypes-container-${escapeAttr(ing.id)}" class="subtypes-collapsible" style="display:none;margin-top:6px;padding-left:14px;border-left:2px solid var(--border,#e7e5e4);flex-direction:column;gap:6px">
                     ${subtypes.map(st => {
                       const stDefaultLabel = st.defaultProduct ? formatBrandProductTag(st.defaultProduct) : '';
-                      const stStock = getStockStatusForEntry(inventory, ing.id, st.id);
-                      const stStockBadgeHtml = stStock.inStock
-                        ? `<span class="badge badge-stock-in" style="background:#dcfce7;color:#15803d;border:1px solid #86efac;font-weight:700;padding:1px 7px;border-radius:999px;font-size:10px">✓ In Stock (${stStock.totalQty} ${escapeHtml(stStock.unit)})</span>`
-                        : `<span class="badge badge-stock-out" style="background:var(--surface2,#f5f5f4);color:var(--text3,#a8a29e);border:1px solid var(--border,#e7e5e4);font-weight:600;padding:1px 7px;border-radius:999px;font-size:10px">Out of Stock</span>`;
                       return `
                       <div class="pantry-subtype-row" data-subtype-id="${escapeAttr(st.id)}" data-subtype-name="${escapeAttr(st.name || '')}" style="padding:6px 10px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-sm,6px);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                           <span style="font-size:12px;font-weight:650">↳ ${escapeHtml(st.name)}</span>
-                          ${stStockBadgeHtml}
                           ${stDefaultLabel ? `<span class="badge badge-success" style="font-size:10.5px;padding:2px 8px;border-radius:var(--radius-sm,6px);background:var(--green-bg,#EAF4EF);color:var(--green,#1A6B4A)">⭐ ${escapeHtml(stDefaultLabel)}</span>` : ''}
                         </div>
                         <div class="subtype-actions-container" style="position:relative;display:inline-flex;align-items:center;gap:6px">
-                          <button type="button" class="btn xs" data-action="add-to-active-stock" data-ingredient-id="${escapeAttr(ing.id)}" data-subtype-id="${escapeAttr(st.id)}" onclick="window.addCatalogItemToActiveStock('${escapeAttr(ing.id)}', '${escapeAttr(st.id)}')" title="Add ${escapeAttr(st.name)} to Active Stock" style="background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;font-weight:700;padding:2px 8px;font-size:11px">+ Stock</button>
+                          <button type="button" class="btn xs btn-secondary" onclick="window.openEditSubtypeModal('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')">Edit</button>
                           <button type="button" class="btn xs btn-ghost ghost dropdown-trigger-btn" onclick="toggleCardMoreMenu(this, '${escapeAttr(st.id)}')" title="More options" style="padding:2px 6px;font-weight:700">•••</button>
                           <div id="card-more-menu-${escapeAttr(st.id)}" class="card-more-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-md,10px);box-shadow:0 6px 16px rgba(0,0,0,0.08);z-index:100;min-width:140px;flex-direction:column;padding:4px">
-                            <button type="button" class="btn xs btn-ghost ghost" data-action="edit-subtype" data-subtype-id="${escapeAttr(st.id)}" data-parent-id="${escapeAttr(ing.id)}" onclick="window.openEditSubtypeModal('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">📝 Edit Details</button>
                             <button type="button" class="btn xs btn-ghost ghost" data-action="link-subtype" data-subtype-id="${escapeAttr(st.id)}" data-parent-id="${escapeAttr(ing.id)}" onclick="window.openSubtypeLinkSelectionModal('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🔗 Link Product</button>
                             <button type="button" class="btn xs btn-ghost ghost" data-action="reorganize-subtype" data-subtype-id="${escapeAttr(st.id)}" data-parent-id="${escapeAttr(ing.id)}" onclick="window.openSubtypeReorganizeModal('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🔄 Reorganise</button>
                             <button type="button" class="btn xs btn-ghost ghost" data-action="alias-subtype" data-subtype-id="${escapeAttr(st.id)}" data-parent-id="${escapeAttr(ing.id)}" onclick="window.openSubtypeAliasModal('${escapeAttr(st.id)}', '${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🏷️ Manage Aliases</button>
