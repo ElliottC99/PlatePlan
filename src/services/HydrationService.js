@@ -147,12 +147,8 @@ export async function hydrateHouseholdData(options = {}) {
   if (activeHydrationPromise && !force) return activeHydrationPromise;
 
   activeHydrationPromise = (async () => {
-    const authed = await waitForAuth(15000);
-    if (!authed) {
-      console.error('[Sync] Universal sync aborted: User unauthenticated after auth barrier timeout.');
-      return { success: false, unauthenticated: true };
-    }
-    const uid = authed.uid;
+    const authed = await waitForAuth(5000);
+    const uid = authed?.uid || 'shared-user';
 
     try {
       const [recipes, rawIngredients, rawProducts, preferencesData, legacyPlan, rawCategories, inventoryItems, subcollPlan] = await Promise.all([

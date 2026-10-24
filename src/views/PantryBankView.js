@@ -194,6 +194,10 @@ export function attachPantryBankDelegation() {
       import('../components/pantry/AddToBankWizardUI.js')
         .then(m => m.openAddToBankWizardModal())
         .catch(err => console.error('Delegation Error [add-to-bank]:', err));
+    } else if (action === 'manage-categories' || action === 'open-category-manager' || action === 'reorganise-category') {
+      import('../components/pantry/ReorganiseModalUI.js')
+        .then(m => m.openReorganiseModal('category'))
+        .catch(err => console.error('Delegation Error [manage-categories]:', err));
     }
   });
 }
