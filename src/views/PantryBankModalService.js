@@ -69,7 +69,7 @@ export function closeIngredientFamilyDetailsModal() {
 }
 
 export function openIngredientFamilyDetailsModal(ingredientId = null, parentId = null) {
-  import('../components/pantry/AddToBankWizardUI.js').then(m => m.openAddToBankWizardModal());
+  import('../components/pantry/AddToBankHubUI.js').then(m => m.openAddToBankModal(null, { ingredientId, parentId }));
 }
 
   document.body.style.overflow = 'hidden';

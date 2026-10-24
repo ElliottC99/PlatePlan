@@ -142,7 +142,7 @@ export function routeAction(actionName, target, event) {
   }
 
   if (normalizedAction.includes('createingredientfamilyprompt')) {
-    import('../components/pantry/AddToBankWizardUI.js').then(m => m.openAddToBankWizardModal());
+    import('../components/pantry/AddToBankHubUI.js').then(m => m.openAddToBankModal());
     return true;
   }
 

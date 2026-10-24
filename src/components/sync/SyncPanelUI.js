@@ -6,7 +6,7 @@
 import { getState } from '../../store/store.js';
 import { hydrateHouseholdData } from '../../services/HydrationService.js';
 import { getCounts } from '../../services/SyncService.js';
-import { showCustomConfirm, showCustomCopyModal } from '../pantry/ReorganiseModalUI.js';
+import { showCustomConfirm, showCustomCopyModal } from '../ui/DialogHelpers.js';
 
 let lastSyncTime = new Date();
 

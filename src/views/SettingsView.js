@@ -15,7 +15,7 @@ import { renderSystemDisplayCard, renderSettingsContainer } from '../components/
 import { renderMacroTargetsForm, renderFallbackProductsTable } from './SettingsRenderService.js';
 import { calculateMealSplit } from '../utils/nutritionCalculator.js';
 import { getProfileMealTargets } from '../models/StateModel.js';
-import { showCustomAlert, showCustomCopyModal } from '../components/pantry/ReorganiseModalUI.js';
+
 
 
 // Setup global helpers for Settings interactive elements
@@ -138,13 +138,9 @@ export function generateHouseholdInviteLink() {
   navigator.clipboard.writeText(url).then(() => {
     if (typeof window.showPlatePlanToast === 'function') {
       window.showPlatePlanToast('Household invite link copied to clipboard!');
-    } else if (typeof showCustomAlert === 'function') {
-      showCustomAlert('Household invite link copied to clipboard!');
     }
   }).catch(() => {
-    if (typeof showCustomCopyModal === 'function') {
-      showCustomCopyModal('Household Invite Link', url);
-    }
+    import('../components/pantry/ReorganiseModalUI.js').then(m => m.showCustomCopyModal?.('Household Invite Link', url));
   });
 }
 

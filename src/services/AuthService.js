@@ -93,12 +93,9 @@ export async function signInWithGoogle() {
   }
   const provider = new window.firebase.auth.GoogleAuthProvider();
   try {
-    const result = await window.firebase.auth().signInWithPopup(provider);
-    if (typeof window.syncNow === 'function') window.syncNow();
-    closeLoginUI();
-    return result.user;
+    await window.firebase.auth().signInWithRedirect(provider);
   } catch (err) {
-    console.error('[AuthService] Google Sign-In failed:', err);
+    console.error('[AuthService] Google Sign-In redirect failed:', err);
     throw err;
   }
 }
@@ -139,6 +136,10 @@ export function waitForAuth(timeoutMs = 8000) {
         clearInterval(checkFirebase);
         const authInstance = window.firebase.auth();
         
+        if (typeof authInstance.getRedirectResult === 'function') {
+          authInstance.getRedirectResult().catch(() => {});
+        }
+
         if (authInstance.currentUser) {
           clearTimeout(timer);
           return finish(authInstance.currentUser);

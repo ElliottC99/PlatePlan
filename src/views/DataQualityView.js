@@ -6,7 +6,7 @@
 import { dismissDataQualityAdvisory } from '../services/DataQualityService.js';
 import { getState } from '../store/store.js';
 import { runAudit, scanDataQualitySummary } from '../services/DataQualityScanner.js';
-import { showCustomConfirm, showCustomCopyModal } from '../components/pantry/ReorganiseModalUI.js';
+import { showCustomConfirm, showCustomCopyModal } from '../components/ui/DialogHelpers.js';
 import {
   renderDataQualityView as _render,
   handleVerifyZeroCal,

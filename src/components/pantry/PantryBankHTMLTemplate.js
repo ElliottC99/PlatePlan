@@ -1,46 +1,54 @@
 /**
- * src/components/pantry/PantryBankHTMLTemplate.js (v3.30.0)
- * Extracted HTML UI renderer for the Category -> Item -> Sub-type Hierarchy.
- * Enriched with live Active Stock status badges and 1-click "+ Stock" action buttons.
+ * src/components/pantry/PantryBankHTMLTemplate.js (v3.45.1)
+ * Modular HTML template renderer for Pantry Bank Master Catalog hierarchy.
+ * Clean face buttons and zero inline event handlers or inline dropdown menus.
+ * Strictly under 350 lines.
  */
 
-export function formatBrandProductTag(product, fallbackLabel = '') {
-  if (product && typeof product === 'object') {
-    const brand = String(product.brand || '').trim();
-    let productName = String(product.name || product.title || product.productName || '').trim();
-    if (brand && productName.toLowerCase().startsWith(brand.toLowerCase())) {
-      productName = productName.slice(brand.length).replace(/^[\s\-–—:]+/, '').trim();
-    }
-    if (brand && productName) {
-      return `${brand} ${productName}`;
-    }
-    if (productName || brand) {
-      return productName || brand;
-    }
-  }
-  const raw = String(fallbackLabel || '').trim();
-  return raw.replace(/\s*[-–—]\s*/, ' ').replace(/\s+/g, ' ').trim();
+const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
+
+function formatBrandProductTag(p) {
+  if (!p) return '';
+  const brand = p.brand || p.vendor || '';
+  const name = p.name || p.title || '';
+  const packSize = p.packSize ? `${p.packSize}${p.packUnit || 'g'}` : '';
+  const parts = [brand, name, packSize].filter(Boolean);
+  return parts.join(' • ');
 }
 
-export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inventory = []) {
+export function buildIngredientBankHTML(hierarchy = []) {
+  if (!Array.isArray(hierarchy) || hierarchy.length === 0) {
+    return `
+      <div class="card" style="padding:32px 20px;text-align:center;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:14px;margin-top:12px;">
+        <div style="font-size:32px;margin-bottom:8px">🏛️</div>
+        <h3 style="font-size:16px;font-weight:700;margin:0 0 6px 0">No items match filter</h3>
+        <p style="font-size:12.5px;color:var(--text2,#78716c);margin:0 0 12px 0">Try selecting a different category or clearing search.</p>
+        <button class="btn primary sm" type="button" data-action="add-to-bank">Add to Bank</button>
+      </div>
+    `;
+  }
+
   return hierarchy.map(group => `
-    <div class="card pantry-category-card" data-category="${escapeAttr(group.category || '')}" style="margin-bottom:16px;padding:16px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-lg,14px)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border,#e7e5e4)">
+    <div class="card ingredient-group-card" data-category="${escapeAttr(group.category)}" style="margin-bottom:16px;padding:16px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:14px">
+      <div class="ingredient-group-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border,#e7e5e4);flex-wrap:wrap;gap:8px">
         <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:16px">🏷️</span>
-          <h3 style="margin:0;font-size:15px;font-weight:750;text-transform:capitalize">${escapeHtml(group.category)}</h3>
+          <h3 style="margin:0;font-size:15px;font-weight:750;color:var(--text,#1c1917)">📂 ${escapeHtml(group.category)}</h3>
+          <span class="badge" style="background:var(--surface2,#f5f4ee);color:var(--text2,#78716c);font-weight:700;padding:2px 8px;border-radius:12px;font-size:11px">
+            ${(group.ingredients || []).length} items
+          </span>
         </div>
-        <span class="badge badge-gray" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:var(--radius-sm,6px);background:var(--surface2,#f5f5f4)">${group.ingredients.length} items</span>
+        <button type="button" class="btn xs btn-ghost ghost" data-action="manage-categories" style="font-size:11.5px;font-weight:600;color:var(--purple,#4f46e5)">⚙️ Reorganise Category</button>
       </div>
 
-      <div class="pantry-category-items" style="display:flex;flex-direction:column;gap:12px">
-        ${group.ingredients.map(ing => {
-          const defProd = ing.defaultProduct, subtypes = ing.subtypes || [], aliases = ing.aliases || [];
-          const autoDefaultLabel = formatBrandProductTag(defProd, ing.autoDefault);
+      <div class="ingredient-items-list" style="display:flex;flex-direction:column;gap:10px">
+        ${(group.ingredients || []).map(ing => {
+          const autoDefaultLabel = ing.defaultProduct ? formatBrandProductTag(ing.defaultProduct) : '';
+          const subtypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
 
           return `
-            <div class="ingredient-card-node" data-ingredient-id="${escapeAttr(ing.id)}" data-ingredient-name="${escapeAttr(ing.name || '')}" data-aliases="${escapeAttr(aliases.join(','))}" style="padding:12px 14px;border-radius:var(--radius-md,10px);background:var(--surface2,#f5f5f4);border:1px solid var(--border,#e7e5e4);display:flex;flex-direction:column;gap:8px">
-              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <div class="pantry-item-card" data-id="${escapeAttr(ing.id)}" style="padding:12px;background:var(--surface2,#fbfbf9);border:1px solid var(--border,#e7e5e4);border-radius:10px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
                 <div>
                   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                     <span style="font-size:14px;font-weight:750;color:var(--text,#1c1917)">${escapeHtml(ing.name)}</span>
@@ -57,23 +65,15 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inven
                 </div>
 
                 <div style="display:flex;align-items:center;gap:6px;position:relative;flex-wrap:wrap">
-                  <button type="button" class="btn xs btn-outline outline" data-action="reorganise-item" data-id="${escapeAttr(ing.id)}" title="Edit properties">Edit</button>
-                  <button type="button" class="btn xs btn-secondary secondary subtype-toggle-btn" data-action="add-to-bank" title="Add child sub-type">+ Sub-type</button>
-                  <div style="position:relative;display:inline-block">
-                    <button type="button" class="btn xs btn-ghost ghost" onclick="toggleCardMoreMenu(this, '${escapeAttr(ing.id)}')" title="More actions" style="padding:2px 6px;font-weight:700">•••</button>
-                    <div id="card-more-menu-${escapeAttr(ing.id)}" class="card-more-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-md,10px);box-shadow:0 6px 16px rgba(0,0,0,0.08);z-index:100;min-width:130px;flex-direction:column;padding:4px">
-                      <button type="button" class="btn xs btn-ghost ghost" data-action="alias-item" data-id="${escapeAttr(ing.id)}" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🏷️ + Alias</button>
-                      <button type="button" class="btn xs btn-ghost ghost" data-action="reorganise-item" data-id="${escapeAttr(ing.id)}" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🔄 Reorganise</button>
-                      <div style="height:1px;background:var(--border,#e7e5e4);margin:4px 0"></div>
-                      <button type="button" class="btn xs btn-ghost ghost" onclick="handleDeleteIngredient('${escapeAttr(ing.id)}')" style="justify-content:flex-start;padding:6px 10px;width:100%;color:var(--red,#ef4444);font-size:12px;text-align:left">🗑️ Delete</button>
-                    </div>
-                  </div>
+                  <button type="button" class="btn xs btn-outline outline" data-action="edit-item" data-id="${escapeAttr(ing.id)}" title="Edit properties">Edit</button>
+                  <button type="button" class="btn xs btn-secondary secondary" data-action="add-subtype-shortcut" data-id="${escapeAttr(ing.id)}" title="Add child sub-type">+ Sub-type</button>
+                  <button type="button" class="btn xs btn-ghost ghost" data-action="item-action-sheet" data-id="${escapeAttr(ing.id)}" title="More actions" style="padding:2px 8px;font-weight:700">•••</button>
                 </div>
               </div>
 
               ${subtypes.length ? `
                 <div style="margin-top:4px">
-                  <button type="button" class="btn xs btn-ghost ghost subtype-toggle-btn" onclick="toggleSubtypeCollapse(this, '${escapeAttr(ing.id)}')" style="font-size:11px;font-weight:700;color:var(--text2,#78716c);display:flex;align-items:center;gap:4px;padding:2px 6px">▼ SUB-TYPES (${subtypes.length})</button>
+                  <button type="button" class="btn xs btn-ghost ghost subtype-toggle-btn" data-action="toggle-subtype-collapse" data-id="${escapeAttr(ing.id)}" style="font-size:11px;font-weight:700;color:var(--text2,#78716c);display:flex;align-items:center;gap:4px;padding:2px 6px">▼ SUB-TYPES (${subtypes.length})</button>
                   <div id="subtypes-container-${escapeAttr(ing.id)}" class="subtypes-collapsible" style="display:none;margin-top:6px;padding-left:14px;border-left:2px solid var(--border,#e7e5e4);flex-direction:column;gap:6px">
                     ${subtypes.map(st => {
                       const stDefaultLabel = st.defaultProduct ? formatBrandProductTag(st.defaultProduct) : '';
@@ -85,14 +85,7 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inven
                         </div>
                         <div class="subtype-actions-container" style="position:relative;display:inline-flex;align-items:center;gap:6px">
                           <button type="button" class="btn xs btn-secondary" data-action="edit-subtype" data-subtype-id="${escapeAttr(st.id)}" data-parent-id="${escapeAttr(ing.id)}">Edit</button>
-                          <button type="button" class="btn xs btn-ghost ghost dropdown-trigger-btn" onclick="toggleCardMoreMenu(this, '${escapeAttr(st.id)}')" title="More options" style="padding:2px 6px;font-weight:700">•••</button>
-                          <div id="card-more-menu-${escapeAttr(st.id)}" class="card-more-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-md,10px);box-shadow:0 6px 16px rgba(0,0,0,0.08);z-index:100;min-width:140px;flex-direction:column;padding:4px">
-                            <button type="button" class="btn xs btn-ghost ghost" data-action="link-product" data-subtype-id="${escapeAttr(st.id)}" data-parent-id="${escapeAttr(ing.id)}" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🔗 Link Product</button>
-                            <button type="button" class="btn xs btn-ghost ghost" data-action="reorganise-subtype" data-subtype-id="${escapeAttr(st.id)}" data-parent-id="${escapeAttr(ing.id)}" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🔄 Reorganise</button>
-                            <button type="button" class="btn xs btn-ghost ghost" data-action="alias-subtype" data-subtype-id="${escapeAttr(st.id)}" data-parent-id="${escapeAttr(ing.id)}" style="justify-content:flex-start;padding:6px 10px;width:100%;font-size:12px;text-align:left">🏷️ Manage Aliases</button>
-                            <div style="height:1px;background:var(--border,#e7e5e4);margin:4px 0"></div>
-                            <button type="button" class="btn xs btn-ghost ghost" data-action="delete-subtype" data-id="${escapeAttr(st.id)}" data-subtype-id="${escapeAttr(st.id)}" data-parent-id="${escapeAttr(ing.id)}" style="justify-content:flex-start;padding:6px 10px;width:100%;color:var(--red,#ef4444);font-size:12px;text-align:left">🗑️ Delete</button>
-                          </div>
+                          <button type="button" class="btn xs btn-ghost ghost" data-action="subtype-action-sheet" data-subtype-id="${escapeAttr(st.id)}" data-parent-id="${escapeAttr(ing.id)}" title="More options" style="padding:2px 8px;font-weight:700">•••</button>
                         </div>
                       </div>
                     `;

@@ -14,7 +14,7 @@ import {
   renderWizardStepTemplate, 
   renderWizardCompleteTemplate 
 } from './HierarchyWizardRenderService.js';
-import { showCustomAlert } from '../pantry/ReorganiseModalUI.js';
+import { showCustomAlert } from '../ui/DialogHelpers.js';
 
 
 const MAX_DROPDOWN_ITEMS = 7;

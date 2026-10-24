@@ -8,7 +8,7 @@ import { getState, setProducts } from '../store/store.js';
 import { saveProduct, deleteProduct } from '../services/ProductRepository.js';
 import { reallocateProduct, setAutoDefaultProduct, getActiveCategories, addSubtypeToIngredient } from '../models/PantryHierarchyModel.js';
 import { promptReallocateProduct as openReallocateModal } from '../components/pantry/ReallocateProductModalUI.js';
-import { showCustomAlert } from '../components/pantry/ReorganiseModalUI.js';
+import { showCustomAlert } from '../components/ui/DialogHelpers.js';
 import { escapeHtml, escapeAttr } from '../utils/stringUtils.js';
 
 import { 

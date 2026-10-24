@@ -10,7 +10,7 @@
 import { getState, toggleShoppingItem, addManualShoppingItem, updateShoppingItemQty, setShoppingList } from '../../store/store.js';
 import { generateShoppingListFromPlan, AISLE_CATEGORIES } from '../../services/ShoppingListService.js';
 import { getShoppingLists } from '../../repositories/ShoppingListRepository.js';
-import { showCustomAlert } from '../pantry/ReorganiseModalUI.js';
+import { showCustomAlert } from '../ui/DialogHelpers.js';
 
 
 function escapeHtml(str) {

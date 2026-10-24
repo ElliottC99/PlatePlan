@@ -6,7 +6,7 @@
 import { getState } from '../../store/coreState.js';
 
 import { renderShoppingCategoriesList } from './ShoppingCategoryGroup.js';
-import { showCustomCopyModal } from '../pantry/ReorganiseModalUI.js';
+import { showCustomCopyModal } from '../ui/DialogHelpers.js';
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({

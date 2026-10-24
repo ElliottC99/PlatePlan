@@ -14,7 +14,7 @@ import {
   escapeHtml,
   escapeAttr
 } from './ReallocateProductModalRenderService.js';
-import { showCustomAlert } from './ReorganiseModalUI.js';
+import { showCustomAlert } from '../ui/DialogHelpers.js';
 
 
 function showModal(html) {
