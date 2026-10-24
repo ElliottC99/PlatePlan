@@ -147,8 +147,12 @@ export async function hydrateHouseholdData(options = {}) {
   if (activeHydrationPromise && !force) return activeHydrationPromise;
 
   activeHydrationPromise = (async () => {
-    const authed = await waitForAuth(5000);
-    const uid = authed?.uid || 'shared-user';
+    const authed = await waitForAuth(8000);
+    if (!authed) {
+      console.warn('[HydrationService] Unauthenticated session after auth barrier resolution.');
+      return { success: false, unauthenticated: true };
+    }
+    const uid = authed.uid;
 
     try {
       const [recipes, rawIngredients, rawProducts, preferencesData, legacyPlan, rawCategories, inventoryItems, subcollPlan] = await Promise.all([

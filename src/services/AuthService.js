@@ -144,8 +144,16 @@ export function waitForAuth(timeoutMs = 8000) {
         }
         
         unsubscribe = authInstance.onAuthStateChanged((user) => {
-          clearTimeout(timer);
-          finish(user);
+          if (user) {
+            clearTimeout(timer);
+            finish(user);
+          } else {
+            authInstance.signInAnonymously().catch(err => {
+              console.warn('[Auth] Anonymous sign-in fallback error:', err);
+              clearTimeout(timer);
+              finish(null);
+            });
+          }
         });
       }
     }, 50); // Poll every 50ms for the Firebase SDK
