@@ -1,7 +1,7 @@
 /**
- * src/components/pantry/AddToBankWizardUI.js (v3.43.3)
+ * src/components/pantry/AddToBankWizardUI.js (v3.44.1)
  * Gated 4-Step Add to Bank Wizard: Category ➔ Root Item ➔ Sub-type ➔ Product.
- * Consumes RecipeSearchDropdownHelper and PantryTaxonomyService.
+ * Uses RecipeSearchDropdownHelper across Steps 1, 2, and 3 for taxonomy selections.
  * Strictly under 350 lines.
  */
 
@@ -84,7 +84,7 @@ function renderWizardStep() {
       ${step === 1 ? `
         <div style="margin-bottom:18px;">
           <label style="display:block; font-size:12.5px; font-weight:700; margin-bottom:6px;">1. Select or Type Category</label>
-          <div id="wizard-taxonomy-search-container"></div>
+          <div id="wizard-category-container"></div>
           <p style="font-size:11.5px; color:var(--text2,#78716c); margin:6px 0 0 0;">Pick an existing aisle or type a new category name.</p>
         </div>
       ` : ''}
@@ -93,7 +93,8 @@ function renderWizardStep() {
         <div style="margin-bottom:18px;">
           <div style="font-size:12px; color:var(--purple,#4f46e5); font-weight:600; margin-bottom:4px;">Category: 📂 ${escapeHtml(category)}</div>
           <label style="display:block; font-size:12.5px; font-weight:700; margin-bottom:6px;">2. Root Item Name</label>
-          <input type="text" id="wizard-root-item-input" value="${escapeAttr(rootItemName)}" placeholder="e.g. Cheddar Cheese, Flour, Milk..." style="width:100%; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px;" />
+          <div id="wizard-root-item-container"></div>
+          <p style="font-size:11.5px; color:var(--text2,#78716c); margin:6px 0 0 0;">Pick an existing item or type a new root item name.</p>
         </div>
       ` : ''}
 
@@ -101,7 +102,7 @@ function renderWizardStep() {
         <div style="margin-bottom:18px;">
           <div style="font-size:12px; color:var(--text2,#78716c); font-weight:600; margin-bottom:4px;">📂 ${escapeHtml(category)} ➔ 📦 ${escapeHtml(rootItemName)}</div>
           <label style="display:block; font-size:12.5px; font-weight:700; margin-bottom:6px;">3. Sub-type (Optional)</label>
-          <input type="text" id="wizard-subtype-input" value="${escapeAttr(subtypeName)}" placeholder="e.g. Mature Cheddar, Extra Virgin, Plain..." style="width:100%; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px;" />
+          <div id="wizard-subtype-container"></div>
           <p style="font-size:11.5px; color:var(--text2,#78716c); margin:6px 0 0 0;">Leave blank if not applicable, or enter specific variant.</p>
         </div>
       ` : ''}
@@ -140,9 +141,9 @@ function renderWizardStep() {
 
   showWizardModal(html);
 
-  // Bind step 1 search helper
+  // Mount RecipeSearchDropdownHelper across Steps 1, 2, and 3
   if (step === 1) {
-    const container = document.getElementById('wizard-taxonomy-search-container');
+    const container = document.getElementById('wizard-category-container');
     activeDropdownInstance = createTaxonomySearchInput({
       container,
       categories,
@@ -153,6 +154,32 @@ function renderWizardStep() {
         let selectedCat = label.replace(/^[📂📦🏷️✨\s\[Category\]]+/, '').trim();
         if (val && val.startsWith('cat:')) selectedCat = val.replace('cat:', '');
         activeWizardState.category = selectedCat;
+      }
+    });
+  } else if (step === 2) {
+    const container = document.getElementById('wizard-root-item-container');
+    activeDropdownInstance = createTaxonomySearchInput({
+      container,
+      categories,
+      rootItems,
+      placeholder: 'Type or pick root item name...',
+      initialValue: rootItemName,
+      onSelect: ({ label, val }) => {
+        let selectedItem = label.replace(/^[📂📦🏷️✨\s\[Category\]]+/, '').trim();
+        activeWizardState.rootItemName = selectedItem;
+      }
+    });
+  } else if (step === 3) {
+    const container = document.getElementById('wizard-subtype-container');
+    activeDropdownInstance = createTaxonomySearchInput({
+      container,
+      categories,
+      rootItems,
+      placeholder: 'Type or pick sub-type name...',
+      initialValue: subtypeName,
+      onSelect: ({ label, val }) => {
+        let selectedSubtype = label.replace(/^[📂📦🏷️✨\s\[Category\]]+/, '').trim();
+        activeWizardState.subtypeName = selectedSubtype;
       }
     });
   }
@@ -173,7 +200,7 @@ function renderWizardStep() {
   if (nextBtn) {
     nextBtn.onclick = async () => {
       if (step === 1) {
-        const inputEl = document.querySelector('.wiz-ing-tax-search');
+        const inputEl = document.querySelector('#wizard-category-container .wiz-ing-tax-search') || document.querySelector('.wiz-ing-tax-search');
         if (inputEl && inputEl.value.trim()) {
           activeWizardState.category = inputEl.value.replace(/^[📂📦🏷️✨\s\[Category\]]+/, '').trim();
         }
@@ -184,8 +211,10 @@ function renderWizardStep() {
       }
 
       if (step === 2) {
-        const rootInput = document.getElementById('wizard-root-item-input');
-        if (rootInput) activeWizardState.rootItemName = rootInput.value.trim();
+        const inputEl = document.querySelector('#wizard-root-item-container .wiz-ing-tax-search') || document.querySelector('.wiz-ing-tax-search');
+        if (inputEl && inputEl.value.trim()) {
+          activeWizardState.rootItemName = inputEl.value.replace(/^[📂📦🏷️✨\s\[Category\]]+/, '').trim();
+        }
         if (!activeWizardState.rootItemName) return;
         activeWizardState.step = 3;
         renderWizardStep();
@@ -193,8 +222,10 @@ function renderWizardStep() {
       }
 
       if (step === 3) {
-        const subInput = document.getElementById('wizard-subtype-input');
-        if (subInput) activeWizardState.subtypeName = subInput.value.trim();
+        const inputEl = document.querySelector('#wizard-subtype-container .wiz-ing-tax-search') || document.querySelector('.wiz-ing-tax-search');
+        if (inputEl && inputEl.value.trim()) {
+          activeWizardState.subtypeName = inputEl.value.replace(/^[📂📦🏷️✨\s\[Category\]]+/, '').trim();
+        }
         activeWizardState.step = 4;
         renderWizardStep();
         return;
