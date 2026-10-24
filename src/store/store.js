@@ -23,6 +23,7 @@ import {
 
 import { 
   setIngredients, 
+  setRootItems,
   setProducts, 
   setCategories, 
   updateIngredientInStore, 
@@ -102,6 +103,7 @@ export {
   runOptimisticMutation,
   // Pantry & Preference actions
   setIngredients,
+  setRootItems,
   setProducts,
   setCategories,
   updateIngredientInStore,

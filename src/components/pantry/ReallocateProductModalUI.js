@@ -5,7 +5,7 @@
  */
 
 import { getState, setIngredients, setProducts } from '../../store/store.js';
-import { saveIngredient } from '../../services/IngredientRepository.js';
+import { saveRootItem as saveIngredient } from '../../services/RootItemRepository.js';
 import { saveProduct } from '../../services/ProductRepository.js';
 import { 
   renderReallocateModalBase, 
@@ -14,7 +14,7 @@ import {
   escapeHtml,
   escapeAttr
 } from './ReallocateProductModalRenderService.js';
-import { showCustomAlert } from './IngredientActionModalsUI.js';
+import { showCustomAlert } from './ReorganiseModalUI.js';
 
 
 function showModal(html) {

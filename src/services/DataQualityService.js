@@ -5,7 +5,7 @@
 
 import { getState, setIngredients, runOptimisticMutation } from '../store/store.js';
 import { dismissAdvisoryInDb } from './HouseholdRepository.js';
-import { saveIngredient } from './IngredientRepository.js';
+import { saveRootItem as saveIngredient } from './RootItemRepository.js';
 
 export async function dismissDataQualityAdvisory(issueKey, rerenderCallback) {
   const state = getState();

@@ -6,9 +6,9 @@
 
 import { getState, setIngredients, setProducts, setCategories } from '../../store/store.js';
 import { getUnifiedCategories, saveCategories } from '../../services/CategoryRepository.js';
-import { saveIngredient } from '../../services/IngredientRepository.js';
+import { saveRootItem as saveIngredient } from '../../services/RootItemRepository.js';
 import { invalidateHierarchyCache } from '../../models/PantryHierarchyModel.js';
-import { openSubtypeLinkSelectionModal, openTescoImportModal } from './SubtypeActionModalsUI.js';
+import { openSubtypeLinkSelectionModal, openTescoImportModal } from './TescoImportModalUI.js';
 
 let draftCategory = '';
 let draftItemName = '';

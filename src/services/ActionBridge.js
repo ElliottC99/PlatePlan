@@ -92,20 +92,14 @@ export function routeAction(actionName, target, event) {
   if (normalizedAction === 'delete-subtype' || normalizedAction === 'deletesubtype' || normalizedAction.includes('deletesubtype')) {
     const subtypeId = ds.subtypeId || ds.id || target.getAttribute('data-subtype-id') || target.getAttribute('data-id') || parseArgsString(actionName)[0];
     const parentId = ds.parentId || ds.ingredientId || ds.parentIngredientId || target.getAttribute('data-parent-id') || parseArgsString(actionName)[1];
-    if (typeof window.openSubtypeDeleteModal === 'function') {
-      window.openSubtypeDeleteModal(subtypeId, parentId);
-    } else if (typeof window.deleteSubtype === 'function') {
-      window.deleteSubtype(parentId, subtypeId);
-    }
+    import('../components/pantry/ReorganiseModalUI.js').then(m => m.openReorganiseModal('subtype', { id: subtypeId, parentId }));
     return true;
   }
 
   // 4c. Ingredient & Product Bank Modals
   if (normalizedAction === 'open-ingredient-modal' || normalizedAction.includes('openingredientfamilydetailsmodal')) {
     const ingId = ds.ingredientId || ds.id || parseArgsString(actionName)[0] || null;
-    if (typeof window.openIngredientFamilyDetailsModal === 'function') {
-      window.openIngredientFamilyDetailsModal(ingId);
-    }
+    import('../components/pantry/ReorganiseModalUI.js').then(m => m.openReorganiseModal('item', { id: ingId }));
     return true;
   }
 
@@ -148,11 +142,7 @@ export function routeAction(actionName, target, event) {
   }
 
   if (normalizedAction.includes('createingredientfamilyprompt')) {
-    if (typeof window.createIngredientFamilyPrompt === 'function') {
-      window.createIngredientFamilyPrompt();
-    } else if (typeof window.openIngredientFamilyDetailsModal === 'function') {
-      window.openIngredientFamilyDetailsModal(null);
-    }
+    import('../components/pantry/AddToBankWizardUI.js').then(m => m.openAddToBankWizardModal());
     return true;
   }
 
@@ -204,7 +194,7 @@ export function routeAction(actionName, target, event) {
 
   // 8. Mobile Menu & Toolbar Actions
   if (normalizedAction.includes('opencategorymanagermodal')) {
-    if (typeof window.openCategoryManager === 'function') window.openCategoryManager();
+    import('../components/pantry/AddToBankWizardUI.js').then(m => m.openAddToBankWizardModal());
     return true;
   }
 

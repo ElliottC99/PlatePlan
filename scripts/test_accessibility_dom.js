@@ -28,7 +28,7 @@ function walkDir(dir) {
 const filesToScan = [
   'src/components/recipe/RecipeWizardViews.js',
   'src/components/recipe/RecipeWizardTaxonomySearch.js',
-  'src/components/pantry/CategoryManagerModalUI.js',
+  'src/components/pantry/ReorganiseModalUI.js',
   'src/components/recipe/RecipeWizardTaxonomyModal.js',
   'src/components/recipe-editor/RecipeIngredientRow.js',
   'PlatePlan.html'

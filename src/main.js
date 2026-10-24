@@ -2,10 +2,10 @@ import './config/firebase.js';
 
 if (typeof window !== 'undefined') {
   window.showTescoImport = () => {
-    import('./components/pantry/SubtypeActionModalsUI.js').then(m => m.openTescoImportModal?.(null, null)).catch(err => console.error('[PlatePlan]', err));
+    import('./components/pantry/TescoImportModalUI.js').then(m => m.openTescoImportModal?.(null, null)).catch(err => console.error('[PlatePlan]', err));
   };
   window.createIngredientFamilyPrompt = () => {
-    import('./components/pantry/AddToBankModalUI.js').then(m => m.openAddToBankModal?.()).catch(err => console.error('[PlatePlan]', err));
+    import('./components/pantry/AddToBankWizardUI.js').then(m => m.openAddToBankWizardModal?.()).catch(err => console.error('[PlatePlan]', err));
   };
   window.openCreateActionSheet = () => {
     import('./components/navigation/ActionSheetUI.js').then(m => m.openCreateActionSheet?.()).catch(err => console.error('[PlatePlan]', err));
@@ -21,7 +21,7 @@ import { hydrateHouseholdData, teardownRealtimeSubscriptions } from './services/
 import { subscribe, getState, initStoreCache, setActivePlan } from './store/store.js';
 import { setupActionBridge } from './services/ActionBridge.js';
 import { saveCurrentPlan, stripPlanPayload, getCategories, saveCategories } from './services/HouseholdRepository.js';
-import { saveIngredient, getIngredients } from './services/IngredientRepository.js';
+import { saveRootItem as saveIngredient, getRootItems as getIngredients } from './services/RootItemRepository.js';
 import { saveProduct, getProducts } from './services/ProductRepository.js';
 import { AppState } from './state/AppState.js';
 import { renderToday } from './views/TodayView.js';
@@ -288,7 +288,7 @@ function setupSubscriptions() {
   subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
 }
 
-export const APP_VERSION = 'v3.42.22';
+export const APP_VERSION = 'v3.44.0';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;

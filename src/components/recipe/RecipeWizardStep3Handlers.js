@@ -32,7 +32,7 @@ export function recalculateWizardMacros(recipeObj) {
 
   const state = (typeof window !== 'undefined' ? getState() : {}) || {};
   const globalProducts = Array.isArray(state.products) ? state.products : [];
-  const globalIngredients = Array.isArray(state.ingredients) ? state.ingredients : [];
+  const globalIngredients = Array.isArray(state.rootItems) ? state.rootItems : (Array.isArray(state.ingredients) ? state.ingredients : []);
 
   const productMap = new Map();
   globalProducts.forEach(p => { if (p?.id) productMap.set(String(p.id), p); });

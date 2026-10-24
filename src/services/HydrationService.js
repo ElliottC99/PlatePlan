@@ -6,7 +6,8 @@ import store from "../store/store.js";
  * Delegates maintenance routines to CacheMaintenanceService.js.
  */
 
-import { getRecipes, getIngredients, getProducts, getPreferences, getCurrentPlan, subscribeRecipes, subscribeIngredients, subscribeProducts, subscribePreferences, subscribeCurrentPlan, getCategories, saveCategories, saveIngredient, cleanLegacyMacros } from './HouseholdRepository.js';
+import { getRecipes, getProducts, getPreferences, getCurrentPlan, subscribeRecipes, subscribeIngredients, subscribeProducts, subscribePreferences, subscribeCurrentPlan, getCategories, saveCategories, cleanLegacyMacros } from './HouseholdRepository.js';
+import { getRootItems, saveRootItem } from './RootItemRepository.js';
 import { getInventory } from './InventoryRepository.js';
 import { getCurrentActivePlan as getActivePlanFromSubcollection } from './PlanRepository.js';
 import { setRecipes, setPreferences, setCurrentPlan, saveStateCache, setInventory, sanitizePreferences, updateState } from '../store/store.js';
@@ -131,6 +132,10 @@ export function normalizeIngredientRecord(i) {
   return { ...i, category, subtypes };
 }
 
+export function normalizeRootItemRecord(i) {
+  return normalizeIngredientRecord(i);
+}
+
 function slugifyToKebab(str) {
   return (str || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
@@ -152,7 +157,7 @@ export async function hydrateHouseholdData(options = {}) {
     try {
       const [recipes, rawIngredients, rawProducts, preferencesData, legacyPlan, rawCategories, inventoryItems, subcollPlan] = await Promise.all([
         getRecipes(uid).catch(e => { console.warn('[HydrationService] getRecipes fallback:', e?.message || e); return []; }),
-        getIngredients(uid).catch(e => { console.warn('[HydrationService] getIngredients fallback:', e?.message || e); return []; }),
+        getRootItems(uid).catch(e => { console.warn('[HydrationService] getRootItems fallback:', e?.message || e); return []; }),
         getProducts(uid).catch(e => { console.warn('[HydrationService] getProducts fallback:', e?.message || e); return []; }),
         getPreferences(uid).catch(e => { console.warn('[HydrationService] getPreferences fallback:', e?.message || e); return null; }),
         getCurrentPlan(uid).catch(e => { console.warn('[HydrationService] getCurrentPlan fallback:', e?.message || e); return null; }),
@@ -235,6 +240,7 @@ export async function hydrateHouseholdData(options = {}) {
           getState().isCloudHydrated = true;
         }
         getState().ingredients = ingredients;
+        getState().rootItems = ingredients;
         getState().products = products;
         getState().categories = mergedCategories;
         if (plan && typeof plan === 'object') {
@@ -245,6 +251,7 @@ export async function hydrateHouseholdData(options = {}) {
         }
 
         window.dispatchEvent(new CustomEvent('plateplan:state:ingredients', { detail: getState().ingredients }));
+        window.dispatchEvent(new CustomEvent('plateplan:state:root-items', { detail: getState().rootItems }));
         window.dispatchEvent(new CustomEvent('plateplan:state:products', { detail: products }));
 
         getState().userPrefs = {
@@ -296,6 +303,7 @@ export async function hydrateHouseholdData(options = {}) {
 let unsubs = [];
 let isSubscriptionsInitialized = false;
 let subscriptionDebounceTimer = null;
+let isHydrating = false;
 
 export function teardownRealtimeSubscriptions() {
   if (subscriptionDebounceTimer) {
@@ -309,7 +317,8 @@ export function teardownRealtimeSubscriptions() {
   isSubscriptionsInitialized = false;
 }
 
-function setupRealtimeSubscriptions() {
+export function setupRealtimeSubscriptions() {
+  // Singleton Guard: If real-time listeners are already active, skip re-attachment
   if (isSubscriptionsInitialized && unsubs.length > 0) {
     return;
   }
@@ -326,7 +335,7 @@ function setupRealtimeSubscriptions() {
 
     try {
       unsubs.push(subscribeRecipes((recipes) => {
-        setRecipes(recipes.map(cleanLegacyMacros));
+        setRecipes((recipes || []).map(cleanLegacyMacros));
         if (getState()) getState().recipes = recipes;
       }));
 

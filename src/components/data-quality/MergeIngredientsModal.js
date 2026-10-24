@@ -5,7 +5,7 @@
  */
 
 import { getState, setIngredients, setProducts, setRecipes, setCurrentPlan } from '../../store/store.js';
-import { batchMergeIngredientsInDb } from '../../services/IngredientRepository.js';
+import { batchMergeIngredientsInDb } from '../../services/RootItemRepository.js';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 

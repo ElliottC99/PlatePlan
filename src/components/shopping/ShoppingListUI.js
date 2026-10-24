@@ -6,7 +6,7 @@
 
 import { getState, toggleShoppingItem, addManualShoppingItem, updateShoppingItemQty, setShoppingList } from '../../store/store.js';
 import { generateShoppingListFromPlan, AISLE_CATEGORIES } from '../../services/ShoppingListService.js';
-import { showCustomAlert } from '../pantry/IngredientActionModalsUI.js';
+import { showCustomAlert } from '../pantry/ReorganiseModalUI.js';
 
 
 function escapeHtml(str) {

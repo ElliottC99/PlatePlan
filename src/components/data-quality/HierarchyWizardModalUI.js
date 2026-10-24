@@ -4,7 +4,7 @@
  * Decomposed: HTML template rendering moved to HierarchyWizardRenderService.js.
  */
 import { getState, setIngredients } from '../../store/store.js';
-import { saveIngredient } from '../../services/IngredientRepository.js';
+import { saveRootItem as saveIngredient } from '../../services/RootItemRepository.js';
 import { saveProduct } from '../../services/ProductRepository.js';
 import { safeGetProducts, commitProductUpdates } from './ResolveUnlinkedModalUI.js';
 import { escapeAttr, toTitleCase } from '../../utils/stringUtils.js';
@@ -14,7 +14,7 @@ import {
   renderWizardStepTemplate, 
   renderWizardCompleteTemplate 
 } from './HierarchyWizardRenderService.js';
-import { showCustomAlert } from '../pantry/IngredientActionModalsUI.js';
+import { showCustomAlert } from '../pantry/ReorganiseModalUI.js';
 
 
 const MAX_DROPDOWN_ITEMS = 7;

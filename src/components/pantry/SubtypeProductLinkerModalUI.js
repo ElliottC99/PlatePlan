@@ -84,13 +84,13 @@ export function openSubtypeLinkSelectionModal(subtypeId, parentId) {
   showModal(html);
 }
 
-export function openSubtypeExistingProductPickerModal(subtypeId, parentId) {
+export function openSubtypeExistingProductPickerModal(subtypeId, parentId, onSuccess = null) {
   const state = getState();
   const products = Array.isArray(state.products) ? state.products : [];
-  const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
+  const parent = (state.rootItems || state.ingredients || []).find(i => String(i.id) === String(parentId));
   const subName = subtypeId 
     ? parent?.subtypes?.find(s => String(s.id) === String(subtypeId))?.name 
-    : (window.__draftSubtypePayload?.name || 'New Sub-type');
+    : 'New Sub-type';
 
   const html = `
     <div style="padding: 20px; max-width: 500px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 12px;">
@@ -118,7 +118,7 @@ export function openSubtypeExistingProductPickerModal(subtypeId, parentId) {
   const confirmBtn = document.getElementById('btn-confirm-picker-link');
   const countEl = document.getElementById('picker-selected-count');
 
-  const checkedIds = new Set(window.__draftSubtypePayload?.linkedProductIds || []);
+  const checkedIds = new Set();
 
   const updateBtnState = () => {
     const count = checkedIds.size;
@@ -171,6 +171,12 @@ export function openSubtypeExistingProductPickerModal(subtypeId, parentId) {
     if (!selectedArray.length) return;
     closeModal();
 
+    if (typeof onSuccess === 'function') {
+      const selectedProds = products.filter(p => selectedArray.includes(String(p.id)));
+      onSuccess(selectedProds.length === 1 ? selectedProds[0] : selectedProds);
+      return;
+    }
+
     if (subtypeId && parentId) {
       const updatedProds = products.map(p => selectedArray.includes(String(p.id))
         ? { ...p, ingredientId: parentId, subtypeId: subtypeId, updatedAt: new Date().toISOString() }
@@ -180,31 +186,17 @@ export function openSubtypeExistingProductPickerModal(subtypeId, parentId) {
       if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
       if (typeof window.renderProductBank === 'function') window.renderProductBank();
       await Promise.all(updatedProds.filter(p => selectedArray.includes(String(p.id))).map(p => saveProduct(p)));
-    } else {
-      if (!window.__draftSubtypePayload) window.__draftSubtypePayload = { parentId, name: subName, notes: '' };
-      window.__draftSubtypePayload.linkedProductIds = selectedArray;
-      import('../../views/PantryBankModalService.js').then((module) => {
-        if (typeof module.openIngredientFamilyDetailsModal === 'function') {
-          module.openIngredientFamilyDetailsModal(null, parentId);
-          setTimeout(() => {
-            const nameInput = document.getElementById('ingredient-family-details-name');
-            const notesInput = document.getElementById('ingredient-family-details-notes');
-            if (nameInput && window.__draftSubtypePayload?.name) nameInput.value = window.__draftSubtypePayload.name;
-            if (notesInput && window.__draftSubtypePayload?.notes) notesInput.value = window.__draftSubtypePayload.notes;
-          }, 50);
-        }
-      });
     }
   };
 }
 
-export function openTescoImportModal(subtypeId, parentId) {
+export function openTescoImportModal(subtypeId, parentId, onSuccess = null) {
   const state = getState();
-  const parent = (state.ingredients || []).find(i => String(i.id) === String(parentId));
+  const parent = (state.rootItems || state.ingredients || []).find(i => String(i.id) === String(parentId));
   const parentCategory = parent?.category || 'General';
   const subName = subtypeId 
     ? parent?.subtypes?.find(s => String(s.id) === String(subtypeId))?.name 
-    : (window.__draftSubtypePayload?.name || parent?.name || 'Item');
+    : (parent?.name || 'Item');
 
   const tescoSearchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(subName)}`;
 
@@ -256,11 +248,16 @@ export function openTescoImportModal(subtypeId, parentId) {
 
     parsed.category = parentCategory;
     closeModal();
+
+    if (typeof onSuccess === 'function') {
+      onSuccess(parsed);
+      return;
+    }
+
     window.__prefilledResolveBinding = {
       ingredientId: parentId,
       subtypeId: subtypeId || null,
-      subtypeDraftName: window.__draftSubtypePayload?.name || null,
-      parentCategory: parentCategory,
+      parentCategory,
       tescoImportData: parsed
     };
     setTimeout(() => {

@@ -3,6 +3,7 @@ export const state = {
   recipes: [],
   draftRecipes: [],
   ingredients: [],
+  rootItems: [],
   products: [],
   categories: [],
   inventory: [],

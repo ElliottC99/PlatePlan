@@ -15,7 +15,7 @@ import { renderSystemDisplayCard, renderSettingsContainer } from '../components/
 import { renderMacroTargetsForm, renderFallbackProductsTable } from './SettingsRenderService.js';
 import { calculateMealSplit } from '../utils/nutritionCalculator.js';
 import { getProfileMealTargets } from '../models/StateModel.js';
-import { showCustomAlert, showCustomCopyModal } from '../components/pantry/IngredientActionModalsUI.js';
+import { showCustomAlert, showCustomCopyModal } from '../components/pantry/ReorganiseModalUI.js';
 
 
 // Setup global helpers for Settings interactive elements

@@ -1,6 +1,6 @@
 import { convertToStrictUnit } from './UnitConversionService.js';
 import { getState } from '../store/store.js';
-import { showCustomConfirm, showCustomCopyModal } from '../components/pantry/IngredientActionModalsUI.js';
+import { showCustomConfirm, showCustomCopyModal } from '../components/pantry/ReorganiseModalUI.js';
 
 /**
  * src/services/ShoppingCalculationService.js (v3.31.31)

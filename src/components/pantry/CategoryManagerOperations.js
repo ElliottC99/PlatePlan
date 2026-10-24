@@ -7,7 +7,7 @@
 import { getState, setCategories, setIngredients, setProducts } from '../../store/store.js';
 import { saveCategories } from '../../services/HouseholdRepository.js';
 import { mergeCategory, renameCategory, reassignAndDeleteCategory, deleteCategory } from '../../services/CategoryRepository.js';
-import { getIngredients } from '../../services/IngredientRepository.js';
+import { getRootItems as getIngredients } from '../../services/RootItemRepository.js';
 import { getProducts } from '../../services/ProductRepository.js';
 import { slugCategory, invalidateHierarchyCache, toCanonicalCategoryName } from '../../models/PantryHierarchyModel.js';
 import { resetCategoryFilter } from '../../views/PantryBankView.js';

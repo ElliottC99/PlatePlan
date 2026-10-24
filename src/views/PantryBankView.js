@@ -5,24 +5,18 @@
  */
 
 import { getState, setIngredients, subscribe, setProducts } from '../store/store.js';
-import { saveIngredient } from '../services/IngredientRepository.js';
+import { saveRootItem as saveIngredient } from '../services/RootItemRepository.js';
 import { 
   buildPantryHierarchy, setAutoDefaultProduct, getActiveCategories,
   invalidateHierarchyCache, slugCategory
 } from '../models/PantryHierarchyModel.js';
 import { renderProductBank, openProductEditModal } from './ProductBankView.js';
-import { renderCategoryManagerModal } from '../components/pantry/CategoryManagerModalUI.js';
 import { buildIngredientBankHTML } from '../components/pantry/PantryBankHTMLTemplate.js';
-import { openNewIngredientMappingWizardModal } from '../components/recipe/RecipeWizardTaxonomyModal.js';
 import {
   activePantryTab, switchPantryTab, renderActiveStockTab, addCatalogItemToActiveStock,
   adjustPantryStock, removePantryStock, togglePantryUseUp, handlePantrySearchFilter,
   handlePantryZoneChange, togglePantryUseUpFilter, openAddPantryStockModal as openStockModalUI
 } from '../components/pantry/PantryInventoryUI.js';
-import {
-  openIngredientFamilyDetailsModal, closeIngredientFamilyDetailsModal, saveIngredientFamilyDetailsModal
-} from './PantryBankModalService.js';
-import '../components/pantry/SubtypeActionModalsUI.js';
 
 export let selectedCategoryFilter = null;
 export let activeCategoryFilter = null;
@@ -38,7 +32,7 @@ const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
 
 export function openAddPantryStockModal() {
   const state = getState();
-  openStockModalUI(state.ingredients || []);
+  openStockModalUI(state.rootItems || state.ingredients || []);
 }
 
 export function resetCategoryFilter() {
@@ -75,10 +69,12 @@ export function updateActiveCategoryFilter(oldName, newName) {
 
 export async function handleSetDefaultProduct(prodId, ingId, subtypeId = null) {
   await setAutoDefaultProduct(prodId, ingId, subtypeId);
-  renderIngredientBank(); openIngredientFamilyDetailsModal(ingId);
+  renderIngredientBank();
 }
 
-export function promptAddSubtype(ingId) { openIngredientFamilyDetailsModal(null, ingId); }
+export function promptAddSubtype(ingId) {
+  import('../components/pantry/AddToBankWizardUI.js').then(m => m.openAddToBankWizardModal());
+}
 
 export function renderIngredientBank() {
   if (typeof document === 'undefined') return;
@@ -86,9 +82,9 @@ export function renderIngredientBank() {
   const container = document.getElementById('ingredient-groups-list');
   if (!container) return;
 
-  const state = getState(), ingredients = state.ingredients || [], products = state.products || [], inventory = state.inventory || [];
+  const state = getState(), rootItems = state.rootItems || state.ingredients || [], products = state.products || [], inventory = state.inventory || [];
 
-  if (ingredients.length === 0) {
+  if (rootItems.length === 0) {
     container.innerHTML = `<div class="card" style="padding:32px 20px;text-align:center;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:14px;margin-top:12px;">
       <div style="font-size:32px;margin-bottom:8px">🏛️</div>
       <h3 style="font-size:16px;font-weight:700;margin:0 0 6px 0">No items in Pantry Bank</h3>
@@ -110,7 +106,7 @@ export function renderIngredientBank() {
     return;
   }
 
-  let hierarchy = buildPantryHierarchy(ingredients, products);
+  let hierarchy = buildPantryHierarchy(rootItems, products);
   const curFilter = selectedCategoryFilter || activeCategoryFilter;
   if (curFilter && curFilter !== 'all') {
     const targetSlug = slugCategory(curFilter);
@@ -153,6 +149,7 @@ export function filterPantryBankDOM(rawQuery = '') {
   const container = document.getElementById('ingredient-groups-list');
   if (container) {
     container.innerHTML = buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inventory);
+    attachPantryBankDelegation();
   }
 }
 
@@ -174,22 +171,28 @@ export function attachPantryBankDelegation() {
   container.__hasPantryDelegation = true;
 
   container.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-action], a[data-action]');
+    const btn = e.target.closest('[data-action]');
     if (!btn) return;
     const action = btn.dataset.action;
     const id = btn.dataset.id;
     const subtypeId = btn.dataset.subtypeId;
     const parentId = btn.dataset.parentId;
 
-    if (action === 'edit-subtype') import('../components/pantry/SubtypeActionModalsUI.js').then(m => m.openEditSubtypeModal(subtypeId, parentId));
-    if (action === 'alias-subtype') import('../components/pantry/SubtypeActionModalsUI.js').then(m => m.openSubtypeAliasModal(subtypeId, parentId));
-    if (action === 'reorganise-subtype') import('../components/pantry/SubtypeActionModalsUI.js').then(m => m.openSubtypeReorganizeModal(subtypeId, parentId));
-    if (action === 'link-product') import('../components/pantry/SubtypeProductLinkerModalUI.js').then(m => m.openSubtypeLinkSelectionModal(subtypeId, parentId));
-    if (action === 'alias-item') import('../components/pantry/IngredientActionModalsUI.js').then(m => m.promptAddAlias(id));
-    if (action === 'reorganise-item') import('../components/pantry/IngredientActionModalsUI.js').then(m => m.openIngredientReorganiseModal(id));
-    if (action === 'add-to-bank' || action === 'create-ingredient-family') {
-      import('../components/pantry/AddToBankModalUI.js')
-        .then(m => m.openAddToBankModal())
+    if (action === 'reorganise-subtype' || action === 'edit-subtype' || action === 'alias-subtype') {
+      import('../components/pantry/ReorganiseModalUI.js')
+        .then(m => m.openReorganiseModal('subtype', { id: subtypeId, parentId }))
+        .catch(err => console.error('Delegation Error [reorganise-subtype]:', err));
+    } else if (action === 'link-product') {
+      import('../components/pantry/SubtypeProductLinkerModalUI.js')
+        .then(m => m.openSubtypeLinkSelectionModal(subtypeId, parentId))
+        .catch(err => console.error('Delegation Error [link-product]:', err));
+    } else if (action === 'reorganise-item' || action === 'alias-item' || action === 'edit-item') {
+      import('../components/pantry/ReorganiseModalUI.js')
+        .then(m => m.openReorganiseModal('item', { id }))
+        .catch(err => console.error('Delegation Error [reorganise-item]:', err));
+    } else if (action === 'add-to-bank' || action === 'create-ingredient-family') {
+      import('../components/pantry/AddToBankWizardUI.js')
+        .then(m => m.openAddToBankWizardModal())
         .catch(err => console.error('Delegation Error [add-to-bank]:', err));
     }
   });
@@ -217,24 +220,26 @@ export function mount() {
   attachPantryBankDelegation();
 }
 export const renderPantryBankView = renderIngredientBank; export { renderProductBank, openProductEditModal };
-export function openAddSubtypeModal(parentId) { openIngredientFamilyDetailsModal(null, parentId); }
-export function openCategoryManager() { renderCategoryManagerModal(); }
+export function openAddSubtypeModal(parentId) {
+  import('../components/pantry/AddToBankWizardUI.js').then(m => m.openAddToBankWizardModal());
+}
+export function openCategoryManager() {
+  import('../components/pantry/AddToBankWizardUI.js').then(m => m.openAddToBankWizardModal());
+}
 export function linkProductToSubtype(parentId, subtypeId) {
-  window.__prefilledResolveBinding = { ingredientId: parentId, subtypeId: subtypeId }; if (typeof openProductEditModal === 'function') openProductEditModal(null);
+  import('../components/pantry/SubtypeProductLinkerModalUI.js').then(m => m.openSubtypeLinkSelectionModal(subtypeId, parentId));
 }
 
 if (typeof window !== 'undefined') {
   Object.assign(window, {
-    renderIngredientBank, renderPantryBankView, openIngredientFamilyDetailsModal, closeIngredientFamilyDetailsModal,
+    renderIngredientBank, renderPantryBankView,
     openAddSubtypeModal, linkProductToSubtype, switchPantryTab, renderActiveStockTab, addCatalogItemToActiveStock,
     adjustPantryStock, removePantryStock, togglePantryUseUp, handlePantrySearchFilter, handlePantryZoneChange,
     togglePantryUseUpFilter, openAddPantryStockModal,
-    saveIngredientFamilyDetailsModal: () => saveIngredientFamilyDetailsModal(renderIngredientBank),
     handleSetDefaultProduct,
     promptAddSubtype, openCategoryManager, openCategoryManagerModal: openCategoryManager,
     updateActiveCategoryFilter, setActiveCategoryFilter, resetCategoryFilter, getFilteredIngredients,
-    createIngredientFamilyPrompt: () => openNewIngredientMappingWizardModal({ initialName: '', onComplete: () => renderIngredientBank() }),
-    openNewIngredientMappingWizardModal,
+    createIngredientFamilyPrompt: () => import('../components/pantry/AddToBankWizardUI.js').then(m => m.openAddToBankWizardModal()),
     toggleSubtypeCollapse(btn, ingId) {
       const el = document.getElementById(`subtypes-container-${ingId}`); if (!el) return;
       const collapsed = el.style.display === 'none'; el.style.display = collapsed ? 'flex' : 'none'; el.classList.toggle('is-expanded', collapsed);

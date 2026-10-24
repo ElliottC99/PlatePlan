@@ -4,7 +4,7 @@
  */
 
 import { getState, setIngredients, setProducts, setCategories } from '../store/store.js';
-import { saveIngredient } from '../services/IngredientRepository.js';
+import { saveRootItem as saveIngredient } from '../services/RootItemRepository.js';
 import { saveProduct } from '../services/ProductRepository.js';
 
 export async function handleWizardSubmission({

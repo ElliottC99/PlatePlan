@@ -63,7 +63,7 @@ export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [])
 
 export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
   const storeState = getState();
-  const ingredientsBank = storeState.ingredients || [];
+  const ingredientsBank = storeState.rootItems || storeState.ingredients || [];
   const existingCategories = getUnifiedCategories(storeState);
 
   const filterAndRenderDropdown = (inputEl, dropdownEl) => {

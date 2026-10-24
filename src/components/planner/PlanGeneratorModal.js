@@ -6,7 +6,7 @@
 
 import { generateWeeklyPlan } from '../../services/PlanGeneratorService.js';
 import { setActivePlan, getState } from '../../store/store.js';
-import { showCustomAlert } from '../pantry/IngredientActionModalsUI.js';
+import { showCustomAlert } from '../pantry/ReorganiseModalUI.js';
 
 
 export function openPlanGeneratorModal() {

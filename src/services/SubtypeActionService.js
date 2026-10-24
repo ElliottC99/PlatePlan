@@ -5,7 +5,7 @@
  */
 
 import { getState, setIngredients, setProducts } from '../store/store.js';
-import { deleteSubtypeInDb } from './IngredientRepository.js';
+import { deleteSubtypeInDb } from './RootItemRepository.js';
 import { invalidateHierarchyCache } from '../models/PantryHierarchyModel.js';
 
 export async function deleteSubtype(parentId, subtypeId) {

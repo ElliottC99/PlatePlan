@@ -5,7 +5,7 @@
  */
 
 import { getState, setIngredients, setProducts } from '../store/store.js';
-import { saveIngredient, deleteIngredient } from '../services/IngredientRepository.js';
+import { saveRootItem as saveIngredient, deleteRootItem as deleteIngredient } from '../services/RootItemRepository.js';
 import { saveProduct } from '../services/ProductRepository.js';
 import { slugCategory, slugifyToKebab, toCanonicalCategoryName, slugify } from '../utils/pantryUtils.js';
 import { 

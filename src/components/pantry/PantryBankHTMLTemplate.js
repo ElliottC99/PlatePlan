@@ -57,8 +57,8 @@ export function buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inven
                 </div>
 
                 <div style="display:flex;align-items:center;gap:6px;position:relative;flex-wrap:wrap">
-                  <button type="button" class="btn xs btn-outline outline" onclick="openIngredientFamilyDetailsModal('${escapeAttr(ing.id)}')" title="Edit properties">Edit</button>
-                  <button type="button" class="btn xs btn-secondary secondary subtype-toggle-btn" onclick="openAddSubtypeModal('${escapeAttr(ing.id)}')" title="Add child sub-type">+ Sub-type</button>
+                  <button type="button" class="btn xs btn-outline outline" data-action="reorganise-item" data-id="${escapeAttr(ing.id)}" title="Edit properties">Edit</button>
+                  <button type="button" class="btn xs btn-secondary secondary subtype-toggle-btn" data-action="add-to-bank" title="Add child sub-type">+ Sub-type</button>
                   <div style="position:relative;display:inline-block">
                     <button type="button" class="btn xs btn-ghost ghost" onclick="toggleCardMoreMenu(this, '${escapeAttr(ing.id)}')" title="More actions" style="padding:2px 6px;font-weight:700">•••</button>
                     <div id="card-more-menu-${escapeAttr(ing.id)}" class="card-more-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:var(--radius-md,10px);box-shadow:0 6px 16px rgba(0,0,0,0.08);z-index:100;min-width:130px;flex-direction:column;padding:4px">

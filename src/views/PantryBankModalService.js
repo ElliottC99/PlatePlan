@@ -5,9 +5,36 @@
  */
 
 import { getState, setIngredients } from '../store/store.js';
-import { saveIngredient } from '../services/IngredientRepository.js';
+import { saveRootItem as saveIngredient } from '../services/RootItemRepository.js';
 import { getActiveCategories, slugCategory } from '../models/PantryHierarchyModel.js';
-import { updateIngredientFamilyModalUI } from '../components/pantry/IngredientFamilyModalUI.js';
+function updateIngredientFamilyModalUI(ing, parent) {
+  const labelEl = document.getElementById('ingredient-family-details-name-label');
+  const nameEl = document.getElementById('ingredient-family-details-name');
+  const parentWrap = document.getElementById('parent-ingredient-display-wrap');
+  const actionsWrap = document.getElementById('subtype-product-actions-wrap');
+  const tescoLinkEl = document.getElementById('tesco-search-link');
+  const catEl = document.getElementById('ingredient-family-details-cat');
+
+  if (nameEl) nameEl.oninput = null;
+  if (tescoLinkEl) { tescoLinkEl.style.display = 'none'; tescoLinkEl.innerHTML = ''; }
+  if (catEl && catEl.parentNode) catEl.parentNode.style.display = 'block';
+
+  if (parent) {
+    if (catEl && catEl.parentNode) catEl.parentNode.style.display = 'none';
+    if (parentWrap) {
+      parentWrap.style.display = 'block'; parentWrap.style.padding = '0'; parentWrap.style.background = 'transparent'; parentWrap.style.border = 'none'; parentWrap.style.marginBottom = '12px';
+      parentWrap.innerHTML = `<div class="locked-parent-badge" style="background: #f3f4f6; color: #4b5563; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; margin-bottom: 12px;">🔗 Parent Item: <strong>${escapeHtml(parent.name)}</strong></div>`;
+    }
+    if (labelEl) labelEl.textContent = 'Sub-type Name';
+    if (nameEl) nameEl.placeholder = 'e.g. Mini 4 Pack, Sourdough, Frozen';
+    if (actionsWrap) actionsWrap.style.display = 'flex';
+  } else {
+    if (labelEl) labelEl.textContent = 'Item Name';
+    if (nameEl) nameEl.placeholder = 'e.g. Pasta, Asparagus, Tofu';
+    if (parentWrap) parentWrap.style.display = 'none';
+    if (actionsWrap) actionsWrap.style.display = 'none';
+  }
+}
 import { openProductEditModal } from './ProductBankView.js';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -42,8 +69,8 @@ export function closeIngredientFamilyDetailsModal() {
 }
 
 export function openIngredientFamilyDetailsModal(ingredientId = null, parentId = null) {
-  const modalWrap = document.getElementById('ingredient-family-details-wrap');
-  if (!modalWrap) return;
+  import('../components/pantry/AddToBankWizardUI.js').then(m => m.openAddToBankWizardModal());
+}
 
   document.body.style.overflow = 'hidden';
   activeEditingIngredientId = ingredientId;
@@ -204,7 +231,7 @@ export async function saveIngredientFamilyDetailsModal(renderIngredientBank) {
     if (typeof renderIngredientBank === 'function') renderIngredientBank();
     
     try { 
-      const { saveIngredient } = await import('../services/IngredientRepository.js');
+      const { saveRootItem: saveIngredient } = await import('../services/RootItemRepository.js');
       await saveIngredient(parent); 
       
       // Bind draft products to the new sub-type

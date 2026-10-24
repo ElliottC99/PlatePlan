@@ -62,7 +62,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
 
       const rawSections = parseSectionedIngredients(ingRaw);
       const storeState = getState();
-      const ingredientsBank = storeState.ingredients || [];
+      const ingredientsBank = storeState.rootItems || storeState.ingredients || [];
 
       const parsedSections = rawSections.map(sec => ({
         sectionTitle: toTitleCase(sec.sectionTitle),
@@ -115,7 +115,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
       }
 
       const storeState = getState();
-      const ingredientsBank = storeState.ingredients || [];
+      const ingredientsBank = storeState.rootItems || storeState.ingredients || [];
       const blocks = unpackAndSplitRecipeBlocks(text);
       const parsedRecipes = blocks.map(b => parseSingleRecipeText(b, ingredientsBank)).filter(r => r && (r.title || (r.ingredientSections && r.ingredientSections.length)));
 

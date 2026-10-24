@@ -11,8 +11,14 @@ import { setIngredients as setPantryIngredients, setProducts as setPantryProduct
 export function setIngredients(newIngredients) {
   setPantryIngredients(newIngredients);
   state.ingredients = Array.isArray(newIngredients) ? newIngredients : [];
+  state.rootItems = state.ingredients;
   saveStateCache(state);
   dispatchStateEvent('plateplan:state:ingredients', state.ingredients);
+  dispatchStateEvent('plateplan:state:root-items', state.rootItems);
+}
+
+export function setRootItems(newRootItems) {
+  setIngredients(newRootItems);
 }
 
 export function setProducts(newProducts) {
@@ -110,7 +116,7 @@ export async function learnIngredientAlias(ingredientId, rawString, subtypeId = 
     dispatchStateEvent('plateplan:state:ingredients', state.ingredients);
 
     try {
-      const { saveIngredient } = await import('../../services/IngredientRepository.js');
+      const { saveRootItem: saveIngredient } = await import('../../services/RootItemRepository.js');
       await saveIngredient(ing);
     } catch (err) {
       console.warn('[Store] Failed to persist learned ingredient alias:', err);

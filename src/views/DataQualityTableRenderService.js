@@ -1,6 +1,6 @@
 import { getState, setIngredients } from '../store/store.js';
 import { runAudit } from '../services/DataQualityScanner.js';
-import { saveIngredient } from '../services/IngredientRepository.js';
+import { saveRootItem as saveIngredient } from '../services/RootItemRepository.js';
 import { savePreferencesWithAutoPrune } from '../services/HouseholdRepository.js';
 import { runOptimisticMutation } from '../store/store.js';
 import { openMacroDriftPreviewModal } from '../components/data-quality/MacroDriftPreviewModal.js';

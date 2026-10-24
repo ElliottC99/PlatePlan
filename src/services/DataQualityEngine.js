@@ -90,7 +90,7 @@ function getStringSimilarity(str1, str2) {
  */
 export function runAudit(state = {}) {
   const recipes = Array.isArray(state.recipes) ? state.recipes : [];
-  const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
+  const ingredients = Array.isArray(state.rootItems) ? state.rootItems : (Array.isArray(state.ingredients) ? state.ingredients : []);
   const products = Array.isArray(state.products) ? state.products : [];
   const currentPlan = state.currentPlan || null;
   const preferences = state.preferences || state.userPrefs || {};
