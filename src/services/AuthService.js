@@ -59,24 +59,8 @@ export function showLoginUI() {
         googleBtn.disabled = true;
         googleBtn.style.opacity = '0.7';
 
-        if (!window.firebase?.auth) {
-          if (errorEl) {
-            errorEl.textContent = 'Firebase Auth is not initialized yet. Please check connection.';
-            errorEl.style.display = 'block';
-          }
-          googleBtn.disabled = false;
-          googleBtn.style.opacity = '1';
-          return;
-        }
-
-        const provider = new window.firebase.auth.GoogleAuthProvider();
-        window.firebase.auth().signInWithPopup(provider)
-          .then(() => {
-            if (typeof window.syncNow === 'function') window.syncNow();
-            if (typeof window.closePlatePlanLogin === 'function') window.closePlatePlanLogin();
-          })
+        signInWithGoogle()
           .catch(err => {
-            console.error("Google Sign-In Error:", err);
             if (errorEl) {
               errorEl.textContent = err?.message || 'Google Sign-In failed. Please try again.';
               errorEl.style.display = 'block';
@@ -103,7 +87,24 @@ export function showLoginUI() {
   modal.style.display = 'flex';
 }
 
+export async function signInWithGoogle() {
+  if (typeof window === 'undefined' || !window.firebase?.auth) {
+    throw new Error('Firebase Auth unavailable');
+  }
+  const provider = new window.firebase.auth.GoogleAuthProvider();
+  try {
+    const result = await window.firebase.auth().signInWithPopup(provider);
+    if (typeof window.syncNow === 'function') window.syncNow();
+    closeLoginUI();
+    return result.user;
+  } catch (err) {
+    console.error('[AuthService] Google Sign-In failed:', err);
+    throw err;
+  }
+}
+
 if (typeof window !== 'undefined') {
+  window.signInWithGoogle = signInWithGoogle;
   window.openPlatePlanLogin = showLoginUI;
   window.closePlatePlanLogin = closeLoginUI;
 }
@@ -144,16 +145,8 @@ export function waitForAuth(timeoutMs = 8000) {
         }
         
         unsubscribe = authInstance.onAuthStateChanged((user) => {
-          if (user) {
-            clearTimeout(timer);
-            finish(user);
-          } else {
-            authInstance.signInAnonymously().catch(err => {
-              console.warn('[Auth] Anonymous sign-in fallback error:', err);
-              clearTimeout(timer);
-              finish(null);
-            });
-          }
+          clearTimeout(timer);
+          finish(user);
         });
       }
     }, 50); // Poll every 50ms for the Firebase SDK
