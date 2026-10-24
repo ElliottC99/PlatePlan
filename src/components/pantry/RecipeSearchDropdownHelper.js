@@ -1,7 +1,7 @@
 /**
- * src/components/pantry/RecipeSearchDropdownHelper.js (v3.43.2)
+ * src/components/pantry/RecipeSearchDropdownHelper.js (v3.44.2)
  * Custom DOM-rendered taxonomy autocomplete search component replacing native <select> tags.
- * Reuses the exact Recipe Wizard CSS classes and container structures.
+ * Includes explicit chevron arrow icon and Apple HIG dropdown styling.
  * Strictly under 350 lines.
  */
 
@@ -41,7 +41,8 @@ export function createTaxonomySearchInput({
              value="${escapeAttr(initialValue)}"
              placeholder="${escapeAttr(placeholder)}"
              autocomplete="off"
-             style="width:100%; padding:8px 12px; border-radius:8px; font-size:12.5px; border:1px solid var(--border,#e7e5e4); background:var(--surface,#fff); outline:none;" />
+             style="width:100%; padding:8px 32px 8px 12px; border-radius:8px; font-size:12.5px; border:1px solid var(--border,#e7e5e4); background:var(--surface,#fff); outline:none;" />
+      <div class="wiz-tax-chevron" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); pointer-events:none; font-size:10px; color:var(--text2,#78716c);">▼</div>
       <div class="wiz-tax-dropdown"
            id="${uniqueId}-dropdown"
            style="display:none; position:absolute; top:100%; left:0; right:0; max-height:220px; overflow-y:auto; background:var(--surface,#fff); border:1px solid var(--border,#ddd); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.18); z-index:1050; margin-top:4px;">

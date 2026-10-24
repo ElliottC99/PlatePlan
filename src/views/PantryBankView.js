@@ -89,7 +89,7 @@ export function renderIngredientBank() {
       <div style="font-size:32px;margin-bottom:8px">🏛️</div>
       <h3 style="font-size:16px;font-weight:700;margin:0 0 6px 0">No items in Pantry Bank</h3>
       <p style="font-size:12.5px;color:var(--text2,#78716c);margin:0 0 12px 0">Add Categories, Items, and Sub-types to build your master Pantry Bank catalog.</p>
-      <button class="btn primary sm" type="button" data-action="add-to-bank">+ Add to Bank</button>
+      <button class="btn primary sm" type="button" data-action="add-to-bank">Add to Bank</button>
     </div>`;
 
     if (!container.hasAttribute('data-delegated')) {
@@ -224,7 +224,7 @@ export function openAddSubtypeModal(parentId) {
   import('../components/pantry/AddToBankWizardUI.js').then(m => m.openAddToBankWizardModal());
 }
 export function openCategoryManager() {
-  import('../components/pantry/AddToBankWizardUI.js').then(m => m.openAddToBankWizardModal());
+  import('../components/pantry/ReorganiseModalUI.js').then(m => m.openReorganiseModal('category'));
 }
 export function linkProductToSubtype(parentId, subtypeId) {
   import('../components/pantry/SubtypeProductLinkerModalUI.js').then(m => m.openSubtypeLinkSelectionModal(subtypeId, parentId));

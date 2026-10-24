@@ -194,7 +194,7 @@ export function routeAction(actionName, target, event) {
 
   // 8. Mobile Menu & Toolbar Actions
   if (normalizedAction.includes('opencategorymanagermodal')) {
-    import('../components/pantry/AddToBankWizardUI.js').then(m => m.openAddToBankWizardModal());
+    import('../components/pantry/ReorganiseModalUI.js').then(m => m.openReorganiseModal('category'));
     return true;
   }
 
