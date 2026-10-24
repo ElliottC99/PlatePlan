@@ -5,7 +5,7 @@ if (typeof window !== 'undefined') {
     import('./components/pantry/TescoImportModalUI.js').then(m => m.openTescoImportModal?.(null, null)).catch(err => console.error('[PlatePlan]', err));
   };
   window.createIngredientFamilyPrompt = () => {
-    import('./components/pantry/AddToBankHubUI.js').then(m => m.openAddToBankModal?.()).catch(err => console.error('[PlatePlan]', err));
+    import(`./components/pantry/AddToBankHubUI.js?v=${Date.now()}`).then(m => m.openAddToBankModal?.()).catch(err => console.error('[PlatePlan]', err));
   };
   window.openCreateActionSheet = () => {
     import('./components/navigation/ActionSheetUI.js').then(m => m.openCreateActionSheet?.()).catch(err => console.error('[PlatePlan]', err));
@@ -288,7 +288,7 @@ function setupSubscriptions() {
   subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
 }
 
-export const APP_VERSION = 'v3.45.5';
+export const APP_VERSION = 'v3.45.7';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
