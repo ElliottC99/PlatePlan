@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PlatePlan Rescue Ideation</title>
+<style>
+:root{--bg:#fbfaf7;--surface:#ffffff;--text:#1f1d1a;--muted:#5f5a52;--line:#e4e0d8;--accent:#2f6b4f;--accent-soft:#e3efe8;--accent-text:#1f4f39;--warn-soft:#fbefd9;--warn-text:#7a4a06;--bad-soft:#f8e1de;--bad-text:#8a2a1e;--code:#f2efe9}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171614;--surface:#201f1c;--text:#ece8e1;--muted:#b3ada3;--line:#3a3732;--accent:#7cc4a0;--accent-soft:#1f3329;--accent-text:#a9e0c4;--warn-soft:#3a2d17;--warn-text:#f2c879;--bad-soft:#3d211d;--bad-text:#f2a79c;--code:#2a2825}}
+:root[data-theme="dark"]{--bg:#171614;--surface:#201f1c;--text:#ece8e1;--muted:#b3ada3;--line:#3a3732;--accent:#7cc4a0;--accent-soft:#1f3329;--accent-text:#a9e0c4;--warn-soft:#3a2d17;--warn-text:#f2c879;--bad-soft:#3d211d;--bad-text:#f2a79c;--code:#2a2825}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:900px;margin-inline:auto;padding:32px 16px 48px}
+p,li,dd{max-width:72ch}
+h1{font-size:1.9rem;line-height:1.2;margin:.2em 0 .3em}
+h2{font-size:1.45rem;margin:2.2em 0 .6em;padding-bottom:.25em;border-bottom:1px solid var(--line)}
+h3{font-size:1.15rem;margin:0 0 .4em}
+h4{font-size:1rem;margin:1.2em 0 .3em}
+.eyebrow{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-text);font-weight:600}
+.meta{color:var(--muted);font-size:.9rem}
+.meta span{margin-right:1.2em}
+code{background:var(--code);padding:.05em .35em;border-radius:4px;font-size:.88em}
+strong{color:inherit}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:20px 0}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat b{display:block;font-size:1.35rem}
+.stat span{font-size:.82rem;color:var(--muted)}
+.callout{border-radius:10px;padding:14px 16px;margin:14px 0}
+.callout.good{background:var(--accent-soft);color:var(--accent-text)}
+.callout.warn{background:var(--warn-soft);color:var(--warn-text)}
+.callout .eyebrow{color:inherit}
+.callout p,.callout li{color:inherit}
+article.idea{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 18px 8px;margin:18px 0}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:.2em 0 .8em}
+.chip{display:inline-block;font-size:.78rem;padding:2px 10px;border-radius:999px;background:var(--code);color:var(--text);border:1px solid var(--line)}
+.chip.id{background:var(--accent-soft);color:var(--accent-text);border-color:transparent;font-weight:600}
+dl.fields{margin:0}
+dl.fields dt{font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-top:.8em}
+dl.fields dd{margin:.15em 0 0}
+table{width:100%;border-collapse:collapse;font-size:.92rem;margin:12px 0}
+th,td{text-align:left;vertical-align:top;padding:7px 8px;border-bottom:1px solid var(--line)}
+th{font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.table-wrap{overflow-x:auto}
+nav.jump ol{padding-left:1.3em}
+nav.jump a,a{color:var(--accent-text)}
+figure{margin:14px 0}
+figure svg{width:100%;height:auto;display:block}
+figcaption{font-size:.85rem;color:var(--muted);margin-top:4px}
+svg text{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;fill:var(--text)}
+svg .box{fill:var(--surface);stroke:var(--line);stroke-width:1.5}
+svg .hot{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5}
+svg .bad{fill:var(--bad-soft);stroke:var(--bad-text);stroke-width:1.2}
+svg .edge{stroke:var(--muted);stroke-width:1.4;fill:none}
+svg .small{font-size:12px}
+svg .lbl{font-size:13px}
+footer.composition-signal{margin-top:40px;padding-top:12px;border-top:1px solid var(--line);font-size:.82rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div class="eyebrow">Ideation · repo-grounded</div>
+<h1>Ideation: Rescuing PlatePlan</h1>
+<p class="meta"><span>Date: <time datetime="2026-10-25">2026-10-25</time></span><span>Topic: plateplan-rescue</span><span>Mode: repo-grounded</span></p>
+<p class="meta">Focus: Elliott's AI-Studio-built meal-planning app feels "too far gone" with "loads of parallel systems". Understand its current state, and find the cleanup directions most worth taking.</p>
+</header>
+
+<div class="stats">
+<div class="stat"><b>529</b><span>commits in 3 months, 0 tags</span></div>
+<div class="stat"><b>184</b><span>commits named "bump version"</span></div>
+<div class="stat"><b>230</b><span>files in <code>src/</code>, ~34k lines</span></div>
+<div class="stat"><b>8 / 10</b><span>test scripts pass; ~20 modules tested</span></div>
+<div class="stat"><b>0</b><span>Firestore rules files in the repo</span></div>
+</div>
+
+<div class="callout good">
+<div class="eyebrow">Short answer</div>
+<p>It is not "too far gone". The app runs from one coherent tree (<code>src/</code>), most of its tests pass, and much of the "parallel systems" feeling comes from leftovers and churn rather than from rival live code. A lot of the leftovers can be deleted without changing behaviour. The real live duplication is a short, nameable list. The biggest risks are not the messy code. They are an unknown database security setting, no backup, and an editing workflow that keeps adding copies faster than anyone can remove them.</p>
+</div>
+
+<section id="grounding-context">
+<h2>Grounding Context</h2>
+<h3>Codebase Context</h3>
+<h4>What the app is</h4>
+<ul>
+<li>A meal-planning PWA for one household (Elliott and Chloe). It covers Today, Planner, Recipe Vault, ingredient and product banks, Shopping, Data Quality, Settings, Sync, Tesco import and a plan generator.</li>
+<li>It is plain browser ES modules with no bundler, served by a tiny Express server. Data lives in Firebase Firestore under a hard-coded <code>households/elliott-chloe</code>.</li>
+<li>It was built entirely through Google AI Studio / Gemini chat and synced to GitHub. That produced 529 commits between 2026-07-21 and 2026-10-24, 311 of them in October.</li>
+</ul>
+<h4>What is genuinely wrong</h4>
+<ul>
+<li><strong>Hand-kept bookkeeping.</strong> The version is typed by hand into many places, and the copies now disagree: <code>package.json</code> 3.35.4, <code>sw.js</code> v3.45.7, <code>main.js?v=3.38.18</code>, cache key v3.35.4, and a test expecting 3.30.0. Module header comments carry their own versions too, and the offline cache list is maintained by hand. <code>RecipeWizardModal</code> is imported by <code>main.js</code> but missing from <code>sw.js</code>. Commits titled "bump version" sometimes also carry real code changes (e.g. <code>602b05e</code>).</li>
+<li><strong>Real duplicates still in use:</strong>
+ <ul>
+ <li>two plan generators (<code>PlanGeneratorService</code>, <code>MealPlanGeneratorService</code>)</li>
+ <li>two unit converters, both imported by <code>RecipeIngredientParser.js</code></li>
+ <li>four Data Quality modules (~1,300 lines) with two separate lists of issue types</li>
+ <li>four places holding app state (<code>store/coreState.js</code> is the real one)</li>
+ <li>two copies of <code>ActionSheetUI</code></li>
+ <li>two Firebase config blocks</li>
+ <li>two places the plan is read from (<code>HydrationService.js:168</code>: <code>const plan = subcollPlan || legacyPlan;</code>)</li>
+ <li>two to six modules writing each Firestore collection. For example, the products write appears word for word in both <code>ProductRepository.js:61</code> and <code>ShoppingFirestoreRepository.js:143</code>.</li>
+ </ul></li>
+<li><strong>Problems hidden or bypassed:</strong>
+ <ul>
+ <li>Startup errors are silently swallowed (<code>main.js:323-325</code>). One line, <code>getState() = {}</code> at <code>HydrationService.js:225</code>, is not valid code and only goes unnoticed because the error is caught and discarded.</li>
+ <li>About 160 places write <code>window.*</code> globals, and inline <code>onclick</code> appears 205 times even though <code>ActionBridge</code> exists to replace it.</li>
+ </ul></li>
+<li><strong>No safety net worth the name.</strong> There is no CI, no lint and no smoke test. Two tests fail unnoticed. One file has a syntax error (<code>src/views/PantryBankModalService.js:183</code>), although nothing loads it.</li>
+<li><strong>Repo hygiene.</strong> <code>cookies.txt</code> is committed and there is no <code>.gitignore</code>. AI Studio leftovers are committed too (<code>syntax_check.log</code>, <code>app/applet/</code>).</li>
+</ul>
+<h4>What looks worse than it is</h4>
+<ul>
+<li><strong>The old runtime is dead.</strong> <code>scripts/core|features|services|ui</code> and <code>scripts/main.js</code> are an older runtime that the HTML stopped loading on 2026-09-25 (<code>00538fd</code>). No test imports it either. The tests import <code>src/</code>.</li>
+<li><strong>Many "duplicate" files are one-line re-exports.</strong> They just pass through the real module (<code>export * from …</code>). At least three have no importers: <code>utils/ActionBridge.js</code>, <code>components/recipe/VaultRecipeCard.js</code> and <code>views/ProfileAllocationCard.js</code>. <code>components/RecipeWizardModal.js</code> and <code>services/firebase.js</code> show none either. Two others are still in use: <code>services/InventoryRepository.js</code> and <code>services/PlanRepository.js</code>, which <code>HydrationService</code> imports.</li>
+<li><strong>Two HTML shells, one copy.</strong> <code>index.html</code> and <code>PlatePlan.html</code> are byte-identical. It is one shell kept twice, not two apps.</li>
+<li><strong>Loaded but apparently unused.</strong> The analytics and prep components are loaded and exposed on <code>window</code> through <code>componentRegistry.js</code>, but no caller was found. Shopping can be routed to but has no button in the HTML nav. The Gemini feature is switched off (<code>aiEnabled:false</code>) with no call site.</li>
+</ul>
+<h4>Relation to the older PlatePlanner work</h4>
+<ul>
+<li><code>PlatePlanner</code> <code>main</code> was a single ~4,100-line HTML file with state in localStorage.</li>
+<li>The <code>feat/bun-sqlite-persistence</code> branch held an ideation, brainstorm and plan for a Bun + SQLite "file as document" backend. None of that survived; Elliott's line moved to Firestore instead.</li>
+<li>Its advice to "normalise the schema, migrate from day one" is still the right answer to today's schema drift (idea 7).</li>
+</ul>
+<h4>How this happens</h4>
+<ul>
+<li>GitClear's 2025 data shows AI assistants add new blocks of code instead of reusing existing ones. Copy/paste rose about 8× while refactoring fell.</li>
+<li>AI Studio users report these problems:
+ <ul>
+ <li>the model trusts stale chat history over the current files</li>
+ <li>it rewrites whole files</li>
+ <li>its GitHub sync is one-way and sometimes claims "In Sync" when changes never arrived</li>
+ </ul></li>
+<li>The sprawl is a predictable result of the tool plus a missing safety net. It doesn't mean Elliott did something wrong.</li>
+</ul>
+<div class="callout warn">
+<div class="eyebrow">Questions to take back to Elliott</div>
+<ol>
+<li>What do the Firestore security rules say in the Firebase console? Who can sign in: Google accounts, or anonymous?</li>
+<li>Is the household's recipe and product data backed up anywhere?</li>
+<li>Which screens did you and Chloe actually use last week? Do you ever open Data Quality, Shopping or the plan generator?</li>
+<li>Can AI Studio sync to a branch other than <code>main</code> in your setup?</li>
+<li>Where is the live app hosted (Firebase Hosting, AI Studio, elsewhere), and how does a change reach your phones?</li>
+<li>What is <code>cookies.txt</code>, and does it hold a real session?</li>
+</ol>
+</div>
+</section>
+
+<section id="topic-axes">
+<h2>Topic Axes</h2>
+<ol>
+<li>Parallel systems and dead weight</li>
+<li>The change workflow (AI Studio → GitHub, versioning, keeping re-sprawl out)</li>
+<li>Data and state integrity</li>
+<li>Safety net and verification</li>
+<li>Product core worth keeping</li>
+</ol>
+</section>
+
+<section id="ranked-ideas">
+<h2>Ranked Ideas</h2>
+<nav class="jump" aria-label="Ranked ideas">
+<ol>
+<li><a href="#idea-1">Secure and snapshot the household data first</a></li>
+<li><a href="#idea-2">One evidence-checked map of live, shim and dead code, then quarantine</a></li>
+<li><a href="#idea-3">Pin down "working": checklist, smoke test, real-data golden master, first known-good tag</a></li>
+<li><a href="#idea-4">Stamp, don't type: generate the version, offline cache list and second shell</a></li>
+<li><a href="#idea-5">A father/son operating model: AI Studio on a branch, a canon per chat, a green tick</a></li>
+<li><a href="#idea-6">A usage census with Elliott and Chloe</a></li>
+<li><a href="#idea-7">One door per Firestore collection; Data Quality becomes a report</a></li>
+</ol>
+</nav>
+
+<article class="idea" id="idea-1">
+<h3>1. Secure and snapshot the household data first</h3>
+<div class="chips"><span class="chip id">Idea 1</span><span class="chip">Axis: Data and state integrity</span><span class="chip">Confidence 90%</span><span class="chip">Complexity Low</span></div>
+<dl class="fields">
+<dt>Description</dt>
+<dd>
+<p>Before anyone touches code, do three things:</p>
+<ol>
+<li>Export <code>households/elliott-chloe</code> (every subcollection) to dated JSON, kept outside git.</li>
+<li>Read the security rules currently deployed in the Firebase console.</li>
+<li>Commit a <code>firestore.rules</code> and <code>firebase.json</code> that allow only the two household members' accounts.</li>
+</ol>
+<p>Later, the rules can also reject badly shaped documents, for example recipe writes that use the legacy <code>cal</code> or <code>prot</code> fields.</p>
+</dd>
+<dt>Basis</dt>
+<dd>
+<ul>
+<li>direct: there is no <code>firestore.rules</code> or <code>firebase.json</code> anywhere in the repo.</li>
+<li>direct: the household ID is hard-coded (<code>src/config/firebase.js:8</code>), the public API key appears in two files, and history shows an anonymous-auth flow (<code>54c5aa4</code>).</li>
+<li>direct: startup can wipe local state with <code>try { localStorage.clear(); } catch(e) {}</code> (<code>src/main.js:195</code>).</li>
+<li>direct: collections have several writers each.</li>
+<li>external: vibe-coded apps commonly ship with open backend rules (Lovable CVE-2025-48757, Supabase RLS).</li>
+</ul>
+</dd>
+<dt>Rationale</dt>
+<dd>Git can undo code changes, but nothing can undo lost or leaked household data. With a backup in hand, every later cleanup can be reversed, which lowers the fear holding Elliott back. The rules answer the one question that could outrank everything else: who can read or wipe this data right now?</dd>
+<dt>Downsides</dt>
+<dd>A full export needs the Firebase CLI or Admin SDK and console access, which only Elliott may have. Tightening the rules can lock the app out if the sign-in method doesn't match what the app actually uses, so test against a copy first.</dd>
+</dl>
+</article>
+
+<article class="idea" id="idea-2">
+<h3>2. One evidence-checked map of live, shim and dead code, then quarantine</h3>
+<div class="chips"><span class="chip id">Idea 2</span><span class="chip">Axis: Parallel systems and dead weight</span><span class="chip">Confidence 85%</span><span class="chip">Complexity Low–Medium</span></div>
+<dl class="fields">
+<dt>Description</dt>
+<dd>
+<p><strong>Build the map.</strong> Generate a ledger of every module, starting from the real entry points (<code>index.html → src/main.js</code> and <code>sw.js</code>), using knip or dependency-cruiser. Mark each module as one of:</p>
+<ul>
+<li><em>live</em></li>
+<li><em>live shim</em>: a one-line re-export that something still imports</li>
+<li><em>dead shim</em>: a re-export nothing imports</li>
+<li><em>loaded but uncalled</em></li>
+<li><em>dead</em></li>
+</ul>
+<p>Then name one owner per job: state, plan generation, unit conversion, Data Quality, Firebase init, each collection's writer.</p>
+<p><strong>Quarantine the dead code.</strong> Move what is proven dead into an <code>attic/</code> that the build doesn't copy, and live with that for two weeks before deleting. The proven-dead list:</p>
+<ul>
+<li>the old <code>scripts/</code> runtime (keep <code>build.js</code> and the tests)</li>
+<li>the dead shims</li>
+<li>the unreferenced modules, including the one that fails to parse</li>
+<li><code>FitScoreEngine</code></li>
+<li>the AI Studio leftovers</li>
+</ul>
+<p>Separately, untrack <code>cookies.txt</code> and add a <code>.gitignore</code>.</p>
+</dd>
+<dt>Basis</dt>
+<dd>
+<ul>
+<li>direct: <code>src/utils/ActionBridge.js:6</code> is just <code>export * from '../services/ActionBridge.js';</code>.</li>
+<li>direct: <code>scripts/build.js:30</code> still copies <code>scripts</code> into <code>dist/</code>.</li>
+<li>direct: the verifier confirmed that <code>services/InventoryRepository.js</code> and <code>services/PlanRepository.js</code> look like dead shims but are imported by <code>HydrationService.js:11-12</code>. A map, not a hunch, has to decide what goes.</li>
+<li>external: knip and dependency-cruiser's <code>no-orphans</code> work on plain JS. Rescue playbooks say to delete unused files first, because that exposes further unused exports.</li>
+</ul>
+</dd>
+<dt>Rationale</dt>
+<dd>This turns "loads of parallel systems" into a countable list that is mostly cheap to clear. It answers your question of whether it is as bad as he thinks with evidence rather than reassurance. Every later idea (canon, ratchet, consolidation) reads its "who owns what" from this map.</dd>
+<dt>Downsides</dt>
+<dd>Static analysis can't see globals reached through <code>window.*</code> or inline handlers. The "loaded but uncalled" category needs idea 6's census or a runtime check before anything in it is moved. The two-week attic period slows the visible win slightly.</dd>
+</dl>
+</article>
+
+<article class="idea" id="idea-3">
+<h3>3. Pin down "working": checklist, smoke test, real-data golden master, first known-good tag</h3>
+<div class="chips"><span class="chip id">Idea 3</span><span class="chip">Axis: Safety net and verification</span><span class="chip">Confidence 80%</span><span class="chip">Complexity Medium</span></div>
+<dl class="fields">
+<dt>Description</dt>
+<dd>
+<p>Elliott can't name a last-good version, and the version numbers can't identify one. The scheme reset from V2.6 to v3.x, and there have been three chat-driven rollbacks. So build "good" from the present instead:</p>
+<ol>
+<li><strong>Write the checklist.</strong> Elliott writes a plain-English checklist of the household's week: sign in, see Today, generate a plan, open a recipe, build shopping.</li>
+<li><strong>Automate it.</strong> Turn the checklist into one browser smoke test. It fails on the red crash overlay, on module import errors and on empty views, and it includes a <code>node --check</code> sweep.</li>
+<li><strong>Record a golden master.</strong> Run the plan generator, shopping builder, fit score and recipe parser against idea 1's exported data, and save their outputs.</li>
+<li><strong>Tag the result.</strong> Tag the commit that passes as <code>known-good-1</code>.</li>
+</ol>
+<p>From then on, a reported bug becomes a failing check before anyone asks the AI to fix it.</p>
+</dd>
+<dt>Basis</dt>
+<dd>
+<ul>
+<li>direct: 0 tags in 529 commits.</li>
+<li>direct: rollbacks were done by chat. <code>91b3aef</code> "restore v3.3.0" added 25,471 lines.</li>
+<li>direct: the fix-the-fix run <code>c441d70 … 057f719 … 6691fd9</code> ("fuck fix", "fuck fix 2", "fuck fix 3").</li>
+<li>direct: two live plan generators (<code>PlanGeneratorModal.js:7</code> vs <code>main.js:44</code>/<code>TodayView.js:19</code>).</li>
+<li>direct: the repository tests only exercise the "Firestore not initialised" path.</li>
+<li>external: characterization / golden-master tests (Feathers, <cite>Working Effectively with Legacy Code</cite>). Record them on untouched code before an AI refactors anything.</li>
+</ul>
+</dd>
+<dt>Rationale</dt>
+<dd>"Does it still do our week?" is a test a non-developer can judge, and it removes the need to dig for a good version in the history. Without the golden master, no one can safely merge the real duplicates, such as deciding which plan generator is right.</dd>
+<dt>Downsides</dt>
+<dd>Firebase auth has to be stubbed or test-accounted for the smoke test, which is the fiddliest part. The golden outputs encode today's bugs as well, so log known oddities (a <code>QUIRKS.md</code>) rather than "fixing" them inside the test.</dd>
+</dl>
+</article>
+
+<article class="idea" id="idea-4">
+<h3>4. Stamp, don't type: generate the version, offline cache list and second shell</h3>
+<div class="chips"><span class="chip id">Idea 4</span><span class="chip">Axis: The change workflow</span><span class="chip">Confidence 85%</span><span class="chip">Complexity Low–Medium</span></div>
+<dl class="fields">
+<dt>Description</dt>
+<dd>
+<p>Stop humans and the AI writing version strings. A small build step:</p>
+<ul>
+<li>derives one version from git and stamps it into the HTML meta, <code>APP_VERSION</code> and the <code>sw.js</code> cache names</li>
+<li>generates the precache list from the real files with content hashes (<code>workbox-cli injectManifest</code> works without a bundler)</li>
+<li>produces <code>index.html</code> from <code>PlatePlan.html</code>, so only one is edited</li>
+</ul>
+<p>Then retire the per-module <code>(vX.Y.Z)</code> header comments and the "every change ends with a version bump" habit.</p>
+</dd>
+<dt>Basis</dt>
+<dd>
+<ul>
+<li>direct: 184 commit subjects say "bump version" (verified).</li>
+<li>direct: bump runs touch 40–48 files each.</li>
+<li>direct: <code>PlatePlan.html</code> (414 commits) and <code>sw.js</code> (383) are the two most-churned files.</li>
+<li>direct: the versions disagree, as shown in the figure.</li>
+<li>direct: <code>RecipeWizardModal</code> is missing from the <code>sw.js</code> precache list.</li>
+<li>external: web.dev and Workbox document hand-versioned service workers as a known failure, and revisioned precache manifests as the fix.</li>
+</ul>
+</dd>
+<dt>Rationale</dt>
+<dd>About a third of the history is bookkeeping, and every bump is another AI edit across dozens of files that can drift. A stale offline cache also produces "I fixed it but my phone still shows the old app", which reads as more breakage. This is the cheapest idea that cuts churn at its biggest source.</dd>
+<dt>Downsides</dt>
+<dd>It adds a real build step that Elliott's AI Studio flow must not bypass. If AI Studio deploys straight from source, the generated files need committing, or the deploy has to run the build.</dd>
+</dl>
+<figure>
+<svg viewBox="0 0 760 250" role="img" aria-labelledby="f4t">
+<title id="f4t">Today six hand-typed version values disagree; proposed one generated source feeds all of them</title>
+<text x="20" y="22" class="lbl" font-weight="600">Today: typed by hand, now disagreeing</text>
+<rect class="bad" x="20" y="36" width="300" height="28" rx="6"/><text x="32" y="55" class="small">package.json → 3.35.4</text>
+<rect class="bad" x="20" y="70" width="300" height="28" rx="6"/><text x="32" y="89" class="small">sw.js cache names → v3.45.7</text>
+<rect class="bad" x="20" y="104" width="300" height="28" rx="6"/><text x="32" y="123" class="small">index.html → main.js?v=3.38.18</text>
+<rect class="bad" x="20" y="138" width="300" height="28" rx="6"/><text x="32" y="157" class="small">cacheSlice CACHE_KEY → v3.35.4</text>
+<rect class="bad" x="20" y="172" width="300" height="28" rx="6"/><text x="32" y="191" class="small">sw.js precache list (missing a module)</text>
+<rect class="bad" x="20" y="206" width="300" height="28" rx="6"/><text x="32" y="225" class="small">test_pwa_build expects 3.30.0</text>
+<text x="440" y="22" class="lbl" font-weight="600">Proposed: one source, stamped</text>
+<rect class="hot" x="440" y="100" width="130" height="50" rx="8"/><text x="455" y="122" class="small">git commit</text><text x="455" y="139" class="small">(the only input)</text>
+<path class="edge" d="M570 125 L620 125"/>
+<rect class="box" x="620" y="40" width="125" height="36" rx="6"/><text x="632" y="63" class="small">HTML + APP_VERSION</text>
+<rect class="box" x="620" y="107" width="125" height="36" rx="6"/><text x="632" y="130" class="small">sw cache + precache</text>
+<rect class="box" x="620" y="174" width="125" height="36" rx="6"/><text x="632" y="197" class="small">2nd HTML shell</text>
+<path class="edge" d="M600 125 L600 58 L620 58"/><path class="edge" d="M600 125 L600 192 L620 192"/>
+</svg>
+<figcaption>Each value on the left was last hand-edited at a different time. The proposal makes them outputs of a build instead of inputs typed by the AI.</figcaption>
+</figure>
+</article>
+
+<article class="idea" id="idea-5">
+<h3>5. A father/son operating model: AI Studio on a branch, a canon per chat, a green tick</h3>
+<div class="chips"><span class="chip id">Idea 5</span><span class="chip">Axis: The change workflow</span><span class="chip">Confidence 70%</span><span class="chip">Complexity Medium</span></div>
+<dl class="fields">
+<dt>Description</dt>
+<dd>
+<p>Keep Elliott's tool, and change what reaches the live app:</p>
+<ul>
+<li><strong>Sync to a branch.</strong> AI Studio syncs to a <code>studio</code> branch, not <code>main</code>.</li>
+<li><strong>Automatic check.</strong> A GitHub Action runs idea 3's checks on every sync, plus a ratchet that fails only when things get <em>worse</em> than a committed baseline:
+ <ul>
+ <li>new duplicated blocks (<code>jscpd --fail-on-new-clones</code>)</li>
+ <li>new orphaned files (knip)</li>
+ <li>more <code>window.*</code> writes or inline <code>onclick</code></li>
+ </ul></li>
+<li><strong>Human merge.</strong> You (or the green tick) merge to <code>main</code> and tag good states.</li>
+<li><strong>Canon per chat.</strong> Each AI Studio chat starts fresh with a one-page canon pasted in: idea 2's owner table, a "never create another X; extend the owner" list, and a three-line brief (goal, files allowed, what to reuse).</li>
+<li><strong>Replace the size rule.</strong> The module-size rule becomes an ownership rule.</li>
+</ul>
+</dd>
+<dt>Basis</dt>
+<dd>
+<ul>
+<li>direct: <code>93646c9</code> "unify state access" changed 117 files (+1,162 / −14,960) straight onto the main line. The "fuck fix 1–3" run landed the same way.</li>
+<li>direct: <code>.github/</code> does not exist.</li>
+<li>direct: the repo's own size rule is real but pushes toward more files. <code>Audit_Report_v3.20.md:10</code> says "strictly under the 400-line ceiling" and about ten module headers say "Strictly modular (&lt;350 lines)". Meanwhile modules grew from 144 (v3.20 audit) to 230, with unreferenced split fragments such as <code>CategoryManagerOperations.js</code>.</li>
+<li>external: AI Studio forum reports. The model trusts stale chat history, rewrites whole files, and the GitHub sync is one-way and sometimes claims "In Sync" falsely. Users' prompt-only workaround rules are about 80% reliable. Instructions advise; checks enforce.</li>
+<li>external: jscpd, knip and dependency-cruiser baselines.</li>
+</ul>
+</dd>
+<dt>Rationale</dt>
+<dd>The sprawl is produced by the process, so a one-off cleanup will grow back unless the process changes. This gives each of you a defined role. Elliott keeps building. You review red or green, not code. The AI gets a map instead of guessing each session.</dd>
+<dt>Downsides</dt>
+<dd>It depends on whether AI Studio can target a branch in Elliott's setup (a question for him). A merge gate adds friction he may resist. Ratchet tooling needs an initial baseline and a little tuning to avoid false alarms.</dd>
+</dl>
+<figure>
+<svg viewBox="0 0 760 150" role="img" aria-labelledby="f5t">
+<title id="f5t">Proposed flow from Elliott's chat to the live app, with an automatic check and a human merge</title>
+<rect class="box" x="10" y="45" width="120" height="56" rx="8"/><text x="22" y="68" class="small">Elliott + AI Studio</text><text x="22" y="86" class="small">(canon pasted in)</text>
+<path class="edge" d="M130 73 L170 73"/>
+<rect class="box" x="170" y="45" width="110" height="56" rx="8"/><text x="182" y="68" class="small">studio branch</text><text x="182" y="86" class="small">on GitHub</text>
+<path class="edge" d="M280 73 L320 73"/>
+<rect class="hot" x="320" y="45" width="150" height="56" rx="8"/><text x="332" y="68" class="small">Automatic check</text><text x="332" y="86" class="small">smoke + ratchet: ✔ / ✘</text>
+<path class="edge" d="M470 73 L510 73"/>
+<rect class="box" x="510" y="45" width="110" height="56" rx="8"/><text x="522" y="68" class="small">Barrie merges</text><text x="522" y="86" class="small">and tags good</text>
+<path class="edge" d="M620 73 L650 73"/>
+<rect class="box" x="650" y="45" width="100" height="56" rx="8"/><text x="662" y="68" class="small">main →</text><text x="662" y="86" class="small">live app</text>
+<text x="332" y="128" class="small">✘ goes back to the chat with the failure text</text>
+</svg>
+<figcaption>The only new human step is the merge. Everything between the chat and the merge is automatic.</figcaption>
+</figure>
+</article>
+
+<article class="idea" id="idea-6">
+<h3>6. A usage census with Elliott and Chloe</h3>
+<div class="chips"><span class="chip id">Idea 6</span><span class="chip">Axis: Product core worth keeping</span><span class="chip">Confidence 75%</span><span class="chip">Complexity Low</span></div>
+<dl class="fields">
+<dt>Description</dt>
+<dd>A 15-minute conversation: which screens and actions did each of you use last week? Optionally, back it with a few lines that log each view or modal opened over two weeks. Sort every feature into <em>keep</em> (cleanup effort goes here), <em>freeze</em> (no changes, no cleanup) or <em>attic</em>. The first candidates to question are:
+<ul>
+<li>the analytics and prep components</li>
+<li>the disabled Gemini hook</li>
+<li>Data Quality as a screen</li>
+<li>the duplicate plan generator</li>
+<li>Shopping's missing nav button: is it unused, or is the button lost?</li>
+</ul>
+</dd>
+<dt>Basis</dt>
+<dd>
+<ul>
+<li>direct: analytics and prep components are loaded through <code>componentRegistry.js</code> and spread onto <code>window</code> (<code>main.js:57,138</code>), but no callers were found.</li>
+<li>direct: <code>aiEnabled: false</code> with no Gemini call site.</li>
+<li>direct: the HTML mobile nav is "Today, Recipes, Plan, Data Quality, Search", and Shopping is routable but has no button in the HTML.</li>
+<li>direct: the original PlatePlanner did the core loop in one file.</li>
+<li>external: menu-engineering practice (stars vs dogs). Cut by actual use, not taste.</li>
+</ul>
+</dd>
+<dt>Rationale</dt>
+<dd>Cleanup effort grows with surface area, so shrinking the surface first makes everything else smaller. It is also the conversation you said you want to have with Elliott. He can answer it without any code knowledge, and it makes "the good stuff is there" concrete.</dd>
+<dt>Downsides</dt>
+<dd>Two weeks of usage can miss seasonal or occasional features, such as a Tesco import done once a month. Treat it as freeze, not delete, for anything uncertain.</dd>
+</dl>
+</article>
+
+<article class="idea" id="idea-7">
+<h3>7. One door per Firestore collection; Data Quality becomes a report</h3>
+<div class="chips"><span class="chip id">Idea 7</span><span class="chip">Axis: Data and state integrity</span><span class="chip">Confidence 65%</span><span class="chip">Complexity High</span></div>
+<dl class="fields">
+<dt>Description</dt>
+<dd>
+<p>Most Data Quality issue types (drift, desync, incomplete, orphan) exist because several modules write the same collection in different shapes. Fix the cause:</p>
+<ul>
+<li>give each collection exactly one repository that normalises on write to one schema</li>
+<li>add a <code>schemaVersion</code></li>
+<li>run a one-time migration on the exported data</li>
+<li>redirect every other writer through that one repository</li>
+<li>collapse the old-and-new fallback chains and the hard-coded household constants into one config module</li>
+</ul>
+<p>Data Quality then shrinks to a read-only report on genuinely human data issues: duplicates and missing densities.</p>
+</dd>
+<dt>Basis</dt>
+<dd>
+<ul>
+<li>direct: <code>RecipeFirestoreRepository.js:15</code> reads <code>r.macros?.calories ?? r.macros?.cal ?? r.calories ?? r.cal ?? 0</code>, and <code>DataQualityEngine.js:41</code> repeats the same chain.</li>
+<li>direct: the identical products write in <code>ProductRepository.js:61</code> and <code>ShoppingFirestoreRepository.js:143</code>.</li>
+<li>direct: ingredients are written from about six repositories.</li>
+<li>direct: the legacy-or-subcollection plan read at <code>HydrationService.js:168</code>.</li>
+<li>direct: preference fallbacks such as <code>legacyPrefs.elliottCal ?? legacyPrefs.ecal ?? 2100</code>.</li>
+<li>external: your own PlatePlanner plan ("normalised schema, migrations from day one").</li>
+</ul>
+</dd>
+<dt>Rationale</dt>
+<dd>This is the largest single simplification on offer. It removes the reason a ~1,300-line repair subsystem exists, and it stops the next AI session reintroducing drift in whichever duplicate writer it happens to edit.</dd>
+<dt>Downsides</dt>
+<dd>It is the riskiest idea, because it touches live data and many files. It should only start after ideas 1–3 exist (backup, map, golden master), and it is best done in slices: one collection at a time, starting with recipes.</dd>
+</dl>
+<figure>
+<svg viewBox="0 0 760 190" role="img" aria-labelledby="f7t">
+<title id="f7t">Today several modules write the products and ingredients collections; proposed one repository per collection</title>
+<text x="20" y="20" class="lbl" font-weight="600">Today</text>
+<rect class="box" x="20" y="34" width="190" height="26" rx="6"/><text x="30" y="52" class="small">ProductRepository</text>
+<rect class="box" x="20" y="66" width="190" height="26" rx="6"/><text x="30" y="84" class="small">ShoppingFirestoreRepository</text>
+<rect class="box" x="20" y="110" width="190" height="26" rx="6"/><text x="30" y="128" class="small">~6 repositories</text>
+<rect class="bad" x="270" y="48" width="100" height="30" rx="6"/><text x="282" y="68" class="small">products</text>
+<rect class="bad" x="270" y="108" width="100" height="30" rx="6"/><text x="282" y="128" class="small">ingredients</text>
+<path class="edge" d="M210 47 L270 60"/><path class="edge" d="M210 79 L270 66"/><path class="edge" d="M210 123 L270 123"/>
+<rect class="bad" x="270" y="150" width="100" height="30" rx="6"/><text x="280" y="170" class="small">4 DQ modules</text>
+<text x="440" y="20" class="lbl" font-weight="600">Proposed</text>
+<rect class="hot" x="440" y="48" width="160" height="30" rx="6"/><text x="452" y="68" class="small">ProductRepository only</text>
+<rect class="hot" x="440" y="108" width="160" height="30" rx="6"/><text x="452" y="128" class="small">one ingredient owner</text>
+<rect class="box" x="650" y="48" width="100" height="30" rx="6"/><text x="662" y="68" class="small">products</text>
+<rect class="box" x="650" y="108" width="100" height="30" rx="6"/><text x="662" y="128" class="small">ingredients</text>
+<path class="edge" d="M600 63 L650 63"/><path class="edge" d="M600 123 L650 123"/>
+<rect class="box" x="440" y="150" width="160" height="30" rx="6"/><text x="452" y="170" class="small">1 read-only report</text>
+</svg>
+<figcaption>Several writers with different shapes cause drift, and drift is why Data Quality exists. One writer per collection removes the cause.</figcaption>
+</figure>
+</article>
+</section>
+
+<section id="rejection-summary">
+<h2>Rejection Summary</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>#</th><th>Idea</th><th>Reason Rejected</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Make failure loud (remove swallowed catches, monkeypatch, crash overlay; log errors for a week)</td><td>The verifier judged it weak and generic as a standalone direction. The specific lines (<code>main.js:323-325</code>, <code>HydrationService.js:225</code>) are cited in the context and fit naturally into ideas 3 and 5.</td></tr>
+<tr><td>2</td><td>Restructure into ~6 feature-sized modules that fit an AI chat</td><td>Too expensive relative to value. It is a large rewrite with no feasibility basis, and ideas 2 and 5 get most of the benefit by naming owners.</td></tr>
+<tr><td>3</td><td>Household as one versioned document instead of realtime listeners</td><td>Too heavy. Realtime sync is not shown to be the root cause. Revisit only if idea 7 leaves sync bugs behind.</td></tr>
+<tr><td>4</td><td>Month-long feature freeze</td><td>Generic, and the ratchet in idea 5 gets the same "only shrinks" effect without stopping Elliott building.</td></tr>
+<tr><td>5</td><td>One state holder, with global counts as a scoreboard</td><td>Duplicates idea 5's ratchet and idea 2's owner table.</td></tr>
+<tr><td>6</td><td>"Stop the sprawl generator" chain (map → canon → ratchet)</td><td>The verifier found it circular as a separate idea. Its parts live in ideas 2 and 5.</td></tr>
+<tr><td>7</td><td>Delete-first purge as originally listed</td><td>The basis was partly refuted: two "dead" shims are live (<code>HydrationService.js:11-12</code>) and analytics/prep are loaded. It is kept in corrected form as part of idea 2.</td></tr>
+<tr><td>8</td><td>Known-good tag via bisect; boot-and-click smoke test; golden master; bug-as-failing-check</td><td>Merged into idea 3.</td></tr>
+<tr><td>9</td><td>Data snapshot; Firestore rules as lock and schema check</td><td>Merged into idea 1.</td></tr>
+<tr><td>10</td><td>Studio branch and PR gate; CI ratchet; AI canon file; replace the size rule with an ownership rule</td><td>Merged into idea 5.</td></tr>
+<tr><td>11</td><td>Single-tenant config, deleting household fallbacks</td><td>Merged into idea 7. It is narrow and low-stakes on its own.</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<footer class="composition-signal">Composed <time datetime="2026-10-25T10:39Z">2026-10-25T10:39Z</time> by ce-ideate from Barrie's request to review PlatePlan (repo <code>ElliottC99/PlatePlan</code>, branch <code>dev/review-state</code> at <code>602b05e</code>), with reference to <code>PlatePlanner</code> <code>main</code> and <code>feat/bun-sqlite-persistence</code>.</footer>
+</main>
+</body>
+</html>
