@@ -1,0 +1,17 @@
+# Dependencies and build output
+node_modules/
+dist/
+
+# Secrets: this repo is public
+.env
+cookies.txt
+*firebase-adminsdk*.json
+*service-account*.json
+
+# Firestore backups (scripts/backup_firestore.js) hold household data
+PlatePlan-backups/
+plateplan-backup-*.json
+
+# OS clutter
+.DS_Store
+Thumbs.db
