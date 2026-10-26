@@ -6,8 +6,10 @@
  */
 
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
-import { getState as getStoreState, setIngredients, setRecipes } from '../store/store.js';
-import { isDbAvailable } from './RecipeFirestoreRepository.js';
+import { getState as getStoreState, setIngredients, setProducts, setRecipes } from '../store/store.js';
+import { isDbAvailable, batchUpdateRecipesInDb } from './RecipeFirestoreRepository.js';
+import { saveRootItem, deleteRootItem } from './PantryTaxonomyService.js';
+import { saveProduct, deleteProduct } from './ProductRepository.js';
 
 function remapRecipeIngredients(recipes = [], predicateRemap) {
   const modified = [];
@@ -39,24 +41,13 @@ function remapRecipeIngredients(recipes = [], predicateRemap) {
 export async function deleteSubtypeInDb(parentIngredient, unlinkedProducts) {
   if (!isDbAvailable()) return false;
   try {
-    const batch = db.batch();
-    const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');
-    const ingId = parentIngredient.id;
-    const ingData = { ...parentIngredient, updatedAt: new Date().toISOString() };
-    delete ingData.id;
-    batch.set(colRef.doc(ingId), ingData, { merge: true });
-
-    const prodColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('products');
-    for (const prod of unlinkedProducts) {
-      const prodId = prod.id;
-      const prodData = { ...prod, updatedAt: new Date().toISOString() };
-      delete prodData.id;
-      batch.set(prodColRef.doc(prodId), prodData, { merge: true });
+    await saveRootItem(parentIngredient);
+    if (Array.isArray(unlinkedProducts)) {
+      await Promise.all(unlinkedProducts.map(prod => saveProduct(prod)));
     }
-    await batch.commit();
     return true;
   } catch (err) {
-    console.error('[SubtypeRepository] Error in deleteSubtypeInDb writeBatch:', err);
+    console.error('[SubtypeRepository] Error in deleteSubtypeInDb:', err);
     throw err;
   }
 }
@@ -64,17 +55,12 @@ export async function deleteSubtypeInDb(parentIngredient, unlinkedProducts) {
 export async function batchResolveSubtypeOrphansInDb(productUpdates) {
   if (!isDbAvailable()) return false;
   try {
-    const batch = db.batch();
-    const prodColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('products');
-    productUpdates.forEach(p => {
-      const pId = p.id;
-      const pData = { ...p, updatedAt: new Date().toISOString() };
-      delete pData.id;
-      const pDocRef = prodColRef.doc(pId);
-      if (p._delete === true) batch.delete(pDocRef);
-      else batch.set(pDocRef, pData, { merge: true });
-    });
-    await batch.commit();
+    if (Array.isArray(productUpdates)) {
+      await Promise.all(productUpdates.map(p => {
+        if (p._delete === true) return deleteProduct(p.id);
+        return saveProduct(p);
+      }));
+    }
     return true;
   } catch (err) {
     console.error('[SubtypeRepository] Error in batchResolveSubtypeOrphansInDb:', err);
@@ -85,26 +71,15 @@ export async function batchResolveSubtypeOrphansInDb(productUpdates) {
 export async function batchResolveOrphansWithNewSubtypeInDb(parentIngredient, productUpdates) {
   if (!isDbAvailable()) return false;
   try {
-    const batch = db.batch();
     if (parentIngredient) {
-      const ingColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');
-      const ingId = parentIngredient.id;
-      const ingData = { ...parentIngredient, updatedAt: new Date().toISOString() };
-      delete ingData.id;
-      batch.set(ingColRef.doc(ingId), ingData, { merge: true });
+      await saveRootItem(parentIngredient);
     }
-
-    const prodColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('products');
-    productUpdates.forEach(p => {
-      const pId = p.id;
-      const pData = { ...p, updatedAt: new Date().toISOString() };
-      delete pData.id;
-      const pDocRef = prodColRef.doc(pId);
-      if (p._delete === true) batch.delete(pDocRef);
-      else batch.set(pDocRef, pData, { merge: true });
-    });
-
-    await batch.commit();
+    if (Array.isArray(productUpdates)) {
+      await Promise.all(productUpdates.map(p => {
+        if (p._delete === true) return deleteProduct(p.id);
+        return saveProduct(p);
+      }));
+    }
     return true;
   } catch (err) {
     console.error('[SubtypeRepository] Error in batchResolveOrphansWithNewSubtypeInDb:', err);
@@ -115,37 +90,24 @@ export async function batchResolveOrphansWithNewSubtypeInDb(parentIngredient, pr
 export async function batchMergeIngredientsInDb(canonicalIngredient, duplicateIngredientId, updatedRecipes, updatedProducts, updatedPlan) {
   if (!isDbAvailable()) return false;
   try {
-    const batch = db.batch();
-    const ingColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');
-    batch.delete(ingColRef.doc(duplicateIngredientId));
+    await deleteRootItem(duplicateIngredientId);
+    await saveRootItem(canonicalIngredient);
 
-    const canId = canonicalIngredient.id;
-    const canData = { ...canonicalIngredient, updatedAt: new Date().toISOString() };
-    delete canData.id;
-    batch.set(ingColRef.doc(canId), canData, { merge: true });
+    if (Array.isArray(updatedRecipes) && updatedRecipes.length > 0) {
+      await batchUpdateRecipesInDb(updatedRecipes);
+    }
 
-    const recipeColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes');
-    updatedRecipes.forEach(r => {
-      const rData = { ...r, updatedAt: new Date().toISOString() };
-      delete rData.id;
-      batch.set(recipeColRef.doc(r.id), rData, { merge: true });
-    });
-
-    const prodColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('products');
-    updatedProducts.forEach(p => {
-      const pData = { ...p, updatedAt: new Date().toISOString() };
-      delete pData.id;
-      batch.set(prodColRef.doc(p.id), pData, { merge: true });
-    });
+    if (Array.isArray(updatedProducts) && updatedProducts.length > 0) {
+      await Promise.all(updatedProducts.map(p => saveProduct(p)));
+    }
 
     if (updatedPlan) {
       const planDocRef = db.collection('households').doc(HOUSEHOLD_ID).collection('plans').doc('current');
       const planData = { ...updatedPlan, updatedAt: new Date().toISOString() };
       delete planData.id;
-      batch.set(planDocRef, planData);
+      await planDocRef.set(planData);
     }
 
-    await batch.commit();
     return true;
   } catch (err) {
     console.error('[SubtypeRepository] Error in batchMergeIngredientsInDb:', err);
@@ -225,20 +187,11 @@ export async function promoteSubtype(parentId, subtypeId) {
   setRecipes(allRecipes);
 
   if (isDbAvailable()) {
-    const batch = db.batch();
-    const ingColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');
-    const recipeColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes');
-
-    const parentDoc = { ...parent }; delete parentDoc.id;
-    const newRootDoc = { ...newRoot }; delete newRootDoc.id;
-    batch.set(ingColRef.doc(String(parentId)), parentDoc, { merge: true });
-    batch.set(ingColRef.doc(String(newRootId)), newRootDoc);
-
-    modifiedRecipes.forEach(r => {
-      const rData = { ...r }; delete rData.id;
-      batch.set(recipeColRef.doc(String(r.id)), rData, { merge: true });
-    });
-    await batch.commit();
+    await saveRootItem(parent);
+    await saveRootItem(newRoot);
+    if (modifiedRecipes.length > 0) {
+      await batchUpdateRecipesInDb(modifiedRecipes);
+    }
   }
 
   return { success: true, newRootId, modifiedRecipesCount: modifiedRecipes.length };
@@ -286,20 +239,11 @@ export async function moveSubtype(oldParentId, subtypeId, newParentId) {
   setRecipes(allRecipes);
 
   if (isDbAvailable()) {
-    const batch = db.batch();
-    const ingColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');
-    const recipeColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes');
-
-    const oldParentDoc = { ...oldParent }; delete oldParentDoc.id;
-    const newParentDoc = { ...newParent }; delete newParentDoc.id;
-    batch.set(ingColRef.doc(String(oldParentId)), oldParentDoc, { merge: true });
-    batch.set(ingColRef.doc(String(newParentId)), newParentDoc, { merge: true });
-
-    modifiedRecipes.forEach(r => {
-      const rData = { ...r }; delete rData.id;
-      batch.set(recipeColRef.doc(String(r.id)), rData, { merge: true });
-    });
-    await batch.commit();
+    await saveRootItem(oldParent);
+    await saveRootItem(newParent);
+    if (modifiedRecipes.length > 0) {
+      await batchUpdateRecipesInDb(modifiedRecipes);
+    }
   }
 
   return { success: true, modifiedRecipesCount: modifiedRecipes.length };
@@ -344,18 +288,10 @@ export async function mergeSubtype(parentId, oldSubtypeId, newSubtypeId) {
   setRecipes(allRecipes);
 
   if (isDbAvailable()) {
-    const batch = db.batch();
-    const ingColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');
-    const recipeColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes');
-
-    const parentDoc = { ...parent }; delete parentDoc.id;
-    batch.set(ingColRef.doc(String(parentId)), parentDoc, { merge: true });
-
-    modifiedRecipes.forEach(r => {
-      const rData = { ...r }; delete rData.id;
-      batch.set(recipeColRef.doc(String(r.id)), rData, { merge: true });
-    });
-    await batch.commit();
+    await saveRootItem(parent);
+    if (modifiedRecipes.length > 0) {
+      await batchUpdateRecipesInDb(modifiedRecipes);
+    }
   }
 
   return { success: true, modifiedRecipesCount: modifiedRecipes.length };

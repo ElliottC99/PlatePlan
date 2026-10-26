@@ -6,10 +6,74 @@
  * Strictly under 350 lines. Zero DOM dependencies.
  */
 
+import { db, HOUSEHOLD_ID } from '../config/firebase.js';
+import { enforceCategorySSOT } from '../utils/categoryEnforcer.js';
 import { getState, setCategories, setIngredients, setProducts, saveStateCache } from '../store/store.js';
 import { getCategories, saveCategories } from './CategoryRepository.js';
-import { getRootItems, saveRootItem, deleteRootItem } from './RootItemRepository.js';
 import { getProducts, saveProduct } from './ProductRepository.js';
+
+function isDbAvailable() {
+  if (!db) { console.warn('[PantryTaxonomyService] Firestore db instance not initialised.'); return false; }
+  return true;
+}
+
+async function safeFirestoreGet(ref, timeoutMs = 2500) {
+  if (!ref || typeof ref.get !== 'function') return null;
+  try {
+    const netPromise = ref.get();
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore get timeout')), timeoutMs));
+    return await Promise.race([netPromise, timeoutPromise]);
+  } catch (_netErr) {
+    try { return await ref.get({ source: 'cache' }); } catch (_cacheErr) { return null; }
+  }
+}
+
+export async function getRootItems() {
+  try {
+    if (!isDbAvailable()) return [];
+    const snap = await safeFirestoreGet(db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients'));
+    const raw = (snap && snap.docs) ? snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) : [];
+    const prods = (typeof window !== 'undefined' && getState()?.products) || [];
+    return enforceCategorySSOT({ ingredients: raw, products: prods }).ingredients;
+  } catch (err) {
+    console.warn('[PantryTaxonomyService] getRootItems error:', err);
+    return [];
+  }
+}
+
+export async function saveRootItem(rootItem) {
+  try {
+    if (!isDbAvailable() || !rootItem || typeof rootItem !== 'object') return { success: false, error: 'Invalid' };
+    const prods = (typeof window !== 'undefined' && getState()?.products) || [];
+    const enforced = enforceCategorySSOT({ ingredients: [rootItem], products: prods });
+    const finalItem = enforced.ingredients[0] || rootItem;
+    const itemData = { ...finalItem, schemaVersion: 2, updatedAt: new Date().toISOString() };
+    const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');
+    const itemId = rootItem.id || colRef.doc().id;
+    delete itemData.id;
+    delete itemData.ref;
+    await colRef.doc(String(itemId)).set(itemData, { merge: true });
+    return { success: true, id: itemId };
+  } catch (err) {
+    console.error('[PantryTaxonomyService] saveRootItem error:', err);
+    return { success: false, error: err };
+  }
+}
+
+export async function deleteRootItem(rootItemId) {
+  try {
+    if (!isDbAvailable() || !rootItemId) return { success: false, error: 'Unavailable or missing ID' };
+    await db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients').doc(String(rootItemId)).delete();
+    return { success: true };
+  } catch (err) {
+    console.error('[PantryTaxonomyService] deleteRootItem error:', err);
+    return { success: false, error: err };
+  }
+}
+
+export const getIngredients = getRootItems;
+export const saveIngredient = saveRootItem;
+export const deleteIngredient = deleteRootItem;
 
 export async function commitAtomicChain({ category, rootItemName, subtypeName, productPayload }) {
   try {

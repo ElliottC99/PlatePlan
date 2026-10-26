@@ -1,9 +1,12 @@
 import { getState } from '../store/coreState.js';
-import store from "../store/store.js";
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
 import { enforceCategorySSOT } from '../utils/categoryEnforcer.js';
 import { isDbAvailable } from './FirestoreUtils.js';
-import { safeFirestoreGet } from './HouseholdRepository.js'; // This will be needed until I move safeFirestoreGet
+import { safeFirestoreGet } from './HouseholdRepository.js';
+import {
+  saveRootItem as saveCanonicalIngredient,
+  deleteRootItem as deleteCanonicalIngredient
+} from './PantryTaxonomyService.js';
 
 export async function getIngredients() {
   try {
@@ -14,32 +17,15 @@ export async function getIngredients() {
     const enforced = enforceCategorySSOT({ ingredients: raw, products: prods });
     return enforced.ingredients;
   } catch (err) {
+    console.warn('[PantryFirestoreRepository] getIngredients error:', err);
     return [];
   }
 }
 
 export async function saveIngredient(ingredient) {
-  try {
-    if (!isDbAvailable() || !ingredient || typeof ingredient !== 'object') return { success: false, error: 'Invalid' };
-    const enforced = enforceCategorySSOT({ ingredients: [ingredient], products: (typeof window !== 'undefined' && getState()?.products) || [] });
-    const finalIng = enforced.ingredients[0] || ingredient;
-    const ingData = { ...finalIng, updatedAt: new Date().toISOString() };
-    const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');
-    const ingId = ingredient.id || colRef.doc().id;
-    delete ingData.id;
-    await colRef.doc(ingId).set(ingData, { merge: true });
-    return { success: true, id: ingId };
-  } catch (err) {
-    return { success: false, error: err };
-  }
+  return await saveCanonicalIngredient(ingredient);
 }
 
 export async function deleteIngredient(ingredientId) {
-  try {
-    if (!isDbAvailable() || !ingredientId) return { success: false, error: 'Unavailable or missing ID' };
-    await db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients').doc(ingredientId).delete();
-    return { success: true };
-  } catch (err) {
-    return { success: false, error: err };
-  }
+  return await deleteCanonicalIngredient(ingredientId);
 }
