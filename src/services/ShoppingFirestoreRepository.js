@@ -8,7 +8,12 @@ import store from "../store/store.js";
  */
 
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
-import { enforceCategorySSOT } from '../utils/categoryEnforcer.js';
+import {
+  getProducts as getCanonicalProducts,
+  saveProduct as saveCanonicalProduct,
+  deleteProduct as deleteCanonicalProduct,
+  subscribeProducts as subscribeCanonicalProducts
+} from './ProductRepository.js';
 
 function isDbAvailable() {
   if (!db) {
@@ -113,61 +118,23 @@ export async function updateShoppingItem(listId, itemId, updates = {}) {
 }
 
 // ==========================================
-// PRODUCT OPERATIONS
+// PRODUCT OPERATIONS (Routed to Canonical ProductRepository.js)
 // ==========================================
 
 export async function getProducts() {
-  try {
-    if (!isDbAvailable()) return [];
-    const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('products');
-    const snap = await safeFirestoreGet(colRef);
-    const raw = (snap && snap.docs) ? snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) : [];
-    const ings = (typeof window !== 'undefined' && getState()?.ingredients) || [];
-    const enforced = enforceCategorySSOT({ ingredients: ings, products: raw });
-    return enforced.products;
-  } catch (err) {
-    console.warn('[ShoppingFirestoreRepository] Offline or unable to fetch products:', err.message || err);
-    return [];
-  }
+  return await getCanonicalProducts();
 }
 
 export async function saveProduct(product) {
-  try {
-    if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
-    if (!product || typeof product !== 'object') return { success: false, error: 'Invalid product data' };
-    const enforced = enforceCategorySSOT({ ingredients: (typeof window !== 'undefined' && getState()?.ingredients) || [], products: [product] });
-    const finalProd = enforced.products[0] || product;
-    const prodData = { ...finalProd, updatedAt: new Date().toISOString() };
-    const prodId = product.id || db.collection('households').doc(HOUSEHOLD_ID).collection('products').doc().id;
-    delete prodData.id;
-    await db.collection('households').doc(HOUSEHOLD_ID).collection('products').doc(prodId).set(prodData, { merge: true });
-    return { success: true, id: prodId };
-  } catch (err) {
-    console.warn('[ShoppingFirestoreRepository] Unable to save product to cloud (offline):', err.message || err);
-    return { success: false, error: err };
-  }
+  return await saveCanonicalProduct(product);
 }
 
 export async function deleteProduct(productId) {
-  try {
-    if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
-    if (!productId) return { success: false, error: 'Missing product ID' };
-    await db.collection('households').doc(HOUSEHOLD_ID).collection('products').doc(productId).delete();
-    return { success: true };
-  } catch (err) {
-    console.warn('[ShoppingFirestoreRepository] Unable to delete product from cloud (offline):', err.message || err);
-    return { success: false, error: err };
-  }
+  return await deleteCanonicalProduct(productId);
 }
 
 export function subscribeProducts(callback, errorCallback) {
-  if (!isDbAvailable() || typeof callback !== 'function') return () => {};
-  try {
-    return db.collection('households').doc(HOUSEHOLD_ID).collection('products').onSnapshot(
-      (snap) => { if (snap?.docs) callback(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); },
-      (err) => { if (typeof errorCallback === 'function') errorCallback(err); }
-    );
-  } catch (e) { return () => {}; }
+  return subscribeCanonicalProducts(callback, errorCallback);
 }
 
 // ==========================================
