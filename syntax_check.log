@@ -1,8 +1,0 @@
-/app/applet/src/views/RecipeVaultView.js:327
-    }
-    ^
-
-SyntaxError: missing ) after argument list
-    at checkSyntax (node:internal/main/check_syntax:74:5)
-
-Node.js v22.23.3
