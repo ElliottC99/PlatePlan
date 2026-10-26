@@ -169,7 +169,6 @@ export function bindWizardEvents({
       };
       const openModal = typeof openProductEditModal === 'function' ? openProductEditModal : window.openProductEditModal;
       if (typeof openModal === 'function') openModal(null);
-      document.getElementById('manual-ing-panel')?.style.setProperty('z-index', '25005', 'important');
     });
 
     modalEl.querySelector('#btn-wiz-open-tesco-import')?.addEventListener('click', () => {
