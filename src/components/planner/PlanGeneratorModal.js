@@ -4,7 +4,7 @@
  * Generates automated multi-day plans matching daily protein and calorie targets.
  */
 
-import { generateWeeklyPlan } from '../../services/PlanGeneratorService.js';
+import { generateWeeklyPlan } from '../../services/MealPlanGeneratorService.js';
 import { setActivePlan, getState } from '../../store/store.js';
 import { showCustomAlert } from '../ui/DialogHelpers.js';
 
