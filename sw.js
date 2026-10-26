@@ -1,23 +1,23 @@
 /**
- * sw.js (v3.45.7)
+ * sw.js (__APP_VERSION__)
  * Service Worker for PlatePlan PWA offline support & asset caching.
  * Caches core app shell, modern ES6 modules, stylesheets, and icons.
  */
 
-const PLATEPLAN_CACHE = 'plateplan-cache-v3.45.7';
-const PLATEPLAN_STORE_CACHE = 'plateplan_store_cache_v3.45.7';
-const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-v3.45.7';
-const PLATEPLAN_APP_VERSION = 'v3.45.7';
-const PLATEPLAN_BUILD_ID = '3.38.45-v33845';
+const PLATEPLAN_CACHE = 'plateplan-cache-__APP_VERSION__';
+const PLATEPLAN_STORE_CACHE = 'plateplan_store_cache___APP_VERSION__';
+const PLATEPLAN_IMAGE_CACHE = 'plateplan-images-__APP_VERSION__';
+const PLATEPLAN_APP_VERSION = '__APP_VERSION__';
+const PLATEPLAN_BUILD_ID = '__BUILD_ID__';
 
 const PLATEPLAN_PRECACHE_ASSETS = [
-  'PlatePlan.html',
+  'index.html',
   'manifest.json',
   'src/config/firebase-config.js',
-  'styles/tokens.css?v=3.35.4',
-  'styles/components.css?v=3.35.4',
-  'styles/responsive.css?v=3.35.4',
-  'styles/print.css?v=3.35.4',
+  'styles/tokens.css?v=__APP_VERSION__',
+  'styles/components.css?v=__APP_VERSION__',
+  'styles/responsive.css?v=__APP_VERSION__',
+  'styles/print.css?v=__APP_VERSION__',
   'src/main.js',
   'src/store/store.js',
   'src/config/firebase.js',
@@ -219,7 +219,7 @@ self.addEventListener('fetch', event => {
           })
           .catch(() => {
             if (event.request.mode === 'navigate') {
-              return caches.match('PlatePlan.html') || caches.match('./');
+              return caches.match('index.html') || caches.match('./');
             }
             return new Response('Offline resource not found', { status: 503, statusText: 'Service Unavailable' });
           });

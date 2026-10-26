@@ -5,6 +5,10 @@
 
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
 import { safeFirestoreGet } from './HouseholdRepository.js';
+import {
+  saveRecipe as saveCanonicalRecipe,
+  deleteRecipe as deleteCanonicalRecipe
+} from './RecipeFirestoreRepository.js';
 
 function isDbAvailable() {
   return Boolean(db && HOUSEHOLD_ID);
@@ -22,7 +26,7 @@ function cleanLegacyMacros(recipe) {
   return cloned;
 }
 
-export async function getRecipes(uid) {
+export async function getRecipes(_uid) {
   try {
     if (!isDbAvailable()) return [];
     // Path remains shared but we accept uid for future-proofing and Auth compliance
@@ -36,29 +40,9 @@ export async function getRecipes(uid) {
 }
 
 export async function saveRecipe(recipe, uid) {
-  try {
-    if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
-    if (!recipe || typeof recipe !== 'object') return { success: false, error: 'Invalid recipe data' };
-    const cleanedRecipe = cleanLegacyMacros(recipe);
-    const recipeData = { ...cleanedRecipe, updatedAt: new Date().toISOString() };
-    const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes');
-    const recipeId = recipe.id || colRef.doc().id;
-    delete recipeData.id;
-    await colRef.doc(recipeId).set(recipeData, { merge: true });
-    return { success: true, id: recipeId };
-  } catch (err) {
-    console.error('[RecipeRepository] Save Error:', err);
-    return { success: false, error: err };
-  }
+  return await saveCanonicalRecipe(recipe, uid);
 }
 
 export async function deleteRecipe(recipeId, uid) {
-  try {
-    if (!isDbAvailable() || !recipeId) return { success: false, error: 'Unavailable or missing ID' };
-    await db.collection('households').doc(HOUSEHOLD_ID).collection('recipes').doc(recipeId).delete();
-    return { success: true };
-  } catch (err) {
-    console.error('[RecipeRepository] Delete Error:', err);
-    return { success: false, error: err };
-  }
+  return await deleteCanonicalRecipe(recipeId, uid);
 }

@@ -5,8 +5,13 @@
 
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
 import { enforceCategorySSOT } from '../utils/categoryEnforcer.js';
-import { getState as getStoreState, setIngredients, setRecipes } from '../store/store.js';
-import { getState } from '../store/coreState.js';
+import { getState as getStoreState } from '../store/store.js';
+import {
+  saveRootItem as saveCanonicalRootItem,
+  deleteRootItem as deleteCanonicalRootItem
+} from './PantryTaxonomyService.js';
+import { saveProduct, deleteProduct } from './ProductRepository.js';
+import { batchUpdateRecipesInDb } from './RecipeFirestoreRepository.js';
 
 function isDbAvailable() {
   if (!db) { console.warn('[RootItemRepository] Firestore db instance not initialised.'); return false; }
@@ -58,29 +63,12 @@ export async function getRootItems(uid) {
   } catch (err) { return []; }
 }
 
-export async function saveRootItem(rootItem, uid) {
-  try {
-    if (!isDbAvailable() || !rootItem || typeof rootItem !== 'object') return { success: false, error: 'Invalid' };
-    const safeState = (window.Store && typeof window.Store.getState === 'function') 
-      ? window.Store.getState() 
-      : (typeof getStoreState === 'function' ? getStoreState() : {});
-    const enforced = enforceCategorySSOT({ ingredients: [rootItem], products: (typeof window !== 'undefined' && safeState?.products) || [] });
-    const finalItem = enforced.ingredients[0] || rootItem;
-    const itemData = { ...finalItem, updatedAt: new Date().toISOString() };
-    const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');
-    const itemId = rootItem.id || colRef.doc().id;
-    delete itemData.id;
-    await colRef.doc(itemId).set(itemData, { merge: true });
-    return { success: true, id: itemId };
-  } catch (err) { console.error('[RootItemRepository] Save Error:', err); return { success: false, error: err }; }
+export async function saveRootItem(rootItem, _uid) {
+  return await saveCanonicalRootItem(rootItem);
 }
 
-export async function deleteRootItem(rootItemId, uid) {
-  try {
-    if (!isDbAvailable() || !rootItemId) return { success: false, error: 'Unavailable or missing ID' };
-    await db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients').doc(rootItemId).delete();
-    return { success: true };
-  } catch (err) { console.error('[RootItemRepository] Delete Error:', err); return { success: false, error: err }; }
+export async function deleteRootItem(rootItemId, _uid) {
+  return await deleteCanonicalRootItem(rootItemId);
 }
 
 // Aliases for backwards compatibility during migration
@@ -91,21 +79,10 @@ export const deleteIngredient = deleteRootItem;
 export async function deleteSubtypeInDb(parentRootItem, unlinkedProducts) {
   if (!isDbAvailable()) return false;
   try {
-    const batch = db.batch();
-    const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');
-    const itemId = parentRootItem.id;
-    const itemData = { ...parentRootItem, updatedAt: new Date().toISOString() };
-    delete itemData.id;
-    batch.set(colRef.doc(itemId), itemData, { merge: true });
-
-    const prodColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('products');
-    for (const prod of unlinkedProducts) {
-      const prodId = prod.id;
-      const prodData = { ...prod, updatedAt: new Date().toISOString() };
-      delete prodData.id;
-      batch.set(prodColRef.doc(prodId), prodData, { merge: true });
+    await saveCanonicalRootItem(parentRootItem);
+    if (Array.isArray(unlinkedProducts)) {
+      await Promise.all(unlinkedProducts.map(prod => saveProduct(prod)));
     }
-    await batch.commit();
     return true;
   } catch (err) {
     console.error('[RootItemRepository] Error in deleteSubtypeInDb:', err);
@@ -116,16 +93,12 @@ export async function deleteSubtypeInDb(parentRootItem, unlinkedProducts) {
 export async function batchResolveSubtypeOrphansInDb(productUpdates) {
   if (!isDbAvailable()) return false;
   try {
-    const batch = db.batch();
-    const prodColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('products');
-    productUpdates.forEach(p => {
-      const pId = p.id;
-      const pData = { ...p, updatedAt: new Date().toISOString() };
-      delete pData.id;
-      if (p._delete === true) batch.delete(prodColRef.doc(pId));
-      else batch.set(prodColRef.doc(pId), pData, { merge: true });
-    });
-    await batch.commit();
+    if (Array.isArray(productUpdates)) {
+      await Promise.all(productUpdates.map(p => {
+        if (p._delete === true) return deleteProduct(p.id);
+        return saveProduct(p);
+      }));
+    }
     return true;
   } catch (err) {
     console.error('[RootItemRepository] Error in batchResolveSubtypeOrphansInDb:', err);
@@ -136,23 +109,15 @@ export async function batchResolveSubtypeOrphansInDb(productUpdates) {
 export async function batchResolveOrphansWithNewSubtypeInDb(parentRootItem, productUpdates) {
   if (!isDbAvailable()) return false;
   try {
-    const batch = db.batch();
     if (parentRootItem) {
-      const ingColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');
-      const itemId = parentRootItem.id;
-      const itemData = { ...parentRootItem, updatedAt: new Date().toISOString() };
-      delete itemData.id;
-      batch.set(ingColRef.doc(itemId), itemData, { merge: true });
+      await saveCanonicalRootItem(parentRootItem);
     }
-    const prodColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('products');
-    productUpdates.forEach(p => {
-      const pId = p.id;
-      const pData = { ...p, updatedAt: new Date().toISOString() };
-      delete pData.id;
-      if (p._delete === true) batch.delete(prodColRef.doc(pId));
-      else batch.set(prodColRef.doc(pId), pData, { merge: true });
-    });
-    await batch.commit();
+    if (Array.isArray(productUpdates)) {
+      await Promise.all(productUpdates.map(p => {
+        if (p._delete === true) return deleteProduct(p.id);
+        return saveProduct(p);
+      }));
+    }
     return true;
   } catch (err) {
     console.error('[RootItemRepository] Error in batchResolveOrphansWithNewSubtypeInDb:', err);
@@ -163,42 +128,24 @@ export async function batchResolveOrphansWithNewSubtypeInDb(parentRootItem, prod
 export async function batchMergeIngredientsInDb(canonicalRootItem, duplicateRootItemId, updatedRecipes, updatedProducts, updatedPlan) {
   if (!isDbAvailable()) return false;
   try {
-    const batch = db.batch();
-    const ingColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('ingredients');
+    await saveCanonicalRootItem(canonicalRootItem);
+    await deleteCanonicalRootItem(duplicateRootItemId);
 
-    const canonicalData = { ...canonicalRootItem, updatedAt: new Date().toISOString() };
-    delete canonicalData.id;
-    batch.set(ingColRef.doc(canonicalRootItem.id), canonicalData, { merge: true });
-    batch.delete(ingColRef.doc(duplicateRootItemId));
-
-    const prodColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('products');
-    if (Array.isArray(updatedProducts)) {
-      updatedProducts.forEach(p => {
-        const pId = p.id;
-        const pData = { ...p, updatedAt: new Date().toISOString() };
-        delete pData.id;
-        batch.set(prodColRef.doc(pId), pData, { merge: true });
-      });
+    if (Array.isArray(updatedProducts) && updatedProducts.length > 0) {
+      await Promise.all(updatedProducts.map(p => saveProduct(p)));
     }
 
-    const recipeColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes');
-    if (Array.isArray(updatedRecipes)) {
-      updatedRecipes.forEach(r => {
-        const rId = r.id;
-        const rData = { ...r, updatedAt: new Date().toISOString() };
-        delete rData.id;
-        batch.set(recipeColRef.doc(rId), rData, { merge: true });
-      });
+    if (Array.isArray(updatedRecipes) && updatedRecipes.length > 0) {
+      await batchUpdateRecipesInDb(updatedRecipes);
     }
 
     if (updatedPlan && typeof updatedPlan === 'object' && updatedPlan.id) {
       const planColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('plans');
       const planData = { ...updatedPlan, updatedAt: new Date().toISOString() };
       delete planData.id;
-      batch.set(planColRef.doc(updatedPlan.id), planData, { merge: true });
+      await planColRef.doc(updatedPlan.id).set(planData, { merge: true });
     }
 
-    await batch.commit();
     return true;
   } catch (err) {
     console.error('[RootItemRepository] Error in batchMergeIngredientsInDb:', err);

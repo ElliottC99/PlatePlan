@@ -7,21 +7,12 @@
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
 import { getState as getStoreState, setIngredients, setProducts, setCategories } from '../store/store.js';
 import { isDbAvailable } from './RecipeFirestoreRepository.js';
-
-import { CHUNK_SIZE } from '../config/systemConfig.js';
+import { getRootItems, saveRootItem } from './PantryTaxonomyService.js';
+import { getProducts, saveProduct } from './ProductRepository.js';
 
 const strictNorm = (str) => String(str || '').toLowerCase().trim();
 const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^a-z0-9\-]/g, '');
 const slugCategory = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-
-async function commitChunkedOps(ops) {
-  if (!ops || ops.length === 0) return;
-  for (let i = 0; i < ops.length; i += CHUNK_SIZE) {
-    const chunkBatch = db.batch();
-    ops.slice(i, i + CHUNK_SIZE).forEach(op => op(chunkBatch));
-    await chunkBatch.commit();
-  }
-}
 
 function cascadeReassignment(ingList = [], prodList = [], sourceNorm, cleanTargetCat, targetKebab) {
   const updatedIngs = Array.isArray(ingList) ? ingList.map(i => ({ ...i, subtypes: Array.isArray(i.subtypes) ? [...i.subtypes] : [] })) : [];
@@ -93,39 +84,33 @@ export async function deleteCategory(categoryName, fallbackCatName = 'Uncategori
 
   try {
     const householdRef = db.collection('households').doc(HOUSEHOLD_ID);
-    const [ingSnap, prodSnap, catsSnap] = await Promise.all([
-      householdRef.collection('ingredients').get(),
-      householdRef.collection('products').get(),
+    const [dbIngs, dbProds, catsSnap] = await Promise.all([
+      getRootItems(),
+      getProducts(),
       householdRef.collection('settings').doc('categories').get()
     ]);
-    const dbIngs = ingSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
-    const dbProds = prodSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
 
     const { updatedIngs: dbCascadeIngs, updatedProds: dbCascadeProds, changedIngIds, changedProdIds } = 
       cascadeReassignment(dbIngs, dbProds, sourceNorm, targetCat, targetKebab);
 
-    const deleteOps = [];
-    dbCascadeIngs.forEach(ing => {
-      if (changedIngIds.has(String(ing.id))) {
-        deleteOps.push((b) => b.update(ing.ref, { category: ing.category, cat: ing.cat, subtypes: ing.subtypes || [], updatedAt: new Date().toISOString() }));
-      }
-    });
+    const ingSavePromises = dbCascadeIngs
+      .filter(ing => changedIngIds.has(String(ing.id)))
+      .map(ing => saveRootItem(ing));
 
-    dbCascadeProds.forEach(prod => {
-      if (changedProdIds.has(String(prod.id))) {
-        deleteOps.push((b) => b.update(prod.ref, { category: prod.category, cat: prod.cat, updatedAt: new Date().toISOString() }));
-      }
-    });
+    const prodSavePromises = dbCascadeProds
+      .filter(prod => changedProdIds.has(String(prod.id)))
+      .map(prod => saveProduct(prod));
+
+    await Promise.all([...ingSavePromises, ...prodSavePromises]);
 
     if (catsSnap.exists) {
       const updatedCats = (catsSnap.data()?.categories || []).filter(c => {
         const cName = typeof c === 'string' ? c : c?.name;
         return strictNorm(cName) !== sourceNorm && slugCategory(cName) !== sourceNorm;
       });
-      deleteOps.push((b) => b.set(catsSnap.ref, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true }));
+      await catsSnap.ref.set({ categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true });
     }
 
-    await commitChunkedOps(deleteOps);
     return { success: true };
   } catch (err) {
     console.error('[CategoryManagementRepository] deleteCategory error:', err);
@@ -187,38 +172,32 @@ export async function reassignAndDeleteCategory(deletedCat, reassignMode = 'mass
 
   try {
     const householdRef = db.collection('households').doc(HOUSEHOLD_ID);
-    const [ingSnap, prodSnap, catsSnap] = await Promise.all([
-      householdRef.collection('ingredients').get(),
-      householdRef.collection('products').get(),
+    const [dbIngs, dbProds, catsSnap] = await Promise.all([
+      getRootItems(),
+      getProducts(),
       householdRef.collection('settings').doc('categories').get()
     ]);
-    const dbIngs = ingSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
-    const dbProds = prodSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
 
     const { updatedIngs: dbCascadeIngs, updatedProds: dbCascadeProds, changedIngIds, changedProdIds } = reassignHierarchy(dbIngs, dbProds);
 
-    const deleteOps = [];
-    dbCascadeIngs.forEach(ing => {
-      if (changedIngIds.has(String(ing.id))) {
-        deleteOps.push((b) => b.update(ing.ref, { category: ing.category, cat: ing.cat, subtypes: ing.subtypes || [], updatedAt: new Date().toISOString() }));
-      }
-    });
+    const ingSavePromises = dbCascadeIngs
+      .filter(ing => changedIngIds.has(String(ing.id)))
+      .map(ing => saveRootItem(ing));
 
-    dbCascadeProds.forEach(prod => {
-      if (changedProdIds.has(String(prod.id))) {
-        deleteOps.push((b) => b.update(prod.ref, { category: prod.category, cat: prod.cat, updatedAt: new Date().toISOString() }));
-      }
-    });
+    const prodSavePromises = dbCascadeProds
+      .filter(prod => changedProdIds.has(String(prod.id)))
+      .map(prod => saveProduct(prod));
+
+    await Promise.all([...ingSavePromises, ...prodSavePromises]);
 
     if (catsSnap.exists) {
       const updatedCats = (catsSnap.data()?.categories || []).filter(c => {
         const cName = typeof c === 'string' ? c : c?.name;
         return strictNorm(cName) !== deletedNorm && slugCategory(cName) !== deletedSlug;
       });
-      deleteOps.push((b) => b.set(catsSnap.ref, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true }));
+      await catsSnap.ref.set({ categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true });
     }
 
-    await commitChunkedOps(deleteOps);
     return { success: true };
   } catch (err) {
     console.error('[CategoryManagementRepository] reassignAndDeleteCategory error:', err);
@@ -247,39 +226,33 @@ export async function renameCategory(oldCat, newName) {
 
   try {
     const householdRef = db.collection('households').doc(HOUSEHOLD_ID);
-    const [ingSnap, prodSnap, catsSnap] = await Promise.all([
-      householdRef.collection('ingredients').get(),
-      householdRef.collection('products').get(),
+    const [dbIngs, dbProds, catsSnap] = await Promise.all([
+      getRootItems(),
+      getProducts(),
       householdRef.collection('settings').doc('categories').get()
     ]);
-    const dbIngs = ingSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
-    const dbProds = prodSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
 
     const { updatedIngs: dbCascadeIngs, updatedProds: dbCascadeProds, changedIngIds, changedProdIds } = 
       cascadeReassignment(dbIngs, dbProds, sourceNorm, cleanNewName, targetKebab);
 
-    const renameOps = [];
-    dbCascadeIngs.forEach(ing => {
-      if (changedIngIds.has(String(ing.id))) {
-        renameOps.push((b) => b.update(ing.ref, { category: ing.category, cat: ing.cat, subtypes: ing.subtypes || [], updatedAt: new Date().toISOString() }));
-      }
-    });
+    const ingSavePromises = dbCascadeIngs
+      .filter(ing => changedIngIds.has(String(ing.id)))
+      .map(ing => saveRootItem(ing));
 
-    dbCascadeProds.forEach(prod => {
-      if (changedProdIds.has(String(prod.id))) {
-        renameOps.push((b) => b.update(prod.ref, { category: prod.category, cat: prod.cat, updatedAt: new Date().toISOString() }));
-      }
-    });
+    const prodSavePromises = dbCascadeProds
+      .filter(prod => changedProdIds.has(String(prod.id)))
+      .map(prod => saveProduct(prod));
+
+    await Promise.all([...ingSavePromises, ...prodSavePromises]);
 
     if (catsSnap.exists) {
       const updatedCats = (catsSnap.data()?.categories || []).map(c => {
         const cName = typeof c === 'string' ? c : c?.name;
         return strictNorm(cName) === sourceNorm ? cleanNewName : c;
       });
-      renameOps.push((b) => b.set(catsSnap.ref, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true }));
+      await catsSnap.ref.set({ categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true });
     }
 
-    await commitChunkedOps(renameOps);
     return { success: true };
   } catch (err) {
     console.error('[CategoryManagementRepository] renameCategory error:', err);

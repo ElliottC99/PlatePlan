@@ -8,21 +8,12 @@
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
 import { getState as getStoreState, setIngredients, setProducts, setCategories } from '../store/store.js';
 import { isDbAvailable } from './RecipeFirestoreRepository.js';
-
-import { CHUNK_SIZE } from '../config/systemConfig.js';
+import { getRootItems, saveRootItem } from './PantryTaxonomyService.js';
+import { getProducts, saveProduct } from './ProductRepository.js';
 
 const strictNorm = (str) => String(str || '').toLowerCase().trim();
 const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^a-z0-9\-]/g, '');
 const slugCategory = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-
-async function commitChunkedOps(ops) {
-  if (!ops || ops.length === 0) return;
-  for (let i = 0; i < ops.length; i += CHUNK_SIZE) {
-    const chunkBatch = db.batch();
-    ops.slice(i, i + CHUNK_SIZE).forEach(op => op(chunkBatch));
-    await chunkBatch.commit();
-  }
-}
 
 function cascadeReassignment(ingList = [], prodList = [], sourceNorm, cleanTargetCat, targetKebab) {
   const updatedIngs = Array.isArray(ingList) ? ingList.map(i => ({ ...i, subtypes: Array.isArray(i.subtypes) ? [...i.subtypes] : [] })) : [];
@@ -102,30 +93,21 @@ export async function mergeCategory(sourceCat, targetCat) {
 
   try {
     const householdRef = db.collection('households').doc(HOUSEHOLD_ID);
-    const ingColRef = householdRef.collection('ingredients');
-    const prodColRef = householdRef.collection('products');
     const catsDocRef = householdRef.collection('settings').doc('categories');
 
-    const [ingSnap, prodSnap, catsSnap] = await Promise.all([ingColRef.get(), prodColRef.get(), catsDocRef.get()]);
-    const dbIngs = ingSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
-    const dbProds = prodSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+    const [dbIngs, dbProds, catsSnap] = await Promise.all([getRootItems(), getProducts(), catsDocRef.get()]);
 
     const { updatedIngs: dbCascadeIngs, updatedProds: dbCascadeProds, changedIngIds, changedProdIds } = cascadeReassignment(dbIngs, dbProds, sourceNorm, cleanTargetCat, targetKebab);
 
-    const mergeOps = [];
-    dbCascadeIngs.forEach(ing => {
-      if (changedIngIds.has(String(ing.id))) {
-        const ingData = { ...ing }; delete ingData.id; delete ingData.ref;
-        mergeOps.push((b) => b.set(ing.ref, ingData, { merge: true }));
-      }
-    });
+    const ingSavePromises = dbCascadeIngs
+      .filter(ing => changedIngIds.has(String(ing.id)))
+      .map(ing => saveRootItem(ing));
 
-    dbCascadeProds.forEach(prod => {
-      if (changedProdIds.has(String(prod.id))) {
-        const prodData = { ...prod }; delete prodData.id; delete prodData.ref;
-        mergeOps.push((b) => b.set(prod.ref, prodData, { merge: true }));
-      }
-    });
+    const prodSavePromises = dbCascadeProds
+      .filter(prod => changedProdIds.has(String(prod.id)))
+      .map(prod => saveProduct(prod));
+
+    await Promise.all([...ingSavePromises, ...prodSavePromises]);
 
     if (catsSnap.exists) {
       const snapCats = catsSnap.data()?.categories || [];
@@ -134,12 +116,11 @@ export async function mergeCategory(sourceCat, targetCat) {
         updatedSnapCats.push(cleanTargetCat);
       }
       updatedSnapCats.sort((a, b) => (typeof a === 'string' ? a : a.name).localeCompare(typeof b === 'string' ? b : b.name));
-      mergeOps.push((b) => b.set(catsDocRef, { categories: updatedSnapCats, updatedAt: new Date().toISOString() }, { merge: true }));
+      await catsDocRef.set({ categories: updatedSnapCats, updatedAt: new Date().toISOString() }, { merge: true });
     } else {
-      mergeOps.push((b) => b.set(catsDocRef, { categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true }));
+      await catsDocRef.set({ categories: updatedCats, updatedAt: new Date().toISOString() }, { merge: true });
     }
 
-    await commitChunkedOps(mergeOps);
     return { success: true };
   } catch (err) {
     console.error('[CategoryMergeRepository] mergeCategory error:', err);
@@ -151,19 +132,16 @@ export async function mergeAllDuplicates() {
   if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
 
   try {
-    const batch = db.batch();
     const householdRef = db.collection('households').doc(HOUSEHOLD_ID);
     const categoriesDocRef = householdRef.collection('settings').doc('categories');
 
-    const [categoriesSnap, ingSnap, prodSnap] = await Promise.all([
+    const [categoriesSnap, ingredients, products] = await Promise.all([
       categoriesDocRef.get(),
-      householdRef.collection('ingredients').get(),
-      householdRef.collection('products').get()
+      getRootItems(),
+      getProducts()
     ]);
 
     const categoriesList = categoriesSnap.exists ? (categoriesSnap.data().categories || []) : [];
-    const ingredients = ingSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
-    const products = prodSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
 
     const rawCategoriesSet = new Set();
     categoriesList.forEach(c => {
@@ -216,6 +194,7 @@ export async function mergeAllDuplicates() {
     }
 
     let ingredientsChanged = 0;
+    const ingUpdatePromises = [];
     ingredients.forEach(i => {
       let changed = false;
       let newCat = i.category;
@@ -235,26 +214,28 @@ export async function mergeAllDuplicates() {
         }
       });
       if (changed) {
-        batch.update(i.ref, { category: newCat, cat: slugifyToKebab(newCat), subtypes, updatedAt: new Date().toISOString() });
+        ingUpdatePromises.push(saveRootItem({ ...i, category: newCat, cat: slugifyToKebab(newCat), subtypes }));
         ingredientsChanged++;
       }
     });
 
     let productsChanged = 0;
+    const prodUpdatePromises = [];
     products.forEach(p => {
       if (p.category && canonicalMap.has(p.category)) {
         const mapped = canonicalMap.get(p.category);
         if (p.category !== mapped) {
-          batch.update(p.ref, { category: mapped, cat: slugifyToKebab(mapped), updatedAt: new Date().toISOString() });
+          prodUpdatePromises.push(saveProduct({ ...p, category: mapped, cat: slugifyToKebab(mapped) }));
           productsChanged++;
         }
       }
     });
 
-    const finalUniqueCats = Array.from(new Set(updatedCategoriesList)).sort((a, b) => a.localeCompare(b));
-    batch.set(categoriesDocRef, { categories: finalUniqueCats, updatedAt: new Date().toISOString() }, { merge: true });
+    await Promise.all([...ingUpdatePromises, ...prodUpdatePromises]);
 
-    await batch.commit();
+    const finalUniqueCats = Array.from(new Set(updatedCategoriesList)).sort((a, b) => a.localeCompare(b));
+    await categoriesDocRef.set({ categories: finalUniqueCats, updatedAt: new Date().toISOString() }, { merge: true });
+
     return { success: true, ingredientsChanged, productsChanged, categories: finalUniqueCats };
   } catch (err) {
     console.error('[CategoryMergeRepository] mergeAllDuplicates error:', err);
