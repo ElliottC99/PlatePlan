@@ -8,6 +8,7 @@
  * 5. Today shows one card for a shared meal and one per person for a split meal.
  * 6. Product swaps survive the whole-document plan save a tick triggers.
  * 7. At-home ticks are keyed by ingredient, so a product swap keeps them.
+ * 8. The tick handlers and their bridge routes update the loaded plan, and refuse to save without one.
  */
 
 import assert from 'node:assert';
@@ -150,5 +151,31 @@ assert.strictEqual(oilLine(swappedPlan).name, 'Oil B', 'The swap changes the lin
 assert.ok(oilLine(swappedPlan).isAtHome, 'The tick survives swapping the product');
 assert.strictEqual(oilLine(swappedPlan).atHomeKey, atHomeKey, 'The at-home key does not change with the product');
 console.log('✅ At-home ticks survive a product swap');
+
+// 8. The tick handlers update the loaded plan, and the bridge routes the Today buttons to them
+const { routeAction } = await import('../src/services/ActionBridge.js');
+const { toggleShoppingItemAcquired } = await import('../src/views/ShoppingView.js');
+const toasts = [];
+window.showPlatePlanToast = message => toasts.push(message);
+window.renderPlannerWizard = () => {}; // the Step 3 redraw needs a DOM
+const button = dataset => ({ dataset, closest: () => null, getAttribute: () => null });
+
+getState().currentPlan = { slots: { 1: {} }, dayDates: { 1: day }, eatenMeals: {} };
+assert.ok(routeAction('toggle-meal-eaten', button({ mealType: 'dinner', person: 'e' }), {}), 'The bridge handles toggle-meal-eaten');
+assert.ok(Object.keys(getState().currentPlan.eatenMeals).some(k => k.endsWith(':dinner:e')), 'Elliott\'s dinner tick lands on currentPlan');
+assert.ok(toasts.pop().includes('Elliott'), 'The tick confirms with Elliott\'s name');
+
+routeAction('toggle-shopping-at-home', button({ atHomeKey: 'ing_oil', itemKey: 'p-oil-a' }), {});
+assert.deepStrictEqual(getState().currentPlan.shoppingAtHome, { ing_oil: true }, 'The bridge passes the at-home key, not the product key');
+toggleShoppingItemAcquired('ing_oil');
+assert.deepStrictEqual(getState().currentPlan.shoppingAtHome, {}, 'Ticking again clears it');
+
+getState().currentPlan = null;
+const toastCount = toasts.length;
+routeAction('toggle-meal-eaten', button({ mealType: 'lunch', person: 'both' }), {});
+toggleShoppingItemAcquired('ing_oil');
+assert.strictEqual(getState().currentPlan, null, 'With no plan loaded nothing is created or saved');
+assert.strictEqual(toasts.length, toastCount, 'With no plan loaded neither handler confirms a tick');
+console.log('✅ Tick handlers update the loaded plan, and refuse to save without one');
 
 console.log('\n=== TODAY VIEW SUITE PASSED ===');
