@@ -19,7 +19,7 @@ import {
 import { getPlanSlotInfo } from '../services/MealPlanGeneratorService.js';
 import { renderFitScoreBadge } from '../components/FitScoreBadge.js';
 import { saveCurrentPlan } from '../services/HouseholdRepository.js';
-import { escapeAttr } from '../utils/stringUtils.js';
+import { escapeAttr, escapeHtml } from '../utils/stringUtils.js';
 
 let currentDateStr = getPlatePlanLocalToday();
 let stateUnsub = null;
@@ -143,18 +143,17 @@ function renderTodayMealCard(slot, { info: slotInfo, person }, eatenMeals) {
   const personLabel = person === 'e' ? ' · Elliott' : person === 'c' ? ' · Chloe' : '';
   const fitBadge = renderFitScoreBadge(recipe, slot.type, { showLabel: true });
 
-  const tickButtons = person === 'both' ? `
-        <button class="btn sm ${isEaten ? 'success' : 'ghost'}" type="button" data-action="toggle-meal-eaten" data-meal-type="${slot.type}" data-person="both" style="font-size:12px;flex:1;">
-          ${isEaten ? '✓ Both Eaten' : 'Mark Eaten'}
-        </button>
+  const eatenLabel = person === 'both' ? '✓ Both Eaten' : '✓ Eaten';
+  const mainTick = `
+        <button class="btn sm ${isEaten ? 'success' : 'ghost'}" type="button" data-action="toggle-meal-eaten" data-meal-type="${slot.type}" data-person="${person}" style="font-size:12px;flex:1;">
+          ${isEaten ? eatenLabel : 'Mark Eaten'}
+        </button>`;
+  const personTicks = person !== 'both' ? '' : `
         <button class="btn sm ${isEatenE ? 'primary' : 'ghost'}" type="button" data-action="toggle-meal-eaten" data-meal-type="${slot.type}" data-person="e" style="font-size:11px;padding:4px 8px;" title="Toggle Elliott">
           ${isEatenE ? '✓ E' : 'E'}
         </button>
         <button class="btn sm ${isEatenC ? 'primary' : 'ghost'}" type="button" data-action="toggle-meal-eaten" data-meal-type="${slot.type}" data-person="c" style="font-size:11px;padding:4px 8px;" title="Toggle Chloe">
           ${isEatenC ? '✓ C' : 'C'}
-        </button>` : `
-        <button class="btn sm ${isEaten ? 'success' : 'ghost'}" type="button" data-action="toggle-meal-eaten" data-meal-type="${slot.type}" data-person="${person}" style="font-size:12px;flex:1;">
-          ${isEaten ? '✓ Eaten' : 'Mark Eaten'}
         </button>`;
 
   return `
@@ -169,12 +168,12 @@ function renderTodayMealCard(slot, { info: slotInfo, person }, eatenMeals) {
           <div style="font-size:12px;color:var(--muted,#78716c);display:flex;gap:10px;">
             <span>🔥 ${Math.round(recipe.nutrition?.perServing?.cal ?? recipe.macros?.calories ?? 0)} kcal</span>
             <span>🥩 ${Math.round(recipe.nutrition?.perServing?.prot ?? recipe.macros?.protein ?? 0)}g P</span>
-            ${(recipe.prepTime || recipe.time) ? `<span>⏱️ ${escapeAttr(recipe.prepTime || recipe.time)}</span>` : ''}
+            ${(recipe.prepTime || recipe.time) ? `<span>⏱️ ${escapeHtml(recipe.prepTime || recipe.time)}</span>` : ''}
           </div>
         </div>
         <button class="btn sm" type="button" data-action="view-recipe" data-recipe-id="${escapeAttr(recipe.id)}" data-instance-id="${escapeAttr(slotInfo.instanceId || '')}" data-variant="${escapeAttr(slotInfo.variant || 'original')}" style="white-space:nowrap;font-weight:600;">View Recipe</button>
       </div>
-      <div style="display:flex;gap:8px;border-top:1px dashed var(--border,#e7e5e4);padding-top:10px;margin-top:2px;">${tickButtons}
+      <div style="display:flex;gap:8px;border-top:1px dashed var(--border,#e7e5e4);padding-top:10px;margin-top:2px;">${mainTick}${personTicks}
       </div>
     </div>
   `;
