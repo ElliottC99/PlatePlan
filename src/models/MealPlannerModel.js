@@ -67,7 +67,7 @@ export function sanitizeEatenMeals(eatenMeals) {
 }
 
 /**
- * Sanitises the Step 3 shopping list's at-home ticks, keyed by aggregated item key.
+ * Sanitises the Step 3 shopping list's at-home ticks, keyed by each line's ingredient (atHomeKey).
  * Only ticked entries are kept.
  */
 export function sanitizeShoppingAtHome(shoppingAtHome) {

@@ -209,6 +209,8 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
 
       const resolvedId = overriddenProductId || matchedProd?.id || canonicalIngId || rawName;
       const key = String(resolvedId).toLowerCase().replace(/\s+/g, '_');
+      // At-home ticks are keyed by ingredient, not product, so swapping a line's product keeps its tick.
+      const atHomeKey = String(canonicalIngId || matchedIng?.id || ingId || rawName).toLowerCase().replace(/\s+/g, '_');
       const rawQty = Number(ing.qty ?? ing.quantity ?? ing.amount ?? 1);
       const rawUnit = String(ing.unit || '').trim();
 
@@ -231,8 +233,9 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
         inStockQty: 0,
         unit: canonicalUnit,
         recipeBreakdown: [],
-        isAtHome: !!atHomeMap[key],
-        checked: !!atHomeMap[key]
+        atHomeKey,
+        isAtHome: !!atHomeMap[atHomeKey],
+        checked: !!atHomeMap[atHomeKey]
       };
 
       if (!existing.unit && canonicalUnit) existing.unit = canonicalUnit;

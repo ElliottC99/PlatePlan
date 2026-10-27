@@ -7,6 +7,7 @@
  * 4. Planner Step 3 at-home shopping ticks are kept the same way.
  * 5. Today shows one card for a shared meal and one per person for a split meal.
  * 6. Product swaps survive the whole-document plan save a tick triggers.
+ * 7. At-home ticks are keyed by ingredient, so a product swap keeps them.
  */
 
 import assert from 'node:assert';
@@ -127,5 +128,27 @@ assert.deepStrictEqual(swapPayload.substitutions, {
 assert.deepStrictEqual(swapPayload.productSelections, { ing1: 'prod-9' }, 'Product selections survive, malformed ones dropped');
 assert.deepStrictEqual(stripPlanPayload({ slots: {} }).substitutions, {}, 'A plan without swaps saves an empty map');
 console.log('✅ Product swaps survive the plan save a tick triggers');
+
+// 7. An at-home tick is keyed by ingredient, so swapping the line's product keeps it
+const { aggregateShoppingListFromPlan } = await import('../src/services/ShoppingCalculationService.js');
+const shopState = {
+  recipes: [{ id: 'r-oil', name: 'Stir Fry', ingredients: [{ name: 'Oil', ingredientId: 'ing_oil', qty: 10, unit: 'ml' }] }],
+  ingredients: [{ id: 'ing_oil', name: 'Oil', defaultProductId: 'p-oil-a', category: 'Cupboard' }],
+  products: [
+    { id: 'p-oil-a', name: 'Oil A', ingredientId: 'ing_oil', price: 1 },
+    { id: 'p-oil-b', name: 'Oil B', ingredientId: 'ing_oil', price: 2 }
+  ]
+};
+const shopPlan = { slots: { 1: { dinnerE: { recipeId: 'r-oil' } } }, dayDates: { 1: day } };
+const oilLine = plan => (aggregateShoppingListFromPlan(plan, shopState).items || []).find(i => /oil/i.test(i.name));
+const atHomeKey = oilLine(shopPlan).atHomeKey;
+assert.ok(atHomeKey, 'Each shopping line has an at-home key');
+const tickedPlan = { ...shopPlan, shoppingAtHome: { [atHomeKey]: true } };
+assert.ok(oilLine(tickedPlan).isAtHome, 'The tick shows on the line');
+const swappedPlan = { ...tickedPlan, substitutions: { ing_oil: { productId: 'p-oil-b' } } };
+assert.strictEqual(oilLine(swappedPlan).name, 'Oil B', 'The swap changes the line\'s product');
+assert.ok(oilLine(swappedPlan).isAtHome, 'The tick survives swapping the product');
+assert.strictEqual(oilLine(swappedPlan).atHomeKey, atHomeKey, 'The at-home key does not change with the product');
+console.log('✅ At-home ticks survive a product swap');
 
 console.log('\n=== TODAY VIEW SUITE PASSED ===');

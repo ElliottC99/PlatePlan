@@ -14,28 +14,28 @@ export { renderScrollableSwapModal, executeSwapInState, resolveTargetItem, calcu
 
 /**
  * Toggles an item's at-home tick on the planner's Step 3 shopping list.
- * The ticks live in currentPlan.shoppingAtHome, keyed by the aggregated item key,
- * which is what aggregateShoppingListFromPlan reads back.
+ * The ticks live in currentPlan.shoppingAtHome, keyed by each line's atHomeKey (its
+ * ingredient), which is what aggregateShoppingListFromPlan reads back.
  */
-export function toggleShoppingItemAcquired(itemKey) {
+export function toggleShoppingItemAcquired(atHomeKey) {
   // saveCurrentPlan replaces the whole plans/current document, so never save without a plan.
   const plan = getState().currentPlan;
-  if (!plan || !plan.slots || !itemKey) {
+  if (!plan || !plan.slots || !atHomeKey) {
     console.warn('[ShoppingView] No current plan or item key; not saving at-home tick.');
     return;
   }
 
   const shoppingAtHome = { ...(plan.shoppingAtHome || {}) };
-  const nextAtHome = !shoppingAtHome[itemKey];
-  if (nextAtHome) shoppingAtHome[itemKey] = true;
-  else delete shoppingAtHome[itemKey];
+  const nextAtHome = !shoppingAtHome[atHomeKey];
+  if (nextAtHome) shoppingAtHome[atHomeKey] = true;
+  else delete shoppingAtHome[atHomeKey];
   plan.shoppingAtHome = shoppingAtHome;
 
   saveCurrentPlan(plan).catch(err => {
     console.warn('[ShoppingView] Failed saving at-home ticks to cloud:', err);
   });
 
-  const item = (aggregateShoppingListFromPlan(plan).items || []).find(i => i.key === itemKey);
+  const item = (aggregateShoppingListFromPlan(plan).items || []).find(i => i.atHomeKey === atHomeKey);
   const name = item?.name || 'Item';
 
   if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
