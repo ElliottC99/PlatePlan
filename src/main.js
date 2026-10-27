@@ -27,7 +27,7 @@ import { AppState } from './state/AppState.js';
 import { renderToday } from './views/TodayView.js';
 import { renderIngredientBank, renderProductBank } from './views/PantryBankView.js';
 import { renderSettingsView } from './views/SettingsView.js';
-import { renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired, getShoppingLineStateKey } from './views/ShoppingView.js';
+import { renderScrollableSwapModal, toggleShoppingItemAcquired, getShoppingLineStateKey } from './views/ShoppingView.js';
 import { renderPlanner } from './views/PlannerView.js';
 import { renderRecipeVault } from './views/RecipeVaultView.js';
 import { renderDataQualityView } from './views/DataQualityView.js';
@@ -143,14 +143,13 @@ if (typeof window !== 'undefined') {
     showPlatePlanToast: window.showPlatePlanToast || AppInitializer.showPlatePlanToast,
 
     renderToday, renderPlanner, renderVault: renderRecipeVault, renderRecipeVault, renderVaultGrid: renderRecipeVault,
-    renderSettings: renderSettingsView, renderSettingsView, renderShopping: renderShoppingListUI, renderShoppingList: renderShoppingListUI,
-    renderShoppingListUI, renderIngredientBank, renderProductBank, renderBank: renderProductBank,
+    renderSettings: renderSettingsView, renderSettingsView,
+    renderIngredientBank, renderProductBank, renderBank: renderProductBank,
     renderPlatePlanView(viewId) {
       switch (viewId) {
         case 'today': return renderToday();
         case 'vault': case 'recipes': return renderRecipeVault();
         case 'planner': case 'plan': return renderPlanner();
-        case 'shopping': return renderShoppingListUI();
         case 'settings': case 'prefs': return renderSettingsView();
         case 'ingredients': return renderIngredientBank();
         case 'bank': return renderProductBank();
@@ -223,7 +222,7 @@ export function toggleInlineShoppingSubst(itemKey, groupId = '', instanceId = nu
   renderScrollableSwapModal(itemKey, groupId, null, { instanceId });
 }
 
-export { renderToday, renderSettingsView, renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired, renderPlanner, renderRecipeVault, setupActionBridge, getShoppingLineStateKey, calculateMealFitScore, renderFitScoreBadge, PortionCalculationService };
+export { renderToday, renderSettingsView, renderScrollableSwapModal, toggleShoppingItemAcquired, renderPlanner, renderRecipeVault, setupActionBridge, getShoppingLineStateKey, calculateMealFitScore, renderFitScoreBadge, PortionCalculationService };
 
 let lastErrorMessage = '';
 let lastErrorTime = 0;
@@ -277,15 +276,14 @@ function setupSubscriptions() {
   });
   subscribe('ingredients', (ings) => {
     if (typeof window !== 'undefined' && getState()) getState().ingredients = Array.isArray(ings) ? ings : [];
-    renderShoppingListUI(); renderIngredientBank(); renderDataQualityView();
+    renderIngredientBank(); renderDataQualityView();
   });
   subscribe('products', (prods) => {
     if (typeof window !== 'undefined' && getState()) getState().products = Array.isArray(prods) ? prods : [];
     renderProductBank(); renderDataQualityView();
   });
-  subscribe('shopping', () => renderShoppingListUI());
   subscribe('preferences', () => { renderSettingsView(); renderToday(); });
-  subscribe('plan', () => { renderToday(); renderPlanner(); renderShoppingListUI(); });
+  subscribe('plan', () => { renderToday(); renderPlanner(); });
 }
 
 export const APP_VERSION = 'v3.45.7';
@@ -303,7 +301,7 @@ async function initApp() {
 
   const initialRender = () => {
     try {
-      renderToday(); renderRecipeVault(); renderPlanner(); renderShoppingListUI();
+      renderToday(); renderRecipeVault(); renderPlanner();
       renderIngredientBank(); renderProductBank(); renderDataQualityView();
     } catch (renderErr) {
       console.warn('[initApp] initialRender warning:', renderErr);

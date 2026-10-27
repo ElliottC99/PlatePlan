@@ -6,7 +6,6 @@
 import * as TodayView from '../views/TodayView.js';
 import * as PlannerView from '../views/PlannerView.js';
 import * as RecipeVaultView from '../views/RecipeVaultView.js';
-import * as ShoppingView from '../views/ShoppingView.js';
 import * as SettingsView from '../views/SettingsView.js';
 import * as PantryBankView from '../views/PantryBankView.js';
 import * as ProductBankView from '../views/ProductBankView.js';
@@ -18,7 +17,6 @@ const viewModuleMap = {
   today: TodayView,
   planner: PlannerView,
   vault: RecipeVaultView,
-  shopping: ShoppingView,
   settings: SettingsView,
   prefs: SettingsView,
   ingredients: PantryBankView,

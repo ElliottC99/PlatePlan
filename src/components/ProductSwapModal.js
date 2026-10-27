@@ -121,7 +121,6 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
   document.dispatchEvent(new CustomEvent('plateplan:state:plan', { detail: updatedPlan }));
   document.dispatchEvent(new CustomEvent('plateplan:state:shopping', { detail: updatedItems }));
   if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
-  if (typeof window.renderShoppingListUI === 'function') window.renderShoppingListUI();
 }
 
 export function renderScrollableSwapModal(param1, param2, param3, optionalContext = {}) {

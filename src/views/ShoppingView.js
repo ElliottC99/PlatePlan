@@ -1,19 +1,16 @@
 /**
  * src/views/ShoppingView.js (v3.20.14)
- * Componentised Shopping List View with reactive store subscription.
- * Real-time state synchronisation with Household Meal Plan and Reactive Store.
- * Categorised groceries with clean 'Items I Already Have' separation.
+ * Shopping actions for the planner's Step 3 shopping list (at-home ticks and product
+ * swaps). The standalone Shopping screen was removed; Step 3 is the shopping list.
  */
 import { getState } from '../store/coreState.js';
 
 import { renderScrollableSwapModal, executeSwapInState, resolveTargetItem, calculateMetrics } from '../components/ProductSwapModal.js';
 import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
 import { calculateShoppingItemCost, normalizeProductPackGrams, getFallbackProductData, formatShoppingItemQuantity, aggregateShoppingListFromPlan } from '../services/ShoppingCalculationService.js';
-import { renderShoppingSummary, renderShoppingListUI } from '../components/shopping/ShoppingListUI.js';
-import { subscribe } from '../store/store.js';
 import { saveCurrentPlan } from '../services/HouseholdRepository.js';
 
-export { renderScrollableSwapModal, executeSwapInState, resolveTargetItem, calculateMetrics, getShoppingLineStateKey, calculateShoppingItemCost, formatShoppingItemQuantity, aggregateShoppingListFromPlan, renderShoppingSummary, renderShoppingListUI };
+export { renderScrollableSwapModal, executeSwapInState, resolveTargetItem, calculateMetrics, getShoppingLineStateKey, calculateShoppingItemCost, formatShoppingItemQuantity, aggregateShoppingListFromPlan };
 
 /**
  * Toggles an item's at-home tick on the planner's Step 3 shopping list.
@@ -54,36 +51,7 @@ export function toggleInlineShoppingSubst(itemKey, groupId = '', instanceId = nu
 }
 
 if (typeof window !== 'undefined') {
-  window.renderShopping = renderShoppingListUI;
-  window.renderShoppingList = renderShoppingListUI;
   window.toggleInlineShoppingSubst = toggleInlineShoppingSubst;
   window.toggleShoppingItemAcquired = toggleShoppingItemAcquired;
   window.toggleShoppingAtHome = toggleShoppingItemAcquired;
-}
-
-let shoppingUnsub = null;
-let shoppingTimer = null;
-
-export function mount(container) {
-  if (typeof renderShoppingListUI === 'function') {
-    renderShoppingListUI();
-  } else if (typeof renderShoppingSummary === 'function') {
-    renderShoppingSummary();
-  }
-  shoppingUnsub = subscribe('shopping', (list) => {
-    if (typeof renderShoppingListUI === 'function') {
-      renderShoppingListUI();
-    }
-  });
-}
-
-export function unmount() {
-  if (typeof shoppingUnsub === 'function') {
-    shoppingUnsub();
-    shoppingUnsub = null;
-  }
-  if (shoppingTimer) {
-    clearTimeout(shoppingTimer);
-    shoppingTimer = null;
-  }
 }

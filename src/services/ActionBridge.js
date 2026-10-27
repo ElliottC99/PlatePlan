@@ -5,7 +5,7 @@
  */
 
 import { renderSettingsView } from '../views/SettingsView.js';
-import { renderShoppingListUI, renderScrollableSwapModal, toggleShoppingItemAcquired, toggleInlineShoppingSubst } from '../views/ShoppingView.js';
+import { renderScrollableSwapModal, toggleShoppingItemAcquired, toggleInlineShoppingSubst } from '../views/ShoppingView.js';
 import { renderPlanner } from '../views/PlannerView.js';
 import { renderRecipeVault, handleVaultSortChange } from '../views/RecipeVaultView.js';
 import { openProductEditModal, saveManualIng, cancelManualIng, clearProductGroupFilter } from '../views/ProductBankView.js';
@@ -116,7 +116,6 @@ export function routeAction(actionName, target, event) {
       if (viewName === 'vault') setTimeout(renderRecipeVault, 30);
       else if (viewName === 'planner') setTimeout(renderPlanner, 30);
       else if (viewName === 'prefs' || viewName === 'settings') setTimeout(renderSettingsView, 30);
-      else if (viewName === 'shopping') setTimeout(renderShoppingListUI, 30);
       else if (viewName === 'data' || viewName === 'quality') setTimeout(renderDataQualityView, 30);
     }
     return true;

@@ -49,9 +49,6 @@ export function renderMobileNavUI(activeView = 'today') {
       <button data-view="planner" data-action="navigate-view" class="${activeView === 'planner' ? 'active' : ''}">
         <svg aria-hidden="true" viewbox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2"></path></svg>Plan
       </button>
-      <button data-view="shopping" data-action="navigate-view" class="${activeView === 'shopping' ? 'active' : ''}">
-        <svg aria-hidden="true" viewbox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0"></path></svg>Shopping
-      </button>
       <button data-view="more" onclick="openMobileMore()">
         <svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>More
       </button>

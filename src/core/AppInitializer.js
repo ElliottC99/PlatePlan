@@ -216,51 +216,6 @@ export function initVaultDelegation() {
   });
 }
 
-export function initShoppingDelegation() {
-  if (typeof document === 'undefined') return;
-  const shoppingView = document.getElementById('view-shopping') || document.body;
-  if (!shoppingView || shoppingView.dataset.shoppingDelegated) return;
-  shoppingView.dataset.shoppingDelegated = 'true';
-
-  shoppingView.addEventListener('click', (e) => {
-    const actionEl = e.target.closest('[data-action]');
-    if (!actionEl) return;
-    const action = actionEl.dataset.action;
-    const ds = actionEl.dataset;
-
-    if (action === 'clear-completed-shopping-items') {
-      if (typeof window.clearCompletedShoppingItems === 'function') {
-        window.clearCompletedShoppingItems();
-      }
-    } else if (action === 'toggle-inline-subst' && ds.itemKey) {
-      if (typeof window.toggleInlineShoppingSubst === 'function') {
-        window.toggleInlineShoppingSubst(ds.itemKey, ds.groupId || '', ds.instanceId || null);
-      }
-    } else if (action === 'select-shopping-product-override' && ds.groupId && ds.productId) {
-      if (typeof window.selectShoppingProductOverride === 'function') {
-        window.selectShoppingProductOverride(ds.groupId, ds.productId);
-      }
-    }
-  });
-
-  shoppingView.addEventListener('change', (e) => {
-    const actionEl = e.target.closest('[data-action]');
-    if (!actionEl) return;
-    const action = actionEl.dataset.action;
-    const ds = actionEl.dataset;
-
-    if (action === 'toggle-shopping-at-home' && ds.itemKey) {
-      if (typeof window.toggleShoppingAtHome === 'function') {
-        window.toggleShoppingAtHome(ds.itemKey);
-      }
-    } else if (action === 'switch-supermarket-store') {
-      if (typeof window.switchSupermarketStore === 'function') {
-        window.switchSupermarketStore(e.target.value);
-      }
-    }
-  });
-}
-
 export function initSettingsDelegation() {
   if (typeof document === 'undefined') return;
   const settingsView = document.getElementById('view-settings') || document.body;
@@ -328,7 +283,6 @@ export function initPlatePlanApp() {
   initNavigationDelegation();
   initPlannerGridDelegation();
   initVaultDelegation();
-  initShoppingDelegation();
   initSettingsDelegation();
   initModalDelegation();
 }

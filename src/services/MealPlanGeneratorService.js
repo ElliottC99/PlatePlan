@@ -257,9 +257,6 @@ export async function generatePlan() {
     if (typeof window.renderPlanner === 'function') {
       window.renderPlanner();
     }
-    if (typeof window.renderShoppingListUI === 'function') {
-      window.renderShoppingListUI();
-    }
     if (typeof window.showPlatePlanToast === 'function') {
       window.showPlatePlanToast('✨ Meal plan generated successfully!', 'success');
     }

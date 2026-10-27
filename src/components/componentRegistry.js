@@ -15,8 +15,6 @@ import * as RecipeImportParserForm from './recipe-editor/RecipeImportParserForm.
 import * as ShoppingBatchToolbar from './shopping/ShoppingBatchToolbar.js';
 import * as ShoppingCategoryGroup from './shopping/ShoppingCategoryGroup.js';
 import * as ShoppingItemRow from './shopping/ShoppingItemRow.js';
-import * as ShoppingAisleGroup from './shopping/ShoppingAisleGroup.js';
-import * as ShoppingListToolbar from './shopping/ShoppingListToolbar.js';
 import * as PlannerDayCard from './planner/PlannerDayCard.js';
 import * as PlannerMealSlot from './planner/PlannerMealSlot.js';
 import * as PlannerGridToolbar from './planner/PlannerGridToolbar.js';
@@ -42,7 +40,6 @@ import * as PantryItemRow from './pantry/PantryItemRow.js';
 import * as PantryCategoryGroup from './pantry/PantryCategoryGroup.js';
 import * as PantryToolbar from './pantry/PantryToolbar.js';
 import * as PantryInventoryUI from './pantry/PantryInventoryUI.js';
-import * as ShoppingListUI from './shopping/ShoppingListUI.js';
 import * as ShoppingSubstUI from './shopping/ShoppingSubstUI.js';
 import * as UseUpEditorUI from './pantry/UseUpEditorUI.js';
 import * as UseUpFinderModalUI from './pantry/UseUpFinderModalUI.js';
@@ -65,14 +62,14 @@ import * as NavigationUI from './shell/NavigationUI.js';
 export const registeredComponents = {
   DataQualityDrawer, DataQualityIssueRow, DataQualityFixModal, RecipeEditorModal,
   RecipeIngredientRow, RecipeStepRow, IngredientEditorRows, RecipeImportParserForm,
-  ShoppingBatchToolbar, ShoppingCategoryGroup, ShoppingItemRow, ShoppingAisleGroup,
-  ShoppingListToolbar, PlannerDayCard, PlannerMealSlot, PlannerGridToolbar,
+  ShoppingBatchToolbar, ShoppingCategoryGroup, ShoppingItemRow,
+  PlannerDayCard, PlannerMealSlot, PlannerGridToolbar,
   ProfileMacroEditor, ProfilePreferencesForm, ProfileSettingsModal, GeneratorWizardModal,
   GeneratorConstraintsForm, GeneratorCandidateDrawer, RecipeNutritionCard, RecipePortionScaler,
   RecipeCostBreakdown, MacroTrendChart, NutriScoreBadgeCard, WeeklySummaryToolbar,
   VaultFilterToolbar, VaultRecipeCard, VaultGridContainer, VaultGridUI,
   RecipeDetailModalUI, RecipeEditorModalUI, PantryItemRow, PantryCategoryGroup,
-  PantryToolbar, PantryInventoryUI, ShoppingListUI, ShoppingSubstUI, UseUpEditorUI,
+  PantryToolbar, PantryInventoryUI, ShoppingSubstUI, UseUpEditorUI,
   UseUpFinderModalUI, PlannerGridUI, PlannerModalsUI, PlannerWizardUI, PlannerSwapModalUI,
   PrepStepCard, PrepContainerPlanner, PrepSummaryToolbar, ProfileAllocationCard,
   DietaryExclusionManager, HouseholdSyncCard, SettingsMacroUI, SettingsExclusionsUI,
