@@ -11,39 +11,40 @@ import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
 import { calculateShoppingItemCost, normalizeProductPackGrams, getFallbackProductData, formatShoppingItemQuantity, aggregateShoppingListFromPlan } from '../services/ShoppingCalculationService.js';
 import { renderShoppingSummary, renderShoppingListUI } from '../components/shopping/ShoppingListUI.js';
 import { subscribe } from '../store/store.js';
+import { saveCurrentPlan } from '../services/HouseholdRepository.js';
 
 export { renderScrollableSwapModal, executeSwapInState, resolveTargetItem, calculateMetrics, getShoppingLineStateKey, calculateShoppingItemCost, formatShoppingItemQuantity, aggregateShoppingListFromPlan, renderShoppingSummary, renderShoppingListUI };
 
 /**
- * Toggles an item's acquired/at-home status.
+ * Toggles an item's at-home tick on the planner's Step 3 shopping list.
+ * The ticks live in currentPlan.shoppingAtHome, keyed by the aggregated item key,
+ * which is what aggregateShoppingListFromPlan reads back.
  */
-export function toggleShoppingItemAcquired(groupKey, itemKey, explicitName = '') {
-  const { item } = resolveTargetItem(groupKey, itemKey);
-  const targetKey = item?.key || itemKey;
-  const currentAtHome = !!(item?.isAtHome || (getState()?.plan?.shoppingAtHome && getState().currentPlan.shoppingAtHome[targetKey]));
-  const nextAtHome = !currentAtHome;
-
-  if (item) {
-    item.isAtHome = nextAtHome;
-    item.checked = nextAtHome;
+export function toggleShoppingItemAcquired(itemKey) {
+  // saveCurrentPlan replaces the whole plans/current document, so never save without a plan.
+  const plan = getState().currentPlan;
+  if (!plan || !plan.slots || !itemKey) {
+    console.warn('[ShoppingView] No current plan or item key; not saving at-home tick.');
+    return;
   }
 
-  if (getState()?.plan && typeof getState().currentPlan === 'object') {
-    getState().currentPlan.shoppingAtHome = getState().currentPlan.shoppingAtHome || {};
-    getState().currentPlan.shoppingAtHome[targetKey] = nextAtHome;
-  }
+  const shoppingAtHome = { ...(plan.shoppingAtHome || {}) };
+  const nextAtHome = !shoppingAtHome[itemKey];
+  if (nextAtHome) shoppingAtHome[itemKey] = true;
+  else delete shoppingAtHome[itemKey];
+  plan.shoppingAtHome = shoppingAtHome;
 
-  // Determine human-readable item name for toast
-  let cleanName = item?.name || explicitName;
-  if (!cleanName || cleanName.startsWith('group_') || cleanName.startsWith('bank_') || cleanName.startsWith('raw_')) {
-    cleanName = explicitName || item?.ingredient || item?.productName || item?.bankIng?.name || 'Item';
-  }
+  saveCurrentPlan(plan).catch(err => {
+    console.warn('[ShoppingView] Failed saving at-home ticks to cloud:', err);
+  });
 
-  document.dispatchEvent(new CustomEvent('plateplan:state:shopping', { detail: getState()?.confirmedShopping ?.shoppingList }));
-  renderShoppingListUI();
+  const item = (aggregateShoppingListFromPlan(plan).items || []).find(i => i.key === itemKey);
+  const name = item?.name || 'Item';
+
+  if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
 
   if (typeof window.showPlatePlanToast === 'function') {
-    window.showPlatePlanToast(nextAtHome ? `Checked off "${cleanName}"` : `Moved "${cleanName}" back to shopping list`);
+    window.showPlatePlanToast(nextAtHome ? `Checked off "${name}"` : `Moved "${name}" back to shopping list`);
   }
 }
 

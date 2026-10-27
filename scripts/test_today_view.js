@@ -4,6 +4,7 @@
  * 1. Ticks for Elliott, Chloe and both toggle on and off.
  * 2. stripPlanPayload keeps ticked meals, so saveCurrentPlan persists them.
  * 3. Unticked and malformed entries are dropped from the saved payload.
+ * 4. Planner Step 3 at-home shopping ticks are kept the same way.
  */
 
 import assert from 'node:assert';
@@ -65,5 +66,12 @@ assert.deepStrictEqual(sanitizeEatenMeals({
 }), { [`${day}:breakfast:c`]: true }, 'Only ticked, well-formed keys should be kept');
 assert.deepStrictEqual(stripPlanPayload({ slots: {} }).eatenMeals, {}, 'A plan without ticks saves an empty map');
 console.log('✅ Unticked and malformed entries are dropped');
+
+// 4. Step 3 shopping at-home ticks are saved the same way
+const { sanitizeShoppingAtHome } = await import('../src/models/MealPlannerModel.js');
+const shopPayload = stripPlanPayload({ slots: {}, shoppingAtHome: { ing123: true, ing456: false } });
+assert.deepStrictEqual(shopPayload.shoppingAtHome, { ing123: true }, 'Ticked at-home items should survive stripPlanPayload');
+assert.deepStrictEqual(sanitizeShoppingAtHome(null), {}, 'A missing at-home map saves as empty');
+console.log('✅ stripPlanPayload keeps at-home shopping ticks');
 
 console.log('\n=== TODAY VIEW SUITE PASSED ===');

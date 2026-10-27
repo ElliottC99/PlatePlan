@@ -73,7 +73,7 @@ export function clearCheckedShoppingItems(state) {
 }
 
 export function exportShoppingListToClipboard() {
-  const plan = getState()?.plan;
+  const plan = getState()?.currentPlan;
   const { items = [] } = window.computeWizardShoppingAgg ? window.computeWizardShoppingAgg(plan) : { items: [] };
   const text = exportShoppingListToText(items);
   if (navigator.clipboard && navigator.clipboard.writeText) {

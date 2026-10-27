@@ -67,6 +67,19 @@ export function sanitizeEatenMeals(eatenMeals) {
 }
 
 /**
+ * Sanitises the Step 3 shopping list's at-home ticks, keyed by aggregated item key.
+ * Only ticked entries are kept.
+ */
+export function sanitizeShoppingAtHome(shoppingAtHome) {
+  const clean = {};
+  if (!shoppingAtHome || typeof shoppingAtHome !== 'object') return clean;
+  Object.keys(shoppingAtHome).forEach(key => {
+    if (key && shoppingAtHome[key] === true) clean[key] = true;
+  });
+  return clean;
+}
+
+/**
  * Returns a clean, empty meal plan schema with no recipe attachments.
  */
 export function createCleanEmptyPlanSchema(daysOverride = null) {
@@ -165,7 +178,8 @@ export function stripPlanPayload(rawInput) {
     slots: cleanSlots,
     skeletonGrid: cleanSkeleton,
     mealPrepGroups: cleanPrepGroups,
-    eatenMeals: sanitizeEatenMeals(planData.eatenMeals)
+    eatenMeals: sanitizeEatenMeals(planData.eatenMeals),
+    shoppingAtHome: sanitizeShoppingAtHome(planData.shoppingAtHome)
   };
 
   FORBIDDEN_PLAN_KEYS.forEach(k => delete sanitizedPlan[k]);

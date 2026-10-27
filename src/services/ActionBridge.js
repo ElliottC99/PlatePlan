@@ -97,10 +97,9 @@ export function routeAction(actionName, target, event) {
 
   // 5. Shopping Item Acquired Checkbox
   if (normalizedAction === 'toggle-shopping-item' || normalizedAction === 'toggle-shopping-at-home' || normalizedAction === 'toggleshoppingathome' || normalizedAction.includes('toggleshoppingathome')) {
-    const containerEl = target.closest('[data-item-key], [data-group-key], [data-group-id], .pp-shop-item, .shopping-list-row, .item-row') || target;
-    const groupKey = ds.groupKey || ds.groupId || containerEl.dataset?.groupKey || containerEl.dataset?.groupId || '';
+    const containerEl = target.closest('[data-item-key], .pp-shop-item, .shopping-list-row, .item-row') || target;
     const itemKey = ds.itemKey || containerEl.dataset?.itemKey || '';
-    toggleShoppingItemAcquired(groupKey, itemKey);
+    toggleShoppingItemAcquired(itemKey);
     return true;
   }
 
