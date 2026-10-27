@@ -145,13 +145,41 @@ export function subscribeCurrentPlan(callback, errorCallback) {
   } catch (e) { return () => {}; }
 }
 
+export async function saveRecipe(recipe, _uid) {
+  try {
+    if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
+    if (!recipe || typeof recipe !== 'object') return { success: false, error: 'Invalid recipe data' };
+    const cleanedRecipe = cleanLegacyMacros(recipe);
+    const recipeData = { ...cleanedRecipe, schemaVersion: 2, updatedAt: new Date().toISOString() };
+    const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes');
+    const recipeId = recipe.id || colRef.doc().id;
+    delete recipeData.id;
+    await colRef.doc(String(recipeId)).set(recipeData, { merge: true });
+    return { success: true, id: recipeId };
+  } catch (err) {
+    console.error('[RecipeFirestoreRepository] Save Error:', err);
+    return { success: false, error: err };
+  }
+}
+
+export async function deleteRecipe(recipeId, _uid) {
+  try {
+    if (!isDbAvailable() || !recipeId) return { success: false, error: 'Unavailable or missing ID' };
+    await db.collection('households').doc(HOUSEHOLD_ID).collection('recipes').doc(String(recipeId)).delete();
+    return { success: true };
+  } catch (err) {
+    console.error('[RecipeFirestoreRepository] Delete Error:', err);
+    return { success: false, error: err };
+  }
+}
+
 export async function recalibrateRecipeMacrosAndDismissAdvisoriesInDb(recipe, advisoryKeysToDismiss) {
   if (!isDbAvailable()) return false;
   try {
     const batch = db.batch();
     const recipeColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes');
     const recipeId = recipe.id;
-    const recipeData = { ...recipe, updatedAt: new Date().toISOString() };
+    const recipeData = { ...recipe, schemaVersion: 2, updatedAt: new Date().toISOString() };
     delete recipeData.id;
     const recipeDocRef = recipeColRef.doc(recipeId);
     batch.set(recipeDocRef, recipeData, { merge: true });
@@ -185,7 +213,7 @@ export async function batchRecalibrateRecipesInDb(recipeUpdates, advisoryKeysToD
 
     recipeUpdates.forEach(r => {
       const rId = r.id;
-      const rData = { ...r, updatedAt: new Date().toISOString() };
+      const rData = { ...r, schemaVersion: 2, updatedAt: new Date().toISOString() };
       delete rData.id;
       const rDocRef = recipeColRef.doc(rId);
       batch.set(rDocRef, rData, { merge: true });
@@ -225,7 +253,7 @@ export async function batchUpdateRecipesInDb(recipeUpdates) {
       const batch = db.batch();
       chunk.forEach(r => {
         const rId = r.id;
-        const rData = { ...r, updatedAt: new Date().toISOString() };
+        const rData = { ...r, schemaVersion: 2, updatedAt: new Date().toISOString() };
         delete rData.id;
         const rDocRef = recipeColRef.doc(rId);
         batch.set(rDocRef, rData, { merge: true });

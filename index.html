@@ -13,8 +13,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#F7F6F2">
 <meta name="description" content="PlatePlan — shared meal planning for Elliott and Chloe">
-<meta name="app-version" content="v3.45.7">
-<meta name="version" content="v3.45.7">
+<meta name="app-version" content="__APP_VERSION__">
+<meta name="version" content="__APP_VERSION__">
 <meta name="application-name" content="PlatePlan">
 <meta property="og:title" content="PlatePlan — Elliott &amp; Chloe">
 <meta property="og:description" content="PlatePlan — shared meal planning for Elliott and Chloe">
@@ -65,10 +65,10 @@ try{
   document.documentElement.style.colorScheme=platePlanAppearance==='system'?'light dark':platePlanAppearance;
 }catch(e){}
 </script>
-<link rel="stylesheet" href="styles/tokens.css?v=3.35.4">
-<link rel="stylesheet" href="styles/components.css?v=3.35.4">
-<link rel="stylesheet" href="styles/responsive.css?v=3.35.4">
-<link rel="stylesheet" href="styles/print.css?v=3.35.4" media="print">
+<link rel="stylesheet" href="styles/tokens.css?v=__APP_VERSION__">
+<link rel="stylesheet" href="styles/components.css?v=__APP_VERSION__">
+<link rel="stylesheet" href="styles/responsive.css?v=__APP_VERSION__">
+<link rel="stylesheet" href="styles/print.css?v=__APP_VERSION__" media="print">
 <style>
 :root {
   --radius-sm: 6px;
@@ -198,60 +198,60 @@ try{
 <header class="app-header">
   <div class="logo" style="display:flex;align-items:center;gap:6px">Plate<span>Plan</span><span id="app-header-version" class="version-badge" style="font-size:10px;font-weight:600;letter-spacing:0.04em;background:var(--surface2, #E8E6DF);color:var(--text2, #555);padding:2px 6px;border-radius:999px;line-height:1;margin-left:4px;border:1px solid var(--border,#ddd)"></span></div>
   <div class="app-header-actions">
-    <button class="btn ghost app-menu-button" type="button" data-pp-click="openMobileMore()" aria-label="Open PlatePlan menu"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="19" cy="12" r="1.3"></circle></svg><span>Menu</span></button>
-    <button type="button" id="sync-status" class="sync-pill" data-status="local" data-pp-click="openPlatePlanSyncPanel()" title="PlatePlan sync status">Local only</button>
-    <button id="syncNowTopBtn" class="btn ghost sync-now-btn" type="button" data-pp-click="window.syncNow()" title="Sync now with cloud" style="padding:4px 8px;font-size:12px">Sync Now</button>
-    <button id="logoutBtn" class="btn ghost" type="button" data-pp-click="window.logout()" title="Log out of PlatePlan" style="padding:4px 8px;font-size:12px">Log Out</button>
+    <button class="btn ghost app-menu-button" type="button" data-action="openMobileMore()" aria-label="Open PlatePlan menu"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="19" cy="12" r="1.3"></circle></svg><span>Menu</span></button>
+    <button type="button" id="sync-status" class="sync-pill" data-status="local" data-action="openPlatePlanSyncPanel()" title="PlatePlan sync status">Local only</button>
+    <button id="syncNowTopBtn" class="btn ghost sync-now-btn" type="button" data-action="window.syncNow()" title="Sync now with cloud" style="padding:4px 8px;font-size:12px">Sync Now</button>
+    <button id="logoutBtn" class="btn ghost" type="button" data-action="window.logout()" title="Log out of PlatePlan" style="padding:4px 8px;font-size:12px">Log Out</button>
     <span id="sync-user" class="sync-user-label" style="font-size:11px;color:var(--text3)"></span>
   </div>
 </header>
 
 <nav class="desktop-sidebar" aria-label="Main navigation">
   <div class="nav-group-label">PlatePlan</div>
-  <button type="button" class="ntab active" data-view="today" data-pp-click="showView('today')">Today</button>
-  <button type="button" class="ntab" data-view="vault" data-pp-click="showView('vault')">Recipes</button>
-  <button type="button" class="ntab" data-view="planner" data-pp-click="showView('planner')">Meal Planner</button>
-  <button type="button" class="ntab" data-view="search" data-pp-click="showView('search')">Search</button>
+  <button type="button" class="ntab active" data-view="today" data-action="showView('today')">Today</button>
+  <button type="button" class="ntab" data-view="vault" data-action="showView('vault')">Recipes</button>
+  <button type="button" class="ntab" data-view="planner" data-action="showView('planner')">Meal Planner</button>
+  <button type="button" class="ntab" data-view="search" data-action="showView('search')">Search</button>
   <details class="nav-group" data-sidebar-group="library" open>
     <summary>Library</summary>
-    <button type="button" class="ntab" data-view="planlib" data-pp-click="showView('planlib')">Meal Plan Library</button>
+    <button type="button" class="ntab" data-view="planlib" data-action="showView('planlib')">Meal Plan Library</button>
   </details>
   <details class="nav-group" data-sidebar-group="data" open>
     <summary>Data</summary>
-    <button type="button" class="ntab" data-view="ingredients" data-pp-click="showView('ingredients')">Pantry</button>
-    <button type="button" class="ntab" data-view="bank" data-pp-click="clearProductGroupFilter();showView('bank')" style="padding-left:22px;font-size:12px;color:var(--text2)">↳ Product Bank</button>
-    <button type="button" class="ntab" data-view="data" data-pp-click="showView('data')">Data Quality</button>
+    <button type="button" class="ntab" data-view="ingredients" data-action="showView('ingredients')">Pantry</button>
+    <button type="button" class="ntab" data-view="bank" data-action="clearProductGroupFilter();showView('bank')" style="padding-left:22px;font-size:12px;color:var(--text2)">↳ Product Bank</button>
+    <button type="button" class="ntab" data-view="data" data-action="showView('data')">Data Quality</button>
   </details>
   <details class="nav-group" data-sidebar-group="settings" open>
     <summary>Settings</summary>
-    <button type="button" class="ntab" data-view="prefs" data-pp-click="showView('prefs')">Preferences</button>
+    <button type="button" class="ntab" data-view="prefs" data-action="showView('prefs')">Preferences</button>
   </details>
 </nav>
 
 <div class="mobile-nav" id="mobile-nav" aria-label="Main navigation">
-  <button type="button" data-view="today" class="active" data-pp-click="showView('today')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5M6.5 10v9h11v-9M10 19v-5h4v5"></path></svg>Today</button>
-  <button type="button" data-view="vault" data-pp-click="showView('vault')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M5 4v7M8 4v7M5 8h3M6.5 11v9M16 4c-2 3-2 7 0 9h2V4M18 13v7"></path></svg>Recipes</button>
-  <button type="button" data-view="planner" data-pp-click="showView('planner')"><svg aria-hidden="true" viewbox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2"></path></svg>Plan</button>
-  <button type="button" data-view="data" data-pp-click="showView('data')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>Data Quality</button>
-  <button type="button" data-view="search" data-pp-click="showView('search')"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"></circle><path d="m15 15 4 4"></path></svg>Search</button>
+  <button type="button" data-view="today" class="active" data-action="showView('today')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5M6.5 10v9h11v-9M10 19v-5h4v5"></path></svg>Today</button>
+  <button type="button" data-view="vault" data-action="showView('vault')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M5 4v7M8 4v7M5 8h3M6.5 11v9M16 4c-2 3-2 7 0 9h2V4M18 13v7"></path></svg>Recipes</button>
+  <button type="button" data-view="planner" data-action="showView('planner')"><svg aria-hidden="true" viewbox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2"></path></svg>Plan</button>
+  <button type="button" data-view="data" data-action="showView('data')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>Data Quality</button>
+  <button type="button" data-view="search" data-action="showView('search')"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"></circle><path d="m15 15 4 4"></path></svg>Search</button>
 </div>
-<div class="mobile-more-wrap" id="mobile-more-wrap" data-pp-click="if(event.target===this)closeMobileMore()">
+<div class="mobile-more-wrap" id="mobile-more-wrap" data-action="if(event.target===this)closeMobileMore()">
   <div class="mobile-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-more-title">
     <div class="mobile-sheet-handle"></div>
-    <div class="plateplan-sheet-header"><div><h3 id="mobile-more-title">PlatePlan menu</h3><p>Library, data and settings</p></div><button type="button" class="btn sm ghost" data-pp-click="closeMobileMore()">Close</button></div>
+    <div class="plateplan-sheet-header"><div><h3 id="mobile-more-title">PlatePlan menu</h3><p>Library, data and settings</p></div><button type="button" class="btn sm ghost" data-action="closeMobileMore()">Close</button></div>
     <div class="plateplan-menu-groups">
       <section><h4>Quick Actions</h4>
-        <button type="button" data-pp-click="closeMobileMore();openCreateActionSheet()"><span style="display:flex;align-items:center;gap:6px">➕ Add Recipe / Item</span><span aria-hidden="true">›</span></button>
-        <button type="button" data-pp-click="closeMobileMore();window.syncNow()"><span style="display:flex;align-items:center;gap:6px">🔄 Sync Cloud Now</span><span aria-hidden="true">›</span></button>
-        <button type="button" data-pp-click="closeMobileMore();window.logout()" style="color:var(--red,#e53e3e)"><span style="display:flex;align-items:center;gap:6px">🚪 Log Out</span><span aria-hidden="true">›</span></button>
+        <button type="button" data-action="closeMobileMore();openCreateActionSheet()"><span style="display:flex;align-items:center;gap:6px">➕ Add Recipe / Item</span><span aria-hidden="true">›</span></button>
+        <button type="button" data-action="closeMobileMore();window.syncNow()"><span style="display:flex;align-items:center;gap:6px">🔄 Sync Cloud Now</span><span aria-hidden="true">›</span></button>
+        <button type="button" data-action="closeMobileMore();window.logout()" style="color:var(--red,#e53e3e)"><span style="display:flex;align-items:center;gap:6px">🚪 Log Out</span><span aria-hidden="true">›</span></button>
       </section>
-      <section><h4>Library</h4><button type="button" data-pp-click="mobileMoreView('planlib')"><span>Meal Plan Library</span><span aria-hidden="true">›</span></button></section>
-      <section><h4>Data</h4><button type="button" data-pp-click="mobileMoreView('ingredients')"><span>Pantry</span><span aria-hidden="true">›</span></button><button type="button" data-pp-click="clearProductGroupFilter();mobileMoreView('bank')"><span style="padding-left:12px;font-size:13px;color:var(--text2)">↳ Product Bank</span><span aria-hidden="true">›</span></button><button type="button" data-pp-click="mobileMoreView('data')"><span>Data Quality</span><span aria-hidden="true">›</span></button></section>
-      <section><h4>Settings</h4><button type="button" data-pp-click="mobileMoreView('prefs')"><span>Preferences, sync and recovery</span><span aria-hidden="true">›</span></button></section>
+      <section><h4>Library</h4><button type="button" data-action="mobileMoreView('planlib')"><span>Meal Plan Library</span><span aria-hidden="true">›</span></button></section>
+      <section><h4>Data</h4><button type="button" data-action="mobileMoreView('ingredients')"><span>Pantry</span><span aria-hidden="true">›</span></button><button type="button" data-action="clearProductGroupFilter();mobileMoreView('bank')"><span style="padding-left:12px;font-size:13px;color:var(--text2)">↳ Product Bank</span><span aria-hidden="true">›</span></button><button type="button" data-action="mobileMoreView('data')"><span>Data Quality</span><span aria-hidden="true">›</span></button></section>
+      <section><h4>Settings</h4><button type="button" data-action="mobileMoreView('prefs')"><span>Preferences, sync and recovery</span><span aria-hidden="true">›</span></button></section>
     </div>
   </div>
 </div>
-<div class="mobile-action-sheet-wrap" id="mobile-action-sheet-wrap" data-pp-click="if(event.target===this)closeMobileActionSheet()"><div class="mobile-sheet" id="mobile-action-sheet"></div></div>
+<div class="mobile-action-sheet-wrap" id="mobile-action-sheet-wrap" data-action="if(event.target===this)closeMobileActionSheet()"><div class="mobile-sheet" id="mobile-action-sheet"></div></div>
 
 <main>
 
@@ -262,10 +262,10 @@ try{
       <div class="view-subtitle" id="today-subtitle">Your planned meals</div>
     </div>
     <div class="today-date-nav" aria-label="Browse meal-plan dates">
-      <button class="btn ghost" type="button" data-pp-click="moveTodayDate(-1)" aria-label="Previous day">‹</button>
+      <button class="btn ghost" type="button" data-action="moveTodayDate(-1)" aria-label="Previous day">‹</button>
       <div class="today-date-label" id="today-date-label" aria-live="polite"></div>
-      <button class="btn ghost" type="button" data-pp-click="moveTodayDate(1)" aria-label="Next day">›</button>
-      <button class="btn ghost" type="button" data-pp-click="resetTodayDate()">Today</button>
+      <button class="btn ghost" type="button" data-action="moveTodayDate(1)" aria-label="Next day">›</button>
+      <button class="btn ghost" type="button" data-action="resetTodayDate()">Today</button>
     </div>
   </div>
   <div id="today-content"></div>
@@ -288,8 +288,8 @@ try{
   <div class="view-toolbar">
     <h1 class="view-title" style="margin:0">Recipe Vault</h1>
     <div class="vault-filters" style="display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 8px; width: 100%; overflow-x: auto;">
-      <button class="btn btn-primary primary" type="button" data-pp-click="openUseUpRecipeFinder()" style="flex: 0 0 auto; white-space: nowrap;">Use up ingredients</button>
-      <button type="button" id="vault-filter-fav" class="btn sm btn-ghost ghost fav-filter-btn" data-pp-click="toggleVaultFavouritesFilter()" aria-pressed="false" title="Filter favourites only" style="display:inline-flex;align-items:center;gap:6px;flex: 0 0 auto; white-space: nowrap;">
+      <button class="btn btn-primary primary" type="button" data-action="openUseUpRecipeFinder()" style="flex: 0 0 auto; white-space: nowrap;">Use up ingredients</button>
+      <button type="button" id="vault-filter-fav" class="btn sm btn-ghost ghost fav-filter-btn" data-action="toggleVaultFavouritesFilter()" aria-pressed="false" title="Filter favourites only" style="display:inline-flex;align-items:center;gap:6px;flex: 0 0 auto; white-space: nowrap;">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" class="heart-icon"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
         <span>Favourites Only</span>
       </button>
@@ -328,7 +328,7 @@ try{
           <div style="font-size:12px;color:var(--text2);margin-top:2px">Copy text from any website, book, Apple Live Text, or Google Lens, and paste it here.</div>
         </div>
         <div class="btn-row" style="margin:0">
-          <button type="button" class="btn primary sm" data-pp-click="openRecipeTextPaste()">Paste Recipe Text</button>
+          <button type="button" class="btn primary sm" data-action="openRecipeTextPaste()">Paste Recipe Text</button>
         </div>
       </div>
       <div id="recipe-photo-msg" style="margin-top:4px"></div>
@@ -401,10 +401,10 @@ try{
       Save will structure your inputs, map volumes, and calculate nutrition against your ingredient bank.
     </div>
     <div class="btn-row" style="gap:8px;flex-wrap:wrap">
-      <button type="button" class="btn primary" data-pp-click="submitRecipe()">Parse &amp; Verify</button>
-      <button id="batch-skip-add-btn" type="button" class="btn secondary" data-pp-click="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
-      <button id="batch-abort-add-btn" type="button" class="btn danger ghost" data-pp-click="abortBatchImport()" style="display:none">Abort Batch Import</button>
-      <button type="button" class="btn ghost" data-pp-click="clearForm()">Clear</button>
+      <button type="button" class="btn primary" data-action="submitRecipe()">Parse &amp; Verify</button>
+      <button id="batch-skip-add-btn" type="button" class="btn secondary" data-action="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
+      <button id="batch-abort-add-btn" type="button" class="btn danger ghost" data-action="abortBatchImport()" style="display:none">Abort Batch Import</button>
+      <button type="button" class="btn ghost" data-action="clearForm()">Clear</button>
     </div>
     <div id="form-msg"></div>
   </div>
@@ -418,7 +418,7 @@ try{
     </div>
     <div class="btn-row">
       <button type="button" class="btn sm btn-ghost ghost" data-action="manage-categories">Categories</button>
-      <button type="button" class="btn sm btn-ghost ghost" data-pp-click="clearProductGroupFilter();showView('bank')">Product Bank</button>
+      <button type="button" class="btn sm btn-ghost ghost" data-action="clearProductGroupFilter();showView('bank')">Product Bank</button>
       <button type="button" class="btn sm btn-primary primary" data-action="add-to-bank">Add to Bank</button>
     </div>
   </div>
@@ -443,8 +443,8 @@ try{
   <div class="view-toolbar">
     <h1 class="view-title" style="margin:0">Product Bank</h1>
     <div class="btn-row">
-      <button type="button" class="btn sm btn-primary primary" data-pp-click="showAddIng()">+ Add product</button>
-      <button type="button" class="btn sm btn-outline outline" data-pp-click="showTescoImport()" style="background:var(--purple-bg);color:var(--purple);border-color:var(--purple)">Import Tesco</button>
+      <button type="button" class="btn sm btn-primary primary" data-action="showAddIng()">+ Add product</button>
+      <button type="button" class="btn sm btn-outline outline" data-action="showTescoImport()" style="background:var(--purple-bg);color:var(--purple);border-color:var(--purple)">Import Tesco</button>
     </div>
   </div>
   <div id="bank-groups-panel"></div>
@@ -484,7 +484,7 @@ try{
 
   <div class="cat-filter" id="cat-filter">
     <div style="width:100%;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-top:2px">Category</div>
-    <div class="cf active" data-pp-click="setCat('all')">all</div><div class="cf" data-pp-click="setCat('baking-spices')">Baking</div><div class="cf" data-pp-click="setCat('beverages')">Beverages</div><div class="cf" data-pp-click="setCat('carbs-pasta-rice')">Carbs (Pasta/Rice/Potato)</div><div class="cf" data-pp-click="setCat('dairy-alternative')">Dairy &amp; Eggs</div><div class="cf" data-pp-click="setCat('fruit')">Fruit &amp; Vegetables</div><div class="cf" data-pp-click="setCat('grain')">Grains, Legumes &amp; Pulses</div><div class="cf" data-pp-click="setCat('herbs')">Herbs &amp; Spices</div><div class="cf" data-pp-click="setCat('meat-substitute')">Meat Substitutes</div><div class="cf" data-pp-click="setCat('nuts-seeds')">Nuts &amp; Seeds</div><div class="cf" data-pp-click="setCat('other')">Other</div><div class="cf" data-pp-click="setCat('sauces-condiments')">Sauces, Condiments &amp; Pastes</div><div class="cf" data-pp-click="setCat('store-cupboard')">Store Cupboard</div><div class="cf" data-pp-click="setCat('supplement')">Supplements</div><div class="cf" data-pp-click="setCat('tofu-tempeh')">Tofu, Tempeh &amp; Seitan</div>
+    <div class="cf active" data-action="setCat('all')">all</div><div class="cf" data-action="setCat('baking-spices')">Baking</div><div class="cf" data-action="setCat('beverages')">Beverages</div><div class="cf" data-action="setCat('carbs-pasta-rice')">Carbs (Pasta/Rice/Potato)</div><div class="cf" data-action="setCat('dairy-alternative')">Dairy &amp; Eggs</div><div class="cf" data-action="setCat('fruit')">Fruit &amp; Vegetables</div><div class="cf" data-action="setCat('grain')">Grains, Legumes &amp; Pulses</div><div class="cf" data-action="setCat('herbs')">Herbs &amp; Spices</div><div class="cf" data-action="setCat('meat-substitute')">Meat Substitutes</div><div class="cf" data-action="setCat('nuts-seeds')">Nuts &amp; Seeds</div><div class="cf" data-action="setCat('other')">Other</div><div class="cf" data-action="setCat('sauces-condiments')">Sauces, Condiments &amp; Pastes</div><div class="cf" data-action="setCat('store-cupboard')">Store Cupboard</div><div class="cf" data-action="setCat('supplement')">Supplements</div><div class="cf" data-action="setCat('tofu-tempeh')">Tofu, Tempeh &amp; Seitan</div>
     <div style="width:100%;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-top:6px">Ingredient</div>
     <div style="width:100%;display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
       <input type="search" id="bank-family-search" aria-label="Search ingredient bank family" list="bank-family-options" placeholder="Search ingredient..." data-pp-input="handleProductBankFamilySearch(this.value)" data-pp-change="selectProductBankFamilyFromSearch(this.value)" style="font-size:12px;padding:5px 10px;max-width:260px;flex:1;min-width:180px" name="bank-family-search">
@@ -532,7 +532,7 @@ try{
       <h1 class="view-title" style="margin:0">Meal Plan Library</h1>
       <p style="font-size:12px;color:var(--text2);margin:5px 0 0">Saved meal plans live here so the planner itself can stay focused on generating and adjusting the current plan.</p>
     </div>
-    <button type="button" class="btn sm btn-primary primary" data-pp-click="openSaveMealPlanModal()">Save current plan</button>
+    <button type="button" class="btn sm btn-primary primary" data-action="openSaveMealPlanModal()">Save current plan</button>
   </div>
   <div id="plan-history-panel"></div>
 </div>
@@ -547,7 +547,7 @@ try{
             <option value="category">Group by Category</option>
             <option value="storage">Group by Storage</option>
         </select>
-        <button type="button" class="btn sm btn-secondary secondary" data-pp-click="copyList()">Copy list</button>
+        <button type="button" class="btn sm btn-secondary secondary" data-action="copyList()">Copy list</button>
     </div>
   </div>
   <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Generated from your current meal plan. Allocations trace back to specific meal instances. Use "Product" to choose the product for one specific recipe occurrence.</p>
@@ -558,9 +558,9 @@ try{
     <div class="view-toolbar">
       <h1 class="view-title" style="margin:0">Data Quality Centre</h1>
       <div style="display:flex;gap:8px">
-        <button type="button" class="btn sm primary" data-pp-click="openRecipeAuditModal()" style="font-weight:600;background:var(--primary,#4f46e5);color:#fff;">📖 Recipe Mapping Audit</button>
-        <button type="button" class="btn sm btn-ghost ghost" data-pp-click="runGlobalProductRelink()">Batch Relink Products</button>
-        <button type="button" class="btn sm btn-ghost ghost" data-pp-click="renderDataQuality()">Refresh Scans</button>
+        <button type="button" class="btn sm primary" data-action="openRecipeAuditModal()" style="font-weight:600;background:var(--primary,#4f46e5);color:#fff;">📖 Recipe Mapping Audit</button>
+        <button type="button" class="btn sm btn-ghost ghost" data-action="runGlobalProductRelink()">Batch Relink Products</button>
+        <button type="button" class="btn sm btn-ghost ghost" data-action="renderDataQuality()">Refresh Scans</button>
       </div>
     </div>
     
@@ -601,7 +601,7 @@ try{
   <div class="modal" style="max-width: 980px;">
     <div class="row-between" style="margin-bottom:14px;align-items:center">
       <h2 id="tesco-import-title" style="margin:0">Import Tesco product</h2>
-      <button type="button" class="btn sm ghost" data-pp-click="closeTescoModal()">Cancel</button>
+      <button type="button" class="btn sm ghost" data-action="closeTescoModal()">Cancel</button>
     </div>
     
     <div id="tesco-search-hint" style="display: none; background: var(--surface2); padding: 10px; border-radius: 8px; margin-bottom: 14px; font-size: 13px;">
@@ -612,7 +612,7 @@ try{
     <div id="tesco-bookmarklet-panel" style="background: var(--purple-bg); border-radius: 8px; padding: 12px; margin-bottom: 14px;">
      <h4 style="color:var(--purple); margin-bottom:6px; font-size:13px;">Option A: Fast Import (Recommended)</h4>
      <p style="font-size:12px; color:var(--text2); margin-bottom:8px;">Drag this updated button to your bookmarks bar. Click it on any Tesco product page to securely copy the data, then paste the result below.</p>
-     <a href="javascript:(function(){var%20d=document,n='',b='',p=0,ps=null,pu='g',iw=null,ic=null;var%20diag={nutritionSource:'Fallback',nutritionBasis:'unknown',sourceValues:{cal:null,prot:null,carb:null,fat:null,fibre:null},parsedValues:{cal:0,prot:0,carb:0,fat:0,fibre:0},storageText:'',breadcrumbs:'',packSource:'none',packCandidates:[]};try{var%20scripts=d.querySelectorAll('script[type="application/ld+json"]');for(var%20s%20of%20scripts){var%20j=JSON.parse(s.textContent);var%20items=Array.isArray(j)?j:(j['@graph']||[j]);for(var%20x%20of%20items){var%20t=x['@type'];if(!t)continue;var%20types=Array.isArray(t)?t:[t];if(types.indexOf('Product')%3E=0){if(x.name)n=x.name;if(x.brand)b=(x.brand.name||x.brand)+'';if(x.offers){var%20off=Array.isArray(x.offers)?x.offers[0]:x.offers;if(off%26%26off.price)p=off.price;}if(x.weight%26%26x.weight.value){var%20u=(x.weight.unitCode||x.weight.unitText||'g')+'';ps=parseFloat(x.weight.value);pu=u.toLowerCase().replace('grm','g').replace('kgm','kg').replace('mlt','ml').replace('ltr','l');diag.packSource='jsonld.weight';}if(x.size%26%26typeof%20x.size==='string')diag.packCandidates.push('size:'+x.size);if(x.additionalProperty){var%20aps=Array.isArray(x.additionalProperty)?x.additionalProperty:[x.additionalProperty];for(var%20ap%20of%20aps){if(!ap||!ap.name)continue;var%20nm=(ap.name+'').toLowerCase();if(nm.indexOf('net%20contents')%3E=0||nm.indexOf('pack%20size')%3E=0||nm.indexOf('weight')%3E=0||nm.indexOf('quantity')%3E=0)diag.packCandidates.push(ap.name+':%20'+ap.value);}}}if(types.indexOf('BreadcrumbList')%3E=0%26%26x.itemListElement)diag.breadcrumbs=x.itemListElement.map(function(e){return(e.item%26%26e.item.name)||e.name||'';}).filter(Boolean).join('%20%3E%20');}}}catch(e){}if(!n)n=((d.querySelector('h1')||{}).textContent||'');n=n.trim();if(!p){var%20pEl=d.querySelector('[data-auto="price-value"],[data-auto="price"],.price-per-sellable-unit%20.value,.priceText');if(pEl)p=pEl.textContent.replace(/[^\d.]/g,'');}if(!diag.breadcrumbs)diag.breadcrumbs=Array.from(d.querySelectorAll('.breadcrumbs__link,.breadcrumb-item,[class*="breadcrumb"]%20a')).map(function(el){return%20el.textContent.trim();}).filter(Boolean).join('%20%3E%20');function%20parsePack(str){if(!str)return%20null;str=str.replace(/\s+/g,'%20').trim();if(/per\s+serving|per\s+portion|each\s+serving|serving\s+size|per\s+\d+\s*g\s|typical\s+values\s+per/i.test(str))return%20null;var%20m=str.match(/(\d+)\s*[x%C3%97]\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l)\b/i);if(m){var%20c=parseInt(m[1],10),e=parseFloat(m[2]),u=m[3].toLowerCase();return{count:c,each:e,total:c*e,unit:u};}m=str.match(/(\d+)\s*pack\b/i)||str.match(/pack\s+of\s+(\d+)/i);if(m)return{count:parseInt(m[1],10),each:null,total:parseInt(m[1],10),unit:'qty'};m=str.match(/(\d+(?:\.\d+)?)\s*(g|kg|ml|l)\b/i);if(m)return{count:1,each:parseFloat(m[1]),total:parseFloat(m[1]),unit:m[2].toLowerCase()};return%20null;}function%20pick(r,src){if(!r)return%20false;ps=r.total;iw=r.each!=null?r.each:r.total;pu=r.unit;ic=r.count;diag.packSource=src;return%20true;}var%20labels=['net%20contents','pack%20size','quantity','product%20weight','net%20weight','weight','size','volume'];var%20picked=ps!=null;if(!picked){var%20els=d.querySelectorAll('dt,dd,th,td,li,div,span,p,strong,h2,h3,h4');for(var%20i=0;i%3Cels.length%26%26!picked;i++){var%20el=els[i];var%20tx=(el.textContent||'').trim().toLowerCase().replace(/[:\s]+$/,'');if(!tx||tx.length%3E30)continue;if(labels.indexOf(tx)%3C0)continue;var%20sib=el.nextElementSibling;var%20cand=sib?sib.textContent.trim():'';if(!cand){var%20par=el.parentElement;if(par)cand=par.textContent.replace(el.textContent,'').trim();}diag.packCandidates.push('label['+tx+']:'+cand.slice(0,60));if(pick(parsePack(cand),'label:'+tx))picked=true;}}if(!picked){var%20prod=d.querySelector('[id*="product-details"],[class*="product-info"],[class*="ProductInfo"],main')||d.body;var%20ptxt=(prod.innerText||prod.textContent||'');var%20re=/(net%20contents|pack%20size|net%20weight|product%20weight|quantity|volume)[\s:]+([^\n]{1,40})/ig,mm;while((mm=re.exec(ptxt))%26%26!picked){diag.packCandidates.push('inline['+mm[1]+']:'+mm[2].slice(0,60));if(pick(parsePack(mm[2]),'inline:'+mm[1].toLowerCase()))picked=true;}}if(!picked){var%20pm=n.match(/\(([^)]+)\)\s*$/);if(pm%26%26pick(parsePack(pm[1]),'name-paren'))picked=true;}if(!picked%26%26pick(parsePack(n),'name-trailing'))picked=true;if(pu==='kg'){ps*=1000;if(iw)iw*=1000;pu='g';}else%20if(pu==='l'){ps*=1000;if(iw)iw*=1000;pu='ml';}var%20bodyTxt=(d.body.innerText||d.body.textContent||'').toLowerCase();var%20stm=bodyTxt.match(/(keep%20refrigerated|keep%20frozen|store%20in%20a%20cool|keep%20in%20the%20fridge|freeze|frozen)/i);if(stm)diag.storageText=stm[1];var%20rows=[],tt=null;var%20tables=Array.from(d.querySelectorAll('table'));tt=tables.find(function(t){var%20x=t.textContent.toLowerCase();return%20x.indexOf('protein')%3E=0%26%26(x.indexOf('energy')%3E=0||x.indexOf('kcal')%3E=0);});if(tt){rows=Array.from(tt.querySelectorAll('tr'));diag.nutritionSource='Nutrition%20Table';}else{var%20dv=Array.from(d.querySelectorAll('.nutrition-row,[data-auto="nutrition-row"],.nutrition-event-nutrient'));if(dv.length){rows=dv;diag.nutritionSource='Div-based';}}if(rows.length){var%20bi=1;var%20hd=Array.from((tt||d).querySelectorAll('th,.nutrition-header,.column-header'));hd.forEach(function(th,i){var%20tx=th.textContent.toLowerCase();if(tx.indexOf('100g')%3E=0||tx.indexOf('100ml')%3E=0){bi=i;diag.nutritionBasis=tx.trim();}});if(diag.nutritionBasis==='unknown')diag.nutritionBasis=bodyTxt.indexOf('typical%20values%20per%20100')%3E=0?'per100g%20(inferred)':'assumed%20per%20100g';rows.forEach(function(r){var%20txt=r.textContent.toLowerCase().trim();var%20cells=Array.from(r.querySelectorAll('td,th,.value,span,div.nut-val')).map(function(c){return%20c.textContent.trim();}).filter(Boolean);if(cells.length%3C2)return;var%20ct=cells[Math.min(bi,cells.length-1)]||cells[1];var%20nm=ct.match(/(\d+\.?\d*)/),num=nm?parseFloat(nm[1]):0;function%20P(k,pat,sk){if(pat.test(txt)%26%26(!sk||!sk.test(txt))){diag.sourceValues[k]=ct;diag.parsedValues[k]=num;}}if(/^(energy|calories|energy%20\(kcal\))/.test(txt)){var%20km=ct.match(/(\d+\.?\d*)\s*kcal/i);diag.sourceValues.cal=ct;diag.parsedValues.cal=km?parseFloat(km[1]):num;}else{P('fat',/^(fat|total%20fat)/,/saturates/);P('carb',/^(carbohydrate|carbs|available%20carbohydrate|total%20carbohydrate)/,/sugars/);P('fibre',/^(fibre|fiber|dietary%20fibre)/);P('prot',/^(protein|proteins)/);}});}else{diag.nutritionSource='Not%20found%20(Expand%20section?)';}var%20out={name:n,brand:b,price:parseFloat(p)||0,cal:diag.parsedValues.cal,fat:diag.parsedValues.fat,carb:diag.parsedValues.carb,fibre:diag.parsedValues.fibre,prot:diag.parsedValues.prot,packSize:ps||null,packUnit:pu,itemWeight:iw||null,itemCount:ic||null,url:location.href,diagnostics:diag};var%20sJSON=JSON.stringify(out);var%20ta=d.createElement('textarea');ta.value=sJSON;d.body.appendChild(ta);ta.select();try{d.execCommand('copy');alert('PlatePlan%20v2%20copied!\nName:%20'+n+'\nPack:%20'+(ps?ps+pu:'NONE')+'%20(src:%20'+diag.packSource+')\nNutrition:%20'+diag.nutritionSource);}catch(e){prompt('Copy%20JSON:',sJSON);}d.body.removeChild(ta);})();" class="btn sm" style="background:var(--purple); color:#fff; cursor:grab; text-decoration:none;" data-pp-click="event.preventDefault()">Tesco to PlatePlan</a>
+     <a href="javascript:(function(){var%20d=document,n='',b='',p=0,ps=null,pu='g',iw=null,ic=null;var%20diag={nutritionSource:'Fallback',nutritionBasis:'unknown',sourceValues:{cal:null,prot:null,carb:null,fat:null,fibre:null},parsedValues:{cal:0,prot:0,carb:0,fat:0,fibre:0},storageText:'',breadcrumbs:'',packSource:'none',packCandidates:[]};try{var%20scripts=d.querySelectorAll('script[type="application/ld+json"]');for(var%20s%20of%20scripts){var%20j=JSON.parse(s.textContent);var%20items=Array.isArray(j)?j:(j['@graph']||[j]);for(var%20x%20of%20items){var%20t=x['@type'];if(!t)continue;var%20types=Array.isArray(t)?t:[t];if(types.indexOf('Product')%3E=0){if(x.name)n=x.name;if(x.brand)b=(x.brand.name||x.brand)+'';if(x.offers){var%20off=Array.isArray(x.offers)?x.offers[0]:x.offers;if(off%26%26off.price)p=off.price;}if(x.weight%26%26x.weight.value){var%20u=(x.weight.unitCode||x.weight.unitText||'g')+'';ps=parseFloat(x.weight.value);pu=u.toLowerCase().replace('grm','g').replace('kgm','kg').replace('mlt','ml').replace('ltr','l');diag.packSource='jsonld.weight';}if(x.size%26%26typeof%20x.size==='string')diag.packCandidates.push('size:'+x.size);if(x.additionalProperty){var%20aps=Array.isArray(x.additionalProperty)?x.additionalProperty:[x.additionalProperty];for(var%20ap%20of%20aps){if(!ap||!ap.name)continue;var%20nm=(ap.name+'').toLowerCase();if(nm.indexOf('net%20contents')%3E=0||nm.indexOf('pack%20size')%3E=0||nm.indexOf('weight')%3E=0||nm.indexOf('quantity')%3E=0)diag.packCandidates.push(ap.name+':%20'+ap.value);}}}if(types.indexOf('BreadcrumbList')%3E=0%26%26x.itemListElement)diag.breadcrumbs=x.itemListElement.map(function(e){return(e.item%26%26e.item.name)||e.name||'';}).filter(Boolean).join('%20%3E%20');}}}catch(e){}if(!n)n=((d.querySelector('h1')||{}).textContent||'');n=n.trim();if(!p){var%20pEl=d.querySelector('[data-auto="price-value"],[data-auto="price"],.price-per-sellable-unit%20.value,.priceText');if(pEl)p=pEl.textContent.replace(/[^\d.]/g,'');}if(!diag.breadcrumbs)diag.breadcrumbs=Array.from(d.querySelectorAll('.breadcrumbs__link,.breadcrumb-item,[class*="breadcrumb"]%20a')).map(function(el){return%20el.textContent.trim();}).filter(Boolean).join('%20%3E%20');function%20parsePack(str){if(!str)return%20null;str=str.replace(/\s+/g,'%20').trim();if(/per\s+serving|per\s+portion|each\s+serving|serving\s+size|per\s+\d+\s*g\s|typical\s+values\s+per/i.test(str))return%20null;var%20m=str.match(/(\d+)\s*[x%C3%97]\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l)\b/i);if(m){var%20c=parseInt(m[1],10),e=parseFloat(m[2]),u=m[3].toLowerCase();return{count:c,each:e,total:c*e,unit:u};}m=str.match(/(\d+)\s*pack\b/i)||str.match(/pack\s+of\s+(\d+)/i);if(m)return{count:parseInt(m[1],10),each:null,total:parseInt(m[1],10),unit:'qty'};m=str.match(/(\d+(?:\.\d+)?)\s*(g|kg|ml|l)\b/i);if(m)return{count:1,each:parseFloat(m[1]),total:parseFloat(m[1]),unit:m[2].toLowerCase()};return%20null;}function%20pick(r,src){if(!r)return%20false;ps=r.total;iw=r.each!=null?r.each:r.total;pu=r.unit;ic=r.count;diag.packSource=src;return%20true;}var%20labels=['net%20contents','pack%20size','quantity','product%20weight','net%20weight','weight','size','volume'];var%20picked=ps!=null;if(!picked){var%20els=d.querySelectorAll('dt,dd,th,td,li,div,span,p,strong,h2,h3,h4');for(var%20i=0;i%3Cels.length%26%26!picked;i++){var%20el=els[i];var%20tx=(el.textContent||'').trim().toLowerCase().replace(/[:\s]+$/,'');if(!tx||tx.length%3E30)continue;if(labels.indexOf(tx)%3C0)continue;var%20sib=el.nextElementSibling;var%20cand=sib?sib.textContent.trim():'';if(!cand){var%20par=el.parentElement;if(par)cand=par.textContent.replace(el.textContent,'').trim();}diag.packCandidates.push('label['+tx+']:'+cand.slice(0,60));if(pick(parsePack(cand),'label:'+tx))picked=true;}}if(!picked){var%20prod=d.querySelector('[id*="product-details"],[class*="product-info"],[class*="ProductInfo"],main')||d.body;var%20ptxt=(prod.innerText||prod.textContent||'');var%20re=/(net%20contents|pack%20size|net%20weight|product%20weight|quantity|volume)[\s:]+([^\n]{1,40})/ig,mm;while((mm=re.exec(ptxt))%26%26!picked){diag.packCandidates.push('inline['+mm[1]+']:'+mm[2].slice(0,60));if(pick(parsePack(mm[2]),'inline:'+mm[1].toLowerCase()))picked=true;}}if(!picked){var%20pm=n.match(/\(([^)]+)\)\s*$/);if(pm%26%26pick(parsePack(pm[1]),'name-paren'))picked=true;}if(!picked%26%26pick(parsePack(n),'name-trailing'))picked=true;if(pu==='kg'){ps*=1000;if(iw)iw*=1000;pu='g';}else%20if(pu==='l'){ps*=1000;if(iw)iw*=1000;pu='ml';}var%20bodyTxt=(d.body.innerText||d.body.textContent||'').toLowerCase();var%20stm=bodyTxt.match(/(keep%20refrigerated|keep%20frozen|store%20in%20a%20cool|keep%20in%20the%20fridge|freeze|frozen)/i);if(stm)diag.storageText=stm[1];var%20rows=[],tt=null;var%20tables=Array.from(d.querySelectorAll('table'));tt=tables.find(function(t){var%20x=t.textContent.toLowerCase();return%20x.indexOf('protein')%3E=0%26%26(x.indexOf('energy')%3E=0||x.indexOf('kcal')%3E=0);});if(tt){rows=Array.from(tt.querySelectorAll('tr'));diag.nutritionSource='Nutrition%20Table';}else{var%20dv=Array.from(d.querySelectorAll('.nutrition-row,[data-auto="nutrition-row"],.nutrition-event-nutrient'));if(dv.length){rows=dv;diag.nutritionSource='Div-based';}}if(rows.length){var%20bi=1;var%20hd=Array.from((tt||d).querySelectorAll('th,.nutrition-header,.column-header'));hd.forEach(function(th,i){var%20tx=th.textContent.toLowerCase();if(tx.indexOf('100g')%3E=0||tx.indexOf('100ml')%3E=0){bi=i;diag.nutritionBasis=tx.trim();}});if(diag.nutritionBasis==='unknown')diag.nutritionBasis=bodyTxt.indexOf('typical%20values%20per%20100')%3E=0?'per100g%20(inferred)':'assumed%20per%20100g';rows.forEach(function(r){var%20txt=r.textContent.toLowerCase().trim();var%20cells=Array.from(r.querySelectorAll('td,th,.value,span,div.nut-val')).map(function(c){return%20c.textContent.trim();}).filter(Boolean);if(cells.length%3C2)return;var%20ct=cells[Math.min(bi,cells.length-1)]||cells[1];var%20nm=ct.match(/(\d+\.?\d*)/),num=nm?parseFloat(nm[1]):0;function%20P(k,pat,sk){if(pat.test(txt)%26%26(!sk||!sk.test(txt))){diag.sourceValues[k]=ct;diag.parsedValues[k]=num;}}if(/^(energy|calories|energy%20\(kcal\))/.test(txt)){var%20km=ct.match(/(\d+\.?\d*)\s*kcal/i);diag.sourceValues.cal=ct;diag.parsedValues.cal=km?parseFloat(km[1]):num;}else{P('fat',/^(fat|total%20fat)/,/saturates/);P('carb',/^(carbohydrate|carbs|available%20carbohydrate|total%20carbohydrate)/,/sugars/);P('fibre',/^(fibre|fiber|dietary%20fibre)/);P('prot',/^(protein|proteins)/);}});}else{diag.nutritionSource='Not%20found%20(Expand%20section?)';}var%20out={name:n,brand:b,price:parseFloat(p)||0,cal:diag.parsedValues.cal,fat:diag.parsedValues.fat,carb:diag.parsedValues.carb,fibre:diag.parsedValues.fibre,prot:diag.parsedValues.prot,packSize:ps||null,packUnit:pu,itemWeight:iw||null,itemCount:ic||null,url:location.href,diagnostics:diag};var%20sJSON=JSON.stringify(out);var%20ta=d.createElement('textarea');ta.value=sJSON;d.body.appendChild(ta);ta.select();try{d.execCommand('copy');alert('PlatePlan%20v2%20copied!\nName:%20'+n+'\nPack:%20'+(ps?ps+pu:'NONE')+'%20(src:%20'+diag.packSource+')\nNutrition:%20'+diag.nutritionSource);}catch(e){prompt('Copy%20JSON:',sJSON);}d.body.removeChild(ta);})();" class="btn sm" style="background:var(--purple); color:#fff; cursor:grab; text-decoration:none;" data-action="event.preventDefault()">Tesco to PlatePlan</a>
     </div>
 
     <div class="field" id="tesco-paste-panel" style="">
@@ -620,7 +620,7 @@ try{
       <textarea id="tesco-paste" style="min-height:90px;font-size:12px" placeholder="Paste copied data here..." name="tesco-paste"></textarea>
     </div>
     <div class="btn-row" id="tesco-extract-actions" style="margin-bottom: 10px;">
-      <button type="button" class="btn primary" data-pp-click="extractTescoProduct()">Extract details</button>
+      <button type="button" class="btn primary" data-action="extractTescoProduct()">Extract details</button>
     </div>
     <div id="tesco-msg"></div>
 
@@ -743,7 +743,7 @@ try{
       <div id="tp-pack-summary" class="pack-model-summary" aria-live="polite" style="margin-bottom:8px;"></div>
       <div class="field" style="display: none;"><label for="tp-meatsub">Meat substitute for (optional)</label><input type="text" id="tp-meatsub" placeholder="e.g. mince, chicken, bacon" name="tp-meatsub"></div>
       <div class="btn-row" style="margin-top:6px">
-        <button type="button" class="btn primary" id="tesco-save-btn" data-pp-click="saveTescoIngredient()">Save to Product Bank</button>
+        <button type="button" class="btn primary" id="tesco-save-btn" data-action="saveTescoIngredient()">Save to Product Bank</button>
       </div>
       <div id="tesco-save-msg"></div>
     </div>
@@ -758,8 +758,8 @@ try{
         <span id="batch-banner-parse" class="batch-import-badge" style="display:none;background:var(--purple-bg, #EEF2FF);color:var(--purple, #4F46E5);font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px;border:1px solid rgba(79,70,229,0.25)"></span>
       </div>
       <div class="btn-row" style="margin:0;gap:6px">
-        <button id="batch-abort-parse-btn" type="button" class="btn sm danger ghost" data-pp-click="abortBatchImport()" style="display:none">Abort Batch Import</button>
-        <button type="button" class="btn sm ghost" data-pp-click="document.getElementById('parse-modal-wrap').classList.remove('open')">Cancel</button>
+        <button id="batch-abort-parse-btn" type="button" class="btn sm danger ghost" data-action="abortBatchImport()" style="display:none">Abort Batch Import</button>
+        <button type="button" class="btn sm ghost" data-action="document.getElementById('parse-modal-wrap').classList.remove('open')">Cancel</button>
       </div>
     </div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Please check the extracted amounts, units, and steps before matching against the bank. Nutrition is scaled based on these volumes.</p>
@@ -767,19 +767,19 @@ try{
     <div style="display:grid; grid-template-columns: 1fr; gap:20px; align-items:start;">
       <div>
         <h3 style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">Ingredients</h3>
-        <div id="parse-ing-list" style="display:flex; flex-direction:column; gap:8px;"></div><button type="button" id="parse-add-ingredient-btn" class="btn sm ghost" style="margin-top:8px" data-pp-click="addParseIngredientRow()">+ Add ingredient</button>
+        <div id="parse-ing-list" style="display:flex; flex-direction:column; gap:8px;"></div><button type="button" id="parse-add-ingredient-btn" class="btn sm ghost" style="margin-top:8px" data-action="addParseIngredientRow()">+ Add ingredient</button>
       </div>
       <div>
         <h3 style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">Method Steps</h3>
         <div id="parse-method-list" style="display:flex; flex-direction:column; gap:8px;"></div>
-        <button type="button" class="btn sm ghost" style="margin-top:8px" data-pp-click="addParseMethodStep()">+ Add step</button>
+        <button type="button" class="btn sm ghost" style="margin-top:8px" data-action="addParseMethodStep()">+ Add step</button>
       </div>
     </div>
     <div class="btn-row" style="margin-top:20px; border-top:1px solid var(--border); padding-top:14px; gap:8px; flex-wrap:wrap">
-      <button type="button" class="btn primary" data-pp-click="confirmParseAndMatch()">Confirm &amp; Map Ingredients</button>
-      <button id="batch-skip-parse-btn" type="button" class="btn secondary" data-pp-click="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
-      <button id="batch-abort-parse-btn2" type="button" class="btn danger ghost" data-pp-click="abortBatchImport()" style="display:none">Abort Batch Import</button>
-      <button type="button" class="btn ghost" data-pp-click="document.getElementById('parse-modal-wrap').classList.remove('open')">Cancel</button>
+      <button type="button" class="btn primary" data-action="confirmParseAndMatch()">Confirm &amp; Map Ingredients</button>
+      <button id="batch-skip-parse-btn" type="button" class="btn secondary" data-action="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
+      <button id="batch-abort-parse-btn2" type="button" class="btn danger ghost" data-action="abortBatchImport()" style="display:none">Abort Batch Import</button>
+      <button type="button" class="btn ghost" data-action="document.getElementById('parse-modal-wrap').classList.remove('open')">Cancel</button>
     </div>
   </div>
 </div>
@@ -792,18 +792,18 @@ try{
         <span id="batch-banner-mapping" class="batch-import-badge" style="display:none;background:var(--purple-bg, #EEF2FF);color:var(--purple, #4F46E5);font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px;border:1px solid rgba(79,70,229,0.25)"></span>
       </div>
       <div class="btn-row" style="margin:0;gap:6px">
-        <button id="batch-abort-mapping-top" type="button" class="btn sm danger ghost" data-pp-click="abortBatchImport()" style="display:none">Abort Batch Import</button>
-        <button type="button" class="btn sm ghost" data-pp-click="document.getElementById('mapping-modal-wrap').classList.remove('open')">Cancel</button>
+        <button id="batch-abort-mapping-top" type="button" class="btn sm danger ghost" data-action="abortBatchImport()" style="display:none">Abort Batch Import</button>
+        <button type="button" class="btn sm ghost" data-action="document.getElementById('mapping-modal-wrap').classList.remove('open')">Cancel</button>
       </div>
     </div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Every ingredient must be mapped to your Pantry Bank. This ensures accurate meal planning calculations. Please review and assign all items below.</p>
     <div id="mapping-list" style="overflow-y: auto; flex: 1; min-height:200px; padding-right:10px;"></div>
     <div id="mapping-msg" style="margin-top: 10px;"></div>
     <div class="btn-row" style="margin-top: 15px; padding-top:15px; border-top:1px solid var(--border); gap:8px; flex-wrap:wrap">
-       <button type="button" class="btn primary" data-pp-click="confirmMapping()">Confirm &amp; Calculate</button>
-       <button id="batch-skip-mapping-btn" type="button" class="btn secondary" data-pp-click="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
-       <button id="batch-abort-mapping-btn" type="button" class="btn danger ghost" data-pp-click="abortBatchImport()" style="display:none">Abort Batch Import</button>
-       <button type="button" class="btn ghost" data-pp-click="document.getElementById('mapping-modal-wrap').classList.remove('open')">Cancel</button>
+       <button type="button" class="btn primary" data-action="confirmMapping()">Confirm &amp; Calculate</button>
+       <button id="batch-skip-mapping-btn" type="button" class="btn secondary" data-action="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
+       <button id="batch-abort-mapping-btn" type="button" class="btn danger ghost" data-action="abortBatchImport()" style="display:none">Abort Batch Import</button>
+       <button type="button" class="btn ghost" data-action="document.getElementById('mapping-modal-wrap').classList.remove('open')">Cancel</button>
     </div>
   </div>
 </div>
@@ -815,7 +815,7 @@ try{
         <h3 id="unified-map-title" style="margin:0;font-size:18px">Map Ingredient</h3>
         <div id="unified-map-subtitle" style="font-size:12px;color:var(--text2);margin-top:2px">Select an existing stored product or import directly via Tesco.</div>
       </div>
-      <button type="button" class="btn sm ghost" data-pp-click="closeUnifiedMappingModal()" aria-label="Close mapping modal">Close</button>
+      <button type="button" class="btn sm ghost" data-action="closeUnifiedMappingModal()" aria-label="Close mapping modal">Close</button>
     </div>
     <div id="unified-map-ing-badge" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <div>
@@ -834,10 +834,10 @@ try{
     <div id="unified-map-results" style="overflow-y:auto;flex:1;min-height:220px;max-height:340px;border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:6px"></div>
     <div class="btn-row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center">
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button type="button" class="btn ghost" id="btn-unified-import-tesco" style="color:var(--purple);border-color:var(--purple)" data-pp-click="showTescoSearchModal((window.activeUnifiedMappingContext && window.activeUnifiedMappingContext.ingredientId) || '')">🛒 Import Tesco</button>
-        <button type="button" class="btn ghost" id="btn-unified-add-product" data-pp-click="openAddProductModal((window.activeUnifiedMappingContext && window.activeUnifiedMappingContext.ingredientId) || '')">+ Add Product</button>
+        <button type="button" class="btn ghost" id="btn-unified-import-tesco" style="color:var(--purple);border-color:var(--purple)" data-action="showTescoSearchModal((window.activeUnifiedMappingContext && window.activeUnifiedMappingContext.ingredientId) || '')">🛒 Import Tesco</button>
+        <button type="button" class="btn ghost" id="btn-unified-add-product" data-action="openAddProductModal((window.activeUnifiedMappingContext && window.activeUnifiedMappingContext.ingredientId) || '')">+ Add Product</button>
       </div>
-      <button type="button" class="btn ghost" id="btn-unified-cancel" data-pp-click="closeUnifiedMappingModal()">Cancel</button>
+      <button type="button" class="btn ghost" id="btn-unified-cancel" data-action="closeUnifiedMappingModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -855,9 +855,9 @@ try{
     <div id="subst-herb-conversion" style="display:none;margin-bottom:15px"></div>
     
     <div class="btn-row" style="margin-top: 15px;">
-        <button type="button" class="btn primary" data-pp-click="confirmSubstitute()">Apply</button>
-        <button type="button" class="btn ghost" style="color:var(--purple); border-color:var(--purple);" data-pp-click="openTescoImportFromSubst()">🛒 Import Tesco</button>
-        <button type="button" class="btn ghost" data-pp-click="closeSubstituteModal()">Cancel</button>
+        <button type="button" class="btn primary" data-action="confirmSubstitute()">Apply</button>
+        <button type="button" class="btn ghost" style="color:var(--purple); border-color:var(--purple);" data-action="openTescoImportFromSubst()">🛒 Import Tesco</button>
+        <button type="button" class="btn ghost" data-action="closeSubstituteModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -870,8 +870,8 @@ try{
     <div id="merge-options-container" style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;"></div>
 
     <div class="btn-row">
-        <button type="button" class="btn primary" data-pp-click="executeMerge()">Confirm Merge</button>
-        <button type="button" class="btn ghost" data-pp-click="closeMergeModal()">Cancel</button>
+        <button type="button" class="btn primary" data-action="executeMerge()">Confirm Merge</button>
+        <button type="button" class="btn ghost" data-action="closeMergeModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -881,8 +881,8 @@ try{
       <h3>Replace before delete</h3>
       <div id="replace-ing-body"></div>
       <div class="btn-row" style="margin-top:14px;">
-          <button type="button" class="btn primary" data-pp-click="confirmReplaceAndDelete()">Replace &amp; Delete</button>
-          <button type="button" class="btn ghost" data-pp-click="closeReplaceModal()">Cancel</button>
+          <button type="button" class="btn primary" data-action="confirmReplaceAndDelete()">Replace &amp; Delete</button>
+          <button type="button" class="btn ghost" data-action="closeReplaceModal()">Cancel</button>
       </div>
   </div>
 </div>
@@ -924,8 +924,8 @@ try{
        </div>
        <div id="mini-msg"></div>
        <div class="btn-row" style="margin-top:14px">
-         <button type="button" class="btn primary" data-pp-click="saveMiniIng()">Save &amp; Map</button>
-         <button type="button" class="btn ghost" data-pp-click="document.getElementById('mini-ing-wrap').classList.remove('open')">Cancel</button>
+         <button type="button" class="btn primary" data-action="saveMiniIng()">Save &amp; Map</button>
+         <button type="button" class="btn ghost" data-action="document.getElementById('mini-ing-wrap').classList.remove('open')">Cancel</button>
        </div>
    </div>
 </div>
@@ -938,15 +938,15 @@ try{
         <span id="batch-banner-review" class="batch-import-badge" style="display:none;background:var(--purple-bg, #EEF2FF);color:var(--purple, #4F46E5);font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px;border:1px solid rgba(79,70,229,0.25)"></span>
       </div>
       <div class="btn-row" style="margin:0;gap:6px">
-        <button id="batch-abort-review-top" type="button" class="btn sm danger ghost" data-pp-click="abortBatchImport()" style="display:none">Abort Batch Import</button>
-        <button type="button" class="btn sm ghost" data-pp-click="closeModal()">Close</button>
+        <button id="batch-abort-review-top" type="button" class="btn sm danger ghost" data-action="abortBatchImport()" style="display:none">Abort Batch Import</button>
+        <button type="button" class="btn sm ghost" data-action="closeModal()">Close</button>
       </div>
     </div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:12px" id="review-info">Nutrition calculated from mapped ingredient bank items. Edit mapped ingredients if anything looks wrong.</p>
     <div class="modal-tabs" id="modal-tabs-container">
-      <div class="mt2" data-pp-click="switchModalTab('original')">Original</div>
-      <div class="mt2 active" id="tab-btn-enhanced" data-pp-click="switchModalTab('enhanced')" style="display: block;">Enhanced</div>
-      <div class="mt2" id="tab-btn-compare" data-pp-click="switchModalTab('compare')" style="display: block;">Compare</div>
+      <div class="mt2" data-action="switchModalTab('original')">Original</div>
+      <div class="mt2 active" id="tab-btn-enhanced" data-action="switchModalTab('enhanced')" style="display: block;">Enhanced</div>
+      <div class="mt2" id="tab-btn-compare" data-action="switchModalTab('compare')" style="display: block;">Compare</div>
     </div>
 
     <div id="mtab-original" class="mtab">
@@ -1092,7 +1092,7 @@ try{
         <div class="field">
           <span class="section-label-header" style="font-weight:bold;font-size:12px;display:block;margin-bottom:6px">Ingredients</span>
           <div id="orig-ings-list"></div>
-          <button type="button" class="btn sm ghost" data-pp-click="addModalIng('orig')">+ Add ingredient</button>
+          <button type="button" class="btn sm ghost" data-action="addModalIng('orig')">+ Add ingredient</button>
         </div>
         <div class="field" style="border-top:1px solid var(--border);padding-top:14px;">
           <span class="form-label" style="font-size:13px;font-weight:700;display:block;margin-bottom:6px">Method</span>
@@ -1100,34 +1100,34 @@ try{
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-orig-1" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">1.</label>
            <textarea id="recipe-step-orig-1" name="recipe_step_orig_1" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-orig-2" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">2.</label>
            <textarea id="recipe-step-orig-2" name="recipe_step_orig_2" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-orig-3" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">3.</label>
            <textarea id="recipe-step-orig-3" name="recipe_step_orig_3" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-orig-4" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">4.</label>
            <textarea id="recipe-step-orig-4" name="recipe_step_orig_4" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-orig-5" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">5.</label>
            <textarea id="recipe-step-orig-5" name="recipe_step_orig_5" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
         </div>
     </div>
-          <button type="button" class="btn sm ghost" data-pp-click="addModalMethod('orig')">+ Add step</button>
+          <button type="button" class="btn sm ghost" data-action="addModalMethod('orig')">+ Add step</button>
         </div>
       </div>
     </div>
@@ -1276,50 +1276,50 @@ try{
         <div class="field">
           <span class="section-label-header" style="font-weight:bold;font-size:12px;display:block;margin-bottom:6px">Ingredients</span>
           <div id="enh-ings-list"></div>
-          <button type="button" class="btn sm ghost" data-pp-click="addModalIng('enh')">+ Add ingredient</button>
+          <button type="button" class="btn sm ghost" data-action="addModalIng('enh')">+ Add ingredient</button>
         </div>
         <div class="field" style="border-top:1px solid var(--border);padding-top:14px;">
           <div class="row-between" style="align-items:center;margin-bottom:4px;">
             <span class="section-label-header" style="font-weight:bold;font-size:12px;margin:0">Method</span>
-            <button type="button" class="btn sm ghost" data-pp-click="copyOriginalMethodToEnhanced()">Copy From Original</button>
+            <button type="button" class="btn sm ghost" data-action="copyOriginalMethodToEnhanced()">Copy From Original</button>
           </div>
           <div id="enh-method-list">
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-enh-1" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">1.</label>
            <textarea id="recipe-step-enh-1" name="recipe_step_enh_1" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-enh-2" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">2.</label>
            <textarea id="recipe-step-enh-2" name="recipe_step_enh_2" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-enh-3" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">3.</label>
            <textarea id="recipe-step-enh-3" name="recipe_step_enh_3" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-enh-4" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">4.</label>
            <textarea id="recipe-step-enh-4" name="recipe_step_enh_4" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-enh-5" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">5.</label>
            <textarea id="recipe-step-enh-5" name="recipe_step_enh_5" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-pp-click="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
         </div>
     </div>
-          <button type="button" class="btn sm ghost" data-pp-click="addModalMethod('enh')">+ Add step</button>
+          <button type="button" class="btn sm ghost" data-action="addModalMethod('enh')">+ Add step</button>
         </div>
       </div>
       
       <div class="btn-row" style="margin-top:10px; border-top:1px solid var(--border); padding-top:10px;">
-          <button type="button" class="btn sm danger" data-pp-click="deleteEnhancedVersion()">Delete Enhanced Version</button>
+          <button type="button" class="btn sm danger" data-action="deleteEnhancedVersion()">Delete Enhanced Version</button>
       </div>
     </div>
 
@@ -1331,12 +1331,12 @@ try{
     </div>
 
     <div class="btn-row" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);gap:8px;flex-wrap:wrap">
-      <button type="button" class="btn primary" id="save-both-btn" data-pp-click="saveBoth()" style="">Save Both</button>
-      <button type="button" class="btn primary" id="save-temp-plan-btn" data-pp-click="saveTemporaryPlanReview()" style="display:none">Apply to meal plan only</button>
-      <button type="button" class="btn" id="save-orig-only-btn" data-pp-click="saveOrigOnly()">Save Original Only</button>
-      <button id="batch-skip-review-btn" type="button" class="btn secondary" data-pp-click="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
-      <button id="batch-abort-review-btn" type="button" class="btn danger ghost" data-pp-click="abortBatchImport()" style="display:none">Abort Batch Import</button>
-      <button type="button" class="btn danger" data-pp-click="closeModal()">Discard</button>
+      <button type="button" class="btn primary" id="save-both-btn" data-action="saveBoth()" style="">Save Both</button>
+      <button type="button" class="btn primary" id="save-temp-plan-btn" data-action="saveTemporaryPlanReview()" style="display:none">Apply to meal plan only</button>
+      <button type="button" class="btn" id="save-orig-only-btn" data-action="saveOrigOnly()">Save Original Only</button>
+      <button id="batch-skip-review-btn" type="button" class="btn secondary" data-action="skipBatchImportRecipe()" style="display:none">Skip Recipe</button>
+      <button id="batch-abort-review-btn" type="button" class="btn danger ghost" data-action="abortBatchImport()" style="display:none">Abort Batch Import</button>
+      <button type="button" class="btn danger" data-action="closeModal()">Discard</button>
     </div>
   </div>
 </div>
@@ -1349,125 +1349,12 @@ try{
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js" crossorigin="anonymous"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js" crossorigin="anonymous"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js" crossorigin="anonymous"></script>
-<script src="src/config/firebase-config.js?v=3.31.41"></script>
+<script src="src/config/firebase-config.js?v=__APP_VERSION__"></script>
 
 <!-- Modern ES6 Architecture Entry Point -->
-<script type="module" src="src/main.js?v=3.38.18"></script>
+<script type="module" src="src/main.js?v=__APP_VERSION__"></script>
 
-
-
-
-
-<div id="manual-ing-panel" style="display: none;" class="card" data-modal-wrapped="1"><div id="mi-inner-wrap" style="background: var(--surface); border-radius: 14px; padding: 24px; max-width: 560px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: rgba(0, 0, 0, 0.3) 0px 8px 40px;">
-    <h3 id="mi-title">Edit product</h3><div id="mi-tesco-actions" style="display: flex; justify-content: flex-end; margin: -4px 0px 12px;"><button type="button" class="btn sm ghost" data-pp-click="openTescoImportForIngredientEdit()">Paste/update from Tesco</button></div>
-    <div id="mi-linkage-container" style="margin-bottom: 12px;"></div>
-    <div class="grid2">
-      <div><label for="mi-name">Product name</label><input type="text" id="mi-name" name="mi-name" placeholder="Product name"></div>
-      <div><label for="mi-brand">Brand</label><input type="text" id="mi-brand" name="mi-brand" placeholder="Quorn"></div>
-    </div>
-    <div class="grid2">
-        <div class="field" style="display: none;"><label for="mi-cat-search">Category</label><input type="search" id="mi-cat-search" name="mi-cat-search" placeholder="Search category" list="mi-cat-category-options" style="width: 100%;"><select id="mi-cat" name="mi-cat" aria-label="Category select dropdown" style="display: none;"><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option><option value="__add_new__" style="font-weight:bold; color:var(--green)">+ Add new category...</option></select><datalist id="mi-cat-category-options"><option value="Baking"></option><option value="Beverages"></option><option value="Carbs (Pasta/Rice/Potato)"></option><option value="Dairy &amp; Eggs"></option><option value="Fruit &amp; Vegetables"></option><option value="Grains, Legumes &amp; Pulses"></option><option value="Herbs &amp; Spices"></option><option value="Meat Substitutes"></option><option value="Nuts &amp; Seeds"></option><option value="Other"></option><option value="Sauces, Condiments &amp; Pastes"></option><option value="Store Cupboard"></option><option value="Supplements"></option><option value="Tofu, Tempeh &amp; Seitan"></option></datalist></div>
-        <div class="field"><label for="mi-storage">Storage</label><select id="mi-storage" name="mi-storage"><option value="">-- Select --</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="cupboard">Cupboard</option></select></div>
-    </div>
-    <p class="section-label">Per 100g</p>
-    <div class="grid3">
-      <div><label for="mi-cal">Calories (Energy)</label><input type="number" id="mi-cal" name="mi-cal" placeholder="132"></div>
-      <div><label for="mi-fat">Fat (g)</label><input type="number" id="mi-fat" name="mi-fat" placeholder="5.9"></div>
-      <div><label for="mi-carb">Carbs (g)</label><input type="number" id="mi-carb" name="mi-carb" placeholder="5.4"></div>
-      <div><label for="mi-fibre">Fibre (g)</label><input type="number" id="mi-fibre" name="mi-fibre" placeholder="4.5"></div>
-      <div><label for="mi-prot">Protein (g)</label><input type="number" id="mi-prot" name="mi-prot" placeholder="14.5"></div>
-    </div>
-    <div id="mi-serving-hint" style="display: none;"></div>
-    <div class="grid3">
-      <div><label for="mi-price">Price per pack (£)</label><input type="number" id="mi-price" name="mi-price" placeholder="2.50" step="0.01"></div>
-      <div>
-        <label for="mi-pack">Total pack size</label>
-        <div style="display:flex; gap:5px;">
-          <input type="number" id="mi-pack" name="mi-pack" placeholder="500">
-          <select id="mi-pack-unit" name="mi-pack-unit" aria-label="Pack unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
-            <option value="g">g</option>
-            <option value="ml">ml</option>
-          </select>
-        </div>
-      </div>
-            <div>
-        <label for="mi-item-weight">Weight / volume of 1 usable item</label>
-        <div style="display:flex; gap:5px;">
-          <input type="number" id="mi-item-weight" name="mi-item-weight" placeholder="e.g. 75">
-          <select id="mi-item-weight-unit" name="mi-item-weight-unit" aria-label="Item weight unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
-            <option value="g">g</option>
-            <option value="ml">ml</option>
-          </select>
-        </div>
-      </div>
-      <div>
-        <label for="mi-drained-weight">Drained weight (usable content)</label>
-        <div style="display:flex; gap:5px;">
-          <input type="number" id="mi-drained-weight" name="mi-drained-weight" placeholder="e.g. 235">
-          <select id="mi-drained-weight-unit" name="mi-drained-weight-unit" aria-label="Drained weight unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
-            <option value="g">g</option>
-            <option value="ml">ml</option>
-          </select>
-        </div>
-      </div>
-    </div>
-    <div id="mi-pack-summary" class="pack-model-summary" aria-live="polite"></div>
-        <div class="field" style="display: none;"><label for="mi-meatsub">Meat substitute for (optional)<input type="text" id="mi-meatsub" placeholder="e.g. mince, chicken, bacon" name="mi-meatsub"></label></div>
-    <div id="mi-pack-variants" style="display: block; margin: 8px 0px 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); font-size: 12px; color: var(--text2);">
-    <strong>Available Tesco Variants</strong>
-    <ul style="margin:6px 0 10px 18px;padding:0;"><li style="margin:3px 0;"><span>4 items × 95g = 380g · £0.86</span> <span class="tag">Current pack</span></li></ul>
-    <div class="grid3" style="margin-top:8px;">
-      <div><label for="mi-var-pack">Variant size</label><input type="number" id="mi-var-pack" placeholder="400" name="mi-var-pack"></div>
-      <div><label for="mi-var-unit">Total unit</label><select id="mi-var-unit" aria-label="Variant Unit" name="mi-var-unit"><option value="g">g</option><option value="ml">ml</option></select></div>
-      <div><label for="mi-var-price">Price (£)</label><input type="number" id="mi-var-price" placeholder="1.25" step="0.01" name="mi-var-price"></div>
-      <div><label for="mi-var-item-weight">Weight / volume of 1 usable item</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-item-weight" placeholder="75" name="mi-var-item-weight"><select id="mi-var-item-weight-unit" aria-label="Variant usable item weight unit" style="width:70px" name="mi-var-item-weight-unit"><option value="g">g</option><option value="ml">ml</option></select></div></div>
-      <div><label for="mi-var-drained-weight">Drained weight (usable content)</label><div style="display:flex;gap:5px"><input type="number" id="mi-var-drained-weight" placeholder="235" name="mi-var-drained-weight"><select id="mi-var-drained-weight-unit" aria-label="Variant drained weight unit" style="width:70px" name="mi-var-drained-weight-unit"><option value="g">g</option><option value="ml">ml</option></select></div></div>
-      <div style="display:flex;align-items:flex-end;"><button type="button" class="btn sm secondary" data-pp-click="addManualPackVariant()">Add variant</button></div>
-    </div>
-  </div>
-    <div class="field"><label for="mi-notes">Notes</label><input type="text" id="mi-notes" placeholder="e.g. Great in bolognese, buy frozen" name="mi-notes"></div>
-    <div class="btn-row"><button type="button" class="btn primary" id="mi-save-btn" data-pp-click="saveManualIng()">Save</button><button type="button" class="btn ghost" data-pp-click="cancelManualIng()">Cancel</button></div>
-    <div id="mi-msg"></div>
-  </div></div>
-
-
-
-<div id="ingredient-family-details-wrap" class="modal-wrap" style="z-index: 440;">
-    <div class="modal" style="max-width:540px">
-      <div class="row-between" style="align-items:center;margin-bottom:10px">
-        <h3 id="ingredient-family-details-title" style="margin:0">Edit Catalog Item</h3>
-        <button type="button" class="btn sm ghost" data-pp-click="closeIngredientFamilyDetailsModal()">Close</button>
-      </div>
-      <div id="parent-ingredient-display-wrap" style="display:none;margin-bottom:12px;padding:8px 10px;background:var(--surface2,#f5f5f4);border-radius:8px;font-size:12px;font-weight:600;border:1px solid var(--border,#e7e5e4)"></div>
-      <div class="field">
-        <label for="ingredient-family-details-cat">Category</label>
-        <input type="text" id="ingredient-family-details-cat" list="category-options" placeholder="Search or type category..." class="form-control" autocomplete="off" name="ingredientFamilyDetailsCat">
-        <datalist id="category-options"></datalist>
-      </div>
-      <div class="field">
-        <label id="ingredient-family-details-name-label" for="ingredient-family-details-name">Item Name</label>
-        <input type="text" id="ingredient-family-details-name" name="ingredientFamilyDetailsName" placeholder="e.g. Pasta, Asparagus, Tofu">
-        <div id="tesco-search-helper-link" style="margin-top:6px;font-size:11.5px"></div>
-      </div>
-      <div class="field">
-        <label for="ingredient-family-details-notes">Notes</label>
-        <textarea id="ingredient-family-details-notes" name="ingredientFamilyDetailsNotes" style="min-height:70px"></textarea>
-      </div>
-      <div id="subtype-product-actions-wrap" style="display:none;margin-bottom:12px;flex-direction:column;gap:8px;padding:10px;background:var(--surface2,#f5f5f4);border-radius:8px;border:1px solid var(--border,#e7e5e4)">
-        <div style="font-size:12px;font-weight:750">Sub-type Product Actions</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-          <button type="button" onclick="window.handleSubtypeProductAction('link')" class="action-btn btn sm ghost" data-pp-click="handleSubtypeProductAction('link')">🔗 Link Existing Product(s)</button>
-          <button type="button" onclick="window.handleSubtypeProductAction('manual')" class="action-btn btn sm ghost" data-pp-click="handleSubtypeProductAction('manual')">➕ Add Product Manually</button>
-          <button type="button" onclick="window.handleSubtypeProductAction('tesco')" class="action-btn btn sm ghost" data-pp-click="handleSubtypeProductAction('tesco')">🛒 Import from Tesco</button>
-        </div>
-        <a id="tesco-search-link" href="#" target="_blank" style="font-size: 0.85em; display: none; margin-top: 4px; color: var(--primary,#4f46e5); font-weight: 600;"></a>
-      </div>
-      <div id="ingredient-family-details-msg"></div>
-      <div class="btn-row" style="margin-top:14px">
-        <button type="button" class="btn primary" id="ingredient-family-save-btn" data-pp-click="saveIngredientFamilyDetailsModal()">Save</button>
-        <button type="button" class="btn ghost" data-pp-click="closeIngredientFamilyDetailsModal()">Cancel</button>
-      </div>
-    </div></div>  <div style="display:none;" aria-hidden="true">
+  <div style="display:none;" aria-hidden="true">
     <!-- Sub-type Operations fallback inputs -->
     <label for="new-subtype-name">New Sub-type Name</label>
     <input type="text" id="new-subtype-name" value="" name="new-subtype-name">

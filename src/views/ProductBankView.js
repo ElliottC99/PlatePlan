@@ -22,8 +22,8 @@ import {
 let activeEditingProductId = null;
 
 export function cancelManualIng() {
-  const panel = document.getElementById('manual-ing-panel');
-  if (panel) panel.style.display = 'none';
+  const wrap = document.getElementById('view-modal-wrap');
+  if (wrap) wrap.classList.remove('open');
   document.body.style.overflow = '';
   activeEditingProductId = null;
 
@@ -37,8 +37,53 @@ export function cancelManualIng() {
 }
 
 export function openProductEditModal(productIdOrDraft = null) {
-  const panel = document.getElementById('manual-ing-panel');
-  if (!panel) return;
+  const wrap = document.getElementById('view-modal-wrap');
+  const content = document.getElementById('view-modal-content');
+  if (!wrap || !content) return;
+
+  content.innerHTML = `
+    <div id="mi-inner-wrap" style="background: var(--surface, #fff); border-radius: 14px; padding: 24px; max-width: 560px; width: 100%; margin: 0 auto;">
+      <h3 id="mi-title">Edit product</h3>
+      <div id="mi-tesco-actions" style="display: flex; justify-content: flex-end; margin: -4px 0px 12px;">
+        <button type="button" class="btn sm ghost" data-pp-click="openTescoImportForIngredientEdit()">Paste/update from Tesco</button>
+      </div>
+      <div id="mi-linkage-container" style="margin-bottom: 12px;"></div>
+      <div class="grid2">
+        <div><label for="mi-name">Product name</label><input type="text" id="mi-name" name="mi-name" placeholder="Product name"></div>
+        <div><label for="mi-brand">Brand</label><input type="text" id="mi-brand" name="mi-brand" placeholder="Quorn"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label for="mi-cat-search">Category</label><input type="search" id="mi-cat-search" name="mi-cat-search" placeholder="Search category" list="mi-cat-category-options" style="width: 100%;"><datalist id="mi-cat-category-options"></datalist></div>
+        <div class="field"><label for="mi-storage">Storage</label><select id="mi-storage" name="mi-storage"><option value="">-- Select --</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="cupboard">Cupboard</option></select></div>
+      </div>
+      <p class="section-label">Per 100g</p>
+      <div class="grid3">
+        <div><label for="mi-cal">Calories (Energy)</label><input type="number" id="mi-cal" name="mi-cal" placeholder="132"></div>
+        <div><label for="mi-fat">Fat (g)</label><input type="number" id="mi-fat" name="mi-fat" placeholder="5.9"></div>
+        <div><label for="mi-carb">Carbs (g)</label><input type="number" id="mi-carb" name="mi-carb" placeholder="5.4"></div>
+        <div><label for="mi-fibre">Fibre (g)</label><input type="number" id="mi-fibre" name="mi-fibre" placeholder="4.5"></div>
+        <div><label for="mi-prot">Protein (g)</label><input type="number" id="mi-prot" name="mi-prot" placeholder="14.5"></div>
+      </div>
+      <div class="grid3">
+        <div><label for="mi-price">Price per pack (£)</label><input type="number" id="mi-price" name="mi-price" placeholder="2.50" step="0.01"></div>
+        <div>
+          <label for="mi-pack">Total pack size</label>
+          <div style="display:flex; gap:5px;">
+            <input type="number" id="mi-pack" name="mi-pack" placeholder="500">
+            <select id="mi-pack-unit" name="mi-pack-unit" aria-label="Pack unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
+              <option value="g">g</option>
+              <option value="ml">ml</option>
+            </select>
+          </div>
+        </div>
+        <div><label for="mi-item-weight">Weight / volume of 1 usable item</label><input type="number" id="mi-item-weight" name="mi-item-weight" placeholder="e.g. 75"></div>
+        <div><label for="mi-drained-weight">Drained weight (usable content)</label><input type="number" id="mi-drained-weight" name="mi-drained-weight" placeholder="e.g. 235"></div>
+      </div>
+      <div class="field"><label for="mi-notes">Notes</label><input type="text" id="mi-notes" placeholder="e.g. Great in bolognese, buy frozen" name="mi-notes"></div>
+      <div class="btn-row"><button type="button" class="btn primary" id="mi-save-btn" data-pp-click="saveManualIng()">Save</button><button type="button" class="btn ghost" data-pp-click="cancelManualIng()">Cancel</button></div>
+      <div id="mi-msg"></div>
+    </div>
+  `;
 
   const state = getState();
   const products = Array.isArray(state.products) ? state.products : [];
@@ -127,10 +172,8 @@ export function openProductEditModal(productIdOrDraft = null) {
   }
 
   document.body.style.overflow = 'hidden';
-  if (panel.parentElement === document.body) {
-    document.body.appendChild(panel);
-  }
-  panel.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:25005 !important;backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);overflow-y:auto;padding:16px;box-sizing:border-box;';
+  wrap.style.setProperty('z-index', '25005', 'important');
+  wrap.classList.add('open');
 }
 
 export async function saveManualIng() {

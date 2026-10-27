@@ -73,7 +73,7 @@ export async function handleSetDefaultProduct(prodId, ingId, subtypeId = null) {
 }
 
 export function promptAddSubtype(ingId) {
-  import(`../components/pantry/AddToBankHubUI.js?v=${Date.now()}`).then(m => m.openAddToBankModal('subtype', { parentId: ingId }));
+  import(`../components/pantry/AddToBankHubUI.js`).then(m => m.openAddToBankModal('subtype', { parentId: ingId }));
 }
 
 export function renderIngredientBank() {
@@ -184,19 +184,19 @@ export function attachPantryBankDelegation() {
       btn.textContent = `${collapsed ? '▲' : '▼'} SUB-TYPES (${el.children.length})`;
       return;
     } else if (action === 'item-action-sheet') {
-      import(`../components/pantry/ActionSheetUI.js?v=${Date.now()}`).then(m => {
+      import(`../components/pantry/ActionSheetUI.js`).then(m => {
         m.openActionSheet({
           title: 'Item Options',
           options: [
             {
               label: 'Reorganise Item',
               icon: '🔄',
-              onClick: () => import(`../components/pantry/ReorganiseModalUI.js?v=${Date.now()}`).then(mod => mod.openReorganiseModal('item', { id }))
+              onClick: () => import(`../components/pantry/ReorganiseModalUI.js`).then(mod => mod.openReorganiseModal('item', { id }))
             },
             {
               label: 'Manage Aliases',
               icon: '🏷️',
-              onClick: () => import(`../components/pantry/ReorganiseModalUI.js?v=${Date.now()}`).then(mod => mod.openReorganiseModal('item', { id, tab: 'aliases' }))
+              onClick: () => import(`../components/pantry/ReorganiseModalUI.js`).then(mod => mod.openReorganiseModal('item', { id, tab: 'aliases' }))
             },
             {
               label: 'Delete Item',
@@ -211,58 +211,58 @@ export function attachPantryBankDelegation() {
       });
       return;
     } else if (action === 'subtype-action-sheet') {
-      import(`../components/pantry/ActionSheetUI.js?v=${Date.now()}`).then(m => {
+      import(`../components/pantry/ActionSheetUI.js`).then(m => {
         m.openActionSheet({
           title: 'Sub-type Options',
           options: [
             {
               label: 'Link Product',
               icon: '🔗',
-              onClick: () => import(`../components/pantry/SubtypeProductLinkerModalUI.js?v=${Date.now()}`).then(mod => mod.openSubtypeLinkSelectionModal(subtypeId, parentId))
+              onClick: () => import(`../components/pantry/SubtypeProductLinkerModalUI.js`).then(mod => mod.openSubtypeLinkSelectionModal(subtypeId, parentId))
             },
             {
               label: 'Reorganise Sub-type',
               icon: '🔄',
-              onClick: () => import(`../components/pantry/ReorganiseModalUI.js?v=${Date.now()}`).then(mod => mod.openReorganiseModal('subtype', { id: subtypeId, parentId }))
+              onClick: () => import(`../components/pantry/ReorganiseModalUI.js`).then(mod => mod.openReorganiseModal('subtype', { id: subtypeId, parentId }))
             },
             {
               label: 'Manage Aliases',
               icon: '🏷️',
-              onClick: () => import(`../components/pantry/ReorganiseModalUI.js?v=${Date.now()}`).then(mod => mod.openReorganiseModal('subtype', { id: subtypeId, parentId, tab: 'aliases' }))
+              onClick: () => import(`../components/pantry/ReorganiseModalUI.js`).then(mod => mod.openReorganiseModal('subtype', { id: subtypeId, parentId, tab: 'aliases' }))
             },
             {
               label: 'Delete Sub-type',
               icon: '🗑️',
               isDestructive: true,
-              onClick: () => import(`../components/pantry/ReorganiseModalUI.js?v=${Date.now()}`).then(mod => mod.openReorganiseModal('subtype', { id: subtypeId, parentId, tab: 'delete' }))
+              onClick: () => import(`../components/pantry/ReorganiseModalUI.js`).then(mod => mod.openReorganiseModal('subtype', { id: subtypeId, parentId, tab: 'delete' }))
             }
           ]
         });
       });
       return;
     } else if (action === 'add-subtype-shortcut') {
-      import(`../components/pantry/AddToBankHubUI.js?v=${Date.now()}`)
+      import(`../components/pantry/AddToBankHubUI.js`)
         .then(m => m.openAddToBankModal('subtype', { parentId: id }))
         .catch(err => console.error('Delegation Error [add-subtype-shortcut]:', err));
       return;
     } else if (action === 'reorganise-subtype' || action === 'edit-subtype' || action === 'alias-subtype') {
-      import(`../components/pantry/ReorganiseModalUI.js?v=${Date.now()}`)
+      import(`../components/pantry/ReorganiseModalUI.js`)
         .then(m => m.openReorganiseModal('subtype', { id: subtypeId, parentId }))
         .catch(err => console.error('Delegation Error [reorganise-subtype]:', err));
     } else if (action === 'link-product') {
-      import(`../components/pantry/SubtypeProductLinkerModalUI.js?v=${Date.now()}`)
+      import(`../components/pantry/SubtypeProductLinkerModalUI.js`)
         .then(m => m.openSubtypeLinkSelectionModal(subtypeId, parentId))
         .catch(err => console.error('Delegation Error [link-product]:', err));
     } else if (action === 'reorganise-item' || action === 'alias-item' || action === 'edit-item') {
-      import(`../components/pantry/ReorganiseModalUI.js?v=${Date.now()}`)
+      import(`../components/pantry/ReorganiseModalUI.js`)
         .then(m => m.openReorganiseModal('item', { id }))
         .catch(err => console.error('Delegation Error [reorganise-item]:', err));
     } else if (action === 'add-to-bank' || action === 'create-ingredient-family') {
-      import(`../components/pantry/AddToBankHubUI.js?v=${Date.now()}`)
+      import(`../components/pantry/AddToBankHubUI.js`)
         .then(m => m.openAddToBankModal())
         .catch(err => console.error('Delegation Error [add-to-bank]:', err));
     } else if (action === 'manage-categories' || action === 'open-category-manager' || action === 'reorganise-category') {
-      import(`../components/pantry/ReorganiseModalUI.js?v=${Date.now()}`)
+      import(`../components/pantry/ReorganiseModalUI.js`)
         .then(m => m.openReorganiseModal('category'))
         .catch(err => console.error('Delegation Error [manage-categories]:', err));
     }
@@ -292,13 +292,13 @@ export function mount() {
 }
 export const renderPantryBankView = renderIngredientBank; export { renderProductBank, openProductEditModal };
 export function openAddSubtypeModal(parentId) {
-  import(`../components/pantry/AddToBankHubUI.js?v=${Date.now()}`).then(m => m.openAddToBankModal('subtype', { parentId }));
+  import(`../components/pantry/AddToBankHubUI.js`).then(m => m.openAddToBankModal('subtype', { parentId }));
 }
 export function openCategoryManager() {
-  import(`../components/pantry/ReorganiseModalUI.js?v=${Date.now()}`).then(m => m.openReorganiseModal('category'));
+  import(`../components/pantry/ReorganiseModalUI.js`).then(m => m.openReorganiseModal('category'));
 }
 export function linkProductToSubtype(parentId, subtypeId) {
-  import(`../components/pantry/SubtypeProductLinkerModalUI.js?v=${Date.now()}`).then(m => m.openSubtypeLinkSelectionModal(subtypeId, parentId));
+  import(`../components/pantry/SubtypeProductLinkerModalUI.js`).then(m => m.openSubtypeLinkSelectionModal(subtypeId, parentId));
 }
 
 if (typeof window !== 'undefined') {
@@ -310,7 +310,7 @@ if (typeof window !== 'undefined') {
     handleSetDefaultProduct,
     promptAddSubtype, openCategoryManager, openCategoryManagerModal: openCategoryManager,
     updateActiveCategoryFilter, setActiveCategoryFilter, resetCategoryFilter, getFilteredIngredients,
-    createIngredientFamilyPrompt: () => import(`../components/pantry/AddToBankHubUI.js?v=${Date.now()}`).then(m => m.openAddToBankModal()),
+    createIngredientFamilyPrompt: () => import(`../components/pantry/AddToBankHubUI.js`).then(m => m.openAddToBankModal()),
     toggleSubtypeCollapse(btn, ingId) {
       const el = document.getElementById(`subtypes-container-${ingId}`); if (!el) return;
       const collapsed = el.style.display === 'none'; el.style.display = collapsed ? 'flex' : 'none'; el.classList.toggle('is-expanded', collapsed);

@@ -8,8 +8,8 @@ import store from "../store/store.js";
 
 import { getRecipes, getProducts, getPreferences, getCurrentPlan, subscribeRecipes, subscribeIngredients, subscribeProducts, subscribePreferences, subscribeCurrentPlan, getCategories, saveCategories, cleanLegacyMacros } from './HouseholdRepository.js';
 import { getRootItems, saveRootItem } from './RootItemRepository.js';
-import { getInventory } from './InventoryRepository.js';
-import { getCurrentActivePlan as getActivePlanFromSubcollection } from './PlanRepository.js';
+import { getInventory } from '../repositories/InventoryRepository.js';
+import { getCurrentActivePlan as getActivePlanFromSubcollection } from '../repositories/PlanRepository.js';
 import { setRecipes, setPreferences, setCurrentPlan, saveStateCache, setInventory, sanitizePreferences, updateState } from '../store/store.js';
 import { setIngredients, setProducts, setCategories } from '../store/store.js';
 import { compareProductsByStrategy } from '../models/PantryHierarchyModel.js';
