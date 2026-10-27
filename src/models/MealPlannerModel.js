@@ -52,6 +52,21 @@ export function sanitizeSlotNode(node) {
 }
 
 /**
+ * Sanitises the Today view's eaten-meal ticks, keyed "YYYY-MM-DD:mealType" with an
+ * optional ":e" (Elliott) or ":c" (Chloe) suffix. Only ticked entries are kept.
+ */
+export function sanitizeEatenMeals(eatenMeals) {
+  const clean = {};
+  if (!eatenMeals || typeof eatenMeals !== 'object') return clean;
+  Object.keys(eatenMeals).forEach(key => {
+    if (/^\d{4}-\d{2}-\d{2}:[a-z]+(:[ec])?$/.test(key) && eatenMeals[key] === true) {
+      clean[key] = true;
+    }
+  });
+  return clean;
+}
+
+/**
  * Returns a clean, empty meal plan schema with no recipe attachments.
  */
 export function createCleanEmptyPlanSchema(daysOverride = null) {
@@ -149,7 +164,8 @@ export function stripPlanPayload(rawInput) {
     dayDates: (planData.dayDates && typeof planData.dayDates === 'object') ? { ...planData.dayDates } : {},
     slots: cleanSlots,
     skeletonGrid: cleanSkeleton,
-    mealPrepGroups: cleanPrepGroups
+    mealPrepGroups: cleanPrepGroups,
+    eatenMeals: sanitizeEatenMeals(planData.eatenMeals)
   };
 
   FORBIDDEN_PLAN_KEYS.forEach(k => delete sanitizedPlan[k]);

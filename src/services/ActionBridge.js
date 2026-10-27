@@ -10,6 +10,7 @@ import { renderPlanner } from '../views/PlannerView.js';
 import { renderRecipeVault, handleVaultSortChange } from '../views/RecipeVaultView.js';
 import { openProductEditModal, saveManualIng, cancelManualIng, clearProductGroupFilter } from '../views/ProductBankView.js';
 import { renderDataQualityView } from '../views/DataQualityView.js';
+import { moveTodayDate, resetTodayDate, toggleMealEaten } from '../views/TodayView.js';
 import { showView } from '../core/AppRouter.js';
 import { closeRecipePreview } from './RecipeDetailModalService.js';
 import { routeRecipeAction } from './RecipeActionBridge.js';
@@ -25,6 +26,22 @@ export function routeAction(actionName, target, event) {
 
   // 1. Recipe & Vault Actions (Delegated to RecipeActionBridge)
   if (routeRecipeAction(actionName, target, event, () => [])) {
+    return true;
+  }
+
+  // 1b. Today View: date navigation and meal-eaten toggles
+  if (normalizedAction === 'today-prev' || normalizedAction === 'today-next') {
+    moveTodayDate(normalizedAction === 'today-next' ? 1 : -1);
+    return true;
+  }
+
+  if (normalizedAction === 'today-reset') {
+    resetTodayDate();
+    return true;
+  }
+
+  if (normalizedAction === 'toggle-meal-eaten') {
+    if (ds.mealType) toggleMealEaten(ds.mealType, ds.person || 'both');
     return true;
   }
 
