@@ -13,6 +13,7 @@ import { getCurrentActivePlan as getActivePlanFromSubcollection } from '../repos
 import { setRecipes, setPreferences, setCurrentPlan, saveStateCache, setInventory, sanitizePreferences, updateState } from '../store/store.js';
 import { setIngredients, setProducts, setCategories } from '../store/store.js';
 import { compareProductsByStrategy } from '../models/PantryHierarchyModel.js';
+import { carryInMemoryPlanSelections } from '../models/MealPlannerModel.js';
 import { waitForAuth } from './AuthService.js';
 import { runDeferredMaintenance } from './CacheMaintenanceService.js';
 
@@ -361,8 +362,9 @@ export function setupRealtimeSubscriptions() {
         }
       }));
 
-      unsubs.push(subscribeCurrentPlan((plan) => {
-        if (plan) {
+      unsubs.push(subscribeCurrentPlan((incomingPlan) => {
+        if (incomingPlan) {
+          const plan = carryInMemoryPlanSelections(incomingPlan, getState()?.currentPlan);
           setCurrentPlan(plan);
           if (getState()) {
             getState().currentPlan = plan;

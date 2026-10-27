@@ -80,6 +80,23 @@ export function sanitizeShoppingAtHome(shoppingAtHome) {
 }
 
 /**
+ * Swap Product choices live only on the in-memory plan, and stripPlanPayload drops them,
+ * so a saved plan arriving back from Firestore would undo them. Carry them across when
+ * the incoming plan is the same plan (same start date and days); a new plan starts clean.
+ */
+export function carryInMemoryPlanSelections(incomingPlan, inMemoryPlan) {
+  if (!incomingPlan || !inMemoryPlan) return incomingPlan;
+  const samePlan = String(incomingPlan.startDate || '') === String(inMemoryPlan.startDate || '')
+    && JSON.stringify(incomingPlan.dayDates || {}) === JSON.stringify(inMemoryPlan.dayDates || {});
+  if (!samePlan) return incomingPlan;
+
+  const carried = { ...incomingPlan };
+  if (inMemoryPlan.substitutions && !incomingPlan.substitutions) carried.substitutions = inMemoryPlan.substitutions;
+  if (inMemoryPlan.productSelections && !incomingPlan.productSelections) carried.productSelections = inMemoryPlan.productSelections;
+  return carried;
+}
+
+/**
  * Returns a clean, empty meal plan schema with no recipe attachments.
  */
 export function createCleanEmptyPlanSchema(daysOverride = null) {

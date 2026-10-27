@@ -6,6 +6,7 @@
  * 3. Unticked and malformed entries are dropped from the saved payload.
  * 4. Planner Step 3 at-home shopping ticks are kept the same way.
  * 5. Today shows one card for a shared meal and one per person for a split meal.
+ * 6. Product swaps made this session survive a tick save coming back from Firestore.
  */
 
 import assert from 'node:assert';
@@ -107,5 +108,26 @@ assert.deepStrictEqual(cardsFor({ lunch: { recipeId: 'rec-b' } }, 'lunch'),
 assert.deepStrictEqual(cardsFor({ dinnerE: { recipeId: 'gone' }, dinnerC: { recipeId: 'gone' } }, 'dinner'),
   [], 'A recipe missing from the vault shows no card');
 console.log('✅ Today shows one card for a shared meal and one each for a split meal');
+
+// 6. A saved tick coming back from Firestore keeps the session's product swaps
+const { carryInMemoryPlanSelections } = await import('../src/models/MealPlannerModel.js');
+const dayDates = { 1: '2026-10-24', 2: '2026-10-25' };
+const inMemory = {
+  startDate: '2026-10-24', dayDates,
+  substitutions: { 'evt1:ing1': { productId: 'prod-9' } },
+  productSelections: { ing1: 'prod-9' }
+};
+const saved = { id: 'current', startDate: '2026-10-24', dayDates: { ...dayDates }, shoppingAtHome: { ing2: true } };
+const merged = carryInMemoryPlanSelections(saved, inMemory);
+assert.deepStrictEqual(merged.substitutions, inMemory.substitutions, 'Swaps survive the saved plan coming back');
+assert.deepStrictEqual(merged.productSelections, inMemory.productSelections, 'Product selections survive too');
+assert.deepStrictEqual(merged.shoppingAtHome, { ing2: true }, 'The saved plan\'s own fields are kept');
+
+const newPlan = { id: 'current', startDate: '2026-11-01', dayDates: { 1: '2026-11-01' } };
+const fresh = carryInMemoryPlanSelections(newPlan, inMemory);
+assert.strictEqual(fresh.substitutions, undefined, 'A different plan does not inherit the old plan\'s swaps');
+
+assert.deepStrictEqual(carryInMemoryPlanSelections(saved, null), saved, 'The first load is unchanged');
+console.log('✅ Product swaps survive a tick save but not a new plan');
 
 console.log('\n=== TODAY VIEW SUITE PASSED ===');
