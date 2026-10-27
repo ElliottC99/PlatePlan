@@ -6,7 +6,7 @@
  * 3. Unticked and malformed entries are dropped from the saved payload.
  * 4. Planner Step 3 at-home shopping ticks are kept the same way.
  * 5. Today shows one card for a shared meal and one per person for a split meal.
- * 6. Product swaps made this session survive a tick save coming back from Firestore.
+ * 6. Product swaps survive the whole-document plan save a tick triggers.
  */
 
 import assert from 'node:assert';
@@ -109,25 +109,23 @@ assert.deepStrictEqual(cardsFor({ dinnerE: { recipeId: 'gone' }, dinnerC: { reci
   [], 'A recipe missing from the vault shows no card');
 console.log('✅ Today shows one card for a shared meal and one each for a split meal');
 
-// 6. A saved tick coming back from Firestore keeps the session's product swaps
-const { carryInMemoryPlanSelections } = await import('../src/models/MealPlannerModel.js');
-const dayDates = { 1: '2026-10-24', 2: '2026-10-25' };
-const inMemory = {
-  startDate: '2026-10-24', dayDates,
-  substitutions: { 'evt1:ing1': { productId: 'prod-9' } },
-  productSelections: { ing1: 'prod-9' }
+// 6. Product swaps survive the whole-document plan save a tick triggers
+const swapPlan = {
+  slots: {},
+  substitutions: {
+    'evt1:ing1': { productId: 'prod-9', productName: 'Brand B Oil', brand: 'B', price: 2.5, timestamp: 1782000000000, junk: { deep: true } },
+    ing2: 'prod-7',
+    ing3: { notAProduct: true }
+  },
+  productSelections: { ing1: 'prod-9', ing4: { bad: 1 } }
 };
-const saved = { id: 'current', startDate: '2026-10-24', dayDates: { ...dayDates }, shoppingAtHome: { ing2: true } };
-const merged = carryInMemoryPlanSelections(saved, inMemory);
-assert.deepStrictEqual(merged.substitutions, inMemory.substitutions, 'Swaps survive the saved plan coming back');
-assert.deepStrictEqual(merged.productSelections, inMemory.productSelections, 'Product selections survive too');
-assert.deepStrictEqual(merged.shoppingAtHome, { ing2: true }, 'The saved plan\'s own fields are kept');
-
-const newPlan = { id: 'current', startDate: '2026-11-01', dayDates: { 1: '2026-11-01' } };
-const fresh = carryInMemoryPlanSelections(newPlan, inMemory);
-assert.strictEqual(fresh.substitutions, undefined, 'A different plan does not inherit the old plan\'s swaps');
-
-assert.deepStrictEqual(carryInMemoryPlanSelections(saved, null), saved, 'The first load is unchanged');
-console.log('✅ Product swaps survive a tick save but not a new plan');
+const swapPayload = stripPlanPayload(swapPlan);
+assert.deepStrictEqual(swapPayload.substitutions, {
+  'evt1:ing1': { productId: 'prod-9', productName: 'Brand B Oil', brand: 'B', price: 2.5, timestamp: 1782000000000 },
+  ing2: 'prod-7'
+}, 'Swaps survive stripPlanPayload, without extra or malformed fields');
+assert.deepStrictEqual(swapPayload.productSelections, { ing1: 'prod-9' }, 'Product selections survive, malformed ones dropped');
+assert.deepStrictEqual(stripPlanPayload({ slots: {} }).substitutions, {}, 'A plan without swaps saves an empty map');
+console.log('✅ Product swaps survive the plan save a tick triggers');
 
 console.log('\n=== TODAY VIEW SUITE PASSED ===');

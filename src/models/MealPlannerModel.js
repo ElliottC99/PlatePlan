@@ -80,20 +80,41 @@ export function sanitizeShoppingAtHome(shoppingAtHome) {
 }
 
 /**
- * Swap Product choices live only on the in-memory plan, and stripPlanPayload drops them,
- * so a saved plan arriving back from Firestore would undo them. Carry them across when
- * the incoming plan is the same plan (same start date and days); a new plan starts clean.
+ * Sanitises Step 3 Swap Product choices. Swaps are merge-written to plans/current by
+ * setActivePlan, so the whole-document saveCurrentPlan must carry them or a tick would
+ * erase them. Values are a product id string or { productId, productName, brand, price, timestamp }.
  */
-export function carryInMemoryPlanSelections(incomingPlan, inMemoryPlan) {
-  if (!incomingPlan || !inMemoryPlan) return incomingPlan;
-  const samePlan = String(incomingPlan.startDate || '') === String(inMemoryPlan.startDate || '')
-    && JSON.stringify(incomingPlan.dayDates || {}) === JSON.stringify(inMemoryPlan.dayDates || {});
-  if (!samePlan) return incomingPlan;
+export function sanitizeSubstitutions(substitutions) {
+  const clean = {};
+  if (!substitutions || typeof substitutions !== 'object') return clean;
+  Object.keys(substitutions).forEach(key => {
+    const sub = substitutions[key];
+    if (typeof sub === 'string' && sub) {
+      clean[key] = sub;
+    } else if (sub && typeof sub === 'object' && sub.productId) {
+      clean[key] = {
+        productId: String(sub.productId),
+        productName: String(sub.productName || ''),
+        brand: String(sub.brand || ''),
+        price: Number(sub.price || 0),
+        timestamp: Number(sub.timestamp || 0)
+      };
+    }
+  });
+  return clean;
+}
 
-  const carried = { ...incomingPlan };
-  if (inMemoryPlan.substitutions && !incomingPlan.substitutions) carried.substitutions = inMemoryPlan.substitutions;
-  if (inMemoryPlan.productSelections && !incomingPlan.productSelections) carried.productSelections = inMemoryPlan.productSelections;
-  return carried;
+/**
+ * Sanitises Swap Product selections: ingredient key to product id.
+ */
+export function sanitizeProductSelections(productSelections) {
+  const clean = {};
+  if (!productSelections || typeof productSelections !== 'object') return clean;
+  Object.keys(productSelections).forEach(key => {
+    const productId = productSelections[key];
+    if ((typeof productId === 'string' && productId) || typeof productId === 'number') clean[key] = String(productId);
+  });
+  return clean;
 }
 
 /**
@@ -196,7 +217,9 @@ export function stripPlanPayload(rawInput) {
     skeletonGrid: cleanSkeleton,
     mealPrepGroups: cleanPrepGroups,
     eatenMeals: sanitizeEatenMeals(planData.eatenMeals),
-    shoppingAtHome: sanitizeShoppingAtHome(planData.shoppingAtHome)
+    shoppingAtHome: sanitizeShoppingAtHome(planData.shoppingAtHome),
+    substitutions: sanitizeSubstitutions(planData.substitutions),
+    productSelections: sanitizeProductSelections(planData.productSelections)
   };
 
   FORBIDDEN_PLAN_KEYS.forEach(k => delete sanitizedPlan[k]);
