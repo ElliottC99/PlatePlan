@@ -55,7 +55,7 @@ export async function saveProduct(product) {
     if (!product || typeof product !== 'object') return { success: false, error: 'Invalid product data' };
     const enforced = enforceCategorySSOT({ ingredients: (typeof window !== 'undefined' && getState()?.ingredients) || [], products: [product] });
     const finalProd = enforced.products[0] || product;
-    const prodData = { ...finalProd, updatedAt: new Date().toISOString() };
+    const prodData = { ...finalProd, schemaVersion: 2, updatedAt: new Date().toISOString() };
     const prodId = product.id || db.collection('households').doc(HOUSEHOLD_ID).collection('products').doc().id;
     delete prodData.id;
     await db.collection('households').doc(HOUSEHOLD_ID).collection('products').doc(prodId).set(prodData, { merge: true });

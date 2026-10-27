@@ -7,6 +7,7 @@
 
 import fs from 'fs/promises';
 import { existsSync, mkdirSync, rmSync } from 'fs';
+import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -39,7 +40,7 @@ async function build() {
 
   // 3. Copy individual files
   const filesToCopy = [
-    'PlatePlan.html',
+    'index.html',
     'manifest.json',
     'sw.js',
     'metadata.json',
@@ -60,18 +61,40 @@ async function build() {
     }
   }
 
-  // 4. Generate dist/index.html
-  const platePlanSrc = path.join(rootDir, 'PlatePlan.html');
+  // 4. Ensure dist/index.html exists
+  const indexSrc = path.join(rootDir, 'index.html');
   const distIndex = path.join(distDir, 'index.html');
-  if (existsSync(platePlanSrc)) {
-    await fs.copyFile(platePlanSrc, distIndex);
-    console.log('✅ Generated dist/index.html directly from PlatePlan.html');
+  if (existsSync(indexSrc) && !existsSync(distIndex)) {
+    await fs.copyFile(indexSrc, distIndex);
+    console.log('✅ Generated dist/index.html from index.html');
+  }
+
+  // 4b. Stamp __APP_VERSION__ and __BUILD_ID__ into dist/index.html and dist/sw.js
+  const pkgRaw = await fs.readFile(path.join(rootDir, 'package.json'), 'utf8');
+  const pkg = JSON.parse(pkgRaw);
+  const appVersion = pkg.version;
+  let gitHash = 'unknown';
+  try {
+    gitHash = execSync('git rev-parse --short HEAD', { cwd: rootDir, encoding: 'utf8' }).trim();
+  } catch (err) {
+    console.warn('⚠️ Failed to resolve git commit hash, falling back to "unknown":', err.message);
+  }
+
+  for (const targetFile of ['index.html', 'sw.js']) {
+    const distTarget = path.join(distDir, targetFile);
+    if (existsSync(distTarget)) {
+      const rawContent = await fs.readFile(distTarget, 'utf8');
+      const stampedContent = rawContent
+        .replaceAll('__APP_VERSION__', appVersion)
+        .replaceAll('__BUILD_ID__', gitHash);
+      await fs.writeFile(distTarget, stampedContent, 'utf8');
+      console.log(`✅ Stamped ${targetFile} (__APP_VERSION__=${appVersion}, __BUILD_ID__=${gitHash})`);
+    }
   }
 
   // 5. Verify build artifact validity
   const requiredArtifacts = [
     'index.html',
-    'PlatePlan.html',
     'manifest.json',
     'sw.js',
     'src/config/firebase-config.js',

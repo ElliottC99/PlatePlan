@@ -8,9 +8,13 @@ cookies.txt
 *firebase-adminsdk*.json
 *service-account*.json
 
-# Firestore backups (scripts/backup_firestore.js) hold household data
+# Firestore backups hold household data
 PlatePlan-backups/
 plateplan-backup-*.json
+households_elliott-chloe_backup.json
+
+# Local scratch folder
+attic/
 
 # OS clutter
 .DS_Store
