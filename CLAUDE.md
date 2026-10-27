@@ -8,6 +8,8 @@ PlatePlan is a no-bundler PWA for shared household meal planning: recipes ("vaul
 
 Elliott builds it mostly through Google AI Studio. Barrie reviews and helps with process. `workflow-enforcer.md` and `plateplan-architecture.md` are the rules and target design Elliott's AI works to. Read them before changing structure.
 
+Plans live in `docs/plans/`. Learnings from solved problems live in `docs/solutions/`; check there before changing the area a learning covers.
+
 ## Branches and hosting
 
 GitHub Pages serves `main` from the repo root. It does **not** run `npm run build`, so whatever is committed to `main` is exactly what users load. Work happens on `dev/*` branches, goes to `development` for testing, then to `main`. Don't commit straight to `main`.
