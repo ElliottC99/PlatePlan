@@ -1,0 +1,253 @@
+/**
+ * src/components/pantry/IngredientActionModalsRenderService.js (v3.38.70)
+ * Pure template generation service for Ingredient Action Modals.
+ */
+
+const escapeHTML = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/**
+ * Renders the Manage Aliases modal content.
+ */
+export function renderAddAliasTemplate(ing, aliases) {
+  return `
+    <div style="padding: 20px; max-width: 480px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 12px;">
+      <h3 style="margin-top:0; margin-bottom: 12px; font-size: 1.15rem; font-weight: 750;">🏷️ Manage Aliases: ${escapeHTML(ing.name)}</h3>
+      
+      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom: 16px; padding: 10px; background: var(--surface2,#f5f5f4); border-radius:8px; min-height: 50px;">
+        ${aliases.map(a => `
+          <span style="font-size: 11px; padding: 4px 10px; border-radius: 999px; background: #fff; border: 1px solid var(--border,#e7e5e4); display: flex; align-items: center; gap: 4px;">
+            ${escapeHTML(a)}
+            <span style="cursor:pointer; font-weight:bold; color:var(--red,#ef4444);" onclick="window.handleIngredientAliasRemove('${escapeHTML(a)}')">&times;</span>
+          </span>
+        `).join('') || '<span style="font-size:12px; color:var(--text2); font-style:italic; padding:6px 0;">No aliases defined yet</span>'}
+      </div>
+
+      <div style="display:flex; gap:6px; margin-bottom: 20px;">
+        <input type="text" id="new-ing-alias-input" placeholder="e.g. Sourdough loaf" style="flex:1; padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-size: 12px;" name="new-ing-alias-input" />
+        <button type="button" class="btn primary sm" id="btn-add-ing-alias">Add Alias</button>
+      </div>
+
+      <div style="display:flex; justify-content: flex-end;">
+        <button type="button" class="btn" onclick="window.closeSubtypeActionModal()">Close</button>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Renders the Promote Sub-type confirmation modal.
+ */
+export function renderPromoteSubtypeTemplate() {
+  return `
+    <div style="padding: 24px; max-width: 440px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">🚀</div>
+      <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750;">Promote Sub-type?</h3>
+      <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 24px 0; line-height: 1.5;">
+        Are you sure you want to promote this sub-type to a standalone Ingredient?
+      </p>
+
+      <div style="display:flex; gap:8px; justify-content: center;">
+        <button type="button" class="btn" style="padding: 8px 16px;" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn primary" style="padding: 8px 16px;" id="btn-confirm-sub-promote">Confirm Promote</button>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Renders the Demote Ingredient to Sub-type modal.
+ */
+export function renderDemoteTemplate(candidates) {
+  return `
+    <div style="padding: 24px; max-width: 480px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 12px;">
+      <h3 style="margin-top:0; margin-bottom: 12px; font-size: 1.15rem; font-weight: 750;">⬇️ Move Ingredient to Sub-type</h3>
+      <p style="font-size: 13px; color: var(--text2); margin-bottom: 16px;">Select which parent ingredient you want to nest this under as a child sub-type.</p>
+
+      <div style="display:flex; gap:8px; margin-bottom: 20px;">
+        <select id="demote-parent-select" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:6px; font-size:12px;" name="demote-parent-select">
+          ${candidates.map(c => `<option value="${escapeHTML(c.id)}">${escapeHTML(c.name)} (${escapeHTML(c.category || 'Other')})</option>`).join('')}
+        </select>
+      </div>
+
+      <div style="display:flex; gap:8px; justify-content: flex-end;">
+        <button type="button" class="btn" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn primary" id="btn-confirm-demote">Set as Sub-type</button>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Renders the Merge Ingredient modal.
+ */
+export function renderMergeTemplate(candidates) {
+  return `
+    <div style="padding: 24px; max-width: 480px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 12px;">
+      <h3 style="margin-top:0; margin-bottom: 12px; font-size: 1.15rem; font-weight: 750;">🔀 Merge Ingredient</h3>
+      <p style="font-size: 13px; color: var(--text2); margin-bottom: 16px;">Select another ingredient to merge into. This will combine all aliases, sub-types, and products into the target.</p>
+
+      <div style="display:flex; gap:8px; margin-bottom: 20px;">
+        <select id="merge-target-select" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:6px; font-size:12px;" name="merge-target-select">
+          ${candidates.map(c => `<option value="${escapeHTML(c.id)}">${escapeHTML(c.name)} (${escapeHTML(c.category || 'Other')})</option>`).join('')}
+        </select>
+      </div>
+
+      <div style="display:flex; gap:8px; justify-content: flex-end;">
+        <button type="button" class="btn" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn primary" id="btn-confirm-merge">Merge Ingredients</button>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Renders the Delete Ingredient confirmation modal.
+ */
+export function renderDeleteIngredientTemplate(targetName) {
+  return `
+    <div style="padding: 24px; max-width: 440px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">⚠️</div>
+      <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750; color: var(--red,#ef4444)">Delete Ingredient?</h3>
+      <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 24px 0; line-height: 1.5;">
+        Are you sure you want to delete <strong>"${escapeHTML(targetName)}"</strong>? <br />This will remove it from the pantry bank and clear all relationships.
+      </p>
+
+      <div style="display:flex; gap:8px; justify-content: center;">
+        <button type="button" class="btn" style="padding: 8px 16px;" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn danger" style="padding: 8px 16px;" id="btn-confirm-ing-delete">Confirm Delete</button>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Renders the Delete Product confirmation modal.
+ */
+export function renderDeleteProductTemplate(targetName) {
+  return `
+    <div style="padding: 24px; max-width: 440px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">🗑️</div>
+      <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750; color: var(--red,#ef4444)">Delete Product?</h3>
+      <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 24px 0; line-height: 1.5;">
+        Are you sure you want to delete <strong>"${escapeHTML(targetName)}"</strong> from your bank?
+      </p>
+
+      <div style="display:flex; gap:8px; justify-content: center;">
+        <button type="button" class="btn" style="padding: 8px 16px;" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn danger" style="padding: 8px 16px;" id="btn-confirm-prod-delete">Confirm Delete</button>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Renders a custom alert modal.
+ */
+export function renderCustomAlertTemplate(message) {
+  return `
+    <div style="padding: 24px; max-width: 400px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">⚠️</div>
+      <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750;">Notification</h3>
+      <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 20px 0; line-height: 1.5;">
+        ${escapeHTML(message)}
+      </p>
+      <div style="display:flex; justify-content: center;">
+        <button type="button" class="btn primary" style="padding: 8px 24px;" onclick="window.closeSubtypeActionModal()">OK</button>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Renders the Reorganise Ingredient modal.
+ */
+export function renderReorganiseTemplate(ing, targetCandidates, categories = []) {
+  return `
+    <div style="padding: 24px; max-width: 500px; width: 100%; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);">
+      <h3 style="margin-top:0; margin-bottom: 6px; font-size: 1.15rem; font-weight: 750;">Reorganise: ${escapeHTML(ing.name)}</h3>
+      <p style="font-size: 12.5px; color: var(--text2,#78716c); margin: 0 0 18px 0;">Select how you want to restructure or consolidate this item.</p>
+
+      <!-- Option 1: Promote to Category -->
+      <div style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 14px; background: #f8fafc;">
+        <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">🚀 Option 1: Promote to Category</div>
+        <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Promotes this item into a standalone top-level Category.</p>
+        <button type="button" class="btn primary sm" id="btn-reorg-promote" style="font-weight:600">Promote to Category</button>
+      </div>
+
+      <!-- Option 2: Move Category -->
+      <div style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 14px; background: #f8fafc;">
+        <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">📂 Option 2: Move Category</div>
+        <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Moves this item into a different existing Category.</p>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="reorg-move-cat-input" list="reorg-categories-datalist" autocomplete="off" placeholder="Select or type category..." style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff);" />
+          <datalist id="reorg-categories-datalist">
+            ${categories.map(c => `<option value="${escapeHTML(c)}">`).join('')}
+          </datalist>
+          <button type="button" class="btn primary sm" id="btn-reorg-move" style="font-weight:600">Move Category</button>
+        </div>
+      </div>
+
+      <!-- Option 3: Merge Item -->
+      <div style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 14px; background: #f8fafc;">
+        <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">🔀 Option 3: Merge Item</div>
+        <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Merges this item into another item in your pantry bank.</p>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="reorg-merge-item-input" list="reorg-candidates-datalist" autocomplete="off" placeholder="Select target item..." style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff);" ${targetCandidates.length === 0 ? 'disabled' : ''} />
+          <datalist id="reorg-candidates-datalist">
+            ${targetCandidates.map(t => `<option value="${escapeHTML(t.name)}">`).join('')}
+          </datalist>
+          <button type="button" class="btn primary sm" id="btn-reorg-merge" style="font-weight:600" ${targetCandidates.length === 0 ? 'disabled' : ''}>Merge Item</button>
+        </div>
+      </div>
+
+      <!-- Option 4: Demote to Sub-type -->
+      <div style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 16px; background: #f8fafc;">
+        <div style="font-weight: 750; font-size: 13px; margin-bottom: 4px; color: var(--text,#1c1917);">⬇️ Option 4: Demote to Sub-type</div>
+        <p style="margin: 0 0 10px 0; font-size: 11.5px; color: var(--text2,#78716c);">Nests this item as a child sub-type under another parent item.</p>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="reorg-demote-item-input" list="reorg-candidates-datalist" autocomplete="off" placeholder="Select parent item..." style="flex:1; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; background:var(--surface,#fff);" ${targetCandidates.length === 0 ? 'disabled' : ''} />
+          <button type="button" class="btn primary sm" id="btn-reorg-demote" style="font-weight:600" ${targetCandidates.length === 0 ? 'disabled' : ''}>Demote to Sub-type</button>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content: flex-end;">
+        <button type="button" class="btn ghost sm" onclick="window.closeSubtypeActionModal()" style="font-weight:600">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Renders a custom confirmation modal.
+ */
+export function renderCustomConfirmTemplate(message, title = 'Confirm Action') {
+  return `
+    <div style="padding: 24px; max-width: 400px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
+      <div style="font-size: 40px; margin-bottom: 12px;">❓</div>
+      <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750;">${escapeHTML(title)}</h3>
+      <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 20px 0; line-height: 1.5;">
+        ${escapeHTML(message)}
+      </p>
+      <div style="display:flex; gap:8px; justify-content: center;">
+        <button type="button" class="btn" style="padding: 8px 24px;" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn primary" style="padding: 8px 24px;" id="btn-confirm-custom">Confirm</button>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Renders a modal for copying text.
+ */
+export function renderCopyTextModalTemplate(title, text) {
+  return `
+    <div style="padding: 24px; max-width: 480px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px;">
+      <h3 style="margin-top:0; margin-bottom: 12px; font-size: 1.15rem; font-weight: 750;">${escapeHTML(title)}</h3>
+      <textarea id="copy-modal-textarea" readonly style="width:100%; height: 200px; padding: 12px; border: 1px solid var(--border,#e7e5e4); border-radius: 8px; font-size: 12px; font-family: monospace; background: var(--surface2,#fafaf9); margin-bottom: 16px; resize: none;">${escapeHTML(text)}</textarea>
+      <div style="display:flex; justify-content: flex-end; gap:8px;">
+        <button type="button" class="btn" onclick="window.closeSubtypeActionModal()">Close</button>
+        <button type="button" class="btn primary" id="btn-copy-modal-text">Copy to Clipboard</button>
+      </div>
+    </div>
+  `;
+}
