@@ -5,6 +5,7 @@
  * 2. stripPlanPayload keeps ticked meals, so saveCurrentPlan persists them.
  * 3. Unticked and malformed entries are dropped from the saved payload.
  * 4. Planner Step 3 at-home shopping ticks are kept the same way.
+ * 5. Today shows one card for a shared meal and one per person for a split meal.
  */
 
 import assert from 'node:assert';
@@ -73,5 +74,38 @@ const shopPayload = stripPlanPayload({ slots: {}, shoppingAtHome: { ing123: true
 assert.deepStrictEqual(shopPayload.shoppingAtHome, { ing123: true }, 'Ticked at-home items should survive stripPlanPayload');
 assert.deepStrictEqual(sanitizeShoppingAtHome(null), {}, 'A missing at-home map saves as empty');
 console.log('✅ stripPlanPayload keeps at-home shopping ticks');
+
+// 5. Today's cards follow the planner's shared-or-split rule
+const { getTodayMealCards } = await import('../src/views/TodayView.js');
+const { getState } = await import('../src/store/coreState.js');
+getState().recipes = [{ id: 'rec-a', name: 'Shake' }, { id: 'rec-b', name: 'Curry' }];
+const cardsFor = (dayPlan, meal) => getTodayMealCards(dayPlan, meal).map(c => `${c.person}:${c.info.id}:${c.info.variant}`);
+
+assert.deepStrictEqual(cardsFor({
+  breakfastE: { recipeId: 'rec-a', variant: 'original' },
+  breakfastC: { recipeId: 'rec-a', variant: 'original' }
+}, 'breakfast'), ['both:rec-a:original'], 'Same recipe and version is one shared card');
+
+assert.deepStrictEqual(cardsFor({
+  dinnerE: { recipeId: 'rec-a', variant: 'original' },
+  dinnerC: { recipeId: 'rec-b', variant: 'original' }
+}, 'dinner'), ['e:rec-a:original', 'c:rec-b:original'], 'Different recipes give a card each, Elliott first');
+
+assert.deepStrictEqual(cardsFor({
+  dinnerE: { recipeId: 'rec-a', variant: 'original' },
+  dinnerC: { recipeId: 'rec-a', variant: 'enhanced' }
+}, 'dinner'), ['e:rec-a:original', 'c:rec-a:enhanced'], 'Different versions of one recipe give a card each');
+
+assert.deepStrictEqual(cardsFor({
+  lunchE: { recipeId: 'rec-b', variant: 'original' },
+  lunchC: { isSkipped: true }
+}, 'lunch'), ['e:rec-b:original'], 'A skipped Chloe slot leaves only Elliott\'s card');
+
+assert.deepStrictEqual(cardsFor({ lunch: { recipeId: 'rec-b' } }, 'lunch'),
+  ['both:rec-b:original'], 'An older plan with a plain meal key shows one shared card');
+
+assert.deepStrictEqual(cardsFor({ dinnerE: { recipeId: 'gone' }, dinnerC: { recipeId: 'gone' } }, 'dinner'),
+  [], 'A recipe missing from the vault shows no card');
+console.log('✅ Today shows one card for a shared meal and one each for a split meal');
 
 console.log('\n=== TODAY VIEW SUITE PASSED ===');
