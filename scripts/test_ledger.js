@@ -41,8 +41,15 @@ const BASE_TREE = {
     'export function boot() { return import(`./sheets/Pantry.js`).then(() => import(\'./sheets/Nav.js\')); }',
     "const view = (name) => import(`./views/${name}.js`);",
     "import { B } from './units/B.js'; import { C } from './units/C.js'; import { D } from './units/D.js'; import './config.js';",
+    "const page = (n) => import('./pages/' + n + '.js');",
+    "import { gone } from './missing.js';",
+    // The regex literal looks like the start of a /* comment to a naive stripper.
+    "const trim = (s) => s.replace(/\\/*$/, ''); function lazy() { return import('./re/Hidden.js'); }",
+    '/** end */',
     ''
   ].join('\n'),
+  'src/pages/Home.js': 'export const home = 1;\n',
+  'src/re/Hidden.js': 'export const hidden = 1;\n',
   'src/units/A.js': 'export const a = 1;\n',
   'src/units/B.js': 'export const B = 1;\n',
   'src/units/C.js': 'export const C = 1;\n',
@@ -132,13 +139,16 @@ expectLabel('src/sheets/Nav.js', 'Live');
 expectLabel('src/LiveShim.js', 'Live shims');
 expectLabel('src/DeadShim.js', 'Dead shims');
 expectLabel('src/Dead.js', 'Dead');
-expectLabel('src/Commented.js', 'Dead');
+expectLabel('src/Commented.js', 'Needs a check'); // only a commented-out import names it
 expectLabel('src/cycle/One.js', 'Dead');
 expectLabel('src/cycle/Two.js', 'Dead');
 expectLabel('src/widgets/Mentioned.js', 'Needs a check');
 expectLabel('src/views/Lazy.js', 'Needs a check');
 expectLabel('src/tested/OnlyByTests.js', 'Needs a check');
 expectLabel('src/old/Card.js', 'Dead shims');
+expectLabel('src/pages/Home.js', 'Needs a check'); // import('./pages/' + n + '.js')
+expectLabel('src/re/Hidden.js', 'Needs a check'); // import() hidden from the stripper by a regex literal
+check('A missing import target is listed as broken', ledger.includes('- src/main.js imports ./missing.js'));
 check('A needs-a-check entry says why', /`src\/widgets\/Mentioned\.js`: its path appears in index\.html/.test(ledger));
 check('Attic files are not labelled as src modules', labelOf(ledger, 'attic/src/gone/Dated.js') === null);
 
@@ -179,6 +189,21 @@ check('No ledger is written when the table is wrong', missingResult.ledger === '
 const noTable = makeTree({ ...BASE_TREE, 'plateplan-architecture.md': '# Architecture\n\nNo table here.\n' });
 const noTableResult = runLedger(noTable);
 check('A missing owner table stops the run', noTableResult.status !== 0 && noTableResult.stderr.includes('no owner table'), noTableResult.stderr);
+
+// An import() built from a variable could load anything, so nothing unreachable is dead.
+const variableImport = makeTree({
+  ...BASE_TREE,
+  'src/main.js': `${BASE_TREE['src/main.js']}export const load = (p) => import(p);\n`
+});
+const variableLedger = runLedger(variableImport).ledger;
+check('A variable import() keeps every unreachable file out of Dead', labelOf(variableLedger, 'src/Dead.js') === 'Needs a check' && labelOf(variableLedger, 'src/DeadShim.js') === 'Needs a check');
+
+// Without an entry point every module would look dead, so the run stops instead.
+const { 'index.html': _, ...noIndexTree } = BASE_TREE;
+const noIndex = runLedger(makeTree(noIndexTree));
+check('A missing index.html stops the run', noIndex.status !== 0 && noIndex.stderr.includes('index.html not found') && noIndex.ledger === '', noIndex.stderr);
+const noEntry = runLedger(makeTree({ ...BASE_TREE, 'index.html': '<html><script type="module">import "./src/main.js";</script></html>\n' }));
+check('An index.html with no src/ script tag stops the run', noEntry.status !== 0 && noEntry.stderr.includes('no <script src='), noEntry.stderr);
 
 for (const d of tempDirs) fs.rmSync(d, { recursive: true, force: true });
 

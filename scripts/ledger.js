@@ -14,8 +14,10 @@
  * already loaded, so they need no separate pass. An unreachable module is
  * labelled "needs a check" rather than dead when its folder-plus-name path
  * (for example services/firebase.js) appears in another file's code, when it
- * sits under a folder used by an import() built with ${}, or when a script
- * outside src/ imports it. Only what is left is dead.
+ * sits under a folder a computed import() could reach, when a script outside
+ * src/ imports it, or when an import in a live file's raw text (comments
+ * included) names it. Only what is left is dead. The run stops if index.html
+ * or its src/ script tag is missing, rather than calling everything dead.
  */
 
 import fs from 'fs/promises';
@@ -34,7 +36,8 @@ const LABELS = ['live', 'live shim', 'needs a check', 'dead shim', 'dead'];
 
 const STATIC_IMPORT = /\b(import|export)\s+((?:(?!\b(?:import|export)\b)[^'"`;])*?)\s*\bfrom\s*(['"])([^'"]+)\3|\bimport\s*(['"])([^'"]+)\5/g;
 const DYNAMIC_IMPORT = /\bimport\(\s*(['"`])([^'"`]*)\1\s*\)/g;
-const COMPUTED_IMPORT = /\bimport\(\s*(?!['"`])/;
+const ANY_IMPORT_CALL = /\bimport\(/g;
+const CONCAT_IMPORT = /\bimport\(\s*(['"])([^'"]*)\1\s*\+/g;
 
 class LedgerError extends Error {}
 
@@ -101,7 +104,9 @@ function parseImports(file, code) {
     });
   }
   const interpolatedDirs = [];
+  let literalCalls = 0;
   for (const m of code.matchAll(DYNAMIC_IMPORT)) {
+    literalCalls++;
     const specifier = m[2];
     if (m[1] === '`' && specifier.includes('${')) {
       const prefix = specifier.slice(0, specifier.indexOf('${'));
@@ -111,7 +116,15 @@ function parseImports(file, code) {
       imports.push({ specifier, target: resolveSpecifier(file, specifier), kind: 'dynamic', clause: '' });
     }
   }
-  if (COMPUTED_IMPORT.test(code)) interpolatedDirs.push(toPosix(path.dirname(file)));
+  // An import() built from a quoted prefix plus a variable can load anything under
+  // that prefix's folder; one built some other way can load anything in src/.
+  let computedCalls = (code.match(ANY_IMPORT_CALL) || []).length - literalCalls;
+  for (const m of code.matchAll(CONCAT_IMPORT)) {
+    computedCalls--;
+    const prefix = m[2];
+    interpolatedDirs.push(resolveSpecifier(file, prefix.endsWith('/') ? prefix : path.posix.dirname(prefix) + '/') || 'src');
+  }
+  if (computedCalls > 0) interpolatedDirs.push('src');
   return { imports, interpolatedDirs };
 }
 
@@ -237,10 +250,14 @@ async function buildLedger() {
   for (const f of srcFiles) code.set(f, stripComments(await fs.readFile(path.join(rootDir, f), 'utf8')));
 
   const indexPath = path.join(rootDir, 'index.html');
-  const indexHtml = existsSync(indexPath) ? await fs.readFile(indexPath, 'utf8') : '';
+  if (!existsSync(indexPath)) throw new LedgerError('index.html not found, so nothing can be traced from the app');
+  const indexHtml = await fs.readFile(indexPath, 'utf8');
   const entries = [...indexHtml.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/g)]
     .map((m) => m[1].split('?')[0].replace(/^\.\//, ''))
     .filter((src) => srcSet.has(src));
+  if (entries.length === 0) {
+    throw new LedgerError('index.html has no <script src="src/..."> tag, so nothing can be traced from the app');
+  }
 
   const parsed = new Map();
   const interpolatedDirs = [];
@@ -277,6 +294,15 @@ async function buildLedger() {
     for (const imp of imports) if (imp.target && srcSet.has(imp.target)) importedFromOutside.add(imp.target);
   }
 
+  // Imports found in the raw source of live files, comments included. The comment
+  // stripper can be fooled by a regex literal such as /\/*$/, which would hide a real
+  // import; any module only these name is kept out of "dead".
+  const importedInRawCode = new Set();
+  for (const f of reachable) {
+    const { imports } = parseImports(f, await fs.readFile(path.join(rootDir, f), 'utf8'));
+    for (const imp of imports) if (imp.target && imp.target !== f && srcSet.has(imp.target)) importedInRawCode.add(imp.target);
+  }
+
   // Text each file shows to the mention check: its code minus specifiers that resolved to a file.
   const mentionText = new Map();
   for (const f of srcFiles) {
@@ -298,6 +324,7 @@ async function buildLedger() {
     const dir = interpolatedDirs.find((d) => f.startsWith(d.endsWith('/') ? d : `${d}/`));
     if (dir) return { path: f, label: 'needs a check', reason: `a computed import() can load files under ${dir}` };
     if (importedFromOutside.has(f)) return { path: f, label: 'needs a check', reason: 'a script outside src/ imports it' };
+    if (importedInRawCode.has(f)) return { path: f, label: 'needs a check', reason: 'an import that may be commented out names it' };
     const mention = mentionedBy(f);
     if (mention) return { path: f, label: 'needs a check', reason: `its path appears in ${mention}` };
     return { path: f, label: shim ? 'dead shim' : 'dead' };
