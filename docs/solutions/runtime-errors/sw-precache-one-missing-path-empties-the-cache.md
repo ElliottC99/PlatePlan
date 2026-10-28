@@ -12,6 +12,7 @@ symptoms:
 root_cause: missing_workflow_step
 resolution_type: code_fix
 severity: medium
+last_updated: 2026-10-28
 related_components:
   - infrastructure
 tags: [service-worker, sw-js, precache, cache-addAll, offline, module-removal]
@@ -19,7 +20,7 @@ tags: [service-worker, sw-js, precache, cache-addAll, offline, module-removal]
 
 # One missing path in the sw.js precache list leaves the whole precache empty, with only a console warning
 
-> **Update 2026-10-28:** `sw.js` and its precache list were removed (`docs/plans/2026-10-28-1153-fix-version-stamping-plan.md`). This lesson applies only if a service worker is added back.
+> **Historical since 2026-10-28:** `sw.js`, its precache list and its registration were removed (commit `3b406ec`, `docs/plans/2026-10-28-1153-fix-version-stamping-plan.md`). The check script and console warning below no longer apply to anything in the repo. The underlying lesson, that `cache.addAll` stores nothing when any one path fails, applies only if a service worker is added back.
 
 ## Problem
 
@@ -55,6 +56,8 @@ On 2026-10-27, after `5ee2c08`, it reported 97 paths and none missing.
 
 ## Prevention
 
+These steps applied while `sw.js` existed; keep them in mind only if a service worker returns.
+
 - Run the check above whenever a module is added, renamed or deleted. CLAUDE.md already covers adding.
 - When testing the service worker, look for "Non-fatal precache warning" in the console. Its absence is the only sign that the precache succeeded.
-- The cache names are built from `__APP_VERSION__`, which GitHub Pages serves unstamped (see CLAUDE.md, Versioning). They never change, so the old caches are never cleared on activate. Don't assume a corrected list gives installed phones a fresh cache until the version-stamping fix ships.
+- At the time, the cache names were built from an unstamped `__APP_VERSION__` and never changed. That turned out not to matter: `src/main.js` unregistered every service worker and deleted every cache on each load, so phones never kept stale caches. Pages now publishes a stamped build (`docs/solutions/integration-issues/pages-served-the-unbuilt-repo-so-version-placeholders-went-live.md`).
