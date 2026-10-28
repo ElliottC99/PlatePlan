@@ -42,7 +42,6 @@ async function build() {
   const filesToCopy = [
     'index.html',
     'manifest.json',
-    'sw.js',
     'metadata.json',
     'icon-192.png',
     'icon-192-maskable.png',
@@ -69,7 +68,7 @@ async function build() {
     console.log('✅ Generated dist/index.html from index.html');
   }
 
-  // 4b. Stamp __APP_VERSION__ and __BUILD_ID__ into dist/index.html and dist/sw.js
+  // 4b. Stamp __APP_VERSION__ and __BUILD_ID__ into dist/index.html
   const pkgRaw = await fs.readFile(path.join(rootDir, 'package.json'), 'utf8');
   const pkg = JSON.parse(pkgRaw);
   const appVersion = pkg.version;
@@ -80,7 +79,7 @@ async function build() {
     console.warn('⚠️ Failed to resolve git commit hash, falling back to "unknown":', err.message);
   }
 
-  for (const targetFile of ['index.html', 'sw.js']) {
+  for (const targetFile of ['index.html']) {
     const distTarget = path.join(distDir, targetFile);
     if (existsSync(distTarget)) {
       const rawContent = await fs.readFile(distTarget, 'utf8');
@@ -96,7 +95,6 @@ async function build() {
   const requiredArtifacts = [
     'index.html',
     'manifest.json',
-    'sw.js',
     'src/config/firebase-config.js',
     'metadata.json',
     'src/main.js',
@@ -119,8 +117,33 @@ async function build() {
     process.exit(1);
   }
 
+  // 6. Refuse to publish a page that still holds a version placeholder.
+  // dist/scripts/ is build and test tooling that names the placeholders on purpose.
+  const leftovers = await findLeftoverPlaceholders(distDir, [path.join(distDir, 'scripts')]);
+  if (leftovers.length > 0) {
+    for (const file of leftovers) {
+      console.error(`❌ Unstamped version placeholder in: ${path.relative(distDir, file)}`);
+    }
+    console.error(`Build failed: ${leftovers.length} published file(s) still hold __APP_VERSION__ or __BUILD_ID__.`);
+    process.exit(1);
+  }
+
   const fileCount = (await fs.readdir(distDir)).length;
   console.log(`=== BUILD SUCCEEDED: ${fileCount} top-level entries in dist/ ===`);
+}
+
+async function findLeftoverPlaceholders(dir, excludedDirs) {
+  const leftovers = [];
+  for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (!excludedDirs.includes(entryPath)) leftovers.push(...await findLeftoverPlaceholders(entryPath, excludedDirs));
+    } else if (/\.(html|js|mjs|css|json|webmanifest|txt|md)$/.test(entry.name)) {
+      const content = await fs.readFile(entryPath, 'utf8');
+      if (content.includes('__APP_VERSION__') || content.includes('__BUILD_ID__')) leftovers.push(entryPath);
+    }
+  }
+  return leftovers;
 }
 
 build().catch(err => {

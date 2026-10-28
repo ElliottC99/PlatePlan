@@ -286,7 +286,6 @@ function setupSubscriptions() {
   subscribe('plan', () => { renderToday(); renderPlanner(); });
 }
 
-export const APP_VERSION = 'v3.45.7';
 let isAppInitialized = false;
 async function initApp() {
   if (isAppInitialized || (typeof window !== 'undefined' && window.__plateplan_app_booted)) return;
@@ -309,18 +308,22 @@ async function initApp() {
   };
 
   try {
+    const appVersion = AppInitializer.formatAppVersion(
+      document.querySelector('meta[name="app-version"]')?.content,
+      document.querySelector('meta[name="build-id"]')?.content
+    );
     const versionEl = document.getElementById('app-header-version');
-    if (versionEl) versionEl.textContent = APP_VERSION;
+    if (versionEl) versionEl.textContent = appVersion;
     
     // Explicitly sync store version to runtime version
     const currentState = getState();
-    if (currentState && currentState.version !== APP_VERSION) {
-      AppState.updateState({ version: APP_VERSION });
+    if (currentState && currentState.version !== appVersion) {
+      AppState.updateState({ version: appVersion });
     }
 
     try { await initStoreCache(); } catch (cacheErr) {}
     try { setupActionBridge(); setupSubscriptions(); } catch (bridgeErr) {}
-    try { AppInitializer.registerServiceWorker(); AppInitializer.initPlatePlanApp(); } catch (initErr) {}
+    try { AppInitializer.initPlatePlanApp(); } catch (initErr) {}
 
     setSyncStatus('connecting', 'Connecting...');
 
@@ -355,16 +358,13 @@ async function initApp() {
   }
 }
 
-// Service Worker Update Listener
+// PlatePlan has no service worker. Phones that installed the old one keep it until it is
+// unregistered, and a missing sw.js does not reliably remove it, so this cleanup stays.
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(function(registrations) {
     for(let registration of registrations) {
       registration.unregister();
     }
-  });
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    console.info('[PlatePlan PWA] New Service Worker controller detected. Reloading for fresh assets...');
-    window.location.reload();
   });
 }
 if ('caches' in window) {

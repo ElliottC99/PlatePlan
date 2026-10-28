@@ -1,6 +1,6 @@
 /**
  * src/core/AppInitializer.js (v3.35.1)
- * Core Application Bootstrapping, Passive Service Worker & Toast Notifications
+ * Core Application Bootstrapping, Release Version & Toast Notifications
  */
 
 const TOAST_FADE_OUT_MS = 200;
@@ -26,58 +26,14 @@ export function showPlatePlanToast(msg, type = 'info') {
   }, 3000);
 }
 
-let isSwRegistered = false;
-let swLogged = false;
+// The build stamps the release version and commit ID into index.html's meta tags.
+// An unstamped page (npm run dev on unbuilt files) still holds __NAME__ placeholders.
+const UNSTAMPED_PLACEHOLDER = /^__[A-Z_]+__$/;
 
-export function showUpdateBanner(worker) {
-  if (worker && typeof worker.postMessage === 'function') {
-    worker.postMessage({ type: 'SKIP_WAITING' });
-  }
+export function formatAppVersion(version, buildId) {
+  if (!version || !buildId || UNSTAMPED_PLACEHOLDER.test(version) || UNSTAMPED_PLACEHOLDER.test(buildId)) return 'dev';
+  return `${version} (${buildId})`;
 }
-
-export async function checkAndUpdateApp() {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
-  try {
-    const reg = await navigator.serviceWorker.getRegistration();
-    if (reg) {
-      await reg.update();
-      if (reg.waiting) {
-        showUpdateBanner(reg.waiting);
-      }
-    }
-  } catch (err) {
-    console.warn('[PlatePlan PWA] Passive service worker update check warning:', err);
-  }
-}
-
-export function initServiceWorker() {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator) || isSwRegistered) return;
-  isSwRegistered = true;
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').then(reg => {
-      if (!swLogged) {
-        swLogged = true;
-        console.info('[PlatePlan PWA] Service Worker registered with scope:', reg.scope);
-      }
-      if (reg.waiting) {
-        showUpdateBanner(reg.waiting);
-      }
-      reg.addEventListener('updatefound', () => {
-        const installingWorker = reg.installing;
-        if (!installingWorker) return;
-        installingWorker.addEventListener('statechange', () => {
-          if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            showUpdateBanner(installingWorker);
-          }
-        });
-      });
-    }).catch(err => {
-      console.warn('[PlatePlan PWA] Service Worker registration failed:', err);
-    });
-  });
-}
-
-export const registerServiceWorker = initServiceWorker;
 
 export function initHeaderDelegation() {
   if (typeof document === 'undefined') return;
@@ -278,7 +234,6 @@ export function initPlatePlanApp() {
   if (isPlatePlanAppInitialized) return;
   isPlatePlanAppInitialized = true;
 
-  registerServiceWorker();
   initHeaderDelegation();
   initNavigationDelegation();
   initPlannerGridDelegation();
