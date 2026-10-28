@@ -9,23 +9,21 @@ Data Safety First: Household data under households/elliott-chloe must be backed 
 Stamp, Don't Type: The version number is typed only in package.json; scripts/build.js stamps it and the commit ID into index.html when GitHub Actions builds the site. There is no service worker or precache list.
 
 2. Canon Ownership Table & Consolidation Targets
-App State: src/store/coreState.js
+One owner per job. Parallel versions are other modules that still do the same job; merge each into the owner, then take it out of this table. A new module doing a job listed here goes into its Parallel versions cell in the same change. `npm run ledger` reads this table (keep the header and the `path` cells exactly as they are) and counts the parallel versions in LEDGER.md.
 
-Firebase Config & Auth: src/config/firebase.js
-
-Products Collection: src/services/ProductRepository.js (Must remove duplicate write in ShoppingFirestoreRepository.js)
-
-Ingredients / Pantry: src/services/PantryTaxonomyService.js
-
-Recipes Collection: src/services/RecipeFirestoreRepository.js (Normalise schema on write)
-
-Meal Plans: src/services/PlanRepository.js
-
-Plan Generation: Must unify PlanGeneratorService.js vs MealPlanGeneratorService.js
-
-Data Quality: src/services/DataQualityScanner.js (Target state is a single read-only report)
-
-UI Overlays & Dialogs: src/components/pantry/ActionSheetUI.js and src/components/ui/DialogHelpers.js
+| Job | Owner | Parallel versions |
+|---|---|---|
+| App state | `src/store/coreState.js` | `src/store/state.js`, `src/state/AppState.js`, `src/models/StateModel.js` |
+| Firebase config and auth | `src/config/firebase.js` | — |
+| Products collection | `src/services/ProductRepository.js` | — |
+| Ingredients and pantry | `src/services/PantryTaxonomyService.js` | — |
+| Recipes collection | `src/services/RecipeFirestoreRepository.js` (normalise the schema on write) | — |
+| Meal plans | `src/repositories/PlanRepository.js` | — |
+| Plan generation | `src/services/MealPlanGeneratorService.js` | — |
+| Unit conversion | `src/services/UnitConversionService.js` | `src/services/RecipeUnitConverter.js`, `src/services/UnitConverter.js` |
+| Data Quality | `src/services/DataQualityScanner.js` (target: a single read-only report) | `src/services/DataQualityEngine.js`, `src/services/DataQualityScannerService.js`, `src/services/DataQualityService.js` |
+| Action sheets | `src/components/navigation/ActionSheetUI.js` | `src/components/pantry/ActionSheetUI.js` |
+| Dialogs | `src/components/ui/DialogHelpers.js` | — |
 
 3. Quarantine & Repo Hygiene Targets (attic/)
 Untrack & Ignore: cookies.txt, syntax_check.log, app/applet/ must be added to .gitignore.
