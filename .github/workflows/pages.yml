@@ -1,0 +1,45 @@
+# Builds the site on every push to main, development and dev/** so a broken build
+# shows up before release. Only main publishes the built dist/ to GitHub Pages.
+# Pages must be set to Settings -> Pages -> Source: "GitHub Actions" for the deploy to run.
+name: Build and publish to Pages
+
+on:
+  push:
+    branches: [main, development, 'dev/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # scripts/build.js stamps the version and commit ID and fails on any leftover placeholder.
+      - run: npm run build
+      - if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
