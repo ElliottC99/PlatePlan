@@ -12,7 +12,7 @@ Plans live in `docs/plans/`. Learnings from solved problems live in `docs/soluti
 
 ## Branches and hosting
 
-GitHub Pages publishes from `.github/workflows/pages.yml` (Settings → Pages → Source: "GitHub Actions"). Every push to `main`, `development` or `dev/**` syntax-checks every module in `src/` (except the known-broken `PantryBankModalService.js`) and runs `npm run build` on GitHub; only `main` publishes the built `dist/`. The build fails if it cannot read the git commit ID. A failed build publishes nothing and the previous release stays live. Work happens on `dev/*` branches, goes to `development` for testing, then to `main`. Don't commit straight to `main`.
+GitHub Pages publishes from `.github/workflows/pages.yml` (Settings → Pages → Source: "GitHub Actions"). Every push to `main`, `development` or `dev/**` syntax-checks every module in `src/` and runs `npm run build` on GitHub; only `main` publishes the built `dist/`. The build fails if it cannot read the git commit ID. A failed build publishes nothing and the previous release stays live. Work happens on `dev/*` branches, goes to `development` for testing, then to `main`. Don't commit straight to `main`.
 
 ## Commands
 
@@ -20,6 +20,7 @@ GitHub Pages publishes from `.github/workflows/pages.yml` (Settings → Pages �
 npm run dev          # Express static server on http://0.0.0.0:3000 (serves dist/ if built, else repo root)
 npm run build        # Copy assets into dist/ and stamp __APP_VERSION__ / __BUILD_ID__ (no transpile/bundle)
 npm run lint         # node --check server.js + static a11y scan (scripts/test_accessibility_dom.js)
+npm run ledger       # rewrite LEDGER.md: dead, needs-a-check and live modules, parallel versions, the attic
 npm run test:rules   # firestore.rules checks in the emulator (offline demo-plateplan project; needs Java 21+)
 npm run deploy:rules # runs test:rules, then publishes firestore.rules only (Barrie, after `npx firebase login`)
 node --check src/path/File.js     # quick syntax check of one module
@@ -47,16 +48,10 @@ If `npm run dev` is serving a stale `dist/`, delete `dist/` or rebuild.
 **One HTML shell.** `index.html` (about 1,400 lines) holds the inline CSS and the app shell markup. It loads the Firebase **compat** SDK from the gstatic CDN as globals (`window.firebase`), then `src/config/firebase-config.js`, then `src/main.js` as a module. `PlatePlan.html` and the old `scripts/` runtime have been deleted. `scripts/` now holds only build, backup and test scripts.
 
 **Check for an existing module before adding one.** The codebase grew by adding new modules alongside existing ones. Some of that has been cleaned up, but not all:
-- **Re-export shims with no importers** remain: `services/firebase.js`, `components/RecipeWizardModal.js`, `components/recipe/VaultRecipeCard.js`, `components/recipe/ViewRecipeModal.js` and `views/ProfileAllocationCard.js`. Grep for importers (and `window` / `data-action` uses) before deleting one.
-- **Plan generation** has a single module, `MealPlanGeneratorService`.
-- **Parallel implementations that are still live:**
-  - unit converters: `UnitConversionService`, `RecipeUnitConverter` and `UnitConverter`
-  - Data Quality: `DataQualityEngine`, `DataQualityScanner`, `DataQualityScannerService` and `DataQualityService`
-  - `ActionSheetUI` in both `components/navigation/` and `components/pantry/`
-  - the plan read, which falls back from a subcollection to a legacy doc (`HydrationService.js` `subcollPlan || legacyPlan`)
-- **State.** `store/coreState.js` is the state holder most of the code imports. `store/state.js`, `state/AppState.js` and `models/StateModel.js` also exist.
-- **Firestore writers.** The aim is one writer per collection (`plateplan-architecture.md` has the owner table). `products` is now written only by `ProductRepository`. `recipes` and `ingredients` are still referenced by several modules. Extend the existing owner instead of adding another writer.
-- **`src/views/PantryBankModalService.js`** fails `node --check`, but nothing imports it.
+- **`LEDGER.md`** (rewritten by `npm run ledger`) lists every `src/` module as live, live shim, needs a check, dead shim or dead, and counts the parallel versions. Read it instead of grepping for importers. `scripts/ledger.js` explains the labels; `scripts/test_ledger.js` runs like the other tests.
+- **Parallel implementations that are still live** are listed per job in the owner table in `plateplan-architecture.md`, which the ledger reads: app state, unit conversion, Data Quality and the action sheets. Add a new parallel module there, and take one out when it is merged away. Separately, the plan read falls back from a subcollection to a legacy doc (`HydrationService.js` `subcollPlan || legacyPlan`).
+- **`attic/`** holds modules the ledger proved dead, at their original paths, with move and delete-after dates in `attic/README.md`. The build doesn't copy it. Restore one by moving it back.
+- **Firestore writers.** The aim is one writer per collection. `products` is now written only by `ProductRepository`. `recipes` and `ingredients` are still referenced by several modules. Extend the existing owner instead of adding another writer.
 
 Layers in `src/`:
 - `main.js`: the lifecycle coordinator. It waits for auth (`AuthService`, Google sign-in only), hydrates household data and realtime subscriptions (`HydrationService`), wires the store, and attaches many functions to `window.*` for the HTML and the action bridge.
