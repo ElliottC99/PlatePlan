@@ -25,11 +25,5 @@ One owner per job. Parallel versions are other modules that still do the same jo
 | Action sheets | `src/components/navigation/ActionSheetUI.js` | `src/components/pantry/ActionSheetUI.js` |
 | Dialogs | `src/components/ui/DialogHelpers.js` | — |
 
-3. Quarantine & Repo Hygiene Targets (attic/)
-Untrack & Ignore: cookies.txt, syntax_check.log, app/applet/ must be added to .gitignore.
-
-Dead / Unreferenced Candidates for attic/:
-
-scripts/core, scripts/features, scripts/services, scripts/ui, scripts/main.js
-
-Unreferenced shims: src/utils/ActionBridge.js, src/components/recipe/VaultRecipeCard.js, FitScoreEngine
+3. Quarantine (attic/)
+LEDGER.md, written by `npm run ledger`, lists what is dead, what needs a check, and what is waiting in the attic. A file moves into attic/ only when the ledger labels it dead or dead shim; it keeps its original path there and gets a dated row in attic/README.md. It is deleted after two weeks of normal use on both phones with no related problem.
