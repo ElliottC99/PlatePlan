@@ -1,16 +1,23 @@
 rules_version = '2';
-  service cloud.firestore {
-    match /databases/{database}/documents {
-      function isHousehold() {
-        return request.auth != null
-          && request.auth.uid in [
-            'mXtYrVi2w5XEZksdCO2jw6tJ1U42',  // Elliott
-            '6wwrdUemBBPTIV4Am82NEPNs9Rp2',   // Chloe
-            'VGcmLZJBhTN6oTxnNWY1USidYsh1'   // Barrie
-          ];
-      }
-      match /{document=**} {
-        allow read, write: if isHousehold();
-      }
+// Deployed from this file with `npm run deploy:rules`, which runs
+// `npm run test:rules` first. Don't edit it in the Firebase console.
+// This repo is public: name people, never their email addresses.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isHousehold() {
+      return request.auth != null
+        && request.auth.uid in [
+          'mXtYrVi2w5XEZksdCO2jw6tJ1U42',  // Elliott
+          '6wwrdUemBBPTIV4Am82NEPNs9Rp2',  // Chloe
+          'VGcmLZJBhTN6oTxnNWY1USidYsh1'   // Barrie (temporary: remove when the rescue ends)
+        ];
+    }
+
+    // The household document and everything under it. With rules_version 2,
+    // {document=**} also matches households/elliott-chloe itself.
+    // No other match exists, so every other path is refused.
+    match /households/elliott-chloe/{document=**} {
+      allow read, write: if isHousehold();
     }
   }
+}
