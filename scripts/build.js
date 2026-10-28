@@ -15,6 +15,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 const distDir = path.join(rootDir, 'dist');
+const APP_VERSION_PLACEHOLDER = '__APP_VERSION__';
+const BUILD_ID_PLACEHOLDER = '__BUILD_ID__';
 
 async function build() {
   console.log('=== BUILDING PLATEPLAN FOR PRODUCTION DEPLOYMENT ===');
@@ -79,17 +81,11 @@ async function build() {
     console.warn('⚠️ Failed to resolve git commit hash, falling back to "unknown":', err.message);
   }
 
-  for (const targetFile of ['index.html']) {
-    const distTarget = path.join(distDir, targetFile);
-    if (existsSync(distTarget)) {
-      const rawContent = await fs.readFile(distTarget, 'utf8');
-      const stampedContent = rawContent
-        .replaceAll('__APP_VERSION__', appVersion)
-        .replaceAll('__BUILD_ID__', gitHash);
-      await fs.writeFile(distTarget, stampedContent, 'utf8');
-      console.log(`✅ Stamped ${targetFile} (__APP_VERSION__=${appVersion}, __BUILD_ID__=${gitHash})`);
-    }
-  }
+  const stampedIndex = (await fs.readFile(distIndex, 'utf8'))
+    .replaceAll(APP_VERSION_PLACEHOLDER, appVersion)
+    .replaceAll(BUILD_ID_PLACEHOLDER, gitHash);
+  await fs.writeFile(distIndex, stampedIndex, 'utf8');
+  console.log(`✅ Stamped index.html (${APP_VERSION_PLACEHOLDER}=${appVersion}, ${BUILD_ID_PLACEHOLDER}=${gitHash})`);
 
   // 5. Verify build artifact validity
   const requiredArtifacts = [
@@ -119,12 +115,12 @@ async function build() {
 
   // 6. Refuse to publish a page that still holds a version placeholder.
   // dist/scripts/ is build and test tooling that names the placeholders on purpose.
-  const leftovers = await findLeftoverPlaceholders(distDir, [path.join(distDir, 'scripts')]);
+  const leftovers = await findLeftoverPlaceholders(distDir, path.join(distDir, 'scripts'));
   if (leftovers.length > 0) {
     for (const file of leftovers) {
       console.error(`❌ Unstamped version placeholder in: ${path.relative(distDir, file)}`);
     }
-    console.error(`Build failed: ${leftovers.length} published file(s) still hold __APP_VERSION__ or __BUILD_ID__.`);
+    console.error(`Build failed: ${leftovers.length} published file(s) still hold ${APP_VERSION_PLACEHOLDER} or ${BUILD_ID_PLACEHOLDER}.`);
     process.exit(1);
   }
 
@@ -132,16 +128,14 @@ async function build() {
   console.log(`=== BUILD SUCCEEDED: ${fileCount} top-level entries in dist/ ===`);
 }
 
-async function findLeftoverPlaceholders(dir, excludedDirs) {
+async function findLeftoverPlaceholders(dir, excludedDir) {
   const leftovers = [];
-  for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
-    const entryPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (!excludedDirs.includes(entryPath)) leftovers.push(...await findLeftoverPlaceholders(entryPath, excludedDirs));
-    } else if (/\.(html|js|mjs|css|json|webmanifest|txt|md)$/.test(entry.name)) {
-      const content = await fs.readFile(entryPath, 'utf8');
-      if (content.includes('__APP_VERSION__') || content.includes('__BUILD_ID__')) leftovers.push(entryPath);
-    }
+  for (const entry of await fs.readdir(dir, { recursive: true, withFileTypes: true })) {
+    const entryPath = path.join(entry.parentPath, entry.name);
+    if (!entry.isFile() || entryPath.startsWith(excludedDir + path.sep)) continue;
+    if (!/\.(html|js|mjs|css|json|webmanifest|txt|md)$/.test(entry.name)) continue;
+    const content = await fs.readFile(entryPath, 'utf8');
+    if (content.includes(APP_VERSION_PLACEHOLDER) || content.includes(BUILD_ID_PLACEHOLDER)) leftovers.push(entryPath);
   }
   return leftovers;
 }

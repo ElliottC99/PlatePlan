@@ -13,7 +13,7 @@
 
 import assert from 'node:assert';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,36 +24,33 @@ const pkg = JSON.parse(read('package.json'));
 
 console.log('=== RUNNING PWA BUILD & VERSION STAMPING VERIFICATION ===');
 
-// Copy what scripts/build.js reads into a temporary root and run the build there.
+// Copy what scripts/build.js reads into a temporary root once and run the build there.
 // GIT_DIR points git at this repo so the build still finds the real commit ID.
 const BUILD_INPUTS = [
   'src', 'styles', 'vendor', 'scripts', 'index.html', 'manifest.json', 'metadata.json',
   'icon-192.png', 'icon-192-maskable.png', 'icon-512.png', 'icon-512-maskable.png',
   'server.js', 'package.json'
 ];
-const tempRoots = [];
-function buildInTempCopy(prepare = () => {}) {
-  const tempRoot = mkdtempSync(path.join(tmpdir(), 'plateplan-build-'));
-  tempRoots.push(tempRoot);
-  for (const input of BUILD_INPUTS) {
-    if (existsSync(path.join(rootDir, input))) {
-      cpSync(path.join(rootDir, input), path.join(tempRoot, input), { recursive: true });
-    }
+const tempRoot = mkdtempSync(path.join(tmpdir(), 'plateplan-build-'));
+for (const input of BUILD_INPUTS) {
+  if (existsSync(path.join(rootDir, input))) {
+    cpSync(path.join(rootDir, input), path.join(tempRoot, input), { recursive: true });
   }
-  prepare(tempRoot);
+}
+const distDir = path.join(tempRoot, 'dist');
+function runBuild() {
   const result = spawnSync(process.execPath, [path.join(tempRoot, 'scripts', 'build.js')], {
     cwd: tempRoot,
     env: { ...process.env, GIT_DIR: path.join(rootDir, '.git') },
     encoding: 'utf8'
   });
-  return { tempRoot, distDir: path.join(tempRoot, 'dist'), status: result.status, output: `${result.stdout}${result.stderr}` };
+  return { status: result.status, output: `${result.stdout}${result.stderr}` };
 }
 
 function listFiles(dir) {
-  return readdirSync(dir).flatMap(name => {
-    const full = path.join(dir, name);
-    return statSync(full).isDirectory() ? listFiles(full) : [full];
-  });
+  return readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter(entry => entry.isFile())
+    .map(entry => path.join(entry.parentPath, entry.name));
 }
 
 try {
@@ -61,9 +58,10 @@ try {
   assert.equal(pkg.version, '3.46.0', 'package.json version should be 3.46.0');
   const commitId = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: rootDir, encoding: 'utf8' }).stdout.trim();
 
-  const good = buildInTempCopy();
+  const good = runBuild();
   assert.equal(good.status, 0, `build should succeed:\n${good.output}`);
-  const distHtml = readFileSync(path.join(good.distDir, 'index.html'), 'utf8');
+  const distHtml = readFileSync(path.join(distDir, 'index.html'), 'utf8');
+  const distHasSw = existsSync(path.join(distDir, 'sw.js'));
   assert(!distHtml.includes('__APP_VERSION__'), 'dist/index.html should have no version placeholder');
   assert(!distHtml.includes('__BUILD_ID__'), 'dist/index.html should have no build-ID placeholder');
   assert(distHtml.includes(`<meta name="app-version" content="${pkg.version}">`), 'version meta should equal package.json version');
@@ -75,9 +73,9 @@ try {
   console.log('✅ Test 1 Passed: dist/index.html carries the package.json version and the commit ID');
 
   // 2. A placeholder left in what the page loads fails the build and is named
-  const bad = buildInTempCopy(tempRoot => {
-    writeFileSync(path.join(tempRoot, 'src', 'leftover-placeholder.js'), "export const v = '__BUILD_ID__';\n");
-  });
+  // Rebuild the same copy with a placeholder left in a module the page loads.
+  writeFileSync(path.join(tempRoot, 'src', 'leftover-placeholder.js'), "export const v = '__BUILD_ID__';\n");
+  const bad = runBuild();
   assert.notEqual(bad.status, 0, 'build should fail when a placeholder survives');
   assert(bad.output.includes(path.join('src', 'leftover-placeholder.js')), `failure should name the file:\n${bad.output}`);
   console.log('✅ Test 2 Passed: a leftover placeholder fails the build and names the file');
@@ -99,7 +97,7 @@ try {
 
   // 4. No service worker is registered or published; the cleanup stays
   assert(!existsSync(path.join(rootDir, 'sw.js')), 'sw.js should be removed from the repo');
-  assert(!existsSync(path.join(good.distDir, 'sw.js')), 'sw.js should not be published');
+  assert(!distHasSw, 'sw.js should not be published');
   const registering = [...srcFiles, path.join(rootDir, 'index.html')]
     .filter(f => /serviceWorker\s*\.\s*register\s*\(/.test(readFileSync(f, 'utf8')));
   assert.deepEqual(registering, [], 'nothing should register a service worker');
@@ -116,5 +114,5 @@ try {
 
   console.log('=== ALL PWA BUILD & VERSION STAMPING CHECKS PASSED ===');
 } finally {
-  for (const tempRoot of tempRoots) rmSync(tempRoot, { recursive: true, force: true });
+  rmSync(tempRoot, { recursive: true, force: true });
 }
