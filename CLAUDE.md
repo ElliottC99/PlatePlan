@@ -20,6 +20,8 @@ GitHub Pages publishes from `.github/workflows/pages.yml` (Settings â†’ Pages â†
 npm run dev          # Express static server on http://0.0.0.0:3000 (serves dist/ if built, else repo root)
 npm run build        # Copy assets into dist/ and stamp __APP_VERSION__ / __BUILD_ID__ (no transpile/bundle)
 npm run lint         # node --check server.js + static a11y scan (scripts/test_accessibility_dom.js)
+npm run test:rules   # firestore.rules checks in the emulator (offline demo-plateplan project; needs Java 21+)
+npm run deploy:rules # runs test:rules, then publishes firestore.rules only (Barrie, after `npx firebase login`)
 node --check src/path/File.js     # quick syntax check of one module
 ```
 
@@ -29,7 +31,7 @@ There's no test runner. Each test is a standalone Node script that uses `node:as
 node scripts/test_shopping_list.js
 ```
 
-The tests are `scripts/test_*.js` plus `test_vault_fit_score.js` at the repo root. They import `src/` modules directly and stub `global.window`. Three fail before any change is made:
+The tests are `scripts/test_*.js` plus `test_vault_fit_score.js` at the repo root. They import `src/` modules directly and stub `global.window`. The exception is `test_firestore_rules.js`, which needs the emulator, so run it with `npm run test:rules`. Three fail before any change is made:
 - `test_accessibility_dom.js` (so `npm run lint` fails too) still reads the deleted `PlatePlan.html`.
 - `test_plan_generator.js` still imports the deleted `PlanGeneratorService.js`.
 - `test_recipe_wizard.js` fails an ingredient-name assertion.
@@ -76,4 +78,4 @@ Many modules start with a header comment like `/** src/path/File.js (vX.Y.Z) ...
 
 ## Data and security
 
-The live Firestore rules are set in the Firebase console and allow read and write only for Elliott's and Chloe's UIDs (published 2026-10-27). `firestore.rules` in the repo is an older, looser draft (any signed-in user) and is **not** what's deployed. There's no `firebase.json`, so rules can't be deployed from the repo. If the real rules are added here, leave out the email comments, because the repo is public. The household ID `'elliott-chloe'` is also redeclared in `src/repositories/ShoppingListRepository.js`.
+`firestore.rules` is the deployed Firestore rules, published from the repo since 2026-10-28. It allows read and write only under `households/elliott-chloe`, and only for Elliott's, Chloe's and Barrie's UIDs. Barrie's is temporary and comes out when the rescue ends. Every other path and account is refused. Change the rules only in this file, never in the console. `scripts/test_firestore_rules.js` checks the allow and deny cases, so update it in the same change. Barrie deploys with `npm run deploy:rules`, which runs the test first and stops if it fails. `firebase.json` covers Firestore rules only, and no CI step deploys them. The emulator needs Java 21 or later, and `.tool-versions` selects asdf's openjdk 25.0.2 for this repo. `npm install` removes the unsaved `firebase-admin`, so reinstall it before a backup. The repo is public, so name people in rules comments and never give their email addresses. The household ID `'elliott-chloe'` is also redeclared in `src/repositories/ShoppingListRepository.js`.

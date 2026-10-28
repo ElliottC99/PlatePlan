@@ -14,3 +14,5 @@ Quarantine Before Delete: Before deleting suspected dead code, verify zero calle
 The 95% Confidence Threshold: If your self-critical review reveals ANY doubt, DO NOT output implementation code—issue a read-only audit prompt first.
 
 One Door Per Firestore Collection: Each Firestore collection under households/elliott-chloe must have exactly one Repository module allowed to write to it, normalising data to a single schema (schemaVersion).
+
+Hands Off the Firestore Rules: Never edit firestore.rules, firebase.json or .firebaserc. These files decide who can read and write the household's data, and Barrie tests and deploys them. If a change seems to need different rules, stop and describe the change for Barrie instead of making it.
