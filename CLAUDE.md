@@ -12,7 +12,7 @@ Plans live in `docs/plans/`. Learnings from solved problems live in `docs/soluti
 
 ## Branches and hosting
 
-GitHub Pages publishes from `.github/workflows/pages.yml` (Settings → Pages → Source: "GitHub Actions"). Every push to `main`, `development` or `dev/**` runs `npm run build` on GitHub; only `main` publishes the built `dist/`. A failed build publishes nothing and the previous release stays live. Work happens on `dev/*` branches, goes to `development` for testing, then to `main`. Don't commit straight to `main`.
+GitHub Pages publishes from `.github/workflows/pages.yml` (Settings → Pages → Source: "GitHub Actions"). Every push to `main`, `development` or `dev/**` syntax-checks every module in `src/` (except the known-broken `PantryBankModalService.js`) and runs `npm run build` on GitHub; only `main` publishes the built `dist/`. The build fails if it cannot read the git commit ID. A failed build publishes nothing and the previous release stays live. Work happens on `dev/*` branches, goes to `development` for testing, then to `main`. Don't commit straight to `main`.
 
 ## Commands
 

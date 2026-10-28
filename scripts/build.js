@@ -74,11 +74,16 @@ async function build() {
   const pkgRaw = await fs.readFile(path.join(rootDir, 'package.json'), 'utf8');
   const pkg = JSON.parse(pkgRaw);
   const appVersion = pkg.version;
-  let gitHash = 'unknown';
+  // The commit ID is how a phone shows which release it runs, so refuse to build without one.
+  let gitHash = '';
   try {
-    gitHash = execSync('git rev-parse --short HEAD', { cwd: rootDir, encoding: 'utf8' }).trim();
+    gitHash = execSync('git rev-parse --short HEAD', { cwd: rootDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   } catch (err) {
-    console.warn('⚠️ Failed to resolve git commit hash, falling back to "unknown":', err.message);
+    console.error('❌ Could not read the git commit ID:', err.message.trim());
+  }
+  if (!/^[0-9a-f]{7,}$/.test(gitHash)) {
+    console.error('Build failed: the release needs a git commit ID to stamp into index.html.');
+    process.exit(1);
   }
 
   const stampedIndex = (await fs.readFile(distIndex, 'utf8'))

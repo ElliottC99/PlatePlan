@@ -73,6 +73,15 @@ try {
   console.log('✅ Test 1 Passed: dist/index.html carries the package.json version and the commit ID');
 
   // 2. A placeholder left in what the page loads fails the build and is named
+  // Without a readable commit ID the build fails instead of stamping "unknown".
+  const noGit = spawnSync(process.execPath, [path.join(tempRoot, 'scripts', 'build.js')], {
+    cwd: tempRoot,
+    env: { ...process.env, GIT_DIR: path.join(tempRoot, 'no-such-git-dir') },
+    encoding: 'utf8'
+  });
+  assert.notEqual(noGit.status, 0, 'build should fail when the commit ID cannot be read');
+  console.log('✅ Test 1b Passed: the build fails when the commit ID cannot be read');
+
   // Rebuild the same copy with a placeholder left in a module the page loads.
   writeFileSync(path.join(tempRoot, 'src', 'leftover-placeholder.js'), "export const v = '__BUILD_ID__';\n");
   const bad = runBuild();
