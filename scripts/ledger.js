@@ -23,8 +23,7 @@ import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(process.argv[2] || path.join(__dirname, '..'));
 
 const OWNER_TABLE_FILE = 'plateplan-architecture.md';
@@ -35,7 +34,7 @@ const LABELS = ['live', 'live shim', 'needs a check', 'dead shim', 'dead'];
 
 const STATIC_IMPORT = /\b(import|export)\s+((?:(?!\b(?:import|export)\b)[^'"`;])*?)\s*\bfrom\s*(['"])([^'"]+)\3|\bimport\s*(['"])([^'"]+)\5/g;
 const DYNAMIC_IMPORT = /\bimport\(\s*(['"`])([^'"`]*)\1\s*\)/g;
-const COMPUTED_IMPORT = /\bimport\(\s*(?!['"`])/g;
+const COMPUTED_IMPORT = /\bimport\(\s*(?!['"`])/;
 
 class LedgerError extends Error {}
 
@@ -113,7 +112,6 @@ function parseImports(file, code) {
     }
   }
   if (COMPUTED_IMPORT.test(code)) interpolatedDirs.push(toPosix(path.dirname(file)));
-  COMPUTED_IMPORT.lastIndex = 0;
   return { imports, interpolatedDirs };
 }
 
@@ -348,6 +346,7 @@ function render({ modules, jobs, attic, unusedExports, brokenImports }) {
   const parallelJobs = jobs.filter((j) => j.parallels.length > 0);
   const parallelCount = parallelJobs.reduce((n, j) => n + j.parallels.length, 0);
   const dates = attic.map((a) => a.deleteAfter).filter(Boolean).sort(byText);
+  const checkCount = byLabel['needs a check'].length;
 
   const lines = [
     '# Code Ledger',
@@ -357,7 +356,7 @@ function render({ modules, jobs, attic, unusedExports, brokenImports }) {
     '## Scoreboard',
     '',
     `- ${plural(byLabel.dead.length, 'dead file')} and ${plural(byLabel['dead shim'].length, 'dead shim')} outside the attic. Nothing loads them; move them to \`attic/\`.`,
-    `- ${plural(byLabel['needs a check'].length, 'file')} ${byLabel['needs a check'].length === 1 ? 'needs' : 'need'} a check: nothing imports ${byLabel['needs a check'].length === 1 ? 'it' : 'them'}, but something might still load ${byLabel['needs a check'].length === 1 ? 'it' : 'them'}.`,
+    `- ${plural(checkCount, 'file')} ${checkCount === 1 ? 'needs a check: nothing imports it, but something might still load it' : 'need a check: nothing imports them, but something might still load them'}.`,
     `- ${plural(parallelCount, 'parallel module')} across ${plural(parallelJobs.length, 'job')}, from the owner table in \`plateplan-architecture.md\`. Each one does a job another module already owns.`,
     `- ${plural(unusedExports, 'unused export')} in live files.`,
     attic.length
