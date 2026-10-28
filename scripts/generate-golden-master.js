@@ -3,6 +3,7 @@
 // through PlanGeneratorService, MealPlanGeneratorService, and ShoppingListService.
 
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { generateWeeklyPlan, generateMealPlan } from '../src/services/MealPlanGeneratorService.js';
@@ -12,9 +13,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, '..');
 const BACKUP_FILE = path.join(ROOT_DIR, 'households_elliott-chloe_backup.json');
+// The output is built from household data, so by default it goes next to the
+// backups outside the repo, never into the tracked attic/.
 const OUTPUT_FILE = process.argv[2]
   ? path.resolve(ROOT_DIR, process.argv[2])
-  : path.join(ROOT_DIR, 'attic', 'golden_master_post_refactor.json');
+  : path.join(os.homedir(), 'PlatePlan-backups', 'golden_master_post_refactor.json');
 
 async function generateGoldenMaster() {
   const rawBackup = await fs.readFile(BACKUP_FILE, 'utf8');
@@ -86,6 +89,7 @@ async function generateGoldenMaster() {
     shoppingListOutput: shoppingList
   };
 
+  await fs.mkdir(path.dirname(OUTPUT_FILE), { recursive: true });
   await fs.writeFile(OUTPUT_FILE, JSON.stringify(baseline, null, 2), 'utf8');
   console.log(`[GoldenMaster] Wrote baseline to ${OUTPUT_FILE}`);
 }
