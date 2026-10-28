@@ -13,6 +13,11 @@ PlatePlan-backups/
 plateplan-backup-*.json
 households_elliott-chloe_backup.json
 
+# Firebase CLI and emulator logs
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
 # Local scratch folder
 attic/
 
