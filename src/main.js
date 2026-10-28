@@ -308,10 +308,14 @@ async function initApp() {
   };
 
   try {
-    const appVersion = AppInitializer.formatAppVersion(
-      document.querySelector('meta[name="app-version"]')?.content,
-      document.querySelector('meta[name="build-id"]')?.content
-    );
+    // Just after a release a phone can pair this main.js with a cached older AppInitializer.js
+    // that lacks formatAppVersion; show "dev" then rather than abort the rest of startup.
+    const appVersion = typeof AppInitializer.formatAppVersion === 'function'
+      ? AppInitializer.formatAppVersion(
+        document.querySelector('meta[name="app-version"]')?.content,
+        document.querySelector('meta[name="build-id"]')?.content
+      )
+      : 'dev';
     const versionEl = document.getElementById('app-header-version');
     if (versionEl) versionEl.textContent = appVersion;
     

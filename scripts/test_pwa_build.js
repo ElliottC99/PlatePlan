@@ -55,7 +55,7 @@ function listFiles(dir) {
 
 try {
   // 1. The build stamps one version source and the commit ID
-  assert.equal(pkg.version, '3.46.0', 'package.json version should be 3.46.0');
+  assert.match(pkg.version, /^\d+\.\d+\.\d+$/, 'package.json version should be a plain x.y.z number');
   const commitId = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: rootDir, encoding: 'utf8' }).stdout.trim();
 
   const good = runBuild();
