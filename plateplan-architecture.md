@@ -6,7 +6,7 @@ Canon Ownership: Every domain and Firestore collection has a single canonical ow
 
 Data Safety First: Household data under households/elliott-chloe must be backed up to dated JSON before schema migrations.
 
-Stamp, Don't Type: Version numbers and sw.js manifests are build outputs, not hand-typed edits.
+Stamp, Don't Type: The version number is typed only in package.json; scripts/build.js stamps it and the commit ID into index.html when GitHub Actions builds the site. There is no service worker or precache list.
 
 2. Canon Ownership Table & Consolidation Targets
 App State: src/store/coreState.js

@@ -19,6 +19,8 @@ tags: [service-worker, sw-js, precache, cache-addAll, offline, module-removal]
 
 # One missing path in the sw.js precache list leaves the whole precache empty, with only a console warning
 
+> **Update 2026-10-28:** `sw.js` and its precache list were removed (`docs/plans/2026-10-28-1153-fix-version-stamping-plan.md`). This lesson applies only if a service worker is added back.
+
 ## Problem
 
 `sw.js` precaches an explicit, hand-kept list of files (`PLATEPLAN_PRECACHE_ASSETS`). On 2026-10-27, removing the unlinked Shopping screen deleted four modules: ShoppingListUI, ShoppingListToolbar, ShoppingListView and ShoppingAisleGroup. Their paths had to come off that list in the same commit (`5ee2c08` on `dev/review-state`, pending merge to `main`).

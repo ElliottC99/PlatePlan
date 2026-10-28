@@ -12,7 +12,7 @@ Plans live in `docs/plans/`. Learnings from solved problems live in `docs/soluti
 
 ## Branches and hosting
 
-GitHub Pages serves `main` from the repo root. It does **not** run `npm run build`, so whatever is committed to `main` is exactly what users load. Work happens on `dev/*` branches, goes to `development` for testing, then to `main`. Don't commit straight to `main`.
+GitHub Pages publishes from `.github/workflows/pages.yml` (Settings → Pages → Source: "GitHub Actions"). Every push to `main`, `development` or `dev/**` runs `npm run build` on GitHub; only `main` publishes the built `dist/`. A failed build publishes nothing and the previous release stays live. Work happens on `dev/*` branches, goes to `development` for testing, then to `main`. Don't commit straight to `main`.
 
 ## Commands
 
@@ -29,10 +29,9 @@ There's no test runner. Each test is a standalone Node script that uses `node:as
 node scripts/test_shopping_list.js
 ```
 
-The tests are `scripts/test_*.js` plus `test_vault_fit_score.js` at the repo root. They import `src/` modules directly and stub `global.window`. Four fail before any change is made:
+The tests are `scripts/test_*.js` plus `test_vault_fit_score.js` at the repo root. They import `src/` modules directly and stub `global.window`. Three fail before any change is made:
 - `test_accessibility_dom.js` (so `npm run lint` fails too) still reads the deleted `PlatePlan.html`.
 - `test_plan_generator.js` still imports the deleted `PlanGeneratorService.js`.
-- `test_pwa_build.js` expects an old version string.
 - `test_recipe_wizard.js` fails an ingredient-name assertion.
 
 If `npm run dev` is serving a stale `dist/`, delete `dist/` or rebuild.
@@ -67,13 +66,11 @@ Layers in `src/`:
 - `components/ui/DialogHelpers.js`: the shared custom confirm/prompt dialogs. Use these, never native `alert`/`confirm`/`prompt`.
 - `config/businessRules.js`, `config/systemConfig.js`: tunable constants. Fit-score weights live in `utils/fitScoreWeights.js`.
 
-**Service worker (`sw.js`)** precaches an explicit list of module paths. If you add a module that must work offline, add it to `PLATEPLAN_PRECACHE_ASSETS`.
+**No service worker.** `sw.js` was removed on 2026-10-28; it did nothing, because `src/main.js` unregistered it and wiped the caches on every load. That cleanup block in `src/main.js` stays, so phones that installed the old worker lose it. There is no offline use. Don't add a service worker back without a plan for versioned caches and updates.
 
 ## Versioning
 
-`index.html` and `sw.js` now hold `__APP_VERSION__` and `__BUILD_ID__` placeholders, which `scripts/build.js` replaces in `dist/` from `package.json` `version` and the git hash. **Known bug:** Pages serves the unbuilt root, so the live site shows the literal placeholders, and the service-worker cache names never change. Installed clients may therefore not pick up updates. Until that's fixed, don't assume a deploy reaches installed phones.
-
-`src/main.js` still has a hand-typed `export const APP_VERSION` (`v3.45.7`), which doesn't match `package.json` (`3.35.4`). Stylesheet `?v=` strings follow the placeholder. `cacheSlice` `CACHE_KEY` has its own version; change it only to bust that cache.
+`package.json` `version` is the only place the version number is typed. Bump it for a meaningful release; nothing else needs editing. `index.html` holds `__APP_VERSION__` and `__BUILD_ID__` placeholders in its meta tags and `?v=` strings. `scripts/build.js` replaces them in `dist/` with that version and the short git hash, and fails if any placeholder is left in what the page loads. The header shows `<version> (<commit>)`, read from the meta tags by `formatAppVersion` in `src/core/AppInitializer.js`, or `dev` on an unbuilt page such as `npm run dev` without `dist/`. Never type a version into `src/`. `cacheSlice` `CACHE_KEY` has its own version; change it only to bust that cache.
 
 Many modules start with a header comment like `/** src/path/File.js (vX.Y.Z) ... */`, and some claim a line-count limit. Splitting files to meet a size rule has produced fragments nothing imports. Don't create a new file just to stay under a line count. Extend the module that already owns the job, and split only along a real responsibility boundary.
 

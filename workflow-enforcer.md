@@ -7,7 +7,7 @@ Audit-First Implementation: Never write implementation code without first perfor
 
 The Ownership Rule: One canonical owner per domain. Extend existing files instead of creating parallel modules or arbitrary splits.
 
-Stamp, Don't Type: Ban manual multi-file version bumps. Version stamping belongs to the build script. Edit index.html as the single source of truth.
+Stamp, Don't Type: Ban manual multi-file version bumps. Bump only package.json "version"; scripts/build.js stamps it and the commit ID into index.html, which the app reads. Never type a version into src/. There is no service worker to maintain.
 
 Quarantine Before Delete: Before deleting suspected dead code, verify zero callers exist. Move proven-dead files to attic/ before permanent deletion.
 
