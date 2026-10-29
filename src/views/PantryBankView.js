@@ -4,9 +4,9 @@
  * Strictly modular (<350 lines).
  */
 
-import { getState, setIngredients, subscribe, setProducts } from '../store/store.js';
-import { saveRootItem as saveIngredient, deleteRootItem } from '../services/RootItemRepository.js';
-import { showCustomAlert, showCustomConfirm } from '../components/ui/DialogHelpers.js';
+import { getState, subscribe } from '../store/store.js';
+import { saveRootItem as saveIngredient } from '../services/RootItemRepository.js';
+import { openGuidedDelete } from '../components/pantry/GuidedDeleteModalUI.js';
 import { 
   buildPantryHierarchy, setAutoDefaultProduct, getActiveCategories,
   invalidateHierarchyCache, slugCategory
@@ -71,40 +71,6 @@ export function updateActiveCategoryFilter(oldName, newName) {
 export async function handleSetDefaultProduct(prodId, ingId, subtypeId = null) {
   await setAutoDefaultProduct(prodId, ingId, subtypeId);
   renderIngredientBank();
-}
-
-// Refuses while anything still links to the item, so nothing is left pointing at a deleted doc.
-export function handleDeleteIngredient(ingId) {
-  const state = getState();
-  const item = (state.ingredients || []).find(i => String(i.id) === String(ingId));
-  if (!item) return;
-  const name = item.name || 'this item';
-  const isThisItem = value => value !== undefined && value !== null && String(value) === String(ingId);
-  const subtypeCount = (item.subtypes || []).length;
-  const productCount = (state.products || []).filter(p => isThisItem(p.ingredientId) || isThisItem(p.groupId)).length;
-  const recipeCount = (state.recipes || []).filter(r => [...(r.ingredients || []), ...(r.enhanced?.ingredients || [])]
-    .some(line => line && (isThisItem(line.ingredientId) || isThisItem(line.groupId) || isThisItem(line.pantryItemId)))).length;
-
-  const links = [
-    subtypeCount && `${subtypeCount} sub-type${subtypeCount === 1 ? '' : 's'}`,
-    productCount && `${productCount} product${productCount === 1 ? '' : 's'}`,
-    recipeCount && `${recipeCount} recipe${recipeCount === 1 ? '' : 's'}`
-  ].filter(Boolean);
-  if (links.length) {
-    showCustomAlert(`"${name}" still has ${links.join(', ')} linked to it. Use Reorganise Item to move or merge them first.`, 'Cannot delete yet');
-    return;
-  }
-
-  showCustomConfirm(`Delete "${name}" from the pantry? This can't be undone.`, 'Delete item', async () => {
-    const result = await deleteRootItem(ingId);
-    if (!result?.success) {
-      showCustomAlert(`"${name}" was not deleted. Check your connection and try again.`, 'Delete failed');
-      return;
-    }
-    setIngredients((getState().ingredients || []).filter(i => String(i.id) !== String(ingId)));
-    invalidateHierarchyCache();
-    renderIngredientBank();
-  });
 }
 
 export function promptAddSubtype(ingId) {
@@ -237,7 +203,7 @@ export function attachPantryBankDelegation() {
               label: 'Delete Item',
               icon: '🗑️',
               isDestructive: true,
-              onClick: () => handleDeleteIngredient(id)
+              onClick: () => openGuidedDelete({ kind: 'item', id }, { onDone: renderIngredientBank })
             }
           ]
         });
@@ -267,7 +233,7 @@ export function attachPantryBankDelegation() {
               label: 'Delete Sub-type',
               icon: '🗑️',
               isDestructive: true,
-              onClick: () => import(`../components/pantry/ReorganiseModalUI.js`).then(mod => mod.openReorganiseModal('subtype', { id: subtypeId, parentId, tab: 'delete' }))
+              onClick: () => openGuidedDelete({ kind: 'subtype', itemId: parentId, subtypeId }, { onDone: renderIngredientBank })
             }
           ]
         });
