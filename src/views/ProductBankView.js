@@ -266,26 +266,16 @@ export async function promptReallocateProduct(productId) {
 
 export const openProductReallocateModal = promptReallocateProduct;
 
-// Refuses while a recipe or a pantry default still points at the product.
+// Refuses while a recipe still points at the product. A default is recalculated from the preference
+// metric when its product goes, so it never blocks a delete (R14).
 export async function handleDeleteProduct(productId, prodName = null) {
   const state = getState();
   const product = (state.products || []).find(p => String(p.id) === String(productId));
   const name = prodName || product?.name || 'this product';
-  const isThisProduct = value => value !== undefined && value !== null && String(value?.id ?? value) === String(productId);
   const recipeCount = (state.recipes || []).filter(r => [...(r.ingredients || []), ...(r.enhanced?.ingredients || [])]
-    .some(line => line && isThisProduct(line.productId))).length;
-  const defaultFor = (state.ingredients || []).flatMap(item => [
-    // autoDefaultProduct is usually the product's name, occasionally its ID.
-    (isThisProduct(item.defaultProductId) || isThisProduct(item.autoDefaultProduct) || (product?.name && item.autoDefaultProduct === product.name)) && item.name,
-    ...(item.subtypes || []).filter(st => isThisProduct(st.defaultProductId)).map(st => st.name)
-  ]).filter(Boolean);
-
-  const links = [
-    recipeCount && `is used in ${recipeCount} recipe${recipeCount === 1 ? '' : 's'}`,
-    defaultFor.length && `is the default for ${defaultFor.join(', ')}`
-  ].filter(Boolean);
-  if (links.length) {
-    showCustomAlert(`"${name}" ${links.join(' and ')}. Swap it out or set another default first.`, 'Cannot delete yet');
+    .some(line => line && line.productId != null && String(line.productId) === String(productId))).length;
+  if (recipeCount) {
+    showCustomAlert(`"${name}" is used in ${recipeCount} recipe${recipeCount === 1 ? '' : 's'}. Swap it out first.`, 'Cannot delete yet');
     return;
   }
 

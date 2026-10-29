@@ -185,21 +185,28 @@ await check('Product delete does not call itself through window (it overflowed t
   assert.match(modalText(), /Seeded Loaf/);
 });
 
-await check('Product delete is refused while a recipe or a pantry default uses it', async () => {
+await check('Product delete is refused while a recipe uses it', async () => {
+  reset({ products: [{ id: 'p1', name: 'Seeded Loaf' }], recipes: [{ id: 'r1', ingredients: [{ productId: 'p1' }] }] });
+  await handleDeleteProduct('p1');
+  assert.match(modalText(), /recipe/);
+  assert.equal(el('btn-confirm-yes').onclick, null);
+  await settle();
+  assert.deepEqual(deleted, []);
+});
+
+await check('Covers AE5: a product saved as a default but used in no recipe asks to confirm and is deleted', async () => {
   const cases = [
-    { products: [{ id: 'p1', name: 'Seeded Loaf' }], recipes: [{ id: 'r1', ingredients: [{ productId: 'p1' }] }], expect: /recipe/ },
-    { products: [{ id: 'p1', name: 'Seeded Loaf' }], ingredients: [{ id: 'i1', name: 'Bread', defaultProductId: 'p1', subtypes: [] }], expect: /default/ },
-    { products: [{ id: 'p1', name: 'Seeded Loaf' }], ingredients: [{ id: 'i1', name: 'Bread', subtypes: [{ id: 's1', name: 'Seeded', defaultProductId: 'p1' }] }], expect: /default/ },
-    // Saved items hold the auto-default product by name, not by ID.
-    { products: [{ id: 'p1', name: 'Seeded Loaf' }], ingredients: [{ id: 'i1', name: 'Bread', autoDefaultProduct: 'Seeded Loaf', subtypes: [] }], expect: /default/ }
+    { ingredients: [{ id: 'i1', name: 'Bread', defaultProductId: 'p1', subtypes: [] }] },
+    { ingredients: [{ id: 'i1', name: 'Bread', subtypes: [{ id: 's1', name: 'Seeded', defaultProductId: 'p1' }] }] },
+    { ingredients: [{ id: 'i1', name: 'Bread', autoDefaultProduct: 'Seeded Loaf', subtypes: [] }] }
   ];
   for (const c of cases) {
-    reset(c);
+    reset({ products: [{ id: 'p1', name: 'Seeded Loaf' }], ...c });
     await handleDeleteProduct('p1');
-    assert.match(modalText(), c.expect);
-    assert.equal(el('btn-confirm-yes').onclick, null);
+    assert.match(modalText(), /Delete &quot;Seeded Loaf&quot;\?/);
+    await el('btn-confirm-yes').onclick();
     await settle();
-    assert.deepEqual(deleted, []);
+    assert.deepEqual(deleted, ['households/elliott-chloe/products/p1']);
   }
 });
 
