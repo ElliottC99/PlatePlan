@@ -11,6 +11,7 @@ import { reallocateProduct, setAutoDefaultProduct, getActiveCategories, addSubty
 import { promptReallocateProduct as openReallocateModal } from '../components/pantry/ReallocateProductModalUI.js';
 import { showCustomAlert, showCustomConfirm } from '../components/ui/DialogHelpers.js';
 import { escapeHtml, escapeAttr } from '../utils/stringUtils.js';
+import { parseTescoProduct } from '../services/TescoImportService.js';
 
 import { 
   renderProductBankBase, 
@@ -27,6 +28,8 @@ export function cancelManualIng() {
   if (wrap) wrap.classList.remove('open');
   document.body.style.overflow = '';
   activeEditingProductId = null;
+  // A pre-link from Link Product must not carry over to the next, unrelated new product.
+  window.__prefilledResolveBinding = null;
 
   if (window.__modalContext && window.__modalContext.returnTo === 'data-quality') {
     const ctx = window.__modalContext;
@@ -45,8 +48,15 @@ export function openProductEditModal(productIdOrDraft = null) {
   content.innerHTML = `
     <div id="mi-inner-wrap" style="background: var(--surface, #fff); border-radius: 14px; padding: 24px; max-width: 560px; width: 100%; margin: 0 auto;">
       <h3 id="mi-title">Edit product</h3>
-      <div id="mi-tesco-actions" style="display: flex; justify-content: flex-end; margin: -4px 0px 12px;">
-        <button type="button" class="btn sm ghost" data-pp-click="openTescoImportForIngredientEdit()">Paste/update from Tesco</button>
+      <div id="mi-tesco-actions" style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin: -4px 0px 12px;">
+        <button type="button" class="btn sm ghost" data-action="tesco-update" aria-controls="mi-tesco-paste">Paste/update from Tesco</button>
+        <div id="mi-tesco-updated" role="status" style="font-size: 12px; color: var(--text2, #78716c);"></div>
+        <div id="mi-tesco-paste" hidden style="width: 100%;">
+          <label for="mi-tesco-json" style="font-size: 12px;">Paste the Tesco bookmarklet output</label>
+          <textarea id="mi-tesco-json" name="mi-tesco-json" rows="3" style="width: 100%;"></textarea>
+          <div id="mi-tesco-error" role="alert" style="font-size: 12px; color: var(--red, #dc2626);"></div>
+          <button type="button" class="btn sm primary" data-action="tesco-update-apply">Update fields</button>
+        </div>
       </div>
       <div id="mi-linkage-container" style="margin-bottom: 12px;"></div>
       <div class="grid2">
@@ -172,9 +182,62 @@ export function openProductEditModal(productIdOrDraft = null) {
     catOptsEl.innerHTML = categories.map(c => `<option value="${escapeAttr(c)}"></option>`).join('');
   }
 
+  const pastePanel = document.getElementById('mi-tesco-paste');
+  if (pastePanel) pastePanel.hidden = true;
+
   document.body.style.overflow = 'hidden';
   wrap.style.setProperty('z-index', '25005', 'important');
   wrap.classList.add('open');
+}
+
+// Edit product › Paste/update from Tesco: show or hide the paste box inside the open form.
+export function toggleTescoUpdate() {
+  const panel = document.getElementById('mi-tesco-paste');
+  if (!panel) return;
+  panel.hidden = !panel.hidden;
+  if (!panel.hidden) document.getElementById('mi-tesco-json')?.focus();
+}
+
+// Form field, label, the parsed value, and whether the pasted bookmarklet JSON actually carried it.
+// parseTescoProduct fills every field with a default, so "carried" is read from the raw paste.
+const TESCO_UPDATE_FIELDS = [
+  ['mi-name', 'name', d => d.name, r => !!(r.name || r.title)],
+  ['mi-brand', 'brand', d => d.brand, r => !!r.brand],
+  ['mi-price', 'price', d => d.price, r => r.price !== undefined && r.price !== null && r.price !== ''],
+  ['mi-pack', 'pack size', d => d.packSize, r => r.packSize !== undefined && r.packSize !== null && r.packSize !== ''],
+  ['mi-pack-unit', 'pack unit', d => d.packUnit, r => !!r.packUnit],
+  ['mi-item-weight', 'item weight', d => d.itemWeight, r => !!r.itemWeight],
+  ['mi-drained-weight', 'drained weight', d => d.drainedWeight, r => !!r.drainedWeight],
+  ['mi-storage', 'storage', d => d.storage, r => !!(r.diagnostics?.breadcrumbs || r.diagnostics?.storageText)],
+  ...[['cal', 'calories'], ['prot', 'protein'], ['carb', 'carbs'], ['fat', 'fat'], ['fibre', 'fibre']].map(([key, label]) =>
+    [`mi-${key}`, label, d => d[key], r => (r.diagnostics ? r.diagnostics.sourceValues?.[key] != null : r[key] !== undefined && r[key] !== null)])
+];
+
+// Writes only the fields the paste carried into the open form; nothing is saved until Save (R7-R9).
+export function applyTescoUpdate() {
+  const input = document.getElementById('mi-tesco-json');
+  const errorEl = document.getElementById('mi-tesco-error');
+  const result = parseTescoProduct(String(input?.value || '').trim());
+  if (!result.success) {
+    if (errorEl) errorEl.textContent = result.error;
+    return;
+  }
+  if (errorEl) errorEl.textContent = '';
+  const changed = [];
+  for (const [id, label, value, carried] of TESCO_UPDATE_FIELDS) {
+    const field = document.getElementById(id);
+    const next = value(result.data);
+    if (!field || !carried(result.data.raw) || next === undefined || next === null || next === '') continue;
+    if (String(field.value) !== String(next)) {
+      field.value = next;
+      changed.push(label);
+    }
+  }
+  if (input) input.value = '';
+  const panel = document.getElementById('mi-tesco-paste');
+  if (panel) panel.hidden = true;
+  const summary = document.getElementById('mi-tesco-updated');
+  if (summary) summary.textContent = changed.length ? `Updated: ${changed.join(', ')}` : 'Nothing to update';
 }
 
 export async function saveManualIng() {
@@ -406,10 +469,10 @@ export function clearProductGroupFilter() {
   renderProductBank();
 }
 
-export function showTescoImport() {
-  if (typeof window.openTescoImportModal === 'function') {
-    window.openTescoImportModal(null, null);
-  }
+// Imported directly: window.openTescoImportModal only exists once a Pantry dialog has loaded the module.
+export async function showTescoImport() {
+  const { openTescoImportModal } = await import('../components/pantry/SubtypeProductLinkerModalUI.js');
+  openTescoImportModal(null, null);
 }
 
 if (typeof window !== 'undefined') {

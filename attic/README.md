@@ -31,3 +31,4 @@ A file may be deleted after two weeks of normal use on both phones with no relat
 | `src/views/ProfileAllocationCard.js` | 2026-10-28 | 2026-11-11 |
 | `src/views/SettingsEventService.js` | 2026-10-28 | 2026-11-11 |
 | `src/views/VaultRecipeRenderService.js` | 2026-10-28 | 2026-11-11 |
+| `src/components/pantry/TescoImportModalUI.js` | 2026-10-29 | 2026-11-12 |

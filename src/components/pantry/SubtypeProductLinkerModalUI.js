@@ -50,7 +50,7 @@ export function openSubtypeLinkSelectionModal(subtypeId, parentId) {
       <p style="font-size: 13px; color: var(--text2,#78716c); margin: 0 0 20px 0;">Select how you want to attach a grocery item or barcode to this sub-type.</p>
 
       <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">
-        <div onclick="window.handleSubtypeLinkRoute('link', '${subtypeId || ''}', '${parentId}')" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:#fff; transition: background 0.15s;" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='#fff'">
+        <div role="button" tabindex="0" data-action="link-existing-product" data-subtype-id="${escapeHTML(subtypeId || '')}" data-parent-id="${escapeHTML(parentId || '')}" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:#fff; transition: background 0.15s;" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='#fff'">
           <div style="font-size: 24px;">🔗</div>
           <div>
             <div style="font-weight: 750; font-size: 13.5px;">1. Link Existing Product(s)</div>
@@ -58,7 +58,7 @@ export function openSubtypeLinkSelectionModal(subtypeId, parentId) {
           </div>
         </div>
 
-        <div onclick="window.handleSubtypeLinkRoute('manual', '${subtypeId || ''}', '${parentId}')" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:#fff; transition: background 0.15s;" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='#fff'">
+        <div role="button" tabindex="0" data-action="link-manual-product" data-subtype-id="${escapeHTML(subtypeId || '')}" data-parent-id="${escapeHTML(parentId || '')}" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:#fff; transition: background 0.15s;" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='#fff'">
           <div style="font-size: 24px;">➕</div>
           <div>
             <div style="font-weight: 750; font-size: 13.5px;">2. Add Product Manually</div>
@@ -66,7 +66,7 @@ export function openSubtypeLinkSelectionModal(subtypeId, parentId) {
           </div>
         </div>
 
-        <div onclick="window.handleSubtypeLinkRoute('tesco', '${subtypeId || ''}', '${parentId}')" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:#fff; transition: background 0.15s;" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='#fff'">
+        <div role="button" tabindex="0" data-action="link-tesco-product" data-subtype-id="${escapeHTML(subtypeId || '')}" data-parent-id="${escapeHTML(parentId || '')}" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:#fff; transition: background 0.15s;" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='#fff'">
           <div style="font-size: 24px;">🛒</div>
           <div>
             <div style="font-weight: 750; font-size: 13.5px;">3. Import from Tesco</div>
@@ -76,7 +76,7 @@ export function openSubtypeLinkSelectionModal(subtypeId, parentId) {
       </div>
 
       <div style="display:flex; justify-content: flex-end;">
-        <button type="button" class="btn" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn" data-action="close-pantry-dialog">Cancel</button>
       </div>
     </div>
   `;
@@ -105,7 +105,7 @@ export function openSubtypeExistingProductPickerModal(subtypeId, parentId, onSuc
 
       <div style="display:flex; gap:8px; justify-content: flex-end; align-items:center;">
         <span id="picker-selected-count" style="font-size:12px; color:var(--text2); margin-right:auto; font-weight:600;">0 selected</span>
-        <button type="button" class="btn" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn" data-action="close-pantry-dialog">Cancel</button>
         <button type="button" class="btn primary" id="btn-confirm-picker-link" disabled style="opacity:0.5; pointer-events:none;">Link Selected Product(s)</button>
       </div>
     </div>
@@ -218,7 +218,7 @@ export function openTescoImportModal(subtypeId, parentId, onSuccess = null) {
       </div>
       <div id="tesco-import-error-msg" style="display:none; margin-bottom:14px;"></div>
       <div style="display:flex; gap:8px; justify-content: flex-end;">
-        <button type="button" class="btn" id="btn-cancel-tesco-import" onclick="window.closeSubtypeActionModal()">Cancel</button>
+        <button type="button" class="btn" id="btn-cancel-tesco-import" data-action="close-pantry-dialog">Cancel</button>
         <button type="button" class="btn primary" id="btn-review-tesco-import">Review Import Data</button>
       </div>
     </div>
@@ -226,8 +226,6 @@ export function openTescoImportModal(subtypeId, parentId, onSuccess = null) {
 
   showModal(html);
 
-  const cancelBtn = document.getElementById('btn-cancel-tesco-import');
-  if (cancelBtn) cancelBtn.onclick = () => closeModal();
 
   const jsonInput = document.getElementById('tesco-json-input');
   const errorMsg = document.getElementById('tesco-import-error-msg');
@@ -271,6 +269,16 @@ export function openTescoBookmarkletInstructionsModal() {
 }
 
 export const openSubtypeProductLinkerModal = openSubtypeLinkSelectionModal;
+// The close-pantry-dialog route in ActionBridge.
+export const closePantryDialog = closeModal;
+
+// Link Product › Add product manually: the product form, pre-linked to this sub-type.
+export async function openManualProductForSubtype(subtypeId, parentId) {
+  const parent = (getState().ingredients || []).find(i => String(i.id) === String(parentId));
+  window.__prefilledResolveBinding = { ingredientId: parentId, subtypeId: subtypeId || null, parentCategory: parent?.category || 'General' };
+  const { openProductEditModal } = await import('../../views/ProductBankView.js');
+  openProductEditModal(null);
+}
 
 if (typeof window !== 'undefined') {
   window.openSubtypeLinkSelectionModal = openSubtypeLinkSelectionModal;

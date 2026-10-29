@@ -432,7 +432,7 @@ try{
             <div style="font-weight:700;margin-bottom:3px">Pantry Bank: Categories → Items → Sub-types → Products</div>
             <div style="font-size:12px;color:var(--text2)">Recipes map to Items or Sub-types in your Pantry Bank.</div>
           </div>
-          <input type="search" id="ingredient-group-search" aria-label="Search categories, items, sub-types, or aliases" placeholder="Search categories, items, sub-types, aliases..." data-pp-input="schedulePlatePlanListRender('ingredients')" style="font-size:12px;max-width:260px" name="ingredient-group-search">
+          <input type="search" id="ingredient-group-search" aria-label="Search categories, items, sub-types, or aliases" placeholder="Search categories, items, sub-types, aliases..." style="font-size:12px;max-width:260px" name="ingredient-group-search">
         </div>
       </div>
       <div id="ingredient-groups-list"></div>
@@ -445,7 +445,7 @@ try{
     <h1 class="view-title" style="margin:0">Product Bank</h1>
     <div class="btn-row">
       <button type="button" class="btn sm btn-primary primary" data-action="showAddIng()">+ Add product</button>
-      <button type="button" class="btn sm btn-outline outline" data-action="showTescoImport()" style="background:var(--purple-bg);color:var(--purple);border-color:var(--purple)">Import Tesco</button>
+      <button type="button" class="btn sm btn-outline outline" data-action="tesco-import" style="background:var(--purple-bg);color:var(--purple);border-color:var(--purple)">Import Tesco</button>
     </div>
   </div>
   <div id="bank-groups-panel"></div>
@@ -483,28 +483,6 @@ try{
 
   
 
-  <div class="cat-filter" id="cat-filter">
-    <div style="width:100%;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-top:2px">Category</div>
-    <div class="cf active" data-action="setCat('all')">all</div><div class="cf" data-action="setCat('baking-spices')">Baking</div><div class="cf" data-action="setCat('beverages')">Beverages</div><div class="cf" data-action="setCat('carbs-pasta-rice')">Carbs (Pasta/Rice/Potato)</div><div class="cf" data-action="setCat('dairy-alternative')">Dairy &amp; Eggs</div><div class="cf" data-action="setCat('fruit')">Fruit &amp; Vegetables</div><div class="cf" data-action="setCat('grain')">Grains, Legumes &amp; Pulses</div><div class="cf" data-action="setCat('herbs')">Herbs &amp; Spices</div><div class="cf" data-action="setCat('meat-substitute')">Meat Substitutes</div><div class="cf" data-action="setCat('nuts-seeds')">Nuts &amp; Seeds</div><div class="cf" data-action="setCat('other')">Other</div><div class="cf" data-action="setCat('sauces-condiments')">Sauces, Condiments &amp; Pastes</div><div class="cf" data-action="setCat('store-cupboard')">Store Cupboard</div><div class="cf" data-action="setCat('supplement')">Supplements</div><div class="cf" data-action="setCat('tofu-tempeh')">Tofu, Tempeh &amp; Seitan</div>
-    <div style="width:100%;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-top:6px">Ingredient</div>
-    <div style="width:100%;display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
-      <input type="search" id="bank-family-search" aria-label="Search ingredient bank family" list="bank-family-options" placeholder="Search ingredient..." data-pp-input="handleProductBankFamilySearch(this.value)" data-pp-change="selectProductBankFamilyFromSearch(this.value)" style="font-size:12px;padding:5px 10px;max-width:260px;flex:1;min-width:180px" name="bank-family-search">
-      <datalist id="bank-family-options"></datalist>
-      
-    </div>
-  </div>
-  <div class="row-center" style="margin-bottom:12px">
-    <label for="bank-sort" style="margin:0;font-size:12px">Sort:</label>
-    <select id="bank-sort" aria-label="Sort product bank" data-pp-change="renderBank()" style="width:auto;font-size:12px" name="bank-sort">
-      <option value="name">Name</option>
-      <option value="prot">Protein</option>
-      <option value="cal">Calories</option>
-      <option value="value">Protein per £</option>
-      <option value="prot_kcal">Protein per 100 kcal</option>
-    </select>
-    <input type="text" id="bank-search" aria-label="Search products or groups" placeholder="Search products or groups..." data-pp-input="schedulePlatePlanListRender('bank')" style="font-size:12px;padding:5px 10px;max-width:210px" name="bank-search">
-  </div>
-  <div id="bank-list"></div>
 </div>
 
 <div id="view-planner" class="view">

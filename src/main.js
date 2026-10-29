@@ -2,7 +2,7 @@ import './config/firebase.js';
 
 if (typeof window !== 'undefined') {
   window.showTescoImport = () => {
-    import('./components/pantry/TescoImportModalUI.js').then(m => m.openTescoImportModal?.(null, null)).catch(err => console.error('[PlatePlan]', err));
+    import('./components/pantry/SubtypeProductLinkerModalUI.js').then(m => m.openTescoImportModal?.(null, null)).catch(err => console.error('[PlatePlan]', err));
   };
   window.createIngredientFamilyPrompt = () => {
     import('./components/pantry/AddToBankHubUI.js').then(m => m.openAddToBankModal?.()).catch(err => console.error('[PlatePlan]', err));

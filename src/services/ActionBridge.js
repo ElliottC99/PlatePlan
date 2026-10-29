@@ -8,7 +8,7 @@ import { renderSettingsView } from '../views/SettingsView.js';
 import { renderScrollableSwapModal, toggleShoppingItemAcquired, toggleInlineShoppingSubst } from '../views/ShoppingView.js';
 import { renderPlanner } from '../views/PlannerView.js';
 import { renderRecipeVault, handleVaultSortChange } from '../views/RecipeVaultView.js';
-import { openProductEditModal, saveManualIng, cancelManualIng, clearProductGroupFilter, showTescoImport } from '../views/ProductBankView.js';
+import { openProductEditModal, saveManualIng, cancelManualIng, clearProductGroupFilter, showTescoImport, toggleTescoUpdate, applyTescoUpdate } from '../views/ProductBankView.js';
 import { renderDataQualityView } from '../views/DataQualityView.js';
 import { moveTodayDate, resetTodayDate, toggleMealEaten } from '../views/TodayView.js';
 import { showView } from '../core/AppRouter.js';
@@ -87,6 +87,33 @@ export function routeAction(actionName, target, event) {
 
   if (normalizedAction === 'cancel-manual-ing' || normalizedAction.includes('cancelmanualing')) {
     cancelManualIng();
+    return true;
+  }
+
+  // 3b. Pantry › sub-type › Link Product routes, and Cancel for the pantry dialogs on view-modal
+  if (normalizedAction === 'link-existing-product' || normalizedAction === 'link-manual-product' || normalizedAction === 'link-tesco-product') {
+    const subtypeId = ds.subtypeId || null;
+    const parentId = ds.parentId || null;
+    import('../components/pantry/SubtypeProductLinkerModalUI.js').then(m => {
+      if (normalizedAction === 'link-existing-product') m.openSubtypeExistingProductPickerModal(subtypeId, parentId);
+      else if (normalizedAction === 'link-tesco-product') m.openTescoImportModal(subtypeId, parentId);
+      else m.openManualProductForSubtype(subtypeId, parentId);
+    });
+    return true;
+  }
+
+  if (normalizedAction === 'close-pantry-dialog') {
+    import('../components/pantry/SubtypeProductLinkerModalUI.js').then(m => m.closePantryDialog());
+    return true;
+  }
+
+  if (normalizedAction === 'tesco-update') {
+    toggleTescoUpdate();
+    return true;
+  }
+
+  if (normalizedAction === 'tesco-update-apply') {
+    applyTescoUpdate();
     return true;
   }
 
