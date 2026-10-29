@@ -43,7 +43,10 @@ global.CustomEvent = class { constructor(type, opts) { this.type = type; this.de
 Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
 
 const { getState, setIngredients, setProducts, setRecipes, setCategories } = await import('../src/store/store.js');
-const { planGuidedDelete, applyGuidedDelete, remapRecipeLine, GUIDED_DELETE_WRITE_LIMIT } = await import('../src/services/PantryTaxonomyService.js');
+const { planGuidedDelete, applyGuidedDelete } = await import('../src/services/PantryTaxonomyService.js');
+
+// The batch limit the plan sets (KTD2): one Firestore batch holds 500 writes, the delete stays under 450.
+const WRITE_LIMIT = 450;
 
 const HH = 'households/elliott-chloe';
 
@@ -89,13 +92,21 @@ async function check(label, fn) {
 
 console.log('=== RUNNING PANTRY GUIDED DELETE SUITE ===\n');
 
-// ---- U2: remap rule ----
+// ---- U2: remap rule, driven through the planner ----
+
+// Deletes Bread › Seeded (moving its products to Oat) with one recipe line on it, remapped to target.
+function remapThroughPlan(line, target) {
+  const s = pantry();
+  s.recipes = [{ id: 'r_remap', name: 'Toast', ingredients: [line] }];
+  const plan = planGuidedDelete(load(s), { kind: 'subtype', itemId: 'ing_bread', subtypeId: 'sub_seeded' }, { productsAll: { itemId: 'ing_milk', subtypeId: 'sub_oat' }, linesAll: target });
+  assert.deepEqual(plan.errors, []);
+  return plan.writes.find(w => w.type === 'recipe').data.ingredients[0];
+}
 
 const lineOnSeeded = { name: 'Bread (Seeded)', qty: 2, unit: 'slice', raw: '2 slices seeded bread', ingredientId: 'ing_bread', pantryItemId: 'ing_bread', bankId: 'ing_bread', groupId: 'grp_ing_bread', subtypeId: 'sub_seeded', subtypeName: 'Seeded', productId: 'p_seeded1', productName: 'Seeded Loaf', categoryId: 'Bakery' };
 
 await check('a line remapped to a root item points only at that item', () => {
-  const s = load(pantry());
-  const out = remapRecipeLine(lineOnSeeded, { kind: 'item', itemId: 'ing_rolls' }, s);
+  const out = remapThroughPlan(lineOnSeeded, { kind: 'item', itemId: 'ing_rolls' });
   assert.equal(out.ingredientId, 'ing_rolls');
   assert.equal(out.pantryItemId, 'ing_rolls');
   assert.equal(out.bankId, 'ing_rolls');
@@ -105,23 +116,20 @@ await check('a line remapped to a root item points only at that item', () => {
 });
 
 await check('a line remapped to a category keeps only the category', () => {
-  const s = load(pantry());
-  const out = remapRecipeLine(lineOnSeeded, { kind: 'category', name: 'Grains' }, s);
+  const out = remapThroughPlan(lineOnSeeded, { kind: 'category', name: 'Grains' });
   assert.equal(out.categoryId, 'Grains');
   for (const k of ['ingredientId', 'pantryItemId', 'bankId', 'groupId', 'subtypeId', 'subtypeName', 'productId', 'productName']) assert.ok(!out[k], `${k} cleared`);
 });
 
 await check('a line remapped to a sub-type points at the sub-type and its parent', () => {
-  const s = load(pantry());
-  const out = remapRecipeLine(lineOnSeeded, { kind: 'subtype', itemId: 'ing_milk', subtypeId: 'sub_oat' }, s);
+  const out = remapThroughPlan(lineOnSeeded, { kind: 'subtype', itemId: 'ing_milk', subtypeId: 'sub_oat' });
   assert.deepEqual([out.ingredientId, out.subtypeId, out.subtypeName, out.groupId, out.categoryId], ['ing_milk', 'sub_oat', 'Oat', 'grp_ing_milk', 'Dairy']);
   assert.ok(!out.productId);
 });
 
 await check('remapping keeps qty, unit and raw, and leaves no field naming the old target', () => {
-  const s = load(pantry());
   for (const target of [{ kind: 'item', itemId: 'ing_rolls' }, { kind: 'category', name: 'Grains' }, { kind: 'subtype', itemId: 'ing_milk', subtypeId: 'sub_oat' }]) {
-    const out = remapRecipeLine(lineOnSeeded, target, s);
+    const out = remapThroughPlan(lineOnSeeded, target);
     assert.deepEqual([out.qty, out.unit, out.raw], [2, 'slice', '2 slices seeded bread']);
     const text = JSON.stringify(out);
     for (const old of ['ing_bread', 'sub_seeded', 'p_seeded1']) assert.ok(!text.includes(old), `${old} gone for ${target.kind}`);
@@ -278,7 +286,7 @@ await check('a product without a destination still needs a home', () => {
 
 await check('more writes than the limit is refused', () => {
   const s = pantry();
-  for (let i = 0; i <= GUIDED_DELETE_WRITE_LIMIT; i++) s.recipes.push(recipe(`r${i}`, [{ name: 'Bread', ingredientId: 'ing_test1' }]));
+  for (let i = 0; i <= WRITE_LIMIT; i++) s.recipes.push(recipe(`r${i}`, [{ name: 'Bread', ingredientId: 'ing_test1' }]));
   const plan = planGuidedDelete(load(s), { kind: 'item', id: 'ing_test1' });
   assert.ok(plan.errors.some(e => /too many/i.test(e)));
 });

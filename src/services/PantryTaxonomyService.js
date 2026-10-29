@@ -357,14 +357,14 @@ export async function executeCategoryReallocation({ mode, categoryName, newCateg
 // ---- Guided delete: docs/plans/2026-10-29-1810-feat-pantry-guided-delete-plan.md ----
 
 // One Firestore batch holds at most 500 writes; stay clear of it rather than split (KTD2).
-export const GUIDED_DELETE_WRITE_LIMIT = 450;
+const GUIDED_DELETE_WRITE_LIMIT = 450;
 
 const sameId = (a, b) => a !== undefined && a !== null && a !== '' && String(a) === String(b);
 const itemCategory = item => item?.category || item?.cat || '';
 
 // Rewrites a recipe line to point at a category, root item or sub-type, clearing every field
 // that still names the old target so shopping can't resolve through it (KTD4).
-export function remapRecipeLine(line, target, state = getState()) {
+function remapRecipeLine(line, target, state) {
   const out = { ...line };
   for (const k of ['ingredientId', 'pantryItemId', 'bankId', 'groupId', 'subtypeId', 'subtypeName', 'productId', 'productName']) delete out[k];
   if (target.kind === 'category') {
