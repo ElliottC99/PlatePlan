@@ -242,6 +242,13 @@ export async function batchRecalibrateRecipesInDb(recipeUpdates, advisoryKeysToD
   }
 }
 
+// Adds a recipe write to a batch the caller commits, stamped and merged as batchUpdateRecipesInDb does.
+export function addRecipeToBatch(batch, recipe) {
+  const rData = { ...recipe, schemaVersion: 2, updatedAt: new Date().toISOString() };
+  delete rData.id;
+  batch.set(db.collection('households').doc(HOUSEHOLD_ID).collection('recipes').doc(String(recipe.id)), rData, { merge: true });
+}
+
 export async function batchUpdateRecipesInDb(recipeUpdates) {
   if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
   if (!Array.isArray(recipeUpdates) || recipeUpdates.length === 0) return { success: true, count: 0 };

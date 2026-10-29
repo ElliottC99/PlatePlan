@@ -66,6 +66,14 @@ export async function saveProduct(product) {
   }
 }
 
+// Adds a product write to a batch the caller commits, with the same category and stamping as saveProduct.
+export function addProductToBatch(batch, product) {
+  const enforced = enforceCategorySSOT({ ingredients: (typeof window !== 'undefined' && getState()?.ingredients) || [], products: [product] });
+  const prodData = { ...(enforced.products[0] || product), schemaVersion: 2, updatedAt: new Date().toISOString() };
+  delete prodData.id;
+  batch.set(db.collection('households').doc(HOUSEHOLD_ID).collection('products').doc(String(product.id)), prodData, { merge: true });
+}
+
 export async function deleteProduct(productId) {
   try {
     if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };

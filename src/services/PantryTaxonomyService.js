@@ -8,9 +8,10 @@
 
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
 import { enforceCategorySSOT } from '../utils/categoryEnforcer.js';
-import { getState, setCategories, setIngredients, setProducts, saveStateCache } from '../store/store.js';
+import { getState, setCategories, setIngredients, setProducts, setRecipes, saveStateCache } from '../store/store.js';
 import { getCategories, saveCategories } from './CategoryRepository.js';
-import { getProducts, saveProduct } from './ProductRepository.js';
+import { getProducts, saveProduct, addProductToBatch } from './ProductRepository.js';
+import { addRecipeToBatch } from './RecipeFirestoreRepository.js';
 
 function isDbAvailable() {
   if (!db) { console.warn('[PantryTaxonomyService] Firestore db instance not initialised.'); return false; }
@@ -351,4 +352,219 @@ export async function executeCategoryReallocation({ mode, categoryName, newCateg
 
   saveStateCache(state);
   return { success: true };
+}
+
+// ---- Guided delete: docs/plans/2026-10-29-1810-feat-pantry-guided-delete-plan.md ----
+
+// One Firestore batch holds at most 500 writes; stay clear of it rather than split (KTD2).
+const GUIDED_DELETE_WRITE_LIMIT = 450;
+// With the local cache on, a commit on a dead connection never rejects; it waits for the server.
+const GUIDED_DELETE_COMMIT_TIMEOUT_MS = 10000;
+
+const sameId = (a, b) => a !== undefined && a !== null && a !== '' && String(a) === String(b);
+const itemCategory = item => item?.category || item?.cat || '';
+
+// Rewrites a recipe line to point at a category, root item or sub-type, clearing every field
+// that still names the old target so shopping can't resolve through it (KTD4).
+function remapRecipeLine(line, target, state) {
+  const out = { ...line };
+  for (const k of ['ingredientId', 'pantryItemId', 'bankId', 'groupId', 'subtypeId', 'subtypeName', 'productId', 'productName']) delete out[k];
+  if (target.kind === 'category') {
+    out.categoryId = target.name;
+    out.name = target.name;
+    return out;
+  }
+  const item = (state.ingredients || []).find(i => sameId(i.id, target.itemId)) || target.item || {};
+  const itemId = String(target.itemId);
+  Object.assign(out, { ingredientId: itemId, pantryItemId: itemId, bankId: itemId, groupId: `grp_${itemId}`, categoryId: itemCategory(item) });
+  out.name = item.name || out.name;
+  if (target.kind === 'subtype') {
+    const sub = (item.subtypes || []).find(st => sameId(st.id, target.subtypeId)) || target.subtype || {};
+    out.subtypeId = String(target.subtypeId);
+    out.subtypeName = sub.name || '';
+    if (sub.name) out.name = `${item.name} (${sub.name})`;
+  }
+  return out;
+}
+
+// The recipe lines a recipe holds, with a stable key for each (original, enhanced, and their sections).
+function recipeLineSlots(recipe) {
+  const slots = [];
+  const add = (lines, where) => (Array.isArray(lines) ? lines : []).forEach((line, idx) => {
+    if (line && typeof line === 'object') slots.push({ where, idx, line, key: `${recipe.id}|${where}|${idx}` });
+  });
+  add(recipe.ingredients, 'ingredients');
+  (recipe.ingredientSections || []).forEach((sec, n) => add(sec?.ingredients, `sections.${n}`));
+  add(recipe.enhanced?.ingredients, 'enhanced.ingredients');
+  (recipe.enhanced?.ingredientSections || []).forEach((sec, n) => add(sec?.ingredients, `enhanced.sections.${n}`));
+  return slots;
+}
+
+function setRecipeLine(recipe, where, idx, line) {
+  const parts = where.split('.');
+  const enhanced = parts[0] === 'enhanced';
+  const rest = enhanced ? parts.slice(1) : parts;
+  const holder = enhanced ? (recipe.enhanced = { ...recipe.enhanced }) : recipe;
+  if (rest[0] === 'ingredients') {
+    holder.ingredients = [...holder.ingredients];
+    holder.ingredients[idx] = line;
+  } else {
+    const n = Number(rest[1]);
+    holder.ingredientSections = [...holder.ingredientSections];
+    const sec = { ...holder.ingredientSections[n], ingredients: [...holder.ingredientSections[n].ingredients] };
+    sec.ingredients[idx] = line;
+    holder.ingredientSections[n] = sec;
+  }
+}
+
+// Works out a whole delete from in-memory state and the dialog's choices, without writing anything (KTD1).
+// target: { kind: 'category', name } | { kind: 'item', id } | { kind: 'subtype', itemId, subtypeId }
+// choices: { newSubtypes: [{ id, itemId, name }], productsAll, products: { [productId]: dest },
+//            linesAll, lines: { [lineKey]: dest } }
+export function planGuidedDelete(state, target, choices = {}) {
+  const ingredients = state.ingredients || [];
+  const categories = state.categories || [];
+  const errors = [];
+
+  const removed = { categories: [], items: [], subtypes: [] };
+  if (target.kind === 'category') {
+    removed.categories = [target.name];
+    removed.items = ingredients.filter(i => itemCategory(i) === target.name);
+  } else if (target.kind === 'item') {
+    removed.items = ingredients.filter(i => sameId(i.id, target.id));
+  } else {
+    const parent = ingredients.find(i => sameId(i.id, target.itemId));
+    removed.subtypes = (parent?.subtypes || []).filter(st => sameId(st.id, target.subtypeId));
+  }
+  removed.items.forEach(i => removed.subtypes.push(...(i.subtypes || [])));
+  const removedItemIds = new Set(removed.items.map(i => String(i.id)));
+  const removedSubIds = new Set(removed.subtypes.map(st => String(st.id)));
+  if (target.kind === 'subtype') removedSubIds.add(String(target.subtypeId));
+  const removedCats = new Set(removed.categories);
+
+  // New sub-types created in the dialog join their parent's list in the same batch.
+  const updatedItems = new Map();
+  const itemFor = id => updatedItems.get(String(id)) || ingredients.find(i => sameId(i.id, id));
+  const chosen = [choices.productsAll, choices.linesAll, ...Object.values(choices.products || {}), ...Object.values(choices.lines || {})];
+  const usedNewIds = new Set(chosen.filter(Boolean).map(d => String(d.subtypeId)));
+  for (const ns of (choices.newSubtypes || []).filter(ns => usedNewIds.has(String(ns.id)))) {
+    const name = String(ns.name || '').trim();
+    const parent = itemFor(ns.itemId);
+    if (!parent || removedItemIds.has(String(ns.itemId))) { errors.push('A new sub-type must go under an item that is not being deleted.'); continue; }
+    if (!name) { errors.push('A new sub-type needs a name.'); continue; }
+    if ((parent.subtypes || []).some(st => String(st.name || '').trim().toLowerCase() === name.toLowerCase())) { errors.push(`"${parent.name}" already has a sub-type called "${name}".`); continue; }
+    updatedItems.set(String(parent.id), { ...parent, subtypes: [...(parent.subtypes || []), { id: ns.id, name, parentId: String(parent.id), aliases: [], category: itemCategory(parent), createdAt: new Date().toISOString() }] });
+  }
+
+  const liveSubtype = (itemId, subtypeId) => {
+    if (removedItemIds.has(String(itemId)) || removedSubIds.has(String(subtypeId))) return null;
+    const item = itemFor(itemId);
+    const sub = (item?.subtypes || []).find(st => sameId(st.id, subtypeId));
+    return sub ? { item, sub } : null;
+  };
+
+  // Products under anything removed must move to a surviving sub-type (R6, KTD5).
+  const products = (state.products || []).filter(p => removedSubIds.has(String(p.subtypeId ?? p.subTypeId)) || removedItemIds.has(String(p.ingredientId))).map(p => {
+    const dest = choices.products?.[p.id] || choices.productsAll || null;
+    if (!dest) return { product: p, needsHome: true };
+    const live = liveSubtype(dest.itemId, dest.subtypeId);
+    if (!live) { errors.push(`"${p.name}" can't move somewhere that is being deleted or doesn't exist.`); return { product: p, needsHome: true, destination: dest }; }
+    return { product: p, needsHome: false, destination: dest, live };
+  });
+
+  // Recipe lines naming anything removed must be remapped (R8, KTD4).
+  const usesRemoved = line => [line.ingredientId, line.pantryItemId, line.bankId].some(v => v != null && removedItemIds.has(String(v)))
+    || (line.subtypeId != null && removedSubIds.has(String(line.subtypeId)))
+    || (line.groupId != null && removedItemIds.has(String(line.groupId).replace(/^grp_/, '')))
+    || (line.categoryId != null && removedCats.has(String(line.categoryId)));
+  const liveTarget = dest => {
+    if (dest.kind === 'category') return categories.includes(dest.name) && !removedCats.has(dest.name);
+    if (dest.kind === 'item') return !!itemFor(dest.itemId) && !removedItemIds.has(String(dest.itemId));
+    return !!liveSubtype(dest.itemId, dest.subtypeId);
+  };
+  const lines = [];
+  for (const recipe of state.recipes || []) {
+    for (const slot of recipeLineSlots(recipe)) {
+      if (!usesRemoved(slot.line)) continue;
+      const dest = choices.lines?.[slot.key] || choices.linesAll || null;
+      const entry = { recipeId: recipe.id, recipeName: recipe.name || recipe.title || '', ...slot, needsHome: !dest, destination: dest };
+      if (dest && !liveTarget(dest)) { errors.push(`A line in "${entry.recipeName}" can't be remapped somewhere that is being deleted or doesn't exist.`); entry.needsHome = true; }
+      lines.push(entry);
+    }
+  }
+
+  const writes = [];
+  for (const entry of products.filter(e => !e.needsHome)) {
+    const { item, sub } = entry.live;
+    const moved = { ...entry.product, ingredientId: String(item.id), subtypeId: String(sub.id), subTypeId: String(sub.id), category: itemCategory(item), isAutoDefault: false };
+    if ('is_default' in moved) moved.is_default = false;
+    writes.push({ type: 'product', data: moved });
+  }
+  const recipesById = new Map();
+  for (const entry of lines.filter(e => !e.needsHome)) {
+    const base = recipesById.get(String(entry.recipeId)) || { ...(state.recipes || []).find(r => sameId(r.id, entry.recipeId)) };
+    setRecipeLine(base, entry.where, entry.idx, remapRecipeLine(entry.line, entry.destination, { ingredients: [...updatedItems.values(), ...ingredients] }));
+    recipesById.set(String(entry.recipeId), base);
+  }
+  recipesById.forEach(r => writes.push({ type: 'recipe', data: r }));
+  if (target.kind === 'subtype') {
+    const parent = itemFor(target.itemId);
+    if (parent) {
+      const movedIds = new Set(products.map(e => String(e.product.id)));
+      const trimmed = { ...parent, subtypes: (parent.subtypes || []).filter(st => !sameId(st.id, target.subtypeId)) };
+      // A default that now points at a product in another hierarchy falls back to the metric instead.
+      if (parent.defaultProductId != null && movedIds.has(String(parent.defaultProductId))) trimmed.defaultProductId = null;
+      updatedItems.set(String(parent.id), trimmed);
+    }
+  }
+  updatedItems.forEach(item => writes.push({ type: 'item', data: item }));
+  removed.items.forEach(i => writes.push({ type: 'deleteItem', id: String(i.id) }));
+  if (removed.categories.length) writes.push({ type: 'categories', data: categories.filter(c => !removedCats.has(c)) });
+
+  // Every affected product and recipe gets written once homed, so the size is known before any choice (step 1 refusal).
+  const projected = products.length + new Set(lines.map(e => String(e.recipeId))).size + writes.filter(w => w.type !== 'product' && w.type !== 'recipe').length;
+  if (projected > GUIDED_DELETE_WRITE_LIMIT) errors.push('Too many changes to save in one go.');
+  const needsHome = products.filter(e => e.needsHome).length + lines.filter(e => e.needsHome).length;
+  return { target, removed, products, lines, errors, needsHome, writes };
+}
+
+// Saves a planned delete in one batch; the store changes only after the commit resolves (KTD2, KTD3).
+export async function applyGuidedDelete(plan, { timeoutMs = GUIDED_DELETE_COMMIT_TIMEOUT_MS } = {}) {
+  if (!plan || plan.errors.length || plan.needsHome) return { success: false, error: 'The delete is not ready.' };
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return { success: false, offline: true };
+  if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
+  const household = db.collection('households').doc(HOUSEHOLD_ID);
+  const batch = db.batch();
+  const stamp = new Date().toISOString();
+  for (const w of plan.writes) {
+    if (w.type === 'product') addProductToBatch(batch, w.data);
+    else if (w.type === 'recipe') addRecipeToBatch(batch, w.data);
+    else if (w.type === 'item') {
+      const data = { ...w.data, schemaVersion: 2, updatedAt: stamp };
+      delete data.id;
+      batch.set(household.collection('ingredients').doc(String(w.data.id)), data, { merge: true });
+    } else if (w.type === 'deleteItem') batch.delete(household.collection('ingredients').doc(String(w.id)));
+    else if (w.type === 'categories') batch.set(household.collection('settings').doc('categories'), { categories: w.data, updatedAt: stamp }, { merge: true });
+  }
+  let pending = false;
+  try {
+    const timedOut = new Promise(resolve => setTimeout(() => resolve('timeout'), timeoutMs));
+    pending = (await Promise.race([batch.commit(), timedOut])) === 'timeout';
+  } catch (err) {
+    console.error('[PantryTaxonomyService] Guided delete commit failed:', err);
+    return { success: false, error: err };
+  }
+
+  const state = getState();
+  const writtenById = type => new Map(plan.writes.filter(w => w.type === type).map(w => [String(w.data.id), w.data]));
+  const items = writtenById('item'), prods = writtenById('product'), recipes = writtenById('recipe');
+  const deleted = new Set(plan.writes.filter(w => w.type === 'deleteItem').map(w => w.id));
+  setIngredients((state.ingredients || []).filter(i => !deleted.has(String(i.id))).map(i => items.get(String(i.id)) || i));
+  setProducts((state.products || []).map(p => prods.get(String(p.id)) || p));
+  setRecipes((state.recipes || []).map(r => recipes.get(String(r.id)) || r));
+  const cats = plan.writes.find(w => w.type === 'categories');
+  if (cats) setCategories(cats.data);
+  saveStateCache(getState());
+  // A queued batch can't be taken back: it is already applied on this phone and lands on reconnect.
+  return pending ? { success: false, pending: true } : { success: true };
 }

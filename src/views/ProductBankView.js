@@ -4,8 +4,9 @@
  * Decomposed: HTML template rendering moved to ProductBankRenderService.js.
  */
 
-import { getState, setProducts } from '../store/store.js';
+import { getState, setProducts, setIngredients } from '../store/store.js';
 import { saveProduct, deleteProduct } from '../services/ProductRepository.js';
+import { saveRootItem } from '../services/RootItemRepository.js';
 import { reallocateProduct, setAutoDefaultProduct, getActiveCategories, addSubtypeToIngredient } from '../models/PantryHierarchyModel.js';
 import { promptReallocateProduct as openReallocateModal } from '../components/pantry/ReallocateProductModalUI.js';
 import { showCustomAlert, showCustomConfirm } from '../components/ui/DialogHelpers.js';
@@ -266,26 +267,16 @@ export async function promptReallocateProduct(productId) {
 
 export const openProductReallocateModal = promptReallocateProduct;
 
-// Refuses while a recipe or a pantry default still points at the product.
+// Refuses while a recipe still points at the product. A default is recalculated from the preference
+// metric when its product goes, so it never blocks a delete (R14).
 export async function handleDeleteProduct(productId, prodName = null) {
   const state = getState();
   const product = (state.products || []).find(p => String(p.id) === String(productId));
   const name = prodName || product?.name || 'this product';
-  const isThisProduct = value => value !== undefined && value !== null && String(value?.id ?? value) === String(productId);
   const recipeCount = (state.recipes || []).filter(r => [...(r.ingredients || []), ...(r.enhanced?.ingredients || [])]
-    .some(line => line && isThisProduct(line.productId))).length;
-  const defaultFor = (state.ingredients || []).flatMap(item => [
-    // autoDefaultProduct is usually the product's name, occasionally its ID.
-    (isThisProduct(item.defaultProductId) || isThisProduct(item.autoDefaultProduct) || (product?.name && item.autoDefaultProduct === product.name)) && item.name,
-    ...(item.subtypes || []).filter(st => isThisProduct(st.defaultProductId)).map(st => st.name)
-  ]).filter(Boolean);
-
-  const links = [
-    recipeCount && `is used in ${recipeCount} recipe${recipeCount === 1 ? '' : 's'}`,
-    defaultFor.length && `is the default for ${defaultFor.join(', ')}`
-  ].filter(Boolean);
-  if (links.length) {
-    showCustomAlert(`"${name}" ${links.join(' and ')}. Swap it out or set another default first.`, 'Cannot delete yet');
+    .some(line => line && line.productId != null && String(line.productId) === String(productId))).length;
+  if (recipeCount) {
+    showCustomAlert(`"${name}" is used in ${recipeCount} recipe${recipeCount === 1 ? '' : 's'}. Swap it out first.`, 'Cannot delete yet');
     return;
   }
 
@@ -296,8 +287,26 @@ export async function handleDeleteProduct(productId, prodName = null) {
       return;
     }
     setProducts((getState().products || []).filter(p => String(p.id) !== String(productId)));
+    await clearDefaultsPointingAt(productId);
     renderProductBank();
   });
+}
+
+// A saved default naming a deleted product is cleared, so every reader falls back to the metric (R13).
+async function clearDefaultsPointingAt(productId) {
+  const isIt = v => v != null && String(v) === String(productId);
+  const changed = [];
+  const ingredients = (getState().ingredients || []).map(item => {
+    const subtypes = (item.subtypes || []).map(st => (isIt(st.defaultProductId) ? { ...st, defaultProductId: null } : st));
+    const touched = isIt(item.defaultProductId) || subtypes.some((st, n) => st !== item.subtypes[n]);
+    if (!touched) return item;
+    const next = { ...item, subtypes, ...(isIt(item.defaultProductId) ? { defaultProductId: null } : {}) };
+    changed.push(next);
+    return next;
+  });
+  if (!changed.length) return;
+  setIngredients(ingredients);
+  await Promise.all(changed.map(item => saveRootItem(item)));
 }
 
 export async function handleMakeAutoDefault(productId, ingredientId) {
