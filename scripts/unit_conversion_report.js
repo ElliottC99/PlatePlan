@@ -13,7 +13,7 @@
  *   node scripts/unit_conversion_report.js --backup <file> --base <git-ref> --out <dir>
  *
  * Defaults: the newest plateplan-backup-*.json in ~/PlatePlan-backups, the merge-base of HEAD
- * and origin/development, and ~/PlatePlan-backups/reports.
+ * and origin/main (still the old code until this merge is released), and ~/PlatePlan-backups/reports.
  */
 
 import fs from 'node:fs';
@@ -291,7 +291,7 @@ function extractSrc(ref) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const backupPath = path.resolve(args.backup || newestBackup());
-  const baseRef = args.base || git('merge-base', 'HEAD', 'origin/development');
+  const baseRef = args.base || git('merge-base', 'HEAD', 'origin/main');
   let baseCommit;
   try {
     baseCommit = git('rev-parse', '--short', `${baseRef}^{commit}`);
