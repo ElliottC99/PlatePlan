@@ -3,7 +3,7 @@
  * Pure macro calculation, calorie normalization, and nutritional rollup service.
  * Quarantined from page DOM queries and direct database operations.
  */
-import { UNIT_TO_GRAMS, toGrams } from '../utils/unitConverter.js';
+import { toGrams } from './UnitConversionService.js';
 
 export const NUTRITION_CANONICAL_MAP = {
   cal: "cal", kcal: "cal", calories: "cal", energy: "cal",
@@ -74,18 +74,10 @@ export function calculateItemNutrition(item, quantity, unit = 'g') {
   if (u === 'item' || u === 'piece' || u === 'qty' || u === 'pack' || u === 'can' || u === 'tin') {
     const itemWeight = parseFloat(item.itemWeight) || parseFloat(item.drainedWeight) || parseFloat(item.packSize) || 0;
     grams = q * itemWeight;
-  } else if (u === 'g' || u === 'gram') {
+  } else if (u === 'g' || u === 'gram' || u === 'ml') {
     grams = q;
-  } else if (u === 'kg') {
-    grams = q * 1000;
-  } else if (u === 'ml') {
-    grams = q;
-  } else if (u === 'l' || u === 'litre' || u === 'liter') {
-    grams = q * 1000;
-  } else if (UNIT_TO_GRAMS[u]) {
-    grams = q * UNIT_TO_GRAMS[u];
   } else {
-    grams = toGrams(q, u, item?.itemWeight || 100);
+    grams = toGrams(q, u, item.name, item.itemWeight);
   }
 
   grams = calculateItemNutritionalWeight(item, grams);
