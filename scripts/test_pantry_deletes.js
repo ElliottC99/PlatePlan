@@ -281,10 +281,9 @@ await check('Edit product: Cancel closes the form without saving', async () => {
   assert.deepEqual(saved, []);
 });
 
-await check('Empty Product Bank: "+ Add Product" opens the product form and "Import Tesco" opens the Tesco import', () => {
+await check('Empty Product Bank: "+ Add Product" opens the product form and "Import Tesco" opens the Tesco import', async () => {
   reset({ products: [] });
-  let tesco = 0;
-  window.openTescoImportModal = () => { tesco++; };
+  delete window.openTescoImportModal; // a fresh load: no Pantry dialog has put it on window yet
   renderProductBank();
   const buttons = Object.fromEntries(actionsIn(el('product-bank-cards-wrap').innerHTML));
   assert.ok(buttons['+ Add Product'] && buttons['Import Tesco'], 'both buttons carry a data-action');
@@ -292,7 +291,14 @@ await check('Empty Product Bank: "+ Add Product" opens the product form and "Imp
   assert.equal(route(buttons['+ Add Product']), true);
   assert.match(modalText(), /mi-save-btn/, 'the product form opened');
   assert.equal(route(buttons['Import Tesco']), true);
-  assert.equal(tesco, 1);
+  await settle();
+  assert.match(modalText(), /tesco-json-input/, 'the Tesco import opened');
+});
+
+await check('the Product Bank header\'s Import Tesco is a routed action', () => {
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const bank = html.slice(html.indexOf('<div id="view-bank"'), html.indexOf('<div id="view-planner"'));
+  assert.match(bank, /data-action="tesco-import"[^>]*>Import Tesco</);
 });
 
 // ---- Pantry › sub-type › Link Product (plan 2026-10-29-2038, U1 and U2) ----

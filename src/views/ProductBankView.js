@@ -408,10 +408,10 @@ export function clearProductGroupFilter() {
   renderProductBank();
 }
 
-export function showTescoImport() {
-  if (typeof window.openTescoImportModal === 'function') {
-    window.openTescoImportModal(null, null);
-  }
+// Imported directly: window.openTescoImportModal only exists once a Pantry dialog has loaded the module.
+export async function showTescoImport() {
+  const { openTescoImportModal } = await import('../components/pantry/SubtypeProductLinkerModalUI.js');
+  openTescoImportModal(null, null);
 }
 
 if (typeof window !== 'undefined') {
