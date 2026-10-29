@@ -21,8 +21,10 @@ A file may be deleted after two weeks of normal use on both phones with no relat
 | `src/components/recipe/VaultRecipeCard.js` | 2026-10-28 | 2026-11-11 |
 | `src/components/recipe/ViewRecipeModal.js` | 2026-10-28 | 2026-11-11 |
 | `src/services/FitScoreEngine.js` | 2026-10-28 | 2026-11-11 |
+| `src/services/RecipeUnitConverter.js` | 2026-10-29 | 2026-11-12 |
 | `src/services/RecipeWizardEventService.js` | 2026-10-28 | 2026-11-11 |
 | `src/services/SubtypeActionService.js` | 2026-10-28 | 2026-11-11 |
+| `src/services/UnitConverter.js` | 2026-10-29 | 2026-11-12 |
 | `src/services/firebase.js` | 2026-10-28 | 2026-11-11 |
 | `src/views/MealPlannerView.js` | 2026-10-28 | 2026-11-11 |
 | `src/views/PantryBankModalService.js` | 2026-10-28 | 2026-11-11 |
