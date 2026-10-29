@@ -5,13 +5,13 @@
  * scripts/test_unit_conversion.js pins every rule; change the fixture with the rule.
  */
 
-// Whole words that make an ingredient a liquid, kept in ml.
+// Whole words (or their plurals) that make an ingredient a liquid, kept in ml.
 const LIQUID_WORDS = [
-  'water', 'milk', 'coconut milk', 'buttermilk', 'oil', 'broth', 'stock', 'soy', 'tamari',
-  'vinegar', 'juice', 'cream', 'maple', 'syrup', 'honey', 'wine', 'beer', 'sherry', 'sauce',
-  'dressing', 'yoghurt', 'yogurt', 'passata', 'mustard', 'ketchup', 'mayo'
+  'water', 'milk', 'coconut milk', 'buttermilk', 'oatmilk', 'soymilk', 'oil', 'broth', 'stock',
+  'soy', 'tamari', 'vinegar', 'juice', 'cream', 'maple', 'syrup', 'honey', 'wine', 'beer', 'sherry',
+  'sauce', 'dressing', 'yoghurt', 'yogurt', 'passata', 'mustard', 'ketchup', 'mayo', 'mayonnaise'
 ];
-const LIQUID_PATTERN = new RegExp(`\\b(?:${LIQUID_WORDS.join('|')})\\b`);
+const LIQUID_PATTERN = new RegExp(`\\b(?:${LIQUID_WORDS.join('|')})(?:s|es)?\\b`);
 const NOT_LIQUID_PATTERN = /\b(?:paste|pastes|puree|purees|purée|purées)\b/;
 
 const DENSITY_TABLE = {
@@ -44,6 +44,11 @@ const ML_PER_UNIT = {
   cup: 240, cups: 240,
   'fl oz': 29.57, 'fl. oz': 29.57, 'fl. oz.': 29.57, 'fluid oz': 29.57, floz: 29.57
 };
+
+const METRIC_VOLUME_UNITS = new Set([
+  'ml', 'millilitre', 'millilitres', 'milliliter', 'milliliters',
+  'l', 'litre', 'litres', 'liter', 'liters'
+]);
 
 // Estimated weights for loose measures, per unit.
 const ESTIMATED_GRAMS_PER_UNIT = {
@@ -134,12 +139,14 @@ export function convertToStrictUnit(qty, unit, ingredientName) {
 
 /**
  * Converts a quantity to grams for nutrition and display.
- * Fixed-weight count units (clove, tin, head...) use their own weight; ml counts as grams;
- * any other count uses itemWeight, then a weight matched by name, then 100 g.
+ * Fixed-weight count units (clove, tin, head...) use their own weight; ml and litres count 1:1
+ * as grams; spoons and cups go through convertToStrictUnit; any other count uses itemWeight,
+ * then a weight matched by name, then 100 g.
  */
 export function toGrams(qty, unit, ingredientName = '', itemWeight = 0) {
   const u = normaliseUnitName(unit);
   if (COUNT_UNIT_GRAMS[u]) return round1((Number(qty) || 1) * COUNT_UNIT_GRAMS[u]);
+  if (METRIC_VOLUME_UNITS.has(u)) return round1((Number(qty) || 1) * ML_PER_UNIT[u]);
 
   const strict = convertToStrictUnit(qty, unit, ingredientName);
   if (strict.unit !== 'qty') return strict.qty;

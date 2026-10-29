@@ -29,6 +29,9 @@
     { "qty": 1, "unit": "tbsp", "name": "maple syrup", "expect": { "qty": 15, "unit": "ml", "isEstimated": false, "isFallbackWeight": false } },
     { "qty": 1, "unit": "tbsp", "name": "stock cube", "expect": { "qty": 15, "unit": "ml", "isEstimated": false, "isFallbackWeight": false } },
     { "qty": 1, "unit": "cup", "name": "cream cheese", "expect": { "qty": 240, "unit": "ml", "isEstimated": false, "isFallbackWeight": false } },
+    { "qty": 1, "unit": "tbsp", "name": "Mayonnaise", "expect": { "qty": 15, "unit": "ml", "isEstimated": false, "isFallbackWeight": false } },
+    { "qty": 1, "unit": "cup", "name": "oatmilk", "expect": { "qty": 240, "unit": "ml", "isEstimated": false, "isFallbackWeight": false } },
+    { "qty": 2, "unit": "tbsp", "name": "hot sauces", "expect": { "qty": 30, "unit": "ml", "isEstimated": false, "isFallbackWeight": false } },
     { "qty": 4, "unit": "fl oz", "name": "milk", "expect": { "qty": 118.3, "unit": "ml", "isEstimated": false, "isFallbackWeight": false } },
     { "qty": 1, "unit": "fl. oz", "name": "water", "expect": { "qty": 29.6, "unit": "ml", "isEstimated": false, "isFallbackWeight": false } },
 
@@ -71,7 +74,9 @@
     { "qty": 1, "unit": "tbsp", "name": "honey", "expect": 15 },
     { "qty": 1, "unit": "tbsp", "name": "plain flour", "expect": 7.5 },
     { "qty": 1, "unit": "cup", "name": "basmati rice", "expect": 192 },
-    { "qty": 1, "unit": "kg", "name": "potatoes", "expect": 1000 }
+    { "qty": 1, "unit": "kg", "name": "potatoes", "expect": 1000 },
+    { "qty": 1, "unit": "l", "name": "oat drink", "expect": 1000 },
+    { "qty": 250, "unit": "ml", "name": "vodka", "expect": 250 }
   ],
   "liquid": [
     { "name": "soy sauce", "expect": true },
@@ -80,6 +85,9 @@
     { "name": "tomato paste", "expect": false },
     { "name": "watercress", "expect": false },
     { "name": "boiled potatoes", "expect": false },
-    { "name": "plain flour", "expect": false }
+    { "name": "plain flour", "expect": false },
+    { "name": "Mayonnaise", "expect": true },
+    { "name": "soymilk", "expect": true },
+    { "name": "mixed juices", "expect": true }
   ]
 }
