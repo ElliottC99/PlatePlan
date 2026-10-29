@@ -1,14 +1,18 @@
 /**
- * src/services/UnitConversionService.js (v3.22.1)
- * Density-Based Unit Conversion Engine for PlatePlan Recipe Ingestion.
- * Strictly converts all incoming measurements to 'g', 'ml', or 'qty'.
+ * src/services/UnitConversionService.js
+ * The one unit converter. Recipe import, the shopping list, nutrition, the recipe
+ * detail view and the recipe editor all turn measurements into 'g', 'ml' or 'qty' here.
+ * scripts/test_unit_conversion.js pins every rule; change the fixture with the rule.
  */
 
-const LIQUID_INGREDIENTS = [
-  'water', 'milk', 'oil', 'olive oil', 'vegetable oil', 'broth', 'stock', 'soy sauce', 
-  'tamari', 'vinegar', 'juice', 'lemon juice', 'lime juice', 'cream', 'coconut milk',
-  'maple syrup', 'honey', 'syrup', 'wine', 'beer'
+// Whole words that make an ingredient a liquid, kept in ml.
+const LIQUID_WORDS = [
+  'water', 'milk', 'coconut milk', 'buttermilk', 'oil', 'broth', 'stock', 'soy', 'tamari',
+  'vinegar', 'juice', 'cream', 'maple', 'syrup', 'honey', 'wine', 'beer', 'sherry', 'sauce',
+  'dressing', 'yoghurt', 'yogurt', 'passata', 'mustard', 'ketchup', 'mayo'
 ];
+const LIQUID_PATTERN = new RegExp(`\\b(?:${LIQUID_WORDS.join('|')})\\b`);
+const NOT_LIQUID_PATTERN = /\b(?:paste|pastes|puree|purees|purée|purées)\b/;
 
 const DENSITY_TABLE = {
   // g/ml density ratios
@@ -23,74 +27,139 @@ const DENSITY_TABLE = {
   butter: 0.9,       // 1 tbsp ~ 14g
   powder: 0.5,       // generic powder/spice
 };
+const DEFAULT_DENSITY = 0.7;
+
+const GRAMS_PER_UNIT = {
+  g: 1, gram: 1, grams: 1,
+  kg: 1000, kilogram: 1000, kilograms: 1000, kilo: 1000, kilos: 1000,
+  oz: 28.35, ounce: 28.35, ounces: 28.35,
+  lb: 453.6, lbs: 453.6, pound: 453.6, pounds: 453.6
+};
+
+const ML_PER_UNIT = {
+  ml: 1, millilitre: 1, millilitres: 1, milliliter: 1, milliliters: 1,
+  l: 1000, litre: 1000, litres: 1000, liter: 1000, liters: 1000,
+  tsp: 5, teaspoon: 5, teaspoons: 5,
+  tbsp: 15, tablespoon: 15, tablespoons: 15,
+  cup: 240, cups: 240,
+  'fl oz': 29.57, 'fl. oz': 29.57, 'fl. oz.': 29.57, 'fluid oz': 29.57, floz: 29.57
+};
+
+// Estimated weights for loose measures, per unit.
+const ESTIMATED_GRAMS_PER_UNIT = {
+  pinch: 0.5, pinches: 0.5, dash: 0.5, dashes: 0.5,
+  handful: 30, handfuls: 30,
+  bunch: 20, bunches: 20,
+  'small bunch': 15, 'small bunches': 15,
+  'large bunch': 30, 'large bunches': 30
+};
+
+// Count units with a fixed weight each, used by toGrams even when the item has its own weight.
+const COUNT_UNIT_GRAMS = {
+  clove: 6, cloves: 6,
+  head: 65, heads: 65, bulb: 65, bulbs: 65,
+  tin: 400, tins: 400, can: 400, cans: 400,
+  slice: 30, slices: 30,
+  piece: 100, pieces: 100,
+  stalk: 50, stalks: 50,
+  sprig: 2, sprigs: 2,
+  leaf: 1, leaves: 1,
+  cube: 10, cubes: 10,
+  pod: 5, pods: 5
+};
+
+const COUNT_UNITS = new Set([
+  ...Object.keys(COUNT_UNIT_GRAMS),
+  'block', 'blocks', 'pack', 'packs', 'packet', 'packets', 'package', 'packages',
+  'pot', 'pots', 'jar', 'jars', 'bottle', 'bottles', 'item', 'items', 'count', 'qty', ''
+]);
+
+// Typical weight of one whole item, matched by name, when nothing better is known.
+const COMMON_DISCRETE_WEIGHTS = {
+  lime: 60, lemon: 90, cucumber: 350, onion: 150, shallot: 35,
+  garlic: 6, clove: 6, bulb: 65, head: 65, carrot: 100, potato: 180,
+  avocado: 170, egg: 60, tomato: 100, pepper: 160, chilli: 15,
+  apple: 150, banana: 120, mushroom: 30, stock: 10, cube: 10
+};
+const DEFAULT_ITEM_GRAMS = 100;
+
+const round1 = n => Math.round(n * 10) / 10;
 
 export function isLiquidIngredient(name) {
   const lower = String(name || '').toLowerCase();
-  return LIQUID_INGREDIENTS.some(liq => lower.includes(liq));
+  if (NOT_LIQUID_PATTERN.test(lower)) return false;
+  return LIQUID_PATTERN.test(lower);
 }
 
-export function getIngredientDensity(name) {
+function findDensity(name) {
   const lower = String(name || '').toLowerCase();
   for (const [key, density] of Object.entries(DENSITY_TABLE)) {
     if (lower.includes(key)) return density;
   }
-  return 0.7; // default dry density
+  return null;
+}
+
+export function getIngredientDensity(name) {
+  return findDensity(name) ?? DEFAULT_DENSITY;
+}
+
+function normaliseUnitName(unit) {
+  return String(unit || '').toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
 /**
  * Converts any raw parsed quantity and unit strictly into 'g', 'ml', or 'qty'.
+ * isEstimated marks weights guessed from a volume or a loose measure;
+ * isFallbackWeight marks volume weights that used the default density.
  */
 export function convertToStrictUnit(qty, unit, ingredientName) {
-  let q = Number(qty) || 1;
-  let u = String(unit || 'qty').toLowerCase().trim();
-  const name = String(ingredientName || '').toLowerCase();
+  const q = Number(qty) || 1;
+  const u = normaliseUnitName(unit);
+  const result = (value, outUnit, isEstimated = false, isFallbackWeight = false) =>
+    ({ qty: value, unit: outUnit, isEstimated, isFallbackWeight });
 
-  // 1. Multiplier / Count units -> 'qty'
-  const countUnits = ['clove', 'cloves', 'tin', 'tins', 'can', 'cans', 'block', 'blocks', 'head', 'heads', 'stalk', 'stalks', 'slice', 'slices', 'sprig', 'sprigs', 'piece', 'pieces', 'pack', 'packet', 'package'];
-  if (countUnits.includes(u) || u === 'qty' || u === '') {
-    return { qty: q, unit: 'qty', isFallbackWeight: false };
+  if (COUNT_UNITS.has(u)) return result(q, 'qty');
+  if (GRAMS_PER_UNIT[u]) return result(round1(q * GRAMS_PER_UNIT[u]), 'g');
+  if (ESTIMATED_GRAMS_PER_UNIT[u]) return result(round1(q * ESTIMATED_GRAMS_PER_UNIT[u]), 'g', true);
+
+  if (ML_PER_UNIT[u]) {
+    const ml = q * ML_PER_UNIT[u];
+    if (isLiquidIngredient(ingredientName)) return result(round1(ml), 'ml');
+    const density = findDensity(ingredientName);
+    return result(round1(ml * (density ?? DEFAULT_DENSITY)), 'g', true, density === null);
   }
 
-  // 2. Weight units -> 'g' or 'kg'
-  if (u === 'kg') {
-    return { qty: q * 1000, unit: 'g', isFallbackWeight: false };
-  }
-  if (u === 'g' || u === 'gram' || u === 'grams' || u === 'oz' || u === 'lb' || u === 'lbs') {
-    let grams = q;
-    if (u === 'oz') grams = q * 28.3495;
-    if (u === 'lb' || u === 'lbs') grams = q * 453.592;
-    return { qty: Math.round(grams * 10) / 10, unit: 'g', isFallbackWeight: false };
-  }
+  return result(q, 'qty');
+}
 
-  // 3. Volume units -> 'ml' (if liquid) or 'g' (if dry density lookup)
-  let mlVolume = 0;
-  if (u === 'ml') mlVolume = q;
-  else if (u === 'l' || u === 'liter' || u === 'liters' || u === 'litre' || u === 'litres') mlVolume = q * 1000;
-  else if (u === 'cup' || u === 'cups') mlVolume = q * 240;
-  else if (u === 'tbsp' || u === 'tablespoon' || u === 'tablespoons') mlVolume = q * 15;
-  else if (u === 'tsp' || u === 'teaspoon' || u === 'teaspoons') mlVolume = q * 5;
-  else if (u === 'pinch' || u === 'pinches' || u === 'dash' || u === 'dashes') {
-    return { qty: 1, unit: 'g', isFallbackWeight: true };
-  }
+/**
+ * Converts a quantity to grams for nutrition and display.
+ * Fixed-weight count units (clove, tin, head...) use their own weight; ml counts as grams;
+ * any other count uses itemWeight, then a weight matched by name, then 100 g.
+ */
+export function toGrams(qty, unit, ingredientName = '', itemWeight = 0) {
+  const u = normaliseUnitName(unit);
+  if (COUNT_UNIT_GRAMS[u]) return round1((Number(qty) || 1) * COUNT_UNIT_GRAMS[u]);
 
-  if (mlVolume > 0) {
-    if (isLiquidIngredient(name)) {
-      return { qty: Math.round(mlVolume), unit: 'ml', isFallbackWeight: false };
-    } else {
-      // Dry ingredient volume to weight via density
-      const density = getIngredientDensity(name);
-      const weightGrams = mlVolume * density;
-      const isFallback = (density === 0.7 && !Object.keys(DENSITY_TABLE).some(k => name.includes(k)));
-      return { qty: Math.round(weightGrams * 10) / 10, unit: 'g', isFallbackWeight: isFallback };
-    }
-  }
+  const strict = convertToStrictUnit(qty, unit, ingredientName);
+  if (strict.unit !== 'qty') return strict.qty;
 
-  return { qty: q, unit: 'qty', isFallbackWeight: false };
+  const weight = Number(itemWeight) > 0 ? Number(itemWeight) : inferIngredientWeightByName(ingredientName);
+  return round1(strict.qty * weight);
+}
+
+function inferIngredientWeightByName(name) {
+  const text = String(name || '').toLowerCase();
+  for (const [kw, g] of Object.entries(COMMON_DISCRETE_WEIGHTS)) {
+    if (text.includes(kw)) return g;
+  }
+  return DEFAULT_ITEM_GRAMS;
 }
 
 if (typeof window !== 'undefined') {
   window.UnitConversionService = {
     convertToStrictUnit,
+    toGrams,
     isLiquidIngredient,
     getIngredientDensity
   };
