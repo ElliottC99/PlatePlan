@@ -45,6 +45,8 @@ function replan() {
   if (p.products.length) active.steps.push('products');
   if (p.lines.length) active.steps.push('recipes');
   if (active.steps.length > 1) active.steps.push('confirm');
+  // A re-plan against newer state can drop a step; stay on a step that still exists.
+  active.stepIndex = Math.min(active.stepIndex ?? 0, active.steps.length - 1);
 }
 
 export function openGuidedDelete(target, { onDone } = {}) {
