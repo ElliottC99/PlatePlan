@@ -10,6 +10,7 @@ import { getState } from '../../store/store.js';
 import { createTaxonomySearchInput } from './RecipeSearchDropdownHelper.js';
 import { executeSafeReallocation, executeSubtypeReallocation, executeCategoryReallocation } from '../../services/PantryTaxonomyService.js';
 import { invalidateHierarchyCache } from '../../models/PantryHierarchyModel.js';
+import { openGuidedDelete } from './GuidedDeleteModalUI.js';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -381,8 +382,13 @@ function renderCategoryModal(categoryData, categories, rootItems) {
         if (itemsInCat.length > 0) {
           actionSection.innerHTML = `
             <div style="padding:10px 12px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; margin-bottom:12px; font-size:12px; color:#dc2626;">
-              ⚠️ Category contains ${itemsInCat.length} items. Select a destination category to reallocate them before deletion:
+              ⚠️ Category contains ${itemsInCat.length} items. Move them to another category, or delete them too:
             </div>
+            <fieldset style="border:0; padding:0; margin:0 0 12px;">
+              <legend style="font-size:12px; font-weight:700; margin-bottom:6px;">What happens to the items</legend>
+              <label style="display:flex; gap:8px; align-items:center; font-size:12.5px; min-height:32px;"><input type="radio" name="cat_items_fate" value="move" checked> Move them to another category</label>
+              <label style="display:flex; gap:8px; align-items:center; font-size:12.5px; min-height:32px;"><input type="radio" name="cat_items_fate" value="delete"> Delete the items and their sub-types too</label>
+            </fieldset>
             <label for="cat-realloc-select" style="font-size:12px; font-weight:700; display:block; margin-bottom:6px;">Destination Category</label>
             <select id="cat-realloc-select" name="cat_realloc_select" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border,#e7e5e4); font-size:12.5px;">
               <option value="">-- Select destination category --</option>
@@ -409,6 +415,12 @@ function renderCategoryModal(categoryData, categories, rootItems) {
           const input = document.getElementById('cat-new-name-input');
           newName = input ? input.value.trim() : null;
         } else if (mode === 'delete') {
+          // An empty category, or "delete the items too", goes through the guided delete (KTD6).
+          const fate = document.querySelector('input[name="cat_items_fate"]:checked')?.value;
+          if (itemsInCat.length === 0 || fate === 'delete') {
+            openGuidedDelete({ kind: 'category', name: categoryName }, { onDone: () => { if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank(); } });
+            return;
+          }
           const reallocSelect = document.getElementById('cat-realloc-select');
           migrationTarget = reallocSelect ? reallocSelect.value : null;
         }
