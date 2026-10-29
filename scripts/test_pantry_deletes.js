@@ -44,7 +44,7 @@ const elements = new Map();
 function el(id) {
   if (!elements.has(id)) {
     elements.set(id, {
-      id, innerHTML: '', value: '', onclick: null, dataset: {}, style: { setProperty() {} },
+      id, innerHTML: '', value: '', textContent: '', hidden: false, onclick: null, dataset: {}, style: { setProperty() {} }, focus() { this.focused = true; },
       classes: new Set(),
       classList: { add(c) { this.owner.classes.add(c); }, remove(c) { this.owner.classes.delete(c); }, toggle() {}, contains(c) { return this.owner.classes.has(c); } },
       listeners: {}, addEventListener(type, fn) { this.listeners[type] = fn; }, setAttribute() {}, hasAttribute: () => false, querySelector: () => null, querySelectorAll: () => []
@@ -390,6 +390,59 @@ await check('Covers AE4: Cancel closes the link, picker, Tesco import and reallo
     assert.ok(!el('view-modal-wrap').classList.contains('open'), 'the dialog closed');
     assert.deepEqual(saved, []);
   }
+});
+
+// ---- Edit product › Paste/update from Tesco (plan 2026-10-29-2038, U4) ----
+
+const loaf = () => ({ products: [{ id: 'p1', name: 'Seeded Loaf', brand: 'Tesco', notes: 'Freeze half', price: 1.2, prot: 9, fibre: 5, storage: 'fridge', category: 'Bakery' }] });
+const tescoPaste = JSON.stringify({
+  name: 'Tesco Seeded Batch Loaf 800G', brand: 'Tesco', price: 1.45,
+  diagnostics: { sourceValues: { cal: null, prot: '10.1g', carb: null, fat: null, fibre: null }, parsedValues: { cal: 0, prot: 10.1, carb: 0, fat: 0, fibre: 0 }, breadcrumbs: '', storageText: '' }
+});
+function openPaste() {
+  openProductEditModal('p1');
+  assert.match(modalText(), /data-action="tesco-update"/, 'Paste/update from Tesco is a routed action');
+  assert.equal(el('mi-tesco-paste').hidden, true, 'the paste box starts closed');
+  assert.equal(route('tesco-update'), true);
+  assert.equal(el('mi-tesco-paste').hidden, false, 'the paste box opens');
+  assert.ok(el('mi-tesco-json').focused, 'focus moves to the paste box');
+}
+
+await check('Covers AE5: pasting bookmarklet output updates only the fields it carries, and nothing is saved', () => {
+  reset(loaf());
+  openPaste();
+  el('mi-tesco-json').value = tescoPaste;
+  assert.equal(route('tesco-update-apply'), true);
+  assert.equal(String(el('mi-price').value), '1.45');
+  assert.equal(String(el('mi-prot').value), '10.1');
+  assert.equal(String(el('mi-fibre').value), '5', 'fibre was not in the paste');
+  assert.equal(el('mi-storage').value, 'fridge', 'no breadcrumbs, so storage is not guessed');
+  assert.equal(el('mi-notes').value, 'Freeze half');
+  assert.match(el('mi-tesco-updated').textContent, /price/);
+  assert.match(el('mi-tesco-updated').textContent, /protein/);
+  assert.doesNotMatch(el('mi-tesco-updated').textContent, /fibre/);
+  assert.equal(el('mi-tesco-paste').hidden, true, 'the paste box closes');
+  assert.equal(el('mi-tesco-json').value, '', 'the paste is cleared');
+  assert.deepEqual(saved, []);
+});
+
+await check('Covers AE6: a paste that is not bookmarklet output shows an error and changes nothing', () => {
+  for (const paste of ['not json at all', '']) {
+    reset(loaf());
+    openPaste();
+    el('mi-tesco-json').value = paste;
+    route('tesco-update-apply');
+    assert.ok(el('mi-tesco-error').textContent.length > 0, `error shown for "${paste}"`);
+    assert.equal(String(el('mi-price').value), '1.2');
+    assert.equal(el('mi-tesco-paste').hidden, false, 'the box stays open');
+  }
+});
+
+await check('tapping Paste/update from Tesco again hides the box', () => {
+  reset(loaf());
+  openPaste();
+  route('tesco-update');
+  assert.equal(el('mi-tesco-paste').hidden, true);
 });
 
 if (failures === 0) {

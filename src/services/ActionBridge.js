@@ -8,7 +8,7 @@ import { renderSettingsView } from '../views/SettingsView.js';
 import { renderScrollableSwapModal, toggleShoppingItemAcquired, toggleInlineShoppingSubst } from '../views/ShoppingView.js';
 import { renderPlanner } from '../views/PlannerView.js';
 import { renderRecipeVault, handleVaultSortChange } from '../views/RecipeVaultView.js';
-import { openProductEditModal, saveManualIng, cancelManualIng, clearProductGroupFilter, showTescoImport } from '../views/ProductBankView.js';
+import { openProductEditModal, saveManualIng, cancelManualIng, clearProductGroupFilter, showTescoImport, toggleTescoUpdate, applyTescoUpdate } from '../views/ProductBankView.js';
 import { renderDataQualityView } from '../views/DataQualityView.js';
 import { moveTodayDate, resetTodayDate, toggleMealEaten } from '../views/TodayView.js';
 import { showView } from '../core/AppRouter.js';
@@ -104,6 +104,16 @@ export function routeAction(actionName, target, event) {
 
   if (normalizedAction === 'close-pantry-dialog') {
     import('../components/pantry/SubtypeProductLinkerModalUI.js').then(m => m.closePantryDialog());
+    return true;
+  }
+
+  if (normalizedAction === 'tesco-update') {
+    toggleTescoUpdate();
+    return true;
+  }
+
+  if (normalizedAction === 'tesco-update-apply') {
+    applyTescoUpdate();
     return true;
   }
 
