@@ -24,8 +24,7 @@ function showModal(html) {
   }
 }
 
-// Exported as closePantryDialog for the close-pantry-dialog route in ActionBridge.
-export function closeModal() {
+function closeModal() {
   const wrap = document.getElementById('view-modal-wrap');
   if (wrap) {
     wrap.classList.remove('open');
@@ -227,8 +226,6 @@ export function openTescoImportModal(subtypeId, parentId, onSuccess = null) {
 
   showModal(html);
 
-  const cancelBtn = document.getElementById('btn-cancel-tesco-import');
-  if (cancelBtn) cancelBtn.onclick = () => closeModal();
 
   const jsonInput = document.getElementById('tesco-json-input');
   const errorMsg = document.getElementById('tesco-import-error-msg');
@@ -272,6 +269,7 @@ export function openTescoBookmarkletInstructionsModal() {
 }
 
 export const openSubtypeProductLinkerModal = openSubtypeLinkSelectionModal;
+// The close-pantry-dialog route in ActionBridge.
 export const closePantryDialog = closeModal;
 
 // Link Product › Add product manually: the product form, pre-linked to this sub-type.
