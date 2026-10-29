@@ -120,8 +120,11 @@ export function findDeadControls(files, { defined, routed }) {
       const name = m[1] || m[2];
       if (!isDefined(name)) dead.push(`${at(m.index)} window.${name} is never defined`);
     }
-    for (const m of f.text.matchAll(/data-action=(["'])([^"'$]+?)\1/g)) {
-      if (!isRouted(m[2])) dead.push(`${at(m.index)} data-action="${m[2]}" is not routed`);
+    // Either quote may wrap the value, with the other inside it: data-action="fn('arg')".
+    for (const m of f.text.matchAll(/data-action=(?:"([^"]*)"|'([^']*)')/g)) {
+      const value = m[1] ?? m[2];
+      if (value.includes('${')) continue; // built at render time; checked where the value is chosen
+      if (!isRouted(value)) dead.push(`${at(m.index)} data-action="${value}" is not routed`);
     }
   }
   return dead;
@@ -156,6 +159,7 @@ check('an inline handler calling a missing window function is reported, a define
 check('a data-action nothing routes is reported, a routed one is not', () => {
   assert.equal(fixture('<button data-action="nobody-routes-this">x</button>').length, 1);
   assert.deepEqual(fixture('<button data-action="tesco-import">x</button>'), []);
+  assert.equal(fixture(`<button data-action="nobodyRoutes('x')">x</button>`).length, 1, 'the fn(\'arg\') form is checked too');
 });
 
 check('no dead controls on the Pantry and Product Bank screens', () => {
