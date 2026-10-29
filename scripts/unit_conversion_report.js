@@ -35,6 +35,7 @@ const CALLERS = [
   ['detailGarlic', 'Recipe detail view, garlic lines (grams before turning into cloves)']
 ];
 const STORED_UNITS = new Set(['g', 'ml', 'qty']);
+const LIQUID_WHY = 'liquid (whole-word match)';
 
 /** Loads the functions each caller converts through, from a checkout's src/ directory. */
 export async function loadModuleSet(rootDir) {
@@ -43,7 +44,7 @@ export async function loadModuleSet(rootDir) {
   const utils = await load('utils/unitConverter.js');
   const owner = await load('services/UnitConversionService.js');
   const nutrition = await load('services/NutritionService.js');
-  // Before the merge the detail view multiplied by UNIT_TO_GRAMS (6 g when the unit was missing).
+  // Base commits from before the merge export UNIT_TO_GRAMS; their detail view used 6 g for an unknown unit.
   const garlicGrams = utils.UNIT_TO_GRAMS
     ? (qty, unit) => qty * (utils.UNIT_TO_GRAMS[unit] || 6)
     : (qty, unit) => owner.toGrams(qty, unit, 'garlic');
@@ -121,10 +122,10 @@ function explain(owner, line, caller) {
   const name = lineName(line);
   const density = () => `not liquid, density ${owner.getIngredientDensity(name)} g/ml`;
   if (caller === 'import' || caller === 'editorPaste') {
-    return owner.isLiquidIngredient(name) ? 'liquid (whole-word match)' : density();
+    return owner.isLiquidIngredient(name) ? LIQUID_WHY : density();
   }
   const r = owner.convertToStrictUnit(line.qty ?? line.quantity ?? line.amount, line.unit, name);
-  if (r.unit === 'ml') return 'liquid (whole-word match)';
+  if (r.unit === 'ml') return LIQUID_WHY;
   if (r.unit === 'qty') return 'count unit';
   if (/pinch|dash|handful|bunch/i.test(String(line.unit))) return 'loose measure';
   if (r.isEstimated) return density();
