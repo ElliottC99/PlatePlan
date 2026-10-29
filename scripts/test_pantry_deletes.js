@@ -139,6 +139,22 @@ await check('Covers AE6: cancelling at the summary after choosing a home saves n
   assert.equal(getState().ingredients.length, 2);
 });
 
+await check('adding a new sub-type with no name keeps the name prompt open and adds nothing', async () => {
+  reset(withLinks());
+  openGuidedDelete({ kind: 'item', id: 'ing_old' });
+  await tap('next');
+  await tap('pick-productsAll');
+  const rows = modalText().match(/data-row="(\d+)"[^>]*>New sub-type under Bread/);
+  assert.ok(rows, 'the picker offers a new sub-type under Bread');
+  await tap('pick-row', { row: rows[1] });
+  await tap('new-add');
+  assert.match(modalText(), /needs a name/);
+  assert.match(modalText(), /gd-new-name/, 'still asking for the name');
+  await tap('picker-cancel');
+  await tap('picker-cancel');
+  assert.match(modalText(), /1 product still needs a home/, 'no error left behind');
+});
+
 await check('offline, Delete opens no batch and says nothing was deleted', async () => {
   reset({ ingredients: [test1] });
   openGuidedDelete({ kind: 'item', id: 'ing_test1' });
@@ -208,6 +224,19 @@ await check('Covers AE5: a product saved as a default but used in no recipe asks
     await settle();
     assert.deepEqual(deleted, ['households/elliott-chloe/products/p1']);
   }
+});
+
+await check('deleting a product that is a saved default clears that default', async () => {
+  reset({ products: [{ id: 'p1', name: 'Seeded Loaf' }], ingredients: [
+    { id: 'i1', name: 'Bread', defaultProductId: 'p1', subtypes: [{ id: 's1', name: 'Seeded', defaultProductId: 'p1' }, { id: 's2', name: 'White', defaultProductId: 'p9' }] }
+  ] });
+  await handleDeleteProduct('p1');
+  await el('btn-confirm-yes').onclick();
+  await settle();
+  const bread = getState().ingredients[0];
+  assert.equal(bread.defaultProductId, null);
+  assert.equal(bread.subtypes[0].defaultProductId, null);
+  assert.equal(bread.subtypes[1].defaultProductId, 'p9', 'other defaults untouched');
 });
 
 if (failures === 0) {

@@ -358,6 +358,8 @@ export async function executeCategoryReallocation({ mode, categoryName, newCateg
 
 // One Firestore batch holds at most 500 writes; stay clear of it rather than split (KTD2).
 const GUIDED_DELETE_WRITE_LIMIT = 450;
+// With the local cache on, a commit on a dead connection never rejects; it waits for the server.
+const GUIDED_DELETE_COMMIT_TIMEOUT_MS = 10000;
 
 const sameId = (a, b) => a !== undefined && a !== null && a !== '' && String(a) === String(b);
 const itemCategory = item => item?.category || item?.cat || '';
@@ -443,7 +445,9 @@ export function planGuidedDelete(state, target, choices = {}) {
   // New sub-types created in the dialog join their parent's list in the same batch.
   const updatedItems = new Map();
   const itemFor = id => updatedItems.get(String(id)) || ingredients.find(i => sameId(i.id, id));
-  for (const ns of choices.newSubtypes || []) {
+  const chosen = [choices.productsAll, choices.linesAll, ...Object.values(choices.products || {}), ...Object.values(choices.lines || {})];
+  const usedNewIds = new Set(chosen.filter(Boolean).map(d => String(d.subtypeId)));
+  for (const ns of (choices.newSubtypes || []).filter(ns => usedNewIds.has(String(ns.id)))) {
     const name = String(ns.name || '').trim();
     const parent = itemFor(ns.itemId);
     if (!parent || removedItemIds.has(String(ns.itemId))) { errors.push('A new sub-type must go under an item that is not being deleted.'); continue; }
@@ -505,7 +509,13 @@ export function planGuidedDelete(state, target, choices = {}) {
   recipesById.forEach(r => writes.push({ type: 'recipe', data: r }));
   if (target.kind === 'subtype') {
     const parent = itemFor(target.itemId);
-    if (parent) updatedItems.set(String(parent.id), { ...parent, subtypes: (parent.subtypes || []).filter(st => !sameId(st.id, target.subtypeId)) });
+    if (parent) {
+      const movedIds = new Set(products.map(e => String(e.product.id)));
+      const trimmed = { ...parent, subtypes: (parent.subtypes || []).filter(st => !sameId(st.id, target.subtypeId)) };
+      // A default that now points at a product in another hierarchy falls back to the metric instead.
+      if (parent.defaultProductId != null && movedIds.has(String(parent.defaultProductId))) trimmed.defaultProductId = null;
+      updatedItems.set(String(parent.id), trimmed);
+    }
   }
   updatedItems.forEach(item => writes.push({ type: 'item', data: item }));
   removed.items.forEach(i => writes.push({ type: 'deleteItem', id: String(i.id) }));
@@ -519,7 +529,7 @@ export function planGuidedDelete(state, target, choices = {}) {
 }
 
 // Saves a planned delete in one batch; the store changes only after the commit resolves (KTD2, KTD3).
-export async function applyGuidedDelete(plan) {
+export async function applyGuidedDelete(plan, { timeoutMs = GUIDED_DELETE_COMMIT_TIMEOUT_MS } = {}) {
   if (!plan || plan.errors.length || plan.needsHome) return { success: false, error: 'The delete is not ready.' };
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return { success: false, offline: true };
   if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
@@ -536,8 +546,10 @@ export async function applyGuidedDelete(plan) {
     } else if (w.type === 'deleteItem') batch.delete(household.collection('ingredients').doc(String(w.id)));
     else if (w.type === 'categories') batch.set(household.collection('settings').doc('categories'), { categories: w.data, updatedAt: stamp }, { merge: true });
   }
+  let pending = false;
   try {
-    await batch.commit();
+    const timedOut = new Promise(resolve => setTimeout(() => resolve('timeout'), timeoutMs));
+    pending = (await Promise.race([batch.commit(), timedOut])) === 'timeout';
   } catch (err) {
     console.error('[PantryTaxonomyService] Guided delete commit failed:', err);
     return { success: false, error: err };
@@ -553,5 +565,6 @@ export async function applyGuidedDelete(plan) {
   const cats = plan.writes.find(w => w.type === 'categories');
   if (cats) setCategories(cats.data);
   saveStateCache(getState());
-  return { success: true };
+  // A queued batch can't be taken back: it is already applied on this phone and lands on reconnect.
+  return pending ? { success: false, pending: true } : { success: true };
 }

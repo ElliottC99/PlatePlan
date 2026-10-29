@@ -4,8 +4,9 @@
  * Decomposed: HTML template rendering moved to ProductBankRenderService.js.
  */
 
-import { getState, setProducts } from '../store/store.js';
+import { getState, setProducts, setIngredients } from '../store/store.js';
 import { saveProduct, deleteProduct } from '../services/ProductRepository.js';
+import { saveRootItem } from '../services/RootItemRepository.js';
 import { reallocateProduct, setAutoDefaultProduct, getActiveCategories, addSubtypeToIngredient } from '../models/PantryHierarchyModel.js';
 import { promptReallocateProduct as openReallocateModal } from '../components/pantry/ReallocateProductModalUI.js';
 import { showCustomAlert, showCustomConfirm } from '../components/ui/DialogHelpers.js';
@@ -286,8 +287,26 @@ export async function handleDeleteProduct(productId, prodName = null) {
       return;
     }
     setProducts((getState().products || []).filter(p => String(p.id) !== String(productId)));
+    await clearDefaultsPointingAt(productId);
     renderProductBank();
   });
+}
+
+// A saved default naming a deleted product is cleared, so every reader falls back to the metric (R13).
+async function clearDefaultsPointingAt(productId) {
+  const isIt = v => v != null && String(v) === String(productId);
+  const changed = [];
+  const ingredients = (getState().ingredients || []).map(item => {
+    const subtypes = (item.subtypes || []).map(st => (isIt(st.defaultProductId) ? { ...st, defaultProductId: null } : st));
+    const touched = isIt(item.defaultProductId) || subtypes.some((st, n) => st !== item.subtypes[n]);
+    if (!touched) return item;
+    const next = { ...item, subtypes, ...(isIt(item.defaultProductId) ? { defaultProductId: null } : {}) };
+    changed.push(next);
+    return next;
+  });
+  if (!changed.length) return;
+  setIngredients(ingredients);
+  await Promise.all(changed.map(item => saveRootItem(item)));
 }
 
 export async function handleMakeAutoDefault(productId, ingredientId) {

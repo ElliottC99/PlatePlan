@@ -10,6 +10,7 @@ import { getState } from '../../store/store.js';
 import { planGuidedDelete, applyGuidedDelete } from '../../services/PantryTaxonomyService.js';
 import { invalidateHierarchyCache } from '../../models/PantryHierarchyModel.js';
 import { escapeHtml, escapeAttr } from '../../utils/stringUtils.js';
+import { showCustomAlert } from '../ui/DialogHelpers.js';
 
 const PICKER_ROW_LIMIT = 60;
 let active = null;
@@ -277,6 +278,10 @@ async function onClick(event) {
     else if (row) setDestination(row.dest);
   } else if (gd === 'new-add') {
     const name = String(document.getElementById('gd-new-name')?.value || '').trim();
+    const parent = (getState().ingredients || []).find(i => String(i.id) === String(active.newSubFor));
+    const siblings = [...(parent?.subtypes || []), ...active.choices.newSubtypes.filter(ns => String(ns.itemId) === String(active.newSubFor))];
+    if (!name) { active.message = 'The new sub-type needs a name.'; render(); return; }
+    if (siblings.some(st => String(st.name || '').trim().toLowerCase() === name.toLowerCase())) { active.message = `"${parent?.name}" already has a sub-type called "${name}".`; render(); return; }
     const id = `sub_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     active.choices.newSubtypes.push({ id, itemId: active.newSubFor, name });
     setDestination({ kind: 'subtype', itemId: active.newSubFor, subtypeId: id });
@@ -307,11 +312,12 @@ async function confirmDelete() {
   const result = await applyGuidedDelete(active.plan);
   if (!active) return;
   active.busy = false;
-  if (result.success) {
+  if (result.success || result.pending) {
     const { onDone } = active;
     close();
     invalidateHierarchyCache();
     if (typeof onDone === 'function') onDone();
+    if (result.pending) showCustomAlert('Deleted on this phone. It will finish saving when the connection comes back.', 'Waiting for a connection');
     return;
   }
   active.message = result.offline ? "You're offline. Nothing was deleted." : 'Nothing was deleted. Try again.';

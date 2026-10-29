@@ -4,7 +4,7 @@
  * Strictly modular (<350 lines).
  */
 
-import { getState, setIngredients, subscribe, setProducts } from '../store/store.js';
+import { getState, subscribe } from '../store/store.js';
 import { saveRootItem as saveIngredient } from '../services/RootItemRepository.js';
 import { openGuidedDelete } from '../components/pantry/GuidedDeleteModalUI.js';
 import { 

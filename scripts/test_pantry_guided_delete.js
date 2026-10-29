@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 
 const batches = [];
 let failNextCommit = false;
+let hangNextCommit = false;
 function fakeDocRef(path) {
   return { path, collection: name => fakeCollection(`${path}/${name}`), set: async () => {}, delete: async () => {}, get: async () => ({ exists: false, data: () => ({}) }) };
 }
@@ -28,6 +29,7 @@ const fakeDb = {
       delete(ref) { ops.push({ op: 'delete', path: ref.path }); },
       async commit() {
         if (failNextCommit) { failNextCommit = false; throw new Error('permission-denied'); }
+        if (hangNextCommit) { hangNextCommit = false; return new Promise(() => {}); }
         batch.committed = true;
       }
     };
@@ -201,6 +203,24 @@ await check('a new sub-type with a blank or duplicate name is an error', () => {
   }
 });
 
+await check('a new sub-type that no choice uses any more is not created', () => {
+  const s = load(pantry());
+  const plan = planGuidedDelete(s, { kind: 'subtype', itemId: 'ing_bread', subtypeId: 'sub_seeded' }, {
+    newSubtypes: [{ id: 'sub_dropped', itemId: 'ing_rolls', name: 'Dropped' }, { id: 'sub_blank', itemId: 'ing_rolls', name: '' }],
+    productsAll: { itemId: 'ing_milk', subtypeId: 'sub_oat' }
+  });
+  assert.deepEqual(plan.errors, [], 'an unused blank entry does not block');
+  assert.ok(!plan.writes.some(w => w.type === 'item' && w.data.id === 'ing_rolls'));
+});
+
+await check('deleting a sub-type clears the parent default when it points at a moved product', () => {
+  const s = pantry();
+  s.ingredients[1].defaultProductId = 'p_seeded1';
+  const plan = planGuidedDelete(load(s), { kind: 'subtype', itemId: 'ing_bread', subtypeId: 'sub_seeded' }, { productsAll: { itemId: 'ing_milk', subtypeId: 'sub_oat' } });
+  const bread = plan.writes.find(w => w.type === 'item' && w.data.id === 'ing_bread').data;
+  assert.equal(bread.defaultProductId, null);
+});
+
 await check('a legacy product on the deleted item with no sub-type needs a home', () => {
   const s = pantry();
   s.products.push({ id: 'p_legacy', name: 'Old loaf', ingredientId: 'ing_bread', category: 'Bakery' });
@@ -291,14 +311,14 @@ await check('more writes than the limit is refused', () => {
   assert.ok(plan.errors.some(e => /too many/i.test(e)));
 });
 
-await check('Covers AE5: a product saved as a default does not block, and no write touches the default', () => {
+await check('Covers AE5: a product saved as a default does not block, and the default is cleared so the metric picks', () => {
   const s = pantry();
   s.ingredients[1].defaultProductId = 'p_white';
   s.products = s.products.filter(p => p.id !== 'p_seeded1' && p.id !== 'p_seeded2');
   const plan = planGuidedDelete(load(s), { kind: 'subtype', itemId: 'ing_bread', subtypeId: 'sub_white' }, { productsAll: { itemId: 'ing_milk', subtypeId: 'sub_oat' } });
   assert.deepEqual(plan.errors, []);
   const item = plan.writes.find(w => w.type === 'item' && w.data.id === 'ing_bread');
-  assert.equal(item.data.defaultProductId, 'p_white');
+  assert.equal(item.data.defaultProductId, null);
 });
 
 // ---- U3: apply ----
@@ -324,6 +344,16 @@ await check('Covers F2: applying commits one batch with every write, then update
   assert.ok(!now.ingredients.some(i => i.id === 'ing_bread'));
   assert.equal(now.products.find(p => p.id === 'p_white').subtypeId, 'sub_oat');
   assert.equal(now.recipes.find(r => r.id === 'r1').ingredients[0].ingredientId, 'ing_rolls');
+});
+
+await check('a commit with no server answer times out as pending and the store shows the delete', async () => {
+  const st = load(pantry());
+  const plan = planGuidedDelete(st, { kind: 'item', id: 'ing_test1' });
+  hangNextCommit = true;
+  const res = await applyGuidedDelete(plan, { timeoutMs: 20 });
+  assert.equal(res.success, false);
+  assert.equal(res.pending, true);
+  assert.ok(!getState().ingredients.some(i => i.id === 'ing_test1'), 'queued writes already apply on this phone');
 });
 
 await check('a rejected commit leaves the store as it was', async () => {
