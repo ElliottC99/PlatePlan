@@ -28,8 +28,8 @@ export function renderEmptyProductBank() {
       <h3 style="font-size:16px;font-weight:700;margin:0 0 6px 0">No products in product bank</h3>
       <p style="font-size:13px;color:var(--text2,#78716c);margin:0 0 16px 0">Import groceries from Tesco or add products to calculate prices and nutrition.</p>
       <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-        <button class="btn btn-primary primary sm" type="button" data-pp-click="showAddIng()">+ Add Product</button>
-        <button class="btn btn-outline outline sm" type="button" data-pp-click="showTescoImport()" style="background:var(--purple-bg,#f3e8ff);color:var(--purple,#7e22ce)">Import Tesco</button>
+        <button class="btn btn-primary primary sm" type="button" data-action="open-product-modal">+ Add Product</button>
+        <button class="btn btn-outline outline sm" type="button" data-action="tesco-import" style="background:var(--purple-bg,#f3e8ff);color:var(--purple,#7e22ce)">Import Tesco</button>
       </div>
     </div>
   `;
