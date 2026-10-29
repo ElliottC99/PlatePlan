@@ -129,7 +129,8 @@ export function convertToStrictUnit(qty, unit, ingredientName) {
 
   if (ML_PER_UNIT[u]) {
     const ml = q * ML_PER_UNIT[u];
-    if (isLiquidIngredient(ingredientName)) return result(round1(ml), 'ml');
+    // An exact ml or litre amount stays in ml; only spoons, cups and fl oz of dry goods are weighed.
+    if (METRIC_VOLUME_UNITS.has(u) || isLiquidIngredient(ingredientName)) return result(round1(ml), 'ml');
     const density = findDensity(ingredientName);
     return result(round1(ml * (density ?? DEFAULT_DENSITY)), 'g', true, density === null);
   }

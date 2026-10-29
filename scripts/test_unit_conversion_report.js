@@ -75,9 +75,9 @@ check('a saved handful line is a raw-unit line and changes on the shopping list 
   assert.deepEqual([row.old, row.new], [{ qty: 2, unit: 'qty' }, { qty: 60, unit: 'g' }]);
 });
 
-check('a saved 200 ml passata line changes on the shopping list for the liquid list', () => {
+check('a saved 200 ml passata line changes on the shopping list because exact ml amounts stay in ml', () => {
   const row = result.changed.backup.shopping.find(r => r.text === '200ml passata');
-  assert.deepEqual([row.old, row.new, row.why], [{ qty: 140, unit: 'g' }, { qty: 200, unit: 'ml' }, 'liquid (whole-word match)']);
+  assert.deepEqual([row.old, row.new, row.why], [{ qty: 140, unit: 'g' }, { qty: 200, unit: 'ml' }, 'exact ml or litre amount, kept in ml']);
 });
 
 check('a saved 125 g rice line is unchanged everywhere and is not a raw-unit line', () => {
@@ -105,7 +105,7 @@ check('identical module sets report no changes', () => {
 
 check('the rendered report names each section and the changed lines', () => {
   const md = renderReport(result, { backupName: 'test.json', baseRef: 'base', baseCommit: 'abc1234', headCommit: 'def5678', generatedAt: 'now' });
-  for (const text of ['## Counts', '## Saved lines that still hold a raw unit', '## Changed saved recipe lines', '200ml passata', '140 g', '200 ml']) {
+  for (const text of ['## The rules in plain words', '## Counts', '## Saved lines that still hold a raw unit', '## Changed saved recipe lines', '200ml passata', '140 g', '200 ml']) {
     assert.ok(md.includes(text), text);
   }
 });

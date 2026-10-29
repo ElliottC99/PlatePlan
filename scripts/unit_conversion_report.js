@@ -36,6 +36,25 @@ const CALLERS = [
 ];
 const STORED_UNITS = new Set(['g', 'ml', 'qty']);
 const LIQUID_WHY = 'liquid (whole-word match)';
+const METRIC_VOLUME = /^(?:ml|millilit(?:re|er)s?|l|lit(?:re|er)s?)$/i;
+
+// The converter's rules for the reader who decides whether each change is right.
+// Keep this in step with src/services/UnitConversionService.js.
+const RULES_IN_PLAIN_WORDS = `## The rules in plain words
+
+Every part of PlatePlan now turns a recipe amount into grams (g), millilitres (ml) or a count (qty) the same way:
+
+- **Weights** stay weights: kg, oz and lb become grams (1 oz = 28.35 g, 1 lb = 453.6 g).
+- **Exact ml or litre amounts** stay in ml, whatever the ingredient, because the recipe measured them by volume. "250 ml ale" stays 250 ml.
+- **Spoons, cups and fl oz** (tsp 5 ml, tbsp 15 ml, cup 240 ml, fl oz 29.57 ml) stay in ml for liquids. For anything else they become grams using a density: flour 0.5 g per ml, sugar 0.85, rice 0.8, oats 0.4, nuts and seeds 0.6, lentils 0.85, beans 0.8, butter 0.9, powders 0.5, and 0.7 when the ingredient isn't on that list. So 1 tbsp flour is 7.5 g and 1 cup rice is 192 g. These are marked "Est. Weight" on import.
+- **Liquids** are ingredients whose name contains one of these words, or its plural: water, milk, coconut milk, buttermilk, oatmilk, soymilk, oil, broth, stock, soy, tamari, vinegar, juice, cream, maple, syrup, honey, wine, beer, sherry, sauce, dressing, yoghurt, yogurt, passata, mustard, ketchup, mayo, mayonnaise. A name with "paste" or "purée" in it is never a liquid. Whole words only, so "watercress" is not water.
+- **Loose measures** become estimated grams: a pinch or dash is 0.5 g each, a handful 30 g, a bunch 20 g (small 15 g, large 30 g).
+- **Counts** stay counts: cloves, tins, cans, heads, slices, pieces, packs, pots, jars and so on, and any unit the converter doesn't know.
+- **Rounding**: grams and ml are rounded to one decimal place (7.5 ml stays 7.5 ml rather than becoming 8).
+- **Nutrition** counts ml and litres as the same number of grams. For counts it uses the pantry item's own weight, or a typical weight (a clove of garlic 6 g, an onion 150 g, a tin 400 g), or 100 g.
+
+Saved recipes are not changed. They are already stored in g, ml or qty, and opening and saving one in the editor leaves its amounts exactly as they are.
+`;
 
 /** Loads the functions each caller converts through, from a checkout's src/ directory. */
 export async function loadModuleSet(rootDir) {
@@ -125,6 +144,7 @@ function explain(owner, line, caller) {
     return owner.isLiquidIngredient(name) ? LIQUID_WHY : density();
   }
   const r = owner.convertToStrictUnit(line.qty ?? line.quantity ?? line.amount, line.unit, name);
+  if (r.unit === 'ml' && METRIC_VOLUME.test(String(line.unit).trim())) return 'exact ml or litre amount, kept in ml';
   if (r.unit === 'ml') return LIQUID_WHY;
   if (r.unit === 'qty') return 'count unit';
   if (/pinch|dash|handful|bunch/i.test(String(line.unit))) return 'loose measure';
@@ -212,6 +232,7 @@ export function renderReport(result, meta) {
   out.push(`- New code: working tree at ${meta.headCommit}`);
   out.push(`- Generated: ${meta.generatedAt}`, '');
   out.push('This file holds household recipe data. Keep it out of the repo.', '');
+  out.push(RULES_IN_PLAIN_WORDS);
 
   out.push('## Counts', '');
   out.push('| Caller | Saved recipe lines checked | Changed | Made-up lines checked | Changed |', '|---|---|---|---|---|');
