@@ -73,7 +73,7 @@ export function renderReallocateModalBase(prod) {
       </div>
 
       <div style="display:flex; gap:8px; justify-content: flex-end;">
-        <button type="button" class="btn btn-secondary secondary" style="min-height:44px; padding:0 16px;" onclick="window.closeSubtypeActionModal ? window.closeSubtypeActionModal() : (window.closeModal ? window.closeModal() : null)">Cancel</button>
+        <button type="button" class="btn btn-secondary secondary" style="min-height:44px; padding:0 16px;" data-action="close-pantry-dialog">Cancel</button>
         <button type="button" class="btn btn-primary primary" style="min-height:44px; padding:0 16px;" id="btn-confirm-realloc">Reallocate Product</button>
       </div>
     </div>

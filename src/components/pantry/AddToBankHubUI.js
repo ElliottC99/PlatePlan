@@ -10,7 +10,8 @@ import { getUnifiedCategories, saveCategories } from '../../services/CategoryRep
 import { createTaxonomySearchInput } from './RecipeSearchDropdownHelper.js';
 import { saveRootItem } from '../../services/RootItemRepository.js';
 import { commitAtomicChain } from '../../services/PantryTaxonomyService.js';
-import { openTescoImportModal, openSubtypeExistingProductPickerModal } from './TescoImportModalUI.js';
+import { openTescoImportModal, openSubtypeExistingProductPickerModal } from './SubtypeProductLinkerModalUI.js';
+import { showCustomAlert } from '../ui/DialogHelpers.js';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
@@ -205,17 +206,15 @@ function renderSpecificForm(mode, prefillData = {}) {
       container, categories, rootItems,
       placeholder: 'Type or search target item / sub-type...',
       onSelect: ({ label, val }) => {
-        closeAddToBankModal();
-        let targetSubtypeId = val;
-        let parentItemId = null;
-        if (val && val.includes(':')) {
-          const parts = val.split(':');
-          parentItemId = parts[0];
-          targetSubtypeId = parts[1];
+        // Products live only on sub-types; an item or category has nowhere to attach them.
+        if (!val || !val.includes(':')) {
+          showCustomAlert('Pick a sub-type to attach products to.', 'Choose a sub-type');
+          return;
         }
-        openSubtypeExistingProductPickerModal(parentItemId, targetSubtypeId, () => {
-          if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-        });
+        closeAddToBankModal();
+        const [parentItemId, targetSubtypeId] = val.split(':');
+        // No onSuccess: with one, the picker returns before it links and saves the products.
+        openSubtypeExistingProductPickerModal(targetSubtypeId, parentItemId);
       }
     });
   }
