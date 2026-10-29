@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const deleted = [];
+const saved = [];
 function fakeCollection(path) {
   return { doc: id => fakeDoc(`${path}/${id}`), get: async () => ({ docs: [] }) };
 }
@@ -34,7 +35,7 @@ function fakeDoc(path) {
     path,
     collection: name => fakeCollection(`${path}/${name}`),
     delete: async () => { deleted.push(path); },
-    set: async () => {},
+    set: async data => { saved.push({ path, data }); },
     get: async () => ({ exists: false, data: () => ({}) })
   };
 }
@@ -43,18 +44,21 @@ const elements = new Map();
 function el(id) {
   if (!elements.has(id)) {
     elements.set(id, {
-      id, innerHTML: '', onclick: null, dataset: {}, style: { setProperty() {} },
-      classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+      id, innerHTML: '', value: '', onclick: null, dataset: {}, style: { setProperty() {} },
+      classes: new Set(),
+      classList: { add(c) { this.owner.classes.add(c); }, remove(c) { this.owner.classes.delete(c); }, toggle() {}, contains(c) { return this.owner.classes.has(c); } },
       listeners: {}, addEventListener(type, fn) { this.listeners[type] = fn; }, setAttribute() {}, hasAttribute: () => false, querySelector: () => null, querySelectorAll: () => []
     });
   }
-  return elements.get(id);
+  const e = elements.get(id);
+  e.classList.owner = e;
+  return e;
 }
 
 global.window = { firebase: { apps: [1], firestore: () => fakeDb }, addEventListener() {}, dispatchEvent() {}, location: { origin: '', pathname: '' } };
 global.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 global.document = {
-  getElementById: id => (['view-modal-wrap', 'view-modal-content', 'btn-confirm-yes', 'btn-confirm-cancel', 'btn-alert-ok'].includes(id) ? el(id) : null),
+  getElementById: id => (['view-modal-wrap', 'view-modal-content', 'btn-confirm-yes', 'btn-confirm-cancel', 'btn-alert-ok', 'bank-groups-panel', 'product-bank-cards-wrap', 'product-bank-search'].includes(id) || /^mi-/.test(id) ? el(id) : null),
   querySelector: () => null, querySelectorAll: () => [], addEventListener() {}, dispatchEvent() {},
   createElement: () => el(`created-${elements.size}`), body: { style: {}, appendChild() {} }
 };
@@ -63,12 +67,14 @@ Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, config
 
 const { getState, setIngredients, setProducts, setRecipes } = await import('../src/store/store.js');
 const { openGuidedDelete } = await import('../src/components/pantry/GuidedDeleteModalUI.js');
-const { handleDeleteProduct } = await import('../src/views/ProductBankView.js');
+const { handleDeleteProduct, openProductEditModal, renderProductBank } = await import('../src/views/ProductBankView.js');
+const { routeAction } = await import('../src/services/ActionBridge.js');
 
 const modalText = () => el('view-modal-content').innerHTML;
 const settle = () => new Promise(resolve => setTimeout(resolve, 10));
 function reset({ ingredients = [], products = [], recipes = [] }) {
   deleted.length = 0;
+  saved.length = 0;
   batches.length = 0;
   el('view-modal-content').innerHTML = '';
   el('btn-confirm-yes').onclick = null;
@@ -237,6 +243,47 @@ await check('deleting a product that is a saved default clears that default', as
   assert.equal(bread.defaultProductId, null);
   assert.equal(bread.subtypes[0].defaultProductId, null);
   assert.equal(bread.subtypes[1].defaultProductId, 'p9', 'other defaults untouched');
+});
+
+// The bridge's document-level listener hands every data-action click to routeAction.
+const route = action => routeAction(action, { dataset: {}, getAttribute: () => null, closest: () => null, value: '' }, { preventDefault() {}, stopPropagation() {} });
+const actionsIn = html => [...html.matchAll(/data-action="([^"]+)"[^>]*>([^<]*)</g)].map(m => [m[2].trim(), m[1]]);
+
+await check('Edit product: Save saves the edited product', async () => {
+  reset({ products: [{ id: 'p1', name: 'Seeded Loaf', category: 'Bakery' }] });
+  openProductEditModal('p1');
+  const save = actionsIn(modalText()).find(([label]) => label === 'Save');
+  assert.ok(save, 'Save carries a data-action');
+  el('mi-name').value = 'Seeded Loaf 800g';
+  assert.equal(route(save[1]), true, 'the bridge routes Save');
+  await settle();
+  assert.ok(saved.some(w => w.path === 'households/elliott-chloe/products/p1' && w.data.name === 'Seeded Loaf 800g'), 'the product is written');
+  assert.equal(getState().products.find(p => p.id === 'p1').name, 'Seeded Loaf 800g');
+});
+
+await check('Edit product: Cancel closes the form without saving', async () => {
+  reset({ products: [{ id: 'p1', name: 'Seeded Loaf' }] });
+  openProductEditModal('p1');
+  assert.ok(el('view-modal-wrap').classList.contains('open'));
+  const cancel = actionsIn(modalText()).find(([label]) => label === 'Cancel');
+  assert.ok(cancel, 'Cancel carries a data-action');
+  assert.equal(route(cancel[1]), true, 'the bridge routes Cancel');
+  assert.ok(!el('view-modal-wrap').classList.contains('open'));
+  assert.deepEqual(saved, []);
+});
+
+await check('Empty Product Bank: "+ Add Product" opens the product form and "Import Tesco" opens the Tesco import', () => {
+  reset({ products: [] });
+  let tesco = 0;
+  window.openTescoImportModal = () => { tesco++; };
+  renderProductBank();
+  const buttons = Object.fromEntries(actionsIn(el('product-bank-cards-wrap').innerHTML));
+  assert.ok(buttons['+ Add Product'] && buttons['Import Tesco'], 'both buttons carry a data-action');
+  el('view-modal-content').innerHTML = '';
+  assert.equal(route(buttons['+ Add Product']), true);
+  assert.match(modalText(), /mi-save-btn/, 'the product form opened');
+  assert.equal(route(buttons['Import Tesco']), true);
+  assert.equal(tesco, 1);
 });
 
 if (failures === 0) {

@@ -81,7 +81,7 @@ export function openProductEditModal(productIdOrDraft = null) {
         <div><label for="mi-drained-weight">Drained weight (usable content)</label><input type="number" id="mi-drained-weight" name="mi-drained-weight" placeholder="e.g. 235"></div>
       </div>
       <div class="field"><label for="mi-notes">Notes</label><input type="text" id="mi-notes" placeholder="e.g. Great in bolognese, buy frozen" name="mi-notes"></div>
-      <div class="btn-row"><button type="button" class="btn primary" id="mi-save-btn" data-pp-click="saveManualIng()">Save</button><button type="button" class="btn ghost" data-pp-click="cancelManualIng()">Cancel</button></div>
+      <div class="btn-row"><button type="button" class="btn primary" id="mi-save-btn" data-action="save-manual-ing">Save</button><button type="button" class="btn ghost" data-action="cancel-manual-ing">Cancel</button></div>
       <div id="mi-msg"></div>
     </div>
   `;

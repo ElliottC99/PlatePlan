@@ -8,7 +8,7 @@ import { renderSettingsView } from '../views/SettingsView.js';
 import { renderScrollableSwapModal, toggleShoppingItemAcquired, toggleInlineShoppingSubst } from '../views/ShoppingView.js';
 import { renderPlanner } from '../views/PlannerView.js';
 import { renderRecipeVault, handleVaultSortChange } from '../views/RecipeVaultView.js';
-import { openProductEditModal, saveManualIng, cancelManualIng, clearProductGroupFilter } from '../views/ProductBankView.js';
+import { openProductEditModal, saveManualIng, cancelManualIng, clearProductGroupFilter, showTescoImport } from '../views/ProductBankView.js';
 import { renderDataQualityView } from '../views/DataQualityView.js';
 import { moveTodayDate, resetTodayDate, toggleMealEaten } from '../views/TodayView.js';
 import { showView } from '../core/AppRouter.js';
@@ -87,6 +87,11 @@ export function routeAction(actionName, target, event) {
 
   if (normalizedAction === 'cancel-manual-ing' || normalizedAction.includes('cancelmanualing')) {
     cancelManualIng();
+    return true;
+  }
+
+  if (normalizedAction === 'tesco-import') {
+    showTescoImport();
     return true;
   }
 
