@@ -4,7 +4,6 @@
  */
 
 import { getState } from '../store/store.js';
-import { normaliseUnitAndQty } from './RecipeUnitConverter.js';
 import { convertToStrictUnit } from './UnitConversionService.js';
 
 export function toTitleCase(str) {
@@ -165,7 +164,7 @@ export function parseIngredientString(rawStr) {
     const mult = parseFloat(parenMult[1]) || 1;
     const innerWeight = parseFloat(parenMult[3]) || 0;
     const nameClean = parenMult[2].trim();
-    const normalised = normaliseUnitAndQty(mult * innerWeight, parenMult[4], nameClean);
+    const normalised = convertToStrictUnit(mult * innerWeight, parenMult[4], nameClean);
     return {
       raw: s,
       qty: normalised.qty,
@@ -182,7 +181,7 @@ export function parseIngredientString(rawStr) {
     const multComp = parseFloat(compMatch[1]) || 1;
     const baseWeight = parseFloat(compMatch[2]) || 0;
     const rawName = (compMatch[4] || '').replace(/^(?:blocks?|packs?|tins?|cans?)\s*(?:of\s*)?/i, '').trim();
-    const normalised = normaliseUnitAndQty(multComp * baseWeight, compMatch[3], rawName);
+    const normalised = convertToStrictUnit(multComp * baseWeight, compMatch[3], rawName);
     return {
       raw: s,
       qty: normalised.qty,
@@ -203,7 +202,7 @@ export function parseIngredientString(rawStr) {
       qtyStd = (parts[0] + parts[1]) / 2;
     }
     const rawName = (stdMatch[3] || '').trim();
-    const normalised = normaliseUnitAndQty(qtyStd, stdMatch[2], rawName);
+    const normalised = convertToStrictUnit(qtyStd, stdMatch[2], rawName);
     return {
       raw: s,
       qty: normalised.qty,

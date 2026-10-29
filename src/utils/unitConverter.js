@@ -1,58 +1,14 @@
 /**
- * src/utils/unitConverter.js (v3.8.1)
- * Pure unit conversion matrices, culinary measurement helpers,
- * and ingredient text parsing regex engine.
+ * src/utils/unitConverter.js
+ * Culinary measurement helpers and the ingredient text parsing regex engine.
+ * Unit conversion itself lives in src/services/UnitConversionService.js.
  * Quarantined from page DOM queries and UI mutations.
  */
 
-export const UNIT_TO_GRAMS = {
-  g: 1, kg: 1000, ml: 1, l: 1000,
-  tsp: 5, teaspoon: 5, teaspoons: 5,
-  tbsp: 15, tablespoon: 15, tablespoons: 15,
-  cup: 240, cups: 240,
-  oz: 28.35, ounce: 28.35, ounces: 28.35,
-  lb: 453.6, lbs: 453.6, pound: 453.6, pounds: 453.6,
-  'fl oz': 30, 'fl. oz': 30, 'fl. oz.': 30, 'fluid oz': 30, floz: 30,
-  tin: 400, can: 400,
-  handful: 30, handfuls: 30,
-  'small bunch': 15, 'small bunches': 15,
-  'large bunch': 30, 'large bunches': 30,
-  bunch: 20, bunches: 20,
-  pinch: 1, dash: 1,
-  slice: 30, slices: 30, piece: 100, pieces: 100, stalk: 50, stalks: 50,
-  sprig: 2, sprigs: 2, leaf: 1, leaves: 2,
-  cube: 10, cubes: 10, pod: 5, pods: 5
-};
-
-export const COMMON_DISCRETE_WEIGHTS = {
-  lime: 60, lemon: 90, cucumber: 350, onion: 150, shallot: 35,
-  garlic: 6, clove: 6, bulb: 65, head: 65, carrot: 100, potato: 180,
-  avocado: 170, egg: 60, tomato: 100, pepper: 160, chilli: 15,
-  apple: 150, banana: 120, mushroom: 30, stock: 10, cube: 10
-};
-
-export function inferIngredientWeightByName(name = '', fallback = 100) {
-  const text = String(name || '').toLowerCase();
-  for (const [kw, g] of Object.entries(COMMON_DISCRETE_WEIGHTS)) {
-    if (text.includes(kw)) return g;
-  }
-  return fallback;
-}
-
-export function toGrams(qty, unit, itemWeight = 0, name = '') {
-  const u = String(unit || '').toLowerCase().replace(/s$/, '');
-  const baseWeight = itemWeight > 0 ? itemWeight : inferIngredientWeightByName(name, 100);
-  if (u === 'qty' || u === 'item' || u === 'count' || u === 'clove' || u === 'head' || u === 'bulb') {
-    return Math.round(qty * (u === 'clove' ? 6 : (u === 'head' || u === 'bulb' ? 65 : baseWeight)));
-  }
-  const factor = UNIT_TO_GRAMS[u] || baseWeight;
-  return Math.round(qty * factor);
-}
+import { convertToStrictUnit, toGrams, isLiquidIngredient } from '../services/UnitConversionService.js';
 
 export function isLikelyLiquidIngredientName(name) {
-  const text = String(name || '').toLowerCase();
-  if (/\b(paste|pastes|puree|purees|purée|purées)\b/.test(text)) return false;
-  return /oil|vinegar|sauce|milk|water|stock|juice|tamari|soy|maple|syrup|cream|yoghurt|yogurt|coconut milk|passata|dressing|mustard|ketchup|mayo/.test(text);
+  return isLiquidIngredient(name);
 }
 
 export function isLikelyCountableIngredientName(name) {
@@ -135,18 +91,11 @@ export function normaliseRecipeAmountForUi(ing = {}) {
   const name = ing.name || ing.raw || '';
   let qty = parseFloat(ing.qty);
   if (!isFinite(qty)) qty = 1;
-  let unit = (ing.unit || '').toLowerCase().replace(/s$/, '') || inferParsedUnitForIngredient(ing);
-  if (unit === 'kg') return { qty: Math.round(qty * 1000 * 10) / 10, unit: 'g' };
-  if (unit === 'l') return { qty: Math.round(qty * 1000 * 10) / 10, unit: 'ml' };
-  if (['tsp', 'tbsp', 'cup'].includes(unit)) {
-    return { qty: toGrams(qty, unit), unit: isLikelyLiquidIngredientName(name) ? 'ml' : 'g' };
-  }
-  if (unit === 'clove') return { qty, unit: 'qty' };
-  if (unit === 'head' || unit === 'bulb') return { qty: Math.round(qty * 11 * 10) / 10, unit: 'qty' };
-  if (['slice', 'piece', 'stalk', 'sprig', 'leaf', 'tin', 'can'].includes(unit)) return { qty, unit: 'qty' };
-  if (unit === 'ml') return { qty, unit: 'ml' };
-  if (unit === 'qty') return { qty, unit: 'qty' };
-  return { qty, unit: 'g' };
+  const unit = (ing.unit || '').toLowerCase().replace(/s$/, '') || inferParsedUnitForIngredient(ing);
+  // Stored amounts are already g, ml or qty; return them untouched so saving never rewrites them.
+  if (unit === 'g' || unit === 'ml' || unit === 'qty') return { qty, unit };
+  const strict = convertToStrictUnit(qty, unit, name);
+  return { qty: strict.qty, unit: strict.unit };
 }
 
 export function parseIngredientLine(raw) {
@@ -220,31 +169,9 @@ export function parseIngredientLine(raw) {
     }
   }
 
-  let { qty, unit, name } = parsed;
-  unit = (unit || '').toLowerCase().replace(/s$/, '');
-
-  if (unit === 'handful') { qty *= 30; unit = 'g'; }
-  else if (unit === 'bunch') { qty *= 20; unit = 'g'; }
-  else if (unit === 'pinch' || unit === 'dash') { qty = 1; unit = 'g'; }
-
-  const liquidToMl = ['tsp', 'tbsp', 'cup', 'fl oz', 'floz'];
-  const volToG = ['kg', 'tin', 'can', 'oz', 'ounce', 'lb', 'lbs', 'pound'];
-  const discreteToQty = ['clove', 'head', 'bulb', 'slice', 'piece', 'stalk', 'sprig', 'leaf'];
-
-  if ((liquidToMl.includes(unit) && isLikelyLiquidIngredientName(name)) || unit === 'fl oz' || unit === 'floz') {
-    qty = toGrams(qty, unit);
-    unit = 'ml';
-  } else if (liquidToMl.includes(unit) || volToG.includes(unit)) {
-    qty = toGrams(qty, unit);
-    unit = 'g';
-  } else if (unit === 'l') {
-    qty *= 1000;
-    unit = 'ml';
-  } else if (discreteToQty.includes(unit)) {
-    unit = 'qty';
-  }
-
-  return { raw: line, qty, unit, name, grams: toGrams(qty, unit) };
+  const { qty, unit, name } = parsed;
+  const strict = convertToStrictUnit(qty, unit, name);
+  return { raw: line, qty: strict.qty, unit: strict.unit, name, grams: toGrams(qty, unit, name) };
 }
 
 export function formatGarlicQuantity(ingredient, weightG) {

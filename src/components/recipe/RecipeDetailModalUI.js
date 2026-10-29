@@ -6,7 +6,8 @@
 
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
 import { calculateMealFitScore, getFitScoreTierMeta } from '../../utils/fitScoreCalculator.js';
-import { formatGarlicQuantity, UNIT_TO_GRAMS } from '../../utils/unitConverter.js';
+import { formatGarlicQuantity } from '../../utils/unitConverter.js';
+import { toGrams } from '../../services/UnitConversionService.js';
 
 function escapeHtml(str) {
   if (typeof window !== 'undefined' && window.ppEscapeHtml) {
@@ -141,7 +142,7 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
                         String(ingredientLabel).trim().toLowerCase() === 'garlic';
 
   if (isFreshGarlic) {
-    const weightG = (unit === 'g' || unit === 'gram' || !unit) ? (scaledQty) : ((scaledQty) * (UNIT_TO_GRAMS[unit] || 6));
+    const weightG = (unit === 'g' || unit === 'gram' || !unit) ? (scaledQty) : toGrams(scaledQty, unit, 'garlic');
     formattedLine = formatGarlicQuantity(ingObj || { name: ingredientLabel, id: ingObj?.id || 'garlic_fresh' }, weightG);
   }
 
