@@ -51,9 +51,7 @@ export function populateReallocateCategoryDatalist() {
   const datalist = document.getElementById('reallocate-categories-datalist');
   if (!datalist) return;
 
-  const state = (window.Store && typeof window.Store.getState === 'function') 
-    ? window.Store.getState() 
-    : (typeof getState === 'function' ? getState() : {});
+  const state = getState();
   const ingredients = state.ingredients || state.pantry?.ingredients || [];
 
   const categoriesSet = new Set();
@@ -107,18 +105,13 @@ export async function submitCreateNewIngredientFromReallocate() {
     updatedAt: new Date().toISOString()
   };
 
-  const state = (window.Store && typeof window.Store.getState === 'function') ? window.Store.getState() : (getState());
+  const state = getState();
   const currentIngs = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
   currentIngs.push(newIng);
 
   if (typeof setIngredients === 'function') setIngredients(currentIngs);
-  if (window.Store && typeof window.Store.setState === 'function') window.Store.setState({ ingredients: currentIngs });
 
-  if (window.PantryRepository && typeof window.PantryRepository.saveIngredient === 'function') {
-    try { await window.PantryRepository.saveIngredient(newIng); } catch (err) { console.warn('[ReallocateModal] Firestore sync warning:', err); }
-  } else {
-    try { await saveIngredient(newIng); } catch (err) { console.warn('[ReallocateModal] Repository sync warning:', err); }
-  }
+  try { await saveIngredient(newIng); } catch (err) { console.warn('[ReallocateModal] Repository sync warning:', err); }
 
   selectTargetParentIngredient(newIng.id, newIng.name);
   toggleCreateIngredientBox(false);
@@ -129,7 +122,7 @@ export async function submitCreateNewIngredientFromReallocate() {
 }
 
 export function promptReallocateProduct(productId) {
-  const state = (window.Store && typeof window.Store.getState === 'function') ? window.Store.getState() : (getState());
+  const state = getState();
   const currentIngs = Array.isArray(state.ingredients) ? state.ingredients : [];
   const prods = Array.isArray(state.products) ? state.products : [];
   const prod = prods.find(p => String(p.id) === String(productId));

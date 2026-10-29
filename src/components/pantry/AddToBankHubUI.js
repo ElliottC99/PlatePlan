@@ -10,7 +10,7 @@ import { getUnifiedCategories, saveCategories } from '../../services/CategoryRep
 import { createTaxonomySearchInput } from './RecipeSearchDropdownHelper.js';
 import { saveRootItem } from '../../services/RootItemRepository.js';
 import { commitAtomicChain } from '../../services/PantryTaxonomyService.js';
-import { openTescoImportModal, openSubtypeExistingProductPickerModal } from './TescoImportModalUI.js';
+import { openTescoImportModal, openSubtypeExistingProductPickerModal } from './SubtypeProductLinkerModalUI.js';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
@@ -213,9 +213,8 @@ function renderSpecificForm(mode, prefillData = {}) {
           parentItemId = parts[0];
           targetSubtypeId = parts[1];
         }
-        openSubtypeExistingProductPickerModal(parentItemId, targetSubtypeId, () => {
-          if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-        });
+        // No onSuccess: with one, the picker returns before it links and saves the products.
+        openSubtypeExistingProductPickerModal(targetSubtypeId, parentItemId);
       }
     });
   }

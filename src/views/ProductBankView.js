@@ -27,6 +27,8 @@ export function cancelManualIng() {
   if (wrap) wrap.classList.remove('open');
   document.body.style.overflow = '';
   activeEditingProductId = null;
+  // A pre-link from Link Product must not carry over to the next, unrelated new product.
+  window.__prefilledResolveBinding = null;
 
   if (window.__modalContext && window.__modalContext.returnTo === 'data-quality') {
     const ctx = window.__modalContext;

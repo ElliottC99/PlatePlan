@@ -52,13 +52,18 @@ function el(id) {
   }
   const e = elements.get(id);
   e.classList.owner = e;
+  e.querySelectorAll = sel => {
+    if (sel !== '.product-picker-cb') return [];
+    if (e.boxesFor !== e.innerHTML) { e.boxesFor = e.innerHTML; e.boxes = [...e.innerHTML.matchAll(/class="product-picker-cb" value="([^"]+)"/g)].map(m => ({ value: m[1], checked: false, onchange: null })); }
+    return e.boxes;
+  };
   return e;
 }
 
 global.window = { firebase: { apps: [1], firestore: () => fakeDb }, addEventListener() {}, dispatchEvent() {}, location: { origin: '', pathname: '' } };
 global.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 global.document = {
-  getElementById: id => (['view-modal-wrap', 'view-modal-content', 'btn-confirm-yes', 'btn-confirm-cancel', 'btn-alert-ok', 'bank-groups-panel', 'product-bank-cards-wrap', 'product-bank-search'].includes(id) || /^mi-/.test(id) ? el(id) : null),
+  getElementById: id => (['view-modal-wrap', 'view-modal-content', 'btn-confirm-yes', 'btn-confirm-cancel', 'btn-alert-ok', 'bank-groups-panel', 'product-bank-cards-wrap', 'product-bank-search'].includes(id) || /^(mi-|picker-|tesco-|realloc|new-reallocate-|new-sub-|create-ingredient|btn-(review|cancel)-tesco|btn-confirm-(picker|realloc)|btn-(toggle|save|cancel)-create-sub)/.test(id) ? el(id) : null),
   querySelector: () => null, querySelectorAll: () => [], addEventListener() {}, dispatchEvent() {},
   createElement: () => el(`created-${elements.size}`), body: { style: {}, appendChild() {} }
 };
@@ -246,7 +251,11 @@ await check('deleting a product that is a saved default clears that default', as
 });
 
 // The bridge's document-level listener hands every data-action click to routeAction.
-const route = action => routeAction(action, { dataset: {}, getAttribute: () => null, closest: () => null, value: '' }, { preventDefault() {}, stopPropagation() {} });
+const route = (action, dataset = {}) => routeAction(action, { dataset, getAttribute: () => null, closest: () => null, value: '' }, { preventDefault() {}, stopPropagation() {} });
+const dataOf = (html, action) => {
+  const tag = html.match(new RegExp(`<[^>]*data-action="${action}"[^>]*>`))?.[0] || '';
+  return { subtypeId: tag.match(/data-subtype-id="([^"]*)"/)?.[1], parentId: tag.match(/data-parent-id="([^"]*)"/)?.[1] };
+};
 const actionsIn = html => [...html.matchAll(/data-action="([^"]+)"[^>]*>([^<]*)</g)].map(m => [m[2].trim(), m[1]]);
 
 await check('Edit product: Save saves the edited product', async () => {
@@ -284,6 +293,97 @@ await check('Empty Product Bank: "+ Add Product" opens the product form and "Imp
   assert.match(modalText(), /mi-save-btn/, 'the product form opened');
   assert.equal(route(buttons['Import Tesco']), true);
   assert.equal(tesco, 1);
+});
+
+// ---- Pantry › sub-type › Link Product (plan 2026-10-29-2038, U1 and U2) ----
+
+const bread = () => ({
+  ingredients: [{ id: 'ing_bread', name: 'Bread', category: 'Bakery', subtypes: [{ id: 'sub_seeded', name: 'Seeded' }] }],
+  products: [{ id: 'p_white', name: 'White Loaf', category: 'Bakery' }]
+});
+const { openSubtypeLinkSelectionModal, openSubtypeExistingProductPickerModal } = await import('../src/components/pantry/SubtypeProductLinkerModalUI.js');
+
+async function linkRoute(action) {
+  openSubtypeLinkSelectionModal('sub_seeded', 'ing_bread');
+  assert.equal(route(action, dataOf(modalText(), action)), true, `${action} is routed`);
+  await settle();
+}
+
+await check('Covers AE1: Link existing opens the picker for the sub-type, and Confirm links the product', async () => {
+  reset(bread());
+  await linkRoute('link-existing-product');
+  assert.match(modalText(), /Select Existing Products for &quot;Seeded&quot;|Select Existing Products for "Seeded"/);
+  const box = el('picker-product-list').querySelectorAll('.product-picker-cb').find(b => b.value === 'p_white');
+  box.checked = true;
+  box.onchange();
+  await el('btn-confirm-picker-link').onclick();
+  await settle();
+  const linked = saved.find(w => w.path === 'households/elliott-chloe/products/p_white');
+  assert.deepEqual([linked?.data.subtypeId, linked?.data.ingredientId], ['sub_seeded', 'ing_bread']);
+});
+
+await check('Add to Bank links an existing product with the picker\'s own save, in the right argument order', () => {
+  const source = fs.readFileSync(new URL('../src/components/pantry/AddToBankHubUI.js', import.meta.url), 'utf8');
+  assert.match(source, /openSubtypeExistingProductPickerModal\(targetSubtypeId, parentItemId\);/);
+});
+
+await check('Covers AE2: Add product manually opens the form pre-linked, and Save stores it on the sub-type', async () => {
+  reset(bread());
+  await linkRoute('link-manual-product');
+  assert.match(modalText(), /mi-save-btn/);
+  el('mi-name').value = 'Seeded Bloomer';
+  route('save-manual-ing');
+  await settle();
+  const created = saved.find(w => w.path.startsWith('households/elliott-chloe/products/') && w.data.name === 'Seeded Bloomer');
+  assert.deepEqual([created?.data.subtypeId, created?.data.ingredientId], ['sub_seeded', 'ing_bread']);
+});
+
+await check('Covers AE3: Import from Tesco reviews the bookmarklet output and Save stores it on the sub-type', async () => {
+  reset(bread());
+  await linkRoute('link-tesco-product');
+  assert.match(modalText(), /tesco-json-input/);
+  el('tesco-json-input').value = JSON.stringify({ title: 'Tesco Seeded Batch Loaf 800G', brand: 'Tesco', price: 1.4 });
+  el('btn-review-tesco-import').onclick();
+  await new Promise(resolve => setTimeout(resolve, 200)); // the review step opens the form after 150 ms
+  assert.match(modalText(), /mi-save-btn/, 'the product form opened');
+  route('save-manual-ing');
+  await settle();
+  const created = saved.find(w => w.path.startsWith('households/elliott-chloe/products/') && /Seeded Batch Loaf/.test(w.data.name));
+  assert.deepEqual([created?.data.subtypeId, created?.data.ingredientId], ['sub_seeded', 'ing_bread']);
+});
+
+await check('a cancelled Add product manually does not pre-link the next new product', async () => {
+  reset(bread());
+  await linkRoute('link-manual-product');
+  route('cancel-manual-ing');
+  route('open-product-modal');
+  el('mi-name').value = 'Unrelated Jam';
+  route('save-manual-ing');
+  await settle();
+  const created = saved.find(w => w.data.name === 'Unrelated Jam');
+  assert.ok(created, 'the product is written');
+  assert.ok(!created.data.subtypeId && !created.data.ingredientId, 'not linked to Seeded');
+});
+
+await check('Covers AE4: Cancel closes the link, picker, Tesco import and reallocate dialogs without saving', async () => {
+  const { promptReallocateProduct } = await import('../src/views/ProductBankView.js');
+  const opens = [
+    () => openSubtypeLinkSelectionModal('sub_seeded', 'ing_bread'),
+    () => openSubtypeExistingProductPickerModal('sub_seeded', 'ing_bread'),
+    async () => { (await import('../src/components/pantry/SubtypeProductLinkerModalUI.js')).openTescoImportModal('sub_seeded', 'ing_bread'); },
+    () => promptReallocateProduct('p_white')
+  ];
+  for (const open of opens) {
+    reset(bread());
+    await open();
+    await settle();
+    assert.ok(el('view-modal-wrap').classList.contains('open'), 'the dialog opened');
+    assert.match(modalText(), /data-action="close-pantry-dialog"/);
+    assert.equal(route('close-pantry-dialog'), true);
+    await settle();
+    assert.ok(!el('view-modal-wrap').classList.contains('open'), 'the dialog closed');
+    assert.deepEqual(saved, []);
+  }
 });
 
 if (failures === 0) {

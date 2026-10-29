@@ -90,6 +90,23 @@ export function routeAction(actionName, target, event) {
     return true;
   }
 
+  // 3b. Pantry › sub-type › Link Product routes, and Cancel for the pantry dialogs on view-modal
+  if (normalizedAction === 'link-existing-product' || normalizedAction === 'link-manual-product' || normalizedAction === 'link-tesco-product') {
+    const subtypeId = ds.subtypeId || null;
+    const parentId = ds.parentId || null;
+    import('../components/pantry/SubtypeProductLinkerModalUI.js').then(m => {
+      if (normalizedAction === 'link-existing-product') m.openSubtypeExistingProductPickerModal(subtypeId, parentId);
+      else if (normalizedAction === 'link-tesco-product') m.openTescoImportModal(subtypeId, parentId);
+      else m.openManualProductForSubtype(subtypeId, parentId);
+    });
+    return true;
+  }
+
+  if (normalizedAction === 'close-pantry-dialog') {
+    import('../components/pantry/SubtypeProductLinkerModalUI.js').then(m => m.closePantryDialog());
+    return true;
+  }
+
   if (normalizedAction === 'tesco-import') {
     showTescoImport();
     return true;
