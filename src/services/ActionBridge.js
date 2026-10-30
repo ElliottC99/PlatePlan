@@ -14,6 +14,7 @@ import { moveTodayDate, resetTodayDate, toggleMealEaten } from '../views/TodayVi
 import { showView } from '../core/AppRouter.js';
 import { closeRecipePreview } from './RecipeDetailModalService.js';
 import { routeRecipeAction } from './RecipeActionBridge.js';
+import { scrollToTop } from '../components/shell/ScrollToTopButton.js';
 
 let isBridgeInitialized = false;
 
@@ -185,6 +186,11 @@ export function routeAction(actionName, target, event) {
   if (normalizedAction === 'vault-sort' || normalizedAction.includes('vaultsort') || normalizedAction.includes('handlevaultsortchange')) {
     const val = target.value || ds.sort || '';
     handleVaultSortChange(val);
+    return true;
+  }
+
+  if (normalizedAction === 'scroll-to-top') {
+    scrollToTop();
     return true;
   }
 

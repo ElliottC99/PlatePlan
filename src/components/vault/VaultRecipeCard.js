@@ -233,7 +233,8 @@ function closeAllRecipeActionMenus() {
 
 export function renderVaultRecipeCard(r, options = {}) {
   const types = r.types || [r.type || 'dinner'];
-  const mealType = options.mealType || (types[0] || 'dinner');
+  const requestedMealType = options.mealType || 'all';
+  const activeProfile = options.activeProfile || 'everyone';
   const whoKey = String(r.who || 'both').toLowerCase();
   const showE = whoKey === 'both' || whoKey === 'elliott' || whoKey === 'e';
   const showC = whoKey === 'both' || whoKey === 'chloe' || whoKey === 'c';
@@ -254,26 +255,32 @@ export function renderVaultRecipeCard(r, options = {}) {
     r.time ? `<span class="tag">${escapeHtml(r.time)}m</span>` : ''
   ].filter(Boolean).join(' ');
 
-  const buildFit = (active, useEnhanced = false) => {
-    const bundle = typeof window.calculateRecipeDisplayNutrition === 'function' ? window.calculateRecipeDisplayNutrition({ recipe: r, variant: useEnhanced ? 'enhanced' : 'original', mealType }) : null;
+  const buildFit = (_active, useEnhanced = false) => {
+    const variantKey = useEnhanced ? 'enhanced' : 'original';
+    const liveFitData = typeof window.calculateMealFitScore === 'function'
+      ? window.calculateMealFitScore(r, requestedMealType, { activeProfile, variant: variantKey, portionScaled: true })
+      : null;
+    const resolvedMealType = liveFitData?.mealType || (requestedMealType !== 'all' ? requestedMealType : (types[0] || 'dinner'));
+    const bundle = typeof window.calculateRecipeDisplayNutrition === 'function'
+      ? window.calculateRecipeDisplayNutrition({ recipe: r, variant: variantKey, mealType: resolvedMealType })
+      : null;
     const portions = bundle?.portions || { eCal: 0, eProt: 0, cCal: 0, cProt: 0, e: '', c: '' };
 
-    const targetMealType = r.types?.[0] || r.type || 'dinner';
-    const liveFitData = typeof window.calculateMealFitScore === 'function' ? window.calculateMealFitScore(r, targetMealType) : null;
-    if (liveFitData && typeof liveFitData.score === 'number') {
+    if (liveFitData && typeof liveFitData.score === 'number' && !useEnhanced) {
       r.fitScore = liveFitData.score;
       r._computedFitScore = liveFitData.score;
     }
 
-    const fitTagHtml = renderFitScoreBadge(r, mealType, {
-      activeProfile: 'everyone',
-      variant: useEnhanced ? 'enhanced' : 'original',
+    const fitTagHtml = renderFitScoreBadge(r, resolvedMealType, {
+      activeProfile,
+      variant: variantKey,
       portions,
       portionScaled: true,
+      precomputedFit: liveFitData,
       showLabel: true
     });
-    const html = renderFitBlock({ showE, showC, portions, recipeId: r.id, variant: useEnhanced ? 'enhanced' : 'original', fitTagHtml });
-    return { portions, html };
+    const html = renderFitBlock({ showE, showC, portions, recipeId: r.id, variant: variantKey, fitTagHtml });
+    return { portions, html, mealType: resolvedMealType };
   };
 
   const originalFit = buildFit(r, false);
