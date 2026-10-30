@@ -4,6 +4,17 @@
  */
 
 import { getState } from '../store/coreState.js';
+import { resolveFitScoreParams } from './fitScoreWeights.js';
+
+export function getActiveFitScoreParams(customParams = null) {
+  const state = typeof getState === 'function' ? getState() : {};
+  const raw = customParams
+    || state?.preferences?.fitScoreParams
+    || state?.userPrefs?.fitScoreParams
+    || state?.prefs?.fitScoreParams
+    || {};
+  return resolveFitScoreParams(raw);
+}
 
 export function parsePositiveNumberOrNull(val) {
   if (val === undefined || val === null || val === '') return null;
@@ -109,58 +120,66 @@ export function sweepRecipeMacroQuality(recipes = []) {
   return flagged;
 }
 
-/**
- * Universal Asymmetric Calorie Score Curve (50% Weight)
- */
-export function calculateCalorieScore(actual, target) {
-  if (!target || target <= 0 || actual === null || actual === undefined || actual <= 0) return 0;
-  const state = typeof getState === 'function' ? getState() : {};
-  const params = state?.userPrefs?.fitScoreParams || state?.prefs?.fitScoreParams || {};
-  const minOpt = params.calMinOpt ?? 0.95;
-  const maxOpt = params.calMaxOpt ?? 1.00;
-  const lowFloor = params.calLowFloor ?? 0.50;
-  const highCeil = params.calHighCeil ?? 1.40;
-
-  const r = actual / target;
-
+function interpolateAsymmetricCurve(r, lowFloor, minGrace, minOpt, maxOpt, maxGrace, highCeil) {
   if (r >= minOpt && r <= maxOpt) return 100;
-  if (r >= (minOpt - 0.10) && r < minOpt) return 86 + ((r - (minOpt - 0.10)) / (minOpt - (minOpt - 0.10))) * (99 - 86);
-  if (r > maxOpt && r <= (maxOpt + 0.05)) return 99 - ((r - maxOpt) / ((maxOpt + 0.05) - maxOpt)) * (99 - 86);
-  if (r < minOpt) {
+
+  if (r >= minGrace && r < minOpt) {
+    const span = minOpt - minGrace;
+    return span > 0 ? 86 + ((r - minGrace) / span) * (99 - 86) : 99;
+  }
+
+  if (r > maxOpt && r <= maxGrace) {
+    const span = maxGrace - maxOpt;
+    return span > 0 ? 99 - ((r - maxOpt) / span) * (99 - 86) : 99;
+  }
+
+  if (r < minGrace) {
     if (r <= lowFloor) return 0;
-    return ((r - lowFloor) / (minOpt - lowFloor)) * 85;
+    const span = minGrace - lowFloor;
+    return span > 0 ? ((r - lowFloor) / span) * 85 : 0;
   }
-  if (r > maxOpt) {
+
+  if (r > maxGrace) {
     if (r >= highCeil) return 0;
-    return (1 - ((r - maxOpt) / (highCeil - maxOpt))) * 85;
+    const span = highCeil - maxGrace;
+    return span > 0 ? (1 - ((r - maxGrace) / span)) * 85 : 0;
   }
+
   return 0;
 }
 
 /**
- * Universal Asymmetric Protein Score Curve (50% Weight)
+ * Universal Asymmetric Calorie Score Curve
  */
-export function calculateProteinScore(actual, target) {
+export function calculateCalorieScore(actual, target, customParams = null) {
   if (!target || target <= 0 || actual === null || actual === undefined || actual <= 0) return 0;
-  const state = typeof getState === 'function' ? getState() : {};
-  const params = state?.userPrefs?.fitScoreParams || state?.prefs?.fitScoreParams || {};
-  const protMinOpt = params.protMinOpt ?? 1.00;
-  const protMaxOpt = params.protMaxOpt ?? 1.20;
-  const protLowFloor = params.protLowFloor ?? 0.70;
-  const protHighCeil = params.protHighCeil ?? 2.00;
-
+  const params = getActiveFitScoreParams(customParams);
   const r = actual / target;
+  return interpolateAsymmetricCurve(
+    r,
+    params.calLowFloor,
+    params.calMinGrace,
+    params.calMinOpt,
+    params.calMaxOpt,
+    params.calMaxGrace,
+    params.calHighCeil
+  );
+}
 
-  if (r >= protMinOpt && r <= protMaxOpt) return 100;
-  if (r >= (protMinOpt - 0.05) && r < protMinOpt) return 86 + ((r - (protMinOpt - 0.05)) / (protMinOpt - (protMinOpt - 0.05))) * (99 - 86);
-  if (r > protMaxOpt && r <= (protMaxOpt + 0.10)) return 99 - ((r - protMaxOpt) / ((protMaxOpt + 0.10) - protMaxOpt)) * (99 - 86);
-  if (r < protMinOpt) {
-    if (r <= protLowFloor) return 0;
-    return ((r - protLowFloor) / (protMinOpt - protLowFloor)) * 85;
-  }
-  if (r > protMaxOpt) {
-    if (r >= protHighCeil) return 0;
-    return (1 - ((r - protMaxOpt) / (protHighCeil - protMaxOpt))) * 85;
-  }
-  return 0;
+/**
+ * Universal Asymmetric Protein Score Curve
+ */
+export function calculateProteinScore(actual, target, customParams = null) {
+  if (!target || target <= 0 || actual === null || actual === undefined || actual <= 0) return 0;
+  const params = getActiveFitScoreParams(customParams);
+  const r = actual / target;
+  return interpolateAsymmetricCurve(
+    r,
+    params.protLowFloor,
+    params.protMinGrace,
+    params.protMinOpt,
+    params.protMaxOpt,
+    params.protMaxGrace,
+    params.protHighCeil
+  );
 }

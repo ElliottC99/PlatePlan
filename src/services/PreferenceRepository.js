@@ -3,6 +3,7 @@
  * Repository for preference and advisory management.
  */
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
+import { NETWORK_TIMEOUT_MS } from '../config/systemConfig.js';
 import { getState as getStoreState } from '../store/store.js';
 import { isDbAvailable } from './RecipeFirestoreRepository.js';
 
@@ -10,7 +11,7 @@ export function whitelistPreferences(preferences) {
   if (!preferences || typeof preferences !== 'object') return {};
   const whitelisted = {};
   const allowedKeys = [
-    'nutritionTargets', 'profiles', 'settings', 'theme', 'mealPlanSettings', 'activeView', 'userPrefs', 'dismissedQualityAdvisories', 'dismissedAdvisories', 'dismissed_advisories', 'updatedAt'
+    'nutritionTargets', 'profiles', 'fitScoreParams', 'settings', 'theme', 'mealPlanSettings', 'activeView', 'userPrefs', 'dismissedQualityAdvisories', 'dismissedAdvisories', 'dismissed_advisories', 'updatedAt'
   ];
   Object.keys(preferences).forEach(key => {
     if (!allowedKeys.includes(key)) return;
@@ -132,6 +133,9 @@ export function prunePreferences(obj) {
   }
   if (!cloned.nutritionTargets && currentPreferences.nutritionTargets) {
     cloned.nutritionTargets = currentPreferences.nutritionTargets;
+  }
+  if (!cloned.fitScoreParams && currentPreferences.fitScoreParams) {
+    cloned.fitScoreParams = currentPreferences.fitScoreParams;
   }
   if (!cloned.settings && currentPreferences.settings) {
     cloned.settings = currentPreferences.settings;

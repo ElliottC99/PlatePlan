@@ -138,10 +138,10 @@ export function initScrollToTopButton() {
   updateVisibility(null);
 }
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   if (document.readyState === 'complete' || document.readyState === 'interactive') {
     initScrollToTopButton();
-  } else {
+  } else if (typeof window.addEventListener === 'function') {
     window.addEventListener('DOMContentLoaded', initScrollToTopButton);
   }
 }

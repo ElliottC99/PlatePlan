@@ -141,7 +141,12 @@ function renderTodayMealCard(slot, { info: slotInfo, person }, eatenMeals) {
     : person === 'c' ? isEatenC
     : isMealEatenOnDate(eatenMeals, currentDateStr, slot.type, 'both');
   const personLabel = person === 'e' ? ' · Elliott' : person === 'c' ? ' · Chloe' : '';
-  const fitBadge = renderFitScoreBadge(recipe, slot.type, { showLabel: true });
+  const activeProfile = person === 'e' ? 'elliott' : person === 'c' ? 'chloe' : 'everyone';
+  const fitBadge = renderFitScoreBadge(slotInfo.recipe || recipe, slot.type, {
+    activeProfile,
+    variant: slotInfo.variant || 'original',
+    showLabel: true
+  });
 
   const eatenLabel = person === 'both' ? '✓ Both Eaten' : '✓ Eaten';
   const mainTick = `
