@@ -2,7 +2,7 @@
  * scripts/test_shopping_list.js
  * Verification test suite for Smart Shopping List Consolidation Engine:
  * 1. Accurate ingredient aggregation across multi-day recipes.
- * 2. Exact pantry subtraction (e.g., 500g required - 200g in stock = 300g to buy).
+ * 2. No stock subtraction: every item buys its full required quantity, with inStockQty 0 and isChecked false.
  * 3. Category aisle grouping.
  * 4. Persistence isolated within shoppingLists subcollection.
  */
@@ -50,11 +50,6 @@ const mockIngredientsBank = [
   { id: 'ing-lentils', name: 'Brown Lentils', category: 'Pantry & Beans' }
 ];
 
-const mockInventory = [
-  { ingredientId: 'ing-tofu', status: 'in_stock', quantity: 200, unit: 'g' },     // 400 - 200 = 200g buy
-  { ingredientId: 'ing-garlic', status: 'in_stock', quantity: 5, unit: 'qty' }      // 5 required - 5 in stock = 0 buy
-];
-
 const mockPlan = {
   id: 'plan_test_001',
   days: [
@@ -74,8 +69,8 @@ const mockPlan = {
 };
 
 async function testShoppingListEngine() {
-  console.log('--- Test 1 & 2: Aggregation & Exact Pantry Subtraction ---');
-  const shoppingList = generateShoppingListFromPlan(mockPlan, mockInventory, mockRecipes, mockIngredientsBank);
+  console.log('--- Test 1 & 2: Aggregation, Full Quantities To Buy ---');
+  const shoppingList = generateShoppingListFromPlan(mockPlan, mockRecipes, mockIngredientsBank);
   console.log('Generated Shopping List Items:', JSON.stringify(shoppingList.items, null, 2));
 
   const tofuItem = shoppingList.items.find(i => i.ingredientId === 'ing-tofu');
@@ -83,19 +78,22 @@ async function testShoppingListEngine() {
   const oilItem = shoppingList.items.find(i => i.ingredientId === 'ing-oil');
   const lentilsItem = shoppingList.items.find(i => i.ingredientId === 'ing-lentils');
 
-  // Tofu: 400g required - 200g in stock = 200g buy
-  const tofuPass = tofuItem && tofuItem.requiredQty === 400 && tofuItem.inStockQty === 200 && tofuItem.buyQty === 200;
-  // Garlic: 2 + 3 = 5 required - 5 in stock = 0 buy (isChecked = true)
-  const garlicPass = garlicItem && garlicItem.requiredQty === 5 && garlicItem.inStockQty === 5 && garlicItem.buyQty === 0 && garlicItem.isChecked === true;
-  // Olive Oil: 30 + 15 = 45ml required - 0 in stock = 45ml buy
-  const oilPass = oilItem && oilItem.requiredQty === 45 && oilItem.buyQty === 45;
-  // Brown Lentils: 300g required - 0 in stock = 300g buy
-  const lentilsPass = lentilsItem && lentilsItem.requiredQty === 300 && lentilsItem.buyQty === 300;
+  // Every item buys what the plan needs: nothing is in stock and nothing starts ticked
+  const buysAll = (item, qty, unit) => item && item.requiredQty === qty && item.buyQty === qty && item.unit === unit
+    && item.inStockQty === 0 && item.isChecked === false;
+  // Tofu: 400g required = 400g buy
+  const tofuPass = buysAll(tofuItem, 400, 'g');
+  // Garlic: 2 + 3 = 5 required = 5 buy
+  const garlicPass = buysAll(garlicItem, 5, 'qty');
+  // Olive Oil: 30 + 15 = 45ml required = 45ml buy
+  const oilPass = buysAll(oilItem, 45, 'ml');
+  // Brown Lentils: 300g required = 300g buy
+  const lentilsPass = buysAll(lentilsItem, 300, 'g');
 
-  if (tofuPass && garlicPass && oilPass && lentilsPass) {
-    console.log('✅ Test 1 & 2 Passed: Ingredient aggregation and pantry subtraction calculated correctly.');
+  if (shoppingList.items.length === 4 && tofuPass && garlicPass && oilPass && lentilsPass) {
+    console.log('✅ Test 1 & 2 Passed: Ingredients aggregated and the full quantity is bought.');
   } else {
-    console.error('❌ Test 1 & 2 Failed: Subtraction or aggregation mismatch.');
+    console.error('❌ Test 1 & 2 Failed: Aggregation or buy quantity mismatch.');
     testFailures++;
   }
   console.log('');

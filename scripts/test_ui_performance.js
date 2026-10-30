@@ -43,10 +43,10 @@ async function testHydrationSpeed() {
   console.log('--- Test 1: Store Offline Cache Hydration Speed ---');
   const start = performance.now();
   
-  // Simulate reading cached payload of 500 recipes & inventory items
+  // Simulate reading a cached payload of 300 recipes and 200 products
   const cachedData = {
     recipes: Array.from({ length: 300 }, (_, i) => ({ id: `rec-${i}`, title: `Recipe ${i}`, macros: { calories: 500, protein: 30 } })),
-    inventory: Array.from({ length: 200 }, (_, i) => ({ id: `inv-${i}`, ingredientId: `ing-${i}`, status: 'in_stock', isUseUp: i % 5 === 0 })),
+    products: Array.from({ length: 200 }, (_, i) => ({ id: `prod-${i}`, ingredientId: `ing-${i}`, name: `Product ${i}`, price: 1.5 })),
     timestamp: Date.now()
   };
 
@@ -54,7 +54,7 @@ async function testHydrationSpeed() {
   const parsed = JSON.parse(jsonStr);
   
   const duration = performance.now() - start;
-  console.log(`Hydration Benchmark Duration: ${duration.toFixed(2)} ms (${parsed.recipes.length} recipes, ${parsed.inventory.length} inventory items)`);
+  console.log(`Hydration Benchmark Duration: ${duration.toFixed(2)} ms (${parsed.recipes.length} recipes, ${parsed.products.length} products)`);
   
   if (duration < 100) {
     console.log('✅ Test 1 Passed: Hydration completed well under 100ms threshold.');
@@ -82,9 +82,9 @@ async function testOptimisticUpdateLatency() {
   const start = performance.now();
   
   // Simulate optimistic local mutation
-  const item = { id: 'inv-123', isUseUp: false };
-  item.isUseUp = true; // Optimistic mutate
-  notify({ type: 'plateplan:inventory-updated', item });
+  const item = { id: 'item-123', isChecked: false };
+  item.isChecked = true; // Optimistic mutate
+  notify({ type: 'plateplan:state:shoppingList', item });
 
   const duration = performance.now() - start;
   console.log(`Optimistic Update & Subscriber Dispatch Latency: ${duration.toFixed(3)} ms`);
