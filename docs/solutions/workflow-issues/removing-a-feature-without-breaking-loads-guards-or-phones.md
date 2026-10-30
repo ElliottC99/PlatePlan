@@ -1,6 +1,7 @@
 ---
 title: Removing a whole feature without breaking loading, the guards or the phones' caches
 date: 2026-10-30
+last_updated: 2026-10-30
 category: workflow-issues
 module: feature removal (Active Stock, 3.50.0)
 problem_type: workflow_issue
@@ -11,8 +12,9 @@ applies_when:
   - "Unregistering components from componentRegistry.js while their files stay in src/"
   - "Clearing a localStorage key or cached field that older releases left on the phones"
   - "Deciding whether firestore.rules can close one collection under the household"
+  - "Deciding to keep a neighbouring feature that a removal touches"
 related_components: [frontend, data_model, testing_framework]
-tags: [feature-removal, attic, ledger, dead-controls, cache, indexeddb, firestore-rules, active-stock]
+tags: [feature-removal, attic, ledger, dead-controls, cache, indexeddb, firestore-rules, active-stock, use-up]
 ---
 
 # Removing a whole feature without breaking loading, the guards or the phones' caches
@@ -31,9 +33,11 @@ Elliott asked for Active Stock to be removed entirely (PR #10, released as 3.50.
 
 **4. firestore.rules cannot close one household collection with a deny rule.** The rules have a single `match /households/elliott-chloe/{document=**}` allow. Firestore combines allow rules with OR, so a `match .../inventory/{doc=**} { allow read, write: if false; }` beside it changes nothing. Closing one collection means rewriting the wildcard into a list of allowed collections, or a condition on the collection name. That changes the rules for the whole household and needs `scripts/test_firestore_rules.js` updated, so we decided to leave the rules alone for the Active Stock removal.
 
+**5. Before keeping a neighbouring feature, check it has live callers.** The Active Stock plan kept "Use up ingredients" (its R11) because the code read as working: templates, helpers, a Vault button. In fact the button called `openUseUpRecipeFinder()`, which nothing defined, and none of the helpers had a caller. It was removed in 3.51.0 (`docs/plans/2026-10-30-1212-refactor-remove-use-up-ingredients-plan.md`). Two cheap checks would have caught it. First, grep for callers of the exported functions outside their own files. Second, run a copy of `scripts/test_dead_controls.js` with its `OUT_OF_SCOPE` exclusion removed. A guard exclusion is exactly where unchecked dead code hides.
+
 ## Why This Matters
 
-Each trap fails quietly. Getting 1 wrong breaks the app at module load. Getting 2 wrong leaves a red guard that looks like a real dead control. Getting 3 wrong passes in Node, because there is no `indexedDB` there and the fallback always runs, yet the stale data stays on both phones. Getting 4 wrong produces a rules change that deploys, passes a careless test, and closes nothing.
+Each trap fails quietly. Getting 1 wrong breaks the app at module load. Getting 2 wrong leaves a red guard that looks like a real dead control. Getting 3 wrong passes in Node, because there is no `indexedDB` there and the fallback always runs, yet the stale data stays on both phones. Getting 4 wrong produces a rules change that deploys, passes a careless test, and closes nothing. Getting 5 wrong commits a plan to keeping something that never worked, and the next session has to unpick that decision.
 
 ## When to Apply
 
