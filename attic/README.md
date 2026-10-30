@@ -41,3 +41,5 @@ A file may be deleted after two weeks of normal use on both phones with no relat
 | `src/repositories/InventoryRepository.js` | 2026-10-30 | 2026-11-13 |
 | `src/services/InventoryService.js` | 2026-10-30 | 2026-11-13 |
 | `src/store/inventorySlice.js` | 2026-10-30 | 2026-11-13 |
+| `src/components/pantry/UseUpEditorUI.js` | 2026-10-30 | 2026-11-13 |
+| `src/components/pantry/UseUpFinderModalUI.js` | 2026-10-30 | 2026-11-13 |
