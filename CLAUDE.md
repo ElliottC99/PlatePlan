@@ -32,9 +32,8 @@ There's no test runner. Each test is a standalone Node script that uses `node:as
 node scripts/test_shopping_list.js
 ```
 
-The tests are `scripts/test_*.js` plus `test_vault_fit_score.js` at the repo root. They import `src/` modules directly and stub `global.window`. The exception is `test_firestore_rules.js`, which needs the emulator, so run it with `npm run test:rules`. Three fail before any change is made:
+The tests are `scripts/test_*.js` plus `test_vault_fit_score.js` at the repo root. They import `src/` modules directly and stub `global.window`. The exception is `test_firestore_rules.js`, which needs the emulator, so run it with `npm run test:rules`. Two fail before any change is made:
 - `test_accessibility_dom.js` (so `npm run lint` fails too) still reads the deleted `PlatePlan.html`.
-- `test_plan_generator.js` still imports the deleted `PlanGeneratorService.js`.
 - `test_recipe_wizard.js` fails an ingredient-name assertion.
 
 If `npm run dev` is serving a stale `dist/`, delete `dist/` or rebuild.
@@ -55,7 +54,7 @@ If `npm run dev` is serving a stale `dist/`, delete `dist/` or rebuild.
 
 Layers in `src/`:
 - `main.js`: the lifecycle coordinator. It waits for auth (`AuthService`, Google sign-in only), hydrates household data and realtime subscriptions (`HydrationService`), wires the store, and attaches many functions to `window.*` for the HTML and the action bridge.
-- `store/`: the custom reactive store (`store.js` is the facade). It combines slices (`cacheSlice`, `inventorySlice`, `planSlice`, `shoppingSlice`, `recipeStore`) and `actions/`, and broadcasts changes as DOM `CustomEvent`s. Change state through the store's setters or `Store.setState()`. Don't assign `window.state` directly. `cacheSlice` keeps a localStorage cache keyed by `CACHE_KEY`.
+- `store/`: the custom reactive store (`store.js` is the facade). It combines slices (`cacheSlice`, `planSlice`, `shoppingSlice`, `recipeStore`) and `actions/`, and broadcasts changes as DOM `CustomEvent`s. Change state through the store's setters or `Store.setState()`. Don't assign `window.state` directly. `cacheSlice` keeps a localStorage cache keyed by `CACHE_KEY`.
 - `services/`: domain logic and Firestore repositories. All persistence goes under `households/{HOUSEHOLD_ID}/...`. `src/repositories/` holds a few more repositories.
 - `components/componentRegistry.js`: imported by `main.js`, which spreads every registered component onto `window`. A missing direct import doesn't prove a component is unused, so also grep for its use as a `window` global and in `data-action` strings.
 - `views/` + `components/`: render functions that build HTML strings. Larger views are split into `*View.js` (orchestration), `*RenderService.js` / `*HTMLTemplate.js` (markup), and `*UI.js` (modals and widgets). `core/AppRouter.js` switches between views.
