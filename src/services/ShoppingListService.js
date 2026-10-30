@@ -2,7 +2,7 @@
  * src/services/ShoppingListService.js (v3.31.19)
  * Smart Shopping List Consolidation Engine:
  * - Aggregates required ingredients across all meals in active meal plan with deduplication for split slots.
- * - Subtracts active in_stock pantry quantities matching by ingredientId and units (g, ml, qty).
+ * - Buys the full required quantity: household stock isn't tracked, so nothing is subtracted.
  * - Groups purchase items under supermarket aisles/categories and computes recipe usage summaries.
  */
 
@@ -28,13 +28,12 @@ export function mapCategoryToAisle(categoryName) {
 }
 
 /**
- * Generates a consolidated shopping list from active meal plan and inventory.
+ * Generates a consolidated shopping list from active meal plan.
  * @param {Object} plan Active meal plan document
- * @param {Array} inventory Active household inventory items
  * @param {Array} recipes All available recipes in store
  * @param {Array} ingredientsBank All available ingredients/items in bank
  */
-export function generateShoppingListFromPlan(plan, inventory = [], recipes = [], ingredientsBank = []) {
+export function generateShoppingListFromPlan(plan, recipes = [], ingredientsBank = []) {
   if (!plan || !Array.isArray(plan.days)) {
     return {
       id: `list_${Date.now()}`,
@@ -51,16 +50,6 @@ export function generateShoppingListFromPlan(plan, inventory = [], recipes = [],
 
   const ingredientMap = new Map();
   ingredientsBank.forEach(i => ingredientMap.set(i.id, i));
-
-  // Map inventory by ingredientId & unit
-  const inventoryMap = new Map();
-  inventory.forEach(item => {
-    if (item.status === 'in_stock' && item.ingredientId) {
-      const key = `${item.ingredientId}_${item.unit || 'qty'}`;
-      const existingQty = inventoryMap.get(key) || 0;
-      inventoryMap.set(key, existingQty + (Number(item.quantity) || 0));
-    }
-  });
 
   // Aggregate required ingredients across plan days & meals with recipe breakdown & split deduplication
   const aggregatedRequirements = new Map(); // key: `${ingredientId}_${unit}`
@@ -135,12 +124,9 @@ export function generateShoppingListFromPlan(plan, inventory = [], recipes = [],
     });
   });
 
-  // Subtract pantry stock and construct shopping list items
+  // Construct shopping list items; the whole required quantity is bought
   const items = [];
-  aggregatedRequirements.forEach((req, key) => {
-    const stockQty = inventoryMap.get(key) || 0;
-    const netBuyQty = Math.max(0, req.requiredQty - stockQty);
-
+  aggregatedRequirements.forEach(req => {
     const aisleCategory = mapCategoryToAisle(req.category);
 
     // Aggregate recipeBreakdown into recipeSummary for expandable product cards
@@ -163,10 +149,10 @@ export function generateShoppingListFromPlan(plan, inventory = [], recipes = [],
       name: req.name,
       category: aisleCategory,
       requiredQty: Math.round(req.requiredQty * 10) / 10,
-      inStockQty: Math.round(stockQty * 10) / 10,
-      buyQty: Math.round(netBuyQty * 10) / 10,
+      inStockQty: 0,
+      buyQty: Math.round(req.requiredQty * 10) / 10,
       unit: req.unit,
-      isChecked: netBuyQty <= 0,
+      isChecked: false,
       isManualAdd: false,
       recipeBreakdown: req.recipeBreakdown || [],
       recipeSummary

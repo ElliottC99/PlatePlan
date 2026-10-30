@@ -81,7 +81,6 @@ export function renderPlanOverallSummary(score) {
           <div style="font-size:13px;color:var(--text2);display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px;">
             <span class="tag" style="background:#e0f2fe;color:#0369a1;font-weight:700;">🎯 Daily Protein Target: ${targets.protein}g</span>
             <span class="tag" style="background:#fef3c7;color:#92400e;font-weight:700;">⚡ Daily Calories: ${targets.calories} kcal</span>
-            ${currentPlan?.pantrySummary ? `<span class="tag" style="background:#dcfce7;color:#14532d;font-weight:700;">🔥 ${currentPlan.pantrySummary.useUpItemsConsumed} Use-Up Items Consumed</span>` : ''}
           </div>
         </div>
         <div>
