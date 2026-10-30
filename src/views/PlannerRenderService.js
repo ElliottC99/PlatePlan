@@ -3,7 +3,6 @@
  * Pure template generation service for the Meal Planner Wizard.
  * Isolates HTML string building from the main PlannerView controller.
  */
-import { getState } from '../store/coreState.js';
 import { formatPlanDayLabel } from '../services/TodayViewService.js';
 
 /**
@@ -100,26 +99,4 @@ export function renderWizardStep3(plan) {
       </div>
     </div>
   `;
-}
-
-/**
- * Calculates day nutrition summary.
- * @returns {Object} Nutrition totals and targets.
- */
-export function makeRenderedDaySummary() {
-  const totals = { e: { cal: 0, prot: 0 }, c: { cal: 0, prot: 0 } };
-  const assumed = { e: { cal: 0, prot: 0, labels: ['snacks'] }, c: { cal: 0, prot: 0, labels: ['snacks'] } };
-  ['e', 'c'].forEach(person => {
-    const b = typeof window.getBudgets === 'function' ? window.getBudgets(person, 'snack') : { cal: 0, prot: 0 };
-    totals[person].cal += +b.cal || 0;
-    totals[person].prot += +b.prot || 0;
-    assumed[person].cal += +b.cal || 0;
-    assumed[person].prot += +b.prot || 0;
-  });
-  return {
-    totals,
-    targets: { e: { cal: +getState()?.prefs?.ecal || 0, prot: +getState()?.prefs?.eprot || 0 }, c: { cal: +getState()?.prefs?.ccal || 0, prot: +getState()?.prefs?.cprot || 0 } },
-    assumed,
-    score: 0
-  };
 }

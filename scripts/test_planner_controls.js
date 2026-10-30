@@ -10,6 +10,7 @@
  *    keeps the ticks and swaps, and survives a reload, even with a stale state.plan after a product swap.
  * 6. Step 2 day headings show the day's date once and "Day N" once; a day with no date shows "Day N" only.
  * 7. The restored slot helpers: meal type from a slot key, and a slot in the generator's shape.
+ * 8. Smoke render: Steps 1, 2 and 3 still draw their markup, and the hidden legacy grid is not drawn.
  * "Reload" runs the real hydration against what was written.
  * Run: node scripts/test_planner_controls.js
  */
@@ -277,6 +278,38 @@ function checkPlanKept(plan, label) {
   assert.equal(fromValue.variant, 'enhanced', 'an "id::enhanced" value gives the enhanced variant');
   assert.notEqual(makePlanSlot('r5').instanceId, makePlanSlot('r5').instanceId, 'each slot gets its own instance id');
   console.log('PASS 7: getMealTypeFromSlotKey and makePlanSlot build the generator slot shape');
+}
+
+// 8. Smoke render: with the hidden legacy grid removed, Steps 1, 2 and 3 still draw their markup,
+//    and nothing is written into the hidden #plan-content any more.
+{
+  window.GeneratorWizardModal = await import('../src/components/generator/GeneratorWizardModal.js');
+  window.ShoppingBatchToolbar = await import('../src/components/shopping/ShoppingBatchToolbar.js');
+  window.ShoppingCategoryGroup = await import('../src/components/shopping/ShoppingCategoryGroup.js');
+  const host = { innerHTML: '', hasAttribute: () => true, setAttribute() {}, addEventListener() {}, querySelectorAll: () => [] };
+  const planContent = { innerHTML: 'untouched' };
+  const realGetById = document.getElementById;
+  document.getElementById = id => (id === 'planner-wizard-host' ? host : id === 'plan-content' ? planContent : null);
+  getState().recipes = [{ id: 'r1', name: 'Tofu Curry' }, { id: 'r2', name: 'Lentil Soup' }, { id: 'r3', name: 'Chickpea Stew' }];
+  getState().currentPlan = {
+    days: 2, dayDates: { 1: '2026-11-02', 2: '2026-11-03' },
+    slots: { 1: { dinnerE: { id: 'r1', recipeId: 'r1' }, dinnerC: { id: 'r2', recipeId: 'r2' } }, 2: { dinnerE: { id: 'r3', recipeId: 'r3' }, dinnerC: { id: 'r3', recipeId: 'r3' } } }
+  };
+  const render = step => { getState().currentPlannerStep = step; host.innerHTML = ''; window.renderPlanner(); return host.innerHTML; };
+
+  const step1 = render(1);
+  assert.match(step1, /pp-generator-constraints-card/, 'Step 1 draws the requests form');
+  assert.match(step1, /id="wizard-plan-days"/, 'Step 1 has the plan length control');
+  const step2 = render(2);
+  assert.match(step2, /class="dense-plan-day-card"/, 'Step 2 draws the day cards');
+  assert.match(step2, /Mon 2 Nov/, 'Step 2 headings carry the date');
+  assert.match(step2, /Tofu Curry/, 'Step 2 lists the planned meals');
+  assert.match(step2, /data-action="searchable-swap-slot"/, 'Step 2 has the Swap button');
+  const step3 = render(3);
+  assert.match(step3, /data-action="commit-plan"/, 'Step 3 has the save and commit button');
+  assert.equal(planContent.innerHTML, 'untouched', 'the hidden legacy grid is not drawn');
+  document.getElementById = realGetById;
+  console.log('PASS 8: Steps 1, 2 and 3 still render, and the hidden legacy grid is not drawn');
 }
 
 
