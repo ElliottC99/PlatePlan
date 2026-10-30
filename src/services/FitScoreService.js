@@ -109,7 +109,7 @@ export function attachComputedFitScores(recipes = [], targetSlot = 'dinner', con
  * - Maps 'needs-work' and 'fit-asc' to Ascending sort
  * - Maps 'name' and 'name-asc' to Alphabetical A-Z
  * - Maps 'name-desc' to Alphabetical Z-A
- * - Any other value, including the removed 'useup-desc' and 'pantry-desc', falls back to Descending
+ * - Any other value, including the removed stock sorts, falls back to Descending
  */
 export function getSortedRecipes(recipes = [], sortOption = 'fit-desc', activeSlotTargets = 'dinner', context = {}) {
   if (!Array.isArray(recipes)) return [];
