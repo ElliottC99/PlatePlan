@@ -8,6 +8,7 @@ import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
 import { subscribe } from '../store/store.js';
 import { getState } from '../store/coreState.js';
 import { createCleanEmptyPlanSchema } from '../models/MealPlannerModel.js';
+import { saveCurrentPlan } from '../services/HouseholdRepository.js';
 import { renderDraftPlanBanner, renderPlanExpiredBanner, renderEarlierDaysHeading, renderPlannerEmptyError, renderPlanDaySlotRow } from '../components/planner/PlannerGridToolbar.js';
 import * as GeneratorConstraintsForm from '../components/generator/GeneratorConstraintsForm.js';
 import { renderWizardStep2, renderWizardStep3, makeRenderedDaySummary } from './PlannerRenderService.js';
@@ -58,9 +59,11 @@ export function renderPlannerWizard() {
   let stepContentHtml = '';
 
   if (currentStep === 1) {
-    const daysVal = getState().currentPlan?.days || 10;
+    // The form's own values win, as in the old runtime, so an edit or Start Fresh isn't undone
+    // by the loaded plan on the next render.
+    const daysVal = getState().currentPlannerDays || getState().currentPlan?.days || 10;
     const today = new Date().toISOString().split('T')[0];
-    const startVal = getState().currentPlan?.dayDates?.[1] || today;
+    const startVal = getState().currentPlannerStartDate || getState().currentPlan?.dayDates?.[1] || today;
     const cadence = getState()?.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
     const minFitScore = getState()?.prefs?.minFitScore || 0;
     const activeExclusions = typeof window.getActiveWizardExclusions === 'function' ? window.getActiveWizardExclusions() : [];
@@ -282,21 +285,50 @@ export function renderPlanOverallSummary() {
   if (typeof window.renderPlanOverallSummaryHtml === 'function') window.renderPlanOverallSummaryHtml(score);
 }
 
+// Step 3 "Save Shopping List & Plan" and Step 4 "Commit Plan Now". Saves the loaded plan as a
+// whole document, leaves the wizard on Step 2 for next time and opens Today, as the old commit did.
+export function commitPlannerWizardPlan() {
+  const toast = (m, type) => { if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(m, type); };
+  const plan = getState().currentPlan;
+  if (!plan || !plan.slots) {
+    toast('No active plan found to commit.');
+    return;
+  }
+  getState().currentPlannerStep = 2;
+  const failed = err => {
+    if (err) console.error('[PlannerView] Failed to commit meal plan:', err);
+    toast('Failed to commit meal plan. Check network connection.', 'error');
+  };
+  saveCurrentPlan(plan).then(saved => {
+    if (!saved) { failed(); return; }
+    toast('Meal plan committed! Displaying Today\'s meals. ✓', 'success');
+    if (typeof window.showView === 'function') window.showView('today');
+  }).catch(failed);
+}
+
 export function setPlannerWizardStep(step) {
   const nextStep = Math.max(1, Math.min(4, step));
   if (typeof window !== 'undefined' && getState()) getState().currentPlannerStep = nextStep;
   renderPlannerWizard();
 }
 
+// Start Fresh, as the old runtime had it: back to Step 1 with no pinned meals, today's date and
+// 10 days. The saved plan is left alone, so Today keeps the current week until a new plan is
+// committed.
 export function resetPlannerStartFresh() {
-  const cleanEmptySchema = createCleanEmptyPlanSchema();
-  if (getState()) { getState().currentPlan = cleanEmptySchema; getState().skeletonGrid = {}; }
-  clearPlan(); setPlannerWizardStep(1);
+  const state = getState();
+  if (state) {
+    if (state.currentPlanOptions?.pinnedMeals) state.currentPlanOptions.pinnedMeals.pinnedRecipes = [];
+    state.currentPlannerStartDate = new Date().toISOString().split('T')[0];
+    state.currentPlannerDays = 10;
+  }
+  setPlannerWizardStep(1);
+  if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Meal planner reset to Step 1. ✓');
 }
 
 if (typeof window !== 'undefined') {
   Object.assign(window, {
-    setPlannerWizardStep, resetPlannerStartFresh, renderPlanner, renderPlannerWizard, renderPlan,
+    setPlannerWizardStep, resetPlannerStartFresh, commitPlannerWizardPlan, renderPlanner, renderPlannerWizard, renderPlan,
     toggleSlotVariant, prioritiseAllPlannedEnhancedRecipes, openPlannedMealActions, swapSlot,
     openSwapMealModal, setSwapModalFilter, selectSwapModalRecipe, confirmSwapMealModal,
     renderSwapModalOptionsList, executeSwapSlotAndClose, closeSwapMealModal, quickRandomizeSwap,

@@ -30,7 +30,7 @@ execution: code
 
 ### Summary
 
-Product Contract preservation: changed R1, R2, R5, R8, AE1–AE4 and Scope Boundaries. Barrie narrowed the piece to the visible planner after the planning audit found that most dead planner markup is never shown (user-directed, 2026-10-30). R6–R8 are unchanged.
+Product Contract preservation: changed R1, R2, R5, R8, AE1–AE4 and Scope Boundaries. R1 and AE2 changed again during ce-work: Start Fresh restores the old wizard reset instead of deleting the saved plan (user-directed, 2026-10-30, chosen over saving an empty plan). Barrie narrowed the piece to the visible planner after the planning audit found that most dead planner markup is never shown (user-directed, 2026-10-30). R6–R8 are unchanged.
 
 Fix the planner controls people can see:
 - committing a plan from Step 3 and Step 4;
@@ -46,7 +46,7 @@ A whole-app scan on 2026-10-30 found about 90 dead-control hits in the planner. 
 
 **What is visible is the wizard** (`#planner-wizard-host`). Four things are broken in it:
 - **Commit does nothing.** "Save Shopping List & Plan" (Step 3) and "Commit Plan Now" (Step 4) call `commitPlannerWizardPlan`, which nothing defines.
-- **Start Fresh doesn't stick.** It clears the plan on screen but saves nothing, so the next load brings the plan back.
+- **Start Fresh is half-broken.** It wipes the plan on screen without saving, so the next load brings the plan back. The old runtime never cleared the saved plan: it only reset the wizard. Step 1 also ignores the wizard's own day and date values and re-renders from the loaded plan.
 - **Step 2 "Swap ▾" doesn't change the meal.** It edits the stale `state.plan` copy instead of the loaded plan. Usually it does nothing; after a step-3 product swap it throws.
 - **Step 2 headings show "Day N" with no date**, because `formatPlanDayLabel` is missing.
 
@@ -67,7 +67,7 @@ Every missing function was defined in the old runtime, `scripts/plateplan-app.js
 **Visible planner behaviour**
 - R1. These controls work as they did before the break:
   - Step 3 "Save Shopping List & Plan" and Step 4 "Commit Plan Now" save the plan and move on as the old commit did;
-  - Start Fresh clears the plan, and the clear survives a reload;
+  - Start Fresh takes the wizard back to Step 1 with no pinned meals, today's date and 10 days, as the old runtime did. It leaves the saved plan alone, so Today keeps the current week until a new plan is committed;
   - Step 2 "Swap ▾" changes that meal on the loaded plan and saves it.
 - R2. Step 2 day headings show each day's date, as the old runtime's day labels did. The other helpers the visible planner skips quietly are available again: meal type from a slot key, slot construction and the escape helpers.
 - R3. Restored behaviour works on today's plan data. It reads and writes the loaded plan (`currentPlan`) and its per-person slots, not the old shapes.
@@ -84,7 +84,7 @@ Every missing function was defined in the old runtime, `scripts/plateplan-app.js
 ### Acceptance Examples
 
 - AE1. **Covers R1, R4.** Given a generated plan with an at-home tick and a swap saved, when Elliott taps "Commit Plan Now", then the plan is saved, the app moves on as the old commit did, and the tick and the swap survive a reload.
-- AE2. **Covers R1.** Given a saved plan, when Chloe taps Start Fresh and reloads, then the planner starts empty, and the old plan doesn't come back.
+- AE2. **Covers R1.** Given a saved plan with a pinned meal, when Chloe taps Start Fresh, then the wizard shows Step 1 with no pins, today's date and 10 days, and Today still shows the saved plan after a reload.
 - AE3. **Covers R1, R3.** Given a plan on Step 2, when Elliott uses "Swap ▾" on Tuesday's dinner and picks another recipe, then Tuesday's dinner on the loaded plan shows the new recipe and keeps it after a reload. This holds even after a step-3 product swap.
 - AE4. **Covers R2.** Given a plan whose day 1 is Monday 2 November, when Step 2 renders, then day 1's heading shows that date, not "Day 1" alone.
 
