@@ -3,41 +3,26 @@
  * Modular Presentation Component for Weekly Meal Planner Grid & History Cards
  */
 
-import { renderDayPlanCard, renderDenseDayCard, renderPersonSummaryBox } from './PlannerDayCard.js';
-import { renderDraftPlanBanner, renderPlanExpiredBanner, renderEarlierDaysHeading, renderPlanOverallSummary, renderPlannerEmptyError } from './PlannerGridToolbar.js';
+import { renderDenseDayCard, renderPersonSummaryBox } from './PlannerDayCard.js';
+import { renderPlannerEmptyError } from './PlannerGridToolbar.js';
 
 function escapeHtml(str) {
-  if (typeof window !== 'undefined' && window.ppEscapeHtml) {
-    return window.ppEscapeHtml(str);
-  }
   return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function renderExpandableText(text, idKey, className) {
-  if (typeof window !== 'undefined' && window.renderExpandableText) {
-    return window.renderExpandableText(text, idKey, className);
-  }
   return `<span class="${className}">${escapeHtml(text)}</span>`;
 }
 
 function getPlanDateRangeLabel(p) {
-  if (typeof window !== 'undefined' && window.getPlanDateRangeLabel) {
-    return window.getPlanDateRangeLabel(p);
-  }
   return p?.date ? new Date(p.date).toLocaleDateString() : '';
 }
 
 function getPlanRecipeIds(p) {
-  if (typeof window !== 'undefined' && window.getPlanRecipeIds) {
-    return window.getPlanRecipeIds(p);
-  }
   return [];
 }
 
 function getProductIndexRecipe(id) {
-  if (typeof window !== 'undefined' && window.getProductIndexRecipe) {
-    return window.getProductIndexRecipe(id);
-  }
   return null;
 }
 
@@ -87,12 +72,7 @@ export function renderHistoryPanel(hist = []) {
 
 // Re-export sub-components for direct access
 export {
-  renderDayPlanCard,
   renderDenseDayCard,
   renderPersonSummaryBox,
-  renderDraftPlanBanner,
-  renderPlanExpiredBanner,
-  renderEarlierDaysHeading,
-  renderPlanOverallSummary,
   renderPlannerEmptyError
 };

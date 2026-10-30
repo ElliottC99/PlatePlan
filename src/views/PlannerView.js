@@ -7,10 +7,9 @@
 import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
 import { subscribe } from '../store/store.js';
 import { getState } from '../store/coreState.js';
-import { createCleanEmptyPlanSchema } from '../models/MealPlannerModel.js';
-import { renderDraftPlanBanner, renderPlanExpiredBanner, renderEarlierDaysHeading, renderPlannerEmptyError, renderPlanDaySlotRow } from '../components/planner/PlannerGridToolbar.js';
+import { saveCurrentPlan } from '../services/HouseholdRepository.js';
 import * as GeneratorConstraintsForm from '../components/generator/GeneratorConstraintsForm.js';
-import { renderWizardStep2, renderWizardStep3, makeRenderedDaySummary } from './PlannerRenderService.js';
+import { renderWizardStep2, renderWizardStep3 } from './PlannerRenderService.js';
 import {
   openSwapMealModal,
   setSwapModalFilter,
@@ -27,7 +26,6 @@ import {
 } from '../components/planner/PlannerSwapModalUI.js';
 
 export {
-  createCleanEmptyPlanSchema,
   getShoppingLineStateKey,
   openSwapMealModal,
   setSwapModalFilter,
@@ -58,17 +56,18 @@ export function renderPlannerWizard() {
   let stepContentHtml = '';
 
   if (currentStep === 1) {
-    const daysVal = getState().currentPlan?.days || 10;
+    // The form's own values win, as in the old runtime, so an edit or Start Fresh isn't undone
+    // by the loaded plan on the next render.
+    const daysVal = getState().currentPlannerDays || getState().currentPlan?.days || 10;
     const today = new Date().toISOString().split('T')[0];
-    const startVal = getState().currentPlan?.dayDates?.[1] || today;
+    const startVal = getState().currentPlannerStartDate || getState().currentPlan?.dayDates?.[1] || today;
     const cadence = getState()?.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
     const minFitScore = getState()?.prefs?.minFitScore || 0;
-    const activeExclusions = typeof window.getActiveWizardExclusions === 'function' ? window.getActiveWizardExclusions() : [];
     const rawPinned = getState().currentPlanOptions?.pinnedMeals ?.pinnedRecipes || [];
     const pinned = Array.isArray(rawPinned) ? rawPinned : [];
 
     stepContentHtml = GeneratorConstraintsForm.renderConstraintsForm({
-      daysVal, startVal, cadence, minFitScore, activeExclusions, pinned
+      daysVal, startVal, cadence, minFitScore, pinned
     }) || '';
   } else if (currentStep === 2) {
     if (!hasActivePlan) {
@@ -121,165 +120,33 @@ export function renderPlannerWizard() {
   }
 }
 
+// The legacy day grid (#plan-content) sits in a hidden wrap in index.html and is no longer drawn:
+// what people see is the wizard.
 export function renderPlan() {
-  if (typeof window.ensurePlannerShell === 'function') window.ensurePlannerShell();
-  if (typeof window.installPlannerSummaryObserver === 'function') window.installPlannerSummaryObserver();
   renderPlannerWizard();
-  const el = document.getElementById('plan-content');
-  if (!el) return;
-  try {
-    if (!getState().currentPlan || !getState().currentPlan.slots) {
-      el.innerHTML = '';
-      const actions = document.getElementById('plan-actions'); if (actions) actions.style.display = 'none';
-      const overall = document.getElementById('plan-overall-summary'); if (overall) overall.innerHTML = '';
-      const prep = document.getElementById('plan-meal-prep-panel'); if (prep) prep.innerHTML = '';
-      return;
-    }
-
-    const { days, slots } = getState().currentPlan;
-    const startInput = document.getElementById('plan-start-date');
-    if (startInput) startInput.value = getState().currentPlan.dayDates?.[1] || '';
-    let hasValidSlots = false;
-
-    let html = '';
-    if (getState().isDraftPlan || getState().draftPlan) {
-      html += renderDraftPlanBanner();
-    }
-
-    const localToday = typeof window.getPlatePlanLocalToday === 'function' ? window.getPlatePlanLocalToday() : new Date().toISOString().split('T')[0];
-    const isPlanExpired = typeof window.checkIsPlanExpired === 'function' ? window.checkIsPlanExpired(getState().currentPlan, localToday) : false;
-    if (isPlanExpired) {
-      const tomorrow = typeof window.getTomorrowLocalDate === 'function' ? window.getTomorrowLocalDate() : localToday;
-      const datedEntries = Object.entries(getState().currentPlan.dayDates || {}).filter(([, v]) => typeof window.parsePlanLocalDate === 'function' ? !!window.parsePlanLocalDate(v) : !!v);
-      const dates = datedEntries.map(([, v]) => v).sort();
-      const maxDate = dates[dates.length - 1] || localToday;
-      const endLabel = typeof window.parsePlanLocalDate === 'function' && window.parsePlanLocalDate(maxDate) ? window.formatPlanDateShort(maxDate) : maxDate;
-      const tomorrowLabel = typeof window.formatPlanDateShort === 'function' ? window.formatPlanDateShort(tomorrow) : tomorrow;
-      html += renderPlanExpiredBanner(endLabel, tomorrowLabel);
-    }
-
-    const earlierDays = Array.from({ length: days }, (_, index) => index + 1).filter(day => {
-      const value = getState().currentPlan.dayDates?.[day] || '';
-      return typeof window.parsePlanLocalDate === 'function' ? !!window.parsePlanLocalDate(value) && value < localToday : false;
-    });
-
-    if (earlierDays.length) {
-      const firstLabel = typeof window.formatPlanDayLabel === 'function' ? window.formatPlanDayLabel(getState().currentPlan, earlierDays[0], { short: true }) : `Day ${earlierDays[0]}`;
-      const lastLabel = typeof window.formatPlanDayLabel === 'function' ? window.formatPlanDayLabel(getState().currentPlan, earlierDays[earlierDays.length - 1], { short: true }) : `Day ${earlierDays[earlierDays.length - 1]}`;
-      const range = earlierDays.length > 1 ? `${firstLabel} – ${lastLabel}` : firstLabel;
-      const isExpanded = typeof window.platePlanEarlierDaysExpanded !== 'undefined' ? window.platePlanEarlierDaysExpanded : false;
-      html += renderEarlierDaysHeading(range, earlierDays.length, isExpanded);
-    }
-
-    for (let d = 1; d <= days; d++) {
-      const isExpanded = typeof window.platePlanEarlierDaysExpanded !== 'undefined' ? window.platePlanEarlierDaysExpanded : false;
-      if (earlierDays.includes(d) && !isExpanded) continue;
-      const s = slots[d] || {};
-      const allEx = typeof window.SLOTS !== 'undefined' ? window.SLOTS.every(sl => getState().excluded?.[d]?.[sl.key]) : false;
-      const dayLabelFormatted = typeof window.formatPlanDayLabel === 'function' ? window.formatPlanDayLabel(getState().currentPlan, d, { short: true }) : `Day ${d}`;
-      const dayDateVal = getState().currentPlan.dayDates?.[d] || '';
-
-      if (allEx) {
-        html += window.PlannerDayCard?.renderDayPlanCard?.({ day: d, dayLabel: dayLabelFormatted, dayDate: dayDateVal, isAllExcluded: true }) || '';
-        continue;
-      }
-
-      const daySlotInfos = typeof window.buildPlanDaySlotInfos === 'function' ? window.buildPlanDaySlotInfos(getState().currentPlan, d) : [];
-      const daySummary = makeRenderedDaySummary();
-      let dayRowsHtml = '';
-
-      if (typeof window.SLOTS !== 'undefined' && typeof window.SLOT_LABELS !== 'undefined' && typeof window.SLOT_COLORS !== 'undefined') {
-        window.SLOTS.forEach(sl => {
-          const isEx = getState().excluded?.[d]?.[sl.key];
-          const slotData = s[sl.key];
-          const slotInfo = typeof window.getPlanSlotInfo === 'function' ? window.getPlanSlotInfo(slotData) : { active: null, id: null, variant: 'original', instanceId: null };
-          const r = slotInfo?.active;
-          const rId = slotInfo?.id;
-          const instanceId = slotInfo?.instanceId;
-          const lblLines = window.SLOT_LABELS[sl.key].split('\n');
-          const showRecipe = !!r && !isEx;
-          if (showRecipe) hasValidSlots = true;
-
-          const slotNutrition = daySlotInfos.find(info => info.slotKey === sl.key) || (typeof window.getPlannerSlotNutritionInfo === 'function' ? window.getPlannerSlotNutritionInfo(getState().currentPlan, d, sl.key) : { cal: 0, prot: 0 });
-          let calStr = '', rowCal = 0, rowProt = 0;
-          const rowPerson = sl.key.endsWith('E') ? 'e' : sl.key.endsWith('C') ? 'c' : '';
-          if (showRecipe) {
-            rowCal = +slotNutrition.cal || 0;
-            rowProt = +slotNutrition.prot || 0;
-            calStr = `${Math.round(rowCal)}kcal / P${typeof window.round1 === 'function' ? window.round1(rowProt) : rowProt}g`;
-            if (rowPerson) {
-              daySummary.totals[rowPerson].cal += rowCal;
-              daySummary.totals[rowPerson].prot += rowProt;
-            }
-          }
-          const slotReason = typeof window.getPlanSlotReason === 'function' ? window.getPlanSlotReason(getState().currentPlan, d, sl.key) : '';
-          const slotReasonLabel = typeof window.formatPlanSlotReason === 'function' ? window.formatPlanSlotReason(slotReason) : slotReason;
-          const isPinned = !!(r && (slotData?.pinned || slotData?.isPinned || (typeof window.getPinnedRecipesList === 'function' && window.getPinnedRecipesList().some(p => p.recipeId === rId))));
-          dayRowsHtml += renderPlanDaySlotRow({ d, sl, isEx, showRecipe, r, rId, instanceId, slotInfo, lblLines, calStr, rowPerson, rowCal, rowProt, slotReason, slotReasonLabel, isPinned });
-        });
-      }
-
-      daySummary.score = typeof window.calculatePlanDayScoreFromTotals === 'function' ? window.calculatePlanDayScoreFromTotals(daySummary.totals) : 0;
-      html += window.PlannerDayCard?.renderDayPlanCard?.({
-        day: d, dayLabel: dayLabelFormatted, dayDate: dayDateVal, isAllExcluded: false, daySummary, dayRowsHtml, score: daySummary.score
-      }) || '';
-    }
-
-    el.innerHTML = html;
-    if (typeof window.reconcileVisiblePlanSummaries === 'function') window.reconcileVisiblePlanSummaries();
-    if (typeof window.renderMealPrepSuggestions === 'function') window.renderMealPrepSuggestions();
-    if (typeof window.renderPlanHistoryPanel === 'function') window.renderPlanHistoryPanel();
-    const setup = document.getElementById('plan-setup-card'); if (setup) setup.style.display = '';
-    const actions = document.getElementById('plan-actions'); if (actions) actions.style.display = hasValidSlots ? 'block' : 'none';
-    if (typeof window.updatePlannerCompactHeader === 'function') window.updatePlannerCompactHeader();
-  } catch (err) {
-    console.error('Error rendering Meal Planner:', err);
-    el.innerHTML = renderPlannerEmptyError();
-  }
-}
-
-export function clearPlan() {
-  const cleanEmptySchema = createCleanEmptyPlanSchema();
-  if (getState()) {
-    getState().currentPlan = cleanEmptySchema;
-    getState().skeletonGrid = {};
-    getState().overrides = {};
-    getState().currentPlannerStep = 1;
-    getState().isDraftPlan = false;
-    getState().draftPlan = null;
-  }
-  if (typeof window.Store?.setState === 'function') {
-    window.Store.setState({ plan: cleanEmptySchema, skeletonGrid: {} });
-  }
-  if (typeof window.platePlanEarlierDaysExpanded !== 'undefined') window.platePlanEarlierDaysExpanded = false;
-  if (typeof window.saveState === 'function') window.saveState(cleanEmptySchema);
-
-  const content = document.getElementById('plan-content'); if (content) content.innerHTML = '';
-  const warnings = document.getElementById('plan-warnings'); if (warnings) warnings.innerHTML = '';
-  const overall = document.getElementById('plan-overall-summary'); if (overall) overall.innerHTML = '';
-  const prep = document.getElementById('plan-meal-prep-panel'); if (prep) prep.innerHTML = '';
-  const setup = document.getElementById('plan-setup-card'); if (setup) setup.style.display = '';
-  const actions = document.getElementById('plan-actions'); if (actions) actions.style.display = 'none';
+  // Deferred to the plan library piece, which defines it.
   if (typeof window.renderPlanHistoryPanel === 'function') window.renderPlanHistoryPanel();
-  if (typeof window.updatePlannerCompactHeader === 'function') window.updatePlannerCompactHeader();
-  renderPlannerWizard();
 }
 
-export function showPlanSetup() {
-  if (typeof window.ensurePlannerShell === 'function') window.ensurePlannerShell();
-  if (typeof window.openPlanOptionsWorkspace === 'function') window.openPlanOptionsWorkspace();
-}
-
-export function renderPlanOverallSummary() {
-  const el = document.getElementById('plan-overall-summary');
-  if (!el || !getState().currentPlan?.slots) { if (el) el.innerHTML = ''; return; }
-  if (document.querySelector('#plan-content .day-plan-card:not(.skipped)')) {
-    if (typeof window.reconcileVisiblePlanSummaries === 'function') window.reconcileVisiblePlanSummaries();
+// Step 3 "Save Shopping List & Plan" and Step 4 "Commit Plan Now". Saves the loaded plan as a
+// whole document, leaves the wizard on Step 2 for next time and opens Today, as the old commit did.
+export function commitPlannerWizardPlan() {
+  const toast = (m, type) => { if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(m, type); };
+  const plan = getState().currentPlan;
+  if (!plan || !plan.slots) {
+    toast('No active plan found to commit.');
     return;
   }
-  const score = typeof window.calculatePlanScore === 'function' ? window.calculatePlanScore(getState().currentPlan) : 0;
-  getState().currentPlan.score = score;
-  if (typeof window.renderPlanOverallSummaryHtml === 'function') window.renderPlanOverallSummaryHtml(score);
+  getState().currentPlannerStep = 2;
+  const failed = err => {
+    if (err) console.error('[PlannerView] Failed to commit meal plan:', err);
+    toast('Failed to commit meal plan. Check network connection.', 'error');
+  };
+  saveCurrentPlan(plan).then(saved => {
+    if (!saved) { failed(); return; }
+    toast('Meal plan committed! Displaying Today\'s meals. ✓', 'success');
+    if (typeof window.showView === 'function') window.showView('today');
+  }).catch(failed);
 }
 
 export function setPlannerWizardStep(step) {
@@ -288,19 +155,26 @@ export function setPlannerWizardStep(step) {
   renderPlannerWizard();
 }
 
+// Start Fresh, as the old runtime had it: back to Step 1 with no pinned meals, today's date and
+// 10 days. The saved plan is left alone, so Today keeps the current week until a new plan is
+// generated (Generate saves the plan straight away).
 export function resetPlannerStartFresh() {
-  const cleanEmptySchema = createCleanEmptyPlanSchema();
-  if (getState()) { getState().currentPlan = cleanEmptySchema; getState().skeletonGrid = {}; }
-  clearPlan(); setPlannerWizardStep(1);
+  const state = getState();
+  if (state) {
+    if (state.currentPlanOptions?.pinnedMeals) state.currentPlanOptions.pinnedMeals.pinnedRecipes = [];
+    state.currentPlannerStartDate = new Date().toISOString().split('T')[0];
+    state.currentPlannerDays = 10;
+  }
+  setPlannerWizardStep(1);
+  if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Meal planner reset to Step 1. ✓');
 }
 
 if (typeof window !== 'undefined') {
   Object.assign(window, {
-    setPlannerWizardStep, resetPlannerStartFresh, renderPlanner, renderPlannerWizard, renderPlan,
+    setPlannerWizardStep, resetPlannerStartFresh, commitPlannerWizardPlan, renderPlanner, renderPlannerWizard, renderPlan,
     toggleSlotVariant, prioritiseAllPlannedEnhancedRecipes, openPlannedMealActions, swapSlot,
     openSwapMealModal, setSwapModalFilter, selectSwapModalRecipe, confirmSwapMealModal,
     renderSwapModalOptionsList, executeSwapSlotAndClose, closeSwapMealModal, quickRandomizeSwap,
-    clearPlan, showPlanSetup, renderPlanOverallSummary,
     openRecipeModal: (id, instanceId, variant) => typeof window.viewRecipe === 'function' ? window.viewRecipe(id, instanceId, variant) : undefined
   });
   window.showRecipeModal = window.openRecipeModal;
