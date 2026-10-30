@@ -157,7 +157,7 @@ export function setPlannerWizardStep(step) {
 
 // Start Fresh, as the old runtime had it: back to Step 1 with no pinned meals, today's date and
 // 10 days. The saved plan is left alone, so Today keeps the current week until a new plan is
-// committed.
+// generated (Generate saves the plan straight away).
 export function resetPlannerStartFresh() {
   const state = getState();
   if (state) {

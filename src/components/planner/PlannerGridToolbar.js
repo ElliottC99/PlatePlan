@@ -1,7 +1,7 @@
 /**
  * src/components/planner/PlannerGridToolbar.js (v3.20.14)
- * UI component for planner week controls, date range selectors,
- * banners, clear plan modal triggers, and target setters.
+ * Two planner markup helpers: renderPlannerEmptyError, the card shown when the planner fails to
+ * render, and renderPlanDaySlotRow, one meal row of the legacy day grid (nothing calls it now).
  */
 export function renderPlannerEmptyError() {
   return `

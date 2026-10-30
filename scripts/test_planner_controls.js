@@ -11,6 +11,9 @@
  * 6. Step 2 day headings show the day's date once and "Day N" once; a day with no date shows "Day N" only.
  * 7. The restored slot helpers: meal type from a slot key, and a slot in the generator's shape.
  * 8. Smoke render: Steps 1, 2 and 3 still draw their markup, and the hidden legacy grid is not drawn.
+ * 9. Generate uses the Step 1 day count and start date (Start Fresh's 10 days from today, or the
+ *    person's edit), then the loaded plan's, then 10 days from today, as Step 1 shows.
+ * 10. A failed save: commit shows the error toast and doesn't open Today; swap shows the error toast.
  * "Reload" runs the real hydration against what was written.
  * Run: node scripts/test_planner_controls.js
  */
@@ -19,6 +22,8 @@ import assert from 'node:assert/strict';
 
 const docs = {};
 const writes = [];
+// When true, every fake doc.set rejects, as a write does when the network is down.
+let failSets = false;
 function fakeCollection(path) {
   return {
     path,
@@ -37,6 +42,7 @@ function fakeDoc(path) {
     collection: name => fakeCollection(`${path}/${name}`),
     get: async () => ({ exists: Boolean(docs[path]), id: path.split('/').pop(), data: () => JSON.parse(JSON.stringify(docs[path] || {})) }),
     set: async (data, opts) => {
+      if (failSets) throw new Error('offline (test)');
       writes.push({ op: 'set', path, data: JSON.parse(JSON.stringify(data)), merge: Boolean(opts?.merge) });
       docs[path] = opts?.merge ? { ...(docs[path] || {}), ...data } : JSON.parse(JSON.stringify(data));
     },
@@ -305,6 +311,114 @@ function checkPlanKept(plan, label) {
   assert.equal(planContent.innerHTML, 'untouched', 'the hidden legacy grid is not drawn');
   document.getElementById = realGetById;
   console.log('PASS 8: Steps 1, 2 and 3 still render, and the hidden legacy grid is not drawn');
+}
+
+// 9. Generate uses the Step 1 form values, as the old runtime's generate read state.plannerDays
+//    and the start date; then the loaded plan's; then 10 days from today.
+{
+  const { generatePlan } = await import('../src/services/MealPlanGeneratorService.js');
+  const recipes = [{ id: 'r1', name: 'Tofu Curry' }, { id: 'r2', name: 'Lentil Soup' }, { id: 'r3', name: 'Chickpea Stew' }];
+  const today = new Date().toISOString().split('T')[0];
+  const addDays = (iso, n) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().split('T')[0]; };
+  const generate = async () => {
+    getState().recipes = recipes;
+    toasts.length = 0;
+    await generatePlan();
+    assert.deepEqual(toasts.filter(t => t.type === 'error'), [], 'Generate shows no error');
+    const plan = getState().currentPlan;
+    await settle();
+    return plan;
+  };
+
+  // After Start Fresh: 10 days starting today.
+  docs[CURRENT] = JSON.parse(JSON.stringify(generatedPlan()));
+  await reload();
+  window.resetPlannerStartFresh();
+  let plan = await generate();
+  assert.equal(plan.days, 10, 'after Start Fresh, Generate builds 10 days');
+  assert.equal(Object.keys(plan.dayDates).length, 10, 'ten day dates');
+  assert.equal(plan.dayDates[1], today, 'the plan starts today');
+  assert.equal(plan.dayDates[10], addDays(today, 9), 'the tenth day is nine days on');
+
+  // An edit on Step 1: 14 days from a chosen date.
+  getState().currentPlannerDays = 14;
+  getState().currentPlannerStartDate = '2026-11-09';
+  plan = await generate();
+  assert.equal(plan.days, 14, 'Generate builds the 14 days set on Step 1');
+  assert.equal(plan.startDate, '2026-11-09', 'the plan starts on the date set on Step 1');
+  assert.equal(plan.dayDates[1], '2026-11-09', 'day 1 is the chosen date');
+  assert.equal(plan.dayDates[14], '2026-11-22', 'day 14 is thirteen days on');
+
+  // No form values: the loaded plan's length and first day, which Step 1 shows.
+  getState().currentPlannerDays = undefined;
+  getState().currentPlannerStartDate = undefined;
+  getState().currentPlan = generatedPlan();
+  plan = await generate();
+  assert.equal(plan.days, 2, "with no form values, Generate uses the loaded plan's length");
+  assert.equal(plan.dayDates[1], '2026-11-02', "with no form values, Generate starts on the loaded plan's first day");
+
+  // No form values and no plan: 10 days from today, the default Step 1 shows.
+  getState().currentPlannerDays = undefined;
+  getState().currentPlannerStartDate = undefined;
+  getState().currentPlan = null;
+  plan = await generate();
+  assert.equal(plan.days, 10, 'with no form values and no plan, Generate builds 10 days');
+  assert.equal(plan.dayDates[1], today, 'with no form values and no plan, the plan starts today');
+  console.log('PASS 9: Generate uses the Step 1 day count and start date, then the loaded plan, then 10 days from today');
+}
+
+// 10. A failed save shows the error toast; commit then doesn't open Today.
+{
+  const { openSearchableRecipeSwapModal, selectAndSwapRecipe } = await import('../src/components/planner/PlannerMealSlot.js');
+  getState().recipes = [{ id: 'r1', name: 'Tofu Curry' }, { id: 'r2', name: 'Lentil Soup' }, { id: 'r3', name: 'Chickpea Stew' }];
+  const errorToasts = () => toasts.filter(t => t.type === 'error').map(t => t.m);
+  // A plan whose save throws inside saveCurrentPlan, so its promise rejects rather than resolving false.
+  const throwingPlan = () => {
+    const plan = generatedPlan();
+    Object.defineProperty(plan, 'days', { get() { throw new Error('bad plan (test)'); }, enumerable: true });
+    return plan;
+  };
+  const quiet = console.error; const quietWarn = console.warn;
+  console.error = () => {}; console.warn = () => {};
+
+  // Commit, doc.set rejects: saveCurrentPlan resolves false.
+  getState().currentPlan = generatedPlan();
+  failSets = true; toasts.length = 0; viewsShown.length = 0;
+  window.commitPlannerWizardPlan();
+  await settle();
+  failSets = false;
+  assert.deepEqual(viewsShown, [], 'a failed commit does not open Today');
+  assert.deepEqual(errorToasts(), ['Failed to commit meal plan. Check network connection.'], 'a failed commit shows the error toast');
+  assert.ok(!toasts.some(t => t.type === 'success'), 'a failed commit shows no success toast');
+
+  // Commit, saveCurrentPlan rejects.
+  getState().currentPlan = throwingPlan();
+  toasts.length = 0; viewsShown.length = 0;
+  window.commitPlannerWizardPlan();
+  await settle();
+  assert.deepEqual(viewsShown, [], 'a commit whose save rejects does not open Today');
+  assert.deepEqual(errorToasts(), ['Failed to commit meal plan. Check network connection.'], 'a commit whose save rejects shows the error toast');
+
+  // Swap, doc.set rejects.
+  getState().currentPlan = generatedPlan();
+  failSets = true; toasts.length = 0;
+  openSearchableRecipeSwapModal(1, 'dinnerE', false);
+  selectAndSwapRecipe('r3', 'original');
+  await settle();
+  failSets = false;
+  assert.deepEqual(errorToasts(), ['Failed to save the swap. Check network connection.'], 'a failed swap save shows the error toast');
+
+  // Swap, saveCurrentPlan rejects.
+  getState().currentPlan = throwingPlan();
+  toasts.length = 0;
+  openSearchableRecipeSwapModal(1, 'dinnerE', false);
+  selectAndSwapRecipe('r3', 'original');
+  await settle();
+  assert.deepEqual(errorToasts(), ['Failed to save the swap. Check network connection.'], 'a swap whose save rejects shows the error toast');
+
+  console.error = quiet; console.warn = quietWarn;
+  getState().currentPlan = null;
+  console.log('PASS 10: a failed save shows the error toast, and a failed commit does not open Today');
 }
 
 

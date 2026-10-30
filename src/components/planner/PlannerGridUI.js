@@ -3,7 +3,7 @@
  * Modular Presentation Component for Weekly Meal Planner Grid & History Cards
  */
 
-import { renderDayPlanCard, renderDenseDayCard, renderPersonSummaryBox } from './PlannerDayCard.js';
+import { renderDenseDayCard, renderPersonSummaryBox } from './PlannerDayCard.js';
 import { renderPlannerEmptyError } from './PlannerGridToolbar.js';
 
 function escapeHtml(str) {
@@ -72,7 +72,6 @@ export function renderHistoryPanel(hist = []) {
 
 // Re-export sub-components for direct access
 export {
-  renderDayPlanCard,
   renderDenseDayCard,
   renderPersonSummaryBox,
   renderPlannerEmptyError

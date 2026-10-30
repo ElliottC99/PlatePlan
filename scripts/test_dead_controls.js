@@ -8,8 +8,9 @@
  *   - a window.X call or typeof window.X check for an X nothing defines;
  *   - a data-action that neither ActionBridge.routeAction nor a listener in scope handles.
  * "Defined" means assigned to window anywhere in src/, or exported by a module that
- * componentRegistry spreads onto window. "Routed" also covers the planner grid's
- * `action === '...'` values in src/core/AppInitializer.js, whose own controls aren't checked here.
+ * componentRegistry spreads onto window. "Routed" also covers the `action === '...'` branches of
+ * the planner grid's listener (initPlannerGridDelegation in src/core/AppInitializer.js) whose
+ * window functions are all defined; AppInitializer's own controls aren't checked here.
  * Every Pantry component is in scope, and every planner one except the swap modal. The planner
  * features deferred to later pieces (slot reasons, plan history and library) are excluded by name.
  * Run: node scripts/test_dead_controls.js
@@ -108,13 +109,28 @@ const DEFERRED_NAMES = new Set([
 // Their data-action values. AppInitializer routes these to the deferred functions above.
 const DEFERRED_ACTIONS = new Set(['clear-slot-reason', 'open-saved-plan-recipe-cards', 'open-plan-history-actions']);
 
-function routedActions() {
-  const bridge = read('src/services/ActionBridge.js') + read('src/services/RecipeActionBridge.js');
-  // The planner grid's delegated listener (initPlannerGridDelegation) routes Step 2's buttons (KTD7).
+// The planner grid's delegated listener (initPlannerGridDelegation in AppInitializer.js) routes
+// Step 2's buttons (KTD7). Only that function's branches count, as the other listeners there serve
+// other screens, and a branch counts only when every window function it calls is defined.
+function plannerGridActions(defined) {
   const appInit = read('src/core/AppInitializer.js');
+  const start = appInit.indexOf('export function initPlannerGridDelegation');
+  assert.ok(start >= 0, 'AppInitializer.js still has initPlannerGridDelegation');
+  const next = appInit.indexOf('export function', start + 1);
+  const body = appInit.slice(start, next < 0 ? appInit.length : next);
+  const branches = [...body.matchAll(/\baction\s*===\s*'([^']+)'/g)];
+  return branches.filter((m, i) => {
+    const branch = body.slice(m.index, branches[i + 1]?.index ?? body.length);
+    const calls = [...branch.matchAll(/window\.(\w+)\s*\(/g)].map(c => c[1]);
+    return calls.length > 0 && calls.every(n => defined.has(n));
+  }).map(m => m[1]);
+}
+
+function routedActions(defined) {
+  const bridge = read('src/services/ActionBridge.js') + read('src/services/RecipeActionBridge.js');
   return {
-    exact: new Set([...bridge.matchAll(/normalizedAction\s*===\s*'([^']+)'/g),
-      ...appInit.matchAll(/\baction\s*===\s*'([^']+)'/g)].map(m => m[1])),
+    exact: new Set([...[...bridge.matchAll(/normalizedAction\s*===\s*'([^']+)'/g)].map(m => m[1]),
+      ...plannerGridActions(defined)]),
     includes: [...bridge.matchAll(/normalizedAction\.(?:includes|startsWith)\('([^']+)'\)/g)].map(m => m[1])
   };
 }
@@ -168,7 +184,8 @@ function check(label, fn) {
 
 console.log('=== RUNNING DEAD CONTROLS SUITE ===\n');
 
-const context = { defined: definedOnWindow(), routed: routedActions() };
+const defined = definedOnWindow();
+const context = { defined, routed: routedActions(defined) };
 const fixture = text => findDeadControls([{ name: 'fixture.js', text, lineBase: 0 }], context);
 
 check('Covers AE7: a data-pp-click button is reported', () => {
@@ -195,6 +212,16 @@ check('a deferred planner name is not reported, and Step 2\'s routed swap is not
   assert.deepEqual(fixture('<button data-action="searchable-swap-slot" data-day="1">Swap ▾</button>'), [], 'routed in AppInitializer.js');
   assert.equal(fixture('if (typeof window.calculatePlanScore === \'function\') window.calculatePlanScore(plan);').length >= 1, true,
     'a swap-modal helper name is still reported in a live file');
+});
+
+check('a planner action AppInitializer routes to a missing window function is reported', () => {
+  assert.equal(context.defined.has('setPlanDayDate'), false, 'window.setPlanDayDate is still undefined');
+  assert.equal(fixture('<input type="date" data-action="set-plan-day-date" data-day="1">').length, 1,
+    'set-plan-day-date is routed only to window.setPlanDayDate, which nothing defines');
+  assert.deepEqual(fixture('<button data-action="searchable-swap-slot" data-day="1">Swap ▾</button>'), [],
+    'searchable-swap-slot calls window.openSearchableRecipeSwapModal, which is defined');
+  assert.equal(fixture('<button data-action="add-exclusion">x</button>').length, 1,
+    'an action AppInitializer routes only for Settings is not routed for the planner');
 });
 
 check('no dead controls on the Pantry, Product Bank and planner screens', () => {
