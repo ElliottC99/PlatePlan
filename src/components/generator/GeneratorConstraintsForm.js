@@ -4,22 +4,12 @@
  * - Target plan duration & start date selectors
  * - Meal repeat cadence & batch prep frequency toggles
  * - Macro target fit score tolerance & filter options
- * - Slot exclusions, pinned recipes, and pantry use-up ingredient tags
+ * - Slot exclusions and pinned recipes
  */
 import { getState } from '../../store/coreState.js';
 
 import { renderFitScoreScopeUI, renderSkeletonGridUI } from '../planner/PlannerSkeletonGridUI.js';
 import store from '../../store/store.js';
-
-function escapeHtml(str) {
-  return String(str ?? '').replace(/[&<>"']/g, ch => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[ch]));
-}
 
 function escapeAttr(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -100,37 +90,6 @@ export function renderConstraintsForm({
     </div>
   `;
 }
-
-/**
- * Renders the Pantry Use-Up sub-panel.
- */
-export function renderUseUpPanel(useUp) {
-  return `
-    <div style="background:var(--surface2);padding:14px;border-radius:12px;border:1px solid var(--border)">
-      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">Pantry Use-Up (${useUp.length})</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Prioritise recipes that use ingredients expiring in your pantry.</div>
-
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
-        ${useUp.length === 0 ? '<span style="font-size:12px;color:var(--text3)">No items designated for pantry use-up.</span>' : ''}
-        ${useUp.map(id => {
-          const prod = typeof getProduct === 'function' ? getProduct(id) : null;
-          return `
-            <span class="inline-search-chip">
-              🥫 ${escapeHtml(prod?.name || 'Product')}
-              <button type="button" onclick="removeWizardUseUpProduct('${escapeAttr(id)}')">✕</button>
-            </span>
-          `;
-        }).join('')}
-      </div>
-
-      <label for="wizard-useup-search" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Search product to use up</label>
-      <input type="search" id="wizard-useup-search" name="useUpProductSearch" aria-label="Search product to use up" class="input sm" placeholder="Search product to use up..." style="width:100%" oninput="filterWizardUseUpProducts(this.value)">
-      <div id="wizard-useup-search-results" style="margin-top:6px;max-height:140px;overflow-y:auto;display:none;background:var(--surface);border:1px solid var(--border);border-radius:8px"></div>
-    </div>
-  `;
-}
-
-
 
 export function bindConstraintEvents(container, onRender) {
   const inputs = container.querySelectorAll('.pp-constraint-input');

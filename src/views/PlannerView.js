@@ -66,11 +66,9 @@ export function renderPlannerWizard() {
     const activeExclusions = typeof window.getActiveWizardExclusions === 'function' ? window.getActiveWizardExclusions() : [];
     const rawPinned = getState().currentPlanOptions?.pinnedMeals ?.pinnedRecipes || [];
     const pinned = Array.isArray(rawPinned) ? rawPinned : [];
-    const rawUseUp = getState().currentPlanOptions?.useUp ?.useUpProducts || [];
-    const useUp = Array.isArray(rawUseUp) ? rawUseUp : (rawUseUp && typeof rawUseUp === 'object' ? Object.keys(rawUseUp) : []);
 
     stepContentHtml = GeneratorConstraintsForm.renderConstraintsForm({
-      daysVal, startVal, cadence, minFitScore, activeExclusions, pinned, useUp
+      daysVal, startVal, cadence, minFitScore, activeExclusions, pinned
     }) || '';
   } else if (currentStep === 2) {
     if (!hasActivePlan) {
