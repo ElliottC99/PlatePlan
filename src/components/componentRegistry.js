@@ -36,10 +36,6 @@ import * as VaultGridContainer from './vault/VaultGridContainer.js';
 import * as VaultGridUI from './vault/VaultGridUI.js';
 import * as RecipeDetailModalUI from './recipe/RecipeDetailModalUI.js';
 import * as RecipeEditorModalUI from './recipe/RecipeEditorModalUI.js';
-import * as PantryItemRow from './pantry/PantryItemRow.js';
-import * as PantryCategoryGroup from './pantry/PantryCategoryGroup.js';
-import * as PantryToolbar from './pantry/PantryToolbar.js';
-import * as PantryInventoryUI from './pantry/PantryInventoryUI.js';
 import * as ShoppingSubstUI from './shopping/ShoppingSubstUI.js';
 import * as UseUpEditorUI from './pantry/UseUpEditorUI.js';
 import * as UseUpFinderModalUI from './pantry/UseUpFinderModalUI.js';
@@ -68,8 +64,7 @@ export const registeredComponents = {
   GeneratorConstraintsForm, GeneratorCandidateDrawer, RecipeNutritionCard, RecipePortionScaler,
   RecipeCostBreakdown, MacroTrendChart, NutriScoreBadgeCard, WeeklySummaryToolbar,
   VaultFilterToolbar, VaultRecipeCard, VaultGridContainer, VaultGridUI,
-  RecipeDetailModalUI, RecipeEditorModalUI, PantryItemRow, PantryCategoryGroup,
-  PantryToolbar, PantryInventoryUI, ShoppingSubstUI, UseUpEditorUI,
+  RecipeDetailModalUI, RecipeEditorModalUI, ShoppingSubstUI, UseUpEditorUI,
   UseUpFinderModalUI, PlannerGridUI, PlannerModalsUI, PlannerWizardUI, PlannerSwapModalUI,
   PrepStepCard, PrepContainerPlanner, PrepSummaryToolbar, ProfileAllocationCard,
   DietaryExclusionManager, HouseholdSyncCard, SettingsMacroUI, SettingsExclusionsUI,

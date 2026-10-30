@@ -32,3 +32,9 @@ A file may be deleted after two weeks of normal use on both phones with no relat
 | `src/views/SettingsEventService.js` | 2026-10-28 | 2026-11-11 |
 | `src/views/VaultRecipeRenderService.js` | 2026-10-28 | 2026-11-11 |
 | `src/components/pantry/TescoImportModalUI.js` | 2026-10-29 | 2026-11-12 |
+| `src/components/pantry/PantryCategoryGroup.js` | 2026-10-30 | 2026-11-13 |
+| `src/components/pantry/PantryInventoryRenderService.js` | 2026-10-30 | 2026-11-13 |
+| `src/components/pantry/PantryInventoryUI.js` | 2026-10-30 | 2026-11-13 |
+| `src/components/pantry/PantryItemRow.js` | 2026-10-30 | 2026-11-13 |
+| `src/components/pantry/PantryStockToolbar.js` | 2026-10-30 | 2026-11-13 |
+| `src/components/pantry/PantryToolbar.js` | 2026-10-30 | 2026-11-13 |
