@@ -1,7 +1,7 @@
 /**
  * src/services/TodayViewService.js (v3.8.1)
  * Pure Today dashboard calculations, daily meal assignment resolvers,
- * ingredient use-up counters, and usage tracking engine.
+ * and usage tracking engine.
  * Quarantined from page DOM queries and direct database operations.
  */
 
@@ -108,78 +108,6 @@ export function calculateMealEatenUpdates(eatenMeals = {}, dateStr, mealType, pe
   }
 
   return { nextEaten, toastMessage };
-}
-
-export function getUseUpEntries(useUpProducts = {}, productsMap = new Map()) {
-  return Object.entries(useUpProducts || {}).map(([productId, entry]) => {
-    const product = productsMap instanceof Map ? productsMap.get(productId) : (productsMap[productId] || null);
-    return {
-      productId,
-      product,
-      quantity: Number(entry?.quantity) || 0,
-      unit: ['g', 'ml', 'item', 'pack', 'unknown'].includes(entry?.unit) ? entry.unit : 'unknown'
-    };
-  }).filter(entry => entry.product);
-}
-
-export function getUseUpAvailableAmount(entry, productAmountResolver = null) {
-  if (!entry || !(entry.quantity > 0) || entry.unit === 'unknown') return null;
-  const product = entry.product;
-  if (entry.unit === 'pack') {
-    const packGrams = productAmountResolver ? productAmountResolver(product, 'pack') : (Number(product?.drainedWeight) || Number(product?.packSize) || 0);
-    return entry.quantity * packGrams;
-  }
-  if (entry.unit === 'item') {
-    const itemGrams = productAmountResolver ? productAmountResolver(product, 'item') : (Number(product?.itemWeight) || 100);
-    return entry.quantity * itemGrams;
-  }
-  return entry.quantity;
-}
-
-export function getRecipeUseUpCoverage(option, entries = [], gramsResolver = null) {
-  const active = option?.variant === 'enhanced' && option.recipe?.enhanced
-    ? { ...option.recipe, ...option.recipe.enhanced, ingredients: option.recipe.enhanced.ingredients || [] }
-    : option?.recipe || option;
-
-  if (!active || !Array.isArray(active.ingredients)) {
-    return { matches: [], matchedCount: 0, otherIngredients: 0, score: 0 };
-  }
-
-  const matches = [];
-  const matchedIngredientKeys = new Set();
-
-  entries.forEach(entry => {
-    let used = 0;
-    (active.ingredients || []).forEach((ing, index) => {
-      const groupId = ing.groupId || ing.group || '';
-      if (entry.product.groupId && groupId === entry.product.groupId) {
-        const g = gramsResolver ? gramsResolver(ing, entry.product) : (Number(ing.qty) || Number(ing.grams) || 0);
-        used += g;
-        matchedIngredientKeys.add(index);
-      }
-    });
-    if (used > 0) {
-      const available = getUseUpAvailableAmount(entry);
-      matches.push({
-        productId: entry.productId,
-        product: entry.product,
-        used,
-        available,
-        remainder: available == null ? null : Math.max(0, available - used)
-      });
-    }
-  });
-
-  const knownUtilisation = matches.reduce((sum, row) => sum + (row.available > 0 ? Math.min(row.used, row.available) / row.available : 0), 0);
-  const otherIngredients = Math.max(0, active.ingredients.length - matchedIngredientKeys.size);
-  const score = (matches.length * 100) + (knownUtilisation * 35) - otherIngredients;
-
-  return {
-    matches,
-    matchedCount: matches.length,
-    otherIngredients,
-    score
-  };
 }
 
 export function getIngredientUsage(bankId, stateData = {}, formatPlanDayLabelFn = null) {
