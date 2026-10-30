@@ -7,6 +7,8 @@
  * - Enhanced variant indicators
  */
 
+import { getFitScoreTierMeta } from '../../utils/fitScoreCalculator.js';
+
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
     '&': '&amp;',
@@ -31,10 +33,7 @@ function escapeAttr(str) {
  * Returns color code corresponding to a Macro Fit score.
  */
 export function getMacroSuitabilityColor(score = 0) {
-  if (score >= 85) return '#10B981'; // Green
-  if (score >= 65) return '#84CC16'; // Lime/Yellow-Green
-  if (score >= 40) return '#F59E0B'; // Amber
-  return '#EF4444'; // Red
+  return getFitScoreTierMeta(score).color;
 }
 
 /**

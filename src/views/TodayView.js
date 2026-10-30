@@ -141,7 +141,12 @@ function renderTodayMealCard(slot, { info: slotInfo, person }, eatenMeals) {
     : person === 'c' ? isEatenC
     : isMealEatenOnDate(eatenMeals, currentDateStr, slot.type, 'both');
   const personLabel = person === 'e' ? ' · Elliott' : person === 'c' ? ' · Chloe' : '';
-  const fitBadge = renderFitScoreBadge(recipe, slot.type, { showLabel: true });
+  const activeProfile = person === 'e' ? 'elliott' : person === 'c' ? 'chloe' : 'everyone';
+  const fitBadge = renderFitScoreBadge(slotInfo.recipe || recipe, slot.type, {
+    activeProfile,
+    variant: slotInfo.variant || 'original',
+    showLabel: true
+  });
 
   const eatenLabel = person === 'both' ? '✓ Both Eaten' : '✓ Eaten';
   const mainTick = `
@@ -167,7 +172,7 @@ function renderTodayMealCard(slot, { info: slotInfo, person }, eatenMeals) {
           <h4 style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:var(--text,#1c1917);">${recipe.name || 'Untitled Recipe'}</h4>
           <div style="font-size:12px;color:var(--muted,#78716c);display:flex;gap:10px;">
             <span>🔥 ${Math.round(recipe.nutrition?.perServing?.cal ?? recipe.macros?.calories ?? 0)} kcal</span>
-            <span>🥩 ${Math.round(recipe.nutrition?.perServing?.prot ?? recipe.macros?.protein ?? 0)}g P</span>
+            <span>💪 ${Math.round(recipe.nutrition?.perServing?.prot ?? recipe.macros?.protein ?? 0)}g P</span>
             ${(recipe.prepTime || recipe.time) ? `<span>⏱️ ${escapeHtml(recipe.prepTime || recipe.time)}</span>` : ''}
           </div>
         </div>

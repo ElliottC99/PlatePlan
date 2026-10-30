@@ -16,6 +16,7 @@ let previewState = {
   instanceId: null,
   currentTab: 'original',
   servingMode: 'both',
+  mealType: 'all',
   targetServes: 2,
   singleServes: 1
 };
@@ -159,8 +160,15 @@ export function renderRecipePreview() {
 
   const isFav = isRecipeVariantFavourite(r.id, previewState.currentTab);
   const types = r.types || [r.type || 'dinner'];
-  const mealType = types[0] || 'dinner';
   const baseServes = Number(activeR?.serves || activeR?.servings || r?.serves || r?.servings || 2) || 2;
+
+  // 1. Calculate Universal Fit Score & Dynamic Macros first (picks best eligible mealType when 'all')
+  const fitResult = typeof calculateMealFitScore === 'function' ? calculateMealFitScore(r, previewState.mealType || 'all', {
+    activeProfile: previewState.servingMode === 'both' ? 'everyone' : previewState.servingMode,
+    variant: isEnh ? 'enhanced' : 'original',
+    portionScaled: true
+  }) : null;
+  const mealType = fitResult?.mealType || types[0] || 'dinner';
 
   // Multiplier for ingredients
   const scaleMultiplier = computeRecipeScaleMultiplier(activeR, previewState.servingMode, previewState.targetServes, previewState.singleServes);
@@ -192,48 +200,24 @@ export function renderRecipePreview() {
     </div>
   ` : '<div style="color:var(--text3);font-size:13px">No method steps specified.</div>';
 
-  // Dual Macro Split Calculations
-  const userPrefs = state.preferences || state.userPrefs || {};
-  const profiles = userPrefs.profiles || {};
-  const eProf = profiles.elliott || profiles.e || { dailyKcal: 1950, dailyProtein: 140 };
-  const cProf = profiles.chloe || profiles.c || { dailyKcal: 1350, dailyProtein: 100 };
-  const eDailyKcal = Number(eProf.dailyKcal) || 1950, cDailyKcal = Number(cProf.dailyKcal) || 1350;
-  const eDailyProt = Number(eProf.dailyProtein) || 140, cDailyProt = Number(cProf.dailyProtein) || 100;
-
-  const eSplits = typeof resolveMealSplitPercentages === 'function' ? resolveMealSplitPercentages(userPrefs, 'elliott') : { calories: { dinner: 35 }, protein: { dinner: 35 } };
-  const cSplits = typeof resolveMealSplitPercentages === 'function' ? resolveMealSplitPercentages(userPrefs, 'chloe') : { calories: { dinner: 35 }, protein: { dinner: 35 } };
-  const eCalPct = Number(eSplits.calories?.[mealType] ?? eSplits.calories?.dinner ?? 35) / 100;
-  const cCalPct = Number(cSplits.calories?.[mealType] ?? cSplits.calories?.dinner ?? 35) / 100;
-  const eProtPct = Number(eSplits.protein?.[mealType] ?? eSplits.protein?.dinner ?? 35) / 100;
-  const cProtPct = Number(cSplits.protein?.[mealType] ?? cSplits.protein?.dinner ?? 35) / 100;
-
-  const eMealTargetKcal = Math.round(eDailyKcal * eCalPct), cMealTargetKcal = Math.round(cDailyKcal * cCalPct);
-  const eMealTargetProt = Math.round(eDailyProt * eProtPct), cMealTargetProt = Math.round(cDailyProt * cProtPct);
+  // 2. Extract live summed macros & targets directly from universal fitResult
+  const eMealTargetKcal = Math.round(fitResult?.details?.elliott?.kcalTarget || 735);
+  const cMealTargetKcal = Math.round(fitResult?.details?.chloe?.kcalTarget || 578);
+  const eMealTargetProt = Math.round(fitResult?.details?.elliott?.proteinTarget || 49);
+  const cMealTargetProt = Math.round(fitResult?.details?.chloe?.proteinTarget || 37);
 
   const totalKcalBudget = eMealTargetKcal + cMealTargetKcal;
-  const eShare = totalKcalBudget > 0 ? (eMealTargetKcal / totalKcalBudget) : 0.59;
-  const cShare = totalKcalBudget > 0 ? (cMealTargetKcal / totalKcalBudget) : 0.41;
+  const eShare = totalKcalBudget > 0 ? (eMealTargetKcal / totalKcalBudget) : 0.56;
+  const cShare = totalKcalBudget > 0 ? (cMealTargetKcal / totalKcalBudget) : 0.44;
   const eSharePct = Math.round(eShare * 100), cSharePct = Math.round(cShare * 100);
 
-  const prefs = typeof getState === 'function' ? (getState()?.userPrefs?.fitScoreParams || {}) : {};
-  const eTargetKcal = prefs.elliott?.calories || 800, cTargetKcal = prefs.chloe?.calories || 600;
-  const eTargetProt = prefs.elliott?.protein || 40, cTargetProt = prefs.chloe?.protein || 30;
-
-  // 1. Calculate Fit Score & Dynamic Macros first
-  const fitResult = typeof calculateMealFitScore === 'function' ? calculateMealFitScore(activeR, mealType, {
-    activeProfile: previewState.servingMode === 'both' ? 'everyone' : previewState.servingMode,
-    variant: isEnh ? 'enhanced' : 'original',
-    portionScaled: true
-  }) : null;
-
-  // 2. Extract live summed macros directly from fitResult
   const singleKcalE = Math.round(fitResult?.details?.elliott?.recipeKcal || 0);
   const singleProtE = Math.round(fitResult?.details?.elliott?.recipeProtein || 0);
   const singleKcalC = Math.round(fitResult?.details?.chloe?.recipeKcal || 0);
   const singleProtC = Math.round(fitResult?.details?.chloe?.recipeProtein || 0);
 
-  const kcalDiffE = singleKcalE - eTargetKcal, protDiffE = singleProtE - eTargetProt;
-  const kcalDiffC = singleKcalC - cTargetKcal, protDiffC = singleProtC - cTargetProt;
+  const kcalDiffE = singleKcalE - eMealTargetKcal, protDiffE = singleProtE - eMealTargetProt;
+  const kcalDiffC = singleKcalC - cMealTargetKcal, protDiffC = singleProtC - cMealTargetProt;
   const eKcal = singleKcalE, cKcal = singleKcalC, eProt = singleProtE, cProt = singleProtC;
 
   const fitScore = Math.round(Number(fitResult?.score) || 0);
@@ -307,28 +291,37 @@ export function renderRecipePreview() {
   }
 }
 
-export function openRecipePreview(recipeId, initialTab = 'original') {
+export function openRecipePreview(recipeId, instanceOrTab = 'original', variantArg = null, targetPerson = null, mealTypeOverride = null) {
   const state = (typeof window !== 'undefined' ? getState() : {}) || {};
   const recipes = Array.isArray(state.recipes) ? state.recipes : [];
   const found = recipes.find(rec => String(rec.id) === String(recipeId));
   if (!found) return;
 
+  const isTwoArgVariant = (instanceOrTab === 'original' || instanceOrTab === 'enhanced') && !variantArg;
+  const resolvedVariant = variantArg === 'enhanced' || (isTwoArgVariant && instanceOrTab === 'enhanced') ? 'enhanced' : 'original';
+  const resolvedInstanceId = isTwoArgVariant ? null : (instanceOrTab || null);
+  const normPerson = String(targetPerson || '').toLowerCase();
+  const resolvedServingMode = (normPerson === 'elliott' || normPerson === 'e') ? 'elliott'
+    : ((normPerson === 'chloe' || normPerson === 'c') ? 'chloe' : 'both');
+
   previewState.recipe = found;
-  previewState.currentTab = initialTab;
-  previewState.servingMode = 'both';
+  previewState.instanceId = resolvedInstanceId;
+  previewState.currentTab = resolvedVariant;
+  previewState.servingMode = resolvedServingMode;
+  previewState.mealType = mealTypeOverride || 'all';
   previewState.targetServes = Number(found.serves ?? 2) || 2;
   previewState.singleServes = 1;
 
   if (typeof window !== 'undefined') {
     window.previewBaseRecipe = found;
-    window.currentViewTab = initialTab;
+    window.currentViewTab = resolvedVariant;
   }
 
   renderRecipePreview();
 }
 
-export function openRecipeModal(recipeId, instanceId, variant, targetPerson) {
-  return openRecipePreview(recipeId, variant || 'original');
+export function openRecipeModal(recipeId, instanceId, variant, targetPerson, mealTypeOverride) {
+  return openRecipePreview(recipeId, instanceId, variant || 'original', targetPerson, mealTypeOverride);
 }
 export const viewRecipe = openRecipePreview;
 

@@ -135,7 +135,7 @@ export function renderRecipeGrid(recipesToRender) {
   const fwNorm = String(fw || 'all').toLowerCase();
   const activeProfile = (fwNorm === 'elliott' || fwNorm === 'chloe') ? fwNorm : 'everyone';
   const sort = document.getElementById('vault-sort')?.value || 'fit-desc';
-  const selectedMealType = ft !== 'all' ? ft : 'dinner';
+  const selectedMealType = ft !== 'all' ? ft : 'all';
 
   const sortedRecipes = getSortedRecipes(recipesToRender || [], sort, selectedMealType, { activeProfile });
 
@@ -164,7 +164,7 @@ export function renderRecipeGrid(recipesToRender) {
       const variant = target.dataset.variant || 'original';
       
       if (action === 'view-recipe') {
-        if (typeof window.viewRecipe === 'function') window.viewRecipe(recipeId, null, variant);
+        if (typeof window.viewRecipe === 'function') window.viewRecipe(recipeId, null, variant, activeProfile, target.dataset.mealType || selectedMealType);
       } else if (action === 'toggle-favorite') {
         if (typeof window.toggleRecipeFavourite === 'function') window.toggleRecipeFavourite(recipeId, e, variant);
       } else if (action === 'open-recipe-actions') {

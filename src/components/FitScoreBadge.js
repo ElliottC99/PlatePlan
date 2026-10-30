@@ -28,9 +28,9 @@ function escapeHtml(str) {
  * @param {Object} [extraOptions={}]
  * @returns {string} HTML string
  */
-export function renderFitScoreBadge(fitScoreOrRecipe, mealTypeOrOptions = 'dinner', extraOptions = {}) {
+export function renderFitScoreBadge(fitScoreOrRecipe, mealTypeOrOptions = 'all', extraOptions = {}) {
   let fitResult = null;
-  const mealType = typeof mealTypeOrOptions === 'string' ? mealTypeOrOptions : 'dinner';
+  const mealType = typeof mealTypeOrOptions === 'string' ? mealTypeOrOptions : 'all';
   const opts = typeof mealTypeOrOptions === 'object' && mealTypeOrOptions !== null
     ? { ...mealTypeOrOptions, ...(extraOptions || {}) }
     : (extraOptions || {});
@@ -45,6 +45,8 @@ export function renderFitScoreBadge(fitScoreOrRecipe, mealTypeOrOptions = 'dinne
       tierLabel: meta.label,
       color: meta.color
     };
+  } else if (opts.precomputedFit && typeof opts.precomputedFit.score === 'number') {
+    fitResult = opts.precomputedFit;
   } else if (fitScoreOrRecipe && typeof fitScoreOrRecipe === 'object') {
     const isComputedResult = typeof fitScoreOrRecipe.score === 'number'
       && (fitScoreOrRecipe.tier || fitScoreOrRecipe.tierLabel || fitScoreOrRecipe.details)
