@@ -4,16 +4,10 @@
  */
 
 function escapeHtml(str) {
-  if (typeof window !== 'undefined' && window.ppEscapeHtml) {
-    return window.ppEscapeHtml(str);
-  }
   return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function escapeAttr(str) {
-  if (typeof window !== 'undefined' && window.ppEscapeAttr) {
-    return window.ppEscapeAttr(str);
-  }
   return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 }
 
