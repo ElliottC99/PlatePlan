@@ -3,7 +3,7 @@
  * Pure template generation service for the Meal Planner Wizard.
  * Isolates HTML string building from the main PlannerView controller.
  */
-import { formatPlanDayLabel } from '../services/TodayViewService.js';
+import { formatTodayDateLabel } from '../services/TodayViewService.js';
 
 /**
  * Renders the Step 2 review screen for the planner wizard.
@@ -19,7 +19,7 @@ export function renderWizardStep2(plan) {
   let cardsHtml = '';
   for (let d = 1; d <= days; d++) {
     // The day card prints "Day N" itself, so it takes only the date, or '' when the day has none.
-    const dateLabel = formatPlanDayLabel(plan, d, { short: true }).replace(/^Day \d+(?: · )?/, '');
+    const dateLabel = formatTodayDateLabel(plan.dayDates?.[d]);
     const daySlots = plan.slots?.[d] || {};
     let eCal = 0, eProt = 0, cCal = 0, cProt = 0;
 

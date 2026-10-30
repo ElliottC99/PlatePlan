@@ -7,7 +7,6 @@
 import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
 import { subscribe } from '../store/store.js';
 import { getState } from '../store/coreState.js';
-import { createCleanEmptyPlanSchema } from '../models/MealPlannerModel.js';
 import { saveCurrentPlan } from '../services/HouseholdRepository.js';
 import * as GeneratorConstraintsForm from '../components/generator/GeneratorConstraintsForm.js';
 import { renderWizardStep2, renderWizardStep3 } from './PlannerRenderService.js';
@@ -27,7 +26,6 @@ import {
 } from '../components/planner/PlannerSwapModalUI.js';
 
 export {
-  createCleanEmptyPlanSchema,
   getShoppingLineStateKey,
   openSwapMealModal,
   setSwapModalFilter,
@@ -123,8 +121,7 @@ export function renderPlannerWizard() {
 }
 
 // The legacy day grid (#plan-content) sits in a hidden wrap in index.html and is no longer drawn:
-// what people see is the wizard. Removed with its banners, slot rows and summary calls
-// (plan 2026-10-30-1508, KTD4).
+// what people see is the wizard.
 export function renderPlan() {
   renderPlannerWizard();
   // Deferred to the plan library piece, which defines it.

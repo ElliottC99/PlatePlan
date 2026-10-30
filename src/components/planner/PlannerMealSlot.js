@@ -238,10 +238,8 @@ export function filterSearchableRecipeSwapModal(query = '') {
     const macros = extractRecipeMacros(activeR, variant);
     const cal = Math.round(macros.cal || 0);
     const prot = Math.round((macros.prot || 0) * 10) / 10;
-    const mealType = getMealTypeFromSlotKey(slotKey) || 'dinner';
-    const person = currentSearchableSwapContext.isShared ? 'everyone' : (slotKey.endsWith('C') ? 'chloe' : 'elliott');
-    const fitRes = calculateMealFitScore(activeR, mealType, { activeProfile: person, variant, portionScaled: true });
-    const fitBadgeHtml = renderFitScoreBadge(fitRes, mealType, { activeProfile: person });
+    const fitRes = calculateMealFitScore(activeR, mealType, { activeProfile, variant, portionScaled: true });
+    const fitBadgeHtml = renderFitScoreBadge(fitRes, mealType, { activeProfile });
 
     const row = document.createElement('div');
     row.className = 'swap-candidate-row';

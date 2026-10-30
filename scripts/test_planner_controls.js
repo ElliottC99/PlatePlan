@@ -238,16 +238,11 @@ function checkPlanKept(plan, label) {
 
 // 6. Step 2 day headings show the date once and "Day N" once.
 {
-  const { formatPlanDayLabel } = await import('../src/services/TodayViewService.js');
   const { renderWizardStep2 } = await import('../src/views/PlannerRenderService.js');
   window.PlannerMealSlot = await import('../src/components/planner/PlannerMealSlot.js');
   window.PlannerDayCard = await import('../src/components/planner/PlannerDayCard.js');
 
   const plan = { days: 2, dayDates: { 1: '2026-11-02' }, slots: { 1: {}, 2: {} } };
-  assert.equal(formatPlanDayLabel(plan, 1, { short: true }), 'Day 1 · Mon 2 Nov', 'short label carries the date');
-  assert.equal(formatPlanDayLabel(plan, 1), 'Day 1 · Mon, 2 Nov 2026', 'long label carries the year');
-  assert.equal(formatPlanDayLabel(plan, 2, { short: true }), 'Day 2', 'a day with no date is "Day N"');
-  assert.equal(formatPlanDayLabel(null, 3), 'Day 3', 'no plan gives "Day N"');
 
   const html = renderWizardStep2(plan);
   const headings = [...html.matchAll(/<div class="dense-plan-day-card">\s*<div[^>]*>\s*<div>([\s\S]*?)<\/div>/g)].map(m => m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());

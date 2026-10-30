@@ -24,18 +24,6 @@ export function parsePlanLocalDate(value) {
   return isNaN(date.getTime()) ? null : date;
 }
 
-// A plan day's label, "Day N · Mon 2 Nov" (short) or "Day N · Mon 2 Nov 2026", or "Day N" when
-// the day has no date. Ported from the old runtime's formatPlanDayLabel.
-export function formatPlanDayLabel(planContext, day, { short = false } = {}) {
-  const base = `Day ${day}`;
-  const date = parsePlanLocalDate(planContext?.dayDates?.[day]);
-  if (!date) return base;
-  const options = short
-    ? { weekday: 'short', day: 'numeric', month: 'short' }
-    : { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
-  return `${base} · ${new Intl.DateTimeFormat('en-GB', options).format(date)}`;
-}
-
 export function getPlatePlanLocalToday() {
   return formatPlanLocalDateValue(new Date());
 }
