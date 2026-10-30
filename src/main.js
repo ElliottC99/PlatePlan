@@ -40,6 +40,7 @@ import './components/recipe/BulkRecipeImporterModal.js';
 import './components/recipe/RecipeWizardModal.js';
 import './components/recipe/RecipeAuditModal.js';
 import './components/shell/OfflineBanner.js';
+import './components/shell/ScrollToTopButton.js';
 
 import * as MealPlanGeneratorService from './services/MealPlanGeneratorService.js';
 import * as RecipeDetailModalService from './services/RecipeDetailModalService.js';

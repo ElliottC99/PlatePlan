@@ -111,7 +111,7 @@ if (typeof window !== 'undefined') {
     tooltip.innerHTML = `
       <strong style="display:block;margin-bottom:4px">${label}</strong>
       <div>🔥 ${cal} kcal</div>
-      <div style="color:var(--blue)">🍗 ${prot}g Protein</div>
+      <div style="color:var(--blue)">💪 ${prot}g Protein</div>
       <div style="color:var(--purple)">🍞 ${carb}g Carbs</div>
       <div style="color:var(--amber)">🥑 ${fat}g Fat</div>
     `;

@@ -186,10 +186,21 @@ export async function hydrateHouseholdData(options = {}) {
 
       const currentStoreState = (typeof window !== 'undefined' && window.Store?.getState?.()) || {};
 
-      if (Array.isArray(recipes) && recipes.length > 0) {
-        setRecipes(recipes);
-      } else if (!currentStoreState.recipes || currentStoreState.recipes.length === 0) {
-        setRecipes([]);
+      // Hydrate Preferences FIRST before recipes/plan so initial renders use real user targets & tapering rules (zero score flicker)
+      if (typeof window !== 'undefined' && getState()) {
+        const docData = sanitizedPrefs || {};
+        const userPrefs = docData.userPrefs || docData;
+        getState().userPrefs = {
+          ...(getState().userPrefs || {}),
+          ...userPrefs,
+          favouriteVariantIds: Array.isArray(userPrefs.favouriteVariantIds) ? userPrefs.favouriteVariantIds : (getState().userPrefs?.favouriteVariantIds || []),
+          favourites: Array.isArray(userPrefs.favourites) ? userPrefs.favourites : (getState().userPrefs?.favourites || [])
+        };
+        getState().preferences = finalPrefs;
+      }
+
+      if (finalPrefs && Object.keys(finalPrefs).length > 0) {
+        setPreferences(finalPrefs);
       }
 
       if (Array.isArray(ingredients) && ingredients.length > 0) {
@@ -204,8 +215,10 @@ export async function hydrateHouseholdData(options = {}) {
         setProducts([]);
       }
 
-      if (finalPrefs && Object.keys(finalPrefs).length > 0) {
-        setPreferences(finalPrefs);
+      if (Array.isArray(recipes) && recipes.length > 0) {
+        setRecipes(recipes.map(cleanLegacyMacros));
+      } else if (!currentStoreState.recipes || currentStoreState.recipes.length === 0) {
+        setRecipes([]);
       }
 
       if (plan) {
@@ -274,7 +287,7 @@ export async function hydrateHouseholdData(options = {}) {
       }
 
       setupRealtimeSubscriptions();
-      saveStateCache();
+      saveStateCache(getState());
 
       runDeferredMaintenance(preferencesData, mergedCategories, mutated, saveCategories);
 
@@ -328,6 +341,18 @@ export function setupRealtimeSubscriptions() {
     }
 
     try {
+      unsubs.push(subscribePreferences((prefs) => {
+        if (prefs) {
+          const sanitized = sanitizePreferences(prefs);
+          if (getState()) {
+            getState().userPrefs = { ...(getState().userPrefs || {}), ...(sanitized.userPrefs || sanitized) };
+            getState().preferences = sanitized;
+            getState().settings = { ...(getState().settings || {}), ...(sanitized.settings || {}) };
+          }
+          setPreferences(sanitized);
+        }
+      }));
+
       unsubs.push(subscribeRecipes((recipes) => {
         setRecipes((recipes || []).map(cleanLegacyMacros));
         if (getState()) getState().recipes = recipes;
@@ -343,16 +368,6 @@ export function setupRealtimeSubscriptions() {
         const normProds = (products || []).map(normalizeProductRecord);
         setProducts(normProds);
         if (getState()) getState().products = normProds;
-      }));
-
-      unsubs.push(subscribePreferences((prefs) => {
-        if (prefs) {
-          const sanitized = sanitizePreferences(prefs);
-          setPreferences(sanitized);
-          if (getState()) {
-            getState().settings = { ...(getState().settings || {}), ...(sanitized.settings || {}) };
-          }
-        }
       }));
 
       unsubs.push(subscribeCurrentPlan((plan) => {

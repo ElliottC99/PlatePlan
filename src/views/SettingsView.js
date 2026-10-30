@@ -9,6 +9,7 @@ import store from "../store/store.js";
 import { savePreferences } from '../services/HouseholdRepository.js';
 import { hydrateHouseholdData } from '../services/HydrationService.js';
 import { renderProfileAllocationCard } from '../components/settings/ProfileAllocationCard.js';
+import { renderFitScoreTaperingCard, readFitScoreParamsFromDOM, bindFitScoreTaperingListeners } from '../components/settings/FitScoreTaperingCard.js';
 import { renderDietaryExclusionManager } from '../components/settings/DietaryExclusionManager.js';
 import { renderHouseholdSyncCard } from '../components/settings/HouseholdSyncCard.js';
 import { renderSystemDisplayCard, renderSettingsContainer } from '../components/profile/ProfileSettingsModal.js';
@@ -155,11 +156,13 @@ export function renderSettingsView() {
   const householdHtml = renderHouseholdSyncCard(settings);
   const dietaryHtml = renderDietaryExclusionManager(prefs, settings);
   const profileHtml = renderProfileAllocationCard(prefs);
+  const taperingHtml = renderFitScoreTaperingCard(prefs);
   const systemHtml = renderSystemDisplayCard(settings.theme || 'system', 'v3.39.6 (ES6 Modern)');
   const macrosHtml = renderMacroTargetsForm(prefs.macroTargets);
   const fallbackHtml = renderFallbackProductsTable(prefs.fallbackProducts);
 
-  container.innerHTML = renderSettingsContainer(householdHtml, dietaryHtml, profileHtml, systemHtml, macrosHtml, fallbackHtml);
+  container.innerHTML = renderSettingsContainer(householdHtml, dietaryHtml, `${profileHtml}${taperingHtml}`, systemHtml, macrosHtml, fallbackHtml);
+  bindFitScoreTaperingListeners(container);
 
   // Attach Recipe Audit modal listener
   const recipeAuditBtn = container.querySelector('#pp-recipe-audit-btn');
@@ -256,6 +259,11 @@ export function renderSettingsView() {
 
       getState().userPrefs.nutritionTargets = nutritionTargets;
       getState().preferences.nutritionTargets = nutritionTargets;
+
+      const fitScoreParams = readFitScoreParamsFromDOM(container);
+      getState().userPrefs.fitScoreParams = fitScoreParams;
+      getState().preferences.fitScoreParams = fitScoreParams;
+      if (getState().prefs) getState().prefs.fitScoreParams = fitScoreParams;
 
       getState().settings = getState().settings || {};
       const newTheme = container.querySelector('#pp-setting-theme')?.value || 'system';

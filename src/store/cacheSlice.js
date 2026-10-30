@@ -4,6 +4,7 @@
  */
 
 import { DB_VERSION } from '../config/systemConfig.js';
+import { getState } from './coreState.js';
 
 const DB_NAME = 'PlatePlanDB';
 const STORE_NAME = 'StateStore';
@@ -88,26 +89,34 @@ export async function loadStateCache() {
 }
 
 let saveTimer = null;
-export function saveStateCache(state) {
+export function saveStateCache(passedState) {
+  const coreState = (typeof getState === 'function' ? getState() : null) || {};
+  const state = (passedState && typeof passedState === 'object')
+    ? { ...coreState, ...passedState }
+    : coreState;
   if (!state || typeof state !== 'object' || !state.recipes) {
     return;
   }
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     try {
-      if (!state || typeof state !== 'object' || !state.recipes) {
+      const latestCore = (typeof getState === 'function' ? getState() : null) || {};
+      const fullState = { ...latestCore, ...state };
+      if (!fullState || typeof fullState !== 'object' || !fullState.recipes) {
         return;
       }
       const payload = {
-        recipes: state.recipes || [],
-        ingredients: state.ingredients || [],
-        products: state.products || [],
-        categories: state.categories || [],
-        preferences: state.preferences ? { nutritionTargets: state.preferences.nutritionTargets } : null,
-        userPrefs: state.userPrefs || {},
-        settings: state.settings || {},
-        currentPlan: state.currentPlan || null,
-        shoppingList: state.shoppingList || [],
+        recipes: fullState.recipes || [],
+        ingredients: fullState.ingredients || [],
+        products: fullState.products || [],
+        categories: fullState.categories || [],
+        preferences: fullState.preferences || latestCore.preferences || fullState.userPrefs || null,
+        userPrefs: (fullState.userPrefs && Object.keys(fullState.userPrefs).length > 0)
+          ? fullState.userPrefs
+          : (latestCore.userPrefs || fullState.preferences || {}),
+        settings: fullState.settings || latestCore.settings || {},
+        currentPlan: fullState.currentPlan || latestCore.currentPlan || null,
+        shoppingList: fullState.shoppingList || latestCore.shoppingList || [],
         cachedAt: Date.now()
       };
       const db = await openIDB();
@@ -145,8 +154,10 @@ export async function initStoreCache(targetState) {
       targetState.ingredients = Array.isArray(initialCache.ingredients) ? initialCache.ingredients : [];
       targetState.products = Array.isArray(initialCache.products) ? initialCache.products : [];
       targetState.categories = Array.isArray(initialCache.categories) ? initialCache.categories : [];
-      targetState.preferences = initialCache.preferences || null;
-      targetState.userPrefs = initialCache.userPrefs || {};
+      targetState.preferences = initialCache.preferences || initialCache.userPrefs || null;
+      targetState.userPrefs = (initialCache.userPrefs && Object.keys(initialCache.userPrefs).length > 0)
+        ? initialCache.userPrefs
+        : (initialCache.preferences || {});
       targetState.settings = initialCache.settings || {};
       targetState.currentPlan = initialCache.currentPlan || null;
       targetState.shoppingList = Array.isArray(initialCache.shoppingList) ? initialCache.shoppingList : [];

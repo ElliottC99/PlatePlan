@@ -7,18 +7,22 @@ import store from "../store/store.js";
  */
 
 import { saveCurrentPlan } from '../services/HouseholdRepository.js';
-import { DEFAULT_SPLITS, getFitScoreTierMeta } from './fitScoreWeights.js';
+import { DEFAULT_SPLITS, DEFAULT_FIT_SCORE_PARAMS, resolveFitScoreParams, getFitScoreTierMeta } from './fitScoreWeights.js';
 import { 
   extractRecipeMacros, 
   sweepRecipeMacroQuality, 
   calculateCalorieScore, 
-  calculateProteinScore 
+  calculateProteinScore,
+  getActiveFitScoreParams
 } from './macroScoringUtils.js';
 
 export { 
   extractRecipeMacros, 
   sweepRecipeMacroQuality, 
   getFitScoreTierMeta,
+  DEFAULT_FIT_SCORE_PARAMS,
+  resolveFitScoreParams,
+  getActiveFitScoreParams,
   calculateCalorieScore,
   calculateProteinScore
 };
@@ -54,37 +58,57 @@ export const getTarget = (profile, type, meal) => {
 };
 
 function resolveHouseholdProfiles(options = {}) {
-  const winState = typeof window !== 'undefined' ? (getState()) : {};
+  const winState = typeof window !== 'undefined' ? (getState() || {}) : {};
   const rawProfiles = options?.userPrefs?.profiles
-    || winState.prefs?.profiles
+    || options?.preferences?.profiles
     || winState.preferences?.profiles
     || winState.userPrefs?.profiles
+    || winState.prefs?.profiles
     || {};
-  const legacyPrefs = options?.userPrefs || winState.prefs || winState.preferences || winState.userPrefs || {};
+  const legacyPrefs = options?.userPrefs || options?.preferences || winState.preferences || winState.userPrefs || winState.prefs || {};
+  const nutritionTargets = legacyPrefs.nutritionTargets || winState.preferences?.nutritionTargets || winState.userPrefs?.nutritionTargets || {};
 
   const eRaw = rawProfiles.elliott || rawProfiles.e || {};
   const cRaw = rawProfiles.chloe || rawProfiles.c || {};
+  const eTargets = nutritionTargets.elliott || {};
+  const cTargets = nutritionTargets.chloe || {};
 
   const elliott = {
+    ...eTargets,
     ...eRaw,
-    dailyKcal: Number(eRaw.dailyKcal ?? legacyPrefs.elliottCal ?? legacyPrefs.ecal ?? 2100) || 2100,
-    dailyProtein: Number(eRaw.dailyProtein ?? legacyPrefs.elliottProt ?? legacyPrefs.eprot ?? 140) || 140
+    dailyKcal: Number(eRaw.dailyKcal ?? eTargets.dailyKcal ?? legacyPrefs.elliottCal ?? legacyPrefs.ecal ?? 2100) || 2100,
+    dailyProtein: Number(eRaw.dailyProtein ?? eTargets.dailyProtein ?? legacyPrefs.elliottProt ?? legacyPrefs.eprot ?? 140) || 140
   };
   const chloe = {
+    ...cTargets,
     ...cRaw,
-    dailyKcal: Number(cRaw.dailyKcal ?? legacyPrefs.chloeCal ?? legacyPrefs.ccal ?? 1650) || 1650,
-    dailyProtein: Number(cRaw.dailyProtein ?? legacyPrefs.chloeProt ?? legacyPrefs.cprot ?? 105) || 105
+    dailyKcal: Number(cRaw.dailyKcal ?? cTargets.dailyKcal ?? legacyPrefs.chloeCal ?? legacyPrefs.ccal ?? 1650) || 1650,
+    dailyProtein: Number(cRaw.dailyProtein ?? cTargets.dailyProtein ?? legacyPrefs.chloeProt ?? legacyPrefs.cprot ?? 105) || 105
   };
 
   return { elliott, chloe };
 }
 
 /**
- * Calculates meal fit score for a recipe and meal type across active profile or shared household.
+ * Extracts normalized eligible meal types for a recipe (e.g. ['lunch', 'dinner']).
  */
-export function calculateMealFitScore(recipe, mealType = 'dinner', options = {}) {
+export function getEligibleMealTypes(recipe) {
   const r = recipe?.recipe || recipe || {};
-  const requestedVariant = options.variant || (r.enhanced ? 'enhanced' : 'original');
+  const rawList = Array.isArray(r.types) && r.types.length > 0
+    ? r.types
+    : (Array.isArray(r.mealSuitability) && r.mealSuitability.length > 0
+      ? r.mealSuitability
+      : [r.type || 'dinner']);
+  const cleaned = rawList
+    .map(t => String(t || '').toLowerCase().trim())
+    .map(t => (t === 'snacking' ? 'snack' : t))
+    .filter(Boolean);
+  return cleaned.length > 0 ? Array.from(new Set(cleaned)) : ['dinner'];
+}
+
+function calculateSingleMealTypeFitScore(recipe, mealType = 'dinner', options = {}) {
+  const r = recipe?.recipe || recipe || {};
+  const requestedVariant = options.variant || (r._variant === 'enhanced' ? 'enhanced' : 'original');
   const macros = extractRecipeMacros(r, requestedVariant);
   const totalKcal = macros.cal;
   const totalProt = macros.prot;
@@ -96,6 +120,8 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
       tierIcon: '🔴',
       tierLabel: 'Missing Macros',
       color: '#ef4444',
+      mealType: String(mealType || 'dinner').toLowerCase(),
+      variant: requestedVariant,
       isMissingMacros: true,
       error: 'Missing Calorie/Protein Data'
     };
@@ -106,6 +132,9 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
   const activeProfile = (rawProfile === 'both' || rawProfile === 'all') ? 'everyone' : rawProfile;
 
   const { elliott: profileE, chloe: profileC } = resolveHouseholdProfiles(options);
+  const scoringParams = getActiveFitScoreParams(
+    options.fitScoreParams || options.userPrefs?.fitScoreParams || options.preferences?.fitScoreParams || null
+  );
 
   const targetCal_E = getTarget(profileE, 'kcal', normMeal);
   const targetProt_E = getTarget(profileE, 'protein', normMeal);
@@ -130,13 +159,16 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
   const actualKcalC = totalKcal * multC;
   const actualProtC = totalProt * multC;
 
-  const calScoreE = calculateCalorieScore(actualKcalE, targetCal_E);
-  const protScoreE = calculateProteinScore(actualProtE, targetProt_E);
-  const calScoreC = calculateCalorieScore(actualKcalC, targetCal_C);
-  const protScoreC = calculateProteinScore(actualProtC, targetProt_C);
+  const calScoreE = calculateCalorieScore(actualKcalE, targetCal_E, scoringParams);
+  const protScoreE = calculateProteinScore(actualProtE, targetProt_E, scoringParams);
+  const calScoreC = calculateCalorieScore(actualKcalC, targetCal_C, scoringParams);
+  const protScoreC = calculateProteinScore(actualProtC, targetProt_C, scoringParams);
 
-  const fitScoreE = Math.round((calScoreE * 0.5) + (protScoreE * 0.5));
-  const fitScoreC = Math.round((calScoreC * 0.5) + (protScoreC * 0.5));
+  const calWeight = scoringParams.calorieWeight ?? 0.5;
+  const protWeight = scoringParams.proteinWeight ?? 0.5;
+
+  const fitScoreE = Math.round((calScoreE * calWeight) + (protScoreE * protWeight));
+  const fitScoreC = Math.round((calScoreC * calWeight) + (protScoreC * protWeight));
 
   const hasTargetE = targetCal_E > 0 && targetProt_E > 0;
   const hasTargetC = targetCal_C > 0 && targetProt_C > 0;
@@ -163,6 +195,8 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
   const details = {
     elliott: {
       score: fitScoreE,
+      calScore: Math.round(calScoreE),
+      protScore: Math.round(protScoreE),
       tier: metaE.tier,
       tierIcon: metaE.icon,
       tierLabel: metaE.label,
@@ -177,6 +211,8 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
     },
     chloe: {
       score: fitScoreC,
+      calScore: Math.round(calScoreC),
+      protScore: Math.round(protScoreC),
       tier: metaC.tier,
       tierIcon: metaC.icon,
       tierLabel: metaC.label,
@@ -198,9 +234,31 @@ export function calculateMealFitScore(recipe, mealType = 'dinner', options = {})
     tierLabel: finalMeta.label,
     color: finalMeta.color,
     activeProfile,
+    variant: requestedVariant,
     mealType: normMeal,
     details
   };
+}
+
+/**
+ * Calculates meal fit score for a recipe and meal type across active profile or shared household.
+ * When mealType is 'all', 'best', or omitted/null, evaluates all of the recipe's eligible meal types
+ * and returns the highest Fit Score result.
+ */
+export function calculateMealFitScore(recipe, mealType = 'all', options = {}) {
+  const normRequested = String(mealType || 'all').toLowerCase().trim();
+  if (normRequested === 'all' || normRequested === 'best' || options.useBestMealType) {
+    const eligible = getEligibleMealTypes(recipe);
+    let bestResult = null;
+    for (const candidateType of eligible) {
+      const candidateRes = calculateSingleMealTypeFitScore(recipe, candidateType, options);
+      if (!bestResult || (candidateRes.score > bestResult.score)) {
+        bestResult = candidateRes;
+      }
+    }
+    return bestResult || calculateSingleMealTypeFitScore(recipe, 'dinner', options);
+  }
+  return calculateSingleMealTypeFitScore(recipe, normRequested, options);
 }
 
 export function calculateRecipeFit(recipe, mealType = 'dinner', options = {}) {

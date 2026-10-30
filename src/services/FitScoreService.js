@@ -10,6 +10,7 @@ import {
   calculateRecipeFit,
   calculateCalorieScore,
   calculateProteinScore,
+  getActiveFitScoreParams,
   extractRecipeMacros,
   sweepRecipeMacroQuality,
   getFitScoreTierMeta,
@@ -34,11 +35,12 @@ export function getVaultTargetMacros(mealType = 'dinner', userPrefs = null) {
   return modernGetVaultTargetMacros(mealType, userPrefs);
 }
 
-export function computeProfileFitScore(actualCal, targetCal, actualProt, targetProt) {
+export function computeProfileFitScore(actualCal, targetCal, actualProt, targetProt, customParams = null) {
   if (!targetCal || targetCal <= 0 || !targetProt || targetProt <= 0 || !actualCal || actualCal <= 0 || !actualProt || actualProt <= 0) return 0;
-  const calScore = calculateCalorieScore(actualCal, targetCal);
-  const protScore = calculateProteinScore(actualProt, targetProt);
-  return Math.round((calScore * 0.5) + (protScore * 0.5));
+  const params = getActiveFitScoreParams(customParams);
+  const calScore = calculateCalorieScore(actualCal, targetCal, params);
+  const protScore = calculateProteinScore(actualProt, targetProt, params);
+  return Math.round((calScore * (params.calorieWeight ?? 0.5)) + (protScore * (params.proteinWeight ?? 0.5)));
 }
 
 export function calculateMacroFitTierAndScore(recipe, mealType = 'dinner', protAct, protTgt, context = {}) {
@@ -111,9 +113,9 @@ export function attachComputedFitScores(recipes = [], targetSlot = 'dinner', con
  * - Maps 'name-desc' to Alphabetical Z-A
  * - Any other value falls back to Descending (fit score)
  */
-export function getSortedRecipes(recipes = [], sortOption = 'fit-desc', activeSlotTargets = 'dinner', context = {}) {
+export function getSortedRecipes(recipes = [], sortOption = 'fit-desc', activeSlotTargets = 'all', context = {}) {
   if (!Array.isArray(recipes)) return [];
-  const slot = typeof activeSlotTargets === 'string' ? activeSlotTargets : (activeSlotTargets?.mealType || 'dinner');
+  const slot = typeof activeSlotTargets === 'string' ? activeSlotTargets : (activeSlotTargets?.mealType || 'all');
   const activeProfile = context.activeProfile || 'everyone';
 
   const scoredRecipes = recipes.map(item => {
@@ -125,15 +127,18 @@ export function getSortedRecipes(recipes = [], sortOption = 'fit-desc', activeSl
       };
     }
     const baseRecipe = item.recipe || item;
-    const scoreOrig = calculateMealFitScore(baseRecipe, slot, { ...context, activeProfile, variant: item.variant || 'original', portionScaled: true }).score;
+    const resOrig = calculateMealFitScore(baseRecipe, slot, { ...context, activeProfile, variant: item.variant || 'original', portionScaled: true });
+    const scoreOrig = resOrig.score;
     const hasEnh = !item.variant && !!(baseRecipe.enhanced);
-    const scoreEnh = hasEnh
-      ? calculateMealFitScore(baseRecipe, slot, { ...context, activeProfile, variant: 'enhanced', portionScaled: true }).score
-      : scoreOrig;
+    const resEnh = hasEnh
+      ? calculateMealFitScore(baseRecipe, slot, { ...context, activeProfile, variant: 'enhanced', portionScaled: true })
+      : resOrig;
+    const scoreEnh = resEnh.score;
 
     return {
       ...item,
-      _computedFitScore: Math.max(scoreOrig, scoreEnh)
+      _computedFitScore: Math.max(scoreOrig, scoreEnh),
+      _bestMealType: scoreEnh > scoreOrig ? resEnh.mealType : resOrig.mealType
     };
   });
 
@@ -141,7 +146,7 @@ export function getSortedRecipes(recipes = [], sortOption = 'fit-desc', activeSl
 
   return scoredRecipes.sort((a, b) => {
     if (normSort === 'needs-work' || normSort === 'fit-asc') {
-      return (a._computedFitScore ?? a.fitScore ?? 0) - (b._computedFitScore ?? b.fitScore ?? 0);
+      return (a._computedFitScore ?? 0) - (b._computedFitScore ?? 0);
     }
     if (normSort === 'name' || normSort === 'name-asc') {
       return String(a.label || a.title || a.name || '').localeCompare(String(b.label || b.title || b.name || ''));
@@ -150,7 +155,7 @@ export function getSortedRecipes(recipes = [], sortOption = 'fit-desc', activeSl
       return String(b.label || b.title || b.name || '').localeCompare(String(a.label || a.title || a.name || ''));
     }
     // 'best-fit', 'fit-desc' and any unrecognised value
-    return (b._computedFitScore ?? b.fitScore ?? 0) - (a._computedFitScore ?? a.fitScore ?? 0);
+    return (b._computedFitScore ?? 0) - (a._computedFitScore ?? 0);
   });
 }
 
