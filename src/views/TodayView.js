@@ -167,7 +167,7 @@ function renderTodayMealCard(slot, { info: slotInfo, person }, eatenMeals) {
           <h4 style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:var(--text,#1c1917);">${recipe.name || 'Untitled Recipe'}</h4>
           <div style="font-size:12px;color:var(--muted,#78716c);display:flex;gap:10px;">
             <span>🔥 ${Math.round(recipe.nutrition?.perServing?.cal ?? recipe.macros?.calories ?? 0)} kcal</span>
-            <span>🥩 ${Math.round(recipe.nutrition?.perServing?.prot ?? recipe.macros?.protein ?? 0)}g P</span>
+            <span>💪 ${Math.round(recipe.nutrition?.perServing?.prot ?? recipe.macros?.protein ?? 0)}g P</span>
             ${(recipe.prepTime || recipe.time) ? `<span>⏱️ ${escapeHtml(recipe.prepTime || recipe.time)}</span>` : ''}
           </div>
         </div>
