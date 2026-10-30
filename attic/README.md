@@ -38,3 +38,6 @@ A file may be deleted after two weeks of normal use on both phones with no relat
 | `src/components/pantry/PantryItemRow.js` | 2026-10-30 | 2026-11-13 |
 | `src/components/pantry/PantryStockToolbar.js` | 2026-10-30 | 2026-11-13 |
 | `src/components/pantry/PantryToolbar.js` | 2026-10-30 | 2026-11-13 |
+| `src/repositories/InventoryRepository.js` | 2026-10-30 | 2026-11-13 |
+| `src/services/InventoryService.js` | 2026-10-30 | 2026-11-13 |
+| `src/store/inventorySlice.js` | 2026-10-30 | 2026-11-13 |
