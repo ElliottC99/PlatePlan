@@ -37,8 +37,6 @@ import * as VaultGridUI from './vault/VaultGridUI.js';
 import * as RecipeDetailModalUI from './recipe/RecipeDetailModalUI.js';
 import * as RecipeEditorModalUI from './recipe/RecipeEditorModalUI.js';
 import * as ShoppingSubstUI from './shopping/ShoppingSubstUI.js';
-import * as UseUpEditorUI from './pantry/UseUpEditorUI.js';
-import * as UseUpFinderModalUI from './pantry/UseUpFinderModalUI.js';
 import * as PlannerGridUI from './planner/PlannerGridUI.js';
 import * as PlannerModalsUI from './planner/PlannerModalsUI.js';
 import * as PlannerWizardUI from './planner/PlannerWizardUI.js';
@@ -64,8 +62,8 @@ export const registeredComponents = {
   GeneratorConstraintsForm, GeneratorCandidateDrawer, RecipeNutritionCard, RecipePortionScaler,
   RecipeCostBreakdown, MacroTrendChart, NutriScoreBadgeCard, WeeklySummaryToolbar,
   VaultFilterToolbar, VaultRecipeCard, VaultGridContainer, VaultGridUI,
-  RecipeDetailModalUI, RecipeEditorModalUI, ShoppingSubstUI, UseUpEditorUI,
-  UseUpFinderModalUI, PlannerGridUI, PlannerModalsUI, PlannerWizardUI, PlannerSwapModalUI,
+  RecipeDetailModalUI, RecipeEditorModalUI, ShoppingSubstUI,
+  PlannerGridUI, PlannerModalsUI, PlannerWizardUI, PlannerSwapModalUI,
   PrepStepCard, PrepContainerPlanner, PrepSummaryToolbar, ProfileAllocationCard,
   DietaryExclusionManager, HouseholdSyncCard, SettingsMacroUI, SettingsExclusionsUI,
   SettingsHouseholdUI, HeaderUI, NavigationUI

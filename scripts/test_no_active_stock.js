@@ -7,7 +7,6 @@
  *   - "inventory" in any case, apart from the allowlisted lines below;
  *   - a stock use-up flag (isUseUp) or a stock store action;
  *   - the removed useup-desc / pantry-desc Vault sorts.
- * Product-based use-up names (useUpProducts, UseUpFinderModalUI) are allowed.
  * Run: node scripts/test_no_active_stock.js
  */
 
@@ -87,10 +86,6 @@ check('a Firestore inventory collection and a state.inventory read are reported'
 
 check('a removed stock sort is reported', () => {
   assert.equal(fixture('<option value="useup-desc">Use-Up First</option>').length, 1);
-});
-
-check('product-based use-up names are not reported', () => {
-  assert.deepEqual(fixture('const useUpProducts = plan.useUpProducts || {};\nimport * as UseUpFinderModalUI from "./UseUpFinderModalUI.js";'), []);
 });
 
 check('the allowlisted cache-clearing line passes only in its own file', () => {
