@@ -7,6 +7,8 @@ import { getState } from '../../store/coreState.js';
 
 import { calculateMealFitScore, extractRecipeMacros } from '../../utils/fitScoreCalculator.js';
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
+import { getMealTypeFromSlotKey, makePlanSlot } from '../../services/MealPlanGeneratorService.js';
+import { saveCurrentPlan } from '../../services/HouseholdRepository.js';
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -165,8 +167,7 @@ export function ensureSearchableRecipeSwapModalDom() {
 export function openSearchableRecipeSwapModal(day, slotKey, isShared = false) {
   currentSearchableSwapContext = { day, slotKey, isShared };
   const modal = ensureSearchableRecipeSwapModalDom();
-  const getMealType = window.getMealTypeFromSlotKey || (k => k.includes('breakfast') ? 'breakfast' : k.includes('lunch') ? 'lunch' : 'dinner');
-  const mealType = getMealType(slotKey) || 'dinner';
+  const mealType = getMealTypeFromSlotKey(slotKey) || 'dinner';
   const person = isShared ? 'Both (Elliott & Chloe)' : (slotKey.endsWith('C') ? 'Chloe' : 'Elliott');
 
   const titleEl = document.getElementById('swap-modal-title');
@@ -192,10 +193,10 @@ export function filterSearchableRecipeSwapModal(query = '') {
 
   const { day, slotKey, isShared } = currentSearchableSwapContext;
   const stateObj = getState();
-  const currentSlot = stateObj.plan?.slots?.[day]?.[slotKey];
-  const currentId = currentSlot?.id;
+  const currentSlot = stateObj.currentPlan?.slots?.[day]?.[slotKey];
+  const currentId = currentSlot?.recipeId || currentSlot?.id;
   const cleanQ = (query || '').toLowerCase().trim();
-  const mealType = window.getMealTypeFromSlotKey?.(slotKey) || (slotKey.includes('breakfast') ? 'breakfast' : slotKey.includes('lunch') ? 'lunch' : 'dinner');
+  const mealType = getMealTypeFromSlotKey(slotKey) || 'dinner';
   const activeProfile = isShared ? 'everyone' : (slotKey.endsWith('C') ? 'chloe' : 'elliott');
 
   const allRecipes = Array.isArray(stateObj.recipes) ? stateObj.recipes : [];
@@ -237,7 +238,7 @@ export function filterSearchableRecipeSwapModal(query = '') {
     const macros = extractRecipeMacros(activeR, variant);
     const cal = Math.round(macros.cal || 0);
     const prot = Math.round((macros.prot || 0) * 10) / 10;
-    const mealType = window.getMealTypeFromSlotKey?.(slotKey) || (slotKey.includes('breakfast') ? 'breakfast' : slotKey.includes('lunch') ? 'lunch' : 'dinner');
+    const mealType = getMealTypeFromSlotKey(slotKey) || 'dinner';
     const person = currentSearchableSwapContext.isShared ? 'everyone' : (slotKey.endsWith('C') ? 'chloe' : 'elliott');
     const fitRes = calculateMealFitScore(activeR, mealType, { activeProfile: person, variant, portionScaled: true });
     const fitBadgeHtml = renderFitScoreBadge(fitRes, mealType, { activeProfile: person });
@@ -259,30 +260,31 @@ export function filterSearchableRecipeSwapModal(query = '') {
   });
 }
 
+// Step 2 "Swap ▾" → "Select & Swap". Puts the chosen recipe in the slot (both people's for a
+// shared meal) on the loaded plan and saves the plan as a whole document.
 export function selectAndSwapRecipe(recipeId, variant = 'original') {
-  const stateObj = getState();
-  if (!currentSearchableSwapContext || !stateObj?.plan?.slots) return;
+  const plan = getState()?.currentPlan;
+  if (!currentSearchableSwapContext || !plan?.slots) return;
   const { day, slotKey, isShared } = currentSearchableSwapContext;
-  if (!stateObj.plan.slots[day]) stateObj.plan.slots[day] = {};
+  if (!plan.slots[day]) plan.slots[day] = {};
 
-  const makeSlot = window.makePlanSlot || ((id, v) => ({ id, variant: v }));
   if (isShared) {
-    const getMealType = window.getMealTypeFromSlotKey || (k => k.includes('breakfast') ? 'breakfast' : k.includes('lunch') ? 'lunch' : 'dinner');
-    const meal = getMealType(slotKey) || 'dinner';
-    stateObj.plan.slots[day][meal + 'E'] = makeSlot(recipeId, variant);
-    stateObj.plan.slots[day][meal + 'C'] = makeSlot(recipeId, variant);
+    const meal = getMealTypeFromSlotKey(slotKey) || 'dinner';
+    // One cooking event for both people, as generateMealPlan builds a shared meal.
+    const slot = makePlanSlot(recipeId, variant);
+    plan.slots[day][meal + 'E'] = slot;
+    plan.slots[day][meal + 'C'] = { ...slot };
   } else {
-    stateObj.plan.slots[day][slotKey] = makeSlot(recipeId, variant);
+    plan.slots[day][slotKey] = makePlanSlot(recipeId, variant);
   }
 
-  if (window.calculatePlanScore) stateObj.plan.score = window.calculatePlanScore(stateObj.plan);
-  if (window.findMealPrepSuggestions) {
-    const autoPrepSuggestions = window.findMealPrepSuggestions(stateObj.plan);
-    stateObj.plan.mealPrepGroups = autoPrepSuggestions.map(s => ({ key: s.key, recipeId: s.recipeId, variant: s.variant, mealKey: s.mealKey, peopleKey: s.peopleKey, days: s.days }));
-  }
-  if (window.saveState) window.saveState();
+  const toast = (m, type) => { if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(m, type); };
+  const failed = err => {
+    if (err) console.error('[PlannerMealSlot] Failed to save the swapped meal:', err);
+    toast('Failed to save the swap. Check network connection.', 'error');
+  };
+  saveCurrentPlan(plan).then(saved => { if (!saved) failed(); }).catch(failed);
   closeSearchableRecipeSwapModal();
-  if (window.renderPlannerWizard) window.renderPlannerWizard();
-  if (window.showPlatePlanToast) window.showPlatePlanToast('Recipe swapped & Fit Score updated! ✓');
+  if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
+  toast('Recipe swapped ✓');
 }
-

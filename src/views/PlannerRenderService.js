@@ -4,6 +4,7 @@
  * Isolates HTML string building from the main PlannerView controller.
  */
 import { getState } from '../store/coreState.js';
+import { formatPlanDayLabel } from '../services/TodayViewService.js';
 
 /**
  * Renders the Step 2 review screen for the planner wizard.
@@ -18,7 +19,8 @@ export function renderWizardStep2(plan) {
 
   let cardsHtml = '';
   for (let d = 1; d <= days; d++) {
-    const dateLabel = typeof window.formatPlanDayLabel === 'function' ? window.formatPlanDayLabel(plan, d, { short: true }) : `Day ${d}`;
+    // The day card prints "Day N" itself, so it takes only the date, or '' when the day has none.
+    const dateLabel = formatPlanDayLabel(plan, d, { short: true }).replace(/^Day \d+(?: · )?/, '');
     const daySlots = plan.slots?.[d] || {};
     let eCal = 0, eProt = 0, cCal = 0, cProt = 0;
 

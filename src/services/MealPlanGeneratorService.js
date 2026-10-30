@@ -29,6 +29,42 @@ export function detectPrimaryProteinKeyword(recipe) {
 }
 
 /**
+ * Meal type of a slot key such as "dinnerE": breakfast, lunch, snack or dinner, or '' if none.
+ */
+export function getMealTypeFromSlotKey(slotKey) {
+  const s = String(slotKey || '').toLowerCase();
+  if (s.includes('breakfast')) return 'breakfast';
+  if (s.includes('lunch')) return 'lunch';
+  if (s.includes('snack')) return 'snack';
+  if (s.includes('dinner')) return 'dinner';
+  return '';
+}
+
+// "id::enhanced" → { id, variant: 'enhanced' }; anything else is the original variant.
+function parsePlanRecipeValue(value) {
+  const text = String(value || '');
+  if (text.endsWith('::enhanced')) return { id: text.slice(0, -10), variant: 'enhanced' };
+  return { id: text, variant: 'original' };
+}
+
+/**
+ * A new planned slot for one recipe, in the shape generateMealPlan builds.
+ */
+export function makePlanSlot(recipeId, variant = 'original') {
+  const clean = parsePlanRecipeValue(recipeId);
+  return {
+    id: clean.id,
+    recipeId: clean.id,
+    variant: variant === 'enhanced' || clean.variant === 'enhanced' ? 'enhanced' : 'original',
+    instanceId: 'pm-' + Date.now() + Math.random().toString(36).substring(2, 7),
+    isSkipped: false,
+    skipped: false,
+    isSplit: false,
+    pinned: false
+  };
+}
+
+/**
  * Resolves planned slot data into full recipe information.
  */
 export function getPlanSlotInfo(slotData) {
