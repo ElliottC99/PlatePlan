@@ -109,7 +109,7 @@ export function attachComputedFitScores(recipes = [], targetSlot = 'dinner', con
  * - Maps 'needs-work' and 'fit-asc' to Ascending sort
  * - Maps 'name' and 'name-asc' to Alphabetical A-Z
  * - Maps 'name-desc' to Alphabetical Z-A
- * - Any other value, including the removed stock sorts, falls back to Descending
+ * - Any other value falls back to Descending (fit score)
  */
 export function getSortedRecipes(recipes = [], sortOption = 'fit-desc', activeSlotTargets = 'dinner', context = {}) {
   if (!Array.isArray(recipes)) return [];
@@ -149,7 +149,7 @@ export function getSortedRecipes(recipes = [], sortOption = 'fit-desc', activeSl
     if (normSort === 'name-desc') {
       return String(b.label || b.title || b.name || '').localeCompare(String(a.label || a.title || a.name || ''));
     }
-    // 'best-fit', 'fit-desc' and any other value, such as the removed stock sorts
+    // 'best-fit', 'fit-desc' and any unrecognised value
     return (b._computedFitScore ?? b.fitScore ?? 0) - (a._computedFitScore ?? a.fitScore ?? 0);
   });
 }
