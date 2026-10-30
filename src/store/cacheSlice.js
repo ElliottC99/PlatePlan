@@ -31,7 +31,9 @@ export async function loadStateCache() {
   // the IndexedDB path below returns early whenever it holds recipes.
   try {
     localStorage.removeItem('plateplan_inventory');
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[Store] Could not clear the retired stock cache key:', e);
+  }
 
   try {
     const db = await openIDB();
