@@ -27,6 +27,12 @@ function openIDB() {
 }
 
 export async function loadStateCache() {
+  // Drop the retired stock list key left on phones by older releases. It runs first because
+  // the IndexedDB path below returns early whenever it holds recipes.
+  try {
+    localStorage.removeItem('plateplan_inventory');
+  } catch (e) {}
+
   try {
     const db = await openIDB();
     const idbData = await new Promise((resolve, reject) => {
@@ -50,7 +56,6 @@ export async function loadStateCache() {
     const ingredients = JSON.parse(localStorage.getItem('plateplan_ingredients') || '[]');
     const products = JSON.parse(localStorage.getItem('plateplan_products') || '[]');
     const shoppingList = JSON.parse(localStorage.getItem('plateplan_shopping') || '[]');
-    const inventory = JSON.parse(localStorage.getItem('plateplan_inventory') || '[]');
     
     let v2Blob = null;
     if (recipes.length === 0) {
@@ -63,7 +68,6 @@ export async function loadStateCache() {
       ingredients: ingredients.length > 0 ? ingredients : (v2Blob?.ingredients || []),
       products: products.length > 0 ? products : (v2Blob?.products || []),
       categories: v2Blob?.categories || [],
-      inventory: inventory.length > 0 ? inventory : (v2Blob?.inventory || []),
       shoppingList: shoppingList.length > 0 ? shoppingList : (v2Blob?.shoppingList || []),
       preferences: v2Blob?.preferences || null,
       userPrefs: v2Blob?.userPrefs || {},
@@ -97,7 +101,6 @@ export function saveStateCache(state) {
         ingredients: state.ingredients || [],
         products: state.products || [],
         categories: state.categories || [],
-        inventory: state.inventory || [],
         preferences: state.preferences ? { nutritionTargets: state.preferences.nutritionTargets } : null,
         userPrefs: state.userPrefs || {},
         settings: state.settings || {},
@@ -140,7 +143,6 @@ export async function initStoreCache(targetState) {
       targetState.ingredients = Array.isArray(initialCache.ingredients) ? initialCache.ingredients : [];
       targetState.products = Array.isArray(initialCache.products) ? initialCache.products : [];
       targetState.categories = Array.isArray(initialCache.categories) ? initialCache.categories : [];
-      targetState.inventory = Array.isArray(initialCache.inventory) ? initialCache.inventory : [];
       targetState.preferences = initialCache.preferences || null;
       targetState.userPrefs = initialCache.userPrefs || {};
       targetState.settings = initialCache.settings || {};

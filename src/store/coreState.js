@@ -6,7 +6,6 @@ export const state = {
   rootItems: [],
   products: [],
   categories: [],
-  inventory: [],
   preferences: null,
   userPrefs: {},
   settings: {},

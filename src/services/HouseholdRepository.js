@@ -42,11 +42,7 @@ import {
   getProducts,
   saveProduct,
   deleteProduct,
-  subscribeProducts,
-  getInventory,
-  savePantryItem,
-  deletePantryItem,
-  saveInventory
+  subscribeProducts
 } from './ShoppingFirestoreRepository.js';
 import { 
   deleteSubtypeInDb,
@@ -159,10 +155,6 @@ const HouseholdRepository = {
   getShoppingList,
   deleteShoppingList,
   updateShoppingItem,
-  getInventory,
-  savePantryItem,
-  deletePantryItem,
-  saveInventory,
   getCategories,
   saveCategories,
   getPreferences,
@@ -224,10 +216,6 @@ export {
   getShoppingList,
   deleteShoppingList,
   updateShoppingItem,
-  getInventory,
-  savePantryItem,
-  deletePantryItem,
-  saveInventory,
   getPlanHistory,
   savePlanHistory,
   deleteSubtypeInDb,

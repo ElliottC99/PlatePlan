@@ -8,9 +8,8 @@ import store from "../store/store.js";
 
 import { getRecipes, getProducts, getPreferences, getCurrentPlan, subscribeRecipes, subscribeIngredients, subscribeProducts, subscribePreferences, subscribeCurrentPlan, getCategories, saveCategories, cleanLegacyMacros } from './HouseholdRepository.js';
 import { getRootItems, saveRootItem } from './RootItemRepository.js';
-import { getInventory } from '../repositories/InventoryRepository.js';
 import { getCurrentActivePlan as getActivePlanFromSubcollection } from '../repositories/PlanRepository.js';
-import { setRecipes, setPreferences, setCurrentPlan, saveStateCache, setInventory, sanitizePreferences, updateState } from '../store/store.js';
+import { setRecipes, setPreferences, setCurrentPlan, saveStateCache, sanitizePreferences, updateState } from '../store/store.js';
 import { setIngredients, setProducts, setCategories } from '../store/store.js';
 import { compareProductsByStrategy } from '../models/PantryHierarchyModel.js';
 import { waitForAuth } from './AuthService.js';
@@ -155,14 +154,13 @@ export async function hydrateHouseholdData(options = {}) {
     const uid = authed.uid;
 
     try {
-      const [recipes, rawIngredients, rawProducts, preferencesData, legacyPlan, rawCategories, inventoryItems, subcollPlan] = await Promise.all([
+      const [recipes, rawIngredients, rawProducts, preferencesData, legacyPlan, rawCategories, subcollPlan] = await Promise.all([
         getRecipes(uid).catch(e => { console.warn('[HydrationService] getRecipes fallback:', e?.message || e); return []; }),
         getRootItems(uid).catch(e => { console.warn('[HydrationService] getRootItems fallback:', e?.message || e); return []; }),
         getProducts(uid).catch(e => { console.warn('[HydrationService] getProducts fallback:', e?.message || e); return []; }),
         getPreferences(uid).catch(e => { console.warn('[HydrationService] getPreferences fallback:', e?.message || e); return null; }),
         getCurrentPlan(uid).catch(e => { console.warn('[HydrationService] getCurrentPlan fallback:', e?.message || e); return null; }),
         getCategories(uid).catch(e => { console.warn('[HydrationService] getCategories fallback:', e?.message || e); return []; }),
-        getInventory(uid).catch(e => { console.warn('[HydrationService] getInventory fallback:', e?.message || e); return []; }),
         getActivePlanFromSubcollection(uid).catch(e => { console.warn('[HydrationService] getActivePlan fallback:', e?.message || e); return null; })
       ]);
       const plan = subcollPlan || legacyPlan;
@@ -216,10 +214,6 @@ export async function hydrateHouseholdData(options = {}) {
 
       if (Array.isArray(mergedCategories) && mergedCategories.length > 0) {
         setCategories(mergedCategories);
-      }
-
-      if (Array.isArray(inventoryItems) && inventoryItems.length > 0) {
-        setInventory(inventoryItems);
       }
 
       if (typeof window !== 'undefined') {

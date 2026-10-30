@@ -36,35 +36,6 @@ export async function toggleShoppingItem(itemId) {
   item.isChecked = !item.isChecked;
   saveStateCache(state);
   dispatchStateEvent('plateplan:state:shoppingList', state.shoppingList);
-
-  // If checked off while shopping, optionally replenish pantry stock
-  if (item.isChecked && item.ingredientId) {
-    try {
-      const invItem = {
-        id: `inv_${item.ingredientId}`,
-        ingredientId: item.ingredientId,
-        customName: item.name,
-        status: 'in_stock',
-        isUseUp: false,
-        quantity: item.buyQty || item.requiredQty || 1,
-        unit: item.unit || 'qty',
-        updatedAt: new Date().toISOString()
-      };
-      const { savePantryItem } = await import('../repositories/InventoryRepository.js');
-      await savePantryItem(invItem);
-      
-      const existingInv = state.inventory.find(i => i.id === invItem.id);
-      if (existingInv) {
-        existingInv.status = 'in_stock';
-        existingInv.quantity = invItem.quantity;
-      } else {
-        state.inventory.push(invItem);
-      }
-      dispatchStateEvent('plateplan:state:inventory', state.inventory);
-    } catch (err) {
-      console.warn('[Store] Failed to replenish pantry stock on shopping checkoff:', err);
-    }
-  }
 }
 
 export async function addManualShoppingItem(newItem) {
