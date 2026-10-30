@@ -1,6 +1,7 @@
 // scripts/generate-golden-master.js
 // Generates a deterministic Golden Master baseline from households_elliott-chloe_backup.json
-// through PlanGeneratorService, MealPlanGeneratorService, and ShoppingListService.
+// through MealPlanGeneratorService and ShoppingListService. Household stock isn't tracked,
+// so neither the plan nor the shopping list takes a stock list.
 
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -34,25 +35,14 @@ async function generateGoldenMaster() {
     .map(doc => ({ id: doc.id, ...doc.data }))
     .sort((a, b) => String(a.id).localeCompare(String(b.id)));
 
-  // Deterministic sample subset of 25 recipes and 5 sample pantry stock items
+  // Deterministic sample subset of 25 recipes
   const sampleRecipes = allRecipes.slice(0, 25);
-  const sampleInventory = allIngredients.slice(0, 5).map((ing, idx) => ({
-    id: `inv_sample_${idx + 1}`,
-    ingredientId: ing.id,
-    name: ing.name,
-    status: 'in_stock',
-    quantity: 200,
-    unit: 'g',
-    isUseUp: idx === 0
-  }));
 
   const weeklyPlan = generateWeeklyPlan({
     days: 7,
     startDate: '2026-10-26',
     dailyTargets: { calories: 2000, protein: 140, carbs: 200, fat: 65 },
     recipes: sampleRecipes,
-    inventory: sampleInventory,
-    pantryPriorityWeight: 1.5,
     proteinRotation: true
   });
 
@@ -67,7 +57,6 @@ async function generateGoldenMaster() {
 
   const shoppingList = generateShoppingListFromPlan(
     weeklyPlan,
-    sampleInventory,
     sampleRecipes,
     allIngredients
   );
@@ -80,8 +69,7 @@ async function generateGoldenMaster() {
         totalRecipesInBackup: allRecipes.length,
         sampleRecipesUsed: sampleRecipes.length,
         totalIngredientsInBackup: allIngredients.length,
-        totalProductsInBackup: allProducts.length,
-        sampleInventoryItems: sampleInventory.length
+        totalProductsInBackup: allProducts.length
       }
     },
     weeklyPlanOutput: weeklyPlan,

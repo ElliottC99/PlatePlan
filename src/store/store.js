@@ -5,7 +5,6 @@
  */
 
 import * as CacheSlice from './cacheSlice.js';
-import * as InventorySlice from './inventorySlice.js';
 import * as PlanSlice from './planSlice.js';
 import * as ShoppingSlice from './shoppingSlice.js';
 import * as RecipeSlice from './recipeStore.js';
@@ -32,14 +31,6 @@ import {
   setPreferences, 
   learnIngredientAlias 
 } from './actions/pantryActions.js';
-
-import { 
-  setInventory, 
-  addPantryItem, 
-  updatePantryItem, 
-  removePantryItem, 
-  toggleUseUpStatus 
-} from './inventorySlice.js';
 
 import { 
   setActivePlan, 
@@ -80,7 +71,6 @@ export const store = {
 export {
   // Slices
   CacheSlice,
-  InventorySlice,
   PlanSlice,
   ShoppingSlice,
   RecipeSlice,
@@ -111,12 +101,6 @@ export {
   sanitizePreferences,
   setPreferences,
   learnIngredientAlias,
-  // Inventory actions
-  setInventory,
-  addPantryItem,
-  updatePantryItem,
-  removePantryItem,
-  toggleUseUpStatus,
   // Plan actions
   setActivePlan,
   updatePlanMeal,

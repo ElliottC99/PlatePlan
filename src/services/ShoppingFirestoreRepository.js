@@ -2,7 +2,7 @@ import { getState } from '../store/coreState.js';
 import store from "../store/store.js";
 /**
  * src/services/ShoppingFirestoreRepository.js (v3.38.52)
- * Dedicated Firestore repository for Shopping Lists, Products, and Inventory items.
+ * Dedicated Firestore repository for Shopping Lists and Products.
  * Strictly scoped to 'households/elliott-chloe' subcollections.
  * Quarantines Firestore database logic from UI components.
  */
@@ -135,75 +135,4 @@ export async function deleteProduct(productId) {
 
 export function subscribeProducts(callback, errorCallback) {
   return subscribeCanonicalProducts(callback, errorCallback);
-}
-
-// ==========================================
-// INVENTORY & PANTRY OPERATIONS
-// ==========================================
-
-export async function getInventory() {
-  try {
-    if (!isDbAvailable()) return [];
-    const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('inventory');
-    const snap = await safeFirestoreGet(colRef);
-    if (!snap || !snap.docs) return [];
-    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (err) {
-    console.warn('[ShoppingFirestoreRepository] Offline or error fetching inventory:', err.message || err);
-    return [];
-  }
-}
-
-export async function savePantryItem(item) {
-  try {
-    if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
-    if (!item || typeof item !== 'object') return { success: false, error: 'Invalid item data' };
-
-    const itemId = item.id || db.collection('households').doc(HOUSEHOLD_ID).collection('inventory').doc().id;
-    const itemData = {
-      id: itemId,
-      ingredientId: item.ingredientId || null,
-      subtypeId: item.subtypeId || null,
-      productId: item.productId || null,
-      customName: String(item.customName || item.name || '').trim(),
-      category: item.category || null,
-      storage: item.storage || 'cupboard',
-      status: item.status || 'in_stock',
-      isUseUp: Boolean(item.isUseUp),
-      quantity: item.quantity !== undefined ? item.quantity : null,
-      unit: item.unit || null,
-      expiryDate: item.expiryDate || null,
-      updatedAt: new Date().toISOString()
-    };
-
-    const docRef = db.collection('households').doc(HOUSEHOLD_ID).collection('inventory').doc(itemId);
-    await docRef.set(itemData, { merge: true });
-    return { success: true, item: itemData };
-  } catch (err) {
-    console.error('[ShoppingFirestoreRepository] Error saving pantry item:', err);
-    return { success: false, error: err.message || err };
-  }
-}
-
-export async function deletePantryItem(itemId) {
-  try {
-    if (!isDbAvailable() || !itemId) return { success: false, error: 'Invalid parameters' };
-    const docRef = db.collection('households').doc(HOUSEHOLD_ID).collection('inventory').doc(itemId);
-    await docRef.delete();
-    return { success: true };
-  } catch (err) {
-    console.error('[ShoppingFirestoreRepository] Error deleting pantry item:', err);
-    return { success: false, error: err.message || err };
-  }
-}
-
-export async function saveInventory(items = []) {
-  try {
-    if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
-    const results = await Promise.all(items.map(item => savePantryItem(item)));
-    return { success: true, results };
-  } catch (err) {
-    console.error('[ShoppingFirestoreRepository] Error saving inventory:', err);
-    return { success: false, error: err.message || err };
-  }
 }

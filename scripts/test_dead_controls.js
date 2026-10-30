@@ -7,7 +7,7 @@
  *   - a window.X call or typeof window.X check for an X nothing defines;
  *   - a data-action that neither ActionBridge.routeAction nor a listener in scope handles.
  * "Defined" means assigned to window anywhere in src/, or exported by a module that
- * componentRegistry spreads onto window. Active Stock and use-up files are out of scope.
+ * componentRegistry spreads onto window. The use-up files are out of scope.
  * Run: node scripts/test_dead_controls.js
  */
 
@@ -29,7 +29,7 @@ function listJs(dir) {
 
 // ---- the scope ----
 
-const OUT_OF_SCOPE = /\/(PantryInventory|PantryStock|UseUp)[^/]*\.js$/;
+const OUT_OF_SCOPE = /\/UseUp[^/]*\.js$/;
 function scopeFiles() {
   const html = read('index.html');
   const start = html.indexOf('<div id="view-ingredients"');

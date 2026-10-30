@@ -9,7 +9,6 @@ import { getState } from '../store/coreState.js';
 import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
 import { setCurrentPlan } from '../store/store.js';
 import { saveCurrentPlan, stripPlanPayload } from './HouseholdRepository.js';
-import { calculateRecipePantryMatch } from './InventoryService.js';
 
 const PROTEIN_KEYWORDS = [
   'tofu', 'tempeh', 'seitan', 'halloumi', 'lentils', 'paneer',
@@ -271,7 +270,6 @@ export async function generatePlan() {
 export function generateWeeklyPlan(options = {}) {
   const storeState = (typeof getState === 'function') ? getState() : {};
   const recipes = options.recipes || storeState.recipes || [];
-  const inventory = options.inventory || storeState.inventory || [];
   if (!recipes || recipes.length === 0) throw new Error('No recipes available in state to generate meal plan.');
 
   const numDays = typeof options.days === 'number' ? options.days : (Array.isArray(options.days) ? options.days.length : 7);
@@ -282,23 +280,19 @@ export function generateWeeklyPlan(options = {}) {
     carbs: Number(options.dailyTargets?.carbs || 200),
     fat: Number(options.dailyTargets?.fat || 65)
   };
-  const pantryPriorityWeight = Number(options.pantryPriorityWeight !== undefined ? options.pantryPriorityWeight : 1.5);
   const enableProteinRotation = options.proteinRotation !== false;
 
   const candidateRecipes = recipes.map(r => {
-    const pm = calculateRecipePantryMatch(r, inventory);
     const proteinKw = detectPrimaryProteinKeyword(r);
     const calories = Number(r.macros?.calories || r.calories || r.cal || 450);
     const protein = Number(r.macros?.protein || r.protein || r.prot || 25);
     const carbs = Number(r.macros?.carbs || r.carbohydrateContent || r.carbs || 45);
     const fat = Number(r.macros?.fat || r.fatContent || r.fat || 15);
-    return { ...r, _pantryMatch: pm, _proteinKw: proteinKw, _macros: { calories, protein, carbs, fat } };
+    return { ...r, _proteinKw: proteinKw, _macros: { calories, protein, carbs, fat } };
   });
 
   const planDays = [];
   let prevMainProtein = '';
-  let totalUseUpItems = 0;
-  let totalMatchPct = 0;
   const startDate = new Date(startDateStr);
 
   for (let d = 0; d < numDays; d++) {
@@ -320,10 +314,6 @@ export function generateWeeklyPlan(options = {}) {
         const servings = Math.max(0.5, Math.round((slot.targetProt / Math.max(baseProt, 10)) * 2) / 2);
         const scaledProt = baseProt * servings, scaledCal = baseCal * servings;
         let fitScore = 100 - (Math.abs(scaledProt - slot.targetProt) * 1.5 + Math.abs(scaledCal - slot.targetCal) * 0.05);
-        if (pantryPriorityWeight > 0) {
-          if (r._pantryMatch.useUpMatches.length > 0) fitScore += (r._pantryMatch.useUpMatches.length * 20 * pantryPriorityWeight);
-          fitScore += (r._pantryMatch.matchPercentage * 0.3 * pantryPriorityWeight);
-        }
         if (enableProteinRotation && (slot.mealType === 'lunch' || slot.mealType === 'dinner')) {
           if (prevMainProtein && r._proteinKw === prevMainProtein && r._proteinKw !== 'other') fitScore -= 45;
         }
@@ -342,10 +332,6 @@ export function generateWeeklyPlan(options = {}) {
       if (slot.mealType === 'dinner' && chosen) prevMainProtein = chosen._proteinKw;
       dayCalories += scaledMacros.calories; dayProtein += scaledMacros.protein;
       dayCarbs += scaledMacros.carbs; dayFat += scaledMacros.fat;
-      if (chosen._pantryMatch) {
-        totalUseUpItems += chosen._pantryMatch.useUpMatches.length;
-        totalMatchPct += chosen._pantryMatch.matchPercentage;
-      }
       dayMeals.push({
         mealType: slot.mealType,
         recipeId: chosen.id,
@@ -370,10 +356,6 @@ export function generateWeeklyPlan(options = {}) {
     endDate: planDays[planDays.length - 1]?.date || startDateStr,
     days: planDays,
     macroTargets: dailyTargets,
-    pantrySummary: {
-      useUpItemsConsumed: totalUseUpItems,
-      avgPantryMatchPct: Math.round(totalMatchPct / Math.max(numDays * 3, 1))
-    },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };

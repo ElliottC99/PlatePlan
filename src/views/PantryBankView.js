@@ -1,6 +1,6 @@
 /**
  * src/views/PantryBankView.js (v3.38.74)
- * Modular ES6 View for Pantry Active Stock & Master Catalog.
+ * Modular ES6 View for the Pantry Master Catalog.
  * Strictly modular (<350 lines).
  */
 
@@ -13,28 +13,13 @@ import {
 } from '../models/PantryHierarchyModel.js';
 import { renderProductBank, openProductEditModal } from './ProductBankView.js';
 import { buildIngredientBankHTML } from '../components/pantry/PantryBankHTMLTemplate.js';
-import {
-  activePantryTab, switchPantryTab, renderActiveStockTab, addCatalogItemToActiveStock,
-  adjustPantryStock, removePantryStock, togglePantryUseUp, handlePantrySearchFilter,
-  handlePantryZoneChange, togglePantryUseUpFilter, openAddPantryStockModal as openStockModalUI
-} from '../components/pantry/PantryInventoryUI.js';
 
 export let selectedCategoryFilter = null;
 export let activeCategoryFilter = null;
 export let isCategoryManagerOpen = false;
-export {
-  activePantryTab, switchPantryTab, renderActiveStockTab, addCatalogItemToActiveStock,
-  adjustPantryStock, removePantryStock, togglePantryUseUp, handlePantrySearchFilter,
-  handlePantryZoneChange, togglePantryUseUpFilter
-};
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
-
-export function openAddPantryStockModal() {
-  const state = getState();
-  openStockModalUI(state.rootItems || state.ingredients || []);
-}
 
 export function resetCategoryFilter() {
   selectedCategoryFilter = activeCategoryFilter = null;
@@ -83,7 +68,7 @@ export function renderIngredientBank() {
   const container = document.getElementById('ingredient-groups-list');
   if (!container) return;
 
-  const state = getState(), rootItems = state.rootItems || state.ingredients || [], products = state.products || [], inventory = state.inventory || [];
+  const state = getState(), rootItems = state.rootItems || state.ingredients || [], products = state.products || [];
 
   if (rootItems.length === 0) {
     container.innerHTML = `<div class="card" style="padding:32px 20px;text-align:center;background:var(--surface,#fff);border:1px solid var(--border,#e7e5e4);border-radius:14px;margin-top:12px;">
@@ -114,7 +99,7 @@ export function renderIngredientBank() {
     hierarchy = hierarchy.filter(g => slugCategory(g.category) === targetSlug || slugCategory(g.cat) === targetSlug);
   }
 
-  container.innerHTML = buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inventory);
+  container.innerHTML = buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr);
   attachPantryBankSearchListener();
   attachPantryBankDelegation();
   const searchInput = document.getElementById('ingredient-group-search');
@@ -128,7 +113,6 @@ export function filterPantryBankDOM(rawQuery = '') {
   const state = getState();
   const ingredients = state.ingredients || [];
   const products = state.products || [];
-  const inventory = state.inventory || [];
 
   let filteredIngredients = ingredients;
   if (q) {
@@ -149,7 +133,7 @@ export function filterPantryBankDOM(rawQuery = '') {
 
   const container = document.getElementById('ingredient-groups-list');
   if (container) {
-    container.innerHTML = buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr, inventory);
+    container.innerHTML = buildIngredientBankHTML(hierarchy, escapeHtml, escapeAttr);
     attachPantryBankDelegation();
   }
 }
@@ -274,11 +258,10 @@ export function initBankSubscriptions() {
   isSubscribed = true;
   attachPantryBankDelegation();
   const update = () => { renderIngredientBank(); renderProductBank(); };
-  subscribe('ingredients', update); subscribe('products', update); subscribe('inventory', update);
+  subscribe('ingredients', update); subscribe('products', update);
   if (typeof document !== 'undefined') {
     document.addEventListener('plateplan:state:ingredients', update);
     document.addEventListener('plateplan:state:products', update);
-    document.addEventListener('plateplan:state:inventory', update);
   }
 }
 
@@ -303,9 +286,7 @@ export function linkProductToSubtype(parentId, subtypeId) {
 if (typeof window !== 'undefined') {
   Object.assign(window, {
     renderIngredientBank, renderPantryBankView,
-    openAddSubtypeModal, linkProductToSubtype, switchPantryTab, renderActiveStockTab, addCatalogItemToActiveStock,
-    adjustPantryStock, removePantryStock, togglePantryUseUp, handlePantrySearchFilter, handlePantryZoneChange,
-    togglePantryUseUpFilter, openAddPantryStockModal,
+    openAddSubtypeModal, linkProductToSubtype,
     handleSetDefaultProduct,
     promptAddSubtype, openCategoryManager, openCategoryManagerModal: openCategoryManager,
     updateActiveCategoryFilter, setActiveCategoryFilter, resetCategoryFilter, getFilteredIngredients,

@@ -16,7 +16,6 @@ import {
   getVaultTargetMacros as modernGetVaultTargetMacros
 } from '../utils/fitScoreCalculator.js';
 import { getProfilesFromState } from '../models/StateModel.js';
-import { calculateRecipePantryMatch } from './InventoryService.js';
 import { FIT_SCORE_TIERS } from '../config/businessRules.js';
 
 export {
@@ -110,6 +109,7 @@ export function attachComputedFitScores(recipes = [], targetSlot = 'dinner', con
  * - Maps 'needs-work' and 'fit-asc' to Ascending sort
  * - Maps 'name' and 'name-asc' to Alphabetical A-Z
  * - Maps 'name-desc' to Alphabetical Z-A
+ * - Any other value falls back to Descending (fit score)
  */
 export function getSortedRecipes(recipes = [], sortOption = 'fit-desc', activeSlotTargets = 'dinner', context = {}) {
   if (!Array.isArray(recipes)) return [];
@@ -140,21 +140,6 @@ export function getSortedRecipes(recipes = [], sortOption = 'fit-desc', activeSl
   const normSort = String(sortOption || 'fit-desc').toLowerCase();
 
   return scoredRecipes.sort((a, b) => {
-    if (normSort === 'useup-desc') {
-      const pA = a.pantryMatch || calculateRecipePantryMatch(a.recipe || a);
-      const pB = b.pantryMatch || calculateRecipePantryMatch(b.recipe || b);
-      if (pB.useUpScore !== pA.useUpScore) return pB.useUpScore - pA.useUpScore;
-      return pB.matchPercentage - pA.matchPercentage;
-    }
-    if (normSort === 'pantry-desc') {
-      const pA = a.pantryMatch || calculateRecipePantryMatch(a.recipe || a);
-      const pB = b.pantryMatch || calculateRecipePantryMatch(b.recipe || b);
-      if (pB.matchPercentage !== pA.matchPercentage) return pB.matchPercentage - pA.matchPercentage;
-      return pB.useUpScore - pA.useUpScore;
-    }
-    if (normSort === 'best-fit' || normSort === 'fit-desc') {
-      return (b._computedFitScore ?? b.fitScore ?? 0) - (a._computedFitScore ?? a.fitScore ?? 0);
-    }
     if (normSort === 'needs-work' || normSort === 'fit-asc') {
       return (a._computedFitScore ?? a.fitScore ?? 0) - (b._computedFitScore ?? b.fitScore ?? 0);
     }
@@ -164,7 +149,8 @@ export function getSortedRecipes(recipes = [], sortOption = 'fit-desc', activeSl
     if (normSort === 'name-desc') {
       return String(b.label || b.title || b.name || '').localeCompare(String(a.label || a.title || a.name || ''));
     }
-    return 0;
+    // 'best-fit', 'fit-desc' and any unrecognised value
+    return (b._computedFitScore ?? b.fitScore ?? 0) - (a._computedFitScore ?? a.fitScore ?? 0);
   });
 }
 
