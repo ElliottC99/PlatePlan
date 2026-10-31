@@ -29,6 +29,42 @@ export function detectPrimaryProteinKeyword(recipe) {
 }
 
 /**
+ * Meal type of a slot key such as "dinnerE": breakfast, lunch, snack or dinner, or '' if none.
+ */
+export function getMealTypeFromSlotKey(slotKey) {
+  const s = String(slotKey || '').toLowerCase();
+  if (s.includes('breakfast')) return 'breakfast';
+  if (s.includes('lunch')) return 'lunch';
+  if (s.includes('snack')) return 'snack';
+  if (s.includes('dinner')) return 'dinner';
+  return '';
+}
+
+// "id::enhanced" → { id, variant: 'enhanced' }; anything else is the original variant.
+function parsePlanRecipeValue(value) {
+  const text = String(value || '');
+  if (text.endsWith('::enhanced')) return { id: text.slice(0, -10), variant: 'enhanced' };
+  return { id: text, variant: 'original' };
+}
+
+/**
+ * A new planned slot for one recipe, in the shape generateMealPlan builds.
+ */
+export function makePlanSlot(recipeId, variant = 'original') {
+  const clean = parsePlanRecipeValue(recipeId);
+  return {
+    id: clean.id,
+    recipeId: clean.id,
+    variant: variant === 'enhanced' || clean.variant === 'enhanced' ? 'enhanced' : 'original',
+    instanceId: 'pm-' + Date.now() + Math.random().toString(36).substring(2, 7),
+    isSkipped: false,
+    skipped: false,
+    isSplit: false,
+    pinned: false
+  };
+}
+
+/**
  * Resolves planned slot data into full recipe information.
  */
 export function getPlanSlotInfo(slotData) {
@@ -74,8 +110,13 @@ export function getPlannedSlotNutrition(activeRecipe, slotKey = 'dinnerE', insta
  * Generates an automated household meal plan adhering to cadence, macros, and preferences.
  */
 export function generateMealPlan(options = {}) {
-  const days = Number(options.days ?.plannerDays ?.plan?.days || 7);
-  const startDateStr = options.startDate ?.plannerStartDate || new Date().toISOString().split('T')[0];
+  // Length and start: the caller's, then the Step 1 form's, then the loaded plan's (which Step 1
+  // shows when the form is untouched), then 7 days from today.
+  const state = getState() || {};
+  const loadedPlan = state.currentPlan || {};
+  const days = Number(options.days || state.currentPlannerDays || loadedPlan.days || 10) || 10;
+  const startDateStr = options.startDate || state.currentPlannerStartDate || loadedPlan.dayDates?.[1]
+    || loadedPlan.startDate || new Date().toISOString().split('T')[0];
   const cadence = options.cadence ?.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
   const minFitScore = Number(options.minFitScore !== undefined ? options.minFitScore : (getState()?.prefs?.minFitScore || 0));
   const maxFitScore = Number(options.maxFitScore !== undefined ? options.maxFitScore : (getState()?.prefs?.maxFitScore || 100));
@@ -238,7 +279,11 @@ export function generateMealPlan(options = {}) {
 export async function generatePlan() {
   if (typeof window === 'undefined') return;
   try {
-    const plan = generateMealPlan();
+    // The Step 1 day count and start date, as the old runtime's generate read them.
+    const plan = generateMealPlan({
+      days: getState()?.currentPlannerDays,
+      startDate: getState()?.currentPlannerStartDate
+    });
     if (getState()) {
       getState().currentPlan = plan;
       getState().currentPlannerStep = 2;
