@@ -71,13 +71,15 @@ export function calculateItemNutrition(item, quantity, unit = 'g') {
   let grams = 0;
   const u = String(unit || 'g').trim().toLowerCase().replace(/s$/, '');
 
-  if (u === 'item' || u === 'piece' || u === 'qty' || u === 'pack' || u === 'can' || u === 'tin') {
-    const itemWeight = parseFloat(item.itemWeight) || parseFloat(item.drainedWeight) || parseFloat(item.packSize) || 0;
-    grams = q * itemWeight;
-  } else if (u === 'g' || u === 'gram' || u === 'ml') {
+  if (u === 'g' || u === 'gram' || u === 'ml') {
     grams = q;
+  } else if (u === 'pack' || u === 'can' || u === 'tin') {
+    const packAmount = parseFloat(item.drainedWeight) || parseFloat(item.usablePackAmount) || parseFloat(item.packSize) || 400;
+    grams = q * packAmount;
+  } else if (parseFloat(item.itemWeight) > 0) {
+    grams = q * parseFloat(item.itemWeight);
   } else {
-    grams = toGrams(q, u, item.name, item.itemWeight);
+    grams = toGrams(q, u, item.name, 0);
   }
 
   grams = calculateItemNutritionalWeight(item, grams);

@@ -27,18 +27,95 @@ function escapeHtml(str) {
  * @param {Object} recipeObj 
  * @returns {Object} Per-serving macro totals
  */
+export function resolveProductForIngredient(item, { products = [], ingredients = [] } = {}) {
+  if (!item || typeof item !== 'object') return null;
+
+  // 1. Direct product ID
+  const directId = item.productId || item.bankId || item.mappedItemId || item.productMatch?.id;
+  if (directId) {
+    const prod = products.find(p => String(p.id) === String(directId));
+    if (prod) return prod;
+  }
+
+  // 2. Subtype mapping
+  if (item.subtypeId) {
+    if (item.ingredientId) {
+      const parentIng = ingredients.find(i => String(i.id) === String(item.ingredientId));
+      if (parentIng && Array.isArray(parentIng.subtypes)) {
+        const sub = parentIng.subtypes.find(s => String(s.id) === String(item.subtypeId));
+        const subDefId = sub?.defaultProductId || sub?.defaultProduct;
+        if (subDefId) {
+          const prod = products.find(p => String(p.id) === String(subDefId));
+          if (prod) return prod;
+        }
+      }
+    }
+    const subAuto = products.find(p => String(p.subtypeId) === String(item.subtypeId) && p.isAutoDefault);
+    if (subAuto) return subAuto;
+    const subAny = products.find(p => String(p.subtypeId) === String(item.subtypeId));
+    if (subAny) return subAny;
+  }
+
+  // 3. Root item mapping
+  if (item.ingredientId) {
+    const parentIng = ingredients.find(i => String(i.id) === String(item.ingredientId));
+    const ingDefId = parentIng?.defaultProductId || parentIng?.defaultProduct;
+    if (ingDefId) {
+      const prod = products.find(p => String(p.id) === String(ingDefId));
+      if (prod) return prod;
+    }
+    const ingAuto = products.find(p => String(p.ingredientId) === String(item.ingredientId) && p.isAutoDefault);
+    if (ingAuto) return ingAuto;
+    const ingAny = products.find(p => String(p.ingredientId) === String(item.ingredientId));
+    if (ingAny) return ingAny;
+  }
+
+  // 4. Category mapping
+  if (item.categoryId || item.isCategoryDefault) {
+    const catName = String(item.categoryId || '').toLowerCase();
+    const catAuto = products.find(p => (String(p.category || p.cat || '').toLowerCase() === catName) && p.isAutoDefault);
+    if (catAuto) return catAuto;
+    const catAny = products.find(p => (String(p.category || p.cat || '').toLowerCase() === catName));
+    if (catAny) return catAny;
+  }
+
+  // 5. Name matching (exact or partial)
+  const rawSearchName = String(item.matchedName || item.name || '').trim().toLowerCase();
+  if (rawSearchName) {
+    const exactProd = products.find(p => String(p.name || '').trim().toLowerCase() === rawSearchName);
+    if (exactProd) return exactProd;
+
+    const partialProd = products.find(p => {
+      const pName = String(p.name || '').trim().toLowerCase();
+      return pName && (pName.includes(rawSearchName) || rawSearchName.includes(pName));
+    });
+    if (partialProd) return partialProd;
+
+    const matchedIng = ingredients.find(i => String(i.name || '').trim().toLowerCase() === rawSearchName);
+    if (matchedIng) {
+      const defId = matchedIng.defaultProductId || matchedIng.defaultProduct;
+      if (defId) {
+        const prod = products.find(p => String(p.id) === String(defId));
+        if (prod) return prod;
+      }
+      const pAuto = products.find(p => String(p.ingredientId) === String(matchedIng.id) && p.isAutoDefault);
+      if (pAuto) return pAuto;
+      const pAny = products.find(p => String(p.ingredientId) === String(matchedIng.id));
+      if (pAny) return pAny;
+    }
+  }
+
+  return null;
+}
+
 export function recalculateWizardMacros(recipeObj) {
   if (!recipeObj || typeof recipeObj !== 'object') return null;
 
-  const state = (typeof window !== 'undefined' ? getState() : {}) || {};
+  const state = (typeof getState === 'function' ? getState() : (typeof window !== 'undefined' && typeof window.getState === 'function' ? window.getState() : {})) || {};
   const globalProducts = Array.isArray(state.products) ? state.products : [];
-  const globalIngredients = Array.isArray(state.rootItems) ? state.rootItems : (Array.isArray(state.ingredients) ? state.ingredients : []);
-
-  const productMap = new Map();
-  globalProducts.forEach(p => { if (p?.id) productMap.set(String(p.id), p); });
-
-  const ingredientMap = new Map();
-  globalIngredients.forEach(i => { if (i?.id) ingredientMap.set(String(i.id), i); });
+  const globalIngredients = Array.isArray(state.rootItems) 
+    ? state.rootItems 
+    : (Array.isArray(state.ingredients) ? state.ingredients : []);
 
   const allIngredients = (recipeObj.ingredientSections && recipeObj.ingredientSections.length > 0)
     ? recipeObj.ingredientSections.flatMap(s => s.ingredients || [])
@@ -55,44 +132,15 @@ export function recalculateWizardMacros(recipeObj) {
 
   allIngredients.forEach(item => {
     if (!item || item.excludeNutrition) return;
-    let matchedSource = null;
+    const matchedProduct = resolveProductForIngredient(item, {
+      products: globalProducts,
+      ingredients: globalIngredients
+    });
 
-    if (item.productId && productMap.has(String(item.productId))) {
-      matchedSource = productMap.get(String(item.productId));
-    }
-    if (!matchedSource && item.ingredientId) {
-      const ing = ingredientMap.get(String(item.ingredientId));
-      if (ing) {
-        if (item.subtypeId && Array.isArray(ing.subtypes)) {
-          const sub = ing.subtypes.find(s => String(s.id) === String(item.subtypeId));
-          if (sub?.defaultProduct && productMap.has(String(sub.defaultProduct))) {
-            matchedSource = productMap.get(String(sub.defaultProduct));
-          }
-        }
-        if (!matchedSource && ing.defaultProduct && productMap.has(String(ing.defaultProduct))) {
-          matchedSource = productMap.get(String(ing.defaultProduct));
-        }
-        if (!matchedSource) {
-          matchedSource = globalProducts.find(p => String(p.ingredientId) === String(item.ingredientId) && p.isAutoDefault) 
-                       || globalProducts.find(p => String(p.ingredientId) === String(item.ingredientId));
-        }
-      }
-    }
-    if (!matchedSource && (item.categoryId || item.isCategoryDefault)) {
-      const catName = String(item.categoryId || '').toLowerCase();
-      matchedSource = globalProducts.find(p => (String(p.category || p.cat || '').toLowerCase() === catName) && p.isAutoDefault) ||
-                      globalProducts.find(p => String(p.category || p.cat || '').toLowerCase() === catName);
-    }
-    if (!matchedSource && item.name) {
-      const qName = String(item.name).toLowerCase().trim();
-      matchedSource = globalProducts.find(p => String(p.name || '').toLowerCase().includes(qName)) ||
-                      globalIngredients.find(i => String(i.name || '').toLowerCase().includes(qName));
-    }
-
-    if (matchedSource) {
+    if (matchedProduct) {
       const qty = Number(item.scaledQty ?? item.qty ?? item.amount ?? 1) || 1;
       const unit = item.unit || 'g';
-      const nut = calcFn(matchedSource, qty, unit);
+      const nut = calcFn(matchedProduct, qty, unit);
       totalCal += (nut.kcal ?? nut.cal ?? 0);
       totalProt += (nut.protein ?? nut.prot ?? 0);
       totalCarb += (nut.carbs ?? nut.carb ?? 0);
@@ -100,7 +148,7 @@ export function recalculateWizardMacros(recipeObj) {
     }
   });
 
-  const serves = Number(recipeObj.servings || recipeObj.serves || recipeObj.targetServings || 4) || 4;
+  const serves = Number(recipeObj.targetServings || recipeObj.servings || recipeObj.serves || 4) || 4;
   const perServing = {
     calories: Math.round(totalCal / serves),
     protein: Math.round((totalProt / serves) * 10) / 10,
@@ -109,12 +157,25 @@ export function recalculateWizardMacros(recipeObj) {
   };
 
   recipeObj.macros = perServing;
+  recipeObj.calories = perServing.calories;
+  recipeObj.protein = perServing.protein;
+  recipeObj.carbs = perServing.carbs;
+  recipeObj.fat = perServing.fat;
+  recipeObj.perServing = { ...perServing, cal: perServing.calories, prot: perServing.protein };
   recipeObj.nutrition = {
-    calories: perServing.calories,
-    protein: perServing.protein,
-    carbs: perServing.carbs,
-    fat: perServing.fat
+    ...perServing,
+    cal: perServing.calories,
+    prot: perServing.protein,
+    perServing: { ...perServing, cal: perServing.calories, prot: perServing.protein }
   };
+
+  const targetMealType = recipeObj.mealSuitability?.[0] || recipeObj.types?.[0] || recipeObj.type || 'dinner';
+  const fitResult = calculateMealFitScore(recipeObj, targetMealType);
+  if (fitResult && typeof fitResult.score === 'number') {
+    recipeObj.fitScore = fitResult.score;
+    recipeObj.fitTier = fitResult.tier;
+    recipeObj._computedFitScore = fitResult.score;
+  }
 
   return perServing;
 }
@@ -336,5 +397,17 @@ export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice
   const btnSave = modalWrap.querySelector('#btn-save-wizard-recipe');
   if (btnSave) {
     btnSave.onclick = () => onSaveRecipe(modalWrap, { renderWizardModal, showWizardNotice, loadNextRecipeFromQueue, closeRecipeWizard });
+  }
+
+  const servInput = modalWrap.querySelector('#wiz-rev-servings') || modalWrap.querySelector('#tp-serving-size');
+  if (servInput) {
+    servInput.onchange = () => {
+      syncStep3InputsToState(modalWrap);
+      recalculateWizardMacros(wizardState.activeRecipe);
+      if (wizardState.activeRecipe.enhanced) {
+        recalculateWizardMacros(wizardState.activeRecipe.enhanced);
+      }
+      renderWizardModal();
+    };
   }
 }

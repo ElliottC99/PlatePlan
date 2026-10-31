@@ -6,43 +6,9 @@
 import { wizardState, syncStep2InputsToState } from './RecipeWizardState.js';
 import { bindTaxonomyAutocompleteEvents } from './RecipeWizardTaxonomySearch.js';
 import { promptRecipeWizardAliases } from './RecipeWizardAliasesPrompt.js';
-import * as NutritionService from '../../services/NutritionService.js';
-import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
 import { getState } from '../../store/store.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
-
-/**
- * Recalculates per-serving macros and fit score for the active wizard recipe.
- */
-function recalculateWizardMacros(rec) {
-  if (!rec) return;
-
-  const targetServings = Number(rec.targetServings || rec.serves || 4);
-  const storeState = getState();
-  const products = storeState.products || [];
-
-  const allIngredients = (rec.ingredientSections || []).flatMap(s => s.ingredients || []);
-  const nutritionList = allIngredients.map(ing => {
-    const prodId = ing.productId || ing.mappedItemId || ing.productMatch?.id;
-    const product = prodId ? products.find(p => String(p.id) === String(prodId)) : null;
-    if (!product) return { kcal: 0, prot: 0, carb: 0, fat: 0 };
-    return NutritionService.calculateItemNutrition(product, ing.scaledQty || ing.qty, ing.unit);
-  });
-
-  const rolled = NutritionService.rollupNutritionTotals(nutritionList, targetServings);
-  
-  rec.macros = {
-    calories: Math.round(rolled.perServing?.cal || rolled.perServing?.kcal || 0),
-    protein: Math.round((rolled.perServing?.prot || rolled.perServing?.protein || 0) * 10) / 10,
-    carbs: Math.round((rolled.perServing?.carb || rolled.perServing?.carbs || 0) * 10) / 10,
-    fat: Math.round((rolled.perServing?.fat || 0) * 10) / 10
-  };
-
-  // Recompute fit score
-  const fitResult = calculateMealFitScore(rec, rec.mealSuitability?.[0] || 'dinner');
-  rec.fitScore = fitResult.score;
-  rec.fitTier = fitResult.tier;
-}
+import { recalculateWizardMacros } from './RecipeWizardStep3Handlers.js';
 
 export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice }) {
   if (!modalWrap || wizardState.currentStep !== 2) return;

@@ -46,9 +46,7 @@ export function renderState2Mapping() {
       const scaledQty = Number((item.baseQty * scaleFactor).toFixed(1));
       item.scaledQty = scaledQty;
 
-      const fallbackBadge = item.isFallbackWeight
-        ? `<span class="badge" style="background:#fef3c7;color:#92400e;font-size:10px;margin-left:4px;" title="Volume converted assuming density table">⚠️ Est. Weight</span>`
-        : '';
+      const fallbackBadge = '';
 
       const isStock = String(item.name || '').toLowerCase().includes('stock') || String(item.name || '').toLowerCase().includes('bouillon') || String(item.name || '').toLowerCase().includes('cube') || String(item.raw || '').toLowerCase().includes('stock') || String(item.raw || '').toLowerCase().includes('bouillon') || String(item.raw || '').toLowerCase().includes('cube');
 
@@ -93,11 +91,6 @@ export function renderState2Mapping() {
             <select id="wiz-ing-unit-${sIdx}-${iIdx}" name="wiz_ing_unit_${sIdx}_${iIdx}" aria-label="Unit for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-unit" data-sidx="${sIdx}" data-iidx="${iIdx}" style="width: 100%; padding: 4px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px;">
               ${['g', 'ml', 'qty'].map(u => `<option value="${u}" ${u === item.unit ? 'selected' : ''}>${u}</option>`).join('')}
             </select>
-            ${item.isEstimated ? `
-              <span style="font-size: 10px; font-weight: 600; color: #b45309; background: #fef3c7; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px; margin-top: 4px; white-space: nowrap;">
-                ⚠️ Est. Weight
-              </span>
-            ` : ''}
           </td>
           <td style="padding: 6px;">
             <input type="text" id="wiz-ing-name-${sIdx}-${iIdx}" name="wiz_ing_name_${sIdx}_${iIdx}" aria-label="Ingredient name for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-name" data-sidx="${sIdx}" data-iidx="${iIdx}" value="${escapeAttr(item.name)}" style="width: 100%; padding: 4px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px;" />

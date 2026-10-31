@@ -6,6 +6,7 @@
 import { wizardState, MEAL_TAGS, getSaveButtonLabel } from './RecipeWizardState.js';
 import { getState } from '../../store/store.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
+import { recalculateWizardMacros } from './RecipeWizardStep3Handlers.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -59,8 +60,11 @@ export function renderMacroBreakdownCrossbar(recipe, variant = 'original') {
   const cSharePct = Math.round(cShare * 100);
 
   const activeRec = (variant === 'enhanced' && recipe.enhanced) ? { ...recipe, ...recipe.enhanced } : recipe;
-  const baselineCal = Number(activeRec.macros?.calories || activeRec.calories || 450);
-  const baselineProt = Number(activeRec.macros?.protein || activeRec.protein || 28);
+  if (!activeRec.macros || (!activeRec.macros.calories && !activeRec.macros.protein)) {
+    recalculateWizardMacros(activeRec);
+  }
+  const baselineCal = Number(activeRec.macros?.calories || activeRec.calories || 0);
+  const baselineProt = Number(activeRec.macros?.protein || activeRec.protein || 0);
 
   const batchServes = 2;
   const eKcal = Math.round(baselineCal * batchServes * eShare);
@@ -138,7 +142,8 @@ export function renderState3Review() {
         notesHtml = ` (${escapeHtml(cleanNotes)})`;
       }
 
-      let mainLineText = `${escapeHtml(ing.name)}${notesHtml}`;
+      const cleanName = String(ing.name || '').replace(/\(Est\.?\s*Weight\)/gi, '').trim();
+      let mainLineText = `${escapeHtml(cleanName)}${notesHtml}`;
 
       if (ing.isCategoryDefault || ing.categoryId) {
         const storeState = getState();

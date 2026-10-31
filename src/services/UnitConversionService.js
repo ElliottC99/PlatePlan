@@ -158,8 +158,19 @@ export function toGrams(qty, unit, ingredientName = '', itemWeight = 0) {
 }
 
 function inferIngredientWeightByName(name) {
-  const text = String(name || '').toLowerCase();
+  const text = String(name || '').toLowerCase().trim();
+  // Seasonings & spices without explicit unit (pinch / light seasoning)
+  if (text.includes('salt') || text.includes('black pepper') || text.includes('white pepper') || text.includes('cayenne') || text.includes('peppercorn')) {
+    return 0.5;
+  }
+  // Unmeasured cooking oils / fats (e.g. "vegetable oil, for frying", "olive oil, for cooking") -> 1 tbsp (15g)
+  if (text.includes('oil') && (text.includes('frying') || text.includes('cooking') || text.includes('drizzle') || !text.includes('pack'))) {
+    return 15;
+  }
   for (const [kw, g] of Object.entries(COMMON_DISCRETE_WEIGHTS)) {
+    if (kw === 'pepper' && (text.includes('black pepper') || text.includes('white pepper') || text.includes('cayenne') || text.includes('peppercorn'))) {
+      continue;
+    }
     if (text.includes(kw)) return g;
   }
   return DEFAULT_ITEM_GRAMS;
