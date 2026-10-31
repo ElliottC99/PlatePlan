@@ -48,52 +48,117 @@ export function openProductEditModal(productIdOrDraft = null) {
   if (!wrap || !content) return;
 
   content.innerHTML = `
-    <div id="mi-inner-wrap" style="background: var(--surface, #fff); border-radius: 14px; padding: 24px; max-width: 560px; width: 100%; margin: 0 auto;">
-      <h3 id="mi-title">Edit product</h3>
-      <div id="mi-tesco-actions" style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin: -4px 0px 12px;">
-        <button type="button" class="btn sm ghost" data-action="tesco-update" aria-controls="mi-tesco-paste">Paste/update from Tesco</button>
-        <div id="mi-tesco-updated" role="status" style="font-size: 12px; color: var(--text2, #78716c);"></div>
-        <div id="mi-tesco-paste" hidden style="width: 100%;">
-          <label for="mi-tesco-json" style="font-size: 12px;">Paste the Tesco bookmarklet output</label>
-          <textarea id="mi-tesco-json" name="mi-tesco-json" rows="3" style="width: 100%;"></textarea>
-          <div id="mi-tesco-error" role="alert" style="font-size: 12px; color: var(--red, #dc2626);"></div>
-          <button type="button" class="btn sm primary" data-action="tesco-update-apply">Update fields</button>
+    <div id="mi-inner-wrap" style="background: var(--surface, #fff); border-radius: 14px; padding: 18px 24px; max-width: 680px; width: 100%; margin: 0 auto; max-height: 88vh; overflow-y: auto; box-sizing: border-box; box-shadow: 0 10px 25px rgba(0,0,0,0.12);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px; border-bottom: 1px solid var(--border, #e7e5e4); padding-bottom: 8px;">
+        <h3 id="mi-title" style="margin: 0; font-size: 1.15rem; font-weight: 750; color: var(--text, #1c1917);">Add product</h3>
+        <div id="mi-tesco-actions" style="display: flex; align-items: center; gap: 8px;">
+          <div id="mi-tesco-updated" role="status" style="font-size: 11px; color: var(--text2, #78716c);"></div>
+          <button type="button" class="btn xs ghost" data-action="tesco-update" aria-controls="mi-tesco-paste" style="font-size: 11.5px; padding: 3px 8px; font-weight: 650; border: 1px solid var(--border, #e7e5e4);">Paste/update from Tesco</button>
         </div>
       </div>
-      <div id="mi-linkage-container" style="margin-bottom: 12px;"></div>
-      <div class="grid2">
-        <div><label for="mi-name">Product name</label><input type="text" id="mi-name" name="mi-name" placeholder="Product name"></div>
-        <div><label for="mi-brand">Brand</label><input type="text" id="mi-brand" name="mi-brand" placeholder="Quorn"></div>
+      <div id="mi-tesco-paste" hidden style="width: 100%; margin-bottom: 12px; background: var(--surface2, #f8fafc); border: 1px solid var(--border, #e2e8f0); border-radius: 8px; padding: 10px;">
+        <label for="mi-tesco-json" style="font-size: 11.5px; font-weight: 600; display: block; margin-bottom: 4px;">Paste the Tesco bookmarklet output</label>
+        <textarea id="mi-tesco-json" name="mi-tesco-json" rows="2" style="width: 100%; font-size: 12px; padding: 6px; box-sizing: border-box; border-radius: 6px; border: 1px solid var(--border);"></textarea>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+          <div id="mi-tesco-error" role="alert" style="font-size: 11.5px; color: var(--red, #dc2626);"></div>
+          <button type="button" class="btn xs primary" data-action="tesco-update-apply" style="font-size: 11.5px; padding: 3px 10px;">Update fields</button>
+        </div>
       </div>
-      <div class="grid2">
-        <div class="field"><label for="mi-cat-search">Category</label><input type="search" id="mi-cat-search" name="mi-cat-search" placeholder="Search category" list="mi-cat-category-options" style="width: 100%;"><datalist id="mi-cat-category-options"></datalist></div>
-        <div class="field"><label for="mi-storage">Storage</label><select id="mi-storage" name="mi-storage"><option value="">-- Select --</option><option value="fridge">Fridge</option><option value="freezer">Freezer</option><option value="cupboard">Cupboard</option></select></div>
-      </div>
-      <p class="section-label">Per 100g</p>
-      <div class="grid3">
-        <div><label for="mi-cal">Calories (Energy)</label><input type="number" id="mi-cal" name="mi-cal" placeholder="132"></div>
-        <div><label for="mi-fat">Fat (g)</label><input type="number" id="mi-fat" name="mi-fat" placeholder="5.9"></div>
-        <div><label for="mi-carb">Carbs (g)</label><input type="number" id="mi-carb" name="mi-carb" placeholder="5.4"></div>
-        <div><label for="mi-fibre">Fibre (g)</label><input type="number" id="mi-fibre" name="mi-fibre" placeholder="4.5"></div>
-        <div><label for="mi-prot">Protein (g)</label><input type="number" id="mi-prot" name="mi-prot" placeholder="14.5"></div>
-      </div>
-      <div class="grid3">
-        <div><label for="mi-price">Price per pack (£)</label><input type="number" id="mi-price" name="mi-price" placeholder="2.50" step="0.01"></div>
+      <div id="mi-linkage-container" style="margin-bottom: 10px;"></div>
+
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 8px;">
         <div>
-          <label for="mi-pack">Total pack size</label>
-          <div style="display:flex; gap:5px;">
-            <input type="number" id="mi-pack" name="mi-pack" placeholder="500">
-            <select id="mi-pack-unit" name="mi-pack-unit" aria-label="Pack unit" style="width:70px; border:1px solid var(--border); border-radius:8px; padding:0 5px;">
+          <label for="mi-name" style="display: block; font-size: 11.5px; font-weight: 700; margin-bottom: 3px;">Product name</label>
+          <input type="text" id="mi-name" name="mi-name" placeholder="Product name" style="width: 100%; padding: 6px 10px; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
+        </div>
+        <div>
+          <label for="mi-brand" style="display: block; font-size: 11.5px; font-weight: 700; margin-bottom: 3px;">Brand</label>
+          <input type="text" id="mi-brand" name="mi-brand" placeholder="e.g. Tesco" style="width: 100%; padding: 6px 10px; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px;">
+        <div>
+          <label for="mi-cat-search" style="display: block; font-size: 11.5px; font-weight: 700; margin-bottom: 3px;">Category</label>
+          <input type="search" id="mi-cat-search" name="mi-cat-search" placeholder="Search category" list="mi-cat-category-options" style="width: 100%; padding: 6px 10px; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
+          <datalist id="mi-cat-category-options"></datalist>
+        </div>
+        <div>
+          <label for="mi-storage" style="display: block; font-size: 11.5px; font-weight: 700; margin-bottom: 3px;">Storage</label>
+          <select id="mi-storage" name="mi-storage" style="width: 100%; padding: 6px 10px; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
+            <option value="">-- Select --</option>
+            <option value="cupboard">Cupboard</option>
+            <option value="fridge">Fridge</option>
+            <option value="freezer">Freezer</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="font-size: 11px; font-weight: 750; color: var(--text2, #78716c); text-transform: uppercase; letter-spacing: 0.5px; margin: 8px 0 4px;">Per 100g</div>
+      <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 10px;">
+        <div>
+          <label for="mi-cal" style="display: block; font-size: 11px; font-weight: 650; margin-bottom: 2px;">Calories</label>
+          <input type="number" id="mi-cal" name="mi-cal" placeholder="132" style="width: 100%; padding: 5px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
+        </div>
+        <div>
+          <label for="mi-fat" style="display: block; font-size: 11px; font-weight: 650; margin-bottom: 2px;">Fat (g)</label>
+          <input type="number" id="mi-fat" name="mi-fat" placeholder="5.9" style="width: 100%; padding: 5px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
+        </div>
+        <div>
+          <label for="mi-carb" style="display: block; font-size: 11px; font-weight: 650; margin-bottom: 2px;">Carbs (g)</label>
+          <input type="number" id="mi-carb" name="mi-carb" placeholder="5.4" style="width: 100%; padding: 5px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
+        </div>
+        <div>
+          <label for="mi-fibre" style="display: block; font-size: 11px; font-weight: 650; margin-bottom: 2px;">Fibre (g)</label>
+          <input type="number" id="mi-fibre" name="mi-fibre" placeholder="4.5" style="width: 100%; padding: 5px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
+        </div>
+        <div>
+          <label for="mi-prot" style="display: block; font-size: 11px; font-weight: 650; margin-bottom: 2px;">Protein (g)</label>
+          <input type="number" id="mi-prot" name="mi-prot" placeholder="14.5" style="width: 100%; padding: 5px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1.25fr 1.35fr 1fr; gap: 8px; margin-bottom: 10px;">
+        <div>
+          <label for="mi-price" style="display: block; font-size: 11px; font-weight: 650; margin-bottom: 2px;">Price / pack (£)</label>
+          <input type="number" id="mi-price" name="mi-price" placeholder="2.50" step="0.01" style="width: 100%; padding: 5px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
+        </div>
+        <div>
+          <label for="mi-pack" style="display: block; font-size: 11px; font-weight: 650; margin-bottom: 2px;">Total pack size</label>
+          <div style="display: flex; gap: 4px;">
+            <input type="number" id="mi-pack" name="mi-pack" placeholder="500" style="min-width: 0; flex: 1; padding: 5px 6px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
+            <select id="mi-pack-unit" name="mi-pack-unit" aria-label="Pack unit" style="width: 52px; border: 1px solid var(--border, #ccc); border-radius: 6px; padding: 0 4px; font-size: 11.5px;">
               <option value="g">g</option>
               <option value="ml">ml</option>
             </select>
           </div>
         </div>
-        <div><label for="mi-item-weight">Weight / volume of 1 usable item</label><input type="number" id="mi-item-weight" name="mi-item-weight" placeholder="e.g. 75"></div>
-        <div><label for="mi-drained-weight">Drained weight (usable content)</label><input type="number" id="mi-drained-weight" name="mi-drained-weight" placeholder="e.g. 235"></div>
+        <div>
+          <label for="mi-item-weight" style="display: block; font-size: 11px; font-weight: 650; margin-bottom: 2px;">1 Usable item size</label>
+          <div style="display: flex; gap: 4px;">
+            <input type="number" id="mi-item-weight" name="mi-item-weight" placeholder="e.g. 75" style="min-width: 0; flex: 1; padding: 5px 6px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
+            <select id="mi-item-weight-unit" name="mi-item-weight-unit" aria-label="Weight / volume of 1 usable item unit" style="width: 62px; border: 1px solid var(--border, #ccc); border-radius: 6px; padding: 0 4px; font-size: 11.5px;">
+              <option value="g">g</option>
+              <option value="ml">ml</option>
+              <option value="units">units</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label for="mi-drained-weight" style="display: block; font-size: 11px; font-weight: 650; margin-bottom: 2px;">Drained weight</label>
+          <input type="number" id="mi-drained-weight" name="mi-drained-weight" placeholder="e.g. 235" style="width: 100%; padding: 5px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
+        </div>
       </div>
-      <div class="field"><label for="mi-notes">Notes</label><input type="text" id="mi-notes" placeholder="e.g. Great in bolognese, buy frozen" name="mi-notes"></div>
-      <div class="btn-row"><button type="button" class="btn primary" id="mi-save-btn" data-action="save-manual-ing">Save</button><button type="button" class="btn ghost" data-action="cancel-manual-ing">Cancel</button></div>
+
+      <div style="margin-bottom: 12px;">
+        <label for="mi-notes" style="display: block; font-size: 11px; font-weight: 650; margin-bottom: 2px;">Notes</label>
+        <input type="text" id="mi-notes" name="mi-notes" placeholder="e.g. Great in bolognese, buy frozen" style="width: 100%; padding: 5px 10px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; border-top: 1px solid var(--border, #e7e5e4); padding-top: 12px; margin-top: 6px;">
+        <button type="button" class="btn sm ghost" data-action="cancel-manual-ing" style="font-weight: 600;">Cancel</button>
+        <button type="button" class="btn sm primary" id="mi-save-btn" data-action="save-manual-ing" style="font-weight: 700;">Save Product</button>
+      </div>
       <div id="mi-msg"></div>
     </div>
   `;
@@ -142,6 +207,7 @@ export function openProductEditModal(productIdOrDraft = null) {
     setVal('mi-pack', prod.pack ?? prod.packSize ?? '');
     setVal('mi-pack-unit', prod.packUnit || prod.unit || 'g');
     setVal('mi-item-weight', prod.itemWeight ?? '');
+    setVal('mi-item-weight-unit', prod.itemWeightUnit || prod.item_weight_unit || 'g');
     setVal('mi-drained-weight', prod.drainedWeight ?? '');
     setVal('mi-notes', prod.notes ?? '');
   } else if (tescoData) {
@@ -158,6 +224,7 @@ export function openProductEditModal(productIdOrDraft = null) {
     setVal('mi-fibre', tescoData.fibre ?? '');
     setVal('mi-prot', tescoData.prot ?? tescoData.protein ?? '');
     setVal('mi-item-weight', tescoData.itemWeight ?? '');
+    setVal('mi-item-weight-unit', tescoData.itemWeightUnit || 'g');
     setVal('mi-drained-weight', tescoData.drainedWeight ?? '');
     setVal('mi-notes', tescoData.notes || (tescoData.url || tescoData.tescoUrl ? `Tesco: ${tescoData.url || tescoData.tescoUrl}` : ''));
   } else {
@@ -174,6 +241,7 @@ export function openProductEditModal(productIdOrDraft = null) {
     setVal('mi-pack', '');
     setVal('mi-pack-unit', 'g');
     setVal('mi-item-weight', '');
+    setVal('mi-item-weight-unit', 'g');
     setVal('mi-drained-weight', '');
     setVal('mi-notes', '');
   }
@@ -209,6 +277,7 @@ const TESCO_UPDATE_FIELDS = [
   ['mi-pack', 'pack size', d => d.packSize, r => r.packSize !== undefined && r.packSize !== null && r.packSize !== ''],
   ['mi-pack-unit', 'pack unit', d => d.packUnit, r => !!r.packUnit],
   ['mi-item-weight', 'item weight', d => d.itemWeight, r => !!r.itemWeight],
+  ['mi-item-weight-unit', 'item weight unit', d => d.itemWeightUnit || 'g', r => !!(r.itemWeightUnit || r.itemWeight)],
   ['mi-drained-weight', 'drained weight', d => d.drainedWeight, r => !!r.drainedWeight],
   ['mi-storage', 'storage', d => d.storage, r => !!(r.diagnostics?.breadcrumbs || r.diagnostics?.storageText)],
   ...[['cal', 'calories'], ['prot', 'protein'], ['carb', 'carbs'], ['fat', 'fat'], ['fibre', 'fibre']].map(([key, label]) =>
@@ -295,6 +364,7 @@ export async function saveManualIng() {
     pack: getNum('mi-pack') || 0,
     packUnit: getVal('mi-pack-unit') || 'g',
     itemWeight: getNum('mi-item-weight'),
+    itemWeightUnit: getVal('mi-item-weight-unit') || 'g',
     drainedWeight: getNum('mi-drained-weight'),
     notes: getVal('mi-notes'),
     ingredientId: activeEditingProductId ? (currentProds.find(p => String(p.id) === String(activeEditingProductId))?.ingredientId || null) : ingredientId,

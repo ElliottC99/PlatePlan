@@ -242,80 +242,103 @@ export function parseIngredientString(rawStr) {
   };
 }
 
+export function normalizeTaxonomyName(str) {
+  if (!str) return '';
+  return String(str).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[,\(\)\/\"\'\:\;\-\–\—\.]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export function stemIngredientName(rawName) {
   if (!rawName) return '';
-  let str = String(rawName).toLowerCase().trim();
-  str = str.replace(/\b(cloves?|heads?|bulbs?|block|blocks|diced|sliced|chopped|minced|fresh|raw|organic)\b/g, '').trim();
-  if (str.endsWith('ies')) str = str.slice(0, -3) + 'y';
-  else if (str.endsWith('es')) str = str.slice(0, -2);
-  else if (str.endsWith('s') && !str.endsWith('ss')) str = str.slice(0, -1);
+  let str = normalizeTaxonomyName(rawName).replace(/^\d+(?:\.\d+)?\s*(?:x\s*)?/, '').trim();
+  str = str.replace(/\b(cloves?|heads?|bulbs?|stalks?|sprigs?|leaves?|leaf|pieces?|pots?|tins?|cans?|jars?|packs?|packet?|boxes?|blocks?|bottles?|bags?|diced|sliced|chopped|minced|grated|crushed|ground|shredded|pitted|peeled|cracked|parboiled|toasted|roasted|pressed|mashed|fresh|dried|dry|raw|cooked|frozen|boiled|organic|unsweetened|sweetened|salted|unsalted|extra virgin|best quality|good quality|pure|natural|plant based|plant-based|vegan|vegetarian|large|small|medium|thick|thin|finely|roughly|coarsely|to serve|for frying|for dusting|optional|garnish)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  if (str.endsWith('potatoes') || str.endsWith('tomatoes')) str = str.slice(0, -2);
+  else if (str.endsWith('chillies')) str = str.slice(0, -3) + 'i';
+  else if (str.endsWith('ies')) str = str.slice(0, -3) + 'y';
+  else if (str.endsWith('es') && !str.endsWith('cheese')) str = str.slice(0, -2);
+  else if (str.endsWith('s') && !str.endsWith('ss') && !str.endsWith('is') && !str.endsWith('us')) str = str.slice(0, -1);
   return str.trim();
 }
 
 /**
- * Cross-references parsed ingredient against existing Store items including aliases.
+ * Cross-references parsed ingredient against existing Store items including aliases and subtypes.
  */
 export function matchIngredientTaxonomy(parsedItem, existingIngredients = null) {
   if (!parsedItem) return null;
   const storeState = (typeof getState === 'function') ? getState() : {};
-  const ingredients = existingIngredients || storeState.ingredients || [];
-
+  const ingredients = (existingIngredients && existingIngredients.length) ? existingIngredients : (storeState.rootItems || storeState.ingredients || []);
   const rawClean = (parsedItem.name || '').toLowerCase().trim();
-  const stemmed = stemIngredientName(rawClean);
+  const normParsed = normalizeTaxonomyName(rawClean);
+  const stemmedParsed = stemIngredientName(rawClean);
 
-  // 1. Direct Name Match
-  const direct = ingredients.find(ing => (ing.name || '').toLowerCase().trim() === rawClean);
-  if (direct) {
-    return {
-      ...parsedItem,
-      ingredientId: direct.id,
-      matchedName: direct.name,
-      matchedCategory: direct.category || 'General',
-      isNewTaxonomyItem: false
-    };
-  }
+  let bestMatch = null, bestScore = 0;
 
-  // 2. Alias Match
-  const aliasMatch = ingredients.find(ing => {
-    if (!ing.aliases || !Array.isArray(ing.aliases)) return false;
-    return ing.aliases.some(alias => {
-      const aClean = alias.toLowerCase().trim();
-      return aClean === rawClean || aClean === stemmed;
+  for (const ing of ingredients) {
+    if (!ing) continue;
+    const ingName = (ing.name || '').trim();
+    const normIng = normalizeTaxonomyName(ingName), stemmedIng = stemIngredientName(ingName);
+
+    if (normIng && normParsed === normIng) {
+      return { ...parsedItem, ingredientId: ing.id, subtypeId: null, matchedName: ing.name, matchedCategory: ing.category || 'General', isNewTaxonomyItem: false };
+    }
+
+    const subtypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
+    for (const sub of subtypes) {
+      const normSub = normalizeTaxonomyName(sub.name);
+      if (normSub && normParsed === normSub) {
+        return { ...parsedItem, ingredientId: ing.id, subtypeId: sub.id || sub.name, matchedName: `${sub.name} (${ing.name})`, matchedCategory: ing.category || 'General', isNewTaxonomyItem: false };
+      }
+    }
+
+    (Array.isArray(ing.aliases) ? ing.aliases : []).forEach(al => {
+      const normAl = normalizeTaxonomyName(al);
+      if (normAl && (normParsed === normAl || stemmedParsed === normAl) && bestScore < 95) {
+        bestScore = 95; bestMatch = { ing, subtype: null, name: ing.name };
+      }
     });
-  });
 
-  if (aliasMatch) {
-    return {
-      ...parsedItem,
-      ingredientId: aliasMatch.id,
-      matchedName: aliasMatch.name,
-      matchedCategory: aliasMatch.category || 'General',
-      isNewTaxonomyItem: false
-    };
+    for (const sub of subtypes) {
+      const normSub = normalizeTaxonomyName(sub.name), stemmedSub = stemIngredientName(sub.name);
+      if (stemmedSub && (stemmedParsed === stemmedSub || normParsed === stemmedSub) && bestScore < 90) {
+        bestScore = 90; bestMatch = { ing, subtype: sub, name: `${sub.name} (${ing.name})` };
+      }
+      (Array.isArray(sub.aliases) ? sub.aliases : []).forEach(sal => {
+        const normSal = normalizeTaxonomyName(sal);
+        if (normSal && (normParsed === normSal || stemmedParsed === normSal) && bestScore < 92) {
+          bestScore = 92; bestMatch = { ing, subtype: sub, name: `${sub.name} (${ing.name})` };
+        }
+      });
+    }
+
+    if (stemmedIng && (stemmedParsed === stemmedIng || normParsed === stemmedIng) && bestScore < 88) {
+      bestScore = 88; bestMatch = { ing, subtype: null, name: ing.name };
+    }
+
+    for (const sub of subtypes) {
+      const normSub = normalizeTaxonomyName(sub.name);
+      if (normSub.length >= 3) {
+        const regex = new RegExp('(^|\\s)' + normSub.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(?:s|es)?(\\s|$)', 'i');
+        if ((regex.test(normParsed) || regex.test(stemmedParsed)) && (75 + normSub.length > bestScore)) {
+          bestScore = 75 + normSub.length; bestMatch = { ing, subtype: sub, name: `${sub.name} (${ing.name})` };
+        }
+      }
+    }
+
+    if (normIng.length >= 3) {
+      const regex = new RegExp('(^|\\s)' + normIng.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(?:s|es)?(\\s|$)', 'i');
+      if ((regex.test(normParsed) || regex.test(stemmedParsed)) && (70 + normIng.length > bestScore)) {
+        bestScore = 70 + normIng.length; bestMatch = { ing, subtype: null, name: ing.name };
+      } else if (normParsed.length >= 3) {
+        const pRegex = new RegExp('(^|\\s)' + normParsed.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(?:s|es)?(\\s|$)', 'i');
+        if (pRegex.test(normIng) && (65 + normParsed.length > bestScore)) {
+          bestScore = 65 + normParsed.length; bestMatch = { ing, subtype: null, name: ing.name };
+        }
+      }
+    }
   }
 
-  // 3. Stemmed Match
-  const stemmedMatch = ingredients.find(ing => {
-    const ingStem = stemIngredientName(ing.name);
-    return ingStem === stemmed || ingStem === rawClean;
-  });
-
-  if (stemmedMatch) {
-    return {
-      ...parsedItem,
-      ingredientId: stemmedMatch.id,
-      matchedName: stemmedMatch.name,
-      matchedCategory: stemmedMatch.category || 'General',
-      isNewTaxonomyItem: false
-    };
+  if (bestMatch && bestScore >= 65) {
+    return { ...parsedItem, ingredientId: bestMatch.ing.id, subtypeId: bestMatch.subtype?.id || bestMatch.subtype?.name || null, matchedName: bestMatch.name, matchedCategory: bestMatch.ing.category || 'General', isNewTaxonomyItem: false };
   }
 
-  // 4. Fallback: New Taxonomy Item
-  return {
-    ...parsedItem,
-    ingredientId: null,
-    matchedName: parsedItem.name,
-    matchedCategory: 'Store Cupboard',
-    isNewTaxonomyItem: true
-  };
+  return { ...parsedItem, ingredientId: null, subtypeId: null, matchedName: parsedItem.name, matchedCategory: 'Store Cupboard', isNewTaxonomyItem: true };
 }
