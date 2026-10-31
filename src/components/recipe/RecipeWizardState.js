@@ -96,8 +96,6 @@ export function syncStep2InputsToState(modalWrap) {
     if (s > 0) {
       wizardState.targetServings = s;
       wizardState.activeRecipe.targetServings = s;
-      wizardState.activeRecipe.servings = s;
-      wizardState.activeRecipe.serves = s;
     }
   }
 

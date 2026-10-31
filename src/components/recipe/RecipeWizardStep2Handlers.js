@@ -63,13 +63,14 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
 
   const updateServingsScale = (newServings) => {
     const rec = wizardState.activeRecipe || {};
-    const baseServings = Number(rec.servings || rec.currentServings) || 4;
+    if (!rec.baseServings) {
+      rec.baseServings = Number(rec.currentServings || rec.servings) || 4;
+    }
+    const baseServings = Number(rec.baseServings) || 4;
     const targetServings = Math.max(1, Math.min(24, parseInt(newServings, 10) || baseServings));
 
     wizardState.targetServings = targetServings;
     rec.targetServings = targetServings;
-    rec.servings = targetServings;
-    rec.serves = targetServings;
 
     if (targetServingsInput) targetServingsInput.value = targetServings;
 

@@ -38,6 +38,7 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
       wizardState.activeRecipe = {
         id: found.id,
         title: found.title || found.name || '',
+        baseServings: found.servings || found.serves || 4,
         currentServings: found.servings || found.serves || 4,
         targetServings: found.targetServings || found.servings || found.serves || 4,
         prepTime: found.prepTime !== undefined && found.prepTime !== null ? found.prepTime : { hours: '', minutes: '' },
@@ -124,6 +125,7 @@ export function loadNextRecipeFromQueue() {
 
   wizardState.activeRecipe = {
     title: next.title || 'Imported Recipe',
+    baseServings: next.servings || 4,
     currentServings: next.servings || 4,
     targetServings: next.servings || 4,
     prepTime: next.prepTime || { hours: 0, minutes: 15 },

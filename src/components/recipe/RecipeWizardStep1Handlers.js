@@ -89,6 +89,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
         .filter(Boolean);
 
       wizardState.activeRecipe.title = title;
+      wizardState.activeRecipe.baseServings = curServ;
       wizardState.activeRecipe.currentServings = curServ;
       wizardState.activeRecipe.targetServings = tgtServ;
       wizardState.activeRecipe.prepTime = { hours: prepH, minutes: prepM };
