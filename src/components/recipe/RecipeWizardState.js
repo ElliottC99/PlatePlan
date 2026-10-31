@@ -90,6 +90,17 @@ export function resetWizardState() {
 export function syncStep2InputsToState(modalWrap) {
   if (!modalWrap) return;
 
+  const targetServInput = modalWrap.querySelector('#wiz-target-servings-input');
+  if (targetServInput) {
+    const s = parseInt(targetServInput.value, 10);
+    if (s > 0) {
+      wizardState.targetServings = s;
+      wizardState.activeRecipe.targetServings = s;
+      wizardState.activeRecipe.servings = s;
+      wizardState.activeRecipe.serves = s;
+    }
+  }
+
   // Section titles
   modalWrap.querySelectorAll('.wiz-section-title-input').forEach(input => {
     const sIdx = parseInt(input.dataset.sidx, 10);
@@ -198,8 +209,13 @@ export function syncStep3InputsToState(modalWrap) {
   const title = modalWrap.querySelector('#wiz-rev-title')?.value?.trim();
   if (title) rec.title = title;
 
-  const serv = parseInt(modalWrap.querySelector('#wiz-rev-servings')?.value, 10);
-  if (serv > 0) rec.targetServings = serv;
+  const servInput = modalWrap.querySelector('#tp-serving-size') || modalWrap.querySelector('#wiz-rev-servings');
+  const serv = parseInt(servInput?.value, 10);
+  if (serv > 0) {
+    rec.targetServings = serv;
+    rec.servings = serv;
+    rec.serves = serv;
+  }
 
   const prepMins = parseInt(modalWrap.querySelector('#wiz-rev-prepm')?.value, 10) || 0;
   const cookMins = parseInt(modalWrap.querySelector('#wiz-rev-cookm')?.value, 10) || 0;

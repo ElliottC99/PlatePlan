@@ -153,7 +153,7 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
 
   // Read verified v3.34.0 DOM selectors
   const titleInput = document.getElementById('wiz-rev-title') || modalWrap.querySelector('#wiz-rev-title');
-  const servingsInput = document.getElementById('wiz-rev-servings') || modalWrap.querySelector('#wiz-rev-servings');
+  const servingsInput = document.getElementById('tp-serving-size') || document.getElementById('wiz-rev-servings') || modalWrap.querySelector('#tp-serving-size') || modalWrap.querySelector('#wiz-rev-servings');
 
   const safeTitle = toTitleCase(titleInput?.value || rec.title || 'Untitled');
   const safeServings = parseInt(servingsInput?.value, 10) || rec.targetServings || rec.servings || 4;

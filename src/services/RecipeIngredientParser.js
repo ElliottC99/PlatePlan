@@ -179,7 +179,7 @@ export function parseIngredientString(rawStr) {
       unit: normalised.unit,
       isEstimated: normalised.isEstimated,
       name: toTitleCase(rawName),
-      notes: normalised.isEstimated ? 'Est. Weight' : ''
+      notes: ''
     };
   }
 
@@ -196,7 +196,7 @@ export function parseIngredientString(rawStr) {
       unit: normalised.unit,
       isEstimated: normalised.isEstimated,
       name: toTitleCase(nameClean),
-      notes: normalised.isEstimated ? 'Est. Weight' : `${mult} pack (${innerWeight}${parenMult[4]})`
+      notes: `${mult} pack (${innerWeight}${parenMult[4]})`
     };
   }
 
@@ -213,7 +213,7 @@ export function parseIngredientString(rawStr) {
       unit: normalised.unit,
       isEstimated: normalised.isEstimated,
       name: toTitleCase(rawName),
-      notes: normalised.isEstimated ? 'Est. Weight' : `${multComp} x ${baseWeight}${compMatch[3]}`
+      notes: `${multComp} x ${baseWeight}${compMatch[3]}`
     };
   }
 
@@ -238,7 +238,7 @@ export function parseIngredientString(rawStr) {
     unit: normalised.unit,
     isEstimated: normalised.isEstimated,
     name: toTitleCase(rawName || remainder),
-    notes: normalised.isEstimated ? 'Est. Weight' : ''
+    notes: ''
   };
 }
 

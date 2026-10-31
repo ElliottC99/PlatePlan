@@ -68,6 +68,8 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
 
     wizardState.targetServings = targetServings;
     rec.targetServings = targetServings;
+    rec.servings = targetServings;
+    rec.serves = targetServings;
 
     if (targetServingsInput) targetServingsInput.value = targetServings;
 
@@ -227,6 +229,10 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
   if (btnNext2) {
     btnNext2.onclick = () => {
       syncStep2InputsToState(modalWrap);
+      const finalServings = wizardState.targetServings || wizardState.activeRecipe.targetServings || wizardState.activeRecipe.servings || 4;
+      wizardState.activeRecipe.servings = finalServings;
+      wizardState.activeRecipe.serves = finalServings;
+      wizardState.activeRecipe.targetServings = finalServings;
       
       // Auto-format all section headers to Title Case
       if (wizardState.activeRecipe.ingredientSections) {
