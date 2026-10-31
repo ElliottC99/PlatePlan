@@ -8,7 +8,7 @@ topic: product-first-weights-unit-converters-fit-score
 # Product-First Weights with Measurement Unit Converters & Drained Weight Normalization
 
 > Created: 2026-10-31  
-> Status: Approved Architecture  
+> Status: Implemented  
 > Branch: dev/recipe-bulk-parse-instruction-fix  
 
 ---
@@ -93,9 +93,9 @@ In [`src/components/FitScoreBadge.js`](file:///Users/elliottcallender/Downloads/
 - If macros exist and `fitResult.score === 0`, render `🔴 0%` (Poor Match) with tooltip.
 
 ### Task 6: Automated Verification & Regression Tests
-- Run unit conversion tests: `node scripts/test_unit_conversion.js`.
-- Run parser tests: `node scripts/test_multi_recipe_parser.js`.
-- Run shopping list tests: `node scripts/test_shopping_list.js`.
-- Run ledger tests: `node scripts/test_ledger.js`.
-- Run production build: `npm run build`.
-- Simulate *Sausage Party Pizza* and canned beans to verify exact macros and scores.
+- [x] Run unit conversion tests: `node scripts/test_unit_conversion.js`.
+- [x] Run parser tests: `node scripts/test_multi_recipe_parser.js`.
+- [x] Run shopping list tests: `node scripts/test_shopping_list.js`.
+- [x] Run ledger tests: `node scripts/test_ledger.js`.
+- [x] Run production build: `npm run build`.
+- [x] Simulate *Sausage Party Pizza* and canned beans to verify exact macros and scores.
