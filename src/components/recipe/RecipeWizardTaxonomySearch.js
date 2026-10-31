@@ -148,12 +148,16 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
             iIdx,
             initialName: currentIngName,
             onComplete: (created) => {
-              const combinedKey = `${created.ingredientId}:${created.subtypeId}`;
-              const displayLabel = `🏷️ ${created.subtypeName} (${created.parentName})`;
+              const ingId = created.ingredientId || created.rootItem?.id || created.id || 'custom';
+              const subId = created.subtypeId || created.subtype?.id || created.subtypeName || 'standard';
+              const parentName = created.parentName || created.rootItem?.name || created.rootItemName || currentIngName;
+              const subName = created.subtypeName || created.subtype?.name || parentName;
+              const combinedKey = `${ingId}:${subId}`;
+              const displayLabel = `🏷️ ${subName} (${parentName})`;
               inputEl.dataset.taxVal = combinedKey;
               inputEl.value = displayLabel;
               if (rowNameInput) {
-                rowNameInput.value = created.subtypeName;
+                rowNameInput.value = subName;
               }
               if (typeof onSelectCallback === 'function') {
                 onSelectCallback(sIdx, iIdx, combinedKey, created);

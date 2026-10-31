@@ -308,7 +308,7 @@ export async function saveManualIng() {
     window.__pendingHierarchyCommit = null;
     window.__prefilledResolveBinding = null;
     try {
-      await commitAtomicChain({
+      const res = await commitAtomicChain({
         category: pending.category || inheritedCategory || 'General',
         rootItemName: pending.rootItemName,
         subtypeName: pending.subtypeName || 'Standard',
@@ -317,6 +317,11 @@ export async function saveManualIng() {
       cancelManualIng();
       renderProductBank();
       if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+      if (typeof window.__onHierarchyComplete === 'function') {
+        const cb = window.__onHierarchyComplete;
+        window.__onHierarchyComplete = null;
+        cb(res || { ingredientId: res?.rootItem?.id || pending.rootItemName, subtypeId: res?.subtype?.id || pending.subtypeName, subtypeName: pending.subtypeName, parentName: pending.rootItemName, category: pending.category });
+      }
       return;
     } catch (e) {
       console.error('[ProductBankView] Atomic commit failed:', e);

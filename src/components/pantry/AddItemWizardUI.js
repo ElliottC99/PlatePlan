@@ -46,6 +46,8 @@ export function closeAddItemWizard() {
 export function openAddItemWizard(options = {}) {
   let startAt = options.startAt || 'item';
   let step = 1;
+  const onComplete = options.onComplete || null;
+  if (onComplete) window.__onHierarchyComplete = onComplete;
 
   let wizardData = {
     startAt,
@@ -222,7 +224,6 @@ export function openAddItemWizard(options = {}) {
 
     document.getElementById('btn-wiz-close')?.addEventListener('click', closeAddItemWizard);
     document.getElementById('btn-wiz-cancel')?.addEventListener('click', closeAddItemWizard);
-
     document.getElementById('btn-wiz-jump-sub')?.addEventListener('click', () => { startAt = 'subtype'; step = 1; renderStep(); });
     document.getElementById('btn-wiz-jump-item')?.addEventListener('click', () => { startAt = 'item'; step = 1; renderStep(); });
     document.getElementById('btn-wiz-jump-cat')?.addEventListener('click', () => { startAt = 'category'; step = 1; renderStep(); });
@@ -230,29 +231,14 @@ export function openAddItemWizard(options = {}) {
     document.getElementById('btn-launch-tesco-prod')?.addEventListener('click', () => proceedToProduct('tesco'));
 
     attachDuplicateDetector({
-      inputEl: document.getElementById('wiz-cat-name-input'),
-      containerEl: document.getElementById('wiz-cat-dup-box'),
-      items: categories,
-      icon: '📂',
-      onSelect: (cat) => { wizardData.category = cat; }
+      inputEl: document.getElementById('wiz-cat-name-input'), containerEl: document.getElementById('wiz-cat-dup-box'), items: categories, icon: '📂', onSelect: (cat) => { wizardData.category = cat; }
     });
     attachDuplicateDetector({
-      inputEl: document.getElementById('wiz-item-name'),
-      containerEl: document.getElementById('wiz-item-dup-box'),
-      items: rootItems,
-      icon: '📦',
-      onSelect: (item) => {
-        wizardData.itemName = item.name;
-        if (item.category) wizardData.category = item.category;
-      }
+      inputEl: document.getElementById('wiz-item-name'), containerEl: document.getElementById('wiz-item-dup-box'), items: rootItems, icon: '📦', onSelect: (item) => { wizardData.itemName = item.name; if (item.category) wizardData.category = item.category; }
     });
     const activeItemSubtypes = wizardData.selectedParentItem ? (wizardData.selectedParentItem.subtypes || []) : [];
     attachDuplicateDetector({
-      inputEl: document.getElementById('wiz-subtype-name'),
-      containerEl: document.getElementById('wiz-subtype-dup-box'),
-      items: activeItemSubtypes,
-      icon: '🏷️',
-      onSelect: (sub) => { wizardData.subtypeName = sub.name; }
+      inputEl: document.getElementById('wiz-subtype-name'), containerEl: document.getElementById('wiz-subtype-dup-box'), items: activeItemSubtypes, icon: '🏷️', onSelect: (sub) => { wizardData.subtypeName = sub.name; }
     });
 
     const catContainer = document.getElementById('wiz-cat-container');
@@ -364,7 +350,7 @@ export function openAddItemWizard(options = {}) {
       if (finishBtn) { finishBtn.disabled = true; finishBtn.textContent = 'Saving...'; }
 
       try {
-        await commitAtomicChain({
+        const res = await commitAtomicChain({
           category: wizardData.category,
           rootItemName: wizardData.itemName,
           subtypeName: wizardData.subtypeName,
@@ -373,6 +359,17 @@ export function openAddItemWizard(options = {}) {
         closeAddItemWizard();
         if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
         if (typeof window.renderProductBank === 'function') window.renderProductBank();
+        const cb = onComplete || window.__onHierarchyComplete;
+        if (typeof cb === 'function') {
+          window.__onHierarchyComplete = null;
+          cb(res || {
+            ingredientId: res?.rootItem?.id || wizardData.itemName,
+            subtypeId: res?.subtype?.id || wizardData.subtypeName,
+            subtypeName: wizardData.subtypeName,
+            parentName: wizardData.itemName,
+            category: wizardData.category
+          });
+        }
       } catch (err) {
         console.error('[AddItemWizardUI] Commit error:', err);
         if (finishBtn) { finishBtn.disabled = false; finishBtn.textContent = 'Finish & Link to Bank'; }
