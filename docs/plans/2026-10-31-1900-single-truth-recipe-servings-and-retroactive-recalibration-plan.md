@@ -8,7 +8,7 @@ topic: single-truth-recipe-servings-and-macro-recalibration
 # Single-Truth Recipe Servings Architecture & Retroactive Macro Recalibration
 
 > Created: 2026-10-31  
-> Status: Draft  
+> Status: Implemented  
 > Branch: dev/recipe-bulk-parse-instruction-fix  
 
 ---
@@ -31,28 +31,28 @@ This plan refactors the Recipe Wizard and macro engine to a **Single-Truth Recip
 ## 2. Requirements & Acceptance Criteria
 
 ### A. Recipe Wizard Simplification
-- [ ] **Remove `currentServings`**: Completely purge `currentServings` from `RecipeWizardState.js`, `RecipeWizardViews.js`, `RecipeWizardStep1Handlers.js`, and `RecipeWizardModal.js`.
-- [ ] **Single Yield Input in Step 1**: Step 1A (Manual Form) features a single input: `Recipe Yield (Servings)`. Default to parsed value or 4.
-- [ ] **Non-Destructive Step 2 Mapping**: Step 2 displays the author's yield (`Yield: X servings`) without mutating ingredient quantities into `scaledQty`. The input values remain the true recipe quantities.
-- [ ] **Unified Servings in Step 3**: Step 3 displays and edits the canonical `recipe.servings`. Changing it immediately recalibrates macros:
+- [x] **Remove `currentServings`**: Completely purge `currentServings` from `RecipeWizardState.js`, `RecipeWizardViews.js`, `RecipeWizardStep1Handlers.js`, and `RecipeWizardModal.js`.
+- [x] **Single Yield Input in Step 1**: Step 1A (Manual Form) features a single input: `Recipe Yield (Servings)`. Default to parsed value or 4.
+- [x] **Non-Destructive Step 2 Mapping**: Step 2 displays the author's yield (`Yield: X servings`) without mutating ingredient quantities into `scaledQty`. The input values remain the true recipe quantities.
+- [x] **Unified Servings in Step 3**: Step 3 displays and edits the canonical `recipe.servings`. Changing it immediately recalibrates macros:
   $$\text{Calories Per Serving} = \frac{\sum (\text{canonical ingredient qty} \times \text{product kcal})}{\text{recipe.servings}}$$
-- [ ] **Deterministic Dual-Profile Split**: Step 3 crossbar shows the exact dinner split for 2 people:
+- [x] **Deterministic Dual-Profile Split**: Step 3 crossbar shows the exact dinner split for 2 people:
   - Total dinner cooked = 2 portions.
   - **Elliott** ($59\%$ of 2 portions = 1.18 portions): $\text{Calories Per Serving} \times 1.18$.
   - **Chloe** ($41\%$ of 2 portions = 0.82 portions): $\text{Calories Per Serving} \times 0.82$.
-- [ ] **Canonical Persistence**: `onSaveRecipe` writes unscaled `qty` into Firestore and sets `servings: safeServings`. Does not save `targetServings` or `baseServings`.
+- [x] **Canonical Persistence**: `onSaveRecipe` writes unscaled `qty` into Firestore and sets `servings: safeServings`. Does not save `targetServings` or `baseServings`.
 
 ### B. Dynamic Runtime Scaling
-- [ ] In `RecipeDetailModalService.js`:
+- [x] In `RecipeDetailModalService.js`:
   - "Shared (2)" scales by $\frac{2}{\text{recipe.servings}}$.
   - "Elliott (1)" scales by $\frac{1.18}{\text{recipe.servings}}$.
   - "Chloe (1)" scales by $\frac{0.82}{\text{recipe.servings}}$.
-- [ ] In `ShoppingListService.js`:
+- [x] In `ShoppingListService.js`:
   - Shopping multiplier continues to calculate $\frac{\text{meal.servings}}{\text{recipe.servings}}$.
 
 ### C. Retroactive Recalibration for Existing Recipes
-- [ ] Implement `batchRecalibrateAllHouseholdRecipes()` in `RecipeFirestoreRepository.js` / `DataQualityScannerService.js`.
-- [ ] Expose an action button in Data Quality / Settings (or executable script) to sweep all existing recipes in `households/elliott-chloe/recipes`, recalibrating their macros and fit scores against the new product-first, drained-weight engine.
+- [x] Implement `batchRecalibrateAllHouseholdRecipes()` in `RecipeFirestoreRepository.js` / `DataQualityScannerService.js`.
+- [x] Expose an action button in Data Quality / Settings (or executable script) to sweep all existing recipes in `households/elliott-chloe/recipes`, recalibrating their macros and fit scores against the new product-first, drained-weight engine.
 
 ---
 
