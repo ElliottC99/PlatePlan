@@ -7,6 +7,7 @@
 import { getState, setProducts, setIngredients } from '../store/store.js';
 import { saveProduct, deleteProduct } from '../services/ProductRepository.js';
 import { saveRootItem } from '../services/RootItemRepository.js';
+import { commitAtomicChain } from '../services/PantryTaxonomyService.js';
 import { reallocateProduct, setAutoDefaultProduct, getActiveCategories, addSubtypeToIngredient } from '../models/PantryHierarchyModel.js';
 import { promptReallocateProduct as openReallocateModal } from '../components/pantry/ReallocateProductModalUI.js';
 import { showCustomAlert, showCustomConfirm } from '../components/ui/DialogHelpers.js';
@@ -30,6 +31,7 @@ export function cancelManualIng() {
   activeEditingProductId = null;
   // A pre-link from Link Product must not carry over to the next, unrelated new product.
   window.__prefilledResolveBinding = null;
+  window.__pendingHierarchyCommit = null;
 
   if (window.__modalContext && window.__modalContext.returnTo === 'data-quality') {
     const ctx = window.__modalContext;
@@ -300,6 +302,26 @@ export async function saveManualIng() {
     isAutoDefault: activeEditingProductId ? (currentProds.find(p => String(p.id) === String(activeEditingProductId))?.isAutoDefault || false) : isAutoDefault,
     updatedAt: new Date().toISOString()
   };
+
+  if (window.__pendingHierarchyCommit) {
+    const pending = window.__pendingHierarchyCommit;
+    window.__pendingHierarchyCommit = null;
+    window.__prefilledResolveBinding = null;
+    try {
+      await commitAtomicChain({
+        category: pending.category || inheritedCategory || 'General',
+        rootItemName: pending.rootItemName,
+        subtypeName: pending.subtypeName || 'Standard',
+        productPayload: updatedProd
+      });
+      cancelManualIng();
+      renderProductBank();
+      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+      return;
+    } catch (e) {
+      console.error('[ProductBankView] Atomic commit failed:', e);
+    }
+  }
 
   if (window.__prefilledResolveBinding) {
     window.__prefilledResolveBinding = null;
