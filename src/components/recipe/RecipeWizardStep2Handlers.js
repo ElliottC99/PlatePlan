@@ -17,7 +17,7 @@ import { toTitleCase } from '../../utils/stringUtils.js';
 function recalculateWizardMacros(rec) {
   if (!rec) return;
 
-  const targetServings = Number(rec.targetServings || rec.serves || 2);
+  const targetServings = Number(rec.targetServings || rec.serves || 4);
   const storeState = getState();
   const products = storeState.products || [];
 
@@ -63,7 +63,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
 
   const updateServingsScale = (newServings) => {
     const rec = wizardState.activeRecipe || {};
-    const baseServings = Number(rec.servings || rec.currentServings) || 2;
+    const baseServings = Number(rec.servings || rec.currentServings) || 4;
     const targetServings = Math.max(1, Math.min(24, parseInt(newServings, 10) || baseServings));
 
     wizardState.targetServings = targetServings;

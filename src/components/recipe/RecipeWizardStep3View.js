@@ -244,7 +244,7 @@ export function renderState3Review() {
           </div>
           <div>
             <label for="tp-serving-size" style="display:block; font-size:11px; font-weight:600; color:var(--text2);">Servings</label>
-            <input type="number" id="tp-serving-size" name="rev_servings" value="${recipe.servings || recipe.serves || 2}" style="width:100%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
+            <input type="number" id="tp-serving-size" name="rev_servings" value="${recipe.servings || recipe.serves || 4}" style="width:100%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
           </div>
           <div>
             <label for="wiz-rev-prepm" style="display:block; font-size:11px; font-weight:600; color:var(--text2);">Prep / Cook (Mins)</label>

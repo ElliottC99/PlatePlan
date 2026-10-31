@@ -100,7 +100,7 @@ export function recalculateWizardMacros(recipeObj) {
     }
   });
 
-  const serves = Number(recipeObj.servings || recipeObj.serves || recipeObj.targetServings || 2) || 2;
+  const serves = Number(recipeObj.servings || recipeObj.serves || recipeObj.targetServings || 4) || 4;
   const perServing = {
     calories: Math.round(totalCal / serves),
     protein: Math.round((totalProt / serves) * 10) / 10,
@@ -156,7 +156,7 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
   const servingsInput = document.getElementById('wiz-rev-servings') || modalWrap.querySelector('#wiz-rev-servings');
 
   const safeTitle = toTitleCase(titleInput?.value || rec.title || 'Untitled');
-  const safeServings = parseInt(servingsInput?.value, 10) || rec.targetServings || rec.servings || 2;
+  const safeServings = parseInt(servingsInput?.value, 10) || rec.targetServings || rec.servings || 4;
 
   rec.title = safeTitle;
   rec.name = safeTitle;
