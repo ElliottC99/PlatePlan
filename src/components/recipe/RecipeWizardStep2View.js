@@ -6,7 +6,6 @@
 import { wizardState } from './RecipeWizardState.js';
 import { getState } from '../../store/store.js';
 import { renderTaxonomySearchHTML } from './RecipeWizardTaxonomySearch.js';
-import { scaleEmbeddedVolume } from '../../services/PortionCalculationService.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
 
 function escapeHtml(str) {
@@ -26,11 +25,9 @@ function escapeAttr(str) {
 export function renderState2Mapping() {
   const activeRecipe = wizardState.activeRecipe || {};
   const recipe = activeRecipe;
-  const baseServings = Number(activeRecipe.baseServings || 4);
-  activeRecipe.baseServings = baseServings;
-  const targetServings = Number(activeRecipe.targetServings || baseServings);
-  activeRecipe.targetServings = targetServings;
-  const scaleFactor = baseServings > 0 ? (targetServings / baseServings) : 1;
+  const servings = Number(activeRecipe.servings || activeRecipe.serves || 4) || 4;
+  activeRecipe.servings = servings;
+  activeRecipe.serves = servings;
 
   const storeState = getState();
   const ingredientsBank = storeState.ingredients || [];
@@ -40,26 +37,20 @@ export function renderState2Mapping() {
   (recipe.ingredientSections || []).forEach((sec, sIdx) => {
     let rowsHtml = '';
     (sec.ingredients || []).forEach((item, iIdx) => {
-      if (item.baseQty === undefined || item.baseQty === null) {
-        item.baseQty = Number(item.qty) || 1;
-      }
-      const scaledQty = Number((item.baseQty * scaleFactor).toFixed(1));
-      item.scaledQty = scaledQty;
+      const qty = Number(item.qty) || 1;
+      item.qty = qty;
 
       const fallbackBadge = '';
 
       const isStock = String(item.name || '').toLowerCase().includes('stock') || String(item.name || '').toLowerCase().includes('bouillon') || String(item.name || '').toLowerCase().includes('cube') || String(item.raw || '').toLowerCase().includes('stock') || String(item.raw || '').toLowerCase().includes('bouillon') || String(item.raw || '').toLowerCase().includes('cube');
 
-      if (isStock) {
+      if (isStock && item.waterMl === undefined) {
         const rawLower = String(item.raw || '').toLowerCase();
         const mlMatch = /(\d+)\s*(?:ml|millilitres|ml\b)/i.exec(rawLower);
-        if (item.baseWaterMl === undefined) {
-          item.baseWaterMl = mlMatch ? parseInt(mlMatch[1], 10) : (item.waterMl ?? 400);
-        }
-        item.waterMl = Math.round(item.baseWaterMl * scaleFactor);
+        item.waterMl = mlMatch ? parseInt(mlMatch[1], 10) : 400;
       }
 
-      const scaledRaw = scaleEmbeddedVolume(item.raw || '', scaleFactor);
+      const rawDisplay = item.raw || `${qty} ${item.unit || 'g'} ${item.name || ''}`.trim();
 
       const waterInputHtml = isStock ? `
         <div style="margin-top: 4px; display: flex; align-items: center; gap: 4px;">
@@ -81,11 +72,11 @@ export function renderState2Mapping() {
       rowsHtml += `
         <tr style="border-bottom: 1px solid var(--border, #eee);">
           <td style="padding: 6px;">
-            <div style="font-size: 11px; color: var(--text2, #666); font-style: italic;">Raw: "${escapeHtml(scaledRaw)}"</div>
+            <div style="font-size: 11px; color: var(--text2, #666); font-style: italic;">Raw: "${escapeHtml(rawDisplay)}"</div>
             ${fallbackBadge}
           </td>
           <td style="padding: 6px; width: 75px;">
-            <input type="number" step="any" id="wiz-ing-qty-${sIdx}-${iIdx}" name="wiz_ing_qty_${sIdx}_${iIdx}" aria-label="Quantity for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-qty" data-sidx="${sIdx}" data-iidx="${iIdx}" data-base-qty="${item.baseQty}" value="${scaledQty}" style="width: 100%; padding: 4px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px;" />
+            <input type="number" step="any" id="wiz-ing-qty-${sIdx}-${iIdx}" name="wiz_ing_qty_${sIdx}_${iIdx}" aria-label="Quantity for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-qty" data-sidx="${sIdx}" data-iidx="${iIdx}" value="${qty}" style="width: 100%; padding: 4px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px;" />
           </td>
           <td style="padding: 6px; width: 75px;">
             <select id="wiz-ing-unit-${sIdx}-${iIdx}" name="wiz_ing_unit_${sIdx}_${iIdx}" aria-label="Unit for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-unit" data-sidx="${sIdx}" data-iidx="${iIdx}" style="width: 100%; padding: 4px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px;">
@@ -149,21 +140,15 @@ export function renderState2Mapping() {
         </div>
       </div>
 
-      <div class="wiz-scaling-banner" id="wiz-scaling-banner" style="background: var(--purple-bg, #eef2ff); border: 1px solid rgba(79,70,229,0.2); padding: 10px 16px; border-radius: 10px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+      <div class="wiz-servings-banner" id="wiz-servings-banner" style="background: var(--purple-bg, #eef2ff); border: 1px solid rgba(79,70,229,0.2); padding: 10px 16px; border-radius: 10px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 14px; font-weight: 600; color: var(--purple, #4f46e5);">Scaling &amp; Density Normalization</span>
-          <span style="font-size: 12px; color: var(--text2, #666);">(Base: <strong id="wiz-base-servings-label">${baseServings}</strong> servings)</span>
+          <span style="font-size: 14px; font-weight: 600; color: var(--purple, #4f46e5);">Recipe Mapping</span>
+          <span style="font-size: 12px; color: var(--text2, #666);">Canonical Author Quantities</span>
         </div>
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <label for="wiz-target-servings-input" style="font-size: 13px; font-weight: 600; color: var(--text, #111);">Target Servings:</label>
-          <div style="display: flex; align-items: center; gap: 4px;">
-            <button type="button" id="wiz-scale-down-btn" class="btn sm secondary" style="padding: 2px 8px; font-weight: 700; cursor: pointer;">−</button>
-            <input type="number" id="wiz-target-servings-input" min="1" max="24" step="1" value="${targetServings}" style="width: 50px; text-align: center; font-size: 13px; font-weight: 700; padding: 4px; border: 1px solid var(--border, #ccc); border-radius: 6px;">
-            <button type="button" id="wiz-scale-up-btn" class="btn sm secondary" style="padding: 2px 8px; font-weight: 700; cursor: pointer;">+</button>
-          </div>
-          <span id="wiz-scale-factor-badge" class="badge" style="background: #e0e7ff; color: #3730a3; font-weight: 700; font-size: 12px;">
-            ${scaleFactor.toFixed(2)}x
-          </span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label for="wiz-servings-input" style="font-size: 13px; font-weight: 600; color: var(--text, #111);">Yield:</label>
+          <input type="number" id="wiz-servings-input" min="1" max="50" step="1" value="${servings}" style="width: 55px; text-align: center; font-size: 13px; font-weight: 700; padding: 4px; border: 1px solid var(--border, #ccc); border-radius: 6px;">
+          <span style="font-size: 12px; color: var(--text2, #666);">servings</span>
         </div>
       </div>
 

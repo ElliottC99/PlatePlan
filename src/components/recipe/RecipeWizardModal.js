@@ -39,9 +39,6 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
       wizardState.activeRecipe = {
         id: found.id,
         title: found.title || found.name || '',
-        baseServings: safeServes,
-        currentServings: safeServes,
-        targetServings: Number(found.targetServings || safeServes) || safeServes,
         servings: safeServes,
         serves: safeServes,
         prepTime: found.prepTime !== undefined && found.prepTime !== null ? found.prepTime : { hours: '', minutes: '' },
@@ -117,7 +114,6 @@ export function loadNextRecipeFromQueue() {
   if (!wizardState.processingQueue.length) return;
   wizardState.currentQueueIndex++;
   const next = wizardState.processingQueue.shift();
-  delete wizardState.targetServings;
 
   const ingRawText = (next.ingredientSections || []).map(sec => {
     const header = sec.sectionTitle && sec.sectionTitle !== 'Main Ingredients' ? `${sec.sectionTitle}:\n` : '';
@@ -130,9 +126,6 @@ export function loadNextRecipeFromQueue() {
 
   wizardState.activeRecipe = {
     title: next.title || 'Imported Recipe',
-    baseServings: safeServes,
-    currentServings: safeServes,
-    targetServings: safeServes,
     servings: safeServes,
     serves: safeServes,
     prepTime: next.prepTime || { hours: 0, minutes: 15 },

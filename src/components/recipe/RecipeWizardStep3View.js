@@ -81,7 +81,7 @@ export function renderMacroBreakdownCrossbar(recipe, variant = 'original') {
     <div class="recipe-modal-crossbar" style="width: 100%; background: var(--surface2, #f5f4ee); border: 1px solid var(--border, #e5e5e5); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px;">
       <div style="display:flex; align-items:center; gap:6px;">
         <span style="font-size: 12px; font-weight: 700; color: var(--text);">Dual-Profile Per-Portion Split</span>
-        <span style="font-size: 11px; color: var(--text2);">(${recipe.targetServings || 4} servings)</span>
+        <span style="font-size: 11px; color: var(--text2);">(${recipe.servings || 4} servings)</span>
       </div>
 
       <div class="recipe-modal-crossbar-macros" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px;">
@@ -249,7 +249,7 @@ export function renderState3Review() {
           </div>
           <div>
             <label for="tp-serving-size" style="display:block; font-size:11px; font-weight:600; color:var(--text2);">Servings</label>
-            <input type="number" id="tp-serving-size" name="rev_servings" value="${recipe.targetServings || recipe.servings || recipe.serves || 4}" style="width:100%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
+            <input type="number" id="tp-serving-size" name="rev_servings" value="${recipe.servings || recipe.serves || 4}" style="width:100%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
           </div>
           <div>
             <label for="wiz-rev-prepm" style="display:block; font-size:11px; font-weight:600; color:var(--text2);">Prep / Cook (Mins)</label>

@@ -51,8 +51,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
     btnNext1A.onclick = () => {
       const rawTitle = modalWrap.querySelector('#wiz-title')?.value.trim() || 'Untitled Recipe';
       const title = toTitleCase(rawTitle);
-      const curServ = parseInt(modalWrap.querySelector('#wiz-current-servings')?.value, 10) || 4;
-      const tgtServ = parseInt(modalWrap.querySelector('#wiz-target-servings')?.value, 10) || 4;
+      const serv = parseInt(modalWrap.querySelector('#wiz-servings')?.value, 10) || 4;
       const prepH = parseInt(modalWrap.querySelector('#wiz-prep-hours')?.value, 10) || 0;
       const prepM = parseInt(modalWrap.querySelector('#wiz-prep-mins')?.value, 10) || 0;
       const cookH = parseInt(modalWrap.querySelector('#wiz-cook-hours')?.value, 10) || 0;
@@ -89,9 +88,8 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
         .filter(Boolean);
 
       wizardState.activeRecipe.title = title;
-      wizardState.activeRecipe.baseServings = curServ;
-      wizardState.activeRecipe.currentServings = curServ;
-      wizardState.activeRecipe.targetServings = tgtServ;
+      wizardState.activeRecipe.servings = serv;
+      wizardState.activeRecipe.serves = serv;
       wizardState.activeRecipe.prepTime = { hours: prepH, minutes: prepM };
       wizardState.activeRecipe.cookTime = { hours: cookH, minutes: cookM };
       wizardState.activeRecipe.ingredientsRaw = ingRaw;
@@ -125,7 +123,6 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
         return;
       }
 
-      delete wizardState.targetServings;
       wizardState.processingQueue = parsedRecipes;
       wizardState.currentQueueTotal = parsedRecipes.length;
       wizardState.currentQueueIndex = 0;
@@ -187,7 +184,6 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
     const btnRepaste = modalWrap.querySelector('#btn-repaste-text');
     if (btnRepaste) {
       btnRepaste.onclick = () => {
-        delete wizardState.targetServings;
         wizardState.currentStep = 1;
         renderWizardModal();
       };
@@ -219,7 +215,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
               ingredientSections: rec.ingredientSections,
               ingredients: allIngredients.map(i => ({
                 name: i.name,
-                qty: i.scaledQty || i.qty || 1,
+                qty: i.qty || 1,
                 unit: i.unit || 'qty',
                 raw: i.raw || i.name,
                 ingredientId: i.ingredientId || null,
@@ -255,7 +251,6 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
     const btnStartReview = modalWrap.querySelector('#btn-start-queue-review');
     if (btnStartReview) {
       btnStartReview.onclick = () => {
-        delete wizardState.targetServings;
         wizardState.initialQueueTotal = wizardState.processingQueue.length;
         wizardState.currentQueueIndex = 0;
         loadNextRecipeFromQueue();

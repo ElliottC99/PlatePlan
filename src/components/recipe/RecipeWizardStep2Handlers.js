@@ -22,68 +22,13 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
     if (newWb) newWb.scrollTop = st;
   };
 
-  const targetServingsInput = modalWrap.querySelector('#wiz-target-servings-input');
-  const scaleDownBtn = modalWrap.querySelector('#wiz-scale-down-btn');
-  const scaleUpBtn = modalWrap.querySelector('#wiz-scale-up-btn');
-  const scaleFactorBadge = modalWrap.querySelector('#wiz-scale-factor-badge');
-
-  const updateServingsScale = (newServings) => {
-    const rec = wizardState.activeRecipe || {};
-    const baseServings = Number(rec.baseServings || 4);
-    rec.baseServings = baseServings;
-    const targetServings = Math.max(1, Math.min(24, parseInt(newServings, 10) || baseServings));
-
-    wizardState.targetServings = targetServings;
-    rec.targetServings = targetServings;
-
-    if (targetServingsInput) targetServingsInput.value = targetServings;
-
-    const newScale = targetServings / baseServings;
-    if (scaleFactorBadge) scaleFactorBadge.textContent = `${newScale.toFixed(2)}x`;
-
-    modalWrap.querySelectorAll('.wiz-ing-qty').forEach(input => {
-      const sIdx = parseInt(input.dataset.sidx, 10);
-      const iIdx = parseInt(input.dataset.iidx, 10);
-      const baseQty = parseFloat(input.dataset.baseQty) || parseFloat(input.value) || 1;
-      const scaledQty = Math.round(baseQty * newScale * 100) / 100;
-      input.value = scaledQty;
-
-      const item = rec.ingredientSections[sIdx]?.ingredients[iIdx];
-      if (item) {
-        item.scaledQty = scaledQty;
-        item.baseQty = baseQty;
-      }
-    });
-
-    modalWrap.querySelectorAll('.wiz-ing-water-ml').forEach(input => {
-      const sIdx = parseInt(input.dataset.sidx, 10);
-      const iIdx = parseInt(input.dataset.iidx, 10);
-      const item = rec.ingredientSections[sIdx]?.ingredients[iIdx];
-      if (item && item.baseWaterMl) {
-        const scaledWater = Math.round(item.baseWaterMl * newScale);
-        input.value = scaledWater;
-        item.waterMl = scaledWater;
-      }
-    });
-
-    recalculateWizardMacros(wizardState.activeRecipe);
-  };
-
-  if (targetServingsInput) {
-    targetServingsInput.oninput = (e) => updateServingsScale(e.target.value);
-  }
-
-  if (scaleDownBtn) {
-    scaleDownBtn.onclick = () => {
-      const current = parseInt(targetServingsInput?.value, 10) || (wizardState.activeRecipe.targetServings || 4);
-      if (current > 1) updateServingsScale(current - 1);
-    };
-  }
-
-  if (scaleUpBtn) {
-    scaleUpBtn.onclick = () => {
-      const current = parseInt(targetServingsInput?.value, 10) || (wizardState.activeRecipe.targetServings || 4);
-      if (current < 24) updateServingsScale(current + 1);
+  const servingsInput = modalWrap.querySelector('#wiz-servings-input');
+  if (servingsInput) {
+    servingsInput.oninput = (e) => {
+      const val = Math.max(1, parseInt(e.target.value, 10) || 4);
+      wizardState.activeRecipe.servings = val;
+      wizardState.activeRecipe.serves = val;
+      recalculateWizardMacros(wizardState.activeRecipe);
     };
   }
 
@@ -194,10 +139,9 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
   if (btnNext2) {
     btnNext2.onclick = () => {
       syncStep2InputsToState(modalWrap);
-      const finalServings = wizardState.activeRecipe.targetServings || wizardState.activeRecipe.baseServings || 4;
+      const finalServings = Number(wizardState.activeRecipe.servings || wizardState.activeRecipe.serves || 4) || 4;
       wizardState.activeRecipe.servings = finalServings;
       wizardState.activeRecipe.serves = finalServings;
-      wizardState.activeRecipe.targetServings = finalServings;
       
       // Auto-format all section headers to Title Case
       if (wizardState.activeRecipe.ingredientSections) {

@@ -138,7 +138,7 @@ export function recalculateWizardMacros(recipeObj) {
     });
 
     if (matchedProduct) {
-      const qty = Number(item.scaledQty ?? item.qty ?? item.amount ?? 1) || 1;
+      const qty = Number(item.qty ?? item.amount ?? 1) || 1;
       const unit = item.unit || 'g';
       const nut = calcFn(matchedProduct, qty, unit);
       totalCal += (nut.kcal ?? nut.cal ?? 0);
@@ -148,7 +148,7 @@ export function recalculateWizardMacros(recipeObj) {
     }
   });
 
-  const serves = Number(recipeObj.targetServings || recipeObj.servings || recipeObj.serves || 4) || 4;
+  const serves = Number(recipeObj.servings || recipeObj.serves || 4) || 4;
   const perServing = {
     calories: Math.round(totalCal / serves),
     protein: Math.round((totalProt / serves) * 10) / 10,
@@ -187,7 +187,6 @@ export function onNextDish(modalWrap, { loadNextRecipeFromQueue, renderWizardMod
   if (wizardState.activeRecipe) {
     recalculateWizardMacros(wizardState.activeRecipe);
   }
-  delete wizardState.targetServings;
   loadNextRecipeFromQueue();
   wizardState.currentStep = 2;
   renderWizardModal();
@@ -218,11 +217,10 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
   const servingsInput = document.getElementById('tp-serving-size') || document.getElementById('wiz-rev-servings') || modalWrap.querySelector('#tp-serving-size') || modalWrap.querySelector('#wiz-rev-servings');
 
   const safeTitle = toTitleCase(titleInput?.value || rec.title || 'Untitled');
-  const safeServings = parseInt(servingsInput?.value, 10) || rec.targetServings || rec.servings || 4;
+  const safeServings = parseInt(servingsInput?.value, 10) || rec.servings || rec.serves || 4;
 
   rec.title = safeTitle;
   rec.name = safeTitle;
-  rec.targetServings = safeServings;
   rec.servings = safeServings;
   rec.serves = safeServings;
 
@@ -261,7 +259,6 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
     title: safeTitle,
     servings: safeServings,
     serves: safeServings,
-    targetServings: safeServings,
     prepTime: rec.prepTime,
     cookTime: rec.cookTime,
     time: (rec.prepTime.hours * 60 + rec.prepTime.minutes) + (rec.cookTime.hours * 60 + rec.cookTime.minutes),
@@ -271,7 +268,7 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
     ingredientSections: rec.ingredientSections,
     ingredients: rec.ingredients.map(i => ({
       name: i.name,
-      qty: i.scaledQty || i.qty,
+      qty: Number(i.qty) || 1,
       unit: i.unit,
       raw: i.raw,
       ingredientId: i.ingredientId,
