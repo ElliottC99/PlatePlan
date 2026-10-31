@@ -87,7 +87,7 @@ tags: [ui, ux, scroll-to-top, accessibility, emoji, macros, vegetarian]
 **Rationale:** Scope is crystal-clear, edge cases (regex preservation in `unitConverter.js` and mobile nav clearance) are identified, and all changes fit cleanly within PlatePlan's modular architecture.
 
 ## Next Steps
-- [ ] Run `/plan` to generate the step-by-step implementation plan in `plans/`.
+- [x] Run `/plan` to generate the step-by-step implementation plan in `plans/`.
 
 ## References
 - `src/views/TodayView.js`

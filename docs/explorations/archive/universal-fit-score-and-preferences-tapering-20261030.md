@@ -164,4 +164,4 @@ Right now, `src/utils/macroScoringUtils.js` secretly looks for `state.userPrefs.
 
 ## Next Steps
 - [x] Align with user on tapering UI and "All Meal Types" highest-score behavior.
-- [ ] Create implementation plan in `plans/2026-10-30-universal-fit-score-and-tapering-controls.md` via `/plan`.
+- [x] Create implementation plan in `plans/2026-10-30-universal-fit-score-and-tapering-controls.md` via `/plan`.
