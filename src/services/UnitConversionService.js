@@ -53,7 +53,9 @@ const METRIC_VOLUME_UNITS = new Set([
 // Estimated weights for loose measures, per unit.
 const ESTIMATED_GRAMS_PER_UNIT = {
   pinch: 0.5, pinches: 0.5, dash: 0.5, dashes: 0.5,
-  drizzle: 0.5, drizzles: 0.5, splash: 0.5, splashes: 0.5,
+  drizzle: 5, drizzles: 5, splash: 5, splashes: 5,
+  sprig: 2, sprigs: 2,
+  leaf: 1, leaves: 1,
   handful: 30, handfuls: 30,
   bunch: 20, bunches: 20,
   'small bunch': 15, 'small bunches': 15,
@@ -68,8 +70,6 @@ const COUNT_UNIT_GRAMS = {
   slice: 30, slices: 30,
   piece: 100, pieces: 100,
   stalk: 50, stalks: 50,
-  sprig: 2, sprigs: 2,
-  leaf: 1, leaves: 1,
   cube: 10, cubes: 10,
   pod: 5, pods: 5
 };
@@ -167,7 +167,21 @@ function inferIngredientWeightByName(name) {
   if (text.includes('oil') && (text.includes('frying') || text.includes('cooking') || text.includes('drizzle') || !text.includes('pack'))) {
     return 15;
   }
+  // Discrete herbs, leaves, or sprigs in name
+  if (text.includes('sprig')) return 2;
+  if (text.includes('leaf') || text.includes('leaves')) return 1;
+  if (text.includes('sesame') || text.includes('sprinkle')) return 2;
+  // Spring onions / scallions (prioritize before whole onion collision)
+  if (text.includes('spring onion') || text.includes('scallion')) return 15;
+  // Olives (prioritize before oil or default 100g)
+  if (text.includes('olive') && !text.includes('oil')) return 3.5;
+  // Wraps / tortillas
+  if (text.includes('tortilla') || text.includes('wrap')) return 30;
+  // Sausages
+  if (text.includes('sausage') || text.includes('banger')) return 55;
+
   for (const [kw, g] of Object.entries(COMMON_DISCRETE_WEIGHTS)) {
+    if (kw === 'onion' && (text.includes('spring onion') || text.includes('scallion'))) continue;
     if (kw === 'pepper' && (text.includes('black pepper') || text.includes('white pepper') || text.includes('cayenne') || text.includes('peppercorn'))) {
       continue;
     }

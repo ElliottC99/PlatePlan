@@ -64,7 +64,13 @@ export function renderFitScoreBadge(fitScoreOrRecipe, mealTypeOrOptions = 'all',
     }
   }
 
-  if (!fitResult || fitResult.score <= 0 || fitResult.error || fitResult.isMissingMacros) {
+  const isActuallyMissing = !fitResult 
+    || fitResult.isMissingMacros 
+    || fitResult.error 
+    || typeof fitResult.score !== 'number'
+    || Number.isNaN(fitResult.score);
+
+  if (isActuallyMissing) {
     return `<span class="pp-fit-badge pp-fit-neutral" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:#f1f5f9;color:#64748b;border:1px solid #cbd5e1" title="${escapeHtml(fitResult?.error || 'Missing Calorie/Protein Data')}">⚪ --</span>`;
   }
 

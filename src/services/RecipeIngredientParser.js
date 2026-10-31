@@ -28,7 +28,7 @@ export const UNIT_MAP = {
   handful: 'handful', handfuls: 'handful', bunch: 'bunch', bunches: 'bunch',
   pack: 'pack', packet: 'pack', packets: 'pack', package: 'pack', packages: 'pack', pkg: 'pack',
   head: 'head', heads: 'head', stalk: 'stalk', stalks: 'stalk', stick: 'stalk', sticks: 'stalk',
-  sprig: 'sprig', sprigs: 'sprig', dash: 'dash', dashes: 'dash', drizzle: 'dash', splash: 'dash',
+  sprig: 'sprig', sprigs: 'sprig', leaf: 'leaf', leaves: 'leaf', dash: 'dash', dashes: 'dash', drizzle: 'dash', splash: 'dash',
   drop: 'dash', drops: 'dash', oz: 'oz', ounce: 'oz', ounces: 'oz', lb: 'lb', lbs: 'lb', pound: 'lb', pounds: 'lb'
 };
 
@@ -228,6 +228,20 @@ export function parseIngredientString(rawStr) {
     if (UNIT_MAP[word]) {
       parsedUnit = UNIT_MAP[word];
       rawName = (unitMatch[2] || '').replace(/^(?:of\s+|tins?\s+(?:of\s+)?|cans?\s+(?:of\s+)?|packs?\s+(?:of\s+)?)/i, '').trim();
+    }
+  }
+
+  // Trailing measurement unit check e.g. "4 rosemary sprigs", "3 thyme sprigs", "2 large bay leaves", "4 garlic cloves"
+  if (parsedUnit === 'qty') {
+    const trailingUnitMatch = remainder.match(/^(.*?)\s+(sprigs?|leaves?|leaf|cloves?|slices?|stalks?|heads?|bulbs?)\b(?:\s+(?:of\s+)?(.*))?$/i);
+    if (trailingUnitMatch) {
+      const uWord = trailingUnitMatch[2].toLowerCase();
+      if (UNIT_MAP[uWord]) {
+        parsedUnit = UNIT_MAP[uWord];
+        const prefix = trailingUnitMatch[1].trim();
+        const suffix = (trailingUnitMatch[3] || '').trim();
+        rawName = suffix ? `${prefix} ${suffix}`.trim() : prefix;
+      }
     }
   }
 
