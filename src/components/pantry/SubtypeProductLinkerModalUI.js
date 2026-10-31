@@ -6,6 +6,7 @@
 
 import { getState, setProducts } from '../../store/store.js';
 import { saveProduct } from '../../services/ProductRepository.js';
+import { parseTescoProduct, cleanProductName, toTitleCase } from '../../services/TescoImportService.js';
 
 const escapeHTML = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -255,11 +256,18 @@ export function openTescoImportModal(subtypeId, parentId, onSuccess = null, cust
       return;
     }
 
-    parsed.category = parentCategory;
+    const res = parseTescoProduct(parsed);
+    const cleanData = res.success ? res.data : parsed;
+    const brand = toTitleCase(cleanData.brand || parsed.brand || 'Tesco');
+    const name = cleanProductName(cleanData.name || parsed.name || parsed.title || '', brand);
+    cleanData.brand = brand;
+    cleanData.name = name;
+    cleanData.title = name;
+    cleanData.category = parentCategory;
     closeModal();
 
     if (typeof onSuccess === 'function') {
-      onSuccess(parsed);
+      onSuccess(cleanData);
       return;
     }
 
@@ -267,7 +275,7 @@ export function openTescoImportModal(subtypeId, parentId, onSuccess = null, cust
       ingredientId: parentId,
       subtypeId: subtypeId || null,
       parentCategory,
-      tescoImportData: parsed
+      tescoImportData: cleanData
     };
     setTimeout(() => {
       if (typeof window.openProductEditModal === 'function') window.openProductEditModal(null);

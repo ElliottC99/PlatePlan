@@ -12,7 +12,7 @@ import { reallocateProduct, setAutoDefaultProduct, getActiveCategories, addSubty
 import { promptReallocateProduct as openReallocateModal } from '../components/pantry/ReallocateProductModalUI.js';
 import { showCustomAlert, showCustomConfirm } from '../components/ui/DialogHelpers.js';
 import { escapeHtml, escapeAttr } from '../utils/stringUtils.js';
-import { parseTescoProduct } from '../services/TescoImportService.js';
+import { parseTescoProduct, cleanProductName, toTitleCase } from '../services/TescoImportService.js';
 
 import { 
   renderProductBankBase, 
@@ -211,8 +211,12 @@ export function openProductEditModal(productIdOrDraft = null) {
     setVal('mi-drained-weight', prod.drainedWeight ?? '');
     setVal('mi-notes', prod.notes ?? '');
   } else if (tescoData) {
-    setVal('mi-name', tescoData.title || tescoData.name || binding.subtypeDraftName || '');
-    setVal('mi-brand', tescoData.brand || 'Tesco');
+    const rawBrand = tescoData.brand || 'Tesco';
+    const brand = toTitleCase(rawBrand);
+    const rawName = tescoData.title || tescoData.name || binding.subtypeDraftName || '';
+    const name = cleanProductName(rawName, brand);
+    setVal('mi-name', name);
+    setVal('mi-brand', brand);
     setVal('mi-cat-search', tescoData.category || binding.parentCategory || 'General');
     setVal('mi-storage', tescoData.storage || 'cupboard');
     setVal('mi-price', tescoData.price || '');

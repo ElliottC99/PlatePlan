@@ -24,15 +24,21 @@ export function cleanProductName(rawName, rawBrand) {
   let name = String(rawName || '').trim();
   const brand = toTitleCase((rawBrand || '').trim());
 
-  if (brand && brand !== 'Generic') {
-    const re = new RegExp('\\b' + brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'ig');
-    name = name.replace(re, '').trim();
+  if (brand && brand.toLowerCase() !== 'generic') {
+    const escaped = brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const leadingRe = new RegExp('^' + escaped + '\\s*[-–:]?\\s*', 'i');
+    if (leadingRe.test(name)) {
+      name = name.replace(leadingRe, '').trim();
+    } else {
+      const wordRe = new RegExp('\\b' + escaped + '\\b', 'ig');
+      name = name.replace(wordRe, '').trim();
+    }
   }
 
-  // Remove trailing pack sizes (e.g., "226g", "2 x 113g", "1kg", "4 pack")
-  name = name.replace(/\s+(?:\d+\s*[x×]\s*)?\d+(?:\.\d+)?\s*(g|kg|ml|l|pack)$/i, '').trim();
   name = name.replace(/^[-,\s]+|[-,\s]+$/g, '').trim();
-  return toTitleCase(name);
+  let titleCased = toTitleCase(name);
+  titleCased = titleCased.replace(/\b(\d+)(g|kg|ml|l)\b/gi, (_, num, unit) => num + unit.toUpperCase());
+  return titleCased;
 }
 
 /**
@@ -151,8 +157,8 @@ export function parseTescoProduct(rawInput) {
     return { success: false, error: 'Invalid payload structure.' };
   }
 
-  const brand = toTitleCase((raw.brand || '').trim());
-  const name = cleanProductName(raw.name, brand);
+  const brand = toTitleCase((raw.brand || '').trim()) || 'Tesco';
+  const name = cleanProductName(raw.name || raw.title, brand);
   const breadcrumbs = raw.diagnostics?.breadcrumbs || '';
   const storageText = raw.diagnostics?.storageText || '';
   const storage = inferStorageLocation(breadcrumbs, storageText);
