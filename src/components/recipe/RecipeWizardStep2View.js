@@ -26,11 +26,10 @@ function escapeAttr(str) {
 export function renderState2Mapping() {
   const activeRecipe = wizardState.activeRecipe || {};
   const recipe = activeRecipe;
-  if (!activeRecipe.baseServings) {
-    activeRecipe.baseServings = Number(activeRecipe.currentServings || activeRecipe.servings) || 4;
-  }
-  const baseServings = Number(activeRecipe.baseServings) || 4;
-  const targetServings = Number(wizardState.targetServings || activeRecipe.targetServings || baseServings);
+  const baseServings = Number(activeRecipe.baseServings || 4);
+  activeRecipe.baseServings = baseServings;
+  const targetServings = Number(activeRecipe.targetServings || baseServings);
+  activeRecipe.targetServings = targetServings;
   const scaleFactor = baseServings > 0 ? (targetServings / baseServings) : 1;
 
   const storeState = getState();

@@ -18,8 +18,10 @@ export const wizardState = {
   currentQueueIndex: 0,
   activeRecipe: {
     title: '',
+    baseServings: 4,
     currentServings: 4,
     targetServings: 4,
+    servings: 4,
     prepTime: { hours: 0, minutes: 15 },
     cookTime: { hours: 0, minutes: 30 },
     mealSuitability: ['Dinner'],
@@ -69,10 +71,13 @@ export function resetWizardState() {
   wizardState.currentQueueTotal = 0;
   wizardState.initialQueueTotal = 0;
   wizardState.currentQueueIndex = 0;
+  delete wizardState.targetServings;
   wizardState.activeRecipe = {
     title: '',
+    baseServings: 4,
     currentServings: 4,
     targetServings: 4,
+    servings: 4,
     prepTime: { hours: 0, minutes: 15 },
     cookTime: { hours: 0, minutes: 30 },
     mealSuitability: ['Dinner'],

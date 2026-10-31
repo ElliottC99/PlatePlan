@@ -35,12 +35,15 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
         ? found.steps.join('\n\n') 
         : (Array.isArray(found.methodSteps) ? found.methodSteps.join('\n\n') : (found.method || found.instructions || ''));
 
+      const safeServes = Number(found.servings || found.serves || 4) || 4;
       wizardState.activeRecipe = {
         id: found.id,
         title: found.title || found.name || '',
-        baseServings: found.servings || found.serves || 4,
-        currentServings: found.servings || found.serves || 4,
-        targetServings: found.targetServings || found.servings || found.serves || 4,
+        baseServings: safeServes,
+        currentServings: safeServes,
+        targetServings: Number(found.targetServings || safeServes) || safeServes,
+        servings: safeServes,
+        serves: safeServes,
         prepTime: found.prepTime !== undefined && found.prepTime !== null ? found.prepTime : { hours: '', minutes: '' },
         cookTime: found.cookTime !== undefined && found.cookTime !== null ? found.cookTime : { hours: '', minutes: '' },
         mealSuitability: found.mealSuitability || (found.types ? found.types.map(t => t.charAt(0).toUpperCase() + t.slice(1)) : ['Dinner']),
@@ -114,6 +117,7 @@ export function loadNextRecipeFromQueue() {
   if (!wizardState.processingQueue.length) return;
   wizardState.currentQueueIndex++;
   const next = wizardState.processingQueue.shift();
+  delete wizardState.targetServings;
 
   const ingRawText = (next.ingredientSections || []).map(sec => {
     const header = sec.sectionTitle && sec.sectionTitle !== 'Main Ingredients' ? `${sec.sectionTitle}:\n` : '';
@@ -122,12 +126,15 @@ export function loadNextRecipeFromQueue() {
   }).join('\n\n');
 
   const methodRawText = (next.instructions || next.methodSteps || []).join('\n');
+  const safeServes = Number(next.servings || next.serves || 4) || 4;
 
   wizardState.activeRecipe = {
     title: next.title || 'Imported Recipe',
-    baseServings: next.servings || 4,
-    currentServings: next.servings || 4,
-    targetServings: next.servings || 4,
+    baseServings: safeServes,
+    currentServings: safeServes,
+    targetServings: safeServes,
+    servings: safeServes,
+    serves: safeServes,
     prepTime: next.prepTime || { hours: 0, minutes: 15 },
     cookTime: next.cookTime || { hours: 0, minutes: 30 },
     mealSuitability: next.mealSuitability || ['Dinner'],

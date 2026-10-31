@@ -125,6 +125,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
         return;
       }
 
+      delete wizardState.targetServings;
       wizardState.processingQueue = parsedRecipes;
       wizardState.currentQueueTotal = parsedRecipes.length;
       wizardState.currentQueueIndex = 0;
@@ -186,6 +187,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
     const btnRepaste = modalWrap.querySelector('#btn-repaste-text');
     if (btnRepaste) {
       btnRepaste.onclick = () => {
+        delete wizardState.targetServings;
         wizardState.currentStep = 1;
         renderWizardModal();
       };
@@ -253,6 +255,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
     const btnStartReview = modalWrap.querySelector('#btn-start-queue-review');
     if (btnStartReview) {
       btnStartReview.onclick = () => {
+        delete wizardState.targetServings;
         wizardState.initialQueueTotal = wizardState.processingQueue.length;
         wizardState.currentQueueIndex = 0;
         loadNextRecipeFromQueue();

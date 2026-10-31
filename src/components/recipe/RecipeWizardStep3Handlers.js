@@ -126,6 +126,7 @@ export function onNextDish(modalWrap, { loadNextRecipeFromQueue, renderWizardMod
   if (wizardState.activeRecipe) {
     recalculateWizardMacros(wizardState.activeRecipe);
   }
+  delete wizardState.targetServings;
   loadNextRecipeFromQueue();
   wizardState.currentStep = 2;
   renderWizardModal();

@@ -63,10 +63,8 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
 
   const updateServingsScale = (newServings) => {
     const rec = wizardState.activeRecipe || {};
-    if (!rec.baseServings) {
-      rec.baseServings = Number(rec.currentServings || rec.servings) || 4;
-    }
-    const baseServings = Number(rec.baseServings) || 4;
+    const baseServings = Number(rec.baseServings || 4);
+    rec.baseServings = baseServings;
     const targetServings = Math.max(1, Math.min(24, parseInt(newServings, 10) || baseServings));
 
     wizardState.targetServings = targetServings;
@@ -230,7 +228,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
   if (btnNext2) {
     btnNext2.onclick = () => {
       syncStep2InputsToState(modalWrap);
-      const finalServings = wizardState.targetServings || wizardState.activeRecipe.targetServings || wizardState.activeRecipe.servings || 4;
+      const finalServings = wizardState.activeRecipe.targetServings || wizardState.activeRecipe.baseServings || 4;
       wizardState.activeRecipe.servings = finalServings;
       wizardState.activeRecipe.serves = finalServings;
       wizardState.activeRecipe.targetServings = finalServings;
