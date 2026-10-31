@@ -233,7 +233,9 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
 
     ingLines.forEach(line => {
       if (/^(?:for\s+the\s+[a-zA-Z\s]+:?|to\s+serve:?|[a-zA-Z\s]+:)$/i.test(line) && !/^\d+\b|serves|yield|prep|cook/i.test(line)) {
-        currentSectionTitle = toTitleCase(line.replace(':', '').trim());
+        let cleanSec = line.replace(':', '').trim();
+        cleanSec = cleanSec.replace(/^for\s+the\s+to\s+serve/i, 'To Serve').replace(/^for\s+the\s+/i, '');
+        currentSectionTitle = toTitleCase(cleanSec);
         if (!sectionsMap[currentSectionTitle]) sectionsMap[currentSectionTitle] = [];
         return;
       }

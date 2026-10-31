@@ -53,6 +53,7 @@ const METRIC_VOLUME_UNITS = new Set([
 // Estimated weights for loose measures, per unit.
 const ESTIMATED_GRAMS_PER_UNIT = {
   pinch: 0.5, pinches: 0.5, dash: 0.5, dashes: 0.5,
+  drizzle: 0.5, drizzles: 0.5, splash: 0.5, splashes: 0.5,
   handful: 30, handfuls: 30,
   bunch: 20, bunches: 20,
   'small bunch': 15, 'small bunches': 15,

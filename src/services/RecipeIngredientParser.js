@@ -1,5 +1,5 @@
 /**
- * src/services/RecipeIngredientParser.js (v3.32.7)
+ * src/services/RecipeIngredientParser.js (v3.32.9)
  * Core ingredient string parsing, units, quantities, fractions, and taxonomy matching.
  */
 
@@ -39,6 +39,7 @@ export function parseQuantity(rawText) {
   let text = String(rawText || '').trim();
   if (!text) return { qty: 1, remainder: '' };
 
+  text = text.replace(/(\d+)\s*([½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])/g, '$1 $2');
   Object.keys(UNICODE_FRACTIONS).forEach(uf => {
     if (text.includes(uf)) {
       text = text.replace(new RegExp(uf, 'g'), UNICODE_FRACTIONS[uf]);
@@ -158,8 +159,32 @@ export function parseIngredientString(rawStr) {
   // Standalone multiplier guard: never allow orphaned multiplier rows
   if (/^\d+(?:\.\d+)?\s*[xX]$/.test(s)) return null;
 
-  // 1. Package multiplier with parenthetical weight e.g. "1 x pack plant-based chicken pieces (about 160g)"
-  const parenMult = s.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s+(?:of\s+)?(.*?)\s*\((?:about|approx\.?)?\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l)\)/i);
+  // Insert space between integer and unicode fraction: "1½" -> "1 ½"
+  let clean = s.replace(/(\d+)\s*([½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])/g, '$1 $2');
+  Object.keys(UNICODE_FRACTIONS).forEach(uf => {
+    if (clean.includes(uf)) {
+      clean = clean.replace(new RegExp(uf, 'g'), UNICODE_FRACTIONS[uf]);
+    }
+  });
+
+  // 1. Loose measures without leading numbers e.g. "handful of parsley", "pinch of black pepper", "drizzle of olive oil"
+  const looseMatch = clean.match(/^(?:a\s+)?(handful|handfuls|pinch|pinches|bunch|bunches|drizzle|drizzles|dash|dashes|splash|splashes)\s+(?:of\s+)?(.*)/i);
+  if (looseMatch) {
+    const u = looseMatch[1].toLowerCase();
+    const rawName = looseMatch[2].trim();
+    const normalised = convertToStrictUnit(1, u, rawName);
+    return {
+      raw: s,
+      qty: normalised.qty,
+      unit: normalised.unit,
+      isEstimated: normalised.isEstimated,
+      name: toTitleCase(rawName),
+      notes: normalised.isEstimated ? 'Est. Weight' : ''
+    };
+  }
+
+  // 2. Package multiplier with parenthetical weight e.g. "1 x pack plant-based chicken pieces (about 160g)"
+  const parenMult = clean.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s+(?:of\s+)?(.*?)\s*\((?:about|approx\.?)?\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l)\)/i);
   if (parenMult) {
     const mult = parseFloat(parenMult[1]) || 1;
     const innerWeight = parseFloat(parenMult[3]) || 0;
@@ -175,8 +200,8 @@ export function parseIngredientString(rawStr) {
     };
   }
 
-  // 2. Explicit unit multiplier e.g. "2 x 280g blocks extra-firm tofu", "1 x 400g tin black beans"
-  const compMatch = s.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tbsp|tablespoons?|tsp|teaspoons?|cups?|oz|fl\s*oz|lbs?|pinch|cm)\b\s*(?:(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s*(?:of\s*)?)?(.*)/i);
+  // 3. Explicit unit multiplier e.g. "2 x 400g tins best-quality Italian chopped tomatoes", "1 x 280g tin jackfruit in water"
+  const compMatch = clean.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tbsp|tablespoons?|tsp|teaspoons?|cups?|oz|fl\s*oz|lbs?|pinch|cm)\b\s*(?:(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s*(?:of\s*)?)?(.*)/i);
   if (compMatch) {
     const multComp = parseFloat(compMatch[1]) || 1;
     const baseWeight = parseFloat(compMatch[2]) || 0;
@@ -192,52 +217,28 @@ export function parseIngredientString(rawStr) {
     };
   }
 
-  // 3. Standard match with strict word boundary on unit
-  const stdMatch = s.match(/^(\d+(?:\.\d+)?(?:\s*[-–]\s*\d+(?:\.\d+)?)?)\s*(g|kg|ml|l|tbsp|tablespoons?|tsp|teaspoons?|cups?|oz|fl\s*oz|lbs?|pinch|cm)\b\s*(.*)/i);
-  if (stdMatch) {
-    let rawQty = stdMatch[1];
-    let qtyStd = parseFloat(rawQty);
-    if (rawQty.includes('-') || rawQty.includes('–')) {
-      const parts = rawQty.split(/[-–]/).map(p => parseFloat(p.trim()));
-      qtyStd = (parts[0] + parts[1]) / 2;
+  // 4. Standard parsed quantity with unit or count
+  const { qty, remainder } = parseQuantity(clean);
+  const unitMatch = remainder.match(/^([a-zA-Z]+)\b\s*(.*)/i);
+  let parsedUnit = 'qty';
+  let rawName = remainder;
+
+  if (unitMatch) {
+    const word = unitMatch[1].toLowerCase();
+    if (UNIT_MAP[word]) {
+      parsedUnit = UNIT_MAP[word];
+      rawName = (unitMatch[2] || '').replace(/^(?:of\s+|tins?\s+(?:of\s+)?|cans?\s+(?:of\s+)?|packs?\s+(?:of\s+)?)/i, '').trim();
     }
-    const rawName = (stdMatch[3] || '').trim();
-    const normalised = convertToStrictUnit(qtyStd, stdMatch[2], rawName);
-    return {
-      raw: s,
-      qty: normalised.qty,
-      unit: normalised.unit,
-      isEstimated: normalised.isEstimated,
-      name: toTitleCase(rawName),
-      notes: normalised.isEstimated ? 'Est. Weight' : ''
-    };
   }
 
-  // 4. Count quantity e.g. "2 garlic cloves", "1 lemon", "2 peppers"
-  const countMatch = s.match(/^(\d+(?:\.\d+)?(?:\s*[-–]\s*\d+(?:\.\d+)?)?)\s+(.*)/i);
-  if (countMatch) {
-    let rawCountQty = countMatch[1];
-    let qtyCount = parseFloat(rawCountQty);
-    if (rawCountQty.includes('-') || rawCountQty.includes('–')) {
-      const parts = rawCountQty.split(/[-–]/).map(p => parseFloat(p.trim()));
-      qtyCount = (parts[0] + parts[1]) / 2;
-    }
-    return {
-      raw: s,
-      qty: qtyCount || 1,
-      unit: 'qty',
-      name: toTitleCase((countMatch[2] || '').trim()),
-      notes: ''
-    };
-  }
-
-  // 5. Unquantified descriptor fallback
+  const normalised = convertToStrictUnit(qty, parsedUnit, rawName);
   return {
     raw: s,
-    qty: 1,
-    unit: 'qty',
-    name: toTitleCase(s),
-    notes: ''
+    qty: normalised.qty,
+    unit: normalised.unit,
+    isEstimated: normalised.isEstimated,
+    name: toTitleCase(rawName || remainder),
+    notes: normalised.isEstimated ? 'Est. Weight' : ''
   };
 }
 
@@ -258,53 +259,63 @@ export function matchIngredientTaxonomy(parsedItem, existingIngredients = null) 
   if (!parsedItem) return null;
   const storeState = (typeof getState === 'function') ? getState() : {};
   const ingredients = existingIngredients || storeState.ingredients || [];
-  
-  const rawNameLower = String(parsedItem.name || '').toLowerCase().trim();
-  const stemmed = stemIngredientName(rawNameLower);
 
-  let matchedIng = null;
+  const rawClean = (parsedItem.name || '').toLowerCase().trim();
+  const stemmed = stemIngredientName(rawClean);
 
-  for (const ing of ingredients) {
-    if (!ing) continue;
-    const aliases = Array.isArray(ing.aliases) ? ing.aliases.map(a => String(a).toLowerCase().trim()) : [];
-    if (aliases.includes(rawNameLower) || aliases.includes(stemmed) || aliases.some(a => rawNameLower.includes(a) || a.includes(rawNameLower))) {
-      matchedIng = ing;
-      break;
-    }
-
-    if (ing.name) {
-      const ingNameLower = String(ing.name).toLowerCase().trim();
-      const ingStemmed = stemIngredientName(ingNameLower);
-      if (ingNameLower === rawNameLower || (stemmed && stemmed === ingStemmed) || ingNameLower.includes(stemmed) || stemmed.includes(ingNameLower)) {
-        matchedIng = ing;
-        break;
-      }
-    }
-  }
-
-  if (!matchedIng && stemmed.length > 3) {
-    for (const ing of ingredients) {
-      if (!ing || !ing.name) continue;
-      const ingNameLower = String(ing.name).toLowerCase().trim();
-      if (ingNameLower.includes(stemmed) || stemmed.includes(ingNameLower)) {
-        matchedIng = ing;
-        break;
-      }
-    }
-  }
-
-  if (matchedIng) {
+  // 1. Direct Name Match
+  const direct = ingredients.find(ing => (ing.name || '').toLowerCase().trim() === rawClean);
+  if (direct) {
     return {
       ...parsedItem,
-      ingredientId: matchedIng.id,
-      isNewTaxonomyItem: false,
-      matchedName: matchedIng.name
+      ingredientId: direct.id,
+      matchedName: direct.name,
+      matchedCategory: direct.category || 'General',
+      isNewTaxonomyItem: false
     };
   }
 
+  // 2. Alias Match
+  const aliasMatch = ingredients.find(ing => {
+    if (!ing.aliases || !Array.isArray(ing.aliases)) return false;
+    return ing.aliases.some(alias => {
+      const aClean = alias.toLowerCase().trim();
+      return aClean === rawClean || aClean === stemmed;
+    });
+  });
+
+  if (aliasMatch) {
+    return {
+      ...parsedItem,
+      ingredientId: aliasMatch.id,
+      matchedName: aliasMatch.name,
+      matchedCategory: aliasMatch.category || 'General',
+      isNewTaxonomyItem: false
+    };
+  }
+
+  // 3. Stemmed Match
+  const stemmedMatch = ingredients.find(ing => {
+    const ingStem = stemIngredientName(ing.name);
+    return ingStem === stemmed || ingStem === rawClean;
+  });
+
+  if (stemmedMatch) {
+    return {
+      ...parsedItem,
+      ingredientId: stemmedMatch.id,
+      matchedName: stemmedMatch.name,
+      matchedCategory: stemmedMatch.category || 'General',
+      isNewTaxonomyItem: false
+    };
+  }
+
+  // 4. Fallback: New Taxonomy Item
   return {
     ...parsedItem,
     ingredientId: null,
+    matchedName: parsedItem.name,
+    matchedCategory: 'Store Cupboard',
     isNewTaxonomyItem: true
   };
 }
