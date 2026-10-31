@@ -190,13 +190,16 @@ export function openSubtypeExistingProductPickerModal(subtypeId, parentId, onSuc
   };
 }
 
-export function openTescoImportModal(subtypeId, parentId, onSuccess = null) {
+export function openTescoImportModal(subtypeId, parentId, onSuccess = null, customSearchName = null) {
   const state = getState();
   const parent = (state.rootItems || state.ingredients || []).find(i => String(i.id) === String(parentId));
-  const parentCategory = parent?.category || 'General';
-  const subName = subtypeId 
-    ? parent?.subtypes?.find(s => String(s.id) === String(subtypeId))?.name 
-    : (parent?.name || 'Item');
+  const parentCategory = parent?.category || window.__pendingHierarchyCommit?.category || 'General';
+  const subName = customSearchName
+    || (subtypeId ? parent?.subtypes?.find(s => String(s.id) === String(subtypeId))?.name : null)
+    || window.__pendingHierarchyCommit?.subtypeName
+    || parent?.name
+    || window.__pendingHierarchyCommit?.rootItemName
+    || 'Item';
 
   const tescoSearchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(subName)}`;
 

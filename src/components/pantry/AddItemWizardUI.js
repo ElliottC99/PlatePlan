@@ -4,7 +4,7 @@
  * Supports starting at: Category, Root Item, Sub-Type, or Product.
  * Subtype-only filtering for Product step with full hierarchy links.
  * Full Product Form integration for Manual and Tesco review pathways.
- * Strictly under 380 lines.
+ * Dynamic step titles, auto-filling parent category, and atomic commits.
  */
 
 import { getState } from '../../store/store.js';
@@ -60,29 +60,31 @@ export function openAddItemWizard(options = {}) {
     selectedExistingProduct: null
   };
 
+  const initialRootItems = getState().rootItems || getState().ingredients || [];
+  if (!wizardData.selectedParentItem && wizardData.itemName) {
+    const rawLower = wizardData.itemName.toLowerCase().trim();
+    const existing = initialRootItems.find(i => {
+      const iName = (i.name || '').toLowerCase().trim();
+      return iName === rawLower || rawLower.includes(iName) || iName.includes(rawLower);
+    });
+    if (existing) {
+      wizardData.selectedParentItem = existing;
+      if (!wizardData.category && existing.category) wizardData.category = existing.category;
+    }
+  }
+
   if (wizardData.selectedParentItem) {
-    wizardData.itemName = wizardData.selectedParentItem.name || '';
-    wizardData.category = wizardData.selectedParentItem.category || 'General';
+    wizardData.itemName = wizardData.selectedParentItem.name || wizardData.itemName;
+    wizardData.category = wizardData.selectedParentItem.category || wizardData.category || 'General';
   }
 
   const proceedToProduct = async (mode) => {
     closeAddItemWizard();
-    // Atomic all-or-nothing guard: stage hierarchy until product is actually saved
-    window.__pendingHierarchyCommit = {
-      category: wizardData.category || 'General',
-      rootItemName: wizardData.itemName,
-      subtypeName: wizardData.subtypeName || 'Standard'
-    };
-
+    window.__pendingHierarchyCommit = { category: wizardData.category || 'General', rootItemName: wizardData.itemName, subtypeName: wizardData.subtypeName || 'Standard' };
     if (mode === 'tesco') {
-      openTescoImportModal(wizardData.subtypeId || null, wizardData.selectedParentItem?.id || null);
+      openTescoImportModal(wizardData.subtypeId || null, wizardData.selectedParentItem?.id || null, null, wizardData.subtypeName || wizardData.itemName);
     } else {
-      window.__prefilledResolveBinding = {
-        ingredientId: wizardData.selectedParentItem?.id || null,
-        subtypeId: wizardData.subtypeId || null,
-        parentCategory: wizardData.category || 'General',
-        subtypeDraftName: wizardData.subtypeName || wizardData.itemName
-      };
+      window.__prefilledResolveBinding = { ingredientId: wizardData.selectedParentItem?.id || null, subtypeId: wizardData.subtypeId || null, parentCategory: wizardData.category || 'General', subtypeDraftName: wizardData.subtypeName || wizardData.itemName };
       const { openProductEditModal } = await import('../../views/ProductBankView.js');
       openProductEditModal(null);
     }
@@ -96,13 +98,10 @@ export function openAddItemWizard(options = {}) {
     const rootItems = state.rootItems || state.ingredients || [];
     const products = Array.isArray(state.products) ? state.products : [];
 
-    const isCat = startAt === 'category';
-    const isSub = startAt === 'subtype';
-    const isProd = startAt === 'product';
+    const isCat = startAt === 'category', isSub = startAt === 'subtype', isProd = startAt === 'product';
     const isFinalStep = (isCat && step === 4) || (!isCat && !isProd && step === 3) || (isProd && step === 2);
 
     let stepBodyHtml = '';
-
     if (isCat && step === 1) {
       stepBodyHtml = `
         <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">Step 1 of 4: Define Category</div>
@@ -110,8 +109,7 @@ export function openAddItemWizard(options = {}) {
           <label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:6px;">Category Name</label>
           <input type="text" id="wiz-cat-name-input" value="${escapeHtml(wizardData.category)}" placeholder="e.g. World Foods, Chilled, Breakfast..." style="width:100%; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px;" />
           <div id="wiz-cat-dup-box" style="margin-top:6px;"></div>
-        </div>
-      `;
+        </div>`;
     } else if ((isCat && step === 2) || (!isCat && !isSub && !isProd && step === 1)) {
       const stepLabel = isCat ? 'Step 2 of 4: Add Root Item' : 'Step 1 of 3: Define Root Item & Category';
       stepBodyHtml = `
@@ -122,14 +120,8 @@ export function openAddItemWizard(options = {}) {
             <input type="text" id="wiz-item-name" value="${escapeHtml(wizardData.itemName)}" placeholder="e.g. Basmati Rice, Cheddar Cheese..." style="width:100%; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px;" />
             <div id="wiz-item-dup-box" style="margin-top:6px;"></div>
           </div>
-          ${!isCat ? `
-            <div>
-              <label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:6px;">Category</label>
-              <div id="wiz-cat-container"></div>
-            </div>
-          ` : breadcrumbs(wizardData.category)}
-        </div>
-      `;
+          ${!isCat ? `<div><label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:6px;">Category</label><div id="wiz-cat-container"></div></div>` : breadcrumbs(wizardData.category)}
+        </div>`;
     } else if (isSub && step === 1) {
       stepBodyHtml = `
         <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">Step 1 of 3: Select Parent Root Item</div>
@@ -141,8 +133,7 @@ export function openAddItemWizard(options = {}) {
             <button type="button" class="btn xs ghost" id="btn-wiz-jump-item" style="font-weight:600;">+ New Root Item</button>
             <button type="button" class="btn xs ghost" id="btn-wiz-jump-cat" style="font-weight:600;">+ New Category</button>
           </div>
-        </div>
-      `;
+        </div>`;
     } else if (isProd && step === 1) {
       stepBodyHtml = `
         <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">Step 1 of 2: Select Target Sub-Type</div>
@@ -155,8 +146,7 @@ export function openAddItemWizard(options = {}) {
             <button type="button" class="btn xs ghost" id="btn-wiz-jump-item" style="font-weight:600;">+ New Root Item</button>
             <button type="button" class="btn xs ghost" id="btn-wiz-jump-cat" style="font-weight:600;">+ New Category</button>
           </div>
-        </div>
-      `;
+        </div>`;
     } else if ((isCat && step === 3) || (!isCat && !isProd && step === 2)) {
       const stepLabel = isCat ? 'Step 3 of 4: Define Sub-type' : 'Step 2 of 3: Define Sub-type';
       stepBodyHtml = `
@@ -166,19 +156,16 @@ export function openAddItemWizard(options = {}) {
           <label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:4px;">Sub-type Name</label>
           <input type="text" id="wiz-subtype-name" value="${escapeHtml(wizardData.subtypeName)}" placeholder="e.g. Standard, Mature, Extra Virgin, Organic..." style="width:100%; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px;" />
           <div id="wiz-subtype-dup-box" style="margin-top:6px;"></div>
-        </div>
-      `;
+        </div>`;
     } else {
       stepBodyHtml = `
         <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">Final Step: Store Product Association</div>
         ${breadcrumbs(wizardData.category, wizardData.itemName, wizardData.subtypeName)}
-
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:14px;">
           <button type="button" class="btn sm ${wizardData.productMode === 'manual' ? 'primary' : 'ghost'} btn-prod-path" data-path="manual" style="font-size:11px; font-weight:650; padding:6px 4px;">1. Add Manually</button>
           <button type="button" class="btn sm ${wizardData.productMode === 'existing' ? 'primary' : 'ghost'} btn-prod-path" data-path="existing" style="font-size:11px; font-weight:650; padding:6px 4px;">2. Link Existing</button>
           <button type="button" class="btn sm ${wizardData.productMode === 'tesco' ? 'primary' : 'ghost'} btn-prod-path" data-path="tesco" style="font-size:11px; font-weight:650; padding:6px 4px; color:var(--primary,#4f46e5);">3. Import Tesco</button>
         </div>
-
         ${wizardData.productMode === 'manual' ? `
           <div style="padding:16px; background:var(--surface2,#f8fafc); border:1px solid var(--border,#e2e8f0); border-radius:10px; text-align:center;">
             <div style="font-weight:750; font-size:13px; margin-bottom:4px; color:var(--text,#1c1917);">Complete Product Details Form</div>
@@ -191,34 +178,30 @@ export function openAddItemWizard(options = {}) {
             <div style="font-size:12px; color:var(--text2,#64748b); margin-bottom:12px;">Paste Tesco bookmarklet JSON and review all fields in the full product editor before saving.</div>
             <button type="button" class="btn primary sm" id="btn-launch-tesco-prod">Open Tesco Importer ➔</button>
           </div>
-        ` : `
-          <div>
-            <label style="display:block; font-size:12px; font-weight:750; margin-bottom:4px;">Search Existing Product to Link</label>
-            <div id="wiz-existing-prod-container"></div>
-          </div>
-        `}
-      `;
+        ` : `<div><label style="display:block; font-size:12px; font-weight:750; margin-bottom:4px;">Search Existing Product to Link</label><div id="wiz-existing-prod-container"></div></div>`}`;
     }
 
     const navHtml = `
       <div style="display:flex; justify-content:space-between; margin-top:20px; border-top:1px solid var(--border,#e7e5e4); padding-top:16px;">
         ${step === 1 ? `<button type="button" class="btn sm" id="btn-wiz-cancel">Cancel</button>` : `<button type="button" class="btn sm" id="btn-wiz-back">‹ Back</button>`}
         ${isFinalStep ? (wizardData.productMode === 'existing' ? `<button type="button" class="btn primary sm" id="btn-wiz-finish">Finish &amp; Link to Bank</button>` : `<div></div>`) : `<button type="button" class="btn primary sm" id="btn-wiz-next">Next ➔</button>`}
-      </div>
-    `;
+      </div>`;
+
+    let currentStepTitle = '📦 Add Root Item';
+    if (isCat) currentStepTitle = step === 1 ? '📂 Add Category' : (step === 2 ? '📦 Add Root Item' : (step === 3 ? '🏷️ Add Sub-Type' : '🛒 Add Product'));
+    else if (isSub) currentStepTitle = step === 1 ? '📦 Select Root Item' : (step === 2 ? '🏷️ Add Sub-Type' : '🛒 Add Product');
+    else if (isProd) currentStepTitle = step === 1 ? '🏷️ Select Sub-Type' : '🛒 Add Product';
+    else currentStepTitle = step === 1 ? '📦 Add Root Item' : (step === 2 ? '🏷️ Add Sub-Type' : '🛒 Add Product');
 
     const modalHtml = `
       <div class="add-to-bank-hub-modal" style="padding: 24px; max-width: 520px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; position:relative; box-shadow:0 10px 25px rgba(0,0,0,0.1);">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-          <h3 style="margin:0; font-size:1.15rem; font-weight:750; color:var(--text,#1c1917);">
-            ${isCat ? '📂 Add Category' : (isSub ? '🏷️ Add Sub-Type' : (isProd ? '🛒 Add Product' : '📦 Add Root Item'))}
-          </h3>
+          <h3 style="margin:0; font-size:1.15rem; font-weight:750; color:var(--text,#1c1917);">${currentStepTitle}</h3>
           <button type="button" class="btn xs ghost" id="btn-wiz-close" style="font-weight:700;">✕</button>
         </div>
         ${stepBodyHtml}
         ${navHtml}
-      </div>
-    `;
+      </div>`;
 
     showModal(modalHtml);
 
@@ -233,9 +216,30 @@ export function openAddItemWizard(options = {}) {
     attachDuplicateDetector({
       inputEl: document.getElementById('wiz-cat-name-input'), containerEl: document.getElementById('wiz-cat-dup-box'), items: categories, icon: '📂', onSelect: (cat) => { wizardData.category = cat; }
     });
+
     attachDuplicateDetector({
-      inputEl: document.getElementById('wiz-item-name'), containerEl: document.getElementById('wiz-item-dup-box'), items: rootItems, icon: '📦', onSelect: (item) => { wizardData.itemName = item.name; if (item.category) wizardData.category = item.category; }
+      inputEl: document.getElementById('wiz-item-name'), containerEl: document.getElementById('wiz-item-dup-box'), items: rootItems, icon: '📦', onSelect: (item) => {
+        wizardData.itemName = item.name;
+        wizardData.selectedParentItem = item;
+        if (item.category) {
+          wizardData.category = item.category;
+          const catInput = document.getElementById('wiz-cat-container')?.querySelector('input');
+          if (catInput) catInput.value = item.category;
+        }
+      }
     });
+
+    document.getElementById('wiz-item-name')?.addEventListener('input', (e) => {
+      const val = e.target.value.trim().toLowerCase();
+      const matched = rootItems.find(i => (i.name || '').toLowerCase() === val);
+      if (matched && matched.category) {
+        wizardData.selectedParentItem = matched;
+        wizardData.category = matched.category;
+        const catInput = document.getElementById('wiz-cat-container')?.querySelector('input');
+        if (catInput) catInput.value = matched.category;
+      }
+    });
+
     const activeItemSubtypes = wizardData.selectedParentItem ? (wizardData.selectedParentItem.subtypes || []) : [];
     attachDuplicateDetector({
       inputEl: document.getElementById('wiz-subtype-name'), containerEl: document.getElementById('wiz-subtype-dup-box'), items: activeItemSubtypes, icon: '🏷️', onSelect: (sub) => { wizardData.subtypeName = sub.name; }
@@ -268,17 +272,8 @@ export function openAddItemWizard(options = {}) {
     const targetSubtypeContainer = document.getElementById('wiz-target-subtype-container');
     if (targetSubtypeContainer) {
       activeDropdownInstance = createTaxonomySearchInput({
-        container: targetSubtypeContainer,
-        categories: [],
-        rootItems,
-        subtypesOnly: true,
-        placeholder: 'Search target sub-type...',
-        onNewClick: (typedSub) => {
-          startAt = 'subtype';
-          step = 1;
-          wizardData.subtypeName = typedSub || 'Standard';
-          renderStep();
-        },
+        container: targetSubtypeContainer, categories: [], rootItems, subtypesOnly: true, placeholder: 'Search target sub-type...',
+        onNewClick: (typedSub) => { startAt = 'subtype'; step = 1; wizardData.subtypeName = typedSub || 'Standard'; renderStep(); },
         onSelect: ({ val }) => {
           if (val && val.includes(':')) {
             const [pId, sId] = val.split(':');
@@ -324,21 +319,18 @@ export function openAddItemWizard(options = {}) {
     });
 
     document.querySelectorAll('.btn-prod-path').forEach(btn => {
-      btn.onclick = () => {
-        wizardData.productMode = btn.dataset.path;
-        renderStep();
-      };
+      btn.onclick = () => { wizardData.productMode = btn.dataset.path; renderStep(); };
     });
 
-    const prodSearchContainer = document.getElementById('wiz-existing-prod-container');
-    if (prodSearchContainer && wizardData.productMode === 'existing') {
+    const existingProdContainer = document.getElementById('wiz-existing-prod-container');
+    if (existingProdContainer) {
       activeDropdownInstance = createTaxonomySearchInput({
-        container: prodSearchContainer,
-        categories: [],
-        rootItems: products.map(p => ({ id: p.id, name: p.name, category: p.category || 'General', subtypes: [] })),
-        placeholder: 'Search store products...',
+        container: existingProdContainer, categories: [], rootItems: [],
+        products: products.map(p => ({ ...p, name: `${p.name || p.title} ${p.brand ? `(${p.brand})` : ''}` })),
+        placeholder: 'Search product by name or brand...',
         onSelect: ({ val }) => {
-          wizardData.selectedExistingProduct = products.find(p => String(p.id) === String(val)) || null;
+          const prod = products.find(p => String(p.id) === String(val));
+          if (prod) wizardData.selectedExistingProduct = prod;
         }
       });
     }
