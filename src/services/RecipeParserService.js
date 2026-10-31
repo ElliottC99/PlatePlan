@@ -1,5 +1,5 @@
 /**
- * src/services/RecipeParserService.js (v3.32.8)
+ * src/services/RecipeParserService.js (v3.32.9)
  * Multi-Recipe Batch Parsing, Token Normalisation, Block Chunking,
  * Collapsed Ingredient Unpacking & Method Step Splitting.
  */
@@ -38,9 +38,8 @@ export function unpackAndSplitRecipeBlocks(rawText) {
   structural.forEach(h => { clean = clean.replace(new RegExp(`([^\\n])(${h})`, 'gi'), '$1\n$2'); });
 
   // 2. Normalise dividers and ensure headers have clear boundaries
-  clean = clean.replace(/\n\s*[-=_*~]{3,}\s*\n/g, '\n\n__RECIPE_SPLIT__\n\n')
-    .replace(/([^\n])\n*((?:Dish|Recipe)\s*\d*[:\.\-\s]|Recipe Title:|Title:)/gi, '$1\n\n$2')
-    .replace(/((?:Dish|Recipe|\d+[\.\)])\s*[^\n]+)\s*\n+\s*Recipe Title:\s*/gi, '$1 - ');
+  clean = clean.replace(/(?:^|\n)\s*[-=_*~]{3,}\s*(?:\n|$)/g, '\n\n__RECIPE_SPLIT__\n\n')
+    .replace(/([^\n])\n*((?:Dish|Recipe)\s*\d*[:\.\-\s]|Recipe Title:|Title:)/gi, '$1\n\n$2');
 
   // 3. Line-by-line semantic state machine
   const lines = clean.split('\n');
@@ -51,7 +50,7 @@ export function unpackAndSplitRecipeBlocks(rawText) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i], trimmed = line.trim();
 
-    if (trimmed === '__RECIPE_SPLIT__') {
+    if (trimmed.includes('__RECIPE_SPLIT__')) {
       if (currentBlockLines.length > 0) blocks.push(currentBlockLines.join('\n').trim());
       currentBlockLines = []; seenIngredients = false; seenMethod = false;
       continue;
@@ -99,20 +98,27 @@ export function unpackAndSplitRecipeBlocks(rawText) {
  */
 export function unpackCollapsedIngredients(rawIngText) {
   if (!rawIngText || typeof rawIngText !== 'string') return '';
-  let text = rawIngText.replace(/\r\n/g, '\n').trim()
-    .replace(/([^\n])\s*(FOR THE [A-Z\s]+|TO SERVE)/gi, '$1\n\n$2\n')
-    .replace(/\)\s*(?=[0-9a-zA-Z])/g, ')\n');
+  let text = rawIngText.replace(/\r\n/g, '\n').trim();
 
-  // Mask parentheticals to protect inner weights e.g. "(about 160g)"
+  // 1. Mask parentheticals to protect inner weights & serving notes e.g. "(about 160g)", "(to serve, optional)"
   const parens = [];
   text = text.replace(/\([^)]*\)/g, m => { parens.push(m); return `###PAREN_${parens.length - 1}###`; });
+
+  // 2. Separate subsections e.g. "For the chips:", "To serve:"
+  text = text.replace(/([^\n])\s*(FOR THE [A-Z\s]+:?|TO SERVE:?)/gi, '$1\n\n$2\n')
+    .replace(/\)\s*(?=[0-9a-zA-Z])/g, ')\n');
+
+  // 3. Separate letters followed immediately by ANY quantity (never splits inside parens)
   text = text.replace(/([a-zA-Z])(?=(?:0\.\d+|[1-9]\d*(?:\.\d+)?)(?:\s*[-–]\s*\d+(?:\.\d+)?)?\s*(?:x\s*\d+|g|kg|ml|l|tbsp|tsp|cm|packs?|cloves?|spring|tin|pot|large|medium|small|pieces?|blocks?|handful|bunch|drizzle|pinch|aubergine|onion|[a-zA-Z]+))/gi, '$1\n');
 
+  // 4. Separate known descriptor phrases glued to words without numbers
   const unspacedTokens = ['bunch of', 'handful of', 'a few', 'nooch', 'flat-leaf', 'drizzle of', 'pinch of', 'vegetable oil', 'olive oil', 'sun-dried tomatoes', 'cornflour'];
   unspacedTokens.forEach(tok => { text = text.replace(new RegExp(`([a-zA-Z])(${tok})`, 'gi'), '$1\n$2'); });
 
+  // 5. Restore parentheticals cleanly
   text = text.replace(/###PAREN_(\d+)###/g, (_, i) => parens[Number(i)]);
 
+  // 6. Stitch standalone multiplier lines ("1 x\n280g" -> "1 x 280g")
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const stitched = [];
   for (let i = 0; i < lines.length; i++) {
@@ -151,8 +157,8 @@ export function unpackCollapsedSteps(rawMethodText) {
 export function parseSingleRecipeText(block, ingredientsBank = []) {
   if (!block || typeof block !== 'string') return null;
 
-  const ingMatch = block.match(/(?:^|\n)\s*(?:#+\s*)?(?:main\s+)?ingredients?:?\s*(?:\n|$)/i);
-  const methodMatch = block.match(/(?:^|\n)\s*(?:#+\s*)?(?:Method\s+Instructions|Method|Instructions|Steps|Preparation):?\s*(?:\n|$)/i);
+  const ingMatch = block.match(/(?:^|\n)\s*(?:#+\s*)?(?:main\s+)?ingredients?:?\s*/i);
+  const methodMatch = block.match(/(?:^|\n)\s*(?:#+\s*)?(?:Method\s+Instructions|Method|Instructions|Steps|Preparation):?\s*/i);
 
   let headerText = block, rawIngText = '', rawMethodText = '';
 
@@ -175,7 +181,7 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
     if (boundary) rawMethodText = rawMethodText.slice(0, boundary.index);
   }
 
-  let title = 'Imported Recipe', servings = 4, prepMinutes = 15, cookMinutes = 30;
+  let title = 'Imported Recipe', servings = null, prepMinutes = 15, cookMinutes = 30;
   const headerLines = headerText.split('\n').map(l => l.trim()).filter(Boolean);
 
   headerLines.forEach((line, idx) => {
@@ -248,7 +254,7 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
 
   return {
     title: toTitleCase(title),
-    servings: servings || 4,
+    servings,
     prepTime: { hours: Math.floor(prepMinutes / 60), minutes: prepMinutes % 60 },
     cookTime: { hours: Math.floor(cookMinutes / 60), minutes: cookMinutes % 60 },
     mealSuitability: ['Dinner'],
@@ -327,6 +333,7 @@ function reallocateGroupedInstructions(rawText, parsedRecipes) {
 function cleanRecipeTitle(raw) {
   if (!raw) return '';
   let str = String(raw)
+    .replace(/^__RECIPE_SPLIT__\s*[-–—]?\s*/i, '')
     .replace(/^#+\s*/, '')
     .replace(/^\d+[\.\)]\s*/, '')
     .replace(/^(?:Dish|Recipe)\s*\d*:?\s*/i, '')
@@ -349,10 +356,18 @@ function parseDurationMinutes(line) {
 }
 
 function parseIngredientLine(line, currentSectionTitle, sectionsMap, ingredientsBank) {
+  if (!line || /^[:\-\*•\s]+$/.test(line.trim())) return;
   if (!sectionsMap[currentSectionTitle]) sectionsMap[currentSectionTitle] = [];
-  const rawSubLines = line.split(/(?<=[^\n])\s+(?=\d+(?:\.\d+)?\s*(?:g|kg|ml|l|tbsp|tsp|cup|cloves?|cans?|packs?|pinches?|slices?|handfuls?|bunches?|stalks?)\b)/gi);
+
+  // Protect parentheticals from quantity splits e.g. "(about 160g)", "(to serve, optional)"
+  const parens = [];
+  const safeLine = line.replace(/\([^)]*\)/g, m => { parens.push(m); return `###PAREN_${parens.length - 1}###`; });
+
+  const rawSubLines = safeLine.split(/(?<=[^\n])\s+(?=\d+(?:\.\d+)?\s*(?:g|kg|ml|l|tbsp|tsp|cup|cloves?|cans?|packs?|pinches?|slices?|handfuls?|bunches?|stalks?)\b)/gi);
   rawSubLines.forEach(subLine => {
-    const parsed = parseIngredientString(subLine.trim());
+    const unmasked = subLine.replace(/###PAREN_(\d+)###/g, (_, i) => parens[Number(i)]).trim();
+    if (!unmasked || /^[:\-\*•\s]+$/.test(unmasked)) return;
+    const parsed = parseIngredientString(unmasked);
     if (parsed) {
       const matched = matchIngredientTaxonomy(parsed, ingredientsBank);
       if (matched) sectionsMap[currentSectionTitle].push(matched);

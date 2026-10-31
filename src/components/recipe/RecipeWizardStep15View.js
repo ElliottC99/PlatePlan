@@ -40,7 +40,7 @@ export function renderStep1Point5() {
     const ingCount = rawIngs.length;
     const steps = recipe.instructions || recipe.methodSteps || [];
     const stepCount = steps.length;
-    const servings = recipe.servings || 4;
+    const servings = recipe.servings ? `${recipe.servings} serves` : 'unknown serves';
     const title = toTitleCase(recipe.title || 'Untitled Recipe');
 
     return `
@@ -53,7 +53,7 @@ export function renderStep1Point5() {
             </h4>
           </div>
           <div style="display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px;">
-            <span style="color: var(--text2, #64748b); font-weight: 500;">🍽️ ${servings} serves</span>
+            <span style="color: var(--text2, #64748b); font-weight: 500;">🍽️ ${servings}</span>
             <span style="color: var(--text2, #64748b); opacity: 0.5;">•</span>
             <span style="color: var(--text2, #64748b); font-weight: 500;">🥗 ${ingCount} ingr.</span>
             <span style="color: var(--text2, #64748b); opacity: 0.5;">•</span>
