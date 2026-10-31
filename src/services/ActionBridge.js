@@ -165,8 +165,8 @@ export function routeAction(actionName, target, event) {
   }
 
   // 8. Mobile Menu & Toolbar Actions
-  if (normalizedAction === 'open-category-manager' || normalizedAction.includes('opencategorymanagermodal')) {
-    import('../components/pantry/ReorganiseModalUI.js').then(m => m.openReorganiseModal('category'));
+  if (normalizedAction === 'manage-categories' || normalizedAction === 'open-category-manager' || normalizedAction.includes('opencategorymanagermodal') || normalizedAction.includes('managecategories')) {
+    import('../components/pantry/CategoryManagerModalUI.js').then(m => m.openCategoryManagerModal());
     return true;
   }
 

@@ -230,6 +230,14 @@ export function openTescoImportModal(subtypeId, parentId, onSuccess = null) {
   const jsonInput = document.getElementById('tesco-json-input');
   const errorMsg = document.getElementById('tesco-import-error-msg');
   const reviewBtn = document.getElementById('btn-review-tesco-import');
+  const cancelBtn = document.getElementById('btn-cancel-tesco-import');
+
+  if (cancelBtn) {
+    cancelBtn.onclick = () => {
+      window.__pendingHierarchyCommit = null;
+      closeModal();
+    };
+  }
 
   reviewBtn.onclick = () => {
     const raw = (jsonInput ? jsonInput.value : '').trim();
