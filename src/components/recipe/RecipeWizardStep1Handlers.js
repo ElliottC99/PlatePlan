@@ -63,11 +63,17 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
       const storeState = getState();
       const ingredientsBank = storeState.rootItems || storeState.ingredients || [];
 
+      const existingIngs = (wizardState.activeRecipe?.ingredientSections || []).flatMap(s => s.ingredients || []);
+
       const parsedSections = rawSections.map(sec => ({
         sectionTitle: toTitleCase(sec.sectionTitle),
         ingredients: sec.lines.map(line => {
           const parsed = parseIngredientString(line);
           const matched = matchIngredientTaxonomy(parsed, ingredientsBank);
+          const existing = existingIngs.find(e => 
+            (e.raw && e.raw.trim().toLowerCase() === line.trim().toLowerCase()) ||
+            (e.name && parsed.name && e.name.trim().toLowerCase() === parsed.name.trim().toLowerCase())
+          );
           return {
             raw: line,
             qty: parsed.qty,
@@ -76,9 +82,11 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
             name: parsed.name,
             notes: parsed.notes,
             isFallbackWeight: parsed.isFallbackWeight,
-            ingredientId: matched?.ingredientId || null,
-            subtypeId: matched?.subtypeId || null,
-            isNewTaxonomyItem: !matched
+            ingredientId: existing?.ingredientId || matched?.ingredientId || null,
+            subtypeId: existing?.subtypeId || matched?.subtypeId || null,
+            productId: existing?.productId || matched?.productId || null,
+            defaultProductId: existing?.defaultProductId || null,
+            isNewTaxonomyItem: existing ? !!existing.isNewTaxonomyItem : !matched
           };
         })
       }));
