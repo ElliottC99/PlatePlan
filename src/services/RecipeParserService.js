@@ -105,7 +105,7 @@ export function unpackCollapsedIngredients(rawIngText) {
   text = text.replace(/\([^)]*\)/g, m => { parens.push(m); return `###PAREN_${parens.length - 1}###`; });
 
   // 2. Separate subsections e.g. "For the chips:", "To serve:"
-  text = text.replace(/([^\n])\s*(FOR THE [A-Z\s]+:?|TO SERVE:?)/gi, '$1\n\n$2\n')
+  text = text.replace(/([^\n,])\s*(\bFOR THE\s+[A-Za-z\s]+:|\bTO SERVE:)/gi, '$1\n\n$2\n')
     .replace(/\)\s*(?=[0-9a-zA-Z])/g, ')\n');
 
   // 3. Separate letters followed immediately by ANY quantity (never splits inside parens)
@@ -372,7 +372,11 @@ function parseIngredientLine(line, currentSectionTitle, sectionsMap, ingredients
     const parsed = parseIngredientString(unmasked);
     if (parsed) {
       const matched = matchIngredientTaxonomy(parsed, ingredientsBank);
-      if (matched) sectionsMap[currentSectionTitle].push(matched);
+      if (matched) {
+        const destSection = (parsed.isToServe && currentSectionTitle.toLowerCase() !== 'to serve') ? 'To Serve' : currentSectionTitle;
+        if (!sectionsMap[destSection]) sectionsMap[destSection] = [];
+        sectionsMap[destSection].push(matched);
+      }
     }
   });
 }

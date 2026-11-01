@@ -273,6 +273,7 @@ function parseSectionedIngredients(rawText) {
   if (!rawText) return [];
   const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
   const sections = [];
+  const toServeLines = [];
   let currentSection = { sectionTitle: 'Main Ingredients', lines: [] };
 
   lines.forEach(line => {
@@ -285,12 +286,26 @@ function parseSectionedIngredients(rawText) {
         lines: []
       };
     } else {
-      currentSection.lines.push(line);
+      const isServing = /(?:,\s*|\s*\()(?:\b(?:to\s+serve|for\s+serving|to\s+garnish|for\s+garnish|to\s+finish|for\s+finishing)\b)\)?$/i.test(line);
+      if (isServing && currentSection.sectionTitle.toLowerCase() !== 'to serve') {
+        toServeLines.push(line);
+      } else {
+        currentSection.lines.push(line);
+      }
     }
   });
 
   if (currentSection.lines.length > 0) {
     sections.push(currentSection);
+  }
+
+  if (toServeLines.length > 0) {
+    const existing = sections.find(s => s.sectionTitle.toLowerCase() === 'to serve');
+    if (existing) {
+      existing.lines.push(...toServeLines);
+    } else {
+      sections.push({ sectionTitle: 'To Serve', lines: toServeLines });
+    }
   }
 
   return sections;

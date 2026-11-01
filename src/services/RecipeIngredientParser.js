@@ -11,6 +11,25 @@ export function toTitleCase(str) {
   return str.replace(/\b\w/g, c => c.toUpperCase());
 }
 
+function parseFractionOrNumber(val) {
+  const s = String(val || '').trim();
+  const m = s.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (m) return parseFloat(m[1]) + (parseFloat(m[3]) > 0 ? parseFloat(m[2]) / parseFloat(m[3]) : 0);
+  const f = s.match(/^(\d+)\/(\d+)$/);
+  if (f) return parseFloat(f[2]) > 0 ? parseFloat(f[1]) / parseFloat(f[2]) : 0;
+  return parseFloat(s) || 0;
+}
+
+function extractServingQualifier(rawName) {
+  const text = String(rawName || '').trim();
+  const serveMatch = text.match(/(?:,\s*|\s*\()(?:\b(?:to\s+serve|for\s+serving|to\s+garnish|for\s+garnish|to\s+finish|for\s+finishing)\b)\)?$/i);
+  if (serveMatch) {
+    const cleaned = text.replace(/(?:,\s*|\s*\()(?:\b(?:to\s+serve|for\s+serving|to\s+garnish|for\s+garnish|to\s+finish|for\s+finishing)\b)\)?$/i, '').trim();
+    return { name: cleaned, notes: 'to serve', isToServe: true };
+  }
+  return { name: text, notes: '', isToServe: false };
+}
+
 export const UNICODE_FRACTIONS = {
   '½': '1/2', '⅓': '1/3', '⅔': '2/3', '¼': '1/4', '¾': '3/4', '⅕': '1/5',
   '⅖': '2/5', '⅗': '3/5', '⅘': '4/5', '⅙': '1/6', '⅚': '5/6', '⅛': '1/8',
@@ -91,11 +110,11 @@ export function parseQuantity(rawText) {
     return { qty: parseFloat(countMultMatch[1]), remainder: countMultMatch[2].trim() };
   }
 
-  // Range e.g. "3-4" or "3 to 4"
-  const rangeMatch = text.match(/^(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)(.*)/i);
+  // Range with fractions, mixed numbers, or decimals e.g. "1/4 - 1/2", "1/4–1/2", "3-4", "1 1/2 to 2"
+  const rangeMatch = text.match(/^((?:\d+\s+)?\d+\/\d+|\d+(?:\.\d+)?)\s*(?:-|–|—|to)\s*((?:\d+\s+)?\d+\/\d+|\d+(?:\.\d+)?)\s*(.*)/i);
   if (rangeMatch) {
-    const q1 = parseFloat(rangeMatch[1]);
-    const q2 = parseFloat(rangeMatch[2]);
+    const q1 = parseFractionOrNumber(rangeMatch[1]);
+    const q2 = parseFractionOrNumber(rangeMatch[2]);
     const avg = (q1 + q2) / 2;
     return { qty: avg, remainder: rangeMatch[3].trim() };
   }
@@ -172,14 +191,16 @@ export function parseIngredientString(rawStr) {
   if (looseMatch) {
     const u = looseMatch[1].toLowerCase();
     const rawName = looseMatch[2].trim();
-    const normalised = convertToStrictUnit(1, u, rawName);
+    const servingInfo = extractServingQualifier(rawName);
+    const normalised = convertToStrictUnit(1, u, servingInfo.name);
     return {
       raw: s,
       qty: normalised.qty,
       unit: normalised.unit,
       isEstimated: normalised.isEstimated,
-      name: toTitleCase(rawName),
-      notes: ''
+      name: toTitleCase(servingInfo.name),
+      notes: servingInfo.notes,
+      isToServe: servingInfo.isToServe
     };
   }
 
@@ -189,14 +210,17 @@ export function parseIngredientString(rawStr) {
     const mult = parseFloat(parenMult[1]) || 1;
     const innerWeight = parseFloat(parenMult[3]) || 0;
     const nameClean = parenMult[2].trim();
-    const normalised = convertToStrictUnit(mult * innerWeight, parenMult[4], nameClean);
+    const servingInfo = extractServingQualifier(nameClean);
+    const normalised = convertToStrictUnit(mult * innerWeight, parenMult[4], servingInfo.name);
+    const baseNotes = `${mult} pack (${innerWeight}${parenMult[4]})`;
     return {
       raw: s,
       qty: normalised.qty,
       unit: normalised.unit,
       isEstimated: normalised.isEstimated,
-      name: toTitleCase(nameClean),
-      notes: `${mult} pack (${innerWeight}${parenMult[4]})`
+      name: toTitleCase(servingInfo.name),
+      notes: servingInfo.isToServe ? `${baseNotes}, to serve` : baseNotes,
+      isToServe: servingInfo.isToServe
     };
   }
 
@@ -206,14 +230,56 @@ export function parseIngredientString(rawStr) {
     const multComp = parseFloat(compMatch[1]) || 1;
     const baseWeight = parseFloat(compMatch[2]) || 0;
     const rawName = (compMatch[4] || '').replace(/^(?:blocks?|packs?|tins?|cans?)\s*(?:of\s*)?/i, '').trim();
-    const normalised = convertToStrictUnit(multComp * baseWeight, compMatch[3], rawName);
+    const servingInfo = extractServingQualifier(rawName);
+    const normalised = convertToStrictUnit(multComp * baseWeight, compMatch[3], servingInfo.name);
+    const baseNotes = `${multComp} x ${baseWeight}${compMatch[3]}`;
     return {
       raw: s,
       qty: normalised.qty,
       unit: normalised.unit,
       isEstimated: normalised.isEstimated,
-      name: toTitleCase(rawName),
-      notes: `${multComp} x ${baseWeight}${compMatch[3]}`
+      name: toTitleCase(servingInfo.name),
+      notes: servingInfo.isToServe ? `${baseNotes}, to serve` : baseNotes,
+      isToServe: servingInfo.isToServe
+    };
+  }
+
+  // 3.5. Dimensioned root/produce items e.g. "2.5cm piece of fresh ginger", "1 inch piece of ginger", "thumb-sized piece of ginger"
+  const dimMatch = clean.match(/^(\d+(?:\.\d+)?)\s*(cm|inch(?:es)?|in\.?)\s*(?:piece(?:\s+of)?|chunk(?:\s+of)?|slice(?:\s+of)?)?\s+(?:of\s+)?(.*)/i);
+  const thumbMatch = !dimMatch && clean.match(/^(?:a\s+)?(\d+(?:\.\d+)?\s*)?(?:thumb(?:-sized)?(?:\s+piece)?)\s+(?:of\s+)?(.*)/i);
+
+  if (dimMatch || thumbMatch) {
+    let dimVal = 1;
+    let dimUnit = 'cm';
+    let rawName = '';
+
+    if (dimMatch) {
+      dimVal = parseFloat(dimMatch[1]) || 1;
+      dimUnit = dimMatch[2].toLowerCase().startsWith('in') ? 'inch' : 'cm';
+      rawName = dimMatch[3].trim();
+    } else {
+      const count = parseFloat(thumbMatch[1]) || 1;
+      dimVal = count * 2.5; // 1 thumb ≈ 2.5cm / 1 inch
+      dimUnit = 'cm';
+      rawName = thumbMatch[2].trim();
+    }
+
+    const cmTotal = dimUnit === 'inch' ? dimVal * 2.54 : dimVal;
+    // Standard culinary conversion for ginger, turmeric, galangal: 1 cm ≈ 5g (2.5cm / 1 inch ≈ 12.5g)
+    const gramsPerCm = 5;
+    const calculatedGrams = Math.round(cmTotal * gramsPerCm * 10) / 10;
+    const cleanItemName = rawName.replace(/^(?:piece|chunk|slice)\s+(?:of\s+)?/i, '').trim();
+    const servingInfo = extractServingQualifier(cleanItemName);
+    const baseNotes = `${dimVal}${dimUnit} piece`;
+
+    return {
+      raw: s,
+      qty: calculatedGrams,
+      unit: 'g',
+      isEstimated: true,
+      name: toTitleCase(servingInfo.name),
+      notes: servingInfo.isToServe ? `${baseNotes}, to serve` : baseNotes,
+      isToServe: servingInfo.isToServe
     };
   }
 
@@ -245,14 +311,16 @@ export function parseIngredientString(rawStr) {
     }
   }
 
-  const normalised = convertToStrictUnit(qty, parsedUnit, rawName);
+  const servingInfo = extractServingQualifier(rawName || remainder);
+  const normalised = convertToStrictUnit(qty, parsedUnit, servingInfo.name);
   return {
     raw: s,
     qty: normalised.qty,
     unit: normalised.unit,
     isEstimated: normalised.isEstimated,
-    name: toTitleCase(rawName || remainder),
-    notes: ''
+    name: toTitleCase(servingInfo.name),
+    notes: servingInfo.isToServe ? 'to serve' : '',
+    isToServe: servingInfo.isToServe
   };
 }
 
