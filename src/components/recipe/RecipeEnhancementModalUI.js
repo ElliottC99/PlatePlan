@@ -6,6 +6,7 @@
 import { getFitScoreTierMeta } from '../../utils/fitScoreWeights.js';
 import { generateEnhancementPlan, buildEnhancedRecipePayload } from '../../services/RecipeEnhancementService.js';
 import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
+import { saveHouseholdSwapPreference } from '../../services/HouseholdRepository.js';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, ch => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -126,43 +127,21 @@ function renderEnhancementModalContent(wrap, plan) {
     const borderStyle = isLast ? '' : 'border-bottom: 1px solid var(--border, rgba(120,120,128,0.18));';
 
     let tagHtml = '';
-    if (adj.deltaProt && adj.deltaProt > 0) {
-      tagHtml = `<span style="font-size:11px;font-weight:700;color:#16a34a;background:rgba(22,163,74,0.12);padding:2px 6px;border-radius:6px;white-space:nowrap;">+${adj.deltaProt}g prot</span>`;
-    } else if (adj.deltaKcal && adj.deltaKcal < 0) {
-      tagHtml = `<span style="font-size:11px;font-weight:700;color:#2563eb;background:rgba(37,99,235,0.12);padding:2px 6px;border-radius:6px;white-space:nowrap;">${adj.deltaKcal} kcal</span>`;
+    const totalProt = Math.round(((adj.deltaProt || 0) + (adj.swapDeltaProt || 0)) * 10) / 10;
+    const totalKcal = (adj.deltaKcal || 0) + (adj.swapDeltaKcal || 0);
+    if (totalProt > 0) {
+      tagHtml = `<span style="font-size:11px;font-weight:700;color:#16a34a;background:rgba(22,163,74,0.12);padding:2px 6px;border-radius:6px;white-space:nowrap;">+${totalProt}g prot</span>`;
+    } else if (totalKcal < 0) {
+      tagHtml = `<span style="font-size:11px;font-weight:700;color:#2563eb;background:rgba(37,99,235,0.12);padding:2px 6px;border-radius:6px;white-space:nowrap;">${totalKcal} kcal</span>`;
     }
 
     let taxonomyHtml = '';
-    if (adj.type === 'swap' && adj.preTaxonomy && adj.postTaxonomy) {
+    if (adj.selectedSwap && adj.postTaxonomy) {
       taxonomyHtml = `
         <div class="enh-taxonomy-box" style="margin-top:9px;background:var(--surface2, #fbfaf8);border:1px solid var(--border, rgba(120,120,128,0.18));border-radius:10px;padding:9px 12px;font-size:11.5px;line-height:1.4;">
-          <!-- Pre-Swap -->
-          <div style="display:flex;align-items:flex-start;gap:8px;">
-            <span style="font-size:10px;font-weight:700;color:#ef4444;background:rgba(239,68,68,0.12);padding:1px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap;margin-top:2px;">
-              Pre-Swap
-            </span>
-            <div style="flex:1;min-width:0;">
-              <div style="color:var(--text, #1c1917);word-break:break-word;">
-                <span style="color:var(--text2, #78716c);font-size:11px;">Pantry:</span>
-                <strong style="font-weight:600;">${escapeHtml(adj.preTaxonomy.category)}</strong>
-                <span style="color:var(--text2, #78716c);margin:0 3px;">/</span>
-                <strong style="font-weight:600;">${escapeHtml(adj.preTaxonomy.rootItem)}</strong>
-                <span style="color:var(--text2, #78716c);margin:0 3px;">/</span>
-                <span>${escapeHtml(adj.preTaxonomy.subtype)}</span>
-              </div>
-              <div style="color:var(--text2, #78716c);font-size:11px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                <span>Linked Product:</span>
-                <span style="color:var(--text, #1c1917);font-weight:500;">${escapeHtml(adj.preTaxonomy.productName)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div style="height:1px;background:var(--border, rgba(120,120,128,0.14));margin:7px 0;"></div>
-
-          <!-- Post-Swap -->
           <div style="display:flex;align-items:flex-start;gap:8px;">
             <span style="font-size:10px;font-weight:700;color:#16a34a;background:rgba(22,163,74,0.14);padding:1px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap;margin-top:2px;">
-              Post-Swap
+              Substitute
             </span>
             <div style="flex:1;min-width:0;">
               <div style="color:var(--text, #1c1917);word-break:break-word;">
@@ -200,13 +179,32 @@ function renderEnhancementModalContent(wrap, plan) {
       `;
     }
 
+    let swapPickerHtml = '';
+    if (Array.isArray(adj.swapCandidates) && adj.swapCandidates.length > 0) {
+      swapPickerHtml = `
+        <div class="enh-inline-swap-row" style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--surface2,#fbfaf8);border:1px solid var(--border,rgba(120,120,128,0.18));border-radius:8px;padding:6px 10px;">
+          <span style="font-size:11px;font-weight:600;color:var(--text2,#78716c);white-space:nowrap;">🔄 Substitute:</span>
+          <select class="enh-swap-select" data-adj-id="${escapeHtml(adj.id)}" data-ing-name="${escapeHtml(adj.ingredientName || '')}" style="flex:1;min-width:0;padding:4px 6px;font-size:11.5px;font-weight:550;border-radius:6px;border:1px solid var(--border,#ccc);background:var(--surface,#fff);color:var(--text,#1c1917);outline:none;cursor:pointer;">
+            <option value="">Keep Original (${escapeHtml(adj.originalQty || adj.proposedQty || '')}${escapeHtml(adj.unit || '')})</option>
+            ${adj.swapCandidates.map(c => `
+              <option value="${escapeHtml(c.productId || c.productName)}" ${adj.selectedSwapProduct === (c.productId || c.productName) ? 'selected' : ''}>
+                ${escapeHtml(c.label)} [1:1 volume]
+              </option>
+            `).join('')}
+          </select>
+        </div>
+      `;
+    }
+
+    const isChecked = adj.type === 'optional_swap' ? Boolean(adj.active) : (adj.active !== false);
+
     return `
       <div class="enh-adj-row" style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;background:var(--surface,#fff);${borderStyle}">
         <input 
           type="checkbox" 
           class="enh-adj-cb" 
           data-adj-id="${escapeHtml(adj.id)}" 
-          checked 
+          ${isChecked ? 'checked' : ''} 
           style="width:20px!important;height:20px!important;min-width:20px!important;max-width:20px!important;min-height:20px!important;max-height:20px!important;flex:0 0 20px!important;margin:2px 0 0 0!important;padding:0!important;border-radius:6px;cursor:pointer;accent-color:var(--action,#007aff);"
         />
         <div style="flex:1;min-width:0;">
@@ -220,6 +218,7 @@ function renderEnhancementModalContent(wrap, plan) {
             ${escapeHtml(adj.detail)}
           </div>
           ${taxonomyHtml}
+          ${swapPickerHtml}
         </div>
       </div>
     `;
@@ -426,11 +425,77 @@ function renderEnhancementModalContent(wrap, plan) {
     };
   });
 
+  // Wire Inline Swap Selectors
+  const swapSelects = wrap.querySelectorAll('.enh-swap-select');
+  swapSelects.forEach(sel => {
+    sel.onchange = () => {
+      const adjId = sel.getAttribute('data-adj-id');
+      const targetAdj = (activeRoute.adjustments || []).find(a => a.id === adjId);
+      if (!targetAdj) return;
+      const selectedVal = sel.value;
+      if (selectedVal) {
+        const candidate = (targetAdj.swapCandidates || []).find(c => (c.productId || c.productName) === selectedVal);
+        if (candidate) {
+          targetAdj.selectedSwap = candidate;
+          targetAdj.selectedSwapProduct = selectedVal;
+          targetAdj.active = true;
+          // Keep volume 1:1 strictly preserved
+          const origQty = Number(targetAdj.originalQty || targetAdj.proposedQty || 100);
+          const unit = String(targetAdj.unit || 'g').toLowerCase();
+          const servings = activeRoute.proposedServings || 2;
+          let grams = origQty;
+          if (unit === 'ml') grams = origQty;
+          else if (unit === 'tbsp') grams = origQty * 15;
+          else if (unit === 'tsp') grams = origQty * 5;
+          else if (unit === 'kg') grams = origQty * 1000;
+          else if (unit === 'qty' || unit === 'item' || unit === 'slice') grams = origQty * 25;
+
+          targetAdj.swapDeltaKcal = Math.round(((candidate.deltaKcalPer100g || 0) / 100) * (grams / servings));
+          targetAdj.swapDeltaProt = Math.round((((candidate.deltaProtPer100g || 0) / 100) * (grams / servings)) * 10) / 10;
+          targetAdj.postTaxonomy = {
+            category: candidate.category,
+            rootItem: candidate.rootItem,
+            subtype: candidate.subtype,
+            productName: candidate.productName
+          };
+        }
+      } else {
+        delete targetAdj.selectedSwap;
+        delete targetAdj.selectedSwapProduct;
+        delete targetAdj.swapDeltaKcal;
+        delete targetAdj.swapDeltaProt;
+        delete targetAdj.postTaxonomy;
+        if (targetAdj.type === 'optional_swap') {
+          targetAdj.active = false;
+        }
+      }
+      const cb = wrap.querySelector(`.enh-adj-cb[data-adj-id="${adjId}"]`);
+      if (cb) cb.checked = targetAdj.active;
+      recomputeModalPredictedScore(wrap, activeRoute);
+    };
+  });
+
   // Wire Apply Button
   const btnApply = wrap.querySelector('#btn-apply-enh');
   if (btnApply) {
     btnApply.onclick = () => {
       closeEnhancementModal();
+      // Persist chosen swaps to household swap memory
+      const chosenSwaps = (activeRoute.adjustments || []).filter(a => a.selectedSwap);
+      chosenSwaps.forEach(a => {
+        const ingKey = String(a.ingredientName || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '_');
+        const swapData = {
+          originalName: a.ingredientName,
+          preferredProductId: a.selectedSwap.productId,
+          preferredSubtype: a.selectedSwap.subtype,
+          preferredProductName: a.selectedSwap.productName,
+          preferredRootItem: a.selectedSwap.rootItem
+        };
+        saveHouseholdSwapPreference(ingKey, swapData).catch(err => {
+          console.warn('[RecipeEnhancement] Failed to save swap preference:', err);
+        });
+      });
+
       if (typeof currentOnApply === 'function') {
         currentOnApply(activeRoute.enhancedRecipePayload || plan.enhancedRecipePayload);
       }
@@ -441,19 +506,19 @@ function renderEnhancementModalContent(wrap, plan) {
 function recomputeModalPredictedScore(wrap, route) {
   const targetMeal = route.targets?.mealType || 'dinner';
   const activeAdjs = (route.adjustments || []).filter(a => a.active);
-  const deltaKcalTotal = activeAdjs.reduce((acc, a) => acc + (a.deltaKcal || 0), 0);
-  const deltaProtTotal = Math.round(activeAdjs.reduce((acc, a) => acc + (a.deltaProt || 0), 0) * 10) / 10;
+  const deltaKcalTotal = activeAdjs.reduce((acc, a) => acc + (a.deltaKcal || 0) + (a.swapDeltaKcal || 0), 0);
+  const deltaProtTotal = Math.round(activeAdjs.reduce((acc, a) => acc + (a.deltaProt || 0) + (a.swapDeltaProt || 0), 0) * 10) / 10;
 
-  const baseKcal = route.enhancedRecipePayload?.nutrition?.perServing?.cal || route.targets?.targetKcal || 650;
-  const baseProt = route.enhancedRecipePayload?.nutrition?.perServing?.prot || route.targets?.targetProt || 42;
+  const baseKcal = (route.enhancedRecipePayload?.nutrition?.perServing?.cal || route.targets?.targetKcal || 650) + activeAdjs.reduce((acc, a) => acc + (a.swapDeltaKcal || 0), 0);
+  const baseProt = (route.enhancedRecipePayload?.nutrition?.perServing?.prot || route.targets?.targetProt || 42) + activeAdjs.reduce((acc, a) => acc + (a.swapDeltaProt || 0), 0);
 
   const simulated = {
     ...route.enhancedRecipePayload,
     perServing: {
-      cal: baseKcal,
-      prot: baseProt,
-      calories: baseKcal,
-      protein: baseProt
+      cal: Math.max(100, Math.round(baseKcal)),
+      prot: Math.max(5, Math.round(baseProt * 10) / 10),
+      calories: Math.max(100, Math.round(baseKcal)),
+      protein: Math.max(5, Math.round(baseProt * 10) / 10)
     }
   };
 

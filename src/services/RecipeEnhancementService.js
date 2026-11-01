@@ -400,7 +400,22 @@ export const SWAP_OPPORTUNITIES = [
     }
   },
   {
-    match: /\b(greek yogurt|greek yoghurt|natural yogurt|natural yoghurt|creme fraiche)\b/i,
+    match: /\b(creme fraiche|sour cream)\b/i,
+    exclude: /\b(half fat|50% less|light|reduced fat|low fat)\b/i,
+    swapTo: 'Half-Fat Creme Fraiche',
+    productSearchRegex: /\b(half fat|50% less|light creme fraiche)\b/i,
+    kcalPer100gDiff: -140,
+    protPer100gDiff: 0,
+    reason: 'Maintains creamy culinary sauce while cutting 50% fat calories',
+    targetTaxonomy: {
+      category: 'Dairy & Eggs',
+      rootItem: 'Creme Fraiche',
+      subtype: 'Half-Fat Creme Fraiche',
+      productName: '50% Less Fat Creme Fraiche'
+    }
+  },
+  {
+    match: /\b(greek yogurt|greek yoghurt|natural yogurt|natural yoghurt)\b/i,
     exclude: /\b(0%|fat free|light|low fat)\b/i,
     swapTo: '0% Fat Greek Yogurt',
     productSearchRegex: /\b(0% fat|fat free|0% greek|skyr)\b/i,
@@ -415,6 +430,137 @@ export const SWAP_OPPORTUNITIES = [
     }
   }
 ];
+
+/**
+ * Discovers safe culinary swap candidates for an ingredient using pantry hierarchy & learned memory.
+ * Strictly prevents self-swapping and culinary mismatches.
+ */
+export function findCulinarySwapCandidates(item, { products = [], allIngredients = [], swapPreferences = {} } = {}) {
+  if (!item) return [];
+  const matchedProd = item._matchedProduct || resolveProductForIngredient(item, { products, ingredients: allIngredients });
+  const matchedId = String(matchedProd?.id || '').toLowerCase();
+  const matchedName = String(matchedProd?.name || item.name || '').toLowerCase();
+  const rawIngName = String(item.name || '').toLowerCase();
+
+  const candidates = [];
+  const seenProductIds = new Set();
+  if (matchedId) seenProductIds.add(matchedId);
+
+  // 1. Household Swap Learning Memory (Top priority)
+  const ingKey = rawIngName.trim().replace(/[^a-z0-9]/g, '_');
+  const learned = swapPreferences[ingKey] || (matchedId ? swapPreferences[matchedId] : null);
+  if (learned && learned.preferredProductId && !seenProductIds.has(String(learned.preferredProductId).toLowerCase())) {
+    const prod = products.find(p => String(p.id) === String(learned.preferredProductId));
+    if (prod) {
+      seenProductIds.add(String(prod.id).toLowerCase());
+      const pKcal = Number(prod.cal || prod.calories || prod.kcal || prod.macros?.calories || 0);
+      const pProt = Number(prod.prot || prod.protein || prod.macros?.protein || 0);
+      const origKcal = Number(matchedProd?.cal || matchedProd?.calories || matchedProd?.kcal || matchedProd?.macros?.calories || 0);
+      const origProt = Number(matchedProd?.prot || matchedProd?.protein || matchedProd?.macros?.protein || 0);
+      candidates.push({
+        productId: prod.id,
+        productName: prod.name,
+        subtype: learned.preferredSubtype || prod.subtype || 'Preferred Substitute',
+        category: prod.category || 'Dairy & Eggs',
+        rootItem: learned.preferredRootItem || prod.rootItem || item.name,
+        kcalPer100g: pKcal,
+        protPer100g: pProt,
+        deltaKcalPer100g: pKcal - origKcal,
+        deltaProtPer100g: Math.round((pProt - origProt) * 10) / 10,
+        isLearned: true,
+        label: `⭐ ${prod.name} (${Math.round(pKcal - origKcal)} kcal/100g)`
+      });
+    }
+  }
+
+  // 2. Query Pantry Bank Hierarchy
+  const ingDef = allIngredients.find(i => String(i.id) === String(item.ingredientId)) ||
+                 allIngredients.find(i => String(i.name || '').toLowerCase() === rawIngName);
+
+  if (ingDef) {
+    const siblingProducts = products.filter(p => {
+      if (!p || !p.id) return false;
+      if (seenProductIds.has(String(p.id).toLowerCase())) return false;
+      const matchesIng = String(p.ingredientId) === String(ingDef.id);
+      const matchesSub = Array.isArray(ingDef.subtypes) && ingDef.subtypes.some(s => String(s.id) === String(p.subTypeId));
+      return matchesIng || matchesSub;
+    });
+
+    siblingProducts.forEach(prod => {
+      const pKcal = Number(prod.cal || prod.calories || prod.kcal || prod.macros?.calories || 0);
+      const origKcal = Number(matchedProd?.cal || matchedProd?.calories || matchedProd?.kcal || matchedProd?.macros?.calories || 0);
+      // Strictly prevent self-swap or zero-benefit swap
+      if (pKcal < origKcal - 15) {
+        seenProductIds.add(String(prod.id).toLowerCase());
+        const pProt = Number(prod.prot || prod.protein || prod.macros?.protein || 0);
+        const origProt = Number(matchedProd?.prot || matchedProd?.protein || matchedProd?.macros?.protein || 0);
+        candidates.push({
+          productId: prod.id,
+          productName: prod.name,
+          subtype: prod.subtype || ingDef.name,
+          category: prod.category || ingDef.category || 'Pantry',
+          rootItem: ingDef.name,
+          kcalPer100g: pKcal,
+          protPer100g: pProt,
+          deltaKcalPer100g: pKcal - origKcal,
+          deltaProtPer100g: Math.round((pProt - origProt) * 10) / 10,
+          isLearned: false,
+          label: `${prod.name} (${Math.round(pKcal - origKcal)} kcal/100g)`
+        });
+      }
+    });
+  }
+
+  // 3. Curated Opportunities fallback (safely guarded against self-swaps)
+  for (const opp of SWAP_OPPORTUNITIES) {
+    if (opp.match.test(rawIngName) && !opp.exclude.test(rawIngName)) {
+      // Discard if the current product already matches target (prevents Cheddar self-swap!)
+      const alreadyMatchesTarget = opp.exclude.test(matchedName);
+      if (alreadyMatchesTarget) continue;
+
+      let matchedPantryProd = null;
+      if (opp.productSearchRegex) {
+        matchedPantryProd = products.find(p => 
+          opp.productSearchRegex.test(p.name || '') && !seenProductIds.has(String(p.id).toLowerCase())
+        );
+      }
+      if (matchedPantryProd) {
+        seenProductIds.add(String(matchedPantryProd.id).toLowerCase());
+        const pKcal = Number(matchedPantryProd.cal || matchedPantryProd.calories || matchedPantryProd.kcal || 0);
+        const origKcal = Number(matchedProd?.cal || matchedProd?.calories || matchedProd?.kcal || (pKcal - opp.kcalPer100gDiff));
+        candidates.push({
+          productId: matchedPantryProd.id,
+          productName: matchedPantryProd.name,
+          subtype: opp.targetTaxonomy?.subtype || opp.swapTo,
+          category: opp.targetTaxonomy?.category || 'General',
+          rootItem: opp.targetTaxonomy?.rootItem || item.name,
+          kcalPer100g: pKcal,
+          protPer100g: Number(matchedPantryProd.protein || matchedPantryProd.prot || 0),
+          deltaKcalPer100g: opp.kcalPer100gDiff,
+          deltaProtPer100g: opp.protPer100gDiff,
+          isLearned: false,
+          label: `${matchedPantryProd.name} (${opp.kcalPer100gDiff} kcal/100g)`
+        });
+      } else {
+        candidates.push({
+          productId: null,
+          productName: opp.targetTaxonomy?.productName || opp.swapTo,
+          subtype: opp.targetTaxonomy?.subtype || opp.swapTo,
+          category: opp.targetTaxonomy?.category || 'General',
+          rootItem: opp.targetTaxonomy?.rootItem || item.name,
+          kcalPer100g: 0,
+          protPer100g: 0,
+          deltaKcalPer100g: opp.kcalPer100gDiff,
+          deltaProtPer100g: opp.protPer100gDiff,
+          isLearned: false,
+          label: `${opp.swapTo} (${opp.kcalPer100gDiff} kcal/100g)`
+        });
+      }
+    }
+  }
+
+  return candidates;
+}
 
 /**
  * Evaluates a single optimization route towards the household macro targets.
@@ -677,26 +823,34 @@ function buildRoutePlan({
   };
 
   // Mode Execution:
-  if (mode === 'swaps') {
-    // Route 1: Swaps First, Portion-Preserved
-    runFatModeration(targets.maxKcal);
-    runSwaps();
-    if (currentProt < targets.minProt) {
-      runProteinScaling(0.8);
+  if (mode === 'protein') {
+    // Route 2: High Protein Boost
+    runFatModeration(targets.targetKcal);
+    runProteinScaling(1.2);
+    runCarbBalancing();
+  } else if (mode === 'servings') {
+    // Route 3: Rebalanced Servings
+    if (proposedServings === initialServings && currentKcal > 600) {
+      proposedServings = initialServings + 1;
+      currentMacros = calculateBatchMacros(workingIngredients, proposedServings, { products, allIngredients });
+      currentKcal = currentMacros.perServing.calories;
+      currentProt = currentMacros.perServing.protein;
+      adjustments.push({
+        id: 'adj_yield',
+        type: 'yield',
+        label: `Rebalance yield: ${initialServings} ➔ ${proposedServings} portions`,
+        detail: `Normalizes portion calories to ${currentKcal} kcal/serving.`,
+        deltaKcal: currentKcal - Math.round(currentMacros.total.cal / initialServings),
+        deltaProt: currentProt - Math.round(currentMacros.total.prot / initialServings),
+        active: true
+      });
     }
-  } else if (mode === 'portions') {
-    // Route 2: Portions Only, Ingredients-Preserved
     runFatModeration(targets.targetKcal);
     runProteinScaling(1.0);
-    runCarbBalancing();
-    if (currentKcal > targets.maxKcal) {
-      runSwaps(1);
-    }
   } else {
-    // Route 3: Balanced Hybrid
+    // Route 1 (Default): Balanced Quantity Tuning
     runFatModeration(targets.maxKcal);
-    runProteinScaling(0.9);
-    runSwaps();
+    runProteinScaling(1.0);
     runCarbBalancing();
   }
 
@@ -725,6 +879,44 @@ function buildRoutePlan({
     currentKcal += 140;
     currentProt += 24;
   }
+
+  // Attach safe culinary swap candidates to adjustments
+  const swapPreferences = options?.swapPreferences || {};
+  adjustments.forEach(adj => {
+    if (adj.type === 'quantity') {
+      const origItem = workingIngredients.find(i => i.name === adj.ingredientName);
+      if (origItem) {
+        adj.swapCandidates = findCulinarySwapCandidates(origItem, { products, allIngredients, swapPreferences });
+      }
+    }
+  });
+
+  // Also check remaining ingredients for optional lighter culinary alternatives
+  workingIngredients.forEach(item => {
+    const hasAdj = adjustments.some(a => a.ingredientName === item.name);
+    if (!hasAdj) {
+      const candidates = findCulinarySwapCandidates(item, { products, allIngredients, swapPreferences });
+      if (candidates.length > 0) {
+        const taxonomy = resolvePantryTaxonomy(item, { ingredients: allIngredients, products });
+        const q = Number(item.qty ?? item.amount ?? 1) || 1;
+        const u = String(item.unit || 'g').toLowerCase();
+        adjustments.push({
+          id: `adj_opt_swap_${item.name}`,
+          type: 'optional_swap',
+          ingredientName: item.name,
+          originalQty: q,
+          unit: u,
+          label: `Optional Swap: ${item.name}`,
+          detail: `Select a lighter substitute from your pantry bank to trim calories.`,
+          deltaKcal: 0,
+          deltaProt: 0,
+          taxonomy,
+          swapCandidates: candidates,
+          active: false
+        });
+      }
+    }
+  });
 
   const finalMacros = {
     perServing: {
@@ -778,6 +970,7 @@ export function generateEnhancementPlan(recipe, options = {}) {
   const state = typeof getState === 'function' ? (getState() || {}) : {};
   const products = Array.isArray(options.products) ? options.products : (state.products || []);
   const allIngredients = Array.isArray(options.ingredients) ? options.ingredients : (state.ingredients || []);
+  const swapPreferences = options.swapPreferences || state.preferences?.swapPreferences || {};
 
   const targets = resolveRecipeTargets(recipe, options);
   const targetMealType = targets.mealType;
@@ -786,17 +979,17 @@ export function generateEnhancementPlan(recipe, options = {}) {
 
   const currentServings = Number(recipe.servings || recipe.serves || 2) || 2;
 
-  // Build candidate routes
+  // Build candidate routes (Quantity-focused)
   const r1 = buildRoutePlan({
-    routeId: 'route_swaps',
-    name: 'Route 1: Via Pantry Swaps',
-    badge: '🔄 Swaps',
-    description: 'Reaches goal by substituting leaner ingredients while preserving original quantities.',
-    mode: 'swaps',
+    routeId: 'route_balanced',
+    name: 'Route 1: Balanced Quantity Tuning',
+    badge: '⚖️ Balanced',
+    description: 'Reaches goal through balanced portion tuning and light cooking fat moderation.',
+    mode: 'balanced',
     recipe,
     initialServings: currentServings,
     targets,
-    options,
+    options: { ...options, swapPreferences },
     beforeScore,
     products,
     allIngredients,
@@ -805,15 +998,15 @@ export function generateEnhancementPlan(recipe, options = {}) {
   });
 
   const r2 = buildRoutePlan({
-    routeId: 'route_portions',
-    name: 'Route 2: Via Portion Scaling',
-    badge: '⚖️ Portions',
-    description: 'Reaches goal by scaling protein portion while keeping original ingredients.',
-    mode: 'portions',
+    routeId: 'route_protein',
+    name: 'Route 2: High Protein Boost',
+    badge: '💪 Protein',
+    description: 'Reaches goal by scaling protein cut (fillet, patty, or chicken) to household targets.',
+    mode: 'protein',
     recipe,
     initialServings: currentServings,
     targets,
-    options,
+    options: { ...options, swapPreferences },
     beforeScore,
     products,
     allIngredients,
@@ -822,15 +1015,15 @@ export function generateEnhancementPlan(recipe, options = {}) {
   });
 
   const r3 = buildRoutePlan({
-    routeId: 'route_hybrid',
-    name: 'Route 3: Balanced Hybrid',
-    badge: '✨ Balanced',
-    description: 'Reaches goal with a balanced combination of portion boost and light swaps.',
-    mode: 'hybrid',
+    routeId: 'route_servings',
+    name: 'Route 3: Rebalanced Servings',
+    badge: '🍽️ Servings',
+    description: 'Reaches goal by re-portioning batch count to optimize per-serving calorie density.',
+    mode: 'servings',
     recipe,
     initialServings: currentServings,
     targets,
-    options,
+    options: { ...options, swapPreferences },
     beforeScore,
     products,
     allIngredients,
@@ -844,7 +1037,7 @@ export function generateEnhancementPlan(recipe, options = {}) {
   const seenSignatures = new Set();
   const uniqueRoutes = [];
   candidateRoutes.forEach(r => {
-    const sig = (r.adjustments || []).map(a => `${a.type}:${a.ingredientName || a.label}:${a.proposedQty || a.swapTo || ''}`).sort().join('|');
+    const sig = (r.adjustments || []).map(a => `${a.type}:${a.ingredientName || a.label}:${a.proposedQty || ''}`).sort().join('|');
     if (sig && !seenSignatures.has(sig)) {
       seenSignatures.add(sig);
       uniqueRoutes.push(r);

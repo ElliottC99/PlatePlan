@@ -11,7 +11,7 @@ export function whitelistPreferences(preferences) {
   if (!preferences || typeof preferences !== 'object') return {};
   const whitelisted = {};
   const allowedKeys = [
-    'nutritionTargets', 'profiles', 'fitScoreParams', 'settings', 'theme', 'mealPlanSettings', 'activeView', 'userPrefs', 'dismissedQualityAdvisories', 'dismissedAdvisories', 'dismissed_advisories', 'updatedAt'
+    'nutritionTargets', 'profiles', 'fitScoreParams', 'settings', 'theme', 'mealPlanSettings', 'activeView', 'userPrefs', 'dismissedQualityAdvisories', 'dismissedAdvisories', 'dismissed_advisories', 'swapPreferences', 'updatedAt'
   ];
   Object.keys(preferences).forEach(key => {
     if (!allowedKeys.includes(key)) return;
@@ -243,4 +243,31 @@ export async function getPreferences() {
 
 export async function savePreferences(preferences) {
   return savePreferencesWithAutoPrune(preferences);
+}
+
+export async function saveHouseholdSwapPreference(ingredientKey, swapData) {
+  if (!ingredientKey || !swapData) return;
+  const storeState = (typeof getStoreState === 'function') ? getStoreState() : {};
+  const currentPreferences = storeState.preferences || {};
+  const currentSwaps = currentPreferences.swapPreferences || {};
+
+  const updatedSwaps = {
+    ...currentSwaps,
+    [ingredientKey]: {
+      ...swapData,
+      updatedAt: new Date().toISOString()
+    }
+  };
+
+  const updatedPreferences = {
+    ...currentPreferences,
+    swapPreferences: updatedSwaps
+  };
+
+  return savePreferencesWithAutoPrune(updatedPreferences);
+}
+
+export function getHouseholdSwapPreferences() {
+  const storeState = (typeof getStoreState === 'function') ? getStoreState() : {};
+  return storeState.preferences?.swapPreferences || {};
 }
