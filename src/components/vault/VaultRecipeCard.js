@@ -74,7 +74,7 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
     ? window.isRecipeVariantFavourite(recipeId, variant)
     : (recipe.isFavourite || recipe.isFavorite);
 
-  dropdown.innerHTML = renderRecipeActionsItems(recipeId, isFav);
+  dropdown.innerHTML = renderRecipeActionsItems(recipeId, isFav, variant);
 
   if (targetBtn) {
     const rect = targetBtn.getBoundingClientRect();
@@ -182,21 +182,48 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
     dropdown.remove();
     confirmDeleteVaultRecipe(recipe, async () => {
       try {
-        const { deleteRecipe } = await import('../../services/HouseholdRepository.js');
-        await deleteRecipe(recipeId);
-        if (getState()?.recipes) {
-          getState().recipes = getState().recipes.filter(r => r.id !== recipeId);
+        if (variant === 'enhanced') {
+          const { deleteRecipeVariant } = await import('../../services/HouseholdRepository.js');
+          await deleteRecipeVariant(recipeId, 'enhanced');
+          const allRecipes = getState()?.recipes;
+          if (Array.isArray(allRecipes)) {
+            const r = allRecipes.find(x => x.id === recipeId);
+            if (r) {
+              delete r.enhanced;
+              delete r.enhancedFitScore;
+              if (r.variants) delete r.variants.enhanced;
+            }
+          }
+          const favList = getState()?.userPrefs?.variantFavourites;
+          if (Array.isArray(favList)) {
+            const idx = favList.indexOf(`${recipeId}_enhanced`);
+            if (idx !== -1) favList.splice(idx, 1);
+          }
+          document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: getState()?.recipes }));
+          if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
+          if (typeof window.showPlatePlanToast === 'function') {
+            window.showPlatePlanToast(`Removed enhanced variant from "${recipe.name || recipe.title}"`);
+          }
+        } else {
+          const { deleteRecipe } = await import('../../services/HouseholdRepository.js');
+          await deleteRecipe(recipeId);
+          if (getState()?.recipes) {
+            getState().recipes = getState().recipes.filter(r => r.id !== recipeId);
+          }
+          document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: getState()?.recipes }));
+          if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
+          if (typeof window.showPlatePlanToast === 'function') {
+            window.showPlatePlanToast(`Deleted "${recipe.name || recipe.title}"`);
+          }
         }
-        if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
-        if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(`Deleted "${recipe.name || recipe.title}"`);
       } catch (err) {
-        console.error('[VaultRecipeCard] Error deleting recipe:', err);
+        console.error('[VaultRecipeCard] Error deleting recipe/variant:', err);
       }
-    });
+    }, variant);
   };
 }
 
-function confirmDeleteVaultRecipe(recipe, onConfirm) {
+function confirmDeleteVaultRecipe(recipe, onConfirm, variant = 'original') {
   let wrap = document.getElementById('view-modal-wrap');
   let content = document.getElementById('view-modal-content');
   if (!wrap) {
@@ -213,7 +240,7 @@ function confirmDeleteVaultRecipe(recipe, onConfirm) {
   }
 
   const recipeTitle = recipe.name || recipe.title || 'this recipe';
-  content.innerHTML = renderDeleteConfirmationContent(recipeTitle);
+  content.innerHTML = renderDeleteConfirmationContent(recipeTitle, variant);
   wrap.classList.add('open');
   document.body.style.overflow = 'hidden';
 

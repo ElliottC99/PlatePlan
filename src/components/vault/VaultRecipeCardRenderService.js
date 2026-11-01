@@ -91,21 +91,33 @@ export function renderRecipeCardShell({
 /**
  * Renders the recipe actions dropdown items.
  */
-export function renderRecipeActionsItems(recipeId, isFav) {
+export function renderRecipeActionsItems(recipeId, isFav, variant = 'original') {
   const rId = escapeAttr(recipeId);
-  return `
-    <button type="button" class="action-menu-item" data-action="menu-view" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
-      <span>👁️</span> View Details
-    </button>
+  const isEnh = variant === 'enhanced';
+
+  const enhanceItem = !isEnh ? `
     <button type="button" class="action-menu-item" data-action="menu-enhance" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:600;color:#16a34a;">
       <span>✨</span> Auto-Enhance (85+)
     </button>
+  ` : '';
+
+  const editReviewItems = !isEnh ? `
     <button type="button" class="action-menu-item" data-action="menu-edit" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
       <span>✏️</span> Edit Recipe
     </button>
     <button type="button" class="action-menu-item" data-action="menu-review" data-id="${rId}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
       <span>🔍</span> Review Recipe
     </button>
+  ` : '';
+
+  const deleteLabel = isEnh ? 'Remove Enhanced Variant' : 'Delete Entire Recipe';
+
+  return `
+    <button type="button" class="action-menu-item" data-action="menu-view" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
+      <span>👁️</span> View Details
+    </button>
+    ${enhanceItem}
+    ${editReviewItems}
     <button type="button" class="action-menu-item" data-action="menu-duplicate" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
       <span>📋</span> Duplicate Recipe
     </button>
@@ -114,7 +126,7 @@ export function renderRecipeActionsItems(recipeId, isFav) {
     </button>
     <div style="height:1px;background:var(--border, #eee);margin:4px 0"></div>
     <button type="button" class="action-menu-item" data-action="menu-delete" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:#ef4444;">
-      <span>🗑️</span> Delete Recipe
+      <span>🗑️</span> ${deleteLabel}
     </button>
   `;
 }
@@ -122,17 +134,24 @@ export function renderRecipeActionsItems(recipeId, isFav) {
 /**
  * Renders the delete confirmation dialog content.
  */
-export function renderDeleteConfirmationContent(recipeTitle) {
+export function renderDeleteConfirmationContent(recipeTitle, variant = 'original') {
+  const isEnh = variant === 'enhanced';
+  const modalTitle = isEnh ? 'Remove Enhanced Variant?' : 'Delete Entire Recipe?';
+  const confirmBtnLabel = isEnh ? 'Remove Variant' : 'Delete Recipe';
+  const bodyText = isEnh
+    ? `Are you sure you want to remove the enhanced version of <strong>"${escapeHtml(recipeTitle)}"</strong>?<br><br><span style="font-size:12.5px;color:var(--text2,#78716c);display:block;background:var(--surface2,#f5f4ee);padding:8px 12px;border-radius:8px;border:1px solid var(--border,#e5e5e5)">🔒 Your original recipe will remain 100% untouched.</span>`
+    : `Are you sure you want to permanently delete <strong>"${escapeHtml(recipeTitle)}"</strong>? This will delete both the original and enhanced versions.`;
+
   return `
     <div style="padding: 24px; max-width: 440px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; text-align: center;">
       <div style="font-size: 40px; margin-bottom: 12px;">🗑️</div>
-      <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750; color: var(--red,#ef4444)">Delete Recipe?</h3>
+      <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.15rem; font-weight: 750; color: var(--red,#ef4444)">${modalTitle}</h3>
       <p style="font-size: 13.5px; color: var(--text2,#78716c); margin: 0 0 24px 0; line-height: 1.5;">
-        Are you sure you want to delete <strong>"${escapeHtml(recipeTitle)}"</strong>?
+        ${bodyText}
       </p>
       <div style="display:flex; gap:8px; justify-content: center;">
         <button type="button" class="btn" style="padding: 8px 16px;" id="btn-cancel-vault-del">Cancel</button>
-        <button type="button" class="btn danger" style="padding: 8px 16px;" id="btn-confirm-vault-del">Confirm Delete</button>
+        <button type="button" class="btn danger" style="padding: 8px 16px;" id="btn-confirm-vault-del">${confirmBtnLabel}</button>
       </div>
     </div>
   `;

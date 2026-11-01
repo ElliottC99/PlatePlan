@@ -1,6 +1,22 @@
 import './config/firebase.js';
 
+import { RESTORED_GNOCCHI_RECIPE } from './config/restoredGnocchi.js';
+
 if (typeof window !== 'undefined') {
+  window.restoreDeletedGnocchi = async () => {
+    try {
+      const { saveRecipe } = await import('./services/HouseholdRepository.js');
+      await saveRecipe(RESTORED_GNOCCHI_RECIPE);
+      const state = getState();
+      if (state?.recipes && !state.recipes.some(r => r.id === RESTORED_GNOCCHI_RECIPE.id)) {
+        state.recipes.push(RESTORED_GNOCCHI_RECIPE);
+      }
+      if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
+      if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Restored "Creamy Sausage & Pea Gnocchi" from database backup!');
+    } catch (e) {
+      console.error('[PlatePlan] Failed to restore Gnocchi:', e);
+    }
+  };
   window.showTescoImport = () => {
     import('./components/pantry/SubtypeProductLinkerModalUI.js').then(m => m.openTescoImportModal?.(null, null)).catch(err => console.error('[PlatePlan]', err));
   };
@@ -273,6 +289,12 @@ function setupSubscriptions() {
   subscribe('recipes', (recipes) => {
     const clean = sanitizeRecipes(recipes);
     if (typeof window !== 'undefined') { getState().recipes = clean; window.allRecipes = clean; window.recipes = clean; }
+    if (clean.length > 0 && !clean.some(r => r.id === 'r1784057670563') && !window.__gnocchiRestored) {
+      window.__gnocchiRestored = true;
+      if (typeof window.restoreDeletedGnocchi === 'function') {
+        window.restoreDeletedGnocchi();
+      }
+    }
     renderRecipeVault(); renderToday(); if (getState().currentPlan && typeof renderPlanner === 'function') renderPlanner();
     renderDataQualityView();
   });

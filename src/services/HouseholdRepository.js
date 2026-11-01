@@ -33,7 +33,7 @@ import {
   isDbAvailable, 
   safeFirestoreGet 
 } from './RecipeFirestoreRepository.js';
-import { getRecipes, saveRecipe, deleteRecipe } from './RecipeRepository.js';
+import { getRecipes, saveRecipe, deleteRecipe, deleteRecipeVariant } from './RecipeRepository.js';
 import { getIngredients, saveIngredient, deleteIngredient } from './PantryFirestoreRepository.js';
 import { 
   saveShoppingList,
@@ -210,6 +210,7 @@ export {
   getRecipes,
   saveRecipe,
   deleteRecipe,
+  deleteRecipeVariant,
   getIngredients,
   saveIngredient,
   deleteIngredient,
