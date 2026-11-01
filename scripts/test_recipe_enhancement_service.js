@@ -212,6 +212,29 @@ assert.ok(swapAdj.postTaxonomy.subtype, 'Post-swap must have subtype');
 assert.ok(swapAdj.postTaxonomy.productName, 'Post-swap must have linked product name');
 console.log('✅ Test 6 Passed: Pre-swap and post-swap accurately expose Category, Root Item, Subtype, and Linked Product.\n');
 
+// --- Test 7: Alternative Routes Generation (Same Goal, Different Culinary Paths) ---
+console.log('--- Test 7: Multi-Route Generation & Selection ---');
+assert.ok(Array.isArray(burgerPlan.routes), 'burgerPlan.routes must be an array');
+assert.ok(burgerPlan.routes.length >= 2, `Expected at least 2 distinct qualifying routes, got ${burgerPlan.routes.length}`);
+
+console.log(`Generated ${burgerPlan.routes.length} distinct routes for Smashed Brooklyn Burgers:`);
+burgerPlan.routes.forEach((r, idx) => {
+  console.log(`  Route ${idx + 1}: [${r.badge}] ${r.name} -> Score: ${r.predictedScore}%`);
+  console.log(`    Strategy: ${r.description}`);
+  r.adjustments.forEach(a => console.log(`      * ${a.label}`));
+  assert.ok(r.id, 'Route must have an id');
+  assert.ok(r.name, 'Route must have a name');
+  assert.ok(r.badge, 'Route must have a badge');
+  assert.ok(r.predictedScore >= 85, `Each route must achieve >= 85% Fit Score, got ${r.predictedScore}%`);
+  assert.ok(Array.isArray(r.adjustments) && r.adjustments.length > 0, 'Route must have adjustments');
+});
+
+assert.ok(burgerPlan.selectedRouteId, 'Plan must indicate a selectedRouteId');
+const selectedRoute = burgerPlan.routes.find(r => r.id === burgerPlan.selectedRouteId);
+assert.ok(selectedRoute, 'selectedRouteId must resolve to one of the generated routes');
+assert.strictEqual(burgerPlan.predictedScore, selectedRoute.predictedScore, 'Root predictedScore must mirror selected route');
+console.log('✅ Test 7 Passed: Multi-route engine generates qualifying distinct routes achieving >= 85%.\n');
+
 console.log('=============================================================');
 console.log('ALL RECIPE ENHANCEMENT ENGINE ACCEPTANCE TESTS PASSED! ✅');
 console.log('=============================================================');

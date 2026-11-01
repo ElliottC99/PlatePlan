@@ -1,60 +1,32 @@
-# Plan Quality Review: Multi-Option Recipe Enhancement Engine
+# Plan Quality Review: Multi-Route Recipe Enhancement to 85+ Fit Score
 
 > Plan File: `docs/plans/2026-11-01-2030-multi-option-recipe-enhancement-plan.md`  
 > Review Date: 2026-11-01  
 > Reviewer: Advanced Agentic Engineer (Antigravity)  
-> Status: **APPROVED WITH CRITICAL SAFEGUARDS (Ready for /work)**
+> Status: **APPROVED (Ready for Execution)**
 
 ---
 
-## 1. Completeness Assessment
+## 1. Plan Assessment
 
 | Area | Status | Findings |
 | :--- | :---: | :--- |
-| **Problem Statement** | ✅ Pass | Clearly identifies why single-path optimization is restrictive and how 2–3 distinct culinary strategies empower household meal choice. |
-| **Success Criteria** | ✅ Pass | Specific, measurable criteria defined: all presented options must reach $\ge 85\%$ Fit Score, render cleanly in an Apple HIG segmented control, and preserve section immutability. |
-| **Research & Patterns** | ✅ Pass | References Pattern #10 (Atomic State Transitions), Pattern #09 (Rigorous Planning & Multi-Order Thinking), and leverages existing `resolvePantryTaxonomy` machinery. |
-| **Implementation Steps** | ✅ Pass | Four concrete phases from service decomposition to UI segmented bar, unit tests, and build verification. |
+| **User Alignment** | ✅ Pass | Fixes the core user objection: rejects artificial "themed options" (like inserting tofu into burgers) and focuses strictly on **alternative routes to the exact same macro target**. |
+| **Mathematical Parity** | ✅ Pass | All candidate routes ($R_1: \text{Swaps}$, $R_2: \text{Portions}$, $R_3: \text{Hybrid}$) target the exact same household calories ($\approx 656\text{ kcal}$) and protein ($\approx 43\text{g}$), and must achieve $\ge 85\%$ Fit Score. |
+| **Pantry & Product Parity** | ✅ Pass | Every route uses the established `resolvePantryTaxonomy` and `resolvePantryTaxonomyForSwap` to expose `Category / Root Item / Sub-type` and linked products pre- and post-swap. |
+| **Backward Compatibility** | ✅ Pass | Spreads the top route onto the root `EnhancementPlan` object so existing callers in the wizard and vault preview remain 100% operational. |
 
 ---
 
-## 2. Deep Gap Analysis & Critical Safeguards
-
-### Safeguard 1: Duplicate Strategy De-duplication Guard
-* **Risk**: On simple recipes (e.g. recipes with only 1 primary protein and no dairy/fats), different heuristics might produce identical or nearly identical adjustment sets. Showing two identical options confuses the user.
-* **Mitigation**: The strategy aggregator in `RecipeEnhancementService` must compute an adjustment signature (`strategy.adjustments.map(a => a.id).sort().join(',')`). If Strategy B's signature matches Strategy A's, Strategy B must be pruned.
-
-### Safeguard 2: Minimum Score Floor ($\ge 85\%$) Filter
-* **Risk**: An exploratory strategy (e.g. adding beans or scaling protein) might fail to hit $85\%$ on recipes with extreme baseline macro imbalances.
-* **Mitigation**: Filter all candidate strategies with `strategy.predictedScore >= 85`. Only strategies reaching the green "Ideal Match" tier are included in `strategies`. If only 1 strategy qualifies, the modal cleanly renders that single strategy without showing a redundant 1-item tab bar.
-
-### Safeguard 3: Root-Level Backward Compatibility
-* **Risk**: Existing code in `RecipeWizardStep3Handlers.js`, `RecipeDetailModalService.js`, and `test_recipe_enhancement_service.js` directly accesses `plan.adjustments`, `plan.predictedScore`, and `plan.enhancedRecipePayload`.
-* **Mitigation**: The returned `EnhancementPlan` object will spread the primary strategy (`strategies[0]`) onto the root of the plan object:
-  ```javascript
-  return {
-    ...primaryStrategy,
-    strategies,
-    selectedStrategyId: primaryStrategy.id
-  };
-  ```
-  This guarantees 100% backward compatibility with all existing consumers.
-
-### Safeguard 4: Strategy-Isolated Checkbox State
-* **Risk**: Toggling a checkbox in "Strategy A" could leak into "Strategy B" if adjustment state is shared across strategies.
-* **Mitigation**: Each strategy object in `plan.strategies` maintains its own `adjustments` array with independent `active` booleans. The modal's interactive toggle listener references `plan.strategies.find(s => s.id === activeStrategyId)`.
-
-### Safeguard 5: Mobile UI Segmented Control
-* **Risk**: Long strategy titles on narrow mobile screens (375px) might cause text wrapping and clutter.
-* **Mitigation**: Use compact, Apple HIG tab badges:
-  - `🔄 Smart Swaps (96%)`
-  - `💪 Protein Boost (92%)`
-  - `🌿 Plant Booster (88%)`
-  Render with `display: flex; gap: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch;`.
+## 2. Review Safeguards & Verification Checklist
+1. **De-duplication Check**: If Route 2 (portions only) and Route 3 (hybrid) generate identical adjustments, prune Route 3 so the UI only presents truly distinct paths.
+2. **Floor Filter ($\ge 85\%$)**: Never show a route that fails to reach the green Ideal Match tier ($\ge 85\%$).
+3. **State Isolation**: Switching route tabs in the UI resets interactive checkboxes to the selected route's defaults, avoiding checkbox state leakage.
+4. **Clean Mobile UI**: Compact Apple HIG route pill badges with clear single-line summaries.
 
 ---
 
 ## 3. Verdict
 **VERDICT: APPROVED ✓**
 
-The plan is mathematically sound, culinarily grounded, and adheres strictly to PlatePlan's architecture (no bundlers, single-writer persistence, immutable originals, Apple HIG styling). Proceed directly to `/work`.
+The plan is aligned with the user's intent. Proceed to `/work` implementation.

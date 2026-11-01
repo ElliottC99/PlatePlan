@@ -1,101 +1,111 @@
 ---
-title: Multi-Option Recipe Enhancement Engine
+title: Multi-Route Recipe Enhancement to 85+ Fit Score
 type: feat
 date: 2026-11-01
-topic: recipe-enhancement-multi-strategy
+topic: recipe-enhancement-routes
 ---
 
-# Multi-Option Recipe Enhancement Engine
+# Multi-Route Recipe Enhancement to 85+ Fit Score
 
 > Created: 2026-11-01
 > Status: Approved ✓ (Reviewed 2026-11-01)
 
 ## Summary
-Extend the automated recipe enhancement engine (`RecipeEnhancementService`) and the Apple HIG interactive modal (`RecipeEnhancementModalUI`) to generate and present **multiple distinct optimization strategies** (e.g., "Smart Swaps", "High-Protein Volume", and "Plant/Fiber Booster") when feasible, allowing users to choose the culinary direction that best suits their appetite, pantry stock, and preferences while guaranteeing every proposed option achieves a Fit Score $\ge 85\%$.
+Refactor the automated recipe enhancement engine (`RecipeEnhancementService`) and Apple HIG modal (`RecipeEnhancementModalUI`) to generate **alternative routes that achieve the exact same nutritional target ($\ge 85\%$ Fit Score)**. Instead of altering the character of the recipe with disparate themes, the optimizer provides 2–3 different culinary routes (e.g. Route 1: via ingredient swaps, Route 2: via portion scaling, Route 3: via balanced hybrid) that all arrive at the same destination: meeting household calorie and protein goals.
 
 ---
 
-## Problem Statement
-Currently, the Nutritional Optimizer generates a single linear enhancement plan. In real households, there are multiple valid culinary ways to balance a meal for fitness and household macro targets:
-1. One person may prefer keeping portions unchanged and making smart pantry swaps (e.g. 5% lean beef, reduced-fat cheese, light coconut milk).
-2. Another day, they may be post-workout, prefer double protein volume (e.g. 2 patties ➔ 4 patties), and trim excess oil or starches.
-3. Another day, they may prefer adding high-protein plant wholefoods (e.g., lentils, black beans, edamame, tofu) to boost fiber and micronutrients.
+## Problem Statement & User Intent
+When optimizing a recipe (e.g. "Smashed Brooklyn Burgers" or "Crispy Chicken Kimchi Caesar Salad"), the target destination is fixed: **achieve $\ge 85\%$ Fit Score for the household profile**.
 
-Presenting a single rigid suggestion forces the user into one culinary philosophy. Allowing the engine to generate 2–3 distinct, high-scoring ($\ge 85\%$) strategy options with an Apple HIG segmented picker empowers Elliott and Chloe with choice and transparency.
+However, there is more than one path to reach that exact nutritional target:
+1. **Route 1 (Pantry Swaps)**: Keep the original portions unchanged (e.g., 2 burger patties), and reach the macro target entirely by swapping high-fat items to their leaner counterparts (e.g., 5% lean beef patties, reduced-fat cheese).
+2. **Route 2 (Portion / Quantity Scaling)**: Keep the original ingredients unchanged (no swaps), and reach the macro target by scaling protein quantity (e.g., 2 patties ➔ 4 patties) while moderating cooking fat or balancing carbs.
+3. **Route 3 (Balanced Hybrid)**: A moderate blend (e.g., 2 patties ➔ 3 patties plus light cheese swap) that balances portion satisfaction and calorie lightness.
 
----
-
-## Prior Solutions & Patterns
-- [`docs/plans/2026-11-01-1945-automated-recipe-enhancement-to-85-fit-score-plan.md`](file:///Users/elliottcallender/Downloads/PlatePlan-main/docs/plans/2026-11-01-1945-automated-recipe-enhancement-to-85-fit-score-plan.md): Established the 5 culinary levers, discrete item scaling, and 85+ score targeting.
-- `Pattern #10: Atomic State Transitions`: Ensure switching between enhancement options is instantaneous and idempotent, preserving immutability until explicit user acceptance.
-- `Pattern #09: Rigorous Planning & Multi-Order Thinking`: Analyze downstream impacts on shopping list aggregation, recipe wizard edits, and Firestore persistence.
+The user does not want divergent or artificial concepts (like inserting tofu or beans where they don't belong). The goal is identical across all options: **the same household target, reached via different routes**.
 
 ---
 
-## Multi-Order Thinking & Architecture Analysis
+## Architectural & Algorithmic Design
 
-### 1st Order (Direct Effects)
-- `RecipeEnhancementService.js`: Refactor `generateEnhancementPlan` to return `strategies: [...]` (or `options: [...]`), where each strategy has:
-  - `id`: e.g. `'strategy_smart_swaps'`, `'strategy_protein_boost'`, `'strategy_plant_blend'`
-  - `name`: e.g. `'Smart Swaps'`, `'Protein Boost'`, `'Plant & Fiber Booster'`
-  - `description`: Summary of culinary approach
-  - `predictedScore`: Computed fit score $\ge 85\%$
-  - `predictedTier`: e.g. `'🟢 Ideal Match'`
-  - `macros`: `{ perServing, total }`
-  - `adjustments`: Specific checklist of actions with `preTaxonomy` and `postTaxonomy`
-  - `enhancedRecipePayload`: Complete recipe payload for that strategy.
-- `RecipeEnhancementModalUI.js`: Render an Apple HIG segmented control / tab switcher at the top of the modal when `plan.strategies.length > 1`.
+### 1. Unified Goal Specification
+Each recipe enhancement run resolves an identical, immutable target:
+* Target Kcal (e.g. $656\text{ kcal}$)
+* Target Protein (e.g. $43\text{g}$)
+* Fit Score Goal: $\ge 85\%$ (Ideal Match)
 
-### 2nd Order (Downstream Components)
-- `RecipeWizardStep3Handlers.js` & `RecipeDetailModalService.js`: Both call `openEnhancementModal`. The `onApply` callback continues to receive the selected `enhancedRecipePayload`, ensuring 100% backward compatibility without changing callers.
-- Checkbox live re-scoring must recalculate against the **currently selected strategy's baseline**, not leak state across strategies.
+### 2. The Three Routes to the Same Goal
 
-### 3rd Order (Data & Persistence)
-- `recipe.enhanced`: Only the user-selected strategy is written to `recipe.enhanced` when "Accept & Apply Enhanced Variant" is clicked. Unselected options are discarded, keeping the Firestore document lean and preserving SSOT.
+#### Route 1: "Via Pantry Swaps" (Portion-Preserved)
+* **Strategy**: Fixes quantities to original servings/pieces; relies entirely on Lever 4 (Smart Swaps) and Lever 1 (Cooking Fat Moderation).
+* **When Applicable**: When recipe contains swappable ingredients (beef/mince ➔ 5% lean, regular cheese ➔ reduced fat, coconut milk ➔ light coconut milk, regular mayo ➔ light mayo).
+* **Destination**: Hitting $\ge 85\%$ Fit Score purely through product choices without altering portion counts.
 
-### 4th Order (Culinary Feasibility)
-- Not every recipe has enough levers to produce 3 wildly different options. If a recipe only admits 1 sensible strategy (e.g. pure fat moderation on an already high-protein curry), the engine must gracefully present just that 1 strategy without creating artificial or nonsensical options.
+#### Route 2: "Via Portion Scaling" (Ingredient-Preserved)
+* **Strategy**: Avoids ingredient swaps; reaches the protein target by scaling the primary protein (Lever 2), while moderating cooking oil (Lever 1) or trimming starches (Lever 3) so calories stay in the optimal window.
+* **When Applicable**: When the user prefers to use their existing staple ingredients as-is, but is willing to eat an extra patty or larger fillet.
+* **Destination**: Hitting $\ge 85\%$ Fit Score purely through portion adjustments.
+
+#### Route 3: "Via Balanced Hybrid" (Swaps + Portions)
+* **Strategy**: Applies a gentle portion increase (e.g. 1 extra discrete item or $+25\%$ protein) combined with a primary lean swap, preventing extreme portion bulk or extreme swap reliance.
+* **Destination**: Hitting $\ge 85\%$ Fit Score with minimal disruption to taste and volume.
+
+### 3. Route Evaluation & Pruning Pipeline
+1. For each candidate route ($R_1, R_2, R_3$):
+   - Evaluate adjustments against a deep clone of the recipe's ingredients.
+   - Calculate resulting macros: `finalMacros`.
+   - Compute fit score using `calculateMealFitScore(simulatedRecipe, mealType, options)`.
+   - Attach `preTaxonomy` and `postTaxonomy` (`Category / Root Item / Sub-type`) and linked products to every adjustment.
+2. **Pruning & Qualification**:
+   - Filter: Only keep routes where `predictedScore >= 85` (or reaches the green Ideal Match tier).
+   - De-duplicate: If Route 2 and Route 3 generate the exact same adjustment list, drop the duplicate.
+   - Sort: Rank routes by predicted score (highest first).
+3. **Fallback & Parity**:
+   - If only 1 route reaches $\ge 85\%$, present that single route cleanly.
+   - Spread the top route on the root of the plan object (`{ ...primaryRoute, routes: [...], selectedRouteId: primaryRoute.id }`) for 100% backward compatibility.
 
 ---
 
-## Concrete Proposed Strategies
+## UI / UX Design in `RecipeEnhancementModalUI`
 
-1. **Strategy A: "Smart Swaps" (Lean Pantry Substitution)**
-   - Prioritizes Lever 4 (Pantry Swaps: 5% lean beef/mince, reduced fat cheese, light coconut milk/mayo) and Lever 1 (fat moderation).
-   - Minimal volume change; familiar plate appearance and texture.
-   - Ideal for calorie control while meeting protein goals.
+### Apple HIG Route Selector Bar
+When multiple routes qualify (`routes.length > 1`), display an Apple HIG segmented control right under the modal header:
 
-2. **Strategy B: "Protein Volume Boost" (Portion Scaling)**
-   - Prioritizes Lever 2 (Scaling primary protein: e.g. 2 patties ➔ 3 or 4 patties, 200g chicken ➔ 300g chicken).
-   - Pairs with Lever 3 (Carb balancing / gentle bun/rice trimming) or Lever 1 (oil moderation) to prevent calorie overshoot.
-   - Ideal for high satiety, post-workout, and double-protein meals.
+```
+[ 🔄 Route 1: Via Swaps (96%) ]   [ ⚖️ Route 2: Via Portions (87%) ]   [ ✨ Route 3: Balanced (98%) ]
+```
 
-3. **Strategy C: "Fiber & Plant Booster" (Wholefood Enrichment)**
-   - Prioritizes adding or blending a plant-based protein booster (e.g. black beans into burgers, chickpeas/lentils into curries, or edamame/tofu into stir-fries).
-   - High micronutrient and fiber density, lower saturated fat.
+* **Interactive Switch**: Clicking a route pill immediately switches the displayed adjustment checklist, target impacts ($\Delta\text{kcal}$, $\Delta\text{protein}$), pre/post taxonomy comparison cards, and predicted fit score badge.
+* **Visual Clarity**: Each route displays a clean description:
+  - *Route 1*: "Reaches goal by substituting leaner ingredients while preserving original quantities."
+  - *Route 2*: "Reaches goal by scaling protein portion while keeping original ingredients."
+  - *Route 3*: "Reaches goal with a balanced combination of portion scaling and lean swaps."
+* **Acceptance**: Clicking "Accept & Apply Enhanced Variant" saves strictly the selected route's `enhancedRecipePayload` into `recipe.enhanced`.
 
 ---
 
 ## Acceptance Criteria
-- [ ] `generateEnhancementPlan` evaluates and returns an array of `strategies` (1 to 3 valid options, each scoring $\ge 85\%$).
-- [ ] If multiple strategies achieve $\ge 85\%$, `RecipeEnhancementModalUI` displays an Apple HIG segmented control allowing the user to click between strategies.
-- [ ] Switching strategies updates the headline fit score badge, target impacts, adjustment rows, and pre/post swap taxonomy in real time.
-- [ ] Toggling adjustment checkboxes within the selected strategy updates that strategy's live fit score.
-- [ ] Clicking "Accept & Apply Enhanced Variant" saves strictly the selected strategy's payload into `recipe.enhanced`.
-- [ ] Unit test suite in `scripts/test_recipe_enhancement_service.js` covers multi-strategy generation, verifying distinct adjustment sets and valid scores across options.
-- [ ] All existing test suites pass; production build compiles cleanly.
+- [ ] `generateEnhancementPlan` evaluates Route 1 (Swaps), Route 2 (Portions), and Route 3 (Hybrid), all aiming for the exact same target macros and $\ge 85\%$ Fit Score.
+- [ ] No artificial or irrelevant ingredients (no tofu/beans forced into burger or pasta dishes unless present in recipe).
+- [ ] Only routes achieving $\ge 85\%$ Fit Score are returned in `plan.routes`.
+- [ ] `RecipeEnhancementModalUI` renders an Apple HIG segmented control when multiple routes exist.
+- [ ] Switching routes updates the checklist, macro deltas, and pre/post taxonomy (`Category / Root Item / Sub-type` and linked product) in real time.
+- [ ] Toggling checkboxes within a route recalculates that route's live fit score.
+- [ ] 100% backward compatible: `plan.adjustments`, `plan.predictedScore`, and `plan.enhancedRecipePayload` point to the default/first route.
+- [ ] Unit tests verify multi-route generation on both burger and curry recipes.
+- [ ] Full regression suite passes and production build compiles cleanly.
 
 ---
 
 ## Implementation Steps
-1. **Extend `RecipeEnhancementService.js`**:
-   - Decompose plan generation into modular strategy builders: `buildSmartSwapsStrategy`, `buildProteinBoostStrategy`, `buildPlantBoosterStrategy`.
-   - Aggregate valid strategies that achieve $\ge 85\%$ (or top-ranking if baseline is very low).
-   - Return `{ selectedStrategyId, strategies: [...], ...primaryStrategy }` for 100% backward compatibility.
-2. **Update `RecipeEnhancementModalUI.js`**:
-   - Add Apple HIG segmented pill bar (`.enh-strategy-picker`) when `strategies.length > 1`.
-   - Wire click handler to switch `activeStrategyId` and re-render interactive adjustments.
-3. **Expand Test Suite**:
-   - Add Test 7 in `scripts/test_recipe_enhancement_service.js` verifying multi-option generation on burger and curry recipes.
-4. **Verification & Build**:
-   - Run tests, run `npm run build`, push to git.
+1. **Refactor `src/services/RecipeEnhancementService.js`**:
+   - Implement `buildSwapsRoute`, `buildPortionsRoute`, and `buildHybridRoute`.
+   - Aggregate, validate $\ge 85\%$, de-duplicate, and return `{ selectedRouteId, routes, ...primaryRoute }`.
+2. **Update `src/components/recipe/RecipeEnhancementModalUI.js`**:
+   - Add Apple HIG route segmented picker (`.enh-route-picker`).
+   - Wire route switching and isolated checkbox recalculation.
+3. **Expand Test Suite (`scripts/test_recipe_enhancement_service.js`)**:
+   - Test that multiple routes reaching the same goal are generated, verified $\ge 85\%$, and expose full pre/post taxonomy.
+4. **Verification & Commit**:
+   - Run tests, compile with `npm run build`, push to git.

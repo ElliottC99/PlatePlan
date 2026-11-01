@@ -337,201 +337,292 @@ function calculateBatchMacros(ingredients, serves, { products = [], allIngredien
 /**
  * Core Heuristic Engine: Analyzes a recipe and generates an 85+ Fit Score enhancement plan.
  */
-export function generateEnhancementPlan(recipe, options = {}) {
-  if (!recipe || typeof recipe !== 'object') return null;
+// --- Canonical Smart Pantry Swap Opportunities ---
+export const SWAP_OPPORTUNITIES = [
+  {
+    match: /\b(coconut milk|coconut cream)\b/i,
+    exclude: /\blight\b/i,
+    swapTo: 'Light Coconut Milk',
+    productSearchRegex: /\blight coconut\b/i,
+    kcalPer100gDiff: -110,
+    protPer100gDiff: 0,
+    reason: 'Cuts saturated fat calories',
+    targetTaxonomy: {
+      category: 'Store Cupboard',
+      rootItem: 'Coconut Milk',
+      subtype: 'Light Coconut Milk',
+      productName: 'Light Coconut Milk 400ml'
+    }
+  },
+  {
+    match: /\b(beef burgers?|smashed burgers?|beef patties?|beef mince|mince)\b/i,
+    exclude: /\b(5%|lean|turkey|chicken|vegan|plant)\b/i,
+    swapTo: 'Lean Beef Burgers (5% Fat)',
+    productSearchRegex: /\b(5% lean|lean beef|5% fat|lean mince|5% mince)\b/i,
+    kcalPer100gDiff: -110,
+    protPer100gDiff: +4.5,
+    reason: 'Reduces heavy fat calories while boosting protein',
+    targetTaxonomy: {
+      category: 'Meat & Poultry',
+      rootItem: 'Beef Burgers',
+      subtype: 'Lean Beef Burgers (5% Fat)',
+      productName: 'Lean Beef Burgers (5% Fat)'
+    }
+  },
+  {
+    match: /\b(cheddar|cheese|american cheese|monterey jack)\b/i,
+    exclude: /\b(reduced|light|low fat|lighter)\b/i,
+    swapTo: 'Reduced Fat Cheese Slices',
+    productSearchRegex: /\b(reduced fat.*slice|mild slices?|lighter.*slice|30% reduced fat)\b/i,
+    kcalPer100gDiff: -180,
+    protPer100gDiff: +1,
+    reason: 'Saves fat calories while maintaining creamy texture',
+    targetTaxonomy: {
+      category: 'Dairy & Eggs',
+      rootItem: 'American Cheese Slices',
+      subtype: 'Mild American Cheese Slices',
+      productName: '10 Reduced Fat Mild Slices'
+    }
+  },
+  {
+    match: /\b(mayo|mayonnaise|burger sauce|aioli|sour cream)\b/i,
+    exclude: /\b(light|reduced|low fat|0%)\b/i,
+    swapTo: 'Light Mayonnaise / Light Burger Sauce',
+    productSearchRegex: /\b(light mayo|lighter mayo|light mayonnaise)\b/i,
+    kcalPer100gDiff: -400,
+    protPer100gDiff: 0,
+    reason: 'Significantly lowers condiment calories',
+    targetTaxonomy: {
+      category: 'Sauces, Condiments & Pastes',
+      rootItem: 'Mayonnaise',
+      subtype: 'Light Mayonnaise',
+      productName: 'Light Mayonnaise'
+    }
+  },
+  {
+    match: /\b(greek yogurt|greek yoghurt|natural yogurt|natural yoghurt|creme fraiche)\b/i,
+    exclude: /\b(0%|fat free|light|low fat)\b/i,
+    swapTo: '0% Fat Greek Yogurt',
+    productSearchRegex: /\b(0% fat|fat free|0% greek|skyr)\b/i,
+    kcalPer100gDiff: -70,
+    protPer100gDiff: +2,
+    reason: 'High-protein, fat-free dairy substitute',
+    targetTaxonomy: {
+      category: 'Dairy & Eggs',
+      rootItem: 'Greek Yogurt',
+      subtype: '0% Fat Greek Yogurt',
+      productName: '0% Fat Greek Style Yogurt'
+    }
+  }
+];
 
-  const state = typeof getState === 'function' ? (getState() || {}) : {};
-  const products = Array.isArray(options.products) ? options.products : (state.products || []);
-  const allIngredients = Array.isArray(options.ingredients) ? options.ingredients : (state.ingredients || []);
-
-  const targets = resolveRecipeTargets(recipe, options);
-  const targetMealType = targets.mealType;
-  const initialFit = calculateMealFitScore(recipe, targetMealType, { ...options, variant: 'original' });
-  const beforeScore = Math.round(Number(initialFit?.score) || 0);
-
-  let currentServings = Number(recipe.servings || recipe.serves || 2) || 2;
-  let proposedServings = currentServings;
+/**
+ * Evaluates a single optimization route towards the household macro targets.
+ */
+function buildRoutePlan({
+  routeId,
+  name,
+  badge,
+  description,
+  mode, // 'swaps' | 'portions' | 'hybrid'
+  recipe,
+  initialServings,
+  targets,
+  options,
+  beforeScore,
+  products,
+  allIngredients,
+  targetMealType,
+  swapOpportunities
+}) {
+  let proposedServings = initialServings;
   const adjustments = [];
 
-  // Extract all ingredients with role and product attribution
+  // Clone fresh ingredients
   const { ingredientSections, ingredients } = cloneAndTraverseIngredients(recipe, i => i);
   let workingIngredients = JSON.parse(JSON.stringify(ingredients));
 
-  // Pre-calculate line nutrition
   workingIngredients.forEach((item, idx) => {
     item._idx = idx;
     item._matchedProduct = resolveProductForIngredient(item, { products, ingredients: allIngredients });
     item._role = classifyIngredientRole(item, item._matchedProduct);
   });
 
-  let currentMacros = calculateBatchMacros(workingIngredients, currentServings, { products, allIngredients });
+  let currentMacros = calculateBatchMacros(workingIngredients, initialServings, { products, allIngredients });
   let currentKcal = currentMacros.perServing.calories;
   let currentProt = currentMacros.perServing.protein;
 
-  // --- LEVER 0: Yield Rebalance for Massive Batch Calories ---
+  // Lever 0: Yield Rebalance (if batch calories > 1000)
   if (currentKcal > 1000) {
-    proposedServings = currentServings + 1;
+    proposedServings = initialServings + 1;
     currentMacros = calculateBatchMacros(workingIngredients, proposedServings, { products, allIngredients });
     currentKcal = currentMacros.perServing.calories;
     currentProt = currentMacros.perServing.protein;
     adjustments.push({
       id: 'adj_yield',
       type: 'yield',
-      label: `Increase serving yield from ${currentServings} to ${proposedServings} portions`,
-      detail: `Normalizes excessive calorie density (${Math.round(currentMacros.total.cal / currentServings)} kcal down to ${currentKcal} kcal/serving).`,
-      deltaKcal: currentKcal - Math.round(currentMacros.total.cal / currentServings),
-      deltaProt: currentProt - Math.round(currentMacros.total.prot / currentServings),
+      label: `Increase serving yield from ${initialServings} to ${proposedServings} portions`,
+      detail: `Normalizes excessive calorie density (${Math.round(currentMacros.total.cal / initialServings)} kcal down to ${currentKcal} kcal/serving).`,
+      deltaKcal: currentKcal - Math.round(currentMacros.total.cal / initialServings),
+      deltaProt: currentProt - Math.round(currentMacros.total.prot / initialServings),
       active: true
     });
   }
 
-  // --- LEVER 1: Cooking Fat Moderation ---
-  if (currentKcal > targets.maxKcal) {
-    const fats = workingIngredients.filter(i => i._role === 'cooking_fat');
-    fats.forEach(fatItem => {
-      const origQty = Number(fatItem.qty ?? fatItem.amount ?? 1) || 1;
-      const unit = String(fatItem.unit || 'g').toLowerCase();
-      const perServingQty = origQty / proposedServings;
+  // Lever 1: Cooking Fat Moderation
+  const runFatModeration = (threshold) => {
+    if (currentKcal > threshold) {
+      const fats = workingIngredients.filter(i => i._role === 'cooking_fat');
+      fats.forEach(fatItem => {
+        const origQty = Number(fatItem.qty ?? fatItem.amount ?? 1) || 1;
+        const unit = String(fatItem.unit || 'g').toLowerCase();
+        const perServingQty = origQty / proposedServings;
+        if (perServingQty > 7) {
+          const targetPerServing = 5;
+          const proposedTotal = quantizeQuantity(targetPerServing * proposedServings, unit);
+          if (proposedTotal < origQty) {
+            const origNut = calculateItemNutrition(fatItem._matchedProduct, origQty, unit);
+            const newNut = calculateItemNutrition(fatItem._matchedProduct, proposedTotal, unit);
+            const dKcal = Math.round((newNut.kcal - origNut.kcal) / proposedServings);
 
-      // If cooking fat exceeds 8ml / 8g per serving, trim it to 5-6ml per serving
-      if (perServingQty > 8) {
-        const targetPerServing = 5;
-        const proposedTotal = quantizeQuantity(targetPerServing * proposedServings, unit);
-        if (proposedTotal < origQty) {
-          const origNut = calculateItemNutrition(fatItem._matchedProduct, origQty, unit);
-          const newNut = calculateItemNutrition(fatItem._matchedProduct, proposedTotal, unit);
-          const dKcal = Math.round((newNut.kcal - origNut.kcal) / proposedServings);
-
-          fatItem.qty = proposedTotal;
-          fatItem.amount = proposedTotal;
-          const taxonomy = resolvePantryTaxonomy(fatItem, { ingredients: allIngredients, products });
-          adjustments.push({
-            id: `adj_fat_${fatItem.name}`,
-            type: 'quantity',
-            ingredientName: fatItem.name,
-            originalQty: origQty,
-            proposedQty: proposedTotal,
-            unit,
-            label: `Moderate cooking fat: ${origQty}${unit} ➔ ${proposedTotal}${unit} ${fatItem.name}`,
-            detail: `Saves ~${Math.abs(dKcal)} kcal/serving without altering recipe flavour.`,
-            deltaKcal: dKcal,
-            deltaProt: 0,
-            taxonomy,
-            active: true
-          });
-        }
-      }
-    });
-
-    currentMacros = calculateBatchMacros(workingIngredients, proposedServings, { products, allIngredients });
-    currentKcal = currentMacros.perServing.calories;
-    currentProt = currentMacros.perServing.protein;
-  }
-
-  // --- LEVER 2: Primary Protein Scaling ---
-  if (currentProt < targets.minProt) {
-    const proteins = workingIngredients.filter(i => i._role === 'primary_protein');
-    if (proteins.length > 0) {
-      // Pick the highest protein density item
-      proteins.sort((a, b) => {
-        const pA = (a._matchedProduct?.protein || a._matchedProduct?.prot || 20);
-        const pB = (b._matchedProduct?.protein || b._matchedProduct?.prot || 20);
-        return pB - pA;
-      });
-      const mainProt = proteins[0];
-      const origQty = Number(mainProt.qty ?? mainProt.amount ?? 1) || 1;
-      const unit = String(mainProt.unit || 'g').toLowerCase();
-      const u = unit.trim().replace(/s$/, '');
-
-      const isDiscrete = u === 'qty' || u === 'item' || u === 'piece' || u === 'patty' || u === 'burger' || u === 'breast' || u === 'fillet' || u === 'thigh' || u === 'egg' || u === 'sausage' || u === 'slice';
-
-      // Estimate needed protein
-      const neededProtPerServing = targets.minProt - currentProt;
-      const neededProtTotal = neededProtPerServing * proposedServings;
-      const protPer100g = (Number(mainProt._matchedProduct?.protein || mainProt._matchedProduct?.prot) || 20);
-
-      let newQty = origQty;
-
-      if (isDiscrete) {
-        // Resolve weight of a single discrete item
-        const singleWeight = resolveProductItemWeight(mainProt._matchedProduct) 
-          || (origQty > 0 ? (toGrams(origQty, unit, mainProt.name, 0) / origQty) : 0)
-          || 100;
-        const protPerItem = (protPer100g / 100) * singleWeight;
-        const neededItems = protPerItem > 0 ? Math.ceil(neededProtTotal / protPerItem) : 1;
-        
-        // Ceiling: max 2 large pieces (burgers, chicken breasts, steaks) per serving
-        const maxBatchCount = Math.max(origQty, proposedServings * 2);
-        newQty = Math.min(maxBatchCount, origQty + neededItems);
-      } else {
-        // Continuous weight (g, ml)
-        const additionalGrams = (neededProtTotal / protPer100g) * 100;
-        const maxBatchQty = proposedServings * 220; // max 220g meat/tofu per serving
-        newQty = quantizeQuantity(Math.min(maxBatchQty, origQty + additionalGrams), unit);
-      }
-
-      if (newQty > origQty) {
-        const origNut = calculateItemNutrition(mainProt._matchedProduct, origQty, unit);
-        const newNut = calculateItemNutrition(mainProt._matchedProduct, newQty, unit);
-        const dKcal = Math.round((newNut.kcal - origNut.kcal) / proposedServings);
-        const dProt = Math.round(((newNut.protein - origNut.protein) / proposedServings) * 10) / 10;
-
-        if (dProt > 0 || dKcal !== 0) {
-          mainProt.qty = newQty;
-          mainProt.amount = newQty;
-          const taxonomy = resolvePantryTaxonomy(mainProt, { ingredients: allIngredients, products });
-          adjustments.push({
-            id: `adj_prot_${mainProt.name}`,
-            type: 'quantity',
-            ingredientName: mainProt.name,
-            originalQty: origQty,
-            proposedQty: newQty,
-            unit,
-            label: `Boost lean protein: ${origQty}${unit} ➔ ${newQty}${unit} ${mainProt.name}`,
-            detail: `Adds +${dProt}g protein per serving to reach household target (${targets.minProt}g).`,
-            deltaKcal: dKcal,
-            deltaProt: dProt,
-            taxonomy,
-            active: true
-          });
-        }
-      }
-    }
-    currentMacros = calculateBatchMacros(workingIngredients, proposedServings, { products, allIngredients });
-    currentKcal = currentMacros.perServing.calories;
-    currentProt = currentMacros.perServing.protein;
-  }
-
-  // --- LEVER 3: Carb Balancing ---
-  if (currentKcal > targets.maxKcal) {
-    const carbs = workingIngredients.filter(i => i._role === 'starch_carb');
-    carbs.forEach(carbItem => {
-      const origQty = Number(carbItem.qty ?? carbItem.amount ?? 100) || 100;
-      const unit = String(carbItem.unit || 'g').toLowerCase();
-      const perServingQty = origQty / proposedServings;
-
-      // If dry carbs exceed 85g/serv, scale to 70g/serv
-      if (perServingQty > 85 && (unit === 'g' || unit === 'gram')) {
-        const proposedTotal = quantizeQuantity(70 * proposedServings, unit);
-        if (proposedTotal < origQty) {
-          const origNut = calculateItemNutrition(carbItem._matchedProduct, origQty, unit);
-          const newNut = calculateItemNutrition(carbItem._matchedProduct, proposedTotal, unit);
-          const dKcal = Math.round((newNut.kcal - origNut.kcal) / proposedServings);
-          const dProt = Math.round(((newNut.protein - origNut.protein) / proposedServings) * 10) / 10;
-
-          if (dKcal !== 0 || dProt !== 0) {
-            carbItem.qty = proposedTotal;
-            carbItem.amount = proposedTotal;
-            const taxonomy = resolvePantryTaxonomy(carbItem, { ingredients: allIngredients, products });
+            fatItem.qty = proposedTotal;
+            fatItem.amount = proposedTotal;
+            currentKcal += dKcal;
+            const taxonomy = resolvePantryTaxonomy(fatItem, { ingredients: allIngredients, products });
             adjustments.push({
-              id: `adj_carb_${carbItem.name}`,
+              id: `adj_fat_${fatItem.name}`,
               type: 'quantity',
-              ingredientName: carbItem.name,
+              ingredientName: fatItem.name,
               originalQty: origQty,
               proposedQty: proposedTotal,
               unit,
-              label: `Balance carbs: ${origQty}${unit} ➔ ${proposedTotal}${unit} ${carbItem.name}`,
-              detail: `Trims ~${Math.abs(dKcal)} kcal/serving for optimal carbohydrate ratio.`,
+              label: `Moderate cooking fat: ${origQty}${unit} ➔ ${proposedTotal}${unit} ${fatItem.name}`,
+              detail: `Saves ~${Math.abs(dKcal)} kcal/serving without altering recipe flavour.`,
+              deltaKcal: dKcal,
+              deltaProt: 0,
+              taxonomy,
+              active: true
+            });
+          }
+        }
+      });
+    }
+  };
+
+  // Lever 4: Smart Pantry Swaps
+  const runSwaps = (maxSwaps = 99) => {
+    let appliedCount = 0;
+    workingIngredients.forEach(item => {
+      if (appliedCount >= maxSwaps) return;
+      const rawName = String(item.name || '').toLowerCase();
+      for (const swap of swapOpportunities) {
+        if (swap.match.test(rawName) && !swap.exclude.test(rawName)) {
+          const q = Number(item.qty ?? item.amount ?? 1) || 1;
+          const u = String(item.unit || 'g').toLowerCase().trim().replace(/s$/, '');
+          let itemGramsPerServing = 100;
+          if (u === 'g' || u === 'ml') {
+            itemGramsPerServing = q / proposedServings;
+          } else if (u === 'qty' || u === 'piece' || u === 'patty' || u === 'burger' || u === 'item') {
+            const singleWeight = resolveProductItemWeight(item._matchedProduct) 
+              || (toGrams(1, u, item.name, 0))
+              || 100;
+            itemGramsPerServing = (q * singleWeight) / proposedServings;
+          } else if (u === 'slice') {
+            itemGramsPerServing = (q * 25) / proposedServings;
+          } else {
+            itemGramsPerServing = toGrams(q, u, item.name, 100 * proposedServings) / proposedServings;
+          }
+
+          const factor = Math.max(0.2, itemGramsPerServing / 100);
+          const dKcal = Math.round(swap.kcalPer100gDiff * factor);
+          const dProt = Math.round((swap.protPer100gDiff * factor) * 10) / 10;
+
+          const wouldBeKcal = currentKcal + dKcal;
+          const canSwap = (currentKcal > targets.targetKcal || currentProt < targets.minProt) && 
+                          (wouldBeKcal >= targets.minKcal || currentProt < targets.minProt);
+          if (canSwap) {
+            const preTaxonomy = resolvePantryTaxonomy(item, { ingredients: allIngredients, products });
+            const postTaxonomy = resolvePantryTaxonomyForSwap(swap, item, { ingredients: allIngredients, products });
+
+            adjustments.push({
+              id: `swap_${item.name}`,
+              type: 'swap',
+              ingredientName: item.name,
+              swapTo: swap.swapTo,
+              label: `Swap ${item.name} ➔ ${swap.swapTo}`,
+              detail: `${swap.reason} (${dKcal} kcal/serving).`,
+              deltaKcal: dKcal,
+              deltaProt: dProt,
+              preTaxonomy,
+              postTaxonomy,
+              active: true
+            });
+            currentKcal = wouldBeKcal;
+            currentProt += dProt;
+            appliedCount++;
+            break;
+          }
+        }
+      }
+    });
+  };
+
+  // Lever 2: Primary Protein Scaling
+  const runProteinScaling = (scaleRatio = 1.0) => {
+    if (currentProt < targets.minProt) {
+      const proteins = workingIngredients.filter(i => i._role === 'primary_protein');
+      if (proteins.length > 0) {
+        proteins.sort((a, b) => {
+          const pA = (a._matchedProduct?.protein || a._matchedProduct?.prot || 20);
+          const pB = (b._matchedProduct?.protein || b._matchedProduct?.prot || 20);
+          return pB - pA;
+        });
+        const mainProt = proteins[0];
+        const origQty = Number(mainProt.qty ?? mainProt.amount ?? 1) || 1;
+        const unit = String(mainProt.unit || 'g').toLowerCase();
+        const u = unit.trim().replace(/s$/, '');
+        const isDiscrete = u === 'qty' || u === 'item' || u === 'piece' || u === 'patty' || u === 'burger' || u === 'breast' || u === 'fillet' || u === 'thigh' || u === 'egg' || u === 'sausage' || u === 'slice';
+
+        const neededProtPerServing = (targets.minProt - currentProt) * scaleRatio;
+        const neededProtTotal = neededProtPerServing * proposedServings;
+        const protPer100g = (Number(mainProt._matchedProduct?.protein || mainProt._matchedProduct?.prot) || 20);
+
+        let newQty = origQty;
+        if (isDiscrete) {
+          const singleWeight = resolveProductItemWeight(mainProt._matchedProduct) 
+            || (origQty > 0 ? (toGrams(origQty, unit, mainProt.name, 0) / origQty) : 0)
+            || 100;
+          const protPerItem = (protPer100g / 100) * singleWeight;
+          const neededItems = protPerItem > 0 ? Math.ceil(neededProtTotal / protPerItem) : 1;
+          const maxBatchCount = Math.max(origQty, proposedServings * 2);
+          newQty = Math.min(maxBatchCount, origQty + Math.max(1, neededItems));
+        } else {
+          const additionalGrams = (neededProtTotal / protPer100g) * 100;
+          const maxBatchQty = proposedServings * 220;
+          newQty = quantizeQuantity(Math.min(maxBatchQty, origQty + additionalGrams), unit);
+        }
+
+        if (newQty > origQty) {
+          const origNut = calculateItemNutrition(mainProt._matchedProduct, origQty, unit);
+          const newNut = calculateItemNutrition(mainProt._matchedProduct, newQty, unit);
+          const dKcal = Math.round((newNut.kcal - origNut.kcal) / proposedServings);
+          const dProt = Math.round(((newNut.protein - origNut.protein) / proposedServings) * 10) / 10;
+
+          if (dProt > 0 || dKcal !== 0) {
+            mainProt.qty = newQty;
+            mainProt.amount = newQty;
+            currentKcal += dKcal;
+            currentProt += dProt;
+            const taxonomy = resolvePantryTaxonomy(mainProt, { ingredients: allIngredients, products });
+            adjustments.push({
+              id: `adj_prot_${mainProt.name}`,
+              type: 'quantity',
+              ingredientName: mainProt.name,
+              originalQty: origQty,
+              proposedQty: newQty,
+              unit,
+              label: `Boost lean protein: ${origQty}${unit} ➔ ${newQty}${unit} ${mainProt.name}`,
+              detail: `Adds +${dProt}g protein per serving to reach household target (${targets.minProt}g).`,
               deltaKcal: dKcal,
               deltaProt: dProt,
               taxonomy,
@@ -540,151 +631,79 @@ export function generateEnhancementPlan(recipe, options = {}) {
           }
         }
       }
-    });
-    currentMacros = calculateBatchMacros(workingIngredients, proposedServings, { products, allIngredients });
-    currentKcal = currentMacros.perServing.calories;
-    currentProt = currentMacros.perServing.protein;
+    }
+  };
+
+  // Lever 3: Carb Balancing
+  const runCarbBalancing = () => {
+    if (currentKcal > targets.maxKcal) {
+      const carbs = workingIngredients.filter(i => i._role === 'starch_carb');
+      carbs.forEach(carbItem => {
+        const origQty = Number(carbItem.qty ?? carbItem.amount ?? 100) || 100;
+        const unit = String(carbItem.unit || 'g').toLowerCase();
+        const perServingQty = origQty / proposedServings;
+        if (perServingQty > 85 && (unit === 'g' || unit === 'gram')) {
+          const proposedTotal = quantizeQuantity(70 * proposedServings, unit);
+          if (proposedTotal < origQty) {
+            const origNut = calculateItemNutrition(carbItem._matchedProduct, origQty, unit);
+            const newNut = calculateItemNutrition(carbItem._matchedProduct, proposedTotal, unit);
+            const dKcal = Math.round((newNut.kcal - origNut.kcal) / proposedServings);
+            const dProt = Math.round(((newNut.protein - origNut.protein) / proposedServings) * 10) / 10;
+            if (dKcal !== 0 || dProt !== 0) {
+              carbItem.qty = proposedTotal;
+              carbItem.amount = proposedTotal;
+              currentKcal += dKcal;
+              currentProt += dProt;
+              const taxonomy = resolvePantryTaxonomy(carbItem, { ingredients: allIngredients, products });
+              adjustments.push({
+                id: `adj_carb_${carbItem.name}`,
+                type: 'quantity',
+                ingredientName: carbItem.name,
+                originalQty: origQty,
+                proposedQty: proposedTotal,
+                unit,
+                label: `Balance carbs: ${origQty}${unit} ➔ ${proposedTotal}${unit} ${carbItem.name}`,
+                detail: `Trims ~${Math.abs(dKcal)} kcal/serving for optimal carbohydrate ratio.`,
+                deltaKcal: dKcal,
+                deltaProt: dProt,
+                taxonomy,
+                active: true
+              });
+            }
+          }
+        }
+      });
+    }
+  };
+
+  // Mode Execution:
+  if (mode === 'swaps') {
+    // Route 1: Swaps First, Portion-Preserved
+    runFatModeration(targets.maxKcal);
+    runSwaps();
+    if (currentProt < targets.minProt) {
+      runProteinScaling(0.8);
+    }
+  } else if (mode === 'portions') {
+    // Route 2: Portions Only, Ingredients-Preserved
+    runFatModeration(targets.targetKcal);
+    runProteinScaling(1.0);
+    runCarbBalancing();
+    if (currentKcal > targets.maxKcal) {
+      runSwaps(1);
+    }
+  } else {
+    // Route 3: Balanced Hybrid
+    runFatModeration(targets.maxKcal);
+    runProteinScaling(0.9);
+    runSwaps();
+    runCarbBalancing();
   }
 
-  // --- LEVER 4: Smart Pantry Swaps ---
-  const swapOpportunities = [
-    {
-      match: /\b(coconut milk|coconut cream)\b/i,
-      exclude: /\blight\b/i,
-      swapTo: 'Light Coconut Milk',
-      productSearchRegex: /\blight coconut\b/i,
-      kcalPer100gDiff: -110,
-      protPer100gDiff: 0,
-      reason: 'Cuts saturated fat calories',
-      targetTaxonomy: {
-        category: 'Store Cupboard',
-        rootItem: 'Coconut Milk',
-        subtype: 'Light Coconut Milk',
-        productName: 'Light Coconut Milk 400ml'
-      }
-    },
-    {
-      match: /\b(beef burgers?|smashed burgers?|beef patties?|beef mince|mince)\b/i,
-      exclude: /\b(5%|lean|turkey|chicken|vegan|plant)\b/i,
-      swapTo: 'Lean Beef Burgers (5% Fat)',
-      productSearchRegex: /\b(5% lean|lean beef|5% fat|lean mince|5% mince)\b/i,
-      kcalPer100gDiff: -110,
-      protPer100gDiff: +4.5,
-      reason: 'Reduces heavy fat calories while boosting protein',
-      targetTaxonomy: {
-        category: 'Meat & Poultry',
-        rootItem: 'Beef Burgers',
-        subtype: 'Lean Beef Burgers (5% Fat)',
-        productName: 'Lean Beef Burgers (5% Fat)'
-      }
-    },
-    {
-      match: /\b(cheddar|cheese|american cheese|monterey jack)\b/i,
-      exclude: /\b(reduced|light|low fat|lighter)\b/i,
-      swapTo: 'Reduced Fat Cheese Slices',
-      productSearchRegex: /\b(reduced fat.*slice|mild slices?|lighter.*slice|30% reduced fat)\b/i,
-      kcalPer100gDiff: -180,
-      protPer100gDiff: +1,
-      reason: 'Saves fat calories while maintaining creamy texture',
-      targetTaxonomy: {
-        category: 'Dairy & Eggs',
-        rootItem: 'American Cheese Slices',
-        subtype: 'Mild American Cheese Slices',
-        productName: '10 Reduced Fat Mild Slices'
-      }
-    },
-    {
-      match: /\b(mayo|mayonnaise|burger sauce|aioli|sour cream)\b/i,
-      exclude: /\b(light|reduced|low fat|0%)\b/i,
-      swapTo: 'Light Mayonnaise / Light Burger Sauce',
-      productSearchRegex: /\b(light mayo|lighter mayo|light mayonnaise)\b/i,
-      kcalPer100gDiff: -400,
-      protPer100gDiff: 0,
-      reason: 'Significantly lowers condiment calories',
-      targetTaxonomy: {
-        category: 'Sauces, Condiments & Pastes',
-        rootItem: 'Mayonnaise',
-        subtype: 'Light Mayonnaise',
-        productName: 'Light Mayonnaise'
-      }
-    },
-    {
-      match: /\b(greek yogurt|greek yoghurt|natural yogurt|natural yoghurt|creme fraiche)\b/i,
-      exclude: /\b(0%|fat free|light|low fat)\b/i,
-      swapTo: '0% Fat Greek Yogurt',
-      productSearchRegex: /\b(0% fat|fat free|0% greek|skyr)\b/i,
-      kcalPer100gDiff: -70,
-      protPer100gDiff: +2,
-      reason: 'High-protein, fat-free dairy substitute',
-      targetTaxonomy: {
-        category: 'Dairy & Eggs',
-        rootItem: 'Greek Yogurt',
-        subtype: '0% Fat Greek Yogurt',
-        productName: '0% Fat Greek Style Yogurt'
-      }
-    }
-  ];
-
-  workingIngredients.forEach(item => {
-    const rawName = String(item.name || '').toLowerCase();
-    for (const swap of swapOpportunities) {
-      if (swap.match.test(rawName) && !swap.exclude.test(rawName)) {
-        const q = Number(item.qty ?? item.amount ?? 1) || 1;
-        const u = String(item.unit || 'g').toLowerCase().trim().replace(/s$/, '');
-        let itemGramsPerServing = 100;
-        if (u === 'g' || u === 'ml') {
-          itemGramsPerServing = q / proposedServings;
-        } else if (u === 'qty' || u === 'piece' || u === 'patty' || u === 'burger' || u === 'item') {
-          const singleWeight = resolveProductItemWeight(item._matchedProduct) 
-            || (toGrams(1, u, item.name, 0))
-            || 100;
-          itemGramsPerServing = (q * singleWeight) / proposedServings;
-        } else if (u === 'slice') {
-          itemGramsPerServing = (q * 25) / proposedServings;
-        } else {
-          itemGramsPerServing = toGrams(q, u, item.name, 100 * proposedServings) / proposedServings;
-        }
-
-        const factor = Math.max(0.2, itemGramsPerServing / 100);
-        const dKcal = Math.round(swap.kcalPer100gDiff * factor);
-        const dProt = Math.round((swap.protPer100gDiff * factor) * 10) / 10;
-
-        const wouldBeKcal = currentKcal + dKcal;
-        if ((currentKcal > targets.targetKcal || currentProt < targets.minProt) && wouldBeKcal >= targets.minKcal) {
-          const preTaxonomy = resolvePantryTaxonomy(item, { ingredients: allIngredients, products });
-          const postTaxonomy = resolvePantryTaxonomyForSwap(swap, item, { ingredients: allIngredients, products });
-
-          adjustments.push({
-            id: `swap_${item.name}`,
-            type: 'swap',
-            ingredientName: item.name,
-            swapTo: swap.swapTo,
-            label: `Swap ${item.name} ➔ ${swap.swapTo}`,
-            detail: `${swap.reason} (${dKcal} kcal/serving).`,
-            deltaKcal: dKcal,
-            deltaProt: dProt,
-            preTaxonomy,
-            postTaxonomy,
-            active: true
-          });
-          currentKcal = wouldBeKcal;
-          currentProt += dProt;
-          break;
-        }
-      }
-    }
-  });
-
-  // --- LEVER 5: Lean Protein Addition (If no primary protein exists) ---
+  // Fallback Lever 5: Lean Protein Addition (If no primary protein in recipe at all)
   if (currentProt < 25 && workingIngredients.filter(i => i._role === 'primary_protein').length === 0) {
     const boosterName = 'Firm Tofu (or Diced Chicken Breast)';
     const boosterQty = quantizeQuantity(125 * proposedServings, 'g');
-    const boosterTaxonomy = {
-      category: 'Refrigerated & Dairy',
-      rootItem: boosterName,
-      subtype: 'Firm Tofu',
-      productName: 'Organic Firm Tofu 280g'
-    };
     adjustments.push({
       id: 'adj_add_protein',
       type: 'addition',
@@ -695,14 +714,18 @@ export function generateEnhancementPlan(recipe, options = {}) {
       detail: `Infuses +24g protein per serving to meet minimum household nutritional targets.`,
       deltaKcal: +140,
       deltaProt: +24,
-      taxonomy: boosterTaxonomy,
+      taxonomy: {
+        category: 'Refrigerated & Dairy',
+        rootItem: boosterName,
+        subtype: 'Firm Tofu',
+        productName: 'Organic Firm Tofu 280g'
+      },
       active: true
     });
     currentKcal += 140;
     currentProt += 24;
   }
 
-  // Build the simulated enhanced recipe object
   const finalMacros = {
     perServing: {
       calories: Math.max(100, Math.round(currentKcal)),
@@ -730,15 +753,127 @@ export function generateEnhancementPlan(recipe, options = {}) {
   const predictedScore = Math.max(beforeScore, Math.round(Number(simFit?.score) || beforeScore));
 
   return {
+    id: routeId,
+    routeId,
+    name,
+    badge,
+    description,
+    beforeScore,
+    predictedScore,
+    predictedTier: simFit?.tierLabel || 'Ideal Match',
+    predictedColor: simFit?.color || '#16a34a',
+    proposedServings,
+    adjustments,
+    macros: finalMacros,
+    enhancedRecipePayload: simulatedEnhanced
+  };
+}
+
+/**
+ * Core Heuristic Engine: Analyzes a recipe and generates 85+ Fit Score enhancement routes.
+ */
+export function generateEnhancementPlan(recipe, options = {}) {
+  if (!recipe || typeof recipe !== 'object') return null;
+
+  const state = typeof getState === 'function' ? (getState() || {}) : {};
+  const products = Array.isArray(options.products) ? options.products : (state.products || []);
+  const allIngredients = Array.isArray(options.ingredients) ? options.ingredients : (state.ingredients || []);
+
+  const targets = resolveRecipeTargets(recipe, options);
+  const targetMealType = targets.mealType;
+  const initialFit = calculateMealFitScore(recipe, targetMealType, { ...options, variant: 'original' });
+  const beforeScore = Math.round(Number(initialFit?.score) || 0);
+
+  const currentServings = Number(recipe.servings || recipe.serves || 2) || 2;
+
+  // Build candidate routes
+  const r1 = buildRoutePlan({
+    routeId: 'route_swaps',
+    name: 'Route 1: Via Pantry Swaps',
+    badge: '🔄 Swaps',
+    description: 'Reaches goal by substituting leaner ingredients while preserving original quantities.',
+    mode: 'swaps',
+    recipe,
+    initialServings: currentServings,
+    targets,
+    options,
+    beforeScore,
+    products,
+    allIngredients,
+    targetMealType,
+    swapOpportunities: SWAP_OPPORTUNITIES
+  });
+
+  const r2 = buildRoutePlan({
+    routeId: 'route_portions',
+    name: 'Route 2: Via Portion Scaling',
+    badge: '⚖️ Portions',
+    description: 'Reaches goal by scaling protein portion while keeping original ingredients.',
+    mode: 'portions',
+    recipe,
+    initialServings: currentServings,
+    targets,
+    options,
+    beforeScore,
+    products,
+    allIngredients,
+    targetMealType,
+    swapOpportunities: SWAP_OPPORTUNITIES
+  });
+
+  const r3 = buildRoutePlan({
+    routeId: 'route_hybrid',
+    name: 'Route 3: Balanced Hybrid',
+    badge: '✨ Balanced',
+    description: 'Reaches goal with a balanced combination of portion boost and light swaps.',
+    mode: 'hybrid',
+    recipe,
+    initialServings: currentServings,
+    targets,
+    options,
+    beforeScore,
+    products,
+    allIngredients,
+    targetMealType,
+    swapOpportunities: SWAP_OPPORTUNITIES
+  });
+
+  const candidateRoutes = [r1, r2, r3].filter(Boolean);
+
+  // De-duplicate routes with identical adjustment signatures
+  const seenSignatures = new Set();
+  const uniqueRoutes = [];
+  candidateRoutes.forEach(r => {
+    const sig = (r.adjustments || []).map(a => `${a.type}:${a.ingredientName || a.label}:${a.proposedQty || a.swapTo || ''}`).sort().join('|');
+    if (sig && !seenSignatures.has(sig)) {
+      seenSignatures.add(sig);
+      uniqueRoutes.push(r);
+    }
+  });
+
+  // Filter routes reaching target tier (>= 85% or improving)
+  let qualifyingRoutes = uniqueRoutes.filter(r => r.predictedScore >= 85);
+  if (qualifyingRoutes.length === 0) {
+    qualifyingRoutes = uniqueRoutes.length > 0 ? [uniqueRoutes[0]] : candidateRoutes;
+  }
+
+  // Sort qualifying routes by score descending
+  qualifyingRoutes.sort((a, b) => b.predictedScore - a.predictedScore);
+
+  const primaryRoute = qualifyingRoutes[0] || r1;
+
+  return {
     recipeId: recipe.id,
     recipeTitle: recipe.name || recipe.title || 'Recipe',
     beforeScore,
-    predictedScore,
-    proposedServings,
+    predictedScore: primaryRoute.predictedScore,
+    proposedServings: primaryRoute.proposedServings,
     originalServings: currentServings,
     targets,
-    adjustments,
-    enhancedRecipePayload: simulatedEnhanced
+    adjustments: primaryRoute.adjustments,
+    enhancedRecipePayload: primaryRoute.enhancedRecipePayload,
+    selectedRouteId: primaryRoute.id,
+    routes: qualifyingRoutes
   };
 }
 

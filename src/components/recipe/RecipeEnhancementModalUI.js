@@ -13,6 +13,7 @@ const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, ch => ({
 
 let currentPlan = null;
 let currentOnApply = null;
+let currentSelectedRouteId = null;
 
 function ensureEnhancementModalDOM() {
   let wrap = document.getElementById('enhancement-modal-wrap');
@@ -61,6 +62,7 @@ export function openEnhancementModal(recipe, { onApply, options = {} } = {}) {
     return;
   }
   currentPlan = plan;
+  currentSelectedRouteId = plan.selectedRouteId || (plan.routes && plan.routes.length > 0 ? plan.routes[0].id : null);
 
   renderEnhancementModalContent(wrap, plan);
   wrap.style.setProperty('display', 'flex', 'important');
@@ -69,14 +71,58 @@ export function openEnhancementModal(recipe, { onApply, options = {} } = {}) {
 }
 
 function renderEnhancementModalContent(wrap, plan) {
-  const beforeMeta = getFitScoreTierMeta(plan.beforeScore);
-  const predMeta = getFitScoreTierMeta(plan.predictedScore);
+  const activeRoute = (plan.routes && plan.routes.find(r => r.id === currentSelectedRouteId)) || plan.routes?.[0] || plan;
+  const beforeMeta = getFitScoreTierMeta(activeRoute.beforeScore ?? plan.beforeScore);
+  const predMeta = getFitScoreTierMeta(activeRoute.predictedScore ?? plan.predictedScore);
 
-  const deltaKcalTotal = plan.adjustments.reduce((acc, a) => acc + (a.deltaKcal || 0), 0);
-  const deltaProtTotal = Math.round(plan.adjustments.reduce((acc, a) => acc + (a.deltaProt || 0), 0) * 10) / 10;
+  const activeAdjs = activeRoute.adjustments || [];
+  const deltaKcalTotal = activeAdjs.reduce((acc, a) => acc + (a.deltaKcal || 0), 0);
+  const deltaProtTotal = Math.round(activeAdjs.reduce((acc, a) => acc + (a.deltaProt || 0), 0) * 10) / 10;
 
-  const adjRowsHtml = plan.adjustments.map((adj, idx) => {
-    const isLast = idx === plan.adjustments.length - 1;
+  let routeNavHtml = '';
+  if (plan.routes && plan.routes.length > 1) {
+    routeNavHtml = `
+      <div class="enh-route-nav" role="tablist" style="
+        display: flex;
+        background: var(--surface2, #f0eee9);
+        padding: 4px;
+        border-radius: 12px;
+        margin-bottom: 16px;
+        gap: 6px;
+      ">
+        ${plan.routes.map(r => {
+          const isSelected = r.id === activeRoute.id;
+          return `
+            <button type="button" class="enh-route-tab" data-route-id="${escapeHtml(r.id)}" role="tab" aria-selected="${isSelected ? 'true' : 'false'}" style="
+              flex: 1;
+              padding: 8px 12px;
+              font-size: 12.5px;
+              font-weight: ${isSelected ? '700' : '500'};
+              border: none;
+              border-radius: 9px;
+              background: ${isSelected ? 'var(--surface, #ffffff)' : 'transparent'};
+              color: ${isSelected ? 'var(--text, #1c1917)' : 'var(--text2, #78716c)'};
+              box-shadow: ${isSelected ? '0 2px 6px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)' : 'none'};
+              cursor: pointer;
+              transition: all 0.15s ease;
+              white-space: nowrap;
+              text-align: center;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 6px;
+            ">
+              <span>${escapeHtml(r.badge)}</span>
+              <span style="font-weight:700;color:${isSelected ? 'var(--action, #007aff)' : 'inherit'};">${escapeHtml(r.predictedScore)}%</span>
+            </button>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  const adjRowsHtml = activeAdjs.map((adj, idx) => {
+    const isLast = idx === activeAdjs.length - 1;
     const borderStyle = isLast ? '' : 'border-bottom: 1px solid var(--border, rgba(120,120,128,0.18));';
 
     let tagHtml = '';
@@ -236,6 +282,9 @@ function renderEnhancementModalContent(wrap, plan) {
         -webkit-overflow-scrolling: touch;
       ">
         
+        <!-- Apple HIG Route Nav Switcher -->
+        ${routeNavHtml}
+
         <!-- Apple Health Style Hero Card -->
         <div style="
           background: var(--surface2, #f5f4f0);
@@ -248,7 +297,7 @@ function renderEnhancementModalContent(wrap, plan) {
             <div>
               <div style="font-size: 11px; font-weight: 600; color: var(--text2, #78716c); margin-bottom: 3px;">Current Match</div>
               <span class="badge ${beforeMeta.tier}" style="background:${beforeMeta.bg};color:${beforeMeta.text};border:1px solid ${beforeMeta.border};font-weight:700;padding:3px 8px;border-radius:6px;font-size:12px;">
-                ${beforeMeta.icon} ${plan.beforeScore}%
+                ${beforeMeta.icon} ${activeRoute.beforeScore ?? plan.beforeScore}%
               </span>
             </div>
             
@@ -257,7 +306,7 @@ function renderEnhancementModalContent(wrap, plan) {
             <div style="text-align: right;">
               <div style="font-size: 11px; font-weight: 600; color: var(--text2, #78716c); margin-bottom: 3px;">Enhanced Goal</div>
               <span id="enh-pred-badge" class="badge ${predMeta.tier}" style="background:${predMeta.bg};color:${predMeta.text};border:1px solid ${predMeta.border};font-weight:700;padding:3px 8px;border-radius:6px;font-size:12px;">
-                ${predMeta.icon} <span id="enh-pred-score">${plan.predictedScore}</span>% - ${predMeta.label}
+                ${predMeta.icon} <span id="enh-pred-score">${activeRoute.predictedScore ?? plan.predictedScore}</span>% - ${predMeta.label}
               </span>
             </div>
           </div>
@@ -269,6 +318,12 @@ function renderEnhancementModalContent(wrap, plan) {
               ${deltaProtTotal !== 0 ? `💪 ${deltaProtTotal > 0 ? '+' : ''}${deltaProtTotal}g protein` : ''}
             </span>
           </div>
+
+          ${activeRoute.description ? `
+            <div style="font-size: 11.5px; font-style: italic; color: var(--text2, #78716c); margin-top: 6px; border-top: 1px solid var(--border, rgba(120, 120, 128, 0.12)); padding-top: 6px;">
+              Route: ${escapeHtml(activeRoute.description)}
+            </div>
+          ` : ''}
         </div>
 
         <!-- Inset Grouped Adjustments List -->
@@ -287,10 +342,10 @@ function renderEnhancementModalContent(wrap, plan) {
         </div>
 
         <!-- Serving Note Callout -->
-        ${plan.proposedServings !== plan.originalServings ? `
+        ${(activeRoute.proposedServings || plan.proposedServings) !== (activeRoute.originalServings || plan.originalServings) ? `
           <div style="background: rgba(37,99,235,0.08); border: 1px solid rgba(37,99,235,0.2); border-radius: 12px; padding: 10px 14px; font-size: 12.5px; color: #2563eb; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
             <span>ℹ️</span>
-            <div><strong>Servings rebalanced:</strong> Adjusted from ${plan.originalServings} to ${plan.proposedServings} portions to bring batch calories into ideal ranges.</div>
+            <div><strong>Servings rebalanced:</strong> Adjusted from ${activeRoute.originalServings || plan.originalServings} to ${activeRoute.proposedServings || plan.proposedServings} portions to bring batch calories into ideal ranges.</div>
           </div>
         ` : ''}
 
@@ -346,16 +401,28 @@ function renderEnhancementModalContent(wrap, plan) {
   const btnCancel = wrap.querySelector('#btn-cancel-enh');
   if (btnCancel) btnCancel.onclick = closeEnhancementModal;
 
+  // Wire Route Segmented Switcher
+  const routeTabs = wrap.querySelectorAll('.enh-route-tab');
+  routeTabs.forEach(tab => {
+    tab.onclick = () => {
+      const routeId = tab.getAttribute('data-route-id');
+      if (routeId && routeId !== currentSelectedRouteId) {
+        currentSelectedRouteId = routeId;
+        renderEnhancementModalContent(wrap, plan);
+      }
+    };
+  });
+
   // Wire Checkboxes live re-scoring
   const checkboxes = wrap.querySelectorAll('.enh-adj-cb');
   checkboxes.forEach(cb => {
     cb.onchange = () => {
       const adjId = cb.getAttribute('data-adj-id');
-      const targetAdj = plan.adjustments.find(a => a.id === adjId);
+      const targetAdj = (activeRoute.adjustments || []).find(a => a.id === adjId);
       if (targetAdj) {
         targetAdj.active = cb.checked;
       }
-      recomputeModalPredictedScore(wrap, plan);
+      recomputeModalPredictedScore(wrap, activeRoute);
     };
   });
 
@@ -365,23 +432,23 @@ function renderEnhancementModalContent(wrap, plan) {
     btnApply.onclick = () => {
       closeEnhancementModal();
       if (typeof currentOnApply === 'function') {
-        currentOnApply(plan.enhancedRecipePayload);
+        currentOnApply(activeRoute.enhancedRecipePayload || plan.enhancedRecipePayload);
       }
     };
   }
 }
 
-function recomputeModalPredictedScore(wrap, plan) {
-  const targetMeal = plan.targets?.mealType || 'dinner';
-  const activeAdjs = plan.adjustments.filter(a => a.active);
+function recomputeModalPredictedScore(wrap, route) {
+  const targetMeal = route.targets?.mealType || 'dinner';
+  const activeAdjs = (route.adjustments || []).filter(a => a.active);
   const deltaKcalTotal = activeAdjs.reduce((acc, a) => acc + (a.deltaKcal || 0), 0);
   const deltaProtTotal = Math.round(activeAdjs.reduce((acc, a) => acc + (a.deltaProt || 0), 0) * 10) / 10;
 
-  const baseKcal = plan.enhancedRecipePayload?.nutrition?.perServing?.cal || plan.targets?.targetKcal || 650;
-  const baseProt = plan.enhancedRecipePayload?.nutrition?.perServing?.prot || plan.targets?.targetProt || 42;
+  const baseKcal = route.enhancedRecipePayload?.nutrition?.perServing?.cal || route.targets?.targetKcal || 650;
+  const baseProt = route.enhancedRecipePayload?.nutrition?.perServing?.prot || route.targets?.targetProt || 42;
 
   const simulated = {
-    ...plan.enhancedRecipePayload,
+    ...route.enhancedRecipePayload,
     perServing: {
       cal: baseKcal,
       prot: baseProt,
@@ -391,7 +458,7 @@ function recomputeModalPredictedScore(wrap, plan) {
   };
 
   const simFit = calculateMealFitScore(simulated, targetMeal, { variant: 'enhanced' });
-  const newScore = Math.max(plan.beforeScore, Math.round(Number(simFit?.score) || plan.beforeScore));
+  const newScore = Math.max(route.beforeScore || 0, Math.round(Number(simFit?.score) || route.beforeScore || 0));
   const newMeta = getFitScoreTierMeta(newScore);
 
   const badgeElem = wrap.querySelector('#enh-pred-badge');
