@@ -191,6 +191,27 @@ assert.ok(protAdj.deltaProt > 0, `Protein delta must be positive, got ${protAdj.
 assert.ok(burgerPlan.predictedScore >= 85, `Burger predicted score must reach >= 85%, got ${burgerPlan.predictedScore}%`);
 console.log('✅ Test 5 Passed: Discrete units scale sanely by item count without gram-inflation.\n');
 
+// --- Test 6: Pantry Bank (Category / Root Item / Subtype) & Linked Product Tracking ---
+console.log('--- Test 6: Pantry Bank & Linked Product Pre/Post Swap Tracking ---');
+const swapAdj = burgerPlan.adjustments.find(a => a.type === 'swap');
+assert.ok(swapAdj, 'Should have at least one swap adjustment');
+assert.ok(swapAdj.preTaxonomy, 'Swap adjustment must include preTaxonomy');
+assert.ok(swapAdj.postTaxonomy, 'Swap adjustment must include postTaxonomy');
+
+console.log('Pre-Swap Taxonomy:', swapAdj.preTaxonomy);
+console.log('Post-Swap Taxonomy:', swapAdj.postTaxonomy);
+
+assert.ok(swapAdj.preTaxonomy.category, 'Pre-swap must have category');
+assert.ok(swapAdj.preTaxonomy.rootItem, 'Pre-swap must have rootItem');
+assert.ok(swapAdj.preTaxonomy.subtype, 'Pre-swap must have subtype');
+assert.ok(swapAdj.preTaxonomy.productName, 'Pre-swap must have linked product name');
+
+assert.ok(swapAdj.postTaxonomy.category, 'Post-swap must have category');
+assert.ok(swapAdj.postTaxonomy.rootItem, 'Post-swap must have rootItem');
+assert.ok(swapAdj.postTaxonomy.subtype, 'Post-swap must have subtype');
+assert.ok(swapAdj.postTaxonomy.productName, 'Post-swap must have linked product name');
+console.log('✅ Test 6 Passed: Pre-swap and post-swap accurately expose Category, Root Item, Subtype, and Linked Product.\n');
+
 console.log('=============================================================');
 console.log('ALL RECIPE ENHANCEMENT ENGINE ACCEPTANCE TESTS PASSED! ✅');
 console.log('=============================================================');

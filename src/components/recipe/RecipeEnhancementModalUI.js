@@ -86,24 +86,95 @@ function renderEnhancementModalContent(wrap, plan) {
       tagHtml = `<span style="font-size:11px;font-weight:700;color:#2563eb;background:rgba(37,99,235,0.12);padding:2px 6px;border-radius:6px;white-space:nowrap;">${adj.deltaKcal} kcal</span>`;
     }
 
+    let taxonomyHtml = '';
+    if (adj.type === 'swap' && adj.preTaxonomy && adj.postTaxonomy) {
+      taxonomyHtml = `
+        <div class="enh-taxonomy-box" style="margin-top:9px;background:var(--surface2, #fbfaf8);border:1px solid var(--border, rgba(120,120,128,0.18));border-radius:10px;padding:9px 12px;font-size:11.5px;line-height:1.4;">
+          <!-- Pre-Swap -->
+          <div style="display:flex;align-items:flex-start;gap:8px;">
+            <span style="font-size:10px;font-weight:700;color:#ef4444;background:rgba(239,68,68,0.12);padding:1px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap;margin-top:2px;">
+              Pre-Swap
+            </span>
+            <div style="flex:1;min-width:0;">
+              <div style="color:var(--text, #1c1917);word-break:break-word;">
+                <span style="color:var(--text2, #78716c);font-size:11px;">Pantry:</span>
+                <strong style="font-weight:600;">${escapeHtml(adj.preTaxonomy.category)}</strong>
+                <span style="color:var(--text2, #78716c);margin:0 3px;">/</span>
+                <strong style="font-weight:600;">${escapeHtml(adj.preTaxonomy.rootItem)}</strong>
+                <span style="color:var(--text2, #78716c);margin:0 3px;">/</span>
+                <span>${escapeHtml(adj.preTaxonomy.subtype)}</span>
+              </div>
+              <div style="color:var(--text2, #78716c);font-size:11px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                <span>Linked Product:</span>
+                <span style="color:var(--text, #1c1917);font-weight:500;">${escapeHtml(adj.preTaxonomy.productName)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="height:1px;background:var(--border, rgba(120,120,128,0.14));margin:7px 0;"></div>
+
+          <!-- Post-Swap -->
+          <div style="display:flex;align-items:flex-start;gap:8px;">
+            <span style="font-size:10px;font-weight:700;color:#16a34a;background:rgba(22,163,74,0.14);padding:1px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap;margin-top:2px;">
+              Post-Swap
+            </span>
+            <div style="flex:1;min-width:0;">
+              <div style="color:var(--text, #1c1917);word-break:break-word;">
+                <span style="color:var(--text2, #78716c);font-size:11px;">Pantry:</span>
+                <strong style="font-weight:600;color:#16a34a;">${escapeHtml(adj.postTaxonomy.category)}</strong>
+                <span style="color:var(--text2, #78716c);margin:0 3px;">/</span>
+                <strong style="font-weight:600;color:#16a34a;">${escapeHtml(adj.postTaxonomy.rootItem)}</strong>
+                <span style="color:var(--text2, #78716c);margin:0 3px;">/</span>
+                <span style="color:#16a34a;font-weight:600;">${escapeHtml(adj.postTaxonomy.subtype)}</span>
+              </div>
+              <div style="color:var(--text2, #78716c);font-size:11px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                <span>Linked Product:</span>
+                <span style="color:var(--text, #1c1917);font-weight:600;">${escapeHtml(adj.postTaxonomy.productName)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    } else if (adj.taxonomy) {
+      taxonomyHtml = `
+        <div class="enh-taxonomy-box" style="margin-top:8px;background:var(--surface2, #fbfaf8);border:1px solid var(--border, rgba(120,120,128,0.14));border-radius:8px;padding:6px 10px;font-size:11px;line-height:1.4;">
+          <div style="color:var(--text, #1c1917);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            <span style="color:var(--text2, #78716c);">Pantry:</span>
+            <strong style="font-weight:600;">${escapeHtml(adj.taxonomy.category)}</strong>
+            <span style="color:var(--text2, #78716c);margin:0 3px;">/</span>
+            <strong style="font-weight:600;">${escapeHtml(adj.taxonomy.rootItem)}</strong>
+            <span style="color:var(--text2, #78716c);margin:0 3px;">/</span>
+            <span>${escapeHtml(adj.taxonomy.subtype)}</span>
+          </div>
+          <div style="color:var(--text2, #78716c);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            <span>Linked Product:</span>
+            <span style="color:var(--text, #1c1917);font-weight:500;">${escapeHtml(adj.taxonomy.productName)}</span>
+          </div>
+        </div>
+      `;
+    }
+
     return `
-      <div class="enh-adj-row" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface,#fff);${borderStyle}">
+      <div class="enh-adj-row" style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;background:var(--surface,#fff);${borderStyle}">
         <input 
           type="checkbox" 
           class="enh-adj-cb" 
           data-adj-id="${escapeHtml(adj.id)}" 
           checked 
-          style="width:20px!important;height:20px!important;min-width:20px!important;max-width:20px!important;min-height:20px!important;max-height:20px!important;flex:0 0 20px!important;margin:0!important;padding:0!important;border-radius:6px;cursor:pointer;accent-color:var(--action,#007aff);"
+          style="width:20px!important;height:20px!important;min-width:20px!important;max-width:20px!important;min-height:20px!important;max-height:20px!important;flex:0 0 20px!important;margin:2px 0 0 0!important;padding:0!important;border-radius:6px;cursor:pointer;accent-color:var(--action,#007aff);"
         />
         <div style="flex:1;min-width:0;">
-          <div style="font-weight:600;font-size:13.5px;color:var(--text,#1c1917);line-height:1.35;word-break:break-word;">
-            ${escapeHtml(adj.label)}
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+            <div style="font-weight:600;font-size:13.5px;color:var(--text,#1c1917);line-height:1.35;word-break:break-word;">
+              ${escapeHtml(adj.label)}
+            </div>
+            ${tagHtml ? `<div style="flex:0 0 auto;">${tagHtml}</div>` : ''}
           </div>
           <div style="font-size:12px;color:var(--text2,#78716c);margin-top:2px;line-height:1.35;">
             ${escapeHtml(adj.detail)}
           </div>
+          ${taxonomyHtml}
         </div>
-        ${tagHtml ? `<div style="flex:0 0 auto;margin-left:6px;">${tagHtml}</div>` : ''}
       </div>
     `;
   }).join('');

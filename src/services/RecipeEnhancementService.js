@@ -11,6 +11,147 @@ import { toGrams } from './UnitConversionService.js';
 import { resolveProductForIngredient } from '../components/recipe/RecipeWizardStep3Handlers.js';
 
 /**
+ * Resolves full Pantry Bank taxonomy (Category / Root Item / Sub-type) and Linked Product.
+ */
+export function resolvePantryTaxonomy(item, { ingredients = [], products = [] } = {}) {
+  if (!item || typeof item !== 'object') {
+    return { category: 'General', rootItem: 'Unknown', subtype: 'Standard', productName: 'None' };
+  }
+
+  // 1. Resolve product
+  let prod = item._matchedProduct || null;
+  if (!prod && item.productId) {
+    prod = products.find(p => String(p.id) === String(item.productId));
+  }
+  if (!prod && item.bankId) {
+    prod = products.find(p => String(p.id) === String(item.bankId));
+  }
+  if (!prod && item.productName) {
+    prod = products.find(p => p.name && p.name.toLowerCase() === String(item.productName).toLowerCase());
+  }
+  if (!prod) {
+    prod = resolveProductForIngredient(item, { products, ingredients });
+  }
+
+  // 2. Resolve root ingredient
+  let rootIng = null;
+  if (item.ingredientId) {
+    rootIng = ingredients.find(i => String(i.id) === String(item.ingredientId));
+  }
+  if (!rootIng && prod?.ingredientId) {
+    rootIng = ingredients.find(i => String(i.id) === String(prod.ingredientId));
+  }
+  if (!rootIng && (prod?.groupId || item.groupId)) {
+    const gId = prod?.groupId || item.groupId;
+    rootIng = ingredients.find(i => String(i.groupId || i.id) === String(gId));
+  }
+  if (!rootIng && item.name) {
+    const cleanName = String(item.name).trim().toLowerCase();
+    rootIng = ingredients.find(i => i.name && (i.name.toLowerCase() === cleanName || cleanName.includes(i.name.toLowerCase())));
+  }
+
+  // 3. Resolve subtype
+  let subtypeName = item.subtypeName || null;
+  if (!subtypeName && item.subtypeId && rootIng?.subtypes) {
+    const st = rootIng.subtypes.find(s => String(s.id) === String(item.subtypeId));
+    if (st) subtypeName = st.name;
+  }
+  if (!subtypeName && prod?.subtypeId && rootIng?.subtypes) {
+    const st = rootIng.subtypes.find(s => String(s.id) === String(prod.subtypeId));
+    if (st) subtypeName = st.name;
+  }
+  if (!subtypeName) {
+    if (rootIng?.name && item.name && rootIng.name.toLowerCase() !== item.name.toLowerCase()) {
+      subtypeName = item.name;
+    } else {
+      subtypeName = 'Standard';
+    }
+  }
+
+  const category = rootIng?.category || prod?.category || item.category || 'General';
+  const rootItem = rootIng?.name || item.name || 'Unknown';
+  const productName = prod?.name || item.productName || item.productMatch?.name || 'Default Product';
+
+  return {
+    category,
+    rootItem,
+    subtype: subtypeName,
+    productName,
+    productId: prod?.id || item.productId || null,
+    ingredientId: rootIng?.id || item.ingredientId || null,
+    subtypeId: prod?.subtypeId || item.subtypeId || null
+  };
+}
+
+/**
+ * Resolves post-swap Pantry Bank taxonomy (Category / Root Item / Sub-type) and Linked Product.
+ */
+export function resolvePantryTaxonomyForSwap(swap, originalItem, { ingredients = [], products = [] } = {}) {
+  const searchRegex = swap.productSearchRegex || new RegExp(swap.swapTo.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'i');
+  const matchedProd = products.find(p => p.name && searchRegex.test(p.name));
+
+  if (matchedProd) {
+    let rootIng = null;
+    if (matchedProd.ingredientId) {
+      rootIng = ingredients.find(i => String(i.id) === String(matchedProd.ingredientId));
+    }
+    if (!rootIng && matchedProd.groupId) {
+      rootIng = ingredients.find(i => String(i.groupId || i.id) === String(matchedProd.groupId));
+    }
+
+    let subtypeName = null;
+    if (matchedProd.subtypeId && rootIng?.subtypes) {
+      const st = rootIng.subtypes.find(s => String(s.id) === String(matchedProd.subtypeId));
+      if (st) subtypeName = st.name;
+    }
+    if (!subtypeName) {
+      subtypeName = swap.targetTaxonomy?.subtype || swap.swapTo;
+    }
+
+    return {
+      category: matchedProd.category || rootIng?.category || swap.targetTaxonomy?.category || 'Store Cupboard',
+      rootItem: rootIng?.name || swap.targetTaxonomy?.rootItem || swap.swapTo,
+      subtype: subtypeName,
+      productName: matchedProd.name,
+      productId: matchedProd.id,
+      ingredientId: rootIng?.id || null,
+      subtypeId: matchedProd.subtypeId || null
+    };
+  }
+
+  const matchedIng = ingredients.find(i => i.name && searchRegex.test(i.name));
+  if (matchedIng) {
+    let defProd = null;
+    if (matchedIng.defaultProductId) {
+      defProd = products.find(p => String(p.id) === String(matchedIng.defaultProductId));
+    }
+    return {
+      category: matchedIng.category || swap.targetTaxonomy?.category || 'Store Cupboard',
+      rootItem: matchedIng.name,
+      subtype: swap.targetTaxonomy?.subtype || 'Standard',
+      productName: defProd?.name || swap.targetTaxonomy?.productName || swap.swapTo,
+      productId: defProd?.id || null,
+      ingredientId: matchedIng.id,
+      subtypeId: null
+    };
+  }
+
+  if (swap.targetTaxonomy) {
+    return { ...swap.targetTaxonomy };
+  }
+
+  return {
+    category: 'Store Cupboard',
+    rootItem: swap.swapTo,
+    subtype: 'Standard',
+    productName: swap.swapTo,
+    productId: null,
+    ingredientId: null,
+    subtypeId: null
+  };
+}
+
+/**
  * Quantizes ingredient quantities to natural culinary increments.
  */
 export function quantizeQuantity(qty, unit = 'g') {
@@ -263,6 +404,7 @@ export function generateEnhancementPlan(recipe, options = {}) {
 
           fatItem.qty = proposedTotal;
           fatItem.amount = proposedTotal;
+          const taxonomy = resolvePantryTaxonomy(fatItem, { ingredients: allIngredients, products });
           adjustments.push({
             id: `adj_fat_${fatItem.name}`,
             type: 'quantity',
@@ -274,6 +416,7 @@ export function generateEnhancementPlan(recipe, options = {}) {
             detail: `Saves ~${Math.abs(dKcal)} kcal/serving without altering recipe flavour.`,
             deltaKcal: dKcal,
             deltaProt: 0,
+            taxonomy,
             active: true
           });
         }
@@ -336,6 +479,7 @@ export function generateEnhancementPlan(recipe, options = {}) {
         if (dProt > 0 || dKcal !== 0) {
           mainProt.qty = newQty;
           mainProt.amount = newQty;
+          const taxonomy = resolvePantryTaxonomy(mainProt, { ingredients: allIngredients, products });
           adjustments.push({
             id: `adj_prot_${mainProt.name}`,
             type: 'quantity',
@@ -347,6 +491,7 @@ export function generateEnhancementPlan(recipe, options = {}) {
             detail: `Adds +${dProt}g protein per serving to reach household target (${targets.minProt}g).`,
             deltaKcal: dKcal,
             deltaProt: dProt,
+            taxonomy,
             active: true
           });
         }
@@ -377,6 +522,7 @@ export function generateEnhancementPlan(recipe, options = {}) {
           if (dKcal !== 0 || dProt !== 0) {
             carbItem.qty = proposedTotal;
             carbItem.amount = proposedTotal;
+            const taxonomy = resolvePantryTaxonomy(carbItem, { ingredients: allIngredients, products });
             adjustments.push({
               id: `adj_carb_${carbItem.name}`,
               type: 'quantity',
@@ -388,6 +534,7 @@ export function generateEnhancementPlan(recipe, options = {}) {
               detail: `Trims ~${Math.abs(dKcal)} kcal/serving for optimal carbohydrate ratio.`,
               deltaKcal: dKcal,
               deltaProt: dProt,
+              taxonomy,
               active: true
             });
           }
@@ -405,33 +552,76 @@ export function generateEnhancementPlan(recipe, options = {}) {
       match: /\b(coconut milk|coconut cream)\b/i,
       exclude: /\blight\b/i,
       swapTo: 'Light Coconut Milk',
+      productSearchRegex: /\blight coconut\b/i,
       kcalPer100gDiff: -110,
       protPer100gDiff: 0,
-      reason: 'Cuts saturated fat calories'
+      reason: 'Cuts saturated fat calories',
+      targetTaxonomy: {
+        category: 'Store Cupboard',
+        rootItem: 'Coconut Milk',
+        subtype: 'Light Coconut Milk',
+        productName: 'Light Coconut Milk 400ml'
+      }
     },
     {
       match: /\b(beef burgers?|smashed burgers?|beef patties?|beef mince|mince)\b/i,
       exclude: /\b(5%|lean|turkey|chicken|vegan|plant)\b/i,
       swapTo: 'Lean Beef Burgers (5% Fat)',
+      productSearchRegex: /\b(5% lean|lean beef|5% fat|lean mince|5% mince)\b/i,
       kcalPer100gDiff: -110,
       protPer100gDiff: +4.5,
-      reason: 'Reduces heavy fat calories while boosting protein'
+      reason: 'Reduces heavy fat calories while boosting protein',
+      targetTaxonomy: {
+        category: 'Meat & Poultry',
+        rootItem: 'Beef Burgers',
+        subtype: 'Lean Beef Burgers (5% Fat)',
+        productName: 'Lean Beef Burgers (5% Fat)'
+      }
     },
     {
       match: /\b(cheddar|cheese|american cheese|monterey jack)\b/i,
       exclude: /\b(reduced|light|low fat|lighter)\b/i,
       swapTo: 'Reduced Fat Cheese Slices',
+      productSearchRegex: /\b(reduced fat.*slice|mild slices?|lighter.*slice|30% reduced fat)\b/i,
       kcalPer100gDiff: -180,
       protPer100gDiff: +1,
-      reason: 'Saves fat calories while maintaining creamy texture'
+      reason: 'Saves fat calories while maintaining creamy texture',
+      targetTaxonomy: {
+        category: 'Dairy & Eggs',
+        rootItem: 'American Cheese Slices',
+        subtype: 'Mild American Cheese Slices',
+        productName: '10 Reduced Fat Mild Slices'
+      }
     },
     {
       match: /\b(mayo|mayonnaise|burger sauce|aioli|sour cream)\b/i,
       exclude: /\b(light|reduced|low fat|0%)\b/i,
       swapTo: 'Light Mayonnaise / Light Burger Sauce',
+      productSearchRegex: /\b(light mayo|lighter mayo|light mayonnaise)\b/i,
       kcalPer100gDiff: -400,
       protPer100gDiff: 0,
-      reason: 'Significantly lowers condiment calories'
+      reason: 'Significantly lowers condiment calories',
+      targetTaxonomy: {
+        category: 'Sauces, Condiments & Pastes',
+        rootItem: 'Mayonnaise',
+        subtype: 'Light Mayonnaise',
+        productName: 'Light Mayonnaise'
+      }
+    },
+    {
+      match: /\b(greek yogurt|greek yoghurt|natural yogurt|natural yoghurt|creme fraiche)\b/i,
+      exclude: /\b(0%|fat free|light|low fat)\b/i,
+      swapTo: '0% Fat Greek Yogurt',
+      productSearchRegex: /\b(0% fat|fat free|0% greek|skyr)\b/i,
+      kcalPer100gDiff: -70,
+      protPer100gDiff: +2,
+      reason: 'High-protein, fat-free dairy substitute',
+      targetTaxonomy: {
+        category: 'Dairy & Eggs',
+        rootItem: 'Greek Yogurt',
+        subtype: '0% Fat Greek Yogurt',
+        productName: '0% Fat Greek Style Yogurt'
+      }
     }
   ];
 
@@ -461,6 +651,9 @@ export function generateEnhancementPlan(recipe, options = {}) {
 
         const wouldBeKcal = currentKcal + dKcal;
         if ((currentKcal > targets.targetKcal || currentProt < targets.minProt) && wouldBeKcal >= targets.minKcal) {
+          const preTaxonomy = resolvePantryTaxonomy(item, { ingredients: allIngredients, products });
+          const postTaxonomy = resolvePantryTaxonomyForSwap(swap, item, { ingredients: allIngredients, products });
+
           adjustments.push({
             id: `swap_${item.name}`,
             type: 'swap',
@@ -470,6 +663,8 @@ export function generateEnhancementPlan(recipe, options = {}) {
             detail: `${swap.reason} (${dKcal} kcal/serving).`,
             deltaKcal: dKcal,
             deltaProt: dProt,
+            preTaxonomy,
+            postTaxonomy,
             active: true
           });
           currentKcal = wouldBeKcal;
@@ -484,6 +679,12 @@ export function generateEnhancementPlan(recipe, options = {}) {
   if (currentProt < 25 && workingIngredients.filter(i => i._role === 'primary_protein').length === 0) {
     const boosterName = 'Firm Tofu (or Diced Chicken Breast)';
     const boosterQty = quantizeQuantity(125 * proposedServings, 'g');
+    const boosterTaxonomy = {
+      category: 'Refrigerated & Dairy',
+      rootItem: boosterName,
+      subtype: 'Firm Tofu',
+      productName: 'Organic Firm Tofu 280g'
+    };
     adjustments.push({
       id: 'adj_add_protein',
       type: 'addition',
@@ -494,6 +695,7 @@ export function generateEnhancementPlan(recipe, options = {}) {
       detail: `Infuses +24g protein per serving to meet minimum household nutritional targets.`,
       deltaKcal: +140,
       deltaProt: +24,
+      taxonomy: boosterTaxonomy,
       active: true
     });
     currentKcal += 140;
@@ -601,6 +803,14 @@ export function buildEnhancedRecipePayload(originalRecipe, adjustedIngredients, 
       if (String(item.name || '').toLowerCase() === targetName) {
         item.name = swapAdj.swapTo;
         item.raw = `${item.qty || 1}${item.unit || 'g'} ${swapAdj.swapTo}`;
+        if (swapAdj.postTaxonomy) {
+          if (swapAdj.postTaxonomy.productId) item.productId = swapAdj.postTaxonomy.productId;
+          if (swapAdj.postTaxonomy.productName) item.productName = swapAdj.postTaxonomy.productName;
+          if (swapAdj.postTaxonomy.ingredientId) item.ingredientId = swapAdj.postTaxonomy.ingredientId;
+          if (swapAdj.postTaxonomy.subtypeId) item.subtypeId = swapAdj.postTaxonomy.subtypeId;
+          if (swapAdj.postTaxonomy.subtype) item.subtypeName = swapAdj.postTaxonomy.subtype;
+          if (swapAdj.postTaxonomy.category) item.category = swapAdj.postTaxonomy.category;
+        }
       }
     };
     finalIngredients.forEach(replaceName);
@@ -655,6 +865,8 @@ if (typeof window !== 'undefined') {
     quantizeQuantity,
     classifyIngredientRole,
     resolveRecipeTargets,
+    resolvePantryTaxonomy,
+    resolvePantryTaxonomyForSwap,
     generateEnhancementPlan,
     buildEnhancedRecipePayload
   };
