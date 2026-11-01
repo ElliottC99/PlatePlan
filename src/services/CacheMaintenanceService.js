@@ -58,6 +58,46 @@ export async function runDeferredMaintenance(preferencesData, mergedCategories, 
         console.warn('[Maintenance] sweepAndRecalibrateIngredientDefaults failed:', e);
       }
     }
+
+    // Scrub products with kJ stored as calories
+    if (typeof window !== 'undefined' && window.Store?.getState) {
+      try {
+        const storeState = window.Store.getState() || {};
+        const prods = Array.isArray(storeState.products) ? storeState.products : [];
+        const { normalizeEnergyKcal } = await import('./NutritionService.js');
+        const { saveProduct } = await import('./ProductRepository.js');
+        const { setProducts } = await import('../store/store.js');
+
+        let scrubCount = 0;
+        const scrubbedProds = prods.map(p => {
+          if (!p || typeof p !== 'object') return p;
+          const rawCal = Number(p.cal ?? p.kcal ?? 0);
+          const prot = Number(p.prot ?? p.protein ?? 0);
+          const carb = Number(p.carb ?? p.carbs ?? 0);
+          const fat = Number(p.fat ?? 0);
+          const fibre = Number(p.fibre ?? p.fiber ?? 0);
+          const cleanCal = normalizeEnergyKcal(rawCal, prot, carb, fat, fibre);
+          if (cleanCal > 0 && cleanCal !== rawCal) {
+            scrubCount++;
+            return { ...p, cal: cleanCal, kcal: cleanCal, updatedAt: new Date().toISOString() };
+          }
+          return p;
+        });
+
+        if (scrubCount > 0) {
+          setProducts(scrubbedProds);
+          for (const p of scrubbedProds) {
+            const orig = prods.find(o => String(o.id) === String(p.id));
+            if (orig && p.cal !== orig.cal) {
+              await saveProduct(p);
+            }
+          }
+          console.log(`[Maintenance] Successfully corrected energy units (kJ -> kcal) for ${scrubCount} products.`);
+        }
+      } catch (err) {
+        console.warn('[Maintenance] Product energy scrub error:', err);
+      }
+    }
   } catch (err) {
     console.warn('[Maintenance] Deferred maintenance skipped:', err);
   }

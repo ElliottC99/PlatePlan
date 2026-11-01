@@ -3,6 +3,7 @@
  * Isolated pure data parsing service for Tesco bookmarklet imports.
  * Quarantined from the DOM and direct database operations.
  */
+import { normalizeEnergyKcal } from './NutritionService.js';
 
 /**
  * Standard title-casing helper for product and brand names.
@@ -174,11 +175,13 @@ export function parseTescoProduct(rawInput) {
   const richSourceEnergy = typeof sourceEnergy === 'string' && /(kcal|kj|\/)/i.test(sourceEnergy);
   const energyValue = richSourceEnergy ? sourceEnergy : (parsedEnergy ?? sourceEnergy);
 
-  const cal = Math.max(0, +energyValue || +pvRaw.cal || +raw.cal || 0);
   const prot = Math.max(0, Math.round((+pvRaw.prot || +raw.prot || 0) * 10) / 10);
   const carb = Math.max(0, Math.round((+pvRaw.carb || +raw.carb || 0) * 10) / 10);
   const fat = Math.max(0, Math.round((+pvRaw.fat || +raw.fat || 0) * 10) / 10);
   const fibre = Math.max(0, Math.round((+pvRaw.fibre || +raw.fibre || 0) * 10) / 10);
+
+  const rawEnergy = energyValue ?? pvRaw.cal ?? raw.cal ?? 0;
+  const cal = normalizeEnergyKcal(rawEnergy, prot, carb, fat, fibre);
 
   const normalisedPv = { cal, prot, carb, fat, fibre };
   const warnings = validateNutritionValues(normalisedPv, nsrc);

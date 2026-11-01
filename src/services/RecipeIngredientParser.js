@@ -341,6 +341,13 @@ export function stemIngredientName(rawName) {
   return str.trim();
 }
 
+export const CANONICAL_COMPOUND_SYNONYMS = {
+  'coconut rice': 'jasmine rice',
+  'thai coconut rice': 'jasmine rice',
+  'curry rice': 'jasmine rice',
+  'garlic rice': 'jasmine rice'
+};
+
 /**
  * Cross-references parsed ingredient against existing Store items including aliases and subtypes.
  */
@@ -349,8 +356,9 @@ export function matchIngredientTaxonomy(parsedItem, existingIngredients = null) 
   const storeState = (typeof getState === 'function') ? getState() : {};
   const ingredients = (existingIngredients && existingIngredients.length) ? existingIngredients : (storeState.rootItems || storeState.ingredients || []);
   const rawClean = (parsedItem.name || '').toLowerCase().trim();
-  const normParsed = normalizeTaxonomyName(rawClean);
-  const stemmedParsed = stemIngredientName(rawClean);
+  const targetClean = CANONICAL_COMPOUND_SYNONYMS[rawClean] || rawClean;
+  const normParsed = normalizeTaxonomyName(targetClean);
+  const stemmedParsed = stemIngredientName(targetClean);
 
   let bestMatch = null, bestScore = 0;
 

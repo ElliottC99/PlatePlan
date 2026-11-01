@@ -51,7 +51,7 @@ export async function sweepAndRecalibrateIngredientDefaults() {
   const state = window.Store?.getState?.() || {};
   const ingredients = state.ingredients || (getState()?.ingredients || []);
   const products = state.products || (getState()?.products || []);
-  const criterion = state.settings?.autoDefaultStrategy || state.settings?.autoDefaultCriterion || state.userPrefs?.autoDefaultStrategy || state.userPrefs?.autoDefaultCriterion ?.settings?.autoDefaultStrategy ?.settings?.autoDefaultCriterion ?.userPrefs?.autoDefaultStrategy ?.userPrefs?.autoDefaultCriterion || 'lowest_absolute_price';
+  const criterion = state.settings?.autoDefaultStrategy || state.settings?.autoDefaultCriterion || state.userPrefs?.autoDefaultStrategy || state.userPrefs?.autoDefaultCriterion || 'lowest_absolute_price';
   let updatedCount = 0;
 
   const updatedIngredients = ingredients.map(ing => {
@@ -67,7 +67,8 @@ export async function sweepAndRecalibrateIngredientDefaults() {
     });
 
     if (matchedProducts.length > 0) {
-      const bestProduct = compareProductsByStrategy(matchedProducts, criterion);
+      const sorted = [...matchedProducts].sort((a, b) => compareProductsByStrategy(a, b, criterion));
+      const bestProduct = sorted[0];
       if (bestProduct && String(ing.defaultProductId || '') !== String(bestProduct.id)) {
         updatedCount++;
         return { ...ing, defaultProductId: bestProduct.id, updatedAt: new Date().toISOString() };
@@ -82,7 +83,7 @@ export async function sweepAndRecalibrateIngredientDefaults() {
     try {
       for (const ing of updatedIngredients) {
         if (ing.defaultProductId) {
-          await saveIngredient(ing);
+          await saveRootItem(ing);
         }
       }
       console.log(`[HydrationService] Repaired and recalibrated defaults for ${updatedCount} ingredients.`);

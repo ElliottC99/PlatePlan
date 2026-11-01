@@ -29,34 +29,62 @@ export function numericNutritionValues(value) {
   return String(value).match(/\d+(?:\.\d+)?/g)?.map(Number).filter(Number.isFinite) || [];
 }
 
-export function normalizeEnergyKcal(value) {
+export function normalizeEnergyKcal(value, prot = 0, carb = 0, fat = 0, fibre = 0) {
   if (value === null || value === undefined || value === '') return 0;
-  if (typeof value === 'number') return value > 2500 ? Math.round(value / 4.184) : Math.round(value);
-  const text = String(value).toLowerCase();
-  const kcalMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:kcal|calories|cals?\b)/i);
-  if (kcalMatch) return Math.round(+kcalMatch[1]);
-  const kjMatch = text.match(/(\d+(?:\.\d+)?)\s*kj/i);
-  const nums = numericNutritionValues(text);
-  if (nums.length >= 2) {
-    const plausible = nums.filter(n => n > 0 && n < 1000);
-    if (plausible.length) return Math.round(Math.min(...plausible));
+  
+  let valNum = 0;
+  if (typeof value === 'number') {
+    valNum = value;
+  } else {
+    const text = String(value).toLowerCase();
+    const kcalMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:kcal|calories|cals?\b)/i);
+    if (kcalMatch) return Math.round(+kcalMatch[1]);
+    const kjMatch = text.match(/(\d+(?:\.\d+)?)\s*kj/i);
+    const nums = numericNutritionValues(text);
+    if (nums.length >= 2) {
+      const plausible = nums.filter(n => n > 0 && n < 1000);
+      if (plausible.length) valNum = Math.min(...plausible);
+    } else if (kjMatch) {
+      return Math.round((+kjMatch[1]) / 4.184);
+    } else if (nums.length === 1) {
+      valNum = nums[0];
+    }
   }
-  if (kjMatch) return Math.round((+kjMatch[1]) / 4.184);
-  if (nums.length === 1) return nums[0] > 2500 ? Math.round(nums[0] / 4.184) : Math.round(nums[0]);
-  return 0;
+
+  if (valNum <= 0) return 0;
+
+  // Atwater macronutrient cross-validation:
+  // If macros are available, check if the calorie number is actually in kilojoules.
+  // 1 kcal = 4.184 kJ. Ratio of kJ to expected Atwater kcal is typically between 3.4 and 5.2.
+  const p = Number(prot) || 0, c = Number(carb) || 0, f = Number(fat) || 0, fib = Number(fibre) || 0;
+  const atwater = (4 * p) + (4 * c) + (9 * f) + (2 * fib);
+  if (atwater > 15) {
+    const ratio = valNum / atwater;
+    if (ratio >= 3.4 && ratio <= 5.2) {
+      return Math.round(valNum / 4.184);
+    }
+  }
+
+  if (valNum > 2500) return Math.round(valNum / 4.184);
+  return Math.round(valNum);
 }
 
 export function normalizeNutritionPayload(raw) {
   const parsed = {};
+  const prot = +(raw?.prot ?? raw?.protein ?? 0);
+  const carb = +(raw?.carb ?? raw?.carbs ?? raw?.carbohydrate ?? 0);
+  const fat = +(raw?.fat ?? 0);
+  const fibre = +(raw?.fibre ?? raw?.fiber ?? 0);
+
   for (const k in (raw || {})) {
     const cleanKey = String(k || '').toLowerCase();
     const key = normalizeNutrientKey(k);
-    if (key === 'cal') parsed[key] = normalizeEnergyKcal(raw[k]);
-    else if (cleanKey.includes('kj') && !parsed.cal) parsed.cal = normalizeEnergyKcal(`${raw[k]} kJ`);
+    if (key === 'cal') parsed[key] = normalizeEnergyKcal(raw[k], prot, carb, fat, fibre);
+    else if (cleanKey.includes('kj') && !parsed.cal) parsed.cal = normalizeEnergyKcal(`${raw[k]} kJ`, prot, carb, fat, fibre);
     else parsed[key] = +raw[k] || 0;
   }
   if (!parsed.cal) {
-    parsed.cal = normalizeEnergyKcal(raw?.energy ?? raw?.calories ?? raw?.kcal ?? raw?.cal);
+    parsed.cal = normalizeEnergyKcal(raw?.energy ?? raw?.calories ?? raw?.kcal ?? raw?.cal, prot, carb, fat, fibre);
   }
   return parsed;
 }
@@ -125,11 +153,20 @@ export function calculateItemNutrition(item, quantity, unit = 'g') {
   if (grams <= 0) return zero;
 
   const scale = grams / 100;
-  const calVal = (parseFloat(item.cal) || parseFloat(item.calories) || parseFloat(item.kcal) || 0) * scale;
-  const protVal = (parseFloat(item.prot) || parseFloat(item.protein) || 0) * scale;
-  const carbVal = (parseFloat(item.carb) || parseFloat(item.carbs) || 0) * scale;
-  const fatVal = (parseFloat(item.fat) || 0) * scale;
-  const fibreVal = (parseFloat(item.fibre) || parseFloat(item.fiber) || 0) * scale;
+  const rawCal = parseFloat(item.cal) || parseFloat(item.calories) || parseFloat(item.kcal) || 0;
+  const rawProt = parseFloat(item.prot) || parseFloat(item.protein) || 0;
+  const rawCarb = parseFloat(item.carb) || parseFloat(item.carbs) || 0;
+  const rawFat = parseFloat(item.fat) || 0;
+  const rawFibre = parseFloat(item.fibre) || parseFloat(item.fiber) || 0;
+
+  // Runtime safeguard against products stored in database with kJ as cal
+  const cleanCal = normalizeEnergyKcal(rawCal, rawProt, rawCarb, rawFat, rawFibre);
+
+  const calVal = cleanCal * scale;
+  const protVal = rawProt * scale;
+  const carbVal = rawCarb * scale;
+  const fatVal = rawFat * scale;
+  const fibreVal = rawFibre * scale;
 
   let costVal = 0;
   if (parseFloat(item.price) > 0) {
