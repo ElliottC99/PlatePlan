@@ -117,10 +117,10 @@ export function generateMealPlan(options = {}) {
   const days = Number(options.days || state.currentPlannerDays || loadedPlan.days || 10) || 10;
   const startDateStr = options.startDate || state.currentPlannerStartDate || loadedPlan.dayDates?.[1]
     || loadedPlan.startDate || new Date().toISOString().split('T')[0];
-  const cadence = options.cadence ?.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
-  const minFitScore = Number(options.minFitScore !== undefined ? options.minFitScore : (getState()?.prefs?.minFitScore || 0));
-  const maxFitScore = Number(options.maxFitScore !== undefined ? options.maxFitScore : (getState()?.prefs?.maxFitScore || 100));
-  const skeletonGrid = options.skeletonGrid ?.skeletonGrid || {};
+  const cadence = options.cadence || state.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
+  const minFitScore = Number(options.minFitScore !== undefined ? options.minFitScore : (state.prefs?.minFitScore || 0));
+  const maxFitScore = Number(options.maxFitScore !== undefined ? options.maxFitScore : (state.prefs?.maxFitScore || 100));
+  const skeletonGrid = options.skeletonGrid || state.skeletonGrid || {};
   const rawRecipes = Array.isArray(options.recipes) ? options.recipes : (getState()?.recipes || []);
   const allRecipes = [];
   rawRecipes.forEach(r => {
@@ -267,6 +267,7 @@ export function generateMealPlan(options = {}) {
     startDate: startDateStr,
     dayDates,
     slots,
+    cadence,
     skeletonGrid,
     mealPrepGroups,
     createdAt: new Date().toISOString()

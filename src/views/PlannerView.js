@@ -63,7 +63,9 @@ export function renderPlannerWizard() {
     const startVal = getState().currentPlannerStartDate || getState().currentPlan?.dayDates?.[1] || today;
     const cadence = getState()?.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
     const minFitScore = getState()?.prefs?.minFitScore || 0;
-    const rawPinned = getState().currentPlanOptions?.pinnedMeals ?.pinnedRecipes || [];
+    const rawPinned = getState()?.currentPlanOptions?.pinnedMeals?.pinnedRecipes 
+      || getState()?.currentPlanOptions?.pinnedMeals 
+      || [];
     const pinned = Array.isArray(rawPinned) ? rawPinned : [];
 
     stepContentHtml = GeneratorConstraintsForm.renderConstraintsForm({

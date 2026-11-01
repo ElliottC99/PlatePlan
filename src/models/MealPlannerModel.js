@@ -214,6 +214,7 @@ export function stripPlanPayload(rawInput) {
     startDate: String(planData.startDate || rawInput.plannerStartDate || ''),
     dayDates: (planData.dayDates && typeof planData.dayDates === 'object') ? { ...planData.dayDates } : {},
     slots: cleanSlots,
+    cadence: (planData.cadence && typeof planData.cadence === 'object') ? { ...planData.cadence } : undefined,
     skeletonGrid: cleanSkeleton,
     mealPrepGroups: cleanPrepGroups,
     eatenMeals: sanitizeEatenMeals(planData.eatenMeals),
@@ -221,6 +222,7 @@ export function stripPlanPayload(rawInput) {
     substitutions: sanitizeSubstitutions(planData.substitutions),
     productSelections: sanitizeProductSelections(planData.productSelections)
   };
+  if (!sanitizedPlan.cadence) delete sanitizedPlan.cadence;
 
   FORBIDDEN_PLAN_KEYS.forEach(k => delete sanitizedPlan[k]);
   return sanitizedPlan;

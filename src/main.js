@@ -34,7 +34,7 @@ if (typeof window !== 'undefined') {
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData, teardownRealtimeSubscriptions } from './services/HydrationService.js';
-import { subscribe, getState, initStoreCache, setActivePlan } from './store/store.js';
+import { subscribe, getState, initStoreCache, setActivePlan, saveStateCache } from './store/store.js';
 import { setupActionBridge } from './services/ActionBridge.js';
 import { saveCurrentPlan, stripPlanPayload, getCategories, saveCategories } from './services/HouseholdRepository.js';
 import { saveRootItem as saveIngredient, getRootItems as getIngredients } from './services/RootItemRepository.js';
@@ -89,21 +89,38 @@ const safeClone = (obj) => {
 if (typeof window !== 'undefined') {
   window.stripPlanPayload = stripPlanPayload;
   window.saveState = function(stateData) {
-    const rawPlan = stateData?.plan || stateData?.currentPlan || stateData .currentPlan ?.currentPlan;
-    if (!rawPlan) return;
+    try {
+      const state = typeof getState === 'function' ? getState() : (window.AppState ? window.AppState.getState() : null);
+      const data = stateData || state;
 
-    // 1. Dispatch into official store orchestrator
-    if (typeof setActivePlan === 'function') {
-      setActivePlan(rawPlan);
-    } else if (window.store && typeof window.store.setActivePlan === 'function') {
-      window.store.setActivePlan(rawPlan);
-    }
+      // Extract plan safely whether passed as plan, stateData.plan, stateData.currentPlan, or state.currentPlan
+      const rawPlan = (data?.slots ? data : null)
+        || data?.plan
+        || data?.currentPlan
+        || state?.currentPlan
+        || state?.plan;
 
-    // 2. Commit directly to repository if available
-    if (window.HouseholdRepository && typeof window.HouseholdRepository.saveCurrentPlan === 'function') {
-      window.HouseholdRepository.saveCurrentPlan(rawPlan).catch(err => {
-        console.error('[Persistence] Error delegating plan to HouseholdRepository:', err);
-      });
+      // 1. Always update local state cache to persist in-memory adjustments
+      if (typeof saveStateCache === 'function') {
+        saveStateCache(data);
+      }
+
+      // 2. If a valid plan exists, dispatch into official store and cloud repository
+      if (rawPlan && rawPlan.slots && typeof rawPlan.slots === 'object') {
+        if (typeof setActivePlan === 'function') {
+          setActivePlan(rawPlan);
+        } else if (window.store && typeof window.store.setActivePlan === 'function') {
+          window.store.setActivePlan(rawPlan);
+        }
+
+        if (window.HouseholdRepository && typeof window.HouseholdRepository.saveCurrentPlan === 'function') {
+          window.HouseholdRepository.saveCurrentPlan(rawPlan).catch(err => {
+            console.error('[Persistence] Error delegating plan to HouseholdRepository:', err);
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('[Persistence] Handled warning in window.saveState:', err);
     }
   };
 
