@@ -53,6 +53,7 @@ export async function sweepAndRecalibrateIngredientDefaults() {
   const products = state.products || (getState()?.products || []);
   const criterion = state.settings?.autoDefaultStrategy || state.settings?.autoDefaultCriterion || state.userPrefs?.autoDefaultStrategy || state.userPrefs?.autoDefaultCriterion || 'lowest_absolute_price';
   let updatedCount = 0;
+  const changedIngredients = [];
 
   const updatedIngredients = ingredients.map(ing => {
     const nestedSubtypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
@@ -71,22 +72,20 @@ export async function sweepAndRecalibrateIngredientDefaults() {
       const bestProduct = sorted[0];
       if (bestProduct && String(ing.defaultProductId || '') !== String(bestProduct.id)) {
         updatedCount++;
-        return { ...ing, defaultProductId: bestProduct.id, updatedAt: new Date().toISOString() };
+        const updated = { ...ing, defaultProductId: bestProduct.id, updatedAt: new Date().toISOString() };
+        changedIngredients.push(updated);
+        return updated;
       }
     }
     return ing;
   });
 
-  if (updatedCount > 0) {
+  if (changedIngredients.length > 0) {
     setIngredients(updatedIngredients);
     if (getState()) getState().ingredients = updatedIngredients;
     try {
-      for (const ing of updatedIngredients) {
-        if (ing.defaultProductId) {
-          await saveRootItem(ing);
-        }
-      }
-      console.log(`[HydrationService] Repaired and recalibrated defaults for ${updatedCount} ingredients.`);
+      await Promise.all(changedIngredients.map(ing => saveRootItem(ing)));
+      console.log(`[HydrationService] Repaired and recalibrated defaults for ${changedIngredients.length} ingredients.`);
     } catch (err) {
       console.warn('[HydrationService] Failed persisting repaired ingredient defaults:', err);
     }
