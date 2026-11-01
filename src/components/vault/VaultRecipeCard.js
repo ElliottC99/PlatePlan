@@ -118,6 +118,17 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
     }
   };
 
+  const enhanceBtn = dropdown.querySelector('[data-action="menu-enhance"]');
+  if (enhanceBtn) {
+    enhanceBtn.onclick = (clickEvt) => {
+      clickEvt.stopPropagation();
+      dropdown.remove();
+      if (typeof window.openEnhanceRecipeModalForCurrent === 'function') {
+        window.openEnhanceRecipeModalForCurrent(recipeId);
+      }
+    };
+  }
+
   dropdown.querySelector('[data-action="menu-edit"]').onclick = (clickEvt) => {
     clickEvt.stopPropagation();
     dropdown.remove();

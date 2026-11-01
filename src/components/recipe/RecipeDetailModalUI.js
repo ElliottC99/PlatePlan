@@ -260,7 +260,11 @@ export function renderRecipeDetailModalContent(props = {}) {
               <button type="button" role="tab" class="${!isEnh ? 'active' : ''}" onclick="switchViewTab('original')">Original</button>
               <button type="button" role="tab" class="${isEnh ? 'active' : ''}" onclick="switchViewTab('enhanced')">✨ Enhanced</button>
             </div>
-          ` : ''}
+          ` : `
+            <button type="button" id="modal-recipe-enhance-btn" class="btn sm" style="padding:6px 10px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:4px;border-radius:8px;background:#16a34a;color:#fff;border:1px solid #15803d;cursor:pointer;" onclick="if(typeof openEnhanceRecipeModalForCurrent==='function')openEnhanceRecipeModalForCurrent('${escapeAttr(recipeId)}')">
+              ✨ Auto-Enhance (85+)
+            </button>
+          `}
           ${recipeId ? `
             <button type="button" id="modal-recipe-edit-btn" class="btn secondary" style="padding:6px 10px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;border-radius:8px;border:1px solid var(--border,#ccc);background:var(--surface,#fff);cursor:pointer;" onclick="if(typeof closeRecipePreview==='function')closeRecipePreview();if(typeof openRecipeWizard==='function')openRecipeWizard('manual', '${escapeAttr(recipeId)}')" aria-label="Edit recipe" title="Edit recipe">
               ✏️ Edit

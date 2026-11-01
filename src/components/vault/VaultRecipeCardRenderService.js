@@ -97,6 +97,9 @@ export function renderRecipeActionsItems(recipeId, isFav) {
     <button type="button" class="action-menu-item" data-action="menu-view" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
       <span>👁️</span> View Details
     </button>
+    <button type="button" class="action-menu-item" data-action="menu-enhance" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:600;color:#16a34a;">
+      <span>✨</span> Auto-Enhance (85+)
+    </button>
     <button type="button" class="action-menu-item" data-action="menu-edit" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
       <span>✏️</span> Edit Recipe
     </button>

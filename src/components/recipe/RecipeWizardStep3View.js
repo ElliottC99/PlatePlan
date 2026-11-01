@@ -232,13 +232,20 @@ export function renderState3Review() {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
           <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text);">Inline Editable Review</h3>
           
-          <div class="variant-toggle" style="display: inline-flex; background: var(--surface, #fff); padding: 3px; border-radius: 8px; border: 1px solid var(--border, #ccc);">
-            <button type="button" class="btn sm ${!isEnhancedTab ? 'primary' : 'ghost'}" id="wiz-tab-original" style="padding: 4px 12px; font-size: 12px; font-weight: 600;">
-              Original
-            </button>
-            <button type="button" class="btn sm ${isEnhancedTab ? 'primary' : 'ghost'}" id="wiz-tab-enhanced" style="padding: 4px 12px; font-size: 12px; font-weight: 600;">
-              ✨ Enhanced
-            </button>
+          <div style="display:flex;align-items:center;gap:8px;">
+            ${isEnhancedTab ? `
+              <button type="button" class="btn sm" id="btn-wiz-auto-enhance" style="background:#16a34a;color:#fff;border-color:#15803d;font-weight:700;font-size:12px;padding:4px 10px;display:inline-flex;align-items:center;gap:4px;">
+                ⚡ Auto-Optimize to 85+ Fit
+              </button>
+            ` : ''}
+            <div class="variant-toggle" style="display: inline-flex; background: var(--surface, #fff); padding: 3px; border-radius: 8px; border: 1px solid var(--border, #ccc);">
+              <button type="button" class="btn sm ${!isEnhancedTab ? 'primary' : 'ghost'}" id="wiz-tab-original" style="padding: 4px 12px; font-size: 12px; font-weight: 600;">
+                Original
+              </button>
+              <button type="button" class="btn sm ${isEnhancedTab ? 'primary' : 'ghost'}" id="wiz-tab-enhanced" style="padding: 4px 12px; font-size: 12px; font-weight: 600;">
+                ✨ Enhanced
+              </button>
+            </div>
           </div>
         </div>
 

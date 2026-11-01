@@ -10,6 +10,7 @@ import { getState, updateRecipeInStore, learnIngredientAlias } from '../../store
 import { toTitleCase } from '../../utils/stringUtils.js';
 import { calculateItemNutrition } from '../../services/NutritionService.js';
 import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
+import { openEnhancementModal } from './RecipeEnhancementModalUI.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -388,6 +389,25 @@ export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice
         };
       }
       renderWizardModal();
+    };
+  }
+
+  const btnAutoEnh = modalWrap.querySelector('#btn-wiz-auto-enhance');
+  if (btnAutoEnh) {
+    btnAutoEnh.onclick = () => {
+      syncStep3InputsToState(modalWrap);
+      const baseRec = wizardState.activeRecipe;
+      openEnhancementModal(baseRec, {
+        onApply: (enhancedPayload) => {
+          wizardState.activeRecipe.enhanced = enhancedPayload;
+          wizardState.activeVariant = 'enhanced';
+          recalculateWizardMacros(wizardState.activeRecipe.enhanced);
+          renderWizardModal();
+          if (typeof window.showPlatePlanToast === 'function') {
+            window.showPlatePlanToast('✨ Enhanced variant updated with 85+ Fit Score!');
+          }
+        }
+      });
     };
   }
 

@@ -142,7 +142,7 @@ export function calculateItemNutrition(item, quantity, unit = 'g') {
   // Pack / Drained Weight Ceiling Guard for discrete counts:
   // Discrete piece counts against a jar or can (e.g. 20 olives) cannot exceed the container's solid weight
   if (u === 'qty' || u === 'item' || u === 'count') {
-    const maxContainerWeight = parseFloat(item.drainedWeight) || parseFloat(item.usablePackAmount) || parseFloat(item.packSize) || 0;
+    const maxContainerWeight = parseFloat(item.drainedWeight) || parseFloat(item.usablePackAmount) || 0;
     if (maxContainerWeight > 0 && grams > maxContainerWeight) {
       grams = maxContainerWeight;
     }

@@ -10,6 +10,8 @@ import { isRecipeVariantFavourite } from '../views/RecipeVaultView.js';
 import { calculateMealFitScore, getFitScoreTierMeta, extractRecipeMacros } from '../utils/fitScoreCalculator.js';
 import { resolveMealSplitPercentages } from '../utils/nutritionCalculator.js';
 import { getState } from '../store/store.js';
+import { openEnhancementModal } from '../components/recipe/RecipeEnhancementModalUI.js';
+import { saveRecipe } from './HouseholdRepository.js';
 
 let previewState = {
   recipe: null,
@@ -325,6 +327,46 @@ export function openRecipeModal(recipeId, instanceId, variant, targetPerson, mea
 }
 export const viewRecipe = openRecipePreview;
 
+export async function openEnhanceRecipeModalForCurrent(recipeId) {
+  const state = (typeof window !== 'undefined' ? getState() : {}) || {};
+  const recipes = Array.isArray(state.recipes) ? state.recipes : [];
+  const found = recipes.find(rec => String(rec.id) === String(recipeId)) || previewState.recipe;
+  if (!found) return;
+
+  openEnhancementModal(found, {
+    onApply: async (enhancedPayload) => {
+      const updatedRecipe = {
+        ...found,
+        enhanced: enhancedPayload,
+        updatedAt: new Date().toISOString()
+      };
+      try {
+        await saveRecipe(updatedRecipe);
+        if (state.recipes) {
+          const idx = state.recipes.findIndex(r => String(r.id) === String(found.id));
+          if (idx !== -1) {
+            state.recipes[idx] = updatedRecipe;
+          }
+        }
+        previewState.recipe = updatedRecipe;
+        previewState.currentTab = 'enhanced';
+        if (typeof window.renderRecipeVault === 'function') {
+          window.renderRecipeVault();
+        }
+        renderRecipePreview();
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast('✨ Enhanced recipe saved with 85+ Fit Score!');
+        }
+      } catch (err) {
+        console.error('[RecipeDetailModalService] Failed saving enhanced recipe:', err);
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast('Failed to save enhanced recipe.', 'error');
+        }
+      }
+    }
+  });
+}
+
 if (typeof window !== 'undefined') {
   Object.assign(window, {
     closeRecipePreview,
@@ -334,6 +376,7 @@ if (typeof window !== 'undefined') {
     updateSinglePersonServes,
     openRecipePreview,
     openRecipeModal,
-    viewRecipe
+    viewRecipe,
+    openEnhanceRecipeModalForCurrent
   });
 }

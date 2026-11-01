@@ -53,6 +53,7 @@ import * as FitScoreService from './services/FitScoreService.js';
 import * as DataQualityService from './services/DataQualityService.js';
 import * as TodayViewService from './services/TodayViewService.js';
 import * as RecipeAuthoringService from './services/RecipeAuthoringService.js';
+import * as RecipeEnhancementService from './services/RecipeEnhancementService.js';
 import * as MaintenanceService from './services/MaintenanceService.js';
 import { alignAllFitScores } from './services/MaintenanceService.js';
 import { registeredComponents } from './components/componentRegistry.js';
@@ -136,7 +137,7 @@ if (typeof window !== 'undefined') {
   Object.assign(window, {
     MealPlanGeneratorService, RecipeDetailModalService, PortionCalculationService, TescoImportService,
     ShoppingCalculationService, UnitConverter, NutritionService, FitScoreService, DataQualityService,
-    TodayViewService, RecipeAuthoringService, MaintenanceService, alignAllFitScores, ...registeredComponents, AppRouter, AppInitializer,
+    TodayViewService, RecipeAuthoringService, RecipeEnhancementService, MaintenanceService, alignAllFitScores, ...registeredComponents, AppRouter, AppInitializer,
 
     showView: window.showView || AppRouter.showView,
     syncMobileNavigation: window.syncMobileNavigation || AppRouter.syncMobileNavigation,
