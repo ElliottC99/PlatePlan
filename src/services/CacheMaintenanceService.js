@@ -53,7 +53,13 @@ export async function runDeferredMaintenance(preferencesData, mergedCategories, 
 
     if (typeof window !== 'undefined' && typeof window.sweepAndRecalibrateIngredientDefaults === 'function') {
       try {
-        await window.sweepAndRecalibrateIngredientDefaults();
+        const recalibratedCount = await window.sweepAndRecalibrateIngredientDefaults();
+        if (recalibratedCount > 0) {
+          const { recalculateAllRecipeMacros } = await import('./MaintenanceService.js');
+          if (typeof recalculateAllRecipeMacros === 'function') {
+            await recalculateAllRecipeMacros({ forceAll: false });
+          }
+        }
       } catch (e) {
         console.warn('[Maintenance] sweepAndRecalibrateIngredientDefaults failed:', e);
       }

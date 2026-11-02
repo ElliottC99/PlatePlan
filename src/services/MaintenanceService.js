@@ -262,7 +262,27 @@ export async function recalculateAllRecipeMacros(options = {}) {
       updatePayload.enhancedFitScore = newEnhScore;
     }
 
-    updates.push(updatePayload);
+    // Delta-detection: Only push to Firestore write updates if macros or fit scores meaningfully changed
+    const oldCal = Number(r.nutrition?.perServing?.cal ?? r.macros?.calories ?? r.calories ?? 0);
+    const oldProt = Number(r.nutrition?.perServing?.prot ?? r.macros?.protein ?? r.protein ?? 0);
+    const oldScore = Number(r.fitScore ?? r._computedFitScore ?? 0);
+    const hasOrigChange = Math.abs(oldCal - updatedOriginal.calories) > 0.5 ||
+                          Math.abs(oldProt - updatedOriginal.protein) > 0.2 ||
+                          oldScore !== newScore;
+
+    let hasEnhChange = false;
+    if (r.enhanced && updatedOriginal.enhanced) {
+      const oldEnhCal = Number(r.enhanced.nutrition?.perServing?.cal ?? r.enhanced.macros?.calories ?? r.enhanced.calories ?? 0);
+      const oldEnhProt = Number(r.enhanced.nutrition?.perServing?.prot ?? r.enhanced.macros?.protein ?? r.enhanced.protein ?? 0);
+      const oldEnhScore = Number(r.enhancedFitScore ?? r.enhanced.fitScore ?? 0);
+      hasEnhChange = Math.abs(oldEnhCal - updatedOriginal.enhanced.calories) > 0.5 ||
+                     Math.abs(oldEnhProt - updatedOriginal.enhanced.protein) > 0.2 ||
+                     oldEnhScore !== updatedOriginal.enhancedFitScore;
+    }
+
+    if (options.forceAll || hasOrigChange || hasEnhChange) {
+      updates.push(updatePayload);
+    }
     updatedRecipesForStore.push(updatedOriginal);
   }
 
