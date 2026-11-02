@@ -92,13 +92,13 @@ Harden the 18 other unguarded DOM queries identified in the audit with defensive
 
 ## 3. Acceptance Criteria
 
-- [ ] Clicking "More" (`...`) on an **Enhanced** recipe card in the Recipe Vault opens the dropdown menu without errors.
-- [ ] Clicking "More" (`...`) on an **Original** recipe card in the Recipe Vault opens the dropdown menu with all items functional.
-- [ ] Selecting "View Details", "Duplicate Recipe", "Favourite", or "Remove Enhanced Variant" works cleanly from the enhanced card menu.
-- [ ] All 24 identified unguarded DOM lookups across the codebase are guarded against `null` returns.
-- [ ] New automated test `scripts/test_vault_recipe_card_menu.js` passes, verifying both original and enhanced menu construction and action handling.
-- [ ] Full regression suite (`test_auto_default_and_recipe_recalculation.js`, `test_shopping_list.js`, `test_shopping_servings_multiplier.js`, `test_ledger.js`) passes.
-- [ ] Clean build via `npm run build`.
+- [x] Clicking "More" (`...`) on an **Enhanced** recipe card in the Recipe Vault opens the dropdown menu without errors.
+- [x] Clicking "More" (`...`) on an **Original** recipe card in the Recipe Vault opens the dropdown menu with all items functional.
+- [x] Selecting "View Details", "Duplicate Recipe", "Favourite", or "Remove Enhanced Variant" works cleanly from the enhanced card menu.
+- [x] All 24 identified unguarded DOM lookups across the codebase are guarded against `null` returns.
+- [x] New automated test `scripts/test_vault_recipe_card_menu.js` passes, verifying both original and enhanced menu construction and action handling.
+- [x] Full regression suite (`test_auto_default_and_recipe_recalculation.js`, `test_shopping_list.js`, `test_shopping_servings_multiplier.js`, `test_ledger.js`) passes.
+- [x] Clean build via `npm run build`.
 
 ---
 
