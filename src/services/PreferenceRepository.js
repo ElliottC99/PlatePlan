@@ -11,7 +11,7 @@ export function whitelistPreferences(preferences) {
   if (!preferences || typeof preferences !== 'object') return {};
   const whitelisted = {};
   const allowedKeys = [
-    'nutritionTargets', 'profiles', 'fitScoreParams', 'settings', 'theme', 'mealPlanSettings', 'activeView', 'userPrefs', 'dismissedQualityAdvisories', 'dismissedAdvisories', 'dismissed_advisories', 'swapPreferences', 'updatedAt'
+    'nutritionTargets', 'profiles', 'fitScoreParams', 'settings', 'theme', 'mealPlanSettings', 'activeView', 'userPrefs', 'dismissedQualityAdvisories', 'dismissedAdvisories', 'dismissed_advisories', 'swapPreferences', 'autoDefaultStrategy', 'autoDefaultCriterion', 'productPriority', 'autoMappingStrategy', 'updatedAt'
   ];
   Object.keys(preferences).forEach(key => {
     if (!allowedKeys.includes(key)) return;

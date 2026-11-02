@@ -114,8 +114,10 @@ if (typeof window !== 'undefined') {
     if (typeof window.sweepAndRecalibrateIngredientDefaults === 'function') {
       try {
         await window.sweepAndRecalibrateIngredientDefaults();
+        const { recalculateAllRecipeMacros } = await import('../services/MaintenanceService.js');
+        const recResult = await recalculateAllRecipeMacros();
         if (typeof window.showPlatePlanToast === 'function') {
-          window.showPlatePlanToast(`Pantry defaults recalibrated to prioritise ${label}`);
+          window.showPlatePlanToast(`Pantry defaults & ${recResult.updatedCount || 0} recipes recalibrated to prioritise ${label}`);
         }
       } catch (err) {
         console.warn('[SettingsView] Recalibration failed on strategy change:', err);
@@ -139,7 +141,32 @@ if (typeof window !== 'undefined') {
         window.showPlatePlanToast('Recalibration failed.');
       }
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = '⚡ Recalibrate All Defaults Now'; }
+      if (btn) { btn.disabled = false; btn.textContent = '⚡ Recalibrate Pantry Defaults'; }
+    }
+  };
+
+  window.handleManualRecalibrateRecipeMacros = async function() {
+    const btn = document.getElementById('btn-recalibrate-recipes');
+    if (btn) { btn.disabled = true; btn.textContent = 'Recalibrating Recipes...'; }
+    try {
+      const { recalculateAllRecipeMacros } = await import('../services/MaintenanceService.js');
+      const res = await recalculateAllRecipeMacros();
+      if (res.success) {
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast(`Recalibrated macros for ${res.updatedCount || 0} recipes in Vault!`);
+        }
+      } else {
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast('Recipe recalibration failed: ' + (res.error || 'Unknown error'));
+        }
+      }
+    } catch (err) {
+      console.error('[SettingsView] Failed to recalculate recipe macros:', err);
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast('Recipe recalibration error.');
+      }
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '⚡ Recalibrate Recipe Macros from Optimal Defaults'; }
     }
   };
 

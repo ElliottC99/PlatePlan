@@ -8,6 +8,7 @@ import store from "../store/store.js";
 
 import { getRecipes, getProducts, getPreferences, getCurrentPlan, subscribeRecipes, subscribeIngredients, subscribeProducts, subscribePreferences, subscribeCurrentPlan, getCategories, saveCategories, cleanLegacyMacros } from './HouseholdRepository.js';
 import { getRootItems, saveRootItem } from './RootItemRepository.js';
+import { saveProduct } from './ProductRepository.js';
 import { getCurrentActivePlan as getActivePlanFromSubcollection } from '../repositories/PlanRepository.js';
 import { setRecipes, setPreferences, setCurrentPlan, saveStateCache, sanitizePreferences, updateState } from '../store/store.js';
 import { setIngredients, setProducts, setCategories } from '../store/store.js';
@@ -51,9 +52,17 @@ export async function sweepAndRecalibrateIngredientDefaults() {
   const state = window.Store?.getState?.() || {};
   const ingredients = state.ingredients || (getState()?.ingredients || []);
   const products = state.products || (getState()?.products || []);
-  const criterion = state.settings?.autoDefaultStrategy || state.settings?.autoDefaultCriterion || state.userPrefs?.autoDefaultStrategy || state.userPrefs?.autoDefaultCriterion || 'lowest_absolute_price';
+  const criterion = state.settings?.autoDefaultStrategy
+    || state.settings?.autoDefaultCriterion
+    || state.userPrefs?.autoDefaultStrategy
+    || state.userPrefs?.autoDefaultCriterion
+    || state.userPrefs?.productPriority
+    || state.userPrefs?.autoMappingStrategy
+    || 'highest_protein_per_kcal';
   let updatedCount = 0;
   const changedIngredients = [];
+  const changedProducts = [];
+  const updatedProducts = products.map(p => ({ ...p }));
 
   const updatedIngredients = ingredients.map(ing => {
     const nestedSubtypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
@@ -61,7 +70,7 @@ export async function sweepAndRecalibrateIngredientDefaults() {
       String(s.id || ''), String(s.name || ''), String(s.subtypeId || '')
     ].filter(Boolean));
 
-    const matchedProducts = products.filter(p => {
+    const matchedProducts = updatedProducts.filter(p => {
       const pIngId = String(p.ingredientId || p.ingredient_id || p.groupId || '');
       const pSubId = String(p.subtypeId || p.subTypeId || p.sub_type_id || '');
       return pIngId === String(ing.id) || subtypeIdentifiers.includes(pSubId);
@@ -70,11 +79,24 @@ export async function sweepAndRecalibrateIngredientDefaults() {
     if (matchedProducts.length > 0) {
       const sorted = [...matchedProducts].sort((a, b) => compareProductsByStrategy(a, b, criterion));
       const bestProduct = sorted[0];
-      if (bestProduct && String(ing.defaultProductId || '') !== String(bestProduct.id)) {
-        updatedCount++;
-        const updated = { ...ing, defaultProductId: bestProduct.id, updatedAt: new Date().toISOString() };
-        changedIngredients.push(updated);
-        return updated;
+      if (bestProduct) {
+        if (String(ing.defaultProductId || '') !== String(bestProduct.id)) {
+          updatedCount++;
+          const updated = { ...ing, defaultProductId: bestProduct.id, updatedAt: new Date().toISOString() };
+          changedIngredients.push(updated);
+          ing = updated;
+        }
+
+        matchedProducts.forEach(p => {
+          const isWinner = String(p.id) === String(bestProduct.id);
+          if (p.isAutoDefault !== isWinner) {
+            p.isAutoDefault = isWinner;
+            p.updatedAt = new Date().toISOString();
+            if (!changedProducts.some(cp => String(cp.id) === String(p.id))) {
+              changedProducts.push(p);
+            }
+          }
+        });
       }
     }
     return ing;
@@ -90,6 +112,18 @@ export async function sweepAndRecalibrateIngredientDefaults() {
       console.warn('[HydrationService] Failed persisting repaired ingredient defaults:', err);
     }
   }
+
+  if (changedProducts.length > 0) {
+    setProducts(updatedProducts);
+    if (getState()) getState().products = updatedProducts;
+    try {
+      await Promise.all(changedProducts.map(p => saveProduct(p)));
+      console.log(`[HydrationService] Synchronized isAutoDefault flags for ${changedProducts.length} products.`);
+    } catch (err) {
+      console.warn('[HydrationService] Failed persisting synchronized product flags:', err);
+    }
+  }
+
   return updatedCount;
 }
 
@@ -234,14 +268,18 @@ export async function hydrateHouseholdData(options = {}) {
         const docData = sanitizedPrefs || {};
         const userPrefs = docData.userPrefs || docData;
         getState().settings = { ...(getState().settings || {}), ...(docData.settings || {}) };
-        const strat = userPrefs.autoDefaultStrategy || userPrefs.autoDefaultCriterion || docData.settings?.autoDefaultStrategy || docData.settings?.autoDefaultCriterion;
-        if (strat) {
-          getState().settings.autoDefaultStrategy = strat;
-          getState().settings.autoDefaultCriterion = strat;
-          if (!getState().userPrefs) getState().userPrefs = {};
-          getState().userPrefs.autoDefaultStrategy = strat;
-          getState().userPrefs.autoDefaultCriterion = strat;
-        }
+        const strat = userPrefs.autoDefaultStrategy
+          || userPrefs.autoDefaultCriterion
+          || docData.settings?.autoDefaultStrategy
+          || docData.settings?.autoDefaultCriterion
+          || userPrefs.productPriority
+          || userPrefs.autoMappingStrategy
+          || 'highest_protein_per_kcal';
+        getState().settings.autoDefaultStrategy = strat;
+        getState().settings.autoDefaultCriterion = strat;
+        if (!getState().userPrefs) getState().userPrefs = {};
+        getState().userPrefs.autoDefaultStrategy = strat;
+        getState().userPrefs.autoDefaultCriterion = strat;
         const cloudHasData = (Array.isArray(recipes) && recipes.length > 0) || (Array.isArray(ingredients) && ingredients.length > 0) || Boolean(plan);
         if (cloudHasData) {
           getState().isCloudHydrated = true;
