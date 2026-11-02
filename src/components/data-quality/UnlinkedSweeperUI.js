@@ -110,8 +110,10 @@ export function openUnlinkedSweeperModal() {
   document.body.appendChild(activeModalOverlay);
   document.body.style.overflow = 'hidden';
 
-  document.getElementById('sweeper-close-btn').addEventListener('click', closeUnlinkedSweeperModal);
-  document.getElementById('sweeper-cancel-btn').addEventListener('click', closeUnlinkedSweeperModal);
+  const closeBtn = document.getElementById('sweeper-close-btn');
+  if (closeBtn) closeBtn.addEventListener('click', closeUnlinkedSweeperModal);
+  const cancelBtn = document.getElementById('sweeper-cancel-btn');
+  if (cancelBtn) cancelBtn.addEventListener('click', closeUnlinkedSweeperModal);
   attachSweeperSearchEvents(activeModalOverlay, unlinkedGroups);
 
   const saveBtn = document.getElementById('sweeper-save-all-btn');

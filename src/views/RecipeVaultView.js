@@ -234,15 +234,21 @@ export function renderRecipeVault() {
   if (list?.parentElement) list.parentElement.insertBefore(actionsBar, list);
 
   // Bind actions
-  actionsBar.querySelector('#btn-manual-recipe').addEventListener('click', () => {
-    if (typeof window.openRecipeWizard === 'function') window.openRecipeWizard('manual');
-    else if (typeof window.openRecipeEditor === 'function') window.openRecipeEditor();
-  });
+  const btnManual = actionsBar.querySelector('#btn-manual-recipe');
+  if (btnManual) {
+    btnManual.addEventListener('click', () => {
+      if (typeof window.openRecipeWizard === 'function') window.openRecipeWizard('manual');
+      else if (typeof window.openRecipeEditor === 'function') window.openRecipeEditor();
+    });
+  }
   
-  actionsBar.querySelector('#btn-import-recipe').addEventListener('click', () => {
-    if (typeof window.openRecipeWizard === 'function') window.openRecipeWizard('bulk');
-    else if (typeof window.openBulkRecipeImporterModal === 'function') window.openBulkRecipeImporterModal();
-  });
+  const btnImport = actionsBar.querySelector('#btn-import-recipe');
+  if (btnImport) {
+    btnImport.addEventListener('click', () => {
+      if (typeof window.openRecipeWizard === 'function') window.openRecipeWizard('bulk');
+      else if (typeof window.openBulkRecipeImporterModal === 'function') window.openBulkRecipeImporterModal();
+    });
+  }
 
 
 

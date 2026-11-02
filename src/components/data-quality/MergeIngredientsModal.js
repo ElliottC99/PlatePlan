@@ -128,7 +128,9 @@ export function openMergeIngredientsModal(issue = {}) {
   });
 
   // Action Button Binding
-  document.getElementById('confirm-merge-btn').onclick = async () => {
+  const confirmBtn = document.getElementById('confirm-merge-btn');
+  if (confirmBtn) {
+    confirmBtn.onclick = async () => {
     const selectedRadio = modal.querySelector('input[name="canonical-selection"]:checked').value;
     
     // canonical is the one KEPT, duplicate is the one DELETED
@@ -264,6 +266,7 @@ export function openMergeIngredientsModal(issue = {}) {
       if (typeof window.renderDataQualityView === 'function') window.renderDataQualityView();
     }
   };
+  }
 }
 
 export function closeMergeIngredientsModal() {

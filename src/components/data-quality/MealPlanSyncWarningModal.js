@@ -75,56 +75,62 @@ export function openMealPlanSyncWarningModal(issue = {}) {
   `;
 
   // Option 1: Update Active Week Meal Plan Snapshots
-  document.getElementById('btn-sync-active-plan').onclick = async () => {
-    window.closeMealPlanSyncWarningModal();
+  const syncBtn = document.getElementById('btn-sync-active-plan');
+  if (syncBtn) {
+    syncBtn.onclick = async () => {
+      window.closeMealPlanSyncWarningModal();
 
-    const plan = { ...currentPlan };
-    if (plan.slots && plan.slots[dayKey] && plan.slots[dayKey][mealKey]) {
-      const node = { ...plan.slots[dayKey][mealKey] };
+      const plan = { ...currentPlan };
+      if (plan.slots && plan.slots[dayKey] && plan.slots[dayKey][mealKey]) {
+        const node = { ...plan.slots[dayKey][mealKey] };
 
-      // Update the snapshot macros to match the base template
-      node.cal = tempCal;
-      node.calories = tempCal;
-      node.protein = tempProt;
-      node.prot = tempProt;
-      if (node.macros) {
-        node.macros.calories = tempCal;
-        node.macros.cal = tempCal;
-        node.macros.protein = tempProt;
-        node.macros.prot = tempProt;
-      }
-
-      plan.slots[dayKey][mealKey] = node;
-
-      // 1. Optimistic Store Update
-      setCurrentPlan(plan);
-      if (typeof window.renderDataQualityView === 'function') window.renderDataQualityView();
-
-      // 2. Persist to Firestore
-      try {
-        await saveCurrentPlan(plan);
-        if (typeof window.showPlatePlanToast === 'function') {
-          window.showPlatePlanToast('Successfully synchronised meal plan snapshot.', 'success');
+        // Update the snapshot macros to match the base template
+        node.cal = tempCal;
+        node.calories = tempCal;
+        node.protein = tempProt;
+        node.prot = tempProt;
+        if (node.macros) {
+          node.macros.calories = tempCal;
+          node.macros.cal = tempCal;
+          node.macros.protein = tempProt;
+          node.macros.prot = tempProt;
         }
-      } catch (e) {
-        console.error('[MealPlanSyncWarningModal] Failed to save plan:', e);
-        if (typeof window.showPlatePlanToast === 'function') {
-          window.showPlatePlanToast('Failed to save meal plan online. Rolled back.', 'error');
-        }
-        // Rollback
-        setCurrentPlan(currentPlan);
+
+        plan.slots[dayKey][mealKey] = node;
+
+        // 1. Optimistic Store Update
+        setCurrentPlan(plan);
         if (typeof window.renderDataQualityView === 'function') window.renderDataQualityView();
+
+        // 2. Persist to Firestore
+        try {
+          await saveCurrentPlan(plan);
+          if (typeof window.showPlatePlanToast === 'function') {
+            window.showPlatePlanToast('Successfully synchronised meal plan snapshot.', 'success');
+          }
+        } catch (e) {
+          console.error('[MealPlanSyncWarningModal] Failed to save plan:', e);
+          if (typeof window.showPlatePlanToast === 'function') {
+            window.showPlatePlanToast('Failed to save meal plan online. Rolled back.', 'error');
+          }
+          // Rollback
+          setCurrentPlan(currentPlan);
+          if (typeof window.renderDataQualityView === 'function') window.renderDataQualityView();
+        }
       }
-    }
-  };
+    };
+  }
 
   // Option 2: Keep Base Template Only
-  document.getElementById('btn-preserve-snapshot').onclick = () => {
-    window.closeMealPlanSyncWarningModal();
-    if (typeof window.showPlatePlanToast === 'function') {
-      window.showPlatePlanToast('Preserved static snapshot macros.', 'info');
-    }
-  };
+  const preserveBtn = document.getElementById('btn-preserve-snapshot');
+  if (preserveBtn) {
+    preserveBtn.onclick = () => {
+      window.closeMealPlanSyncWarningModal();
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast('Preserved static snapshot macros.', 'info');
+      }
+    };
+  }
 }
 
 export function closeMealPlanSyncWarningModal() {

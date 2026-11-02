@@ -224,10 +224,10 @@ export function renderDataQualityView() {
   if (sweeperBtn) sweeperBtn.onclick = () => openUnlinkedSweeperModal();
   const auditBtn = document.getElementById('dq-btn-recipe-audit');
   if (auditBtn) auditBtn.onclick = () => openRecipeAuditModal();
-  document.getElementById('dq-btn-relink').onclick = performGlobalProductRelink; // Assuming we can use performGlobalProductRelink directly if exported. Wait, it needs to be imported or delegated. 
-  // It needs ingredients, products. So it should be a handler in the service.
-  // I'll fix this in the next step.
-  document.getElementById('dq-btn-refresh').onclick = () => renderDataQualityView();
+  const relinkBtn = document.getElementById('dq-btn-relink');
+  if (relinkBtn) relinkBtn.onclick = performGlobalProductRelink;
+  const refreshBtn = document.getElementById('dq-btn-refresh');
+  if (refreshBtn) refreshBtn.onclick = () => renderDataQualityView();
 
   // Bind all actions...
   // This is too much code in the render function. I need to delegate action handlers.

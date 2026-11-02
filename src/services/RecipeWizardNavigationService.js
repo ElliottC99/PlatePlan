@@ -57,10 +57,13 @@ export function bindNavigationHandlers({
       };
     }
   } else if (currentStep.get() === 2) {
-    modalEl.querySelector('#btn-back-step2').onclick = () => {
-      currentStep.set(1);
-      renderWizard();
-    };
+    const btnBackStep2 = modalEl.querySelector('#btn-back-step2');
+    if (btnBackStep2) {
+      btnBackStep2.onclick = () => {
+        currentStep.set(1);
+        renderWizard();
+      };
+    }
 
     const itemInput = modalEl.querySelector('#map-item-search-input');
     if (itemInput) {
@@ -142,10 +145,13 @@ export function bindNavigationHandlers({
       };
     }
   } else if (currentStep.get() === 3) {
-    modalEl.querySelector('#btn-back-step3').onclick = () => {
-      currentStep.set(2);
-      renderWizard();
-    };
+    const btnBackStep3 = modalEl.querySelector('#btn-back-step3');
+    if (btnBackStep3) {
+      btnBackStep3.onclick = () => {
+        currentStep.set(2);
+        renderWizard();
+      };
+    }
 
     modalEl.querySelector('#btn-remove-linked-product')?.addEventListener('click', () => {
       wizardData.linkedProduct = null;

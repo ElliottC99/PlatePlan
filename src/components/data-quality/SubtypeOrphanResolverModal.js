@@ -123,23 +123,29 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
   });
 
   // Apply batch resolution handler
-  document.getElementById('batch-apply-btn').onclick = () => {
-    const val = document.getElementById('batch-resolution-select').value;
-    const selects = modal.querySelectorAll('.orphan-action-select');
-    selects.forEach(sel => {
-      sel.value = val;
-      const container = sel.closest('td').querySelector('.new-subtype-container');
-      if (container) {
-        container.style.display = val === 'NEW_SUBTYPE' ? 'block' : 'none';
+  const batchBtn = document.getElementById('batch-apply-btn');
+  if (batchBtn) {
+    batchBtn.onclick = () => {
+      const batchSel = document.getElementById('batch-resolution-select');
+      const val = batchSel ? batchSel.value : '';
+      const selects = modal.querySelectorAll('.orphan-action-select');
+      selects.forEach(sel => {
+        sel.value = val;
+        const container = sel.closest('td').querySelector('.new-subtype-container');
+        if (container) {
+          container.style.display = val === 'NEW_SUBTYPE' ? 'block' : 'none';
+        }
+      });
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast('Batch resolution action prepared for commit.', 'info');
       }
-    });
-    if (typeof window.showPlatePlanToast === 'function') {
-      window.showPlatePlanToast('Batch resolution action prepared for commit.', 'info');
-    }
-  };
+    };
+  }
 
   // Commit handler
-  document.getElementById('resolve-orphans-confirm-btn').onclick = async () => {
+  const confirmOrphansBtn = document.getElementById('resolve-orphans-confirm-btn');
+  if (confirmOrphansBtn) {
+    confirmOrphansBtn.onclick = async () => {
     const selects = modal.querySelectorAll('.orphan-action-select');
     const updates = [];
     let createdSubtype = null;
@@ -223,6 +229,7 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
       if (typeof window.renderDataQualityView === 'function') window.renderDataQualityView();
     }
   };
+  }
 }
 
 export function closeSubtypeOrphanResolverModal() {

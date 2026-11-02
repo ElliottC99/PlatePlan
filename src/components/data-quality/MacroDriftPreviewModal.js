@@ -135,14 +135,16 @@ export function openMacroDriftPreviewModal(recipesToRecalibrate = []) {
   }
 
   // Bind Recalibrate Button
-  document.getElementById('drift-approve-btn').onclick = async () => {
-    const selectedIndexes = Array.from(rCbs).filter(cb => cb.checked).map(cb => Number(cb.dataset.index));
-    if (selectedIndexes.length === 0) {
-      if (typeof window.showPlatePlanToast === 'function') {
-        window.showPlatePlanToast('Please select at least one recipe to recalibrate.', 'warning');
+  const approveBtn = document.getElementById('drift-approve-btn');
+  if (approveBtn) {
+    approveBtn.onclick = async () => {
+      const selectedIndexes = Array.from(rCbs).filter(cb => cb.checked).map(cb => Number(cb.dataset.index));
+      if (selectedIndexes.length === 0) {
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast('Please select at least one recipe to recalibrate.', 'warning');
+        }
+        return;
       }
-      return;
-    }
 
     const updates = [];
     const advisoryKeys = [];
@@ -219,6 +221,7 @@ export function openMacroDriftPreviewModal(recipesToRecalibrate = []) {
       if (typeof window.renderDataQualityView === 'function') window.renderDataQualityView();
     }
   };
+}
 }
 
 export function closeMacroDriftPreviewModal() {
