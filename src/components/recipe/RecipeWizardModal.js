@@ -66,8 +66,11 @@ function formatMethodLine(step, idx) {
   return `${idx + 1}. ${text}`;
 }
 
-export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
+export function openRecipeWizard(initialMode = 'manual', editRecipeId = null, variant = 'original') {
   resetWizardState();
+  const activeVariant = variant === 'enhanced' ? 'enhanced' : 'original';
+  wizardState.activeVariant = activeVariant;
+
   if (editRecipeId) {
     let allRecipes = [];
     if (typeof getState === 'function') {
@@ -85,27 +88,30 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
     }
     const found = allRecipes.find(r => r && (String(r.id) === String(editRecipeId) || String(r._id) === String(editRecipeId)));
     if (found) {
-      let rawTags = found.mealSuitability;
+      const isEnhVariant = activeVariant === 'enhanced' && found.enhanced;
+      const targetSource = isEnhVariant ? { ...found, ...found.enhanced } : found;
+
+      let rawTags = targetSource.mealSuitability;
       if (!rawTags || !rawTags.length) {
-        if (Array.isArray(found.types)) rawTags = found.types;
-        else if (found.type) rawTags = [found.type];
-        else if (found.category) rawTags = [found.category];
-        else if (found.mealType) rawTags = [found.mealType];
+        if (Array.isArray(targetSource.types)) rawTags = targetSource.types;
+        else if (targetSource.type) rawTags = [targetSource.type];
+        else if (targetSource.category) rawTags = [targetSource.category];
+        else if (targetSource.mealType) rawTags = [targetSource.mealType];
       }
       const mealSuitability = Array.isArray(rawTags) && rawTags.length > 0
         ? rawTags.map(t => String(t).charAt(0).toUpperCase() + String(t).slice(1).toLowerCase())
         : ['Dinner'];
 
-      const prepTime = found.prepTime !== undefined && found.prepTime !== null
-        ? normalizeTime(found.prepTime, 0, 15)
-        : (found.time ? normalizeTime(found.time, 0, 15) : { hours: 0, minutes: 15 });
-      const cookTime = found.cookTime !== undefined && found.cookTime !== null
-        ? normalizeTime(found.cookTime, 0, 30)
+      const prepTime = targetSource.prepTime !== undefined && targetSource.prepTime !== null
+        ? normalizeTime(targetSource.prepTime, 0, 15)
+        : (targetSource.time ? normalizeTime(targetSource.time, 0, 15) : { hours: 0, minutes: 15 });
+      const cookTime = targetSource.cookTime !== undefined && targetSource.cookTime !== null
+        ? normalizeTime(targetSource.cookTime, 0, 30)
         : { hours: 0, minutes: 30 };
 
       let ingredientSections = [];
-      if (Array.isArray(found.ingredientSections) && found.ingredientSections.length > 0) {
-        ingredientSections = found.ingredientSections.map(sec => ({
+      if (Array.isArray(targetSource.ingredientSections) && targetSource.ingredientSections.length > 0) {
+        ingredientSections = targetSource.ingredientSections.map(sec => ({
           sectionTitle: sec.sectionTitle || 'Main Ingredients',
           ingredients: Array.isArray(sec.ingredients) ? sec.ingredients.map(i => ({
             ...i,
@@ -116,10 +122,10 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
             raw: formatIngredientLine(i)
           })) : []
         }));
-      } else if (Array.isArray(found.ingredients) && found.ingredients.length > 0) {
+      } else if (Array.isArray(targetSource.ingredients) && targetSource.ingredients.length > 0) {
         ingredientSections = [{
           sectionTitle: 'Main Ingredients',
-          ingredients: found.ingredients.map(i => ({
+          ingredients: targetSource.ingredients.map(i => ({
             ...(typeof i === 'object' ? i : {}),
             name: typeof i === 'string' ? i : (i.name || i.ingredientName || i.ingredient || ''),
             qty: i.qty !== undefined && i.qty !== null ? i.qty : 1,
@@ -138,23 +144,23 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
         return `${header}${items}`.trim();
       }).filter(Boolean).join('\n\n');
 
-      const methodStepsArray = Array.isArray(found.steps) 
-        ? found.steps 
-        : (Array.isArray(found.methodSteps) ? found.methodSteps : (Array.isArray(found.instructions) ? found.instructions : []));
+      const methodStepsArray = Array.isArray(targetSource.steps) 
+        ? targetSource.steps 
+        : (Array.isArray(targetSource.methodSteps) ? targetSource.methodSteps : (Array.isArray(targetSource.instructions) ? targetSource.instructions : []));
 
       let methodRawText = '';
       if (methodStepsArray.length > 0) {
         methodRawText = methodStepsArray.map(formatMethodLine).filter(Boolean).join('\n');
-      } else if (typeof found.method === 'string') {
-        methodRawText = found.method;
-      } else if (typeof found.instructions === 'string') {
-        methodRawText = found.instructions;
+      } else if (typeof targetSource.method === 'string') {
+        methodRawText = targetSource.method;
+      } else if (typeof targetSource.instructions === 'string') {
+        methodRawText = targetSource.instructions;
       }
 
-      const safeServes = Number(found.servings || found.serves || 4) || 4;
+      const safeServes = Number(targetSource.servings || targetSource.serves || 4) || 4;
       wizardState.activeRecipe = {
         id: found.id || found._id,
-        title: found.title || found.name || '',
+        title: targetSource.title || targetSource.name || found.title || found.name || '',
         servings: safeServes,
         serves: safeServes,
         prepTime,
@@ -164,8 +170,8 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
         methodRaw: methodRawText,
         ingredientSections,
         ingredients: ingredientSections.flatMap(s => s.ingredients || []),
-        methodSteps: methodStepsArray.length ? methodStepsArray : (typeof found.method === 'string' ? found.method.split('\n').filter(Boolean) : []),
-        macros: found.macros || found.nutrition || { calories: 450, protein: 28, carbs: 40, fat: 16 },
+        methodSteps: methodStepsArray.length ? methodStepsArray : (typeof targetSource.method === 'string' ? targetSource.method.split('\n').filter(Boolean) : []),
+        macros: targetSource.macros || targetSource.nutrition || { calories: 450, protein: 28, carbs: 40, fat: 16 },
         enhanced: found.enhanced || null
       };
     }
@@ -176,7 +182,7 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
     wizardState.currentStep = 1;
   } else if (initialMode === 'review') {
     wizardState.choice = 'manual';
-    wizardState.currentStep = 3;
+    wizardState.currentStep = 2;
   } else if (initialMode === 'manual') {
     wizardState.choice = 'manual';
     wizardState.currentStep = 1;

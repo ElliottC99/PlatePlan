@@ -145,7 +145,7 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
 
       case 'menu-review':
         if (typeof window.openRecipeWizard === 'function') {
-          window.openRecipeWizard('review', recipeId);
+          window.openRecipeWizard('review', recipeId, variant);
         }
         break;
 

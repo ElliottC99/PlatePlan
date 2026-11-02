@@ -7,6 +7,9 @@ import { wizardState } from './RecipeWizardState.js';
 import { getState } from '../../store/store.js';
 import { renderTaxonomySearchHTML } from './RecipeWizardTaxonomySearch.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
+import { recalculateWizardMacros } from './RecipeWizardStep3Handlers.js';
+import { renderMacroBreakdownCrossbar } from './RecipeWizardStep3View.js';
+import { renderFitScoreBadge } from '../FitScoreBadge.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -20,6 +23,26 @@ function escapeHtml(str) {
 
 function escapeAttr(str) {
   return escapeHtml(str).replace(/`/g, '&#96;');
+}
+
+export function renderStep2MacrosSummaryHTML(activeRecipe) {
+  const m = activeRecipe.macros || { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  return `
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;flex-wrap:wrap;">
+      <span style="background:var(--surface,#fff);padding:3px 8px;border-radius:6px;border:1px solid var(--border,#ddd);color:var(--text,#111);">
+        🔥 ${m.calories ?? 0} kcal
+      </span>
+      <span style="background:var(--surface,#fff);padding:3px 8px;border-radius:6px;border:1px solid var(--border,#ddd);color:#16a34a;">
+        💪 ${m.protein ?? 0}g prot
+      </span>
+      <span style="background:var(--surface,#fff);padding:3px 8px;border-radius:6px;border:1px solid var(--border,#ddd);color:#2563eb;">
+        🌾 ${m.carbs ?? 0}g carbs
+      </span>
+      <span style="background:var(--surface,#fff);padding:3px 8px;border-radius:6px;border:1px solid var(--border,#ddd);color:#d97706;">
+        🥑 ${m.fat ?? 0}g fat
+      </span>
+    </div>
+  `;
 }
 
 export function renderState2Mapping() {
@@ -127,9 +150,19 @@ export function renderState2Mapping() {
     `;
   });
 
+  const currentVariant = wizardState.activeVariant || 'original';
+  recalculateWizardMacros(activeRecipe);
+  const targetMealType = activeRecipe.mealSuitability?.[0] || activeRecipe.types?.[0] || activeRecipe.type || 'dinner';
+  const fitTagHtml = renderFitScoreBadge(activeRecipe, targetMealType, {
+    variant: currentVariant,
+    showLabel: true
+  });
+  const macroCrossbarHtml = renderMacroBreakdownCrossbar(activeRecipe, currentVariant);
+  const macrosSummaryHtml = renderStep2MacrosSummaryHTML(activeRecipe);
+
   return `
     <div>
-      <div style="background: var(--surface2, #f8fafc); border: 1px solid var(--border, #e2e8f0); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+      <div style="background: var(--surface2, #f8fafc); border: 1px solid var(--border, #e2e8f0); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px;">
             Dish ${wizardState.currentQueueIndex || 1} of ${wizardState.initialQueueTotal || wizardState.processingQueue?.length || 1}
@@ -137,13 +170,24 @@ export function renderState2Mapping() {
           <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text, #0f172a);">
             ${escapeHtml(toTitleCase(activeRecipe.title || 'Untitled Recipe'))}
           </h3>
+          ${currentVariant === 'enhanced' ? '<span class="badge" style="background:#dcfce7;color:#15803d;font-weight:700;">✨ Enhanced Variant</span>' : ''}
         </div>
+        <div id="wiz-step2-fit-badge-container" style="display: flex; align-items: center;">
+          ${fitTagHtml}
+        </div>
+      </div>
+
+      <div id="wiz-step2-macro-crossbar-container" style="margin-bottom: 12px;">
+        ${macroCrossbarHtml}
       </div>
 
       <div class="wiz-servings-banner" id="wiz-servings-banner" style="background: var(--purple-bg, #eef2ff); border: 1px solid rgba(79,70,229,0.2); padding: 10px 16px; border-radius: 10px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 14px; font-weight: 600; color: var(--purple, #4f46e5);">Recipe Mapping</span>
           <span style="font-size: 12px; color: var(--text2, #666);">Canonical Author Quantities</span>
+        </div>
+        <div id="wiz-step2-macros-summary-container">
+          ${macrosSummaryHtml}
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
           <label for="wiz-servings-input" style="font-size: 13px; font-weight: 600; color: var(--text, #111);">Yield:</label>

@@ -4,9 +4,15 @@
  */
 
 import { getFitScoreTierMeta } from '../../utils/fitScoreWeights.js';
-import { generateEnhancementPlan, buildEnhancedRecipePayload } from '../../services/RecipeEnhancementService.js';
+import { 
+  generateEnhancementPlan, 
+  buildEnhancedRecipePayload,
+  cloneAndTraverseIngredients,
+  calculateBatchMacros
+} from '../../services/RecipeEnhancementService.js';
 import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
 import { saveHouseholdSwapPreference } from '../../services/HouseholdRepository.js';
+import { getState } from '../../store/store.js';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, ch => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -48,6 +54,103 @@ export function closeEnhancementModal() {
 }
 
 /**
+ * Dynamically synthesizes the live enhanced recipe from strictly active user adjustments.
+ */
+export function buildLiveEnhancedRecipe(route, originalRecipe) {
+  const orig = originalRecipe || currentPlan?.originalRecipe || route?.originalRecipe;
+  if (!orig) return null;
+
+  // Filter ONLY active adjustments (guarantees unchecked adjustments are excluded)
+  const activeAdjs = (route.adjustments || []).filter(a => a.active !== false);
+
+  // Deep clone original ingredients
+  const { ingredients } = cloneAndTraverseIngredients(orig, i => ({ ...i }));
+  let workingIngredients = JSON.parse(JSON.stringify(ingredients));
+
+  // Determine servings
+  const yieldAdj = activeAdjs.find(a => a.type === 'yield');
+  const serves = yieldAdj 
+    ? (Number(route.proposedServings) || Number(orig.servings || orig.serves || 2) || 2)
+    : (Number(orig.servings || orig.serves || 2) || 2);
+
+  // Apply active quantity adjustments
+  activeAdjs.filter(a => a.type === 'quantity').forEach(qAdj => {
+    const targetName = String(qAdj.ingredientName || '').toLowerCase().trim();
+    const item = workingIngredients.find(i => String(i.name || '').toLowerCase().trim() === targetName);
+    if (item) {
+      item.qty = Number(qAdj.proposedQty) || item.qty;
+      item.amount = item.qty;
+      if (qAdj.unit) item.unit = qAdj.unit;
+    }
+  });
+
+  // Apply active swaps
+  activeAdjs.filter(a => a.type === 'swap').forEach(sAdj => {
+    const targetName = String(sAdj.ingredientName || '').toLowerCase().trim();
+    const item = workingIngredients.find(i => String(i.name || '').toLowerCase().trim() === targetName);
+    if (item) {
+      item.name = sAdj.swapTo;
+      if (sAdj.postTaxonomy) {
+        if (sAdj.postTaxonomy.productId) item.productId = sAdj.postTaxonomy.productId;
+        if (sAdj.postTaxonomy.productName) item.productName = sAdj.postTaxonomy.productName;
+        if (sAdj.postTaxonomy.ingredientId) item.ingredientId = sAdj.postTaxonomy.ingredientId;
+        if (sAdj.postTaxonomy.subtypeId) item.subtypeId = sAdj.postTaxonomy.subtypeId;
+        if (sAdj.postTaxonomy.subtype) item.subtypeName = sAdj.postTaxonomy.subtype;
+        if (sAdj.postTaxonomy.category) item.category = sAdj.postTaxonomy.category;
+      }
+    }
+  });
+
+  // Also handle inline swap selectors if an adjustment has selectedSwap
+  activeAdjs.filter(a => a.selectedSwap).forEach(sAdj => {
+    const targetName = String(sAdj.ingredientName || '').toLowerCase().trim();
+    const item = workingIngredients.find(i => String(i.name || '').toLowerCase().trim() === targetName);
+    if (item && sAdj.selectedSwap) {
+      item.name = sAdj.selectedSwap.productName || sAdj.selectedSwap.subtype || item.name;
+      if (sAdj.postTaxonomy) {
+        if (sAdj.postTaxonomy.productId) item.productId = sAdj.postTaxonomy.productId;
+        if (sAdj.postTaxonomy.productName) item.productName = sAdj.postTaxonomy.productName;
+        if (sAdj.postTaxonomy.ingredientId) item.ingredientId = sAdj.postTaxonomy.ingredientId;
+        if (sAdj.postTaxonomy.subtypeId) item.subtypeId = sAdj.postTaxonomy.subtypeId;
+        if (sAdj.postTaxonomy.subtype) item.subtypeName = sAdj.postTaxonomy.subtype;
+        if (sAdj.postTaxonomy.category) item.category = sAdj.postTaxonomy.category;
+      }
+    }
+  });
+
+  // Calculate true batch macros
+  const state = (typeof getState === 'function' ? getState() : (typeof window !== 'undefined' && window.getState ? window.getState() : {})) || {};
+  const products = state.products || [];
+  const allIngs = state.rootItems || state.ingredients || [];
+  const macros = calculateBatchMacros(workingIngredients, serves, { products, allIngredients: allIngs });
+
+  // Build the enhanced recipe payload using canonical helper
+  const livePayload = buildEnhancedRecipePayload(orig, workingIngredients, serves, activeAdjs, macros);
+
+  // Calculate live fit score
+  const targetMeal = route.targets?.mealType || orig.mealSuitability?.[0] || orig.types?.[0] || orig.type || 'dinner';
+  const liveFit = calculateMealFitScore(livePayload, targetMeal, { variant: 'enhanced' });
+  const liveScore = Math.round(Number(liveFit?.score) || 0);
+
+  // Compute delta against original recipe baseline
+  const origKcal = Math.round(Number(orig.macros?.calories || orig.calories || orig.nutrition?.cal || 0));
+  const origProt = Math.round(Number(orig.macros?.protein || orig.protein || orig.nutrition?.prot || 0) * 10) / 10;
+  const deltaKcalTotal = origKcal > 0 ? (macros.perServing.calories - origKcal) : activeAdjs.reduce((acc, a) => acc + (a.deltaKcal || 0) + (a.swapDeltaKcal || 0), 0);
+  const deltaProtTotal = origProt > 0 ? Math.round((macros.perServing.protein - origProt) * 10) / 10 : Math.round(activeAdjs.reduce((acc, a) => acc + (a.deltaProt || 0) + (a.swapDeltaProt || 0), 0) * 10) / 10;
+
+  return {
+    livePayload,
+    liveScore,
+    liveFit,
+    liveMacros: macros.perServing,
+    servings: serves,
+    activeAdjs,
+    deltaKcalTotal,
+    deltaProtTotal
+  };
+}
+
+/**
  * Opens the Apple HIG compliant interactive enhancement review modal.
  */
 export function openEnhancementModal(recipe, { onApply, options = {} } = {}) {
@@ -73,12 +176,12 @@ export function openEnhancementModal(recipe, { onApply, options = {} } = {}) {
 
 function renderEnhancementModalContent(wrap, plan) {
   const activeRoute = (plan.routes && plan.routes.find(r => r.id === currentSelectedRouteId)) || plan.routes?.[0] || plan;
+  const liveData = buildLiveEnhancedRecipe(activeRoute, plan.originalRecipe);
   const beforeMeta = getFitScoreTierMeta(activeRoute.beforeScore ?? plan.beforeScore);
-  const predMeta = getFitScoreTierMeta(activeRoute.predictedScore ?? plan.predictedScore);
+  const currentPredScore = liveData ? liveData.liveScore : (activeRoute.predictedScore ?? plan.predictedScore);
+  const predMeta = getFitScoreTierMeta(currentPredScore);
 
   const activeAdjs = activeRoute.adjustments || [];
-  const deltaKcalTotal = activeAdjs.reduce((acc, a) => acc + (a.deltaKcal || 0), 0);
-  const deltaProtTotal = Math.round(activeAdjs.reduce((acc, a) => acc + (a.deltaProt || 0), 0) * 10) / 10;
 
   let routeNavHtml = '';
   if (plan.routes && plan.routes.length > 1) {
@@ -133,6 +236,21 @@ function renderEnhancementModalContent(wrap, plan) {
       tagHtml = `<span style="font-size:11px;font-weight:700;color:#16a34a;background:rgba(22,163,74,0.12);padding:2px 6px;border-radius:6px;white-space:nowrap;">+${totalProt}g prot</span>`;
     } else if (totalKcal < 0) {
       tagHtml = `<span style="font-size:11px;font-weight:700;color:#2563eb;background:rgba(37,99,235,0.12);padding:2px 6px;border-radius:6px;white-space:nowrap;">${totalKcal} kcal</span>`;
+    }
+
+    let volumeStepperHtml = '';
+    if (adj.type === 'quantity' && adj.proposedQty !== undefined) {
+      const stepUnit = String(adj.unit || 'g').toLowerCase();
+      const stepVal = (stepUnit === 'ml' || stepUnit === 'g') ? (stepUnit === 'ml' ? 5 : 10) : 1;
+      volumeStepperHtml = `
+        <div class="enh-volume-stepper" style="margin-top:8px;display:inline-flex;align-items:center;gap:6px;background:var(--surface2,#fbfaf8);border:1px solid var(--border,rgba(120,120,128,0.2));border-radius:8px;padding:3px 8px;">
+          <span style="font-size:11px;font-weight:600;color:var(--text2,#78716c);">Adjust Volume:</span>
+          <button type="button" class="enh-stepper-btn enh-stepper-minus" data-adj-id="${escapeHtml(adj.id)}" data-step="${stepVal}" style="width:24px;height:24px;border:1px solid var(--border,#ccc);border-radius:6px;background:var(--surface,#fff);cursor:pointer;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;color:var(--text);">-</button>
+          <input type="number" class="enh-stepper-input" data-adj-id="${escapeHtml(adj.id)}" value="${adj.proposedQty}" style="width:58px;padding:2px 4px;font-size:12px;font-weight:700;text-align:center;border:1px solid var(--border,#ccc);border-radius:6px;background:var(--surface,#fff);color:var(--text);" />
+          <span style="font-size:11.5px;color:var(--text2,#78716c);font-weight:600;">${escapeHtml(adj.unit || 'g')}</span>
+          <button type="button" class="enh-stepper-btn enh-stepper-plus" data-adj-id="${escapeHtml(adj.id)}" data-step="${stepVal}" style="width:24px;height:24px;border:1px solid var(--border,#ccc);border-radius:6px;background:var(--surface,#fff);cursor:pointer;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;color:var(--text);">+</button>
+        </div>
+      `;
     }
 
     let taxonomyHtml = '';
@@ -217,6 +335,7 @@ function renderEnhancementModalContent(wrap, plan) {
           <div style="font-size:12px;color:var(--text2,#78716c);margin-top:2px;line-height:1.35;">
             ${escapeHtml(adj.detail)}
           </div>
+          ${volumeStepperHtml}
           ${taxonomyHtml}
           ${swapPickerHtml}
         </div>
@@ -305,16 +424,32 @@ function renderEnhancementModalContent(wrap, plan) {
             <div style="text-align: right;">
               <div style="font-size: 11px; font-weight: 600; color: var(--text2, #78716c); margin-bottom: 3px;">Enhanced Goal</div>
               <span id="enh-pred-badge" class="badge ${predMeta.tier}" style="background:${predMeta.bg};color:${predMeta.text};border:1px solid ${predMeta.border};font-weight:700;padding:3px 8px;border-radius:6px;font-size:12px;">
-                ${predMeta.icon} <span id="enh-pred-score">${activeRoute.predictedScore ?? plan.predictedScore}</span>% - ${predMeta.label}
+                ${predMeta.icon} <span id="enh-pred-score">${currentPredScore}</span>% - <span id="enh-pred-tier-label">${predMeta.label}</span>
               </span>
             </div>
+          </div>
+
+          <!-- Live Macros Row -->
+          <div id="enh-live-macros-row" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; font-size: 11.5px; font-weight: 600;">
+            <span id="enh-macro-kcal" style="background:var(--surface,#fff);padding:3px 8px;border-radius:6px;border:1px solid var(--border,#ddd);color:var(--text,#111);">
+              🔥 ${liveData?.liveMacros?.calories ?? 0} kcal
+            </span>
+            <span id="enh-macro-prot" style="background:var(--surface,#fff);padding:3px 8px;border-radius:6px;border:1px solid var(--border,#ddd);color:#16a34a;">
+              💪 ${liveData?.liveMacros?.protein ?? 0}g prot
+            </span>
+            <span id="enh-macro-carb" style="background:var(--surface,#fff);padding:3px 8px;border-radius:6px;border:1px solid var(--border,#ddd);color:#2563eb;">
+              🌾 ${liveData?.liveMacros?.carbs ?? 0}g carbs
+            </span>
+            <span id="enh-macro-fat" style="background:var(--surface,#fff);padding:3px 8px;border-radius:6px;border:1px solid var(--border,#ddd);color:#d97706;">
+              🥑 ${liveData?.liveMacros?.fat ?? 0}g fat
+            </span>
           </div>
 
           <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border, rgba(120, 120, 128, 0.12)); padding-top: 8px; font-size: 12px; color: var(--text2, #78716c);">
             <span>Household Target Impact:</span>
             <span id="enh-impact-text" style="font-weight: 650; color: var(--text, #1c1917);">
-              ${deltaKcalTotal !== 0 ? `🔥 ${deltaKcalTotal > 0 ? '+' : ''}${deltaKcalTotal} kcal ` : ''}
-              ${deltaProtTotal !== 0 ? `💪 ${deltaProtTotal > 0 ? '+' : ''}${deltaProtTotal}g protein` : ''}
+              ${liveData && liveData.deltaKcalTotal !== 0 ? `🔥 ${liveData.deltaKcalTotal > 0 ? '+' : ''}${liveData.deltaKcalTotal} kcal ` : ''}
+              ${liveData && liveData.deltaProtTotal !== 0 ? `💪 ${liveData.deltaProtTotal > 0 ? '+' : ''}${liveData.deltaProtTotal}g protein` : ''}
             </span>
           </div>
 
@@ -425,6 +560,51 @@ function renderEnhancementModalContent(wrap, plan) {
     };
   });
 
+  // Wire Volume Stepper Buttons
+  wrap.querySelectorAll('.enh-stepper-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const adjId = btn.getAttribute('data-adj-id');
+      const step = Number(btn.getAttribute('data-step')) || 5;
+      const isMinus = btn.classList.contains('enh-stepper-minus');
+      const targetAdj = (activeRoute.adjustments || []).find(a => a.id === adjId);
+      if (!targetAdj) return;
+
+      const currentVal = Number(targetAdj.proposedQty) || 10;
+      const minVal = step;
+      targetAdj.proposedQty = isMinus ? Math.max(minVal, currentVal - step) : (currentVal + step);
+
+      const input = wrap.querySelector(`.enh-stepper-input[data-adj-id="${adjId}"]`);
+      if (input) input.value = targetAdj.proposedQty;
+
+      // Ensure the adjustment is checked if user adjusts volume
+      targetAdj.active = true;
+      const cb = wrap.querySelector(`.enh-adj-cb[data-adj-id="${adjId}"]`);
+      if (cb) cb.checked = true;
+
+      recomputeModalPredictedScore(wrap, activeRoute);
+    };
+  });
+
+  // Wire Volume Stepper Direct Input
+  wrap.querySelectorAll('.enh-stepper-input').forEach(input => {
+    input.onchange = () => {
+      const adjId = input.getAttribute('data-adj-id');
+      const targetAdj = (activeRoute.adjustments || []).find(a => a.id === adjId);
+      if (!targetAdj) return;
+
+      const val = Math.max(1, Number(input.value) || 1);
+      targetAdj.proposedQty = val;
+      input.value = val;
+
+      targetAdj.active = true;
+      const cb = wrap.querySelector(`.enh-adj-cb[data-adj-id="${adjId}"]`);
+      if (cb) cb.checked = true;
+
+      recomputeModalPredictedScore(wrap, activeRoute);
+    };
+  });
+
   // Wire Inline Swap Selectors
   const swapSelects = wrap.querySelectorAll('.enh-swap-select');
   swapSelects.forEach(sel => {
@@ -439,19 +619,6 @@ function renderEnhancementModalContent(wrap, plan) {
           targetAdj.selectedSwap = candidate;
           targetAdj.selectedSwapProduct = selectedVal;
           targetAdj.active = true;
-          // Keep volume 1:1 strictly preserved
-          const origQty = Number(targetAdj.originalQty || targetAdj.proposedQty || 100);
-          const unit = String(targetAdj.unit || 'g').toLowerCase();
-          const servings = activeRoute.proposedServings || 2;
-          let grams = origQty;
-          if (unit === 'ml') grams = origQty;
-          else if (unit === 'tbsp') grams = origQty * 15;
-          else if (unit === 'tsp') grams = origQty * 5;
-          else if (unit === 'kg') grams = origQty * 1000;
-          else if (unit === 'qty' || unit === 'item' || unit === 'slice') grams = origQty * 25;
-
-          targetAdj.swapDeltaKcal = Math.round(((candidate.deltaKcalPer100g || 0) / 100) * (grams / servings));
-          targetAdj.swapDeltaProt = Math.round((((candidate.deltaProtPer100g || 0) / 100) * (grams / servings)) * 10) / 10;
           targetAdj.postTaxonomy = {
             category: candidate.category,
             rootItem: candidate.rootItem,
@@ -462,8 +629,6 @@ function renderEnhancementModalContent(wrap, plan) {
       } else {
         delete targetAdj.selectedSwap;
         delete targetAdj.selectedSwapProduct;
-        delete targetAdj.swapDeltaKcal;
-        delete targetAdj.swapDeltaProt;
         delete targetAdj.postTaxonomy;
         if (targetAdj.type === 'optional_swap') {
           targetAdj.active = false;
@@ -475,13 +640,13 @@ function renderEnhancementModalContent(wrap, plan) {
     };
   });
 
-  // Wire Apply Button
+  // Wire Apply Button (strictly builds payload from active adjustments)
   const btnApply = wrap.querySelector('#btn-apply-enh');
   if (btnApply) {
     btnApply.onclick = () => {
       closeEnhancementModal();
       // Persist chosen swaps to household swap memory
-      const chosenSwaps = (activeRoute.adjustments || []).filter(a => a.selectedSwap);
+      const chosenSwaps = (activeRoute.adjustments || []).filter(a => a.selectedSwap && a.active !== false);
       chosenSwaps.forEach(a => {
         const ingKey = String(a.ingredientName || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '_');
         const swapData = {
@@ -496,53 +661,56 @@ function renderEnhancementModalContent(wrap, plan) {
         });
       });
 
+      const liveData = buildLiveEnhancedRecipe(activeRoute, plan.originalRecipe);
+      const finalPayload = liveData?.livePayload || activeRoute.enhancedRecipePayload || plan.enhancedRecipePayload;
+
       if (typeof currentOnApply === 'function') {
-        currentOnApply(activeRoute.enhancedRecipePayload || plan.enhancedRecipePayload);
+        currentOnApply(finalPayload);
       }
     };
   }
 }
 
 function recomputeModalPredictedScore(wrap, route) {
-  const targetMeal = route.targets?.mealType || 'dinner';
-  const activeAdjs = (route.adjustments || []).filter(a => a.active);
-  const deltaKcalTotal = activeAdjs.reduce((acc, a) => acc + (a.deltaKcal || 0) + (a.swapDeltaKcal || 0), 0);
-  const deltaProtTotal = Math.round(activeAdjs.reduce((acc, a) => acc + (a.deltaProt || 0) + (a.swapDeltaProt || 0), 0) * 10) / 10;
+  const liveData = buildLiveEnhancedRecipe(route, currentPlan?.originalRecipe || route.originalRecipe);
+  if (!liveData) return;
 
-  const baseKcal = (route.enhancedRecipePayload?.nutrition?.perServing?.cal || route.targets?.targetKcal || 650) + activeAdjs.reduce((acc, a) => acc + (a.swapDeltaKcal || 0), 0);
-  const baseProt = (route.enhancedRecipePayload?.nutrition?.perServing?.prot || route.targets?.targetProt || 42) + activeAdjs.reduce((acc, a) => acc + (a.swapDeltaProt || 0), 0);
-
-  const simulated = {
-    ...route.enhancedRecipePayload,
-    perServing: {
-      cal: Math.max(100, Math.round(baseKcal)),
-      prot: Math.max(5, Math.round(baseProt * 10) / 10),
-      calories: Math.max(100, Math.round(baseKcal)),
-      protein: Math.max(5, Math.round(baseProt * 10) / 10)
-    }
-  };
-
-  const simFit = calculateMealFitScore(simulated, targetMeal, { variant: 'enhanced' });
-  const newScore = Math.max(route.beforeScore || 0, Math.round(Number(simFit?.score) || route.beforeScore || 0));
+  const newScore = liveData.liveScore;
   const newMeta = getFitScoreTierMeta(newScore);
 
   const badgeElem = wrap.querySelector('#enh-pred-badge');
   const scoreElem = wrap.querySelector('#enh-pred-score');
+  const tierLabelElem = wrap.querySelector('#enh-pred-tier-label');
   if (badgeElem && scoreElem) {
     scoreElem.textContent = newScore;
     badgeElem.className = `badge ${newMeta.tier}`;
     badgeElem.style.background = newMeta.bg;
     badgeElem.style.color = newMeta.text;
     badgeElem.style.borderColor = newMeta.border;
+    if (tierLabelElem) tierLabelElem.textContent = newMeta.label;
   }
 
   const impactElem = wrap.querySelector('#enh-impact-text');
   if (impactElem) {
     const parts = [];
-    if (deltaKcalTotal !== 0) parts.push(`🔥 ${deltaKcalTotal > 0 ? '+' : ''}${deltaKcalTotal} kcal`);
-    if (deltaProtTotal !== 0) parts.push(`💪 ${deltaProtTotal > 0 ? '+' : ''}${deltaProtTotal}g protein`);
+    if (liveData.deltaKcalTotal !== 0) parts.push(`🔥 ${liveData.deltaKcalTotal > 0 ? '+' : ''}${liveData.deltaKcalTotal} kcal`);
+    if (liveData.deltaProtTotal !== 0) parts.push(`💪 ${liveData.deltaProtTotal > 0 ? '+' : ''}${liveData.deltaProtTotal}g protein`);
     impactElem.textContent = parts.join('   ') || 'Optimal match reached';
   }
+
+  const kcalElem = wrap.querySelector('#enh-macro-kcal');
+  const protElem = wrap.querySelector('#enh-macro-prot');
+  const carbElem = wrap.querySelector('#enh-macro-carb');
+  const fatElem = wrap.querySelector('#enh-macro-fat');
+  if (kcalElem) kcalElem.textContent = `🔥 ${liveData.liveMacros.calories} kcal`;
+  if (protElem) protElem.textContent = `💪 ${liveData.liveMacros.protein}g prot`;
+  if (carbElem) carbElem.textContent = `🌾 ${liveData.liveMacros.carbs}g carbs`;
+  if (fatElem) fatElem.textContent = `🥑 ${liveData.liveMacros.fat}g fat`;
+}
+
+if (typeof window !== 'undefined') {
+  window.openEnhancementModal = openEnhancementModal;
+  window.closeEnhancementModal = closeEnhancementModal;
 }
 
 if (typeof window !== 'undefined') {

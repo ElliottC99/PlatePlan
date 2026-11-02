@@ -197,7 +197,8 @@ const enhHtml = renderRecipeActionsItems('rec_pasta_carbonara', false, 'enhanced
 assert.ok(enhHtml.includes('data-action="menu-view"'), 'Enhanced menu must include View Details');
 assert.ok(!enhHtml.includes('data-action="menu-enhance"'), 'Enhanced menu must NOT include Auto-Enhance');
 assert.ok(!enhHtml.includes('data-action="menu-edit"'), 'Enhanced menu must NOT include Edit Recipe');
-assert.ok(!enhHtml.includes('data-action="menu-review"'), 'Enhanced menu must NOT include Review Recipe');
+assert.ok(enhHtml.includes('data-action="menu-review"'), 'Enhanced menu must include Review Recipe');
+assert.ok(enhHtml.includes('Review Enhanced Recipe'), 'Enhanced menu review button must say "Review Enhanced Recipe"');
 assert.ok(enhHtml.includes('data-action="menu-duplicate"'), 'Enhanced menu must include Duplicate Recipe');
 assert.ok(enhHtml.includes('data-action="menu-favorite"'), 'Enhanced menu must include Favourite');
 assert.ok(enhHtml.includes('Remove Enhanced Variant'), 'Enhanced menu delete button must say "Remove Enhanced Variant"');
