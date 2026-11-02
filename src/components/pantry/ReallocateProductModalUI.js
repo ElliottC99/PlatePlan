@@ -28,6 +28,15 @@ function showModal(html) {
 }
 
 export function closeModal() {
+  if (activeReallocateState.pendingNewSub) {
+    const { ing, newSubId } = activeReallocateState.pendingNewSub;
+    if (ing && Array.isArray(ing.subtypes)) {
+      ing.subtypes = ing.subtypes.filter(s => String(s.id) !== String(newSubId));
+      const st = getState();
+      if (Array.isArray(st.ingredients)) setIngredients([...st.ingredients]);
+    }
+    activeReallocateState.pendingNewSub = null;
+  }
   const wrap = document.getElementById('view-modal-wrap');
   if (wrap) {
     wrap.classList.remove('open');
@@ -196,15 +205,12 @@ export function promptReallocateProduct(productId) {
 
       const newSub = { id: `sub_${Date.now()}`, name: newSubName, aliases: [], createdAt: new Date().toISOString() };
       ing.subtypes.push(newSub);
-      ing.updatedAt = new Date().toISOString();
-      setIngredients([...ings]);
+      activeReallocateState.pendingNewSub = { ing, newSubId: newSub.id };
       activeReallocateState.selectedSubId = newSub.id;
       createSubPanel.style.display = 'none';
       if (subNameInput) subNameInput.value = '';
 
       renderSubtypeList();
-      if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-      await saveIngredient(ing);
     };
   }
 
@@ -217,6 +223,7 @@ export function promptReallocateProduct(productId) {
     document.getElementById('btn-confirm-realloc').onclick = async () => {
       if (!activeReallocateState.selectedIngId) return;
       const subtypeId = activeReallocateState.selectedSubId || null;
+      activeReallocateState.pendingNewSub = null;
       const st = getState();
       const ings = Array.isArray(st.ingredients) ? st.ingredients : currentIngs;
       const ing = ings.find(i => String(i.id) === String(activeReallocateState.selectedIngId));

@@ -29,36 +29,92 @@ export function numericNutritionValues(value) {
   return String(value).match(/\d+(?:\.\d+)?/g)?.map(Number).filter(Number.isFinite) || [];
 }
 
-export function normalizeEnergyKcal(value) {
+export function normalizeEnergyKcal(value, prot = 0, carb = 0, fat = 0, fibre = 0) {
   if (value === null || value === undefined || value === '') return 0;
-  if (typeof value === 'number') return value > 2500 ? Math.round(value / 4.184) : Math.round(value);
-  const text = String(value).toLowerCase();
-  const kcalMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:kcal|calories|cals?\b)/i);
-  if (kcalMatch) return Math.round(+kcalMatch[1]);
-  const kjMatch = text.match(/(\d+(?:\.\d+)?)\s*kj/i);
-  const nums = numericNutritionValues(text);
-  if (nums.length >= 2) {
-    const plausible = nums.filter(n => n > 0 && n < 1000);
-    if (plausible.length) return Math.round(Math.min(...plausible));
+  
+  let valNum = 0;
+  if (typeof value === 'number') {
+    valNum = value;
+  } else {
+    const text = String(value).toLowerCase();
+    const kcalMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:kcal|calories|cals?\b)/i);
+    if (kcalMatch) return Math.round(+kcalMatch[1]);
+    const kjMatch = text.match(/(\d+(?:\.\d+)?)\s*kj/i);
+    const nums = numericNutritionValues(text);
+    if (nums.length >= 2) {
+      const plausible = nums.filter(n => n > 0 && n < 1000);
+      if (plausible.length) valNum = Math.min(...plausible);
+    } else if (kjMatch) {
+      return Math.round((+kjMatch[1]) / 4.184);
+    } else if (nums.length === 1) {
+      valNum = nums[0];
+    }
   }
-  if (kjMatch) return Math.round((+kjMatch[1]) / 4.184);
-  if (nums.length === 1) return nums[0] > 2500 ? Math.round(nums[0] / 4.184) : Math.round(nums[0]);
-  return 0;
+
+  if (valNum <= 0) return 0;
+
+  // Atwater macronutrient cross-validation:
+  // If macros are available, check if the calorie number is actually in kilojoules.
+  // 1 kcal = 4.184 kJ. Ratio of kJ to expected Atwater kcal is typically between 3.4 and 5.2.
+  const p = Number(prot) || 0, c = Number(carb) || 0, f = Number(fat) || 0, fib = Number(fibre) || 0;
+  const atwater = (4 * p) + (4 * c) + (9 * f) + (2 * fib);
+  if (atwater > 15) {
+    const ratio = valNum / atwater;
+    if (ratio >= 3.4 && ratio <= 5.2) {
+      return Math.round(valNum / 4.184);
+    }
+  }
+
+  if (valNum > 2500) return Math.round(valNum / 4.184);
+  return Math.round(valNum);
 }
 
 export function normalizeNutritionPayload(raw) {
   const parsed = {};
+  const prot = +(raw?.prot ?? raw?.protein ?? 0);
+  const carb = +(raw?.carb ?? raw?.carbs ?? raw?.carbohydrate ?? 0);
+  const fat = +(raw?.fat ?? 0);
+  const fibre = +(raw?.fibre ?? raw?.fiber ?? 0);
+
   for (const k in (raw || {})) {
     const cleanKey = String(k || '').toLowerCase();
     const key = normalizeNutrientKey(k);
-    if (key === 'cal') parsed[key] = normalizeEnergyKcal(raw[k]);
-    else if (cleanKey.includes('kj') && !parsed.cal) parsed.cal = normalizeEnergyKcal(`${raw[k]} kJ`);
+    if (key === 'cal') parsed[key] = normalizeEnergyKcal(raw[k], prot, carb, fat, fibre);
+    else if (cleanKey.includes('kj') && !parsed.cal) parsed.cal = normalizeEnergyKcal(`${raw[k]} kJ`, prot, carb, fat, fibre);
     else parsed[key] = +raw[k] || 0;
   }
   if (!parsed.cal) {
-    parsed.cal = normalizeEnergyKcal(raw?.energy ?? raw?.calories ?? raw?.kcal ?? raw?.cal);
+    parsed.cal = normalizeEnergyKcal(raw?.energy ?? raw?.calories ?? raw?.kcal ?? raw?.cal, prot, carb, fat, fibre);
   }
   return parsed;
+}
+
+export function resolveProductItemWeight(product) {
+  if (!product || typeof product !== 'object') return 0;
+  const explicit = parseFloat(product.itemWeight || product.item_weight || 0);
+  if (explicit > 0) return explicit;
+
+  const packSize = parseFloat(product.packSize || product.pack_size || 0);
+  const itemCount = parseFloat(product.itemCount || product.item_count || 0);
+  if (packSize > 0 && itemCount > 1) {
+    return Math.round((packSize / itemCount) * 10) / 10;
+  }
+
+  const name = String(product.name || product.title || '');
+  const leadingCountMatch = name.match(/^(\d+)\s+(?:pack\s+of\s+)?([a-zA-Z\s]+)/i);
+  if (leadingCountMatch && packSize > 0) {
+    const count = parseInt(leadingCountMatch[1], 10);
+    if (count > 1 && count <= 50) {
+      return Math.round((packSize / count) * 10) / 10;
+    }
+  }
+
+  const packUnit = String(product.packUnit || product.pack_unit || product.unit || '').toLowerCase();
+  if ((packUnit === 'each' || packUnit === 'item' || /\beach\b/i.test(name)) && packSize > 0 && packSize <= 1000) {
+    return packSize;
+  }
+
+  return 0;
 }
 
 export function calculateItemNutrition(item, quantity, unit = 'g') {
@@ -70,14 +126,26 @@ export function calculateItemNutrition(item, quantity, unit = 'g') {
 
   let grams = 0;
   const u = String(unit || 'g').trim().toLowerCase().replace(/s$/, '');
+  const resolvedItemWeight = resolveProductItemWeight(item);
 
-  if (u === 'item' || u === 'piece' || u === 'qty' || u === 'pack' || u === 'can' || u === 'tin') {
-    const itemWeight = parseFloat(item.itemWeight) || parseFloat(item.drainedWeight) || parseFloat(item.packSize) || 0;
-    grams = q * itemWeight;
-  } else if (u === 'g' || u === 'gram' || u === 'ml') {
+  if (u === 'g' || u === 'gram' || u === 'ml') {
     grams = q;
+  } else if (u === 'pack' || u === 'can' || u === 'tin') {
+    const packAmount = parseFloat(item.drainedWeight) || parseFloat(item.usablePackAmount) || parseFloat(item.packSize) || 400;
+    grams = q * packAmount;
+  } else if (resolvedItemWeight > 0) {
+    grams = q * resolvedItemWeight;
   } else {
-    grams = toGrams(q, u, item.name, item.itemWeight);
+    grams = toGrams(q, u, item.name, 0);
+  }
+
+  // Pack / Drained Weight Ceiling Guard for discrete counts:
+  // Discrete piece counts against a jar or can (e.g. 20 olives) cannot exceed the container's solid weight
+  if (u === 'qty' || u === 'item' || u === 'count') {
+    const maxContainerWeight = parseFloat(item.drainedWeight) || parseFloat(item.usablePackAmount) || 0;
+    if (maxContainerWeight > 0 && grams > maxContainerWeight) {
+      grams = maxContainerWeight;
+    }
   }
 
   grams = calculateItemNutritionalWeight(item, grams);
@@ -85,11 +153,20 @@ export function calculateItemNutrition(item, quantity, unit = 'g') {
   if (grams <= 0) return zero;
 
   const scale = grams / 100;
-  const calVal = (parseFloat(item.cal) || parseFloat(item.calories) || parseFloat(item.kcal) || 0) * scale;
-  const protVal = (parseFloat(item.prot) || parseFloat(item.protein) || 0) * scale;
-  const carbVal = (parseFloat(item.carb) || parseFloat(item.carbs) || 0) * scale;
-  const fatVal = (parseFloat(item.fat) || 0) * scale;
-  const fibreVal = (parseFloat(item.fibre) || parseFloat(item.fiber) || 0) * scale;
+  const rawCal = parseFloat(item.cal) || parseFloat(item.calories) || parseFloat(item.kcal) || 0;
+  const rawProt = parseFloat(item.prot) || parseFloat(item.protein) || 0;
+  const rawCarb = parseFloat(item.carb) || parseFloat(item.carbs) || 0;
+  const rawFat = parseFloat(item.fat) || 0;
+  const rawFibre = parseFloat(item.fibre) || parseFloat(item.fiber) || 0;
+
+  // Runtime safeguard against products stored in database with kJ as cal
+  const cleanCal = normalizeEnergyKcal(rawCal, rawProt, rawCarb, rawFat, rawFibre);
+
+  const calVal = cleanCal * scale;
+  const protVal = rawProt * scale;
+  const carbVal = rawCarb * scale;
+  const fatVal = rawFat * scale;
+  const fibreVal = rawFibre * scale;
 
   let costVal = 0;
   if (parseFloat(item.price) > 0) {
@@ -165,12 +242,17 @@ export function scaleNutrition(nutrition, targetServings, baseServings = 1) {
 }
 
 export function calculateItemNutritionalWeight(product, requestedGramWeight) {
-  if (product && product.drainedWeightG && product.netWeightG) {
-    const drainedRatio = product.drainedWeightG / product.netWeightG;
-    return requestedGramWeight * drainedRatio;
-  }
-  if (product && product.drainedWeight && product.netWeight) {
-    const drainedRatio = product.drainedWeight / product.netWeight;
+  if (!product || typeof product !== 'object' || requestedGramWeight <= 0) return requestedGramWeight;
+  const drained = parseFloat(product.drainedWeight || product.drainedWeightG || product.drained_weight || 0);
+  const pack = parseFloat(product.packSize || product.netWeight || product.netWeightG || product.usablePackAmount || 0);
+
+  if (drained > 0 && pack > 0 && drained < pack) {
+    // If recipe asks for roughly the gross can size (e.g. 360g-440g for a 400g can), scale to drained weight
+    if (Math.abs(requestedGramWeight - pack) / pack <= 0.15) {
+      return drained * (requestedGramWeight / pack);
+    }
+    // Partial gram weight requested (e.g. 200g of canned beans) -> scale by drained ratio
+    const drainedRatio = drained / pack;
     return requestedGramWeight * drainedRatio;
   }
   return requestedGramWeight;

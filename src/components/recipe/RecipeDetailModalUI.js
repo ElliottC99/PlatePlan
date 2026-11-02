@@ -221,6 +221,7 @@ export function renderRecipeDetailModalContent(props = {}) {
   const variantKey = isEnh ? 'enhanced' : 'original';
   const name = escapeHtml(activeR.name || r.name || 'Untitled Recipe');
   const favBtnClass = isFav ? 'active' : '';
+  const recipeId = r.id || activeR.id || '';
 
   // 1. Title & Fit Score Pill: The header must show the recipe title, meal type, baseline servings, and Fit Score / Match pill (e.g., <span class="badge red">49% - Poor Match</span>)
   let fitPillHtml = props.fitPillHtml || props.fitBadgeHtml;
@@ -259,6 +260,20 @@ export function renderRecipeDetailModalContent(props = {}) {
               <button type="button" role="tab" class="${!isEnh ? 'active' : ''}" onclick="switchViewTab('original')">Original</button>
               <button type="button" role="tab" class="${isEnh ? 'active' : ''}" onclick="switchViewTab('enhanced')">✨ Enhanced</button>
             </div>
+          ` : `
+            <button type="button" id="modal-recipe-enhance-btn" class="btn sm" style="padding:6px 10px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:4px;border-radius:8px;background:#16a34a;color:#fff;border:1px solid #15803d;cursor:pointer;" onclick="if(typeof openEnhanceRecipeModalForCurrent==='function')openEnhanceRecipeModalForCurrent('${escapeAttr(recipeId)}')">
+              ✨ Auto-Enhance (85+)
+            </button>
+          `}
+          ${recipeId ? `
+            <button type="button" id="modal-recipe-edit-btn" class="btn secondary" style="padding:6px 10px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;border-radius:8px;border:1px solid var(--border,#ccc);background:var(--surface,#fff);cursor:pointer;" onclick="if(typeof closeRecipePreview==='function')closeRecipePreview();if(typeof openRecipeWizard==='function')openRecipeWizard('manual', '${escapeAttr(recipeId)}')" aria-label="Edit recipe" title="Edit recipe">
+              ✏️ Edit
+            </button>
+          ` : ''}
+          ${isEnh && recipeId ? `
+            <button type="button" id="modal-recipe-delete-variant-btn" class="btn sm danger" style="padding:6px 10px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;border-radius:8px;cursor:pointer;" onclick="if(typeof removeCurrentEnhancedVariant==='function')removeCurrentEnhancedVariant('${escapeAttr(recipeId)}')">
+              🗑️ Remove Variant
+            </button>
           ` : ''}
           <button type="button" id="modal-recipe-fav-btn" class="recipe-fav-btn ${favBtnClass}" onclick="toggleRecipeFavourite('${escapeAttr(r.id)}', event, '${variantKey}')" aria-label="${isFav ? 'Remove from favourites' : 'Add to favourites'}" title="${isFav ? 'Favourited' : 'Add to favourites'}">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

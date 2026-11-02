@@ -22,3 +22,10 @@ ui-debug.log
 # OS clutter
 .DS_Store
 Thumbs.db
+
+# Antigravity agent workflows & local tooling
+.agent/
+.agents/
+/plans/
+/todos/
+

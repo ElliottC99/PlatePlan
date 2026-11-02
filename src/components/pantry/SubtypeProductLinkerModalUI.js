@@ -6,6 +6,7 @@
 
 import { getState, setProducts } from '../../store/store.js';
 import { saveProduct } from '../../services/ProductRepository.js';
+import { parseTescoProduct, cleanProductName, toTitleCase } from '../../services/TescoImportService.js';
 
 const escapeHTML = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -190,13 +191,16 @@ export function openSubtypeExistingProductPickerModal(subtypeId, parentId, onSuc
   };
 }
 
-export function openTescoImportModal(subtypeId, parentId, onSuccess = null) {
+export function openTescoImportModal(subtypeId, parentId, onSuccess = null, customSearchName = null) {
   const state = getState();
   const parent = (state.rootItems || state.ingredients || []).find(i => String(i.id) === String(parentId));
-  const parentCategory = parent?.category || 'General';
-  const subName = subtypeId 
-    ? parent?.subtypes?.find(s => String(s.id) === String(subtypeId))?.name 
-    : (parent?.name || 'Item');
+  const parentCategory = parent?.category || window.__pendingHierarchyCommit?.category || 'General';
+  const subName = customSearchName
+    || (subtypeId ? parent?.subtypes?.find(s => String(s.id) === String(subtypeId))?.name : null)
+    || window.__pendingHierarchyCommit?.subtypeName
+    || parent?.name
+    || window.__pendingHierarchyCommit?.rootItemName
+    || 'Item';
 
   const tescoSearchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(subName)}`;
 
@@ -230,6 +234,14 @@ export function openTescoImportModal(subtypeId, parentId, onSuccess = null) {
   const jsonInput = document.getElementById('tesco-json-input');
   const errorMsg = document.getElementById('tesco-import-error-msg');
   const reviewBtn = document.getElementById('btn-review-tesco-import');
+  const cancelBtn = document.getElementById('btn-cancel-tesco-import');
+
+  if (cancelBtn) {
+    cancelBtn.onclick = () => {
+      window.__pendingHierarchyCommit = null;
+      closeModal();
+    };
+  }
 
   reviewBtn.onclick = () => {
     const raw = (jsonInput ? jsonInput.value : '').trim();
@@ -244,11 +256,18 @@ export function openTescoImportModal(subtypeId, parentId, onSuccess = null) {
       return;
     }
 
-    parsed.category = parentCategory;
+    const res = parseTescoProduct(parsed);
+    const cleanData = res.success ? res.data : parsed;
+    const brand = toTitleCase(cleanData.brand || parsed.brand || 'Tesco');
+    const name = cleanProductName(cleanData.name || parsed.name || parsed.title || '', brand);
+    cleanData.brand = brand;
+    cleanData.name = name;
+    cleanData.title = name;
+    cleanData.category = parentCategory;
     closeModal();
 
     if (typeof onSuccess === 'function') {
-      onSuccess(parsed);
+      onSuccess(cleanData);
       return;
     }
 
@@ -256,7 +275,7 @@ export function openTescoImportModal(subtypeId, parentId, onSuccess = null) {
       ingredientId: parentId,
       subtypeId: subtypeId || null,
       parentCategory,
-      tescoImportData: parsed
+      tescoImportData: cleanData
     };
     setTimeout(() => {
       if (typeof window.openProductEditModal === 'function') window.openProductEditModal(null);

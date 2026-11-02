@@ -60,19 +60,19 @@ export function renderConstraintsForm({
         </div>
         <div>
           <label for="wizard-cadence-breakfast" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;cursor:pointer">BREAKFAST REPEAT</label>
-          <select id="wizard-cadence-breakfast" name="cadenceBreakfast" aria-label="Breakfast repeat cadence" class="select" style="width:100%" onchange="state.prefs.mealRepeatCadence=state.prefs.mealRepeatCadence||{};state.prefs.mealRepeatCadence.breakfast=parseInt(this.value)||1;saveState();">
+          <select id="wizard-cadence-breakfast" name="cadenceBreakfast" aria-label="Breakfast repeat cadence" class="select pp-constraint-input" style="width:100%" data-key="cadenceBreakfast">
             ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${n === cadence.breakfast ? 'selected' : ''}>${n} day${n > 1 ? 's' : ''}</option>`).join('')}
           </select>
         </div>
         <div>
           <label for="wizard-cadence-lunch" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;cursor:pointer">LUNCH REPEAT</label>
-          <select id="wizard-cadence-lunch" name="cadenceLunch" aria-label="Lunch repeat cadence" class="select" style="width:100%" onchange="state.prefs.mealRepeatCadence=state.prefs.mealRepeatCadence||{};state.prefs.mealRepeatCadence.lunch=parseInt(this.value)||2;saveState();">
+          <select id="wizard-cadence-lunch" name="cadenceLunch" aria-label="Lunch repeat cadence" class="select pp-constraint-input" style="width:100%" data-key="cadenceLunch">
             ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${n === cadence.lunch ? 'selected' : ''}>${n} day${n > 1 ? 's' : ''}</option>`).join('')}
           </select>
         </div>
         <div>
           <label for="wizard-cadence-dinner" style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;cursor:pointer">DINNER REPEAT</label>
-          <select id="wizard-cadence-dinner" name="cadenceDinner" aria-label="Dinner repeat cadence" class="select" style="width:100%" onchange="state.prefs.mealRepeatCadence=state.prefs.mealRepeatCadence||{};state.prefs.mealRepeatCadence.dinner=parseInt(this.value)||2;saveState();">
+          <select id="wizard-cadence-dinner" name="cadenceDinner" aria-label="Dinner repeat cadence" class="select pp-constraint-input" style="width:100%" data-key="cadenceDinner">
             ${[1,2,3,4,5,6,7].map(n => `<option value="${n}" ${n === cadence.dinner ? 'selected' : ''}>${n} day${n > 1 ? 's' : ''}</option>`).join('')}
           </select>
         </div>
@@ -98,8 +98,26 @@ export function bindConstraintEvents(container, onRender) {
       const key = e.target.dataset.key;
       const val = e.target.value;
       const state = getState();
+      if (!state) return;
+
       if (key === 'plannerDays') state.currentPlannerDays = parseInt(val) || 7;
       if (key === 'plannerStartDate') state.currentPlannerStartDate = val;
+      if (key === 'cadenceBreakfast') {
+        state.prefs = state.prefs || {};
+        state.prefs.mealRepeatCadence = state.prefs.mealRepeatCadence || {};
+        state.prefs.mealRepeatCadence.breakfast = parseInt(val, 10) || 1;
+      }
+      if (key === 'cadenceLunch') {
+        state.prefs = state.prefs || {};
+        state.prefs.mealRepeatCadence = state.prefs.mealRepeatCadence || {};
+        state.prefs.mealRepeatCadence.lunch = parseInt(val, 10) || 2;
+      }
+      if (key === 'cadenceDinner') {
+        state.prefs = state.prefs || {};
+        state.prefs.mealRepeatCadence = state.prefs.mealRepeatCadence || {};
+        state.prefs.mealRepeatCadence.dinner = parseInt(val, 10) || 2;
+      }
+
       if (typeof window.saveState === 'function') window.saveState();
       if (onRender) onRender();
     };

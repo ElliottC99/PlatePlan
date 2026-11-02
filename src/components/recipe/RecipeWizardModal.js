@@ -9,6 +9,7 @@
  * - State 3: Final Inline Review with Macro Crossbar, Variant Switcher & Queue Navigation
  */
 
+import { getState } from '../../state/AppState.js';
 import { wizardState, resetWizardState, syncStep2InputsToState } from './RecipeWizardState.js';
 import { renderStepBadge, renderState0Choice, renderState1AManual, renderState1BBulk, renderState3Review } from './RecipeWizardViews.js';
 import { renderState2Mapping } from './RecipeWizardStep2View.js';
@@ -19,34 +20,151 @@ import { bindStep3Events } from './RecipeWizardStep3Handlers.js';
 
 const TOAST_DURATION_MS = 4000;
 
+function normalizeTime(t, defH = 0, defM = 0) {
+  if (typeof t === 'number' && !isNaN(t)) {
+    return { hours: Math.floor(t / 60), minutes: t % 60 };
+  }
+  if (typeof t === 'string' && t.trim() !== '') {
+    const num = parseInt(t, 10);
+    if (!isNaN(num)) return { hours: Math.floor(num / 60), minutes: num % 60 };
+  }
+  if (t && typeof t === 'object') {
+    const h = parseInt(t.hours, 10);
+    const m = parseInt(t.minutes, 10);
+    return {
+      hours: isNaN(h) ? defH : Math.max(0, h),
+      minutes: isNaN(m) ? defM : Math.max(0, Math.min(59, m))
+    };
+  }
+  return { hours: defH, minutes: defM };
+}
+
+function formatIngredientLine(i) {
+  if (!i) return '';
+  if (typeof i === 'string') return i.trim();
+  if (i.raw && typeof i.raw === 'string' && i.raw.trim()) return i.raw.trim();
+  const parts = [];
+  if (i.qty !== undefined && i.qty !== null && i.qty !== '') parts.push(i.qty);
+  if (i.unit && typeof i.unit === 'string' && i.unit.trim()) parts.push(i.unit.trim());
+  const name = i.name || i.ingredientName || i.ingredient || '';
+  if (name && typeof name === 'string' && name.trim()) parts.push(name.trim());
+  let line = parts.join(' ').trim();
+  const notes = i.notes || i.comment;
+  if (notes && typeof notes === 'string' && notes.trim() && !line.includes(notes.trim())) {
+    line = line ? `${line} (${notes.trim()})` : notes.trim();
+  }
+  return line;
+}
+
+function formatMethodLine(step, idx) {
+  if (!step) return '';
+  const text = typeof step === 'string' ? step.trim() : (step.text || step.instruction || step.step || String(step)).trim();
+  if (!text) return '';
+  if (/^\d+[\.\)]\s*/.test(text)) {
+    return text;
+  }
+  return `${idx + 1}. ${text}`;
+}
+
 export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
   resetWizardState();
   if (editRecipeId) {
-    const allRecipes = (typeof window !== 'undefined' ? (window.Store?.getState?.()?.recipes ?.recipes || []) : []);
-    const found = allRecipes.find(r => r && String(r.id) === String(editRecipeId));
+    let allRecipes = [];
+    if (typeof getState === 'function') {
+      const st = getState();
+      if (Array.isArray(st?.recipes)) allRecipes = st.recipes;
+    }
+    if (!allRecipes.length && typeof window !== 'undefined') {
+      if (Array.isArray(window.Store?.getState?.()?.recipes)) {
+        allRecipes = window.Store.getState().recipes;
+      } else if (Array.isArray(window.allRecipes)) {
+        allRecipes = window.allRecipes;
+      } else if (Array.isArray(window.recipes)) {
+        allRecipes = window.recipes;
+      }
+    }
+    const found = allRecipes.find(r => r && (String(r.id) === String(editRecipeId) || String(r._id) === String(editRecipeId)));
     if (found) {
-      const ingRawText = (found.ingredientSections || []).map(sec => {
+      let rawTags = found.mealSuitability;
+      if (!rawTags || !rawTags.length) {
+        if (Array.isArray(found.types)) rawTags = found.types;
+        else if (found.type) rawTags = [found.type];
+        else if (found.category) rawTags = [found.category];
+        else if (found.mealType) rawTags = [found.mealType];
+      }
+      const mealSuitability = Array.isArray(rawTags) && rawTags.length > 0
+        ? rawTags.map(t => String(t).charAt(0).toUpperCase() + String(t).slice(1).toLowerCase())
+        : ['Dinner'];
+
+      const prepTime = found.prepTime !== undefined && found.prepTime !== null
+        ? normalizeTime(found.prepTime, 0, 15)
+        : (found.time ? normalizeTime(found.time, 0, 15) : { hours: 0, minutes: 15 });
+      const cookTime = found.cookTime !== undefined && found.cookTime !== null
+        ? normalizeTime(found.cookTime, 0, 30)
+        : { hours: 0, minutes: 30 };
+
+      let ingredientSections = [];
+      if (Array.isArray(found.ingredientSections) && found.ingredientSections.length > 0) {
+        ingredientSections = found.ingredientSections.map(sec => ({
+          sectionTitle: sec.sectionTitle || 'Main Ingredients',
+          ingredients: Array.isArray(sec.ingredients) ? sec.ingredients.map(i => ({
+            ...i,
+            name: i.name || i.ingredientName || i.ingredient || (typeof i === 'string' ? i : ''),
+            qty: i.qty !== undefined && i.qty !== null ? i.qty : 1,
+            scaledQty: i.scaledQty !== undefined && i.scaledQty !== null ? i.scaledQty : (i.qty !== undefined && i.qty !== null ? i.qty : 1),
+            unit: i.unit || '',
+            raw: formatIngredientLine(i)
+          })) : []
+        }));
+      } else if (Array.isArray(found.ingredients) && found.ingredients.length > 0) {
+        ingredientSections = [{
+          sectionTitle: 'Main Ingredients',
+          ingredients: found.ingredients.map(i => ({
+            ...(typeof i === 'object' ? i : {}),
+            name: typeof i === 'string' ? i : (i.name || i.ingredientName || i.ingredient || ''),
+            qty: i.qty !== undefined && i.qty !== null ? i.qty : 1,
+            scaledQty: i.scaledQty !== undefined && i.scaledQty !== null ? i.scaledQty : (i.qty !== undefined && i.qty !== null ? i.qty : 1),
+            unit: i.unit || '',
+            raw: formatIngredientLine(i)
+          }))
+        }];
+      } else {
+        ingredientSections = [{ sectionTitle: 'Main Ingredients', ingredients: [] }];
+      }
+
+      const ingRawText = ingredientSections.map(sec => {
         const header = sec.sectionTitle && sec.sectionTitle !== 'Main Ingredients' ? `${sec.sectionTitle}:\n` : '';
-        const items = (sec.ingredients || []).map(i => i.raw || `${i.qty || ''} ${i.unit || ''} ${i.name || ''}`.trim()).join('\n');
-        return `${header}${items}`;
-      }).join('\n\n') || (found.ingredients || []).map(i => i.raw || `${i.qty || ''} ${i.unit || ''} ${i.name || ''}`.trim()).join('\n');
+        const items = (sec.ingredients || []).map(formatIngredientLine).filter(Boolean).join('\n');
+        return `${header}${items}`.trim();
+      }).filter(Boolean).join('\n\n');
 
-      const methodRawText = Array.isArray(found.steps) 
-        ? found.steps.join('\n\n') 
-        : (Array.isArray(found.methodSteps) ? found.methodSteps.join('\n\n') : (found.method || found.instructions || ''));
+      const methodStepsArray = Array.isArray(found.steps) 
+        ? found.steps 
+        : (Array.isArray(found.methodSteps) ? found.methodSteps : (Array.isArray(found.instructions) ? found.instructions : []));
 
+      let methodRawText = '';
+      if (methodStepsArray.length > 0) {
+        methodRawText = methodStepsArray.map(formatMethodLine).filter(Boolean).join('\n');
+      } else if (typeof found.method === 'string') {
+        methodRawText = found.method;
+      } else if (typeof found.instructions === 'string') {
+        methodRawText = found.instructions;
+      }
+
+      const safeServes = Number(found.servings || found.serves || 4) || 4;
       wizardState.activeRecipe = {
-        id: found.id,
+        id: found.id || found._id,
         title: found.title || found.name || '',
-        currentServings: found.servings || found.serves || 4,
-        targetServings: found.targetServings || found.servings || found.serves || 4,
-        prepTime: found.prepTime !== undefined && found.prepTime !== null ? found.prepTime : { hours: '', minutes: '' },
-        cookTime: found.cookTime !== undefined && found.cookTime !== null ? found.cookTime : { hours: '', minutes: '' },
-        mealSuitability: found.mealSuitability || (found.types ? found.types.map(t => t.charAt(0).toUpperCase() + t.slice(1)) : ['Dinner']),
+        servings: safeServes,
+        serves: safeServes,
+        prepTime,
+        cookTime,
+        mealSuitability,
         ingredientsRaw: ingRawText,
         methodRaw: methodRawText,
-        ingredientSections: found.ingredientSections || [{ sectionTitle: 'Main Ingredients', ingredients: found.ingredients || [] }],
-        methodSteps: found.steps || found.methodSteps || found.instructions || (typeof found.method === 'string' ? found.method.split('\n') : found.method) || [],
+        ingredientSections,
+        ingredients: ingredientSections.flatMap(s => s.ingredients || []),
+        methodSteps: methodStepsArray.length ? methodStepsArray : (typeof found.method === 'string' ? found.method.split('\n').filter(Boolean) : []),
         macros: found.macros || found.nutrition || { calories: 450, protein: 28, carbs: 40, fat: 16 },
         enhanced: found.enhanced || null
       };
@@ -116,16 +234,20 @@ export function loadNextRecipeFromQueue() {
 
   const ingRawText = (next.ingredientSections || []).map(sec => {
     const header = sec.sectionTitle && sec.sectionTitle !== 'Main Ingredients' ? `${sec.sectionTitle}:\n` : '';
-    const items = sec.ingredients.map(i => i.raw || `${i.qty} ${i.unit} ${i.name}`).join('\n');
-    return `${header}${items}`;
-  }).join('\n\n');
+    const items = (sec.ingredients || []).map(formatIngredientLine).filter(Boolean).join('\n');
+    return `${header}${items}`.trim();
+  }).filter(Boolean).join('\n\n');
 
-  const methodRawText = (next.instructions || next.methodSteps || []).join('\n');
+  const rawSteps = next.instructions || next.methodSteps || [];
+  const methodRawText = Array.isArray(rawSteps)
+    ? rawSteps.map(formatMethodLine).filter(Boolean).join('\n')
+    : (typeof rawSteps === 'string' ? rawSteps : '');
+  const safeServes = Number(next.servings || next.serves || 4) || 4;
 
   wizardState.activeRecipe = {
     title: next.title || 'Imported Recipe',
-    currentServings: next.servings || 4,
-    targetServings: next.servings || 4,
+    servings: safeServes,
+    serves: safeServes,
     prepTime: next.prepTime || { hours: 0, minutes: 15 },
     cookTime: next.cookTime || { hours: 0, minutes: 30 },
     mealSuitability: next.mealSuitability || ['Dinner'],

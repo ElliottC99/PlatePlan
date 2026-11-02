@@ -102,34 +102,49 @@ export function getCanonicalIngredientId(item, ingredientsBank = []) {
   const rawName = String(item.name || item.ingredient || item.productName || item.raw || '').toLowerCase().trim();
   if (Array.isArray(ingredientsBank) && ingredientsBank.length && rawName) {
     const matched = ingredientsBank.find(b => 
-      String(b.id) === String(item.id) ||
-      String(b.groupId) === String(item.groupId) ||
-      String(b.name || '').toLowerCase().trim() === rawName
+      (item.id && b.id && String(b.id) === String(item.id)) ||
+      (item.groupId && b.groupId && String(b.groupId) === String(item.groupId)) ||
+      (rawName && String(b.name || '').toLowerCase().trim() === rawName)
     );
     if (matched) return String(matched.id);
   }
   return String(item.id || rawName.replace(/\s+/g, '_'));
 }
 
-export function aggregateShoppingListFromPlan(plan = null, state = null) {
-  const storeState = getState ? getState() : {};
-  const appState = state || storeState || (typeof window !== 'undefined' ? getState() : {}) || {};
+export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIngredients = null, maybeProducts = null) {
+  let appState = {};
+  let vaultRecipes = [];
+  let ingredientsBank = [];
+  let productsBank = [];
+
+  if (Array.isArray(state)) {
+    // Interop signature: aggregateShoppingListFromPlan(plan, recipes, ingredients, products)
+    vaultRecipes = state;
+    ingredientsBank = Array.isArray(maybeIngredients) ? maybeIngredients : [];
+    productsBank = Array.isArray(maybeProducts) ? maybeProducts : [];
+  } else {
+    const storeState = getState ? getState() : {};
+    appState = state || storeState || (typeof window !== 'undefined' ? getState() : {}) || {};
+    vaultRecipes = (Array.isArray(appState.recipes) && appState.recipes.length ? appState.recipes : null)
+      || (typeof window !== 'undefined' && Array.isArray(window.recipes) ? window.recipes : []);
+    ingredientsBank = Array.isArray(appState.ingredients) ? appState.ingredients : [];
+    productsBank = Array.isArray(appState.products) ? appState.products : [];
+  }
+
   const activePlan = plan || appState.plan || {};
-  const vaultRecipes = (Array.isArray(appState.recipes) && appState.recipes.length ? appState.recipes : null)
-    || (typeof window !== 'undefined' && Array.isArray(window.recipes) ? window.recipes : []);
-  const ingredientsBank = Array.isArray(appState.ingredients) ? appState.ingredients : [];
-  const productsBank = Array.isArray(appState.products) ? appState.products : [];
   const atHomeMap = activePlan.shoppingAtHome || {};
-  const prepGroups = Array.isArray(activePlan.mealPrepGroups) ? activePlan.mealPrepGroups : [];
+  const prepGroups = Array.isArray(activePlan.mealPrepGroups)
+    ? activePlan.mealPrepGroups
+    : (Array.isArray(activePlan.prepGroups) ? activePlan.prepGroups : []);
 
   const aggregatedMap = new Map();
   const rawSlots = activePlan.slots && typeof activePlan.slots === 'object' ? activePlan.slots : {};
 
-  const processSlotNode = (slotNode, portionWeight = 0.5, dayNum = 1, mealType = 'meal') => {
+  const processSlotNode = (slotNode, personCount = 1, dayNum = 1, mealType = 'meal') => {
     if (!slotNode || slotNode.isSkipped || slotNode.skipped) return;
     if (slotNode.isSplit && (slotNode.elliott || slotNode.chloe)) {
-      if (slotNode.elliott) processSlotNode(slotNode.elliott, 0.5, dayNum, mealType);
-      if (slotNode.chloe) processSlotNode(slotNode.chloe, 0.5, dayNum, mealType);
+      if (slotNode.elliott) processSlotNode(slotNode.elliott, 1, dayNum, mealType);
+      if (slotNode.chloe) processSlotNode(slotNode.chloe, 1, dayNum, mealType);
       return;
     }
     const recipeId = typeof slotNode === 'string' ? slotNode : (slotNode.recipeId || slotNode.id);
@@ -137,6 +152,10 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
 
     const fullRecipe = vaultRecipes.find(r => r && String(r.id) === String(recipeId));
     if (!fullRecipe) return;
+
+    const baseServings = Math.max(1, Number(fullRecipe.serves || fullRecipe.servings || 2) || 2);
+    const targetServings = Number(slotNode?.servings || personCount || 1) || 1;
+    const scaleMultiplier = targetServings / baseServings;
 
     const variant = typeof slotNode === 'object' && slotNode.variant ? slotNode.variant : 'original';
     const rawIngs = (variant === 'enhanced' && fullRecipe.enhanced && Array.isArray(fullRecipe.enhanced.ingredients))
@@ -215,7 +234,7 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
       const rawUnit = String(ing.unit || '').trim();
 
       const strict = convertToStrictUnit(rawQty, rawUnit, rawName);
-      const convertedAmount = Math.round((strict.qty * portionWeight) * 10) / 10;
+      const slotQty = strict.qty * scaleMultiplier;
       const canonicalUnit = strict.unit;
 
       const existing = aggregatedMap.get(key) || {
@@ -240,11 +259,11 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
 
       if (!existing.unit && canonicalUnit) existing.unit = canonicalUnit;
 
-      existing.buyQty += convertedAmount;
-      existing.requiredQty += convertedAmount;
+      existing.buyQty += slotQty;
+      existing.requiredQty += slotQty;
       existing.recipeBreakdown.push({
         cookingEventId, recipeName, day: dayNum, mealType,
-        servings: slotNode.servings || fullRecipe.serves || 4, qty: convertedAmount
+        servings: targetServings, qty: Math.round(slotQty * 100) / 100
       });
 
       aggregatedMap.set(key, existing);
@@ -255,9 +274,9 @@ export function aggregateShoppingListFromPlan(plan = null, state = null) {
     if (!dayObj || typeof dayObj !== 'object') return;
     const dayNum = dayIdx + 1;
     Object.entries(dayObj).forEach(([slotKey, slotVal]) => {
-      const weight = (slotKey.endsWith('E') || slotKey.endsWith('C')) ? 0.5 : 1;
+      const personCount = (slotKey.endsWith('E') || slotKey.endsWith('C')) ? 1 : 2;
       const mealType = slotKey.replace(/[EC]$/, '');
-      processSlotNode(slotVal, weight, dayNum, mealType);
+      processSlotNode(slotVal, personCount, dayNum, mealType);
     });
   });
 

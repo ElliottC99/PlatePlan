@@ -7,7 +7,8 @@ import { db, HOUSEHOLD_ID } from '../config/firebase.js';
 import { safeFirestoreGet } from './HouseholdRepository.js';
 import {
   saveRecipe as saveCanonicalRecipe,
-  deleteRecipe as deleteCanonicalRecipe
+  deleteRecipe as deleteCanonicalRecipe,
+  deleteRecipeVariant as deleteCanonicalRecipeVariant
 } from './RecipeFirestoreRepository.js';
 
 function isDbAvailable() {
@@ -45,4 +46,8 @@ export async function saveRecipe(recipe, uid) {
 
 export async function deleteRecipe(recipeId, uid) {
   return await deleteCanonicalRecipe(recipeId, uid);
+}
+
+export async function deleteRecipeVariant(recipeId, variantKey = 'enhanced', uid) {
+  return await deleteCanonicalRecipeVariant(recipeId, variantKey, uid);
 }

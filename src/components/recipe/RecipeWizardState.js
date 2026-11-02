@@ -18,8 +18,7 @@ export const wizardState = {
   currentQueueIndex: 0,
   activeRecipe: {
     title: '',
-    currentServings: 4,
-    targetServings: 4,
+    servings: 4,
     prepTime: { hours: 0, minutes: 15 },
     cookTime: { hours: 0, minutes: 30 },
     mealSuitability: ['Dinner'],
@@ -38,12 +37,12 @@ export function hasDistinctEnhancedVariant(recipe = wizardState.activeRecipe) {
   if (!recipe || !recipe.enhanced || typeof recipe.enhanced !== 'object') return false;
   
   const originalRecipe = {
-    ingredients: recipe.ingredients || (recipe.ingredientSections || []).flatMap(s => s.ingredients).map(i => ({ name: i.name, qty: i.scaledQty || i.qty, unit: i.unit })),
+    ingredients: recipe.ingredients || (recipe.ingredientSections || []).flatMap(s => s.ingredients).map(i => ({ name: i.name, qty: i.qty, unit: i.unit })),
     method: recipe.methodSteps || recipe.instructions || recipe.method || []
   };
   
   const enhancedRecipe = {
-    ingredients: recipe.enhanced.ingredients || (recipe.enhanced.ingredientSections || []).flatMap(s => s.ingredients).map(i => ({ name: i.name, qty: i.scaledQty || i.qty, unit: i.unit })),
+    ingredients: recipe.enhanced.ingredients || (recipe.enhanced.ingredientSections || []).flatMap(s => s.ingredients).map(i => ({ name: i.name, qty: i.qty, unit: i.unit })),
     method: recipe.enhanced.methodSteps || recipe.enhanced.instructions || recipe.enhanced.method || []
   };
 
@@ -71,8 +70,7 @@ export function resetWizardState() {
   wizardState.currentQueueIndex = 0;
   wizardState.activeRecipe = {
     title: '',
-    currentServings: 4,
-    targetServings: 4,
+    servings: 4,
     prepTime: { hours: 0, minutes: 15 },
     cookTime: { hours: 0, minutes: 30 },
     mealSuitability: ['Dinner'],
@@ -104,7 +102,12 @@ export function syncStep2InputsToState(modalWrap) {
     const iIdx = parseInt(input.dataset.iidx, 10);
     if (!isNaN(sIdx) && !isNaN(iIdx)) {
       const item = wizardState.activeRecipe.ingredientSections[sIdx]?.ingredients[iIdx];
-      if (item) item.scaledQty = parseFloat(input.value) || item.qty;
+      if (item) {
+        const val = parseFloat(input.value) || 0;
+        item.qty = val;
+        delete item.scaledQty;
+        delete item.baseQty;
+      }
     }
   });
 
@@ -198,8 +201,12 @@ export function syncStep3InputsToState(modalWrap) {
   const title = modalWrap.querySelector('#wiz-rev-title')?.value?.trim();
   if (title) rec.title = title;
 
-  const serv = parseInt(modalWrap.querySelector('#wiz-rev-servings')?.value, 10);
-  if (serv > 0) rec.targetServings = serv;
+  const servInput = modalWrap.querySelector('#tp-serving-size') || modalWrap.querySelector('#wiz-rev-servings');
+  const serv = parseInt(servInput?.value, 10);
+  if (serv > 0) {
+    rec.servings = serv;
+    rec.serves = serv;
+  }
 
   const prepMins = parseInt(modalWrap.querySelector('#wiz-rev-prepm')?.value, 10) || 0;
   const cookMins = parseInt(modalWrap.querySelector('#wiz-rev-cookm')?.value, 10) || 0;

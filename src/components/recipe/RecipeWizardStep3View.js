@@ -6,6 +6,7 @@
 import { wizardState, MEAL_TAGS, getSaveButtonLabel } from './RecipeWizardState.js';
 import { getState } from '../../store/store.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
+import { recalculateWizardMacros } from './RecipeWizardStep3Handlers.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -59,8 +60,11 @@ export function renderMacroBreakdownCrossbar(recipe, variant = 'original') {
   const cSharePct = Math.round(cShare * 100);
 
   const activeRec = (variant === 'enhanced' && recipe.enhanced) ? { ...recipe, ...recipe.enhanced } : recipe;
-  const baselineCal = Number(activeRec.macros?.calories || activeRec.calories || 450);
-  const baselineProt = Number(activeRec.macros?.protein || activeRec.protein || 28);
+  if (!activeRec.macros || (!activeRec.macros.calories && !activeRec.macros.protein)) {
+    recalculateWizardMacros(activeRec);
+  }
+  const baselineCal = Number(activeRec.macros?.calories || activeRec.calories || 0);
+  const baselineProt = Number(activeRec.macros?.protein || activeRec.protein || 0);
 
   const batchServes = 2;
   const eKcal = Math.round(baselineCal * batchServes * eShare);
@@ -77,7 +81,7 @@ export function renderMacroBreakdownCrossbar(recipe, variant = 'original') {
     <div class="recipe-modal-crossbar" style="width: 100%; background: var(--surface2, #f5f4ee); border: 1px solid var(--border, #e5e5e5); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px;">
       <div style="display:flex; align-items:center; gap:6px;">
         <span style="font-size: 12px; font-weight: 700; color: var(--text);">Dual-Profile Per-Portion Split</span>
-        <span style="font-size: 11px; color: var(--text2);">(${recipe.targetServings || 4} servings)</span>
+        <span style="font-size: 11px; color: var(--text2);">(${recipe.servings || 4} servings)</span>
       </div>
 
       <div class="recipe-modal-crossbar-macros" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px;">
@@ -128,7 +132,7 @@ export function renderState3Review() {
       let isMapped = !!(ing.ingredientId || ing.isCategoryDefault || ing.categoryId);
       
       let notesHtml = '';
-      const cleanNotes = (ing.notes || '').replace(/dissolved in \d+\s*ml water/gi, '').replace(/\b\d+\s*ml water\b/gi, '').trim().replace(/^[\(\s,]+|[\)\s,]+$/g, '');
+      const cleanNotes = (ing.notes || '').replace(/Est\.?\s*Weight/gi, '').replace(/dissolved in \d+\s*ml water/gi, '').replace(/\b\d+\s*ml water\b/gi, '').trim().replace(/^[\(\s,]+|[\)\s,]+$/g, '');
       if (ing.waterMl) {
         notesHtml = ` (dissolved in ${ing.waterMl}ml water)`;
         if (cleanNotes) {
@@ -138,7 +142,8 @@ export function renderState3Review() {
         notesHtml = ` (${escapeHtml(cleanNotes)})`;
       }
 
-      let mainLineText = `${escapeHtml(ing.name)}${notesHtml}`;
+      const cleanName = String(ing.name || '').replace(/\(Est\.?\s*Weight\)/gi, '').trim();
+      let mainLineText = `${escapeHtml(cleanName)}${notesHtml}`;
 
       if (ing.isCategoryDefault || ing.categoryId) {
         const storeState = getState();
@@ -227,13 +232,20 @@ export function renderState3Review() {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
           <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text);">Inline Editable Review</h3>
           
-          <div class="variant-toggle" style="display: inline-flex; background: var(--surface, #fff); padding: 3px; border-radius: 8px; border: 1px solid var(--border, #ccc);">
-            <button type="button" class="btn sm ${!isEnhancedTab ? 'primary' : 'ghost'}" id="wiz-tab-original" style="padding: 4px 12px; font-size: 12px; font-weight: 600;">
-              Original
-            </button>
-            <button type="button" class="btn sm ${isEnhancedTab ? 'primary' : 'ghost'}" id="wiz-tab-enhanced" style="padding: 4px 12px; font-size: 12px; font-weight: 600;">
-              ✨ Enhanced
-            </button>
+          <div style="display:flex;align-items:center;gap:8px;">
+            ${isEnhancedTab ? `
+              <button type="button" class="btn sm" id="btn-wiz-auto-enhance" style="background:#16a34a;color:#fff;border-color:#15803d;font-weight:700;font-size:12px;padding:4px 10px;display:inline-flex;align-items:center;gap:4px;">
+                ⚡ Auto-Optimize to 85+ Fit
+              </button>
+            ` : ''}
+            <div class="variant-toggle" style="display: inline-flex; background: var(--surface, #fff); padding: 3px; border-radius: 8px; border: 1px solid var(--border, #ccc);">
+              <button type="button" class="btn sm ${!isEnhancedTab ? 'primary' : 'ghost'}" id="wiz-tab-original" style="padding: 4px 12px; font-size: 12px; font-weight: 600;">
+                Original
+              </button>
+              <button type="button" class="btn sm ${isEnhancedTab ? 'primary' : 'ghost'}" id="wiz-tab-enhanced" style="padding: 4px 12px; font-size: 12px; font-weight: 600;">
+                ✨ Enhanced
+              </button>
+            </div>
           </div>
         </div>
 
@@ -244,7 +256,7 @@ export function renderState3Review() {
           </div>
           <div>
             <label for="tp-serving-size" style="display:block; font-size:11px; font-weight:600; color:var(--text2);">Servings</label>
-            <input type="number" id="tp-serving-size" name="rev_servings" value="${recipe.servings || recipe.serves || 2}" style="width:100%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
+            <input type="number" id="tp-serving-size" name="rev_servings" value="${recipe.servings || recipe.serves || 4}" style="width:100%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
           </div>
           <div>
             <label for="wiz-rev-prepm" style="display:block; font-size:11px; font-weight:600; color:var(--text2);">Prep / Cook (Mins)</label>

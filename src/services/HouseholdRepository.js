@@ -14,7 +14,9 @@ import {
   savePreferencesWithAutoPrune,
   getHouseholdData,
   getPreferences,
-  savePreferences
+  savePreferences,
+  saveHouseholdSwapPreference,
+  getHouseholdSwapPreferences
 } from './PreferenceRepository.js';
 import { getUnifiedCategories, getCategories, saveCategories } from './CategoryRepository.js';
 import { executeSubcollectionMigration, cleanPreferencesBloat } from './SyncRepository.js';
@@ -31,7 +33,7 @@ import {
   isDbAvailable, 
   safeFirestoreGet 
 } from './RecipeFirestoreRepository.js';
-import { getRecipes, saveRecipe, deleteRecipe } from './RecipeRepository.js';
+import { getRecipes, saveRecipe, deleteRecipe, deleteRecipeVariant } from './RecipeRepository.js';
 import { getIngredients, saveIngredient, deleteIngredient } from './PantryFirestoreRepository.js';
 import { 
   saveShoppingList,
@@ -159,6 +161,8 @@ const HouseholdRepository = {
   saveCategories,
   getPreferences,
   savePreferences,
+  saveHouseholdSwapPreference,
+  getHouseholdSwapPreferences,
   dismissAdvisoryInDb,
   savePreferencesWithAutoPrune,
   batchResolveOrphansWithNewSubtypeInDb,
@@ -185,6 +189,8 @@ export {
   getHouseholdData,
   getPreferences,
   savePreferences,
+  saveHouseholdSwapPreference,
+  getHouseholdSwapPreferences,
   getUnifiedCategories,
   getCategories,
   saveCategories,
@@ -204,6 +210,7 @@ export {
   getRecipes,
   saveRecipe,
   deleteRecipe,
+  deleteRecipeVariant,
   getIngredients,
   saveIngredient,
   deleteIngredient,
