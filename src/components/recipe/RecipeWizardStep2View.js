@@ -5,7 +5,7 @@
 
 import { wizardState } from './RecipeWizardState.js';
 import { getState } from '../../store/store.js';
-import { renderTaxonomySearchHTML } from './RecipeWizardTaxonomySearch.js';
+import { renderTaxonomySearchHTML, isIngredientUnlinked } from './RecipeWizardTaxonomySearch.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
 import { recalculateWizardMacros } from './RecipeWizardStep3Handlers.js';
 import { renderMacroBreakdownCrossbar } from './RecipeWizardStep3View.js';
@@ -52,8 +52,9 @@ export function renderState2Mapping() {
   activeRecipe.servings = servings;
   activeRecipe.serves = servings;
 
-  const storeState = getState();
-  const ingredientsBank = storeState.ingredients || [];
+  const storeState = getState() || {};
+  const ingredientsBank = storeState.rootItems || storeState.ingredients || [];
+  const productsBank = storeState.products || [];
 
   let sectionsHtml = '';
 
@@ -111,7 +112,7 @@ export function renderState2Mapping() {
             ${waterInputHtml}
           </td>
           <td style="padding: 6px; min-width: 220px;">
-            ${renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank)}
+            ${renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank, productsBank)}
           </td>
           <td style="padding: 6px; width: 36px; text-align: center;">
             <button type="button" class="btn sm danger ghost wiz-del-ing-btn" data-sidx="${sIdx}" data-iidx="${iIdx}" title="Delete ingredient">🗑️</button>
@@ -214,7 +215,7 @@ export function renderState2Mapping() {
 
       ${(() => {
         const allIngs = (recipe.ingredientSections || []).flatMap(s => s.ingredients || []);
-        const unlinkedIngs = allIngs.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
+        const unlinkedIngs = allIngs.filter(i => isIngredientUnlinked(i, productsBank, ingredientsBank));
         if (!unlinkedIngs.length) return '';
         return `
           <div class="wiz-gate-warning" id="wiz-gate-warning-banner" style="margin-bottom: 12px; padding: 10px 14px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; color: #9f1239; font-size: 12.5px; display: flex; align-items: center; gap: 8px;">
@@ -227,7 +228,7 @@ export function renderState2Mapping() {
         <button type="button" class="btn ghost" id="wizard-back-btn">← Back</button>
         ${(() => {
           const allIngs = (recipe.ingredientSections || []).flatMap(s => s.ingredients || []);
-          const unlinked = allIngs.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
+          const unlinked = allIngs.filter(i => isIngredientUnlinked(i, productsBank, ingredientsBank));
           const isDisabled = unlinked.length > 0;
           return `<button type="button" class="btn primary" id="btn-next-step2" ${isDisabled ? 'disabled style="opacity:0.6; cursor:not-allowed;" title="All ingredients must be linked before proceeding"' : ''}>Next: Final Inline Review →</button>`;
         })()}

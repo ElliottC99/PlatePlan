@@ -1,6 +1,7 @@
 import './config/firebase.js';
 
 import { RESTORED_GNOCCHI_RECIPE } from './config/restoredGnocchi.js';
+import { RESTORED_DAN_DAN_RECIPE } from './config/restoredDanDan.js';
 
 if (typeof window !== 'undefined') {
   window.restoreDeletedGnocchi = async () => {
@@ -15,6 +16,27 @@ if (typeof window !== 'undefined') {
       if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Restored "Creamy Sausage & Pea Gnocchi" from database backup!');
     } catch (e) {
       console.error('[PlatePlan] Failed to restore Gnocchi:', e);
+    }
+  };
+  window.restoreDanDanNoodles = async () => {
+    try {
+      const { saveRecipe } = await import('./services/HouseholdRepository.js');
+      await saveRecipe(RESTORED_DAN_DAN_RECIPE);
+      const state = getState();
+      if (state?.recipes) {
+        const idx = state.recipes.findIndex(r => r.id === RESTORED_DAN_DAN_RECIPE.id);
+        if (idx !== -1) {
+          state.recipes[idx] = RESTORED_DAN_DAN_RECIPE;
+        } else {
+          state.recipes.push(RESTORED_DAN_DAN_RECIPE);
+        }
+      }
+      if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
+      if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Restored "Spicy Dan Dan Noodles" with enhanced variant from database backup!');
+      return true;
+    } catch (e) {
+      console.error('[PlatePlan] Failed to restore Dan Dan Noodles:', e);
+      return false;
     }
   };
   window.showTescoImport = () => {
@@ -310,6 +332,13 @@ function setupSubscriptions() {
       window.__gnocchiRestored = true;
       if (typeof window.restoreDeletedGnocchi === 'function') {
         window.restoreDeletedGnocchi();
+      }
+    }
+    const danDan = clean.find(r => r.id === 'r1788293902486' || r.name === 'Spicy Dan Dan Noodles');
+    if (danDan && !danDan.enhanced && !window.__danDanRestored) {
+      window.__danDanRestored = true;
+      if (typeof window.restoreDanDanNoodles === 'function') {
+        window.restoreDanDanNoodles();
       }
     }
     renderRecipeVault(); renderToday(); if (getState().currentPlan && typeof renderPlanner === 'function') renderPlanner();

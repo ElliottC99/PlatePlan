@@ -88,6 +88,8 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null, va
     }
     const found = allRecipes.find(r => r && (String(r.id) === String(editRecipeId) || String(r._id) === String(editRecipeId)));
     if (found) {
+      wizardState.baseOriginalRecipe = JSON.parse(JSON.stringify(found));
+      wizardState.activeVariant = activeVariant || 'original';
       const isEnhVariant = activeVariant === 'enhanced' && found.enhanced;
       const targetSource = isEnhVariant ? { ...found, ...found.enhanced } : found;
 

@@ -11,31 +11,121 @@
 import { getState } from '../../store/store.js';
 import { getUnifiedCategories } from '../../services/HouseholdRepository.js';
 import { openTaxonomyCreationModal } from './RecipeWizardTaxonomyModal.js';
+import { resolveProductForIngredient } from './RecipeWizardStep3Handlers.js';
 
-export function getTaxonomyLabel(ingredientId, subtypeId, rawName = '', ingredientsBank = [], categoryId = null) {
+/**
+ * Validates whether an ingredient is truly unlinked.
+ * An item is LINKED if:
+ * - it has a known productId in products
+ * - it has an ingredientId in ingredients
+ * - it has a categoryId
+ * - it resolves via resolveProductForIngredient
+ */
+export function isIngredientUnlinked(item, products = [], ingredients = []) {
+  if (!item || typeof item !== 'object') return false;
+  if (item.isNewTaxonomyItem || item.ingredientId === 'new_item') return true;
+  if (item.categoryId) return false;
+  if (item.productId && (products || []).some(p => String(p.id) === String(item.productId))) return false;
+  if (item.ingredientId && (ingredients || []).some(i => String(i.id) === String(item.ingredientId))) return false;
+  if (item.subtypeId) {
+    for (const ing of (ingredients || [])) {
+      if ((ing.subtypes || []).some(s => String(s.id) === String(item.subtypeId) || String(s.name) === String(item.subtypeId))) {
+        return false;
+      }
+    }
+  }
+  if (typeof resolveProductForIngredient === 'function') {
+    const resolved = resolveProductForIngredient(item, { products, ingredients });
+    if (resolved) return false;
+  }
+  return true;
+}
+
+export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, arg6 = []) {
+  let item = null;
+  let ingredientId = null;
+  let subtypeId = null;
+  let rawName = '';
+  let categoryId = null;
+  let ingBank = [];
+  let prodBank = [];
+
+  if (typeof arg1 === 'object' && arg1 !== null) {
+    item = arg1;
+    ingredientId = item.ingredientId;
+    subtypeId = item.subtypeId;
+    rawName = item.name || item.raw || '';
+    categoryId = item.categoryId;
+    ingBank = Array.isArray(arg2) ? arg2 : (Array.isArray(arg4) ? arg4 : (getState()?.ingredients || []));
+    prodBank = Array.isArray(arg3) ? arg3 : (Array.isArray(arg6) && arg6.length ? arg6 : (getState()?.products || []));
+  } else {
+    ingredientId = arg1;
+    subtypeId = arg2;
+    rawName = arg3;
+    ingBank = Array.isArray(arg4) ? arg4 : (getState()?.ingredients || []);
+    categoryId = arg5;
+    prodBank = Array.isArray(arg6) ? arg6 : (getState()?.products || []);
+  }
+
   if (categoryId) {
     return `📂 [Category] ${categoryId}`;
   }
-  if (!ingredientId || ingredientId === 'new_item') {
-    return `✨ New Item: ${rawName || 'Custom'}`;
-  }
 
-  const ing = ingredientsBank.find(i => String(i.id) === String(ingredientId));
-  if (!ing) return `✨ New Item: ${rawName || 'Custom'}`;
-
-  if (subtypeId) {
-    const sub = (ing.subtypes || []).find(s => String(s.id) === String(subtypeId) || String(s.name) === String(subtypeId));
-    if (sub) {
-      return `🏷️ ${sub.name} (${ing.name})`;
+  // 1. Direct product ID or bankId
+  const directProdId = item?.productId || item?.bankId;
+  if (directProdId) {
+    const prod = (prodBank || []).find(p => String(p.id) === String(directProdId));
+    if (prod) {
+      return `📦 ${prod.name || prod.productName} [${prod.category || prod.cat || 'Product'}]`;
+    }
+    if (item?.productName) {
+      return `📦 ${item.productName} [Product]`;
     }
   }
 
-  return `📦 ${ing.name} [${ing.category || 'General'}]`;
+  // 2. Subtype mapping in ingredientsBank
+  if (subtypeId) {
+    for (const ing of (ingBank || [])) {
+      const sub = (ing.subtypes || []).find(s => String(s.id) === String(subtypeId) || String(s.name) === String(subtypeId));
+      if (sub) {
+        return `🏷️ ${sub.name} (${ing.name})`;
+      }
+    }
+  }
+
+  // 3. Root ingredient mapping in ingredientsBank
+  if (ingredientId && ingredientId !== 'new_item') {
+    const ing = (ingBank || []).find(i => String(i.id) === String(ingredientId));
+    if (ing) {
+      return `📦 ${ing.name} [${ing.category || 'General'}]`;
+    }
+  }
+
+  // 4. Resolve via canonical resolver if item exists
+  if (item && typeof resolveProductForIngredient === 'function') {
+    const resolved = resolveProductForIngredient(item, { products: prodBank, ingredients: ingBank });
+    if (resolved) {
+      return `📦 ${resolved.name} [${resolved.category || 'Product'}]`;
+    }
+  }
+
+  return `✨ New Item: ${rawName || 'Custom'}`;
 }
 
-export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = []) {
-  const selectedVal = item.categoryId ? `cat:${item.categoryId}` : (item.subtypeId ? `${item.ingredientId}:${item.subtypeId}` : (item.ingredientId || 'new_item'));
-  const selectedLabel = getTaxonomyLabel(item.ingredientId, item.subtypeId, item.name, ingredientsBank, item.categoryId);
+export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [], productsBank = []) {
+  const pBank = Array.isArray(productsBank) && productsBank.length ? productsBank : (getState()?.products || []);
+  const iBank = Array.isArray(ingredientsBank) && ingredientsBank.length ? ingredientsBank : (getState()?.ingredients || []);
+
+  const hasProd = item.productId && pBank.some(p => String(p.id) === String(item.productId));
+  const selectedVal = item.categoryId 
+    ? `cat:${item.categoryId}` 
+    : (hasProd 
+        ? `prod:${item.productId}` 
+        : (item.subtypeId 
+            ? `${item.ingredientId}:${item.subtypeId}` 
+            : (item.ingredientId || (item.productId ? `prod:${item.productId}` : 'new_item'))));
+
+  const selectedLabel = getTaxonomyLabel(item, iBank, pBank);
   const isCat = Boolean(item.categoryId) || selectedVal.startsWith('cat:');
   const catInputStyle = isCat ? 'background:#eef2ff; border:1px solid #818cf8; color:#4338ca; font-weight:600;' : 'background:var(--surface,#fff); border:1px solid var(--border,#ccc); color:var(--text);';
 
@@ -50,7 +140,7 @@ export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [])
              data-iidx="${iIdx}"
              data-tax-val="${escapeAttr(selectedVal)}"
              value="${escapeAttr(selectedLabel)}"
-             placeholder="Search category or item..."
+             placeholder="Search category, product, or item..."
              autocomplete="off"
              style="width:100%; padding:6px 8px; border-radius:6px; font-size:12px; ${catInputStyle}" />
       <div class="wiz-tax-dropdown"
@@ -64,6 +154,7 @@ export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [])
 export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
   const storeState = getState();
   const ingredientsBank = storeState.rootItems || storeState.ingredients || [];
+  const productsBank = storeState.products || [];
   const existingCategories = getUnifiedCategories(storeState);
 
   const filterAndRenderDropdown = (inputEl, dropdownEl) => {
@@ -88,6 +179,31 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
         `;
       }
     });
+
+    // Render matched products (ranked by isAutoDefault first)
+    if (query) {
+      const matchedProds = productsBank
+        .filter(p => {
+          const pName = String(p.name || '').toLowerCase();
+          const pCat = String(p.category || p.cat || '').toLowerCase();
+          const pBrand = String(p.brand || '').toLowerCase();
+          return pName.includes(query) || pCat.includes(query) || pBrand.includes(query);
+        })
+        .sort((a, b) => (b.isAutoDefault ? 1 : 0) - (a.isAutoDefault ? 1 : 0))
+        .slice(0, 15);
+
+      if (matchedProds.length > 0) {
+        html += `<div style="padding:4px 10px;font-size:10.5px;font-weight:700;color:var(--text2,#78716c);text-transform:uppercase;background:var(--surface2,#fbfbf9);border-bottom:1px solid var(--border,#eee);">Products (Pantry)</div>`;
+        matchedProds.forEach(prod => {
+          const autoBadge = prod.isAutoDefault ? `<span class="badge" style="background:#10b981;color:#fff;font-size:9.5px;padding:1px 4px;border-radius:4px;margin-left:4px;">Default</span>` : '';
+          html += `
+            <div class="wiz-tax-opt wiz-tax-product" data-val="prod:${escapeAttr(prod.id)}" data-label="📦 ${escapeAttr(prod.name)} [${escapeAttr(prod.category || prod.cat || 'Product')}]" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:600; color:var(--text); border-bottom:1px solid rgba(0,0,0,0.03);">
+              📦 ${escapeHtml(prod.name)}${autoBadge} <span style="font-size:10.5px;font-weight:normal;color:var(--text2);">[${escapeHtml(prod.category || prod.cat || 'Product')}]</span>
+            </div>
+          `;
+        });
+      }
+    }
 
     ingredientsBank.forEach(ing => {
       const ingName = String(ing.name || '').toLowerCase();

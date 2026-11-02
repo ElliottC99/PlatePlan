@@ -4,7 +4,7 @@
  */
 
 import { wizardState, syncStep2InputsToState } from './RecipeWizardState.js';
-import { bindTaxonomyAutocompleteEvents } from './RecipeWizardTaxonomySearch.js';
+import { bindTaxonomyAutocompleteEvents, isIngredientUnlinked } from './RecipeWizardTaxonomySearch.js';
 import { promptRecipeWizardAliases } from './RecipeWizardAliasesPrompt.js';
 import { getState } from '../../store/store.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
@@ -192,8 +192,11 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
         });
       }
 
+      const state = getState() || {};
+      const prods = state.products || [];
+      const ings = state.rootItems || state.ingredients || [];
       const allIngs = (wizardState.activeRecipe.ingredientSections || []).flatMap(s => s.ingredients || []);
-      const unlinked = allIngs.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
+      const unlinked = allIngs.filter(i => isIngredientUnlinked(i, prods, ings));
       if (unlinked.length > 0) {
         showWizardNotice(`Cannot proceed: ${unlinked.length} ingredient(s) retain an unlinked "✨ New Item" status. Please map each ingredient to a valid Category, Item, or Sub-Type.`, 'warning');
         return;

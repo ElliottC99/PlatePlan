@@ -36,7 +36,7 @@ export function scanUnlinkedRecipeIngredients() {
 
     const check = (item, sIdx, iIdx) => {
       if (!item) return;
-      const linked = Boolean(item.pantryItemId || item.ingredientId || item.targetId || (item.id && typeof item.id === 'string' && item.id.length > 3));
+      const linked = Boolean(item.productId || item.bankId || item.categoryId || item.pantryItemId || item.ingredientId || item.targetId || (item.id && typeof item.id === 'string' && item.id.length > 3));
       if (!linked) {
         const raw = typeof item === 'string' ? item : (item.raw || item.name || item.ingredient || item.ingredientName || '');
         const key = normaliseIngredientString(raw).toLowerCase();

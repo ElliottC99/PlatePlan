@@ -90,6 +90,11 @@ export function buildLiveEnhancedRecipe(route, originalRecipe) {
     const item = workingIngredients.find(i => String(i.name || '').toLowerCase().trim() === targetName);
     if (item) {
       item.name = sAdj.swapTo;
+      if (sAdj.proposedQty !== undefined) {
+        item.qty = Number(sAdj.proposedQty);
+        item.amount = item.qty;
+      }
+      if (sAdj.unit) item.unit = sAdj.unit;
       if (sAdj.postTaxonomy) {
         if (sAdj.postTaxonomy.productId) item.productId = sAdj.postTaxonomy.productId;
         if (sAdj.postTaxonomy.productName) item.productName = sAdj.postTaxonomy.productName;
@@ -107,6 +112,11 @@ export function buildLiveEnhancedRecipe(route, originalRecipe) {
     const item = workingIngredients.find(i => String(i.name || '').toLowerCase().trim() === targetName);
     if (item && sAdj.selectedSwap) {
       item.name = sAdj.selectedSwap.productName || sAdj.selectedSwap.subtype || item.name;
+      if (sAdj.proposedQty !== undefined) {
+        item.qty = Number(sAdj.proposedQty);
+        item.amount = item.qty;
+      }
+      if (sAdj.unit) item.unit = sAdj.unit;
       if (sAdj.postTaxonomy) {
         if (sAdj.postTaxonomy.productId) item.productId = sAdj.postTaxonomy.productId;
         if (sAdj.postTaxonomy.productName) item.productName = sAdj.postTaxonomy.productName;
@@ -182,48 +192,10 @@ function renderEnhancementModalContent(wrap, plan) {
   const predMeta = getFitScoreTierMeta(currentPredScore);
 
   const activeAdjs = activeRoute.adjustments || [];
-
-  let routeNavHtml = '';
-  if (plan.routes && plan.routes.length > 1) {
-    routeNavHtml = `
-      <div class="enh-route-nav" role="tablist" style="
-        display: flex;
-        background: var(--surface2, #f0eee9);
-        padding: 4px;
-        border-radius: 12px;
-        margin-bottom: 16px;
-        gap: 6px;
-      ">
-        ${plan.routes.map(r => {
-          const isSelected = r.id === activeRoute.id;
-          return `
-            <button type="button" class="enh-route-tab" data-route-id="${escapeHtml(r.id)}" role="tab" aria-selected="${isSelected ? 'true' : 'false'}" style="
-              flex: 1;
-              padding: 8px 12px;
-              font-size: 12.5px;
-              font-weight: ${isSelected ? '700' : '500'};
-              border: none;
-              border-radius: 9px;
-              background: ${isSelected ? 'var(--surface, #ffffff)' : 'transparent'};
-              color: ${isSelected ? 'var(--text, #1c1917)' : 'var(--text2, #78716c)'};
-              box-shadow: ${isSelected ? '0 2px 6px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)' : 'none'};
-              cursor: pointer;
-              transition: all 0.15s ease;
-              white-space: nowrap;
-              text-align: center;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              gap: 6px;
-            ">
-              <span>${escapeHtml(r.badge)}</span>
-              <span style="font-weight:700;color:${isSelected ? 'var(--action, #007aff)' : 'inherit'};">${escapeHtml(r.predictedScore)}%</span>
-            </button>
-          `;
-        }).join('')}
-      </div>
-    `;
-  }
+  const orig = plan.originalRecipe || {};
+  const origIngredients = (orig.ingredientSections && orig.ingredientSections.length > 0)
+    ? orig.ingredientSections.flatMap(s => s.ingredients || [])
+    : (Array.isArray(orig.ingredients) ? orig.ingredients : []);
 
   const adjRowsHtml = activeAdjs.map((adj, idx) => {
     const isLast = idx === activeAdjs.length - 1;
@@ -233,13 +205,13 @@ function renderEnhancementModalContent(wrap, plan) {
     const totalProt = Math.round(((adj.deltaProt || 0) + (adj.swapDeltaProt || 0)) * 10) / 10;
     const totalKcal = (adj.deltaKcal || 0) + (adj.swapDeltaKcal || 0);
     if (totalProt > 0) {
-      tagHtml = `<span style="font-size:11px;font-weight:700;color:#16a34a;background:rgba(22,163,74,0.12);padding:2px 6px;border-radius:6px;white-space:nowrap;">+${totalProt}g prot</span>`;
+      tagHtml = `<span class="enh-adj-tag" data-adj-id="${escapeHtml(adj.id)}" style="font-size:11px;font-weight:700;color:#16a34a;background:rgba(22,163,74,0.12);padding:2px 6px;border-radius:6px;white-space:nowrap;">+${totalProt}g prot</span>`;
     } else if (totalKcal < 0) {
-      tagHtml = `<span style="font-size:11px;font-weight:700;color:#2563eb;background:rgba(37,99,235,0.12);padding:2px 6px;border-radius:6px;white-space:nowrap;">${totalKcal} kcal</span>`;
+      tagHtml = `<span class="enh-adj-tag" data-adj-id="${escapeHtml(adj.id)}" style="font-size:11px;font-weight:700;color:#2563eb;background:rgba(37,99,235,0.12);padding:2px 6px;border-radius:6px;white-space:nowrap;">${totalKcal} kcal</span>`;
     }
 
     let volumeStepperHtml = '';
-    if (adj.type === 'quantity' && adj.proposedQty !== undefined) {
+    if ((adj.type === 'quantity' || adj.type === 'swap') && adj.proposedQty !== undefined) {
       const stepUnit = String(adj.unit || 'g').toLowerCase();
       const stepVal = (stepUnit === 'ml' || stepUnit === 'g') ? (stepUnit === 'ml' ? 5 : 10) : 1;
       volumeStepperHtml = `
@@ -264,15 +236,13 @@ function renderEnhancementModalContent(wrap, plan) {
             <div style="flex:1;min-width:0;">
               <div style="color:var(--text, #1c1917);word-break:break-word;">
                 <span style="color:var(--text2, #78716c);font-size:11px;">Pantry:</span>
-                <strong style="font-weight:600;color:#16a34a;">${escapeHtml(adj.postTaxonomy.category)}</strong>
-                <span style="color:var(--text2, #78716c);margin:0 3px;">/</span>
-                <strong style="font-weight:600;color:#16a34a;">${escapeHtml(adj.postTaxonomy.rootItem)}</strong>
-                <span style="color:var(--text2, #78716c);margin:0 3px;">/</span>
-                <span style="color:#16a34a;font-weight:600;">${escapeHtml(adj.postTaxonomy.subtype)}</span>
+                <strong style="font-weight:600;color:#16a34a;">${escapeHtml(adj.postTaxonomy.category || 'Pantry')}</strong>
+                ${adj.postTaxonomy.rootItem ? `<span style="color:var(--text2, #78716c);margin:0 3px;">/</span><strong style="font-weight:600;color:#16a34a;">${escapeHtml(adj.postTaxonomy.rootItem)}</strong>` : ''}
+                ${adj.postTaxonomy.subtype ? `<span style="color:var(--text2, #78716c);margin:0 3px;">/</span><span style="color:#16a34a;font-weight:600;">${escapeHtml(adj.postTaxonomy.subtype)}</span>` : ''}
               </div>
               <div style="color:var(--text2, #78716c);font-size:11px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
                 <span>Linked Product:</span>
-                <span style="color:var(--text, #1c1917);font-weight:600;">${escapeHtml(adj.postTaxonomy.productName)}</span>
+                <span style="color:var(--text, #1c1917);font-weight:600;">${escapeHtml(adj.postTaxonomy.productName || adj.swapTo)}</span>
               </div>
             </div>
           </div>
@@ -317,7 +287,7 @@ function renderEnhancementModalContent(wrap, plan) {
     const isChecked = adj.type === 'optional_swap' ? Boolean(adj.active) : (adj.active !== false);
 
     return `
-      <div class="enh-adj-row" style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;background:var(--surface,#fff);${borderStyle}">
+      <div class="enh-adj-row" data-adj-id="${escapeHtml(adj.id)}" style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;background:var(--surface,#fff);${borderStyle}">
         <input 
           type="checkbox" 
           class="enh-adj-cb" 
@@ -327,12 +297,12 @@ function renderEnhancementModalContent(wrap, plan) {
         />
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
-            <div style="font-weight:600;font-size:13.5px;color:var(--text,#1c1917);line-height:1.35;word-break:break-word;">
+            <div class="enh-adj-label" data-adj-id="${escapeHtml(adj.id)}" style="font-weight:600;font-size:13.5px;color:var(--text,#1c1917);line-height:1.35;word-break:break-word;">
               ${escapeHtml(adj.label)}
             </div>
             ${tagHtml ? `<div style="flex:0 0 auto;">${tagHtml}</div>` : ''}
           </div>
-          <div style="font-size:12px;color:var(--text2,#78716c);margin-top:2px;line-height:1.35;">
+          <div class="enh-adj-detail" data-adj-id="${escapeHtml(adj.id)}" style="font-size:12px;color:var(--text2,#78716c);margin-top:2px;line-height:1.35;">
             ${escapeHtml(adj.detail)}
           </div>
           ${volumeStepperHtml}
@@ -473,6 +443,31 @@ function renderEnhancementModalContent(wrap, plan) {
           background: var(--surface, #ffffff);
         ">
           ${adjRowsHtml || '<div style="padding:16px;text-align:center;font-size:13px;color:var(--text2);">Recipe already meets 85%+ Fit Score targets!</div>'}
+        </div>
+
+        <!-- Custom Free-Hand Ingredient Substitution & Swaps -->
+        <div style="margin-bottom: 16px;">
+          <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text2, #78716c); margin-bottom: 8px; padding-left: 2px;">
+            ➕ Custom Ingredient Substitution
+          </div>
+          <div style="background: var(--surface2, #fbfaf8); border: 1px solid var(--border, rgba(120, 120, 128, 0.2)); border-radius: 12px; padding: 12px;">
+            <div style="display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 140px;">
+                <label style="display: block; font-size: 11px; font-weight: 600; color: var(--text2, #78716c); margin-bottom: 4px;">Ingredient to Substitute:</label>
+                <select id="enh-custom-source-ing" style="width: 100%; padding: 6px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); background: var(--surface, #fff); color: var(--text);">
+                  ${origIngredients.map(i => `<option value="${escapeAttr(i.name)}" data-qty="${i.qty || 1}" data-unit="${escapeAttr(i.unit || 'g')}">${escapeHtml(i.name)} (${i.qty || 1}${i.unit || 'g'})</option>`).join('')}
+                </select>
+              </div>
+              <div style="flex: 1.5; min-width: 180px; position: relative;">
+                <label style="display: block; font-size: 11px; font-weight: 600; color: var(--text2, #78716c); margin-bottom: 4px;">Substitute With (Pantry Product):</label>
+                <input type="text" id="enh-custom-search-product" placeholder="Search product (defaults ranked first)..." style="width: 100%; padding: 6px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); background: var(--surface, #fff); color: var(--text);" autocomplete="off" />
+                <div id="enh-custom-product-dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 200px; overflow-y: auto; background: var(--surface, #fff); border: 1px solid var(--border, #ddd); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); z-index: 1100; margin-top: 2px;"></div>
+              </div>
+            </div>
+            <div style="font-size: 11px; color: var(--text2, #78716c);">
+              💡 Search any pantry item to add your own custom swap. Products with auto-default set will appear first.
+            </div>
+          </div>
         </div>
 
         <!-- Serving Note Callout -->
@@ -640,6 +635,97 @@ function renderEnhancementModalContent(wrap, plan) {
     };
   });
 
+  // Wire Custom Product Search Autocomplete
+  const customSearchInput = wrap.querySelector('#enh-custom-search-product');
+  const customDropdown = wrap.querySelector('#enh-custom-product-dropdown');
+  const sourceIngSelect = wrap.querySelector('#enh-custom-source-ing');
+
+  if (customSearchInput && customDropdown) {
+    const storeState = getState() || {};
+    const products = storeState.products || [];
+
+    const renderCustomProductDropdown = (query) => {
+      const q = (query || '').toLowerCase().trim();
+      const matched = products
+        .filter(p => {
+          const pName = String(p.name || '').toLowerCase();
+          const pCat = String(p.category || p.cat || '').toLowerCase();
+          const pBrand = String(p.brand || '').toLowerCase();
+          return !q || pName.includes(q) || pCat.includes(q) || pBrand.includes(q);
+        })
+        .sort((a, b) => (b.isAutoDefault ? 1 : 0) - (a.isAutoDefault ? 1 : 0))
+        .slice(0, 15);
+
+      if (!matched.length) {
+        customDropdown.innerHTML = `<div style="padding:10px;font-size:12px;color:var(--text2,#78716c);text-align:center;">No matching products found.</div>`;
+        customDropdown.style.display = 'block';
+        return;
+      }
+
+      customDropdown.innerHTML = matched.map(p => {
+        const autoBadge = p.isAutoDefault ? `<span class="badge" style="background:#10b981;color:#fff;font-size:9.5px;padding:1px 4px;border-radius:4px;margin-left:4px;">Default</span>` : '';
+        return `
+          <div class="enh-custom-prod-opt" data-prod-id="${escapeHtml(p.id)}" style="padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid rgba(0,0,0,0.04);display:flex;align-items:center;justify-content:space-between;gap:6px;">
+            <div>
+              <strong style="color:var(--text,#1c1917);">${escapeHtml(p.name)}</strong>${autoBadge}
+              <div style="font-size:10.5px;color:var(--text2,#78716c);">${escapeHtml(p.category || p.cat || 'Pantry')}</div>
+            </div>
+            <div style="font-size:11px;font-weight:600;color:var(--text2,#78716c);white-space:nowrap;">
+              ${p.cal || p.kcal ? `${p.cal || p.kcal} kcal` : ''} ${p.prot || p.protein ? `| ${p.prot || p.protein}g P` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+      customDropdown.style.display = 'block';
+
+      customDropdown.querySelectorAll('.enh-custom-prod-opt').forEach(opt => {
+        opt.onclick = () => {
+          const prodId = opt.getAttribute('data-prod-id');
+          const p = products.find(x => String(x.id) === String(prodId));
+          if (!p) return;
+
+          const selectedOption = sourceIngSelect?.selectedOptions?.[0];
+          const sourceName = sourceIngSelect?.value || 'Ingredient';
+          const sourceQty = Number(selectedOption?.getAttribute('data-qty')) || 100;
+          const sourceUnit = selectedOption?.getAttribute('data-unit') || 'g';
+
+          const newAdj = {
+            id: `custom_swap_${Date.now()}`,
+            type: 'swap',
+            active: true,
+            isCustom: true,
+            ingredientName: sourceName,
+            swapTo: p.name,
+            selectedSwap: {
+              productId: p.id,
+              productName: p.name,
+              category: p.category || p.cat || 'Pantry'
+            },
+            proposedQty: sourceQty,
+            unit: sourceUnit,
+            postTaxonomy: {
+              productId: p.id,
+              productName: p.name,
+              category: p.category || p.cat || 'Pantry'
+            },
+            label: `Custom Swap: ${sourceName} ➔ ${p.name}`,
+            detail: `Substitute ${sourceQty}${sourceUnit} of ${sourceName} with ${p.name}`
+          };
+
+          if (!activeRoute.adjustments) activeRoute.adjustments = [];
+          activeRoute.adjustments.push(newAdj);
+          customDropdown.style.display = 'none';
+          customSearchInput.value = '';
+
+          renderEnhancementModalContent(wrap, plan);
+        };
+      });
+    };
+
+    customSearchInput.onfocus = () => renderCustomProductDropdown(customSearchInput.value);
+    customSearchInput.oninput = () => renderCustomProductDropdown(customSearchInput.value);
+  }
+
   // Wire Apply Button (strictly builds payload from active adjustments)
   const btnApply = wrap.querySelector('#btn-apply-enh');
   if (btnApply) {
@@ -690,6 +776,29 @@ function recomputeModalPredictedScore(wrap, route) {
     if (tierLabelElem) tierLabelElem.textContent = newMeta.label;
   }
 
+  // Update dynamic row labels & tags for each adjustment
+  (route.adjustments || []).forEach(adj => {
+    const labelEl = wrap.querySelector(`.enh-adj-label[data-adj-id="${adj.id}"]`);
+    if (labelEl && adj.type === 'quantity') {
+      const verb = adj.label?.includes('Boost') ? 'Boost lean protein' : (adj.label?.includes('Reduce') ? 'Reduce portion' : 'Adjust volume');
+      labelEl.textContent = `${verb}: ${adj.originalQty || ''}${adj.unit || 'g'} ➔ ${adj.proposedQty}${adj.unit || 'g'} ${adj.ingredientName}`;
+    }
+    const tagEl = wrap.querySelector(`.enh-adj-tag[data-adj-id="${adj.id}"]`);
+    if (tagEl && adj.type === 'quantity' && adj.originalQty) {
+      if (adj.deltaProt) {
+        const estProt = Math.round((adj.deltaProt * (adj.proposedQty / adj.originalQty)) * 10) / 10;
+        tagEl.textContent = `${estProt >= 0 ? '+' : ''}${estProt}g prot`;
+      }
+    }
+    const detailEl = wrap.querySelector(`.enh-adj-detail[data-adj-id="${adj.id}"]`);
+    if (detailEl && adj.type === 'quantity' && adj.originalQty) {
+      if (adj.deltaProt) {
+        const estProt = Math.round((adj.deltaProt * (adj.proposedQty / adj.originalQty)) * 10) / 10;
+        detailEl.textContent = `Adjusts to ${adj.proposedQty}${adj.unit || 'g'} to deliver ${estProt >= 0 ? '+' : ''}${estProt}g protein.`;
+      }
+    }
+  });
+
   const impactElem = wrap.querySelector('#enh-impact-text');
   if (impactElem) {
     const parts = [];
@@ -706,11 +815,6 @@ function recomputeModalPredictedScore(wrap, route) {
   if (protElem) protElem.textContent = `💪 ${liveData.liveMacros.protein}g prot`;
   if (carbElem) carbElem.textContent = `🌾 ${liveData.liveMacros.carbs}g carbs`;
   if (fatElem) fatElem.textContent = `🥑 ${liveData.liveMacros.fat}g fat`;
-}
-
-if (typeof window !== 'undefined') {
-  window.openEnhancementModal = openEnhancementModal;
-  window.closeEnhancementModal = closeEnhancementModal;
 }
 
 if (typeof window !== 'undefined') {

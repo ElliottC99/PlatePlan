@@ -30,7 +30,8 @@ export const wizardState = {
     methodSteps: [],
     macros: { calories: 450, protein: 28, carbs: 40, fat: 16 },
     enhanced: null
-  }
+  },
+  baseOriginalRecipe: null
 };
 
 export function hasDistinctEnhancedVariant(recipe = wizardState.activeRecipe) {
@@ -56,6 +57,9 @@ export function hasDistinctEnhancedVariant(recipe = wizardState.activeRecipe) {
 }
 
 export function getSaveButtonLabel(recipe = wizardState.activeRecipe) {
+  if (wizardState.activeVariant === 'enhanced') {
+    return 'Save Enhanced Variant';
+  }
   return hasDistinctEnhancedVariant(recipe) ? 'Save Both Recipes' : 'Save Original Recipe';
 }
 
@@ -63,6 +67,7 @@ export function resetWizardState() {
   wizardState.currentStep = 0;
   wizardState.choice = 'manual';
   wizardState.activeVariant = 'original';
+  wizardState.baseOriginalRecipe = null;
   wizardState.bulkText = '';
   wizardState.processingQueue = [];
   wizardState.currentQueueTotal = 0;
@@ -139,13 +144,28 @@ export function syncStep2InputsToState(modalWrap) {
       const item = wizardState.activeRecipe.ingredientSections[sIdx]?.ingredients[iIdx];
       if (item) {
         const val = input.dataset.taxVal || (input.value.startsWith('✨') ? 'new_item' : input.value);
-        if (!val || val === 'new_item') {
+        if (val.startsWith('prod:')) {
+          item.productId = val.slice(5);
           item.ingredientId = null;
           item.subtypeId = null;
           item.categoryId = null;
           item.isCategoryDefault = false;
           item.displayName = null;
-          item.isNewTaxonomyItem = true;
+          item.isNewTaxonomyItem = false;
+        } else if (!val || val === 'new_item') {
+          // If the item ALREADY has a known productId, do NOT discard it
+          const state = (typeof getState === 'function' ? getState() : (typeof window !== 'undefined' ? window.getState?.() : null)) || {};
+          const prods = state.products || [];
+          if (item.productId && prods.some(p => String(p.id) === String(item.productId))) {
+            item.isNewTaxonomyItem = false;
+          } else {
+            item.ingredientId = null;
+            item.subtypeId = null;
+            item.categoryId = null;
+            item.isCategoryDefault = false;
+            item.displayName = null;
+            item.isNewTaxonomyItem = true;
+          }
         } else if (val.startsWith('cat:')) {
           item.categoryId = val.slice(4);
           item.ingredientId = null;
