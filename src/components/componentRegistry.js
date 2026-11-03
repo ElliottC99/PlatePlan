@@ -4,9 +4,6 @@
  * Keeps main.js lean and under strict ES6 file size limits.
  */
 
-import * as DataQualityDrawer from './data-quality/DataQualityDrawer.js';
-import * as DataQualityIssueRow from './data-quality/DataQualityIssueRow.js';
-import * as DataQualityFixModal from './data-quality/DataQualityFixModal.js';
 import * as RecipeEditorModal from './recipe-editor/RecipeEditorModal.js';
 import * as RecipeIngredientRow from './recipe-editor/RecipeIngredientRow.js';
 import * as RecipeStepRow from './recipe-editor/RecipeStepRow.js';
@@ -54,7 +51,7 @@ import * as HeaderUI from './shell/HeaderUI.js';
 import * as NavigationUI from './shell/NavigationUI.js';
 
 export const registeredComponents = {
-  DataQualityDrawer, DataQualityIssueRow, DataQualityFixModal, RecipeEditorModal,
+  RecipeEditorModal,
   RecipeIngredientRow, RecipeStepRow, IngredientEditorRows, RecipeImportParserForm,
   ShoppingBatchToolbar, ShoppingCategoryGroup, ShoppingItemRow,
   PlannerDayCard, PlannerMealSlot, PlannerGridToolbar,

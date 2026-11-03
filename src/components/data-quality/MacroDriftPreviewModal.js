@@ -5,7 +5,7 @@
 
 import { getState, setRecipes, setPreferences } from '../../store/store.js';
 import { batchRecalibrateRecipesInDb } from '../../services/HouseholdRepository.js';
-import { calculateRecipeDynamicMacros } from '../../services/DataQualityScannerService.js';
+import { calculateRecipeDynamicMacros } from '../../services/DataQualityScanner.js';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -15,7 +15,11 @@ export function openMacroDriftPreviewModal(recipesToRecalibrate = []) {
   const products = state.products || [];
 
   // If no specific list, find all recipes with drift dynamically
-  let list = recipesToRecalibrate;
+  let list = Array.isArray(recipesToRecalibrate) ? [...recipesToRecalibrate] : [];
+  if (list.length > 0 && typeof list[0] === 'string') {
+    const allRecipes = state.recipes || [];
+    list = list.map(id => allRecipes.find(r => String(r.id) === String(id))).filter(Boolean);
+  }
   if (!list.length) {
     const recipes = state.recipes || [];
     recipes.forEach(r => {

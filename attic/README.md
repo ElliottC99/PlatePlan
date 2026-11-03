@@ -43,3 +43,6 @@ A file may be deleted after two weeks of normal use on both phones with no relat
 | `src/store/inventorySlice.js` | 2026-10-30 | 2026-11-13 |
 | `src/components/pantry/UseUpEditorUI.js` | 2026-10-30 | 2026-11-13 |
 | `src/components/pantry/UseUpFinderModalUI.js` | 2026-10-30 | 2026-11-13 |
+| `src/components/data-quality/DataQualityDrawer.js` | 2026-11-03 | 2026-11-17 |
+| `src/components/data-quality/DataQualityFixModal.js` | 2026-11-03 | 2026-11-17 |
+| `src/components/data-quality/DataQualityIssueRow.js` | 2026-11-03 | 2026-11-17 |

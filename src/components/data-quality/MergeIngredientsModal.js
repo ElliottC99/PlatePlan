@@ -51,6 +51,10 @@ export function openMergeIngredientsModal(issue = {}) {
   const ing1RecipesCount = getRecipeCount(ing1.id);
   const ing2RecipesCount = getRecipeCount(ing2.id);
 
+  const ing1Score = (ing1RecipesCount * 10) + ing1Prods.length;
+  const ing2Score = (ing2RecipesCount * 10) + ing2Prods.length;
+  const preferB = ing2Score > ing1Score;
+
   modal.innerHTML = `
     <div class="card" style="width:100%; max-width:640px; padding:24px; border-radius:14px; background:var(--surface,#fff); box-shadow:0 12px 36px rgba(0,0,0,0.25); display:flex; flex-direction:column; max-height:90vh; box-sizing:border-box;">
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px;">
@@ -65,27 +69,33 @@ export function openMergeIngredientsModal(issue = {}) {
       <div style="flex:1; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:10px; margin-bottom:18px; background:var(--surface2,#f5f5f4); padding:10px;">
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:14px;">
           <!-- Card 1 -->
-          <label class="card" style="cursor:pointer; padding:14px; border:2px solid var(--primary,#4f46e5); border-radius:10px; background:#fff; display:flex; flex-direction:column; gap:6px;">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <input type="radio" name="canonical-selection" value="ing1" checked style="width:18px; height:18px; accent-color:var(--primary,#4f46e5);" />
-              <strong style="font-size:14px; color:var(--primary,#4f46e5);">Keep Option A (Canonical)</strong>
+          <label class="card" style="cursor:pointer; padding:14px; border:2px solid ${!preferB ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'}; border-radius:10px; background:#fff; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <input type="radio" name="canonical-selection" value="ing1" ${!preferB ? 'checked' : ''} style="width:18px; height:18px; accent-color:var(--primary,#4f46e5);" />
+                <strong style="font-size:13.5px; color:${!preferB ? 'var(--primary,#4f46e5)' : 'var(--text,#1c1917)'};">Keep Option A</strong>
+              </div>
+              ${!preferB ? `<span class="badge" style="background:#dcfce7; color:#15803d; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Recommended</span>` : ''}
             </div>
             <div style="font-size:15px; font-weight:750; color:#111827; margin-top:4px;">${escapeHtml(ing1.name)}</div>
             <div style="font-size:11.5px; color:var(--text2);">Category: ${escapeHtml(ing1.category || 'other')}</div>
-            <div style="font-size:11.5px; color:var(--text2);">Macros: ${ing1.cal} kcal · ${ing1.prot}g protein</div>
+            <div style="font-size:11.5px; color:var(--text2);">Macros: ${ing1.cal || ing1.kcal || 0} kcal · ${ing1.prot || ing1.protein || 0}g protein</div>
             <div style="font-size:11.5px; color:var(--text2); font-weight:600;">Linked products: ${ing1Prods.length}</div>
             <div style="font-size:11.5px; color:var(--text2); font-weight:600;">Linked recipes: ${ing1RecipesCount}</div>
           </label>
 
           <!-- Card 2 -->
-          <label class="card" style="cursor:pointer; padding:14px; border:2px solid var(--border); border-radius:10px; background:#fff; display:flex; flex-direction:column; gap:6px;" onclick="this.style.borderColor='var(--primary)'" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <input type="radio" name="canonical-selection" value="ing2" style="width:18px; height:18px; accent-color:var(--primary,#4f46e5);" />
-              <strong style="font-size:14px; color:var(--text3,#78716c);">Keep Option B (Canonical)</strong>
+          <label class="card" style="cursor:pointer; padding:14px; border:2px solid ${preferB ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'}; border-radius:10px; background:#fff; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <input type="radio" name="canonical-selection" value="ing2" ${preferB ? 'checked' : ''} style="width:18px; height:18px; accent-color:var(--primary,#4f46e5);" />
+                <strong style="font-size:13.5px; color:${preferB ? 'var(--primary,#4f46e5)' : 'var(--text,#1c1917)'};">Keep Option B</strong>
+              </div>
+              ${preferB ? `<span class="badge" style="background:#dcfce7; color:#15803d; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Recommended</span>` : ''}
             </div>
             <div style="font-size:15px; font-weight:750; color:#111827; margin-top:4px;">${escapeHtml(ing2.name)}</div>
             <div style="font-size:11.5px; color:var(--text2);">Category: ${escapeHtml(ing2.category || 'other')}</div>
-            <div style="font-size:11.5px; color:var(--text2);">Macros: ${ing2.cal} kcal · ${ing2.prot}g protein</div>
+            <div style="font-size:11.5px; color:var(--text2);">Macros: ${ing2.cal || ing2.kcal || 0} kcal · ${ing2.prot || ing2.protein || 0}g protein</div>
             <div style="font-size:11.5px; color:var(--text2); font-weight:600;">Linked products: ${ing2Prods.length}</div>
             <div style="font-size:11.5px; color:var(--text2); font-weight:600;">Linked recipes: ${ing2RecipesCount}</div>
           </label>
