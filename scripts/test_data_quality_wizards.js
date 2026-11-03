@@ -315,4 +315,32 @@ console.log('\n--- Test 6: Inverted Unmapped Pantry Card Retired ---');
   console.log('✅ Test 6 Passed: Unmapped pantry staples do not produce artificial action items.');
 }
 
+// --- Test 7: Category Mapping & Audit Issue Counting ---
+console.log('\n--- Test 7: Category Mapping & Audit Issue Counting ---');
+{
+  const mockState = {
+    ingredients: [
+      { id: 'fam_produce', name: 'Apples', category: 'Fruit & Vegetables' }
+    ],
+    recipes: [
+      {
+        id: 'rec_1',
+        name: 'Fruit Salad',
+        ingredients: [
+          { name: 'Apples', ingredientId: 'fam_produce' },
+          { name: 'Mixed Berries', categoryId: 'Fruit & Vegetables' }, // Linked via category
+          { name: 'Pears' } // Unlinked
+        ]
+      }
+    ]
+  };
+
+  const { auditRecipeMappings } = await import('../src/utils/RecipeAuditService.js');
+  const auditReport = auditRecipeMappings(mockState);
+
+  assert.strictEqual(auditReport.issues.length, 1, 'Only completely unlinked items without category or ingredient link should be flagged');
+  assert.strictEqual(auditReport.issues[0].itemName, 'Pears');
+  console.log('✅ Test 7 Passed: Category-level ingredient links recognized and audit count matches.');
+}
+
 console.log('\n=== ALL DATA QUALITY TESTS PASSED SUCCESSFULLY! ===');

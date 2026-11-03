@@ -132,8 +132,14 @@ export function auditRecipeMappings(stateData = null) {
         itemName = String(item.name || item.ingredient || item.ingredientName || 'Unnamed Ingredient').trim();
         currentIngredientId = item.ingredientId || null;
         currentSubtypeId = item.subtypeId || null;
+        let currentCategoryId = item.categoryId || (item.cat ? String(item.cat) : null);
 
-        if (!currentIngredientId && !currentSubtypeId) {
+        if (currentIngredientId && String(currentIngredientId).startsWith('cat:')) {
+          currentCategoryId = String(currentIngredientId).replace('cat:', '');
+          currentIngredientId = null;
+        }
+
+        if (!currentIngredientId && !currentSubtypeId && !currentCategoryId) {
           issueType = 'unlinked';
           message = 'Ingredient lacks Master Catalog link.';
         } else if (currentIngredientId && !ingredientById.has(String(currentIngredientId))) {
@@ -208,13 +214,15 @@ export async function relinkRecipeIngredient({ recipeId, itemIndex, itemName = '
   }
 
   const recipe = JSON.parse(JSON.stringify(recipes[recIndex]));
-  const parentIng = ingredients.find(i => String(i.id) === String(newIngredientId));
+  const isCat = String(newIngredientId || '').startsWith('cat:');
+  const catName = isCat ? String(newIngredientId).replace('cat:', '') : '';
+  const parentIng = !isCat ? ingredients.find(i => String(i.id) === String(newIngredientId)) : null;
   const subType = parentIng && newSubtypeId && Array.isArray(parentIng.subtypes) 
     ? parentIng.subtypes.find(s => String(s.id) === String(newSubtypeId))
     : null;
 
-  const effectiveIngName = parentIng?.name || newIngredientName || '';
-  const effectiveSubName = subType?.name || newSubtypeName || '';
+  const effectiveIngName = isCat ? catName : (parentIng?.name || newIngredientName || '');
+  const effectiveSubName = isCat ? '' : (subType?.name || newSubtypeName || '');
 
   let foundTarget = false;
   let originalItem = null;
@@ -236,11 +244,14 @@ export async function relinkRecipeIngredient({ recipeId, itemIndex, itemName = '
 
           sec.ingredients[i] = {
             ...originalItem,
-            name: effectiveSubName ? `${effectiveIngName} (${effectiveSubName})` : effectiveIngName,
-            ingredientName: effectiveIngName,
-            ingredientId: String(newIngredientId),
-            subtypeId: newSubtypeId ? String(newSubtypeId) : null,
-            subtypeName: effectiveSubName,
+            name: isCat ? (originalItem.name || catName) : (effectiveSubName ? `${effectiveIngName} (${effectiveSubName})` : effectiveIngName),
+            ingredientName: isCat ? '' : effectiveIngName,
+            ingredientId: isCat ? null : String(newIngredientId),
+            pantryItemId: isCat ? null : String(newIngredientId),
+            categoryId: isCat ? catName : (parentIng?.category || originalItem.categoryId || null),
+            cat: isCat ? catName.toLowerCase().replace(/[^a-z0-9]+/g, '-') : (parentIng?.category || originalItem.cat || null),
+            subtypeId: isCat ? null : (newSubtypeId ? String(newSubtypeId) : null),
+            subtypeName: isCat ? null : effectiveSubName,
             qty: effectiveQty,
             unit: effectiveUnit
           };
@@ -270,11 +281,14 @@ export async function relinkRecipeIngredient({ recipeId, itemIndex, itemName = '
 
       recipe.ingredients[idx] = {
         ...originalItem,
-        name: effectiveSubName ? `${effectiveIngName} (${effectiveSubName})` : effectiveIngName,
-        ingredientName: effectiveIngName,
-        ingredientId: String(newIngredientId),
-        subtypeId: newSubtypeId ? String(newSubtypeId) : null,
-        subtypeName: effectiveSubName,
+        name: isCat ? (originalItem.name || catName) : (effectiveSubName ? `${effectiveIngName} (${effectiveSubName})` : effectiveIngName),
+        ingredientName: isCat ? '' : effectiveIngName,
+        ingredientId: isCat ? null : String(newIngredientId),
+        pantryItemId: isCat ? null : String(newIngredientId),
+        categoryId: isCat ? catName : (parentIng?.category || originalItem.categoryId || null),
+        cat: isCat ? catName.toLowerCase().replace(/[^a-z0-9]+/g, '-') : (parentIng?.category || originalItem.cat || null),
+        subtypeId: isCat ? null : (newSubtypeId ? String(newSubtypeId) : null),
+        subtypeName: isCat ? null : effectiveSubName,
         qty: effectiveQty,
         unit: effectiveUnit
       };
@@ -321,13 +335,15 @@ export async function batchRelinkRecipeMappings(fixes = []) {
     const recipe = recipeMap.get(rId);
     if (!recipe) continue;
 
-    const parentIng = ingredients.find(i => String(i.id) === String(fix.newIngredientId));
+    const isCat = String(fix.newIngredientId || '').startsWith('cat:');
+    const catName = isCat ? String(fix.newIngredientId).replace('cat:', '') : '';
+    const parentIng = !isCat ? ingredients.find(i => String(i.id) === String(fix.newIngredientId)) : null;
     const subType = parentIng && fix.newSubtypeId && Array.isArray(parentIng.subtypes)
       ? parentIng.subtypes.find(s => String(s.id) === String(fix.newSubtypeId))
       : null;
 
-    const effectiveIngName = parentIng?.name || fix.newIngredientName || '';
-    const effectiveSubName = subType?.name || fix.newSubtypeName || '';
+    const effectiveIngName = isCat ? catName : (parentIng?.name || fix.newIngredientName || '');
+    const effectiveSubName = isCat ? '' : (subType?.name || fix.newSubtypeName || '');
 
     let fixApplied = false;
 
@@ -347,11 +363,14 @@ export async function batchRelinkRecipeMappings(fixes = []) {
 
             sec.ingredients[i] = {
               ...item,
-              name: effectiveSubName ? `${effectiveIngName} (${effectiveSubName})` : effectiveIngName,
-              ingredientName: effectiveIngName,
-              ingredientId: String(fix.newIngredientId),
-              subtypeId: fix.newSubtypeId ? String(fix.newSubtypeId) : null,
-              subtypeName: effectiveSubName,
+              name: isCat ? (item.name || catName) : (effectiveSubName ? `${effectiveIngName} (${effectiveSubName})` : effectiveIngName),
+              ingredientName: isCat ? '' : effectiveIngName,
+              ingredientId: isCat ? null : String(fix.newIngredientId),
+              pantryItemId: isCat ? null : String(fix.newIngredientId),
+              categoryId: isCat ? catName : (parentIng?.category || item.categoryId || null),
+              cat: isCat ? catName.toLowerCase().replace(/[^a-z0-9]+/g, '-') : (parentIng?.category || item.cat || null),
+              subtypeId: isCat ? null : (fix.newSubtypeId ? String(fix.newSubtypeId) : null),
+              subtypeName: isCat ? null : effectiveSubName,
               qty: effQty,
               unit: effUnit
             };
@@ -381,11 +400,14 @@ export async function batchRelinkRecipeMappings(fixes = []) {
 
         recipe.ingredients[idx] = {
           ...item,
-          name: effectiveSubName ? `${effectiveIngName} (${effectiveSubName})` : effectiveIngName,
-          ingredientName: effectiveIngName,
-          ingredientId: String(fix.newIngredientId),
-          subtypeId: fix.newSubtypeId ? String(fix.newSubtypeId) : null,
-          subtypeName: effectiveSubName,
+          name: isCat ? (item.name || catName) : (effectiveSubName ? `${effectiveIngName} (${effectiveSubName})` : effectiveIngName),
+          ingredientName: isCat ? '' : effectiveIngName,
+          ingredientId: isCat ? null : String(fix.newIngredientId),
+          pantryItemId: isCat ? null : String(fix.newIngredientId),
+          categoryId: isCat ? catName : (parentIng?.category || item.categoryId || null),
+          cat: isCat ? catName.toLowerCase().replace(/[^a-z0-9]+/g, '-') : (parentIng?.category || item.cat || null),
+          subtypeId: isCat ? null : (fix.newSubtypeId ? String(fix.newSubtypeId) : null),
+          subtypeName: isCat ? null : effectiveSubName,
           qty: effQty,
           unit: effUnit
         };

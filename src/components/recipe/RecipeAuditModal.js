@@ -10,6 +10,7 @@ import { renderKPIBadge, renderIssueCard, renderEmptyState } from './RecipeAudit
 import { AUDIT_SUGGESTION_THRESHOLD } from '../../config/businessRules.js';
 import { createTaxonomySearchInput } from '../pantry/RecipeSearchDropdownHelper.js';
 import { openTaxonomyCreationModal } from './RecipeWizardTaxonomyModal.js';
+import { getUnifiedCategories } from '../../services/CategoryRepository.js';
 
 let modalOverlay = null;
 let currentFilter = 'all';
@@ -24,6 +25,7 @@ function renderModalContent() {
   activeAuditSearchInstances.forEach(inst => inst?.destroy?.());
   activeAuditSearchInstances = [];
   const state = getState();
+  const categories = getUnifiedCategories(state) || [];
   const auditReport = auditRecipeMappings(state);
   const ingredients = state.ingredients || [];
   const { summary, issues } = auditReport;
@@ -143,10 +145,10 @@ function renderModalContent() {
     </div>
   `;
 
-  bindModalEvents(issues, totalPages, ingredients);
+  bindModalEvents(issues, totalPages, ingredients, categories);
 }
 
-function bindModalEvents(issues = [], totalPages = 1, ingredients = []) {
+function bindModalEvents(issues = [], totalPages = 1, ingredients = [], categories = []) {
   if (!modalOverlay) return;
 
   // Mount searchable autocomplete inputs on each issue card
@@ -161,17 +163,27 @@ function bindModalEvents(issues = [], totalPages = 1, ingredients = []) {
     let initialSubId = mountEl.dataset.selectedSubId || '';
 
     if (suggested) {
-      initialLabel = suggested.displayName ? `🏷️ ${suggested.displayName}` : `📦 ${suggested.ingredientName}`;
-      initialId = suggested.ingredientId;
-      initialSubId = suggested.subtypeId || '';
+      if (suggested.ingredientId && String(suggested.ingredientId).startsWith('cat:')) {
+        initialLabel = suggested.displayName || `📂 [Category] ${suggested.ingredientName}`;
+        initialId = suggested.ingredientId;
+        initialSubId = '';
+      } else {
+        initialLabel = suggested.displayName ? `🏷️ ${suggested.displayName}` : `📦 ${suggested.ingredientName}`;
+        initialId = suggested.ingredientId;
+        initialSubId = suggested.subtypeId || '';
+      }
     } else if (initialId) {
-      const parentIng = ingredients.find(ing => String(ing.id) === String(initialId));
-      if (parentIng) {
-        if (initialSubId && Array.isArray(parentIng.subtypes)) {
-          const sub = parentIng.subtypes.find(s => String(s.id) === String(initialSubId));
-          initialLabel = sub ? `🏷️ ${sub.name} (${parentIng.name})` : `📦 ${parentIng.name}`;
-        } else {
-          initialLabel = `📦 ${parentIng.name}`;
+      if (String(initialId).startsWith('cat:')) {
+        initialLabel = `📂 [Category] ${String(initialId).replace('cat:', '')}`;
+      } else {
+        const parentIng = ingredients.find(ing => String(ing.id) === String(initialId));
+        if (parentIng) {
+          if (initialSubId && Array.isArray(parentIng.subtypes)) {
+            const sub = parentIng.subtypes.find(s => String(s.id) === String(initialSubId));
+            initialLabel = sub ? `🏷️ ${sub.name} (${parentIng.name})` : `📦 ${parentIng.name}`;
+          } else {
+            initialLabel = `📦 ${parentIng.name}`;
+          }
         }
       }
     }
@@ -183,8 +195,10 @@ function bindModalEvents(issues = [], totalPages = 1, ingredients = []) {
 
     const searchInst = createTaxonomySearchInput({
       container: mountEl,
+      categories,
       rootItems: ingredients,
-      placeholder: 'Search Master Pantry...',
+      newItemType: 'item',
+      placeholder: 'Search category, root item, or sub-type...',
       initialValue: initialLabel,
       onNewClick: (typedName) => {
         const rawPhrase = mountEl.closest('.ram-issue-card')?.querySelector('[style*="color:var(--text,#1c1917)"] strong')?.textContent?.replace(/"/g, '')?.trim();
@@ -206,7 +220,10 @@ function bindModalEvents(issues = [], totalPages = 1, ingredients = []) {
         });
       },
       onSelect: ({ val, label }) => {
-        if (val && val.includes(':')) {
+        if (val && val.startsWith('cat:')) {
+          mountEl.dataset.selectedId = val;
+          mountEl.dataset.selectedSubId = '';
+        } else if (val && val.includes(':')) {
           const [ingId, subId] = val.split(':');
           mountEl.dataset.selectedId = ingId;
           mountEl.dataset.selectedSubId = subId;

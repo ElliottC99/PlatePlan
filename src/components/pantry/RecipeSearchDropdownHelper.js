@@ -25,7 +25,7 @@ export function createTaxonomySearchInput({
   const uniqueId = inputId || `tax-search-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
   const resolvedNewType = newItemType !== null 
     ? newItemType 
-    : (subtypesOnly ? 'subtype' : (categories.length > 0 && rootItems.length === 0 ? 'category' : (rootItems.length > 0 && categories.length === 0 ? 'item' : 'none')));
+    : (subtypesOnly ? 'subtype' : (categories.length > 0 && rootItems.length === 0 ? 'category' : (rootItems.length > 0 ? 'item' : 'none')));
 
   container.innerHTML = `
     <div class="wiz-tax-autocomplete-container" style="position:relative; width:100%;">

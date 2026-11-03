@@ -13,6 +13,7 @@ import { openMealPlanSyncWarningModal } from '../components/data-quality/MealPla
 import { openMergeIngredientsModal } from '../components/data-quality/MergeIngredientsModal.js';
 import { openRecipeAuditModal } from '../components/recipe/RecipeAuditModal.js';
 import { openUnlinkedSweeperModal, scanUnlinkedRecipeIngredients } from '../components/data-quality/UnlinkedSweeperUI.js';
+import { auditRecipeMappings } from '../utils/RecipeAuditService.js';
 import { performGlobalProductRelink, verifyZeroCalorieIngredient } from '../services/DataQualityService.js';
 import { showCustomDensityModal } from '../components/ui/DialogHelpers.js';
 
@@ -221,6 +222,14 @@ export function renderDataQualityView() {
     unlinkedRecipeCount = 0;
   }
 
+  let recipeAuditCount = 0;
+  try {
+    const auditReport = auditRecipeMappings(state);
+    recipeAuditCount = auditReport?.summary?.totalIssues || auditReport?.issues?.length || 0;
+  } catch (e) {
+    recipeAuditCount = 0;
+  }
+
   container.innerHTML = `
     <div style="max-width:920px; margin:0 auto; padding:20px; box-sizing:border-box;">
       
@@ -259,8 +268,8 @@ export function renderDataQualityView() {
           <button type="button" class="btn sm" data-action-dq="open-sweeper" style="font-weight:600; background:#059669; color:#fff; ${unlinkedRecipeCount === 0 ? 'opacity:0.55; cursor:default;' : ''}">
             🧹 Unlinked Sweeper (${unlinkedRecipeCount}${unlinkedRecipeCount === 0 ? ' ✓' : ''})
           </button>
-          <button type="button" class="btn sm" data-action-dq="open-recipe-audit" style="font-weight:600; background:var(--primary,#4f46e5); color:#fff;">
-            📖 Recipe Mapping Audit
+          <button type="button" class="btn sm" data-action-dq="open-recipe-audit" style="font-weight:600; background:var(--primary,#4f46e5); color:#fff; ${recipeAuditCount === 0 ? 'opacity:0.55; cursor:default;' : ''}">
+            📖 Recipe Mapping Audit (${recipeAuditCount}${recipeAuditCount === 0 ? ' ✓' : ''})
           </button>
         </div>
       </div>
