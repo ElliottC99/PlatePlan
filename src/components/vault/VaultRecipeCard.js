@@ -189,6 +189,7 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
                   delete r.enhanced;
                   delete r.enhancedFitScore;
                   if (r.variants) delete r.variants.enhanced;
+                  r._bestVariant = 'original';
                 }
               }
               const favList = getState()?.userPrefs?.variantFavourites;

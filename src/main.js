@@ -221,6 +221,8 @@ if (typeof window !== 'undefined') {
     updateRecipePreviewScale: RecipeDetailModalService.updateRecipePreviewScale,
     updateSinglePersonServes: RecipeDetailModalService.updateSinglePersonServes,
     renderRecipePreview: RecipeDetailModalService.renderRecipePreview,
+    removeCurrentEnhancedVariant: RecipeDetailModalService.removeCurrentEnhancedVariant,
+    openEnhanceRecipeModalForCurrent: RecipeDetailModalService.openEnhanceRecipeModalForCurrent,
     generatePlan: MealPlanGeneratorService.generatePlan,
     generateMealPlan: MealPlanGeneratorService.generateMealPlan,
     getPlanSlotInfo: MealPlanGeneratorService.getPlanSlotInfo,
@@ -332,13 +334,6 @@ function setupSubscriptions() {
       window.__gnocchiRestored = true;
       if (typeof window.restoreDeletedGnocchi === 'function') {
         window.restoreDeletedGnocchi();
-      }
-    }
-    const danDan = clean.find(r => r.id === 'r1788293902486' || r.name === 'Spicy Dan Dan Noodles');
-    if (danDan && !danDan.enhanced && !window.__danDanRestored) {
-      window.__danDanRestored = true;
-      if (typeof window.restoreDanDanNoodles === 'function') {
-        window.restoreDanDanNoodles();
       }
     }
     renderRecipeVault(); renderToday(); if (getState().currentPlan && typeof renderPlanner === 'function') renderPlanner();

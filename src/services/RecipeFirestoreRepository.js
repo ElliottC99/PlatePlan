@@ -197,6 +197,7 @@ export async function deleteRecipeVariant(recipeId, variantKey = 'enhanced') {
         updates.enhanced = null;
         updates.enhancedFitScore = null;
       }
+      updates._bestVariant = 'original';
     }
 
     await docRef.update(updates);
