@@ -204,10 +204,21 @@ export function openAddItemWizard(options = {}) {
         ` : `<div><label style="display:block; font-size:12px; font-weight:750; margin-bottom:4px;">Search Existing Product to Link</label><div id="wiz-existing-prod-container"></div></div>`}`;
     }
 
+    let finishBtnLabel = 'Finish &amp; Link to Bank';
+    if (isCat && step === 1) finishBtnLabel = 'Finish &amp; Save Category';
+    else if (!isCat && step === 1) finishBtnLabel = 'Finish &amp; Save Item';
+
+    const canFinishEarly = (isCat && step === 1) || (!isCat && !isProd && (step === 1 || step === 2)) || (isSub && step === 2);
+
     const navHtml = `
-      <div style="display:flex; justify-content:space-between; margin-top:20px; border-top:1px solid var(--border,#e7e5e4); padding-top:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; border-top:1px solid var(--border,#e7e5e4); padding-top:16px;">
         ${step === 1 ? `<button type="button" class="btn sm" id="btn-wiz-cancel">Cancel</button>` : `<button type="button" class="btn sm" id="btn-wiz-back">‹ Back</button>`}
-        ${isFinalStep ? (wizardData.productMode === 'existing' ? `<button type="button" class="btn primary sm" id="btn-wiz-finish">Finish &amp; Link to Bank</button>` : `<div></div>`) : `<button type="button" class="btn primary sm" id="btn-wiz-next">Next ➔</button>`}
+        <div style="display:flex; gap:8px;">
+          ${canFinishEarly ? `<button type="button" class="btn secondary sm btn-wiz-finish-action" id="btn-wiz-finish-early">${finishBtnLabel}</button>` : ''}
+          ${isFinalStep 
+            ? `<button type="button" class="btn primary sm btn-wiz-finish-action" id="btn-wiz-finish">${wizardData.productMode === 'existing' ? 'Finish &amp; Link Product' : 'Finish without Product'}</button>` 
+            : `<button type="button" class="btn primary sm" id="btn-wiz-next">Next ➔</button>`}
+        </div>
       </div>`;
 
     let currentStepTitle = '📦 Add Root Item';
@@ -425,19 +436,46 @@ export function openAddItemWizard(options = {}) {
       });
     }
 
-    document.getElementById('btn-wiz-finish')?.addEventListener('click', async () => {
-      const finishBtn = document.getElementById('btn-wiz-finish');
-      if (!wizardData.selectedExistingProduct) return showCustomAlert('Please select an existing product.', 'Missing Product');
+    const executeFinishCommit = async () => {
+      if (isCat && step === 1) {
+        const catSearch = document.querySelector('#wiz-cat-container .wiz-ing-tax-search') || document.getElementById('wiz-cat-name-input');
+        const catVal = (catSearch?.value || wizardData.category || '').trim();
+        if (!catVal) return showCustomAlert('Please enter or select a category name.', 'Missing Category');
+        wizardData.category = catVal;
+      } else if (!isCat && !isSub && !isProd && step === 1) {
+        const nameVal = document.getElementById('wiz-item-name')?.value.trim();
+        const catVal = wizardData.category || (document.querySelector('#wiz-cat-container .wiz-ing-tax-search')?.value || '').trim();
+        if (!nameVal) return showCustomAlert('Please enter an item name.', 'Missing Name');
+        if (!catVal) return showCustomAlert('Please select or type a category.', 'Missing Category');
+        wizardData.itemName = nameVal;
+        wizardData.category = catVal;
+      } else if (isSub && step === 1) {
+        if (!wizardData.selectedParentItem) return showCustomAlert('Please select a parent root item.', 'Missing Selection');
+      }
 
-      if (finishBtn) { finishBtn.disabled = true; finishBtn.textContent = 'Saving...'; }
+      if (!isCat && step === 2) {
+        const subInput = document.getElementById('wiz-subtype-name');
+        if (subInput) {
+          const subVal = subInput.value.trim();
+          if (subVal) wizardData.subtypeName = subVal;
+        }
+      }
+
+      const finishBtns = document.querySelectorAll('.btn-wiz-finish-action');
+      finishBtns.forEach(b => { b.disabled = true; b.textContent = 'Saving...'; });
 
       try {
+        const prodPayload = (isFinalStep && wizardData.productMode === 'existing' && wizardData.selectedExistingProduct)
+          ? { ...wizardData.selectedExistingProduct, category: wizardData.category }
+          : null;
+
         const res = await commitAtomicChain({
-          category: wizardData.category,
-          rootItemName: wizardData.itemName,
-          subtypeName: wizardData.subtypeName,
-          productPayload: { ...wizardData.selectedExistingProduct, category: wizardData.category }
+          category: wizardData.category || 'General',
+          rootItemName: wizardData.itemName || null,
+          subtypeName: wizardData.subtypeName || (wizardData.itemName ? 'Standard' : null),
+          productPayload: prodPayload
         });
+
         const cb = onComplete || window.__onHierarchyComplete;
         window.__onHierarchyComplete = null;
         closeAddItemWizard();
@@ -445,23 +483,27 @@ export function openAddItemWizard(options = {}) {
         if (typeof window.renderProductBank === 'function') window.renderProductBank();
         if (typeof cb === 'function') {
           const rootObj = res?.rootItem || wizardData.selectedParentItem;
-          const subObj = res?.subtype || { id: res?.subtypeId || wizardData.subtypeId, name: wizardData.subtypeName };
+          const subObj = res?.subtype || (res?.subtypeId ? { id: res.subtypeId, name: wizardData.subtypeName } : (wizardData.subtypeName ? { id: wizardData.subtypeName, name: wizardData.subtypeName } : null));
           cb({
             ...(res || {}),
-            ingredientId: rootObj?.id || wizardData.itemName,
-            subtypeId: subObj?.id || res?.subtypeId || wizardData.subtypeName,
-            parentName: rootObj?.name || wizardData.itemName,
-            subtypeName: subObj?.name || wizardData.subtypeName,
+            ingredientId: rootObj?.id || (wizardData.itemName ? wizardData.itemName : null),
+            subtypeId: subObj?.id || res?.subtypeId || (wizardData.subtypeName || null),
+            parentName: rootObj?.name || wizardData.itemName || '',
+            subtypeName: subObj?.name || wizardData.subtypeName || '',
             category: wizardData.category || res?.category || 'General',
             rootItem: rootObj,
-            subtype: subObj
+            subtype: subObj,
+            product: res?.product || prodPayload
           });
         }
       } catch (err) {
         console.error('[AddItemWizardUI] Commit error:', err);
-        if (finishBtn) { finishBtn.disabled = false; finishBtn.textContent = 'Finish & Link to Bank'; }
+        finishBtns.forEach(b => { b.disabled = false; b.textContent = 'Finish & Link to Bank'; });
       }
-    });
+    };
+
+    document.getElementById('btn-wiz-finish-early')?.addEventListener('click', executeFinishCommit);
+    document.getElementById('btn-wiz-finish')?.addEventListener('click', executeFinishCommit);
   };
 
   renderStep();

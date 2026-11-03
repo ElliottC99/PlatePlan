@@ -321,14 +321,37 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
             iIdx,
             initialName: currentIngName,
             onComplete: (created) => {
+              if (!created) return;
+              if (created.category && !created.ingredientId && !created.rootItem) {
+                const combinedKey = `cat:${created.category}`;
+                const displayLabel = `📂 [Category] ${created.category}`;
+                inputEl.dataset.taxVal = combinedKey;
+                inputEl.value = displayLabel;
+                inputEl.setAttribute('value', displayLabel);
+                inputEl.style.borderColor = '#10b981';
+                inputEl.style.backgroundColor = '#ecfdf5';
+                inputEl.style.color = 'var(--text,#1e293b)';
+                inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+                inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+                if (typeof onSelectCallback === 'function') {
+                  onSelectCallback(sIdx, iIdx, combinedKey, created);
+                }
+                return;
+              }
               const ingId = created.ingredientId || created.rootItem?.id || created.id || 'custom';
               const subId = created.subtypeId || created.subtype?.id || created.subtypeName || 'standard';
               const parentName = created.parentName || created.rootItem?.name || created.rootItemName || currentIngName;
               const subName = created.subtypeName || created.subtype?.name || parentName;
               const combinedKey = `${ingId}:${subId}`;
-              const displayLabel = `🏷️ ${subName} (${parentName})`;
+              const displayLabel = subName && subName !== parentName ? `🏷️ ${subName} (${parentName})` : `📦 ${parentName}`;
               inputEl.dataset.taxVal = combinedKey;
               inputEl.value = displayLabel;
+              inputEl.setAttribute('value', displayLabel);
+              inputEl.style.borderColor = '#10b981';
+              inputEl.style.backgroundColor = '#ecfdf5';
+              inputEl.style.color = 'var(--text,#1e293b)';
+              inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+              inputEl.dispatchEvent(new Event('change', { bubbles: true }));
               if (rowNameInput) {
                 rowNameInput.value = subName;
               }

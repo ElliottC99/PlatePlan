@@ -204,18 +204,35 @@ function attachSweeperSearchEvents(container, unlinkedGroups = []) {
             openTaxonomyCreationModal({
               initialName: initialPhrase,
               onComplete: (created = {}) => {
+                if (created.category && !created.ingredientId && !created.rootItem) {
+                  const catLabel = `📂 [Category] ${created.category}`;
+                  input.value = catLabel;
+                  input.setAttribute('value', catLabel);
+                  input.dataset.selectedId = `cat:${created.category}`;
+                  input.dataset.selectedSubId = '';
+                  if (parent) { parent.dataset.selectedId = `cat:${created.category}`; parent.dataset.selectedSubId = ''; }
+                  input.style.borderColor = '#10b981';
+                  input.style.backgroundColor = '#ecfdf5';
+                  input.style.color = 'var(--text,#1e293b)';
+                  input.dispatchEvent(new Event('input', { bubbles: true }));
+                  input.dispatchEvent(new Event('change', { bubbles: true }));
+                  return;
+                }
                 const ingId = created.ingredientId || created.rootItem?.id || created.id || '';
                 const subId = created.subtypeId || created.subtype?.id || '';
                 const parentName = created.parentName || created.rootItem?.name || created.rootItemName || initialPhrase;
                 const subName = created.subtypeName || created.subtype?.name || parentName;
                 const displayLabel = subName && subName !== parentName ? `🏷️ ${subName} (${parentName})` : `📦 ${parentName}`;
                 input.value = displayLabel;
+                input.setAttribute('value', displayLabel);
                 input.dataset.selectedId = ingId;
                 input.dataset.selectedSubId = subId;
                 if (parent) { parent.dataset.selectedId = ingId; parent.dataset.selectedSubId = subId; }
                 input.style.borderColor = '#10b981';
                 input.style.backgroundColor = '#ecfdf5';
                 input.style.color = 'var(--text,#1e293b)';
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
               }
             });
             return;
