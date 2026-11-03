@@ -397,12 +397,12 @@ export async function saveManualIng() {
         subtypeName: pending.subtypeName || 'Standard',
         productPayload: updatedProd
       });
+      const cb = window.__onHierarchyComplete;
+      window.__onHierarchyComplete = null;
       cancelManualIng();
       renderProductBank();
       if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-      if (typeof window.__onHierarchyComplete === 'function') {
-        const cb = window.__onHierarchyComplete;
-        window.__onHierarchyComplete = null;
+      if (typeof cb === 'function') {
         const rootObj = res?.rootItem || { id: pending.rootItemName, name: pending.rootItemName };
         const subObj = res?.subtype || { id: res?.subtypeId || pending.subtypeName, name: pending.subtypeName };
         cb({

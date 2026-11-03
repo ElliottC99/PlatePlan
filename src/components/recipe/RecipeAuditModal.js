@@ -207,6 +207,18 @@ function bindModalEvents(issues = [], totalPages = 1, ingredients = [], categori
           initialName: initialSearch,
           onComplete: (created) => {
             if (!created) return;
+            if (created.category && !created.ingredientId && !created.rootItem) {
+              mountEl.dataset.selectedId = `cat:${created.category}`;
+              mountEl.dataset.selectedSubId = '';
+              if (searchInst && searchInst.inputEl) {
+                searchInst.inputEl.value = `📂 [Category] ${created.category}`;
+                searchInst.inputEl.dataset.taxVal = `cat:${created.category}`;
+                searchInst.inputEl.style.borderColor = '#10b981';
+                searchInst.inputEl.style.backgroundColor = '#ecfdf5';
+                searchInst.inputEl.style.color = 'var(--text,#1e293b)';
+              }
+              return;
+            }
             const parentName = created.parentName || created.rootItem?.name || initialSearch;
             const subName = created.subtypeName || created.subtype?.name || 'Standard';
             const ingId = created.ingredientId || created.rootItem?.id;
@@ -214,7 +226,12 @@ function bindModalEvents(issues = [], totalPages = 1, ingredients = [], categori
             mountEl.dataset.selectedId = ingId;
             mountEl.dataset.selectedSubId = subId;
             if (searchInst && searchInst.inputEl) {
-              searchInst.inputEl.value = `🏷️ ${subName} (${parentName})`;
+              const displayLabel = subName && subName !== parentName ? `🏷️ ${subName} (${parentName})` : `📦 ${parentName}`;
+              searchInst.inputEl.value = displayLabel;
+              searchInst.inputEl.dataset.taxVal = `${ingId}:${subId}`;
+              searchInst.inputEl.style.borderColor = '#10b981';
+              searchInst.inputEl.style.backgroundColor = '#ecfdf5';
+              searchInst.inputEl.style.color = 'var(--text,#1e293b)';
             }
           }
         });

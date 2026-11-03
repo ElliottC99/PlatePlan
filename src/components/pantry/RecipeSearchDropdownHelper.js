@@ -72,8 +72,15 @@ export function createTaxonomySearchInput({
       `;
     }
 
+    const liveRootItems = (typeof window !== 'undefined' && Array.isArray(window.Store?.getState?.()?.ingredients) && window.Store.getState().ingredients.length > 0) 
+      ? window.Store.getState().ingredients 
+      : rootItems;
+    const liveCategories = (typeof window !== 'undefined' && Array.isArray(window.Store?.getState?.()?.categories) && window.Store.getState().categories.length > 0)
+      ? window.Store.getState().categories
+      : categories;
+
     if (subtypesOnly) {
-      (rootItems || []).forEach(item => {
+      (liveRootItems || []).forEach(item => {
         if (!item) return;
         const itemName = String(item.name || '');
         const itemCat = String(item.category || 'General');
@@ -96,7 +103,7 @@ export function createTaxonomySearchInput({
       });
     } else {
       // Render Categories
-      (categories || []).forEach(rawCat => {
+      (liveCategories || []).forEach(rawCat => {
         const catName = typeof rawCat === 'string' ? rawCat : (rawCat?.name || rawCat?.categoryName || '');
         if (!catName) return;
         if (!query || catName.toLowerCase().includes(query)) {
@@ -109,7 +116,7 @@ export function createTaxonomySearchInput({
       });
 
       // Render Root Items & Sub-types
-      (rootItems || []).forEach(item => {
+      (liveRootItems || []).forEach(item => {
         if (!item) return;
         const itemName = String(item.name || '').toLowerCase();
         const itemCat = String(item.category || 'General').toLowerCase();

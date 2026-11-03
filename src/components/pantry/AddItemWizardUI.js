@@ -438,12 +438,12 @@ export function openAddItemWizard(options = {}) {
           subtypeName: wizardData.subtypeName,
           productPayload: { ...wizardData.selectedExistingProduct, category: wizardData.category }
         });
+        const cb = onComplete || window.__onHierarchyComplete;
+        window.__onHierarchyComplete = null;
         closeAddItemWizard();
         if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
         if (typeof window.renderProductBank === 'function') window.renderProductBank();
-        const cb = onComplete || window.__onHierarchyComplete;
         if (typeof cb === 'function') {
-          window.__onHierarchyComplete = null;
           const rootObj = res?.rootItem || wizardData.selectedParentItem;
           const subObj = res?.subtype || { id: res?.subtypeId || wizardData.subtypeId, name: wizardData.subtypeName };
           cb({
