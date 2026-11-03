@@ -13,7 +13,8 @@ let modalOverlay = null;
 let currentFilter = 'all';
 let currentSearch = '';
 let targetRecipeFilter = null;
-
+let currentPage = 1;
+const PAGE_SIZE = 20;
 
 function renderModalContent() {
   if (!modalOverlay) return;
@@ -33,6 +34,15 @@ function renderModalContent() {
     }
     return true;
   });
+
+  const totalFiltered = filteredIssues.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
+
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const endIndex = Math.min(startIndex + PAGE_SIZE, totalFiltered);
+  const pagedIssues = filteredIssues.slice(startIndex, endIndex);
 
   const countBadge = (type, count, label) => `
     <button type="button" class="ram-filter-chip" data-filter="${type}" style="border:none; cursor:pointer; padding:6px 12px; border-radius:20px; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:6px; background:${currentFilter === type ? 'var(--primary,#4f46e5)' : '#f1f5f9'}; color:${currentFilter === type ? '#fff' : '#475569'};">
@@ -83,41 +93,67 @@ function renderModalContent() {
           <input type="search" id="ram-search-input" name="recipe_audit_search" aria-label="Search recipes or ingredients" placeholder="Filter by recipe name or ingredient text..." value="${String(currentSearch || '').replace(/"/g, '&quot;')}" style="width:100%; padding:7px 12px; font-size:12.5px; border:1px solid var(--border,#cbd5e1); border-radius:8px; outline:none; box-sizing:border-box; background:#fff;" />
         </div>
         <div style="font-size:12px; color:var(--text2,#64748b); white-space:nowrap;">
-          Showing <strong>${filteredIssues.length}</strong> of ${summary.totalIssues} issue(s)
+          Showing <strong>${totalFiltered === 0 ? 0 : startIndex + 1}–${endIndex}</strong> of ${totalFiltered} (${summary.totalIssues} total)
         </div>
       </div>
 
-      <!-- Issues Table -->
+      <!-- Issues Table (Paginated to 20 for lightning performance) -->
       <div style="flex:1; overflow-y:auto; padding:16px 24px; box-sizing:border-box;">
-        ${filteredIssues.length === 0 ? renderEmptyState(summary.totalIssues === 0) : `
+        ${pagedIssues.length === 0 ? renderEmptyState(summary.totalIssues === 0) : `
           <div style="display:flex; flex-direction:column; gap:12px;">
-            ${filteredIssues.map(issue => renderIssueCard(issue, ingredients)).join('')}
+            ${pagedIssues.map(issue => renderIssueCard(issue, ingredients)).join('')}
           </div>
         `}
       </div>
 
-      <!-- Footer -->
-      <div style="padding:14px 24px; border-top:1px solid var(--border,#e2e8f0); display:flex; justify-content:flex-end; gap:10px; background:var(--surface2,#f8fafc);">
+      <!-- Footer with Pagination -->
+      <div style="padding:12px 24px; border-top:1px solid var(--border,#e2e8f0); display:flex; justify-content:space-between; align-items:center; gap:10px; background:var(--surface2,#f8fafc);">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button type="button" id="ram-prev-btn" class="btn sm ghost" ${currentPage <= 1 ? 'disabled style="opacity:0.4; cursor:not-allowed;"' : 'style="cursor:pointer; font-weight:600;"'}>
+            « Previous
+          </button>
+          <span style="font-size:12px; font-weight:700; color:var(--text2,#64748b);">
+            Page ${currentPage} of ${totalPages}
+          </span>
+          <button type="button" id="ram-next-btn" class="btn sm ghost" ${currentPage >= totalPages ? 'disabled style="opacity:0.4; cursor:not-allowed;"' : 'style="cursor:pointer; font-weight:600;"'}>
+            Next »
+          </button>
+        </div>
         <button type="button" id="ram-done-btn" class="btn sm secondary" style="font-weight:700; padding:8px 18px; border-radius:8px; cursor:pointer;">Done</button>
       </div>
     </div>
   `;
 
-  bindModalEvents(filteredIssues);
+  bindModalEvents(issues, totalPages);
 }
 
-function bindModalEvents(issues = []) {
+function bindModalEvents(issues = [], totalPages = 1) {
   if (!modalOverlay) return;
 
   // Close handlers
   modalOverlay.querySelector('#ram-close-btn')?.addEventListener('click', closeRecipeAuditModal);
   modalOverlay.querySelector('#ram-done-btn')?.addEventListener('click', closeRecipeAuditModal);
 
+  // Pagination handlers
+  modalOverlay.querySelector('#ram-prev-btn')?.addEventListener('click', () => {
+    if (currentPage > 1) {
+      currentPage--;
+      renderModalContent();
+    }
+  });
+  modalOverlay.querySelector('#ram-next-btn')?.addEventListener('click', () => {
+    if (currentPage < totalPages) {
+      currentPage++;
+      renderModalContent();
+    }
+  });
+
   // Search input
   const searchInput = modalOverlay.querySelector('#ram-search-input');
   if (searchInput) {
     searchInput.addEventListener('input', (e) => {
       currentSearch = e.target.value.trim();
+      currentPage = 1;
       renderModalContent();
     });
   }
@@ -126,12 +162,14 @@ function bindModalEvents(issues = []) {
   modalOverlay.querySelectorAll('.ram-filter-chip').forEach(btn => {
     btn.addEventListener('click', () => {
       currentFilter = btn.dataset.filter || 'all';
+      currentPage = 1;
       renderModalContent();
     });
   });
 
   // Re-scan button
   modalOverlay.querySelector('#ram-rescan-btn')?.addEventListener('click', () => {
+    currentPage = 1;
     renderModalContent();
     if (typeof window.showPlatePlanToast === 'function') {
       window.showPlatePlanToast('Recipe scan refreshed.', 'info');
@@ -229,6 +267,7 @@ export function openRecipeAuditModal(targetRecipeId = null) {
   targetRecipeFilter = targetRecipeId ? String(targetRecipeId) : null;
   currentFilter = 'all';
   currentSearch = '';
+  currentPage = 1;
 
   if (!modalOverlay) {
     modalOverlay = document.createElement('div');

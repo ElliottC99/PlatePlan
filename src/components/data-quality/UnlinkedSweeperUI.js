@@ -26,8 +26,8 @@ export function cleanDisplayPhrase(str) {
 }
 
 export function scanUnlinkedRecipeIngredients() {
-  const state = (typeof window !== 'undefined' ? (window.Store?.getState?.() ) : {});
-  const recipes = Array.isArray(state.recipes) ? state.recipes : [];
+  const state = (typeof getState === 'function' ? getState() : (typeof window !== 'undefined' && window.Store?.getState ? window.Store.getState() : {})) || {};
+  const recipes = Array.isArray(state.recipes) ? state.recipes : Object.values(state.recipes || {});
   const groups = new Map();
 
   recipes.forEach(recipe => {
