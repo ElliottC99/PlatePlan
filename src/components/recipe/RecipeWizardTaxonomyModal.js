@@ -8,7 +8,7 @@ import { openAddItemWizard } from '../pantry/AddItemWizardUI.js';
 
 export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = '', onComplete = null } = {}) {
   openAddItemWizard({
-    startAt: 'item',
+    startAt: 'category',
     itemName: initialName,
     onComplete: (created) => {
       if (typeof onComplete === 'function') {

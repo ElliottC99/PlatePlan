@@ -67,6 +67,9 @@ console.log('--- Test 1: Liquid-Aware Volume Density Filtering ---');
     { id: 'ing_oil', name: 'Sesame Oil', category: 'Store Cupboard' },
     { id: 'ing_vinegar', name: 'Rice Wine Vinegar', category: 'Store Cupboard' },
     { id: 'ing_sugar', name: 'Granulated Sugar', category: 'Baking' }, // Staple with known density in UnitConversionService
+    { id: 'ing_lime', name: 'Limes', category: 'Fresh Produce' }, // Culinary produce with known juice density
+    { id: 'ing_lemon', name: 'Lemons', category: 'Fresh Produce' }, // Culinary produce with known juice density
+    { id: 'ing_coconut', name: 'Creamed Coconut', category: 'Store Cupboard' }, // Known coconut density
     { id: 'ing_couscous', name: 'Dried Couscous', category: 'Grains' } // Dry good without known density
   ];
 
@@ -85,6 +88,9 @@ console.log('--- Test 1: Liquid-Aware Volume Density Filtering ---');
         { ingredientId: 'ing_oil', qty: 15, unit: 'ml' },
         { ingredientId: 'ing_vinegar', qty: 10, unit: 'ml' },
         { ingredientId: 'ing_sugar', qty: 2, unit: 'tbsp' }, // Known staple density
+        { ingredientId: 'ing_lime', qty: 15, unit: 'ml' }, // Produce measured in ml
+        { ingredientId: 'ing_lemon', qty: 1, unit: 'tbsp' }, // Produce measured in tbsp
+        { ingredientId: 'ing_coconut', qty: 50, unit: 'ml' }, // Coconut in ml
         { ingredientId: 'ing_couscous', qty: 1, unit: 'cup' } // Volume dry good
       ]
     },
@@ -114,6 +120,11 @@ console.log('--- Test 1: Liquid-Aware Volume Density Filtering ---');
   // Verify that Sugar produces ZERO density warnings because it has known density (0.85) in UnitConversionService
   const sugarWarning = audit.densityMismatch.find(d => d.ingredientId === 'ing_sugar');
   assert(!sugarWarning, 'Staple "Granulated Sugar" with known density must NEVER produce a density warning');
+
+  // Verify that Limes, Lemons, and Creamed Coconut produce ZERO density warnings
+  assert(!audit.densityMismatch.find(d => d.ingredientId === 'ing_lime'), 'Limes measured in volume must NEVER produce a density warning');
+  assert(!audit.densityMismatch.find(d => d.ingredientId === 'ing_lemon'), 'Lemons measured in volume must NEVER produce a density warning');
+  assert(!audit.densityMismatch.find(d => d.ingredientId === 'ing_coconut'), 'Creamed Coconut measured in volume must NEVER produce a density warning');
 
   // Verify that Couscous produces EXACTLY 1 grouped warning across both recipes
   assert.strictEqual(audit.densityMismatch.length, 1, `Expected exactly 1 density mismatch for Couscous, got ${audit.densityMismatch.length}`);
@@ -284,6 +295,23 @@ console.log('\n--- Test 5: UI Card Markup & Action Delegation Attributes ---');
   assert(cardHtml.includes('data-ing1-id="ing_1"'), 'Card HTML must carry ing1 ID');
   assert(cardHtml.includes('data-ing2-id="ing_2"'), 'Card HTML must carry ing2 ID');
   console.log('✅ Test 5 Passed: UI cards carry standardized delegated action attributes.');
+}
+
+// --- Test 6: Modernized Unmapped Card & Action Buttons ---
+console.log('\n--- Test 6: Modernized Unmapped Card & Action Buttons ---');
+{
+  const mockUnmapped = [
+    { ingredientId: 'ing_penne', ingredientName: 'Dried Penne', message: 'Zero attached products in store catalog' }
+  ];
+
+  const cardHtml = renderAuditCard('Pantry Items Lacking Store Products', '🛒', mockUnmapped, (item) => `
+    <button type="button" class="btn sm primary dq-action-btn" data-action-dq="unmapped-link" data-ing-id="${item.ingredientId}">Link Product</button>
+  `);
+
+  assert(cardHtml.includes('Pantry Items Lacking Store Products'), 'Card must use modernized title');
+  assert(cardHtml.includes('data-action-dq="unmapped-link"'), 'Card must offer modern unmapped-link action');
+  assert(cardHtml.includes('Link Product'), 'Button label must read Link Product');
+  console.log('✅ Test 6 Passed: Unmapped card uses modern taxonomy terminology and multi-option linker.');
 }
 
 console.log('\n=== ALL DATA QUALITY TESTS PASSED SUCCESSFULLY! ===');

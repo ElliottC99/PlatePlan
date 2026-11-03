@@ -104,14 +104,29 @@ export function openAddItemWizard(options = {}) {
     let stepBodyHtml = '';
     if (isCat && step === 1) {
       stepBodyHtml = `
-        <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">Step 1 of 4: Define Category</div>
+        <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">Step 1 of 4: Select or Create Category</div>
         <div style="margin-bottom:18px;">
-          <label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:6px;">Category Name</label>
-          <input type="text" id="wiz-cat-name-input" value="${escapeHtml(wizardData.category)}" placeholder="e.g. World Foods, Chilled, Breakfast..." style="width:100%; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px;" />
-          <div id="wiz-cat-dup-box" style="margin-top:6px;"></div>
+          <label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:6px;">Category</label>
+          <div id="wiz-cat-container"></div>
         </div>`;
-    } else if ((isCat && step === 2) || (!isCat && !isSub && !isProd && step === 1)) {
-      const stepLabel = isCat ? 'Step 2 of 4: Add Root Item' : 'Step 1 of 3: Define Root Item & Category';
+    } else if (isCat && step === 2) {
+      stepBodyHtml = `
+        <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">Step 2 of 4: Select or Create Root Item</div>
+        ${breadcrumbs(wizardData.category)}
+        <div style="margin-bottom:18px;">
+          <label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:6px;">Root Item</label>
+          <div id="wiz-item-container"></div>
+        </div>`;
+    } else if (isCat && step === 3) {
+      stepBodyHtml = `
+        <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">Step 3 of 4: Select or Create Sub-type</div>
+        ${breadcrumbs(wizardData.category, wizardData.itemName)}
+        <div style="margin-bottom:18px;">
+          <label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:6px;">Sub-type Variant</label>
+          <div id="wiz-subtype-container"></div>
+        </div>`;
+    } else if (!isCat && !isSub && !isProd && step === 1) {
+      const stepLabel = 'Step 1 of 3: Define Root Item & Category';
       stepBodyHtml = `
         <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">${stepLabel}</div>
         <div style="margin-bottom:18px; display:flex; flex-direction:column; gap:12px;">
@@ -120,7 +135,7 @@ export function openAddItemWizard(options = {}) {
             <input type="text" id="wiz-item-name" value="${escapeHtml(wizardData.itemName)}" placeholder="e.g. Basmati Rice, Cheddar Cheese..." style="width:100%; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px;" />
             <div id="wiz-item-dup-box" style="margin-top:6px;"></div>
           </div>
-          ${!isCat ? `<div><label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:6px;">Category</label><div id="wiz-cat-container"></div></div>` : breadcrumbs(wizardData.category)}
+          <div><label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:6px;">Category</label><div id="wiz-cat-container"></div></div>
         </div>`;
     } else if (isSub && step === 1) {
       stepBodyHtml = `
@@ -248,11 +263,62 @@ export function openAddItemWizard(options = {}) {
     const catContainer = document.getElementById('wiz-cat-container');
     if (catContainer) {
       activeDropdownInstance = createTaxonomySearchInput({
-        container: catContainer, categories, rootItems: [], placeholder: 'Search or type category...', initialValue: wizardData.category,
+        container: catContainer, categories, rootItems: [], newItemType: 'category', placeholder: 'Search or type category...', initialValue: wizardData.category,
         onSelect: ({ label, val }) => {
-          let cat = label.replace(/^[📂📦🏷️✨\s\[Category\]]+/, '').trim();
+          let cat = label.replace(/^[📂📦🏷️✨\s]+/, '').replace(/^\[Category\]\s*/i, '').trim();
           if (val && val.startsWith('cat:')) cat = val.replace('cat:', '');
           wizardData.category = cat;
+        }
+      });
+    }
+
+    const itemContainer = document.getElementById('wiz-item-container');
+    if (itemContainer) {
+      const categoryRootItems = rootItems.filter(r => !wizardData.category || (r.category || '').toLowerCase() === (wizardData.category || '').toLowerCase());
+      const displayRootItems = categoryRootItems.length > 0 ? categoryRootItems : rootItems;
+      activeDropdownInstance = createTaxonomySearchInput({
+        container: itemContainer,
+        categories: [],
+        rootItems: displayRootItems,
+        newItemType: 'item',
+        placeholder: 'Search existing root item or type new...',
+        initialValue: wizardData.itemName,
+        onSelect: ({ label, val }) => {
+          let cleanName = label.replace(/^[📦✨\s]+/, '').replace(/^\[Root Item\]\s*/i, '').trim();
+          const found = rootItems.find(r => String(r.id) === String(val) || (r.name || '').toLowerCase() === cleanName.toLowerCase());
+          if (found) {
+            wizardData.selectedParentItem = found;
+            wizardData.itemName = found.name;
+            if (found.category) wizardData.category = found.category;
+          } else {
+            wizardData.itemName = cleanName;
+          }
+        }
+      });
+    }
+
+    const subtypeContainer = document.getElementById('wiz-subtype-container');
+    if (subtypeContainer) {
+      const activeItem = wizardData.selectedParentItem;
+      const subList = activeItem && Array.isArray(activeItem.subtypes) && activeItem.subtypes.length > 0
+        ? activeItem.subtypes
+        : [{ id: 'Standard', name: 'Standard' }];
+      activeDropdownInstance = createTaxonomySearchInput({
+        container: subtypeContainer,
+        categories: [],
+        rootItems: activeItem ? [activeItem] : [],
+        subtypesOnly: !!(activeItem && activeItem.subtypes && activeItem.subtypes.length > 0),
+        newItemType: 'subtype',
+        placeholder: 'Search existing variant or type new (e.g. Standard)...',
+        initialValue: wizardData.subtypeName || 'Standard',
+        onSelect: ({ label, val }) => {
+          let cleanSub = label.replace(/^[🏷️✨\s]+/, '').replace(/^\[Sub-Type\]\s*/i, '').trim();
+          if (cleanSub.includes('(')) cleanSub = cleanSub.split('(')[0].trim();
+          wizardData.subtypeName = cleanSub;
+          if (val && val.includes(':')) {
+            const [, sId] = val.split(':');
+            wizardData.subtypeId = sId;
+          }
         }
       });
     }
@@ -292,10 +358,24 @@ export function openAddItemWizard(options = {}) {
 
     document.getElementById('btn-wiz-next')?.addEventListener('click', () => {
       if (isCat && step === 1) {
-        const catVal = document.getElementById('wiz-cat-name-input')?.value.trim();
-        if (!catVal) return showCustomAlert('Please enter a category name.', 'Missing Category');
+        const catSearch = document.querySelector('#wiz-cat-container .wiz-ing-tax-search') || document.getElementById('wiz-cat-name-input');
+        const catVal = (catSearch?.value || wizardData.category || '').trim();
+        if (!catVal) return showCustomAlert('Please enter or select a category name.', 'Missing Category');
         wizardData.category = catVal;
-      } else if ((isCat && step === 2) || (!isCat && !isSub && !isProd && step === 1)) {
+      } else if (isCat && step === 2) {
+        const itemSearch = document.querySelector('#wiz-item-container .wiz-ing-tax-search') || document.getElementById('wiz-item-name');
+        const nameVal = (itemSearch?.value || wizardData.itemName || '').trim();
+        if (!nameVal) return showCustomAlert('Please enter or select a root item name.', 'Missing Name');
+        wizardData.itemName = nameVal;
+        if (!wizardData.selectedParentItem) {
+          const matched = rootItems.find(i => (i.name || '').toLowerCase() === nameVal.toLowerCase());
+          if (matched) wizardData.selectedParentItem = matched;
+        }
+      } else if (isCat && step === 3) {
+        const subSearch = document.querySelector('#wiz-subtype-container .wiz-ing-tax-search') || document.getElementById('wiz-subtype-name');
+        const subVal = (subSearch?.value || wizardData.subtypeName || 'Standard').trim();
+        wizardData.subtypeName = subVal || 'Standard';
+      } else if (!isCat && !isSub && !isProd && step === 1) {
         const nameVal = document.getElementById('wiz-item-name')?.value.trim();
         const catVal = wizardData.category || (document.querySelector('#wiz-cat-container .wiz-ing-tax-search')?.value || '').trim();
         if (!nameVal) return showCustomAlert('Please enter an item name.', 'Missing Name');
@@ -307,11 +387,13 @@ export function openAddItemWizard(options = {}) {
         if (!wizardData.selectedParentItem || !wizardData.subtypeName) return showCustomAlert('Please select a target sub-type.', 'Missing Selection');
       }
 
-      const subInput = document.getElementById('wiz-subtype-name');
-      if (subInput) {
-        const subVal = subInput.value.trim();
-        if (!subVal) return showCustomAlert('Please enter a sub-type variant name (or "Standard").', 'Missing Sub-type');
-        wizardData.subtypeName = subVal;
+      if (!isCat && step === 2) {
+        const subInput = document.getElementById('wiz-subtype-name');
+        if (subInput) {
+          const subVal = subInput.value.trim();
+          if (!subVal) return showCustomAlert('Please enter a sub-type variant name (or "Standard").', 'Missing Sub-type');
+          wizardData.subtypeName = subVal;
+        }
       }
 
       step++;

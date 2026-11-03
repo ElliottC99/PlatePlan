@@ -14,6 +14,7 @@ import { openMergeIngredientsModal } from '../components/data-quality/MergeIngre
 import { openRecipeAuditModal } from '../components/recipe/RecipeAuditModal.js';
 import { openUnlinkedSweeperModal, scanUnlinkedRecipeIngredients } from '../components/data-quality/UnlinkedSweeperUI.js';
 import { performGlobalProductRelink, verifyZeroCalorieIngredient } from '../services/DataQualityService.js';
+import { showCustomDensityModal } from '../components/ui/DialogHelpers.js';
 
 export function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -148,13 +149,19 @@ function initDataQualityEvents(container) {
       });
       return;
     }
-    if (action === 'unmapped-tesco') {
+    if (action === 'unmapped-link' || action === 'unmapped-tesco') {
       const ingId = btn.dataset.ingId;
       const state = getState();
       const ing = (state.ingredients || []).find(i => String(i.id) === String(ingId));
-      import('../components/pantry/SubtypeProductLinkerModalUI.js').then(m => {
-        m.openTescoImportModal?.(null, ingId, () => renderDataQualityView(), ing?.name || null);
-      }).catch(err => console.error('[DataQualityView] Failed to load Tesco import modal:', err));
+      import('../components/pantry/AddItemWizardUI.js').then(m => {
+        m.openAddItemWizard?.({
+          startAt: 'product',
+          parentId: ingId,
+          itemName: ing?.name,
+          category: ing?.category || 'General',
+          onComplete: () => renderDataQualityView()
+        });
+      }).catch(err => console.error('[DataQualityView] Failed to load AddItemWizardUI:', err));
       return;
     }
     if (action === 'unmapped-ignore') {
@@ -168,21 +175,24 @@ function initDataQualityEvents(container) {
       const state = getState();
       const ing = (state.ingredients || []).find(i => String(i.id) === String(ingId));
       const currentDensity = ing?.density ?? 1.0;
-      const input = prompt(`Enter density factor (g/ml) for "${ingName}":\n(e.g. 1.0 for water/liquids, 0.5 for flour, 0.85 for sugar/lentils)`, currentDensity);
-      if (input !== null && !isNaN(Number(input)) && Number(input) > 0) {
-        const updatedIng = { ...ing, density: Number(input), updatedAt: new Date().toISOString() };
-        try {
-          await saveIngredient(updatedIng);
-          const ings = [...(state.ingredients || [])];
-          const idx = ings.findIndex(i => String(i.id) === String(ingId));
-          if (idx !== -1) ings[idx] = updatedIng;
-          setIngredients(ings);
-          window.showPlatePlanToast?.(`Updated density factor for "${ingName}" to ${input} g/ml.`, 'success');
-          renderDataQualityView();
-        } catch (err) {
-          console.error('[DataQualityView] Failed to save density factor:', err);
+      showCustomDensityModal({
+        ingredientName: ingName,
+        currentDensity,
+        onSave: async (val) => {
+          const updatedIng = { ...ing, density: Number(val), updatedAt: new Date().toISOString() };
+          try {
+            await saveIngredient(updatedIng);
+            const ings = [...(state.ingredients || [])];
+            const idx = ings.findIndex(i => String(i.id) === String(ingId));
+            if (idx !== -1) ings[idx] = updatedIng;
+            setIngredients(ings);
+            window.showPlatePlanToast?.(`Updated density factor for "${ingName}" to ${val} g/ml.`, 'success');
+            renderDataQualityView();
+          } catch (err) {
+            console.error('[DataQualityView] Failed to save density factor:', err);
+          }
         }
-      }
+      });
       return;
     }
     if (action === 'fix-macros') {
@@ -368,15 +378,15 @@ export function renderDataQualityView() {
         `)}
 
         <!-- 5. UNMAPPED CORE INGREDIENTS CARD -->
-        ${renderAuditCard('Unmapped Core Ingredients', '🛒', audit.unmappedItems, (item) => `
+        ${renderAuditCard('Pantry Items Lacking Store Products', '🛒', audit.unmappedItems, (item) => `
           <div style="padding:12px 14px; background:#fff; border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
             <div style="min-width:0;">
               <strong style="font-size:13.5px; color:#111827;">${escapeHtml(item.ingredientName)}</strong>
               <div style="font-size:12px; color:var(--text2,#78716c); margin-top:3px;">${escapeHtml(item.message)}</div>
             </div>
             <div style="display:flex; gap:6px; flex-shrink:0;">
-              <button type="button" class="btn sm primary dq-action-btn" data-action-dq="unmapped-tesco" data-ing-id="${escapeAttr(item.ingredientId)}" style="background:var(--primary,#4f46e5); color:#fff; font-weight:600;">Find Tesco Match</button>
-              <button type="button" class="btn sm ghost dq-action-btn" data-action-dq="unmapped-ignore" data-ing-id="${escapeAttr(item.ingredientId)}">Ignore</button>
+              <button type="button" class="btn sm primary dq-action-btn" data-action-dq="unmapped-link" data-ing-id="${escapeAttr(item.ingredientId)}" style="background:var(--primary,#4f46e5); color:#fff; font-weight:600;">Link Product</button>
+              <button type="button" class="btn sm ghost dq-action-btn" data-action-dq="unmapped-ignore" data-ing-id="${escapeAttr(item.ingredientId)}" title="Mark as non-store staple">Ignore</button>
             </div>
           </div>
         `)}

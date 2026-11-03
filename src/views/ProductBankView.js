@@ -32,6 +32,7 @@ export function cancelManualIng() {
   // A pre-link from Link Product must not carry over to the next, unrelated new product.
   window.__prefilledResolveBinding = null;
   window.__pendingHierarchyCommit = null;
+  window.__onHierarchyComplete = null;
 
   if (window.__modalContext && window.__modalContext.returnTo === 'data-quality') {
     const ctx = window.__modalContext;
@@ -394,7 +395,19 @@ export async function saveManualIng() {
       if (typeof window.__onHierarchyComplete === 'function') {
         const cb = window.__onHierarchyComplete;
         window.__onHierarchyComplete = null;
-        cb(res || { ingredientId: res?.rootItem?.id || pending.rootItemName, subtypeId: res?.subtype?.id || pending.subtypeName, subtypeName: pending.subtypeName, parentName: pending.rootItemName, category: pending.category });
+        const rootObj = res?.rootItem || { id: pending.rootItemName, name: pending.rootItemName };
+        const subObj = res?.subtype || { id: res?.subtypeId || pending.subtypeName, name: pending.subtypeName };
+        cb({
+          ...(res || {}),
+          ingredientId: rootObj?.id || pending.rootItemName,
+          parentName: rootObj?.name || pending.rootItemName,
+          subtypeId: subObj?.id || pending.subtypeName,
+          subtypeName: subObj?.name || pending.subtypeName,
+          category: pending.category || res?.category || 'General',
+          rootItem: rootObj,
+          subtype: subObj,
+          product: res?.product || updatedProd
+        });
       }
       return;
     } catch (e) {

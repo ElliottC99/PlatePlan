@@ -402,7 +402,7 @@ export function runAudit(state = {}) {
     }
   });
 
-  // 6. Unmapped Core Ingredients (Pantry items with 0 store products)
+  // 6. Pantry Items Lacking Store Products (Pantry items with 0 store products)
   const prodIngSet = new Set(products.map(p => p.ingredientId ? String(p.ingredientId) : null).filter(Boolean));
   const prodSubSet = new Set(products.map(p => p.subtypeId ? String(p.subtypeId) : null).filter(Boolean));
 
