@@ -1,14 +1,14 @@
 ---
 date: "2026-11-03"
 problem_type: "logic_error"
-component: "recipe_wizard_and_taxonomy"
+component: "javascript_logic"
 severity: "high"
 symptoms:
   - "Ingredients in Step 2 defaulted to sub-types (e.g. Eggs became Medium Eggs) when mapped from linked products"
   - "Step 2 threw a blocking toast 'Cannot proceed: 12 ingredient(s) retain an unlinked New Item status' when advancing to Step 3"
   - "Deleting the enhanced variant of Spicy Dan Dan Noodles repeatedly resurrected due to a background recovery subscription loop"
   - "Auto-Enhance modal threw ReferenceError: escapeAttr is not defined and routeNavHtml is not defined"
-root_cause: "Taxonomy resolver eagerly matched subtypeId instead of resolving the highest level where a product is an auto-default (Category > Root Item > Sub-Type); prod: values in Step 2 were blanked instead of taxonomy-mapped; and reactive subscriptions held an automatic restore hook."
+root_cause: "incorrect_algorithm"
 tags:
   - "recipe-wizard"
   - "taxonomy-mapping"
