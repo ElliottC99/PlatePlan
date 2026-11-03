@@ -390,26 +390,8 @@ export function runAudit(state = {}) {
     }
   });
 
-  // 6. Pantry Items Lacking Store Products (Pantry items with 0 store products)
-  const prodIngSet = new Set(products.map(p => p.ingredientId ? String(p.ingredientId) : null).filter(Boolean));
-  const prodSubSet = new Set(products.map(p => p.subtypeId ? String(p.subtypeId) : null).filter(Boolean));
-
-  ingredients.forEach(ing => {
-    if (ing.ignoreStoreMapping === true) return;
-
-    const hasDirectProduct = prodIngSet.has(String(ing.id));
-    const hasSubtypeProduct = Array.isArray(ing.subtypes) && ing.subtypes.some(st => prodSubSet.has(String(st.id)));
-
-    if (!hasDirectProduct && !hasSubtypeProduct) {
-      results.unmappedItems.push({
-        key: `unmapped:ing:${ing.id}`,
-        ingredientId: ing.id,
-        ingredientName: ing.name,
-        message: `Ingredient "${ing.name}" is unmapped and has zero attached products in the store catalog.`,
-        severity: 'gap'
-      });
-    }
-  });
+  // 6. Pantry Items Lacking Store Products (Retired: Recipe Mapping Audit is the single source of truth for ingredient linkage)
+  // Pantry staples do not require store barcode products; results.unmappedItems remains empty.
 
   // 7. Duplicate Ingredient Detection (> 85% similarity)
   for (let i = 0; i < ingredients.length; i++) {

@@ -149,26 +149,6 @@ function initDataQualityEvents(container) {
       });
       return;
     }
-    if (action === 'unmapped-link' || action === 'unmapped-tesco') {
-      const ingId = btn.dataset.ingId;
-      const state = getState();
-      const ing = (state.ingredients || []).find(i => String(i.id) === String(ingId));
-      import('../components/pantry/AddItemWizardUI.js').then(m => {
-        m.openAddItemWizard?.({
-          startAt: 'category',
-          parentId: ingId,
-          itemName: ing?.name,
-          category: ing?.category || 'General',
-          onComplete: () => renderDataQualityView()
-        });
-      }).catch(err => console.error('[DataQualityView] Failed to load AddItemWizardUI:', err));
-      return;
-    }
-    if (action === 'unmapped-ignore') {
-      const ingId = btn.dataset.ingId;
-      await handleIgnoreStoreMapping(ingId);
-      return;
-    }
     if (action === 'add-density') {
       const ingId = btn.dataset.ingId;
       const ingName = btn.dataset.ingName;
@@ -230,7 +210,7 @@ export function renderDataQualityView() {
 
   const totalIssues = audit.totalCount || 0;
   const blockers = audit.orphans.length;
-  const gaps = audit.unmappedItems.length + audit.densityMismatch.length + audit.planDesync.length;
+  const gaps = audit.densityMismatch.length + audit.planDesync.length;
   const advisories = audit.macroDrift.length;
   const healthScore = Math.max(0, Math.min(100, Math.round(100 - (blockers * 4 + gaps * 1 + advisories * 0.3))));
   const isHealthy = totalIssues === 0;
@@ -364,21 +344,7 @@ export function renderDataQualityView() {
           </div>
         `)}
 
-        <!-- 5. UNMAPPED CORE INGREDIENTS CARD -->
-        ${renderAuditCard('Pantry Items Lacking Store Products', '🛒', audit.unmappedItems, (item) => `
-          <div style="padding:12px 14px; background:#fff; border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-            <div style="min-width:0;">
-              <strong style="font-size:13.5px; color:#111827;">${escapeHtml(item.ingredientName)}</strong>
-              <div style="font-size:12px; color:var(--text2,#78716c); margin-top:3px;">${escapeHtml(item.message)}</div>
-            </div>
-            <div style="display:flex; gap:6px; flex-shrink:0;">
-              <button type="button" class="btn sm primary dq-action-btn" data-action-dq="unmapped-link" data-ing-id="${escapeAttr(item.ingredientId)}" style="background:var(--primary,#4f46e5); color:#fff; font-weight:600;">Link Product</button>
-              <button type="button" class="btn sm ghost dq-action-btn" data-action-dq="unmapped-ignore" data-ing-id="${escapeAttr(item.ingredientId)}" title="Mark as non-store staple">Ignore</button>
-            </div>
-          </div>
-        `)}
-
-        <!-- 6. DRY-GOODS VOLUME DENSITY MISMATCH CARD -->
+        <!-- 5. DRY-GOODS VOLUME DENSITY MISMATCH CARD -->
         ${renderAuditCard('Weight-to-Volume Density Mismatch', '🧪', audit.densityMismatch, (item) => `
           <div style="padding:12px 14px; background:#fff; border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
             <div style="min-width:0;">
@@ -417,32 +383,8 @@ export async function handleVerifyZeroCal(ingredientId) {
   }
 }
 
-export async function handleIgnoreStoreMapping(ingredientId) {
-  const state = getState();
-  const ingredients = Array.isArray(state.ingredients) ? [...state.ingredients] : [];
-  const ingIndex = ingredients.findIndex(i => String(i.id) === String(ingredientId));
-  if (ingIndex < 0) return;
-
-  const originalIng = ingredients[ingIndex];
-  const updatedIng = {
-    ...originalIng,
-    ignoreStoreMapping: true,
-    updatedAt: new Date().toISOString()
-  };
-
-  ingredients[ingIndex] = updatedIng;
-  setIngredients(ingredients);
-  renderDataQualityView();
-
-  try {
-    await saveIngredient(updatedIng);
-    window.showPlatePlanToast?.(`Ignored store mapping for "${updatedIng.name}".`, 'info');
-  } catch (e) {
-    console.error('[DataQualityView] Failed to save ignoreStoreMapping:', e);
-    ingredients[ingIndex] = originalIng;
-    setIngredients(ingredients);
-    renderDataQualityView();
-  }
+export async function handleIgnoreStoreMapping() {
+  // Benign no-op: Pantry-to-product mapping card has been retired.
 }
 
 export async function handleCleanHistoryCache() {

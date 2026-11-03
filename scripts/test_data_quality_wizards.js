@@ -297,21 +297,22 @@ console.log('\n--- Test 5: UI Card Markup & Action Delegation Attributes ---');
   console.log('✅ Test 5 Passed: UI cards carry standardized delegated action attributes.');
 }
 
-// --- Test 6: Modernized Unmapped Card & Action Buttons ---
-console.log('\n--- Test 6: Modernized Unmapped Card & Action Buttons ---');
+// --- Test 6: Inverted Unmapped Pantry Card Retired ---
+console.log('\n--- Test 6: Inverted Unmapped Pantry Card Retired ---');
 {
-  const mockUnmapped = [
-    { ingredientId: 'ing_penne', ingredientName: 'Dried Penne', message: 'Zero attached products in store catalog' }
+  const mockIngredients = [
+    { id: 'ing_penne', name: 'Dried Penne', category: 'Pasta' },
+    { id: 'ing_sherry', name: 'Sherry', category: 'Alcohol' }
   ];
 
-  const cardHtml = renderAuditCard('Pantry Items Lacking Store Products', '🛒', mockUnmapped, (item) => `
-    <button type="button" class="btn sm primary dq-action-btn" data-action-dq="unmapped-link" data-ing-id="${item.ingredientId}">Link Product</button>
-  `);
+  const audit = runAudit({
+    recipes: [],
+    ingredients: mockIngredients,
+    products: []
+  });
 
-  assert(cardHtml.includes('Pantry Items Lacking Store Products'), 'Card must use modernized title');
-  assert(cardHtml.includes('data-action-dq="unmapped-link"'), 'Card must offer modern unmapped-link action');
-  assert(cardHtml.includes('Link Product'), 'Button label must read Link Product');
-  console.log('✅ Test 6 Passed: Unmapped card uses modern taxonomy terminology and multi-option linker.');
+  assert.strictEqual(audit.unmappedItems.length, 0, 'Pantry staples without store products must NOT produce noisy alerts');
+  console.log('✅ Test 6 Passed: Unmapped pantry staples do not produce artificial action items.');
 }
 
 console.log('\n=== ALL DATA QUALITY TESTS PASSED SUCCESSFULLY! ===');
