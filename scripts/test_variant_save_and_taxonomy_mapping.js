@@ -37,7 +37,7 @@ global.document = global.window.document;
 
 // Import target modules
 import { setRecipes, setProducts, setIngredients } from '../src/store/store.js';
-import { getTaxonomyLabel, renderTaxonomySearchHTML, isIngredientUnlinked } from '../src/components/recipe/RecipeWizardTaxonomySearch.js';
+import { getTaxonomyLabel, renderTaxonomySearchHTML, isIngredientUnlinked, resolveHighestAutoDefaultTaxonomy } from '../src/components/recipe/RecipeWizardTaxonomySearch.js';
 import { wizardState, syncStep2InputsToState, getSaveButtonLabel } from '../src/components/recipe/RecipeWizardState.js';
 import { buildLiveEnhancedRecipe } from '../src/components/recipe/RecipeEnhancementModalUI.js';
 import { openRecipeWizard } from '../src/components/recipe/RecipeWizardModal.js';
@@ -107,36 +107,88 @@ console.log('--- Test 1: Taxonomy Resolution & Clean Concise Display ---');
   console.log('✅ Test 1 Passed: Taxonomy-mapped ingredients resolve to clean concise names.');
 }
 
-// --- Test 2: syncStep2InputsToState Enforces Taxonomy-Only Mapping ---
-console.log('\n--- Test 2: State Synchronization Enforces Taxonomy-Only Mapping ---');
+// --- Test 2: syncStep2InputsToState Enforces Taxonomy-Only Mapping & Preserves Exact User Level ---
+console.log('\n--- Test 2: State Synchronization Enforces Taxonomy-Only Mapping & Preserves Exact User Level ---');
 {
+  // Test Highest Auto-Default Resolution (Category > Root Item > Sub-Type)
+  const eggProduct = {
+    id: 'prod_eggs_med',
+    name: 'Medium Free Range Eggs',
+    category: 'Dairy & Eggs',
+    ingredientId: 'ing_eggs',
+    subtypeId: 'sub_med_eggs',
+    isAutoDefault: true
+  };
+  const eggRootItem = {
+    id: 'ing_eggs',
+    name: 'Eggs',
+    category: 'Dairy & Eggs',
+    defaultProductId: 'prod_eggs_med',
+    subtypes: [
+      { id: 'sub_med_eggs', name: 'Medium Eggs', defaultProductId: null }
+    ]
+  };
+
+  const highestResolved = resolveHighestAutoDefaultTaxonomy(eggProduct, {
+    ingredients: [eggRootItem],
+    products: [eggProduct]
+  });
+  assert.strictEqual(highestResolved.level, 'root', 'Eggs product must resolve to Root Item level because it is root defaultProductId');
+  assert.strictEqual(highestResolved.name, 'Eggs', 'Must resolve to Root Item name "Eggs", NOT sub-type "Medium Eggs"');
+
   wizardState.activeRecipe = {
     ingredientSections: [
       {
         sectionTitle: 'Main Ingredients',
         ingredients: [
-          { name: 'Tofu', productId: 'legacy_prod_id', qty: 200, unit: 'g' }
+          { name: 'Tofu', productId: 'legacy_prod_id', qty: 200, unit: 'g' },
+          { name: 'Eggs', productId: 'legacy_egg_id', qty: 2, unit: 'qty' },
+          { name: 'Vegetables', productId: 'legacy_veg_id', qty: 100, unit: 'g' }
         ]
       }
     ]
   };
 
-  const mockInput = {
+  const mockInputSubtype = {
     dataset: { sidx: '0', iidx: '0', taxVal: 'ing_tofu:sub_firm' },
-    value: '🏷️ Firm Tofu (Tofu) (Organic Firm Tofu)'
+    value: '🏷️ Firm Tofu'
+  };
+  const mockInputRoot = {
+    dataset: { sidx: '0', iidx: '1', taxVal: 'ing_eggs' },
+    value: '📦 Eggs'
+  };
+  const mockInputCat = {
+    dataset: { sidx: '0', iidx: '2', taxVal: 'cat:Vegetables' },
+    value: '📂 Vegetables'
   };
 
   const mockWrap = {
-    querySelectorAll: (sel) => sel === '.wiz-ing-tax-search' ? [mockInput] : []
+    querySelectorAll: (sel) => sel === '.wiz-ing-tax-search' ? [mockInputSubtype, mockInputRoot, mockInputCat] : []
   };
 
   syncStep2InputsToState(mockWrap);
-  const syncedItem = wizardState.activeRecipe.ingredientSections[0].ingredients[0];
-  assert.strictEqual(syncedItem.ingredientId, 'ing_tofu', 'ingredientId must be mapped');
-  assert.strictEqual(syncedItem.subtypeId, 'sub_firm', 'subtypeId must be mapped');
-  assert.strictEqual(syncedItem.productId, null, 'Direct productId must be cleared in favor of taxonomy mapping');
-  assert.strictEqual(syncedItem.isNewTaxonomyItem, false, 'Item must NOT be marked as isNewTaxonomyItem');
-  console.log('✅ Test 2 Passed: syncStep2InputsToState maps to taxonomy and clears direct productId.');
+  const items = wizardState.activeRecipe.ingredientSections[0].ingredients;
+  
+  // 1. Sub-Type selection strictly preserved
+  assert.strictEqual(items[0].ingredientId, 'ing_tofu');
+  assert.strictEqual(items[0].subtypeId, 'sub_firm');
+  assert.strictEqual(items[0].productId, null);
+  assert.strictEqual(items[0].isNewTaxonomyItem, false);
+
+  // 2. Root Item selection strictly preserved
+  assert.strictEqual(items[1].ingredientId, 'ing_eggs');
+  assert.strictEqual(items[1].subtypeId, null);
+  assert.strictEqual(items[1].productId, null);
+  assert.strictEqual(items[1].isNewTaxonomyItem, false);
+
+  // 3. Category selection strictly preserved
+  assert.strictEqual(items[2].categoryId, 'Vegetables');
+  assert.strictEqual(items[2].ingredientId, null);
+  assert.strictEqual(items[2].subtypeId, null);
+  assert.strictEqual(items[2].productId, null);
+  assert.strictEqual(items[2].isNewTaxonomyItem, false);
+
+  console.log('✅ Test 2 Passed: syncStep2InputsToState maps to taxonomy, respects highest auto-default, and preserves exact user level choice.');
 }
 
 // --- Test 3: Dual-Variant Save Button Context ---

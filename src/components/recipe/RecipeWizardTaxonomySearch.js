@@ -21,6 +21,58 @@ import { resolveProductForIngredient } from './RecipeWizardStep3Handlers.js';
  * - it has a categoryId
  * - it resolves via resolveProductForIngredient
  */
+/**
+ * Resolves a product to the HIGHEST taxonomy level where it serves as an auto-default:
+ * Category > Root Item > Sub-Type.
+ */
+export function resolveHighestAutoDefaultTaxonomy(prod, { ingredients = [], products = [] } = {}) {
+  if (!prod || typeof prod !== 'object') return { level: 'unknown' };
+  const pId = String(prod.id);
+
+  // 1. Check if Category Auto-Default
+  if (prod.isCategoryDefault) {
+    return { level: 'category', categoryId: prod.category || prod.cat };
+  }
+  if ((prod.category || prod.cat) && prod.isAutoDefault && !prod.ingredientId && !prod.subtypeId) {
+    return { level: 'category', categoryId: prod.category || prod.cat };
+  }
+
+  // 2. Check if Root Item Auto-Default (Category > Root Item > Sub-Type)
+  const rootItemDef = (ingredients || []).find(i => 
+    String(i.defaultProductId) === pId || (String(i.id) === String(prod.ingredientId) && prod.isAutoDefault && !prod.subtypeId)
+  );
+  if (rootItemDef) {
+    return { level: 'root', ingredientId: rootItemDef.id, name: rootItemDef.name };
+  }
+
+  // 3. Check if Sub-Type Auto-Default
+  for (const ing of (ingredients || [])) {
+    for (const sub of (ing.subtypes || [])) {
+      if (String(sub.defaultProductId) === pId || (String(sub.id) === String(prod.subtypeId) && prod.isAutoDefault)) {
+        return { level: 'subtype', ingredientId: ing.id, subtypeId: sub.id, name: sub.name };
+      }
+    }
+  }
+
+  // 4. Fallback when not explicitly an auto-default:
+  if (prod.ingredientId) {
+    const ing = (ingredients || []).find(i => String(i.id) === String(prod.ingredientId));
+    if (ing) {
+      if (prod.subtypeId) {
+        const sub = (ing.subtypes || []).find(s => String(s.id) === String(prod.subtypeId));
+        if (sub) return { level: 'subtype', ingredientId: ing.id, subtypeId: sub.id, name: sub.name };
+      }
+      return { level: 'root', ingredientId: ing.id, name: ing.name };
+    }
+  }
+
+  if (prod.category || prod.cat) {
+    return { level: 'category', categoryId: prod.category || prod.cat };
+  }
+
+  return { level: 'product', productId: pId, name: prod.name || prod.productName };
+}
+
 export function isIngredientUnlinked(item, products = [], ingredients = []) {
   if (!item || typeof item !== 'object') return false;
   if (item.isNewTaxonomyItem || item.ingredientId === 'new_item') return true;
@@ -51,22 +103,23 @@ export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, 
     subtypeId = item.subtypeId;
     rawName = item.name || item.raw || '';
     categoryId = item.categoryId;
-    ingBank = Array.isArray(arg2) ? arg2 : (Array.isArray(arg4) ? arg4 : (getState()?.ingredients || []));
+    ingBank = Array.isArray(arg2) ? arg2 : (Array.isArray(arg4) ? arg4 : (getState()?.ingredients || getState()?.rootItems || []));
     prodBank = Array.isArray(arg3) ? arg3 : (Array.isArray(arg6) && arg6.length ? arg6 : (getState()?.products || []));
   } else {
     ingredientId = arg1;
     subtypeId = arg2;
     rawName = arg3;
-    ingBank = Array.isArray(arg4) ? arg4 : (getState()?.ingredients || []);
+    ingBank = Array.isArray(arg4) ? arg4 : (getState()?.ingredients || getState()?.rootItems || []);
     categoryId = arg5;
     prodBank = Array.isArray(arg6) ? arg6 : (getState()?.products || []);
   }
 
+  // 1. Explicit Category assignment
   if (categoryId) {
     return `📂 ${categoryId}`;
   }
 
-  // 1. Subtype mapping in ingredientsBank (Priority: Taxonomy Sub-Type)
+  // 2. Explicit Subtype assignment
   if (subtypeId) {
     for (const ing of (ingBank || [])) {
       const sub = (ing.subtypes || []).find(s => String(s.id) === String(subtypeId) || String(s.name) === String(subtypeId));
@@ -76,7 +129,7 @@ export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, 
     }
   }
 
-  // 2. Root ingredient mapping in ingredientsBank
+  // 3. Explicit Root Item assignment
   if (ingredientId && ingredientId !== 'new_item') {
     const ing = (ingBank || []).find(i => String(i.id) === String(ingredientId));
     if (ing) {
@@ -84,24 +137,16 @@ export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, 
     }
   }
 
-  // 3. Fallback for items with direct productId or bankId
+  // 4. If only productId or bankId is known, resolve to the HIGHEST level where it is an Auto-Default:
+  // Category > Root Item > Sub-Type
   const directProdId = item?.productId || item?.bankId;
   if (directProdId) {
     const prod = (prodBank || []).find(p => String(p.id) === String(directProdId));
     if (prod) {
-      if (prod.subtypeId) {
-        for (const ing of (ingBank || [])) {
-          const sub = (ing.subtypes || []).find(s => String(s.id) === String(prod.subtypeId));
-          if (sub) return `🏷️ ${sub.name}`;
-        }
-      }
-      if (prod.ingredientId) {
-        const ing = (ingBank || []).find(i => String(i.id) === String(prod.ingredientId));
-        if (ing) return `📦 ${ing.name}`;
-      }
-      if (prod.category) {
-        return `📂 ${prod.category}`;
-      }
+      const resolved = resolveHighestAutoDefaultTaxonomy(prod, { ingredients: ingBank, products: prodBank });
+      if (resolved.level === 'category') return `📂 ${resolved.categoryId}`;
+      if (resolved.level === 'root') return `📦 ${resolved.name}`;
+      if (resolved.level === 'subtype') return `🏷️ ${resolved.name}`;
       return `📦 ${prod.name || prod.productName}`;
     }
     if (item?.productName) {
@@ -109,24 +154,15 @@ export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, 
     }
   }
 
-  // 4. Resolve via canonical resolver if item exists
+  // 5. Fallback via canonical resolver if item exists
   if (item && typeof resolveProductForIngredient === 'function') {
-    const resolved = resolveProductForIngredient(item, { products: prodBank, ingredients: ingBank });
-    if (resolved) {
-      if (resolved.subtypeId) {
-        for (const ing of (ingBank || [])) {
-          const sub = (ing.subtypes || []).find(s => String(s.id) === String(resolved.subtypeId));
-          if (sub) return `🏷️ ${sub.name}`;
-        }
-      }
-      if (resolved.ingredientId) {
-        const ing = (ingBank || []).find(i => String(i.id) === String(resolved.ingredientId));
-        if (ing) return `📦 ${ing.name}`;
-      }
-      if (resolved.category) {
-        return `📂 ${resolved.category}`;
-      }
-      return `📦 ${resolved.name}`;
+    const resolvedProd = resolveProductForIngredient(item, { products: prodBank, ingredients: ingBank });
+    if (resolvedProd) {
+      const resolved = resolveHighestAutoDefaultTaxonomy(resolvedProd, { ingredients: ingBank, products: prodBank });
+      if (resolved.level === 'category') return `📂 ${resolved.categoryId}`;
+      if (resolved.level === 'root') return `📦 ${resolved.name}`;
+      if (resolved.level === 'subtype') return `🏷️ ${resolved.name}`;
+      return `📦 ${resolvedProd.name}`;
     }
   }
 
@@ -135,7 +171,7 @@ export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, 
 
 export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [], productsBank = []) {
   const pBank = Array.isArray(productsBank) && productsBank.length ? productsBank : (getState()?.products || []);
-  const iBank = Array.isArray(ingredientsBank) && ingredientsBank.length ? ingredientsBank : (getState()?.ingredients || []);
+  const iBank = Array.isArray(ingredientsBank) && ingredientsBank.length ? ingredientsBank : (getState()?.ingredients || getState()?.rootItems || []);
 
   let selectedVal = 'new_item';
   if (item.categoryId) {
@@ -147,12 +183,12 @@ export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [],
   } else if (item.productId || item.bankId) {
     const prodId = item.productId || item.bankId;
     const prod = pBank.find(p => String(p.id) === String(prodId));
-    if (prod?.ingredientId && prod?.subtypeId) {
-      selectedVal = `${prod.ingredientId}:${prod.subtypeId}`;
-    } else if (prod?.ingredientId) {
-      selectedVal = prod.ingredientId;
-    } else if (prod?.category) {
-      selectedVal = `cat:${prod.category}`;
+    if (prod) {
+      const resolved = resolveHighestAutoDefaultTaxonomy(prod, { ingredients: iBank, products: pBank });
+      if (resolved.level === 'category') selectedVal = `cat:${resolved.categoryId}`;
+      else if (resolved.level === 'root') selectedVal = resolved.ingredientId;
+      else if (resolved.level === 'subtype') selectedVal = `${resolved.ingredientId}:${resolved.subtypeId}`;
+      else selectedVal = `prod:${prodId}`;
     } else {
       selectedVal = `prod:${prodId}`;
     }

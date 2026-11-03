@@ -6,6 +6,7 @@
 import { toTitleCase } from '../../utils/stringUtils.js';
 import { getState } from '../../state/AppState.js';
 import { resolveProductForIngredient } from './RecipeWizardStep3Handlers.js';
+import { resolveHighestAutoDefaultTaxonomy } from './RecipeWizardTaxonomySearch.js';
 
 export const MEAL_TAGS = ['Breakfast', 'Lunch', 'Dinner', 'Snacking'];
 
@@ -169,19 +170,29 @@ export function syncStep2InputsToState(modalWrap) {
         } else if (rawVal.startsWith('prod:')) {
           const pId = rawVal.slice(5);
           const prod = (state.products || []).find(p => String(p.id) === String(pId));
-          if (prod?.ingredientId && prod?.subtypeId) {
-            item.ingredientId = prod.ingredientId;
-            item.subtypeId = prod.subtypeId;
-            item.categoryId = null;
-          } else if (prod?.ingredientId) {
-            item.ingredientId = prod.ingredientId;
-            item.subtypeId = null;
-            item.categoryId = null;
-          } else if (prod?.category) {
-            item.categoryId = prod.category;
-            item.ingredientId = null;
-            item.subtypeId = null;
-            item.isCategoryDefault = true;
+          if (prod) {
+            const resolved = resolveHighestAutoDefaultTaxonomy(prod, {
+              ingredients: state.ingredients || state.rootItems || [],
+              products: state.products || []
+            });
+            if (resolved.level === 'category') {
+              item.categoryId = resolved.categoryId;
+              item.ingredientId = null;
+              item.subtypeId = null;
+              item.isCategoryDefault = true;
+            } else if (resolved.level === 'root') {
+              item.ingredientId = resolved.ingredientId;
+              item.subtypeId = null;
+              item.categoryId = null;
+              item.isCategoryDefault = false;
+            } else if (resolved.level === 'subtype') {
+              item.ingredientId = resolved.ingredientId;
+              item.subtypeId = resolved.subtypeId;
+              item.categoryId = null;
+              item.isCategoryDefault = false;
+            } else {
+              item.productId = pId;
+            }
           } else {
             item.productId = pId;
           }
