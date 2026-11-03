@@ -15,7 +15,7 @@ export function showPlatePlanToast(msg, type = 'info') {
   const toast = document.createElement('div');
   toast.id = 'pp-toast';
   toast.className = `pp-toast pp-toast-${type}`;
-  toast.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--text, #1c1917);color:var(--bg, #fff);padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:10000;pointer-events:none;transition:opacity 0.2s ease;opacity:0';
+  toast.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--text, #1c1917);color:var(--bg, #fff);padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:999999;pointer-events:none;transition:opacity 0.2s ease;opacity:0';
   toast.textContent = msg;
   document.body.appendChild(toast);
 

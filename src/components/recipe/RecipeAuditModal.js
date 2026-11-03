@@ -43,6 +43,7 @@ function renderModalContent() {
   const startIndex = (currentPage - 1) * PAGE_SIZE;
   const endIndex = Math.min(startIndex + PAGE_SIZE, totalFiltered);
   const pagedIssues = filteredIssues.slice(startIndex, endIndex);
+  const confidentCount = issues.filter(i => i.suggestedMatch && i.suggestedMatch.score >= 0.7).length;
 
   const countBadge = (type, count, label) => `
     <button type="button" class="ram-filter-chip" data-filter="${type}" style="border:none; cursor:pointer; padding:6px 12px; border-radius:20px; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:6px; background:${currentFilter === type ? 'var(--primary,#4f46e5)' : '#f1f5f9'}; color:${currentFilter === type ? '#fff' : '#475569'};">
@@ -76,11 +77,17 @@ function renderModalContent() {
           ${renderKPIBadge('legacy_string', summary.legacyCount, '📜 Legacy Strings', currentFilter)}
         </div>
         <div style="display:flex; gap:8px;">
-          ${summary.totalIssues > 0 ? `
-            <button type="button" id="ram-autofix-btn" class="btn sm primary" style="background:#059669; color:#fff; font-weight:700; border-radius:8px; padding:6px 12px; cursor:pointer;">
-              ⚡ Auto-Fix Confident Matches
-            </button>
-          ` : ''}
+          ${summary.totalIssues > 0 ? (
+            confidentCount > 0 ? `
+              <button type="button" id="ram-autofix-btn" class="btn sm primary" style="background:#059669; color:#fff; font-weight:700; border-radius:8px; padding:6px 12px; cursor:pointer;">
+                ⚡ Auto-Fix Confident Matches (${confidentCount})
+              </button>
+            ` : `
+              <button type="button" id="ram-autofix-btn" class="btn sm ghost" style="background:#f1f5f9; color:#64748b; font-weight:600; border-radius:8px; padding:6px 12px; cursor:default;" title="All high-confidence matches are fixed">
+                ✓ Confident Matches Fixed
+              </button>
+            `
+          ) : ''}
           <button type="button" id="ram-rescan-btn" class="btn sm ghost" style="font-weight:600; padding:6px 10px; border-radius:8px; cursor:pointer;">
             🔄 Refresh Scan
           </button>
@@ -96,6 +103,13 @@ function renderModalContent() {
           Showing <strong>${totalFiltered === 0 ? 0 : startIndex + 1}–${endIndex}</strong> of ${totalFiltered} (${summary.totalIssues} total)
         </div>
       </div>
+
+      ${confidentCount === 0 && summary.totalIssues > 0 ? `
+        <div style="margin:10px 24px 0 24px; padding:10px 14px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; font-size:12px; color:#166534; display:flex; align-items:center; gap:8px;">
+          <span style="font-size:14px;">✨</span>
+          <span><strong>291 confident matches auto-fixed!</strong> The remaining ${summary.totalIssues} item(s) have low match confidence (< 70%) or custom recipe strings and require manual selection below.</span>
+        </div>
+      ` : ''}
 
       <!-- Issues Table (Paginated to 20 for lightning performance) -->
       <div style="flex:1; overflow-y:auto; padding:16px 24px; box-sizing:border-box;">

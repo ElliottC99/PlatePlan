@@ -84,7 +84,7 @@ function initDataQualityEvents(container) {
       const state = getState();
       const audit = runAudit(state);
       if (audit.orphans && audit.orphans.length > 0) {
-        openSubtypeOrphanResolverModal(audit.orphans[0]);
+        openSubtypeOrphanResolverModal({ all: true });
       } else {
         window.showPlatePlanToast?.('No orphaned products detected.', 'info');
       }

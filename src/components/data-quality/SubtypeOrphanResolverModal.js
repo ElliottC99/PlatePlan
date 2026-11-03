@@ -8,6 +8,7 @@
 import { getState, setProducts, setIngredients } from '../../store/store.js';
 import { batchResolveOrphansWithNewSubtypeInDb } from '../../services/RootItemRepository.js';
 import { createTaxonomySearchInput } from '../pantry/RecipeSearchDropdownHelper.js';
+import { runAudit } from '../../services/DataQualityScanner.js';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
@@ -19,21 +20,44 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
   const products = state.products || [];
   const ingredients = state.ingredients || [];
 
-  const targetSubtypeId = orphanIssue.subtypeId;
-  const parentId = orphanIssue.parentId;
-  const targetProductId = orphanIssue.productId;
+  const targetSubtypeId = orphanIssue?.subtypeId;
+  const parentId = orphanIssue?.parentId;
+  const targetProductId = orphanIssue?.productId;
 
-  // Find all affected products
+  // Find all orphaned products across the database
   let affectedProducts = [];
-  if (targetProductId) {
-    const direct = products.find(p => String(p.id) === String(targetProductId));
-    if (direct) affectedProducts = [direct];
+  try {
+    const audit = runAudit(state);
+    const orphanList = audit.orphans || [];
+    const orphanProdIds = new Set(orphanList.map(o => String(o.productId)).filter(Boolean));
+    if (orphanProdIds.size > 0) {
+      affectedProducts = products.filter(p => orphanProdIds.has(String(p.id)));
+    }
+  } catch (err) {
+    console.warn('[SubtypeOrphanResolverModal] runAudit failed to collect orphans:', err);
   }
-  if (!affectedProducts.length && targetSubtypeId) {
-    affectedProducts = products.filter(p => String(p.subtypeId) === String(targetSubtypeId));
+
+  // Fallback or ensure specific targets are included
+  if (!affectedProducts.length) {
+    if (targetProductId) {
+      const direct = products.find(p => String(p.id) === String(targetProductId));
+      if (direct) affectedProducts = [direct];
+    }
+    if (!affectedProducts.length && targetSubtypeId) {
+      affectedProducts = products.filter(p => String(p.subtypeId) === String(targetSubtypeId));
+    }
+    if (!affectedProducts.length && parentId) {
+      affectedProducts = products.filter(p => String(p.ingredientId) === String(parentId));
+    }
   }
-  if (!affectedProducts.length && parentId) {
-    affectedProducts = products.filter(p => String(p.ingredientId) === String(parentId));
+
+  // Sort clicked product to the top if user clicked "Resolve Links" on a specific row
+  if (targetProductId && affectedProducts.length > 1) {
+    affectedProducts.sort((a, b) => {
+      if (String(a.id) === String(targetProductId)) return -1;
+      if (String(b.id) === String(targetProductId)) return 1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
   }
 
   if (!affectedProducts.length) {
@@ -81,7 +105,7 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
   `).join('');
 
   modal.innerHTML = `
-    <div class="card" style="width:100%; max-width:740px; padding:24px; border-radius:14px; background:var(--surface,#fff); box-shadow:0 12px 36px rgba(0,0,0,0.25); display:flex; flex-direction:column; max-height:92vh; box-sizing:border-box;">
+    <div class="card" style="width:100%; max-width:840px; padding:24px; border-radius:14px; background:var(--surface,#fff); box-shadow:0 12px 36px rgba(0,0,0,0.25); display:flex; flex-direction:column; max-height:92vh; min-height:520px; box-sizing:border-box;">
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px;">
         <div>
           <h2 style="font-size:17.5px; font-weight:750; margin:0; color:var(--text,#1c1917);">Resolve Broken Product Links</h2>
@@ -105,7 +129,7 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
         </div>
       ` : ''}
 
-      <div style="flex:1; min-height:340px; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:10px; margin-bottom:18px; background:var(--surface2,#f8fafc); padding-bottom:140px; box-sizing:border-box;">
+      <div style="flex:1; min-height:380px; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:10px; margin-bottom:18px; background:var(--surface2,#f8fafc); padding-bottom:260px; box-sizing:border-box;">
         <table style="width:100%; border-collapse:collapse;">
           <thead>
             <tr style="background:#e7e5e4; font-size:11px; font-weight:800; color:var(--text2); text-transform:uppercase; border-bottom:2px solid #d6d3d1;">
@@ -261,7 +285,7 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
       confirmBtn.textContent = 'Saving...';
 
       const updates = [];
-      let parentToSave = null;
+      const parentsToSaveMap = new Map();
 
       plannedResolutions.forEach((res, pId) => {
         const origProd = products.find(p => String(p.id) === String(pId));
@@ -279,7 +303,7 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
           updates.push(p);
 
           const targetParent = ingredients.find(i => String(i.id) === String(res.ingredientId));
-          if (targetParent) parentToSave = targetParent;
+          if (targetParent) parentsToSaveMap.set(String(targetParent.id), targetParent);
         }
       });
 
@@ -302,7 +326,7 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
 
       // 2. Commit atomic write to database
       try {
-        await batchResolveOrphansWithNewSubtypeInDb(parentToSave, updates);
+        await batchResolveOrphansWithNewSubtypeInDb(Array.from(parentsToSaveMap.values()), updates);
         if (typeof window.showPlatePlanToast === 'function') {
           window.showPlatePlanToast(`Successfully resolved ${updates.length} product(s).`, 'success');
         }
