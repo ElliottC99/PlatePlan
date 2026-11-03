@@ -14,8 +14,8 @@ function showModal(html) {
   const wrap = document.getElementById('view-modal-wrap');
   const content = document.getElementById('view-modal-content');
   if (wrap && content) {
-    wrap.style.setProperty('z-index', '25005', 'important');
-    content.style.setProperty('z-index', '25005', 'important');
+    wrap.style.setProperty('z-index', '100005', 'important');
+    content.style.setProperty('z-index', '100005', 'important');
     if (wrap.parentElement === document.body) {
       document.body.appendChild(wrap);
     }
@@ -27,9 +27,14 @@ function showModal(html) {
 
 function closeModal() {
   const wrap = document.getElementById('view-modal-wrap');
+  const content = document.getElementById('view-modal-content');
   if (wrap) {
     wrap.classList.remove('open');
+    wrap.style.setProperty('z-index', '25005', 'important');
     document.body.style.overflow = '';
+  }
+  if (content) {
+    content.style.setProperty('z-index', '25005', 'important');
   }
   const parentWiz = document.getElementById('new-ingredient-mapping-wizard-modal');
   if (parentWiz && parentWiz.dataset.temporarilyHidden === 'true') {

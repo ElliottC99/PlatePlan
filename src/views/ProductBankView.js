@@ -26,7 +26,14 @@ let activeEditingProductId = null;
 
 export function cancelManualIng() {
   const wrap = document.getElementById('view-modal-wrap');
-  if (wrap) wrap.classList.remove('open');
+  const content = document.getElementById('view-modal-content');
+  if (wrap) {
+    wrap.classList.remove('open');
+    wrap.style.setProperty('z-index', '25005', 'important');
+  }
+  if (content) {
+    content.style.setProperty('z-index', '25005', 'important');
+  }
   document.body.style.overflow = '';
   activeEditingProductId = null;
   // A pre-link from Link Product must not carry over to the next, unrelated new product.
@@ -261,7 +268,8 @@ export function openProductEditModal(productIdOrDraft = null) {
   if (pastePanel) pastePanel.hidden = true;
 
   document.body.style.overflow = 'hidden';
-  wrap.style.setProperty('z-index', '25005', 'important');
+  wrap.style.setProperty('z-index', '100005', 'important');
+  content.style.setProperty('z-index', '100005', 'important');
   wrap.classList.add('open');
 }
 

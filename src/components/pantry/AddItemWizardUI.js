@@ -29,8 +29,8 @@ let activeDropdownInstance = null;
 function showModal(html) {
   const wrap = document.getElementById('view-modal-wrap'), content = document.getElementById('view-modal-content');
   if (wrap && content) {
-    wrap.style.setProperty('z-index', '25005', 'important');
-    content.style.setProperty('z-index', '25005', 'important');
+    wrap.style.setProperty('z-index', '100005', 'important');
+    content.style.setProperty('z-index', '100005', 'important');
     content.innerHTML = html;
     wrap.classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -40,7 +40,15 @@ function showModal(html) {
 export function closeAddItemWizard() {
   if (activeDropdownInstance?.destroy) { activeDropdownInstance.destroy(); activeDropdownInstance = null; }
   const wrap = document.getElementById('view-modal-wrap');
-  if (wrap) { wrap.classList.remove('open'); document.body.style.overflow = ''; }
+  const content = document.getElementById('view-modal-content');
+  if (wrap) {
+    wrap.classList.remove('open');
+    wrap.style.setProperty('z-index', '25005', 'important');
+    document.body.style.overflow = '';
+  }
+  if (content) {
+    content.style.setProperty('z-index', '25005', 'important');
+  }
 }
 
 export function openAddItemWizard(options = {}) {

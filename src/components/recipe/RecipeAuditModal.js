@@ -387,7 +387,7 @@ export function openRecipeAuditModal(targetRecipeId = null) {
   if (!modalOverlay) {
     modalOverlay = document.createElement('div');
     modalOverlay.id = 'recipe-audit-modal-overlay';
-    modalOverlay.style.cssText = 'position:fixed; inset:0; z-index:99999; background:rgba(15,23,42,0.65); backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;';
+    modalOverlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(15,23,42,0.65); backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;';
     document.body.appendChild(modalOverlay);
 
     // Close on backdrop click
