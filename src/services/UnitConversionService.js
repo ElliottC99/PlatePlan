@@ -97,7 +97,7 @@ export function isLiquidIngredient(name) {
   return LIQUID_PATTERN.test(lower);
 }
 
-function findDensity(name) {
+export function findDensity(name) {
   const lower = String(name || '').toLowerCase();
   for (const [key, density] of Object.entries(DENSITY_TABLE)) {
     if (lower.includes(key)) return density;

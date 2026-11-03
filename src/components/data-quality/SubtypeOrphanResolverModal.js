@@ -16,20 +16,33 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
 
   const targetSubtypeId = orphanIssue.subtypeId;
   const parentId = orphanIssue.parentId;
+  const targetProductId = orphanIssue.productId;
+  const isNoIngredient = orphanIssue.type === 'no-ingredient' || (!parentId && !!targetProductId);
 
-  // Find all products referencing this missing/deleted subtypeId
-  const affectedProducts = products.filter(p => String(p.subtypeId) === String(targetSubtypeId));
+  // Find all affected products
+  let affectedProducts = [];
+  if (targetProductId) {
+    const direct = products.find(p => String(p.id) === String(targetProductId));
+    if (direct) affectedProducts = [direct];
+  }
+  if (!affectedProducts.length && targetSubtypeId) {
+    affectedProducts = products.filter(p => String(p.subtypeId) === String(targetSubtypeId));
+  }
+  if (!affectedProducts.length && parentId) {
+    affectedProducts = products.filter(p => String(p.ingredientId) === String(parentId));
+  }
 
   if (!affectedProducts.length) {
     if (typeof window.showPlatePlanToast === 'function') {
-      window.showPlatePlanToast('No products are currently referencing this orphaned sub-type.', 'info');
+      window.showPlatePlanToast('No products are currently referencing this orphan issue.', 'info');
     }
     return;
   }
 
-  // Find parent ingredient
+  // Find parent ingredient (if present)
   const parent = ingredients.find(ing => String(ing.id) === String(parentId));
   const availableSubtypes = parent && Array.isArray(parent.subtypes) ? parent.subtypes : [];
+  const sortedIngredients = [...ingredients].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 
   let modal = document.getElementById('subtype-orphan-resolver-modal');
   if (!modal) {
@@ -41,9 +54,24 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
   modal.style.cssText = 'display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;padding:16px;';
 
   const productRows = affectedProducts.map((p, idx) => {
-    const subtypeOptions = availableSubtypes.map(st => `
-      <option value="reassign:${st.id}">${escapeHtml(st.name)} (Sub-type)</option>
-    `).join('');
+    let actionSelectContent = '';
+    if (isNoIngredient || !parent) {
+      actionSelectContent = `
+        <option value="" disabled selected>-- Link to Pantry Ingredient --</option>
+        ${sortedIngredients.map(ing => `<option value="link:${ing.id}">Link to: ${escapeHtml(ing.name)}</option>`).join('')}
+        <option value="delete">🗑️ Delete Product from Catalog</option>
+      `;
+    } else {
+      const subtypeOptions = availableSubtypes.map(st => `
+        <option value="reassign:${st.id}">${escapeHtml(st.name)} (Sub-type)</option>
+      `).join('');
+      actionSelectContent = `
+        <option value="convert" selected>Convert to Parent-level (${escapeHtml(parent?.name || 'Ingredient')})</option>
+        ${subtypeOptions}
+        <option value="NEW_SUBTYPE">+ Create New Sub-Type...</option>
+        <option value="delete">🗑️ Delete Product from Catalog</option>
+      `;
+    }
 
     return `
       <tr style="border-bottom: 1px solid var(--border,#e7e5e4); font-size:12.5px;">
@@ -51,11 +79,8 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
           ${escapeHtml(p.name)} <br /><span style="font-size:10.5px; font-weight:normal; color:var(--text2);">${escapeHtml(p.brand || 'No Brand')}</span>
         </td>
         <td style="padding:10px 8px; text-align:center;">
-          <select class="orphan-action-select" data-index="${idx}" data-prod-id="${escapeHtml(p.id)}" style="padding:6px; font-size:11.5px; border-radius:6px; border:1px solid var(--border); background:#fff; width:100%; max-width:200px; margin-bottom:4px;" name="escapeHtml(p.id)">
-            <option value="convert" selected>Convert to Parent-level (${escapeHtml(parent?.name || 'Ingredient')})</option>
-            ${subtypeOptions}
-            <option value="NEW_SUBTYPE">+ Create New Sub-Type...</option>
-            <option value="delete">🗑️ Delete Product from Catalog</option>
+          <select class="orphan-action-select" data-index="${idx}" data-prod-id="${escapeHtml(p.id)}" style="padding:6px; font-size:11.5px; border-radius:6px; border:1px solid var(--border); background:#fff; width:100%; max-width:240px; margin-bottom:4px;" name="escapeHtml(p.id)">
+            ${actionSelectContent}
           </select>
           <div class="new-subtype-container" style="display:none; margin-top:4px;">
             <input type="text" class="new-subtype-name-input" placeholder="New sub-type name..." style="width:100%; padding:4px 6px; font-size:11px; border:1px solid var(--border); border-radius:4px;" name="new-sub-type-name" />
@@ -66,12 +91,14 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
   }).join('');
 
   modal.innerHTML = `
-    <div class="card" style="width:100%; max-width:600px; padding:24px; border-radius:14px; background:var(--surface,#fff); box-shadow:0 12px 36px rgba(0,0,0,0.25); display:flex; flex-direction:column; max-height:90vh; box-sizing:border-box;">
+    <div class="card" style="width:100%; max-width:620px; padding:24px; border-radius:14px; background:var(--surface,#fff); box-shadow:0 12px 36px rgba(0,0,0,0.25); display:flex; flex-direction:column; max-height:90vh; box-sizing:border-box;">
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px;">
         <div>
-          <h2 style="font-size:17.5px; font-weight:750; margin:0; color:var(--text,#1c1917);">Resolve Orphaned Products</h2>
+          <h2 style="font-size:17.5px; font-weight:750; margin:0; color:var(--text,#1c1917);">Resolve Broken Product Links</h2>
           <p style="font-size:12.5px; color:var(--text2,#78716c); margin:4px 0 0 0;">
-            Products are referencing sub-type ID <strong>"${escapeHtml(targetSubtypeId)}"</strong> which is deleted. Assign resolutions below.
+            ${(isNoIngredient || !parent)
+              ? `Product references missing parent ingredient ID <strong>"${escapeHtml(parentId || 'missing')}"</strong>. Reassign to an existing pantry ingredient or delete it.`
+              : `Products are referencing sub-type ID <strong>"${escapeHtml(targetSubtypeId)}"</strong> which is deleted. Assign resolutions below.`}
           </p>
         </div>
         <button type="button" class="btn sm ghost" style="padding:4px 8px; font-size:16px; line-height:1;" onclick="window.closeSubtypeOrphanResolverModal()">✕</button>
@@ -81,11 +108,17 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
       <div style="background:#eef2ff; border:1px solid #c7d2fe; border-radius:8px; padding:10px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
         <span style="font-size:11.5px; font-weight:700; color:#3730a3;">⚡ Apply Batch Resolution:</span>
         <div style="display:flex; gap:6px;">
-          <select id="batch-resolution-select" style="padding:5px; font-size:11.5px; border-radius:6px; border:1px solid #a5b4fc; background:#fff;" name="batch-resolution-select">
-            <option value="convert">Convert all to Parent-level</option>
-            ${availableSubtypes.map(st => `<option value="reassign:${st.id}">Reassign all to: ${escapeHtml(st.name)}</option>`).join('')}
-            <option value="NEW_SUBTYPE">+ Create New Sub-Type...</option>
-            <option value="delete">Delete all affected products</option>
+          <select id="batch-resolution-select" style="padding:5px; font-size:11.5px; border-radius:6px; border:1px solid #a5b4fc; background:#fff; max-width:200px;" name="batch-resolution-select">
+            ${(isNoIngredient || !parent) ? `
+              <option value="" disabled selected>-- Batch Action --</option>
+              ${sortedIngredients.map(ing => `<option value="link:${ing.id}">Link all to: ${escapeHtml(ing.name)}</option>`).join('')}
+              <option value="delete">Delete all affected products</option>
+            ` : `
+              <option value="convert">Convert all to Parent-level</option>
+              ${availableSubtypes.map(st => `<option value="reassign:${st.id}">Reassign all to: ${escapeHtml(st.name)}</option>`).join('')}
+              <option value="NEW_SUBTYPE">+ Create New Sub-Type...</option>
+              <option value="delete">Delete all affected products</option>
+            `}
           </select>
           <button type="button" id="batch-apply-btn" class="btn primary sm" style="font-size:11px; padding:4px 10px; background:#4f46e5; color:#fff; border-radius:6px;">Apply</button>
         </div>
@@ -96,7 +129,7 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
           <thead>
             <tr style="background:#e7e5e4; font-size:11px; font-weight:800; color:var(--text2); text-transform:uppercase; border-bottom:2px solid #d6d3d1;">
               <th style="padding:10px 8px; text-align:left;">Affected Product</th>
-              <th style="padding:10px 8px; text-align:center; width:240px;">Resolution Action</th>
+              <th style="padding:10px 8px; text-align:center; width:260px;">Resolution Action</th>
             </tr>
           </thead>
           <tbody>
@@ -157,7 +190,14 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
       if (!origProd) return;
 
       const p = { ...origProd };
-      if (val === 'convert') {
+      if (val.startsWith('link:')) {
+        const newIngId = val.split(':')[1];
+        p.ingredientId = newIngId;
+        p.subtypeId = null;
+        p.isAutoDefault = false;
+        p.updatedAt = new Date().toISOString();
+        updates.push(p);
+      } else if (val === 'convert') {
         p.subtypeId = null;
         p.isAutoDefault = false;
         p.updatedAt = new Date().toISOString();

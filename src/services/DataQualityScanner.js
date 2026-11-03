@@ -7,10 +7,10 @@
  */
 
 import { calculateItemNutrition, rollupNutritionTotals } from './NutritionService.js';
-import { isLiquidIngredient, getIngredientDensity } from './UnitConversionService.js';
+import { isLiquidIngredient, getIngredientDensity, findDensity } from './UnitConversionService.js';
 import { DQ_CONFIDENCE_THRESHOLD } from '../config/businessRules.js';
 
-export { getIngredientDensity };
+export { getIngredientDensity, findDensity };
 
 /**
  * Calculates string similarity using Sorensen-Dice coefficient.
@@ -155,9 +155,16 @@ export function autoRecalibrateRecipeDrift(recipe, ingredientStore = [], product
   const calcFat = perServing.fat ?? 0;
 
   const storedCalories = Number(recipe.macros?.calories ?? recipe.macros?.cal ?? recipe.calories ?? recipe.cal ?? 0);
-  const driftRatio = Math.abs(storedCalories - calcCalories) / Math.max(1, storedCalories);
-  
-  if (driftRatio > 0.02) {
+  const storedProtein = Number(recipe.macros?.protein ?? recipe.macros?.prot ?? recipe.protein ?? recipe.prot ?? 0);
+  const storedCarbs = Number(recipe.macros?.carbs ?? recipe.macros?.carb ?? recipe.carbs ?? recipe.carb ?? 0);
+  const storedFat = Number(recipe.macros?.fat ?? recipe.fat ?? 0);
+
+  const calDiff = Math.abs(storedCalories - calcCalories) / Math.max(1, calcCalories);
+  const protDiff = Math.abs(storedProtein - calcProtein) / Math.max(1, calcProtein);
+  const carbDiff = Math.abs(storedCarbs - calcCarbs) / Math.max(1, calcCarbs);
+  const fatDiff = Math.abs(storedFat - calcFat) / Math.max(1, calcFat);
+
+  if (calDiff > 0.02 || protDiff > 0.02 || carbDiff > 0.02 || fatDiff > 0.02) {
     recipe.macros = {
       calories: Math.round(calcCalories),
       protein: Number(calcProtein.toFixed(1)),
@@ -223,13 +230,19 @@ export function runAudit(state = {}) {
     const fatDiff = Math.abs(storedFat - calcFat) / Math.max(1, calcFat);
 
     if (calDiff > 0.02 || protDiff > 0.02 || carbDiff > 0.02 || fatDiff > 0.02) {
+      const driftedParts = [];
+      if (calDiff > 0.02) driftedParts.push(`Calories: ${Math.round(storedCal)} vs ${Math.round(calcCal)} kcal (${(calDiff * 100).toFixed(1)}%)`);
+      if (protDiff > 0.02) driftedParts.push(`Protein: ${storedProt.toFixed(1)}g vs ${calcProt.toFixed(1)}g (${(protDiff * 100).toFixed(1)}%)`);
+      if (carbDiff > 0.02) driftedParts.push(`Carbs: ${storedCarb.toFixed(1)}g vs ${calcCarb.toFixed(1)}g (${(carbDiff * 100).toFixed(1)}%)`);
+      if (fatDiff > 0.02) driftedParts.push(`Fat: ${storedFat.toFixed(1)}g vs ${calcFat.toFixed(1)}g (${(fatDiff * 100).toFixed(1)}%)`);
+
       results.macroDrift.push({
         key: `drift:recipe:${r.id}`,
         recipeId: r.id,
         recipeName: r.name || r.title || 'Untitled Recipe',
         stored: { cal: storedCal, prot: storedProt, carb: storedCarb, fat: storedFat },
         calculated: { cal: calcCal, prot: calcProt, carb: calcCarb, fat: calcFat },
-        message: `Stored macros differ from active ingredient defaults by >2% (${Math.round(storedCal)} kcal stored vs ${Math.round(calcCal)} kcal calculated).`,
+        message: `Stored macros differ from active ingredient defaults: ${driftedParts.join(' · ')}`,
         severity: 'advisory'
       });
     }
@@ -312,7 +325,10 @@ export function runAudit(state = {}) {
       const ingNameLower = String(baseIng.name || '').toLowerCase();
       if (isLiquidIngredient(ingNameLower) || ingNameLower.includes('liquid')) return;
 
-      // 3. Linked product has volume packaging (ml, l)
+      // 3. Known pantry staple density in UnitConversionService (sugar, flour, rice, oats, lentils, etc.)
+      if (findDensity(ingNameLower) != null) return;
+
+      // 4. Linked product has volume packaging (ml, l)
       const hasLiquidProd = products.some(p => String(p.ingredientId) === String(baseIng.id) && (p.packUnit === 'ml' || p.packUnit === 'l'));
       if (hasLiquidProd) return;
 
@@ -358,6 +374,7 @@ export function runAudit(state = {}) {
           key: `orphan:product:${p.id}:no-ing`,
           productId: p.id,
           productName: p.name || 'Unnamed Product',
+          parentId: p.ingredientId,
           subtypeId: p.subtypeId,
           type: 'no-ingredient',
           message: `Product "${p.name}" references parent ingredient ID "${p.ingredientId}" which does not exist in the database.`,

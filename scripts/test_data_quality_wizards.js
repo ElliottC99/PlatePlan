@@ -66,13 +66,15 @@ console.log('--- Test 1: Liquid-Aware Volume Density Filtering ---');
   const mockIngredients = [
     { id: 'ing_oil', name: 'Sesame Oil', category: 'Store Cupboard' },
     { id: 'ing_vinegar', name: 'Rice Wine Vinegar', category: 'Store Cupboard' },
-    { id: 'ing_flour', name: 'Plain Flour', category: 'Baking' } // Dry good without density
+    { id: 'ing_sugar', name: 'Granulated Sugar', category: 'Baking' }, // Staple with known density in UnitConversionService
+    { id: 'ing_couscous', name: 'Dried Couscous', category: 'Grains' } // Dry good without known density
   ];
 
   const mockProducts = [
     { id: 'p_oil', name: 'Toasted Sesame Oil', ingredientId: 'ing_oil', packUnit: 'ml', cal: 890, prot: 0 },
     { id: 'p_vinegar', name: 'Rice Wine Vinegar', ingredientId: 'ing_vinegar', packUnit: 'ml', cal: 20, prot: 0 },
-    { id: 'p_flour', name: 'Plain White Flour', ingredientId: 'ing_flour', packUnit: 'g', cal: 350, prot: 10 }
+    { id: 'p_sugar', name: 'Granulated Sugar', ingredientId: 'ing_sugar', packUnit: 'g', cal: 400, prot: 0 },
+    { id: 'p_couscous', name: 'Dried Couscous', ingredientId: 'ing_couscous', packUnit: 'g', cal: 350, prot: 12 }
   ];
 
   const mockRecipes = [
@@ -82,7 +84,8 @@ console.log('--- Test 1: Liquid-Aware Volume Density Filtering ---');
       ingredients: [
         { ingredientId: 'ing_oil', qty: 15, unit: 'ml' },
         { ingredientId: 'ing_vinegar', qty: 10, unit: 'ml' },
-        { ingredientId: 'ing_flour', qty: 1, unit: 'cup' } // Volume dry good
+        { ingredientId: 'ing_sugar', qty: 2, unit: 'tbsp' }, // Known staple density
+        { ingredientId: 'ing_couscous', qty: 1, unit: 'cup' } // Volume dry good
       ]
     },
     {
@@ -90,7 +93,7 @@ console.log('--- Test 1: Liquid-Aware Volume Density Filtering ---');
       name: 'Stir Fry 2',
       ingredients: [
         { ingredientId: 'ing_oil', qty: 30, unit: 'ml' },
-        { ingredientId: 'ing_flour', qty: 2, unit: 'cup' } // Volume dry good in another recipe
+        { ingredientId: 'ing_couscous', qty: 2, unit: 'cup' } // Volume dry good in another recipe
       ]
     }
   ];
@@ -108,12 +111,16 @@ console.log('--- Test 1: Liquid-Aware Volume Density Filtering ---');
   const vinegarWarning = audit.densityMismatch.find(d => d.ingredientId === 'ing_vinegar');
   assert(!vinegarWarning, 'Recognized liquid "Rice Wine Vinegar" must NEVER produce a density warning');
 
-  // Verify that Flour produces EXACTLY 1 grouped warning across both recipes
-  assert.strictEqual(audit.densityMismatch.length, 1, `Expected exactly 1 density mismatch for Flour, got ${audit.densityMismatch.length}`);
-  const flourWarning = audit.densityMismatch[0];
-  assert.strictEqual(flourWarning.ingredientId, 'ing_flour');
-  assert.strictEqual(flourWarning.recipes.length, 2, 'Flour warning must group all 2 affected recipes');
-  console.log('✅ Test 1 Passed: Recognized kitchen liquids silenced; dry goods grouped cleanly by ingredient.');
+  // Verify that Sugar produces ZERO density warnings because it has known density (0.85) in UnitConversionService
+  const sugarWarning = audit.densityMismatch.find(d => d.ingredientId === 'ing_sugar');
+  assert(!sugarWarning, 'Staple "Granulated Sugar" with known density must NEVER produce a density warning');
+
+  // Verify that Couscous produces EXACTLY 1 grouped warning across both recipes
+  assert.strictEqual(audit.densityMismatch.length, 1, `Expected exactly 1 density mismatch for Couscous, got ${audit.densityMismatch.length}`);
+  const couscousWarning = audit.densityMismatch[0];
+  assert.strictEqual(couscousWarning.ingredientId, 'ing_couscous');
+  assert.strictEqual(couscousWarning.recipes.length, 2, 'Couscous warning must group all 2 affected recipes');
+  console.log('✅ Test 1 Passed: Recognized kitchen liquids and known staple densities silenced; dry goods grouped cleanly.');
 }
 
 // --- Test 2: Duplicate Ingredient Detection (Sorensen-Dice) ---
@@ -222,12 +229,41 @@ console.log('\n--- Test 4: Recipe Macro Drift Calculation & Auto-Recalibration -
   assert.strictEqual(audit.macroDrift[0].stored.cal, 500);
   assert.strictEqual(audit.macroDrift[0].calculated.cal, 240);
 
-  // Test Auto-Recalibration
+  // Test Auto-Recalibration for high calorie drift
   const recalResult = autoRecalibrateRecipeDrift(driftedRecipe, mockIngredients, mockProducts);
   assert(recalResult.updated, 'autoRecalibrateRecipeDrift must update drifted recipe');
   assert.strictEqual(driftedRecipe.macros.calories, 240, 'Recalibrated calories must equal calculated 240 kcal');
   assert.strictEqual(driftedRecipe.macros.protein, 28, 'Recalibrated protein must equal calculated 28g');
-  console.log('✅ Test 4 Passed: Macro drift detected and auto-recalibrated accurately.');
+
+  // Test Auto-Recalibration when calories are identical (0% diff) but protein drifted
+  const proteinDriftedRecipe = {
+    id: 'r_prot_drift',
+    name: 'Protein Drift Recipe',
+    serves: 1,
+    ingredients: [
+      { ingredientId: 'ing_tofu', qty: 200, unit: 'g' } // 240 kcal, 28g protein
+    ],
+    macros: {
+      calories: 240, // Exact same calories (0% diff)
+      protein: 14,   // 14g vs 28g (100% diff)
+      carbs: 0,
+      fat: 0
+    }
+  };
+
+  const auditProt = runAudit({
+    recipes: [proteinDriftedRecipe],
+    ingredients: mockIngredients,
+    products: mockProducts
+  });
+  assert.strictEqual(auditProt.macroDrift.length, 1, 'Must detect macro drift even when calories match but protein drifted');
+  assert(auditProt.macroDrift[0].message.includes('Protein:'), 'Audit message must clearly indicate protein drifted');
+
+  const recalProt = autoRecalibrateRecipeDrift(proteinDriftedRecipe, mockIngredients, mockProducts);
+  assert(recalProt.updated, 'autoRecalibrateRecipeDrift must update when protein drifted even if calories match');
+  assert.strictEqual(proteinDriftedRecipe.macros.protein, 28, 'Protein must be updated to 28g');
+
+  console.log('✅ Test 4 Passed: Macro drift detected and auto-recalibrated accurately across all macros.');
 }
 
 // --- Test 5: UI Card Markup with data-action-dq Attributes ---

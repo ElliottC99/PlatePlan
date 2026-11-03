@@ -120,7 +120,9 @@ function initDataQualityEvents(container) {
     if (action === 'resolve-orphan') {
       const subtypeId = btn.dataset.subtypeId;
       const parentId = btn.dataset.parentId;
-      openSubtypeOrphanResolverModal({ subtypeId, parentId });
+      const productId = btn.dataset.productId;
+      const type = btn.dataset.orphanType;
+      openSubtypeOrphanResolverModal({ subtypeId, parentId, productId, type });
       return;
     }
     if (action === 'inspect-macro') {
@@ -230,7 +232,10 @@ export function renderDataQualityView() {
   }
 
   const totalIssues = audit.totalCount || 0;
-  const healthScore = Math.max(0, Math.min(100, Math.round(100 - (totalIssues * 1.5))));
+  const blockers = audit.orphans.length;
+  const gaps = audit.unmappedItems.length + audit.densityMismatch.length + audit.incompleteMacros.length + audit.planDesync.length;
+  const advisories = audit.macroDrift.length;
+  const healthScore = Math.max(0, Math.min(100, Math.round(100 - (blockers * 4 + gaps * 1 + advisories * 0.3))));
   const isHealthy = totalIssues === 0;
 
   container.innerHTML = `
@@ -259,17 +264,17 @@ export function renderDataQualityView() {
 
         <!-- Guided Resolution Action Ribbon -->
         <div style="display:flex; gap:8px; flex-wrap:wrap; padding-top:12px; border-top:1px solid var(--border,#e7e5e4);">
-          <button type="button" class="btn sm" data-action-dq="open-macro-recalibrate" style="font-weight:600; background:#3b82f6; color:#fff;">
-            📉 Macro Recalibration (${audit.macroDrift.length})
+          <button type="button" class="btn sm" data-action-dq="open-macro-recalibrate" style="font-weight:600; background:#3b82f6; color:#fff; ${audit.macroDrift.length === 0 ? 'opacity:0.55; cursor:default;' : ''}">
+            📉 Macro Recalibration (${audit.macroDrift.length}${audit.macroDrift.length === 0 ? ' ✓' : ''})
           </button>
-          <button type="button" class="btn sm" data-action-dq="open-duplicate-merge" style="font-weight:600; background:#8b5cf6; color:#fff;">
-            👥 Deduplication Wizard (${audit.duplicates.length})
+          <button type="button" class="btn sm" data-action-dq="open-duplicate-merge" style="font-weight:600; background:#8b5cf6; color:#fff; ${audit.duplicates.length === 0 ? 'opacity:0.55; cursor:default;' : ''}">
+            👥 Deduplication Wizard (${audit.duplicates.length}${audit.duplicates.length === 0 ? ' ✓' : ''})
           </button>
-          <button type="button" class="btn sm" data-action-dq="open-orphan-resolver" style="font-weight:600; background:#f59e0b; color:#fff;">
-            🔗 Resolve Orphans (${audit.orphans.length})
+          <button type="button" class="btn sm" data-action-dq="open-orphan-resolver" style="font-weight:600; background:#f59e0b; color:#fff; ${audit.orphans.length === 0 ? 'opacity:0.55; cursor:default;' : ''}">
+            🔗 Resolve Orphans (${audit.orphans.length}${audit.orphans.length === 0 ? ' ✓' : ''})
           </button>
-          <button type="button" class="btn sm" data-action-dq="open-sweeper" style="font-weight:600; background:#059669; color:#fff;">
-            🧹 Unlinked Sweeper (${audit.unmappedItems.length})
+          <button type="button" class="btn sm" data-action-dq="open-sweeper" style="font-weight:600; background:#059669; color:#fff; ${audit.unmappedItems.length === 0 ? 'opacity:0.55; cursor:default;' : ''}">
+            🧹 Unlinked Sweeper (${audit.unmappedItems.length}${audit.unmappedItems.length === 0 ? ' ✓' : ''})
           </button>
           <button type="button" class="btn sm" data-action-dq="open-recipe-audit" style="font-weight:600; background:var(--primary,#4f46e5); color:#fff;">
             📖 Recipe Mapping Audit
@@ -309,6 +314,8 @@ export function renderDataQualityView() {
                 data-action-dq="resolve-orphan"
                 data-subtype-id="${escapeAttr(item.subtypeId || '')}" 
                 data-parent-id="${escapeAttr(item.parentId || '')}"
+                data-product-id="${escapeAttr(item.productId || '')}"
+                data-orphan-type="${escapeAttr(item.type || '')}"
                 style="background:var(--primary,#4f46e5); color:#fff; font-weight:600;">Resolve Links</button>
             </div>
           </div>
