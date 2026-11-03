@@ -62,13 +62,13 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
 
   const productRowsHtml = affectedProducts.map(p => `
     <tr style="border-bottom: 1px solid var(--border,#e7e5e4); font-size:12.5px;" data-prod-id="${escapeAttr(p.id)}">
-      <td style="padding:12px 10px; font-weight:700; text-align:left; vertical-align:top; width:45%;">
+      <td style="padding:12px 10px; font-weight:700; text-align:left; vertical-align:top; width:35%;">
         <div style="font-size:13px; color:var(--text,#0f172a);">${escapeHtml(p.name)}</div>
         <div style="font-size:11px; font-weight:normal; color:var(--text2,#64748b); margin-top:2px;">
           ${escapeHtml(p.brand || 'No Brand')} ${p.packSize ? `&bull; ${escapeHtml(p.packSize)}` : ''}
         </div>
       </td>
-      <td style="padding:12px 10px; text-align:left; vertical-align:top; width:55%;">
+      <td style="padding:12px 10px; text-align:left; vertical-align:top; width:65%;">
         <div style="display:flex; gap:8px; align-items:flex-start;">
           <div class="product-tax-mount" data-prod-id="${escapeAttr(p.id)}" style="flex:1; min-width:0;"></div>
           <button type="button" class="btn sm ghost orphan-delete-btn" data-prod-id="${escapeAttr(p.id)}" title="Delete Product from Catalog" style="padding:7px 10px; font-size:13px; color:#ef4444; border:1px solid #fecaca; border-radius:8px; flex-shrink:0; cursor:pointer;">
@@ -81,7 +81,7 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
   `).join('');
 
   modal.innerHTML = `
-    <div class="card" style="width:100%; max-width:680px; padding:24px; border-radius:14px; background:var(--surface,#fff); box-shadow:0 12px 36px rgba(0,0,0,0.25); display:flex; flex-direction:column; max-height:90vh; box-sizing:border-box;">
+    <div class="card" style="width:100%; max-width:740px; padding:24px; border-radius:14px; background:var(--surface,#fff); box-shadow:0 12px 36px rgba(0,0,0,0.25); display:flex; flex-direction:column; max-height:92vh; box-sizing:border-box;">
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px;">
         <div>
           <h2 style="font-size:17.5px; font-weight:750; margin:0; color:var(--text,#1c1917);">Resolve Broken Product Links</h2>
@@ -105,12 +105,12 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
         </div>
       ` : ''}
 
-      <div style="flex:1; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:10px; margin-bottom:18px; background:var(--surface2,#f8fafc);">
+      <div style="flex:1; min-height:340px; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:10px; margin-bottom:18px; background:var(--surface2,#f8fafc); padding-bottom:140px; box-sizing:border-box;">
         <table style="width:100%; border-collapse:collapse;">
           <thead>
             <tr style="background:#e7e5e4; font-size:11px; font-weight:800; color:var(--text2); text-transform:uppercase; border-bottom:2px solid #d6d3d1;">
-              <th style="padding:10px 10px; text-align:left;">Affected Product</th>
-              <th style="padding:10px 10px; text-align:left;">Assign Valid Sub-Type</th>
+              <th style="padding:10px 10px; text-align:left; width:35%;">Affected Product</th>
+              <th style="padding:10px 10px; text-align:left; width:65%;">Assign Valid Sub-Type</th>
             </tr>
           </thead>
           <tbody>

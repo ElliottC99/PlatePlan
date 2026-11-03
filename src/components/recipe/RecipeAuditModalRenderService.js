@@ -94,7 +94,7 @@ export function renderIssueCard(issue, ingredients) {
           <input type="text" id="ram-unit-${issue.id}" name="ram_unit_${issue.id}" aria-label="Unit for ${escapeAttr(issue.itemName)}" value="${escapeAttr(issue.unit)}" placeholder="Unit" style="width:100%; padding:7px 8px; font-size:12px; border:1px solid var(--border,#cbd5e1); border-radius:8px; outline:none; box-sizing:border-box; text-align:center;" />
         </div>
         <div>
-          <button type="button" class="btn sm primary ram-save-fix-btn" data-recipe-id="${escapeAttr(issue.recipeId)}" data-item-index="${issue.itemIndex}" data-issue-id="${escapeAttr(issue.id)}" style="background:var(--primary,#4f46e5); color:#fff; font-weight:700; padding:7px 14px; border-radius:8px; cursor:pointer; white-space:nowrap;">
+          <button type="button" class="btn sm primary ram-save-fix-btn" data-recipe-id="${escapeAttr(issue.recipeId)}" data-item-index="${issue.itemIndex}" data-issue-id="${escapeAttr(issue.id)}" data-item-name="${escapeAttr(issue.itemName)}" style="background:var(--primary,#4f46e5); color:#fff; font-weight:700; padding:7px 14px; border-radius:8px; cursor:pointer; white-space:nowrap;">
             Save &amp; Fix
           </button>
         </div>

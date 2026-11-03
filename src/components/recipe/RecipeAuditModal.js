@@ -178,6 +178,7 @@ function bindModalEvents(issues = [], totalPages = 1) {
 
   // Auto-fix button
   modalOverlay.querySelector('#ram-autofix-btn')?.addEventListener('click', async () => {
+    const btn = modalOverlay.querySelector('#ram-autofix-btn');
     const confidentIssues = issues.filter(i => i.suggestedMatch && i.suggestedMatch.score >= 0.7);
     if (!confidentIssues.length) {
       if (typeof window.showPlatePlanToast === 'function') {
@@ -186,9 +187,15 @@ function bindModalEvents(issues = [], totalPages = 1) {
       return;
     }
 
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = `⚡ Auto-fixing ${confidentIssues.length} items...`;
+    }
+
     const fixes = confidentIssues.map(i => ({
       recipeId: i.recipeId,
       itemIndex: i.itemIndex,
+      itemName: i.itemName,
       newIngredientId: i.suggestedMatch.ingredientId,
       newSubtypeId: i.suggestedMatch.subtypeId,
       newIngredientName: i.suggestedMatch.ingredientName,
@@ -200,11 +207,18 @@ function bindModalEvents(issues = [], totalPages = 1) {
     try {
       const res = await batchRelinkRecipeMappings(fixes);
       if (typeof window.showPlatePlanToast === 'function') {
-        window.showPlatePlanToast(`Auto-fixed ${res.count} recipe mapping(s)!`, 'success');
+        window.showPlatePlanToast(`Auto-fixed ${res.count} recipe mapping(s) across ${res.modifiedCount || 'all'} recipe(s)!`, 'success');
       }
       renderModalContent();
     } catch (err) {
       console.error('[RecipeAuditModal] Auto-fix error:', err);
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast('Auto-fix encountered an error. Check console.', 'error');
+      }
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '⚡ Auto-Fix Confident Matches';
+      }
     }
   });
 
@@ -214,6 +228,7 @@ function bindModalEvents(issues = [], totalPages = 1) {
       const issueId = btn.dataset.issueId;
       const recipeId = btn.dataset.recipeId;
       const itemIndex = Number(btn.dataset.itemIndex);
+      const itemName = btn.dataset.itemName || '';
 
       const selectEl = modalOverlay.querySelector(`#ram-select-${issueId}`);
       const qtyEl = modalOverlay.querySelector(`#ram-qty-${issueId}`);
@@ -237,6 +252,7 @@ function bindModalEvents(issues = [], totalPages = 1) {
         await relinkRecipeIngredient({
           recipeId,
           itemIndex,
+          itemName,
           newIngredientId,
           newSubtypeId: newSubtypeId || null,
           qty,

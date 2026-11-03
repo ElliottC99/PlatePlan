@@ -153,8 +153,8 @@ function attachSweeperSearchEvents(container, unlinkedGroups = []) {
 
     const renderFilteredOptions = () => {
       const query = (input.value || '').toLowerCase().trim();
-      const st = window.Store?.getState?.() ;
-      const masterItems = st.ingredients || [];
+      const st = (typeof getState === 'function' ? getState() : (window.Store?.getState?.() || {})) || {};
+      const masterItems = Array.isArray(st.ingredients) ? st.ingredients : [];
       const masterCategories = Array.from(new Set([...STANDARD_CATS, ...(st.categories || []), ...masterItems.map(i => i.category).filter(Boolean)]));
 
       let matchCount = 0;
