@@ -27,35 +27,12 @@ export function renderKPIBadge(type, count, label, currentFilter) {
 }
 
 /**
- * Builds the dropdown options for selecting catalog targets.
- */
-export function buildCatalogOptions(ingredients = [], selectedIngId = null, selectedSubId = null) {
-  const sorted = [...ingredients].sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || ''));
-  const html = ['<option value="">-- Select Master Catalog Target --</option>'];
-
-  sorted.forEach(ing => {
-    const isIngSelected = String(ing.id) === String(selectedIngId) && !selectedSubId;
-    html.push(`<option value="${escapeAttr(ing.id)}:" ${isIngSelected ? 'selected' : ''}>[${escapeHtml(ing.category || 'Pantry')}] ${escapeHtml(ing.name)} (Item-level)</option>`);
-
-    if (Array.isArray(ing.subtypes) && ing.subtypes.length > 0) {
-      ing.subtypes.forEach(sub => {
-        const isSubSelected = String(ing.id) === String(selectedIngId) && String(sub.id) === String(selectedSubId);
-        html.push(`<option value="${escapeAttr(ing.id)}:${escapeAttr(sub.id)}" ${isSubSelected ? 'selected' : ''}>&nbsp;&nbsp;↳ ${escapeHtml(ing.name)} ➔ ${escapeHtml(sub.name)} (Sub-type)</option>`);
-      });
-    }
-  });
-
-  return html.join('');
-}
-
-/**
- * Renders an individual issue card.
+ * Renders an individual issue card with an autocomplete search mount.
  */
 export function renderIssueCard(issue, ingredients) {
   const suggested = issue.suggestedMatch;
   const preSelectIng = suggested ? suggested.ingredientId : issue.currentIngredientId;
   const preSelectSub = suggested ? suggested.subtypeId : issue.currentSubtypeId;
-  const optionsHtml = buildCatalogOptions(ingredients, preSelectIng, preSelectSub);
 
   let badgeStyle = 'background:#fef3c7; color:#b45309;';
   let badgeText = 'Unlinked';
@@ -63,7 +40,7 @@ export function renderIssueCard(issue, ingredients) {
   if (issue.issueType === 'legacy_string') { badgeStyle = 'background:#e0e7ff; color:#3730a3;'; badgeText = 'Legacy String'; }
 
   return `
-    <div class="ram-issue-card" id="ram-issue-${issue.id}" style="background:#fff; border:1px solid var(--border,#e2e8f0); border-radius:12px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.03); display:flex; flex-direction:column; gap:10px;">
+    <div class="ram-issue-card" id="ram-issue-${issue.id}" style="background:#fff; border:1px solid var(--border,#e2e8f0); border-radius:12px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.03); display:flex; flex-direction:column; gap:10px; position:relative;">
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap;">
         <div>
           <div style="display:flex; align-items:center; gap:8px;">
@@ -82,11 +59,7 @@ export function renderIssueCard(issue, ingredients) {
       </div>
 
       <div style="display:grid; grid-template-columns:1fr 70px 70px auto; gap:8px; align-items:center;">
-        <div>
-          <select id="ram-select-${issue.id}" name="ram_target_catalog_${issue.id}" aria-label="Select Master Catalog entry for ${escapeAttr(issue.itemName)}" style="width:100%; padding:7px 10px; font-size:12px; border:1px solid var(--border,#cbd5e1); border-radius:8px; background:#fff; outline:none;">
-            ${optionsHtml}
-          </select>
-        </div>
+        <div class="ram-search-mount" id="ram-mount-${escapeAttr(issue.id)}" data-issue-id="${escapeAttr(issue.id)}" data-selected-id="${escapeAttr(preSelectIng || '')}" data-selected-sub-id="${escapeAttr(preSelectSub || '')}" style="min-width:0; position:relative;"></div>
         <div>
           <input type="text" id="ram-qty-${issue.id}" name="ram_qty_${issue.id}" aria-label="Quantity for ${escapeAttr(issue.itemName)}" value="${escapeAttr(issue.qty)}" placeholder="Qty" style="width:100%; padding:7px 8px; font-size:12px; border:1px solid var(--border,#cbd5e1); border-radius:8px; outline:none; box-sizing:border-box; text-align:center;" />
         </div>

@@ -12,7 +12,7 @@ import { openSubtypeOrphanResolverModal } from '../components/data-quality/Subty
 import { openMealPlanSyncWarningModal } from '../components/data-quality/MealPlanSyncWarningModal.js';
 import { openMergeIngredientsModal } from '../components/data-quality/MergeIngredientsModal.js';
 import { openRecipeAuditModal } from '../components/recipe/RecipeAuditModal.js';
-import { openUnlinkedSweeperModal } from '../components/data-quality/UnlinkedSweeperUI.js';
+import { openUnlinkedSweeperModal, scanUnlinkedRecipeIngredients } from '../components/data-quality/UnlinkedSweeperUI.js';
 import { performGlobalProductRelink, verifyZeroCalorieIngredient } from '../services/DataQualityService.js';
 
 export function escapeHtml(str) {
@@ -237,6 +237,12 @@ export function renderDataQualityView() {
   const advisories = audit.macroDrift.length;
   const healthScore = Math.max(0, Math.min(100, Math.round(100 - (blockers * 4 + gaps * 1 + advisories * 0.3))));
   const isHealthy = totalIssues === 0;
+  let unlinkedRecipeCount = 0;
+  try {
+    unlinkedRecipeCount = scanUnlinkedRecipeIngredients().length;
+  } catch (e) {
+    unlinkedRecipeCount = 0;
+  }
 
   container.innerHTML = `
     <div style="max-width:920px; margin:0 auto; padding:20px; box-sizing:border-box;">
@@ -273,8 +279,8 @@ export function renderDataQualityView() {
           <button type="button" class="btn sm" data-action-dq="open-orphan-resolver" style="font-weight:600; background:#f59e0b; color:#fff; ${audit.orphans.length === 0 ? 'opacity:0.55; cursor:default;' : ''}">
             🔗 Resolve Orphans (${audit.orphans.length}${audit.orphans.length === 0 ? ' ✓' : ''})
           </button>
-          <button type="button" class="btn sm" data-action-dq="open-sweeper" style="font-weight:600; background:#059669; color:#fff; ${audit.unmappedItems.length === 0 ? 'opacity:0.55; cursor:default;' : ''}">
-            🧹 Unlinked Sweeper (${audit.unmappedItems.length}${audit.unmappedItems.length === 0 ? ' ✓' : ''})
+          <button type="button" class="btn sm" data-action-dq="open-sweeper" style="font-weight:600; background:#059669; color:#fff; ${unlinkedRecipeCount === 0 ? 'opacity:0.55; cursor:default;' : ''}">
+            🧹 Unlinked Sweeper (${unlinkedRecipeCount}${unlinkedRecipeCount === 0 ? ' ✓' : ''})
           </button>
           <button type="button" class="btn sm" data-action-dq="open-recipe-audit" style="font-weight:600; background:var(--primary,#4f46e5); color:#fff;">
             📖 Recipe Mapping Audit

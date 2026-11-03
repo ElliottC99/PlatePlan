@@ -8,6 +8,7 @@ import { getState } from '../../store/store.js';
 import { auditRecipeMappings, relinkRecipeIngredient, batchRelinkRecipeMappings } from '../../utils/RecipeAuditService.js';
 import { renderKPIBadge, renderIssueCard, renderEmptyState } from './RecipeAuditModalRenderService.js';
 import { AUDIT_SUGGESTION_THRESHOLD } from '../../config/businessRules.js';
+import { createTaxonomySearchInput } from '../pantry/RecipeSearchDropdownHelper.js';
 
 let modalOverlay = null;
 let currentFilter = 'all';
@@ -15,9 +16,12 @@ let currentSearch = '';
 let targetRecipeFilter = null;
 let currentPage = 1;
 const PAGE_SIZE = 20;
+let activeAuditSearchInstances = [];
 
 function renderModalContent() {
   if (!modalOverlay) return;
+  activeAuditSearchInstances.forEach(inst => inst?.destroy?.());
+  activeAuditSearchInstances = [];
   const state = getState();
   const auditReport = auditRecipeMappings(state);
   const ingredients = state.ingredients || [];
@@ -138,11 +142,70 @@ function renderModalContent() {
     </div>
   `;
 
-  bindModalEvents(issues, totalPages);
+  bindModalEvents(issues, totalPages, ingredients);
 }
 
-function bindModalEvents(issues = [], totalPages = 1) {
+function bindModalEvents(issues = [], totalPages = 1, ingredients = []) {
   if (!modalOverlay) return;
+
+  // Mount searchable autocomplete inputs on each issue card
+  modalOverlay.querySelectorAll('.ram-search-mount').forEach(mountEl => {
+    const issueId = mountEl.dataset.issueId;
+    const issue = issues.find(i => String(i.id) === String(issueId));
+    if (!issue) return;
+
+    const suggested = issue.suggestedMatch;
+    let initialLabel = '';
+    let initialId = mountEl.dataset.selectedId || '';
+    let initialSubId = mountEl.dataset.selectedSubId || '';
+
+    if (suggested) {
+      initialLabel = suggested.displayName ? `🏷️ ${suggested.displayName}` : `📦 ${suggested.ingredientName}`;
+      initialId = suggested.ingredientId;
+      initialSubId = suggested.subtypeId || '';
+    } else if (initialId) {
+      const parentIng = ingredients.find(ing => String(ing.id) === String(initialId));
+      if (parentIng) {
+        if (initialSubId && Array.isArray(parentIng.subtypes)) {
+          const sub = parentIng.subtypes.find(s => String(s.id) === String(initialSubId));
+          initialLabel = sub ? `🏷️ ${sub.name} (${parentIng.name})` : `📦 ${parentIng.name}`;
+        } else {
+          initialLabel = `📦 ${parentIng.name}`;
+        }
+      }
+    }
+
+    mountEl.dataset.selectedId = initialId;
+    mountEl.dataset.selectedSubId = initialSubId;
+
+    const card = mountEl.closest('.ram-issue-card');
+
+    const searchInst = createTaxonomySearchInput({
+      container: mountEl,
+      rootItems: ingredients,
+      placeholder: 'Search Master Pantry...',
+      initialValue: initialLabel,
+      onSelect: ({ val, label }) => {
+        if (val && val.includes(':')) {
+          const [ingId, subId] = val.split(':');
+          mountEl.dataset.selectedId = ingId;
+          mountEl.dataset.selectedSubId = subId;
+        } else {
+          mountEl.dataset.selectedId = val || '';
+          mountEl.dataset.selectedSubId = '';
+        }
+        if (card) card.style.zIndex = '1';
+      }
+    });
+
+    if (searchInst) {
+      activeAuditSearchInstances.push(searchInst);
+      if (searchInst.inputEl && card) {
+        searchInst.inputEl.addEventListener('focus', () => { card.style.zIndex = '50'; });
+        searchInst.inputEl.addEventListener('blur', () => { setTimeout(() => { card.style.zIndex = '1'; }, 200); });
+      }
+    }
+  });
 
   // Close handlers
   modalOverlay.querySelector('#ram-close-btn')?.addEventListener('click', closeRecipeAuditModal);
@@ -244,18 +307,20 @@ function bindModalEvents(issues = [], totalPages = 1) {
       const itemIndex = Number(btn.dataset.itemIndex);
       const itemName = btn.dataset.itemName || '';
 
-      const selectEl = modalOverlay.querySelector(`#ram-select-${issueId}`);
+      const mountEl = modalOverlay.querySelector(`#ram-mount-${issueId}`);
       const qtyEl = modalOverlay.querySelector(`#ram-qty-${issueId}`);
       const unitEl = modalOverlay.querySelector(`#ram-unit-${issueId}`);
 
-      if (!selectEl || !selectEl.value) {
+      const newIngredientId = mountEl?.dataset?.selectedId;
+      const newSubtypeId = mountEl?.dataset?.selectedSubId || null;
+
+      if (!newIngredientId) {
         if (typeof window.showPlatePlanToast === 'function') {
-          window.showPlatePlanToast('Please select a Master Catalog entry to link.', 'warning');
+          window.showPlatePlanToast('Please search and select a Master Catalog entry to link.', 'warning');
         }
         return;
       }
 
-      const [newIngredientId, newSubtypeId] = selectEl.value.split(':');
       const qty = qtyEl ? qtyEl.value.trim() : null;
       const unit = unitEl ? unitEl.value.trim() : null;
 
@@ -320,6 +385,8 @@ export function openRecipeAuditModal(targetRecipeId = null) {
  * Closes the Recipe Mapping Audit modal.
  */
 export function closeRecipeAuditModal() {
+  activeAuditSearchInstances.forEach(inst => inst?.destroy?.());
+  activeAuditSearchInstances = [];
   if (modalOverlay) {
     modalOverlay.style.display = 'none';
   }

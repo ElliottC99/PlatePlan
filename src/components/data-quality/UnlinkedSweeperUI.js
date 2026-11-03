@@ -36,7 +36,7 @@ export function scanUnlinkedRecipeIngredients() {
 
     const check = (item, sIdx, iIdx) => {
       if (!item) return;
-      const linked = Boolean(item.productId || item.bankId || item.categoryId || item.pantryItemId || item.ingredientId || item.targetId || (item.id && typeof item.id === 'string' && item.id.length > 3));
+      const linked = Boolean(item.productId || item.bankId || item.pantryItemId || item.ingredientId || item.subtypeId || item.targetId);
       if (!linked) {
         const raw = typeof item === 'string' ? item : (item.raw || item.name || item.ingredient || item.ingredientName || '');
         const key = normaliseIngredientString(raw).toLowerCase();
@@ -203,13 +203,16 @@ function attachSweeperSearchEvents(container, unlinkedGroups = []) {
             const initialPhrase = unlinkedGroups[idx]?.displayName || input.value || '';
             openTaxonomyCreationModal({
               initialName: initialPhrase,
-              onComplete: (created) => {
-                const combinedKey = `${created.ingredientId}:${created.subtypeId}`;
-                const displayLabel = `🏷️ ${created.subtypeName} (${created.parentName})`;
+              onComplete: (created = {}) => {
+                const ingId = created.ingredientId || created.rootItem?.id || created.id || '';
+                const subId = created.subtypeId || created.subtype?.id || '';
+                const parentName = created.parentName || created.rootItem?.name || created.rootItemName || initialPhrase;
+                const subName = created.subtypeName || created.subtype?.name || parentName;
+                const displayLabel = subName && subName !== parentName ? `🏷️ ${subName} (${parentName})` : `📦 ${parentName}`;
                 input.value = displayLabel;
-                input.dataset.selectedId = created.ingredientId;
-                input.dataset.selectedSubId = created.subtypeId;
-                if (parent) { parent.dataset.selectedId = created.ingredientId; parent.dataset.selectedSubId = created.subtypeId; }
+                input.dataset.selectedId = ingId;
+                input.dataset.selectedSubId = subId;
+                if (parent) { parent.dataset.selectedId = ingId; parent.dataset.selectedSubId = subId; }
                 input.style.borderColor = '#10b981';
                 input.style.backgroundColor = '#ecfdf5';
                 input.style.color = 'var(--text,#1e293b)';

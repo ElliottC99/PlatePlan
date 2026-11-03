@@ -354,12 +354,17 @@ export function openAddItemWizard(options = {}) {
         const cb = onComplete || window.__onHierarchyComplete;
         if (typeof cb === 'function') {
           window.__onHierarchyComplete = null;
-          cb(res || {
-            ingredientId: res?.rootItem?.id || wizardData.itemName,
-            subtypeId: res?.subtype?.id || wizardData.subtypeName,
-            subtypeName: wizardData.subtypeName,
-            parentName: wizardData.itemName,
-            category: wizardData.category
+          const rootObj = res?.rootItem || wizardData.selectedParentItem;
+          const subObj = res?.subtype || { id: res?.subtypeId || wizardData.subtypeId, name: wizardData.subtypeName };
+          cb({
+            ...(res || {}),
+            ingredientId: rootObj?.id || wizardData.itemName,
+            subtypeId: subObj?.id || res?.subtypeId || wizardData.subtypeName,
+            parentName: rootObj?.name || wizardData.itemName,
+            subtypeName: subObj?.name || wizardData.subtypeName,
+            category: wizardData.category || res?.category || 'General',
+            rootItem: rootObj,
+            subtype: subObj
           });
         }
       } catch (err) {
