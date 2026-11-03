@@ -18,6 +18,8 @@ const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, ch => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[ch]));
 
+const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
+
 let currentPlan = null;
 let currentOnApply = null;
 let currentSelectedRouteId = null;

@@ -25,15 +25,10 @@ export function isIngredientUnlinked(item, products = [], ingredients = []) {
   if (!item || typeof item !== 'object') return false;
   if (item.isNewTaxonomyItem || item.ingredientId === 'new_item') return true;
   if (item.categoryId) return false;
+  if (item.subtypeId) return false;
+  if (item.ingredientId && item.ingredientId !== 'new_item') return false;
   if (item.productId && (products || []).some(p => String(p.id) === String(item.productId))) return false;
-  if (item.ingredientId && (ingredients || []).some(i => String(i.id) === String(item.ingredientId))) return false;
-  if (item.subtypeId) {
-    for (const ing of (ingredients || [])) {
-      if ((ing.subtypes || []).some(s => String(s.id) === String(item.subtypeId) || String(s.name) === String(item.subtypeId))) {
-        return false;
-      }
-    }
-  }
+  if (item.bankId && (products || []).some(p => String(p.id) === String(item.bankId))) return false;
   if (typeof resolveProductForIngredient === 'function') {
     const resolved = resolveProductForIngredient(item, { products, ingredients });
     if (resolved) return false;
@@ -68,7 +63,7 @@ export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, 
   }
 
   if (categoryId) {
-    return `📂 [Category] ${categoryId}`;
+    return `📂 ${categoryId}`;
   }
 
   // 1. Subtype mapping in ingredientsBank (Priority: Taxonomy Sub-Type)
@@ -76,10 +71,7 @@ export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, 
     for (const ing of (ingBank || [])) {
       const sub = (ing.subtypes || []).find(s => String(s.id) === String(subtypeId) || String(s.name) === String(subtypeId));
       if (sub) {
-        const subDef = (prodBank || []).find(p => (String(p.subtypeId) === String(sub.id) || String(p.id) === String(sub.defaultProductId)) && p.isAutoDefault)
-          || (prodBank || []).find(p => String(p.id) === String(sub.defaultProductId));
-        const defSuffix = subDef ? ` (${subDef.name})` : '';
-        return `🏷️ ${sub.name} (${ing.name})${defSuffix}`;
+        return `🏷️ ${sub.name}`;
       }
     }
   }
@@ -88,22 +80,32 @@ export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, 
   if (ingredientId && ingredientId !== 'new_item') {
     const ing = (ingBank || []).find(i => String(i.id) === String(ingredientId));
     if (ing) {
-      const ingDef = (prodBank || []).find(p => (String(p.ingredientId) === String(ing.id) || String(p.id) === String(ing.defaultProductId)) && p.isAutoDefault)
-        || (prodBank || []).find(p => String(p.id) === String(ing.defaultProductId));
-      const defSuffix = ingDef ? ` → ${ingDef.name}` : '';
-      return `📦 ${ing.name} [${ing.category || 'General'}]${defSuffix}`;
+      return `📦 ${ing.name}`;
     }
   }
 
-  // 3. Fallback for legacy items with direct productId or bankId
+  // 3. Fallback for items with direct productId or bankId
   const directProdId = item?.productId || item?.bankId;
   if (directProdId) {
     const prod = (prodBank || []).find(p => String(p.id) === String(directProdId));
     if (prod) {
-      return `📦 ${prod.name || prod.productName} [${prod.category || prod.cat || 'Product'}]`;
+      if (prod.subtypeId) {
+        for (const ing of (ingBank || [])) {
+          const sub = (ing.subtypes || []).find(s => String(s.id) === String(prod.subtypeId));
+          if (sub) return `🏷️ ${sub.name}`;
+        }
+      }
+      if (prod.ingredientId) {
+        const ing = (ingBank || []).find(i => String(i.id) === String(prod.ingredientId));
+        if (ing) return `📦 ${ing.name}`;
+      }
+      if (prod.category) {
+        return `📂 ${prod.category}`;
+      }
+      return `📦 ${prod.name || prod.productName}`;
     }
     if (item?.productName) {
-      return `📦 ${item.productName} [Product]`;
+      return `📦 ${item.productName}`;
     }
   }
 
@@ -111,22 +113,50 @@ export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, 
   if (item && typeof resolveProductForIngredient === 'function') {
     const resolved = resolveProductForIngredient(item, { products: prodBank, ingredients: ingBank });
     if (resolved) {
-      return `📦 ${resolved.name} [${resolved.category || 'Product'}]`;
+      if (resolved.subtypeId) {
+        for (const ing of (ingBank || [])) {
+          const sub = (ing.subtypes || []).find(s => String(s.id) === String(resolved.subtypeId));
+          if (sub) return `🏷️ ${sub.name}`;
+        }
+      }
+      if (resolved.ingredientId) {
+        const ing = (ingBank || []).find(i => String(i.id) === String(resolved.ingredientId));
+        if (ing) return `📦 ${ing.name}`;
+      }
+      if (resolved.category) {
+        return `📂 ${resolved.category}`;
+      }
+      return `📦 ${resolved.name}`;
     }
   }
 
-  return `✨ New Item: ${rawName || 'Custom'}`;
+  return `✨ New Item`;
 }
 
 export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [], productsBank = []) {
   const pBank = Array.isArray(productsBank) && productsBank.length ? productsBank : (getState()?.products || []);
   const iBank = Array.isArray(ingredientsBank) && ingredientsBank.length ? ingredientsBank : (getState()?.ingredients || []);
 
-  const selectedVal = item.categoryId 
-    ? `cat:${item.categoryId}` 
-    : (item.subtypeId 
-        ? `${item.ingredientId}:${item.subtypeId}` 
-        : (item.ingredientId || (item.productId ? `prod:${item.productId}` : 'new_item')));
+  let selectedVal = 'new_item';
+  if (item.categoryId) {
+    selectedVal = `cat:${item.categoryId}`;
+  } else if (item.subtypeId && item.ingredientId) {
+    selectedVal = `${item.ingredientId}:${item.subtypeId}`;
+  } else if (item.ingredientId && item.ingredientId !== 'new_item') {
+    selectedVal = item.ingredientId;
+  } else if (item.productId || item.bankId) {
+    const prodId = item.productId || item.bankId;
+    const prod = pBank.find(p => String(p.id) === String(prodId));
+    if (prod?.ingredientId && prod?.subtypeId) {
+      selectedVal = `${prod.ingredientId}:${prod.subtypeId}`;
+    } else if (prod?.ingredientId) {
+      selectedVal = prod.ingredientId;
+    } else if (prod?.category) {
+      selectedVal = `cat:${prod.category}`;
+    } else {
+      selectedVal = `prod:${prodId}`;
+    }
+  }
 
   const selectedLabel = getTaxonomyLabel(item, iBank, pBank);
   const isCat = Boolean(item.categoryId) || selectedVal.startsWith('cat:');
@@ -176,22 +206,18 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
       const catLower = cat.toLowerCase();
       if (!query || catLower.includes(query) || '[category]'.includes(query)) {
         html += `
-          <div class="wiz-tax-opt wiz-tax-category" data-val="cat:${escapeAttr(cat)}" data-label="📂 [Category] ${escapeAttr(cat)}" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--purple,#4f46e5); background:var(--surface2,#f5f4ee); border-bottom:1px solid var(--border,#eee);">
-            📂 <span class="badge" style="background:#eef2ff; color:#4f46e5; font-size:10px; padding:1px 5px; border-radius:4px; margin-right:4px;">[Category]</span> ${escapeHtml(cat)}
+          <div class="wiz-tax-opt wiz-tax-category" data-val="cat:${escapeAttr(cat)}" data-label="📂 ${escapeAttr(cat)}" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--purple,#4f46e5); background:var(--surface2,#f5f4ee); border-bottom:1px solid var(--border,#eee);">
+            📂 ${escapeHtml(cat)}
           </div>
         `;
       }
     });
 
-    // Render taxonomy root items & sub-types with Auto-Default Product indicators
+    // Render taxonomy root items & sub-types (clean and concise names only)
     ingredientsBank.forEach(ing => {
       const ingName = String(ing.name || '').toLowerCase();
       const ingCategory = String(ing.category || '').toLowerCase();
       const subTypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
-
-      // Look up auto-default product for root item
-      const ingDefProd = productsBank.find(p => (String(p.ingredientId) === String(ing.id) || String(p.id) === String(ing.defaultProductId)) && p.isAutoDefault)
-        || productsBank.find(p => String(p.id) === String(ing.defaultProductId));
 
       // Check if any product belonging to this root item matches query (enables searching by product name!)
       const hasMatchingProduct = query && productsBank.some(p => 
@@ -209,23 +235,17 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
       });
 
       if (matchesIng || matchingSubtypes.length > 0) {
-        const rootDefBadge = ingDefProd ? `<span class="badge" style="background:var(--surface,#fff); border:1px solid var(--border,#ddd); color:var(--text2,#78716c); font-size:9.5px; padding:1px 5px; border-radius:4px; margin-left:6px;">Default: ${escapeHtml(ingDefProd.name)}</span>` : '';
-
         html += `
-          <div class="wiz-tax-opt wiz-tax-main" data-val="${escapeAttr(ing.id)}" data-label="📦 ${escapeAttr(ing.name)} [${escapeAttr(ing.category || 'General')}]" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--text); background:var(--surface2,#fbfbf9);">
-            📦 ${escapeHtml(ing.name)} <span style="font-size:10.5px; font-weight:normal; color:var(--text2);">[${escapeHtml(ing.category || 'General')}]</span>${rootDefBadge}
+          <div class="wiz-tax-opt wiz-tax-main" data-val="${escapeAttr(ing.id)}" data-label="📦 ${escapeAttr(ing.name)}" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--text); background:var(--surface2,#fbfbf9);">
+            📦 ${escapeHtml(ing.name)}
           </div>
         `;
 
         (matchesIng ? subTypes : matchingSubtypes).forEach(sub => {
           const subKey = `${ing.id}:${sub.id || sub.name}`;
-          const subDefProd = productsBank.find(p => (String(p.subtypeId) === String(sub.id) || String(p.id) === String(sub.defaultProductId)) && p.isAutoDefault)
-            || productsBank.find(p => String(p.id) === String(sub.defaultProductId));
-          const subDefBadge = subDefProd ? `<span class="badge" style="background:var(--surface,#fff); border:1px solid var(--border,#ddd); color:var(--text2,#78716c); font-size:9.5px; padding:1px 5px; border-radius:4px; margin-left:6px;">Default: ${escapeHtml(subDefProd.name)}</span>` : '';
-
           html += `
-            <div class="wiz-tax-opt wiz-tax-sub" data-val="${escapeAttr(subKey)}" data-label="🏷️ ${escapeAttr(sub.name)} (${escapeAttr(ing.name)})" style="padding:5px 10px 5px 24px; font-size:11.5px; cursor:pointer; color:var(--text); border-bottom:1px solid rgba(0,0,0,0.03);">
-              ↳ 🏷️ ${escapeHtml(sub.name)}${subDefBadge}
+            <div class="wiz-tax-opt wiz-tax-sub" data-val="${escapeAttr(subKey)}" data-label="🏷️ ${escapeAttr(sub.name)}" style="padding:5px 10px 5px 24px; font-size:11.5px; cursor:pointer; color:var(--text); border-bottom:1px solid rgba(0,0,0,0.03);">
+              ↳ 🏷️ ${escapeHtml(sub.name)}
             </div>
           `;
         });

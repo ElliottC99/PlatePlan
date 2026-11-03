@@ -146,10 +146,9 @@ export function syncStep2InputsToState(modalWrap) {
       const item = wizardState.activeRecipe.ingredientSections[sIdx]?.ingredients[iIdx];
       if (item) {
         const rawVal = input.dataset.taxVal || (input.value.startsWith('✨') ? 'new_item' : input.value);
-        const val = rawVal.startsWith('prod:') ? '' : rawVal;
         const state = (typeof getState === 'function' ? getState() : (typeof window !== 'undefined' ? window.getState?.() : null)) || {};
 
-        if (!val || val === 'new_item') {
+        if (!rawVal || rawVal === 'new_item') {
           item.ingredientId = null;
           item.subtypeId = null;
           item.categoryId = null;
@@ -158,8 +157,8 @@ export function syncStep2InputsToState(modalWrap) {
           item.isCategoryDefault = false;
           item.displayName = null;
           item.isNewTaxonomyItem = true;
-        } else if (val.startsWith('cat:')) {
-          item.categoryId = val.slice(4);
+        } else if (rawVal.startsWith('cat:')) {
+          item.categoryId = rawVal.slice(4);
           item.ingredientId = null;
           item.subtypeId = null;
           item.productId = null;
@@ -167,8 +166,28 @@ export function syncStep2InputsToState(modalWrap) {
           item.isCategoryDefault = true;
           item.displayName = `Generic ${item.categoryId}`;
           item.isNewTaxonomyItem = false;
-        } else if (val.includes(':')) {
-          const [ingId, subId] = val.split(':');
+        } else if (rawVal.startsWith('prod:')) {
+          const pId = rawVal.slice(5);
+          const prod = (state.products || []).find(p => String(p.id) === String(pId));
+          if (prod?.ingredientId && prod?.subtypeId) {
+            item.ingredientId = prod.ingredientId;
+            item.subtypeId = prod.subtypeId;
+            item.categoryId = null;
+          } else if (prod?.ingredientId) {
+            item.ingredientId = prod.ingredientId;
+            item.subtypeId = null;
+            item.categoryId = null;
+          } else if (prod?.category) {
+            item.categoryId = prod.category;
+            item.ingredientId = null;
+            item.subtypeId = null;
+            item.isCategoryDefault = true;
+          } else {
+            item.productId = pId;
+          }
+          item.isNewTaxonomyItem = false;
+        } else if (rawVal.includes(':')) {
+          const [ingId, subId] = rawVal.split(':');
           item.ingredientId = ingId;
           item.subtypeId = subId;
           item.categoryId = null;
@@ -178,7 +197,7 @@ export function syncStep2InputsToState(modalWrap) {
           item.displayName = null;
           item.isNewTaxonomyItem = false;
         } else {
-          item.ingredientId = val;
+          item.ingredientId = rawVal;
           item.subtypeId = null;
           item.categoryId = null;
           item.productId = null;

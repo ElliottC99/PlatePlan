@@ -78,8 +78,8 @@ global.window.Store = {
   })
 };
 
-// --- Test 1: Taxonomy Resolution & Auto-Default Display ---
-console.log('--- Test 1: Taxonomy Resolution & Auto-Default Display ---');
+// --- Test 1: Taxonomy Resolution & Clean Concise Display ---
+console.log('--- Test 1: Taxonomy Resolution & Clean Concise Display ---');
 {
   const itemWithSubtype = {
     name: 'Tofu',
@@ -90,16 +90,21 @@ console.log('--- Test 1: Taxonomy Resolution & Auto-Default Display ---');
   };
 
   const label = getTaxonomyLabel(itemWithSubtype, mockIngredients, mockProducts);
-  assert(label.includes('Firm Tofu'), `Label should include subtype name, got: "${label}"`);
-  assert(label.includes('Organic Firm Tofu'), `Label should include auto-default product, got: "${label}"`);
+  assert.strictEqual(label, '🏷️ Firm Tofu', `Label should be clean subtype name only, got: "${label}"`);
   assert(!label.includes('✨ New Item'), `Label must NOT be tagged as "✨ New Item", got: "${label}"`);
+
+  const rootLabel = getTaxonomyLabel({ ingredientId: 'ing_sesame_oil' }, mockIngredients, mockProducts);
+  assert.strictEqual(rootLabel, '📦 Sesame Oil', `Label should be clean root item name only, got: "${rootLabel}"`);
+
+  const catLabel = getTaxonomyLabel({ categoryId: 'Proteins' }, mockIngredients, mockProducts);
+  assert.strictEqual(catLabel, '📂 Proteins', `Label should be clean category name only, got: "${catLabel}"`);
 
   const isUnlinked = isIngredientUnlinked(itemWithSubtype, mockProducts, mockIngredients);
   assert.strictEqual(isUnlinked, false, 'Taxonomy-mapped item must NOT be considered unlinked');
 
   const html = renderTaxonomySearchHTML(0, 0, itemWithSubtype, mockIngredients, mockProducts);
   assert(html.includes('data-tax-val="ing_tofu:sub_firm"'), `HTML must set data-tax-val="ing_tofu:sub_firm", got: ${html}`);
-  console.log('✅ Test 1 Passed: Taxonomy-mapped ingredients resolve to subtype and display auto-default product.');
+  console.log('✅ Test 1 Passed: Taxonomy-mapped ingredients resolve to clean concise names.');
 }
 
 // --- Test 2: syncStep2InputsToState Enforces Taxonomy-Only Mapping ---
