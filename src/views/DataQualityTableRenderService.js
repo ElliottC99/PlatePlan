@@ -155,7 +155,7 @@ function initDataQualityEvents(container) {
       const ing = (state.ingredients || []).find(i => String(i.id) === String(ingId));
       import('../components/pantry/AddItemWizardUI.js').then(m => {
         m.openAddItemWizard?.({
-          startAt: 'product',
+          startAt: 'category',
           parentId: ingId,
           itemName: ing?.name,
           category: ing?.category || 'General',
@@ -195,19 +195,6 @@ function initDataQualityEvents(container) {
       });
       return;
     }
-    if (action === 'fix-macros') {
-      const ingId = btn.dataset.ingId;
-      if (typeof window.editIng === 'function') {
-        window.editIng(ingId);
-      } else {
-        window.showPlatePlanToast?.('Open Pantry tab to edit ingredient macros directly.', 'info');
-      }
-      return;
-    }
-    if (action === 'clean-cache') {
-      await handleCleanHistoryCache();
-      return;
-    }
   });
 }
 
@@ -243,7 +230,7 @@ export function renderDataQualityView() {
 
   const totalIssues = audit.totalCount || 0;
   const blockers = audit.orphans.length;
-  const gaps = audit.unmappedItems.length + audit.densityMismatch.length + audit.incompleteMacros.length + audit.planDesync.length;
+  const gaps = audit.unmappedItems.length + audit.densityMismatch.length + audit.planDesync.length;
   const advisories = audit.macroDrift.length;
   const healthScore = Math.max(0, Math.min(100, Math.round(100 - (blockers * 4 + gaps * 1 + advisories * 0.3))));
   const isHealthy = totalIssues === 0;
@@ -404,32 +391,6 @@ export function renderDataQualityView() {
                 data-ing-id="${escapeAttr(item.ingredientId)}"
                 data-ing-name="${escapeAttr(item.ingredientName)}"
                 style="background:var(--primary,#4f46e5); color:#fff; font-weight:600;">Set Density</button>
-            </div>
-          </div>
-        `)}
-
-        <!-- 7. INCOMPLETE MACRO SPECIFICATIONS CARD -->
-        ${renderAuditCard('Incomplete Macro Specifications', '🔬', audit.incompleteMacros, (item) => `
-          <div style="padding:12px 14px; background:#fff; border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-            <div style="min-width:0;">
-              <strong style="font-size:13.5px; color:#111827;">${escapeHtml(item.ingredientName)}</strong>
-              <div style="font-size:12px; color:var(--text2,#78716c); margin-top:3px;">${escapeHtml(item.message)}</div>
-            </div>
-            <div style="display:flex; gap:6px; flex-shrink:0;">
-              <button type="button" class="btn sm primary dq-action-btn" data-action-dq="fix-macros" data-ing-id="${escapeAttr(item.ingredientId)}" style="background:var(--primary,#4f46e5); color:#fff; font-weight:600;">Fix Macros</button>
-            </div>
-          </div>
-        `)}
-
-        <!-- 8. DATABASE STORAGE HEALTH CARD -->
-        ${renderAuditCard('Database Payload Health Warning', '💾', audit.storageHealth, (item) => `
-          <div style="padding:12px 14px; background:#fffbf2; border:1px solid #fef3c7; border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-            <div style="min-width:0;">
-              <strong style="font-size:13.5px; color:#92400e;">Preferences Storage Warning (${item.sizeKb} KB)</strong>
-              <div style="font-size:12px; color:#b45309; margin-top:3px;">${escapeHtml(item.message)}</div>
-            </div>
-            <div style="display:flex; gap:6px; flex-shrink:0;">
-              <button type="button" class="btn sm primary dq-action-btn" data-action-dq="clean-cache" style="background:#d97706; color:#fff; border:none; font-weight:600;">Clean History Cache</button>
             </div>
           </div>
         `)}

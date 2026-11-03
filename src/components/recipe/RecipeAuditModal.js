@@ -9,6 +9,7 @@ import { auditRecipeMappings, relinkRecipeIngredient, batchRelinkRecipeMappings 
 import { renderKPIBadge, renderIssueCard, renderEmptyState } from './RecipeAuditModalRenderService.js';
 import { AUDIT_SUGGESTION_THRESHOLD } from '../../config/businessRules.js';
 import { createTaxonomySearchInput } from '../pantry/RecipeSearchDropdownHelper.js';
+import { openTaxonomyCreationModal } from './RecipeWizardTaxonomyModal.js';
 
 let modalOverlay = null;
 let currentFilter = 'all';
@@ -185,6 +186,25 @@ function bindModalEvents(issues = [], totalPages = 1, ingredients = []) {
       rootItems: ingredients,
       placeholder: 'Search Master Pantry...',
       initialValue: initialLabel,
+      onNewClick: (typedName) => {
+        const rawPhrase = mountEl.closest('.ram-issue-card')?.querySelector('[style*="color:var(--text,#1c1917)"] strong')?.textContent?.replace(/"/g, '')?.trim();
+        const initialSearch = typedName || rawPhrase || '';
+        openTaxonomyCreationModal({
+          initialName: initialSearch,
+          onComplete: (created) => {
+            if (!created) return;
+            const parentName = created.parentName || created.rootItem?.name || initialSearch;
+            const subName = created.subtypeName || created.subtype?.name || 'Standard';
+            const ingId = created.ingredientId || created.rootItem?.id;
+            const subId = created.subtypeId || created.subtype?.id;
+            mountEl.dataset.selectedId = ingId;
+            mountEl.dataset.selectedSubId = subId;
+            if (searchInst && searchInst.inputEl) {
+              searchInst.inputEl.value = `🏷️ ${subName} (${parentName})`;
+            }
+          }
+        });
+      },
       onSelect: ({ val, label }) => {
         if (val && val.includes(':')) {
           const [ingId, subId] = val.split(':');

@@ -289,20 +289,8 @@ export function runAudit(state = {}) {
     });
   }
 
-  // 3. Incomplete Macro Specifications
-  ingredients.forEach(ing => {
-    const effective = getEffectiveIngredientMacros(ing, products);
-    if (!effective) {
-      results.incompleteMacros.push({
-        key: `incomplete:ing:${ing.id}`,
-        ingredientId: ing.id,
-        ingredientName: ing.name,
-        type: 'incomplete',
-        message: `Ingredient "${ing.name}" lacks complete calorie or protein specifications (neither direct nor default product specs available).`,
-        severity: 'gap'
-      });
-    }
-  });
+  // 3. Incomplete Macro Specifications (Retired: Subsumed under Pantry Items Lacking Store Products)
+  // Effective macros are derived from Auto-Default Products; items without products are handled by unmappedItems.
 
   // 4. Liquid-Aware Density Mismatch (Grouped by Ingredient ID, silencing kitchen liquids)
   const densityByIng = new Map();
@@ -444,23 +432,7 @@ export function runAudit(state = {}) {
     }
   }
 
-  // 8. Storage Health (> 500 KB)
-  let payloadStr = '{}';
-  try {
-    payloadStr = JSON.stringify(preferences || {});
-  } catch {
-    payloadStr = '{}';
-  }
-  const sizeBytes = new TextEncoder().encode(payloadStr).length;
-  if (sizeBytes > 500000) {
-    results.storageHealth.push({
-      key: 'health:preference-size',
-      sizeBytes,
-      sizeKb: Math.round(sizeBytes / 1024),
-      message: `System Alert: Preference payload size is ${Math.round(sizeBytes / 1024)} KB, exceeding 500 KB performance threshold.`,
-      severity: 'advisory'
-    });
-  }
+  // 8. Storage Health (Retired: Silently auto-pruned in background by DataQualityTableRenderService)
 
   // Filter out dismissed advisories across all audit categories
   Object.keys(results).forEach(cat => {
