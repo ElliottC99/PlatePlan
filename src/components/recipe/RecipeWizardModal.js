@@ -10,6 +10,7 @@
  */
 
 import { getState } from '../../state/AppState.js';
+import { extractRecipeMacros } from '../../utils/fitScoreCalculator.js';
 import { wizardState, resetWizardState, syncStep2InputsToState } from './RecipeWizardState.js';
 import { renderStepBadge, renderState0Choice, renderState1AManual, renderState1BBulk, renderState3Review } from './RecipeWizardViews.js';
 import { renderState2Mapping } from './RecipeWizardStep2View.js';
@@ -67,11 +68,21 @@ function formatMethodLine(step, idx) {
 }
 
 export function openRecipeWizard(initialMode = 'manual', editRecipeId = null, variant = 'original') {
+  let mode = initialMode;
+  let recipeId = editRecipeId;
+  let targetVariant = variant;
+
+  if (typeof initialMode === 'object' && initialMode !== null) {
+    mode = initialMode.initialMode || initialMode.mode || 'manual';
+    recipeId = initialMode.editRecipeId || initialMode.recipeId || null;
+    targetVariant = initialMode.variant || initialMode.activeVariant || 'original';
+  }
+
   resetWizardState();
-  const activeVariant = variant === 'enhanced' ? 'enhanced' : 'original';
+  const activeVariant = targetVariant === 'enhanced' ? 'enhanced' : 'original';
   wizardState.activeVariant = activeVariant;
 
-  if (editRecipeId) {
+  if (recipeId) {
     let allRecipes = [];
     if (typeof getState === 'function') {
       const st = getState();
@@ -86,12 +97,20 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null, va
         allRecipes = window.recipes;
       }
     }
-    const found = allRecipes.find(r => r && (String(r.id) === String(editRecipeId) || String(r._id) === String(editRecipeId)));
+    const found = allRecipes.find(r => r && (String(r.id) === String(recipeId) || String(r._id) === String(recipeId)));
     if (found) {
       wizardState.baseOriginalRecipe = JSON.parse(JSON.stringify(found));
       wizardState.activeVariant = activeVariant || 'original';
-      const isEnhVariant = activeVariant === 'enhanced' && found.enhanced;
-      const targetSource = isEnhVariant ? { ...found, ...found.enhanced } : found;
+      const isEnhVariant = activeVariant === 'enhanced' && Boolean(found.enhanced);
+      let targetSource = isEnhVariant ? { ...found, ...found.enhanced } : found;
+
+      // When reviewing enhanced variant, if enhanced has ingredients,
+      // prevent found.ingredientSections from shadowing enhanced.ingredients!
+      if (isEnhVariant && Array.isArray(found.enhanced?.ingredients) && found.enhanced.ingredients.length > 0) {
+        if (!Array.isArray(found.enhanced.ingredientSections) || found.enhanced.ingredientSections.length === 0) {
+          delete targetSource.ingredientSections;
+        }
+      }
 
       let rawTags = targetSource.mealSuitability;
       if (!rawTags || !rawTags.length) {
@@ -160,6 +179,14 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null, va
       }
 
       const safeServes = Number(targetSource.servings || targetSource.serves || 4) || 4;
+      const rawExtracted = extractRecipeMacros(targetSource, isEnhVariant ? 'enhanced' : 'original');
+      const safeMacros = {
+        calories: Number(rawExtracted.calories ?? rawExtracted.cal ?? targetSource.macros?.calories ?? 450),
+        protein: Number(rawExtracted.protein ?? rawExtracted.prot ?? targetSource.macros?.protein ?? 28),
+        carbs: Number(targetSource.macros?.carbs ?? targetSource.nutrition?.perServing?.carb ?? targetSource.carb ?? 40),
+        fat: Number(targetSource.macros?.fat ?? targetSource.nutrition?.perServing?.fat ?? targetSource.fat ?? 16)
+      };
+
       wizardState.activeRecipe = {
         id: found.id || found._id,
         title: targetSource.title || targetSource.name || found.title || found.name || '',
@@ -173,19 +200,19 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null, va
         ingredientSections,
         ingredients: ingredientSections.flatMap(s => s.ingredients || []),
         methodSteps: methodStepsArray.length ? methodStepsArray : (typeof targetSource.method === 'string' ? targetSource.method.split('\n').filter(Boolean) : []),
-        macros: targetSource.macros || targetSource.nutrition || { calories: 450, protein: 28, carbs: 40, fat: 16 },
+        macros: safeMacros,
         enhanced: found.enhanced || null
       };
     }
   }
 
-  if (initialMode === 'bulk' || initialMode === 'parse') {
+  if (mode === 'bulk' || mode === 'parse') {
     wizardState.choice = 'bulk';
     wizardState.currentStep = 1;
-  } else if (initialMode === 'review') {
+  } else if (mode === 'review') {
     wizardState.choice = 'manual';
     wizardState.currentStep = 2;
-  } else if (initialMode === 'manual') {
+  } else if (mode === 'manual') {
     wizardState.choice = 'manual';
     wizardState.currentStep = 1;
   } else {

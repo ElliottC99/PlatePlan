@@ -25,16 +25,23 @@ global.window = {
   CustomEvent: class CustomEvent { constructor(type, detail) { this.type = type; this.detail = detail; } },
   dispatchEvent: () => true,
   document: {
-    createElement: (tag) => ({ tagName: tag, style: {}, classList: { add: () => {}, remove: () => {} }, querySelector: () => null, querySelectorAll: () => [] }),
-    body: { style: {} }
+    createElement: (tag) => ({ tagName: tag, style: {}, classList: { add: () => {}, remove: () => {} }, querySelector: () => null, querySelectorAll: () => [], appendChild: () => {} }),
+    getElementById: () => null,
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    dispatchEvent: () => true,
+    body: { style: {}, appendChild: () => {} }
   }
 };
 global.document = global.window.document;
 
 // Import target modules
+import { setRecipes, setProducts, setIngredients } from '../src/store/store.js';
 import { getTaxonomyLabel, renderTaxonomySearchHTML, isIngredientUnlinked } from '../src/components/recipe/RecipeWizardTaxonomySearch.js';
 import { wizardState, syncStep2InputsToState, getSaveButtonLabel } from '../src/components/recipe/RecipeWizardState.js';
 import { buildLiveEnhancedRecipe } from '../src/components/recipe/RecipeEnhancementModalUI.js';
+import { openRecipeWizard } from '../src/components/recipe/RecipeWizardModal.js';
+import { renderMacroBreakdownCrossbar } from '../src/components/recipe/RecipeWizardStep3View.js';
 
 console.log('=== RUNNING VARIANT SAVE & TAXONOMY MAPPING TEST SUITE ===\n');
 
@@ -42,52 +49,76 @@ console.log('=== RUNNING VARIANT SAVE & TAXONOMY MAPPING TEST SUITE ===\n');
 const mockProducts = [
   { id: 'p_tofu_std', name: 'Firm Tofu Standard', category: 'Proteins', isAutoDefault: false },
   { id: 'p_tofu_def', name: 'Organic Firm Tofu', category: 'Proteins', isAutoDefault: true },
-  { id: 'p_sesame_oil', name: 'Toasted Sesame Oil', category: 'Store Cupboard', isAutoDefault: false }
+  { id: 'p_sesame_oil', name: 'Toasted Sesame Oil', category: 'Store Cupboard', isAutoDefault: true }
 ];
 
 const mockIngredients = [
-  { id: 'ing_tofu', name: 'Tofu', category: 'Proteins', subtypes: [{ id: 'sub_firm', name: 'Firm Tofu' }] }
+  { 
+    id: 'ing_tofu', 
+    name: 'Tofu', 
+    category: 'Proteins', 
+    subtypes: [
+      { id: 'sub_firm', name: 'Firm Tofu', defaultProductId: 'p_tofu_def' }
+    ] 
+  },
+  {
+    id: 'ing_sesame_oil',
+    name: 'Sesame Oil',
+    category: 'Store Cupboard',
+    defaultProductId: 'p_sesame_oil'
+  }
 ];
 
-// --- Test 1: Taxonomy Resolution for Product-Mapped Ingredients ---
-console.log('--- Test 1: Taxonomy Resolution for Product-Mapped Ingredients ---');
+// Provide products and ingredients via global.window.Store
+global.window.Store = {
+  getState: () => ({
+    products: mockProducts,
+    ingredients: mockIngredients,
+    recipes: []
+  })
+};
+
+// --- Test 1: Taxonomy Resolution & Auto-Default Display ---
+console.log('--- Test 1: Taxonomy Resolution & Auto-Default Display ---');
 {
-  const itemWithProduct = {
-    name: 'Sesame Oil',
-    productId: 'p_sesame_oil',
-    qty: 10,
-    unit: 'ml'
+  const itemWithSubtype = {
+    name: 'Tofu',
+    ingredientId: 'ing_tofu',
+    subtypeId: 'sub_firm',
+    qty: 200,
+    unit: 'g'
   };
 
-  const label = getTaxonomyLabel(itemWithProduct, mockIngredients, mockProducts);
-  assert(label.includes('Toasted Sesame Oil'), `Label should resolve product name, got: "${label}"`);
+  const label = getTaxonomyLabel(itemWithSubtype, mockIngredients, mockProducts);
+  assert(label.includes('Firm Tofu'), `Label should include subtype name, got: "${label}"`);
+  assert(label.includes('Organic Firm Tofu'), `Label should include auto-default product, got: "${label}"`);
   assert(!label.includes('✨ New Item'), `Label must NOT be tagged as "✨ New Item", got: "${label}"`);
 
-  const isUnlinked = isIngredientUnlinked(itemWithProduct, mockProducts, mockIngredients);
-  assert.strictEqual(isUnlinked, false, 'Item mapped via productId must NOT be considered unlinked');
+  const isUnlinked = isIngredientUnlinked(itemWithSubtype, mockProducts, mockIngredients);
+  assert.strictEqual(isUnlinked, false, 'Taxonomy-mapped item must NOT be considered unlinked');
 
-  const html = renderTaxonomySearchHTML(0, 0, itemWithProduct, mockIngredients, mockProducts);
-  assert(html.includes('data-tax-val="prod:p_sesame_oil"'), `HTML must set data-tax-val="prod:p_sesame_oil", got: ${html}`);
-  console.log('✅ Test 1 Passed: Product-mapped ingredients resolve to product taxonomy and are recognized as linked.');
+  const html = renderTaxonomySearchHTML(0, 0, itemWithSubtype, mockIngredients, mockProducts);
+  assert(html.includes('data-tax-val="ing_tofu:sub_firm"'), `HTML must set data-tax-val="ing_tofu:sub_firm", got: ${html}`);
+  console.log('✅ Test 1 Passed: Taxonomy-mapped ingredients resolve to subtype and display auto-default product.');
 }
 
-// --- Test 2: syncStep2InputsToState Preserves Product Links ---
-console.log('\n--- Test 2: State Synchronization Preserves Product Links ---');
+// --- Test 2: syncStep2InputsToState Enforces Taxonomy-Only Mapping ---
+console.log('\n--- Test 2: State Synchronization Enforces Taxonomy-Only Mapping ---');
 {
   wizardState.activeRecipe = {
     ingredientSections: [
       {
         sectionTitle: 'Main Ingredients',
         ingredients: [
-          { name: 'Sesame Oil', productId: 'p_sesame_oil', qty: 10, unit: 'ml' }
+          { name: 'Tofu', productId: 'legacy_prod_id', qty: 200, unit: 'g' }
         ]
       }
     ]
   };
 
   const mockInput = {
-    dataset: { sidx: '0', iidx: '0', taxVal: 'prod:p_sesame_oil' },
-    value: '📦 Toasted Sesame Oil [Store Cupboard]'
+    dataset: { sidx: '0', iidx: '0', taxVal: 'ing_tofu:sub_firm' },
+    value: '🏷️ Firm Tofu (Tofu) (Organic Firm Tofu)'
   };
 
   const mockWrap = {
@@ -96,9 +127,11 @@ console.log('\n--- Test 2: State Synchronization Preserves Product Links ---');
 
   syncStep2InputsToState(mockWrap);
   const syncedItem = wizardState.activeRecipe.ingredientSections[0].ingredients[0];
-  assert.strictEqual(syncedItem.productId, 'p_sesame_oil', 'Product ID must be preserved');
+  assert.strictEqual(syncedItem.ingredientId, 'ing_tofu', 'ingredientId must be mapped');
+  assert.strictEqual(syncedItem.subtypeId, 'sub_firm', 'subtypeId must be mapped');
+  assert.strictEqual(syncedItem.productId, null, 'Direct productId must be cleared in favor of taxonomy mapping');
   assert.strictEqual(syncedItem.isNewTaxonomyItem, false, 'Item must NOT be marked as isNewTaxonomyItem');
-  console.log('✅ Test 2 Passed: syncStep2InputsToState correctly registers and preserves prod: mappings.');
+  console.log('✅ Test 2 Passed: syncStep2InputsToState maps to taxonomy and clears direct productId.');
 }
 
 // --- Test 3: Dual-Variant Save Button Context ---
@@ -167,6 +200,53 @@ console.log('\n--- Test 4: Free-Hand Custom Swaps Application ---');
   assert.strictEqual(swappedIng.qty, 250, 'Swapped ingredient must use the proposed quantity of 250g');
   assert.strictEqual(swappedIng.productId, 'p_tofu_def', 'Swapped ingredient must carry postTaxonomy.productId');
   console.log('✅ Test 4 Passed: Free-hand custom swaps flow cleanly into the synthesized enhanced payload.');
+}
+
+// --- Test 5: Enhanced Variant Ingredient Shadowing Fix in Wizard ---
+console.log('\n--- Test 5: Enhanced Variant Ingredient Shadowing Fix in Wizard ---');
+{
+  const mockRecipeWithEnhanced = {
+    id: 'r_dan_dan_shadow_test',
+    title: 'Spicy Dan Dan Noodles',
+    serves: 2,
+    ingredientSections: [
+      {
+        sectionTitle: 'Main Ingredients',
+        ingredients: [
+          { name: 'Sesame Oil', qty: 15, unit: 'ml' },
+          { name: 'Beef Mince', qty: 200, unit: 'g' }
+        ]
+      }
+    ],
+    enhanced: {
+      serves: 2,
+      cal: 566,
+      ingredients: [
+        { name: 'Sesame Oil', qty: 7.5, unit: 'ml' },
+        { name: 'Quorn Mince', qty: 250, unit: 'g' }
+      ]
+    }
+  };
+
+  // Set in store
+  setRecipes([mockRecipeWithEnhanced]);
+  setProducts(mockProducts);
+  setIngredients(mockIngredients);
+
+  // Open wizard in enhanced mode
+  openRecipeWizard({
+    editRecipeId: 'r_dan_dan_shadow_test',
+    variant: 'enhanced',
+    initialMode: 'review'
+  });
+
+  const loadedIngredients = wizardState.activeRecipe.ingredientSections[0].ingredients;
+  assert.strictEqual(loadedIngredients.length, 2, 'Must load 2 ingredients from enhanced variant');
+  assert.strictEqual(loadedIngredients[0].name, 'Sesame Oil');
+  assert.strictEqual(loadedIngredients[0].qty, 7.5, 'Must load enhanced 7.5ml Sesame Oil, NOT base recipe 15ml!');
+  assert.strictEqual(loadedIngredients[1].name, 'Quorn Mince', 'Must load Quorn Mince, NOT base recipe Beef Mince!');
+  assert.strictEqual(loadedIngredients[1].qty, 250, 'Must load enhanced 250g Quorn Mince, NOT base recipe 200g!');
+  console.log('✅ Test 5 Passed: Wizard correctly unpacks enhanced.ingredients without base ingredientSections shadowing.');
 }
 
 console.log('\n=== ALL VARIANT SAVE & TAXONOMY MAPPING TESTS PASSED! ===');

@@ -4,6 +4,8 @@
  */
 
 import { toTitleCase } from '../../utils/stringUtils.js';
+import { getState } from '../../state/AppState.js';
+import { resolveProductForIngredient } from './RecipeWizardStep3Handlers.js';
 
 export const MEAL_TAGS = ['Breakfast', 'Lunch', 'Dinner', 'Snacking'];
 
@@ -143,33 +145,25 @@ export function syncStep2InputsToState(modalWrap) {
     if (!isNaN(sIdx) && !isNaN(iIdx)) {
       const item = wizardState.activeRecipe.ingredientSections[sIdx]?.ingredients[iIdx];
       if (item) {
-        const val = input.dataset.taxVal || (input.value.startsWith('✨') ? 'new_item' : input.value);
-        if (val.startsWith('prod:')) {
-          item.productId = val.slice(5);
+        const rawVal = input.dataset.taxVal || (input.value.startsWith('✨') ? 'new_item' : input.value);
+        const val = rawVal.startsWith('prod:') ? '' : rawVal;
+        const state = (typeof getState === 'function' ? getState() : (typeof window !== 'undefined' ? window.getState?.() : null)) || {};
+
+        if (!val || val === 'new_item') {
           item.ingredientId = null;
           item.subtypeId = null;
           item.categoryId = null;
+          item.productId = null;
+          item.bankId = null;
           item.isCategoryDefault = false;
           item.displayName = null;
-          item.isNewTaxonomyItem = false;
-        } else if (!val || val === 'new_item') {
-          // If the item ALREADY has a known productId, do NOT discard it
-          const state = (typeof getState === 'function' ? getState() : (typeof window !== 'undefined' ? window.getState?.() : null)) || {};
-          const prods = state.products || [];
-          if (item.productId && prods.some(p => String(p.id) === String(item.productId))) {
-            item.isNewTaxonomyItem = false;
-          } else {
-            item.ingredientId = null;
-            item.subtypeId = null;
-            item.categoryId = null;
-            item.isCategoryDefault = false;
-            item.displayName = null;
-            item.isNewTaxonomyItem = true;
-          }
+          item.isNewTaxonomyItem = true;
         } else if (val.startsWith('cat:')) {
           item.categoryId = val.slice(4);
           item.ingredientId = null;
           item.subtypeId = null;
+          item.productId = null;
+          item.bankId = null;
           item.isCategoryDefault = true;
           item.displayName = `Generic ${item.categoryId}`;
           item.isNewTaxonomyItem = false;
@@ -178,6 +172,8 @@ export function syncStep2InputsToState(modalWrap) {
           item.ingredientId = ingId;
           item.subtypeId = subId;
           item.categoryId = null;
+          item.productId = null;
+          item.bankId = null;
           item.isCategoryDefault = false;
           item.displayName = null;
           item.isNewTaxonomyItem = false;
@@ -185,9 +181,22 @@ export function syncStep2InputsToState(modalWrap) {
           item.ingredientId = val;
           item.subtypeId = null;
           item.categoryId = null;
+          item.productId = null;
+          item.bankId = null;
           item.isCategoryDefault = false;
           item.displayName = null;
           item.isNewTaxonomyItem = false;
+        }
+
+        // Dynamically resolve auto-default product for nutrition / display
+        if (!item.isNewTaxonomyItem && typeof resolveProductForIngredient === 'function') {
+          const autoDefProd = resolveProductForIngredient(item, {
+            products: state.products || [],
+            ingredients: state.ingredients || state.rootItems || []
+          });
+          if (autoDefProd) {
+            item.productName = autoDefProd.name || autoDefProd.productName;
+          }
         }
       }
     }

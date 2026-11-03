@@ -370,9 +370,6 @@ function renderEnhancementModalContent(wrap, plan) {
         -webkit-overflow-scrolling: touch;
       ">
         
-        <!-- Apple HIG Route Nav Switcher -->
-        ${routeNavHtml}
-
         <!-- Apple Health Style Hero Card -->
         <div style="
           background: var(--surface2, #f5f4f0);
