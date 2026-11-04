@@ -78,21 +78,21 @@ if (typeof window !== 'undefined') {
   };
 
   window.handleAutoDefaultCriterionChange = async function(val) {
-    if (!getState()) getState() = {};
-    if (!getState().settings) getState().settings = {};
-    if (!getState().userPrefs) getState().userPrefs = {};
+    const curState = getState() || {};
+    if (!curState.settings) curState.settings = {};
+    if (!curState.userPrefs) curState.userPrefs = {};
 
-    getState().settings.autoDefaultStrategy = val;
-    getState().settings.autoDefaultCriterion = val;
-    getState().userPrefs.autoDefaultStrategy = val;
-    getState().userPrefs.autoDefaultCriterion = val;
+    curState.settings.autoDefaultStrategy = val;
+    curState.settings.autoDefaultCriterion = val;
+    curState.userPrefs.autoDefaultStrategy = val;
+    curState.userPrefs.autoDefaultCriterion = val;
     if (window.Store?.setState) {
       window.Store.setState({ settings: { ...(window.Store.getState()?.settings || {}), autoDefaultStrategy: val, autoDefaultCriterion: val } });
     }
     if (typeof window.saveState === 'function') window.saveState();
 
     try {
-      await savePreferences({ ...getState().userPrefs, settings: getState().settings });
+      await savePreferences({ ...curState.userPrefs, settings: curState.settings });
     } catch (err) {
       console.warn('[SettingsView] Failed saving auto-default strategy preference:', err);
     }
@@ -112,9 +112,15 @@ if (typeof window !== 'undefined') {
     const label = labelMap[val] || val;
 
     if (typeof window.sweepAndRecalibrateIngredientDefaults === 'function') {
-      await window.sweepAndRecalibrateIngredientDefaults();
-      if (typeof window.showPlatePlanToast === 'function') {
-        window.showPlatePlanToast(`Pantry defaults recalibrated to prioritise ${label}`);
+      try {
+        await window.sweepAndRecalibrateIngredientDefaults();
+        const { recalculateAllRecipeMacros } = await import('../services/MaintenanceService.js');
+        const recResult = await recalculateAllRecipeMacros();
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast(`Pantry defaults & ${recResult.updatedCount || 0} recipes recalibrated to prioritise ${label}`);
+        }
+      } catch (err) {
+        console.warn('[SettingsView] Recalibration failed on strategy change:', err);
       }
     }
   };
@@ -122,13 +128,46 @@ if (typeof window !== 'undefined') {
   window.handleManualRecalibrateDefaults = async function() {
     const btn = document.getElementById('btn-recalibrate-defaults');
     if (btn) { btn.disabled = true; btn.textContent = 'Recalibrating...'; }
-    if (typeof window.sweepAndRecalibrateIngredientDefaults === 'function') {
-      const updatedCount = await window.sweepAndRecalibrateIngredientDefaults();
-      if (typeof window.showPlatePlanToast === 'function') {
-        window.showPlatePlanToast(`Pantry defaults recalibrated (${updatedCount} updated).`);
+    try {
+      if (typeof window.sweepAndRecalibrateIngredientDefaults === 'function') {
+        const updatedCount = await window.sweepAndRecalibrateIngredientDefaults();
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast(`Pantry defaults recalibrated (${updatedCount} updated).`);
+        }
       }
+    } catch (err) {
+      console.error('[SettingsView] Failed to recalibrate defaults:', err);
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast('Recalibration failed.');
+      }
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '⚡ Recalibrate Pantry Defaults'; }
     }
-    if (btn) { btn.disabled = false; btn.textContent = '⚡ Recalibrate All Defaults Now'; }
+  };
+
+  window.handleManualRecalibrateRecipeMacros = async function() {
+    const btn = document.getElementById('btn-recalibrate-recipes');
+    if (btn) { btn.disabled = true; btn.textContent = 'Recalibrating Recipes...'; }
+    try {
+      const { recalculateAllRecipeMacros } = await import('../services/MaintenanceService.js');
+      const res = await recalculateAllRecipeMacros();
+      if (res.success) {
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast(`Recalibrated macros for ${res.updatedCount || 0} recipes in Vault!`);
+        }
+      } else {
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast('Recipe recalibration failed: ' + (res.error || 'Unknown error'));
+        }
+      }
+    } catch (err) {
+      console.error('[SettingsView] Failed to recalculate recipe macros:', err);
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast('Recipe recalibration error.');
+      }
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '⚡ Recalibrate Recipe Macros from Optimal Defaults'; }
+    }
   };
 
 }

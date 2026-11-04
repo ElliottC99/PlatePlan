@@ -39,13 +39,31 @@ export function scrollToTop() {
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const behavior = prefersReducedMotion ? 'instant' : 'smooth';
 
-  window.scrollTo({ top: 0, behavior });
+  try { window.scrollTo({ top: 0, left: 0, behavior }); } catch (e) {}
+  if (document.documentElement) {
+    try { document.documentElement.scrollTo?.({ top: 0, left: 0, behavior }); } catch (e) {}
+    document.documentElement.scrollTop = 0;
+  }
+  if (document.body) {
+    try { document.body.scrollTo?.({ top: 0, left: 0, behavior }); } catch (e) {}
+    document.body.scrollTop = 0;
+  }
   if (document.scrollingElement) {
-    document.scrollingElement.scrollTo?.({ top: 0, behavior });
+    try { document.scrollingElement.scrollTo?.({ top: 0, left: 0, behavior }); } catch (e) {}
+    document.scrollingElement.scrollTop = 0;
   }
-  if (lastScrolledContainer && typeof lastScrolledContainer.scrollTo === 'function') {
-    lastScrolledContainer.scrollTo({ top: 0, behavior });
+  if (lastScrolledContainer) {
+    try { lastScrolledContainer.scrollTo?.({ top: 0, left: 0, behavior }); } catch (e) {}
+    lastScrolledContainer.scrollTop = 0;
   }
+
+  const containers = document.querySelectorAll('.app, main, .view, #main-content, #app-body, .view-container, .vault-container, .pantry-container');
+  containers.forEach(el => {
+    if (el && el.scrollTop > 0) {
+      try { el.scrollTo?.({ top: 0, left: 0, behavior }); } catch (e) {}
+      el.scrollTop = 0;
+    }
+  });
 }
 
 export function initScrollToTopButton() {
@@ -114,6 +132,10 @@ export function initScrollToTopButton() {
     </svg>
     <span>Top</span>
   `;
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    scrollToTop();
+  });
   document.body.appendChild(btn);
 
   let ticking = false;

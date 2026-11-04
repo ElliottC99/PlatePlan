@@ -67,6 +67,12 @@ export const store = {
   setState: (patch) => updateStoreState(patch), 
   subscribe: (domain, cb) => subscribe(domain, cb) 
 };
+export const Store = store;
+
+if (typeof window !== 'undefined') {
+  window.Store = store;
+  window.store = store;
+}
 
 export {
   // Slices

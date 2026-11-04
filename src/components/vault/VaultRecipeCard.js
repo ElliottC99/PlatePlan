@@ -74,7 +74,7 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
     ? window.isRecipeVariantFavourite(recipeId, variant)
     : (recipe.isFavourite || recipe.isFavorite);
 
-  dropdown.innerHTML = renderRecipeActionsItems(recipeId, isFav);
+  dropdown.innerHTML = renderRecipeActionsItems(recipeId, isFav, variant);
 
   if (targetBtn) {
     const rect = targetBtn.getBoundingClientRect();
@@ -102,90 +102,128 @@ export function openRecipeActions(evt, recipeIdParam, variantParam = 'original')
 
   document.body.appendChild(dropdown);
 
+  const closeMenu = () => {
+    dropdown.remove();
+    document.removeEventListener('click', dismiss, true);
+  };
+
   const dismiss = (event) => {
     if (!dropdown.contains(event.target)) {
-      dropdown.remove();
-      document.removeEventListener('click', dismiss, true);
+      closeMenu();
     }
   };
   setTimeout(() => document.addEventListener('click', dismiss, true), 10);
 
-  dropdown.querySelector('[data-action="menu-view"]').onclick = (clickEvt) => {
+  // Delegated event listener for all dropdown actions (immune to conditionally omitted items)
+  dropdown.addEventListener('click', async (clickEvt) => {
+    const item = clickEvt.target.closest('[data-action]');
+    if (!item) return;
     clickEvt.stopPropagation();
-    dropdown.remove();
-    if (typeof window.viewRecipe === 'function') {
-      window.viewRecipe(recipeId, null, variant);
-    }
-  };
+    closeMenu();
 
-  dropdown.querySelector('[data-action="menu-edit"]').onclick = (clickEvt) => {
-    clickEvt.stopPropagation();
-    dropdown.remove();
-    if (typeof window.openRecipeWizard === 'function') {
-      window.openRecipeWizard('manual', recipeId);
-    } else if (typeof window.openRecipeEditor === 'function') {
-      window.openRecipeEditor(recipeId);
-    }
-  };
-
-  dropdown.querySelector('[data-action="menu-review"]').onclick = (clickEvt) => {
-    clickEvt.stopPropagation();
-    dropdown.remove();
-    if (typeof window.openRecipeWizard === 'function') {
-      window.openRecipeWizard('review', recipeId);
-    }
-  };
-
-  dropdown.querySelector('[data-action="menu-duplicate"]').onclick = async (clickEvt) => {
-    clickEvt.stopPropagation();
-    dropdown.remove();
-    const dup = {
-      ...recipe,
-      id: crypto.randomUUID(),
-      name: `${recipe.name || recipe.title} (Copy)`,
-      title: `${recipe.name || recipe.title} (Copy)`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    try {
-      const { saveRecipe } = await import('../../services/HouseholdRepository.js');
-      await saveRecipe(dup);
-      if (getState()?.recipes) getState().recipes.unshift(dup);
-      if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
-      if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(`Duplicated "${recipe.name}"`);
-    } catch (err) {
-      console.error('[VaultRecipeCard] Error duplicating recipe:', err);
-    }
-  };
-
-  dropdown.querySelector('[data-action="menu-favorite"]').onclick = (clickEvt) => {
-    clickEvt.stopPropagation();
-    dropdown.remove();
-    if (typeof window.toggleRecipeFavourite === 'function') {
-      window.toggleRecipeFavourite(recipeId, clickEvt, variant);
-    }
-  };
-
-  dropdown.querySelector('[data-action="menu-delete"]').onclick = (clickEvt) => {
-    clickEvt.stopPropagation();
-    dropdown.remove();
-    confirmDeleteVaultRecipe(recipe, async () => {
-      try {
-        const { deleteRecipe } = await import('../../services/HouseholdRepository.js');
-        await deleteRecipe(recipeId);
-        if (getState()?.recipes) {
-          getState().recipes = getState().recipes.filter(r => r.id !== recipeId);
+    const action = item.dataset.action;
+    switch (action) {
+      case 'menu-view':
+        if (typeof window.viewRecipe === 'function') {
+          window.viewRecipe(recipeId, null, variant);
         }
-        if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
-        if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(`Deleted "${recipe.name || recipe.title}"`);
-      } catch (err) {
-        console.error('[VaultRecipeCard] Error deleting recipe:', err);
+        break;
+
+      case 'menu-enhance':
+        if (typeof window.openEnhanceRecipeModalForCurrent === 'function') {
+          window.openEnhanceRecipeModalForCurrent(recipeId);
+        }
+        break;
+
+      case 'menu-edit':
+        if (typeof window.openRecipeWizard === 'function') {
+          window.openRecipeWizard('manual', recipeId);
+        } else if (typeof window.openRecipeEditor === 'function') {
+          window.openRecipeEditor(recipeId);
+        }
+        break;
+
+      case 'menu-review':
+        if (typeof window.openRecipeWizard === 'function') {
+          window.openRecipeWizard('review', recipeId, variant);
+        }
+        break;
+
+      case 'menu-duplicate': {
+        const dup = {
+          ...recipe,
+          id: crypto.randomUUID(),
+          name: `${recipe.name || recipe.title} (Copy)`,
+          title: `${recipe.name || recipe.title} (Copy)`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        try {
+          const { saveRecipe } = await import('../../services/HouseholdRepository.js');
+          await saveRecipe(dup);
+          if (getState()?.recipes) getState().recipes.unshift(dup);
+          if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
+          if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(`Duplicated "${recipe.name}"`);
+        } catch (err) {
+          console.error('[VaultRecipeCard] Error duplicating recipe:', err);
+        }
+        break;
       }
-    });
-  };
+
+      case 'menu-favorite':
+        if (typeof window.toggleRecipeFavourite === 'function') {
+          window.toggleRecipeFavourite(recipeId, clickEvt, variant);
+        }
+        break;
+
+      case 'menu-delete':
+        confirmDeleteVaultRecipe(recipe, async () => {
+          try {
+            if (variant === 'enhanced') {
+              const { deleteRecipeVariant } = await import('../../services/HouseholdRepository.js');
+              await deleteRecipeVariant(recipeId, 'enhanced');
+              const allRecipes = getState()?.recipes;
+              if (Array.isArray(allRecipes)) {
+                const r = allRecipes.find(x => x.id === recipeId);
+                if (r) {
+                  delete r.enhanced;
+                  delete r.enhancedFitScore;
+                  if (r.variants) delete r.variants.enhanced;
+                  r._bestVariant = 'original';
+                }
+              }
+              const favList = getState()?.userPrefs?.variantFavourites;
+              if (Array.isArray(favList)) {
+                const idx = favList.indexOf(`${recipeId}_enhanced`);
+                if (idx !== -1) favList.splice(idx, 1);
+              }
+              document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: getState()?.recipes }));
+              if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
+              if (typeof window.showPlatePlanToast === 'function') {
+                window.showPlatePlanToast(`Removed enhanced variant from "${recipe.name || recipe.title}"`);
+              }
+            } else {
+              const { deleteRecipe } = await import('../../services/HouseholdRepository.js');
+              await deleteRecipe(recipeId);
+              if (getState()?.recipes) {
+                getState().recipes = getState().recipes.filter(r => r.id !== recipeId);
+              }
+              document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: getState()?.recipes }));
+              if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
+              if (typeof window.showPlatePlanToast === 'function') {
+                window.showPlatePlanToast(`Deleted "${recipe.name || recipe.title}"`);
+              }
+            }
+          } catch (err) {
+            console.error('[VaultRecipeCard] Error deleting recipe/variant:', err);
+          }
+        }, variant);
+        break;
+    }
+  });
 }
 
-function confirmDeleteVaultRecipe(recipe, onConfirm) {
+function confirmDeleteVaultRecipe(recipe, onConfirm, variant = 'original') {
   let wrap = document.getElementById('view-modal-wrap');
   let content = document.getElementById('view-modal-content');
   if (!wrap) {
@@ -202,7 +240,7 @@ function confirmDeleteVaultRecipe(recipe, onConfirm) {
   }
 
   const recipeTitle = recipe.name || recipe.title || 'this recipe';
-  content.innerHTML = renderDeleteConfirmationContent(recipeTitle);
+  content.innerHTML = renderDeleteConfirmationContent(recipeTitle, variant);
   wrap.classList.add('open');
   document.body.style.overflow = 'hidden';
 

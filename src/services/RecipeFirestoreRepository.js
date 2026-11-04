@@ -173,6 +173,41 @@ export async function deleteRecipe(recipeId, _uid) {
   }
 }
 
+export async function deleteRecipeVariant(recipeId, variantKey = 'enhanced') {
+  try {
+    if (!isDbAvailable() || !recipeId) return { success: false, error: 'Unavailable or missing ID' };
+    const docRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes').doc(String(recipeId));
+
+    let deleteField = null;
+    if (typeof window !== 'undefined' && window.firebase?.firestore?.FieldValue?.delete) {
+      deleteField = window.firebase.firestore.FieldValue.delete();
+    } else if (db && db.app && typeof db.app.firestore?.FieldValue?.delete === 'function') {
+      deleteField = db.app.firestore.FieldValue.delete();
+    }
+
+    const updates = {
+      updatedAt: new Date().toISOString()
+    };
+
+    if (variantKey === 'enhanced') {
+      if (deleteField) {
+        updates.enhanced = deleteField;
+        updates.enhancedFitScore = deleteField;
+      } else {
+        updates.enhanced = null;
+        updates.enhancedFitScore = null;
+      }
+      updates._bestVariant = 'original';
+    }
+
+    await docRef.update(updates);
+    return { success: true };
+  } catch (err) {
+    console.error('[RecipeFirestoreRepository] Delete Variant Error:', err);
+    return { success: false, error: err };
+  }
+}
+
 export async function recalibrateRecipeMacrosAndDismissAdvisoriesInDb(recipe, advisoryKeysToDismiss) {
   if (!isDbAvailable()) return false;
   try {

@@ -47,8 +47,8 @@ async function generateGoldenMaster() {
   });
 
   const householdPlan = generateMealPlan({
-    days: { plannerDays: { plan: { days: 7 } } },
-    startDate: { plannerStartDate: '2026-10-26' },
+    days: 7,
+    startDate: '2026-10-26',
     cadence: { prefs: { mealRepeatCadence: { breakfast: 1, lunch: 2, dinner: 2 } } },
     minFitScore: 0,
     maxFitScore: 100,

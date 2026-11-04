@@ -1,0 +1,510 @@
+/**
+ * src/components/pantry/AddItemWizardUI.js
+ * Universal Guided Hierarchy Creation Wizard:
+ * Supports starting at: Category, Root Item, Sub-Type, or Product.
+ * Subtype-only filtering for Product step with full hierarchy links.
+ * Full Product Form integration for Manual and Tesco review pathways.
+ * Dynamic step titles, auto-filling parent category, and atomic commits.
+ */
+
+import { getState } from '../../store/store.js';
+import { getUnifiedCategories } from '../../services/CategoryRepository.js';
+import { createTaxonomySearchInput } from './RecipeSearchDropdownHelper.js';
+import { commitAtomicChain } from '../../services/PantryTaxonomyService.js';
+import { openTescoImportModal } from './SubtypeProductLinkerModalUI.js';
+import { attachDuplicateDetector } from './WizardDuplicateHelper.js';
+import { showCustomAlert } from '../ui/DialogHelpers.js';
+
+const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const breadcrumbs = (cat, item, sub) => `
+  <div class="lineage-breadcrumbs" style="display:inline-flex; align-items:center; gap:6px; padding:5px 8px; background:var(--surface2,#f8fafc); border:1px solid var(--border,#e2e8f0); border-radius:8px; font-size:11.5px; font-weight:650; color:var(--text2,#64748b); margin-bottom:12px;">
+    <span>📂 ${escapeHtml(cat || 'General')}</span>
+    ${item ? `<span style="opacity:0.5;">›</span><span style="color:var(--text,#1c1917); font-weight:750;">📦 ${escapeHtml(item)}</span>` : ''}
+    ${sub ? `<span style="opacity:0.5;">›</span><span style="color:var(--text,#1c1917); font-weight:750;">🏷️ ${escapeHtml(sub)}</span>` : ''}
+  </div>
+`;
+
+let activeDropdownInstance = null;
+
+function showModal(html) {
+  const wrap = document.getElementById('view-modal-wrap'), content = document.getElementById('view-modal-content');
+  if (wrap && content) {
+    wrap.style.setProperty('z-index', '100005', 'important');
+    content.style.setProperty('z-index', '100005', 'important');
+    content.innerHTML = html;
+    wrap.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+export function closeAddItemWizard() {
+  if (activeDropdownInstance?.destroy) { activeDropdownInstance.destroy(); activeDropdownInstance = null; }
+  const wrap = document.getElementById('view-modal-wrap');
+  const content = document.getElementById('view-modal-content');
+  if (wrap) {
+    wrap.classList.remove('open');
+    wrap.style.setProperty('z-index', '25005', 'important');
+    document.body.style.overflow = '';
+  }
+  if (content) {
+    content.style.setProperty('z-index', '25005', 'important');
+  }
+}
+
+export function openAddItemWizard(options = {}) {
+  let startAt = options.startAt || 'item';
+  let step = 1;
+  const onComplete = options.onComplete || null;
+  if (onComplete) window.__onHierarchyComplete = onComplete;
+
+  let wizardData = {
+    startAt,
+    category: options.category || '',
+    itemName: options.itemName || '',
+    selectedParentItem: options.parentId ? (getState().ingredients || []).find(i => String(i.id) === String(options.parentId)) : null,
+    subtypeName: options.subtypeName || 'Standard',
+    subtypeId: null,
+    productMode: 'manual',
+    selectedExistingProduct: null
+  };
+
+  const initialRootItems = getState().rootItems || getState().ingredients || [];
+  if (!wizardData.selectedParentItem && wizardData.itemName) {
+    const rawLower = wizardData.itemName.toLowerCase().trim();
+    const existing = initialRootItems.find(i => {
+      const iName = (i.name || '').toLowerCase().trim();
+      return iName === rawLower || rawLower.includes(iName) || iName.includes(rawLower);
+    });
+    if (existing) {
+      wizardData.selectedParentItem = existing;
+      if (!wizardData.category && existing.category) wizardData.category = existing.category;
+    }
+  }
+
+  if (wizardData.selectedParentItem) {
+    wizardData.itemName = wizardData.selectedParentItem.name || wizardData.itemName;
+    wizardData.category = wizardData.selectedParentItem.category || wizardData.category || 'General';
+  }
+
+  const proceedToProduct = async (mode) => {
+    closeAddItemWizard();
+    window.__pendingHierarchyCommit = { category: wizardData.category || 'General', rootItemName: wizardData.itemName, subtypeName: wizardData.subtypeName || 'Standard' };
+    if (mode === 'tesco') {
+      openTescoImportModal(wizardData.subtypeId || null, wizardData.selectedParentItem?.id || null, null, wizardData.subtypeName || wizardData.itemName);
+    } else {
+      window.__prefilledResolveBinding = { ingredientId: wizardData.selectedParentItem?.id || null, subtypeId: wizardData.subtypeId || null, parentCategory: wizardData.category || 'General', subtypeDraftName: wizardData.subtypeName || wizardData.itemName };
+      const { openProductEditModal } = await import('../../views/ProductBankView.js');
+      openProductEditModal(null);
+    }
+  };
+
+  const renderStep = () => {
+    if (activeDropdownInstance?.destroy) { activeDropdownInstance.destroy(); activeDropdownInstance = null; }
+
+    const state = getState();
+    const categories = getUnifiedCategories(state) || [];
+    const rootItems = state.rootItems || state.ingredients || [];
+    const products = Array.isArray(state.products) ? state.products : [];
+
+    const isCat = startAt === 'category', isSub = startAt === 'subtype', isProd = startAt === 'product';
+    const isFinalStep = (isCat && step === 4) || (!isCat && !isProd && step === 3) || (isProd && step === 2);
+
+    let stepBodyHtml = '';
+    if (isCat && step === 1) {
+      stepBodyHtml = `
+        <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">Step 1 of 4: Select or Create Category</div>
+        <div style="margin-bottom:18px;">
+          <label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:6px;">Category</label>
+          <div id="wiz-cat-container"></div>
+        </div>`;
+    } else if (isCat && step === 2) {
+      stepBodyHtml = `
+        <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">Step 2 of 4: Select or Create Root Item</div>
+        ${breadcrumbs(wizardData.category)}
+        <div style="margin-bottom:18px;">
+          <label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:6px;">Root Item</label>
+          <div id="wiz-item-container"></div>
+        </div>`;
+    } else if (isCat && step === 3) {
+      stepBodyHtml = `
+        <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">Step 3 of 4: Select or Create Sub-type</div>
+        ${breadcrumbs(wizardData.category, wizardData.itemName)}
+        <div style="margin-bottom:18px;">
+          <label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:6px;">Sub-type Variant</label>
+          <div id="wiz-subtype-container"></div>
+        </div>`;
+    } else if (!isCat && !isSub && !isProd && step === 1) {
+      const stepLabel = 'Step 1 of 3: Define Root Item & Category';
+      stepBodyHtml = `
+        <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">${stepLabel}</div>
+        <div style="margin-bottom:18px; display:flex; flex-direction:column; gap:12px;">
+          <div>
+            <label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:6px;">Root Item Name</label>
+            <input type="text" id="wiz-item-name" value="${escapeHtml(wizardData.itemName)}" placeholder="e.g. Basmati Rice, Cheddar Cheese..." style="width:100%; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px;" />
+            <div id="wiz-item-dup-box" style="margin-top:6px;"></div>
+          </div>
+          <div><label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:6px;">Category</label><div id="wiz-cat-container"></div></div>
+        </div>`;
+    } else if (isSub && step === 1) {
+      stepBodyHtml = `
+        <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">Step 1 of 3: Select Parent Root Item</div>
+        <div style="margin-bottom:18px;">
+          <label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:6px;">Parent Root Item</label>
+          <div id="wiz-parent-item-container"></div>
+          <div style="display:flex; gap:6px; margin-top:8px; font-size:11.5px; color:var(--text2,#78716c); align-items:center;">
+            <span>Need a higher level?</span>
+            <button type="button" class="btn xs ghost" id="btn-wiz-jump-item" style="font-weight:600;">+ New Root Item</button>
+            <button type="button" class="btn xs ghost" id="btn-wiz-jump-cat" style="font-weight:600;">+ New Category</button>
+          </div>
+        </div>`;
+    } else if (isProd && step === 1) {
+      stepBodyHtml = `
+        <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">Step 1 of 2: Select Target Sub-Type</div>
+        <div style="margin-bottom:18px;">
+          <label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:6px;">Target Sub-type</label>
+          <div id="wiz-target-subtype-container"></div>
+          <div style="display:flex; gap:6px; margin-top:10px; font-size:11.5px; color:var(--text2,#78716c); align-items:center; flex-wrap:wrap;">
+            <span>Need to add higher level?</span>
+            <button type="button" class="btn xs ghost" id="btn-wiz-jump-sub" style="font-weight:600;">+ New Sub-Type</button>
+            <button type="button" class="btn xs ghost" id="btn-wiz-jump-item" style="font-weight:600;">+ New Root Item</button>
+            <button type="button" class="btn xs ghost" id="btn-wiz-jump-cat" style="font-weight:600;">+ New Category</button>
+          </div>
+        </div>`;
+    } else if ((isCat && step === 3) || (!isCat && !isProd && step === 2)) {
+      const stepLabel = isCat ? 'Step 3 of 4: Define Sub-type' : 'Step 2 of 3: Define Sub-type';
+      stepBodyHtml = `
+        <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">${stepLabel}</div>
+        ${breadcrumbs(wizardData.category, wizardData.itemName)}
+        <div style="margin-bottom:18px;">
+          <label style="display:block; font-size:12.5px; font-weight:750; margin-bottom:4px;">Sub-type Name</label>
+          <input type="text" id="wiz-subtype-name" value="${escapeHtml(wizardData.subtypeName)}" placeholder="e.g. Standard, Mature, Extra Virgin, Organic..." style="width:100%; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:12.5px;" />
+          <div id="wiz-subtype-dup-box" style="margin-top:6px;"></div>
+        </div>`;
+    } else {
+      stepBodyHtml = `
+        <div style="font-size:12px; color:var(--text2,#78716c); margin-bottom:12px;">Final Step: Store Product Association</div>
+        ${breadcrumbs(wizardData.category, wizardData.itemName, wizardData.subtypeName)}
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:14px;">
+          <button type="button" class="btn sm ${wizardData.productMode === 'manual' ? 'primary' : 'ghost'} btn-prod-path" data-path="manual" style="font-size:11px; font-weight:650; padding:6px 4px;">1. Add Manually</button>
+          <button type="button" class="btn sm ${wizardData.productMode === 'existing' ? 'primary' : 'ghost'} btn-prod-path" data-path="existing" style="font-size:11px; font-weight:650; padding:6px 4px;">2. Link Existing</button>
+          <button type="button" class="btn sm ${wizardData.productMode === 'tesco' ? 'primary' : 'ghost'} btn-prod-path" data-path="tesco" style="font-size:11px; font-weight:650; padding:6px 4px; color:var(--primary,#4f46e5);">3. Import Tesco</button>
+        </div>
+        ${wizardData.productMode === 'manual' ? `
+          <div style="padding:16px; background:var(--surface2,#f8fafc); border:1px solid var(--border,#e2e8f0); border-radius:10px; text-align:center;">
+            <div style="font-weight:750; font-size:13px; margin-bottom:4px; color:var(--text,#1c1917);">Complete Product Details Form</div>
+            <div style="font-size:12px; color:var(--text2,#64748b); margin-bottom:12px;">Specify full product details: macros, nutrients, pack sizes, storage, and price in the dedicated product form.</div>
+            <button type="button" class="btn primary sm" id="btn-launch-full-prod">Open Full Product Form ➔</button>
+          </div>
+        ` : wizardData.productMode === 'tesco' ? `
+          <div style="padding:16px; background:var(--surface2,#f8fafc); border:1px solid var(--border,#e2e8f0); border-radius:10px; text-align:center;">
+            <div style="font-weight:750; font-size:13px; margin-bottom:4px; color:var(--text,#1c1917);">Import from Tesco Bookmarklet</div>
+            <div style="font-size:12px; color:var(--text2,#64748b); margin-bottom:12px;">Paste Tesco bookmarklet JSON and review all fields in the full product editor before saving.</div>
+            <button type="button" class="btn primary sm" id="btn-launch-tesco-prod">Open Tesco Importer ➔</button>
+          </div>
+        ` : `<div><label style="display:block; font-size:12px; font-weight:750; margin-bottom:4px;">Search Existing Product to Link</label><div id="wiz-existing-prod-container"></div></div>`}`;
+    }
+
+    let finishBtnLabel = 'Finish &amp; Link to Bank';
+    if (isCat && step === 1) finishBtnLabel = 'Finish &amp; Save Category';
+    else if (!isCat && step === 1) finishBtnLabel = 'Finish &amp; Save Item';
+
+    const canFinishEarly = (isCat && step === 1) || (!isCat && !isProd && (step === 1 || step === 2)) || (isSub && step === 2);
+
+    const navHtml = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; border-top:1px solid var(--border,#e7e5e4); padding-top:16px;">
+        ${step === 1 ? `<button type="button" class="btn sm" id="btn-wiz-cancel">Cancel</button>` : `<button type="button" class="btn sm" id="btn-wiz-back">‹ Back</button>`}
+        <div style="display:flex; gap:8px;">
+          ${canFinishEarly ? `<button type="button" class="btn secondary sm btn-wiz-finish-action" id="btn-wiz-finish-early">${finishBtnLabel}</button>` : ''}
+          ${isFinalStep 
+            ? `<button type="button" class="btn primary sm btn-wiz-finish-action" id="btn-wiz-finish">${wizardData.productMode === 'existing' ? 'Finish &amp; Link Product' : 'Finish without Product'}</button>` 
+            : `<button type="button" class="btn primary sm" id="btn-wiz-next">Next ➔</button>`}
+        </div>
+      </div>`;
+
+    let currentStepTitle = '📦 Add Root Item';
+    if (isCat) currentStepTitle = step === 1 ? '📂 Add Category' : (step === 2 ? '📦 Add Root Item' : (step === 3 ? '🏷️ Add Sub-Type' : '🛒 Add Product'));
+    else if (isSub) currentStepTitle = step === 1 ? '📦 Select Root Item' : (step === 2 ? '🏷️ Add Sub-Type' : '🛒 Add Product');
+    else if (isProd) currentStepTitle = step === 1 ? '🏷️ Select Sub-Type' : '🛒 Add Product';
+    else currentStepTitle = step === 1 ? '📦 Add Root Item' : (step === 2 ? '🏷️ Add Sub-Type' : '🛒 Add Product');
+
+    const modalHtml = `
+      <div class="add-to-bank-hub-modal" style="padding: 24px; max-width: 520px; width: 100%; margin: 0 auto; background: var(--surface,#fff); border-radius: 14px; position:relative; box-shadow:0 10px 25px rgba(0,0,0,0.1);">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+          <h3 style="margin:0; font-size:1.15rem; font-weight:750; color:var(--text,#1c1917);">${currentStepTitle}</h3>
+          <button type="button" class="btn xs ghost" id="btn-wiz-close" style="font-weight:700;">✕</button>
+        </div>
+        ${stepBodyHtml}
+        ${navHtml}
+      </div>`;
+
+    showModal(modalHtml);
+
+    document.getElementById('btn-wiz-close')?.addEventListener('click', closeAddItemWizard);
+    document.getElementById('btn-wiz-cancel')?.addEventListener('click', closeAddItemWizard);
+    document.getElementById('btn-wiz-jump-sub')?.addEventListener('click', () => { startAt = 'subtype'; step = 1; renderStep(); });
+    document.getElementById('btn-wiz-jump-item')?.addEventListener('click', () => { startAt = 'item'; step = 1; renderStep(); });
+    document.getElementById('btn-wiz-jump-cat')?.addEventListener('click', () => { startAt = 'category'; step = 1; renderStep(); });
+    document.getElementById('btn-launch-full-prod')?.addEventListener('click', () => proceedToProduct('manual'));
+    document.getElementById('btn-launch-tesco-prod')?.addEventListener('click', () => proceedToProduct('tesco'));
+
+    attachDuplicateDetector({
+      inputEl: document.getElementById('wiz-cat-name-input'), containerEl: document.getElementById('wiz-cat-dup-box'), items: categories, icon: '📂', onSelect: (cat) => { wizardData.category = cat; }
+    });
+
+    attachDuplicateDetector({
+      inputEl: document.getElementById('wiz-item-name'), containerEl: document.getElementById('wiz-item-dup-box'), items: rootItems, icon: '📦', onSelect: (item) => {
+        wizardData.itemName = item.name;
+        wizardData.selectedParentItem = item;
+        if (item.category) {
+          wizardData.category = item.category;
+          const catInput = document.getElementById('wiz-cat-container')?.querySelector('input');
+          if (catInput) catInput.value = item.category;
+        }
+      }
+    });
+
+    document.getElementById('wiz-item-name')?.addEventListener('input', (e) => {
+      const val = e.target.value.trim().toLowerCase();
+      const matched = rootItems.find(i => (i.name || '').toLowerCase() === val);
+      if (matched && matched.category) {
+        wizardData.selectedParentItem = matched;
+        wizardData.category = matched.category;
+        const catInput = document.getElementById('wiz-cat-container')?.querySelector('input');
+        if (catInput) catInput.value = matched.category;
+      }
+    });
+
+    const activeItemSubtypes = wizardData.selectedParentItem ? (wizardData.selectedParentItem.subtypes || []) : [];
+    attachDuplicateDetector({
+      inputEl: document.getElementById('wiz-subtype-name'), containerEl: document.getElementById('wiz-subtype-dup-box'), items: activeItemSubtypes, icon: '🏷️', onSelect: (sub) => { wizardData.subtypeName = sub.name; }
+    });
+
+    const catContainer = document.getElementById('wiz-cat-container');
+    if (catContainer) {
+      activeDropdownInstance = createTaxonomySearchInput({
+        container: catContainer, categories, rootItems: [], newItemType: 'category', placeholder: 'Search or type category...', initialValue: wizardData.category,
+        onSelect: ({ label, val }) => {
+          let cat = label.replace(/^[📂📦🏷️✨\s]+/, '').replace(/^\[Category\]\s*/i, '').trim();
+          if (val && val.startsWith('cat:')) cat = val.replace('cat:', '');
+          wizardData.category = cat;
+        }
+      });
+    }
+
+    const itemContainer = document.getElementById('wiz-item-container');
+    if (itemContainer) {
+      const categoryRootItems = rootItems.filter(r => !wizardData.category || (r.category || '').toLowerCase() === (wizardData.category || '').toLowerCase());
+      const displayRootItems = categoryRootItems.length > 0 ? categoryRootItems : rootItems;
+      activeDropdownInstance = createTaxonomySearchInput({
+        container: itemContainer,
+        categories: [],
+        rootItems: displayRootItems,
+        newItemType: 'item',
+        placeholder: 'Search existing root item or type new...',
+        initialValue: wizardData.itemName,
+        onSelect: ({ label, val }) => {
+          let cleanName = label.replace(/^[📦✨\s]+/, '').replace(/^\[Root Item\]\s*/i, '').trim();
+          const found = rootItems.find(r => String(r.id) === String(val) || (r.name || '').toLowerCase() === cleanName.toLowerCase());
+          if (found) {
+            wizardData.selectedParentItem = found;
+            wizardData.itemName = found.name;
+            if (found.category) wizardData.category = found.category;
+          } else {
+            wizardData.itemName = cleanName;
+          }
+        }
+      });
+    }
+
+    const subtypeContainer = document.getElementById('wiz-subtype-container');
+    if (subtypeContainer) {
+      const activeItem = wizardData.selectedParentItem;
+      const subList = activeItem && Array.isArray(activeItem.subtypes) && activeItem.subtypes.length > 0
+        ? activeItem.subtypes
+        : [{ id: 'Standard', name: 'Standard' }];
+      activeDropdownInstance = createTaxonomySearchInput({
+        container: subtypeContainer,
+        categories: [],
+        rootItems: activeItem ? [activeItem] : [],
+        subtypesOnly: !!(activeItem && activeItem.subtypes && activeItem.subtypes.length > 0),
+        newItemType: 'subtype',
+        placeholder: 'Search existing variant or type new (e.g. Standard)...',
+        initialValue: wizardData.subtypeName || 'Standard',
+        onSelect: ({ label, val }) => {
+          let cleanSub = label.replace(/^[🏷️✨\s]+/, '').replace(/^\[Sub-Type\]\s*/i, '').trim();
+          if (cleanSub.includes('(')) cleanSub = cleanSub.split('(')[0].trim();
+          wizardData.subtypeName = cleanSub;
+          if (val && val.includes(':')) {
+            const [, sId] = val.split(':');
+            wizardData.subtypeId = sId;
+          }
+        }
+      });
+    }
+
+    const parentItemContainer = document.getElementById('wiz-parent-item-container');
+    if (parentItemContainer) {
+      const initVal = wizardData.selectedParentItem ? `📦 ${wizardData.selectedParentItem.name}` : '';
+      activeDropdownInstance = createTaxonomySearchInput({
+        container: parentItemContainer, categories: [], rootItems, placeholder: 'Search existing root item...', initialValue: initVal,
+        onSelect: ({ val }) => {
+          const found = rootItems.find(r => String(r.id) === String(val));
+          if (found) { wizardData.selectedParentItem = found; wizardData.itemName = found.name; wizardData.category = found.category || 'General'; }
+        }
+      });
+    }
+
+    const targetSubtypeContainer = document.getElementById('wiz-target-subtype-container');
+    if (targetSubtypeContainer) {
+      activeDropdownInstance = createTaxonomySearchInput({
+        container: targetSubtypeContainer, categories: [], rootItems, subtypesOnly: true, placeholder: 'Search target sub-type...',
+        onNewClick: (typedSub) => { startAt = 'subtype'; step = 1; wizardData.subtypeName = typedSub || 'Standard'; renderStep(); },
+        onSelect: ({ val }) => {
+          if (val && val.includes(':')) {
+            const [pId, sId] = val.split(':');
+            const parent = rootItems.find(r => String(r.id) === String(pId));
+            if (parent) {
+              wizardData.selectedParentItem = parent; wizardData.itemName = parent.name; wizardData.category = parent.category || 'General';
+              const sub = (parent.subtypes || []).find(s => String(s.id) === String(sId) || s.name === sId);
+              if (sub) { wizardData.subtypeName = sub.name; wizardData.subtypeId = sub.id || null; }
+            }
+          }
+        }
+      });
+    }
+
+    document.getElementById('btn-wiz-back')?.addEventListener('click', () => { step = Math.max(1, step - 1); renderStep(); });
+
+    document.getElementById('btn-wiz-next')?.addEventListener('click', () => {
+      if (isCat && step === 1) {
+        const catSearch = document.querySelector('#wiz-cat-container .wiz-ing-tax-search') || document.getElementById('wiz-cat-name-input');
+        const catVal = (catSearch?.value || wizardData.category || '').trim();
+        if (!catVal) return showCustomAlert('Please enter or select a category name.', 'Missing Category');
+        wizardData.category = catVal;
+      } else if (isCat && step === 2) {
+        const itemSearch = document.querySelector('#wiz-item-container .wiz-ing-tax-search') || document.getElementById('wiz-item-name');
+        const nameVal = (itemSearch?.value || wizardData.itemName || '').trim();
+        if (!nameVal) return showCustomAlert('Please enter or select a root item name.', 'Missing Name');
+        wizardData.itemName = nameVal;
+        if (!wizardData.selectedParentItem) {
+          const matched = rootItems.find(i => (i.name || '').toLowerCase() === nameVal.toLowerCase());
+          if (matched) wizardData.selectedParentItem = matched;
+        }
+      } else if (isCat && step === 3) {
+        const subSearch = document.querySelector('#wiz-subtype-container .wiz-ing-tax-search') || document.getElementById('wiz-subtype-name');
+        const subVal = (subSearch?.value || wizardData.subtypeName || 'Standard').trim();
+        wizardData.subtypeName = subVal || 'Standard';
+      } else if (!isCat && !isSub && !isProd && step === 1) {
+        const nameVal = document.getElementById('wiz-item-name')?.value.trim();
+        const catVal = wizardData.category || (document.querySelector('#wiz-cat-container .wiz-ing-tax-search')?.value || '').trim();
+        if (!nameVal) return showCustomAlert('Please enter an item name.', 'Missing Name');
+        if (!catVal) return showCustomAlert('Please select or type a category.', 'Missing Category');
+        wizardData.itemName = nameVal; wizardData.category = catVal;
+      } else if (isSub && step === 1) {
+        if (!wizardData.selectedParentItem) return showCustomAlert('Please select a parent root item.', 'Missing Selection');
+      } else if (isProd && step === 1) {
+        if (!wizardData.selectedParentItem || !wizardData.subtypeName) return showCustomAlert('Please select a target sub-type.', 'Missing Selection');
+      }
+
+      if (!isCat && step === 2) {
+        const subInput = document.getElementById('wiz-subtype-name');
+        if (subInput) {
+          const subVal = subInput.value.trim();
+          if (!subVal) return showCustomAlert('Please enter a sub-type variant name (or "Standard").', 'Missing Sub-type');
+          wizardData.subtypeName = subVal;
+        }
+      }
+
+      step++;
+      renderStep();
+    });
+
+    document.querySelectorAll('.btn-prod-path').forEach(btn => {
+      btn.onclick = () => { wizardData.productMode = btn.dataset.path; renderStep(); };
+    });
+
+    const existingProdContainer = document.getElementById('wiz-existing-prod-container');
+    if (existingProdContainer) {
+      activeDropdownInstance = createTaxonomySearchInput({
+        container: existingProdContainer, categories: [], rootItems: [],
+        products: products.map(p => ({ ...p, name: `${p.name || p.title} ${p.brand ? `(${p.brand})` : ''}` })),
+        placeholder: 'Search product by name or brand...',
+        onSelect: ({ val }) => {
+          const prod = products.find(p => String(p.id) === String(val));
+          if (prod) wizardData.selectedExistingProduct = prod;
+        }
+      });
+    }
+
+    const executeFinishCommit = async () => {
+      if (isCat && step === 1) {
+        const catSearch = document.querySelector('#wiz-cat-container .wiz-ing-tax-search') || document.getElementById('wiz-cat-name-input');
+        const catVal = (catSearch?.value || wizardData.category || '').trim();
+        if (!catVal) return showCustomAlert('Please enter or select a category name.', 'Missing Category');
+        wizardData.category = catVal;
+      } else if (!isCat && !isSub && !isProd && step === 1) {
+        const nameVal = document.getElementById('wiz-item-name')?.value.trim();
+        const catVal = wizardData.category || (document.querySelector('#wiz-cat-container .wiz-ing-tax-search')?.value || '').trim();
+        if (!nameVal) return showCustomAlert('Please enter an item name.', 'Missing Name');
+        if (!catVal) return showCustomAlert('Please select or type a category.', 'Missing Category');
+        wizardData.itemName = nameVal;
+        wizardData.category = catVal;
+      } else if (isSub && step === 1) {
+        if (!wizardData.selectedParentItem) return showCustomAlert('Please select a parent root item.', 'Missing Selection');
+      }
+
+      if (!isCat && step === 2) {
+        const subInput = document.getElementById('wiz-subtype-name');
+        if (subInput) {
+          const subVal = subInput.value.trim();
+          if (subVal) wizardData.subtypeName = subVal;
+        }
+      }
+
+      const finishBtns = document.querySelectorAll('.btn-wiz-finish-action');
+      finishBtns.forEach(b => { b.disabled = true; b.textContent = 'Saving...'; });
+
+      try {
+        const prodPayload = (isFinalStep && wizardData.productMode === 'existing' && wizardData.selectedExistingProduct)
+          ? { ...wizardData.selectedExistingProduct, category: wizardData.category }
+          : null;
+
+        const res = await commitAtomicChain({
+          category: wizardData.category || 'General',
+          rootItemName: wizardData.itemName || null,
+          subtypeName: wizardData.subtypeName || (wizardData.itemName ? 'Standard' : null),
+          productPayload: prodPayload
+        });
+
+        const cb = onComplete || window.__onHierarchyComplete;
+        window.__onHierarchyComplete = null;
+        closeAddItemWizard();
+        if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
+        if (typeof window.renderProductBank === 'function') window.renderProductBank();
+        if (typeof cb === 'function') {
+          const rootObj = res?.rootItem || wizardData.selectedParentItem;
+          const subObj = res?.subtype || (res?.subtypeId ? { id: res.subtypeId, name: wizardData.subtypeName } : (wizardData.subtypeName ? { id: wizardData.subtypeName, name: wizardData.subtypeName } : null));
+          cb({
+            ...(res || {}),
+            ingredientId: rootObj?.id || (wizardData.itemName ? wizardData.itemName : null),
+            subtypeId: subObj?.id || res?.subtypeId || (wizardData.subtypeName || null),
+            parentName: rootObj?.name || wizardData.itemName || '',
+            subtypeName: subObj?.name || wizardData.subtypeName || '',
+            category: wizardData.category || res?.category || 'General',
+            rootItem: rootObj,
+            subtype: subObj,
+            product: res?.product || prodPayload
+          });
+        }
+      } catch (err) {
+        console.error('[AddItemWizardUI] Commit error:', err);
+        finishBtns.forEach(b => { b.disabled = false; b.textContent = 'Finish & Link to Bank'; });
+      }
+    };
+
+    document.getElementById('btn-wiz-finish-early')?.addEventListener('click', executeFinishCommit);
+    document.getElementById('btn-wiz-finish')?.addEventListener('click', executeFinishCommit);
+  };
+
+  renderStep();
+}

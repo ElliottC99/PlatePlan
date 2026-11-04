@@ -201,7 +201,7 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   const closeBtn = container.querySelector('#pp-modal-close');
   const selectedPreviewEl = container.querySelector('#pp-selected-preview');
 
-  closeBtn.addEventListener('click', () => overlay.remove());
+  if (closeBtn) closeBtn.addEventListener('click', () => overlay.remove());
 
   container.querySelectorAll('.pp-tier-tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -216,13 +216,15 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     });
   });
 
-  searchInput.addEventListener('input', () => renderList(searchInput.value));
-  sortSelect.addEventListener('change', () => { currentSort = sortSelect.value; renderList(searchInput.value); });
-  applyBtn.addEventListener('click', async () => {
-    if (!selectedSubstituteProduct) return;
-    await executeSwapInState(targetItem, selectedSubstituteProduct, ctx);
-    overlay.remove();
-  });
+  if (searchInput) searchInput.addEventListener('input', () => renderList(searchInput.value));
+  if (sortSelect) sortSelect.addEventListener('change', () => { currentSort = sortSelect.value; renderList(searchInput?.value || ''); });
+  if (applyBtn) {
+    applyBtn.addEventListener('click', async () => {
+      if (!selectedSubstituteProduct) return;
+      await executeSwapInState(targetItem, selectedSubstituteProduct, ctx);
+      overlay.remove();
+    });
+  }
 
   function sortItems(items) {
     const sorted = [...items];

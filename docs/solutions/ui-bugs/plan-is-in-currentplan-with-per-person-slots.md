@@ -1,6 +1,7 @@
 ---
 title: The loaded plan is state.currentPlan, and its slots are per person
 date: 2026-10-27
+last_updated: 2026-10-30
 category: ui-bugs
 module: meal plan state (currentPlan, plan slots)
 problem_type: ui_bug
@@ -58,13 +59,13 @@ if (infoE && infoC && infoE.id === infoC.id && infoE.variant === infoC.variant) 
 
 - Read the live plan from `getState().currentPlan`. Treat `state.plan` as stale unless you've checked that the code path keeps it in sync.
 - Some code still uses `state.plan`, so check before reusing it:
-  - `selectAndSwapRecipe` in `src/components/planner/PlannerMealSlot.js` edits `stateObj.plan.slots`.
   - `clearCheckedShoppingItems` in `src/components/shopping/ShoppingBatchToolbar.js` clears `state.plan.shoppingAtHome`, while the at-home ticks now live on `currentPlan`. Nothing calls it by name; `componentRegistry.js` puts it on `window`.
   - `ProductSwapModal.js` picks `state.plan` before `currentPlan` when `plan` is set.
+- Planner code lost in the 2026-10-01 modularisation can be recovered from the old runtime at `git show b9e38ab:scripts/plateplan-app.js`, but every function there reads and writes `state.plan` and calls an old `saveState()` whose cloud parts were stubs. So port the behaviour onto `currentPlan` and save through `saveCurrentPlan`; don't copy the code. `window.saveState` in `src/main.js` is no substitute: it saves nothing when given a bare plan. The 3.52.0 planner fix (`docs/plans/2026-10-30-1508-fix-planner-dead-controls-plan.md`) did this for commit, Start Fresh and the Step 2 swap.
 - Look up a meal with the `E`/`C` suffix, and decide shared-or-split with the planner's id-and-variant rule rather than inventing another.
 - Test against the real `plans/current` document or a backup of it, not a hand-made plan with plain `dinner` keys.
 
 ## Related Issues
 
 - `docs/solutions/database-issues/plan-whole-document-save-erases-unlisted-fields.md`: the save these fixes call.
-- `docs/plans/2026-10-27-1549-fix-today-and-step3-shopping-plan.md`, Deferred to Follow-Up Work: the swap path's stale `state.plan`.
+- `docs/plans/2026-10-27-1549-fix-today-and-step3-shopping-plan.md`, Deferred to Follow-Up Work: the swap path's stale `state.plan`. Fixed in 3.52.0: `selectAndSwapRecipe` now edits `currentPlan`.

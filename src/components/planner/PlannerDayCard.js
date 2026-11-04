@@ -14,10 +14,6 @@ function escapeHtml(value) {
   }[ch]));
 }
 
-function escapeAttr(value) {
-  return escapeHtml(value).replace(/`/g, '&#96;');
-}
-
 export function renderPersonSummaryBox(personKey, daySummary) {
   const name = personKey === 'e' ? 'Elliott' : 'Chloe';
   const total = daySummary?.totals?.[personKey] || { cal: 0, prot: 0 };
@@ -40,46 +36,6 @@ export function renderPersonSummaryBox(personKey, daySummary) {
     <div style="color:${calColor}">${Math.round(total.cal)} / ${tgt.cal} kcal · ${fmtCalDelta}</div>
     <div style="color:${protColor}">P ${Number(total.prot).toFixed(1)} / ${tgt.prot}g · ${fmtProtDelta}</div>
     ${assumedText}`;
-}
-
-export function renderDayPlanCard({
-  day,
-  dayLabel,
-  dayDate = '',
-  isAllExcluded = false,
-  daySummary = null,
-  dayRowsHtml = '',
-  score = 0
-}) {
-  if (isAllExcluded) {
-    return `
-      <div class="day-plan-card skipped">
-        <div style="display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap">
-          <label for="planner-date-day-${day}" style="font-weight:700">${escapeHtml(dayLabel)}</label>
-          <input type="date" id="planner-date-day-${day}" name="planner-date-day-${day}" aria-label="Date for day ${day}" value="${escapeAttr(dayDate)}" data-action="set-plan-day-date" data-day="${day}" style="width:auto">
-          <span style="color:var(--text3)">-- no meals planned</span>
-        </div>
-      </div>
-    `;
-  }
-
-  const summaryHtml = ['e', 'c'].map(p => `
-    <div class="summary-box">${renderPersonSummaryBox(p, daySummary)}</div>
-  `).join('');
-
-  return `
-    <div class="day-plan-card">
-      <div class="row-between" style="margin-bottom:10px;gap:8px;flex-wrap:wrap">
-        <div class="plan-date-control">
-          <label for="planner-date-day-${day}" style="font-size:13px;font-weight:600;display:block;margin-bottom:2px">${escapeHtml(dayLabel)}</label>
-          <input type="date" id="planner-date-day-${day}" name="planner-date-day-${day}" aria-label="Date for day ${day}" value="${escapeAttr(dayDate)}" data-action="set-plan-day-date" data-day="${day}">
-        </div>
-        <span class="tag" title="Lower is better. Calories miss plus protein shortfall.">Score ${score}</span>
-      </div>
-      <div class="plan-summary">${summaryHtml}</div>
-      ${dayRowsHtml}
-    </div>
-  `;
 }
 
 export function renderDenseDayCard({

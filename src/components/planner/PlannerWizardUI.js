@@ -37,23 +37,6 @@ export function renderPlannerWizardView({ currentStep = 1, hasActivePlan = false
   `;
 }
 
-export function renderPlanSetupCard({ daysVal = 7, startVal = '', isExpanded = false } = {}) {
-  return `
-    <div id="plan-setup-card" class="card" style="padding:16px 20px;margin-bottom:16px;background:var(--surface)">
-      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="togglePlanSetupCollapse()">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="font-size:16px">⚙️</span>
-          <div>
-            <div style="font-weight:700;font-size:15px;color:var(--text)">Meal Plan Configuration</div>
-            <div style="font-size:12px;color:var(--text2)">${daysVal} days starting ${startVal || 'Today'}</div>
-          </div>
-        </div>
-        <button type="button" class="btn ghost sm" aria-label="Toggle setup parameters">${isExpanded ? '▲ Hide' : '▼ Edit Setup'}</button>
-      </div>
-    </div>
-  `;
-}
-
 export function renderBatchPrepPanel(prepGroups = []) {
   if (!prepGroups || !prepGroups.length) return '';
   const groupCards = prepGroups.map(g => `

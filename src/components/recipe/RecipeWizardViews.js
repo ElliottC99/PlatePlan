@@ -80,15 +80,9 @@ export function renderState1AManual() {
           <input type="text" id="wiz-title" name="title" value="${escapeAttr(recipe.title)}" placeholder="e.g. High-Protein Crispy Tofu Curry" style="width: 100%; padding: 10px; border: 1px solid var(--border, #ccc); border-radius: 8px; font-size: 14px; background: var(--surface, #fff); color: var(--text, #111);" />
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
-          <div>
-            <label for="wiz-current-servings" style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px;">Current Servings</label>
-            <input type="number" id="wiz-current-servings" name="current_servings" value="${recipe.currentServings}" min="1" style="width: 100%; padding: 10px; border: 1px solid var(--border, #ccc); border-radius: 8px; font-size: 14px; background: var(--surface, #fff);" />
-          </div>
-          <div>
-            <label for="wiz-target-servings" style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px;">Target Servings</label>
-            <input type="number" id="wiz-target-servings" name="target_servings" value="${recipe.targetServings}" min="1" style="width: 100%; padding: 10px; border: 1px solid var(--border, #ccc); border-radius: 8px; font-size: 14px; background: var(--surface, #fff);" />
-          </div>
+        <div>
+          <label for="wiz-servings" style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px;">Recipe Yield (Servings)</label>
+          <input type="number" id="wiz-servings" name="servings" value="${recipe.servings || 4}" min="1" max="50" style="width: 100%; padding: 10px; border: 1px solid var(--border, #ccc); border-radius: 8px; font-size: 14px; background: var(--surface, #fff);" />
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">

@@ -11,31 +11,190 @@
 import { getState } from '../../store/store.js';
 import { getUnifiedCategories } from '../../services/HouseholdRepository.js';
 import { openTaxonomyCreationModal } from './RecipeWizardTaxonomyModal.js';
+import { resolveProductForIngredient } from './RecipeWizardStep3Handlers.js';
 
-export function getTaxonomyLabel(ingredientId, subtypeId, rawName = '', ingredientsBank = [], categoryId = null) {
-  if (categoryId) {
-    return `📂 [Category] ${categoryId}`;
+/**
+ * Validates whether an ingredient is truly unlinked.
+ * An item is LINKED if:
+ * - it has a known productId in products
+ * - it has an ingredientId in ingredients
+ * - it has a categoryId
+ * - it resolves via resolveProductForIngredient
+ */
+/**
+ * Resolves a product to the HIGHEST taxonomy level where it serves as an auto-default:
+ * Category > Root Item > Sub-Type.
+ */
+export function resolveHighestAutoDefaultTaxonomy(prod, { ingredients = [], products = [] } = {}) {
+  if (!prod || typeof prod !== 'object') return { level: 'unknown' };
+  const pId = String(prod.id);
+
+  // 1. Check if Category Auto-Default
+  if (prod.isCategoryDefault) {
+    return { level: 'category', categoryId: prod.category || prod.cat };
   }
-  if (!ingredientId || ingredientId === 'new_item') {
-    return `✨ New Item: ${rawName || 'Custom'}`;
+  if ((prod.category || prod.cat) && prod.isAutoDefault && !prod.ingredientId && !prod.subtypeId) {
+    return { level: 'category', categoryId: prod.category || prod.cat };
   }
 
-  const ing = ingredientsBank.find(i => String(i.id) === String(ingredientId));
-  if (!ing) return `✨ New Item: ${rawName || 'Custom'}`;
+  // 2. Check if Root Item Auto-Default (Category > Root Item > Sub-Type)
+  const rootItemDef = (ingredients || []).find(i => 
+    String(i.defaultProductId) === pId || (String(i.id) === String(prod.ingredientId) && prod.isAutoDefault && !prod.subtypeId)
+  );
+  if (rootItemDef) {
+    return { level: 'root', ingredientId: rootItemDef.id, name: rootItemDef.name };
+  }
 
-  if (subtypeId) {
-    const sub = (ing.subtypes || []).find(s => String(s.id) === String(subtypeId) || String(s.name) === String(subtypeId));
-    if (sub) {
-      return `🏷️ ${sub.name} (${ing.name})`;
+  // 3. Check if Sub-Type Auto-Default
+  for (const ing of (ingredients || [])) {
+    for (const sub of (ing.subtypes || [])) {
+      if (String(sub.defaultProductId) === pId || (String(sub.id) === String(prod.subtypeId) && prod.isAutoDefault)) {
+        return { level: 'subtype', ingredientId: ing.id, subtypeId: sub.id, name: sub.name };
+      }
     }
   }
 
-  return `📦 ${ing.name} [${ing.category || 'General'}]`;
+  // 4. Fallback when not explicitly an auto-default:
+  if (prod.ingredientId) {
+    const ing = (ingredients || []).find(i => String(i.id) === String(prod.ingredientId));
+    if (ing) {
+      if (prod.subtypeId) {
+        const sub = (ing.subtypes || []).find(s => String(s.id) === String(prod.subtypeId));
+        if (sub) return { level: 'subtype', ingredientId: ing.id, subtypeId: sub.id, name: sub.name };
+      }
+      return { level: 'root', ingredientId: ing.id, name: ing.name };
+    }
+  }
+
+  if (prod.category || prod.cat) {
+    return { level: 'category', categoryId: prod.category || prod.cat };
+  }
+
+  return { level: 'product', productId: pId, name: prod.name || prod.productName };
 }
 
-export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = []) {
-  const selectedVal = item.categoryId ? `cat:${item.categoryId}` : (item.subtypeId ? `${item.ingredientId}:${item.subtypeId}` : (item.ingredientId || 'new_item'));
-  const selectedLabel = getTaxonomyLabel(item.ingredientId, item.subtypeId, item.name, ingredientsBank, item.categoryId);
+export function isIngredientUnlinked(item, products = [], ingredients = []) {
+  if (!item || typeof item !== 'object') return false;
+  if (item.isNewTaxonomyItem || item.ingredientId === 'new_item') return true;
+  if (item.categoryId) return false;
+  if (item.subtypeId) return false;
+  if (item.ingredientId && item.ingredientId !== 'new_item') return false;
+  if (item.productId && (products || []).some(p => String(p.id) === String(item.productId))) return false;
+  if (item.bankId && (products || []).some(p => String(p.id) === String(item.bankId))) return false;
+  if (typeof resolveProductForIngredient === 'function') {
+    const resolved = resolveProductForIngredient(item, { products, ingredients });
+    if (resolved) return false;
+  }
+  return true;
+}
+
+export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, arg6 = []) {
+  let item = null;
+  let ingredientId = null;
+  let subtypeId = null;
+  let rawName = '';
+  let categoryId = null;
+  let ingBank = [];
+  let prodBank = [];
+
+  if (typeof arg1 === 'object' && arg1 !== null) {
+    item = arg1;
+    ingredientId = item.ingredientId;
+    subtypeId = item.subtypeId;
+    rawName = item.name || item.raw || '';
+    categoryId = item.categoryId;
+    ingBank = Array.isArray(arg2) ? arg2 : (Array.isArray(arg4) ? arg4 : (getState()?.ingredients || getState()?.rootItems || []));
+    prodBank = Array.isArray(arg3) ? arg3 : (Array.isArray(arg6) && arg6.length ? arg6 : (getState()?.products || []));
+  } else {
+    ingredientId = arg1;
+    subtypeId = arg2;
+    rawName = arg3;
+    ingBank = Array.isArray(arg4) ? arg4 : (getState()?.ingredients || getState()?.rootItems || []);
+    categoryId = arg5;
+    prodBank = Array.isArray(arg6) ? arg6 : (getState()?.products || []);
+  }
+
+  // 1. Explicit Category assignment
+  if (categoryId) {
+    return `📂 ${categoryId}`;
+  }
+
+  // 2. Explicit Subtype assignment
+  if (subtypeId) {
+    for (const ing of (ingBank || [])) {
+      const sub = (ing.subtypes || []).find(s => String(s.id) === String(subtypeId) || String(s.name) === String(subtypeId));
+      if (sub) {
+        return `🏷️ ${sub.name}`;
+      }
+    }
+  }
+
+  // 3. Explicit Root Item assignment
+  if (ingredientId && ingredientId !== 'new_item') {
+    const ing = (ingBank || []).find(i => String(i.id) === String(ingredientId));
+    if (ing) {
+      return `📦 ${ing.name}`;
+    }
+  }
+
+  // 4. If only productId or bankId is known, resolve to the HIGHEST level where it is an Auto-Default:
+  // Category > Root Item > Sub-Type
+  const directProdId = item?.productId || item?.bankId;
+  if (directProdId) {
+    const prod = (prodBank || []).find(p => String(p.id) === String(directProdId));
+    if (prod) {
+      const resolved = resolveHighestAutoDefaultTaxonomy(prod, { ingredients: ingBank, products: prodBank });
+      if (resolved.level === 'category') return `📂 ${resolved.categoryId}`;
+      if (resolved.level === 'root') return `📦 ${resolved.name}`;
+      if (resolved.level === 'subtype') return `🏷️ ${resolved.name}`;
+      return `📦 ${prod.name || prod.productName}`;
+    }
+    if (item?.productName) {
+      return `📦 ${item.productName}`;
+    }
+  }
+
+  // 5. Fallback via canonical resolver if item exists
+  if (item && typeof resolveProductForIngredient === 'function') {
+    const resolvedProd = resolveProductForIngredient(item, { products: prodBank, ingredients: ingBank });
+    if (resolvedProd) {
+      const resolved = resolveHighestAutoDefaultTaxonomy(resolvedProd, { ingredients: ingBank, products: prodBank });
+      if (resolved.level === 'category') return `📂 ${resolved.categoryId}`;
+      if (resolved.level === 'root') return `📦 ${resolved.name}`;
+      if (resolved.level === 'subtype') return `🏷️ ${resolved.name}`;
+      return `📦 ${resolvedProd.name}`;
+    }
+  }
+
+  return `✨ New Item`;
+}
+
+export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [], productsBank = []) {
+  const pBank = Array.isArray(productsBank) && productsBank.length ? productsBank : (getState()?.products || []);
+  const iBank = Array.isArray(ingredientsBank) && ingredientsBank.length ? ingredientsBank : (getState()?.ingredients || getState()?.rootItems || []);
+
+  let selectedVal = 'new_item';
+  if (item.categoryId) {
+    selectedVal = `cat:${item.categoryId}`;
+  } else if (item.subtypeId && item.ingredientId) {
+    selectedVal = `${item.ingredientId}:${item.subtypeId}`;
+  } else if (item.ingredientId && item.ingredientId !== 'new_item') {
+    selectedVal = item.ingredientId;
+  } else if (item.productId || item.bankId) {
+    const prodId = item.productId || item.bankId;
+    const prod = pBank.find(p => String(p.id) === String(prodId));
+    if (prod) {
+      const resolved = resolveHighestAutoDefaultTaxonomy(prod, { ingredients: iBank, products: pBank });
+      if (resolved.level === 'category') selectedVal = `cat:${resolved.categoryId}`;
+      else if (resolved.level === 'root') selectedVal = resolved.ingredientId;
+      else if (resolved.level === 'subtype') selectedVal = `${resolved.ingredientId}:${resolved.subtypeId}`;
+      else selectedVal = `prod:${prodId}`;
+    } else {
+      selectedVal = `prod:${prodId}`;
+    }
+  }
+
+  const selectedLabel = getTaxonomyLabel(item, iBank, pBank);
   const isCat = Boolean(item.categoryId) || selectedVal.startsWith('cat:');
   const catInputStyle = isCat ? 'background:#eef2ff; border:1px solid #818cf8; color:#4338ca; font-weight:600;' : 'background:var(--surface,#fff); border:1px solid var(--border,#ccc); color:var(--text);';
 
@@ -50,7 +209,7 @@ export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [])
              data-iidx="${iIdx}"
              data-tax-val="${escapeAttr(selectedVal)}"
              value="${escapeAttr(selectedLabel)}"
-             placeholder="Search category or item..."
+             placeholder="Search category, root item, or sub-type..."
              autocomplete="off"
              style="width:100%; padding:6px 8px; border-radius:6px; font-size:12px; ${catInputStyle}" />
       <div class="wiz-tax-dropdown"
@@ -64,6 +223,7 @@ export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [])
 export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
   const storeState = getState();
   const ingredientsBank = storeState.rootItems || storeState.ingredients || [];
+  const productsBank = storeState.products || [];
   const existingCategories = getUnifiedCategories(storeState);
 
   const filterAndRenderDropdown = (inputEl, dropdownEl) => {
@@ -82,32 +242,45 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
       const catLower = cat.toLowerCase();
       if (!query || catLower.includes(query) || '[category]'.includes(query)) {
         html += `
-          <div class="wiz-tax-opt wiz-tax-category" data-val="cat:${escapeAttr(cat)}" data-label="📂 [Category] ${escapeAttr(cat)}" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--purple,#4f46e5); background:var(--surface2,#f5f4ee); border-bottom:1px solid var(--border,#eee);">
-            📂 <span class="badge" style="background:#eef2ff; color:#4f46e5; font-size:10px; padding:1px 5px; border-radius:4px; margin-right:4px;">[Category]</span> ${escapeHtml(cat)}
+          <div class="wiz-tax-opt wiz-tax-category" data-val="cat:${escapeAttr(cat)}" data-label="📂 ${escapeAttr(cat)}" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--purple,#4f46e5); background:var(--surface2,#f5f4ee); border-bottom:1px solid var(--border,#eee);">
+            📂 ${escapeHtml(cat)}
           </div>
         `;
       }
     });
 
+    // Render taxonomy root items & sub-types (clean and concise names only)
     ingredientsBank.forEach(ing => {
       const ingName = String(ing.name || '').toLowerCase();
       const ingCategory = String(ing.category || '').toLowerCase();
       const subTypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
 
-      const matchesIng = !query || ingName.includes(query) || ingCategory.includes(query);
-      const matchingSubtypes = subTypes.filter(s => !query || String(s.name || '').toLowerCase().includes(query) || ingName.includes(query));
+      // Check if any product belonging to this root item matches query (enables searching by product name!)
+      const hasMatchingProduct = query && productsBank.some(p => 
+        String(p.ingredientId) === String(ing.id) && String(p.name || '').toLowerCase().includes(query)
+      );
+
+      const matchesIng = !query || ingName.includes(query) || ingCategory.includes(query) || hasMatchingProduct;
+      const matchingSubtypes = subTypes.filter(s => {
+        if (!query) return true;
+        const sName = String(s.name || '').toLowerCase();
+        const hasSubProd = productsBank.some(p => 
+          String(p.subtypeId) === String(s.id) && String(p.name || '').toLowerCase().includes(query)
+        );
+        return sName.includes(query) || ingName.includes(query) || hasSubProd;
+      });
 
       if (matchesIng || matchingSubtypes.length > 0) {
         html += `
-          <div class="wiz-tax-opt wiz-tax-main" data-val="${escapeAttr(ing.id)}" data-label="📦 ${escapeAttr(ing.name)} [${escapeAttr(ing.category || 'General')}]" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--text); background:var(--surface2,#fbfbf9);">
-            📦 ${escapeHtml(ing.name)} <span style="font-size:10.5px; font-weight:normal; color:var(--text2);">[${escapeHtml(ing.category || 'General')}]</span>
+          <div class="wiz-tax-opt wiz-tax-main" data-val="${escapeAttr(ing.id)}" data-label="📦 ${escapeAttr(ing.name)}" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--text); background:var(--surface2,#fbfbf9);">
+            📦 ${escapeHtml(ing.name)}
           </div>
         `;
 
         (matchesIng ? subTypes : matchingSubtypes).forEach(sub => {
           const subKey = `${ing.id}:${sub.id || sub.name}`;
           html += `
-            <div class="wiz-tax-opt wiz-tax-sub" data-val="${escapeAttr(subKey)}" data-label="🏷️ ${escapeAttr(sub.name)} (${escapeAttr(ing.name)})" style="padding:5px 10px 5px 24px; font-size:11.5px; cursor:pointer; color:var(--text); border-bottom:1px solid rgba(0,0,0,0.03);">
+            <div class="wiz-tax-opt wiz-tax-sub" data-val="${escapeAttr(subKey)}" data-label="🏷️ ${escapeAttr(sub.name)}" style="padding:5px 10px 5px 24px; font-size:11.5px; cursor:pointer; color:var(--text); border-bottom:1px solid rgba(0,0,0,0.03);">
               ↳ 🏷️ ${escapeHtml(sub.name)}
             </div>
           `;
@@ -148,12 +321,38 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
             iIdx,
             initialName: currentIngName,
             onComplete: (created) => {
-              const combinedKey = `${created.ingredientId}:${created.subtypeId}`;
-              const displayLabel = `🏷️ ${created.subtypeName} (${created.parentName})`;
+              if (!created) return;
+              if (dropdownEl) dropdownEl.style.display = 'none';
+              if (created.category && !created.ingredientId && !created.rootItem) {
+                const combinedKey = `cat:${created.category}`;
+                const displayLabel = `📂 [Category] ${created.category}`;
+                inputEl.dataset.taxVal = combinedKey;
+                inputEl.value = displayLabel;
+                inputEl.setAttribute('value', displayLabel);
+                inputEl.style.borderColor = '#10b981';
+                inputEl.style.backgroundColor = '#ecfdf5';
+                inputEl.style.color = 'var(--text,#1e293b)';
+                inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+                if (typeof onSelectCallback === 'function') {
+                  onSelectCallback(sIdx, iIdx, combinedKey, created);
+                }
+                return;
+              }
+              const ingId = created.ingredientId || created.rootItem?.id || created.id || 'custom';
+              const subId = created.subtypeId || created.subtype?.id || created.subtypeName || 'standard';
+              const parentName = created.parentName || created.rootItem?.name || created.rootItemName || currentIngName;
+              const subName = created.subtypeName || created.subtype?.name || parentName;
+              const combinedKey = `${ingId}:${subId}`;
+              const displayLabel = subName && subName !== parentName ? `🏷️ ${subName} (${parentName})` : `📦 ${parentName}`;
               inputEl.dataset.taxVal = combinedKey;
               inputEl.value = displayLabel;
+              inputEl.setAttribute('value', displayLabel);
+              inputEl.style.borderColor = '#10b981';
+              inputEl.style.backgroundColor = '#ecfdf5';
+              inputEl.style.color = 'var(--text,#1e293b)';
+              inputEl.dispatchEvent(new Event('change', { bubbles: true }));
               if (rowNameInput) {
-                rowNameInput.value = created.subtypeName;
+                rowNameInput.value = subName;
               }
               if (typeof onSelectCallback === 'function') {
                 onSelectCallback(sIdx, iIdx, combinedKey, created);

@@ -22,3 +22,15 @@ ui-debug.log
 # OS clutter
 .DS_Store
 Thumbs.db
+
+# Antigravity agent workflows & local tooling
+.agent/
+.agents/
+/plans/
+/todos/
+
+# Compound Engineering scratch space & local overrides
+.context/compound-engineering/
+.compound-engineering/*.local.yaml
+
+

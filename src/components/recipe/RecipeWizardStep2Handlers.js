@@ -4,50 +4,45 @@
  */
 
 import { wizardState, syncStep2InputsToState } from './RecipeWizardState.js';
-import { bindTaxonomyAutocompleteEvents } from './RecipeWizardTaxonomySearch.js';
+import { bindTaxonomyAutocompleteEvents, isIngredientUnlinked } from './RecipeWizardTaxonomySearch.js';
 import { promptRecipeWizardAliases } from './RecipeWizardAliasesPrompt.js';
-import * as NutritionService from '../../services/NutritionService.js';
-import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
 import { getState } from '../../store/store.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
-
-/**
- * Recalculates per-serving macros and fit score for the active wizard recipe.
- */
-function recalculateWizardMacros(rec) {
-  if (!rec) return;
-
-  const targetServings = Number(rec.targetServings || rec.serves || 2);
-  const storeState = getState();
-  const products = storeState.products || [];
-
-  const allIngredients = (rec.ingredientSections || []).flatMap(s => s.ingredients || []);
-  const nutritionList = allIngredients.map(ing => {
-    const prodId = ing.productId || ing.mappedItemId || ing.productMatch?.id;
-    const product = prodId ? products.find(p => String(p.id) === String(prodId)) : null;
-    if (!product) return { kcal: 0, prot: 0, carb: 0, fat: 0 };
-    return NutritionService.calculateItemNutrition(product, ing.scaledQty || ing.qty, ing.unit);
-  });
-
-  const rolled = NutritionService.rollupNutritionTotals(nutritionList, targetServings);
-  
-  rec.macros = {
-    calories: Math.round(rolled.perServing?.cal || rolled.perServing?.kcal || 0),
-    protein: Math.round((rolled.perServing?.prot || rolled.perServing?.protein || 0) * 10) / 10,
-    carbs: Math.round((rolled.perServing?.carb || rolled.perServing?.carbs || 0) * 10) / 10,
-    fat: Math.round((rolled.perServing?.fat || 0) * 10) / 10
-  };
-
-  // Recompute fit score
-  const fitResult = calculateMealFitScore(rec, rec.mealSuitability?.[0] || 'dinner');
-  rec.fitScore = fitResult.score;
-  rec.fitTier = fitResult.tier;
-}
+import { recalculateWizardMacros } from './RecipeWizardStep3Handlers.js';
+import { renderMacroBreakdownCrossbar } from './RecipeWizardStep3View.js';
+import { renderFitScoreBadge } from '../FitScoreBadge.js';
+import { renderStep2MacrosSummaryHTML } from './RecipeWizardStep2View.js';
 
 export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice }) {
   if (!modalWrap || wizardState.currentStep !== 2) return;
 
+  const updateLiveStep2NutritionDOM = () => {
+    syncStep2InputsToState(modalWrap);
+    recalculateWizardMacros(wizardState.activeRecipe);
+
+    const fitContainer = modalWrap.querySelector('#wiz-step2-fit-badge-container');
+    const macroBarContainer = modalWrap.querySelector('#wiz-step2-macro-crossbar-container');
+    const summaryContainer = modalWrap.querySelector('#wiz-step2-macros-summary-container');
+
+    const currentVariant = wizardState.activeVariant || 'original';
+    const targetMealType = wizardState.activeRecipe?.mealSuitability?.[0] || wizardState.activeRecipe?.types?.[0] || wizardState.activeRecipe?.type || 'dinner';
+
+    if (fitContainer) {
+      fitContainer.innerHTML = renderFitScoreBadge(wizardState.activeRecipe, targetMealType, {
+        variant: currentVariant,
+        showLabel: true
+      });
+    }
+    if (macroBarContainer) {
+      macroBarContainer.innerHTML = renderMacroBreakdownCrossbar(wizardState.activeRecipe, currentVariant);
+    }
+    if (summaryContainer) {
+      summaryContainer.innerHTML = renderStep2MacrosSummaryHTML(wizardState.activeRecipe);
+    }
+  };
+
   const safeRender = () => {
+    syncStep2InputsToState(modalWrap);
     recalculateWizardMacros(wizardState.activeRecipe);
     const wb = document.getElementById('wizard-modal-body') || document.querySelector('.modal-body');
     const st = wb ? wb.scrollTop : 0;
@@ -56,67 +51,26 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
     if (newWb) newWb.scrollTop = st;
   };
 
-  const targetServingsInput = modalWrap.querySelector('#wiz-target-servings-input');
-  const scaleDownBtn = modalWrap.querySelector('#wiz-scale-down-btn');
-  const scaleUpBtn = modalWrap.querySelector('#wiz-scale-up-btn');
-  const scaleFactorBadge = modalWrap.querySelector('#wiz-scale-factor-badge');
+  // Live input delegation on table inputs: qty, unit, name, water ml, servings
+  modalWrap.addEventListener('input', (e) => {
+    if (e.target && e.target.matches('.wiz-ing-qty, .wiz-ing-unit, .wiz-ing-name, .wiz-ing-water-ml, #wiz-servings-input')) {
+      updateLiveStep2NutritionDOM();
+    }
+  });
 
-  const updateServingsScale = (newServings) => {
-    const rec = wizardState.activeRecipe || {};
-    const baseServings = Number(rec.servings || rec.currentServings) || 2;
-    const targetServings = Math.max(1, Math.min(24, parseInt(newServings, 10) || baseServings));
+  modalWrap.addEventListener('change', (e) => {
+    if (e.target && e.target.matches('.wiz-ing-qty, .wiz-ing-unit, .wiz-ing-name, .wiz-ing-water-ml, #wiz-servings-input')) {
+      updateLiveStep2NutritionDOM();
+    }
+  });
 
-    wizardState.targetServings = targetServings;
-    rec.targetServings = targetServings;
-
-    if (targetServingsInput) targetServingsInput.value = targetServings;
-
-    const newScale = targetServings / baseServings;
-    if (scaleFactorBadge) scaleFactorBadge.textContent = `${newScale.toFixed(2)}x`;
-
-    modalWrap.querySelectorAll('.wiz-ing-qty').forEach(input => {
-      const sIdx = parseInt(input.dataset.sidx, 10);
-      const iIdx = parseInt(input.dataset.iidx, 10);
-      const baseQty = parseFloat(input.dataset.baseQty) || parseFloat(input.value) || 1;
-      const scaledQty = Math.round(baseQty * newScale * 100) / 100;
-      input.value = scaledQty;
-
-      const item = rec.ingredientSections[sIdx]?.ingredients[iIdx];
-      if (item) {
-        item.scaledQty = scaledQty;
-        item.baseQty = baseQty;
-      }
-    });
-
-    modalWrap.querySelectorAll('.wiz-ing-water-ml').forEach(input => {
-      const sIdx = parseInt(input.dataset.sidx, 10);
-      const iIdx = parseInt(input.dataset.iidx, 10);
-      const item = rec.ingredientSections[sIdx]?.ingredients[iIdx];
-      if (item && item.baseWaterMl) {
-        const scaledWater = Math.round(item.baseWaterMl * newScale);
-        input.value = scaledWater;
-        item.waterMl = scaledWater;
-      }
-    });
-
-    recalculateWizardMacros(wizardState.activeRecipe);
-  };
-
-  if (targetServingsInput) {
-    targetServingsInput.oninput = (e) => updateServingsScale(e.target.value);
-  }
-
-  if (scaleDownBtn) {
-    scaleDownBtn.onclick = () => {
-      const current = parseInt(targetServingsInput?.value, 10) || (wizardState.activeRecipe.targetServings || 4);
-      if (current > 1) updateServingsScale(current - 1);
-    };
-  }
-
-  if (scaleUpBtn) {
-    scaleUpBtn.onclick = () => {
-      const current = parseInt(targetServingsInput?.value, 10) || (wizardState.activeRecipe.targetServings || 4);
-      if (current < 24) updateServingsScale(current + 1);
+  const servingsInput = modalWrap.querySelector('#wiz-servings-input');
+  if (servingsInput) {
+    servingsInput.oninput = (e) => {
+      const val = Math.max(1, parseInt(e.target.value, 10) || 4);
+      wizardState.activeRecipe.servings = val;
+      wizardState.activeRecipe.serves = val;
+      updateLiveStep2NutritionDOM();
     };
   }
 
@@ -200,9 +154,16 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
   bindTaxonomyAutocompleteEvents(modalWrap, (sIdx, iIdx, val) => {
     const item = wizardState.activeRecipe.ingredientSections[sIdx]?.ingredients[iIdx];
     if (item) {
+      // Clear previous direct product matches when changing taxonomy mapping
+      item.productId = null;
+      item.bankId = null;
+      delete item.mappedItemId;
+      delete item.productMatch;
+
       if (!val || val === 'new_item') {
         item.ingredientId = null;
         item.subtypeId = null;
+        item.categoryId = null;
         item.isNewTaxonomyItem = true;
       } else if (val.startsWith('cat:')) {
         item.categoryId = val.replace('cat:', '');
@@ -213,10 +174,12 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
         const [ingId, subId] = val.split(':');
         item.ingredientId = ingId;
         item.subtypeId = subId;
+        item.categoryId = null;
         item.isNewTaxonomyItem = false;
       } else {
         item.ingredientId = val;
         item.subtypeId = null;
+        item.categoryId = null;
         item.isNewTaxonomyItem = false;
       }
     }
@@ -227,6 +190,9 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
   if (btnNext2) {
     btnNext2.onclick = () => {
       syncStep2InputsToState(modalWrap);
+      const finalServings = Number(wizardState.activeRecipe.servings || wizardState.activeRecipe.serves || 4) || 4;
+      wizardState.activeRecipe.servings = finalServings;
+      wizardState.activeRecipe.serves = finalServings;
       
       // Auto-format all section headers to Title Case
       if (wizardState.activeRecipe.ingredientSections) {
@@ -235,8 +201,11 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
         });
       }
 
+      const state = getState() || {};
+      const prods = state.products || [];
+      const ings = state.rootItems || state.ingredients || [];
       const allIngs = (wizardState.activeRecipe.ingredientSections || []).flatMap(s => s.ingredients || []);
-      const unlinked = allIngs.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
+      const unlinked = allIngs.filter(i => isIngredientUnlinked(i, prods, ings));
       if (unlinked.length > 0) {
         showWizardNotice(`Cannot proceed: ${unlinked.length} ingredient(s) retain an unlinked "✨ New Item" status. Please map each ingredient to a valid Category, Item, or Sub-Type.`, 'warning');
         return;

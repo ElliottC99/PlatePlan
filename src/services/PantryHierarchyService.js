@@ -62,7 +62,7 @@ export function enforceCategorySSOT(state = {}) {
 /**
  * Compares two products based on a specific strategy (price, protein, kcal, etc).
  */
-export function compareProductsByStrategy(a, b, criterion = 'lowest_absolute_price') {
+export function compareProductsByStrategy(a, b, criterion = 'highest_protein_per_kcal') {
   const normCrit = String(criterion || 'lowest_absolute_price').toLowerCase().replace(/-/g, '_');
   const priceA = Number(a?.price ?? a?.cost ?? 0), priceB = Number(b?.price ?? b?.cost ?? 0);
   const safePriceA = isNaN(priceA) || priceA < 0 ? 0 : priceA, safePriceB = isNaN(priceB) || priceB < 0 ? 0 : priceB;
@@ -109,20 +109,29 @@ export function compareProductsByStrategy(a, b, criterion = 'lowest_absolute_pri
 export function resolveDefaultProduct(item, products = []) {
   if (!item) return null;
   const list = Array.isArray(products) ? products : Object.values(products || {});
-  const autoDefault = list.find(p =>
-    (String(p.ingredientId) === String(item.id) || String(p.subtypeId) === String(item.id) || String(p.groupId) === String(item.id)) &&
-    (p.isAutoDefault === true || p.is_default === true)
-  );
-  if (autoDefault) return { ...autoDefault, isAutoDefault: true };
+
+  // 1. If ingredient explicitly specifies defaultProductId, that product is the designated default
   if (item.defaultProductId) {
     const matched = list.find(p => String(p.id) === String(item.defaultProductId));
     if (matched) return { ...matched, isAutoDefault: true };
   }
-  const linked = list.filter(p => String(p.ingredientId) === String(item.id) || String(p.subtypeId) === String(item.id) || String(p.groupId) === String(item.id));
+
+  // 2. Candidate pool for this ingredient or subtype
+  const linked = list.filter(p =>
+    String(p.ingredientId) === String(item.id) ||
+    String(p.subtypeId) === String(item.id) ||
+    String(p.groupId) === String(item.id)
+  );
   const pool = linked.length > 0 ? linked : list;
+
   if (pool.length > 0) {
-    const state = getState();
-    const criterion = state.settings?.autoDefaultStrategy || state.settings?.autoDefaultCriterion || state.userPrefs?.autoDefaultStrategy || state.userPrefs?.autoDefaultCriterion || 'lowest_absolute_price';
+    const state = typeof getState === 'function' ? getState() : {};
+    const criterion = state?.settings?.autoDefaultStrategy
+      || state?.settings?.autoDefaultCriterion
+      || state?.userPrefs?.autoDefaultStrategy
+      || state?.userPrefs?.autoDefaultCriterion
+      || state?.userPrefs?.productPriority
+      || 'highest_protein_per_kcal';
     const sorted = [...pool].sort((a, b) => compareProductsByStrategy(a, b, criterion));
     return { ...sorted[0], isAutoDefault: true };
   }

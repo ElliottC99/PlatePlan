@@ -10,6 +10,8 @@ import { isRecipeVariantFavourite } from '../views/RecipeVaultView.js';
 import { calculateMealFitScore, getFitScoreTierMeta, extractRecipeMacros } from '../utils/fitScoreCalculator.js';
 import { resolveMealSplitPercentages } from '../utils/nutritionCalculator.js';
 import { getState } from '../store/store.js';
+import { openEnhancementModal } from '../components/recipe/RecipeEnhancementModalUI.js';
+import { saveRecipe } from './HouseholdRepository.js';
 
 let previewState = {
   recipe: null,
@@ -325,6 +327,111 @@ export function openRecipeModal(recipeId, instanceId, variant, targetPerson, mea
 }
 export const viewRecipe = openRecipePreview;
 
+export async function openEnhanceRecipeModalForCurrent(recipeId) {
+  const state = (typeof window !== 'undefined' ? getState() : {}) || {};
+  const recipes = Array.isArray(state.recipes) ? state.recipes : [];
+  const found = recipes.find(rec => String(rec.id) === String(recipeId)) || previewState.recipe;
+  if (!found) return;
+
+  openEnhancementModal(found, {
+    onApply: async (enhancedPayload) => {
+      const updatedRecipe = {
+        ...found,
+        enhanced: enhancedPayload,
+        updatedAt: new Date().toISOString()
+      };
+      try {
+        await saveRecipe(updatedRecipe);
+        if (state.recipes) {
+          const idx = state.recipes.findIndex(r => String(r.id) === String(found.id));
+          if (idx !== -1) {
+            state.recipes[idx] = updatedRecipe;
+          }
+        }
+        previewState.recipe = updatedRecipe;
+        previewState.currentTab = 'enhanced';
+        if (typeof window.renderRecipeVault === 'function') {
+          window.renderRecipeVault();
+        }
+        renderRecipePreview();
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast('✨ Enhanced recipe saved with 85+ Fit Score!');
+        }
+      } catch (err) {
+        console.error('[RecipeDetailModalService] Failed saving enhanced recipe:', err);
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast('Failed to save enhanced recipe.', 'error');
+        }
+      }
+    }
+  });
+}
+
+export async function removeCurrentEnhancedVariant(recipeId) {
+  const state = (typeof window !== 'undefined' ? getState() : {}) || {};
+  const recipes = Array.isArray(state.recipes) ? state.recipes : [];
+  const r = previewState.recipe || recipes.find(rec => String(rec.id) === String(recipeId));
+  if (!r) return;
+
+  const { renderDeleteConfirmationContent } = await import('../components/vault/VaultRecipeCardRenderService.js');
+  const recipeTitle = r.name || r.title || 'this recipe';
+
+  const content = document.getElementById('view-modal-content');
+  if (!content) return;
+
+  content.innerHTML = renderDeleteConfirmationContent(recipeTitle, 'enhanced');
+
+  const cancelBtn = content.querySelector('#btn-cancel-vault-del');
+  if (cancelBtn) {
+    cancelBtn.onclick = () => {
+      renderRecipePreview();
+    };
+  }
+
+  const confirmBtn = content.querySelector('#btn-confirm-vault-del');
+  if (confirmBtn) {
+    confirmBtn.onclick = async () => {
+      try {
+        const { deleteRecipeVariant } = await import('./HouseholdRepository.js');
+        await deleteRecipeVariant(recipeId, 'enhanced');
+
+        if (previewState.recipe && String(previewState.recipe.id) === String(recipeId)) {
+          delete previewState.recipe.enhanced;
+          delete previewState.recipe.enhancedFitScore;
+          if (previewState.recipe.variants) delete previewState.recipe.variants.enhanced;
+          previewState.recipe._bestVariant = 'original';
+        }
+
+        const found = recipes.find(rec => String(rec.id) === String(recipeId));
+        if (found) {
+          delete found.enhanced;
+          delete found.enhancedFitScore;
+          if (found.variants) delete found.variants.enhanced;
+          found._bestVariant = 'original';
+        }
+
+        const favList = state.userPrefs?.variantFavourites;
+        if (Array.isArray(favList)) {
+          const idx = favList.indexOf(`${recipeId}_enhanced`);
+          if (idx !== -1) favList.splice(idx, 1);
+        }
+
+        previewState.currentTab = 'original';
+        renderRecipePreview();
+
+        document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: state.recipes }));
+        if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast(`Removed enhanced variant from "${recipeTitle}"`);
+        }
+      } catch (err) {
+        console.error('[RecipeDetailModalService] Error removing enhanced variant:', err);
+        renderRecipePreview();
+      }
+    };
+  }
+}
+
 if (typeof window !== 'undefined') {
   Object.assign(window, {
     closeRecipePreview,
@@ -334,6 +441,8 @@ if (typeof window !== 'undefined') {
     updateSinglePersonServes,
     openRecipePreview,
     openRecipeModal,
-    viewRecipe
+    viewRecipe,
+    openEnhanceRecipeModalForCurrent,
+    removeCurrentEnhancedVariant
   });
 }

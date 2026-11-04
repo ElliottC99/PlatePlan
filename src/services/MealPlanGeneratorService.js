@@ -29,6 +29,42 @@ export function detectPrimaryProteinKeyword(recipe) {
 }
 
 /**
+ * Meal type of a slot key such as "dinnerE": breakfast, lunch, snack or dinner, or '' if none.
+ */
+export function getMealTypeFromSlotKey(slotKey) {
+  const s = String(slotKey || '').toLowerCase();
+  if (s.includes('breakfast')) return 'breakfast';
+  if (s.includes('lunch')) return 'lunch';
+  if (s.includes('snack')) return 'snack';
+  if (s.includes('dinner')) return 'dinner';
+  return '';
+}
+
+// "id::enhanced" → { id, variant: 'enhanced' }; anything else is the original variant.
+function parsePlanRecipeValue(value) {
+  const text = String(value || '');
+  if (text.endsWith('::enhanced')) return { id: text.slice(0, -10), variant: 'enhanced' };
+  return { id: text, variant: 'original' };
+}
+
+/**
+ * A new planned slot for one recipe, in the shape generateMealPlan builds.
+ */
+export function makePlanSlot(recipeId, variant = 'original') {
+  const clean = parsePlanRecipeValue(recipeId);
+  return {
+    id: clean.id,
+    recipeId: clean.id,
+    variant: variant === 'enhanced' || clean.variant === 'enhanced' ? 'enhanced' : 'original',
+    instanceId: 'pm-' + Date.now() + Math.random().toString(36).substring(2, 7),
+    isSkipped: false,
+    skipped: false,
+    isSplit: false,
+    pinned: false
+  };
+}
+
+/**
  * Resolves planned slot data into full recipe information.
  */
 export function getPlanSlotInfo(slotData) {
@@ -71,15 +107,65 @@ export function getPlannedSlotNutrition(activeRecipe, slotKey = 'dinnerE', insta
 }
 
 /**
+ * Extracts recipe usage within a recent window (default 30 days) across active & historical meal plans.
+ * Returns a Map of recipeId -> { dateTime, dateStr }
+ */
+export function getRecentRecipeUsageMap(planHistory = [], currentPlan = null, windowDays = 30) {
+  const usageMap = new Map();
+  const now = new Date();
+  const cutoffTime = now.getTime() - (windowDays * 24 * 60 * 60 * 1000);
+
+  const processPlan = (plan) => {
+    if (!plan || !plan.slots || typeof plan.slots !== 'object') return;
+    const dayDates = plan.dayDates || {};
+    const planStartDate = plan.startDate ? new Date(plan.startDate).getTime() : 0;
+
+    Object.entries(plan.slots).forEach(([dKey, daySlot]) => {
+      if (!daySlot || typeof daySlot !== 'object') return;
+      const dateStr = dayDates[dKey] || (planStartDate ? new Date(planStartDate + ((Number(dKey) - 1) * 86400000)).toISOString().split('T')[0] : null);
+      const dateTime = dateStr ? new Date(dateStr).getTime() : (plan.updatedAt ? new Date(plan.updatedAt).getTime() : now.getTime());
+
+      if (dateTime >= cutoffTime) {
+        const recordSlot = (slot) => {
+          if (!slot || slot.isSkipped || slot.skipped) return;
+          const rId = slot.recipeId || slot.id;
+          if (rId) {
+            const existing = usageMap.get(rId);
+            if (!existing || dateTime > existing.dateTime) {
+              usageMap.set(rId, { dateTime, dateStr });
+            }
+          }
+          if (slot.elliott && typeof slot.elliott === 'object') recordSlot(slot.elliott);
+          if (slot.chloe && typeof slot.chloe === 'object') recordSlot(slot.chloe);
+        };
+        Object.values(daySlot).forEach(recordSlot);
+      }
+    });
+  };
+
+  if (currentPlan) processPlan(currentPlan);
+  if (Array.isArray(planHistory)) {
+    planHistory.forEach(p => processPlan(p));
+  }
+
+  return usageMap;
+}
+
+/**
  * Generates an automated household meal plan adhering to cadence, macros, and preferences.
  */
 export function generateMealPlan(options = {}) {
-  const days = Number(options.days ?.plannerDays ?.plan?.days || 7);
-  const startDateStr = options.startDate ?.plannerStartDate || new Date().toISOString().split('T')[0];
-  const cadence = options.cadence ?.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
-  const minFitScore = Number(options.minFitScore !== undefined ? options.minFitScore : (getState()?.prefs?.minFitScore || 0));
-  const maxFitScore = Number(options.maxFitScore !== undefined ? options.maxFitScore : (getState()?.prefs?.maxFitScore || 100));
-  const skeletonGrid = options.skeletonGrid ?.skeletonGrid || {};
+  // Length and start: the caller's, then the Step 1 form's, then the loaded plan's (which Step 1
+  // shows when the form is untouched), then 7 days from today.
+  const state = getState() || {};
+  const loadedPlan = state.currentPlan || {};
+  const days = Number(options.days || state.currentPlannerDays || loadedPlan.days || 10) || 10;
+  const startDateStr = options.startDate || state.currentPlannerStartDate || loadedPlan.dayDates?.[1]
+    || loadedPlan.startDate || new Date().toISOString().split('T')[0];
+  const cadence = options.cadence || state.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
+  const minFitScore = Number(options.minFitScore !== undefined ? options.minFitScore : (state.prefs?.minFitScore || 0));
+  const maxFitScore = Number(options.maxFitScore !== undefined ? options.maxFitScore : (state.prefs?.maxFitScore || 100));
+  const skeletonGrid = options.skeletonGrid || state.skeletonGrid || {};
   const rawRecipes = Array.isArray(options.recipes) ? options.recipes : (getState()?.recipes || []);
   const allRecipes = [];
   rawRecipes.forEach(r => {
@@ -110,8 +196,14 @@ export function generateMealPlan(options = {}) {
     dayDates[d] = cur.toISOString().split('T')[0];
   }
 
+  const recentUsageMap = options.recentRecipeUsageMap || getRecentRecipeUsageMap(
+    options.planHistory || state.planHistory || [],
+    state.currentPlan,
+    options.cooldownDays !== undefined ? options.cooldownDays : 30
+  );
+
   const getFilteredRecipes = (type) => {
-    return allRecipes.filter(r => {
+    const matching = allRecipes.filter(r => {
       const types = (r.types || [r.type || 'dinner']).map(t => String(t).toLowerCase());
       if (!types.includes(type)) return false;
       const scoreObj = calculateMealFitScore(r, type, { activeProfile: 'everyone' });
@@ -119,6 +211,28 @@ export function generateMealPlan(options = {}) {
       if (score < minFitScore || score > maxFitScore) return false;
       return true;
     });
+
+    if (recentUsageMap && recentUsageMap.size > 0 && matching.length > 0) {
+      const freshCandidates = matching.filter(r => !recentUsageMap.has(r.id) && !recentUsageMap.has(r.originalId));
+      const neededSlots = Math.ceil(days / (cadence[type] || 2));
+
+      // If fresh pool is sufficient, strictly use fresh candidates
+      if (freshCandidates.length >= neededSlots) {
+        return freshCandidates;
+      }
+
+      // Graceful fallback: append used candidates sorted by least recently used (oldest first)
+      const usedCandidates = matching.filter(r => recentUsageMap.has(r.id) || recentUsageMap.has(r.originalId));
+      usedCandidates.sort((a, b) => {
+        const timeA = (recentUsageMap.get(a.id) || recentUsageMap.get(a.originalId))?.dateTime || 0;
+        const timeB = (recentUsageMap.get(b.id) || recentUsageMap.get(b.originalId))?.dateTime || 0;
+        return timeA - timeB;
+      });
+
+      return [...freshCandidates, ...usedCandidates];
+    }
+
+    return matching;
   };
 
   const breakfasts = getFilteredRecipes('breakfast').length ? getFilteredRecipes('breakfast') : allRecipes;
@@ -226,6 +340,7 @@ export function generateMealPlan(options = {}) {
     startDate: startDateStr,
     dayDates,
     slots,
+    cadence,
     skeletonGrid,
     mealPrepGroups,
     createdAt: new Date().toISOString()
@@ -238,7 +353,11 @@ export function generateMealPlan(options = {}) {
 export async function generatePlan() {
   if (typeof window === 'undefined') return;
   try {
-    const plan = generateMealPlan();
+    // The Step 1 day count and start date, as the old runtime's generate read them.
+    const plan = generateMealPlan({
+      days: getState()?.currentPlannerDays,
+      startDate: getState()?.currentPlannerStartDate
+    });
     if (getState()) {
       getState().currentPlan = plan;
       getState().currentPlannerStep = 2;

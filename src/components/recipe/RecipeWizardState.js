@@ -4,6 +4,9 @@
  */
 
 import { toTitleCase } from '../../utils/stringUtils.js';
+import { getState } from '../../state/AppState.js';
+import { resolveProductForIngredient } from './RecipeWizardStep3Handlers.js';
+import { resolveHighestAutoDefaultTaxonomy } from './RecipeWizardTaxonomySearch.js';
 
 export const MEAL_TAGS = ['Breakfast', 'Lunch', 'Dinner', 'Snacking'];
 
@@ -18,8 +21,7 @@ export const wizardState = {
   currentQueueIndex: 0,
   activeRecipe: {
     title: '',
-    currentServings: 4,
-    targetServings: 4,
+    servings: 4,
     prepTime: { hours: 0, minutes: 15 },
     cookTime: { hours: 0, minutes: 30 },
     mealSuitability: ['Dinner'],
@@ -31,19 +33,20 @@ export const wizardState = {
     methodSteps: [],
     macros: { calories: 450, protein: 28, carbs: 40, fat: 16 },
     enhanced: null
-  }
+  },
+  baseOriginalRecipe: null
 };
 
 export function hasDistinctEnhancedVariant(recipe = wizardState.activeRecipe) {
   if (!recipe || !recipe.enhanced || typeof recipe.enhanced !== 'object') return false;
   
   const originalRecipe = {
-    ingredients: recipe.ingredients || (recipe.ingredientSections || []).flatMap(s => s.ingredients).map(i => ({ name: i.name, qty: i.scaledQty || i.qty, unit: i.unit })),
+    ingredients: recipe.ingredients || (recipe.ingredientSections || []).flatMap(s => s.ingredients).map(i => ({ name: i.name, qty: i.qty, unit: i.unit })),
     method: recipe.methodSteps || recipe.instructions || recipe.method || []
   };
   
   const enhancedRecipe = {
-    ingredients: recipe.enhanced.ingredients || (recipe.enhanced.ingredientSections || []).flatMap(s => s.ingredients).map(i => ({ name: i.name, qty: i.scaledQty || i.qty, unit: i.unit })),
+    ingredients: recipe.enhanced.ingredients || (recipe.enhanced.ingredientSections || []).flatMap(s => s.ingredients).map(i => ({ name: i.name, qty: i.qty, unit: i.unit })),
     method: recipe.enhanced.methodSteps || recipe.enhanced.instructions || recipe.enhanced.method || []
   };
 
@@ -57,6 +60,9 @@ export function hasDistinctEnhancedVariant(recipe = wizardState.activeRecipe) {
 }
 
 export function getSaveButtonLabel(recipe = wizardState.activeRecipe) {
+  if (wizardState.activeVariant === 'enhanced') {
+    return 'Save Enhanced Variant';
+  }
   return hasDistinctEnhancedVariant(recipe) ? 'Save Both Recipes' : 'Save Original Recipe';
 }
 
@@ -64,6 +70,7 @@ export function resetWizardState() {
   wizardState.currentStep = 0;
   wizardState.choice = 'manual';
   wizardState.activeVariant = 'original';
+  wizardState.baseOriginalRecipe = null;
   wizardState.bulkText = '';
   wizardState.processingQueue = [];
   wizardState.currentQueueTotal = 0;
@@ -71,8 +78,7 @@ export function resetWizardState() {
   wizardState.currentQueueIndex = 0;
   wizardState.activeRecipe = {
     title: '',
-    currentServings: 4,
-    targetServings: 4,
+    servings: 4,
     prepTime: { hours: 0, minutes: 15 },
     cookTime: { hours: 0, minutes: 30 },
     mealSuitability: ['Dinner'],
@@ -104,7 +110,12 @@ export function syncStep2InputsToState(modalWrap) {
     const iIdx = parseInt(input.dataset.iidx, 10);
     if (!isNaN(sIdx) && !isNaN(iIdx)) {
       const item = wizardState.activeRecipe.ingredientSections[sIdx]?.ingredients[iIdx];
-      if (item) item.scaledQty = parseFloat(input.value) || item.qty;
+      if (item) {
+        const val = parseFloat(input.value) || 0;
+        item.qty = val;
+        delete item.scaledQty;
+        delete item.baseQty;
+      }
     }
   });
 
@@ -135,36 +146,87 @@ export function syncStep2InputsToState(modalWrap) {
     if (!isNaN(sIdx) && !isNaN(iIdx)) {
       const item = wizardState.activeRecipe.ingredientSections[sIdx]?.ingredients[iIdx];
       if (item) {
-        const val = input.dataset.taxVal || (input.value.startsWith('✨') ? 'new_item' : input.value);
-        if (!val || val === 'new_item') {
+        const rawVal = input.dataset.taxVal || (input.value.startsWith('✨') ? 'new_item' : input.value);
+        const state = (typeof getState === 'function' ? getState() : (typeof window !== 'undefined' ? window.getState?.() : null)) || {};
+
+        if (!rawVal || rawVal === 'new_item') {
           item.ingredientId = null;
           item.subtypeId = null;
           item.categoryId = null;
+          item.productId = null;
+          item.bankId = null;
           item.isCategoryDefault = false;
           item.displayName = null;
           item.isNewTaxonomyItem = true;
-        } else if (val.startsWith('cat:')) {
-          item.categoryId = val.slice(4);
+        } else if (rawVal.startsWith('cat:')) {
+          item.categoryId = rawVal.slice(4);
           item.ingredientId = null;
           item.subtypeId = null;
+          item.productId = null;
+          item.bankId = null;
           item.isCategoryDefault = true;
           item.displayName = `Generic ${item.categoryId}`;
           item.isNewTaxonomyItem = false;
-        } else if (val.includes(':')) {
-          const [ingId, subId] = val.split(':');
+        } else if (rawVal.startsWith('prod:')) {
+          const pId = rawVal.slice(5);
+          const prod = (state.products || []).find(p => String(p.id) === String(pId));
+          if (prod) {
+            const resolved = resolveHighestAutoDefaultTaxonomy(prod, {
+              ingredients: state.ingredients || state.rootItems || [],
+              products: state.products || []
+            });
+            if (resolved.level === 'category') {
+              item.categoryId = resolved.categoryId;
+              item.ingredientId = null;
+              item.subtypeId = null;
+              item.isCategoryDefault = true;
+            } else if (resolved.level === 'root') {
+              item.ingredientId = resolved.ingredientId;
+              item.subtypeId = null;
+              item.categoryId = null;
+              item.isCategoryDefault = false;
+            } else if (resolved.level === 'subtype') {
+              item.ingredientId = resolved.ingredientId;
+              item.subtypeId = resolved.subtypeId;
+              item.categoryId = null;
+              item.isCategoryDefault = false;
+            } else {
+              item.productId = pId;
+            }
+          } else {
+            item.productId = pId;
+          }
+          item.isNewTaxonomyItem = false;
+        } else if (rawVal.includes(':')) {
+          const [ingId, subId] = rawVal.split(':');
           item.ingredientId = ingId;
           item.subtypeId = subId;
           item.categoryId = null;
+          item.productId = null;
+          item.bankId = null;
           item.isCategoryDefault = false;
           item.displayName = null;
           item.isNewTaxonomyItem = false;
         } else {
-          item.ingredientId = val;
+          item.ingredientId = rawVal;
           item.subtypeId = null;
           item.categoryId = null;
+          item.productId = null;
+          item.bankId = null;
           item.isCategoryDefault = false;
           item.displayName = null;
           item.isNewTaxonomyItem = false;
+        }
+
+        // Dynamically resolve auto-default product for nutrition / display
+        if (!item.isNewTaxonomyItem && typeof resolveProductForIngredient === 'function') {
+          const autoDefProd = resolveProductForIngredient(item, {
+            products: state.products || [],
+            ingredients: state.ingredients || state.rootItems || []
+          });
+          if (autoDefProd) {
+            item.productName = autoDefProd.name || autoDefProd.productName;
+          }
         }
       }
     }
@@ -190,6 +252,25 @@ export function syncStep2InputsToState(modalWrap) {
   if (stepInputs.length > 0) {
     wizardState.activeRecipe.methodSteps = stepInputs.filter(Boolean);
   }
+
+  // Keep activeRecipe.ingredients and activeRecipe.enhanced in sync
+  if (wizardState.activeRecipe.ingredientSections) {
+    wizardState.activeRecipe.ingredients = wizardState.activeRecipe.ingredientSections.flatMap(s => s.ingredients || []);
+  }
+  if (wizardState.activeVariant === 'enhanced' && wizardState.activeRecipe.enhanced && typeof wizardState.activeRecipe.enhanced === 'object') {
+    wizardState.activeRecipe.enhanced.ingredientSections = wizardState.activeRecipe.ingredientSections;
+    wizardState.activeRecipe.enhanced.ingredients = wizardState.activeRecipe.ingredients;
+    if (wizardState.activeRecipe.methodSteps) {
+      wizardState.activeRecipe.enhanced.methodSteps = wizardState.activeRecipe.methodSteps;
+      wizardState.activeRecipe.enhanced.steps = wizardState.activeRecipe.methodSteps;
+      wizardState.activeRecipe.enhanced.method = wizardState.activeRecipe.methodSteps;
+      wizardState.activeRecipe.enhanced.instructions = wizardState.activeRecipe.methodSteps;
+    }
+    if (wizardState.activeRecipe.servings) {
+      wizardState.activeRecipe.enhanced.servings = wizardState.activeRecipe.servings;
+      wizardState.activeRecipe.enhanced.serves = wizardState.activeRecipe.servings;
+    }
+  }
 }
 
 export function syncStep3InputsToState(modalWrap) {
@@ -198,8 +279,12 @@ export function syncStep3InputsToState(modalWrap) {
   const title = modalWrap.querySelector('#wiz-rev-title')?.value?.trim();
   if (title) rec.title = title;
 
-  const serv = parseInt(modalWrap.querySelector('#wiz-rev-servings')?.value, 10);
-  if (serv > 0) rec.targetServings = serv;
+  const servInput = modalWrap.querySelector('#tp-serving-size') || modalWrap.querySelector('#wiz-rev-servings');
+  const serv = parseInt(servInput?.value, 10);
+  if (serv > 0) {
+    rec.servings = serv;
+    rec.serves = serv;
+  }
 
   const prepMins = parseInt(modalWrap.querySelector('#wiz-rev-prepm')?.value, 10) || 0;
   const cookMins = parseInt(modalWrap.querySelector('#wiz-rev-cookm')?.value, 10) || 0;

@@ -1,5 +1,5 @@
 /**
- * src/services/RecipeIngredientParser.js (v3.32.7)
+ * src/services/RecipeIngredientParser.js (v3.32.9)
  * Core ingredient string parsing, units, quantities, fractions, and taxonomy matching.
  */
 
@@ -9,6 +9,25 @@ import { convertToStrictUnit } from './UnitConversionService.js';
 export function toTitleCase(str) {
   if (!str) return '';
   return str.replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function parseFractionOrNumber(val) {
+  const s = String(val || '').trim();
+  const m = s.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (m) return parseFloat(m[1]) + (parseFloat(m[3]) > 0 ? parseFloat(m[2]) / parseFloat(m[3]) : 0);
+  const f = s.match(/^(\d+)\/(\d+)$/);
+  if (f) return parseFloat(f[2]) > 0 ? parseFloat(f[1]) / parseFloat(f[2]) : 0;
+  return parseFloat(s) || 0;
+}
+
+function extractServingQualifier(rawName) {
+  const text = String(rawName || '').trim();
+  const serveMatch = text.match(/(?:,\s*|\s*\()(?:\b(?:to\s+serve|for\s+serving|to\s+garnish|for\s+garnish|to\s+finish|for\s+finishing)\b)\)?$/i);
+  if (serveMatch) {
+    const cleaned = text.replace(/(?:,\s*|\s*\()(?:\b(?:to\s+serve|for\s+serving|to\s+garnish|for\s+garnish|to\s+finish|for\s+finishing)\b)\)?$/i, '').trim();
+    return { name: cleaned, notes: 'to serve', isToServe: true };
+  }
+  return { name: text, notes: '', isToServe: false };
 }
 
 export const UNICODE_FRACTIONS = {
@@ -28,7 +47,7 @@ export const UNIT_MAP = {
   handful: 'handful', handfuls: 'handful', bunch: 'bunch', bunches: 'bunch',
   pack: 'pack', packet: 'pack', packets: 'pack', package: 'pack', packages: 'pack', pkg: 'pack',
   head: 'head', heads: 'head', stalk: 'stalk', stalks: 'stalk', stick: 'stalk', sticks: 'stalk',
-  sprig: 'sprig', sprigs: 'sprig', dash: 'dash', dashes: 'dash', drizzle: 'dash', splash: 'dash',
+  sprig: 'sprig', sprigs: 'sprig', leaf: 'leaf', leaves: 'leaf', dash: 'dash', dashes: 'dash', drizzle: 'dash', splash: 'dash',
   drop: 'dash', drops: 'dash', oz: 'oz', ounce: 'oz', ounces: 'oz', lb: 'lb', lbs: 'lb', pound: 'lb', pounds: 'lb'
 };
 
@@ -39,6 +58,7 @@ export function parseQuantity(rawText) {
   let text = String(rawText || '').trim();
   if (!text) return { qty: 1, remainder: '' };
 
+  text = text.replace(/(\d+)\s*([½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])/g, '$1 $2');
   Object.keys(UNICODE_FRACTIONS).forEach(uf => {
     if (text.includes(uf)) {
       text = text.replace(new RegExp(uf, 'g'), UNICODE_FRACTIONS[uf]);
@@ -90,11 +110,11 @@ export function parseQuantity(rawText) {
     return { qty: parseFloat(countMultMatch[1]), remainder: countMultMatch[2].trim() };
   }
 
-  // Range e.g. "3-4" or "3 to 4"
-  const rangeMatch = text.match(/^(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)(.*)/i);
+  // Range with fractions, mixed numbers, or decimals e.g. "1/4 - 1/2", "1/4–1/2", "3-4", "1 1/2 to 2"
+  const rangeMatch = text.match(/^((?:\d+\s+)?\d+\/\d+|\d+(?:\.\d+)?)\s*(?:-|–|—|to)\s*((?:\d+\s+)?\d+\/\d+|\d+(?:\.\d+)?)\s*(.*)/i);
   if (rangeMatch) {
-    const q1 = parseFloat(rangeMatch[1]);
-    const q2 = parseFloat(rangeMatch[2]);
+    const q1 = parseFractionOrNumber(rangeMatch[1]);
+    const q2 = parseFractionOrNumber(rangeMatch[2]);
     const avg = (q1 + q2) / 2;
     return { qty: avg, remainder: rangeMatch[3].trim() };
   }
@@ -158,153 +178,257 @@ export function parseIngredientString(rawStr) {
   // Standalone multiplier guard: never allow orphaned multiplier rows
   if (/^\d+(?:\.\d+)?\s*[xX]$/.test(s)) return null;
 
-  // 1. Package multiplier with parenthetical weight e.g. "1 x pack plant-based chicken pieces (about 160g)"
-  const parenMult = s.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s+(?:of\s+)?(.*?)\s*\((?:about|approx\.?)?\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l)\)/i);
+  // Insert space between integer and unicode fraction: "1½" -> "1 ½"
+  let clean = s.replace(/(\d+)\s*([½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])/g, '$1 $2');
+  Object.keys(UNICODE_FRACTIONS).forEach(uf => {
+    if (clean.includes(uf)) {
+      clean = clean.replace(new RegExp(uf, 'g'), UNICODE_FRACTIONS[uf]);
+    }
+  });
+
+  // 1. Loose measures without leading numbers e.g. "handful of parsley", "pinch of black pepper", "drizzle of olive oil"
+  const looseMatch = clean.match(/^(?:a\s+)?(handful|handfuls|pinch|pinches|bunch|bunches|drizzle|drizzles|dash|dashes|splash|splashes)\s+(?:of\s+)?(.*)/i);
+  if (looseMatch) {
+    const u = looseMatch[1].toLowerCase();
+    const rawName = looseMatch[2].trim();
+    const servingInfo = extractServingQualifier(rawName);
+    const normalised = convertToStrictUnit(1, u, servingInfo.name);
+    return {
+      raw: s,
+      qty: normalised.qty,
+      unit: normalised.unit,
+      isEstimated: normalised.isEstimated,
+      name: toTitleCase(servingInfo.name),
+      notes: servingInfo.notes,
+      isToServe: servingInfo.isToServe
+    };
+  }
+
+  // 2. Package multiplier with parenthetical weight e.g. "1 x pack plant-based chicken pieces (about 160g)"
+  const parenMult = clean.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s+(?:of\s+)?(.*?)\s*\((?:about|approx\.?)?\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l)\)/i);
   if (parenMult) {
     const mult = parseFloat(parenMult[1]) || 1;
     const innerWeight = parseFloat(parenMult[3]) || 0;
     const nameClean = parenMult[2].trim();
-    const normalised = convertToStrictUnit(mult * innerWeight, parenMult[4], nameClean);
+    const servingInfo = extractServingQualifier(nameClean);
+    const normalised = convertToStrictUnit(mult * innerWeight, parenMult[4], servingInfo.name);
+    const baseNotes = `${mult} pack (${innerWeight}${parenMult[4]})`;
     return {
       raw: s,
       qty: normalised.qty,
       unit: normalised.unit,
       isEstimated: normalised.isEstimated,
-      name: toTitleCase(nameClean),
-      notes: normalised.isEstimated ? 'Est. Weight' : `${mult} pack (${innerWeight}${parenMult[4]})`
+      name: toTitleCase(servingInfo.name),
+      notes: servingInfo.isToServe ? `${baseNotes}, to serve` : baseNotes,
+      isToServe: servingInfo.isToServe
     };
   }
 
-  // 2. Explicit unit multiplier e.g. "2 x 280g blocks extra-firm tofu", "1 x 400g tin black beans"
-  const compMatch = s.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tbsp|tablespoons?|tsp|teaspoons?|cups?|oz|fl\s*oz|lbs?|pinch|cm)\b\s*(?:(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s*(?:of\s*)?)?(.*)/i);
+  // 3. Explicit unit multiplier e.g. "2 x 400g tins best-quality Italian chopped tomatoes", "1 x 280g tin jackfruit in water"
+  const compMatch = clean.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tbsp|tablespoons?|tsp|teaspoons?|cups?|oz|fl\s*oz|lbs?|pinch|cm)\b\s*(?:(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s*(?:of\s*)?)?(.*)/i);
   if (compMatch) {
     const multComp = parseFloat(compMatch[1]) || 1;
     const baseWeight = parseFloat(compMatch[2]) || 0;
     const rawName = (compMatch[4] || '').replace(/^(?:blocks?|packs?|tins?|cans?)\s*(?:of\s*)?/i, '').trim();
-    const normalised = convertToStrictUnit(multComp * baseWeight, compMatch[3], rawName);
+    const servingInfo = extractServingQualifier(rawName);
+    const normalised = convertToStrictUnit(multComp * baseWeight, compMatch[3], servingInfo.name);
+    const baseNotes = `${multComp} x ${baseWeight}${compMatch[3]}`;
     return {
       raw: s,
       qty: normalised.qty,
       unit: normalised.unit,
       isEstimated: normalised.isEstimated,
-      name: toTitleCase(rawName),
-      notes: normalised.isEstimated ? 'Est. Weight' : `${multComp} x ${baseWeight}${compMatch[3]}`
+      name: toTitleCase(servingInfo.name),
+      notes: servingInfo.isToServe ? `${baseNotes}, to serve` : baseNotes,
+      isToServe: servingInfo.isToServe
     };
   }
 
-  // 3. Standard match with strict word boundary on unit
-  const stdMatch = s.match(/^(\d+(?:\.\d+)?(?:\s*[-–]\s*\d+(?:\.\d+)?)?)\s*(g|kg|ml|l|tbsp|tablespoons?|tsp|teaspoons?|cups?|oz|fl\s*oz|lbs?|pinch|cm)\b\s*(.*)/i);
-  if (stdMatch) {
-    let rawQty = stdMatch[1];
-    let qtyStd = parseFloat(rawQty);
-    if (rawQty.includes('-') || rawQty.includes('–')) {
-      const parts = rawQty.split(/[-–]/).map(p => parseFloat(p.trim()));
-      qtyStd = (parts[0] + parts[1]) / 2;
+  // 3.5. Dimensioned root/produce items e.g. "2.5cm piece of fresh ginger", "1 inch piece of ginger", "thumb-sized piece of ginger"
+  const dimMatch = clean.match(/^(\d+(?:\.\d+)?)\s*(cm|inch(?:es)?|in\.?)\s*(?:piece(?:\s+of)?|chunk(?:\s+of)?|slice(?:\s+of)?)?\s+(?:of\s+)?(.*)/i);
+  const thumbMatch = !dimMatch && clean.match(/^(?:a\s+)?(\d+(?:\.\d+)?\s*)?(?:thumb(?:-sized)?(?:\s+piece)?)\s+(?:of\s+)?(.*)/i);
+
+  if (dimMatch || thumbMatch) {
+    let dimVal = 1;
+    let dimUnit = 'cm';
+    let rawName = '';
+
+    if (dimMatch) {
+      dimVal = parseFloat(dimMatch[1]) || 1;
+      dimUnit = dimMatch[2].toLowerCase().startsWith('in') ? 'inch' : 'cm';
+      rawName = dimMatch[3].trim();
+    } else {
+      const count = parseFloat(thumbMatch[1]) || 1;
+      dimVal = count * 2.5; // 1 thumb ≈ 2.5cm / 1 inch
+      dimUnit = 'cm';
+      rawName = thumbMatch[2].trim();
     }
-    const rawName = (stdMatch[3] || '').trim();
-    const normalised = convertToStrictUnit(qtyStd, stdMatch[2], rawName);
+
+    const cmTotal = dimUnit === 'inch' ? dimVal * 2.54 : dimVal;
+    // Standard culinary conversion for ginger, turmeric, galangal: 1 cm ≈ 5g (2.5cm / 1 inch ≈ 12.5g)
+    const gramsPerCm = 5;
+    const calculatedGrams = Math.round(cmTotal * gramsPerCm * 10) / 10;
+    const cleanItemName = rawName.replace(/^(?:piece|chunk|slice)\s+(?:of\s+)?/i, '').trim();
+    const servingInfo = extractServingQualifier(cleanItemName);
+    const baseNotes = `${dimVal}${dimUnit} piece`;
+
     return {
       raw: s,
-      qty: normalised.qty,
-      unit: normalised.unit,
-      isEstimated: normalised.isEstimated,
-      name: toTitleCase(rawName),
-      notes: normalised.isEstimated ? 'Est. Weight' : ''
+      qty: calculatedGrams,
+      unit: 'g',
+      isEstimated: true,
+      name: toTitleCase(servingInfo.name),
+      notes: servingInfo.isToServe ? `${baseNotes}, to serve` : baseNotes,
+      isToServe: servingInfo.isToServe
     };
   }
 
-  // 4. Count quantity e.g. "2 garlic cloves", "1 lemon", "2 peppers"
-  const countMatch = s.match(/^(\d+(?:\.\d+)?(?:\s*[-–]\s*\d+(?:\.\d+)?)?)\s+(.*)/i);
-  if (countMatch) {
-    let rawCountQty = countMatch[1];
-    let qtyCount = parseFloat(rawCountQty);
-    if (rawCountQty.includes('-') || rawCountQty.includes('–')) {
-      const parts = rawCountQty.split(/[-–]/).map(p => parseFloat(p.trim()));
-      qtyCount = (parts[0] + parts[1]) / 2;
+  // 4. Standard parsed quantity with unit or count
+  const { qty, remainder } = parseQuantity(clean);
+  const unitMatch = remainder.match(/^([a-zA-Z]+)\b\s*(.*)/i);
+  let parsedUnit = 'qty';
+  let rawName = remainder;
+
+  if (unitMatch) {
+    const word = unitMatch[1].toLowerCase();
+    if (UNIT_MAP[word]) {
+      parsedUnit = UNIT_MAP[word];
+      rawName = (unitMatch[2] || '').replace(/^(?:of\s+|tins?\s+(?:of\s+)?|cans?\s+(?:of\s+)?|packs?\s+(?:of\s+)?)/i, '').trim();
     }
-    return {
-      raw: s,
-      qty: qtyCount || 1,
-      unit: 'qty',
-      name: toTitleCase((countMatch[2] || '').trim()),
-      notes: ''
-    };
   }
 
-  // 5. Unquantified descriptor fallback
+  // Trailing measurement unit check e.g. "4 rosemary sprigs", "3 thyme sprigs", "2 large bay leaves", "4 garlic cloves"
+  if (parsedUnit === 'qty') {
+    const trailingUnitMatch = remainder.match(/^(.*?)\s+(sprigs?|leaves?|leaf|cloves?|slices?|stalks?|heads?|bulbs?)\b(?:\s+(?:of\s+)?(.*))?$/i);
+    if (trailingUnitMatch) {
+      const uWord = trailingUnitMatch[2].toLowerCase();
+      if (UNIT_MAP[uWord]) {
+        parsedUnit = UNIT_MAP[uWord];
+        const prefix = trailingUnitMatch[1].trim();
+        const suffix = (trailingUnitMatch[3] || '').trim();
+        rawName = suffix ? `${prefix} ${suffix}`.trim() : prefix;
+      }
+    }
+  }
+
+  const servingInfo = extractServingQualifier(rawName || remainder);
+  const normalised = convertToStrictUnit(qty, parsedUnit, servingInfo.name);
   return {
     raw: s,
-    qty: 1,
-    unit: 'qty',
-    name: toTitleCase(s),
-    notes: ''
+    qty: normalised.qty,
+    unit: normalised.unit,
+    isEstimated: normalised.isEstimated,
+    name: toTitleCase(servingInfo.name),
+    notes: servingInfo.isToServe ? 'to serve' : '',
+    isToServe: servingInfo.isToServe
   };
+}
+
+export function normalizeTaxonomyName(str) {
+  if (!str) return '';
+  return String(str).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[,\(\)\/\"\'\:\;\-\–\—\.]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 export function stemIngredientName(rawName) {
   if (!rawName) return '';
-  let str = String(rawName).toLowerCase().trim();
-  str = str.replace(/\b(cloves?|heads?|bulbs?|block|blocks|diced|sliced|chopped|minced|fresh|raw|organic)\b/g, '').trim();
-  if (str.endsWith('ies')) str = str.slice(0, -3) + 'y';
-  else if (str.endsWith('es')) str = str.slice(0, -2);
-  else if (str.endsWith('s') && !str.endsWith('ss')) str = str.slice(0, -1);
+  let str = normalizeTaxonomyName(rawName).replace(/^\d+(?:\.\d+)?\s*(?:x\s*)?/, '').trim();
+  str = str.replace(/\b(cloves?|heads?|bulbs?|stalks?|sprigs?|leaves?|leaf|pieces?|pots?|tins?|cans?|jars?|packs?|packet?|boxes?|blocks?|bottles?|bags?|diced|sliced|chopped|minced|grated|crushed|ground|shredded|pitted|peeled|cracked|parboiled|toasted|roasted|pressed|mashed|fresh|dried|dry|raw|cooked|frozen|boiled|organic|unsweetened|sweetened|salted|unsalted|extra virgin|best quality|good quality|pure|natural|plant based|plant-based|vegan|vegetarian|large|small|medium|thick|thin|finely|roughly|coarsely|to serve|for frying|for dusting|optional|garnish)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  if (str.endsWith('potatoes') || str.endsWith('tomatoes')) str = str.slice(0, -2);
+  else if (str.endsWith('chillies')) str = str.slice(0, -3) + 'i';
+  else if (str.endsWith('ies')) str = str.slice(0, -3) + 'y';
+  else if (str.endsWith('es') && !str.endsWith('cheese')) str = str.slice(0, -2);
+  else if (str.endsWith('s') && !str.endsWith('ss') && !str.endsWith('is') && !str.endsWith('us')) str = str.slice(0, -1);
   return str.trim();
 }
 
+export const CANONICAL_COMPOUND_SYNONYMS = {
+  'coconut rice': 'jasmine rice',
+  'thai coconut rice': 'jasmine rice',
+  'curry rice': 'jasmine rice',
+  'garlic rice': 'jasmine rice'
+};
+
 /**
- * Cross-references parsed ingredient against existing Store items including aliases.
+ * Cross-references parsed ingredient against existing Store items including aliases and subtypes.
  */
 export function matchIngredientTaxonomy(parsedItem, existingIngredients = null) {
   if (!parsedItem) return null;
   const storeState = (typeof getState === 'function') ? getState() : {};
-  const ingredients = existingIngredients || storeState.ingredients || [];
-  
-  const rawNameLower = String(parsedItem.name || '').toLowerCase().trim();
-  const stemmed = stemIngredientName(rawNameLower);
+  const ingredients = (existingIngredients && existingIngredients.length) ? existingIngredients : (storeState.rootItems || storeState.ingredients || []);
+  const rawClean = (parsedItem.name || '').toLowerCase().trim();
+  const targetClean = CANONICAL_COMPOUND_SYNONYMS[rawClean] || rawClean;
+  const normParsed = normalizeTaxonomyName(targetClean);
+  const stemmedParsed = stemIngredientName(targetClean);
 
-  let matchedIng = null;
+  let bestMatch = null, bestScore = 0;
 
   for (const ing of ingredients) {
     if (!ing) continue;
-    const aliases = Array.isArray(ing.aliases) ? ing.aliases.map(a => String(a).toLowerCase().trim()) : [];
-    if (aliases.includes(rawNameLower) || aliases.includes(stemmed) || aliases.some(a => rawNameLower.includes(a) || a.includes(rawNameLower))) {
-      matchedIng = ing;
-      break;
+    const ingName = (ing.name || '').trim();
+    const normIng = normalizeTaxonomyName(ingName), stemmedIng = stemIngredientName(ingName);
+
+    if (normIng && normParsed === normIng) {
+      return { ...parsedItem, ingredientId: ing.id, subtypeId: null, matchedName: ing.name, matchedCategory: ing.category || 'General', isNewTaxonomyItem: false };
     }
 
-    if (ing.name) {
-      const ingNameLower = String(ing.name).toLowerCase().trim();
-      const ingStemmed = stemIngredientName(ingNameLower);
-      if (ingNameLower === rawNameLower || (stemmed && stemmed === ingStemmed) || ingNameLower.includes(stemmed) || stemmed.includes(ingNameLower)) {
-        matchedIng = ing;
-        break;
+    const subtypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
+    for (const sub of subtypes) {
+      const normSub = normalizeTaxonomyName(sub.name);
+      if (normSub && normParsed === normSub) {
+        return { ...parsedItem, ingredientId: ing.id, subtypeId: sub.id || sub.name, matchedName: `${sub.name} (${ing.name})`, matchedCategory: ing.category || 'General', isNewTaxonomyItem: false };
+      }
+    }
+
+    (Array.isArray(ing.aliases) ? ing.aliases : []).forEach(al => {
+      const normAl = normalizeTaxonomyName(al);
+      if (normAl && (normParsed === normAl || stemmedParsed === normAl) && bestScore < 95) {
+        bestScore = 95; bestMatch = { ing, subtype: null, name: ing.name };
+      }
+    });
+
+    for (const sub of subtypes) {
+      const normSub = normalizeTaxonomyName(sub.name), stemmedSub = stemIngredientName(sub.name);
+      if (stemmedSub && (stemmedParsed === stemmedSub || normParsed === stemmedSub) && bestScore < 90) {
+        bestScore = 90; bestMatch = { ing, subtype: sub, name: `${sub.name} (${ing.name})` };
+      }
+      (Array.isArray(sub.aliases) ? sub.aliases : []).forEach(sal => {
+        const normSal = normalizeTaxonomyName(sal);
+        if (normSal && (normParsed === normSal || stemmedParsed === normSal) && bestScore < 92) {
+          bestScore = 92; bestMatch = { ing, subtype: sub, name: `${sub.name} (${ing.name})` };
+        }
+      });
+    }
+
+    if (stemmedIng && (stemmedParsed === stemmedIng || normParsed === stemmedIng) && bestScore < 88) {
+      bestScore = 88; bestMatch = { ing, subtype: null, name: ing.name };
+    }
+
+    for (const sub of subtypes) {
+      const normSub = normalizeTaxonomyName(sub.name);
+      if (normSub.length >= 3) {
+        const regex = new RegExp('(^|\\s)' + normSub.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(?:s|es)?(\\s|$)', 'i');
+        if ((regex.test(normParsed) || regex.test(stemmedParsed)) && (75 + normSub.length > bestScore)) {
+          bestScore = 75 + normSub.length; bestMatch = { ing, subtype: sub, name: `${sub.name} (${ing.name})` };
+        }
+      }
+    }
+
+    if (normIng.length >= 3) {
+      const regex = new RegExp('(^|\\s)' + normIng.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(?:s|es)?(\\s|$)', 'i');
+      if ((regex.test(normParsed) || regex.test(stemmedParsed)) && (70 + normIng.length > bestScore)) {
+        bestScore = 70 + normIng.length; bestMatch = { ing, subtype: null, name: ing.name };
+      } else if (normParsed.length >= 3) {
+        const pRegex = new RegExp('(^|\\s)' + normParsed.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(?:s|es)?(\\s|$)', 'i');
+        if (pRegex.test(normIng) && (65 + normParsed.length > bestScore)) {
+          bestScore = 65 + normParsed.length; bestMatch = { ing, subtype: null, name: ing.name };
+        }
       }
     }
   }
 
-  if (!matchedIng && stemmed.length > 3) {
-    for (const ing of ingredients) {
-      if (!ing || !ing.name) continue;
-      const ingNameLower = String(ing.name).toLowerCase().trim();
-      if (ingNameLower.includes(stemmed) || stemmed.includes(ingNameLower)) {
-        matchedIng = ing;
-        break;
-      }
-    }
+  if (bestMatch && bestScore >= 65) {
+    return { ...parsedItem, ingredientId: bestMatch.ing.id, subtypeId: bestMatch.subtype?.id || bestMatch.subtype?.name || null, matchedName: bestMatch.name, matchedCategory: bestMatch.ing.category || 'General', isNewTaxonomyItem: false };
   }
 
-  if (matchedIng) {
-    return {
-      ...parsedItem,
-      ingredientId: matchedIng.id,
-      isNewTaxonomyItem: false,
-      matchedName: matchedIng.name
-    };
-  }
-
-  return {
-    ...parsedItem,
-    ingredientId: null,
-    isNewTaxonomyItem: true
-  };
+  return { ...parsedItem, ingredientId: null, subtypeId: null, matchedName: parsedItem.name, matchedCategory: 'Store Cupboard', isNewTaxonomyItem: true };
 }

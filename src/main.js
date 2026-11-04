@@ -1,6 +1,22 @@
 import './config/firebase.js';
 
+import { RESTORED_GNOCCHI_RECIPE } from './config/restoredGnocchi.js';
+
 if (typeof window !== 'undefined') {
+  window.restoreDeletedGnocchi = async () => {
+    try {
+      const { saveRecipe } = await import('./services/HouseholdRepository.js');
+      await saveRecipe(RESTORED_GNOCCHI_RECIPE);
+      const state = getState();
+      if (state?.recipes && !state.recipes.some(r => r.id === RESTORED_GNOCCHI_RECIPE.id)) {
+        state.recipes.push(RESTORED_GNOCCHI_RECIPE);
+      }
+      if (typeof window.renderRecipeVault === 'function') window.renderRecipeVault();
+      if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Restored "Creamy Sausage & Pea Gnocchi" from database backup!');
+    } catch (e) {
+      console.error('[PlatePlan] Failed to restore Gnocchi:', e);
+    }
+  };
   window.showTescoImport = () => {
     import('./components/pantry/SubtypeProductLinkerModalUI.js').then(m => m.openTescoImportModal?.(null, null)).catch(err => console.error('[PlatePlan]', err));
   };
@@ -18,7 +34,7 @@ if (typeof window !== 'undefined') {
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData, teardownRealtimeSubscriptions } from './services/HydrationService.js';
-import { subscribe, getState, initStoreCache, setActivePlan } from './store/store.js';
+import { subscribe, getState, initStoreCache, setActivePlan, saveStateCache, store } from './store/store.js';
 import { setupActionBridge } from './services/ActionBridge.js';
 import { saveCurrentPlan, stripPlanPayload, getCategories, saveCategories } from './services/HouseholdRepository.js';
 import { saveRootItem as saveIngredient, getRootItems as getIngredients } from './services/RootItemRepository.js';
@@ -28,7 +44,7 @@ import { renderToday } from './views/TodayView.js';
 import { renderIngredientBank, renderProductBank } from './views/PantryBankView.js';
 import { renderSettingsView } from './views/SettingsView.js';
 import { renderScrollableSwapModal, toggleShoppingItemAcquired, getShoppingLineStateKey } from './views/ShoppingView.js';
-import { renderPlanner } from './views/PlannerView.js';
+import { renderPlanner, renderPlanLibrary } from './views/PlannerView.js';
 import { renderRecipeVault } from './views/RecipeVaultView.js';
 import { renderDataQualityView } from './views/DataQualityView.js';
 import './components/data-quality/ResolveUnlinkedModalUI.js';
@@ -53,6 +69,7 @@ import * as FitScoreService from './services/FitScoreService.js';
 import * as DataQualityService from './services/DataQualityService.js';
 import * as TodayViewService from './services/TodayViewService.js';
 import * as RecipeAuthoringService from './services/RecipeAuthoringService.js';
+import * as RecipeEnhancementService from './services/RecipeEnhancementService.js';
 import * as MaintenanceService from './services/MaintenanceService.js';
 import { alignAllFitScores } from './services/MaintenanceService.js';
 import { registeredComponents } from './components/componentRegistry.js';
@@ -70,23 +87,42 @@ const safeClone = (obj) => {
 
 // Global Compatibility Shims & Persistence Delegation
 if (typeof window !== 'undefined') {
+  window.Store = store;
+  window.store = store;
   window.stripPlanPayload = stripPlanPayload;
   window.saveState = function(stateData) {
-    const rawPlan = stateData?.plan || stateData?.currentPlan || stateData .currentPlan ?.currentPlan;
-    if (!rawPlan) return;
+    try {
+      const state = typeof getState === 'function' ? getState() : (window.AppState ? window.AppState.getState() : null);
+      const data = stateData || state;
 
-    // 1. Dispatch into official store orchestrator
-    if (typeof setActivePlan === 'function') {
-      setActivePlan(rawPlan);
-    } else if (window.store && typeof window.store.setActivePlan === 'function') {
-      window.store.setActivePlan(rawPlan);
-    }
+      // Extract plan safely whether passed as plan, stateData.plan, stateData.currentPlan, or state.currentPlan
+      const rawPlan = (data?.slots ? data : null)
+        || data?.plan
+        || data?.currentPlan
+        || state?.currentPlan
+        || state?.plan;
 
-    // 2. Commit directly to repository if available
-    if (window.HouseholdRepository && typeof window.HouseholdRepository.saveCurrentPlan === 'function') {
-      window.HouseholdRepository.saveCurrentPlan(rawPlan).catch(err => {
-        console.error('[Persistence] Error delegating plan to HouseholdRepository:', err);
-      });
+      // 1. Always update local state cache to persist in-memory adjustments
+      if (typeof saveStateCache === 'function') {
+        saveStateCache(data);
+      }
+
+      // 2. If a valid plan exists, dispatch into official store and cloud repository
+      if (rawPlan && rawPlan.slots && typeof rawPlan.slots === 'object') {
+        if (typeof setActivePlan === 'function') {
+          setActivePlan(rawPlan);
+        } else if (window.store && typeof window.store.setActivePlan === 'function') {
+          window.store.setActivePlan(rawPlan);
+        }
+
+        if (window.HouseholdRepository && typeof window.HouseholdRepository.saveCurrentPlan === 'function') {
+          window.HouseholdRepository.saveCurrentPlan(rawPlan).catch(err => {
+            console.error('[Persistence] Error delegating plan to HouseholdRepository:', err);
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('[Persistence] Handled warning in window.saveState:', err);
     }
   };
 
@@ -136,7 +172,7 @@ if (typeof window !== 'undefined') {
   Object.assign(window, {
     MealPlanGeneratorService, RecipeDetailModalService, PortionCalculationService, TescoImportService,
     ShoppingCalculationService, UnitConverter, NutritionService, FitScoreService, DataQualityService,
-    TodayViewService, RecipeAuthoringService, MaintenanceService, alignAllFitScores, ...registeredComponents, AppRouter, AppInitializer,
+    TodayViewService, RecipeAuthoringService, RecipeEnhancementService, MaintenanceService, alignAllFitScores, ...registeredComponents, AppRouter, AppInitializer,
 
     showView: window.showView || AppRouter.showView,
     syncMobileNavigation: window.syncMobileNavigation || AppRouter.syncMobileNavigation,
@@ -151,6 +187,7 @@ if (typeof window !== 'undefined') {
         case 'today': return renderToday();
         case 'vault': case 'recipes': return renderRecipeVault();
         case 'planner': case 'plan': return renderPlanner();
+        case 'planlib': return renderPlanLibrary();
         case 'settings': case 'prefs': return renderSettingsView();
         case 'ingredients': return renderIngredientBank();
         case 'bank': return renderProductBank();
@@ -165,6 +202,8 @@ if (typeof window !== 'undefined') {
     updateRecipePreviewScale: RecipeDetailModalService.updateRecipePreviewScale,
     updateSinglePersonServes: RecipeDetailModalService.updateSinglePersonServes,
     renderRecipePreview: RecipeDetailModalService.renderRecipePreview,
+    removeCurrentEnhancedVariant: RecipeDetailModalService.removeCurrentEnhancedVariant,
+    openEnhanceRecipeModalForCurrent: RecipeDetailModalService.openEnhanceRecipeModalForCurrent,
     generatePlan: MealPlanGeneratorService.generatePlan,
     generateMealPlan: MealPlanGeneratorService.generateMealPlan,
     getPlanSlotInfo: MealPlanGeneratorService.getPlanSlotInfo,
@@ -272,6 +311,12 @@ function setupSubscriptions() {
   subscribe('recipes', (recipes) => {
     const clean = sanitizeRecipes(recipes);
     if (typeof window !== 'undefined') { getState().recipes = clean; window.allRecipes = clean; window.recipes = clean; }
+    if (clean.length > 0 && !clean.some(r => r.id === 'r1784057670563') && !window.__gnocchiRestored) {
+      window.__gnocchiRestored = true;
+      if (typeof window.restoreDeletedGnocchi === 'function') {
+        window.restoreDeletedGnocchi();
+      }
+    }
     renderRecipeVault(); renderToday(); if (getState().currentPlan && typeof renderPlanner === 'function') renderPlanner();
     renderDataQualityView();
   });

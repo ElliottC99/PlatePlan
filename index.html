@@ -10,8 +10,9 @@
   });
 </script>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#F7F6F2">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta name="description" content="PlatePlan — shared meal planning for Elliott and Chloe">
 <meta name="app-version" content="__APP_VERSION__">
 <meta name="version" content="__APP_VERSION__">
@@ -229,13 +230,38 @@ try{
   </details>
 </nav>
 
-<div class="mobile-nav" id="mobile-nav" aria-label="Main navigation">
-  <button type="button" data-view="today" class="active" data-action="showView('today')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5M6.5 10v9h11v-9M10 19v-5h4v5"></path></svg>Today</button>
-  <button type="button" data-view="vault" data-action="showView('vault')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M5 4v7M8 4v7M5 8h3M6.5 11v9M16 4c-2 3-2 7 0 9h2V4M18 13v7"></path></svg>Recipes</button>
-  <button type="button" data-view="planner" data-action="showView('planner')"><svg aria-hidden="true" viewbox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2"></path></svg>Plan</button>
-  <button type="button" data-view="data" data-action="showView('data')"><svg aria-hidden="true" viewbox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>Data Quality</button>
-  <button type="button" data-view="search" data-action="showView('search')"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"></circle><path d="m15 15 4 4"></path></svg>Search</button>
-</div>
+<nav class="mobile-nav ios-tab-bar" id="mobile-nav" role="tablist" aria-label="Main navigation">
+  <button type="button" class="ios-tab-item active" data-view="today" data-action="showView('today')" role="tab" aria-selected="true">
+    <div class="ios-tab-icon">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+    </div>
+    <span class="ios-tab-label">Today</span>
+  </button>
+  <button type="button" class="ios-tab-item" data-view="planner" data-action="showView('planner')" role="tab" aria-selected="false">
+    <div class="ios-tab-icon">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="4"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg>
+    </div>
+    <span class="ios-tab-label">Planner</span>
+  </button>
+  <button type="button" class="ios-tab-item" data-view="vault" data-action="showView('vault')" role="tab" aria-selected="false">
+    <div class="ios-tab-icon">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4v7M8 4v7M5 8h3M6.5 11v9M16 4c-2 3-2 7 0 9h2V4M18 13v7"></path></svg>
+    </div>
+    <span class="ios-tab-label">Recipes</span>
+  </button>
+  <button type="button" class="ios-tab-item" data-view="ingredients" data-action="showView('ingredients')" role="tab" aria-selected="false">
+    <div class="ios-tab-icon">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 10l2-6h12l2 6v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10z"></path><path d="M10 10v6m4-6v6"></path></svg>
+    </div>
+    <span class="ios-tab-label">Pantry</span>
+  </button>
+  <button type="button" class="ios-tab-item" data-view="shopping" data-action="showView('shopping')" role="tab" aria-selected="false">
+    <div class="ios-tab-icon">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+    </div>
+    <span class="ios-tab-label">Shopping</span>
+  </button>
+</nav>
 <div class="mobile-more-wrap" id="mobile-more-wrap" data-action="if(event.target===this)closeMobileMore()">
   <div class="mobile-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-more-title">
     <div class="mobile-sheet-handle"></div>
@@ -516,34 +542,7 @@ try{
 </div>
 
 
-<div id="view-data" class="view">
-    <div class="view-toolbar">
-      <h1 class="view-title" style="margin:0">Data Quality Centre</h1>
-      <div style="display:flex;gap:8px">
-        <button type="button" class="btn sm primary" data-action="openRecipeAuditModal()" style="font-weight:600;background:var(--primary,#4f46e5);color:#fff;">📖 Recipe Mapping Audit</button>
-        <button type="button" class="btn sm btn-ghost ghost" data-action="runGlobalProductRelink()">Batch Relink Products</button>
-        <button type="button" class="btn sm btn-ghost ghost" data-action="renderDataQuality()">Refresh Scans</button>
-      </div>
-    </div>
-    
-    <div class="card" style="border-left:3px solid var(--amber);">
-        <h3>Missing Information</h3>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Ingredients missing pricing, pack sizes, macros, or storage details.</p>
-        <div id="dq-missing-list"></div>
-    </div>
-    
-    <div class="card" style="border-left:3px solid var(--purple);">
-        <h3>Likely Duplicate Ingredients</h3>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Ingredients with identical or highly similar normalized names. Merging will update recipes and meal plans.</p>
-        <div id="dq-duplicate-list"></div>
-    </div>
-
-    <div class="card" style="display: none;">
-        <h3>Category Management</h3>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Manage your custom categories.</p>
-        <div id="dq-cat-list"></div>
-    </div>
-</div>
+<div id="view-data" class="view"></div>
 
 <div id="view-prefs" class="view"></div>
 

@@ -76,7 +76,7 @@ export const getIngredients = getRootItems;
 export const saveIngredient = saveRootItem;
 export const deleteIngredient = deleteRootItem;
 
-export async function commitAtomicChain({ category, rootItemName, subtypeName, productPayload }) {
+export async function commitAtomicChain({ category, rootItemName, subtypeName, productPayload, productName, unit }) {
   try {
     const state = getState();
     const categories = Array.isArray(state.categories) ? [...state.categories] : await getCategories();
@@ -84,6 +84,8 @@ export async function commitAtomicChain({ category, rootItemName, subtypeName, p
       ? [...(state.rootItems || state.ingredients)] 
       : await getRootItems();
     const products = Array.isArray(state.products) ? [...state.products] : await getProducts();
+
+    const resolvedProductPayload = productPayload || (productName ? { name: productName, unit: unit || '' } : null);
 
     let targetCategory = (category || 'General').trim();
     if (targetCategory && !categories.includes(targetCategory)) {
@@ -116,6 +118,7 @@ export async function commitAtomicChain({ category, rootItemName, subtypeName, p
     }
 
     let subtypeId = null;
+    let subtypeObj = null;
     if (rootItem && subtypeName && subtypeName.trim()) {
       const cleanSubName = subtypeName.trim();
       if (!Array.isArray(rootItem.subtypes)) rootItem.subtypes = [];
@@ -133,6 +136,7 @@ export async function commitAtomicChain({ category, rootItemName, subtypeName, p
       } else {
         subtypeId = existingSub.id;
       }
+      subtypeObj = existingSub;
     }
 
     if (rootItem) {
@@ -142,14 +146,14 @@ export async function commitAtomicChain({ category, rootItemName, subtypeName, p
     }
 
     let createdProduct = null;
-    if (productPayload && typeof productPayload === 'object' && productPayload.name) {
-      const prodId = productPayload.id || ('prod_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7));
+    if (resolvedProductPayload && typeof resolvedProductPayload === 'object' && resolvedProductPayload.name) {
+      const prodId = resolvedProductPayload.id || ('prod_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7));
       createdProduct = {
-        ...productPayload,
+        ...resolvedProductPayload,
         id: prodId,
-        ingredientId: rootItemId || productPayload.ingredientId || null,
-        subtypeId: subtypeId || productPayload.subtypeId || null,
-        category: targetCategory || productPayload.category || 'General',
+        ingredientId: rootItemId || resolvedProductPayload.ingredientId || null,
+        subtypeId: subtypeId || resolvedProductPayload.subtypeId || null,
+        category: targetCategory || resolvedProductPayload.category || 'General',
         updatedAt: new Date().toISOString()
       };
       
@@ -164,7 +168,7 @@ export async function commitAtomicChain({ category, rootItemName, subtypeName, p
     }
 
     saveStateCache(state);
-    return { success: true, category: targetCategory, rootItem, subtypeId, product: createdProduct };
+    return { success: true, category: targetCategory, rootItem, subtype: subtypeObj, subtypeId, product: createdProduct };
   } catch (err) {
     console.error('[PantryTaxonomyService] commitAtomicChain error:', err);
     return { success: false, error: err };
@@ -181,14 +185,33 @@ export async function executeSafeReallocation({ mode, sourceItemId, targetCatego
 
   if (mode === 'move') {
     if (!targetCategoryName) throw new Error('Target category is required');
-    sourceItem.category = targetCategoryName;
-    if (!categories.includes(targetCategoryName)) {
-      categories.push(targetCategoryName);
+    const cleanCat = targetCategoryName.trim();
+    sourceItem.category = cleanCat;
+    if (Array.isArray(sourceItem.subtypes)) {
+      sourceItem.subtypes.forEach(st => {
+        if (st) st.category = cleanCat;
+      });
+    }
+    if (!categories.includes(cleanCat)) {
+      categories.push(cleanCat);
       setCategories(categories);
       await saveCategories(categories);
     }
     setIngredients(rootItems);
     await saveRootItem(sourceItem);
+
+    const products = Array.isArray(state.products) ? [...state.products] : [];
+    let prodsChanged = false;
+    for (const prod of products) {
+      if (prod && String(prod.ingredientId) === String(sourceItemId)) {
+        prod.category = cleanCat;
+        prodsChanged = true;
+        await saveProduct(prod);
+      }
+    }
+    if (prodsChanged) {
+      setProducts(products);
+    }
   } else if (mode === 'merge') {
     if (!targetItemId || String(targetItemId) === String(sourceItemId)) {
       throw new Error('Cannot merge an item with itself.');

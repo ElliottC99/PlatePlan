@@ -51,8 +51,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
     btnNext1A.onclick = () => {
       const rawTitle = modalWrap.querySelector('#wiz-title')?.value.trim() || 'Untitled Recipe';
       const title = toTitleCase(rawTitle);
-      const curServ = parseInt(modalWrap.querySelector('#wiz-current-servings')?.value, 10) || 4;
-      const tgtServ = parseInt(modalWrap.querySelector('#wiz-target-servings')?.value, 10) || 4;
+      const serv = parseInt(modalWrap.querySelector('#wiz-servings')?.value, 10) || 4;
       const prepH = parseInt(modalWrap.querySelector('#wiz-prep-hours')?.value, 10) || 0;
       const prepM = parseInt(modalWrap.querySelector('#wiz-prep-mins')?.value, 10) || 0;
       const cookH = parseInt(modalWrap.querySelector('#wiz-cook-hours')?.value, 10) || 0;
@@ -64,11 +63,17 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
       const storeState = getState();
       const ingredientsBank = storeState.rootItems || storeState.ingredients || [];
 
+      const existingIngs = (wizardState.activeRecipe?.ingredientSections || []).flatMap(s => s.ingredients || []);
+
       const parsedSections = rawSections.map(sec => ({
         sectionTitle: toTitleCase(sec.sectionTitle),
         ingredients: sec.lines.map(line => {
           const parsed = parseIngredientString(line);
           const matched = matchIngredientTaxonomy(parsed, ingredientsBank);
+          const existing = existingIngs.find(e => 
+            (e.raw && e.raw.trim().toLowerCase() === line.trim().toLowerCase()) ||
+            (e.name && parsed.name && e.name.trim().toLowerCase() === parsed.name.trim().toLowerCase())
+          );
           return {
             raw: line,
             qty: parsed.qty,
@@ -77,9 +82,11 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
             name: parsed.name,
             notes: parsed.notes,
             isFallbackWeight: parsed.isFallbackWeight,
-            ingredientId: matched?.ingredientId || null,
-            subtypeId: matched?.subtypeId || null,
-            isNewTaxonomyItem: !matched
+            ingredientId: existing?.ingredientId || matched?.ingredientId || null,
+            subtypeId: existing?.subtypeId || matched?.subtypeId || null,
+            productId: existing?.productId || matched?.productId || null,
+            defaultProductId: existing?.defaultProductId || null,
+            isNewTaxonomyItem: existing ? !!existing.isNewTaxonomyItem : !matched
           };
         })
       }));
@@ -89,8 +96,8 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
         .filter(Boolean);
 
       wizardState.activeRecipe.title = title;
-      wizardState.activeRecipe.currentServings = curServ;
-      wizardState.activeRecipe.targetServings = tgtServ;
+      wizardState.activeRecipe.servings = serv;
+      wizardState.activeRecipe.serves = serv;
       wizardState.activeRecipe.prepTime = { hours: prepH, minutes: prepM };
       wizardState.activeRecipe.cookTime = { hours: cookH, minutes: cookM };
       wizardState.activeRecipe.ingredientsRaw = ingRaw;
@@ -216,7 +223,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
               ingredientSections: rec.ingredientSections,
               ingredients: allIngredients.map(i => ({
                 name: i.name,
-                qty: i.scaledQty || i.qty || 1,
+                qty: i.qty || 1,
                 unit: i.unit || 'qty',
                 raw: i.raw || i.name,
                 ingredientId: i.ingredientId || null,
@@ -266,6 +273,7 @@ function parseSectionedIngredients(rawText) {
   if (!rawText) return [];
   const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
   const sections = [];
+  const toServeLines = [];
   let currentSection = { sectionTitle: 'Main Ingredients', lines: [] };
 
   lines.forEach(line => {
@@ -278,12 +286,26 @@ function parseSectionedIngredients(rawText) {
         lines: []
       };
     } else {
-      currentSection.lines.push(line);
+      const isServing = /(?:,\s*|\s*\()(?:\b(?:to\s+serve|for\s+serving|to\s+garnish|for\s+garnish|to\s+finish|for\s+finishing)\b)\)?$/i.test(line);
+      if (isServing && currentSection.sectionTitle.toLowerCase() !== 'to serve') {
+        toServeLines.push(line);
+      } else {
+        currentSection.lines.push(line);
+      }
     }
   });
 
   if (currentSection.lines.length > 0) {
     sections.push(currentSection);
+  }
+
+  if (toServeLines.length > 0) {
+    const existing = sections.find(s => s.sectionTitle.toLowerCase() === 'to serve');
+    if (existing) {
+      existing.lines.push(...toServeLines);
+    } else {
+      sections.push({ sectionTitle: 'To Serve', lines: toServeLines });
+    }
   }
 
   return sections;
