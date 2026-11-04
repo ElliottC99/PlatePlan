@@ -91,7 +91,7 @@ export function getPlanSlotInfo(slotData) {
  */
 export function getPlannedSlotNutrition(activeRecipe, slotKey = 'dinnerE', instanceId = null, plan = null) {
   if (!activeRecipe) return { cal: 0, prot: 0 };
-  const mealType = slotKey.startsWith('breakfast') ? 'breakfast' : (slotKey.startsWith('lunch') ? 'lunch' : 'dinner');
+  const mealType = getMealTypeFromSlotKey(slotKey) || 'dinner';
   const person = slotKey.endsWith('E') ? 'elliott' : 'chloe';
 
   const res = calculateMealFitScore(activeRecipe, mealType, {

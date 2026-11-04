@@ -9,81 +9,72 @@ import { renderFitScoreBadge } from '../components/FitScoreBadge.js';
 import { isMealEatenOnDate } from '../services/TodayViewService.js';
 
 /**
- * Renders Apple Health-style horizontal macro progress bars.
+ * Renders Apple Health-style stacked per-person macro progress bars (Calories & Protein).
  *
- * @param {Object} totals - Calculated daily totals { calories, protein, carbs, fat }
- * @param {Object} targets - Target daily values { calories, protein, carbs, fat }
+ * @param {Object} totals - Per-person daily totals { elliott: { calories, protein }, chloe: { calories, protein } }
+ * @param {Object} targets - Per-person daily targets { elliott: { calories, protein }, chloe: { calories, protein } }
  * @returns {string} HTML markup
  */
 export function renderTodayMacrosCard(totals = {}, targets = {}) {
-  const cal = Math.round(totals.calories || 0);
-  const prot = Math.round(totals.protein || 0);
-  const carbs = Math.round(totals.carbs || 0);
-  const fat = Math.round(totals.fat || 0);
+  const eTot = totals.elliott || totals.e || { calories: totals.calories || 0, protein: totals.protein || 0 };
+  const cTot = totals.chloe || totals.c || { calories: totals.calories || 0, protein: totals.protein || 0 };
 
-  const targetCal = Math.round(targets.calories || 2000);
-  const targetProt = Math.round(targets.protein || 130);
-  const targetCarbs = Math.round(targets.carbs || 220);
-  const targetFat = Math.round(targets.fat || 65);
+  const eTgt = targets.elliott || targets.e || { calories: targets.calories || 2100, protein: targets.protein || 140 };
+  const cTgt = targets.chloe || targets.c || { calories: targets.calories || 1650, protein: targets.protein || 105 };
 
-  const calPct = Math.min(100, Math.round((cal / (targetCal || 1)) * 100));
-  const protPct = Math.min(100, Math.round((prot / (targetProt || 1)) * 100));
-  const carbsPct = Math.min(100, Math.round((carbs / (targetCarbs || 1)) * 100));
-  const fatPct = Math.min(100, Math.round((fat / (targetFat || 1)) * 100));
+  const renderPersonRow = (name, personTotals, personTargets, isLast = false) => {
+    const cal = Math.round(Number(personTotals.calories || personTotals.cal || 0));
+    const prot = Math.round(Number(personTotals.protein || personTotals.prot || 0));
+    const targetCal = Math.round(Number(personTargets.calories || personTargets.cal || 2000));
+    const targetProt = Math.round(Number(personTargets.protein || personTargets.prot || 120));
 
-  return `
-    <div class="ios-grouped-card" style="padding: 16px; margin-bottom: 16px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 14px;">
-        <span class="ios-headline" style="color:var(--label); font-weight:700;">Daily Nutrition</span>
-        <span style="font-size:13px; font-weight:600; color:var(--secondary-label);">${cal} / ${targetCal} kcal</span>
-      </div>
+    const calRawPct = Math.round((cal / (targetCal || 1)) * 100);
+    const protRawPct = Math.round((prot / (targetProt || 1)) * 100);
+    const calBarPct = Math.min(100, Math.max(0, calRawPct));
+    const protBarPct = Math.min(100, Math.max(0, protRawPct));
 
-      <!-- Macro Progress Bars Grid -->
-      <div style="display:flex; flex-direction:column; gap:12px;">
-        <!-- Calories -->
-        <div>
-          <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; font-weight:600;">
-            <span style="color:var(--label);">Calories</span>
-            <span style="color:var(--secondary-label);">${calPct}%</span>
-          </div>
-          <div style="height:8px; border-radius:4px; background:var(--system-gray5); overflow:hidden;">
-            <div style="height:100%; width:${calPct}%; background:var(--tint-color); border-radius:4px; transition:width 0.4s ease;"></div>
-          </div>
+    const dividerStyle = isLast
+      ? ''
+      : 'padding-bottom: 12px; margin-bottom: 12px; border-bottom: 0.5px solid var(--separator);';
+
+    return `
+      <div style="${dividerStyle}">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 8px;">
+          <span style="font-size:14px; font-weight:700; color:var(--label);">${escapeHtml(name)}</span>
+          <span style="font-size:12px; font-weight:600; color:var(--secondary-label);">${calRawPct}% kcal · ${protRawPct}% prot</span>
         </div>
-
-        <!-- Protein -->
-        <div>
-          <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; font-weight:600;">
-            <span style="color:var(--label);">Protein</span>
-            <span style="color:var(--secondary-label);">${prot} / ${targetProt}g</span>
-          </div>
-          <div style="height:8px; border-radius:4px; background:var(--system-gray5); overflow:hidden;">
-            <div style="height:100%; width:${protPct}%; background:var(--system-blue); border-radius:4px; transition:width 0.4s ease;"></div>
-          </div>
-        </div>
-
-        <!-- Carbs & Fat Row -->
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
           <div>
             <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; font-weight:600;">
-              <span style="color:var(--label);">Carbs</span>
-              <span style="color:var(--secondary-label);">${carbs}g</span>
+              <span style="color:var(--label);">Calories</span>
+              <span style="color:var(--secondary-label);">${cal.toLocaleString('en-GB')} / ${targetCal.toLocaleString('en-GB')}</span>
             </div>
             <div style="height:8px; border-radius:4px; background:var(--system-gray5); overflow:hidden;">
-              <div style="height:100%; width:${carbsPct}%; background:var(--system-orange); border-radius:4px; transition:width 0.4s ease;"></div>
+              <div style="height:100%; width:${calBarPct}%; background:var(--tint-color); border-radius:4px; transition:width 0.4s ease;"></div>
             </div>
           </div>
           <div>
             <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; font-weight:600;">
-              <span style="color:var(--label);">Fat</span>
-              <span style="color:var(--secondary-label);">${fat}g</span>
+              <span style="color:var(--label);">Protein</span>
+              <span style="color:var(--secondary-label);">${prot} / ${targetProt}g</span>
             </div>
             <div style="height:8px; border-radius:4px; background:var(--system-gray5); overflow:hidden;">
-              <div style="height:100%; width:${fatPct}%; background:var(--system-yellow); border-radius:4px; transition:width 0.4s ease;"></div>
+              <div style="height:100%; width:${protBarPct}%; background:var(--system-blue); border-radius:4px; transition:width 0.4s ease;"></div>
             </div>
           </div>
         </div>
       </div>
+    `;
+  };
+
+  return `
+    <div class="ios-grouped-card" style="padding: 16px; margin-bottom: 16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+        <span class="ios-headline" style="color:var(--label); font-weight:700;">Daily Nutrition</span>
+        <span style="font-size:12px; font-weight:600; color:var(--secondary-label);">Planned Today</span>
+      </div>
+      ${renderPersonRow('Elliott', eTot, eTgt, false)}
+      ${renderPersonRow('Chloe', cTot, cTgt, true)}
     </div>
   `;
 }
