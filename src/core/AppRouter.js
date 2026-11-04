@@ -1,6 +1,7 @@
 /**
- * src/core/AppRouter.js (v3.12.1)
+ * src/core/AppRouter.js
  * Core Application Router & View Lifecycle Mounting Engine
+ * Apple HIG Navigation & Large Title Scroll Orchestration
  */
 
 import * as TodayView from '../views/TodayView.js';
@@ -24,15 +25,30 @@ const viewModuleMap = {
   pantry: PantryBankView,
   bank: ProductBankView,
   data: DataQualityView,
-  quality: DataQualityView
+  quality: DataQualityView,
+  shopping: PlannerView
 };
+
+// Global scroll listener for Apple Large Title collapsing behavior
+if (typeof window !== 'undefined' && !window._iosNavScrollInitialized) {
+  window._iosNavScrollInitialized = true;
+  window.addEventListener('scroll', () => {
+    const navBar = document.querySelector('.view.active .ios-nav-bar') || document.querySelector('.ios-nav-bar');
+    if (navBar) {
+      navBar.classList.toggle('scrolled', window.scrollY > 20);
+    }
+  }, { passive: true });
+}
 
 export function syncMobileNavigation(viewId) {
   const mobileNav = document.getElementById('mobile-nav');
   if (!mobileNav) return;
-  const buttons = mobileNav.querySelectorAll('button[data-view]');
+  const normalized = viewId === 'pantry' ? 'ingredients' : viewId;
+  const buttons = mobileNav.querySelectorAll('button[data-view], .ios-tab-item[data-view]');
   buttons.forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.view === viewId);
+    const isTarget = btn.dataset.view === viewId || btn.dataset.view === normalized;
+    btn.classList.toggle('active', isTarget);
+    btn.setAttribute('aria-selected', isTarget ? 'true' : 'false');
   });
 }
 
@@ -48,6 +64,12 @@ export function requestPlatePlanViewRender(viewId) {
 export function showView(viewId) {
   if (typeof document === 'undefined') return;
 
+  if (viewId === 'shopping') {
+    if (typeof PlannerView.setPlannerWizardStep === 'function') {
+      PlannerView.setPlannerWizardStep(3);
+    }
+  }
+
   // 1. Teardown active view module if it has unmount()
   if (activeViewModule && typeof activeViewModule.unmount === 'function') {
     try {
@@ -58,7 +80,7 @@ export function showView(viewId) {
   }
 
   // Update desktop sidebar tabs
-  const normalizedViewId = viewId === 'pantry' ? 'ingredients' : viewId;
+  const normalizedViewId = (viewId === 'pantry' || viewId === 'ingredients') ? 'ingredients' : (viewId === 'shopping' ? 'planner' : viewId);
   document.querySelectorAll('.desktop-sidebar .ntab').forEach(tab => {
     tab.classList.toggle('active', tab.dataset.view === normalizedViewId || tab.dataset.view === viewId);
   });
@@ -84,8 +106,14 @@ export function showView(viewId) {
 
   activeViewModule = nextModule || null;
 
-  // Update mobile nav
+  // Update mobile navigation tabs
   syncMobileNavigation(viewId);
+
+  // Reset scroll state on nav bar
+  const navBar = viewEl?.querySelector('.ios-nav-bar') || document.querySelector('.ios-nav-bar');
+  if (navBar) {
+    navBar.classList.remove('scrolled');
+  }
 
   if (window.platePlanDirtyViews && window.platePlanDirtyViews.delete) {
     window.platePlanDirtyViews.delete(viewId);

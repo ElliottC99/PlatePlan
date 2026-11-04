@@ -22,6 +22,7 @@ import { saveCurrentPlan } from '../services/HouseholdRepository.js';
 import { escapeAttr, escapeHtml } from '../utils/stringUtils.js';
 import { swapPlanMealSlots } from '../services/PlanSlotSwapService.js';
 import { renderTodaySwapModalHtml } from '../components/today/TodaySwapMealModalUI.js';
+import { renderTodayMacrosCard, renderTodayMealCard } from './TodayRenderService.js';
 
 let currentDateStr = getPlatePlanLocalToday();
 let stateUnsub = null;
@@ -85,7 +86,13 @@ export function renderToday() {
   const dayPlan = dayKey && plan.slots ? plan.slots[dayKey] : null;
 
   if (!dayPlan || Object.keys(dayPlan).length === 0) {
-    contentEl.innerHTML = `<div class="empty-state-container" style="padding: 2rem; text-align: center; color: var(--text-secondary);">No meals assigned to this day in your active plan.</div>`;
+    contentEl.innerHTML = `
+      <div class="ios-grouped-card" style="padding: 32px 16px; text-align: center; margin: 16px 0;">
+        <div style="font-size: 28px; margin-bottom: 8px;">🍽️</div>
+        <div class="ios-headline" style="color:var(--label); margin-bottom: 4px;">No Planned Meals</div>
+        <div style="font-size: 13px; color: var(--secondary-label);">No meals assigned to this day in your active plan.</div>
+      </div>
+    `;
     return;
   }
 
@@ -98,10 +105,44 @@ export function renderToday() {
 
   const eatenMeals = plan.eatenMeals || {};
 
-  const cardsHtml = mealSlots.flatMap(slot => getTodayMealCards(dayPlan, slot.type)
-    .map(card => renderTodayMealCard(slot, card, eatenMeals, dayKey))).join('');
+  // Calculate day macro totals across all planned meal slots
+  const allMealCards = mealSlots.flatMap(slot => 
+    getTodayMealCards(dayPlan, slot.type).map(card => ({ slot, ...card }))
+  );
 
-  contentEl.innerHTML = cardsHtml || `<div class="empty-state-container" style="padding: 2rem; text-align: center; color: var(--text-secondary);">No meals assigned to this day in your active plan.</div>`;
+  const dayTotals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  allMealCards.forEach(({ info }) => {
+    const r = info?.active;
+    if (r) {
+      dayTotals.calories += Number(r.nutrition?.perServing?.cal ?? r.macros?.calories ?? 0);
+      dayTotals.protein += Number(r.nutrition?.perServing?.prot ?? r.macros?.protein ?? 0);
+      dayTotals.carbs += Number(r.nutrition?.perServing?.carb ?? r.macros?.carbs ?? 0);
+      dayTotals.fat += Number(r.nutrition?.perServing?.fat ?? r.macros?.fat ?? 0);
+    }
+  });
+
+  const rawTargets = state.preferences?.nutritionTargets?.both || 
+                     state.preferences?.nutritionTargets?.elliott || 
+                     state.userPrefs?.nutritionTargets?.elliott || 
+                     { calories: 2000, protein: 130, carbs: 220, fat: 65 };
+
+  const targets = {
+    calories: Number(rawTargets.calories || rawTargets.cal || 2000),
+    protein: Number(rawTargets.protein || rawTargets.prot || 130),
+    carbs: Number(rawTargets.carbs || rawTargets.carb || 220),
+    fat: Number(rawTargets.fat || 65)
+  };
+
+  const macrosHtml = renderTodayMacrosCard(dayTotals, targets);
+  const cardsHtml = allMealCards.map(({ slot, ...card }) => 
+    renderTodayMealCard(slot, card, eatenMeals, dayKey, currentDateStr)
+  ).join('');
+
+  contentEl.innerHTML = macrosHtml + (cardsHtml || `
+    <div class="ios-grouped-card" style="padding: 24px 16px; text-align: center;">
+      <div style="font-size: 13px; color: var(--secondary-label);">No meals assigned to this day.</div>
+    </div>
+  `);
 }
 
 /**
@@ -133,62 +174,6 @@ export function getTodayMealCards(dayPlan, mealType) {
     infoE ? { info: infoE, person: 'e' } : null,
     infoC ? { info: infoC, person: 'c' } : null
   ].filter(Boolean);
-}
-
-function renderTodayMealCard(slot, { info: slotInfo, person }, eatenMeals, dayKey) {
-  const recipe = slotInfo.active;
-  const isEatenE = isMealEatenOnDate(eatenMeals, currentDateStr, slot.type, 'e');
-  const isEatenC = isMealEatenOnDate(eatenMeals, currentDateStr, slot.type, 'c');
-  const isEaten = person === 'e' ? isEatenE
-    : person === 'c' ? isEatenC
-    : isMealEatenOnDate(eatenMeals, currentDateStr, slot.type, 'both');
-  const personLabel = person === 'e' ? ' · Elliott' : person === 'c' ? ' · Chloe' : '';
-  const activeProfile = person === 'e' ? 'elliott' : person === 'c' ? 'chloe' : 'everyone';
-  const fitBadge = renderFitScoreBadge(slotInfo.recipe || recipe, slot.type, {
-    activeProfile,
-    variant: slotInfo.variant || 'original',
-    showLabel: true
-  });
-
-  const eatenLabel = person === 'both' ? '✓ Both Eaten' : '✓ Eaten';
-  const mainTick = `
-        <button class="btn sm ${isEaten ? 'success' : 'ghost'}" type="button" data-action="toggle-meal-eaten" data-meal-type="${slot.type}" data-person="${person}" style="font-size:12px;flex:1;">
-          ${isEaten ? eatenLabel : 'Mark Eaten'}
-        </button>`;
-  const personTicks = person !== 'both' ? '' : `
-        <button class="btn sm ${isEatenE ? 'primary' : 'ghost'}" type="button" data-action="toggle-meal-eaten" data-meal-type="${slot.type}" data-person="e" style="font-size:11px;padding:4px 8px;" title="Toggle Elliott">
-          ${isEatenE ? '✓ E' : 'E'}
-        </button>
-        <button class="btn sm ${isEatenC ? 'primary' : 'ghost'}" type="button" data-action="toggle-meal-eaten" data-meal-type="${slot.type}" data-person="c" style="font-size:11px;padding:4px 8px;" title="Toggle Chloe">
-          ${isEatenC ? '✓ C' : 'C'}
-        </button>`;
-
-  const swapBtn = dayKey ? `
-        <button class="btn sm ghost" type="button" data-action="open-today-rearrange-modal" data-day-key="${escapeAttr(dayKey)}" data-meal-type="${escapeAttr(slot.type)}" title="Swap with another day" style="font-size:11.5px;padding:4px 8px;white-space:nowrap;display:flex;align-items:center;gap:3px;color:var(--text2,#78716c);">
-          ⇄ Swap
-        </button>` : '';
-
-  return `
-    <div class="today-meal-card ${isEaten ? 'meal-eaten' : ''}" style="background:var(--card,#fff);border:1px solid ${isEaten ? 'var(--green-light,#bbf7d0)' : 'var(--border,#e7e5e4)'};border-radius:14px;padding:16px;margin-bottom:12px;display:flex;flex-direction:column;gap:12px;opacity:${isEaten ? '0.75' : '1'};transition:all 0.2s ease;">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted,#78716c);">${slot.icon} ${slot.label}${personLabel}</span>
-        <div>${fitBadge}</div>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-        <div>
-          <h4 style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:var(--text,#1c1917);">${recipe.name || 'Untitled Recipe'}</h4>
-          <div style="font-size:12px;color:var(--muted,#78716c);display:flex;gap:10px;">
-            <span>🔥 ${Math.round(recipe.nutrition?.perServing?.cal ?? recipe.macros?.calories ?? 0)} kcal</span>
-            <span>💪 ${Math.round(recipe.nutrition?.perServing?.prot ?? recipe.macros?.protein ?? 0)}g P</span>
-            ${(recipe.prepTime || recipe.time) ? `<span>⏱️ ${escapeHtml(recipe.prepTime || recipe.time)}</span>` : ''}
-          </div>
-        </div>
-        <button class="btn sm" type="button" data-action="view-recipe" data-recipe-id="${escapeAttr(recipe.id)}" data-instance-id="${escapeAttr(slotInfo.instanceId || '')}" data-variant="${escapeAttr(slotInfo.variant || 'original')}" style="white-space:nowrap;font-weight:600;">View Recipe</button>
-      </div>
-      <div style="display:flex;gap:8px;border-top:1px dashed var(--border,#e7e5e4);padding-top:10px;margin-top:2px;align-items:center;">${mainTick}${personTicks}${swapBtn}
-      </div>
-    </div>
-  `;
 }
 
 export function openTodayRearrangeModal(dayKey, mealType = 'dinner') {

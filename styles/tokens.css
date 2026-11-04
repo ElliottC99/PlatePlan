@@ -1,82 +1,376 @@
 /**
- * styles/tokens.css (v3.20.02)
- * Harmonised Design System Tokens & Typographic Scale
+ * styles/tokens.css
+ * Apple Human Interface Guidelines Design System Tokens & Typography
+ * Supports Dynamic Light & Dark Mode with PlatePlan Emerald Green Accent
  */
+
 :root {
-  --bg: #F7F6F2;
-  --surface: #FFFFFF;
-  --surface2: #F0EFE9;
-  --surface3: #E6E4DC;
-  --border: #E2E0D8;
-  --border-strong: #C8C5BA;
-  --text: #1A1916;
-  --text2: #57544D;
-  --text3: #8C8980;
-  --primary: #1A6B4A;
-  --action: #0969DA;
-  --action-hover: #0757B8;
-  --green: #1A6B4A;
-  --green-bg: #EAF4EF;
-  --purple: #4A3D8F;
-  --purple-bg: #EEEAF9;
-  --coral: #A8402A;
-  --coral-bg: #FAECEA;
-  --amber: #7A5200;
-  --amber-bg: #FDF3E0;
-  --red: #991F1F;
-  --red-bg: #FDEAEA;
-  --blue: #1A4A6B;
-  --blue-bg: #EAF0F4;
-  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --type-title: 24px;
-  --type-heading: 18px;
-  --type-subheading: 15px;
-  --type-body: 15px;
-  --type-secondary: 13px;
-  --type-caption: 11.5px;
+  /* Apple Dynamic System Colors (Light Default) */
+  --system-bg: #FFFFFF;
+  --secondary-system-bg: #F2F2F7;
+  --tertiary-system-bg: #FFFFFF;
+  --system-grouped-bg: #F2F2F7;
+  --secondary-system-grouped-bg: #FFFFFF;
+  --tertiary-system-grouped-bg: #F2F2F7;
+
+  /* Apple Dynamic Label Colors */
+  --label: #000000;
+  --secondary-label: rgba(60, 60, 67, 0.60);
+  --tertiary-label: rgba(60, 60, 67, 0.30);
+  --quaternary-label: rgba(60, 60, 67, 0.18);
+
+  /* Apple Separator Colors */
+  --separator: rgba(60, 60, 67, 0.20);
+  --opaque-separator: #C6C6C8;
+
+  /* PlatePlan Apple System Accent (Emerald Green HIG) */
+  --tint-color: #34C759;
+  --tint-color-hover: #28A745;
+  --tint-color-muted: rgba(52, 199, 89, 0.15);
+
+  /* Apple System Palette */
+  --system-blue: #007AFF;
+  --system-red: #FF3B30;
+  --system-orange: #FF9500;
+  --system-yellow: #FFCC00;
+  --system-green: #34C759;
+  --system-mint: #00C7BE;
+  --system-teal: #30B0C7;
+  --system-cyan: #32ADE6;
+  --system-indigo: #5856D6;
+  --system-purple: #AF52DE;
+  --system-pink: #FF2D55;
+  --system-brown: #A2845E;
+
+  /* Apple System Grays */
+  --system-gray: #8E8E93;
+  --system-gray2: #AEAEB2;
+  --system-gray3: #C7C7CC;
+  --system-gray4: #D1D1D6;
+  --system-gray5: #E5E5EA;
+  --system-gray6: #F2F2F7;
+
+  /* Backward Compatibility Mappings for Existing PlatePlan Code */
+  --bg: var(--system-grouped-bg);
+  --surface: var(--secondary-system-grouped-bg);
+  --surface2: var(--system-gray6);
+  --surface3: var(--system-gray5);
+  --border: var(--separator);
+  --border-strong: var(--opaque-separator);
+  --text: var(--label);
+  --text2: var(--secondary-label);
+  --text3: var(--tertiary-label);
+  --primary: var(--tint-color);
+  --action: var(--tint-color);
+  --action-hover: var(--tint-color-hover);
+  --green: var(--system-green);
+  --green-bg: var(--tint-color-muted);
+  --red: var(--system-red);
+  --red-bg: rgba(255, 59, 48, 0.12);
+  --amber: var(--system-orange);
+  --amber-bg: rgba(255, 149, 0, 0.12);
+  --purple: var(--system-purple);
+  --purple-bg: rgba(175, 82, 222, 0.12);
+  --blue: var(--system-blue);
+  --blue-bg: rgba(0, 122, 255, 0.12);
+
+  /* Apple Typography Scale (SF Pro Font Stack) */
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro", system-ui, sans-serif;
+
+  --type-large-title: 34px;
+  --type-title-1: 28px;
+  --type-title-2: 22px;
+  --type-title-3: 20px;
+  --type-headline: 17px;
+  --type-body: 17px;
+  --type-callout: 16px;
+  --type-subhead: 15px;
+  --type-footnote: 13px;
+  --type-caption-1: 12px;
+  --type-caption-2: 11px;
+
+  /* Legacy Typography Aliases */
+  --type-title: var(--type-title-1);
+  --type-heading: var(--type-title-2);
+  --type-subheading: var(--type-subhead);
+  --type-secondary: var(--type-footnote);
+  --type-caption: var(--type-caption-1);
+
+  /* Spacing & Layout */
   --space-unit: 4px;
-  --radius-sm: 6px;
+  --radius-sm: 8px;
   --radius-md: 10px;
   --radius-lg: 14px;
   --radius-xl: 20px;
   --radius-control: 10px;
   --radius-group: 14px;
-  --focus-ring: 0 0 0 3px rgba(9, 105, 218, 0.28);
-  --separator: rgba(60, 60, 67, 0.14);
+  --radius-sheet: 20px;
+  --radius-pill: 9999px;
+
+  /* Apple System Focus & Shadows */
+  --focus-ring: 0 0 0 3px rgba(52, 199, 89, 0.38);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12);
+  --shadow-sheet: 0 -4px 32px rgba(0, 0, 0, 0.18);
+
+  /* Apple System Translucent Materials */
+  --ios-material-chrome: rgba(255, 255, 255, 0.82);
+  --ios-material-sheet: rgba(255, 255, 255, 0.94);
+  --ios-material-card: var(--secondary-system-grouped-bg);
+  --ios-blur: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: var(--ios-blur);
+  backdrop-filter: var(--ios-blur);
 }
+
+/* Dark Mode Appearance Tokens */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --system-bg: #000000;
+    --secondary-system-bg: #1C1C1E;
+    --tertiary-system-bg: #2C2C2E;
+    --system-grouped-bg: #000000;
+    --secondary-system-grouped-bg: #1C1C1E;
+    --tertiary-system-grouped-bg: #2C2C2E;
+
+    --label: #FFFFFF;
+    --secondary-label: rgba(235, 235, 245, 0.60);
+    --tertiary-label: rgba(235, 235, 245, 0.30);
+    --quaternary-label: rgba(235, 235, 245, 0.16);
+
+    --separator: rgba(84, 84, 88, 0.50);
+    --opaque-separator: #38383A;
+
+    --tint-color: #30D158;
+    --tint-color-hover: #248A3D;
+    --tint-color-muted: rgba(48, 209, 88, 0.18);
+
+    --system-blue: #0A84FF;
+    --system-red: #FF453A;
+    --system-orange: #FF9F0A;
+    --system-yellow: #FFD60A;
+    --system-green: #30D158;
+    --system-mint: #66D4CF;
+    --system-teal: #40CBE0;
+    --system-cyan: #64D2FF;
+    --system-indigo: #5E5CE6;
+    --system-purple: #BF5AF2;
+    --system-pink: #FF375F;
+    --system-brown: #AC8E68;
+
+    --system-gray: #8E8E93;
+    --system-gray2: #636366;
+    --system-gray3: #48484A;
+    --system-gray4: #3A3A3C;
+    --system-gray5: #2C2C2E;
+    --system-gray6: #1C1C1E;
+
+    --ios-material-chrome: rgba(28, 28, 30, 0.82);
+    --ios-material-sheet: rgba(28, 28, 30, 0.94);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+    --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+    --shadow-sheet: 0 -4px 32px rgba(0, 0, 0, 0.65);
+  }
+}
+
+html[data-theme="dark"] {
+  --system-bg: #000000;
+  --secondary-system-bg: #1C1C1E;
+  --tertiary-system-bg: #2C2C2E;
+  --system-grouped-bg: #000000;
+  --secondary-system-grouped-bg: #1C1C1E;
+  --tertiary-system-grouped-bg: #2C2C2E;
+
+  --label: #FFFFFF;
+  --secondary-label: rgba(235, 235, 245, 0.60);
+  --tertiary-label: rgba(235, 235, 245, 0.30);
+  --quaternary-label: rgba(235, 235, 245, 0.16);
+
+  --separator: rgba(84, 84, 88, 0.50);
+  --opaque-separator: #38383A;
+
+  --tint-color: #30D158;
+  --tint-color-hover: #248A3D;
+  --tint-color-muted: rgba(48, 209, 88, 0.18);
+
+  --system-blue: #0A84FF;
+  --system-red: #FF453A;
+  --system-orange: #FF9F0A;
+  --system-yellow: #FFD60A;
+  --system-green: #30D158;
+  --system-mint: #66D4CF;
+  --system-teal: #40CBE0;
+  --system-cyan: #64D2FF;
+  --system-indigo: #5E5CE6;
+  --system-purple: #BF5AF2;
+  --system-pink: #FF375F;
+  --system-brown: #AC8E68;
+
+  --system-gray: #8E8E93;
+  --system-gray2: #636366;
+  --system-gray3: #48484A;
+  --system-gray4: #3A3A3C;
+  --system-gray5: #2C2C2E;
+  --system-gray6: #1C1C1E;
+
+  --ios-material-chrome: rgba(28, 28, 30, 0.82);
+  --ios-material-sheet: rgba(28, 28, 30, 0.94);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --shadow-sheet: 0 -4px 32px rgba(0, 0, 0, 0.65);
+}
+
+html[data-theme="light"] {
+  --system-bg: #FFFFFF;
+  --secondary-system-bg: #F2F2F7;
+  --tertiary-system-bg: #FFFFFF;
+  --system-grouped-bg: #F2F2F7;
+  --secondary-system-grouped-bg: #FFFFFF;
+  --tertiary-system-grouped-bg: #F2F2F7;
+
+  --label: #000000;
+  --secondary-label: rgba(60, 60, 67, 0.60);
+  --tertiary-label: rgba(60, 60, 67, 0.30);
+  --quaternary-label: rgba(60, 60, 67, 0.18);
+
+  --separator: rgba(60, 60, 67, 0.20);
+  --opaque-separator: #C6C6C8;
+
+  --tint-color: #34C759;
+  --tint-color-hover: #28A745;
+  --tint-color-muted: rgba(52, 199, 89, 0.15);
+
+  --ios-material-chrome: rgba(255, 255, 255, 0.82);
+  --ios-material-sheet: rgba(255, 255, 255, 0.94);
+}
+
+/* Global Reset & Base Typography */
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
+
 body {
   font-family: var(--font);
   font-size: var(--type-body);
-  line-height: 1.5;
-  color: var(--text);
-  background: var(--bg);
-  min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
-h1 {
-  font-size: var(--type-title);
-  font-weight: 750;
+  line-height: 1.45;
   letter-spacing: -0.02em;
-  line-height: 1.25;
-  color: var(--text);
+  color: var(--label);
+  background-color: var(--system-grouped-bg);
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  padding-bottom: env(safe-area-inset-bottom, 20px);
 }
-h2 {
-  font-size: var(--type-heading);
-  font-weight: 750;
-  letter-spacing: -0.015em;
-  line-height: 1.3;
-  color: var(--text);
-}
-h3 {
-  font-size: var(--type-subheading);
+
+/* Apple Typography Heading Elements */
+h1, .ios-large-title {
+  font-family: var(--font-display);
+  font-size: var(--type-large-title);
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.024em;
+  line-height: 1.2;
+  color: var(--label);
+}
+
+h2, .ios-title-1 {
+  font-family: var(--font-display);
+  font-size: var(--type-title-1);
+  font-weight: 700;
+  letter-spacing: -0.021em;
+  line-height: 1.25;
+  color: var(--label);
+}
+
+h3, .ios-title-2 {
+  font-family: var(--font-display);
+  font-size: var(--type-title-2);
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  line-height: 1.3;
+  color: var(--label);
+}
+
+h4, .ios-title-3 {
+  font-size: var(--type-title-3);
+  font-weight: 600;
+  letter-spacing: -0.017em;
   line-height: 1.35;
-  color: var(--text);
+  color: var(--label);
+}
+
+h5, .ios-headline {
+  font-size: var(--type-headline);
+  font-weight: 600;
+  letter-spacing: -0.024em;
+  line-height: 1.35;
+  color: var(--label);
+}
+
+/* Apple Inset Grouped Section & Table Styles */
+.ios-grouped-section {
+  margin: 16px 16px 24px 16px;
+}
+
+.ios-section-header {
+  font-size: var(--type-footnote);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: var(--secondary-label);
+  padding: 0 16px 6px 16px;
+}
+
+.ios-section-footer {
+  font-size: var(--type-footnote);
+  color: var(--secondary-label);
+  padding: 6px 16px 0 16px;
+  line-height: 1.35;
+}
+
+.ios-grouped-card {
+  background: var(--secondary-system-grouped-bg);
+  border-radius: var(--radius-group);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  border: 0.5px solid var(--separator);
+}
+
+.ios-list-row {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 12px 16px;
+  background: var(--secondary-system-grouped-bg);
+  position: relative;
+  transition: background-color 0.12s ease;
+}
+
+.ios-list-row:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  left: 16px;
+  height: 0.5px;
+  background-color: var(--separator);
+}
+
+.ios-list-row:active {
+  background-color: var(--system-gray5);
+}
+
+.ios-chevron {
+  color: var(--tertiary-label);
+  margin-left: auto;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
 }
