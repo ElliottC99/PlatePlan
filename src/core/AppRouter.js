@@ -16,6 +16,7 @@ let activeViewModule = null;
 const viewModuleMap = {
   today: TodayView,
   planner: PlannerView,
+  planlib: PlannerView,
   vault: RecipeVaultView,
   settings: SettingsView,
   prefs: SettingsView,

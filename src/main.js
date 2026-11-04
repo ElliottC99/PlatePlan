@@ -44,7 +44,7 @@ import { renderToday } from './views/TodayView.js';
 import { renderIngredientBank, renderProductBank } from './views/PantryBankView.js';
 import { renderSettingsView } from './views/SettingsView.js';
 import { renderScrollableSwapModal, toggleShoppingItemAcquired, getShoppingLineStateKey } from './views/ShoppingView.js';
-import { renderPlanner } from './views/PlannerView.js';
+import { renderPlanner, renderPlanLibrary } from './views/PlannerView.js';
 import { renderRecipeVault } from './views/RecipeVaultView.js';
 import { renderDataQualityView } from './views/DataQualityView.js';
 import './components/data-quality/ResolveUnlinkedModalUI.js';
@@ -187,6 +187,7 @@ if (typeof window !== 'undefined') {
         case 'today': return renderToday();
         case 'vault': case 'recipes': return renderRecipeVault();
         case 'planner': case 'plan': return renderPlanner();
+        case 'planlib': return renderPlanLibrary();
         case 'settings': case 'prefs': return renderSettingsView();
         case 'ingredients': return renderIngredientBank();
         case 'bank': return renderProductBank();

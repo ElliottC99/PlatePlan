@@ -76,6 +76,37 @@ export async function deletePlan(planId) {
   }
 }
 
+export function createPlanArchivePayload(plan, options = {}) {
+  if (!plan || typeof plan !== 'object') return null;
+  const days = Number(plan.days || Object.keys(plan.slots || {}).length || 0);
+  const startDate = plan.startDate || new Date().toISOString().split('T')[0];
+  let endDate = plan.endDate;
+  if (!endDate && startDate && days > 0) {
+    const end = new Date(startDate);
+    end.setDate(end.getDate() + (days - 1));
+    endDate = end.toISOString().split('T')[0];
+  }
+  let startFmt = startDate;
+  let endFmt = endDate;
+  try {
+    startFmt = new Date(startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    endFmt = endDate ? new Date(endDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+  } catch (_) {}
+  const defaultName = `Plan: ${startFmt}${endFmt ? ` – ${endFmt}` : ''}`;
+  const planId = options.id || plan.id || `plan_${startDate.replace(/-/g, '')}_${Date.now()}`;
+
+  return {
+    ...plan,
+    id: planId,
+    name: options.name || plan.name || defaultName,
+    startDate,
+    endDate,
+    days,
+    archivedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
 export async function getPlanHistory() {
   try {
     if (!isDbAvailable()) return [];
@@ -110,7 +141,8 @@ const PlanRepository = {
   getCurrentActivePlan,
   deletePlan,
   getPlanHistory,
-  savePlanHistory
+  savePlanHistory,
+  createPlanArchivePayload
 };
 
 if (typeof window !== 'undefined') {

@@ -128,6 +128,40 @@ export function routeAction(actionName, target, event) {
     return true;
   }
 
+  // 4b. Meal Plan Library Actions
+  if (normalizedAction === 'restore-saved-plan') {
+    const planId = ds.planId || target.getAttribute('data-plan-id');
+    import('../views/PlannerView.js').then(m => m.restoreSavedPlan(planId));
+    return true;
+  }
+
+  if (normalizedAction === 'delete-saved-plan') {
+    const planId = ds.planId || target.getAttribute('data-plan-id');
+    import('../views/PlannerView.js').then(m => m.deleteSavedPlan(planId));
+    return true;
+  }
+
+  if (normalizedAction === 'open-saved-plan-recipe-cards') {
+    const planId = ds.planId || target.getAttribute('data-plan-id') || (ds.index !== undefined ? ds.index : null);
+    import('../views/PlannerView.js').then(m => m.openSavedPlanRecipeCards(planId));
+    return true;
+  }
+
+  if (normalizedAction === 'open-active-plan-recipe-cards') {
+    import('../views/PlannerView.js').then(m => m.openActivePlanRecipeCards());
+    return true;
+  }
+
+  if (normalizedAction === 'open-planner-view') {
+    showView('planner');
+    return true;
+  }
+
+  if (normalizedAction === 'opensavemealplanmodal()' || normalizedAction === 'open-save-meal-plan-modal' || normalizedAction.includes('opensavemealplanmodal')) {
+    import('../views/PlannerView.js').then(m => m.openSaveMealPlanModal());
+    return true;
+  }
+
   // 5. Shopping Item Acquired Checkbox
   if (normalizedAction === 'toggle-shopping-item' || normalizedAction === 'toggle-shopping-at-home' || normalizedAction === 'toggleshoppingathome' || normalizedAction.includes('toggleshoppingathome')) {
     const containerEl = target.closest('[data-item-key], .pp-shop-item, .shopping-list-row, .item-row') || target;
