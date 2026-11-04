@@ -31,10 +31,11 @@ export async function savePlan(plan) {
     const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('plans');
     
     // Save to specific planId doc and current active plan doc
-    await Promise.all([
-      colRef.doc(planId).set(planData, { merge: true }),
-      colRef.doc('current').set(planData, { merge: true })
-    ]);
+    const writePromises = [colRef.doc('current').set(planData, { merge: true })];
+    if (planId && planId !== 'current') {
+      writePromises.push(colRef.doc(planId).set(planData, { merge: true }));
+    }
+    await Promise.all(writePromises);
 
     return { success: true, plan: planData };
   } catch (err) {
@@ -93,7 +94,11 @@ export function createPlanArchivePayload(plan, options = {}) {
     endFmt = endDate ? new Date(endDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
   } catch (_) {}
   const defaultName = `Plan: ${startFmt}${endFmt ? ` – ${endFmt}` : ''}`;
-  const planId = options.id || plan.id || `plan_${startDate.replace(/-/g, '')}_${Date.now()}`;
+  const planId = (options.id && options.id !== 'current')
+    ? options.id
+    : (plan.id && plan.id !== 'current')
+      ? plan.id
+      : `plan_${startDate.replace(/-/g, '')}_${Date.now()}`;
 
   return {
     ...plan,

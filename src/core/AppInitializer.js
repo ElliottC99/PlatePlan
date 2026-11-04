@@ -116,6 +116,14 @@ export function initPlannerGridDelegation() {
       if (typeof window.openPlanHistoryActions === 'function') {
         window.openPlanHistoryActions(Number(ds.index));
       }
+    } else if (action === 'set-step' && ds.step) {
+      if (typeof window.setPlannerWizardStep === 'function') {
+        window.setPlannerWizardStep(Number(ds.step));
+      }
+    } else if (action === 'commit-plan') {
+      if (typeof window.commitPlannerWizardPlan === 'function') {
+        window.commitPlannerWizardPlan();
+      }
     }
   });
 

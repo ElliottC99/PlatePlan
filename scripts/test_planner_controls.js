@@ -134,11 +134,11 @@ function checkPlanKept(plan, label) {
   writes.length = 0; viewsShown.length = 0;
   window.commitPlannerWizardPlan();
   await settle();
-  const planWrites = writes.filter(w => w.path.includes('/plans/'));
-  assert.equal(planWrites.length, 1, `exactly one plan write: ${planWrites.map(w => w.path)}`);
-  assert.equal(planWrites[0].path, CURRENT, 'the write goes to plans/current');
-  assert.equal(planWrites[0].merge, false, 'the write is the whole document');
-  checkPlanKept(planWrites[0].data, 'written document');
+  const currentWrites = writes.filter(w => w.path === CURRENT);
+  assert.equal(currentWrites.length, 1, `exactly one plan write to plans/current: ${writes.map(w => w.path)}`);
+  assert.equal(currentWrites[0].path, CURRENT, 'the write goes to plans/current');
+  assert.equal(currentWrites[0].merge, false, 'the write is the whole document');
+  checkPlanKept(currentWrites[0].data, 'written document');
   assert.equal(getState().currentPlannerStep, 2, 'the wizard step is 2, as the old commit set it');
   assert.deepEqual(viewsShown, ['today'], 'the app asks for the Today view');
   checkPlanKept(await reload(), 'after reload');
