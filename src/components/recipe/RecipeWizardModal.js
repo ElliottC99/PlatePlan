@@ -330,17 +330,19 @@ export function renderWizardModal() {
   }
 
   modalWrap.innerHTML = `
-    <div class="modal-backdrop" onclick="closeRecipeWizard()"></div>
-    <div class="modal" style="max-width: 920px; width: 94%; max-height: 92vh; display: flex; flex-direction: column; padding: 24px; background: var(--surface, #fff); border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,0.25);">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border, #eee); padding-bottom: 14px; margin-bottom: 18px;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: var(--text, #111);">Recipe Wizard</h2>
+    <div class="ios-fullscreen-modal open">
+      <div class="ios-fullscreen-nav">
+        <button type="button" class="ios-nav-btn" onclick="closeRecipeWizard()">Cancel</button>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:17px; font-weight:600; color:var(--label); letter-spacing:-0.024em;">Recipe Wizard</span>
           ${renderStepBadge()}
         </div>
-        <button type="button" class="btn sm ghost" onclick="closeRecipeWizard()" aria-label="Close Wizard">✕</button>
+        <button type="button" class="ios-nav-btn bold" onclick="closeRecipeWizard()">Done</button>
       </div>
-      <div id="wizard-modal-body" style="flex: 1; overflow-y: auto; padding-right: 4px;">
-        ${bodyContent}
+      <div class="ios-fullscreen-body" id="wizard-modal-body">
+        <div style="max-width: 860px; margin: 0 auto; width: 100%;">
+          ${bodyContent}
+        </div>
       </div>
     </div>
   `;
