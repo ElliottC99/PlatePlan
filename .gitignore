@@ -29,3 +29,8 @@ Thumbs.db
 /plans/
 /todos/
 
+# Compound Engineering scratch space & local overrides
+.context/compound-engineering/
+.compound-engineering/*.local.yaml
+
+
