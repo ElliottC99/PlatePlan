@@ -53,15 +53,24 @@ console.log('\n--- Test 2: Recipe Extraction from Plan Slots ---');
         breakfastE: { isSkipped: true },
         lunchE: { id: 'rec-salad' },
         dinnerE: { skipped: true }
+      },
+      3: {
+        dinner: {
+          isSplit: true,
+          elliott: { recipeId: 'rec-curry' },
+          chloe: { recipeId: 'rec-pasta' }
+        }
       }
     }
   };
 
   const recipeIds = getPlanRecipeIds(planWithSkips);
-  assert.strictEqual(recipeIds.length, 3, 'Should extract exactly 3 unique non-skipped recipes');
+  assert.strictEqual(recipeIds.length, 5, 'Should extract exactly 5 unique non-skipped recipes including split slots');
   assert.ok(recipeIds.includes('rec-oats'), 'Includes rec-oats');
   assert.ok(recipeIds.includes('rec-stirfry'), 'Includes rec-stirfry');
   assert.ok(recipeIds.includes('rec-salad'), 'Includes rec-salad');
+  assert.ok(recipeIds.includes('rec-curry'), 'Includes split elliott rec-curry');
+  assert.ok(recipeIds.includes('rec-pasta'), 'Includes split chloe rec-pasta');
 
   console.log('✅ Test 2 Passed: Recipe IDs extracted cleanly without duplicates or skipped slots.');
 }

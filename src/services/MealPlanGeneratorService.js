@@ -126,7 +126,7 @@ export function getRecentRecipeUsageMap(planHistory = [], currentPlan = null, wi
       const dateTime = dateStr ? new Date(dateStr).getTime() : (plan.updatedAt ? new Date(plan.updatedAt).getTime() : now.getTime());
 
       if (dateTime >= cutoffTime) {
-        Object.values(daySlot).forEach(slot => {
+        const recordSlot = (slot) => {
           if (!slot || slot.isSkipped || slot.skipped) return;
           const rId = slot.recipeId || slot.id;
           if (rId) {
@@ -135,7 +135,10 @@ export function getRecentRecipeUsageMap(planHistory = [], currentPlan = null, wi
               usageMap.set(rId, { dateTime, dateStr });
             }
           }
-        });
+          if (slot.elliott && typeof slot.elliott === 'object') recordSlot(slot.elliott);
+          if (slot.chloe && typeof slot.chloe === 'object') recordSlot(slot.chloe);
+        };
+        Object.values(daySlot).forEach(recordSlot);
       }
     });
   };

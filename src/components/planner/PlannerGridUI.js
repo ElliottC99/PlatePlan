@@ -44,13 +44,16 @@ export function getPlanDateRangeLabel(p) {
 export function getPlanRecipeIds(p) {
   if (!p || !p.slots || typeof p.slots !== 'object') return [];
   const ids = new Set();
+  const collect = (slot) => {
+    if (!slot || slot.isSkipped || slot.skipped) return;
+    const rId = slot.recipeId || slot.id;
+    if (rId) ids.add(rId);
+    if (slot.elliott && typeof slot.elliott === 'object') collect(slot.elliott);
+    if (slot.chloe && typeof slot.chloe === 'object') collect(slot.chloe);
+  };
   Object.values(p.slots).forEach(daySlot => {
     if (!daySlot || typeof daySlot !== 'object') return;
-    Object.values(daySlot).forEach(slot => {
-      if (!slot || slot.isSkipped || slot.skipped) return;
-      const rId = slot.recipeId || slot.id;
-      if (rId) ids.add(rId);
-    });
+    Object.values(daySlot).forEach(collect);
   });
   return Array.from(ids);
 }

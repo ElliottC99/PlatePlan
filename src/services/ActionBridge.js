@@ -152,6 +152,12 @@ export function routeAction(actionName, target, event) {
     return true;
   }
 
+  if (normalizedAction === 'close-plan-recipe-cards') {
+    const modal = document.getElementById('plan-recipe-cards-modal-wrap');
+    if (modal) modal.remove();
+    return true;
+  }
+
   if (normalizedAction === 'open-planner-view') {
     showView('planner');
     return true;

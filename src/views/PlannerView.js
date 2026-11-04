@@ -5,7 +5,7 @@
  */
 
 import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
-import { subscribe, store, Store } from '../store/store.js';
+import { subscribe, store, Store, setCurrentPlan } from '../store/store.js';
 import { getState } from '../store/coreState.js';
 import { saveCurrentPlan } from '../services/HouseholdRepository.js';
 import * as GeneratorConstraintsForm from '../components/generator/GeneratorConstraintsForm.js';
@@ -197,8 +197,10 @@ export async function restoreSavedPlan(planId) {
   delete cleanPlan.archivedAt;
   const saveRes = await repo.savePlan(cleanPlan);
   if (saveRes.success) {
-    if (Store && Store.setState) {
-      Store.setState({ currentPlan: cleanPlan });
+    if (typeof setCurrentPlan === 'function') {
+      setCurrentPlan(cleanPlan);
+    } else if (store && store.setState) {
+      store.setState({ currentPlan: cleanPlan });
     }
     if (typeof window.showPlatePlanToast === 'function') {
       window.showPlatePlanToast(`Loaded "${target.name || 'Saved Plan'}" as active plan! ✓`, 'success');
@@ -274,12 +276,12 @@ export function openPlanRecipeCardsModal(plan) {
             <h2 style="margin:0; font-size:17px; font-weight:700; color:var(--text,#1c1917);">${escapeHtml(plan.name || 'Meal Plan Recipes')}</h2>
             <div style="font-size:12px; color:var(--text2,#78716c); margin-top:3px;">${escapeHtml(getPlanDateRangeLabel(plan))} · ${matchedRecipes.length} distinct meals</div>
           </div>
-          <button type="button" class="btn sm ghost" onclick="document.getElementById('plan-recipe-cards-modal-wrap')?.remove()">✕ Close</button>
+          <button type="button" class="btn sm ghost" data-action="close-plan-recipe-cards">✕ Close</button>
         </div>
         <div style="overflow-y:auto; flex:1; display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:12px; padding:4px;">
           ${matchedRecipes.length === 0 ? `<div style="grid-column: 1 / -1; text-align:center; padding:20px; color:var(--text3,#78716c);">No recipes found in this plan.</div>` : ''}
           ${matchedRecipes.map(r => `
-            <div class="card" style="margin:0; padding:12px; cursor:pointer; border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; flex-direction:column; justify-content:space-between; background:var(--surface2,#fafaf9);" onclick="if(typeof window.viewRecipe === 'function') window.viewRecipe('${escapeAttr(r.id)}')">
+            <div class="card" style="margin:0; padding:12px; cursor:pointer; border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; flex-direction:column; justify-content:space-between; background:var(--surface2,#fafaf9);" data-action="view-recipe" data-recipe-id="${escapeAttr(r.id)}">
               <div>
                 <div style="font-size:10px; color:var(--primary,#059669); font-weight:700; text-transform:uppercase;">${escapeHtml((r.types || [r.type || 'Meal']).join(', '))}</div>
                 <div style="font-weight:700; font-size:13px; margin:6px 0; color:var(--text,#1c1917); line-height:1.3;">${escapeHtml(r.name || r.title || r.id)}</div>

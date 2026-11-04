@@ -59,6 +59,30 @@ export function showConfirm(options = {}) {
   } = typeof options === 'string' ? { message: options } : options;
 
   return new Promise((resolve) => {
+    let settled = false;
+    const wrap = document.getElementById('view-modal-wrap');
+
+    const finish = (val) => {
+      if (settled) return;
+      settled = true;
+      document.removeEventListener('keydown', onKey);
+      if (wrap) wrap.removeEventListener('click', onBackdrop);
+      closeModal();
+      resolve(val);
+    };
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        finish(false);
+      }
+    };
+
+    const onBackdrop = (e) => {
+      if (e.target === wrap) {
+        finish(false);
+      }
+    };
+
     const html = `
       <div style="padding:20px; max-width:420px; width:100%; margin:0 auto; background:var(--surface,#fff); border-radius:12px; text-align:center;">
         <h3 style="margin:0 0 8px 0; font-size:1.1rem; font-weight:750; color:var(--text,#1c1917);">${escapeHtml(title)}</h3>
@@ -70,19 +94,17 @@ export function showConfirm(options = {}) {
       </div>
     `;
     showModal(html);
+
+    document.addEventListener('keydown', onKey);
+    if (wrap) wrap.addEventListener('click', onBackdrop);
+
     const cancelBtn = document.getElementById('btn-promise-confirm-cancel');
     if (cancelBtn) {
-      cancelBtn.onclick = () => {
-        closeModal();
-        resolve(false);
-      };
+      cancelBtn.onclick = () => finish(false);
     }
     const yesBtn = document.getElementById('btn-promise-confirm-yes');
     if (yesBtn) {
-      yesBtn.onclick = () => {
-        closeModal();
-        resolve(true);
-      };
+      yesBtn.onclick = () => finish(true);
     }
   });
 }
@@ -97,6 +119,30 @@ export function showPrompt(options = {}) {
   } = typeof options === 'string' ? { title: options } : options;
 
   return new Promise((resolve) => {
+    let settled = false;
+    const wrap = document.getElementById('view-modal-wrap');
+
+    const finish = (val) => {
+      if (settled) return;
+      settled = true;
+      document.removeEventListener('keydown', onKey);
+      if (wrap) wrap.removeEventListener('click', onBackdrop);
+      closeModal();
+      resolve(val);
+    };
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        finish(null);
+      }
+    };
+
+    const onBackdrop = (e) => {
+      if (e.target === wrap) {
+        finish(null);
+      }
+    };
+
     const html = `
       <div style="padding:20px; max-width:440px; width:100%; margin:0 auto; background:var(--surface,#fff); border-radius:12px;">
         <h3 style="margin:0 0 8px 0; font-size:1.1rem; font-weight:750; color:var(--text,#1c1917);">${escapeHtml(title)}</h3>
@@ -109,6 +155,10 @@ export function showPrompt(options = {}) {
       </div>
     `;
     showModal(html);
+
+    document.addEventListener('keydown', onKey);
+    if (wrap) wrap.addEventListener('click', onBackdrop);
+
     const inputEl = document.getElementById('prompt-modal-input');
     if (inputEl) {
       setTimeout(() => {
@@ -118,29 +168,19 @@ export function showPrompt(options = {}) {
       inputEl.onkeydown = (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          const val = inputEl.value;
-          closeModal();
-          resolve(val);
+          finish(inputEl.value);
         } else if (e.key === 'Escape') {
-          closeModal();
-          resolve(null);
+          finish(null);
         }
       };
     }
     const cancelBtn = document.getElementById('btn-prompt-cancel');
     if (cancelBtn) {
-      cancelBtn.onclick = () => {
-        closeModal();
-        resolve(null);
-      };
+      cancelBtn.onclick = () => finish(null);
     }
     const saveBtn = document.getElementById('btn-prompt-save');
     if (saveBtn) {
-      saveBtn.onclick = () => {
-        const val = inputEl ? inputEl.value : defaultValue;
-        closeModal();
-        resolve(val);
-      };
+      saveBtn.onclick = () => finish(inputEl ? inputEl.value : defaultValue);
     }
   });
 }
