@@ -1,17 +1,31 @@
 /**
  * src/components/pantry/RecipeSearchDropdownHelper.js
  * Search and autocomplete helper for Pantry Category / Item / Sub-type taxonomy locking.
- * Dynamic "Create New" options with dedicated category/item routing.
- * Strictly under 170 lines.
+ * Dynamic "Create New" options with dedicated category/item routing and live store synchronization.
+ * Multi-token substring filtering across the entire lineage.
  */
+
+import { getState } from '../../store/store.js';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
+
+function cleanSearchQuery(rawVal) {
+  if (!rawVal) return '';
+  let str = String(rawVal).trim();
+  str = str.replace(/^[📦🏷️📂🛒✨\s]+/, '');
+  str = str.replace(/^\[Category\]\s*/i, '');
+  str = str.replace(/^\[Root Item\]\s*/i, '');
+  str = str.replace(/^\[Sub-Type\]\s*/i, '');
+  str = str.replace(/[()[\]]/g, ' ');
+  return str.toLowerCase().trim();
+}
 
 export function createTaxonomySearchInput({
   container,
   categories = [],
   rootItems = [],
+  products = [],
   subtypesOnly = false,
   placeholder = 'Search category, item, or sub-type...',
   initialValue = '',
@@ -49,7 +63,15 @@ export function createTaxonomySearchInput({
 
   const filterAndRender = () => {
     const rawVal = inputEl.value || '';
-    const query = rawVal.toLowerCase().trim();
+    const cleanQuery = cleanSearchQuery(rawVal);
+    const searchTokens = cleanQuery.split(/\s+/).filter(Boolean);
+
+    const matchesTokens = (text) => {
+      if (!searchTokens.length) return true;
+      const t = String(text || '').toLowerCase();
+      return searchTokens.every(tok => t.includes(tok));
+    };
+
     let html = '';
 
     if (resolvedNewType === 'category') {
@@ -72,14 +94,33 @@ export function createTaxonomySearchInput({
       `;
     }
 
-    const liveRootItems = (typeof window !== 'undefined' && Array.isArray(window.Store?.getState?.()?.ingredients) && window.Store.getState().ingredients.length > 0) 
-      ? window.Store.getState().ingredients 
+    const state = (typeof getState === 'function' ? getState() : null) || (typeof window !== 'undefined' ? (window.Store?.getState?.() || window.state) : null) || {};
+    const liveRootItems = Array.isArray(state?.ingredients) && state.ingredients.length > 0 
+      ? state.ingredients 
       : rootItems;
-    const liveCategories = (typeof window !== 'undefined' && Array.isArray(window.Store?.getState?.()?.categories) && window.Store.getState().categories.length > 0)
-      ? window.Store.getState().categories
+    const liveCategories = Array.isArray(state?.categories) && state.categories.length > 0 
+      ? state.categories 
       : categories;
+    const liveProducts = Array.isArray(products) && products.length > 0
+      ? products
+      : (Array.isArray(state?.products) ? state.products : []);
 
-    if (subtypesOnly) {
+    // Dedicated Product Search Mode (e.g. within AddItemWizard existing product picker)
+    if (products.length > 0 && liveRootItems.length === 0 && liveCategories.length === 0) {
+      products.forEach(prod => {
+        if (!prod) return;
+        const pName = String(prod.name || prod.title || '');
+        const pBrand = String(prod.brand || '');
+        const fullProdText = `${pName} ${pBrand}`;
+        if (matchesTokens(fullProdText)) {
+          html += `
+            <div class="wiz-tax-opt wiz-tax-product" data-val="${escapeAttr(prod.id)}" data-label="${escapeAttr(pName)}${pBrand ? ` (${escapeAttr(pBrand)})` : ''}" style="padding:6px 10px; font-size:12px; cursor:pointer; color:var(--text,#1c1917); border-bottom:1px solid rgba(0,0,0,0.03);">
+              🛒 <strong>${escapeHtml(pName)}</strong> ${pBrand ? `<span style="font-size:10.5px; color:var(--text2,#78716c);">(${escapeHtml(pBrand)})</span>` : ''}
+            </div>
+          `;
+        }
+      });
+    } else if (subtypesOnly) {
       (liveRootItems || []).forEach(item => {
         if (!item) return;
         const itemName = String(item.name || '');
@@ -89,8 +130,8 @@ export function createTaxonomySearchInput({
         subTypes.forEach(sub => {
           if (!sub) return;
           const subName = String(sub.name || '');
-          const matches = !query || subName.toLowerCase().includes(query) || itemName.toLowerCase().includes(query) || itemCat.toLowerCase().includes(query);
-          if (matches) {
+          const combinedText = `${subName} ${itemName} ${itemCat}`;
+          if (matchesTokens(combinedText)) {
             const subKey = `${item.id}:${sub.id || sub.name}`;
             html += `
               <div class="wiz-tax-opt wiz-tax-sub" data-val="${escapeAttr(subKey)}" data-label="🏷️ ${escapeAttr(sub.name)} (${escapeAttr(itemName)})" style="padding:7px 10px; font-size:12px; cursor:pointer; color:var(--text,#1c1917); border-bottom:1px solid rgba(0,0,0,0.04); display:flex; align-items:center; justify-content:space-between;">
@@ -106,7 +147,7 @@ export function createTaxonomySearchInput({
       (liveCategories || []).forEach(rawCat => {
         const catName = typeof rawCat === 'string' ? rawCat : (rawCat?.name || rawCat?.categoryName || '');
         if (!catName) return;
-        if (!query || catName.toLowerCase().includes(query)) {
+        if (matchesTokens(catName)) {
           html += `
             <div class="wiz-tax-opt wiz-tax-category" data-val="cat:${escapeAttr(catName)}" data-label="📂 [Category] ${escapeAttr(catName)}" style="padding:7px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--purple,#4f46e5); background:var(--surface2,#f5f4ee); border-bottom:1px solid var(--border,#eee);">
               📂 <span class="badge" style="background:#eef2ff; color:#4f46e5; font-size:10px; padding:1px 5px; border-radius:4px; margin-right:4px;">[Category]</span> ${escapeHtml(catName)}
@@ -118,21 +159,21 @@ export function createTaxonomySearchInput({
       // Render Root Items & Sub-types
       (liveRootItems || []).forEach(item => {
         if (!item) return;
-        const itemName = String(item.name || '').toLowerCase();
-        const itemCat = String(item.category || 'General').toLowerCase();
+        const itemName = String(item.name || '');
+        const itemCat = String(item.category || 'General');
         const subTypes = Array.isArray(item.subtypes) ? item.subtypes : [];
 
-        const matchesItem = !query || itemName.includes(query) || itemCat.includes(query);
-        const matchingSubtypes = subTypes.filter(s => !query || String(s?.name || '').toLowerCase().includes(query) || itemName.includes(query));
+        const itemMatches = matchesTokens(`${itemName} ${itemCat}`);
+        const matchingSubtypes = subTypes.filter(s => matchesTokens(`${s?.name || ''} ${itemName} ${itemCat}`));
 
-        if (matchesItem || matchingSubtypes.length > 0) {
+        if (itemMatches || matchingSubtypes.length > 0) {
           html += `
             <div class="wiz-tax-opt wiz-tax-main" data-val="${escapeAttr(item.id)}" data-label="📦 ${escapeAttr(item.name)} [${escapeAttr(item.category || 'General')}]" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--text,#1c1917); background:var(--surface2,#fbfbf9);">
               📦 ${escapeHtml(item.name)} <span style="font-size:10.5px; font-weight:normal; color:var(--text2,#78716c);">[${escapeHtml(item.category || 'General')}]</span>
             </div>
           `;
 
-          (matchesItem ? subTypes : matchingSubtypes).forEach(sub => {
+          (itemMatches ? subTypes : matchingSubtypes).forEach(sub => {
             if (!sub) return;
             const subKey = `${item.id}:${sub.id || sub.name}`;
             html += `

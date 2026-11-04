@@ -34,7 +34,7 @@ if (typeof window !== 'undefined') {
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData, teardownRealtimeSubscriptions } from './services/HydrationService.js';
-import { subscribe, getState, initStoreCache, setActivePlan, saveStateCache } from './store/store.js';
+import { subscribe, getState, initStoreCache, setActivePlan, saveStateCache, store } from './store/store.js';
 import { setupActionBridge } from './services/ActionBridge.js';
 import { saveCurrentPlan, stripPlanPayload, getCategories, saveCategories } from './services/HouseholdRepository.js';
 import { saveRootItem as saveIngredient, getRootItems as getIngredients } from './services/RootItemRepository.js';
@@ -87,6 +87,8 @@ const safeClone = (obj) => {
 
 // Global Compatibility Shims & Persistence Delegation
 if (typeof window !== 'undefined') {
+  window.Store = store;
+  window.store = store;
   window.stripPlanPayload = stripPlanPayload;
   window.saveState = function(stateData) {
     try {

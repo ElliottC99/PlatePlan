@@ -68,6 +68,11 @@ export const store = {
   subscribe: (domain, cb) => subscribe(domain, cb) 
 };
 
+if (typeof window !== 'undefined') {
+  window.Store = store;
+  window.store = store;
+}
+
 export {
   // Slices
   CacheSlice,

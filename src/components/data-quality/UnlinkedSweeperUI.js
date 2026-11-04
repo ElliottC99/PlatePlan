@@ -204,6 +204,7 @@ function attachSweeperSearchEvents(container, unlinkedGroups = []) {
             openTaxonomyCreationModal({
               initialName: initialPhrase,
               onComplete: (created = {}) => {
+                if (dropdown) dropdown.style.display = 'none';
                 if (created.category && !created.ingredientId && !created.rootItem) {
                   const catLabel = `📂 [Category] ${created.category}`;
                   input.value = catLabel;
@@ -214,7 +215,6 @@ function attachSweeperSearchEvents(container, unlinkedGroups = []) {
                   input.style.borderColor = '#10b981';
                   input.style.backgroundColor = '#ecfdf5';
                   input.style.color = 'var(--text,#1e293b)';
-                  input.dispatchEvent(new Event('input', { bubbles: true }));
                   input.dispatchEvent(new Event('change', { bubbles: true }));
                   return;
                 }
@@ -231,7 +231,6 @@ function attachSweeperSearchEvents(container, unlinkedGroups = []) {
                 input.style.borderColor = '#10b981';
                 input.style.backgroundColor = '#ecfdf5';
                 input.style.color = 'var(--text,#1e293b)';
-                input.dispatchEvent(new Event('input', { bubbles: true }));
                 input.dispatchEvent(new Event('change', { bubbles: true }));
               }
             });

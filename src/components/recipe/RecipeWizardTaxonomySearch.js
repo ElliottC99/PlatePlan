@@ -322,6 +322,7 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
             initialName: currentIngName,
             onComplete: (created) => {
               if (!created) return;
+              if (dropdownEl) dropdownEl.style.display = 'none';
               if (created.category && !created.ingredientId && !created.rootItem) {
                 const combinedKey = `cat:${created.category}`;
                 const displayLabel = `📂 [Category] ${created.category}`;
@@ -331,7 +332,6 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
                 inputEl.style.borderColor = '#10b981';
                 inputEl.style.backgroundColor = '#ecfdf5';
                 inputEl.style.color = 'var(--text,#1e293b)';
-                inputEl.dispatchEvent(new Event('input', { bubbles: true }));
                 inputEl.dispatchEvent(new Event('change', { bubbles: true }));
                 if (typeof onSelectCallback === 'function') {
                   onSelectCallback(sIdx, iIdx, combinedKey, created);
@@ -350,7 +350,6 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
               inputEl.style.borderColor = '#10b981';
               inputEl.style.backgroundColor = '#ecfdf5';
               inputEl.style.color = 'var(--text,#1e293b)';
-              inputEl.dispatchEvent(new Event('input', { bubbles: true }));
               inputEl.dispatchEvent(new Event('change', { bubbles: true }));
               if (rowNameInput) {
                 rowNameInput.value = subName;

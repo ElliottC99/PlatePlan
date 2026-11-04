@@ -208,6 +208,8 @@ function bindModalEvents(issues = [], totalPages = 1, ingredients = [], categori
           onComplete: (created) => {
             if (!created) return;
             const inputEl = mountEl.querySelector('.wiz-ing-tax-search') || searchInst?.inputEl;
+            const dropdownEl = mountEl.querySelector('.wiz-tax-dropdown') || searchInst?.dropdownEl;
+            if (dropdownEl) dropdownEl.style.display = 'none';
 
             if (created.category && !created.ingredientId && !created.rootItem) {
               mountEl.dataset.selectedId = `cat:${created.category}`;
@@ -220,7 +222,6 @@ function bindModalEvents(issues = [], totalPages = 1, ingredients = [], categori
                 inputEl.style.borderColor = '#10b981';
                 inputEl.style.backgroundColor = '#ecfdf5';
                 inputEl.style.color = 'var(--text,#1e293b)';
-                inputEl.dispatchEvent(new Event('input', { bubbles: true }));
                 inputEl.dispatchEvent(new Event('change', { bubbles: true }));
               }
               return;
@@ -239,7 +240,6 @@ function bindModalEvents(issues = [], totalPages = 1, ingredients = [], categori
               inputEl.style.borderColor = '#10b981';
               inputEl.style.backgroundColor = '#ecfdf5';
               inputEl.style.color = 'var(--text,#1e293b)';
-              inputEl.dispatchEvent(new Event('input', { bubbles: true }));
               inputEl.dispatchEvent(new Event('change', { bubbles: true }));
             }
           }
