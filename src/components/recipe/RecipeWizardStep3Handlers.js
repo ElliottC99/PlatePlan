@@ -325,10 +325,10 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
         waterMl: i.waterMl || null
       })),
       ingredientSections: rec.ingredientSections,
-      steps: rec.methodSteps || baseOrig.steps || [],
-      methodSteps: rec.methodSteps || baseOrig.methodSteps || [],
-      method: (rec.methodSteps || []).join('\n'),
-      instructions: rec.methodSteps || [],
+      steps: rec.methodSteps || baseOrig.steps || baseOrig.method || baseOrig.instructions || [],
+      methodSteps: rec.methodSteps || baseOrig.methodSteps || baseOrig.steps || baseOrig.method || [],
+      method: (rec.methodSteps && rec.methodSteps.length ? rec.methodSteps : (baseOrig.methodSteps || baseOrig.steps || (Array.isArray(baseOrig.method) ? baseOrig.method : (typeof baseOrig.method === 'string' ? [baseOrig.method] : [])) || [])).join('\n'),
+      instructions: rec.methodSteps || baseOrig.instructions || baseOrig.steps || baseOrig.method || [],
       macros: {
         calories: finalMacros.calories || finalMacros.cal || 0,
         protein: finalMacros.protein || finalMacros.prot || 0,
@@ -391,8 +391,10 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
         waterMl: i.waterMl || null,
         isNewTaxonomyItem: !!i.isNewTaxonomyItem
       })),
-      instructions: rec.methodSteps,
-      method: rec.methodSteps,
+      instructions: rec.methodSteps || [],
+      method: rec.methodSteps || [],
+      methodSteps: rec.methodSteps || [],
+      steps: rec.methodSteps || [],
       macros: {
         calories: finalMacros.calories || finalMacros.cal || 0,
         protein: finalMacros.protein || finalMacros.prot || 0,

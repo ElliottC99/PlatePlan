@@ -117,6 +117,7 @@ const mockOriginalRecipe = {
   serves: 2,
   mealSuitability: ['Dinner'],
   macros: { calories: 620, protein: 32, carbs: 70, fat: 22 },
+  method: ['Marinate chicken in soy sauce.', 'Sear chicken in hot pan.', 'Serve over white rice.'],
   ingredientSections: [
     {
       sectionTitle: 'Main Ingredients',
@@ -178,6 +179,8 @@ openRecipeWizard('review', 'rec_chicken_bowl', 'enhanced');
 assert.strictEqual(wizardState.currentStep, 2, 'Should navigate to Step 2');
 assert.strictEqual(wizardState.activeVariant, 'enhanced', 'Active variant must be enhanced');
 assert.strictEqual(wizardState.activeRecipe.ingredientSections[0].ingredients[0].name, 'Chicken Breast');
+assert.strictEqual(wizardState.activeRecipe.methodSteps?.length, 3, 'Method steps must follow over when reviewing enhanced recipe');
+assert.strictEqual(wizardState.activeRecipe.methodSteps[0], 'Marinate chicken in soy sauce.', 'First method step must match base recipe');
 
 // Initial macro calculation
 const initialMacros = recalculateWizardMacros(wizardState.activeRecipe);
@@ -218,9 +221,11 @@ itemToRemap.bankId = null;
 const remappedProduct = resolveProductForIngredient(itemToRemap, { products: mockProducts, ingredients: mockIngredients });
 assert.strictEqual(remappedProduct?.id, 'p_tofu', 'Must resolve to Firm Tofu product after mapping change');
 
-// Test 4: Step 3 Review Preserves Step 2 Edits
-console.log('\n--- Test 4: Step 3 Review Retains Step 2 Edits ---');
+// Test 4: Step 3 Review Preserves Step 2 Edits & Method Steps
+console.log('\n--- Test 4: Step 3 Review Retains Step 2 Edits & Method Steps ---');
 const step3Html = renderState3Review();
 assert.ok(step3Html.includes('600g') || step3Html.includes('600'), 'Step 3 must display updated 600g quantity, not stale 300g');
+assert.ok(step3Html.includes('Marinate chicken in soy sauce.'), 'Step 3 must display method steps from base recipe');
+assert.ok(step3Html.includes('Sear chicken in hot pan.'), 'Step 3 must display all method steps');
 
 console.log('\n=== ALL ENHANCED RECIPE WIZARD TESTS PASSED SUCCESSFULLY! ===');

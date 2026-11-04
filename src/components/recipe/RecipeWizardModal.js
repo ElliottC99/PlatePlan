@@ -165,18 +165,31 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null, va
         return `${header}${items}`.trim();
       }).filter(Boolean).join('\n\n');
 
-      const methodStepsArray = Array.isArray(targetSource.steps) 
-        ? targetSource.steps 
-        : (Array.isArray(targetSource.methodSteps) ? targetSource.methodSteps : (Array.isArray(targetSource.instructions) ? targetSource.instructions : []));
+      const extractRawSteps = (src) => {
+        if (!src) return [];
+        if (Array.isArray(src.methodSteps) && src.methodSteps.length > 0) return src.methodSteps;
+        if (Array.isArray(src.steps) && src.steps.length > 0) return src.steps;
+        if (Array.isArray(src.method) && src.method.length > 0) return src.method;
+        if (Array.isArray(src.instructions) && src.instructions.length > 0) return src.instructions;
+        if (typeof src.method === 'string' && src.method.trim()) {
+          return src.method.split('\n').map(s => s.trim()).filter(Boolean);
+        }
+        if (typeof src.instructions === 'string' && src.instructions.trim()) {
+          return src.instructions.split('\n').map(s => s.trim()).filter(Boolean);
+        }
+        if (typeof src.steps === 'string' && src.steps.trim()) {
+          return src.steps.split('\n').map(s => s.trim()).filter(Boolean);
+        }
+        return [];
+      };
 
-      let methodRawText = '';
-      if (methodStepsArray.length > 0) {
-        methodRawText = methodStepsArray.map(formatMethodLine).filter(Boolean).join('\n');
-      } else if (typeof targetSource.method === 'string') {
-        methodRawText = targetSource.method;
-      } else if (typeof targetSource.instructions === 'string') {
-        methodRawText = targetSource.instructions;
+      let rawStepsList = extractRawSteps(targetSource);
+      if ((!rawStepsList || rawStepsList.length === 0) && isEnhVariant && found) {
+        rawStepsList = extractRawSteps(found);
       }
+
+      const methodStepsArray = rawStepsList.map(s => typeof s === 'string' ? s.trim() : (s?.text || s?.instruction || s?.step || String(s || '')).trim()).filter(Boolean);
+      const methodRawText = methodStepsArray.map(formatMethodLine).filter(Boolean).join('\n');
 
       const safeServes = Number(targetSource.servings || targetSource.serves || 4) || 4;
       const rawExtracted = extractRecipeMacros(targetSource, isEnhVariant ? 'enhanced' : 'original');
@@ -199,7 +212,7 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null, va
         methodRaw: methodRawText,
         ingredientSections,
         ingredients: ingredientSections.flatMap(s => s.ingredients || []),
-        methodSteps: methodStepsArray.length ? methodStepsArray : (typeof targetSource.method === 'string' ? targetSource.method.split('\n').filter(Boolean) : []),
+        methodSteps: methodStepsArray,
         macros: safeMacros,
         enhanced: found.enhanced || null
       };
@@ -273,10 +286,14 @@ export function loadNextRecipeFromQueue() {
     return `${header}${items}`.trim();
   }).filter(Boolean).join('\n\n');
 
-  const rawSteps = next.instructions || next.methodSteps || [];
-  const methodRawText = Array.isArray(rawSteps)
-    ? rawSteps.map(formatMethodLine).filter(Boolean).join('\n')
-    : (typeof rawSteps === 'string' ? rawSteps : '');
+  const rawSteps = Array.isArray(next.methodSteps) && next.methodSteps.length ? next.methodSteps
+    : (Array.isArray(next.steps) && next.steps.length ? next.steps
+    : (Array.isArray(next.method) && next.method.length ? next.method
+    : (Array.isArray(next.instructions) && next.instructions.length ? next.instructions
+    : (typeof next.method === 'string' ? next.method.split('\n').filter(Boolean)
+    : (typeof next.instructions === 'string' ? next.instructions.split('\n').filter(Boolean) : [])))));
+  const parsedSteps = rawSteps.map(s => typeof s === 'string' ? s.trim() : (s?.text || s?.instruction || s?.step || String(s || '')).trim()).filter(Boolean);
+  const methodRawText = parsedSteps.map(formatMethodLine).filter(Boolean).join('\n');
   const safeServes = Number(next.servings || next.serves || 4) || 4;
 
   wizardState.activeRecipe = {
@@ -289,7 +306,7 @@ export function loadNextRecipeFromQueue() {
     ingredientsRaw: ingRawText,
     methodRaw: methodRawText,
     ingredientSections: next.ingredientSections || [{ sectionTitle: 'Main Ingredients', ingredients: next.ingredients || [] }],
-    methodSteps: next.instructions || next.methodSteps || [],
+    methodSteps: parsedSteps,
     macros: next.macros || { calories: 450, protein: 28, carbs: 40, fat: 16 }
   };
 }

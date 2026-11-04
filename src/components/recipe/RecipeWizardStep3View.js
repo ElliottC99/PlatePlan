@@ -128,6 +128,7 @@ export function renderState3Review() {
         ingredientSections: recipe.ingredientSections || recipe.enhanced.ingredientSections,
         ingredients: (recipe.ingredientSections ? recipe.ingredientSections.flatMap(s => s.ingredients || []) : null) || recipe.ingredients || recipe.enhanced.ingredients,
         macros: recipe.macros || recipe.enhanced.macros,
+        methodSteps: recipe.methodSteps || recipe.enhanced.methodSteps || recipe.enhanced.steps || recipe.enhanced.method || recipe.enhanced.instructions || recipe.steps || recipe.method || recipe.instructions || [],
         servings: recipe.servings || recipe.serves || recipe.enhanced.servings || recipe.enhanced.serves || 4
       }
     : recipe;
@@ -225,7 +226,10 @@ export function renderState3Review() {
   });
 
   let stepsReviewHtml = '';
-  const activeSteps = displayRecipe.methodSteps || displayRecipe.instructions || [];
+  const rawActiveSteps = displayRecipe.methodSteps || displayRecipe.steps || displayRecipe.method || displayRecipe.instructions || recipe.methodSteps || [];
+  const activeSteps = Array.isArray(rawActiveSteps)
+    ? rawActiveSteps.map(s => typeof s === 'string' ? s : (s?.text || s?.instruction || s?.step || String(s || ''))).filter(Boolean)
+    : (typeof rawActiveSteps === 'string' ? rawActiveSteps.split('\n').filter(Boolean) : []);
   activeSteps.forEach((s) => {
     stepsReviewHtml += `<li style="margin-bottom: 6px; font-size: 13px; color: var(--text, #333);">${escapeHtml(s)}</li>`;
   });

@@ -263,6 +263,8 @@ export function syncStep2InputsToState(modalWrap) {
     if (wizardState.activeRecipe.methodSteps) {
       wizardState.activeRecipe.enhanced.methodSteps = wizardState.activeRecipe.methodSteps;
       wizardState.activeRecipe.enhanced.steps = wizardState.activeRecipe.methodSteps;
+      wizardState.activeRecipe.enhanced.method = wizardState.activeRecipe.methodSteps;
+      wizardState.activeRecipe.enhanced.instructions = wizardState.activeRecipe.methodSteps;
     }
     if (wizardState.activeRecipe.servings) {
       wizardState.activeRecipe.enhanced.servings = wizardState.activeRecipe.servings;

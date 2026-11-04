@@ -141,7 +141,11 @@ export function renderState2Mapping() {
 
   // Method steps rendering with delete buttons
   let stepsHtml = '';
-  (recipe.methodSteps || []).forEach((step, idx) => {
+  const rawMethodSteps = recipe.methodSteps || recipe.steps || recipe.method || recipe.instructions || [];
+  const normalizedSteps = Array.isArray(rawMethodSteps)
+    ? rawMethodSteps.map(s => typeof s === 'string' ? s : (s?.text || s?.instruction || s?.step || String(s || ''))).filter(Boolean)
+    : (typeof rawMethodSteps === 'string' ? rawMethodSteps.split('\n').filter(Boolean) : []);
+  normalizedSteps.forEach((step, idx) => {
     stepsHtml += `
       <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
         <span style="font-size: 12px; font-weight: 700; color: var(--text2); width: 24px; text-align: right;">${idx + 1}.</span>
