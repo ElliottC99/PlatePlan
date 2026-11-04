@@ -10,7 +10,7 @@ import { renderPlanner } from '../views/PlannerView.js';
 import { renderRecipeVault, handleVaultSortChange } from '../views/RecipeVaultView.js';
 import { openProductEditModal, saveManualIng, cancelManualIng, clearProductGroupFilter, showTescoImport, toggleTescoUpdate, applyTescoUpdate } from '../views/ProductBankView.js';
 import { renderDataQualityView } from '../views/DataQualityView.js';
-import { moveTodayDate, resetTodayDate, toggleMealEaten } from '../views/TodayView.js';
+import { moveTodayDate, resetTodayDate, toggleMealEaten, openTodayRearrangeModal, closeTodaySwapModal, executeTodaySlotSwap } from '../views/TodayView.js';
 import { showView } from '../core/AppRouter.js';
 import { closeRecipePreview } from './RecipeDetailModalService.js';
 import { routeRecipeAction } from './RecipeActionBridge.js';
@@ -43,6 +43,26 @@ export function routeAction(actionName, target, event) {
 
   if (normalizedAction === 'toggle-meal-eaten') {
     if (ds.mealType) toggleMealEaten(ds.mealType, ds.person || 'both');
+    return true;
+  }
+
+  if (normalizedAction === 'open-today-rearrange-modal') {
+    const dayKey = ds.dayKey || target.getAttribute('data-day-key');
+    const mealType = ds.mealType || target.getAttribute('data-meal-type') || 'dinner';
+    openTodayRearrangeModal(dayKey, mealType);
+    return true;
+  }
+
+  if (normalizedAction === 'close-today-swap-modal') {
+    closeTodaySwapModal();
+    return true;
+  }
+
+  if (normalizedAction === 'execute-today-slot-swap') {
+    const srcDay = ds.sourceDay || target.getAttribute('data-source-day');
+    const tgtDay = ds.targetDay || target.getAttribute('data-target-day');
+    const mealType = ds.mealType || target.getAttribute('data-meal-type') || 'dinner';
+    executeTodaySlotSwap(srcDay, tgtDay, mealType);
     return true;
   }
 

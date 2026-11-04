@@ -5,7 +5,7 @@
  * Renders daily meal timeline, macro snapshots, and meal completion toggles.
  */
 
-import { subscribe } from '../store/store.js';
+import { subscribe, setCurrentPlan } from '../store/store.js';
 import { getState } from '../store/coreState.js';
 import {
   getPlatePlanLocalToday,
@@ -20,6 +20,8 @@ import { getPlanSlotInfo } from '../services/MealPlanGeneratorService.js';
 import { renderFitScoreBadge } from '../components/FitScoreBadge.js';
 import { saveCurrentPlan } from '../services/HouseholdRepository.js';
 import { escapeAttr, escapeHtml } from '../utils/stringUtils.js';
+import { swapPlanMealSlots } from '../services/PlanSlotSwapService.js';
+import { renderTodaySwapModalHtml } from '../components/today/TodaySwapMealModalUI.js';
 
 let currentDateStr = getPlatePlanLocalToday();
 let stateUnsub = null;
@@ -97,7 +99,7 @@ export function renderToday() {
   const eatenMeals = plan.eatenMeals || {};
 
   const cardsHtml = mealSlots.flatMap(slot => getTodayMealCards(dayPlan, slot.type)
-    .map(card => renderTodayMealCard(slot, card, eatenMeals))).join('');
+    .map(card => renderTodayMealCard(slot, card, eatenMeals, dayKey))).join('');
 
   contentEl.innerHTML = cardsHtml || `<div class="empty-state-container" style="padding: 2rem; text-align: center; color: var(--text-secondary);">No meals assigned to this day in your active plan.</div>`;
 }
@@ -133,7 +135,7 @@ export function getTodayMealCards(dayPlan, mealType) {
   ].filter(Boolean);
 }
 
-function renderTodayMealCard(slot, { info: slotInfo, person }, eatenMeals) {
+function renderTodayMealCard(slot, { info: slotInfo, person }, eatenMeals, dayKey) {
   const recipe = slotInfo.active;
   const isEatenE = isMealEatenOnDate(eatenMeals, currentDateStr, slot.type, 'e');
   const isEatenC = isMealEatenOnDate(eatenMeals, currentDateStr, slot.type, 'c');
@@ -161,6 +163,11 @@ function renderTodayMealCard(slot, { info: slotInfo, person }, eatenMeals) {
           ${isEatenC ? '✓ C' : 'C'}
         </button>`;
 
+  const swapBtn = dayKey ? `
+        <button class="btn sm ghost" type="button" data-action="open-today-rearrange-modal" data-day-key="${escapeAttr(dayKey)}" data-meal-type="${escapeAttr(slot.type)}" title="Swap with another day" style="font-size:11.5px;padding:4px 8px;white-space:nowrap;display:flex;align-items:center;gap:3px;color:var(--text2,#78716c);">
+          ⇄ Swap
+        </button>` : '';
+
   return `
     <div class="today-meal-card ${isEaten ? 'meal-eaten' : ''}" style="background:var(--card,#fff);border:1px solid ${isEaten ? 'var(--green-light,#bbf7d0)' : 'var(--border,#e7e5e4)'};border-radius:14px;padding:16px;margin-bottom:12px;display:flex;flex-direction:column;gap:12px;opacity:${isEaten ? '0.75' : '1'};transition:all 0.2s ease;">
       <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -178,10 +185,90 @@ function renderTodayMealCard(slot, { info: slotInfo, person }, eatenMeals) {
         </div>
         <button class="btn sm" type="button" data-action="view-recipe" data-recipe-id="${escapeAttr(recipe.id)}" data-instance-id="${escapeAttr(slotInfo.instanceId || '')}" data-variant="${escapeAttr(slotInfo.variant || 'original')}" style="white-space:nowrap;font-weight:600;">View Recipe</button>
       </div>
-      <div style="display:flex;gap:8px;border-top:1px dashed var(--border,#e7e5e4);padding-top:10px;margin-top:2px;">${mainTick}${personTicks}
+      <div style="display:flex;gap:8px;border-top:1px dashed var(--border,#e7e5e4);padding-top:10px;margin-top:2px;align-items:center;">${mainTick}${personTicks}${swapBtn}
       </div>
     </div>
   `;
+}
+
+export function openTodayRearrangeModal(dayKey, mealType = 'dinner') {
+  const state = getState();
+  const plan = state?.currentPlan;
+  if (!plan || !plan.slots) {
+    if (typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast('No active meal plan loaded to rearrange.', 'info');
+    }
+    return;
+  }
+  const recipes = state?.recipes || [];
+  const modalHtml = renderTodaySwapModalHtml({
+    plan,
+    sourceDayKey: dayKey,
+    mealType,
+    recipes
+  });
+
+  const existing = document.getElementById('today-swap-modal-wrap');
+  if (existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  const wrap = document.getElementById('today-swap-modal-wrap');
+  if (wrap) {
+    const handleKey = (e) => {
+      if (e.key === 'Escape') {
+        closeTodaySwapModal();
+        document.removeEventListener('keydown', handleKey);
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+  }
+}
+
+export function closeTodaySwapModal() {
+  const existing = document.getElementById('today-swap-modal-wrap');
+  if (existing) existing.remove();
+}
+
+export async function executeTodaySlotSwap(sourceDayKey, targetDayKey, mealType = 'dinner') {
+  const plan = getState()?.currentPlan;
+  if (!plan) return;
+
+  const result = swapPlanMealSlots(plan, sourceDayKey, targetDayKey, mealType);
+  if (!result.success || !result.plan) {
+    if (typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast(result.error || 'Failed swapping meals.', 'error');
+    }
+    return;
+  }
+
+  const updatedPlan = result.plan;
+  if (typeof setCurrentPlan === 'function') {
+    setCurrentPlan(updatedPlan);
+  }
+
+  saveCurrentPlan(updatedPlan).catch(err => {
+    console.warn('[TodayView] Failed saving swapped plan to cloud:', err);
+  });
+
+  if (typeof window.showPlatePlanToast === 'function') {
+    const dayDates = updatedPlan.dayDates || {};
+    const tgtDate = dayDates[String(targetDayKey)];
+    let destLabel = `Day ${targetDayKey}`;
+    if (tgtDate) {
+      try {
+        destLabel = new Date(tgtDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+      } catch (_) {}
+    }
+    window.showPlatePlanToast(`Swapped ${mealType} with ${destLabel}! ✓`, 'success');
+  }
+
+  // Refresh modal if still open so subsequent swaps can be done smoothly
+  const modalWrap = document.getElementById('today-swap-modal-wrap');
+  if (modalWrap) {
+    openTodayRearrangeModal(sourceDayKey, mealType);
+  }
+
+  renderToday();
 }
 
 export function mount(container) {
@@ -206,10 +293,16 @@ if (typeof window !== 'undefined') {
     moveTodayDate,
     resetTodayDate,
     toggleMealEaten,
+    openTodayRearrangeModal,
+    closeTodaySwapModal,
+    executeTodaySlotSwap,
     mount,
     unmount
   };
   window.renderToday = renderToday;
   window.moveTodayDate = moveTodayDate;
   window.resetTodayDate = resetTodayDate;
+  window.openTodayRearrangeModal = openTodayRearrangeModal;
+  window.closeTodaySwapModal = closeTodaySwapModal;
+  window.executeTodaySlotSwap = executeTodaySlotSwap;
 }
