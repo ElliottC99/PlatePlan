@@ -49,6 +49,102 @@ export function showCustomAlert(message, title = 'Notice') {
   if (btn) btn.onclick = closeModal;
 }
 
+export function showConfirm(options = {}) {
+  const {
+    title = 'Confirm Action',
+    message = 'Are you sure?',
+    confirmLabel = 'Confirm',
+    cancelLabel = 'Cancel',
+    isDanger = false
+  } = typeof options === 'string' ? { message: options } : options;
+
+  return new Promise((resolve) => {
+    const html = `
+      <div style="padding:20px; max-width:420px; width:100%; margin:0 auto; background:var(--surface,#fff); border-radius:12px; text-align:center;">
+        <h3 style="margin:0 0 8px 0; font-size:1.1rem; font-weight:750; color:var(--text,#1c1917);">${escapeHtml(title)}</h3>
+        <p style="font-size:13px; color:var(--text2,#78716c); margin:0 0 16px 0; line-height:1.4;">${escapeHtml(message)}</p>
+        <div style="display:flex; gap:8px; justify-content:center;">
+          <button type="button" class="btn sm" id="btn-promise-confirm-cancel">${escapeHtml(cancelLabel)}</button>
+          <button type="button" class="btn ${isDanger ? 'danger' : 'primary'} sm" id="btn-promise-confirm-yes" style="${isDanger ? 'background:#ef4444; color:#fff;' : ''}">${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>
+    `;
+    showModal(html);
+    const cancelBtn = document.getElementById('btn-promise-confirm-cancel');
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        closeModal();
+        resolve(false);
+      };
+    }
+    const yesBtn = document.getElementById('btn-promise-confirm-yes');
+    if (yesBtn) {
+      yesBtn.onclick = () => {
+        closeModal();
+        resolve(true);
+      };
+    }
+  });
+}
+
+export function showPrompt(options = {}) {
+  const {
+    title = 'Enter Value',
+    message = '',
+    defaultValue = '',
+    confirmLabel = 'Save',
+    cancelLabel = 'Cancel'
+  } = typeof options === 'string' ? { title: options } : options;
+
+  return new Promise((resolve) => {
+    const html = `
+      <div style="padding:20px; max-width:440px; width:100%; margin:0 auto; background:var(--surface,#fff); border-radius:12px;">
+        <h3 style="margin:0 0 8px 0; font-size:1.1rem; font-weight:750; color:var(--text,#1c1917);">${escapeHtml(title)}</h3>
+        ${message ? `<p style="font-size:13px; color:var(--text2,#78716c); margin:0 0 12px 0;">${escapeHtml(message)}</p>` : ''}
+        <input type="text" id="prompt-modal-input" value="${escapeHtml(defaultValue)}" style="width:100%; padding:8px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; margin-bottom:16px; outline:none;" />
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+          <button type="button" class="btn sm" id="btn-prompt-cancel">${escapeHtml(cancelLabel)}</button>
+          <button type="button" class="btn primary sm" id="btn-prompt-save">${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>
+    `;
+    showModal(html);
+    const inputEl = document.getElementById('prompt-modal-input');
+    if (inputEl) {
+      setTimeout(() => {
+        inputEl.focus();
+        inputEl.select();
+      }, 50);
+      inputEl.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const val = inputEl.value;
+          closeModal();
+          resolve(val);
+        } else if (e.key === 'Escape') {
+          closeModal();
+          resolve(null);
+        }
+      };
+    }
+    const cancelBtn = document.getElementById('btn-prompt-cancel');
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        closeModal();
+        resolve(null);
+      };
+    }
+    const saveBtn = document.getElementById('btn-prompt-save');
+    if (saveBtn) {
+      saveBtn.onclick = () => {
+        const val = inputEl ? inputEl.value : defaultValue;
+        closeModal();
+        resolve(val);
+      };
+    }
+  });
+}
+
 export function showCustomConfirm(message, title = 'Confirm Action', onConfirm) {
   const html = `
     <div style="padding:20px; max-width:420px; width:100%; margin:0 auto; background:var(--surface,#fff); border-radius:12px; text-align:center;">
@@ -151,3 +247,15 @@ export function showCustomDensityModal({ ingredientName, currentDensity = 1.0, o
     };
   }
 }
+
+const DialogHelpers = {
+  showCustomAlert,
+  showCustomConfirm,
+  showCustomCopyModal,
+  showCustomDensityModal,
+  showConfirm,
+  showPrompt
+};
+
+export default DialogHelpers;
+
