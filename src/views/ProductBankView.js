@@ -165,7 +165,7 @@ export function openProductEditModal(productIdOrDraft = null) {
 
       <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; border-top: 1px solid var(--border, #e7e5e4); padding-top: 12px; margin-top: 6px;">
         <button type="button" class="btn sm ghost" data-action="cancel-manual-ing" style="font-weight: 600;">Cancel</button>
-        <button type="button" class="btn sm primary" id="mi-save-btn" data-action="save-manual-ing" style="font-weight: 700;">Save Product</button>
+        <button type="button" class="btn sm primary" id="mi-save-btn" data-action="save-manual-ing" style="font-weight: 700;">Save</button>
       </div>
       <div id="mi-msg"></div>
     </div>

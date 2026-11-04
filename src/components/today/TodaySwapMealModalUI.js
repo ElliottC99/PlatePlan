@@ -78,9 +78,9 @@ export function renderTodaySwapModalHtml({ plan, sourceDayKey, mealType = 'dinne
 
         <!-- Sheet Header Bar -->
         <div class="ios-sheet-header">
-          <button type="button" class="ios-nav-btn" data-action="closeTodaySwapModal()">Cancel</button>
+          <button type="button" class="ios-nav-btn" data-action="close-today-swap-modal">Cancel</button>
           <h3>Swap ${escapeHtml(capitalizedMeal)}</h3>
-          <button type="button" class="ios-nav-btn bold" data-action="closeTodaySwapModal()">Done</button>
+          <button type="button" class="ios-nav-btn bold" data-action="close-today-swap-modal">Done</button>
         </div>
 
         <!-- Sheet Body -->

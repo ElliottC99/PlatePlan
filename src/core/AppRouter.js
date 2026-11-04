@@ -30,7 +30,7 @@ const viewModuleMap = {
 };
 
 // Global scroll listener for Apple Large Title collapsing behavior
-if (typeof window !== 'undefined' && !window._iosNavScrollInitialized) {
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function' && !window._iosNavScrollInitialized) {
   window._iosNavScrollInitialized = true;
   window.addEventListener('scroll', () => {
     const navBar = document.querySelector('.view.active .ios-nav-bar') || document.querySelector('.ios-nav-bar');

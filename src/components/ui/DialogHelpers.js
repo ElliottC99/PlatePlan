@@ -74,8 +74,10 @@ export function showConfirm(options = {}) {
     const finish = (val) => {
       if (settled) return;
       settled = true;
-      document.removeEventListener('keydown', onKey);
-      if (wrap) wrap.removeEventListener('click', onBackdrop);
+      if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+        document.removeEventListener('keydown', onKey);
+      }
+      if (wrap && typeof wrap.removeEventListener === 'function') wrap.removeEventListener('click', onBackdrop);
       closeModal();
       resolve(val);
     };
@@ -95,8 +97,8 @@ export function showConfirm(options = {}) {
           <div class="ios-alert-message">${escapeHtml(message)}</div>
         </div>
         <div class="ios-alert-actions">
-          <button type="button" class="ios-alert-btn" id="btn-promise-confirm-cancel">${escapeHtml(cancelLabel)}</button>
-          <button type="button" class="ios-alert-btn bold ${isDanger ? 'destructive' : ''}" id="btn-promise-confirm-yes">${escapeHtml(confirmLabel)}</button>
+          <button type="button" class="ios-alert-btn" id="btn-confirm-cancel">${escapeHtml(cancelLabel)}</button>
+          <button type="button" class="ios-alert-btn bold ${isDanger ? 'destructive' : ''}" id="btn-confirm-yes">${escapeHtml(confirmLabel)}</button>
         </div>
       </div>
     `;
@@ -105,9 +107,9 @@ export function showConfirm(options = {}) {
     document.addEventListener('keydown', onKey);
     if (wrap) wrap.addEventListener('click', onBackdrop);
 
-    const cancelBtn = document.getElementById('btn-promise-confirm-cancel');
+    const cancelBtn = document.getElementById('btn-confirm-cancel');
     if (cancelBtn) cancelBtn.onclick = () => finish(false);
-    const yesBtn = document.getElementById('btn-promise-confirm-yes');
+    const yesBtn = document.getElementById('btn-confirm-yes');
     if (yesBtn) yesBtn.onclick = () => finish(true);
   });
 }
@@ -131,8 +133,10 @@ export function showPrompt(options = {}) {
     const finish = (val) => {
       if (settled) return;
       settled = true;
-      document.removeEventListener('keydown', onKey);
-      if (wrap) wrap.removeEventListener('click', onBackdrop);
+      if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+        document.removeEventListener('keydown', onKey);
+      }
+      if (wrap && typeof wrap.removeEventListener === 'function') wrap.removeEventListener('click', onBackdrop);
       closeModal();
       resolve(val);
     };
@@ -205,8 +209,10 @@ export function showActionSheet(options = {}) {
     const finish = (actionIndex) => {
       if (settled) return;
       settled = true;
-      document.removeEventListener('keydown', onKey);
-      if (wrap) wrap.removeEventListener('click', onBackdrop);
+      if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+        document.removeEventListener('keydown', onKey);
+      }
+      if (wrap && typeof wrap.removeEventListener === 'function') wrap.removeEventListener('click', onBackdrop);
       closeModal();
       resolve(actionIndex);
     };

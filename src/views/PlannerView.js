@@ -57,21 +57,55 @@ export function renderPlanner() {
 }
 
 export function renderPlannerWizard() {
-  const wizardContainer = document.getElementById('planner-wizard-flow');
-  if (!wizardContainer) return;
-  const state = getState() || {};
-  const currentStep = state.currentPlannerStep || 2;
+  const host = document.getElementById('planner-wizard-flow') || document.getElementById('planner-wizard-host');
+  if (!host) return;
+
+  const currentStep = typeof window.getPlannerWizardStep === 'function' ? window.getPlannerWizardStep() : (getState().currentPlannerStep || 1);
+  const hasActivePlan = !!(getState().currentPlan?.slots && Object.keys(getState().currentPlan.slots).length > 0);
+  let stepContentHtml = '';
 
   if (currentStep === 1) {
-    if (typeof GeneratorConstraintsForm.renderStep1 === 'function') {
-      GeneratorConstraintsForm.renderStep1(wizardContainer);
-    }
+    const daysVal = getState().currentPlannerDays || getState().currentPlan?.days || 10;
+    const today = new Date().toISOString().split('T')[0];
+    const startVal = getState().currentPlannerStartDate || getState().currentPlan?.dayDates?.[1] || today;
+    const cadence = getState()?.prefs?.mealRepeatCadence || { breakfast: 1, lunch: 2, dinner: 2 };
+    const minFitScore = getState()?.prefs?.minFitScore || 0;
+    const rawPinned = getState()?.currentPlanOptions?.pinnedMeals?.pinnedRecipes 
+      || getState()?.currentPlanOptions?.pinnedMeals 
+      || [];
+    const pinned = Array.isArray(rawPinned) ? rawPinned : [];
+
+    stepContentHtml = GeneratorConstraintsForm.renderConstraintsForm({
+      daysVal, startVal, cadence, minFitScore, pinned
+    }) || '';
   } else if (currentStep === 2) {
-    renderWizardStep2(wizardContainer);
+    if (!hasActivePlan) {
+      stepContentHtml = window.GeneratorWizardModal?.renderWizardEmptyPlanCard?.(2) || `
+        <div class="card" style="padding:24px;text-align:center">
+          <h3>No Meal Plan Generated Yet</h3>
+          <p style="color:var(--text2);font-size:13px;margin-bottom:14px">Configure your days and requests in Step 1 to generate your meal plan.</p>
+          <button type="button" class="btn primary" onclick="setPlannerWizardStep(1)">← Go to Step 1: Configure Requests</button>
+        </div>
+      `;
+    } else {
+      stepContentHtml = renderWizardStep2(getState().currentPlan || {});
+    }
   } else if (currentStep === 3) {
-    renderWizardStep3(wizardContainer);
-  } else {
-    renderWizardStep2(wizardContainer);
+    if (!hasActivePlan) {
+      stepContentHtml = window.GeneratorWizardModal?.renderWizardEmptyPlanCard?.(3) || '';
+    } else {
+      stepContentHtml = renderWizardStep3(getState().currentPlan || {});
+    }
+  } else if (currentStep === 4) {
+    stepContentHtml = window.GeneratorWizardModal?.renderWizardStep4Commit?.('v3.30.0') || '';
+  }
+
+  host.innerHTML = window.GeneratorWizardModal?.renderPlannerWizardView?.({
+    currentStep, hasActivePlan, stepContentHtml
+  }) || `<div class="planner-wizard-container">${stepContentHtml}</div>`;
+  
+  if (currentStep === 1) {
+    GeneratorConstraintsForm.bindConstraintEvents(host, renderPlannerWizard);
   }
 }
 
