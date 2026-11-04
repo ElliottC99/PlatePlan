@@ -5,7 +5,7 @@
  */
 
 import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
-import { subscribe, Store } from '../store/store.js';
+import { subscribe, store, Store } from '../store/store.js';
 import { getState } from '../store/coreState.js';
 import { saveCurrentPlan } from '../services/HouseholdRepository.js';
 import * as GeneratorConstraintsForm from '../components/generator/GeneratorConstraintsForm.js';
