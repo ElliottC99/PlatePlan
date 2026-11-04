@@ -121,7 +121,16 @@ export function renderState3Review() {
   const recipe = wizardState.activeRecipe;
   const currentVariant = wizardState.activeVariant || 'original';
   const isEnhancedTab = currentVariant === 'enhanced';
-  const displayRecipe = (isEnhancedTab && recipe.enhanced) ? { ...recipe, ...recipe.enhanced } : recipe;
+  const displayRecipe = (isEnhancedTab && recipe.enhanced)
+    ? {
+        ...recipe,
+        ...recipe.enhanced,
+        ingredientSections: recipe.ingredientSections || recipe.enhanced.ingredientSections,
+        ingredients: (recipe.ingredientSections ? recipe.ingredientSections.flatMap(s => s.ingredients || []) : null) || recipe.ingredients || recipe.enhanced.ingredients,
+        macros: recipe.macros || recipe.enhanced.macros,
+        servings: recipe.servings || recipe.serves || recipe.enhanced.servings || recipe.enhanced.serves || 4
+      }
+    : recipe;
   const targetMealType = displayRecipe.mealSuitability?.[0] || displayRecipe.types?.[0] || displayRecipe.type || 'dinner';
   const fitTagHtml = typeof renderFitScoreBadge === 'function' ? renderFitScoreBadge(displayRecipe, targetMealType, {
     variant: currentVariant,

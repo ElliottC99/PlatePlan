@@ -154,9 +154,16 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
   bindTaxonomyAutocompleteEvents(modalWrap, (sIdx, iIdx, val) => {
     const item = wizardState.activeRecipe.ingredientSections[sIdx]?.ingredients[iIdx];
     if (item) {
+      // Clear previous direct product matches when changing taxonomy mapping
+      item.productId = null;
+      item.bankId = null;
+      delete item.mappedItemId;
+      delete item.productMatch;
+
       if (!val || val === 'new_item') {
         item.ingredientId = null;
         item.subtypeId = null;
+        item.categoryId = null;
         item.isNewTaxonomyItem = true;
       } else if (val.startsWith('cat:')) {
         item.categoryId = val.replace('cat:', '');
@@ -167,10 +174,12 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
         const [ingId, subId] = val.split(':');
         item.ingredientId = ingId;
         item.subtypeId = subId;
+        item.categoryId = null;
         item.isNewTaxonomyItem = false;
       } else {
         item.ingredientId = val;
         item.subtypeId = null;
+        item.categoryId = null;
         item.isNewTaxonomyItem = false;
       }
     }

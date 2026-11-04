@@ -171,12 +171,48 @@ export function recalculateWizardMacros(recipeObj) {
     perServing: { ...perServing, cal: perServing.calories, prot: perServing.protein }
   };
 
+  const isEnh = (typeof wizardState !== 'undefined' && wizardState.activeVariant === 'enhanced') || Boolean(recipeObj.enhanced && recipeObj._isEnhanced);
+  if (recipeObj.enhanced && (typeof wizardState !== 'undefined' ? wizardState.activeVariant === 'enhanced' : true)) {
+    if (typeof recipeObj.enhanced === 'object') {
+      recipeObj.enhanced.macros = { ...perServing };
+      recipeObj.enhanced.nutrition = {
+        ...recipeObj.nutrition,
+        perServing: { ...perServing, cal: perServing.calories, prot: perServing.protein },
+        total: {
+          cal: Math.round(perServing.calories * serves),
+          prot: Math.round(perServing.protein * serves),
+          carb: Math.round(perServing.carbs * serves),
+          fat: Math.round(perServing.fat * serves)
+        }
+      };
+      recipeObj.enhanced.calories = perServing.calories;
+      recipeObj.enhanced.protein = perServing.protein;
+      recipeObj.enhanced.carbs = perServing.carbs;
+      recipeObj.enhanced.fat = perServing.fat;
+      if (recipeObj.ingredientSections) {
+        recipeObj.enhanced.ingredientSections = recipeObj.ingredientSections;
+      }
+      if (recipeObj.ingredients) {
+        recipeObj.enhanced.ingredients = recipeObj.ingredients;
+      }
+    }
+  }
+
+  const activeVar = (typeof wizardState !== 'undefined' && wizardState.activeVariant) ? wizardState.activeVariant : (recipeObj.enhanced ? 'enhanced' : 'original');
   const targetMealType = recipeObj.mealSuitability?.[0] || recipeObj.types?.[0] || recipeObj.type || 'dinner';
-  const fitResult = calculateMealFitScore(recipeObj, targetMealType);
+  const fitResult = calculateMealFitScore(recipeObj, targetMealType, { variant: activeVar });
   if (fitResult && typeof fitResult.score === 'number') {
     recipeObj.fitScore = fitResult.score;
     recipeObj.fitTier = fitResult.tier;
     recipeObj._computedFitScore = fitResult.score;
+    if (activeVar === 'enhanced') {
+      recipeObj.enhancedFitScore = fitResult.score;
+      recipeObj._scoreEnhanced = fitResult.score;
+      if (recipeObj.enhanced && typeof recipeObj.enhanced === 'object') {
+        recipeObj.enhanced.fitScore = fitResult.score;
+        recipeObj.enhanced._computedFitScore = fitResult.score;
+      }
+    }
   }
 
   return perServing;
@@ -251,12 +287,18 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
 
   let finalComputedScore = rec.fitScore || 0;
   const targetMealType = rec.types?.[0] || rec.type || 'dinner';
-  if (typeof window.calculateMealFitScore === 'function') {
-    const fitData = window.calculateMealFitScore(rec, targetMealType);
+  const scoreVariant = wizardState.activeVariant || 'original';
+  const calcMealScore = (typeof calculateMealFitScore === 'function') ? calculateMealFitScore : (typeof window !== 'undefined' ? window.calculateMealFitScore : null);
+  if (typeof calcMealScore === 'function') {
+    const fitData = calcMealScore(rec, targetMealType, { variant: scoreVariant });
     if (fitData && typeof fitData.score === 'number') finalComputedScore = fitData.score;
   }
   rec.fitScore = finalComputedScore;
   rec._computedFitScore = finalComputedScore;
+  if (scoreVariant === 'enhanced') {
+    rec.enhancedFitScore = finalComputedScore;
+    rec._scoreEnhanced = finalComputedScore;
+  }
 
   let recipeToSave;
   const baseOrig = wizardState.baseOriginalRecipe || {};

@@ -252,6 +252,23 @@ export function syncStep2InputsToState(modalWrap) {
   if (stepInputs.length > 0) {
     wizardState.activeRecipe.methodSteps = stepInputs.filter(Boolean);
   }
+
+  // Keep activeRecipe.ingredients and activeRecipe.enhanced in sync
+  if (wizardState.activeRecipe.ingredientSections) {
+    wizardState.activeRecipe.ingredients = wizardState.activeRecipe.ingredientSections.flatMap(s => s.ingredients || []);
+  }
+  if (wizardState.activeVariant === 'enhanced' && wizardState.activeRecipe.enhanced && typeof wizardState.activeRecipe.enhanced === 'object') {
+    wizardState.activeRecipe.enhanced.ingredientSections = wizardState.activeRecipe.ingredientSections;
+    wizardState.activeRecipe.enhanced.ingredients = wizardState.activeRecipe.ingredients;
+    if (wizardState.activeRecipe.methodSteps) {
+      wizardState.activeRecipe.enhanced.methodSteps = wizardState.activeRecipe.methodSteps;
+      wizardState.activeRecipe.enhanced.steps = wizardState.activeRecipe.methodSteps;
+    }
+    if (wizardState.activeRecipe.servings) {
+      wizardState.activeRecipe.enhanced.servings = wizardState.activeRecipe.servings;
+      wizardState.activeRecipe.enhanced.serves = wizardState.activeRecipe.servings;
+    }
+  }
 }
 
 export function syncStep3InputsToState(modalWrap) {
