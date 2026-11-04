@@ -32,7 +32,7 @@ export function renderStep3Template(wizardData, showProductSearch, productSearch
               <strong style="font-size: 13px; color: var(--badge-green-text);">🛒 ${escapeHtml(wizardData.linkedProduct.name || wizardData.linkedProduct.title)}</strong>
               <div style="font-size: 11.5px; color: var(--badge-green-text); margin-top: 2px;">${escapeHtml(wizardData.linkedProduct.brand || 'Tesco')} · £${Number(wizardData.linkedProduct.price || 0).toFixed(2)}</div>
             </div>
-            <button type="button" id="btn-remove-linked-product" class="btn ghost" style="font-size: 11px; padding: 4px 8px; color: var(--danger);">Unlink</button>
+            <button type="button" id="btn-remove-linked-product" class="btn ghost" style="font-size: 11px; padding: 4px 8px; color: var(--system-red);">Unlink</button>
           </div>
         ` : `
           <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">

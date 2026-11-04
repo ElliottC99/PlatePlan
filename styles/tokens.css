@@ -98,6 +98,8 @@ html.theme-light {
   --green-bg: var(--tint-color-muted);
   --red: var(--system-red);
   --red-bg: rgba(255, 59, 48, 0.12);
+  --danger: var(--system-red);
+  --danger-bg: rgba(255, 59, 48, 0.12);
   --amber: var(--system-orange);
   --amber-bg: rgba(255, 149, 0, 0.12);
   --coral: var(--system-orange);
@@ -244,6 +246,8 @@ html.theme-light {
     --green-bg: var(--tint-color-muted);
     --red: var(--system-red);
     --red-bg: rgba(255, 69, 58, 0.18);
+    --danger: var(--system-red);
+    --danger-bg: rgba(255, 69, 58, 0.18);
     --amber: var(--system-orange);
     --amber-bg: rgba(255, 159, 10, 0.18);
     --coral: var(--system-orange);
@@ -348,6 +352,8 @@ html.theme-dark {
   --green-bg: var(--tint-color-muted);
   --red: var(--system-red);
   --red-bg: rgba(255, 69, 58, 0.18);
+  --danger: var(--system-red);
+  --danger-bg: rgba(255, 69, 58, 0.18);
   --amber: var(--system-orange);
   --amber-bg: rgba(255, 159, 10, 0.18);
   --coral: var(--system-orange);

@@ -29,6 +29,8 @@ const requiredTokens = [
   '--separator',
   '--tint-color',
   '--system-blue',
+  '--system-red',
+  '--danger',
   '--card',
   '--badge-green-bg',
   '--badge-green-text',

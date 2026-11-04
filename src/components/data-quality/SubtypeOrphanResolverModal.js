@@ -122,7 +122,7 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
           <div style="font-size:12px; font-weight:700; color:var(--badge-blue-text); margin-bottom:8px;">⚡ Apply Batch Sub-Type to All (${affectedProducts.length} products):</div>
           <div style="display:flex; gap:8px; align-items:center;">
             <div id="batch-sub-type-mount" style="flex:1; min-width:0;"></div>
-            <button type="button" id="batch-delete-all-btn" class="btn sm ghost" style="color:var(--danger); border:1px solid var(--badge-red-border); background:var(--surface); font-size:11.5px; padding:7px 12px; border-radius:8px; white-space:nowrap; cursor:pointer;">
+            <button type="button" id="batch-delete-all-btn" class="btn sm ghost" style="color:var(--system-red); border:1px solid var(--badge-red-border); background:var(--surface); font-size:11.5px; padding:7px 12px; border-radius:8px; white-space:nowrap; cursor:pointer;">
               🗑️ Delete All (${affectedProducts.length})
             </button>
           </div>
