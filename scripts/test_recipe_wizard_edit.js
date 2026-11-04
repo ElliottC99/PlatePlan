@@ -119,9 +119,9 @@ const detailHtml = renderRecipeDetailModalContent({
   activeR: mockPizzaRecipe
 });
 
-assert(detailHtml.includes('modal-recipe-edit-btn'), 'Detail modal must include modal-recipe-edit-btn');
-assert(detailHtml.includes('openRecipeWizard(\'manual\', \'rec_pizza_1\')'), 'Edit button must call openRecipeWizard with rec_pizza_1');
-console.log('✅ Test 2 passed: Recipe Detail Modal renders Edit button!');
+assert(detailHtml.includes('modal-recipe-review-btn') || detailHtml.includes('modal-recipe-edit-btn'), 'Detail modal must include modal-recipe-review-btn or modal-recipe-edit-btn');
+assert(detailHtml.includes('openRecipeWizard(\'review\', \'rec_pizza_1\'') || detailHtml.includes('openRecipeWizard(\'manual\', \'rec_pizza_1\''), 'Button must call openRecipeWizard with rec_pizza_1');
+console.log('✅ Test 2 passed: Recipe Detail Modal renders Review/Edit button!');
 
 // Test 3: Fallback recipe retrieval via window.Store / window.allRecipes
 console.log('Testing Test 3: Fallback recipe retrieval...');

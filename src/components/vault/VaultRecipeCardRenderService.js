@@ -101,14 +101,18 @@ export function renderRecipeActionsItems(recipeId, isFav, variant = 'original') 
     </button>
   ` : '';
 
-  const editReviewItems = !isEnh ? `
+  const editItem = !isEnh ? `
     <button type="button" class="action-menu-item" data-action="menu-edit" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
       <span>✏️</span> Edit Recipe
     </button>
-    <button type="button" class="action-menu-item" data-action="menu-review" data-id="${rId}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
-      <span>🔍</span> Review Recipe
-    </button>
   ` : '';
+
+  const reviewLabel = isEnh ? 'Review Enhanced Recipe' : 'Review Recipe';
+  const reviewItem = `
+    <button type="button" class="action-menu-item" data-action="menu-review" data-id="${rId}" data-variant="${escapeAttr(variant)}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
+      <span>🔍</span> ${reviewLabel}
+    </button>
+  `;
 
   const deleteLabel = isEnh ? 'Remove Enhanced Variant' : 'Delete Entire Recipe';
 
@@ -117,7 +121,8 @@ export function renderRecipeActionsItems(recipeId, isFav, variant = 'original') 
       <span>👁️</span> View Details
     </button>
     ${enhanceItem}
-    ${editReviewItems}
+    ${editItem}
+    ${reviewItem}
     <button type="button" class="action-menu-item" data-action="menu-duplicate" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:none;background:none;width:100%;text-align:left;cursor:pointer;border-radius:6px;font-weight:500;color:var(--text, #111);">
       <span>📋</span> Duplicate Recipe
     </button>

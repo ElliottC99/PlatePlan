@@ -6,7 +6,10 @@
 import { wizardState, MEAL_TAGS, getSaveButtonLabel } from './RecipeWizardState.js';
 import { getState } from '../../store/store.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
-import { recalculateWizardMacros } from './RecipeWizardStep3Handlers.js';
+import { recalculateWizardMacros, resolveProductForIngredient } from './RecipeWizardStep3Handlers.js';
+import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
+import { renderFitScoreBadge } from '../FitScoreBadge.js';
+import { isIngredientUnlinked } from './RecipeWizardTaxonomySearch.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -47,54 +50,67 @@ function renderComparisonBadge(actual, target) {
 }
 
 export function renderMacroBreakdownCrossbar(recipe, variant = 'original') {
-  const storeState = getState();
-  const userPrefs = storeState.preferences || storeState.userPrefs || {};
-  const profiles = userPrefs.profiles || {};
-  const eProf = profiles.elliott || profiles.e || { dailyKcal: 2400, dailyProtein: 140 };
-  const cProf = profiles.chloe || profiles.c || { dailyKcal: 1650, dailyProtein: 100 };
+  const activeRec = (variant === 'enhanced' && recipe.enhanced) ? { ...recipe, ...recipe.enhanced } : recipe;
+  const targetMealType = activeRec.mealSuitability?.[0] || activeRec.types?.[0] || activeRec.type || 'dinner';
 
-  const totalKcalBudget = (Number(eProf.dailyKcal) || 0) + (Number(cProf.dailyKcal) || 0);
-  const eShare = totalKcalBudget > 0 ? (Number(eProf.dailyKcal) / totalKcalBudget) : 0.59;
-  const cShare = totalKcalBudget > 0 ? (Number(cProf.dailyKcal) / totalKcalBudget) : 0.41;
+  // 1. Calculate Universal Fit Score & Dynamic Macros directly via calculateMealFitScore with portionScaled: true
+  const fitResult = typeof calculateMealFitScore === 'function' ? calculateMealFitScore(activeRec, targetMealType, {
+    activeProfile: 'everyone',
+    variant: variant === 'enhanced' ? 'enhanced' : 'original',
+    portionScaled: true
+  }) : null;
+
+  const eMealTargetKcal = Math.round(fitResult?.details?.elliott?.kcalTarget || 735);
+  const cMealTargetKcal = Math.round(fitResult?.details?.chloe?.kcalTarget || 578);
+  const eMealTargetProt = Math.round(fitResult?.details?.elliott?.proteinTarget || 49);
+  const cMealTargetProt = Math.round(fitResult?.details?.chloe?.proteinTarget || 37);
+
+  const totalKcalBudget = eMealTargetKcal + cMealTargetKcal;
+  const eShare = totalKcalBudget > 0 ? (eMealTargetKcal / totalKcalBudget) : 0.59;
+  const cShare = totalKcalBudget > 0 ? (cMealTargetKcal / totalKcalBudget) : 0.41;
   const eSharePct = Math.round(eShare * 100);
   const cSharePct = Math.round(cShare * 100);
 
-  const activeRec = (variant === 'enhanced' && recipe.enhanced) ? { ...recipe, ...recipe.enhanced } : recipe;
-  if (!activeRec.macros || (!activeRec.macros.calories && !activeRec.macros.protein)) {
-    recalculateWizardMacros(activeRec);
-  }
-  const baselineCal = Number(activeRec.macros?.calories || activeRec.calories || 0);
-  const baselineProt = Number(activeRec.macros?.protein || activeRec.protein || 0);
+  const eKcal = Math.round(fitResult?.details?.elliott?.recipeKcal || 0);
+  const eProt = Math.round(fitResult?.details?.elliott?.recipeProtein || 0);
+  const cKcal = Math.round(fitResult?.details?.chloe?.recipeKcal || 0);
+  const cProt = Math.round(fitResult?.details?.chloe?.recipeProtein || 0);
 
-  const batchServes = 2;
-  const eKcal = Math.round(baselineCal * batchServes * eShare);
-  const eProt = Math.round((baselineProt * batchServes * eShare) * 10) / 10;
-  const cKcal = Math.round(baselineCal * batchServes * cShare);
-  const cProt = Math.round((baselineProt * batchServes * cShare) * 10) / 10;
+  const kcalDiffE = eKcal - eMealTargetKcal;
+  const protDiffE = eProt - eMealTargetProt;
+  const kcalDiffC = cKcal - cMealTargetKcal;
+  const protDiffC = cProt - cMealTargetProt;
 
-  const eTargetCal = Math.round((Number(eProf.dailyKcal) || 2400) * 0.35);
-  const eTargetProt = Math.round((Number(eProf.dailyProtein) || 140) * 0.35);
-  const cTargetCal = Math.round((Number(cProf.dailyKcal) || 1650) * 0.35);
-  const cTargetProt = Math.round((Number(cProf.dailyProtein) || 100) * 0.35);
+  const renderMacroBadge = (type, diff) => {
+    const isKcal = type === 'kcal';
+    const isGood = isKcal ? diff <= 0 : diff >= 0;
+    const sign = diff > 0 ? '+' : '';
+    const bg = isGood ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)';
+    const color = isGood ? '#166534' : '#991b1b';
+    const border = isGood ? '#86efac' : '#fca5a5';
+    return `<span style="display:inline-flex; align-items:center; justify-content:center; padding: 2px 6px; border-radius: 6px; background: ${bg}; color: ${color}; border: 1px solid ${border}; font-size: 10px; font-weight: 800; margin-left: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">${sign}${diff}${isKcal ? '' : 'g'}</span>`;
+  };
+
+  const servesCount = activeRec.servings || activeRec.serves || recipe.servings || recipe.serves || 2;
 
   return `
     <div class="recipe-modal-crossbar" style="width: 100%; background: var(--surface2, #f5f4ee); border: 1px solid var(--border, #e5e5e5); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px;">
       <div style="display:flex; align-items:center; gap:6px;">
         <span style="font-size: 12px; font-weight: 700; color: var(--text);">Dual-Profile Per-Portion Split</span>
-        <span style="font-size: 11px; color: var(--text2);">(${recipe.servings || 4} servings)</span>
+        <span style="font-size: 11px; color: var(--text2);">(${servesCount} servings)</span>
       </div>
 
       <div class="recipe-modal-crossbar-macros" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px;">
         <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4); font-size: 11.5px;">
           <span style="font-weight:700;">👤 Elliott (${eSharePct}%):</span>
-          <span>🔥 <strong>${eKcal} kcal</strong> ${renderComparisonBadge(eKcal, eTargetCal)}</span>
-          <span>💪 <strong>${eProt}g</strong> ${renderComparisonBadge(eProt, eTargetProt)}</span>
+          <span>🔥 <strong>${eKcal} kcal</strong> ${renderMacroBadge('kcal', kcalDiffE)}</span>
+          <span>💪 <strong>${eProt}g</strong> ${renderMacroBadge('prot', protDiffE)}</span>
         </div>
 
         <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4); font-size: 11.5px;">
           <span style="font-weight:700;">👤 Chloe (${cSharePct}%):</span>
-          <span>🔥 <strong>${cKcal} kcal</strong> ${renderComparisonBadge(cKcal, cTargetCal)}</span>
-          <span>💪 <strong>${cProt}g</strong> ${renderComparisonBadge(cProt, cTargetProt)}</span>
+          <span>🔥 <strong>${cKcal} kcal</strong> ${renderMacroBadge('kcal', kcalDiffC)}</span>
+          <span>💪 <strong>${cProt}g</strong> ${renderMacroBadge('prot', protDiffC)}</span>
         </div>
       </div>
     </div>
@@ -105,10 +121,25 @@ export function renderState3Review() {
   const recipe = wizardState.activeRecipe;
   const currentVariant = wizardState.activeVariant || 'original';
   const isEnhancedTab = currentVariant === 'enhanced';
-  const displayRecipe = (isEnhancedTab && recipe.enhanced) ? { ...recipe, ...recipe.enhanced } : recipe;
+  const displayRecipe = (isEnhancedTab && recipe.enhanced)
+    ? {
+        ...recipe,
+        ...recipe.enhanced,
+        ingredientSections: recipe.ingredientSections || recipe.enhanced.ingredientSections,
+        ingredients: (recipe.ingredientSections ? recipe.ingredientSections.flatMap(s => s.ingredients || []) : null) || recipe.ingredients || recipe.enhanced.ingredients,
+        macros: recipe.macros || recipe.enhanced.macros,
+        methodSteps: recipe.methodSteps || recipe.enhanced.methodSteps || recipe.enhanced.steps || recipe.enhanced.method || recipe.enhanced.instructions || recipe.steps || recipe.method || recipe.instructions || [],
+        servings: recipe.servings || recipe.serves || recipe.enhanced.servings || recipe.enhanced.serves || 4
+      }
+    : recipe;
+  const targetMealType = displayRecipe.mealSuitability?.[0] || displayRecipe.types?.[0] || displayRecipe.type || 'dinner';
+  const fitTagHtml = typeof renderFitScoreBadge === 'function' ? renderFitScoreBadge(displayRecipe, targetMealType, {
+    variant: currentVariant,
+    showLabel: true
+  }) : '';
 
   const identityBanner = `
-    <div style="background: var(--surface2, #f8fafc); border: 1px solid var(--border, #e2e8f0); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+    <div style="background: var(--surface2, #f8fafc); border: 1px solid var(--border, #e2e8f0); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
       <div style="display: flex; align-items: center; gap: 8px;">
         <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px;">
           Dish ${wizardState.currentQueueIndex || 1} of ${wizardState.initialQueueTotal || wizardState.processingQueue?.length || 1}:
@@ -116,6 +147,10 @@ export function renderState3Review() {
         <span style="font-size: 14px; font-weight: 700; color: var(--text, #0f172a);">
           ${escapeHtml(toTitleCase(recipe.title || 'Untitled Recipe'))}
         </span>
+        ${isEnhancedTab ? '<span class="badge" style="background:#dcfce7;color:#15803d;font-weight:700;">✨ Enhanced Variant</span>' : ''}
+      </div>
+      <div style="display: flex; align-items: center;">
+        ${fitTagHtml}
       </div>
     </div>
   `;
@@ -145,47 +180,28 @@ export function renderState3Review() {
       const cleanName = String(ing.name || '').replace(/\(Est\.?\s*Weight\)/gi, '').trim();
       let mainLineText = `${escapeHtml(cleanName)}${notesHtml}`;
 
-      if (ing.isCategoryDefault || ing.categoryId) {
-        const storeState = getState();
-        const products = storeState.products || [];
-        const catName = ing.categoryId || 'General Groceries';
-        let defaultProduct = products.find(p => (String(p.category).toLowerCase() === catName.toLowerCase() || String(p.cat).toLowerCase() === catName.toLowerCase()) && p.isAutoDefault);
-        if (!defaultProduct) {
-          defaultProduct = products.find(p => (String(p.category).toLowerCase() === catName.toLowerCase() || String(p.cat).toLowerCase() === catName.toLowerCase()));
-        }
+      const storeState = getState();
+      const globalProducts = storeState.products || [];
+      const globalIngredients = storeState.ingredients || storeState.rootItems || [];
 
-        if (defaultProduct) {
-          const brandStr = defaultProduct.brand ? `${defaultProduct.brand} ` : '';
-          const matchName = typeof ing.productMatch === 'object' ? ing.productMatch?.name : null;
-          const displayName = ing.productName || matchName ?.items?.[ing.mappedItemId]?.name || ing.name;
-          const productId = ing.productId || ing.mappedItemId || ing.productMatch?.id;
+      // Resolve linked product or taxonomy auto-default
+      const resolvedProduct = resolveProductForIngredient(ing, {
+        products: globalProducts,
+        ingredients: globalIngredients
+      });
 
-          if (productId) {
-             mainLineText += ` - <a class="product-link" href="#" data-product-id="${productId}" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(displayName)}</a>`;
-          } else if (!ing.ingredientId && !ing.categoryId) {
-             mainLineText += ` <span class="badge badge-purple" style="font-size:10px;">Mapped</span>`;
-          }
-          taxLabel = `<span class="badge badge-purple" style="font-size:10px;">Mapped</span>`;
-        } else {
-            const fallbackQuery = `Tesco Generic ${catName}`;
-            const searchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(fallbackQuery)}`;
-            mainLineText = `${escapeHtml(ing.name)}${notesHtml} - <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--text2,#78716c); text-decoration:underline;">Tesco ${escapeHtml(catName)} Generic</a>`;
-            taxLabel = `<span class="badge badge-purple" style="font-size:10px;">Mapped</span>`;
-        }
-      } else if (ing.ingredientId) {
-        const storeState = getState();
-        const products = storeState.products || [];
-        const linkedProduct = products.find(p => String(p.ingredientId) === String(ing.ingredientId));
-        if (linkedProduct) {
-          const brandStr = linkedProduct.brand ? `${linkedProduct.brand} ` : '';
-          const prodTitle = `${brandStr}${linkedProduct.name || linkedProduct.title || ''}`.trim();
-          const searchUrl = linkedProduct.tescoUrl || `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(prodTitle)}`;
-          mainLineText = `${escapeHtml(ing.name)}${notesHtml} - <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(prodTitle)}</a>`;
-        } else if (ing.ingredientId || ing.matchedName) {
-          const searchName = ing.matchedName || ing.name;
-          const fallbackUrl = 'https://www.tesco.com/groceries/en-GB/search?query=' + encodeURIComponent(searchName);
-          mainLineText = `${escapeHtml(ing.name)}${notesHtml} - <a href="${fallbackUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(searchName)}</a>`;
-        }
+      const isUnlinked = isIngredientUnlinked(ing, globalProducts, globalIngredients);
+
+      if (resolvedProduct) {
+        const brandStr = resolvedProduct.brand ? `${resolvedProduct.brand} ` : '';
+        const prodTitle = `${brandStr}${resolvedProduct.name || resolvedProduct.title || ''}`.trim();
+        const searchUrl = resolvedProduct.tescoUrl || `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(prodTitle)}`;
+        mainLineText += ` - <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(prodTitle)}</a>`;
+        taxLabel = `<span class="badge" style="background:#dcfce7; color:#15803d; border:1px solid #86efac; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Mapped</span>`;
+      } else if (!isUnlinked) {
+        taxLabel = `<span class="badge" style="background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Mapped</span>`;
+      } else {
+        taxLabel = `<span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Unmapped</span>`;
       }
 
       rows += `
@@ -210,7 +226,10 @@ export function renderState3Review() {
   });
 
   let stepsReviewHtml = '';
-  const activeSteps = displayRecipe.methodSteps || displayRecipe.instructions || [];
+  const rawActiveSteps = displayRecipe.methodSteps || displayRecipe.steps || displayRecipe.method || displayRecipe.instructions || recipe.methodSteps || [];
+  const activeSteps = Array.isArray(rawActiveSteps)
+    ? rawActiveSteps.map(s => typeof s === 'string' ? s : (s?.text || s?.instruction || s?.step || String(s || ''))).filter(Boolean)
+    : (typeof rawActiveSteps === 'string' ? rawActiveSteps.split('\n').filter(Boolean) : []);
   activeSteps.forEach((s) => {
     stepsReviewHtml += `<li style="margin-bottom: 6px; font-size: 13px; color: var(--text, #333);">${escapeHtml(s)}</li>`;
   });

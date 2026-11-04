@@ -178,21 +178,24 @@ export function promptReallocateProduct(productId) {
   activeReallocateState.renderIngredientList = () => renderIngredientList(ingSearch.value);
   activeReallocateState.renderSubtypeList = () => renderSubtypeList(subSearch.value);
 
-  ingSearch.oninput = () => renderIngredientList(ingSearch.value);
-  subSearch.oninput = () => renderSubtypeList(subSearch.value);
+  if (ingSearch) ingSearch.oninput = () => renderIngredientList(ingSearch.value);
+  if (subSearch) subSearch.oninput = () => renderSubtypeList(subSearch.value);
 
   const createSubPanel = document.getElementById('realloc-create-sub-panel');
-  if (document.getElementById('btn-toggle-create-sub')) {
-    document.getElementById('btn-toggle-create-sub').onclick = () => {
+  const btnToggleSub = document.getElementById('btn-toggle-create-sub');
+  if (btnToggleSub && createSubPanel) {
+    btnToggleSub.onclick = () => {
       createSubPanel.style.display = createSubPanel.style.display === 'none' ? 'block' : 'none';
     };
   }
-  if (document.getElementById('btn-cancel-create-sub')) {
-    document.getElementById('btn-cancel-create-sub').onclick = () => { createSubPanel.style.display = 'none'; };
+  const btnCancelSub = document.getElementById('btn-cancel-create-sub');
+  if (btnCancelSub && createSubPanel) {
+    btnCancelSub.onclick = () => { createSubPanel.style.display = 'none'; };
   }
 
-  if (document.getElementById('btn-save-create-sub')) {
-    document.getElementById('btn-save-create-sub').onclick = async () => {
+  const btnSaveSub = document.getElementById('btn-save-create-sub');
+  if (btnSaveSub) {
+    btnSaveSub.onclick = async () => {
       const subNameInput = document.getElementById('new-sub-name-input');
       const newSubName = (subNameInput ? subNameInput.value : '').trim();
       if (!newSubName || !activeReallocateState.selectedIngId) return;
@@ -207,7 +210,7 @@ export function promptReallocateProduct(productId) {
       ing.subtypes.push(newSub);
       activeReallocateState.pendingNewSub = { ing, newSubId: newSub.id };
       activeReallocateState.selectedSubId = newSub.id;
-      createSubPanel.style.display = 'none';
+      if (createSubPanel) createSubPanel.style.display = 'none';
       if (subNameInput) subNameInput.value = '';
 
       renderSubtypeList();
@@ -215,12 +218,13 @@ export function promptReallocateProduct(productId) {
   }
 
   const initialIng = currentIngs.find(i => String(i.id) === String(activeReallocateState.selectedIngId));
-  if (initialIng) ingSearch.placeholder = `Current: ${initialIng.name} (type to search...)`;
+  if (initialIng && ingSearch) ingSearch.placeholder = `Current: ${initialIng.name} (type to search...)`;
   renderIngredientList();
   renderSubtypeList();
 
-  if (document.getElementById('btn-confirm-realloc')) {
-    document.getElementById('btn-confirm-realloc').onclick = async () => {
+  const btnConfirmRealloc = document.getElementById('btn-confirm-realloc');
+  if (btnConfirmRealloc) {
+    btnConfirmRealloc.onclick = async () => {
       if (!activeReallocateState.selectedIngId) return;
       const subtypeId = activeReallocateState.selectedSubId || null;
       activeReallocateState.pendingNewSub = null;

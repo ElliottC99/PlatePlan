@@ -14,8 +14,8 @@ function showModal(html) {
   const wrap = document.getElementById('view-modal-wrap');
   const content = document.getElementById('view-modal-content');
   if (wrap && content) {
-    wrap.style.setProperty('z-index', '25005', 'important');
-    content.style.setProperty('z-index', '25005', 'important');
+    wrap.style.setProperty('z-index', '100005', 'important');
+    content.style.setProperty('z-index', '100005', 'important');
     if (wrap.parentElement === document.body) {
       document.body.appendChild(wrap);
     }
@@ -27,9 +27,14 @@ function showModal(html) {
 
 function closeModal() {
   const wrap = document.getElementById('view-modal-wrap');
+  const content = document.getElementById('view-modal-content');
   if (wrap) {
     wrap.classList.remove('open');
+    wrap.style.setProperty('z-index', '25005', 'important');
     document.body.style.overflow = '';
+  }
+  if (content) {
+    content.style.setProperty('z-index', '25005', 'important');
   }
   const parentWiz = document.getElementById('new-ingredient-mapping-wizard-modal');
   if (parentWiz && parentWiz.dataset.temporarilyHidden === 'true') {
@@ -243,44 +248,46 @@ export function openTescoImportModal(subtypeId, parentId, onSuccess = null, cust
     };
   }
 
-  reviewBtn.onclick = () => {
-    const raw = (jsonInput ? jsonInput.value : '').trim();
-    let parsed = null;
-    try { parsed = raw ? JSON.parse(raw) : null; } catch (e) { parsed = null; }
+  if (reviewBtn) {
+    reviewBtn.onclick = () => {
+      const raw = (jsonInput ? jsonInput.value : '').trim();
+      let parsed = null;
+      try { parsed = raw ? JSON.parse(raw) : null; } catch (e) { parsed = null; }
 
-    if (!parsed || typeof parsed !== 'object') {
-      if (errorMsg) {
-        errorMsg.style.display = 'block';
-        errorMsg.innerHTML = `<div style="padding:10px; background:#fee2e2; color:#ef4444; border-radius:8px; font-weight:600; font-size:12px;">⚠️ Invalid Tesco JSON string. Please copy directly from the bookmarklet output.</div>`;
+      if (!parsed || typeof parsed !== 'object') {
+        if (errorMsg) {
+          errorMsg.style.display = 'block';
+          errorMsg.innerHTML = `<div style="padding:10px; background:#fee2e2; color:#ef4444; border-radius:8px; font-weight:600; font-size:12px;">⚠️ Invalid Tesco JSON string. Please copy directly from the bookmarklet output.</div>`;
+        }
+        return;
       }
-      return;
-    }
 
-    const res = parseTescoProduct(parsed);
-    const cleanData = res.success ? res.data : parsed;
-    const brand = toTitleCase(cleanData.brand || parsed.brand || 'Tesco');
-    const name = cleanProductName(cleanData.name || parsed.name || parsed.title || '', brand);
-    cleanData.brand = brand;
-    cleanData.name = name;
-    cleanData.title = name;
-    cleanData.category = parentCategory;
-    closeModal();
+      const res = parseTescoProduct(parsed);
+      const cleanData = res.success ? res.data : parsed;
+      const brand = toTitleCase(cleanData.brand || parsed.brand || 'Tesco');
+      const name = cleanProductName(cleanData.name || parsed.name || parsed.title || '', brand);
+      cleanData.brand = brand;
+      cleanData.name = name;
+      cleanData.title = name;
+      cleanData.category = parentCategory;
+      closeModal();
 
-    if (typeof onSuccess === 'function') {
-      onSuccess(cleanData);
-      return;
-    }
+      if (typeof onSuccess === 'function') {
+        onSuccess(cleanData);
+        return;
+      }
 
-    window.__prefilledResolveBinding = {
-      ingredientId: parentId,
-      subtypeId: subtypeId || null,
-      parentCategory,
-      tescoImportData: cleanData
+      window.__prefilledResolveBinding = {
+        ingredientId: parentId,
+        subtypeId: subtypeId || null,
+        parentCategory,
+        tescoImportData: cleanData
+      };
+      setTimeout(() => {
+        if (typeof window.openProductEditModal === 'function') window.openProductEditModal(null);
+      }, 150);
     };
-    setTimeout(() => {
-      if (typeof window.openProductEditModal === 'function') window.openProductEditModal(null);
-    }, 150);
-  };
+  }
 }
 
 export function openTescoBookmarkletInstructionsModal() {

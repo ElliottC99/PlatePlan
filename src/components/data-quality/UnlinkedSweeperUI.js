@@ -26,8 +26,8 @@ export function cleanDisplayPhrase(str) {
 }
 
 export function scanUnlinkedRecipeIngredients() {
-  const state = (typeof window !== 'undefined' ? (window.Store?.getState?.() ) : {});
-  const recipes = Array.isArray(state.recipes) ? state.recipes : [];
+  const state = (typeof getState === 'function' ? getState() : (typeof window !== 'undefined' && window.Store?.getState ? window.Store.getState() : {})) || {};
+  const recipes = Array.isArray(state.recipes) ? state.recipes : Object.values(state.recipes || {});
   const groups = new Map();
 
   recipes.forEach(recipe => {
@@ -36,7 +36,7 @@ export function scanUnlinkedRecipeIngredients() {
 
     const check = (item, sIdx, iIdx) => {
       if (!item) return;
-      const linked = Boolean(item.pantryItemId || item.ingredientId || item.targetId || (item.id && typeof item.id === 'string' && item.id.length > 3));
+      const linked = Boolean(item.productId || item.bankId || item.pantryItemId || item.ingredientId || item.subtypeId || item.targetId);
       if (!linked) {
         const raw = typeof item === 'string' ? item : (item.raw || item.name || item.ingredient || item.ingredientName || '');
         const key = normaliseIngredientString(raw).toLowerCase();
@@ -75,7 +75,7 @@ export function openUnlinkedSweeperModal() {
   const rowsHtml = !unlinkedGroups.length
     ? `<div style="text-align:center;padding:48px 20px;color:var(--text2,#64748b);"><span style="font-size:36px;display:block;margin-bottom:12px;">🎉</span><strong style="font-size:16px;color:var(--text,#111827);">All Recipe Ingredients Linked!</strong><p style="font-size:13px;margin-top:6px;">No unlinked ingredient strings found across your recipes.</p></div>`
     : unlinkedGroups.map((g, idx) => `
-      <div class="sweeper-row" data-norm="${escapeAttr(g.normalisedKey)}" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:10px;margin-bottom:8px;">
+      <div class="sweeper-row" data-norm="${escapeAttr(g.normalisedKey)}" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:10px;margin-bottom:8px;position:relative;">
         <div style="flex:1;min-width:200px;">
           <div style="display:flex;align-items:center;gap:8px;">
             <strong style="font-size:14px;color:var(--text,#0f172a);">${escapeHtml(g.displayName)}</strong>
@@ -83,20 +83,20 @@ export function openUnlinkedSweeperModal() {
           </div>
           <div style="font-size:11.5px;color:var(--text2,#64748b);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:320px;" title="${escapeAttr(g.occurrences.map(o => o.recipeName).join(', '))}">Used in: ${escapeHtml(g.occurrences.map(o => o.recipeName).slice(0, 3).join(', '))}${g.occurrences.length > 3 ? ` +${g.occurrences.length - 3} more` : ''}</div>
         </div>
-        <div style="flex:1;min-width:240px;max-width:320px;position:relative;" class="pantry-search-container relative">
-          <input type="text" class="pantry-search-input" placeholder="Search Master Pantry..." data-idx="${idx}" data-phrase="${escapeAttr(g.normalisedKey)}" data-selected-id="" data-selected-sub-id="" autocomplete="off" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border,#cbd5e1);font-size:13px;background:var(--surface,#fff);color:var(--text,#1e293b);box-sizing:border-box;" />
-          <div class="pantry-search-dropdown hidden absolute bg-white shadow-lg w-full z-10 max-h-48 overflow-y-auto" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:220px;overflow-y:auto;background:#fff;border:1px solid var(--border,#e2e8f0);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.18);z-index:20;margin-top:2px;"></div>
+        <div style="flex:1;min-width:280px;max-width:380px;position:relative;" class="pantry-search-container relative">
+          <input type="text" class="pantry-search-input" placeholder="Search Master Pantry..." data-idx="${idx}" data-phrase="${escapeAttr(g.normalisedKey)}" data-selected-id="" data-selected-sub-id="" autocomplete="off" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border,#cbd5e1);font-size:13px;background:var(--surface,#fff);color:var(--text,#1e293b);box-sizing:border-box;" />
+          <div class="pantry-search-dropdown hidden absolute bg-white shadow-lg w-full z-10 max-h-48 overflow-y-auto" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:260px;overflow-y:auto;background:#fff;border:1px solid var(--border,#cbd5e1);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,0.2);z-index:1050;margin-top:4px;"></div>
         </div>
       </div>
     `).join('');
 
   activeModalOverlay.innerHTML = `
-    <div class="sweeper-dialog" style="width:100%;max-width:760px;max-height:88vh;background:var(--surface,#fff);border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,0.3);display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;">
+    <div class="sweeper-dialog" style="width:100%;max-width:860px;min-height:540px;max-height:88vh;background:var(--surface,#fff);border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,0.3);display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;">
       <div style="padding:18px 24px;border-bottom:1px solid var(--border,#e2e8f0);display:flex;align-items:center;justify-content:space-between;background:var(--surface2,#f8fafc);">
         <div><h2 style="margin:0;font-size:18px;font-weight:750;color:var(--text,#0f172a);display:flex;align-items:center;gap:8px;"><span>🧹</span> Unlinked Ingredient Sweeper</h2><p style="margin:4px 0 0;font-size:12.5px;color:var(--text2,#64748b);">Rapid-fire bulk mapping: link recurring unlinked recipe ingredients to Master Pantry items.</p></div>
         <button type="button" class="btn sm ghost" id="sweeper-close-btn" style="border:none;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:6px;" aria-label="Close">✕</button>
       </div>
-      <div style="padding:16px 24px;overflow-y:auto;flex:1;background:var(--surface2,#f8fafc);" id="sweeper-list-container">${rowsHtml}</div>
+      <div style="padding:16px 24px;overflow-y:auto;flex:1;background:var(--surface2,#f8fafc);padding-bottom:260px;" id="sweeper-list-container">${rowsHtml}</div>
       <div style="padding:14px 24px;border-top:1px solid var(--border,#e2e8f0);display:flex;align-items:center;justify-content:space-between;background:var(--surface,#fff);">
         <div style="font-size:12.5px;color:var(--text2,#64748b);">${unlinkedGroups.length ? `<strong>${unlinkedGroups.length}</strong> unique unlinked phrases found` : 'All ingredients mapped'}</div>
         <div style="display:flex;gap:10px;">
@@ -110,8 +110,10 @@ export function openUnlinkedSweeperModal() {
   document.body.appendChild(activeModalOverlay);
   document.body.style.overflow = 'hidden';
 
-  document.getElementById('sweeper-close-btn').addEventListener('click', closeUnlinkedSweeperModal);
-  document.getElementById('sweeper-cancel-btn').addEventListener('click', closeUnlinkedSweeperModal);
+  const closeBtn = document.getElementById('sweeper-close-btn');
+  if (closeBtn) closeBtn.addEventListener('click', closeUnlinkedSweeperModal);
+  const cancelBtn = document.getElementById('sweeper-cancel-btn');
+  if (cancelBtn) cancelBtn.addEventListener('click', closeUnlinkedSweeperModal);
   attachSweeperSearchEvents(activeModalOverlay, unlinkedGroups);
 
   const saveBtn = document.getElementById('sweeper-save-all-btn');
@@ -142,29 +144,20 @@ export function openUnlinkedSweeperModal() {
 
 function attachSweeperSearchEvents(container, unlinkedGroups = []) {
   const inputs = container.querySelectorAll('.pantry-search-input');
-  const STANDARD_CATS = ['Store Cupboard', 'Produce', 'Refrigerated & Dairy', 'Frozen', 'Bakery', 'Spices & Oils'];
 
   inputs.forEach(input => {
     const parent = input.closest('.pantry-search-container');
+    const row = input.closest('.sweeper-row');
     const dropdown = parent?.querySelector('.pantry-search-dropdown');
     if (!dropdown) return;
 
     const renderFilteredOptions = () => {
       const query = (input.value || '').toLowerCase().trim();
-      const st = window.Store?.getState?.() ;
-      const masterItems = st.ingredients || [];
-      const masterCategories = Array.from(new Set([...STANDARD_CATS, ...(st.categories || []), ...masterItems.map(i => i.category).filter(Boolean)]));
+      const st = (typeof getState === 'function' ? getState() : (window.Store?.getState?.() || {})) || {};
+      const masterItems = Array.isArray(st.ingredients) ? st.ingredients : [];
 
       let matchCount = 0;
-      let html = `<div class="wiz-tax-opt" data-val="new_item" data-label="✨ New Item" style="padding:7px 10px; font-size:12px; cursor:pointer; font-weight:600; color:#059669; border-bottom:1px solid #eee;">✨ New Item</div>`;
-
-      masterCategories.forEach(cat => {
-        const catStr = String(cat || '');
-        if (!query || catStr.toLowerCase().includes(query) || '[category]'.includes(query)) {
-          matchCount++;
-          html += `<div class="wiz-tax-opt wiz-tax-category" data-val="cat:${escapeAttr(catStr)}" data-label="📂 [Category] ${escapeAttr(catStr)}" style="padding:6px 10px;font-size:12px;cursor:pointer;font-weight:700;color:var(--purple,#4f46e5);background:var(--surface2,#f5f4ee);border-bottom:1px solid #eee;">📂 <span class="badge" style="background:#eef2ff;color:#4f46e5;font-size:10px;padding:1px 5px;border-radius:4px;margin-right:4px;">[Category]</span> ${escapeHtml(catStr)}</div>`;
-        }
-      });
+      let html = `<div class="wiz-tax-opt" data-val="new_item" data-label="✨ New Item" style="padding:8px 12px; font-size:12.5px; cursor:pointer; font-weight:700; color:#059669; border-bottom:1px solid #eee; background:#ecfdf5;">✨ Create New Item ➔</div>`;
 
       masterItems.forEach(ing => {
         if (!ing?.id) return;
@@ -176,16 +169,24 @@ function attachSweeperSearchEvents(container, unlinkedGroups = []) {
 
         if (matchesMain || matchingSubs.length > 0) {
           matchCount++;
-          html += `<div class="wiz-tax-opt wiz-tax-main" data-val="${escapeAttr(ing.id)}" data-label="📦 ${escapeAttr(ing.name)} [${escapeAttr(ing.category || 'General')}]" style="padding:6px 10px;font-size:12px;cursor:pointer;font-weight:700;color:var(--text);background:var(--surface2,#fbfbf9);border-bottom:1px solid rgba(0,0,0,0.03);">📦 ${escapeHtml(ing.name)} <span style="font-size:10.5px;font-weight:normal;color:var(--text2,#64748b);">[${escapeHtml(ing.category || 'General')}]</span></div>`;
+          html += `<div class="wiz-tax-opt wiz-tax-main" data-val="${escapeAttr(ing.id)}" data-label="📦 ${escapeAttr(ing.name)}" style="padding:7px 12px;font-size:12.5px;cursor:pointer;font-weight:700;color:var(--text,#1e293b);background:var(--surface2,#f8fafc);border-bottom:1px solid rgba(0,0,0,0.04);display:flex;align-items:center;justify-content:space-between;">
+            <div>📦 ${escapeHtml(ing.name)}</div>
+            <span style="font-size:10.5px;font-weight:600;color:#64748b;background:#e2e8f0;padding:1px 6px;border-radius:4px;">${escapeHtml(ing.category || 'General')}</span>
+          </div>`;
 
           (matchesMain ? subTypes : matchingSubs).forEach(sub => {
             matchCount++;
-            html += `<div class="wiz-tax-opt wiz-tax-sub" data-val="${escapeAttr(`${ing.id}:${sub.id || sub.name}`)}" data-label="🏷️ ${escapeAttr(sub.name)} (${escapeAttr(ing.name)})" style="padding:5px 10px 5px 22px;font-size:11.5px;cursor:pointer;color:var(--text);border-bottom:1px solid rgba(0,0,0,0.03);">↳ 🏷️ ${escapeHtml(sub.name)}</div>`;
+            html += `<div class="wiz-tax-opt wiz-tax-sub" data-val="${escapeAttr(`${ing.id}:${sub.id || sub.name}`)}" data-label="🏷️ ${escapeAttr(sub.name)} (${escapeAttr(ing.name)})" style="padding:6px 12px 6px 26px;font-size:12px;cursor:pointer;color:var(--text,#1e293b);border-bottom:1px solid rgba(0,0,0,0.03);display:flex;align-items:center;justify-content:space-between;">
+              <div>↳ 🏷️ <strong>${escapeHtml(sub.name)}</strong></div>
+              <span style="font-size:10px;color:#94a3b8;">${escapeHtml(ing.name)}</span>
+            </div>`;
           });
         }
       });
 
-      if (matchCount === 0 && !query) html = `<div style="padding:10px;font-size:12px;color:#94a3b8;text-align:center;">No pantry items matching "${escapeHtml(query)}"</div>`;
+      if (matchCount === 0 && query) {
+        html += `<div style="padding:12px;font-size:12px;color:#94a3b8;text-align:center;">No pantry items matching "${escapeHtml(query)}"</div>`;
+      }
       dropdown.innerHTML = html;
       dropdown.classList.remove('hidden');
       dropdown.style.display = 'block';
@@ -202,16 +203,35 @@ function attachSweeperSearchEvents(container, unlinkedGroups = []) {
             const initialPhrase = unlinkedGroups[idx]?.displayName || input.value || '';
             openTaxonomyCreationModal({
               initialName: initialPhrase,
-              onComplete: (created) => {
-                const combinedKey = `${created.ingredientId}:${created.subtypeId}`;
-                const displayLabel = `🏷️ ${created.subtypeName} (${created.parentName})`;
+              onComplete: (created = {}) => {
+                if (dropdown) dropdown.style.display = 'none';
+                if (created.category && !created.ingredientId && !created.rootItem) {
+                  const catLabel = `📂 [Category] ${created.category}`;
+                  input.value = catLabel;
+                  input.setAttribute('value', catLabel);
+                  input.dataset.selectedId = `cat:${created.category}`;
+                  input.dataset.selectedSubId = '';
+                  if (parent) { parent.dataset.selectedId = `cat:${created.category}`; parent.dataset.selectedSubId = ''; }
+                  input.style.borderColor = '#10b981';
+                  input.style.backgroundColor = '#ecfdf5';
+                  input.style.color = 'var(--text,#1e293b)';
+                  input.dispatchEvent(new Event('change', { bubbles: true }));
+                  return;
+                }
+                const ingId = created.ingredientId || created.rootItem?.id || created.id || '';
+                const subId = created.subtypeId || created.subtype?.id || '';
+                const parentName = created.parentName || created.rootItem?.name || created.rootItemName || initialPhrase;
+                const subName = created.subtypeName || created.subtype?.name || parentName;
+                const displayLabel = subName && subName !== parentName ? `🏷️ ${subName} (${parentName})` : `📦 ${parentName}`;
                 input.value = displayLabel;
-                input.dataset.selectedId = created.ingredientId;
-                input.dataset.selectedSubId = created.subtypeId;
-                if (parent) { parent.dataset.selectedId = created.ingredientId; parent.dataset.selectedSubId = created.subtypeId; }
+                input.setAttribute('value', displayLabel);
+                input.dataset.selectedId = ingId;
+                input.dataset.selectedSubId = subId;
+                if (parent) { parent.dataset.selectedId = ingId; parent.dataset.selectedSubId = subId; }
                 input.style.borderColor = '#10b981';
                 input.style.backgroundColor = '#ecfdf5';
                 input.style.color = 'var(--text,#1e293b)';
+                input.dispatchEvent(new Event('change', { bubbles: true }));
               }
             });
             return;
@@ -229,15 +249,28 @@ function attachSweeperSearchEvents(container, unlinkedGroups = []) {
             if (parent) { parent.dataset.selectedId = val; parent.dataset.selectedSubId = ''; }
           }
 
-          input.style.borderColor = val.startsWith('cat:') ? '#818cf8' : '#10b981';
-          input.style.backgroundColor = val.startsWith('cat:') ? '#eef2ff' : '#ecfdf5';
-          input.style.color = val.startsWith('cat:') ? '#4338ca' : 'var(--text,#1e293b)';
+          input.style.borderColor = '#10b981';
+          input.style.backgroundColor = '#ecfdf5';
+          input.style.color = 'var(--text,#1e293b)';
         });
       });
     };
 
-    input.addEventListener('focus', renderFilteredOptions);
-    input.addEventListener('input', renderFilteredOptions);
+    input.addEventListener('focus', () => {
+      if (row) row.style.zIndex = '50';
+      renderFilteredOptions();
+    });
+    input.addEventListener('blur', () => {
+      setTimeout(() => {
+        if (row) row.style.zIndex = '1';
+        dropdown.classList.add('hidden');
+        dropdown.style.display = 'none';
+      }, 250);
+    });
+    input.addEventListener('input', () => {
+      if (row) row.style.zIndex = '50';
+      renderFilteredOptions();
+    });
   });
 
   container.addEventListener('click', (e) => {
@@ -248,7 +281,7 @@ function attachSweeperSearchEvents(container, unlinkedGroups = []) {
 }
 
 async function applySweeperBatchMappings(assignments = []) {
-  const state = (typeof window !== 'undefined' ? (window.Store?.getState?.() ) : {});
+  const state = (typeof getState === 'function' ? getState() : (typeof window !== 'undefined' ? (window.Store?.getState?.() || {}) : {})) || {};
   const recipes = Array.isArray(state.recipes) ? [...state.recipes] : [];
   const masterItems = (window.Store?.getState?.()  || state).ingredients || [];
 

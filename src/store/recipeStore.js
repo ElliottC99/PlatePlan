@@ -5,7 +5,7 @@
  */
 
 import { saveStateCache } from './cacheSlice.js';
-import { autoRecalibrateRecipeDrift } from '../services/DataQualityEngine.js';
+import { autoRecalibrateRecipeDrift } from '../services/DataQualityScanner.js';
 
 let recipeState = {
   recipes: [],

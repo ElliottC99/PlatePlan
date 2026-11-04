@@ -10,7 +10,7 @@ import { renderPlanner } from '../views/PlannerView.js';
 import { renderRecipeVault, handleVaultSortChange } from '../views/RecipeVaultView.js';
 import { openProductEditModal, saveManualIng, cancelManualIng, clearProductGroupFilter, showTescoImport, toggleTescoUpdate, applyTescoUpdate } from '../views/ProductBankView.js';
 import { renderDataQualityView } from '../views/DataQualityView.js';
-import { moveTodayDate, resetTodayDate, toggleMealEaten } from '../views/TodayView.js';
+import { moveTodayDate, resetTodayDate, toggleMealEaten, openTodayRearrangeModal, closeTodaySwapModal, executeTodaySlotSwap } from '../views/TodayView.js';
 import { showView } from '../core/AppRouter.js';
 import { closeRecipePreview } from './RecipeDetailModalService.js';
 import { routeRecipeAction } from './RecipeActionBridge.js';
@@ -43,6 +43,26 @@ export function routeAction(actionName, target, event) {
 
   if (normalizedAction === 'toggle-meal-eaten') {
     if (ds.mealType) toggleMealEaten(ds.mealType, ds.person || 'both');
+    return true;
+  }
+
+  if (normalizedAction === 'open-today-rearrange-modal') {
+    const dayKey = ds.dayKey || target.getAttribute('data-day-key');
+    const mealType = ds.mealType || target.getAttribute('data-meal-type') || 'dinner';
+    openTodayRearrangeModal(dayKey, mealType);
+    return true;
+  }
+
+  if (normalizedAction === 'close-today-swap-modal') {
+    closeTodaySwapModal();
+    return true;
+  }
+
+  if (normalizedAction === 'execute-today-slot-swap') {
+    const srcDay = ds.sourceDay || target.getAttribute('data-source-day');
+    const tgtDay = ds.targetDay || target.getAttribute('data-target-day');
+    const mealType = ds.mealType || target.getAttribute('data-meal-type') || 'dinner';
+    executeTodaySlotSwap(srcDay, tgtDay, mealType);
     return true;
   }
 
@@ -125,6 +145,46 @@ export function routeAction(actionName, target, event) {
 
   if (normalizedAction === 'add-to-bank' || normalizedAction.includes('createingredientfamilyprompt')) {
     import('../components/pantry/AddToBankHubUI.js').then(m => m.openAddToBankModal());
+    return true;
+  }
+
+  // 4b. Meal Plan Library Actions
+  if (normalizedAction === 'restore-saved-plan') {
+    const planId = ds.planId || target.getAttribute('data-plan-id');
+    import('../views/PlannerView.js').then(m => m.restoreSavedPlan(planId));
+    return true;
+  }
+
+  if (normalizedAction === 'delete-saved-plan') {
+    const planId = ds.planId || target.getAttribute('data-plan-id');
+    import('../views/PlannerView.js').then(m => m.deleteSavedPlan(planId));
+    return true;
+  }
+
+  if (normalizedAction === 'open-saved-plan-recipe-cards') {
+    const planId = ds.planId || target.getAttribute('data-plan-id') || (ds.index !== undefined ? ds.index : null);
+    import('../views/PlannerView.js').then(m => m.openSavedPlanRecipeCards(planId));
+    return true;
+  }
+
+  if (normalizedAction === 'open-active-plan-recipe-cards') {
+    import('../views/PlannerView.js').then(m => m.openActivePlanRecipeCards());
+    return true;
+  }
+
+  if (normalizedAction === 'close-plan-recipe-cards') {
+    const modal = document.getElementById('plan-recipe-cards-modal-wrap');
+    if (modal) modal.remove();
+    return true;
+  }
+
+  if (normalizedAction === 'open-planner-view') {
+    showView('planner');
+    return true;
+  }
+
+  if (normalizedAction === 'opensavemealplanmodal()' || normalizedAction === 'open-save-meal-plan-modal' || normalizedAction.includes('opensavemealplanmodal')) {
+    import('../views/PlannerView.js').then(m => m.openSaveMealPlanModal());
     return true;
   }
 

@@ -10,6 +10,7 @@
  */
 
 import { getState } from '../../state/AppState.js';
+import { extractRecipeMacros } from '../../utils/fitScoreCalculator.js';
 import { wizardState, resetWizardState, syncStep2InputsToState } from './RecipeWizardState.js';
 import { renderStepBadge, renderState0Choice, renderState1AManual, renderState1BBulk, renderState3Review } from './RecipeWizardViews.js';
 import { renderState2Mapping } from './RecipeWizardStep2View.js';
@@ -66,9 +67,22 @@ function formatMethodLine(step, idx) {
   return `${idx + 1}. ${text}`;
 }
 
-export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
+export function openRecipeWizard(initialMode = 'manual', editRecipeId = null, variant = 'original') {
+  let mode = initialMode;
+  let recipeId = editRecipeId;
+  let targetVariant = variant;
+
+  if (typeof initialMode === 'object' && initialMode !== null) {
+    mode = initialMode.initialMode || initialMode.mode || 'manual';
+    recipeId = initialMode.editRecipeId || initialMode.recipeId || null;
+    targetVariant = initialMode.variant || initialMode.activeVariant || 'original';
+  }
+
   resetWizardState();
-  if (editRecipeId) {
+  const activeVariant = targetVariant === 'enhanced' ? 'enhanced' : 'original';
+  wizardState.activeVariant = activeVariant;
+
+  if (recipeId) {
     let allRecipes = [];
     if (typeof getState === 'function') {
       const st = getState();
@@ -83,29 +97,42 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
         allRecipes = window.recipes;
       }
     }
-    const found = allRecipes.find(r => r && (String(r.id) === String(editRecipeId) || String(r._id) === String(editRecipeId)));
+    const found = allRecipes.find(r => r && (String(r.id) === String(recipeId) || String(r._id) === String(recipeId)));
     if (found) {
-      let rawTags = found.mealSuitability;
+      wizardState.baseOriginalRecipe = JSON.parse(JSON.stringify(found));
+      wizardState.activeVariant = activeVariant || 'original';
+      const isEnhVariant = activeVariant === 'enhanced' && Boolean(found.enhanced);
+      let targetSource = isEnhVariant ? { ...found, ...found.enhanced } : found;
+
+      // When reviewing enhanced variant, if enhanced has ingredients,
+      // prevent found.ingredientSections from shadowing enhanced.ingredients!
+      if (isEnhVariant && Array.isArray(found.enhanced?.ingredients) && found.enhanced.ingredients.length > 0) {
+        if (!Array.isArray(found.enhanced.ingredientSections) || found.enhanced.ingredientSections.length === 0) {
+          delete targetSource.ingredientSections;
+        }
+      }
+
+      let rawTags = targetSource.mealSuitability;
       if (!rawTags || !rawTags.length) {
-        if (Array.isArray(found.types)) rawTags = found.types;
-        else if (found.type) rawTags = [found.type];
-        else if (found.category) rawTags = [found.category];
-        else if (found.mealType) rawTags = [found.mealType];
+        if (Array.isArray(targetSource.types)) rawTags = targetSource.types;
+        else if (targetSource.type) rawTags = [targetSource.type];
+        else if (targetSource.category) rawTags = [targetSource.category];
+        else if (targetSource.mealType) rawTags = [targetSource.mealType];
       }
       const mealSuitability = Array.isArray(rawTags) && rawTags.length > 0
         ? rawTags.map(t => String(t).charAt(0).toUpperCase() + String(t).slice(1).toLowerCase())
         : ['Dinner'];
 
-      const prepTime = found.prepTime !== undefined && found.prepTime !== null
-        ? normalizeTime(found.prepTime, 0, 15)
-        : (found.time ? normalizeTime(found.time, 0, 15) : { hours: 0, minutes: 15 });
-      const cookTime = found.cookTime !== undefined && found.cookTime !== null
-        ? normalizeTime(found.cookTime, 0, 30)
+      const prepTime = targetSource.prepTime !== undefined && targetSource.prepTime !== null
+        ? normalizeTime(targetSource.prepTime, 0, 15)
+        : (targetSource.time ? normalizeTime(targetSource.time, 0, 15) : { hours: 0, minutes: 15 });
+      const cookTime = targetSource.cookTime !== undefined && targetSource.cookTime !== null
+        ? normalizeTime(targetSource.cookTime, 0, 30)
         : { hours: 0, minutes: 30 };
 
       let ingredientSections = [];
-      if (Array.isArray(found.ingredientSections) && found.ingredientSections.length > 0) {
-        ingredientSections = found.ingredientSections.map(sec => ({
+      if (Array.isArray(targetSource.ingredientSections) && targetSource.ingredientSections.length > 0) {
+        ingredientSections = targetSource.ingredientSections.map(sec => ({
           sectionTitle: sec.sectionTitle || 'Main Ingredients',
           ingredients: Array.isArray(sec.ingredients) ? sec.ingredients.map(i => ({
             ...i,
@@ -116,10 +143,10 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
             raw: formatIngredientLine(i)
           })) : []
         }));
-      } else if (Array.isArray(found.ingredients) && found.ingredients.length > 0) {
+      } else if (Array.isArray(targetSource.ingredients) && targetSource.ingredients.length > 0) {
         ingredientSections = [{
           sectionTitle: 'Main Ingredients',
-          ingredients: found.ingredients.map(i => ({
+          ingredients: targetSource.ingredients.map(i => ({
             ...(typeof i === 'object' ? i : {}),
             name: typeof i === 'string' ? i : (i.name || i.ingredientName || i.ingredient || ''),
             qty: i.qty !== undefined && i.qty !== null ? i.qty : 1,
@@ -138,23 +165,44 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
         return `${header}${items}`.trim();
       }).filter(Boolean).join('\n\n');
 
-      const methodStepsArray = Array.isArray(found.steps) 
-        ? found.steps 
-        : (Array.isArray(found.methodSteps) ? found.methodSteps : (Array.isArray(found.instructions) ? found.instructions : []));
+      const extractRawSteps = (src) => {
+        if (!src) return [];
+        if (Array.isArray(src.methodSteps) && src.methodSteps.length > 0) return src.methodSteps;
+        if (Array.isArray(src.steps) && src.steps.length > 0) return src.steps;
+        if (Array.isArray(src.method) && src.method.length > 0) return src.method;
+        if (Array.isArray(src.instructions) && src.instructions.length > 0) return src.instructions;
+        if (typeof src.method === 'string' && src.method.trim()) {
+          return src.method.split('\n').map(s => s.trim()).filter(Boolean);
+        }
+        if (typeof src.instructions === 'string' && src.instructions.trim()) {
+          return src.instructions.split('\n').map(s => s.trim()).filter(Boolean);
+        }
+        if (typeof src.steps === 'string' && src.steps.trim()) {
+          return src.steps.split('\n').map(s => s.trim()).filter(Boolean);
+        }
+        return [];
+      };
 
-      let methodRawText = '';
-      if (methodStepsArray.length > 0) {
-        methodRawText = methodStepsArray.map(formatMethodLine).filter(Boolean).join('\n');
-      } else if (typeof found.method === 'string') {
-        methodRawText = found.method;
-      } else if (typeof found.instructions === 'string') {
-        methodRawText = found.instructions;
+      let rawStepsList = extractRawSteps(targetSource);
+      if ((!rawStepsList || rawStepsList.length === 0) && isEnhVariant && found) {
+        rawStepsList = extractRawSteps(found);
       }
 
-      const safeServes = Number(found.servings || found.serves || 4) || 4;
+      const methodStepsArray = rawStepsList.map(s => typeof s === 'string' ? s.trim() : (s?.text || s?.instruction || s?.step || String(s || '')).trim()).filter(Boolean);
+      const methodRawText = methodStepsArray.map(formatMethodLine).filter(Boolean).join('\n');
+
+      const safeServes = Number(targetSource.servings || targetSource.serves || 4) || 4;
+      const rawExtracted = extractRecipeMacros(targetSource, isEnhVariant ? 'enhanced' : 'original');
+      const safeMacros = {
+        calories: Number(rawExtracted.calories ?? rawExtracted.cal ?? targetSource.macros?.calories ?? 450),
+        protein: Number(rawExtracted.protein ?? rawExtracted.prot ?? targetSource.macros?.protein ?? 28),
+        carbs: Number(targetSource.macros?.carbs ?? targetSource.nutrition?.perServing?.carb ?? targetSource.carb ?? 40),
+        fat: Number(targetSource.macros?.fat ?? targetSource.nutrition?.perServing?.fat ?? targetSource.fat ?? 16)
+      };
+
       wizardState.activeRecipe = {
         id: found.id || found._id,
-        title: found.title || found.name || '',
+        title: targetSource.title || targetSource.name || found.title || found.name || '',
         servings: safeServes,
         serves: safeServes,
         prepTime,
@@ -164,20 +212,20 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null) {
         methodRaw: methodRawText,
         ingredientSections,
         ingredients: ingredientSections.flatMap(s => s.ingredients || []),
-        methodSteps: methodStepsArray.length ? methodStepsArray : (typeof found.method === 'string' ? found.method.split('\n').filter(Boolean) : []),
-        macros: found.macros || found.nutrition || { calories: 450, protein: 28, carbs: 40, fat: 16 },
+        methodSteps: methodStepsArray,
+        macros: safeMacros,
         enhanced: found.enhanced || null
       };
     }
   }
 
-  if (initialMode === 'bulk' || initialMode === 'parse') {
+  if (mode === 'bulk' || mode === 'parse') {
     wizardState.choice = 'bulk';
     wizardState.currentStep = 1;
-  } else if (initialMode === 'review') {
+  } else if (mode === 'review') {
     wizardState.choice = 'manual';
-    wizardState.currentStep = 3;
-  } else if (initialMode === 'manual') {
+    wizardState.currentStep = 2;
+  } else if (mode === 'manual') {
     wizardState.choice = 'manual';
     wizardState.currentStep = 1;
   } else {
@@ -238,10 +286,14 @@ export function loadNextRecipeFromQueue() {
     return `${header}${items}`.trim();
   }).filter(Boolean).join('\n\n');
 
-  const rawSteps = next.instructions || next.methodSteps || [];
-  const methodRawText = Array.isArray(rawSteps)
-    ? rawSteps.map(formatMethodLine).filter(Boolean).join('\n')
-    : (typeof rawSteps === 'string' ? rawSteps : '');
+  const rawSteps = Array.isArray(next.methodSteps) && next.methodSteps.length ? next.methodSteps
+    : (Array.isArray(next.steps) && next.steps.length ? next.steps
+    : (Array.isArray(next.method) && next.method.length ? next.method
+    : (Array.isArray(next.instructions) && next.instructions.length ? next.instructions
+    : (typeof next.method === 'string' ? next.method.split('\n').filter(Boolean)
+    : (typeof next.instructions === 'string' ? next.instructions.split('\n').filter(Boolean) : [])))));
+  const parsedSteps = rawSteps.map(s => typeof s === 'string' ? s.trim() : (s?.text || s?.instruction || s?.step || String(s || '')).trim()).filter(Boolean);
+  const methodRawText = parsedSteps.map(formatMethodLine).filter(Boolean).join('\n');
   const safeServes = Number(next.servings || next.serves || 4) || 4;
 
   wizardState.activeRecipe = {
@@ -254,7 +306,7 @@ export function loadNextRecipeFromQueue() {
     ingredientsRaw: ingRawText,
     methodRaw: methodRawText,
     ingredientSections: next.ingredientSections || [{ sectionTitle: 'Main Ingredients', ingredients: next.ingredients || [] }],
-    methodSteps: next.instructions || next.methodSteps || [],
+    methodSteps: parsedSteps,
     macros: next.macros || { calories: 450, protein: 28, carbs: 40, fat: 16 }
   };
 }

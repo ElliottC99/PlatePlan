@@ -12,8 +12,8 @@ function showHubModal(html) {
   const wrap = document.getElementById('view-modal-wrap');
   const content = document.getElementById('view-modal-content');
   if (wrap && content) {
-    wrap.style.setProperty('z-index', '25005', 'important');
-    content.style.setProperty('z-index', '25005', 'important');
+    wrap.style.setProperty('z-index', '100005', 'important');
+    content.style.setProperty('z-index', '100005', 'important');
     content.innerHTML = html;
     wrap.classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -22,9 +22,15 @@ function showHubModal(html) {
 
 export function closeAddToBankModal() {
   const wrap = document.getElementById('view-modal-wrap');
+  const content = document.getElementById('view-modal-content');
   if (wrap) {
     wrap.classList.remove('open');
+    wrap.style.setProperty('z-index', '25005', 'important');
+    wrap.onclick = null;
     document.body.style.overflow = '';
+  }
+  if (content) {
+    content.style.setProperty('z-index', '25005', 'important');
   }
 }
 
@@ -76,11 +82,22 @@ export function openAddToBankModal(initialMode = null, prefillData = {}) {
   const closeBtn = document.getElementById('btn-hub-close');
   if (closeBtn) closeBtn.onclick = closeAddToBankModal;
 
+  const wrap = document.getElementById('view-modal-wrap');
+  if (wrap) {
+    wrap.onclick = (e) => {
+      if (e.target === wrap) closeAddToBankModal();
+    };
+  }
+
   document.querySelectorAll('.hub-tile-btn').forEach(btn => {
     btn.onclick = () => {
       const mode = btn.dataset.hubMode;
       closeAddToBankModal();
-      openAddItemWizard({ startAt: mode });
+      const opts = { startAt: mode, ...prefillData };
+      if (mode === 'subtype' && prefillData.itemName && !prefillData.subtypeName) {
+        opts.subtypeName = prefillData.itemName;
+      }
+      openAddItemWizard(opts);
     };
   });
 }

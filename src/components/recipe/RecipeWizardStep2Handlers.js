@@ -4,16 +4,45 @@
  */
 
 import { wizardState, syncStep2InputsToState } from './RecipeWizardState.js';
-import { bindTaxonomyAutocompleteEvents } from './RecipeWizardTaxonomySearch.js';
+import { bindTaxonomyAutocompleteEvents, isIngredientUnlinked } from './RecipeWizardTaxonomySearch.js';
 import { promptRecipeWizardAliases } from './RecipeWizardAliasesPrompt.js';
 import { getState } from '../../store/store.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
 import { recalculateWizardMacros } from './RecipeWizardStep3Handlers.js';
+import { renderMacroBreakdownCrossbar } from './RecipeWizardStep3View.js';
+import { renderFitScoreBadge } from '../FitScoreBadge.js';
+import { renderStep2MacrosSummaryHTML } from './RecipeWizardStep2View.js';
 
 export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice }) {
   if (!modalWrap || wizardState.currentStep !== 2) return;
 
+  const updateLiveStep2NutritionDOM = () => {
+    syncStep2InputsToState(modalWrap);
+    recalculateWizardMacros(wizardState.activeRecipe);
+
+    const fitContainer = modalWrap.querySelector('#wiz-step2-fit-badge-container');
+    const macroBarContainer = modalWrap.querySelector('#wiz-step2-macro-crossbar-container');
+    const summaryContainer = modalWrap.querySelector('#wiz-step2-macros-summary-container');
+
+    const currentVariant = wizardState.activeVariant || 'original';
+    const targetMealType = wizardState.activeRecipe?.mealSuitability?.[0] || wizardState.activeRecipe?.types?.[0] || wizardState.activeRecipe?.type || 'dinner';
+
+    if (fitContainer) {
+      fitContainer.innerHTML = renderFitScoreBadge(wizardState.activeRecipe, targetMealType, {
+        variant: currentVariant,
+        showLabel: true
+      });
+    }
+    if (macroBarContainer) {
+      macroBarContainer.innerHTML = renderMacroBreakdownCrossbar(wizardState.activeRecipe, currentVariant);
+    }
+    if (summaryContainer) {
+      summaryContainer.innerHTML = renderStep2MacrosSummaryHTML(wizardState.activeRecipe);
+    }
+  };
+
   const safeRender = () => {
+    syncStep2InputsToState(modalWrap);
     recalculateWizardMacros(wizardState.activeRecipe);
     const wb = document.getElementById('wizard-modal-body') || document.querySelector('.modal-body');
     const st = wb ? wb.scrollTop : 0;
@@ -22,13 +51,26 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
     if (newWb) newWb.scrollTop = st;
   };
 
+  // Live input delegation on table inputs: qty, unit, name, water ml, servings
+  modalWrap.addEventListener('input', (e) => {
+    if (e.target && e.target.matches('.wiz-ing-qty, .wiz-ing-unit, .wiz-ing-name, .wiz-ing-water-ml, #wiz-servings-input')) {
+      updateLiveStep2NutritionDOM();
+    }
+  });
+
+  modalWrap.addEventListener('change', (e) => {
+    if (e.target && e.target.matches('.wiz-ing-qty, .wiz-ing-unit, .wiz-ing-name, .wiz-ing-water-ml, #wiz-servings-input')) {
+      updateLiveStep2NutritionDOM();
+    }
+  });
+
   const servingsInput = modalWrap.querySelector('#wiz-servings-input');
   if (servingsInput) {
     servingsInput.oninput = (e) => {
       const val = Math.max(1, parseInt(e.target.value, 10) || 4);
       wizardState.activeRecipe.servings = val;
       wizardState.activeRecipe.serves = val;
-      recalculateWizardMacros(wizardState.activeRecipe);
+      updateLiveStep2NutritionDOM();
     };
   }
 
@@ -112,9 +154,16 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
   bindTaxonomyAutocompleteEvents(modalWrap, (sIdx, iIdx, val) => {
     const item = wizardState.activeRecipe.ingredientSections[sIdx]?.ingredients[iIdx];
     if (item) {
+      // Clear previous direct product matches when changing taxonomy mapping
+      item.productId = null;
+      item.bankId = null;
+      delete item.mappedItemId;
+      delete item.productMatch;
+
       if (!val || val === 'new_item') {
         item.ingredientId = null;
         item.subtypeId = null;
+        item.categoryId = null;
         item.isNewTaxonomyItem = true;
       } else if (val.startsWith('cat:')) {
         item.categoryId = val.replace('cat:', '');
@@ -125,10 +174,12 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
         const [ingId, subId] = val.split(':');
         item.ingredientId = ingId;
         item.subtypeId = subId;
+        item.categoryId = null;
         item.isNewTaxonomyItem = false;
       } else {
         item.ingredientId = val;
         item.subtypeId = null;
+        item.categoryId = null;
         item.isNewTaxonomyItem = false;
       }
     }
@@ -150,8 +201,11 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
         });
       }
 
+      const state = getState() || {};
+      const prods = state.products || [];
+      const ings = state.rootItems || state.ingredients || [];
       const allIngs = (wizardState.activeRecipe.ingredientSections || []).flatMap(s => s.ingredients || []);
-      const unlinked = allIngs.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
+      const unlinked = allIngs.filter(i => isIngredientUnlinked(i, prods, ings));
       if (unlinked.length > 0) {
         showWizardNotice(`Cannot proceed: ${unlinked.length} ingredient(s) retain an unlinked "✨ New Item" status. Please map each ingredient to a valid Category, Item, or Sub-Type.`, 'warning');
         return;

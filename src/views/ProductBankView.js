@@ -26,12 +26,20 @@ let activeEditingProductId = null;
 
 export function cancelManualIng() {
   const wrap = document.getElementById('view-modal-wrap');
-  if (wrap) wrap.classList.remove('open');
+  const content = document.getElementById('view-modal-content');
+  if (wrap) {
+    wrap.classList.remove('open');
+    wrap.style.setProperty('z-index', '25005', 'important');
+  }
+  if (content) {
+    content.style.setProperty('z-index', '25005', 'important');
+  }
   document.body.style.overflow = '';
   activeEditingProductId = null;
   // A pre-link from Link Product must not carry over to the next, unrelated new product.
   window.__prefilledResolveBinding = null;
   window.__pendingHierarchyCommit = null;
+  window.__onHierarchyComplete = null;
 
   if (window.__modalContext && window.__modalContext.returnTo === 'data-quality') {
     const ctx = window.__modalContext;
@@ -260,7 +268,8 @@ export function openProductEditModal(productIdOrDraft = null) {
   if (pastePanel) pastePanel.hidden = true;
 
   document.body.style.overflow = 'hidden';
-  wrap.style.setProperty('z-index', '25005', 'important');
+  wrap.style.setProperty('z-index', '100005', 'important');
+  content.style.setProperty('z-index', '100005', 'important');
   wrap.classList.add('open');
 }
 
@@ -388,13 +397,25 @@ export async function saveManualIng() {
         subtypeName: pending.subtypeName || 'Standard',
         productPayload: updatedProd
       });
+      const cb = window.__onHierarchyComplete;
+      window.__onHierarchyComplete = null;
       cancelManualIng();
       renderProductBank();
       if (typeof window.renderIngredientBank === 'function') window.renderIngredientBank();
-      if (typeof window.__onHierarchyComplete === 'function') {
-        const cb = window.__onHierarchyComplete;
-        window.__onHierarchyComplete = null;
-        cb(res || { ingredientId: res?.rootItem?.id || pending.rootItemName, subtypeId: res?.subtype?.id || pending.subtypeName, subtypeName: pending.subtypeName, parentName: pending.rootItemName, category: pending.category });
+      if (typeof cb === 'function') {
+        const rootObj = res?.rootItem || { id: pending.rootItemName, name: pending.rootItemName };
+        const subObj = res?.subtype || { id: res?.subtypeId || pending.subtypeName, name: pending.subtypeName };
+        cb({
+          ...(res || {}),
+          ingredientId: rootObj?.id || pending.rootItemName,
+          parentName: rootObj?.name || pending.rootItemName,
+          subtypeId: subObj?.id || pending.subtypeName,
+          subtypeName: subObj?.name || pending.subtypeName,
+          category: pending.category || res?.category || 'General',
+          rootItem: rootObj,
+          subtype: subObj,
+          product: res?.product || updatedProd
+        });
       }
       return;
     } catch (e) {

@@ -110,7 +110,11 @@ export async function batchResolveOrphansWithNewSubtypeInDb(parentRootItem, prod
   if (!isDbAvailable()) return false;
   try {
     if (parentRootItem) {
-      await saveCanonicalRootItem(parentRootItem);
+      if (Array.isArray(parentRootItem)) {
+        await Promise.all(parentRootItem.map(item => saveCanonicalRootItem(item)));
+      } else {
+        await saveCanonicalRootItem(parentRootItem);
+      }
     }
     if (Array.isArray(productUpdates)) {
       await Promise.all(productUpdates.map(p => {

@@ -399,6 +399,7 @@ export async function removeCurrentEnhancedVariant(recipeId) {
           delete previewState.recipe.enhanced;
           delete previewState.recipe.enhancedFitScore;
           if (previewState.recipe.variants) delete previewState.recipe.variants.enhanced;
+          previewState.recipe._bestVariant = 'original';
         }
 
         const found = recipes.find(rec => String(rec.id) === String(recipeId));
@@ -406,6 +407,7 @@ export async function removeCurrentEnhancedVariant(recipeId) {
           delete found.enhanced;
           delete found.enhancedFitScore;
           if (found.variants) delete found.variants.enhanced;
+          found._bestVariant = 'original';
         }
 
         const favList = state.userPrefs?.variantFavourites;

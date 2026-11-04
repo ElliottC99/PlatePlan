@@ -1,15 +1,16 @@
 /**
  * src/components/recipe/RecipeWizardTaxonomyModal.js
- * Universal Guided Hierarchy Creation Wizard adapter for Recipe Wizard.
- * Forwards taxonomy mapping to openAddItemWizard, enforcing Category -> Root Item -> Sub-Type -> Product.
+ * Universal Guided Hierarchy Creation Wizard adapter for Recipe Wizard & Audit.
+ * Delegates to AddToBankHubUI router so user can choose Category, Root Item, Sub-Type, or Product,
+ * and fulfills the full pantry bank hierarchy chain.
  */
 
-import { openAddItemWizard } from '../pantry/AddItemWizardUI.js';
+import { openAddToBankModal } from '../pantry/AddToBankHubUI.js';
 
 export function openNewIngredientMappingWizardModal({ sIdx, iIdx, initialName = '', onComplete = null } = {}) {
-  openAddItemWizard({
-    startAt: 'item',
+  openAddToBankModal(null, {
     itemName: initialName,
+    subtypeName: initialName,
     onComplete: (created) => {
       if (typeof onComplete === 'function') {
         onComplete(created);

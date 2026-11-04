@@ -26,6 +26,9 @@ const DENSITY_TABLE = {
   beans: 0.8,        // 1 cup ~ 180g
   butter: 0.9,       // 1 tbsp ~ 14g
   powder: 0.5,       // generic powder/spice
+  lime: 1.0,         // juice / produce volume
+  lemon: 1.0,        // juice / produce volume
+  coconut: 0.95      // creamed coconut / milk
 };
 const DEFAULT_DENSITY = 0.7;
 
@@ -97,7 +100,7 @@ export function isLiquidIngredient(name) {
   return LIQUID_PATTERN.test(lower);
 }
 
-function findDensity(name) {
+export function findDensity(name) {
   const lower = String(name || '').toLowerCase();
   for (const [key, density] of Object.entries(DENSITY_TABLE)) {
     if (lower.includes(key)) return density;

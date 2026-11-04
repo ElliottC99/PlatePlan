@@ -107,6 +107,51 @@ export function getPlannedSlotNutrition(activeRecipe, slotKey = 'dinnerE', insta
 }
 
 /**
+ * Extracts recipe usage within a recent window (default 30 days) across active & historical meal plans.
+ * Returns a Map of recipeId -> { dateTime, dateStr }
+ */
+export function getRecentRecipeUsageMap(planHistory = [], currentPlan = null, windowDays = 30) {
+  const usageMap = new Map();
+  const now = new Date();
+  const cutoffTime = now.getTime() - (windowDays * 24 * 60 * 60 * 1000);
+
+  const processPlan = (plan) => {
+    if (!plan || !plan.slots || typeof plan.slots !== 'object') return;
+    const dayDates = plan.dayDates || {};
+    const planStartDate = plan.startDate ? new Date(plan.startDate).getTime() : 0;
+
+    Object.entries(plan.slots).forEach(([dKey, daySlot]) => {
+      if (!daySlot || typeof daySlot !== 'object') return;
+      const dateStr = dayDates[dKey] || (planStartDate ? new Date(planStartDate + ((Number(dKey) - 1) * 86400000)).toISOString().split('T')[0] : null);
+      const dateTime = dateStr ? new Date(dateStr).getTime() : (plan.updatedAt ? new Date(plan.updatedAt).getTime() : now.getTime());
+
+      if (dateTime >= cutoffTime) {
+        const recordSlot = (slot) => {
+          if (!slot || slot.isSkipped || slot.skipped) return;
+          const rId = slot.recipeId || slot.id;
+          if (rId) {
+            const existing = usageMap.get(rId);
+            if (!existing || dateTime > existing.dateTime) {
+              usageMap.set(rId, { dateTime, dateStr });
+            }
+          }
+          if (slot.elliott && typeof slot.elliott === 'object') recordSlot(slot.elliott);
+          if (slot.chloe && typeof slot.chloe === 'object') recordSlot(slot.chloe);
+        };
+        Object.values(daySlot).forEach(recordSlot);
+      }
+    });
+  };
+
+  if (currentPlan) processPlan(currentPlan);
+  if (Array.isArray(planHistory)) {
+    planHistory.forEach(p => processPlan(p));
+  }
+
+  return usageMap;
+}
+
+/**
  * Generates an automated household meal plan adhering to cadence, macros, and preferences.
  */
 export function generateMealPlan(options = {}) {
@@ -151,8 +196,14 @@ export function generateMealPlan(options = {}) {
     dayDates[d] = cur.toISOString().split('T')[0];
   }
 
+  const recentUsageMap = options.recentRecipeUsageMap || getRecentRecipeUsageMap(
+    options.planHistory || state.planHistory || [],
+    state.currentPlan,
+    options.cooldownDays !== undefined ? options.cooldownDays : 30
+  );
+
   const getFilteredRecipes = (type) => {
-    return allRecipes.filter(r => {
+    const matching = allRecipes.filter(r => {
       const types = (r.types || [r.type || 'dinner']).map(t => String(t).toLowerCase());
       if (!types.includes(type)) return false;
       const scoreObj = calculateMealFitScore(r, type, { activeProfile: 'everyone' });
@@ -160,6 +211,28 @@ export function generateMealPlan(options = {}) {
       if (score < minFitScore || score > maxFitScore) return false;
       return true;
     });
+
+    if (recentUsageMap && recentUsageMap.size > 0 && matching.length > 0) {
+      const freshCandidates = matching.filter(r => !recentUsageMap.has(r.id) && !recentUsageMap.has(r.originalId));
+      const neededSlots = Math.ceil(days / (cadence[type] || 2));
+
+      // If fresh pool is sufficient, strictly use fresh candidates
+      if (freshCandidates.length >= neededSlots) {
+        return freshCandidates;
+      }
+
+      // Graceful fallback: append used candidates sorted by least recently used (oldest first)
+      const usedCandidates = matching.filter(r => recentUsageMap.has(r.id) || recentUsageMap.has(r.originalId));
+      usedCandidates.sort((a, b) => {
+        const timeA = (recentUsageMap.get(a.id) || recentUsageMap.get(a.originalId))?.dateTime || 0;
+        const timeB = (recentUsageMap.get(b.id) || recentUsageMap.get(b.originalId))?.dateTime || 0;
+        return timeA - timeB;
+      });
+
+      return [...freshCandidates, ...usedCandidates];
+    }
+
+    return matching;
   };
 
   const breakfasts = getFilteredRecipes('breakfast').length ? getFilteredRecipes('breakfast') : allRecipes;

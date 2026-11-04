@@ -5,6 +5,7 @@
  */
 
 import { wizardState, syncStep3InputsToState, getSaveButtonLabel, hasDistinctEnhancedVariant } from './RecipeWizardState.js';
+import { isIngredientUnlinked } from './RecipeWizardTaxonomySearch.js';
 import { saveRecipe } from '../../services/HouseholdRepository.js';
 import { getState, updateRecipeInStore, learnIngredientAlias } from '../../store/store.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
@@ -170,12 +171,48 @@ export function recalculateWizardMacros(recipeObj) {
     perServing: { ...perServing, cal: perServing.calories, prot: perServing.protein }
   };
 
+  const isEnh = (typeof wizardState !== 'undefined' && wizardState.activeVariant === 'enhanced') || Boolean(recipeObj.enhanced && recipeObj._isEnhanced);
+  if (recipeObj.enhanced && (typeof wizardState !== 'undefined' ? wizardState.activeVariant === 'enhanced' : true)) {
+    if (typeof recipeObj.enhanced === 'object') {
+      recipeObj.enhanced.macros = { ...perServing };
+      recipeObj.enhanced.nutrition = {
+        ...recipeObj.nutrition,
+        perServing: { ...perServing, cal: perServing.calories, prot: perServing.protein },
+        total: {
+          cal: Math.round(perServing.calories * serves),
+          prot: Math.round(perServing.protein * serves),
+          carb: Math.round(perServing.carbs * serves),
+          fat: Math.round(perServing.fat * serves)
+        }
+      };
+      recipeObj.enhanced.calories = perServing.calories;
+      recipeObj.enhanced.protein = perServing.protein;
+      recipeObj.enhanced.carbs = perServing.carbs;
+      recipeObj.enhanced.fat = perServing.fat;
+      if (recipeObj.ingredientSections) {
+        recipeObj.enhanced.ingredientSections = recipeObj.ingredientSections;
+      }
+      if (recipeObj.ingredients) {
+        recipeObj.enhanced.ingredients = recipeObj.ingredients;
+      }
+    }
+  }
+
+  const activeVar = (typeof wizardState !== 'undefined' && wizardState.activeVariant) ? wizardState.activeVariant : (recipeObj.enhanced ? 'enhanced' : 'original');
   const targetMealType = recipeObj.mealSuitability?.[0] || recipeObj.types?.[0] || recipeObj.type || 'dinner';
-  const fitResult = calculateMealFitScore(recipeObj, targetMealType);
+  const fitResult = calculateMealFitScore(recipeObj, targetMealType, { variant: activeVar });
   if (fitResult && typeof fitResult.score === 'number') {
     recipeObj.fitScore = fitResult.score;
     recipeObj.fitTier = fitResult.tier;
     recipeObj._computedFitScore = fitResult.score;
+    if (activeVar === 'enhanced') {
+      recipeObj.enhancedFitScore = fitResult.score;
+      recipeObj._scoreEnhanced = fitResult.score;
+      if (recipeObj.enhanced && typeof recipeObj.enhanced === 'object') {
+        recipeObj.enhanced.fitScore = fitResult.score;
+        recipeObj.enhanced._computedFitScore = fitResult.score;
+      }
+    }
   }
 
   return perServing;
@@ -200,7 +237,10 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
   syncStep3InputsToState(modalWrap);
   const rec = wizardState.activeRecipe;
   const allIngredients = (rec.ingredientSections || []).flatMap(s => s.ingredients);
-  const unlinked = allIngredients.filter(i => i.isNewTaxonomyItem || i.ingredientId === 'new_item' || (!i.ingredientId && !i.categoryId) || String(i.name || '').includes('✨ New'));
+  const state = (typeof getState === 'function' ? getState() : (typeof window !== 'undefined' ? window.getState?.() : null)) || {};
+  const products = state.products || [];
+  const ingredients = state.rootItems || state.ingredients || [];
+  const unlinked = allIngredients.filter(i => isIngredientUnlinked(i, products, ingredients));
   
   if (unlinked.length > 0) {
     showWizardNotice(`Cannot save recipe: ${unlinked.length} ingredient(s) retain an unlinked "✨ New Item" status. Please map all ingredients to a valid Category, Item, or Sub-Type before saving.`, 'warning');
@@ -247,73 +287,145 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
 
   let finalComputedScore = rec.fitScore || 0;
   const targetMealType = rec.types?.[0] || rec.type || 'dinner';
-  if (typeof window.calculateMealFitScore === 'function') {
-    const fitData = window.calculateMealFitScore(rec, targetMealType);
+  const scoreVariant = wizardState.activeVariant || 'original';
+  const calcMealScore = (typeof calculateMealFitScore === 'function') ? calculateMealFitScore : (typeof window !== 'undefined' ? window.calculateMealFitScore : null);
+  if (typeof calcMealScore === 'function') {
+    const fitData = calcMealScore(rec, targetMealType, { variant: scoreVariant });
     if (fitData && typeof fitData.score === 'number') finalComputedScore = fitData.score;
   }
   rec.fitScore = finalComputedScore;
   rec._computedFitScore = finalComputedScore;
+  if (scoreVariant === 'enhanced') {
+    rec.enhancedFitScore = finalComputedScore;
+    rec._scoreEnhanced = finalComputedScore;
+  }
 
-  const recipeToSave = {
-    id: rec.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}`),
-    name: safeTitle,
-    title: safeTitle,
-    servings: safeServings,
-    serves: safeServings,
-    prepTime: rec.prepTime,
-    cookTime: rec.cookTime,
-    time: (rec.prepTime.hours * 60 + rec.prepTime.minutes) + (rec.cookTime.hours * 60 + rec.cookTime.minutes),
-    mealSuitability: rec.mealSuitability,
-    types: rec.types,
-    mealType: rec.mealType,
-    ingredientSections: rec.ingredientSections,
-    ingredients: rec.ingredients.map(i => ({
-      name: i.name,
-      qty: Number(i.qty) || 1,
-      unit: i.unit,
-      raw: i.raw,
-      ingredientId: i.ingredientId,
-      productId: i.productId,
-      bankId: i.bankId,
-      subtypeId: i.subtypeId || null,
-      categoryId: i.categoryId || null,
-      isCategoryDefault: i.isCategoryDefault || false,
-      displayName: i.displayName || null,
-      waterMl: i.waterMl || null,
-      isNewTaxonomyItem: !!i.isNewTaxonomyItem
-    })),
-    instructions: rec.methodSteps,
-    method: rec.methodSteps,
-    macros: {
-      calories: finalMacros.calories || finalMacros.cal || 0,
-      protein: finalMacros.protein || finalMacros.prot || 0,
-      carbs: finalMacros.carbs || 0,
-      fat: finalMacros.fat || 0
-    },
-    nutrition: {
-      perServing: {
+  let recipeToSave;
+  const baseOrig = wizardState.baseOriginalRecipe || {};
+
+  if (wizardState.activeVariant === 'enhanced') {
+    const editedEnhancedPayload = {
+      ...(baseOrig.enhanced || {}),
+      name: rec.name || `${baseOrig.name || baseOrig.title || 'Recipe'} (enhanced)`,
+      title: rec.title || `${baseOrig.name || baseOrig.title || 'Recipe'} (enhanced)`,
+      servings: safeServings,
+      serves: safeServings,
+      ingredients: allIngredients.map(i => ({
+        name: i.name,
+        qty: Number(i.qty) || 1,
+        unit: i.unit || '',
+        raw: i.raw || `${i.qty || 1} ${i.unit || ''} ${i.name || ''}`.trim(),
+        ingredientId: i.ingredientId || null,
+        productId: i.productId || null,
+        bankId: i.bankId || i.productId || null,
+        subtypeId: i.subtypeId || null,
+        categoryId: i.categoryId || null,
+        isCategoryDefault: i.isCategoryDefault || false,
+        displayName: i.displayName || null,
+        waterMl: i.waterMl || null
+      })),
+      ingredientSections: rec.ingredientSections,
+      steps: rec.methodSteps || baseOrig.steps || baseOrig.method || baseOrig.instructions || [],
+      methodSteps: rec.methodSteps || baseOrig.methodSteps || baseOrig.steps || baseOrig.method || [],
+      method: (rec.methodSteps && rec.methodSteps.length ? rec.methodSteps : (baseOrig.methodSteps || baseOrig.steps || (Array.isArray(baseOrig.method) ? baseOrig.method : (typeof baseOrig.method === 'string' ? [baseOrig.method] : [])) || [])).join('\n'),
+      instructions: rec.methodSteps || baseOrig.instructions || baseOrig.steps || baseOrig.method || [],
+      macros: {
         calories: finalMacros.calories || finalMacros.cal || 0,
         protein: finalMacros.protein || finalMacros.prot || 0,
         carbs: finalMacros.carbs || 0,
         fat: finalMacros.fat || 0
       },
-      calories: finalMacros.calories || finalMacros.cal || 0,
-      protein: finalMacros.protein || finalMacros.prot || 0,
-      carbs: finalMacros.carbs || 0,
-      fat: finalMacros.fat || 0
-    },
-    fitScore: finalComputedScore,
-    _computedFitScore: finalComputedScore,
-    createdAt: rec.createdAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
+      nutrition: {
+        perServing: {
+          calories: finalMacros.calories || finalMacros.cal || 0,
+          protein: finalMacros.protein || finalMacros.prot || 0,
+          carbs: finalMacros.carbs || 0,
+          fat: finalMacros.fat || 0
+        },
+        calories: finalMacros.calories || finalMacros.cal || 0,
+        protein: finalMacros.protein || finalMacros.prot || 0,
+        carbs: finalMacros.carbs || 0,
+        fat: finalMacros.fat || 0
+      },
+      fitScore: finalComputedScore,
+      _computedFitScore: finalComputedScore,
+      updatedAt: new Date().toISOString()
+    };
 
-  if (hasDistinctEnhancedVariant(rec) && rec.enhanced) {
-    recalculateWizardMacros(rec.enhanced);
-    const finalEnhMacros = (rec.enhanced.nutrition && rec.enhanced.nutrition.calories > (rec.enhanced.macros?.calories || 0)) ? rec.enhanced.nutrition : rec.enhanced.macros;
-    rec.enhanced.macros = finalEnhMacros;
-    rec.enhanced.nutrition = finalEnhMacros;
-    recipeToSave.enhanced = rec.enhanced;
+    recipeToSave = {
+      ...baseOrig,
+      id: baseOrig.id || rec.id,
+      enhanced: editedEnhancedPayload,
+      enhancedFitScore: finalComputedScore,
+      _scoreEnhanced: finalComputedScore,
+      updatedAt: new Date().toISOString()
+    };
+  } else {
+    // Original variant editing
+    recipeToSave = {
+      ...rec,
+      id: rec.id || baseOrig.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}`),
+      name: safeTitle,
+      title: safeTitle,
+      servings: safeServings,
+      serves: safeServings,
+      prepTime: rec.prepTime,
+      cookTime: rec.cookTime,
+      time: (rec.prepTime.hours * 60 + rec.prepTime.minutes) + (rec.cookTime.hours * 60 + rec.cookTime.minutes),
+      mealSuitability: rec.mealSuitability,
+      types: rec.types,
+      mealType: rec.mealType,
+      ingredientSections: rec.ingredientSections,
+      ingredients: allIngredients.map(i => ({
+        name: i.name,
+        qty: Number(i.qty) || 1,
+        unit: i.unit,
+        raw: i.raw,
+        ingredientId: i.ingredientId,
+        productId: i.productId,
+        bankId: i.bankId,
+        subtypeId: i.subtypeId || null,
+        categoryId: i.categoryId || null,
+        isCategoryDefault: i.isCategoryDefault || false,
+        displayName: i.displayName || null,
+        waterMl: i.waterMl || null,
+        isNewTaxonomyItem: !!i.isNewTaxonomyItem
+      })),
+      instructions: rec.methodSteps || [],
+      method: rec.methodSteps || [],
+      methodSteps: rec.methodSteps || [],
+      steps: rec.methodSteps || [],
+      macros: {
+        calories: finalMacros.calories || finalMacros.cal || 0,
+        protein: finalMacros.protein || finalMacros.prot || 0,
+        carbs: finalMacros.carbs || 0,
+        fat: finalMacros.fat || 0
+      },
+      nutrition: {
+        perServing: {
+          calories: finalMacros.calories || finalMacros.cal || 0,
+          protein: finalMacros.protein || finalMacros.prot || 0,
+          carbs: finalMacros.carbs || 0,
+          fat: finalMacros.fat || 0
+        },
+        calories: finalMacros.calories || finalMacros.cal || 0,
+        protein: finalMacros.protein || finalMacros.prot || 0,
+        carbs: finalMacros.carbs || 0,
+        fat: finalMacros.fat || 0
+      },
+      fitScore: finalComputedScore,
+      _computedFitScore: finalComputedScore,
+      createdAt: rec.createdAt || baseOrig.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // Strictly preserve existing enhanced variant if present on baseOrig or rec
+    const existingEnhanced = baseOrig.enhanced || rec.enhanced;
+    if (existingEnhanced) {
+      recipeToSave.enhanced = existingEnhanced;
+      recipeToSave.enhancedFitScore = baseOrig.enhancedFitScore || baseOrig._scoreEnhanced || rec.enhancedFitScore || 0;
+      recipeToSave._scoreEnhanced = recipeToSave.enhancedFitScore;
+    }
   }
 
   try {

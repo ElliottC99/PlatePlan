@@ -266,8 +266,8 @@ export function renderRecipeDetailModalContent(props = {}) {
             </button>
           `}
           ${recipeId ? `
-            <button type="button" id="modal-recipe-edit-btn" class="btn secondary" style="padding:6px 10px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;border-radius:8px;border:1px solid var(--border,#ccc);background:var(--surface,#fff);cursor:pointer;" onclick="if(typeof closeRecipePreview==='function')closeRecipePreview();if(typeof openRecipeWizard==='function')openRecipeWizard('manual', '${escapeAttr(recipeId)}')" aria-label="Edit recipe" title="Edit recipe">
-              ✏️ Edit
+            <button type="button" id="modal-recipe-review-btn" class="btn secondary" style="padding:6px 10px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;border-radius:8px;border:1px solid var(--border,#ccc);background:var(--surface,#fff);cursor:pointer;" onclick="if(typeof closeRecipePreview==='function')closeRecipePreview();if(typeof openRecipeWizard==='function')openRecipeWizard('review', '${escapeAttr(recipeId)}', '${escapeAttr(variantKey)}')" aria-label="Review recipe" title="Review recipe">
+              🔍 Review
             </button>
           ` : ''}
           ${isEnh && recipeId ? `

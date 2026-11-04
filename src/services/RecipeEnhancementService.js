@@ -284,7 +284,7 @@ export function resolveRecipeTargets(recipe, options = {}) {
 /**
  * Recursively maps and updates ingredients while preserving sections.
  */
-function cloneAndTraverseIngredients(recipe, mutatorFn) {
+export function cloneAndTraverseIngredients(recipe, mutatorFn) {
   let hasSections = Array.isArray(recipe.ingredientSections) && recipe.ingredientSections.length > 0;
   
   if (hasSections) {
@@ -303,7 +303,7 @@ function cloneAndTraverseIngredients(recipe, mutatorFn) {
 /**
  * Calculates per-serving macros for an ingredient list.
  */
-function calculateBatchMacros(ingredients, serves, { products = [], allIngredients = [] }) {
+export function calculateBatchMacros(ingredients, serves, { products = [], allIngredients = [] }) {
   let totalCal = 0, totalProt = 0, totalCarb = 0, totalFat = 0;
 
   ingredients.forEach(item => {
@@ -950,6 +950,7 @@ function buildRoutePlan({
     name,
     badge,
     description,
+    originalRecipe: recipe,
     beforeScore,
     predictedScore,
     predictedTier: simFit?.tierLabel || 'Ideal Match',
@@ -1058,6 +1059,7 @@ export function generateEnhancementPlan(recipe, options = {}) {
   return {
     recipeId: recipe.id,
     recipeTitle: recipe.name || recipe.title || 'Recipe',
+    originalRecipe: recipe,
     beforeScore,
     predictedScore: primaryRoute.predictedScore,
     proposedServings: primaryRoute.proposedServings,
