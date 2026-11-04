@@ -53,9 +53,9 @@ function renderModalContent() {
   const confidentCount = issues.filter(i => i.suggestedMatch && i.suggestedMatch.score >= 0.7).length;
 
   const countBadge = (type, count, label) => `
-    <button type="button" class="ram-filter-chip" data-filter="${type}" style="border:none; cursor:pointer; padding:6px 12px; border-radius:20px; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:6px; background:${currentFilter === type ? 'var(--primary,#4f46e5)' : '#f1f5f9'}; color:${currentFilter === type ? '#fff' : '#475569'};">
+    <button type="button" class="ram-filter-chip" data-filter="${type}" style="border:none; cursor:pointer; padding:6px 12px; border-radius:20px; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:6px; background:${currentFilter === type ? 'var(--tint-color)' : 'var(--tertiary-system-grouped-bg)'}; color:${currentFilter === type ? '#fff' : 'var(--secondary-label)'};">
       <span>${label}</span>
-      <span style="background:${currentFilter === type ? 'rgba(255,255,255,0.25)' : '#e2e8f0'}; padding:1px 6px; border-radius:10px; font-size:11px;">${count}</span>
+      <span style="background:${currentFilter === type ? 'rgba(255,255,255,0.25)' : 'var(--separator)'}; padding:1px 6px; border-radius:10px; font-size:11px;">${count}</span>
     </button>
   `;
 
@@ -76,7 +76,7 @@ function renderModalContent() {
       </div>
 
       <!-- KPI Summary -->
-      <div style="padding:12px 24px; background:#fff; border-bottom:1px solid var(--border,#e2e8f0); display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
+      <div style="padding:12px 24px; background:var(--secondary-system-grouped-bg); border-bottom:1px solid var(--border,#e2e8f0); display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           ${renderKPIBadge('all', summary.totalIssues, 'All Issues', currentFilter)}
           ${renderKPIBadge('orphaned', summary.orphanedCount, '⚠️ Orphaned IDs', currentFilter)}
@@ -86,11 +86,11 @@ function renderModalContent() {
         <div style="display:flex; gap:8px;">
           ${summary.totalIssues > 0 ? (
             confidentCount > 0 ? `
-              <button type="button" id="ram-autofix-btn" class="btn sm primary" style="background:#059669; color:#fff; font-weight:700; border-radius:8px; padding:6px 12px; cursor:pointer;">
+              <button type="button" id="ram-autofix-btn" class="btn sm primary" style="background:var(--tint-color); color:#fff; font-weight:700; border-radius:8px; padding:6px 12px; cursor:pointer;">
                 ⚡ Auto-Fix Confident Matches (${confidentCount})
               </button>
             ` : `
-              <button type="button" id="ram-autofix-btn" class="btn sm ghost" style="background:#f1f5f9; color:#64748b; font-weight:600; border-radius:8px; padding:6px 12px; cursor:default;" title="All high-confidence matches are fixed">
+              <button type="button" id="ram-autofix-btn" class="btn sm ghost" style="background:var(--tertiary-system-grouped-bg); color:var(--secondary-label); font-weight:600; border-radius:8px; padding:6px 12px; cursor:default;" title="All high-confidence matches are fixed">
                 ✓ Confident Matches Fixed
               </button>
             `
@@ -104,7 +104,7 @@ function renderModalContent() {
       <!-- Search & Filters -->
       <div style="padding:10px 24px; background:var(--surface2,#f8fafc); border-bottom:1px solid var(--border,#e2e8f0); display:flex; gap:12px; align-items:center;">
         <div style="position:relative; flex:1;">
-          <input type="search" id="ram-search-input" name="recipe_audit_search" aria-label="Search recipes or ingredients" placeholder="Filter by recipe name or ingredient text..." value="${String(currentSearch || '').replace(/"/g, '&quot;')}" style="width:100%; padding:7px 12px; font-size:12.5px; border:1px solid var(--border,#cbd5e1); border-radius:8px; outline:none; box-sizing:border-box; background:#fff;" />
+          <input type="search" id="ram-search-input" name="recipe_audit_search" aria-label="Search recipes or ingredients" placeholder="Filter by recipe name or ingredient text..." value="${String(currentSearch || '').replace(/"/g, '&quot;')}" style="width:100%; padding:7px 12px; font-size:12.5px; border:1px solid var(--border,#cbd5e1); border-radius:8px; outline:none; box-sizing:border-box; background:var(--secondary-system-grouped-bg); color:var(--label);" />
         </div>
         <div style="font-size:12px; color:var(--text2,#64748b); white-space:nowrap;">
           Showing <strong>${totalFiltered === 0 ? 0 : startIndex + 1}–${endIndex}</strong> of ${totalFiltered} (${summary.totalIssues} total)
@@ -112,7 +112,7 @@ function renderModalContent() {
       </div>
 
       ${confidentCount === 0 && summary.totalIssues > 0 ? `
-        <div style="margin:10px 24px 0 24px; padding:10px 14px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; font-size:12px; color:#166534; display:flex; align-items:center; gap:8px;">
+        <div style="margin:10px 24px 0 24px; padding:10px 14px; background:var(--badge-green-bg); border:1px solid var(--badge-green-border); border-radius:8px; font-size:12px; color:var(--badge-green-text); display:flex; align-items:center; gap:8px;">
           <span style="font-size:14px;">✨</span>
           <span><strong>291 confident matches auto-fixed!</strong> The remaining ${summary.totalIssues} item(s) have low match confidence (< 70%) or custom recipe strings and require manual selection below.</span>
         </div>

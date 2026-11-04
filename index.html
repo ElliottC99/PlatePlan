@@ -62,8 +62,11 @@ try{
     guardedStringify._isPlatePlanGuarded = true;
     JSON.stringify = guardedStringify;
   }
-  const platePlanAppearance=localStorage.getItem('plateplan_appearance')||'system';
-  if(platePlanAppearance==='light'||platePlanAppearance==='dark') document.documentElement.dataset.theme=platePlanAppearance;
+  const platePlanAppearance=localStorage.getItem('plateplan-appearance')||localStorage.getItem('plateplan_appearance')||localStorage.getItem('plateplan-theme')||'system';
+  if(platePlanAppearance==='light'||platePlanAppearance==='dark'){
+    document.documentElement.dataset.theme=platePlanAppearance;
+    document.documentElement.classList.add('theme-'+platePlanAppearance);
+  }
   document.documentElement.style.colorScheme=platePlanAppearance==='system'?'light dark':platePlanAppearance;
 }catch(e){}
 </script>
@@ -117,7 +120,7 @@ try{
   border-color: var(--border-strong, #cbd5e1);
 }
 .btn-primary, .btn.btn-primary, .btn.primary {
-  background: var(--text, #1A1916);
+  background: var(--tint-color, #34C759);
   color: #ffffff;
   border: 1px solid transparent;
   font-weight: 650;
@@ -170,9 +173,9 @@ try{
   font-variant-numeric: tabular-nums;
 }
 .pp-fit-badge.pp-fit-neutral {
-  background: #f8fafc;
-  color: #64748b;
-  border: 1px solid #cbd5e1;
+  background: var(--badge-neutral-bg, var(--surface2));
+  color: var(--badge-neutral-text, var(--text2));
+  border: 1px solid var(--badge-neutral-border, var(--border));
 }
 .skeleton-grid-cards {
   display: grid;
@@ -255,11 +258,11 @@ try{
     </div>
     <span class="ios-tab-label">Pantry</span>
   </button>
-  <button type="button" class="ios-tab-item" data-view="shopping" data-action="showView('shopping')" role="tab" aria-selected="false">
+  <button type="button" class="ios-tab-item" data-view="data" data-action="showView('data')" role="tab" aria-selected="false">
     <div class="ios-tab-icon">
-      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12l2 2 4-4"></path></svg>
     </div>
-    <span class="ios-tab-label">Shopping</span>
+    <span class="ios-tab-label">Data Quality</span>
   </button>
 </nav>
 <div class="mobile-more-wrap" id="mobile-more-wrap" data-action="if(event.target===this)closeMobileMore()">

@@ -85,9 +85,9 @@ export function renderMacroBreakdownCrossbar(recipe, variant = 'original') {
     const isKcal = type === 'kcal';
     const isGood = isKcal ? diff <= 0 : diff >= 0;
     const sign = diff > 0 ? '+' : '';
-    const bg = isGood ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)';
-    const color = isGood ? '#166534' : '#991b1b';
-    const border = isGood ? '#86efac' : '#fca5a5';
+    const bg = isGood ? 'var(--badge-green-bg)' : 'var(--badge-red-bg)';
+    const color = isGood ? 'var(--badge-green-text)' : 'var(--badge-red-text)';
+    const border = isGood ? 'var(--badge-green-border)' : 'var(--badge-red-border)';
     return `<span style="display:inline-flex; align-items:center; justify-content:center; padding: 2px 6px; border-radius: 6px; background: ${bg}; color: ${color}; border: 1px solid ${border}; font-size: 10px; font-weight: 800; margin-left: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">${sign}${diff}${isKcal ? '' : 'g'}</span>`;
   };
 
@@ -147,7 +147,7 @@ export function renderState3Review() {
         <span style="font-size: 14px; font-weight: 700; color: var(--text, #0f172a);">
           ${escapeHtml(toTitleCase(recipe.title || 'Untitled Recipe'))}
         </span>
-        ${isEnhancedTab ? '<span class="badge" style="background:#dcfce7;color:#15803d;font-weight:700;">✨ Enhanced Variant</span>' : ''}
+        ${isEnhancedTab ? '<span class="badge" style="background:var(--badge-green-bg);color:var(--badge-green-text);font-weight:700;">✨ Enhanced Variant</span>' : ''}
       </div>
       <div style="display: flex; align-items: center;">
         ${fitTagHtml}
@@ -197,11 +197,11 @@ export function renderState3Review() {
         const prodTitle = `${brandStr}${resolvedProduct.name || resolvedProduct.title || ''}`.trim();
         const searchUrl = resolvedProduct.tescoUrl || `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(prodTitle)}`;
         mainLineText += ` - <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(prodTitle)}</a>`;
-        taxLabel = `<span class="badge" style="background:#dcfce7; color:#15803d; border:1px solid #86efac; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Mapped</span>`;
+        taxLabel = `<span class="badge" style="background:var(--badge-green-bg); color:var(--badge-green-text); border:1px solid var(--badge-green-border); font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Mapped</span>`;
       } else if (!isUnlinked) {
-        taxLabel = `<span class="badge" style="background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Mapped</span>`;
+        taxLabel = `<span class="badge" style="background:var(--badge-blue-bg); color:var(--badge-blue-text); border:1px solid var(--badge-blue-border); font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Mapped</span>`;
       } else {
-        taxLabel = `<span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Unmapped</span>`;
+        taxLabel = `<span class="badge" style="background:var(--badge-red-bg); color:var(--badge-red-text); border:1px solid var(--badge-red-border); font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Unmapped</span>`;
       }
 
       rows += `
@@ -236,7 +236,7 @@ export function renderState3Review() {
 
   let mealTagsHtml = MEAL_TAGS.map(tag => {
     const isSelected = (recipe.mealSuitability || []).includes(tag);
-    return `<label style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 8px; border: 1px solid var(--border, #ccc); border-radius: 999px; background: ${isSelected ? '#eef2ff' : '#fff'}; color: ${isSelected ? '#4f46e5' : '#333'}; cursor: pointer;">
+    return `<label style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 8px; border: 1px solid var(--border, #ccc); border-radius: 999px; background: ${isSelected ? 'var(--badge-blue-bg)' : 'var(--surface)'}; color: ${isSelected ? 'var(--badge-blue-text)' : 'var(--text)'}; cursor: pointer;">
       <input type="checkbox" id="wiz-review-tag-${tag.toLowerCase()}" name="wiz_review_tag_${tag.toLowerCase()}" aria-label="Review tag ${tag}" class="wiz-review-tag" value="${tag}" ${isSelected ? 'checked' : ''} style="display:none;" />
       ${tag}
     </label>`;

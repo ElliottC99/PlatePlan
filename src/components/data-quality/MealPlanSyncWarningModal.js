@@ -41,20 +41,20 @@ export function openMealPlanSyncWarningModal(issue = {}) {
         <button type="button" class="btn sm ghost" style="padding:4px 8px; font-size:16px; line-height:1;" onclick="window.closeMealPlanSyncWarningModal()">✕</button>
       </div>
 
-      <div style="padding:14px; background:#fffbf7; border:1px solid #fed7aa; border-radius:10px; margin-bottom:18px;">
-        <div style="font-weight:700; font-size:13px; color:#c2410c; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+      <div style="padding:14px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; margin-bottom:18px;">
+        <div style="font-weight:700; font-size:13px; color:var(--badge-orange-text); margin-bottom:6px; display:flex; align-items:center; gap:6px;">
           <span>⚠️ Snapshot Comparison:</span> <strong>${escapeHtml(recipeName)}</strong>
         </div>
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; text-align:center; font-size:13px; margin-top:10px;">
-          <div style="background:#fef3c7; padding:8px; border-radius:6px; border:1px solid #fde68a;">
-            <div style="font-weight:700; color:#92400e; font-size:11px; text-transform:uppercase;">Active Plan Slot</div>
-            <strong style="font-size:14px; color:#78350f;">${Math.round(nodeCal)} kcal</strong>
-            <div style="font-size:11px; color:#b45309;">Protein: ${nodeProt}g</div>
+          <div style="background:var(--badge-yellow-bg); padding:8px; border-radius:6px; border:1px solid var(--badge-yellow-border);">
+            <div style="font-weight:700; color:var(--badge-yellow-text); font-size:11px; text-transform:uppercase;">Active Plan Slot</div>
+            <strong style="font-size:14px; color:var(--badge-yellow-text);">${Math.round(nodeCal)} kcal</strong>
+            <div style="font-size:11px; color:var(--badge-yellow-text);">Protein: ${nodeProt}g</div>
           </div>
-          <div style="background:#dcfce7; padding:8px; border-radius:6px; border:1px solid #bbf7d0;">
-            <div style="font-weight:700; color:#166534; font-size:11px; text-transform:uppercase;">Base Recipe Template</div>
-            <strong style="font-size:14px; color:#15803d;">${Math.round(tempCal)} kcal</strong>
-            <div style="font-size:11px; color:#16a34a;">Protein: ${tempProt}g</div>
+          <div style="background:var(--badge-green-bg); padding:8px; border-radius:6px; border:1px solid var(--badge-green-border);">
+            <div style="font-weight:700; color:var(--badge-green-text); font-size:11px; text-transform:uppercase;">Base Recipe Template</div>
+            <strong style="font-size:14px; color:var(--badge-green-text);">${Math.round(tempCal)} kcal</strong>
+            <div style="font-size:11px; color:var(--badge-green-text);">Protein: ${tempProt}g</div>
           </div>
         </div>
       </div>

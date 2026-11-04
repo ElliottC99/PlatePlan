@@ -118,11 +118,11 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
 
       ${affectedProducts.length > 1 ? `
         <!-- Batch Sub-Type Search Bar -->
-        <div style="background:#eef2ff; border:1px solid #c7d2fe; border-radius:10px; padding:12px; margin-bottom:14px;">
-          <div style="font-size:12px; font-weight:700; color:#3730a3; margin-bottom:8px;">⚡ Apply Batch Sub-Type to All (${affectedProducts.length} products):</div>
+        <div style="background:var(--badge-blue-bg); border:1px solid var(--badge-blue-border); border-radius:10px; padding:12px; margin-bottom:14px;">
+          <div style="font-size:12px; font-weight:700; color:var(--badge-blue-text); margin-bottom:8px;">⚡ Apply Batch Sub-Type to All (${affectedProducts.length} products):</div>
           <div style="display:flex; gap:8px; align-items:center;">
             <div id="batch-sub-type-mount" style="flex:1; min-width:0;"></div>
-            <button type="button" id="batch-delete-all-btn" class="btn sm ghost" style="color:#ef4444; border:1px solid #fecaca; background:#fff; font-size:11.5px; padding:7px 12px; border-radius:8px; white-space:nowrap; cursor:pointer;">
+            <button type="button" id="batch-delete-all-btn" class="btn sm ghost" style="color:var(--danger); border:1px solid var(--badge-red-border); background:var(--surface); font-size:11.5px; padding:7px 12px; border-radius:8px; white-space:nowrap; cursor:pointer;">
               🗑️ Delete All (${affectedProducts.length})
             </button>
           </div>
@@ -132,7 +132,7 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
       <div style="flex:1; min-height:380px; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:10px; margin-bottom:18px; background:var(--surface2,#f8fafc); padding-bottom:260px; box-sizing:border-box;">
         <table style="width:100%; border-collapse:collapse;">
           <thead>
-            <tr style="background:#e7e5e4; font-size:11px; font-weight:800; color:var(--text2); text-transform:uppercase; border-bottom:2px solid #d6d3d1;">
+            <tr style="background:var(--surface2); font-size:11px; font-weight:800; color:var(--text2); text-transform:uppercase; border-bottom:2px solid var(--border);">
               <th style="padding:10px 10px; text-align:left; width:35%;">Affected Product</th>
               <th style="padding:10px 10px; text-align:left; width:65%;">Assign Valid Sub-Type</th>
             </tr>

@@ -92,53 +92,53 @@ export function renderMemberMacroCard(memberKey, name, badgeLabel, colorTheme, d
   });
 
   return `
-    <div class="pp-macro-member-card" style="background:#f8fafc;border:1px solid #e2e8f0;padding:18px;border-radius:12px">
+    <div class="pp-macro-member-card" style="background:var(--tertiary-system-grouped-bg);border:1px solid var(--separator);padding:18px;border-radius:12px">
       <div style="font-weight:700;font-size:15px;color:${accentColor};margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
         <span>${escapeHtml(name)}'s Targets</span>
         <span style="font-size:11px;background:${badgeBg};color:${badgeText};padding:2px 8px;border-radius:10px;font-weight:600">${escapeHtml(badgeLabel)}</span>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;background:#ffffff;padding:10px;border-radius:8px;border:1px solid #cbd5e1">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;background:var(--secondary-system-grouped-bg);padding:10px;border-radius:8px;border:1px solid var(--separator)">
         <div class="pp-input-group" style="margin-bottom:0">
-          <label for="pp-macro-${pKey}-cal" style="font-size:12px;font-weight:600;color:#475569">Daily Calories (kcal)</label>
-          <input type="number" id="pp-macro-${pKey}-cal" name="ppMacro${pKey}Cal" aria-label="Daily Calories for ${pKey}" value="${dailyCal}" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px">
+          <label for="pp-macro-${pKey}-cal" style="font-size:12px;font-weight:600;color:var(--secondary-label)">Daily Calories (kcal)</label>
+          <input type="number" id="pp-macro-${pKey}-cal" name="ppMacro${pKey}Cal" aria-label="Daily Calories for ${pKey}" value="${dailyCal}" style="padding:6px 10px;border:1px solid var(--separator);border-radius:6px;font-size:13px;background:var(--secondary-system-grouped-bg);color:var(--label)">
         </div>
         <div class="pp-input-group" style="margin-bottom:0">
-          <label for="pp-macro-${pKey}-prot" style="font-size:12px;font-weight:600;color:#475569">Daily Protein (g)</label>
-          <input type="number" id="pp-macro-${pKey}-prot" name="ppMacro${pKey}Prot" aria-label="Daily Protein for ${pKey}" value="${dailyProt}" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px">
+          <label for="pp-macro-${pKey}-prot" style="font-size:12px;font-weight:600;color:var(--secondary-label)">Daily Protein (g)</label>
+          <input type="number" id="pp-macro-${pKey}-prot" name="ppMacro${pKey}Prot" aria-label="Daily Protein for ${pKey}" value="${dailyProt}" style="padding:6px 10px;border:1px solid var(--separator);border-radius:6px;font-size:13px;background:var(--secondary-system-grouped-bg);color:var(--label)">
         </div>
       </div>
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div style="font-size:12px;font-weight:700;color:#475569;text-transform:uppercase">4-Meal Slot Breakdown</div>
-        <span style="font-size:11px;color:${deltas.isCalBalanced ? '#16a34a' : '#d97706'}">
+        <div style="font-size:12px;font-weight:700;color:var(--secondary-label);text-transform:uppercase">4-Meal Slot Breakdown</div>
+        <span style="font-size:11px;color:${deltas.isCalBalanced ? 'var(--system-green)' : 'var(--system-orange)'}">
           ${deltas.isCalBalanced ? '✓ 100% Allocated' : `Sum: ${deltas.sumCal} kcal`}
         </span>
       </div>
 
       <div style="display:flex;flex-direction:column;gap:8px">
-        <div style="display:grid;grid-template-columns:90px 1fr 1fr;gap:8px;align-items:center;background:#fff;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0">
-          <span style="font-size:12px;font-weight:600;color:#334155">🍳 Breakfast</span>
-          <input type="number" id="pp-macro-${pKey}-bf-cal" name="ppMacro${pKey}BfCal" aria-label="Breakfast Calories for ${pKey}" value="${bfCal}" placeholder="kcal" style="padding:4px 8px;font-size:12px;border:1px solid #cbd5e1;border-radius:6px">
-          <input type="number" id="pp-macro-${pKey}-bf-prot" name="ppMacro${pKey}BfProt" aria-label="Breakfast Protein for ${pKey}" value="${bfProt}" placeholder="protein (g)" style="padding:4px 8px;font-size:12px;border:1px solid #cbd5e1;border-radius:6px">
+        <div style="display:grid;grid-template-columns:90px 1fr 1fr;gap:8px;align-items:center;background:var(--secondary-system-grouped-bg);padding:6px 10px;border-radius:6px;border:1px solid var(--separator)">
+          <span style="font-size:12px;font-weight:600;color:var(--label)">🍳 Breakfast</span>
+          <input type="number" id="pp-macro-${pKey}-bf-cal" name="ppMacro${pKey}BfCal" aria-label="Breakfast Calories for ${pKey}" value="${bfCal}" placeholder="kcal" style="padding:4px 8px;font-size:12px;border:1px solid var(--separator);border-radius:6px;background:var(--secondary-system-grouped-bg);color:var(--label)">
+          <input type="number" id="pp-macro-${pKey}-bf-prot" name="ppMacro${pKey}BfProt" aria-label="Breakfast Protein for ${pKey}" value="${bfProt}" placeholder="protein (g)" style="padding:4px 8px;font-size:12px;border:1px solid var(--separator);border-radius:6px;background:var(--secondary-system-grouped-bg);color:var(--label)">
         </div>
 
-        <div style="display:grid;grid-template-columns:90px 1fr 1fr;gap:8px;align-items:center;background:#fff;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0">
-          <span style="font-size:12px;font-weight:600;color:#334155">🥗 Lunch</span>
-          <input type="number" id="pp-macro-${pKey}-lu-cal" name="ppMacro${pKey}LuCal" aria-label="Lunch Calories for ${pKey}" value="${luCal}" placeholder="kcal" style="padding:4px 8px;font-size:12px;border:1px solid #cbd5e1;border-radius:6px">
-          <input type="number" id="pp-macro-${pKey}-lu-prot" name="ppMacro${pKey}LuProt" aria-label="Lunch Protein for ${pKey}" value="${luProt}" placeholder="protein (g)" style="padding:4px 8px;font-size:12px;border:1px solid #cbd5e1;border-radius:6px">
+        <div style="display:grid;grid-template-columns:90px 1fr 1fr;gap:8px;align-items:center;background:var(--secondary-system-grouped-bg);padding:6px 10px;border-radius:6px;border:1px solid var(--separator)">
+          <span style="font-size:12px;font-weight:600;color:var(--label)">🥗 Lunch</span>
+          <input type="number" id="pp-macro-${pKey}-lu-cal" name="ppMacro${pKey}LuCal" aria-label="Lunch Calories for ${pKey}" value="${luCal}" placeholder="kcal" style="padding:4px 8px;font-size:12px;border:1px solid var(--separator);border-radius:6px;background:var(--secondary-system-grouped-bg);color:var(--label)">
+          <input type="number" id="pp-macro-${pKey}-lu-prot" name="ppMacro${pKey}LuProt" aria-label="Lunch Protein for ${pKey}" value="${luProt}" placeholder="protein (g)" style="padding:4px 8px;font-size:12px;border:1px solid var(--separator);border-radius:6px;background:var(--secondary-system-grouped-bg);color:var(--label)">
         </div>
 
-        <div style="display:grid;grid-template-columns:90px 1fr 1fr;gap:8px;align-items:center;background:#fff;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0">
-          <span style="font-size:12px;font-weight:600;color:#334155">🍲 Dinner</span>
-          <input type="number" id="pp-macro-${pKey}-di-cal" name="ppMacro${pKey}DiCal" aria-label="Dinner Calories for ${pKey}" value="${diCal}" placeholder="kcal" style="padding:4px 8px;font-size:12px;border:1px solid #cbd5e1;border-radius:6px">
-          <input type="number" id="pp-macro-${pKey}-di-prot" name="ppMacro${pKey}DiProt" aria-label="Dinner Protein for ${pKey}" value="${diProt}" placeholder="protein (g)" style="padding:4px 8px;font-size:12px;border:1px solid #cbd5e1;border-radius:6px">
+        <div style="display:grid;grid-template-columns:90px 1fr 1fr;gap:8px;align-items:center;background:var(--secondary-system-grouped-bg);padding:6px 10px;border-radius:6px;border:1px solid var(--separator)">
+          <span style="font-size:12px;font-weight:600;color:var(--label)">🍲 Dinner</span>
+          <input type="number" id="pp-macro-${pKey}-di-cal" name="ppMacro${pKey}DiCal" aria-label="Dinner Calories for ${pKey}" value="${diCal}" placeholder="kcal" style="padding:4px 8px;font-size:12px;border:1px solid var(--separator);border-radius:6px;background:var(--secondary-system-grouped-bg);color:var(--label)">
+          <input type="number" id="pp-macro-${pKey}-di-prot" name="ppMacro${pKey}DiProt" aria-label="Dinner Protein for ${pKey}" value="${diProt}" placeholder="protein (g)" style="padding:4px 8px;font-size:12px;border:1px solid var(--separator);border-radius:6px;background:var(--secondary-system-grouped-bg);color:var(--label)">
         </div>
 
-        <div style="display:grid;grid-template-columns:90px 1fr 1fr;gap:8px;align-items:center;background:#fff;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0">
-          <span style="font-size:12px;font-weight:600;color:#334155">🥤 Snacking</span>
-          <input type="number" id="pp-macro-${pKey}-sn-cal" name="ppMacro${pKey}SnCal" aria-label="Snack Calories for ${pKey}" value="${snCal}" placeholder="kcal" style="padding:4px 8px;font-size:12px;border:1px solid #cbd5e1;border-radius:6px">
-          <input type="number" id="pp-macro-${pKey}-sn-prot" name="ppMacro${pKey}SnProt" aria-label="Snack Protein for ${pKey}" value="${snProt}" placeholder="protein (g)" style="padding:4px 8px;font-size:12px;border:1px solid #cbd5e1;border-radius:6px">
+        <div style="display:grid;grid-template-columns:90px 1fr 1fr;gap:8px;align-items:center;background:var(--secondary-system-grouped-bg);padding:6px 10px;border-radius:6px;border:1px solid var(--separator)">
+          <span style="font-size:12px;font-weight:600;color:var(--label)">🥤 Snacking</span>
+          <input type="number" id="pp-macro-${pKey}-sn-cal" name="ppMacro${pKey}SnCal" aria-label="Snack Calories for ${pKey}" value="${snCal}" placeholder="kcal" style="padding:4px 8px;font-size:12px;border:1px solid var(--separator);border-radius:6px;background:var(--secondary-system-grouped-bg);color:var(--label)">
+          <input type="number" id="pp-macro-${pKey}-sn-prot" name="ppMacro${pKey}SnProt" aria-label="Snack Protein for ${pKey}" value="${snProt}" placeholder="protein (g)" style="padding:4px 8px;font-size:12px;border:1px solid var(--separator);border-radius:6px;background:var(--secondary-system-grouped-bg);color:var(--label)">
         </div>
       </div>
     </div>
@@ -165,10 +165,10 @@ export function renderMacroEditorSection(userPrefs = {}) {
 
   return `
     <div class="pp-settings-card" id="pp-macro-editor-section">
-      <div class="pp-settings-title" style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 12px 0;display:flex;align-items:center;gap:8px">
+      <div class="pp-settings-title" style="font-size:16px;font-weight:700;color:var(--label);margin:0 0 12px 0;display:flex;align-items:center;gap:8px">
         ⚡ Daily Nutritional Targets & 4-Meal Breakdown
       </div>
-      <p style="font-size:12px;color:#64748b;margin:-4px 0 16px 0">
+      <p style="font-size:12px;color:var(--secondary-label);margin:-4px 0 16px 0">
         Individual calorie and protein targets across Breakfast, Lunch, Dinner, and Snacking/Drinking for Elliott & Chloe.
       </p>
 

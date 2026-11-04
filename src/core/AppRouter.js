@@ -43,7 +43,7 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
 export function syncMobileNavigation(viewId) {
   const mobileNav = document.getElementById('mobile-nav');
   if (!mobileNav) return;
-  const normalized = viewId === 'pantry' ? 'ingredients' : viewId;
+  const normalized = viewId === 'pantry' ? 'ingredients' : (viewId === 'quality' ? 'data' : viewId);
   const buttons = mobileNav.querySelectorAll('button[data-view], .ios-tab-item[data-view]');
   buttons.forEach(btn => {
     const isTarget = btn.dataset.view === viewId || btn.dataset.view === normalized;
@@ -80,7 +80,9 @@ export function showView(viewId) {
   }
 
   // Update desktop sidebar tabs
-  const normalizedViewId = (viewId === 'pantry' || viewId === 'ingredients') ? 'ingredients' : (viewId === 'shopping' ? 'planner' : viewId);
+  const normalizedViewId = (viewId === 'pantry' || viewId === 'ingredients')
+    ? 'ingredients'
+    : (viewId === 'quality' ? 'data' : (viewId === 'shopping' ? 'planner' : viewId));
   document.querySelectorAll('.desktop-sidebar .ntab').forEach(tab => {
     tab.classList.toggle('active', tab.dataset.view === normalizedViewId || tab.dataset.view === viewId);
   });

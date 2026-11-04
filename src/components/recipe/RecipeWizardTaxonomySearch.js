@@ -196,7 +196,7 @@ export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [],
 
   const selectedLabel = getTaxonomyLabel(item, iBank, pBank);
   const isCat = Boolean(item.categoryId) || selectedVal.startsWith('cat:');
-  const catInputStyle = isCat ? 'background:#eef2ff; border:1px solid #818cf8; color:#4338ca; font-weight:600;' : 'background:var(--surface,#fff); border:1px solid var(--border,#ccc); color:var(--text);';
+  const catInputStyle = isCat ? 'background:var(--badge-blue-bg); border:1px solid var(--badge-blue-border); color:var(--badge-blue-text); font-weight:600;' : 'background:var(--surface,#fff); border:1px solid var(--border,#ccc); color:var(--text);';
 
   return `
     <div class="wiz-tax-autocomplete-container" style="position:relative; width:100%;">
@@ -302,9 +302,9 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
         dropdownEl.style.display = 'none';
 
         if (val.startsWith('cat:')) {
-          inputEl.style.background = '#eef2ff';
-          inputEl.style.border = '1px solid #818cf8';
-          inputEl.style.color = '#4338ca';
+          inputEl.style.background = 'var(--badge-blue-bg)';
+          inputEl.style.border = '1px solid var(--badge-blue-border)';
+          inputEl.style.color = 'var(--badge-blue-text)';
           inputEl.style.fontWeight = '600';
         } else {
           inputEl.style.background = 'var(--surface,#fff)';

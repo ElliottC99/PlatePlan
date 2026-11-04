@@ -17,7 +17,7 @@ export function renderStep2ItemCategorySection(wizardData) {
              value="${escapeAttr(wizardData.selectedCategory)}"
              readonly
              disabled
-             style="width: 100%; padding: 8px 10px; border: 1px solid #a7f3d0; border-radius: 6px; font-size: 13px; background: #ecfdf5; color: #065f46; font-weight: 600; cursor: not-allowed; box-sizing: border-box;" />
+             style="width: 100%; padding: 8px 10px; border: 1px solid var(--badge-green-border); border-radius: 6px; font-size: 13px; background: var(--badge-green-bg); color: var(--badge-green-text); font-weight: 600; cursor: not-allowed; box-sizing: border-box;" />
     </div>
   ` : `
     <div>

@@ -95,7 +95,7 @@ function renderSingleProfileCard(profileId, profile = {}) {
           </div>
           <div>
             <label for="pp-profile-${pId}-cal-di" style="font-size:10px;color:var(--text2);display:block;cursor:pointer">Dinner (Rem)</label>
-            <input type="number" id="pp-profile-${pId}-cal-di" name="profileCalDi-${pId}" aria-label="${escapeHtml(name)} Calorie Split Dinner" value="${calDi}" readonly style="width:100%;font-size:11px;background:rgba(0,0,0,0.04);font-weight:700;color:var(--primary, #2563eb)">
+            <input type="number" id="pp-profile-${pId}-cal-di" name="profileCalDi-${pId}" aria-label="${escapeHtml(name)} Calorie Split Dinner" value="${calDi}" readonly style="width:100%;font-size:11px;background:var(--tertiary-system-grouped-bg);font-weight:700;color:var(--tint-color)">
             <input type="hidden" id="pp-macro-${legacyPrefix}-di-cal" aria-label="Legacy Dinner Calories ${legacyPrefix}" name="macroCalDi-${legacyPrefix}" value="${calDi}">
           </div>
         </div>
@@ -122,7 +122,7 @@ function renderSingleProfileCard(profileId, profile = {}) {
           </div>
           <div>
             <label for="pp-profile-${pId}-prot-di" style="font-size:10px;color:var(--text2);display:block;cursor:pointer">Dinner (Rem)</label>
-            <input type="number" id="pp-profile-${pId}-prot-di" name="profileProtDi-${pId}" aria-label="${escapeHtml(name)} Protein Split Dinner" value="${protDi}" readonly style="width:100%;font-size:11px;background:rgba(0,0,0,0.04);font-weight:700;color:var(--primary, #2563eb)">
+            <input type="number" id="pp-profile-${pId}-prot-di" name="profileProtDi-${pId}" aria-label="${escapeHtml(name)} Protein Split Dinner" value="${protDi}" readonly style="width:100%;font-size:11px;background:var(--tertiary-system-grouped-bg);font-weight:700;color:var(--tint-color)">
           </div>
         </div>
       </div>
@@ -164,8 +164,8 @@ export function renderProfileAllocationCard(prefs = {}) {
         ${renderSingleProfileCard('chloe', chloeProf)}
       </div>
 
-      <div style="margin-top:14px;background:rgba(37,99,235,0.04);border:1px solid rgba(37,99,235,0.15);padding:10px 12px;border-radius:8px;font-size:12px;color:var(--text2)">
-        <span style="font-weight:700;color:var(--primary, #2563eb)">⚡ Decoupled Splits & Zero-Drift Engine:</span>
+      <div style="margin-top:14px;background:var(--tint-color-muted);border:1px solid var(--badge-green-border);padding:10px 12px;border-radius:8px;font-size:12px;color:var(--text2)">
+        <span style="font-weight:700;color:var(--tint-color)">⚡ Decoupled Splits & Zero-Drift Engine:</span>
         Each profile configures independent calorie and protein percentages per meal. Dinner dynamically calculates as the exact remainder to eliminate rounding drift against daily targets.
       </div>
     </div>

@@ -295,16 +295,6 @@
 
 /* PlatePlan 19.2 coherence layer */
 :root{
-  color-scheme:light dark;
-  --action:#0969da;
-  --action-hover:#0757b8;
-  --action-bg:#eaf3ff;
-  --action-fill:#0969da;
-  --action-fill-hover:#0757b8;
-  --on-action:#fff;
-  --focus:#0a84ff;
-  --overlay:rgba(18,18,20,.46);
-  --shadow:0 12px 38px rgba(24,24,28,.14);
   --radius-sm:8px;
   --radius-md:12px;
   --radius-lg:18px;
@@ -380,36 +370,6 @@ a{color:var(--action)}
 .dq-fix-btn{min-width:76px;justify-content:center}
 
 @media(prefers-color-scheme:dark){
-  :root{
-    --bg:#111214;
-    --surface:#1b1c1f;
-    --surface2:#24262a;
-    --border:#35383e;
-    --border-strong:#555a63;
-    --text:#f2f3f5;
-    --text2:#b6bac2;
-    --text3:#858b95;
-    --green:#72d5a5;
-    --green-bg:#18392c;
-    --purple:#c4b5fd;
-    --purple-bg:#30294a;
-    --coral:#ff9b83;
-    --coral-bg:#492820;
-    --amber:#ffd071;
-    --amber-bg:#433317;
-    --red:#ff8f8f;
-    --red-bg:#482323;
-    --blue:#8ab4f8;
-    --blue-bg:#1d334e;
-    --action:#5b9cf6;
-    --action-hover:#77adf7;
-    --action-bg:#1d334e;
-    --action-fill:#0969da;
-    --action-fill-hover:#0757b8;
-    --focus:#73aef8;
-    --overlay:rgba(0,0,0,.68);
-    --shadow:0 16px 44px rgba(0,0,0,.46);
-  }
   img:not([src*="icon"]){filter:brightness(.94)}
   .source-link{color:var(--blue)}
   .btn.primary,.btn.dq-fix-btn{color:var(--on-action)}
@@ -446,26 +406,6 @@ a{color:var(--action)}
 }
 
 /* PlatePlan 19.3 readability and interaction layer */
-html[data-theme="light"]{
-  color-scheme:light;
-  --bg:#F7F6F2;--surface:#FFFFFF;--surface2:#F0EFE9;--border:#E2E0D8;--border-strong:#C8C5BA;
-  --text:#1A1916;--text2:#5D5A53;--text3:#817E76;--green:#1A6B4A;--green-bg:#EAF4EF;
-  --purple:#4A3D8F;--purple-bg:#EEEAF9;--coral:#A8402A;--coral-bg:#FAECEA;
-  --amber:#7A5200;--amber-bg:#FDF3E0;--red:#991F1F;--red-bg:#FDEAEA;
-  --blue:#1A4A6B;--blue-bg:#EAF0F4;--action:#0969da;--action-hover:#0757b8;--action-bg:#eaf3ff;
-  --action-fill:#0969da;--action-fill-hover:#0757b8;
-  --focus:#0a84ff;--overlay:rgba(18,18,20,.46);--shadow:0 12px 38px rgba(24,24,28,.14);
-}
-html[data-theme="dark"]{
-  color-scheme:dark;
-  --bg:#111214;--surface:#1b1c1f;--surface2:#24262a;--border:#35383e;--border-strong:#555a63;
-  --text:#f2f3f5;--text2:#c3c6cd;--text3:#969ca6;--green:#72d5a5;--green-bg:#18392c;
-  --purple:#c4b5fd;--purple-bg:#30294a;--coral:#ff9b83;--coral-bg:#492820;
-  --amber:#ffd071;--amber-bg:#433317;--red:#ff9f9f;--red-bg:#482323;
-  --blue:#8ab4f8;--blue-bg:#1d334e;--action:#5b9cf6;--action-hover:#77adf7;--action-bg:#1d334e;
-  --action-fill:#0969da;--action-fill-hover:#0757b8;--on-action:#fff;
-  --focus:#73aef8;--overlay:rgba(0,0,0,.68);--shadow:0 16px 44px rgba(0,0,0,.46);
-}
 .breakable-url,.breakable-id{overflow-wrap:break-word;word-break:break-word}
 .recipe-card-name,.plan-library-title,.plan-library-main,.plan-library-recipe-preview,.shop-item-copy,
 .slot-name,.slot-skipped,.review-mapping-status,.mobile-editor-card,.bank-card,.dq-card,
@@ -665,9 +605,9 @@ main{max-width:var(--content-max);padding:22px 20px 96px}
 .nav-group>summary::-webkit-details-marker{display:none}
 .nav-group>summary::after{content:'›';font-size:18px;transform:rotate(90deg);transition:transform .15s ease}
 .nav-group:not([open])>summary::after{transform:rotate(0)}
-.desktop-sidebar .ntab{display:flex;align-items:center;width:100%;min-height:44px;padding:9px 12px;margin:0;border:0;border-radius:10px;white-space:normal}
-.desktop-sidebar .ntab.active{background:var(--action-bg);color:var(--action);border:0}
-.desktop-sidebar .ntab:hover{background:var(--surface2)}
+.desktop-sidebar .ntab{display:flex;align-items:center;width:100%;min-height:44px;padding:9px 12px;margin:0;border:0;border-radius:10px;white-space:normal;background:transparent;color:var(--secondary-label)}
+.desktop-sidebar .ntab.active{background:var(--tint-color-muted);color:var(--tint-color);border:0;font-weight:600}
+.desktop-sidebar .ntab:hover:not(.active){background:var(--surface2);color:var(--label)}
 .desktop-sidebar-footer{margin-top:auto;padding:12px}
 .sync-pill[data-status="synced"]{font-size:0;padding:8px}
 .sync-pill[data-status="synced"]::after{content:'Synced';font-size:11px}
@@ -810,13 +750,13 @@ main{max-width:var(--content-max);padding:22px 20px 96px}
 
 /* PlatePlan 20.3 — flexible meal rescheduling */
 .btn.primary,.btn.dq-fix-btn,.cf.active,.mt2.active{
-  background:var(--action-fill,#0969da)!important;
-  border-color:var(--action-fill,#0969da)!important;
+  background:var(--tint-color,#34C759)!important;
+  border-color:var(--tint-color,#34C759)!important;
   color:var(--on-action,#fff)!important;
 }
 .btn.primary:hover,.btn.dq-fix-btn:hover,.cf.active:hover,.mt2.active:hover{
-  background:var(--action-fill-hover,#0757b8)!important;
-  border-color:var(--action-fill-hover,#0757b8)!important;
+  background:var(--tint-color-hover,#28A745)!important;
+  border-color:var(--tint-color-hover,#28A745)!important;
 }
 .btn.primary svg,.btn.dq-fix-btn svg,.cf.active svg,.mt2.active svg{
   color:inherit;
@@ -1160,8 +1100,8 @@ button,.btn,.btn.sm,.ntab,.cf,.mt2{
 .today-date-nav .btn{min-height:48px}
 .btn,.btn.sm{padding:10px 14px}
 .btn.primary,.btn.dq-fix-btn,.plan-choice.selected,.cf.active{
-  background:var(--action-fill,#0969da)!important;
-  border-color:var(--action-fill,#0969da)!important;
+  background:var(--tint-color,#34C759)!important;
+  border-color:var(--tint-color,#34C759)!important;
   color:var(--on-action,#fff)!important;
 }
 .btn.primary *, .btn.dq-fix-btn *{color:inherit!important}
@@ -1249,7 +1189,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   padding:0 14px;
   border-radius:999px;
   border:1px solid rgba(255,255,255,0.22);
-  background:var(--action, #2563eb);
+  background:var(--tint-color, #34C759);
   color:#ffffff;
   font-family:var(--font, system-ui, sans-serif);
   font-size:13px;
