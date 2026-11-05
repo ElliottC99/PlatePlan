@@ -34,7 +34,7 @@ export function attachDuplicateDetector({ inputEl, containerEl, items, icon = 'ð
           const name = typeof m === 'string' ? m : m.name;
           const meta = typeof m === 'object' && m.category ? ` [${m.category}]` : '';
           return `
-            <button type="button" class="btn xs ghost btn-wiz-dup-pill" style="font-size:11px; padding:2px 8px; border:1px solid var(--border,#e7e5e4); background:#fff;">
+            <button type="button" class="btn xs ghost btn-wiz-dup-pill" style="font-size:11px; padding:2px 8px; border:1px solid var(--border,#e7e5e4); background:var(--surface);">
               ${icon} ${escapeHtml(name)} <span style="opacity:0.6;">${escapeHtml(meta)}</span>
             </button>
           `;

@@ -81,7 +81,7 @@ export function renderDietaryExclusionManager(prefs = {}, settings = {}) {
           <button type="button" id="btn-recalibrate-defaults" class="btn sm secondary" onclick="window.handleManualRecalibrateDefaults()" style="font-weight:700;font-size:12px;padding:6px 12px">
             ⚡ Recalibrate Pantry Defaults
           </button>
-          <button type="button" id="btn-recalibrate-recipes" class="btn sm primary" onclick="window.handleManualRecalibrateRecipeMacros()" style="font-weight:700;font-size:12px;padding:6px 12px;background:var(--primary,#4f46e5);color:#fff">
+          <button type="button" id="btn-recalibrate-recipes" class="btn sm primary" onclick="window.handleManualRecalibrateRecipeMacros()" style="font-weight:700;font-size:12px;padding:6px 12px;background:var(--tint-color);color:#fff">
             ⚡ Recalibrate Recipe Macros from Optimal Defaults
           </button>
         </div>

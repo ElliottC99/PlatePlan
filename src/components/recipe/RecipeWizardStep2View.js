@@ -175,7 +175,7 @@ export function renderState2Mapping() {
           <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text, #0f172a);">
             ${escapeHtml(toTitleCase(activeRecipe.title || 'Untitled Recipe'))}
           </h3>
-          ${currentVariant === 'enhanced' ? '<span class="badge" style="background:#dcfce7;color:#15803d;font-weight:700;">✨ Enhanced Variant</span>' : ''}
+          ${currentVariant === 'enhanced' ? '<span class="badge" style="background:var(--badge-green-bg);color:var(--badge-green-text);font-weight:700;">✨ Enhanced Variant</span>' : ''}
         </div>
         <div id="wiz-step2-fit-badge-container" style="display: flex; align-items: center;">
           ${fitTagHtml}

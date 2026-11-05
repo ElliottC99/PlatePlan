@@ -106,7 +106,7 @@ export function openMacroDriftPreviewModal(recipesToRecalibrate = []) {
       <div style="flex:1; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:10px; margin-bottom:18px; background:var(--surface2,#f5f5f4);">
         <table style="width:100%; border-collapse:collapse; text-align:center;">
           <thead>
-            <tr style="background:#e7e5e4; font-size:11px; font-weight:800; color:var(--text2); text-transform:uppercase; border-bottom:2px solid #d6d3d1;">
+            <tr style="background:var(--surface2); font-size:11px; font-weight:800; color:var(--text2); text-transform:uppercase; border-bottom:2px solid var(--border);">
               <th style="padding:10px 8px; text-align:left; width:40px;">
                 <input type="checkbox" id="drift-select-all" checked style="width:16px; height:16px; cursor:pointer;" name="drift-select-all" />
               </th>

@@ -43,7 +43,7 @@ export const renderAuditCard = (title, icon, items, renderer, headerActionHtml =
         </h3>
         <div style="display:flex; align-items:center; gap:8px;">
           ${headerActionHtml}
-          <span style="font-size:11px; font-weight:700; padding:3px 8px; border-radius:999px; background:${count > 0 ? '#fee2e2' : '#dcfce7'}; color:${count > 0 ? '#b91c1c' : '#15803d'}">
+          <span style="font-size:11px; font-weight:700; padding:3px 8px; border-radius:999px; background:${count > 0 ? 'var(--badge-red-bg)' : 'var(--badge-green-bg)'}; color:${count > 0 ? 'var(--badge-red-text)' : 'var(--badge-green-text)'}">
             ${count > 0 ? `${count} Action Required` : 'Healthy'}
           </span>
         </div>
@@ -239,7 +239,7 @@ export function renderDataQualityView() {
           <div>
             <div style="display:flex; align-items:center; gap:10px;">
               <h2 style="font-size:22px; font-weight:800; margin:0; color:var(--text,#1c1917);">Data Health Centre</h2>
-              <span style="font-size:12px; font-weight:750; padding:3px 10px; border-radius:999px; background:${isHealthy ? '#dcfce7' : '#fee2e2'}; color:${isHealthy ? '#15803d' : '#b91c1c'};">
+              <span style="font-size:12px; font-weight:750; padding:3px 10px; border-radius:999px; background:${isHealthy ? 'var(--badge-green-bg)' : 'var(--badge-red-bg)'}; color:${isHealthy ? 'var(--badge-green-text)' : 'var(--badge-red-text)'};">
                 ${healthScore}% Healthy · ${totalIssues} Action Items
               </span>
             </div>
@@ -279,9 +279,9 @@ export function renderDataQualityView() {
         
         <!-- 1. DUPLICATE INGREDIENTS CARD -->
         ${renderAuditCard('Duplicate Ingredient Candidates', '👥', audit.duplicates, (item) => `
-          <div style="padding:12px 14px; background:#fff; border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <div style="padding:12px 14px; background:var(--surface2); border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
             <div style="min-width:0;">
-              <strong style="font-size:13.5px; color:#111827;">"${escapeHtml(item.ing1Name)}" &amp; "${escapeHtml(item.ing2Name)}"</strong>
+              <strong style="font-size:13.5px; color:var(--text);">"${escapeHtml(item.ing1Name)}" &amp; "${escapeHtml(item.ing2Name)}"</strong>
               <div style="font-size:12px; color:var(--text2,#78716c); margin-top:3px;">${escapeHtml(item.message)}</div>
             </div>
             <div style="display:flex; gap:6px; flex-shrink:0;">
@@ -296,9 +296,9 @@ export function renderDataQualityView() {
 
         <!-- 2. BROKEN / ORPHANED PRODUCTS CARD -->
         ${renderAuditCard('Broken / Orphaned Grocery Products', '🔗', audit.orphans, (item) => `
-          <div style="padding:12px 14px; background:#fff; border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <div style="padding:12px 14px; background:var(--surface2); border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
             <div style="min-width:0;">
-              <strong style="font-size:13.5px; color:#111827;">${escapeHtml(item.productName)}</strong>
+              <strong style="font-size:13.5px; color:var(--text);">${escapeHtml(item.productName)}</strong>
               <div style="font-size:12px; color:var(--text2,#78716c); margin-top:3px;">${escapeHtml(item.message)}</div>
             </div>
             <div style="display:flex; gap:6px; flex-shrink:0;">
@@ -315,9 +315,9 @@ export function renderDataQualityView() {
 
         <!-- 3. RECIPE MACRO DRIFT CARD -->
         ${renderAuditCard('Recipe Macro Drift Anomaly', '📉', audit.macroDrift, (item) => `
-          <div style="padding:12px 14px; background:#fff; border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <div style="padding:12px 14px; background:var(--surface2); border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
             <div style="min-width:0;">
-              <strong style="font-size:13.5px; color:#111827;">${escapeHtml(item.recipeName)}</strong>
+              <strong style="font-size:13.5px; color:var(--text);">${escapeHtml(item.recipeName)}</strong>
               <div style="font-size:12px; color:var(--text2,#78716c); margin-top:3px;">${escapeHtml(item.message)}</div>
             </div>
             <div style="display:flex; gap:8px; align-items:center; flex-shrink:0;">
@@ -325,16 +325,16 @@ export function renderDataQualityView() {
             </div>
           </div>
         `, audit.macroDrift.length > 0 ? `
-          <button type="button" class="btn sm primary dq-action-btn" data-action-dq="recalibrate-all-macros" style="font-weight:700; background:#2563eb; color:#fff;">
+          <button type="button" class="btn sm primary dq-action-btn" data-action-dq="recalibrate-all-macros" style="font-weight:700; background:var(--system-blue); color:#fff;">
             ⚡ Recalibrate All (${audit.macroDrift.length})
           </button>
         ` : '')}
 
         <!-- 4. ACTIVE MEAL PLAN DESYNC CARD -->
         ${renderAuditCard('Active Week Meal Plan Desync', '📅', audit.planDesync, (item) => `
-          <div style="padding:12px 14px; background:#fff; border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <div style="padding:12px 14px; background:var(--surface2); border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
             <div style="min-width:0;">
-              <strong style="font-size:13.5px; color:#111827;">${escapeHtml(item.recipeName)} (Day ${escapeHtml(item.dayKey)} · ${escapeHtml(item.mealKey)})</strong>
+              <strong style="font-size:13.5px; color:var(--text);">${escapeHtml(item.recipeName)} (Day ${escapeHtml(item.dayKey)} · ${escapeHtml(item.mealKey)})</strong>
               <div style="font-size:12px; color:var(--text2,#78716c); margin-top:3px;">${escapeHtml(item.message)}</div>
             </div>
             <div style="display:flex; gap:6px; flex-shrink:0;">
@@ -355,9 +355,9 @@ export function renderDataQualityView() {
 
         <!-- 5. DRY-GOODS VOLUME DENSITY MISMATCH CARD -->
         ${renderAuditCard('Weight-to-Volume Density Mismatch', '🧪', audit.densityMismatch, (item) => `
-          <div style="padding:12px 14px; background:#fff; border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <div style="padding:12px 14px; background:var(--surface2); border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
             <div style="min-width:0;">
-              <strong style="font-size:13.5px; color:#111827;">${escapeHtml(item.ingredientName)}</strong>
+              <strong style="font-size:13.5px; color:var(--text);">${escapeHtml(item.ingredientName)}</strong>
               <div style="font-size:12px; color:var(--text2,#78716c); margin-top:3px;">${escapeHtml(item.message)}</div>
             </div>
             <div style="display:flex; gap:6px; flex-shrink:0;">

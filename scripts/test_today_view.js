@@ -178,4 +178,45 @@ assert.strictEqual(getState().currentPlan, null, 'With no plan loaded nothing is
 assert.strictEqual(toasts.length, toastCount, 'With no plan loaded neither handler confirms a tick');
 console.log('✅ Tick handlers update the loaded plan, and refuse to save without one');
 
+// 9. Daily Nutrition card renders stacked person rows (Elliott & Chloe) with Calories and Protein only
+const { renderTodayMacrosCard } = await import('../src/views/TodayRenderService.js');
+const { computeTodayNutritionSummary } = await import('../src/views/TodayView.js');
+
+getState().userPrefs = {
+  profiles: {
+    elliott: { dailyKcal: 2200, dailyProtein: 160 },
+    chloe: { dailyKcal: 1650, dailyProtein: 115 }
+  }
+};
+getState().recipes = [
+  { id: 'rec-shared', name: 'Oats', serves: 2, macros: { calories: 500, protein: 30, carbs: 60, fat: 12 } },
+  { id: 'rec-e-only', name: 'Wrap E', serves: 1, macros: { calories: 600, protein: 45, carbs: 50, fat: 15 } },
+  { id: 'rec-c-only', name: 'Salad C', serves: 1, macros: { calories: 400, protein: 25, carbs: 30, fat: 10 } }
+];
+
+const summary = computeTodayNutritionSummary({
+  breakfastE: { recipeId: 'rec-shared', variant: 'original' },
+  breakfastC: { recipeId: 'rec-shared', variant: 'original' },
+  lunchE: { recipeId: 'rec-e-only', variant: 'original' },
+  lunchC: { recipeId: 'rec-c-only', variant: 'original' }
+});
+
+assert.strictEqual(summary.targets.elliott.calories, 2200, 'Elliott calorie target comes from profile');
+assert.strictEqual(summary.targets.elliott.protein, 160, 'Elliott protein target comes from profile');
+assert.strictEqual(summary.targets.chloe.calories, 1650, 'Chloe calorie target comes from profile');
+assert.strictEqual(summary.targets.chloe.protein, 115, 'Chloe protein target comes from profile');
+assert.ok(summary.totals.elliott.calories > summary.totals.chloe.calories, 'Elliott planned calories reflect his portion and split meal');
+assert.ok(summary.totals.elliott.protein > summary.totals.chloe.protein, 'Elliott planned protein reflects his portion and split meal');
+
+const macroHtml = renderTodayMacrosCard(summary.totals, summary.targets);
+assert.ok(macroHtml.includes('Elliott'), 'Nutrition card shows Elliott row');
+assert.ok(macroHtml.includes('Chloe'), 'Nutrition card shows Chloe row');
+assert.ok(macroHtml.includes('2,200') || macroHtml.includes('2200'), 'Nutrition card shows Elliott calorie budget');
+assert.ok(macroHtml.includes('160g'), 'Nutrition card shows Elliott protein target');
+assert.ok(macroHtml.includes('1,650') || macroHtml.includes('1650'), 'Nutrition card shows Chloe calorie budget');
+assert.ok(macroHtml.includes('115g'), 'Nutrition card shows Chloe protein target');
+assert.ok(!macroHtml.includes('Carbs'), 'Nutrition card omits Carbs');
+assert.ok(!macroHtml.includes('Fat'), 'Nutrition card omits Fat');
+console.log('✅ Daily Nutrition card shows Elliott and Chloe Calories & Protein targets without Carbs or Fat');
+
 console.log('\n=== TODAY VIEW SUITE PASSED ===');

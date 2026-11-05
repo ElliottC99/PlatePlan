@@ -223,7 +223,7 @@ export function renderRecipePreview() {
   const eKcal = singleKcalE, cKcal = singleKcalC, eProt = singleProtE, cProt = singleProtC;
 
   const fitScore = Math.round(Number(fitResult?.score) || 0);
-  const meta = typeof getFitScoreTierMeta === 'function' ? getFitScoreTierMeta(fitScore) : { tier: 'red', icon: '🔴', label: 'Poor Match', color: '#ef4444', bg: '#fee2e2', text: '#7f1d1d', border: '#fca5a5' };
+  const meta = typeof getFitScoreTierMeta === 'function' ? getFitScoreTierMeta(fitScore) : { tier: 'red', icon: '🔴', label: 'Poor Match', color: 'var(--system-red)', bg: 'var(--badge-red-bg)', text: 'var(--badge-red-text)', border: 'var(--badge-red-border)' };
   const fitPillHtml = `<span class="badge ${meta.tier}" style="background:${meta.bg};color:${meta.text};border:1px solid ${meta.border}">${meta.icon} ${fitScore}% - ${meta.label}</span>`;
 
   const renderMacroBadge = (type, diff) => {
@@ -232,9 +232,9 @@ export function renderRecipePreview() {
     // Protein: Positive/Zero is Good (Green), Negative is Bad (Red)
     const isGood = isKcal ? diff <= 0 : diff >= 0;
     const sign = diff > 0 ? '+' : '';
-    const bg = isGood ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)';
-    const color = isGood ? '#166534' : '#991b1b';
-    const border = isGood ? '#86efac' : '#fca5a5';
+    const bg = isGood ? 'var(--badge-green-bg)' : 'var(--badge-red-bg)';
+    const color = isGood ? 'var(--badge-green-text)' : 'var(--badge-red-text)';
+    const border = isGood ? 'var(--badge-green-border)' : 'var(--badge-red-border)';
     return `<span style="display:inline-flex; align-items:center; justify-content:center; padding: 2px 6px; border-radius: 6px; background: ${bg}; color: ${color}; border: 1px solid ${border}; font-size: 10px; font-weight: 800; margin-left: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">${sign}${diff}${isKcal ? '' : 'g'}</span>`;
   };
 

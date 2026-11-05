@@ -4,7 +4,10 @@
  * Supports Dynamic Light & Dark Mode with PlatePlan Emerald Green Accent
  */
 
-:root {
+:root,
+html[data-theme="light"],
+html.theme-light {
+  color-scheme: light;
   /* Apple Dynamic System Colors (Light Default) */
   --system-bg: #FFFFFF;
   --secondary-system-bg: #F2F2F7;
@@ -50,11 +53,32 @@
   --system-gray5: #E5E5EA;
   --system-gray6: #F2F2F7;
 
+  /* Adaptive Semantic Status Badges (Light Mode) */
+  --badge-green-bg: rgba(52, 199, 89, 0.14);
+  --badge-green-text: #14532D;
+  --badge-green-border: rgba(52, 199, 89, 0.45);
+  --badge-yellow-bg: rgba(255, 204, 0, 0.18);
+  --badge-yellow-text: #713F12;
+  --badge-yellow-border: rgba(234, 179, 8, 0.55);
+  --badge-orange-bg: rgba(255, 149, 0, 0.16);
+  --badge-orange-text: #7C2D12;
+  --badge-orange-border: rgba(249, 115, 22, 0.50);
+  --badge-red-bg: rgba(255, 59, 48, 0.14);
+  --badge-red-text: #7F1D1D;
+  --badge-red-border: rgba(239, 68, 68, 0.45);
+  --badge-blue-bg: rgba(0, 122, 255, 0.12);
+  --badge-blue-text: #1E40AF;
+  --badge-blue-border: rgba(0, 122, 255, 0.35);
+  --badge-neutral-bg: var(--system-gray6);
+  --badge-neutral-text: var(--secondary-label);
+  --badge-neutral-border: var(--separator);
+
   /* Backward Compatibility Mappings for Existing PlatePlan Code */
   --bg: var(--system-grouped-bg);
   --surface: var(--secondary-system-grouped-bg);
   --surface2: var(--system-gray6);
   --surface3: var(--system-gray5);
+  --card: var(--secondary-system-grouped-bg);
   --border: var(--separator);
   --border-strong: var(--opaque-separator);
   --text: var(--label);
@@ -63,16 +87,28 @@
   --primary: var(--tint-color);
   --action: var(--tint-color);
   --action-hover: var(--tint-color-hover);
+  --action-bg: var(--tint-color-muted);
+  --action-fill: var(--tint-color);
+  --action-fill-hover: var(--tint-color-hover);
+  --on-action: #FFFFFF;
+  --focus: var(--tint-color);
+  --overlay: rgba(15, 23, 42, 0.45);
+  --shadow: 0 12px 38px rgba(0, 0, 0, 0.12);
   --green: var(--system-green);
   --green-bg: var(--tint-color-muted);
   --red: var(--system-red);
   --red-bg: rgba(255, 59, 48, 0.12);
+  --danger: var(--system-red);
+  --danger-bg: rgba(255, 59, 48, 0.12);
   --amber: var(--system-orange);
   --amber-bg: rgba(255, 149, 0, 0.12);
+  --coral: var(--system-orange);
+  --coral-bg: rgba(255, 149, 0, 0.12);
   --purple: var(--system-purple);
   --purple-bg: rgba(175, 82, 222, 0.12);
   --blue: var(--system-blue);
   --blue-bg: rgba(0, 122, 255, 0.12);
+  --info-bg: rgba(0, 122, 255, 0.12);
 
   /* Apple Typography Scale (SF Pro Font Stack) */
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", system-ui, sans-serif;
@@ -126,7 +162,8 @@
 
 /* Dark Mode Appearance Tokens */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme="light"]):not(.theme-light) {
+    color-scheme: dark;
     --system-bg: #000000;
     --secondary-system-bg: #1C1C1E;
     --tertiary-system-bg: #2C2C2E;
@@ -166,6 +203,61 @@
     --system-gray5: #2C2C2E;
     --system-gray6: #1C1C1E;
 
+    --badge-green-bg: rgba(48, 209, 88, 0.18);
+    --badge-green-text: #30D158;
+    --badge-green-border: rgba(48, 209, 88, 0.45);
+    --badge-yellow-bg: rgba(255, 214, 10, 0.18);
+    --badge-yellow-text: #FFD60A;
+    --badge-yellow-border: rgba(255, 214, 10, 0.45);
+    --badge-orange-bg: rgba(255, 159, 10, 0.18);
+    --badge-orange-text: #FF9F0A;
+    --badge-orange-border: rgba(255, 159, 10, 0.45);
+    --badge-red-bg: rgba(255, 69, 58, 0.18);
+    --badge-red-text: #FF453A;
+    --badge-red-border: rgba(255, 69, 58, 0.45);
+    --badge-blue-bg: rgba(10, 132, 255, 0.18);
+    --badge-blue-text: #64D2FF;
+    --badge-blue-border: rgba(10, 132, 255, 0.45);
+    --badge-neutral-bg: var(--tertiary-system-grouped-bg);
+    --badge-neutral-text: var(--secondary-label);
+    --badge-neutral-border: var(--separator);
+
+    --bg: var(--system-grouped-bg);
+    --surface: var(--secondary-system-grouped-bg);
+    --surface2: var(--tertiary-system-grouped-bg);
+    --surface3: var(--system-gray4);
+    --card: var(--secondary-system-grouped-bg);
+    --border: var(--separator);
+    --border-strong: var(--opaque-separator);
+    --text: var(--label);
+    --text2: var(--secondary-label);
+    --text3: var(--tertiary-label);
+    --primary: var(--tint-color);
+    --action: var(--tint-color);
+    --action-hover: var(--tint-color-hover);
+    --action-bg: var(--tint-color-muted);
+    --action-fill: var(--tint-color);
+    --action-fill-hover: var(--tint-color-hover);
+    --on-action: #FFFFFF;
+    --focus: var(--tint-color);
+    --overlay: rgba(0, 0, 0, 0.68);
+    --shadow: 0 16px 44px rgba(0, 0, 0, 0.46);
+    --green: var(--system-green);
+    --green-bg: var(--tint-color-muted);
+    --red: var(--system-red);
+    --red-bg: rgba(255, 69, 58, 0.18);
+    --danger: var(--system-red);
+    --danger-bg: rgba(255, 69, 58, 0.18);
+    --amber: var(--system-orange);
+    --amber-bg: rgba(255, 159, 10, 0.18);
+    --coral: var(--system-orange);
+    --coral-bg: rgba(255, 159, 10, 0.18);
+    --purple: var(--system-purple);
+    --purple-bg: rgba(191, 90, 242, 0.18);
+    --blue: var(--system-blue);
+    --blue-bg: rgba(10, 132, 255, 0.18);
+    --info-bg: rgba(10, 132, 255, 0.18);
+
     --ios-material-chrome: rgba(28, 28, 30, 0.82);
     --ios-material-sheet: rgba(28, 28, 30, 0.94);
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
@@ -175,7 +267,9 @@
   }
 }
 
-html[data-theme="dark"] {
+html[data-theme="dark"],
+html.theme-dark {
+  color-scheme: dark;
   --system-bg: #000000;
   --secondary-system-bg: #1C1C1E;
   --tertiary-system-bg: #2C2C2E;
@@ -215,36 +309,67 @@ html[data-theme="dark"] {
   --system-gray5: #2C2C2E;
   --system-gray6: #1C1C1E;
 
+  --badge-green-bg: rgba(48, 209, 88, 0.18);
+  --badge-green-text: #30D158;
+  --badge-green-border: rgba(48, 209, 88, 0.45);
+  --badge-yellow-bg: rgba(255, 214, 10, 0.18);
+  --badge-yellow-text: #FFD60A;
+  --badge-yellow-border: rgba(255, 214, 10, 0.45);
+  --badge-orange-bg: rgba(255, 159, 10, 0.18);
+  --badge-orange-text: #FF9F0A;
+  --badge-orange-border: rgba(255, 159, 10, 0.45);
+  --badge-red-bg: rgba(255, 69, 58, 0.18);
+  --badge-red-text: #FF453A;
+  --badge-red-border: rgba(255, 69, 58, 0.45);
+  --badge-blue-bg: rgba(10, 132, 255, 0.18);
+  --badge-blue-text: #64D2FF;
+  --badge-blue-border: rgba(10, 132, 255, 0.45);
+  --badge-neutral-bg: var(--tertiary-system-grouped-bg);
+  --badge-neutral-text: var(--secondary-label);
+  --badge-neutral-border: var(--separator);
+
+  --bg: var(--system-grouped-bg);
+  --surface: var(--secondary-system-grouped-bg);
+  --surface2: var(--tertiary-system-grouped-bg);
+  --surface3: var(--system-gray4);
+  --card: var(--secondary-system-grouped-bg);
+  --border: var(--separator);
+  --border-strong: var(--opaque-separator);
+  --text: var(--label);
+  --text2: var(--secondary-label);
+  --text3: var(--tertiary-label);
+  --primary: var(--tint-color);
+  --action: var(--tint-color);
+  --action-hover: var(--tint-color-hover);
+  --action-bg: var(--tint-color-muted);
+  --action-fill: var(--tint-color);
+  --action-fill-hover: var(--tint-color-hover);
+  --on-action: #FFFFFF;
+  --focus: var(--tint-color);
+  --overlay: rgba(0, 0, 0, 0.68);
+  --shadow: 0 16px 44px rgba(0, 0, 0, 0.46);
+  --green: var(--system-green);
+  --green-bg: var(--tint-color-muted);
+  --red: var(--system-red);
+  --red-bg: rgba(255, 69, 58, 0.18);
+  --danger: var(--system-red);
+  --danger-bg: rgba(255, 69, 58, 0.18);
+  --amber: var(--system-orange);
+  --amber-bg: rgba(255, 159, 10, 0.18);
+  --coral: var(--system-orange);
+  --coral-bg: rgba(255, 159, 10, 0.18);
+  --purple: var(--system-purple);
+  --purple-bg: rgba(191, 90, 242, 0.18);
+  --blue: var(--system-blue);
+  --blue-bg: rgba(10, 132, 255, 0.18);
+  --info-bg: rgba(10, 132, 255, 0.18);
+
   --ios-material-chrome: rgba(28, 28, 30, 0.82);
   --ios-material-sheet: rgba(28, 28, 30, 0.94);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
   --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
   --shadow-sheet: 0 -4px 32px rgba(0, 0, 0, 0.65);
-}
-
-html[data-theme="light"] {
-  --system-bg: #FFFFFF;
-  --secondary-system-bg: #F2F2F7;
-  --tertiary-system-bg: #FFFFFF;
-  --system-grouped-bg: #F2F2F7;
-  --secondary-system-grouped-bg: #FFFFFF;
-  --tertiary-system-grouped-bg: #F2F2F7;
-
-  --label: #000000;
-  --secondary-label: rgba(60, 60, 67, 0.60);
-  --tertiary-label: rgba(60, 60, 67, 0.30);
-  --quaternary-label: rgba(60, 60, 67, 0.18);
-
-  --separator: rgba(60, 60, 67, 0.20);
-  --opaque-separator: #C6C6C8;
-
-  --tint-color: #34C759;
-  --tint-color-hover: #28A745;
-  --tint-color-muted: rgba(52, 199, 89, 0.15);
-
-  --ios-material-chrome: rgba(255, 255, 255, 0.82);
-  --ios-material-sheet: rgba(255, 255, 255, 0.94);
 }
 
 /* Global Reset & Base Typography */

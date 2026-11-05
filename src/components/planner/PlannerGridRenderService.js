@@ -77,14 +77,14 @@ export function renderRecipeCandidateRows(recipes, { dayIndex, mealType, person 
       : `window.setSplitPersonSlotStatus(${dayIndex}, '${mealType}', '${person}', 'pinned', '${escapeAttr(r.id)}', '${escapeAttr(r.name)}')`;
 
     return `
-      <div onclick="${clickAction}" style="padding:8px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#ffffff;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#ffffff'">
+      <div onclick="${clickAction}" style="padding:8px 10px;border-radius:6px;border:1px solid var(--separator);background:var(--secondary-system-grouped-bg);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px" onmouseover="this.style.background='var(--tertiary-system-grouped-bg)'" onmouseout="this.style.background='var(--secondary-system-grouped-bg)'">
         <div style="min-width:0;flex:1;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <span style="font-weight:600;color:#1e293b">${escapeHtml(r.name)}</span>
-          ${isEnhanced ? '<span class="tag green" style="background:#dcfce7;color:#16a34a;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700;margin-left:4px">Enhanced</span>' : ''}
+          <span style="font-weight:600;color:var(--label)">${escapeHtml(r.name)}</span>
+          ${isEnhanced ? '<span class="tag green" style="background:var(--badge-green-bg);color:var(--badge-green-text);font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700;margin-left:4px">Enhanced</span>' : ''}
           ${badgeHtml}
-          ${isDup ? `<span class="badge badge-warning" style="font-size:10px;background:#fef3c7;color:#b45309;font-weight:700;padding:2px 6px;border-radius:4px">🔄 Already in Plan</span>` : ''}
+          ${isDup ? `<span class="badge badge-warning" style="font-size:10px;background:var(--badge-yellow-bg);color:var(--badge-yellow-text);font-weight:700;padding:2px 6px;border-radius:4px">🔄 Already in Plan</span>` : ''}
         </div>
-        <span style="font-size:11px;color:#2563eb;font-weight:700;flex-shrink:0">Pin →</span>
+        <span style="font-size:11px;color:var(--tint-color);font-weight:700;flex-shrink:0">Pin →</span>
       </div>
     `;
   }).join('');
@@ -96,7 +96,7 @@ export function renderRecipeCandidateRows(recipes, { dayIndex, mealType, person 
 export function renderFitScoreScopeUI({ minVal = 0, maxVal = 100 } = {}) {
   const min = Math.max(0, Math.min(100, Number(minVal) || 0));
   const max = Math.max(min, Math.min(100, Number(maxVal) || 100));
-  const trackGradient = `linear-gradient(90deg, #e2e8f0 0%, #e2e8f0 ${min}%, #2563eb ${min}%, #2563eb ${max}%, #e2e8f0 ${max}%, #e2e8f0 100%)`;
+  const trackGradient = `linear-gradient(90deg, var(--separator) 0%, var(--separator) ${min}%, var(--tint-color) ${min}%, var(--tint-color) ${max}%, var(--separator) ${max}%, var(--separator) 100%)`;
 
   return `
     <div class="fit-score-scope-card" style="background:var(--surface2,#f8fafc);padding:14px;border-radius:12px;border:1px solid var(--border,#e2e8f0);margin-bottom:14px">
@@ -108,12 +108,12 @@ export function renderFitScoreScopeUI({ minVal = 0, maxVal = 100 } = {}) {
         <div style="display:flex;align-items:center;gap:8px">
           <div style="display:flex;align-items:center;gap:4px">
             <label for="wizard-fit-score-min" style="font-size:11px;font-weight:600;color:var(--text2,#64748b);cursor:pointer">Min:</label>
-            <input type="number" id="wizard-fit-score-min" name="minFitScore" aria-label="Minimum Fit Score" min="0" max="100" value="${min}" style="width:58px;padding:4px 6px;font-size:12px;border:1px solid var(--border,#cbd5e1);border-radius:6px;background:#fff;font-weight:600" onchange="window.handleFitScoreMinChange(this.value)">
+            <input type="number" id="wizard-fit-score-min" name="minFitScore" aria-label="Minimum Fit Score" min="0" max="100" value="${min}" style="width:58px;padding:4px 6px;font-size:12px;border:1px solid var(--border,#cbd5e1);border-radius:6px;background:var(--secondary-system-grouped-bg);color:var(--label);font-weight:600" onchange="window.handleFitScoreMinChange(this.value)">
           </div>
           <span style="font-size:12px;color:var(--text2,#64748b)">–</span>
           <div style="display:flex;align-items:center;gap:4px">
             <label for="wizard-fit-score-max" style="font-size:11px;font-weight:600;color:var(--text2,#64748b);cursor:pointer">Max:</label>
-            <input type="number" id="wizard-fit-score-max" name="maxFitScore" aria-label="Maximum Fit Score" min="0" max="100" value="${max}" style="width:58px;padding:4px 6px;font-size:12px;border:1px solid var(--border,#cbd5e1);border-radius:6px;background:#fff;font-weight:600" onchange="window.handleFitScoreMaxChange(this.value)">
+            <input type="number" id="wizard-fit-score-max" name="maxFitScore" aria-label="Maximum Fit Score" min="0" max="100" value="${max}" style="width:58px;padding:4px 6px;font-size:12px;border:1px solid var(--border,#cbd5e1);border-radius:6px;background:var(--secondary-system-grouped-bg);color:var(--label);font-weight:600" onchange="window.handleFitScoreMaxChange(this.value)">
           </div>
         </div>
       </div>
@@ -128,9 +128,9 @@ export function renderFitScoreScopeUI({ minVal = 0, maxVal = 100 } = {}) {
 export function renderSlotCardSummary(day, meal, config) {
   if (!config || config.status === 'unassigned') {
     return `
-      <div class="skeleton-slot unassigned" onclick="window.openSlotConfigurator(${day}, '${meal.key}')" style="padding:8px 10px;border:1px dashed #cbd5e1;border-radius:8px;background:#ffffff;cursor:pointer;display:flex;align-items:center;justify-content:space-between" title="Tap to configure slot">
-        <span style="font-size:12px;font-weight:600;color:#64748b">${meal.icon} ${meal.label}</span>
-        <span style="font-size:11px;color:#94a3b8;font-style:italic">+ Assign</span>
+      <div class="skeleton-slot unassigned" onclick="window.openSlotConfigurator(${day}, '${meal.key}')" style="padding:8px 10px;border:1px dashed var(--separator);border-radius:8px;background:var(--secondary-system-grouped-bg);cursor:pointer;display:flex;align-items:center;justify-content:space-between" title="Tap to configure slot">
+        <span style="font-size:12px;font-weight:600;color:var(--secondary-label)">${meal.icon} ${meal.label}</span>
+        <span style="font-size:11px;color:var(--tertiary-label);font-style:italic">+ Assign</span>
       </div>
     `;
   }
@@ -140,33 +140,33 @@ export function renderSlotCardSummary(day, meal, config) {
     const eSummary = config.elliott?.isSkipped ? '🚫 Skipped' : (eName ? `📌 ${escapeHtml(eName)}` : '⚡ Auto');
     const cSummary = config.chloe?.isSkipped ? '🚫 Skipped' : (cName ? `📌 ${escapeHtml(cName)}` : '⚡ Auto');
     return `
-      <div class="skeleton-slot split" onclick="window.openSlotConfigurator(${day}, '${meal.key}')" style="padding:8px 10px;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;cursor:pointer;display:flex;flex-direction:column;gap:3px" title="Tap to modify split slot">
+      <div class="skeleton-slot split" onclick="window.openSlotConfigurator(${day}, '${meal.key}')" style="padding:8px 10px;border:1px solid var(--badge-blue-border);border-radius:8px;background:var(--badge-blue-bg);cursor:pointer;display:flex;flex-direction:column;gap:3px" title="Tap to modify split slot">
         <div style="display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:10px;font-weight:700;color:#1e40af;text-transform:uppercase">${meal.icon} ${meal.label}</span>
-          <span class="badge" style="font-size:9.5px;background:#dbeafe;color:#1d4ed8;font-weight:700;padding:1px 5px;border-radius:4px">Split</span>
+          <span style="font-size:10px;font-weight:700;color:var(--badge-blue-text);text-transform:uppercase">${meal.icon} ${meal.label}</span>
+          <span class="badge" style="font-size:9.5px;background:var(--badge-blue-bg);color:var(--badge-blue-text);border:1px solid var(--badge-blue-border);font-weight:700;padding:1px 5px;border-radius:4px">Split</span>
         </div>
-        <div style="font-size:11px;color:#1e3a8a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><strong>E:</strong> ${eSummary}</div>
-        <div style="font-size:11px;color:#1e3a8a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><strong>C:</strong> ${cSummary}</div>
+        <div style="font-size:11px;color:var(--label);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><strong>E:</strong> ${eSummary}</div>
+        <div style="font-size:11px;color:var(--label);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><strong>C:</strong> ${cSummary}</div>
       </div>
     `;
   }
   if (config.isSkipped || config.status === 'skipped') {
     return `
-      <div class="skeleton-slot skipped" onclick="window.openSlotConfigurator(${day}, '${meal.key}')" style="padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#f1f5f9;cursor:pointer;display:flex;align-items:center;justify-content:space-between;opacity:0.85" title="Tap to modify">
-        <span style="font-size:12px;font-weight:600;color:#94a3b8;text-decoration:line-through">${meal.icon} ${meal.label}</span>
-        <span class="badge" style="font-size:10px;background:#cbd5e1;color:#334155;font-weight:700;padding:2px 6px;border-radius:4px">Skipped</span>
+      <div class="skeleton-slot skipped" onclick="window.openSlotConfigurator(${day}, '${meal.key}')" style="padding:8px 10px;border:1px solid var(--separator);border-radius:8px;background:var(--tertiary-system-grouped-bg);cursor:pointer;display:flex;align-items:center;justify-content:space-between;opacity:0.85" title="Tap to modify">
+        <span style="font-size:12px;font-weight:600;color:var(--tertiary-label);text-decoration:line-through">${meal.icon} ${meal.label}</span>
+        <span class="badge" style="font-size:10px;background:var(--badge-neutral-bg);color:var(--badge-neutral-text);border:1px solid var(--badge-neutral-border);font-weight:700;padding:2px 6px;border-radius:4px">Skipped</span>
       </div>
     `;
   }
   const sharedName = config.recipeId ? resolveRecipeName(config.recipeId, config.recipeName) : config.recipeName;
   if (sharedName) {
     return `
-      <div class="skeleton-slot pinned" onclick="window.openSlotConfigurator(${day}, '${meal.key}')" style="padding:8px 10px;border:1px solid #bbf7d0;border-radius:8px;background:#f0fdf4;cursor:pointer;display:flex;align-items:center;justify-content:space-between" title="Tap to modify">
+      <div class="skeleton-slot pinned" onclick="window.openSlotConfigurator(${day}, '${meal.key}')" style="padding:8px 10px;border:1px solid var(--badge-green-border);border-radius:8px;background:var(--badge-green-bg);cursor:pointer;display:flex;align-items:center;justify-content:space-between" title="Tap to modify">
         <div style="min-width:0;flex:1;padding-right:6px">
-          <div style="font-size:10px;font-weight:700;color:#166534;text-transform:uppercase">${meal.icon} ${meal.label}</div>
-          <div style="font-size:12px;font-weight:700;color:#14532d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📌 ${escapeHtml(sharedName)}</div>
+          <div style="font-size:10px;font-weight:700;color:var(--badge-green-text);text-transform:uppercase">${meal.icon} ${meal.label}</div>
+          <div style="font-size:12px;font-weight:700;color:var(--label);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📌 ${escapeHtml(sharedName)}</div>
         </div>
-        <span class="badge" style="font-size:10px;background:#dcfce7;color:#15803d;font-weight:700;padding:2px 6px;border-radius:4px;flex-shrink:0">Pinned</span>
+        <span class="badge" style="font-size:10px;background:var(--badge-green-bg);color:var(--badge-green-text);border:1px solid var(--badge-green-border);font-weight:700;padding:2px 6px;border-radius:4px;flex-shrink:0">Pinned</span>
       </div>
     `;
   }
@@ -193,10 +193,10 @@ export function renderSkeletonGridUI({ days = 7, startDate = '', skeletonGrid = 
     const slotsHtml = meals.map(m => renderSlotCardSummary(d, m, getSkeletonSlotConfig(skeletonGrid, d, m.key))).join('');
 
     gridCardsHtml += `
-      <div class="skeleton-day-card" style="background:#ffffff;border:1px solid var(--border,#e2e8f0);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 2px rgba(0,0,0,0.03)">
-        <div style="font-size:13px;font-weight:750;color:var(--text,#1e293b);padding-bottom:4px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">
+      <div class="skeleton-day-card" style="background:var(--secondary-system-grouped-bg);border:1px solid var(--border,#e2e8f0);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 2px rgba(0,0,0,0.03)">
+        <div style="font-size:13px;font-weight:750;color:var(--text,#1e293b);padding-bottom:4px;border-bottom:1px solid var(--separator);display:flex;align-items:center;justify-content:space-between">
           <span>Day ${d}</span>
-          <span style="font-size:11px;font-weight:600;color:#64748b">${escapeHtml(dateStr)}</span>
+          <span style="font-size:11px;font-weight:600;color:var(--secondary-label)">${escapeHtml(dateStr)}</span>
         </div>
         ${slotsHtml}
       </div>
@@ -225,11 +225,11 @@ export function renderPersonSplitColumn(personKey, personLabel, dayIndex, mealTy
   const statusText = isSkipped ? '🚫 Skipped' : (pinnedName ? `📌 ${escapeHtml(pinnedName)}` : '⚡ Auto-Generate (Unassigned)');
 
   return `
-    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;background:#f8fafc;display:flex;flex-direction:column;gap:8px">
+    <div style="border:1px solid var(--separator);border-radius:10px;padding:12px;background:var(--tertiary-system-grouped-bg);display:flex;flex-direction:column;gap:8px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap">
         <div>
-          <div style="font-size:13px;font-weight:750;color:#0f172a">${personLabel}'s Meal</div>
-          <div style="font-size:11.5px;color:#475569;margin-top:1px">${statusText}</div>
+          <div style="font-size:13px;font-weight:750;color:var(--label)">${personLabel}'s Meal</div>
+          <div style="font-size:11.5px;color:var(--secondary-label);margin-top:1px">${statusText}</div>
         </div>
         <div style="display:flex;gap:6px">
           <button type="button" class="btn sm ${isSkipped ? 'btn-primary primary' : 'btn-secondary secondary'}" style="font-size:11px;font-weight:700;padding:4px 8px" onclick="window.setSplitPersonSlotStatus(${dayIndex}, '${mealType}', '${personKey}', '${isSkipped ? 'unassigned' : 'skipped'}')">
@@ -239,7 +239,7 @@ export function renderPersonSplitColumn(personKey, personLabel, dayIndex, mealTy
         </div>
       </div>
       <label for="slot-config-search-${personKey}" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Search recipe for ${personLabel}</label>
-      <input type="search" id="slot-config-search-${personKey}" aria-label="Search recipe for ${personLabel}" placeholder="Search recipe for ${personLabel}..." class="input sm" style="width:100%;background:#fff" oninput="window.filterSlotConfigRecipes(this.value, '${personKey}')" name="slot-config-search-personKey">
+      <input type="search" id="slot-config-search-${personKey}" aria-label="Search recipe for ${personLabel}" placeholder="Search recipe for ${personLabel}..." class="input sm" style="width:100%;background:var(--secondary-system-grouped-bg);color:var(--label)" oninput="window.filterSlotConfigRecipes(this.value, '${personKey}')" name="slot-config-search-personKey">
       <div id="slot-config-recipe-list-${personKey}" style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
         ${renderRecipeCandidateRows(recipes, { dayIndex, mealType, person: personKey, query: '', skeletonGrid })}
       </div>
@@ -266,29 +266,29 @@ export function renderSlotConfiguratorModal({ dayIndex, mealLabel, mealType, isS
           <button type="button" class="btn btn-secondary secondary" style="flex:1;padding:9px 12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px" onclick="window.setSlotConfiguredStatus(${dayIndex}, '${mealType}', 'skipped')">
             🚫 Skip Entire Slot (Both)
           </button>
-          ${hasAnyConfig ? `<button type="button" class="btn btn-outline outline danger" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;font-weight:700;padding:9px 12px" onclick="window.setSlotConfiguredStatus(${dayIndex}, '${mealType}', 'unassigned')">Clear Slot</button>` : ''}
+          ${hasAnyConfig ? `<button type="button" class="btn btn-outline outline danger" style="background:var(--badge-red-bg);color:var(--badge-red-text);border:1px solid var(--badge-red-border);font-weight:700;padding:9px 12px" onclick="window.setSlotConfiguredStatus(${dayIndex}, '${mealType}', 'unassigned')">Clear Slot</button>` : ''}
         </div>
 
         <!-- Dining Mode Segmented Toggle -->
-        <div style="display:flex;background:#f1f5f9;padding:4px;border-radius:10px;gap:4px">
-          <button type="button" onclick="window.toggleSlotConfiguratorMode(false)" style="flex:1;padding:7px 10px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:${!isSplit ? '#ffffff' : 'transparent'};color:${!isSplit ? '#0f172a' : '#64748b'};box-shadow:${!isSplit ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'}">
+        <div style="display:flex;background:var(--tertiary-system-grouped-bg);padding:4px;border-radius:10px;gap:4px">
+          <button type="button" onclick="window.toggleSlotConfiguratorMode(false)" style="flex:1;padding:7px 10px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:${!isSplit ? 'var(--secondary-system-grouped-bg)' : 'transparent'};color:${!isSplit ? 'var(--label)' : 'var(--secondary-label)'};box-shadow:${!isSplit ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'}">
             👫 Shared Meal
           </button>
-          <button type="button" onclick="window.toggleSlotConfiguratorMode(true)" style="flex:1;padding:7px 10px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:${isSplit ? '#ffffff' : 'transparent'};color:${isSplit ? '#0f172a' : '#64748b'};box-shadow:${isSplit ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'}">
+          <button type="button" onclick="window.toggleSlotConfiguratorMode(true)" style="flex:1;padding:7px 10px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:${isSplit ? 'var(--secondary-system-grouped-bg)' : 'transparent'};color:${isSplit ? 'var(--label)' : 'var(--secondary-label)'};box-shadow:${isSplit ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'}">
             ↔️ Separate Meals (Elliott &amp; Chloe)
           </button>
         </div>
 
         ${!isSplit ? `
-          <div style="border-top:1px solid #e2e8f0;padding-top:10px">
-            <label for="slot-config-recipe-search" style="font-size:12px;font-weight:700;color:#334155;display:block;margin-bottom:6px">📌 Pin Shared Recipe (Applies to Both)</label>
+          <div style="border-top:1px solid var(--separator);padding-top:10px">
+            <label for="slot-config-recipe-search" style="font-size:12px;font-weight:700;color:var(--label);display:block;margin-bottom:6px">📌 Pin Shared Recipe (Applies to Both)</label>
             <input type="search" id="slot-config-recipe-search" aria-label="Search recipe to pin" placeholder="Search recipe name..." class="input sm" style="width:100%;margin-bottom:8px" oninput="window.filterSlotConfigRecipes(this.value, 'both')" name="slot-config-recipe-search">
             <div id="slot-config-recipe-list-both" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
               ${renderRecipeCandidateRows(recipes, { dayIndex, mealType, person: 'both', query: '', skeletonGrid })}
             </div>
           </div>
         ` : `
-          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:12px;border-top:1px solid #e2e8f0;padding-top:10px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:12px;border-top:1px solid var(--separator);padding-top:10px">
             ${renderPersonSplitColumn('elliott', 'Elliott', dayIndex, mealType, currentConfig.elliott || {}, recipes, skeletonGrid)}
             ${renderPersonSplitColumn('chloe', 'Chloe', dayIndex, mealType, currentConfig.chloe || {}, recipes, skeletonGrid)}
           </div>

@@ -33,17 +33,17 @@ export function renderReallocateModalBase(prod) {
           <h4 style="margin: 0 0 12px 0; font-size: 15px; font-weight: 600;">Create New Ingredient</h4>
           <div style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
             <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
-              <label for="new-reallocate-ingredient-name" style="font-size: 12px; font-weight: 600; color: #666;">Ingredient Name</label>
-              <input type="text" id="new-reallocate-ingredient-name" placeholder="e.g. Granulated Sugar" style="width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; box-sizing: border-box;" name="new-reallocate-ingredient-name" />
+              <label for="new-reallocate-ingredient-name" style="font-size: 12px; font-weight: 600; color: var(--text2);">Ingredient Name</label>
+              <input type="text" id="new-reallocate-ingredient-name" placeholder="e.g. Granulated Sugar" style="width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; box-sizing: border-box; background: var(--surface); color: var(--text);" name="new-reallocate-ingredient-name" />
             </div>
             <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
-              <label for="new-reallocate-ingredient-category" style="font-size: 12px; font-weight: 600; color: #666;">Category</label>
-              <input type="text" id="new-reallocate-ingredient-category" list="reallocate-categories-datalist" placeholder="Search existing or type new category..." style="width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; box-sizing: border-box;" name="new-reallocate-ingredient-category" />
+              <label for="new-reallocate-ingredient-category" style="font-size: 12px; font-weight: 600; color: var(--text2);">Category</label>
+              <input type="text" id="new-reallocate-ingredient-category" list="reallocate-categories-datalist" placeholder="Search existing or type new category..." style="width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; box-sizing: border-box; background: var(--surface); color: var(--text);" name="new-reallocate-ingredient-category" />
               <datalist id="reallocate-categories-datalist"></datalist>
             </div>
             <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
-              <button type="button" onclick="toggleCreateIngredientBox(false)" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid #ccc; background: #fff; font-weight: 500; cursor: pointer;">Cancel</button>
-              <button type="button" onclick="submitCreateNewIngredientFromReallocate()" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: none; background: #007aff; color: #fff; font-weight: 600; cursor: pointer;">Add Ingredient</button>
+              <button type="button" onclick="toggleCreateIngredientBox(false)" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-weight: 500; cursor: pointer;">Cancel</button>
+              <button type="button" onclick="submitCreateNewIngredientFromReallocate()" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: none; background: var(--system-blue); color: #fff; font-weight: 600; cursor: pointer;">Add Ingredient</button>
             </div>
           </div>
         </div>
@@ -87,7 +87,7 @@ export function renderSubtypeListItems(subtypes, selectedSubId, parentIngName = 
   const isTopLevelSelected = !selectedSubId;
   
   let itemsHtml = `
-    <div class="realloc-sub-option" data-id="" style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; margin-bottom:2px; border-radius:6px; cursor:pointer; background:${isTopLevelSelected ? 'var(--primary,#4f46e5)' : '#fff'}; color:${isTopLevelSelected ? '#fff' : 'var(--text,#1c1917)'}; border:1px solid ${isTopLevelSelected ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'};">
+    <div class="realloc-sub-option" data-id="" style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; margin-bottom:2px; border-radius:6px; cursor:pointer; background:${isTopLevelSelected ? 'var(--primary,#4f46e5)' : 'var(--surface)'}; color:${isTopLevelSelected ? '#fff' : 'var(--text,#1c1917)'}; border:1px solid ${isTopLevelSelected ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'};">
       <span style="font-size:12.5px; font-weight:650;">None (Top-level ${escapeHtml(parentIngName)})</span>
     </div>
   `;
@@ -95,7 +95,7 @@ export function renderSubtypeListItems(subtypes, selectedSubId, parentIngName = 
   subtypes.forEach(s => {
     const isSelected = String(s.id) === String(selectedSubId);
     itemsHtml += `
-      <div class="realloc-sub-option" data-id="${escapeAttr(s.id)}" style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; margin-bottom:2px; border-radius:6px; cursor:pointer; background:${isSelected ? 'var(--primary,#4f46e5)' : '#fff'}; color:${isSelected ? '#fff' : 'var(--text,#1c1917)'}; border:1px solid ${isSelected ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'};">
+      <div class="realloc-sub-option" data-id="${escapeAttr(s.id)}" style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; margin-bottom:2px; border-radius:6px; cursor:pointer; background:${isSelected ? 'var(--primary,#4f46e5)' : 'var(--surface)'}; color:${isSelected ? '#fff' : 'var(--text,#1c1917)'}; border:1px solid ${isSelected ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'};">
         <span style="font-size:12.5px; font-weight:650;">${escapeHtml(s.name)}</span>
       </div>
     `;
@@ -115,7 +115,7 @@ export function renderIngredientListItems(ingredients, selectedIngId) {
   return ingredients.map(i => {
     const isSelected = String(i.id) === String(selectedIngId);
     return `
-      <div class="realloc-ing-option" data-id="${escapeAttr(i.id)}" data-name="${escapeAttr(i.name)}" style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; margin-bottom:2px; border-radius:6px; cursor:pointer; background:${isSelected ? 'var(--primary,#4f46e5)' : '#fff'}; color:${isSelected ? '#fff' : 'var(--text,#1c1917)'}; border:1px solid ${isSelected ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'};">
+      <div class="realloc-ing-option" data-id="${escapeAttr(i.id)}" data-name="${escapeAttr(i.name)}" style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; margin-bottom:2px; border-radius:6px; cursor:pointer; background:${isSelected ? 'var(--primary,#4f46e5)' : 'var(--surface)'}; color:${isSelected ? '#fff' : 'var(--text,#1c1917)'}; border:1px solid ${isSelected ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'};">
         <span style="font-size:12.5px; font-weight:650;">${escapeHtml(i.name)}</span>
         <span style="font-size:11px; opacity:0.85;">${escapeHtml(i.category || 'General')}</span>
       </div>

@@ -109,13 +109,13 @@ export function resolveFitScoreParams(rawParams = {}) {
 export function getFitScoreTierMeta(score) {
   const s = Math.round(Number(score) || 0);
   if (s >= 85) {
-    return { tier: 'green', icon: '🟢', label: 'Ideal Match', color: '#22c55e', bg: '#dcfce7', text: '#14532d', border: '#86efac' };
+    return { tier: 'green', icon: '🟢', label: 'Ideal Match', color: 'var(--system-green)', bg: 'var(--badge-green-bg)', text: 'var(--badge-green-text)', border: 'var(--badge-green-border)' };
   }
   if (s >= 70) {
-    return { tier: 'yellow', icon: '🟡', label: 'Needs Work', color: '#eab308', bg: '#fef9c3', text: '#713f12', border: '#fde047' };
+    return { tier: 'yellow', icon: '🟡', label: 'Needs Work', color: 'var(--system-yellow)', bg: 'var(--badge-yellow-bg)', text: 'var(--badge-yellow-text)', border: 'var(--badge-yellow-border)' };
   }
   if (s >= 50) {
-    return { tier: 'orange', icon: '🟠', label: 'Suboptimal', color: '#f97316', bg: '#ffedd5', text: '#7c2d12', border: '#fdba74' };
+    return { tier: 'orange', icon: '🟠', label: 'Suboptimal', color: 'var(--system-orange)', bg: 'var(--badge-orange-bg)', text: 'var(--badge-orange-text)', border: 'var(--badge-orange-border)' };
   }
-  return { tier: 'red', icon: '🔴', label: 'Poor Match', color: '#ef4444', bg: '#fee2e2', text: '#7f1d1d', border: '#fca5a5' };
+  return { tier: 'red', icon: '🔴', label: 'Poor Match', color: 'var(--system-red)', bg: 'var(--badge-red-bg)', text: 'var(--badge-red-text)', border: 'var(--badge-red-border)' };
 }

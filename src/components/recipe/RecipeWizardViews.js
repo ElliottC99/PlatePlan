@@ -24,11 +24,11 @@ export { renderState3Review, renderMacroBreakdownCrossbar } from './RecipeWizard
 
 export function renderStepBadge() {
   const step = wizardState.currentStep;
-  if (step === 0) return `<span class="badge" style="background:var(--surface2, #e8e6df);color:var(--text2, #555);">Choice</span>`;
-  if (step === 1) return `<span class="badge badge-purple" style="background:#eef2ff;color:#4f46e5;">Step 1: Ingestion</span>`;
-  if (step === 1.5) return `<span class="badge badge-amber" style="background:#fef3c7;color:#b45309;font-weight:600;">Step 1.5: Recipe Review Queue (${wizardState.processingQueue.length} Detected)</span>`;
-  if (step === 2) return `<span class="badge badge-green" style="background:#ecfdf5;color:#059669;">Step 2: Sections & Mapping</span>`;
-  if (step === 3) return `<span class="badge badge-coral" style="background:#fef2f2;color:#dc2626;">Step 3: Inline Review & Save</span>`;
+  if (step === 0) return `<span class="badge" style="background:var(--badge-neutral-bg);color:var(--badge-neutral-text);border:1px solid var(--badge-neutral-border);">Choice</span>`;
+  if (step === 1) return `<span class="badge badge-purple" style="background:var(--purple-bg);color:var(--purple);">Step 1: Ingestion</span>`;
+  if (step === 1.5) return `<span class="badge badge-amber" style="background:var(--badge-yellow-bg);color:var(--badge-yellow-text);font-weight:600;">Step 1.5: Recipe Review Queue (${wizardState.processingQueue.length} Detected)</span>`;
+  if (step === 2) return `<span class="badge badge-green" style="background:var(--badge-green-bg);color:var(--badge-green-text);">Step 2: Sections & Mapping</span>`;
+  if (step === 3) return `<span class="badge badge-coral" style="background:var(--badge-red-bg);color:var(--badge-red-text);">Step 3: Inline Review & Save</span>`;
   return '';
 }
 
@@ -58,7 +58,7 @@ export function renderState0Choice() {
 export function renderState1AManual() {
   const recipe = wizardState.activeRecipe;
   const queueInfo = wizardState.initialQueueTotal > 1
-    ? `<div style="background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; margin-bottom: 16px;">
+    ? `<div style="background: var(--badge-green-bg); border: 1px solid var(--badge-green-border); color: var(--badge-green-text); padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; margin-bottom: 16px;">
         📌 Batch Queue: Recipe ${wizardState.currentQueueIndex || 1} of ${wizardState.initialQueueTotal} (${wizardState.processingQueue.length} remaining)
        </div>`
     : '';
