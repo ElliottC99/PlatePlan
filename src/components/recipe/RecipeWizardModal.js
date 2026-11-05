@@ -13,7 +13,7 @@ import { getState } from '../../state/AppState.js';
 import { extractRecipeMacros } from '../../utils/fitScoreCalculator.js';
 import { wizardState, resetWizardState, syncStep2InputsToState } from './RecipeWizardState.js';
 import { renderStepBadge, renderState0Choice, renderState1AManual, renderState1BBulk, renderState3Review } from './RecipeWizardViews.js';
-import { renderState2Mapping } from './RecipeWizardStep2View.js';
+import { renderState2Mapping, renderStep2Footer } from './RecipeWizardStep2View.js';
 import { renderStep1Point5 } from './RecipeWizardStep15View.js';
 import { bindStep01Events } from './RecipeWizardStep1Handlers.js';
 import { bindStep2Events } from './RecipeWizardStep2Handlers.js';
@@ -311,6 +311,13 @@ export function loadNextRecipeFromQueue() {
   };
 }
 
+export function renderWizardFooter() {
+  if (wizardState.currentStep === 2) {
+    return renderStep2Footer();
+  }
+  return '';
+}
+
 export function renderWizardModal() {
   const modalWrap = document.getElementById('recipe-wizard-modal-wrap');
   if (!modalWrap) return;
@@ -344,6 +351,7 @@ export function renderWizardModal() {
           ${bodyContent}
         </div>
       </div>
+      ${renderWizardFooter()}
     </div>
   `;
 

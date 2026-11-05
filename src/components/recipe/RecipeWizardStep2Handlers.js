@@ -46,6 +46,20 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
         countSpan.textContent = Math.max(unlinked.length, taxInputs.filter(inp => /new[\s_]*item/i.test(inp.dataset.taxVal || inp.value || '')).length, 1);
       }
     }
+
+    const gatePill = modalWrap.querySelector('#wiz-gate-pill');
+    if (gatePill) {
+      const count = Math.max(unlinked.length, taxInputs.filter(inp => /new[\s_]*item/i.test(inp.dataset.taxVal || inp.value || '')).length, 1);
+      if (isBlocked) {
+        gatePill.className = 'wiz-gate-pill blocked';
+        gatePill.title = 'Click to jump to next unmapped ingredient';
+        gatePill.innerHTML = `<span>⚠️</span> <span class="wiz-unlinked-count">${count}</span> unmapped item(s) <span style="font-size:10px;text-decoration:underline;margin-left:2px;">(jump)</span>`;
+      } else {
+        gatePill.className = 'wiz-gate-pill ready';
+        gatePill.title = 'All ingredients are linked';
+        gatePill.innerHTML = `<span>✓</span> All items linked`;
+      }
+    }
   };
 
   const updateLiveStep2NutritionDOM = () => {
@@ -65,7 +79,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       });
     }
     if (macroBarContainer) {
-      macroBarContainer.innerHTML = renderMacroBreakdownCrossbar(wizardState.activeRecipe, currentVariant);
+      macroBarContainer.innerHTML = renderMacroBreakdownCrossbar(wizardState.activeRecipe, currentVariant, { compact: true });
     }
     updateStep2NextButtonState();
   };
@@ -104,6 +118,53 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       updateLiveStep2NutritionDOM();
     };
   }
+
+  // Interactive gating pill jump: smooth scroll to first unlinked ingredient row
+  const gatePill = modalWrap.querySelector('#wiz-gate-pill');
+  if (gatePill) {
+    gatePill.onclick = () => {
+      const unlinkedRow = modalWrap.querySelector('tr.wiz-row-unlinked') ||
+        Array.from(modalWrap.querySelectorAll('tr[id^="wiz-ing-row-"]')).find(r => {
+          const inp = r.querySelector('.wiz-ing-tax-search');
+          const val = (inp?.dataset?.taxVal || inp?.value || '').trim();
+          return !val || val === 'new_item' || /new[\s_]*item/i.test(val);
+        });
+      if (unlinkedRow) {
+        unlinkedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const inp = unlinkedRow.querySelector('.wiz-ing-tax-search');
+        if (inp) {
+          inp.focus();
+          inp.style.outline = '2px solid #e11d48';
+          setTimeout(() => { if (inp) inp.style.outline = ''; }, 1500);
+        }
+      }
+    };
+  }
+
+  // Compact auto-fitting method step textarea resizing
+  modalWrap.addEventListener('focusin', (e) => {
+    if (e.target && e.target.matches('.wiz-step-input')) {
+      e.target.style.height = 'auto';
+      e.target.style.height = Math.max(32, e.target.scrollHeight) + 'px';
+      e.target.style.overflowY = 'auto';
+    }
+  });
+
+  modalWrap.addEventListener('input', (e) => {
+    if (e.target && e.target.matches('.wiz-step-input')) {
+      e.target.style.height = 'auto';
+      e.target.style.height = Math.max(32, e.target.scrollHeight) + 'px';
+    }
+  });
+
+  modalWrap.addEventListener('focusout', (e) => {
+    if (e.target && e.target.matches('.wiz-step-input')) {
+      if (e.target.value.length < 80 && !e.target.value.includes('\n')) {
+        e.target.style.height = '32px';
+        e.target.style.overflowY = 'hidden';
+      }
+    }
+  });
 
   const btnAddSection = modalWrap.querySelector('#wiz-add-section-btn');
   if (btnAddSection) {

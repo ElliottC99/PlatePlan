@@ -49,7 +49,8 @@ function renderComparisonBadge(actual, target) {
   return `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${bg};color:${color};line-height:1">${label}</span>`;
 }
 
-export function renderMacroBreakdownCrossbar(recipe, variant = 'original') {
+export function renderMacroBreakdownCrossbar(recipe, variant = 'original', options = {}) {
+  const isCompact = options.compact === true;
   const activeRec = (variant === 'enhanced' && recipe.enhanced) ? { ...recipe, ...recipe.enhanced } : recipe;
   const targetMealType = activeRec.mealSuitability?.[0] || activeRec.types?.[0] || activeRec.type || 'dinner';
 
@@ -92,6 +93,23 @@ export function renderMacroBreakdownCrossbar(recipe, variant = 'original') {
   };
 
   const servesCount = activeRec.servings || activeRec.serves || recipe.servings || recipe.serves || 2;
+
+  if (isCompact) {
+    return `
+      <div class="recipe-modal-crossbar-compact" style="display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px;">
+        <div style="display: flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4);">
+          <span style="font-weight:700;">👤 E (${eSharePct}%):</span>
+          <span>🔥 <strong>${eKcal}</strong> ${renderMacroBadge('kcal', kcalDiffE)}</span>
+          <span>💪 <strong>${eProt}g</strong> ${renderMacroBadge('prot', protDiffE)}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4);">
+          <span style="font-weight:700;">👤 C (${cSharePct}%):</span>
+          <span>🔥 <strong>${cKcal}</strong> ${renderMacroBadge('kcal', kcalDiffC)}</span>
+          <span>💪 <strong>${cProt}g</strong> ${renderMacroBadge('prot', protDiffC)}</span>
+        </div>
+      </div>
+    `;
+  }
 
   return `
     <div class="recipe-modal-crossbar" style="width: 100%; background: var(--surface2, #f5f4ee); border: 1px solid var(--border, #e5e5e5); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px;">
