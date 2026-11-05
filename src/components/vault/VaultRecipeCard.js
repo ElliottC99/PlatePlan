@@ -296,20 +296,28 @@ export function renderVaultRecipeCard(r, options = {}) {
   const buildFit = (_active, useEnhanced = false) => {
     const variantKey = useEnhanced ? 'enhanced' : 'original';
     const liveFitData = typeof window.calculateMealFitScore === 'function'
-      ? window.calculateMealFitScore(r, requestedMealType, { activeProfile, variant: variantKey, portionScaled: true })
+      ? window.calculateMealFitScore(_active, requestedMealType, { activeProfile, variant: variantKey, portionScaled: true })
       : null;
     const resolvedMealType = liveFitData?.mealType || (requestedMealType !== 'all' ? requestedMealType : (types[0] || 'dinner'));
-    const bundle = typeof window.calculateRecipeDisplayNutrition === 'function'
-      ? window.calculateRecipeDisplayNutrition({ recipe: r, variant: variantKey, mealType: resolvedMealType })
-      : null;
-    const portions = bundle?.portions || { eCal: 0, eProt: 0, cCal: 0, cProt: 0, e: '', c: '' };
+    
+    // Derive portion display directly from liveFitData details
+    const e = liveFitData?.details?.elliott;
+    const c = liveFitData?.details?.chloe;
+    const portions = {
+      eCal: e?.recipeKcal || 0,
+      eProt: e?.recipeProtein || 0,
+      cCal: c?.recipeKcal || 0,
+      cProt: c?.recipeProtein || 0,
+      e: e && e.recipeKcal ? `${Math.round(e.recipeKcal)}kcal, ${Math.round(e.recipeProtein)}g` : '',
+      c: c && c.recipeKcal ? `${Math.round(c.recipeKcal)}kcal, ${Math.round(c.recipeProtein)}g` : ''
+    };
 
     if (liveFitData && typeof liveFitData.score === 'number' && !useEnhanced) {
       r.fitScore = liveFitData.score;
       r._computedFitScore = liveFitData.score;
     }
 
-    const fitTagHtml = renderFitScoreBadge(r, resolvedMealType, {
+    const fitTagHtml = renderFitScoreBadge(_active, resolvedMealType, {
       activeProfile,
       variant: variantKey,
       portions,

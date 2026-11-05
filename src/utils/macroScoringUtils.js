@@ -72,10 +72,16 @@ export function extractRecipeMacros(recipe, variant = 'original') {
       node.prot,
       node.protein
     ]);
-    if (cal !== null && serves > 1 && !node.perServing && !node.nutrition?.perServing) {
+    const isExplicitPerServing = Boolean(
+      node.nutrition?.perServing ||
+      node.perServing ||
+      node.macros ||
+      (cal !== null && !node.nutrition?.total && !node.total)
+    );
+    if (!isExplicitPerServing && cal !== null && serves > 1) {
       cal = cal / serves;
     }
-    if (prot !== null && serves > 1 && !node.perServing && !node.nutrition?.perServing) {
+    if (!isExplicitPerServing && prot !== null && serves > 1) {
       prot = prot / serves;
     }
     return { cal, prot };

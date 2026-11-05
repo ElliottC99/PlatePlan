@@ -146,10 +146,11 @@ export function syncStep2InputsToState(modalWrap) {
     if (!isNaN(sIdx) && !isNaN(iIdx)) {
       const item = wizardState.activeRecipe.ingredientSections[sIdx]?.ingredients[iIdx];
       if (item) {
-        const rawVal = input.dataset.taxVal || (input.value.startsWith('✨') ? 'new_item' : input.value);
+        const rawVal = (input.dataset.taxVal || input.value || '').trim();
+        const valText = String(input.value || '').trim();
         const state = (typeof getState === 'function' ? getState() : (typeof window !== 'undefined' ? window.getState?.() : null)) || {};
 
-        if (!rawVal || rawVal === 'new_item') {
+        if (!rawVal || rawVal === 'new_item' || /new[\s_]*item/i.test(rawVal) || /new[\s_]*item/i.test(valText) || valText.startsWith('✨')) {
           item.ingredientId = null;
           item.subtypeId = null;
           item.categoryId = null;

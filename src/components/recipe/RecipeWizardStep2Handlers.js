@@ -15,6 +15,39 @@ import { renderFitScoreBadge } from '../FitScoreBadge.js';
 export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice }) {
   if (!modalWrap || wizardState.currentStep !== 2) return;
 
+  const updateStep2NextButtonState = () => {
+    const state = (typeof getState === 'function' ? getState() : (typeof window !== 'undefined' ? window.getState?.() : null)) || {};
+    const prods = state.products || [];
+    const ings = state.rootItems || state.ingredients || [];
+    const allIngs = (wizardState.activeRecipe?.ingredientSections || []).flatMap(s => s.ingredients || []);
+
+    const taxInputs = Array.from(modalWrap.querySelectorAll('.wiz-ing-tax-search'));
+    const hasDomUnlinked = taxInputs.some(inp => {
+      const val = (inp.dataset.taxVal || inp.value || '').trim();
+      return !val || val === 'new_item' || /new[\s_]*item/i.test(val);
+    });
+
+    const unlinked = allIngs.filter(i => isIngredientUnlinked(i, prods, ings));
+    const isBlocked = unlinked.length > 0 || hasDomUnlinked;
+
+    const btnNext = modalWrap.querySelector('#btn-next-step2');
+    if (btnNext) {
+      btnNext.disabled = isBlocked;
+      btnNext.style.opacity = isBlocked ? '0.6' : '1';
+      btnNext.style.cursor = isBlocked ? 'not-allowed' : 'pointer';
+      btnNext.title = isBlocked ? 'All ingredients must be linked before proceeding' : '';
+    }
+
+    const warningBanner = modalWrap.querySelector('#wiz-gate-warning-banner');
+    if (warningBanner) {
+      warningBanner.style.display = isBlocked ? 'flex' : 'none';
+      const countSpan = warningBanner.querySelector('.wiz-unlinked-count');
+      if (countSpan) {
+        countSpan.textContent = Math.max(unlinked.length, taxInputs.filter(inp => /new[\s_]*item/i.test(inp.dataset.taxVal || inp.value || '')).length, 1);
+      }
+    }
+  };
+
   const updateLiveStep2NutritionDOM = () => {
     syncStep2InputsToState(modalWrap);
     recalculateWizardMacros(wizardState.activeRecipe);
@@ -34,6 +67,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
     if (macroBarContainer) {
       macroBarContainer.innerHTML = renderMacroBreakdownCrossbar(wizardState.activeRecipe, currentVariant);
     }
+    updateStep2NextButtonState();
   };
 
   const safeRender = ({ syncInputs = true } = {}) => {
@@ -217,9 +251,16 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       const prods = state.products || [];
       const ings = state.rootItems || state.ingredients || [];
       const allIngs = (wizardState.activeRecipe.ingredientSections || []).flatMap(s => s.ingredients || []);
+      const taxInputs = Array.from(modalWrap.querySelectorAll('.wiz-ing-tax-search'));
+      const hasDomUnlinked = taxInputs.some(inp => {
+        const val = (inp.dataset.taxVal || inp.value || '').trim();
+        return !val || val === 'new_item' || /new[\s_]*item/i.test(val);
+      });
       const unlinked = allIngs.filter(i => isIngredientUnlinked(i, prods, ings));
-      if (unlinked.length > 0) {
-        showWizardNotice(`Cannot proceed: ${unlinked.length} ingredient(s) retain an unlinked "✨ New Item" status. Please map each ingredient to a valid Category, Item, or Sub-Type.`, 'warning');
+      if (unlinked.length > 0 || hasDomUnlinked) {
+        const count = Math.max(unlinked.length, taxInputs.filter(inp => /new[\s_]*item/i.test(inp.dataset.taxVal || inp.value || '')).length, 1);
+        showWizardNotice(`Cannot proceed: ${count} ingredient(s) retain an unlinked "✨ New Item" status. Please map each ingredient to a valid Category, Item, or Sub-Type.`, 'warning');
+        updateStep2NextButtonState();
         return;
       }
 

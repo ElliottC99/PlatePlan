@@ -75,16 +75,13 @@ export function resolveHighestAutoDefaultTaxonomy(prod, { ingredients = [], prod
 
 export function isIngredientUnlinked(item, products = [], ingredients = []) {
   if (!item || typeof item !== 'object') return false;
-  if (item.isNewTaxonomyItem || item.ingredientId === 'new_item') return true;
-  if (item.categoryId) return false;
+  if (item.isNewTaxonomyItem || item.ingredientId === 'new_item' || /new[\s_]*item/i.test(item.ingredientId || '')) return true;
+  if (item.isCategoryDefault && item.categoryId) return false;
+  if (item.categoryId && item.categoryId !== 'Store Cupboard' && item.categoryId !== 'General') return false;
   if (item.subtypeId) return false;
-  if (item.ingredientId && item.ingredientId !== 'new_item') return false;
+  if (item.ingredientId && item.ingredientId !== 'new_item' && !/new[\s_]*item/i.test(item.ingredientId)) return false;
   if (item.productId && (products || []).some(p => String(p.id) === String(item.productId))) return false;
   if (item.bankId && (products || []).some(p => String(p.id) === String(item.bankId))) return false;
-  if (typeof resolveProductForIngredient === 'function') {
-    const resolved = resolveProductForIngredient(item, { products, ingredients });
-    if (resolved) return false;
-  }
   return true;
 }
 
