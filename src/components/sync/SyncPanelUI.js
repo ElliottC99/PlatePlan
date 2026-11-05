@@ -47,9 +47,13 @@ export function renderSyncPanelModal() {
   const isOnline = typeof navigator !== 'undefined' && navigator.onLine;
   const counts = getCounts();
 
-  const statusLabel = isOnline ? 'Connected (Live)' : 'Offline';
-  const statusColor = isOnline ? 'var(--green,#10b981)' : 'var(--red,#ef4444)';
-  const statusBg = isOnline ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+  const currentUser = (typeof window !== 'undefined' && window.firebase?.auth) ? window.firebase.auth().currentUser : null;
+  const isAuth = !!currentUser;
+  const userEmail = currentUser?.email || (isAuth ? 'Authenticated' : 'Local Only (Not Signed In)');
+
+  const statusLabel = isAuth ? (isOnline ? 'Connected (Live)' : 'Offline') : 'Local Mode';
+  const statusColor = isAuth ? (isOnline ? 'var(--green,#10b981)' : 'var(--red,#ef4444)') : 'var(--system-blue,#2563eb)';
+  const statusBg = isAuth ? (isOnline ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)') : 'rgba(37,99,235,0.1)';
 
   modal.innerHTML = `
     <div class="card" style="width:100%;max-width:380px;background:var(--surface,#fff);padding:20px;border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,0.15)">
@@ -61,6 +65,16 @@ export function renderSyncPanelModal() {
         <button type="button" class="btn sm ghost" data-action="close-sync-panel" style="padding:2px 6px;font-size:18px">&times;</button>
       </div>
 
+      ${!isAuth ? `
+        <div style="background:var(--badge-blue-bg); border:1px solid var(--badge-blue-border); color:var(--badge-blue-text); padding:10px 12px; border-radius:8px; font-size:12px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <div>
+            <div style="font-weight:700;">Local Mode Active</div>
+            <div style="font-size:11px;opacity:0.85;">Sign in with Google to sync household data.</div>
+          </div>
+          <button type="button" class="btn primary sm" data-action="google-login" style="white-space:nowrap; padding:6px 12px; font-size:12px; font-weight:700;">Sign in</button>
+        </div>
+      ` : ''}
+
       <!-- Status & Timestamp -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding:10px 12px;background:var(--surface2,#f5f5f4);border-radius:8px;border:1px solid var(--border,#e7e5e4)">
         <span style="font-size:12px;font-weight:600;color:var(--text2,#78716c)">Status</span>
@@ -70,6 +84,10 @@ export function renderSyncPanelModal() {
       </div>
 
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;font-size:12.5px">
+        <div style="display:flex;justify-content:space-between;padding-bottom:6px;border-bottom:1px solid var(--border,#e7e5e4)">
+          <span style="color:var(--text2,#78716c)">Account</span>
+          <span style="font-weight:600;font-size:11.5px;color:var(--text,#1c1917)">${userEmail}</span>
+        </div>
         <div style="display:flex;justify-content:space-between;padding-bottom:6px;border-bottom:1px solid var(--border,#e7e5e4)">
           <span style="color:var(--text2,#78716c)">Last Synced</span>
           <span style="font-weight:600;color:var(--text,#1c1917)">${formatSyncTime(lastSyncTime)}</span>
@@ -115,6 +133,13 @@ export function renderSyncPanelModal() {
       
       if (action === 'close-sync-panel') {
         closeSyncPanelModal();
+      } else if (action === 'google-login') {
+        closeSyncPanelModal();
+        if (typeof window.openPlatePlanLogin === 'function') {
+          window.openPlatePlanLogin();
+        } else if (typeof window.signInWithGoogle === 'function') {
+          window.signInWithGoogle().catch(err => console.error(err));
+        }
       } else if (action === 'rehydrate-catalog') {
         handleRehydrateCatalog();
       } else if (action === 'sync-now') {

@@ -290,6 +290,11 @@ export function routeAction(actionName, target, event) {
     return true;
   }
 
+  if (normalizedAction === 'openplateplanlogin()' || normalizedAction === 'window.openplateplanlogin()' || normalizedAction.includes('openplateplanlogin')) {
+    if (typeof window.openPlatePlanLogin === 'function') window.openPlatePlanLogin();
+    return true;
+  }
+
   if (normalizedAction === 'sync-now' || normalizedAction === 'window.syncnow()' || normalizedAction.includes('syncnow')) {
     if (typeof window.syncNow === 'function') window.syncNow();
     return true;

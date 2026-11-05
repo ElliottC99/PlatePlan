@@ -93,10 +93,24 @@ export async function signInWithGoogle() {
   }
   const provider = new window.firebase.auth.GoogleAuthProvider();
   try {
-    await window.firebase.auth().signInWithRedirect(provider);
-  } catch (err) {
-    console.error('[AuthService] Google Sign-In redirect failed:', err);
-    throw err;
+    // 1. Prefer Popup sign-in (reliable across Chrome, Safari, and localhost, immune to 3rd-party storage partitioning)
+    const result = await window.firebase.auth().signInWithPopup(provider);
+    if (result && result.user) {
+      console.log(`[AuthService] Popup sign-in succeeded: ${result.user.email || result.user.uid}`);
+      closeLoginUI();
+      if (typeof window.syncNow === 'function') {
+        window.syncNow().catch(e => console.warn('[AuthService] Post-login sync failed:', e));
+      }
+      return result.user;
+    }
+  } catch (popupErr) {
+    console.warn('[AuthService] signInWithPopup failed, falling back to redirect:', popupErr);
+    try {
+      await window.firebase.auth().signInWithRedirect(provider);
+    } catch (redirectErr) {
+      console.error('[AuthService] Google Sign-In redirect failed:', redirectErr);
+      throw redirectErr;
+    }
   }
 }
 
@@ -137,7 +151,14 @@ export function waitForAuth(timeoutMs = 8000) {
         const authInstance = window.firebase.auth();
         
         if (typeof authInstance.getRedirectResult === 'function') {
-          authInstance.getRedirectResult().catch(() => {});
+          authInstance.getRedirectResult().then(result => {
+            if (result && result.user) {
+              console.log('[AuthService] Redirect login succeeded:', result.user.email || result.user.uid);
+              closeLoginUI();
+            }
+          }).catch(err => {
+            console.warn('[AuthService] Redirect result note:', err);
+          });
         }
 
         if (authInstance.currentUser) {

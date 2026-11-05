@@ -8,10 +8,9 @@ import { bindTaxonomyAutocompleteEvents, isIngredientUnlinked } from './RecipeWi
 import { promptRecipeWizardAliases } from './RecipeWizardAliasesPrompt.js';
 import { getState } from '../../store/store.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
-import { recalculateWizardMacros } from './RecipeWizardStep3Handlers.js';
+import { recalculateWizardMacros, resolveProductForIngredient } from './RecipeWizardStep3Handlers.js';
 import { renderMacroBreakdownCrossbar } from './RecipeWizardStep3View.js';
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
-import { renderStep2MacrosSummaryHTML } from './RecipeWizardStep2View.js';
 
 export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice }) {
   if (!modalWrap || wizardState.currentStep !== 2) return;
@@ -22,7 +21,6 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
 
     const fitContainer = modalWrap.querySelector('#wiz-step2-fit-badge-container');
     const macroBarContainer = modalWrap.querySelector('#wiz-step2-macro-crossbar-container');
-    const summaryContainer = modalWrap.querySelector('#wiz-step2-macros-summary-container');
 
     const currentVariant = wizardState.activeVariant || 'original';
     const targetMealType = wizardState.activeRecipe?.mealSuitability?.[0] || wizardState.activeRecipe?.types?.[0] || wizardState.activeRecipe?.type || 'dinner';
@@ -36,13 +34,12 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
     if (macroBarContainer) {
       macroBarContainer.innerHTML = renderMacroBreakdownCrossbar(wizardState.activeRecipe, currentVariant);
     }
-    if (summaryContainer) {
-      summaryContainer.innerHTML = renderStep2MacrosSummaryHTML(wizardState.activeRecipe);
-    }
   };
 
-  const safeRender = () => {
-    syncStep2InputsToState(modalWrap);
+  const safeRender = ({ syncInputs = true } = {}) => {
+    if (syncInputs) {
+      syncStep2InputsToState(modalWrap);
+    }
     recalculateWizardMacros(wizardState.activeRecipe);
     const wb = document.getElementById('wizard-modal-body') || document.querySelector('.modal-body');
     const st = wb ? wb.scrollTop : 0;
@@ -82,7 +79,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
         sectionTitle: toTitleCase('New Section'),
         ingredients: []
       });
-      safeRender();
+      safeRender({ syncInputs: false });
     };
   }
 
@@ -100,7 +97,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
           qty: 1,
           unit: 'g'
         });
-        safeRender();
+        safeRender({ syncInputs: false });
       }
     };
   });
@@ -114,7 +111,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
         if (!wizardState.activeRecipe.ingredientSections.length) {
           wizardState.activeRecipe.ingredientSections = [{ sectionTitle: 'Main Ingredients', ingredients: [] }];
         }
-        safeRender();
+        safeRender({ syncInputs: false });
       }
     };
   });
@@ -125,8 +122,8 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       const sIdx = parseInt(btn.dataset.sidx, 10);
       const iIdx = parseInt(btn.dataset.iidx, 10);
       if (!isNaN(sIdx) && !isNaN(iIdx)) {
-        wizardState.activeRecipe.ingredientSections[sIdx]?.ingredients.splice(iIdx, 1);
-        safeRender();
+        wizardState.activeRecipe.ingredientSections[sIdx]?.ingredients?.splice(iIdx, 1);
+        safeRender({ syncInputs: false });
       }
     };
   });
@@ -135,8 +132,11 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
   if (btnAddStep) {
     btnAddStep.onclick = () => {
       syncStep2InputsToState(modalWrap);
-      wizardState.activeRecipe.methodSteps.push('New step instruction');
-      safeRender();
+      if (!Array.isArray(wizardState.activeRecipe.methodSteps)) {
+        wizardState.activeRecipe.methodSteps = [];
+      }
+      wizardState.activeRecipe.methodSteps.push('');
+      safeRender({ syncInputs: false });
     };
   }
 
@@ -144,9 +144,9 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
     btn.onclick = () => {
       syncStep2InputsToState(modalWrap);
       const idx = parseInt(btn.dataset.idx, 10);
-      if (!isNaN(idx)) {
+      if (!isNaN(idx) && Array.isArray(wizardState.activeRecipe.methodSteps)) {
         wizardState.activeRecipe.methodSteps.splice(idx, 1);
-        safeRender();
+        safeRender({ syncInputs: false });
       }
     };
   });
@@ -182,8 +182,20 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
         item.categoryId = null;
         item.isNewTaxonomyItem = false;
       }
+
+      // Auto resolve product and update live nutrition
+      const storeState = getState() || {};
+      const resolvedProd = resolveProductForIngredient(item, {
+        products: storeState.products || [],
+        ingredients: storeState.rootItems || storeState.ingredients || []
+      });
+      if (resolvedProd) {
+        item.productId = resolvedProd.id;
+        item.productName = resolvedProd.name || resolvedProd.productName;
+      }
     }
-    safeRender();
+    updateLiveStep2NutritionDOM();
+    safeRender({ syncInputs: false });
   });
 
   const btnNext2 = modalWrap.querySelector('#btn-next-step2');

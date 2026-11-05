@@ -135,17 +135,39 @@ export function unpackCollapsedIngredients(rawIngText) {
 
 /**
  * Unpacks collapsed method instructions into individual steps.
+ * Handles numbered lines, inline numbered steps (1. ... 2. ...), step prefixes (Step 1: ...),
+ * bullet points, and paragraph breaks.
  * @param {string} rawMethodText
  * @returns {string[]}
  */
 export function unpackCollapsedSteps(rawMethodText) {
-  if (!rawMethodText) return [];
-  let text = rawMethodText.replace(/\r\n/g, '\n').trim()
-    .replace(/([\.!?])\s*(?=[A-Z][a-zA-Z0-9\s,'–-]{2,45}:)/g, '$1\n\n')
-    .replace(/([\.!?])\s*(?=\d+[\.\)]\s+)/g, '$1\n\n');
+  if (!rawMethodText || typeof rawMethodText !== 'string') return [];
+  let text = rawMethodText.replace(/\r\n/g, '\n').trim();
 
-  const steps = text.split(/(?:\n\s*\n|\n(?=\d+[\.\)]\s+))/g).map(s => s.trim()).filter(s => s.length > 5);
-  return steps.length > 0 ? steps : [text];
+  // 1. Separate "Step 1:", "Step 1.", "Step 1 -" with newlines
+  text = text.replace(/(\bStep\s*\d+[:\.\-]?\s*)/gi, '\n\n$1\n');
+
+  // 2. Separate inline numbered steps (e.g. "... 2. Add onions ...")
+  text = text.replace(/(?:^|\n|[\.!?]|\s+)(?=(?:[1-9]\d?[\.\)])\s+[A-Za-z])/g, '\n\n');
+
+  // 3. Separate bulleted items: •, -, * followed by space and letter
+  text = text.replace(/(?:^|\n|[\.!?]|\s+)(?=[•\*\-]\s+[A-Za-z])/g, '\n\n');
+
+  // 4. Split on newlines and clean step prefixes
+  const rawList = text.split(/(?:\n\s*\n|\n)/).map(s => s.trim()).filter(Boolean);
+
+  const cleanSteps = [];
+  rawList.forEach(line => {
+    // Strip leading numbering, bullets, or Step prefixes: e.g. "1. ", "1) ", "Step 1: ", "• ", "- "
+    const cleaned = line
+      .replace(/^(?:Step\s*\d+[:\.\-]?\s*|[0-9]+[\.\)]\s*|[•\*\-]\s*)/i, '')
+      .trim();
+    if (cleaned.length > 0) {
+      cleanSteps.push(cleaned);
+    }
+  });
+
+  return cleanSteps.length > 0 ? cleanSteps : [rawMethodText.trim()];
 }
 
 /**
