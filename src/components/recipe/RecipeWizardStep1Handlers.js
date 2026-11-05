@@ -3,7 +3,7 @@
  * Event bindings for Wizard Step 0, Step 1A (Manual), Step 1B (Bulk), and Step 1.5 (Queue Review).
  */
 
-import { unpackAndSplitRecipeBlocks, parseSingleRecipeText } from '../../services/RecipeParserService.js';
+import { unpackAndSplitRecipeBlocks, parseSingleRecipeText, unpackCollapsedSteps } from '../../services/RecipeParserService.js';
 import { parseIngredientString, matchIngredientTaxonomy } from '../../services/RecipeImporter.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
 import { getState, updateState, reorderDraftRecipes } from '../../state/AppState.js';
@@ -91,9 +91,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
         })
       }));
 
-      const methodSteps = metRaw.split('\n')
-        .map(l => l.replace(/^\d+[\.\)]\s*/, '').trim())
-        .filter(Boolean);
+      const methodSteps = unpackCollapsedSteps(metRaw);
 
       wizardState.activeRecipe.title = title;
       wizardState.activeRecipe.servings = serv;

@@ -244,13 +244,21 @@ export function syncStep2InputsToState(modalWrap) {
     }
   });
 
-  // Method steps edits
+  // Servings yield
+  const servingsInput = modalWrap.querySelector('#wiz-servings-input');
+  if (servingsInput) {
+    const servVal = Math.max(1, parseInt(servingsInput.value, 10) || 4);
+    wizardState.activeRecipe.servings = servVal;
+    wizardState.activeRecipe.serves = servVal;
+  }
+
+  // Method steps edits (preserve in-progress editing including newly added steps)
   const stepInputs = [];
   modalWrap.querySelectorAll('.wiz-step-input').forEach(input => {
-    stepInputs.push(input.value.trim());
+    stepInputs.push(input.value);
   });
   if (stepInputs.length > 0) {
-    wizardState.activeRecipe.methodSteps = stepInputs.filter(Boolean);
+    wizardState.activeRecipe.methodSteps = stepInputs;
   }
 
   // Keep activeRecipe.ingredients and activeRecipe.enhanced in sync

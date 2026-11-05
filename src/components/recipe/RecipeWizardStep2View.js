@@ -26,23 +26,8 @@ function escapeAttr(str) {
 }
 
 export function renderStep2MacrosSummaryHTML(activeRecipe) {
-  const m = activeRecipe.macros || { calories: 0, protein: 0, carbs: 0, fat: 0 };
-  return `
-    <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;flex-wrap:wrap;">
-      <span style="background:var(--surface,#fff);padding:3px 8px;border-radius:6px;border:1px solid var(--border,#ddd);color:var(--text,#111);">
-        🔥 ${m.calories ?? 0} kcal
-      </span>
-      <span style="background:var(--surface,#fff);padding:3px 8px;border-radius:6px;border:1px solid var(--border,#ddd);color:#16a34a;">
-        💪 ${m.protein ?? 0}g prot
-      </span>
-      <span style="background:var(--surface,#fff);padding:3px 8px;border-radius:6px;border:1px solid var(--border,#ddd);color:#2563eb;">
-        🌾 ${m.carbs ?? 0}g carbs
-      </span>
-      <span style="background:var(--surface,#fff);padding:3px 8px;border-radius:6px;border:1px solid var(--border,#ddd);color:#d97706;">
-        🥑 ${m.fat ?? 0}g fat
-      </span>
-    </div>
-  `;
+  // Deprecated in favor of dual-profile crossbar (Elliott & Chloe Calories + Protein + Fit Score)
+  return '';
 }
 
 export function renderState2Mapping() {
@@ -147,10 +132,10 @@ export function renderState2Mapping() {
     : (typeof rawMethodSteps === 'string' ? rawMethodSteps.split('\n').filter(Boolean) : []);
   normalizedSteps.forEach((step, idx) => {
     stepsHtml += `
-      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
-        <span style="font-size: 12px; font-weight: 700; color: var(--text2); width: 24px; text-align: right;">${idx + 1}.</span>
-        <input type="text" id="wiz-step-input-${idx}" name="wiz_step_input_${idx}" aria-label="Method step instruction for step ${idx + 1}" class="wiz-step-input" data-idx="${idx}" value="${escapeAttr(step)}" style="flex: 1; padding: 6px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface);" />
-        <button type="button" class="btn sm danger ghost wiz-del-step-btn" data-idx="${idx}" title="Delete step">🗑️</button>
+      <div style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px;">
+        <span style="font-size: 12px; font-weight: 700; color: var(--text2); width: 24px; text-align: right; padding-top: 6px;">${idx + 1}.</span>
+        <textarea id="wiz-step-input-${idx}" name="wiz_step_input_${idx}" aria-label="Method step instruction for step ${idx + 1}" class="wiz-step-input" data-idx="${idx}" rows="2" style="flex: 1; padding: 6px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; font-family: inherit; line-height: 1.4; background: var(--surface); resize: vertical;">${escapeHtml(step)}</textarea>
+        <button type="button" class="btn sm danger ghost wiz-del-step-btn" data-idx="${idx}" title="Delete step" style="margin-top: 4px;">🗑️</button>
       </div>
     `;
   });
@@ -163,7 +148,6 @@ export function renderState2Mapping() {
     showLabel: true
   });
   const macroCrossbarHtml = renderMacroBreakdownCrossbar(activeRecipe, currentVariant);
-  const macrosSummaryHtml = renderStep2MacrosSummaryHTML(activeRecipe);
 
   return `
     <div>
@@ -191,13 +175,12 @@ export function renderState2Mapping() {
           <span style="font-size: 14px; font-weight: 600; color: var(--purple, #4f46e5);">Recipe Mapping</span>
           <span style="font-size: 12px; color: var(--text2, #666);">Canonical Author Quantities</span>
         </div>
-        <div id="wiz-step2-macros-summary-container">
-          ${macrosSummaryHtml}
-        </div>
         <div style="display: flex; align-items: center; gap: 8px;">
           <label for="wiz-servings-input" style="font-size: 13px; font-weight: 600; color: var(--text, #111);">Yield:</label>
           <input type="number" id="wiz-servings-input" min="1" max="50" step="1" value="${servings}" style="width: 55px; text-align: center; font-size: 13px; font-weight: 700; padding: 4px; border: 1px solid var(--border, #ccc); border-radius: 6px;">
           <span style="font-size: 12px; color: var(--text2, #666);">servings</span>
+        </div>
+      </div>
         </div>
       </div>
 

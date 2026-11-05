@@ -157,6 +157,20 @@ export function setSyncStatus(status, detail = '') {
     el.textContent = label;
     if (detail) el.title = detail;
   }
+
+  try {
+    const isAuth = !!(typeof window !== 'undefined' && window.firebase?.auth && window.firebase.auth().currentUser);
+    const loginTop = document.getElementById('loginTopBtn');
+    const logoutTop = document.getElementById('logoutBtn');
+    const mobileLogin = document.getElementById('mobile-login-btn');
+    const mobileLogout = document.getElementById('mobile-logout-btn');
+
+    if (loginTop) loginTop.style.display = isAuth ? 'none' : 'inline-flex';
+    if (logoutTop) logoutTop.style.display = isAuth ? 'inline-flex' : 'none';
+    if (mobileLogin) mobileLogin.style.display = isAuth ? 'none' : 'block';
+    if (mobileLogout) mobileLogout.style.display = isAuth ? 'block' : 'none';
+  } catch (_) {}
+
   inSyncStatusTransition = false;
 }
 
