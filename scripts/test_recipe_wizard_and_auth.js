@@ -4,7 +4,7 @@
  */
 
 import assert from 'node:assert';
-import { unpackCollapsedSteps } from '../src/services/RecipeParserService.js';
+import { unpackCollapsedSteps, parseBulkRecipeText } from '../src/services/RecipeParserService.js';
 import { renderStep2MacrosSummaryHTML } from '../src/components/recipe/RecipeWizardStep2View.js';
 import { wizardState, syncStep2InputsToState } from '../src/components/recipe/RecipeWizardState.js';
 
@@ -102,6 +102,38 @@ console.log('--- Running Recipe Wizard & Auth Regression Tests ---');
   assert.strictEqual(wizardState.activeRecipe.methodSteps[2], '', 'Newly added step should not be erased');
 
   console.log('  ✓ syncStep2InputsToState preserves newly added steps and servings');
+}
+
+// 4. Culinary "Dish" Term vs Recipe Boundary Isolation
+{
+  console.log('Testing culinary dish term preservation in bulk recipe parser...');
+
+  const bourguignonText = `Recipe Title: Boeuf Bourguignon
+Prep Time: 0 Hours 20 Mins
+Cook Time: 1 Hours 10 Mins
+Ingredients:
+For the boeuf bourguignon:
+2 onions
+3 garlic cloves
+2 carrots
+splash of olive oil
+Method:
+1. Warm olive oil in a large casserole dish over medium heat, add the diced onions, minced garlic, and carrot chunks with salt, and cook for roughly 10 minutes until softening.
+2. Add the bite-sized steak pieces, bacon lardons, halved button mushrooms, and drained pickled pearl onions to the dish, frying for another 8 minutes before stirring through the tomato purée.
+3. Dissolve the vegetable stock pot in the boiling water, then pour into the casserole along with the red wine, fresh herbs, bay leaves, tamari, and brown sugar.
+4. Bring to a boil, reduce the heat to simmer for 30 minutes, then cover and bake in an oven preheated to 100°C for a further 30 minutes.
+5. Boil the peeled, chunked potatoes in salted water for 15 minutes until tender, then drain and pass through a sieve or ricer back into the warm pan.
+6. Beat the butter and milk into the potatoes until smooth, seasoning with salt and pepper to taste.
+7. Discard the herb sprigs and bay leaves from the bourguignon, then serve hot alongside the creamy mash, garnished with chopped fresh parsley and cracked black pepper.`;
+
+  const parsed = parseBulkRecipeText(bourguignonText);
+  assert.strictEqual(parsed.length, 1, 'Should parse exactly 1 recipe');
+  assert.strictEqual(parsed[0].title, 'Boeuf Bourguignon', 'Should preserve recipe title');
+  assert.strictEqual(parsed[0].methodSteps.length, 7, `Expected 7 method steps without truncating at "casserole dish", got ${parsed[0].methodSteps.length}`);
+  assert.ok(parsed[0].methodSteps[0].includes('large casserole dish over medium heat'), 'Step 1 should preserve full sentence');
+  assert.ok(parsed[0].methodSteps[6].includes('Discard the herb sprigs'), 'Step 7 should exist and be preserved');
+
+  console.log('  ✓ Culinary dish terms in methods do not false-split bulk recipes');
 }
 
 console.log('All Recipe Wizard & Auth tests passed successfully! ✅');

@@ -13,7 +13,7 @@ const isIngredientsHeader = l => /^(?:#+\s*)?(?:main\s+)?ingredients?:?/i.test(l
 
 const isExplicitRecipeHeader = l => {
   const t = l.trim();
-  if (/^(?:Recipe|Dish)\s*\d*[:\.\-\s]|^Recipe Title:|^Title:/i.test(t)) return true;
+  if (/^(?:Recipe|Dish)\s*(?:#?\s*\d+[:\.\-\s]?|[:\-])|^(?:Recipe\s*)?(?:Title|Name):/i.test(t)) return true;
   if (/^#+\s+/.test(t)) {
     const withoutHash = t.replace(/^#+\s*/, '').trim();
     if (isIngredientsHeader(withoutHash) || isMethodHeader(withoutHash)) return false;
@@ -39,7 +39,7 @@ export function unpackAndSplitRecipeBlocks(rawText) {
 
   // 2. Normalise dividers and ensure headers have clear boundaries
   clean = clean.replace(/(?:^|\n)\s*[-=_*~]{3,}\s*(?:\n|$)/g, '\n\n__RECIPE_SPLIT__\n\n')
-    .replace(/([^\n])\n*((?:Dish|Recipe)\s*\d*[:\.\-\s]|Recipe Title:|Title:)/gi, '$1\n\n$2');
+    .replace(/([^\n])\n*((?:Dish|Recipe)\s*(?:#?\s*\d+[:\.\-\s]?|[:\-])|(?:Recipe\s*)?(?:Title|Name):)/gi, '$1\n\n$2');
 
   // 3. Line-by-line semantic state machine
   const lines = clean.split('\n');
@@ -199,7 +199,7 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
 
   // Prevent greedy method ingestion if boundary marker or secondary ingredients header exists
   if (rawMethodText) {
-    const boundary = rawMethodText.match(/(?:\n\s*\n|\n)(?=(?:(?:Recipe|Dish)\s*\d*[:\.\-\s]|Recipe Title:|Title:|[#]+\s+|(?:main\s+)?ingredients?:))/i);
+    const boundary = rawMethodText.match(/(?:\n\s*\n|\n)(?=(?:(?:Recipe|Dish)\s*(?:#?\s*\d+[:\.\-\s]?|[:\-])|(?:Recipe\s*)?(?:Title|Name):|[#]+\s+|(?:main\s+)?ingredients?:))/i);
     if (boundary) rawMethodText = rawMethodText.slice(0, boundary.index);
   }
 
@@ -212,8 +212,8 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
       if (ext) title = ext;
       return;
     }
-    if (/^(?:Dish|Recipe)\s+\d+:\s*(.*)/i.test(line)) {
-      const match = line.match(/^(?:Dish|Recipe)\s+\d+:\s*(.*)/i);
+    if (/^(?:Dish|Recipe)\s+#?\s*\d+[:\.\-]?\s*(.*)/i.test(line)) {
+      const match = line.match(/^(?:Dish|Recipe)\s+#?\s*\d+[:\.\-]?\s*(.*)/i);
       const ext = cleanRecipeTitle(match[1]);
       if (ext) title = ext;
       return;
