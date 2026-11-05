@@ -203,10 +203,10 @@ export function renderState2Mapping() {
       ${(() => {
         const allIngs = (recipe.ingredientSections || []).flatMap(s => s.ingredients || []);
         const unlinkedIngs = allIngs.filter(i => isIngredientUnlinked(i, productsBank, ingredientsBank));
-        if (!unlinkedIngs.length) return '';
+        const isShown = unlinkedIngs.length > 0;
         return `
-          <div class="wiz-gate-warning" id="wiz-gate-warning-banner" style="margin-bottom: 12px; padding: 10px 14px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; color: #9f1239; font-size: 12.5px; display: flex; align-items: center; gap: 8px;">
-            <span>⚠️</span> <span><strong>Action Required:</strong> ${unlinkedIngs.length} ingredient(s) retain an unlinked "✨ New Item" status. Please click the search picker for each item to select or link it to a valid Category, Item, or Sub-Type before proceeding.</span>
+          <div class="wiz-gate-warning" id="wiz-gate-warning-banner" style="margin-bottom: 12px; padding: 10px 14px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; color: #9f1239; font-size: 12.5px; display: ${isShown ? 'flex' : 'none'}; align-items: center; gap: 8px;">
+            <span>⚠️</span> <span><strong>Action Required:</strong> <span class="wiz-unlinked-count">${unlinkedIngs.length}</span> ingredient(s) retain an unlinked "✨ New Item" status. Please click the search picker for each item to select or link it to a valid Category, Item, or Sub-Type before proceeding.</span>
           </div>
         `;
       })()}
