@@ -8,23 +8,12 @@ import { safeFirestoreGet } from './HouseholdRepository.js';
 import {
   saveRecipe as saveCanonicalRecipe,
   deleteRecipe as deleteCanonicalRecipe,
-  deleteRecipeVariant as deleteCanonicalRecipeVariant
+  deleteRecipeVariant as deleteCanonicalRecipeVariant,
+  cleanLegacyMacros
 } from './RecipeFirestoreRepository.js';
 
 function isDbAvailable() {
   return Boolean(db && HOUSEHOLD_ID);
-}
-
-function cleanLegacyMacros(recipe) {
-  if (!recipe || typeof recipe !== 'object') return recipe;
-  const cloned = { ...recipe };
-  if (cloned.macros && typeof cloned.macros === 'object') {
-    cloned.calories = cloned.calories ?? cloned.macros.calories ?? cloned.macros.kcal ?? 0;
-    cloned.protein = cloned.protein ?? cloned.macros.protein ?? cloned.macros.prot ?? 0;
-    cloned.carbs = cloned.carbs ?? cloned.macros.carbs ?? cloned.macros.carb ?? 0;
-    cloned.fat = cloned.fat ?? cloned.macros.fat ?? 0;
-  }
-  return cloned;
 }
 
 export async function getRecipes(_uid) {

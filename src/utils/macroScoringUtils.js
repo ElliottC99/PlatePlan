@@ -47,28 +47,29 @@ export function extractRecipeMacros(recipe, variant = 'original') {
   }
   const r = recipe.recipe || recipe;
 
-  const serves = Number(r.servings || r.serves || 1) || 1;
+  const serves = Number(r.servings || r.serves || r.yield || r.enhanced?.servings || r.enhanced?.serves || 2) || 2;
 
   const extractFromNode = (node) => {
     if (!node || typeof node !== 'object') return { cal: null, prot: null };
+    const nodeServes = Number(node.servings || node.serves || node.yield || serves || 2) || 2;
     let cal = pickFirstValidMacro([
+      node.macros?.cal,
+      node.macros?.calories,
       node.nutrition?.perServing?.cal,
       node.nutrition?.perServing?.calories,
       node.perServing?.cal,
       node.perServing?.calories,
-      node.macros?.cal,
-      node.macros?.calories,
       node.cal,
       node.calories,
       node.kcal
     ]);
     let prot = pickFirstValidMacro([
+      node.macros?.prot,
+      node.macros?.protein,
       node.nutrition?.perServing?.prot,
       node.nutrition?.perServing?.protein,
       node.perServing?.prot,
       node.perServing?.protein,
-      node.macros?.prot,
-      node.macros?.protein,
       node.prot,
       node.protein
     ]);
@@ -78,11 +79,11 @@ export function extractRecipeMacros(recipe, variant = 'original') {
       node.macros ||
       (cal !== null && !node.nutrition?.total && !node.total)
     );
-    if (!isExplicitPerServing && cal !== null && serves > 1) {
-      cal = cal / serves;
+    if (!isExplicitPerServing && cal !== null && nodeServes > 1) {
+      cal = cal / nodeServes;
     }
-    if (!isExplicitPerServing && prot !== null && serves > 1) {
-      prot = prot / serves;
+    if (!isExplicitPerServing && prot !== null && nodeServes > 1) {
+      prot = prot / nodeServes;
     }
     return { cal, prot };
   };

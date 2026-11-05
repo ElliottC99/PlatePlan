@@ -1168,7 +1168,10 @@ export function buildEnhancedRecipePayload(originalRecipe, adjustedIngredients, 
     fat: Math.round(perServing.fat * s)
   };
 
-  const methodSteps = Array.isArray(originalRecipe.method) ? [...originalRecipe.method] : (Array.isArray(originalRecipe.steps) ? [...originalRecipe.steps] : []);
+  const rawMethod = originalRecipe.methodSteps || originalRecipe.steps || originalRecipe.method || originalRecipe.instructions || [];
+  const methodSteps = Array.isArray(rawMethod)
+    ? [...rawMethod]
+    : (typeof rawMethod === 'string' ? rawMethod.split('\n').filter(Boolean) : []);
 
   return {
     name: `${origName} (Enhanced)`,
@@ -1186,6 +1189,8 @@ export function buildEnhancedRecipePayload(originalRecipe, adjustedIngredients, 
     ingredients: finalIngredients,
     method: methodSteps,
     steps: methodSteps,
+    methodSteps: methodSteps,
+    instructions: methodSteps,
     updatedAt: new Date().toISOString()
   };
 }

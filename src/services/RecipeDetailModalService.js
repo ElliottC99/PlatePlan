@@ -187,7 +187,11 @@ export function renderRecipePreview() {
   const ingredientsHtml = renderRecipeIngredientsListHTML(ingredients, state, scaleMultiplier, sections);
 
   // Render method steps
-  const steps = Array.isArray(activeR.method || activeR.steps) ? (activeR.method || activeR.steps) : [];
+  const rawSteps = activeR.methodSteps || activeR.steps || activeR.method || activeR.instructions ||
+                   r.methodSteps || r.steps || r.method || r.instructions || [];
+  const steps = Array.isArray(rawSteps)
+    ? rawSteps
+    : (typeof rawSteps === 'string' ? rawSteps.split('\n').filter(Boolean) : []);
   const methodHtml = steps.length ? `
     <div class="recipe-view-method-list" style="display:flex;flex-direction:column;gap:10px">
       ${steps.map((st, i) => {

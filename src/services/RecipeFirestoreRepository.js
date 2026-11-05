@@ -26,6 +26,23 @@ export function cleanLegacyMacros(target) {
         price: Number(price) || 0
       };
 
+      if (r.nutrition && typeof r.nutrition === 'object') {
+        const perServing = (r.nutrition.perServing && typeof r.nutrition.perServing === 'object')
+          ? { ...r.nutrition.perServing }
+          : {};
+        perServing.cal = r.macros.calories;
+        perServing.calories = r.macros.calories;
+        perServing.prot = r.macros.protein;
+        perServing.protein = r.macros.protein;
+        perServing.carb = r.macros.carbs;
+        perServing.carbs = r.macros.carbs;
+        perServing.fat = r.macros.fat;
+        r.nutrition = {
+          ...r.nutrition,
+          perServing
+        };
+      }
+
       delete r.cal;
       delete r.calories;
       delete r.prot;

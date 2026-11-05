@@ -330,7 +330,13 @@ export function renderVaultRecipeCard(r, options = {}) {
   };
 
   const originalFit = buildFit(r, false);
-  const enhancedActive = r.enhanced ? { ...r, ...r.enhanced, ingredients: r.enhanced.ingredients || r.ingredients } : null;
+  const enhancedActive = r.enhanced ? {
+    ...r,
+    ...r.enhanced,
+    serves: Number(r.enhanced.serves || r.enhanced.servings || r.serves || r.servings || 2) || 2,
+    servings: Number(r.enhanced.servings || r.enhanced.serves || r.servings || r.serves || 2) || 2,
+    ingredients: r.enhanced.ingredients || r.ingredients
+  } : null;
   const enhancedFit = enhancedActive ? buildFit(enhancedActive, true) : null;
   const enhancedChanges = r.enhanced?.changes ? `<div style="font-size:12px;color:var(--text2);margin-top:6px">${escapeHtml(r.enhanced.changes)}</div>` : '';
   const expandableName = typeof window.renderExpandableText === 'function' ? window.renderExpandableText(r.name, `recipe-${r.id}`, 'recipe-card-name') : escapeHtml(r.name);

@@ -337,13 +337,19 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
       },
       nutrition: {
         perServing: {
+          cal: finalMacros.calories || finalMacros.cal || 0,
           calories: finalMacros.calories || finalMacros.cal || 0,
+          prot: finalMacros.protein || finalMacros.prot || 0,
           protein: finalMacros.protein || finalMacros.prot || 0,
+          carb: finalMacros.carbs || 0,
           carbs: finalMacros.carbs || 0,
           fat: finalMacros.fat || 0
         },
+        cal: finalMacros.calories || finalMacros.cal || 0,
         calories: finalMacros.calories || finalMacros.cal || 0,
+        prot: finalMacros.protein || finalMacros.prot || 0,
         protein: finalMacros.protein || finalMacros.prot || 0,
+        carb: finalMacros.carbs || 0,
         carbs: finalMacros.carbs || 0,
         fat: finalMacros.fat || 0
       },
@@ -403,13 +409,19 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
       },
       nutrition: {
         perServing: {
+          cal: finalMacros.calories || finalMacros.cal || 0,
           calories: finalMacros.calories || finalMacros.cal || 0,
+          prot: finalMacros.protein || finalMacros.prot || 0,
           protein: finalMacros.protein || finalMacros.prot || 0,
+          carb: finalMacros.carbs || 0,
           carbs: finalMacros.carbs || 0,
           fat: finalMacros.fat || 0
         },
+        cal: finalMacros.calories || finalMacros.cal || 0,
         calories: finalMacros.calories || finalMacros.cal || 0,
+        prot: finalMacros.protein || finalMacros.prot || 0,
         protein: finalMacros.protein || finalMacros.prot || 0,
+        carb: finalMacros.carbs || 0,
         carbs: finalMacros.carbs || 0,
         fat: finalMacros.fat || 0
       },
@@ -496,7 +508,12 @@ export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice
           title: `${wizardState.activeRecipe.title} (Enhanced)`,
           ingredientSections: JSON.parse(JSON.stringify(wizardState.activeRecipe.ingredientSections || [])),
           ingredients: JSON.parse(JSON.stringify(wizardState.activeRecipe.ingredients || [])),
+          serves: wizardState.activeRecipe.serves || 2,
+          servings: wizardState.activeRecipe.servings || wizardState.activeRecipe.serves || 2,
           methodSteps: [...(wizardState.activeRecipe.methodSteps || [])],
+          method: [...(wizardState.activeRecipe.methodSteps || [])],
+          steps: [...(wizardState.activeRecipe.methodSteps || [])],
+          instructions: [...(wizardState.activeRecipe.methodSteps || [])],
           macros: { ...(wizardState.activeRecipe.macros || { calories: 500, protein: 35, carbs: 42, fat: 16 }) }
         };
       }
