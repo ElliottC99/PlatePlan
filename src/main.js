@@ -45,7 +45,7 @@ import { renderIngredientBank, renderProductBank } from './views/PantryBankView.
 import { renderSettingsView } from './views/SettingsView.js';
 import { renderScrollableSwapModal, toggleShoppingItemAcquired, getShoppingLineStateKey } from './views/ShoppingView.js';
 import { renderPlanner, renderPlanLibrary } from './views/PlannerView.js';
-import { renderRecipeVault } from './views/RecipeVaultView.js';
+import { renderRecipeVault, toggleRecipeFavourite } from './views/RecipeVaultView.js';
 import { renderDataQualityView } from './views/DataQualityView.js';
 import './components/data-quality/ResolveUnlinkedModalUI.js';
 import './components/data-quality/UnlinkedSweeperUI.js';
@@ -180,6 +180,7 @@ if (typeof window !== 'undefined') {
     showPlatePlanToast: window.showPlatePlanToast || AppInitializer.showPlatePlanToast,
 
     renderToday, renderPlanner, renderVault: renderRecipeVault, renderRecipeVault, renderVaultGrid: renderRecipeVault,
+    toggleRecipeFavourite,
     renderSettings: renderSettingsView, renderSettingsView,
     renderIngredientBank, renderProductBank, renderBank: renderProductBank,
     renderPlatePlanView(viewId) {

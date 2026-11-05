@@ -229,6 +229,23 @@ check('no dead controls on the Pantry, Product Bank and planner screens', () => 
   assert.deepEqual(dead, [], `\n  ${dead.join('\n  ')}`);
 });
 
+check('no dead controls in header, mobile navigation, vault toolbar, action sheet, today swap modal, recipe detail modal, or shopping toolbar', () => {
+  const html = read('index.html');
+  const headerStart = html.indexOf('<header class="app-header">');
+  const viewAddStart = html.indexOf('<div id="view-add"');
+  assert.ok(headerStart > 0 && viewAddStart > headerStart, 'index.html has header through view-vault');
+  const extraFiles = [
+    { name: 'index.html (header, nav, today, search, vault)', text: html.slice(headerStart, viewAddStart), lineBase: lineOf(html, headerStart) - 1 },
+    ...['src/components/navigation/ActionSheetUI.js',
+      'src/components/today/TodaySwapMealModalUI.js',
+      'src/components/shopping/ShoppingBatchToolbar.js']
+      .map(f => ({ name: f, text: read(f), lineBase: 0 }))
+  ];
+  const dead = findDeadControls(extraFiles, context);
+  assert.deepEqual(dead, [], `\n  ${dead.join('\n  ')}`);
+  assert.equal(context.defined.has('toggleRecipeFavourite'), true, 'window.toggleRecipeFavourite must be defined');
+});
+
 if (failures === 0) {
   console.log('\n=== ALL DEAD CONTROLS TESTS PASSED ===');
   process.exit(0);

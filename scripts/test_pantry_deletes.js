@@ -328,10 +328,15 @@ await check('Covers AE1: Link existing opens the picker for the sub-type, and Co
   assert.deepEqual([linked?.data.subtypeId, linked?.data.ingredientId], ['sub_seeded', 'ing_bread']);
 });
 
-await check('Add to Bank links an existing product with the picker\'s own save, in the right argument order', () => {
-  const source = fs.readFileSync(new URL('../src/components/pantry/AddToBankHubUI.js', import.meta.url), 'utf8');
-  assert.match(source, /openSubtypeExistingProductPickerModal\(targetSubtypeId, parentItemId\);/);
-  assert.match(source, /!val\.includes\(':'\)\) \{\s*showCustomAlert\(/, 'an item or category asks for a sub-type instead of opening a picker that cannot save');
+await check('Add to Bank links an existing product via AddItemWizardUI atomic chain', () => {
+  const hubSource = fs.readFileSync(new URL('../src/components/pantry/AddToBankHubUI.js', import.meta.url), 'utf8');
+  const wizardSource = fs.readFileSync(new URL('../src/components/pantry/AddItemWizardUI.js', import.meta.url), 'utf8');
+  const serviceSource = fs.readFileSync(new URL('../src/services/PantryTaxonomyService.js', import.meta.url), 'utf8');
+  assert.match(hubSource, /data-hub-mode="product"/);
+  assert.match(hubSource, /openAddItemWizard\(opts\)/);
+  assert.match(wizardSource, /wizardData\.productMode === 'existing'/);
+  assert.match(wizardSource, /await commitAtomicChain\(\{/);
+  assert.match(serviceSource, /export async function commitAtomicChain\(/);
 });
 
 await check('Covers AE2: Add product manually opens the form pre-linked, and Save stores it on the sub-type', async () => {

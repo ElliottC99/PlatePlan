@@ -403,3 +403,8 @@ export function unmount() {
     vaultTimer = null;
   }
 }
+
+if (typeof window !== 'undefined') {
+  window.toggleRecipeFavourite = toggleRecipeFavourite;
+  window.handleVaultSortChange = handleVaultSortChange;
+}
