@@ -106,7 +106,7 @@ export function resolveProductItemWeight(product) {
   const packSize = parseFloat(product.packSize ?? product.pack_size ?? val.packSize ?? val.pack_size ?? 0);
   const itemCount = parseFloat(product.itemCount ?? product.item_count ?? val.itemCount ?? val.item_count ?? 0);
 
-  if (itemCount > 0) {
+  if (itemCount > 1) {
     const baseWeight = (drainedWeight > 0 ? drainedWeight : (usablePack > 0 ? usablePack : packSize));
     if (baseWeight > 0) {
       return Math.round((baseWeight / itemCount) * 10) / 10;
