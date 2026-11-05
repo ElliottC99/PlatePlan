@@ -951,3 +951,66 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
   -webkit-overflow-scrolling: touch;
 }
 
+.ios-fullscreen-footer {
+  height: 60px;
+  min-height: 60px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--ios-material-chrome, var(--surface, #ffffff));
+  backdrop-filter: var(--ios-blur, blur(20px));
+  -webkit-backdrop-filter: var(--ios-blur, blur(20px));
+  border-top: 0.5px solid var(--separator, var(--border, #e5e5e5));
+  z-index: 10;
+  padding-bottom: max(0px, env(safe-area-inset-bottom));
+}
+
+.wiz-gate-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  background: none;
+}
+
+.wiz-gate-pill.blocked {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #e11d48;
+}
+
+.wiz-gate-pill.blocked:hover {
+  background: #ffe4e6;
+}
+
+.wiz-gate-pill.ready {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #16a34a;
+}
+
+.wiz-raw-subtext {
+  font-size: 10.5px;
+  color: var(--text2, #6b7280);
+  font-style: italic;
+  margin-top: 2px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+.wiz-row-unlinked {
+  background: rgba(239, 68, 68, 0.04);
+}
+
+
