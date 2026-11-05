@@ -31,7 +31,7 @@ const filesToScan = [
   'src/components/pantry/ReorganiseModalUI.js',
   'src/components/recipe/RecipeWizardTaxonomyModal.js',
   'src/components/recipe-editor/RecipeIngredientRow.js',
-  'PlatePlan.html'
+  'index.html'
 ];
 
 let totalErrors = 0;

@@ -9,6 +9,7 @@
 
 import { generateShoppingListFromPlan } from '../src/services/ShoppingListService.js';
 import { saveShoppingList } from '../src/repositories/ShoppingListRepository.js';
+import { clearCheckedShoppingItems } from '../src/components/shopping/ShoppingBatchToolbar.js';
 
 console.log('=== RUNNING SMART SHOPPING LIST VERIFICATION SUITE ===\n');
 
@@ -124,6 +125,20 @@ async function testShoppingListEngine() {
     console.log('✅ Test 4 Passed: Shopping list successfully saved to shoppingLists subcollection.');
   } else {
     console.error('❌ Test 4 Failed:', saveRes.error);
+    testFailures++;
+  }
+  console.log('');
+
+  console.log('--- Test 5: clearCheckedShoppingItems clears currentPlan.shoppingAtHome ---');
+  const mockState = {
+    currentPlan: { shoppingAtHome: { 'item-1': true, 'item-2': true } },
+    plan: { shoppingAtHome: { 'item-1': true } }
+  };
+  await clearCheckedShoppingItems(mockState);
+  if (Object.keys(mockState.currentPlan.shoppingAtHome).length === 0 && Object.keys(mockState.plan.shoppingAtHome).length === 0) {
+    console.log('✅ Test 5 Passed: clearCheckedShoppingItems clears both currentPlan.shoppingAtHome and plan.shoppingAtHome.');
+  } else {
+    console.error('❌ Test 5 Failed: currentPlan.shoppingAtHome was not cleared:', mockState.currentPlan.shoppingAtHome);
     testFailures++;
   }
   console.log('');

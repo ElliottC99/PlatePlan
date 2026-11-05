@@ -186,6 +186,34 @@ export function parseIngredientString(rawStr) {
     }
   });
 
+  // 0. Compound stock cube + liquid patterns (e.g., "1 stock cube + 400ml water", "0.5 stock cube in 200ml boiling water", "1 chicken stock cube dissolved in 500ml water")
+  const compoundStockMatch = clean.match(
+    /^(?:(\d+(?:\.\d+)?|\d+\s*\/\s*\d+|a|an|one|two|three|half)\s*)?(?:x\s*)?(?:(vegetable|chicken|beef|fish|lamb|vegan|mushroom|onion)\s+)?(?:stock\s*cubes?|cubes?\s*(?:of\s*)?stock|cubes?\s*(?:vegetable|chicken|beef|fish|lamb|vegan)?\s*stock)\s*(?:\+|\bin\b|,\s*dissolved\s+in\b|\bdissolved\s+in\b|\bmade\s+(?:up\s+)?(?:to\s+)?with\b|\bmixed\s+with\b)\s*([\s\S]*)$/i
+  );
+  if (compoundStockMatch) {
+    const rawQty = compoundStockMatch[1] || '1';
+    const { qty: parsedQty } = parseQuantity(rawQty);
+    const stockType = compoundStockMatch[2] ? toTitleCase(compoundStockMatch[2]) : 'Vegetable';
+    const name = `${stockType} Stock Cube`;
+    const liquidPart = (compoundStockMatch[3] || '').trim();
+    let notes = liquidPart;
+    if (notes && !notes.toLowerCase().startsWith('in ') && !notes.toLowerCase().startsWith('with ') && !notes.toLowerCase().startsWith('dissolved')) {
+      notes = `dissolved in ${notes}`;
+    }
+    const mlMatch = /(\d+)\s*(?:ml|millilitres|ml\b)/i.exec(liquidPart);
+    const waterMl = mlMatch ? parseInt(mlMatch[1], 10) : 400;
+    return {
+      raw: s,
+      qty: parsedQty || 1,
+      unit: 'qty',
+      isEstimated: false,
+      name: toTitleCase(name),
+      notes,
+      waterMl,
+      isToServe: false
+    };
+  }
+
   // 1. Loose measures without leading numbers e.g. "handful of parsley", "pinch of black pepper", "drizzle of olive oil"
   const looseMatch = clean.match(/^(?:a\s+)?(handful|handfuls|pinch|pinches|bunch|bunches|drizzle|drizzles|dash|dashes|splash|splashes)\s+(?:of\s+)?(.*)/i);
   if (looseMatch) {
@@ -312,14 +340,37 @@ export function parseIngredientString(rawStr) {
   }
 
   const servingInfo = extractServingQualifier(rawName || remainder);
-  const normalised = convertToStrictUnit(qty, parsedUnit, servingInfo.name);
+  let cleanedName = servingInfo.name;
+  let extraNotes = '';
+
+  const parenMatch = cleanedName.match(/^(.*?)\((.*?)\)(.*)$/);
+  if (parenMatch) {
+    cleanedName = (parenMatch[1] + ' ' + parenMatch[3]).trim();
+    extraNotes = parenMatch[2].trim();
+  }
+
+  if (cleanedName.includes(',')) {
+    const parts = cleanedName.split(',');
+    cleanedName = parts[0].trim();
+    const commaNotes = parts.slice(1).join(', ').trim();
+    extraNotes = extraNotes ? `${extraNotes}, ${commaNotes}` : commaNotes;
+  }
+
+  if (/^(?:(vegetable|chicken|beef|fish|lamb|vegan|mushroom|onion)\s+)?stock\s*cubes?$/i.test(cleanedName)) {
+    const typeMatch = cleanedName.match(/^(vegetable|chicken|beef|fish|lamb|vegan|mushroom|onion)\b/i);
+    const stockType = typeMatch ? toTitleCase(typeMatch[1]) : 'Vegetable';
+    cleanedName = `${stockType} Stock Cube`;
+  }
+
+  const combinedNotes = [extraNotes, servingInfo.isToServe ? 'to serve' : ''].filter(Boolean).join(', ');
+  const normalised = convertToStrictUnit(qty, parsedUnit, cleanedName);
   return {
     raw: s,
     qty: normalised.qty,
     unit: normalised.unit,
     isEstimated: normalised.isEstimated,
-    name: toTitleCase(servingInfo.name),
-    notes: servingInfo.isToServe ? 'to serve' : '',
+    name: toTitleCase(cleanedName),
+    notes: combinedNotes,
     isToServe: servingInfo.isToServe
   };
 }

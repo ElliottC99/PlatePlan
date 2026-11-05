@@ -64,12 +64,14 @@ export function exportShoppingListToText(items = []) {
 }
 
 export function clearCheckedShoppingItems(state) {
-  if (!state?.plan) return;
-  state.plan.shoppingAtHome = {};
-  if (typeof window.saveState === 'function') window.saveState();
-  if (typeof window.renderShopping === 'function') window.renderShopping();
-  if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
-  if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Cleared checked shopping items.');
+  if (!state?.plan && !state?.currentPlan) return;
+  if (state.plan) state.plan.shoppingAtHome = {};
+  if (state.currentPlan) state.currentPlan.shoppingAtHome = {};
+  if (typeof window !== 'undefined') {
+    if (typeof window.saveState === 'function') window.saveState();
+    if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
+    if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Cleared checked shopping items.');
+  }
 }
 
 export function exportShoppingListToClipboard() {
