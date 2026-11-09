@@ -174,19 +174,9 @@ export function attachPantryBankDelegation() {
           title: 'Item Options',
           options: [
             {
-              label: 'Edit Item',
-              icon: '✏️',
-              onClick: () => import(`../components/pantry/EditPantryTaxonomyModalUI.js`).then(mod => mod.openEditItemModal(id))
-            },
-            {
               label: 'Reorganise Item',
               icon: '🔄',
               onClick: () => import(`../components/pantry/ReorganiseModalUI.js`).then(mod => mod.openReorganiseModal('item', { id }))
-            },
-            {
-              label: 'Manage Aliases',
-              icon: '🏷️',
-              onClick: () => import(`../components/pantry/EditPantryTaxonomyModalUI.js`).then(mod => mod.openEditItemModal(id, { focusTab: 'aliases' }))
             },
             {
               label: 'Delete Item',
@@ -204,11 +194,6 @@ export function attachPantryBankDelegation() {
           title: 'Sub-type Options',
           options: [
             {
-              label: 'Edit Sub-type',
-              icon: '✏️',
-              onClick: () => import(`../components/pantry/EditPantryTaxonomyModalUI.js`).then(mod => mod.openEditSubtypeModal(parentId, subtypeId))
-            },
-            {
               label: 'Link Product',
               icon: '🔗',
               onClick: () => import(`../components/pantry/SubtypeProductLinkerModalUI.js`).then(mod => mod.openSubtypeLinkSelectionModal(subtypeId, parentId))
@@ -217,11 +202,6 @@ export function attachPantryBankDelegation() {
               label: 'Reorganise Sub-type',
               icon: '🔄',
               onClick: () => import(`../components/pantry/ReorganiseModalUI.js`).then(mod => mod.openReorganiseModal('subtype', { id: subtypeId, parentId }))
-            },
-            {
-              label: 'Manage Aliases',
-              icon: '🏷️',
-              onClick: () => import(`../components/pantry/EditPantryTaxonomyModalUI.js`).then(mod => mod.openEditSubtypeModal(parentId, subtypeId, { focusTab: 'aliases' }))
             },
             {
               label: 'Delete Sub-type',
@@ -238,7 +218,11 @@ export function attachPantryBankDelegation() {
         .then(m => m.openAddToBankModal('subtype', { parentId: id }))
         .catch(err => console.error('Delegation Error [add-subtype-shortcut]:', err));
       return;
-    } else if (action === 'reorganise-subtype' || action === 'edit-subtype' || action === 'alias-subtype') {
+    } else if (action === 'edit-subtype' || action === 'alias-subtype') {
+      import(`../components/pantry/EditPantryTaxonomyModalUI.js`)
+        .then(m => m.openEditSubtypeModal(parentId, subtypeId))
+        .catch(err => console.error('Delegation Error [edit-subtype]:', err));
+    } else if (action === 'reorganise-subtype') {
       import(`../components/pantry/ReorganiseModalUI.js`)
         .then(m => m.openReorganiseModal('subtype', { id: subtypeId, parentId }))
         .catch(err => console.error('Delegation Error [reorganise-subtype]:', err));
@@ -246,7 +230,11 @@ export function attachPantryBankDelegation() {
       import(`../components/pantry/SubtypeProductLinkerModalUI.js`)
         .then(m => m.openSubtypeLinkSelectionModal(subtypeId, parentId))
         .catch(err => console.error('Delegation Error [link-product]:', err));
-    } else if (action === 'reorganise-item' || action === 'alias-item' || action === 'edit-item') {
+    } else if (action === 'edit-item' || action === 'alias-item') {
+      import(`../components/pantry/EditPantryTaxonomyModalUI.js`)
+        .then(m => m.openEditItemModal(id))
+        .catch(err => console.error('Delegation Error [edit-item]:', err));
+    } else if (action === 'reorganise-item') {
       import(`../components/pantry/ReorganiseModalUI.js`)
         .then(m => m.openReorganiseModal('item', { id }))
         .catch(err => console.error('Delegation Error [reorganise-item]:', err));

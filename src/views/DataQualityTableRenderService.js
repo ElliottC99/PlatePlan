@@ -13,6 +13,7 @@ import { openMealPlanSyncWarningModal } from '../components/data-quality/MealPla
 import { openMergeIngredientsModal } from '../components/data-quality/MergeIngredientsModal.js';
 import { openRecipeAuditModal } from '../components/recipe/RecipeAuditModal.js';
 import { openUnlinkedSweeperModal, scanUnlinkedRecipeIngredients } from '../components/data-quality/UnlinkedSweeperUI.js';
+import { findDuplicateCategoryClusters } from '../components/pantry/CategoryMergeModalUI.js';
 import { auditRecipeMappings } from '../utils/RecipeAuditService.js';
 import { performGlobalProductRelink, verifyZeroCalorieIngredient } from '../services/DataQualityService.js';
 import { showCustomDensityModal } from '../components/ui/DialogHelpers.js';
@@ -234,6 +235,13 @@ export function renderDataQualityView() {
     recipeAuditCount = 0;
   }
 
+  let categoryClusterCount = 0;
+  try {
+    categoryClusterCount = findDuplicateCategoryClusters(state).length;
+  } catch (e) {
+    categoryClusterCount = 0;
+  }
+
   container.innerHTML = `
     <div style="max-width:920px; margin:0 auto; padding:20px; box-sizing:border-box;">
       
@@ -272,8 +280,8 @@ export function renderDataQualityView() {
           <button type="button" class="btn sm" data-action-dq="open-sweeper" style="font-weight:600; background:#059669; color:#fff; ${unlinkedRecipeCount === 0 ? 'opacity:0.55; cursor:default;' : ''}">
             🧹 Unlinked Sweeper (${unlinkedRecipeCount}${unlinkedRecipeCount === 0 ? ' ✓' : ''})
           </button>
-          <button type="button" class="btn sm" data-action-dq="open-category-merge" style="font-weight:600; background:#0284c7; color:#fff;">
-            📂 Category Deduplication
+          <button type="button" class="btn sm" data-action-dq="open-category-merge" style="font-weight:600; background:#0284c7; color:#fff; ${categoryClusterCount === 0 ? 'opacity:0.55; cursor:default;' : ''}">
+            📂 Category Deduplication (${categoryClusterCount}${categoryClusterCount === 0 ? ' ✓' : ''})
           </button>
           <button type="button" class="btn sm" data-action-dq="open-recipe-audit" style="font-weight:600; background:var(--primary,#4f46e5); color:#fff; ${recipeAuditCount === 0 ? 'opacity:0.55; cursor:default;' : ''}">
             📖 Recipe Mapping Audit (${recipeAuditCount}${recipeAuditCount === 0 ? ' ✓' : ''})

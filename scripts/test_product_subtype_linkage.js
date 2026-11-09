@@ -63,11 +63,39 @@ setIngredients([
   }
 ]);
 
-// 1. Verify modal shell has no #mi-cat-search input
+// 1. Verify modal shell has no #mi-cat-search input and all three unit selects carry g, ml, units
 openProductEditModal();
 const modalContent = document.getElementById('view-modal-content');
 assert.ok(!modalContent.innerHTML.includes('id="mi-cat-search"'), 'Category search input #mi-cat-search must be removed');
 assert.ok(modalContent.innerHTML.includes('id="mi-drained-weight-unit"'), 'Drained weight unit selector must be present');
+
+for (const selectId of ['mi-pack-unit', 'mi-item-weight-unit', 'mi-drained-weight-unit']) {
+  const regex = new RegExp(`<select[^>]*id="${selectId}"[\\s\\S]*?<\\/select>`);
+  const selectHtml = modalContent.innerHTML.match(regex)?.[0] || '';
+  assert.ok(selectHtml.includes('value="g"'), `${selectId} must include g option`);
+  assert.ok(selectHtml.includes('value="ml"'), `${selectId} must include ml option`);
+  assert.ok(selectHtml.includes('value="units"'), `${selectId} must include units option`);
+}
+
+// Verify changing one unit dropdown synchronizes all three
+const packUnitEl = document.getElementById('mi-pack-unit');
+const itemUnitEl = document.getElementById('mi-item-weight-unit');
+const drainedUnitEl = document.getElementById('mi-drained-weight-unit');
+
+packUnitEl.value = 'ml';
+packUnitEl.onchange({ target: packUnitEl });
+assert.equal(itemUnitEl.value, 'ml', 'Changing pack unit to ml must sync item weight unit to ml');
+assert.equal(drainedUnitEl.value, 'ml', 'Changing pack unit to ml must sync drained weight unit to ml');
+
+drainedUnitEl.value = 'units';
+drainedUnitEl.onchange({ target: drainedUnitEl });
+assert.equal(packUnitEl.value, 'units', 'Changing drained unit to units must sync pack unit to units');
+assert.equal(itemUnitEl.value, 'units', 'Changing drained unit to units must sync item weight unit to units');
+
+itemUnitEl.value = 'g';
+itemUnitEl.onchange({ target: itemUnitEl });
+assert.equal(packUnitEl.value, 'g', 'Changing item unit to g must sync pack unit to g');
+assert.equal(drainedUnitEl.value, 'g', 'Changing item unit to g must sync drained weight unit to g');
 
 // 2. Verify saving standalone product without linked Sub-Type inherits General category cleanly
 document.getElementById('mi-name').value = 'Test Standalone Jam';

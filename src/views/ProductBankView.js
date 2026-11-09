@@ -195,9 +195,10 @@ export function openProductEditModal(productIdOrDraft = null) {
           <label for="mi-pack" style="display: block; font-size: 11px; font-weight: 650; margin-bottom: 2px;">Total pack size</label>
           <div style="display: flex; gap: 4px;">
             <input type="number" id="mi-pack" name="mi-pack" placeholder="500" style="min-width: 0; flex: 1; padding: 5px 6px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
-            <select id="mi-pack-unit" name="mi-pack-unit" aria-label="Pack unit" style="width: 52px; border: 1px solid var(--border, #ccc); border-radius: 6px; padding: 0 4px; font-size: 11.5px;">
+            <select id="mi-pack-unit" name="mi-pack-unit" aria-label="Pack unit" style="width: 62px; border: 1px solid var(--border, #ccc); border-radius: 6px; padding: 0 4px; font-size: 11.5px;">
               <option value="g">g</option>
               <option value="ml">ml</option>
+              <option value="units">units</option>
             </select>
           </div>
         </div>
@@ -216,9 +217,10 @@ export function openProductEditModal(productIdOrDraft = null) {
           <label for="mi-drained-weight" style="display: block; font-size: 11px; font-weight: 650; margin-bottom: 2px;">Drained weight</label>
           <div style="display: flex; gap: 4px;">
             <input type="number" id="mi-drained-weight" name="mi-drained-weight" placeholder="e.g. 235" style="min-width: 0; flex: 1; padding: 5px 6px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
-            <select id="mi-drained-weight-unit" name="mi-drained-weight-unit" aria-label="Drained weight unit" style="width: 52px; border: 1px solid var(--border, #ccc); border-radius: 6px; padding: 0 4px; font-size: 11.5px;">
+            <select id="mi-drained-weight-unit" name="mi-drained-weight-unit" aria-label="Drained weight unit" style="width: 62px; border: 1px solid var(--border, #ccc); border-radius: 6px; padding: 0 4px; font-size: 11.5px;">
               <option value="g">g</option>
               <option value="ml">ml</option>
+              <option value="units">units</option>
             </select>
           </div>
         </div>
@@ -267,7 +269,14 @@ export function openProductEditModal(productIdOrDraft = null) {
   const binding = window.__prefilledResolveBinding || {};
   const tescoData = binding.tescoImportData;
 
+  const UNIT_SELECT_IDS = ['mi-pack-unit', 'mi-item-weight-unit', 'mi-drained-weight-unit'];
+  const syncUnitSelects = (val) => {
+    const cleanUnit = ['g', 'ml', 'units'].includes(val) ? val : 'g';
+    UNIT_SELECT_IDS.forEach(id => setVal(id, cleanUnit));
+  };
+
   if (prod) {
+    const unifiedUnit = prod.packUnit || prod.unit || prod.itemWeightUnit || prod.item_weight_unit || prod.drainedWeightUnit || 'g';
     setVal('mi-name', prod.name || binding.subtypeDraftName || '');
     setVal('mi-brand', prod.brand || '');
     setVal('mi-storage', prod.storage || 'cupboard');
@@ -278,13 +287,12 @@ export function openProductEditModal(productIdOrDraft = null) {
     setVal('mi-prot', prod.prot ?? prod.protein ?? '');
     setVal('mi-price', prod.price ?? '');
     setVal('mi-pack', prod.pack ?? prod.packSize ?? '');
-    setVal('mi-pack-unit', prod.packUnit || prod.unit || 'g');
     setVal('mi-item-weight', prod.itemWeight ?? '');
-    setVal('mi-item-weight-unit', prod.itemWeightUnit || prod.item_weight_unit || 'g');
     setVal('mi-drained-weight', prod.drainedWeight ?? '');
-    setVal('mi-drained-weight-unit', prod.drainedWeightUnit || prod.packUnit || 'g');
+    syncUnitSelects(unifiedUnit);
     setVal('mi-notes', prod.notes ?? '');
   } else if (tescoData) {
+    const unifiedUnit = tescoData.packUnit || tescoData.unit || tescoData.itemWeightUnit || tescoData.drainedWeightUnit || 'g';
     const rawBrand = tescoData.brand || 'Tesco';
     const brand = toTitleCase(rawBrand);
     const rawName = tescoData.title || tescoData.name || binding.subtypeDraftName || '';
@@ -294,16 +302,14 @@ export function openProductEditModal(productIdOrDraft = null) {
     setVal('mi-storage', tescoData.storage || 'cupboard');
     setVal('mi-price', tescoData.price || '');
     setVal('mi-pack', tescoData.pack || tescoData.packSize || tescoData.size || '');
-    setVal('mi-pack-unit', tescoData.packUnit || tescoData.unit || 'g');
     setVal('mi-cal', tescoData.cal ?? tescoData.calories ?? '');
     setVal('mi-fat', tescoData.fat ?? '');
     setVal('mi-carb', tescoData.carb ?? tescoData.carbs ?? '');
     setVal('mi-fibre', tescoData.fibre ?? '');
     setVal('mi-prot', tescoData.prot ?? tescoData.protein ?? '');
     setVal('mi-item-weight', tescoData.itemWeight ?? '');
-    setVal('mi-item-weight-unit', tescoData.itemWeightUnit || 'g');
     setVal('mi-drained-weight', tescoData.drainedWeight ?? '');
-    setVal('mi-drained-weight-unit', tescoData.drainedWeightUnit || tescoData.packUnit || 'g');
+    syncUnitSelects(unifiedUnit);
     setVal('mi-notes', tescoData.notes || (tescoData.url || tescoData.tescoUrl ? `Tesco: ${tescoData.url || tescoData.tescoUrl}` : ''));
   } else {
     setVal('mi-name', binding.subtypeDraftName || '');
@@ -316,13 +322,22 @@ export function openProductEditModal(productIdOrDraft = null) {
     setVal('mi-prot', '');
     setVal('mi-price', '');
     setVal('mi-pack', '');
-    setVal('mi-pack-unit', 'g');
     setVal('mi-item-weight', '');
-    setVal('mi-item-weight-unit', 'g');
     setVal('mi-drained-weight', '');
-    setVal('mi-drained-weight-unit', 'g');
+    syncUnitSelects('g');
     setVal('mi-notes', '');
   }
+
+  UNIT_SELECT_IDS.forEach(id => {
+    const selectEl = document.getElementById(id);
+    if (selectEl) {
+      const onUnitChange = (e) => syncUnitSelects(e?.target?.value ?? selectEl.value);
+      selectEl.onchange = onUnitChange;
+      if (typeof selectEl.addEventListener === 'function') {
+        selectEl.addEventListener('change', onUnitChange);
+      }
+    }
+  });
 
   renderLinkageContainer(prod, binding);
 
@@ -376,6 +391,12 @@ export function applyTescoUpdate() {
     if (!field || !carried(result.data.raw) || next === undefined || next === null || next === '') continue;
     if (String(field.value) !== String(next)) {
       field.value = next;
+      if (id === 'mi-pack-unit' || id === 'mi-item-weight-unit') {
+        ['mi-pack-unit', 'mi-item-weight-unit', 'mi-drained-weight-unit'].forEach(uid => {
+          const uEl = document.getElementById(uid);
+          if (uEl) uEl.value = next;
+        });
+      }
       changed.push(label);
     }
   }
