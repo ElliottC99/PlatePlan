@@ -8,7 +8,8 @@ import { safeFirestoreGet } from './HouseholdRepository.js';
 import {
   saveRecipe as saveCanonicalRecipe,
   deleteRecipe as deleteCanonicalRecipe,
-  deleteRecipeVariant as deleteCanonicalRecipeVariant
+  deleteRecipeVariant as deleteCanonicalRecipeVariant,
+  sanitizeForFirestore
 } from './RecipeFirestoreRepository.js';
 
 function isDbAvailable() {
@@ -51,3 +52,5 @@ export async function deleteRecipe(recipeId, uid) {
 export async function deleteRecipeVariant(recipeId, variantKey = 'enhanced', uid) {
   return await deleteCanonicalRecipeVariant(recipeId, variantKey, uid);
 }
+
+export { sanitizeForFirestore };

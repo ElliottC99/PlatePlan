@@ -145,16 +145,48 @@ export function subscribeCurrentPlan(callback, errorCallback) {
   } catch (e) { return () => {}; }
 }
 
+/**
+ * Recursively removes undefined fields from an object or array to ensure safe
+ * compatibility with Firestore document writes without throwing 'Unsupported field value: undefined'.
+ * Top-level undefined properties become null; nested undefined properties are deleted.
+ * @param {*} val 
+ * @param {boolean} [isRoot=true]
+ * @returns {*}
+ */
+export function sanitizeForFirestore(val, isRoot = true) {
+  if (val === undefined) return isRoot ? null : undefined;
+  if (val === null || typeof val !== 'object') return val;
+  if (Array.isArray(val)) {
+    return val.map(item => {
+      const cleaned = sanitizeForFirestore(item, false);
+      return cleaned === undefined ? null : cleaned;
+    });
+  }
+  const clean = {};
+  for (const [k, v] of Object.entries(val)) {
+    if (v !== undefined) {
+      const sanitizedChild = sanitizeForFirestore(v, false);
+      if (sanitizedChild !== undefined) {
+        clean[k] = sanitizedChild;
+      }
+    } else if (k === 'enhanced' || k === 'sourceUrl' || k === 'sourceBook' || k === 'sourcePage') {
+      clean[k] = null;
+    }
+  }
+  return clean;
+}
+
 export async function saveRecipe(recipe, _uid) {
   try {
-    if (!isDbAvailable()) return { success: false, error: 'Database unavailable' };
+    if (!isDbAvailable()) return { success: false, offline: true, error: 'Database unavailable' };
     if (!recipe || typeof recipe !== 'object') return { success: false, error: 'Invalid recipe data' };
     const cleanedRecipe = cleanLegacyMacros(recipe);
     const recipeData = { ...cleanedRecipe, schemaVersion: 2, updatedAt: new Date().toISOString() };
     const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes');
     const recipeId = recipe.id || colRef.doc().id;
     delete recipeData.id;
-    await colRef.doc(String(recipeId)).set(recipeData, { merge: true });
+    const sanitizedData = sanitizeForFirestore(recipeData);
+    await colRef.doc(String(recipeId)).set(sanitizedData, { merge: true });
     return { success: true, id: recipeId };
   } catch (err) {
     console.error('[RecipeFirestoreRepository] Save Error:', err);

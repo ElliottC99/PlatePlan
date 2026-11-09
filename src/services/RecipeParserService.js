@@ -253,6 +253,183 @@ export function unpackCollapsedSteps(rawMethodText) {
 }
 
 /**
+ * Detects if a line looks like an ingredient or ingredient section start.
+ * @param {string} line
+ * @returns {boolean}
+ */
+export function isIngredientOrSectionLine(line) {
+  if (!line || typeof line !== 'string') return false;
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+
+  // 1. Explicit bullet or leading emoji
+  if (/^[\s*\-–—~•●◦▪▫▫️▪️+\p{Extended_Pictographic}\uFE0F\u200D]+\s*/u.test(trimmed)) return true;
+
+  const stripped = trimmed.replace(/^[\s*\-–—~•●◦▪▫▫️▪️+\p{Extended_Pictographic}\uFE0F\u200D]+\s*/u, '');
+  if (!stripped) return false;
+
+  // 2. Ingredient Section header e.g. "Wet coating:", "Korean glaze:", "For the sauce:", "To serve:"
+  if (/^(?:for\s+the\s+[a-zA-Z\s]+:?|to\s+serve:?|[a-zA-Z\s]{2,35}:)$/i.test(stripped) &&
+      !/^(?:serves|makes|prep|cook|method|instructions|step|steps|notes?|tips?|equipment):/i.test(stripped)) {
+    return true;
+  }
+
+  // 3. Starts with quantity/unit/article count
+  if (/^\s*(?:\d+[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]?|[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|half\b|a\s+pinch\b|pinch\b|handful\b|small\s+handful\b|dash\b|drizzle\b|squeeze\b|sprinkle\b|few\b|several\b|one\b|two\b|three\b|four\b|five\b|six\b|seven\b|eight\b|nine\b|ten\b|\d+\s*x\b)/i.test(stripped)) {
+    return true;
+  }
+
+  // 4. Contains measurement units
+  if (/\b(?:g|kg|ml|l|tbsp|tsp|cup|cups|oz|lb|cloves?|cans?|tins?|bunches?|slices?|packs?|packets?|pots?)\b/i.test(stripped)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Detects if a line is metadata that should stay in the recipe header.
+ * @param {string} line
+ * @returns {boolean}
+ */
+export function isHeaderMetadataLine(line) {
+  if (!line) return false;
+  const trimmed = line.trim();
+  return /^(?:(?:Dish|Recipe)\s*#?\s*\d+|(?:Recipe\s*)?(?:Title|Name):|(?:Makes|Serves|Yield|Servings|Total\s+Servings)\b|(?:Prep|Cook)\s+Time\b|Difficulty|Calories|Author|Course|Cuisine)/i.test(trimmed);
+}
+
+/**
+ * Detects if a line represents the start of method/instruction steps.
+ * @param {string} line
+ * @returns {boolean}
+ */
+export function isMethodStepLine(line) {
+  if (!line || typeof line !== 'string') return false;
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+
+  // Numbered step: "1. ", "1) ", "Step 1: "
+  if (/^(?:Step\s*\d+|[1-9]\d?[\.\)])\s+[A-Za-z]/i.test(trimmed)) {
+    return true;
+  }
+
+  // Action verbs and sequence adverbs typical of recipe instructions
+  const startsWithInstructionWord = /^(?:Preheat|Heat|Cook|Bake|Boil|Simmer|Fry|Air fry|Roast|Sauté|Tear|Chop|Cut|Dice|Slice|Mix|Stir|Whisk|Blend|Combine|Toss|Place|Put|Add|Pour|Season|Serve|Spread|Divide|Garnish|Drizzle|Transfer|Cover|Remove|Drain|Rinse|Dip|Press|Spray|Warm|Assemble|Meanwhile|In a |To make |Using a |Once |When |While |After |For the [a-zA-Z\s]+,\s*(?:toss|mix|heat|cook|fry|stir|combine|bake|place|add|put|whisk|simmer))\b/i.test(trimmed);
+
+  if (!startsWithInstructionWord) return false;
+
+  // Must NOT look like a pure ingredient quantity specification e.g. "200g tempeh...", "2 tbsp cornflour..."
+  const isIngredientQuantity = /^\s*(?:\d+[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]?|[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|half\b|a\s+pinch\b|pinch\b|handful\b|small\s+handful\b|dash\b|drizzle\b|squeeze\b|sprinkle\b|few\b|several\b|one\b|two\b|three\b|four\b|five\b|six\b|seven\b|eight\b|nine\b|ten\b|\d+\s*x\b)\s+(?:g|kg|ml|l|tbsp|tsp|cup|cups|oz|lb|cloves?|cans?|tins?|bunches?|slices?|packs?|packets?|pots?|large|small|medium)\b/i.test(trimmed);
+  if (isIngredientQuantity) return false;
+
+  // Has sentence structure: length > 35, or contains sentence terminal punctuation (. or !), or has clause commas with >= 6 words
+  const hasSentenceStructure = trimmed.length > 35 || /[.!]/.test(trimmed) || (trimmed.includes(',') && trimmed.split(/\s+/).length >= 6);
+  return hasSentenceStructure;
+}
+
+/**
+ * Partitions raw recipe text into headerText, rawIngText, and rawMethodText.
+ * Gracefully handles missing Ingredients/Method headings by identifying ingredient
+ * quantity lines and sentence-structured cooking instruction steps.
+ * @param {string} block
+ * @returns {{ headerText: string, rawIngText: string, rawMethodText: string }}
+ */
+export function partitionRecipeBlock(block) {
+  if (!block || typeof block !== 'string') {
+    return { headerText: '', rawIngText: '', rawMethodText: '' };
+  }
+
+  const ingMatch = block.match(/(?:^|\n)\s*(?:#+\s*)?(?:main\s+)?ingredients?:?\s*/i);
+  const methodMatch = block.match(/(?:^|\n)\s*(?:#+\s*)?(?:Method\s+Instructions|Method|Instructions|Steps|Preparation):?\s*/i);
+
+  let headerText = '', rawIngText = '', rawMethodText = '';
+
+  if (ingMatch && methodMatch && methodMatch.index > ingMatch.index) {
+    headerText = block.slice(0, ingMatch.index);
+    rawIngText = block.slice(ingMatch.index + ingMatch[0].length, methodMatch.index);
+    rawMethodText = block.slice(methodMatch.index + methodMatch[0].length);
+  } else if (ingMatch && (!methodMatch || methodMatch.index < ingMatch.index)) {
+    headerText = block.slice(0, ingMatch.index);
+    const remainder = block.slice(ingMatch.index + ingMatch[0].length);
+    const lines = remainder.split('\n');
+    let methodIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (isMethodStepLine(lines[i])) {
+        methodIdx = i;
+        break;
+      }
+    }
+    if (methodIdx !== -1) {
+      rawIngText = lines.slice(0, methodIdx).join('\n');
+      rawMethodText = lines.slice(methodIdx).join('\n');
+    } else {
+      rawIngText = remainder;
+    }
+  } else if (!ingMatch && methodMatch) {
+    rawMethodText = block.slice(methodMatch.index + methodMatch[0].length);
+    const beforeMethod = block.slice(0, methodMatch.index);
+    const lines = beforeMethod.split('\n');
+    let ingIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      if (i === 0 && !/^[-•*▫️▪️]/.test(line)) continue;
+      if (isHeaderMetadataLine(line)) continue;
+      if (isIngredientOrSectionLine(line)) {
+        ingIdx = i;
+        break;
+      }
+    }
+    if (ingIdx !== -1) {
+      headerText = lines.slice(0, ingIdx).join('\n');
+      rawIngText = lines.slice(ingIdx).join('\n');
+    } else {
+      headerText = beforeMethod;
+    }
+  } else {
+    // Neither explicit header exists
+    const lines = block.split('\n');
+    let ingIdx = -1;
+    let methodIdx = -1;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      if (ingIdx === -1) {
+        if (i === 0 && !/^[-•*▫️▪️]/.test(line)) continue;
+        if (isHeaderMetadataLine(line)) continue;
+        if (isIngredientOrSectionLine(line)) {
+          ingIdx = i;
+        }
+      } else if (methodIdx === -1) {
+        if (isMethodStepLine(line)) {
+          methodIdx = i;
+          break;
+        }
+      }
+    }
+
+    if (ingIdx !== -1) {
+      headerText = lines.slice(0, ingIdx).join('\n');
+      if (methodIdx !== -1) {
+        rawIngText = lines.slice(ingIdx, methodIdx).join('\n');
+        rawMethodText = lines.slice(methodIdx).join('\n');
+      } else {
+        rawIngText = lines.slice(ingIdx).join('\n');
+      }
+    } else if (methodIdx !== -1) {
+      headerText = lines.slice(0, methodIdx).join('\n');
+      rawMethodText = lines.slice(methodIdx).join('\n');
+    } else {
+      headerText = block;
+    }
+  }
+
+  return { headerText, rawIngText, rawMethodText };
+}
+
+/**
  * Parses a single recipe text block into a complete recipe object.
  * @param {string} block
  * @param {Array} ingredientsBank
@@ -262,23 +439,7 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
   if (!block || typeof block !== 'string') return null;
   block = normalizeSocialCaptionText(block);
 
-  const ingMatch = block.match(/(?:^|\n)\s*(?:#+\s*)?(?:main\s+)?ingredients?:?\s*/i);
-  const methodMatch = block.match(/(?:^|\n)\s*(?:#+\s*)?(?:Method\s+Instructions|Method|Instructions|Steps|Preparation):?\s*/i);
-
-  let headerText = block, rawIngText = '', rawMethodText = '';
-
-  if (ingMatch) {
-    headerText = block.slice(0, ingMatch.index);
-    if (methodMatch && methodMatch.index > ingMatch.index) {
-      rawIngText = block.slice(ingMatch.index + ingMatch[0].length, methodMatch.index);
-      rawMethodText = block.slice(methodMatch.index + methodMatch[0].length);
-    } else {
-      rawIngText = block.slice(ingMatch.index + ingMatch[0].length);
-    }
-  } else if (methodMatch) {
-    headerText = block.slice(0, methodMatch.index);
-    rawMethodText = block.slice(methodMatch.index + methodMatch[0].length);
-  }
+  let { headerText, rawIngText, rawMethodText } = partitionRecipeBlock(block);
 
   // Prevent greedy method ingestion if boundary marker or secondary ingredients header exists
   if (rawMethodText) {
@@ -359,12 +520,24 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
   const rawSteps = unpackCollapsedSteps(rawMethodText);
   const methodSteps = rawSteps.map(s => s.replace(/^\d+[\.\)]\s*/, '').trim()).filter(Boolean);
 
+  const cleanTitle = toTitleCase(title);
+  let inferredMeal = 'Dinner';
+  if (/breakfast|oat|pancake|porridge|waffle|granola|scramble|cereal|brunch/i.test(cleanTitle)) {
+    inferredMeal = 'Breakfast';
+  } else if (/wrap|sandwich|salad|toast|lunch|soup|panini|bagel/i.test(cleanTitle)) {
+    inferredMeal = 'Lunch';
+  } else if (/snack|bite|bar|cookie|muffin|smoothie|shake|protein ball/i.test(cleanTitle)) {
+    inferredMeal = 'Snacking';
+  }
+
   return {
-    title: toTitleCase(title),
+    title: cleanTitle,
     servings,
     prepTime: { hours: Math.floor(prepMinutes / 60), minutes: prepMinutes % 60 },
     cookTime: { hours: Math.floor(cookMinutes / 60), minutes: cookMinutes % 60 },
-    mealSuitability: ['Dinner'],
+    mealSuitability: [inferredMeal],
+    types: [inferredMeal.toLowerCase()],
+    mealType: inferredMeal.toLowerCase(),
     ingredientSections,
     ingredients: ingredientSections.flatMap(s => s.ingredients),
     instructions: methodSteps,

@@ -419,6 +419,14 @@ export function syncStep2InputsToState(modalWrap) {
     wizardState.activeRecipe.serves = servVal;
   }
 
+  // Meal suitability / type tags
+  const mealTagCheckboxes = modalWrap.querySelectorAll?.('.wiz-step2-meal-tag');
+  if (mealTagCheckboxes && mealTagCheckboxes.length > 0) {
+    const selectedTags = Array.from(mealTagCheckboxes).filter(el => el.checked).map(el => el.value);
+    wizardState.activeRecipe.mealSuitability = selectedTags.length > 0 ? selectedTags : ['Dinner'];
+    wizardState.activeRecipe.types = wizardState.activeRecipe.mealSuitability.map(t => t.toLowerCase());
+  }
+
   // Method steps edits (preserve in-progress editing including newly added blank steps and deletion down to 0 steps)
   const stepElements = modalWrap.querySelectorAll?.('.wiz-step-input') || [];
   const stepInputs = Array.from(stepElements).map(input => input.value);
