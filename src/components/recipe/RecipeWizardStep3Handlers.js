@@ -7,6 +7,7 @@
 import { wizardState, syncStep3InputsToState, getSaveButtonLabel, hasDistinctEnhancedVariant, stashActiveVariantSnapshot, switchWizardVariant } from './RecipeWizardState.js';
 import { isIngredientUnlinked } from './RecipeWizardTaxonomySearch.js';
 import { saveRecipe } from '../../services/HouseholdRepository.js';
+import { findExistingRecipeByTitle } from '../../services/RecipeFirestoreRepository.js';
 import { getState, updateRecipeInStore, learnIngredientAlias } from '../../store/store.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
 import { calculateItemNutrition } from '../../services/NutritionService.js';
@@ -488,20 +489,35 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal = () => {}, sh
   wizardState.activeVariant = prevVarForOrig;
   const origScore = tempOrigRec.fitScore || baseOrig.fitScore || finalComputedScore || 0;
 
+  const cleanTitle = safeTitle.replace(/\s*\(enhanced\)\s*$/i, '');
+  const existingMatch = findExistingRecipeByTitle(
+    state.recipes || (typeof window !== 'undefined' && window.getState ? window.getState()?.recipes : []) || [],
+    cleanTitle,
+    rec.id || baseOrig.id
+  );
+
+  const finalId = rec.id || baseOrig.id || existingMatch?.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}`);
+  const finalCreatedAt = rec.createdAt || baseOrig.createdAt || existingMatch?.createdAt || new Date().toISOString();
+
+  const combinedSuitability = existingMatch && Array.isArray(existingMatch.mealSuitability)
+    ? Array.from(new Set([...existingMatch.mealSuitability, ...rec.mealSuitability]))
+    : rec.mealSuitability;
+  const combinedTypes = combinedSuitability.map(t => String(t).toLowerCase());
+
   recipeToSave = {
     ...baseOrig,
     ...rec,
-    id: rec.id || baseOrig.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}`),
-    name: safeTitle.replace(/\s*\(enhanced\)\s*$/i, ''),
-    title: safeTitle.replace(/\s*\(enhanced\)\s*$/i, ''),
+    id: finalId,
+    name: cleanTitle,
+    title: cleanTitle,
     servings: origServes,
     serves: origServes,
     prepTime: normalizedPrepTime,
     cookTime: normalizedCookTime,
     time: totalTimeMins,
-    mealSuitability: rec.mealSuitability,
-    types: rec.types,
-    mealType: rec.mealType,
+    mealSuitability: combinedSuitability,
+    types: combinedTypes,
+    mealType: combinedTypes[0] || 'dinner',
     sourceType,
     sourceUrl,
     sourceBook,
@@ -533,9 +549,14 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal = () => {}, sh
     },
     fitScore: origScore,
     _computedFitScore: origScore,
-    createdAt: rec.createdAt || baseOrig.createdAt || new Date().toISOString(),
+    createdAt: finalCreatedAt,
     updatedAt: new Date().toISOString()
   };
+
+  if (existingMatch && (existingMatch.isFavourite || existingMatch.isFavorite)) {
+    recipeToSave.isFavourite = true;
+    recipeToSave.isFavorite = true;
+  }
 
   const hasEnh = Boolean(wizardState.activeVariant === 'enhanced' || enhSnap || rec.enhanced || baseOrig.enhanced);
   if (hasEnh) {
@@ -546,6 +567,10 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal = () => {}, sh
     recipeToSave.enhanced = editedEnhancedPayload;
     recipeToSave.enhancedFitScore = editedEnhancedPayload.fitScore;
     recipeToSave._scoreEnhanced = editedEnhancedPayload.fitScore;
+  } else if (existingMatch && existingMatch.enhanced) {
+    recipeToSave.enhanced = existingMatch.enhanced;
+    recipeToSave.enhancedFitScore = existingMatch.enhancedFitScore;
+    recipeToSave._scoreEnhanced = existingMatch._scoreEnhanced;
   }
 
   try {

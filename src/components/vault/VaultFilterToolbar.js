@@ -47,7 +47,7 @@ export function renderVaultFilterToolbar({
             <option value="breakfast" ${selectedType === 'breakfast' ? 'selected' : ''}>Breakfast</option>
             <option value="lunch" ${selectedType === 'lunch' ? 'selected' : ''}>Lunch</option>
             <option value="dinner" ${selectedType === 'dinner' ? 'selected' : ''}>Dinner</option>
-            <option value="snack" ${selectedType === 'snack' ? 'selected' : ''}>Snack</option>
+            <option value="snacking" ${selectedType === 'snacking' || selectedType === 'snack' ? 'selected' : ''}>Snacking</option>
           </select>
         </div>
 

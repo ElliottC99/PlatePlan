@@ -27,6 +27,34 @@ function escapeAttr(str) {
   return escapeHtml(str).replace(/`/g, '&#96;');
 }
 
+export function getNormalizedRecipeTypes(recipe) {
+  const r = recipe?.recipe || recipe || {};
+  const typesSet = new Set();
+  const add = (t) => {
+    if (!t) return;
+    if (Array.isArray(t)) {
+      t.forEach(add);
+      return;
+    }
+    const rawStr = String(t || '').trim().toLowerCase();
+    if (!rawStr) return;
+    if (rawStr.includes(',')) {
+      rawStr.split(',').forEach(add);
+      return;
+    }
+    typesSet.add(rawStr);
+    if (rawStr === 'snack') typesSet.add('snacking');
+    if (rawStr === 'snacking') typesSet.add('snack');
+  };
+
+  add(r.types);
+  add(r.mealSuitability);
+  add(r.type);
+  add(r.mealType);
+
+  return typesSet.size > 0 ? Array.from(typesSet) : ['dinner'];
+}
+
 export function openRecipeActions(evt, recipeIdParam, variantParam = 'original') {
   let e = evt;
   let recipeId = recipeIdParam;
@@ -270,7 +298,7 @@ function closeAllRecipeActionMenus() {
 }
 
 export function renderVaultRecipeCard(r, options = {}) {
-  const types = r.types || [r.type || 'dinner'];
+  const types = getNormalizedRecipeTypes(r);
   const requestedMealType = options.mealType || 'all';
   const activeProfile = options.activeProfile || 'everyone';
   const whoKey = String(r.who || 'both').toLowerCase();
@@ -278,7 +306,14 @@ export function renderVaultRecipeCard(r, options = {}) {
   const showC = whoKey === 'both' || whoKey === 'chloe' || whoKey === 'c';
   const personLabel = whoKey === 'both' ? 'Shared' : (whoKey === 'elliott' || whoKey === 'e' ? 'Elliott' : 'Chloe');
 
-  const badges = types.map(t => `<span class="badge ${t === 'breakfast' ? 'badge-green' : t === 'lunch' ? 'badge-purple' : 'badge-coral'}">${escapeHtml(t.toUpperCase())}</span>`).join(' ');
+  const displayTypes = Array.from(new Set(types.map(t => (t === 'snack' ? 'snacking' : t))));
+  const badges = displayTypes.map(t => {
+    let cls = 'badge-coral';
+    if (t === 'breakfast') cls = 'badge-green';
+    else if (t === 'lunch') cls = 'badge-purple';
+    else if (t === 'snack' || t === 'snacking') cls = 'badge-amber';
+    return `<span class="badge ${cls}">${escapeHtml(t.toUpperCase())}</span>`;
+  }).join(' ');
 
   const origFav = typeof window.isRecipeVariantFavourite === 'function' ? window.isRecipeVariantFavourite(r.id, 'original') : (r.isFavourite || r.isFavorite);
   const enhFav = typeof window.isRecipeVariantFavourite === 'function' ? window.isRecipeVariantFavourite(r.id, 'enhanced') : false;
@@ -333,7 +368,8 @@ export function renderVaultRecipeCard(r, options = {}) {
   const enhancedActive = r.enhanced ? { ...r, ...r.enhanced, ingredients: r.enhanced.ingredients || r.ingredients } : null;
   const enhancedFit = enhancedActive ? buildFit(enhancedActive, true) : null;
   const enhancedChanges = r.enhanced?.changes ? `<div style="font-size:12px;color:var(--text2);margin-top:6px">${escapeHtml(r.enhanced.changes)}</div>` : '';
-  const expandableName = typeof window.renderExpandableText === 'function' ? window.renderExpandableText(r.name, `recipe-${r.id}`, 'recipe-card-name') : escapeHtml(r.name);
+  const recipeDisplayName = r.name || r.title || 'Untitled Recipe';
+  const expandableName = typeof window.renderExpandableText === 'function' ? window.renderExpandableText(recipeDisplayName, `recipe-${r.id}`, 'recipe-card-name') : escapeHtml(recipeDisplayName);
 
   return renderRecipeCardShell({
     recipe: r,

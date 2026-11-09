@@ -8,6 +8,8 @@ import { parseIngredientString, matchIngredientTaxonomy } from '../../services/R
 import { toTitleCase } from '../../utils/stringUtils.js';
 import { getState, updateState, reorderDraftRecipes } from '../../state/AppState.js';
 import { saveRecipe } from '../../services/HouseholdRepository.js';
+import { findExistingRecipeByTitle } from '../../services/RecipeFirestoreRepository.js';
+import { updateRecipeInStore } from '../../store/store.js';
 import { wizardState, stashActiveVariantSnapshot } from './RecipeWizardState.js';
 
 export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotice, loadNextRecipeFromQueue, closeRecipeWizard }) {
@@ -249,16 +251,28 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
         try {
           for (const rec of recipes) {
             const allIngredients = (rec.ingredientSections || []).flatMap(s => s.ingredients || []);
+            const safeTitle = toTitleCase(rec.title || 'Untitled Recipe');
+            const cleanTitle = safeTitle.replace(/\s*\(enhanced\)\s*$/i, '');
+            const existingMatch = findExistingRecipeByTitle(getState()?.recipes || [], cleanTitle);
+
+            const suitability = rec.mealSuitability && rec.mealSuitability.length ? rec.mealSuitability : ['Dinner'];
+            const combinedSuitability = existingMatch && Array.isArray(existingMatch.mealSuitability)
+              ? Array.from(new Set([...existingMatch.mealSuitability, ...suitability]))
+              : suitability;
+            const normTypes = combinedSuitability.map(t => String(t).toLowerCase());
+
             const recipeToSave = {
-              id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-              name: rec.title,
-              title: rec.title,
+              id: existingMatch?.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`),
+              name: cleanTitle,
+              title: cleanTitle,
               servings: rec.servings || 4,
               serves: rec.servings || 4,
               prepTime: rec.prepTime || { hours: 0, minutes: 15 },
               cookTime: rec.cookTime || { hours: 0, minutes: 30 },
               time: (rec.prepTime?.hours || 0) * 60 + (rec.prepTime?.minutes || 15) + (rec.cookTime?.hours || 0) * 60 + (rec.cookTime?.minutes || 30),
-              mealSuitability: rec.mealSuitability || ['Dinner'],
+              mealSuitability: combinedSuitability,
+              types: normTypes,
+              mealType: normTypes[0] || 'dinner',
               ingredientSections: rec.ingredientSections,
               ingredients: allIngredients.map(i => ({
                 name: i.name,
@@ -276,9 +290,19 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
               instructions: rec.instructions || rec.methodSteps || [],
               method: rec.instructions || rec.methodSteps || [],
               macros: rec.macros || { calories: 450, protein: 28, carbs: 40, fat: 16 },
-              createdAt: new Date().toISOString()
+              createdAt: existingMatch?.createdAt || new Date().toISOString()
             };
+            if (existingMatch?.enhanced) {
+              recipeToSave.enhanced = existingMatch.enhanced;
+              recipeToSave.enhancedFitScore = existingMatch.enhancedFitScore;
+              recipeToSave._scoreEnhanced = existingMatch._scoreEnhanced;
+            }
+            if (existingMatch?.isFavourite || existingMatch?.isFavorite) {
+              recipeToSave.isFavourite = true;
+              recipeToSave.isFavorite = true;
+            }
             await saveRecipe(recipeToSave);
+            updateRecipeInStore(recipeToSave);
           }
           wizardState.processingQueue = [];
           closeRecipeWizard();
