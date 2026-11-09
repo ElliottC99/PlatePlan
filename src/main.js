@@ -338,10 +338,14 @@ function setupSubscriptions() {
   subscribe('ingredients', (ings) => {
     if (typeof window !== 'undefined' && getState()) getState().ingredients = Array.isArray(ings) ? ings : [];
     renderIngredientBank(); renderDataQualityView();
+    if (typeof renderRecipeVault === 'function') renderRecipeVault();
+    if (getState().currentPlan && typeof renderPlanner === 'function') renderPlanner();
   });
   subscribe('products', (prods) => {
     if (typeof window !== 'undefined' && getState()) getState().products = Array.isArray(prods) ? prods : [];
     renderProductBank(); renderDataQualityView();
+    if (typeof renderRecipeVault === 'function') renderRecipeVault();
+    if (getState().currentPlan && typeof renderPlanner === 'function') renderPlanner();
   });
   subscribe('preferences', () => { renderSettingsView(); renderToday(); });
   subscribe('plan', () => { renderToday(); renderPlanner(); });

@@ -163,6 +163,9 @@ export function switchWizardVariant(targetVariant, modalWrap = null) {
     rec.serves = rec.servings;
     if (enhSource.macros) rec.macros = { ...enhSource.macros };
     if (enhSource.fitScore !== undefined) rec.fitScore = enhSource.fitScore;
+    if (enhSource.enhancedFitScore !== undefined || enhSource.fitScore !== undefined) {
+      rec.enhancedFitScore = enhSource.enhancedFitScore ?? enhSource.fitScore;
+    }
   } else {
     const origSnap = wizardState.variantSnapshots?.original || wizardState.baseOriginalRecipe;
     if (origSnap) {

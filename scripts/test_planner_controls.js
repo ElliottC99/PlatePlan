@@ -530,5 +530,79 @@ function checkPlanKept(plan, label) {
   console.log('PASS 11: Enhanced recipes are treated as distinct candidates with separate fit scores, summaries, and plan slots');
 }
 
+// 12. Pre-Generation Layout Grid: Duplicate Isolation and Title Apostrophe Safety
+{
+  const { isRecipeInSkeletonGrid, renderRecipeCandidateRows } = await import('../src/components/planner/PlannerGridRenderService.js');
+
+  const skeletonWithEnhancedOnly = {
+    '5_breakfast': {
+      status: 'pinned',
+      pinned: true,
+      recipeId: 'rec_cinnamon',
+      variant: 'enhanced',
+      elliott: { recipeId: 'rec_cinnamon', variant: 'enhanced', pinned: true },
+      chloe: { recipeId: 'rec_cinnamon', variant: 'enhanced', pinned: true }
+    }
+  };
+
+  // A. Variant isolation in isRecipeInSkeletonGrid
+  assert.equal(isRecipeInSkeletonGrid('rec_cinnamon', skeletonWithEnhancedOnly, 'original'), false, 'Original recipe must NOT be marked in plan when only enhanced is pinned');
+  assert.equal(isRecipeInSkeletonGrid('rec_cinnamon', skeletonWithEnhancedOnly, 'enhanced'), true, 'Enhanced recipe must be detected as in plan');
+
+  // B. Candidate rows rendering & duplicate badge isolation
+  const recipes = [
+    {
+      id: 'rec_cinnamon',
+      name: 'Cinnamon Roll Baked Oats',
+      type: 'breakfast',
+      types: ['breakfast'],
+      serves: 4,
+      macros: { calories: 446, protein: 26 },
+      enhanced: {
+        name: 'Cinnamon Roll Baked Oats (enhanced)',
+        serves: 4,
+        macros: { calories: 430, protein: 38 }
+      }
+    },
+    {
+      id: 'rec_mac_cheese',
+      name: "Roasted Pepper Mac 'n' Cheese with Paprika and Manchego",
+      type: 'dinner',
+      types: ['dinner'],
+      serves: 2,
+      macros: { calories: 650, protein: 30 }
+    }
+  ];
+
+  const candidateHtml = renderRecipeCandidateRows(recipes, {
+    dayIndex: 5,
+    mealType: 'breakfast',
+    person: 'both',
+    query: 'cinnamon',
+    skeletonGrid: skeletonWithEnhancedOnly
+  });
+
+  // Verify candidate HTML contains duplicate badge ONLY on enhanced
+  const [origPart, enhPart] = candidateHtml.split('Cinnamon Roll Baked Oats (enhanced)');
+  assert.ok(origPart.includes('Cinnamon Roll Baked Oats'), 'Original recipe candidate must render');
+  assert.equal(origPart.includes('Already in Plan'), false, 'Original recipe must NOT have Already in Plan badge');
+  assert.ok(enhPart.includes('Already in Plan'), 'Enhanced candidate MUST have Already in Plan badge');
+
+  // C. Recipe with apostrophes in title must render valid onclick without syntax errors
+  const macHtml = renderRecipeCandidateRows(recipes, {
+    dayIndex: 1,
+    mealType: 'dinner',
+    person: 'both',
+    query: 'mac',
+    skeletonGrid: {}
+  });
+
+  assert.ok(macHtml.includes("Roasted Pepper Mac &#39;n&#39; Cheese"), 'Recipe with apostrophe in title must be escaped');
+  assert.equal(macHtml.includes("Mac 'n' Cheese"), false, 'Inline onclick must NOT have unescaped raw single quote');
+  assert.ok(macHtml.includes("window.setSlotConfiguredStatus(1, 'dinner', 'pinned', 'rec_mac_cheese')"), 'Click handler must cleanly invoke setSlotConfiguredStatus without crashing');
+
+  console.log('PASS 12: Skeleton candidate rows cleanly isolate variant duplicates and safely escape recipe titles with apostrophes');
+}
+
 console.log('\nAll planner control checks passed.');
 process.exit(0);

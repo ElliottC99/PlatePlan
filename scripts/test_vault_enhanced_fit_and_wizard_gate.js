@@ -242,6 +242,20 @@ console.log('--- Running Vault Enhanced Fit & Wizard Step 2 Gating Tests ---');
   assert.strictEqual(recipeWithUncomputedEnh.enhanced.fitScore, enhFit.score, 'Card rendering must write enhanced.fitScore');
 
   console.log(`  ✓ Dynamically recovered enhanced macros (${enhExtracted.cal} kcal, ${enhExtracted.prot}g prot) and fit score (${enhFit.score}%)`);
+
+  // Recipe where enhanced.macros was cloned from original baseline (377 / 22)
+  const recipeWithClonedMacros = {
+    ...recipeWithUncomputedEnh,
+    enhanced: {
+      ...recipeWithUncomputedEnh.enhanced,
+      macros: { calories: 377, protein: 22 }
+    }
+  };
+  const clonedExtracted = extractRecipeMacros(recipeWithClonedMacros, 'enhanced');
+  assert.notStrictEqual(clonedExtracted.cal, 377, 'Cloned macros must be overridden by dynamic ingredients calculation');
+  assert.notStrictEqual(clonedExtracted.prot, 22, 'Cloned macros must be overridden by dynamic ingredients calculation');
+  assert.strictEqual(clonedExtracted.cal, 410, 'Dynamic calories should equal calculated ingredient sum (410)');
+  console.log('  ✓ Overrode cloned default macros with dynamic ingredients calculation');
 }
 
 console.log('All Vault Enhanced Fit & Wizard Step 2 Gating tests passed! ✅');

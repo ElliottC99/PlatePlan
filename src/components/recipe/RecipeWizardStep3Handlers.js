@@ -421,7 +421,14 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal = () => {}, sh
     wizardState.activeVariant = 'enhanced';
     const enhMacros = recalculateWizardMacros(tempEnhRec) || enhSourceObj.macros || finalMacros || { calories: 0, protein: 0, carbs: 0, fat: 0 };
     wizardState.activeVariant = prevVar;
-    const enhScore = tempEnhRec.enhancedFitScore || tempEnhRec.fitScore || finalComputedScore || 0;
+    let enhScore = tempEnhRec.enhancedFitScore || tempEnhRec.fitScore || 0;
+    if (typeof calcMealScore === 'function') {
+      const liveEnhFit = calcMealScore(tempEnhRec, targetMealType, { variant: 'enhanced' });
+      if (liveEnhFit && typeof liveEnhFit.score === 'number' && !liveEnhFit.isMissingMacros) {
+        enhScore = liveEnhFit.score;
+      }
+    }
+    if (!enhScore) enhScore = finalComputedScore || 0;
 
     return {
       ...(baseOrig.enhanced || {}),

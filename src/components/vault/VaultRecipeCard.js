@@ -347,7 +347,7 @@ export function renderVaultRecipeCard(r, options = {}) {
       c: c && c.recipeKcal ? `${Math.round(c.recipeKcal)}kcal, ${Math.round(c.recipeProtein)}g` : ''
     };
 
-    if (liveFitData && typeof liveFitData.score === 'number') {
+    if (liveFitData && typeof liveFitData.score === 'number' && !liveFitData.isMissingMacros) {
       if (!useEnhanced) {
         r.fitScore = liveFitData.score;
         r._computedFitScore = liveFitData.score;

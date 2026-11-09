@@ -147,15 +147,27 @@ export function extractRecipeMacros(recipe, variant = 'original') {
     let cal = (enh.cal !== null && enh.cal > 0) ? enh.cal : null;
     let prot = (enh.prot !== null && enh.prot > 0) ? enh.prot : null;
 
-    if (cal === null || prot === null) {
-      const enhIngs = (Array.isArray(r.enhanced.ingredientSections) && r.enhanced.ingredientSections.length > 0)
-        ? r.enhanced.ingredientSections.flatMap(s => s.ingredients || [])
-        : (Array.isArray(r.enhanced.ingredients) ? r.enhanced.ingredients : []);
+    // Detect if enhanced macros were cloned verbatim from base without recalculation
+    const isClonedFromBase = Boolean(
+      base.cal !== null && base.prot !== null &&
+      cal === base.cal && prot === base.prot
+    );
+
+    const enhIngs = (Array.isArray(r.enhanced.ingredientSections) && r.enhanced.ingredientSections.length > 0)
+      ? r.enhanced.ingredientSections.flatMap(s => s.ingredients || [])
+      : (Array.isArray(r.enhanced.ingredients) ? r.enhanced.ingredients : []);
+
+    if ((cal === null || prot === null || isClonedFromBase) && enhIngs.length > 0) {
       const enhServes = Number(r.enhanced.servings || r.enhanced.serves || serves) || serves;
       const dynamic = computeDynamicMacrosFromIngredients(enhIngs, enhServes);
-      if (dynamic) {
-        if (cal === null) cal = dynamic.cal;
-        if (prot === null) prot = dynamic.prot;
+      if (dynamic && dynamic.cal > 0 && dynamic.prot > 0) {
+        cal = dynamic.cal;
+        prot = dynamic.prot;
+        if (r.enhanced && typeof r.enhanced === 'object') {
+          if (!r.enhanced.macros) r.enhanced.macros = {};
+          r.enhanced.macros.calories = dynamic.cal;
+          r.enhanced.macros.protein = dynamic.prot;
+        }
       }
     }
 
