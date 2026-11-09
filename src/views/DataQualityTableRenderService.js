@@ -14,6 +14,8 @@ import { openMergeIngredientsModal } from '../components/data-quality/MergeIngre
 import { openRecipeAuditModal } from '../components/recipe/RecipeAuditModal.js';
 import { openUnlinkedSweeperModal, scanUnlinkedRecipeIngredients } from '../components/data-quality/UnlinkedSweeperUI.js';
 import { findDuplicateCategoryClusters } from '../components/pantry/CategoryMergeModalUI.js';
+import { findDuplicateRecipeClusters } from '../services/RecipeFirestoreRepository.js';
+import { openRecipeDeduplicationModal } from './RecipeVaultView.js';
 import { auditRecipeMappings } from '../utils/RecipeAuditService.js';
 import { performGlobalProductRelink, verifyZeroCalorieIngredient } from '../services/DataQualityService.js';
 import { showCustomDensityModal } from '../components/ui/DialogHelpers.js';
@@ -99,6 +101,10 @@ function initDataQualityEvents(container) {
     }
     if (action === 'open-recipe-audit') {
       openRecipeAuditModal();
+      return;
+    }
+    if (action === 'open-recipe-dedup') {
+      openRecipeDeduplicationModal();
       return;
     }
     if (action === 'open-category-merge') {
@@ -242,6 +248,16 @@ export function renderDataQualityView() {
     categoryClusterCount = 0;
   }
 
+  let recipeClusterCount = 0;
+  let recipeClusters = [];
+  try {
+    recipeClusters = findDuplicateRecipeClusters(state.recipes);
+    recipeClusterCount = recipeClusters.length;
+  } catch (e) {
+    recipeClusterCount = 0;
+    recipeClusters = [];
+  }
+
   container.innerHTML = `
     <div style="max-width:920px; margin:0 auto; padding:20px; box-sizing:border-box;">
       
@@ -283,6 +299,9 @@ export function renderDataQualityView() {
           <button type="button" class="btn sm" data-action-dq="open-category-merge" style="font-weight:600; background:#0284c7; color:#fff; ${categoryClusterCount === 0 ? 'opacity:0.55; cursor:default;' : ''}">
             📂 Category Deduplication (${categoryClusterCount}${categoryClusterCount === 0 ? ' ✓' : ''})
           </button>
+          <button type="button" class="btn sm" data-action-dq="open-recipe-dedup" style="font-weight:600; background:#6366f1; color:#fff; ${recipeClusterCount === 0 ? 'opacity:0.55; cursor:default;' : ''}">
+            🍲 Recipe Deduplication (${recipeClusterCount}${recipeClusterCount === 0 ? ' ✓' : ''})
+          </button>
           <button type="button" class="btn sm" data-action-dq="open-recipe-audit" style="font-weight:600; background:var(--primary,#4f46e5); color:#fff; ${recipeAuditCount === 0 ? 'opacity:0.55; cursor:default;' : ''}">
             📖 Recipe Mapping Audit (${recipeAuditCount}${recipeAuditCount === 0 ? ' ✓' : ''})
           </button>
@@ -292,6 +311,25 @@ export function renderDataQualityView() {
       <!-- Health Pillars Grid -->
       <div style="display:grid; grid-template-columns:1fr; gap:16px;">
         
+        <!-- 0. DUPLICATE RECIPES CARD -->
+        ${renderAuditCard('Duplicate Recipe Candidates', '🍲', recipeClusters.map(c => ({
+          title: c.title,
+          count: c.variants.length,
+          message: `${c.variants.length} recipes sharing normalized title "${c.title}"`
+        })), (item) => `
+          <div style="padding:12px 14px; background:var(--surface2); border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="min-width:0;">
+              <strong style="font-size:13.5px; color:var(--text);">"${escapeHtml(item.title)}"</strong>
+              <div style="font-size:12px; color:var(--text2,#78716c); margin-top:3px;">${escapeHtml(item.message)}</div>
+            </div>
+            <div style="display:flex; gap:6px; flex-shrink:0;">
+              <button type="button" class="btn sm primary dq-action-btn" 
+                data-action-dq="open-recipe-dedup"
+                style="background:#6366f1; color:#fff; font-weight:600;">Review &amp; Merge</button>
+            </div>
+          </div>
+        `)}
+
         <!-- 1. DUPLICATE INGREDIENTS CARD -->
         ${renderAuditCard('Duplicate Ingredient Candidates', '👥', audit.duplicates, (item) => `
           <div style="padding:12px 14px; background:var(--surface2); border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">

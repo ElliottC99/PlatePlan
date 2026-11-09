@@ -504,4 +504,206 @@ assert.equal(acronymRecipe[0].methodSteps.length, 2, 'Prose "makes 4 buns" insid
 assert.equal(acronymRecipe[0].methodSteps[1], 'Divide the mixture so it makes 4 buns.');
 console.log('✅ Passed: TikTok Cinnamon Roll Baked Oats parses cleanly into title, servings, 3 sections, and 6 steps');
 
+// --- Test 17: U1 Recipe Vault Visibility & Meal-Type Normalization (AE1) ---
+console.log('\n--- Test 17: Recipe Vault Visibility & Meal-Type Normalization ---');
+const { getNormalizedRecipeTypes, renderRecipeGrid } = await import('../src/views/RecipeVaultView.js');
+
+const snackingRecipe = {
+  id: 'rec_snack_1',
+  title: 'Snack Protein Balls',
+  mealSuitability: ['Snacking']
+};
+const normalizedSnackTypes = getNormalizedRecipeTypes(snackingRecipe);
+assert(normalizedSnackTypes.includes('snacking'), 'Must include "snacking"');
+assert(normalizedSnackTypes.includes('snack'), 'Must include "snack" for backwards compatibility');
+
+const emptyRecipe = { id: 'rec_empty_1', title: 'Bare Recipe' };
+assert.deepEqual(getNormalizedRecipeTypes(emptyRecipe), ['dinner'], 'Empty recipe types should default to dinner');
+
+// Test >50 recipes grid rendering without truncation
+const mockVaultList = {
+  innerHTML: '',
+  hasAttribute: () => false,
+  setAttribute: () => {},
+  addEventListener: () => {}
+};
+global.document.getElementById = (id) => {
+  if (id === 'vault-list') return mockVaultList;
+  if (id === 'filter-type') return { value: 'all' };
+  if (id === 'filter-who') return { value: 'all' };
+  if (id === 'vault-sort') return { value: 'fit-desc' };
+  return null;
+};
+
+const sixtyFiveRecipes = Array.from({ length: 65 }, (_, idx) => ({
+  id: `rec_${idx + 1}`,
+  name: `Recipe ${idx + 1}`,
+  mealSuitability: ['Dinner'],
+  macros: { calories: 500, protein: 30, carbs: 40, fat: 15 }
+}));
+
+renderRecipeGrid(sixtyFiveRecipes);
+const cardMatches = mockVaultList.innerHTML.match(/class="recipe-card[\s"]/g) || [];
+assert.equal(cardMatches.length, 65, `All 65 recipes must be rendered without truncation (got ${cardMatches.length})`);
+console.log('✅ Passed: All 65 recipes render in grid without 50-item cap, and snacking mealSuitability normalizes cleanly');
+
+// --- Test 18: U2 Recipe Deduplication Service, Clustering & Meal Plan Repointing (AE2) ---
+console.log('\n--- Test 18: Recipe Deduplication Service, Clustering & Meal Plan Repointing ---');
+const {
+  normalizeRecipeTitleKey,
+  scoreRecipeCompleteness,
+  findDuplicateRecipeClusters,
+  repointMealPlanRecipeIds,
+  mergeDuplicateRecipeCluster
+} = await import('../src/services/RecipeFirestoreRepository.js');
+
+assert.equal(normalizeRecipeTitleKey('Cinnamon Roll Baked Oats (Copy)'), 'cinnamon roll baked oats');
+assert.equal(normalizeRecipeTitleKey('  cinnamon-roll  baked  oats (enhanced)  '), 'cinnamon roll baked oats');
+assert.equal(normalizeRecipeTitleKey("Chef's Special Pizza!"), 'chefs special pizza');
+
+const mockRecipes = [
+  {
+    id: 'rec_orig',
+    name: 'Cinnamon Roll Baked Oats',
+    title: 'Cinnamon Roll Baked Oats',
+    mealSuitability: ['Breakfast'],
+    types: ['breakfast'],
+    ingredients: [
+      { name: 'Oats', ingredientId: 'ing_oats' },
+      { name: 'Milk', ingredientId: 'ing_milk' }
+    ],
+    updatedAt: '2026-11-01T10:00:00Z'
+  },
+  {
+    id: 'rec_dup_enhanced',
+    name: 'Cinnamon Roll Baked Oats (Copy)',
+    title: 'Cinnamon Roll Baked Oats (Copy)',
+    mealSuitability: ['Snacking'],
+    types: ['snacking'],
+    ingredients: [
+      { name: 'Oats', ingredientId: 'ing_oats' },
+      { name: 'Milk', ingredientId: 'ing_milk' },
+      { name: 'Cinnamon', ingredientId: 'ing_cinnamon' }
+    ],
+    enhanced: {
+      title: 'Cinnamon Roll Baked Oats (Enhanced)',
+      macros: { calories: 380, protein: 32 }
+    },
+    enhancedFitScore: 92,
+    isFavourite: true,
+    updatedAt: '2026-11-08T12:00:00Z'
+  },
+  {
+    id: 'rec_other',
+    name: 'Chicken Curry',
+    title: 'Chicken Curry'
+  }
+];
+
+const clusters = findDuplicateRecipeClusters(mockRecipes, ['rec_dup_enhanced_original']);
+assert.equal(clusters.length, 1, 'Should find exactly 1 duplicate cluster');
+assert.equal(clusters[0].variants.length, 2, 'Cluster should have 2 recipe variants');
+// The enhanced one with more ingredients should score higher and be pre-selected at index 0
+assert.equal(clusters[0].variants[0].id, 'rec_dup_enhanced', 'Richest recipe (with enhanced & favourite) must be first');
+
+// Test Meal Plan Slot Repointing
+const mockPlan = {
+  slots: {
+    Mon: {
+      breakfast: { recipeId: 'rec_dup_enhanced', isSkipped: false },
+      lunch: { recipeId: 'rec_other', isSkipped: false }
+    },
+    Tue: {
+      dinner: {
+        isSplit: true,
+        elliott: { recipeId: 'rec_dup_enhanced' },
+        chloe: { recipeId: 'rec_other' }
+      }
+    }
+  },
+  days: [
+    {
+      meals: [
+        { recipeId: 'rec_dup_enhanced', mealType: 'breakfast' }
+      ]
+    }
+  ]
+};
+const mockSkeleton = {
+  Mon: { breakfast: { recipeId: 'rec_dup_enhanced' } }
+};
+
+const repointed = repointMealPlanRecipeIds(mockPlan, mockSkeleton, { 'rec_dup_enhanced': 'rec_orig' });
+assert.equal(repointed.modified, true);
+assert.equal(repointed.plan.slots.Mon.breakfast.recipeId, 'rec_orig');
+assert.equal(repointed.plan.slots.Tue.dinner.elliott.recipeId, 'rec_orig');
+assert.equal(repointed.plan.days[0].meals[0].recipeId, 'rec_orig');
+assert.equal(repointed.skeletonGrid.Mon.breakfast.recipeId, 'rec_orig');
+
+// Test mergeDuplicateRecipeCluster execution, enhanced adoption, type union & favorite migration
+const mergeOptions = {
+  plan: mockPlan,
+  skeletonGrid: mockSkeleton,
+  state: {
+    preferences: {
+      favouriteVariantIds: ['rec_orig_original', 'rec_other_original']
+    }
+  }
+};
+const mergeResult = await mergeDuplicateRecipeCluster(clusters[0].variants, 'rec_dup_enhanced', mergeOptions);
+assert.equal(mergeResult.success, true, 'Merge operation must succeed');
+assert.equal(mergeResult.canonical.id, 'rec_dup_enhanced', 'Canonical recipe ID must match chosen target');
+assert.equal(mergeResult.deletedCount, 1, 'Exactly 1 duplicate must be marked for deletion');
+assert.deepEqual(mergeResult.deletedIds, ['rec_orig']);
+assert(mergeResult.canonical.enhanced && mergeResult.canonical.enhanced.title.includes('Enhanced'), 'Canonical must retain enhanced variant');
+assert(mergeResult.canonical.types.includes('breakfast') && mergeResult.canonical.types.includes('snacking'), 'Canonical must union meal types');
+assert(mergeOptions.state.preferences.favouriteVariantIds.includes('rec_dup_enhanced_original'), 'Favourite variant ID must be migrated from duplicate to canonical');
+
+console.log('✅ Passed: Title normalization, duplicate clustering with richness scoring, Meal Plan repointing, and mergeDuplicateRecipeCluster verified');
+
+// --- Test 19: U3 Duplicate-Title Consolidation on Recipe Save (AE3) ---
+console.log('\n--- Test 19: Duplicate-Title Consolidation on Recipe Wizard Save ---');
+const { setRecipes, getState } = await import('../src/store/store.js');
+
+const existingFajitas = {
+  id: 'rec_existing_fajitas',
+  name: 'Chicken Fajitas',
+  title: 'Chicken Fajitas',
+  createdAt: '2026-10-01T00:00:00Z',
+  isFavourite: true,
+  isFavorite: true,
+  mealSuitability: ['Dinner'],
+  types: ['dinner'],
+  enhanced: {
+    title: 'Chicken Fajitas (Enhanced)',
+    macros: { calories: 480, protein: 42 }
+  },
+  enhancedFitScore: 89,
+  _scoreEnhanced: 89
+};
+
+setRecipes([existingFajitas]);
+
+resetWizardState();
+wizardState.activeRecipe.title = 'chicken fajitas';
+wizardState.activeRecipe.mealSuitability = ['Snacking'];
+wizardState.activeRecipe.ingredientSections = [
+  { sectionTitle: 'Main Ingredients', ingredients: [{ name: 'Chicken Breast', qty: 300, unit: 'g', ingredientId: 'ing_chicken', productId: 'prod_chicken' }] }
+];
+wizardState.activeRecipe.methodSteps = ['Cook chicken in skillet.'];
+// No enhanced variant created in this wizard session
+wizardState.activeVariant = 'original';
+
+await onSaveRecipe(mockModalWrap, mockCallbacks);
+
+const storeRecipes = getState().recipes || [];
+assert.equal(storeRecipes.length, 1, 'Must not create duplicate recipe entry in store');
+const savedRecipeOutput = storeRecipes[0];
+assert.equal(savedRecipeOutput.id, 'rec_existing_fajitas', 'Must reuse existing recipe ID instead of generating a new one');
+assert.equal(savedRecipeOutput.createdAt, '2026-10-01T00:00:00Z', 'Must preserve original createdAt timestamp');
+assert.equal(savedRecipeOutput.isFavourite, true, 'Must preserve existing favourite status');
+assert(savedRecipeOutput.enhanced && savedRecipeOutput.enhanced.title.includes('Enhanced'), 'Must preserve existing enhanced variant');
+assert(savedRecipeOutput.mealSuitability.includes('Dinner') && savedRecipeOutput.mealSuitability.includes('Snacking'), 'Must union mealSuitability');
+console.log('✅ Passed: Saving duplicate recipe title reuses ID, preserves enhanced variant and favourites, and unions tags');
+
 console.log('\n=== ALL RECIPE WIZARD v3.28.3 TESTS PASSED SUCCESSFULLY ===');

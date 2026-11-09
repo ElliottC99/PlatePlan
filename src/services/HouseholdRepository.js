@@ -31,7 +31,13 @@ import {
   batchRecalibrateRecipesInDb, 
   batchUpdateRecipesInDb, 
   isDbAvailable, 
-  safeFirestoreGet 
+  safeFirestoreGet,
+  normalizeRecipeTitleKey,
+  scoreRecipeCompleteness,
+  findDuplicateRecipeClusters,
+  findExistingRecipeByTitle,
+  repointMealPlanRecipeIds,
+  mergeDuplicateRecipeCluster
 } from './RecipeFirestoreRepository.js';
 import { getRecipes, saveRecipe, deleteRecipe, deleteRecipeVariant } from './RecipeRepository.js';
 import { getIngredients, saveIngredient, deleteIngredient } from './PantryFirestoreRepository.js';
@@ -242,6 +248,12 @@ export {
   subscribePreferences,
   save,
   saveHouseholdState,
+  normalizeRecipeTitleKey,
+  scoreRecipeCompleteness,
+  findDuplicateRecipeClusters,
+  findExistingRecipeByTitle,
+  repointMealPlanRecipeIds,
+  mergeDuplicateRecipeCluster,
   HouseholdRepository
 };
 
