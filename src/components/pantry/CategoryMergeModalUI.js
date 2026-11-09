@@ -19,6 +19,12 @@ export function findDuplicateCategoryClusters(state = null) {
   const products = Array.isArray(st.products) ? st.products : [];
 
   const allNames = new Set(categories);
+  if (Array.isArray(st.categories)) {
+    st.categories.forEach(c => {
+      const name = typeof c === 'string' ? c : (c?.name || c?.categoryName || '');
+      if (name) allNames.add(name);
+    });
+  }
   ingredients.forEach(i => {
     if (i?.category) allNames.add(i.category);
     if (Array.isArray(i?.subtypes)) {
@@ -44,17 +50,17 @@ export function findDuplicateCategoryClusters(state = null) {
     const names = Array.from(namesSet);
     if (names.length > 1) {
       const variants = names.map(name => {
-        const norm = String(name).toLowerCase().trim();
-        const rootCount = ingredients.filter(i => String(i?.category || '').toLowerCase().trim() === norm).length;
+        const cleanName = String(name).trim();
+        const rootCount = ingredients.filter(i => String(i?.category || '').trim() === cleanName).length;
         let subCount = 0;
         ingredients.forEach(i => {
           if (Array.isArray(i?.subtypes)) {
-            subCount += i.subtypes.filter(s => String(s?.category || '').toLowerCase().trim() === norm).length;
+            subCount += i.subtypes.filter(s => String(s?.category || '').trim() === cleanName).length;
           }
         });
-        const prodCount = products.filter(p => String(p?.category || '').toLowerCase().trim() === norm).length;
+        const prodCount = products.filter(p => String(p?.category || '').trim() === cleanName).length;
         const total = rootCount + subCount + prodCount;
-        return { name, rootCount, subCount, prodCount, total };
+        return { name: cleanName, rootCount, subCount, prodCount, total };
       });
       // Sort variants by total items descending so the most-used is default canonical
       variants.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));

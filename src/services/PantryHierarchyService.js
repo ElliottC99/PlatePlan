@@ -24,10 +24,10 @@ export function enforceCategorySSOT(state = {}) {
   ingredients.forEach(ing => {
     const parentCat = ing.category || ing.cat;
     if (parentCat && Array.isArray(ing.subtypes)) {
+      const cleanParentCat = String(parentCat).trim();
+      const kebabCat = slugifyToKebab(cleanParentCat);
       ing.subtypes.forEach(st => {
-        const canonicalCat = toCanonicalCategoryName(parentCat);
-        const kebabCat = slugifyToKebab(canonicalCat);
-        st.category = canonicalCat;
+        st.category = cleanParentCat;
         st.cat = kebabCat;
       });
     }
@@ -49,7 +49,7 @@ export function enforceCategorySSOT(state = {}) {
     }
 
     if (parentCat) {
-      const targetCat = toCanonicalCategoryName(parentCat);
+      const targetCat = String(parentCat).trim();
       const targetKebab = slugifyToKebab(targetCat);
       p.category = targetCat;
       p.cat = targetKebab;

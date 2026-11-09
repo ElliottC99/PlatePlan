@@ -1,7 +1,46 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 
-// Setup browser DOM / store stubs
+// Setup browser DOM / store / Firestore stubs
+const firestoreStore = {
+  ingredients: new Map(),
+  products: new Map(),
+  settings: new Map()
+};
+
+function makeCollection(colName) {
+  const map = firestoreStore[colName] || new Map();
+  return {
+    doc(id = `doc_${Date.now()}`) {
+      const key = String(id);
+      return {
+        id: key,
+        async get() {
+          const val = map.get(key);
+          return { exists: val !== undefined, id: key, data: () => (val ? JSON.parse(JSON.stringify(val)) : undefined) };
+        },
+        async set(data, opts) {
+          const prev = (opts?.merge && map.get(key)) ? map.get(key) : {};
+          map.set(key, JSON.parse(JSON.stringify({ ...prev, ...data })));
+        },
+        async delete() {
+          map.delete(key);
+        },
+        collection(subCol) {
+          return makeCollection(subCol);
+        }
+      };
+    },
+    async get() {
+      const docs = Array.from(map.entries()).map(([id, val]) => ({
+        id,
+        data: () => JSON.parse(JSON.stringify(val))
+      }));
+      return { docs, empty: docs.length === 0 };
+    }
+  };
+}
+
 global.localStorage = { removeItem: () => {}, getItem: () => null, setItem: () => {} };
 global.CustomEvent = class CustomEvent {
   constructor(type, params) {
@@ -11,7 +50,15 @@ global.CustomEvent = class CustomEvent {
 };
 global.window = {
   localStorage: global.localStorage,
-  dispatchEvent: () => true
+  dispatchEvent: () => true,
+  firebase: {
+    apps: [{}],
+    initializeApp: () => {},
+    auth: () => ({ onAuthStateChanged: () => {}, currentUser: { uid: 'test-uid' } }),
+    firestore: () => ({
+      collection: (name) => makeCollection(name)
+    })
+  }
 };
 global.document = {
   body: { style: {} },
@@ -98,5 +145,61 @@ assert.equal(updatedProd1.category, 'Bakery', 'Product category must be cascaded
 // Re-scanning clusters must now return empty
 const afterClusters = findDuplicateCategoryClusters();
 assert.equal(afterClusters.length, 0, 'No duplicate clusters should remain after merge');
+
+// 4. Test Reload Persistence (Firestore round-trip + enforceCategorySSOT + Hydration normalization)
+console.log('Testing persistence across Firestore save and reload...');
+const { getRootItems } = await import('../src/services/RootItemRepository.js');
+const { getProducts } = await import('../src/services/ProductRepository.js');
+const { getCategories } = await import('../src/services/CategoryRepository.js');
+const { normalizeIngredientRecord, normalizeProductRecord } = await import('../src/services/HydrationService.js');
+
+// Seed raw Firestore documents (including a lowercase-conjunction category and a legacy `cat`-only record)
+firestoreStore.settings.set('categories', { categories: ['Grains, Nuts and Seeds', 'Store Cupboard'] });
+firestoreStore.ingredients.clear();
+firestoreStore.ingredients.set('ing-oats', {
+  name: 'Oats',
+  category: 'Grains, Nuts and Seeds',
+  subtypes: [{ id: 'sub-rolled', name: 'Rolled Oats', category: 'Grains, Nuts and Seeds' }]
+});
+firestoreStore.ingredients.set('ing-almonds', {
+  name: 'Almonds',
+  category: 'Grains, Nuts And Seeds',
+  subtypes: [{ id: 'sub-flaked', name: 'Flaked Almonds', category: 'Grains, Nuts And Seeds' }]
+});
+firestoreStore.ingredients.set('ing-salt', {
+  name: 'Sea Salt',
+  cat: 'store-cupboard',
+  subtypes: []
+});
+firestoreStore.products.clear();
+firestoreStore.products.set('prod-oats', {
+  name: 'Tesco Rolled Oats',
+  ingredientId: 'ing-oats',
+  subtypeId: 'sub-rolled',
+  category: 'Grains, Nuts And Seeds'
+});
+
+// Hydrate initial state from Firestore just as HydrationService does
+setCategories(await getCategories());
+setIngredients((await getRootItems()).map(normalizeIngredientRecord));
+setProducts((await getProducts()).map(normalizeProductRecord));
+
+const reloadClustersBefore = findDuplicateCategoryClusters();
+assert.equal(reloadClustersBefore.length, 2, 'Should detect both duplicate clusters before merge');
+
+await mergeCategory('Grains, Nuts And Seeds', 'Grains, Nuts and Seeds');
+await mergeCategory('store-cupboard', 'Store Cupboard');
+
+// Simulate full page reload from Firestore via getCategories, getRootItems, getProducts + normalizers
+setCategories(await getCategories());
+setIngredients((await getRootItems()).map(normalizeIngredientRecord));
+setProducts((await getProducts()).map(normalizeProductRecord));
+
+const reloadClustersAfter = findDuplicateCategoryClusters();
+assert.equal(
+  reloadClustersAfter.length,
+  0,
+  `Merged categories must not reappear after reload (found: ${JSON.stringify(reloadClustersAfter.map(c => c.variants.map(v => v.name)))})`
+);
 
 console.log('✅ Category Deduplication & Cascading Merge tests passed!');
