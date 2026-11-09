@@ -194,4 +194,54 @@ console.log('--- Running Vault Enhanced Fit & Wizard Step 2 Gating Tests ---');
   console.log('  ✓ syncStep2InputsToState normalizes "New Item" inputs reliably');
 }
 
+// 5. Test Enhanced Recipe Dynamic Macro Recovery & Fit Score Distinctness
+{
+  console.log('Testing Enhanced Recipe Dynamic Macro Recovery when enhanced.macros is missing...');
+  const { calculateMealFitScore } = await import('../src/utils/fitScoreCalculator.js');
+  const { extractRecipeMacros } = await import('../src/utils/macroScoringUtils.js');
+  const { renderVaultRecipeCard } = await import('../src/components/vault/VaultRecipeCard.js');
+
+  // Recipe where original has 377 kcal & 22g protein (41% on breakfast)
+  // Enhanced has adjusted ingredients (adds 60g protein powder) but NO pre-saved macros on enhanced
+  const recipeWithUncomputedEnh = {
+    id: 'rec_cinnamon_baked_oats',
+    name: 'Cinnamon Roll Baked Oats',
+    title: 'Cinnamon Roll Baked Oats',
+    types: ['breakfast'],
+    serves: 4,
+    servings: 4,
+    macros: { calories: 377, protein: 22 },
+    fitScore: 41,
+    enhanced: {
+      name: 'Cinnamon Roll Baked Oats (enhanced)',
+      title: 'Cinnamon Roll Baked Oats (enhanced)',
+      serves: 4,
+      servings: 4,
+      changes: 'Nutritionally optimized for household macro targets.',
+      ingredients: [
+        { name: 'Rolled Oats', qty: 500, unit: 'g', productId: 'prod_tofu' },
+        { name: 'Beef Burgers', qty: 4, unit: 'qty', productId: 'prod_beef' }
+      ]
+    }
+  };
+
+  // Macro extraction for enhanced variant MUST NOT fallback to original baseline macros (377 / 22)
+  const enhExtracted = extractRecipeMacros(recipeWithUncomputedEnh, 'enhanced');
+  assert.notStrictEqual(enhExtracted.cal, 377, 'Enhanced calories should not fall back to original (377)');
+  assert.notStrictEqual(enhExtracted.prot, 22, 'Enhanced protein should not fall back to original (22)');
+  assert.ok(enhExtracted.cal > 0, 'Enhanced calories should be dynamically computed from ingredients');
+
+  // Fit score for enhanced must evaluate dynamically and not collapse to original 41%
+  const enhFit = calculateMealFitScore(recipeWithUncomputedEnh, 'breakfast', { variant: 'enhanced', portionScaled: true });
+  assert.notStrictEqual(enhFit.score, 41, 'Enhanced fit score should not collapse to original 41%');
+  assert.ok(enhFit.score >= 70, `Enhanced fit score should be high match, got ${enhFit.score}%`);
+
+  // Rendering Vault card should calculate distinct portions and cache enhanced fit score
+  renderVaultRecipeCard(recipeWithUncomputedEnh, { mealType: 'all', activeProfile: 'everyone' });
+  assert.strictEqual(recipeWithUncomputedEnh.enhancedFitScore, enhFit.score, 'Card rendering must write enhancedFitScore');
+  assert.strictEqual(recipeWithUncomputedEnh.enhanced.fitScore, enhFit.score, 'Card rendering must write enhanced.fitScore');
+
+  console.log(`  ✓ Dynamically recovered enhanced macros (${enhExtracted.cal} kcal, ${enhExtracted.prot}g prot) and fit score (${enhFit.score}%)`);
+}
+
 console.log('All Vault Enhanced Fit & Wizard Step 2 Gating tests passed! ✅');

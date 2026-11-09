@@ -347,9 +347,17 @@ export function renderVaultRecipeCard(r, options = {}) {
       c: c && c.recipeKcal ? `${Math.round(c.recipeKcal)}kcal, ${Math.round(c.recipeProtein)}g` : ''
     };
 
-    if (liveFitData && typeof liveFitData.score === 'number' && !useEnhanced) {
-      r.fitScore = liveFitData.score;
-      r._computedFitScore = liveFitData.score;
+    if (liveFitData && typeof liveFitData.score === 'number') {
+      if (!useEnhanced) {
+        r.fitScore = liveFitData.score;
+        r._computedFitScore = liveFitData.score;
+      } else {
+        r.enhancedFitScore = liveFitData.score;
+        if (r.enhanced && typeof r.enhanced === 'object') {
+          r.enhanced.fitScore = liveFitData.score;
+          r.enhanced._computedFitScore = liveFitData.score;
+        }
+      }
     }
 
     const fitTagHtml = renderFitScoreBadge(_active, resolvedMealType, {

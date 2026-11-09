@@ -5,6 +5,56 @@
 
 import { getState } from '../store/coreState.js';
 import { resolveFitScoreParams } from './fitScoreWeights.js';
+import { calculateItemNutrition } from '../services/NutritionService.js';
+
+export function findProductForIngredient(item, products = []) {
+  if (!item || !Array.isArray(products) || !products.length) return null;
+  const directId = item.productId || item.bankId || item.mappedItemId || item.productMatch?.id;
+  if (directId) {
+    const p = products.find(prod => String(prod.id) === String(directId));
+    if (p) return p;
+  }
+  const name = String(item.productName || item.name || '').toLowerCase().trim();
+  if (!name) return null;
+  return products.find(p => String(p.name || '').toLowerCase().trim() === name) || null;
+}
+
+export function computeDynamicMacrosFromIngredients(ingredients, serves = 1) {
+  if (!Array.isArray(ingredients) || ingredients.length === 0) return null;
+  const state = typeof window !== 'undefined' && typeof window.getState === 'function'
+    ? window.getState()
+    : (typeof getState === 'function' ? getState() : {});
+  const products = (Array.isArray(state?.products) && state.products.length > 0)
+    ? state.products
+    : (Array.isArray(globalThis?.window?.Store?.getState?.()?.products)
+        ? globalThis.window.Store.getState().products
+        : (Array.isArray(state?.products) ? state.products : []));
+  if (!products.length) return null;
+
+  let totalCal = 0;
+  let totalProt = 0;
+  let matchedCount = 0;
+
+  ingredients.forEach(item => {
+    if (!item || item.excludeNutrition) return;
+    const prod = findProductForIngredient(item, products);
+    if (prod) {
+      matchedCount++;
+      const qty = Number(item.qty ?? item.amount ?? 1) || 1;
+      const unit = item.unit || 'g';
+      const nut = calculateItemNutrition(prod, qty, unit);
+      totalCal += (nut.kcal ?? nut.cal ?? 0);
+      totalProt += (nut.protein ?? nut.prot ?? 0);
+    }
+  });
+
+  if (matchedCount === 0 || (totalCal === 0 && totalProt === 0)) return null;
+  const s = Math.max(1, Number(serves) || 1);
+  return {
+    cal: Math.round(totalCal / s),
+    prot: Math.round((totalProt / s) * 10) / 10
+  };
+}
 
 export function getActiveFitScoreParams(customParams = null) {
   const state = typeof getState === 'function' ? getState() : {};
@@ -94,13 +144,37 @@ export function extractRecipeMacros(recipe, variant = 'original') {
   if (variant === 'enhanced' && r.enhanced && typeof r.enhanced === 'object') {
     const enh = extractFromNode(r.enhanced);
     const base = extractFromNode(r);
-    const cal = (enh.cal !== null && enh.cal > 0) ? enh.cal : base.cal;
-    const prot = (enh.prot !== null && enh.prot > 0) ? enh.prot : base.prot;
+    let cal = (enh.cal !== null && enh.cal > 0) ? enh.cal : null;
+    let prot = (enh.prot !== null && enh.prot > 0) ? enh.prot : null;
+
+    if (cal === null || prot === null) {
+      const enhIngs = (Array.isArray(r.enhanced.ingredientSections) && r.enhanced.ingredientSections.length > 0)
+        ? r.enhanced.ingredientSections.flatMap(s => s.ingredients || [])
+        : (Array.isArray(r.enhanced.ingredients) ? r.enhanced.ingredients : []);
+      const enhServes = Number(r.enhanced.servings || r.enhanced.serves || serves) || serves;
+      const dynamic = computeDynamicMacrosFromIngredients(enhIngs, enhServes);
+      if (dynamic) {
+        if (cal === null) cal = dynamic.cal;
+        if (prot === null) prot = dynamic.prot;
+      }
+    }
+
+    cal = (cal !== null && cal > 0) ? cal : base.cal;
+    prot = (prot !== null && prot > 0) ? prot : base.prot;
     return { cal, prot, calories: cal, protein: prot };
   }
 
   const base = extractFromNode(r);
-  return { cal: base.cal, prot: base.prot, calories: base.cal, protein: base.prot };
+  let cal = base.cal;
+  let prot = base.prot;
+  if ((cal === null || cal <= 0 || prot === null || prot <= 0) && Array.isArray(r.ingredients) && r.ingredients.length > 0) {
+    const dynamic = computeDynamicMacrosFromIngredients(r.ingredients, serves);
+    if (dynamic) {
+      if (cal === null || cal <= 0) cal = dynamic.cal;
+      if (prot === null || prot <= 0) prot = dynamic.prot;
+    }
+  }
+  return { cal, prot, calories: cal, protein: prot };
 }
 
 /**
