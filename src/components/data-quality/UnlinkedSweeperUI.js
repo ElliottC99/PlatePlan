@@ -36,16 +36,23 @@ export function scanUnlinkedRecipeIngredients() {
 
     const check = (item, sIdx, iIdx) => {
       if (!item) return;
-      const linked = Boolean(item.productId || item.bankId || item.pantryItemId || item.ingredientId || item.subtypeId || item.targetId);
-      if (!linked) {
-        const raw = typeof item === 'string' ? item : (item.raw || item.name || item.ingredient || item.ingredientName || '');
-        const key = normaliseIngredientString(raw).toLowerCase();
-        if (!key) return;
-        if (!groups.has(key)) groups.set(key, { normalisedKey: key, displayName: cleanDisplayPhrase(raw) || key, count: 0, occurrences: [] });
-        const g = groups.get(key);
-        g.count++;
-        g.occurrences.push({ recipeId: recipe.id, recipeName: rName, sectionIdx: sIdx, itemIdx: iIdx });
+      if (typeof item === 'object') {
+        const isNew = item.isNewTaxonomyItem || item.ingredientId === 'new_item' || /new[\s_]*item/i.test(item.ingredientId || '');
+        if (!isNew) {
+          if (item.isCategoryDefault && item.categoryId) return;
+          if (item.categoryId && item.categoryId !== 'Store Cupboard' && item.categoryId !== 'General') return;
+          if (item.subtypeId) return;
+          if (item.ingredientId && item.ingredientId !== 'new_item' && !/new[\s_]*item/i.test(item.ingredientId)) return;
+          if (item.productId || item.bankId || item.pantryItemId || item.targetId) return;
+        }
       }
+      const raw = typeof item === 'string' ? item : (item.raw || item.name || item.ingredient || item.ingredientName || '');
+      const key = normaliseIngredientString(raw).toLowerCase();
+      if (!key) return;
+      if (!groups.has(key)) groups.set(key, { normalisedKey: key, displayName: cleanDisplayPhrase(raw) || key, count: 0, occurrences: [] });
+      const g = groups.get(key);
+      g.count++;
+      g.occurrences.push({ recipeId: recipe.id, recipeName: rName, sectionIdx: sIdx, itemIdx: iIdx });
     };
 
     if (Array.isArray(recipe.ingredientSections) && recipe.ingredientSections.length) {

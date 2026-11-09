@@ -6,7 +6,7 @@
  */
 
 import { db, HOUSEHOLD_ID } from '../config/firebase.js';
-import { getState as getStoreState, setIngredients, setProducts, setCategories } from '../store/store.js';
+import { getState as getStoreState, setIngredients, setProducts, setCategories, saveStateCache } from '../store/store.js';
 import { isDbAvailable } from './RecipeFirestoreRepository.js';
 import { getRootItems, saveRootItem } from './PantryTaxonomyService.js';
 import { getProducts, saveProduct } from './ProductRepository.js';
@@ -15,38 +15,75 @@ const strictNorm = (str) => String(str || '').toLowerCase().trim();
 const slugifyToKebab = (str) => (str || '').toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^a-z0-9\-]/g, '');
 const slugCategory = (str) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-function cascadeReassignment(ingList = [], prodList = [], sourceNorm, cleanTargetCat, targetKebab) {
-  const updatedIngs = Array.isArray(ingList) ? ingList.map(i => ({ ...i, subtypes: Array.isArray(i.subtypes) ? [...i.subtypes] : [] })) : [];
+function resolveRawCategory(record) {
+  if (!record || typeof record !== 'object') return '';
+  return String(record.category ?? record.category_id ?? record.categoryName ?? record.cat ?? '').trim();
+}
+
+function matchesSourceCategory(rawCat, sourceNorm, sourceSlug) {
+  if (!rawCat) return false;
+  if (strictNorm(rawCat) === sourceNorm) return true;
+  if (sourceSlug && slugCategory(rawCat) === sourceSlug) return true;
+  return false;
+}
+
+function cascadeReassignment(ingList = [], prodList = [], sourceNorm, cleanTargetCat, targetKebab, sourceSlug = slugCategory(sourceNorm)) {
+  const updatedIngs = Array.isArray(ingList) ? ingList.map(i => ({ ...i, subtypes: Array.isArray(i.subtypes) ? i.subtypes.map(st => ({ ...st })) : [] })) : [];
   const updatedProds = Array.isArray(prodList) ? prodList.map(p => ({ ...p })) : [];
   const changedIngIds = new Set(), changedSubtypeIds = new Set(), changedProdIds = new Set();
 
   updatedIngs.forEach(ing => {
-    if (strictNorm(ing.category) === sourceNorm) {
-      ing.category = cleanTargetCat; ing.cat = targetKebab; ing.updatedAt = new Date().toISOString();
-      changedIngIds.add(String(ing.id));
+    const ingRawCat = resolveRawCategory(ing);
+    if (matchesSourceCategory(ingRawCat, sourceNorm, sourceSlug)) {
+      if (ing.category !== cleanTargetCat || ing.cat !== targetKebab || ing.category_id !== undefined || ing.categoryName !== undefined) {
+        ing.category = cleanTargetCat;
+        ing.cat = targetKebab;
+        if (ing.category_id !== undefined) ing.category_id = cleanTargetCat;
+        if (ing.categoryName !== undefined) ing.categoryName = cleanTargetCat;
+        ing.updatedAt = new Date().toISOString();
+        changedIngIds.add(String(ing.id));
+      }
       if (Array.isArray(ing.subtypes)) {
         ing.subtypes.forEach(st => {
-          st.category = cleanTargetCat; st.cat = targetKebab;
-          if (st.id) changedSubtypeIds.add(String(st.id));
+          if (st.category !== cleanTargetCat || st.cat !== targetKebab) {
+            st.category = cleanTargetCat;
+            st.cat = targetKebab;
+            if (st.categoryName !== undefined) st.categoryName = cleanTargetCat;
+            if (st.id) changedSubtypeIds.add(String(st.id));
+            changedIngIds.add(String(ing.id));
+          }
         });
       }
       updatedProds.forEach(prod => {
         if (String(prod.ingredientId || prod.groupId || '') === String(ing.id)) {
-          prod.category = cleanTargetCat; prod.cat = targetKebab; prod.updatedAt = new Date().toISOString();
-          changedProdIds.add(String(prod.id));
+          if (prod.category !== cleanTargetCat || prod.cat !== targetKebab) {
+            prod.category = cleanTargetCat;
+            prod.cat = targetKebab;
+            prod.updatedAt = new Date().toISOString();
+            changedProdIds.add(String(prod.id));
+          }
         }
       });
     }
     if (Array.isArray(ing.subtypes)) {
       ing.subtypes.forEach(st => {
-        if (strictNorm(st.category) === sourceNorm) {
-          st.category = cleanTargetCat; st.cat = targetKebab;
-          if (st.id) changedSubtypeIds.add(String(st.id));
-          changedIngIds.add(String(ing.id));
+        const stRawCat = resolveRawCategory(st);
+        if (matchesSourceCategory(stRawCat, sourceNorm, sourceSlug)) {
+          if (st.category !== cleanTargetCat || st.cat !== targetKebab) {
+            st.category = cleanTargetCat;
+            st.cat = targetKebab;
+            if (st.categoryName !== undefined) st.categoryName = cleanTargetCat;
+            if (st.id) changedSubtypeIds.add(String(st.id));
+            changedIngIds.add(String(ing.id));
+          }
           updatedProds.forEach(prod => {
             if (String(prod.subtypeId || '') === String(st.id)) {
-              prod.category = cleanTargetCat; prod.cat = targetKebab; prod.updatedAt = new Date().toISOString();
-              changedProdIds.add(String(prod.id));
+              if (prod.category !== cleanTargetCat || prod.cat !== targetKebab) {
+                prod.category = cleanTargetCat;
+                prod.cat = targetKebab;
+                prod.updatedAt = new Date().toISOString();
+                changedProdIds.add(String(prod.id));
+              }
             }
           });
         }
@@ -55,9 +92,16 @@ function cascadeReassignment(ingList = [], prodList = [], sourceNorm, cleanTarge
   });
 
   updatedProds.forEach(prod => {
-    if (strictNorm(prod.category) === sourceNorm) {
-      prod.category = cleanTargetCat; prod.cat = targetKebab; prod.updatedAt = new Date().toISOString();
-      changedProdIds.add(String(prod.id));
+    const prodRawCat = resolveRawCategory(prod);
+    if (matchesSourceCategory(prodRawCat, sourceNorm, sourceSlug)) {
+      if (prod.category !== cleanTargetCat || prod.cat !== targetKebab || prod.category_id !== undefined || prod.categoryName !== undefined) {
+        prod.category = cleanTargetCat;
+        prod.cat = targetKebab;
+        if (prod.category_id !== undefined) prod.category_id = cleanTargetCat;
+        if (prod.categoryName !== undefined) prod.categoryName = cleanTargetCat;
+        prod.updatedAt = new Date().toISOString();
+        changedProdIds.add(String(prod.id));
+      }
     }
   });
 
@@ -68,14 +112,22 @@ export async function mergeCategory(sourceCat, targetCat) {
   if (!sourceCat || !targetCat) return { success: false, error: 'Missing source or target' };
 
   const sourceNorm = strictNorm(sourceCat);
+  const sourceSlug = slugCategory(sourceCat);
   const targetNorm = strictNorm(targetCat);
+  const targetSlug = slugCategory(targetCat);
   const cleanTargetCat = String(targetCat).trim();
   const targetKebab = slugifyToKebab(cleanTargetCat);
 
   const state = getStoreState() || {};
   const currentCats = Array.isArray(state.categories) ? [...state.categories] : [];
-  const filteredCats = currentCats.filter(c => strictNorm(typeof c === 'string' ? c : c.name) !== sourceNorm);
-  if (!filteredCats.some(c => strictNorm(typeof c === 'string' ? c : c.name) === targetNorm)) {
+  const filteredCats = currentCats.filter(c => {
+    const name = typeof c === 'string' ? c : c?.name;
+    return !matchesSourceCategory(name, sourceNorm, sourceSlug);
+  });
+  if (!filteredCats.some(c => {
+    const name = typeof c === 'string' ? c : c?.name;
+    return strictNorm(name) === targetNorm || (targetSlug && slugCategory(name) === targetSlug);
+  })) {
     filteredCats.push(cleanTargetCat);
   }
   const updatedCats = filteredCats.sort((a, b) => {
@@ -83,11 +135,12 @@ export async function mergeCategory(sourceCat, targetCat) {
     return nameA.localeCompare(nameB);
   });
 
-  const { updatedIngs: localCascadeIngs, updatedProds: localCascadeProds } = cascadeReassignment(state.ingredients || [], state.products || [], sourceNorm, cleanTargetCat, targetKebab);
+  const { updatedIngs: localCascadeIngs, updatedProds: localCascadeProds } = cascadeReassignment(state.ingredients || [], state.products || [], sourceNorm, cleanTargetCat, targetKebab, sourceSlug);
 
   setCategories(updatedCats);
   setIngredients(localCascadeIngs);
   setProducts(localCascadeProds);
+  if (typeof saveStateCache === 'function') saveStateCache(getStoreState());
 
   if (!isDbAvailable()) return { success: true };
 
@@ -97,7 +150,7 @@ export async function mergeCategory(sourceCat, targetCat) {
 
     const [dbIngs, dbProds, catsSnap] = await Promise.all([getRootItems(), getProducts(), catsDocRef.get()]);
 
-    const { updatedIngs: dbCascadeIngs, updatedProds: dbCascadeProds, changedIngIds, changedProdIds } = cascadeReassignment(dbIngs, dbProds, sourceNorm, cleanTargetCat, targetKebab);
+    const { updatedIngs: dbCascadeIngs, updatedProds: dbCascadeProds, changedIngIds, changedProdIds } = cascadeReassignment(dbIngs, dbProds, sourceNorm, cleanTargetCat, targetKebab, sourceSlug);
 
     const ingSavePromises = dbCascadeIngs
       .filter(ing => changedIngIds.has(String(ing.id)))
@@ -111,8 +164,14 @@ export async function mergeCategory(sourceCat, targetCat) {
 
     if (catsSnap.exists) {
       const snapCats = catsSnap.data()?.categories || [];
-      const updatedSnapCats = snapCats.filter(c => strictNorm(typeof c === 'string' ? c : c.name) !== sourceNorm);
-      if (!updatedSnapCats.some(c => strictNorm(typeof c === 'string' ? c : c.name) === targetNorm)) {
+      const updatedSnapCats = snapCats.filter(c => {
+        const name = typeof c === 'string' ? c : c?.name;
+        return !matchesSourceCategory(name, sourceNorm, sourceSlug);
+      });
+      if (!updatedSnapCats.some(c => {
+        const name = typeof c === 'string' ? c : c?.name;
+        return strictNorm(name) === targetNorm || (targetSlug && slugCategory(name) === targetSlug);
+      })) {
         updatedSnapCats.push(cleanTargetCat);
       }
       updatedSnapCats.sort((a, b) => (typeof a === 'string' ? a : a.name).localeCompare(typeof b === 'string' ? b : b.name));

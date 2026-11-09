@@ -13,6 +13,7 @@ import { promptReallocateProduct as openReallocateModal } from '../components/pa
 import { showCustomAlert, showCustomConfirm } from '../components/ui/DialogHelpers.js';
 import { escapeHtml, escapeAttr } from '../utils/stringUtils.js';
 import { parseTescoProduct, cleanProductName, toTitleCase } from '../services/TescoImportService.js';
+import { createTaxonomySearchInput } from '../components/pantry/RecipeSearchDropdownHelper.js';
 
 import { 
   renderProductBankBase, 
@@ -50,6 +51,73 @@ export function cancelManualIng() {
   }
 }
 
+function renderLinkageContainer(prod, binding = {}) {
+  const container = document.getElementById('mi-linkage-container');
+  if (!container) return;
+  const state = getState() || {};
+  const ingredients = state.ingredients || [];
+
+  const subId = prod?.subtypeId || binding?.subtypeId;
+  const ingId = prod?.ingredientId || binding?.ingredientId;
+
+  let parentRoot = null;
+  let parentSub = null;
+
+  if (subId || ingId) {
+    parentRoot = ingredients.find(i => (i.subtypes || []).some(s => String(s.id) === String(subId)) || String(i.id) === String(ingId));
+    parentSub = parentRoot?.subtypes?.find(s => String(s.id) === String(subId));
+  }
+
+  if (parentSub && parentRoot) {
+    container.innerHTML = `
+      <div style="background:var(--surface2, #f8fafc); border:1px solid var(--border, #e2e8f0); border-radius:8px; padding:8px 12px; display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <div style="font-size:12px; font-weight:600; color:var(--text,#1e293b); display:flex; align-items:center; gap:6px;">
+          <span>📂 ${escapeHtml(parentRoot.category || 'General')}</span>
+          <span style="color:var(--text2,#94a3b8);">›</span>
+          <span>📦 ${escapeHtml(parentRoot.name)}</span>
+          <span style="color:var(--text2,#94a3b8);">›</span>
+          <span style="color:#059669; font-weight:700;">🏷️ ${escapeHtml(parentSub.name)}</span>
+        </div>
+        ${!activeEditingProductId ? `<button type="button" class="btn xs ghost" id="mi-change-subtype-btn" style="font-size:11px; padding:2px 8px; font-weight:650;">Change</button>` : ''}
+      </div>
+    `;
+    const changeBtn = container.querySelector('#mi-change-subtype-btn');
+    if (changeBtn) {
+      changeBtn.onclick = () => {
+        if (window.__prefilledResolveBinding) {
+          window.__prefilledResolveBinding.subtypeId = null;
+          window.__prefilledResolveBinding.ingredientId = null;
+        }
+        renderLinkageContainer(null, window.__prefilledResolveBinding);
+      };
+    }
+  } else {
+    container.innerHTML = `
+      <div style="background:var(--surface2, #f8fafc); border:1px solid var(--border, #e2e8f0); border-radius:8px; padding:10px 12px; margin-bottom:8px;">
+        <label style="display:block; font-size:11.5px; font-weight:700; margin-bottom:4px; color:var(--text,#1c1917);">Pantry Sub-Type Linkage <span style="color:#ef4444;">*</span></label>
+        <div id="mi-tax-search-mount"></div>
+        <div style="font-size:11px; color:var(--text2,#78716c); margin-top:4px;">Products must belong to a Sub-Type. Category and Root Item are derived automatically.</div>
+      </div>
+    `;
+    const mount = container.querySelector('#mi-tax-search-mount');
+    if (mount) {
+      createTaxonomySearchInput({
+        container: mount,
+        rootItems: ingredients,
+        subtypesOnly: true,
+        placeholder: 'Search and select parent Sub-Type (e.g. Brioche Buns)...',
+        onSelect: (sel) => {
+          if (!window.__prefilledResolveBinding) window.__prefilledResolveBinding = {};
+          window.__prefilledResolveBinding.subtypeId = sel.subtypeId;
+          window.__prefilledResolveBinding.ingredientId = sel.ingredientId;
+          window.__prefilledResolveBinding.parentCategory = sel.category;
+          renderLinkageContainer(null, window.__prefilledResolveBinding);
+        }
+      });
+    }
+  }
+}
+
 export function openProductEditModal(productIdOrDraft = null) {
   const wrap = document.getElementById('view-modal-wrap');
   const content = document.getElementById('view-modal-content');
@@ -74,7 +142,7 @@ export function openProductEditModal(productIdOrDraft = null) {
       </div>
       <div id="mi-linkage-container" style="margin-bottom: 10px;"></div>
 
-      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 8px;">
+      <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-bottom: 10px;">
         <div>
           <label for="mi-name" style="display: block; font-size: 11.5px; font-weight: 700; margin-bottom: 3px;">Product name</label>
           <input type="text" id="mi-name" name="mi-name" placeholder="Product name" style="width: 100%; padding: 6px 10px; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
@@ -82,14 +150,6 @@ export function openProductEditModal(productIdOrDraft = null) {
         <div>
           <label for="mi-brand" style="display: block; font-size: 11.5px; font-weight: 700; margin-bottom: 3px;">Brand</label>
           <input type="text" id="mi-brand" name="mi-brand" placeholder="e.g. Tesco" style="width: 100%; padding: 6px 10px; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
-        </div>
-      </div>
-
-      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px;">
-        <div>
-          <label for="mi-cat-search" style="display: block; font-size: 11.5px; font-weight: 700; margin-bottom: 3px;">Category</label>
-          <input type="search" id="mi-cat-search" name="mi-cat-search" placeholder="Search category" list="mi-cat-category-options" style="width: 100%; padding: 6px 10px; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
-          <datalist id="mi-cat-category-options"></datalist>
         </div>
         <div>
           <label for="mi-storage" style="display: block; font-size: 11.5px; font-weight: 700; margin-bottom: 3px;">Storage</label>
@@ -135,9 +195,10 @@ export function openProductEditModal(productIdOrDraft = null) {
           <label for="mi-pack" style="display: block; font-size: 11px; font-weight: 650; margin-bottom: 2px;">Total pack size</label>
           <div style="display: flex; gap: 4px;">
             <input type="number" id="mi-pack" name="mi-pack" placeholder="500" style="min-width: 0; flex: 1; padding: 5px 6px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
-            <select id="mi-pack-unit" name="mi-pack-unit" aria-label="Pack unit" style="width: 52px; border: 1px solid var(--border, #ccc); border-radius: 6px; padding: 0 4px; font-size: 11.5px;">
+            <select id="mi-pack-unit" name="mi-pack-unit" aria-label="Pack unit" style="width: 62px; border: 1px solid var(--border, #ccc); border-radius: 6px; padding: 0 4px; font-size: 11.5px;">
               <option value="g">g</option>
               <option value="ml">ml</option>
+              <option value="units">units</option>
             </select>
           </div>
         </div>
@@ -154,7 +215,14 @@ export function openProductEditModal(productIdOrDraft = null) {
         </div>
         <div>
           <label for="mi-drained-weight" style="display: block; font-size: 11px; font-weight: 650; margin-bottom: 2px;">Drained weight</label>
-          <input type="number" id="mi-drained-weight" name="mi-drained-weight" placeholder="e.g. 235" style="width: 100%; padding: 5px 8px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
+          <div style="display: flex; gap: 4px;">
+            <input type="number" id="mi-drained-weight" name="mi-drained-weight" placeholder="e.g. 235" style="min-width: 0; flex: 1; padding: 5px 6px; font-size: 12px; border-radius: 6px; border: 1px solid var(--border, #ccc); box-sizing: border-box;">
+            <select id="mi-drained-weight-unit" name="mi-drained-weight-unit" aria-label="Drained weight unit" style="width: 62px; border: 1px solid var(--border, #ccc); border-radius: 6px; padding: 0 4px; font-size: 11.5px;">
+              <option value="g">g</option>
+              <option value="ml">ml</option>
+              <option value="units">units</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -201,10 +269,16 @@ export function openProductEditModal(productIdOrDraft = null) {
   const binding = window.__prefilledResolveBinding || {};
   const tescoData = binding.tescoImportData;
 
+  const UNIT_SELECT_IDS = ['mi-pack-unit', 'mi-item-weight-unit', 'mi-drained-weight-unit'];
+  const syncUnitSelects = (val) => {
+    const cleanUnit = ['g', 'ml', 'units'].includes(val) ? val : 'g';
+    UNIT_SELECT_IDS.forEach(id => setVal(id, cleanUnit));
+  };
+
   if (prod) {
+    const unifiedUnit = prod.packUnit || prod.unit || prod.itemWeightUnit || prod.item_weight_unit || prod.drainedWeightUnit || 'g';
     setVal('mi-name', prod.name || binding.subtypeDraftName || '');
     setVal('mi-brand', prod.brand || '');
-    setVal('mi-cat-search', prod.category || prod.cat || binding.parentCategory || 'General');
     setVal('mi-storage', prod.storage || 'cupboard');
     setVal('mi-cal', prod.cal ?? prod.calories ?? '');
     setVal('mi-fat', prod.fat ?? '');
@@ -213,36 +287,33 @@ export function openProductEditModal(productIdOrDraft = null) {
     setVal('mi-prot', prod.prot ?? prod.protein ?? '');
     setVal('mi-price', prod.price ?? '');
     setVal('mi-pack', prod.pack ?? prod.packSize ?? '');
-    setVal('mi-pack-unit', prod.packUnit || prod.unit || 'g');
     setVal('mi-item-weight', prod.itemWeight ?? '');
-    setVal('mi-item-weight-unit', prod.itemWeightUnit || prod.item_weight_unit || 'g');
     setVal('mi-drained-weight', prod.drainedWeight ?? '');
+    syncUnitSelects(unifiedUnit);
     setVal('mi-notes', prod.notes ?? '');
   } else if (tescoData) {
+    const unifiedUnit = tescoData.packUnit || tescoData.unit || tescoData.itemWeightUnit || tescoData.drainedWeightUnit || 'g';
     const rawBrand = tescoData.brand || 'Tesco';
     const brand = toTitleCase(rawBrand);
     const rawName = tescoData.title || tescoData.name || binding.subtypeDraftName || '';
     const name = cleanProductName(rawName, brand);
     setVal('mi-name', name);
     setVal('mi-brand', brand);
-    setVal('mi-cat-search', tescoData.category || binding.parentCategory || 'General');
     setVal('mi-storage', tescoData.storage || 'cupboard');
     setVal('mi-price', tescoData.price || '');
     setVal('mi-pack', tescoData.pack || tescoData.packSize || tescoData.size || '');
-    setVal('mi-pack-unit', tescoData.packUnit || tescoData.unit || 'g');
     setVal('mi-cal', tescoData.cal ?? tescoData.calories ?? '');
     setVal('mi-fat', tescoData.fat ?? '');
     setVal('mi-carb', tescoData.carb ?? tescoData.carbs ?? '');
     setVal('mi-fibre', tescoData.fibre ?? '');
     setVal('mi-prot', tescoData.prot ?? tescoData.protein ?? '');
     setVal('mi-item-weight', tescoData.itemWeight ?? '');
-    setVal('mi-item-weight-unit', tescoData.itemWeightUnit || 'g');
     setVal('mi-drained-weight', tescoData.drainedWeight ?? '');
+    syncUnitSelects(unifiedUnit);
     setVal('mi-notes', tescoData.notes || (tescoData.url || tescoData.tescoUrl ? `Tesco: ${tescoData.url || tescoData.tescoUrl}` : ''));
   } else {
     setVal('mi-name', binding.subtypeDraftName || '');
     setVal('mi-brand', '');
-    setVal('mi-cat-search', binding.parentCategory || 'General');
     setVal('mi-storage', 'cupboard');
     setVal('mi-cal', '');
     setVal('mi-fat', '');
@@ -251,18 +322,24 @@ export function openProductEditModal(productIdOrDraft = null) {
     setVal('mi-prot', '');
     setVal('mi-price', '');
     setVal('mi-pack', '');
-    setVal('mi-pack-unit', 'g');
     setVal('mi-item-weight', '');
-    setVal('mi-item-weight-unit', 'g');
     setVal('mi-drained-weight', '');
+    syncUnitSelects('g');
     setVal('mi-notes', '');
   }
 
-  const catOptsEl = document.getElementById('mi-cat-category-options');
-  if (catOptsEl) {
-    const categories = getActiveCategories(state);
-    catOptsEl.innerHTML = categories.map(c => `<option value="${escapeAttr(c)}"></option>`).join('');
-  }
+  UNIT_SELECT_IDS.forEach(id => {
+    const selectEl = document.getElementById(id);
+    if (selectEl) {
+      const onUnitChange = (e) => syncUnitSelects(e?.target?.value ?? selectEl.value);
+      selectEl.onchange = onUnitChange;
+      if (typeof selectEl.addEventListener === 'function') {
+        selectEl.addEventListener('change', onUnitChange);
+      }
+    }
+  });
+
+  renderLinkageContainer(prod, binding);
 
   const pastePanel = document.getElementById('mi-tesco-paste');
   if (pastePanel) pastePanel.hidden = true;
@@ -314,6 +391,12 @@ export function applyTescoUpdate() {
     if (!field || !carried(result.data.raw) || next === undefined || next === null || next === '') continue;
     if (String(field.value) !== String(next)) {
       field.value = next;
+      if (id === 'mi-pack-unit' || id === 'mi-item-weight-unit') {
+        ['mi-pack-unit', 'mi-item-weight-unit', 'mi-drained-weight-unit'].forEach(uid => {
+          const uEl = document.getElementById(uid);
+          if (uEl) uEl.value = next;
+        });
+      }
       changed.push(label);
     }
   }
@@ -351,15 +434,18 @@ export async function saveManualIng() {
   }
 
   const binding = window.__prefilledResolveBinding || {};
-  const ingredientId = window.__draftSubtypePayload?.parentId || binding.ingredientId || null;
-  const subtypeId = draftSubtypeId || binding.subtypeId || null;
-  const isAutoDefault = !!ingredientId;
+  const ingredientId = window.__draftSubtypePayload?.parentId || binding.ingredientId || (activeEditingProductId ? currentProds.find(p => String(p.id) === String(activeEditingProductId))?.ingredientId : null);
+  const subtypeId = draftSubtypeId || binding.subtypeId || (activeEditingProductId ? currentProds.find(p => String(p.id) === String(activeEditingProductId))?.subtypeId : null);
 
+  const isAutoDefault = !!ingredientId;
   window.__draftSubtypePayload = null;
 
-  const finalIngId = activeEditingProductId ? (currentProds.find(p => String(p.id) === String(activeEditingProductId))?.ingredientId || null) : ingredientId;
+  const existingProd = activeEditingProductId ? currentProds.find(p => String(p.id) === String(activeEditingProductId)) : null;
+  const finalIngId = activeEditingProductId ? (existingProd?.ingredientId || null) : ingredientId;
   const parentIng = finalIngId ? (state.ingredients || []).find(i => String(i.id) === String(finalIngId)) : null;
-  const inheritedCategory = parentIng?.category || getVal('mi-cat-search') || 'General';
+  const parentSub = subtypeId ? (parentIng?.subtypes || []).find(s => String(s.id) === String(subtypeId)) : null;
+  const inheritedCategory = parentIng?.category || parentSub?.category || binding.parentCategory || existingProd?.category || 'General';
+  const catSlug = (inheritedCategory || '').toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^a-z0-9\-]/g, '');
 
   const updatedProd = {
     ...(activeEditingProductId ? currentProds.find(p => String(p.id) === String(activeEditingProductId)) : {}),
@@ -367,6 +453,7 @@ export async function saveManualIng() {
     name,
     brand: getVal('mi-brand'),
     category: inheritedCategory,
+    cat: catSlug,
     storage: getVal('mi-storage') || 'cupboard',
     cal: getNum('mi-cal') || 0,
     fat: getNum('mi-fat') || 0,
@@ -379,9 +466,10 @@ export async function saveManualIng() {
     itemWeight: getNum('mi-item-weight'),
     itemWeightUnit: getVal('mi-item-weight-unit') || 'g',
     drainedWeight: getNum('mi-drained-weight'),
+    drainedWeightUnit: getVal('mi-drained-weight-unit') || 'g',
     notes: getVal('mi-notes'),
-    ingredientId: activeEditingProductId ? (currentProds.find(p => String(p.id) === String(activeEditingProductId))?.ingredientId || null) : ingredientId,
-    subtypeId: activeEditingProductId ? (currentProds.find(p => String(p.id) === String(activeEditingProductId))?.subtypeId || null) : subtypeId,
+    ingredientId: finalIngId,
+    subtypeId,
     isAutoDefault: activeEditingProductId ? (currentProds.find(p => String(p.id) === String(activeEditingProductId))?.isAutoDefault || false) : isAutoDefault,
     updatedAt: new Date().toISOString()
   };

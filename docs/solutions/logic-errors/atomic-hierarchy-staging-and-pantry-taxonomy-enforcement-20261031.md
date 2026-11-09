@@ -17,7 +17,7 @@ tags:
   - "state-staging"
   - "taxonomy-reorganisation"
 related_issues: []
-last_referenced: "2026-10-31"
+last_referenced: "2026-11-09"
 status: "active"
 ---
 
@@ -57,6 +57,7 @@ Pantry database records became fragmented with orphan sub-types and empty items,
 | 2. Inspect Reallocate modal inline sub-type creation | Inline "Save Sub-Type" immediately invoked `saveIngredient()` | ✅ Confirmed: cancelling the reallocate modal left the sub-type persisted |
 | 3. Audit Category Manager duplicate keys | `getUnifiedCategories()` used raw case-sensitive strings in a `Set` | ✅ Confirmed: casing variants produced duplicate category entries |
 | 4. Audit Move Category flow in Reorganise modal | `onNewClick` redirected to `openAddItemWizard()` rather than passing target to `executeSafeReallocation()` | ✅ Confirmed: existing hierarchy was discarded instead of reallocated |
+| 5. Trace why merged categories reappeared after reload (2026-11-09) | `enforceCategorySSOT()` ran `toCanonicalCategoryName(parentCat)` on sub-types and products during every save and load while leaving `ing.category` untouched, and `mergeCategory()` only checked `.category` on un-normalized Firestore records | ✅ Confirmed: `enforceCategorySSOT` actively re-split `"and"` into `"And"` on every `saveRootItem`/`saveProduct`/`getRootItems`/`getProducts` call, and raw Firestore records with `cat`/`category_id`/`categoryName` were skipped |
 
 ---
 
@@ -64,6 +65,8 @@ Pantry database records became fragmented with orphan sub-types and empty items,
 
 * **Premature Eager Commits:** The application assumed that staging an entity required writing it to the database immediately, rather than maintaining draft state in memory until the entire atomic chain is complete.
 * **Lack of Normalization in Taxonomy SSOT:** String comparison in category sets did not normalize alphanumeric keys, causing Firestore case variants to bifurcate into duplicate display entries.
+* **SSOT Enforcer Casing Divergence (`enforceCategorySSOT`):** Both `src/utils/categoryEnforcer.js` and `src/services/PantryHierarchyService.js` left `ing.category` as-is (e.g. `"Grains, Nuts and Seeds"`), but overwrote every child `st.category` and linked `p.category` with `toCanonicalCategoryName(parentCat)` (which uppercased every word after whitespace, turning `"and"` into `"And"`). Because `saveRootItem`, `saveProduct`, `getRootItems`, and `getProducts` all invoke `enforceCategorySSOT`, any category merge was immediately undone on save and reload.
+* **Hydration vs. Raw Repository Field Mismatch:** `HydrationService.js` (`normalizeIngredientRecord` and `normalizeProductRecord`) populates `record.category` in memory from fallback fields (`category ?? category_id ?? categoryName ?? cat`). However, `CategoryMergeRepository.js` (`mergeCategory`) fetched raw un-normalized records via `getRootItems()` and `getProducts()` and compared only `strictNorm(record.category) === sourceNorm`, updating in-memory state while skipping the raw Firestore documents.
 * **Modal Context Switching:** Reorganise operations failed to treat "create new target category" as an in-place property assignment on the active item, unnecessarily spawning a secondary wizard.
 
 ---
@@ -103,8 +106,10 @@ In `ReorganiseModalUI.js` and `PantryTaxonomyService.js`, selecting or typing a 
 `createTaxonomySearchInput({ subtypesOnly: true })` restricts options strictly to sub-types formatted with parent context:
 `🏷️ [Sub-Type Name] · 📂 [Category] › 📦 [Root Item]`
 
-### 4. Alphanumeric Category Normalization
-`getUnifiedCategories()` now unifies categories using normalized alphanumeric keys (`normKey = trimmed.toLowerCase().replace(/[^a-z0-9]/g, '')`), safely collapsing casing and punctuation variants into a single canonical entry.
+### 4. Verbatim Category Inheritance & Slug-Aware Cascading Merge
+- `getUnifiedCategories()` unifies categories using normalized alphanumeric keys (`normKey = trimmed.toLowerCase().replace(/[^a-z0-9]/g, '')`).
+- `enforceCategorySSOT()` in both `src/utils/categoryEnforcer.js` and `src/services/PantryHierarchyService.js` propagates `String(parentCat).trim()` verbatim onto child sub-types and linked products instead of re-casing via `toCanonicalCategoryName(parentCat)`.
+- `mergeCategory()` in `src/services/CategoryMergeRepository.js` resolves raw category strings across all fallback fields (`category ?? category_id ?? categoryName ?? cat`) and matches by both `strictNorm` and `slugCategory`, persisting every record whose category string or `cat` slug differs from the chosen canonical target.
 
 ### 5. Instant Empty Category Deletion
 In `CategoryManagerModalUI.js`, categories with 0 items and 0 products bypass the reassignment selector and delete immediately upon confirmation.
@@ -114,5 +119,5 @@ In `CategoryManagerModalUI.js`, categories with 0 items and 0 products bypass th
 ## Prevention Strategies
 
 1. **Never persist partial domain models:** Multi-step guided creation wizards must keep draft state in memory and execute persistence exclusively upon final submission.
-2. **Canonical keys for user-input taxonomy:** Always normalize identifiers via slugification or alphanumeric cleansing when aggregating taxonomy tags.
-3. **Automated Unit Verification:** Verify atomic commits and category cascades using `scripts/test_category_manager.js`.
+2. **Preserve parent strings verbatim in SSOT enforcers:** Any function invoked on both read and write (`enforceCategorySSOT`) must copy parent taxonomy strings verbatim (`String(parentCat).trim()`) rather than applying destructive casing transforms (`toCanonicalCategoryName`) only to child tiers.
+3. **Account for hydration fallback fields in repository migrations:** When writing repository-level migrations or merges that call `getRootItems()` / `getProducts()` directly, resolve the same fallback chain (`category ?? category_id ?? categoryName ?? cat`) that `HydrationService.js` applies on load, and test with an in-memory Firestore mock + reload cycle (`scripts/test_category_merge_deduplication.js`).
