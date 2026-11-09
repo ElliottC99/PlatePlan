@@ -103,6 +103,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
         sectionTitle: toTitleCase(sec.sectionTitle),
         ingredients: sec.lines.map(line => {
           const parsed = parseIngredientString(line);
+          if (!parsed) return null;
           const matched = matchIngredientTaxonomy(parsed, ingredientsBank);
           const existing = existingIngs.find(e => 
             (e.raw && e.raw.trim().toLowerCase() === line.trim().toLowerCase()) ||
@@ -122,7 +123,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
             defaultProductId: existing?.defaultProductId || null,
             isNewTaxonomyItem: existing ? !!existing.isNewTaxonomyItem : !matched
           };
-        })
+        }).filter(Boolean)
       }));
 
       const methodSteps = unpackCollapsedSteps(metRaw);

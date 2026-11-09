@@ -5,11 +5,9 @@
 
 import { getState } from '../store/store.js';
 import { convertToStrictUnit } from './UnitConversionService.js';
+import { toTitleCase } from '../utils/stringUtils.js';
 
-export function toTitleCase(str) {
-  if (!str) return '';
-  return str.replace(/\b\w/g, c => c.toUpperCase());
-}
+export { toTitleCase };
 
 function parseFractionOrNumber(val) {
   const s = String(val || '').trim();
@@ -167,6 +165,36 @@ export function normalizeUnit(rawUnit) {
 }
 
 /**
+ * Returns true if the ingredient line represents standalone unmeasured salt and/or black/white pepper
+ * (including "to taste", "for seasoning", or "a pinch/dash of"), while preserving explicit numeric
+ * culinary measurements (e.g., "1 tsp salt", "1/2 tsp black pepper") and culinary peppers/blends
+ * (e.g., "bell pepper", "garlic salt").
+ */
+function isImpliedSaltOrPepperLine(rawStr) {
+  if (!rawStr || typeof rawStr !== 'string') return false;
+  let text = rawStr.replace(/^[\s•●◦▪▫▫️▪️\-\*]+/, '').trim();
+  if (!text) return false;
+
+  // Preserve explicit numeric culinary measurements (e.g., "1 tsp salt", "1/2 tsp black pepper", "10g sea salt")
+  const explicitUnitRegex = /^(?:\d+(?:\s+\d+\/\d+|\.\d+)?|\d+\/\d+|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|a|an|one|two|three|four|five|half)\s*(?:[xX×]\s*\d+(?:\.\d+)?\s*)?(?:(?:heaped|heaping|level|generous|scant|rounded)\s+)?(?:g|grams?|kg|kilograms?|mg|oz|ounces?|lbs?|pounds?|tsp|teaspoons?|tbsp|tablespoons?|tbl|tbs|tb|cups?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?)\b/i;
+  if (explicitUnitRegex.test(text)) return false;
+
+  // Strip optional parenthetical qualifiers and loose pinch/dash prefixes
+  text = text
+    .replace(/\((?:optional|to\s+taste|for\s+seasoning|for\s+serving|to\s+serve)\)/gi, ' ')
+    .replace(/^(?:(?:\d+|a|an|one|two|good|generous|small|big|large)\s+)?(?:(?:pinch|pinches|dash|dashes|sprinkle|sprinkles|twist|twists|grind|grinds|crack|cracks)\s+(?:of\s+)?|little\s+|some\s+)/i, '')
+    .replace(/\b(?:to\s+taste|for\s+seasoning|for\s+serving|to\s+serve|optional|as\s+needed|if\s+needed)\b/gi, ' ')
+    .replace(/[&+/]/g, ' and ')
+    .replace(/[,.;:!?*()]/g, ' ')
+    .replace(/\b(?:sea|kosher|flaky|table|maldon|rock|fine|finely|coarse|coarsely|freshly|fresh|ground|cracked|milled|black|white|cooking)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!text) return false;
+  return /^(?:salt|pepper)(?:\s+(?:and|or)\s+(?:salt|pepper))*$/i.test(text);
+}
+
+/**
  * Parses raw ingredient string into structured quantity, unit, name, and notes,
  * then converts strictly into 'g', 'ml', or 'qty' via UnitConversionService.
  */
@@ -174,6 +202,7 @@ export function parseIngredientString(rawStr) {
   if (!rawStr || typeof rawStr !== 'string') return null;
   const s = rawStr.trim();
   if (!s || /^(?:FOR THE\b|TO SERVE\b)/i.test(s)) return null;
+  if (isImpliedSaltOrPepperLine(s)) return null;
 
   // Standalone multiplier guard: never allow orphaned multiplier rows
   if (/^\d+(?:\.\d+)?\s*[xX]$/.test(s)) return null;
@@ -313,7 +342,8 @@ export function parseIngredientString(rawStr) {
 
   // 4. Standard parsed quantity with unit or count
   const { qty, remainder } = parseQuantity(clean);
-  const unitMatch = remainder.match(/^([a-zA-Z]+)\b\s*(.*)/i);
+  const cleanedRemainder = remainder.replace(/^(?:heaped|heaping|level|generous|scant|rounded)\s+/i, '');
+  const unitMatch = cleanedRemainder.match(/^([a-zA-Z]+)\b\s*(.*)/i);
   let parsedUnit = 'qty';
   let rawName = remainder;
 
@@ -355,6 +385,8 @@ export function parseIngredientString(rawStr) {
     const commaNotes = parts.slice(1).join(', ').trim();
     extraNotes = extraNotes ? `${extraNotes}, ${commaNotes}` : commaNotes;
   }
+
+  cleanedName = cleanedName.replace(/\*+/g, '').trim();
 
   if (/^(?:(vegetable|chicken|beef|fish|lamb|vegan|mushroom|onion)\s+)?stock\s*cubes?$/i.test(cleanedName)) {
     const typeMatch = cleanedName.match(/^(vegetable|chicken|beef|fish|lamb|vegan|mushroom|onion)\b/i);

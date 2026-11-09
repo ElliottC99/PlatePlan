@@ -416,4 +416,92 @@ assert.equal(wizardState.variantSnapshots.original.ingredientSections[0].ingredi
 assert.equal(wizardState.variantSnapshots.enhanced.ingredientSections[0].ingredients[0].qty, 5, 'Enhanced snapshot must preserve edited qty=5');
 console.log('✅ Passed: onSaveRecipe enforces mandatory meal suitability, preserves ingredientId vs productId, and retains dual-variant snapshots');
 
+// --- Test 14: Unicode Accented & Apostrophe Title Casing (AE1) ---
+console.log('\n--- Test 14: Unicode Accented & Apostrophe Title Casing ---');
+assert.equal(toTitleCase('CRÈME FRAÎCHE & JALAPEÑO PÂTÉ'), 'Crème Fraîche & Jalapeño Pâté');
+assert.equal(toTitleCase("if you’re using chef's crème"), "If You’re Using Chef's Crème");
+assert.equal(toTitleCase('FIVE-MINUTE SAUTÉED SHISHITO PEPPERS'), 'Five-Minute Sautéed Shishito Peppers');
+console.log('✅ Passed: toTitleCase handles accented Latin characters, apostrophes, and hyphens cleanly');
+
+// --- Test 15: Implied Salt & Black Pepper Filtering & Spoon/Asterisk Normalization (AE2, AE3) ---
+console.log('\n--- Test 15: Implied Salt & Pepper Filtering and Spoon/Asterisk Normalization ---');
+assert.equal(parseIngredientString('Salt and freshly ground black pepper'), null);
+assert.equal(parseIngredientString('sea salt, to taste'), null);
+assert.equal(parseIngredientString('Black pepper'), null);
+assert.equal(parseIngredientString('a pinch of salt'), null);
+assert.equal(parseIngredientString('kosher salt & cracked black pepper, for seasoning'), null);
+
+const measuredSalt = parseIngredientString('1 tsp sea salt');
+assert(measuredSalt !== null, 'Explicitly measured "1 tsp sea salt" must be preserved');
+assert.equal(measuredSalt.qty, 3.5);
+assert.equal(measuredSalt.unit, 'g');
+assert.equal(measuredSalt.name, 'Sea Salt');
+
+const measuredPepper = parseIngredientString('1/2 tsp black pepper');
+assert(measuredPepper !== null, 'Explicitly measured "1/2 tsp black pepper" must be preserved');
+assert.equal(measuredPepper.qty, 1.8);
+assert.equal(measuredPepper.unit, 'g');
+assert.equal(measuredPepper.name, 'Black Pepper');
+
+const bellPepper = parseIngredientString('1 red bell pepper');
+assert(bellPepper !== null, '"1 red bell pepper" must be preserved');
+assert.equal(bellPepper.name, 'Red Bell Pepper');
+
+const garlicSalt = parseIngredientString('1 tsp garlic salt');
+assert(garlicSalt !== null, '"1 tsp garlic salt" must be preserved');
+assert.equal(garlicSalt.name, 'Garlic Salt');
+
+const heapedBakingPowder = parseIngredientString('1 heaped tsp baking powder');
+assert.equal(heapedBakingPowder.qty, 2.5);
+assert.equal(heapedBakingPowder.unit, 'g');
+assert.equal(heapedBakingPowder.name, 'Baking Powder');
+
+const milkAsterisk = parseIngredientString('350-450ml milk*');
+assert.equal(milkAsterisk.qty, 400);
+assert.equal(milkAsterisk.unit, 'ml');
+assert.equal(milkAsterisk.name, 'Milk');
+console.log('✅ Passed: Implied salt/pepper lines drop, measured salt/pepper & bell peppers remain, and heaped/asterisk tokens normalize');
+
+// --- Test 16: TikTok Social Caption Unpacking (CINNAMON ROLL BAKED OATS - AE4) ---
+console.log('\n--- Test 16: TikTok Social Caption Unpacking (CINNAMON ROLL BAKED OATS) ---');
+const tiktokCaption = `CINNAMON ROLL BAKED OATSAll the flavours of a cinnamon roll in a cosy, make-ahead breakfast 🙂‍↔️ YES pleaseMakes 4-5 servings.▫️ 2 bananas▫️ 200g rolled oats▫️ 60g flavoured soy protein powder▫️ 1 heaped tsp baking powder▫️ 350-450ml milk*▫️ 1 tsp cinnamonFor the top:▫️ Cinnamon swirl- 1 tsp ground cinnamon- 1 tsp brown sugar- 2 tsp melted butter/olive oil▫️ Cream cheese- 2 tbsp cream cheese- 1 tbsp honey* If you’re using a different protein powder, you may need to adjust the liquid. Start with as little as 150ml and add gradually until you reach the consistency shown in the video.1. Preheat your oven to 180°C fan.2. In a 9×6 baking dish (line if yours tends to stick), mash the bananas until smooth. Add the oats, soy protein, baking powder, cinnamon, and milk. Stir until everything is fully combined, then smooth the top and clean down the sides.3. Top with alternating dollops of the cinnamon swirl and cream cheese mixes and swirl together using the back of a spoon.4. Bake for about 35 minutes, until golden and set in the middle.5. Once the baked oats are out of the oven, let them cool for 5-10 minutes so the squares hold their shape.6. Slice into portions. Microwave for 1 minute to warm through or enjoy cold for more of an oat-bar vibe. Store leftovers in an airtight container in the fridge for up to 5 days.ENJOY! [#bakedoats](https://www.tiktok.com/tag/bakedoats) [#breakfasttok](https://www.tiktok.com/tag/breakfasttok) [#highprotein](https://www.tiktok.com/tag/highprotein)`;
+
+const parsedTikTok = parseBulkRecipeText(tiktokCaption);
+assert.equal(parsedTikTok.length, 1, 'Should parse 1 recipe from TikTok caption');
+const bakedOats = parsedTikTok[0];
+assert.equal(bakedOats.title, 'Cinnamon Roll Baked Oats', 'Title should separate cleanly from intro blurb');
+assert.equal(bakedOats.servings, 4, 'Makes 4-5 servings should resolve to 4');
+assert.equal(bakedOats.ingredientSections.length, 3, 'Should have 3 ingredient sections');
+assert.equal(bakedOats.ingredientSections[0].sectionTitle, 'Main Ingredients');
+assert.equal(bakedOats.ingredientSections[0].ingredients.length, 6);
+assert.deepEqual(
+  bakedOats.ingredientSections[0].ingredients.map(i => i.name),
+  ['Bananas', 'Rolled Oats', 'Flavoured Soy Protein Powder', 'Baking Powder', 'Milk', 'Cinnamon']
+);
+assert.equal(bakedOats.ingredientSections[1].sectionTitle, 'Cinnamon Swirl');
+assert.equal(bakedOats.ingredientSections[1].ingredients.length, 3);
+assert.deepEqual(
+  bakedOats.ingredientSections[1].ingredients.map(i => i.name),
+  ['Ground Cinnamon', 'Brown Sugar', 'Melted Butter/Olive Oil']
+);
+assert.equal(bakedOats.ingredientSections[2].sectionTitle, 'Cream Cheese');
+assert.equal(bakedOats.ingredientSections[2].ingredients.length, 2);
+assert.deepEqual(
+  bakedOats.ingredientSections[2].ingredients.map(i => i.name),
+  ['Cream Cheese', 'Honey']
+);
+assert.equal(bakedOats.methodSteps.length, 6, 'Should extract 6 method steps');
+assert.equal(bakedOats.methodSteps[0], 'Preheat your oven to 180°C fan.');
+assert.equal(
+  bakedOats.methodSteps[5],
+  'Slice into portions. Microwave for 1 minute to warm through or enjoy cold for more of an oat-bar vibe. Store leftovers in an airtight container in the fridge for up to 5 days.'
+);
+
+const acronymRecipe = parseBulkRecipeText(`BBQ Pulled Pork\nServes: 4\nIngredients:\n500g pork shoulder\nMethod:\n1. Slow cook the pork until tender.\n2. Divide the mixture so it makes 4 buns.`);
+assert.equal(acronymRecipe.length, 1);
+assert.equal(acronymRecipe[0].title, 'Bbq Pulled Pork', 'Acronym-prefixed title with space must not be truncated');
+assert.equal(acronymRecipe[0].methodSteps.length, 2, 'Prose "makes 4 buns" inside method step must not split the step');
+assert.equal(acronymRecipe[0].methodSteps[1], 'Divide the mixture so it makes 4 buns.');
+console.log('✅ Passed: TikTok Cinnamon Roll Baked Oats parses cleanly into title, servings, 3 sections, and 6 steps');
+
 console.log('\n=== ALL RECIPE WIZARD v3.28.3 TESTS PASSED SUCCESSFULLY ===');

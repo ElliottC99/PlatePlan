@@ -12,9 +12,7 @@
  */
 export function toTitleCase(str) {
   if (!str || typeof str !== 'string') return '';
-  const minorWords = /^(and|as|at|but|by|en|for|if|in|nor|of|on|or|per|the|to|v[.]?|via|with)$/i;
-  return str.toLowerCase().replace(/\b[a-z]+(?:-[a-z]+)*\b/g, (word, index) => {
-    if (index > 0 && minorWords.test(word)) return word.toLowerCase();
+  return str.normalize('NFC').toLowerCase().replace(/[\p{L}\p{M}]+(?:['’\-][\p{L}\p{M}]+)*/gu, (word) => {
     return word.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join('-');
   });
 }
