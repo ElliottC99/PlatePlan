@@ -1,5 +1,6 @@
 ---
 date: "2026-11-01"
+last_updated: "2026-11-09"
 problem_type: "logic_error"
 component: "javascript_logic"
 severity: "medium"
@@ -7,6 +8,8 @@ symptoms:
   - "'¼–½ Tsp Cayenne Pepper' parsed as 0.25 qty with name '–1/2 Tsp Cayenne Pepper' rather than converted to grams"
   - "'2.5cm piece of fresh ginger' parsed as 2.5 qty of ginger roots rather than metric root weight (12.5g)"
   - "'20g unsalted peanuts (to serve)' remained in Main Ingredients with '(to serve)' in the item name instead of separating into a 'To Serve' section"
+  - "Accented words and contractions in titles and ingredients capitalized the letter after the accent or apostrophe ('CrèMe', 'JalapeñO', 'You’Re')"
+  - "Unmeasured 'salt and black pepper' lines imported as 1-unit items, and single-line TikTok captions collapsed into the recipe title with 0 ingredients"
 root_cause: "edge_case_unhandled"
 tags:
   - "recipe-wizard"
@@ -14,6 +17,8 @@ tags:
   - "unit-conversion"
   - "fraction-ranges"
   - "serving-qualifiers"
+  - "unicode-title-case"
+  - "social-caption-parsing"
 related_issues: []
 status: "active"
 ---
@@ -98,18 +103,28 @@ if (dimMatch) {
 - Extracted `(to serve)`, `, to serve`, `(for serving)`, `(to garnish)` from ingredient names, moving the qualifier into `notes: 'to serve'` and flagging `isToServe: true`.
 - In `parseSectionedIngredients` (`RecipeWizardStep1Handlers.js`) and `parseIngredientLine` (`RecipeParserService.js`), lines marked `isToServe` are automatically placed in a dedicated `"To Serve"` section at the end of the section list.
 
+### 4. Unicode-Aware Title Casing, Implied Salt/Pepper Filtering, and Social-Caption Unpacking (Nov 2026 Update)
+- **Unicode Property Escapes in `toTitleCase` (`src/utils/stringUtils.js`)**: JavaScript's `\b` and `\w` are ASCII-only, treating accented characters (`è`, `é`, `ñ`) and curly apostrophes (`’`) as word boundaries (`CrèMe`, `You’Re`). Normalizing to NFC and matching `/[\p{L}\p{M}]+(?:['’\-][\p{L}\p{M}]+)*/gu` keeps accented words and contractions intact while capitalizing hyphenated segments (`Five-Minute`). `src/services/RecipeIngredientParser.js` re-exports this canonical implementation.
+- **Implied Salt & Black Pepper Filtering (`isImpliedSaltOrPepperLine` in `src/services/RecipeIngredientParser.js`)**: `parseIngredientString` returns `null` for standalone unmeasured salt/pepper lines (`"Salt and freshly ground black pepper"`, `"sea salt, to taste"`, `"a pinch of salt"`), while preserving explicit numeric culinary measurements (`"1 tsp sea salt"`, `"1/2 tsp black pepper"`) and culinary peppers/blends (`"1 red bell pepper"`, `"1 tsp garlic salt"`). Step 1A manual parsing in `src/components/recipe/RecipeWizardStep1Handlers.js` filters out `null` entries via `.filter(Boolean)`. Spoon descriptors (`heaped`, `level`, `generous`, `scant`, `rounded`) are stripped before `UNIT_MAP` lookup and trailing `*` footnote markers are stripped from `cleanedName`.
+- **Single-Line Social Caption Unpacking (`normalizeSocialCaptionText` in `src/services/RecipeParserService.js`)**:
+  - When splitting an ALL-CAPS leading title glued to a sentence-case blurb (`CINNAMON ROLL BAKED OATSAll the flavours...`), the capture group must end on an uppercase letter (`/^([A-Z0-9\s&'’\-]{3,}[A-Z])(?=[A-Z][a-z]{2,})/`) so space-separated acronym titles (`"BBQ Pulled Pork"`) are not truncated at the space.
+  - Glued social-caption tokens like `pleaseMakes 4-5 servings.` and `cinnamonFor the top:` have no word boundary (`\b`) between the lowercase end of the preceding word and the uppercase start of `Makes`/`For`, so split regexes must not depend on a leading `\b`.
+  - In `unpackCollapsedSteps`, inline numbered steps glued to sentence punctuation (`fan.2. In a 9×6`) must preserve the sentence-ending punctuation (`$1\n\n`) rather than replacing `[\.!?]` with `\n\n`.
+
 ---
 
 ## Prevention Strategies
 
 1. **Test Complex Multi-Format Quantities**: Every time quantity parsing is modified, run test cases containing Unicode fractions, ASCII fractions, mixed fractions, ranges, and multipliers.
 2. **Preserve Unit Test Fixtures**: `scripts/test_unit_conversion.js` asserts 92 strict unit conversion rules. Never alter these fixtures without explicit architectural review.
-3. **Regression Tests**: Added `scripts/test_recipe_wizard_tuning.js` to continuously verify all 3 patterns.
+3. **Guard Callers of `parseIngredientString` Against `null`**: Because `parseIngredientString` returns `null` for section headers, orphaned multipliers, and unmeasured salt/pepper lines, any caller mapping over raw ingredient lines must guard `if (!parsed) return null` and `.filter(Boolean)`.
+4. **Regression Tests**: Verified in `scripts/test_recipe_wizard.js` (`Test 14`–`Test 16`) and `scripts/test_recipe_wizard_tuning.js`.
 
 ---
 
 ## Cross-References
 
 - Plan: `docs/plans/2026-11-01-1630-fine-tune-recipe-wizard-ingredient-parsing-plan.md`
-- Tests: `scripts/test_recipe_wizard_tuning.js`
+- Plan: `docs/plans/2026-11-09-1521-feat-recipe-parser-and-text-formatting-plan.md`
+- Tests: `scripts/test_recipe_wizard.js`, `scripts/test_recipe_wizard_tuning.js`
 - Prior solution: `docs/solutions/logic-errors/product-first-weights-drained-weight-and-fit-score-zero-20261031.md`
