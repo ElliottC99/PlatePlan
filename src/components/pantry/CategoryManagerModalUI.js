@@ -98,6 +98,11 @@ export function openCategoryManagerModal() {
         <button type="button" class="btn primary sm" id="btn-cat-mgr-add" style="white-space:nowrap; font-weight:700;">+ Add</button>
       </div>
 
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <span style="font-size:12px; font-weight:700; color:var(--text,#1c1917);">Categories (${categories.length})</span>
+        <button type="button" class="btn xs secondary" id="btn-cat-mgr-dedup" style="font-weight:650;">🧹 Merge Duplicates</button>
+      </div>
+
       <div style="max-height:360px; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:var(--surface2,#fbfbf9); padding:4px;">
         ${categories.length === 0 ? `
           <div style="padding:24px; text-align:center; font-size:13px; color:var(--text2,#78716c);">No categories found.</div>
@@ -132,8 +137,14 @@ export function openCategoryManagerModal() {
 
   const closeBtn = document.getElementById('btn-cat-mgr-close');
   const doneBtn = document.getElementById('btn-cat-mgr-done');
+  const dedupBtn = document.getElementById('btn-cat-mgr-dedup');
   if (closeBtn) closeBtn.onclick = closeCategoryManagerModal;
   if (doneBtn) doneBtn.onclick = closeCategoryManagerModal;
+  if (dedupBtn) {
+    dedupBtn.onclick = () => {
+      import('./CategoryMergeModalUI.js').then(m => m.openCategoryMergeModal());
+    };
+  }
 
   const addBtn = document.getElementById('btn-cat-mgr-add');
   const inputEl = document.getElementById('cat-mgr-new-input');

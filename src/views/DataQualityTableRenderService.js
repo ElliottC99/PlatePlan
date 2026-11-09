@@ -100,6 +100,10 @@ function initDataQualityEvents(container) {
       openRecipeAuditModal();
       return;
     }
+    if (action === 'open-category-merge') {
+      import('../components/pantry/CategoryMergeModalUI.js').then(m => m.openCategoryMergeModal());
+      return;
+    }
     if (action === 'relink-catalog') {
       const state = getState();
       const { modifiedCount } = await performGlobalProductRelink(state.ingredients || [], state.products || []);
@@ -267,6 +271,9 @@ export function renderDataQualityView() {
           </button>
           <button type="button" class="btn sm" data-action-dq="open-sweeper" style="font-weight:600; background:#059669; color:#fff; ${unlinkedRecipeCount === 0 ? 'opacity:0.55; cursor:default;' : ''}">
             🧹 Unlinked Sweeper (${unlinkedRecipeCount}${unlinkedRecipeCount === 0 ? ' ✓' : ''})
+          </button>
+          <button type="button" class="btn sm" data-action-dq="open-category-merge" style="font-weight:600; background:#0284c7; color:#fff;">
+            📂 Category Deduplication
           </button>
           <button type="button" class="btn sm" data-action-dq="open-recipe-audit" style="font-weight:600; background:var(--primary,#4f46e5); color:#fff; ${recipeAuditCount === 0 ? 'opacity:0.55; cursor:default;' : ''}">
             📖 Recipe Mapping Audit (${recipeAuditCount}${recipeAuditCount === 0 ? ' ✓' : ''})

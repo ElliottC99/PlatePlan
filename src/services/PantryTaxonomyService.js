@@ -332,6 +332,54 @@ export async function executeSubtypeReallocation({ mode, subtypeId, parentId, ta
   return { success: true };
 }
 
+export async function renameRootItem(itemId, newName, { newCategory = null, aliases = null } = {}) {
+  const state = getState();
+  const rootItems = Array.isArray(state.rootItems || state.ingredients) ? [...(state.rootItems || state.ingredients)] : [];
+  const item = rootItems.find(r => String(r.id) === String(itemId));
+  if (!item) throw new Error('Root item not found');
+  const cleanName = (newName || '').trim();
+  if (!cleanName) throw new Error('Item name cannot be empty');
+
+  item.name = cleanName;
+  if (newCategory) {
+    item.category = newCategory.trim();
+    if (Array.isArray(item.subtypes)) {
+      item.subtypes.forEach(s => { s.category = item.category; });
+    }
+  }
+  if (Array.isArray(aliases)) {
+    item.aliases = aliases.map(a => String(a).trim()).filter(Boolean);
+  }
+  item.updatedAt = new Date().toISOString();
+
+  setIngredients(rootItems);
+  saveStateCache(state);
+  await saveRootItem(item);
+  return { success: true, item };
+}
+
+export async function renameSubtype(parentId, subtypeId, newName, { aliases = null } = {}) {
+  const state = getState();
+  const rootItems = Array.isArray(state.rootItems || state.ingredients) ? [...(state.rootItems || state.ingredients)] : [];
+  const parent = rootItems.find(r => String(r.id) === String(parentId));
+  if (!parent || !Array.isArray(parent.subtypes)) throw new Error('Parent root item not found');
+  const sub = parent.subtypes.find(s => String(s.id) === String(subtypeId));
+  if (!sub) throw new Error('Sub-type not found');
+  const cleanName = (newName || '').trim();
+  if (!cleanName) throw new Error('Sub-type name cannot be empty');
+
+  sub.name = cleanName;
+  if (Array.isArray(aliases)) {
+    sub.aliases = aliases.map(a => String(a).trim()).filter(Boolean);
+  }
+  parent.updatedAt = new Date().toISOString();
+
+  setIngredients(rootItems);
+  saveStateCache(state);
+  await saveRootItem(parent);
+  return { success: true, parent, subtype: sub };
+}
+
 export async function executeCategoryReallocation({ mode, categoryName, newCategoryName, targetCategoryName }) {
   const state = getState();
   const rootItems = Array.isArray(state.rootItems || state.ingredients) ? [...(state.rootItems || state.ingredients)] : [];

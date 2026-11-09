@@ -174,6 +174,11 @@ export function attachPantryBankDelegation() {
           title: 'Item Options',
           options: [
             {
+              label: 'Edit Item',
+              icon: '✏️',
+              onClick: () => import(`../components/pantry/EditPantryTaxonomyModalUI.js`).then(mod => mod.openEditItemModal(id))
+            },
+            {
               label: 'Reorganise Item',
               icon: '🔄',
               onClick: () => import(`../components/pantry/ReorganiseModalUI.js`).then(mod => mod.openReorganiseModal('item', { id }))
@@ -181,7 +186,7 @@ export function attachPantryBankDelegation() {
             {
               label: 'Manage Aliases',
               icon: '🏷️',
-              onClick: () => import(`../components/pantry/ReorganiseModalUI.js`).then(mod => mod.openReorganiseModal('item', { id, tab: 'aliases' }))
+              onClick: () => import(`../components/pantry/EditPantryTaxonomyModalUI.js`).then(mod => mod.openEditItemModal(id, { focusTab: 'aliases' }))
             },
             {
               label: 'Delete Item',
@@ -199,6 +204,11 @@ export function attachPantryBankDelegation() {
           title: 'Sub-type Options',
           options: [
             {
+              label: 'Edit Sub-type',
+              icon: '✏️',
+              onClick: () => import(`../components/pantry/EditPantryTaxonomyModalUI.js`).then(mod => mod.openEditSubtypeModal(parentId, subtypeId))
+            },
+            {
               label: 'Link Product',
               icon: '🔗',
               onClick: () => import(`../components/pantry/SubtypeProductLinkerModalUI.js`).then(mod => mod.openSubtypeLinkSelectionModal(subtypeId, parentId))
@@ -211,7 +221,7 @@ export function attachPantryBankDelegation() {
             {
               label: 'Manage Aliases',
               icon: '🏷️',
-              onClick: () => import(`../components/pantry/ReorganiseModalUI.js`).then(mod => mod.openReorganiseModal('subtype', { id: subtypeId, parentId, tab: 'aliases' }))
+              onClick: () => import(`../components/pantry/EditPantryTaxonomyModalUI.js`).then(mod => mod.openEditSubtypeModal(parentId, subtypeId, { focusTab: 'aliases' }))
             },
             {
               label: 'Delete Sub-type',
