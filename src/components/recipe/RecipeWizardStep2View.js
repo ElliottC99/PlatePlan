@@ -3,7 +3,7 @@
  * View rendering for Step 2: Sections, Interactive Target Servings Scaling & Taxonomy Autocomplete Mapping.
  */
 
-import { wizardState } from './RecipeWizardState.js';
+import { wizardState, MEAL_TAGS } from './RecipeWizardState.js';
 import { getState } from '../../store/store.js';
 import { renderTaxonomySearchHTML, isIngredientUnlinked } from './RecipeWizardTaxonomySearch.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
@@ -186,7 +186,19 @@ export function renderState2Mapping() {
     variant: currentVariant,
     showLabel: true
   });
-  const macroCrossbarHtml = renderMacroBreakdownCrossbar(activeRecipe, currentVariant, { compact: true });
+  const macroCrossbarHtml = renderMacroBreakdownCrossbar(activeRecipe, currentVariant, { compact: true, mealType: targetMealType });
+
+  const selectedSuitability = activeRecipe.mealSuitability || activeRecipe.types || ['Dinner'];
+  const normalizedSuitability = Array.isArray(selectedSuitability)
+    ? selectedSuitability.map(s => String(s).toLowerCase())
+    : [String(selectedSuitability).toLowerCase()];
+  const mealTagsHtml = MEAL_TAGS.map(tag => {
+    const isSelected = normalizedSuitability.includes(tag.toLowerCase());
+    return `<label class="wiz-step2-meal-tag-label" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; padding: 2px 8px; border: 1px solid var(--border, #cbd5e1); border-radius: 999px; background: ${isSelected ? 'var(--purple-bg, #eef2ff)' : 'var(--surface, #fff)'}; color: ${isSelected ? 'var(--purple, #4f46e5)' : 'var(--text2, #475569)'}; cursor: pointer; user-select: none;">
+      <input type="checkbox" id="wiz-step2-tag-${tag.toLowerCase()}" name="wiz_step2_meal_tag" class="wiz-step2-meal-tag" value="${tag}" ${isSelected ? 'checked' : ''} style="display: none;" />
+      ${tag}
+    </label>`;
+  }).join(' ');
 
   const step2VariantToggleHtml = hasEnhanced ? `
     <div class="variant-toggle" id="wiz-step2-variant-toggle" style="display: inline-flex; background: var(--surface, #fff); padding: 2px; border-radius: 8px; border: 1px solid var(--border, #ccc);">
@@ -217,10 +229,18 @@ export function renderState2Mapping() {
             ${macroCrossbarHtml}
           </div>
         </div>
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <label for="wiz-servings-input" style="font-size: 12px; font-weight: 600; color: var(--text2, #555);">Yield:</label>
-          <input type="number" id="wiz-servings-input" min="1" max="50" step="1" value="${servings}" style="width: 48px; text-align: center; font-size: 12px; font-weight: 700; padding: 2px 4px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--surface);">
-          <span style="font-size: 11px; color: var(--text2, #666);">servings</span>
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span style="font-size: 11px; font-weight: 600; color: var(--text2, #64748b);">Meal:</span>
+            <div class="wiz-step2-meal-tags-container" style="display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+              ${mealTagsHtml}
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label for="wiz-servings-input" style="font-size: 12px; font-weight: 600; color: var(--text2, #555);">Yield:</label>
+            <input type="number" id="wiz-servings-input" min="1" max="50" step="1" value="${servings}" style="width: 48px; text-align: center; font-size: 12px; font-weight: 700; padding: 2px 4px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--surface);">
+            <span style="font-size: 11px; color: var(--text2, #666);">servings</span>
+          </div>
         </div>
       </div>
 

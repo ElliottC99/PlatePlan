@@ -147,23 +147,28 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
       if (slotNode.chloe) processSlotNode(slotNode.chloe, 1, dayNum, mealType);
       return;
     }
-    const recipeId = typeof slotNode === 'string' ? slotNode : (slotNode.recipeId || slotNode.id);
-    if (!recipeId) return;
+    const rawRecipeId = typeof slotNode === 'string' ? slotNode : (slotNode.recipeId || slotNode.id);
+    if (!rawRecipeId) return;
+    const [baseRecipeId, variantFromId] = String(rawRecipeId).split('::');
+    const recipeId = baseRecipeId;
 
     const fullRecipe = vaultRecipes.find(r => r && String(r.id) === String(recipeId));
     if (!fullRecipe) return;
 
-    const baseServings = Math.max(1, Number(fullRecipe.serves || fullRecipe.servings || 2) || 2);
+    const variant = (typeof slotNode === 'object' && slotNode.variant) ? slotNode.variant : (variantFromId || 'original');
+    const recipeServes = variant === 'enhanced'
+      ? (fullRecipe.enhanced?.servings || fullRecipe.enhanced?.serves || fullRecipe.servings || fullRecipe.serves || 2)
+      : (fullRecipe.servings || fullRecipe.serves || 2);
+    const baseServings = Math.max(1, Number(recipeServes) || 2);
     const targetServings = Number(slotNode?.servings || personCount || 1) || 1;
     const scaleMultiplier = targetServings / baseServings;
 
-    const variant = typeof slotNode === 'object' && slotNode.variant ? slotNode.variant : 'original';
     const rawIngs = (variant === 'enhanced' && fullRecipe.enhanced && Array.isArray(fullRecipe.enhanced.ingredients))
       ? fullRecipe.enhanced.ingredients
       : (Array.isArray(fullRecipe.ingredients) ? fullRecipe.ingredients : []);
 
     const recipeName = fullRecipe.title || fullRecipe.name || 'Recipe';
-    const matchedPrep = prepGroups.find(g => String(g.recipeId) === String(recipeId) && Array.isArray(g.days) && g.days.some(d => Number(d) === Number(dayNum)));
+    const matchedPrep = prepGroups.find(g => String(g.recipeId).split('::')[0] === String(recipeId) && Array.isArray(g.days) && g.days.some(d => Number(d) === Number(dayNum)));
     const prepGroupId = matchedPrep?.id || matchedPrep?.prepGroupId || matchedPrep?.key || (matchedPrep ? `prep_${matchedPrep.recipeId}` : null);
     const slotInstanceId = (typeof slotNode === 'object' && slotNode.instanceId) ? slotNode.instanceId : `instance_${recipeId}_d${dayNum}_${mealType}`;
     const cookingEventId = prepGroupId || slotInstanceId;

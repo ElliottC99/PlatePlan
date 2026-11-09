@@ -54,6 +54,8 @@ export function extractRecipeMacros(recipe, variant = 'original') {
     let cal = pickFirstValidMacro([
       node.nutrition?.perServing?.cal,
       node.nutrition?.perServing?.calories,
+      node.nutrition?.calories,
+      node.nutrition?.cal,
       node.perServing?.cal,
       node.perServing?.calories,
       node.macros?.cal,
@@ -65,6 +67,8 @@ export function extractRecipeMacros(recipe, variant = 'original') {
     let prot = pickFirstValidMacro([
       node.nutrition?.perServing?.prot,
       node.nutrition?.perServing?.protein,
+      node.nutrition?.protein,
+      node.nutrition?.prot,
       node.perServing?.prot,
       node.perServing?.protein,
       node.macros?.prot,

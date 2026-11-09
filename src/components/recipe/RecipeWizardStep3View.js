@@ -51,8 +51,16 @@ function renderComparisonBadge(actual, target) {
 
 export function renderMacroBreakdownCrossbar(recipe, variant = 'original', options = {}) {
   const isCompact = options.compact === true;
-  const activeRec = (variant === 'enhanced' && recipe.enhanced) ? { ...recipe, ...recipe.enhanced } : recipe;
-  const targetMealType = activeRec.mealSuitability?.[0] || activeRec.types?.[0] || activeRec.type || 'dinner';
+  const activeRec = (variant === 'enhanced' && recipe.enhanced)
+    ? {
+        ...recipe,
+        ...recipe.enhanced,
+        mealSuitability: recipe.enhanced.mealSuitability || recipe.mealSuitability,
+        types: recipe.enhanced.types || recipe.types,
+        type: recipe.enhanced.type || recipe.type || recipe.mealType
+      }
+    : recipe;
+  const targetMealType = options.mealType || activeRec.mealSuitability?.[0] || activeRec.types?.[0] || activeRec.type || 'dinner';
 
   // 1. Calculate Universal Fit Score & Dynamic Macros directly via calculateMealFitScore with portionScaled: true
   const fitResult = typeof calculateMealFitScore === 'function' ? calculateMealFitScore(activeRec, targetMealType, {
@@ -144,6 +152,9 @@ export function renderState3Review() {
     ? {
         ...recipe,
         ...recipe.enhanced,
+        mealSuitability: recipe.enhanced.mealSuitability || recipe.mealSuitability,
+        types: recipe.enhanced.types || recipe.types,
+        type: recipe.enhanced.type || recipe.type || recipe.mealType,
         ingredientSections: recipe.ingredientSections || recipe.enhanced.ingredientSections,
         ingredients: (recipe.ingredientSections ? recipe.ingredientSections.flatMap(s => s.ingredients || []) : null) || recipe.ingredients || recipe.enhanced.ingredients,
         macros: recipe.macros || recipe.enhanced.macros,
@@ -168,14 +179,14 @@ export function renderState3Review() {
         </span>
         ${isEnhancedTab ? '<span class="badge" style="background:var(--badge-green-bg);color:var(--badge-green-text);font-weight:700;">✨ Enhanced Variant</span>' : ''}
       </div>
-      <div style="display: flex; align-items: center;">
+      <div id="wiz-step3-fit-badge-container" style="display: flex; align-items: center;">
         ${fitTagHtml}
       </div>
     </div>
   `;
 
   const saveBtnText = getSaveButtonLabel(recipe);
-  const macroCrossbarHtml = renderMacroBreakdownCrossbar(recipe, currentVariant);
+  const macroCrossbarHtml = `<div id="wiz-step3-macro-crossbar-container">${renderMacroBreakdownCrossbar(recipe, currentVariant, { mealType: targetMealType })}</div>`;
 
   let sectionsReviewHtml = '';
   const activeSections = displayRecipe.ingredientSections || [{ sectionTitle: 'Main Ingredients', ingredients: displayRecipe.ingredients || [] }];

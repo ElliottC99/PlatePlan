@@ -12,11 +12,17 @@ import { escapeHtml, escapeAttr } from '../../utils/stringUtils.js';
 /**
  * Resolves a recipe name from the global state.
  */
-export function resolveRecipeName(recipeId, fallback = '') {
+export function resolveRecipeName(recipeId, fallback = '', variant = 'original') {
   if (!recipeId) return fallback || '';
+  const [baseId, variantFromId] = String(recipeId).split('::');
+  const activeVariant = variantFromId || variant || 'original';
   const recipes = (typeof window !== 'undefined' && Array.isArray(getState()?.recipes)) ? getState().recipes : [];
-  const found = recipes.find(r => String(r.id) === String(recipeId));
-  return found?.name || fallback || 'Pinned Recipe';
+  const found = recipes.find(r => String(r.id) === String(baseId));
+  if (!found) return fallback || 'Pinned Recipe';
+  if (activeVariant === 'enhanced' && found.enhanced) {
+    return found.enhanced.name || (found.name ? `${found.name} (Enhanced)` : 'Enhanced Recipe');
+  }
+  return found.name || fallback || 'Pinned Recipe';
 }
 
 /**
@@ -54,8 +60,19 @@ export function renderRecipeCandidateRows(recipes, { dayIndex, mealType, person 
     if (r.enhanced) {
       expandedRecipes.push({
         ...r,
+        ...r.enhanced,
         id: r.id + '::enhanced',
-        name: r.enhanced.name || r.name
+        originalId: r.id,
+        _variant: 'enhanced',
+        name: r.enhanced.name || (r.name ? `${r.name} (Enhanced)` : 'Enhanced Recipe'),
+        macros: r.enhanced.macros || r.macros,
+        nutrition: r.enhanced.nutrition || r.nutrition,
+        ingredients: r.enhanced.ingredients || r.ingredients,
+        ingredientSections: r.enhanced.ingredientSections || r.ingredientSections,
+        servings: r.enhanced.servings || r.enhanced.serves || r.servings || r.serves,
+        serves: r.enhanced.serves || r.enhanced.servings || r.serves || r.servings,
+        fitScore: r.enhancedFitScore ?? r.enhanced.fitScore ?? r.fitScore,
+        _computedFitScore: r.enhancedFitScore ?? r.enhanced._computedFitScore ?? r._computedFitScore
       });
     }
   });
@@ -69,8 +86,8 @@ export function renderRecipeCandidateRows(recipes, { dayIndex, mealType, person 
     const variant = isEnhanced ? 'enhanced' : 'original';
     const baseId = (r.id && r.id.includes('::')) ? r.id.split('::')[0] : r.id;
     // The score calculator needs the recipe, the badge needs the recipe.
-    const fitObj = typeof window.calculateMealFitScore === 'function' ? window.calculateMealFitScore(r, mealType, { activeProfile, variant }) : null;
-    const badgeHtml = typeof window.renderFitScoreBadge === 'function' ? window.renderFitScoreBadge(r, mealType, { activeProfile, variant, precomputedFit: fitObj, showLabel: true }) : '';
+    const fitObj = typeof window.calculateMealFitScore === 'function' ? window.calculateMealFitScore(r, mealType, { activeProfile, variant, portionScaled: true }) : null;
+    const badgeHtml = typeof window.renderFitScoreBadge === 'function' ? window.renderFitScoreBadge(r, mealType, { activeProfile, variant, portionScaled: true, precomputedFit: fitObj, showLabel: true }) : '';
     const isDup = isRecipeInSkeletonGrid(baseId, skeletonGrid) || isRecipeInSkeletonGrid(r.id, skeletonGrid);
     const clickAction = person === 'both'
       ? `window.setSlotConfiguredStatus(${dayIndex}, '${mealType}', 'pinned', '${escapeAttr(r.id)}', '${escapeAttr(r.name)}')`
@@ -135,10 +152,12 @@ export function renderSlotCardSummary(day, meal, config) {
     `;
   }
   if (config.isSplit) {
-    const eName = config.elliott?.recipeId ? resolveRecipeName(config.elliott.recipeId, config.elliott.recipeName) : '';
-    const cName = config.chloe?.recipeId ? resolveRecipeName(config.chloe.recipeId, config.chloe.recipeName) : '';
-    const eSummary = config.elliott?.isSkipped ? '🚫 Skipped' : (eName ? `📌 ${escapeHtml(eName)}` : '⚡ Auto');
-    const cSummary = config.chloe?.isSkipped ? '🚫 Skipped' : (cName ? `📌 ${escapeHtml(cName)}` : '⚡ Auto');
+    const eVariant = config.elliott?.variant || (config.elliott?.recipeId?.includes('::enhanced') ? 'enhanced' : 'original');
+    const cVariant = config.chloe?.variant || (config.chloe?.recipeId?.includes('::enhanced') ? 'enhanced' : 'original');
+    const eName = config.elliott?.recipeId ? resolveRecipeName(config.elliott.recipeId, config.elliott.recipeName, eVariant) : '';
+    const cName = config.chloe?.recipeId ? resolveRecipeName(config.chloe.recipeId, config.chloe.recipeName, cVariant) : '';
+    const eSummary = config.elliott?.isSkipped ? '🚫 Skipped' : (eName ? `📌 ${escapeHtml(eName)} ${eVariant === 'enhanced' ? '<span class="tag green" style="background:var(--badge-green-bg);color:var(--badge-green-text);font-size:9px;padding:1px 4px;border-radius:3px;font-weight:700">Enhanced</span>' : ''}` : '⚡ Auto');
+    const cSummary = config.chloe?.isSkipped ? '🚫 Skipped' : (cName ? `📌 ${escapeHtml(cName)} ${cVariant === 'enhanced' ? '<span class="tag green" style="background:var(--badge-green-bg);color:var(--badge-green-text);font-size:9px;padding:1px 4px;border-radius:3px;font-weight:700">Enhanced</span>' : ''}` : '⚡ Auto');
     return `
       <div class="skeleton-slot split" onclick="window.openSlotConfigurator(${day}, '${meal.key}')" style="padding:8px 10px;border:1px solid var(--badge-blue-border);border-radius:8px;background:var(--badge-blue-bg);cursor:pointer;display:flex;flex-direction:column;gap:3px" title="Tap to modify split slot">
         <div style="display:flex;align-items:center;justify-content:space-between">
@@ -158,15 +177,20 @@ export function renderSlotCardSummary(day, meal, config) {
       </div>
     `;
   }
-  const sharedName = config.recipeId ? resolveRecipeName(config.recipeId, config.recipeName) : config.recipeName;
+  const slotVariant = config.variant || (config.recipeId?.includes('::enhanced') ? 'enhanced' : 'original');
+  const sharedName = config.recipeId ? resolveRecipeName(config.recipeId, config.recipeName, slotVariant) : config.recipeName;
   if (sharedName) {
+    const isEnh = slotVariant === 'enhanced';
     return `
       <div class="skeleton-slot pinned" onclick="window.openSlotConfigurator(${day}, '${meal.key}')" style="padding:8px 10px;border:1px solid var(--badge-green-border);border-radius:8px;background:var(--badge-green-bg);cursor:pointer;display:flex;align-items:center;justify-content:space-between" title="Tap to modify">
         <div style="min-width:0;flex:1;padding-right:6px">
           <div style="font-size:10px;font-weight:700;color:var(--badge-green-text);text-transform:uppercase">${meal.icon} ${meal.label}</div>
           <div style="font-size:12px;font-weight:700;color:var(--label);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📌 ${escapeHtml(sharedName)}</div>
         </div>
-        <span class="badge" style="font-size:10px;background:var(--badge-green-bg);color:var(--badge-green-text);border:1px solid var(--badge-green-border);font-weight:700;padding:2px 6px;border-radius:4px;flex-shrink:0">Pinned</span>
+        <div style="display:flex;align-items:center;gap:4px">
+          ${isEnh ? '<span class="tag green" style="background:var(--badge-green-bg);color:var(--badge-green-text);font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700">Enhanced</span>' : ''}
+          <span class="badge" style="font-size:10px;background:var(--badge-green-bg);color:var(--badge-green-text);border:1px solid var(--badge-green-border);font-weight:700;padding:2px 6px;border-radius:4px;flex-shrink:0">Pinned</span>
+        </div>
       </div>
     `;
   }

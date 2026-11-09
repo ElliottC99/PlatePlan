@@ -15,6 +15,8 @@ import { renderState2Mapping } from '../src/components/recipe/RecipeWizardStep2V
 import { renderStepBadge, renderState1AManual, renderState3Review } from '../src/components/recipe/RecipeWizardViews.js';
 import { filterTaxonomyItemsByQuery } from '../src/components/recipe/RecipeWizardTaxonomySearch.js';
 import { resolveProductForIngredient, onSaveRecipe } from '../src/components/recipe/RecipeWizardStep3Handlers.js';
+import { renderMacroBreakdownCrossbar } from '../src/components/recipe/RecipeWizardStep3View.js';
+import { sanitizeForFirestore } from '../src/services/RecipeFirestoreRepository.js';
 import { formatRecipeSourceHTML } from '../src/services/RecipeDetailModalService.js';
 import { scaleEmbeddedVolume } from '../src/services/PortionCalculationService.js';
 
@@ -705,5 +707,168 @@ assert.equal(savedRecipeOutput.isFavourite, true, 'Must preserve existing favour
 assert(savedRecipeOutput.enhanced && savedRecipeOutput.enhanced.title.includes('Enhanced'), 'Must preserve existing enhanced variant');
 assert(savedRecipeOutput.mealSuitability.includes('Dinner') && savedRecipeOutput.mealSuitability.includes('Snacking'), 'Must union mealSuitability');
 console.log('✅ Passed: Saving duplicate recipe title reuses ID, preserves enhanced variant and favourites, and unions tags');
+
+// --- Test 20: Headerless Social Recipe Parsing & Step 2 Meal Type Selection ---
+console.log('\n--- Test 20: Headerless Social Recipe Parsing & Step 2 Meal Type Selection ---');
+const headerlessText = `Korean Crispy Tempeh + Chickpea Wraps
+Serves 2
+
+200g tempeh, torn into small pieces
+2 tbsp cornflour
+
+Wet coating:
+3 tbsp plain flour
+3–4 tbsp water
+Half tsp garlic powder
+Pinch of salt
+
+Crispy coating:
+Half cup panko breadcrumbs
+2 tbsp white sesame seeds
+1 tsp garlic powder
+1 tsp onion powder
+Pinch of salt
+
+Korean glaze:
+2 tbsp gochujang
+1 tbsp soy sauce
+1 tbsp maple syrup
+1 tbsp rice vinegar
+1 tbsp water
+1 tsp sesame oil
+1 garlic clove, grated
+1 tsp grated ginger
+
+Creamy slaw:
+Shredded cabbage
+Half an cucumber, thinly sliced
+1 small carrot, grated
+Small handful coriander, chopped
+4 tbsp vegan mayo
+1 tbsp rice vinegar
+1 tsp sesame oil
+1 tsp maple syrup
+1 tsp soy sauce
+Squeeze of lime
+Sprinkle of crispy onions
+Pinch of salt
+
+Crispy chickpeas:
+1 x 400g tin chickpeas, drained and dried well
+1 tbsp neutral oil
+Pinch of salt
+1 tsp garlic powder
+
+2 large tortilla wraps
+
+Tear the tempeh into small pieces, lightly coat in cornflour then dip each piece into the wet coating then press firmly into the panko and sesame mixture until well coated. Spray with oil and air fry at 200C for 15–20 minutes, turning halfway, until golden and crispy.
+
+Meanwhile, add the glaze ingredients to a small pan and simmer slightly thickened. Toss the crispy tempeh through the glaze until coated.
+
+For the chickpeas, toss with the oil and air fry at 200°C for 15–20 minutes, shaking occasionally, until crisp. Toss with the seasonings while still hot.`;
+
+const parsedHeaderless = parseBulkRecipeText(headerlessText);
+assert.equal(parsedHeaderless.length, 1, 'Should extract 1 recipe from headerless text');
+const tempehRecipe = parsedHeaderless[0];
+assert.equal(tempehRecipe.title, 'Korean Crispy Tempeh + Chickpea Wraps', 'Title must match first line');
+assert.equal(tempehRecipe.servings, 2, 'Servings must parse as 2');
+assert(tempehRecipe.ingredientSections.length >= 5, `Must parse sections, got ${tempehRecipe.ingredientSections.length}`);
+const sectionTitles = tempehRecipe.ingredientSections.map(s => s.sectionTitle);
+assert(sectionTitles.includes('Wet Coating'), 'Must include Wet Coating section');
+assert(sectionTitles.includes('Crispy Coating'), 'Must include Crispy Coating section');
+assert(sectionTitles.includes('Korean Glaze'), 'Must include Korean Glaze section');
+assert(sectionTitles.includes('Creamy Slaw'), 'Must include Creamy Slaw section');
+assert(sectionTitles.includes('Crispy Chickpeas'), 'Must include Crispy Chickpeas section');
+assert(tempehRecipe.ingredients.length >= 25, `Must parse at least 25 ingredients, got ${tempehRecipe.ingredients.length}`);
+
+// Check that leading "an" was cleaned from "Half an cucumber"
+const cucumberIng = tempehRecipe.ingredients.find(i => i.name.toLowerCase().includes('cucumber'));
+assert(cucumberIng, 'Must find cucumber ingredient');
+assert.equal(cucumberIng.name, 'Cucumber', `Ingredient should be named "Cucumber", got "${cucumberIng.name}"`);
+
+assert.equal(tempehRecipe.methodSteps.length, 3, `Must extract 3 method steps, got ${tempehRecipe.methodSteps.length}`);
+assert(tempehRecipe.methodSteps[0].startsWith('Tear the tempeh'), 'Step 1 must start with "Tear the tempeh"');
+assert(tempehRecipe.methodSteps[1].startsWith('Meanwhile, add the glaze'), 'Step 2 must start with "Meanwhile"');
+assert(tempehRecipe.methodSteps[2].startsWith('For the chickpeas, toss'), 'Step 3 must start with "For the chickpeas"');
+
+// Test Step 2 View renders meal suitability pills and updating them updates state
+wizardState.activeRecipe = { ...tempehRecipe, mealSuitability: ['Lunch'] };
+const step2Html = renderState2Mapping();
+assert(step2Html.includes('wiz-step2-meal-tags-container'), 'Step 2 must include meal tags container');
+assert(step2Html.includes('wiz-step2-tag-lunch'), 'Step 2 must render Lunch tag');
+assert(step2Html.includes('wiz-step2-tag-snacking'), 'Step 2 must render Snacking tag');
+
+console.log('✅ Passed: Headerless recipe with subsections and paragraph steps parses cleanly, and Step 2 renders meal suitability selection');
+
+// --- Test 21: Leading Bullets, Asterisks & Emojis Ignored in Quantity Parsing ---
+console.log('\n--- Test 21: Leading Bullets, Asterisks & Emojis Ignored in Quantity Parsing ---');
+const bulletTest1 = parseIngredientString('* 5g baking powder');
+assert.equal(bulletTest1.qty, 5, 'Asterisk: qty should be 5');
+assert.equal(bulletTest1.unit, 'g', 'Asterisk: unit should be g');
+assert.equal(bulletTest1.name, 'Baking Powder', 'Asterisk: name should be Baking Powder');
+
+const bulletTest2 = parseIngredientString('✨ 5g baking powder');
+assert.equal(bulletTest2.qty, 5, 'Emoji: qty should be 5');
+assert.equal(bulletTest2.unit, 'g', 'Emoji: unit should be g');
+assert.equal(bulletTest2.name, 'Baking Powder', 'Emoji: name should be Baking Powder');
+
+const bulletTest3 = parseIngredientString('🌿 2 tbsp olive oil');
+assert.equal(bulletTest3.qty, 30, 'Herb emoji: qty should be converted to 30ml');
+assert.equal(bulletTest3.unit, 'ml', 'Herb emoji: unit should be ml');
+assert.equal(bulletTest3.name, 'Olive Oil', 'Herb emoji: name should be Olive Oil');
+
+const bulletTest4 = parseIngredientString('▫️ 100g flour');
+assert.equal(bulletTest4.qty, 100, 'Bullet: qty should be 100');
+assert.equal(bulletTest4.unit, 'g', 'Bullet: unit should be g');
+assert.equal(bulletTest4.name, 'Flour', 'Bullet: name should be Flour');
+
+console.log('✅ Passed: Leading bullets, asterisks, and emojis are stripped cleanly, parsing correct quantity and unit');
+
+// --- Test 22: Live Meal-Type Selection & Macro Target Recalculation Across Enhanced Variants ---
+console.log('\n--- Test 22: Live Meal-Type Selection & Macro Target Recalculation Across Enhanced Variants ---');
+const lunchRecipe = {
+  title: 'Korean Crispy Tempeh Wraps',
+  servings: 2,
+  mealSuitability: ['Lunch'],
+  types: ['lunch'],
+  macros: { calories: 500, protein: 30, carbs: 50, fat: 15 },
+  enhanced: {
+    title: 'Korean Crispy Tempeh Wraps (enhanced)',
+    servings: 2,
+    macros: { calories: 540, protein: 38, carbs: 45, fat: 18 }
+  }
+};
+
+// Check that enhanced variant crossbar uses Lunch targets (Elliott Lunch kcal target 630 instead of Dinner 735)
+const lunchCrossbar = renderMacroBreakdownCrossbar(lunchRecipe, 'enhanced');
+assert(lunchCrossbar.includes('Dual-Profile Per-Portion Split'), 'Crossbar must render');
+// In Lunch targets for 2 servings (share ~56% Elliott = 605 kcal scaled vs 630 target => -25 kcal, not dinner 735 => -130)
+assert(!lunchCrossbar.includes('-130'), 'Should not use dinner target differences for a lunch recipe');
+
+console.log('✅ Passed: Enhanced variant retains mealSuitability and evaluates against lunch macro targets');
+
+// --- Test 23: Firestore Sanitization and Save Result Verification ---
+console.log('\n--- Test 23: Firestore Sanitization and Save Result Verification ---');
+const rawDirtyRecipe = {
+  id: 'test-rec-1',
+  title: 'Test Clean Recipe',
+  enhanced: undefined,
+  macros: {
+    calories: 400,
+    protein: 25,
+    carbs: undefined
+  },
+  ingredients: [
+    { name: 'Tofu', qty: 200, unit: 'g', scaledQty: undefined, waterMl: null }
+  ]
+};
+
+const sanitized = sanitizeForFirestore(rawDirtyRecipe);
+assert.equal(sanitized.enhanced, null, 'undefined enhanced field should become null');
+assert.equal('carbs' in sanitized.macros, false, 'undefined nested keys should be stripped');
+assert.equal('scaledQty' in sanitized.ingredients[0], false, 'undefined ingredient fields should be stripped');
+assert.equal(sanitized.ingredients[0].waterMl, null, 'null fields should be preserved');
+
+console.log('✅ Passed: sanitizeForFirestore eliminates undefined fields recursively');
 
 console.log('\n=== ALL RECIPE WIZARD v3.28.3 TESTS PASSED SUCCESSFULLY ===');

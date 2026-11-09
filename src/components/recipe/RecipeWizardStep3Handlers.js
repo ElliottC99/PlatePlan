@@ -14,6 +14,8 @@ import { calculateItemNutrition } from '../../services/NutritionService.js';
 import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
 import { openEnhancementModal } from './RecipeEnhancementModalUI.js';
 import { cleanIngredientPhraseForAlias, stemIngredientName } from '../../services/RecipeIngredientParser.js';
+import { renderMacroBreakdownCrossbar } from './RecipeWizardStep3View.js';
+import { renderFitScoreBadge } from '../FitScoreBadge.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -356,7 +358,7 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal = () => {}, sh
   rec.nutrition = finalMacros;
 
   let finalComputedScore = rec.fitScore || 0;
-  const targetMealType = rec.types?.[0] || rec.type || 'dinner';
+  const targetMealType = rec.mealSuitability?.[0] || rec.types?.[0] || rec.type || 'dinner';
   const scoreVariant = wizardState.activeVariant || 'original';
   const calcMealScore = (typeof calculateMealFitScore === 'function') ? calculateMealFitScore : (typeof window !== 'undefined' ? window.calculateMealFitScore : null);
   if (typeof calcMealScore === 'function') {
@@ -574,7 +576,13 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal = () => {}, sh
   }
 
   try {
-    await saveRecipe(recipeToSave);
+    const saveRes = await saveRecipe(recipeToSave);
+    if (saveRes && saveRes.success === false && !saveRes.offline) {
+      const errMsg = typeof saveRes?.error === 'string'
+        ? saveRes.error
+        : (saveRes?.error?.message || 'Database save failed');
+      throw new Error(errMsg);
+    }
     updateRecipeInStore(recipeToSave);
 
     const resolvedForLearning = [
@@ -632,12 +640,37 @@ export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice
   // Step 3: Meal tag toggles
   modalWrap.querySelectorAll('.wiz-review-tag').forEach(cb => {
     cb.onchange = () => {
-      const selected = Array.from(modalWrap.querySelectorAll('#wiz-review-tags-box input:checked')).map(i => i.value);
+      let selected = Array.from(modalWrap.querySelectorAll('#wiz-review-tags-box input:checked')).map(i => i.value);
+      if (selected.length === 0) {
+        selected = ['Dinner'];
+      }
+      if (cb.checked && cb.value) {
+        selected = [cb.value, ...selected.filter(v => v !== cb.value)];
+      }
       wizardState.activeRecipe.mealSuitability = selected;
-      const parentLabel = cb.closest('label');
-      if (parentLabel) {
-        parentLabel.style.background = cb.checked ? 'var(--badge-blue-bg)' : 'var(--surface)';
-        parentLabel.style.color = cb.checked ? 'var(--badge-blue-text)' : 'var(--text)';
+      wizardState.activeRecipe.types = selected.map(t => t.toLowerCase());
+      wizardState.activeRecipe.mealType = wizardState.activeRecipe.types[0];
+
+      modalWrap.querySelectorAll('#wiz-review-tags-box .wiz-review-tag').forEach(input => {
+        const parentLabel = input.closest('label');
+        if (parentLabel) {
+          parentLabel.style.background = input.checked ? 'var(--badge-blue-bg)' : 'var(--surface)';
+          parentLabel.style.color = input.checked ? 'var(--badge-blue-text)' : 'var(--text)';
+        }
+      });
+
+      const currentVariant = wizardState.activeVariant || 'original';
+      const targetMealType = wizardState.activeRecipe.mealSuitability[0];
+      const fitContainer = modalWrap.querySelector('#wiz-step3-fit-badge-container');
+      const macroCrossbarContainer = modalWrap.querySelector('#wiz-step3-macro-crossbar-container');
+      if (fitContainer) {
+        fitContainer.innerHTML = renderFitScoreBadge(wizardState.activeRecipe, targetMealType, {
+          variant: currentVariant,
+          showLabel: true
+        });
+      }
+      if (macroCrossbarContainer) {
+        macroCrossbarContainer.innerHTML = renderMacroBreakdownCrossbar(wizardState.activeRecipe, currentVariant, { mealType: targetMealType });
       }
     };
   });

@@ -56,6 +56,10 @@ export function parseQuantity(rawText) {
   let text = String(rawText || '').trim();
   if (!text) return { qty: 1, remainder: '' };
 
+  // Strip leading bullets, asterisks, dashes, pluses, tildes, unicode bullets, and emojis
+  text = text.replace(/^[\s*\-–—~•●◦▪▫▫️▪️+\p{Extended_Pictographic}\uFE0F\u200D]+\s*/u, '');
+  if (!text) return { qty: 1, remainder: '' };
+
   text = text.replace(/(\d+)\s*([½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])/g, '$1 $2');
   Object.keys(UNICODE_FRACTIONS).forEach(uf => {
     if (text.includes(uf)) {
@@ -201,14 +205,15 @@ function isImpliedSaltOrPepperLine(rawStr) {
 export function parseIngredientString(rawStr) {
   if (!rawStr || typeof rawStr !== 'string') return null;
   const s = rawStr.trim();
-  if (!s || /^(?:FOR THE\b|TO SERVE\b)/i.test(s)) return null;
-  if (isImpliedSaltOrPepperLine(s)) return null;
+  const unbulleted = s.replace(/^[\s*\-–—~•●◦▪▫▫️▪️+\p{Extended_Pictographic}\uFE0F\u200D]+\s*/u, '');
+  if (!unbulleted || /^(?:FOR THE\b|TO SERVE\b)/i.test(unbulleted)) return null;
+  if (isImpliedSaltOrPepperLine(unbulleted)) return null;
 
   // Standalone multiplier guard: never allow orphaned multiplier rows
-  if (/^\d+(?:\.\d+)?\s*[xX]$/.test(s)) return null;
+  if (/^\d+(?:\.\d+)?\s*[xX]$/.test(unbulleted)) return null;
 
   // Insert space between integer and unicode fraction: "1½" -> "1 ½"
-  let clean = s.replace(/(\d+)\s*([½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])/g, '$1 $2');
+  let clean = unbulleted.replace(/(\d+)\s*([½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])/g, '$1 $2');
   Object.keys(UNICODE_FRACTIONS).forEach(uf => {
     if (clean.includes(uf)) {
       clean = clean.replace(new RegExp(uf, 'g'), UNICODE_FRACTIONS[uf]);
@@ -387,6 +392,7 @@ export function parseIngredientString(rawStr) {
   }
 
   cleanedName = cleanedName.replace(/\*+/g, '').trim();
+  cleanedName = cleanedName.replace(/^(?:a|an)\s+/i, '').trim();
 
   if (/^(?:(vegetable|chicken|beef|fish|lamb|vegan|mushroom|onion)\s+)?stock\s*cubes?$/i.test(cleanedName)) {
     const typeMatch = cleanedName.match(/^(vegetable|chicken|beef|fish|lamb|vegan|mushroom|onion)\b/i);

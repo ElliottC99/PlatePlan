@@ -79,7 +79,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       });
     }
     if (macroBarContainer) {
-      macroBarContainer.innerHTML = renderMacroBreakdownCrossbar(wizardState.activeRecipe, currentVariant, { compact: true });
+      macroBarContainer.innerHTML = renderMacroBreakdownCrossbar(wizardState.activeRecipe, currentVariant, { compact: true, mealType: targetMealType });
     }
     updateStep2NextButtonState();
   };
@@ -121,6 +121,27 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
   });
 
   modalWrap.addEventListener('change', (e) => {
+    if (e.target && e.target.matches('.wiz-step2-meal-tag')) {
+      const clickedTag = e.target.value;
+      const allChecked = Array.from(modalWrap.querySelectorAll('.wiz-step2-meal-tag:checked')).map(el => el.value);
+      let selected = allChecked.length > 0 ? allChecked : ['Dinner'];
+      if (e.target.checked && clickedTag) {
+        selected = [clickedTag, ...selected.filter(t => t !== clickedTag)];
+      }
+      wizardState.activeRecipe.mealSuitability = selected;
+      wizardState.activeRecipe.types = selected.map(t => t.toLowerCase());
+      wizardState.activeRecipe.mealType = wizardState.activeRecipe.types[0];
+
+      modalWrap.querySelectorAll('.wiz-step2-meal-tag').forEach(input => {
+        const label = input.closest('label');
+        if (label) {
+          label.style.background = input.checked ? 'var(--purple-bg, #eef2ff)' : 'var(--surface, #fff)';
+          label.style.color = input.checked ? 'var(--purple, #4f46e5)' : 'var(--text2, #475569)';
+        }
+      });
+      updateLiveStep2NutritionDOM();
+      return;
+    }
     if (e.target && e.target.matches('.wiz-ing-qty, .wiz-ing-unit, .wiz-ing-name, .wiz-ing-water-ml, #wiz-servings-input')) {
       updateLiveStep2NutritionDOM();
     }
