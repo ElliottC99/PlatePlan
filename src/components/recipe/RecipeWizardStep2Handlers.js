@@ -3,7 +3,7 @@
  * Event bindings for Wizard Step 2: Interactive Servings Scaling, Section Editing, Line Editing & Taxonomy Linking.
  */
 
-import { wizardState, syncStep2InputsToState } from './RecipeWizardState.js';
+import { wizardState, syncStep2InputsToState, switchWizardVariant, isMultiRecipeQueueFlow } from './RecipeWizardState.js';
 import { bindTaxonomyAutocompleteEvents, isIngredientUnlinked } from './RecipeWizardTaxonomySearch.js';
 import { promptRecipeWizardAliases } from './RecipeWizardAliasesPrompt.js';
 import { getState } from '../../store/store.js';
@@ -95,6 +95,23 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
     const newWb = document.getElementById('wizard-modal-body') || document.querySelector('.modal-body');
     if (newWb) newWb.scrollTop = st;
   };
+
+  // Step 2 Variant toggle buttons (Original <-> Enhanced)
+  const step2TabOrig = modalWrap.querySelector('#wiz-step2-tab-original');
+  if (step2TabOrig) {
+    step2TabOrig.onclick = () => {
+      switchWizardVariant('original', modalWrap);
+      safeRender({ syncInputs: false });
+    };
+  }
+
+  const step2TabEnh = modalWrap.querySelector('#wiz-step2-tab-enhanced');
+  if (step2TabEnh) {
+    step2TabEnh.onclick = () => {
+      switchWizardVariant('enhanced', modalWrap);
+      safeRender({ syncInputs: false });
+    };
+  }
 
   // Live input delegation on table inputs: qty, unit, name, water ml, servings
   modalWrap.addEventListener('input', (e) => {
@@ -341,7 +358,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       if (wizardState.currentStep === 2) {
         syncStep2InputsToState(modalWrap);
       }
-      wizardState.currentStep = 1.5;
+      wizardState.currentStep = isMultiRecipeQueueFlow(wizardState) ? 1.5 : 1;
       renderWizardModal();
     });
   }

@@ -9,8 +9,13 @@
  */
 
 import { strict as assert } from 'assert';
-import { parseIngredientString, parseBulkRecipeText, toTitleCase, matchIngredientTaxonomy } from '../src/services/RecipeImporter.js';
-import { getSaveButtonLabel, hasDistinctEnhancedVariant } from '../src/components/recipe/RecipeWizardState.js';
+import { parseIngredientString, parseBulkRecipeText, toTitleCase, matchIngredientTaxonomy, cleanIngredientPhraseForAlias } from '../src/services/RecipeImporter.js';
+import { wizardState, resetWizardState, getSaveButtonLabel, hasDistinctEnhancedVariant, getWizardStepDisplayInfo, switchWizardVariant, stashActiveVariantSnapshot } from '../src/components/recipe/RecipeWizardState.js';
+import { renderState2Mapping } from '../src/components/recipe/RecipeWizardStep2View.js';
+import { renderStepBadge, renderState1AManual, renderState3Review } from '../src/components/recipe/RecipeWizardViews.js';
+import { filterTaxonomyItemsByQuery } from '../src/components/recipe/RecipeWizardTaxonomySearch.js';
+import { resolveProductForIngredient, onSaveRecipe } from '../src/components/recipe/RecipeWizardStep3Handlers.js';
+import { formatRecipeSourceHTML } from '../src/services/RecipeDetailModalService.js';
 import { scaleEmbeddedVolume } from '../src/services/PortionCalculationService.js';
 
 console.log('=== RUNNING RECIPE WIZARD v3.28.3 VERIFICATION SUITE ===');
@@ -170,5 +175,245 @@ const matched = matchIngredientTaxonomy({ name: 'organic pressed tofu block' }, 
 assert.equal(matched.ingredientId, 'ing_tofu');
 assert.equal(matched.isNewTaxonomyItem, false);
 console.log('✅ Passed: matchIngredientTaxonomy matched raw imported text against learned aliases array');
+
+// --- Test 8: U1 End-to-End Alias Matching (Stemmed, Subtype, Legacy Cleaned) & Resolution ---
+console.log('\n--- Test 8: End-to-End Alias Matching & Clean Alias Learning (U1) ---');
+const aliasBank = [
+  {
+    id: 'ing_onion',
+    name: 'Onions',
+    category: 'Produce',
+    aliases: ['allium'],
+    subtypes: [
+      { id: 'sub_spring_onion', name: 'Spring Onion', aliases: ['scallions', 'green onions'], defaultProductId: 'prod_spring_onion' }
+    ]
+  },
+  {
+    id: 'ing_coriander',
+    name: 'Coriander',
+    category: 'Produce',
+    aliases: ['fresh cilantro', '25g cilantro bunch'],
+    defaultProductId: 'prod_coriander',
+    subtypes: []
+  }
+];
+const aliasProducts = [
+  { id: 'prod_spring_onion', name: 'Tesco Spring Onions 100g', ingredientId: 'ing_onion', subtypeId: 'sub_spring_onion', isAutoDefault: true },
+  { id: 'prod_coriander', name: 'Tesco Fresh Coriander 30g', ingredientId: 'ing_coriander', isAutoDefault: true }
+];
+
+// 8a: Plural alias "scallions" matches singular + prep note "1 fresh scallion, finely sliced"
+const parsedScallion = parseIngredientString('1 fresh scallion, finely sliced');
+const matchedScallion = matchIngredientTaxonomy(parsedScallion, aliasBank);
+assert.equal(matchedScallion.ingredientId, 'ing_onion', 'Should match parent root item Onions');
+assert.equal(matchedScallion.subtypeId, 'sub_spring_onion', 'Should match subtype Spring Onion via plural alias scallions');
+assert.equal(matchedScallion.isNewTaxonomyItem, false);
+
+// 8b: Multi-word or legacy quantity-prefixed alias "fresh cilantro" / "25g cilantro bunch" matches "cilantro"
+const parsedCilantro = parseIngredientString('15g cilantro, chopped');
+const matchedCilantro = matchIngredientTaxonomy(parsedCilantro, aliasBank);
+assert.equal(matchedCilantro.ingredientId, 'ing_coriander', 'Should match Coriander via alias');
+assert.equal(matchedCilantro.isNewTaxonomyItem, false);
+
+// 8c: Step 2 autocomplete dropdown filters by root-item and sub-type aliases
+const taxResultsScallion = filterTaxonomyItemsByQuery('scallion', aliasBank, aliasProducts);
+assert.equal(taxResultsScallion.length, 1, 'Dropdown should find Onions when searching scallion');
+assert.equal(taxResultsScallion[0].ing.id, 'ing_onion');
+assert.equal(taxResultsScallion[0].subtypesToShow[0].id, 'sub_spring_onion');
+
+const taxResultsCilantro = filterTaxonomyItemsByQuery('cilantro', aliasBank, aliasProducts);
+assert.equal(taxResultsCilantro.length, 1, 'Dropdown should find Coriander when searching cilantro');
+assert.equal(taxResultsCilantro[0].ing.id, 'ing_coriander');
+
+// 8d: Step 3 product fallback resolves product via alias
+const resolvedViaSubAlias = resolveProductForIngredient({ name: 'Scallion' }, { products: aliasProducts, ingredients: aliasBank });
+assert.equal(resolvedViaSubAlias?.id, 'prod_spring_onion', 'Step 3 fallback should resolve Spring Onion default product via alias');
+
+const resolvedViaRootAlias = resolveProductForIngredient({ name: 'Cilantro' }, { products: aliasProducts, ingredients: aliasBank });
+assert.equal(resolvedViaRootAlias?.id, 'prod_coriander', 'Step 3 fallback should resolve Coriander default product via alias');
+
+// 8e: Clean alias phrase extraction strips quantities, units, and prep notes
+assert.equal(cleanIngredientPhraseForAlias('200g organic firm tofu, cubed'), 'organic firm tofu');
+assert.equal(cleanIngredientPhraseForAlias({ raw: '2 cloves garlic, minced', name: 'Garlic' }), 'garlic');
+assert.equal(cleanIngredientPhraseForAlias({ name: '200g firm tofu, cubed' }), 'firm tofu');
+console.log('✅ Passed: End-to-end alias matching across parser, Step 2 dropdown, Step 3 product fallback, and clean alias extraction');
+
+// --- Test 9: U2 Adding Method Steps When Starting From Zero Steps ---
+console.log('\n--- Test 9: Adding Method Steps From 0 Steps (U2) ---');
+resetWizardState();
+wizardState.activeRecipe.title = 'Zero Step Salad';
+wizardState.activeRecipe.methodSteps = [];
+// Emulate clicking "+ Add Step" which pushes ''
+wizardState.activeRecipe.methodSteps.push('');
+const step2ZeroHtml = renderState2Mapping();
+assert(step2ZeroHtml.includes('id="wiz-step-input-0"'), 'Step 2 should render textarea #wiz-step-input-0 when a blank step is added from 0 steps');
+assert(step2ZeroHtml.includes('Method Steps (1)'), 'Method Steps count should reflect 1 step');
+console.log('✅ Passed: Adding a method step from 0 steps renders an editable textarea');
+
+// --- Test 10: U3 Dynamic Whole-Number Wizard Step Numbering ---
+console.log('\n--- Test 10: Dynamic Whole-Number Wizard Step Numbering (U3) ---');
+resetWizardState();
+wizardState.currentStep = 1;
+assert.equal(getWizardStepDisplayInfo(wizardState).label, 'Step 1: Ingestion');
+wizardState.currentStep = 2;
+assert.equal(getWizardStepDisplayInfo(wizardState).label, 'Step 2: Sections & Mapping');
+wizardState.currentStep = 3;
+assert.equal(getWizardStepDisplayInfo(wizardState).label, 'Step 3: Inline Review & Save');
+
+// Multi-recipe queue flow (Steps 1 -> 2 -> 3 -> 4, no Step 1.5)
+wizardState.initialQueueTotal = 3;
+wizardState.processingQueue = [{ title: 'R1' }, { title: 'R2' }];
+wizardState.currentStep = 1.5;
+const badge15 = renderStepBadge();
+assert(!badge15.includes('1.5'), 'Badge must never display Step 1.5');
+assert(badge15.includes('Step 2: Recipe Review Queue'), 'Multi-recipe queue review must be Step 2');
+wizardState.currentStep = 2;
+assert.equal(getWizardStepDisplayInfo(wizardState).label, 'Step 3: Sections & Mapping');
+wizardState.currentStep = 3;
+assert.equal(getWizardStepDisplayInfo(wizardState).label, 'Step 4: Inline Review & Save');
+console.log('✅ Passed: Wizard steps use whole integers dynamically (1-3 single, 1-4 multi-recipe queue)');
+
+// --- Test 11: U4 Original <-> Enhanced Variant Switching in Step 2 & Step 3 ---
+console.log('\n--- Test 11: Original <-> Enhanced Variant Switching (U4) ---');
+resetWizardState();
+wizardState.activeRecipe.title = 'Tofu Stir Fry';
+wizardState.activeRecipe.ingredientSections = [
+  { sectionTitle: 'Main Ingredients', ingredients: [{ name: 'Firm Tofu', qty: 200, unit: 'g', ingredientId: 'ing_tofu' }] }
+];
+wizardState.activeRecipe.methodSteps = ['Fry tofu in pan.'];
+wizardState.activeRecipe.enhanced = {
+  title: 'Tofu Stir Fry (Enhanced)',
+  ingredientSections: [
+    { sectionTitle: 'Main Ingredients', ingredients: [{ name: 'Firm Tofu', qty: 350, unit: 'g', ingredientId: 'ing_tofu' }, { name: 'Edamame', qty: 100, unit: 'g', ingredientId: 'ing_edamame' }] }
+  ],
+  methodSteps: ['Air fry 350g tofu and toss with edamame.']
+};
+stashActiveVariantSnapshot();
+
+const step2WithEnhHtml = renderState2Mapping();
+assert(step2WithEnhHtml.includes('id="wiz-step2-tab-original"'), 'Step 2 header should render Original tab when Enhanced variant exists');
+assert(step2WithEnhHtml.includes('id="wiz-step2-tab-enhanced"'), 'Step 2 header should render Enhanced tab when Enhanced variant exists');
+
+// Switch to Enhanced and verify working state swaps
+switchWizardVariant('enhanced');
+assert.equal(wizardState.activeVariant, 'enhanced');
+assert.equal(wizardState.activeRecipe.ingredientSections[0].ingredients.length, 2, 'Enhanced variant should have 2 ingredients');
+assert.equal(wizardState.activeRecipe.ingredientSections[0].ingredients[0].qty, 350, 'Enhanced tofu qty should be 350g');
+
+// Mutate Enhanced ingredient qty, then switch back to Original
+wizardState.activeRecipe.ingredientSections[0].ingredients[0].qty = 400;
+switchWizardVariant('original');
+assert.equal(wizardState.activeVariant, 'original');
+assert.equal(wizardState.activeRecipe.ingredientSections[0].ingredients.length, 1, 'Original variant should retain 1 ingredient');
+assert.equal(wizardState.activeRecipe.ingredientSections[0].ingredients[0].qty, 200, 'Original tofu qty should remain 200g');
+
+// Switch back to Enhanced and verify the 400g edit was preserved in snapshot
+switchWizardVariant('enhanced');
+assert.equal(wizardState.activeRecipe.ingredientSections[0].ingredients[0].qty, 400, 'Enhanced tofu edit (400g) must persist across tab switches');
+assert.equal(getSaveButtonLabel(wizardState.activeRecipe), 'Save Enhanced Variant', 'Save button should say Save Enhanced Variant on enhanced tab');
+switchWizardVariant('original');
+assert.equal(getSaveButtonLabel(wizardState.activeRecipe), 'Save Both Recipes', 'Save button should say Save Both Recipes on original tab when distinct enhanced exists');
+console.log('✅ Passed: Original <-> Enhanced toggle in Step 2 & Step 3 preserves independent variant edits');
+
+// --- Test 12: U5 & U6 Blank Defaults, Mandatory Meal Suitability & Recipe Source Fields ---
+console.log('\n--- Test 12: Blank Defaults, Mandatory Meal Suitability & Source Fields (U5 & U6) ---');
+resetWizardState();
+assert.deepEqual(wizardState.activeRecipe.prepTime, { hours: '', minutes: '' }, 'New recipe prepTime should default to blank');
+assert.deepEqual(wizardState.activeRecipe.cookTime, { hours: '', minutes: '' }, 'New recipe cookTime should default to blank');
+assert.deepEqual(wizardState.activeRecipe.mealSuitability, [], 'New recipe mealSuitability should default to empty array');
+assert.equal(wizardState.activeRecipe.sourceType, '', 'New recipe sourceType should default to empty');
+
+const step1AHtml = renderState1AManual();
+assert(step1AHtml.includes('id="wiz-source-url"'), 'Step 1A should render Online URL input');
+assert(step1AHtml.includes('id="wiz-source-book"'), 'Step 1A should render Book Name input');
+assert(step1AHtml.includes('id="wiz-source-page"'), 'Step 1A should render Book Page input');
+
+wizardState.activeRecipe.sourceType = 'book';
+wizardState.activeRecipe.sourceBook = 'Ottolenghi Simple';
+wizardState.activeRecipe.sourcePage = '142';
+const step3Html = renderState3Review();
+assert(step3Html.includes('id="wiz-rev-source-url"'), 'Step 3 should render Online URL input');
+assert(step3Html.includes('id="wiz-rev-source-book"'), 'Step 3 should render Book Name input');
+assert(step3Html.includes('Ottolenghi Simple'), 'Step 3 should populate Book Name');
+
+const bookSourceBadge = formatRecipeSourceHTML(wizardState.activeRecipe);
+assert(bookSourceBadge.includes('Ottolenghi Simple, p. 142'), 'Detail modal should format book + page source');
+
+const onlineSourceBadge = formatRecipeSourceHTML({ sourceType: 'online', sourceUrl: 'https://ottolenghi.co.uk/recipes/tofu' });
+assert(onlineSourceBadge.includes('href="https://ottolenghi.co.uk/recipes/tofu"'), 'Detail modal should format online source as clickable link');
+console.log('✅ Passed: Blank defaults, mandatory meal suitability state, and Online/Book source fields verified');
+
+// --- Test 13: onSaveRecipe Integration (AE1 ingredientId vs productId, AE4 Dual-Variant Save, AE5 Meal Suitability Gate) ---
+console.log('\n--- Test 13: onSaveRecipe Integration (AE1, AE4, AE5) ---');
+global.document = global.document || {
+  getElementById: () => null,
+  querySelector: () => null,
+  querySelectorAll: () => [],
+  dispatchEvent: () => {}
+};
+global.window = global.window || {};
+global.window.dispatchEvent = () => {};
+global.window.getState = () => ({
+  recipes: [],
+  products: [
+    { id: 'prod_spring_onion', name: 'Tesco Spring Onions 100g', ingredientId: 'ing_onion', subtypeId: 'sub_spring_onion', isDefault: true }
+  ],
+  rootItems: [
+    { id: 'ing_onion', name: 'Onion', categoryId: 'cat_produce', defaultProductId: 'prod_spring_onion', subtypes: [{ id: 'sub_spring_onion', name: 'Spring Onion', defaultProductId: 'prod_spring_onion' }] }
+  ]
+});
+
+const mockModalWrap = {
+  querySelector: () => null,
+  querySelectorAll: () => [],
+  remove: () => {}
+};
+
+let lastNotice = null;
+let closeCalled = false;
+const mockCallbacks = {
+  renderWizardModal: () => {},
+  showWizardNotice: (msg, type) => { lastNotice = { msg, type }; },
+  loadNextRecipeFromQueue: () => {},
+  closeRecipeWizard: () => { closeCalled = true; }
+};
+
+// 13a: Saving with empty mealSuitability is blocked (AE5)
+resetWizardState();
+wizardState.activeRecipe.title = 'Unclassified Dish';
+wizardState.activeRecipe.mealSuitability = [];
+wizardState.activeRecipe.ingredientSections = [
+  { sectionTitle: 'Main Ingredients', ingredients: [{ name: 'Spring Onion', qty: 2, unit: 'qty', ingredientId: 'ing_onion', subtypeId: 'sub_spring_onion', productId: 'prod_spring_onion' }] }
+];
+await onSaveRecipe(mockModalWrap, mockCallbacks);
+assert.equal(closeCalled, false, 'onSaveRecipe must abort without closing wizard when mealSuitability is empty');
+assert(lastNotice && lastNotice.msg.includes('Meal Suitability'), 'onSaveRecipe should show warning notice when mealSuitability is empty');
+
+// 13b: Saving with valid mealSuitability preserves ingredientId distinct from productId (AE1) & saves edits to both variants (AE4)
+lastNotice = null;
+wizardState.activeRecipe.mealSuitability = ['Dinner'];
+wizardState.activeRecipe.sourceType = 'book';
+wizardState.activeRecipe.sourceBook = 'Simple';
+wizardState.activeRecipe.sourcePage = '55';
+wizardState.activeRecipe.methodSteps = ['Chop spring onions (Original).'];
+wizardState.activeRecipe.enhanced = {
+  title: 'Unclassified Dish (Enhanced)',
+  ingredientSections: [
+    { sectionTitle: 'Main Ingredients', ingredients: [{ name: 'Spring Onion', qty: 4, unit: 'qty', ingredientId: 'ing_onion', subtypeId: 'sub_spring_onion', productId: 'prod_spring_onion' }] }
+  ],
+  methodSteps: ['Grill 4 spring onions (Enhanced).']
+};
+stashActiveVariantSnapshot();
+
+// Switch to Enhanced, edit qty to 5, then save directly from Enhanced tab
+switchWizardVariant('enhanced');
+wizardState.activeRecipe.ingredientSections[0].ingredients[0].qty = 5;
+
+await onSaveRecipe(mockModalWrap, mockCallbacks);
+assert.equal(wizardState.activeRecipe.ingredients[0].ingredientId, 'ing_onion', 'Saved ingredient must retain root ingredientId distinct from productId');
+assert.equal(wizardState.activeRecipe.ingredients[0].productId, 'prod_spring_onion', 'Saved ingredient must retain productId');
+assert.equal(wizardState.variantSnapshots.original.ingredientSections[0].ingredients[0].qty, 2, 'Original snapshot must preserve qty=2');
+assert.equal(wizardState.variantSnapshots.enhanced.ingredientSections[0].ingredients[0].qty, 5, 'Enhanced snapshot must preserve edited qty=5');
+console.log('✅ Passed: onSaveRecipe enforces mandatory meal suitability, preserves ingredientId vs productId, and retains dual-variant snapshots');
 
 console.log('\n=== ALL RECIPE WIZARD v3.28.3 TESTS PASSED SUCCESSFULLY ===');

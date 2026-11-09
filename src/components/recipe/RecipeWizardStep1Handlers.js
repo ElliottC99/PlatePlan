@@ -8,7 +8,7 @@ import { parseIngredientString, matchIngredientTaxonomy } from '../../services/R
 import { toTitleCase } from '../../utils/stringUtils.js';
 import { getState, updateState, reorderDraftRecipes } from '../../state/AppState.js';
 import { saveRecipe } from '../../services/HouseholdRepository.js';
-import { wizardState } from './RecipeWizardState.js';
+import { wizardState, stashActiveVariantSnapshot } from './RecipeWizardState.js';
 
 export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotice, loadNextRecipeFromQueue, closeRecipeWizard }) {
   if (!modalWrap) return;
@@ -36,7 +36,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
   modalWrap.querySelectorAll('.wiz-meal-tag').forEach(cb => {
     cb.onchange = () => {
       const selected = Array.from(modalWrap.querySelectorAll('.wiz-meal-tag:checked')).map(i => i.value);
-      wizardState.activeRecipe.mealSuitability = selected.length ? selected : ['Dinner'];
+      wizardState.activeRecipe.mealSuitability = selected;
       const parentLabel = cb.closest('label');
       if (parentLabel) {
         parentLabel.style.background = cb.checked ? 'var(--purple-bg, #eef2ff)' : 'var(--surface, #fff)';
@@ -45,17 +45,51 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
     };
   });
 
+  // Step 1A: Source type radios
+  modalWrap.querySelectorAll('.wiz-source-type-radio').forEach(radio => {
+    radio.onchange = () => {
+      const selectedType = radio.value || '';
+      wizardState.activeRecipe.sourceType = selectedType;
+      modalWrap.querySelectorAll('.wiz-source-type-pill').forEach(lbl => {
+        const inp = lbl.querySelector('input');
+        const isSel = inp && inp.checked;
+        lbl.style.background = isSel ? 'var(--purple-bg, #eef2ff)' : 'var(--surface, #fff)';
+        lbl.style.color = isSel ? 'var(--purple, #4f46e5)' : 'var(--text, #333)';
+        lbl.style.fontWeight = isSel ? '600' : '500';
+      });
+      const onlineDiv = modalWrap.querySelector('#wiz-source-online-fields');
+      const bookDiv = modalWrap.querySelector('#wiz-source-book-fields');
+      if (onlineDiv) onlineDiv.style.display = selectedType === 'online' ? 'block' : 'none';
+      if (bookDiv) bookDiv.style.display = selectedType === 'book' ? 'grid' : 'none';
+    };
+  });
+
   // Step 1A: Next
   const btnNext1A = modalWrap.querySelector('#btn-next-step1a');
   if (btnNext1A) {
     btnNext1A.onclick = () => {
+      const selectedMealTags = Array.from(modalWrap.querySelectorAll('.wiz-meal-tag:checked')).map(i => i.value);
+      wizardState.activeRecipe.mealSuitability = selectedMealTags;
+      if (selectedMealTags.length === 0) {
+        showWizardNotice('Please select at least one Meal Suitability tag (e.g. Breakfast, Lunch, Dinner, or Snacking) before proceeding.', 'warning');
+        return;
+      }
+
       const rawTitle = modalWrap.querySelector('#wiz-title')?.value.trim() || 'Untitled Recipe';
       const title = toTitleCase(rawTitle);
       const serv = parseInt(modalWrap.querySelector('#wiz-servings')?.value, 10) || 4;
-      const prepH = parseInt(modalWrap.querySelector('#wiz-prep-hours')?.value, 10) || 0;
-      const prepM = parseInt(modalWrap.querySelector('#wiz-prep-mins')?.value, 10) || 0;
-      const cookH = parseInt(modalWrap.querySelector('#wiz-cook-hours')?.value, 10) || 0;
-      const cookM = parseInt(modalWrap.querySelector('#wiz-cook-mins')?.value, 10) || 0;
+      const rawPrepH = modalWrap.querySelector('#wiz-prep-hours')?.value?.trim() ?? '';
+      const rawPrepM = modalWrap.querySelector('#wiz-prep-mins')?.value?.trim() ?? '';
+      const rawCookH = modalWrap.querySelector('#wiz-cook-hours')?.value?.trim() ?? '';
+      const rawCookM = modalWrap.querySelector('#wiz-cook-mins')?.value?.trim() ?? '';
+      const prepH = rawPrepH === '' ? '' : (parseInt(rawPrepH, 10) || 0);
+      const prepM = rawPrepM === '' ? '' : (parseInt(rawPrepM, 10) || 0);
+      const cookH = rawCookH === '' ? '' : (parseInt(rawCookH, 10) || 0);
+      const cookM = rawCookM === '' ? '' : (parseInt(rawCookM, 10) || 0);
+      const srcType = modalWrap.querySelector('input[name="wiz_source_type"]:checked')?.value ?? (wizardState.activeRecipe.sourceType || '');
+      const srcUrl = modalWrap.querySelector('#wiz-source-url')?.value?.trim() || '';
+      const srcBook = modalWrap.querySelector('#wiz-source-book')?.value?.trim() || '';
+      const srcPage = modalWrap.querySelector('#wiz-source-page')?.value?.trim() || '';
       const ingRaw = modalWrap.querySelector('#wiz-ingredients-raw')?.value.trim() || '';
       const metRaw = modalWrap.querySelector('#wiz-method-raw')?.value.trim() || '';
 
@@ -98,10 +132,15 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
       wizardState.activeRecipe.serves = serv;
       wizardState.activeRecipe.prepTime = { hours: prepH, minutes: prepM };
       wizardState.activeRecipe.cookTime = { hours: cookH, minutes: cookM };
+      wizardState.activeRecipe.sourceType = srcType;
+      wizardState.activeRecipe.sourceUrl = srcUrl;
+      wizardState.activeRecipe.sourceBook = srcBook;
+      wizardState.activeRecipe.sourcePage = srcPage;
       wizardState.activeRecipe.ingredientsRaw = ingRaw;
       wizardState.activeRecipe.methodRaw = metRaw;
       wizardState.activeRecipe.ingredientSections = parsedSections.length ? parsedSections : [{ sectionTitle: 'Main Ingredients', ingredients: [] }];
       wizardState.activeRecipe.methodSteps = methodSteps;
+      stashActiveVariantSnapshot();
 
       wizardState.currentStep = 2;
       renderWizardModal();
@@ -131,6 +170,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
 
       wizardState.processingQueue = parsedRecipes;
       wizardState.currentQueueTotal = parsedRecipes.length;
+      wizardState.initialQueueTotal = parsedRecipes.length;
       wizardState.currentQueueIndex = 0;
       updateState({ draftRecipes: parsedRecipes });
 

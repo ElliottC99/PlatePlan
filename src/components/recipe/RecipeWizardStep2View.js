@@ -152,12 +152,17 @@ export function renderState2Mapping() {
     `;
   });
 
-  // Compact Method steps rendering with delete buttons
+  // Compact Method steps rendering with delete buttons (preserve blank steps added via + Add Step)
   let stepsHtml = '';
-  const rawMethodSteps = recipe.methodSteps || recipe.steps || recipe.method || recipe.instructions || [];
-  const normalizedSteps = Array.isArray(rawMethodSteps)
-    ? rawMethodSteps.map(s => typeof s === 'string' ? s : (s?.text || s?.instruction || s?.step || String(s || ''))).filter(Boolean)
-    : (typeof rawMethodSteps === 'string' ? rawMethodSteps.split('\n').filter(Boolean) : []);
+  const hasExplicitMethodStepsArray = Array.isArray(recipe.methodSteps);
+  const rawMethodSteps = hasExplicitMethodStepsArray
+    ? recipe.methodSteps
+    : (recipe.steps || recipe.method || recipe.instructions || []);
+  const normalizedSteps = hasExplicitMethodStepsArray
+    ? rawMethodSteps.map(s => typeof s === 'string' ? s : (s?.text || s?.instruction || s?.step || String(s ?? '')))
+    : (Array.isArray(rawMethodSteps)
+        ? rawMethodSteps.map(s => typeof s === 'string' ? s : (s?.text || s?.instruction || s?.step || String(s ?? ''))).filter(Boolean)
+        : (typeof rawMethodSteps === 'string' ? rawMethodSteps.split('\n').filter(Boolean) : []));
   normalizedSteps.forEach((step, idx) => {
     stepsHtml += `
       <div style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 6px;">
@@ -169,6 +174,12 @@ export function renderState2Mapping() {
   });
 
   const currentVariant = wizardState.activeVariant || 'original';
+  const isEnhancedTab = currentVariant === 'enhanced';
+  const hasEnhanced = Boolean(
+    activeRecipe.enhanced ||
+    wizardState.baseOriginalRecipe?.enhanced ||
+    wizardState.variantSnapshots?.enhanced
+  );
   recalculateWizardMacros(activeRecipe);
   const targetMealType = activeRecipe.mealSuitability?.[0] || activeRecipe.types?.[0] || activeRecipe.type || 'dinner';
   const fitTagHtml = renderFitScoreBadge(activeRecipe, targetMealType, {
@@ -176,6 +187,17 @@ export function renderState2Mapping() {
     showLabel: true
   });
   const macroCrossbarHtml = renderMacroBreakdownCrossbar(activeRecipe, currentVariant, { compact: true });
+
+  const step2VariantToggleHtml = hasEnhanced ? `
+    <div class="variant-toggle" id="wiz-step2-variant-toggle" style="display: inline-flex; background: var(--surface, #fff); padding: 2px; border-radius: 8px; border: 1px solid var(--border, #ccc);">
+      <button type="button" class="btn sm ${!isEnhancedTab ? 'primary' : 'ghost'}" id="wiz-step2-tab-original" style="padding: 3px 10px; font-size: 11.5px; font-weight: 600;">
+        Original
+      </button>
+      <button type="button" class="btn sm ${isEnhancedTab ? 'primary' : 'ghost'}" id="wiz-step2-tab-enhanced" style="padding: 3px 10px; font-size: 11.5px; font-weight: 600;">
+        ✨ Enhanced
+      </button>
+    </div>
+  ` : '';
 
   return `
     <div>
@@ -187,7 +209,7 @@ export function renderState2Mapping() {
           <h3 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--text, #0f172a); max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeAttr(toTitleCase(activeRecipe.title || 'Untitled Recipe'))}">
             ${escapeHtml(toTitleCase(activeRecipe.title || 'Untitled Recipe'))}
           </h3>
-          ${currentVariant === 'enhanced' ? '<span class="badge" style="background:var(--badge-green-bg);color:var(--badge-green-text);font-weight:700;font-size:10px;">✨ Enhanced</span>' : ''}
+          ${step2VariantToggleHtml}
           <div id="wiz-step2-fit-badge-container" style="display: inline-flex; align-items: center;">
             ${fitTagHtml}
           </div>
@@ -210,7 +232,7 @@ export function renderState2Mapping() {
       ${sectionsHtml}
 
       <div style="display: flex; justify-content: space-between; align-items: center; margin: 14px 0 6px;">
-        <h4 style="margin: 0; font-size: 14px; font-weight: 700;">Method Steps (${(recipe.methodSteps || []).length})</h4>
+        <h4 style="margin: 0; font-size: 14px; font-weight: 700;">Method Steps (${normalizedSteps.length})</h4>
         <button type="button" id="wiz-add-step-btn" class="btn sm secondary" style="padding: 2px 8px; font-size: 11px;">+ Add Step</button>
       </div>
 
