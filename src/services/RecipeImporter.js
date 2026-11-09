@@ -12,6 +12,7 @@ import {
   normalizeUnit,
   parseIngredientString,
   stemIngredientName,
+  cleanIngredientPhraseForAlias,
   matchIngredientTaxonomy
 } from './RecipeIngredientParser.js';
 
@@ -30,6 +31,7 @@ export {
   normalizeUnit,
   parseIngredientString,
   stemIngredientName,
+  cleanIngredientPhraseForAlias,
   matchIngredientTaxonomy,
   unpackCollapsedIngredients,
   unpackAndSplitRecipeBlocks,

@@ -105,7 +105,7 @@ export function unpackCollapsedIngredients(rawIngText) {
   text = text.replace(/\([^)]*\)/g, m => { parens.push(m); return `###PAREN_${parens.length - 1}###`; });
 
   // 2. Separate subsections e.g. "For the chips:", "To serve:"
-  text = text.replace(/([^\n,])\s*(\bFOR THE\s+[A-Za-z\s]+:|\bTO SERVE:)/gi, '$1\n\n$2\n')
+  text = text.replace(/([^\n,])\s*(FOR THE\s+[A-Za-z\s]+:|TO SERVE:)/gi, '$1\n\n$2\n')
     .replace(/\)\s*(?=[0-9a-zA-Z])/g, ')\n');
 
   // 3. Separate letters followed immediately by ANY quantity (never splits inside parens)
@@ -134,6 +134,82 @@ export function unpackCollapsedIngredients(rawIngText) {
 }
 
 /**
+ * Pre-normalizes single-line and social-media recipe captions (such as TikTok / Instagram captions)
+ * into structured lines with Ingredients: and Method: boundaries when explicit headers are absent.
+ * @param {string} rawBlock
+ * @returns {string}
+ */
+function normalizeSocialCaptionText(rawBlock) {
+  if (!rawBlock || typeof rawBlock !== 'string') return '';
+  let text = rawBlock.replace(/\r\n/g, '\n').trim();
+
+  // 1. Strip trailing social sign-offs ("ENJOY!") and markdown or plain hashtag blocks at the end
+  text = text.replace(/\s*(?:ENJOY!?\s*)?(?:\s*(?:\[#[^\]]+\]\([^)]*\)|#[a-zA-Z0-9_]+))+\s*$/i, '').trim();
+  text = text.replace(/(?<=[.!?])\s*ENJOY!?\s*$/i, '').trim();
+
+  // 2. Separate a leading ALL-CAPS title glued directly to a Capitalized+lowercase sentence
+  text = text.replace(/^([A-Z0-9\s&'’\-]{3,}[A-Z])(?=[A-Z][a-z]{2,})/, '$1\n');
+
+  // 3. Place "Makes X-Y servings." / "Serves: X" onto its own line when glued to preceding text
+  text = text.replace(/([^\n])\s*((?:(?:Makes|Serves)\s+\d+(?:\s*[-–to]+\s*\d+)?\s+servings?\.?|(?:Serves|Yield|Servings|Total\s+Servings):\s*\d+(?:\s*[-–to]+\s*\d+)?(?:\s*(?:servings?|portions?))?\.?))/gi, '$1\n$2\n');
+
+  // 4. Remove inline "* If you're using..." / "* Note..." footnote explanations before numbered Step 1
+  text = text.replace(/\*\s+(?:If\b|Note\b|You\s+can\b|Use\b|Adjust\b)[\s\S]*?(?=(?:\n|\s)*1[\.\)]\s+[A-Z])/gi, '\n');
+
+  // 5. Separate inline "For the <section>:" headers when glued to preceding words
+  text = text.replace(/([^\n])\s*(For\s+the\s+[A-Za-z\s]+:|To\s+serve:)/gi, '$1\n$2\n');
+
+  // 6. Expand Unicode square/round bullets onto their own lines and unpack inline "- qty" subsections
+  if (/(?:▫️|▪️|[•●◦▪▫])/.test(text)) {
+    text = text.replace(/\s*(?:▫️|▪️|[•●◦▪▫])\s*/g, '\n▫️ ');
+    const rawLines = text.split('\n');
+    const expandedLines = [];
+    let insertedIngredientsHeader = /(?:^|\n)\s*(?:#+\s*)?(?:main\s+)?ingredients?:?/i.test(text);
+
+    for (const rawLine of rawLines) {
+      const trimmed = rawLine.trim();
+      if (!trimmed) continue;
+
+      if (trimmed.startsWith('▫️')) {
+        if (!insertedIngredientsHeader) {
+          expandedLines.push('Ingredients:');
+          insertedIngredientsHeader = true;
+        }
+        const content = trimmed.replace(/^▫️\s*/, '').trim();
+        const subParts = content.split(/(?<!\d)-\s+(?=(?:\d|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]))/).map(p => p.trim()).filter(Boolean);
+        if (
+          subParts.length > 1 &&
+          !/^(?:\d|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|a\b|an\b|one\b|two\b|three\b|four\b|five\b|half\b|pinch\b|handful\b|dash\b|drizzle\b)/i.test(subParts[0])
+        ) {
+          const secHeader = subParts[0].replace(/:$/, '').trim();
+          expandedLines.push(`${secHeader}:`);
+          for (let j = 1; j < subParts.length; j++) {
+            expandedLines.push(subParts[j]);
+          }
+        } else {
+          expandedLines.push(content);
+        }
+      } else {
+        expandedLines.push(trimmed);
+      }
+    }
+    text = expandedLines.join('\n');
+  }
+
+  // 7. Split inline numbered method steps glued to sentence punctuation (e.g. ".1. Preheat... .2. In a...")
+  text = text.replace(/([.!?])\s*(?=[1-9]\d?[\.\)]\s+[A-Z])/g, '$1\n');
+
+  // 8. If no explicit Method/Instructions header exists, insert "Method:" before "1. <Step>" when "2. <Step>" also exists
+  if (!/(?:^|\n)\s*(?:#+\s*)?(?:Method\s+Instructions|Method|Instructions|Steps|Preparation):?/i.test(text)) {
+    if (/(?:^|\n)\s*1[\.\)]\s+[A-Z][\s\S]*?(?:^|\n)\s*2[\.\)]\s+[A-Z]/.test(text)) {
+      text = text.replace(/((?:^|\n)\s*)(1[\.\)]\s+[A-Z])/, '$1Method:\n$2');
+    }
+  }
+
+  return text.trim();
+}
+
+/**
  * Unpacks collapsed method instructions into individual steps.
  * Handles numbered lines, inline numbered steps (1. ... 2. ...), step prefixes (Step 1: ...),
  * bullet points, and paragraph breaks.
@@ -144,14 +220,20 @@ export function unpackCollapsedSteps(rawMethodText) {
   if (!rawMethodText || typeof rawMethodText !== 'string') return [];
   let text = rawMethodText.replace(/\r\n/g, '\n').trim();
 
+  // Strip trailing social sign-offs ("ENJOY!") and hashtags
+  text = text.replace(/\s*(?:ENJOY!?\s*)?(?:\s*(?:\[#[^\]]+\]\([^)]*\)|#[a-zA-Z0-9_]+))+\s*$/i, '').trim();
+  text = text.replace(/(?<=[.!?])\s*ENJOY!?\s*$/i, '').trim();
+
   // 1. Separate "Step 1:", "Step 1.", "Step 1 -" with newlines
   text = text.replace(/(\bStep\s*\d+[:\.\-]?\s*)/gi, '\n\n$1\n');
 
-  // 2. Separate inline numbered steps (e.g. "... 2. Add onions ...")
-  text = text.replace(/(?:^|\n|[\.!?]|\s+)(?=(?:[1-9]\d?[\.\)])\s+[A-Za-z])/g, '\n\n');
+  // 2. Separate inline numbered steps (e.g. "... 2. Add onions ..." or "...fan.2. In a...")
+  text = text.replace(/([\.!?])\s*(?=(?:[1-9]\d?[\.\)])\s+[A-Za-z])/g, '$1\n\n');
+  text = text.replace(/(?:^|\n|\s+)(?=(?:[1-9]\d?[\.\)])\s+[A-Za-z])/g, '\n\n');
 
   // 3. Separate bulleted items: •, -, * followed by space and letter
-  text = text.replace(/(?:^|\n|[\.!?]|\s+)(?=[•\*\-]\s+[A-Za-z])/g, '\n\n');
+  text = text.replace(/([\.!?])\s*(?=[•\*\-]\s+[A-Za-z])/g, '$1\n\n');
+  text = text.replace(/(?:^|\n|\s+)(?=[•\*\-]\s+[A-Za-z])/g, '\n\n');
 
   // 4. Split on newlines and clean step prefixes
   const rawList = text.split(/(?:\n\s*\n|\n)/).map(s => s.trim()).filter(Boolean);
@@ -178,6 +260,7 @@ export function unpackCollapsedSteps(rawMethodText) {
  */
 export function parseSingleRecipeText(block, ingredientsBank = []) {
   if (!block || typeof block !== 'string') return null;
+  block = normalizeSocialCaptionText(block);
 
   const ingMatch = block.match(/(?:^|\n)\s*(?:#+\s*)?(?:main\s+)?ingredients?:?\s*/i);
   const methodMatch = block.match(/(?:^|\n)\s*(?:#+\s*)?(?:Method\s+Instructions|Method|Instructions|Steps|Preparation):?\s*/i);
@@ -218,7 +301,7 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
       if (ext) title = ext;
       return;
     }
-    if (/^(?:Serves|Yield|Servings|Total\s+Servings):/i.test(line)) {
+    if (/^(?:Makes|Serves|Yield|Servings|Total\s+Servings)\b/i.test(line)) {
       const match = line.match(/\d+/);
       if (match) servings = parseInt(match[0], 10);
       return;

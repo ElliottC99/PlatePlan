@@ -11,7 +11,7 @@
 
 import { getState } from '../../state/AppState.js';
 import { extractRecipeMacros } from '../../utils/fitScoreCalculator.js';
-import { wizardState, resetWizardState, syncStep2InputsToState } from './RecipeWizardState.js';
+import { wizardState, resetWizardState, syncStep2InputsToState, stashActiveVariantSnapshot } from './RecipeWizardState.js';
 import { renderStepBadge, renderState0Choice, renderState1AManual, renderState1BBulk, renderState3Review } from './RecipeWizardViews.js';
 import { renderState2Mapping, renderStep2Footer } from './RecipeWizardStep2View.js';
 import { renderStep1Point5 } from './RecipeWizardStep15View.js';
@@ -200,6 +200,79 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null, va
         fat: Number(targetSource.macros?.fat ?? targetSource.nutrition?.perServing?.fat ?? targetSource.fat ?? 16)
       };
 
+      const buildSectionsFromSource = (srcObj) => {
+        if (!srcObj) return [{ sectionTitle: 'Main Ingredients', ingredients: [] }];
+        if (Array.isArray(srcObj.ingredientSections) && srcObj.ingredientSections.length > 0) {
+          return srcObj.ingredientSections.map(sec => ({
+            sectionTitle: sec.sectionTitle || 'Main Ingredients',
+            ingredients: Array.isArray(sec.ingredients) ? sec.ingredients.map(i => ({
+              ...i,
+              name: i.name || i.ingredientName || i.ingredient || (typeof i === 'string' ? i : ''),
+              qty: i.qty !== undefined && i.qty !== null ? i.qty : 1,
+              scaledQty: i.scaledQty !== undefined && i.scaledQty !== null ? i.scaledQty : (i.qty !== undefined && i.qty !== null ? i.qty : 1),
+              unit: i.unit || '',
+              raw: formatIngredientLine(i)
+            })) : []
+          }));
+        }
+        if (Array.isArray(srcObj.ingredients) && srcObj.ingredients.length > 0) {
+          return [{
+            sectionTitle: 'Main Ingredients',
+            ingredients: srcObj.ingredients.map(i => ({
+              ...(typeof i === 'object' ? i : {}),
+              name: typeof i === 'string' ? i : (i.name || i.ingredientName || i.ingredient || ''),
+              qty: i.qty !== undefined && i.qty !== null ? i.qty : 1,
+              scaledQty: i.scaledQty !== undefined && i.scaledQty !== null ? i.scaledQty : (i.qty !== undefined && i.qty !== null ? i.qty : 1),
+              unit: i.unit || '',
+              raw: formatIngredientLine(i)
+            }))
+          }];
+        }
+        return [{ sectionTitle: 'Main Ingredients', ingredients: [] }];
+      };
+
+      const origSectionsSnapshot = buildSectionsFromSource(found);
+      const origStepsSnapshot = extractRawSteps(found).map(s => typeof s === 'string' ? s.trim() : (s?.text || s?.instruction || s?.step || String(s || '')).trim()).filter(Boolean);
+      const origExtracted = extractRecipeMacros(found, 'original');
+      wizardState.variantSnapshots = {
+        original: {
+          ingredientSections: JSON.parse(JSON.stringify(origSectionsSnapshot)),
+          ingredients: JSON.parse(JSON.stringify(origSectionsSnapshot.flatMap(s => s.ingredients || []))),
+          methodSteps: [...origStepsSnapshot],
+          servings: Number(found.servings || found.serves || 4) || 4,
+          macros: {
+            calories: Number(origExtracted.calories ?? origExtracted.cal ?? found.macros?.calories ?? 450),
+            protein: Number(origExtracted.protein ?? origExtracted.prot ?? found.macros?.protein ?? 28),
+            carbs: Number(found.macros?.carbs ?? 40),
+            fat: Number(found.macros?.fat ?? 16)
+          }
+        },
+        enhanced: found.enhanced ? (() => {
+          const enhSecs = buildSectionsFromSource(found.enhanced);
+          const enhStepsRaw = extractRawSteps(found.enhanced);
+          const enhSteps = (enhStepsRaw.length ? enhStepsRaw : origStepsSnapshot).map(s => typeof s === 'string' ? s.trim() : (s?.text || s?.instruction || s?.step || String(s || '')).trim()).filter(Boolean);
+          const enhExt = extractRecipeMacros(found, 'enhanced');
+          return {
+            ingredientSections: JSON.parse(JSON.stringify(enhSecs)),
+            ingredients: JSON.parse(JSON.stringify(enhSecs.flatMap(s => s.ingredients || []))),
+            methodSteps: [...enhSteps],
+            servings: Number(found.enhanced.servings || found.enhanced.serves || found.servings || found.serves || 4) || 4,
+            macros: {
+              calories: Number(enhExt.calories ?? enhExt.cal ?? found.enhanced.macros?.calories ?? 450),
+              protein: Number(enhExt.protein ?? enhExt.prot ?? found.enhanced.macros?.protein ?? 28),
+              carbs: Number(found.enhanced.macros?.carbs ?? 40),
+              fat: Number(found.enhanced.macros?.fat ?? 16)
+            }
+          };
+        })() : null
+      };
+
+      const rawSourceStr = String(found.source || found.url || '').trim();
+      const inferredSourceType = found.sourceType || (found.sourceUrl || /^https?:\/\//i.test(rawSourceStr) ? 'online' : (found.sourceBook ? 'book' : ''));
+      const inferredSourceUrl = found.sourceUrl || (/^https?:\/\//i.test(rawSourceStr) ? rawSourceStr : '');
+      const inferredSourceBook = found.sourceBook || (inferredSourceType === 'book' ? rawSourceStr : '');
+      const inferredSourcePage = found.sourcePage || '';
+
       wizardState.activeRecipe = {
         id: found.id || found._id,
         title: targetSource.title || targetSource.name || found.title || found.name || '',
@@ -208,6 +281,10 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null, va
         prepTime,
         cookTime,
         mealSuitability,
+        sourceType: inferredSourceType,
+        sourceUrl: inferredSourceUrl,
+        sourceBook: inferredSourceBook,
+        sourcePage: inferredSourcePage,
         ingredientsRaw: ingRawText,
         methodRaw: methodRawText,
         ingredientSections,
@@ -216,6 +293,7 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null, va
         macros: safeMacros,
         enhanced: found.enhanced || null
       };
+      stashActiveVariantSnapshot();
     }
   }
 
@@ -296,19 +374,32 @@ export function loadNextRecipeFromQueue() {
   const methodRawText = parsedSteps.map(formatMethodLine).filter(Boolean).join('\n');
   const safeServes = Number(next.servings || next.serves || 4) || 4;
 
+  const isDefinedTimeVal = (val) => val !== '' && val !== undefined && val !== null;
+  const hasPrep = Boolean(next.prepTime && (isDefinedTimeVal(next.prepTime.hours) || isDefinedTimeVal(next.prepTime.minutes)));
+  const hasCook = Boolean(next.cookTime && (isDefinedTimeVal(next.cookTime.hours) || isDefinedTimeVal(next.cookTime.minutes)));
+  const rawNextTags = Array.isArray(next.mealSuitability) ? next.mealSuitability : [];
+
+  wizardState.variantSnapshots = { original: null, enhanced: null };
+  wizardState.activeVariant = 'original';
   wizardState.activeRecipe = {
     title: next.title || 'Imported Recipe',
     servings: safeServes,
     serves: safeServes,
-    prepTime: next.prepTime || { hours: 0, minutes: 15 },
-    cookTime: next.cookTime || { hours: 0, minutes: 30 },
-    mealSuitability: next.mealSuitability || ['Dinner'],
+    prepTime: hasPrep ? next.prepTime : { hours: '', minutes: '' },
+    cookTime: hasCook ? next.cookTime : { hours: '', minutes: '' },
+    mealSuitability: rawNextTags,
+    sourceType: next.sourceType || (next.sourceUrl ? 'online' : (next.sourceBook ? 'book' : '')),
+    sourceUrl: next.sourceUrl || '',
+    sourceBook: next.sourceBook || '',
+    sourcePage: next.sourcePage || '',
     ingredientsRaw: ingRawText,
     methodRaw: methodRawText,
     ingredientSections: next.ingredientSections || [{ sectionTitle: 'Main Ingredients', ingredients: next.ingredients || [] }],
     methodSteps: parsedSteps,
-    macros: next.macros || { calories: 450, protein: 28, carbs: 40, fat: 16 }
+    macros: next.macros || { calories: 450, protein: 28, carbs: 40, fat: 16 },
+    enhanced: next.enhanced || null
   };
+  stashActiveVariantSnapshot();
 }
 
 export function renderWizardFooter() {

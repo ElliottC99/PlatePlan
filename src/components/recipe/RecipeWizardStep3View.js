@@ -137,6 +137,7 @@ export function renderMacroBreakdownCrossbar(recipe, variant = 'original', optio
 
 export function renderState3Review() {
   const recipe = wizardState.activeRecipe;
+  recalculateWizardMacros(recipe);
   const currentVariant = wizardState.activeVariant || 'original';
   const isEnhancedTab = currentVariant === 'enhanced';
   const displayRecipe = (isEnhancedTab && recipe.enhanced)
@@ -260,6 +261,12 @@ export function renderState3Review() {
     </label>`;
   }).join(' ');
 
+  const hasExplicitPrep = recipe.prepTime && (recipe.prepTime.hours !== '' || recipe.prepTime.minutes !== '');
+  const hasExplicitCook = recipe.cookTime && (recipe.cookTime.hours !== '' || recipe.cookTime.minutes !== '');
+  const prepTotalMins = hasExplicitPrep ? ((Number(recipe.prepTime.hours) || 0) * 60 + (Number(recipe.prepTime.minutes) || 0)) : '';
+  const cookTotalMins = hasExplicitCook ? ((Number(recipe.cookTime.hours) || 0) * 60 + (Number(recipe.cookTime.minutes) || 0)) : '';
+  const curSourceType = recipe.sourceType || '';
+
   return `
     <div>
       ${identityBanner}
@@ -298,16 +305,40 @@ export function renderState3Review() {
           <div>
             <label for="wiz-rev-prepm" style="display:block; font-size:11px; font-weight:600; color:var(--text2);">Prep / Cook (Mins)</label>
             <div style="display:flex; gap:4px;">
-              <input type="number" id="wiz-rev-prepm" name="rev_prepm" value="${(recipe.prepTime.hours * 60) + recipe.prepTime.minutes}" aria-label="Prep mins" style="width:50%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
-              <input type="number" id="wiz-rev-cookm" name="rev_cookm" value="${(recipe.cookTime.hours * 60) + recipe.cookTime.minutes}" aria-label="Cook mins" style="width:50%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
+              <input type="number" id="wiz-rev-prepm" name="rev_prepm" placeholder="Prep min" value="${prepTotalMins}" aria-label="Prep mins" style="width:50%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
+              <input type="number" id="wiz-rev-cookm" name="rev_cookm" placeholder="Cook min" value="${cookTotalMins}" aria-label="Cook mins" style="width:50%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
             </div>
           </div>
         </div>
 
-        <div style="margin-bottom: 14px;">
-          <label style="display:block; font-size:11px; font-weight:600; color:var(--text2); margin-bottom: 4px;">Meal Suitability Tags</label>
+        <div style="margin-bottom: 12px;">
+          <label style="display:block; font-size:11px; font-weight:600; color:var(--text2); margin-bottom: 4px;">Meal Suitability Tags <span style="color:var(--danger,#ef4444);">*</span></label>
           <div style="display:flex; flex-wrap:wrap; gap:6px;" id="wiz-review-tags-box">
             ${mealTagsHtml}
+          </div>
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <label style="display:block; font-size:11px; font-weight:600; color:var(--text2); margin-bottom: 4px;">Recipe Source</label>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;" id="wiz-rev-source-type-box">
+            ${[
+              { val: '', label: 'None' },
+              { val: 'online', label: '🌐 Online (URL)' },
+              { val: 'book', label: '📖 Book' }
+            ].map(opt => {
+              const isSel = curSourceType === opt.val;
+              return `<label class="wiz-rev-source-type-pill" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 9px; border: 1px solid var(--border, #ccc); border-radius: 999px; background: ${isSel ? 'var(--badge-blue-bg)' : 'var(--surface)'}; color: ${isSel ? 'var(--badge-blue-text)' : 'var(--text)'}; font-weight: ${isSel ? '600' : '500'}; cursor: pointer;">
+                <input type="radio" name="wiz_rev_source_type" class="wiz-rev-source-type-radio" value="${opt.val}" ${isSel ? 'checked' : ''} style="display:none;" />
+                ${opt.label}
+              </label>`;
+            }).join(' ')}
+          </div>
+          <div id="wiz-rev-source-online-fields" style="display:${curSourceType === 'online' ? 'block' : 'none'};">
+            <input type="url" id="wiz-rev-source-url" name="rev_source_url" aria-label="Recipe source URL" value="${escapeAttr(recipe.sourceUrl || '')}" placeholder="https://example.com/recipe..." style="width:100%; padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-size:12.5px; background: var(--surface);" />
+          </div>
+          <div id="wiz-rev-source-book-fields" style="display:${curSourceType === 'book' ? 'grid' : 'none'}; grid-template-columns: 2fr 1fr; gap: 8px;">
+            <input type="text" id="wiz-rev-source-book" name="rev_source_book" aria-label="Recipe book name" value="${escapeAttr(recipe.sourceBook || '')}" placeholder="Book Name (e.g. Ottolenghi Simple)" style="width:100%; padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-size:12.5px; background: var(--surface);" />
+            <input type="text" id="wiz-rev-source-page" name="rev_source_page" aria-label="Recipe book page" value="${escapeAttr(recipe.sourcePage || '')}" placeholder="Page (e.g. 142)" style="width:100%; padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-size:12.5px; background: var(--surface);" />
           </div>
         </div>
 

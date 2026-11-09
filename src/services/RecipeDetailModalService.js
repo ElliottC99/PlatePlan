@@ -149,6 +149,32 @@ function renderComparisonBadge(actual, target) {
   return `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${bg};color:${color};line-height:1">${label}</span>`;
 }
 
+export function formatRecipeSourceHTML(r) {
+  if (!r || typeof r !== 'object') return '';
+  const esc = (str) => String(str ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  const srcType = String(r.sourceType || '').toLowerCase();
+  const srcUrl = String(r.sourceUrl || '').trim();
+  const srcBook = String(r.sourceBook || '').trim();
+  const srcPage = String(r.sourcePage || '').trim();
+  const legacySource = String(r.source || r.url || '').trim();
+
+  if (srcType === 'online' || (!srcType && /^https?:\/\//i.test(srcUrl || legacySource))) {
+    const url = srcUrl || legacySource;
+    if (!url) return '';
+    const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    return `<span>🌐 Source: <a href="${esc(href)}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4f46e5);text-decoration:underline;">${esc(url)}</a></span>`;
+  }
+  if (srcType === 'book' || srcBook) {
+    const bookText = [srcBook, srcPage ? `p. ${srcPage}` : ''].filter(Boolean).join(', ');
+    if (!bookText) return '';
+    return `<span>📖 Source: <strong>${esc(bookText)}</strong></span>`;
+  }
+  if (legacySource) {
+    return `<span>📌 Source: ${esc(legacySource)}</span>`;
+  }
+  return '';
+}
+
 export function renderRecipePreview() {
   const modalContent = document.getElementById('view-modal-content');
   if (!modalContent || !previewState.recipe) return;
@@ -254,6 +280,8 @@ export function renderRecipePreview() {
     </div>
   `;
 
+  const sourceHtml = formatRecipeSourceHTML(activeR) || formatRecipeSourceHTML(r);
+
   modalContent.innerHTML = renderRecipeDetailModalContent({
     r,
     recipe: activeR,
@@ -269,6 +297,7 @@ export function renderRecipePreview() {
     singleServes: previewState.singleServes,
     mealType,
     baseServes,
+    sourceHtml,
     ingredientsHtml,
     methodHtml,
     macroSplitHtml,

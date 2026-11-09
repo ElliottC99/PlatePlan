@@ -4,7 +4,7 @@
  * Includes live macro recalculation and dual-key state synchronization.
  */
 
-import { wizardState, syncStep3InputsToState, getSaveButtonLabel, hasDistinctEnhancedVariant } from './RecipeWizardState.js';
+import { wizardState, syncStep3InputsToState, getSaveButtonLabel, hasDistinctEnhancedVariant, stashActiveVariantSnapshot, switchWizardVariant } from './RecipeWizardState.js';
 import { isIngredientUnlinked } from './RecipeWizardTaxonomySearch.js';
 import { saveRecipe } from '../../services/HouseholdRepository.js';
 import { getState, updateRecipeInStore, learnIngredientAlias } from '../../store/store.js';
@@ -12,6 +12,7 @@ import { toTitleCase } from '../../utils/stringUtils.js';
 import { calculateItemNutrition } from '../../services/NutritionService.js';
 import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
 import { openEnhancementModal } from './RecipeEnhancementModalUI.js';
+import { cleanIngredientPhraseForAlias, stemIngredientName } from '../../services/RecipeIngredientParser.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -44,7 +45,7 @@ export function resolveProductForIngredient(item, { products = [], ingredients =
     if (item.ingredientId) {
       const parentIng = ingredients.find(i => String(i.id) === String(item.ingredientId));
       if (parentIng && Array.isArray(parentIng.subtypes)) {
-        const sub = parentIng.subtypes.find(s => String(s.id) === String(item.subtypeId));
+        const sub = parentIng.subtypes.find(s => String(s.id) === String(item.subtypeId) || String(s.name || '').toLowerCase() === String(item.subtypeId).toLowerCase());
         const subDefId = sub?.defaultProductId || sub?.defaultProduct;
         if (subDefId) {
           const prod = products.find(p => String(p.id) === String(subDefId));
@@ -93,7 +94,16 @@ export function resolveProductForIngredient(item, { products = [], ingredients =
     });
     if (partialProd) return partialProd;
 
-    const matchedIng = ingredients.find(i => String(i.name || '').trim().toLowerCase() === rawSearchName);
+    const matchedIng = ingredients.find(i => {
+      const iName = String(i.name || '').trim().toLowerCase();
+      if (iName === rawSearchName || (stemIngredientName(iName) && stemIngredientName(iName) === stemIngredientName(rawSearchName))) return true;
+      const iAliases = Array.isArray(i.aliases) ? i.aliases : [];
+      return iAliases.some(a => {
+        const aLower = String(a || '').trim().toLowerCase();
+        const aClean = cleanIngredientPhraseForAlias(aLower);
+        return aLower === rawSearchName || aClean === rawSearchName || (stemIngredientName(aClean || aLower) && stemIngredientName(aClean || aLower) === stemIngredientName(rawSearchName));
+      });
+    });
     if (matchedIng) {
       const defId = matchedIng.defaultProductId || matchedIng.defaultProduct;
       if (defId) {
@@ -104,6 +114,37 @@ export function resolveProductForIngredient(item, { products = [], ingredients =
       if (pAuto) return pAuto;
       const pAny = products.find(p => String(p.ingredientId) === String(matchedIng.id));
       if (pAny) return pAny;
+    }
+
+    // Check subtype name & subtype aliases in fallback
+    for (const ing of ingredients) {
+      for (const sub of (ing.subtypes || [])) {
+        const sName = String(sub.name || '').trim().toLowerCase();
+        const sAliases = Array.isArray(sub.aliases) ? sub.aliases : [];
+        const subMatches = sName === rawSearchName
+          || (stemIngredientName(sName) && stemIngredientName(sName) === stemIngredientName(rawSearchName))
+          || sAliases.some(sa => {
+            const saLower = String(sa || '').trim().toLowerCase();
+            const saClean = cleanIngredientPhraseForAlias(saLower);
+            return saLower === rawSearchName || saClean === rawSearchName || (stemIngredientName(saClean || saLower) && stemIngredientName(saClean || saLower) === stemIngredientName(rawSearchName));
+          });
+        if (subMatches) {
+          const subDefId = sub.defaultProductId || sub.defaultProduct;
+          if (subDefId) {
+            const prod = products.find(p => String(p.id) === String(subDefId));
+            if (prod) return prod;
+          }
+          const subAuto = products.find(p => String(p.subtypeId) === String(sub.id) && p.isAutoDefault);
+          if (subAuto) return subAuto;
+          const subAny = products.find(p => String(p.subtypeId) === String(sub.id));
+          if (subAny) return subAny;
+          const ingDefId = ing.defaultProductId || ing.defaultProduct;
+          if (ingDefId) {
+            const prod = products.find(p => String(p.id) === String(ingDefId));
+            if (prod) return prod;
+          }
+        }
+      }
     }
   }
 
@@ -233,14 +274,27 @@ export function onNextDish(modalWrap, { loadNextRecipeFromQueue, renderWizardMod
 /**
  * Handle recipe saving with DOM input extraction, dynamic formatting, live macros, and Store dispatch.
  */
-export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNotice, loadNextRecipeFromQueue, closeRecipeWizard }) {
+export async function onSaveRecipe(modalWrap, { renderWizardModal = () => {}, showWizardNotice = () => {}, loadNextRecipeFromQueue = () => {}, closeRecipeWizard = () => {} } = {}) {
   syncStep3InputsToState(modalWrap);
+  stashActiveVariantSnapshot();
   const rec = wizardState.activeRecipe;
-  const allIngredients = (rec.ingredientSections || []).flatMap(s => s.ingredients);
+
+  if (!Array.isArray(rec.mealSuitability) || rec.mealSuitability.length === 0) {
+    showWizardNotice('Please select at least one Meal Suitability tag (Breakfast, Lunch, Dinner, or Snacking) before saving.', 'warning');
+    return;
+  }
+
+  const allIngredients = (rec.ingredientSections || []).flatMap(s => s.ingredients || []);
+  const inactiveSnap = wizardState.activeVariant === 'enhanced'
+    ? wizardState.variantSnapshots?.original
+    : wizardState.variantSnapshots?.enhanced;
+  const inactiveIngredients = inactiveSnap
+    ? (inactiveSnap.ingredientSections || []).flatMap(s => s.ingredients || [])
+    : [];
   const state = (typeof getState === 'function' ? getState() : (typeof window !== 'undefined' ? window.getState?.() : null)) || {};
   const products = state.products || [];
   const ingredients = state.rootItems || state.ingredients || [];
-  const unlinked = allIngredients.filter(i => isIngredientUnlinked(i, products, ingredients));
+  const unlinked = [...allIngredients, ...inactiveIngredients].filter(i => isIngredientUnlinked(i, products, ingredients));
   
   if (unlinked.length > 0) {
     showWizardNotice(`Cannot save recipe: ${unlinked.length} ingredient(s) retain an unlinked "✨ New Item" status. Please map all ingredients to a valid Category, Item, or Sub-Type before saving.`, 'warning');
@@ -265,20 +319,35 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
   rec.servings = safeServings;
   rec.serves = safeServings;
 
-  rec.ingredients = allIngredients.map(i => {
-    const resolvedId = i.productId || i.bankId || i.mappedItemId || i.productMatch?.id || i.ingredientId || null;
-    return { 
-      ...i, 
-      productId: resolvedId, 
-      bankId: resolvedId, 
-      ingredientId: resolvedId 
+  const mapIngredientItem = (i) => {
+    const resolvedProd = resolveProductForIngredient(i, { products, ingredients });
+    const resolvedProdId = i.productId || i.bankId || i.mappedItemId || i.productMatch?.id || resolvedProd?.id || null;
+    const resolvedIngId = i.ingredientId || resolvedProd?.ingredientId || null;
+    return {
+      ...i,
+      name: i.name,
+      qty: Number(i.qty) || 1,
+      unit: i.unit || '',
+      raw: i.raw || `${i.qty || 1} ${i.unit || ''} ${i.name || ''}`.trim(),
+      productId: resolvedProdId,
+      bankId: resolvedProdId,
+      ingredientId: resolvedIngId,
+      subtypeId: i.subtypeId || null,
+      categoryId: i.categoryId || null,
+      isCategoryDefault: i.isCategoryDefault || false,
+      displayName: i.displayName || null,
+      waterMl: i.waterMl || null,
+      isNewTaxonomyItem: !!i.isNewTaxonomyItem
     };
-  });
-  rec.types = (rec.mealSuitability && rec.mealSuitability.length > 0) ? rec.mealSuitability.map(t => t.toLowerCase()) : ['dinner'];
+  };
+
+  rec.ingredients = allIngredients.map(mapIngredientItem);
+  rec.types = rec.mealSuitability.map(t => t.toLowerCase());
   rec.mealType = rec.types[0];
 
   // Force live macro recalculation
   recalculateWizardMacros(rec);
+  stashActiveVariantSnapshot();
 
   // Force strict sync between nutrition keys
   const finalMacros = (rec.nutrition && rec.nutrition.calories > (rec.macros?.calories || 0)) ? rec.nutrition : rec.macros;
@@ -302,139 +371,197 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
 
   let recipeToSave;
   const baseOrig = wizardState.baseOriginalRecipe || {};
+  const origSnap = wizardState.variantSnapshots?.original;
+  const enhSnap = wizardState.variantSnapshots?.enhanced;
 
-  if (wizardState.activeVariant === 'enhanced') {
-    const editedEnhancedPayload = {
-      ...(baseOrig.enhanced || {}),
-      name: rec.name || `${baseOrig.name || baseOrig.title || 'Recipe'} (enhanced)`,
-      title: rec.title || `${baseOrig.name || baseOrig.title || 'Recipe'} (enhanced)`,
-      servings: safeServings,
-      serves: safeServings,
-      ingredients: allIngredients.map(i => ({
-        name: i.name,
-        qty: Number(i.qty) || 1,
-        unit: i.unit || '',
-        raw: i.raw || `${i.qty || 1} ${i.unit || ''} ${i.name || ''}`.trim(),
-        ingredientId: i.ingredientId || null,
-        productId: i.productId || null,
-        bankId: i.bankId || i.productId || null,
-        subtypeId: i.subtypeId || null,
-        categoryId: i.categoryId || null,
-        isCategoryDefault: i.isCategoryDefault || false,
-        displayName: i.displayName || null,
-        waterMl: i.waterMl || null
-      })),
-      ingredientSections: rec.ingredientSections,
-      steps: rec.methodSteps || baseOrig.steps || baseOrig.method || baseOrig.instructions || [],
-      methodSteps: rec.methodSteps || baseOrig.methodSteps || baseOrig.steps || baseOrig.method || [],
-      method: (rec.methodSteps && rec.methodSteps.length ? rec.methodSteps : (baseOrig.methodSteps || baseOrig.steps || (Array.isArray(baseOrig.method) ? baseOrig.method : (typeof baseOrig.method === 'string' ? [baseOrig.method] : [])) || [])).join('\n'),
-      instructions: rec.methodSteps || baseOrig.instructions || baseOrig.steps || baseOrig.method || [],
-      macros: {
-        calories: finalMacros.calories || finalMacros.cal || 0,
-        protein: finalMacros.protein || finalMacros.prot || 0,
-        carbs: finalMacros.carbs || 0,
-        fat: finalMacros.fat || 0
-      },
-      nutrition: {
-        perServing: {
-          calories: finalMacros.calories || finalMacros.cal || 0,
-          protein: finalMacros.protein || finalMacros.prot || 0,
-          carbs: finalMacros.carbs || 0,
-          fat: finalMacros.fat || 0
-        },
-        calories: finalMacros.calories || finalMacros.cal || 0,
-        protein: finalMacros.protein || finalMacros.prot || 0,
-        carbs: finalMacros.carbs || 0,
-        fat: finalMacros.fat || 0
-      },
-      fitScore: finalComputedScore,
-      _computedFitScore: finalComputedScore,
-      updatedAt: new Date().toISOString()
-    };
+  const cleanPrepH = Number(rec.prepTime?.hours) || 0;
+  const cleanPrepM = Number(rec.prepTime?.minutes) || 0;
+  const cleanCookH = Number(rec.cookTime?.hours) || 0;
+  const cleanCookM = Number(rec.cookTime?.minutes) || 0;
+  const normalizedPrepTime = { hours: cleanPrepH, minutes: cleanPrepM };
+  const normalizedCookTime = { hours: cleanCookH, minutes: cleanCookM };
+  const totalTimeMins = (cleanPrepH * 60 + cleanPrepM) + (cleanCookH * 60 + cleanCookM);
 
-    recipeToSave = {
-      ...baseOrig,
-      id: baseOrig.id || rec.id,
-      enhanced: editedEnhancedPayload,
-      enhancedFitScore: finalComputedScore,
-      _scoreEnhanced: finalComputedScore,
-      updatedAt: new Date().toISOString()
-    };
-  } else {
-    // Original variant editing
-    recipeToSave = {
+  const sourceType = rec.sourceType || baseOrig.sourceType || '';
+  const sourceUrl = sourceType === 'online' ? (rec.sourceUrl ?? baseOrig.sourceUrl ?? '') : '';
+  const sourceBook = sourceType === 'book' ? (rec.sourceBook ?? baseOrig.sourceBook ?? '') : '';
+  const sourcePage = sourceType === 'book' ? (rec.sourcePage ?? baseOrig.sourcePage ?? '') : '';
+  const sourceFormatted = sourceType === 'online'
+    ? sourceUrl
+    : (sourceType === 'book'
+        ? [sourceBook, sourcePage ? `p. ${sourcePage}` : ''].filter(Boolean).join(', ')
+        : (rec.source || baseOrig.source || ''));
+
+  const buildEnhancedPayload = (enhSourceObj) => {
+    const enhSections = (enhSourceObj.ingredientSections && enhSourceObj.ingredientSections.length)
+      ? enhSourceObj.ingredientSections.map(s => ({
+          ...s,
+          ingredients: (s.ingredients || []).map(mapIngredientItem)
+        }))
+      : [{ sectionTitle: 'Main Ingredients', ingredients: (enhSourceObj.ingredients || []).map(mapIngredientItem) }];
+    const enhIngs = enhSections.flatMap(s => s.ingredients || []);
+    const enhStepsRaw = enhSourceObj.methodSteps || enhSourceObj.steps || enhSourceObj.method || enhSourceObj.instructions || baseOrig.steps || baseOrig.method || [];
+    const enhSteps = (Array.isArray(enhStepsRaw) ? enhStepsRaw : String(enhStepsRaw || '').split('\n'))
+      .map(s => typeof s === 'string' ? s.trim() : String(s?.text || s?.instruction || s || '').trim())
+      .filter(Boolean);
+    const enhServes = Number(enhSourceObj.servings || enhSourceObj.serves || safeServings) || safeServings;
+
+    const tempEnhRec = {
       ...rec,
-      id: rec.id || baseOrig.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}`),
-      name: safeTitle,
-      title: safeTitle,
-      servings: safeServings,
-      serves: safeServings,
-      prepTime: rec.prepTime,
-      cookTime: rec.cookTime,
-      time: (rec.prepTime.hours * 60 + rec.prepTime.minutes) + (rec.cookTime.hours * 60 + rec.cookTime.minutes),
-      mealSuitability: rec.mealSuitability,
-      types: rec.types,
-      mealType: rec.mealType,
-      ingredientSections: rec.ingredientSections,
-      ingredients: allIngredients.map(i => ({
-        name: i.name,
-        qty: Number(i.qty) || 1,
-        unit: i.unit,
-        raw: i.raw,
-        ingredientId: i.ingredientId,
-        productId: i.productId,
-        bankId: i.bankId,
-        subtypeId: i.subtypeId || null,
-        categoryId: i.categoryId || null,
-        isCategoryDefault: i.isCategoryDefault || false,
-        displayName: i.displayName || null,
-        waterMl: i.waterMl || null,
-        isNewTaxonomyItem: !!i.isNewTaxonomyItem
-      })),
-      instructions: rec.methodSteps || [],
-      method: rec.methodSteps || [],
-      methodSteps: rec.methodSteps || [],
-      steps: rec.methodSteps || [],
+      servings: enhServes,
+      serves: enhServes,
+      ingredientSections: enhSections,
+      ingredients: enhIngs,
+      methodSteps: enhSteps
+    };
+    const prevVar = wizardState.activeVariant;
+    wizardState.activeVariant = 'enhanced';
+    const enhMacros = recalculateWizardMacros(tempEnhRec) || enhSourceObj.macros || finalMacros || { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    wizardState.activeVariant = prevVar;
+    const enhScore = tempEnhRec.enhancedFitScore || tempEnhRec.fitScore || finalComputedScore || 0;
+
+    return {
+      ...(baseOrig.enhanced || {}),
+      name: `${safeTitle.replace(/\s*\(enhanced\)\s*$/i, '')} (enhanced)`,
+      title: `${safeTitle.replace(/\s*\(enhanced\)\s*$/i, '')} (enhanced)`,
+      servings: enhServes,
+      serves: enhServes,
+      ingredients: enhIngs,
+      ingredientSections: enhSections,
+      steps: enhSteps,
+      methodSteps: enhSteps,
+      method: enhSteps.join('\n'),
+      instructions: enhSteps,
       macros: {
-        calories: finalMacros.calories || finalMacros.cal || 0,
-        protein: finalMacros.protein || finalMacros.prot || 0,
-        carbs: finalMacros.carbs || 0,
-        fat: finalMacros.fat || 0
+        calories: enhMacros.calories || enhMacros.cal || 0,
+        protein: enhMacros.protein || enhMacros.prot || 0,
+        carbs: enhMacros.carbs || 0,
+        fat: enhMacros.fat || 0
       },
       nutrition: {
         perServing: {
-          calories: finalMacros.calories || finalMacros.cal || 0,
-          protein: finalMacros.protein || finalMacros.prot || 0,
-          carbs: finalMacros.carbs || 0,
-          fat: finalMacros.fat || 0
+          calories: enhMacros.calories || enhMacros.cal || 0,
+          protein: enhMacros.protein || enhMacros.prot || 0,
+          carbs: enhMacros.carbs || 0,
+          fat: enhMacros.fat || 0
         },
-        calories: finalMacros.calories || finalMacros.cal || 0,
-        protein: finalMacros.protein || finalMacros.prot || 0,
-        carbs: finalMacros.carbs || 0,
-        fat: finalMacros.fat || 0
+        calories: enhMacros.calories || enhMacros.cal || 0,
+        protein: enhMacros.protein || enhMacros.prot || 0,
+        carbs: enhMacros.carbs || 0,
+        fat: enhMacros.fat || 0
       },
-      fitScore: finalComputedScore,
-      _computedFitScore: finalComputedScore,
-      createdAt: rec.createdAt || baseOrig.createdAt || new Date().toISOString(),
+      fitScore: enhScore,
+      _computedFitScore: enhScore,
       updatedAt: new Date().toISOString()
     };
+  };
 
-    // Strictly preserve existing enhanced variant if present on baseOrig or rec
-    const existingEnhanced = baseOrig.enhanced || rec.enhanced;
-    if (existingEnhanced) {
-      recipeToSave.enhanced = existingEnhanced;
-      recipeToSave.enhancedFitScore = baseOrig.enhancedFitScore || baseOrig._scoreEnhanced || rec.enhancedFitScore || 0;
-      recipeToSave._scoreEnhanced = recipeToSave.enhancedFitScore;
-    }
+  // Determine Original source data (prefer snapshot if user switched to Enhanced, else current rec / baseOrig)
+  const origSource = (wizardState.activeVariant === 'enhanced')
+    ? (origSnap || baseOrig || rec)
+    : rec;
+
+  const origSections = (origSource.ingredientSections && origSource.ingredientSections.length)
+    ? origSource.ingredientSections.map(s => ({
+        ...s,
+        ingredients: (s.ingredients || []).map(mapIngredientItem)
+      }))
+    : [{ sectionTitle: 'Main Ingredients', ingredients: (origSource.ingredients || []).map(mapIngredientItem) }];
+  const origIngs = origSections.flatMap(s => s.ingredients || []);
+  const origStepsRaw = origSource.methodSteps || origSource.steps || origSource.method || origSource.instructions || [];
+  const origSteps = (Array.isArray(origStepsRaw) ? origStepsRaw : String(origStepsRaw || '').split('\n'))
+    .map(s => typeof s === 'string' ? s.trim() : String(s?.text || s?.instruction || s || '').trim())
+    .filter(Boolean);
+  const origServes = Number(origSource.servings || origSource.serves || safeServings) || safeServings;
+
+  const tempOrigRec = {
+    ...rec,
+    servings: origServes,
+    serves: origServes,
+    ingredientSections: origSections,
+    ingredients: origIngs,
+    methodSteps: origSteps
+  };
+  const prevVarForOrig = wizardState.activeVariant;
+  wizardState.activeVariant = 'original';
+  const origMacros = recalculateWizardMacros(tempOrigRec) || origSource.macros || finalMacros || { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  wizardState.activeVariant = prevVarForOrig;
+  const origScore = tempOrigRec.fitScore || baseOrig.fitScore || finalComputedScore || 0;
+
+  recipeToSave = {
+    ...baseOrig,
+    ...rec,
+    id: rec.id || baseOrig.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}`),
+    name: safeTitle.replace(/\s*\(enhanced\)\s*$/i, ''),
+    title: safeTitle.replace(/\s*\(enhanced\)\s*$/i, ''),
+    servings: origServes,
+    serves: origServes,
+    prepTime: normalizedPrepTime,
+    cookTime: normalizedCookTime,
+    time: totalTimeMins,
+    mealSuitability: rec.mealSuitability,
+    types: rec.types,
+    mealType: rec.mealType,
+    sourceType,
+    sourceUrl,
+    sourceBook,
+    sourcePage,
+    source: sourceFormatted,
+    ingredientSections: origSections,
+    ingredients: origIngs,
+    instructions: origSteps,
+    method: origSteps,
+    methodSteps: origSteps,
+    steps: origSteps,
+    macros: {
+      calories: origMacros.calories || origMacros.cal || 0,
+      protein: origMacros.protein || origMacros.prot || 0,
+      carbs: origMacros.carbs || 0,
+      fat: origMacros.fat || 0
+    },
+    nutrition: {
+      perServing: {
+        calories: origMacros.calories || origMacros.cal || 0,
+        protein: origMacros.protein || origMacros.prot || 0,
+        carbs: origMacros.carbs || 0,
+        fat: origMacros.fat || 0
+      },
+      calories: origMacros.calories || origMacros.cal || 0,
+      protein: origMacros.protein || origMacros.prot || 0,
+      carbs: origMacros.carbs || 0,
+      fat: origMacros.fat || 0
+    },
+    fitScore: origScore,
+    _computedFitScore: origScore,
+    createdAt: rec.createdAt || baseOrig.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  const hasEnh = Boolean(wizardState.activeVariant === 'enhanced' || enhSnap || rec.enhanced || baseOrig.enhanced);
+  if (hasEnh) {
+    const enhSource = (wizardState.activeVariant === 'enhanced')
+      ? rec
+      : (enhSnap || rec.enhanced || baseOrig.enhanced);
+    const editedEnhancedPayload = buildEnhancedPayload(enhSource);
+    recipeToSave.enhanced = editedEnhancedPayload;
+    recipeToSave.enhancedFitScore = editedEnhancedPayload.fitScore;
+    recipeToSave._scoreEnhanced = editedEnhancedPayload.fitScore;
   }
 
   try {
     await saveRecipe(recipeToSave);
     updateRecipeInStore(recipeToSave);
 
-    for (const ing of allIngredients) {
-      if (ing.ingredientId && ing.raw) {
-        await learnIngredientAlias(ing.ingredientId, ing.raw);
+    const resolvedForLearning = [
+      ...(recipeToSave.ingredients || []),
+      ...(recipeToSave.enhanced?.ingredients || [])
+    ];
+    for (const ing of resolvedForLearning) {
+      if (ing.ingredientId && (ing.raw || ing.name) && !ing._aliasPromptHandled) {
+        const cleaned = cleanIngredientPhraseForAlias(ing);
+        if (cleaned) {
+          await learnIngredientAlias(ing.ingredientId, cleaned, ing.subtypeId || null);
+        }
       }
     }
 
@@ -477,11 +604,42 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal, showWizardNot
 export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice, loadNextRecipeFromQueue, closeRecipeWizard }) {
   if (!modalWrap || wizardState.currentStep !== 3) return;
 
+  // Step 3: Meal tag toggles
+  modalWrap.querySelectorAll('.wiz-review-tag').forEach(cb => {
+    cb.onchange = () => {
+      const selected = Array.from(modalWrap.querySelectorAll('#wiz-review-tags-box input:checked')).map(i => i.value);
+      wizardState.activeRecipe.mealSuitability = selected;
+      const parentLabel = cb.closest('label');
+      if (parentLabel) {
+        parentLabel.style.background = cb.checked ? 'var(--badge-blue-bg)' : 'var(--surface)';
+        parentLabel.style.color = cb.checked ? 'var(--badge-blue-text)' : 'var(--text)';
+      }
+    };
+  });
+
+  // Step 3: Source type radios
+  modalWrap.querySelectorAll('.wiz-rev-source-type-radio').forEach(radio => {
+    radio.onchange = () => {
+      const selectedType = radio.value || '';
+      wizardState.activeRecipe.sourceType = selectedType;
+      modalWrap.querySelectorAll('.wiz-rev-source-type-pill').forEach(lbl => {
+        const inp = lbl.querySelector('input');
+        const isSel = inp && inp.checked;
+        lbl.style.background = isSel ? 'var(--badge-blue-bg)' : 'var(--surface)';
+        lbl.style.color = isSel ? 'var(--badge-blue-text)' : 'var(--text)';
+        lbl.style.fontWeight = isSel ? '600' : '500';
+      });
+      const onlineDiv = modalWrap.querySelector('#wiz-rev-source-online-fields');
+      const bookDiv = modalWrap.querySelector('#wiz-rev-source-book-fields');
+      if (onlineDiv) onlineDiv.style.display = selectedType === 'online' ? 'block' : 'none';
+      if (bookDiv) bookDiv.style.display = selectedType === 'book' ? 'grid' : 'none';
+    };
+  });
+
   const tabOrig = modalWrap.querySelector('#wiz-tab-original');
   if (tabOrig) {
     tabOrig.onclick = () => {
-      syncStep3InputsToState(modalWrap);
-      wizardState.activeVariant = 'original';
+      switchWizardVariant('original', modalWrap);
       renderWizardModal();
     };
   }
@@ -489,17 +647,7 @@ export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice
   const tabEnh = modalWrap.querySelector('#wiz-tab-enhanced');
   if (tabEnh) {
     tabEnh.onclick = () => {
-      syncStep3InputsToState(modalWrap);
-      wizardState.activeVariant = 'enhanced';
-      if (!wizardState.activeRecipe.enhanced) {
-        wizardState.activeRecipe.enhanced = {
-          title: `${wizardState.activeRecipe.title} (Enhanced)`,
-          ingredientSections: JSON.parse(JSON.stringify(wizardState.activeRecipe.ingredientSections || [])),
-          ingredients: JSON.parse(JSON.stringify(wizardState.activeRecipe.ingredients || [])),
-          methodSteps: [...(wizardState.activeRecipe.methodSteps || [])],
-          macros: { ...(wizardState.activeRecipe.macros || { calories: 500, protein: 35, carbs: 42, fat: 16 }) }
-        };
-      }
+      switchWizardVariant('enhanced', modalWrap);
       renderWizardModal();
     };
   }
@@ -508,12 +656,25 @@ export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice
   if (btnAutoEnh) {
     btnAutoEnh.onclick = () => {
       syncStep3InputsToState(modalWrap);
+      stashActiveVariantSnapshot();
       const baseRec = wizardState.activeRecipe;
       openEnhancementModal(baseRec, {
         onApply: (enhancedPayload) => {
           wizardState.activeRecipe.enhanced = enhancedPayload;
-          wizardState.activeVariant = 'enhanced';
-          recalculateWizardMacros(wizardState.activeRecipe.enhanced);
+          if (wizardState.variantSnapshots) {
+            wizardState.variantSnapshots.enhanced = {
+              ingredientSections: enhancedPayload.ingredientSections
+                ? JSON.parse(JSON.stringify(enhancedPayload.ingredientSections))
+                : [{ sectionTitle: 'Main Ingredients', ingredients: JSON.parse(JSON.stringify(enhancedPayload.ingredients || [])) }],
+              ingredients: JSON.parse(JSON.stringify(enhancedPayload.ingredients || [])),
+              methodSteps: [...(enhancedPayload.methodSteps || enhancedPayload.steps || enhancedPayload.method || baseRec.methodSteps || [])],
+              servings: enhancedPayload.servings || enhancedPayload.serves || baseRec.servings || 4,
+              macros: { ...(enhancedPayload.macros || baseRec.macros || { calories: 500, protein: 35, carbs: 42, fat: 16 }) }
+            };
+          }
+          switchWizardVariant('enhanced');
+          recalculateWizardMacros(wizardState.activeRecipe);
+          stashActiveVariantSnapshot();
           renderWizardModal();
           if (typeof window.showPlatePlanToast === 'function') {
             window.showPlatePlanToast('✨ Enhanced variant updated with 85+ Fit Score!');

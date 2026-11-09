@@ -5,11 +5,9 @@
 
 import { getState } from '../store/store.js';
 import { convertToStrictUnit } from './UnitConversionService.js';
+import { toTitleCase } from '../utils/stringUtils.js';
 
-export function toTitleCase(str) {
-  if (!str) return '';
-  return str.replace(/\b\w/g, c => c.toUpperCase());
-}
+export { toTitleCase };
 
 function parseFractionOrNumber(val) {
   const s = String(val || '').trim();
@@ -167,6 +165,36 @@ export function normalizeUnit(rawUnit) {
 }
 
 /**
+ * Returns true if the ingredient line represents standalone unmeasured salt and/or black/white pepper
+ * (including "to taste", "for seasoning", or "a pinch/dash of"), while preserving explicit numeric
+ * culinary measurements (e.g., "1 tsp salt", "1/2 tsp black pepper") and culinary peppers/blends
+ * (e.g., "bell pepper", "garlic salt").
+ */
+function isImpliedSaltOrPepperLine(rawStr) {
+  if (!rawStr || typeof rawStr !== 'string') return false;
+  let text = rawStr.replace(/^[\s•●◦▪▫▫️▪️\-\*]+/, '').trim();
+  if (!text) return false;
+
+  // Preserve explicit numeric culinary measurements (e.g., "1 tsp salt", "1/2 tsp black pepper", "10g sea salt")
+  const explicitUnitRegex = /^(?:\d+(?:\s+\d+\/\d+|\.\d+)?|\d+\/\d+|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|a|an|one|two|three|four|five|half)\s*(?:[xX×]\s*\d+(?:\.\d+)?\s*)?(?:(?:heaped|heaping|level|generous|scant|rounded)\s+)?(?:g|grams?|kg|kilograms?|mg|oz|ounces?|lbs?|pounds?|tsp|teaspoons?|tbsp|tablespoons?|tbl|tbs|tb|cups?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?)\b/i;
+  if (explicitUnitRegex.test(text)) return false;
+
+  // Strip optional parenthetical qualifiers and loose pinch/dash prefixes
+  text = text
+    .replace(/\((?:optional|to\s+taste|for\s+seasoning|for\s+serving|to\s+serve)\)/gi, ' ')
+    .replace(/^(?:(?:\d+|a|an|one|two|good|generous|small|big|large)\s+)?(?:(?:pinch|pinches|dash|dashes|sprinkle|sprinkles|twist|twists|grind|grinds|crack|cracks)\s+(?:of\s+)?|little\s+|some\s+)/i, '')
+    .replace(/\b(?:to\s+taste|for\s+seasoning|for\s+serving|to\s+serve|optional|as\s+needed|if\s+needed)\b/gi, ' ')
+    .replace(/[&+/]/g, ' and ')
+    .replace(/[,.;:!?*()]/g, ' ')
+    .replace(/\b(?:sea|kosher|flaky|table|maldon|rock|fine|finely|coarse|coarsely|freshly|fresh|ground|cracked|milled|black|white|cooking)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!text) return false;
+  return /^(?:salt|pepper)(?:\s+(?:and|or)\s+(?:salt|pepper))*$/i.test(text);
+}
+
+/**
  * Parses raw ingredient string into structured quantity, unit, name, and notes,
  * then converts strictly into 'g', 'ml', or 'qty' via UnitConversionService.
  */
@@ -174,6 +202,7 @@ export function parseIngredientString(rawStr) {
   if (!rawStr || typeof rawStr !== 'string') return null;
   const s = rawStr.trim();
   if (!s || /^(?:FOR THE\b|TO SERVE\b)/i.test(s)) return null;
+  if (isImpliedSaltOrPepperLine(s)) return null;
 
   // Standalone multiplier guard: never allow orphaned multiplier rows
   if (/^\d+(?:\.\d+)?\s*[xX]$/.test(s)) return null;
@@ -313,7 +342,8 @@ export function parseIngredientString(rawStr) {
 
   // 4. Standard parsed quantity with unit or count
   const { qty, remainder } = parseQuantity(clean);
-  const unitMatch = remainder.match(/^([a-zA-Z]+)\b\s*(.*)/i);
+  const cleanedRemainder = remainder.replace(/^(?:heaped|heaping|level|generous|scant|rounded)\s+/i, '');
+  const unitMatch = cleanedRemainder.match(/^([a-zA-Z]+)\b\s*(.*)/i);
   let parsedUnit = 'qty';
   let rawName = remainder;
 
@@ -356,6 +386,8 @@ export function parseIngredientString(rawStr) {
     extraNotes = extraNotes ? `${extraNotes}, ${commaNotes}` : commaNotes;
   }
 
+  cleanedName = cleanedName.replace(/\*+/g, '').trim();
+
   if (/^(?:(vegetable|chicken|beef|fish|lamb|vegan|mushroom|onion)\s+)?stock\s*cubes?$/i.test(cleanedName)) {
     const typeMatch = cleanedName.match(/^(vegetable|chicken|beef|fish|lamb|vegan|mushroom|onion)\b/i);
     const stockType = typeMatch ? toTitleCase(typeMatch[1]) : 'Vegetable';
@@ -392,6 +424,29 @@ export function stemIngredientName(rawName) {
   return str.trim();
 }
 
+/**
+ * Strips quantities, units, and preparation notes from a raw ingredient string or parsed item
+ * to produce a clean canonical phrase suitable for alias matching and learning.
+ */
+export function cleanIngredientPhraseForAlias(rawOrItem) {
+  if (!rawOrItem) return '';
+  if (typeof rawOrItem === 'object') {
+    rawOrItem = rawOrItem.raw || rawOrItem.name || '';
+  }
+  const str = String(rawOrItem).trim();
+  if (!str) return '';
+  const parsed = parseIngredientString(str);
+  if (parsed && parsed.name) {
+    return normalizeTaxonomyName(parsed.name);
+  }
+  const fallback = str
+    .replace(/^[\d\s\/\.\-\u00BC-\u00BE\u2150-\u215E]+(?:x\s*)?(?:g|kg|ml|l|oz|lb|tbsp|tsp|cup|cups|scoop|scoops|pinch|can|cans|tin|tins|clove|cloves|slice|slices|pack|packs|bunch|bunches)?\s+(?:of\s+)?/i, '')
+    .split(',')[0]
+    .replace(/\(.*?\)/g, '')
+    .trim();
+  return normalizeTaxonomyName(fallback || str);
+}
+
 export const CANONICAL_COMPOUND_SYNONYMS = {
   'coconut rice': 'jasmine rice',
   'thai coconut rice': 'jasmine rice',
@@ -410,8 +465,43 @@ export function matchIngredientTaxonomy(parsedItem, existingIngredients = null) 
   const targetClean = CANONICAL_COMPOUND_SYNONYMS[rawClean] || rawClean;
   const normParsed = normalizeTaxonomyName(targetClean);
   const stemmedParsed = stemIngredientName(targetClean);
+  const cleanedRawPhrase = parsedItem.raw ? cleanIngredientPhraseForAlias(parsedItem.raw) : '';
+  const stemmedRawPhrase = cleanedRawPhrase ? stemIngredientName(cleanedRawPhrase) : '';
 
   let bestMatch = null, bestScore = 0;
+
+  const matchesAliasCandidate = (aliasStr) => {
+    if (!aliasStr) return 0;
+    const normAl = normalizeTaxonomyName(aliasStr);
+    const cleanedAl = cleanIngredientPhraseForAlias(aliasStr);
+    const stemmedAl = stemIngredientName(cleanedAl || normAl);
+    if (!normAl && !stemmedAl) return 0;
+
+    if (
+      (normAl && (normParsed === normAl || stemmedParsed === normAl || (cleanedRawPhrase && cleanedRawPhrase === normAl))) ||
+      (cleanedAl && (normParsed === cleanedAl || stemmedParsed === cleanedAl || (cleanedRawPhrase && cleanedRawPhrase === cleanedAl))) ||
+      (stemmedAl && (stemmedParsed === stemmedAl || normParsed === stemmedAl || (stemmedRawPhrase && stemmedRawPhrase === stemmedAl)))
+    ) {
+      return 1; // exact or stemmed match
+    }
+
+    const tokenTarget = stemmedAl || cleanedAl || normAl;
+    if (tokenTarget.length >= 3 && normParsed.length >= 3) {
+      const escapedAl = tokenTarget.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const regexAlInParsed = new RegExp('(^|\\s)' + escapedAl + '(?:s|es)?(\\s|$)', 'i');
+      if (regexAlInParsed.test(normParsed) || regexAlInParsed.test(stemmedParsed)) {
+        return 2; // alias contained in parsed phrase
+      }
+      const escapedParsed = (stemmedParsed || normParsed).replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      if (escapedParsed.length >= 3) {
+        const regexParsedInAl = new RegExp('(^|\\s)' + escapedParsed + '(?:s|es)?(\\s|$)', 'i');
+        if (regexParsedInAl.test(tokenTarget) || regexParsedInAl.test(normAl)) {
+          return 3; // parsed phrase contained in multi-word alias
+        }
+      }
+    }
+    return 0;
+  };
 
   for (const ing of ingredients) {
     if (!ing) continue;
@@ -431,9 +521,11 @@ export function matchIngredientTaxonomy(parsedItem, existingIngredients = null) 
     }
 
     (Array.isArray(ing.aliases) ? ing.aliases : []).forEach(al => {
-      const normAl = normalizeTaxonomyName(al);
-      if (normAl && (normParsed === normAl || stemmedParsed === normAl) && bestScore < 95) {
+      const mType = matchesAliasCandidate(al);
+      if (mType === 1 && bestScore < 95) {
         bestScore = 95; bestMatch = { ing, subtype: null, name: ing.name };
+      } else if (mType >= 2 && bestScore < 85) {
+        bestScore = 85; bestMatch = { ing, subtype: null, name: ing.name };
       }
     });
 
@@ -443,9 +535,11 @@ export function matchIngredientTaxonomy(parsedItem, existingIngredients = null) 
         bestScore = 90; bestMatch = { ing, subtype: sub, name: `${sub.name} (${ing.name})` };
       }
       (Array.isArray(sub.aliases) ? sub.aliases : []).forEach(sal => {
-        const normSal = normalizeTaxonomyName(sal);
-        if (normSal && (normParsed === normSal || stemmedParsed === normSal) && bestScore < 92) {
-          bestScore = 92; bestMatch = { ing, subtype: sub, name: `${sub.name} (${ing.name})` };
+        const mType = matchesAliasCandidate(sal);
+        if (mType === 1 && bestScore < 96) {
+          bestScore = 96; bestMatch = { ing, subtype: sub, name: `${sub.name} (${ing.name})` };
+        } else if (mType >= 2 && bestScore < 87) {
+          bestScore = 87; bestMatch = { ing, subtype: sub, name: `${sub.name} (${ing.name})` };
         }
       });
     }

@@ -5,6 +5,7 @@
  */
 
 import { getState, learnIngredientAlias } from '../../store/store.js';
+import { cleanIngredientPhraseForAlias, stemIngredientName } from '../../services/RecipeIngredientParser.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -33,19 +34,26 @@ export function promptRecipeWizardAliases(allIngs, onProceed) {
 
     let targetName = targetIng.name;
     let targetDoc = targetIng;
+    let targetOwnName = String(targetIng.name || '').toLowerCase();
     if (ing.subtypeId && Array.isArray(targetIng.subtypes)) {
-      const sub = targetIng.subtypes.find(s => String(s.id) === String(ing.subtypeId));
+      const sub = targetIng.subtypes.find(s => String(s.id) === String(ing.subtypeId) || String(s.name).toLowerCase() === String(ing.subtypeId).toLowerCase());
       if (sub) {
         targetName = `${targetIng.name} (${sub.name})`;
         targetDoc = sub;
+        targetOwnName = String(sub.name || '').toLowerCase();
       }
     }
 
     const rawPhrase = String(ing.raw || '').trim();
-    const cleanedPhrase = rawPhrase.replace(/^[\d\s\/\.\-\u00BC-\u00BE\u2150-\u215E]+(?:g|kg|ml|l|oz|lb|tbsp|tsp|cup|cups|scoop|scoops|pinch|can|clove|slice|slices)?\s+(?:of\s+)?/i, '').trim();
+    const cleanedPhrase = cleanIngredientPhraseForAlias(ing) || rawPhrase.replace(/^[\d\s\/\.\-\u00BC-\u00BE\u2150-\u215E]+(?:g|kg|ml|l|oz|lb|tbsp|tsp|cup|cups|scoop|scoops|pinch|can|clove|slice|slices)?\s+(?:of\s+)?/i, '').trim();
     const rawClean = (cleanedPhrase || rawPhrase).toLowerCase();
     const existingAliases = (targetDoc.aliases || []).map(a => String(a).toLowerCase());
-    const isAlreadyKnown = rawClean === targetName.toLowerCase() || existingAliases.includes(rawClean);
+    const stemmedRaw = stemIngredientName(rawClean);
+    const isAlreadyKnown = rawClean === targetOwnName
+      || rawClean === String(targetIng.name || '').toLowerCase()
+      || (stemmedRaw && stemmedRaw === stemIngredientName(targetOwnName))
+      || existingAliases.includes(rawClean)
+      || existingAliases.some(a => stemIngredientName(a) === stemmedRaw);
 
     if (!isAlreadyKnown && rawClean.length > 2) {
       candidates.push({ ing, targetName, rawClean, cleanedPhrase: cleanedPhrase || rawPhrase });
@@ -101,6 +109,7 @@ export function promptRecipeWizardAliases(allIngs, onProceed) {
   const btnSkip = promptEl.querySelector('#btn-skip-aliases');
   if (btnSkip) {
     btnSkip.onclick = () => {
+      candidates.forEach(c => { if (c.ing) c.ing._aliasPromptHandled = true; });
       closePrompt();
       onProceed();
     };
@@ -109,6 +118,7 @@ export function promptRecipeWizardAliases(allIngs, onProceed) {
   const btnSave = promptEl.querySelector('#btn-save-aliases');
   if (btnSave) {
     btnSave.onclick = async () => {
+      candidates.forEach(c => { if (c.ing) c.ing._aliasPromptHandled = true; });
       const checks = promptEl.querySelectorAll('.wiz-alias-check:checked');
       if (checks.length > 0) {
         for (const chk of checks) {
