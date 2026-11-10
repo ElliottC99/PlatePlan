@@ -5,7 +5,7 @@
  */
 import { getState } from '../../store/coreState.js';
 
-import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
+import { calculateMealFitScore, extractRecipeMacros } from '../../utils/fitScoreCalculator.js';
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
 import { escapeHtml, escapeAttr } from '../../utils/stringUtils.js';
 
@@ -35,15 +35,26 @@ export function getSkeletonSlotConfig(skeletonGrid, dayIndex, mealType) {
 /**
  * Checks if a recipe is already present in the skeleton grid.
  */
-export function isRecipeInSkeletonGrid(recipeId, skeletonGrid = {}) {
+export function isRecipeInSkeletonGrid(recipeId, skeletonGrid = {}, targetVariant = null) {
   if (!recipeId || !skeletonGrid) return false;
+  const targetVar = targetVariant ? String(targetVariant).toLowerCase().trim() : null;
+  const matches = (slot) => {
+    if (!slot || typeof slot !== 'object' || slot.isSkipped) return false;
+    if (String(slot.recipeId) !== String(recipeId)) return false;
+    if (targetVar) {
+      const slotVar = String(slot.variant || 'original').toLowerCase().trim();
+      if (slotVar !== targetVar) return false;
+    }
+    return true;
+  };
+
   for (const key of Object.keys(skeletonGrid)) {
     const val = skeletonGrid[key];
     if (!val || typeof val !== 'object') continue;
-    if (val.recipeId === recipeId || val.elliott?.recipeId === recipeId || val.chloe?.recipeId === recipeId) return true;
+    if (matches(val) || matches(val.elliott) || matches(val.chloe)) return true;
     for (const m of ['breakfast', 'lunch', 'dinner']) {
       const sub = val[m];
-      if (sub && (sub.recipeId === recipeId || sub.elliott?.recipeId === recipeId || sub.chloe?.recipeId === recipeId)) return true;
+      if (sub && (matches(sub) || matches(sub.elliott) || matches(sub.chloe))) return true;
     }
   }
   return false;
@@ -58,6 +69,7 @@ export function renderRecipeCandidateRows(recipes, { dayIndex, mealType, person 
   recipes.forEach(r => {
     expandedRecipes.push(r);
     if (r.enhanced) {
+      const enhMacros = extractRecipeMacros(r, 'enhanced');
       expandedRecipes.push({
         ...r,
         ...r.enhanced,
@@ -65,7 +77,7 @@ export function renderRecipeCandidateRows(recipes, { dayIndex, mealType, person 
         originalId: r.id,
         _variant: 'enhanced',
         name: r.enhanced.name || (r.name ? `${r.name} (Enhanced)` : 'Enhanced Recipe'),
-        macros: r.enhanced.macros || r.macros,
+        macros: (enhMacros && enhMacros.cal !== null) ? { calories: enhMacros.cal, protein: enhMacros.prot } : (r.enhanced.macros || r.macros),
         nutrition: r.enhanced.nutrition || r.nutrition,
         ingredients: r.enhanced.ingredients || r.ingredients,
         ingredientSections: r.enhanced.ingredientSections || r.ingredientSections,
@@ -88,10 +100,10 @@ export function renderRecipeCandidateRows(recipes, { dayIndex, mealType, person 
     // The score calculator needs the recipe, the badge needs the recipe.
     const fitObj = typeof window.calculateMealFitScore === 'function' ? window.calculateMealFitScore(r, mealType, { activeProfile, variant, portionScaled: true }) : null;
     const badgeHtml = typeof window.renderFitScoreBadge === 'function' ? window.renderFitScoreBadge(r, mealType, { activeProfile, variant, portionScaled: true, precomputedFit: fitObj, showLabel: true }) : '';
-    const isDup = isRecipeInSkeletonGrid(baseId, skeletonGrid) || isRecipeInSkeletonGrid(r.id, skeletonGrid);
+    const isDup = isRecipeInSkeletonGrid(baseId, skeletonGrid, variant) || isRecipeInSkeletonGrid(r.id, skeletonGrid, variant);
     const clickAction = person === 'both'
-      ? `window.setSlotConfiguredStatus(${dayIndex}, '${mealType}', 'pinned', '${escapeAttr(r.id)}', '${escapeAttr(r.name)}')`
-      : `window.setSplitPersonSlotStatus(${dayIndex}, '${mealType}', '${person}', 'pinned', '${escapeAttr(r.id)}', '${escapeAttr(r.name)}')`;
+      ? `window.setSlotConfiguredStatus(${dayIndex}, '${mealType}', 'pinned', '${escapeAttr(r.id)}')`
+      : `window.setSplitPersonSlotStatus(${dayIndex}, '${mealType}', '${person}', 'pinned', '${escapeAttr(r.id)}')`;
 
     return `
       <div onclick="${clickAction}" style="padding:8px 10px;border-radius:6px;border:1px solid var(--separator);background:var(--secondary-system-grouped-bg);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px" onmouseover="this.style.background='var(--tertiary-system-grouped-bg)'" onmouseout="this.style.background='var(--secondary-system-grouped-bg)'">

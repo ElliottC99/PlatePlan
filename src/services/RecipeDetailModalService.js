@@ -367,6 +367,7 @@ export async function openEnhanceRecipeModalForCurrent(recipeId) {
       const updatedRecipe = {
         ...found,
         enhanced: enhancedPayload,
+        ...(enhancedPayload?.fitScore !== undefined ? { enhancedFitScore: enhancedPayload.fitScore } : {}),
         updatedAt: new Date().toISOString()
       };
       try {
