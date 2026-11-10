@@ -661,7 +661,7 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
 
   const subId = line.subtypeId || line.subTypeId || null;
   const ingId = line.ingredientId || line.groupId || null;
-  const cat = line.category || line.cat || null;
+  const cat = line.category || line.categoryId || line.cat || null;
   const directProdId = line.productId || line.bankId || null;
 
   function pickBestProduct(candidatePool) {
@@ -731,11 +731,43 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
     if (matched) return matched;
   }
 
-  // 5. Name fallback: match by raw ingredient name
+  // 5. Name fallback: match by raw ingredient name against products, root items, or sub-types
   const rawName = String(line.name || line.matchedName || line.ingredient || '').trim().toLowerCase();
   if (rawName) {
     const nameMatched = prodsList.find(p => String(p.name || '').trim().toLowerCase() === rawName);
     if (nameMatched) return nameMatched;
+
+    const partialProd = prodsList.find(p => {
+      const pName = String(p.name || '').trim().toLowerCase();
+      return pName && (pName.includes(rawName) || rawName.includes(pName));
+    });
+    if (partialProd) return partialProd;
+
+    const matchedRoot = ingsList.find(i => {
+      const iName = String(i.name || '').trim().toLowerCase();
+      if (iName === rawName) return true;
+      const aliases = Array.isArray(i.aliases) ? i.aliases : [];
+      return aliases.some(a => String(a || '').trim().toLowerCase() === rawName);
+    });
+    if (matchedRoot) {
+      return resolveDynamicProductForIngredient(
+        { ...line, ingredientId: matchedRoot.id },
+        { products: prodsList, ingredients: ingsList, preferences: activePrefs }
+      );
+    }
+
+    for (const root of ingsList) {
+      for (const sub of (root.subtypes || [])) {
+        const sName = String(sub.name || '').trim().toLowerCase();
+        const sAliases = Array.isArray(sub.aliases) ? sub.aliases : [];
+        if (sName === rawName || sAliases.some(a => String(a || '').trim().toLowerCase() === rawName)) {
+          return resolveDynamicProductForIngredient(
+            { ...line, subtypeId: sub.id, ingredientId: root.id },
+            { products: prodsList, ingredients: ingsList, preferences: activePrefs }
+          );
+        }
+      }
+    }
   }
 
   return null;
@@ -762,7 +794,12 @@ export function freezeProductSelectionsForPlan(plan, { products = [], ingredient
   const activePrefs = preferences || state?.preferences || state?.settings || {};
 
   const processSlot = (dayKey, slotKey, slotVal) => {
-    if (!slotVal) return;
+    if (!slotVal || slotVal.isSkipped || slotVal.skipped) return;
+    if (slotVal.isSplit && (slotVal.elliott || slotVal.chloe)) {
+      if (slotVal.elliott) processSlot(dayKey, `${slotKey}_E`, slotVal.elliott);
+      if (slotVal.chloe) processSlot(dayKey, `${slotKey}_C`, slotVal.chloe);
+      return;
+    }
     const recipeId = slotVal.recipeId || slotVal.id || (typeof slotVal === 'string' ? slotVal : null);
     if (!recipeId) return;
     const rec = allRecipes.find(r => String(r.id) === String(recipeId));

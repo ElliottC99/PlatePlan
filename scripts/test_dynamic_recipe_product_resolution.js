@@ -349,4 +349,38 @@ assert.ok(emptySubtypeIssue, 'Data Quality scanner must flag empty sub-type in o
 assert.match(emptySubtypeIssue.message, /Dragonfruit/, 'Message must cite empty sub-type name');
 
 console.log('✅ Unit 5: Startup Migration & Data Quality Scanner verified!\n');
+
+// ==========================================================
+// CODE REVIEW FIX VERIFICATION
+// ==========================================================
+console.log('--- Code Review Findings Verification ---');
+
+// 1. Generic Culinary Name Fallback matching root items
+const chickenRoots = [{ id: 'ing_chicken', name: 'Chicken Breast', subtypes: [{ id: 'sub_fillets', name: 'Chicken Breast Fillets', defaultProductId: 'prod_chicken_fillets' }] }];
+const chickenProducts = [{ id: 'prod_chicken_fillets', name: 'Tesco British Chicken Breast Fillets 650g', ingredientId: 'ing_chicken', subtypeId: 'sub_fillets', prot: 31, cal: 140, isAutoDefault: true }];
+const resGenericName = resolveDynamicProductForIngredient({ name: 'Chicken Breast' }, { products: chickenProducts, ingredients: chickenRoots });
+assert.ok(resGenericName, 'Generic culinary name must resolve via root item name fallback');
+assert.equal(resGenericName.id, 'prod_chicken_fillets', 'Resolves to default product under matched root item');
+
+// 2. CategoryId Key Resolution
+const resCategoryId = resolveDynamicProductForIngredient({ categoryId: 'Dairy' }, { products: testProducts, ingredients: testIngredients });
+assert.ok(resCategoryId, 'Must resolve via categoryId key');
+
+// 3. Split Meal Plan Freezing
+const splitPlan = {
+  slots: {
+    '0': {
+      dinner: {
+        isSplit: true,
+        elliott: { recipeId: 'rec_toast', variant: 'original' },
+        chloe: { recipeId: 'rec_toast', variant: 'original' }
+      }
+    }
+  }
+};
+const splitFrozen = freezeProductSelectionsForPlan(splitPlan, { products: testProducts, ingredients: testIngredients, recipes: [recipeToast] });
+assert.ok(splitFrozen['0_dinner_E:sub_mature'], 'Must freeze split selection for Elliott (dinner_E)');
+assert.ok(splitFrozen['0_dinner_C:sub_mature'], 'Must freeze split selection for Chloe (dinner_C)');
+
+console.log('✅ Code Review Findings Verified!\n');
 console.log('🎉 ALL UNITS 1-5 FOR DYNAMIC RECIPE-TO-PANTRY RESOLUTION VERIFIED!');
