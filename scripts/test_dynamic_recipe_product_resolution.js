@@ -264,3 +264,21 @@ const baseRecipeCheck = store.getState().recipes.find(r => r.id === 'rec_toast')
 assert.equal(baseRecipeCheck.ingredients[0].productId, undefined, 'Base recipe must remain completely decoupled after in-plan swap');
 
 console.log('✅ Unit 3: Meal Plan Product Freezing & Local Swaps verified!');
+
+// ==========================================================
+// UNIT 4: Unblock Pantry Product Deletion
+// ==========================================================
+console.log('\n--- Unit 4: Unblock Pantry Product Deletion ---');
+
+// In a decoupled architecture, deleting a product used in recipes is unblocked.
+// When Tesco Mature Cheddar is removed from productsBank, the recipe line dynamically falls back to Cathedral Mature!
+const remainingProducts = testProducts.filter(p => p.id !== 'prod_mature_tesco');
+const resolvedAfterDelete = resolveDynamicProductForIngredient(
+  { name: 'Mature Cheddar', subtypeId: 'sub_mature', ingredientId: 'ing_cheddar' },
+  { products: remainingProducts, ingredients: testIngredients }
+);
+
+assert.ok(resolvedAfterDelete, 'Recipe line must successfully resolve to remaining sub-type product');
+assert.equal(resolvedAfterDelete.id, 'prod_mature_cathedral', 'Dynamically resolves to Cathedral City Mature after Tesco Mature deletion');
+
+console.log('✅ Unit 4: Unblock Pantry Product Deletion verified!');

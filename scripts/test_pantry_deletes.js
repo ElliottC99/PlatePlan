@@ -212,13 +212,13 @@ await check('Product delete does not call itself through window (it overflowed t
   assert.match(modalText(), /Seeded Loaf/);
 });
 
-await check('Product delete is refused while a recipe uses it', async () => {
-  reset({ products: [{ id: 'p1', name: 'Seeded Loaf' }], recipes: [{ id: 'r1', ingredients: [{ productId: 'p1' }] }] });
+await check('Product delete asks confirmation and proceeds even when recipes exist (decoupled dynamic taxonomy)', async () => {
+  reset({ products: [{ id: 'p1', name: 'Seeded Loaf' }], recipes: [{ id: 'r1', ingredients: [{ subtypeId: 's1' }] }] });
   await handleDeleteProduct('p1');
-  assert.match(modalText(), /recipe/);
-  assert.equal(el('btn-confirm-yes').onclick, null);
+  assert.match(modalText(), /Seeded Loaf/);
+  await el('btn-confirm-yes').onclick();
   await settle();
-  assert.deepEqual(deleted, []);
+  assert.deepEqual(deleted, ['households/elliott-chloe/products/p1']);
 });
 
 await check('Covers AE5: a product saved as a default but used in no recipe asks to confirm and is deleted', async () => {
