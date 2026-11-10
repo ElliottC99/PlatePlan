@@ -12,6 +12,7 @@ import { getState, setCategories, setIngredients, setProducts, setRecipes, saveS
 import { getCategories, saveCategories } from './CategoryRepository.js';
 import { getProducts, saveProduct, addProductToBatch } from './ProductRepository.js';
 import { addRecipeToBatch } from './RecipeFirestoreRepository.js';
+import { compareProductsByStrategy } from './PantryHierarchyService.js';
 
 function isDbAvailable() {
   if (!db) { console.warn('[PantryTaxonomyService] Firestore db instance not initialised.'); return false; }
@@ -638,4 +639,104 @@ export async function applyGuidedDelete(plan, { timeoutMs = GUIDED_DELETE_COMMIT
   saveStateCache(getState());
   // A queued batch can't be taken back: it is already applied on this phone and lands on reconnect.
   return pending ? { success: false, pending: true } : { success: true };
+}
+
+/**
+ * Resolves the optimal product for a recipe ingredient line dynamically.
+ * Supports hierarchical bindings: Sub-Type, Root Item, or Category.
+ * Evaluates candidate products using auto-defaults and household preference metrics.
+ * 
+ * @param {Object} line - Recipe ingredient line
+ * @param {Object} options - { products, ingredients, preferences }
+ * @returns {Object|null} The resolved product object or null
+ */
+export function resolveDynamicProductForIngredient(line, { products = [], ingredients = [], preferences = null } = {}) {
+  if (!line || typeof line !== 'object') return null;
+
+  const prodsList = Array.isArray(products) ? products : [];
+  const ingsList = Array.isArray(ingredients) ? ingredients : [];
+  const state = typeof getState === 'function' ? (getState() || {}) : {};
+  const activePrefs = preferences || state.preferences || state.settings || state.userPrefs || {};
+  const criterion = activePrefs.autoDefaultStrategy || activePrefs.autoDefaultCriterion || activePrefs.productPriority || 'highest_protein_per_kcal';
+
+  const subId = line.subtypeId || line.subTypeId || null;
+  const ingId = line.ingredientId || line.groupId || null;
+  const cat = line.category || line.cat || null;
+  const directProdId = line.productId || line.bankId || null;
+
+  function pickBestProduct(candidatePool) {
+    if (!candidatePool || candidatePool.length === 0) return null;
+    const explicitAuto = candidatePool.find(p => p && p.isAutoDefault);
+    if (explicitAuto) return explicitAuto;
+    const sorted = [...candidatePool].sort((a, b) => compareProductsByStrategy(a, b, criterion));
+    return sorted[0] || null;
+  }
+
+  // 1. If bound to a Sub-Type
+  if (subId) {
+    const parentRoot = ingsList.find(i => (i.subtypes || []).some(s => String(s.id) === String(subId)) || String(i.id) === String(ingId));
+    const subObj = parentRoot?.subtypes?.find(s => String(s.id) === String(subId));
+    if (subObj?.defaultProductId) {
+      const def = prodsList.find(p => String(p.id) === String(subObj.defaultProductId));
+      if (def) return def;
+    }
+    const subPool = prodsList.filter(p => String(p.subtypeId) === String(subId));
+    if (subPool.length > 0) {
+      const best = pickBestProduct(subPool);
+      if (best) return best;
+    }
+  }
+
+  // 2. If bound to a Root Item (cascade to all sub-types under the root item)
+  if (ingId) {
+    const rootItem = ingsList.find(i => String(i.id) === String(ingId));
+    if (rootItem) {
+      if (rootItem.defaultProductId) {
+        const def = prodsList.find(p => String(p.id) === String(rootItem.defaultProductId));
+        if (def) return def;
+      }
+      const subtypeIds = new Set((rootItem.subtypes || []).map(s => String(s.id)));
+      const candidatePool = prodsList.filter(p => subtypeIds.has(String(p.subtypeId)) || String(p.ingredientId) === String(ingId));
+      if (candidatePool.length > 0) {
+        const best = pickBestProduct(candidatePool);
+        if (best) return best;
+      }
+    }
+  }
+
+  // 3. If bound to a Category (cascade to all sub-types under root items in the category)
+  if (cat) {
+    const normCat = String(cat).trim().toLowerCase();
+    const matchingRoots = ingsList.filter(i => String(i.category || '').trim().toLowerCase() === normCat);
+    const subtypeIds = new Set();
+    const rootIds = new Set();
+    matchingRoots.forEach(r => {
+      rootIds.add(String(r.id));
+      (r.subtypes || []).forEach(s => subtypeIds.add(String(s.id)));
+    });
+    const candidatePool = prodsList.filter(p =>
+      subtypeIds.has(String(p.subtypeId)) ||
+      rootIds.has(String(p.ingredientId)) ||
+      String(p.category || p.cat || '').trim().toLowerCase() === normCat
+    );
+    if (candidatePool.length > 0) {
+      const best = pickBestProduct(candidatePool);
+      if (best) return best;
+    }
+  }
+
+  // 4. Backward-compatibility fallback: direct productId
+  if (directProdId) {
+    const matched = prodsList.find(p => String(p.id) === String(directProdId));
+    if (matched) return matched;
+  }
+
+  // 5. Name fallback: match by raw ingredient name
+  const rawName = String(line.name || line.matchedName || line.ingredient || '').trim().toLowerCase();
+  if (rawName) {
+    const nameMatched = prodsList.find(p => String(p.name || '').trim().toLowerCase() === rawName);
+    if (nameMatched) return nameMatched;
+  }
+
+  return null;
 }
