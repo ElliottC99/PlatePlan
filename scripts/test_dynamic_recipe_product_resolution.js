@@ -382,5 +382,12 @@ const splitFrozen = freezeProductSelectionsForPlan(splitPlan, { products: testPr
 assert.ok(splitFrozen['0_dinner_E:sub_mature'], 'Must freeze split selection for Elliott (dinner_E)');
 assert.ok(splitFrozen['0_dinner_C:sub_mature'], 'Must freeze split selection for Chloe (dinner_C)');
 
+// 4. Zero Products Stack Overflow Regression Guard
+const resNoProducts = resolveDynamicProductForIngredient(
+  { name: 'Table Salt' },
+  { products: [], ingredients: [{ id: 'ing_salt', name: 'Table Salt' }] }
+);
+assert.equal(resNoProducts, null, 'Must return null without RangeError or stack overflow when taxonomy has 0 products');
+
 console.log('✅ Code Review Findings Verified!\n');
 console.log('🎉 ALL UNITS 1-5 FOR DYNAMIC RECIPE-TO-PANTRY RESOLUTION VERIFIED!');

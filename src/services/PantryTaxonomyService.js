@@ -743,6 +743,7 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
     });
     if (partialProd) return partialProd;
 
+    // Check root items directly without recursive re-entry
     const matchedRoot = ingsList.find(i => {
       const iName = String(i.name || '').trim().toLowerCase();
       if (iName === rawName) return true;
@@ -750,21 +751,33 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
       return aliases.some(a => String(a || '').trim().toLowerCase() === rawName);
     });
     if (matchedRoot) {
-      return resolveDynamicProductForIngredient(
-        { ...line, ingredientId: matchedRoot.id },
-        { products: prodsList, ingredients: ingsList, preferences: activePrefs }
-      );
+      if (matchedRoot.defaultProductId) {
+        const def = prodsList.find(p => String(p.id) === String(matchedRoot.defaultProductId));
+        if (def) return def;
+      }
+      const subtypeIds = new Set((matchedRoot.subtypes || []).map(s => String(s.id)));
+      const candidatePool = prodsList.filter(p => subtypeIds.has(String(p.subtypeId)) || String(p.ingredientId) === String(matchedRoot.id));
+      if (candidatePool.length > 0) {
+        const best = pickBestProduct(candidatePool);
+        if (best) return best;
+      }
     }
 
+    // Check sub-types directly without recursive re-entry
     for (const root of ingsList) {
       for (const sub of (root.subtypes || [])) {
         const sName = String(sub.name || '').trim().toLowerCase();
         const sAliases = Array.isArray(sub.aliases) ? sub.aliases : [];
         if (sName === rawName || sAliases.some(a => String(a || '').trim().toLowerCase() === rawName)) {
-          return resolveDynamicProductForIngredient(
-            { ...line, subtypeId: sub.id, ingredientId: root.id },
-            { products: prodsList, ingredients: ingsList, preferences: activePrefs }
-          );
+          if (sub.defaultProductId) {
+            const def = prodsList.find(p => String(p.id) === String(sub.defaultProductId));
+            if (def) return def;
+          }
+          const subPool = prodsList.filter(p => String(p.subtypeId) === String(sub.id));
+          if (subPool.length > 0) {
+            const best = pickBestProduct(subPool);
+            if (best) return best;
+          }
         }
       }
     }
