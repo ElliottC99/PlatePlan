@@ -6,17 +6,22 @@
 import { getState } from '../store/coreState.js';
 import { resolveFitScoreParams } from './fitScoreWeights.js';
 import { calculateItemNutrition } from '../services/NutritionService.js';
+import { resolveDynamicProductForIngredient } from '../services/PantryTaxonomyService.js';
 
-export function findProductForIngredient(item, products = []) {
+export function findProductForIngredient(item, products = [], options = {}) {
   if (!item || !Array.isArray(products) || !products.length) return null;
-  const directId = item.productId || item.bankId || item.mappedItemId || item.productMatch?.id;
-  if (directId) {
-    const p = products.find(prod => String(prod.id) === String(directId));
-    if (p) return p;
-  }
-  const name = String(item.productName || item.name || '').toLowerCase().trim();
-  if (!name) return null;
-  return products.find(p => String(p.name || '').toLowerCase().trim() === name) || null;
+  const state = (options.ingredients && options.preferences)
+    ? null
+    : (typeof window !== 'undefined' && typeof window.getState === 'function'
+        ? window.getState()
+        : (typeof getState === 'function' ? getState() : {}));
+  const ingredients = options.ingredients || state?.rootItems || state?.ingredients || [];
+  const preferences = options.preferences || state?.preferences || state?.settings || {};
+  return resolveDynamicProductForIngredient(item, {
+    products,
+    ingredients,
+    preferences
+  });
 }
 
 export function computeDynamicMacrosFromIngredients(ingredients, serves = 1) {
@@ -31,13 +36,16 @@ export function computeDynamicMacrosFromIngredients(ingredients, serves = 1) {
         : (Array.isArray(state?.products) ? state.products : []));
   if (!products.length) return null;
 
+  const rootItems = state?.rootItems || state?.ingredients || [];
+  const preferences = state?.preferences || state?.settings || {};
+
   let totalCal = 0;
   let totalProt = 0;
   let matchedCount = 0;
 
   ingredients.forEach(item => {
     if (!item || item.excludeNutrition) return;
-    const prod = findProductForIngredient(item, products);
+    const prod = findProductForIngredient(item, products, { ingredients: rootItems, preferences });
     if (prod) {
       matchedCount++;
       const qty = Number(item.qty ?? item.amount ?? 1) || 1;

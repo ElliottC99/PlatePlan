@@ -176,11 +176,45 @@ export function sanitizeForFirestore(val, isRoot = true) {
   return clean;
 }
 
+export function stripProductIdsFromIngredients(recipe) {
+  if (!recipe || typeof recipe !== 'object') return recipe;
+  const cleanIng = (ing) => {
+    if (!ing || typeof ing !== 'object') return ing;
+    const { productId, bankId, ...rest } = ing;
+    return rest;
+  };
+
+  const copy = { ...recipe };
+  if (Array.isArray(copy.ingredients)) {
+    copy.ingredients = copy.ingredients.map(cleanIng);
+  }
+  if (Array.isArray(copy.ingredientSections)) {
+    copy.ingredientSections = copy.ingredientSections.map(sec => ({
+      ...sec,
+      ingredients: Array.isArray(sec.ingredients) ? sec.ingredients.map(cleanIng) : []
+    }));
+  }
+  if (copy.enhanced && typeof copy.enhanced === 'object') {
+    const enh = { ...copy.enhanced };
+    if (Array.isArray(enh.ingredients)) {
+      enh.ingredients = enh.ingredients.map(cleanIng);
+    }
+    if (Array.isArray(enh.ingredientSections)) {
+      enh.ingredientSections = enh.ingredientSections.map(sec => ({
+        ...sec,
+        ingredients: Array.isArray(sec.ingredients) ? sec.ingredients.map(cleanIng) : []
+      }));
+    }
+    copy.enhanced = enh;
+  }
+  return copy;
+}
+
 export async function saveRecipe(recipe, _uid) {
   try {
     if (!isDbAvailable()) return { success: false, offline: true, error: 'Database unavailable' };
     if (!recipe || typeof recipe !== 'object') return { success: false, error: 'Invalid recipe data' };
-    const cleanedRecipe = cleanLegacyMacros(recipe);
+    const cleanedRecipe = stripProductIdsFromIngredients(cleanLegacyMacros(recipe));
     const recipeData = { ...cleanedRecipe, schemaVersion: 2, updatedAt: new Date().toISOString() };
     const colRef = db.collection('households').doc(HOUSEHOLD_ID).collection('recipes');
     const recipeId = recipe.id || colRef.doc().id;

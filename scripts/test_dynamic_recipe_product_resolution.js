@@ -59,10 +59,10 @@ const testIngredients = [
 ];
 
 const testProducts = [
-  { id: 'prod_mature_tesco', name: 'Tesco Mature Cheddar 400g', ingredientId: 'ing_cheddar', subtypeId: 'sub_mature', price: 3.00, pack: 400, packUnit: 'g', prot: 25, cal: 410 },
-  { id: 'prod_mature_cathedral', name: 'Cathedral City Mature 350g', ingredientId: 'ing_cheddar', subtypeId: 'sub_mature', price: 2.50, pack: 350, packUnit: 'g', prot: 26, cal: 415 },
-  { id: 'prod_mild_tesco', name: 'Tesco Mild Cheddar 400g', ingredientId: 'ing_cheddar', subtypeId: 'sub_mild', price: 2.80, pack: 400, packUnit: 'g', prot: 24, cal: 400 },
-  { id: 'prod_brioche_albi', name: 'Albi Brioche Buns 4pk', ingredientId: 'ing_bread', subtypeId: 'sub_brioche', price: 1.20, pack: 200, packUnit: 'g', prot: 8, cal: 280, isAutoDefault: true }
+  { id: 'prod_mature_tesco', name: 'Tesco Mature Cheddar 400g', ingredientId: 'ing_cheddar', subtypeId: 'sub_mature', price: 3.00, pack: 400, packUnit: 'g', prot: 25, fat: 34, carb: 0.1, cal: 410 },
+  { id: 'prod_mature_cathedral', name: 'Cathedral City Mature 350g', ingredientId: 'ing_cheddar', subtypeId: 'sub_mature', price: 2.50, pack: 350, packUnit: 'g', prot: 26, fat: 35, carb: 0.1, cal: 415 },
+  { id: 'prod_mild_tesco', name: 'Tesco Mild Cheddar 400g', ingredientId: 'ing_cheddar', subtypeId: 'sub_mild', price: 2.80, pack: 400, packUnit: 'g', prot: 24, fat: 33, carb: 0.1, cal: 400 },
+  { id: 'prod_brioche_albi', name: 'Albi Brioche Buns 4pk', ingredientId: 'ing_bread', subtypeId: 'sub_brioche', price: 1.20, pack: 200, packUnit: 'g', prot: 8, fat: 5, carb: 50, cal: 280, isAutoDefault: true }
 ];
 
 setIngredients(testIngredients);
@@ -112,3 +112,68 @@ const resNull = resolveDynamicProductForIngredient(textOnlyLine, { products: tes
 assert.equal(resNull, null, 'Returns null safely for text-only ingredient');
 
 console.log('✅ Unit 1: Dynamic Taxonomy Resolver Engine verified!');
+
+// ==========================================================
+// UNIT 2: Recipe Wizard, Vault Scoring & Nutrition Decoupling
+// ==========================================================
+console.log('\n--- Unit 2: Decoupled Recipe Schema & Dynamic Nutrition ---');
+
+const { stripProductIdsFromIngredients } = await import('../src/services/RecipeFirestoreRepository.js');
+const { findProductForIngredient, computeDynamicMacrosFromIngredients } = await import('../src/utils/macroScoringUtils.js');
+const { formatRecipeIngredientRow } = await import('../src/components/recipe/RecipeDetailModalUI.js');
+
+// 1. Test stripProductIdsFromIngredients
+const mockRecipeWithProductIds = {
+  id: 'rec_cheesy_toast',
+  title: 'Cheesy Toast',
+  ingredients: [
+    { name: 'Mature Cheddar', qty: 50, unit: 'g', subtypeId: 'sub_mature', ingredientId: 'ing_cheddar', productId: 'prod_mature_tesco', bankId: 'prod_mature_tesco' }
+  ],
+  ingredientSections: [
+    {
+      sectionTitle: 'Topping',
+      ingredients: [
+        { name: 'Mild Cheddar', qty: 25, unit: 'g', subtypeId: 'sub_mild', ingredientId: 'ing_cheddar', productId: 'prod_mild_tesco', bankId: 'prod_mild_tesco' }
+      ]
+    }
+  ],
+  enhanced: {
+    ingredients: [
+      { name: 'Brioche Bun', qty: 1, unit: 'item', subtypeId: 'sub_brioche', ingredientId: 'ing_bread', productId: 'prod_brioche_albi' }
+    ]
+  }
+};
+
+const stripped = stripProductIdsFromIngredients(mockRecipeWithProductIds);
+assert.equal(stripped.ingredients[0].productId, undefined, 'Base ingredients must have productId stripped');
+assert.equal(stripped.ingredients[0].bankId, undefined, 'Base ingredients must have bankId stripped');
+assert.equal(stripped.ingredients[0].subtypeId, 'sub_mature', 'Base ingredients must retain subtypeId');
+assert.equal(stripped.ingredientSections[0].ingredients[0].productId, undefined, 'Section ingredients must have productId stripped');
+assert.equal(stripped.ingredientSections[0].ingredients[0].subtypeId, 'sub_mild', 'Section ingredients must retain subtypeId');
+assert.equal(stripped.enhanced.ingredients[0].productId, undefined, 'Enhanced ingredients must have productId stripped');
+assert.equal(stripped.enhanced.ingredients[0].subtypeId, 'sub_brioche', 'Enhanced ingredients must retain subtypeId');
+
+// 2. Test findProductForIngredient in macroScoringUtils resolves dynamically
+const foundProd = findProductForIngredient({ subtypeId: 'sub_mature', ingredientId: 'ing_cheddar' }, testProducts, { ingredients: testIngredients });
+assert.ok(foundProd, 'findProductForIngredient must resolve product dynamically via taxonomy');
+assert.equal(foundProd.id, 'prod_mature_tesco');
+
+// 3. Test computeDynamicMacrosFromIngredients resolves dynamically via taxonomy keys
+// 100g of Tesco Mature Cheddar: 410 kcal, 25g prot. Serves 1 -> 410 cal, 25 prot
+const decoupledIngredients = [
+  { name: 'Mature Cheddar', qty: 100, unit: 'g', subtypeId: 'sub_mature', ingredientId: 'ing_cheddar' }
+];
+const computedMacros = computeDynamicMacrosFromIngredients(decoupledIngredients, 1);
+assert.ok(computedMacros, 'computeDynamicMacrosFromIngredients must succeed with decoupled ingredient');
+assert.equal(computedMacros.cal, 410, 'Calories calculated dynamically from matched product');
+assert.equal(computedMacros.prot, 25, 'Protein calculated dynamically from matched product');
+
+// 4. Test formatRecipeIngredientRow dynamically resolves and displays product without baked-in productId
+const rowHtml = formatRecipeIngredientRow(
+  { name: 'Mature Cheddar', subtypeId: 'sub_mature', ingredientId: 'ing_cheddar' },
+  { products: testProducts, ingredients: testIngredients, rootItems: testIngredients }
+);
+assert.ok(rowHtml.includes('Tesco Mature Cheddar 400g'), 'Ingredient row HTML must include dynamically resolved product name');
+assert.ok(rowHtml.includes('data-product-id="prod_mature_tesco"'), 'Ingredient row HTML must include resolved product id data attribute');
+
+console.log('✅ Unit 2: Recipe Wizard, Vault Scoring & Nutrition Decoupling verified!');
