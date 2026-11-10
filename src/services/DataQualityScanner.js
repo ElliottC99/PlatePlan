@@ -391,24 +391,6 @@ export function runAudit(state = {}) {
     }
   });
 
-  // Flag sub-types that have zero products in the bank as taxonomy gaps
-  ingredients.forEach(ing => {
-    (ing.subtypes || []).forEach(sub => {
-      const hasProd = products.some(p => String(p.subtypeId || p.subTypeId) === String(sub.id));
-      if (!hasProd) {
-        results.unmappedItems.push({
-          key: `gap:subtype:${sub.id}:no-products`,
-          subtypeId: sub.id,
-          subtypeName: sub.name,
-          parentId: ing.id,
-          parentName: ing.name,
-          type: 'empty-subtype',
-          message: `Sub-type "${sub.name}" under "${ing.name}" has no products in the Product Bank.`,
-          severity: 'gap'
-        });
-      }
-    });
-  });
 
   // 6. Recipe Ingredients Lacking Pantry Taxonomy Linkage
   recipes.forEach(r => {

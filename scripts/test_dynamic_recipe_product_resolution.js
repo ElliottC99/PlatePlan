@@ -343,10 +343,9 @@ const unlinkedIssue = auditResults.unmappedItems.find(i => i.recipeId === 'rec_u
 assert.ok(unlinkedIssue, 'Data Quality scanner must flag unlinked recipe ingredient in unmappedItems');
 assert.match(unlinkedIssue.message, /Unicorn Stardust Herb/, 'Message must cite unlinked ingredient name');
 
-// Assert empty sub-type detected
+// Assert pantry staples without products do not produce noisy unmapped alerts
 const emptySubtypeIssue = auditResults.unmappedItems.find(i => i.subtypeId === 'sub_dragonfruit' && i.type === 'empty-subtype');
-assert.ok(emptySubtypeIssue, 'Data Quality scanner must flag empty sub-type in unmappedItems');
-assert.match(emptySubtypeIssue.message, /Dragonfruit/, 'Message must cite empty sub-type name');
+assert.strictEqual(emptySubtypeIssue, undefined, 'Pantry sub-types without products must NOT pollute unmappedItems recipe queue');
 
 console.log('✅ Unit 5: Startup Migration & Data Quality Scanner verified!\n');
 
