@@ -177,3 +177,90 @@ assert.ok(rowHtml.includes('Tesco Mature Cheddar 400g'), 'Ingredient row HTML mu
 assert.ok(rowHtml.includes('data-product-id="prod_mature_tesco"'), 'Ingredient row HTML must include resolved product id data attribute');
 
 console.log('✅ Unit 2: Recipe Wizard, Vault Scoring & Nutrition Decoupling verified!');
+
+// ==========================================================
+// UNIT 3: Meal Plan Product Freezing & Local Swaps
+// ==========================================================
+console.log('\n--- Unit 3: Meal Plan Product Freezing & Local Swaps ---');
+
+const { freezeProductSelectionsForPlan, lockProductSelectionsForSlots } = await import('../src/services/PantryTaxonomyService.js');
+const { executeSwapInState } = await import('../src/components/ProductSwapModal.js');
+const { aggregateShoppingListFromPlan } = await import('../src/services/ShoppingCalculationService.js');
+
+const recipeToast = {
+  id: 'rec_toast',
+  title: 'Cheesy Toast',
+  ingredients: [
+    { name: 'Mature Cheddar', qty: 100, unit: 'g', subtypeId: 'sub_mature', ingredientId: 'ing_cheddar' }
+  ]
+};
+
+setRecipes([recipeToast]);
+
+const mockPlan = {
+  id: 'plan_test_week',
+  slots: {
+    '0': {
+      dinner: { id: 'rec_toast', recipeId: 'rec_toast', variant: 'original' }
+    }
+  },
+  productSelections: {}
+};
+
+// 1. Test Freezing: productSelections populated with resolved product IDs
+const frozenSelections = freezeProductSelectionsForPlan(mockPlan, {
+  products: testProducts,
+  ingredients: testIngredients,
+  recipes: [recipeToast]
+});
+
+assert.ok(frozenSelections['0_dinner:sub_mature'], 'Must freeze scoped product selection for 0_dinner:sub_mature');
+assert.equal(frozenSelections['0_dinner:sub_mature'], 'prod_mature_tesco', 'Frozen product must be Tesco Mature Cheddar');
+
+// 2. Test Decoupling: changing default product does NOT mutate frozen plan selection
+const changedSubtypeIngredients = testIngredients.map(i => ({
+  ...i,
+  subtypes: i.subtypes.map(s => s.id === 'sub_mature' ? { ...s, defaultProductId: 'prod_mature_cathedral' } : s)
+}));
+
+const planWithFrozen = {
+  ...mockPlan,
+  productSelections: { ...frozenSelections }
+};
+
+// Re-freezing existing selections preserves previously frozen product
+const refrozen = freezeProductSelectionsForPlan(planWithFrozen, {
+  products: testProducts,
+  ingredients: changedSubtypeIngredients,
+  recipes: [recipeToast]
+});
+assert.equal(refrozen['0_dinner:sub_mature'], 'prod_mature_tesco', 'Existing frozen selection must not be overwritten by changed default');
+
+// 3. Test Shopping List Aggregation uses frozen product selection
+const shoppingResult = aggregateShoppingListFromPlan(
+  planWithFrozen,
+  { recipes: [recipeToast], preferences: {} },
+  changedSubtypeIngredients,
+  testProducts
+);
+assert.ok(shoppingResult.items.length > 0, 'Shopping items must be generated');
+const cheeseShopItem = shoppingResult.items.find(i => i.bankIng?.id === 'prod_mature_tesco' || i.name.includes('Tesco Mature Cheddar'));
+assert.ok(cheeseShopItem, 'Shopping list must buy frozen product Tesco Mature Cheddar, not changed default');
+
+// 4. Test In-Plan Local Swap via executeSwapInState
+const { store } = await import('../src/store/store.js');
+store.setState({ currentPlan: planWithFrozen, products: testProducts, ingredients: testIngredients });
+
+await executeSwapInState(
+  { canonicalIngId: 'ing_cheddar', subtypeId: 'sub_mature', name: 'Mature Cheddar' },
+  { id: 'prod_mature_cathedral', name: 'Cathedral City Mature 350g', price: 2.50 },
+  { cookingEventId: '0_dinner' }
+);
+
+const swappedPlan = store.getState().currentPlan;
+assert.equal(swappedPlan.productSelections['0_dinner:sub_mature'], 'prod_mature_cathedral', 'In-plan swap must update scoped product selection');
+// Base recipe must remain completely untouched
+const baseRecipeCheck = store.getState().recipes.find(r => r.id === 'rec_toast');
+assert.equal(baseRecipeCheck.ingredients[0].productId, undefined, 'Base recipe must remain completely decoupled after in-plan swap');
+
+console.log('✅ Unit 3: Meal Plan Product Freezing & Local Swaps verified!');

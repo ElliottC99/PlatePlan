@@ -9,6 +9,7 @@ import { getState } from '../store/coreState.js';
 import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
 import { setCurrentPlan } from '../store/store.js';
 import { saveCurrentPlan, stripPlanPayload } from './HouseholdRepository.js';
+import { freezeProductSelectionsForPlan } from './PantryTaxonomyService.js';
 
 const PROTEIN_KEYWORDS = [
   'tofu', 'tempeh', 'seitan', 'halloumi', 'lentils', 'paneer',
@@ -481,7 +482,7 @@ export function generateWeeklyPlan(options = {}) {
     });
   }
 
-  return {
+  const generatedPlan = {
     id: `plan_${Date.now()}`,
     startDate: startDateStr,
     endDate: planDays[planDays.length - 1]?.date || startDateStr,
@@ -490,6 +491,15 @@ export function generateWeeklyPlan(options = {}) {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
+
+  generatedPlan.productSelections = freezeProductSelectionsForPlan(generatedPlan, {
+    products: storeState.products || [],
+    ingredients: storeState.rootItems || storeState.ingredients || [],
+    recipes,
+    preferences: storeState.preferences || storeState.settings || {}
+  });
+
+  return generatedPlan;
 }
 
 // Global browser registration for backward compatibility

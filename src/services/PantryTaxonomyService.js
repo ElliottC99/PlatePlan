@@ -740,3 +740,109 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
 
   return null;
 }
+
+/**
+ * Freezes resolved product IDs for ingredients in a meal plan to decouple
+ * planned meals from future changes in the pantry bank.
+ * @param {Object} plan 
+ * @param {Object} [options]
+ * @returns {Object} productSelections dictionary
+ */
+export function freezeProductSelectionsForPlan(plan, { products = [], ingredients = [], recipes = [], preferences = null } = {}) {
+  if (!plan || typeof plan !== 'object') return {};
+  const currentSelections = { ...(plan.productSelections || {}) };
+
+  const state = (products.length && ingredients.length && recipes.length)
+    ? null
+    : (typeof window !== 'undefined' && typeof window.getState === 'function' ? window.getState() : (typeof getState === 'function' ? getState() : {}));
+
+  const allProducts = products.length ? products : (state?.products || []);
+  const allIngredients = ingredients.length ? ingredients : (state?.rootItems || state?.ingredients || []);
+  const allRecipes = recipes.length ? recipes : (state?.recipes || []);
+  const activePrefs = preferences || state?.preferences || state?.settings || {};
+
+  const processSlot = (dayKey, slotKey, slotVal) => {
+    if (!slotVal) return;
+    const recipeId = slotVal.recipeId || slotVal.id || (typeof slotVal === 'string' ? slotVal : null);
+    if (!recipeId) return;
+    const rec = allRecipes.find(r => String(r.id) === String(recipeId));
+    if (!rec) return;
+
+    const variant = slotVal.variant || 'original';
+    const source = (variant === 'enhanced' && rec.enhanced) ? rec.enhanced : rec;
+    const ingList = (source.ingredientSections && source.ingredientSections.length)
+      ? source.ingredientSections.flatMap(s => s.ingredients || [])
+      : (Array.isArray(source.ingredients) ? source.ingredients : []);
+
+    const eventId = `${dayKey}_${slotKey}`;
+    ingList.forEach(ing => {
+      if (!ing || ing.excludeNutrition) return;
+      const key = ing.subtypeId || ing.ingredientId || ing.name;
+      if (!key) return;
+      const scopedKey = `${eventId}:${key}`;
+      if (currentSelections[scopedKey]) return;
+
+      const resolved = resolveDynamicProductForIngredient(ing, {
+        products: allProducts,
+        ingredients: allIngredients,
+        preferences: activePrefs
+      });
+      if (resolved && resolved.id) {
+        currentSelections[scopedKey] = resolved.id;
+        if (!currentSelections[key]) {
+          currentSelections[key] = resolved.id;
+        }
+      }
+    });
+  };
+
+  const slots = plan.slots || {};
+  if (Array.isArray(slots)) {
+    slots.forEach((daySlots, dayIdx) => {
+      if (typeof daySlots === 'object' && daySlots !== null) {
+        Object.entries(daySlots).forEach(([slotKey, slotVal]) => {
+          processSlot(dayIdx, slotKey, slotVal);
+        });
+      }
+    });
+  } else if (typeof slots === 'object' && slots !== null) {
+    Object.entries(slots).forEach(([dayKey, daySlots]) => {
+      if (typeof daySlots === 'object' && daySlots !== null) {
+        Object.entries(daySlots).forEach(([slotKey, slotVal]) => {
+          processSlot(dayKey, slotKey, slotVal);
+        });
+      }
+    });
+  }
+
+  if (Array.isArray(plan.days)) {
+    plan.days.forEach((dayObj, dayIdx) => {
+      const dayKey = dayObj.date || dayIdx;
+      if (Array.isArray(dayObj.meals)) {
+        dayObj.meals.forEach(meal => {
+          if (meal && meal.recipeId) {
+            processSlot(dayKey, meal.mealType || 'meal', meal);
+          }
+        });
+      }
+    });
+  }
+
+  return currentSelections;
+}
+
+export function lockProductSelectionsForSlots(slots, priority = 'protein') {
+  const state = typeof window !== 'undefined' && typeof window.getState === 'function'
+    ? window.getState()
+    : (typeof getState === 'function' ? getState() : {});
+  const plan = state?.currentPlan || state?.plan || {};
+  return freezeProductSelectionsForPlan(
+    { ...plan, slots },
+    { preferences: { autoDefaultCriterion: priority } }
+  );
+}
+
+if (typeof window !== 'undefined') {
+  window.lockProductSelectionsForSlots = lockProductSelectionsForSlots;
+  window.freezeProductSelectionsForPlan = freezeProductSelectionsForPlan;
+}

@@ -76,7 +76,12 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
   if (!targetItem || !newProduct) return;
   const storeState = (typeof store !== 'undefined' && store.getState) ? store.getState() : (getState());
   const bank = targetItem.bankIng || {};
-  const candidateKeys = [targetItem.canonicalIngId, bank.ingredientId, bank.groupId, bank.id, targetItem.ingredientId !== targetItem.id ? targetItem.ingredientId : null, targetItem.name].filter(Boolean).map(String);
+  const candidateKeys = [
+    targetItem.subtypeId, targetItem.subTypeId, bank.subtypeId, bank.subTypeId,
+    targetItem.canonicalIngId, bank.ingredientId, bank.groupId, bank.id,
+    targetItem.ingredientId !== targetItem.id ? targetItem.ingredientId : null,
+    targetItem.name
+  ].filter(Boolean).map(String);
 
   if (candidateKeys.length === 0) {
     if (targetItem.id) candidateKeys.push(String(targetItem.id));
@@ -93,11 +98,13 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
 
   const eventId = ctx?.cookingEventId || ctx?.instanceId || ctx?.prepEventId || null;
   if (eventId) {
-    candidateKeys.forEach(k => { updatedPlan.substitutions[`${eventId}:${k}`] = subPayload; });
+    candidateKeys.forEach(k => {
+      updatedPlan.substitutions[`${eventId}:${k}`] = subPayload;
+      updatedPlan.productSelections[`${eventId}:${k}`] = newProduct.id;
+    });
   } else {
     candidateKeys.forEach(k => {
       updatedPlan.substitutions[k] = subPayload;
-      if (!updatedPlan.productSelections) updatedPlan.productSelections = {};
       updatedPlan.productSelections[k] = newProduct.id;
     });
   }
