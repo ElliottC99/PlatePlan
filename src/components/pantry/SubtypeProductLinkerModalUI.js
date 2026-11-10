@@ -281,6 +281,7 @@ export function openTescoImportModal(subtypeId, parentId, onSuccess = null, cust
         ingredientId: parentId,
         subtypeId: subtypeId || null,
         parentCategory,
+        subtypeDraftName: subtypeId ? null : (window.__pendingHierarchyCommit?.subtypeName || subName),
         tescoImportData: cleanData
       };
       setTimeout(() => {
@@ -301,7 +302,15 @@ export const closePantryDialog = closeModal;
 // Link Product › Add product manually: the product form, pre-linked to this sub-type.
 export async function openManualProductForSubtype(subtypeId, parentId) {
   const parent = (getState().ingredients || []).find(i => String(i.id) === String(parentId));
-  window.__prefilledResolveBinding = { ingredientId: parentId, subtypeId: subtypeId || null, parentCategory: parent?.category || 'General' };
+  const subName = subtypeId 
+    ? parent?.subtypes?.find(s => String(s.id) === String(subtypeId))?.name 
+    : (window.__pendingHierarchyCommit?.subtypeName || window.__draftSubtypePayload?.name || null);
+  window.__prefilledResolveBinding = {
+    ingredientId: parentId,
+    subtypeId: subtypeId || null,
+    parentCategory: parent?.category || window.__pendingHierarchyCommit?.category || 'General',
+    subtypeDraftName: subtypeId ? null : subName
+  };
   const { openProductEditModal } = await import('../../views/ProductBankView.js');
   openProductEditModal(null);
 }

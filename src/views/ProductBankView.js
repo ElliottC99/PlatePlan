@@ -40,6 +40,7 @@ export function cancelManualIng() {
   // A pre-link from Link Product must not carry over to the next, unrelated new product.
   window.__prefilledResolveBinding = null;
   window.__pendingHierarchyCommit = null;
+  window.__draftSubtypePayload = null;
   window.__onHierarchyComplete = null;
 
   if (window.__modalContext && window.__modalContext.returnTo === 'data-quality') {
@@ -51,7 +52,7 @@ export function cancelManualIng() {
   }
 }
 
-function renderLinkageContainer(prod, binding = {}) {
+export function renderLinkageContainer(prod, binding = {}) {
   const container = document.getElementById('mi-linkage-container');
   if (!container) return;
   const state = getState() || {};
@@ -67,6 +68,10 @@ function renderLinkageContainer(prod, binding = {}) {
     parentRoot = ingredients.find(i => (i.subtypes || []).some(s => String(s.id) === String(subId)) || String(i.id) === String(ingId));
     parentSub = parentRoot?.subtypes?.find(s => String(s.id) === String(subId));
   }
+
+  const draftSubtypeName = binding?.subtypeDraftName || window.__pendingHierarchyCommit?.subtypeName || window.__draftSubtypePayload?.name || null;
+  const draftRootName = parentRoot?.name || window.__pendingHierarchyCommit?.rootItemName || binding?.parentName || null;
+  const draftCategory = parentRoot?.category || binding?.parentCategory || window.__pendingHierarchyCommit?.category || 'General';
 
   if (parentSub && parentRoot) {
     container.innerHTML = `
@@ -87,7 +92,37 @@ function renderLinkageContainer(prod, binding = {}) {
         if (window.__prefilledResolveBinding) {
           window.__prefilledResolveBinding.subtypeId = null;
           window.__prefilledResolveBinding.ingredientId = null;
+          window.__prefilledResolveBinding.subtypeDraftName = null;
         }
+        window.__pendingHierarchyCommit = null;
+        window.__draftSubtypePayload = null;
+        renderLinkageContainer(null, window.__prefilledResolveBinding);
+      };
+    }
+  } else if (draftSubtypeName && (parentRoot || draftRootName)) {
+    container.innerHTML = `
+      <div style="background:var(--surface2, #f8fafc); border:1px solid var(--border, #e2e8f0); border-radius:8px; padding:8px 12px; display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <div style="font-size:12px; font-weight:600; color:var(--text,#1e293b); display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+          <span>📂 ${escapeHtml(draftCategory)}</span>
+          <span style="color:var(--text2,#94a3b8);">›</span>
+          <span>📦 ${escapeHtml(parentRoot?.name || draftRootName)}</span>
+          <span style="color:var(--text2,#94a3b8);">›</span>
+          <span style="color:#059669; font-weight:700;">🏷️ ${escapeHtml(draftSubtypeName)}</span>
+          <span style="background:rgba(5, 150, 105, 0.12); color:#059669; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; text-transform:uppercase; letter-spacing:0.5px;">New Sub-Type</span>
+        </div>
+        ${!activeEditingProductId ? `<button type="button" class="btn xs ghost" id="mi-change-subtype-btn" style="font-size:11px; padding:2px 8px; font-weight:650;">Change</button>` : ''}
+      </div>
+    `;
+    const changeBtn = container.querySelector('#mi-change-subtype-btn');
+    if (changeBtn) {
+      changeBtn.onclick = () => {
+        if (window.__prefilledResolveBinding) {
+          window.__prefilledResolveBinding.subtypeId = null;
+          window.__prefilledResolveBinding.ingredientId = null;
+          window.__prefilledResolveBinding.subtypeDraftName = null;
+        }
+        window.__pendingHierarchyCommit = null;
+        window.__draftSubtypePayload = null;
         renderLinkageContainer(null, window.__prefilledResolveBinding);
       };
     }
@@ -111,6 +146,8 @@ function renderLinkageContainer(prod, binding = {}) {
           window.__prefilledResolveBinding.subtypeId = sel.subtypeId;
           window.__prefilledResolveBinding.ingredientId = sel.ingredientId;
           window.__prefilledResolveBinding.parentCategory = sel.category;
+          window.__prefilledResolveBinding.subtypeDraftName = null;
+          window.__pendingHierarchyCommit = null;
           renderLinkageContainer(null, window.__prefilledResolveBinding);
         }
       });
@@ -434,6 +471,7 @@ export async function saveManualIng() {
   }
 
   const binding = window.__prefilledResolveBinding || {};
+  const draftSubtypeName = binding.subtypeDraftName || window.__pendingHierarchyCommit?.subtypeName || window.__draftSubtypePayload?.name || null;
   const ingredientId = window.__draftSubtypePayload?.parentId || binding.ingredientId || (activeEditingProductId ? currentProds.find(p => String(p.id) === String(activeEditingProductId))?.ingredientId : null);
   const subtypeId = draftSubtypeId || binding.subtypeId || (activeEditingProductId ? currentProds.find(p => String(p.id) === String(activeEditingProductId))?.subtypeId : null);
 
@@ -473,6 +511,14 @@ export async function saveManualIng() {
     isAutoDefault: activeEditingProductId ? (currentProds.find(p => String(p.id) === String(activeEditingProductId))?.isAutoDefault || false) : isAutoDefault,
     updatedAt: new Date().toISOString()
   };
+
+  if (!window.__pendingHierarchyCommit && draftSubtypeName && !subtypeId) {
+    window.__pendingHierarchyCommit = {
+      category: inheritedCategory || 'General',
+      rootItemName: parentIng?.name || binding.parentName || 'General',
+      subtypeName: draftSubtypeName
+    };
+  }
 
   if (window.__pendingHierarchyCommit) {
     const pending = window.__pendingHierarchyCommit;
