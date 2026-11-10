@@ -344,8 +344,8 @@ assert.ok(unlinkedIssue, 'Data Quality scanner must flag unlinked recipe ingredi
 assert.match(unlinkedIssue.message, /Unicorn Stardust Herb/, 'Message must cite unlinked ingredient name');
 
 // Assert empty sub-type detected
-const emptySubtypeIssue = auditResults.orphans.find(i => i.subtypeId === 'sub_dragonfruit' && i.type === 'empty-subtype');
-assert.ok(emptySubtypeIssue, 'Data Quality scanner must flag empty sub-type in orphans');
+const emptySubtypeIssue = auditResults.unmappedItems.find(i => i.subtypeId === 'sub_dragonfruit' && i.type === 'empty-subtype');
+assert.ok(emptySubtypeIssue, 'Data Quality scanner must flag empty sub-type in unmappedItems');
 assert.match(emptySubtypeIssue.message, /Dragonfruit/, 'Message must cite empty sub-type name');
 
 console.log('✅ Unit 5: Startup Migration & Data Quality Scanner verified!\n');
@@ -388,6 +388,53 @@ const resNoProducts = resolveDynamicProductForIngredient(
   { products: [], ingredients: [{ id: 'ing_salt', name: 'Table Salt' }] }
 );
 assert.equal(resNoProducts, null, 'Must return null without RangeError or stack overflow when taxonomy has 0 products');
+
+// 5. Recipe Mapping Audit & Full-Variant Relinking
+const { auditRecipeMappings, relinkRecipeIngredient, batchRelinkRecipeMappings } = await import('../src/utils/RecipeAuditService.js');
+const testRecAudit = {
+  id: 'rec_audit_test',
+  name: 'Spicy Noodle Soup',
+  ingredients: [
+    { name: 'Instant Noodles', ingredientId: 'ing_noodle', subtypeId: 'sub_deleted_orphan', subTypeId: 'sub_deleted_orphan', qty: 200, unit: 'g' }
+  ],
+  enhanced: {
+    ingredients: [
+      { name: 'Ramen Noodles', ingredientId: 'ing_noodle', subtypeId: 'sub_deleted_orphan', subTypeId: 'sub_deleted_orphan', qty: 200, unit: 'g' }
+    ]
+  }
+};
+const testPantryIngredients = [
+  { id: 'ing_noodle', name: 'Instant Noodles', subtypes: [{ id: 'sub_valid_noodle', name: 'Egg Noodles' }] }
+];
+setRecipes([testRecAudit]);
+setIngredients(testPantryIngredients);
+
+const initialAudit = auditRecipeMappings(getState());
+const noodleAuditIssue = initialAudit.issues.find(i => i.recipeId === 'rec_audit_test');
+assert.ok(noodleAuditIssue, 'Must flag orphaned subtype in recipe audit');
+assert.equal(noodleAuditIssue.issueType, 'orphaned');
+
+// Relink to valid subtype and verify synchronization across base and enhanced variants
+await relinkRecipeIngredient({
+  recipeId: 'rec_audit_test',
+  itemIndex: 0,
+  itemName: 'Instant Noodles',
+  originalSubtypeId: 'sub_deleted_orphan',
+  originalIngredientId: 'ing_noodle',
+  newIngredientId: 'ing_noodle',
+  newSubtypeId: 'sub_valid_noodle',
+  qty: 200,
+  unit: 'g'
+});
+
+const updatedRecAudit = getState().recipes.find(r => r.id === 'rec_audit_test');
+assert.equal(updatedRecAudit.ingredients[0].subtypeId, 'sub_valid_noodle', 'Base ingredient subtypeId must be updated');
+assert.equal(updatedRecAudit.ingredients[0].subTypeId, undefined, 'Base ingredient legacy subTypeId must be deleted');
+assert.equal(updatedRecAudit.enhanced.ingredients[0].subtypeId, 'sub_valid_noodle', 'Enhanced variant ingredient subtypeId must be synchronized');
+assert.equal(updatedRecAudit.enhanced.ingredients[0].subTypeId, undefined, 'Enhanced variant legacy subTypeId must be deleted');
+
+const postRelinkAudit = auditRecipeMappings(getState());
+assert.equal(postRelinkAudit.issues.filter(i => i.recipeId === 'rec_audit_test').length, 0, 'Audit must clear after successful relinking');
 
 console.log('✅ Code Review Findings Verified!\n');
 console.log('🎉 ALL UNITS 1-5 FOR DYNAMIC RECIPE-TO-PANTRY RESOLUTION VERIFIED!');

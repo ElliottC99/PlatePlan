@@ -391,20 +391,20 @@ export function runAudit(state = {}) {
     }
   });
 
-  // Flag sub-types that have zero products in the bank
+  // Flag sub-types that have zero products in the bank as taxonomy gaps
   ingredients.forEach(ing => {
     (ing.subtypes || []).forEach(sub => {
-      const hasProd = products.some(p => String(p.subtypeId) === String(sub.id));
+      const hasProd = products.some(p => String(p.subtypeId || p.subTypeId) === String(sub.id));
       if (!hasProd) {
-        results.orphans.push({
-          key: `orphan:subtype:${sub.id}:no-products`,
+        results.unmappedItems.push({
+          key: `gap:subtype:${sub.id}:no-products`,
           subtypeId: sub.id,
           subtypeName: sub.name,
           parentId: ing.id,
           parentName: ing.name,
           type: 'empty-subtype',
           message: `Sub-type "${sub.name}" under "${ing.name}" has no products in the Product Bank.`,
-          severity: 'advisory'
+          severity: 'gap'
         });
       }
     });

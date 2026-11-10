@@ -113,7 +113,9 @@ export function auditRecipeMappings(stateData = null) {
 
   recipes.forEach(recipe => {
     if (!recipe || typeof recipe !== 'object') return;
-    const rawIngs = recipe.ingredients || recipe.recipe?.ingredients || recipe.parsedIngredients || [];
+    const rawIngs = (recipe.ingredientSections && recipe.ingredientSections.length > 0)
+      ? recipe.ingredientSections.flatMap(s => s.ingredients || [])
+      : (Array.isArray(recipe.ingredients) ? recipe.ingredients : (recipe.recipe?.ingredients || recipe.parsedIngredients || []));
     const items = Array.isArray(rawIngs) ? rawIngs : (typeof rawIngs === 'object' ? Object.values(rawIngs) : []);
 
     items.forEach((item, index) => {
@@ -131,7 +133,7 @@ export function auditRecipeMappings(stateData = null) {
       } else if (item && typeof item === 'object') {
         itemName = String(item.name || item.ingredient || item.ingredientName || 'Unnamed Ingredient').trim();
         currentIngredientId = item.ingredientId || null;
-        currentSubtypeId = item.subtypeId || null;
+        currentSubtypeId = item.subtypeId || item.subTypeId || null;
         let currentCategoryId = item.categoryId || (item.cat ? String(item.cat) : null);
 
         if (currentIngredientId && String(currentIngredientId).startsWith('cat:')) {
@@ -201,9 +203,161 @@ export function auditRecipeMappings(stateData = null) {
 }
 
 /**
+ * Transforms an ingredient line with new catalog mapping and strips legacy identifiers.
+ */
+function applyRelinkToIngredient(item, { isCat, catName, parentIng, effectiveIngName, effectiveSubName, newIngredientId, newSubtypeId, effQty, effUnit }) {
+  const updated = {
+    ...item,
+    name: isCat ? (item.name || catName) : (effectiveSubName ? `${effectiveIngName} (${effectiveSubName})` : effectiveIngName),
+    ingredientName: isCat ? '' : effectiveIngName,
+    ingredientId: isCat ? null : (newIngredientId ? String(newIngredientId) : null),
+    pantryItemId: isCat ? null : (newIngredientId ? String(newIngredientId) : null),
+    categoryId: isCat ? catName : (parentIng?.category || item.categoryId || null),
+    cat: isCat ? catName.toLowerCase().replace(/[^a-z0-9]+/g, '-') : (parentIng?.category || item.cat || null),
+    subtypeId: isCat ? null : (newSubtypeId ? String(newSubtypeId) : null),
+    subtypeName: isCat ? null : (effectiveSubName || null),
+    qty: effQty,
+    unit: effUnit
+  };
+  delete updated.subTypeId;
+  delete updated.productId;
+  delete updated.bankId;
+  delete updated.needsSubtypeMapping;
+  return updated;
+}
+
+/**
+ * Synchronizes an ingredient mapping fix across all recipe structures
+ * (sections, flat list, enhanced sections, and enhanced flat list).
+ */
+function applyFixToRecipe(recipe, fix, ingredients) {
+  const isCat = String(fix.newIngredientId || '').startsWith('cat:');
+  const catName = isCat ? String(fix.newIngredientId).replace('cat:', '') : '';
+  const parentIng = !isCat ? ingredients.find(i => String(i.id) === String(fix.newIngredientId)) : null;
+  const subType = parentIng && fix.newSubtypeId && Array.isArray(parentIng.subtypes)
+    ? parentIng.subtypes.find(s => String(s.id) === String(fix.newSubtypeId))
+    : null;
+
+  const effectiveIngName = isCat ? catName : (parentIng?.name || fix.newIngredientName || '');
+  const effectiveSubName = isCat ? '' : (subType?.name || fix.newSubtypeName || '');
+
+  const normTarget = normalizeText(fix.itemName);
+  const matchesItem = (item, idx) => {
+    if (!item) return false;
+    if (normTarget) {
+      const itemNorm = normalizeText(item.name || item.raw || item.ingredientName || '');
+      if (itemNorm === normTarget || (normTarget.length > 3 && (itemNorm.includes(normTarget) || normTarget.includes(itemNorm)))) {
+        return true;
+      }
+    }
+    if (fix.originalSubtypeId && String(item.subtypeId || item.subTypeId || '') === String(fix.originalSubtypeId)) {
+      return true;
+    }
+    if (fix.originalIngredientId && String(item.ingredientId || item.pantryItemId || '') === String(fix.originalIngredientId)) {
+      return true;
+    }
+    return idx === fix.itemIndex;
+  };
+
+  let fixApplied = false;
+
+  // 1. Synchronize sections if present
+  if (Array.isArray(recipe.ingredientSections) && recipe.ingredientSections.length) {
+    let gIdx = 0;
+    for (const sec of recipe.ingredientSections) {
+      if (!Array.isArray(sec.ingredients)) continue;
+      for (let i = 0; i < sec.ingredients.length; i++) {
+        const item = sec.ingredients[i];
+        if (matchesItem(item, gIdx)) {
+          const origQty = typeof item === 'object' ? (item.qty ?? item.amount ?? 1) : 1;
+          const origUnit = typeof item === 'object' ? (item.unit ?? item.measure ?? 'g') : 'g';
+          const effQty = fix.qty !== null && fix.qty !== undefined && fix.qty !== '' ? Number(fix.qty) || fix.qty : origQty;
+          const effUnit = fix.unit !== null && fix.unit !== undefined && fix.unit !== '' ? fix.unit : origUnit;
+
+          sec.ingredients[i] = applyRelinkToIngredient(item, {
+            isCat, catName, parentIng, effectiveIngName, effectiveSubName,
+            newIngredientId: fix.newIngredientId, newSubtypeId: fix.newSubtypeId,
+            effQty, effUnit
+          });
+          fixApplied = true;
+        }
+        gIdx++;
+      }
+    }
+  }
+
+  // 2. Synchronize flat ingredients if present
+  if (Array.isArray(recipe.ingredients)) {
+    for (let i = 0; i < recipe.ingredients.length; i++) {
+      const item = recipe.ingredients[i];
+      if (matchesItem(item, i)) {
+        const origQty = typeof item === 'object' ? (item.qty ?? item.amount ?? 1) : 1;
+        const origUnit = typeof item === 'object' ? (item.unit ?? item.measure ?? 'g') : 'g';
+        const effQty = fix.qty !== null && fix.qty !== undefined && fix.qty !== '' ? Number(fix.qty) || fix.qty : origQty;
+        const effUnit = fix.unit !== null && fix.unit !== undefined && fix.unit !== '' ? fix.unit : origUnit;
+
+        recipe.ingredients[i] = applyRelinkToIngredient(item, {
+          isCat, catName, parentIng, effectiveIngName, effectiveSubName,
+          newIngredientId: fix.newIngredientId, newSubtypeId: fix.newSubtypeId,
+          effQty, effUnit
+        });
+        fixApplied = true;
+      }
+    }
+  }
+
+  // 3. Synchronize enhanced variant if present
+  if (recipe.enhanced && typeof recipe.enhanced === 'object') {
+    if (Array.isArray(recipe.enhanced.ingredientSections)) {
+      let egIdx = 0;
+      for (const sec of recipe.enhanced.ingredientSections) {
+        if (!Array.isArray(sec.ingredients)) continue;
+        for (let i = 0; i < sec.ingredients.length; i++) {
+          const item = sec.ingredients[i];
+          if (matchesItem(item, egIdx)) {
+            const origQty = typeof item === 'object' ? (item.qty ?? item.amount ?? 1) : 1;
+            const origUnit = typeof item === 'object' ? (item.unit ?? item.measure ?? 'g') : 'g';
+            const effQty = fix.qty !== null && fix.qty !== undefined && fix.qty !== '' ? Number(fix.qty) || fix.qty : origQty;
+            const effUnit = fix.unit !== null && fix.unit !== undefined && fix.unit !== '' ? fix.unit : origUnit;
+
+            sec.ingredients[i] = applyRelinkToIngredient(item, {
+              isCat, catName, parentIng, effectiveIngName, effectiveSubName,
+              newIngredientId: fix.newIngredientId, newSubtypeId: fix.newSubtypeId,
+              effQty, effUnit
+            });
+            fixApplied = true;
+          }
+          egIdx++;
+        }
+      }
+    }
+    if (Array.isArray(recipe.enhanced.ingredients)) {
+      for (let i = 0; i < recipe.enhanced.ingredients.length; i++) {
+        const item = recipe.enhanced.ingredients[i];
+        if (matchesItem(item, i)) {
+          const origQty = typeof item === 'object' ? (item.qty ?? item.amount ?? 1) : 1;
+          const origUnit = typeof item === 'object' ? (item.unit ?? item.measure ?? 'g') : 'g';
+          const effQty = fix.qty !== null && fix.qty !== undefined && fix.qty !== '' ? Number(fix.qty) || fix.qty : origQty;
+          const effUnit = fix.unit !== null && fix.unit !== undefined && fix.unit !== '' ? fix.unit : origUnit;
+
+          recipe.enhanced.ingredients[i] = applyRelinkToIngredient(item, {
+            isCat, catName, parentIng, effectiveIngName, effectiveSubName,
+            newIngredientId: fix.newIngredientId, newSubtypeId: fix.newSubtypeId,
+            effQty, effUnit
+          });
+          fixApplied = true;
+        }
+      }
+    }
+  }
+
+  return fixApplied;
+}
+
+/**
  * Relinks a single recipe ingredient item to the Master Catalog.
  */
-export async function relinkRecipeIngredient({ recipeId, itemIndex, itemName = '', newIngredientId, newSubtypeId = null, newIngredientName = '', newSubtypeName = '', qty = null, unit = null }) {
+export async function relinkRecipeIngredient({ recipeId, itemIndex, itemName = '', originalIngredientId = null, originalSubtypeId = null, newIngredientId, newSubtypeId = null, newIngredientName = '', newSubtypeName = '', qty = null, unit = null }) {
   const state = getState();
   const recipes = Array.isArray(state.recipes) ? [...state.recipes] : [];
   const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
@@ -214,89 +368,20 @@ export async function relinkRecipeIngredient({ recipeId, itemIndex, itemName = '
   }
 
   const recipe = JSON.parse(JSON.stringify(recipes[recIndex]));
-  const isCat = String(newIngredientId || '').startsWith('cat:');
-  const catName = isCat ? String(newIngredientId).replace('cat:', '') : '';
-  const parentIng = !isCat ? ingredients.find(i => String(i.id) === String(newIngredientId)) : null;
-  const subType = parentIng && newSubtypeId && Array.isArray(parentIng.subtypes) 
-    ? parentIng.subtypes.find(s => String(s.id) === String(newSubtypeId))
-    : null;
+  const fixApplied = applyFixToRecipe(recipe, {
+    itemIndex,
+    itemName,
+    originalIngredientId,
+    originalSubtypeId,
+    newIngredientId,
+    newSubtypeId,
+    newIngredientName,
+    newSubtypeName,
+    qty,
+    unit
+  }, ingredients);
 
-  const effectiveIngName = isCat ? catName : (parentIng?.name || newIngredientName || '');
-  const effectiveSubName = isCat ? '' : (subType?.name || newSubtypeName || '');
-
-  let foundTarget = false;
-  let originalItem = null;
-
-  // 1. Check sections
-  if (Array.isArray(recipe.ingredientSections) && recipe.ingredientSections.length) {
-    let globalIdx = 0;
-    for (const sec of recipe.ingredientSections) {
-      if (!Array.isArray(sec.ingredients)) continue;
-      for (let i = 0; i < sec.ingredients.length; i++) {
-        const item = sec.ingredients[i];
-        const nameMatches = itemName && String(item?.name || item?.raw || '').trim().toLowerCase() === String(itemName).trim().toLowerCase();
-        if (globalIdx === itemIndex || nameMatches) {
-          originalItem = item;
-          const originalQty = typeof originalItem === 'object' ? (originalItem.qty ?? originalItem.amount ?? 1) : 1;
-          const originalUnit = typeof originalItem === 'object' ? (originalItem.unit ?? originalItem.measure ?? 'g') : 'g';
-          const effectiveQty = qty !== null && qty !== undefined && qty !== '' ? Number(qty) || qty : originalQty;
-          const effectiveUnit = unit !== null && unit !== undefined && unit !== '' ? unit : originalUnit;
-
-          sec.ingredients[i] = {
-            ...originalItem,
-            name: isCat ? (originalItem.name || catName) : (effectiveSubName ? `${effectiveIngName} (${effectiveSubName})` : effectiveIngName),
-            ingredientName: isCat ? '' : effectiveIngName,
-            ingredientId: isCat ? null : String(newIngredientId),
-            pantryItemId: isCat ? null : String(newIngredientId),
-            categoryId: isCat ? catName : (parentIng?.category || originalItem.categoryId || null),
-            cat: isCat ? catName.toLowerCase().replace(/[^a-z0-9]+/g, '-') : (parentIng?.category || originalItem.cat || null),
-            subtypeId: isCat ? null : (newSubtypeId ? String(newSubtypeId) : null),
-            subtypeName: isCat ? null : effectiveSubName,
-            qty: effectiveQty,
-            unit: effectiveUnit
-          };
-          foundTarget = true;
-          break;
-        }
-        globalIdx++;
-      }
-      if (foundTarget) break;
-    }
-  }
-
-  // 2. Check flat ingredients
-  if (!foundTarget && Array.isArray(recipe.ingredients)) {
-    let idx = itemIndex;
-    if (idx < 0 || idx >= recipe.ingredients.length) {
-      if (itemName) {
-        idx = recipe.ingredients.findIndex(ing => String(ing?.name || ing?.raw || '').trim().toLowerCase() === String(itemName).trim().toLowerCase());
-      }
-    }
-    if (idx >= 0 && idx < recipe.ingredients.length) {
-      originalItem = recipe.ingredients[idx];
-      const originalQty = typeof originalItem === 'object' ? (originalItem.qty ?? originalItem.amount ?? 1) : 1;
-      const originalUnit = typeof originalItem === 'object' ? (originalItem.unit ?? originalItem.measure ?? 'g') : 'g';
-      const effectiveQty = qty !== null && qty !== undefined && qty !== '' ? Number(qty) || qty : originalQty;
-      const effectiveUnit = unit !== null && unit !== undefined && unit !== '' ? unit : originalUnit;
-
-      recipe.ingredients[idx] = {
-        ...originalItem,
-        name: isCat ? (originalItem.name || catName) : (effectiveSubName ? `${effectiveIngName} (${effectiveSubName})` : effectiveIngName),
-        ingredientName: isCat ? '' : effectiveIngName,
-        ingredientId: isCat ? null : String(newIngredientId),
-        pantryItemId: isCat ? null : String(newIngredientId),
-        categoryId: isCat ? catName : (parentIng?.category || originalItem.categoryId || null),
-        cat: isCat ? catName.toLowerCase().replace(/[^a-z0-9]+/g, '-') : (parentIng?.category || originalItem.cat || null),
-        subtypeId: isCat ? null : (newSubtypeId ? String(newSubtypeId) : null),
-        subtypeName: isCat ? null : effectiveSubName,
-        qty: effectiveQty,
-        unit: effectiveUnit
-      };
-      foundTarget = true;
-    }
-  }
-
-  if (!foundTarget) {
+  if (!fixApplied) {
     throw new Error(`Target ingredient could not be resolved for recipe "${recipe.name}".`);
   }
 
@@ -306,8 +391,10 @@ export async function relinkRecipeIngredient({ recipeId, itemIndex, itemName = '
   recipes[recIndex] = recipe;
   setRecipes(recipes);
 
-  document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: recipes }));
-  document.dispatchEvent(new CustomEvent('plateplan:recipes-updated', { detail: recipes }));
+  if (typeof document !== 'undefined' && typeof CustomEvent !== 'undefined') {
+    document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: recipes }));
+    document.dispatchEvent(new CustomEvent('plateplan:recipes-updated', { detail: recipes }));
+  }
 
   // Firestore write
   await saveRecipe(recipe);
@@ -335,86 +422,7 @@ export async function batchRelinkRecipeMappings(fixes = []) {
     const recipe = recipeMap.get(rId);
     if (!recipe) continue;
 
-    const isCat = String(fix.newIngredientId || '').startsWith('cat:');
-    const catName = isCat ? String(fix.newIngredientId).replace('cat:', '') : '';
-    const parentIng = !isCat ? ingredients.find(i => String(i.id) === String(fix.newIngredientId)) : null;
-    const subType = parentIng && fix.newSubtypeId && Array.isArray(parentIng.subtypes)
-      ? parentIng.subtypes.find(s => String(s.id) === String(fix.newSubtypeId))
-      : null;
-
-    const effectiveIngName = isCat ? catName : (parentIng?.name || fix.newIngredientName || '');
-    const effectiveSubName = isCat ? '' : (subType?.name || fix.newSubtypeName || '');
-
-    let fixApplied = false;
-
-    // 1. Check sections
-    if (Array.isArray(recipe.ingredientSections) && recipe.ingredientSections.length) {
-      let gIdx = 0;
-      for (const sec of recipe.ingredientSections) {
-        if (!Array.isArray(sec.ingredients)) continue;
-        for (let i = 0; i < sec.ingredients.length; i++) {
-          const item = sec.ingredients[i];
-          const nameMatches = fix.itemName && String(item?.name || item?.raw || '').trim().toLowerCase() === String(fix.itemName).trim().toLowerCase();
-          if (gIdx === fix.itemIndex || nameMatches) {
-            const origQty = typeof item === 'object' ? (item.qty ?? item.amount ?? 1) : 1;
-            const origUnit = typeof item === 'object' ? (item.unit ?? item.measure ?? 'g') : 'g';
-            const effQty = fix.qty !== null && fix.qty !== undefined && fix.qty !== '' ? Number(fix.qty) || fix.qty : origQty;
-            const effUnit = fix.unit !== null && fix.unit !== undefined && fix.unit !== '' ? fix.unit : origUnit;
-
-            sec.ingredients[i] = {
-              ...item,
-              name: isCat ? (item.name || catName) : (effectiveSubName ? `${effectiveIngName} (${effectiveSubName})` : effectiveIngName),
-              ingredientName: isCat ? '' : effectiveIngName,
-              ingredientId: isCat ? null : String(fix.newIngredientId),
-              pantryItemId: isCat ? null : String(fix.newIngredientId),
-              categoryId: isCat ? catName : (parentIng?.category || item.categoryId || null),
-              cat: isCat ? catName.toLowerCase().replace(/[^a-z0-9]+/g, '-') : (parentIng?.category || item.cat || null),
-              subtypeId: isCat ? null : (fix.newSubtypeId ? String(fix.newSubtypeId) : null),
-              subtypeName: isCat ? null : effectiveSubName,
-              qty: effQty,
-              unit: effUnit
-            };
-            fixApplied = true;
-            break;
-          }
-          gIdx++;
-        }
-        if (fixApplied) break;
-      }
-    }
-
-    // 2. Check flat ingredients
-    if (!fixApplied && Array.isArray(recipe.ingredients)) {
-      let idx = fix.itemIndex;
-      if (idx < 0 || idx >= recipe.ingredients.length) {
-        if (fix.itemName) {
-          idx = recipe.ingredients.findIndex(ing => String(ing?.name || ing?.raw || '').trim().toLowerCase() === String(fix.itemName).trim().toLowerCase());
-        }
-      }
-      if (idx >= 0 && idx < recipe.ingredients.length) {
-        const item = recipe.ingredients[idx];
-        const origQty = typeof item === 'object' ? (item.qty ?? item.amount ?? 1) : 1;
-        const origUnit = typeof item === 'object' ? (item.unit ?? item.measure ?? 'g') : 'g';
-        const effQty = fix.qty !== null && fix.qty !== undefined && fix.qty !== '' ? Number(fix.qty) || fix.qty : origQty;
-        const effUnit = fix.unit !== null && fix.unit !== undefined && fix.unit !== '' ? fix.unit : origUnit;
-
-        recipe.ingredients[idx] = {
-          ...item,
-          name: isCat ? (item.name || catName) : (effectiveSubName ? `${effectiveIngName} (${effectiveSubName})` : effectiveIngName),
-          ingredientName: isCat ? '' : effectiveIngName,
-          ingredientId: isCat ? null : String(fix.newIngredientId),
-          pantryItemId: isCat ? null : String(fix.newIngredientId),
-          categoryId: isCat ? catName : (parentIng?.category || item.categoryId || null),
-          cat: isCat ? catName.toLowerCase().replace(/[^a-z0-9]+/g, '-') : (parentIng?.category || item.cat || null),
-          subtypeId: isCat ? null : (fix.newSubtypeId ? String(fix.newSubtypeId) : null),
-          subtypeName: isCat ? null : effectiveSubName,
-          qty: effQty,
-          unit: effUnit
-        };
-        fixApplied = true;
-      }
-    }
-
+    const fixApplied = applyFixToRecipe(recipe, fix, ingredients);
     if (fixApplied) {
       recipe.updatedAt = new Date().toISOString();
       modifiedRecipeIds.add(rId);
@@ -427,8 +435,10 @@ export async function batchRelinkRecipeMappings(fixes = []) {
 
   // Optimistic local state update
   setRecipes(updatedAllRecipes);
-  document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: updatedAllRecipes }));
-  document.dispatchEvent(new CustomEvent('plateplan:recipes-updated', { detail: updatedAllRecipes }));
+  if (typeof document !== 'undefined' && typeof CustomEvent !== 'undefined') {
+    document.dispatchEvent(new CustomEvent('plateplan:state:recipes', { detail: updatedAllRecipes }));
+    document.dispatchEvent(new CustomEvent('plateplan:recipes-updated', { detail: updatedAllRecipes }));
+  }
 
   // Atomic 1-batch Firestore commit
   try {
