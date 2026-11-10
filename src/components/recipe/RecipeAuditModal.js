@@ -336,6 +336,8 @@ function bindModalEvents(issues = [], totalPages = 1, ingredients = [], categori
       recipeId: i.recipeId,
       itemIndex: i.itemIndex,
       itemName: i.itemName,
+      originalIngredientId: i.currentIngredientId,
+      originalSubtypeId: i.currentSubtypeId,
       newIngredientId: i.suggestedMatch.ingredientId,
       newSubtypeId: i.suggestedMatch.subtypeId,
       newIngredientName: i.suggestedMatch.ingredientName,
@@ -370,6 +372,9 @@ function bindModalEvents(issues = [], totalPages = 1, ingredients = [], categori
       const itemIndex = Number(btn.dataset.itemIndex);
       const itemName = btn.dataset.itemName || '';
 
+      const originalIngredientId = btn.dataset.origIngId || null;
+      const originalSubtypeId = btn.dataset.origSubId || null;
+
       const mountEl = modalOverlay.querySelector(`#ram-mount-${issueId}`);
       const qtyEl = modalOverlay.querySelector(`#ram-qty-${issueId}`);
       const unitEl = modalOverlay.querySelector(`#ram-unit-${issueId}`);
@@ -395,6 +400,8 @@ function bindModalEvents(issues = [], totalPages = 1, ingredients = [], categori
           recipeId,
           itemIndex,
           itemName,
+          originalIngredientId,
+          originalSubtypeId,
           newIngredientId,
           newSubtypeId: newSubtypeId || null,
           qty,

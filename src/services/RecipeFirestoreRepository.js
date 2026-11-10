@@ -361,10 +361,12 @@ export async function batchUpdateRecipesInDb(recipeUpdates) {
       const batch = db.batch();
       chunk.forEach(r => {
         const rId = r.id;
-        const rData = { ...r, schemaVersion: 2, updatedAt: new Date().toISOString() };
+        const cleanedRecipe = stripProductIdsFromIngredients(cleanLegacyMacros(r));
+        const rData = { ...cleanedRecipe, schemaVersion: 2, updatedAt: new Date().toISOString() };
         delete rData.id;
+        const sanitizedData = sanitizeForFirestore(rData);
         const rDocRef = recipeColRef.doc(rId);
-        batch.set(rDocRef, rData, { merge: true });
+        batch.set(rDocRef, sanitizedData, { merge: true });
       });
       await batch.commit();
     }
