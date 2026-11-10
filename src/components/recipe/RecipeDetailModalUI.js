@@ -8,6 +8,7 @@ import { renderFitScoreBadge } from '../FitScoreBadge.js';
 import { calculateMealFitScore, getFitScoreTierMeta } from '../../utils/fitScoreCalculator.js';
 import { formatGarlicQuantity } from '../../utils/unitConverter.js';
 import { toGrams } from '../../services/UnitConversionService.js';
+import { resolveDynamicProductForIngredient } from '../../services/PantryTaxonomyService.js';
 
 function escapeHtml(str) {
   if (typeof window !== 'undefined' && window.ppEscapeHtml) {
@@ -48,12 +49,11 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
   if (typeof ing === 'string') return ing.trim();
 
   const appState = state || (typeof window !== 'undefined' ? (window.Store?.getState?.() ) : {});
-  const pantryIngs = Array.isArray(appState.ingredients) ? appState.ingredients : [];
+  const pantryIngs = Array.isArray(appState.rootItems) ? appState.rootItems : (Array.isArray(appState.ingredients) ? appState.ingredients : []);
   const products = Array.isArray(appState.products) ? appState.products : [];
 
   const ingId = ing.ingredientId || ing.groupId || ing.familyId || ing.ingId || '';
   const subId = ing.subtypeId || ing.subTypeId || '';
-  const prodId = ing.productId || ing.mappedProductId || ing.defaultProductId || '';
 
   let ingObj = ingId ? pantryIngs.find(i => String(i?.id) === String(ingId)) : null;
   if (!ingObj) {
@@ -63,7 +63,15 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
     }
   }
 
-  let prodObj = prodId ? products.find(p => String(p?.id) === String(prodId)) : null;
+  let prodObj = resolveDynamicProductForIngredient(ing, {
+    products,
+    ingredients: pantryIngs,
+    preferences: appState.preferences || appState.settings || {}
+  });
+
+  if (!ingObj && prodObj?.ingredientId) {
+    ingObj = pantryIngs.find(i => String(i?.id) === String(prodObj.ingredientId)) || null;
+  }
 
   let subObj = null;
   const subtypes = Array.isArray(ingObj?.subtypes) ? ingObj.subtypes : [];
@@ -76,22 +84,6 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
   }
   if (!subObj && prodObj?.subtypeId && subtypes.length) {
     subObj = subtypes.find(s => String(s?.id) === String(prodObj.subtypeId)) || null;
-  }
-
-  if (!prodObj) {
-    if (subObj) {
-      const subDefaultId = subObj.defaultProductId || subObj.defaultProduct?.id || '';
-      prodObj = subDefaultId
-        ? products.find(p => String(p?.id) === String(subDefaultId))
-        : products.find(p => String(p?.subtypeId || p?.subTypeId || '') === String(subObj.id));
-    }
-    if (!prodObj && ingObj) {
-      const ingDefaultId = ingObj.defaultProductId || ingObj.autoDefaultProduct || '';
-      prodObj = ingDefaultId
-        ? products.find(p => String(p?.id) === String(ingDefaultId))
-        : (products.find(p => String(p?.ingredientId) === String(ingObj.id) && p?.isAutoDefault) ||
-           products.find(p => String(p?.ingredientId) === String(ingObj.id)));
-    }
   }
 
   const ingredientLabel = String(

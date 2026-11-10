@@ -592,12 +592,6 @@ export async function handleDeleteProduct(productId, prodName = null) {
   const state = getState();
   const product = (state.products || []).find(p => String(p.id) === String(productId));
   const name = prodName || product?.name || 'this product';
-  const recipeCount = (state.recipes || []).filter(r => [...(r.ingredients || []), ...(r.enhanced?.ingredients || [])]
-    .some(line => line && line.productId != null && String(line.productId) === String(productId))).length;
-  if (recipeCount) {
-    showCustomAlert(`"${name}" is used in ${recipeCount} recipe${recipeCount === 1 ? '' : 's'}. Swap it out first.`, 'Cannot delete yet');
-    return;
-  }
 
   showCustomConfirm(`Delete "${name}"? This can't be undone.`, 'Delete product', async () => {
     const result = await deleteProduct(productId);

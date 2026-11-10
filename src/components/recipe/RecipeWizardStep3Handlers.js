@@ -16,6 +16,7 @@ import { openEnhancementModal } from './RecipeEnhancementModalUI.js';
 import { cleanIngredientPhraseForAlias, stemIngredientName } from '../../services/RecipeIngredientParser.js';
 import { renderMacroBreakdownCrossbar } from './RecipeWizardStep3View.js';
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
+import { resolveDynamicProductForIngredient } from '../../services/PantryTaxonomyService.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -33,125 +34,9 @@ function escapeHtml(str) {
  * @param {Object} recipeObj 
  * @returns {Object} Per-serving macro totals
  */
-export function resolveProductForIngredient(item, { products = [], ingredients = [] } = {}) {
+export function resolveProductForIngredient(item, { products = [], ingredients = [], preferences } = {}) {
   if (!item || typeof item !== 'object') return null;
-
-  // 1. Direct product ID
-  const directId = item.productId || item.bankId || item.mappedItemId || item.productMatch?.id;
-  if (directId) {
-    const prod = products.find(p => String(p.id) === String(directId));
-    if (prod) return prod;
-  }
-
-  // 2. Subtype mapping
-  if (item.subtypeId) {
-    if (item.ingredientId) {
-      const parentIng = ingredients.find(i => String(i.id) === String(item.ingredientId));
-      if (parentIng && Array.isArray(parentIng.subtypes)) {
-        const sub = parentIng.subtypes.find(s => String(s.id) === String(item.subtypeId) || String(s.name || '').toLowerCase() === String(item.subtypeId).toLowerCase());
-        const subDefId = sub?.defaultProductId || sub?.defaultProduct;
-        if (subDefId) {
-          const prod = products.find(p => String(p.id) === String(subDefId));
-          if (prod) return prod;
-        }
-      }
-    }
-    const subAuto = products.find(p => String(p.subtypeId) === String(item.subtypeId) && p.isAutoDefault);
-    if (subAuto) return subAuto;
-    const subAny = products.find(p => String(p.subtypeId) === String(item.subtypeId));
-    if (subAny) return subAny;
-  }
-
-  // 3. Root item mapping
-  if (item.ingredientId) {
-    const parentIng = ingredients.find(i => String(i.id) === String(item.ingredientId));
-    const ingDefId = parentIng?.defaultProductId || parentIng?.defaultProduct;
-    if (ingDefId) {
-      const prod = products.find(p => String(p.id) === String(ingDefId));
-      if (prod) return prod;
-    }
-    const ingAuto = products.find(p => String(p.ingredientId) === String(item.ingredientId) && p.isAutoDefault);
-    if (ingAuto) return ingAuto;
-    const ingAny = products.find(p => String(p.ingredientId) === String(item.ingredientId));
-    if (ingAny) return ingAny;
-  }
-
-  // 4. Category mapping
-  if (item.categoryId || item.isCategoryDefault) {
-    const catName = String(item.categoryId || '').toLowerCase();
-    const catAuto = products.find(p => (String(p.category || p.cat || '').toLowerCase() === catName) && p.isAutoDefault);
-    if (catAuto) return catAuto;
-    const catAny = products.find(p => (String(p.category || p.cat || '').toLowerCase() === catName));
-    if (catAny) return catAny;
-  }
-
-  // 5. Name matching (exact or partial)
-  const rawSearchName = String(item.matchedName || item.name || '').trim().toLowerCase();
-  if (rawSearchName) {
-    const exactProd = products.find(p => String(p.name || '').trim().toLowerCase() === rawSearchName);
-    if (exactProd) return exactProd;
-
-    const partialProd = products.find(p => {
-      const pName = String(p.name || '').trim().toLowerCase();
-      return pName && (pName.includes(rawSearchName) || rawSearchName.includes(pName));
-    });
-    if (partialProd) return partialProd;
-
-    const matchedIng = ingredients.find(i => {
-      const iName = String(i.name || '').trim().toLowerCase();
-      if (iName === rawSearchName || (stemIngredientName(iName) && stemIngredientName(iName) === stemIngredientName(rawSearchName))) return true;
-      const iAliases = Array.isArray(i.aliases) ? i.aliases : [];
-      return iAliases.some(a => {
-        const aLower = String(a || '').trim().toLowerCase();
-        const aClean = cleanIngredientPhraseForAlias(aLower);
-        return aLower === rawSearchName || aClean === rawSearchName || (stemIngredientName(aClean || aLower) && stemIngredientName(aClean || aLower) === stemIngredientName(rawSearchName));
-      });
-    });
-    if (matchedIng) {
-      const defId = matchedIng.defaultProductId || matchedIng.defaultProduct;
-      if (defId) {
-        const prod = products.find(p => String(p.id) === String(defId));
-        if (prod) return prod;
-      }
-      const pAuto = products.find(p => String(p.ingredientId) === String(matchedIng.id) && p.isAutoDefault);
-      if (pAuto) return pAuto;
-      const pAny = products.find(p => String(p.ingredientId) === String(matchedIng.id));
-      if (pAny) return pAny;
-    }
-
-    // Check subtype name & subtype aliases in fallback
-    for (const ing of ingredients) {
-      for (const sub of (ing.subtypes || [])) {
-        const sName = String(sub.name || '').trim().toLowerCase();
-        const sAliases = Array.isArray(sub.aliases) ? sub.aliases : [];
-        const subMatches = sName === rawSearchName
-          || (stemIngredientName(sName) && stemIngredientName(sName) === stemIngredientName(rawSearchName))
-          || sAliases.some(sa => {
-            const saLower = String(sa || '').trim().toLowerCase();
-            const saClean = cleanIngredientPhraseForAlias(saLower);
-            return saLower === rawSearchName || saClean === rawSearchName || (stemIngredientName(saClean || saLower) && stemIngredientName(saClean || saLower) === stemIngredientName(rawSearchName));
-          });
-        if (subMatches) {
-          const subDefId = sub.defaultProductId || sub.defaultProduct;
-          if (subDefId) {
-            const prod = products.find(p => String(p.id) === String(subDefId));
-            if (prod) return prod;
-          }
-          const subAuto = products.find(p => String(p.subtypeId) === String(sub.id) && p.isAutoDefault);
-          if (subAuto) return subAuto;
-          const subAny = products.find(p => String(p.subtypeId) === String(sub.id));
-          if (subAny) return subAny;
-          const ingDefId = ing.defaultProductId || ing.defaultProduct;
-          if (ingDefId) {
-            const prod = products.find(p => String(p.id) === String(ingDefId));
-            if (prod) return prod;
-          }
-        }
-      }
-    }
-  }
-
-  return null;
+  return resolveDynamicProductForIngredient(item, { products, ingredients, preferences });
 }
 
 export function recalculateWizardMacros(recipeObj) {
@@ -323,25 +208,28 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal = () => {}, sh
   rec.serves = safeServings;
 
   const mapIngredientItem = (i) => {
-    const resolvedProd = resolveProductForIngredient(i, { products, ingredients });
-    const resolvedProdId = i.productId || i.bankId || i.mappedItemId || i.productMatch?.id || resolvedProd?.id || null;
+    const resolvedProd = resolveProductForIngredient(i, { products, ingredients, preferences: state.preferences || state.settings });
     const resolvedIngId = i.ingredientId || resolvedProd?.ingredientId || null;
-    return {
+    const resolvedSubId = i.subtypeId || resolvedProd?.subtypeId || null;
+    const resolvedCat = i.category || i.categoryId || resolvedProd?.category || null;
+    const mapped = {
       ...i,
       name: i.name,
       qty: Number(i.qty) || 1,
       unit: i.unit || '',
       raw: i.raw || `${i.qty || 1} ${i.unit || ''} ${i.name || ''}`.trim(),
-      productId: resolvedProdId,
-      bankId: resolvedProdId,
       ingredientId: resolvedIngId,
-      subtypeId: i.subtypeId || null,
-      categoryId: i.categoryId || null,
+      subtypeId: resolvedSubId,
+      category: resolvedCat,
+      categoryId: resolvedCat,
       isCategoryDefault: i.isCategoryDefault || false,
       displayName: i.displayName || null,
       waterMl: i.waterMl || null,
       isNewTaxonomyItem: !!i.isNewTaxonomyItem
     };
+    delete mapped.productId;
+    delete mapped.bankId;
+    return mapped;
   };
 
   rec.ingredients = allIngredients.map(mapIngredientItem);

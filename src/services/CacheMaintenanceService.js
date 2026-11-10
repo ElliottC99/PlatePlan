@@ -65,6 +65,15 @@ export async function runDeferredMaintenance(preferencesData, mergedCategories, 
       }
     }
 
+    try {
+      const { migrateLegacyRecipeProductBindings } = await import('./MaintenanceService.js');
+      if (typeof migrateLegacyRecipeProductBindings === 'function') {
+        await migrateLegacyRecipeProductBindings();
+      }
+    } catch (e) {
+      console.warn('[Maintenance] migrateLegacyRecipeProductBindings failed:', e);
+    }
+
     // Scrub products with kJ stored as calories
     if (typeof window !== 'undefined' && window.Store?.getState) {
       try {
