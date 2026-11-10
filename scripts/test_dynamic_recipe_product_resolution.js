@@ -282,3 +282,71 @@ assert.ok(resolvedAfterDelete, 'Recipe line must successfully resolve to remaini
 assert.equal(resolvedAfterDelete.id, 'prod_mature_cathedral', 'Dynamically resolves to Cathedral City Mature after Tesco Mature deletion');
 
 console.log('✅ Unit 4: Unblock Pantry Product Deletion verified!');
+
+// ==========================================================
+// UNIT 5: Startup Migration & Data Quality Scanner
+// ==========================================================
+console.log('\n--- Unit 5: Startup Migration & Data Quality Scanner ---');
+
+const { migrateLegacyRecipeProductBindings } = await import('../src/services/MaintenanceService.js');
+const { runAudit } = await import('../src/services/DataQualityScanner.js');
+
+// 1. Test migrateLegacyRecipeProductBindings
+const legacyRecipe = {
+  id: 'rec_legacy_cheese',
+  title: 'Legacy Cheese Sandwich',
+  ingredients: [
+    { name: 'Cheddar', qty: 50, unit: 'g', productId: 'prod_mature_tesco', bankId: 'prod_mature_tesco' }
+  ]
+};
+
+setRecipes([legacyRecipe]);
+setProducts(testProducts);
+setIngredients(testIngredients);
+
+const migrationResult = await migrateLegacyRecipeProductBindings({ dryRun: true });
+assert.ok(migrationResult.success, 'Migration must succeed');
+assert.equal(migrationResult.migratedCount, 1, 'Exactly 1 legacy recipe must be migrated');
+const migratedRec = migrationResult.updates[0];
+assert.equal(migratedRec.ingredients[0].subtypeId, 'sub_mature', 'Must resolve and copy subtypeId from product');
+assert.equal(migratedRec.ingredients[0].ingredientId, 'ing_cheddar', 'Must resolve and copy ingredientId from product');
+assert.equal(migratedRec.ingredients[0].productId, undefined, 'Must strip productId from ingredient line');
+assert.equal(migratedRec.ingredients[0].bankId, undefined, 'Must strip bankId from ingredient line');
+
+// 2. Test Data Quality Scanner for unlinked recipe ingredients & empty subtypes
+const recipeWithOrphan = {
+  id: 'rec_unlinked',
+  title: 'Mysterious Brew',
+  ingredients: [
+    { name: 'Unicorn Stardust Herb', qty: 5, unit: 'g' } // No taxonomy match
+  ]
+};
+
+const auditState = {
+  recipes: [recipeWithOrphan],
+  ingredients: [
+    {
+      id: 'ing_empty',
+      name: 'Exotic Fruit',
+      subtypes: [
+        { id: 'sub_dragonfruit', name: 'Dragonfruit' } // No products in products catalog
+      ]
+    }
+  ],
+  products: testProducts
+};
+
+const auditResults = runAudit(auditState);
+
+// Assert unlinked recipe ingredient detected
+const unlinkedIssue = auditResults.unmappedItems.find(i => i.recipeId === 'rec_unlinked');
+assert.ok(unlinkedIssue, 'Data Quality scanner must flag unlinked recipe ingredient in unmappedItems');
+assert.match(unlinkedIssue.message, /Unicorn Stardust Herb/, 'Message must cite unlinked ingredient name');
+
+// Assert empty sub-type detected
+const emptySubtypeIssue = auditResults.orphans.find(i => i.subtypeId === 'sub_dragonfruit' && i.type === 'empty-subtype');
+assert.ok(emptySubtypeIssue, 'Data Quality scanner must flag empty sub-type in orphans');
+assert.match(emptySubtypeIssue.message, /Dragonfruit/, 'Message must cite empty sub-type name');
+
+console.log('✅ Unit 5: Startup Migration & Data Quality Scanner verified!\n');
+console.log('🎉 ALL UNITS 1-5 FOR DYNAMIC RECIPE-TO-PANTRY RESOLUTION VERIFIED!');

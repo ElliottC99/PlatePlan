@@ -138,6 +138,17 @@ function initDataQualityEvents(container) {
       openSubtypeOrphanResolverModal({ subtypeId, parentId, productId, type });
       return;
     }
+    if (action === 'edit-recipe') {
+      const recipeId = btn.dataset.recipeId;
+      if (typeof window.openRecipeWizard === 'function') {
+        window.openRecipeWizard(recipeId);
+      } else if (typeof window.editRecipeInWizard === 'function') {
+        window.editRecipeInWizard(recipeId);
+      } else {
+        window.showPlatePlanToast?.('Open Recipe Vault to edit this recipe.', 'info');
+      }
+      return;
+    }
     if (action === 'inspect-macro') {
       const recipeId = btn.dataset.recipeId;
       openMacroDriftPreviewModal([recipeId]);
@@ -419,6 +430,22 @@ export function renderDataQualityView() {
                 data-ing-id="${escapeAttr(item.ingredientId)}"
                 data-ing-name="${escapeAttr(item.ingredientName)}"
                 style="background:var(--primary,#4f46e5); color:#fff; font-weight:600;">Set Density</button>
+            </div>
+          </div>
+        `)}
+
+        <!-- 6. UNLINKED RECIPE INGREDIENTS CARD -->
+        ${renderAuditCard('Unlinked Recipe Ingredients', '⚠️', audit.unmappedItems, (item) => `
+          <div style="padding:12px 14px; background:var(--surface2); border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="min-width:0;">
+              <strong style="font-size:13.5px; color:var(--text);">${escapeHtml(item.recipeName)}</strong>
+              <div style="font-size:12px; color:var(--text2,#78716c); margin-top:3px;">${escapeHtml(item.message)}</div>
+            </div>
+            <div style="display:flex; gap:6px; flex-shrink:0;">
+              <button type="button" class="btn sm primary dq-action-btn" 
+                data-action-dq="edit-recipe" 
+                data-recipe-id="${escapeAttr(item.recipeId)}"
+                style="background:var(--primary,#4f46e5); color:#fff; font-weight:600;">Edit in Wizard</button>
             </div>
           </div>
         `)}
