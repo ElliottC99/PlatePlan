@@ -301,8 +301,8 @@ console.log('\n--- Test 5: UI Card Markup & Action Delegation Attributes ---');
 console.log('\n--- Test 6: Inverted Unmapped Pantry Card Retired ---');
 {
   const mockIngredients = [
-    { id: 'ing_penne', name: 'Dried Penne', category: 'Pasta' },
-    { id: 'ing_sherry', name: 'Sherry', category: 'Alcohol' }
+    { id: 'ing_penne', name: 'Dried Penne', category: 'Pasta', subtypes: [{ id: 'sub_penne', name: 'Dried Penne' }] },
+    { id: 'ing_sherry', name: 'Sherry', category: 'Alcohol', subtypes: [{ id: 'sub_sherry', name: 'Dry Sherry' }] }
   ];
 
   const audit = runAudit({
