@@ -111,9 +111,9 @@ export function renderToday() {
     getTodayMealCards(dayPlan, slot.type).map(card => ({ slot, ...card }))
   );
 
-  const { totals, targets } = computeTodayNutritionSummary(dayPlan, plan, state);
+  const { totals, targets, profileNames } = computeTodayNutritionSummary(dayPlan, plan, state);
 
-  const macrosHtml = renderTodayMacrosCard(totals, targets);
+  const macrosHtml = renderTodayMacrosCard(totals, targets, profileNames);
   const cardsHtml = allMealCards.map(({ slot, ...card }) => 
     renderTodayMealCard(slot, card, eatenMeals, dayKey, currentDateStr)
   ).join('');
@@ -183,7 +183,12 @@ export function computeTodayNutritionSummary(dayPlan = {}, plan = null, stateObj
     }
   };
 
-  return { totals, targets };
+  const profileNames = {
+    elliott: eProfile.name || 'Elliott',
+    chloe: cProfile.name || 'Chloe'
+  };
+
+  return { totals, targets, profileNames };
 }
 
 /**

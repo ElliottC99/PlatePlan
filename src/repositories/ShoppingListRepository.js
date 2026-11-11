@@ -4,7 +4,7 @@
  * Quarantines direct Firestore calls away from UI components.
  */
 
-const HOUSEHOLD_ID = 'elliott-chloe';
+import { HOUSEHOLD_ID } from '../config/firebase.js';
 
 export async function saveShoppingList(list) {
   if (!list || !list.id) return { success: false, error: 'Invalid shopping list object' };

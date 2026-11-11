@@ -4,6 +4,8 @@
  * ingredient restrictions, and profile mapping strategies.
  */
 
+import { HOUSEHOLD_ID } from '../../config/firebase.js';
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&': '&amp;',
@@ -17,7 +19,7 @@ function escapeHtml(value) {
 /**
  * Renders household header and active session badge card.
  */
-export function renderHouseholdProfileHeader(householdId = 'elliott-chloe', memberNames = ['Elliott', 'Chloe']) {
+export function renderHouseholdProfileHeader(householdId = HOUSEHOLD_ID, memberNames = ['Elliott', 'Chloe']) {
   return `
     <div class="pp-settings-card" id="pp-household-profile-card">
       <div class="pp-settings-title" style="font-size:16px;font-weight:700;color:var(--label);margin:0 0 12px 0;display:flex;align-items:center;gap:8px">

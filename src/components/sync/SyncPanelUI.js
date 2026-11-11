@@ -4,6 +4,7 @@
  */
 
 import { getState } from '../../store/store.js';
+import { HOUSEHOLD_ID } from '../../config/firebase.js';
 import { hydrateHouseholdData } from '../../services/HydrationService.js';
 import { getCounts } from '../../services/SyncService.js';
 import { showCustomConfirm, showCustomCopyModal } from '../ui/DialogHelpers.js';
@@ -94,7 +95,7 @@ export function renderSyncPanelModal() {
         </div>
         <div style="display:flex;justify-content:space-between;padding-bottom:6px;border-bottom:1px solid var(--border,#e7e5e4)">
           <span style="color:var(--text2,#78716c)">Routing Path</span>
-          <span style="font-weight:600;font-family:monospace;font-size:11px">households/elliott-chloe</span>
+          <span style="font-weight:600;font-family:monospace;font-size:11px">households/${HOUSEHOLD_ID}</span>
         </div>
         <div style="display:flex;justify-content:space-between;padding-bottom:6px;border-bottom:1px solid var(--border,#e7e5e4)">
           <span style="color:var(--text2,#78716c)">Ingredients</span>

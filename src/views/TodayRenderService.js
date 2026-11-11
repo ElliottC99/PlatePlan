@@ -33,14 +33,18 @@ export function formatRecipeTime(timeVal) {
  *
  * @param {Object} totals - Per-person daily totals { elliott: { calories, protein }, chloe: { calories, protein } }
  * @param {Object} targets - Per-person daily targets { elliott: { calories, protein }, chloe: { calories, protein } }
+ * @param {Object} profileNames - Display names { elliott: 'Elliott', chloe: 'Chloe' }
  * @returns {string} HTML markup
  */
-export function renderTodayMacrosCard(totals = {}, targets = {}) {
+export function renderTodayMacrosCard(totals = {}, targets = {}, profileNames = {}) {
   const eTot = totals.elliott || totals.e || { calories: totals.calories || 0, protein: totals.protein || 0 };
   const cTot = totals.chloe || totals.c || { calories: totals.calories || 0, protein: totals.protein || 0 };
 
   const eTgt = targets.elliott || targets.e || { calories: targets.calories || 2100, protein: targets.protein || 140 };
   const cTgt = targets.chloe || targets.c || { calories: targets.calories || 1650, protein: targets.protein || 105 };
+
+  const eName = profileNames.elliott || profileNames.e || 'Elliott';
+  const cName = profileNames.chloe || profileNames.c || 'Chloe';
 
   const renderPersonRow = (name, personTotals, personTargets, isLast = false) => {
     const cal = Math.round(Number(personTotals.calories || personTotals.cal || 0));
@@ -93,8 +97,8 @@ export function renderTodayMacrosCard(totals = {}, targets = {}) {
         <span class="ios-headline" style="color:var(--label); font-weight:700;">Daily Nutrition</span>
         <span style="font-size:12px; font-weight:600; color:var(--secondary-label);">Planned Today</span>
       </div>
-      ${renderPersonRow('Elliott', eTot, eTgt, false)}
-      ${renderPersonRow('Chloe', cTot, cTgt, true)}
+      ${renderPersonRow(eName, eTot, eTgt, false)}
+      ${renderPersonRow(cName, cTot, cTgt, true)}
     </div>
   `;
 }
