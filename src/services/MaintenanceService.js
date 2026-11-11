@@ -9,6 +9,7 @@ import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
 import { batchUpdateRecipesInDb } from './HouseholdRepository.js';
 import { calculateItemNutrition } from './NutritionService.js';
 import { resolveDefaultProduct } from './PantryHierarchyService.js';
+import { resolveDynamicProductForIngredient } from './PantryTaxonomyService.js';
 
 /**
  * Re-aligns fit scores for all existing recipes using the current FitScoreEngine formulas,
@@ -135,23 +136,11 @@ export async function recalculateAllRecipeMacros(options = {}) {
 
     allIngredients.forEach(item => {
       if (!item || item.excludeNutrition) return;
-      const parentIngId = String(item.ingredientId || item.groupId || '').replace(/^grp_/, '');
-      const parentIng = ingMap.get(parentIngId);
-      let matchedProd = null;
-      if (parentIng) {
-        if (parentIng.defaultProductId && prodMap.has(String(parentIng.defaultProductId))) {
-          matchedProd = prodMap.get(String(parentIng.defaultProductId));
-        } else {
-          matchedProd = resolveDefaultProduct(parentIng, products);
-        }
-      }
-      if (!matchedProd && item.productId && prodMap.has(String(item.productId))) {
-        matchedProd = prodMap.get(String(item.productId));
-      }
-      if (!matchedProd && item.name) {
-        const itemLower = String(item.name).toLowerCase().trim();
-        matchedProd = products.find(p => String(p.name || '').toLowerCase().trim() === itemLower);
-      }
+      const matchedProd = resolveDynamicProductForIngredient(item, {
+        products,
+        ingredients,
+        preferences: state.preferences || state.settings
+      });
 
       if (matchedProd) {
         const qty = Number(item.qty ?? item.amount ?? 1) || 1;
@@ -313,11 +302,122 @@ export async function recalculateAllRecipeMacros(options = {}) {
   }
 }
 
+/**
+ * Migrates legacy recipes with static productId/bankId bindings to dynamic pantry taxonomy.
+ * Resolves child subtypes or parent root items, strips product IDs, and routes orphans to Data Quality.
+ *
+ * @param {Object} [options={}]
+ * @param {boolean} [options.dryRun=false]
+ * @returns {Promise<{ success: boolean, migratedCount: number, updates: Array<Object> }>}
+ */
+export async function migrateLegacyRecipeProductBindings(options = {}) {
+  const isDryRun = Boolean(options.dryRun);
+  const state = typeof getState === 'function' ? getState() : {};
+  const recipes = Array.isArray(state.recipes) ? state.recipes : [];
+  const ingredients = Array.isArray(state.rootItems) ? state.rootItems : (Array.isArray(state.ingredients) ? state.ingredients : []);
+  const products = Array.isArray(state.products) ? state.products : [];
+
+  if (recipes.length === 0) {
+    return { success: true, migratedCount: 0, updates: [] };
+  }
+
+  const prodMap = new Map(products.map(p => [String(p.id), p]));
+  const updates = [];
+  const updatedRecipesForStore = [];
+
+  for (const r of recipes) {
+    if (!r || !r.id) continue;
+    let recipeChanged = false;
+
+    const migrateLine = (line) => {
+      if (!line || typeof line !== 'object') return line;
+      let newLine = { ...line };
+      const hasDirectProduct = Boolean(line.productId || line.bankId);
+      const isMissingTaxonomy = !line.subtypeId && !line.ingredientId;
+
+      if (hasDirectProduct || isMissingTaxonomy) {
+        const prodId = line.productId || line.bankId;
+        const matchedProd = prodId ? prodMap.get(String(prodId)) : resolveDynamicProductForIngredient(line, { products, ingredients });
+
+        if (matchedProd) {
+          newLine.subtypeId = newLine.subtypeId || matchedProd.subtypeId || null;
+          newLine.ingredientId = newLine.ingredientId || matchedProd.ingredientId || null;
+          newLine.category = newLine.category || matchedProd.category || matchedProd.cat || null;
+          if (newLine.needsSubtypeMapping) delete newLine.needsSubtypeMapping;
+        } else {
+          if (!newLine.subtypeId && !newLine.ingredientId) {
+            newLine.needsSubtypeMapping = true;
+          }
+        }
+
+        if (hasDirectProduct) {
+          delete newLine.productId;
+          delete newLine.bankId;
+          recipeChanged = true;
+        }
+      }
+      return newLine;
+    };
+
+    let updatedIngredients = null;
+    if (Array.isArray(r.ingredients)) {
+      updatedIngredients = r.ingredients.map(migrateLine);
+    }
+
+    let updatedSections = null;
+    if (Array.isArray(r.ingredientSections)) {
+      updatedSections = r.ingredientSections.map(sec => ({
+        ...sec,
+        ingredients: Array.isArray(sec.ingredients) ? sec.ingredients.map(migrateLine) : []
+      }));
+    }
+
+    let updatedEnhanced = null;
+    if (r.enhanced && typeof r.enhanced === 'object') {
+      const enh = { ...r.enhanced };
+      if (Array.isArray(enh.ingredients)) {
+        enh.ingredients = enh.ingredients.map(migrateLine);
+      }
+      if (Array.isArray(enh.ingredientSections)) {
+        enh.ingredientSections = enh.ingredientSections.map(sec => ({
+          ...sec,
+          ingredients: Array.isArray(sec.ingredients) ? sec.ingredients.map(migrateLine) : []
+        }));
+      }
+      updatedEnhanced = enh;
+    }
+
+    if (recipeChanged) {
+      const updatedRecipe = {
+        ...r,
+        ingredients: updatedIngredients || r.ingredients,
+        ...(updatedSections ? { ingredientSections: updatedSections } : {}),
+        ...(updatedEnhanced ? { enhanced: updatedEnhanced } : {}),
+        schemaVersion: 2,
+        updatedAt: new Date().toISOString()
+      };
+      updates.push(updatedRecipe);
+      updatedRecipesForStore.push(updatedRecipe);
+    }
+  }
+
+  if (updates.length > 0 && !isDryRun) {
+    await batchUpdateRecipesInDb(updates);
+    const recipeMap = new Map(recipes.map(r => [r.id, r]));
+    updatedRecipesForStore.forEach(u => recipeMap.set(u.id, u));
+    setRecipes(Array.from(recipeMap.values()));
+  }
+
+  return { success: true, migratedCount: updates.length, updates };
+}
+
 if (typeof window !== 'undefined') {
   window.MaintenanceService = {
     alignAllFitScores,
-    recalculateAllRecipeMacros
+    recalculateAllRecipeMacros,
+    migrateLegacyRecipeProductBindings
   };
   window.alignAllFitScores = alignAllFitScores;
   window.recalculateAllRecipeMacros = recalculateAllRecipeMacros;
+  window.migrateLegacyRecipeProductBindings = migrateLegacyRecipeProductBindings;
 }

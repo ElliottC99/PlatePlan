@@ -12,6 +12,63 @@ import { getState } from '../../store/store.js';
 import { getUnifiedCategories } from '../../services/HouseholdRepository.js';
 import { openTaxonomyCreationModal } from './RecipeWizardTaxonomyModal.js';
 import { resolveProductForIngredient } from './RecipeWizardStep3Handlers.js';
+import { stemIngredientName, cleanIngredientPhraseForAlias } from '../../services/RecipeIngredientParser.js';
+
+/**
+ * Pure helper to filter taxonomy root items and subtypes by query (including aliases and linked products).
+ */
+export function filterTaxonomyItemsByQuery(query, ingredientsBank = [], productsBank = []) {
+  const q = String(query || '').toLowerCase().trim();
+  const stemmedQ = q ? stemIngredientName(q) : '';
+  const results = [];
+
+  (ingredientsBank || []).forEach(ing => {
+    if (!ing) return;
+    const ingName = String(ing.name || '').toLowerCase();
+    const ingCategory = String(ing.category || '').toLowerCase();
+    const subTypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
+    const ingAliases = Array.isArray(ing.aliases) ? ing.aliases : [];
+
+    const hasMatchingIngAlias = q && ingAliases.some(a => {
+      const aLower = String(a || '').toLowerCase();
+      const aClean = cleanIngredientPhraseForAlias(aLower);
+      const aStem = stemIngredientName(aClean || aLower);
+      return aLower.includes(q) || (aClean && aClean.includes(q)) || (stemmedQ && aStem && (aStem.includes(stemmedQ) || stemmedQ.includes(aStem)));
+    });
+
+    const hasMatchingProduct = q && (productsBank || []).some(p =>
+      String(p.ingredientId) === String(ing.id) && String(p.name || '').toLowerCase().includes(q)
+    );
+
+    const matchesIng = !q || ingName.includes(q) || (stemmedQ && stemIngredientName(ingName).includes(stemmedQ)) || ingCategory.includes(q) || hasMatchingIngAlias || hasMatchingProduct;
+
+    const matchingSubtypes = subTypes.filter(s => {
+      if (!q) return true;
+      const sName = String(s.name || '').toLowerCase();
+      const sAliases = Array.isArray(s.aliases) ? s.aliases : [];
+      const hasSubAlias = sAliases.some(sa => {
+        const saLower = String(sa || '').toLowerCase();
+        const saClean = cleanIngredientPhraseForAlias(saLower);
+        const saStem = stemIngredientName(saClean || saLower);
+        return saLower.includes(q) || (saClean && saClean.includes(q)) || (stemmedQ && saStem && (saStem.includes(stemmedQ) || stemmedQ.includes(saStem)));
+      });
+      const hasSubProd = (productsBank || []).some(p =>
+        String(p.subtypeId) === String(s.id) && String(p.name || '').toLowerCase().includes(q)
+      );
+      return sName.includes(q) || (stemmedQ && stemIngredientName(sName).includes(stemmedQ)) || ingName.includes(q) || hasSubAlias || hasSubProd;
+    });
+
+    if (matchesIng || matchingSubtypes.length > 0) {
+      results.push({
+        ing,
+        matchesIng,
+        subtypesToShow: matchesIng ? subTypes : matchingSubtypes
+      });
+    }
+  });
+
+  return results;
+}
 
 /**
  * Validates whether an ingredient is truly unlinked.
@@ -75,16 +132,13 @@ export function resolveHighestAutoDefaultTaxonomy(prod, { ingredients = [], prod
 
 export function isIngredientUnlinked(item, products = [], ingredients = []) {
   if (!item || typeof item !== 'object') return false;
-  if (item.isNewTaxonomyItem || item.ingredientId === 'new_item') return true;
-  if (item.categoryId) return false;
+  if (item.isNewTaxonomyItem || item.ingredientId === 'new_item' || /new[\s_]*item/i.test(item.ingredientId || '')) return true;
+  if (item.isCategoryDefault && item.categoryId) return false;
+  if (item.categoryId && item.categoryId !== 'Store Cupboard' && item.categoryId !== 'General') return false;
   if (item.subtypeId) return false;
-  if (item.ingredientId && item.ingredientId !== 'new_item') return false;
+  if (item.ingredientId && item.ingredientId !== 'new_item' && !/new[\s_]*item/i.test(item.ingredientId)) return false;
   if (item.productId && (products || []).some(p => String(p.id) === String(item.productId))) return false;
   if (item.bankId && (products || []).some(p => String(p.id) === String(item.bankId))) return false;
-  if (typeof resolveProductForIngredient === 'function') {
-    const resolved = resolveProductForIngredient(item, { products, ingredients });
-    if (resolved) return false;
-  }
   return true;
 }
 
@@ -196,7 +250,7 @@ export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [],
 
   const selectedLabel = getTaxonomyLabel(item, iBank, pBank);
   const isCat = Boolean(item.categoryId) || selectedVal.startsWith('cat:');
-  const catInputStyle = isCat ? 'background:#eef2ff; border:1px solid #818cf8; color:#4338ca; font-weight:600;' : 'background:var(--surface,#fff); border:1px solid var(--border,#ccc); color:var(--text);';
+  const catInputStyle = isCat ? 'background:var(--badge-blue-bg); border:1px solid var(--badge-blue-border); color:var(--badge-blue-text); font-weight:600;' : 'background:var(--surface,#fff); border:1px solid var(--border,#ccc); color:var(--text);';
 
   return `
     <div class="wiz-tax-autocomplete-container" style="position:relative; width:100%;">
@@ -250,42 +304,22 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
     });
 
     // Render taxonomy root items & sub-types (clean and concise names only)
-    ingredientsBank.forEach(ing => {
-      const ingName = String(ing.name || '').toLowerCase();
-      const ingCategory = String(ing.category || '').toLowerCase();
-      const subTypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
+    const filteredTaxonomy = filterTaxonomyItemsByQuery(query, ingredientsBank, productsBank);
+    filteredTaxonomy.forEach(({ ing, subtypesToShow }) => {
+      html += `
+        <div class="wiz-tax-opt wiz-tax-main" data-val="${escapeAttr(ing.id)}" data-label="📦 ${escapeAttr(ing.name)}" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--text); background:var(--surface2,#fbfbf9);">
+          📦 ${escapeHtml(ing.name)}
+        </div>
+      `;
 
-      // Check if any product belonging to this root item matches query (enables searching by product name!)
-      const hasMatchingProduct = query && productsBank.some(p => 
-        String(p.ingredientId) === String(ing.id) && String(p.name || '').toLowerCase().includes(query)
-      );
-
-      const matchesIng = !query || ingName.includes(query) || ingCategory.includes(query) || hasMatchingProduct;
-      const matchingSubtypes = subTypes.filter(s => {
-        if (!query) return true;
-        const sName = String(s.name || '').toLowerCase();
-        const hasSubProd = productsBank.some(p => 
-          String(p.subtypeId) === String(s.id) && String(p.name || '').toLowerCase().includes(query)
-        );
-        return sName.includes(query) || ingName.includes(query) || hasSubProd;
-      });
-
-      if (matchesIng || matchingSubtypes.length > 0) {
+      subtypesToShow.forEach(sub => {
+        const subKey = `${ing.id}:${sub.id || sub.name}`;
         html += `
-          <div class="wiz-tax-opt wiz-tax-main" data-val="${escapeAttr(ing.id)}" data-label="📦 ${escapeAttr(ing.name)}" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--text); background:var(--surface2,#fbfbf9);">
-            📦 ${escapeHtml(ing.name)}
+          <div class="wiz-tax-opt wiz-tax-sub" data-val="${escapeAttr(subKey)}" data-label="🏷️ ${escapeAttr(sub.name)}" style="padding:5px 10px 5px 24px; font-size:11.5px; cursor:pointer; color:var(--text); border-bottom:1px solid rgba(0,0,0,0.03);">
+            ↳ 🏷️ ${escapeHtml(sub.name)}
           </div>
         `;
-
-        (matchesIng ? subTypes : matchingSubtypes).forEach(sub => {
-          const subKey = `${ing.id}:${sub.id || sub.name}`;
-          html += `
-            <div class="wiz-tax-opt wiz-tax-sub" data-val="${escapeAttr(subKey)}" data-label="🏷️ ${escapeAttr(sub.name)}" style="padding:5px 10px 5px 24px; font-size:11.5px; cursor:pointer; color:var(--text); border-bottom:1px solid rgba(0,0,0,0.03);">
-              ↳ 🏷️ ${escapeHtml(sub.name)}
-            </div>
-          `;
-        });
-      }
+      });
     });
 
     dropdownEl.innerHTML = html;
@@ -302,9 +336,9 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
         dropdownEl.style.display = 'none';
 
         if (val.startsWith('cat:')) {
-          inputEl.style.background = '#eef2ff';
-          inputEl.style.border = '1px solid #818cf8';
-          inputEl.style.color = '#4338ca';
+          inputEl.style.background = 'var(--badge-blue-bg)';
+          inputEl.style.border = '1px solid var(--badge-blue-border)';
+          inputEl.style.color = 'var(--badge-blue-text)';
           inputEl.style.fontWeight = '600';
         } else {
           inputEl.style.background = 'var(--surface,#fff)';

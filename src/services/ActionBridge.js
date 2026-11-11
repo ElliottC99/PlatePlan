@@ -19,6 +19,26 @@ import { scrollToTop } from '../components/shell/ScrollToTopButton.js';
 let isBridgeInitialized = false;
 
 /**
+ * Parse positional arguments from a function-call style data-action string,
+ * e.g. "toggleRecipeFavourite('rec_1', event, 'enhanced')" -> ['rec_1', 'event', 'enhanced'].
+ */
+function parseArgsString(actionStr) {
+  const str = String(actionStr || '');
+  const openIdx = str.indexOf('(');
+  const closeIdx = str.lastIndexOf(')');
+  if (openIdx === -1 || closeIdx <= openIdx) return [];
+  const inner = str.slice(openIdx + 1, closeIdx).trim();
+  if (!inner) return [];
+  return inner.split(',').map(part => {
+    const trimmed = part.trim();
+    if ((trimmed.startsWith("'") && trimmed.endsWith("'")) || (trimmed.startsWith('"') && trimmed.endsWith('"'))) {
+      return trimmed.slice(1, -1);
+    }
+    return trimmed;
+  });
+}
+
+/**
  * Route modular data-action values to their corresponding ES6 views or handlers.
  */
 export function routeAction(actionName, target, event) {
@@ -26,7 +46,7 @@ export function routeAction(actionName, target, event) {
   const normalizedAction = String(actionName || '').toLowerCase().trim();
 
   // 1. Recipe & Vault Actions (Delegated to RecipeActionBridge)
-  if (routeRecipeAction(actionName, target, event, () => [])) {
+  if (routeRecipeAction(actionName, target, event, parseArgsString)) {
     return true;
   }
 
@@ -53,7 +73,10 @@ export function routeAction(actionName, target, event) {
     return true;
   }
 
-  if (normalizedAction === 'close-today-swap-modal') {
+  if (normalizedAction === 'close-today-swap-modal' || normalizedAction.includes('closetodayswapmodal')) {
+    if (normalizedAction.includes('event.target===this') && event && event.target !== target) {
+      return false;
+    }
     closeTodaySwapModal();
     return true;
   }
@@ -236,10 +259,59 @@ export function routeAction(actionName, target, event) {
   }
 
   if (normalizedAction === 'close-mobile-more' || normalizedAction.includes('closemobilemore')) {
+    if (normalizedAction.includes('event.target===this') && event && event.target !== target) {
+      return false;
+    }
     document.getElementById('mobile-more-wrap')?.classList.remove('open');
     if (normalizedAction.includes('opencreateactionsheet')) {
       import('../components/navigation/ActionSheetUI.js').then(m => m.openCreateActionSheet?.());
     }
+    if (normalizedAction.includes('syncnow') && typeof window.syncNow === 'function') {
+      window.syncNow();
+    }
+    if (normalizedAction.includes('logout') && typeof window.logout === 'function') {
+      window.logout();
+    }
+    return true;
+  }
+
+  if (normalizedAction === 'close-mobile-action-sheet' || normalizedAction.includes('closemobileactionsheet')) {
+    if (normalizedAction.includes('event.target===this') && event && event.target !== target) {
+      return false;
+    }
+    document.getElementById('mobile-action-sheet-wrap')?.classList.remove('open');
+    document.getElementById('pp-mobile-action-sheet')?.remove();
+    document.getElementById('pp-action-sheet-modal')?.remove();
+    return true;
+  }
+
+  if (normalizedAction === 'openplateplansyncpanel()' || normalizedAction === 'open-sync-panel' || normalizedAction.includes('openplateplansyncpanel')) {
+    if (typeof window.openPlatePlanSyncPanel === 'function') window.openPlatePlanSyncPanel();
+    return true;
+  }
+
+  if (normalizedAction === 'openplateplanlogin()' || normalizedAction === 'window.openplateplanlogin()' || normalizedAction.includes('openplateplanlogin')) {
+    if (typeof window.openPlatePlanLogin === 'function') window.openPlatePlanLogin();
+    return true;
+  }
+
+  if (normalizedAction === 'sync-now' || normalizedAction === 'window.syncnow()' || normalizedAction.includes('syncnow')) {
+    if (typeof window.syncNow === 'function') window.syncNow();
+    return true;
+  }
+
+  if (normalizedAction === 'logout' || normalizedAction === 'window.logout()' || normalizedAction.includes('logout')) {
+    if (typeof window.logout === 'function') window.logout();
+    return true;
+  }
+
+  if (normalizedAction === 'back-to-plan') {
+    if (typeof window.setPlannerWizardStep === 'function') window.setPlannerWizardStep(2);
+    return true;
+  }
+
+  if (normalizedAction === 'copy-list') {
+    import('../components/shopping/ShoppingBatchToolbar.js').then(m => m.exportShoppingListToClipboard());
     return true;
   }
 

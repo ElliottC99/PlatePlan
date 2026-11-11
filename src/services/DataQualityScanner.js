@@ -9,6 +9,7 @@
 import { calculateItemNutrition, rollupNutritionTotals } from './NutritionService.js';
 import { isLiquidIngredient, getIngredientDensity, findDensity } from './UnitConversionService.js';
 import { DQ_CONFIDENCE_THRESHOLD } from '../config/businessRules.js';
+import { resolveDynamicProductForIngredient } from './PantryTaxonomyService.js';
 
 export { getIngredientDensity, findDensity };
 
@@ -390,8 +391,34 @@ export function runAudit(state = {}) {
     }
   });
 
-  // 6. Pantry Items Lacking Store Products (Retired: Recipe Mapping Audit is the single source of truth for ingredient linkage)
-  // Pantry staples do not require store barcode products; results.unmappedItems remains empty.
+
+  // 6. Recipe Ingredients Lacking Pantry Taxonomy Linkage
+  recipes.forEach(r => {
+    const rawIngs = (r.ingredientSections && r.ingredientSections.length > 0)
+      ? r.ingredientSections.flatMap(s => s.ingredients || [])
+      : (Array.isArray(r.ingredients) ? r.ingredients : []);
+
+    rawIngs.forEach((item, idx) => {
+      if (!item || item.excludeNutrition) return;
+      const isUnlinked = item.needsSubtypeMapping || (!item.subtypeId && !item.ingredientId && !item.categoryId);
+      if (isUnlinked) {
+        const resolved = resolveDynamicProductForIngredient(item, { products, ingredients });
+        if (!resolved) {
+          const ingName = item.name || item.raw || `Ingredient #${idx + 1}`;
+          const rTitle = r.name || r.title || 'Untitled Recipe';
+          results.unmappedItems.push({
+            key: `unmapped:recipe:${r.id}:${item.id || idx}`,
+            recipeId: r.id,
+            recipeName: rTitle,
+            ingredientName: ingName,
+            ingredientIndex: idx,
+            message: `Recipe "${rTitle}" has unlinked ingredient "${ingName}" with no matching Pantry Category, Item, or Sub-Type.`,
+            severity: 'gap'
+          });
+        }
+      }
+    });
+  });
 
   // 7. Duplicate Ingredient Detection (> 85% similarity)
   for (let i = 0; i < ingredients.length; i++) {

@@ -56,7 +56,7 @@ export function openSubtypeLinkSelectionModal(subtypeId, parentId) {
       <p style="font-size: 13px; color: var(--text2,#78716c); margin: 0 0 20px 0;">Select how you want to attach a grocery item or barcode to this sub-type.</p>
 
       <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">
-        <div role="button" tabindex="0" data-action="link-existing-product" data-subtype-id="${escapeHTML(subtypeId || '')}" data-parent-id="${escapeHTML(parentId || '')}" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:#fff; transition: background 0.15s;" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='#fff'">
+        <div role="button" tabindex="0" data-action="link-existing-product" data-subtype-id="${escapeHTML(subtypeId || '')}" data-parent-id="${escapeHTML(parentId || '')}" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:var(--surface2); transition: background 0.15s;" onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='var(--surface2)'">
           <div style="font-size: 24px;">🔗</div>
           <div>
             <div style="font-weight: 750; font-size: 13.5px;">1. Link Existing Product(s)</div>
@@ -64,7 +64,7 @@ export function openSubtypeLinkSelectionModal(subtypeId, parentId) {
           </div>
         </div>
 
-        <div role="button" tabindex="0" data-action="link-manual-product" data-subtype-id="${escapeHTML(subtypeId || '')}" data-parent-id="${escapeHTML(parentId || '')}" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:#fff; transition: background 0.15s;" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='#fff'">
+        <div role="button" tabindex="0" data-action="link-manual-product" data-subtype-id="${escapeHTML(subtypeId || '')}" data-parent-id="${escapeHTML(parentId || '')}" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:var(--surface2); transition: background 0.15s;" onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='var(--surface2)'">
           <div style="font-size: 24px;">➕</div>
           <div>
             <div style="font-weight: 750; font-size: 13.5px;">2. Add Product Manually</div>
@@ -72,7 +72,7 @@ export function openSubtypeLinkSelectionModal(subtypeId, parentId) {
           </div>
         </div>
 
-        <div role="button" tabindex="0" data-action="link-tesco-product" data-subtype-id="${escapeHTML(subtypeId || '')}" data-parent-id="${escapeHTML(parentId || '')}" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:#fff; transition: background 0.15s;" onmouseover="this.style.background='var(--surface2,#f5f5f4)'" onmouseout="this.style.background='#fff'">
+        <div role="button" tabindex="0" data-action="link-tesco-product" data-subtype-id="${escapeHTML(subtypeId || '')}" data-parent-id="${escapeHTML(parentId || '')}" style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border,#e7e5e4); border-radius:10px; background:var(--surface2); transition: background 0.15s;" onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='var(--surface2)'">
           <div style="font-size: 24px;">🛒</div>
           <div>
             <div style="font-weight: 750; font-size: 13.5px;">3. Import from Tesco</div>
@@ -149,7 +149,7 @@ export function openSubtypeExistingProductPickerModal(subtypeId, parentId, onSuc
       const pName = String(p.name || '').trim();
       const displayLabel = pBrand && pName && !pName.toLowerCase().startsWith(pBrand.toLowerCase()) ? `${pBrand} ${pName}` : pName;
       return `
-        <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:#fff; border:1px solid var(--border,#e7e5e4); border-radius:6px; cursor:pointer;">
+        <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:var(--surface); border:1px solid var(--border,#e7e5e4); border-radius:6px; cursor:pointer;">
           <input type="checkbox" class="product-picker-cb" value="${escapeHTML(p.id)}" ${isChecked ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--primary,#4f46e5); cursor:pointer;" name="input-field" />
           <div style="flex:1; min-width:0;">
             <div style="font-size:12.5px; font-weight:650; color:var(--text,#1c1917); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${escapeHTML(displayLabel)}</div>
@@ -223,7 +223,7 @@ export function openTescoImportModal(subtypeId, parentId, onSuccess = null, cust
       </div>
       <div class="field" style="margin-bottom: 12px;">
         <label for="tesco-json-input" style="font-weight:600; font-size:0.85rem; display:block; margin-bottom:6px;">Paste Tesco Bookmarklet JSON Output</label>
-        <textarea id="tesco-json-input" placeholder='{"title":"Tesco Bagels 4 Pack","price":1.50,"brand":"Tesco",...}' style="width:100%; min-height:110px; font-family:monospace; font-size:11.5px; padding:10px; border:1px solid var(--border,#e7e5e4); border-radius:8px; outline:none; background:#fff;" name="tesco-json-input"></textarea>
+        <textarea id="tesco-json-input" placeholder='{"title":"Tesco Bagels 4 Pack","price":1.50,"brand":"Tesco",...}' style="width:100%; min-height:110px; font-family:monospace; font-size:11.5px; padding:10px; border:1px solid var(--border,#e7e5e4); border-radius:8px; outline:none; background:var(--surface2); color:var(--text);" name="tesco-json-input"></textarea>
       </div>
       <div id="tesco-import-error-msg" style="display:none; margin-bottom:14px;"></div>
       <div style="display:flex; gap:8px; justify-content: flex-end;">
@@ -257,7 +257,7 @@ export function openTescoImportModal(subtypeId, parentId, onSuccess = null, cust
       if (!parsed || typeof parsed !== 'object') {
         if (errorMsg) {
           errorMsg.style.display = 'block';
-          errorMsg.innerHTML = `<div style="padding:10px; background:#fee2e2; color:#ef4444; border-radius:8px; font-weight:600; font-size:12px;">⚠️ Invalid Tesco JSON string. Please copy directly from the bookmarklet output.</div>`;
+          errorMsg.innerHTML = `<div style="padding:10px; background:var(--badge-red-bg); color:var(--badge-red-text); border-radius:8px; font-weight:600; font-size:12px;">⚠️ Invalid Tesco JSON string. Please copy directly from the bookmarklet output.</div>`;
         }
         return;
       }
@@ -281,6 +281,7 @@ export function openTescoImportModal(subtypeId, parentId, onSuccess = null, cust
         ingredientId: parentId,
         subtypeId: subtypeId || null,
         parentCategory,
+        subtypeDraftName: subtypeId ? null : (window.__pendingHierarchyCommit?.subtypeName || subName),
         tescoImportData: cleanData
       };
       setTimeout(() => {
@@ -301,7 +302,15 @@ export const closePantryDialog = closeModal;
 // Link Product › Add product manually: the product form, pre-linked to this sub-type.
 export async function openManualProductForSubtype(subtypeId, parentId) {
   const parent = (getState().ingredients || []).find(i => String(i.id) === String(parentId));
-  window.__prefilledResolveBinding = { ingredientId: parentId, subtypeId: subtypeId || null, parentCategory: parent?.category || 'General' };
+  const subName = subtypeId 
+    ? parent?.subtypes?.find(s => String(s.id) === String(subtypeId))?.name 
+    : (window.__pendingHierarchyCommit?.subtypeName || window.__draftSubtypePayload?.name || null);
+  window.__prefilledResolveBinding = {
+    ingredientId: parentId,
+    subtypeId: subtypeId || null,
+    parentCategory: parent?.category || window.__pendingHierarchyCommit?.category || 'General',
+    subtypeDraftName: subtypeId ? null : subName
+  };
   const { openProductEditModal } = await import('../../views/ProductBankView.js');
   openProductEditModal(null);
 }

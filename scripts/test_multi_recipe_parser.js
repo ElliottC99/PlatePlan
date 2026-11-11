@@ -400,28 +400,28 @@ Method: 1. Peel and thinly slice the carrot and daikon, or cut them into matchst
   const parsed = parseBulkRecipeText(poutineText);
   assert.strictEqual(parsed.length, 4, `Expected 4 recipes, got ${parsed.length}`);
 
-  // Recipe 1: Poutine
+  // Recipe 1: Poutine (implied salt/pepper filtered)
   assert.strictEqual(parsed[0].title, 'Poutine');
   assert.strictEqual(parsed[0].servings, null);
-  assert.strictEqual(parsed[0].ingredients.length, 25);
+  assert.strictEqual(parsed[0].ingredients.length, 21);
   assert.strictEqual(parsed[0].instructions.length, 14);
 
-  // Recipe 2: Sausage Party Pizza
+  // Recipe 2: Sausage Party Pizza (implied salt/pepper filtered)
   assert.strictEqual(parsed[1].title, 'Sausage Party Pizza');
   assert.strictEqual(parsed[1].servings, null);
-  assert.strictEqual(parsed[1].ingredients.length, 28);
+  assert.strictEqual(parsed[1].ingredients.length, 26);
   assert.strictEqual(parsed[1].instructions.length, 16);
 
-  // Recipe 3: Cheesy Chicken Enchiladas
+  // Recipe 3: Cheesy Chicken Enchiladas (implied salt/pepper filtered)
   assert.strictEqual(parsed[2].title, 'Cheesy Chicken Enchiladas And Mexican-Style Corn Salad');
   assert.strictEqual(parsed[2].servings, null);
-  assert.strictEqual(parsed[2].ingredients.length, 44);
-  assert.strictEqual(parsed[2].instructions.length, 10);
+  assert.strictEqual(parsed[2].ingredients.length, 43);
+  assert.strictEqual(parsed[2].instructions.length, 11);
 
-  // Recipe 4: Blackened Monk Chicken Noodles
+  // Recipe 4: Blackened Monk Chicken Noodles (implied salt/pepper filtered)
   assert.strictEqual(parsed[3].title, 'Blackened Monk Chicken Noodles');
   assert.strictEqual(parsed[3].servings, null);
-  assert.strictEqual(parsed[3].ingredients.length, 25);
+  assert.strictEqual(parsed[3].ingredients.length, 24);
   assert.strictEqual(parsed[3].instructions.length, 9);
 });
 

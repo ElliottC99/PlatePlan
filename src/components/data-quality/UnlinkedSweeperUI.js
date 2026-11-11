@@ -36,16 +36,23 @@ export function scanUnlinkedRecipeIngredients() {
 
     const check = (item, sIdx, iIdx) => {
       if (!item) return;
-      const linked = Boolean(item.productId || item.bankId || item.pantryItemId || item.ingredientId || item.subtypeId || item.targetId);
-      if (!linked) {
-        const raw = typeof item === 'string' ? item : (item.raw || item.name || item.ingredient || item.ingredientName || '');
-        const key = normaliseIngredientString(raw).toLowerCase();
-        if (!key) return;
-        if (!groups.has(key)) groups.set(key, { normalisedKey: key, displayName: cleanDisplayPhrase(raw) || key, count: 0, occurrences: [] });
-        const g = groups.get(key);
-        g.count++;
-        g.occurrences.push({ recipeId: recipe.id, recipeName: rName, sectionIdx: sIdx, itemIdx: iIdx });
+      if (typeof item === 'object') {
+        const isNew = item.isNewTaxonomyItem || item.ingredientId === 'new_item' || /new[\s_]*item/i.test(item.ingredientId || '');
+        if (!isNew) {
+          if (item.isCategoryDefault && item.categoryId) return;
+          if (item.categoryId && item.categoryId !== 'Store Cupboard' && item.categoryId !== 'General') return;
+          if (item.subtypeId) return;
+          if (item.ingredientId && item.ingredientId !== 'new_item' && !/new[\s_]*item/i.test(item.ingredientId)) return;
+          if (item.productId || item.bankId || item.pantryItemId || item.targetId) return;
+        }
       }
+      const raw = typeof item === 'string' ? item : (item.raw || item.name || item.ingredient || item.ingredientName || '');
+      const key = normaliseIngredientString(raw).toLowerCase();
+      if (!key) return;
+      if (!groups.has(key)) groups.set(key, { normalisedKey: key, displayName: cleanDisplayPhrase(raw) || key, count: 0, occurrences: [] });
+      const g = groups.get(key);
+      g.count++;
+      g.occurrences.push({ recipeId: recipe.id, recipeName: rName, sectionIdx: sIdx, itemIdx: iIdx });
     };
 
     if (Array.isArray(recipe.ingredientSections) && recipe.ingredientSections.length) {
@@ -85,7 +92,7 @@ export function openUnlinkedSweeperModal() {
         </div>
         <div style="flex:1;min-width:280px;max-width:380px;position:relative;" class="pantry-search-container relative">
           <input type="text" class="pantry-search-input" placeholder="Search Master Pantry..." data-idx="${idx}" data-phrase="${escapeAttr(g.normalisedKey)}" data-selected-id="" data-selected-sub-id="" autocomplete="off" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border,#cbd5e1);font-size:13px;background:var(--surface,#fff);color:var(--text,#1e293b);box-sizing:border-box;" />
-          <div class="pantry-search-dropdown hidden absolute bg-white shadow-lg w-full z-10 max-h-48 overflow-y-auto" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:260px;overflow-y:auto;background:#fff;border:1px solid var(--border,#cbd5e1);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,0.2);z-index:1050;margin-top:4px;"></div>
+          <div class="pantry-search-dropdown hidden absolute bg-white shadow-lg w-full z-10 max-h-48 overflow-y-auto" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:260px;overflow-y:auto;background:var(--surface);border:1px solid var(--border,#cbd5e1);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,0.2);z-index:1050;margin-top:4px;"></div>
         </div>
       </div>
     `).join('');
@@ -171,7 +178,7 @@ function attachSweeperSearchEvents(container, unlinkedGroups = []) {
           matchCount++;
           html += `<div class="wiz-tax-opt wiz-tax-main" data-val="${escapeAttr(ing.id)}" data-label="📦 ${escapeAttr(ing.name)}" style="padding:7px 12px;font-size:12.5px;cursor:pointer;font-weight:700;color:var(--text,#1e293b);background:var(--surface2,#f8fafc);border-bottom:1px solid rgba(0,0,0,0.04);display:flex;align-items:center;justify-content:space-between;">
             <div>📦 ${escapeHtml(ing.name)}</div>
-            <span style="font-size:10.5px;font-weight:600;color:#64748b;background:#e2e8f0;padding:1px 6px;border-radius:4px;">${escapeHtml(ing.category || 'General')}</span>
+            <span style="font-size:10.5px;font-weight:600;color:var(--badge-neutral-text);background:var(--badge-neutral-bg);padding:1px 6px;border-radius:4px;">${escapeHtml(ing.category || 'General')}</span>
           </div>`;
 
           (matchesMain ? subTypes : matchingSubs).forEach(sub => {

@@ -7,15 +7,17 @@ import store from "../store/store.js";
  * Features real-time Cloud subscription synchronization and DocumentFragment rendering.
  */
 import { savePreferences } from '../services/HouseholdRepository.js';
-import { renderVaultRecipeCard } from '../components/vault/VaultRecipeCard.js';
+import { renderVaultRecipeCard, getNormalizedRecipeTypes } from '../components/vault/VaultRecipeCard.js';
 import { renderVaultGridContainer } from '../components/vault/VaultGridContainer.js';
 import * as VaultFilterToolbar from '../components/vault/VaultFilterToolbar.js';
 import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
 import { getSortedRecipes } from '../services/FitScoreService.js';
 import { formatRecipeIngredientRow, renderRecipeIngredientsListHTML } from '../components/recipe/RecipeDetailModalUI.js';
 import { subscribe } from '../store/store.js';
+import { findDuplicateRecipeClusters, mergeDuplicateRecipeCluster } from '../services/RecipeFirestoreRepository.js';
+import { escapeHtml, escapeAttr } from '../utils/stringUtils.js';
 
-export { renderVaultRecipeCard, renderVaultGridContainer, VaultFilterToolbar, calculateMealFitScore, getSortedRecipes, formatRecipeIngredientRow, renderRecipeIngredientsListHTML };
+export { renderVaultRecipeCard, getNormalizedRecipeTypes, renderVaultGridContainer, VaultFilterToolbar, calculateMealFitScore, getSortedRecipes, formatRecipeIngredientRow, renderRecipeIngredientsListHTML, findDuplicateRecipeClusters, mergeDuplicateRecipeCluster };
 
 let currentRecipeSearchQuery = '';
 
@@ -144,16 +146,7 @@ export function renderRecipeGrid(recipesToRender) {
     return;
   }
 
-  const listSignature = [ft, fw, currentRecipeSearchQuery, sort].join('|');
-  if (typeof window.resetProgressiveList === 'function') {
-    window.resetProgressiveList('vault', listSignature);
-  }
-  const totalRecipes = sortedRecipes.length;
-  const limit = window.platePlanListLimits?.vault || 50;
-  const visibleRecipes = sortedRecipes.slice(0, limit);
-  const progressiveBtn = typeof window.progressiveListButton === 'function' ? window.progressiveListButton('vault', totalRecipes, visibleRecipes.length) : '';
-
-  list.innerHTML = renderVaultGridContainer({ recipes: visibleRecipes, mealType: selectedMealType, activeProfile, progressiveBtn });
+  list.innerHTML = renderVaultGridContainer({ recipes: sortedRecipes, mealType: selectedMealType, activeProfile });
 
   if (!list.hasAttribute('data-delegated')) {
     list.addEventListener('click', (e) => {
@@ -182,26 +175,7 @@ export function renderRecipeGrid(recipesToRender) {
 
 export function handleRecipeSearch(query) {
   currentRecipeSearchQuery = (query || '').toLowerCase().trim();
-
-  const state = (window.Store && typeof window.Store.getState === 'function')
-    ? window.Store.getState()
-    : {};
-  const recipes = Array.isArray(state.recipes) ? state.recipes : (getState()?.recipes || []);
-
-  const filtered = recipes.filter(recipe => {
-    if (!currentRecipeSearchQuery) return true;
-    const nameMatch = String(recipe.name || recipe.title || '').toLowerCase().includes(currentRecipeSearchQuery);
-    const catMatch = String(recipe.category || '').toLowerCase().includes(currentRecipeSearchQuery);
-    const tagMatch = Array.isArray(recipe.tags) && recipe.tags.some(t => String(t).toLowerCase().includes(currentRecipeSearchQuery));
-    const ingMatch = Array.isArray(recipe.ingredients) && recipe.ingredients.some(i => String(i.name || i).toLowerCase().includes(currentRecipeSearchQuery));
-    const enh = recipe.enhanced;
-    const enhNameMatch = enh && String(enh.name || enh.title || '').toLowerCase().includes(currentRecipeSearchQuery);
-    const enhChangesMatch = enh && String(enh.changes || '').toLowerCase().includes(currentRecipeSearchQuery);
-    const enhIngMatch = enh && Array.isArray(enh.ingredients) && enh.ingredients.some(i => String(i.name || i).toLowerCase().includes(currentRecipeSearchQuery));
-    return nameMatch || catMatch || tagMatch || ingMatch || enhNameMatch || enhChangesMatch || enhIngMatch;
-  });
-
-  renderRecipeGrid(filtered);
+  renderRecipeVault();
 }
 
 export function renderRecipeVault() {
@@ -217,15 +191,24 @@ export function renderRecipeVault() {
   const q = currentRecipeSearchQuery;
   const list = document.getElementById('vault-list');
 
+  const allRecipesForDedup = getState()?.recipes || (window.Store && typeof window.Store.getState === 'function' ? window.Store.getState().recipes : []) || [];
+  const favListForDedup = ensureVariantFavoritingPrefs();
+  const duplicateClusters = findDuplicateRecipeClusters(allRecipesForDedup, favListForDedup);
+  const clusterCount = duplicateClusters.length;
+
   // Inject Recipe Actions Bar
   const actionsBar = document.createElement('div');
   actionsBar.className = 'recipe-actions-bar';
   actionsBar.style.display = 'flex';
   actionsBar.style.gap = '6px';
   actionsBar.style.marginBottom = '10px';
+  actionsBar.style.flexWrap = 'wrap';
   actionsBar.innerHTML = `
     <button id="btn-manual-recipe" class="btn primary sm">Create Recipe</button>
     <button id="btn-import-recipe" class="btn secondary sm">Paste & Parse Recipes</button>
+    <button id="btn-dedup-recipe" class="btn ghost sm" style="font-weight:600; color:var(--text); ${clusterCount > 0 ? 'background:var(--surface2);' : ''}">
+      🧹 Deduplicate Recipes ${clusterCount > 0 ? `(${clusterCount})` : ''}
+    </button>
   `;
   
   // Clear existing before adding if it exists
@@ -250,6 +233,13 @@ export function renderRecipeVault() {
     });
   }
 
+  const btnDedup = actionsBar.querySelector('#btn-dedup-recipe');
+  if (btnDedup) {
+    btnDedup.addEventListener('click', () => {
+      openRecipeDeduplicationModal();
+    });
+  }
+
 
 
   const favFilterBtn = document.getElementById('vault-filter-fav');
@@ -267,7 +257,7 @@ export function renderRecipeVault() {
     const hasAnyFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
     if (isFavOnly && !hasAnyFav) return false;
     const ftNorm = String(ft || 'all').toLowerCase();
-    const types = (r.types || [r.type]).map(t => String(t || '').toLowerCase());
+    const types = getNormalizedRecipeTypes(r);
     const enh = r.enhanced;
     const searchable = [
       r.name,
@@ -390,6 +380,158 @@ export function handleVaultSortChange(val) {
   renderRecipeVault();
 }
 
+export function closeRecipeDeduplicationModal() {
+  const wrap = document.getElementById('view-modal-wrap');
+  if (wrap) {
+    wrap.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+}
+
+export function openRecipeDeduplicationModal() {
+  let wrap = document.getElementById('view-modal-wrap');
+  let content = document.getElementById('view-modal-content');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'view-modal-wrap';
+    wrap.className = 'modal-wrap';
+    document.body.appendChild(wrap);
+  }
+  if (!content) {
+    content = document.createElement('div');
+    content.id = 'view-modal-content';
+    content.className = 'modal';
+    wrap.appendChild(content);
+  }
+
+  const state = getState() || {};
+  const allRecipes = state.recipes || (window.Store && typeof window.Store.getState === 'function' ? window.Store.getState().recipes : []) || [];
+  const favList = ensureVariantFavoritingPrefs();
+  const clusters = findDuplicateRecipeClusters(allRecipes, favList);
+
+  if (clusters.length === 0) {
+    content.innerHTML = `
+      <div style="padding:28px 24px; max-width:480px; width:100%; margin:0 auto; background:var(--surface,#fff); border-radius:14px; position:relative; box-shadow:0 10px 25px rgba(0,0,0,0.15); text-align:center;">
+        <div style="font-size:36px; margin-bottom:8px;">🎉</div>
+        <h3 style="margin:0 0 8px 0; font-size:1.15rem; font-weight:750; color:var(--text,#1c1917);">All Recipes Unique</h3>
+        <p style="font-size:12.5px; color:var(--text2,#78716c); margin:0 0 20px 0;">No duplicate recipe clusters detected across your Recipe Vault.</p>
+        <button type="button" class="btn sm primary" id="btn-rec-dedup-done" style="padding:6px 18px; font-weight:650;">Done</button>
+      </div>
+    `;
+    wrap.style.setProperty('z-index', '25005', 'important');
+    content.style.setProperty('z-index', '25005', 'important');
+    wrap.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    const doneBtn = content.querySelector('#btn-rec-dedup-done');
+    if (doneBtn) doneBtn.onclick = closeRecipeDeduplicationModal;
+    return;
+  }
+
+  content.innerHTML = `
+    <div style="padding:24px; max-width:620px; width:100%; margin:0 auto; background:var(--surface,#fff); border-radius:14px; position:relative; box-shadow:0 10px 25px rgba(0,0,0,0.15); max-height:85vh; display:flex; flex-direction:column;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; border-bottom:1px solid var(--border,#e7e5e4); padding-bottom:10px;">
+        <h3 style="margin:0; font-size:1.15rem; font-weight:750; color:var(--text,#1c1917); display:flex; align-items:center; gap:6px;">
+          <span>🧹</span> Deduplicate Recipes
+        </h3>
+        <button type="button" class="btn xs ghost" id="btn-rec-dedup-close" style="font-weight:700;">✕</button>
+      </div>
+
+      <p style="font-size:12.5px; color:var(--text2,#78716c); margin:0 0 14px 0;">
+        Found <strong>${clusters.length}</strong> duplicate recipe cluster${clusters.length === 1 ? '' : 's'}. Select the canonical version to keep for each dish. Any enhanced variant, favourite status, tags, and active Meal Plan slots will be consolidated into the chosen recipe before duplicates are removed.
+      </p>
+
+      <div id="rec-clusters-list" style="overflow-y:auto; flex:1; margin-bottom:16px; padding-right:4px;">
+        ${clusters.map((cluster, cIdx) => `
+          <div class="rec-cluster-card" data-cidx="${cIdx}" style="background:var(--surface2,#f8fafc); border:1px solid var(--border,#e2e8f0); border-radius:10px; padding:12px 14px; margin-bottom:12px;">
+            <div style="font-size:11px; font-weight:700; color:var(--text2,#64748b); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">
+              Cluster: "${escapeHtml(cluster.title)}" (${cluster.variants.length} copies)
+            </div>
+            ${cluster.variants.map((v, vIdx) => {
+              const hasEnh = Boolean(v.enhanced);
+              const ingCount = Array.isArray(v.ingredients) ? v.ingredients.length : 0;
+              const serves = v.servings || v.serves || 4;
+              const isFav = Boolean(v.isFavourite || v.isFavorite || favList.includes(`${v.id}_original`));
+              const tags = Array.isArray(v.mealSuitability) && v.mealSuitability.length ? v.mealSuitability.join(', ') : (Array.isArray(v.types) ? v.types.join(', ') : 'Dinner');
+
+              return `
+                <label style="display:flex; align-items:center; justify-content:space-between; padding:9px 12px; background:var(--surface,#fff); border:1px solid var(--border,#eee); border-radius:8px; margin-bottom:6px; cursor:pointer;">
+                  <div style="display:flex; align-items:flex-start; gap:10px; min-width:0;">
+                    <input type="radio" name="rec_cluster_${cIdx}" value="${escapeAttr(v.id)}" ${vIdx === 0 ? 'checked' : ''} style="margin-top:3px; cursor:pointer;" />
+                    <div style="min-width:0;">
+                      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                        <strong style="font-size:13px; color:var(--text,#1c1917);">${escapeHtml(v.name || v.title)}</strong>
+                        ${vIdx === 0 ? '<span style="font-size:10px; background:var(--badge-green-bg); color:var(--badge-green-text); font-weight:700; padding:1px 6px; border-radius:4px;">Recommended</span>' : ''}
+                        ${hasEnh ? '<span style="font-size:10px; background:var(--badge-blue-bg); color:var(--badge-blue-text); font-weight:700; padding:1px 6px; border-radius:4px;">✨ Enhanced</span>' : ''}
+                        ${isFav ? '<span style="font-size:10px; color:#ef4444;">❤️</span>' : ''}
+                      </div>
+                      <div style="font-size:11.5px; color:var(--text2,#64748b); margin-top:2px;">
+                        Tags: ${escapeHtml(tags)} · ${ingCount} ingredients · Serves ${serves}
+                      </div>
+                    </div>
+                  </div>
+                  <span style="font-size:11px; color:var(--text2,#64748b); background:var(--surface2,#f1f5f9); padding:2px 8px; border-radius:6px; white-space:nowrap; margin-left:8px;">
+                    ${v._stats?.linkedIngCount || 0} mapped
+                  </span>
+                </label>
+              `;
+            }).join('')}
+          </div>
+        `).join('')}
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px; border-top:1px solid var(--border,#e7e5e4); padding-top:12px;">
+        <button type="button" class="btn sm ghost" id="btn-rec-dedup-cancel">Cancel</button>
+        <button type="button" class="btn sm primary" id="btn-rec-dedup-apply" style="font-weight:650; background:#6366f1; color:#fff;">⚡ Merge Selected (${clusters.length})</button>
+      </div>
+    </div>
+  `;
+
+  wrap.style.setProperty('z-index', '25005', 'important');
+  content.style.setProperty('z-index', '25005', 'important');
+  wrap.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  const closeBtn = content.querySelector('#btn-rec-dedup-close');
+  const cancelBtn = content.querySelector('#btn-rec-dedup-cancel');
+  const applyBtn = content.querySelector('#btn-rec-dedup-apply');
+
+  if (closeBtn) closeBtn.onclick = closeRecipeDeduplicationModal;
+  if (cancelBtn) cancelBtn.onclick = closeRecipeDeduplicationModal;
+
+  if (applyBtn) {
+    applyBtn.onclick = async () => {
+      applyBtn.disabled = true;
+      applyBtn.textContent = 'Merging recipes...';
+
+      try {
+        let totalMerged = 0;
+        for (let cIdx = 0; cIdx < clusters.length; cIdx++) {
+          const cluster = clusters[cIdx];
+          const checkedRadio = content.querySelector(`input[name="rec_cluster_${cIdx}"]:checked`);
+          const targetId = checkedRadio ? checkedRadio.value : cluster.variants[0].id;
+          const res = await mergeDuplicateRecipeCluster(cluster.variants, targetId);
+          if (res?.success) totalMerged++;
+        }
+
+        closeRecipeDeduplicationModal();
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast(`Recipe deduplication complete! (${totalMerged} cluster${totalMerged === 1 ? '' : 's'} consolidated)`, 'success');
+        }
+        if (typeof renderRecipeVault === 'function') renderRecipeVault();
+        if (typeof window.renderDataQualityView === 'function') window.renderDataQualityView();
+      } catch (err) {
+        console.error('[RecipeDeduplication] Error merging recipes:', err);
+        applyBtn.disabled = false;
+        applyBtn.textContent = `⚡ Merge Selected (${clusters.length})`;
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast(`Error merging recipes: ${err.message}`, 'error');
+        }
+      }
+    };
+  }
+}
+
 export function unmount() {
   if (typeof vaultUnsub === 'function') {
     vaultUnsub();
@@ -402,4 +544,12 @@ export function unmount() {
     clearTimeout(vaultTimer);
     vaultTimer = null;
   }
+}
+
+if (typeof window !== 'undefined') {
+  window.toggleRecipeFavourite = toggleRecipeFavourite;
+  window.toggleVaultFavouritesFilter = toggleVaultFavouritesFilter;
+  window.handleVaultSortChange = handleVaultSortChange;
+  window.openRecipeDeduplicationModal = openRecipeDeduplicationModal;
+  window.closeRecipeDeduplicationModal = closeRecipeDeduplicationModal;
 }

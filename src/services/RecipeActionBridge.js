@@ -83,6 +83,14 @@ export function routeRecipeAction(actionName, target, event, parseArgsString) {
     return true;
   }
 
+  if (normalizedAction.includes('copymethodfromoriginalrecipe')) {
+    const recipeId = ds.recipeId || ds.id || parseArgsString(actionName)[0];
+    if (recipeId && typeof window.copyMethodFromOriginalRecipe === 'function') {
+      window.copyMethodFromOriginalRecipe(recipeId);
+    }
+    return true;
+  }
+
   // 2. Recipe Favourite Toggle
   if (normalizedAction === 'toggle-favorite' || normalizedAction === 'toggle-fav' || normalizedAction === 'togglefavourite' || normalizedAction.includes('togglerecipefavourite')) {
     const recipeId = ds.recipeId || ds.id || parseArgsString(actionName)[0];

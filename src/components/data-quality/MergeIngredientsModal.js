@@ -69,15 +69,15 @@ export function openMergeIngredientsModal(issue = {}) {
       <div style="flex:1; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:10px; margin-bottom:18px; background:var(--surface2,#f5f5f4); padding:10px;">
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:14px;">
           <!-- Card 1 -->
-          <label class="card" style="cursor:pointer; padding:14px; border:2px solid ${!preferB ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'}; border-radius:10px; background:#fff; display:flex; flex-direction:column; gap:6px;">
+          <label class="card" style="cursor:pointer; padding:14px; border:2px solid ${!preferB ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'}; border-radius:10px; background:var(--surface); display:flex; flex-direction:column; gap:6px;">
             <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
               <div style="display:flex; align-items:center; gap:8px;">
                 <input type="radio" name="canonical-selection" value="ing1" ${!preferB ? 'checked' : ''} style="width:18px; height:18px; accent-color:var(--primary,#4f46e5);" />
                 <strong style="font-size:13.5px; color:${!preferB ? 'var(--primary,#4f46e5)' : 'var(--text,#1c1917)'};">Keep Option A</strong>
               </div>
-              ${!preferB ? `<span class="badge" style="background:#dcfce7; color:#15803d; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Recommended</span>` : ''}
+              ${!preferB ? `<span class="badge" style="background:var(--badge-green-bg); color:var(--badge-green-text); font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Recommended</span>` : ''}
             </div>
-            <div style="font-size:15px; font-weight:750; color:#111827; margin-top:4px;">${escapeHtml(ing1.name)}</div>
+            <div style="font-size:15px; font-weight:750; color:var(--text); margin-top:4px;">${escapeHtml(ing1.name)}</div>
             <div style="font-size:11.5px; color:var(--text2);">Category: ${escapeHtml(ing1.category || 'other')}</div>
             <div style="font-size:11.5px; color:var(--text2);">Macros: ${ing1.cal || ing1.kcal || 0} kcal · ${ing1.prot || ing1.protein || 0}g protein</div>
             <div style="font-size:11.5px; color:var(--text2); font-weight:600;">Linked products: ${ing1Prods.length}</div>
@@ -85,15 +85,15 @@ export function openMergeIngredientsModal(issue = {}) {
           </label>
 
           <!-- Card 2 -->
-          <label class="card" style="cursor:pointer; padding:14px; border:2px solid ${preferB ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'}; border-radius:10px; background:#fff; display:flex; flex-direction:column; gap:6px;">
+          <label class="card" style="cursor:pointer; padding:14px; border:2px solid ${preferB ? 'var(--primary,#4f46e5)' : 'var(--border,#e7e5e4)'}; border-radius:10px; background:var(--surface); display:flex; flex-direction:column; gap:6px;">
             <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
               <div style="display:flex; align-items:center; gap:8px;">
                 <input type="radio" name="canonical-selection" value="ing2" ${preferB ? 'checked' : ''} style="width:18px; height:18px; accent-color:var(--primary,#4f46e5);" />
                 <strong style="font-size:13.5px; color:${preferB ? 'var(--primary,#4f46e5)' : 'var(--text,#1c1917)'};">Keep Option B</strong>
               </div>
-              ${preferB ? `<span class="badge" style="background:#dcfce7; color:#15803d; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Recommended</span>` : ''}
+              ${preferB ? `<span class="badge" style="background:var(--badge-green-bg); color:var(--badge-green-text); font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Recommended</span>` : ''}
             </div>
-            <div style="font-size:15px; font-weight:750; color:#111827; margin-top:4px;">${escapeHtml(ing2.name)}</div>
+            <div style="font-size:15px; font-weight:750; color:var(--text); margin-top:4px;">${escapeHtml(ing2.name)}</div>
             <div style="font-size:11.5px; color:var(--text2);">Category: ${escapeHtml(ing2.category || 'other')}</div>
             <div style="font-size:11.5px; color:var(--text2);">Macros: ${ing2.cal || ing2.kcal || 0} kcal · ${ing2.prot || ing2.protein || 0}g protein</div>
             <div style="font-size:11.5px; color:var(--text2); font-weight:600;">Linked products: ${ing2Prods.length}</div>
@@ -101,7 +101,7 @@ export function openMergeIngredientsModal(issue = {}) {
           </label>
         </div>
 
-        <div style="font-size:12px; color:var(--text2); line-height:1.5; padding:8px; border-radius:6px; background:#fef3c7; border:1px solid #fde68a; display:flex; gap:6px;">
+        <div style="font-size:12px; color:var(--badge-yellow-text); line-height:1.5; padding:8px; border-radius:6px; background:var(--badge-yellow-bg); border:1px solid var(--badge-yellow-border); display:flex; gap:6px;">
           <span>💡</span>
           <div>
             <strong>Atomic Merge Actions Prepared:</strong><br />

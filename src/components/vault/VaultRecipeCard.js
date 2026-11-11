@@ -27,6 +27,34 @@ function escapeAttr(str) {
   return escapeHtml(str).replace(/`/g, '&#96;');
 }
 
+export function getNormalizedRecipeTypes(recipe) {
+  const r = recipe?.recipe || recipe || {};
+  const typesSet = new Set();
+  const add = (t) => {
+    if (!t) return;
+    if (Array.isArray(t)) {
+      t.forEach(add);
+      return;
+    }
+    const rawStr = String(t || '').trim().toLowerCase();
+    if (!rawStr) return;
+    if (rawStr.includes(',')) {
+      rawStr.split(',').forEach(add);
+      return;
+    }
+    typesSet.add(rawStr);
+    if (rawStr === 'snack') typesSet.add('snacking');
+    if (rawStr === 'snacking') typesSet.add('snack');
+  };
+
+  add(r.types);
+  add(r.mealSuitability);
+  add(r.type);
+  add(r.mealType);
+
+  return typesSet.size > 0 ? Array.from(typesSet) : ['dinner'];
+}
+
 export function openRecipeActions(evt, recipeIdParam, variantParam = 'original') {
   let e = evt;
   let recipeId = recipeIdParam;
@@ -270,7 +298,7 @@ function closeAllRecipeActionMenus() {
 }
 
 export function renderVaultRecipeCard(r, options = {}) {
-  const types = r.types || [r.type || 'dinner'];
+  const types = getNormalizedRecipeTypes(r);
   const requestedMealType = options.mealType || 'all';
   const activeProfile = options.activeProfile || 'everyone';
   const whoKey = String(r.who || 'both').toLowerCase();
@@ -278,7 +306,14 @@ export function renderVaultRecipeCard(r, options = {}) {
   const showC = whoKey === 'both' || whoKey === 'chloe' || whoKey === 'c';
   const personLabel = whoKey === 'both' ? 'Shared' : (whoKey === 'elliott' || whoKey === 'e' ? 'Elliott' : 'Chloe');
 
-  const badges = types.map(t => `<span class="badge ${t === 'breakfast' ? 'badge-green' : t === 'lunch' ? 'badge-purple' : 'badge-coral'}">${escapeHtml(t.toUpperCase())}</span>`).join(' ');
+  const displayTypes = Array.from(new Set(types.map(t => (t === 'snack' ? 'snacking' : t))));
+  const badges = displayTypes.map(t => {
+    let cls = 'badge-coral';
+    if (t === 'breakfast') cls = 'badge-green';
+    else if (t === 'lunch') cls = 'badge-purple';
+    else if (t === 'snack' || t === 'snacking') cls = 'badge-amber';
+    return `<span class="badge ${cls}">${escapeHtml(t.toUpperCase())}</span>`;
+  }).join(' ');
 
   const origFav = typeof window.isRecipeVariantFavourite === 'function' ? window.isRecipeVariantFavourite(r.id, 'original') : (r.isFavourite || r.isFavorite);
   const enhFav = typeof window.isRecipeVariantFavourite === 'function' ? window.isRecipeVariantFavourite(r.id, 'enhanced') : false;
@@ -296,20 +331,36 @@ export function renderVaultRecipeCard(r, options = {}) {
   const buildFit = (_active, useEnhanced = false) => {
     const variantKey = useEnhanced ? 'enhanced' : 'original';
     const liveFitData = typeof window.calculateMealFitScore === 'function'
-      ? window.calculateMealFitScore(r, requestedMealType, { activeProfile, variant: variantKey, portionScaled: true })
+      ? window.calculateMealFitScore(_active, requestedMealType, { activeProfile, variant: variantKey, portionScaled: true })
       : null;
     const resolvedMealType = liveFitData?.mealType || (requestedMealType !== 'all' ? requestedMealType : (types[0] || 'dinner'));
-    const bundle = typeof window.calculateRecipeDisplayNutrition === 'function'
-      ? window.calculateRecipeDisplayNutrition({ recipe: r, variant: variantKey, mealType: resolvedMealType })
-      : null;
-    const portions = bundle?.portions || { eCal: 0, eProt: 0, cCal: 0, cProt: 0, e: '', c: '' };
+    
+    // Derive portion display directly from liveFitData details
+    const e = liveFitData?.details?.elliott;
+    const c = liveFitData?.details?.chloe;
+    const portions = {
+      eCal: e?.recipeKcal || 0,
+      eProt: e?.recipeProtein || 0,
+      cCal: c?.recipeKcal || 0,
+      cProt: c?.recipeProtein || 0,
+      e: e && e.recipeKcal ? `${Math.round(e.recipeKcal)}kcal, ${Math.round(e.recipeProtein)}g` : '',
+      c: c && c.recipeKcal ? `${Math.round(c.recipeKcal)}kcal, ${Math.round(c.recipeProtein)}g` : ''
+    };
 
-    if (liveFitData && typeof liveFitData.score === 'number' && !useEnhanced) {
-      r.fitScore = liveFitData.score;
-      r._computedFitScore = liveFitData.score;
+    if (liveFitData && typeof liveFitData.score === 'number' && !liveFitData.isMissingMacros) {
+      if (!useEnhanced) {
+        r.fitScore = liveFitData.score;
+        r._computedFitScore = liveFitData.score;
+      } else {
+        r.enhancedFitScore = liveFitData.score;
+        if (r.enhanced && typeof r.enhanced === 'object') {
+          r.enhanced.fitScore = liveFitData.score;
+          r.enhanced._computedFitScore = liveFitData.score;
+        }
+      }
     }
 
-    const fitTagHtml = renderFitScoreBadge(r, resolvedMealType, {
+    const fitTagHtml = renderFitScoreBadge(_active, resolvedMealType, {
       activeProfile,
       variant: variantKey,
       portions,
@@ -325,7 +376,8 @@ export function renderVaultRecipeCard(r, options = {}) {
   const enhancedActive = r.enhanced ? { ...r, ...r.enhanced, ingredients: r.enhanced.ingredients || r.ingredients } : null;
   const enhancedFit = enhancedActive ? buildFit(enhancedActive, true) : null;
   const enhancedChanges = r.enhanced?.changes ? `<div style="font-size:12px;color:var(--text2);margin-top:6px">${escapeHtml(r.enhanced.changes)}</div>` : '';
-  const expandableName = typeof window.renderExpandableText === 'function' ? window.renderExpandableText(r.name, `recipe-${r.id}`, 'recipe-card-name') : escapeHtml(r.name);
+  const recipeDisplayName = r.name || r.title || 'Untitled Recipe';
+  const expandableName = typeof window.renderExpandableText === 'function' ? window.renderExpandableText(recipeDisplayName, `recipe-${r.id}`, 'recipe-card-name') : escapeHtml(recipeDisplayName);
 
   return renderRecipeCardShell({
     recipe: r,

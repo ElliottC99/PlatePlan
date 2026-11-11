@@ -4,6 +4,7 @@
  */
 
 import { getState } from '../../store/coreState.js';
+import { HOUSEHOLD_ID } from '../../config/firebase.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -21,7 +22,7 @@ function escapeHtml(str) {
  * @returns {string} HTML template literal
  */
 export function renderHouseholdSyncCard(settings = {}) {
-  const currentHousehold = window.activeHouseholdId || 'elliott-chloe';
+  const currentHousehold = window.activeHouseholdId || HOUSEHOLD_ID;
   const lastSynced = getState()?.lastSyncedTime || 'Just now';
   const connectionState = navigator.onLine ? 'Cloud Sync Connected' : 'Offline Cache Mode';
 

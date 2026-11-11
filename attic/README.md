@@ -46,3 +46,15 @@ A file may be deleted after two weeks of normal use on both phones with no relat
 | `src/components/data-quality/DataQualityDrawer.js` | 2026-11-03 | 2026-11-17 |
 | `src/components/data-quality/DataQualityFixModal.js` | 2026-11-03 | 2026-11-17 |
 | `src/components/data-quality/DataQualityIssueRow.js` | 2026-11-03 | 2026-11-17 |
+| `src/services/RecipeTaxonomyManager.js` | 2026-11-10 | 2026-11-24 |
+| `src/services/RecipeWizardFilterService.js` | 2026-11-10 | 2026-11-24 |
+| `src/services/RecipeWizardNavigationService.js` | 2026-11-10 | 2026-11-24 |
+| `src/services/RecipeWizardStep2FieldsRenderService.js` | 2026-11-10 | 2026-11-24 |
+| `src/services/RecipeWizardStep2RenderService.js` | 2026-11-10 | 2026-11-24 |
+| `src/services/RecipeWizardStep3RenderService.js` | 2026-11-10 | 2026-11-24 |
+| `src/services/RecipeWizardStepRenderService.js` | 2026-11-10 | 2026-11-24 |
+| `src/services/RecipeWizardStepValidator.js` | 2026-11-10 | 2026-11-24 |
+| `src/services/RecipeWizardSubmissionService.js` | 2026-11-10 | 2026-11-24 |
+| `src/services/RecipeWizardValidationService.js` | 2026-11-10 | 2026-11-24 |
+| `src/services/TaxonomyMapper.js` | 2026-11-10 | 2026-11-24 |
+| `src/services/DataQualityEngine.js` | 2026-11-10 | 2026-11-24 |

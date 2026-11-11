@@ -91,25 +91,61 @@ export function normalizeNutritionPayload(raw) {
 
 export function resolveProductItemWeight(product) {
   if (!product || typeof product !== 'object') return 0;
-  const explicit = parseFloat(product.itemWeight || product.item_weight || 0);
+  const val = product.value && typeof product.value === 'object' ? product.value : {};
+
+  // 1. Explicit 1 usable item size
+  const explicit = parseFloat(
+    product.itemWeight ?? product.item_weight ?? product.usableItemSize ?? product.singleItemWeight ??
+    val.itemWeight ?? val.item_weight ?? val.usableItemSize ?? val.singleItemWeight ?? 0
+  );
   if (explicit > 0) return explicit;
 
-  const packSize = parseFloat(product.packSize || product.pack_size || 0);
-  const itemCount = parseFloat(product.itemCount || product.item_count || 0);
-  if (packSize > 0 && itemCount > 1) {
-    return Math.round((packSize / itemCount) * 10) / 10;
-  }
+  // 2. Derive from pack size, drained weight, or usable pack amount divided by itemCount
+  const drainedWeight = parseFloat(product.drainedWeight ?? product.drained_weight ?? val.drainedWeight ?? val.drained_weight ?? 0);
+  const usablePack = parseFloat(product.usablePackAmount ?? product.usable_pack_amount ?? val.usablePackAmount ?? val.usable_pack_amount ?? 0);
+  const packSize = parseFloat(product.packSize ?? product.pack_size ?? val.packSize ?? val.pack_size ?? 0);
+  const itemCount = parseFloat(product.itemCount ?? product.item_count ?? val.itemCount ?? val.item_count ?? 0);
 
-  const name = String(product.name || product.title || '');
-  const leadingCountMatch = name.match(/^(\d+)\s+(?:pack\s+of\s+)?([a-zA-Z\s]+)/i);
-  if (leadingCountMatch && packSize > 0) {
-    const count = parseInt(leadingCountMatch[1], 10);
-    if (count > 1 && count <= 50) {
-      return Math.round((packSize / count) * 10) / 10;
+  if (itemCount > 1) {
+    const baseWeight = (drainedWeight > 0 ? drainedWeight : (usablePack > 0 ? usablePack : packSize));
+    if (baseWeight > 0) {
+      return Math.round((baseWeight / itemCount) * 10) / 10;
     }
   }
 
-  const packUnit = String(product.packUnit || product.pack_unit || product.unit || '').toLowerCase();
+  // 3. Single packaged unit with drained weight (e.g. fresh mozzarella ball in liquid)
+  const packUnit = String(product.packUnit || product.pack_unit || product.unit || val.packUnit || '').toLowerCase();
+  const name = String(product.name || product.title || val.name || '');
+  const notes = String(product.notes || val.notes || '');
+
+  if (drainedWeight > 0 && (packUnit === 'each' || packUnit === 'item' || packUnit === 'qty' || /\b(?:ball|block)\b/i.test(name))) {
+    return drainedWeight;
+  }
+
+  // 4. Look for embedded count in product name or notes (e.g. "6 Vegan Sausages", "Twin Pack", "2 Burgers")
+  let parsedCount = 0;
+  const nameCountMatch = name.match(/^(\d+)\s+(?:pack\s+of\s+)?([a-zA-Z\s]+)/i) || 
+                         name.match(/\b(\d+)\s+(?:[a-zA-Z&'-]+\s+)*(?:pack|burgers?|patties?|pieces?|items?|sausages?|fillets?|slices?|wraps?|buns?)\b/i) ||
+                         name.match(/\b(?:pack of|box of)\s*(\d+)\b/i);
+  if (nameCountMatch) {
+    parsedCount = parseInt(nameCountMatch[1], 10);
+  } else if (/\btwin\s*pack\b/i.test(name)) {
+    parsedCount = 2;
+  } else if (notes) {
+    const notesCountMatch = notes.match(/\b(\d+)\s*(?:[a-zA-Z&'-]+\s+)*(?:pack|burgers?|patties?|pieces?|items?|sausages?|fillets?|slices?|wraps?|buns?)\b/i);
+    if (notesCountMatch) {
+      parsedCount = parseInt(notesCountMatch[1], 10);
+    }
+  }
+
+  if (parsedCount > 1 && parsedCount <= 100) {
+    const baseWeight = (drainedWeight > 0 ? drainedWeight : (usablePack > 0 ? usablePack : packSize));
+    if (baseWeight > 0) {
+      return Math.round((baseWeight / parsedCount) * 10) / 10;
+    }
+  }
+
+  // 5. Pack unit indicates each / item and pack size is within single item range
   if ((packUnit === 'each' || packUnit === 'item' || /\beach\b/i.test(name)) && packSize > 0 && packSize <= 1000) {
     return packSize;
   }
@@ -131,7 +167,10 @@ export function calculateItemNutrition(item, quantity, unit = 'g') {
   if (u === 'g' || u === 'gram' || u === 'ml') {
     grams = q;
   } else if (u === 'pack' || u === 'can' || u === 'tin') {
-    const packAmount = parseFloat(item.drainedWeight) || parseFloat(item.usablePackAmount) || parseFloat(item.packSize) || 400;
+    const drained = parseFloat(item.drainedWeight ?? item.value?.drainedWeight ?? 0);
+    const usablePack = parseFloat(item.usablePackAmount ?? item.value?.usablePackAmount ?? 0);
+    const pack = parseFloat(item.packSize ?? item.value?.packSize ?? 0);
+    const packAmount = drained || usablePack || pack || 400;
     grams = q * packAmount;
   } else if (resolvedItemWeight > 0) {
     grams = q * resolvedItemWeight;
@@ -142,7 +181,8 @@ export function calculateItemNutrition(item, quantity, unit = 'g') {
   // Pack / Drained Weight Ceiling Guard for discrete counts:
   // Discrete piece counts against a jar or can (e.g. 20 olives) cannot exceed the container's solid weight
   if (u === 'qty' || u === 'item' || u === 'count') {
-    const maxContainerWeight = parseFloat(item.drainedWeight) || parseFloat(item.usablePackAmount) || 0;
+    const maxContainerWeight = parseFloat(item.drainedWeight ?? item.value?.drainedWeight ?? 0) || 
+                               parseFloat(item.usablePackAmount ?? item.value?.usablePackAmount ?? 0);
     if (maxContainerWeight > 0 && grams > maxContainerWeight) {
       grams = maxContainerWeight;
     }

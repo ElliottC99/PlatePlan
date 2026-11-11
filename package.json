@@ -1,6 +1,6 @@
 {
   "name": "plateplan",
-  "version": "3.54.0",
+  "version": "3.55.0",
   "type": "module",
   "scripts": {
     "dev": "node server.js",
@@ -8,6 +8,10 @@
     "build": "node scripts/build.js",
     "lint": "node --check server.js && node scripts/test_accessibility_dom.js",
     "ledger": "node scripts/ledger.js",
+    "branch:start": "node scripts/git_flow.js start",
+    "branch:sync": "node scripts/git_flow.js sync",
+    "branch:clean": "node scripts/git_flow.js clean",
+    "branch:status": "node scripts/git_flow.js status",
     "test:rules": "firebase emulators:exec --only firestore --project demo-plateplan \"node scripts/test_firestore_rules.js\"",
     "deploy:rules": "npm run test:rules && firebase deploy --only firestore:rules"
   },

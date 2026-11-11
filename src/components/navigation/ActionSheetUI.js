@@ -47,8 +47,8 @@ export function openCreateActionSheet() {
   if (btnAddRecipe) {
     btnAddRecipe.onclick = () => {
       overlay.remove();
-      if (typeof window.openRecipeEditor === 'function') window.openRecipeEditor();
-      else if (typeof window.showView === 'function') window.showView('recipes');
+      if (typeof window.openRecipeWizard === 'function') window.openRecipeWizard('manual');
+      else if (typeof window.showView === 'function') window.showView('vault');
     };
   }
 
@@ -64,9 +64,15 @@ export function openCreateActionSheet() {
   if (btnPantry) {
     btnPantry.onclick = () => {
       overlay.remove();
-      if (typeof window.createIngredientGroupPrompt === 'function') window.createIngredientGroupPrompt();
+      if (typeof window.createIngredientFamilyPrompt === 'function') window.createIngredientFamilyPrompt();
     };
   }
+}
+
+export function closeMobileActionSheet() {
+  document.getElementById('mobile-action-sheet-wrap')?.classList.remove('open');
+  document.getElementById('pp-mobile-action-sheet')?.remove();
+  document.getElementById('pp-action-sheet-modal')?.remove();
 }
 
 export function openMobileActionSheet(title = 'Actions', actions = []) {
@@ -116,4 +122,5 @@ export function openMobileActionSheet(title = 'Actions', actions = []) {
 if (typeof window !== 'undefined') {
   window.openCreateActionSheet = openCreateActionSheet;
   window.openMobileActionSheet = openMobileActionSheet;
+  window.closeMobileActionSheet = closeMobileActionSheet;
 }

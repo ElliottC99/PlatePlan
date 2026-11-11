@@ -12,6 +12,7 @@ import { getState, setCategories, setIngredients, setProducts, setRecipes, saveS
 import { getCategories, saveCategories } from './CategoryRepository.js';
 import { getProducts, saveProduct, addProductToBatch } from './ProductRepository.js';
 import { addRecipeToBatch } from './RecipeFirestoreRepository.js';
+import { compareProductsByStrategy } from './PantryHierarchyService.js';
 
 function isDbAvailable() {
   if (!db) { console.warn('[PantryTaxonomyService] Firestore db instance not initialised.'); return false; }
@@ -281,55 +282,110 @@ export async function executeSafeReallocation({ mode, sourceItemId, targetCatego
   return { success: true };
 }
 
-export async function executeSubtypeReallocation({ mode, subtypeId, parentId, targetParentItemId, targetSubtypeId }) {
+export async function executeSubtypeReallocation({
+  mode,
+  subtypeId,
+  parentId,
+  sourceSubtypeId,
+  sourceParentItemId,
+  targetParentItemId,
+  targetSubtypeId
+}) {
+  const actualSubtypeId = subtypeId || sourceSubtypeId;
+  let actualParentId = parentId || sourceParentItemId;
+
   const state = getState();
   const rootItems = Array.isArray(state.rootItems || state.ingredients) ? [...(state.rootItems || state.ingredients)] : [];
 
-  const sourceParent = rootItems.find(r => r && String(r.id) === String(parentId));
+  // Fallback: discover parent item by searching for subtype
+  if (!actualParentId && actualSubtypeId) {
+    const foundParent = rootItems.find(r => r && Array.isArray(r.subtypes) && r.subtypes.some(s => s && String(s.id) === String(actualSubtypeId)));
+    if (foundParent) actualParentId = foundParent.id;
+  }
+
+  const sourceParent = rootItems.find(r => r && String(r.id) === String(actualParentId));
   if (!sourceParent || !Array.isArray(sourceParent.subtypes)) throw new Error('Source parent item not found');
 
-  const subIdx = sourceParent.subtypes.findIndex(s => s && String(s.id) === String(subtypeId));
+  const subIdx = sourceParent.subtypes.findIndex(s => s && String(s.id) === String(actualSubtypeId));
   if (subIdx === -1) throw new Error('Sub-type not found in parent item');
-  const targetSubtype = sourceParent.subtypes[subIdx];
+
+  if (mode === 'promote_to_item') {
+    const { promoteSubtype } = await import('./SubtypeRepository.js');
+    const result = await promoteSubtype(actualParentId, actualSubtypeId);
+    saveStateCache(getState());
+    return result;
+  }
 
   if (mode === 'move_parent') {
-    if (!targetParentItemId || String(targetParentItemId) === String(parentId)) {
+    if (!targetParentItemId || String(targetParentItemId) === String(actualParentId)) {
       throw new Error('Target parent item must be different from current parent.');
     }
-    const targetParent = rootItems.find(r => r && String(r.id) === String(targetParentItemId));
-    if (!targetParent) throw new Error('Target parent item not found');
+    const { moveSubtype } = await import('./SubtypeRepository.js');
+    const result = await moveSubtype(actualParentId, actualSubtypeId, targetParentItemId);
+    saveStateCache(getState());
+    return result;
+  }
 
-    sourceParent.subtypes.splice(subIdx, 1);
-    if (!Array.isArray(targetParent.subtypes)) targetParent.subtypes = [];
-    targetParent.subtypes.push({ ...targetSubtype, category: targetParent.category || 'General' });
-
-    setIngredients(rootItems);
-    await saveRootItem(sourceParent);
-    await saveRootItem(targetParent);
-  } else if (mode === 'merge') {
-    if (!targetSubtypeId || String(targetSubtypeId) === String(subtypeId)) {
+  if (mode === 'merge') {
+    if (!targetSubtypeId || String(targetSubtypeId) === String(actualSubtypeId)) {
       throw new Error('Cannot merge a sub-type with itself.');
     }
-    sourceParent.subtypes.splice(subIdx, 1);
-    setIngredients(rootItems);
-    await saveRootItem(sourceParent);
-  } else if (mode === 'promote_to_item') {
-    sourceParent.subtypes.splice(subIdx, 1);
-    const newRootItem = {
-      id: 'ing_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-      name: targetSubtype.name,
-      category: sourceParent.category || 'General',
-      subtypes: [],
-      updatedAt: new Date().toISOString()
-    };
-    rootItems.push(newRootItem);
-    setIngredients(rootItems);
-    await saveRootItem(sourceParent);
-    await saveRootItem(newRootItem);
+    const { mergeSubtype } = await import('./SubtypeRepository.js');
+    const result = await mergeSubtype(actualParentId, actualSubtypeId, targetSubtypeId);
+    saveStateCache(getState());
+    return result;
   }
 
   saveStateCache(state);
   return { success: true };
+}
+
+export async function renameRootItem(itemId, newName, { newCategory = null, aliases = null } = {}) {
+  const state = getState();
+  const rootItems = Array.isArray(state.rootItems || state.ingredients) ? [...(state.rootItems || state.ingredients)] : [];
+  const item = rootItems.find(r => String(r.id) === String(itemId));
+  if (!item) throw new Error('Root item not found');
+  const cleanName = (newName || '').trim();
+  if (!cleanName) throw new Error('Item name cannot be empty');
+
+  item.name = cleanName;
+  if (newCategory) {
+    item.category = newCategory.trim();
+    if (Array.isArray(item.subtypes)) {
+      item.subtypes.forEach(s => { s.category = item.category; });
+    }
+  }
+  if (Array.isArray(aliases)) {
+    item.aliases = aliases.map(a => String(a).trim()).filter(Boolean);
+  }
+  item.updatedAt = new Date().toISOString();
+
+  setIngredients(rootItems);
+  saveStateCache(state);
+  await saveRootItem(item);
+  return { success: true, item };
+}
+
+export async function renameSubtype(parentId, subtypeId, newName, { aliases = null } = {}) {
+  const state = getState();
+  const rootItems = Array.isArray(state.rootItems || state.ingredients) ? [...(state.rootItems || state.ingredients)] : [];
+  const parent = rootItems.find(r => String(r.id) === String(parentId));
+  if (!parent || !Array.isArray(parent.subtypes)) throw new Error('Parent root item not found');
+  const sub = parent.subtypes.find(s => String(s.id) === String(subtypeId));
+  if (!sub) throw new Error('Sub-type not found');
+  const cleanName = (newName || '').trim();
+  if (!cleanName) throw new Error('Sub-type name cannot be empty');
+
+  sub.name = cleanName;
+  if (Array.isArray(aliases)) {
+    sub.aliases = aliases.map(a => String(a).trim()).filter(Boolean);
+  }
+  parent.updatedAt = new Date().toISOString();
+
+  setIngredients(rootItems);
+  saveStateCache(state);
+  await saveRootItem(parent);
+  return { success: true, parent, subtype: sub };
 }
 
 export async function executeCategoryReallocation({ mode, categoryName, newCategoryName, targetCategoryName }) {
@@ -590,4 +646,260 @@ export async function applyGuidedDelete(plan, { timeoutMs = GUIDED_DELETE_COMMIT
   saveStateCache(getState());
   // A queued batch can't be taken back: it is already applied on this phone and lands on reconnect.
   return pending ? { success: false, pending: true } : { success: true };
+}
+
+/**
+ * Resolves the optimal product for a recipe ingredient line dynamically.
+ * Supports hierarchical bindings: Sub-Type, Root Item, or Category.
+ * Evaluates candidate products using auto-defaults and household preference metrics.
+ * 
+ * @param {Object} line - Recipe ingredient line
+ * @param {Object} options - { products, ingredients, preferences }
+ * @returns {Object|null} The resolved product object or null
+ */
+export function resolveDynamicProductForIngredient(line, { products = [], ingredients = [], preferences = null } = {}) {
+  if (!line || typeof line !== 'object') return null;
+
+  const prodsList = Array.isArray(products) ? products : [];
+  const ingsList = Array.isArray(ingredients) ? ingredients : [];
+  const state = typeof getState === 'function' ? (getState() || {}) : {};
+  const activePrefs = preferences || state.preferences || state.settings || state.userPrefs || {};
+  const criterion = activePrefs.autoDefaultStrategy || activePrefs.autoDefaultCriterion || activePrefs.productPriority || 'highest_protein_per_kcal';
+
+  const subId = line.subtypeId || line.subTypeId || null;
+  const ingId = line.ingredientId || line.groupId || null;
+  const cat = line.category || line.categoryId || line.cat || null;
+  const directProdId = line.productId || line.bankId || null;
+
+  function pickBestProduct(candidatePool) {
+    if (!candidatePool || candidatePool.length === 0) return null;
+    const explicitAuto = candidatePool.find(p => p && p.isAutoDefault);
+    if (explicitAuto) return explicitAuto;
+    const sorted = [...candidatePool].sort((a, b) => compareProductsByStrategy(a, b, criterion));
+    return sorted[0] || null;
+  }
+
+  // 1. If bound to a Sub-Type
+  if (subId) {
+    const parentRoot = ingsList.find(i => (i.subtypes || []).some(s => String(s.id) === String(subId)) || String(i.id) === String(ingId));
+    const subObj = parentRoot?.subtypes?.find(s => String(s.id) === String(subId));
+    if (subObj?.defaultProductId) {
+      const def = prodsList.find(p => String(p.id) === String(subObj.defaultProductId));
+      if (def) return def;
+    }
+    const subPool = prodsList.filter(p => String(p.subtypeId) === String(subId));
+    if (subPool.length > 0) {
+      const best = pickBestProduct(subPool);
+      if (best) return best;
+    }
+  }
+
+  // 2. If bound to a Root Item (cascade to all sub-types under the root item)
+  if (ingId) {
+    const rootItem = ingsList.find(i => String(i.id) === String(ingId));
+    if (rootItem) {
+      if (rootItem.defaultProductId) {
+        const def = prodsList.find(p => String(p.id) === String(rootItem.defaultProductId));
+        if (def) return def;
+      }
+      const subtypeIds = new Set((rootItem.subtypes || []).map(s => String(s.id)));
+      const candidatePool = prodsList.filter(p => subtypeIds.has(String(p.subtypeId)) || String(p.ingredientId) === String(ingId));
+      if (candidatePool.length > 0) {
+        const best = pickBestProduct(candidatePool);
+        if (best) return best;
+      }
+    }
+  }
+
+  // 3. If bound to a Category (cascade to all sub-types under root items in the category)
+  if (cat) {
+    const normCat = String(cat).trim().toLowerCase();
+    const matchingRoots = ingsList.filter(i => String(i.category || '').trim().toLowerCase() === normCat);
+    const subtypeIds = new Set();
+    const rootIds = new Set();
+    matchingRoots.forEach(r => {
+      rootIds.add(String(r.id));
+      (r.subtypes || []).forEach(s => subtypeIds.add(String(s.id)));
+    });
+    const candidatePool = prodsList.filter(p =>
+      subtypeIds.has(String(p.subtypeId)) ||
+      rootIds.has(String(p.ingredientId)) ||
+      String(p.category || p.cat || '').trim().toLowerCase() === normCat
+    );
+    if (candidatePool.length > 0) {
+      const best = pickBestProduct(candidatePool);
+      if (best) return best;
+    }
+  }
+
+  // 4. Backward-compatibility fallback: direct productId
+  if (directProdId) {
+    const matched = prodsList.find(p => String(p.id) === String(directProdId));
+    if (matched) return matched;
+  }
+
+  // 5. Name fallback: match by raw ingredient name against products, root items, or sub-types
+  const rawName = String(line.name || line.matchedName || line.ingredient || '').trim().toLowerCase();
+  if (rawName) {
+    const nameMatched = prodsList.find(p => String(p.name || '').trim().toLowerCase() === rawName);
+    if (nameMatched) return nameMatched;
+
+    const partialProd = prodsList.find(p => {
+      const pName = String(p.name || '').trim().toLowerCase();
+      return pName && (pName.includes(rawName) || rawName.includes(pName));
+    });
+    if (partialProd) return partialProd;
+
+    // Check root items directly without recursive re-entry
+    const matchedRoot = ingsList.find(i => {
+      const iName = String(i.name || '').trim().toLowerCase();
+      if (iName === rawName) return true;
+      const aliases = Array.isArray(i.aliases) ? i.aliases : [];
+      return aliases.some(a => String(a || '').trim().toLowerCase() === rawName);
+    });
+    if (matchedRoot) {
+      if (matchedRoot.defaultProductId) {
+        const def = prodsList.find(p => String(p.id) === String(matchedRoot.defaultProductId));
+        if (def) return def;
+      }
+      const subtypeIds = new Set((matchedRoot.subtypes || []).map(s => String(s.id)));
+      const candidatePool = prodsList.filter(p => subtypeIds.has(String(p.subtypeId)) || String(p.ingredientId) === String(matchedRoot.id));
+      if (candidatePool.length > 0) {
+        const best = pickBestProduct(candidatePool);
+        if (best) return best;
+      }
+    }
+
+    // Check sub-types directly without recursive re-entry
+    for (const root of ingsList) {
+      for (const sub of (root.subtypes || [])) {
+        const sName = String(sub.name || '').trim().toLowerCase();
+        const sAliases = Array.isArray(sub.aliases) ? sub.aliases : [];
+        if (sName === rawName || sAliases.some(a => String(a || '').trim().toLowerCase() === rawName)) {
+          if (sub.defaultProductId) {
+            const def = prodsList.find(p => String(p.id) === String(sub.defaultProductId));
+            if (def) return def;
+          }
+          const subPool = prodsList.filter(p => String(p.subtypeId) === String(sub.id));
+          if (subPool.length > 0) {
+            const best = pickBestProduct(subPool);
+            if (best) return best;
+          }
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Freezes resolved product IDs for ingredients in a meal plan to decouple
+ * planned meals from future changes in the pantry bank.
+ * @param {Object} plan 
+ * @param {Object} [options]
+ * @returns {Object} productSelections dictionary
+ */
+export function freezeProductSelectionsForPlan(plan, { products = [], ingredients = [], recipes = [], preferences = null } = {}) {
+  if (!plan || typeof plan !== 'object') return {};
+  const currentSelections = { ...(plan.productSelections || {}) };
+
+  const state = (products.length && ingredients.length && recipes.length)
+    ? null
+    : (typeof window !== 'undefined' && typeof window.getState === 'function' ? window.getState() : (typeof getState === 'function' ? getState() : {}));
+
+  const allProducts = products.length ? products : (state?.products || []);
+  const allIngredients = ingredients.length ? ingredients : (state?.rootItems || state?.ingredients || []);
+  const allRecipes = recipes.length ? recipes : (state?.recipes || []);
+  const activePrefs = preferences || state?.preferences || state?.settings || {};
+
+  const processSlot = (dayKey, slotKey, slotVal) => {
+    if (!slotVal || slotVal.isSkipped || slotVal.skipped) return;
+    if (slotVal.isSplit && (slotVal.elliott || slotVal.chloe)) {
+      if (slotVal.elliott) processSlot(dayKey, `${slotKey}_E`, slotVal.elliott);
+      if (slotVal.chloe) processSlot(dayKey, `${slotKey}_C`, slotVal.chloe);
+      return;
+    }
+    const recipeId = slotVal.recipeId || slotVal.id || (typeof slotVal === 'string' ? slotVal : null);
+    if (!recipeId) return;
+    const rec = allRecipes.find(r => String(r.id) === String(recipeId));
+    if (!rec) return;
+
+    const variant = slotVal.variant || 'original';
+    const source = (variant === 'enhanced' && rec.enhanced) ? rec.enhanced : rec;
+    const ingList = (source.ingredientSections && source.ingredientSections.length)
+      ? source.ingredientSections.flatMap(s => s.ingredients || [])
+      : (Array.isArray(source.ingredients) ? source.ingredients : []);
+
+    const eventId = `${dayKey}_${slotKey}`;
+    ingList.forEach(ing => {
+      if (!ing || ing.excludeNutrition) return;
+      const key = ing.subtypeId || ing.ingredientId || ing.name;
+      if (!key) return;
+      const scopedKey = `${eventId}:${key}`;
+      if (currentSelections[scopedKey]) return;
+
+      const resolved = resolveDynamicProductForIngredient(ing, {
+        products: allProducts,
+        ingredients: allIngredients,
+        preferences: activePrefs
+      });
+      if (resolved && resolved.id) {
+        currentSelections[scopedKey] = resolved.id;
+        if (!currentSelections[key]) {
+          currentSelections[key] = resolved.id;
+        }
+      }
+    });
+  };
+
+  const slots = plan.slots || {};
+  if (Array.isArray(slots)) {
+    slots.forEach((daySlots, dayIdx) => {
+      if (typeof daySlots === 'object' && daySlots !== null) {
+        Object.entries(daySlots).forEach(([slotKey, slotVal]) => {
+          processSlot(dayIdx, slotKey, slotVal);
+        });
+      }
+    });
+  } else if (typeof slots === 'object' && slots !== null) {
+    Object.entries(slots).forEach(([dayKey, daySlots]) => {
+      if (typeof daySlots === 'object' && daySlots !== null) {
+        Object.entries(daySlots).forEach(([slotKey, slotVal]) => {
+          processSlot(dayKey, slotKey, slotVal);
+        });
+      }
+    });
+  }
+
+  if (Array.isArray(plan.days)) {
+    plan.days.forEach((dayObj, dayIdx) => {
+      const dayKey = dayObj.date || dayIdx;
+      if (Array.isArray(dayObj.meals)) {
+        dayObj.meals.forEach(meal => {
+          if (meal && meal.recipeId) {
+            processSlot(dayKey, meal.mealType || 'meal', meal);
+          }
+        });
+      }
+    });
+  }
+
+  return currentSelections;
+}
+
+export function lockProductSelectionsForSlots(slots, priority = 'protein') {
+  const state = typeof window !== 'undefined' && typeof window.getState === 'function'
+    ? window.getState()
+    : (typeof getState === 'function' ? getState() : {});
+  const plan = state?.currentPlan || state?.plan || {};
+  return freezeProductSelectionsForPlan(
+    { ...plan, slots },
+    { preferences: { autoDefaultCriterion: priority } }
+  );
+}
+
+if (typeof window !== 'undefined') {
+  window.lockProductSelectionsForSlots = lockProductSelectionsForSlots;
+  window.freezeProductSelectionsForPlan = freezeProductSelectionsForPlan;
 }

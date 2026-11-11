@@ -9,81 +9,98 @@ import { renderFitScoreBadge } from '../components/FitScoreBadge.js';
 import { isMealEatenOnDate } from '../services/TodayViewService.js';
 
 /**
- * Renders Apple Health-style horizontal macro progress bars.
+ * Formats a recipe time or prepTime value safely regardless of whether it's
+ * an object ({ hours, minutes }, { prep, cook }, { total }), number, or string.
+ */
+export function formatRecipeTime(timeVal) {
+  if (!timeVal) return '';
+  if (typeof timeVal === 'object') {
+    const hours = Number(timeVal.hours) || 0;
+    const minutes = Number(timeVal.minutes) || 0;
+    if (hours > 0 || minutes > 0) {
+      return hours > 0 ? (minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`) : `${minutes}m`;
+    }
+    const mins = timeVal.total || timeVal.prep || timeVal.cook || timeVal.time || '';
+    if (!mins) return '';
+    const minsStr = String(mins).trim();
+    return minsStr.endsWith('m') || minsStr.includes('min') || minsStr.endsWith('h') ? minsStr : `${minsStr}m`;
+  }
+  const str = String(timeVal).trim();
+  if (!str) return '';
+  return str.endsWith('m') || str.includes('min') || str.endsWith('h') ? str : `${str}m`;
+}
+
+/**
+ * Renders Apple Health-style stacked per-person macro progress bars (Calories & Protein).
  *
- * @param {Object} totals - Calculated daily totals { calories, protein, carbs, fat }
- * @param {Object} targets - Target daily values { calories, protein, carbs, fat }
+ * @param {Object} totals - Per-person daily totals { elliott: { calories, protein }, chloe: { calories, protein } }
+ * @param {Object} targets - Per-person daily targets { elliott: { calories, protein }, chloe: { calories, protein } }
+ * @param {Object} profileNames - Display names { elliott: 'Elliott', chloe: 'Chloe' }
  * @returns {string} HTML markup
  */
-export function renderTodayMacrosCard(totals = {}, targets = {}) {
-  const cal = Math.round(totals.calories || 0);
-  const prot = Math.round(totals.protein || 0);
-  const carbs = Math.round(totals.carbs || 0);
-  const fat = Math.round(totals.fat || 0);
+export function renderTodayMacrosCard(totals = {}, targets = {}, profileNames = {}) {
+  const eTot = totals.elliott || totals.e || { calories: totals.calories || 0, protein: totals.protein || 0 };
+  const cTot = totals.chloe || totals.c || { calories: totals.calories || 0, protein: totals.protein || 0 };
 
-  const targetCal = Math.round(targets.calories || 2000);
-  const targetProt = Math.round(targets.protein || 130);
-  const targetCarbs = Math.round(targets.carbs || 220);
-  const targetFat = Math.round(targets.fat || 65);
+  const eTgt = targets.elliott || targets.e || { calories: targets.calories || 2100, protein: targets.protein || 140 };
+  const cTgt = targets.chloe || targets.c || { calories: targets.calories || 1650, protein: targets.protein || 105 };
 
-  const calPct = Math.min(100, Math.round((cal / (targetCal || 1)) * 100));
-  const protPct = Math.min(100, Math.round((prot / (targetProt || 1)) * 100));
-  const carbsPct = Math.min(100, Math.round((carbs / (targetCarbs || 1)) * 100));
-  const fatPct = Math.min(100, Math.round((fat / (targetFat || 1)) * 100));
+  const eName = profileNames.elliott || profileNames.e || 'Elliott';
+  const cName = profileNames.chloe || profileNames.c || 'Chloe';
 
-  return `
-    <div class="ios-grouped-card" style="padding: 16px; margin-bottom: 16px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 14px;">
-        <span class="ios-headline" style="color:var(--label); font-weight:700;">Daily Nutrition</span>
-        <span style="font-size:13px; font-weight:600; color:var(--secondary-label);">${cal} / ${targetCal} kcal</span>
-      </div>
+  const renderPersonRow = (name, personTotals, personTargets, isLast = false) => {
+    const cal = Math.round(Number(personTotals.calories || personTotals.cal || 0));
+    const prot = Math.round(Number(personTotals.protein || personTotals.prot || 0));
+    const targetCal = Math.round(Number(personTargets.calories || personTargets.cal || 2000));
+    const targetProt = Math.round(Number(personTargets.protein || personTargets.prot || 120));
 
-      <!-- Macro Progress Bars Grid -->
-      <div style="display:flex; flex-direction:column; gap:12px;">
-        <!-- Calories -->
-        <div>
-          <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; font-weight:600;">
-            <span style="color:var(--label);">Calories</span>
-            <span style="color:var(--secondary-label);">${calPct}%</span>
-          </div>
-          <div style="height:8px; border-radius:4px; background:var(--system-gray5); overflow:hidden;">
-            <div style="height:100%; width:${calPct}%; background:var(--tint-color); border-radius:4px; transition:width 0.4s ease;"></div>
-          </div>
+    const calRawPct = Math.round((cal / (targetCal || 1)) * 100);
+    const protRawPct = Math.round((prot / (targetProt || 1)) * 100);
+    const calBarPct = Math.min(100, Math.max(0, calRawPct));
+    const protBarPct = Math.min(100, Math.max(0, protRawPct));
+
+    const dividerStyle = isLast
+      ? ''
+      : 'padding-bottom: 12px; margin-bottom: 12px; border-bottom: 0.5px solid var(--separator);';
+
+    return `
+      <div style="${dividerStyle}">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 8px;">
+          <span style="font-size:14px; font-weight:700; color:var(--label);">${escapeHtml(name)}</span>
+          <span style="font-size:12px; font-weight:600; color:var(--secondary-label);">${calRawPct}% kcal · ${protRawPct}% prot</span>
         </div>
-
-        <!-- Protein -->
-        <div>
-          <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; font-weight:600;">
-            <span style="color:var(--label);">Protein</span>
-            <span style="color:var(--secondary-label);">${prot} / ${targetProt}g</span>
-          </div>
-          <div style="height:8px; border-radius:4px; background:var(--system-gray5); overflow:hidden;">
-            <div style="height:100%; width:${protPct}%; background:var(--system-blue); border-radius:4px; transition:width 0.4s ease;"></div>
-          </div>
-        </div>
-
-        <!-- Carbs & Fat Row -->
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
           <div>
             <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; font-weight:600;">
-              <span style="color:var(--label);">Carbs</span>
-              <span style="color:var(--secondary-label);">${carbs}g</span>
+              <span style="color:var(--label);">Calories</span>
+              <span style="color:var(--secondary-label);">${cal.toLocaleString('en-GB')} / ${targetCal.toLocaleString('en-GB')}</span>
             </div>
             <div style="height:8px; border-radius:4px; background:var(--system-gray5); overflow:hidden;">
-              <div style="height:100%; width:${carbsPct}%; background:var(--system-orange); border-radius:4px; transition:width 0.4s ease;"></div>
+              <div style="height:100%; width:${calBarPct}%; background:var(--tint-color); border-radius:4px; transition:width 0.4s ease;"></div>
             </div>
           </div>
           <div>
             <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; font-weight:600;">
-              <span style="color:var(--label);">Fat</span>
-              <span style="color:var(--secondary-label);">${fat}g</span>
+              <span style="color:var(--label);">Protein</span>
+              <span style="color:var(--secondary-label);">${prot} / ${targetProt}g</span>
             </div>
             <div style="height:8px; border-radius:4px; background:var(--system-gray5); overflow:hidden;">
-              <div style="height:100%; width:${fatPct}%; background:var(--system-yellow); border-radius:4px; transition:width 0.4s ease;"></div>
+              <div style="height:100%; width:${protBarPct}%; background:var(--system-blue); border-radius:4px; transition:width 0.4s ease;"></div>
             </div>
           </div>
         </div>
       </div>
+    `;
+  };
+
+  return `
+    <div class="ios-grouped-card" style="padding: 16px; margin-bottom: 16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+        <span class="ios-headline" style="color:var(--label); font-weight:700;">Daily Nutrition</span>
+        <span style="font-size:12px; font-weight:600; color:var(--secondary-label);">Planned Today</span>
+      </div>
+      ${renderPersonRow(eName, eTot, eTgt, false)}
+      ${renderPersonRow(cName, cTot, cTgt, true)}
     </div>
   `;
 }
@@ -150,7 +167,7 @@ export function renderTodayMealCard(slot, { info: slotInfo, person }, eatenMeals
           <div style="font-size:13px; color:var(--secondary-label); display:flex; gap:12px; align-items:center;">
             <span>🔥 ${cal} kcal</span>
             <span>💪 ${prot}g P</span>
-            ${(recipe.prepTime || recipe.time) ? `<span>⏱️ ${escapeHtml(recipe.prepTime || recipe.time)}</span>` : ''}
+            ${formatRecipeTime(recipe.prepTime || recipe.time) ? `<span>⏱️ ${escapeHtml(formatRecipeTime(recipe.prepTime || recipe.time))}</span>` : ''}
           </div>
         </div>
         <button class="btn sm" type="button" data-action="view-recipe" data-recipe-id="${escapeAttr(recipe.id)}" data-instance-id="${escapeAttr(slotInfo.instanceId || '')}" data-variant="${escapeAttr(slotInfo.variant || 'original')}" style="font-size:13px; font-weight:600; border-radius:var(--radius-control); padding:6px 12px; white-space:nowrap;">

@@ -7,6 +7,7 @@ import store from "../store/store.js";
  */
 
 import { savePreferences } from '../services/HouseholdRepository.js';
+import { HOUSEHOLD_ID } from '../config/firebase.js';
 import { hydrateHouseholdData } from '../services/HydrationService.js';
 import { renderProfileAllocationCard } from '../components/settings/ProfileAllocationCard.js';
 import { renderFitScoreTaperingCard, readFitScoreParamsFromDOM, bindFitScoreTaperingListeners } from '../components/settings/FitScoreTaperingCard.js';
@@ -173,7 +174,7 @@ if (typeof window !== 'undefined') {
 }
   
 export function generateHouseholdInviteLink() {
-  const householdId = window.activeHouseholdId || 'elliott-chloe';
+  const householdId = window.activeHouseholdId || HOUSEHOLD_ID;
   const url = `${window.location.origin}${window.location.pathname}?household=${encodeURIComponent(householdId)}`;
   navigator.clipboard.writeText(url).then(() => {
     if (typeof window.showPlatePlanToast === 'function') {
@@ -327,10 +328,10 @@ export function renderSettingsView() {
 
       saveBtn.disabled = false;
       saveBtn.textContent = '✓ Preferences Saved';
-      saveBtn.style.background = '#16a34a';
+      saveBtn.style.background = 'var(--tint-color)';
       setTimeout(() => {
         saveBtn.textContent = 'Save Preferences';
-        saveBtn.style.background = '#2563eb';
+        saveBtn.style.background = 'var(--tint-color)';
       }, 1800);
     };
   }
@@ -367,13 +368,20 @@ export function applyTheme(theme = 'system') {
   if (theme === 'system') {
     delete document.documentElement.dataset.theme;
     document.documentElement.classList.remove('theme-dark', 'theme-light');
+    if (document.documentElement.style) {
+      document.documentElement.style.colorScheme = 'light dark';
+    }
   } else {
     document.documentElement.dataset.theme = theme;
     document.documentElement.classList.remove('theme-dark', 'theme-light');
     document.documentElement.classList.add(`theme-${theme}`);
+    if (document.documentElement.style) {
+      document.documentElement.style.colorScheme = theme;
+    }
   }
   try {
     localStorage.setItem('plateplan-appearance', theme);
+    localStorage.setItem('plateplan_appearance', theme);
     localStorage.setItem('plateplan-theme', theme);
   } catch (_e) {}
 }

@@ -18,6 +18,26 @@ Write every report, summary, or handoff to the user through the `ce-noslop` skil
 
 GitHub Pages publishes from `.github/workflows/pages.yml` (Settings → Pages → Source: "GitHub Actions"). Every push to `main`, `development` or `dev/**` syntax-checks every module in `src/` and runs `npm run build` on GitHub; only `main` publishes the built `dist/`. The build fails if it cannot read the git commit ID. A failed build publishes nothing and the previous release stays live. Work happens on `dev/*` branches, goes to `development` for testing, then to `main`. Don't commit straight to `main`.
 
+## Branching, PR and AI Workflow (Agreed 30 Oct 2026, Updated Nov 2026)
+
+Every change follows the 7-step process:
+1. **Start from latest development**: `npm run branch:start <topic>` (or `git switch development && git pull && git switch -c dev/<topic>`). One branch holds one change.
+2. **Work and commit on the branch**: Test on `npm run dev` (localhost) as you go, and run standalone tests (`scripts/test_*.js`).
+3. **Keep current via merge**: Whenever `development` moves, and always before step 4, run `npm run branch:sync` (or `git fetch && git merge origin/development`). Fix any conflicts, then re-test. Use merge, not rebase.
+4. **Target development only**: PRs target `development`, never `main`. Fill in `.github/pull_request_template.md` and ensure CI is green.
+5. **Review / Merge**: Author may merge once CI is green and the template is completed, or await review.
+6. **Test on development**: Test live changes on both phones from `development`.
+7. **Release PR to main**: Only release PRs target `main` (opened by Barrie with version bump in `package.json`, approved by Elliott). Never bump version on `dev/*` branches.
+8. **Prune merged branches**: Once a PR is merged into `development`, delete the feature branch on GitHub and locally via `npm run branch:clean`.
+
+### AI Tool Invariants
+- **Single Source of Truth**: `CLAUDE.md` is the project rules file. `AGENTS.md` is a symlink to it.
+- **Mandatory Task Start Check**: Before editing files for any new request, inspect `git branch` and `git status`. If on `development`, `main`, or an already-merged `dev/*` branch, switch to `development`, pull latest `origin/development`, prune merged branches with `npm run branch:clean`, and start a fresh `dev/<topic>` branch before writing code.
+- **Mandatory Pre-PR Sync**: Before presenting work as complete or opening a PR, run `npm run branch:sync` (`git fetch && git merge origin/development`), run `npm run build`, and verify affected tests.
+- **PR Target Rule**: PRs opened by AI tools or author always target `development`, never `main`. Always supply `.github/pull_request_template.md` pre-filled.
+- **Document Locations**: Plans live strictly in `docs/plans/`, solved problems in `docs/solutions/`. AI tools must NOT create top-level directories (e.g. `plans/`) or new directories under `docs/` without explicit instruction.
+- **Diff Hygiene**: Before opening a PR, inspect `git diff --stat origin/development` to guarantee no unrelated or scaffold files are committed.
+
 ## Commands
 
 ```bash
@@ -25,6 +45,10 @@ npm run dev          # Express static server on http://0.0.0.0:3000 (serves dist
 npm run build        # Copy assets into dist/ and stamp __APP_VERSION__ / __BUILD_ID__ (no transpile/bundle)
 npm run lint         # node --check server.js + static a11y scan (scripts/test_accessibility_dom.js)
 npm run ledger       # rewrite LEDGER.md: dead, needs-a-check and live modules, parallel versions, the attic
+npm run branch:start <topic> # Switch to development, pull latest, and create dev/<topic>
+npm run branch:sync  # Fetch origin and merge origin/development into current feature branch
+npm run branch:clean # Safely delete local feature branches already merged into development
+npm run branch:status# Check distance from origin/development
 npm run test:rules   # firestore.rules checks in the emulator (offline demo-plateplan project; needs Java 21+)
 npm run deploy:rules # runs test:rules, then publishes firestore.rules only (Barrie, after `npx firebase login`)
 node --check src/path/File.js     # quick syntax check of one module

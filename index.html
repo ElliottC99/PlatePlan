@@ -62,8 +62,11 @@ try{
     guardedStringify._isPlatePlanGuarded = true;
     JSON.stringify = guardedStringify;
   }
-  const platePlanAppearance=localStorage.getItem('plateplan_appearance')||'system';
-  if(platePlanAppearance==='light'||platePlanAppearance==='dark') document.documentElement.dataset.theme=platePlanAppearance;
+  const platePlanAppearance=localStorage.getItem('plateplan-appearance')||localStorage.getItem('plateplan_appearance')||localStorage.getItem('plateplan-theme')||'system';
+  if(platePlanAppearance==='light'||platePlanAppearance==='dark'){
+    document.documentElement.dataset.theme=platePlanAppearance;
+    document.documentElement.classList.add('theme-'+platePlanAppearance);
+  }
   document.documentElement.style.colorScheme=platePlanAppearance==='system'?'light dark':platePlanAppearance;
 }catch(e){}
 </script>
@@ -117,7 +120,7 @@ try{
   border-color: var(--border-strong, #cbd5e1);
 }
 .btn-primary, .btn.btn-primary, .btn.primary {
-  background: var(--text, #1A1916);
+  background: var(--tint-color, #34C759);
   color: #ffffff;
   border: 1px solid transparent;
   font-weight: 650;
@@ -170,9 +173,9 @@ try{
   font-variant-numeric: tabular-nums;
 }
 .pp-fit-badge.pp-fit-neutral {
-  background: #f8fafc;
-  color: #64748b;
-  border: 1px solid #cbd5e1;
+  background: var(--badge-neutral-bg, var(--surface2));
+  color: var(--badge-neutral-text, var(--text2));
+  border: 1px solid var(--badge-neutral-border, var(--border));
 }
 .skeleton-grid-cards {
   display: grid;
@@ -202,7 +205,7 @@ try{
   <div class="app-header-actions">
     <button class="btn ghost app-menu-button" type="button" data-action="openMobileMore()" aria-label="Open PlatePlan menu"><svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="5" cy="12" r="1.3"></circle><circle cx="12" cy="12" r="1.3"></circle><circle cx="19" cy="12" r="1.3"></circle></svg><span>Menu</span></button>
     <button type="button" id="sync-status" class="sync-pill" data-status="local" data-action="openPlatePlanSyncPanel()" title="PlatePlan sync status">Local only</button>
-    <button id="syncNowTopBtn" class="btn ghost sync-now-btn" type="button" data-action="window.syncNow()" title="Sync now with cloud" style="padding:4px 8px;font-size:12px">Sync Now</button>
+    <button id="loginTopBtn" class="btn primary" type="button" data-action="openPlatePlanLogin()" title="Sign in to PlatePlan with Google" style="display:none;padding:4px 10px;font-size:12px;font-weight:700">Sign In</button>
     <button id="logoutBtn" class="btn ghost" type="button" data-action="window.logout()" title="Log out of PlatePlan" style="padding:4px 8px;font-size:12px">Log Out</button>
     <span id="sync-user" class="sync-user-label" style="font-size:11px;color:var(--text3)"></span>
   </div>
@@ -255,11 +258,11 @@ try{
     </div>
     <span class="ios-tab-label">Pantry</span>
   </button>
-  <button type="button" class="ios-tab-item" data-view="shopping" data-action="showView('shopping')" role="tab" aria-selected="false">
+  <button type="button" class="ios-tab-item" data-view="data" data-action="showView('data')" role="tab" aria-selected="false">
     <div class="ios-tab-icon">
-      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12l2 2 4-4"></path></svg>
     </div>
-    <span class="ios-tab-label">Shopping</span>
+    <span class="ios-tab-label">Data Quality</span>
   </button>
 </nav>
 <div class="mobile-more-wrap" id="mobile-more-wrap" data-action="if(event.target===this)closeMobileMore()">
@@ -269,8 +272,9 @@ try{
     <div class="plateplan-menu-groups">
       <section><h4>Quick Actions</h4>
         <button type="button" data-action="closeMobileMore();openCreateActionSheet()"><span style="display:flex;align-items:center;gap:6px">➕ Add Recipe / Item</span><span aria-hidden="true">›</span></button>
+        <button type="button" id="mobile-login-btn" data-action="closeMobileMore();openPlatePlanLogin()" style="display:none;color:var(--system-blue,#2563eb);font-weight:700"><span style="display:flex;align-items:center;gap:6px">🔑 Sign In with Google</span><span aria-hidden="true">›</span></button>
         <button type="button" data-action="closeMobileMore();window.syncNow()"><span style="display:flex;align-items:center;gap:6px">🔄 Sync Cloud Now</span><span aria-hidden="true">›</span></button>
-        <button type="button" data-action="closeMobileMore();window.logout()" style="color:var(--red,#e53e3e)"><span style="display:flex;align-items:center;gap:6px">🚪 Log Out</span><span aria-hidden="true">›</span></button>
+        <button type="button" id="mobile-logout-btn" data-action="closeMobileMore();window.logout()" style="color:var(--red,#e53e3e)"><span style="display:flex;align-items:center;gap:6px">🚪 Log Out</span><span aria-hidden="true">›</span></button>
       </section>
       <section><h4>Library</h4><button type="button" data-action="mobileMoreView('planlib')"><span>Meal Plan Library</span><span aria-hidden="true">›</span></button></section>
       <section><h4>Data</h4><button type="button" data-action="mobileMoreView('ingredients')"><span>Pantry</span><span aria-hidden="true">›</span></button><button type="button" data-action="clearProductGroupFilter();mobileMoreView('bank')"><span style="padding-left:12px;font-size:13px;color:var(--text2)">↳ Product Bank</span><span aria-hidden="true">›</span></button><button type="button" data-action="mobileMoreView('data')"><span>Data Quality</span><span aria-hidden="true">›</span></button></section>
@@ -319,20 +323,21 @@ try{
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" class="heart-icon"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
         <span>Favourites Only</span>
       </button>
-      <input type="search" id="recipe-search-input" name="vaultSearch" aria-label="Search recipes" placeholder="Search recipes..." data-pp-input="handleRecipeSearch(this.value)" style="flex: 1 1 140px; min-width: 120px; font-size: 12px;">
-      <select id="vault-sort" name="vaultSort" aria-label="Sort options" class="select" data-pp-change="handleVaultSortChange(this.value)" style="flex: 0 0 auto; width: auto; min-width: 110px; white-space: nowrap; font-size: 12px;">
+      <input type="search" id="recipe-search-input" name="vaultSearch" aria-label="Search recipes" placeholder="Search recipes..." style="flex: 1 1 140px; min-width: 120px; font-size: 12px;">
+      <select id="vault-sort" name="vaultSort" aria-label="Sort options" class="select" style="flex: 0 0 auto; width: auto; min-width: 110px; white-space: nowrap; font-size: 12px;">
         <option value="fit-desc">Fit Score: High to Low</option>
         <option value="fit-asc">Fit Score: Low to High</option>
         <option value="name-asc">Name: A to Z</option>
         <option value="name-desc">Name: Z to A</option>
       </select>
-      <select id="filter-type" name="filterType" aria-label="Filter by type" data-pp-change="renderVault()" style="flex: 0 0 auto; width: auto; min-width: 96px; white-space: nowrap; font-size: 12px;">
+      <select id="filter-type" name="filterType" aria-label="Filter by type" style="flex: 0 0 auto; width: auto; min-width: 96px; white-space: nowrap; font-size: 12px;">
         <option value="all">All types</option>
         <option value="breakfast">Breakfast</option>
         <option value="lunch">Lunch</option>
         <option value="dinner">Dinner</option>
+        <option value="snacking">Snacking</option>
       </select>
-      <select id="filter-who" name="filterWho" aria-label="Filter who" data-pp-change="renderVault()" style="flex: 0 0 auto; width: auto; min-width: 96px; white-space: nowrap; font-size: 12px;">
+      <select id="filter-who" name="filterWho" aria-label="Filter who" style="flex: 0 0 auto; width: auto; min-width: 96px; white-space: nowrap; font-size: 12px;">
         <option value="all">Everyone</option>
         <option value="Elliott">Elliott</option>
         <option value="Chloe">Chloe</option>

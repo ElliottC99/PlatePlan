@@ -45,7 +45,7 @@ import { renderIngredientBank, renderProductBank } from './views/PantryBankView.
 import { renderSettingsView } from './views/SettingsView.js';
 import { renderScrollableSwapModal, toggleShoppingItemAcquired, getShoppingLineStateKey } from './views/ShoppingView.js';
 import { renderPlanner, renderPlanLibrary } from './views/PlannerView.js';
-import { renderRecipeVault } from './views/RecipeVaultView.js';
+import { renderRecipeVault, toggleRecipeFavourite } from './views/RecipeVaultView.js';
 import { renderDataQualityView } from './views/DataQualityView.js';
 import './components/data-quality/ResolveUnlinkedModalUI.js';
 import './components/data-quality/UnlinkedSweeperUI.js';
@@ -145,8 +145,8 @@ export function setSyncStatus(status, detail = '') {
 
   const el = document.getElementById('sync-status');
   if (el) {
-    let label = '• Synced';
-    if (status === 'synced') label = '• Synced';
+    let label = 'Synced';
+    if (status === 'synced') label = 'Synced';
     else if (status === 'saving') label = 'Saving…';
     else if (status === 'offline') label = 'Offline';
     else if (status === 'connecting') label = 'Connecting…';
@@ -157,6 +157,20 @@ export function setSyncStatus(status, detail = '') {
     el.textContent = label;
     if (detail) el.title = detail;
   }
+
+  try {
+    const isAuth = !!(typeof window !== 'undefined' && window.firebase?.auth && window.firebase.auth().currentUser);
+    const loginTop = document.getElementById('loginTopBtn');
+    const logoutTop = document.getElementById('logoutBtn');
+    const mobileLogin = document.getElementById('mobile-login-btn');
+    const mobileLogout = document.getElementById('mobile-logout-btn');
+
+    if (loginTop) loginTop.style.display = isAuth ? 'none' : 'inline-flex';
+    if (logoutTop) logoutTop.style.display = isAuth ? 'inline-flex' : 'none';
+    if (mobileLogin) mobileLogin.style.display = isAuth ? 'none' : 'block';
+    if (mobileLogout) mobileLogout.style.display = isAuth ? 'block' : 'none';
+  } catch (_) {}
+
   inSyncStatusTransition = false;
 }
 
@@ -180,6 +194,7 @@ if (typeof window !== 'undefined') {
     showPlatePlanToast: window.showPlatePlanToast || AppInitializer.showPlatePlanToast,
 
     renderToday, renderPlanner, renderVault: renderRecipeVault, renderRecipeVault, renderVaultGrid: renderRecipeVault,
+    toggleRecipeFavourite,
     renderSettings: renderSettingsView, renderSettingsView,
     renderIngredientBank, renderProductBank, renderBank: renderProductBank,
     renderPlatePlanView(viewId) {
@@ -323,10 +338,14 @@ function setupSubscriptions() {
   subscribe('ingredients', (ings) => {
     if (typeof window !== 'undefined' && getState()) getState().ingredients = Array.isArray(ings) ? ings : [];
     renderIngredientBank(); renderDataQualityView();
+    if (typeof renderRecipeVault === 'function') renderRecipeVault();
+    if (getState().currentPlan && typeof renderPlanner === 'function') renderPlanner();
   });
   subscribe('products', (prods) => {
     if (typeof window !== 'undefined' && getState()) getState().products = Array.isArray(prods) ? prods : [];
     renderProductBank(); renderDataQualityView();
+    if (typeof renderRecipeVault === 'function') renderRecipeVault();
+    if (getState().currentPlan && typeof renderPlanner === 'function') renderPlanner();
   });
   subscribe('preferences', () => { renderSettingsView(); renderToday(); });
   subscribe('plan', () => { renderToday(); renderPlanner(); });

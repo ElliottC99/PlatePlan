@@ -13,7 +13,7 @@ const isIngredientsHeader = l => /^(?:#+\s*)?(?:main\s+)?ingredients?:?/i.test(l
 
 const isExplicitRecipeHeader = l => {
   const t = l.trim();
-  if (/^(?:Recipe|Dish)\s*\d*[:\.\-\s]|^Recipe Title:|^Title:/i.test(t)) return true;
+  if (/^(?:Recipe|Dish)\s*(?:#?\s*\d+[:\.\-\s]?|[:\-])|^(?:Recipe\s*)?(?:Title|Name):/i.test(t)) return true;
   if (/^#+\s+/.test(t)) {
     const withoutHash = t.replace(/^#+\s*/, '').trim();
     if (isIngredientsHeader(withoutHash) || isMethodHeader(withoutHash)) return false;
@@ -39,7 +39,7 @@ export function unpackAndSplitRecipeBlocks(rawText) {
 
   // 2. Normalise dividers and ensure headers have clear boundaries
   clean = clean.replace(/(?:^|\n)\s*[-=_*~]{3,}\s*(?:\n|$)/g, '\n\n__RECIPE_SPLIT__\n\n')
-    .replace(/([^\n])\n*((?:Dish|Recipe)\s*\d*[:\.\-\s]|Recipe Title:|Title:)/gi, '$1\n\n$2');
+    .replace(/([^\n])\n*((?:Dish|Recipe)\s*(?:#?\s*\d+[:\.\-\s]?|[:\-])|(?:Recipe\s*)?(?:Title|Name):)/gi, '$1\n\n$2');
 
   // 3. Line-by-line semantic state machine
   const lines = clean.split('\n');
@@ -105,7 +105,7 @@ export function unpackCollapsedIngredients(rawIngText) {
   text = text.replace(/\([^)]*\)/g, m => { parens.push(m); return `###PAREN_${parens.length - 1}###`; });
 
   // 2. Separate subsections e.g. "For the chips:", "To serve:"
-  text = text.replace(/([^\n,])\s*(\bFOR THE\s+[A-Za-z\s]+:|\bTO SERVE:)/gi, '$1\n\n$2\n')
+  text = text.replace(/([^\n,])\s*(FOR THE\s+[A-Za-z\s]+:|TO SERVE:)/gi, '$1\n\n$2\n')
     .replace(/\)\s*(?=[0-9a-zA-Z])/g, ')\n');
 
   // 3. Separate letters followed immediately by ANY quantity (never splits inside parens)
@@ -134,18 +134,299 @@ export function unpackCollapsedIngredients(rawIngText) {
 }
 
 /**
+ * Pre-normalizes single-line and social-media recipe captions (such as TikTok / Instagram captions)
+ * into structured lines with Ingredients: and Method: boundaries when explicit headers are absent.
+ * @param {string} rawBlock
+ * @returns {string}
+ */
+function normalizeSocialCaptionText(rawBlock) {
+  if (!rawBlock || typeof rawBlock !== 'string') return '';
+  let text = rawBlock.replace(/\r\n/g, '\n').trim();
+
+  // 1. Strip trailing social sign-offs ("ENJOY!") and markdown or plain hashtag blocks at the end
+  text = text.replace(/\s*(?:ENJOY!?\s*)?(?:\s*(?:\[#[^\]]+\]\([^)]*\)|#[a-zA-Z0-9_]+))+\s*$/i, '').trim();
+  text = text.replace(/(?<=[.!?])\s*ENJOY!?\s*$/i, '').trim();
+
+  // 2. Separate a leading ALL-CAPS title glued directly to a Capitalized+lowercase sentence
+  text = text.replace(/^([A-Z0-9\s&'’\-]{3,}[A-Z])(?=[A-Z][a-z]{2,})/, '$1\n');
+
+  // 3. Place "Makes X-Y servings." / "Serves: X" onto its own line when glued to preceding text
+  text = text.replace(/([^\n])\s*((?:(?:Makes|Serves)\s+\d+(?:\s*[-–to]+\s*\d+)?\s+servings?\.?|(?:Serves|Yield|Servings|Total\s+Servings):\s*\d+(?:\s*[-–to]+\s*\d+)?(?:\s*(?:servings?|portions?))?\.?))/gi, '$1\n$2\n');
+
+  // 4. Remove inline "* If you're using..." / "* Note..." footnote explanations before numbered Step 1
+  text = text.replace(/\*\s+(?:If\b|Note\b|You\s+can\b|Use\b|Adjust\b)[\s\S]*?(?=(?:\n|\s)*1[\.\)]\s+[A-Z])/gi, '\n');
+
+  // 5. Separate inline "For the <section>:" headers when glued to preceding words
+  text = text.replace(/([^\n])\s*(For\s+the\s+[A-Za-z\s]+:|To\s+serve:)/gi, '$1\n$2\n');
+
+  // 6. Expand Unicode square/round bullets onto their own lines and unpack inline "- qty" subsections
+  if (/(?:▫️|▪️|[•●◦▪▫])/.test(text)) {
+    text = text.replace(/\s*(?:▫️|▪️|[•●◦▪▫])\s*/g, '\n▫️ ');
+    const rawLines = text.split('\n');
+    const expandedLines = [];
+    let insertedIngredientsHeader = /(?:^|\n)\s*(?:#+\s*)?(?:main\s+)?ingredients?:?/i.test(text);
+
+    for (const rawLine of rawLines) {
+      const trimmed = rawLine.trim();
+      if (!trimmed) continue;
+
+      if (trimmed.startsWith('▫️')) {
+        if (!insertedIngredientsHeader) {
+          expandedLines.push('Ingredients:');
+          insertedIngredientsHeader = true;
+        }
+        const content = trimmed.replace(/^▫️\s*/, '').trim();
+        const subParts = content.split(/(?<!\d)-\s+(?=(?:\d|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]))/).map(p => p.trim()).filter(Boolean);
+        if (
+          subParts.length > 1 &&
+          !/^(?:\d|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|a\b|an\b|one\b|two\b|three\b|four\b|five\b|half\b|pinch\b|handful\b|dash\b|drizzle\b)/i.test(subParts[0])
+        ) {
+          const secHeader = subParts[0].replace(/:$/, '').trim();
+          expandedLines.push(`${secHeader}:`);
+          for (let j = 1; j < subParts.length; j++) {
+            expandedLines.push(subParts[j]);
+          }
+        } else {
+          expandedLines.push(content);
+        }
+      } else {
+        expandedLines.push(trimmed);
+      }
+    }
+    text = expandedLines.join('\n');
+  }
+
+  // 7. Split inline numbered method steps glued to sentence punctuation (e.g. ".1. Preheat... .2. In a...")
+  text = text.replace(/([.!?])\s*(?=[1-9]\d?[\.\)]\s+[A-Z])/g, '$1\n');
+
+  // 8. If no explicit Method/Instructions header exists, insert "Method:" before "1. <Step>" when "2. <Step>" also exists
+  if (!/(?:^|\n)\s*(?:#+\s*)?(?:Method\s+Instructions|Method|Instructions|Steps|Preparation):?/i.test(text)) {
+    if (/(?:^|\n)\s*1[\.\)]\s+[A-Z][\s\S]*?(?:^|\n)\s*2[\.\)]\s+[A-Z]/.test(text)) {
+      text = text.replace(/((?:^|\n)\s*)(1[\.\)]\s+[A-Z])/, '$1Method:\n$2');
+    }
+  }
+
+  return text.trim();
+}
+
+/**
  * Unpacks collapsed method instructions into individual steps.
+ * Handles numbered lines, inline numbered steps (1. ... 2. ...), step prefixes (Step 1: ...),
+ * bullet points, and paragraph breaks.
  * @param {string} rawMethodText
  * @returns {string[]}
  */
 export function unpackCollapsedSteps(rawMethodText) {
-  if (!rawMethodText) return [];
-  let text = rawMethodText.replace(/\r\n/g, '\n').trim()
-    .replace(/([\.!?])\s*(?=[A-Z][a-zA-Z0-9\s,'–-]{2,45}:)/g, '$1\n\n')
-    .replace(/([\.!?])\s*(?=\d+[\.\)]\s+)/g, '$1\n\n');
+  if (!rawMethodText || typeof rawMethodText !== 'string') return [];
+  let text = rawMethodText.replace(/\r\n/g, '\n').trim();
 
-  const steps = text.split(/(?:\n\s*\n|\n(?=\d+[\.\)]\s+))/g).map(s => s.trim()).filter(s => s.length > 5);
-  return steps.length > 0 ? steps : [text];
+  // Strip trailing social sign-offs ("ENJOY!") and hashtags
+  text = text.replace(/\s*(?:ENJOY!?\s*)?(?:\s*(?:\[#[^\]]+\]\([^)]*\)|#[a-zA-Z0-9_]+))+\s*$/i, '').trim();
+  text = text.replace(/(?<=[.!?])\s*ENJOY!?\s*$/i, '').trim();
+
+  // 1. Separate "Step 1:", "Step 1.", "Step 1 -" with newlines
+  text = text.replace(/(\bStep\s*\d+[:\.\-]?\s*)/gi, '\n\n$1\n');
+
+  // 2. Separate inline numbered steps (e.g. "... 2. Add onions ..." or "...fan.2. In a...")
+  text = text.replace(/([\.!?])\s*(?=(?:[1-9]\d?[\.\)])\s+[A-Za-z])/g, '$1\n\n');
+  text = text.replace(/(?:^|\n|\s+)(?=(?:[1-9]\d?[\.\)])\s+[A-Za-z])/g, '\n\n');
+
+  // 3. Separate bulleted items: •, -, * followed by space and letter
+  text = text.replace(/([\.!?])\s*(?=[•\*\-]\s+[A-Za-z])/g, '$1\n\n');
+  text = text.replace(/(?:^|\n|\s+)(?=[•\*\-]\s+[A-Za-z])/g, '\n\n');
+
+  // 4. Split on newlines and clean step prefixes
+  const rawList = text.split(/(?:\n\s*\n|\n)/).map(s => s.trim()).filter(Boolean);
+
+  const cleanSteps = [];
+  rawList.forEach(line => {
+    // Strip leading numbering, bullets, or Step prefixes: e.g. "1. ", "1) ", "Step 1: ", "• ", "- "
+    const cleaned = line
+      .replace(/^(?:Step\s*\d+[:\.\-]?\s*|[0-9]+[\.\)]\s*|[•\*\-]\s*)/i, '')
+      .trim();
+    if (cleaned.length > 0) {
+      cleanSteps.push(cleaned);
+    }
+  });
+
+  return cleanSteps.length > 0 ? cleanSteps : [rawMethodText.trim()];
+}
+
+/**
+ * Detects if a line looks like an ingredient or ingredient section start.
+ * @param {string} line
+ * @returns {boolean}
+ */
+export function isIngredientOrSectionLine(line) {
+  if (!line || typeof line !== 'string') return false;
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+
+  // 1. Explicit bullet or leading emoji
+  if (/^[\s*\-–—~•●◦▪▫▫️▪️+\p{Extended_Pictographic}\uFE0F\u200D]+\s*/u.test(trimmed)) return true;
+
+  const stripped = trimmed.replace(/^[\s*\-–—~•●◦▪▫▫️▪️+\p{Extended_Pictographic}\uFE0F\u200D]+\s*/u, '');
+  if (!stripped) return false;
+
+  // 2. Ingredient Section header e.g. "Wet coating:", "Korean glaze:", "For the sauce:", "To serve:"
+  if (/^(?:for\s+the\s+[a-zA-Z\s]+:?|to\s+serve:?|[a-zA-Z\s]{2,35}:)$/i.test(stripped) &&
+      !/^(?:serves|makes|prep|cook|method|instructions|step|steps|notes?|tips?|equipment):/i.test(stripped)) {
+    return true;
+  }
+
+  // 3. Starts with quantity/unit/article count
+  if (/^\s*(?:\d+[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]?|[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|half\b|a\s+pinch\b|pinch\b|handful\b|small\s+handful\b|dash\b|drizzle\b|squeeze\b|sprinkle\b|few\b|several\b|one\b|two\b|three\b|four\b|five\b|six\b|seven\b|eight\b|nine\b|ten\b|\d+\s*x\b)/i.test(stripped)) {
+    return true;
+  }
+
+  // 4. Contains measurement units
+  if (/\b(?:g|kg|ml|l|tbsp|tsp|cup|cups|oz|lb|cloves?|cans?|tins?|bunches?|slices?|packs?|packets?|pots?)\b/i.test(stripped)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Detects if a line is metadata that should stay in the recipe header.
+ * @param {string} line
+ * @returns {boolean}
+ */
+export function isHeaderMetadataLine(line) {
+  if (!line) return false;
+  const trimmed = line.trim();
+  return /^(?:(?:Dish|Recipe)\s*#?\s*\d+|(?:Recipe\s*)?(?:Title|Name):|(?:Makes|Serves|Yield|Servings|Total\s+Servings)\b|(?:Prep|Cook)\s+Time\b|Difficulty|Calories|Author|Course|Cuisine)/i.test(trimmed);
+}
+
+/**
+ * Detects if a line represents the start of method/instruction steps.
+ * @param {string} line
+ * @returns {boolean}
+ */
+export function isMethodStepLine(line) {
+  if (!line || typeof line !== 'string') return false;
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+
+  // Numbered step: "1. ", "1) ", "Step 1: "
+  if (/^(?:Step\s*\d+|[1-9]\d?[\.\)])\s+[A-Za-z]/i.test(trimmed)) {
+    return true;
+  }
+
+  // Action verbs and sequence adverbs typical of recipe instructions
+  const startsWithInstructionWord = /^(?:Preheat|Heat|Cook|Bake|Boil|Simmer|Fry|Air fry|Roast|Sauté|Tear|Chop|Cut|Dice|Slice|Mix|Stir|Whisk|Blend|Combine|Toss|Place|Put|Add|Pour|Season|Serve|Spread|Divide|Garnish|Drizzle|Transfer|Cover|Remove|Drain|Rinse|Dip|Press|Spray|Warm|Assemble|Meanwhile|In a |To make |Using a |Once |When |While |After |For the [a-zA-Z\s]+,\s*(?:toss|mix|heat|cook|fry|stir|combine|bake|place|add|put|whisk|simmer))\b/i.test(trimmed);
+
+  if (!startsWithInstructionWord) return false;
+
+  // Must NOT look like a pure ingredient quantity specification e.g. "200g tempeh...", "2 tbsp cornflour..."
+  const isIngredientQuantity = /^\s*(?:\d+[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]?|[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|half\b|a\s+pinch\b|pinch\b|handful\b|small\s+handful\b|dash\b|drizzle\b|squeeze\b|sprinkle\b|few\b|several\b|one\b|two\b|three\b|four\b|five\b|six\b|seven\b|eight\b|nine\b|ten\b|\d+\s*x\b)\s+(?:g|kg|ml|l|tbsp|tsp|cup|cups|oz|lb|cloves?|cans?|tins?|bunches?|slices?|packs?|packets?|pots?|large|small|medium)\b/i.test(trimmed);
+  if (isIngredientQuantity) return false;
+
+  // Has sentence structure: length > 35, or contains sentence terminal punctuation (. or !), or has clause commas with >= 6 words
+  const hasSentenceStructure = trimmed.length > 35 || /[.!]/.test(trimmed) || (trimmed.includes(',') && trimmed.split(/\s+/).length >= 6);
+  return hasSentenceStructure;
+}
+
+/**
+ * Partitions raw recipe text into headerText, rawIngText, and rawMethodText.
+ * Gracefully handles missing Ingredients/Method headings by identifying ingredient
+ * quantity lines and sentence-structured cooking instruction steps.
+ * @param {string} block
+ * @returns {{ headerText: string, rawIngText: string, rawMethodText: string }}
+ */
+export function partitionRecipeBlock(block) {
+  if (!block || typeof block !== 'string') {
+    return { headerText: '', rawIngText: '', rawMethodText: '' };
+  }
+
+  const ingMatch = block.match(/(?:^|\n)\s*(?:#+\s*)?(?:main\s+)?ingredients?:?\s*/i);
+  const methodMatch = block.match(/(?:^|\n)\s*(?:#+\s*)?(?:Method\s+Instructions|Method|Instructions|Steps|Preparation):?\s*/i);
+
+  let headerText = '', rawIngText = '', rawMethodText = '';
+
+  if (ingMatch && methodMatch && methodMatch.index > ingMatch.index) {
+    headerText = block.slice(0, ingMatch.index);
+    rawIngText = block.slice(ingMatch.index + ingMatch[0].length, methodMatch.index);
+    rawMethodText = block.slice(methodMatch.index + methodMatch[0].length);
+  } else if (ingMatch && (!methodMatch || methodMatch.index < ingMatch.index)) {
+    headerText = block.slice(0, ingMatch.index);
+    const remainder = block.slice(ingMatch.index + ingMatch[0].length);
+    const lines = remainder.split('\n');
+    let methodIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (isMethodStepLine(lines[i])) {
+        methodIdx = i;
+        break;
+      }
+    }
+    if (methodIdx !== -1) {
+      rawIngText = lines.slice(0, methodIdx).join('\n');
+      rawMethodText = lines.slice(methodIdx).join('\n');
+    } else {
+      rawIngText = remainder;
+    }
+  } else if (!ingMatch && methodMatch) {
+    rawMethodText = block.slice(methodMatch.index + methodMatch[0].length);
+    const beforeMethod = block.slice(0, methodMatch.index);
+    const lines = beforeMethod.split('\n');
+    let ingIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      if (i === 0 && !/^[-•*▫️▪️]/.test(line)) continue;
+      if (isHeaderMetadataLine(line)) continue;
+      if (isIngredientOrSectionLine(line)) {
+        ingIdx = i;
+        break;
+      }
+    }
+    if (ingIdx !== -1) {
+      headerText = lines.slice(0, ingIdx).join('\n');
+      rawIngText = lines.slice(ingIdx).join('\n');
+    } else {
+      headerText = beforeMethod;
+    }
+  } else {
+    // Neither explicit header exists
+    const lines = block.split('\n');
+    let ingIdx = -1;
+    let methodIdx = -1;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      if (ingIdx === -1) {
+        if (i === 0 && !/^[-•*▫️▪️]/.test(line)) continue;
+        if (isHeaderMetadataLine(line)) continue;
+        if (isIngredientOrSectionLine(line)) {
+          ingIdx = i;
+        }
+      } else if (methodIdx === -1) {
+        if (isMethodStepLine(line)) {
+          methodIdx = i;
+          break;
+        }
+      }
+    }
+
+    if (ingIdx !== -1) {
+      headerText = lines.slice(0, ingIdx).join('\n');
+      if (methodIdx !== -1) {
+        rawIngText = lines.slice(ingIdx, methodIdx).join('\n');
+        rawMethodText = lines.slice(methodIdx).join('\n');
+      } else {
+        rawIngText = lines.slice(ingIdx).join('\n');
+      }
+    } else if (methodIdx !== -1) {
+      headerText = lines.slice(0, methodIdx).join('\n');
+      rawMethodText = lines.slice(methodIdx).join('\n');
+    } else {
+      headerText = block;
+    }
+  }
+
+  return { headerText, rawIngText, rawMethodText };
 }
 
 /**
@@ -156,28 +437,13 @@ export function unpackCollapsedSteps(rawMethodText) {
  */
 export function parseSingleRecipeText(block, ingredientsBank = []) {
   if (!block || typeof block !== 'string') return null;
+  block = normalizeSocialCaptionText(block);
 
-  const ingMatch = block.match(/(?:^|\n)\s*(?:#+\s*)?(?:main\s+)?ingredients?:?\s*/i);
-  const methodMatch = block.match(/(?:^|\n)\s*(?:#+\s*)?(?:Method\s+Instructions|Method|Instructions|Steps|Preparation):?\s*/i);
-
-  let headerText = block, rawIngText = '', rawMethodText = '';
-
-  if (ingMatch) {
-    headerText = block.slice(0, ingMatch.index);
-    if (methodMatch && methodMatch.index > ingMatch.index) {
-      rawIngText = block.slice(ingMatch.index + ingMatch[0].length, methodMatch.index);
-      rawMethodText = block.slice(methodMatch.index + methodMatch[0].length);
-    } else {
-      rawIngText = block.slice(ingMatch.index + ingMatch[0].length);
-    }
-  } else if (methodMatch) {
-    headerText = block.slice(0, methodMatch.index);
-    rawMethodText = block.slice(methodMatch.index + methodMatch[0].length);
-  }
+  let { headerText, rawIngText, rawMethodText } = partitionRecipeBlock(block);
 
   // Prevent greedy method ingestion if boundary marker or secondary ingredients header exists
   if (rawMethodText) {
-    const boundary = rawMethodText.match(/(?:\n\s*\n|\n)(?=(?:(?:Recipe|Dish)\s*\d*[:\.\-\s]|Recipe Title:|Title:|[#]+\s+|(?:main\s+)?ingredients?:))/i);
+    const boundary = rawMethodText.match(/(?:\n\s*\n|\n)(?=(?:(?:Recipe|Dish)\s*(?:#?\s*\d+[:\.\-\s]?|[:\-])|(?:Recipe\s*)?(?:Title|Name):|[#]+\s+|(?:main\s+)?ingredients?:))/i);
     if (boundary) rawMethodText = rawMethodText.slice(0, boundary.index);
   }
 
@@ -190,13 +456,13 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
       if (ext) title = ext;
       return;
     }
-    if (/^(?:Dish|Recipe)\s+\d+:\s*(.*)/i.test(line)) {
-      const match = line.match(/^(?:Dish|Recipe)\s+\d+:\s*(.*)/i);
+    if (/^(?:Dish|Recipe)\s+#?\s*\d+[:\.\-]?\s*(.*)/i.test(line)) {
+      const match = line.match(/^(?:Dish|Recipe)\s+#?\s*\d+[:\.\-]?\s*(.*)/i);
       const ext = cleanRecipeTitle(match[1]);
       if (ext) title = ext;
       return;
     }
-    if (/^(?:Serves|Yield|Servings|Total\s+Servings):/i.test(line)) {
+    if (/^(?:Makes|Serves|Yield|Servings|Total\s+Servings)\b/i.test(line)) {
       const match = line.match(/\d+/);
       if (match) servings = parseInt(match[0], 10);
       return;
@@ -254,12 +520,24 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
   const rawSteps = unpackCollapsedSteps(rawMethodText);
   const methodSteps = rawSteps.map(s => s.replace(/^\d+[\.\)]\s*/, '').trim()).filter(Boolean);
 
+  const cleanTitle = toTitleCase(title);
+  let inferredMeal = 'Dinner';
+  if (/breakfast|oat|pancake|porridge|waffle|granola|scramble|cereal|brunch/i.test(cleanTitle)) {
+    inferredMeal = 'Breakfast';
+  } else if (/wrap|sandwich|salad|toast|lunch|soup|panini|bagel/i.test(cleanTitle)) {
+    inferredMeal = 'Lunch';
+  } else if (/snack|bite|bar|cookie|muffin|smoothie|shake|protein ball/i.test(cleanTitle)) {
+    inferredMeal = 'Snacking';
+  }
+
   return {
-    title: toTitleCase(title),
+    title: cleanTitle,
     servings,
     prepTime: { hours: Math.floor(prepMinutes / 60), minutes: prepMinutes % 60 },
     cookTime: { hours: Math.floor(cookMinutes / 60), minutes: cookMinutes % 60 },
-    mealSuitability: ['Dinner'],
+    mealSuitability: [inferredMeal],
+    types: [inferredMeal.toLowerCase()],
+    mealType: inferredMeal.toLowerCase(),
     ingredientSections,
     ingredients: ingredientSections.flatMap(s => s.ingredients),
     instructions: methodSteps,

@@ -71,7 +71,7 @@ export function renderFitScoreBadge(fitScoreOrRecipe, mealTypeOrOptions = 'all',
     || Number.isNaN(fitResult.score);
 
   if (isActuallyMissing) {
-    return `<span class="pp-fit-badge pp-fit-neutral" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:#f1f5f9;color:#64748b;border:1px solid #cbd5e1" title="${escapeHtml(fitResult?.error || 'Missing Calorie/Protein Data')}">⚪ --</span>`;
+    return `<span class="pp-fit-badge pp-fit-neutral" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--badge-neutral-bg);color:var(--badge-neutral-text);border:1px solid var(--badge-neutral-border)" title="${escapeHtml(fitResult?.error || 'Missing Calorie/Protein Data')}">⚪ --</span>`;
   }
 
   const score = Math.round(Number(fitResult.score) || 0);
@@ -89,7 +89,7 @@ export function renderFitScoreBadge(fitScoreOrRecipe, mealTypeOrOptions = 'all',
 
   const labelSuffix = opts.showLabel ? ` · ${escapeHtml(meta.label)}` : '';
 
-  return `<span class="pp-fit-badge gradient-badge" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background-color:${meta.bg};color:${meta.text};border:1px solid ${meta.color};line-height:1.2" title="${escapeHtml(title)}" data-fit-score="${score}" data-fit-tier="${meta.tier}">${meta.icon} ${score}%${labelSuffix}</span>`;
+  return `<span class="pp-fit-badge gradient-badge" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background-color:${meta.bg};color:${meta.text};border:1px solid ${meta.border || meta.color};line-height:1.2" title="${escapeHtml(title)}" data-fit-score="${score}" data-fit-tier="${meta.tier}">${meta.icon} ${score}%${labelSuffix}</span>`;
 }
 
 if (typeof window !== 'undefined') {

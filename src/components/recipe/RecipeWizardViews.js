@@ -3,7 +3,7 @@
  * Template view rendering functions for Choice and Ingestion steps of the Recipe Ingestion Wizard.
  */
 
-import { wizardState, MEAL_TAGS } from './RecipeWizardState.js';
+import { wizardState, MEAL_TAGS, getWizardStepDisplayInfo } from './RecipeWizardState.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, ch => ({
@@ -24,11 +24,12 @@ export { renderState3Review, renderMacroBreakdownCrossbar } from './RecipeWizard
 
 export function renderStepBadge() {
   const step = wizardState.currentStep;
-  if (step === 0) return `<span class="badge" style="background:var(--surface2, #e8e6df);color:var(--text2, #555);">Choice</span>`;
-  if (step === 1) return `<span class="badge badge-purple" style="background:#eef2ff;color:#4f46e5;">Step 1: Ingestion</span>`;
-  if (step === 1.5) return `<span class="badge badge-amber" style="background:#fef3c7;color:#b45309;font-weight:600;">Step 1.5: Recipe Review Queue (${wizardState.processingQueue.length} Detected)</span>`;
-  if (step === 2) return `<span class="badge badge-green" style="background:#ecfdf5;color:#059669;">Step 2: Sections & Mapping</span>`;
-  if (step === 3) return `<span class="badge badge-coral" style="background:#fef2f2;color:#dc2626;">Step 3: Inline Review & Save</span>`;
+  const info = getWizardStepDisplayInfo(wizardState);
+  if (step === 0) return `<span class="badge" style="background:var(--badge-neutral-bg);color:var(--badge-neutral-text);border:1px solid var(--badge-neutral-border);">${escapeHtml(info.label)}</span>`;
+  if (step === 1) return `<span class="badge badge-purple" style="background:var(--purple-bg);color:var(--purple);">${escapeHtml(info.label)}</span>`;
+  if (step === 1.5) return `<span class="badge badge-amber" style="background:var(--badge-yellow-bg);color:var(--badge-yellow-text);font-weight:600;">${escapeHtml(info.label)}</span>`;
+  if (step === 2) return `<span class="badge badge-green" style="background:var(--badge-green-bg);color:var(--badge-green-text);">${escapeHtml(info.label)}</span>`;
+  if (step === 3) return `<span class="badge badge-coral" style="background:var(--badge-red-bg);color:var(--badge-red-text);">${escapeHtml(info.label)}</span>`;
   return '';
 }
 
@@ -58,7 +59,7 @@ export function renderState0Choice() {
 export function renderState1AManual() {
   const recipe = wizardState.activeRecipe;
   const queueInfo = wizardState.initialQueueTotal > 1
-    ? `<div style="background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; margin-bottom: 16px;">
+    ? `<div style="background: var(--badge-green-bg); border: 1px solid var(--badge-green-border); color: var(--badge-green-text); padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; margin-bottom: 16px;">
         📌 Batch Queue: Recipe ${wizardState.currentQueueIndex || 1} of ${wizardState.initialQueueTotal} (${wizardState.processingQueue.length} remaining)
        </div>`
     : '';
@@ -89,23 +90,47 @@ export function renderState1AManual() {
           <div>
             <label for="wiz-prep-hours" style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px;">Prep Time (Hours & Mins)</label>
             <div style="display: flex; gap: 6px;">
-              <input type="number" id="wiz-prep-hours" name="prep_hours" aria-label="Prep hours" placeholder="0 hr" value="${recipe.prepTime.hours}" min="0" style="width: 50%; padding: 8px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px;" />
-              <input type="number" id="wiz-prep-mins" name="prep_minutes" aria-label="Prep minutes" placeholder="15 min" value="${recipe.prepTime.minutes}" min="0" max="59" style="width: 50%; padding: 8px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px;" />
+              <input type="number" id="wiz-prep-hours" name="prep_hours" aria-label="Prep hours" placeholder="0 hr" value="${recipe.prepTime?.hours ?? ''}" min="0" style="width: 50%; padding: 8px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px;" />
+              <input type="number" id="wiz-prep-mins" name="prep_minutes" aria-label="Prep minutes" placeholder="15 min" value="${recipe.prepTime?.minutes ?? ''}" min="0" max="59" style="width: 50%; padding: 8px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px;" />
             </div>
           </div>
           <div>
             <label for="wiz-cook-hours" style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px;">Cook Time (Hours & Mins)</label>
             <div style="display: flex; gap: 6px;">
-              <input type="number" id="wiz-cook-hours" name="cook_hours" aria-label="Cook hours" placeholder="0 hr" value="${recipe.cookTime.hours}" min="0" style="width: 50%; padding: 8px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px;" />
-              <input type="number" id="wiz-cook-mins" name="cook_minutes" aria-label="Cook minutes" placeholder="30 min" value="${recipe.cookTime.minutes}" min="0" max="59" style="width: 50%; padding: 8px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px;" />
+              <input type="number" id="wiz-cook-hours" name="cook_hours" aria-label="Cook hours" placeholder="0 hr" value="${recipe.cookTime?.hours ?? ''}" min="0" style="width: 50%; padding: 8px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px;" />
+              <input type="number" id="wiz-cook-mins" name="cook_minutes" aria-label="Cook minutes" placeholder="30 min" value="${recipe.cookTime?.minutes ?? ''}" min="0" max="59" style="width: 50%; padding: 8px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px;" />
             </div>
           </div>
         </div>
 
         <div>
-          <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Meal Suitability</label>
+          <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Meal Suitability <span style="color:var(--danger,#ef4444);">*</span></label>
           <div style="display: flex; flex-wrap: wrap; gap: 8px;" id="wiz-meal-tags-container">
             ${mealTagsHtml}
+          </div>
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">Recipe Source</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;" id="wiz-source-type-container">
+            ${[
+              { val: '', label: 'None' },
+              { val: 'online', label: '🌐 Online (URL)' },
+              { val: 'book', label: '📖 Book' }
+            ].map(opt => {
+              const isSel = (recipe.sourceType || '') === opt.val;
+              return `<label class="wiz-source-type-pill" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 5px 12px; border: 1px solid var(--border, #ccc); border-radius: 999px; background: ${isSel ? 'var(--purple-bg, #eef2ff)' : 'var(--surface, #fff)'}; color: ${isSel ? 'var(--purple, #4f46e5)' : 'var(--text, #333)'}; font-weight: ${isSel ? '600' : '500'}; cursor: pointer;">
+                <input type="radio" name="wiz_source_type" class="wiz-source-type-radio" value="${opt.val}" ${isSel ? 'checked' : ''} style="display:none;" />
+                ${opt.label}
+              </label>`;
+            }).join(' ')}
+          </div>
+          <div id="wiz-source-online-fields" style="display: ${(recipe.sourceType || '') === 'online' ? 'block' : 'none'};">
+            <input type="url" id="wiz-source-url" name="source_url" aria-label="Recipe URL" value="${escapeAttr(recipe.sourceUrl || '')}" placeholder="https://example.com/recipe..." style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface, #fff);" />
+          </div>
+          <div id="wiz-source-book-fields" style="display: ${(recipe.sourceType || '') === 'book' ? 'grid' : 'none'}; grid-template-columns: 2fr 1fr; gap: 8px;">
+            <input type="text" id="wiz-source-book" name="source_book" aria-label="Book name" value="${escapeAttr(recipe.sourceBook || '')}" placeholder="Book Name (e.g. Ottolenghi Simple)" style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface, #fff);" />
+            <input type="text" id="wiz-source-page" name="source_page" aria-label="Book page number" value="${escapeAttr(recipe.sourcePage || '')}" placeholder="Page (e.g. 142)" style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface, #fff);" />
           </div>
         </div>
 

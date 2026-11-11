@@ -1,6 +1,7 @@
 import { convertToStrictUnit } from './UnitConversionService.js';
 import { getState } from '../store/store.js';
 import { showCustomConfirm, showCustomCopyModal } from '../components/ui/DialogHelpers.js';
+import { resolveDynamicProductForIngredient } from './PantryTaxonomyService.js';
 
 /**
  * src/services/ShoppingCalculationService.js (v3.31.31)
@@ -127,8 +128,12 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
     appState = state || storeState || (typeof window !== 'undefined' ? getState() : {}) || {};
     vaultRecipes = (Array.isArray(appState.recipes) && appState.recipes.length ? appState.recipes : null)
       || (typeof window !== 'undefined' && Array.isArray(window.recipes) ? window.recipes : []);
-    ingredientsBank = Array.isArray(appState.ingredients) ? appState.ingredients : [];
-    productsBank = Array.isArray(appState.products) ? appState.products : [];
+    ingredientsBank = (Array.isArray(maybeIngredients) && maybeIngredients.length)
+      ? maybeIngredients
+      : (Array.isArray(appState.ingredients) ? appState.ingredients : []);
+    productsBank = (Array.isArray(maybeProducts) && maybeProducts.length)
+      ? maybeProducts
+      : (Array.isArray(appState.products) ? appState.products : []);
   }
 
   const activePlan = plan || appState.plan || {};
@@ -140,33 +145,45 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
   const aggregatedMap = new Map();
   const rawSlots = activePlan.slots && typeof activePlan.slots === 'object' ? activePlan.slots : {};
 
-  const processSlotNode = (slotNode, personCount = 1, dayNum = 1, mealType = 'meal') => {
+  const processSlotNode = (slotNode, personCount = 1, dayNum = 1, mealType = 'meal', dayKey = null, slotKey = null) => {
     if (!slotNode || slotNode.isSkipped || slotNode.skipped) return;
     if (slotNode.isSplit && (slotNode.elliott || slotNode.chloe)) {
-      if (slotNode.elliott) processSlotNode(slotNode.elliott, 1, dayNum, mealType);
-      if (slotNode.chloe) processSlotNode(slotNode.chloe, 1, dayNum, mealType);
+      if (slotNode.elliott) processSlotNode(slotNode.elliott, 1, dayNum, mealType, dayKey, slotKey);
+      if (slotNode.chloe) processSlotNode(slotNode.chloe, 1, dayNum, mealType, dayKey, slotKey);
       return;
     }
-    const recipeId = typeof slotNode === 'string' ? slotNode : (slotNode.recipeId || slotNode.id);
-    if (!recipeId) return;
+    const rawRecipeId = typeof slotNode === 'string' ? slotNode : (slotNode.recipeId || slotNode.id);
+    if (!rawRecipeId) return;
+    const [baseRecipeId, variantFromId] = String(rawRecipeId).split('::');
+    const recipeId = baseRecipeId;
 
     const fullRecipe = vaultRecipes.find(r => r && String(r.id) === String(recipeId));
     if (!fullRecipe) return;
 
-    const baseServings = Math.max(1, Number(fullRecipe.serves || fullRecipe.servings || 2) || 2);
+    const variant = (typeof slotNode === 'object' && slotNode.variant) ? slotNode.variant : (variantFromId || 'original');
+    const recipeServes = variant === 'enhanced'
+      ? (fullRecipe.enhanced?.servings || fullRecipe.enhanced?.serves || fullRecipe.servings || fullRecipe.serves || 2)
+      : (fullRecipe.servings || fullRecipe.serves || 2);
+    const baseServings = Math.max(1, Number(recipeServes) || 2);
     const targetServings = Number(slotNode?.servings || personCount || 1) || 1;
     const scaleMultiplier = targetServings / baseServings;
 
-    const variant = typeof slotNode === 'object' && slotNode.variant ? slotNode.variant : 'original';
     const rawIngs = (variant === 'enhanced' && fullRecipe.enhanced && Array.isArray(fullRecipe.enhanced.ingredients))
       ? fullRecipe.enhanced.ingredients
       : (Array.isArray(fullRecipe.ingredients) ? fullRecipe.ingredients : []);
 
     const recipeName = fullRecipe.title || fullRecipe.name || 'Recipe';
-    const matchedPrep = prepGroups.find(g => String(g.recipeId) === String(recipeId) && Array.isArray(g.days) && g.days.some(d => Number(d) === Number(dayNum)));
+    const matchedPrep = prepGroups.find(g => String(g.recipeId).split('::')[0] === String(recipeId) && Array.isArray(g.days) && g.days.some(d => Number(d) === Number(dayNum)));
     const prepGroupId = matchedPrep?.id || matchedPrep?.prepGroupId || matchedPrep?.key || (matchedPrep ? `prep_${matchedPrep.recipeId}` : null);
     const slotInstanceId = (typeof slotNode === 'object' && slotNode.instanceId) ? slotNode.instanceId : `instance_${recipeId}_d${dayNum}_${mealType}`;
     const cookingEventId = prepGroupId || slotInstanceId;
+    const candidateEventIds = [
+      cookingEventId,
+      dayKey && slotKey ? `${dayKey}_${slotKey}` : null,
+      dayKey ? `${dayKey}_${mealType}` : null,
+      `${dayNum}_${mealType}`,
+      `d${dayNum}_${mealType}`
+    ].filter(Boolean);
 
     rawIngs.forEach(ing => {
       if (!ing) return;
@@ -185,24 +202,26 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
       const planProductSelections = activePlan.productSelections || {};
 
       const lookupKeys = [
-        canonicalIngId, ing.bankId, ing.productId, ing.id, ing.ingredientId, ing.groupId, ingId, rawName
+        subId, ing.subtypeId, ing.subTypeId, canonicalIngId, ing.bankId, ing.productId, ing.id, ing.ingredientId, ing.groupId, ingId, rawName
       ].filter(Boolean).map(String);
 
       let overriddenProductId = null;
-      for (const k of lookupKeys) {
-        if (instanceProductOverrides?.[k]) { overriddenProductId = instanceProductOverrides[k]; break; }
-        const scopedSub = planSubstitutions?.[`${cookingEventId}:${k}`];
-        if (scopedSub) { overriddenProductId = typeof scopedSub === 'object' ? (scopedSub.productId || scopedSub.id) : scopedSub; break; }
+      for (const evId of candidateEventIds) {
+        for (const k of lookupKeys) {
+          if (instanceProductOverrides?.[k]) { overriddenProductId = instanceProductOverrides[k]; break; }
+          const scopedSub = planSubstitutions?.[`${evId}:${k}`];
+          if (scopedSub) { overriddenProductId = typeof scopedSub === 'object' ? (scopedSub.productId || scopedSub.id) : scopedSub; break; }
+          const scopedSel = planProductSelections?.[`${evId}:${k}`];
+          if (scopedSel) { overriddenProductId = typeof scopedSel === 'object' ? (scopedSel.productId || scopedSel.id) : scopedSel; break; }
+        }
+        if (overriddenProductId) break;
       }
       if (!overriddenProductId) {
         for (const k of lookupKeys) {
           const globalSub = planSubstitutions?.[k];
           if (globalSub) { overriddenProductId = typeof globalSub === 'object' ? (globalSub.productId || globalSub.id) : globalSub; break; }
-        }
-      }
-      if (!overriddenProductId) {
-        for (const k of lookupKeys) {
-          if (planProductSelections?.[k]) { overriddenProductId = planProductSelections[k]; break; }
+          const globalSel = planProductSelections?.[k];
+          if (globalSel) { overriddenProductId = typeof globalSel === 'object' ? (globalSel.productId || globalSel.id) : globalSel; break; }
         }
       }
 
@@ -218,13 +237,11 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
           || ingredientsBank.find(i => String(i.id) === String(overriddenProductId) || String(i.name).toLowerCase() === String(overriddenProductId).toLowerCase());
       }
 
-      const matchedProd = overriddenProduct || productsBank.find(p =>
-        (prodId && String(p.id) === String(prodId)) ||
-        (subId && String(p.subtypeId) === String(subId) && p.isAutoDefault) ||
-        (matchedIng && String(p.id) === String(matchedIng.defaultProductId)) ||
-        (matchedIng && String(p.ingredientId) === String(matchedIng.id) && p.isAutoDefault) ||
-        (matchedIng && String(p.ingredientId) === String(matchedIng.id))
-      ) || getFallbackProductData(rawName);
+      const matchedProd = overriddenProduct || resolveDynamicProductForIngredient(ing, {
+        products: productsBank,
+        ingredients: ingredientsBank,
+        preferences: appState.preferences || appState.settings || {}
+      }) || getFallbackProductData(rawName);
 
       const resolvedId = overriddenProductId || matchedProd?.id || canonicalIngId || rawName;
       const key = String(resolvedId).toLowerCase().replace(/\s+/g, '_');
@@ -276,7 +293,7 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
     Object.entries(dayObj).forEach(([slotKey, slotVal]) => {
       const personCount = (slotKey.endsWith('E') || slotKey.endsWith('C')) ? 1 : 2;
       const mealType = slotKey.replace(/[EC]$/, '');
-      processSlotNode(slotVal, personCount, dayNum, mealType);
+      processSlotNode(slotVal, personCount, dayNum, mealType, dayKey, slotKey);
     });
   });
 

@@ -1,9 +1,9 @@
 /**
- * src/components/recipe/RecipeWizardStep2View.js (v3.32.6)
+ * src/components/recipe/RecipeWizardStep2View.js (v3.36.0)
  * View rendering for Step 2: Sections, Interactive Target Servings Scaling & Taxonomy Autocomplete Mapping.
  */
 
-import { wizardState } from './RecipeWizardState.js';
+import { wizardState, MEAL_TAGS } from './RecipeWizardState.js';
 import { getState } from '../../store/store.js';
 import { renderTaxonomySearchHTML, isIngredientUnlinked } from './RecipeWizardTaxonomySearch.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
@@ -26,21 +26,33 @@ function escapeAttr(str) {
 }
 
 export function renderStep2MacrosSummaryHTML(activeRecipe) {
-  const m = activeRecipe.macros || { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  // Deprecated in favor of dual-profile crossbar (Elliott & Chloe Calories + Protein + Fit Score)
+  return '';
+}
+
+export function renderStep2Footer() {
+  const activeRecipe = wizardState.activeRecipe || {};
+  const storeState = getState() || {};
+  const ingredientsBank = storeState.rootItems || storeState.ingredients || [];
+  const productsBank = storeState.products || [];
+
+  const allIngs = (activeRecipe.ingredientSections || []).flatMap(s => s.ingredients || []);
+  const unlinkedIngs = allIngs.filter(i => isIngredientUnlinked(i, productsBank, ingredientsBank));
+  const isBlocked = unlinkedIngs.length > 0;
+
   return `
-    <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;flex-wrap:wrap;">
-      <span style="background:var(--surface,#fff);padding:3px 8px;border-radius:6px;border:1px solid var(--border,#ddd);color:var(--text,#111);">
-        🔥 ${m.calories ?? 0} kcal
-      </span>
-      <span style="background:var(--surface,#fff);padding:3px 8px;border-radius:6px;border:1px solid var(--border,#ddd);color:#16a34a;">
-        💪 ${m.protein ?? 0}g prot
-      </span>
-      <span style="background:var(--surface,#fff);padding:3px 8px;border-radius:6px;border:1px solid var(--border,#ddd);color:#2563eb;">
-        🌾 ${m.carbs ?? 0}g carbs
-      </span>
-      <span style="background:var(--surface,#fff);padding:3px 8px;border-radius:6px;border:1px solid var(--border,#ddd);color:#d97706;">
-        🥑 ${m.fat ?? 0}g fat
-      </span>
+    <div class="ios-fullscreen-footer" id="wizard-step2-footer">
+      <button type="button" class="btn ghost" id="wizard-back-btn">← Back</button>
+      
+      <button type="button" class="wiz-gate-pill ${isBlocked ? 'blocked' : 'ready'}" id="wiz-gate-pill" title="${isBlocked ? 'Click to jump to next unmapped ingredient' : 'All ingredients are linked'}">
+        ${isBlocked
+          ? `<span>⚠️</span> <span class="wiz-unlinked-count">${unlinkedIngs.length}</span> unmapped item(s) <span style="font-size:10px;text-decoration:underline;margin-left:2px;">(jump)</span>`
+          : `<span>✓</span> All items linked`}
+      </button>
+
+      <button type="button" class="btn primary" id="btn-next-step2" ${isBlocked ? 'disabled style="opacity:0.6; cursor:not-allowed;" title="All ingredients must be linked before proceeding"' : ''}>
+        Next: Final Inline Review →
+      </button>
     </div>
   `;
 }
@@ -64,8 +76,6 @@ export function renderState2Mapping() {
       const qty = Number(item.qty) || 1;
       item.qty = qty;
 
-      const fallbackBadge = '';
-
       const isStock = String(item.name || '').toLowerCase().includes('stock') || String(item.name || '').toLowerCase().includes('bouillon') || String(item.name || '').toLowerCase().includes('cube') || String(item.raw || '').toLowerCase().includes('stock') || String(item.raw || '').toLowerCase().includes('bouillon') || String(item.raw || '').toLowerCase().includes('cube');
 
       if (isStock && item.waterMl === undefined) {
@@ -75,6 +85,7 @@ export function renderState2Mapping() {
       }
 
       const rawDisplay = item.raw || `${qty} ${item.unit || 'g'} ${item.name || ''}`.trim();
+      const isUnlinked = isIngredientUnlinked(item, productsBank, ingredientsBank);
 
       const waterInputHtml = isStock ? `
         <div style="margin-top: 4px; display: flex; align-items: center; gap: 4px;">
@@ -93,149 +104,172 @@ export function renderState2Mapping() {
         </div>
       ` : '';
 
+      const isFirst = iIdx === 0;
+      const isLast = iIdx === (sec.ingredients || []).length - 1;
+
       rowsHtml += `
-        <tr style="border-bottom: 1px solid var(--border, #eee);">
-          <td style="padding: 6px;">
-            <div style="font-size: 11px; color: var(--text2, #666); font-style: italic;">Raw: "${escapeHtml(rawDisplay)}"</div>
-            ${fallbackBadge}
+        <tr id="wiz-ing-row-${sIdx}-${iIdx}" data-sidx="${sIdx}" data-iidx="${iIdx}" class="${isUnlinked ? 'wiz-row-unlinked' : ''}" style="border-bottom: 1px solid var(--border, #eee); ${isUnlinked ? 'border-left: 3px solid #f43f5e;' : ''}">
+          <td style="padding: 4px 4px; width: 32px; text-align: center; vertical-align: top;">
+            <div style="display: flex; flex-direction: column; gap: 2px; align-items: center; padding-top: 2px;">
+              <button type="button" class="btn sm ghost wiz-reorder-btn" data-direction="up" data-sidx="${sIdx}" data-iidx="${iIdx}" ${isFirst ? 'disabled' : ''} title="Move up" style="padding: 1px 3px; font-size: 10px; line-height: 1; min-width: 20px; ${isFirst ? 'opacity: 0.3; cursor: not-allowed;' : ''}">▲</button>
+              <button type="button" class="btn sm ghost wiz-reorder-btn" data-direction="down" data-sidx="${sIdx}" data-iidx="${iIdx}" ${isLast ? 'disabled' : ''} title="Move down" style="padding: 1px 3px; font-size: 10px; line-height: 1; min-width: 20px; ${isLast ? 'opacity: 0.3; cursor: not-allowed;' : ''}">▼</button>
+            </div>
           </td>
-          <td style="padding: 6px; width: 75px;">
-            <input type="number" step="any" id="wiz-ing-qty-${sIdx}-${iIdx}" name="wiz_ing_qty_${sIdx}_${iIdx}" aria-label="Quantity for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-qty" data-sidx="${sIdx}" data-iidx="${iIdx}" value="${qty}" style="width: 100%; padding: 4px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px;" />
+          <td style="padding: 4px 6px; width: 125px; vertical-align: top;">
+            <div style="display: flex; gap: 4px; align-items: center;">
+              <input type="number" step="any" id="wiz-ing-qty-${sIdx}-${iIdx}" name="wiz_ing_qty_${sIdx}_${iIdx}" aria-label="Quantity for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-qty" data-sidx="${sIdx}" data-iidx="${iIdx}" value="${qty}" style="width: 54px; padding: 4px 6px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px; font-weight: 600;" />
+              <select id="wiz-ing-unit-${sIdx}-${iIdx}" name="wiz_ing_unit_${sIdx}_${iIdx}" aria-label="Unit for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-unit" data-sidx="${sIdx}" data-iidx="${iIdx}" style="width: 62px; padding: 4px 4px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px;">
+                ${['g', 'ml', 'qty'].map(u => `<option value="${u}" ${u === item.unit ? 'selected' : ''}>${u}</option>`).join('')}
+              </select>
+            </div>
           </td>
-          <td style="padding: 6px; width: 75px;">
-            <select id="wiz-ing-unit-${sIdx}-${iIdx}" name="wiz_ing_unit_${sIdx}_${iIdx}" aria-label="Unit for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-unit" data-sidx="${sIdx}" data-iidx="${iIdx}" style="width: 100%; padding: 4px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px;">
-              ${['g', 'ml', 'qty'].map(u => `<option value="${u}" ${u === item.unit ? 'selected' : ''}>${u}</option>`).join('')}
-            </select>
-          </td>
-          <td style="padding: 6px;">
-            <input type="text" id="wiz-ing-name-${sIdx}-${iIdx}" name="wiz_ing_name_${sIdx}_${iIdx}" aria-label="Ingredient name for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-name" data-sidx="${sIdx}" data-iidx="${iIdx}" value="${escapeAttr(item.name)}" style="width: 100%; padding: 4px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px;" />
+          <td style="padding: 4px 6px; vertical-align: top;">
+            <input type="text" id="wiz-ing-name-${sIdx}-${iIdx}" name="wiz_ing_name_${sIdx}_${iIdx}" aria-label="Ingredient name for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-name" data-sidx="${sIdx}" data-iidx="${iIdx}" value="${escapeAttr(item.name)}" style="width: 100%; padding: 4px 8px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px;" />
+            <div class="wiz-raw-subtext" title="Raw: &quot;${escapeAttr(rawDisplay)}&quot;">Raw: "${escapeHtml(rawDisplay)}"</div>
             ${waterInputHtml}
           </td>
-          <td style="padding: 6px; min-width: 220px;">
+          <td style="padding: 4px 6px; min-width: 250px; vertical-align: top;">
             ${renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank, productsBank)}
           </td>
-          <td style="padding: 6px; width: 36px; text-align: center;">
-            <button type="button" class="btn sm danger ghost wiz-del-ing-btn" data-sidx="${sIdx}" data-iidx="${iIdx}" title="Delete ingredient">🗑️</button>
+          <td style="padding: 4px 4px; width: 34px; text-align: center; vertical-align: top;">
+            <button type="button" class="btn sm danger ghost wiz-del-ing-btn" data-sidx="${sIdx}" data-iidx="${iIdx}" title="Delete ingredient" style="padding: 4px 6px; font-size: 12px;">🗑️</button>
           </td>
         </tr>
       `;
     });
 
     sectionsHtml += `
-      <div style="background: var(--surface2, #f9f8f6); border: 1px solid var(--border, #e5e7eb); padding: 12px; border-radius: 10px; margin-bottom: 14px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <input type="text" id="wiz-section-title-input-${sIdx}" name="wiz_section_title_input_${sIdx}" aria-label="Section title for section ${sIdx}" class="wiz-section-title-input" data-sidx="${sIdx}" value="${escapeAttr(sec.sectionTitle)}" style="font-weight: 700; font-size: 14px; padding: 4px 8px; border: 1px solid var(--border, #ccc); border-radius: 6px; width: 60%; background: var(--surface);" />
+      <div class="wiz-section-card" data-sidx="${sIdx}" style="background: var(--surface2, #f9f8f6); border: 1px solid var(--border, #e5e7eb); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+            <input type="text" id="wiz-section-title-input-${sIdx}" name="wiz_section_title_input_${sIdx}" aria-label="Section title for section ${sIdx}" class="wiz-section-title-input" data-sidx="${sIdx}" value="${escapeAttr(sec.sectionTitle)}" style="font-weight: 700; font-size: 13px; padding: 4px 8px; border: 1px solid var(--border, #ccc); border-radius: 6px; width: 60%; max-width: 280px; background: var(--surface);" />
+            <span style="font-size: 11px; font-weight: 600; color: var(--text2, #6b7280); background: var(--border, #e5e7eb); padding: 2px 7px; border-radius: 999px;">
+              ${(sec.ingredients || []).length} items
+            </span>
+          </div>
           <div style="display: flex; align-items: center; gap: 6px;">
-            <button type="button" class="btn sm secondary wiz-add-line-btn" data-sidx="${sIdx}">+ Add Line</button>
-            <button type="button" class="btn sm ghost wiz-del-section-btn" data-sidx="${sIdx}" style="color: #ef4444;">Remove Section</button>
+            <button type="button" class="btn sm secondary wiz-add-line-btn" data-sidx="${sIdx}" style="padding: 2px 8px; font-size: 11px;">+ Add Line</button>
+            <button type="button" class="btn sm ghost wiz-del-section-btn" data-sidx="${sIdx}" style="color: #ef4444; padding: 2px 6px; font-size: 11px;">Remove Section</button>
           </div>
         </div>
         <table style="width: 100%; border-collapse: collapse;">
           <tbody>
-            ${rowsHtml || '<tr><td colspan="6" style="padding: 8px; color: var(--text2); font-size: 12px;">No ingredients in section.</td></tr>'}
+            ${rowsHtml || '<tr><td colspan="5" style="padding: 8px; color: var(--text2); font-size: 12px;">No ingredients in section.</td></tr>'}
           </tbody>
         </table>
       </div>
     `;
   });
 
-  // Method steps rendering with delete buttons
+  // Compact Method steps rendering with delete buttons (preserve blank steps added via + Add Step)
   let stepsHtml = '';
-  const rawMethodSteps = recipe.methodSteps || recipe.steps || recipe.method || recipe.instructions || [];
-  const normalizedSteps = Array.isArray(rawMethodSteps)
-    ? rawMethodSteps.map(s => typeof s === 'string' ? s : (s?.text || s?.instruction || s?.step || String(s || ''))).filter(Boolean)
-    : (typeof rawMethodSteps === 'string' ? rawMethodSteps.split('\n').filter(Boolean) : []);
+  const hasExplicitMethodStepsArray = Array.isArray(recipe.methodSteps);
+  const rawMethodSteps = hasExplicitMethodStepsArray
+    ? recipe.methodSteps
+    : (recipe.steps || recipe.method || recipe.instructions || []);
+  const normalizedSteps = hasExplicitMethodStepsArray
+    ? rawMethodSteps.map(s => typeof s === 'string' ? s : (s?.text || s?.instruction || s?.step || String(s ?? '')))
+    : (Array.isArray(rawMethodSteps)
+        ? rawMethodSteps.map(s => typeof s === 'string' ? s : (s?.text || s?.instruction || s?.step || String(s ?? ''))).filter(Boolean)
+        : (typeof rawMethodSteps === 'string' ? rawMethodSteps.split('\n').filter(Boolean) : []));
   normalizedSteps.forEach((step, idx) => {
     stepsHtml += `
-      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
-        <span style="font-size: 12px; font-weight: 700; color: var(--text2); width: 24px; text-align: right;">${idx + 1}.</span>
-        <input type="text" id="wiz-step-input-${idx}" name="wiz_step_input_${idx}" aria-label="Method step instruction for step ${idx + 1}" class="wiz-step-input" data-idx="${idx}" value="${escapeAttr(step)}" style="flex: 1; padding: 6px 10px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 13px; background: var(--surface);" />
-        <button type="button" class="btn sm danger ghost wiz-del-step-btn" data-idx="${idx}" title="Delete step">🗑️</button>
+      <div style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 6px;">
+        <span style="font-size: 11px; font-weight: 700; color: var(--text2); width: 20px; text-align: right; padding-top: 6px;">${idx + 1}.</span>
+        <textarea id="wiz-step-input-${idx}" name="wiz_step_input_${idx}" aria-label="Method step instruction for step ${idx + 1}" class="wiz-step-input" data-idx="${idx}" rows="1" style="flex: 1; min-height: 32px; height: 32px; padding: 5px 8px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12.5px; font-family: inherit; line-height: 1.35; background: var(--surface); resize: vertical; overflow-y: hidden;">${escapeHtml(step)}</textarea>
+        <button type="button" class="btn sm danger ghost wiz-del-step-btn" data-idx="${idx}" title="Delete step" style="margin-top: 2px; padding: 3px 6px; font-size: 11px;">🗑️</button>
       </div>
     `;
   });
 
   const currentVariant = wizardState.activeVariant || 'original';
+  const isEnhancedTab = currentVariant === 'enhanced';
+  const hasEnhanced = Boolean(
+    activeRecipe.enhanced ||
+    wizardState.baseOriginalRecipe?.enhanced ||
+    wizardState.variantSnapshots?.enhanced
+  );
   recalculateWizardMacros(activeRecipe);
   const targetMealType = activeRecipe.mealSuitability?.[0] || activeRecipe.types?.[0] || activeRecipe.type || 'dinner';
   const fitTagHtml = renderFitScoreBadge(activeRecipe, targetMealType, {
     variant: currentVariant,
     showLabel: true
   });
-  const macroCrossbarHtml = renderMacroBreakdownCrossbar(activeRecipe, currentVariant);
-  const macrosSummaryHtml = renderStep2MacrosSummaryHTML(activeRecipe);
+  const macroCrossbarHtml = renderMacroBreakdownCrossbar(activeRecipe, currentVariant, { compact: true, mealType: targetMealType });
+
+  const selectedSuitability = activeRecipe.mealSuitability || activeRecipe.types || ['Dinner'];
+  const normalizedSuitability = Array.isArray(selectedSuitability)
+    ? selectedSuitability.map(s => String(s).toLowerCase())
+    : [String(selectedSuitability).toLowerCase()];
+  const mealTagsHtml = MEAL_TAGS.map(tag => {
+    const isSelected = normalizedSuitability.includes(tag.toLowerCase());
+    return `<label class="wiz-step2-meal-tag-label" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; padding: 2px 8px; border: 1px solid var(--border, #cbd5e1); border-radius: 999px; background: ${isSelected ? 'var(--purple-bg, #eef2ff)' : 'var(--surface, #fff)'}; color: ${isSelected ? 'var(--purple, #4f46e5)' : 'var(--text2, #475569)'}; cursor: pointer; user-select: none;">
+      <input type="checkbox" id="wiz-step2-tag-${tag.toLowerCase()}" name="wiz_step2_meal_tag" class="wiz-step2-meal-tag" value="${tag}" ${isSelected ? 'checked' : ''} style="display: none;" />
+      ${tag}
+    </label>`;
+  }).join(' ');
+
+  const step2VariantToggleHtml = hasEnhanced ? `
+    <div class="variant-toggle" id="wiz-step2-variant-toggle" style="display: inline-flex; background: var(--surface, #fff); padding: 2px; border-radius: 8px; border: 1px solid var(--border, #ccc);">
+      <button type="button" class="btn sm ${!isEnhancedTab ? 'primary' : 'ghost'}" id="wiz-step2-tab-original" style="padding: 3px 10px; font-size: 11.5px; font-weight: 600;">
+        Original
+      </button>
+      <button type="button" class="btn sm ${isEnhancedTab ? 'primary' : 'ghost'}" id="wiz-step2-tab-enhanced" style="padding: 3px 10px; font-size: 11.5px; font-weight: 600;">
+        ✨ Enhanced
+      </button>
+    </div>
+  ` : '';
 
   return `
     <div>
-      <div style="background: var(--surface2, #f8fafc); border: 1px solid var(--border, #e2e8f0); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px;">
+      <div class="wiz-step2-header-container" style="background: var(--surface2, #f8fafc); border: 1px solid var(--border, #e2e8f0); border-radius: 8px; padding: 6px 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: #e0e7ff; color: #4338ca; padding: 2px 7px; border-radius: 4px;">
             Dish ${wizardState.currentQueueIndex || 1} of ${wizardState.initialQueueTotal || wizardState.processingQueue?.length || 1}
           </span>
-          <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text, #0f172a);">
+          <h3 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--text, #0f172a); max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeAttr(toTitleCase(activeRecipe.title || 'Untitled Recipe'))}">
             ${escapeHtml(toTitleCase(activeRecipe.title || 'Untitled Recipe'))}
           </h3>
-          ${currentVariant === 'enhanced' ? '<span class="badge" style="background:#dcfce7;color:#15803d;font-weight:700;">✨ Enhanced Variant</span>' : ''}
+          ${step2VariantToggleHtml}
+          <div id="wiz-step2-fit-badge-container" style="display: inline-flex; align-items: center;">
+            ${fitTagHtml}
+          </div>
+          <div id="wiz-step2-macro-crossbar-container" style="display: inline-flex; align-items: center;">
+            ${macroCrossbarHtml}
+          </div>
         </div>
-        <div id="wiz-step2-fit-badge-container" style="display: flex; align-items: center;">
-          ${fitTagHtml}
-        </div>
-      </div>
-
-      <div id="wiz-step2-macro-crossbar-container" style="margin-bottom: 12px;">
-        ${macroCrossbarHtml}
-      </div>
-
-      <div class="wiz-servings-banner" id="wiz-servings-banner" style="background: var(--purple-bg, #eef2ff); border: 1px solid rgba(79,70,229,0.2); padding: 10px 16px; border-radius: 10px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 14px; font-weight: 600; color: var(--purple, #4f46e5);">Recipe Mapping</span>
-          <span style="font-size: 12px; color: var(--text2, #666);">Canonical Author Quantities</span>
-        </div>
-        <div id="wiz-step2-macros-summary-container">
-          ${macrosSummaryHtml}
-        </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <label for="wiz-servings-input" style="font-size: 13px; font-weight: 600; color: var(--text, #111);">Yield:</label>
-          <input type="number" id="wiz-servings-input" min="1" max="50" step="1" value="${servings}" style="width: 55px; text-align: center; font-size: 13px; font-weight: 700; padding: 4px; border: 1px solid var(--border, #ccc); border-radius: 6px;">
-          <span style="font-size: 12px; color: var(--text2, #666);">servings</span>
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span style="font-size: 11px; font-weight: 600; color: var(--text2, #64748b);">Meal:</span>
+            <div class="wiz-step2-meal-tags-container" style="display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+              ${mealTagsHtml}
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label for="wiz-servings-input" style="font-size: 12px; font-weight: 600; color: var(--text2, #555);">Yield:</label>
+            <input type="number" id="wiz-servings-input" min="1" max="50" step="1" value="${servings}" style="width: 48px; text-align: center; font-size: 12px; font-weight: 700; padding: 2px 4px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--surface);">
+            <span style="font-size: 11px; color: var(--text2, #666);">servings</span>
+          </div>
         </div>
       </div>
 
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-        <h4 style="margin: 0; font-size: 15px; font-weight: 700;">Ingredient Sections</h4>
-        <button type="button" id="wiz-add-section-btn" class="btn sm secondary">+ Add Section Header</button>
+        <h4 style="margin: 0; font-size: 14px; font-weight: 700;">Ingredient Sections</h4>
+        <button type="button" id="wiz-add-section-btn" class="btn sm secondary" style="padding: 2px 8px; font-size: 11px;">+ Add Section Header</button>
       </div>
 
       ${sectionsHtml}
 
-      <div style="display: flex; justify-content: space-between; align-items: center; margin: 16px 0 8px;">
-        <h4 style="margin: 0; font-size: 15px; font-weight: 700;">Method Steps (${(recipe.methodSteps || []).length})</h4>
-        <button type="button" id="wiz-add-step-btn" class="btn sm secondary">+ Add Step</button>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin: 14px 0 6px;">
+        <h4 style="margin: 0; font-size: 14px; font-weight: 700;">Method Steps (${normalizedSteps.length})</h4>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          ${isEnhancedTab ? '<button type="button" id="wiz-copy-method-btn" class="btn sm secondary" style="padding: 2px 8px; font-size: 11px;">📋 Copy Method from Original Recipe</button>' : ''}
+          <button type="button" id="wiz-add-step-btn" class="btn sm secondary" style="padding: 2px 8px; font-size: 11px;">+ Add Step</button>
+        </div>
       </div>
 
       <div style="margin-bottom: 20px;">
         ${stepsHtml || '<p style="color:var(--text2);font-size:12px;">No method steps.</p>'}
-      </div>
-
-      ${(() => {
-        const allIngs = (recipe.ingredientSections || []).flatMap(s => s.ingredients || []);
-        const unlinkedIngs = allIngs.filter(i => isIngredientUnlinked(i, productsBank, ingredientsBank));
-        if (!unlinkedIngs.length) return '';
-        return `
-          <div class="wiz-gate-warning" id="wiz-gate-warning-banner" style="margin-bottom: 12px; padding: 10px 14px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; color: #9f1239; font-size: 12.5px; display: flex; align-items: center; gap: 8px;">
-            <span>⚠️</span> <span><strong>Action Required:</strong> ${unlinkedIngs.length} ingredient(s) retain an unlinked "✨ New Item" status. Please click the search picker for each item to select or link it to a valid Category, Item, or Sub-Type before proceeding.</span>
-          </div>
-        `;
-      })()}
-
-      <div style="display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border, #eee); padding-top: 14px;">
-        <button type="button" class="btn ghost" id="wizard-back-btn">← Back</button>
-        ${(() => {
-          const allIngs = (recipe.ingredientSections || []).flatMap(s => s.ingredients || []);
-          const unlinked = allIngs.filter(i => isIngredientUnlinked(i, productsBank, ingredientsBank));
-          const isDisabled = unlinked.length > 0;
-          return `<button type="button" class="btn primary" id="btn-next-step2" ${isDisabled ? 'disabled style="opacity:0.6; cursor:not-allowed;" title="All ingredients must be linked before proceeding"' : ''}>Next: Final Inline Review →</button>`;
-        })()}
       </div>
     </div>
   `;

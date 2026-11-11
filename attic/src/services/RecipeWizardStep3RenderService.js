@@ -8,11 +8,11 @@ import { escapeHtml, escapeAttr } from '../utils/stringUtils.js';
 export function renderStep3Template(wizardData, showProductSearch, productSearchQuery) {
   return `
     <div style="display: flex; flex-direction: column; gap: 16px;">
-      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px 14px; border-radius: 10px; font-size: 12.5px; color: #166534; display: flex; align-items: flex-start; gap: 8px;">
+      <div style="background: var(--badge-green-bg); border: 1px solid var(--badge-green-border); padding: 12px 14px; border-radius: 10px; font-size: 12.5px; color: var(--badge-green-text); display: flex; align-items: flex-start; gap: 8px;">
         <span style="font-size: 16px; margin-top: -1px;">✅</span>
         <div style="flex: 1; min-width: 0;">
           <strong style="font-size: 13px;">Hierarchy Structured:</strong>
-          <div style="font-size: 12px; color: #15803d; margin-top: 3px; line-height: 1.4;">
+          <div style="font-size: 12px; color: var(--badge-green-text); margin-top: 3px; line-height: 1.4;">
             Category ➔ <strong>${escapeHtml(wizardData.selectedCategory)}</strong> | Item ➔ <strong>${escapeHtml(wizardData.newItemName)}</strong> | Sub-Type ➔ <strong>${escapeHtml(wizardData.subTypeName)}</strong>
           </div>
         </div>
@@ -27,12 +27,12 @@ export function renderStep3Template(wizardData, showProductSearch, productSearch
         </p>
 
         ${wizardData.linkedProduct ? `
-          <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; margin-bottom: 10px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--badge-green-bg); border: 1px solid var(--badge-green-border); border-radius: 8px; margin-bottom: 10px;">
             <div>
-              <strong style="font-size: 13px; color: #065f46;">🛒 ${escapeHtml(wizardData.linkedProduct.name || wizardData.linkedProduct.title)}</strong>
-              <div style="font-size: 11.5px; color: #047857; margin-top: 2px;">${escapeHtml(wizardData.linkedProduct.brand || 'Tesco')} · £${Number(wizardData.linkedProduct.price || 0).toFixed(2)}</div>
+              <strong style="font-size: 13px; color: var(--badge-green-text);">🛒 ${escapeHtml(wizardData.linkedProduct.name || wizardData.linkedProduct.title)}</strong>
+              <div style="font-size: 11.5px; color: var(--badge-green-text); margin-top: 2px;">${escapeHtml(wizardData.linkedProduct.brand || 'Tesco')} · £${Number(wizardData.linkedProduct.price || 0).toFixed(2)}</div>
             </div>
-            <button type="button" id="btn-remove-linked-product" class="btn ghost" style="font-size: 11px; padding: 4px 8px; color: #dc2626;">Unlink</button>
+            <button type="button" id="btn-remove-linked-product" class="btn ghost" style="font-size: 11px; padding: 4px 8px; color: var(--system-red);">Unlink</button>
           </div>
         ` : `
           <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">

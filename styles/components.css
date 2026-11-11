@@ -33,7 +33,7 @@ textarea{resize:vertical;min-height:90px}
 /* Buttons */
 .btn,.btn-primary,.btn-secondary,.btn-outline,.btn-ghost{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border:1px solid var(--border);border-radius:var(--radius-sm, 6px);background:var(--surface);color:var(--text);font-size:13px;cursor:pointer;font-family:var(--font);transition:all .15s;font-weight:600}
 .btn:hover{background:var(--surface2)}
-.btn.primary,.btn-primary{background:var(--text);color:#fff;border-color:transparent;font-weight:650}
+.btn.primary,.btn-primary{background:var(--tint-color);color:#fff;border-color:transparent;font-weight:650}
 .btn.primary:hover,.btn-primary:hover{opacity:.88}
 .btn.secondary,.btn-secondary{background:var(--surface2);color:var(--text);border-color:var(--border)}
 .btn.secondary:hover,.btn-secondary:hover{background:var(--surface3, #E6E4DC)}
@@ -115,7 +115,7 @@ textarea{resize:vertical;min-height:90px}
 /* INGREDIENT BANK */
 .cat-filter{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
 .cf{padding:4px 11px;border:1px solid var(--border);border-radius:14px;font-size:12px;cursor:pointer;color:var(--text2);background:var(--surface);white-space:nowrap;transition:all .15s}
-.cf.active{background:var(--text);color:#fff;border-color:transparent}
+.cf.active{background:var(--tint-color);color:#fff;border-color:transparent}
 .bank-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px}
 .rank{display:inline-flex;align-items:center;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:500}
 .rank-high{background:var(--green-bg);color:var(--green)}
@@ -950,4 +950,67 @@ details.shop-item-details[open] > summary { border-bottom: 1px dashed var(--bord
   padding: 16px;
   -webkit-overflow-scrolling: touch;
 }
+
+.ios-fullscreen-footer {
+  height: 60px;
+  min-height: 60px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--ios-material-chrome, var(--surface, #ffffff));
+  backdrop-filter: var(--ios-blur, blur(20px));
+  -webkit-backdrop-filter: var(--ios-blur, blur(20px));
+  border-top: 0.5px solid var(--separator, var(--border, #e5e5e5));
+  z-index: 10;
+  padding-bottom: max(0px, env(safe-area-inset-bottom));
+}
+
+.wiz-gate-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  background: none;
+}
+
+.wiz-gate-pill.blocked {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #e11d48;
+}
+
+.wiz-gate-pill.blocked:hover {
+  background: #ffe4e6;
+}
+
+.wiz-gate-pill.ready {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #16a34a;
+}
+
+.wiz-raw-subtext {
+  font-size: 10.5px;
+  color: var(--text2, #6b7280);
+  font-style: italic;
+  margin-top: 2px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+.wiz-row-unlinked {
+  background: rgba(239, 68, 68, 0.04);
+}
+
 

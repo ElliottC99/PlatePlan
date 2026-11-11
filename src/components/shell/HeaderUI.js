@@ -20,7 +20,6 @@ export function renderHeaderUI({ version = 'v3.30.0', syncStatus = 'Local only',
           <span>Menu</span>
         </button>
         <button id="sync-status" class="sync-pill" data-status="local" onclick="openPlatePlanSyncPanel()" title="PlatePlan sync status">${syncStatus}</button>
-        <button id="syncNowTopBtn" class="btn ghost sync-now-btn" type="button" data-action="sync-now" title="Sync now with cloud" style="padding:4px 8px;font-size:12px">Sync Now</button>
         <button id="logoutBtn" class="btn ghost" type="button" data-action="logout" title="Log out of PlatePlan" style="padding:4px 8px;font-size:12px">Log Out</button>
         <span id="sync-user" class="sync-user-label" style="font-size:11px;color:var(--text3)">${userEmail}</span>
       </div>

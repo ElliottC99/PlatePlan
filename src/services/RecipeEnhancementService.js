@@ -1181,6 +1181,8 @@ export function buildEnhancedRecipePayload(originalRecipe, adjustedIngredients, 
       total,
       perServing
     },
+    fitScore: calculatedMacros?.fitScore ?? calculatedMacros?.liveScore ?? null,
+    _computedFitScore: calculatedMacros?.fitScore ?? calculatedMacros?.liveScore ?? null,
     changes: changesList || 'Nutritionally optimized for household macro targets.',
     ingredientSections: finalSections,
     ingredients: finalIngredients,

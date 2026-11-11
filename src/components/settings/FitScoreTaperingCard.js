@@ -212,8 +212,8 @@ export function renderFitScoreTaperingCard(prefs = {}) {
       </div>
 
       <!-- Live Curve Preview -->
-      <div style="background:rgba(37,99,235,0.04);border:1px solid rgba(37,99,235,0.15);padding:10px 12px;border-radius:8px">
-        <div style="font-size:11px;font-weight:700;color:var(--primary,#2563eb);margin-bottom:8px">
+      <div style="background:var(--tint-color-muted);border:1px solid var(--badge-green-border);padding:10px 12px;border-radius:8px">
+        <div style="font-size:11px;font-weight:700;color:var(--tint-color);margin-bottom:8px">
           📈 LIVE TAPERING PREVIEW (IF BOTH CALORIES &amp; PROTEIN ARE AT % OF TARGET)
         </div>
         <div id="pp-fit-tapering-preview-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(95px, 1fr));gap:6px">

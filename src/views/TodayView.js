@@ -16,7 +16,7 @@ import {
   isMealEatenOnDate,
   calculateMealEatenUpdates
 } from '../services/TodayViewService.js';
-import { getPlanSlotInfo } from '../services/MealPlanGeneratorService.js';
+import { getPlanSlotInfo, getPlannedSlotNutrition } from '../services/MealPlanGeneratorService.js';
 import { renderFitScoreBadge } from '../components/FitScoreBadge.js';
 import { saveCurrentPlan } from '../services/HouseholdRepository.js';
 import { escapeAttr, escapeHtml } from '../utils/stringUtils.js';
@@ -26,6 +26,7 @@ import { renderTodayMacrosCard, renderTodayMealCard } from './TodayRenderService
 
 let currentDateStr = getPlatePlanLocalToday();
 let stateUnsub = null;
+let prefsUnsub = null;
 
 export function getSelectedTodayDate() {
   return currentDateStr;
@@ -110,30 +111,9 @@ export function renderToday() {
     getTodayMealCards(dayPlan, slot.type).map(card => ({ slot, ...card }))
   );
 
-  const dayTotals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
-  allMealCards.forEach(({ info }) => {
-    const r = info?.active;
-    if (r) {
-      dayTotals.calories += Number(r.nutrition?.perServing?.cal ?? r.macros?.calories ?? 0);
-      dayTotals.protein += Number(r.nutrition?.perServing?.prot ?? r.macros?.protein ?? 0);
-      dayTotals.carbs += Number(r.nutrition?.perServing?.carb ?? r.macros?.carbs ?? 0);
-      dayTotals.fat += Number(r.nutrition?.perServing?.fat ?? r.macros?.fat ?? 0);
-    }
-  });
+  const { totals, targets, profileNames } = computeTodayNutritionSummary(dayPlan, plan, state);
 
-  const rawTargets = state.preferences?.nutritionTargets?.both || 
-                     state.preferences?.nutritionTargets?.elliott || 
-                     state.userPrefs?.nutritionTargets?.elliott || 
-                     { calories: 2000, protein: 130, carbs: 220, fat: 65 };
-
-  const targets = {
-    calories: Number(rawTargets.calories || rawTargets.cal || 2000),
-    protein: Number(rawTargets.protein || rawTargets.prot || 130),
-    carbs: Number(rawTargets.carbs || rawTargets.carb || 220),
-    fat: Number(rawTargets.fat || 65)
-  };
-
-  const macrosHtml = renderTodayMacrosCard(dayTotals, targets);
+  const macrosHtml = renderTodayMacrosCard(totals, targets, profileNames);
   const cardsHtml = allMealCards.map(({ slot, ...card }) => 
     renderTodayMealCard(slot, card, eatenMeals, dayKey, currentDateStr)
   ).join('');
@@ -143,6 +123,72 @@ export function renderToday() {
       <div style="font-size: 13px; color: var(--secondary-label);">No meals assigned to this day.</div>
     </div>
   `);
+}
+
+/**
+ * Computes per-person planned daily Calorie and Protein totals and targets for Elliott and Chloe.
+ */
+export function computeTodayNutritionSummary(dayPlan = {}, plan = null, stateObj = null) {
+  const state = stateObj || getState() || {};
+  const activePlan = plan || state.currentPlan || {};
+
+  const totals = {
+    elliott: { calories: 0, protein: 0 },
+    chloe: { calories: 0, protein: 0 }
+  };
+
+  const resolveSlot = slotData => {
+    if (!slotData || slotData.isSkipped || slotData.skipped) return null;
+    const info = getPlanSlotInfo(slotData);
+    return info && info.active ? info : null;
+  };
+
+  ['breakfast', 'lunch', 'dinner', 'snack'].forEach(mealType => {
+    const rawE = dayPlan[`${mealType}E`];
+    const rawC = dayPlan[`${mealType}C`];
+    const legacy = (!rawE && !rawC) ? dayPlan[mealType] : null;
+
+    const infoE = resolveSlot(rawE || legacy);
+    if (infoE) {
+      const nutE = getPlannedSlotNutrition(infoE.active, `${mealType}E`, infoE.instanceId, activePlan);
+      totals.elliott.calories += Number(nutE?.cal || 0);
+      totals.elliott.protein += Number(nutE?.prot || 0);
+    }
+
+    const infoC = resolveSlot(rawC || legacy);
+    if (infoC) {
+      const nutC = getPlannedSlotNutrition(infoC.active, `${mealType}C`, infoC.instanceId, activePlan);
+      totals.chloe.calories += Number(nutC?.cal || 0);
+      totals.chloe.protein += Number(nutC?.prot || 0);
+    }
+  });
+
+  const profiles = state.preferences?.profiles || state.userPrefs?.profiles || state.prefs?.profiles || {};
+  const nutTargets = state.preferences?.nutritionTargets || state.userPrefs?.nutritionTargets || {};
+  const legacyPrefs = state.userPrefs || state.preferences || state.prefs || {};
+
+  const eProfile = profiles.elliott || profiles.e || {};
+  const cProfile = profiles.chloe || profiles.c || {};
+  const eNut = nutTargets.elliott || {};
+  const cNut = nutTargets.chloe || {};
+
+  const targets = {
+    elliott: {
+      calories: Number(eProfile.dailyKcal ?? eNut.dailyKcal ?? eNut.calories ?? legacyPrefs.elliottCal ?? 2100) || 2100,
+      protein: Number(eProfile.dailyProtein ?? eNut.dailyProtein ?? eNut.protein ?? legacyPrefs.elliottProt ?? 140) || 140
+    },
+    chloe: {
+      calories: Number(cProfile.dailyKcal ?? cNut.dailyKcal ?? cNut.calories ?? legacyPrefs.chloeCal ?? 1650) || 1650,
+      protein: Number(cProfile.dailyProtein ?? cNut.dailyProtein ?? cNut.protein ?? legacyPrefs.chloeProt ?? 105) || 105
+    }
+  };
+
+  const profileNames = {
+    elliott: eProfile.name || 'Elliott',
+    chloe: cProfile.name || 'Chloe'
+  };
+
+  return { totals, targets, profileNames };
 }
 
 /**
@@ -263,12 +309,21 @@ export function mount(container) {
       renderToday();
     });
   }
+  if (!prefsUnsub) {
+    prefsUnsub = subscribe('preferences', () => {
+      renderToday();
+    });
+  }
 }
 
 export function unmount() {
   if (typeof stateUnsub === 'function') {
     stateUnsub();
     stateUnsub = null;
+  }
+  if (typeof prefsUnsub === 'function') {
+    prefsUnsub();
+    prefsUnsub = null;
   }
 }
 

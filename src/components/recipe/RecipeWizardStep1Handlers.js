@@ -3,12 +3,14 @@
  * Event bindings for Wizard Step 0, Step 1A (Manual), Step 1B (Bulk), and Step 1.5 (Queue Review).
  */
 
-import { unpackAndSplitRecipeBlocks, parseSingleRecipeText } from '../../services/RecipeParserService.js';
+import { unpackAndSplitRecipeBlocks, parseSingleRecipeText, unpackCollapsedSteps } from '../../services/RecipeParserService.js';
 import { parseIngredientString, matchIngredientTaxonomy } from '../../services/RecipeImporter.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
 import { getState, updateState, reorderDraftRecipes } from '../../state/AppState.js';
 import { saveRecipe } from '../../services/HouseholdRepository.js';
-import { wizardState } from './RecipeWizardState.js';
+import { findExistingRecipeByTitle } from '../../services/RecipeFirestoreRepository.js';
+import { updateRecipeInStore } from '../../store/store.js';
+import { wizardState, stashActiveVariantSnapshot } from './RecipeWizardState.js';
 
 export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotice, loadNextRecipeFromQueue, closeRecipeWizard }) {
   if (!modalWrap) return;
@@ -36,7 +38,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
   modalWrap.querySelectorAll('.wiz-meal-tag').forEach(cb => {
     cb.onchange = () => {
       const selected = Array.from(modalWrap.querySelectorAll('.wiz-meal-tag:checked')).map(i => i.value);
-      wizardState.activeRecipe.mealSuitability = selected.length ? selected : ['Dinner'];
+      wizardState.activeRecipe.mealSuitability = selected;
       const parentLabel = cb.closest('label');
       if (parentLabel) {
         parentLabel.style.background = cb.checked ? 'var(--purple-bg, #eef2ff)' : 'var(--surface, #fff)';
@@ -45,17 +47,51 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
     };
   });
 
+  // Step 1A: Source type radios
+  modalWrap.querySelectorAll('.wiz-source-type-radio').forEach(radio => {
+    radio.onchange = () => {
+      const selectedType = radio.value || '';
+      wizardState.activeRecipe.sourceType = selectedType;
+      modalWrap.querySelectorAll('.wiz-source-type-pill').forEach(lbl => {
+        const inp = lbl.querySelector('input');
+        const isSel = inp && inp.checked;
+        lbl.style.background = isSel ? 'var(--purple-bg, #eef2ff)' : 'var(--surface, #fff)';
+        lbl.style.color = isSel ? 'var(--purple, #4f46e5)' : 'var(--text, #333)';
+        lbl.style.fontWeight = isSel ? '600' : '500';
+      });
+      const onlineDiv = modalWrap.querySelector('#wiz-source-online-fields');
+      const bookDiv = modalWrap.querySelector('#wiz-source-book-fields');
+      if (onlineDiv) onlineDiv.style.display = selectedType === 'online' ? 'block' : 'none';
+      if (bookDiv) bookDiv.style.display = selectedType === 'book' ? 'grid' : 'none';
+    };
+  });
+
   // Step 1A: Next
   const btnNext1A = modalWrap.querySelector('#btn-next-step1a');
   if (btnNext1A) {
     btnNext1A.onclick = () => {
+      const selectedMealTags = Array.from(modalWrap.querySelectorAll('.wiz-meal-tag:checked')).map(i => i.value);
+      wizardState.activeRecipe.mealSuitability = selectedMealTags;
+      if (selectedMealTags.length === 0) {
+        showWizardNotice('Please select at least one Meal Suitability tag (e.g. Breakfast, Lunch, Dinner, or Snacking) before proceeding.', 'warning');
+        return;
+      }
+
       const rawTitle = modalWrap.querySelector('#wiz-title')?.value.trim() || 'Untitled Recipe';
       const title = toTitleCase(rawTitle);
       const serv = parseInt(modalWrap.querySelector('#wiz-servings')?.value, 10) || 4;
-      const prepH = parseInt(modalWrap.querySelector('#wiz-prep-hours')?.value, 10) || 0;
-      const prepM = parseInt(modalWrap.querySelector('#wiz-prep-mins')?.value, 10) || 0;
-      const cookH = parseInt(modalWrap.querySelector('#wiz-cook-hours')?.value, 10) || 0;
-      const cookM = parseInt(modalWrap.querySelector('#wiz-cook-mins')?.value, 10) || 0;
+      const rawPrepH = modalWrap.querySelector('#wiz-prep-hours')?.value?.trim() ?? '';
+      const rawPrepM = modalWrap.querySelector('#wiz-prep-mins')?.value?.trim() ?? '';
+      const rawCookH = modalWrap.querySelector('#wiz-cook-hours')?.value?.trim() ?? '';
+      const rawCookM = modalWrap.querySelector('#wiz-cook-mins')?.value?.trim() ?? '';
+      const prepH = rawPrepH === '' ? '' : (parseInt(rawPrepH, 10) || 0);
+      const prepM = rawPrepM === '' ? '' : (parseInt(rawPrepM, 10) || 0);
+      const cookH = rawCookH === '' ? '' : (parseInt(rawCookH, 10) || 0);
+      const cookM = rawCookM === '' ? '' : (parseInt(rawCookM, 10) || 0);
+      const srcType = modalWrap.querySelector('input[name="wiz_source_type"]:checked')?.value ?? (wizardState.activeRecipe.sourceType || '');
+      const srcUrl = modalWrap.querySelector('#wiz-source-url')?.value?.trim() || '';
+      const srcBook = modalWrap.querySelector('#wiz-source-book')?.value?.trim() || '';
+      const srcPage = modalWrap.querySelector('#wiz-source-page')?.value?.trim() || '';
       const ingRaw = modalWrap.querySelector('#wiz-ingredients-raw')?.value.trim() || '';
       const metRaw = modalWrap.querySelector('#wiz-method-raw')?.value.trim() || '';
 
@@ -69,6 +105,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
         sectionTitle: toTitleCase(sec.sectionTitle),
         ingredients: sec.lines.map(line => {
           const parsed = parseIngredientString(line);
+          if (!parsed) return null;
           const matched = matchIngredientTaxonomy(parsed, ingredientsBank);
           const existing = existingIngs.find(e => 
             (e.raw && e.raw.trim().toLowerCase() === line.trim().toLowerCase()) ||
@@ -88,22 +125,25 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
             defaultProductId: existing?.defaultProductId || null,
             isNewTaxonomyItem: existing ? !!existing.isNewTaxonomyItem : !matched
           };
-        })
+        }).filter(Boolean)
       }));
 
-      const methodSteps = metRaw.split('\n')
-        .map(l => l.replace(/^\d+[\.\)]\s*/, '').trim())
-        .filter(Boolean);
+      const methodSteps = unpackCollapsedSteps(metRaw);
 
       wizardState.activeRecipe.title = title;
       wizardState.activeRecipe.servings = serv;
       wizardState.activeRecipe.serves = serv;
       wizardState.activeRecipe.prepTime = { hours: prepH, minutes: prepM };
       wizardState.activeRecipe.cookTime = { hours: cookH, minutes: cookM };
+      wizardState.activeRecipe.sourceType = srcType;
+      wizardState.activeRecipe.sourceUrl = srcUrl;
+      wizardState.activeRecipe.sourceBook = srcBook;
+      wizardState.activeRecipe.sourcePage = srcPage;
       wizardState.activeRecipe.ingredientsRaw = ingRaw;
       wizardState.activeRecipe.methodRaw = metRaw;
       wizardState.activeRecipe.ingredientSections = parsedSections.length ? parsedSections : [{ sectionTitle: 'Main Ingredients', ingredients: [] }];
       wizardState.activeRecipe.methodSteps = methodSteps;
+      stashActiveVariantSnapshot();
 
       wizardState.currentStep = 2;
       renderWizardModal();
@@ -133,6 +173,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
 
       wizardState.processingQueue = parsedRecipes;
       wizardState.currentQueueTotal = parsedRecipes.length;
+      wizardState.initialQueueTotal = parsedRecipes.length;
       wizardState.currentQueueIndex = 0;
       updateState({ draftRecipes: parsedRecipes });
 
@@ -210,16 +251,28 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
         try {
           for (const rec of recipes) {
             const allIngredients = (rec.ingredientSections || []).flatMap(s => s.ingredients || []);
+            const safeTitle = toTitleCase(rec.title || 'Untitled Recipe');
+            const cleanTitle = safeTitle.replace(/\s*\(enhanced\)\s*$/i, '');
+            const existingMatch = findExistingRecipeByTitle(getState()?.recipes || [], cleanTitle);
+
+            const suitability = rec.mealSuitability && rec.mealSuitability.length ? rec.mealSuitability : ['Dinner'];
+            const combinedSuitability = existingMatch && Array.isArray(existingMatch.mealSuitability)
+              ? Array.from(new Set([...existingMatch.mealSuitability, ...suitability]))
+              : suitability;
+            const normTypes = combinedSuitability.map(t => String(t).toLowerCase());
+
             const recipeToSave = {
-              id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-              name: rec.title,
-              title: rec.title,
+              id: existingMatch?.id || ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `recipe_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`),
+              name: cleanTitle,
+              title: cleanTitle,
               servings: rec.servings || 4,
               serves: rec.servings || 4,
               prepTime: rec.prepTime || { hours: 0, minutes: 15 },
               cookTime: rec.cookTime || { hours: 0, minutes: 30 },
               time: (rec.prepTime?.hours || 0) * 60 + (rec.prepTime?.minutes || 15) + (rec.cookTime?.hours || 0) * 60 + (rec.cookTime?.minutes || 30),
-              mealSuitability: rec.mealSuitability || ['Dinner'],
+              mealSuitability: combinedSuitability,
+              types: normTypes,
+              mealType: normTypes[0] || 'dinner',
               ingredientSections: rec.ingredientSections,
               ingredients: allIngredients.map(i => ({
                 name: i.name,
@@ -237,9 +290,19 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
               instructions: rec.instructions || rec.methodSteps || [],
               method: rec.instructions || rec.methodSteps || [],
               macros: rec.macros || { calories: 450, protein: 28, carbs: 40, fat: 16 },
-              createdAt: new Date().toISOString()
+              createdAt: existingMatch?.createdAt || new Date().toISOString()
             };
+            if (existingMatch?.enhanced) {
+              recipeToSave.enhanced = existingMatch.enhanced;
+              recipeToSave.enhancedFitScore = existingMatch.enhancedFitScore;
+              recipeToSave._scoreEnhanced = existingMatch._scoreEnhanced;
+            }
+            if (existingMatch?.isFavourite || existingMatch?.isFavorite) {
+              recipeToSave.isFavourite = true;
+              recipeToSave.isFavorite = true;
+            }
             await saveRecipe(recipeToSave);
+            updateRecipeInStore(recipeToSave);
           }
           wizardState.processingQueue = [];
           closeRecipeWizard();

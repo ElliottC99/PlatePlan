@@ -49,9 +49,18 @@ function renderComparisonBadge(actual, target) {
   return `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${bg};color:${color};line-height:1">${label}</span>`;
 }
 
-export function renderMacroBreakdownCrossbar(recipe, variant = 'original') {
-  const activeRec = (variant === 'enhanced' && recipe.enhanced) ? { ...recipe, ...recipe.enhanced } : recipe;
-  const targetMealType = activeRec.mealSuitability?.[0] || activeRec.types?.[0] || activeRec.type || 'dinner';
+export function renderMacroBreakdownCrossbar(recipe, variant = 'original', options = {}) {
+  const isCompact = options.compact === true;
+  const activeRec = (variant === 'enhanced' && recipe.enhanced)
+    ? {
+        ...recipe,
+        ...recipe.enhanced,
+        mealSuitability: recipe.enhanced.mealSuitability || recipe.mealSuitability,
+        types: recipe.enhanced.types || recipe.types,
+        type: recipe.enhanced.type || recipe.type || recipe.mealType
+      }
+    : recipe;
+  const targetMealType = options.mealType || activeRec.mealSuitability?.[0] || activeRec.types?.[0] || activeRec.type || 'dinner';
 
   // 1. Calculate Universal Fit Score & Dynamic Macros directly via calculateMealFitScore with portionScaled: true
   const fitResult = typeof calculateMealFitScore === 'function' ? calculateMealFitScore(activeRec, targetMealType, {
@@ -85,13 +94,30 @@ export function renderMacroBreakdownCrossbar(recipe, variant = 'original') {
     const isKcal = type === 'kcal';
     const isGood = isKcal ? diff <= 0 : diff >= 0;
     const sign = diff > 0 ? '+' : '';
-    const bg = isGood ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)';
-    const color = isGood ? '#166534' : '#991b1b';
-    const border = isGood ? '#86efac' : '#fca5a5';
+    const bg = isGood ? 'var(--badge-green-bg)' : 'var(--badge-red-bg)';
+    const color = isGood ? 'var(--badge-green-text)' : 'var(--badge-red-text)';
+    const border = isGood ? 'var(--badge-green-border)' : 'var(--badge-red-border)';
     return `<span style="display:inline-flex; align-items:center; justify-content:center; padding: 2px 6px; border-radius: 6px; background: ${bg}; color: ${color}; border: 1px solid ${border}; font-size: 10px; font-weight: 800; margin-left: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">${sign}${diff}${isKcal ? '' : 'g'}</span>`;
   };
 
   const servesCount = activeRec.servings || activeRec.serves || recipe.servings || recipe.serves || 2;
+
+  if (isCompact) {
+    return `
+      <div class="recipe-modal-crossbar-compact" style="display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px;">
+        <div style="display: flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4);">
+          <span style="font-weight:700;">👤 E (${eSharePct}%):</span>
+          <span>🔥 <strong>${eKcal}</strong> ${renderMacroBadge('kcal', kcalDiffE)}</span>
+          <span>💪 <strong>${eProt}g</strong> ${renderMacroBadge('prot', protDiffE)}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4);">
+          <span style="font-weight:700;">👤 C (${cSharePct}%):</span>
+          <span>🔥 <strong>${cKcal}</strong> ${renderMacroBadge('kcal', kcalDiffC)}</span>
+          <span>💪 <strong>${cProt}g</strong> ${renderMacroBadge('prot', protDiffC)}</span>
+        </div>
+      </div>
+    `;
+  }
 
   return `
     <div class="recipe-modal-crossbar" style="width: 100%; background: var(--surface2, #f5f4ee); border: 1px solid var(--border, #e5e5e5); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px;">
@@ -119,12 +145,16 @@ export function renderMacroBreakdownCrossbar(recipe, variant = 'original') {
 
 export function renderState3Review() {
   const recipe = wizardState.activeRecipe;
+  recalculateWizardMacros(recipe);
   const currentVariant = wizardState.activeVariant || 'original';
   const isEnhancedTab = currentVariant === 'enhanced';
   const displayRecipe = (isEnhancedTab && recipe.enhanced)
     ? {
         ...recipe,
         ...recipe.enhanced,
+        mealSuitability: recipe.enhanced.mealSuitability || recipe.mealSuitability,
+        types: recipe.enhanced.types || recipe.types,
+        type: recipe.enhanced.type || recipe.type || recipe.mealType,
         ingredientSections: recipe.ingredientSections || recipe.enhanced.ingredientSections,
         ingredients: (recipe.ingredientSections ? recipe.ingredientSections.flatMap(s => s.ingredients || []) : null) || recipe.ingredients || recipe.enhanced.ingredients,
         macros: recipe.macros || recipe.enhanced.macros,
@@ -147,16 +177,16 @@ export function renderState3Review() {
         <span style="font-size: 14px; font-weight: 700; color: var(--text, #0f172a);">
           ${escapeHtml(toTitleCase(recipe.title || 'Untitled Recipe'))}
         </span>
-        ${isEnhancedTab ? '<span class="badge" style="background:#dcfce7;color:#15803d;font-weight:700;">✨ Enhanced Variant</span>' : ''}
+        ${isEnhancedTab ? '<span class="badge" style="background:var(--badge-green-bg);color:var(--badge-green-text);font-weight:700;">✨ Enhanced Variant</span>' : ''}
       </div>
-      <div style="display: flex; align-items: center;">
+      <div id="wiz-step3-fit-badge-container" style="display: flex; align-items: center;">
         ${fitTagHtml}
       </div>
     </div>
   `;
 
   const saveBtnText = getSaveButtonLabel(recipe);
-  const macroCrossbarHtml = renderMacroBreakdownCrossbar(recipe, currentVariant);
+  const macroCrossbarHtml = `<div id="wiz-step3-macro-crossbar-container">${renderMacroBreakdownCrossbar(recipe, currentVariant, { mealType: targetMealType })}</div>`;
 
   let sectionsReviewHtml = '';
   const activeSections = displayRecipe.ingredientSections || [{ sectionTitle: 'Main Ingredients', ingredients: displayRecipe.ingredients || [] }];
@@ -197,11 +227,11 @@ export function renderState3Review() {
         const prodTitle = `${brandStr}${resolvedProduct.name || resolvedProduct.title || ''}`.trim();
         const searchUrl = resolvedProduct.tescoUrl || `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(prodTitle)}`;
         mainLineText += ` - <a href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(prodTitle)}</a>`;
-        taxLabel = `<span class="badge" style="background:#dcfce7; color:#15803d; border:1px solid #86efac; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Mapped</span>`;
+        taxLabel = `<span class="badge" style="background:var(--badge-green-bg); color:var(--badge-green-text); border:1px solid var(--badge-green-border); font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Mapped</span>`;
       } else if (!isUnlinked) {
-        taxLabel = `<span class="badge" style="background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Mapped</span>`;
+        taxLabel = `<span class="badge" style="background:var(--badge-blue-bg); color:var(--badge-blue-text); border:1px solid var(--badge-blue-border); font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Mapped</span>`;
       } else {
-        taxLabel = `<span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Unmapped</span>`;
+        taxLabel = `<span class="badge" style="background:var(--badge-red-bg); color:var(--badge-red-text); border:1px solid var(--badge-red-border); font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">Unmapped</span>`;
       }
 
       rows += `
@@ -236,11 +266,17 @@ export function renderState3Review() {
 
   let mealTagsHtml = MEAL_TAGS.map(tag => {
     const isSelected = (recipe.mealSuitability || []).includes(tag);
-    return `<label style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 8px; border: 1px solid var(--border, #ccc); border-radius: 999px; background: ${isSelected ? '#eef2ff' : '#fff'}; color: ${isSelected ? '#4f46e5' : '#333'}; cursor: pointer;">
+    return `<label style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 8px; border: 1px solid var(--border, #ccc); border-radius: 999px; background: ${isSelected ? 'var(--badge-blue-bg)' : 'var(--surface)'}; color: ${isSelected ? 'var(--badge-blue-text)' : 'var(--text)'}; cursor: pointer;">
       <input type="checkbox" id="wiz-review-tag-${tag.toLowerCase()}" name="wiz_review_tag_${tag.toLowerCase()}" aria-label="Review tag ${tag}" class="wiz-review-tag" value="${tag}" ${isSelected ? 'checked' : ''} style="display:none;" />
       ${tag}
     </label>`;
   }).join(' ');
+
+  const hasExplicitPrep = recipe.prepTime && (recipe.prepTime.hours !== '' || recipe.prepTime.minutes !== '');
+  const hasExplicitCook = recipe.cookTime && (recipe.cookTime.hours !== '' || recipe.cookTime.minutes !== '');
+  const prepTotalMins = hasExplicitPrep ? ((Number(recipe.prepTime.hours) || 0) * 60 + (Number(recipe.prepTime.minutes) || 0)) : '';
+  const cookTotalMins = hasExplicitCook ? ((Number(recipe.cookTime.hours) || 0) * 60 + (Number(recipe.cookTime.minutes) || 0)) : '';
+  const curSourceType = recipe.sourceType || '';
 
   return `
     <div>
@@ -280,16 +316,40 @@ export function renderState3Review() {
           <div>
             <label for="wiz-rev-prepm" style="display:block; font-size:11px; font-weight:600; color:var(--text2);">Prep / Cook (Mins)</label>
             <div style="display:flex; gap:4px;">
-              <input type="number" id="wiz-rev-prepm" name="rev_prepm" value="${(recipe.prepTime.hours * 60) + recipe.prepTime.minutes}" aria-label="Prep mins" style="width:50%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
-              <input type="number" id="wiz-rev-cookm" name="rev_cookm" value="${(recipe.cookTime.hours * 60) + recipe.cookTime.minutes}" aria-label="Cook mins" style="width:50%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
+              <input type="number" id="wiz-rev-prepm" name="rev_prepm" placeholder="Prep min" value="${prepTotalMins}" aria-label="Prep mins" style="width:50%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
+              <input type="number" id="wiz-rev-cookm" name="rev_cookm" placeholder="Cook min" value="${cookTotalMins}" aria-label="Cook mins" style="width:50%; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:13px; background: var(--surface);" />
             </div>
           </div>
         </div>
 
-        <div style="margin-bottom: 14px;">
-          <label style="display:block; font-size:11px; font-weight:600; color:var(--text2); margin-bottom: 4px;">Meal Suitability Tags</label>
+        <div style="margin-bottom: 12px;">
+          <label style="display:block; font-size:11px; font-weight:600; color:var(--text2); margin-bottom: 4px;">Meal Suitability Tags <span style="color:var(--danger,#ef4444);">*</span></label>
           <div style="display:flex; flex-wrap:wrap; gap:6px;" id="wiz-review-tags-box">
             ${mealTagsHtml}
+          </div>
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <label style="display:block; font-size:11px; font-weight:600; color:var(--text2); margin-bottom: 4px;">Recipe Source</label>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;" id="wiz-rev-source-type-box">
+            ${[
+              { val: '', label: 'None' },
+              { val: 'online', label: '🌐 Online (URL)' },
+              { val: 'book', label: '📖 Book' }
+            ].map(opt => {
+              const isSel = curSourceType === opt.val;
+              return `<label class="wiz-rev-source-type-pill" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 9px; border: 1px solid var(--border, #ccc); border-radius: 999px; background: ${isSel ? 'var(--badge-blue-bg)' : 'var(--surface)'}; color: ${isSel ? 'var(--badge-blue-text)' : 'var(--text)'}; font-weight: ${isSel ? '600' : '500'}; cursor: pointer;">
+                <input type="radio" name="wiz_rev_source_type" class="wiz-rev-source-type-radio" value="${opt.val}" ${isSel ? 'checked' : ''} style="display:none;" />
+                ${opt.label}
+              </label>`;
+            }).join(' ')}
+          </div>
+          <div id="wiz-rev-source-online-fields" style="display:${curSourceType === 'online' ? 'block' : 'none'};">
+            <input type="url" id="wiz-rev-source-url" name="rev_source_url" aria-label="Recipe source URL" value="${escapeAttr(recipe.sourceUrl || '')}" placeholder="https://example.com/recipe..." style="width:100%; padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-size:12.5px; background: var(--surface);" />
+          </div>
+          <div id="wiz-rev-source-book-fields" style="display:${curSourceType === 'book' ? 'grid' : 'none'}; grid-template-columns: 2fr 1fr; gap: 8px;">
+            <input type="text" id="wiz-rev-source-book" name="rev_source_book" aria-label="Recipe book name" value="${escapeAttr(recipe.sourceBook || '')}" placeholder="Book Name (e.g. Ottolenghi Simple)" style="width:100%; padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-size:12.5px; background: var(--surface);" />
+            <input type="text" id="wiz-rev-source-page" name="rev_source_page" aria-label="Recipe book page" value="${escapeAttr(recipe.sourcePage || '')}" placeholder="Page (e.g. 142)" style="width:100%; padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-size:12.5px; background: var(--surface);" />
           </div>
         </div>
 

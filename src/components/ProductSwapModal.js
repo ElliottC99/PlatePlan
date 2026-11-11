@@ -76,7 +76,12 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
   if (!targetItem || !newProduct) return;
   const storeState = (typeof store !== 'undefined' && store.getState) ? store.getState() : (getState());
   const bank = targetItem.bankIng || {};
-  const candidateKeys = [targetItem.canonicalIngId, bank.ingredientId, bank.groupId, bank.id, targetItem.ingredientId !== targetItem.id ? targetItem.ingredientId : null, targetItem.name].filter(Boolean).map(String);
+  const candidateKeys = [
+    targetItem.subtypeId, targetItem.subTypeId, bank.subtypeId, bank.subTypeId,
+    targetItem.canonicalIngId, bank.ingredientId, bank.groupId, bank.id,
+    targetItem.ingredientId !== targetItem.id ? targetItem.ingredientId : null,
+    targetItem.name
+  ].filter(Boolean).map(String);
 
   if (candidateKeys.length === 0) {
     if (targetItem.id) candidateKeys.push(String(targetItem.id));
@@ -93,11 +98,13 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
 
   const eventId = ctx?.cookingEventId || ctx?.instanceId || ctx?.prepEventId || null;
   if (eventId) {
-    candidateKeys.forEach(k => { updatedPlan.substitutions[`${eventId}:${k}`] = subPayload; });
+    candidateKeys.forEach(k => {
+      updatedPlan.substitutions[`${eventId}:${k}`] = subPayload;
+      updatedPlan.productSelections[`${eventId}:${k}`] = newProduct.id;
+    });
   } else {
     candidateKeys.forEach(k => {
       updatedPlan.substitutions[k] = subPayload;
-      if (!updatedPlan.productSelections) updatedPlan.productSelections = {};
       updatedPlan.productSelections[k] = newProduct.id;
     });
   }
@@ -159,19 +166,19 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);z-index:999999;display:flex;align-items:center;justify-content:center;';
 
   const container = document.createElement('div');
-  container.style.cssText = 'background:#fff;width:94%;max-width:620px;max-height:88vh;border-radius:16px;display:flex;flex-direction:column;box-shadow:0 24px 48px rgba(0,0,0,0.22);overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
+  container.style.cssText = 'background:var(--surface);width:94%;max-width:620px;max-height:88vh;border-radius:16px;display:flex;flex-direction:column;box-shadow:0 24px 48px rgba(0,0,0,0.22);overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
   const currentProductName = targetItem?.brand ? `${targetItem.brand} - ${targetItem.name}` : (targetItem?.name || 'Item');
 
   container.innerHTML = `
-    <div style="padding:16px 20px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;background:#fafafa;">
-      <div><h3 style="margin:0;font-size:16px;font-weight:700;color:#0f172a;">Swap Product / Brand</h3><p style="margin:2px 0 0;font-size:13px;color:#64748b;">Swapping ${escapeHtml(targetSubtype)} &rarr; <strong style="color:#2563eb;">${escapeHtml(currentProductName)}</strong></p></div>
-      <button id="pp-modal-close" class="modal-close-btn" aria-label="Close" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;line-height:1;padding:4px 8px;border-radius:6px;">&times;</button>
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--surface2);">
+      <div><h3 style="margin:0;font-size:16px;font-weight:700;color:var(--text);">Swap Product / Brand</h3><p style="margin:2px 0 0;font-size:13px;color:var(--text2);">Swapping ${escapeHtml(targetSubtype)} &rarr; <strong style="color:var(--system-blue);">${escapeHtml(currentProductName)}</strong></p></div>
+      <button id="pp-modal-close" class="modal-close-btn" aria-label="Close" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text3);line-height:1;padding:4px 8px;border-radius:6px;">&times;</button>
     </div>
-    <div style="padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+    <div style="padding:12px 20px;background:var(--surface2);border-bottom:1px solid var(--border);">
       <div style="display:flex;gap:10px;align-items:center;">
         <label for="pp-product-search" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Search substitute products</label>
-        <input type="text" id="pp-product-search" name="productSubstituteSearch" aria-label="Search substitute products" placeholder="🔍 Search substitute products..." style="flex:1;min-width:0;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;">
-        <select id="pp-product-sort" name="productSubstituteSort" aria-label="Sort options" style="flex:0 0 140px;max-width:140px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;background:#fff;cursor:pointer;">
+        <input type="text" id="pp-product-search" name="productSubstituteSearch" aria-label="Search substitute products" placeholder="🔍 Search substitute products..." style="flex:1;min-width:0;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none;background:var(--surface);color:var(--text);">
+        <select id="pp-product-sort" name="productSubstituteSort" aria-label="Sort options" style="flex:0 0 140px;max-width:140px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;background:var(--surface);color:var(--text);cursor:pointer;">
           <option value="relevance">Sort: Default</option>
           <option value="name">Sort: Name (A-Z)</option>
           <option value="proteinPerKcal">Sort: Protein / kcal</option>
@@ -180,14 +187,14 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
         </select>
       </div>
     </div>
-    <div id="pp-tier-tabs" style="display:flex;gap:4px;padding:8px 20px 0 20px;border-bottom:1px solid #e2e8f0;background:#fff;overflow-x:auto;">
-      <button type="button" class="pp-tier-tab" data-tier="tier1" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:700;color:#2563eb;border-bottom:2px solid #2563eb;cursor:pointer;white-space:nowrap;">Tier 1: Sub-Types</button>
-      <button type="button" class="pp-tier-tab" data-tier="tier2" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Tier 2: Item Family</button>
-      <button type="button" class="pp-tier-tab" data-tier="tier3" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Tier 3: Global Catalog</button>
+    <div id="pp-tier-tabs" style="display:flex;gap:4px;padding:8px 20px 0 20px;border-bottom:1px solid var(--border);background:var(--surface);overflow-x:auto;">
+      <button type="button" class="pp-tier-tab" data-tier="tier1" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:700;color:var(--system-blue);border-bottom:2px solid var(--system-blue);cursor:pointer;white-space:nowrap;">Tier 1: Sub-Types</button>
+      <button type="button" class="pp-tier-tab" data-tier="tier2" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:600;color:var(--text2);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Tier 2: Item Family</button>
+      <button type="button" class="pp-tier-tab" data-tier="tier3" style="border:none;background:none;padding:6px 12px;font-size:12px;font-weight:600;color:var(--text2);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;">Tier 3: Global Catalog</button>
     </div>
     <div id="pp-product-list" style="padding:16px 20px;overflow-y:auto;flex-grow:1;max-height:40vh;"></div>
-    <div style="padding:14px 20px;border-top:1px solid #e2e8f0;background:#fafafa;display:flex;justify-content:space-between;align-items:center;">
-      <div id="pp-selected-preview" style="font-size:12px;color:#64748b;">No substitute selected</div>
+    <div style="padding:14px 20px;border-top:1px solid var(--border);background:var(--surface2);display:flex;justify-content:space-between;align-items:center;">
+      <div id="pp-selected-preview" style="font-size:12px;color:var(--text2);">No substitute selected</div>
       <button type="button" id="pp-apply-substitution" class="btn primary" disabled style="opacity:0.5;cursor:not-allowed;font-weight:700;padding:8px 18px;border-radius:8px;">Apply Substitution</button>
     </div>`;
 
@@ -314,19 +321,19 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
         const delta = newScore - baseScore;
 
         const sign = delta > 0 ? '+' : '';
-        const badgeBg = delta > 0 ? '#dcfce7' : (delta < 0 ? '#ffe4e6' : '#f1f5f9');
-        const badgeFg = delta > 0 ? '#15803d' : (delta < 0 ? '#be123c' : '#475569');
+        const badgeBg = delta > 0 ? 'var(--badge-green-bg)' : (delta < 0 ? 'var(--badge-red-bg)' : 'var(--badge-neutral-bg)');
+        const badgeFg = delta > 0 ? 'var(--badge-green-text)' : (delta < 0 ? 'var(--badge-red-text)' : 'var(--badge-neutral-text)');
         badgeHtml = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:${badgeBg};color:${badgeFg};margin-left:auto;">[${sign}${delta} - ${baseScore} &rarr; ${newScore}]</span>`;
       } else {
         const packDisplay = item.packSize ? `${item.packSize}${item.packUnit || 'g'}` : '';
         const protDisplay = (item.protein || item.prot) ? `${item.protein || item.prot}g protein` : '';
         const subInfo = [packDisplay, protDisplay].filter(Boolean).join(' • ');
-        if (subInfo) badgeHtml = `<span style="font-size:11px;color:#64748b;margin-left:auto;">${escapeHtml(subInfo)}</span>`;
+        if (subInfo) badgeHtml = `<span style="font-size:11px;color:var(--text2);margin-left:auto;">${escapeHtml(subInfo)}</span>`;
       }
 
       const priceDisplay = item.price ? `£${Number(item.price).toFixed(2)}` : '';
 
-      return `<div class="pp-swap-card" data-ing-id="${escapeAttr(item.id || item.name)}" style="padding:12px 14px;border:2px solid ${isSelected ? '#2563eb' : '#e2e8f0'};border-radius:10px;margin-bottom:8px;cursor:pointer;transition:all 0.15s ease;background:${isSelected ? '#eff6ff' : '#fff'};"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div><span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">${escapeAttr(item.brand || '')}</span><div style="font-weight:650;color:#1e293b;font-size:14px;margin-top:1px;">${escapeHtml(item.name)}</div></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#e0f2fe;color:#0369a1;">${escapeHtml(inferSubtype(item))}</span>${badgeHtml}</div></div><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${priceDisplay ? `<span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:4px;">${priceDisplay}</span>` : ''}</div></div>`;
+      return `<div class="pp-swap-card" data-ing-id="${escapeAttr(item.id || item.name)}" style="padding:12px 14px;border:2px solid ${isSelected ? 'var(--system-blue)' : 'var(--border)'};border-radius:10px;margin-bottom:8px;cursor:pointer;transition:all 0.15s ease;background:${isSelected ? 'var(--badge-blue-bg)' : 'var(--surface)'};"><div style="display:flex;justify-content:space-between;align-items:flex-start;"><div><span style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;">${escapeAttr(item.brand || '')}</span><div style="font-weight:650;color:var(--text);font-size:14px;margin-top:1px;">${escapeHtml(item.name)}</div></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:var(--badge-blue-bg);color:var(--badge-blue-text);">${escapeHtml(inferSubtype(item))}</span>${badgeHtml}</div></div><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${priceDisplay ? `<span style="font-size:11px;background:var(--badge-neutral-bg);color:var(--badge-neutral-text);padding:2px 6px;border-radius:4px;">${priceDisplay}</span>` : ''}</div></div>`;
     }).join('');
 
     listEl.querySelectorAll('.pp-swap-card').forEach(card => {
@@ -334,7 +341,7 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
         const item = displayItems.find(p => String(p.id || p.name) === String(card.dataset.ingId));
         if (!item) return;
         selectedSubstituteProduct = item;
-        selectedPreviewEl.innerHTML = `<strong style="color:#0f172a;">${escapeHtml(item.brand ? item.brand + ' - ' + item.name : item.name)}</strong> selected`;
+        selectedPreviewEl.innerHTML = `<strong style="color:var(--text);">${escapeHtml(item.brand ? item.brand + ' - ' + item.name : item.name)}</strong> selected`;
         applyBtn.disabled = false;
         applyBtn.style.opacity = '1';
         applyBtn.style.cursor = 'pointer';

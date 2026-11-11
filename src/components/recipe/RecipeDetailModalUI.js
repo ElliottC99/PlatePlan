@@ -8,6 +8,7 @@ import { renderFitScoreBadge } from '../FitScoreBadge.js';
 import { calculateMealFitScore, getFitScoreTierMeta } from '../../utils/fitScoreCalculator.js';
 import { formatGarlicQuantity } from '../../utils/unitConverter.js';
 import { toGrams } from '../../services/UnitConversionService.js';
+import { resolveDynamicProductForIngredient } from '../../services/PantryTaxonomyService.js';
 
 function escapeHtml(str) {
   if (typeof window !== 'undefined' && window.ppEscapeHtml) {
@@ -48,12 +49,11 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
   if (typeof ing === 'string') return ing.trim();
 
   const appState = state || (typeof window !== 'undefined' ? (window.Store?.getState?.() ) : {});
-  const pantryIngs = Array.isArray(appState.ingredients) ? appState.ingredients : [];
+  const pantryIngs = Array.isArray(appState.rootItems) ? appState.rootItems : (Array.isArray(appState.ingredients) ? appState.ingredients : []);
   const products = Array.isArray(appState.products) ? appState.products : [];
 
   const ingId = ing.ingredientId || ing.groupId || ing.familyId || ing.ingId || '';
   const subId = ing.subtypeId || ing.subTypeId || '';
-  const prodId = ing.productId || ing.mappedProductId || ing.defaultProductId || '';
 
   let ingObj = ingId ? pantryIngs.find(i => String(i?.id) === String(ingId)) : null;
   if (!ingObj) {
@@ -63,7 +63,15 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
     }
   }
 
-  let prodObj = prodId ? products.find(p => String(p?.id) === String(prodId)) : null;
+  let prodObj = resolveDynamicProductForIngredient(ing, {
+    products,
+    ingredients: pantryIngs,
+    preferences: appState.preferences || appState.settings || {}
+  });
+
+  if (!ingObj && prodObj?.ingredientId) {
+    ingObj = pantryIngs.find(i => String(i?.id) === String(prodObj.ingredientId)) || null;
+  }
 
   let subObj = null;
   const subtypes = Array.isArray(ingObj?.subtypes) ? ingObj.subtypes : [];
@@ -76,22 +84,6 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
   }
   if (!subObj && prodObj?.subtypeId && subtypes.length) {
     subObj = subtypes.find(s => String(s?.id) === String(prodObj.subtypeId)) || null;
-  }
-
-  if (!prodObj) {
-    if (subObj) {
-      const subDefaultId = subObj.defaultProductId || subObj.defaultProduct?.id || '';
-      prodObj = subDefaultId
-        ? products.find(p => String(p?.id) === String(subDefaultId))
-        : products.find(p => String(p?.subtypeId || p?.subTypeId || '') === String(subObj.id));
-    }
-    if (!prodObj && ingObj) {
-      const ingDefaultId = ingObj.defaultProductId || ingObj.autoDefaultProduct || '';
-      prodObj = ingDefaultId
-        ? products.find(p => String(p?.id) === String(ingDefaultId))
-        : (products.find(p => String(p?.ingredientId) === String(ingObj.id) && p?.isAutoDefault) ||
-           products.find(p => String(p?.ingredientId) === String(ingObj.id)));
-    }
   }
 
   const ingredientLabel = String(
@@ -275,7 +267,7 @@ export function renderRecipeDetailModalContent(props = {}) {
               🗑️ Remove Variant
             </button>
           ` : ''}
-          <button type="button" id="modal-recipe-fav-btn" class="recipe-fav-btn ${favBtnClass}" onclick="toggleRecipeFavourite('${escapeAttr(r.id)}', event, '${variantKey}')" aria-label="${isFav ? 'Remove from favourites' : 'Add to favourites'}" title="${isFav ? 'Favourited' : 'Add to favourites'}">
+          <button type="button" id="modal-recipe-fav-btn" class="recipe-fav-btn ${favBtnClass}" data-action="toggleRecipeFavourite('${escapeAttr(r.id)}', event, '${escapeAttr(variantKey)}')" data-recipe-id="${escapeAttr(r.id)}" data-variant="${escapeAttr(variantKey)}" aria-label="${isFav ? 'Remove from favourites' : 'Add to favourites'}" title="${isFav ? 'Favourited' : 'Add to favourites'}">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
             </svg>
@@ -347,7 +339,10 @@ export function renderRecipeDetailModalContent(props = {}) {
         <!-- Right Column: Method Steps -->
         <div class="recipe-modal-col-method recipe-modal-col-card" style="min-width:0">
           <h3 style="margin-top:0;margin-bottom:12px;font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;justify-content:space-between">
-            <span>👨‍🍳 Method</span>
+            <span style="display:flex;align-items:center;gap:6px;">
+              <span>👨‍🍳 Method</span>
+              ${isEnh ? `<button type="button" class="btn sm secondary" data-action="copyMethodFromOriginalRecipe('${escapeAttr(recipeId)}')" style="font-size:11px;padding:2px 8px;font-weight:600;">📋 Copy from Original</button>` : ''}
+            </span>
             ${stepsCount > 0 ? `<span style="font-size:12px;font-weight:600;color:var(--text2)">${stepsCount} steps</span>` : ''}
           </h3>
           ${methodHtml}

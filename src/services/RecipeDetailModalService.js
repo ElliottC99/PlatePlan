@@ -149,6 +149,32 @@ function renderComparisonBadge(actual, target) {
   return `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${bg};color:${color};line-height:1">${label}</span>`;
 }
 
+export function formatRecipeSourceHTML(r) {
+  if (!r || typeof r !== 'object') return '';
+  const esc = (str) => String(str ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  const srcType = String(r.sourceType || '').toLowerCase();
+  const srcUrl = String(r.sourceUrl || '').trim();
+  const srcBook = String(r.sourceBook || '').trim();
+  const srcPage = String(r.sourcePage || '').trim();
+  const legacySource = String(r.source || r.url || '').trim();
+
+  if (srcType === 'online' || (!srcType && /^https?:\/\//i.test(srcUrl || legacySource))) {
+    const url = srcUrl || legacySource;
+    if (!url) return '';
+    const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    return `<span>🌐 Source: <a href="${esc(href)}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4f46e5);text-decoration:underline;">${esc(url)}</a></span>`;
+  }
+  if (srcType === 'book' || srcBook) {
+    const bookText = [srcBook, srcPage ? `p. ${srcPage}` : ''].filter(Boolean).join(', ');
+    if (!bookText) return '';
+    return `<span>📖 Source: <strong>${esc(bookText)}</strong></span>`;
+  }
+  if (legacySource) {
+    return `<span>📌 Source: ${esc(legacySource)}</span>`;
+  }
+  return '';
+}
+
 export function renderRecipePreview() {
   const modalContent = document.getElementById('view-modal-content');
   if (!modalContent || !previewState.recipe) return;
@@ -223,7 +249,7 @@ export function renderRecipePreview() {
   const eKcal = singleKcalE, cKcal = singleKcalC, eProt = singleProtE, cProt = singleProtC;
 
   const fitScore = Math.round(Number(fitResult?.score) || 0);
-  const meta = typeof getFitScoreTierMeta === 'function' ? getFitScoreTierMeta(fitScore) : { tier: 'red', icon: '🔴', label: 'Poor Match', color: '#ef4444', bg: '#fee2e2', text: '#7f1d1d', border: '#fca5a5' };
+  const meta = typeof getFitScoreTierMeta === 'function' ? getFitScoreTierMeta(fitScore) : { tier: 'red', icon: '🔴', label: 'Poor Match', color: 'var(--system-red)', bg: 'var(--badge-red-bg)', text: 'var(--badge-red-text)', border: 'var(--badge-red-border)' };
   const fitPillHtml = `<span class="badge ${meta.tier}" style="background:${meta.bg};color:${meta.text};border:1px solid ${meta.border}">${meta.icon} ${fitScore}% - ${meta.label}</span>`;
 
   const renderMacroBadge = (type, diff) => {
@@ -232,9 +258,9 @@ export function renderRecipePreview() {
     // Protein: Positive/Zero is Good (Green), Negative is Bad (Red)
     const isGood = isKcal ? diff <= 0 : diff >= 0;
     const sign = diff > 0 ? '+' : '';
-    const bg = isGood ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)';
-    const color = isGood ? '#166534' : '#991b1b';
-    const border = isGood ? '#86efac' : '#fca5a5';
+    const bg = isGood ? 'var(--badge-green-bg)' : 'var(--badge-red-bg)';
+    const color = isGood ? 'var(--badge-green-text)' : 'var(--badge-red-text)';
+    const border = isGood ? 'var(--badge-green-border)' : 'var(--badge-red-border)';
     return `<span style="display:inline-flex; align-items:center; justify-content:center; padding: 2px 6px; border-radius: 6px; background: ${bg}; color: ${color}; border: 1px solid ${border}; font-size: 10px; font-weight: 800; margin-left: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">${sign}${diff}${isKcal ? '' : 'g'}</span>`;
   };
 
@@ -254,6 +280,8 @@ export function renderRecipePreview() {
     </div>
   `;
 
+  const sourceHtml = formatRecipeSourceHTML(activeR) || formatRecipeSourceHTML(r);
+
   modalContent.innerHTML = renderRecipeDetailModalContent({
     r,
     recipe: activeR,
@@ -269,6 +297,7 @@ export function renderRecipePreview() {
     singleServes: previewState.singleServes,
     mealType,
     baseServes,
+    sourceHtml,
     ingredientsHtml,
     methodHtml,
     macroSplitHtml,
@@ -338,6 +367,7 @@ export async function openEnhanceRecipeModalForCurrent(recipeId) {
       const updatedRecipe = {
         ...found,
         enhanced: enhancedPayload,
+        ...(enhancedPayload?.fitScore !== undefined ? { enhancedFitScore: enhancedPayload.fitScore } : {}),
         updatedAt: new Date().toISOString()
       };
       try {
@@ -432,6 +462,55 @@ export async function removeCurrentEnhancedVariant(recipeId) {
   }
 }
 
+export async function copyMethodFromOriginalRecipe(recipeId) {
+  const state = (typeof window !== 'undefined' ? getState() : {}) || {};
+  const recipes = Array.isArray(state.recipes) ? state.recipes : [];
+  const r = previewState.recipe || recipes.find(rec => String(rec.id) === String(recipeId));
+  if (!r) return;
+
+  const originalSteps = r.methodSteps || r.method || r.steps || r.instructions || [];
+  const normalizedSteps = Array.isArray(originalSteps)
+    ? originalSteps.map(s => typeof s === 'string' ? s : (s?.text || s?.instruction || s?.step || String(s ?? ''))).filter(Boolean)
+    : (typeof originalSteps === 'string' ? originalSteps.split('\n').filter(Boolean) : []);
+
+  if (!normalizedSteps.length) {
+    if (typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast('Original recipe has no method steps to copy.');
+    }
+    return;
+  }
+
+  if (!r.enhanced) r.enhanced = {};
+  r.enhanced.method = [...normalizedSteps];
+  r.enhanced.methodSteps = [...normalizedSteps];
+  if (r.variants && r.variants.enhanced) {
+    r.variants.enhanced.method = [...normalizedSteps];
+    r.variants.enhanced.methodSteps = [...normalizedSteps];
+  }
+
+  const found = recipes.find(rec => String(rec.id) === String(recipeId));
+  if (found && found !== r) {
+    if (!found.enhanced) found.enhanced = {};
+    found.enhanced.method = [...normalizedSteps];
+    found.enhanced.methodSteps = [...normalizedSteps];
+    if (found.variants && found.variants.enhanced) {
+      found.variants.enhanced.method = [...normalizedSteps];
+      found.variants.enhanced.methodSteps = [...normalizedSteps];
+    }
+  }
+
+  try {
+    const { saveRecipe } = await import('./RecipeFirestoreRepository.js');
+    await saveRecipe(r);
+    renderRecipePreview();
+    if (typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast(`Copied ${normalizedSteps.length} method steps from original recipe.`);
+    }
+  } catch (err) {
+    console.error('[RecipeDetailModalService] Failed to save copied method:', err);
+  }
+}
+
 if (typeof window !== 'undefined') {
   Object.assign(window, {
     closeRecipePreview,
@@ -443,6 +522,7 @@ if (typeof window !== 'undefined') {
     openRecipeModal,
     viewRecipe,
     openEnhanceRecipeModalForCurrent,
-    removeCurrentEnhancedVariant
+    removeCurrentEnhancedVariant,
+    copyMethodFromOriginalRecipe
   });
 }

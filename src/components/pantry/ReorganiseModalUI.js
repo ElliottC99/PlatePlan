@@ -354,6 +354,8 @@ function renderSubtypeModal(entityData, categories, rootItems) {
       try {
         await executeSubtypeReallocation({
           mode: opMode,
+          parentId,
+          subtypeId,
           sourceParentItemId: parentId,
           sourceSubtypeId: subtypeId,
           targetParentItemId: opMode === 'move_parent' ? selectedTargetValue : null,

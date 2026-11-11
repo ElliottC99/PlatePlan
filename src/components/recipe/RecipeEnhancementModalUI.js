@@ -144,6 +144,9 @@ export function buildLiveEnhancedRecipe(route, originalRecipe) {
   const liveFit = calculateMealFitScore(livePayload, targetMeal, { variant: 'enhanced' });
   const liveScore = Math.round(Number(liveFit?.score) || 0);
 
+  livePayload.fitScore = liveScore;
+  livePayload._computedFitScore = liveScore;
+
   // Compute delta against original recipe baseline
   const origKcal = Math.round(Number(orig.macros?.calories || orig.calories || orig.nutrition?.cal || 0));
   const origProt = Math.round(Number(orig.macros?.protein || orig.protein || orig.nutrition?.prot || 0) * 10) / 10;

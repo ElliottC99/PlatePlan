@@ -9,6 +9,7 @@ import { getState } from '../store/coreState.js';
 import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
 import { setCurrentPlan } from '../store/store.js';
 import { saveCurrentPlan, stripPlanPayload } from './HouseholdRepository.js';
+import { freezeProductSelectionsForPlan } from './PantryTaxonomyService.js';
 
 const PROTEIN_KEYWORDS = [
   'tofu', 'tempeh', 'seitan', 'halloumi', 'lentils', 'paneer',
@@ -69,12 +70,14 @@ export function makePlanSlot(recipeId, variant = 'original') {
  */
 export function getPlanSlotInfo(slotData) {
   if (!slotData) return null;
-  const id = typeof slotData === 'string' ? slotData : (slotData.recipeId || slotData.id);
-  const variant = (typeof slotData === 'object' && slotData.variant) ? slotData.variant : 'original';
+  const rawId = typeof slotData === 'string' ? slotData : (slotData.recipeId || slotData.id);
+  const [baseId, variantFromId] = String(rawId || '').split('::');
+  const variant = (typeof slotData === 'object' && slotData.variant) ? slotData.variant : (variantFromId || 'original');
+  const id = baseId;
   const instanceId = typeof slotData === 'object' ? (slotData.instanceId || `${id}_${Date.now()}`) : `${id}_${Date.now()}`;
   
   const recipes = getState()?.recipes || [];
-  const recipe = recipes.find(r => r && r.id === id) || null;
+  const recipe = recipes.find(r => r && String(r.id) === String(id)) || null;
   if (!recipe) {
     return { id, variant, instanceId, recipe: null, active: null };
   }
@@ -86,12 +89,14 @@ export function getPlanSlotInfo(slotData) {
   return { id, variant, instanceId, recipe, active };
 }
 
+export const resolvePlannedSlotRecipe = getPlanSlotInfo;
+
 /**
  * Resolves nutrition for a planned slot.
  */
 export function getPlannedSlotNutrition(activeRecipe, slotKey = 'dinnerE', instanceId = null, plan = null) {
   if (!activeRecipe) return { cal: 0, prot: 0 };
-  const mealType = slotKey.startsWith('breakfast') ? 'breakfast' : (slotKey.startsWith('lunch') ? 'lunch' : 'dinner');
+  const mealType = getMealTypeFromSlotKey(slotKey) || 'dinner';
   const person = slotKey.endsWith('E') ? 'elliott' : 'chloe';
 
   const res = calculateMealFitScore(activeRecipe, mealType, {
@@ -175,10 +180,15 @@ export function generateMealPlan(options = {}) {
       allRecipes.push({
         ...r,
         ...r.enhanced,
-        id: r.id,
+        id: r.id + '::enhanced',
         originalId: r.id,
         _variant: 'enhanced',
-        name: r.enhanced.name || r.name + ' (Enhanced)',
+        name: r.enhanced.name || (r.name ? `${r.name} (Enhanced)` : 'Enhanced Recipe'),
+        macros: r.enhanced.macros || r.macros,
+        nutrition: r.enhanced.nutrition || r.nutrition,
+        ingredients: r.enhanced.ingredients || r.ingredients,
+        servings: r.enhanced.servings || r.enhanced.serves || r.servings || r.serves,
+        serves: r.enhanced.serves || r.enhanced.servings || r.serves || r.servings,
         enhanced: r.enhanced
       });
     }
@@ -206,7 +216,7 @@ export function generateMealPlan(options = {}) {
     const matching = allRecipes.filter(r => {
       const types = (r.types || [r.type || 'dinner']).map(t => String(t).toLowerCase());
       if (!types.includes(type)) return false;
-      const scoreObj = calculateMealFitScore(r, type, { activeProfile: 'everyone' });
+      const scoreObj = calculateMealFitScore(r, type, { activeProfile: 'everyone', variant: r._variant || 'original', portionScaled: true });
       const score = Number(scoreObj?.score || 0);
       if (score < minFitScore || score > maxFitScore) return false;
       return true;
@@ -242,9 +252,10 @@ export function generateMealPlan(options = {}) {
   const slots = {};
   const mealPrepGroups = [];
 
-  const createPinnedSlot = (recipeId, dayNum, suffix = '', isSplit = false) => {
-    const r = allRecipes.find(item => item.id === recipeId);
-    const variant = r && r.enhanced ? 'enhanced' : 'original';
+  const createPinnedSlot = (rawRecipeId, dayNum, suffix = '', isSplit = false, explicitVariant = null) => {
+    const [baseRecipeId, variantFromId] = String(rawRecipeId || '').split('::');
+    const recipeId = baseRecipeId;
+    const variant = explicitVariant || variantFromId || 'original';
     const instanceId = `inst_pinned_${recipeId}_d${dayNum}${suffix}_${Math.random().toString(36).substr(2, 5)}`;
     return { id: recipeId, recipeId, variant, instanceId, isSkipped: false, skipped: false, isSplit, pinned: true, isPinned: true };
   };
@@ -260,19 +271,19 @@ export function generateMealPlan(options = {}) {
         if (config.elliott?.isSkipped) {
           slots[d][`${mealType}E`] = { isSkipped: true, skipped: true, isSplit: true };
         } else if (config.elliott?.recipeId) {
-          slots[d][`${mealType}E`] = createPinnedSlot(config.elliott.recipeId, d, '_E', true);
+          slots[d][`${mealType}E`] = createPinnedSlot(config.elliott.recipeId, d, '_E', true, config.elliott.variant);
         }
         if (config.chloe?.isSkipped) {
           slots[d][`${mealType}C`] = { isSkipped: true, skipped: true, isSplit: true };
         } else if (config.chloe?.recipeId) {
-          slots[d][`${mealType}C`] = createPinnedSlot(config.chloe.recipeId, d, '_C', true);
+          slots[d][`${mealType}C`] = createPinnedSlot(config.chloe.recipeId, d, '_C', true, config.chloe.variant);
         }
       } else if (config.isSkipped || config.status === 'skipped') {
         const skipData = { isSkipped: true, skipped: true, isSplit: false };
         slots[d][`${mealType}E`] = skipData;
         slots[d][`${mealType}C`] = skipData;
       } else if (config.recipeId) {
-        const pinData = createPinnedSlot(config.recipeId, d, '', false);
+        const pinData = createPinnedSlot(config.recipeId, d, '', false, config.variant);
         slots[d][`${mealType}E`] = pinData;
         slots[d][`${mealType}C`] = pinData;
       }
@@ -296,8 +307,10 @@ export function generateMealPlan(options = {}) {
 
       const recipe = pool[poolIdx % pool.length];
       poolIdx++;
-      const variant = recipe.enhanced ? 'enhanced' : 'original';
-      const instanceId = `inst_${recipe.id}_d${d}_${Math.random().toString(36).substr(2, 5)}`;
+      const [baseRecipeId, variantFromId] = String(recipe.id || '').split('::');
+      const recipeId = recipe.originalId || baseRecipeId;
+      const variant = recipe._variant || variantFromId || 'original';
+      const instanceId = `inst_${recipeId}_d${d}_${Math.random().toString(36).substr(2, 5)}`;
       const assignedDays = [];
 
       const span = Math.min(repeatCount, days - d + 1);
@@ -311,7 +324,7 @@ export function generateMealPlan(options = {}) {
           break;
         }
 
-        const slotData = { id: recipe.id, recipeId: recipe.id, variant, instanceId, isSkipped: false, skipped: false, isSplit: false, pinned: false };
+        const slotData = { id: recipeId, recipeId, variant, instanceId, isSkipped: false, skipped: false, isSplit: false, pinned: false };
         if (!curEAnchored) slots[curDay][`${mealType}E`] = slotData;
         if (!curCAnchored) slots[curDay][`${mealType}C`] = slotData;
         assignedDays.push(curDay);
@@ -320,7 +333,7 @@ export function generateMealPlan(options = {}) {
       if (assignedDays.length > 1) {
         mealPrepGroups.push({
           id: `prep_${instanceId}`,
-          recipeId: recipe.id,
+          recipeId: recipeId,
           mealType,
           days: assignedDays,
           servings: assignedDays.length * 2
@@ -469,7 +482,7 @@ export function generateWeeklyPlan(options = {}) {
     });
   }
 
-  return {
+  const generatedPlan = {
     id: `plan_${Date.now()}`,
     startDate: startDateStr,
     endDate: planDays[planDays.length - 1]?.date || startDateStr,
@@ -478,6 +491,15 @@ export function generateWeeklyPlan(options = {}) {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
+
+  generatedPlan.productSelections = freezeProductSelectionsForPlan(generatedPlan, {
+    products: storeState.products || [],
+    ingredients: storeState.rootItems || storeState.ingredients || [],
+    recipes,
+    preferences: storeState.preferences || storeState.settings || {}
+  });
+
+  return generatedPlan;
 }
 
 // Global browser registration for backward compatibility
