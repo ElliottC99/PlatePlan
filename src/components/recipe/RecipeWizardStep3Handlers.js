@@ -216,7 +216,7 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal = () => {}, sh
     let finalSubId = null;
     let isCatDefault = false;
 
-    if (i.categoryId || (i.category && !i.ingredientId && !i.subtypeId)) {
+    if ((i.categoryId || i.category) && !i.ingredientId && !i.subtypeId) {
       finalCat = i.categoryId || i.category;
       finalIngId = null;
       finalSubId = null;

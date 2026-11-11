@@ -21,7 +21,9 @@ export function formatRecipeTime(timeVal) {
       return hours > 0 ? (minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`) : `${minutes}m`;
     }
     const mins = timeVal.total || timeVal.prep || timeVal.cook || timeVal.time || '';
-    return mins ? `${mins}m` : '';
+    if (!mins) return '';
+    const minsStr = String(mins).trim();
+    return minsStr.endsWith('m') || minsStr.includes('min') || minsStr.endsWith('h') ? minsStr : `${minsStr}m`;
   }
   const str = String(timeVal).trim();
   if (!str) return '';

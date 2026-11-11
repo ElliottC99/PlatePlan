@@ -488,6 +488,17 @@ export async function copyMethodFromOriginalRecipe(recipeId) {
     r.variants.enhanced.methodSteps = [...normalizedSteps];
   }
 
+  const found = recipes.find(rec => String(rec.id) === String(recipeId));
+  if (found && found !== r) {
+    if (!found.enhanced) found.enhanced = {};
+    found.enhanced.method = [...normalizedSteps];
+    found.enhanced.methodSteps = [...normalizedSteps];
+    if (found.variants && found.variants.enhanced) {
+      found.variants.enhanced.method = [...normalizedSteps];
+      found.variants.enhanced.methodSteps = [...normalizedSteps];
+    }
+  }
+
   try {
     const { saveRecipe } = await import('./RecipeFirestoreRepository.js');
     await saveRecipe(r);

@@ -5,7 +5,7 @@
  */
 
 import { getState } from '../../store/store.js';
-import { scanRecipeTaxonomyElevations, applyRootElevationsToRecipe, applyCategoryPromotionToRecipe } from '../../../scripts/migrate_recipe_taxonomy_levels.js';
+import { scanRecipeTaxonomyElevations, applyRootElevationsToRecipe, applyCategoryPromotionToRecipe } from '../../services/RecipeTaxonomyElevationService.js';
 import { saveRecipe } from '../../services/RecipeFirestoreRepository.js';
 
 function escapeHtml(str) {
