@@ -189,6 +189,10 @@ export async function promoteSubtype(parentId, subtypeId) {
   if (isDbAvailable()) {
     await saveRootItem(parent);
     await saveRootItem(newRoot);
+    const modifiedProducts = updatedProds.filter(p => String(p.ingredientId) === String(newRootId));
+    if (modifiedProducts.length > 0) {
+      await Promise.all(modifiedProducts.map(p => saveProduct(p)));
+    }
     if (modifiedRecipes.length > 0) {
       await batchUpdateRecipesInDb(modifiedRecipes);
     }

@@ -282,51 +282,58 @@ export async function executeSafeReallocation({ mode, sourceItemId, targetCatego
   return { success: true };
 }
 
-export async function executeSubtypeReallocation({ mode, subtypeId, parentId, targetParentItemId, targetSubtypeId }) {
+export async function executeSubtypeReallocation({
+  mode,
+  subtypeId,
+  parentId,
+  sourceSubtypeId,
+  sourceParentItemId,
+  targetParentItemId,
+  targetSubtypeId
+}) {
+  const actualSubtypeId = subtypeId || sourceSubtypeId;
+  let actualParentId = parentId || sourceParentItemId;
+
   const state = getState();
   const rootItems = Array.isArray(state.rootItems || state.ingredients) ? [...(state.rootItems || state.ingredients)] : [];
 
-  const sourceParent = rootItems.find(r => r && String(r.id) === String(parentId));
+  // Fallback: discover parent item by searching for subtype
+  if (!actualParentId && actualSubtypeId) {
+    const foundParent = rootItems.find(r => r && Array.isArray(r.subtypes) && r.subtypes.some(s => s && String(s.id) === String(actualSubtypeId)));
+    if (foundParent) actualParentId = foundParent.id;
+  }
+
+  const sourceParent = rootItems.find(r => r && String(r.id) === String(actualParentId));
   if (!sourceParent || !Array.isArray(sourceParent.subtypes)) throw new Error('Source parent item not found');
 
-  const subIdx = sourceParent.subtypes.findIndex(s => s && String(s.id) === String(subtypeId));
+  const subIdx = sourceParent.subtypes.findIndex(s => s && String(s.id) === String(actualSubtypeId));
   if (subIdx === -1) throw new Error('Sub-type not found in parent item');
-  const targetSubtype = sourceParent.subtypes[subIdx];
+
+  if (mode === 'promote_to_item') {
+    const { promoteSubtype } = await import('./SubtypeRepository.js');
+    const result = await promoteSubtype(actualParentId, actualSubtypeId);
+    saveStateCache(getState());
+    return result;
+  }
 
   if (mode === 'move_parent') {
-    if (!targetParentItemId || String(targetParentItemId) === String(parentId)) {
+    if (!targetParentItemId || String(targetParentItemId) === String(actualParentId)) {
       throw new Error('Target parent item must be different from current parent.');
     }
-    const targetParent = rootItems.find(r => r && String(r.id) === String(targetParentItemId));
-    if (!targetParent) throw new Error('Target parent item not found');
+    const { moveSubtype } = await import('./SubtypeRepository.js');
+    const result = await moveSubtype(actualParentId, actualSubtypeId, targetParentItemId);
+    saveStateCache(getState());
+    return result;
+  }
 
-    sourceParent.subtypes.splice(subIdx, 1);
-    if (!Array.isArray(targetParent.subtypes)) targetParent.subtypes = [];
-    targetParent.subtypes.push({ ...targetSubtype, category: targetParent.category || 'General' });
-
-    setIngredients(rootItems);
-    await saveRootItem(sourceParent);
-    await saveRootItem(targetParent);
-  } else if (mode === 'merge') {
-    if (!targetSubtypeId || String(targetSubtypeId) === String(subtypeId)) {
+  if (mode === 'merge') {
+    if (!targetSubtypeId || String(targetSubtypeId) === String(actualSubtypeId)) {
       throw new Error('Cannot merge a sub-type with itself.');
     }
-    sourceParent.subtypes.splice(subIdx, 1);
-    setIngredients(rootItems);
-    await saveRootItem(sourceParent);
-  } else if (mode === 'promote_to_item') {
-    sourceParent.subtypes.splice(subIdx, 1);
-    const newRootItem = {
-      id: 'ing_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-      name: targetSubtype.name,
-      category: sourceParent.category || 'General',
-      subtypes: [],
-      updatedAt: new Date().toISOString()
-    };
-    rootItems.push(newRootItem);
-    setIngredients(rootItems);
-    await saveRootItem(sourceParent);
-    await saveRootItem(newRootItem);
+    const { mergeSubtype } = await import('./SubtypeRepository.js');
+    const result = await mergeSubtype(actualParentId, actualSubtypeId, targetSubtypeId);
+    saveStateCache(getState());
+    return result;
   }
 
   saveStateCache(state);
