@@ -111,6 +111,18 @@ const textOnlyLine = { name: 'pinch of salt' };
 const resNull = resolveDynamicProductForIngredient(textOnlyLine, { products: testProducts, ingredients: testIngredients });
 assert.equal(resNull, null, 'Returns null safely for text-only ingredient');
 
+// 6. Test Root Item level mapping preservation (subtypeId === null) dynamically cascades
+const lineRootItemOnly = { name: 'Cheddar', ingredientId: 'ing_cheddar', subtypeId: null };
+const resRootDynamic = resolveDynamicProductForIngredient(lineRootItemOnly, { products: testProducts, ingredients: testIngredients });
+assert.ok(resRootDynamic, 'Root item with subtypeId: null dynamically resolves to a product in its pool');
+assert.ok(['prod_mature_tesco', 'prod_mild_tesco', 'prod_mature_cathedral'].includes(resRootDynamic.id), 'Resolves to candidate product under the root item');
+
+// 7. Test Category level mapping preservation (ingredientId === null, subtypeId === null)
+const lineCategoryOnly = { name: 'Cheese', category: 'Dairy', categoryId: 'Dairy', ingredientId: null, subtypeId: null };
+const resCatDynamic = resolveDynamicProductForIngredient(lineCategoryOnly, { products: testProducts, ingredients: testIngredients });
+assert.ok(resCatDynamic, 'Category mapping dynamically resolves to a product in Dairy');
+assert.ok(['prod_mature_tesco', 'prod_mild_tesco', 'prod_mature_cathedral'].includes(resCatDynamic.id), 'Resolves to candidate product under Dairy root items');
+
 console.log('✅ Unit 1: Dynamic Taxonomy Resolver Engine verified!');
 
 // ==========================================================

@@ -209,20 +209,45 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal = () => {}, sh
 
   const mapIngredientItem = (i) => {
     const resolvedProd = resolveProductForIngredient(i, { products, ingredients, preferences: state.preferences || state.settings });
-    const resolvedIngId = i.ingredientId || resolvedProd?.ingredientId || null;
-    const resolvedSubId = i.subtypeId || resolvedProd?.subtypeId || null;
-    const resolvedCat = i.category || i.categoryId || resolvedProd?.category || null;
+    
+    // Explicit mapping level preservation (prevents auto-collapsing Root Items or Categories to default product sub-types)
+    let finalCat = null;
+    let finalIngId = null;
+    let finalSubId = null;
+    let isCatDefault = false;
+
+    if (i.categoryId || (i.category && !i.ingredientId && !i.subtypeId)) {
+      finalCat = i.categoryId || i.category;
+      finalIngId = null;
+      finalSubId = null;
+      isCatDefault = true;
+    } else if (i.ingredientId && !i.subtypeId) {
+      finalIngId = i.ingredientId;
+      finalSubId = null;
+      finalCat = i.category || resolvedProd?.category || null;
+      isCatDefault = false;
+    } else if (i.subtypeId) {
+      finalSubId = i.subtypeId;
+      finalIngId = i.ingredientId || resolvedProd?.ingredientId || null;
+      finalCat = i.category || resolvedProd?.category || null;
+      isCatDefault = false;
+    } else {
+      finalIngId = resolvedProd?.ingredientId || null;
+      finalSubId = resolvedProd?.subtypeId || null;
+      finalCat = resolvedProd?.category || null;
+    }
+
     const mapped = {
       ...i,
       name: i.name,
       qty: Number(i.qty) || 1,
       unit: i.unit || '',
       raw: i.raw || `${i.qty || 1} ${i.unit || ''} ${i.name || ''}`.trim(),
-      ingredientId: resolvedIngId,
-      subtypeId: resolvedSubId,
-      category: resolvedCat,
-      categoryId: resolvedCat,
-      isCategoryDefault: i.isCategoryDefault || false,
+      ingredientId: finalIngId,
+      subtypeId: finalSubId,
+      category: finalCat,
+      categoryId: finalCat,
+      isCategoryDefault: isCatDefault,
       displayName: i.displayName || null,
       waterMl: i.waterMl || null,
       isNewTaxonomyItem: !!i.isNewTaxonomyItem
