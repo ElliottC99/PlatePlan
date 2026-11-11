@@ -13,6 +13,7 @@ import { openMealPlanSyncWarningModal } from '../components/data-quality/MealPla
 import { openMergeIngredientsModal } from '../components/data-quality/MergeIngredientsModal.js';
 import { openRecipeAuditModal } from '../components/recipe/RecipeAuditModal.js';
 import { openUnlinkedSweeperModal, scanUnlinkedRecipeIngredients } from '../components/data-quality/UnlinkedSweeperUI.js';
+import { openCategoryPromotionModal } from '../components/data-quality/CategoryPromotionModalUI.js';
 import { findDuplicateCategoryClusters } from '../components/pantry/CategoryMergeModalUI.js';
 import { findDuplicateRecipeClusters } from '../services/RecipeFirestoreRepository.js';
 import { openRecipeDeduplicationModal } from './RecipeVaultView.js';
@@ -97,6 +98,10 @@ function initDataQualityEvents(container) {
     }
     if (action === 'open-sweeper') {
       openUnlinkedSweeperModal();
+      return;
+    }
+    if (action === 'open-taxonomy-elevation') {
+      openCategoryPromotionModal();
       return;
     }
     if (action === 'open-recipe-audit') {
@@ -316,6 +321,9 @@ export function renderDataQualityView() {
           <button type="button" class="btn sm" data-action-dq="open-recipe-audit" style="font-weight:600; background:var(--primary,#4f46e5); color:#fff; ${recipeAuditCount === 0 ? 'opacity:0.55; cursor:default;' : ''}">
             📖 Recipe Mapping Audit (${recipeAuditCount}${recipeAuditCount === 0 ? ' ✓' : ''})
           </button>
+          <button type="button" class="btn sm" data-action-dq="open-taxonomy-elevation" style="font-weight:600; background:#0d9488; color:#fff;">
+            📈 Taxonomy Elevation
+          </button>
         </div>
       </div>
 
@@ -449,6 +457,23 @@ export function renderDataQualityView() {
             </div>
           </div>
         `)}
+
+        <!-- 7. RETROSPECTIVE TAXONOMY ELEVATION CARD -->
+        <div class="card" style="background:var(--surface,#fff); border-radius:14px; padding:18px; border:1px solid var(--border,#e7e5e4); margin-bottom:16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; border-bottom:1px solid var(--border,#e7e5e4); padding-bottom:10px; flex-wrap:wrap; gap:8px;">
+            <h3 style="margin:0; font-size:14.5px; font-weight:750; color:var(--text,#1c1917); display:flex; align-items:center; gap:8px;">
+              <span>📈</span> Retrospective Taxonomy Elevation
+            </h3>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" class="btn sm primary dq-action-btn" data-action-dq="open-taxonomy-elevation" style="background:#0d9488; color:#fff; font-weight:700;">
+                Review Elevations
+              </button>
+            </div>
+          </div>
+          <div style="font-size:12.5px; color:var(--text2,#78716c); padding:6px 0;">
+            Elevate recipe ingredients mapped to default/standard sub-types back up to Root Items or Categories for dynamic product flexibility.
+          </div>
+        </div>
 
       </div>
     </div>
