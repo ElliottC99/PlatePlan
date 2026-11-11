@@ -334,4 +334,63 @@ console.log('--- Test 6: Commit Service ---');
   console.log('✅ Test 6 Passed: Commit service synchronized Store state.\n');
 }
 
+// --- TEST 7: Batch Apply Multi-Recipe Candidates for Matching Root Item ---
+console.log('--- Test 7: Batch Apply Multi-Recipe Matching Candidates ---');
+{
+  const recipeA = {
+    id: 'rec_batch_a',
+    title: 'Batch Pancakes',
+    servings: 2,
+    ingredients: [
+      { name: 'Maple Syrup', qty: 30, unit: 'ml', ingredientId: 'ing_maple', subtypeId: 'sub_zero_cal_maple', productId: 'prod_zero_cal_maple' }
+    ]
+  };
+  const recipeB = {
+    id: 'rec_batch_b',
+    title: 'Batch Waffles',
+    servings: 2,
+    ingredients: [
+      { name: 'Maple Syrup', qty: 25, unit: 'ml', ingredientId: 'ing_maple', subtypeId: 'sub_zero_cal_maple', productId: 'prod_zero_cal_maple' }
+    ]
+  };
+
+  const scan = scanRecipeTaxonomyElevations([recipeA, recipeB], mockIngredients, mockProducts);
+  assert.strictEqual(scan.categoryCandidates.length, 2, 'Both recipes should produce category candidates');
+
+  // Verify grouping and batch elevation to Category
+  const matchingTargets = scan.categoryCandidates.filter(c => String(c.rootId) === 'ing_maple');
+  assert.strictEqual(matchingTargets.length, 2, 'Both candidates match ing_maple root item');
+
+  const modified = [];
+  const recipesMap = new Map([['rec_batch_a', recipeA], ['rec_batch_b', recipeB]]);
+
+  matchingTargets.forEach(t => {
+    const r = recipesMap.get(t.recipeId);
+    const updated = applyCategoryElevationToRecipe(r, {
+      action: 'category',
+      variant: t.variant,
+      sectionIndex: t.sectionIndex,
+      ingredientIndex: t.ingredientIndex,
+      targetCategory: t.category,
+      rootId: t.rootId
+    }, { products: mockProducts, ingredients: mockIngredients });
+    recipesMap.set(t.recipeId, updated);
+  });
+
+  const finalA = recipesMap.get('rec_batch_a');
+  const finalB = recipesMap.get('rec_batch_b');
+
+  assert.strictEqual(finalA.ingredients[0].category, 'Syrups & Sweeteners');
+  assert.strictEqual(finalA.ingredients[0].subtypeId, undefined);
+  assert.strictEqual(finalB.ingredients[0].category, 'Syrups & Sweeteners');
+  assert.strictEqual(finalB.ingredients[0].subtypeId, undefined);
+
+  // Commit batch
+  const commitRes = await commitRecipeElevations([finalA, finalB]);
+  assert.strictEqual(commitRes.success, true);
+  assert.strictEqual(commitRes.count, 2);
+
+  console.log('✅ Test 7 Passed: Multi-recipe matching candidates elevated in batch successfully.\n');
+}
+
 console.log('🎉 ALL RETROSPECTIVE TAXONOMY ELEVATION TESTS PASSED SUCCESSFULLY!\n');
