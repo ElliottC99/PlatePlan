@@ -21,7 +21,7 @@ One owner per job. Parallel versions are other modules that still do the same jo
 | Meal plans | `src/repositories/PlanRepository.js` | — |
 | Plan generation | `src/services/MealPlanGeneratorService.js` | — |
 | Unit conversion | `src/services/UnitConversionService.js` | — |
-| Data Quality | `src/services/DataQualityScanner.js` (target: a single read-only report) | `src/services/DataQualityEngine.js`, `src/services/DataQualityScannerService.js`, `src/services/DataQualityService.js` |
+| Data Quality | `src/services/DataQualityScanner.js` (target: a single read-only report) | `src/services/DataQualityScannerService.js`, `src/services/DataQualityService.js` |
 | Action sheets | `src/components/navigation/ActionSheetUI.js` | `src/components/pantry/ActionSheetUI.js` |
 | Dialogs | `src/components/ui/DialogHelpers.js` | — |
 
