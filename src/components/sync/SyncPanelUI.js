@@ -120,7 +120,6 @@ export function renderSyncPanelModal() {
 
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button type="button" class="btn ghost sm" data-action="rehydrate-catalog" style="padding:6px 10px;font-size:12px">Re-hydrate Catalog</button>
-        <button type="button" class="btn primary sm" data-action="sync-now" style="padding:6px 12px;font-size:12px">Sync Now</button>
       </div>
     </div>
   `;

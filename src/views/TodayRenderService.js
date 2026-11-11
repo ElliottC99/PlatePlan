@@ -9,6 +9,26 @@ import { renderFitScoreBadge } from '../components/FitScoreBadge.js';
 import { isMealEatenOnDate } from '../services/TodayViewService.js';
 
 /**
+ * Formats a recipe time or prepTime value safely regardless of whether it's
+ * an object ({ hours, minutes }, { prep, cook }, { total }), number, or string.
+ */
+export function formatRecipeTime(timeVal) {
+  if (!timeVal) return '';
+  if (typeof timeVal === 'object') {
+    const hours = Number(timeVal.hours) || 0;
+    const minutes = Number(timeVal.minutes) || 0;
+    if (hours > 0 || minutes > 0) {
+      return hours > 0 ? (minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`) : `${minutes}m`;
+    }
+    const mins = timeVal.total || timeVal.prep || timeVal.cook || timeVal.time || '';
+    return mins ? `${mins}m` : '';
+  }
+  const str = String(timeVal).trim();
+  if (!str) return '';
+  return str.endsWith('m') || str.includes('min') || str.endsWith('h') ? str : `${str}m`;
+}
+
+/**
  * Renders Apple Health-style stacked per-person macro progress bars (Calories & Protein).
  *
  * @param {Object} totals - Per-person daily totals { elliott: { calories, protein }, chloe: { calories, protein } }
@@ -141,7 +161,7 @@ export function renderTodayMealCard(slot, { info: slotInfo, person }, eatenMeals
           <div style="font-size:13px; color:var(--secondary-label); display:flex; gap:12px; align-items:center;">
             <span>🔥 ${cal} kcal</span>
             <span>💪 ${prot}g P</span>
-            ${(recipe.prepTime || recipe.time) ? `<span>⏱️ ${escapeHtml(recipe.prepTime || recipe.time)}</span>` : ''}
+            ${formatRecipeTime(recipe.prepTime || recipe.time) ? `<span>⏱️ ${escapeHtml(formatRecipeTime(recipe.prepTime || recipe.time))}</span>` : ''}
           </div>
         </div>
         <button class="btn sm" type="button" data-action="view-recipe" data-recipe-id="${escapeAttr(recipe.id)}" data-instance-id="${escapeAttr(slotInfo.instanceId || '')}" data-variant="${escapeAttr(slotInfo.variant || 'original')}" style="font-size:13px; font-weight:600; border-radius:var(--radius-control); padding:6px 12px; white-space:nowrap;">

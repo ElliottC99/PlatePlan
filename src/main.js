@@ -145,8 +145,8 @@ export function setSyncStatus(status, detail = '') {
 
   const el = document.getElementById('sync-status');
   if (el) {
-    let label = '• Synced';
-    if (status === 'synced') label = '• Synced';
+    let label = 'Synced';
+    if (status === 'synced') label = 'Synced';
     else if (status === 'saving') label = 'Saving…';
     else if (status === 'offline') label = 'Offline';
     else if (status === 'connecting') label = 'Connecting…';

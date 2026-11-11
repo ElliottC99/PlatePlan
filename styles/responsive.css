@@ -609,9 +609,6 @@ main{max-width:var(--content-max);padding:22px 20px 96px}
 .desktop-sidebar .ntab.active{background:var(--tint-color-muted);color:var(--tint-color);border:0;font-weight:600}
 .desktop-sidebar .ntab:hover:not(.active){background:var(--surface2);color:var(--label)}
 .desktop-sidebar-footer{margin-top:auto;padding:12px}
-.sync-pill[data-status="synced"]{font-size:0;padding:8px}
-.sync-pill[data-status="synced"]::after{content:'Synced';font-size:11px}
-.sync-pill[data-status="saving"],.sync-pill[data-status="offline"],.sync-pill[data-status="conflict"],.sync-pill[data-status="error"],.sync-pill[data-status="connecting"]{font-size:11px}
 .sync-user-label{display:none!important}
 .mobile-nav{
   background:var(--chrome-bg)!important;
