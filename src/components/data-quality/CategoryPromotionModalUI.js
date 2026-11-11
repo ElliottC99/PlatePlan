@@ -36,7 +36,7 @@ export function openCategoryPromotionModal() {
   if (existing) existing.remove();
 
   const state = getState() || {};
-  const currentRecipes = Array.isArray(state.recipes) ? [...state.recipes] : [];
+  let currentRecipes = Array.isArray(state.recipes) ? [...state.recipes] : [];
   const ingredients = state.rootItems || state.ingredients || [];
   const products = state.products || [];
   const preferences = state.preferences || state.settings || {};
@@ -57,7 +57,15 @@ export function openCategoryPromotionModal() {
   // Stage 2 state
   let currentCardIndex = 0;
   const stage2Stats = { categoryCount: 0, rootCount: 0, keptCount: 0, skippedCount: 0 };
+  const resolvedKeys = new Set();
   let liveDelta = null;
+
+  function advanceToNextUnresolved() {
+    currentCardIndex++;
+    while (currentCardIndex < categoryCandidates.length && resolvedKeys.has(categoryCandidates[currentCardIndex].key)) {
+      currentCardIndex++;
+    }
+  }
 
   const modal = document.createElement('div');
   modal.id = 'category-promotion-modal';
@@ -138,6 +146,11 @@ export function openCategoryPromotionModal() {
       if (!groupedRootByRecipe.has(item.recipeTitle)) groupedRootByRecipe.set(item.recipeTitle, []);
       groupedRootByRecipe.get(item.recipeTitle).push(item);
     });
+
+    // Advance to next unresolved candidate if needed
+    while (currentCardIndex < catTotal && resolvedKeys.has(categoryCandidates[currentCardIndex].key)) {
+      currentCardIndex++;
+    }
 
     // Compute live delta for active Stage 2 candidate
     if (currentStage === 2 && currentCardIndex < catTotal) {
@@ -321,6 +334,13 @@ export function openCategoryPromotionModal() {
               <!-- Single Interactive Card -->
               ${(() => {
                 const item = categoryCandidates[currentCardIndex];
+                const remainingCandidates = categoryCandidates.slice(currentCardIndex).filter(c => !resolvedKeys.has(c.key));
+                const matchingRemaining = remainingCandidates.filter(c =>
+                  (c.rootId && item.rootId && String(c.rootId) === String(item.rootId)) ||
+                  (c.ingredientName && item.ingredientName && c.ingredientName.trim().toLowerCase() === item.ingredientName.trim().toLowerCase())
+                );
+                const matchingCount = matchingRemaining.length;
+
                 return `
                   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                     <span style="font-size:12px;font-weight:700;color:var(--text2,#6b7280);text-transform:uppercase;letter-spacing:0.04em;">
@@ -369,6 +389,14 @@ export function openCategoryPromotionModal() {
                           </div>
                         </div>
                       </div>
+                    ` : ''}
+
+                    <!-- Batch Checkbox for Remaining Matching Instances -->
+                    ${matchingCount > 1 ? `
+                      <label style="display:flex;align-items:center;gap:9px;margin-bottom:14px;padding:9px 12px;background:var(--surface2,#f9fafb);border:1.5px solid var(--primary-border,rgba(99,102,241,0.25));border-radius:10px;cursor:pointer;font-size:12.5px;color:var(--text,#111827);user-select:none;">
+                        <input type="checkbox" id="chk-apply-all-matching" style="width:16px;height:16px;accent-color:var(--primary,#4f46e5);cursor:pointer;" />
+                        <span>Apply decision to all <strong>${matchingCount}</strong> remaining recipes using <strong>${escapeHtml(item.rootName || item.ingredientName)}</strong></span>
+                      </label>
                     ` : ''}
 
                     <!-- 3 Action Decision Buttons -->
@@ -521,93 +549,124 @@ export function openCategoryPromotionModal() {
 
     // Stage 2 Review Card Action Handlers
     const activeCandidate = categoryCandidates[currentCardIndex];
+    if (activeCandidate) {
+      const remainingCandidates = categoryCandidates.slice(currentCardIndex).filter(c => !resolvedKeys.has(c.key));
+      const matchingRemaining = remainingCandidates.filter(c =>
+        (c.rootId && activeCandidate.rootId && String(c.rootId) === String(activeCandidate.rootId)) ||
+        (c.ingredientName && activeCandidate.ingredientName && c.ingredientName.trim().toLowerCase() === activeCandidate.ingredientName.trim().toLowerCase())
+      );
+      const matchingCount = matchingRemaining.length;
 
-    const btnPromoteCat = modal.querySelector('#btn-card-promote-cat');
-    if (btnPromoteCat && activeCandidate) {
-      btnPromoteCat.onclick = async () => {
+      const chkApplyAll = modal.querySelector('#chk-apply-all-matching');
+      const btnPromoteCat = modal.querySelector('#btn-card-promote-cat');
+      const btnPromoteRoot = modal.querySelector('#btn-card-promote-root');
+      const btnKeepSubtype = modal.querySelector('#btn-card-keep-subtype');
+      const btnCardSkip = modal.querySelector('#btn-card-skip');
+
+      if (chkApplyAll) {
+        chkApplyAll.onchange = () => {
+          const isAll = chkApplyAll.checked;
+          if (btnPromoteCat) {
+            btnPromoteCat.textContent = isAll
+              ? `Elevate all ${matchingCount} to Category ("${activeCandidate.category}")`
+              : `Elevate to Category ("${activeCandidate.category}")`;
+          }
+          if (btnPromoteRoot) {
+            btnPromoteRoot.textContent = isAll
+              ? `Elevate all ${matchingCount} to Root Item ("${activeCandidate.rootName}")`
+              : `Elevate to Root Item ("${activeCandidate.rootName}")`;
+          }
+          if (btnKeepSubtype) {
+            btnKeepSubtype.textContent = isAll
+              ? `Keep all ${matchingCount} as Sub-types`
+              : `Keep as Sub-type ("${activeCandidate.currentSubtypeName}")`;
+          }
+        };
+      }
+
+      const executeStage2Decision = async (action) => {
         isProcessing = true;
         errorMessage = '';
         renderModal();
         try {
-          const recipe = currentRecipes.find(r => String(r.id) === String(activeCandidate.recipeId));
-          if (recipe) {
-            const updated = applyCategoryElevationToRecipe(recipe, {
-              action: 'category',
-              variant: activeCandidate.variant,
-              sectionIndex: activeCandidate.sectionIndex,
-              ingredientIndex: activeCandidate.ingredientIndex,
-              targetCategory: activeCandidate.category,
-              rootId: activeCandidate.rootId
-            }, { products, ingredients, preferences });
+          const isApplyAll = Boolean(chkApplyAll?.checked);
+          const targets = (isApplyAll && matchingCount > 1) ? matchingRemaining : [activeCandidate];
 
-            await commitRecipeElevations([updated]);
-            const idx = currentRecipes.findIndex(r => String(r.id) === String(updated.id));
-            if (idx !== -1) currentRecipes[idx] = updated;
+          if (action === 'subtype') {
+            targets.forEach(t => {
+              resolvedKeys.add(t.key);
+              stage2Stats.keptCount++;
+            });
+            advanceToNextUnresolved();
+          } else {
+            // Group targets by recipeId to apply sequentially per recipe
+            const targetsByRecipe = new Map();
+            targets.forEach(t => {
+              if (!targetsByRecipe.has(t.recipeId)) targetsByRecipe.set(t.recipeId, []);
+              targetsByRecipe.get(t.recipeId).push(t);
+            });
 
-            stage2Stats.categoryCount++;
-            currentCardIndex++;
+            const modifiedRecipes = [];
+            for (const [recipeId, tList] of targetsByRecipe.entries()) {
+              const recipe = currentRecipes.find(r => String(r.id) === String(recipeId));
+              if (!recipe) continue;
+
+              let updated = recipe;
+              for (const t of tList) {
+                updated = applyCategoryElevationToRecipe(updated, {
+                  action,
+                  variant: t.variant,
+                  sectionIndex: t.sectionIndex,
+                  ingredientIndex: t.ingredientIndex,
+                  targetCategory: t.category,
+                  rootId: t.rootId
+                }, { products, ingredients, preferences });
+              }
+              modifiedRecipes.push(updated);
+            }
+
+            if (modifiedRecipes.length > 0) {
+              await commitRecipeElevations(modifiedRecipes);
+              const modMap = new Map(modifiedRecipes.map(r => [String(r.id), r]));
+              currentRecipes = currentRecipes.map(r => modMap.get(String(r.id)) || r);
+            }
+
+            targets.forEach(t => {
+              resolvedKeys.add(t.key);
+              if (action === 'category') {
+                stage2Stats.categoryCount++;
+              } else if (action === 'root') {
+                stage2Stats.rootCount++;
+              }
+            });
+
+            advanceToNextUnresolved();
           }
         } catch (err) {
-          console.error('[CategoryPromotionModalUI] Stage 2 Promote Category failed:', err);
-          errorMessage = 'Failed to elevate ingredient to Category. Please retry.';
+          console.error('[CategoryPromotionModalUI] Stage 2 decision failed:', err);
+          errorMessage = 'Failed to apply decision. Please retry.';
         } finally {
           isProcessing = false;
           renderModal();
         }
       };
-    }
 
-    const btnPromoteRoot = modal.querySelector('#btn-card-promote-root');
-    if (btnPromoteRoot && activeCandidate) {
-      btnPromoteRoot.onclick = async () => {
-        isProcessing = true;
-        errorMessage = '';
-        renderModal();
-        try {
-          const recipe = currentRecipes.find(r => String(r.id) === String(activeCandidate.recipeId));
-          if (recipe) {
-            const updated = applyCategoryElevationToRecipe(recipe, {
-              action: 'root',
-              variant: activeCandidate.variant,
-              sectionIndex: activeCandidate.sectionIndex,
-              ingredientIndex: activeCandidate.ingredientIndex,
-              targetCategory: activeCandidate.category,
-              rootId: activeCandidate.rootId
-            }, { products, ingredients, preferences });
+      if (btnPromoteCat) btnPromoteCat.onclick = () => executeStage2Decision('category');
+      if (btnPromoteRoot) btnPromoteRoot.onclick = () => executeStage2Decision('root');
+      if (btnKeepSubtype) btnKeepSubtype.onclick = () => executeStage2Decision('subtype');
 
-            await commitRecipeElevations([updated]);
-            const idx = currentRecipes.findIndex(r => String(r.id) === String(updated.id));
-            if (idx !== -1) currentRecipes[idx] = updated;
-
-            stage2Stats.rootCount++;
-            currentCardIndex++;
-          }
-        } catch (err) {
-          console.error('[CategoryPromotionModalUI] Stage 2 Promote Root failed:', err);
-          errorMessage = 'Failed to elevate ingredient to Root Item. Please retry.';
-        } finally {
-          isProcessing = false;
+      if (btnCardSkip) {
+        btnCardSkip.onclick = () => {
+          const isApplyAll = Boolean(chkApplyAll?.checked);
+          const targets = (isApplyAll && matchingCount > 1) ? matchingRemaining : [activeCandidate];
+          targets.forEach(t => {
+            resolvedKeys.add(t.key);
+            stage2Stats.skippedCount++;
+          });
+          advanceToNextUnresolved();
           renderModal();
-        }
-      };
-    }
-
-    const btnKeepSubtype = modal.querySelector('#btn-card-keep-subtype');
-    if (btnKeepSubtype && activeCandidate) {
-      btnKeepSubtype.onclick = () => {
-        stage2Stats.keptCount++;
-        currentCardIndex++;
-        renderModal();
-      };
-    }
-
-    const btnCardSkip = modal.querySelector('#btn-card-skip');
-    if (btnCardSkip) {
-      btnCardSkip.onclick = () => {
-        stage2Stats.skippedCount++;
-        currentCardIndex++;
-        renderModal();
-      };
+        };
+      }
     }
   }
 
