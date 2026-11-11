@@ -261,6 +261,57 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
     };
   });
 
+  // Reorder ingredients up or down within section
+  modalWrap.querySelectorAll('.wiz-reorder-btn').forEach(btn => {
+    btn.onclick = () => {
+      syncStep2InputsToState(modalWrap);
+      const sIdx = parseInt(btn.dataset.sidx, 10);
+      const iIdx = parseInt(btn.dataset.iidx, 10);
+      const direction = btn.dataset.direction;
+      const sec = wizardState.activeRecipe.ingredientSections?.[sIdx];
+      if (!sec || !Array.isArray(sec.ingredients)) return;
+
+      const targetIdx = direction === 'up' ? iIdx - 1 : iIdx + 1;
+      if (targetIdx < 0 || targetIdx >= sec.ingredients.length) return;
+
+      const temp = sec.ingredients[iIdx];
+      sec.ingredients[iIdx] = sec.ingredients[targetIdx];
+      sec.ingredients[targetIdx] = temp;
+
+      safeRender({ syncInputs: false });
+    };
+  });
+
+  // Copy method steps from base/original recipe into enhanced variant
+  const btnCopyMethod = modalWrap.querySelector('#wiz-copy-method-btn');
+  if (btnCopyMethod) {
+    btnCopyMethod.onclick = () => {
+      syncStep2InputsToState(modalWrap);
+      const base = wizardState.baseOriginalRecipe || wizardState.originalRecipe || wizardState.variantSnapshots?.original;
+      if (!base) {
+        showWizardNotice('Original recipe instructions not found.', 'warning');
+        return;
+      }
+      const rawSteps = Array.isArray(base.methodSteps)
+        ? base.methodSteps
+        : (base.steps || base.method || base.instructions || []);
+      const copiedSteps = Array.isArray(rawSteps)
+        ? rawSteps.map(s => typeof s === 'string' ? s : (s?.text || s?.instruction || s?.step || String(s ?? ''))).filter(Boolean)
+        : (typeof rawSteps === 'string' ? rawSteps.split('\n').filter(Boolean) : []);
+
+      if (!copiedSteps.length) {
+        showWizardNotice('Original recipe has no method steps to copy.', 'warning');
+        return;
+      }
+
+      wizardState.activeRecipe.methodSteps = [...copiedSteps];
+      safeRender({ syncInputs: false });
+      if (typeof window.showPlatePlanToast === 'function') {
+        window.showPlatePlanToast(`Copied ${copiedSteps.length} method steps from original recipe.`);
+      }
+    };
+  }
+
   const btnAddStep = modalWrap.querySelector('#wiz-add-step-btn');
   if (btnAddStep) {
     btnAddStep.onclick = () => {

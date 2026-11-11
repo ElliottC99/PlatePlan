@@ -339,7 +339,10 @@ export function renderRecipeDetailModalContent(props = {}) {
         <!-- Right Column: Method Steps -->
         <div class="recipe-modal-col-method recipe-modal-col-card" style="min-width:0">
           <h3 style="margin-top:0;margin-bottom:12px;font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;justify-content:space-between">
-            <span>👨‍🍳 Method</span>
+            <span style="display:flex;align-items:center;gap:6px;">
+              <span>👨‍🍳 Method</span>
+              ${isEnh ? `<button type="button" class="btn sm secondary" data-action="copyMethodFromOriginalRecipe('${escapeAttr(recipeId)}')" style="font-size:11px;padding:2px 8px;font-weight:600;">📋 Copy from Original</button>` : ''}
+            </span>
             ${stepsCount > 0 ? `<span style="font-size:12px;font-weight:600;color:var(--text2)">${stepsCount} steps</span>` : ''}
           </h3>
           ${methodHtml}

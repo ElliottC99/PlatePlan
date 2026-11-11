@@ -104,8 +104,17 @@ export function renderState2Mapping() {
         </div>
       ` : '';
 
+      const isFirst = iIdx === 0;
+      const isLast = iIdx === (sec.ingredients || []).length - 1;
+
       rowsHtml += `
         <tr id="wiz-ing-row-${sIdx}-${iIdx}" data-sidx="${sIdx}" data-iidx="${iIdx}" class="${isUnlinked ? 'wiz-row-unlinked' : ''}" style="border-bottom: 1px solid var(--border, #eee); ${isUnlinked ? 'border-left: 3px solid #f43f5e;' : ''}">
+          <td style="padding: 4px 4px; width: 32px; text-align: center; vertical-align: top;">
+            <div style="display: flex; flex-direction: column; gap: 2px; align-items: center; padding-top: 2px;">
+              <button type="button" class="btn sm ghost wiz-reorder-btn" data-direction="up" data-sidx="${sIdx}" data-iidx="${iIdx}" ${isFirst ? 'disabled' : ''} title="Move up" style="padding: 1px 3px; font-size: 10px; line-height: 1; min-width: 20px; ${isFirst ? 'opacity: 0.3; cursor: not-allowed;' : ''}">▲</button>
+              <button type="button" class="btn sm ghost wiz-reorder-btn" data-direction="down" data-sidx="${sIdx}" data-iidx="${iIdx}" ${isLast ? 'disabled' : ''} title="Move down" style="padding: 1px 3px; font-size: 10px; line-height: 1; min-width: 20px; ${isLast ? 'opacity: 0.3; cursor: not-allowed;' : ''}">▼</button>
+            </div>
+          </td>
           <td style="padding: 4px 6px; width: 125px; vertical-align: top;">
             <div style="display: flex; gap: 4px; align-items: center;">
               <input type="number" step="any" id="wiz-ing-qty-${sIdx}-${iIdx}" name="wiz_ing_qty_${sIdx}_${iIdx}" aria-label="Quantity for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-qty" data-sidx="${sIdx}" data-iidx="${iIdx}" value="${qty}" style="width: 54px; padding: 4px 6px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px; font-weight: 600;" />
@@ -145,7 +154,7 @@ export function renderState2Mapping() {
         </div>
         <table style="width: 100%; border-collapse: collapse;">
           <tbody>
-            ${rowsHtml || '<tr><td colspan="4" style="padding: 8px; color: var(--text2); font-size: 12px;">No ingredients in section.</td></tr>'}
+            ${rowsHtml || '<tr><td colspan="5" style="padding: 8px; color: var(--text2); font-size: 12px;">No ingredients in section.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -253,7 +262,10 @@ export function renderState2Mapping() {
 
       <div style="display: flex; justify-content: space-between; align-items: center; margin: 14px 0 6px;">
         <h4 style="margin: 0; font-size: 14px; font-weight: 700;">Method Steps (${normalizedSteps.length})</h4>
-        <button type="button" id="wiz-add-step-btn" class="btn sm secondary" style="padding: 2px 8px; font-size: 11px;">+ Add Step</button>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          ${isEnhancedTab ? '<button type="button" id="wiz-copy-method-btn" class="btn sm secondary" style="padding: 2px 8px; font-size: 11px;">📋 Copy Method from Original Recipe</button>' : ''}
+          <button type="button" id="wiz-add-step-btn" class="btn sm secondary" style="padding: 2px 8px; font-size: 11px;">+ Add Step</button>
+        </div>
       </div>
 
       <div style="margin-bottom: 20px;">

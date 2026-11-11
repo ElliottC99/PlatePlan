@@ -462,6 +462,44 @@ export async function removeCurrentEnhancedVariant(recipeId) {
   }
 }
 
+export async function copyMethodFromOriginalRecipe(recipeId) {
+  const state = (typeof window !== 'undefined' ? getState() : {}) || {};
+  const recipes = Array.isArray(state.recipes) ? state.recipes : [];
+  const r = previewState.recipe || recipes.find(rec => String(rec.id) === String(recipeId));
+  if (!r) return;
+
+  const originalSteps = r.methodSteps || r.method || r.steps || r.instructions || [];
+  const normalizedSteps = Array.isArray(originalSteps)
+    ? originalSteps.map(s => typeof s === 'string' ? s : (s?.text || s?.instruction || s?.step || String(s ?? ''))).filter(Boolean)
+    : (typeof originalSteps === 'string' ? originalSteps.split('\n').filter(Boolean) : []);
+
+  if (!normalizedSteps.length) {
+    if (typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast('Original recipe has no method steps to copy.');
+    }
+    return;
+  }
+
+  if (!r.enhanced) r.enhanced = {};
+  r.enhanced.method = [...normalizedSteps];
+  r.enhanced.methodSteps = [...normalizedSteps];
+  if (r.variants && r.variants.enhanced) {
+    r.variants.enhanced.method = [...normalizedSteps];
+    r.variants.enhanced.methodSteps = [...normalizedSteps];
+  }
+
+  try {
+    const { saveRecipe } = await import('./RecipeFirestoreRepository.js');
+    await saveRecipe(r);
+    renderRecipePreview();
+    if (typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast(`Copied ${normalizedSteps.length} method steps from original recipe.`);
+    }
+  } catch (err) {
+    console.error('[RecipeDetailModalService] Failed to save copied method:', err);
+  }
+}
+
 if (typeof window !== 'undefined') {
   Object.assign(window, {
     closeRecipePreview,
@@ -473,6 +511,7 @@ if (typeof window !== 'undefined') {
     openRecipeModal,
     viewRecipe,
     openEnhanceRecipeModalForCurrent,
-    removeCurrentEnhancedVariant
+    removeCurrentEnhancedVariant,
+    copyMethodFromOriginalRecipe
   });
 }
