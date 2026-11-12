@@ -104,6 +104,36 @@ console.log('--- Test 1: Taxonomy Resolution & Clean Concise Display ---');
 
   const html = renderTaxonomySearchHTML(0, 0, itemWithSubtype, mockIngredients, mockProducts);
   assert(html.includes('data-tax-val="ing_tofu:sub_firm"'), `HTML must set data-tax-val="ing_tofu:sub_firm", got: ${html}`);
+
+  // Regression test: Items loaded from Firestore have categoryId alongside ingredientId/subtypeId.
+  // categoryId must NOT shadow or collapse the specific subtype or root item!
+  const itemWithSubtypeAndCat = {
+    name: 'Tofu',
+    ingredientId: 'ing_tofu',
+    subtypeId: 'sub_firm',
+    categoryId: 'Proteins',
+    qty: 200,
+    unit: 'g'
+  };
+  const labelWithCat = getTaxonomyLabel(itemWithSubtypeAndCat, mockIngredients, mockProducts);
+  assert.strictEqual(labelWithCat, '🏷️ Firm Tofu', `Subtype with categoryId must resolve to subtype label, got: "${labelWithCat}"`);
+  const htmlWithCat = renderTaxonomySearchHTML(0, 0, itemWithSubtypeAndCat, mockIngredients, mockProducts);
+  assert(htmlWithCat.includes('data-tax-val="ing_tofu:sub_firm"'), `HTML with categoryId must keep data-tax-val="ing_tofu:sub_firm", got: ${htmlWithCat}`);
+  assert(!htmlWithCat.includes('badge-blue-bg'), 'Subtype item with categoryId must NOT be styled with blue category badge');
+
+  const itemWithRootAndCat = {
+    name: 'Sesame Oil',
+    ingredientId: 'ing_sesame_oil',
+    categoryId: 'Store Cupboard',
+    qty: 15,
+    unit: 'ml'
+  };
+  const rootLabelWithCat = getTaxonomyLabel(itemWithRootAndCat, mockIngredients, mockProducts);
+  assert.strictEqual(rootLabelWithCat, '📦 Sesame Oil', `Root item with categoryId must resolve to root label, got: "${rootLabelWithCat}"`);
+  const htmlRootWithCat = renderTaxonomySearchHTML(0, 1, itemWithRootAndCat, mockIngredients, mockProducts);
+  assert(htmlRootWithCat.includes('data-tax-val="ing_sesame_oil"'), `HTML with categoryId must keep data-tax-val="ing_sesame_oil", got: ${htmlRootWithCat}`);
+  assert(!htmlRootWithCat.includes('badge-blue-bg'), 'Root item with categoryId must NOT be styled with blue category badge');
+
   console.log('✅ Test 1 Passed: Taxonomy-mapped ingredients resolve to clean concise names.');
 }
 
