@@ -121,10 +121,10 @@ export function resolveHighestAutoDefaultTaxonomy(prod, { ingredients = [], prod
       }
       return { level: 'root', ingredientId: ing.id, name: ing.name };
     }
-  }
-
-  if (prod.category || prod.cat) {
-    return { level: 'category', categoryId: prod.category || prod.cat };
+    if (prod.subtypeId) {
+      return { level: 'subtype', ingredientId: prod.ingredientId, subtypeId: prod.subtypeId, name: prod.subtypeName || prod.name };
+    }
+    return { level: 'root', ingredientId: prod.ingredientId, name: prod.ingredientName || prod.name };
   }
 
   return { level: 'product', productId: pId, name: prod.name || prod.productName };
@@ -133,10 +133,10 @@ export function resolveHighestAutoDefaultTaxonomy(prod, { ingredients = [], prod
 export function isIngredientUnlinked(item, products = [], ingredients = []) {
   if (!item || typeof item !== 'object') return false;
   if (item.isNewTaxonomyItem || item.ingredientId === 'new_item' || /new[\s_]*item/i.test(item.ingredientId || '')) return true;
-  if (item.isCategoryDefault && item.categoryId) return false;
-  if (item.categoryId && item.categoryId !== 'Store Cupboard' && item.categoryId !== 'General') return false;
   if (item.subtypeId) return false;
   if (item.ingredientId && item.ingredientId !== 'new_item' && !/new[\s_]*item/i.test(item.ingredientId)) return false;
+  if (item.isCategoryDefault && item.categoryId) return false;
+  if (item.categoryId && item.categoryId !== 'Store Cupboard' && item.categoryId !== 'General') return false;
   if (item.productId && (products || []).some(p => String(p.id) === String(item.productId))) return false;
   if (item.bankId && (products || []).some(p => String(p.id) === String(item.bankId))) return false;
   return true;
@@ -148,6 +148,7 @@ export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, 
   let subtypeId = null;
   let rawName = '';
   let categoryId = null;
+  let isCategoryDefault = false;
   let ingBank = [];
   let prodBank = [];
 
@@ -157,6 +158,7 @@ export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, 
     subtypeId = item.subtypeId;
     rawName = item.name || item.raw || '';
     categoryId = item.categoryId;
+    isCategoryDefault = !!item.isCategoryDefault;
     ingBank = Array.isArray(arg2) ? arg2 : (Array.isArray(arg4) ? arg4 : (getState()?.ingredients || getState()?.rootItems || []));
     prodBank = Array.isArray(arg3) ? arg3 : (Array.isArray(arg6) && arg6.length ? arg6 : (getState()?.products || []));
   } else {
@@ -168,12 +170,7 @@ export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, 
     prodBank = Array.isArray(arg6) ? arg6 : (getState()?.products || []);
   }
 
-  // 1. Explicit Category assignment
-  if (categoryId) {
-    return `📂 ${categoryId}`;
-  }
-
-  // 2. Explicit Subtype assignment
+  // 1. Explicit Subtype assignment
   if (subtypeId) {
     for (const ing of (ingBank || [])) {
       const sub = (ing.subtypes || []).find(s => String(s.id) === String(subtypeId) || String(s.name) === String(subtypeId));
@@ -181,26 +178,37 @@ export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, 
         return `🏷️ ${sub.name}`;
       }
     }
+    if (item?.subtypeName) {
+      return `🏷️ ${item.subtypeName}`;
+    }
   }
 
-  // 3. Explicit Root Item assignment
+  // 2. Explicit Root Item assignment
   if (ingredientId && ingredientId !== 'new_item') {
     const ing = (ingBank || []).find(i => String(i.id) === String(ingredientId));
     if (ing) {
       return `📦 ${ing.name}`;
     }
+    if (item?.ingredientName) {
+      return `📦 ${item.ingredientName}`;
+    }
+  }
+
+  // 3. Explicit Category assignment (only if explicitly category default or no root/subtype set)
+  if (isCategoryDefault || (categoryId && !ingredientId && !subtypeId)) {
+    return `📂 ${categoryId}`;
   }
 
   // 4. If only productId or bankId is known, resolve to the HIGHEST level where it is an Auto-Default:
-  // Category > Root Item > Sub-Type
+  // Root Item > Sub-Type > Category > Product
   const directProdId = item?.productId || item?.bankId;
   if (directProdId) {
     const prod = (prodBank || []).find(p => String(p.id) === String(directProdId));
     if (prod) {
       const resolved = resolveHighestAutoDefaultTaxonomy(prod, { ingredients: ingBank, products: prodBank });
-      if (resolved.level === 'category') return `📂 ${resolved.categoryId}`;
-      if (resolved.level === 'root') return `📦 ${resolved.name}`;
       if (resolved.level === 'subtype') return `🏷️ ${resolved.name}`;
+      if (resolved.level === 'root') return `📦 ${resolved.name}`;
+      if (resolved.level === 'category') return `📂 ${resolved.categoryId}`;
       return `📦 ${prod.name || prod.productName}`;
     }
     if (item?.productName) {
@@ -213,9 +221,9 @@ export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, 
     const resolvedProd = resolveProductForIngredient(item, { products: prodBank, ingredients: ingBank });
     if (resolvedProd) {
       const resolved = resolveHighestAutoDefaultTaxonomy(resolvedProd, { ingredients: ingBank, products: prodBank });
-      if (resolved.level === 'category') return `📂 ${resolved.categoryId}`;
-      if (resolved.level === 'root') return `📦 ${resolved.name}`;
       if (resolved.level === 'subtype') return `🏷️ ${resolved.name}`;
+      if (resolved.level === 'root') return `📦 ${resolved.name}`;
+      if (resolved.level === 'category') return `📂 ${resolved.categoryId}`;
       return `📦 ${resolvedProd.name}`;
     }
   }
@@ -228,28 +236,46 @@ export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [],
   const iBank = Array.isArray(ingredientsBank) && ingredientsBank.length ? ingredientsBank : (getState()?.ingredients || getState()?.rootItems || []);
 
   let selectedVal = 'new_item';
-  if (item.categoryId) {
-    selectedVal = `cat:${item.categoryId}`;
-  } else if (item.subtypeId && item.ingredientId) {
-    selectedVal = `${item.ingredientId}:${item.subtypeId}`;
+  if (item.subtypeId) {
+    let parentIngId = item.ingredientId;
+    if (!parentIngId) {
+      const foundRoot = (iBank || []).find(i => (i.subtypes || []).some(s => String(s.id) === String(item.subtypeId)));
+      if (foundRoot) parentIngId = foundRoot.id;
+    }
+    if (parentIngId) {
+      selectedVal = `${parentIngId}:${item.subtypeId}`;
+    } else {
+      selectedVal = `:${item.subtypeId}`;
+    }
   } else if (item.ingredientId && item.ingredientId !== 'new_item') {
     selectedVal = item.ingredientId;
+  } else if (item.isCategoryDefault || (item.categoryId && !item.ingredientId && !item.subtypeId)) {
+    selectedVal = `cat:${item.categoryId}`;
   } else if (item.productId || item.bankId) {
     const prodId = item.productId || item.bankId;
     const prod = pBank.find(p => String(p.id) === String(prodId));
     if (prod) {
       const resolved = resolveHighestAutoDefaultTaxonomy(prod, { ingredients: iBank, products: pBank });
-      if (resolved.level === 'category') selectedVal = `cat:${resolved.categoryId}`;
+      if (resolved.level === 'subtype') selectedVal = `${resolved.ingredientId}:${resolved.subtypeId}`;
       else if (resolved.level === 'root') selectedVal = resolved.ingredientId;
-      else if (resolved.level === 'subtype') selectedVal = `${resolved.ingredientId}:${resolved.subtypeId}`;
+      else if (resolved.level === 'category') selectedVal = `cat:${resolved.categoryId}`;
       else selectedVal = `prod:${prodId}`;
     } else {
       selectedVal = `prod:${prodId}`;
     }
+  } else if (typeof resolveProductForIngredient === 'function') {
+    const resolvedProd = resolveProductForIngredient(item, { products: pBank, ingredients: iBank });
+    if (resolvedProd) {
+      const resolved = resolveHighestAutoDefaultTaxonomy(resolvedProd, { ingredients: iBank, products: pBank });
+      if (resolved.level === 'subtype') selectedVal = `${resolved.ingredientId}:${resolved.subtypeId}`;
+      else if (resolved.level === 'root') selectedVal = resolved.ingredientId;
+      else if (resolved.level === 'category') selectedVal = `cat:${resolved.categoryId}`;
+      else selectedVal = `prod:${resolvedProd.id}`;
+    }
   }
 
   const selectedLabel = getTaxonomyLabel(item, iBank, pBank);
-  const isCat = Boolean(item.categoryId) || selectedVal.startsWith('cat:');
+  const isCat = (Boolean(item.isCategoryDefault) || (Boolean(item.categoryId) && !item.ingredientId && !item.subtypeId)) || selectedVal.startsWith('cat:');
   const catInputStyle = isCat ? 'background:var(--badge-blue-bg); border:1px solid var(--badge-blue-border); color:var(--badge-blue-text); font-weight:600;' : 'background:var(--surface,#fff); border:1px solid var(--border,#ccc); color:var(--text);';
 
   return `
