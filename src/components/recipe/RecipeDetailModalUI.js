@@ -233,22 +233,32 @@ export function renderRecipeDetailModalContent(props = {}) {
   return `
     <div class="recipe-view-sheet">
       <div class="recipe-view-nav">
-        <div class="recipe-view-nav-title">
-          <h2>${name}</h2>
-          <div class="recipe-view-nav-subtitle">
-            ${isFav ? '<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favourite</span>' : ''}
-            ${isEnh ? '<span class="tag enhanced-pill">✨ Enhanced</span>' : ''}
-            ${activeR.time ? `<span>⏱ ${activeR.time}m prep</span> · ` : ''}
-            <span>${toTitle(mealType || 'Dinner')}</span>
-            <span>·</span>
-            <span>Serves ${baseServes} baseline</span>
-            ${instanceId ? '<span class="tag" style="background:var(--purple-bg);color:var(--purple);font-size:11px">Planned Meal</span>' : ''}
-            ${fitPillHtml}
+        <div class="recipe-view-nav-main">
+          <div class="recipe-view-nav-title">
+            <h2>${name}</h2>
+            <div class="recipe-view-nav-subtitle">
+              ${isFav ? '<span class="tag fav-tag" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;font-weight:600">❤️ Favourite</span>' : ''}
+              ${isEnh ? '<span class="tag enhanced-pill">✨ Enhanced</span>' : ''}
+              ${activeR.time ? `<span>⏱ ${activeR.time}m prep</span> · ` : ''}
+              <span>${toTitle(mealType || 'Dinner')}</span>
+              <span>·</span>
+              <span>Serves ${baseServes} baseline</span>
+              ${instanceId ? '<span class="tag" style="background:var(--purple-bg);color:var(--purple);font-size:11px">Planned Meal</span>' : ''}
+              ${fitPillHtml}
+            </div>
+          </div>
+          <div class="recipe-view-nav-icons">
+            <button type="button" id="modal-recipe-fav-btn" class="recipe-fav-btn ${favBtnClass}" data-action="toggleRecipeFavourite('${escapeAttr(r.id)}', event, '${escapeAttr(variantKey)}')" data-recipe-id="${escapeAttr(r.id)}" data-variant="${escapeAttr(variantKey)}" aria-label="${isFav ? 'Remove from favourites' : 'Add to favourites'}" title="${isFav ? 'Favourited' : 'Add to favourites'}">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+              </svg>
+            </button>
+            <button type="button" class="modal-close-btn recipe-view-close-btn" onclick="closeRecipePreview()" aria-label="Close">&times;</button>
           </div>
         </div>
         <div class="recipe-view-nav-actions" style="display:flex;align-items:center;gap:8px">
           ${hasEnh ? `
-            <div class="segmented-control" role="tablist" style="width:fit-content;transform:scale(0.9);transform-origin:right center;">
+            <div class="segmented-control" role="tablist" style="width:fit-content;transform:scale(0.9);transform-origin:left center;">
               <button type="button" role="tab" class="${!isEnh ? 'active' : ''}" onclick="switchViewTab('original')">Original</button>
               <button type="button" role="tab" class="${isEnh ? 'active' : ''}" onclick="switchViewTab('enhanced')">✨ Enhanced</button>
             </div>
@@ -267,85 +277,107 @@ export function renderRecipeDetailModalContent(props = {}) {
               🗑️ Remove Variant
             </button>
           ` : ''}
-          <button type="button" id="modal-recipe-fav-btn" class="recipe-fav-btn ${favBtnClass}" data-action="toggleRecipeFavourite('${escapeAttr(r.id)}', event, '${escapeAttr(variantKey)}')" data-recipe-id="${escapeAttr(r.id)}" data-variant="${escapeAttr(variantKey)}" aria-label="${isFav ? 'Remove from favourites' : 'Add to favourites'}" title="${isFav ? 'Favourited' : 'Add to favourites'}">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-            </svg>
-          </button>
-          <button type="button" class="modal-close-btn recipe-view-close-btn" onclick="closeRecipePreview()" aria-label="Close">&times;</button>
         </div>
       </div>
 
       <style>
         #view-modal-content { max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; }
         .recipe-view-sheet { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-        .recipe-modal-crossbar{width:100%;background:var(--surface2,#f5f4ee);border:1px solid var(--border,#e5e5e5);border-radius:10px;padding:8px 12px;margin-bottom:10px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px}
-        .recipe-modal-crossbar-controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;flex:1 1 300px}
-        .recipe-modal-crossbar-macros{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;flex:1 1 360px}
-        .recipe-modal-body{display:grid;grid-template-columns:1fr 1.2fr;gap:18px;align-items:start; overflow-y: auto; flex: 1 1 auto; min-height: 0; padding-right: 8px; -webkit-overflow-scrolling: touch;}
-        @media(max-width:768px){.recipe-modal-crossbar{flex-direction:column;align-items:stretch;padding:10px;gap:10px}.recipe-modal-crossbar-macros{justify-content:stretch}.recipe-modal-body{grid-template-columns:1fr;gap:14px}}
-        .recipe-modal-col-card{background:var(--surface,#ffffff);border:1px solid var(--border,#e5e5e5);border-radius:12px;padding:14px 16px}
-        .recipe-method-step-card{position:relative;padding:10px 12px 10px 38px;margin-bottom:8px;background:var(--surface2,#faf9f6);border:1px solid var(--border,#eee);border-radius:10px;font-size:13.5px;line-height:1.5;color:var(--text)}
-        .recipe-method-step-card:last-child{margin-bottom:0}
-        .recipe-method-step-card .step-num{position:absolute;left:10px;top:10px;width:20px;height:20px;border-radius:50%;background:var(--text,#292524);color:var(--bg,#fff);font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+        .recipe-view-nav { position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 95%, transparent); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); flex-shrink: 0; }
+        .recipe-view-scroll-body { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; min-height: 0; padding: 14px 18px 24px; }
+        .recipe-modal-crossbar { width: 100%; background: var(--surface2, #f5f4ee); border: 1px solid var(--border, #e5e5e5); border-radius: 12px; padding: 10px 14px; margin-bottom: 16px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+        .recipe-modal-crossbar-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; flex: 1 1 300px; }
+        .recipe-modal-crossbar-macros { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; flex: 1 1 360px; }
+        .recipe-modal-body { display: grid; grid-template-columns: 1fr 1.2fr; gap: 18px; align-items: start; }
+        .recipe-modal-col-card { background: var(--surface, #ffffff); border: 1px solid var(--border, #e5e5e5); border-radius: 12px; padding: 14px 16px; }
+        .recipe-method-step-card { position: relative; padding: 10px 12px 10px 38px; margin-bottom: 8px; background: var(--surface2, #faf9f6); border: 1px solid var(--border, #eee); border-radius: 10px; font-size: 13.5px; line-height: 1.5; color: var(--text); }
+        .recipe-method-step-card:last-child { margin-bottom: 0; }
+        .recipe-method-step-card .step-num { position: absolute; left: 10px; top: 10px; width: 20px; height: 20px; border-radius: 50%; background: var(--text, #292524); color: var(--bg, #fff); font-size: 10.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+        @media (min-width: 769px) {
+          .recipe-view-nav { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 20px; }
+          .recipe-view-nav-main { display: contents; }
+          .recipe-view-nav-title { order: 1; flex: 1 1 auto; min-width: 0; }
+          .recipe-view-nav-actions { order: 2; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+          .recipe-view-nav-icons { order: 3; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        }
+
+        @media (max-width: 768px) {
+          #view-modal-content { max-height: 100dvh; }
+          .recipe-view-sheet { height: 100dvh; }
+          .recipe-view-nav { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 12px; }
+          .recipe-view-nav-main { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; width: 100%; }
+          .recipe-view-nav-title { flex: 1 1 auto; min-width: 0; }
+          .recipe-view-nav-title h2 { font-size: 17px; line-height: 1.25; margin: 0; }
+          .recipe-view-nav-icons { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+          .recipe-view-nav-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; }
+          .recipe-view-scroll-body { padding: 10px 12px calc(48px + env(safe-area-inset-bottom, 24px)) !important; }
+          .recipe-modal-crossbar { flex-direction: column; align-items: stretch; padding: 10px 12px; gap: 10px; border-radius: 10px; margin-bottom: 12px; }
+          .recipe-modal-crossbar-controls { width: 100%; justify-content: space-between; flex: 1 1 auto; }
+          .recipe-modal-crossbar-macros { width: 100%; flex-direction: column; align-items: stretch; justify-content: stretch; gap: 6px; flex: 1 1 auto; }
+          .recipe-modal-body { grid-template-columns: 1fr; gap: 14px; }
+          .recipe-modal-col-card { padding: 12px 14px; border-radius: 10px; }
+        }
       </style>
 
-      ${sourceHtml ? `<div class="recipe-source-bar" style="font-size:12px;color:var(--text2);margin-bottom:8px">${sourceHtml}</div>` : ''}
+      <div class="recipe-view-scroll-body">
+        ${sourceHtml ? `<div class="recipe-source-bar" style="font-size:12px;color:var(--text2);margin-bottom:8px">${sourceHtml}</div>` : ''}
 
-      <!-- Top Full-Width Horizontal Crossbar -->
-      <div class="recipe-modal-crossbar">
-        <!-- Left: Controls -->
-        <div class="recipe-modal-crossbar-controls">
-          <div class="segmented-control" role="tablist">
-            <button type="button" role="tab" class="${servingMode === 'both' ? 'active' : ''}" onclick="switchPreviewServingMode('both')">Shared (${baseServes})</button>
-            <button type="button" role="tab" class="${servingMode === 'elliott' ? 'active' : ''}" onclick="switchPreviewServingMode('elliott')">👤 Elliott</button>
-            <button type="button" role="tab" class="${servingMode === 'chloe' ? 'active' : ''}" onclick="switchPreviewServingMode('chloe')">👤 Chloe</button>
+        <!-- Top Full-Width Horizontal Crossbar -->
+        <div class="recipe-modal-crossbar">
+          <!-- Left: Controls -->
+          <div class="recipe-modal-crossbar-controls">
+            <div class="segmented-control" role="tablist">
+              <button type="button" role="tab" class="${servingMode === 'both' ? 'active' : ''}" onclick="switchPreviewServingMode('both')">Shared (${baseServes})</button>
+              <button type="button" role="tab" class="${servingMode === 'elliott' ? 'active' : ''}" onclick="switchPreviewServingMode('elliott')">👤 Elliott</button>
+              <button type="button" role="tab" class="${servingMode === 'chloe' ? 'active' : ''}" onclick="switchPreviewServingMode('chloe')">👤 Chloe</button>
+            </div>
+            ${servingMode === 'both' ? `
+              <div style="display:flex;align-items:center;gap:6px;font-size:13px;">
+                <label for="preview-serves" style="font-weight:650;color:var(--text)">Servings:</label>
+                <input type="number" id="preview-serves" name="previewServes" value="${targetServes}" oninput="updateRecipePreviewScale(this.value)" style="width:62px;min-height:34px;padding:4px 6px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-weight:700;text-align:center" min="1" step="1">
+              </div>
+            ` : `
+              <div style="display:flex;align-items:center;gap:6px;font-size:13px;">
+                <label for="preview-single-serves" style="font-weight:650;color:var(--text)">Servings:</label>
+                <input type="number" id="preview-single-serves" name="previewSingleServes" value="${singleServes}" oninput="updateSinglePersonServes(this.value, '${servingMode}')" style="width:62px;min-height:34px;padding:4px 6px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-weight:700;text-align:center" min="1" step="1">
+              </div>
+            `}
           </div>
-          ${servingMode === 'both' ? `
-            <div style="display:flex;align-items:center;gap:6px;font-size:13px;">
-              <label for="preview-serves" style="font-weight:650;color:var(--text)">Servings:</label>
-              <input type="number" id="preview-serves" name="previewServes" value="${targetServes}" oninput="updateRecipePreviewScale(this.value)" style="width:62px;min-height:34px;padding:4px 6px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-weight:700;text-align:center" min="1" step="1">
-            </div>
-          ` : `
-            <div style="display:flex;align-items:center;gap:6px;font-size:13px;">
-              <label for="preview-single-serves" style="font-weight:650;color:var(--text)">Servings:</label>
-              <input type="number" id="preview-single-serves" name="previewSingleServes" value="${singleServes}" oninput="updateSinglePersonServes(this.value, '${servingMode}')" style="width:62px;min-height:34px;padding:4px 6px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-weight:700;text-align:center" min="1" step="1">
-            </div>
-          `}
-        </div>
 
-        <!-- Right: Per-Portion Macro Breakdown Compact Cards -->
-        <div class="recipe-modal-crossbar-macros">
-          ${macroCrossbarHtml}
-        </div>
-      </div>
-
-      ${servingModeBannerHtml ? `<div style="margin-bottom:12px">${servingModeBannerHtml}</div>` : ''}
-      ${allocationAndTargetHtml ? `<div style="margin-bottom:12px">${allocationAndTargetHtml}</div>` : ''}
-
-      <!-- Main Body: Two-Column Side-by-Side Grid (Ingredients Left, Method Right) -->
-      <div class="recipe-modal-body recipe-view-grid-layout">
-        <!-- Left Column: Ingredients -->
-        <div class="recipe-modal-col-ingredients recipe-modal-col-card" style="min-width:0">
-          <h3 style="margin-top:0;margin-bottom:12px;font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;justify-content:space-between">
-            <span>🥗 Ingredients</span>
-            ${ingredientsCount > 0 ? `<span style="font-size:12px;font-weight:600;color:var(--text2)">${ingredientsCount} items</span>` : ''}
-          </h3>
-          <div id="recipe-modal-ingredients-list">
-            ${ingredientsHtml}
+          <!-- Right: Per-Portion Macro Breakdown Compact Cards -->
+          <div class="recipe-modal-crossbar-macros">
+            ${macroCrossbarHtml}
           </div>
         </div>
 
-        <!-- Right Column: Method Steps -->
-        <div class="recipe-modal-col-method recipe-modal-col-card" style="min-width:0">
-          <h3 style="margin-top:0;margin-bottom:12px;font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;justify-content:space-between">
-            <span style="display:flex;align-items:center;gap:6px;">
-              <span>👨‍🍳 Method</span>
-              ${isEnh ? `<button type="button" class="btn sm secondary" data-action="copyMethodFromOriginalRecipe('${escapeAttr(recipeId)}')" style="font-size:11px;padding:2px 8px;font-weight:600;">📋 Copy from Original</button>` : ''}
-            </span>
-            ${stepsCount > 0 ? `<span style="font-size:12px;font-weight:600;color:var(--text2)">${stepsCount} steps</span>` : ''}
-          </h3>
-          ${methodHtml}
+        ${servingModeBannerHtml ? `<div style="margin-bottom:12px">${servingModeBannerHtml}</div>` : ''}
+        ${allocationAndTargetHtml ? `<div style="margin-bottom:12px">${allocationAndTargetHtml}</div>` : ''}
+
+        <!-- Main Body: Two-Column Side-by-Side Grid (Ingredients Left, Method Right) -->
+        <div class="recipe-modal-body recipe-view-grid-layout">
+          <!-- Left Column: Ingredients -->
+          <div class="recipe-modal-col-ingredients recipe-modal-col-card" style="min-width:0">
+            <h3 style="margin-top:0;margin-bottom:12px;font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;justify-content:space-between">
+              <span>🥗 Ingredients</span>
+              ${ingredientsCount > 0 ? `<span style="font-size:12px;font-weight:600;color:var(--text2)">${ingredientsCount} items</span>` : ''}
+            </h3>
+            <div id="recipe-modal-ingredients-list">
+              ${ingredientsHtml}
+            </div>
+          </div>
+
+          <!-- Right Column: Method Steps -->
+          <div class="recipe-modal-col-method recipe-modal-col-card" style="min-width:0">
+            <h3 style="margin-top:0;margin-bottom:12px;font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;justify-content:space-between">
+              <span style="display:flex;align-items:center;gap:6px;">
+                <span>👨‍🍳 Method</span>
+                ${isEnh ? `<button type="button" class="btn sm secondary" data-action="copyMethodFromOriginalRecipe('${escapeAttr(recipeId)}')" style="font-size:11px;padding:2px 8px;font-weight:600;">📋 Copy from Original</button>` : ''}
+              </span>
+              ${stepsCount > 0 ? `<span style="font-size:12px;font-weight:600;color:var(--text2)">${stepsCount} steps</span>` : ''}
+            </h3>
+            ${methodHtml}
+          </div>
         </div>
       </div>
     </div>
