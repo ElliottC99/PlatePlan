@@ -265,17 +265,21 @@ export function renderRecipePreview() {
   };
 
   const macroSplitHtml = `
-    <div class="recipe-modal-crossbar-macros" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px;">
-      <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4); font-size: 11.5px;">
-        <span style="font-weight:700;">👤 Elliott (${eSharePct}%):</span>
-        <span>🔥 <strong>${singleKcalE} kcal</strong> ${renderMacroBadge('kcal', kcalDiffE)}</span>
-        <span>💪 <strong>${singleProtE}g</strong> ${renderMacroBadge('prot', protDiffE)}</span>
+    <div style="display: flex; flex-direction: column; gap: 6px; width: 100%;">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4); font-size: 11.5px;">
+        <span style="font-weight:700; white-space: nowrap;">👤 Elliott (${eSharePct}%):</span>
+        <div style="display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;">
+          <span style="white-space: nowrap;">🔥 <strong>${singleKcalE} kcal</strong> ${renderMacroBadge('kcal', kcalDiffE)}</span>
+          <span style="white-space: nowrap;">💪 <strong>${singleProtE}g</strong> ${renderMacroBadge('prot', protDiffE)}</span>
+        </div>
       </div>
 
-      <div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4); font-size: 11.5px;">
-        <span style="font-weight:700;">👤 Chloe (${cSharePct}%):</span>
-        <span>🔥 <strong>${singleKcalC} kcal</strong> ${renderMacroBadge('kcal', kcalDiffC)}</span>
-        <span>💪 <strong>${singleProtC}g</strong> ${renderMacroBadge('prot', protDiffC)}</span>
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--surface, #fff); border: 1px solid var(--border, #e7e5e4); font-size: 11.5px;">
+        <span style="font-weight:700; white-space: nowrap;">👤 Chloe (${cSharePct}%):</span>
+        <div style="display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;">
+          <span style="white-space: nowrap;">🔥 <strong>${singleKcalC} kcal</strong> ${renderMacroBadge('kcal', kcalDiffC)}</span>
+          <span style="white-space: nowrap;">💪 <strong>${singleProtC}g</strong> ${renderMacroBadge('prot', protDiffC)}</span>
+        </div>
       </div>
     </div>
   `;
