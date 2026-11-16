@@ -36,6 +36,7 @@ import { getState, setCategories, setIngredients, setProducts } from '../src/sto
 import { getUnifiedCategories, saveCategories } from '../src/services/CategoryRepository.js';
 import { renameCategory, deleteCategory } from '../src/services/CategoryManagementRepository.js';
 import { commitAtomicChain } from '../src/services/PantryTaxonomyService.js';
+import { createTaxonomySearchInput } from '../src/components/pantry/RecipeSearchDropdownHelper.js';
 
 console.log('=== RUNNING CATEGORY MANAGEMENT & HIERARCHY TEST SUITE ===\n');
 
@@ -191,6 +192,67 @@ await runAsyncTest('commitAtomicChain creates Category -> Item -> Sub-type -> Pr
   assert.ok(prod, 'Product must exist in state');
   assert.strictEqual(String(prod.ingredientId), String(root.id), 'Product must be linked to rootItem id');
   assert.strictEqual(String(prod.subtypeId), String(sub.id), 'Product must be linked to subtype id');
+});
+
+// 6. Category Search Input: Unified Categories ("Noodles") and Strict Category-Only / Root-Item-Only Filtering
+runTest('createTaxonomySearchInput shows unified categories (including Noodles) and filters strictly to categories in category mode', () => {
+  setCategories(['Produce', 'Dairy & Eggs']);
+  setIngredients([
+    {
+      id: 'ing-noodle-1',
+      name: 'Egg Noodles',
+      category: 'Noodles',
+      subtypes: [{ id: 'sub-med-noodle', name: 'Medium Egg Noodles', category: 'Noodles' }]
+    }
+  ]);
+
+  const makeMockContainer = () => {
+    const inputObj = { value: '', dataset: {}, onfocus: null, oninput: null };
+    const dropdownObj = {
+      innerHTML: '',
+      style: { display: 'none' },
+      querySelectorAll: () => []
+    };
+    return {
+      innerHTML: '',
+      contains: () => false,
+      querySelector: (sel) => (sel.endsWith('-dropdown') ? dropdownObj : inputObj),
+      _input: inputObj,
+      _dropdown: dropdownObj
+    };
+  };
+
+  const catContainer = makeMockContainer();
+  const catInst = createTaxonomySearchInput({
+    container: catContainer,
+    categories: getUnifiedCategories(getState()),
+    rootItems: [],
+    newItemType: 'category',
+    categoriesOnly: true
+  });
+  catContainer._input.onfocus();
+  const catHtml = catContainer._dropdown.innerHTML;
+
+  assert.ok(catHtml.includes('Noodles'), 'Category dropdown must include unified category "Noodles" even when absent from raw state.categories');
+  assert.ok(catHtml.includes('wiz-tax-category'), 'Category dropdown must render category options');
+  assert.ok(!catHtml.includes('wiz-tax-main'), 'Category dropdown must NOT render Root Items');
+  assert.ok(!catHtml.includes('wiz-tax-sub'), 'Category dropdown must NOT render Sub-Types');
+  catInst.destroy();
+
+  const rootContainer = makeMockContainer();
+  const rootInst = createTaxonomySearchInput({
+    container: rootContainer,
+    categories: [],
+    rootItems: getState().ingredients,
+    rootItemsOnly: true
+  });
+  rootContainer._input.onfocus();
+  const rootHtml = rootContainer._dropdown.innerHTML;
+
+  assert.ok(rootHtml.includes('wiz-tax-main'), 'Root-item-only dropdown must render Root Items');
+  assert.ok(!rootHtml.includes('wiz-tax-category'), 'Root-item-only dropdown must NOT render Categories');
+  assert.ok(!rootHtml.includes('wiz-tax-sub'), 'Root-item-only dropdown must NOT render Sub-Types');
+  rootInst.destroy();
 });
 
 console.log('\n=== CATEGORY MANAGEMENT & HIERARCHY TEST RUN COMPLETE ===');

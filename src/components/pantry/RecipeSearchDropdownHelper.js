@@ -6,6 +6,7 @@
  */
 
 import { getState } from '../../store/store.js';
+import { getUnifiedCategories } from '../../services/CategoryRepository.js';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
@@ -27,6 +28,8 @@ export function createTaxonomySearchInput({
   rootItems = [],
   products = [],
   subtypesOnly = false,
+  categoriesOnly = false,
+  rootItemsOnly = false,
   placeholder = 'Search category, item, or sub-type...',
   initialValue = '',
   inputId = '',
@@ -39,7 +42,11 @@ export function createTaxonomySearchInput({
   const uniqueId = inputId || `tax-search-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
   const resolvedNewType = newItemType !== null 
     ? newItemType 
-    : (subtypesOnly ? 'subtype' : (categories.length > 0 && rootItems.length === 0 ? 'category' : (rootItems.length > 0 ? 'item' : 'none')));
+    : (categoriesOnly ? 'category' : (rootItemsOnly ? 'item' : (subtypesOnly ? 'subtype' : (categories.length > 0 && rootItems.length === 0 ? 'category' : (rootItems.length > 0 ? 'item' : 'none')))));
+  const isCategoriesOnly = Boolean(categoriesOnly || resolvedNewType === 'category');
+  const isRootItemsOnly = Boolean(rootItemsOnly);
+  const isItemsMode = Boolean(isRootItemsOnly || resolvedNewType === 'item' || (!isCategoriesOnly && !subtypesOnly && categories.length === 0 && rootItems.length > 0));
+  const isProductsOnly = Boolean(products.length > 0 && rootItems.length === 0 && categories.length === 0 && !isCategoriesOnly && !isItemsMode && !subtypesOnly);
 
   container.innerHTML = `
     <div class="wiz-tax-autocomplete-container" style="position:relative; width:100%;">
@@ -95,18 +102,23 @@ export function createTaxonomySearchInput({
     }
 
     const state = (typeof getState === 'function' ? getState() : null) || (typeof window !== 'undefined' ? (window.Store?.getState?.() || window.state) : null) || {};
-    const liveRootItems = Array.isArray(state?.ingredients) && state.ingredients.length > 0 
-      ? state.ingredients 
-      : rootItems;
-    const liveCategories = Array.isArray(state?.categories) && state.categories.length > 0 
-      ? state.categories 
-      : categories;
-    const liveProducts = Array.isArray(products) && products.length > 0
-      ? products
-      : (Array.isArray(state?.products) ? state.products : []);
+    const liveRootItems = Array.isArray(rootItems) && rootItems.length > 0
+      ? rootItems
+      : (Array.isArray(state?.ingredients) ? state.ingredients : []);
+
+    const catMap = new Map();
+    const addCat = (c) => {
+      const name = typeof c === 'string' ? c.trim() : String(c?.name || c?.categoryName || '').trim();
+      if (!name) return;
+      const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (key && !catMap.has(key)) catMap.set(key, name);
+    };
+    (getUnifiedCategories(state) || []).forEach(addCat);
+    (Array.isArray(categories) ? categories : []).forEach(addCat);
+    const liveCategories = Array.from(catMap.values()).sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
 
     // Dedicated Product Search Mode (e.g. within AddItemWizard existing product picker)
-    if (products.length > 0 && liveRootItems.length === 0 && liveCategories.length === 0) {
+    if (isProductsOnly) {
       products.forEach(prod => {
         if (!prod) return;
         const pName = String(prod.name || prod.title || '');
@@ -116,6 +128,19 @@ export function createTaxonomySearchInput({
           html += `
             <div class="wiz-tax-opt wiz-tax-product" data-val="${escapeAttr(prod.id)}" data-label="${escapeAttr(pName)}${pBrand ? ` (${escapeAttr(pBrand)})` : ''}" style="padding:6px 10px; font-size:12px; cursor:pointer; color:var(--text,#1c1917); border-bottom:1px solid rgba(0,0,0,0.03);">
               🛒 <strong>${escapeHtml(pName)}</strong> ${pBrand ? `<span style="font-size:10.5px; color:var(--text2,#78716c);">(${escapeHtml(pBrand)})</span>` : ''}
+            </div>
+          `;
+        }
+      });
+    } else if (isCategoriesOnly) {
+      // Strictly Categories Only
+      (liveCategories || []).forEach(rawCat => {
+        const catName = typeof rawCat === 'string' ? rawCat : (rawCat?.name || rawCat?.categoryName || '');
+        if (!catName) return;
+        if (matchesTokens(catName)) {
+          html += `
+            <div class="wiz-tax-opt wiz-tax-category" data-val="cat:${escapeAttr(catName)}" data-label="📂 [Category] ${escapeAttr(catName)}" style="padding:7px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--purple,#4f46e5); background:var(--surface2,#f5f4ee); border-bottom:1px solid var(--border,#eee);">
+              📂 <span class="badge" style="background:#eef2ff; color:#4f46e5; font-size:10px; padding:1px 5px; border-radius:4px; margin-right:4px;">[Category]</span> ${escapeHtml(catName)}
             </div>
           `;
         }
@@ -143,18 +168,20 @@ export function createTaxonomySearchInput({
         });
       });
     } else {
-      // Render Categories
-      (liveCategories || []).forEach(rawCat => {
-        const catName = typeof rawCat === 'string' ? rawCat : (rawCat?.name || rawCat?.categoryName || '');
-        if (!catName) return;
-        if (matchesTokens(catName)) {
-          html += `
-            <div class="wiz-tax-opt wiz-tax-category" data-val="cat:${escapeAttr(catName)}" data-label="📂 [Category] ${escapeAttr(catName)}" style="padding:7px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--purple,#4f46e5); background:var(--surface2,#f5f4ee); border-bottom:1px solid var(--border,#eee);">
-              📂 <span class="badge" style="background:#eef2ff; color:#4f46e5; font-size:10px; padding:1px 5px; border-radius:4px; margin-right:4px;">[Category]</span> ${escapeHtml(catName)}
-            </div>
-          `;
-        }
-      });
+      // Render Categories unless in Root-Item-Only / Item-Only mode
+      if (!isItemsMode) {
+        (liveCategories || []).forEach(rawCat => {
+          const catName = typeof rawCat === 'string' ? rawCat : (rawCat?.name || rawCat?.categoryName || '');
+          if (!catName) return;
+          if (matchesTokens(catName)) {
+            html += `
+              <div class="wiz-tax-opt wiz-tax-category" data-val="cat:${escapeAttr(catName)}" data-label="📂 [Category] ${escapeAttr(catName)}" style="padding:7px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--purple,#4f46e5); background:var(--surface2,#f5f4ee); border-bottom:1px solid var(--border,#eee);">
+                📂 <span class="badge" style="background:#eef2ff; color:#4f46e5; font-size:10px; padding:1px 5px; border-radius:4px; margin-right:4px;">[Category]</span> ${escapeHtml(catName)}
+              </div>
+            `;
+          }
+        });
+      }
 
       // Render Root Items & Sub-types
       (liveRootItems || []).forEach(item => {
@@ -164,7 +191,7 @@ export function createTaxonomySearchInput({
         const subTypes = Array.isArray(item.subtypes) ? item.subtypes : [];
 
         const itemMatches = matchesTokens(`${itemName} ${itemCat}`);
-        const matchingSubtypes = subTypes.filter(s => matchesTokens(`${s?.name || ''} ${itemName} ${itemCat}`));
+        const matchingSubtypes = isRootItemsOnly ? [] : subTypes.filter(s => matchesTokens(`${s?.name || ''} ${itemName} ${itemCat}`));
 
         if (itemMatches || matchingSubtypes.length > 0) {
           html += `
@@ -173,15 +200,17 @@ export function createTaxonomySearchInput({
             </div>
           `;
 
-          (itemMatches ? subTypes : matchingSubtypes).forEach(sub => {
-            if (!sub) return;
-            const subKey = `${item.id}:${sub.id || sub.name}`;
-            html += `
-              <div class="wiz-tax-opt wiz-tax-sub" data-val="${escapeAttr(subKey)}" data-label="🏷️ ${escapeAttr(sub.name)} (${escapeAttr(item.name)})" style="padding:5px 10px 5px 24px; font-size:11.5px; cursor:pointer; color:var(--text,#1c1917); border-bottom:1px solid rgba(0,0,0,0.03);">
-                ↳ 🏷️ ${escapeHtml(sub.name)}
-              </div>
-            `;
-          });
+          if (!isRootItemsOnly) {
+            (itemMatches ? subTypes : matchingSubtypes).forEach(sub => {
+              if (!sub) return;
+              const subKey = `${item.id}:${sub.id || sub.name}`;
+              html += `
+                <div class="wiz-tax-opt wiz-tax-sub" data-val="${escapeAttr(subKey)}" data-label="🏷️ ${escapeAttr(sub.name)} (${escapeAttr(item.name)})" style="padding:5px 10px 5px 24px; font-size:11.5px; cursor:pointer; color:var(--text,#1c1917); border-bottom:1px solid rgba(0,0,0,0.03);">
+                  ↳ 🏷️ ${escapeHtml(sub.name)}
+                </div>
+              `;
+            });
+          }
         }
       });
     }
