@@ -4,12 +4,14 @@
  * Dedicated service for data alignment, fit score recalculation, and batch migrations.
  */
 
-import { getState, setRecipes } from '../store/store.js';
+import { getState, setRecipes, setIngredients, setProducts } from '../store/store.js';
 import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
 import { batchUpdateRecipesInDb } from './HouseholdRepository.js';
 import { calculateItemNutrition } from './NutritionService.js';
 import { resolveDefaultProduct } from './PantryHierarchyService.js';
 import { resolveDynamicProductForIngredient } from './PantryTaxonomyService.js';
+import { cleanIngredientPhraseForAlias, normalizeTaxonomyName } from './RecipeIngredientParser.js';
+import { isNonDiscreteBulkIngredient } from './UnitConversionService.js';
 
 /**
  * Re-aligns fit scores for all existing recipes using the current FitScoreEngine formulas,
@@ -411,13 +413,159 @@ export async function migrateLegacyRecipeProductBindings(options = {}) {
   return { success: true, migratedCount: updates.length, updates };
 }
 
+function parseEmbeddedItemCount(name = '', notes = '') {
+  const n = String(name || '');
+  const nt = String(notes || '');
+  const nameCountMatch = n.match(/^(\d+)\s+(?:pack\s+of\s+)?([a-zA-Z\s]+)/i) ||
+                         n.match(/\b(\d+)\s+(?:[a-zA-Z&'-]+\s+)*(?:pack|burgers?|patties?|pieces?|items?|sausages?|fillets?|slices?|wraps?|buns?|rolls?|bagels?|pittas?|naans?|eggs?)\b/i) ||
+                         n.match(/\b(?:pack of|box of)\s*(\d+)\b/i);
+  if (nameCountMatch) return parseInt(nameCountMatch[1], 10);
+  if (/\btwin\s*pack\b/i.test(n)) return 2;
+  if (nt) {
+    const notesCountMatch = nt.match(/\b(\d+)\s*(?:[a-zA-Z&'-]+\s+)*(?:pack|burgers?|patties?|pieces?|items?|sausages?|fillets?|slices?|wraps?|buns?)\b/i);
+    if (notesCountMatch) return parseInt(notesCountMatch[1], 10);
+  }
+  return 0;
+}
+
+/**
+ * Sanitizes existing stored aliases on Root Items and Sub-Types (stripping measurements,
+ * containers, self-matching names, and duplicates) and fixes products where itemWeight
+ * was erroneously set equal to packSize by earlier Tesco bookmarklet imports.
+ */
+export async function sanitizeStoredAliasesAndItemWeights(options = {}) {
+  const isDryRun = Boolean(options.dryRun);
+  const state = typeof getState === 'function' ? getState() : {};
+  const ingredients = Array.isArray(state.ingredients) ? state.ingredients : [];
+  const products = Array.isArray(state.products) ? state.products : [];
+
+  const cleanAliasArray = (aliases, ...ownNames) => {
+    if (!Array.isArray(aliases)) return [];
+    const ownSet = new Set(ownNames.map(n => normalizeTaxonomyName(n)).filter(Boolean));
+    const seen = new Set();
+    const out = [];
+    for (const raw of aliases) {
+      const cleaned = cleanIngredientPhraseForAlias(raw).toLowerCase().trim();
+      if (!cleaned || cleaned.length < 2) continue;
+      if (ownSet.has(cleaned) || seen.has(cleaned)) continue;
+      seen.add(cleaned);
+      out.push(cleaned);
+    }
+    return out;
+  };
+
+  const arraysEqual = (a, b) => {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  };
+
+  const changedIngredients = [];
+  const updatedIngredients = ingredients.map(ing => {
+    if (!ing || typeof ing !== 'object') return ing;
+    let mutated = false;
+    const nextAliases = cleanAliasArray(ing.aliases || [], ing.name);
+    if (!arraysEqual(ing.aliases || [], nextAliases)) {
+      mutated = true;
+    }
+    const nextSubtypes = Array.isArray(ing.subtypes)
+      ? ing.subtypes.map(sub => {
+          if (!sub || typeof sub !== 'object') return sub;
+          const nextSubAliases = cleanAliasArray(sub.aliases || [], sub.name, ing.name);
+          if (!arraysEqual(sub.aliases || [], nextSubAliases)) {
+            mutated = true;
+            return { ...sub, aliases: nextSubAliases };
+          }
+          return sub;
+        })
+      : ing.subtypes;
+
+    if (mutated) {
+      const updated = {
+        ...ing,
+        aliases: nextAliases,
+        ...(Array.isArray(nextSubtypes) ? { subtypes: nextSubtypes } : {}),
+        updatedAt: new Date().toISOString()
+      };
+      changedIngredients.push(updated);
+      return updated;
+    }
+    return ing;
+  });
+
+  if (changedIngredients.length > 0) {
+    setIngredients(updatedIngredients);
+    if (getState()) {
+      getState().ingredients = updatedIngredients;
+      getState().rootItems = updatedIngredients;
+    }
+    if (!isDryRun) {
+      try {
+        const { saveRootItem } = await import('./RootItemRepository.js');
+        await Promise.all(changedIngredients.map(ing => saveRootItem(ing)));
+      } catch (err) {
+        console.warn('[MaintenanceService] Failed persisting sanitized ingredient aliases:', err);
+      }
+    }
+  }
+
+  const changedProducts = [];
+  const updatedProducts = products.map(p => {
+    if (!p || typeof p !== 'object') return p;
+    const packSize = Number(p.packSize ?? p.pack ?? 0);
+    const itemWeight = Number(p.itemWeight ?? 0);
+    if (itemWeight > 0 && packSize > 0 && itemWeight === packSize) {
+      const explicitCount = Number(p.itemCount || 0);
+      const parsedCount = explicitCount > 1 ? explicitCount : parseEmbeddedItemCount(p.name || p.title, p.notes);
+      const packUnit = String(p.packUnit || p.unit || 'g').toLowerCase();
+      if (parsedCount > 1 && parsedCount <= 100) {
+        const baseWeight = Number(p.drainedWeight || packSize);
+        const derivedWeight = Math.round((baseWeight / parsedCount) * 10) / 10;
+        const updated = { ...p, itemWeight: derivedWeight, updatedAt: new Date().toISOString() };
+        changedProducts.push(updated);
+        return updated;
+      } else if (isNonDiscreteBulkIngredient(p.name || p.title, p.category) || (packUnit !== 'each' && packUnit !== 'item' && packUnit !== 'units')) {
+        const updated = { ...p, itemWeight: null, updatedAt: new Date().toISOString() };
+        changedProducts.push(updated);
+        return updated;
+      }
+    }
+    return p;
+  });
+
+  if (changedProducts.length > 0) {
+    setProducts(updatedProducts);
+    if (getState()) getState().products = updatedProducts;
+    if (!isDryRun) {
+      try {
+        const { saveProduct } = await import('./ProductRepository.js');
+        await Promise.all(changedProducts.map(p => saveProduct(p)));
+      } catch (err) {
+        console.warn('[MaintenanceService] Failed persisting sanitized product itemWeights:', err);
+      }
+    }
+  }
+
+  return {
+    success: true,
+    cleanedIngredientsCount: changedIngredients.length,
+    cleanedProductsCount: changedProducts.length
+  };
+}
+
+export const sanitizeStoredIngredientAliases = sanitizeStoredAliasesAndItemWeights;
+
 if (typeof window !== 'undefined') {
   window.MaintenanceService = {
     alignAllFitScores,
     recalculateAllRecipeMacros,
-    migrateLegacyRecipeProductBindings
+    migrateLegacyRecipeProductBindings,
+    sanitizeStoredAliasesAndItemWeights
   };
   window.alignAllFitScores = alignAllFitScores;
   window.recalculateAllRecipeMacros = recalculateAllRecipeMacros;
   window.migrateLegacyRecipeProductBindings = migrateLegacyRecipeProductBindings;
+  window.sanitizeStoredAliasesAndItemWeights = sanitizeStoredAliasesAndItemWeights;
 }

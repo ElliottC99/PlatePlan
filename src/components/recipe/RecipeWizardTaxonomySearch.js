@@ -13,6 +13,8 @@ import { getUnifiedCategories } from '../../services/HouseholdRepository.js';
 import { openTaxonomyCreationModal } from './RecipeWizardTaxonomyModal.js';
 import { resolveProductForIngredient } from './RecipeWizardStep3Handlers.js';
 import { stemIngredientName, cleanIngredientPhraseForAlias } from '../../services/RecipeIngredientParser.js';
+import { isNonDiscreteBulkIngredient, isLiquidIngredient } from '../../services/UnitConversionService.js';
+import { resolveProductItemWeight } from '../../services/NutritionService.js';
 
 /**
  * Pure helper to filter taxonomy root items and subtypes by query (including aliases and linked products).
@@ -140,6 +142,54 @@ export function isIngredientUnlinked(item, products = [], ingredients = []) {
   if (item.productId && (products || []).some(p => String(p.id) === String(item.productId))) return false;
   if (item.bankId && (products || []).some(p => String(p.id) === String(item.bankId))) return false;
   return true;
+}
+
+const SELF_WEIGHED_CULINARY_COUNT_REGEX = /^(?:.*\b)?(?:garlic|cloves?|bay\s+leaves?|bay\s+leaf|curry\s+leaves?|curry\s+leaf|lime\s+leaves?|lime\s+leaf|vine\s+leaves?|vine\s+leaf|salad\s+leaves?|stock\s*cubes?|cubes?|water)\b/i;
+
+/**
+ * Evaluates whether a Step 2 ingredient row using `unit === 'qty'` has an invalid/uncalculable quantity:
+ * - `bulk_item_in_qty`: A non-discrete bulk ingredient (e.g. natural yoghurt, milk, flour, oil) measured in `qty`
+ *   when the mapped product does not have a genuine single-item weight (`itemWeight`).
+ * - `missing_product_item_weight`: A discrete ingredient measured in `qty` mapped to a product that lacks a calculable `itemWeight`.
+ */
+export function getIngredientQtyValidationIssue(item, productsBank = [], ingredientsBank = []) {
+  if (!item || typeof item !== 'object') return { invalid: false };
+  const unit = String(item.unit || '').toLowerCase().trim();
+  if (unit !== 'qty') return { invalid: false };
+
+  const name = String(item.name || item.raw || '').trim();
+  if (SELF_WEIGHED_CULINARY_COUNT_REGEX.test(name)) {
+    return { invalid: false };
+  }
+
+  const pBank = Array.isArray(productsBank) && productsBank.length ? productsBank : (getState()?.products || []);
+  const iBank = Array.isArray(ingredientsBank) && ingredientsBank.length ? ingredientsBank : (getState()?.ingredients || getState()?.rootItems || []);
+
+  const resolvedProd = typeof resolveProductForIngredient === 'function'
+    ? resolveProductForIngredient(item, { products: pBank, ingredients: iBank })
+    : null;
+  const prodItemWeight = resolvedProd ? resolveProductItemWeight(resolvedProd) : 0;
+
+  if ((item.isInvalidQtyUnit || isNonDiscreteBulkIngredient(name)) && prodItemWeight <= 0) {
+    return {
+      invalid: true,
+      reason: 'bulk_item_in_qty',
+      suggestedUnit: isLiquidIngredient(name) ? 'ml' : 'g',
+      resolvedProd: resolvedProd || null
+    };
+  }
+
+  const unlinked = isIngredientUnlinked(item, pBank, iBank);
+  if (!unlinked && resolvedProd && prodItemWeight <= 0) {
+    return {
+      invalid: true,
+      reason: 'missing_product_item_weight',
+      suggestedUnit: 'g',
+      resolvedProd
+    };
+  }
+
+  return { invalid: false };
 }
 
 export function getTaxonomyLabel(arg1, arg2, arg3 = '', arg4 = [], arg5 = null, arg6 = []) {

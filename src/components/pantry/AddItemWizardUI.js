@@ -282,7 +282,7 @@ export function openAddItemWizard(options = {}) {
     const catContainer = document.getElementById('wiz-cat-container');
     if (catContainer) {
       activeDropdownInstance = createTaxonomySearchInput({
-        container: catContainer, categories, rootItems: [], newItemType: 'category', placeholder: 'Search or type category...', initialValue: wizardData.category,
+        container: catContainer, categories, rootItems: [], newItemType: 'category', categoriesOnly: true, placeholder: 'Search or type category...', initialValue: wizardData.category,
         onSelect: ({ label, val }) => {
           let cat = label.replace(/^[📂📦🏷️✨\s]+/, '').replace(/^\[Category\]\s*/i, '').trim();
           if (val && val.startsWith('cat:')) cat = val.replace('cat:', '');
@@ -300,6 +300,7 @@ export function openAddItemWizard(options = {}) {
         categories: [],
         rootItems: displayRootItems,
         newItemType: 'item',
+        rootItemsOnly: true,
         placeholder: 'Search existing root item or type new...',
         initialValue: wizardData.itemName,
         onSelect: ({ label, val }) => {
@@ -346,7 +347,7 @@ export function openAddItemWizard(options = {}) {
     if (parentItemContainer) {
       const initVal = wizardData.selectedParentItem ? `📦 ${wizardData.selectedParentItem.name}` : '';
       activeDropdownInstance = createTaxonomySearchInput({
-        container: parentItemContainer, categories: [], rootItems, placeholder: 'Search existing root item...', initialValue: initVal,
+        container: parentItemContainer, categories: [], rootItems, rootItemsOnly: true, placeholder: 'Search existing root item...', initialValue: initVal,
         onSelect: ({ val }) => {
           const found = rootItems.find(r => String(r.id) === String(val));
           if (found) { wizardData.selectedParentItem = found; wizardData.itemName = found.name; wizardData.category = found.category || 'General'; }

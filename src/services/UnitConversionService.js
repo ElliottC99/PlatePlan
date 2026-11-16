@@ -94,10 +94,31 @@ const DEFAULT_ITEM_GRAMS = 100;
 
 const round1 = n => Math.round(n * 10) / 10;
 
+const DISCRETE_COUNTABLE_OVERRIDE = /\b(?:stock\s*cubes?|cubes?|sheets?|nests?|wraps?|tortillas?|buns?|rolls?|bagels?|pittas?|naans?|biscuits?|crackers?|eggs?|bay\s+leaves?|bay\s+leaf|curry\s+leaves?|curry\s+leaf|lime\s+leaves?|lime\s+leaf|vine\s+leaves?|vine\s+leaf|cloves?|bulbs?|heads?|sprigs?|stalks?|sticks?|slices?|fillets?|breasts?|thighs?|drumsticks?|wings?|sausages?|bangers?|burgers?|patties|patty|meatballs?|falafels?|dumplings?|gyozas?|bao)\b/i;
+
+const BULK_AMORPHOUS_PATTERN = /\b(?:yoghurt|yogurt|cream|creme\s+fraiche|crème\s+fraîche|mascarpone|ricotta|cottage\s+cheese|quark|butter|margarine|ghee|lard|flour|sugar|rice|pasta|spaghetti|penne|fusilli|macaroni|rigatoni|tagliatelle|linguine|orzo|noodles?|couscous|quinoa|bulgur|polenta|oats|porridge|granola|muesli|lentils?|beans?|chickpeas?|peas|sweetcorn|spinach|watercress|rocket|arugula|kale|salad\s+leaves|paste|pastes|puree|purees|purée|purées|pesto|chutney|jam|marmalade|peanut\s+butter|almond\s+butter|tahini|hummus|houmous|miso|harissa|gochujang|sambal|sriracha|hoisin|teriyaki|curry\s+powder|spices?|seasoning|paprika|cumin|turmeric|cinnamon|nutmeg|oregano|chopped\s+tomatoes|tinned\s+tomatoes|canned\s+tomatoes|plum\s+tomatoes|crushed\s+tomatoes|mince|grated|breadcrumbs|panko|cornflour|cornstarch|baking\s+powder|bicarbonate|yeast|cocoa|desiccated\s+coconut|chia\s+seeds|flaxseeds|linseeds|sesame\s+seeds|sunflower\s+seeds|pumpkin\s+seeds|pine\s+nuts)\b/i;
+
 export function isLiquidIngredient(name) {
   const lower = String(name || '').toLowerCase();
   if (NOT_LIQUID_PATTERN.test(lower)) return false;
   return LIQUID_PATTERN.test(lower);
+}
+
+/**
+ * Returns true if the ingredient is an amorphous, liquid, or bulk good that
+ * does not make sense as a bare discrete count ('qty') without a weight/volume.
+ */
+export function isNonDiscreteBulkIngredient(name, category = '') {
+  const lower = String(name || '').toLowerCase().trim();
+  if (!lower) return false;
+  if (DISCRETE_COUNTABLE_OVERRIDE.test(lower)) return false;
+  if (isLiquidIngredient(lower)) return true;
+  if (BULK_AMORPHOUS_PATTERN.test(lower)) return true;
+  const catLower = String(category || '').toLowerCase();
+  if (catLower.includes('oil') || catLower.includes('sauce') || catLower.includes('condiment')) {
+    return true;
+  }
+  return false;
 }
 
 export function findDensity(name) {
@@ -198,6 +219,7 @@ if (typeof window !== 'undefined') {
     convertToStrictUnit,
     toGrams,
     isLiquidIngredient,
+    isNonDiscreteBulkIngredient,
     getIngredientDensity
   };
 }

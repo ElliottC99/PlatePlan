@@ -1,5 +1,7 @@
 import assert from 'node:assert';
+import fs from 'node:fs';
 import { resolveProductItemWeight, calculateItemNutrition } from '../src/services/NutritionService.js';
+import { parseTescoProduct, guessItemWeight } from '../src/services/TescoImportService.js';
 
 console.log('=== RUNNING PRODUCT-DRIVEN ITEM WEIGHT SUITE ===\n');
 
@@ -86,5 +88,47 @@ assert.strictEqual(Math.round(cheeseNutrition.protein * 10) / 10, 12.6, '4 chees
 // 2 burger patties: 2 * 113g = 226g. At 200 kcal/100g:
 const burgerNutrition = calculateItemNutrition({ ...pNotesCount, cal: 200, prot: 18 }, 2, 'qty');
 assert.strictEqual(burgerNutrition.kcal, 452, '2 burger patties should equal 452 kcal');
+
+// 9. Bulk product with bookmarklet-copied itemWeight === packSize must NOT resolve to packSize as 1 item
+const pBulkYoghurt = parseTescoProduct({
+  name: 'Tesco Natural Yoghurt 500G',
+  brand: 'Tesco',
+  packSize: 500,
+  packUnit: 'g',
+  itemWeight: 500,
+  itemCount: 1,
+  cal: 65,
+  prot: 5.2
+});
+assert.strictEqual(pBulkYoghurt.success, true);
+assert(!pBulkYoghurt.data.itemWeight, 'Bulk 500g yoghurt must not copy packSize (500) into itemWeight');
+assert.strictEqual(
+  resolveProductItemWeight({ name: 'Tesco Natural Yoghurt 500G', packSize: 500, packUnit: 'g', itemWeight: 500, itemCount: 1 }),
+  0,
+  'resolveProductItemWeight must return 0 when itemWeight === packSize on a bulk product'
+);
+
+// 10. Multipack product where bookmarklet copied packSize into itemWeight must divide by embedded count
+assert.strictEqual(
+  resolveProductItemWeight({ name: 'Linda McCartney 6 Vegan Sausages', packSize: 270, itemWeight: 270, itemCount: 1 }),
+  45,
+  'Multipack with legacy itemWeight === packSize (270) must resolve to 270/6 = 45g'
+);
+
+const pBuns = parseTescoProduct({
+  name: 'Tesco Finest 4 Brioche Burger Buns 200G',
+  brand: 'Tesco',
+  packSize: 200,
+  packUnit: 'g',
+  itemWeight: 200,
+  itemCount: 1,
+  cal: 280,
+  prot: 8.5
+});
+assert.strictEqual(pBuns.data.itemWeight, 50, '4 Brioche Burger Buns 200G should derive itemWeight = 200 / 4 = 50g');
+
+// 11. ProductBankView unit dropdowns must not force-sync each other
+const pbvSource = fs.readFileSync(new URL('../src/views/ProductBankView.js', import.meta.url), 'utf8');
+assert(!pbvSource.includes('syncUnitSelects('), 'ProductBankView must not couple mi-pack-unit, mi-item-weight-unit, and mi-drained-weight-unit via syncUnitSelects');
 
 console.log('=== ALL PRODUCT-DRIVEN ITEM WEIGHT CHECKS PASSED ===');

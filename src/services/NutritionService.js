@@ -3,7 +3,7 @@
  * Pure macro calculation, calorie normalization, and nutritional rollup service.
  * Quarantined from page DOM queries and direct database operations.
  */
-import { toGrams } from './UnitConversionService.js';
+import { toGrams, isNonDiscreteBulkIngredient } from './UnitConversionService.js';
 
 export const NUTRITION_CANONICAL_MAP = {
   cal: "cal", kcal: "cal", calories: "cal", energy: "cal",
@@ -93,39 +93,18 @@ export function resolveProductItemWeight(product) {
   if (!product || typeof product !== 'object') return 0;
   const val = product.value && typeof product.value === 'object' ? product.value : {};
 
-  // 1. Explicit 1 usable item size
-  const explicit = parseFloat(
-    product.itemWeight ?? product.item_weight ?? product.usableItemSize ?? product.singleItemWeight ??
-    val.itemWeight ?? val.item_weight ?? val.usableItemSize ?? val.singleItemWeight ?? 0
-  );
-  if (explicit > 0) return explicit;
-
-  // 2. Derive from pack size, drained weight, or usable pack amount divided by itemCount
   const drainedWeight = parseFloat(product.drainedWeight ?? product.drained_weight ?? val.drainedWeight ?? val.drained_weight ?? 0);
   const usablePack = parseFloat(product.usablePackAmount ?? product.usable_pack_amount ?? val.usablePackAmount ?? val.usable_pack_amount ?? 0);
   const packSize = parseFloat(product.packSize ?? product.pack_size ?? val.packSize ?? val.pack_size ?? 0);
   const itemCount = parseFloat(product.itemCount ?? product.item_count ?? val.itemCount ?? val.item_count ?? 0);
-
-  if (itemCount > 1) {
-    const baseWeight = (drainedWeight > 0 ? drainedWeight : (usablePack > 0 ? usablePack : packSize));
-    if (baseWeight > 0) {
-      return Math.round((baseWeight / itemCount) * 10) / 10;
-    }
-  }
-
-  // 3. Single packaged unit with drained weight (e.g. fresh mozzarella ball in liquid)
   const packUnit = String(product.packUnit || product.pack_unit || product.unit || val.packUnit || '').toLowerCase();
   const name = String(product.name || product.title || val.name || '');
   const notes = String(product.notes || val.notes || '');
 
-  if (drainedWeight > 0 && (packUnit === 'each' || packUnit === 'item' || packUnit === 'qty' || /\b(?:ball|block)\b/i.test(name))) {
-    return drainedWeight;
-  }
-
-  // 4. Look for embedded count in product name or notes (e.g. "6 Vegan Sausages", "Twin Pack", "2 Burgers")
+  // Look for embedded count in product name or notes (e.g. "6 Vegan Sausages", "Twin Pack", "2 Burgers")
   let parsedCount = 0;
   const nameCountMatch = name.match(/^(\d+)\s+(?:pack\s+of\s+)?([a-zA-Z\s]+)/i) || 
-                         name.match(/\b(\d+)\s+(?:[a-zA-Z&'-]+\s+)*(?:pack|burgers?|patties?|pieces?|items?|sausages?|fillets?|slices?|wraps?|buns?)\b/i) ||
+                         name.match(/\b(\d+)\s+(?:[a-zA-Z&'-]+\s+)*(?:pack|burgers?|patties?|pieces?|items?|sausages?|fillets?|slices?|wraps?|buns?|rolls?|bagels?|pittas?|naans?|eggs?)\b/i) ||
                          name.match(/\b(?:pack of|box of)\s*(\d+)\b/i);
   if (nameCountMatch) {
     parsedCount = parseInt(nameCountMatch[1], 10);
@@ -138,6 +117,39 @@ export function resolveProductItemWeight(product) {
     }
   }
 
+  // 1. Explicit 1 usable item size (guard against legacy bookmarklet copies where itemWeight === packSize)
+  const explicit = parseFloat(
+    product.itemWeight ?? product.item_weight ?? product.usableItemSize ?? product.singleItemWeight ??
+    val.itemWeight ?? val.item_weight ?? val.usableItemSize ?? val.singleItemWeight ?? 0
+  );
+  if (explicit > 0) {
+    if (packSize > 0 && explicit === packSize) {
+      const effectiveCount = itemCount > 1 ? itemCount : (parsedCount > 1 && parsedCount <= 100 ? parsedCount : 0);
+      if (effectiveCount > 1) {
+        const baseWeight = (drainedWeight > 0 ? drainedWeight : (usablePack > 0 ? usablePack : packSize));
+        return Math.round((baseWeight / effectiveCount) * 10) / 10;
+      }
+      if (isNonDiscreteBulkIngredient(name, product.category || val.category)) {
+        return 0;
+      }
+    }
+    return explicit;
+  }
+
+  // 2. Derive from pack size, drained weight, or usable pack amount divided by itemCount
+  if (itemCount > 1) {
+    const baseWeight = (drainedWeight > 0 ? drainedWeight : (usablePack > 0 ? usablePack : packSize));
+    if (baseWeight > 0) {
+      return Math.round((baseWeight / itemCount) * 10) / 10;
+    }
+  }
+
+  // 3. Single packaged unit with drained weight (e.g. fresh mozzarella ball in liquid)
+  if (drainedWeight > 0 && (packUnit === 'each' || packUnit === 'item' || packUnit === 'qty' || /\b(?:ball|block)\b/i.test(name))) {
+    return drainedWeight;
+  }
+
+  // 4. Derive from embedded count in product name or notes
   if (parsedCount > 1 && parsedCount <= 100) {
     const baseWeight = (drainedWeight > 0 ? drainedWeight : (usablePack > 0 ? usablePack : packSize));
     if (baseWeight > 0) {

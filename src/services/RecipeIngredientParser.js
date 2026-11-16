@@ -4,7 +4,7 @@
  */
 
 import { getState } from '../store/store.js';
-import { convertToStrictUnit } from './UnitConversionService.js';
+import { convertToStrictUnit, isNonDiscreteBulkIngredient } from './UnitConversionService.js';
 import { toTitleCase } from '../utils/stringUtils.js';
 
 export { toTitleCase };
@@ -44,6 +44,8 @@ export const UNIT_MAP = {
   pinch: 'pinch', pinches: 'pinch', block: 'block', blocks: 'block', slice: 'slice', slices: 'slice',
   handful: 'handful', handfuls: 'handful', bunch: 'bunch', bunches: 'bunch',
   pack: 'pack', packet: 'pack', packets: 'pack', package: 'pack', packages: 'pack', pkg: 'pack',
+  pot: 'pot', pots: 'pot', tub: 'pot', tubs: 'pot', pouch: 'pack', pouches: 'pack', sachet: 'pack', sachets: 'pack',
+  carton: 'pack', cartons: 'pack', jar: 'jar', jars: 'jar', bottle: 'bottle', bottles: 'bottle', bag: 'pack', bags: 'pack', box: 'pack', boxes: 'pack',
   head: 'head', heads: 'head', stalk: 'stalk', stalks: 'stalk', stick: 'stalk', sticks: 'stalk',
   sprig: 'sprig', sprigs: 'sprig', leaf: 'leaf', leaves: 'leaf', dash: 'dash', dashes: 'dash', drizzle: 'dash', splash: 'dash',
   drop: 'dash', drops: 'dash', oz: 'oz', ounce: 'oz', ounces: 'oz', lb: 'lb', lbs: 'lb', pound: 'lb', pounds: 'lb'
@@ -286,12 +288,12 @@ export function parseIngredientString(rawStr) {
     };
   }
 
-  // 3. Explicit unit multiplier e.g. "2 x 400g tins best-quality Italian chopped tomatoes", "1 x 280g tin jackfruit in water"
-  const compMatch = clean.match(/^(\d+(?:\.\d+)?)\s*[xX]\s+(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tbsp|tablespoons?|tsp|teaspoons?|cups?|oz|fl\s*oz|lbs?|pinch|cm)\b\s*(?:(?:packs?|tins?|cans?|jars?|blocks?|pots?|boxes?)\s*(?:of\s*)?)?(.*)/i);
+  // 3. Explicit unit multiplier e.g. "2 x 400g tins best-quality Italian chopped tomatoes", "1 x 280g tin jackfruit in water", "2x400g cans chickpeas"
+  const compMatch = clean.match(/^(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)\s*(g|kg|ml|l|tbsp|tablespoons?|tsp|teaspoons?|cups?|oz|fl\s*oz|lbs?|pinch|cm)\b\s*(?:(?:packs?|packets?|packages?|tins?|cans?|jars?|blocks?|pots?|tubs?|pouch(?:es)?|sachets?|cartons?|bottles?|bags?|box(?:es)?)\s*(?:of\s*)?)?(.*)/i);
   if (compMatch) {
     const multComp = parseFloat(compMatch[1]) || 1;
     const baseWeight = parseFloat(compMatch[2]) || 0;
-    const rawName = (compMatch[4] || '').replace(/^(?:blocks?|packs?|tins?|cans?)\s*(?:of\s*)?/i, '').trim();
+    const rawName = (compMatch[4] || '').replace(/^(?:blocks?|packs?|packets?|packages?|tins?|cans?|jars?|pots?|tubs?|pouch(?:es)?|sachets?|cartons?|bottles?|bags?|box(?:es)?)\s*(?:of\s*)?/i, '').trim();
     const servingInfo = extractServingQualifier(rawName);
     const normalised = convertToStrictUnit(multComp * baseWeight, compMatch[3], servingInfo.name);
     const baseNotes = `${multComp} x ${baseWeight}${compMatch[3]}`;
@@ -354,15 +356,18 @@ export function parseIngredientString(rawStr) {
 
   if (unitMatch) {
     const word = unitMatch[1].toLowerCase();
-    if (UNIT_MAP[word]) {
-      parsedUnit = UNIT_MAP[word];
-      rawName = (unitMatch[2] || '').replace(/^(?:of\s+|tins?\s+(?:of\s+)?|cans?\s+(?:of\s+)?|packs?\s+(?:of\s+)?)/i, '').trim();
+    const afterWord = (unitMatch[2] || '').trim();
+    const isLeafUnit = (word === 'leaf' || word === 'leaves');
+    if (UNIT_MAP[word] && (!isLeafUnit || /^of\b/i.test(afterWord))) {
+      parsedUnit = isLeafUnit ? 'qty' : UNIT_MAP[word];
+      rawName = afterWord.replace(/^(?:of\s+|(?:tins?|cans?|packs?|packets?|packages?|pots?|tubs?|pouch(?:es)?|sachets?|cartons?|jars?|bottles?|bags?|box(?:es)?)\s+(?:of\s+)?)/i, '').trim();
     }
   }
 
-  // Trailing measurement unit check e.g. "4 rosemary sprigs", "3 thyme sprigs", "2 large bay leaves", "4 garlic cloves"
+  // Trailing measurement unit check e.g. "4 rosemary sprigs", "3 thyme sprigs", "4 garlic cloves"
+  // Botanical leaf nouns ("2 bay leaves", "8 curry leaves", "4 kaffir lime leaves") are preserved in qty.
   if (parsedUnit === 'qty') {
-    const trailingUnitMatch = remainder.match(/^(.*?)\s+(sprigs?|leaves?|leaf|cloves?|slices?|stalks?|heads?|bulbs?)\b(?:\s+(?:of\s+)?(.*))?$/i);
+    const trailingUnitMatch = remainder.match(/^(.*?)\s+(sprigs?|cloves?|slices?|stalks?|heads?|bulbs?)\b(?:\s+(?:of\s+)?(.*))?$/i);
     if (trailingUnitMatch) {
       const uWord = trailingUnitMatch[2].toLowerCase();
       if (UNIT_MAP[uWord]) {
@@ -402,11 +407,13 @@ export function parseIngredientString(rawStr) {
 
   const combinedNotes = [extraNotes, servingInfo.isToServe ? 'to serve' : ''].filter(Boolean).join(', ');
   const normalised = convertToStrictUnit(qty, parsedUnit, cleanedName);
+  const isInvalidQtyUnit = Boolean(normalised.unit === 'qty' && isNonDiscreteBulkIngredient(cleanedName));
   return {
     raw: s,
     qty: normalised.qty,
     unit: normalised.unit,
     isEstimated: normalised.isEstimated,
+    isInvalidQtyUnit,
     name: toTitleCase(cleanedName),
     notes: combinedNotes,
     isToServe: servingInfo.isToServe
@@ -421,7 +428,10 @@ export function normalizeTaxonomyName(str) {
 export function stemIngredientName(rawName) {
   if (!rawName) return '';
   let str = normalizeTaxonomyName(rawName).replace(/^\d+(?:\.\d+)?\s*(?:x\s*)?/, '').trim();
-  str = str.replace(/\b(cloves?|heads?|bulbs?|stalks?|sprigs?|leaves?|leaf|pieces?|pots?|tins?|cans?|jars?|packs?|packet?|boxes?|blocks?|bottles?|bags?|diced|sliced|chopped|minced|grated|crushed|ground|shredded|pitted|peeled|cracked|parboiled|toasted|roasted|pressed|mashed|fresh|dried|dry|raw|cooked|frozen|boiled|organic|unsweetened|sweetened|salted|unsalted|extra virgin|best quality|good quality|pure|natural|plant based|plant-based|vegan|vegetarian|large|small|medium|thick|thin|finely|roughly|coarsely|to serve|for frying|for dusting|optional|garnish)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  str = str.replace(/\b(bay|curry|lime|vine|salad)\s+leaves\b/g, '$1 __botanical_leaf__');
+  str = str.replace(/\b(bay|curry|lime|vine|salad)\s+leaf\b/g, '$1 __botanical_leaf__');
+  str = str.replace(/\b(cloves?|heads?|bulbs?|stalks?|sprigs?|leaves?|leaf|pieces?|pots?|tubs?|pouch(?:es)?|sachets?|cartons?|tins?|cans?|jars?|packs?|packets?|packages?|box(?:es)?|blocks?|bottles?|bags?|diced|sliced|chopped|minced|grated|crushed|ground|shredded|pitted|peeled|cracked|parboiled|toasted|roasted|pressed|mashed|fresh|dried|dry|raw|cooked|frozen|boiled|organic|unsweetened|sweetened|salted|unsalted|extra virgin|best quality|good quality|pure|natural|plant based|plant-based|vegan|vegetarian|large|small|medium|thick|thin|finely|roughly|coarsely|to serve|for frying|for dusting|optional|garnish)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  str = str.replace(/__botanical_leaf__/g, 'leaf');
   if (str.endsWith('potatoes') || str.endsWith('tomatoes')) str = str.slice(0, -2);
   else if (str.endsWith('chillies')) str = str.slice(0, -3) + 'i';
   else if (str.endsWith('ies')) str = str.slice(0, -3) + 'y';
@@ -431,26 +441,44 @@ export function stemIngredientName(rawName) {
 }
 
 /**
- * Strips quantities, units, and preparation notes from a raw ingredient string or parsed item
- * to produce a clean canonical phrase suitable for alias matching and learning.
+ * Strips quantities, units, container nouns, and preparation notes from a raw ingredient string
+ * or parsed item to produce a clean canonical phrase suitable for alias matching and learning.
  */
 export function cleanIngredientPhraseForAlias(rawOrItem) {
   if (!rawOrItem) return '';
   if (typeof rawOrItem === 'object') {
     rawOrItem = rawOrItem.raw || rawOrItem.name || '';
   }
-  const str = String(rawOrItem).trim();
+  let str = String(rawOrItem).trim();
   if (!str) return '';
-  const parsed = parseIngredientString(str);
-  if (parsed && parsed.name) {
-    return normalizeTaxonomyName(parsed.name);
-  }
-  const fallback = str
-    .replace(/^[\d\s\/\.\-\u00BC-\u00BE\u2150-\u215E]+(?:x\s*)?(?:g|kg|ml|l|oz|lb|tbsp|tsp|cup|cups|scoop|scoops|pinch|can|cans|tin|tins|clove|cloves|slice|slices|pack|packs|bunch|bunches)?\s+(?:of\s+)?/i, '')
+
+  // Convert unicode fractions to ASCII
+  str = str.replace(/(\d+)\s*([½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])/g, '$1 $2');
+  Object.keys(UNICODE_FRACTIONS).forEach(uf => {
+    if (str.includes(uf)) {
+      str = str.replace(new RegExp(uf, 'g'), UNICODE_FRACTIONS[uf]);
+    }
+  });
+
+  // Strip parenthetical qualifiers and comma-trailing preparation notes
+  let cleaned = str
+    .replace(/\(.*?\)/g, ' ')
     .split(',')[0]
-    .replace(/\(.*?\)/g, '')
+    .replace(/^[\s*\-–—~•●◦▪▫▫️▪️+\p{Extended_Pictographic}\uFE0F\u200D]+\s*/u, ' ');
+
+  // Strip leading, mid-string, or trailing numeric/fraction + multiplier + unit measurements
+  cleaned = cleaned
+    .replace(/(?:^|\s|\/)(?:\d+(?:\s+\d+\/\d+|\.\d+)?|\d+\/\d+)\s*(?:[xX×]\s*(?:\d+(?:\.\d+)?)?\s*)?(?:g|grams?|kg|kilograms?|kilos?|mg|ml|millilit(?:er|re)s?|mls?|l|lit(?:er|re)s?|oz|fl\.?\s*oz|ounces?|lbs?|pounds?|tbsp|tablespoons?|tbl|tbs|tb|tsp|teaspoons?|cups?|scoops?|pinch(?:es)?|dash(?:es)?|drizzles?|splash(?:es)?|cloves?|slices?|sprigs?|stalks?|sticks?|heads?|bulbs?|cm|mm|inch(?:es)?|qty|items?|units?)\b/gi, ' ')
+    .replace(/\b(?:tins?|cans?|pots?|tubs?|pouch(?:es)?|sachets?|cartons?|jars?|bottles?|packs?|packets?|packages?|pkg|bags?|box(?:es)?|blocks?)\b(?:\s+of\b)?/gi, ' ')
+    .replace(/\b\d+\s*\/\s*\d+\b/g, ' ')
+    .replace(/\b\d+(?:\.\d+)?\s*(?:[xX×]\b)?/g, ' ')
+    .replace(/^(?:\s*(?:of|a|an|one|two|three|four|five|half|heaped|heaping|level|generous|scant|rounded|approx\.?|about|x|×)\b[\s\/]*)+/i, ' ');
+
+  const norm = normalizeTaxonomyName(cleaned)
+    .replace(/^(?:of\s+)+|(?:\s+of)+$/g, '')
     .trim();
-  return normalizeTaxonomyName(fallback || str);
+
+  return norm;
 }
 
 export const CANONICAL_COMPOUND_SYNONYMS = {

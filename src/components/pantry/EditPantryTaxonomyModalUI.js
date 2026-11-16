@@ -7,10 +7,17 @@
 import { getState } from '../../store/store.js';
 import { getUnifiedCategories } from '../../services/CategoryRepository.js';
 import { renameRootItem, renameSubtype } from '../../services/PantryTaxonomyService.js';
+import { createTaxonomySearchInput } from './RecipeSearchDropdownHelper.js';
 import { showCustomAlert } from '../ui/DialogHelpers.js';
 import { escapeHtml, escapeAttr } from '../../utils/stringUtils.js';
 
+let activeEditCategoryDropdown = null;
+
 export function closeEditTaxonomyModal() {
+  if (activeEditCategoryDropdown?.destroy) {
+    activeEditCategoryDropdown.destroy();
+    activeEditCategoryDropdown = null;
+  }
   const wrap = document.getElementById('view-modal-wrap');
   if (wrap) {
     wrap.classList.remove('open');
@@ -50,9 +57,7 @@ export function openEditItemModal(itemId, { focusTab = 'name' } = {}) {
 
       <div style="margin-bottom:12px;">
         <label for="edit-item-category" style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text,#1c1917);">Category</label>
-        <select id="edit-item-category" style="width:100%; padding:8px 12px; font-size:13px; border-radius:8px; border:1px solid var(--border,#ccc); box-sizing:border-box; background:var(--surface,#fff); color:var(--text,#1c1917);">
-          ${categories.map(c => `<option value="${escapeAttr(c)}" ${c.toLowerCase() === (item.category || '').toLowerCase() ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
-        </select>
+        <div id="edit-item-category-container"></div>
       </div>
 
       <div style="margin-bottom:18px;">
@@ -79,9 +84,29 @@ export function openEditItemModal(itemId, { focusTab = 'name' } = {}) {
   const cancelBtn = content.querySelector('#btn-edit-tax-cancel');
   const saveBtn = content.querySelector('#btn-edit-tax-save');
   const nameInput = content.querySelector('#edit-item-name');
-  const catInput = content.querySelector('#edit-item-category');
+  const catContainer = content.querySelector('#edit-item-category-container');
   const aliasInput = content.querySelector('#edit-item-aliases');
   const errorEl = content.querySelector('#edit-item-error');
+
+  let selectedCategory = item.category || 'General';
+  if (catContainer) {
+    if (activeEditCategoryDropdown?.destroy) activeEditCategoryDropdown.destroy();
+    activeEditCategoryDropdown = createTaxonomySearchInput({
+      container: catContainer,
+      categories,
+      rootItems: [],
+      newItemType: 'category',
+      categoriesOnly: true,
+      inputId: 'edit-item-category',
+      placeholder: 'Search or type category...',
+      initialValue: selectedCategory,
+      onSelect: ({ label, val }) => {
+        let cat = String(label || '').replace(/^[📂📦🏷️✨\s]+/, '').replace(/^\[Category\]\s*/i, '').trim();
+        if (val && val.startsWith('cat:')) cat = val.replace('cat:', '');
+        if (cat) selectedCategory = cat;
+      }
+    });
+  }
 
   if (closeBtn) closeBtn.onclick = closeEditTaxonomyModal;
   if (cancelBtn) cancelBtn.onclick = closeEditTaxonomyModal;
@@ -104,7 +129,17 @@ export function openEditItemModal(itemId, { focusTab = 'name' } = {}) {
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving...';
 
-      const newCat = catInput ? catInput.value : item.category;
+      const catInputEl = content.querySelector('#edit-item-category');
+      const rawCatInput = catInputEl ? catInputEl.value : selectedCategory;
+      let newCat = String(rawCatInput || selectedCategory || item.category || 'General')
+        .replace(/^[📂📦🏷️✨\s]+/, '')
+        .replace(/^\[Category\]\s*/i, '')
+        .replace(/^Create New Category\s*"?/i, '')
+        .replace(/"?\s*➔.*$/, '')
+        .trim();
+      if (catInputEl?.dataset?.taxVal && catInputEl.dataset.taxVal.startsWith('cat:')) {
+        newCat = catInputEl.dataset.taxVal.replace('cat:', '').trim() || newCat;
+      }
       const aliases = aliasInput ? aliasInput.value.split(',').map(a => a.trim()).filter(Boolean) : [];
 
       try {

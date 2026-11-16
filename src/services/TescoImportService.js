@@ -105,12 +105,43 @@ export function inferProductCategory(name = '') {
  */
 export function guessItemWeight(data, name = '') {
   if (!data) return '';
-  const count = +data.itemCount || 0;
+  const rawCount = +data.itemCount || 0;
   const packSize = +data.drainedWeight || +data.packSize || 0;
   const explicit = +data.itemWeight || 0;
-  if (explicit > 0) return explicit;
-  if (count > 1 && packSize > 0) return Math.round((packSize / count) * 10) / 10;
-  if (count === 1 && explicit > 0) return explicit;
+  const packUnit = String(data.packUnit || data.unit || 'g').toLowerCase();
+  const prodName = String(name || data.name || data.title || '');
+
+  let parsedCount = 0;
+  const nameCountMatch = prodName.match(/^(\d+)\s+(?:pack\s+of\s+)?([a-zA-Z\s]+)/i) ||
+                         prodName.match(/\b(\d+)\s+(?:[a-zA-Z&'-]+\s+)*(?:pack|burgers?|patties?|pieces?|items?|sausages?|fillets?|slices?|wraps?|buns?|rolls?|bagels?|pittas?|naans?|eggs?)\b/i) ||
+                         prodName.match(/\b(?:pack of|box of)\s*(\d+)\b/i);
+  if (nameCountMatch) {
+    parsedCount = parseInt(nameCountMatch[1], 10);
+  } else if (/\btwin\s*pack\b/i.test(prodName)) {
+    parsedCount = 2;
+  }
+
+  const effectiveCount = rawCount > 1 ? rawCount : (parsedCount > 1 && parsedCount <= 100 ? parsedCount : rawCount);
+
+  if (explicit > 0) {
+    if (packSize > 0 && explicit === packSize) {
+      if (effectiveCount > 1) {
+        return Math.round((packSize / effectiveCount) * 10) / 10;
+      }
+      if (packUnit === 'each' || packUnit === 'item' || /\beach\b/i.test(prodName)) {
+        return explicit;
+      }
+      return '';
+    }
+    return explicit;
+  }
+
+  if (effectiveCount > 1 && packSize > 0) {
+    return Math.round((packSize / effectiveCount) * 10) / 10;
+  }
+  if ((packUnit === 'each' || packUnit === 'item' || /\beach\b/i.test(prodName)) && packSize > 0 && packSize <= 1000) {
+    return packSize;
+  }
   return '';
 }
 
