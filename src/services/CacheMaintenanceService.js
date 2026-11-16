@@ -66,12 +66,15 @@ export async function runDeferredMaintenance(preferencesData, mergedCategories, 
     }
 
     try {
-      const { migrateLegacyRecipeProductBindings } = await import('./MaintenanceService.js');
+      const { migrateLegacyRecipeProductBindings, sanitizeStoredAliasesAndItemWeights } = await import('./MaintenanceService.js');
+      if (typeof sanitizeStoredAliasesAndItemWeights === 'function') {
+        await sanitizeStoredAliasesAndItemWeights();
+      }
       if (typeof migrateLegacyRecipeProductBindings === 'function') {
         await migrateLegacyRecipeProductBindings();
       }
     } catch (e) {
-      console.warn('[Maintenance] migrateLegacyRecipeProductBindings failed:', e);
+      console.warn('[Maintenance] migrateLegacyRecipeProductBindings / sanitizeStoredAliasesAndItemWeights failed:', e);
     }
 
     // Scrub products with kJ stored as calories
