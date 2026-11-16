@@ -5,7 +5,7 @@
 
 import { wizardState, MEAL_TAGS } from './RecipeWizardState.js';
 import { getState } from '../../store/store.js';
-import { renderTaxonomySearchHTML, isIngredientUnlinked } from './RecipeWizardTaxonomySearch.js';
+import { renderTaxonomySearchHTML, isIngredientUnlinked, getIngredientQtyValidationIssue } from './RecipeWizardTaxonomySearch.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
 import { recalculateWizardMacros } from './RecipeWizardStep3Handlers.js';
 import { renderMacroBreakdownCrossbar } from './RecipeWizardStep3View.js';
@@ -38,19 +38,31 @@ export function renderStep2Footer() {
 
   const allIngs = (activeRecipe.ingredientSections || []).flatMap(s => s.ingredients || []);
   const unlinkedIngs = allIngs.filter(i => isIngredientUnlinked(i, productsBank, ingredientsBank));
-  const isBlocked = unlinkedIngs.length > 0;
+  const invalidQtyIngs = allIngs.filter(i => getIngredientQtyValidationIssue(i, productsBank, ingredientsBank).invalid);
+  const isBlocked = unlinkedIngs.length > 0 || invalidQtyIngs.length > 0;
+
+  let pillContentHtml = `<span>✓</span> All items linked`;
+  let pillTitle = 'All ingredients are linked';
+  if (unlinkedIngs.length > 0 && invalidQtyIngs.length > 0) {
+    pillContentHtml = `<span>⚠️</span> <span class="wiz-unlinked-count">${unlinkedIngs.length}</span> unmapped item(s), <span class="wiz-invalid-qty-count">${invalidQtyIngs.length}</span> qty weight issue(s) <span style="font-size:10px;text-decoration:underline;margin-left:2px;">(jump)</span>`;
+    pillTitle = 'Click to jump to next unmapped or invalid qty ingredient';
+  } else if (unlinkedIngs.length > 0) {
+    pillContentHtml = `<span>⚠️</span> <span class="wiz-unlinked-count">${unlinkedIngs.length}</span> unmapped item(s) <span style="font-size:10px;text-decoration:underline;margin-left:2px;">(jump)</span>`;
+    pillTitle = 'Click to jump to next unmapped ingredient';
+  } else if (invalidQtyIngs.length > 0) {
+    pillContentHtml = `<span>⚠️</span> <span class="wiz-invalid-qty-count">${invalidQtyIngs.length}</span> qty weight issue(s) <span style="font-size:10px;text-decoration:underline;margin-left:2px;">(jump)</span>`;
+    pillTitle = 'Click to jump to next ingredient with uncalculable qty weight';
+  }
 
   return `
     <div class="ios-fullscreen-footer" id="wizard-step2-footer">
       <button type="button" class="btn ghost" id="wizard-back-btn">← Back</button>
       
-      <button type="button" class="wiz-gate-pill ${isBlocked ? 'blocked' : 'ready'}" id="wiz-gate-pill" title="${isBlocked ? 'Click to jump to next unmapped ingredient' : 'All ingredients are linked'}">
-        ${isBlocked
-          ? `<span>⚠️</span> <span class="wiz-unlinked-count">${unlinkedIngs.length}</span> unmapped item(s) <span style="font-size:10px;text-decoration:underline;margin-left:2px;">(jump)</span>`
-          : `<span>✓</span> All items linked`}
+      <button type="button" class="wiz-gate-pill ${isBlocked ? 'blocked' : 'ready'}" id="wiz-gate-pill" title="${pillTitle}">
+        ${pillContentHtml}
       </button>
 
-      <button type="button" class="btn primary" id="btn-next-step2" ${isBlocked ? 'disabled style="opacity:0.6; cursor:not-allowed;" title="All ingredients must be linked before proceeding"' : ''}>
+      <button type="button" class="btn primary" id="btn-next-step2" ${isBlocked ? 'disabled style="opacity:0.6; cursor:not-allowed;" title="All ingredients must be linked and have calculable weights before proceeding"' : ''}>
         Next: Final Inline Review →
       </button>
     </div>
@@ -86,6 +98,31 @@ export function renderState2Mapping() {
 
       const rawDisplay = item.raw || `${qty} ${item.unit || 'g'} ${item.name || ''}`.trim();
       const isUnlinked = isIngredientUnlinked(item, productsBank, ingredientsBank);
+      const qtyIssue = getIngredientQtyValidationIssue(item, productsBank, ingredientsBank);
+      const hasQtyIssue = qtyIssue.invalid;
+
+      const qtyIssueBannerHtml = hasQtyIssue ? `
+        <div class="wiz-qty-issue-banner" data-sidx="${sIdx}" data-iidx="${iIdx}" style="margin-top: 6px; padding: 6px 8px; background: #fffbeb; border: 1px solid #f59e0b; border-radius: 6px; font-size: 11px; color: #92400e;">
+          <div style="font-weight: 600; margin-bottom: 4px;">
+            ${qtyIssue.reason === 'bulk_item_in_qty'
+              ? `⚠️ "${escapeHtml(item.name || 'Item')}" cannot be measured as a discrete quantity ("qty"). Switch unit to g/ml or set a single-item weight.`
+              : `⚠️ Mapped product "${escapeHtml(qtyIssue.resolvedProd?.name || 'Product')}" has no 1 Usable item size (g) to calculate "${qty} qty".`}
+          </div>
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px;">
+            <button type="button" class="btn sm secondary wiz-quick-switch-unit-btn" data-sidx="${sIdx}" data-iidx="${iIdx}" data-unit="g" style="padding: 2px 6px; font-size: 10.5px;">Switch to g</button>
+            <button type="button" class="btn sm secondary wiz-quick-switch-unit-btn" data-sidx="${sIdx}" data-iidx="${iIdx}" data-unit="ml" style="padding: 2px 6px; font-size: 10.5px;">Switch to ml</button>
+            ${qtyIssue.resolvedProd ? `
+              <span style="display: inline-flex; align-items: center; gap: 4px;">
+                <label for="wiz-inline-item-weight-${sIdx}-${iIdx}" style="font-size: 10.5px; font-weight: 600;">1 item =</label>
+                <input type="number" step="any" min="0.1" id="wiz-inline-item-weight-${sIdx}-${iIdx}" name="wiz_inline_item_weight_${sIdx}_${iIdx}" aria-label="Single usable item weight in grams for ${escapeAttr(qtyIssue.resolvedProd.name || item.name)}" class="wiz-inline-item-weight" data-sidx="${sIdx}" data-iidx="${iIdx}" data-prod-id="${escapeAttr(qtyIssue.resolvedProd.id)}" placeholder="g" style="width: 56px; padding: 2px 4px; border: 1px solid #d97706; border-radius: 4px; font-size: 11px; background: #fff;" />
+                <span style="font-size: 10.5px;">g</span>
+                <button type="button" class="btn sm primary wiz-save-inline-item-weight-btn" data-sidx="${sIdx}" data-iidx="${iIdx}" data-prod-id="${escapeAttr(qtyIssue.resolvedProd.id)}" style="padding: 2px 6px; font-size: 10.5px;">Save weight</button>
+              </span>
+            ` : ''}
+            <button type="button" class="btn sm ghost wiz-remap-item-btn" data-sidx="${sIdx}" data-iidx="${iIdx}" style="padding: 2px 6px; font-size: 10.5px; text-decoration: underline;">Re-map item</button>
+          </div>
+        </div>
+      ` : '';
 
       const waterInputHtml = isStock ? `
         <div style="margin-top: 4px; display: flex; align-items: center; gap: 4px;">
@@ -106,9 +143,16 @@ export function renderState2Mapping() {
 
       const isFirst = iIdx === 0;
       const isLast = iIdx === (sec.ingredients || []).length - 1;
+      const rowClasses = [
+        isUnlinked ? 'wiz-row-unlinked' : '',
+        hasQtyIssue ? 'wiz-row-invalid-qty' : ''
+      ].filter(Boolean).join(' ');
+      const rowBorderStyle = isUnlinked
+        ? 'border-left: 3px solid #f43f5e;'
+        : (hasQtyIssue ? 'border-left: 3px solid #f59e0b;' : '');
 
       rowsHtml += `
-        <tr id="wiz-ing-row-${sIdx}-${iIdx}" data-sidx="${sIdx}" data-iidx="${iIdx}" class="${isUnlinked ? 'wiz-row-unlinked' : ''}" style="border-bottom: 1px solid var(--border, #eee); ${isUnlinked ? 'border-left: 3px solid #f43f5e;' : ''}">
+        <tr id="wiz-ing-row-${sIdx}-${iIdx}" data-sidx="${sIdx}" data-iidx="${iIdx}" class="${rowClasses}" style="border-bottom: 1px solid var(--border, #eee); ${rowBorderStyle}">
           <td style="padding: 4px 4px; width: 32px; text-align: center; vertical-align: top;">
             <div style="display: flex; flex-direction: column; gap: 2px; align-items: center; padding-top: 2px;">
               <button type="button" class="btn sm ghost wiz-reorder-btn" data-direction="up" data-sidx="${sIdx}" data-iidx="${iIdx}" ${isFirst ? 'disabled' : ''} title="Move up" style="padding: 1px 3px; font-size: 10px; line-height: 1; min-width: 20px; ${isFirst ? 'opacity: 0.3; cursor: not-allowed;' : ''}">▲</button>
@@ -117,8 +161,8 @@ export function renderState2Mapping() {
           </td>
           <td style="padding: 4px 6px; width: 125px; vertical-align: top;">
             <div style="display: flex; gap: 4px; align-items: center;">
-              <input type="number" step="any" id="wiz-ing-qty-${sIdx}-${iIdx}" name="wiz_ing_qty_${sIdx}_${iIdx}" aria-label="Quantity for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-qty" data-sidx="${sIdx}" data-iidx="${iIdx}" value="${qty}" style="width: 54px; padding: 4px 6px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px; font-weight: 600;" />
-              <select id="wiz-ing-unit-${sIdx}-${iIdx}" name="wiz_ing_unit_${sIdx}_${iIdx}" aria-label="Unit for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-unit" data-sidx="${sIdx}" data-iidx="${iIdx}" style="width: 62px; padding: 4px 4px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px;">
+              <input type="number" step="any" id="wiz-ing-qty-${sIdx}-${iIdx}" name="wiz_ing_qty_${sIdx}-${iIdx}" aria-label="Quantity for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-qty" data-sidx="${sIdx}" data-iidx="${iIdx}" value="${qty}" style="width: 54px; padding: 4px 6px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px; font-weight: 600;" />
+              <select id="wiz-ing-unit-${sIdx}-${iIdx}" name="wiz_ing_unit_${sIdx}_${iIdx}" aria-label="Unit for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-unit" data-sidx="${sIdx}" data-iidx="${iIdx}" style="width: 62px; padding: 4px 4px; border: 1px solid ${hasQtyIssue ? '#f59e0b' : 'var(--border, #ccc)'}; border-radius: 6px; font-size: 12px;">
                 ${['g', 'ml', 'qty'].map(u => `<option value="${u}" ${u === item.unit ? 'selected' : ''}>${u}</option>`).join('')}
               </select>
             </div>
@@ -127,6 +171,7 @@ export function renderState2Mapping() {
             <input type="text" id="wiz-ing-name-${sIdx}-${iIdx}" name="wiz_ing_name_${sIdx}_${iIdx}" aria-label="Ingredient name for section ${sIdx} ingredient ${iIdx}" class="wiz-ing-name" data-sidx="${sIdx}" data-iidx="${iIdx}" value="${escapeAttr(item.name)}" style="width: 100%; padding: 4px 8px; border: 1px solid var(--border, #ccc); border-radius: 6px; font-size: 12px;" />
             <div class="wiz-raw-subtext" title="Raw: &quot;${escapeAttr(rawDisplay)}&quot;">Raw: "${escapeHtml(rawDisplay)}"</div>
             ${waterInputHtml}
+            ${qtyIssueBannerHtml}
           </td>
           <td style="padding: 4px 6px; min-width: 250px; vertical-align: top;">
             ${renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank, productsBank)}

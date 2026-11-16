@@ -1,0 +1,136 @@
+/**
+ * scripts/test_recipe_wizard_qty_gate.js
+ * Verification suite for Recipe Wizard Step 2 Invalid-qty Gate & Inline Quick-Fix Banner (U4).
+ */
+
+import assert from 'node:assert/strict';
+
+if (typeof global.localStorage === 'undefined') {
+  global.localStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {}
+  };
+}
+if (typeof global.window === 'undefined') {
+  global.window = {
+    localStorage: global.localStorage,
+    dispatchEvent: () => {}
+  };
+}
+if (typeof global.document === 'undefined') {
+  global.document = {
+    getElementById: () => null,
+    querySelector: () => null,
+    addEventListener: () => {},
+    dispatchEvent: () => {}
+  };
+}
+
+const { setIngredients, setProducts, getState } = await import('../src/store/store.js');
+const { wizardState } = await import('../src/components/recipe/RecipeWizardState.js');
+const { getIngredientQtyValidationIssue } = await import('../src/components/recipe/RecipeWizardTaxonomySearch.js');
+const { renderStep2Footer, renderState2Mapping } = await import('../src/components/recipe/RecipeWizardStep2View.js');
+
+console.log('=== RUNNING RECIPE WIZARD STEP 2 QTY VALIDATION GATE SUITE ===\n');
+
+const mockIngredients = [
+  { id: 'ing_yog', name: 'Natural Yoghurt', category: 'Dairy & Eggs', defaultProductId: 'prod_yog', subtypes: [] },
+  { id: 'ing_courgette', name: 'Courgette', category: 'Fruit & Vegetables', defaultProductId: 'prod_courgette', subtypes: [] },
+  { id: 'ing_bay', name: 'Bay Leaves', category: 'Herbs & Spices', defaultProductId: 'prod_bay', subtypes: [] },
+  { id: 'ing_garlic', name: 'Garlic', category: 'Fruit & Vegetables', defaultProductId: 'prod_garlic', subtypes: [] }
+];
+
+const mockProducts = [
+  { id: 'prod_yog', name: 'Tesco Natural Yoghurt 500G', ingredientId: 'ing_yog', packSize: 500, packUnit: 'g', itemWeight: null, cal: 65, prot: 5.2, isAutoDefault: true },
+  { id: 'prod_courgette', name: 'Tesco Courgettes 500G', ingredientId: 'ing_courgette', packSize: 500, packUnit: 'g', itemWeight: null, cal: 20, prot: 1.2, isAutoDefault: true },
+  { id: 'prod_bay', name: 'Tesco Bay Leaves 5G', ingredientId: 'ing_bay', packSize: 5, packUnit: 'g', itemWeight: null, cal: 313, prot: 7.6, isAutoDefault: true },
+  { id: 'prod_garlic', name: 'Tesco Garlic 4 Pack', ingredientId: 'ing_garlic', packSize: 200, packUnit: 'g', itemWeight: null, cal: 149, prot: 6.4, isAutoDefault: true }
+];
+
+setIngredients(mockIngredients);
+setProducts(mockProducts);
+
+// Test 1: getIngredientQtyValidationIssue detects bulk item in qty
+console.log('--- Test 1: Non-Discrete Bulk Item in qty ---');
+assert.strictEqual(typeof getIngredientQtyValidationIssue, 'function', 'getIngredientQtyValidationIssue must be exported');
+const yogIssue = getIngredientQtyValidationIssue(
+  { name: 'Natural Yoghurt', qty: 1, unit: 'qty', ingredientId: 'ing_yog' },
+  mockProducts,
+  mockIngredients
+);
+assert.strictEqual(yogIssue.invalid, true, '1 qty Natural Yoghurt must be flagged as invalid');
+assert.strictEqual(yogIssue.reason, 'bulk_item_in_qty');
+console.log('✅ Test 1 Passed: Bulk item in qty flagged with bulk_item_in_qty.\n');
+
+// Test 2: Discrete item in qty mapped to product without itemWeight
+console.log('--- Test 2: Discrete Item in qty Mapped to Product Missing itemWeight ---');
+const courgetteIssue = getIngredientQtyValidationIssue(
+  { name: 'Courgette', qty: 2, unit: 'qty', ingredientId: 'ing_courgette' },
+  mockProducts,
+  mockIngredients
+);
+assert.strictEqual(courgetteIssue.invalid, true, '2 qty Courgette mapped to 500g pack without itemWeight must be flagged');
+assert.strictEqual(courgetteIssue.reason, 'missing_product_item_weight');
+assert.strictEqual(courgetteIssue.resolvedProd?.id, 'prod_courgette');
+console.log('✅ Test 2 Passed: Missing product itemWeight flagged accurately.\n');
+
+// Test 3: Self-weighed culinary counts (Bay Leaves, Garlic) are allowed in qty
+console.log('--- Test 3: Self-Weighed Culinary Staples Allowed in qty ---');
+const bayIssue = getIngredientQtyValidationIssue(
+  { name: 'Bay Leaves', qty: 2, unit: 'qty', ingredientId: 'ing_bay' },
+  mockProducts,
+  mockIngredients
+);
+assert.strictEqual(bayIssue.invalid, false, '2 qty Bay Leaves is valid without product itemWeight');
+
+const garlicIssue = getIngredientQtyValidationIssue(
+  { name: 'Garlic Cloves', qty: 3, unit: 'qty', ingredientId: 'ing_garlic' },
+  mockProducts,
+  mockIngredients
+);
+assert.strictEqual(garlicIssue.invalid, false, '3 qty Garlic Cloves is valid without product itemWeight');
+console.log('✅ Test 3 Passed: Self-weighed culinary staples allowed in qty.\n');
+
+// Test 4: Step 2 Footer Gate Blocks & Row Renders Inline Quick-Fix Banner
+console.log('--- Test 4: Step 2 Footer Gate & Inline Resolution Banner ---');
+wizardState.currentStep = 2;
+wizardState.activeRecipe = {
+  title: 'Courgette & Yoghurt Flatbreads',
+  servings: 2,
+  mealSuitability: ['Dinner'],
+  ingredientSections: [
+    {
+      sectionTitle: 'Main Ingredients',
+      ingredients: [
+        { name: 'Natural Yoghurt', raw: '1 natural yoghurt', qty: 1, unit: 'qty', ingredientId: 'ing_yog' },
+        { name: 'Courgette', raw: '2 courgettes', qty: 2, unit: 'qty', ingredientId: 'ing_courgette' }
+      ]
+    }
+  ],
+  methodSteps: ['Mix and cook.']
+};
+
+const footerBlockedHtml = renderStep2Footer();
+assert(footerBlockedHtml.includes('disabled'), 'Footer Next button must be disabled when qty issues exist');
+assert(footerBlockedHtml.includes('wiz-gate-pill blocked'), 'Gate pill must have blocked class');
+
+const step2Html = renderState2Mapping();
+assert(step2Html.includes('wiz-row-invalid-qty'), 'Step 2 table must mark invalid qty rows with wiz-row-invalid-qty');
+assert(step2Html.includes('wiz-qty-issue-banner'), 'Step 2 row must render inline .wiz-qty-issue-banner');
+assert(step2Html.includes('wiz-quick-switch-unit-btn'), 'Banner must include quick unit switch buttons');
+assert(step2Html.includes('wiz-save-inline-item-weight-btn'), 'Banner for missing_product_item_weight must include inline product itemWeight save button');
+
+// Simulate resolving both issues: switch yoghurt to 'g' and set courgette product itemWeight to 180g
+wizardState.activeRecipe.ingredientSections[0].ingredients[0].unit = 'g';
+wizardState.activeRecipe.ingredientSections[0].ingredients[0].qty = 150;
+mockProducts[1].itemWeight = 180;
+setProducts([...mockProducts]);
+
+const footerReadyHtml = renderStep2Footer();
+assert(!footerReadyHtml.includes('disabled'), 'Footer Next button must be enabled once qty issues are resolved');
+assert(footerReadyHtml.includes('wiz-gate-pill ready'), 'Gate pill must transition to ready');
+console.log('✅ Test 4 Passed: Step 2 gate blocks on invalid qty and clears when resolved.\n');
+
+console.log('🎉 ALL RECIPE WIZARD STEP 2 QTY VALIDATION GATE TESTS PASSED!');
