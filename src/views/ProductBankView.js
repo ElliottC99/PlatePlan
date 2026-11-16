@@ -306,14 +306,9 @@ export function openProductEditModal(productIdOrDraft = null) {
   const binding = window.__prefilledResolveBinding || {};
   const tescoData = binding.tescoImportData;
 
-  const UNIT_SELECT_IDS = ['mi-pack-unit', 'mi-item-weight-unit', 'mi-drained-weight-unit'];
-  const syncUnitSelects = (val) => {
-    const cleanUnit = ['g', 'ml', 'units'].includes(val) ? val : 'g';
-    UNIT_SELECT_IDS.forEach(id => setVal(id, cleanUnit));
-  };
+  const cleanUnitVal = (val, fallback = 'g') => ['g', 'ml', 'units'].includes(val) ? val : fallback;
 
   if (prod) {
-    const unifiedUnit = prod.packUnit || prod.unit || prod.itemWeightUnit || prod.item_weight_unit || prod.drainedWeightUnit || 'g';
     setVal('mi-name', prod.name || binding.subtypeDraftName || '');
     setVal('mi-brand', prod.brand || '');
     setVal('mi-storage', prod.storage || 'cupboard');
@@ -324,12 +319,13 @@ export function openProductEditModal(productIdOrDraft = null) {
     setVal('mi-prot', prod.prot ?? prod.protein ?? '');
     setVal('mi-price', prod.price ?? '');
     setVal('mi-pack', prod.pack ?? prod.packSize ?? '');
+    setVal('mi-pack-unit', cleanUnitVal(prod.packUnit || prod.unit || 'g'));
     setVal('mi-item-weight', prod.itemWeight ?? '');
+    setVal('mi-item-weight-unit', cleanUnitVal(prod.itemWeightUnit || prod.item_weight_unit || 'g'));
     setVal('mi-drained-weight', prod.drainedWeight ?? '');
-    syncUnitSelects(unifiedUnit);
+    setVal('mi-drained-weight-unit', cleanUnitVal(prod.drainedWeightUnit || 'g'));
     setVal('mi-notes', prod.notes ?? '');
   } else if (tescoData) {
-    const unifiedUnit = tescoData.packUnit || tescoData.unit || tescoData.itemWeightUnit || tescoData.drainedWeightUnit || 'g';
     const rawBrand = tescoData.brand || 'Tesco';
     const brand = toTitleCase(rawBrand);
     const rawName = tescoData.title || tescoData.name || binding.subtypeDraftName || '';
@@ -339,14 +335,16 @@ export function openProductEditModal(productIdOrDraft = null) {
     setVal('mi-storage', tescoData.storage || 'cupboard');
     setVal('mi-price', tescoData.price || '');
     setVal('mi-pack', tescoData.pack || tescoData.packSize || tescoData.size || '');
+    setVal('mi-pack-unit', cleanUnitVal(tescoData.packUnit || tescoData.unit || 'g'));
     setVal('mi-cal', tescoData.cal ?? tescoData.calories ?? '');
     setVal('mi-fat', tescoData.fat ?? '');
     setVal('mi-carb', tescoData.carb ?? tescoData.carbs ?? '');
     setVal('mi-fibre', tescoData.fibre ?? '');
     setVal('mi-prot', tescoData.prot ?? tescoData.protein ?? '');
     setVal('mi-item-weight', tescoData.itemWeight ?? '');
+    setVal('mi-item-weight-unit', cleanUnitVal(tescoData.itemWeightUnit || 'g'));
     setVal('mi-drained-weight', tescoData.drainedWeight ?? '');
-    syncUnitSelects(unifiedUnit);
+    setVal('mi-drained-weight-unit', cleanUnitVal(tescoData.drainedWeightUnit || 'g'));
     setVal('mi-notes', tescoData.notes || (tescoData.url || tescoData.tescoUrl ? `Tesco: ${tescoData.url || tescoData.tescoUrl}` : ''));
   } else {
     setVal('mi-name', binding.subtypeDraftName || '');
@@ -359,22 +357,13 @@ export function openProductEditModal(productIdOrDraft = null) {
     setVal('mi-prot', '');
     setVal('mi-price', '');
     setVal('mi-pack', '');
+    setVal('mi-pack-unit', 'g');
     setVal('mi-item-weight', '');
+    setVal('mi-item-weight-unit', 'g');
     setVal('mi-drained-weight', '');
-    syncUnitSelects('g');
+    setVal('mi-drained-weight-unit', 'g');
     setVal('mi-notes', '');
   }
-
-  UNIT_SELECT_IDS.forEach(id => {
-    const selectEl = document.getElementById(id);
-    if (selectEl) {
-      const onUnitChange = (e) => syncUnitSelects(e?.target?.value ?? selectEl.value);
-      selectEl.onchange = onUnitChange;
-      if (typeof selectEl.addEventListener === 'function') {
-        selectEl.addEventListener('change', onUnitChange);
-      }
-    }
-  });
 
   renderLinkageContainer(prod, binding);
 
@@ -428,12 +417,6 @@ export function applyTescoUpdate() {
     if (!field || !carried(result.data.raw) || next === undefined || next === null || next === '') continue;
     if (String(field.value) !== String(next)) {
       field.value = next;
-      if (id === 'mi-pack-unit' || id === 'mi-item-weight-unit') {
-        ['mi-pack-unit', 'mi-item-weight-unit', 'mi-drained-weight-unit'].forEach(uid => {
-          const uEl = document.getElementById(uid);
-          if (uEl) uEl.value = next;
-        });
-      }
       changed.push(label);
     }
   }

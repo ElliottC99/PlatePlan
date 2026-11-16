@@ -76,4 +76,28 @@ await assert.rejects(
   'Empty sub-type name must be rejected'
 );
 
+// 6. Test Alias Measurement Stripping on Rename & Searchable Category Autocomplete in EditPantryTaxonomyModalUI
+const fs = await import('node:fs');
+const resAliasClean = await renameRootItem('item-tomatoes', 'Plum Tomatoes', {
+  newCategory: 'Fresh Produce',
+  aliases: ['400g tin roma tomatoes', '2 packs plum tomato', 'Plum Tomatoes']
+});
+assert.ok(resAliasClean.success);
+const afterAliasClean = getState().ingredients.find(i => i.id === 'item-tomatoes');
+assert.deepEqual(
+  afterAliasClean.aliases,
+  ['roma tomatoes', 'plum tomato'],
+  'renameRootItem must strip measurements/containers and omit self-matching aliases'
+);
+
+const editModalSrc = fs.readFileSync(new URL('../src/components/pantry/EditPantryTaxonomyModalUI.js', import.meta.url), 'utf8');
+assert.ok(
+  editModalSrc.includes('createTaxonomySearchInput'),
+  'EditPantryTaxonomyModalUI must use createTaxonomySearchInput for category selection instead of native <select>'
+);
+assert.ok(
+  !editModalSrc.includes('<select id="edit-item-category"'),
+  'EditPantryTaxonomyModalUI must not use native <select id="edit-item-category">'
+);
+
 console.log('✅ Pantry Root Item and Sub-Type Renaming tests passed!');

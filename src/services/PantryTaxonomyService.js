@@ -13,6 +13,7 @@ import { getCategories, saveCategories } from './CategoryRepository.js';
 import { getProducts, saveProduct, addProductToBatch } from './ProductRepository.js';
 import { addRecipeToBatch } from './RecipeFirestoreRepository.js';
 import { compareProductsByStrategy } from './PantryHierarchyService.js';
+import { cleanIngredientPhraseForAlias, normalizeTaxonomyName } from './RecipeIngredientParser.js';
 
 function isDbAvailable() {
   if (!db) { console.warn('[PantryTaxonomyService] Firestore db instance not initialised.'); return false; }
@@ -340,6 +341,21 @@ export async function executeSubtypeReallocation({
   return { success: true };
 }
 
+function sanitizeAliasList(rawAliases, ...ownNames) {
+  if (!Array.isArray(rawAliases)) return [];
+  const ownSet = new Set(ownNames.map(n => normalizeTaxonomyName(n)).filter(Boolean));
+  const seen = new Set();
+  const out = [];
+  for (const raw of rawAliases) {
+    const cleaned = cleanIngredientPhraseForAlias(raw).toLowerCase().trim();
+    if (!cleaned || cleaned.length < 2) continue;
+    if (ownSet.has(cleaned) || seen.has(cleaned)) continue;
+    seen.add(cleaned);
+    out.push(cleaned);
+  }
+  return out;
+}
+
 export async function renameRootItem(itemId, newName, { newCategory = null, aliases = null } = {}) {
   const state = getState();
   const rootItems = Array.isArray(state.rootItems || state.ingredients) ? [...(state.rootItems || state.ingredients)] : [];
@@ -356,7 +372,7 @@ export async function renameRootItem(itemId, newName, { newCategory = null, alia
     }
   }
   if (Array.isArray(aliases)) {
-    item.aliases = aliases.map(a => String(a).trim()).filter(Boolean);
+    item.aliases = sanitizeAliasList(aliases, cleanName);
   }
   item.updatedAt = new Date().toISOString();
 
@@ -378,7 +394,7 @@ export async function renameSubtype(parentId, subtypeId, newName, { aliases = nu
 
   sub.name = cleanName;
   if (Array.isArray(aliases)) {
-    sub.aliases = aliases.map(a => String(a).trim()).filter(Boolean);
+    sub.aliases = sanitizeAliasList(aliases, cleanName, parent.name);
   }
   parent.updatedAt = new Date().toISOString();
 

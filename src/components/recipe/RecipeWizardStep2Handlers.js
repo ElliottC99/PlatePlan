@@ -4,9 +4,10 @@
  */
 
 import { wizardState, syncStep2InputsToState, switchWizardVariant, isMultiRecipeQueueFlow } from './RecipeWizardState.js';
-import { bindTaxonomyAutocompleteEvents, isIngredientUnlinked } from './RecipeWizardTaxonomySearch.js';
+import { bindTaxonomyAutocompleteEvents, isIngredientUnlinked, getIngredientQtyValidationIssue } from './RecipeWizardTaxonomySearch.js';
 import { promptRecipeWizardAliases } from './RecipeWizardAliasesPrompt.js';
-import { getState } from '../../store/store.js';
+import { getState, setProducts } from '../../store/store.js';
+import { saveProduct } from '../../services/ProductRepository.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
 import { recalculateWizardMacros, resolveProductForIngredient } from './RecipeWizardStep3Handlers.js';
 import { renderMacroBreakdownCrossbar } from './RecipeWizardStep3View.js';
@@ -28,14 +29,16 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
     });
 
     const unlinked = allIngs.filter(i => isIngredientUnlinked(i, prods, ings));
-    const isBlocked = unlinked.length > 0 || hasDomUnlinked;
+    const invalidQty = allIngs.filter(i => getIngredientQtyValidationIssue(i, prods, ings).invalid);
+    const unlinkedCount = Math.max(unlinked.length, taxInputs.filter(inp => /new[\s_]*item/i.test(inp.dataset.taxVal || inp.value || '')).length);
+    const isBlocked = unlinkedCount > 0 || hasDomUnlinked || invalidQty.length > 0;
 
     const btnNext = modalWrap.querySelector('#btn-next-step2');
     if (btnNext) {
       btnNext.disabled = isBlocked;
       btnNext.style.opacity = isBlocked ? '0.6' : '1';
       btnNext.style.cursor = isBlocked ? 'not-allowed' : 'pointer';
-      btnNext.title = isBlocked ? 'All ingredients must be linked before proceeding' : '';
+      btnNext.title = isBlocked ? 'All ingredients must be linked and have calculable weights before proceeding' : '';
     }
 
     const warningBanner = modalWrap.querySelector('#wiz-gate-warning-banner');
@@ -43,17 +46,25 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       warningBanner.style.display = isBlocked ? 'flex' : 'none';
       const countSpan = warningBanner.querySelector('.wiz-unlinked-count');
       if (countSpan) {
-        countSpan.textContent = Math.max(unlinked.length, taxInputs.filter(inp => /new[\s_]*item/i.test(inp.dataset.taxVal || inp.value || '')).length, 1);
+        countSpan.textContent = Math.max(unlinkedCount + invalidQty.length, 1);
       }
     }
 
     const gatePill = modalWrap.querySelector('#wiz-gate-pill');
     if (gatePill) {
-      const count = Math.max(unlinked.length, taxInputs.filter(inp => /new[\s_]*item/i.test(inp.dataset.taxVal || inp.value || '')).length, 1);
       if (isBlocked) {
         gatePill.className = 'wiz-gate-pill blocked';
-        gatePill.title = 'Click to jump to next unmapped ingredient';
-        gatePill.innerHTML = `<span>⚠️</span> <span class="wiz-unlinked-count">${count}</span> unmapped item(s) <span style="font-size:10px;text-decoration:underline;margin-left:2px;">(jump)</span>`;
+        if (unlinkedCount > 0 && invalidQty.length > 0) {
+          gatePill.title = 'Click to jump to next unmapped or invalid qty ingredient';
+          gatePill.innerHTML = `<span>⚠️</span> <span class="wiz-unlinked-count">${unlinkedCount}</span> unmapped item(s), <span class="wiz-invalid-qty-count">${invalidQty.length}</span> qty weight issue(s) <span style="font-size:10px;text-decoration:underline;margin-left:2px;">(jump)</span>`;
+        } else if (unlinkedCount > 0 || hasDomUnlinked) {
+          const count = Math.max(unlinkedCount, 1);
+          gatePill.title = 'Click to jump to next unmapped ingredient';
+          gatePill.innerHTML = `<span>⚠️</span> <span class="wiz-unlinked-count">${count}</span> unmapped item(s) <span style="font-size:10px;text-decoration:underline;margin-left:2px;">(jump)</span>`;
+        } else {
+          gatePill.title = 'Click to jump to next ingredient with uncalculable qty weight';
+          gatePill.innerHTML = `<span>⚠️</span> <span class="wiz-invalid-qty-count">${invalidQty.length}</span> qty weight issue(s) <span style="font-size:10px;text-decoration:underline;margin-left:2px;">(jump)</span>`;
+        }
       } else {
         gatePill.className = 'wiz-gate-pill ready';
         gatePill.title = 'All ingredients are linked';
@@ -142,7 +153,12 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       updateLiveStep2NutritionDOM();
       return;
     }
-    if (e.target && e.target.matches('.wiz-ing-qty, .wiz-ing-unit, .wiz-ing-name, .wiz-ing-water-ml, #wiz-servings-input')) {
+    if (e.target && e.target.matches('.wiz-ing-unit')) {
+      syncStep2InputsToState(modalWrap);
+      safeRender({ syncInputs: false });
+      return;
+    }
+    if (e.target && e.target.matches('.wiz-ing-qty, .wiz-ing-name, .wiz-ing-water-ml, #wiz-servings-input')) {
       updateLiveStep2NutritionDOM();
     }
   });
@@ -157,27 +173,91 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
     };
   }
 
-  // Interactive gating pill jump: smooth scroll to first unlinked ingredient row
+  // Interactive gating pill jump: smooth scroll to first unlinked or invalid-qty ingredient row
   const gatePill = modalWrap.querySelector('#wiz-gate-pill');
   if (gatePill) {
     gatePill.onclick = () => {
-      const unlinkedRow = modalWrap.querySelector('tr.wiz-row-unlinked') ||
+      const targetRow = modalWrap.querySelector('tr.wiz-row-unlinked') ||
+        modalWrap.querySelector('tr.wiz-row-invalid-qty') ||
         Array.from(modalWrap.querySelectorAll('tr[id^="wiz-ing-row-"]')).find(r => {
           const inp = r.querySelector('.wiz-ing-tax-search');
           const val = (inp?.dataset?.taxVal || inp?.value || '').trim();
           return !val || val === 'new_item' || /new[\s_]*item/i.test(val);
         });
-      if (unlinkedRow) {
-        unlinkedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const inp = unlinkedRow.querySelector('.wiz-ing-tax-search');
-        if (inp) {
-          inp.focus();
-          inp.style.outline = '2px solid #e11d48';
-          setTimeout(() => { if (inp) inp.style.outline = ''; }, 1500);
+      if (targetRow) {
+        targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const focusEl = targetRow.classList.contains('wiz-row-invalid-qty')
+          ? (targetRow.querySelector('.wiz-inline-item-weight') || targetRow.querySelector('.wiz-ing-unit'))
+          : targetRow.querySelector('.wiz-ing-tax-search');
+        if (focusEl) {
+          focusEl.focus();
+          focusEl.style.outline = '2px solid #e11d48';
+          setTimeout(() => { if (focusEl) focusEl.style.outline = ''; }, 1500);
         }
       }
     };
   }
+
+  // Inline quick-fix actions for invalid-qty rows
+  modalWrap.querySelectorAll('.wiz-quick-switch-unit-btn').forEach(btn => {
+    btn.onclick = () => {
+      syncStep2InputsToState(modalWrap);
+      const sIdx = parseInt(btn.dataset.sidx, 10);
+      const iIdx = parseInt(btn.dataset.iidx, 10);
+      const targetUnit = btn.dataset.unit || 'g';
+      const item = wizardState.activeRecipe?.ingredientSections?.[sIdx]?.ingredients?.[iIdx];
+      if (item) {
+        item.unit = targetUnit;
+        item.isInvalidQtyUnit = false;
+        safeRender({ syncInputs: false });
+      }
+    };
+  });
+
+  modalWrap.querySelectorAll('.wiz-save-inline-item-weight-btn').forEach(btn => {
+    btn.onclick = async () => {
+      syncStep2InputsToState(modalWrap);
+      const sIdx = parseInt(btn.dataset.sidx, 10);
+      const iIdx = parseInt(btn.dataset.iidx, 10);
+      const prodId = btn.dataset.prodId;
+      const weightInput = modalWrap.querySelector(`#wiz-inline-item-weight-${sIdx}-${iIdx}`);
+      const weightVal = parseFloat(weightInput?.value);
+      if (!weightVal || weightVal <= 0) {
+        showWizardNotice('Please enter a valid single-item weight in grams (e.g. 150).', 'warning');
+        if (weightInput) weightInput.focus();
+        return;
+      }
+      const state = getState() || {};
+      const prods = Array.isArray(state.products) ? [...state.products] : [];
+      const pIdx = prods.findIndex(p => String(p.id) === String(prodId));
+      if (pIdx >= 0) {
+        const updatedProd = {
+          ...prods[pIdx],
+          itemWeight: weightVal,
+          itemWeightUnit: 'g'
+        };
+        prods[pIdx] = updatedProd;
+        setProducts(prods);
+        await saveProduct(updatedProd);
+        if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast(`Saved 1 Usable item size (${weightVal}g) on "${updatedProd.name}".`);
+        }
+        safeRender({ syncInputs: false });
+      }
+    };
+  });
+
+  modalWrap.querySelectorAll('.wiz-remap-item-btn').forEach(btn => {
+    btn.onclick = () => {
+      const sIdx = btn.dataset.sidx;
+      const iIdx = btn.dataset.iidx;
+      const taxInp = modalWrap.querySelector(`#wiz-ing-tax-search-${sIdx}-${iIdx}`);
+      if (taxInp) {
+        taxInp.focus();
+        taxInp.select?.();
+      }
+    };
+  });
 
   // Compact auto-fitting method step textarea resizing
   modalWrap.addEventListener('focusin', (e) => {
@@ -407,9 +487,15 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
         return !val || val === 'new_item' || /new[\s_]*item/i.test(val);
       });
       const unlinked = allIngs.filter(i => isIngredientUnlinked(i, prods, ings));
+      const invalidQty = allIngs.filter(i => getIngredientQtyValidationIssue(i, prods, ings).invalid);
       if (unlinked.length > 0 || hasDomUnlinked) {
         const count = Math.max(unlinked.length, taxInputs.filter(inp => /new[\s_]*item/i.test(inp.dataset.taxVal || inp.value || '')).length, 1);
         showWizardNotice(`Cannot proceed: ${count} ingredient(s) retain an unlinked "✨ New Item" status. Please map each ingredient to a valid Category, Item, or Sub-Type.`, 'warning');
+        updateStep2NextButtonState();
+        return;
+      }
+      if (invalidQty.length > 0) {
+        showWizardNotice(`Cannot proceed: ${invalidQty.length} ingredient(s) are measured in "qty" without a calculable single-item weight. Switch their unit to g/ml, set a single-item weight, or re-map them.`, 'warning');
         updateStep2NextButtonState();
         return;
       }
