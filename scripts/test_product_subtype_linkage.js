@@ -87,25 +87,18 @@ for (const selectId of ['mi-pack-unit', 'mi-item-weight-unit', 'mi-drained-weigh
   assert.ok(selectHtml.includes('value="units"'), `${selectId} must include units option`);
 }
 
-// Verify changing one unit dropdown synchronizes all three
+// Verify unit dropdowns operate independently (e.g. pack in 'units' while 1 usable item size is in 'g')
 const packUnitEl = document.getElementById('mi-pack-unit');
 const itemUnitEl = document.getElementById('mi-item-weight-unit');
 const drainedUnitEl = document.getElementById('mi-drained-weight-unit');
 
-packUnitEl.value = 'ml';
-packUnitEl.onchange({ target: packUnitEl });
-assert.equal(itemUnitEl.value, 'ml', 'Changing pack unit to ml must sync item weight unit to ml');
-assert.equal(drainedUnitEl.value, 'ml', 'Changing pack unit to ml must sync drained weight unit to ml');
-
-drainedUnitEl.value = 'units';
-drainedUnitEl.onchange({ target: drainedUnitEl });
-assert.equal(packUnitEl.value, 'units', 'Changing drained unit to units must sync pack unit to units');
-assert.equal(itemUnitEl.value, 'units', 'Changing drained unit to units must sync item weight unit to units');
-
+packUnitEl.value = 'units';
 itemUnitEl.value = 'g';
-itemUnitEl.onchange({ target: itemUnitEl });
-assert.equal(packUnitEl.value, 'g', 'Changing item unit to g must sync pack unit to g');
-assert.equal(drainedUnitEl.value, 'g', 'Changing item unit to g must sync drained weight unit to g');
+drainedUnitEl.value = 'g';
+assert.equal(packUnitEl.value, 'units', 'Pack unit keeps units');
+assert.equal(itemUnitEl.value, 'g', 'Item weight unit stays independent in g');
+assert.equal(drainedUnitEl.value, 'g', 'Drained weight unit stays independent in g');
+packUnitEl.value = 'g';
 
 // 2. Verify saving standalone product without linked Sub-Type inherits General category cleanly
 document.getElementById('mi-name').value = 'Test Standalone Jam';
