@@ -244,8 +244,24 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
     };
   }
 
-  // Live input delegation on table inputs: qty, name, water ml, servings (unit handled by 'change' to avoid double work)
+  // Live input delegation on table inputs: qty, name, water ml, servings, title, source (unit handled by 'change' to avoid double work)
   modalWrap.addEventListener('input', (e) => {
+    if (e.target && e.target.matches('#wiz-step2-title')) {
+      wizardState.activeRecipe.title = toTitleCase(e.target.value.trim() || 'Untitled Recipe');
+      return;
+    }
+    if (e.target && e.target.matches('#wiz-step2-source-url')) {
+      wizardState.activeRecipe.sourceUrl = e.target.value.trim();
+      return;
+    }
+    if (e.target && e.target.matches('#wiz-step2-source-book')) {
+      wizardState.activeRecipe.sourceBook = e.target.value.trim();
+      return;
+    }
+    if (e.target && e.target.matches('#wiz-step2-source-page')) {
+      wizardState.activeRecipe.sourcePage = e.target.value.trim();
+      return;
+    }
     if (e.target && e.target.matches('.wiz-ing-qty, .wiz-ing-name, .wiz-ing-water-ml, #wiz-servings-input')) {
       const sIdx = parseInt(e.target.dataset?.sidx, 10);
       const iIdx = parseInt(e.target.dataset?.iidx, 10);
@@ -271,6 +287,22 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
   }, listenerOpts);
 
   modalWrap.addEventListener('change', (e) => {
+    if (e.target && e.target.matches('.wiz-step2-source-type-radio')) {
+      const selectedType = e.target.value || '';
+      wizardState.activeRecipe.sourceType = selectedType;
+      modalWrap.querySelectorAll('.wiz-step2-source-type-pill').forEach(lbl => {
+        const inp = lbl.querySelector('input');
+        const isSel = inp && inp.checked;
+        lbl.style.background = isSel ? 'var(--purple-bg, #eef2ff)' : 'var(--surface, #fff)';
+        lbl.style.color = isSel ? 'var(--purple, #4f46e5)' : 'var(--text2, #475569)';
+        lbl.style.fontWeight = isSel ? '600' : '500';
+      });
+      const onlineDiv = modalWrap.querySelector('#wiz-step2-source-online-fields');
+      const bookDiv = modalWrap.querySelector('#wiz-step2-source-book-fields');
+      if (onlineDiv) onlineDiv.style.display = selectedType === 'online' ? 'flex' : 'none';
+      if (bookDiv) bookDiv.style.display = selectedType === 'book' ? 'flex' : 'none';
+      return;
+    }
     if (e.target && e.target.matches('.wiz-step2-meal-tag')) {
       const clickedTag = e.target.value;
       const allChecked = Array.from(modalWrap.querySelectorAll('.wiz-step2-meal-tag:checked')).map(el => el.value);

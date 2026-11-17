@@ -414,6 +414,23 @@ export function syncStep2InputsToState(modalWrap) {
     }
   });
 
+  // Title & Source
+  const step2TitleInput = modalWrap.querySelector?.('#wiz-step2-title');
+  if (step2TitleInput) {
+    const t = step2TitleInput.value.trim();
+    if (t) wizardState.activeRecipe.title = toTitleCase(t);
+  }
+  const step2SrcType = modalWrap.querySelector?.('input[name="wiz_step2_source_type"]:checked');
+  if (step2SrcType) {
+    wizardState.activeRecipe.sourceType = step2SrcType.value;
+  }
+  const step2SrcUrl = modalWrap.querySelector?.('#wiz-step2-source-url');
+  if (step2SrcUrl) wizardState.activeRecipe.sourceUrl = step2SrcUrl.value.trim();
+  const step2SrcBook = modalWrap.querySelector?.('#wiz-step2-source-book');
+  if (step2SrcBook) wizardState.activeRecipe.sourceBook = step2SrcBook.value.trim();
+  const step2SrcPage = modalWrap.querySelector?.('#wiz-step2-source-page');
+  if (step2SrcPage) wizardState.activeRecipe.sourcePage = step2SrcPage.value.trim();
+
   // Servings yield
   const servingsInput = modalWrap.querySelector?.('#wiz-servings-input');
   if (servingsInput) {
