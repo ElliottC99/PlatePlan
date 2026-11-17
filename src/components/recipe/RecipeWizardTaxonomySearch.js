@@ -158,7 +158,7 @@ export function getIngredientQtyValidationIssue(item, productsBank = [], ingredi
   if (unit !== 'qty') return { invalid: false };
 
   const name = String(item.name || item.raw || '').trim();
-  if (SELF_WEIGHED_CULINARY_COUNT_REGEX.test(name)) {
+  if (item.isCloveCount || /\bcloves?\b/i.test(String(item.raw || '')) || SELF_WEIGHED_CULINARY_COUNT_REGEX.test(name)) {
     return { invalid: false };
   }
 
@@ -357,6 +357,10 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
   const existingCategories = getUnifiedCategories(storeState);
 
   const filterAndRenderDropdown = (inputEl, dropdownEl) => {
+    const latestState = getState() || {};
+    const latestIngredients = latestState.rootItems || latestState.ingredients || ingredientsBank;
+    const latestProducts = latestState.products || productsBank;
+    const latestCategories = getUnifiedCategories(latestState);
     const query = (inputEl.value || '').toLowerCase().trim();
     const sIdx = inputEl.dataset.sidx;
     const iIdx = inputEl.dataset.iidx;
@@ -368,7 +372,7 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
     `;
 
     // Render category mappings with high visibility
-    existingCategories.forEach(cat => {
+    latestCategories.forEach(cat => {
       const catLower = cat.toLowerCase();
       if (!query || catLower.includes(query) || '[category]'.includes(query)) {
         html += `
@@ -380,7 +384,7 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
     });
 
     // Render taxonomy root items & sub-types (clean and concise names only)
-    const filteredTaxonomy = filterTaxonomyItemsByQuery(query, ingredientsBank, productsBank);
+    const filteredTaxonomy = filterTaxonomyItemsByQuery(query, latestIngredients, latestProducts);
     filteredTaxonomy.forEach(({ ing, subtypesToShow }) => {
       html += `
         <div class="wiz-tax-opt wiz-tax-main" data-val="${escapeAttr(ing.id)}" data-label="📦 ${escapeAttr(ing.name)}" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--text); background:var(--surface2,#fbfbf9);">
@@ -449,10 +453,10 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
                 return;
               }
               const ingId = created.ingredientId || created.rootItem?.id || created.id || 'custom';
-              const subId = created.subtypeId || created.subtype?.id || created.subtypeName || 'standard';
+              const subId = created.subtypeId || created.subtype?.id || null;
               const parentName = created.parentName || created.rootItem?.name || created.rootItemName || currentIngName;
-              const subName = created.subtypeName || created.subtype?.name || parentName;
-              const combinedKey = `${ingId}:${subId}`;
+              const subName = created.subtypeName || created.subtype?.name || '';
+              const combinedKey = subId ? `${ingId}:${subId}` : `${ingId}`;
               const displayLabel = subName && subName !== parentName ? `🏷️ ${subName} (${parentName})` : `📦 ${parentName}`;
               inputEl.dataset.taxVal = combinedKey;
               inputEl.value = displayLabel;
@@ -462,7 +466,7 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
               inputEl.style.color = 'var(--text,#1e293b)';
               inputEl.dispatchEvent(new Event('change', { bubbles: true }));
               if (rowNameInput) {
-                rowNameInput.value = subName;
+                rowNameInput.value = subName || parentName;
               }
               if (typeof onSelectCallback === 'function') {
                 onSelectCallback(sIdx, iIdx, combinedKey, created);

@@ -69,10 +69,10 @@ check('the honey line counts as changed when the editor opens it (30 g to 30 ml)
   assert.deepEqual([row.old, row.new], [{ qty: 30, unit: 'g' }, { qty: 30, unit: 'ml' }]);
 });
 
-check('a saved handful line is a raw-unit line and changes on the shopping list (2 qty to 60 g)', () => {
+check('a saved handful line is a raw-unit line and changes on the shopping list (2 qty to 40 g)', () => {
   assert.ok(result.rawUnitLines.some(r => r.text === '2 handfuls spinach'));
   const row = result.changed.backup.shopping.find(r => r.text === '2 handfuls spinach');
-  assert.deepEqual([row.old, row.new], [{ qty: 2, unit: 'qty' }, { qty: 60, unit: 'g' }]);
+  assert.deepEqual([row.old, row.new], [{ qty: 2, unit: 'qty' }, { qty: 40, unit: 'g' }]);
 });
 
 check('a saved 200 ml passata line changes on the shopping list because exact ml amounts stay in ml', () => {

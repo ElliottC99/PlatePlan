@@ -71,7 +71,9 @@ export function recalculateWizardMacros(recipeObj) {
     if (matchedProduct) {
       const qty = Number(item.qty ?? item.amount ?? 1) || 1;
       const unit = item.unit || 'g';
-      const nut = calcFn(matchedProduct, qty, unit);
+      const nut = calcFn(matchedProduct, qty, unit, {
+        isCloveCount: Boolean(item.isCloveCount || /\bcloves?\b/i.test(item.raw || ''))
+      });
       totalCal += (nut.kcal ?? nut.cal ?? 0);
       totalProt += (nut.protein ?? nut.prot ?? 0);
       totalCarb += (nut.carbs ?? nut.carb ?? 0);
@@ -298,7 +300,7 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal = () => {}, sh
   const normalizedCookTime = { hours: cleanCookH, minutes: cleanCookM };
   const totalTimeMins = (cleanPrepH * 60 + cleanPrepM) + (cleanCookH * 60 + cleanCookM);
 
-  const sourceType = rec.sourceType || baseOrig.sourceType || '';
+  const sourceType = rec.sourceType !== undefined ? rec.sourceType : (baseOrig.sourceType || '');
   const sourceUrl = sourceType === 'online' ? (rec.sourceUrl ?? baseOrig.sourceUrl ?? '') : '';
   const sourceBook = sourceType === 'book' ? (rec.sourceBook ?? baseOrig.sourceBook ?? '') : '';
   const sourcePage = sourceType === 'book' ? (rec.sourcePage ?? baseOrig.sourcePage ?? '') : '';
@@ -306,7 +308,7 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal = () => {}, sh
     ? sourceUrl
     : (sourceType === 'book'
         ? [sourceBook, sourcePage ? `p. ${sourcePage}` : ''].filter(Boolean).join(', ')
-        : (rec.source || baseOrig.source || ''));
+        : '');
 
   const buildEnhancedPayload = (enhSourceObj) => {
     const enhSections = (enhSourceObj.ingredientSections && enhSourceObj.ingredientSections.length)

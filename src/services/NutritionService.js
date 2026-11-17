@@ -165,7 +165,7 @@ export function resolveProductItemWeight(product) {
   return 0;
 }
 
-export function calculateItemNutrition(item, quantity, unit = 'g') {
+export function calculateItemNutrition(item, quantity, unit = 'g', options = {}) {
   const zero = { kcal: 0, protein: 0, carbs: 0, fat: 0, fibre: 0, cost: 0, cal: 0, prot: 0, carb: 0 };
   if (!item || typeof item !== 'object') return zero;
 
@@ -178,6 +178,8 @@ export function calculateItemNutrition(item, quantity, unit = 'g') {
 
   if (u === 'g' || u === 'gram' || u === 'ml') {
     grams = q;
+  } else if (u === 'clove' || ((u === 'qty' || u === 'item' || u === 'count') && options?.isCloveCount)) {
+    grams = toGrams(q, 'clove', item.name, 0);
   } else if (u === 'pack' || u === 'can' || u === 'tin') {
     const drained = parseFloat(item.drainedWeight ?? item.value?.drainedWeight ?? 0);
     const usablePack = parseFloat(item.usablePackAmount ?? item.value?.usablePackAmount ?? 0);

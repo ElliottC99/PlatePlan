@@ -81,6 +81,8 @@ console.log('--- Running Recipe Wizard UI Space-Efficiency & Sticky Footer Tests
   assert.ok(step2Html.includes('class="wiz-step2-header-container"'), 'Step 2 must contain consolidated header container');
   assert.ok(step2Html.includes('Dish 1 of 1'), 'Header must contain dish queue counter');
   assert.ok(step2Html.includes('Boeuf Bourguignon'), 'Header must display recipe title');
+  assert.ok(step2Html.includes('id="wiz-step2-title"'), 'Header must include editable Step 2 title input');
+  assert.ok(step2Html.includes('id="wiz-step2-source-type-box"'), 'Header must include Step 2 source type selector');
   assert.ok(step2Html.includes('id="wiz-step2-fit-badge-container"'), 'Header must contain fit badge container');
   assert.ok(step2Html.includes('id="wiz-step2-macro-crossbar-container"'), 'Header must contain macro crossbar container');
   assert.ok(step2Html.includes('id="wiz-servings-input"'), 'Header must contain servings yield input');

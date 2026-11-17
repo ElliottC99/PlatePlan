@@ -42,7 +42,14 @@ export const UNIT_MAP = {
   tsp: 'tsp', teaspoon: 'tsp', teaspoons: 'tsp', t: 'tsp',
   cup: 'cup', cups: 'cup', clove: 'clove', cloves: 'clove', can: 'can', cans: 'can', tin: 'can', tins: 'can',
   pinch: 'pinch', pinches: 'pinch', block: 'block', blocks: 'block', slice: 'slice', slices: 'slice',
-  handful: 'handful', handfuls: 'handful', bunch: 'bunch', bunches: 'bunch',
+  handful: 'handful', handfuls: 'handful',
+  'small handful': 'small handful', 'small handfuls': 'small handful',
+  'large handful': 'large handful', 'large handfuls': 'large handful',
+  'generous handful': 'generous handful', 'generous handfuls': 'generous handful',
+  'big handful': 'big handful', 'big handfuls': 'big handful',
+  bunch: 'bunch', bunches: 'bunch',
+  'small bunch': 'small bunch', 'small bunches': 'small bunch',
+  'large bunch': 'large bunch', 'large bunches': 'large bunch',
   pack: 'pack', packet: 'pack', packets: 'pack', package: 'pack', packages: 'pack', pkg: 'pack',
   pot: 'pot', pots: 'pot', tub: 'pot', tubs: 'pot', pouch: 'pack', pouches: 'pack', sachet: 'pack', sachets: 'pack',
   carton: 'pack', cartons: 'pack', jar: 'jar', jars: 'jar', bottle: 'bottle', bottles: 'bottle', bag: 'pack', bags: 'pack', box: 'pack', boxes: 'pack',
@@ -250,8 +257,8 @@ export function parseIngredientString(rawStr) {
     };
   }
 
-  // 1. Loose measures without leading numbers e.g. "handful of parsley", "pinch of black pepper", "drizzle of olive oil"
-  const looseMatch = clean.match(/^(?:a\s+)?(handful|handfuls|pinch|pinches|bunch|bunches|drizzle|drizzles|dash|dashes|splash|splashes)\s+(?:of\s+)?(.*)/i);
+  // 1. Loose measures without leading numbers e.g. "small handful of basil", "handful of parsley", "pinch of black pepper", "drizzle of olive oil"
+  const looseMatch = clean.match(/^(?:a\s+)?((?:(?:small|large|generous|big)\s+)?(?:handful|handfuls|bunch|bunches)|pinch|pinches|drizzle|drizzles|dash|dashes|splash|splashes)\s+(?:of\s+)?(.*)/i);
   if (looseMatch) {
     const u = looseMatch[1].toLowerCase();
     const rawName = looseMatch[2].trim();
@@ -349,8 +356,9 @@ export function parseIngredientString(rawStr) {
 
   // 4. Standard parsed quantity with unit or count
   const { qty, remainder } = parseQuantity(clean);
-  const cleanedRemainder = remainder.replace(/^(?:heaped|heaping|level|generous|scant|rounded)\s+/i, '');
-  const unitMatch = cleanedRemainder.match(/^([a-zA-Z]+)\b\s*(.*)/i);
+  const cleanedRemainder = remainder.replace(/^(?:heaped|heaping|level|scant|rounded)\s+|^(?:generous)\s+(?!(?:handful|handfuls)\b)/i, '');
+  const sizedUnitMatch = cleanedRemainder.match(/^((?:small|large|generous|big)\s+(?:handful|handfuls|bunch|bunches))\b\s*(.*)/i);
+  const unitMatch = sizedUnitMatch || cleanedRemainder.match(/^([a-zA-Z]+)\b\s*(.*)/i);
   let parsedUnit = 'qty';
   let rawName = remainder;
 
@@ -414,6 +422,7 @@ export function parseIngredientString(rawStr) {
     unit: normalised.unit,
     isEstimated: normalised.isEstimated,
     isInvalidQtyUnit,
+    isCloveCount: parsedUnit === 'clove',
     name: toTitleCase(cleanedName),
     notes: combinedNotes,
     isToServe: servingInfo.isToServe
@@ -536,6 +545,20 @@ export function matchIngredientTaxonomy(parsedItem, existingIngredients = null) 
     }
     return 0;
   };
+
+  // Exact normalized alias preference check (allows learned Root Item vs Sub-Type tie-breaking)
+  for (const ing of ingredients) {
+    if (!ing) continue;
+    if ((Array.isArray(ing.aliases) ? ing.aliases : []).some(al => normalizeTaxonomyName(al) === normParsed)) {
+      return { ...parsedItem, ingredientId: ing.id, subtypeId: null, matchedName: ing.name, matchedCategory: ing.category || 'General', isNewTaxonomyItem: false };
+    }
+    const subtypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
+    for (const sub of subtypes) {
+      if ((Array.isArray(sub.aliases) ? sub.aliases : []).some(sal => normalizeTaxonomyName(sal) === normParsed)) {
+        return { ...parsedItem, ingredientId: ing.id, subtypeId: sub.id || sub.name, matchedName: `${sub.name} (${ing.name})`, matchedCategory: ing.category || 'General', isNewTaxonomyItem: false };
+      }
+    }
+  }
 
   for (const ing of ingredients) {
     if (!ing) continue;

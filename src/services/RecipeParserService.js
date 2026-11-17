@@ -275,7 +275,7 @@ export function isIngredientOrSectionLine(line) {
   }
 
   // 3. Starts with quantity/unit/article count
-  if (/^\s*(?:\d+[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]?|[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|half\b|a\s+pinch\b|pinch\b|handful\b|small\s+handful\b|dash\b|drizzle\b|squeeze\b|sprinkle\b|few\b|several\b|one\b|two\b|three\b|four\b|five\b|six\b|seven\b|eight\b|nine\b|ten\b|\d+\s*x\b)/i.test(stripped)) {
+  if (/^\s*(?:\d+[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]?|[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|half\b|a\s+pinch\b|pinch\b|(?:(?:small|large|generous|big)\s+)?handfuls?\b|(?:(?:small|large)\s+)?bunch(?:es)?\b|dash\b|drizzle\b|squeeze\b|sprinkle\b|few\b|several\b|one\b|two\b|three\b|four\b|five\b|six\b|seven\b|eight\b|nine\b|ten\b|\d+\s*x\b)/i.test(stripped)) {
     return true;
   }
 
@@ -295,7 +295,7 @@ export function isIngredientOrSectionLine(line) {
 export function isHeaderMetadataLine(line) {
   if (!line) return false;
   const trimmed = line.trim();
-  return /^(?:(?:Dish|Recipe)\s*#?\s*\d+|(?:Recipe\s*)?(?:Title|Name):|(?:Makes|Serves|Yield|Servings|Total\s+Servings)\b|(?:Prep|Cook)\s+Time\b|Difficulty|Calories|Author|Course|Cuisine)/i.test(trimmed);
+  return /^(?:(?:Dish|Recipe)\s*#?\s*\d+|(?:Recipe\s*)?(?:Title|Name):|(?:Makes|Serves|Yield|Servings|Total\s+Servings)\b|(?:Prep|Cook)\s+Time\b|(?:Source(?:\s+URL|\s+Book)?|URL|Link|Book|Cookbook|Page(?:\s+number)?):|https?:\/\/\S+$|Difficulty|Calories|Author|Course|Cuisine)/i.test(trimmed);
 }
 
 /**
@@ -448,18 +448,100 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
   }
 
   let title = 'Imported Recipe', servings = null, prepMinutes = 15, cookMinutes = 30;
-  const headerLines = headerText.split('\n').map(l => l.trim()).filter(Boolean);
+  let sourceType = '', sourceUrl = '', sourceBook = '', sourcePage = '';
 
-  headerLines.forEach((line, idx) => {
+  const applySourceLine = (line) => {
+    const trimmed = String(line || '').trim();
+    if (!trimmed) return false;
+
+    const urlPrefixMatch = trimmed.match(/^(?:Source(?:\s+URL)?|URL|Link|Recipe\s+URL):\s*(https?:\/\/\S+)/i);
+    if (urlPrefixMatch) {
+      sourceType = 'online';
+      sourceUrl = urlPrefixMatch[1].trim();
+      return true;
+    }
+
+    if (/^https?:\/\/\S+$/i.test(trimmed)) {
+      sourceType = 'online';
+      sourceUrl = trimmed;
+      return true;
+    }
+
+    const pageMatch = trimmed.match(/^(?:Page(?:\s+number)?|p\.):\s*(.+)$/i);
+    if (pageMatch) {
+      if (!sourceType) sourceType = 'book';
+      sourcePage = pageMatch[1].trim();
+      return true;
+    }
+
+    const bookMatch = trimmed.match(/^(?:(?:Source\s+)?Book|Cookbook):\s*(.+)$/i);
+    if (bookMatch) {
+      sourceType = 'book';
+      let bookVal = bookMatch[1].trim();
+      const inlinePage = bookVal.match(/,?\s*(?:pages?|pp?\.?)\s*([0-9]+(?:\s*[-–]\s*[0-9]+)?)$/i);
+      if (inlinePage) {
+        sourcePage = sourcePage || inlinePage[1].trim();
+        bookVal = bookVal.slice(0, inlinePage.index).replace(/[,\s]+$/, '').trim();
+      }
+      sourceBook = bookVal;
+      return true;
+    }
+
+    const genericSourceMatch = trimmed.match(/^Source:\s*(.+)$/i);
+    if (genericSourceMatch) {
+      const val = genericSourceMatch[1].trim();
+      const urlInVal = val.match(/(https?:\/\/\S+)/i);
+      if (urlInVal) {
+        sourceType = 'online';
+        sourceUrl = urlInVal[1].trim();
+      } else if (val) {
+        sourceType = 'book';
+        const inlinePage = val.match(/,?\s*(?:pages?|pp?\.?)\s*([0-9]+(?:\s*[-–]\s*[0-9]+)?)$/i);
+        if (inlinePage) {
+          sourcePage = sourcePage || inlinePage[1].trim();
+          sourceBook = val.slice(0, inlinePage.index).replace(/[,\s]+$/, '').trim();
+        } else {
+          sourceBook = val;
+        }
+      }
+      return true;
+    }
+
+    return false;
+  };
+
+  const stripTrailingSourceLines = (rawSectionText) => {
+    if (!rawSectionText) return '';
+    const lines = rawSectionText.split('\n');
+    while (lines.length > 0) {
+      const last = lines[lines.length - 1].trim();
+      if (!last) {
+        lines.pop();
+        continue;
+      }
+      if (applySourceLine(last)) {
+        lines.pop();
+        continue;
+      }
+      break;
+    }
+    return lines.join('\n').trim();
+  };
+
+  const headerLines = headerText.split('\n').map(l => l.trim()).filter(Boolean);
+  let titleAssigned = false;
+
+  headerLines.forEach((line) => {
+    if (applySourceLine(line)) return;
     if (/^(?:Recipe\s*)?(?:Title|Name):/i.test(line)) {
       const ext = cleanRecipeTitle(line.replace(/^(?:Recipe\s*)?(?:Title|Name):/i, ''));
-      if (ext) title = ext;
+      if (ext) { title = ext; titleAssigned = true; }
       return;
     }
     if (/^(?:Dish|Recipe)\s+#?\s*\d+[:\.\-]?\s*(.*)/i.test(line)) {
       const match = line.match(/^(?:Dish|Recipe)\s+#?\s*\d+[:\.\-]?\s*(.*)/i);
       const ext = cleanRecipeTitle(match[1]);
-      if (ext) title = ext;
+      if (ext) { title = ext; titleAssigned = true; }
       return;
     }
     if (/^(?:Makes|Serves|Yield|Servings|Total\s+Servings)\b/i.test(line)) {
@@ -475,11 +557,16 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
       cookMinutes = parseDurationMinutes(line);
       return;
     }
-    if (idx === 0) {
+    if (!titleAssigned && !isHeaderMetadataLine(line)) {
       const rawTitle = cleanRecipeTitle(line);
-      if (rawTitle) title = toTitleCase(rawTitle);
+      if (rawTitle) { title = toTitleCase(rawTitle); titleAssigned = true; }
     }
   });
+
+  rawMethodText = stripTrailingSourceLines(rawMethodText);
+  if (!rawMethodText) {
+    rawIngText = stripTrailingSourceLines(rawIngText);
+  }
 
   const sectionsMap = { 'Main Ingredients': [] };
   let currentSectionTitle = 'Main Ingredients';
@@ -535,6 +622,10 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
     servings,
     prepTime: { hours: Math.floor(prepMinutes / 60), minutes: prepMinutes % 60 },
     cookTime: { hours: Math.floor(cookMinutes / 60), minutes: cookMinutes % 60 },
+    sourceType,
+    sourceUrl,
+    sourceBook,
+    sourcePage,
     mealSuitability: [inferredMeal],
     types: [inferredMeal.toLowerCase()],
     mealType: inferredMeal.toLowerCase(),

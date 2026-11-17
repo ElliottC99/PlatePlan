@@ -36,7 +36,9 @@ global.window = {
 global.document = global.window.document;
 
 // Import target modules
-import { setRecipes, setProducts, setIngredients } from '../src/store/store.js';
+import { setRecipes, setProducts, setIngredients, learnIngredientAlias, getState } from '../src/store/store.js';
+import { matchIngredientTaxonomy } from '../src/services/RecipeIngredientParser.js';
+import { commitAtomicChain } from '../src/services/PantryTaxonomyService.js';
 import { getTaxonomyLabel, renderTaxonomySearchHTML, isIngredientUnlinked, resolveHighestAutoDefaultTaxonomy } from '../src/components/recipe/RecipeWizardTaxonomySearch.js';
 import { wizardState, syncStep2InputsToState, getSaveButtonLabel } from '../src/components/recipe/RecipeWizardState.js';
 import { buildLiveEnhancedRecipe } from '../src/components/recipe/RecipeEnhancementModalUI.js';
@@ -334,6 +336,55 @@ console.log('\n--- Test 5: Enhanced Variant Ingredient Shadowing Fix in Wizard -
   assert.strictEqual(loadedIngredients[1].name, 'Quorn Mince', 'Must load Quorn Mince, NOT base recipe Beef Mince!');
   assert.strictEqual(loadedIngredients[1].qty, 250, 'Must load enhanced 250g Quorn Mince, NOT base recipe 200g!');
   console.log('✅ Test 5 Passed: Wizard correctly unpacks enhanced.ingredients without base ingredientSections shadowing.');
+}
+
+// --- Test 6 (AE4): Learned Root vs Sub-Type Preference Tie-Breaking ---
+console.log('\n--- Test 6: Learned Root vs Sub-Type Preference ---');
+{
+  const lemonIng = {
+    id: 'ing_lemon',
+    name: 'Lemon',
+    category: 'Fruit',
+    aliases: [],
+    subtypes: [{ id: 'sub_lemons', name: 'Lemons', aliases: [] }]
+  };
+  setIngredients([lemonIng]);
+
+  const initialMatch = matchIngredientTaxonomy({ name: 'Lemons', qty: 1, unit: 'qty' }, [lemonIng]);
+  assert.strictEqual(initialMatch.ingredientId, 'ing_lemon');
+  assert.strictEqual(initialMatch.subtypeId, 'sub_lemons', 'Without learned preference, exact subtype name matches sub_lemons');
+
+  await learnIngredientAlias('ing_lemon', 'Lemons', null);
+  assert.ok(lemonIng.aliases.includes('lemons'), 'learnIngredientAlias must store "lemons" on Root Item Lemon despite same-stemmed subtype');
+
+  const rootPreferredMatch = matchIngredientTaxonomy({ name: 'Lemons', qty: 1, unit: 'qty' }, [lemonIng]);
+  assert.strictEqual(rootPreferredMatch.ingredientId, 'ing_lemon');
+  assert.strictEqual(rootPreferredMatch.subtypeId, null, 'After learning Root Item preference, "Lemons" must match Root Item Lemon (subtypeId: null)');
+
+  await learnIngredientAlias('ing_lemon', 'Lemons', 'sub_lemons');
+  assert.ok(!lemonIng.aliases.includes('lemons'), 'Switching preference to Sub-Type must remove "lemons" from Root Item aliases');
+  assert.ok(lemonIng.subtypes[0].aliases.includes('lemons'), 'Switching preference to Sub-Type must store "lemons" on Sub-Type');
+
+  const subPreferredMatch = matchIngredientTaxonomy({ name: 'Lemons', qty: 1, unit: 'qty' }, [lemonIng]);
+  assert.strictEqual(subPreferredMatch.subtypeId, 'sub_lemons', 'After switching preference to Sub-Type, "Lemons" must match sub_lemons');
+  console.log('✅ Test 6 Passed: Root vs Sub-Type preference learning and tie-breaking work in both directions.');
+}
+
+// --- Test 7 (AE5): New Root Item Commit Without Standard Sub-Type ---
+console.log('\n--- Test 7: New Root Item Commit Without Standard Sub-Type ---');
+{
+  const chainRes = await commitAtomicChain({
+    category: 'Spices',
+    rootItemName: 'Smoked Paprika',
+    subtypeName: null
+  });
+  assert.ok(chainRes?.rootItem?.id, 'commitAtomicChain must create Root Item');
+  assert.strictEqual(chainRes.subtypeId || null, null, 'Finishing at Root Item must not create a Standard sub-type');
+  assert.strictEqual(chainRes.rootItem.subtypes.length, 0, 'New Root Item must have empty subtypes array');
+
+  const label = getTaxonomyLabel({ ingredientId: chainRes.rootItem.id, subtypeId: null }, getState().ingredients, []);
+  assert.strictEqual(label, '📦 Smoked Paprika', 'New Root Item must render as 📦 Smoked Paprika');
+  console.log('✅ Test 7 Passed: New Root Item maps cleanly at root level without Standard sub-type.');
 }
 
 console.log('\n=== ALL VARIANT SAVE & TAXONOMY MAPPING TESTS PASSED! ===');

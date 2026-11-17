@@ -59,7 +59,11 @@ const ESTIMATED_GRAMS_PER_UNIT = {
   drizzle: 5, drizzles: 5, splash: 5, splashes: 5,
   sprig: 2, sprigs: 2,
   leaf: 1, leaves: 1,
-  handful: 30, handfuls: 30,
+  'small handful': 10, 'small handfuls': 10,
+  handful: 20, handfuls: 20,
+  'large handful': 30, 'large handfuls': 30,
+  'generous handful': 30, 'generous handfuls': 30,
+  'big handful': 30, 'big handfuls': 30,
   bunch: 20, bunches: 20,
   'small bunch': 15, 'small bunches': 15,
   'large bunch': 30, 'large bunches': 30

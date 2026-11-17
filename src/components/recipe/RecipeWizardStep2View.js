@@ -270,35 +270,61 @@ export function renderState2Mapping() {
     </div>
   ` : '';
 
+  const curSourceType = activeRecipe.sourceType || '';
+  const step2SourceTypeHtml = [
+    { val: '', label: 'None' },
+    { val: 'online', label: '🌐 URL' },
+    { val: 'book', label: '📖 Book' }
+  ].map(opt => {
+    const isSel = curSourceType === opt.val;
+    return `<label class="wiz-step2-source-type-pill" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 8px; border: 1px solid var(--border, #cbd5e1); border-radius: 999px; background: ${isSel ? 'var(--purple-bg, #eef2ff)' : 'var(--surface, #fff)'}; color: ${isSel ? 'var(--purple, #4f46e5)' : 'var(--text2, #475569)'}; font-weight: ${isSel ? '600' : '500'}; cursor: pointer; user-select: none;">
+      <input type="radio" name="wiz_step2_source_type" class="wiz-step2-source-type-radio" value="${opt.val}" ${isSel ? 'checked' : ''} style="display:none;" />
+      ${opt.label}
+    </label>`;
+  }).join(' ');
+
   return `
     <div>
-      <div class="wiz-step2-header-container" style="background: var(--surface2, #f8fafc); border: 1px solid var(--border, #e2e8f0); border-radius: 8px; padding: 6px 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-          <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: #e0e7ff; color: #4338ca; padding: 2px 7px; border-radius: 4px;">
-            Dish ${wizardState.currentQueueIndex || 1} of ${wizardState.initialQueueTotal || wizardState.processingQueue?.length || 1}
-          </span>
-          <h3 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--text, #0f172a); max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeAttr(toTitleCase(activeRecipe.title || 'Untitled Recipe'))}">
-            ${escapeHtml(toTitleCase(activeRecipe.title || 'Untitled Recipe'))}
-          </h3>
-          ${step2VariantToggleHtml}
-          <div id="wiz-step2-fit-badge-container" style="display: inline-flex; align-items: center;">
-            ${fitTagHtml}
-          </div>
-          <div id="wiz-step2-macro-crossbar-container" style="display: inline-flex; align-items: center;">
-            ${macroCrossbarHtml}
-          </div>
-        </div>
-        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; gap: 4px;">
-            <span style="font-size: 11px; font-weight: 600; color: var(--text2, #64748b);">Meal:</span>
-            <div class="wiz-step2-meal-tags-container" style="display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;">
-              ${mealTagsHtml}
+      <div class="wiz-step2-header-container" style="background: var(--surface2, #f8fafc); border: 1px solid var(--border, #e2e8f0); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: #e0e7ff; color: #4338ca; padding: 2px 7px; border-radius: 4px;">
+              Dish ${wizardState.currentQueueIndex || 1} of ${wizardState.initialQueueTotal || wizardState.processingQueue?.length || 1}
+            </span>
+            <input type="text" id="wiz-step2-title" name="wiz_step2_title" aria-label="Recipe Title" value="${escapeAttr(toTitleCase(activeRecipe.title || 'Untitled Recipe'))}" placeholder="Recipe Title" style="font-size: 13.5px; font-weight: 700; color: var(--text, #0f172a); padding: 3px 8px; border: 1px solid var(--border, #cbd5e1); border-radius: 6px; background: var(--surface, #fff); min-width: 200px; max-width: 280px;" />
+            ${step2VariantToggleHtml}
+            <div id="wiz-step2-fit-badge-container" style="display: inline-flex; align-items: center;">
+              ${fitTagHtml}
+            </div>
+            <div id="wiz-step2-macro-crossbar-container" style="display: inline-flex; align-items: center;">
+              ${macroCrossbarHtml}
             </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <label for="wiz-servings-input" style="font-size: 12px; font-weight: 600; color: var(--text2, #555);">Yield:</label>
-            <input type="number" id="wiz-servings-input" min="1" max="50" step="1" value="${servings}" style="width: 48px; text-align: center; font-size: 12px; font-weight: 700; padding: 2px 4px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--surface);">
-            <span style="font-size: 11px; color: var(--text2, #666);">servings</span>
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <span style="font-size: 11px; font-weight: 600; color: var(--text2, #64748b);">Meal:</span>
+              <div class="wiz-step2-meal-tags-container" style="display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                ${mealTagsHtml}
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <label for="wiz-servings-input" style="font-size: 12px; font-weight: 600; color: var(--text2, #555);">Yield:</label>
+              <input type="number" id="wiz-servings-input" min="1" max="50" step="1" value="${servings}" style="width: 48px; text-align: center; font-size: 12px; font-weight: 700; padding: 2px 4px; border: 1px solid var(--border, #ccc); border-radius: 6px; background: var(--surface);">
+              <span style="font-size: 11px; color: var(--text2, #666);">servings</span>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--border, #e2e8f0); padding-top: 6px;">
+          <span style="font-size: 11px; font-weight: 600; color: var(--text2, #64748b);">Source:</span>
+          <div id="wiz-step2-source-type-box" style="display: inline-flex; align-items: center; gap: 4px;">
+            ${step2SourceTypeHtml}
+          </div>
+          <div id="wiz-step2-source-online-fields" style="display: ${curSourceType === 'online' ? 'flex' : 'none'}; flex: 1; min-width: 200px;">
+            <input type="url" id="wiz-step2-source-url" name="wiz_step2_source_url" aria-label="Recipe source URL" value="${escapeAttr(activeRecipe.sourceUrl || '')}" placeholder="https://example.com/recipe..." style="width: 100%; padding: 3px 8px; border: 1px solid var(--border, #cbd5e1); border-radius: 6px; font-size: 12px; background: var(--surface, #fff);" />
+          </div>
+          <div id="wiz-step2-source-book-fields" style="display: ${curSourceType === 'book' ? 'flex' : 'none'}; flex: 1; gap: 6px; min-width: 220px;">
+            <input type="text" id="wiz-step2-source-book" name="wiz_step2_source_book" aria-label="Recipe book name" value="${escapeAttr(activeRecipe.sourceBook || '')}" placeholder="Book Name (e.g. Ottolenghi Simple)" style="flex: 2; padding: 3px 8px; border: 1px solid var(--border, #cbd5e1); border-radius: 6px; font-size: 12px; background: var(--surface, #fff);" />
+            <input type="text" id="wiz-step2-source-page" name="wiz_step2_source_page" aria-label="Recipe book page" value="${escapeAttr(activeRecipe.sourcePage || '')}" placeholder="Page" style="flex: 1; max-width: 80px; padding: 3px 8px; border: 1px solid var(--border, #cbd5e1); border-radius: 6px; font-size: 12px; background: var(--surface, #fff);" />
           </div>
         </div>
       </div>
