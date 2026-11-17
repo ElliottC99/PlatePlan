@@ -604,5 +604,41 @@ function checkPlanKept(plan, label) {
   console.log('PASS 12: Skeleton candidate rows cleanly isolate variant duplicates and safely escape recipe titles with apostrophes');
 }
 
+// 13. Pre-Generation Layout Grid Clear button & clearSkeletonGrid()
+{
+  const { getState } = await import('../src/store/coreState.js');
+  const { renderSkeletonGridUI, clearSkeletonGrid } = await import('../src/components/planner/PlannerSkeletonGridUI.js');
+  const gridHtml = renderSkeletonGridUI({ days: 2, skeletonGrid: { '1_dinner': { status: 'pinned', recipeId: 'r1' } } });
+  assert.ok(gridHtml.includes('data-action="clear-skeleton-grid"'), 'Pre-Generation Layout Grid must render Clear Grid action button');
+
+  const st = getState();
+  st.skeletonGrid = { '1_dinner': { status: 'pinned', recipeId: 'r1' }, '2_lunch': { status: 'skipped', isSkipped: true } };
+  const modalEls = {
+    'view-modal-wrap': { style: { setProperty: () => {} }, classList: { add: () => {}, remove: () => {} }, addEventListener: () => {}, removeEventListener: () => {} },
+    'view-modal-content': { innerHTML: '', style: { setProperty: () => {} } },
+    'btn-confirm-yes': { onclick: null, focus: () => {} },
+    'btn-confirm-cancel': { onclick: null, focus: () => {} }
+  };
+  if (!global.document.body) global.document.body = { style: {} };
+  const origGetById = global.document.getElementById;
+  const origDocAdd = global.document.addEventListener;
+  const origDocRemove = global.document.removeEventListener;
+  global.document.getElementById = (id) => modalEls[id] || null;
+  global.document.addEventListener = () => {};
+  global.document.removeEventListener = () => {};
+  try {
+    clearSkeletonGrid();
+    assert.equal(typeof modalEls['btn-confirm-yes'].onclick, 'function', 'clearSkeletonGrid must open confirmation dialog');
+    modalEls['btn-confirm-yes'].onclick();
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepEqual(st.skeletonGrid, {}, 'Confirming Clear Grid must reset state.skeletonGrid');
+  } finally {
+    global.document.getElementById = origGetById;
+    global.document.addEventListener = origDocAdd;
+    global.document.removeEventListener = origDocRemove;
+  }
+  console.log('PASS 13: Clear Grid button renders and clearSkeletonGrid resets pinned/skipped slots after confirmation');
+}
+
 console.log('\nAll planner control checks passed.');
 process.exit(0);

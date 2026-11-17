@@ -206,6 +206,11 @@ export function routeAction(actionName, target, event) {
     return true;
   }
 
+  if (normalizedAction === 'clear-skeleton-grid') {
+    import('../components/planner/PlannerSkeletonGridUI.js').then(m => m.clearSkeletonGrid());
+    return true;
+  }
+
   if (normalizedAction === 'opensavemealplanmodal()' || normalizedAction === 'open-save-meal-plan-modal' || normalizedAction.includes('opensavemealplanmodal')) {
     import('../views/PlannerView.js').then(m => m.openSaveMealPlanModal());
     return true;

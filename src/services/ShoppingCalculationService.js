@@ -245,8 +245,14 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
 
       const resolvedId = overriddenProductId || matchedProd?.id || canonicalIngId || rawName;
       const key = String(resolvedId).toLowerCase().replace(/\s+/g, '_');
-      // At-home ticks are keyed by ingredient, not product, so swapping a line's product keeps its tick.
-      const atHomeKey = String(canonicalIngId || matchedIng?.id || ingId || rawName).toLowerCase().replace(/\s+/g, '_');
+      // At-home ticks are keyed by sub-type/ingredient line (not product), so swapping brands keeps the tick
+      // while distinct sub-types or items under one root (e.g. Cherry Tomatoes vs Baby Plum Tomatoes) tick separately.
+      const effectiveSubId = subId || ing.subtypeId || ing.subTypeId || matchedProd?.subtypeId || matchedProd?.subTypeId || null;
+      const rootOrIngId = canonicalIngId || matchedIng?.id || ingId || null;
+      const rawAtHomeBase = effectiveSubId
+        ? `${rootOrIngId || 'ing'}:${effectiveSubId}`
+        : (rootOrIngId && rawName ? `${rootOrIngId}:${rawName}` : (rootOrIngId || rawName));
+      const atHomeKey = String(rawAtHomeBase).toLowerCase().replace(/\s+/g, '_');
       const rawQty = Number(ing.qty ?? ing.quantity ?? ing.amount ?? 1);
       const rawUnit = String(ing.unit || '').trim();
 
@@ -336,9 +342,17 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
     groupsMap.get(cat).items.push(entry);
   });
 
+  items.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'en', { sensitivity: 'base' }));
+  const sortedGroups = Array.from(groupsMap.values())
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'en', { sensitivity: 'base' }))
+    .map(g => ({
+      ...g,
+      items: [...g.items].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'en', { sensitivity: 'base' }))
+    }));
+
   return {
     items,
-    groups: Array.from(groupsMap.values()),
+    groups: sortedGroups,
     totalCost: Math.round(totalCost * 100) / 100
   };
 }

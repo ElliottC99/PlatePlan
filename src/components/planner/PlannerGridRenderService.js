@@ -241,9 +241,12 @@ export function renderSkeletonGridUI({ days = 7, startDate = '', skeletonGrid = 
 
   return `
     <div class="skeleton-grid-panel" style="background:var(--surface2,#f8fafc);padding:16px;border-radius:var(--radius-lg,14px);border:1px solid var(--border,#e2e8f0);margin-bottom:16px;min-width:0;max-width:100%;overflow:hidden">
-      <div style="margin-bottom:12px">
-        <h3 style="margin:0;font-size:15px;font-weight:750;color:var(--text,#0f172a)">Pre-Generation Layout Grid</h3>
-        <div style="font-size:12px;color:var(--text2,#64748b);margin-top:2px">Tap any slot to pin a shared or split household recipe or mark as skipped before generating.</div>
+      <div style="margin-bottom:12px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <h3 style="margin:0;font-size:15px;font-weight:750;color:var(--text,#0f172a)">Pre-Generation Layout Grid</h3>
+          <div style="font-size:12px;color:var(--text2,#64748b);margin-top:2px">Tap any slot to pin a shared or split household recipe or mark as skipped before generating.</div>
+        </div>
+        <button type="button" class="btn xs ghost" data-action="clear-skeleton-grid" style="font-size:12px;font-weight:600;color:var(--text2,#64748b);border:1px solid var(--border,#cbd5e1);padding:4px 10px;border-radius:8px;white-space:nowrap">Clear Grid</button>
       </div>
       <div class="skeleton-grid-cards" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(min(100%, 210px), 1fr));gap:12px;min-width:0;width:100%">
         ${gridCardsHtml}

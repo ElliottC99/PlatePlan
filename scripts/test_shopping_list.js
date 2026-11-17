@@ -8,6 +8,8 @@
  */
 
 import { generateShoppingListFromPlan } from '../src/services/ShoppingListService.js';
+import { aggregateShoppingListFromPlan } from '../src/services/ShoppingCalculationService.js';
+import { renderShoppingCategoriesList } from '../src/components/shopping/ShoppingCategoryGroup.js';
 import { saveShoppingList } from '../src/repositories/ShoppingListRepository.js';
 import { clearCheckedShoppingItems } from '../src/components/shopping/ShoppingBatchToolbar.js';
 
@@ -139,6 +141,70 @@ async function testShoppingListEngine() {
     console.log('✅ Test 5 Passed: clearCheckedShoppingItems clears both currentPlan.shoppingAtHome and plan.shoppingAtHome.');
   } else {
     console.error('❌ Test 5 Failed: currentPlan.shoppingAtHome was not cleared:', mockState.currentPlan.shoppingAtHome);
+    testFailures++;
+  }
+  console.log('');
+
+  console.log('--- Test 6 (AE2): Fixed Alphabetical Order & Independent Sub-Type Ticks ---');
+  const tomIngs = [
+    {
+      id: 'ing_tomato',
+      name: 'Tomatoes',
+      category: 'Produce',
+      subtypes: [
+        { id: 'sub_cherry', name: 'Cherry Tomatoes' },
+        { id: 'sub_baby_plum', name: 'Baby Plum Tomatoes' }
+      ]
+    },
+    { id: 'ing_apple', name: 'Apples', category: 'Fruit' }
+  ];
+  const tomProds = [
+    { id: 'prod_cherry', name: 'Cherry Tomatoes 250g', ingredientId: 'ing_tomato', subtypeId: 'sub_cherry', category: 'Produce' },
+    { id: 'prod_baby_plum', name: 'Baby Plum Tomatoes 250g', ingredientId: 'ing_tomato', subtypeId: 'sub_baby_plum', category: 'Produce' },
+    { id: 'prod_apple', name: 'Apples', ingredientId: 'ing_apple', category: 'Fruit' }
+  ];
+  const tomRecipes = [
+    {
+      id: 'rec_tom',
+      name: 'Tomato Salad',
+      serves: 1,
+      ingredients: [
+        { name: 'Cherry Tomatoes', ingredientId: 'ing_tomato', subtypeId: 'sub_cherry', qty: 100, unit: 'g' },
+        { name: 'Baby Plum Tomatoes', ingredientId: 'ing_tomato', subtypeId: 'sub_baby_plum', qty: 100, unit: 'g' },
+        { name: 'Apples', ingredientId: 'ing_apple', qty: 1, unit: 'qty' }
+      ]
+    }
+  ];
+  const tomPlan = {
+    slots: { '2026-11-17': { lunch: { recipeId: 'rec_tom', servings: 1 } } },
+    shoppingAtHome: { 'ing_tomato:sub_cherry': true }
+  };
+  const agg = aggregateShoppingListFromPlan(tomPlan, tomRecipes, tomIngs, tomProds);
+  const cherryRow = agg.items.find(i => i.name.includes('Cherry Tomatoes'));
+  const plumRow = agg.items.find(i => i.name.includes('Baby Plum Tomatoes'));
+  const sameOrderNames = agg.items.map(i => i.name);
+
+  if (
+    cherryRow && plumRow &&
+    cherryRow.atHomeKey !== plumRow.atHomeKey &&
+    cherryRow.isAtHome === true &&
+    plumRow.isAtHome === false &&
+    agg.groups[0].name === 'Fruit' &&
+    agg.groups[1].name === 'Produce' &&
+    sameOrderNames[0].includes('Apples') &&
+    sameOrderNames[1].includes('Baby Plum') &&
+    sameOrderNames[2].includes('Cherry')
+  ) {
+    console.log('✅ Test 6 Passed: Cherry Tomatoes & Baby Plum Tomatoes tick independently and list stays alphabetically sorted.');
+  } else {
+    console.error('❌ Test 6 Failed:', { cherryRow, plumRow, groups: agg.groups.map(g => g.name), sameOrderNames });
+    testFailures++;
+  }
+  const catHtml = renderShoppingCategoriesList(agg.items);
+  if (catHtml.indexOf('Fruit') < catHtml.indexOf('Produce') && catHtml.indexOf('Baby Plum') < catHtml.indexOf('Cherry')) {
+    console.log('✅ Test 6b Passed: renderShoppingCategoriesList preserves alphabetical group and item order.');
+  } else {
+    console.error('❌ Test 6b Failed: HTML category/item order is not alphabetical.');
     testFailures++;
   }
   console.log('');
