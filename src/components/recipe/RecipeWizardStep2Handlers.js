@@ -5,6 +5,7 @@
 
 import { wizardState, syncStep2InputsToState, switchWizardVariant, isMultiRecipeQueueFlow } from './RecipeWizardState.js';
 import { bindTaxonomyAutocompleteEvents, isIngredientUnlinked, getIngredientQtyValidationIssue } from './RecipeWizardTaxonomySearch.js';
+import { renderQtyIssueBannerHTML } from './RecipeWizardStep2View.js';
 import { promptRecipeWizardAliases } from './RecipeWizardAliasesPrompt.js';
 import { getState, setProducts } from '../../store/store.js';
 import { saveProduct } from '../../services/ProductRepository.js';
@@ -15,6 +16,13 @@ import { renderFitScoreBadge } from '../FitScoreBadge.js';
 
 export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice }) {
   if (!modalWrap || wizardState.currentStep !== 2) return;
+
+  if (modalWrap._wizStep2AbortController) {
+    modalWrap._wizStep2AbortController.abort();
+  }
+  const step2AbortController = new AbortController();
+  modalWrap._wizStep2AbortController = step2AbortController;
+  const listenerOpts = { signal: step2AbortController.signal };
 
   const updateStep2NextButtonState = () => {
     const state = (typeof getState === 'function' ? getState() : (typeof window !== 'undefined' ? window.getState?.() : null)) || {};
@@ -73,8 +81,10 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
     }
   };
 
-  const updateLiveStep2NutritionDOM = () => {
-    syncStep2InputsToState(modalWrap);
+  const updateLiveStep2NutritionDOM = ({ syncAll = true } = {}) => {
+    if (syncAll) {
+      syncStep2InputsToState(modalWrap);
+    }
     recalculateWizardMacros(wizardState.activeRecipe);
 
     const fitContainer = modalWrap.querySelector('#wiz-step2-fit-badge-container');
@@ -93,6 +103,116 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       macroBarContainer.innerHTML = renderMacroBreakdownCrossbar(wizardState.activeRecipe, currentVariant, { compact: true, mealType: targetMealType });
     }
     updateStep2NextButtonState();
+  };
+
+  const bindRowBannerActions = (scopeEl) => {
+    if (!scopeEl) return;
+    scopeEl.querySelectorAll('.wiz-quick-switch-unit-btn').forEach(btn => {
+      btn.onclick = () => {
+        const sIdx = parseInt(btn.dataset.sidx, 10);
+        const iIdx = parseInt(btn.dataset.iidx, 10);
+        const targetUnit = btn.dataset.unit || 'g';
+        const item = wizardState.activeRecipe?.ingredientSections?.[sIdx]?.ingredients?.[iIdx];
+        if (item) {
+          item.unit = targetUnit;
+          item.isInvalidQtyUnit = false;
+          const unitSelect = modalWrap.querySelector(`#wiz-ing-unit-${sIdx}-${iIdx}`);
+          if (unitSelect) unitSelect.value = targetUnit;
+          updateRowQtyIssueDOM(sIdx, iIdx);
+          updateLiveStep2NutritionDOM({ syncAll: false });
+        }
+      };
+    });
+
+    scopeEl.querySelectorAll('.wiz-save-inline-item-weight-btn').forEach(btn => {
+      btn.onclick = async () => {
+        const sIdx = parseInt(btn.dataset.sidx, 10);
+        const iIdx = parseInt(btn.dataset.iidx, 10);
+        const prodId = btn.dataset.prodId;
+        const weightInput = modalWrap.querySelector(`#wiz-inline-item-weight-${sIdx}-${iIdx}`);
+        const weightVal = parseFloat(weightInput?.value);
+        if (!weightVal || weightVal <= 0) {
+          showWizardNotice('Please enter a valid single-item weight in grams (e.g. 150).', 'warning');
+          if (weightInput) weightInput.focus();
+          return;
+        }
+        const state = getState() || {};
+        const prods = Array.isArray(state.products) ? [...state.products] : [];
+        const pIdx = prods.findIndex(p => String(p.id) === String(prodId));
+        if (pIdx >= 0) {
+          const updatedProd = {
+            ...prods[pIdx],
+            itemWeight: weightVal,
+            itemWeightUnit: 'g'
+          };
+          prods[pIdx] = updatedProd;
+          setProducts(prods);
+          await saveProduct(updatedProd);
+          if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
+            window.showPlatePlanToast(`Saved 1 Usable item size (${weightVal}g) on "${updatedProd.name}".`);
+          }
+          // Update any rows that map to this product in-place without rebuilding the entire modal
+          (wizardState.activeRecipe?.ingredientSections || []).forEach((sec, secIdx) => {
+            (sec.ingredients || []).forEach((_, ingIdx) => {
+              updateRowQtyIssueDOM(secIdx, ingIdx);
+            });
+          });
+          updateLiveStep2NutritionDOM({ syncAll: false });
+        }
+      };
+    });
+
+    scopeEl.querySelectorAll('.wiz-remap-item-btn').forEach(btn => {
+      btn.onclick = () => {
+        const sIdx = btn.dataset.sidx;
+        const iIdx = btn.dataset.iidx;
+        const taxInp = modalWrap.querySelector(`#wiz-ing-tax-search-${sIdx}-${iIdx}`);
+        if (taxInp) {
+          taxInp.focus();
+          taxInp.select?.();
+        }
+      };
+    });
+  };
+
+  const updateRowQtyIssueDOM = (sIdx, iIdx) => {
+    const item = wizardState.activeRecipe?.ingredientSections?.[sIdx]?.ingredients?.[iIdx];
+    const row = modalWrap.querySelector(`#wiz-ing-row-${sIdx}-${iIdx}`);
+    if (!item || !row) return;
+
+    const state = getState() || {};
+    const prods = state.products || [];
+    const ings = state.rootItems || state.ingredients || [];
+    const isUnlinked = isIngredientUnlinked(item, prods, ings);
+    const qtyIssue = getIngredientQtyValidationIssue(item, prods, ings);
+    const hasQtyIssue = qtyIssue.invalid;
+
+    row.classList.toggle('wiz-row-unlinked', isUnlinked);
+    row.classList.toggle('wiz-row-invalid-qty', hasQtyIssue);
+    row.style.borderLeft = isUnlinked
+      ? '3px solid #f43f5e'
+      : (hasQtyIssue ? '3px solid #f59e0b' : '');
+
+    const unitSelect = row.querySelector(`#wiz-ing-unit-${sIdx}-${iIdx}`);
+    if (unitSelect) {
+      unitSelect.style.borderColor = hasQtyIssue ? '#f59e0b' : 'var(--border, #ccc)';
+    }
+
+    const existingBanner = row.querySelector('.wiz-qty-issue-banner');
+    if (hasQtyIssue) {
+      const bannerHtml = renderQtyIssueBannerHTML(sIdx, iIdx, item, qtyIssue);
+      if (existingBanner) {
+        existingBanner.outerHTML = bannerHtml;
+      } else {
+        const nameCell = row.querySelector(`#wiz-ing-name-${sIdx}-${iIdx}`)?.closest('td');
+        if (nameCell) {
+          nameCell.insertAdjacentHTML('beforeend', bannerHtml);
+        }
+      }
+      bindRowBannerActions(row);
+    } else if (existingBanner) {
+      existingBanner.remove();
+    }
   };
 
   const safeRender = ({ syncInputs = true } = {}) => {
@@ -124,12 +244,31 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
     };
   }
 
-  // Live input delegation on table inputs: qty, unit, name, water ml, servings
+  // Live input delegation on table inputs: qty, name, water ml, servings (unit handled by 'change' to avoid double work)
   modalWrap.addEventListener('input', (e) => {
-    if (e.target && e.target.matches('.wiz-ing-qty, .wiz-ing-unit, .wiz-ing-name, .wiz-ing-water-ml, #wiz-servings-input')) {
+    if (e.target && e.target.matches('.wiz-ing-qty, .wiz-ing-name, .wiz-ing-water-ml, #wiz-servings-input')) {
+      const sIdx = parseInt(e.target.dataset?.sidx, 10);
+      const iIdx = parseInt(e.target.dataset?.iidx, 10);
+      if (!isNaN(sIdx) && !isNaN(iIdx)) {
+        const item = wizardState.activeRecipe?.ingredientSections?.[sIdx]?.ingredients?.[iIdx];
+        if (item) {
+          if (e.target.matches('.wiz-ing-qty')) {
+            item.qty = parseFloat(e.target.value) || 0;
+            delete item.scaledQty;
+            delete item.baseQty;
+          } else if (e.target.matches('.wiz-ing-name')) {
+            item.name = e.target.value.trim();
+            updateRowQtyIssueDOM(sIdx, iIdx);
+          } else if (e.target.matches('.wiz-ing-water-ml')) {
+            item.waterMl = parseInt(e.target.value, 10) || 400;
+          }
+          updateLiveStep2NutritionDOM({ syncAll: false });
+          return;
+        }
+      }
       updateLiveStep2NutritionDOM();
     }
-  });
+  }, listenerOpts);
 
   modalWrap.addEventListener('change', (e) => {
     if (e.target && e.target.matches('.wiz-step2-meal-tag')) {
@@ -150,18 +289,24 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
           label.style.color = input.checked ? 'var(--purple, #4f46e5)' : 'var(--text2, #475569)';
         }
       });
-      updateLiveStep2NutritionDOM();
+      updateLiveStep2NutritionDOM({ syncAll: false });
       return;
     }
     if (e.target && e.target.matches('.wiz-ing-unit')) {
-      syncStep2InputsToState(modalWrap);
-      safeRender({ syncInputs: false });
+      const sIdx = parseInt(e.target.dataset.sidx, 10);
+      const iIdx = parseInt(e.target.dataset.iidx, 10);
+      const item = wizardState.activeRecipe?.ingredientSections?.[sIdx]?.ingredients?.[iIdx];
+      if (item) {
+        item.unit = e.target.value;
+        if (item.unit !== 'qty') {
+          item.isInvalidQtyUnit = false;
+        }
+        updateRowQtyIssueDOM(sIdx, iIdx);
+        updateLiveStep2NutritionDOM({ syncAll: false });
+      }
       return;
     }
-    if (e.target && e.target.matches('.wiz-ing-qty, .wiz-ing-name, .wiz-ing-water-ml, #wiz-servings-input')) {
-      updateLiveStep2NutritionDOM();
-    }
-  });
+  }, listenerOpts);
 
   const servingsInput = modalWrap.querySelector('#wiz-servings-input');
   if (servingsInput) {
@@ -199,65 +344,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
   }
 
   // Inline quick-fix actions for invalid-qty rows
-  modalWrap.querySelectorAll('.wiz-quick-switch-unit-btn').forEach(btn => {
-    btn.onclick = () => {
-      syncStep2InputsToState(modalWrap);
-      const sIdx = parseInt(btn.dataset.sidx, 10);
-      const iIdx = parseInt(btn.dataset.iidx, 10);
-      const targetUnit = btn.dataset.unit || 'g';
-      const item = wizardState.activeRecipe?.ingredientSections?.[sIdx]?.ingredients?.[iIdx];
-      if (item) {
-        item.unit = targetUnit;
-        item.isInvalidQtyUnit = false;
-        safeRender({ syncInputs: false });
-      }
-    };
-  });
-
-  modalWrap.querySelectorAll('.wiz-save-inline-item-weight-btn').forEach(btn => {
-    btn.onclick = async () => {
-      syncStep2InputsToState(modalWrap);
-      const sIdx = parseInt(btn.dataset.sidx, 10);
-      const iIdx = parseInt(btn.dataset.iidx, 10);
-      const prodId = btn.dataset.prodId;
-      const weightInput = modalWrap.querySelector(`#wiz-inline-item-weight-${sIdx}-${iIdx}`);
-      const weightVal = parseFloat(weightInput?.value);
-      if (!weightVal || weightVal <= 0) {
-        showWizardNotice('Please enter a valid single-item weight in grams (e.g. 150).', 'warning');
-        if (weightInput) weightInput.focus();
-        return;
-      }
-      const state = getState() || {};
-      const prods = Array.isArray(state.products) ? [...state.products] : [];
-      const pIdx = prods.findIndex(p => String(p.id) === String(prodId));
-      if (pIdx >= 0) {
-        const updatedProd = {
-          ...prods[pIdx],
-          itemWeight: weightVal,
-          itemWeightUnit: 'g'
-        };
-        prods[pIdx] = updatedProd;
-        setProducts(prods);
-        await saveProduct(updatedProd);
-        if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
-          window.showPlatePlanToast(`Saved 1 Usable item size (${weightVal}g) on "${updatedProd.name}".`);
-        }
-        safeRender({ syncInputs: false });
-      }
-    };
-  });
-
-  modalWrap.querySelectorAll('.wiz-remap-item-btn').forEach(btn => {
-    btn.onclick = () => {
-      const sIdx = btn.dataset.sidx;
-      const iIdx = btn.dataset.iidx;
-      const taxInp = modalWrap.querySelector(`#wiz-ing-tax-search-${sIdx}-${iIdx}`);
-      if (taxInp) {
-        taxInp.focus();
-        taxInp.select?.();
-      }
-    };
-  });
+  bindRowBannerActions(modalWrap);
 
   // Compact auto-fitting method step textarea resizing
   modalWrap.addEventListener('focusin', (e) => {
@@ -266,14 +353,14 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       e.target.style.height = Math.max(32, e.target.scrollHeight) + 'px';
       e.target.style.overflowY = 'auto';
     }
-  });
+  }, listenerOpts);
 
   modalWrap.addEventListener('input', (e) => {
     if (e.target && e.target.matches('.wiz-step-input')) {
       e.target.style.height = 'auto';
       e.target.style.height = Math.max(32, e.target.scrollHeight) + 'px';
     }
-  });
+  }, listenerOpts);
 
   modalWrap.addEventListener('focusout', (e) => {
     if (e.target && e.target.matches('.wiz-step-input')) {
@@ -282,7 +369,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
         e.target.style.overflowY = 'hidden';
       }
     }
-  });
+  }, listenerOpts);
 
   const btnAddSection = modalWrap.querySelector('#wiz-add-section-btn');
   if (btnAddSection) {
@@ -458,8 +545,12 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
         item.productName = resolvedProd.name || resolvedProd.productName;
       }
     }
-    updateLiveStep2NutritionDOM();
-    safeRender({ syncInputs: false });
+    const secIdx = parseInt(sIdx, 10);
+    const ingIdx = parseInt(iIdx, 10);
+    if (!isNaN(secIdx) && !isNaN(ingIdx)) {
+      updateRowQtyIssueDOM(secIdx, ingIdx);
+    }
+    updateLiveStep2NutritionDOM({ syncAll: false });
   });
 
   const btnNext2 = modalWrap.querySelector('#btn-next-step2');
