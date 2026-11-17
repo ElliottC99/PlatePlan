@@ -447,5 +447,20 @@ assert.equal(updatedRecAudit.enhanced.ingredients[0].subTypeId, undefined, 'Enha
 const postRelinkAudit = auditRecipeMappings(getState());
 assert.equal(postRelinkAudit.issues.filter(i => i.recipeId === 'rec_audit_test').length, 0, 'Audit must clear after successful relinking');
 
+// 6. Category-Level Macro Default Selection (AE4)
+const pastaRoots = [
+  { id: 'ing_wheat_pasta', name: 'Wheat Spaghetti', category: 'Pasta', subtypes: [] },
+  { id: 'ing_lentil_pasta', name: 'Red Lentil Pasta', category: 'Pasta', subtypes: [] }
+];
+const pastaProducts = [
+  { id: 'prod_wheat_spaghetti', name: 'Wheat Spaghetti 500g', ingredientId: 'ing_wheat_pasta', category: 'Pasta', prot: 12, cal: 350, kcal: 350, isAutoDefault: true },
+  { id: 'prod_red_lentil_pasta', name: 'Gluten Free Red Lentil Pasta 250g', ingredientId: 'ing_lentil_pasta', category: 'Pasta', prot: 26, cal: 340, kcal: 340, isAutoDefault: true }
+];
+const resPastaCategory = resolveDynamicProductForIngredient(
+  { categoryId: 'Pasta' },
+  { products: pastaProducts, ingredients: pastaRoots, preferences: { autoDefaultStrategy: 'highest_protein_per_kcal' } }
+);
+assert.equal(resPastaCategory?.id, 'prod_red_lentil_pasta', 'Category-level resolution must pick highest protein/kcal product across category rather than first isAutoDefault');
+
 console.log('✅ Code Review Findings Verified!\n');
 console.log('🎉 ALL UNITS 1-5 FOR DYNAMIC RECIPE-TO-PANTRY RESOLUTION VERIFIED!');

@@ -244,9 +244,17 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     }
   }
 
+  function normalizeSearchText(str) {
+    return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  }
+
   function renderList(query = '') {
-    const cleanQ = query.toLowerCase().trim();
-    const matchesQuery = (item) => !cleanQ || (item.name?.toLowerCase().includes(cleanQ) || item.brand?.toLowerCase().includes(cleanQ) || inferSubtype(item).toLowerCase().includes(cleanQ));
+    const cleanQ = normalizeSearchText(query);
+    const matchesQuery = (item) => !cleanQ || (
+      normalizeSearchText(item.name).includes(cleanQ) ||
+      normalizeSearchText(item.brand).includes(cleanQ) ||
+      normalizeSearchText(inferSubtype(item)).includes(cleanQ)
+    );
     let displayItems = [];
     if (currentTierTab === 'tier1') displayItems = sortItems(tier1Items.filter(matchesQuery));
     else if (currentTierTab === 'tier2') displayItems = sortItems(tier2Items.filter(matchesQuery));
