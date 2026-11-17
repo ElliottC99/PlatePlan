@@ -613,6 +613,7 @@ function checkPlanKept(plan, label) {
 
   const st = getState();
   st.skeletonGrid = { '1_dinner': { status: 'pinned', recipeId: 'r1' }, '2_lunch': { status: 'skipped', isSkipped: true } };
+  if (st.currentPlan) st.currentPlan.skeletonGrid = { '1_dinner': { status: 'pinned', recipeId: 'r1' } };
   const modalEls = {
     'view-modal-wrap': { style: { setProperty: () => {} }, classList: { add: () => {}, remove: () => {} }, addEventListener: () => {}, removeEventListener: () => {} },
     'view-modal-content': { innerHTML: '', style: { setProperty: () => {} } },
@@ -632,6 +633,9 @@ function checkPlanKept(plan, label) {
     modalEls['btn-confirm-yes'].onclick();
     await new Promise(r => setTimeout(r, 0));
     assert.deepEqual(st.skeletonGrid, {}, 'Confirming Clear Grid must reset state.skeletonGrid');
+    if (st.currentPlan) {
+      assert.deepEqual(st.currentPlan.skeletonGrid, {}, 'Confirming Clear Grid must also clear currentPlan.skeletonGrid');
+    }
   } finally {
     global.document.getElementById = origGetById;
     global.document.addEventListener = origDocAdd;

@@ -15,6 +15,7 @@ import { showView } from '../core/AppRouter.js';
 import { closeRecipePreview } from './RecipeDetailModalService.js';
 import { routeRecipeAction } from './RecipeActionBridge.js';
 import { scrollToTop } from '../components/shell/ScrollToTopButton.js';
+import { clearSkeletonGrid } from '../components/planner/PlannerSkeletonGridUI.js';
 
 let isBridgeInitialized = false;
 
@@ -207,7 +208,7 @@ export function routeAction(actionName, target, event) {
   }
 
   if (normalizedAction === 'clear-skeleton-grid') {
-    import('../components/planner/PlannerSkeletonGridUI.js').then(m => m.clearSkeletonGrid());
+    clearSkeletonGrid();
     return true;
   }
 
