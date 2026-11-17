@@ -33,6 +33,8 @@ const { wizardState } = await import('../src/components/recipe/RecipeWizardState
 const { getIngredientQtyValidationIssue } = await import('../src/components/recipe/RecipeWizardTaxonomySearch.js');
 const { renderStep2Footer, renderState2Mapping, renderQtyIssueBannerHTML } = await import('../src/components/recipe/RecipeWizardStep2View.js');
 const { bindStep2Events } = await import('../src/components/recipe/RecipeWizardStep2Handlers.js');
+const { parseIngredientString } = await import('../src/services/RecipeIngredientParser.js');
+const { calculateItemNutrition } = await import('../src/services/NutritionService.js');
 
 console.log('=== RUNNING RECIPE WIZARD STEP 2 QTY VALIDATION GATE SUITE ===\n');
 
@@ -175,5 +177,27 @@ liveChangeListeners[0].fn({
 assert.strictEqual(modalRebuildCount, 0, 'Changing a unit must update in-place without calling renderWizardModal()');
 assert.strictEqual(wizardState.activeRecipe.ingredientSections[0].ingredients[0].unit, 'ml', 'Row unit must update to ml in state');
 console.log('✅ Test 5 Passed: Listeners are cleaned up via AbortController and unit changes update in-place.\n');
+
+// Test 6: Garlic cloves stay qty=3 in Step 2 without missing-itemWeight warning, and weigh 6g/clove in nutrition
+const parsedCloves = parseIngredientString('3 cloves garlic');
+assert.strictEqual(parsedCloves.qty, 3);
+assert.strictEqual(parsedCloves.unit, 'qty');
+assert.strictEqual(parsedCloves.isCloveCount, true);
+assert.strictEqual(parsedCloves.name, 'Garlic');
+
+const garlicRoot = { id: 'ing_garlic', name: 'Garlic', subtypes: [] };
+const garlicBulb = { id: 'prod_garlic_bulb', name: 'Garlic Bulb 65g', ingredientId: 'ing_garlic', itemWeight: 65, kcal: 150, protein: 6.4, carbs: 33, fat: 0.5 };
+const garlicNoWeight = { id: 'prod_garlic_noweight', name: 'Garlic Loose', ingredientId: 'ing_garlic', itemWeight: null, kcal: 150, protein: 6.4, carbs: 33, fat: 0.5 };
+
+const cloveIssue = getIngredientQtyValidationIssue(
+  { ...parsedCloves, ingredientId: 'ing_garlic' },
+  [garlicNoWeight],
+  [garlicRoot]
+);
+assert.strictEqual(cloveIssue.invalid, false, 'Garlic cloves in qty must not trigger missing itemWeight gate');
+
+const cloveNutrition = calculateItemNutrition(garlicBulb, 3, 'qty', { isCloveCount: true });
+assert.strictEqual(cloveNutrition.kcal, Math.round(150 * 0.18), '3 cloves must weigh 18g (6g/clove), ignoring 65g whole-bulb itemWeight');
+console.log('✅ Test 6 Passed: Garlic cloves stay qty without warning and weigh 6g/clove in nutrition.\n');
 
 console.log('🎉 ALL RECIPE WIZARD STEP 2 QTY VALIDATION GATE TESTS PASSED!');

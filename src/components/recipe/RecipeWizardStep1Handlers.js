@@ -119,6 +119,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
             name: parsed.name,
             notes: parsed.notes,
             isFallbackWeight: parsed.isFallbackWeight,
+            isCloveCount: !!parsed.isCloveCount,
             ingredientId: existing?.ingredientId || matched?.ingredientId || null,
             subtypeId: existing?.subtypeId || matched?.subtypeId || null,
             productId: existing?.productId || matched?.productId || null,
@@ -289,6 +290,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
                 isCategoryDefault: i.isCategoryDefault || false,
                 displayName: i.displayName || null,
                 waterMl: i.waterMl || null,
+                isCloveCount: !!i.isCloveCount,
                 isNewTaxonomyItem: !!i.isNewTaxonomyItem
               })),
               instructions: rec.instructions || rec.methodSteps || [],

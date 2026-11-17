@@ -71,7 +71,9 @@ export function recalculateWizardMacros(recipeObj) {
     if (matchedProduct) {
       const qty = Number(item.qty ?? item.amount ?? 1) || 1;
       const unit = item.unit || 'g';
-      const nut = calcFn(matchedProduct, qty, unit);
+      const nut = calcFn(matchedProduct, qty, unit, {
+        isCloveCount: Boolean(item.isCloveCount || /\bcloves?\b/i.test(item.raw || ''))
+      });
       totalCal += (nut.kcal ?? nut.cal ?? 0);
       totalProt += (nut.protein ?? nut.prot ?? 0);
       totalCarb += (nut.carbs ?? nut.carb ?? 0);

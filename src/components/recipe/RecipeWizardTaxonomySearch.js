@@ -158,7 +158,7 @@ export function getIngredientQtyValidationIssue(item, productsBank = [], ingredi
   if (unit !== 'qty') return { invalid: false };
 
   const name = String(item.name || item.raw || '').trim();
-  if (SELF_WEIGHED_CULINARY_COUNT_REGEX.test(name)) {
+  if (item.isCloveCount || /\bcloves?\b/i.test(String(item.raw || '')) || SELF_WEIGHED_CULINARY_COUNT_REGEX.test(name)) {
     return { invalid: false };
   }
 

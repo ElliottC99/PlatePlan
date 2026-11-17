@@ -422,6 +422,7 @@ export function parseIngredientString(rawStr) {
     unit: normalised.unit,
     isEstimated: normalised.isEstimated,
     isInvalidQtyUnit,
+    isCloveCount: parsedUnit === 'clove',
     name: toTitleCase(cleanedName),
     notes: combinedNotes,
     isToServe: servingInfo.isToServe
