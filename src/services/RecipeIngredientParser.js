@@ -546,6 +546,20 @@ export function matchIngredientTaxonomy(parsedItem, existingIngredients = null) 
     return 0;
   };
 
+  // Exact normalized alias preference check (allows learned Root Item vs Sub-Type tie-breaking)
+  for (const ing of ingredients) {
+    if (!ing) continue;
+    if ((Array.isArray(ing.aliases) ? ing.aliases : []).some(al => normalizeTaxonomyName(al) === normParsed)) {
+      return { ...parsedItem, ingredientId: ing.id, subtypeId: null, matchedName: ing.name, matchedCategory: ing.category || 'General', isNewTaxonomyItem: false };
+    }
+    const subtypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
+    for (const sub of subtypes) {
+      if ((Array.isArray(sub.aliases) ? sub.aliases : []).some(sal => normalizeTaxonomyName(sal) === normParsed)) {
+        return { ...parsedItem, ingredientId: ing.id, subtypeId: sub.id || sub.name, matchedName: `${sub.name} (${ing.name})`, matchedCategory: ing.category || 'General', isNewTaxonomyItem: false };
+      }
+    }
+  }
+
   for (const ing of ingredients) {
     if (!ing) continue;
     const ingName = (ing.name || '').trim();

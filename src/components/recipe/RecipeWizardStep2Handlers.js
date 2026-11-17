@@ -7,7 +7,8 @@ import { wizardState, syncStep2InputsToState, switchWizardVariant, isMultiRecipe
 import { bindTaxonomyAutocompleteEvents, isIngredientUnlinked, getIngredientQtyValidationIssue } from './RecipeWizardTaxonomySearch.js';
 import { renderQtyIssueBannerHTML } from './RecipeWizardStep2View.js';
 import { promptRecipeWizardAliases } from './RecipeWizardAliasesPrompt.js';
-import { getState, setProducts } from '../../store/store.js';
+import { getState, setProducts, learnIngredientAlias } from '../../store/store.js';
+import { stemIngredientName } from '../../services/RecipeIngredientParser.js';
 import { saveProduct } from '../../services/ProductRepository.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
 import { recalculateWizardMacros, resolveProductForIngredient } from './RecipeWizardStep3Handlers.js';
@@ -568,9 +569,25 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
 
       // Auto resolve product and update live nutrition
       const storeState = getState() || {};
+      const allIngs = storeState.rootItems || storeState.ingredients || [];
+      if (item.ingredientId) {
+        const chosenIng = allIngs.find(i => String(i.id) === String(item.ingredientId));
+        const phrase = String(item.name || item.raw || '').trim();
+        if (chosenIng && phrase && Array.isArray(chosenIng.subtypes) && chosenIng.subtypes.length > 0) {
+          const phraseStem = stemIngredientName(phrase);
+          const rootStem = stemIngredientName(chosenIng.name || '');
+          const hasSimilarNamedNode = chosenIng.subtypes.some(sub => {
+            const subStem = stemIngredientName(sub.name || '');
+            return (subStem && subStem === rootStem) || (subStem && subStem === phraseStem);
+          });
+          if (hasSimilarNamedNode) {
+            learnIngredientAlias(item.ingredientId, phrase, item.subtypeId || null);
+          }
+        }
+      }
       const resolvedProd = resolveProductForIngredient(item, {
         products: storeState.products || [],
-        ingredients: storeState.rootItems || storeState.ingredients || []
+        ingredients: allIngs
       });
       if (resolvedProd) {
         item.productId = resolvedProd.id;
