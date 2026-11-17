@@ -542,11 +542,16 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
   });
 
   // Close dropdown on outside click
+  if (modalWrap._wizTaxOutsideClickAbort) {
+    modalWrap._wizTaxOutsideClickAbort.abort();
+  }
+  const taxAbort = new AbortController();
+  modalWrap._wizTaxOutsideClickAbort = taxAbort;
   modalWrap.addEventListener('click', (e) => {
     if (!e.target.closest('.wiz-tax-autocomplete-container')) {
       modalWrap.querySelectorAll('.wiz-tax-dropdown').forEach(d => d.style.display = 'none');
     }
-  });
+  }, { signal: taxAbort.signal });
 }
 
 function escapeHtml(str) {

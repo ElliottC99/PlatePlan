@@ -25,6 +25,33 @@ function escapeAttr(str) {
   return escapeHtml(str).replace(/`/g, '&#96;');
 }
 
+export function renderQtyIssueBannerHTML(sIdx, iIdx, item, qtyIssue) {
+  if (!qtyIssue || !qtyIssue.invalid) return '';
+  const qty = Number(item?.qty) || 1;
+  return `
+    <div class="wiz-qty-issue-banner" data-sidx="${sIdx}" data-iidx="${iIdx}" style="margin-top: 6px; padding: 6px 8px; background: #fffbeb; border: 1px solid #f59e0b; border-radius: 6px; font-size: 11px; color: #92400e;">
+      <div style="font-weight: 600; margin-bottom: 4px;">
+        ${qtyIssue.reason === 'bulk_item_in_qty'
+          ? `⚠️ "${escapeHtml(item.name || 'Item')}" cannot be measured as a discrete quantity ("qty"). Switch unit to g/ml or set a single-item weight.`
+          : `⚠️ Mapped product "${escapeHtml(qtyIssue.resolvedProd?.name || 'Product')}" has no 1 Usable item size (g) to calculate "${qty} qty".`}
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px;">
+        <button type="button" class="btn sm secondary wiz-quick-switch-unit-btn" data-sidx="${sIdx}" data-iidx="${iIdx}" data-unit="g" style="padding: 2px 6px; font-size: 10.5px;">Switch to g</button>
+        <button type="button" class="btn sm secondary wiz-quick-switch-unit-btn" data-sidx="${sIdx}" data-iidx="${iIdx}" data-unit="ml" style="padding: 2px 6px; font-size: 10.5px;">Switch to ml</button>
+        ${qtyIssue.resolvedProd ? `
+          <span style="display: inline-flex; align-items: center; gap: 4px;">
+            <label for="wiz-inline-item-weight-${sIdx}-${iIdx}" style="font-size: 10.5px; font-weight: 600;">1 item =</label>
+            <input type="number" step="any" min="0.1" id="wiz-inline-item-weight-${sIdx}-${iIdx}" name="wiz_inline_item_weight_${sIdx}_${iIdx}" aria-label="Single usable item weight in grams for ${escapeAttr(qtyIssue.resolvedProd.name || item.name)}" class="wiz-inline-item-weight" data-sidx="${sIdx}" data-iidx="${iIdx}" data-prod-id="${escapeAttr(qtyIssue.resolvedProd.id)}" placeholder="g" style="width: 56px; padding: 2px 4px; border: 1px solid #d97706; border-radius: 4px; font-size: 11px; background: #fff;" />
+            <span style="font-size: 10.5px;">g</span>
+            <button type="button" class="btn sm primary wiz-save-inline-item-weight-btn" data-sidx="${sIdx}" data-iidx="${iIdx}" data-prod-id="${escapeAttr(qtyIssue.resolvedProd.id)}" style="padding: 2px 6px; font-size: 10.5px;">Save weight</button>
+          </span>
+        ` : ''}
+        <button type="button" class="btn sm ghost wiz-remap-item-btn" data-sidx="${sIdx}" data-iidx="${iIdx}" style="padding: 2px 6px; font-size: 10.5px; text-decoration: underline;">Re-map item</button>
+      </div>
+    </div>
+  `;
+}
+
 export function renderStep2MacrosSummaryHTML(activeRecipe) {
   // Deprecated in favor of dual-profile crossbar (Elliott & Chloe Calories + Protein + Fit Score)
   return '';
@@ -100,29 +127,7 @@ export function renderState2Mapping() {
       const isUnlinked = isIngredientUnlinked(item, productsBank, ingredientsBank);
       const qtyIssue = getIngredientQtyValidationIssue(item, productsBank, ingredientsBank);
       const hasQtyIssue = qtyIssue.invalid;
-
-      const qtyIssueBannerHtml = hasQtyIssue ? `
-        <div class="wiz-qty-issue-banner" data-sidx="${sIdx}" data-iidx="${iIdx}" style="margin-top: 6px; padding: 6px 8px; background: #fffbeb; border: 1px solid #f59e0b; border-radius: 6px; font-size: 11px; color: #92400e;">
-          <div style="font-weight: 600; margin-bottom: 4px;">
-            ${qtyIssue.reason === 'bulk_item_in_qty'
-              ? `⚠️ "${escapeHtml(item.name || 'Item')}" cannot be measured as a discrete quantity ("qty"). Switch unit to g/ml or set a single-item weight.`
-              : `⚠️ Mapped product "${escapeHtml(qtyIssue.resolvedProd?.name || 'Product')}" has no 1 Usable item size (g) to calculate "${qty} qty".`}
-          </div>
-          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px;">
-            <button type="button" class="btn sm secondary wiz-quick-switch-unit-btn" data-sidx="${sIdx}" data-iidx="${iIdx}" data-unit="g" style="padding: 2px 6px; font-size: 10.5px;">Switch to g</button>
-            <button type="button" class="btn sm secondary wiz-quick-switch-unit-btn" data-sidx="${sIdx}" data-iidx="${iIdx}" data-unit="ml" style="padding: 2px 6px; font-size: 10.5px;">Switch to ml</button>
-            ${qtyIssue.resolvedProd ? `
-              <span style="display: inline-flex; align-items: center; gap: 4px;">
-                <label for="wiz-inline-item-weight-${sIdx}-${iIdx}" style="font-size: 10.5px; font-weight: 600;">1 item =</label>
-                <input type="number" step="any" min="0.1" id="wiz-inline-item-weight-${sIdx}-${iIdx}" name="wiz_inline_item_weight_${sIdx}_${iIdx}" aria-label="Single usable item weight in grams for ${escapeAttr(qtyIssue.resolvedProd.name || item.name)}" class="wiz-inline-item-weight" data-sidx="${sIdx}" data-iidx="${iIdx}" data-prod-id="${escapeAttr(qtyIssue.resolvedProd.id)}" placeholder="g" style="width: 56px; padding: 2px 4px; border: 1px solid #d97706; border-radius: 4px; font-size: 11px; background: #fff;" />
-                <span style="font-size: 10.5px;">g</span>
-                <button type="button" class="btn sm primary wiz-save-inline-item-weight-btn" data-sidx="${sIdx}" data-iidx="${iIdx}" data-prod-id="${escapeAttr(qtyIssue.resolvedProd.id)}" style="padding: 2px 6px; font-size: 10.5px;">Save weight</button>
-              </span>
-            ` : ''}
-            <button type="button" class="btn sm ghost wiz-remap-item-btn" data-sidx="${sIdx}" data-iidx="${iIdx}" style="padding: 2px 6px; font-size: 10.5px; text-decoration: underline;">Re-map item</button>
-          </div>
-        </div>
-      ` : '';
+      const qtyIssueBannerHtml = renderQtyIssueBannerHTML(sIdx, iIdx, item, qtyIssue);
 
       const waterInputHtml = isStock ? `
         <div style="margin-top: 4px; display: flex; align-items: center; gap: 4px;">
