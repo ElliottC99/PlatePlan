@@ -5,6 +5,7 @@
  * Decomposed: Rendering factories moved to PlannerGridRenderService.js.
  */
 import { getState } from '../../store/coreState.js';
+import { showCustomConfirm } from '../ui/DialogHelpers.js';
 
 import { saveCurrentPlan } from '../../services/HouseholdRepository.js';
 import { 
@@ -126,6 +127,26 @@ export function setSplitPersonSlotStatus(dayIndex, mealType, personKey, status, 
   openSlotConfigurator(dayIndex, mealType, true);
 }
 
+/**
+ * Clears all pinned and skipped slots from the Pre-Generation Layout Grid after confirmation.
+ */
+export function clearSkeletonGrid() {
+  const state = getState();
+  if (!state?.skeletonGrid || Object.keys(state.skeletonGrid).length === 0) return;
+
+  showCustomConfirm(
+    'Clear all pinned and skipped slots from the Pre-Generation Layout Grid?',
+    'Clear Layout Grid',
+    () => {
+      state.skeletonGrid = {};
+      if (typeof window !== 'undefined') {
+        if (typeof window.saveState === 'function') window.saveState();
+        if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
+      }
+    }
+  );
+}
+
 if (typeof window !== 'undefined') {
   Object.assign(window, {
     renderFitScoreScopeUI,
@@ -134,6 +155,7 @@ if (typeof window !== 'undefined') {
     closeSlotConfigurator,
     setSlotConfiguredStatus,
     setSplitPersonSlotStatus,
+    clearSkeletonGrid,
     toggleSlotConfiguratorMode(isSplit) {
       const ctx = window.__slotConfigContext || { day: 1, meal: 'dinner' };
       openSlotConfigurator(ctx.day, ctx.meal, Boolean(isSplit));

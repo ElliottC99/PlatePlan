@@ -18,7 +18,10 @@ function escapeHtml(value) {
 
 export function groupShoppingItemsByCategory(items = []) {
   const categories = {};
-  items.forEach(item => {
+  const sortedItems = [...items].sort((a, b) =>
+    String(a?.name || '').localeCompare(String(b?.name || ''), 'en', { sensitivity: 'base' })
+  );
+  sortedItems.forEach(item => {
     const cat = item.cat || item.category || 'General';
     if (!categories[cat]) categories[cat] = [];
     categories[cat].push(item);
@@ -46,7 +49,9 @@ export function renderShoppingCategoryGroup(categoryName, catItems = []) {
 
 export function renderShoppingCategoriesList(items = []) {
   const categories = groupShoppingItemsByCategory(items);
-  const entries = Object.entries(categories);
+  const entries = Object.entries(categories).sort(([catA], [catB]) =>
+    String(catA || '').localeCompare(String(catB || ''), 'en', { sensitivity: 'base' })
+  );
   if (!entries.length) {
     return `
       <div class="ios-grouped-card" style="padding: 32px 16px; text-align: center; margin: 16px 0;">

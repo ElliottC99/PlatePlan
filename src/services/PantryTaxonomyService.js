@@ -687,10 +687,12 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
   const cat = line.category || line.categoryId || line.cat || null;
   const directProdId = line.productId || line.bankId || null;
 
-  function pickBestProduct(candidatePool) {
+  function pickBestProduct(candidatePool, { respectExplicitAutoDefault = true } = {}) {
     if (!candidatePool || candidatePool.length === 0) return null;
-    const explicitAuto = candidatePool.find(p => p && p.isAutoDefault);
-    if (explicitAuto) return explicitAuto;
+    if (respectExplicitAutoDefault) {
+      const explicitAuto = candidatePool.find(p => p && p.isAutoDefault);
+      if (explicitAuto) return explicitAuto;
+    }
     const sorted = [...candidatePool].sort((a, b) => compareProductsByStrategy(a, b, criterion));
     return sorted[0] || null;
   }
@@ -743,7 +745,9 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
       String(p.category || p.cat || '').trim().toLowerCase() === normCat
     );
     if (candidatePool.length > 0) {
-      const best = pickBestProduct(candidatePool);
+      // Category pools span multiple Root Items (each with its own per-root isAutoDefault),
+      // so compare macros/strategy across the whole category instead of picking the first isAutoDefault.
+      const best = pickBestProduct(candidatePool, { respectExplicitAutoDefault: false });
       if (best) return best;
     }
   }
