@@ -275,7 +275,7 @@ export function isIngredientOrSectionLine(line) {
   }
 
   // 3. Starts with quantity/unit/article count
-  if (/^\s*(?:\d+[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]?|[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|half\b|a\s+pinch\b|pinch\b|handful\b|small\s+handful\b|dash\b|drizzle\b|squeeze\b|sprinkle\b|few\b|several\b|one\b|two\b|three\b|four\b|five\b|six\b|seven\b|eight\b|nine\b|ten\b|\d+\s*x\b)/i.test(stripped)) {
+  if (/^\s*(?:\d+[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]?|[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|half\b|a\s+pinch\b|pinch\b|(?:(?:small|large|generous|big)\s+)?handfuls?\b|(?:(?:small|large)\s+)?bunch(?:es)?\b|dash\b|drizzle\b|squeeze\b|sprinkle\b|few\b|several\b|one\b|two\b|three\b|four\b|five\b|six\b|seven\b|eight\b|nine\b|ten\b|\d+\s*x\b)/i.test(stripped)) {
     return true;
   }
 

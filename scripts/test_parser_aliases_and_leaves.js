@@ -214,4 +214,30 @@ const cleanedSaus = getState().products.find(p => p.id === 'prod_saus');
 assert.strictEqual(cleanedSaus.itemWeight, 45, 'Multipack product (6 Sausages 270g) with bogus itemWeight === packSize must recalculate to 45g');
 console.log('✅ Test 4 Passed: Historical aliases and bogus itemWeights sanitized.\n');
 
+// Test 5: Sized handfuls convert to grams (small = 10g, default = 20g, large/generous/big = 30g)
+const smallHandful = parseIngredientString('Small Handful Of Fresh Thai Basil');
+assert.strictEqual(smallHandful.qty, 10);
+assert.strictEqual(smallHandful.unit, 'g');
+assert.strictEqual(smallHandful.isEstimated, true);
+assert.strictEqual(smallHandful.name, 'Fresh Thai Basil');
+
+const defaultHandful = parseIngredientString('Handful Of Fresh Mint');
+assert.strictEqual(defaultHandful.qty, 20);
+assert.strictEqual(defaultHandful.unit, 'g');
+assert.strictEqual(defaultHandful.isEstimated, true);
+assert.strictEqual(defaultHandful.name, 'Fresh Mint');
+
+const largeHandful = parseIngredientString('Large Handful Of Fresh Coriander');
+assert.strictEqual(largeHandful.qty, 30);
+assert.strictEqual(largeHandful.unit, 'g');
+assert.strictEqual(largeHandful.isEstimated, true);
+assert.strictEqual(largeHandful.name, 'Fresh Coriander');
+
+const generousHandful = parseIngredientString('1 generous handful coriander');
+assert.strictEqual(generousHandful.qty, 30);
+assert.strictEqual(generousHandful.unit, 'g');
+assert.strictEqual(generousHandful.isEstimated, true);
+assert.strictEqual(generousHandful.name, 'Coriander');
+console.log('✅ Test 5 Passed: Sized handfuls parse into grams.\n');
+
 console.log('🎉 ALL PARSER ALIASES, BOTANICAL LEAVES & BULK QTY TESTS PASSED!');
