@@ -470,10 +470,11 @@ export function openAddItemWizard(options = {}) {
           ? { ...wizardData.selectedExistingProduct, category: wizardData.category }
           : null;
 
+        const isRootOnlyFinish = (!isCat && !isSub && !isProd && step === 1);
         const res = await commitAtomicChain({
           category: wizardData.category || 'General',
           rootItemName: wizardData.itemName || null,
-          subtypeName: wizardData.subtypeName || (wizardData.itemName ? 'Standard' : null),
+          subtypeName: isRootOnlyFinish ? null : (wizardData.subtypeName || (wizardData.itemName ? 'Standard' : null)),
           productPayload: prodPayload
         });
 
@@ -484,13 +485,15 @@ export function openAddItemWizard(options = {}) {
         if (typeof window.renderProductBank === 'function') window.renderProductBank();
         if (typeof cb === 'function') {
           const rootObj = res?.rootItem || wizardData.selectedParentItem;
-          const subObj = res?.subtype || (res?.subtypeId ? { id: res.subtypeId, name: wizardData.subtypeName } : (wizardData.subtypeName ? { id: wizardData.subtypeName, name: wizardData.subtypeName } : null));
+          const subObj = isRootOnlyFinish
+            ? null
+            : (res?.subtype || (res?.subtypeId ? { id: res.subtypeId, name: wizardData.subtypeName } : (wizardData.subtypeName ? { id: wizardData.subtypeName, name: wizardData.subtypeName } : null)));
           cb({
             ...(res || {}),
             ingredientId: rootObj?.id || (wizardData.itemName ? wizardData.itemName : null),
-            subtypeId: subObj?.id || res?.subtypeId || (wizardData.subtypeName || null),
+            subtypeId: isRootOnlyFinish ? null : (subObj?.id || res?.subtypeId || (wizardData.subtypeName || null)),
             parentName: rootObj?.name || wizardData.itemName || '',
-            subtypeName: subObj?.name || wizardData.subtypeName || '',
+            subtypeName: isRootOnlyFinish ? '' : (subObj?.name || wizardData.subtypeName || ''),
             category: wizardData.category || res?.category || 'General',
             rootItem: rootObj,
             subtype: subObj,

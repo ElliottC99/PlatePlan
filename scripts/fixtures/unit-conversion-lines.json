@@ -42,7 +42,9 @@
     { "qty": 1, "unit": "small bunch", "name": "coriander", "expect": { "qty": 15, "unit": "g", "isEstimated": true, "isFallbackWeight": false } },
     { "qty": 1, "unit": "bunch", "name": "parsley", "expect": { "qty": 20, "unit": "g", "isEstimated": true, "isFallbackWeight": false } },
     { "qty": 1, "unit": "large bunch", "name": "mint", "expect": { "qty": 30, "unit": "g", "isEstimated": true, "isFallbackWeight": false } },
-    { "qty": 2, "unit": "handfuls", "name": "spinach", "expect": { "qty": 60, "unit": "g", "isEstimated": true, "isFallbackWeight": false } },
+    { "qty": 1, "unit": "small handful", "name": "thai basil", "expect": { "qty": 10, "unit": "g", "isEstimated": true, "isFallbackWeight": false } },
+    { "qty": 2, "unit": "handfuls", "name": "spinach", "expect": { "qty": 40, "unit": "g", "isEstimated": true, "isFallbackWeight": false } },
+    { "qty": 1, "unit": "large handful", "name": "coriander", "expect": { "qty": 30, "unit": "g", "isEstimated": true, "isFallbackWeight": false } },
 
     { "qty": 250, "unit": "grams", "name": "firm tofu", "expect": { "qty": 250, "unit": "g", "isEstimated": false, "isFallbackWeight": false } },
     { "qty": 1.5, "unit": "kg", "name": "potatoes", "expect": { "qty": 1500, "unit": "g", "isEstimated": false, "isFallbackWeight": false } },

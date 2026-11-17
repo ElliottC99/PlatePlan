@@ -120,13 +120,33 @@ export async function learnIngredientAlias(ingredientId, rawString, subtypeId = 
 
   const targetOwnName = String(targetDoc.name || '').trim().toLowerCase();
   const rootOwnName = String(ing.name || '').trim().toLowerCase();
-  if (cleanAlias === targetOwnName || (!subtypeId && cleanAlias === rootOwnName)) return;
+  const hasCompetingNode = Array.isArray(ing.subtypes) && ing.subtypes.some(sub => {
+    const subOwn = String(sub.name || '').trim().toLowerCase();
+    return subOwn === cleanAlias || subOwn === rootOwnName || (subOwn.replace(/s$/, '') === rootOwnName.replace(/s$/, ''));
+  });
+  if (!hasCompetingNode && (cleanAlias === targetOwnName || (!subtypeId && cleanAlias === rootOwnName))) return;
+
+  let removedFromSibling = false;
+  if (subtypeId) {
+    if (Array.isArray(ing.aliases)) {
+      const next = ing.aliases.filter(a => String(a).trim().toLowerCase() !== cleanAlias);
+      if (next.length !== ing.aliases.length) { ing.aliases = next; removedFromSibling = true; }
+    }
+  }
+  if (Array.isArray(ing.subtypes)) {
+    ing.subtypes.forEach(sub => {
+      if (sub !== targetDoc && Array.isArray(sub.aliases)) {
+        const next = sub.aliases.filter(a => String(a).trim().toLowerCase() !== cleanAlias);
+        if (next.length !== sub.aliases.length) { sub.aliases = next; removedFromSibling = true; }
+      }
+    });
+  }
 
   if (!Array.isArray(targetDoc.aliases)) targetDoc.aliases = [];
   const lowerAliases = targetDoc.aliases.map(a => String(a).toLowerCase());
 
-  if (!lowerAliases.includes(cleanAlias)) {
-    targetDoc.aliases.push(cleanAlias);
+  if (!lowerAliases.includes(cleanAlias) || removedFromSibling) {
+    if (!lowerAliases.includes(cleanAlias)) targetDoc.aliases.push(cleanAlias);
     if (!state.ingredients.includes(ing)) state.ingredients.push(ing);
     saveStateCache(state);
     dispatchStateEvent('plateplan:state:ingredients', state.ingredients);

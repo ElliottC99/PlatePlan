@@ -227,7 +227,7 @@ function bindModalEvents(issues = [], totalPages = 1, ingredients = [], categori
               return;
             }
             const parentName = created.parentName || created.rootItem?.name || initialSearch;
-            const subName = created.subtypeName || created.subtype?.name || 'Standard';
+            const subName = created.subtypeName || created.subtype?.name || '';
             const ingId = created.ingredientId || created.rootItem?.id || (created.category ? `cat:${created.category}` : '');
             const subId = created.subtypeId || created.subtype?.id || '';
             mountEl.dataset.selectedId = ingId;

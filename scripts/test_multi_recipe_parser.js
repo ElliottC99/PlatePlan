@@ -425,6 +425,40 @@ Method: 1. Peel and thinly slice the carrot and daikon, or cut them into matchst
   assert.strictEqual(parsed[3].instructions.length, 9);
 });
 
+// Test 8: Extract Source URL and Book/Page from parsed text
+runTest('Extracts Source URL and Book/Page metadata without polluting title or method steps', () => {
+  const urlRecipe = parseSingleRecipeText(`Garlic Chili Noodles
+Source: https://example.com/recipes/garlic-chili-noodles
+Serves: 2
+Ingredients:
+200g rice noodles
+Method:
+1. Boil noodles.
+https://example.com/extra-footer-ignore-or-override`);
+  assert.strictEqual(urlRecipe.title, 'Garlic Chili Noodles');
+  assert.strictEqual(urlRecipe.sourceType, 'online');
+  assert.strictEqual(urlRecipe.sourceUrl, 'https://example.com/extra-footer-ignore-or-override');
+  assert.strictEqual(urlRecipe.methodSteps.length, 1);
+
+  const bookRecipe = parseSingleRecipeText(`Roasted Aubergine
+Book: Ottolenghi Simple, p. 142
+Ingredients:
+1 aubergine`);
+  assert.strictEqual(bookRecipe.title, 'Roasted Aubergine');
+  assert.strictEqual(bookRecipe.sourceType, 'book');
+  assert.strictEqual(bookRecipe.sourceBook, 'Ottolenghi Simple');
+  assert.strictEqual(bookRecipe.sourcePage, '142');
+  assert.strictEqual(bookRecipe.ingredients.length, 1);
+
+  const trailingSourceIngOnly = parseSingleRecipeText(`Quick Broth
+Ingredients:
+500ml stock
+Source: https://example.com/broth`);
+  assert.strictEqual(trailingSourceIngOnly.sourceType, 'online');
+  assert.strictEqual(trailingSourceIngOnly.sourceUrl, 'https://example.com/broth');
+  assert.strictEqual(trailingSourceIngOnly.ingredients.length, 1);
+});
+
 console.log(`\n=== MULTI-RECIPE PARSER TEST RUN COMPLETE ===`);
 if (failures > 0) {
   console.error(`Total Failures: ${failures}`);
