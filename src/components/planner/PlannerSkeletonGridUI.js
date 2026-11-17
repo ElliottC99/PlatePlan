@@ -132,16 +132,32 @@ export function setSplitPersonSlotStatus(dayIndex, mealType, personKey, status, 
  */
 export function clearSkeletonGrid() {
   const state = getState();
-  if (!state?.skeletonGrid || Object.keys(state.skeletonGrid).length === 0) return;
+  if (!state) return;
+
+  const hasStateSlots = Boolean(state.skeletonGrid && Object.keys(state.skeletonGrid).length > 0);
+  const hasPlanSlots = Boolean(state.currentPlan?.skeletonGrid && Object.keys(state.currentPlan.skeletonGrid).length > 0);
+  if (!hasStateSlots && !hasPlanSlots) {
+    if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast('Layout grid is already empty.');
+    }
+    return;
+  }
 
   showCustomConfirm(
     'Clear all pinned and skipped slots from the Pre-Generation Layout Grid?',
     'Clear Layout Grid',
     () => {
       state.skeletonGrid = {};
+      if (state.currentPlan && typeof state.currentPlan === 'object') {
+        state.currentPlan.skeletonGrid = {};
+        if (typeof saveCurrentPlan === 'function') {
+          saveCurrentPlan(state.currentPlan);
+        }
+      }
       if (typeof window !== 'undefined') {
         if (typeof window.saveState === 'function') window.saveState();
         if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
+        if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Layout grid cleared.');
       }
     }
   );
