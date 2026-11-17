@@ -31,7 +31,8 @@ if (typeof global.document === 'undefined') {
 const { setIngredients, setProducts, getState } = await import('../src/store/store.js');
 const { wizardState } = await import('../src/components/recipe/RecipeWizardState.js');
 const { getIngredientQtyValidationIssue } = await import('../src/components/recipe/RecipeWizardTaxonomySearch.js');
-const { renderStep2Footer, renderState2Mapping } = await import('../src/components/recipe/RecipeWizardStep2View.js');
+const { renderStep2Footer, renderState2Mapping, renderQtyIssueBannerHTML } = await import('../src/components/recipe/RecipeWizardStep2View.js');
+const { bindStep2Events } = await import('../src/components/recipe/RecipeWizardStep2Handlers.js');
 
 console.log('=== RUNNING RECIPE WIZARD STEP 2 QTY VALIDATION GATE SUITE ===\n');
 
@@ -132,5 +133,47 @@ const footerReadyHtml = renderStep2Footer();
 assert(!footerReadyHtml.includes('disabled'), 'Footer Next button must be enabled once qty issues are resolved');
 assert(footerReadyHtml.includes('wiz-gate-pill ready'), 'Gate pill must transition to ready');
 console.log('✅ Test 4 Passed: Step 2 gate blocks on invalid qty and clears when resolved.\n');
+
+// Test 5: bindStep2Events Aborts Prior Listeners & Updates Unit Changes In-Place Without Full Modal Rebuild
+console.log('--- Test 5: AbortController Listener Cleanup & In-Place Unit Update ---');
+assert.strictEqual(typeof renderQtyIssueBannerHTML, 'function', 'renderQtyIssueBannerHTML must be exported');
+
+const activeListeners = [];
+const mockModalWrap = {
+  querySelectorAll: () => [],
+  querySelector: () => null,
+  addEventListener: (type, fn, opts) => {
+    const entry = { type, fn, aborted: false };
+    if (opts?.signal) {
+      opts.signal.addEventListener('abort', () => { entry.aborted = true; });
+    }
+    activeListeners.push(entry);
+  }
+};
+
+let modalRebuildCount = 0;
+const mockRenderWizardModal = () => { modalRebuildCount++; };
+
+// Bind Step 2 events 3 times consecutively (simulating 3 re-renders)
+bindStep2Events(mockModalWrap, { renderWizardModal: mockRenderWizardModal, showWizardNotice: () => {} });
+bindStep2Events(mockModalWrap, { renderWizardModal: mockRenderWizardModal, showWizardNotice: () => {} });
+bindStep2Events(mockModalWrap, { renderWizardModal: mockRenderWizardModal, showWizardNotice: () => {} });
+
+const liveChangeListeners = activeListeners.filter(l => l.type === 'change' && !l.aborted);
+const liveInputListeners = activeListeners.filter(l => l.type === 'input' && !l.aborted);
+assert.strictEqual(liveChangeListeners.length, 1, 'Only 1 change listener should remain active after multiple bindStep2Events calls');
+assert.strictEqual(liveInputListeners.length, 2, 'Only 2 input listeners (table inputs + step textarea auto-fit) should remain active');
+
+// Trigger a unit change on row 0,0 via the active change listener and verify renderWizardModal is NOT called
+liveChangeListeners[0].fn({
+  target: {
+    matches: (sel) => sel === '.wiz-ing-unit',
+    dataset: { sidx: '0', iidx: '0' },
+    value: 'ml'
+  }
+});
+assert.strictEqual(modalRebuildCount, 0, 'Changing a unit must update in-place without calling renderWizardModal()');
+assert.strictEqual(wizardState.activeRecipe.ingredientSections[0].ingredients[0].unit, 'ml', 'Row unit must update to ml in state');
+console.log('✅ Test 5 Passed: Listeners are cleaned up via AbortController and unit changes update in-place.\n');
 
 console.log('🎉 ALL RECIPE WIZARD STEP 2 QTY VALIDATION GATE TESTS PASSED!');
