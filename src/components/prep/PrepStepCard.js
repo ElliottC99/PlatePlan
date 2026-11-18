@@ -34,7 +34,7 @@ export function renderPrepStepCard(step = {}, index = 0) {
   const completed = !!step.completed;
 
   const timerHtml = timer > 0 ? `
-    <button type="button" class="btn sm ghost prep-timer-btn" onclick="startPrepTimer(${timer}, 'Step ${num}')" style="font-size:11px;color:var(--purple);border-color:var(--purple);padding:2px 8px">
+    <button type="button" class="btn sm ghost prep-timer-btn" data-action="start-prep-timer" data-timer="${timer}" data-step-label="Step ${num}" style="font-size:11px;color:var(--purple);border-color:var(--purple);padding:2px 8px">
       ⏱️ Start Timer (${Math.ceil(timer / 60)} mins)
     </button>
   ` : '';
@@ -64,7 +64,7 @@ export function renderPrepStepCard(step = {}, index = 0) {
           </div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
-          <button type="button" class="btn sm ${completed ? 'ghost' : 'primary'}" onclick="togglePrepStepComplete(${index})" style="font-size:11px;padding:3px 8px">
+          <button type="button" class="btn sm ${completed ? 'ghost' : 'primary'}" data-action="toggle-prep-step-complete" data-index="${index}" style="font-size:11px;padding:3px 8px">
             ${completed ? '✓ Done' : 'Mark Done'}
           </button>
           ${timerHtml}

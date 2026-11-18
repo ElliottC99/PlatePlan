@@ -25,7 +25,7 @@ export function renderReallocateModalBase(prod) {
       <div class="field" style="margin-bottom: 14px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
           <label style="font-weight: 600; font-size: 0.85rem;">1. Target Ingredient</label>
-          <button type="button" class="btn xs ghost" id="btn-toggle-create-ing" onclick="toggleCreateIngredientBox()" style="color:var(--primary,#4f46e5); font-weight:600; font-size:11.5px;">➕ Create New Ingredient</button>
+          <button type="button" class="btn xs ghost" id="btn-toggle-create-ing" data-action="toggle-create-ingredient-box" style="color:var(--primary,#4f46e5); font-weight:600; font-size:11.5px;">➕ Create New Ingredient</button>
         </div>
 
         <!-- Stacked Column Layout: Create New Ingredient Sub-panel -->
@@ -42,8 +42,8 @@ export function renderReallocateModalBase(prod) {
               <datalist id="reallocate-categories-datalist"></datalist>
             </div>
             <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
-              <button type="button" onclick="toggleCreateIngredientBox(false)" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-weight: 500; cursor: pointer;">Cancel</button>
-              <button type="button" onclick="submitCreateNewIngredientFromReallocate()" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: none; background: var(--system-blue); color: #fff; font-weight: 600; cursor: pointer;">Add Ingredient</button>
+              <button type="button" data-action="toggle-create-ingredient-box" data-open="false" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-weight: 500; cursor: pointer;">Cancel</button>
+              <button type="button" data-action="submit-create-new-ingredient-from-reallocate" style="min-height: 44px; padding: 0 16px; border-radius: 8px; border: none; background: var(--system-blue); color: #fff; font-weight: 600; cursor: pointer;">Add Ingredient</button>
             </div>
           </div>
         </div>

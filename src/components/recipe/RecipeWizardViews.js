@@ -146,7 +146,7 @@ export function renderState1AManual() {
       </div>
 
       <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 20px; border-top: 1px solid var(--border, #eee); padding-top: 14px;">
-        <button type="button" class="btn ghost" onclick="goToWizardStep(0)">← Choice</button>
+        <button type="button" class="btn ghost" data-action="go-to-wizard-step" data-step="0">← Choice</button>
         <button type="button" class="btn primary" id="btn-next-step1a">Next: Parse & Map →</button>
       </div>
     </div>
@@ -161,7 +161,7 @@ export function renderState1BBulk() {
       <textarea id="wiz-bulk-text" name="bulk_text" aria-label="Paste bulk recipe text" rows="12" placeholder="Recipe 1: High-Protein Tofu Bowl&#10;Serves: 4&#10;2 x 400g firm tofu&#10;1 cup milk&#10;&#10;Method:&#10;1. Bake tofu.&#10;&#10;Recipe 2: Smoky Lentil Soup&#10;Serves: 4&#10;200g brown lentils..." style="width: 100%; padding: 12px; border: 1px solid var(--border, #ccc); border-radius: 8px; font-size: 13px; font-family: monospace; background: var(--surface2, #fbfbf9); resize: vertical; margin-bottom: 16px;">${escapeHtml(wizardState.bulkText)}</textarea>
 
       <div style="display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border, #eee); padding-top: 14px;">
-        <button type="button" class="btn ghost" onclick="goToWizardStep(0)">← Choice</button>
+        <button type="button" class="btn ghost" data-action="go-to-wizard-step" data-step="0">← Choice</button>
         <button type="button" class="btn primary" id="btn-next-step1b">Parse Text & Next →</button>
       </div>
     </div>

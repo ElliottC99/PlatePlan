@@ -26,7 +26,7 @@ export function renderDesktopSidebarUI(activeView = 'today') {
       <details class="nav-group" data-sidebar-group="data" open>
         <summary>Data</summary>
         <button class="ntab ${(activeView === 'ingredients' || activeView === 'pantry') ? 'active' : ''}" data-view="ingredients" data-action="navigate-view">Pantry</button>
-        <button class="ntab ${activeView === 'bank' ? 'active' : ''}" data-view="bank" data-action="navigate-view" onclick="clearProductGroupFilter()" style="padding-left:22px;font-size:12px;color:var(--text2)">↳ Product Bank</button>
+        <button class="ntab ${activeView === 'bank' ? 'active' : ''}" data-view="bank" data-action="navigate-view" style="padding-left:22px;font-size:12px;color:var(--text2)">↳ Product Bank</button>
         <button class="ntab ${activeView === 'data' ? 'active' : ''}" data-view="data" data-action="navigate-view">Data Quality</button>
       </details>
       <details class="nav-group" data-sidebar-group="settings" open>
@@ -49,7 +49,7 @@ export function renderMobileNavUI(activeView = 'today') {
       <button data-view="planner" data-action="navigate-view" class="${activeView === 'planner' ? 'active' : ''}">
         <svg aria-hidden="true" viewbox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2"></path></svg>Plan
       </button>
-      <button data-view="more" onclick="openMobileMore()">
+      <button data-view="more" data-action="open-mobile-more">
         <svg aria-hidden="true" viewbox="0 0 24 24"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>More
       </button>
     </div>

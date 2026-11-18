@@ -59,10 +59,10 @@ export function renderPrepContainerPlanner(item = {}, index = 0) {
       </div>
 
       <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:10px">
-        <button type="button" class="btn sm ghost" onclick="openPrintPrepLabelModal(${index})" style="font-size:11px">
+        <button type="button" class="btn sm ghost" data-action="open-print-prep-label-modal" data-index="${index}" style="font-size:11px">
           🏷️ Print Portion Label
         </button>
-        <button type="button" class="btn sm ghost" onclick="adjustPrepContainers(${index})" style="font-size:11px">
+        <button type="button" class="btn sm ghost" data-action="adjust-prep-containers" data-index="${index}" style="font-size:11px">
           ✏️ Edit Allocation
         </button>
       </div>

@@ -8,7 +8,6 @@ import * as RecipeEditorModal from './recipe-editor/RecipeEditorModal.js';
 import * as RecipeIngredientRow from './recipe-editor/RecipeIngredientRow.js';
 import * as RecipeStepRow from './recipe-editor/RecipeStepRow.js';
 import * as IngredientEditorRows from './recipe-editor/IngredientEditorRows.js';
-import * as RecipeImportParserForm from './recipe-editor/RecipeImportParserForm.js';
 import * as ShoppingBatchToolbar from './shopping/ShoppingBatchToolbar.js';
 import * as ShoppingCategoryGroup from './shopping/ShoppingCategoryGroup.js';
 import * as ShoppingItemRow from './shopping/ShoppingItemRow.js';
@@ -52,7 +51,7 @@ import * as NavigationUI from './shell/NavigationUI.js';
 
 export const registeredComponents = {
   RecipeEditorModal,
-  RecipeIngredientRow, RecipeStepRow, IngredientEditorRows, RecipeImportParserForm,
+  RecipeIngredientRow, RecipeStepRow, IngredientEditorRows,
   ShoppingBatchToolbar, ShoppingCategoryGroup, ShoppingItemRow,
   PlannerDayCard, PlannerMealSlot, PlannerGridToolbar,
   ProfileMacroEditor, ProfilePreferencesForm, ProfileSettingsModal, GeneratorWizardModal,

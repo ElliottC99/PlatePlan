@@ -38,7 +38,7 @@ export function openMealPlanSyncWarningModal(issue = {}) {
           <h2 style="font-size:18px; font-weight:750; margin:0; color:var(--text,#1c1917);">Active Meal Plan Desync Warning</h2>
           <p style="font-size:12.5px; color:var(--text2,#78716c); margin:4px 0 0 0;">Outdated recipe macro snapshots detected inside your active weekly meal plan.</p>
         </div>
-        <button type="button" class="btn sm ghost" style="padding:4px 8px; font-size:16px; line-height:1;" onclick="window.closeMealPlanSyncWarningModal()">✕</button>
+        <button type="button" class="btn sm ghost" style="padding:4px 8px; font-size:16px; line-height:1;" data-action="close-meal-plan-sync-warning-modal">✕</button>
       </div>
 
       <div style="padding:14px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; margin-bottom:18px;">

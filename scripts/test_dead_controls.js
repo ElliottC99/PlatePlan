@@ -149,7 +149,7 @@ export function findDeadControls(files, { defined, routed }) {
   const dead = [];
   for (const f of files) {
     const at = idx => `${f.name}:${f.lineBase + lineOf(f.text, idx)}`;
-    for (const m of f.text.matchAll(/data-pp-(click|change|input)=/g)) dead.push(`${at(m.index)} data-pp-${m[1]} is never read`);
+    for (const m of f.text.matchAll(/data-pp-(click|change|input|focus)=/g)) dead.push(`${at(m.index)} data-pp-${m[1]} is never read`);
     for (const m of f.text.matchAll(/\son(?:click|change|input|submit|keyup|keydown)=(["'])(.*?)\1/g)) {
       // Template interpolation such as ${escapeAttr(id)} runs while the markup is built, not on the event.
       const handler = m[2].replace(/\$\{[^}]*\}/g, '');
@@ -220,8 +220,8 @@ check('a planner action AppInitializer routes to a missing window function is re
     'set-plan-day-date is routed only to window.setPlanDayDate, which nothing defines');
   assert.deepEqual(fixture('<button data-action="searchable-swap-slot" data-day="1">Swap ▾</button>'), [],
     'searchable-swap-slot calls window.openSearchableRecipeSwapModal, which is defined');
-  assert.equal(fixture('<button data-action="add-exclusion">x</button>').length, 1,
-    'an action AppInitializer routes only for Settings is not routed for the planner');
+  assert.equal(fixture('<button data-action="nonexistent-planner-action">x</button>').length, 1,
+    'an action neither AppInitializer nor ActionBridge routes is reported');
 });
 
 check('no dead controls on the Pantry, Product Bank and planner screens', () => {
@@ -244,6 +244,48 @@ check('no dead controls in header, mobile navigation, vault toolbar, action shee
   const dead = findDeadControls(extraFiles, context);
   assert.deepEqual(dead, [], `\n  ${dead.join('\n  ')}`);
   assert.equal(context.defined.has('toggleRecipeFavourite'), true, 'window.toggleRecipeFavourite must be defined');
+});
+
+check('zero data-pp-* attributes anywhere in index.html or src/', () => {
+  const allAppFiles = [
+    { name: 'index.html', text: read('index.html'), lineBase: 0 },
+    ...listJs('src').map(f => ({ name: f, text: read(f), lineBase: 0 }))
+  ];
+  const ppHits = [];
+  for (const f of allAppFiles) {
+    for (const m of f.text.matchAll(/data-pp-(click|change|input|focus)=/g)) {
+      ppHits.push(`${f.name}:${lineOf(f.text, m.index)} data-pp-${m[1]}`);
+    }
+  }
+  assert.deepEqual(ppHits, [], `\n  ${ppHits.join('\n  ')}`);
+});
+
+check('zero inline onclick= and zero unrouted data-action= across all src/views and src/components', () => {
+  const allModules = [
+    ...listJs('src/views'),
+    ...listJs('src/components')
+  ].map(f => ({ name: f, text: read(f), lineBase: 0 }));
+  const localHandled = new Set(['toggle-menu']);
+  for (const f of allModules) {
+    for (const m of f.text.matchAll(/\bcase\s+['"]([^'"]+)['"]|\b(?:action|act)\s*===\s*['"]([^'"]+)['"]|\[data-action=["']([^"']+)["']\]/g)) {
+      localHandled.add(m[1] || m[2] || m[3]);
+    }
+  }
+  const problems = [];
+  for (const f of allModules) {
+    for (const m of f.text.matchAll(/\sonclick=(["'])/g)) {
+      problems.push(`${f.name}:${lineOf(f.text, m.index)} still has inline onclick=`);
+    }
+    for (const m of f.text.matchAll(/data-action=(?:"([^"]*)"|'([^']*)')/g)) {
+      const value = m[1] ?? m[2];
+      if (value.includes('${') || localHandled.has(value)) continue;
+      const lower = value.toLowerCase();
+      const routed = context.routed.exact.has(lower) || context.routed.includes.some(l => lower.includes(l));
+      const deferred = DEFERRED_ACTIONS.has(value) || DEFERRED_NAMES.has(value.match(/^(\w+)\(/)?.[1]);
+      if (!routed && !deferred) problems.push(`${f.name}:${lineOf(f.text, m.index)} data-action="${value}" is not routed`);
+    }
+  }
+  assert.deepEqual(problems, [], `\n  ${problems.join('\n  ')}`);
 });
 
 if (failures === 0) {

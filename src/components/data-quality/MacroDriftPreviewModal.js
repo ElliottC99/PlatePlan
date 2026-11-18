@@ -100,7 +100,7 @@ export function openMacroDriftPreviewModal(recipesToRecalibrate = []) {
           <h2 style="font-size:18px; font-weight:750; margin:0; color:var(--text,#1c1917);">Recipe Macro Drift Preview</h2>
           <p style="font-size:12.5px; color:var(--text2,#78716c); margin:4px 0 0 0;">Inspect and selectively approve dynamic updates to template recipe macros.</p>
         </div>
-        <button type="button" class="btn sm ghost" style="padding:4px 8px; font-size:16px; line-height:1;" onclick="window.closeMacroDriftPreviewModal()">✕</button>
+        <button type="button" class="btn sm ghost" style="padding:4px 8px; font-size:16px; line-height:1;" data-action="close-macro-drift-preview-modal">✕</button>
       </div>
 
       <div style="flex:1; overflow-y:auto; border:1px solid var(--border,#e7e5e4); border-radius:10px; margin-bottom:18px; background:var(--surface2,#f5f5f4);">
@@ -123,7 +123,7 @@ export function openMacroDriftPreviewModal(recipesToRecalibrate = []) {
       </div>
 
       <div style="display:flex; gap:10px; justify-content:flex-end;">
-        <button type="button" class="btn sm ghost" onclick="window.closeMacroDriftPreviewModal()">Cancel</button>
+        <button type="button" class="btn sm ghost" data-action="close-macro-drift-preview-modal">Cancel</button>
         <button type="button" class="btn sm primary" id="drift-approve-btn" style="font-weight:700; background:var(--primary,#4f46e5); color:#fff; border-radius:8px; padding:8px 16px;">Approve &amp; Recalibrate Selected</button>
       </div>
     </div>

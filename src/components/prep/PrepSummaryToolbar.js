@@ -35,10 +35,10 @@ export function renderPrepSummaryToolbar(props = {}) {
           <span style="font-size:12px;color:var(--text2);margin-left:6px">(${batches} active ${batches === 1 ? 'batch' : 'batches'})</span>
         </div>
         <div style="display:flex;align-items:center;gap:6px">
-          <button type="button" class="btn sm primary" onclick="markAllPrepStepsComplete()" style="font-size:11px;font-weight:700">
+          <button type="button" class="btn sm primary" data-action="mark-all-prep-steps-complete" style="font-size:11px;font-weight:700">
             ✓ Mark All Complete
           </button>
-          <button type="button" class="btn sm ghost" onclick="printMealPrepGuide()" style="font-size:11px">
+          <button type="button" class="btn sm ghost" data-action="print-meal-prep-guide" style="font-size:11px">
             🖨️ Print Guide
           </button>
         </div>

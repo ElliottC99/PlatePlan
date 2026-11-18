@@ -391,7 +391,7 @@ try{
     <div class="field">
       <label for="r-src-type" style="margin-bottom:6px">Source <span style="font-weight:400;color:var(--text2)">(optional)</span></label>
       <div style="display:flex;gap:8px;align-items:center">
-        <select id="r-src-type" data-pp-change="updateSrcFields()" style="width:160px;flex:none" name="r-src-type">
+        <select id="r-src-type" style="width:160px;flex:none" name="r-src-type">
           <option value="">No source</option>
           <option value="tiktok">TikTok</option>
           <option value="website">Website / blog</option>
@@ -408,14 +408,14 @@ try{
       </div>
       <div id="src-book-fields" class="src-book-fields" style="display: none;">
         <div class="grid3">
-          <div><label for="r-src-book">Book title</label><input type="text" id="r-src-book" placeholder="e.g. Ottolenghi Simple" data-pp-input="updateSrcPreview()" name="r-src-book"></div>
-          <div><label for="r-src-author">Author</label><input type="text" id="r-src-author" placeholder="e.g. Yotam Ottolenghi" data-pp-input="updateSrcPreview()" name="r-src-author"></div>
-          <div><label for="r-src-page">Page</label><input type="text" id="r-src-page" placeholder="e.g. 142" data-pp-input="updateSrcPreview()" name="r-src-page"></div>
+          <div><label for="r-src-book">Book title</label><input type="text" id="r-src-book" placeholder="e.g. Ottolenghi Simple" name="r-src-book"></div>
+          <div><label for="r-src-author">Author</label><input type="text" id="r-src-author" placeholder="e.g. Yotam Ottolenghi" name="r-src-author"></div>
+          <div><label for="r-src-page">Page</label><input type="text" id="r-src-page" placeholder="e.g. 142" name="r-src-page"></div>
         </div>
       </div>
       <div id="src-other-field" class="src-other-field" style="display: none;">
         <label for="r-src-other">Description</label>
-        <input type="text" id="r-src-other" placeholder="e.g. Mum's recipe card, meal prep app" data-pp-input="updateSrcPreview()" name="r-src-other">
+        <input type="text" id="r-src-other" placeholder="e.g. Mum's recipe card, meal prep app" name="r-src-other">
       </div>
       <div id="src-preview" class="src-preview" style="display: none;"></div>
     </div>
@@ -794,7 +794,7 @@ try{
     <div class="field" style="margin-bottom:10px">
       <label for="unified-map-search" style="font-size:12px;font-weight:600">Search Products, Sub-types &amp; Ingredients</label>
       <div class="mapping-search-container" style="position:relative">
-        <input type="text" class="map-search-input" id="unified-map-search" autocomplete="off" placeholder="Search by name, brand, or category..." data-pp-input="handleUnifiedMapSearch(this.value)" name="unified-map-search">
+        <input type="text" class="map-search-input" id="unified-map-search" autocomplete="off" placeholder="Search by name, brand, or category..." name="unified-map-search">
       </div>
     </div>
     <div id="unified-map-results" style="overflow-y:auto;flex:1;min-height:220px;max-height:340px;border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:6px"></div>
@@ -814,7 +814,7 @@ try{
     <p style="font-size:12px; color:var(--text2); margin-bottom:10px;">Choose a product for the selected meal rows.</p>
     <div id="subst-target-summary" style="font-size:12px;color:var(--text2);margin-bottom:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px"></div>
     <div class="mapping-search-container" style="position:relative; margin-bottom: 15px;">
-        <input type="text" class="map-search-input" id="subst-search" aria-label="Search replacement products" autocomplete="off" placeholder="Search products..." data-pp-input="handleSubstSearch(event)" data-pp-focus="handleSubstSearch(event)" name="subst-search">
+        <input type="text" class="map-search-input" id="subst-search" aria-label="Search replacement products" autocomplete="off" placeholder="Search products..." name="subst-search">
         <div class="map-dropdown" id="subst-dropdown" style="display:none;"></div>
     </div>
     <div id="subst-selected" style="font-size:13px; font-weight:500; margin-bottom: 15px; color:var(--green);"></div>
@@ -1039,11 +1039,11 @@ try{
       <div id="orig-improvements"><div style="margin-top:15px;border-top:1px solid var(--border);padding-top:10px;">
         <h4 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text2);margin-bottom:8px">Nutritional Improvement Suggestions</h4>
         <div style="display:grid;grid-template-columns:1.3fr .9fr .9fr .9fr .9fr;gap:6px;margin-bottom:8px;align-items:center">
-          <input type="search" id="enhance-search-orig" name="enhance-search-orig" aria-label="Search original ingredients" placeholder="Search ingredients or sub-types..." data-pp-input="renderEnhancementFinder('orig')" style="font-size:12px;padding:6px 9px">
-          <select id="enhance-cat-orig" name="enhance-cat-orig" aria-label="Original category filter" data-pp-change="renderEnhancementFinder('orig')" style="font-size:12px"><option value="all">All categories</option><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option></select>
-          <input type="search" id="enhance-family-orig" name="enhance-family-orig" aria-label="Original ingredient family filter" placeholder="Ingredient" data-pp-input="renderEnhancementFinder('orig')" style="font-size:12px;padding:6px 9px">
-          <input type="search" id="enhance-type-orig" name="enhance-type-orig" aria-label="Original sub-type filter" placeholder="Sub-type" data-pp-input="renderEnhancementFinder('orig')" style="font-size:12px;padding:6px 9px">
-          <select id="enhance-sort-orig" name="enhance-sort-orig" aria-label="Original sort option" data-pp-change="renderEnhancementFinder('orig')" style="font-size:12px">
+          <input type="search" id="enhance-search-orig" name="enhance-search-orig" aria-label="Search original ingredients" placeholder="Search ingredients or sub-types..." style="font-size:12px;padding:6px 9px">
+          <select id="enhance-cat-orig" name="enhance-cat-orig" aria-label="Original category filter" style="font-size:12px"><option value="all">All categories</option><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option></select>
+          <input type="search" id="enhance-family-orig" name="enhance-family-orig" aria-label="Original ingredient family filter" placeholder="Ingredient" style="font-size:12px;padding:6px 9px">
+          <input type="search" id="enhance-type-orig" name="enhance-type-orig" aria-label="Original sub-type filter" placeholder="Sub-type" style="font-size:12px;padding:6px 9px">
+          <select id="enhance-sort-orig" name="enhance-sort-orig" aria-label="Original sort option" style="font-size:12px">
             <option value="protein_per_kcal">Protein per kcal</option>
             <option value="protein_per_pound">Protein per £</option>
             <option value="protein">Highest protein</option>
@@ -1065,32 +1065,32 @@ try{
           <div id="orig-method-list">
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-orig-1" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">1.</label>
-           <textarea id="recipe-step-orig-1" name="recipe_step_orig_1" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <textarea id="recipe-step-orig-1" name="recipe_step_orig_1" class="r-step" style="flex:1;min-height:40px;"></textarea>
+           <button type="button" class="btn sm danger ghost" data-action="remove-modal-method-step" data-mode="orig">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-orig-2" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">2.</label>
-           <textarea id="recipe-step-orig-2" name="recipe_step_orig_2" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <textarea id="recipe-step-orig-2" name="recipe_step_orig_2" class="r-step" style="flex:1;min-height:40px;"></textarea>
+           <button type="button" class="btn sm danger ghost" data-action="remove-modal-method-step" data-mode="orig">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-orig-3" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">3.</label>
-           <textarea id="recipe-step-orig-3" name="recipe_step_orig_3" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <textarea id="recipe-step-orig-3" name="recipe_step_orig_3" class="r-step" style="flex:1;min-height:40px;"></textarea>
+           <button type="button" class="btn sm danger ghost" data-action="remove-modal-method-step" data-mode="orig">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-orig-4" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">4.</label>
-           <textarea id="recipe-step-orig-4" name="recipe_step_orig_4" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <textarea id="recipe-step-orig-4" name="recipe_step_orig_4" class="r-step" style="flex:1;min-height:40px;"></textarea>
+           <button type="button" class="btn sm danger ghost" data-action="remove-modal-method-step" data-mode="orig">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-orig-5" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">5.</label>
-           <textarea id="recipe-step-orig-5" name="recipe_step_orig_5" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('orig'); updateSaveBothVisibility();">×</button>
+           <textarea id="recipe-step-orig-5" name="recipe_step_orig_5" class="r-step" style="flex:1;min-height:40px;"></textarea>
+           <button type="button" class="btn sm danger ghost" data-action="remove-modal-method-step" data-mode="orig">×</button>
         </div>
     </div>
           <button type="button" class="btn sm ghost" data-action="addModalMethod('orig')">+ Add step</button>
@@ -1101,7 +1101,7 @@ try{
     <div id="mtab-enhanced" class="mtab active">
       <div class="estimated-note" id="enh-note" style="background: var(--amber-bg); color: var(--amber);">Manual editing mode -- edit to create your enhanced version. Nutrition will recalculate from the ingredient bank.</div>
       <div id="bank-flags"></div>
-      <div class="field"><label for="enh-name">Recipe name</label><input type="text" id="enh-name" data-pp-input="updateSaveBothVisibility()" name="enh-name"></div>
+      <div class="field"><label for="enh-name">Recipe name</label><input type="text" id="enh-name" name="enh-name"></div>
       <div class="grid3" style="display: none;">
         <div title=""><label for="enh-cal">Calories (Energy)</label><input type="number" id="enh-cal" readonly style="background:var(--surface2)" title="" name="enh-cal"></div>
         <div title=""><label for="enh-fat">Fat (g)</label><input type="number" id="enh-fat" readonly style="background:var(--surface2)" title="" name="enh-fat"></div>
@@ -1222,11 +1222,11 @@ try{
     </div><div style="margin-top:15px;border-top:1px solid var(--border);padding-top:10px;">
         <h4 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text2);margin-bottom:8px">Nutritional Improvement Suggestions</h4>
         <div style="display:grid;grid-template-columns:1.3fr .9fr .9fr .9fr .9fr;gap:6px;margin-bottom:8px;align-items:center">
-          <input type="search" id="enhance-search-enh" name="enhance-search-enh" aria-label="Search enhanced ingredients" placeholder="Search ingredients or sub-types..." data-pp-input="renderEnhancementFinder('enh')" style="font-size:12px;padding:6px 9px">
-          <select id="enhance-cat-enh" name="enhance-cat-enh" aria-label="Enhanced category filter" data-pp-change="renderEnhancementFinder('enh')" style="font-size:12px"><option value="all">All categories</option><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option></select>
-          <input type="search" id="enhance-family-enh" name="enhance-family-enh" aria-label="Enhanced ingredient family filter" placeholder="Ingredient" data-pp-input="renderEnhancementFinder('enh')" style="font-size:12px;padding:6px 9px">
-          <input type="search" id="enhance-type-enh" name="enhance-type-enh" aria-label="Enhanced sub-type filter" placeholder="Sub-type" data-pp-input="renderEnhancementFinder('enh')" style="font-size:12px;padding:6px 9px">
-          <select id="enhance-sort-enh" name="enhance-sort-enh" aria-label="Enhanced sort option" data-pp-change="renderEnhancementFinder('enh')" style="font-size:12px">
+          <input type="search" id="enhance-search-enh" name="enhance-search-enh" aria-label="Search enhanced ingredients" placeholder="Search ingredients or sub-types..." style="font-size:12px;padding:6px 9px">
+          <select id="enhance-cat-enh" name="enhance-cat-enh" aria-label="Enhanced category filter" style="font-size:12px"><option value="all">All categories</option><option value="baking-spices">Baking</option><option value="beverages">Beverages</option><option value="carbs-pasta-rice">Carbs (Pasta/Rice/Potato)</option><option value="dairy-alternative">Dairy &amp; Eggs</option><option value="fruit">Fruit &amp; Vegetables</option><option value="grain">Grains, Legumes &amp; Pulses</option><option value="herbs">Herbs &amp; Spices</option><option value="meat-substitute">Meat Substitutes</option><option value="nuts-seeds">Nuts &amp; Seeds</option><option value="other">Other</option><option value="sauces-condiments">Sauces, Condiments &amp; Pastes</option><option value="store-cupboard">Store Cupboard</option><option value="supplement">Supplements</option><option value="tofu-tempeh">Tofu, Tempeh &amp; Seitan</option></select>
+          <input type="search" id="enhance-family-enh" name="enhance-family-enh" aria-label="Enhanced ingredient family filter" placeholder="Ingredient" style="font-size:12px;padding:6px 9px">
+          <input type="search" id="enhance-type-enh" name="enhance-type-enh" aria-label="Enhanced sub-type filter" placeholder="Sub-type" style="font-size:12px;padding:6px 9px">
+          <select id="enhance-sort-enh" name="enhance-sort-enh" aria-label="Enhanced sort option" style="font-size:12px">
             <option value="protein_per_kcal">Protein per kcal</option>
             <option value="protein_per_pound">Protein per £</option>
             <option value="protein">Highest protein</option>
@@ -1237,7 +1237,7 @@ try{
         <div id="enhancement-results-enh" data-current-group-ids=""><div style="font-size:12px;color:var(--text2);padding:8px 0">Start typing to search ingredients or sub-types to add.</div></div>
     </div></div>
       
-      <div class="field"><label for="enh-changes">Key changes made</label><textarea id="enh-changes" style="min-height:60px" data-pp-input="updateSaveBothVisibility()" name="enh-changes"></textarea></div>
+      <div class="field"><label for="enh-changes">Key changes made</label><textarea id="enh-changes" style="min-height:60px" name="enh-changes"></textarea></div>
       <div class="review-recipe-sections" style="display:grid; grid-template-columns:1fr; gap:18px;">
         <div class="field">
           <span class="section-label-header" style="font-weight:bold;font-size:12px;display:block;margin-bottom:6px">Ingredients</span>
@@ -1252,32 +1252,32 @@ try{
           <div id="enh-method-list">
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-enh-1" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">1.</label>
-           <textarea id="recipe-step-enh-1" name="recipe_step_enh_1" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <textarea id="recipe-step-enh-1" name="recipe_step_enh_1" class="r-step" style="flex:1;min-height:40px;"></textarea>
+           <button type="button" class="btn sm danger ghost" data-action="remove-modal-method-step" data-mode="enh">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-enh-2" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">2.</label>
-           <textarea id="recipe-step-enh-2" name="recipe_step_enh_2" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <textarea id="recipe-step-enh-2" name="recipe_step_enh_2" class="r-step" style="flex:1;min-height:40px;"></textarea>
+           <button type="button" class="btn sm danger ghost" data-action="remove-modal-method-step" data-mode="enh">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-enh-3" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">3.</label>
-           <textarea id="recipe-step-enh-3" name="recipe_step_enh_3" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <textarea id="recipe-step-enh-3" name="recipe_step_enh_3" class="r-step" style="flex:1;min-height:40px;"></textarea>
+           <button type="button" class="btn sm danger ghost" data-action="remove-modal-method-step" data-mode="enh">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-enh-4" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">4.</label>
-           <textarea id="recipe-step-enh-4" name="recipe_step_enh_4" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <textarea id="recipe-step-enh-4" name="recipe_step_enh_4" class="r-step" style="flex:1;min-height:40px;"></textarea>
+           <button type="button" class="btn sm danger ghost" data-action="remove-modal-method-step" data-mode="enh">×</button>
         </div>
     
         <div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
            <label for="recipe-step-enh-5" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">5.</label>
-           <textarea id="recipe-step-enh-5" name="recipe_step_enh_5" class="r-step" style="flex:1;min-height:40px;" data-pp-input="updateSaveBothVisibility()"></textarea>
-           <button type="button" class="btn sm danger ghost" data-action="this.parentElement.remove(); reindexModalMethod('enh'); updateSaveBothVisibility();">×</button>
+           <textarea id="recipe-step-enh-5" name="recipe_step_enh_5" class="r-step" style="flex:1;min-height:40px;"></textarea>
+           <button type="button" class="btn sm danger ghost" data-action="remove-modal-method-step" data-mode="enh">×</button>
         </div>
     </div>
           <button type="button" class="btn sm ghost" data-action="addModalMethod('enh')">+ Add step</button>

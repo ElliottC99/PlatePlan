@@ -18,7 +18,7 @@ export function renderSwapModalBase({ dayLabel, who, typeTitle, curRecipeName, s
         <h3 style="margin:0;font-size:17px;font-weight:750;color:var(--text)">Swap Meal — ${escHtml(dayLabel)}</h3>
         <div style="font-size:12px;color:var(--text2);margin-top:2px">${escHtml(who === 'both' ? 'Shared (Elliott & Chloe)' : who + "'s")} ${escHtml(typeTitle)}</div>
       </div>
-      <button class="modal-close-btn btn sm btn-ghost ghost" onclick="closeSwapMealModal()" aria-label="Close modal">✕</button>
+      <button class="modal-close-btn btn sm btn-ghost ghost" data-action="close-swap-meal-modal" aria-label="Close modal">✕</button>
     </div>
   `;
 
@@ -28,7 +28,7 @@ export function renderSwapModalBase({ dayLabel, who, typeTitle, curRecipeName, s
         <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Currently Planned</div>
         <div style="font-size:14px;font-weight:600;color:var(--text);margin-top:1px">${escHtml(curRecipeName)} ${slotInfo.variant === 'enhanced' ? '<span class="tag green">Enhanced</span>' : ''}</div>
       </div>
-      <button class="btn sm btn-outline outline danger" onclick="executeSwapSlotAndClose(${dayNum}, '${slotKey}', '')">Clear Slot</button>
+      <button class="btn sm btn-outline outline danger" data-action="execute-swap-slot-and-close" data-day="${dayNum}" data-slot="${slotKey}" data-value="">Clear Slot</button>
     </div>
   ` : `
     <div style="background:var(--surface2);border:1px dashed var(--border);border-radius:var(--radius-md,10px);padding:10px 14px;margin-bottom:12px;color:var(--text3);font-size:13px;font-style:italic;flex-shrink:0">
@@ -49,10 +49,10 @@ export function renderSwapModalBase({ dayLabel, who, typeTitle, curRecipeName, s
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:space-between">
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
             <span style="font-size:11px;color:var(--text3);font-weight:600;margin-right:2px">Filter:</span>
-            <button type="button" class="btn sm btn-secondary active-filter-btn" id="swap-filter-all" onclick="setSwapModalFilter('all')">All (${itemsCount})</button>
-            <button type="button" class="btn sm btn-ghost ghost" id="swap-filter-favourites" onclick="setSwapModalFilter('favourites')">❤️ Favourites</button>
-            <button type="button" class="btn sm btn-ghost ghost" id="swap-filter-enhanced" onclick="setSwapModalFilter('enhanced')">Enhanced</button>
-            <button type="button" class="btn sm btn-ghost ghost" id="swap-filter-original" onclick="setSwapModalFilter('original')">Original</button>
+            <button type="button" class="btn sm btn-secondary active-filter-btn" id="swap-filter-all" data-action="set-swap-modal-filter" data-filter="all">All (${itemsCount})</button>
+            <button type="button" class="btn sm btn-ghost ghost" id="swap-filter-favourites" data-action="set-swap-modal-filter" data-filter="favourites">❤️ Favourites</button>
+            <button type="button" class="btn sm btn-ghost ghost" id="swap-filter-enhanced" data-action="set-swap-modal-filter" data-filter="enhanced">Enhanced</button>
+            <button type="button" class="btn sm btn-ghost ghost" id="swap-filter-original" data-action="set-swap-modal-filter" data-filter="original">Original</button>
           </div>
           <div style="display:flex;gap:6px;align-items:center">
             <label for="swap-modal-sort-select" style="font-size:11px;color:var(--text3);font-weight:600;cursor:pointer">Sort:</label>
@@ -69,11 +69,11 @@ export function renderSwapModalBase({ dayLabel, who, typeTitle, curRecipeName, s
 
       <div class="row-between" style="margin-top:14px;align-items:center;flex-shrink:0;gap:10px;flex-wrap:wrap">
         <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn btn-secondary secondary sm" onclick="quickRandomizeSwap(${dayNum}, '${slotKey}')">🎲 Random Swap</button>
+          <button class="btn btn-secondary secondary sm" data-action="quick-randomize-swap" data-day="${dayNum}" data-slot="${slotKey}">🎲 Random Swap</button>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn btn-ghost ghost sm" onclick="closeSwapMealModal()">Cancel</button>
-          <button id="swap-modal-confirm-btn" class="btn btn-primary primary sm" disabled onclick="confirmSwapMealModal()">Confirm Swap</button>
+          <button class="btn btn-ghost ghost sm" data-action="close-swap-meal-modal">Cancel</button>
+          <button id="swap-modal-confirm-btn" class="btn btn-primary primary sm" disabled data-action="confirm-swap-meal-modal">Confirm Swap</button>
         </div>
       </div>
     </div>
@@ -93,7 +93,7 @@ export function renderSwapModalItem(item, { isCurrent, isSelected, day, slotKey,
   return `
     <div class="swap-modal-item ${isFav ? 'is-favorite' : ''} ${isCurrent ? 'is-current' : ''} ${isSelected ? 'is-selected' : ''}" 
          data-value="${valAttr}" 
-         onclick="selectSwapModalRecipe('${valAttr}')" 
+         data-action="select-swap-modal-recipe" data-value="${valAttr}" 
          ondblclick="executeSwapSlotAndClose(${day}, '${slotKey}', '${valAttr}')">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -111,7 +111,7 @@ export function renderSwapModalItem(item, { isCurrent, isSelected, day, slotKey,
         </div>
       </div>
       <div style="flex-shrink:0;display:flex;align-items:center;gap:8px">
-        <button class="btn sm ${isSelected ? 'btn-primary primary' : 'btn-outline outline'}" type="button" onclick="event.stopPropagation(); selectSwapModalRecipe('${valAttr}');">
+        <button class="btn sm ${isSelected ? 'btn-primary primary' : 'btn-outline outline'}" type="button" data-action="select-swap-modal-recipe" data-value="${valAttr}">
           ${isSelected ? 'Selected ✓' : 'Select'}
         </button>
       </div>

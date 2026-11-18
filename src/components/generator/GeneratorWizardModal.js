@@ -52,22 +52,22 @@ export function setPlannerWizardStep(step) {
 export function renderWizardStepper(currentStep = 1, hasActivePlan = false) {
   return `
     <div class="planner-wizard-stepper">
-      <button type="button" class="wizard-step-btn ${currentStep === 1 ? 'active' : currentStep > 1 ? 'completed' : ''}" onclick="setPlannerWizardStep(1)">
+      <button type="button" class="wizard-step-btn ${currentStep === 1 ? 'active' : currentStep > 1 ? 'completed' : ''}" data-action="set-step" data-step="1">
         <span class="wizard-step-badge">1</span>
         <span>Configure Requests</span>
       </button>
       <span style="color:var(--border-strong);font-weight:bold">→</span>
-      <button type="button" class="wizard-step-btn ${currentStep === 2 ? 'active' : currentStep > 2 ? 'completed' : ''}" ${!hasActivePlan ? 'disabled' : ''} onclick="setPlannerWizardStep(2)">
+      <button type="button" class="wizard-step-btn ${currentStep === 2 ? 'active' : currentStep > 2 ? 'completed' : ''}" ${!hasActivePlan ? 'disabled' : ''} data-action="set-step" data-step="2">
         <span class="wizard-step-badge">2</span>
         <span>Review Plan</span>
       </button>
       <span style="color:var(--border-strong);font-weight:bold">→</span>
-      <button type="button" class="wizard-step-btn ${currentStep === 3 ? 'active' : currentStep > 3 ? 'completed' : ''}" ${!hasActivePlan ? 'disabled' : ''} onclick="setPlannerWizardStep(3)">
+      <button type="button" class="wizard-step-btn ${currentStep === 3 ? 'active' : currentStep > 3 ? 'completed' : ''}" ${!hasActivePlan ? 'disabled' : ''} data-action="set-step" data-step="3">
         <span class="wizard-step-badge">3</span>
         <span>Shopping & Substitutions</span>
       </button>
       <span style="color:var(--border-strong);font-weight:bold">→</span>
-      <button type="button" class="wizard-step-btn ${currentStep === 4 ? 'active' : ''}" ${!hasActivePlan ? 'disabled' : ''} onclick="setPlannerWizardStep(4)">
+      <button type="button" class="wizard-step-btn ${currentStep === 4 ? 'active' : ''}" ${!hasActivePlan ? 'disabled' : ''} data-action="set-step" data-step="4">
         <span class="wizard-step-badge">4</span>
         <span>Commit Plan</span>
       </button>
@@ -90,7 +90,7 @@ export function renderPlannerWizardView({
           <h1 style="margin:0;font-size:20px;font-weight:750;color:var(--text);letter-spacing:-0.02em">Meal Planner</h1>
           <div style="font-size:12.5px;color:var(--text2);margin-top:2px">Configure household requests, review daily macro scores, customize shopping, and commit.</div>
         </div>
-        <button type="button" class="btn ghost sm" style="display:flex;align-items:center;gap:6px;color:var(--red,#dc2626);border-color:var(--red,#dc2626);font-weight:600" onclick="resetPlannerStartFresh()">
+        <button type="button" class="btn ghost sm" style="display:flex;align-items:center;gap:6px;color:var(--red,#dc2626);border-color:var(--red,#dc2626);font-weight:600" data-action="reset-planner-start-fresh">
           <span>↺</span> Start Fresh
         </button>
       </div>
@@ -112,7 +112,7 @@ export function renderWizardStep4Commit(version = 'v3.30.0') {
     <div class="card" style="padding:28px;text-align:center">
       <h2 style="margin-top:0">Committing Meal Plan ${escapeHtml(version)}...</h2>
       <p style="color:var(--text2);font-size:13px;margin-bottom:18px">Finalizing plan metadata, locking shopping quantities, and synchronizing with your live dashboard.</p>
-      <button type="button" class="btn primary" onclick="commitPlannerWizardPlan()">Commit Plan Now</button>
+      <button type="button" class="btn primary" data-action="commit-plan">Commit Plan Now</button>
     </div>
   `;
 }
@@ -126,7 +126,7 @@ export function renderWizardEmptyPlanCard(stepNumber = 2) {
     <div class="card" style="padding:24px;text-align:center">
       <h3>No Meal Plan Active</h3>
       <p style="color:var(--text2);font-size:13px;margin-bottom:14px">${escapeHtml(msg)}</p>
-      <button type="button" class="btn primary" onclick="setPlannerWizardStep(1)">← Go to Step 1: Configure Requests</button>
+      <button type="button" class="btn primary" data-action="set-step" data-step="1">← Go to Step 1: Configure Requests</button>
     </div>
   `;
 }
