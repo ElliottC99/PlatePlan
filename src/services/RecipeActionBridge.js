@@ -4,6 +4,8 @@
  */
 
 import { toggleRecipeFavourite, toggleVaultFavouritesFilter } from '../views/RecipeVaultView.js';
+import { closeRecipePreview } from './RecipeDetailModalService.js';
+import { reindexModalMethodRows } from '../components/recipe-editor/RecipeStepRow.js';
 
 /**
  * Routes recipe-specific actions.
@@ -102,7 +104,7 @@ export function routeRecipeAction(actionName, target, event, parseArgsString) {
   }
 
   // 3. Vault Favourites Filter
-  if (normalizedAction === 'toggle-vault-fav-filter' || normalizedAction.includes('togglevaultfavouritesfilter')) {
+  if (normalizedAction === 'toggle-vault-fav-filter' || normalizedAction === 'toggle-favourites-filter' || normalizedAction.includes('togglevaultfavouritesfilter')) {
     toggleVaultFavouritesFilter();
     return true;
   }
@@ -112,6 +114,88 @@ export function routeRecipeAction(actionName, target, event, parseArgsString) {
       const recId = ds.recipeId || parseArgsString(actionName)[0] || null;
       window.openRecipeAuditModal(recId);
     }
+    return true;
+  }
+
+  if (normalizedAction === 'close-recipe-preview') {
+    closeRecipePreview();
+    return true;
+  }
+
+  if (normalizedAction === 'switch-view-tab') {
+    window.switchViewTab?.(ds.tab || 'original');
+    return true;
+  }
+
+  if (normalizedAction === 'open-enhance-recipe-modal') {
+    window.openEnhanceRecipeModalForCurrent?.(ds.recipeId || '');
+    return true;
+  }
+
+  if (normalizedAction === 'open-recipe-wizard-review') {
+    closeRecipePreview();
+    window.openRecipeWizard?.('review', ds.recipeId || '', ds.variant || 'original');
+    return true;
+  }
+
+  if (normalizedAction === 'remove-current-enhanced-variant') {
+    window.removeCurrentEnhancedVariant?.(ds.recipeId || '');
+    return true;
+  }
+
+  if (normalizedAction === 'switch-preview-serving-mode') {
+    window.switchPreviewServingMode?.(ds.mode || 'both');
+    return true;
+  }
+
+  if (normalizedAction === 'go-to-wizard-step') {
+    window.goToWizardStep?.(Number(ds.step));
+    return true;
+  }
+
+  if (normalizedAction === 'close-recipe-wizard') {
+    window.closeRecipeWizard?.();
+    return true;
+  }
+
+  if (normalizedAction === 'search-substitute-for-ingredient') {
+    window.searchSubstituteForIngredient?.(ds.prefix || 'orig', ds.name || '');
+    return true;
+  }
+
+  if (normalizedAction === 'highlight-review-ingredient-row') {
+    window.highlightReviewIngredientRow?.(ds.prefix || 'orig', Number(ds.idx));
+    return true;
+  }
+
+  if (normalizedAction === 'remove-modal-method-step') {
+    target.closest('.rev-method-row')?.remove();
+    reindexModalMethodRows(ds.mode || 'orig');
+    return true;
+  }
+
+  if (normalizedAction === 'remove-review-ingredient-row') {
+    window.removeReviewIngredientRow?.(target, ds.prefix || 'orig');
+    return true;
+  }
+
+  if (normalizedAction === 'open-review-mapping-modal-from-status') {
+    window.openReviewMappingModalFromStatus?.(target);
+    return true;
+  }
+
+  if (normalizedAction === 'edit-modal-row-ingredient') {
+    window.editModalRowIngredient?.(target);
+    return true;
+  }
+
+  if (normalizedAction === 'open-modal-ingredient-replace') {
+    window.openModalIngredientReplace?.(target);
+    return true;
+  }
+
+  if (normalizedAction === 'open-review-ingredient-actions') {
+    window.openReviewIngredientActions?.(target, ds.prefix || 'orig');
     return true;
   }
 

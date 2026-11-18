@@ -253,27 +253,27 @@ export function renderRecipeDetailModalContent(props = {}) {
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
               </svg>
             </button>
-            <button type="button" class="modal-close-btn recipe-view-close-btn" onclick="closeRecipePreview()" aria-label="Close">&times;</button>
+            <button type="button" class="modal-close-btn recipe-view-close-btn" data-action="close-recipe-preview" aria-label="Close">&times;</button>
           </div>
         </div>
         <div class="recipe-view-nav-actions" style="display:flex;align-items:center;gap:8px">
           ${hasEnh ? `
             <div class="segmented-control" role="tablist" style="width:fit-content;transform:scale(0.9);transform-origin:left center;">
-              <button type="button" role="tab" class="${!isEnh ? 'active' : ''}" onclick="switchViewTab('original')">Original</button>
-              <button type="button" role="tab" class="${isEnh ? 'active' : ''}" onclick="switchViewTab('enhanced')">✨ Enhanced</button>
+              <button type="button" role="tab" class="${!isEnh ? 'active' : ''}" data-action="switch-view-tab" data-tab="original">Original</button>
+              <button type="button" role="tab" class="${isEnh ? 'active' : ''}" data-action="switch-view-tab" data-tab="enhanced">✨ Enhanced</button>
             </div>
           ` : `
-            <button type="button" id="modal-recipe-enhance-btn" class="btn sm" style="padding:6px 10px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:4px;border-radius:8px;background:#16a34a;color:#fff;border:1px solid #15803d;cursor:pointer;" onclick="if(typeof openEnhanceRecipeModalForCurrent==='function')openEnhanceRecipeModalForCurrent('${escapeAttr(recipeId)}')">
+            <button type="button" id="modal-recipe-enhance-btn" class="btn sm" style="padding:6px 10px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:4px;border-radius:8px;background:#16a34a;color:#fff;border:1px solid #15803d;cursor:pointer;" data-action="open-enhance-recipe-modal" data-recipe-id="${escapeAttr(recipeId)}">
               ✨ Auto-Enhance (85+)
             </button>
           `}
           ${recipeId ? `
-            <button type="button" id="modal-recipe-review-btn" class="btn secondary" style="padding:6px 10px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;border-radius:8px;border:1px solid var(--border,#ccc);background:var(--surface,#fff);cursor:pointer;" onclick="if(typeof closeRecipePreview==='function')closeRecipePreview();if(typeof openRecipeWizard==='function')openRecipeWizard('review', '${escapeAttr(recipeId)}', '${escapeAttr(variantKey)}')" aria-label="Review recipe" title="Review recipe">
+            <button type="button" id="modal-recipe-review-btn" class="btn secondary" style="padding:6px 10px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;border-radius:8px;border:1px solid var(--border,#ccc);background:var(--surface,#fff);cursor:pointer;" data-action="open-recipe-wizard-review" data-recipe-id="${escapeAttr(recipeId)}" data-variant="${escapeAttr(variantKey)}" aria-label="Review recipe" title="Review recipe">
               🔍 Review
             </button>
           ` : ''}
           ${isEnh && recipeId ? `
-            <button type="button" id="modal-recipe-delete-variant-btn" class="btn sm danger" style="padding:6px 10px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;border-radius:8px;cursor:pointer;" onclick="if(typeof removeCurrentEnhancedVariant==='function')removeCurrentEnhancedVariant('${escapeAttr(recipeId)}')">
+            <button type="button" id="modal-recipe-delete-variant-btn" class="btn sm danger" style="padding:6px 10px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;border-radius:8px;cursor:pointer;" data-action="remove-current-enhanced-variant" data-recipe-id="${escapeAttr(recipeId)}">
               🗑️ Remove Variant
             </button>
           ` : ''}
@@ -328,9 +328,9 @@ export function renderRecipeDetailModalContent(props = {}) {
           <!-- Left: Controls -->
           <div class="recipe-modal-crossbar-controls">
             <div class="segmented-control" role="tablist">
-              <button type="button" role="tab" class="${servingMode === 'both' ? 'active' : ''}" onclick="switchPreviewServingMode('both')">Shared (${baseServes})</button>
-              <button type="button" role="tab" class="${servingMode === 'elliott' ? 'active' : ''}" onclick="switchPreviewServingMode('elliott')">👤 Elliott</button>
-              <button type="button" role="tab" class="${servingMode === 'chloe' ? 'active' : ''}" onclick="switchPreviewServingMode('chloe')">👤 Chloe</button>
+              <button type="button" role="tab" class="${servingMode === 'both' ? 'active' : ''}" data-action="switch-preview-serving-mode" data-mode="both">Shared (${baseServes})</button>
+              <button type="button" role="tab" class="${servingMode === 'elliott' ? 'active' : ''}" data-action="switch-preview-serving-mode" data-mode="elliott">👤 Elliott</button>
+              <button type="button" role="tab" class="${servingMode === 'chloe' ? 'active' : ''}" data-action="switch-preview-serving-mode" data-mode="chloe">👤 Chloe</button>
             </div>
             ${servingMode === 'both' ? `
               <div style="display:flex;align-items:center;gap:6px;font-size:13px;">

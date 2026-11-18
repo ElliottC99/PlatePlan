@@ -84,7 +84,7 @@ export function renderPlannerWizard() {
         <div class="card" style="padding:24px;text-align:center">
           <h3>No Meal Plan Generated Yet</h3>
           <p style="color:var(--text2);font-size:13px;margin-bottom:14px">Configure your days and requests in Step 1 to generate your meal plan.</p>
-          <button type="button" class="btn primary" onclick="setPlannerWizardStep(1)">← Go to Step 1: Configure Requests</button>
+          <button type="button" class="btn primary" data-action="set-step" data-step="1">← Go to Step 1: Configure Requests</button>
         </div>
       `;
     } else {

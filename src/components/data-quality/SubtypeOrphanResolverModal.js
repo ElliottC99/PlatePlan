@@ -113,7 +113,7 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
             Products must belong directly to a <strong>Sub-type</strong>. Search a valid sub-type or remove the product.
           </p>
         </div>
-        <button type="button" class="btn sm ghost" style="padding:4px 8px; font-size:16px; line-height:1; cursor:pointer;" onclick="window.closeSubtypeOrphanResolverModal()">✕</button>
+        <button type="button" class="btn sm ghost" style="padding:4px 8px; font-size:16px; line-height:1; cursor:pointer;" data-action="close-subtype-orphan-resolver-modal">✕</button>
       </div>
 
       ${affectedProducts.length > 1 ? `
@@ -144,7 +144,7 @@ export function openSubtypeOrphanResolverModal(orphanIssue = {}) {
       </div>
 
       <div style="display:flex; gap:10px; justify-content:flex-end; align-items:center;">
-        <button type="button" class="btn sm ghost" onclick="window.closeSubtypeOrphanResolverModal()" style="font-weight:600; cursor:pointer;">Cancel</button>
+        <button type="button" class="btn sm ghost" data-action="close-subtype-orphan-resolver-modal" style="font-weight:600; cursor:pointer;">Cancel</button>
         <button type="button" class="btn sm primary" id="resolve-orphans-confirm-btn" style="font-weight:700; background:var(--primary,#4f46e5); color:#fff; border-radius:8px; padding:8px 18px; cursor:pointer;">
           Commit Resolutions
         </button>

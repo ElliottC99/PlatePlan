@@ -101,12 +101,10 @@ export function renderRecipeCandidateRows(recipes, { dayIndex, mealType, person 
     const fitObj = typeof window.calculateMealFitScore === 'function' ? window.calculateMealFitScore(r, mealType, { activeProfile, variant, portionScaled: true }) : null;
     const badgeHtml = typeof window.renderFitScoreBadge === 'function' ? window.renderFitScoreBadge(r, mealType, { activeProfile, variant, portionScaled: true, precomputedFit: fitObj, showLabel: true }) : '';
     const isDup = isRecipeInSkeletonGrid(baseId, skeletonGrid, variant) || isRecipeInSkeletonGrid(r.id, skeletonGrid, variant);
-    const clickAction = person === 'both'
-      ? `window.setSlotConfiguredStatus(${dayIndex}, '${mealType}', 'pinned', '${escapeAttr(r.id)}')`
-      : `window.setSplitPersonSlotStatus(${dayIndex}, '${mealType}', '${person}', 'pinned', '${escapeAttr(r.id)}')`;
+    const slotAction = person === 'both' ? 'set-slot-configured-status' : 'set-split-person-slot-status';
 
     return `
-      <div onclick="${clickAction}" style="padding:8px 10px;border-radius:6px;border:1px solid var(--separator);background:var(--secondary-system-grouped-bg);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px" onmouseover="this.style.background='var(--tertiary-system-grouped-bg)'" onmouseout="this.style.background='var(--secondary-system-grouped-bg)'">
+      <div data-action="${slotAction}" data-day="${dayIndex}" data-meal="${escapeAttr(mealType)}" data-person="${escapeAttr(person)}" data-status="pinned" data-recipe-id="${escapeAttr(r.id)}" style="padding:8px 10px;border-radius:6px;border:1px solid var(--separator);background:var(--secondary-system-grouped-bg);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px">
         <div style="min-width:0;flex:1;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span style="font-weight:600;color:var(--label)">${escapeHtml(r.name)}</span>
           ${isEnhanced ? '<span class="tag green" style="background:var(--badge-green-bg);color:var(--badge-green-text);font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700;margin-left:4px">Enhanced</span>' : ''}
@@ -157,7 +155,7 @@ export function renderFitScoreScopeUI({ minVal = 0, maxVal = 100 } = {}) {
 export function renderSlotCardSummary(day, meal, config) {
   if (!config || config.status === 'unassigned') {
     return `
-      <div class="skeleton-slot unassigned" onclick="window.openSlotConfigurator(${day}, '${meal.key}')" style="padding:8px 10px;border:1px dashed var(--separator);border-radius:8px;background:var(--secondary-system-grouped-bg);cursor:pointer;display:flex;align-items:center;justify-content:space-between" title="Tap to configure slot">
+      <div class="skeleton-slot unassigned" data-action="open-slot-configurator" data-day="${day}" data-meal="${escapeAttr(meal.key)}" style="padding:8px 10px;border:1px dashed var(--separator);border-radius:8px;background:var(--secondary-system-grouped-bg);cursor:pointer;display:flex;align-items:center;justify-content:space-between" title="Tap to configure slot">
         <span style="font-size:12px;font-weight:600;color:var(--secondary-label)">${meal.icon} ${meal.label}</span>
         <span style="font-size:11px;color:var(--tertiary-label);font-style:italic">+ Assign</span>
       </div>
@@ -171,7 +169,7 @@ export function renderSlotCardSummary(day, meal, config) {
     const eSummary = config.elliott?.isSkipped ? '🚫 Skipped' : (eName ? `📌 ${escapeHtml(eName)} ${eVariant === 'enhanced' ? '<span class="tag green" style="background:var(--badge-green-bg);color:var(--badge-green-text);font-size:9px;padding:1px 4px;border-radius:3px;font-weight:700">Enhanced</span>' : ''}` : '⚡ Auto');
     const cSummary = config.chloe?.isSkipped ? '🚫 Skipped' : (cName ? `📌 ${escapeHtml(cName)} ${cVariant === 'enhanced' ? '<span class="tag green" style="background:var(--badge-green-bg);color:var(--badge-green-text);font-size:9px;padding:1px 4px;border-radius:3px;font-weight:700">Enhanced</span>' : ''}` : '⚡ Auto');
     return `
-      <div class="skeleton-slot split" onclick="window.openSlotConfigurator(${day}, '${meal.key}')" style="padding:8px 10px;border:1px solid var(--badge-blue-border);border-radius:8px;background:var(--badge-blue-bg);cursor:pointer;display:flex;flex-direction:column;gap:3px" title="Tap to modify split slot">
+      <div class="skeleton-slot split" data-action="open-slot-configurator" data-day="${day}" data-meal="${escapeAttr(meal.key)}" style="padding:8px 10px;border:1px solid var(--badge-blue-border);border-radius:8px;background:var(--badge-blue-bg);cursor:pointer;display:flex;flex-direction:column;gap:3px" title="Tap to modify split slot">
         <div style="display:flex;align-items:center;justify-content:space-between">
           <span style="font-size:10px;font-weight:700;color:var(--badge-blue-text);text-transform:uppercase">${meal.icon} ${meal.label}</span>
           <span class="badge" style="font-size:9.5px;background:var(--badge-blue-bg);color:var(--badge-blue-text);border:1px solid var(--badge-blue-border);font-weight:700;padding:1px 5px;border-radius:4px">Split</span>
@@ -183,7 +181,7 @@ export function renderSlotCardSummary(day, meal, config) {
   }
   if (config.isSkipped || config.status === 'skipped') {
     return `
-      <div class="skeleton-slot skipped" onclick="window.openSlotConfigurator(${day}, '${meal.key}')" style="padding:8px 10px;border:1px solid var(--separator);border-radius:8px;background:var(--tertiary-system-grouped-bg);cursor:pointer;display:flex;align-items:center;justify-content:space-between;opacity:0.85" title="Tap to modify">
+      <div class="skeleton-slot skipped" data-action="open-slot-configurator" data-day="${day}" data-meal="${escapeAttr(meal.key)}" style="padding:8px 10px;border:1px solid var(--separator);border-radius:8px;background:var(--tertiary-system-grouped-bg);cursor:pointer;display:flex;align-items:center;justify-content:space-between;opacity:0.85" title="Tap to modify">
         <span style="font-size:12px;font-weight:600;color:var(--tertiary-label);text-decoration:line-through">${meal.icon} ${meal.label}</span>
         <span class="badge" style="font-size:10px;background:var(--badge-neutral-bg);color:var(--badge-neutral-text);border:1px solid var(--badge-neutral-border);font-weight:700;padding:2px 6px;border-radius:4px">Skipped</span>
       </div>
@@ -194,7 +192,7 @@ export function renderSlotCardSummary(day, meal, config) {
   if (sharedName) {
     const isEnh = slotVariant === 'enhanced';
     return `
-      <div class="skeleton-slot pinned" onclick="window.openSlotConfigurator(${day}, '${meal.key}')" style="padding:8px 10px;border:1px solid var(--badge-green-border);border-radius:8px;background:var(--badge-green-bg);cursor:pointer;display:flex;align-items:center;justify-content:space-between" title="Tap to modify">
+      <div class="skeleton-slot pinned" data-action="open-slot-configurator" data-day="${day}" data-meal="${escapeAttr(meal.key)}" style="padding:8px 10px;border:1px solid var(--badge-green-border);border-radius:8px;background:var(--badge-green-bg);cursor:pointer;display:flex;align-items:center;justify-content:space-between" title="Tap to modify">
         <div style="min-width:0;flex:1;padding-right:6px">
           <div style="font-size:10px;font-weight:700;color:var(--badge-green-text);text-transform:uppercase">${meal.icon} ${meal.label}</div>
           <div style="font-size:12px;font-weight:700;color:var(--label);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📌 ${escapeHtml(sharedName)}</div>
@@ -271,10 +269,10 @@ export function renderPersonSplitColumn(personKey, personLabel, dayIndex, mealTy
           <div style="font-size:11.5px;color:var(--secondary-label);margin-top:1px">${statusText}</div>
         </div>
         <div style="display:flex;gap:6px">
-          <button type="button" class="btn sm ${isSkipped ? 'btn-primary primary' : 'btn-secondary secondary'}" style="font-size:11px;font-weight:700;padding:4px 8px" onclick="window.setSplitPersonSlotStatus(${dayIndex}, '${mealType}', '${personKey}', '${isSkipped ? 'unassigned' : 'skipped'}')">
+          <button type="button" class="btn sm ${isSkipped ? 'btn-primary primary' : 'btn-secondary secondary'}" style="font-size:11px;font-weight:700;padding:4px 8px" data-action="set-split-person-slot-status" data-day="${dayIndex}" data-meal="${escapeAttr(mealType)}" data-person="${escapeAttr(personKey)}" data-status="${isSkipped ? 'unassigned' : 'skipped'}">
             ${isSkipped ? '✓ Skipped' : '🚫 Skip'}
           </button>
-          ${(isSkipped || pinnedName) ? `<button type="button" class="btn sm btn-ghost ghost" style="font-size:11px;padding:4px 6px" onclick="window.setSplitPersonSlotStatus(${dayIndex}, '${mealType}', '${personKey}', 'unassigned')">Reset</button>` : ''}
+          ${(isSkipped || pinnedName) ? `<button type="button" class="btn sm btn-ghost ghost" style="font-size:11px;padding:4px 6px" data-action="set-split-person-slot-status" data-day="${dayIndex}" data-meal="${escapeAttr(mealType)}" data-person="${escapeAttr(personKey)}" data-status="unassigned">Reset</button>` : ''}
         </div>
       </div>
       <label for="slot-config-search-${personKey}" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Search recipe for ${personLabel}</label>
@@ -297,23 +295,23 @@ export function renderSlotConfiguratorModal({ dayIndex, mealLabel, mealType, isS
           <h3 style="margin:0;font-size:15px;font-weight:750;color:var(--text,#0f172a)">Configure Day ${dayIndex} - ${mealLabel}</h3>
           <div style="font-size:11.5px;color:var(--text2,#64748b);margin-top:2px">Organise household anchors for Elliott &amp; Chloe</div>
         </div>
-        <button type="button" class="modal-close-btn btn sm btn-ghost ghost" aria-label="Close configurator" onclick="window.closeSlotConfigurator()">✕</button>
+        <button type="button" class="modal-close-btn btn sm btn-ghost ghost" aria-label="Close configurator" data-action="close-slot-configurator">✕</button>
       </div>
 
       <div style="padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button type="button" class="btn btn-secondary secondary" style="flex:1;padding:9px 12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px" onclick="window.setSlotConfiguredStatus(${dayIndex}, '${mealType}', 'skipped')">
+          <button type="button" class="btn btn-secondary secondary" style="flex:1;padding:9px 12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px" data-action="set-slot-configured-status" data-day="${dayIndex}" data-meal="${escapeAttr(mealType)}" data-status="skipped">
             🚫 Skip Entire Slot (Both)
           </button>
-          ${hasAnyConfig ? `<button type="button" class="btn btn-outline outline danger" style="background:var(--badge-red-bg);color:var(--badge-red-text);border:1px solid var(--badge-red-border);font-weight:700;padding:9px 12px" onclick="window.setSlotConfiguredStatus(${dayIndex}, '${mealType}', 'unassigned')">Clear Slot</button>` : ''}
+          ${hasAnyConfig ? `<button type="button" class="btn btn-outline outline danger" style="background:var(--badge-red-bg);color:var(--badge-red-text);border:1px solid var(--badge-red-border);font-weight:700;padding:9px 12px" data-action="set-slot-configured-status" data-day="${dayIndex}" data-meal="${escapeAttr(mealType)}" data-status="unassigned">Clear Slot</button>` : ''}
         </div>
 
         <!-- Dining Mode Segmented Toggle -->
         <div style="display:flex;background:var(--tertiary-system-grouped-bg);padding:4px;border-radius:10px;gap:4px">
-          <button type="button" onclick="window.toggleSlotConfiguratorMode(false)" style="flex:1;padding:7px 10px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:${!isSplit ? 'var(--secondary-system-grouped-bg)' : 'transparent'};color:${!isSplit ? 'var(--label)' : 'var(--secondary-label)'};box-shadow:${!isSplit ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'}">
+          <button type="button" data-action="toggle-slot-configurator-mode" data-split="false" style="flex:1;padding:7px 10px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:${!isSplit ? 'var(--secondary-system-grouped-bg)' : 'transparent'};color:${!isSplit ? 'var(--label)' : 'var(--secondary-label)'};box-shadow:${!isSplit ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'}">
             👫 Shared Meal
           </button>
-          <button type="button" onclick="window.toggleSlotConfiguratorMode(true)" style="flex:1;padding:7px 10px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:${isSplit ? 'var(--secondary-system-grouped-bg)' : 'transparent'};color:${isSplit ? 'var(--label)' : 'var(--secondary-label)'};box-shadow:${isSplit ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'}">
+          <button type="button" data-action="toggle-slot-configurator-mode" data-split="true" style="flex:1;padding:7px 10px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:${isSplit ? 'var(--secondary-system-grouped-bg)' : 'transparent'};color:${isSplit ? 'var(--label)' : 'var(--secondary-label)'};box-shadow:${isSplit ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'}">
             ↔️ Separate Meals (Elliott &amp; Chloe)
           </button>
         </div>
@@ -332,7 +330,7 @@ export function renderSlotConfiguratorModal({ dayIndex, mealLabel, mealType, isS
             ${renderPersonSplitColumn('chloe', 'Chloe', dayIndex, mealType, currentConfig.chloe || {}, recipes, skeletonGrid)}
           </div>
           <div style="display:flex;justify-content:flex-end;padding-top:4px">
-            <button type="button" class="btn btn-primary primary sm" style="font-weight:700;padding:7px 18px" onclick="window.closeSlotConfigurator()">Done</button>
+            <button type="button" class="btn btn-primary primary sm" style="font-weight:700;padding:7px 18px" data-action="close-slot-configurator">Done</button>
           </div>
         `}
       </div>

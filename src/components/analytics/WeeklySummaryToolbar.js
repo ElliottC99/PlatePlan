@@ -52,7 +52,7 @@ export function renderWeeklySummaryToolbar(options = {}) {
             </div>
           </div>
 
-          <button class="btn sm ghost" type="button" onclick="triggerCsvExport()" style="font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px">
+          <button class="btn sm ghost" type="button" data-action="trigger-csv-export" style="font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px">
             📥 Export to CSV
           </button>
         </div>

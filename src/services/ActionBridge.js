@@ -227,7 +227,7 @@ export function routeAction(actionName, target, event) {
 
   // 6. View Switcher Navigation & Mobile Drawer Routing
   if (normalizedAction === 'navigate-view' || normalizedAction === 'show-view' || normalizedAction.includes('mobilemoreview') || normalizedAction.includes('showview')) {
-    if (normalizedAction.includes('clearproductgroupfilter')) {
+    if (normalizedAction.includes('clearproductgroupfilter') || ds.view === 'bank') {
       clearProductGroupFilter();
     }
     const match = actionName.match(/(?:mobileMoreView|showView)\(['"]?([^'"]+)['"]?\)/i);
@@ -301,7 +301,7 @@ export function routeAction(actionName, target, event) {
     return true;
   }
 
-  if (normalizedAction === 'sync-now' || normalizedAction === 'window.syncnow()' || normalizedAction.includes('syncnow')) {
+  if (normalizedAction === 'sync-now' || normalizedAction === 'refresh-data' || normalizedAction === 'window.syncnow()' || normalizedAction.includes('syncnow')) {
     if (typeof window.syncNow === 'function') window.syncNow();
     return true;
   }
@@ -329,6 +329,244 @@ export function routeAction(actionName, target, event) {
 
   if (normalizedAction === 'scroll-to-top') {
     scrollToTop();
+    return true;
+  }
+
+  if (normalizedAction === 'open-create-action-sheet') {
+    import('../components/navigation/ActionSheetUI.js').then(m => m.openCreateActionSheet?.());
+    return true;
+  }
+
+  if (normalizedAction === 'toggle-item-breakdown') {
+    window.toggleItemBreakdown?.(ds.itemKey || '');
+    return true;
+  }
+
+  if (normalizedAction === 'select-shopping-product-override') {
+    window.selectShoppingProductOverride?.(ds.groupId || '', ds.productId || '');
+    return true;
+  }
+
+  if (normalizedAction === 'manual-recalibrate-defaults') {
+    window.handleManualRecalibrateDefaults?.();
+    return true;
+  }
+
+  if (normalizedAction === 'manual-recalibrate-recipe-macros') {
+    window.handleManualRecalibrateRecipeMacros?.();
+    return true;
+  }
+
+  if (normalizedAction === 'add-exclusion') {
+    window.handleAddExclusionFromInput?.();
+    return true;
+  }
+
+  if (normalizedAction === 'remove-exclusion') {
+    window.handleRemoveExclusion?.(Number(ds.index));
+    return true;
+  }
+
+  if (normalizedAction === 'generate-invite-link') {
+    window.generateHouseholdInviteLink?.();
+    return true;
+  }
+
+  if (normalizedAction === 'trigger-csv-export') {
+    window.triggerCsvExport?.();
+    return true;
+  }
+
+  if (normalizedAction === 'open-print-prep-label-modal') {
+    window.openPrintPrepLabelModal?.(Number(ds.index));
+    return true;
+  }
+
+  if (normalizedAction === 'adjust-prep-containers') {
+    window.adjustPrepContainers?.(Number(ds.index));
+    return true;
+  }
+
+  if (normalizedAction === 'start-prep-timer') {
+    window.startPrepTimer?.(Number(ds.timer), ds.stepLabel || '');
+    return true;
+  }
+
+  if (normalizedAction === 'toggle-prep-step-complete') {
+    window.togglePrepStepComplete?.(Number(ds.index));
+    return true;
+  }
+
+  if (normalizedAction === 'mark-all-prep-steps-complete') {
+    window.markAllPrepStepsComplete?.();
+    return true;
+  }
+
+  if (normalizedAction === 'print-meal-prep-guide') {
+    window.printMealPrepGuide?.();
+    return true;
+  }
+
+  if (normalizedAction === 'set-step' && ds.step) {
+    window.setPlannerWizardStep?.(Number(ds.step));
+    return true;
+  }
+
+  if (normalizedAction === 'commit-plan') {
+    window.commitPlannerWizardPlan?.();
+    return true;
+  }
+
+  if (normalizedAction === 'reset-planner-start-fresh') {
+    window.resetPlannerStartFresh?.();
+    return true;
+  }
+
+  if (normalizedAction === 'reload-plan') {
+    window.renderPlan?.();
+    return true;
+  }
+
+  if (normalizedAction === 'open-apply-plan-from-library') {
+    window.openApplyPlanFromLibraryModal?.();
+    return true;
+  }
+
+  if (normalizedAction === 'close-searchable-recipe-swap-modal') {
+    (window.PlannerMealSlot?.closeSearchableRecipeSwapModal || window.closeSearchableRecipeSwapModal)?.();
+    return true;
+  }
+
+  if (normalizedAction === 'select-and-swap-recipe') {
+    (window.PlannerMealSlot?.selectAndSwapRecipe || window.selectAndSwapRecipe)?.(ds.recipeId || '', ds.variant || 'original');
+    return true;
+  }
+
+  if (normalizedAction === 'open-slot-configurator') {
+    window.openSlotConfigurator?.(Number(ds.day), ds.meal || 'dinner');
+    return true;
+  }
+
+  if (normalizedAction === 'close-slot-configurator') {
+    window.closeSlotConfigurator?.();
+    return true;
+  }
+
+  if (normalizedAction === 'set-slot-configured-status') {
+    window.setSlotConfiguredStatus?.(Number(ds.day), ds.meal || 'dinner', ds.status || 'unassigned', ds.recipeId || null);
+    return true;
+  }
+
+  if (normalizedAction === 'set-split-person-slot-status') {
+    window.setSplitPersonSlotStatus?.(Number(ds.day), ds.meal || 'dinner', ds.person || 'elliott', ds.status || 'unassigned', ds.recipeId || null);
+    return true;
+  }
+
+  if (normalizedAction === 'toggle-slot-configurator-mode') {
+    window.toggleSlotConfiguratorMode?.(ds.split === 'true');
+    return true;
+  }
+
+  if (normalizedAction === 'close-swap-meal-modal') {
+    window.closeSwapMealModal?.();
+    return true;
+  }
+
+  if (normalizedAction === 'execute-swap-slot-and-close') {
+    window.executeSwapSlotAndClose?.(Number(ds.day), ds.slot || '', ds.value ?? '');
+    return true;
+  }
+
+  if (normalizedAction === 'set-swap-modal-filter') {
+    window.setSwapModalFilter?.(ds.filter || 'all');
+    return true;
+  }
+
+  if (normalizedAction === 'quick-randomize-swap') {
+    window.quickRandomizeSwap?.(Number(ds.day), ds.slot || '');
+    return true;
+  }
+
+  if (normalizedAction === 'confirm-swap-meal-modal') {
+    window.confirmSwapMealModal?.();
+    return true;
+  }
+
+  if (normalizedAction === 'select-swap-modal-recipe') {
+    const val = ds.value || target.closest('[data-value]')?.dataset?.value || '';
+    window.selectSwapModalRecipe?.(val);
+    return true;
+  }
+
+  if (normalizedAction === 'toggle-swap-candidate-favourite') {
+    const idAttr = ds.recipeId || '';
+    const varAttr = ds.variant || 'original';
+    window.toggleRecipeFavourite?.(idAttr, event, varAttr);
+    if (typeof window.currentSwapModalContext !== 'undefined' && window.currentSwapModalContext) {
+      (window.currentSwapModalContext.items || []).forEach(it => {
+        if (it.id === idAttr) {
+          it.isFavourite = !it.isFavourite;
+          it.isFavorite = it.isFavourite;
+        }
+      });
+      window.renderSwapModalOptionsList?.();
+    }
+    return true;
+  }
+
+  if (normalizedAction === 'toggle-create-ingredient-box') {
+    const openArg = ds.open === 'false' ? false : (ds.open === 'true' ? true : undefined);
+    window.toggleCreateIngredientBox?.(openArg);
+    return true;
+  }
+
+  if (normalizedAction === 'submit-create-new-ingredient-from-reallocate') {
+    window.submitCreateNewIngredientFromReallocate?.();
+    return true;
+  }
+
+  if (normalizedAction === 'close-macro-drift-preview-modal') {
+    window.closeMacroDriftPreviewModal?.();
+    return true;
+  }
+
+  if (normalizedAction === 'close-subtype-orphan-resolver-modal') {
+    window.closeSubtypeOrphanResolverModal?.();
+    return true;
+  }
+
+  if (normalizedAction === 'close-meal-plan-sync-warning-modal') {
+    window.closeMealPlanSyncWarningModal?.();
+    return true;
+  }
+
+  if (normalizedAction === 'close-merge-ingredients-modal') {
+    window.closeMergeIngredientsModal?.();
+    return true;
+  }
+
+  if (normalizedAction === 'close-resolve-unlinked-modal') {
+    window.closeResolveUnlinkedModal?.();
+    return true;
+  }
+
+  if (normalizedAction === 'submit-resolve-tesco-import') {
+    window.submitResolveTescoImport?.();
+    return true;
+  }
+
+  if (normalizedAction === 'submit-resolve-new-product') {
+    window.submitResolveNewProduct?.();
+    return true;
+  }
+
+  if (normalizedAction === 'submit-resolve-remap-target') {
+    window.submitResolveRemapTarget?.(ds.ingredientId || '', ds.subtypeId || '');
+    return true;
+  }
+
+  if (normalizedAction === 'submit-resolve-link-existing') {
+    window.submitResolveLinkExisting?.(ds.productId || '');
     return true;
   }
 

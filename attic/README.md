@@ -58,3 +58,4 @@ A file may be deleted after two weeks of normal use on both phones with no relat
 | `src/services/RecipeWizardValidationService.js` | 2026-11-10 | 2026-11-24 |
 | `src/services/TaxonomyMapper.js` | 2026-11-10 | 2026-11-24 |
 | `src/services/DataQualityEngine.js` | 2026-11-10 | 2026-11-24 |
+| `src/components/recipe-editor/RecipeImportParserForm.js` | 2026-11-18 | 2026-12-02 |

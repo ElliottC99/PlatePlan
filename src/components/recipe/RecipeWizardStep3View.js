@@ -369,7 +369,7 @@ export function renderState3Review() {
       </div>
 
       <div style="display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border, #eee); padding-top: 14px;">
-        <button type="button" class="btn ghost" onclick="goToWizardStep(2)">← Back to Mapping</button>
+        <button type="button" class="btn ghost" data-action="go-to-wizard-step" data-step="2">← Back to Mapping</button>
         <button type="button" class="btn primary" id="btn-save-wizard-recipe">💾 ${escapeHtml(saveBtnText)}</button>
       </div>
     </div>

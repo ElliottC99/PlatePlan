@@ -599,7 +599,8 @@ function checkPlanKept(plan, label) {
 
   assert.ok(macHtml.includes("Roasted Pepper Mac &#39;n&#39; Cheese"), 'Recipe with apostrophe in title must be escaped');
   assert.equal(macHtml.includes("Mac 'n' Cheese"), false, 'Inline onclick must NOT have unescaped raw single quote');
-  assert.ok(macHtml.includes("window.setSlotConfiguredStatus(1, 'dinner', 'pinned', 'rec_mac_cheese')"), 'Click handler must cleanly invoke setSlotConfiguredStatus without crashing');
+  assert.ok(macHtml.includes('data-action="set-slot-configured-status"'), 'Candidate row must route via data-action="set-slot-configured-status"');
+  assert.ok(macHtml.includes('data-recipe-id="rec_mac_cheese"'), 'Candidate row must carry escaped recipeId in data-recipe-id');
 
   console.log('PASS 12: Skeleton candidate rows cleanly isolate variant duplicates and safely escape recipe titles with apostrophes');
 }

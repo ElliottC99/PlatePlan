@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PlatePlan Full Application Evaluation — Development, Improvement, Simplification &amp; Optimisation</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface2: #f1f5f9;
+      --text: #0f172a;
+      --text2: #475569;
+      --border: #e2e8f0;
+      --accent: #0f766e;
+      --accent-bg: #f0fdfa;
+      --blue: #1d4ed8;
+      --blue-bg: #eff6ff;
+      --amber: #b45309;
+      --amber-bg: #fffbeb;
+      --red: #b91c1c;
+      --red-bg: #fef2f2;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      padding: 32px 20px 64px;
+    }
+    .wrap { max-width: 980px; margin: 0 auto; }
+    header {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 28px;
+      margin-bottom: 20px;
+    }
+    h1 { margin: 0 0 6px; font-size: 24px; line-height: 1.25; }
+    .subtitle { color: var(--text2); font-size: 14px; margin: 0; }
+    details.meta {
+      margin-top: 14px;
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+    }
+    details.meta summary { cursor: pointer; font-weight: 600; color: var(--text2); }
+    dl { display: grid; grid-template-columns: 180px 1fr; gap: 6px 12px; margin: 10px 0 0; }
+    dt { font-weight: 600; color: var(--text2); }
+    dd { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px 26px;
+      margin-bottom: 18px;
+    }
+    h2 { margin: 0 0 14px; font-size: 18px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .stat {
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .stat strong { display: block; font-size: 20px; color: var(--accent); }
+    .stat span { font-size: 12px; color: var(--text2); }
+    .axes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+    }
+    .axis-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: var(--surface2);
+    }
+    .axis-card strong { display: block; font-size: 14px; margin-bottom: 4px; }
+    .axis-card p { margin: 0; font-size: 12.5px; color: var(--text2); }
+    .idea {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+      background: #fff;
+    }
+    .idea-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .idea h3 { margin: 0; font-size: 16px; }
+    .badges { display: flex; gap: 6px; flex-wrap: wrap; }
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .b-axis { background: var(--blue-bg); color: var(--blue); }
+    .b-conf { background: var(--accent-bg); color: var(--accent); }
+    .b-cx { background: var(--amber-bg); color: var(--amber); }
+    .idea p { margin: 6px 0; font-size: 13.5px; }
+    .basis {
+      font-size: 12.5px;
+      background: var(--surface2);
+      border-left: 3px solid var(--accent);
+      padding: 8px 12px;
+      border-radius: 0 8px 8px 0;
+      margin-top: 8px;
+    }
+    .downside {
+      font-size: 12.5px;
+      color: var(--text2);
+      margin-top: 8px;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      background: var(--surface2);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.03em; }
+    footer.composition-signal {
+      text-align: center;
+      color: var(--text2);
+      font-size: 12px;
+      margin-top: 22px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>PlatePlan Full Application Evaluation</h1>
+      <p class="subtitle">Avenues for development, improvement, simplification, and optimisation — grounded in the live <code>src/</code> runtime, <code>LEDGER.md</code>, and <code>plateplan-architecture.md</code>.</p>
+      <details class="meta">
+        <summary>Document metadata</summary>
+        <dl>
+          <dt>artifact_type</dt><dd>ce-ideate</dd>
+          <dt>focus</dt><dd>Entirety of PlatePlan: development, improvement, simplification, optimisation</dd>
+          <dt>date</dt><dd>2026-11-18</dd>
+          <dt>survivors</dt><dd>7 ranked (15 generated, 8 rejected)</dd>
+        </dl>
+      </details>
+    </header>
+
+    <section id="grounding-context">
+      <h2>Grounding Context</h2>
+      <div class="stats">
+        <div class="stat"><strong>186 / 41.5k</strong><span>Live modules / LOC in <code>src/</code></span></div>
+        <div class="stat"><strong>6 / 3</strong><span>Parallel modules across 3 jobs</span></div>
+        <div class="stat"><strong>30 / 127</strong><span>Dead <code>data-pp-*</code> / inline <code>onclick=</code></span></div>
+        <div class="stat"><strong>80</strong><span>Expired files in <code>attic/</code> (past 2026-11-13)</span></div>
+      </div>
+      <p style="font-size:13.5px; color:var(--text2); margin:0;">
+        PlatePlan is a zero-bundler ES-module PWA backed by Firebase Firestore (<code>households/elliott-chloe</code>). Rapid feature velocity left three structural drag points: broken legacy UI bindings (<code>data-pp-*</code>), parallel module owners (State, Data Quality, Action Sheets), and full-DOM re-renders / unversioned sub-module imports. At the same time, two tests (<code>test_accessibility_dom.js</code> / <code>npm run lint</code> and <code>test_recipe_wizard.js</code>) fail out-of-the-box, weakening the CI/local safety net.
+      </p>
+    </section>
+
+    <section id="topic-axes">
+      <h2>Topic Axes</h2>
+      <div class="axes">
+        <div class="axis-card"><strong>1. Simplification</strong><p>Consolidate parallel modules, delete expired attic files, and remove dead UI controls.</p></div>
+        <div class="axis-card"><strong>2. Reliability &amp; Quality</strong><p>Fix broken lint/wizard tests, unify Firestore writers, and restore dead <code>data-pp-*</code> controls.</p></div>
+        <div class="axis-card"><strong>3. Product &amp; UX Development</strong><p>Persistent planner layout, smoother mobile shopping/today workflows, and household polish.</p></div>
+        <div class="axis-card"><strong>4. Runtime Optimisation</strong><p>Targeted DOM patching, sub-module cache-busting, and splitting 1,000-line service monoliths.</p></div>
+      </div>
+    </section>
+
+    <section id="ranked-ideas">
+      <h2>Ranked Ideas</h2>
+
+      <article class="idea" id="idea-1">
+        <div class="idea-head">
+          <h3>I1. Repair or Rewire the 30 Dead <code>data-pp-*</code> Controls &amp; Retire Inline <code>onclick</code></h3>
+          <div class="badges"><span class="badge b-axis">Reliability &amp; Quality</span><span class="badge b-conf">Confidence: High</span><span class="badge b-cx">Complexity: M</span></div>
+        </div>
+        <p><strong>What it is:</strong> Audit all 30 remaining <code>data-pp-click</code> / <code>data-pp-change</code> / <code>data-pp-input</code> attributes in <code>index.html</code> and <code>src/</code>, migrate live ones (vault filter/sort, pantry search, add-ingredient, Tesco import) to <code>ActionBridge.js</code> <code>data-action</code> / delegated <code>change</code>/<code>input</code> handlers, and delete truly dead markup.</p>
+        <div class="basis"><strong>Basis (direct):</strong> <code>AGENTS.md</code> explicitly documents that <code>ActionBridge.js</code> no longer handles <code>data-pp-*</code>, leaving 30 controls across <code>index.html</code> and <code>src/</code> silently broken, alongside 127 inline <code>onclick=</code> attributes.</div>
+        <div class="downside"><strong>Tradeoff:</strong> Requires touching <code>index.html</code> and multiple view templates; best done view-by-view (Vault, Pantry, Planner) so regressions stay isolated.</div>
+      </article>
+
+      <article class="idea" id="idea-2">
+        <div class="idea-head">
+          <h3>I2. Consolidate the 6 Parallel Modules &amp; Purge the 80 Expired <code>attic/</code> Files</h3>
+          <div class="badges"><span class="badge b-axis">Simplification</span><span class="badge b-conf">Confidence: High</span><span class="badge b-cx">Complexity: M</span></div>
+        </div>
+        <p><strong>What it is:</strong> Collapse the 3 duplicate App State modules (<code>store/state.js</code>, <code>state/AppState.js</code>, <code>models/StateModel.js</code>) into <code>store/coreState.js</code>, merge the 2 parallel Data Quality scanners into <code>DataQualityScanner.js</code>, merge the duplicate <code>pantry/ActionSheetUI.js</code> into <code>navigation/ActionSheetUI.js</code>, and delete the 80 <code>attic/</code> files whose delete-after dates (<code>2026-11-11</code>–<code>2026-11-13</code>) have passed.</p>
+        <div class="basis"><strong>Basis (direct):</strong> <code>LEDGER.md</code> reports 6 parallel modules across those exact 3 jobs, 95 unused exports, and 80 expired files in <code>attic/</code>.</div>
+        <div class="downside"><strong>Tradeoff:</strong> Touching <code>coreState.js</code> / state callers requires careful grep verification across scripts and tests.</div>
+      </article>
+
+      <article class="idea" id="idea-3">
+        <div class="idea-head">
+          <h3>I3. Restore <code>npm run lint</code> &amp; Add a Single-Command CI Test Runner</h3>
+          <div class="badges"><span class="badge b-axis">Reliability &amp; Quality</span><span class="badge b-conf">Confidence: High</span><span class="badge b-cx">Complexity: S</span></div>
+        </div>
+        <p><strong>What it is:</strong> Point <code>scripts/test_accessibility_dom.js</code> at <code>index.html</code> instead of the deleted <code>PlatePlan.html</code>, fix the stale assertion in <code>scripts/test_recipe_wizard.js</code>, and add an <code>npm test</code> script + GitHub Actions step that runs all core <code>scripts/test_*.js</code> suites on every PR.</p>
+        <div class="basis"><strong>Basis (direct):</strong> <code>AGENTS.md</code> notes <code>npm run lint</code> and <code>test_recipe_wizard.js</code> fail before any change is made, and <code>.github/workflows/pages.yml</code> only syntax-checks and builds without running behavioral tests.</div>
+        <div class="downside"><strong>Tradeoff:</strong> A few older test scripts assume local/mocked state or take 5–10s; CI should run a curated fast suite (~15–20s).</div>
+      </article>
+
+      <article class="idea" id="idea-4">
+        <div class="idea-head">
+          <h3>I4. Targeted DOM Patching &amp; Cache-Busted Module Graph</h3>
+          <div class="badges"><span class="badge b-axis">Runtime Optimisation</span><span class="badge b-conf">Confidence: High</span><span class="badge b-cx">Complexity: M</span></div>
+        </div>
+        <p><strong>What it is:</strong> Replace full-view <code>innerHTML</code> re-renders (e.g. toggling a shopping list tick in <code>ShoppingView.js</code> re-rendering the entire Planner Wizard) with targeted row DOM updates, and stamp <code>?v=__BUILD_ID__</code> (or an import map) across <code>src/</code> imports during <code>npm run build</code> so phones never run mixed old/new ES modules after a deploy.</p>
+        <div class="basis"><strong>Basis (direct):</strong> <code>ShoppingView.js:41</code> calls <code>window.renderPlannerWizard()</code> on every checkbox tick, and <code>index.html:1321</code> only stamps <code>?v=__BUILD_ID__</code> on <code>src/main.js</code>, leaving all static/dynamic sub-imports unversioned in browser caches.</div>
+        <div class="downside"><strong>Tradeoff:</strong> Build-time import rewriting needs a clean test in <code>scripts/test_pwa_build.js</code> so unbuilt <code>npm run dev</code> continues working seamlessly.</div>
+      </article>
+
+      <article class="idea" id="idea-5">
+        <div class="idea-head">
+          <h3>I5. Persist Planner Layout Grid &amp; Add Multi-Week / Plan-Template Reuse</h3>
+          <div class="badges"><span class="badge b-axis">Product &amp; UX Development</span><span class="badge b-conf">Confidence: Med</span><span class="badge b-cx">Complexity: M</span></div>
+        </div>
+        <p><strong>What it is:</strong> Save <code>skeletonGrid</code> in <code>cacheSlice.js</code> (surviving refreshes even before generating a plan) and let users save named Layout Grid templates (e.g. "Standard Work Week" with lunches pinned and Friday dinner skipped) to reuse across weeks.</p>
+        <div class="basis"><strong>Basis (direct):</strong> <code>cacheSlice.js</code> does not persist <code>skeletonGrid</code>, and <code>PlannerSkeletonGridUI.js</code> only lives in memory until a plan is generated/saved.</div>
+        <div class="downside"><strong>Tradeoff:</strong> Adds a small Firestore/localStorage schema field for saved grid templates; keep optional until basic persistence lands.</div>
+      </article>
+
+      <article class="idea" id="idea-6">
+        <div class="idea-head">
+          <h3>I6. Decompose <code>RecipeEnhancementService.js</code> (1,205 LOC) &amp; Extract <code>restoredGnocchi.js</code> Seed Data</h3>
+          <div class="badges"><span class="badge b-axis">Simplification</span><span class="badge b-conf">Confidence: High</span><span class="badge b-cx">Complexity: M</span></div>
+        </div>
+        <p><strong>What it is:</strong> Split <code>RecipeEnhancementService.js</code> (1,205 lines) along real boundaries (macro-gap rules, swap-candidate matching, nutrition quantization), and move <code>restoredGnocchi.js</code> (844 lines of static fallback recipe JSON) out of the main runtime bundle into lazy JSON or remove it if Firestore already holds the recipe.</p>
+        <div class="basis"><strong>Basis (direct):</strong> <code>find src -name '*.js' -exec wc -l</code> shows <code>RecipeEnhancementService.js</code> (1,205) and <code>restoredGnocchi.js</code> (844) are two of the three largest files in the 41.5k-LOC codebase.</div>
+        <div class="downside"><strong>Tradeoff:</strong> Needs grep verification to confirm whether <code>restoredGnocchi.js</code> is still required as a seed/test fixture.</div>
+      </article>
+
+      <article class="idea" id="idea-7">
+        <div class="idea-head">
+          <h3>I7. Enforce Single-Writer Repositories for <code>recipes</code> and <code>ingredients</code></h3>
+          <div class="badges"><span class="badge b-axis">Reliability &amp; Quality</span><span class="badge b-conf">Confidence: High</span><span class="badge b-cx">Complexity: M</span></div>
+        </div>
+        <p><strong>What it is:</strong> Route all Firestore writes to <code>recipes</code> and <code>ingredients</code> exclusively through <code>RecipeFirestoreRepository.js</code> and <code>PantryTaxonomyService.js</code> (matching how <code>products</code> is already single-writer via <code>ProductRepository.js</code>) so schema normalization and cache updates never drift across callers.</p>
+        <div class="basis"><strong>Basis (direct):</strong> <code>AGENTS.md</code> notes that only <code>products</code> has achieved single-writer status while <code>recipes</code> and <code>ingredients</code> are still written from multiple modules.</div>
+        <div class="downside"><strong>Tradeoff:</strong> Requires auditing all <code>.collection('recipes')</code> and <code>.collection('ingredients')</code> write sites across <code>src/</code>.</div>
+      </article>
+    </section>
+
+    <section id="rejection-summary">
+      <h2>Rejection Summary (8 Cut Candidates)</h2>
+      <table>
+        <thead><tr><th>Rejected Candidate</th><th>Axis</th><th>Reason</th></tr></thead>
+        <tbody>
+          <tr><td>Adopt Vite / TypeScript / React rewrite</td><td>Simplification</td><td>Scope overrun &amp; too expensive relative to value — breaks the deliberate no-bundler static ES-module PWA architecture.</td></tr>
+          <tr><td>Reintroduce offline Service Worker</td><td>Optimisation</td><td><code>AGENTS.md</code> explicitly forbids adding a service worker back without a full versioned-cache update plan.</td></tr>
+          <tr><td>Multi-household / multi-tenant auth</td><td>Development</td><td>Subject-replacement — <code>firestore.rules</code> intentionally locks the app to <code>households/elliott-chloe</code>.</td></tr>
+          <tr><td>Automated Tesco live web scraper</td><td>Development</td><td>Fragile external dependency &amp; anti-bot risk; existing Tesco paste/import workflow covers catalog additions.</td></tr>
+          <tr><td>Split every file under 200 lines</td><td>Simplification</td><td><code>AGENTS.md</code> warns this previously created dead fragments; split only along real responsibility boundaries (I6).</td></tr>
+          <tr><td>AI-generated meal photos on recipe cards</td><td>Development</td><td>Too expensive relative to value; adds API/storage cost without solving meal-planning friction.</td></tr>
+          <tr><td>Full Redux / external state library</td><td>Simplification</td><td>Custom reactive store (<code>store.js</code>) works; consolidating the 3 parallel state files (I2) solves the real issue cheaper.</td></tr>
+          <tr><td>Per-item barcode scanner</td><td>Development</td><td>Duplicate/high-effort mobile camera plumbing relative to existing search &amp; Tesco paste import.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer class="composition-signal">
+      Composed 2026-11-18T12:10Z by <code>ce-ideate</code> from live codebase inspection (<code>LEDGER.md</code>, <code>plateplan-architecture.md</code>, <code>AGENTS.md</code>, <code>src/</code>).
+    </footer>
+  </div>
+</body>
+</html>

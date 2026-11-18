@@ -65,7 +65,7 @@ export function renderShoppingItemRow(item) {
           ${escapeHtml(brandTitle)}
         </span>
         ${hasBreakdown ? `
-          <button type="button" id="breakdown-btn-${escapeAttr(item.key)}" class="ios-nav-btn" style="font-size: 11.5px; padding: 2px 0; margin-top: 4px; align-self: flex-start; color: var(--tint-color);" onclick="toggleItemBreakdown('${escapeAttr(item.key)}')">
+          <button type="button" id="breakdown-btn-${escapeAttr(item.key)}" class="ios-nav-btn" style="font-size: 11.5px; padding: 2px 0; margin-top: 4px; align-self: flex-start; color: var(--tint-color);" data-action="toggle-item-breakdown" data-item-key="${escapeAttr(item.key)}">
             ▼ Recipe Breakdown
           </button>
         ` : ''}
@@ -77,7 +77,7 @@ export function renderShoppingItemRow(item) {
       </div>
 
       <div class="swap-dropdown" style="flex-shrink: 0;">
-        <button type="button" class="btn sm" style="font-size: 11.5px; padding: 4px 8px; border-radius: var(--radius-sm);" data-action="toggle-inline-subst" data-item-key="${escapeAttr(item.key)}" data-group-id="${escapeAttr(item.groupId || '')}" onclick="toggleInlineShoppingSubst('${escapeAttr(item.key)}', '${escapeAttr(item.groupId || '')}')">
+        <button type="button" class="btn sm" style="font-size: 11.5px; padding: 4px 8px; border-radius: var(--radius-sm);" data-action="toggle-inline-subst" data-item-key="${escapeAttr(item.key)}" data-group-id="${escapeAttr(item.groupId || '')}">
           Swap ▾
         </button>
       </div>
@@ -93,8 +93,8 @@ export function renderShoppingItemRow(item) {
               <button type="button" class="btn sm ghost" style="font-size: 10px; padding: 2px 6px;" 
                 data-action="toggle-inline-subst" 
                 data-item-key="${escapeAttr(item.key)}" 
-                data-instance-id="${escapeAttr(r.cookingEventId)}"
-                onclick="toggleInlineShoppingSubst('${escapeAttr(item.key)}', '${escapeAttr(item.groupId || '')}', '${escapeAttr(r.cookingEventId)}')">
+                data-group-id="${escapeAttr(item.groupId || '')}"
+                data-instance-id="${escapeAttr(r.cookingEventId)}">
                 Swap Product ▾
               </button>
             </div>
@@ -119,7 +119,7 @@ export function renderSubstDrawerContent(groupId, products = []) {
             <div style="font-size:13px;font-weight:600;color:var(--label)">${escapeHtml(p.name)}</div>
             <div style="font-size:11px;color:var(--secondary-label)">${escapeHtml(p.brand || 'No brand')} · £${(+p.price || 0).toFixed(2)} (${p.packSize || ''}${p.packUnit || ''})</div>
           </div>
-          <button type="button" class="btn sm ghost" style="font-size:11px;padding:3px 8px;color:var(--tint-color)" data-action="select-shopping-product-override" data-group-id="${escapeAttr(groupId)}" data-product-id="${escapeAttr(p.id)}" onclick="selectShoppingProductOverride('${escapeAttr(groupId)}', '${escapeAttr(p.id)}')">Use This</button>
+          <button type="button" class="btn sm ghost" style="font-size:11px;padding:3px 8px;color:var(--tint-color)" data-action="select-shopping-product-override" data-group-id="${escapeAttr(groupId)}" data-product-id="${escapeAttr(p.id)}">Use This</button>
         </div>
       `).join('')}
     </div>
