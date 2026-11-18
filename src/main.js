@@ -21,7 +21,7 @@ import { hydrateHouseholdData, teardownRealtimeSubscriptions } from './services/
 import { subscribe, getState, updateState, initStoreCache, setActivePlan, saveStateCache, store } from './store/store.js';
 import { setupActionBridge } from './services/ActionBridge.js';
 import { saveCurrentPlan, stripPlanPayload, getCategories, saveCategories } from './services/HouseholdRepository.js';
-import { saveRootItem as saveIngredient, getRootItems as getIngredients } from './services/RootItemRepository.js';
+import { saveRootItem as saveIngredient, getRootItems as getIngredients } from './services/PantryTaxonomyService.js';
 import { saveProduct, getProducts } from './services/ProductRepository.js';
 import { renderToday } from './views/TodayView.js';
 import { renderIngredientBank, renderProductBank } from './views/PantryBankView.js';

@@ -5,7 +5,7 @@
  */
 
 import { getState, setIngredients, setProducts } from '../../store/store.js';
-import { saveRootItem as saveIngredient } from '../../services/RootItemRepository.js';
+import { saveRootItem as saveIngredient } from '../../services/PantryTaxonomyService.js';
 import { saveProduct } from '../../services/ProductRepository.js';
 import { 
   renderReallocateModalBase, 

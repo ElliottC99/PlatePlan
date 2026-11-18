@@ -503,7 +503,7 @@ export async function sanitizeStoredAliasesAndItemWeights(options = {}) {
     }
     if (!isDryRun) {
       try {
-        const { saveRootItem } = await import('./RootItemRepository.js');
+        const { saveRootItem } = await import('./PantryTaxonomyService.js');
         await Promise.all(changedIngredients.map(ing => saveRootItem(ing)));
       } catch (err) {
         console.warn('[MaintenanceService] Failed persisting sanitized ingredient aliases:', err);
