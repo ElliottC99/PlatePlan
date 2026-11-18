@@ -119,8 +119,9 @@ export function renderState1AManual() {
               { val: 'book', label: '📖 Book' }
             ].map(opt => {
               const isSel = (recipe.sourceType || '') === opt.val;
-              return `<label class="wiz-source-type-pill" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 5px 12px; border: 1px solid var(--border, #ccc); border-radius: 999px; background: ${isSel ? 'var(--purple-bg, #eef2ff)' : 'var(--surface, #fff)'}; color: ${isSel ? 'var(--purple, #4f46e5)' : 'var(--text, #333)'}; font-weight: ${isSel ? '600' : '500'}; cursor: pointer;">
-                <input type="radio" name="wiz_source_type" class="wiz-source-type-radio" value="${opt.val}" ${isSel ? 'checked' : ''} style="display:none;" />
+              const radioId = `wiz-source-type-${opt.val || 'none'}`;
+              return `<label for="${radioId}" class="wiz-source-type-pill" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 5px 12px; border: 1px solid var(--border, #ccc); border-radius: 999px; background: ${isSel ? 'var(--purple-bg, #eef2ff)' : 'var(--surface, #fff)'}; color: ${isSel ? 'var(--purple, #4f46e5)' : 'var(--text, #333)'}; font-weight: ${isSel ? '600' : '500'}; cursor: pointer;">
+                <input type="radio" id="${radioId}" name="wiz_source_type" class="wiz-source-type-radio" value="${opt.val}" ${isSel ? 'checked' : ''} style="display:none;" />
                 ${opt.label}
               </label>`;
             }).join(' ')}

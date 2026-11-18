@@ -770,12 +770,24 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
     });
     if (partialProd) return partialProd;
 
+    const stemToken = (s) => s.length > 3 ? s.replace(/ies$/, 'y').replace(/es$/, '').replace(/s$/, '') : s;
+    const rawClean = cleanIngredientPhraseForAlias(rawName) || rawName;
+    const rawStem = stemToken(rawClean);
+    const matchesAliasList = (aliases) => (Array.isArray(aliases) ? aliases : []).some(a => {
+      const aRaw = String(a || '').trim().toLowerCase();
+      if (!aRaw) return false;
+      if (aRaw === rawName) return true;
+      const aClean = cleanIngredientPhraseForAlias(aRaw) || aRaw;
+      if (aClean === rawClean || stemToken(aClean) === rawStem) return true;
+      const tokens = aClean.split(/\s+/).filter(Boolean);
+      return tokens.some(tok => tok === rawClean || stemToken(tok) === rawStem);
+    });
+
     // Check root items directly without recursive re-entry
     const matchedRoot = ingsList.find(i => {
       const iName = String(i.name || '').trim().toLowerCase();
       if (iName === rawName) return true;
-      const aliases = Array.isArray(i.aliases) ? i.aliases : [];
-      return aliases.some(a => String(a || '').trim().toLowerCase() === rawName);
+      return matchesAliasList(i.aliases);
     });
     if (matchedRoot) {
       if (matchedRoot.defaultProductId) {
@@ -794,8 +806,7 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
     for (const root of ingsList) {
       for (const sub of (root.subtypes || [])) {
         const sName = String(sub.name || '').trim().toLowerCase();
-        const sAliases = Array.isArray(sub.aliases) ? sub.aliases : [];
-        if (sName === rawName || sAliases.some(a => String(a || '').trim().toLowerCase() === rawName)) {
+        if (sName === rawName || matchesAliasList(sub.aliases)) {
           if (sub.defaultProductId) {
             const def = prodsList.find(p => String(p.id) === String(sub.defaultProductId));
             if (def) return def;

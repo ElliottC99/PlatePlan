@@ -413,7 +413,8 @@ wizardState.activeRecipe.ingredientSections[0].ingredients[0].qty = 5;
 
 await onSaveRecipe(mockModalWrap, mockCallbacks);
 assert.equal(wizardState.activeRecipe.ingredients[0].ingredientId, 'ing_onion', 'Saved ingredient must retain root ingredientId distinct from productId');
-assert.equal(wizardState.activeRecipe.ingredients[0].productId, 'prod_spring_onion', 'Saved ingredient must retain productId');
+assert.equal(wizardState.activeRecipe.ingredients[0].subtypeId, 'sub_spring_onion', 'Saved ingredient must retain subtypeId for dynamic product resolution');
+assert.equal(wizardState.activeRecipe.ingredients[0].productId, undefined, 'Saved ingredient must decouple static productId in favor of taxonomy');
 assert.equal(wizardState.variantSnapshots.original.ingredientSections[0].ingredients[0].qty, 2, 'Original snapshot must preserve qty=2');
 assert.equal(wizardState.variantSnapshots.enhanced.ingredientSections[0].ingredients[0].qty, 5, 'Enhanced snapshot must preserve edited qty=5');
 console.log('✅ Passed: onSaveRecipe enforces mandatory meal suitability, preserves ingredientId vs productId, and retains dual-variant snapshots');

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
+    "test": "node scripts/run_tests.js",
     "build": "node scripts/build.js",
     "lint": "node --check server.js && node scripts/test_accessibility_dom.js",
     "ledger": "node scripts/ledger.js",
