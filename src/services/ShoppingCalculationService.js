@@ -277,6 +277,7 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
         id: key,
         groupId: canonicalIngId || matchedIng?.id || ingId || key,
         ingredientId: canonicalIngId || matchedIng?.id || ingId,
+        subtypeId: effectiveSubId || null,
         name: matchedProd?.name || matchedIng?.name || rawName,
         brand: matchedProd?.brand || 'Tesco',
         cat: matchedIng?.category || ing.categoryId || ing.category || matchedProd?.category || matchedProd?.cat || 'General Groceries',

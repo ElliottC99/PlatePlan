@@ -11,6 +11,8 @@ import { generateShoppingListFromPlan } from '../src/services/ShoppingListServic
 import { aggregateShoppingListFromPlan } from '../src/services/ShoppingCalculationService.js';
 import { renderShoppingCategoriesList } from '../src/components/shopping/ShoppingCategoryGroup.js';
 import { renderShoppingItemRow } from '../src/components/shopping/ShoppingItemRow.js';
+import { executeSwapInState } from '../src/components/ProductSwapModal.js';
+import { store } from '../src/store/store.js';
 import { saveShoppingList } from '../src/repositories/ShoppingListRepository.js';
 import { clearCheckedShoppingItems } from '../src/components/shopping/ShoppingBatchToolbar.js';
 
@@ -21,6 +23,12 @@ let testFailures = 0;
 // Mock window/Firebase for Node environment
 if (typeof window === 'undefined') {
   global.window = {};
+}
+if (typeof document === 'undefined') {
+  global.document = { dispatchEvent: () => true };
+}
+if (typeof CustomEvent === 'undefined') {
+  global.CustomEvent = class CustomEvent { constructor(type, detail) { this.type = type; this.detail = detail; } };
 }
 
 // Test Data
@@ -245,6 +253,28 @@ async function testShoppingListEngine() {
     console.log('✅ Test 7 Passed: 16 slices at 50g/slice on a 400g loaf resolves to 2 packs (16 qty) and £4.00.');
   } else {
     console.error('❌ Test 7 Failed:', { breadRow, breadHtml });
+    testFailures++;
+  }
+  console.log('');
+
+  console.log('--- Test 8: Swap preserves shoppingAtHome ticks and retains subtypeId for Tier 1 ---');
+  const tomAggWithSub = aggregateShoppingListFromPlan(tomPlan, tomRecipes, tomIngs, tomProds);
+  const cherryAggRow = tomAggWithSub.items.find(i => i.name.includes('Cherry Tomatoes'));
+  store.setState({
+    currentPlan: { slots: tomPlan.slots, shoppingAtHome: { 'ing_tomato:sub_baby_plum': true } },
+    plan: { slots: tomPlan.slots, shoppingAtHome: {} },
+    isDraftPlan: false
+  });
+  await executeSwapInState(cherryAggRow, { id: 'prod_cherry_alt', name: 'Organic Cherry Tomatoes', brand: 'Tesco', price: 1.5 });
+  const afterSwapPlan = store.getState().currentPlan;
+  if (
+    cherryAggRow?.subtypeId === 'sub_cherry' &&
+    afterSwapPlan?.shoppingAtHome?.['ing_tomato:sub_baby_plum'] === true &&
+    afterSwapPlan?.substitutions?.sub_cherry?.productId === 'prod_cherry_alt'
+  ) {
+    console.log('✅ Test 8 Passed: Shopping item carries subtypeId and product swap preserves currentPlan.shoppingAtHome ticks.');
+  } else {
+    console.error('❌ Test 8 Failed:', { cherryAggRow, afterSwapPlan });
     testFailures++;
   }
   console.log('');
