@@ -12,6 +12,7 @@ import { aggregateShoppingListFromPlan } from '../src/services/ShoppingCalculati
 import { renderShoppingCategoriesList } from '../src/components/shopping/ShoppingCategoryGroup.js';
 import { renderShoppingItemRow } from '../src/components/shopping/ShoppingItemRow.js';
 import { executeSwapInState } from '../src/components/ProductSwapModal.js';
+import { toggleShoppingItemAcquired } from '../src/views/ShoppingView.js';
 import { store } from '../src/store/store.js';
 import { saveShoppingList } from '../src/repositories/ShoppingListRepository.js';
 import { clearCheckedShoppingItems } from '../src/components/shopping/ShoppingBatchToolbar.js';
@@ -276,6 +277,37 @@ async function testShoppingListEngine() {
   } else {
     console.error('❌ Test 8 Failed:', { cherryAggRow, afterSwapPlan });
     testFailures++;
+  }
+  console.log('');
+
+  console.log('--- Test 9: toggleShoppingItemAcquired patches Step 3 container without full renderPlannerWizard ---');
+  const origGetById = global.document.getElementById;
+  const origRenderWizard = global.window.renderPlannerWizard;
+  const origComputeAgg = global.window.computeWizardShoppingAgg;
+  const origShoppingGroup = global.window.ShoppingCategoryGroup;
+  const origScrollTo = global.window.scrollTo;
+  let fullRenderCalls = 0;
+  let scrollCalls = 0;
+  const step3Container = { innerHTML: 'stale' };
+  global.document.getElementById = (id) => (id === 'planner-step3-shopping-content' ? step3Container : null);
+  global.window.renderPlannerWizard = () => { fullRenderCalls++; };
+  global.window.computeWizardShoppingAgg = () => ({ items: [{ name: 'Cherry Tomatoes', atHomeKey: 'ing_tomato:sub_cherry' }], totalCost: 2 });
+  global.window.ShoppingCategoryGroup = { renderShoppingCategoriesList: (list) => `<div data-count="${list.length}">updated</div>` };
+  global.window.scrollTo = () => { scrollCalls++; };
+  try {
+    toggleShoppingItemAcquired('ing_tomato:sub_cherry');
+    if (fullRenderCalls === 0 && step3Container.innerHTML.includes('updated') && scrollCalls === 1) {
+      console.log('✅ Test 9 Passed: Step 3 container patched in place with zero full renderPlannerWizard calls.');
+    } else {
+      console.error('❌ Test 9 Failed:', { fullRenderCalls, innerHTML: step3Container.innerHTML, scrollCalls });
+      testFailures++;
+    }
+  } finally {
+    global.document.getElementById = origGetById;
+    global.window.renderPlannerWizard = origRenderWizard;
+    global.window.computeWizardShoppingAgg = origComputeAgg;
+    global.window.ShoppingCategoryGroup = origShoppingGroup;
+    global.window.scrollTo = origScrollTo;
   }
   console.log('');
 }

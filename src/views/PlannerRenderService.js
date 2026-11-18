@@ -79,20 +79,55 @@ export function renderWizardStep2(plan) {
 }
 
 /**
- * Renders the Step 3 shopping list review screen.
+ * Renders the Step 3 shopping toolbar + category list markup.
  * @param {Object} plan - The current plan.
  * @returns {string} HTML string.
  */
-export function renderWizardStep3(plan) {
+export function renderWizardStep3Content(plan) {
   const agg = typeof window.computeWizardShoppingAgg === 'function' ? window.computeWizardShoppingAgg(plan) : { items: [], totalCost: 0 };
   const items = agg.items || [];
   const totalCost = agg.totalCost || 0;
   const topToolbarHtml = window.ShoppingBatchToolbar?.renderShoppingBatchToolbar?.({ totalCost, items }) || '';
   const listHtml = window.ShoppingCategoryGroup?.renderShoppingCategoriesList?.(items) || '';
+  return `${topToolbarHtml}${listHtml}`;
+}
+
+/**
+ * Patches only the Step 3 shopping container when mounted, preserving scroll and Steps 1-2.
+ * Falls back to a full Planner Wizard render if the container is not mounted.
+ * @param {Object} plan - The current plan.
+ * @returns {boolean} True when patched in place.
+ */
+export function patchWizardStep3Shopping(plan) {
+  const container = (typeof document !== 'undefined' && typeof document.getElementById === 'function')
+    ? document.getElementById('planner-step3-shopping-content')
+    : null;
+  if (container) {
+    const scrollX = typeof window !== 'undefined' ? (window.scrollX || 0) : 0;
+    const scrollY = typeof window !== 'undefined' ? (window.scrollY || 0) : 0;
+    container.innerHTML = renderWizardStep3Content(plan);
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      window.scrollTo(scrollX, scrollY);
+    }
+    return true;
+  }
+  if (typeof window !== 'undefined' && typeof window.renderPlannerWizard === 'function') {
+    window.renderPlannerWizard();
+  }
+  return false;
+}
+
+/**
+ * Renders the Step 3 shopping list review screen.
+ * @param {Object} plan - The current plan.
+ * @returns {string} HTML string.
+ */
+export function renderWizardStep3(plan) {
   return `
     <div style="display:flex;flex-direction:column;gap:16px">
-      ${topToolbarHtml}
-      ${listHtml}
+      <div id="planner-step3-shopping-content" style="display:flex;flex-direction:column;gap:16px">
+        ${renderWizardStep3Content(plan)}
+      </div>
       <div class="card" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <button type="button" class="btn ghost" data-action="set-step" data-step="2">← Back to Review Plan</button>
         <button type="button" class="btn primary" style="font-weight:700;padding:10px 24px" data-action="commit-plan">✓ Save Shopping List &amp; Plan (Commit to Today) →</button>

@@ -92,6 +92,10 @@ async function build() {
   await fs.writeFile(distIndex, stampedIndex, 'utf8');
   console.log(`✅ Stamped index.html (${APP_VERSION_PLACEHOLDER}=${appVersion}, ${BUILD_ID_PLACEHOLDER}=${gitHash})`);
 
+  // 4c. Stamp ?v=<gitHash> onto relative ES module imports in dist/src/
+  const stampedModulesCount = await stampModuleImports(path.join(distDir, 'src'), gitHash);
+  console.log(`✅ Stamped module imports in ${stampedModulesCount} dist/src/ files (?v=${gitHash})`);
+
   // 5. Verify build artifact validity
   const requiredArtifacts = [
     'index.html',
@@ -131,6 +135,24 @@ async function build() {
 
   const fileCount = (await fs.readdir(distDir)).length;
   console.log(`=== BUILD SUCCEEDED: ${fileCount} top-level entries in dist/ ===`);
+}
+
+async function stampModuleImports(srcDir, buildId) {
+  if (!existsSync(srcDir)) return 0;
+  let updated = 0;
+  for (const entry of await fs.readdir(srcDir, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+    const filePath = path.join(entry.parentPath, entry.name);
+    const original = await fs.readFile(filePath, 'utf8');
+    const rewritten = original
+      .replace(/(\b(?:from|import)\s+['"])(\.\.?\/[^'"?]+\.js)(['"])/g, `$1$2?v=${buildId}$3`)
+      .replace(/(\bimport\s*\(\s*['"`])(\.\.?\/[^'"`?$]+\.js)(['"`]\s*\))/g, `$1$2?v=${buildId}$3`);
+    if (rewritten !== original) {
+      await fs.writeFile(filePath, rewritten, 'utf8');
+      updated++;
+    }
+  }
+  return updated;
 }
 
 async function findLeftoverPlaceholders(dir, excludedDir) {

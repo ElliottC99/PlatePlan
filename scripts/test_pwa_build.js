@@ -72,6 +72,17 @@ try {
   assert(versionStrings.every(v => v === commitId), 'every ?v= value should be the commit ID');
   console.log('✅ Test 1 Passed: dist/index.html carries the package.json version and the commit ID');
 
+  // 1a. Built dist/src/ modules carry ?v=<commitId> on static and backtick dynamic imports
+  const distMainJs = readFileSync(path.join(distDir, 'src', 'main.js'), 'utf8');
+  const distPantryViewJs = readFileSync(path.join(distDir, 'src', 'views', 'PantryBankView.js'), 'utf8');
+  assert(distMainJs.includes(`./store/store.js?v=${commitId}'`), 'dist/src/main.js should stamp static relative imports');
+  assert(distMainJs.includes(`./core/AppRouter.js?v=${commitId}'`), 'dist/src/main.js should stamp dynamic relative imports');
+  assert(distPantryViewJs.includes(`../components/navigation/ActionSheetUI.js?v=${commitId}\``), 'dist/src/views/PantryBankView.js should stamp backtick dynamic imports');
+  assert(!read('src/main.js').includes('?v='), 'source src/main.js must remain unstamped for npm run dev');
+  assert.equal(spawnSync(process.execPath, ['--check', path.join(distDir, 'src', 'main.js')], { encoding: 'utf8' }).status, 0);
+  assert.equal(spawnSync(process.execPath, ['--check', path.join(distDir, 'src', 'views', 'PantryBankView.js')], { encoding: 'utf8' }).status, 0);
+  console.log('✅ Test 1a Passed: dist/src/ static and dynamic imports carry ?v=<commitId> with valid syntax');
+
   // 2. A placeholder left in what the page loads fails the build and is named
   // Without a readable commit ID the build fails instead of stamping "unknown".
   const noGit = spawnSync(process.execPath, [path.join(tempRoot, 'scripts', 'build.js')], {
