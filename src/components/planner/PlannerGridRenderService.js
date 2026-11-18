@@ -210,7 +210,7 @@ export function renderSlotCardSummary(day, meal, config) {
 /**
  * Renders the full skeleton grid UI.
  */
-export function renderSkeletonGridUI({ days = 7, startDate = '', skeletonGrid = {} } = {}) {
+export function renderSkeletonGridUI({ days = 7, startDate = '', skeletonGrid = {}, gridTemplates = [] } = {}) {
   const dayCount = Number(days) || 7;
   const start = startDate ? new Date(startDate) : new Date();
   const meals = [
@@ -237,6 +237,19 @@ export function renderSkeletonGridUI({ days = 7, startDate = '', skeletonGrid = 
     `;
   }
 
+  const templates = Array.isArray(gridTemplates) ? gridTemplates : [];
+  const templatesHtml = templates.length > 0 ? `
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:12px">
+      <span style="font-size:11px;font-weight:700;color:var(--text2)">TEMPLATES:</span>
+      ${templates.map(t => `
+        <span style="display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:999px;background:var(--surface);overflow:hidden">
+          <button type="button" class="btn xs ghost" data-action="load-grid-template" data-template-id="${escapeAttr(t.id)}" style="font-size:11px;font-weight:600;color:var(--text);padding:3px 8px;border:none">${escapeHtml(t.name)} (${Number(t.days) || 7}d)</button>
+          <button type="button" class="btn xs ghost" data-action="delete-grid-template" data-template-id="${escapeAttr(t.id)}" aria-label="Delete ${escapeAttr(t.name)}" style="font-size:11px;font-weight:700;color:var(--text2);padding:3px 7px;border:none;border-left:1px solid var(--border)">×</button>
+        </span>
+      `).join('')}
+    </div>
+  ` : '';
+
   return `
     <div class="skeleton-grid-panel" style="background:var(--surface2,#f8fafc);padding:16px;border-radius:var(--radius-lg,14px);border:1px solid var(--border,#e2e8f0);margin-bottom:16px;min-width:0;max-width:100%;overflow:hidden">
       <div style="margin-bottom:12px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
@@ -244,8 +257,12 @@ export function renderSkeletonGridUI({ days = 7, startDate = '', skeletonGrid = 
           <h3 style="margin:0;font-size:15px;font-weight:750;color:var(--text,#0f172a)">Pre-Generation Layout Grid</h3>
           <div style="font-size:12px;color:var(--text2,#64748b);margin-top:2px">Tap any slot to pin a shared or split household recipe or mark as skipped before generating.</div>
         </div>
-        <button type="button" class="btn xs ghost" data-action="clear-skeleton-grid" style="font-size:12px;font-weight:600;color:var(--text2,#64748b);border:1px solid var(--border,#cbd5e1);padding:4px 10px;border-radius:8px;white-space:nowrap">Clear Grid</button>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn xs ghost" data-action="save-grid-template" style="font-size:12px;font-weight:600;color:var(--text);border:1px solid var(--border);padding:4px 10px;border-radius:8px;white-space:nowrap">Save Template</button>
+          <button type="button" class="btn xs ghost" data-action="clear-skeleton-grid" style="font-size:12px;font-weight:600;color:var(--text2,#64748b);border:1px solid var(--border,#cbd5e1);padding:4px 10px;border-radius:8px;white-space:nowrap">Clear Grid</button>
+        </div>
       </div>
+      ${templatesHtml}
       <div class="skeleton-grid-cards" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(min(100%, 210px), 1fr));gap:12px;min-width:0;width:100%">
         ${gridCardsHtml}
       </div>

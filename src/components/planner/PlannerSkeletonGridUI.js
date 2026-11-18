@@ -4,10 +4,11 @@
  * and Split Household Slot Configurator (Elliott & Chloe) with Unified Fit & Duplication Badges.
  * Decomposed: Rendering factories moved to PlannerGridRenderService.js.
  */
-import { getState } from '../../store/coreState.js';
-import { showCustomConfirm } from '../ui/DialogHelpers.js';
+import { getState, setPreferences } from '../../store/store.js';
+import { saveStateCache } from '../../store/cacheSlice.js';
+import { showCustomConfirm, showPrompt } from '../ui/DialogHelpers.js';
 
-import { saveCurrentPlan } from '../../services/HouseholdRepository.js';
+import { saveCurrentPlan, savePreferences } from '../../services/HouseholdRepository.js';
 import { 
   getSkeletonSlotConfig, 
   renderFitScoreScopeUI, 
@@ -88,7 +89,14 @@ export function setSlotConfiguredStatus(dayIndex, mealType, status, recipeId = n
     };
   }
 
-  if (typeof saveCurrentPlan === 'function') saveCurrentPlan(getState().currentPlan);
+  if (getState().currentPlan && typeof getState().currentPlan === 'object') {
+    getState().currentPlan.skeletonGrid = getState().skeletonGrid;
+    if (typeof saveCurrentPlan === 'function') saveCurrentPlan(getState().currentPlan);
+  }
+  if (getState().currentPlan && typeof getState().currentPlan === 'object') {
+    getState().currentPlan.skeletonGrid = getState().skeletonGrid;
+  }
+  saveStateCache(getState());
   closeSlotConfigurator();
   if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
 }
@@ -122,6 +130,10 @@ export function setSplitPersonSlotStatus(dayIndex, mealType, personKey, status, 
     chloe: nextChloe
   };
 
+  if (getState().currentPlan && typeof getState().currentPlan === 'object') {
+    getState().currentPlan.skeletonGrid = getState().skeletonGrid;
+  }
+  saveStateCache(getState());
   if (typeof window.saveState === 'function') window.saveState();
   if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
   openSlotConfigurator(dayIndex, mealType, true);
@@ -154,10 +166,135 @@ export function clearSkeletonGrid() {
           saveCurrentPlan(state.currentPlan);
         }
       }
+      saveStateCache(state);
       if (typeof window !== 'undefined') {
         if (typeof window.saveState === 'function') window.saveState();
         if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
         if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast('Layout grid cleared.');
+      }
+    }
+  );
+}
+
+function getPrefsWithTemplates() {
+  const state = getState() || {};
+  const prefs = state.preferences || state.userPrefs || {};
+  const gridTemplates = Array.isArray(prefs.gridTemplates)
+    ? prefs.gridTemplates
+    : (Array.isArray(state.userPrefs?.gridTemplates) ? state.userPrefs.gridTemplates : []);
+  return { state, prefs, gridTemplates };
+}
+
+/**
+ * Saves the current non-empty skeletonGrid as a named household template.
+ */
+export async function saveGridTemplate() {
+  const initialGrid = (getState() || {}).skeletonGrid || {};
+  if (Object.keys(initialGrid).length === 0) {
+    if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast('Pin or skip at least one slot before saving a template.');
+    }
+    return null;
+  }
+
+  const rawName = await showPrompt({
+    title: 'Save Layout Grid Template',
+    message: 'Name this weekly layout template (e.g. Standard Work Week):',
+    defaultValue: '',
+    confirmLabel: 'Save Template'
+  });
+  const name = typeof rawName === 'string' ? rawName.trim() : '';
+  if (!name) return null;
+
+  const { state, prefs, gridTemplates } = getPrefsWithTemplates();
+  const grid = state.skeletonGrid || {};
+  if (Object.keys(grid).length === 0) return null;
+
+  const template = {
+    id: `grid_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    name,
+    days: Number(state.currentPlannerDays || state.currentPlan?.days) || 10,
+    skeletonGrid: JSON.parse(JSON.stringify(grid)),
+    updatedAt: new Date().toISOString()
+  };
+
+  const nextTemplates = [...gridTemplates, template];
+  if (new Blob([JSON.stringify(nextTemplates)]).size > 102400) {
+    if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast('Template storage limit reached. Delete an older template first.', 'warning');
+    }
+    return null;
+  }
+
+  const nextPrefs = { ...prefs, gridTemplates: nextTemplates };
+  let savedOk = false;
+  try {
+    savedOk = await savePreferences(nextPrefs);
+  } catch (err) {
+    console.warn('[PlannerSkeletonGridUI] Failed saving grid template:', err);
+  }
+  setPreferences(nextPrefs);
+
+  if (typeof window !== 'undefined') {
+    if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
+    if (typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast(savedOk ? `Saved template "${name}".` : `Saved template "${name}" locally (cloud sync failed).`, savedOk ? 'success' : 'warning');
+    }
+  }
+  return template;
+}
+
+/**
+ * Loads a saved Layout Grid template onto state.skeletonGrid and syncs day count.
+ */
+export function loadGridTemplate(templateId) {
+  const { state, gridTemplates } = getPrefsWithTemplates();
+  const template = gridTemplates.find(t => String(t.id) === String(templateId));
+  if (!template) return false;
+
+  state.skeletonGrid = JSON.parse(JSON.stringify(template.skeletonGrid || {}));
+  if (Number(template.days) > 0) {
+    state.currentPlannerDays = Number(template.days);
+  }
+  saveStateCache(state);
+
+  if (typeof window !== 'undefined') {
+    if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
+    if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(`Loaded template "${template.name}".`);
+  }
+  return true;
+}
+
+/**
+ * Deletes a saved Layout Grid template after confirmation.
+ */
+export function deleteGridTemplate(templateId) {
+  const { gridTemplates } = getPrefsWithTemplates();
+  const template = gridTemplates.find(t => String(t.id) === String(templateId));
+  if (!template) return;
+
+  showCustomConfirm(
+    `Delete layout template "${template.name}"?`,
+    'Delete Template',
+    async () => {
+      const latest = getPrefsWithTemplates();
+      const nextTemplates = latest.gridTemplates.filter(t => String(t.id) !== String(templateId));
+      const nextPrefs = {
+        ...latest.prefs,
+        gridTemplates: nextTemplates
+      };
+      let savedOk = false;
+      try {
+        savedOk = await savePreferences(nextPrefs);
+      } catch (err) {
+        console.warn('[PlannerSkeletonGridUI] Failed deleting grid template:', err);
+      }
+      setPreferences(nextPrefs);
+      if (typeof window !== 'undefined') {
+        if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
+        if (typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast(savedOk ? `Deleted template "${template.name}".` : `Deleted template "${template.name}" locally (cloud sync failed).`, savedOk ? 'success' : 'warning');
+        }
       }
     }
   );

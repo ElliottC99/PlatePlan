@@ -212,6 +212,23 @@ export function routeAction(actionName, target, event) {
     return true;
   }
 
+  if (normalizedAction === 'save-grid-template') {
+    import('../components/planner/PlannerSkeletonGridUI.js').then(m => m.saveGridTemplate?.());
+    return true;
+  }
+
+  if (normalizedAction === 'load-grid-template') {
+    const templateId = ds.templateId || target.getAttribute('data-template-id') || '';
+    import('../components/planner/PlannerSkeletonGridUI.js').then(m => m.loadGridTemplate?.(templateId));
+    return true;
+  }
+
+  if (normalizedAction === 'delete-grid-template') {
+    const templateId = ds.templateId || target.getAttribute('data-template-id') || '';
+    import('../components/planner/PlannerSkeletonGridUI.js').then(m => m.deleteGridTemplate?.(templateId));
+    return true;
+  }
+
   if (normalizedAction === 'opensavemealplanmodal()' || normalizedAction === 'open-save-meal-plan-modal' || normalizedAction.includes('opensavemealplanmodal')) {
     import('../views/PlannerView.js').then(m => m.openSaveMealPlanModal());
     return true;
