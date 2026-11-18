@@ -120,7 +120,7 @@ const detailHtml = renderRecipeDetailModalContent({
 });
 
 assert(detailHtml.includes('modal-recipe-review-btn') || detailHtml.includes('modal-recipe-edit-btn'), 'Detail modal must include modal-recipe-review-btn or modal-recipe-edit-btn');
-assert(detailHtml.includes('openRecipeWizard(\'review\', \'rec_pizza_1\'') || detailHtml.includes('openRecipeWizard(\'manual\', \'rec_pizza_1\''), 'Button must call openRecipeWizard with rec_pizza_1');
+assert(detailHtml.includes('data-action="open-recipe-wizard-review"') && detailHtml.includes('data-recipe-id="rec_pizza_1"'), 'Button must dispatch open-recipe-wizard-review with rec_pizza_1');
 console.log('✅ Test 2 passed: Recipe Detail Modal renders Review/Edit button!');
 
 // Test 3: Fallback recipe retrieval via window.Store / window.allRecipes
