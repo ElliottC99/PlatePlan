@@ -89,7 +89,13 @@ export function setSlotConfiguredStatus(dayIndex, mealType, status, recipeId = n
     };
   }
 
-  if (typeof saveCurrentPlan === 'function') saveCurrentPlan(getState().currentPlan);
+  if (getState().currentPlan && typeof getState().currentPlan === 'object') {
+    getState().currentPlan.skeletonGrid = getState().skeletonGrid;
+    if (typeof saveCurrentPlan === 'function') saveCurrentPlan(getState().currentPlan);
+  }
+  if (getState().currentPlan && typeof getState().currentPlan === 'object') {
+    getState().currentPlan.skeletonGrid = getState().skeletonGrid;
+  }
   saveStateCache(getState());
   closeSlotConfigurator();
   if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
@@ -124,6 +130,9 @@ export function setSplitPersonSlotStatus(dayIndex, mealType, personKey, status, 
     chloe: nextChloe
   };
 
+  if (getState().currentPlan && typeof getState().currentPlan === 'object') {
+    getState().currentPlan.skeletonGrid = getState().skeletonGrid;
+  }
   saveStateCache(getState());
   if (typeof window.saveState === 'function') window.saveState();
   if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
@@ -170,7 +179,9 @@ export function clearSkeletonGrid() {
 function getPrefsWithTemplates() {
   const state = getState() || {};
   const prefs = state.preferences || state.userPrefs || {};
-  const gridTemplates = Array.isArray(prefs.gridTemplates) ? prefs.gridTemplates : [];
+  const gridTemplates = Array.isArray(prefs.gridTemplates)
+    ? prefs.gridTemplates
+    : (Array.isArray(state.userPrefs?.gridTemplates) ? state.userPrefs.gridTemplates : []);
   return { state, prefs, gridTemplates };
 }
 
@@ -178,9 +189,8 @@ function getPrefsWithTemplates() {
  * Saves the current non-empty skeletonGrid as a named household template.
  */
 export async function saveGridTemplate() {
-  const { state, prefs, gridTemplates } = getPrefsWithTemplates();
-  const grid = state.skeletonGrid || {};
-  if (Object.keys(grid).length === 0) {
+  const initialGrid = (getState() || {}).skeletonGrid || {};
+  if (Object.keys(initialGrid).length === 0) {
     if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
       window.showPlatePlanToast('Pin or skip at least one slot before saving a template.');
     }
@@ -196,20 +206,33 @@ export async function saveGridTemplate() {
   const name = typeof rawName === 'string' ? rawName.trim() : '';
   if (!name) return null;
 
+  const { state, prefs, gridTemplates } = getPrefsWithTemplates();
+  const grid = state.skeletonGrid || {};
+  if (Object.keys(grid).length === 0) return null;
+
   const template = {
     id: `grid_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     name,
-    days: Number(state.currentPlannerDays) || 7,
+    days: Number(state.currentPlannerDays || state.currentPlan?.days) || 10,
     skeletonGrid: JSON.parse(JSON.stringify(grid)),
     updatedAt: new Date().toISOString()
   };
 
-  const nextPrefs = {
-    ...prefs,
-    gridTemplates: [...gridTemplates, template]
-  };
+  const nextTemplates = [...gridTemplates, template];
+  if (new Blob([JSON.stringify(nextTemplates)]).size > 102400) {
+    if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
+      window.showPlatePlanToast('Template storage limit reached. Delete an older template first.', 'warning');
+    }
+    return null;
+  }
 
-  const savedOk = await savePreferences(nextPrefs);
+  const nextPrefs = { ...prefs, gridTemplates: nextTemplates };
+  let savedOk = false;
+  try {
+    savedOk = await savePreferences(nextPrefs);
+  } catch (err) {
+    console.warn('[PlannerSkeletonGridUI] Failed saving grid template:', err);
+  }
   setPreferences(nextPrefs);
 
   if (typeof window !== 'undefined') {
@@ -246,7 +269,7 @@ export function loadGridTemplate(templateId) {
  * Deletes a saved Layout Grid template after confirmation.
  */
 export function deleteGridTemplate(templateId) {
-  const { prefs, gridTemplates } = getPrefsWithTemplates();
+  const { gridTemplates } = getPrefsWithTemplates();
   const template = gridTemplates.find(t => String(t.id) === String(templateId));
   if (!template) return;
 
@@ -254,12 +277,18 @@ export function deleteGridTemplate(templateId) {
     `Delete layout template "${template.name}"?`,
     'Delete Template',
     async () => {
-      const nextTemplates = gridTemplates.filter(t => String(t.id) !== String(templateId));
+      const latest = getPrefsWithTemplates();
+      const nextTemplates = latest.gridTemplates.filter(t => String(t.id) !== String(templateId));
       const nextPrefs = {
-        ...prefs,
+        ...latest.prefs,
         gridTemplates: nextTemplates
       };
-      const savedOk = await savePreferences(nextPrefs);
+      let savedOk = false;
+      try {
+        savedOk = await savePreferences(nextPrefs);
+      } catch (err) {
+        console.warn('[PlannerSkeletonGridUI] Failed deleting grid template:', err);
+      }
       setPreferences(nextPrefs);
       if (typeof window !== 'undefined') {
         if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();

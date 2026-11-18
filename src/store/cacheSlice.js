@@ -118,6 +118,7 @@ export function saveStateCache(passedState) {
         settings: fullState.settings || latestCore.settings || {},
         currentPlan: fullState.currentPlan || latestCore.currentPlan || null,
         skeletonGrid: fullState.skeletonGrid || latestCore.skeletonGrid || {},
+        currentPlannerDays: Number(fullState.currentPlannerDays || latestCore.currentPlannerDays) || null,
         shoppingList: fullState.shoppingList || latestCore.shoppingList || [],
         cachedAt: Date.now()
       };
@@ -168,6 +169,7 @@ export async function initStoreCache(targetState) {
       targetState.settings = initialCache.settings || {};
       targetState.currentPlan = initialCache.currentPlan || null;
       targetState.skeletonGrid = (initialCache.skeletonGrid && typeof initialCache.skeletonGrid === 'object') ? initialCache.skeletonGrid : {};
+      if (Number(initialCache.currentPlannerDays) > 0) targetState.currentPlannerDays = Number(initialCache.currentPlannerDays);
       targetState.shoppingList = Array.isArray(initialCache.shoppingList) ? initialCache.shoppingList : [];
       targetState.isCachedHydrated = true;
     }
