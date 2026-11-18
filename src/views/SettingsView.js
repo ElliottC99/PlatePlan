@@ -16,7 +16,7 @@ import { renderHouseholdSyncCard } from '../components/settings/HouseholdSyncCar
 import { renderSystemDisplayCard, renderSettingsContainer } from '../components/profile/ProfileSettingsModal.js';
 import { renderMacroTargetsForm, renderFallbackProductsTable } from './SettingsRenderService.js';
 import { calculateMealSplit } from '../utils/nutritionCalculator.js';
-import { getProfileMealTargets } from '../models/StateModel.js';
+import { getProfileMealTargets } from '../store/coreState.js';
 
 
 

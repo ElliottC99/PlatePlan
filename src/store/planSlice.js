@@ -3,7 +3,7 @@
  * Meal plan state management.
  */
 
-import { state, dispatchStateEvent } from './state.js';
+import { state, dispatchStateEvent } from './coreState.js';
 import { saveStateCache } from './cacheSlice.js';
 import { savePlan } from '../repositories/PlanRepository.js';
 import { setRecipes as setRecipeSliceRecipes, updateRecipeInStore as updateRecipeInRecipeStore, removeRecipeFromStore as removeRecipeFromRecipeStore, setCurrentPlan as setRecipeSliceCurrentPlan, getRecipeState } from './recipeStore.js';

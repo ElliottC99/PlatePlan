@@ -4,7 +4,7 @@
  */
 
 import { toTitleCase } from '../../utils/stringUtils.js';
-import { getState } from '../../state/AppState.js';
+import { getState } from '../../store/store.js';
 import { resolveProductForIngredient } from './RecipeWizardStep3Handlers.js';
 import { resolveHighestAutoDefaultTaxonomy } from './RecipeWizardTaxonomySearch.js';
 

@@ -34,12 +34,11 @@ if (typeof window !== 'undefined') {
  */
 import { waitForAuth } from './services/AuthService.js';
 import { hydrateHouseholdData, teardownRealtimeSubscriptions } from './services/HydrationService.js';
-import { subscribe, getState, initStoreCache, setActivePlan, saveStateCache, store } from './store/store.js';
+import { subscribe, getState, updateState, initStoreCache, setActivePlan, saveStateCache, store } from './store/store.js';
 import { setupActionBridge } from './services/ActionBridge.js';
 import { saveCurrentPlan, stripPlanPayload, getCategories, saveCategories } from './services/HouseholdRepository.js';
 import { saveRootItem as saveIngredient, getRootItems as getIngredients } from './services/RootItemRepository.js';
 import { saveProduct, getProducts } from './services/ProductRepository.js';
-import { AppState } from './state/AppState.js';
 import { renderToday } from './views/TodayView.js';
 import { renderIngredientBank, renderProductBank } from './views/PantryBankView.js';
 import { renderSettingsView } from './views/SettingsView.js';
@@ -66,7 +65,7 @@ import * as ShoppingCalculationService from './services/ShoppingCalculationServi
 import * as UnitConverter from './utils/unitConverter.js';
 import * as NutritionService from './services/NutritionService.js';
 import * as FitScoreService from './services/FitScoreService.js';
-import * as DataQualityService from './services/DataQualityService.js';
+import * as DataQualityService from './services/DataQualityScanner.js';
 import * as TodayViewService from './services/TodayViewService.js';
 import * as RecipeAuthoringService from './services/RecipeAuthoringService.js';
 import * as RecipeEnhancementService from './services/RecipeEnhancementService.js';
@@ -128,7 +127,7 @@ if (typeof window !== 'undefined') {
 
   window.loadState = window.loadState || function() {
     console.warn('[Compatibility] Global loadState() invoked.');
-    return AppState.getState();
+    return getState();
   };
 }
 
@@ -387,7 +386,7 @@ async function initApp() {
     // Explicitly sync store version to runtime version
     const currentState = getState();
     if (currentState && currentState.version !== appVersion) {
-      AppState.updateState({ version: appVersion });
+      updateState({ version: appVersion });
     }
 
     try { await initStoreCache(); } catch (cacheErr) {}

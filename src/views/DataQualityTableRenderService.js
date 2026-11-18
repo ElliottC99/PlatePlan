@@ -18,7 +18,7 @@ import { findDuplicateCategoryClusters } from '../components/pantry/CategoryMerg
 import { findDuplicateRecipeClusters } from '../services/RecipeFirestoreRepository.js';
 import { openRecipeDeduplicationModal } from './RecipeVaultView.js';
 import { auditRecipeMappings } from '../utils/RecipeAuditService.js';
-import { performGlobalProductRelink, verifyZeroCalorieIngredient } from '../services/DataQualityService.js';
+import { performGlobalProductRelink, verifyZeroCalorieIngredient } from '../services/DataQualityScanner.js';
 import { showCustomDensityModal } from '../components/ui/DialogHelpers.js';
 
 export function escapeHtml(str) {

@@ -38,7 +38,7 @@ if (typeof global.document === 'undefined') {
   };
 }
 
-import { AppState, getState } from '../src/state/AppState.js';
+import { getState } from '../src/store/store.js';
 import { openRecipeWizard } from '../src/components/recipe/RecipeWizardModal.js';
 import { wizardState, resetWizardState } from '../src/components/recipe/RecipeWizardState.js';
 import { renderRecipeDetailModalContent } from '../src/components/recipe/RecipeDetailModalUI.js';
