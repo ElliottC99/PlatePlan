@@ -11,13 +11,14 @@ export function whitelistPreferences(preferences) {
   if (!preferences || typeof preferences !== 'object') return {};
   const whitelisted = {};
   const allowedKeys = [
-    'nutritionTargets', 'profiles', 'fitScoreParams', 'settings', 'theme', 'mealPlanSettings', 'activeView', 'userPrefs', 'dismissedQualityAdvisories', 'dismissedAdvisories', 'dismissed_advisories', 'swapPreferences', 'autoDefaultStrategy', 'autoDefaultCriterion', 'productPriority', 'autoMappingStrategy', 'updatedAt'
+    'nutritionTargets', 'profiles', 'fitScoreParams', 'settings', 'theme', 'mealPlanSettings', 'activeView', 'userPrefs', 'dismissedQualityAdvisories', 'dismissedAdvisories', 'dismissed_advisories', 'swapPreferences', 'autoDefaultStrategy', 'autoDefaultCriterion', 'productPriority', 'autoMappingStrategy', 'gridTemplates', 'updatedAt'
   ];
   Object.keys(preferences).forEach(key => {
     if (!allowedKeys.includes(key)) return;
     const val = preferences[key];
     const valSizeBytes = new Blob([JSON.stringify(val)]).size;
-    if (valSizeBytes > 10240) return;
+    const maxKeyBytes = key === 'gridTemplates' ? 102400 : 10240;
+    if (valSizeBytes > maxKeyBytes) return;
     whitelisted[key] = val;
   });
   return whitelisted;

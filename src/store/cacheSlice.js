@@ -74,7 +74,8 @@ export async function loadStateCache() {
       shoppingList: shoppingList.length > 0 ? shoppingList : (v2Blob?.shoppingList || []),
       preferences: v2Blob?.preferences || null,
       userPrefs: v2Blob?.userPrefs || {},
-      settings: v2Blob?.settings || {}
+      settings: v2Blob?.settings || {},
+      skeletonGrid: JSON.parse(localStorage.getItem('plateplan_skeleton_grid') || '{}')
     };
 
     if (fallbackCache.recipes.length > 0) {
@@ -116,9 +117,15 @@ export function saveStateCache(passedState) {
           : (latestCore.userPrefs || fullState.preferences || {}),
         settings: fullState.settings || latestCore.settings || {},
         currentPlan: fullState.currentPlan || latestCore.currentPlan || null,
+        skeletonGrid: fullState.skeletonGrid || latestCore.skeletonGrid || {},
         shoppingList: fullState.shoppingList || latestCore.shoppingList || [],
         cachedAt: Date.now()
       };
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem('plateplan_skeleton_grid', JSON.stringify(payload.skeletonGrid));
+        } catch (_lsErr) {}
+      }
       const db = await openIDB();
       await new Promise((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, 'readwrite');
@@ -160,6 +167,7 @@ export async function initStoreCache(targetState) {
         : (initialCache.preferences || {});
       targetState.settings = initialCache.settings || {};
       targetState.currentPlan = initialCache.currentPlan || null;
+      targetState.skeletonGrid = (initialCache.skeletonGrid && typeof initialCache.skeletonGrid === 'object') ? initialCache.skeletonGrid : {};
       targetState.shoppingList = Array.isArray(initialCache.shoppingList) ? initialCache.shoppingList : [];
       targetState.isCachedHydrated = true;
     }
