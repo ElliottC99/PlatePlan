@@ -10,6 +10,7 @@
 import { generateShoppingListFromPlan } from '../src/services/ShoppingListService.js';
 import { aggregateShoppingListFromPlan } from '../src/services/ShoppingCalculationService.js';
 import { renderShoppingCategoriesList } from '../src/components/shopping/ShoppingCategoryGroup.js';
+import { renderShoppingItemRow } from '../src/components/shopping/ShoppingItemRow.js';
 import { saveShoppingList } from '../src/repositories/ShoppingListRepository.js';
 import { clearCheckedShoppingItems } from '../src/components/shopping/ShoppingBatchToolbar.js';
 
@@ -205,6 +206,45 @@ async function testShoppingListEngine() {
     console.log('✅ Test 6b Passed: renderShoppingCategoriesList preserves alphabetical group and item order.');
   } else {
     console.error('❌ Test 6b Failed: HTML category/item order is not alphabetical.');
+    testFailures++;
+  }
+  console.log('');
+
+  console.log('--- Test 7: Slice-weighted bread converts qty via itemWeight into packsNeeded and renders pack count ---');
+  const breadIngs = [{ id: 'ing_bread', name: 'Bread', category: 'Bakery', subtypes: [] }];
+  const breadProds = [{
+    id: 'prod_loaf_400',
+    name: 'Sourdough Loaf 400g',
+    ingredientId: 'ing_bread',
+    category: 'Bakery',
+    packSize: 400,
+    packUnit: 'g',
+    itemWeight: 50,
+    price: 2.0
+  }];
+  const breadRecipes = [{
+    id: 'rec_toast',
+    name: 'Toast',
+    serves: 1,
+    ingredients: [{ name: 'Bread', ingredientId: 'ing_bread', qty: 16, unit: 'slices' }]
+  }];
+  const breadPlan = { slots: { '2026-11-18': { breakfast: { recipeId: 'rec_toast', servings: 1 } } } };
+  const breadAgg = aggregateShoppingListFromPlan(breadPlan, breadRecipes, breadIngs, breadProds);
+  const breadRow = breadAgg.items[0];
+  const breadHtml = breadRow ? renderShoppingItemRow(breadRow) : '';
+
+  if (
+    breadRow &&
+    breadRow.buyQty === 16 &&
+    breadRow.unit === 'qty' &&
+    breadRow.grams === 800 &&
+    breadRow.packsNeeded === 2 &&
+    breadRow.cost === 4 &&
+    breadHtml.includes('2 packs (16 qty)')
+  ) {
+    console.log('✅ Test 7 Passed: 16 slices at 50g/slice on a 400g loaf resolves to 2 packs (16 qty) and £4.00.');
+  } else {
+    console.error('❌ Test 7 Failed:', { breadRow, breadHtml });
     testFailures++;
   }
   console.log('');
