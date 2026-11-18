@@ -23,7 +23,12 @@ export function renderShoppingItemRow(item) {
     ? ((item.bankIng.brand ? item.bankIng.brand + ' - ' : '') + (item.bankIng.name || item.name))
     : (item.name || 'Store product');
 
-  const formattedQty = (item.buyQty !== undefined ? item.buyQty : (item.needQty || item.qty || 1)) + (item.unit ? ` ${item.unit}` : 'x');
+  const rawQty = item.buyQty !== undefined ? item.buyQty : (item.needQty || item.qty || 1);
+  const rawAmountLabel = rawQty + (item.unit ? ` ${item.unit}` : 'x');
+  const packsNeeded = Number(item.packsNeeded || 0);
+  const formattedQty = (item.bankIng && packsNeeded >= 1)
+    ? `${packsNeeded} ${packsNeeded === 1 ? 'pack' : 'packs'} (${rawAmountLabel})`
+    : rawAmountLabel;
 
   const costDisplay = (item.bankIng && item.cost > 0)
     ? `<div style="font-weight: 600; color: var(--tint-color); margin-top: 2px; font-size: 13px;">£${Number(item.cost).toFixed(2)}</div>`
