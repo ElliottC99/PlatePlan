@@ -13,7 +13,7 @@ import { getCategories, saveCategories } from './CategoryRepository.js';
 import { getProducts, saveProduct, addProductToBatch } from './ProductRepository.js';
 import { addRecipeToBatch } from './RecipeFirestoreRepository.js';
 import { compareProductsByStrategy } from './PantryHierarchyService.js';
-import { cleanIngredientPhraseForAlias, normalizeTaxonomyName } from './RecipeIngredientParser.js';
+import { cleanIngredientPhraseForAlias, normalizeTaxonomyName, stemIngredientName } from './RecipeIngredientParser.js';
 
 function isDbAvailable() {
   if (!db) { console.warn('[PantryTaxonomyService] Firestore db instance not initialised.'); return false; }
@@ -770,52 +770,61 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
     });
     if (partialProd) return partialProd;
 
-    const stemToken = (s) => s.length > 3 ? s.replace(/ies$/, 'y').replace(/es$/, '').replace(/s$/, '') : s;
+    const resolveRootProduct = (root) => {
+      if (root.defaultProductId) {
+        const def = prodsList.find(p => String(p.id) === String(root.defaultProductId));
+        if (def) return def;
+      }
+      const subtypeIds = new Set((root.subtypes || []).map(s => String(s.id)));
+      const candidatePool = prodsList.filter(p => subtypeIds.has(String(p.subtypeId)) || String(p.ingredientId) === String(root.id));
+      return candidatePool.length > 0 ? pickBestProduct(candidatePool) : null;
+    };
+
+    const resolveSubtypeProduct = (sub) => {
+      if (sub.defaultProductId) {
+        const def = prodsList.find(p => String(p.id) === String(sub.defaultProductId));
+        if (def) return def;
+      }
+      const subPool = prodsList.filter(p => String(p.subtypeId) === String(sub.id));
+      return subPool.length > 0 ? pickBestProduct(subPool) : null;
+    };
+
     const rawClean = cleanIngredientPhraseForAlias(rawName) || rawName;
-    const rawStem = stemToken(rawClean);
+    const rawStem = stemIngredientName(rawClean);
     const matchesAliasList = (aliases) => (Array.isArray(aliases) ? aliases : []).some(a => {
       const aRaw = String(a || '').trim().toLowerCase();
       if (!aRaw) return false;
       if (aRaw === rawName) return true;
       const aClean = cleanIngredientPhraseForAlias(aRaw) || aRaw;
-      if (aClean === rawClean || stemToken(aClean) === rawStem) return true;
-      const tokens = aClean.split(/\s+/).filter(Boolean);
-      return tokens.some(tok => tok === rawClean || stemToken(tok) === rawStem);
+      return aClean === rawClean || stemIngredientName(aClean) === rawStem;
     });
 
-    // Check root items directly without recursive re-entry
-    const matchedRoot = ingsList.find(i => {
-      const iName = String(i.name || '').trim().toLowerCase();
-      if (iName === rawName) return true;
-      return matchesAliasList(i.aliases);
-    });
-    if (matchedRoot) {
-      if (matchedRoot.defaultProductId) {
-        const def = prodsList.find(p => String(p.id) === String(matchedRoot.defaultProductId));
-        if (def) return def;
-      }
-      const subtypeIds = new Set((matchedRoot.subtypes || []).map(s => String(s.id)));
-      const candidatePool = prodsList.filter(p => subtypeIds.has(String(p.subtypeId)) || String(p.ingredientId) === String(matchedRoot.id));
-      if (candidatePool.length > 0) {
-        const best = pickBestProduct(candidatePool);
-        if (best) return best;
+    // 1. Exact root item & sub-type name matches first (before alias matching)
+    const exactRoot = ingsList.find(i => String(i.name || '').trim().toLowerCase() === rawName);
+    if (exactRoot) {
+      const res = resolveRootProduct(exactRoot);
+      if (res) return res;
+    }
+    for (const root of ingsList) {
+      for (const sub of (root.subtypes || [])) {
+        if (String(sub.name || '').trim().toLowerCase() === rawName) {
+          const res = resolveSubtypeProduct(sub);
+          if (res) return res;
+        }
       }
     }
 
-    // Check sub-types directly without recursive re-entry
+    // 2. Whole-phrase cleaned/stemmed alias matches (root items then sub-types)
+    const aliasRoot = ingsList.find(i => matchesAliasList(i.aliases));
+    if (aliasRoot) {
+      const res = resolveRootProduct(aliasRoot);
+      if (res) return res;
+    }
     for (const root of ingsList) {
       for (const sub of (root.subtypes || [])) {
-        const sName = String(sub.name || '').trim().toLowerCase();
-        if (sName === rawName || matchesAliasList(sub.aliases)) {
-          if (sub.defaultProductId) {
-            const def = prodsList.find(p => String(p.id) === String(sub.defaultProductId));
-            if (def) return def;
-          }
-          const subPool = prodsList.filter(p => String(p.subtypeId) === String(sub.id));
-          if (subPool.length > 0) {
-            const best = pickBestProduct(subPool);
-            if (best) return best;
-          }
+        if (matchesAliasList(sub.aliases)) {
+          const res = resolveSubtypeProduct(sub);
+          if (res) return res;
         }
       }
     }
