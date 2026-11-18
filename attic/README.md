@@ -8,44 +8,6 @@ A file may be deleted after two weeks of normal use on both phones with no relat
 
 | File | Moved | Delete after |
 |---|---|---|
-| `src/components/RecipeWizardModal.js` | 2026-10-28 | 2026-11-11 |
-| `src/components/data-quality/HierarchyWizardModalUI.js` | 2026-10-28 | 2026-11-11 |
-| `src/components/data-quality/HierarchyWizardRenderService.js` | 2026-10-28 | 2026-11-11 |
-| `src/components/meal-planner/MealPlannerHTMLTemplate.js` | 2026-10-28 | 2026-11-11 |
-| `src/components/pantry/AddToBankModalUI.js` | 2026-10-28 | 2026-11-11 |
-| `src/components/pantry/CategoryManagerOperations.js` | 2026-10-28 | 2026-11-11 |
-| `src/components/pantry/CategoryManagerTemplates.js` | 2026-10-28 | 2026-11-11 |
-| `src/components/pantry/IngredientActionModalsRenderService.js` | 2026-10-28 | 2026-11-11 |
-| `src/components/pantry/StorageZoneGroup.js` | 2026-10-28 | 2026-11-11 |
-| `src/components/planner/PlanGeneratorModal.js` | 2026-10-28 | 2026-11-11 |
-| `src/components/recipe/VaultRecipeCard.js` | 2026-10-28 | 2026-11-11 |
-| `src/components/recipe/ViewRecipeModal.js` | 2026-10-28 | 2026-11-11 |
-| `src/services/FitScoreEngine.js` | 2026-10-28 | 2026-11-11 |
-| `src/services/RecipeUnitConverter.js` | 2026-10-29 | 2026-11-12 |
-| `src/services/RecipeWizardEventService.js` | 2026-10-28 | 2026-11-11 |
-| `src/services/SubtypeActionService.js` | 2026-10-28 | 2026-11-11 |
-| `src/services/UnitConverter.js` | 2026-10-29 | 2026-11-12 |
-| `src/services/firebase.js` | 2026-10-28 | 2026-11-11 |
-| `src/views/MealPlannerView.js` | 2026-10-28 | 2026-11-11 |
-| `src/views/PantryBankModalService.js` | 2026-10-28 | 2026-11-11 |
-| `src/views/ProfileAllocationCard.js` | 2026-10-28 | 2026-11-11 |
-| `src/views/SettingsEventService.js` | 2026-10-28 | 2026-11-11 |
-| `src/views/VaultRecipeRenderService.js` | 2026-10-28 | 2026-11-11 |
-| `src/components/pantry/TescoImportModalUI.js` | 2026-10-29 | 2026-11-12 |
-| `src/components/pantry/PantryCategoryGroup.js` | 2026-10-30 | 2026-11-13 |
-| `src/components/pantry/PantryInventoryRenderService.js` | 2026-10-30 | 2026-11-13 |
-| `src/components/pantry/PantryInventoryUI.js` | 2026-10-30 | 2026-11-13 |
-| `src/components/pantry/PantryItemRow.js` | 2026-10-30 | 2026-11-13 |
-| `src/components/pantry/PantryStockToolbar.js` | 2026-10-30 | 2026-11-13 |
-| `src/components/pantry/PantryToolbar.js` | 2026-10-30 | 2026-11-13 |
-| `src/repositories/InventoryRepository.js` | 2026-10-30 | 2026-11-13 |
-| `src/services/InventoryService.js` | 2026-10-30 | 2026-11-13 |
-| `src/store/inventorySlice.js` | 2026-10-30 | 2026-11-13 |
-| `src/components/pantry/UseUpEditorUI.js` | 2026-10-30 | 2026-11-13 |
-| `src/components/pantry/UseUpFinderModalUI.js` | 2026-10-30 | 2026-11-13 |
-| `src/components/data-quality/DataQualityDrawer.js` | 2026-11-03 | 2026-11-17 |
-| `src/components/data-quality/DataQualityFixModal.js` | 2026-11-03 | 2026-11-17 |
-| `src/components/data-quality/DataQualityIssueRow.js` | 2026-11-03 | 2026-11-17 |
 | `src/services/RecipeTaxonomyManager.js` | 2026-11-10 | 2026-11-24 |
 | `src/services/RecipeWizardFilterService.js` | 2026-11-10 | 2026-11-24 |
 | `src/services/RecipeWizardNavigationService.js` | 2026-11-10 | 2026-11-24 |
@@ -59,3 +21,9 @@ A file may be deleted after two weeks of normal use on both phones with no relat
 | `src/services/TaxonomyMapper.js` | 2026-11-10 | 2026-11-24 |
 | `src/services/DataQualityEngine.js` | 2026-11-10 | 2026-11-24 |
 | `src/components/recipe-editor/RecipeImportParserForm.js` | 2026-11-18 | 2026-12-02 |
+| `src/store/state.js` | 2026-11-18 | 2026-12-02 | Consolidated into `src/store/coreState.js` |
+| `src/state/AppState.js` | 2026-11-18 | 2026-12-02 | Consolidated into `src/store/store.js` / `src/store/coreState.js` |
+| `src/models/StateModel.js` | 2026-11-18 | 2026-12-02 | Consolidated into `src/store/coreState.js` |
+| `src/services/DataQualityScannerService.js` | 2026-11-18 | 2026-12-02 | Consolidated into `src/services/DataQualityScanner.js` |
+| `src/services/DataQualityService.js` | 2026-11-18 | 2026-12-02 | Consolidated into `src/services/DataQualityScanner.js` |
+| `src/components/pantry/ActionSheetUI.js` | 2026-11-18 | 2026-12-02 | Consolidated into `src/components/navigation/ActionSheetUI.js` |

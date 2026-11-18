@@ -13,7 +13,7 @@ One owner per job. Parallel versions are other modules that still do the same jo
 
 | Job | Owner | Parallel versions |
 |---|---|---|
-| App state | `src/store/coreState.js` | `src/store/state.js`, `src/state/AppState.js`, `src/models/StateModel.js` |
+| App state | `src/store/coreState.js` | — |
 | Firebase config and auth | `src/config/firebase.js` | — |
 | Products collection | `src/services/ProductRepository.js` | — |
 | Ingredients and pantry | `src/services/PantryTaxonomyService.js` | — |
@@ -21,8 +21,8 @@ One owner per job. Parallel versions are other modules that still do the same jo
 | Meal plans | `src/repositories/PlanRepository.js` | — |
 | Plan generation | `src/services/MealPlanGeneratorService.js` | — |
 | Unit conversion | `src/services/UnitConversionService.js` | — |
-| Data Quality | `src/services/DataQualityScanner.js` (target: a single read-only report) | `src/services/DataQualityScannerService.js`, `src/services/DataQualityService.js` |
-| Action sheets | `src/components/navigation/ActionSheetUI.js` | `src/components/pantry/ActionSheetUI.js` |
+| Data Quality | `src/services/DataQualityScanner.js` | — |
+| Action sheets | `src/components/navigation/ActionSheetUI.js` | — |
 | Dialogs | `src/components/ui/DialogHelpers.js` | — |
 
 3. Quarantine (attic/)

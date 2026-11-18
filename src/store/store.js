@@ -8,7 +8,7 @@ import * as CacheSlice from './cacheSlice.js';
 import * as PlanSlice from './planSlice.js';
 import * as ShoppingSlice from './shoppingSlice.js';
 import * as RecipeSlice from './recipeStore.js';
-import { state, dispatchStateEvent, subscribe, getState, updateState } from './state.js';
+import { state, dispatchStateEvent, subscribe, getState, updateState, getProfileMealTargets, normalizeProfileData, getProfilesFromState } from './coreState.js';
 import { loadStateCache, saveStateCache, clearStateCache, initStoreCache as initCacheSlice, CACHE_KEY } from './cacheSlice.js';
 
 import { 
@@ -86,6 +86,9 @@ export {
   subscribe,
   getState,
   updateState,
+  getProfileMealTargets,
+  normalizeProfileData,
+  getProfilesFromState,
   // Cache methods
   loadStateCache,
   saveStateCache,

@@ -169,7 +169,7 @@ export function attachPantryBankDelegation() {
       btn.textContent = `${collapsed ? '▲' : '▼'} SUB-TYPES (${el.children.length})`;
       return;
     } else if (action === 'item-action-sheet') {
-      import(`../components/pantry/ActionSheetUI.js`).then(m => {
+      import(`../components/navigation/ActionSheetUI.js`).then(m => {
         m.openActionSheet({
           title: 'Item Options',
           options: [
@@ -189,7 +189,7 @@ export function attachPantryBankDelegation() {
       });
       return;
     } else if (action === 'subtype-action-sheet') {
-      import(`../components/pantry/ActionSheetUI.js`).then(m => {
+      import(`../components/navigation/ActionSheetUI.js`).then(m => {
         m.openActionSheet({
           title: 'Sub-type Options',
           options: [

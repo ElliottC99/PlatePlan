@@ -9,7 +9,7 @@
  * - State 3: Final Inline Review with Macro Crossbar, Variant Switcher & Queue Navigation
  */
 
-import { getState } from '../../state/AppState.js';
+import { getState } from '../../store/store.js';
 import { extractRecipeMacros } from '../../utils/fitScoreCalculator.js';
 import { wizardState, resetWizardState, syncStep2InputsToState, stashActiveVariantSnapshot } from './RecipeWizardState.js';
 import { renderStepBadge, renderState0Choice, renderState1AManual, renderState1BBulk, renderState3Review } from './RecipeWizardViews.js';

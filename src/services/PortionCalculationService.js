@@ -5,7 +5,7 @@
  * and evaluates protein adequacy and portion realism (sanity penalty).
  */
 
-import { getProfileMealTargets } from '../models/StateModel.js';
+import { getProfileMealTargets } from '../store/coreState.js';
 import { extractRecipeMacros } from '../utils/fitScoreCalculator.js';
 
 /**
