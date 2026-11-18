@@ -10,8 +10,8 @@ import { db, HOUSEHOLD_ID } from '../config/firebase.js';
 import { enforceCategorySSOT } from '../utils/categoryEnforcer.js';
 import { getState, setCategories, setIngredients, setProducts, setRecipes, saveStateCache } from '../store/store.js';
 import { getCategories, saveCategories } from './CategoryRepository.js';
-import { getProducts, saveProduct, addProductToBatch } from './ProductRepository.js';
-import { addRecipeToBatch } from './RecipeFirestoreRepository.js';
+import { getProducts, saveProduct, deleteProduct, addProductToBatch } from './ProductRepository.js';
+import { addRecipeToBatch, batchUpdateRecipesInDb } from './RecipeFirestoreRepository.js';
 import { compareProductsByStrategy } from './PantryHierarchyService.js';
 import { cleanIngredientPhraseForAlias, normalizeTaxonomyName, stemIngredientName } from './RecipeIngredientParser.js';
 
@@ -942,4 +942,85 @@ export function lockProductSelectionsForSlots(slots, priority = 'protein') {
 if (typeof window !== 'undefined') {
   window.lockProductSelectionsForSlots = lockProductSelectionsForSlots;
   window.freezeProductSelectionsForPlan = freezeProductSelectionsForPlan;
+}
+
+export async function deleteSubtypeInDb(parentRootItem, unlinkedProducts) {
+  if (!isDbAvailable()) return false;
+  try {
+    await saveRootItem(parentRootItem);
+    if (Array.isArray(unlinkedProducts)) {
+      await Promise.all(unlinkedProducts.map(prod => saveProduct(prod)));
+    }
+    return true;
+  } catch (err) {
+    console.error('[PantryTaxonomyService] Error in deleteSubtypeInDb:', err);
+    throw err;
+  }
+}
+
+export async function batchResolveSubtypeOrphansInDb(productUpdates) {
+  if (!isDbAvailable()) return false;
+  try {
+    if (Array.isArray(productUpdates)) {
+      await Promise.all(productUpdates.map(p => {
+        if (p._delete === true) return deleteProduct(p.id);
+        return saveProduct(p);
+      }));
+    }
+    return true;
+  } catch (err) {
+    console.error('[PantryTaxonomyService] Error in batchResolveSubtypeOrphansInDb:', err);
+    throw err;
+  }
+}
+
+export async function batchResolveOrphansWithNewSubtypeInDb(parentRootItem, productUpdates) {
+  if (!isDbAvailable()) return false;
+  try {
+    if (parentRootItem) {
+      if (Array.isArray(parentRootItem)) {
+        await Promise.all(parentRootItem.map(item => saveRootItem(item)));
+      } else {
+        await saveRootItem(parentRootItem);
+      }
+    }
+    if (Array.isArray(productUpdates)) {
+      await Promise.all(productUpdates.map(p => {
+        if (p._delete === true) return deleteProduct(p.id);
+        return saveProduct(p);
+      }));
+    }
+    return true;
+  } catch (err) {
+    console.error('[PantryTaxonomyService] Error in batchResolveOrphansWithNewSubtypeInDb:', err);
+    throw err;
+  }
+}
+
+export async function batchMergeIngredientsInDb(canonicalRootItem, duplicateRootItemId, updatedRecipes, updatedProducts, updatedPlan) {
+  if (!isDbAvailable()) return false;
+  try {
+    await saveRootItem(canonicalRootItem);
+    await deleteRootItem(duplicateRootItemId);
+
+    if (Array.isArray(updatedProducts) && updatedProducts.length > 0) {
+      await Promise.all(updatedProducts.map(p => saveProduct(p)));
+    }
+
+    if (Array.isArray(updatedRecipes) && updatedRecipes.length > 0) {
+      await batchUpdateRecipesInDb(updatedRecipes);
+    }
+
+    if (updatedPlan && typeof updatedPlan === 'object' && updatedPlan.id) {
+      const planColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('plans');
+      const planData = { ...updatedPlan, updatedAt: new Date().toISOString() };
+      delete planData.id;
+      await planColRef.doc(updatedPlan.id).set(planData, { merge: true });
+    }
+
+    return true;
+  } catch (err) {
+    console.error('[PantryTaxonomyService] Error in batchMergeIngredientsInDb:', err);
+    throw err;
+  }
 }

@@ -39,8 +39,8 @@ import {
   repointMealPlanRecipeIds,
   mergeDuplicateRecipeCluster
 } from './RecipeFirestoreRepository.js';
-import { getRecipes, saveRecipe, deleteRecipe, deleteRecipeVariant, sanitizeForFirestore } from './RecipeRepository.js';
-import { getIngredients, saveIngredient, deleteIngredient } from './PantryFirestoreRepository.js';
+import { getRecipes, saveRecipe, deleteRecipe, deleteRecipeVariant, sanitizeForFirestore } from './RecipeFirestoreRepository.js';
+import { getIngredients, saveIngredient, deleteIngredient } from './PantryTaxonomyService.js';
 import { 
   saveShoppingList,
   getShoppingLists,

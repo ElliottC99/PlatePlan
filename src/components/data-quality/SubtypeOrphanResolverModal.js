@@ -6,7 +6,7 @@
  */
 
 import { getState, setProducts, setIngredients } from '../../store/store.js';
-import { batchResolveOrphansWithNewSubtypeInDb } from '../../services/RootItemRepository.js';
+import { batchResolveOrphansWithNewSubtypeInDb } from '../../services/PantryTaxonomyService.js';
 import { createTaxonomySearchInput } from '../pantry/RecipeSearchDropdownHelper.js';
 import { runAudit } from '../../services/DataQualityScanner.js';
 

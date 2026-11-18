@@ -28,3 +28,6 @@ A file may be deleted after two weeks of normal use on both phones with no relat
 | `src/services/DataQualityService.js` | 2026-11-18 | 2026-12-02 | Consolidated into `src/services/DataQualityScanner.js` |
 | `src/components/pantry/ActionSheetUI.js` | 2026-11-18 | 2026-12-02 | Consolidated into `src/components/navigation/ActionSheetUI.js` |
 | `src/config/restoredGnocchi.js` | 2026-11-18 | 2026-12-02 | One-off recipe recovery seed removed from main.js |
+| `src/services/RecipeRepository.js` | 2026-11-18 | 2026-12-02 | Consolidated into `src/services/RecipeFirestoreRepository.js` |
+| `src/services/PantryFirestoreRepository.js` | 2026-11-18 | 2026-12-02 | Consolidated into `src/services/PantryTaxonomyService.js` |
+| `src/services/RootItemRepository.js` | 2026-11-18 | 2026-12-02 | Consolidated into `src/services/PantryTaxonomyService.js` |

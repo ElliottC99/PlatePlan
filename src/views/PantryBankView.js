@@ -5,7 +5,7 @@
  */
 
 import { getState, subscribe } from '../store/store.js';
-import { saveRootItem as saveIngredient } from '../services/RootItemRepository.js';
+import { saveRootItem as saveIngredient } from '../services/PantryTaxonomyService.js';
 import { openGuidedDelete } from '../components/pantry/GuidedDeleteModalUI.js';
 import { 
   buildPantryHierarchy, setAutoDefaultProduct, getActiveCategories,

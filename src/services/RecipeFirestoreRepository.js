@@ -720,3 +720,18 @@ export async function mergeDuplicateRecipeCluster(clusterMembers, chosenCanonica
     deletedIds: duplicatesToDelete.map(d => d.id)
   };
 }
+
+/**
+ * Fetch all recipes for the household, scrubbing any legacy macro fields.
+ */
+export async function getRecipes(_uid) {
+  try {
+    if (!isDbAvailable()) return [];
+    const snap = await safeFirestoreGet(db.collection('households').doc(HOUSEHOLD_ID).collection('recipes'));
+    const raw = (snap && snap.docs) ? snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) : [];
+    return raw.map(r => cleanLegacyMacros(r));
+  } catch (err) {
+    console.warn('[RecipeFirestoreRepository] Offline or unable to fetch recipes:', err.message || err);
+    return [];
+  }
+}

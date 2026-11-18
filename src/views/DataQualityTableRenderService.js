@@ -5,7 +5,7 @@
 
 import { getState, setIngredients, runOptimisticMutation } from '../store/store.js';
 import { runAudit } from '../services/DataQualityScanner.js';
-import { saveRootItem as saveIngredient } from '../services/RootItemRepository.js';
+import { saveRootItem as saveIngredient } from '../services/PantryTaxonomyService.js';
 import { savePreferencesWithAutoPrune } from '../services/HouseholdRepository.js';
 import { openMacroDriftPreviewModal } from '../components/data-quality/MacroDriftPreviewModal.js';
 import { openSubtypeOrphanResolverModal } from '../components/data-quality/SubtypeOrphanResolverModal.js';

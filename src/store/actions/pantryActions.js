@@ -152,7 +152,7 @@ export async function learnIngredientAlias(ingredientId, rawString, subtypeId = 
     dispatchStateEvent('plateplan:state:ingredients', state.ingredients);
 
     try {
-      const { saveRootItem: saveIngredient } = await import('../../services/RootItemRepository.js');
+      const { saveRootItem: saveIngredient } = await import('../../services/PantryTaxonomyService.js');
       await saveIngredient(ing);
     } catch (err) {
       console.warn('[Store] Failed to persist learned ingredient alias:', err);

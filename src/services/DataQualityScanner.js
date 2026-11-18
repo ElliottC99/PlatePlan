@@ -12,7 +12,7 @@ import { DQ_CONFIDENCE_THRESHOLD } from '../config/businessRules.js';
 import { resolveDynamicProductForIngredient } from './PantryTaxonomyService.js';
 import { getState, setIngredients, runOptimisticMutation } from '../store/store.js';
 import { dismissAdvisoryInDb } from './HouseholdRepository.js';
-import { saveRootItem as saveIngredient } from './RootItemRepository.js';
+import { saveRootItem as saveIngredient } from './PantryTaxonomyService.js';
 
 export { getIngredientDensity, findDensity };
 
