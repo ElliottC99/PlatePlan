@@ -62,7 +62,7 @@ export function renderHouseholdSyncCard(settings = {}) {
           </div>
 
           <div style="display:flex;gap:6px;margin-top:4px">
-            <button class="btn sm ghost" type="button" data-action="generate-invite-link" onclick="generateHouseholdInviteLink()" style="font-size:11px;flex:1">🔗 Generate Invite Link</button>
+            <button class="btn sm ghost" type="button" data-action="generate-invite-link" style="font-size:11px;flex:1">🔗 Generate Invite Link</button>
             <button class="btn sm ghost" type="button" id="pp-refresh-data-btn" data-action="refresh-data" style="font-size:11px;flex:1">🔄 Refresh Data</button>
           </div>
         </div>

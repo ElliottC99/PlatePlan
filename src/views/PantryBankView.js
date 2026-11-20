@@ -5,7 +5,7 @@
  */
 
 import { getState, subscribe } from '../store/store.js';
-import { saveRootItem as saveIngredient } from '../services/RootItemRepository.js';
+import { saveRootItem as saveIngredient } from '../services/PantryTaxonomyService.js';
 import { openGuidedDelete } from '../components/pantry/GuidedDeleteModalUI.js';
 import { 
   buildPantryHierarchy, setAutoDefaultProduct, getActiveCategories,
@@ -169,7 +169,7 @@ export function attachPantryBankDelegation() {
       btn.textContent = `${collapsed ? '▲' : '▼'} SUB-TYPES (${el.children.length})`;
       return;
     } else if (action === 'item-action-sheet') {
-      import(`../components/pantry/ActionSheetUI.js`).then(m => {
+      import(`../components/navigation/ActionSheetUI.js`).then(m => {
         m.openActionSheet({
           title: 'Item Options',
           options: [
@@ -189,7 +189,7 @@ export function attachPantryBankDelegation() {
       });
       return;
     } else if (action === 'subtype-action-sheet') {
-      import(`../components/pantry/ActionSheetUI.js`).then(m => {
+      import(`../components/navigation/ActionSheetUI.js`).then(m => {
         m.openActionSheet({
           title: 'Sub-type Options',
           options: [

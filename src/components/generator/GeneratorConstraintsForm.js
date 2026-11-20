@@ -35,6 +35,7 @@ export function renderConstraintsForm({
   const currentMin = typeof window !== 'undefined' && getState()?.prefs?.minFitScore !== undefined ? getState().prefs.minFitScore : minFitScore;
   const currentMax = typeof window !== 'undefined' && getState()?.prefs?.maxFitScore !== undefined ? getState().prefs.maxFitScore : maxFitScore;
   const currentGrid = typeof window !== 'undefined' && getState()?.skeletonGrid ? getState().skeletonGrid : skeletonGrid;
+  const gridTemplates = (typeof window !== 'undefined' && (getState()?.preferences?.gridTemplates || getState()?.userPrefs?.gridTemplates)) || [];
 
   return `
     <div class="card pp-generator-constraints-card" style="padding:20px;display:flex;flex-direction:column;gap:18px">
@@ -82,7 +83,7 @@ export function renderConstraintsForm({
       ${renderFitScoreScopeUI({ minVal: currentMin, maxVal: currentMax })}
 
       <!-- Interactive Pre-Generation Skeleton Grid -->
-      ${renderSkeletonGridUI({ days: daysVal, startDate: startVal, skeletonGrid: currentGrid })}
+      ${renderSkeletonGridUI({ days: daysVal, startDate: startVal, skeletonGrid: currentGrid, gridTemplates })}
 
       <div style="display:flex;justify-content:flex-end;margin-top:6px">
         <button type="button" class="btn primary pp-gen-plan-btn" style="font-weight:700;padding:10px 24px;font-size:14px">✨ Generate Meal Plan →</button>

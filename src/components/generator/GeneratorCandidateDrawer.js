@@ -69,11 +69,8 @@ export function renderCandidateRecipeCard({
   const idAttr = escapeAttr(item.id);
   const varAttr = escapeAttr(item.variant || 'original');
 
-  const selectAction = onSelect ? onSelect : `selectSwapModalRecipe('${valAttr}')`;
-  const doubleClickAction = `executeSwapSlotAndClose(${day}, '${slotKey}', '${valAttr}')`;
-
   return `
-    <div class="swap-modal-item pp-candidate-card ${isFav ? 'is-favorite' : ''} ${isCurrent ? 'is-current' : ''} ${isSelected ? 'is-selected' : ''}" data-value="${valAttr}" onclick="${selectAction}" ondblclick="${doubleClickAction}">
+    <div class="swap-modal-item pp-candidate-card ${isFav ? 'is-favorite' : ''} ${isCurrent ? 'is-current' : ''} ${isSelected ? 'is-selected' : ''}" data-value="${valAttr}" data-action="select-swap-modal-recipe">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span>${labelHtml}</span>
@@ -90,12 +87,12 @@ export function renderCandidateRecipeCard({
         </div>
       </div>
       <div style="flex-shrink:0;display:flex;align-items:center;gap:8px">
-        <button type="button" class="recipe-fav-btn ${isFav ? 'active' : ''}" onclick="event.stopPropagation(); toggleRecipeFavourite('${idAttr}', event, '${varAttr}'); if(typeof currentSwapModalContext !== 'undefined' && currentSwapModalContext) { currentSwapModalContext.items.forEach(it => { if(it.id === '${idAttr}') { it.isFavourite = !it.isFavourite; it.isFavorite = it.isFavourite; } }); renderSwapModalOptionsList(); }" aria-label="${isFav ? 'Remove from favourites' : 'Add to favourites'}" title="${isFav ? 'Favourited' : 'Add to favourites'}">
+        <button type="button" class="recipe-fav-btn ${isFav ? 'active' : ''}" data-action="toggle-swap-candidate-favourite" data-recipe-id="${idAttr}" data-variant="${varAttr}" aria-label="${isFav ? 'Remove from favourites' : 'Add to favourites'}" title="${isFav ? 'Favourited' : 'Add to favourites'}">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
           </svg>
         </button>
-        <button class="btn sm ${isSelected ? 'primary' : 'ghost'}" type="button" onclick="event.stopPropagation(); ${selectAction};">
+        <button class="btn sm ${isSelected ? 'primary' : 'ghost'}" type="button" data-action="select-swap-modal-recipe" data-value="${valAttr}">
           ${isSelected ? 'Selected ✓' : 'Select'}
         </button>
       </div>
@@ -123,7 +120,7 @@ export function renderCandidateDrawerModal({
           <h3 style="margin:0;font-size:17px;font-weight:700;color:var(--text)">Candidate Recipes — ${escapeHtml(dayLabel)}</h3>
           <div style="font-size:12px;color:var(--text2);margin-top:2px">${escapeHtml(who === 'both' ? 'Shared (Elliott & Chloe)' : who + "'s")} ${escapeHtml(typeTitle)}</div>
         </div>
-        <button class="btn sm ghost" onclick="closeSwapMealModal()" aria-label="Close modal" style="font-size:16px;padding:4px 10px">✕</button>
+        <button class="btn sm ghost" data-action="close-swap-meal-modal" aria-label="Close modal" style="font-size:16px;padding:4px 10px">✕</button>
       </div>
 
       ${curRecipeName ? `
@@ -132,7 +129,7 @@ export function renderCandidateDrawerModal({
             <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Currently Planned</div>
             <div style="font-size:14px;font-weight:600;color:var(--text);margin-top:1px">${escapeHtml(curRecipeName)} ${isEnhanced ? '<span class="tag green">Enhanced</span>' : ''}</div>
           </div>
-          <button class="btn sm danger" onclick="executeSwapSlotAndClose(${dayNum}, '${escapeAttr(slotKey)}', '')">Clear Slot</button>
+          <button class="btn sm danger" data-action="execute-swap-slot-and-close" data-day="${dayNum}" data-slot="${escapeAttr(slotKey)}" data-value="">Clear Slot</button>
         </div>
       ` : `
         <div style="background:var(--surface2);border:1px dashed var(--border);border-radius:10px;padding:10px 14px;margin-bottom:12px;color:var(--text3);font-size:13px;font-style:italic;flex-shrink:0">
@@ -148,10 +145,10 @@ export function renderCandidateDrawerModal({
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:space-between">
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
             <span style="font-size:11px;color:var(--text3);font-weight:600;margin-right:2px">Filter:</span>
-            <button type="button" class="btn sm active-filter-btn" id="swap-filter-all" onclick="setSwapModalFilter('all')">All (${itemsCount})</button>
-            <button type="button" class="btn sm ghost" id="swap-filter-favourites" onclick="setSwapModalFilter('favourites')">❤️ Favourites</button>
-            <button type="button" class="btn sm ghost" id="swap-filter-enhanced" onclick="setSwapModalFilter('enhanced')">Enhanced</button>
-            <button type="button" class="btn sm ghost" id="swap-filter-original" onclick="setSwapModalFilter('original')">Original</button>
+            <button type="button" class="btn sm active-filter-btn" id="swap-filter-all" data-action="set-swap-modal-filter" data-filter="all">All (${itemsCount})</button>
+            <button type="button" class="btn sm ghost" id="swap-filter-favourites" data-action="set-swap-modal-filter" data-filter="favourites">❤️ Favourites</button>
+            <button type="button" class="btn sm ghost" id="swap-filter-enhanced" data-action="set-swap-modal-filter" data-filter="enhanced">Enhanced</button>
+            <button type="button" class="btn sm ghost" id="swap-filter-original" data-action="set-swap-modal-filter" data-filter="original">Original</button>
           </div>
           <div style="display:flex;gap:6px;align-items:center">
             <label for="swap-modal-sort-select" style="font-size:11px;color:var(--text3);font-weight:600;cursor:pointer">Sort:</label>
@@ -169,11 +166,11 @@ export function renderCandidateDrawerModal({
 
       <div class="row-between" style="margin-top:14px;align-items:center;flex-shrink:0;gap:10px;flex-wrap:wrap">
         <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn ghost sm" onclick="quickRandomizeSwap(${dayNum}, '${escapeAttr(slotKey)}')">🎲 Random Swap</button>
+          <button class="btn ghost sm" data-action="quick-randomize-swap" data-day="${dayNum}" data-slot="${escapeAttr(slotKey)}">🎲 Random Swap</button>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn ghost sm" onclick="closeSwapMealModal()">Cancel</button>
-          <button id="swap-modal-confirm-btn" class="btn primary sm" disabled onclick="confirmSwapMealModal()">Confirm Swap</button>
+          <button class="btn ghost sm" data-action="close-swap-meal-modal">Cancel</button>
+          <button id="swap-modal-confirm-btn" class="btn primary sm" disabled data-action="confirm-swap-meal-modal">Confirm Swap</button>
         </div>
       </div>
     </div>

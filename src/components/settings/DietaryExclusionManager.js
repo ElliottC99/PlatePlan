@@ -78,10 +78,10 @@ export function renderDietaryExclusionManager(prefs = {}, settings = {}) {
           <option value="lowest_calorie_count" ${normCrit === 'lowest_calorie_count' || normCrit === 'lowest_calories' ? 'selected' : ''}>Lowest Calorie Count (kcal)</option>
         </select>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button type="button" id="btn-recalibrate-defaults" class="btn sm secondary" onclick="window.handleManualRecalibrateDefaults()" style="font-weight:700;font-size:12px;padding:6px 12px">
+          <button type="button" id="btn-recalibrate-defaults" class="btn sm secondary" data-action="manual-recalibrate-defaults" style="font-weight:700;font-size:12px;padding:6px 12px">
             ⚡ Recalibrate Pantry Defaults
           </button>
-          <button type="button" id="btn-recalibrate-recipes" class="btn sm primary" onclick="window.handleManualRecalibrateRecipeMacros()" style="font-weight:700;font-size:12px;padding:6px 12px;background:var(--tint-color);color:#fff">
+          <button type="button" id="btn-recalibrate-recipes" class="btn sm primary" data-action="manual-recalibrate-recipe-macros" style="font-weight:700;font-size:12px;padding:6px 12px;background:var(--tint-color);color:#fff">
             ⚡ Recalibrate Recipe Macros from Optimal Defaults
           </button>
         </div>
@@ -92,14 +92,14 @@ export function renderDietaryExclusionManager(prefs = {}, settings = {}) {
         
         <div style="display:flex;gap:6px;margin-bottom:8px">
           <input type="text" id="pref-exclude-search-input" name="prefExcludeSearch" aria-label="Exclude search" placeholder="Type ingredient name (e.g., Mushrooms, Cilantro)..." style="flex:1;padding:8px 10px;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--surface)">
-          <button class="btn primary sm" type="button" data-action="add-exclusion" onclick="handleAddExclusionFromInput()" style="font-size:12px;font-weight:700">Add</button>
+          <button class="btn primary sm" type="button" data-action="add-exclusion" style="font-size:12px;font-weight:700">Add</button>
         </div>
 
         <div id="exclusion-chips-wrap" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
           ${customExclusions.length ? customExclusions.map((ex, idx) => `
             <div style="display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);padding:4px 10px;border-radius:16px;font-size:12px;color:var(--text)">
               <span>${escapeHtml(ex.name || ex)}</span>
-              <button type="button" data-action="remove-exclusion" data-index="${idx}" onclick="handleRemoveExclusion(${idx})" style="border:none;background:none;color:var(--text3);cursor:pointer;font-weight:700;padding:0;font-size:11px">✕</button>
+              <button type="button" data-action="remove-exclusion" data-index="${idx}" style="border:none;background:none;color:var(--text3);cursor:pointer;font-weight:700;padding:0;font-size:11px">✕</button>
             </div>
           `).join('') : '<span style="font-size:12px;color:var(--text3)">No custom blacklist items active.</span>'}
         </div>

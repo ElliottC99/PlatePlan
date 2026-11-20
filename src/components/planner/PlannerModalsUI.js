@@ -78,7 +78,7 @@ export function renderSearchableRecipeSwapModalDom() {
         <h3 id="swap-modal-title" style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text);">Swap Recipe</h3>
         <div id="swap-modal-subtitle" style="font-size: 12px; color: var(--text2); margin-top: 2px;">Search across all recipes by title, ingredient, or tag.</div>
       </div>
-      <button type="button" class="modal-close-btn" onclick="window.PlannerMealSlot?.closeSearchableRecipeSwapModal?.() || (window.closeSearchableRecipeSwapModal && window.closeSearchableRecipeSwapModal())" aria-label="Close" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;line-height:1;padding:4px 8px;border-radius:6px;">&times;</button>
+      <button type="button" class="modal-close-btn" data-action="close-searchable-recipe-swap-modal" aria-label="Close" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94a3b8;line-height:1;padding:4px 8px;border-radius:6px;">&times;</button>
     </div>
     <div style="padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--surface);">
       <input type="search" id="swap-modal-search" aria-label="Search recipe to swap" class="input" placeholder="Type recipe name, ingredient (e.g. chicken, tofu), or tag..." style="width: 100%; font-size: 14px; padding: 8px 12px;" oninput="window.PlannerMealSlot?.filterSearchableRecipeSwapModal?.(this.value) || (window.filterSearchableRecipeSwapModal && window.filterSearchableRecipeSwapModal(this.value))" autofocus name="swap-modal-search">

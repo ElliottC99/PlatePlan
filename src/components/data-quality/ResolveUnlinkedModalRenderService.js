@@ -18,7 +18,7 @@ export function renderResolveModalShell({ targetName, searchTerm, tescoSearchUrl
           <h2 style="font-size:18px;font-weight:750;margin:0;color:var(--text,#1c1917)">Resolve Unlinked Item</h2>
           <div style="font-size:13px;color:var(--text2,#78716c);margin-top:4px">Target Item: <strong style="color:var(--text,#1c1917)">${safeEscapeHtml(targetName)}</strong></div>
         </div>
-        <button type="button" class="modal-close-btn btn sm btn-ghost ghost" onclick="closeResolveUnlinkedModal()" title="Close" aria-label="Close modal">✕</button>
+        <button type="button" class="modal-close-btn btn sm btn-ghost ghost" data-action="close-resolve-unlinked-modal" title="Close" aria-label="Close modal">✕</button>
       </div>
       <p style="font-size:12.5px;color:var(--text2,#78716c);line-height:1.5;margin-bottom:16px">Choose one of the resolution paths below to attach grocery items or link directly to an existing Pantry Bank entity:</p>
       
@@ -42,10 +42,10 @@ export function renderResolveModalShell({ targetName, searchTerm, tescoSearchUrl
           <div style="margin-bottom:8px"><a href="${safeEscapeAttr(tescoSearchUrl)}" target="_blank" rel="noopener noreferrer" class="btn sm ghost" style="display:inline-flex;align-items:center;gap:6px;color:var(--primary,#4f46e5);font-weight:600;font-size:12px;padding:4px 8px;border:1px solid rgba(79,70,229,0.2);background:rgba(79,70,229,0.05);border-radius:6px;text-decoration:none">🔍 Search Tesco for "${safeEscapeHtml(searchTerm)}" ↗</a></div>
           <textarea id="resolve-tesco-json" placeholder='{"name":"Tesco Bagels 4 Pack","price":1.50,"brand":"Tesco",...}' style="width:100%;height:75px;font-family:monospace;font-size:11.5px;padding:6px;border:1px solid var(--border,#e7e5e4);border-radius:6px;background:var(--surface2);color:var(--text,#1c1917);box-sizing:border-box;resize:vertical" name="resolve-tesco-json"></textarea>
           <div id="resolve-tesco-error" style="display:none;color:var(--red,#ef4444);font-size:12px;margin-top:4px;font-weight:600"></div>
-          <button type="button" class="btn sm btn-primary primary" style="width:100%;margin-top:6px;font-weight:700" onclick="submitResolveTescoImport()">Parse &amp; Link Product</button>
+          <button type="button" class="btn sm btn-primary primary" style="width:100%;margin-top:6px;font-weight:700" data-action="submit-resolve-tesco-import">Parse &amp; Link Product</button>
         </div>
 
-        <div style="background:var(--surface);border-radius:14px;padding:14px;border:1px solid var(--border-color,#e5e7eb);box-shadow:0 1px 3px rgba(0,0,0,0.04);cursor:pointer;" onclick="submitResolveNewProduct()">
+        <div style="background:var(--surface);border-radius:14px;padding:14px;border:1px solid var(--border-color,#e5e7eb);box-shadow:0 1px 3px rgba(0,0,0,0.04);cursor:pointer;" data-action="submit-resolve-new-product">
           <div style="font-weight:750;font-size:13.5px;margin-bottom:2px;color:var(--text,#1c1917);display:flex;align-items:center;justify-content:space-between">
             <span>✨ 3. Create New Product</span><span class="btn sm btn-ghost ghost" style="pointer-events:none;font-size:11.5px">Open Blank Form &rarr;</span>
           </div>
@@ -66,7 +66,7 @@ export function renderRemapMatchRow(opt) {
         <div style="font-size:12.5px;font-weight:700;color:var(--text,#1c1917)">${safeEscapeHtml(opt.label)}</div>
         <div style="font-size:11px;color:var(--text2,#78716c)">${opt.type}</div>
       </div>
-      <button type="button" class="btn sm primary" style="font-size:11px;padding:3px 8px" onclick="submitResolveRemapTarget('${safeEscapeAttr(opt.ingredientId)}', '${safeEscapeAttr(opt.subtypeId)}')">Re-map</button>
+      <button type="button" class="btn sm primary" style="font-size:11px;padding:3px 8px" data-action="submit-resolve-remap-target" data-ingredient-id="${safeEscapeAttr(opt.ingredientId)}" data-subtype-id="${safeEscapeAttr(opt.subtypeId)}">Re-map</button>
     </div>
   `;
 }
@@ -81,7 +81,7 @@ export function renderLinkProductRow(p) {
         <div style="font-size:12.5px;font-weight:700;color:var(--text,#1c1917)">${safeEscapeHtml(p.name)}</div>
         <div style="font-size:11px;color:var(--text2,#78716c)">${safeEscapeHtml(p.brand || 'No brand')} · £${Number(p.price || 0).toFixed(2)}</div>
       </div>
-      <button type="button" class="btn sm primary" style="font-size:11px;padding:3px 8px" onclick="submitResolveLinkExisting('${safeEscapeAttr(p.id)}')">Link</button>
+      <button type="button" class="btn sm primary" style="font-size:11px;padding:3px 8px" data-action="submit-resolve-link-existing" data-product-id="${safeEscapeAttr(p.id)}">Link</button>
     </div>
   `;
 }

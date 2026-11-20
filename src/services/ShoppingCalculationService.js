@@ -55,9 +55,21 @@ export function calculateShoppingItemCost(item, bankIng = null) {
   const requiredQty = Number(item?.needQty ?? item?.buyQty ?? item?.qty ?? 1);
   const requiredGrams = Number(item?.grams ?? item?.weight ?? 0);
 
+  const itemWeightG = Number(effectiveProduct?.itemWeight || effectiveProduct?.item_weight || 0);
+  const itemCount = Number(effectiveProduct?.itemCount || 0);
+  const packUnit = String(effectiveProduct?.packUnit || effectiveProduct?.pack_unit || 'g').toLowerCase().trim();
+  const isWeightPack = ['g', 'kg', 'ml', 'l'].includes(packUnit) || normalizeProductPackGrams(effectiveProduct, item?.name) >= 20;
+
   let packsNeeded = 1;
   if (isItemUnit && requiredQty > 0) {
-    packsNeeded = Math.ceil(requiredQty / Math.max(1, Number(effectiveProduct?.itemCount || effectiveProduct?.packSize || 1)));
+    if (itemCount > 0) {
+      packsNeeded = Math.ceil(requiredQty / itemCount);
+    } else if (itemWeightG > 0 && isWeightPack) {
+      const totalGrams = requiredQty * itemWeightG;
+      packsNeeded = Math.ceil(totalGrams / Math.max(20, normalizeProductPackGrams(effectiveProduct, item?.name)));
+    } else {
+      packsNeeded = Math.ceil(requiredQty / Math.max(1, Number(effectiveProduct?.packSize || 1)));
+    }
   } else {
     const grams = requiredGrams > 0 ? requiredGrams : (requiredQty > 0 ? requiredQty * 100 : 250);
     packsNeeded = Math.ceil(grams / Math.max(20, normalizeProductPackGrams(effectiveProduct, item?.name)));
@@ -265,6 +277,7 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
         id: key,
         groupId: canonicalIngId || matchedIng?.id || ingId || key,
         ingredientId: canonicalIngId || matchedIng?.id || ingId,
+        subtypeId: effectiveSubId || null,
         name: matchedProd?.name || matchedIng?.name || rawName,
         brand: matchedProd?.brand || 'Tesco',
         cat: matchedIng?.category || ing.categoryId || ing.category || matchedProd?.category || matchedProd?.cat || 'General Groceries',
@@ -328,11 +341,15 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
 
     entry.needQty = entry.buyQty;
     entry.needUnit = entry.unit;
-    entry.grams = ['g', 'ml'].includes(entry.unit) ? entry.buyQty : entry.buyQty * 100;
+    const prodItemWeight = Number(entry.bankIng?.itemWeight || entry.bankIng?.item_weight || 0);
+    entry.grams = ['g', 'ml'].includes(entry.unit)
+      ? entry.buyQty
+      : (prodItemWeight > 0 ? entry.buyQty * prodItemWeight : entry.buyQty * 100);
 
     const costInfo = calculateShoppingItemCost(entry, entry.bankIng);
     entry.cost = costInfo.cost;
     entry.price = costInfo.price;
+    entry.packsNeeded = costInfo.packsNeeded;
     entry.quantity = formatShoppingItemQuantity(entry);
     if (!entry.isAtHome) totalCost += entry.cost;
     items.push(entry);

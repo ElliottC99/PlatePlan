@@ -41,7 +41,7 @@ export function renderQtyIssueBannerHTML(sIdx, iIdx, item, qtyIssue) {
         ${qtyIssue.resolvedProd ? `
           <span style="display: inline-flex; align-items: center; gap: 4px;">
             <label for="wiz-inline-item-weight-${sIdx}-${iIdx}" style="font-size: 10.5px; font-weight: 600;">1 item =</label>
-            <input type="number" step="any" min="0.1" id="wiz-inline-item-weight-${sIdx}-${iIdx}" name="wiz_inline_item_weight_${sIdx}_${iIdx}" aria-label="Single usable item weight in grams for ${escapeAttr(qtyIssue.resolvedProd.name || item.name)}" class="wiz-inline-item-weight" data-sidx="${sIdx}" data-iidx="${iIdx}" data-prod-id="${escapeAttr(qtyIssue.resolvedProd.id)}" placeholder="g" style="width: 56px; padding: 2px 4px; border: 1px solid #d97706; border-radius: 4px; font-size: 11px; background: #fff;" />
+            <input type="number" step="any" min="0.1" id="wiz-inline-item-weight-${sIdx}-${iIdx}" name="wiz_inline_item_weight_${sIdx}_${iIdx}" aria-label="Single usable item weight in grams for ${escapeAttr(qtyIssue.resolvedProd.name || item.name)}" class="wiz-inline-item-weight" data-sidx="${sIdx}" data-iidx="${iIdx}" data-prod-id="${escapeAttr(qtyIssue.resolvedProd.id)}" placeholder="g" style="width: 56px; padding: 2px 4px; border: 1px solid #d97706; border-radius: 4px; font-size: 11px; background: var(--surface, #ffffff); color: var(--text, #1c1917);" />
             <span style="font-size: 10.5px;">g</span>
             <button type="button" class="btn sm primary wiz-save-inline-item-weight-btn" data-sidx="${sIdx}" data-iidx="${iIdx}" data-prod-id="${escapeAttr(qtyIssue.resolvedProd.id)}" style="padding: 2px 6px; font-size: 10.5px;">Save weight</button>
           </span>

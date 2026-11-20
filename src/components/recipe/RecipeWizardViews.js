@@ -119,8 +119,9 @@ export function renderState1AManual() {
               { val: 'book', label: '📖 Book' }
             ].map(opt => {
               const isSel = (recipe.sourceType || '') === opt.val;
-              return `<label class="wiz-source-type-pill" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 5px 12px; border: 1px solid var(--border, #ccc); border-radius: 999px; background: ${isSel ? 'var(--purple-bg, #eef2ff)' : 'var(--surface, #fff)'}; color: ${isSel ? 'var(--purple, #4f46e5)' : 'var(--text, #333)'}; font-weight: ${isSel ? '600' : '500'}; cursor: pointer;">
-                <input type="radio" name="wiz_source_type" class="wiz-source-type-radio" value="${opt.val}" ${isSel ? 'checked' : ''} style="display:none;" />
+              const radioId = `wiz-source-type-${opt.val || 'none'}`;
+              return `<label for="${radioId}" class="wiz-source-type-pill" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 5px 12px; border: 1px solid var(--border, #ccc); border-radius: 999px; background: ${isSel ? 'var(--purple-bg, #eef2ff)' : 'var(--surface, #fff)'}; color: ${isSel ? 'var(--purple, #4f46e5)' : 'var(--text, #333)'}; font-weight: ${isSel ? '600' : '500'}; cursor: pointer;">
+                <input type="radio" id="${radioId}" name="wiz_source_type" class="wiz-source-type-radio" value="${opt.val}" ${isSel ? 'checked' : ''} style="display:none;" />
                 ${opt.label}
               </label>`;
             }).join(' ')}
@@ -146,7 +147,7 @@ export function renderState1AManual() {
       </div>
 
       <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 20px; border-top: 1px solid var(--border, #eee); padding-top: 14px;">
-        <button type="button" class="btn ghost" onclick="goToWizardStep(0)">← Choice</button>
+        <button type="button" class="btn ghost" data-action="go-to-wizard-step" data-step="0">← Choice</button>
         <button type="button" class="btn primary" id="btn-next-step1a">Next: Parse & Map →</button>
       </div>
     </div>
@@ -161,7 +162,7 @@ export function renderState1BBulk() {
       <textarea id="wiz-bulk-text" name="bulk_text" aria-label="Paste bulk recipe text" rows="12" placeholder="Recipe 1: High-Protein Tofu Bowl&#10;Serves: 4&#10;2 x 400g firm tofu&#10;1 cup milk&#10;&#10;Method:&#10;1. Bake tofu.&#10;&#10;Recipe 2: Smoky Lentil Soup&#10;Serves: 4&#10;200g brown lentils..." style="width: 100%; padding: 12px; border: 1px solid var(--border, #ccc); border-radius: 8px; font-size: 13px; font-family: monospace; background: var(--surface2, #fbfbf9); resize: vertical; margin-bottom: 16px;">${escapeHtml(wizardState.bulkText)}</textarea>
 
       <div style="display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border, #eee); padding-top: 14px;">
-        <button type="button" class="btn ghost" onclick="goToWizardStep(0)">← Choice</button>
+        <button type="button" class="btn ghost" data-action="go-to-wizard-step" data-step="0">← Choice</button>
         <button type="button" class="btn primary" id="btn-next-step1b">Parse Text & Next →</button>
       </div>
     </div>

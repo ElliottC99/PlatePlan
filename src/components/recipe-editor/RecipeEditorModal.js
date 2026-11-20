@@ -116,7 +116,6 @@ export function openModal(name, result, isFallback = false, options = {}) {
   if (saveTempBtn) saveTempBtn.style.display = isTemporaryReview ? '' : 'none';
   if (saveOrigOnlyBtn) saveOrigOnlyBtn.style.display = isTemporaryReview ? 'none' : '';
   
-  if (typeof window.updateSaveBothVisibility === 'function') window.updateSaveBothVisibility();
   document.getElementById('modal-wrap')?.classList.add('open');
   if (typeof window.updateBatchUiBanners === 'function') window.updateBatchUiBanners();
   switchModalTab(window.currentReviewVariant === 'enhanced' && (result.enhanced || existing?.enhanced) ? 'enhanced' : 'original');

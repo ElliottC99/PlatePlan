@@ -21,9 +21,9 @@ function escapeAttr(value) {
 export function renderRecipeStepRow(stepText, index, prefix) {
   const stepId = `recipe-step-${prefix}-${index}`;
   return `<div class="rev-method-row" style="display:flex;gap:5px;margin-bottom:5px;align-items:flex-start;">
-    <label for="${stepId}" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">${index + 1}.</label>
-    <textarea id="${stepId}" name="step_${index}" class="r-step" style="flex:1;min-height:40px;" oninput="updateSaveBothVisibility()">${escapeHtml(stepText || '')}</textarea>
-    <button class="btn sm danger ghost" onclick="this.parentElement.remove(); reindexModalMethod('${escapeAttr(prefix)}'); updateSaveBothVisibility();">&times;</button>
+    <label for="${stepId}" class="step-num" style="font-size:12px;font-weight:600;margin-top:8px;width:20px;">${index + 1}.</label>
+    <textarea id="${stepId}" name="step_${index}" class="r-step" style="flex:1;min-height:40px;">${escapeHtml(stepText || '')}</textarea>
+    <button type="button" class="btn sm danger ghost" data-action="remove-modal-method-step" data-mode="${escapeAttr(prefix)}">&times;</button>
   </div>`;
 }
 
@@ -38,8 +38,8 @@ export function createBlankMethodRow(prefix) {
   const stepId = `recipe-step-blank-${Date.now()}`;
   div.innerHTML = `
     <label for="${stepId}" class="visually-hidden">Step Description</label>
-    <textarea id="${stepId}" name="${stepId}" class="r-step" style="flex:1;min-height:40px;" oninput="updateSaveBothVisibility()"></textarea>
-    <button class="btn sm danger ghost" onclick="this.parentElement.remove(); reindexModalMethod('${escapeAttr(prefix)}'); updateSaveBothVisibility();">&times;</button>`;
+    <textarea id="${stepId}" name="${stepId}" class="r-step" style="flex:1;min-height:40px;"></textarea>
+    <button type="button" class="btn sm danger ghost" data-action="remove-modal-method-step" data-mode="${escapeAttr(prefix)}">&times;</button>`;
   return div;
 }
 
@@ -60,5 +60,4 @@ export function copyOriginalMethodToEnhanced() {
     target.innerHTML = renderModalMethodList('enh', steps);
     reindexModalMethodRows('enh');
   }
-  if (typeof window.updateSaveBothVisibility === 'function') window.updateSaveBothVisibility();
 }

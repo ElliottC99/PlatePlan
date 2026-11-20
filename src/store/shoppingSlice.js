@@ -3,7 +3,7 @@
  * Shopping list state management.
  */
 
-import { state, dispatchStateEvent } from './state.js';
+import { state, dispatchStateEvent } from './coreState.js';
 import { saveStateCache } from './cacheSlice.js';
 
 export async function setShoppingList(listOrArray) {

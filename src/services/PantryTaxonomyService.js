@@ -10,10 +10,10 @@ import { db, HOUSEHOLD_ID } from '../config/firebase.js';
 import { enforceCategorySSOT } from '../utils/categoryEnforcer.js';
 import { getState, setCategories, setIngredients, setProducts, setRecipes, saveStateCache } from '../store/store.js';
 import { getCategories, saveCategories } from './CategoryRepository.js';
-import { getProducts, saveProduct, addProductToBatch } from './ProductRepository.js';
-import { addRecipeToBatch } from './RecipeFirestoreRepository.js';
+import { getProducts, saveProduct, deleteProduct, addProductToBatch } from './ProductRepository.js';
+import { addRecipeToBatch, batchUpdateRecipesInDb } from './RecipeFirestoreRepository.js';
 import { compareProductsByStrategy } from './PantryHierarchyService.js';
-import { cleanIngredientPhraseForAlias, normalizeTaxonomyName } from './RecipeIngredientParser.js';
+import { cleanIngredientPhraseForAlias, normalizeTaxonomyName, stemIngredientName } from './RecipeIngredientParser.js';
 
 function isDbAvailable() {
   if (!db) { console.warn('[PantryTaxonomyService] Firestore db instance not initialised.'); return false; }
@@ -770,41 +770,61 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
     });
     if (partialProd) return partialProd;
 
-    // Check root items directly without recursive re-entry
-    const matchedRoot = ingsList.find(i => {
-      const iName = String(i.name || '').trim().toLowerCase();
-      if (iName === rawName) return true;
-      const aliases = Array.isArray(i.aliases) ? i.aliases : [];
-      return aliases.some(a => String(a || '').trim().toLowerCase() === rawName);
-    });
-    if (matchedRoot) {
-      if (matchedRoot.defaultProductId) {
-        const def = prodsList.find(p => String(p.id) === String(matchedRoot.defaultProductId));
+    const resolveRootProduct = (root) => {
+      if (root.defaultProductId) {
+        const def = prodsList.find(p => String(p.id) === String(root.defaultProductId));
         if (def) return def;
       }
-      const subtypeIds = new Set((matchedRoot.subtypes || []).map(s => String(s.id)));
-      const candidatePool = prodsList.filter(p => subtypeIds.has(String(p.subtypeId)) || String(p.ingredientId) === String(matchedRoot.id));
-      if (candidatePool.length > 0) {
-        const best = pickBestProduct(candidatePool);
-        if (best) return best;
+      const subtypeIds = new Set((root.subtypes || []).map(s => String(s.id)));
+      const candidatePool = prodsList.filter(p => subtypeIds.has(String(p.subtypeId)) || String(p.ingredientId) === String(root.id));
+      return candidatePool.length > 0 ? pickBestProduct(candidatePool) : null;
+    };
+
+    const resolveSubtypeProduct = (sub) => {
+      if (sub.defaultProductId) {
+        const def = prodsList.find(p => String(p.id) === String(sub.defaultProductId));
+        if (def) return def;
+      }
+      const subPool = prodsList.filter(p => String(p.subtypeId) === String(sub.id));
+      return subPool.length > 0 ? pickBestProduct(subPool) : null;
+    };
+
+    const rawClean = cleanIngredientPhraseForAlias(rawName) || rawName;
+    const rawStem = stemIngredientName(rawClean);
+    const matchesAliasList = (aliases) => (Array.isArray(aliases) ? aliases : []).some(a => {
+      const aRaw = String(a || '').trim().toLowerCase();
+      if (!aRaw) return false;
+      if (aRaw === rawName) return true;
+      const aClean = cleanIngredientPhraseForAlias(aRaw) || aRaw;
+      return aClean === rawClean || stemIngredientName(aClean) === rawStem;
+    });
+
+    // 1. Exact root item & sub-type name matches first (before alias matching)
+    const exactRoot = ingsList.find(i => String(i.name || '').trim().toLowerCase() === rawName);
+    if (exactRoot) {
+      const res = resolveRootProduct(exactRoot);
+      if (res) return res;
+    }
+    for (const root of ingsList) {
+      for (const sub of (root.subtypes || [])) {
+        if (String(sub.name || '').trim().toLowerCase() === rawName) {
+          const res = resolveSubtypeProduct(sub);
+          if (res) return res;
+        }
       }
     }
 
-    // Check sub-types directly without recursive re-entry
+    // 2. Whole-phrase cleaned/stemmed alias matches (root items then sub-types)
+    const aliasRoot = ingsList.find(i => matchesAliasList(i.aliases));
+    if (aliasRoot) {
+      const res = resolveRootProduct(aliasRoot);
+      if (res) return res;
+    }
     for (const root of ingsList) {
       for (const sub of (root.subtypes || [])) {
-        const sName = String(sub.name || '').trim().toLowerCase();
-        const sAliases = Array.isArray(sub.aliases) ? sub.aliases : [];
-        if (sName === rawName || sAliases.some(a => String(a || '').trim().toLowerCase() === rawName)) {
-          if (sub.defaultProductId) {
-            const def = prodsList.find(p => String(p.id) === String(sub.defaultProductId));
-            if (def) return def;
-          }
-          const subPool = prodsList.filter(p => String(p.subtypeId) === String(sub.id));
-          if (subPool.length > 0) {
-            const best = pickBestProduct(subPool);
-            if (best) return best;
-          }
+        if (matchesAliasList(sub.aliases)) {
+          const res = resolveSubtypeProduct(sub);
+          if (res) return res;
         }
       }
     }
@@ -922,4 +942,85 @@ export function lockProductSelectionsForSlots(slots, priority = 'protein') {
 if (typeof window !== 'undefined') {
   window.lockProductSelectionsForSlots = lockProductSelectionsForSlots;
   window.freezeProductSelectionsForPlan = freezeProductSelectionsForPlan;
+}
+
+export async function deleteSubtypeInDb(parentRootItem, unlinkedProducts) {
+  if (!isDbAvailable()) return false;
+  try {
+    await saveRootItem(parentRootItem);
+    if (Array.isArray(unlinkedProducts)) {
+      await Promise.all(unlinkedProducts.map(prod => saveProduct(prod)));
+    }
+    return true;
+  } catch (err) {
+    console.error('[PantryTaxonomyService] Error in deleteSubtypeInDb:', err);
+    throw err;
+  }
+}
+
+export async function batchResolveSubtypeOrphansInDb(productUpdates) {
+  if (!isDbAvailable()) return false;
+  try {
+    if (Array.isArray(productUpdates)) {
+      await Promise.all(productUpdates.map(p => {
+        if (p._delete === true) return deleteProduct(p.id);
+        return saveProduct(p);
+      }));
+    }
+    return true;
+  } catch (err) {
+    console.error('[PantryTaxonomyService] Error in batchResolveSubtypeOrphansInDb:', err);
+    throw err;
+  }
+}
+
+export async function batchResolveOrphansWithNewSubtypeInDb(parentRootItem, productUpdates) {
+  if (!isDbAvailable()) return false;
+  try {
+    if (parentRootItem) {
+      if (Array.isArray(parentRootItem)) {
+        await Promise.all(parentRootItem.map(item => saveRootItem(item)));
+      } else {
+        await saveRootItem(parentRootItem);
+      }
+    }
+    if (Array.isArray(productUpdates)) {
+      await Promise.all(productUpdates.map(p => {
+        if (p._delete === true) return deleteProduct(p.id);
+        return saveProduct(p);
+      }));
+    }
+    return true;
+  } catch (err) {
+    console.error('[PantryTaxonomyService] Error in batchResolveOrphansWithNewSubtypeInDb:', err);
+    throw err;
+  }
+}
+
+export async function batchMergeIngredientsInDb(canonicalRootItem, duplicateRootItemId, updatedRecipes, updatedProducts, updatedPlan) {
+  if (!isDbAvailable()) return false;
+  try {
+    await saveRootItem(canonicalRootItem);
+    await deleteRootItem(duplicateRootItemId);
+
+    if (Array.isArray(updatedProducts) && updatedProducts.length > 0) {
+      await Promise.all(updatedProducts.map(p => saveProduct(p)));
+    }
+
+    if (Array.isArray(updatedRecipes) && updatedRecipes.length > 0) {
+      await batchUpdateRecipesInDb(updatedRecipes);
+    }
+
+    if (updatedPlan && typeof updatedPlan === 'object' && updatedPlan.id) {
+      const planColRef = db.collection('households').doc(HOUSEHOLD_ID).collection('plans');
+      const planData = { ...updatedPlan, updatedAt: new Date().toISOString() };
+      delete planData.id;
+      await planColRef.doc(updatedPlan.id).set(planData, { merge: true });
+    }
+
+    return true;
+  } catch (err) {
+    console.error('[PantryTaxonomyService] Error in batchMergeIngredientsInDb:', err);
+    throw err;
+  }
 }

@@ -599,7 +599,8 @@ function checkPlanKept(plan, label) {
 
   assert.ok(macHtml.includes("Roasted Pepper Mac &#39;n&#39; Cheese"), 'Recipe with apostrophe in title must be escaped');
   assert.equal(macHtml.includes("Mac 'n' Cheese"), false, 'Inline onclick must NOT have unescaped raw single quote');
-  assert.ok(macHtml.includes("window.setSlotConfiguredStatus(1, 'dinner', 'pinned', 'rec_mac_cheese')"), 'Click handler must cleanly invoke setSlotConfiguredStatus without crashing');
+  assert.ok(macHtml.includes('data-action="set-slot-configured-status"'), 'Candidate row must route via data-action="set-slot-configured-status"');
+  assert.ok(macHtml.includes('data-recipe-id="rec_mac_cheese"'), 'Candidate row must carry escaped recipeId in data-recipe-id');
 
   console.log('PASS 12: Skeleton candidate rows cleanly isolate variant duplicates and safely escape recipe titles with apostrophes');
 }
@@ -642,6 +643,82 @@ function checkPlanKept(plan, label) {
     global.document.removeEventListener = origDocRemove;
   }
   console.log('PASS 13: Clear Grid button renders and clearSkeletonGrid resets pinned/skipped slots after confirmation');
+}
+
+// 14. Layout Grid templates: whitelistPreferences (>10KB), saveGridTemplate, loadGridTemplate, render, deleteGridTemplate.
+{
+  const { whitelistPreferences } = await import('../src/services/PreferenceRepository.js');
+  const { saveGridTemplate, loadGridTemplate, deleteGridTemplate } = await import('../src/components/planner/PlannerSkeletonGridUI.js');
+  const { renderSkeletonGridUI } = await import('../src/components/planner/PlannerGridRenderService.js');
+
+  // 14a: whitelistPreferences preserves gridTemplates even above 10KB
+  const largeGrid = {};
+  for (let d = 1; d <= 14; d++) {
+    largeGrid[`${d}_dinner`] = { status: 'pinned', pinned: true, recipeId: `rec_long_name_${d}_padding_${'x'.repeat(750)}` };
+  }
+  const largePrefs = whitelistPreferences({
+    gridTemplates: [{ id: 'gt_large', name: 'Fortnight', days: 14, skeletonGrid: largeGrid }]
+  });
+  assert.equal(largePrefs.gridTemplates?.length, 1, 'whitelistPreferences must keep gridTemplates above 10KB');
+
+  // 14b: saveGridTemplate -> loadGridTemplate -> renderSkeletonGridUI -> deleteGridTemplate
+  const st = getState();
+  st.currentPlannerDays = 10;
+  st.skeletonGrid = { '2_dinner': { status: 'skipped', isSkipped: true } };
+  st.preferences = { ...(st.preferences || {}), gridTemplates: [] };
+
+  const promptInput = { value: 'Standard Work Week', focus: () => {}, select: () => {} };
+  const promptSave = { onclick: null };
+  const promptCancel = { onclick: null };
+  const confirmYes = { onclick: null, focus: () => {} };
+  const confirmCancel = { onclick: null, focus: () => {} };
+  const modalEls = {
+    'view-modal-wrap': { classList: { add: () => {}, remove: () => {} }, style: { setProperty: () => {} }, addEventListener: () => {}, removeEventListener: () => {} },
+    'view-modal-content': { innerHTML: '', style: { setProperty: () => {} } },
+    'prompt-modal-input': promptInput,
+    'btn-prompt-save': promptSave,
+    'btn-prompt-cancel': promptCancel,
+    'btn-confirm-yes': confirmYes,
+    'btn-confirm-cancel': confirmCancel
+  };
+  if (!global.document.body) global.document.body = { style: {} };
+  const origGetById = global.document.getElementById;
+  const origDocAdd = global.document.addEventListener;
+  const origDocRemove = global.document.removeEventListener;
+  global.document.getElementById = (id) => modalEls[id] || null;
+  global.document.addEventListener = () => {};
+  global.document.removeEventListener = () => {};
+  try {
+    const savePromise = saveGridTemplate();
+    await new Promise(r => setTimeout(r, 0));
+    assert.equal(typeof promptSave.onclick, 'function', 'saveGridTemplate must open prompt modal');
+    promptSave.onclick();
+    const saved = await savePromise;
+    assert.equal(saved?.name, 'Standard Work Week');
+    assert.equal(saved?.days, 10);
+    assert.equal(st.preferences.gridTemplates.length, 1);
+
+    const gridHtml = renderSkeletonGridUI({ days: 7, skeletonGrid: st.skeletonGrid, gridTemplates: st.preferences.gridTemplates });
+    assert(gridHtml.includes('data-action="save-grid-template"'), 'Must render Save Template button');
+    assert(gridHtml.includes(`data-action="load-grid-template" data-template-id="${saved.id}"`), 'Must render load template pill');
+    assert(gridHtml.includes(`data-action="delete-grid-template" data-template-id="${saved.id}"`), 'Must render delete template button');
+
+    st.skeletonGrid = {};
+    st.currentPlannerDays = 7;
+    assert.equal(loadGridTemplate(saved.id), true);
+    assert.equal(st.skeletonGrid['2_dinner']?.isSkipped, true, 'loadGridTemplate must restore skeletonGrid');
+    assert.equal(st.currentPlannerDays, 10, 'loadGridTemplate must sync currentPlannerDays');
+
+    deleteGridTemplate(saved.id);
+    assert.equal(typeof confirmYes.onclick, 'function', 'deleteGridTemplate must open confirm modal');
+    await confirmYes.onclick();
+    assert.equal(st.preferences.gridTemplates.length, 0, 'deleteGridTemplate must remove the template');
+  } finally {
+    global.document.getElementById = origGetById;
+    global.document.addEventListener = origDocAdd;
+    global.document.removeEventListener = origDocRemove;
+  }
+  console.log('PASS 14: Layout Grid templates persist, render, load (with days sync), and delete cleanly');
 }
 
 console.log('\nAll planner control checks passed.');

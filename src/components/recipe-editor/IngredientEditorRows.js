@@ -46,7 +46,7 @@ export function renderIngredientEditorRow(ing = {}, index = 0, prefix = 'orig') 
       </select>
       <input type="text" id="ing-name-${prefix}-${index}" name="ing_name_${prefix}_${index}" aria-label="Name for ingredient ${index + 1}" class="input input-name" style="flex:1;min-width:140px" placeholder="Ingredient name" value="${escapeAttr(name)}" oninput="handleReviewIngredientNameInput(this, '${prefix}')">
       <input type="text" id="ing-section-${prefix}-${index}" name="ing_section_${prefix}_${index}" aria-label="Section for ingredient ${index + 1}" class="input input-section" style="width:110px" placeholder="Section (opt)" value="${escapeAttr(section)}" onchange="updateIngredientRowField('${prefix}', ${index}, 'section', this.value)">
-      <button type="button" class="btn sm danger" onclick="removeReviewIngredientRow(this, '${prefix}')" title="Remove ingredient" aria-label="Remove ingredient ${index + 1}">×</button>
+      <button type="button" class="btn sm danger" data-action="remove-review-ingredient-row" data-prefix="${escapeAttr(prefix)}" title="Remove ingredient" aria-label="Remove ingredient ${index + 1}">×</button>
     </div>
   `;
 }

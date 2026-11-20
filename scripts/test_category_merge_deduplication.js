@@ -148,7 +148,7 @@ assert.equal(afterClusters.length, 0, 'No duplicate clusters should remain after
 
 // 4. Test Reload Persistence (Firestore round-trip + enforceCategorySSOT + Hydration normalization)
 console.log('Testing persistence across Firestore save and reload...');
-const { getRootItems } = await import('../src/services/RootItemRepository.js');
+const { getRootItems } = await import('../src/services/PantryTaxonomyService.js');
 const { getProducts } = await import('../src/services/ProductRepository.js');
 const { getCategories } = await import('../src/services/CategoryRepository.js');
 const { normalizeIngredientRecord, normalizeProductRecord } = await import('../src/services/HydrationService.js');

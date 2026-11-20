@@ -9,7 +9,7 @@
  * - State 3: Final Inline Review with Macro Crossbar, Variant Switcher & Queue Navigation
  */
 
-import { getState } from '../../state/AppState.js';
+import { getState } from '../../store/store.js';
 import { extractRecipeMacros } from '../../utils/fitScoreCalculator.js';
 import { wizardState, resetWizardState, syncStep2InputsToState, stashActiveVariantSnapshot } from './RecipeWizardState.js';
 import { renderStepBadge, renderState0Choice, renderState1AManual, renderState1BBulk, renderState3Review } from './RecipeWizardViews.js';
@@ -430,12 +430,12 @@ export function renderWizardModal() {
   modalWrap.innerHTML = `
     <div class="ios-fullscreen-modal open">
       <div class="ios-fullscreen-nav">
-        <button type="button" class="ios-nav-btn" onclick="closeRecipeWizard()">Cancel</button>
+        <button type="button" class="ios-nav-btn" data-action="close-recipe-wizard">Cancel</button>
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:17px; font-weight:600; color:var(--label); letter-spacing:-0.024em;">Recipe Wizard</span>
           ${renderStepBadge()}
         </div>
-        <button type="button" class="ios-nav-btn bold" onclick="closeRecipeWizard()">Done</button>
+        <button type="button" class="ios-nav-btn bold" data-action="close-recipe-wizard">Done</button>
       </div>
       <div class="ios-fullscreen-body" id="wizard-modal-body">
         <div style="max-width: 860px; margin: 0 auto; width: 100%;">

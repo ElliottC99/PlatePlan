@@ -16,7 +16,7 @@ import {
   getFitScoreTierMeta,
   getVaultTargetMacros as modernGetVaultTargetMacros
 } from '../utils/fitScoreCalculator.js';
-import { getProfilesFromState } from '../models/StateModel.js';
+import { getProfilesFromState } from '../store/coreState.js';
 import { FIT_SCORE_TIERS } from '../config/businessRules.js';
 
 export {

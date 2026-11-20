@@ -4,7 +4,7 @@
  * Binds directly to the reactive central state object and cacheSlice.
  */
 
-import { state, dispatchStateEvent } from '../state.js';
+import { state, dispatchStateEvent } from '../coreState.js';
 import { saveStateCache } from '../cacheSlice.js';
 import { setIngredients as setPantryIngredients, setProducts as setPantryProducts, setCategories as setPantryCategories } from '../pantryStore.js';
 
@@ -152,7 +152,7 @@ export async function learnIngredientAlias(ingredientId, rawString, subtypeId = 
     dispatchStateEvent('plateplan:state:ingredients', state.ingredients);
 
     try {
-      const { saveRootItem: saveIngredient } = await import('../../services/RootItemRepository.js');
+      const { saveRootItem: saveIngredient } = await import('../../services/PantryTaxonomyService.js');
       await saveIngredient(ing);
     } catch (err) {
       console.warn('[Store] Failed to persist learned ingredient alias:', err);

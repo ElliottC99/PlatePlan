@@ -4,7 +4,7 @@
  * Binds directly to the reactive central state object and cacheSlice.
  */
 
-import { state, dispatchStateEvent } from '../state.js';
+import { state, dispatchStateEvent } from '../coreState.js';
 import { saveStateCache } from '../cacheSlice.js';
 import { safeClone } from '../../utils/safeJson.js';
 import * as RecipeSlice from '../recipeStore.js';

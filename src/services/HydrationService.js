@@ -7,7 +7,7 @@ import store from "../store/store.js";
  */
 
 import { getRecipes, getProducts, getPreferences, getCurrentPlan, subscribeRecipes, subscribeIngredients, subscribeProducts, subscribePreferences, subscribeCurrentPlan, getCategories, saveCategories, cleanLegacyMacros } from './HouseholdRepository.js';
-import { getRootItems, saveRootItem } from './RootItemRepository.js';
+import { getRootItems, saveRootItem } from './PantryTaxonomyService.js';
 import { saveProduct } from './ProductRepository.js';
 import { getCurrentActivePlan as getActivePlanFromSubcollection } from '../repositories/PlanRepository.js';
 import { setRecipes, setPreferences, setCurrentPlan, saveStateCache, sanitizePreferences, updateState } from '../store/store.js';
@@ -290,7 +290,9 @@ export async function hydrateHouseholdData(options = {}) {
         getState().categories = mergedCategories;
         if (plan && typeof plan === 'object') {
           getState().currentPlan = plan;
-          if (plan.skeletonGrid && typeof plan.skeletonGrid === 'object') {
+          const existingGrid = getState().skeletonGrid;
+          const hasLocalGrid = Boolean(existingGrid && typeof existingGrid === 'object' && Object.keys(existingGrid).length > 0);
+          if (!hasLocalGrid && plan.skeletonGrid && typeof plan.skeletonGrid === 'object') {
             getState().skeletonGrid = plan.skeletonGrid;
           }
         }
@@ -413,7 +415,11 @@ export function setupRealtimeSubscriptions() {
           setCurrentPlan(plan);
           if (getState()) {
             getState().currentPlan = plan;
-            if (plan.skeletonGrid) getState().skeletonGrid = plan.skeletonGrid;
+            const existingGrid = getState().skeletonGrid;
+            const hasLocalGrid = Boolean(existingGrid && typeof existingGrid === 'object' && Object.keys(existingGrid).length > 0);
+            if (!hasLocalGrid && plan.skeletonGrid && typeof plan.skeletonGrid === 'object') {
+              getState().skeletonGrid = plan.skeletonGrid;
+            }
           }
         }
       }));

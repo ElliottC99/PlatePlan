@@ -26,6 +26,10 @@ jobs:
       # A syntax error in any module would otherwise build green and publish a broken app.
       - name: Syntax-check every module in src/
         run: find src -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Lint
+        run: npm run lint
+      - name: Run standalone test suites
+        run: npm test
       # scripts/build.js stamps the version and commit ID and fails on any leftover placeholder.
       - run: npm run build
       - if: github.ref == 'refs/heads/main'

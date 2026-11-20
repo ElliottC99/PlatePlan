@@ -9,6 +9,7 @@ import { renderScrollableSwapModal, executeSwapInState, resolveTargetItem, calcu
 import { getShoppingLineStateKey } from '../utils/shoppingUtils.js';
 import { calculateShoppingItemCost, normalizeProductPackGrams, getFallbackProductData, formatShoppingItemQuantity, aggregateShoppingListFromPlan } from '../services/ShoppingCalculationService.js';
 import { saveCurrentPlan } from '../services/HouseholdRepository.js';
+import { patchWizardStep3Shopping } from './PlannerRenderService.js';
 
 export { renderScrollableSwapModal, executeSwapInState, resolveTargetItem, calculateMetrics, getShoppingLineStateKey, calculateShoppingItemCost, formatShoppingItemQuantity, aggregateShoppingListFromPlan };
 
@@ -38,7 +39,7 @@ export function toggleShoppingItemAcquired(atHomeKey) {
   const item = (aggregateShoppingListFromPlan(plan).items || []).find(i => i.atHomeKey === atHomeKey);
   const name = item?.name || 'Item';
 
-  if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
+  patchWizardStep3Shopping(plan);
 
   if (typeof window.showPlatePlanToast === 'function') {
     window.showPlatePlanToast(nextAtHome ? `Checked off "${name}"` : `Moved "${name}" back to shopping list`);

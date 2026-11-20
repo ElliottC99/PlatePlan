@@ -58,18 +58,18 @@ export function renderSlotRow(options) {
     const rId = recipe?.id || '';
     slotActionsHtml = `<div class="slot-actions">
       <span class="slot-macro">${calStr}</span>
-      <button class="btn sm primary" data-action="view-meal-detail" data-recipe-id="${escapeAttr(rId)}" data-instance-id="${escapeAttr(instanceId)}" data-variant="${escapeAttr(variant)}" onclick="viewRecipe('${escapeAttr(rId)}', '${escapeAttr(instanceId)}', '${escapeAttr(variant)}')">View</button>
-      <button class="btn sm ghost" data-action="swap-slot" data-day="${day}" data-slot="${escapeAttr(slotKey)}" onclick="openSwapMealModal(${day}, '${escapeAttr(slotKey)}')">Swap</button>
-      <button class="btn sm ghost" data-action="planned-meal-actions" data-day="${day}" data-slot="${escapeAttr(slotKey)}" onclick="openPlannedMealActions(${day}, '${escapeAttr(slotKey)}')">More</button>
+      <button class="btn sm primary" data-action="view-meal-detail" data-recipe-id="${escapeAttr(rId)}" data-instance-id="${escapeAttr(instanceId)}" data-variant="${escapeAttr(variant)}">View</button>
+      <button class="btn sm ghost" data-action="swap-slot" data-day="${day}" data-slot="${escapeAttr(slotKey)}">Swap</button>
+      <button class="btn sm ghost" data-action="planned-meal-actions" data-day="${day}" data-slot="${escapeAttr(slotKey)}">More</button>
     </div>`;
   } else if (hasSlotReason) {
     slotActionsHtml = `<div class="slot-actions">
-      <button class="btn sm ghost" data-action="swap-slot" data-day="${day}" data-slot="${escapeAttr(slotKey)}" onclick="openSwapMealModal(${day}, '${escapeAttr(slotKey)}')">Choose Meal</button>
-      <button class="btn sm ghost" data-action="clear-slot-reason" data-day="${day}" data-slot="${escapeAttr(slotKey)}" onclick="clearPlanSlotReason(${day}, '${escapeAttr(slotKey)}')">Clear reason</button>
+      <button class="btn sm ghost" data-action="swap-slot" data-day="${day}" data-slot="${escapeAttr(slotKey)}">Choose Meal</button>
+      <button class="btn sm ghost" data-action="clear-slot-reason" data-day="${day}" data-slot="${escapeAttr(slotKey)}">Clear reason</button>
     </div>`;
   } else {
     slotActionsHtml = `<div class="slot-actions">
-      <button class="btn sm ghost" data-action="swap-slot" data-day="${day}" data-slot="${escapeAttr(slotKey)}" onclick="openSwapMealModal(${day}, '${escapeAttr(slotKey)}')">Choose Meal</button>
+      <button class="btn sm ghost" data-action="swap-slot" data-day="${day}" data-slot="${escapeAttr(slotKey)}">Choose Meal</button>
     </div>`;
   }
 
@@ -100,7 +100,7 @@ export function renderDensePlanMealRow({ meal, isShared, rE, rC, infoE, infoC, d
       <div class="dense-plan-person-row">
         <div style="display:flex;align-items:center;justify-content:space-between">
           <span style="font-size:11px;font-weight:750;color:var(--text2);text-transform:uppercase">${meal} (Both)</span>
-          <button type="button" class="dense-plan-swap-btn" data-action="searchable-swap-slot" data-day="${day}" data-slot="${escapeAttr(slotKeyE)}" data-shared="true" onclick="openSearchableRecipeSwapModal(${day}, '${escapeAttr(slotKeyE)}', true)">Swap ▾</button>
+          <button type="button" class="dense-plan-swap-btn" data-action="searchable-swap-slot" data-day="${day}" data-slot="${escapeAttr(slotKeyE)}" data-shared="true">Swap ▾</button>
         </div>
         <div class="dense-plan-slot">
           <span style="font-weight:600;color:var(--text)">${escapeHtml(rE.name)} ${infoE?.variant === 'enhanced' ? '<span style="font-size:10px;color:var(--action);font-weight:700">ENHANCED</span>' : ''}</span>
@@ -115,13 +115,13 @@ export function renderDensePlanMealRow({ meal, isShared, rE, rC, infoE, infoC, d
       ${rE ? `
         <div class="dense-plan-slot">
           <span><strong style="color:var(--text2)">E:</strong> ${escapeHtml(rE.name)} ${infoE?.variant === 'enhanced' ? '<span style="font-size:10px;color:var(--action)">[Enh]</span>' : ''}</span>
-          <button type="button" class="dense-plan-swap-btn" data-action="searchable-swap-slot" data-day="${day}" data-slot="${escapeAttr(slotKeyE)}" data-shared="false" onclick="openSearchableRecipeSwapModal(${day}, '${escapeAttr(slotKeyE)}', false)">Swap ▾</button>
+          <button type="button" class="dense-plan-swap-btn" data-action="searchable-swap-slot" data-day="${day}" data-slot="${escapeAttr(slotKeyE)}" data-shared="false">Swap ▾</button>
         </div>
       ` : ''}
       ${rC ? `
         <div class="dense-plan-slot" style="margin-top:4px">
           <span><strong style="color:var(--text2)">C:</strong> ${escapeHtml(rC.name)} ${infoC?.variant === 'enhanced' ? '<span style="font-size:10px;color:var(--action)">[Enh]</span>' : ''}</span>
-          <button type="button" class="dense-plan-swap-btn" data-action="searchable-swap-slot" data-day="${day}" data-slot="${escapeAttr(slotKeyC)}" data-shared="false" onclick="openSearchableRecipeSwapModal(${day}, '${escapeAttr(slotKeyC)}', false)">Swap ▾</button>
+          <button type="button" class="dense-plan-swap-btn" data-action="searchable-swap-slot" data-day="${day}" data-slot="${escapeAttr(slotKeyC)}" data-shared="false">Swap ▾</button>
         </div>
       ` : ''}
     </div>
@@ -148,14 +148,14 @@ export function ensureSearchableRecipeSwapModalDom() {
             <h3 id="swap-modal-title" style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text);">Swap Recipe</h3>
             <div id="swap-modal-subtitle" style="font-size: 12px; color: var(--text2); margin-top: 2px;">Search across all recipes by title, ingredient, or tag.</div>
           </div>
-          <button type="button" class="btn ghost sm" onclick="window.PlannerMealSlot?.closeSearchableRecipeSwapModal?.() || (window.closeSearchableRecipeSwapModal && window.closeSearchableRecipeSwapModal())" style="font-size: 18px; line-height: 1; padding: 4px 8px;">✕</button>
+          <button type="button" class="btn ghost sm" data-action="close-searchable-recipe-swap-modal" style="font-size: 18px; line-height: 1; padding: 4px 8px;">✕</button>
         </div>
         <div style="padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--surface);">
           <input type="search" id="swap-modal-search" aria-label="Search recipe to swap" class="input" placeholder="Type recipe name, ingredient (e.g. chicken, tofu), or tag..." style="width: 100%; font-size: 14px; padding: 8px 12px;" oninput="window.PlannerMealSlot?.filterSearchableRecipeSwapModal?.(this.value) || (window.filterSearchableRecipeSwapModal && window.filterSearchableRecipeSwapModal(this.value))" autofocus name="swap-modal-search">
         </div>
         <div id="swap-modal-results" style="flex: 1; overflow-y: auto; padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; max-height: 55vh;"></div>
         <div style="padding: 12px 20px; border-top: 1px solid var(--border); background: var(--surface2); display: flex; justify-content: flex-end;">
-          <button type="button" class="btn ghost sm" onclick="window.PlannerMealSlot?.closeSearchableRecipeSwapModal?.() || (window.closeSearchableRecipeSwapModal && window.closeSearchableRecipeSwapModal())">Cancel</button>
+          <button type="button" class="btn ghost sm" data-action="close-searchable-recipe-swap-modal">Cancel</button>
         </div>
       </div>
     `;
@@ -252,7 +252,7 @@ export function filterSearchableRecipeSwapModal(query = '') {
           <span><strong>${cal}</strong> kcal</span><span>·</span><span><strong>${prot}g</strong> protein</span><span>·</span>${fitBadgeHtml}
         </div>
       </div>
-      <button type="button" class="btn sm primary" style="font-size:12px;font-weight:700;padding:6px 12px;white-space:nowrap;flex-shrink:0" onclick="window.PlannerMealSlot?.selectAndSwapRecipe?.('${escapeAttr(r.id)}', '${escapeAttr(variant)}') || (window.selectAndSwapRecipe && window.selectAndSwapRecipe('${escapeAttr(r.id)}', '${escapeAttr(variant)}'))">Select &amp; Swap</button>
+      <button type="button" class="btn sm primary" style="font-size:12px;font-weight:700;padding:6px 12px;white-space:nowrap;flex-shrink:0" data-action="select-and-swap-recipe" data-recipe-id="${escapeAttr(r.id)}" data-variant="${escapeAttr(variant)}">Select &amp; Swap</button>
     `;
     resultsContainer.appendChild(row);
   });

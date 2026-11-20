@@ -3,9 +3,8 @@
  * Facade for Data Quality Centre View.
  */
 
-import { dismissDataQualityAdvisory } from '../services/DataQualityService.js';
 import { getState } from '../store/store.js';
-import { runAudit, scanDataQualitySummary } from '../services/DataQualityScanner.js';
+import { runAudit, scanDataQualitySummary, dismissDataQualityAdvisory } from '../services/DataQualityScanner.js';
 import { showCustomConfirm, showCustomCopyModal } from '../components/ui/DialogHelpers.js';
 import {
   renderDataQualityView as _render,

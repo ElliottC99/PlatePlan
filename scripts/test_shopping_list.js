@@ -10,6 +10,10 @@
 import { generateShoppingListFromPlan } from '../src/services/ShoppingListService.js';
 import { aggregateShoppingListFromPlan } from '../src/services/ShoppingCalculationService.js';
 import { renderShoppingCategoriesList } from '../src/components/shopping/ShoppingCategoryGroup.js';
+import { renderShoppingItemRow } from '../src/components/shopping/ShoppingItemRow.js';
+import { executeSwapInState } from '../src/components/ProductSwapModal.js';
+import { toggleShoppingItemAcquired } from '../src/views/ShoppingView.js';
+import { store } from '../src/store/store.js';
 import { saveShoppingList } from '../src/repositories/ShoppingListRepository.js';
 import { clearCheckedShoppingItems } from '../src/components/shopping/ShoppingBatchToolbar.js';
 
@@ -20,6 +24,12 @@ let testFailures = 0;
 // Mock window/Firebase for Node environment
 if (typeof window === 'undefined') {
   global.window = {};
+}
+if (typeof document === 'undefined') {
+  global.document = { dispatchEvent: () => true };
+}
+if (typeof CustomEvent === 'undefined') {
+  global.CustomEvent = class CustomEvent { constructor(type, detail) { this.type = type; this.detail = detail; } };
 }
 
 // Test Data
@@ -206,6 +216,98 @@ async function testShoppingListEngine() {
   } else {
     console.error('❌ Test 6b Failed: HTML category/item order is not alphabetical.');
     testFailures++;
+  }
+  console.log('');
+
+  console.log('--- Test 7: Slice-weighted bread converts qty via itemWeight into packsNeeded and renders pack count ---');
+  const breadIngs = [{ id: 'ing_bread', name: 'Bread', category: 'Bakery', subtypes: [] }];
+  const breadProds = [{
+    id: 'prod_loaf_400',
+    name: 'Sourdough Loaf 400g',
+    ingredientId: 'ing_bread',
+    category: 'Bakery',
+    packSize: 400,
+    packUnit: 'g',
+    itemWeight: 50,
+    price: 2.0
+  }];
+  const breadRecipes = [{
+    id: 'rec_toast',
+    name: 'Toast',
+    serves: 1,
+    ingredients: [{ name: 'Bread', ingredientId: 'ing_bread', qty: 16, unit: 'slices' }]
+  }];
+  const breadPlan = { slots: { '2026-11-18': { breakfast: { recipeId: 'rec_toast', servings: 1 } } } };
+  const breadAgg = aggregateShoppingListFromPlan(breadPlan, breadRecipes, breadIngs, breadProds);
+  const breadRow = breadAgg.items[0];
+  const breadHtml = breadRow ? renderShoppingItemRow(breadRow) : '';
+
+  if (
+    breadRow &&
+    breadRow.buyQty === 16 &&
+    breadRow.unit === 'qty' &&
+    breadRow.grams === 800 &&
+    breadRow.packsNeeded === 2 &&
+    breadRow.cost === 4 &&
+    breadHtml.includes('2 packs (16 qty)')
+  ) {
+    console.log('✅ Test 7 Passed: 16 slices at 50g/slice on a 400g loaf resolves to 2 packs (16 qty) and £4.00.');
+  } else {
+    console.error('❌ Test 7 Failed:', { breadRow, breadHtml });
+    testFailures++;
+  }
+  console.log('');
+
+  console.log('--- Test 8: Swap preserves shoppingAtHome ticks and retains subtypeId for Tier 1 ---');
+  const tomAggWithSub = aggregateShoppingListFromPlan(tomPlan, tomRecipes, tomIngs, tomProds);
+  const cherryAggRow = tomAggWithSub.items.find(i => i.name.includes('Cherry Tomatoes'));
+  store.setState({
+    currentPlan: { slots: tomPlan.slots, shoppingAtHome: { 'ing_tomato:sub_baby_plum': true } },
+    plan: { slots: tomPlan.slots, shoppingAtHome: {} },
+    isDraftPlan: false
+  });
+  await executeSwapInState(cherryAggRow, { id: 'prod_cherry_alt', name: 'Organic Cherry Tomatoes', brand: 'Tesco', price: 1.5 });
+  const afterSwapPlan = store.getState().currentPlan;
+  if (
+    cherryAggRow?.subtypeId === 'sub_cherry' &&
+    afterSwapPlan?.shoppingAtHome?.['ing_tomato:sub_baby_plum'] === true &&
+    afterSwapPlan?.substitutions?.sub_cherry?.productId === 'prod_cherry_alt'
+  ) {
+    console.log('✅ Test 8 Passed: Shopping item carries subtypeId and product swap preserves currentPlan.shoppingAtHome ticks.');
+  } else {
+    console.error('❌ Test 8 Failed:', { cherryAggRow, afterSwapPlan });
+    testFailures++;
+  }
+  console.log('');
+
+  console.log('--- Test 9: toggleShoppingItemAcquired patches Step 3 container without full renderPlannerWizard ---');
+  const origGetById = global.document.getElementById;
+  const origRenderWizard = global.window.renderPlannerWizard;
+  const origComputeAgg = global.window.computeWizardShoppingAgg;
+  const origShoppingGroup = global.window.ShoppingCategoryGroup;
+  const origScrollTo = global.window.scrollTo;
+  let fullRenderCalls = 0;
+  let scrollCalls = 0;
+  const step3Container = { innerHTML: 'stale' };
+  global.document.getElementById = (id) => (id === 'planner-step3-shopping-content' ? step3Container : null);
+  global.window.renderPlannerWizard = () => { fullRenderCalls++; };
+  global.window.computeWizardShoppingAgg = () => ({ items: [{ name: 'Cherry Tomatoes', atHomeKey: 'ing_tomato:sub_cherry' }], totalCost: 2 });
+  global.window.ShoppingCategoryGroup = { renderShoppingCategoriesList: (list) => `<div data-count="${list.length}">updated</div>` };
+  global.window.scrollTo = () => { scrollCalls++; };
+  try {
+    toggleShoppingItemAcquired('ing_tomato:sub_cherry');
+    if (fullRenderCalls === 0 && step3Container.innerHTML.includes('updated') && scrollCalls === 1) {
+      console.log('✅ Test 9 Passed: Step 3 container patched in place with zero full renderPlannerWizard calls.');
+    } else {
+      console.error('❌ Test 9 Failed:', { fullRenderCalls, innerHTML: step3Container.innerHTML, scrollCalls });
+      testFailures++;
+    }
+  } finally {
+    global.document.getElementById = origGetById;
+    global.window.renderPlannerWizard = origRenderWizard;
+    global.window.computeWizardShoppingAgg = origComputeAgg;
+    global.window.ShoppingCategoryGroup = origShoppingGroup;
+    global.window.scrollTo = origScrollTo;
   }
   console.log('');
 }

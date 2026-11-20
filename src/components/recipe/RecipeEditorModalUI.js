@@ -76,8 +76,8 @@ export function renderProteinEfficiencyAnalysisSection(modalIngs = [], recipe = 
         </div>
         <div style="display:flex;align-items:center;gap:6px">
           <span class="badge ${tagClass}" style="font-size:11px">${displayPPer100}g P / 100 kcal</span>
-          ${!isBest ? `<button type="button" class="btn sm ghost" onclick="searchSubstituteForIngredient('${escapeAttr(prefix)}', '${escapeAttr(item.name)}')">Replace</button>` : ''}
-          <button type="button" class="btn sm ghost" onclick="highlightReviewIngredientRow('${escapeAttr(prefix)}', ${item.idx})">Locate</button>
+          ${!isBest ? `<button type="button" class="btn sm ghost" data-action="search-substitute-for-ingredient" data-prefix="${escapeAttr(prefix)}" data-name="${escapeAttr(item.name)}">Replace</button>` : ''}
+          <button type="button" class="btn sm ghost" data-action="highlight-review-ingredient-row" data-prefix="${escapeAttr(prefix)}" data-idx="${item.idx}">Locate</button>
         </div>
       </div>
     `;

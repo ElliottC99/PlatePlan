@@ -6,7 +6,7 @@
 
 import { getState, setProducts, setIngredients } from '../store/store.js';
 import { saveProduct, deleteProduct } from '../services/ProductRepository.js';
-import { saveRootItem } from '../services/RootItemRepository.js';
+import { saveRootItem } from '../services/PantryTaxonomyService.js';
 import { commitAtomicChain } from '../services/PantryTaxonomyService.js';
 import { reallocateProduct, setAutoDefaultProduct, getActiveCategories, addSubtypeToIngredient } from '../models/PantryHierarchyModel.js';
 import { promptReallocateProduct as openReallocateModal } from '../components/pantry/ReallocateProductModalUI.js';

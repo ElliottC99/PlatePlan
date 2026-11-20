@@ -16,7 +16,7 @@ export function renderPlannerWizardView({ currentStep = 1, hasActivePlan = false
     const isCompleted = s.num < currentStep;
     const cls = isActive ? 'active' : (isCompleted ? 'completed' : '');
     return `
-      <button type="button" class="wizard-step-item ${cls}" onclick="setPlannerWizardStep(${s.num})" ${s.num > 1 && !hasActivePlan && s.num !== currentStep ? 'disabled' : ''}>
+      <button type="button" class="wizard-step-item ${cls}" data-action="set-step" data-step="${s.num}" ${s.num > 1 && !hasActivePlan && s.num !== currentStep ? 'disabled' : ''}>
         <span class="step-badge">${isCompleted ? '✓' : s.num}</span>
         <span class="step-label">${s.label}</span>
       </button>

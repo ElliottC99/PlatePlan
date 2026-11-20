@@ -1,7 +1,9 @@
 import { getState } from '../store/coreState.js';
 import { getCanonicalIngredientId, calculateShoppingItemCost } from '../services/ShoppingCalculationService.js';
 import { store, setActivePlan, setShoppingList } from '../store/store.js';
+import { saveCurrentPlan } from '../services/HouseholdRepository.js';
 import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
+import { calculateItemNutrition } from '../services/NutritionService.js';
 
 /**
  * src/components/ProductSwapModal.js (v3.31.41)
@@ -88,10 +90,14 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
     if (targetItem.key && targetItem.key !== targetItem.id) candidateKeys.push(String(targetItem.key));
   }
 
-  const activePlanKey = storeState.isDraftPlan ? 'draftPlan' : (storeState.plan ? 'plan' : 'currentPlan');
+  const activePlanKey = storeState.isDraftPlan ? 'draftPlan' : (storeState.currentPlan ? 'currentPlan' : 'plan');
   const basePlan = storeState[activePlanKey] || storeState.currentPlan || storeState.plan || {};
   const updatedPlan = JSON.parse(JSON.stringify(basePlan));
 
+  updatedPlan.shoppingAtHome = {
+    ...(storeState.currentPlan?.shoppingAtHome || {}),
+    ...(updatedPlan.shoppingAtHome || {})
+  };
   updatedPlan.substitutions = updatedPlan.substitutions || {};
   updatedPlan.productSelections = updatedPlan.productSelections || {};
   const subPayload = { productId: newProduct.id, productName: newProduct.name, brand: newProduct.brand || '', price: newProduct.price || 0, timestamp: Date.now() };
@@ -112,6 +118,9 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
   if (typeof store !== 'undefined' && typeof store.setState === 'function') store.setState({ [activePlanKey]: updatedPlan, currentPlan: updatedPlan, plan: updatedPlan });
   if (typeof setActivePlan === 'function') setActivePlan(updatedPlan);
   else if (window.store?.setActivePlan) window.store.setActivePlan(updatedPlan);
+  if (!storeState.isDraftPlan && typeof saveCurrentPlan === 'function') {
+    saveCurrentPlan(updatedPlan).catch(err => console.warn('[ProductSwapModal] Failed saving plan swap:', err));
+  }
 
   let updatedItems = [];
   if (typeof window.computeWizardShoppingAgg === 'function') {
@@ -142,24 +151,33 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
   const canonicalIngId = getCanonicalIngredientId(targetItem, ingredients);
   const targetIngId = canonicalIngId || targetItem?.groupId || targetItem?.ingredientId;
   const currentBank = targetItem?.bankIng || {};
+  const currentProductId = String(currentBank.id || targetItem?.bankIng?.id || targetItem?.id || '');
 
-  let targetSubId = currentBank.subTypeId || currentBank.subtypeId || targetItem?.subTypeId || targetItem?.subtypeId;
+  let targetSubId = currentBank.subTypeId || currentBank.subtypeId || targetItem?.subTypeId || targetItem?.subtypeId || null;
+  if (!targetSubId && typeof targetItem?.atHomeKey === 'string' && targetItem.atHomeKey.includes(':')) {
+    const [, keySubPart] = targetItem.atHomeKey.split(':');
+    if (keySubPart && keySubPart.startsWith('sub_')) targetSubId = keySubPart;
+  }
   if (!targetSubId && targetIngId) {
     const parentIng = ingredients.find(i => String(i.id) === String(targetIngId));
     if (parentIng && Array.isArray(parentIng.subtypes)) {
-      targetSubId = (parentIng.subtypes.find(s => s.name === targetItem.name) || parentIng.subtypes[0])?.id;
+      targetSubId = (parentIng.subtypes.find(s => String(s.name || '').toLowerCase() === String(targetItem?.name || '').toLowerCase()) || parentIng.subtypes[0])?.id || null;
     }
   }
 
-  const tier1Items = products.filter(p => p.id !== targetItem?.id && targetSubId && (p.subTypeId === targetSubId || p.subtypeId === targetSubId));
+  const tier1Items = products.filter(p =>
+    String(p.id) !== currentProductId &&
+    targetSubId &&
+    String(p.subTypeId || p.subtypeId || '') === String(targetSubId)
+  );
   const tier2Items = products.filter(p => {
-    if (p.id === targetItem?.id || tier1Items.some(t => t.id === p.id)) return false;
+    if (String(p.id) === currentProductId || tier1Items.some(t => String(t.id) === String(p.id))) return false;
     return Boolean((p.ingredientId && currentBank.ingredientId && String(p.ingredientId) === String(currentBank.ingredientId)) || (p.groupId && currentBank.groupId && String(p.groupId) === String(currentBank.groupId)) || (targetIngId && (String(p.ingredientId) === String(targetIngId) || String(p.groupId) === String(targetIngId))));
   });
 
   const tier3Items = products;
   const targetSubtype = inferSubtype(targetItem);
-  let currentSort = 'relevance', currentTierTab = 'tier1', selectedSubstituteProduct = null;
+  let currentSort = 'fitScore', currentTierTab = 'tier1', selectedSubstituteProduct = null;
 
   const overlay = document.createElement('div');
   overlay.id = 'pp-swap-product-modal';
@@ -179,6 +197,7 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
         <label for="pp-product-search" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0">Search substitute products</label>
         <input type="text" id="pp-product-search" name="productSubstituteSearch" aria-label="Search substitute products" placeholder="🔍 Search substitute products..." style="flex:1;min-width:0;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none;background:var(--surface);color:var(--text);">
         <select id="pp-product-sort" name="productSubstituteSort" aria-label="Sort options" style="flex:0 0 140px;max-width:140px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;background:var(--surface);color:var(--text);cursor:pointer;">
+          <option value="fitScore">Sort: Fit Score</option>
           <option value="relevance">Sort: Default</option>
           <option value="name">Sort: Name (A-Z)</option>
           <option value="proteinPerKcal">Sort: Protein / kcal</option>
@@ -233,9 +252,79 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     });
   }
 
+  const breakdowns = Array.isArray(targetItem?.recipeBreakdown) ? targetItem.recipeBreakdown : [];
+  const primaryUsage = breakdowns[0] || {};
+  const mealType = primaryUsage.mealType || 'dinner';
+  const targetRecipe = (state.recipes || []).find(r => {
+    const rName = String(r.title || r.name || '').toLowerCase().trim();
+    return breakdowns.some(b => {
+      const bName = String(b.recipeName || b.title || '').toLowerCase().trim();
+      return bName && (rName === bName || rName.includes(bName) || bName.includes(rName));
+    });
+  }) || (state.recipes || [])[0];
+
+  let baseScore = 50;
+  let hasValidRecipe = false;
+  if (targetRecipe && typeof calculateMealFitScore === 'function') {
+    hasValidRecipe = true;
+    const baseScoreResult = calculateMealFitScore(targetRecipe, mealType, { activeProfile: 'everyone', preferences: state.preferences || state.userPrefs });
+    baseScore = typeof baseScoreResult === 'number' ? baseScoreResult : (baseScoreResult?.score || 50);
+  }
+
+  function evaluateSwapFitScore(item) {
+    if (!hasValidRecipe || !targetRecipe) return { baseScore, newScore: baseScore, delta: 0 };
+    const serves = Math.max(1, Number(targetRecipe.servings || targetRecipe.serves || 1));
+    const usageQty = Number(primaryUsage.qty || targetItem?.buyQty || 100) || 100;
+    const usageUnit = targetItem?.unit || 'g';
+    const currNut = (currentBank && Object.keys(currentBank).length && typeof calculateItemNutrition === 'function')
+      ? calculateItemNutrition(currentBank, usageQty, usageUnit)
+      : { protein: Number(currentBank?.protein || currentBank?.prot || 0), kcal: Number(currentBank?.calories || currentBank?.cal || currentBank?.kcal || 0) };
+    const candNut = (typeof calculateItemNutrition === 'function')
+      ? calculateItemNutrition(item, usageQty, usageUnit)
+      : { protein: Number(item.protein || item.prot || 0), kcal: Number(item.calories || item.cal || item.kcal || 0) };
+
+    const protDiff = Math.round(((candNut.protein - currNut.protein) / serves) * 10) / 10;
+    const calDiff = Math.round((candNut.kcal - currNut.kcal) / serves);
+
+    const clonedRecipe = JSON.parse(JSON.stringify(targetRecipe));
+    const applyDeltasToNode = (node) => {
+      if (!node || typeof node !== 'object') return;
+      if (node.perServing) {
+        if (typeof node.perServing.prot === 'number') node.perServing.prot += protDiff;
+        if (typeof node.perServing.protein === 'number') node.perServing.protein += protDiff;
+        if (typeof node.perServing.cal === 'number') node.perServing.cal += calDiff;
+        if (typeof node.perServing.calories === 'number') node.perServing.calories += calDiff;
+      }
+      if (node.nutrition?.perServing) {
+        if (typeof node.nutrition.perServing.prot === 'number') node.nutrition.perServing.prot += protDiff;
+        if (typeof node.nutrition.perServing.protein === 'number') node.nutrition.perServing.protein += protDiff;
+        if (typeof node.nutrition.perServing.cal === 'number') node.nutrition.perServing.cal += calDiff;
+        if (typeof node.nutrition.perServing.calories === 'number') node.nutrition.perServing.calories += calDiff;
+      }
+      if (typeof node.prot === 'number') node.prot += protDiff;
+      if (typeof node.protein === 'number') node.protein += protDiff;
+      if (typeof node.cal === 'number') node.cal += calDiff;
+      if (typeof node.calories === 'number') node.calories += calDiff;
+      if (typeof node.kcal === 'number') node.kcal += calDiff;
+    };
+
+    applyDeltasToNode(clonedRecipe);
+    if (clonedRecipe.enhanced) applyDeltasToNode(clonedRecipe.enhanced);
+
+    const newScoreResult = calculateMealFitScore(clonedRecipe, mealType, { activeProfile: 'everyone', preferences: state.preferences || state.userPrefs });
+    const newScore = typeof newScoreResult === 'number' ? newScoreResult : (newScoreResult?.score || baseScore);
+    return { baseScore, newScore, delta: newScore - baseScore };
+  }
+
   function sortItems(items) {
     const sorted = [...items];
     switch (currentSort) {
+      case 'fitScore':
+        return sorted.sort((a, b) => {
+          const scoreDiff = evaluateSwapFitScore(b).newScore - evaluateSwapFitScore(a).newScore;
+          if (scoreDiff !== 0) return scoreDiff;
+          return calculateMetrics(b).proteinPerKcal - calculateMetrics(a).proteinPerKcal;
+        });
       case 'name': return sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       case 'proteinPerKcal': return sorted.sort((a, b) => calculateMetrics(b).proteinPerKcal - calculateMetrics(a).proteinPerKcal);
       case 'proteinPerPound': return sorted.sort((a, b) => calculateMetrics(b).proteinPerPound - calculateMetrics(a).proteinPerPound);
@@ -258,30 +347,11 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     let displayItems = [];
     if (currentTierTab === 'tier1') displayItems = sortItems(tier1Items.filter(matchesQuery));
     else if (currentTierTab === 'tier2') displayItems = sortItems(tier2Items.filter(matchesQuery));
-    else displayItems = sortItems(tier3Items.filter(p => p.id !== targetItem?.id && matchesQuery(p))).slice(0, MAX_SWAP_RESULTS);
+    else displayItems = sortItems(tier3Items.filter(p => String(p.id) !== currentProductId && matchesQuery(p))).slice(0, MAX_SWAP_RESULTS);
 
     if (displayItems.length === 0) {
       listEl.innerHTML = `<div style="text-align:center;padding:28px;color:#94a3b8;font-size:13px;">No substitute products found in this tier.</div>`;
       return;
-    }
-
-    const breakdowns = Array.isArray(targetItem?.recipeBreakdown) ? targetItem.recipeBreakdown : [];
-    const primaryUsage = breakdowns[0] || {};
-    const mealType = primaryUsage.mealType || 'dinner';
-    const targetRecipe = (state.recipes || []).find(r => {
-      const rName = String(r.title || r.name || '').toLowerCase().trim();
-      return breakdowns.some(b => {
-        const bName = String(b.recipeName || b.title || '').toLowerCase().trim();
-        return bName && (rName === bName || rName.includes(bName) || bName.includes(rName));
-      });
-    }) || (state.recipes || [])[0];
-
-    let baseScore = 50;
-    let hasValidRecipe = false;
-    if (targetRecipe && typeof calculateMealFitScore === 'function') {
-      hasValidRecipe = true;
-      const baseScoreResult = calculateMealFitScore(targetRecipe, mealType, { activeProfile: 'everyone', preferences: state.preferences || state.userPrefs });
-      baseScore = typeof baseScoreResult === 'number' ? baseScoreResult : (baseScoreResult?.score || 50);
     }
 
     listEl.innerHTML = displayItems.map(item => {
@@ -290,43 +360,7 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
 
       let badgeHtml = '';
       if (hasValidRecipe && targetRecipe) {
-        const currentProt = Number(targetItem.bankIng?.protein || targetItem.bankIng?.prot || 0);
-        const currentCal = Number(targetItem.bankIng?.calories || targetItem.bankIng?.cal || targetItem.bankIng?.kcal || 0);
-        const candProt = Number(item.protein || item.prot || 0);
-        const candCal = Number(item.calories || item.cal || item.kcal || 0);
-
-        const protDiff = Math.round((candProt - currentProt) * 10) / 10;
-        const calDiff = Math.round(candCal - currentCal);
-
-        const clonedRecipe = JSON.parse(JSON.stringify(targetRecipe));
-
-        const applyDeltasToNode = (node) => {
-          if (!node || typeof node !== 'object') return;
-          if (node.perServing) {
-            if (typeof node.perServing.prot === 'number') node.perServing.prot += protDiff;
-            if (typeof node.perServing.protein === 'number') node.perServing.protein += protDiff;
-            if (typeof node.perServing.cal === 'number') node.perServing.cal += calDiff;
-            if (typeof node.perServing.calories === 'number') node.perServing.calories += calDiff;
-          }
-          if (node.nutrition?.perServing) {
-            if (typeof node.nutrition.perServing.prot === 'number') node.nutrition.perServing.prot += protDiff;
-            if (typeof node.nutrition.perServing.protein === 'number') node.nutrition.perServing.protein += protDiff;
-            if (typeof node.nutrition.perServing.cal === 'number') node.nutrition.perServing.cal += calDiff;
-            if (typeof node.nutrition.perServing.calories === 'number') node.nutrition.perServing.calories += calDiff;
-          }
-          if (typeof node.prot === 'number') node.prot += protDiff;
-          if (typeof node.protein === 'number') node.protein += protDiff;
-          if (typeof node.cal === 'number') node.cal += calDiff;
-          if (typeof node.calories === 'number') node.calories += calDiff;
-          if (typeof node.kcal === 'number') node.kcal += calDiff;
-        };
-
-        applyDeltasToNode(clonedRecipe);
-        if (clonedRecipe.enhanced) applyDeltasToNode(clonedRecipe.enhanced);
-
-        const newScoreResult = calculateMealFitScore(clonedRecipe, mealType, { activeProfile: 'everyone', preferences: state.preferences || state.userPrefs });
-        const newScore = typeof newScoreResult === 'number' ? newScoreResult : (newScoreResult?.score || baseScore);
-        const delta = newScore - baseScore;
+        const { newScore, delta } = evaluateSwapFitScore(item);
 
         const sign = delta > 0 ? '+' : '';
         const badgeBg = delta > 0 ? 'var(--badge-green-bg)' : (delta < 0 ? 'var(--badge-red-bg)' : 'var(--badge-neutral-bg)');

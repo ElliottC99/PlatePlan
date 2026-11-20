@@ -9,7 +9,7 @@
 
 import { strict as assert } from 'assert';
 import { calculateItemNutrition, rollupNutritionTotals } from '../src/services/NutritionService.js';
-import { calculateRecipeDynamicMacros } from '../src/services/DataQualityScannerService.js';
+import { calculateRecipeDynamicMacros } from '../src/services/DataQualityScanner.js';
 
 console.log('=== RUNNING SINGLE-TRUTH RECIPE SERVINGS VERIFICATION SUITE ===\n');
 

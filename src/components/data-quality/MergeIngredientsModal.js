@@ -5,7 +5,7 @@
  */
 
 import { getState, setIngredients, setProducts, setRecipes, setCurrentPlan } from '../../store/store.js';
-import { batchMergeIngredientsInDb } from '../../services/RootItemRepository.js';
+import { batchMergeIngredientsInDb } from '../../services/PantryTaxonomyService.js';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -62,7 +62,7 @@ export function openMergeIngredientsModal(issue = {}) {
           <h2 style="font-size:18px; font-weight:750; margin:0; color:var(--text,#1c1917);">Review &amp; Merge Duplicate Ingredients</h2>
           <p style="font-size:12.5px; color:var(--text2,#78716c); margin:4px 0 0 0;">Compare candidate duplicates and select the canonical entry to keep.</p>
         </div>
-        <button type="button" class="btn sm ghost" style="padding:4px 8px; font-size:16px; line-height:1;" onclick="window.closeMergeIngredientsModal()">✕</button>
+        <button type="button" class="btn sm ghost" style="padding:4px 8px; font-size:16px; line-height:1;" data-action="close-merge-ingredients-modal">✕</button>
       </div>
 
       <!-- Side-by-side comparison table -->
@@ -114,7 +114,7 @@ export function openMergeIngredientsModal(issue = {}) {
       </div>
 
       <div style="display:flex; gap:10px; justify-content:flex-end;">
-        <button type="button" class="btn sm ghost" onclick="window.closeMergeIngredientsModal()">Cancel</button>
+        <button type="button" class="btn sm ghost" data-action="close-merge-ingredients-modal">Cancel</button>
         <button type="button" class="btn sm primary" id="confirm-merge-btn" style="font-weight:700; background:var(--primary,#4f46e5); color:#fff; border-radius:8px; padding:8px 16px;">Approve &amp; Merge Atoms</button>
       </div>
     </div>

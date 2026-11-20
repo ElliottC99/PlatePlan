@@ -5,7 +5,7 @@
 
 import { getState, setIngredients, runOptimisticMutation } from '../store/store.js';
 import { runAudit } from '../services/DataQualityScanner.js';
-import { saveRootItem as saveIngredient } from '../services/RootItemRepository.js';
+import { saveRootItem as saveIngredient } from '../services/PantryTaxonomyService.js';
 import { savePreferencesWithAutoPrune } from '../services/HouseholdRepository.js';
 import { openMacroDriftPreviewModal } from '../components/data-quality/MacroDriftPreviewModal.js';
 import { openSubtypeOrphanResolverModal } from '../components/data-quality/SubtypeOrphanResolverModal.js';
@@ -18,7 +18,7 @@ import { findDuplicateCategoryClusters } from '../components/pantry/CategoryMerg
 import { findDuplicateRecipeClusters } from '../services/RecipeFirestoreRepository.js';
 import { openRecipeDeduplicationModal } from './RecipeVaultView.js';
 import { auditRecipeMappings } from '../utils/RecipeAuditService.js';
-import { performGlobalProductRelink, verifyZeroCalorieIngredient } from '../services/DataQualityService.js';
+import { performGlobalProductRelink, verifyZeroCalorieIngredient } from '../services/DataQualityScanner.js';
 import { showCustomDensityModal } from '../components/ui/DialogHelpers.js';
 
 export function escapeHtml(str) {
