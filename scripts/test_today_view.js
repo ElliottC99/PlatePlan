@@ -219,4 +219,28 @@ assert.ok(!macroHtml.includes('Carbs'), 'Nutrition card omits Carbs');
 assert.ok(!macroHtml.includes('Fat'), 'Nutrition card omits Fat');
 console.log('✅ Daily Nutrition card shows Elliott and Chloe Calories & Protein targets without Carbs or Fat');
 
+// 10. Today meal card View button passes target-person, meal-type, and target-serves (2 for shared, 1 for single)
+const { renderTodayMealCard } = await import('../src/views/TodayRenderService.js');
+const sharedDinnerHtml = renderTodayMealCard(
+  { type: 'dinner', label: 'Dinner', icon: '🍲' },
+  { info: { active: { id: 'rec-shared', name: 'Family Curry', serves: 4, macros: { calories: 500, protein: 30 } }, instanceId: '', variant: 'original' }, person: 'both' },
+  {},
+  'd1',
+  '2026-11-25'
+);
+assert.ok(sharedDinnerHtml.includes('data-target-person="both"'), 'Shared dinner View button includes data-target-person="both"');
+assert.ok(sharedDinnerHtml.includes('data-meal-type="dinner"'), 'Shared dinner View button includes data-meal-type="dinner"');
+assert.ok(sharedDinnerHtml.includes('data-target-serves="2"'), 'Shared dinner View button includes data-target-serves="2"');
+
+const singleLunchHtml = renderTodayMealCard(
+  { type: 'lunch', label: 'Lunch', icon: '🥗' },
+  { info: { active: { id: 'rec-e-only', name: 'Wrap E', serves: 4, macros: { calories: 600, protein: 45 } }, instanceId: '', variant: 'original' }, person: 'e' },
+  {},
+  'd1',
+  '2026-11-25'
+);
+assert.ok(singleLunchHtml.includes('data-target-person="e"'), 'Single-person View button includes data-target-person="e"');
+assert.ok(singleLunchHtml.includes('data-target-serves="1"'), 'Single-person View button includes data-target-serves="1"');
+console.log('✅ Today meal card View button carries target-person, meal-type, and target-serves');
+
 console.log('\n=== TODAY VIEW SUITE PASSED ===');

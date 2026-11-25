@@ -37,12 +37,15 @@ export function routeRecipeAction(actionName, target, event, parseArgsString) {
     const instanceId = ds.instanceId || args[1] || null;
     const variant = ds.variant || args[2] || 'original';
     const targetPerson = ds.targetPerson || args[3] || 'both';
+    const mealType = ds.mealType || args[4] || null;
+    const rawTargetServes = ds.targetServes ?? args[5] ?? null;
+    const targetServes = rawTargetServes !== null && rawTargetServes !== '' ? Number(rawTargetServes) : null;
 
     if (recipeId) {
       if (typeof window.viewRecipe === 'function') {
-        window.viewRecipe(recipeId, instanceId, variant, targetPerson);
+        window.viewRecipe(recipeId, instanceId, variant, targetPerson, mealType, targetServes);
       } else if (typeof window.openRecipeModal === 'function') {
-        window.openRecipeModal(recipeId, instanceId, variant, targetPerson);
+        window.openRecipeModal(recipeId, instanceId, variant, targetPerson, mealType, targetServes);
       }
     }
     return true;

@@ -180,9 +180,16 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
     const targetServings = Number(slotNode?.servings || personCount || 1) || 1;
     const scaleMultiplier = targetServings / baseServings;
 
-    const rawIngs = (variant === 'enhanced' && fullRecipe.enhanced && Array.isArray(fullRecipe.enhanced.ingredients))
-      ? fullRecipe.enhanced.ingredients
-      : (Array.isArray(fullRecipe.ingredients) ? fullRecipe.ingredients : []);
+    const extractIngredientsList = (obj) => {
+      if (!obj || typeof obj !== 'object') return [];
+      if (Array.isArray(obj.ingredientSections) && obj.ingredientSections.length > 0) {
+        const fromSections = obj.ingredientSections.flatMap(sec => Array.isArray(sec?.ingredients) ? sec.ingredients : []);
+        if (fromSections.length > 0) return fromSections;
+      }
+      return Array.isArray(obj.ingredients) ? obj.ingredients : [];
+    };
+    const enhancedIngs = (variant === 'enhanced' && fullRecipe.enhanced) ? extractIngredientsList(fullRecipe.enhanced) : [];
+    const rawIngs = enhancedIngs.length > 0 ? enhancedIngs : extractIngredientsList(fullRecipe);
 
     const recipeName = fullRecipe.title || fullRecipe.name || 'Recipe';
     const matchedPrep = prepGroups.find(g => String(g.recipeId).split('::')[0] === String(recipeId) && Array.isArray(g.days) && g.days.some(d => Number(d) === Number(dayNum)));
@@ -199,12 +206,17 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
 
     rawIngs.forEach(ing => {
       if (!ing) return;
-      const rawName = typeof ing === 'string' ? ing : (ing.name || ing.ingredient || ing.title || ing.item || ing.raw || '');
-      if (!rawName) return;
-
       const ingId = typeof ing === 'object' ? (ing.id || ing.ingredientId || ing.groupId || null) : null;
       const subId = typeof ing === 'object' ? (ing.subtypeId || ing.subTypeId || null) : null;
       const prodId = typeof ing === 'object' ? (ing.productId || ing.bankId || null) : null;
+
+      let rawName = typeof ing === 'string' ? ing : (ing.name || ing.ingredient || ing.title || ing.item || ing.raw || '');
+      if (!rawName && (ingId || subId)) {
+        const fallbackRoot = ingredientsBank.find(i => String(i.id) === String(ingId) || (subId && (i.subtypes || []).some(s => String(s.id) === String(subId))));
+        const fallbackSub = subId ? fallbackRoot?.subtypes?.find(s => String(s.id) === String(subId)) : null;
+        rawName = fallbackSub?.name || fallbackRoot?.name || '';
+      }
+      if (!rawName) return;
 
       const canonicalIngId = getCanonicalIngredientId(ing, ingredientsBank);
 
@@ -216,6 +228,10 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
       const lookupKeys = [
         subId, ing.subtypeId, ing.subTypeId, canonicalIngId, ing.bankId, ing.productId, ing.id, ing.ingredientId, ing.groupId, ingId, rawName
       ].filter(Boolean).map(String);
+      // Sub-type lines must not fall back to unscoped root-item selections, which belong to another sub-type.
+      const globalLookupKeys = subId
+        ? [subId, ing.subtypeId, ing.subTypeId, ing.bankId, ing.productId].filter(Boolean).map(String)
+        : lookupKeys;
 
       let overriddenProductId = null;
       for (const evId of candidateEventIds) {
@@ -229,7 +245,7 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
         if (overriddenProductId) break;
       }
       if (!overriddenProductId) {
-        for (const k of lookupKeys) {
+        for (const k of globalLookupKeys) {
           const globalSub = planSubstitutions?.[k];
           if (globalSub) { overriddenProductId = typeof globalSub === 'object' ? (globalSub.productId || globalSub.id) : globalSub; break; }
           const globalSel = planProductSelections?.[k];
@@ -255,22 +271,49 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
         preferences: appState.preferences || appState.settings || {}
       }) || getFallbackProductData(rawName);
 
-      const resolvedId = overriddenProductId || matchedProd?.id || canonicalIngId || rawName;
-      const key = String(resolvedId).toLowerCase().replace(/\s+/g, '_');
-      // At-home ticks are keyed by sub-type/ingredient line (not product), so swapping brands keeps the tick
-      // while distinct sub-types or items under one root (e.g. Cherry Tomatoes vs Baby Plum Tomatoes) tick separately.
       const effectiveSubId = subId || ing.subtypeId || ing.subTypeId || matchedProd?.subtypeId || matchedProd?.subTypeId || null;
       const rootOrIngId = canonicalIngId || matchedIng?.id || ingId || null;
-      const rawAtHomeBase = effectiveSubId
-        ? `${rootOrIngId || 'ing'}:${effectiveSubId}`
-        : (rootOrIngId && rawName ? `${rootOrIngId}:${rawName}` : (rootOrIngId || rawName));
-      const atHomeKey = String(rawAtHomeBase).toLowerCase().replace(/\s+/g, '_');
-      const rawQty = Number(ing.qty ?? ing.quantity ?? ing.amount ?? 1);
+      const isProductlessSubtypeFallback = Boolean(
+        subId &&
+        !overriddenProduct &&
+        matchedProd &&
+        String(matchedProd.subtypeId || matchedProd.subTypeId || '') !== String(subId)
+      );
+      const validOverrideId = overriddenProduct ? (overriddenProduct.id || overriddenProductId) : null;
+      const resolvedId = isProductlessSubtypeFallback
+        ? `sub_${subId}`
+        : (validOverrideId || matchedProd?.id || canonicalIngId || rawName);
+
+      const rawQtyInput = ing.qty ?? ing.quantity ?? ing.amount;
+      let rawQty = 1;
+      if (typeof rawQtyInput === 'number' && Number.isFinite(rawQtyInput)) {
+        rawQty = rawQtyInput;
+      } else if (typeof rawQtyInput === 'string' && rawQtyInput.trim()) {
+        const fracMatch = rawQtyInput.trim().match(/^(\d+)\s*\/\s*(\d+)$/);
+        if (fracMatch && Number(fracMatch[2]) > 0) {
+          rawQty = Number(fracMatch[1]) / Number(fracMatch[2]);
+        } else {
+          const parsed = Number(rawQtyInput);
+          rawQty = Number.isFinite(parsed) ? parsed : 1;
+        }
+      }
       const rawUnit = String(ing.unit || '').trim();
 
       const strict = convertToStrictUnit(rawQty, rawUnit, rawName);
       const slotQty = strict.qty * scaleMultiplier;
       const canonicalUnit = strict.unit;
+
+      const key = `${String(resolvedId).toLowerCase().replace(/\s+/g, '_')}:${String(canonicalUnit || 'qty').toLowerCase()}`;
+      // At-home ticks are keyed by sub-type/ingredient line (not product), so swapping brands keeps the tick
+      // while distinct sub-types or items under one root (e.g. Cherry Tomatoes vs Baby Plum Tomatoes) tick separately.
+      const rawAtHomeBase = effectiveSubId
+        ? `${rootOrIngId || 'ing'}:${effectiveSubId}`
+        : (rootOrIngId && rawName ? `${rootOrIngId}:${rawName}` : (rootOrIngId || rawName));
+      const atHomeKey = String(rawAtHomeBase).toLowerCase().replace(/\s+/g, '_');
+
+      const displayName = isProductlessSubtypeFallback
+        ? (matchedIng?.subtypes?.find(s => String(s.id) === String(subId))?.name || rawName)
+        : (matchedProd?.name || matchedIng?.name || rawName);
 
       const existing = aggregatedMap.get(key) || {
         key,
@@ -278,11 +321,11 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
         groupId: canonicalIngId || matchedIng?.id || ingId || key,
         ingredientId: canonicalIngId || matchedIng?.id || ingId,
         subtypeId: effectiveSubId || null,
-        name: matchedProd?.name || matchedIng?.name || rawName,
-        brand: matchedProd?.brand || 'Tesco',
+        name: displayName,
+        brand: isProductlessSubtypeFallback ? 'Pantry' : (matchedProd?.brand || 'Tesco'),
         cat: matchedIng?.category || ing.categoryId || ing.category || matchedProd?.category || matchedProd?.cat || 'General Groceries',
         category: matchedIng?.category || ing.categoryId || ing.category || matchedProd?.category || matchedProd?.cat || 'General Groceries',
-        bankIng: matchedProd,
+        bankIng: isProductlessSubtypeFallback ? null : matchedProd,
         buyQty: 0,
         requiredQty: 0,
         inStockQty: 0,
