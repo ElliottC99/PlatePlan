@@ -10,6 +10,7 @@ import { isRecipeVariantFavourite } from '../views/RecipeVaultView.js';
 import { calculateMealFitScore, getFitScoreTierMeta, extractRecipeMacros } from '../utils/fitScoreCalculator.js';
 import { resolveMealSplitPercentages } from '../utils/nutritionCalculator.js';
 import { getState } from '../store/store.js';
+import { normalizeMethodSteps } from '../utils/stringUtils.js';
 import { openEnhancementModal } from '../components/recipe/RecipeEnhancementModalUI.js';
 import { saveRecipe } from './HouseholdRepository.js';
 
@@ -61,7 +62,10 @@ function computeRecipeScaleMultiplier(activeR, mode, targetServes = 2, singleSer
     const eDaily = Number(eProf.dailyKcal) || 1950;
     const cDaily = Number(cProf.dailyKcal) || 1350;
 
-    const mealType = String(activeR.types?.[0] || activeR.type || 'dinner').toLowerCase();
+    const resolvedMealType = (previewState.mealType && previewState.mealType !== 'all')
+      ? previewState.mealType
+      : (activeR.types?.[0] || activeR.type || 'dinner');
+    const mealType = String(resolvedMealType).toLowerCase();
     const eSplits = typeof resolveMealSplitPercentages === 'function' ? resolveMealSplitPercentages(userPrefs, 'elliott').calories : { breakfast: 25, lunch: 30, snacking: 10, dinner: 35 };
     const cSplits = typeof resolveMealSplitPercentages === 'function' ? resolveMealSplitPercentages(userPrefs, 'chloe').calories : { breakfast: 25, lunch: 30, snacking: 10, dinner: 35 };
     const ePct = Number(eSplits[mealType] ?? eSplits.dinner ?? 35) / 100;
@@ -213,7 +217,7 @@ export function renderRecipePreview() {
   const ingredientsHtml = renderRecipeIngredientsListHTML(ingredients, state, scaleMultiplier, sections);
 
   // Render method steps
-  const steps = Array.isArray(activeR.method || activeR.steps) ? (activeR.method || activeR.steps) : [];
+  const steps = normalizeMethodSteps(activeR, r);
   const methodHtml = steps.length ? `
     <div class="recipe-view-method-list" style="display:flex;flex-direction:column;gap:10px">
       ${steps.map((st, i) => {
@@ -326,7 +330,7 @@ export function renderRecipePreview() {
   }
 }
 
-export function openRecipePreview(recipeId, instanceOrTab = 'original', variantArg = null, targetPerson = null, mealTypeOverride = null) {
+export function openRecipePreview(recipeId, instanceOrTab = 'original', variantArg = null, targetPerson = null, mealTypeOverride = null, targetServesOverride = null) {
   const state = (typeof window !== 'undefined' ? getState() : {}) || {};
   const recipes = Array.isArray(state.recipes) ? state.recipes : [];
   const found = recipes.find(rec => String(rec.id) === String(recipeId));
@@ -338,13 +342,16 @@ export function openRecipePreview(recipeId, instanceOrTab = 'original', variantA
   const normPerson = String(targetPerson || '').toLowerCase();
   const resolvedServingMode = (normPerson === 'elliott' || normPerson === 'e') ? 'elliott'
     : ((normPerson === 'chloe' || normPerson === 'c') ? 'chloe' : 'both');
+  const parsedOverrideServes = Number(targetServesOverride);
 
   previewState.recipe = found;
   previewState.instanceId = resolvedInstanceId;
   previewState.currentTab = resolvedVariant;
   previewState.servingMode = resolvedServingMode;
   previewState.mealType = mealTypeOverride || 'all';
-  previewState.targetServes = Number(found.serves ?? 2) || 2;
+  previewState.targetServes = (Number.isFinite(parsedOverrideServes) && parsedOverrideServes > 0)
+    ? parsedOverrideServes
+    : (Number(found.serves ?? 2) || 2);
   previewState.singleServes = 1;
 
   if (typeof window !== 'undefined') {
@@ -355,8 +362,8 @@ export function openRecipePreview(recipeId, instanceOrTab = 'original', variantA
   renderRecipePreview();
 }
 
-export function openRecipeModal(recipeId, instanceId, variant, targetPerson, mealTypeOverride) {
-  return openRecipePreview(recipeId, instanceId, variant || 'original', targetPerson, mealTypeOverride);
+export function openRecipeModal(recipeId, instanceId, variant, targetPerson, mealTypeOverride, targetServesOverride) {
+  return openRecipePreview(recipeId, instanceId, variant || 'original', targetPerson, mealTypeOverride, targetServesOverride);
 }
 export const viewRecipe = openRecipePreview;
 

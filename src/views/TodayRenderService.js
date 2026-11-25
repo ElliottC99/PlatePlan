@@ -170,7 +170,7 @@ export function renderTodayMealCard(slot, { info: slotInfo, person }, eatenMeals
             ${formatRecipeTime(recipe.prepTime || recipe.time) ? `<span>⏱️ ${escapeHtml(formatRecipeTime(recipe.prepTime || recipe.time))}</span>` : ''}
           </div>
         </div>
-        <button class="btn sm" type="button" data-action="view-recipe" data-recipe-id="${escapeAttr(recipe.id)}" data-instance-id="${escapeAttr(slotInfo.instanceId || '')}" data-variant="${escapeAttr(slotInfo.variant || 'original')}" style="font-size:13px; font-weight:600; border-radius:var(--radius-control); padding:6px 12px; white-space:nowrap;">
+        <button class="btn sm" type="button" data-action="view-recipe" data-recipe-id="${escapeAttr(recipe.id)}" data-instance-id="${escapeAttr(slotInfo.instanceId || '')}" data-variant="${escapeAttr(slotInfo.variant || 'original')}" data-target-person="${escapeAttr(person || 'both')}" data-meal-type="${escapeAttr(slot.type || '')}" data-target-serves="${person === 'both' || !person ? 2 : 1}" style="font-size:13px; font-weight:600; border-radius:var(--radius-control); padding:6px 12px; white-space:nowrap;">
           View
         </button>
       </div>

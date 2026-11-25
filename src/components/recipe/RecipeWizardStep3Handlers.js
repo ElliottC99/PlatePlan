@@ -9,7 +9,7 @@ import { isIngredientUnlinked } from './RecipeWizardTaxonomySearch.js';
 import { saveRecipe } from '../../services/HouseholdRepository.js';
 import { findExistingRecipeByTitle } from '../../services/RecipeFirestoreRepository.js';
 import { getState, updateRecipeInStore, learnIngredientAlias } from '../../store/store.js';
-import { toTitleCase } from '../../utils/stringUtils.js';
+import { toTitleCase, normalizeMethodSteps } from '../../utils/stringUtils.js';
 import { calculateItemNutrition } from '../../services/NutritionService.js';
 import { calculateMealFitScore } from '../../utils/fitScoreCalculator.js';
 import { openEnhancementModal } from './RecipeEnhancementModalUI.js';
@@ -318,10 +318,7 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal = () => {}, sh
         }))
       : [{ sectionTitle: 'Main Ingredients', ingredients: (enhSourceObj.ingredients || []).map(mapIngredientItem) }];
     const enhIngs = enhSections.flatMap(s => s.ingredients || []);
-    const enhStepsRaw = enhSourceObj.methodSteps || enhSourceObj.steps || enhSourceObj.method || enhSourceObj.instructions || baseOrig.steps || baseOrig.method || [];
-    const enhSteps = (Array.isArray(enhStepsRaw) ? enhStepsRaw : String(enhStepsRaw || '').split('\n'))
-      .map(s => typeof s === 'string' ? s.trim() : String(s?.text || s?.instruction || s || '').trim())
-      .filter(Boolean);
+    const enhSteps = normalizeMethodSteps(enhSourceObj, baseOrig);
     const enhServes = Number(enhSourceObj.servings || enhSourceObj.serves || safeServings) || safeServings;
 
     const tempEnhRec = {
@@ -647,7 +644,7 @@ export function bindStep3Events(modalWrap, { renderWizardModal, showWizardNotice
                 ? JSON.parse(JSON.stringify(enhancedPayload.ingredientSections))
                 : [{ sectionTitle: 'Main Ingredients', ingredients: JSON.parse(JSON.stringify(enhancedPayload.ingredients || [])) }],
               ingredients: JSON.parse(JSON.stringify(enhancedPayload.ingredients || [])),
-              methodSteps: [...(enhancedPayload.methodSteps || enhancedPayload.steps || enhancedPayload.method || baseRec.methodSteps || [])],
+              methodSteps: normalizeMethodSteps(enhancedPayload, baseRec),
               servings: enhancedPayload.servings || enhancedPayload.serves || baseRec.servings || 4,
               macros: { ...(enhancedPayload.macros || baseRec.macros || { calories: 500, protein: 35, carbs: 42, fat: 16 }) }
             };
