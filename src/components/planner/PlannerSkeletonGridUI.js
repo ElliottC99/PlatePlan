@@ -59,7 +59,7 @@ export function closeSlotConfigurator() {
 }
 
 export function setSlotConfiguredStatus(dayIndex, mealType, status, recipeId = null) {
-  if (!getState()) getState() = {};
+  if (!getState()) return;
   if (!getState().skeletonGrid) getState().skeletonGrid = {};
 
   const slotKey = `${dayIndex}_${mealType}`;
@@ -102,7 +102,7 @@ export function setSlotConfiguredStatus(dayIndex, mealType, status, recipeId = n
 }
 
 export function setSplitPersonSlotStatus(dayIndex, mealType, personKey, status, recipeId = null) {
-  if (!getState()) getState() = {};
+  if (!getState()) return;
   if (!getState().skeletonGrid) getState().skeletonGrid = {};
 
   const slotKey = `${dayIndex}_${mealType}`;
@@ -314,14 +314,14 @@ if (typeof window !== 'undefined') {
       openSlotConfigurator(ctx.day, ctx.meal, Boolean(isSplit));
     },
     handleFitScoreMinChange(val) {
-      if (!getState()) getState() = {};
+      if (!getState()) return;
       if (!getState().prefs) getState().prefs = {};
       getState().prefs.minFitScore = parseInt(val, 10) || 0;
       if (typeof window.saveState === 'function') window.saveState();
       if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
     },
     handleFitScoreMaxChange(val) {
-      if (!getState()) getState() = {};
+      if (!getState()) return;
       if (!getState().prefs) getState().prefs = {};
       getState().prefs.maxFitScore = parseInt(val, 10) || 100;
       if (typeof window.saveState === 'function') window.saveState();
