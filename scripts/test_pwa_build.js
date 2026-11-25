@@ -132,6 +132,21 @@ try {
   assert(Array.isArray(manifest.icons) && manifest.icons.length >= 4, 'manifest should list at least four icons');
   console.log('✅ Test 5 Passed: manifest.json keeps standalone display, ./ start URL and icons');
 
+  // 6. No invalid call-expression left-hand side assignments (e.g. getState() = {})
+  // JavaScriptCore/Safari rejects these at ES module parse time even when V8 defers them.
+  const jsFiles = srcFiles.filter(f => f.endsWith('.js'));
+  const badAssignments = [];
+  for (const file of jsFiles) {
+    const lines = readFileSync(file, 'utf8').split('\n');
+    lines.forEach((line, idx) => {
+      if (/\b[a-zA-Z0-9_$]+\([^)]*\)\s*=[^=>]/.test(line)) {
+        badAssignments.push(`${path.relative(rootDir, file)}:${idx + 1}: ${line.trim()}`);
+      }
+    });
+  }
+  assert.deepEqual(badAssignments, [], `Invalid call-expression assignment(s) found:\n${badAssignments.join('\n')}`);
+  console.log('✅ Test 6 Passed: no invalid call-expression left-hand side assignments in src/');
+
   console.log('=== ALL PWA BUILD & VERSION STAMPING CHECKS PASSED ===');
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });

@@ -263,8 +263,7 @@ export async function hydrateHouseholdData(options = {}) {
         setCategories(mergedCategories);
       }
 
-      if (typeof window !== 'undefined') {
-        if (!getState()) { try { getState() = {}; } catch (e) {} }
+      if (typeof window !== 'undefined' && getState()) {
         const docData = sanitizedPrefs || {};
         const userPrefs = docData.userPrefs || docData;
         getState().settings = { ...(getState().settings || {}), ...(docData.settings || {}) };
