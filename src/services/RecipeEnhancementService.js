@@ -6,6 +6,7 @@
  */
 
 import { getState } from "../store/coreState.js";
+import { normalizeMethodSteps } from "../utils/stringUtils.js";
 import { calculateMealFitScore } from "../utils/fitScoreCalculator.js";
 import { calculateItemNutrition, normalizeEnergyKcal, resolveProductItemWeight } from "./NutritionService.js";
 import { toGrams } from "./UnitConversionService.js";
@@ -639,7 +640,7 @@ export function buildEnhancedRecipePayload(originalRecipe, adjustedIngredients, 
     fat: Math.round(perServing.fat * s)
   };
 
-  const methodSteps = Array.isArray(originalRecipe.method) ? [...originalRecipe.method] : (Array.isArray(originalRecipe.steps) ? [...originalRecipe.steps] : []);
+  const methodSteps = normalizeMethodSteps(originalRecipe);
 
   return {
     name: `${origName} (Enhanced)`,
@@ -657,8 +658,10 @@ export function buildEnhancedRecipePayload(originalRecipe, adjustedIngredients, 
     changes: changesList || 'Nutritionally optimized for household macro targets.',
     ingredientSections: finalSections,
     ingredients: finalIngredients,
+    methodSteps,
     method: methodSteps,
     steps: methodSteps,
+    instructions: methodSteps,
     updatedAt: new Date().toISOString()
   };
 }

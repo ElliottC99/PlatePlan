@@ -239,6 +239,32 @@ assert.equal(targetGrams, 100, 'Grams must remain strictly identical to original
 console.log(`Volume preserved: 100g -> 100g. Expected kcal delta: ${expectedDeltaKcal} kcal`);
 console.log('✅ Test 8 Passed: 1:1 volume preservation confirmed without shifting sauce mass.\n');
 
+// --- Test 9: buildEnhancedRecipePayload preserves methodSteps / instructions / string method ---
+console.log('--- Test 9: Method Steps Preservation in buildEnhancedRecipePayload ---');
+const { buildEnhancedRecipePayload } = await import('../src/services/RecipeEnhancementService.js');
+const recWithMethodSteps = {
+  id: 'rec_method_test',
+  title: 'Wizard Chicken Bowl',
+  serves: 2,
+  ingredients: [{ name: 'Chicken Breast', qty: 200, unit: 'g' }],
+  methodSteps: ['Season chicken well.', 'Grill for 6 mins per side.']
+};
+const builtFromMethodSteps = buildEnhancedRecipePayload(recWithMethodSteps, recWithMethodSteps.ingredients, 2, [], { perServing: { calories: 400, protein: 45, carbs: 20, fat: 10 } });
+assert.deepStrictEqual(builtFromMethodSteps.methodSteps, ['Season chicken well.', 'Grill for 6 mins per side.'], 'methodSteps must be preserved from originalRecipe.methodSteps');
+assert.deepStrictEqual(builtFromMethodSteps.method, ['Season chicken well.', 'Grill for 6 mins per side.'], 'method must be preserved');
+assert.deepStrictEqual(builtFromMethodSteps.steps, ['Season chicken well.', 'Grill for 6 mins per side.'], 'steps must be preserved');
+
+const recWithStringMethod = {
+  id: 'rec_str_method',
+  title: 'String Method Pasta',
+  serves: 2,
+  ingredients: [{ name: 'Pasta', qty: 150, unit: 'g' }],
+  method: 'Boil water.\nCook pasta 10 mins.'
+};
+const builtFromString = buildEnhancedRecipePayload(recWithStringMethod, recWithStringMethod.ingredients, 2, [], { perServing: { calories: 400, protein: 20, carbs: 60, fat: 8 } });
+assert.deepStrictEqual(builtFromString.methodSteps, ['Boil water.', 'Cook pasta 10 mins.'], 'string method must split into methodSteps');
+console.log('✅ Test 9 Passed: Enhanced payload preserves methodSteps, steps, method, and string methods.\n');
+
 console.log('=============================================================');
 console.log('ALL RECIPE ENHANCEMENT ENGINE ACCEPTANCE TESTS PASSED! ✅');
 console.log('=============================================================');

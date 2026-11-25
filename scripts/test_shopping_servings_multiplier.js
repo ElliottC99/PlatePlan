@@ -180,4 +180,60 @@ assert.strictEqual(pepperSplit.buyQty, 0.8, '1 portion of 4-serving recipe calli
 assert.strictEqual(bananaSplit.buyQty, 1, '1 portion of 1-serving recipe calling for 1 banana is 1.0');
 console.log('✅ Test 5 Passed: Split slot nodes calculate independent per-person servings accurately.\n');
 
+// --- TEST CASE 6: Sectioned recipes, productless sub-types, mixed units, and word-boundary matching ---
+console.log('--- Test 6: Sectioned recipes, distinct sub-types, mixed units & matching ---');
+const extraIngredients = [
+  ...ingredientsBank,
+  {
+    id: 'ing_tomatoes',
+    name: 'Tomatoes',
+    category: 'Produce',
+    defaultProductId: 'prod_vine_tom',
+    subtypes: [
+      { id: 'sub_vine', name: 'Vine Tomatoes', defaultProductId: 'prod_vine_tom' },
+      { id: 'sub_plum_no_prod', name: 'Baby Plum Tomatoes' } // no products under this sub-type
+    ]
+  },
+  { id: 'ing_rice', name: 'White Rice', category: 'Cupboard' }
+];
+const extraProducts = [
+  ...productsBank,
+  { id: 'prod_vine_tom', name: 'Tesco Vine Tomatoes 500g', ingredientId: 'ing_tomatoes', subtypeId: 'sub_vine', category: 'Produce', brand: 'Tesco', price: 1.5, packSize: 500, unit: 'g' },
+  { id: 'prod_rice_vinegar', name: 'Blue Dragon Rice Vinegar 150ml', category: 'Cupboard', brand: 'Blue Dragon', price: 2.0, packSize: 150, unit: 'ml' }
+];
+const sectionedRecipe = {
+  id: 'rec_sectioned_tacos',
+  name: 'Sectioned Tacos',
+  serves: 2,
+  ingredients: [],
+  ingredientSections: [
+    {
+      sectionTitle: 'Base',
+      ingredients: [
+        { name: 'Vine Tomatoes', ingredientId: 'ing_tomatoes', subtypeId: 'sub_vine', qty: 200, unit: 'g' },
+        { name: 'Baby Plum Tomatoes', ingredientId: 'ing_tomatoes', subtypeId: 'sub_plum_no_prod', qty: 150, unit: 'g' },
+        { name: 'Rice', qty: 200, unit: 'g' }
+      ]
+    },
+    {
+      sectionTitle: 'Topping',
+      ingredients: [
+        { name: 'Vine Tomatoes', ingredientId: 'ing_tomatoes', subtypeId: 'sub_vine', qty: 2, unit: 'qty' }
+      ]
+    }
+  ]
+};
+const planSectioned = {
+  slots: { d1: { dinnerE: { recipeId: 'rec_sectioned_tacos' }, dinnerC: { recipeId: 'rec_sectioned_tacos' } } },
+  productSelections: { ing_tomatoes: 'prod_vine_tom' }
+};
+const result6 = aggregateShoppingListFromPlan(planSectioned, [...vaultRecipes, sectionedRecipe], extraIngredients, extraProducts);
+assert.ok(result6.items.length >= 4, `Expected >= 4 distinct shopping rows (not collapsed or dropped), got ${result6.items.length}: ${result6.items.map(i => `${i.name}(${i.buyQty}${i.unit})`).join(', ')}`);
+assert.ok(result6.items.some(i => i.subtypeId === 'sub_plum_no_prod' && i.buyQty === 150), 'Productless sub-type Baby Plum Tomatoes must remain a separate 150g row');
+assert.ok(result6.items.some(i => i.subtypeId === 'sub_vine' && i.unit === 'g' && i.buyQty === 200), 'Vine Tomatoes 200g row must stay separate from qty row');
+assert.ok(result6.items.some(i => i.subtypeId === 'sub_vine' && i.unit === 'qty' && i.buyQty === 2), 'Vine Tomatoes 2qty row must stay separate from g row');
+const riceRow = result6.items.find(i => i.name.toLowerCase().includes('rice'));
+assert.ok(riceRow && !riceRow.name.toLowerCase().includes('vinegar'), `Plain "Rice" must not match "Rice Vinegar", got ${riceRow?.name}`);
+console.log('✅ Test 6 Passed: Sectioned recipes, productless sub-types, mixed units, and word-boundary matching work.\n');
+
 console.log('=== ALL SHOPPING LIST SERVINGS MULTIPLIER TESTS PASSED SUCCESSFULLY! ===');

@@ -3,7 +3,7 @@
  * Manages mutable state and step synchronisation for the Recipe Ingestion Wizard.
  */
 
-import { toTitleCase } from '../../utils/stringUtils.js';
+import { toTitleCase, normalizeMethodSteps } from '../../utils/stringUtils.js';
 import { getState } from '../../store/store.js';
 import { resolveProductForIngredient } from './RecipeWizardStep3Handlers.js';
 import { resolveHighestAutoDefaultTaxonomy } from './RecipeWizardTaxonomySearch.js';
@@ -151,10 +151,7 @@ export function switchWizardVariant(targetVariant, modalWrap = null) {
       ? cloneSections(enhSource.ingredientSections)
       : [{ sectionTitle: 'Main Ingredients', ingredients: JSON.parse(JSON.stringify(enhSource.ingredients || rec.ingredients || [])) }];
 
-    const rawEnhSteps = enhSource.methodSteps || enhSource.steps || enhSource.method || enhSource.instructions || rec.methodSteps || [];
-    const enhSteps = Array.isArray(rawEnhSteps)
-      ? rawEnhSteps.map(s => typeof s === 'string' ? s : (s?.text || s?.instruction || s?.step || String(s ?? '')))
-      : (typeof rawEnhSteps === 'string' ? rawEnhSteps.split('\n') : []);
+    const enhSteps = normalizeMethodSteps(enhSource, rec);
 
     rec.ingredientSections = enhSections;
     rec.ingredients = enhSections.flatMap(s => s.ingredients || []);

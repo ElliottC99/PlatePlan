@@ -764,12 +764,6 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
     const nameMatched = prodsList.find(p => String(p.name || '').trim().toLowerCase() === rawName);
     if (nameMatched) return nameMatched;
 
-    const partialProd = prodsList.find(p => {
-      const pName = String(p.name || '').trim().toLowerCase();
-      return pName && (pName.includes(rawName) || rawName.includes(pName));
-    });
-    if (partialProd) return partialProd;
-
     const resolveRootProduct = (root) => {
       if (root.defaultProductId) {
         const def = prodsList.find(p => String(p.id) === String(root.defaultProductId));
