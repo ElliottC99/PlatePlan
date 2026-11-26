@@ -2,7 +2,24 @@ import { convertToStrictUnit } from './UnitConversionService.js';
 import { getState } from '../store/store.js';
 import { showCustomConfirm, showCustomCopyModal } from '../components/ui/DialogHelpers.js';
 import { resolveDynamicProductForIngredient } from './PantryTaxonomyService.js';
-import { buildRecipeLineKeys } from './RecipeProductSolver.js';
+import { buildRecipeLineKeys, solveOptimalRecipeProducts } from './RecipeProductSolver.js';
+
+function formatUnitQtyPart(qty, unit) {
+  const rounded = Math.round(Number(qty || 0) * 10) / 10;
+  const u = String(unit || '').toLowerCase().trim();
+  if (!u || u === 'qty' || u === 'item' || u === 'x') return `${rounded} qty`;
+  if (['g', 'ml', 'kg', 'l'].includes(u)) return `${rounded}${u}`;
+  return `${rounded} ${u}`;
+}
+
+function formatUnitTotalsMap(unitTotals = {}) {
+  const unitOrder = { g: 1, kg: 2, ml: 3, l: 4, qty: 5 };
+  const entries = Object.entries(unitTotals)
+    .filter(([, q]) => Number(q) > 0)
+    .sort(([uA], [uB]) => (unitOrder[uA] || 99) - (unitOrder[uB] || 99) || uA.localeCompare(uB));
+  if (entries.length === 0) return '';
+  return entries.map(([u, q]) => formatUnitQtyPart(q, u)).join(' + ');
+}
 
 /**
  * src/services/ShoppingCalculationService.js (v3.31.31)
@@ -158,11 +175,11 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
   const aggregatedMap = new Map();
   const rawSlots = activePlan.slots && typeof activePlan.slots === 'object' ? activePlan.slots : {};
 
-  const processSlotNode = (slotNode, personCount = 1, dayNum = 1, mealType = 'meal', dayKey = null, slotKey = null) => {
+  const processSlotNode = (slotNode, personCount = 1, dayNum = 1, mealType = 'meal', dayKey = null, slotKey = null, profileOverride = null) => {
     if (!slotNode || slotNode.isSkipped || slotNode.skipped) return;
     if (slotNode.isSplit && (slotNode.elliott || slotNode.chloe)) {
-      if (slotNode.elliott) processSlotNode(slotNode.elliott, 1, dayNum, mealType, dayKey, slotKey ? `${slotKey}_E` : `${mealType}_E`);
-      if (slotNode.chloe) processSlotNode(slotNode.chloe, 1, dayNum, mealType, dayKey, slotKey ? `${slotKey}_C` : `${mealType}_C`);
+      if (slotNode.elliott) processSlotNode(slotNode.elliott, 1, dayNum, mealType, dayKey, slotKey ? `${slotKey}_E` : `${mealType}_E`, 'elliott');
+      if (slotNode.chloe) processSlotNode(slotNode.chloe, 1, dayNum, mealType, dayKey, slotKey ? `${slotKey}_C` : `${mealType}_C`, 'chloe');
       return;
     }
     const rawRecipeId = typeof slotNode === 'string' ? slotNode : (slotNode.recipeId || slotNode.id);
@@ -210,6 +227,25 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
     ].filter(Boolean);
 
     const lineKeys = buildRecipeLineKeys(rawIngs);
+    const activeProfile = profileOverride || (
+      (String(slotKey || '').endsWith('E') || String(slotKey || '').endsWith('_E'))
+        ? 'elliott'
+        : ((String(slotKey || '').endsWith('C') || String(slotKey || '').endsWith('_C')) ? 'chloe' : 'everyone')
+    );
+    const normMealType = ['breakfast', 'lunch', 'dinner', 'snack', 'snacking'].includes(String(mealType || '').toLowerCase())
+      ? (String(mealType).toLowerCase() === 'snacking' ? 'snack' : String(mealType).toLowerCase())
+      : 'dinner';
+    const solvedForSlot = (productsBank.length > 0 && typeof solveOptimalRecipeProducts === 'function')
+      ? solveOptimalRecipeProducts(fullRecipe, {
+          variant,
+          mealType: normMealType,
+          activeProfile,
+          products: productsBank,
+          ingredients: ingredientsBank,
+          preferences: appState.preferences || appState.userPrefs || appState.settings || {}
+        })
+      : null;
+
     rawIngs.forEach((ing, ingIdx) => {
       if (!ing) return;
       const lineKey = lineKeys[ingIdx];
@@ -233,13 +269,17 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
       const planSubstitutions = activePlan.substitutions || {};
       const planProductSelections = activePlan.productSelections || {};
 
-      const lookupKeys = [
-        lineKey, subId, ing.subtypeId, ing.subTypeId, canonicalIngId, catId ? `cat:${String(catId).trim().toLowerCase()}` : null, ing.bankId, ing.productId, ing.id, ing.ingredientId, ing.groupId, ingId, rawName
-      ].filter(Boolean).map(String);
-      // Sub-type lines must not fall back to unscoped root-item selections, which belong to another sub-type.
+      const lookupKeys = subId
+        ? [lineKey, subId, ing.subtypeId, ing.subTypeId, ing.bankId, ing.productId].filter(Boolean).map(String)
+        : [
+            lineKey, canonicalIngId,
+            (!canonicalIngId && catId) ? `cat:${String(catId).trim().toLowerCase()}` : null,
+            ing.bankId, ing.productId, ing.id, ing.ingredientId, ing.groupId, ingId, rawName
+          ].filter(Boolean).map(String);
+      // Never allow broad category keys in globalLookupKeys, and keep sub-type lines isolated from unscoped root keys.
       const globalLookupKeys = subId
         ? [subId, ing.subtypeId, ing.subTypeId, ing.bankId, ing.productId].filter(Boolean).map(String)
-        : lookupKeys;
+        : [canonicalIngId, ing.bankId, ing.productId, ing.id, ing.ingredientId, ing.groupId, ingId, rawName].filter(Boolean).map(String);
 
       let overriddenProductId = null;
       for (const evId of candidateEventIds) {
@@ -273,7 +313,8 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
           || ingredientsBank.find(i => String(i.id) === String(overriddenProductId) || String(i.name).toLowerCase() === String(overriddenProductId).toLowerCase());
       }
 
-      const matchedProd = overriddenProduct || resolveDynamicProductForIngredient(ing, {
+      const solvedProd = !overriddenProduct ? (solvedForSlot?.selections?.get(lineKey) || null) : null;
+      const matchedProd = overriddenProduct || solvedProd || resolveDynamicProductForIngredient(ing, {
         products: productsBank,
         ingredients: ingredientsBank,
         preferences: appState.preferences || appState.settings || {}
@@ -309,9 +350,10 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
 
       const strict = convertToStrictUnit(rawQty, rawUnit, rawName);
       const slotQty = strict.qty * scaleMultiplier;
-      const canonicalUnit = strict.unit;
+      const canonicalUnit = strict.unit || 'qty';
 
-      const key = `${String(resolvedId).toLowerCase().replace(/\s+/g, '_')}:${String(canonicalUnit || 'qty').toLowerCase()}`;
+      // Combine same product across different recorded units into one shopping list row
+      const key = String(resolvedId).toLowerCase().replace(/\s+/g, '_');
       // At-home ticks are anchored to the recipe line's authored taxonomy (not matchedProd.subtypeId),
       // so cross-subtype combo optimization never drops ticks while legacy ticks remain readable.
       const authoredSubId = subId || ing.subtypeId || ing.subTypeId || null;
@@ -343,6 +385,7 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
         requiredQty: 0,
         inStockQty: 0,
         unit: canonicalUnit,
+        unitTotals: {},
         recipeBreakdown: [],
         atHomeKey,
         isAtHome: isAtHomeChecked,
@@ -353,9 +396,22 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
 
       existing.buyQty += slotQty;
       existing.requiredQty += slotQty;
+      existing.unitTotals[canonicalUnit] = (existing.unitTotals[canonicalUnit] || 0) + slotQty;
+      const slotEventId = (dayKey && slotKey) ? `${dayKey}_${slotKey}` : null;
       existing.recipeBreakdown.push({
-        cookingEventId, recipeName, day: dayNum, mealType,
-        servings: targetServings, qty: Math.round(slotQty * 100) / 100
+        cookingEventId,
+        slotEventId,
+        candidateEventIds,
+        recipeId,
+        variant,
+        activeProfile,
+        lineKey,
+        recipeName,
+        day: dayNum,
+        mealType: normMealType,
+        servings: targetServings,
+        qty: Math.round(slotQty * 100) / 100,
+        unit: canonicalUnit
       });
 
       aggregatedMap.set(key, existing);
@@ -365,10 +421,25 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
   Object.entries(rawSlots).forEach(([dayKey, dayObj], dayIdx) => {
     if (!dayObj || typeof dayObj !== 'object') return;
     const dayNum = dayIdx + 1;
+    const sharedMealBases = new Set();
+    for (const meal of ['breakfast', 'lunch', 'dinner', 'snack']) {
+      const sE = dayObj[`${meal}E`];
+      const sC = dayObj[`${meal}C`];
+      if (sE && sC && !sE.isSkipped && !sC.isSkipped && !sE.isSplit && !sC.isSplit) {
+        const idE = typeof sE === 'string' ? sE : (sE.recipeId || sE.id);
+        const idC = typeof sC === 'string' ? sC : (sC.recipeId || sC.id);
+        const varE = sE.variant || 'original';
+        const varC = sC.variant || 'original';
+        if (idE && idE === idC && varE === varC) {
+          sharedMealBases.add(meal);
+        }
+      }
+    }
     Object.entries(dayObj).forEach(([slotKey, slotVal]) => {
       const personCount = (slotKey.endsWith('E') || slotKey.endsWith('C')) ? 1 : 2;
       const mealType = slotKey.replace(/[EC]$/, '');
-      processSlotNode(slotVal, personCount, dayNum, mealType, dayKey, slotKey);
+      const profileOverride = sharedMealBases.has(mealType) ? 'everyone' : null;
+      processSlotNode(slotVal, personCount, dayNum, mealType, dayKey, slotKey, profileOverride);
     });
   });
 
@@ -377,6 +448,9 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
   let totalCost = 0;
 
   aggregatedMap.forEach(entry => {
+    const unitKeys = Object.keys(entry.unitTotals || {}).filter(u => Number(entry.unitTotals[u]) > 0);
+    const isMixedUnits = unitKeys.length > 1;
+    entry.isMixedUnits = isMixedUnits;
     entry.buyQty = Math.round(entry.buyQty * 10) / 10;
     entry.requiredQty = Math.round(entry.requiredQty * 10) / 10;
 
@@ -384,29 +458,60 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
     (entry.recipeBreakdown || []).forEach(b => {
       const groupKey = b.cookingEventId || b.recipeName || 'Recipe';
       if (!recipeSummaryMap.has(groupKey)) {
-        recipeSummaryMap.set(groupKey, { cookingEventId: b.cookingEventId || '', recipeName: b.recipeName, totalQty: 0, usages: [] });
+        recipeSummaryMap.set(groupKey, {
+          cookingEventId: b.cookingEventId || '',
+          candidateEventIds: b.candidateEventIds || [],
+          recipeId: b.recipeId || '',
+          lineKey: b.lineKey || '',
+          recipeName: b.recipeName,
+          unit: b.unit || entry.unit || 'qty',
+          unitTotals: {},
+          totalQty: 0,
+          usages: []
+        });
       }
       const sumEntry = recipeSummaryMap.get(groupKey);
+      const u = b.unit || entry.unit || 'qty';
       sumEntry.totalQty += b.qty;
-      sumEntry.usages.push({ day: b.day, mealType: b.mealType, servings: b.servings, qty: b.qty });
+      sumEntry.unitTotals[u] = (sumEntry.unitTotals[u] || 0) + b.qty;
+      sumEntry.usages.push({ day: b.day, mealType: b.mealType, servings: b.servings, qty: b.qty, unit: u });
     });
 
-    entry.recipeSummary = Array.from(recipeSummaryMap.values()).map(rs => ({
-      ...rs, totalQty: Math.round(rs.totalQty * 10) / 10
-    }));
+    entry.recipeSummary = Array.from(recipeSummaryMap.values()).map(rs => {
+      const roundedTotal = Math.round(rs.totalQty * 10) / 10;
+      const formattedQty = formatUnitTotalsMap(rs.unitTotals) || formatUnitQtyPart(roundedTotal, rs.unit);
+      return {
+        ...rs,
+        totalQty: roundedTotal,
+        formattedQty
+      };
+    });
 
     entry.needQty = entry.buyQty;
     entry.needUnit = entry.unit;
     const prodItemWeight = Number(entry.bankIng?.itemWeight || entry.bankIng?.item_weight || 0);
-    entry.grams = ['g', 'ml'].includes(entry.unit)
-      ? entry.buyQty
-      : (prodItemWeight > 0 ? entry.buyQty * prodItemWeight : entry.buyQty * 100);
+    if (isMixedUnits) {
+      let totalGrams = 0;
+      for (const [u, q] of Object.entries(entry.unitTotals)) {
+        if (u === 'g' || u === 'ml') totalGrams += Number(q || 0);
+        else if (u === 'kg' || u === 'l') totalGrams += Number(q || 0) * 1000;
+        else totalGrams += Number(q || 0) * (prodItemWeight > 0 ? prodItemWeight : 100);
+      }
+      entry.grams = Math.round(totalGrams * 10) / 10;
+      entry.formattedRecordedTotals = formatUnitTotalsMap(entry.unitTotals);
+    } else {
+      entry.grams = ['g', 'ml'].includes(entry.unit)
+        ? entry.buyQty
+        : (prodItemWeight > 0 ? entry.buyQty * prodItemWeight : entry.buyQty * 100);
+      entry.formattedRecordedTotals = formatUnitQtyPart(entry.buyQty, entry.unit);
+    }
 
-    const costInfo = calculateShoppingItemCost(entry, entry.bankIng);
+    const costInput = isMixedUnits ? { ...entry, unit: 'g', needUnit: 'g' } : entry;
+    const costInfo = calculateShoppingItemCost(costInput, entry.bankIng);
     entry.cost = costInfo.cost;
     entry.price = costInfo.price;
     entry.packsNeeded = costInfo.packsNeeded;
-    entry.quantity = formatShoppingItemQuantity(entry);
+    entry.quantity = isMixedUnits ? entry.formattedRecordedTotals : formatShoppingItemQuantity(entry);
     if (!entry.isAtHome) totalCost += entry.cost;
     items.push(entry);
 

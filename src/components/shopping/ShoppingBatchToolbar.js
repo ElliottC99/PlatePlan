@@ -54,9 +54,11 @@ export function exportShoppingListToText(items = []) {
     out += `\n[ ${cat} ]\n`;
     catItems.forEach(item => {
       const status = item.isAtHome ? '[x]' : '[ ]';
-      const qty = (item.needUnit === 'qty' || item.needUnit === 'item')
-        ? `${item.needQty} item${item.needQty > 1 ? 's' : ''}`
-        : `${Math.round(item.grams || item.needQty || 0)}${item.needUnit === 'ml' ? 'ml' : 'g'}`;
+      const qty = item.isMixedUnits
+        ? (item.formattedRecordedTotals || item.quantity || '')
+        : ((item.needUnit === 'qty' || item.needUnit === 'item')
+            ? `${item.needQty} item${item.needQty > 1 ? 's' : ''}`
+            : `${Math.round(item.grams || item.needQty || 0)}${item.needUnit === 'ml' ? 'ml' : 'g'}`);
       const brand = item.bankIng?.brand ? ` (${item.bankIng.brand})` : '';
       const price = item.cost > 0 ? ` - £${item.cost.toFixed(2)}` : '';
       out += `${status} ${item.name}${brand} - ${qty}${price}\n`;

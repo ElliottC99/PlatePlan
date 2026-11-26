@@ -1,9 +1,10 @@
 import { getState } from '../store/coreState.js';
-import { getCanonicalIngredientId, calculateShoppingItemCost } from '../services/ShoppingCalculationService.js';
+import { getCanonicalIngredientId, calculateShoppingItemCost, aggregateShoppingListFromPlan } from '../services/ShoppingCalculationService.js';
 import { store, setActivePlan, setShoppingList } from '../store/store.js';
 import { saveCurrentPlan } from '../services/HouseholdRepository.js';
 import { calculateMealFitScore } from '../utils/fitScoreCalculator.js';
 import { calculateItemNutrition } from '../services/NutritionService.js';
+import { matchesSearchQuery } from '../utils/searchUtils.js';
 
 /**
  * src/components/ProductSwapModal.js (v3.31.41)
@@ -40,14 +41,15 @@ export function calculateMetrics(item) {
 export function resolveTargetItem(param1, param2, param3) {
   if (param1 && typeof param1 === 'object') return { item: param1 };
   const state = (typeof store !== 'undefined' && store.getState) ? store.getState() : (getState());
-  const list = Array.isArray(state.shoppingList) ? state.shoppingList : [];
+  const cachedList = Array.isArray(state.shoppingList) ? state.shoppingList : [];
   const products = Array.isArray(state.products) ? state.products : Object.values(state.productsBank || {});
   const ingredients = Array.isArray(state.ingredients) ? state.ingredients : Object.values(state.ingredientsBank || {});
 
   const idQuery = String(param1 || '').trim().toLowerCase();
+  const baseIdQuery = idQuery.includes(':') ? idQuery.split(':')[0] : idQuery;
   const nameQuery = String(param2 || '').trim().toLowerCase();
 
-  let matched = list.find(item => {
+  const findInList = (list) => list.find(item => {
     if (!item) return false;
     const itemId = String(item.id || '').toLowerCase();
     const itemKey = String(item.key || '').toLowerCase();
@@ -55,16 +57,31 @@ export function resolveTargetItem(param1, param2, param3) {
     const ingId = String(item.ingredientId || item.groupId || '').toLowerCase();
     const itemName = String(item.name || '').toLowerCase();
     const prodName = String(item.productName || item.bankIng?.name || '').toLowerCase();
-    return (idQuery && (itemId === idQuery || itemKey === idQuery || bankId === idQuery || ingId === idQuery)) || (nameQuery && (itemName === nameQuery || prodName === nameQuery)) || (idQuery && itemName === idQuery);
+    return (
+      (idQuery && (itemId === idQuery || itemKey === idQuery || itemKey === baseIdQuery || bankId === idQuery || bankId === baseIdQuery || ingId === idQuery)) ||
+      (nameQuery && (itemName === nameQuery || prodName === nameQuery)) ||
+      (idQuery && itemName === idQuery)
+    );
   });
 
+  let matched = findInList(cachedList);
+  if (!matched || !Array.isArray(matched.recipeBreakdown) || matched.recipeBreakdown.length === 0) {
+    const activePlan = state.isDraftPlan ? (state.draftPlan || state.currentPlan || state.plan) : (state.currentPlan || state.plan);
+    if (activePlan && activePlan.slots) {
+      const liveAgg = aggregateShoppingListFromPlan(activePlan, state);
+      const liveItems = Array.isArray(liveAgg?.items) ? liveAgg.items : [];
+      const liveMatch = findInList(liveItems);
+      if (liveMatch) matched = liveMatch;
+    }
+  }
+
   if (!matched && idQuery) {
-    const prod = products.find(p => String(p.id).toLowerCase() === idQuery || String(p.name).toLowerCase() === nameQuery);
-    if (prod) matched = { id: prod.id, key: prod.id, name: prod.name, bankIng: prod, ingredientId: prod.ingredientId || prod.groupId, buyQty: 1, recipeBreakdown: [] };
+    const prod = products.find(p => String(p.id).toLowerCase() === idQuery || String(p.id).toLowerCase() === baseIdQuery || String(p.name).toLowerCase() === nameQuery);
+    if (prod) matched = { id: prod.id, key: prod.id, name: prod.name, bankIng: prod, ingredientId: prod.ingredientId || prod.groupId, subtypeId: prod.subtypeId || prod.subTypeId || null, buyQty: 1, recipeBreakdown: [] };
   }
 
   if (!matched && (idQuery || nameQuery)) {
-    const ing = ingredients.find(i => String(i.id).toLowerCase() === idQuery || String(i.name).toLowerCase() === nameQuery);
+    const ing = ingredients.find(i => String(i.id).toLowerCase() === idQuery || String(i.id).toLowerCase() === baseIdQuery || String(i.name).toLowerCase() === nameQuery);
     if (ing) {
       const defaultProd = products.find(p => String(p.id) === String(ing.defaultProductId)) || products.find(p => String(p.ingredientId) === String(ing.id));
       matched = { id: ing.id, key: ing.id, name: ing.name, bankIng: defaultProd || ing, ingredientId: ing.id, buyQty: 1, recipeBreakdown: [] };
@@ -74,16 +91,117 @@ export function resolveTargetItem(param1, param2, param3) {
   return { item: matched || { id: param1 || 'unknown', key: param1 || 'unknown', name: param2 || param1 || 'Item', bankIng: null, buyQty: 1, recipeBreakdown: [] } };
 }
 
+export function evaluateSwapFitScoreForTarget(targetItem, candidateProduct, state = {}, ctx = {}) {
+  const recipes = Array.isArray(state.recipes) ? state.recipes : [];
+  const allBreakdowns = Array.isArray(targetItem?.recipeBreakdown) ? targetItem.recipeBreakdown : [];
+  const scopedEventId = ctx?.cookingEventId || ctx?.instanceId || ctx?.prepEventId || null;
+  const breakdowns = scopedEventId
+    ? allBreakdowns.filter(b => String(b.cookingEventId) === String(scopedEventId) || (Array.isArray(b.candidateEventIds) && b.candidateEventIds.includes(String(scopedEventId))))
+    : allBreakdowns;
+
+  // Resolve unique affected (recipe, mealType, lineKey) usages — never fall back to recipes[0]
+  const seenUsage = new Set();
+  const usages = [];
+  for (const b of breakdowns) {
+    const rec = (b.recipeId ? recipes.find(r => String(r.id) === String(b.recipeId)) : null)
+      || recipes.find(r => {
+        const rName = String(r.title || r.name || '').toLowerCase().trim();
+        const bName = String(b.recipeName || b.title || '').toLowerCase().trim();
+        return bName && (rName === bName || rName.includes(bName) || bName.includes(rName));
+      });
+    if (!rec) continue;
+    const mt = b.mealType || 'dinner';
+    const variant = b.variant || 'original';
+    const profile = b.activeProfile || 'everyone';
+    const uKey = `${rec.id}::${variant}::${mt}::${profile}::${b.lineKey || ''}`;
+    if (seenUsage.has(uKey)) continue;
+    seenUsage.add(uKey);
+    usages.push({ recipe: rec, mealType: mt, variant, activeProfile: profile, lineKey: b.lineKey || null, usage: b });
+  }
+
+  if (usages.length === 0 || !candidateProduct?.id || typeof calculateMealFitScore !== 'function') {
+    return { hasValidRecipe: false, baseScore: 0, newScore: 0, delta: 0, recipeCount: 0 };
+  }
+
+  const currentBank = targetItem?.bankIng || {};
+  const currentProductId = currentBank?.id || null;
+  const targetSubId = targetItem?.subtypeId || targetItem?.subTypeId || currentBank?.subtypeId || currentBank?.subTypeId || null;
+  const stateProducts = Array.isArray(state.products) ? state.products : [];
+  const stateIngredients = Array.isArray(state.rootItems) ? state.rootItems : (Array.isArray(state.ingredients) ? state.ingredients : []);
+  const prefs = state.preferences || state.userPrefs || {};
+
+  let baseSum = 0;
+  let newSum = 0;
+
+  for (const { recipe, mealType, variant, activeProfile, lineKey } of usages) {
+    // Keep sub-type swaps isolated from sibling sub-types under the same root item
+    const overrideKeys = targetSubId
+      ? Array.from(new Set([lineKey, targetSubId, currentProductId].filter(Boolean).map(String)))
+      : Array.from(new Set([
+          lineKey,
+          targetItem?.ingredientId,
+          targetItem?.groupId,
+          targetItem?.name
+        ].filter(Boolean).map(String)));
+
+    const buildOverrideMap = (prodId) => {
+      if (!prodId) return null;
+      const map = {};
+      overrideKeys.forEach(k => { map[k] = prodId; });
+      return map;
+    };
+
+    const baseRes = calculateMealFitScore(recipe, mealType, {
+      activeProfile,
+      variant,
+      preferences: prefs,
+      products: stateProducts,
+      ingredients: stateIngredients,
+      ...(currentProductId ? { productOverrides: buildOverrideMap(currentProductId) } : {})
+    });
+    const newRes = calculateMealFitScore(recipe, mealType, {
+      activeProfile,
+      variant,
+      preferences: prefs,
+      products: stateProducts,
+      ingredients: stateIngredients,
+      productOverrides: buildOverrideMap(candidateProduct.id)
+    });
+
+    const bScore = typeof baseRes === 'number' ? baseRes : (baseRes?.score ?? 0);
+    const nScore = typeof newRes === 'number' ? newRes : (newRes?.score ?? bScore);
+    baseSum += bScore;
+    newSum += nScore;
+  }
+
+  const baseScore = Math.round(baseSum / usages.length);
+  const newScore = Math.round(newSum / usages.length);
+  return {
+    hasValidRecipe: true,
+    baseScore,
+    newScore,
+    delta: newScore - baseScore,
+    recipeCount: usages.length
+  };
+}
+
 export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
   if (!targetItem || !newProduct) return;
   const storeState = (typeof store !== 'undefined' && store.getState) ? store.getState() : (getState());
   const bank = targetItem.bankIng || {};
-  const candidateKeys = [
-    targetItem.subtypeId, targetItem.subTypeId, bank.subtypeId, bank.subTypeId,
-    targetItem.canonicalIngId, bank.ingredientId, bank.groupId, bank.id,
-    targetItem.ingredientId !== targetItem.id ? targetItem.ingredientId : null,
-    targetItem.name
-  ].filter(Boolean).map(String);
+  const breakdowns = Array.isArray(targetItem.recipeBreakdown) ? targetItem.recipeBreakdown : [];
+  const lineKeysFromBreakdown = breakdowns.map(b => b?.lineKey).filter(Boolean);
+  const targetSubId = targetItem.subtypeId || targetItem.subTypeId || bank.subtypeId || bank.subTypeId || null;
+
+  // Sub-type swaps stay scoped to sub-type/line/product keys so sibling sub-types under the same root item are never overwritten
+  const candidateKeys = targetSubId
+    ? Array.from(new Set([...lineKeysFromBreakdown, targetSubId, bank.id].filter(Boolean).map(String)))
+    : Array.from(new Set([
+        ...lineKeysFromBreakdown,
+        targetItem.canonicalIngId, bank.ingredientId, bank.groupId, bank.id,
+        targetItem.ingredientId !== targetItem.id ? targetItem.ingredientId : null,
+        targetItem.name
+      ].filter(Boolean).map(String)));
 
   if (candidateKeys.length === 0) {
     if (targetItem.id) candidateKeys.push(String(targetItem.id));
@@ -104,28 +222,72 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
 
   const eventId = ctx?.cookingEventId || ctx?.instanceId || ctx?.prepEventId || null;
   if (eventId) {
-    candidateKeys.forEach(k => {
-      updatedPlan.substitutions[`${eventId}:${k}`] = subPayload;
-      updatedPlan.productSelections[`${eventId}:${k}`] = newProduct.id;
+    const matchedBreakdowns = breakdowns.filter(b =>
+      String(b.cookingEventId) === String(eventId) ||
+      (b.slotEventId && String(b.slotEventId) === String(eventId))
+    );
+    // Write ONLY to the specific cookingEventId and slotEventId (dayKey_slotKey) — never broad day_meal keys that could bleed between E/C split meals
+    const eventIdsToWrite = Array.from(new Set([
+      String(eventId),
+      ...matchedBreakdowns.map(b => b.slotEventId).filter(Boolean).map(String)
+    ]));
+    const scopedKeys = Array.from(new Set([
+      ...matchedBreakdowns.map(b => b.lineKey).filter(Boolean).map(String),
+      ...candidateKeys
+    ]));
+    eventIdsToWrite.forEach(evId => {
+      scopedKeys.forEach(k => {
+        updatedPlan.substitutions[`${evId}:${k}`] = subPayload;
+        updatedPlan.productSelections[`${evId}:${k}`] = newProduct.id;
+      });
     });
   } else {
+    // Global swap: write unscoped keys AND overwrite matching pre-frozen event-scoped keys so they never shadow the swap
     candidateKeys.forEach(k => {
       updatedPlan.substitutions[k] = subPayload;
       updatedPlan.productSelections[k] = newProduct.id;
     });
+    const allEventIds = Array.from(new Set(
+      breakdowns.flatMap(b => [b.cookingEventId, b.slotEventId].filter(Boolean)).map(String)
+    ));
+    allEventIds.forEach(evId => {
+      candidateKeys.forEach(k => {
+        updatedPlan.substitutions[`${evId}:${k}`] = subPayload;
+        updatedPlan.productSelections[`${evId}:${k}`] = newProduct.id;
+      });
+    });
+    const keySet = new Set(candidateKeys);
+    Object.keys(updatedPlan.productSelections).forEach(existingKey => {
+      const colonIdx = existingKey.indexOf(':');
+      if (colonIdx > 0) {
+        const suffix = existingKey.slice(colonIdx + 1);
+        if (keySet.has(suffix)) {
+          updatedPlan.productSelections[existingKey] = newProduct.id;
+        }
+      }
+    });
   }
 
-  if (typeof store !== 'undefined' && typeof store.setState === 'function') store.setState({ [activePlanKey]: updatedPlan, currentPlan: updatedPlan, plan: updatedPlan });
-  if (typeof setActivePlan === 'function') setActivePlan(updatedPlan);
-  else if (window.store?.setActivePlan) window.store.setActivePlan(updatedPlan);
-  if (!storeState.isDraftPlan && typeof saveCurrentPlan === 'function') {
-    saveCurrentPlan(updatedPlan).catch(err => console.warn('[ProductSwapModal] Failed saving plan swap:', err));
+  if (typeof store !== 'undefined' && typeof store.setState === 'function') {
+    store.setState(storeState.isDraftPlan
+      ? { draftPlan: updatedPlan }
+      : { [activePlanKey]: updatedPlan, currentPlan: updatedPlan, plan: updatedPlan });
+  }
+  if (!storeState.isDraftPlan) {
+    if (typeof setActivePlan === 'function') setActivePlan(updatedPlan);
+    else if (window.store?.setActivePlan) window.store.setActivePlan(updatedPlan);
+    if (typeof saveCurrentPlan === 'function') {
+      saveCurrentPlan(updatedPlan).catch(err => console.warn('[ProductSwapModal] Failed saving plan swap:', err));
+    }
   }
 
   let updatedItems = [];
   if (typeof window.computeWizardShoppingAgg === 'function') {
     const aggResult = window.computeWizardShoppingAgg(updatedPlan);
     updatedItems = Array.isArray(aggResult) ? aggResult : (aggResult?.items || []);
+  } else {
+    const aggResult = aggregateShoppingListFromPlan(updatedPlan, storeState);
+    updatedItems = Array.isArray(aggResult?.items) ? aggResult.items : [];
   }
 
   if (updatedItems.length > 0) {
@@ -133,9 +295,15 @@ export async function executeSwapInState(targetItem, newProduct, ctx = {}) {
     else if (window.store?.setShoppingList) window.store.setShoppingList(updatedItems);
   }
 
-  document.dispatchEvent(new CustomEvent('plateplan:state:plan', { detail: updatedPlan }));
-  document.dispatchEvent(new CustomEvent('plateplan:state:shopping', { detail: updatedItems }));
-  if (typeof window.renderPlannerWizard === 'function') window.renderPlannerWizard();
+  if (typeof document !== 'undefined') {
+    document.dispatchEvent(new CustomEvent('plateplan:state:plan', { detail: updatedPlan }));
+    document.dispatchEvent(new CustomEvent('plateplan:state:shopping', { detail: updatedItems }));
+  }
+  if (typeof window !== 'undefined' && typeof window.patchWizardStep3Shopping === 'function') {
+    window.patchWizardStep3Shopping(updatedPlan);
+  } else if (typeof window !== 'undefined' && typeof window.renderPlannerWizard === 'function') {
+    window.renderPlannerWizard();
+  }
 }
 
 export function renderScrollableSwapModal(param1, param2, param3, optionalContext = {}) {
@@ -252,86 +420,13 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     });
   }
 
-  const breakdowns = Array.isArray(targetItem?.recipeBreakdown) ? targetItem.recipeBreakdown : [];
-  const primaryUsage = breakdowns[0] || {};
-  const mealType = primaryUsage.mealType || 'dinner';
-  const targetRecipe = (state.recipes || []).find(r => {
-    const rName = String(r.title || r.name || '').toLowerCase().trim();
-    return breakdowns.some(b => {
-      const bName = String(b.recipeName || b.title || '').toLowerCase().trim();
-      return bName && (rName === bName || rName.includes(bName) || bName.includes(rName));
-    });
-  }) || (state.recipes || [])[0];
-
-  let baseScore = 50;
-  let hasValidRecipe = false;
-  if (targetRecipe && typeof calculateMealFitScore === 'function') {
-    hasValidRecipe = true;
-    const baseScoreResult = calculateMealFitScore(targetRecipe, mealType, { activeProfile: 'everyone', preferences: state.preferences || state.userPrefs });
-    baseScore = typeof baseScoreResult === 'number' ? baseScoreResult : (baseScoreResult?.score || 50);
-  }
-
+  const evalCache = new Map();
   function evaluateSwapFitScore(item) {
-    if (!hasValidRecipe || !targetRecipe) return { baseScore, newScore: baseScore, delta: 0 };
-
-    // When pantry products are hydrated, evaluate via productOverrides so live combo macros reflect the swap
-    const stateProducts = Array.isArray(state.products) ? state.products : [];
-    if (stateProducts.length > 0 && item?.id) {
-      const overrideMap = {};
-      const keys = targetItem?.subtypeId
-        ? [targetItem.subtypeId]
-        : [targetItem?.ingredientId, targetItem?.groupId, targetItem?.name].filter(Boolean);
-      keys.forEach(k => { overrideMap[String(k)] = item.id; });
-      const newScoreResult = calculateMealFitScore(targetRecipe, mealType, {
-        activeProfile: 'everyone',
-        preferences: state.preferences || state.userPrefs,
-        productOverrides: overrideMap
-      });
-      const newScore = typeof newScoreResult === 'number' ? newScoreResult : (newScoreResult?.score ?? baseScore);
-      return { baseScore, newScore, delta: newScore - baseScore };
-    }
-
-    const serves = Math.max(1, Number(targetRecipe.servings || targetRecipe.serves || 1));
-    const usageQty = Number(primaryUsage.qty || targetItem?.buyQty || 100) || 100;
-    const usageUnit = targetItem?.unit || 'g';
-    const currNut = (currentBank && Object.keys(currentBank).length && typeof calculateItemNutrition === 'function')
-      ? calculateItemNutrition(currentBank, usageQty, usageUnit)
-      : { protein: Number(currentBank?.protein || currentBank?.prot || 0), kcal: Number(currentBank?.calories || currentBank?.cal || currentBank?.kcal || 0) };
-    const candNut = (typeof calculateItemNutrition === 'function')
-      ? calculateItemNutrition(item, usageQty, usageUnit)
-      : { protein: Number(item.protein || item.prot || 0), kcal: Number(item.calories || item.cal || item.kcal || 0) };
-
-    const protDiff = Math.round(((candNut.protein - currNut.protein) / serves) * 10) / 10;
-    const calDiff = Math.round((candNut.kcal - currNut.kcal) / serves);
-
-    const clonedRecipe = JSON.parse(JSON.stringify(targetRecipe));
-    const applyDeltasToNode = (node) => {
-      if (!node || typeof node !== 'object') return;
-      if (node.perServing) {
-        if (typeof node.perServing.prot === 'number') node.perServing.prot += protDiff;
-        if (typeof node.perServing.protein === 'number') node.perServing.protein += protDiff;
-        if (typeof node.perServing.cal === 'number') node.perServing.cal += calDiff;
-        if (typeof node.perServing.calories === 'number') node.perServing.calories += calDiff;
-      }
-      if (node.nutrition?.perServing) {
-        if (typeof node.nutrition.perServing.prot === 'number') node.nutrition.perServing.prot += protDiff;
-        if (typeof node.nutrition.perServing.protein === 'number') node.nutrition.perServing.protein += protDiff;
-        if (typeof node.nutrition.perServing.cal === 'number') node.nutrition.perServing.cal += calDiff;
-        if (typeof node.nutrition.perServing.calories === 'number') node.nutrition.perServing.calories += calDiff;
-      }
-      if (typeof node.prot === 'number') node.prot += protDiff;
-      if (typeof node.protein === 'number') node.protein += protDiff;
-      if (typeof node.cal === 'number') node.cal += calDiff;
-      if (typeof node.calories === 'number') node.calories += calDiff;
-      if (typeof node.kcal === 'number') node.kcal += calDiff;
-    };
-
-    applyDeltasToNode(clonedRecipe);
-    if (clonedRecipe.enhanced) applyDeltasToNode(clonedRecipe.enhanced);
-
-    const newScoreResult = calculateMealFitScore(clonedRecipe, mealType, { activeProfile: 'everyone', preferences: state.preferences || state.userPrefs, useStaticOnly: true });
-    const newScore = typeof newScoreResult === 'number' ? newScoreResult : (newScoreResult?.score || baseScore);
-    return { baseScore, newScore, delta: newScore - baseScore };
+    const cacheKey = String(item?.id || item?.name || '');
+    if (evalCache.has(cacheKey)) return evalCache.get(cacheKey);
+    const res = evaluateSwapFitScoreForTarget(targetItem, item, state, ctx);
+    evalCache.set(cacheKey, res);
+    return res;
   }
 
   function sortItems(items) {
@@ -351,17 +446,12 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     }
   }
 
-  function normalizeSearchText(str) {
-    return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  }
-
   function renderList(query = '') {
-    const cleanQ = normalizeSearchText(query);
-    const matchesQuery = (item) => !cleanQ || (
-      normalizeSearchText(item.name).includes(cleanQ) ||
-      normalizeSearchText(item.brand).includes(cleanQ) ||
-      normalizeSearchText(inferSubtype(item)).includes(cleanQ)
-    );
+    const matchesQuery = (item) => !query || matchesSearchQuery(query, [
+      item.name,
+      item.brand,
+      inferSubtype(item)
+    ]);
     let displayItems = [];
     if (currentTierTab === 'tier1') displayItems = sortItems(tier1Items.filter(matchesQuery));
     else if (currentTierTab === 'tier2') displayItems = sortItems(tier2Items.filter(matchesQuery));
@@ -373,17 +463,16 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     }
 
     listEl.innerHTML = displayItems.map(item => {
-      const metrics = calculateMetrics(item);
       const isSelected = selectedSubstituteProduct && (selectedSubstituteProduct.id === item.id || selectedSubstituteProduct.name === item.name);
 
       let badgeHtml = '';
-      if (hasValidRecipe && targetRecipe) {
-        const { newScore, delta } = evaluateSwapFitScore(item);
-
+      const evalRes = evaluateSwapFitScore(item);
+      if (evalRes.hasValidRecipe) {
+        const { baseScore: bScore, newScore, delta } = evalRes;
         const sign = delta > 0 ? '+' : '';
         const badgeBg = delta > 0 ? 'var(--badge-green-bg)' : (delta < 0 ? 'var(--badge-red-bg)' : 'var(--badge-neutral-bg)');
         const badgeFg = delta > 0 ? 'var(--badge-green-text)' : (delta < 0 ? 'var(--badge-red-text)' : 'var(--badge-neutral-text)');
-        badgeHtml = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:${badgeBg};color:${badgeFg};margin-left:auto;">[${sign}${delta} - ${baseScore} &rarr; ${newScore}]</span>`;
+        badgeHtml = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:${badgeBg};color:${badgeFg};margin-left:auto;">[${sign}${delta} · ${bScore} &rarr; ${newScore}]</span>`;
       } else {
         const packDisplay = item.packSize ? `${item.packSize}${item.packUnit || 'g'}` : '';
         const protDisplay = (item.protein || item.prot) ? `${item.protein || item.prot}g protein` : '';
