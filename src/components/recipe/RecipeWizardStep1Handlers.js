@@ -117,6 +117,7 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
             unit: parsed.unit,
             name: parsed.name,
             notes: parsed.notes,
+            waterMl: parsed.waterMl ?? null,
             isFallbackWeight: parsed.isFallbackWeight,
             isCloveCount: !!parsed.isCloveCount,
             ingredientId: existing?.ingredientId || matched?.ingredientId || null,
@@ -137,8 +138,10 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
       wizardState.activeRecipe.cookTime = { hours: cookH, minutes: cookM };
       wizardState.activeRecipe.sourceType = srcType;
       wizardState.activeRecipe.sourceUrl = srcUrl;
+      const notesVal = modalWrap.querySelector('#wiz-notes')?.value?.trim() || '';
       wizardState.activeRecipe.sourceBook = srcBook;
       wizardState.activeRecipe.sourcePage = srcPage;
+      wizardState.activeRecipe.notes = notesVal;
       wizardState.activeRecipe.ingredientsRaw = ingRaw;
       wizardState.activeRecipe.methodRaw = metRaw;
       wizardState.activeRecipe.ingredientSections = parsedSections.length ? parsedSections : [{ sectionTitle: 'Main Ingredients', ingredients: [] }];
@@ -267,13 +270,14 @@ export function bindStep01Events(modalWrap, { renderWizardModal, showWizardNotic
               title: cleanTitle,
               servings: rec.servings || 4,
               serves: rec.servings || 4,
-              prepTime: rec.prepTime || { hours: 0, minutes: 15 },
-              cookTime: rec.cookTime || { hours: 0, minutes: 30 },
-              time: (rec.prepTime?.hours || 0) * 60 + (rec.prepTime?.minutes || 15) + (rec.cookTime?.hours || 0) * 60 + (rec.cookTime?.minutes || 30),
+              prepTime: rec.prepTime || { hours: '', minutes: '' },
+              cookTime: rec.cookTime || { hours: '', minutes: '' },
+              time: (Number(rec.prepTime?.hours) || 0) * 60 + (Number(rec.prepTime?.minutes) || 0) + (Number(rec.cookTime?.hours) || 0) * 60 + (Number(rec.cookTime?.minutes) || 0),
               sourceType: rec.sourceType || '',
               sourceUrl: rec.sourceUrl || '',
               sourceBook: rec.sourceBook || '',
               sourcePage: rec.sourcePage || '',
+              notes: String(rec.notes || existingMatch?.notes || '').trim(),
               mealSuitability: combinedSuitability,
               types: normTypes,
               mealType: normTypes[0] || 'dinner',

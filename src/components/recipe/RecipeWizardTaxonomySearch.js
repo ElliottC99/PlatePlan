@@ -15,60 +15,102 @@ import { resolveProductForIngredient } from './RecipeWizardStep3Handlers.js';
 import { stemIngredientName, cleanIngredientPhraseForAlias } from '../../services/RecipeIngredientParser.js';
 import { isNonDiscreteBulkIngredient, isLiquidIngredient } from '../../services/UnitConversionService.js';
 import { resolveProductItemWeight } from '../../services/NutritionService.js';
+import { tokenizeSearchQuery, scoreSearchMatch, matchesSearchQuery } from '../../utils/searchUtils.js';
 
 /**
- * Pure helper to filter taxonomy root items and subtypes by query (including aliases and linked products).
+ * Pure helper to filter taxonomy root items and subtypes by query (including aliases and linked products),
+ * ranked by match relevance (exact/prefix first, then substring, then 1-edit typo).
  */
 export function filterTaxonomyItemsByQuery(query, ingredientsBank = [], productsBank = []) {
   const q = String(query || '').toLowerCase().trim();
+  const tokens = tokenizeSearchQuery(q);
   const stemmedQ = q ? stemIngredientName(q) : '';
   const results = [];
 
-  (ingredientsBank || []).forEach(ing => {
+  (ingredientsBank || []).forEach((ing, idx) => {
     if (!ing) return;
-    const ingName = String(ing.name || '').toLowerCase();
-    const ingCategory = String(ing.category || '').toLowerCase();
+    const ingName = String(ing.name || '');
+    const ingCategory = String(ing.category || '');
     const subTypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
     const ingAliases = Array.isArray(ing.aliases) ? ing.aliases : [];
 
-    const hasMatchingIngAlias = q && ingAliases.some(a => {
-      const aLower = String(a || '').toLowerCase();
-      const aClean = cleanIngredientPhraseForAlias(aLower);
-      const aStem = stemIngredientName(aClean || aLower);
-      return aLower.includes(q) || (aClean && aClean.includes(q)) || (stemmedQ && aStem && (aStem.includes(stemmedQ) || stemmedQ.includes(aStem)));
-    });
+    const ingProducts = (productsBank || []).filter(p => String(p.ingredientId) === String(ing.id));
+    const ingSearchFields = [
+      ingName,
+      ingCategory,
+      ...ingAliases.flatMap(a => {
+        const cleanA = cleanIngredientPhraseForAlias(a);
+        return cleanA && cleanA !== a ? [a, cleanA] : [a];
+      }),
+      ...ingProducts.map(p => `${p.name || ''} ${p.brand || ''}`.trim())
+    ];
 
-    const hasMatchingProduct = q && (productsBank || []).some(p =>
-      String(p.ingredientId) === String(ing.id) && String(p.name || '').toLowerCase().includes(q)
-    );
-
-    const matchesIng = !q || ingName.includes(q) || (stemmedQ && stemIngredientName(ingName).includes(stemmedQ)) || ingCategory.includes(q) || hasMatchingIngAlias || hasMatchingProduct;
-
-    const matchingSubtypes = subTypes.filter(s => {
-      if (!q) return true;
-      const sName = String(s.name || '').toLowerCase();
-      const sAliases = Array.isArray(s.aliases) ? s.aliases : [];
-      const hasSubAlias = sAliases.some(sa => {
-        const saLower = String(sa || '').toLowerCase();
-        const saClean = cleanIngredientPhraseForAlias(saLower);
-        const saStem = stemIngredientName(saClean || saLower);
-        return saLower.includes(q) || (saClean && saClean.includes(q)) || (stemmedQ && saStem && (saStem.includes(stemmedQ) || stemmedQ.includes(saStem)));
+    let ingScore = tokens.length === 0 ? 1 : scoreSearchMatch(tokens, ingSearchFields);
+    if (ingScore === 0 && stemmedQ) {
+      const ingStem = stemIngredientName(ingName);
+      const aliasStemHit = ingAliases.some(a => {
+        const aStem = stemIngredientName(cleanIngredientPhraseForAlias(a) || a);
+        return aStem && (aStem.includes(stemmedQ) || stemmedQ.includes(aStem));
       });
-      const hasSubProd = (productsBank || []).some(p =>
-        String(p.subtypeId) === String(s.id) && String(p.name || '').toLowerCase().includes(q)
-      );
-      return sName.includes(q) || (stemmedQ && stemIngredientName(sName).includes(stemmedQ)) || ingName.includes(q) || hasSubAlias || hasSubProd;
+      if ((ingStem && ingStem.includes(stemmedQ)) || aliasStemHit) {
+        ingScore = 45;
+      }
+    }
+    const matchesIng = ingScore > 0;
+
+    let bestSubScore = 0;
+    const scoredSubtypes = [];
+    subTypes.forEach((s, sIdx) => {
+      if (tokens.length === 0) {
+        scoredSubtypes.push({ s, score: 1, sIdx });
+        return;
+      }
+      const sName = String(s.name || '');
+      const sAliases = Array.isArray(s.aliases) ? s.aliases : [];
+      const subProducts = (productsBank || []).filter(p => String(p.subtypeId) === String(s.id));
+      const subFields = [
+        sName,
+        ingName,
+        ingCategory,
+        ...sAliases.flatMap(sa => {
+          const cleanSa = cleanIngredientPhraseForAlias(sa);
+          return cleanSa && cleanSa !== sa ? [sa, cleanSa] : [sa];
+        }),
+        ...subProducts.map(p => `${p.name || ''} ${p.brand || ''}`.trim())
+      ];
+      let sScore = scoreSearchMatch(tokens, subFields);
+      if (sScore === 0 && stemmedQ) {
+        const sStem = stemIngredientName(sName);
+        const subAliasStemHit = sAliases.some(sa => {
+          const saStem = stemIngredientName(cleanIngredientPhraseForAlias(sa) || sa);
+          return saStem && (saStem.includes(stemmedQ) || stemmedQ.includes(saStem));
+        });
+        if ((sStem && sStem.includes(stemmedQ)) || subAliasStemHit) {
+          sScore = 45;
+        }
+      }
+      if (sScore > 0) {
+        if (sScore > bestSubScore) bestSubScore = sScore;
+        scoredSubtypes.push({ s, score: sScore, sIdx });
+      }
     });
 
-    if (matchesIng || matchingSubtypes.length > 0) {
+    if (matchesIng || scoredSubtypes.length > 0) {
+      scoredSubtypes.sort((a, b) => b.score - a.score || a.sIdx - b.sIdx);
+      const nameDirectScore = tokens.length > 0 ? scoreSearchMatch(tokens, ingName) : 0;
       results.push({
         ing,
         matchesIng,
-        subtypesToShow: matchesIng ? subTypes : matchingSubtypes
+        subtypesToShow: matchesIng ? subTypes : scoredSubtypes.map(x => x.s),
+        _score: Math.max(nameDirectScore + (nameDirectScore > 0 ? 10 : 0), ingScore, bestSubScore),
+        _idx: idx
       });
     }
   });
 
+  if (tokens.length > 0) {
+    results.sort((a, b) => b._score - a._score || a._idx - b._idx);
+  }
   return results;
 }
 
@@ -350,6 +392,53 @@ export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [],
   `;
 }
 
+export function applyCreatedTaxonomySelection({
+  created,
+  inputEl,
+  dropdownEl = null,
+  currentIngName = '',
+  sIdx,
+  iIdx,
+  onSelectCallback = null
+} = {}) {
+  if (!created || !inputEl) return null;
+  if (dropdownEl) dropdownEl.style.display = 'none';
+  if (created.category && !created.ingredientId && !created.rootItem) {
+    const combinedKey = `cat:${created.category}`;
+    const displayLabel = `📂 [Category] ${created.category}`;
+    inputEl.dataset.taxVal = combinedKey;
+    inputEl.value = displayLabel;
+    inputEl.setAttribute('value', displayLabel);
+    inputEl.style.borderColor = '#10b981';
+    inputEl.style.backgroundColor = '#ecfdf5';
+    inputEl.style.color = 'var(--text,#1e293b)';
+    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+    if (typeof onSelectCallback === 'function') {
+      onSelectCallback(sIdx, iIdx, combinedKey, created);
+    }
+    return { combinedKey, displayLabel };
+  }
+
+  const ingId = created.ingredientId || created.rootItem?.id || created.id || 'custom';
+  const startedAtRoot = created.startAt === 'item';
+  const subId = startedAtRoot ? null : (created.subtypeId || created.subtype?.id || null);
+  const parentName = created.parentName || created.rootItem?.name || created.rootItemName || currentIngName;
+  const subName = subId ? (created.subtypeName || created.subtype?.name || '') : '';
+  const combinedKey = subId ? `${ingId}:${subId}` : `${ingId}`;
+  const displayLabel = subName && subName !== parentName ? `🏷️ ${subName} (${parentName})` : `📦 ${parentName}`;
+  inputEl.dataset.taxVal = combinedKey;
+  inputEl.value = displayLabel;
+  inputEl.setAttribute('value', displayLabel);
+  inputEl.style.borderColor = '#10b981';
+  inputEl.style.backgroundColor = '#ecfdf5';
+  inputEl.style.color = 'var(--text,#1e293b)';
+  inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+  if (typeof onSelectCallback === 'function') {
+    onSelectCallback(sIdx, iIdx, combinedKey, created);
+  }
+  return { combinedKey, displayLabel };
+}
+
 export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
   const storeState = getState();
   const ingredientsBank = storeState.rootItems || storeState.ingredients || [];
@@ -374,7 +463,7 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
     // Render category mappings with high visibility
     latestCategories.forEach(cat => {
       const catLower = cat.toLowerCase();
-      if (!query || catLower.includes(query) || '[category]'.includes(query)) {
+      if (!query || matchesSearchQuery(query, [cat, 'category'])) {
         html += `
           <div class="wiz-tax-opt wiz-tax-category" data-val="cat:${escapeAttr(cat)}" data-label="📂 ${escapeAttr(cat)}" style="padding:6px 10px; font-size:12px; cursor:pointer; font-weight:700; color:var(--purple,#4f46e5); background:var(--surface2,#f5f4ee); border-bottom:1px solid var(--border,#eee);">
             📂 ${escapeHtml(cat)}
@@ -435,42 +524,15 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
             iIdx,
             initialName: currentIngName,
             onComplete: (created) => {
-              if (!created) return;
-              if (dropdownEl) dropdownEl.style.display = 'none';
-              if (created.category && !created.ingredientId && !created.rootItem) {
-                const combinedKey = `cat:${created.category}`;
-                const displayLabel = `📂 [Category] ${created.category}`;
-                inputEl.dataset.taxVal = combinedKey;
-                inputEl.value = displayLabel;
-                inputEl.setAttribute('value', displayLabel);
-                inputEl.style.borderColor = '#10b981';
-                inputEl.style.backgroundColor = '#ecfdf5';
-                inputEl.style.color = 'var(--text,#1e293b)';
-                inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-                if (typeof onSelectCallback === 'function') {
-                  onSelectCallback(sIdx, iIdx, combinedKey, created);
-                }
-                return;
-              }
-              const ingId = created.ingredientId || created.rootItem?.id || created.id || 'custom';
-              const subId = created.subtypeId || created.subtype?.id || null;
-              const parentName = created.parentName || created.rootItem?.name || created.rootItemName || currentIngName;
-              const subName = created.subtypeName || created.subtype?.name || '';
-              const combinedKey = subId ? `${ingId}:${subId}` : `${ingId}`;
-              const displayLabel = subName && subName !== parentName ? `🏷️ ${subName} (${parentName})` : `📦 ${parentName}`;
-              inputEl.dataset.taxVal = combinedKey;
-              inputEl.value = displayLabel;
-              inputEl.setAttribute('value', displayLabel);
-              inputEl.style.borderColor = '#10b981';
-              inputEl.style.backgroundColor = '#ecfdf5';
-              inputEl.style.color = 'var(--text,#1e293b)';
-              inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-              if (rowNameInput) {
-                rowNameInput.value = subName || parentName;
-              }
-              if (typeof onSelectCallback === 'function') {
-                onSelectCallback(sIdx, iIdx, combinedKey, created);
-              }
+              applyCreatedTaxonomySelection({
+                created,
+                inputEl,
+                dropdownEl,
+                currentIngName,
+                sIdx,
+                iIdx,
+                onSelectCallback
+              });
             }
           });
           return;

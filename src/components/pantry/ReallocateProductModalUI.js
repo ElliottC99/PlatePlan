@@ -15,6 +15,7 @@ import {
   escapeAttr
 } from './ReallocateProductModalRenderService.js';
 import { showCustomAlert } from '../ui/DialogHelpers.js';
+import { filterAndRankBySearch } from '../../utils/searchUtils.js';
 
 
 function showModal(html) {
@@ -150,12 +151,12 @@ export function promptReallocateProduct(productId) {
   const subResults = document.getElementById('realloc-sub-results');
 
   const renderSubtypeList = (query = '') => {
-    const q = String(query || '').trim().toLowerCase();
+    const q = String(query || '').trim();
     const st = getState();
     const ings = Array.isArray(st.ingredients) ? st.ingredients : currentIngs;
     const ing = ings.find(i => String(i.id) === String(activeReallocateState.selectedIngId));
     const subtypes = (ing && Array.isArray(ing.subtypes)) ? ing.subtypes : [];
-    const filtered = subtypes.filter(s => !q || (s.name || '').toLowerCase().includes(q));
+    const filtered = q ? filterAndRankBySearch(subtypes, q, s => s.name || '') : subtypes;
 
     subResults.innerHTML = renderSubtypeListItems(filtered, activeReallocateState.selectedSubId, ing ? ing.name : 'Ingredient');
     subResults.querySelectorAll('.realloc-sub-option').forEach(el => {
@@ -164,10 +165,10 @@ export function promptReallocateProduct(productId) {
   };
 
   const renderIngredientList = (query = '') => {
-    const q = String(query || '').trim().toLowerCase();
+    const q = String(query || '').trim();
     const st = getState();
     const ings = Array.isArray(st.ingredients) ? st.ingredients : currentIngs;
-    const filtered = ings.filter(i => !q || (i.name || '').toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q));
+    const filtered = q ? filterAndRankBySearch(ings, q, i => [i.name, i.category]) : ings;
 
     ingResults.innerHTML = renderIngredientListItems(filtered, activeReallocateState.selectedIngId);
     ingResults.querySelectorAll('.realloc-ing-option').forEach(el => {

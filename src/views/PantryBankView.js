@@ -13,6 +13,7 @@ import {
 } from '../models/PantryHierarchyModel.js';
 import { renderProductBank, openProductEditModal } from './ProductBankView.js';
 import { buildIngredientBankHTML } from '../components/pantry/PantryBankHTMLTemplate.js';
+import { tokenizeSearchQuery, matchesSearchQuery } from '../utils/searchUtils.js';
 
 export let selectedCategoryFilter = null;
 export let activeCategoryFilter = null;
@@ -115,12 +116,16 @@ export function filterPantryBankDOM(rawQuery = '') {
   const products = state.products || [];
 
   let filteredIngredients = ingredients;
-  if (q) {
+  const searchTokens = tokenizeSearchQuery(q);
+  if (searchTokens.length > 0) {
     filteredIngredients = ingredients.filter(i => {
-      const nameMatch = (i.name || '').toLowerCase().includes(q);
-      const aliasMatch = Array.isArray(i.aliases) && i.aliases.some(a => String(a).toLowerCase().includes(q));
-      const subMatch = Array.isArray(i.subtypes) && i.subtypes.some(s => (s.name || '').toLowerCase().includes(q));
-      return nameMatch || aliasMatch || subMatch;
+      const fields = [
+        i.name,
+        i.category || i.cat,
+        ...(Array.isArray(i.aliases) ? i.aliases : []),
+        ...(Array.isArray(i.subtypes) ? i.subtypes.map(s => s?.name) : [])
+      ];
+      return matchesSearchQuery(searchTokens, fields);
     });
   }
 

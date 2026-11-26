@@ -490,6 +490,7 @@ export function openAddItemWizard(options = {}) {
             : (res?.subtype || (res?.subtypeId ? { id: res.subtypeId, name: wizardData.subtypeName } : (wizardData.subtypeName ? { id: wizardData.subtypeName, name: wizardData.subtypeName } : null)));
           cb({
             ...(res || {}),
+            startAt,
             ingredientId: rootObj?.id || (wizardData.itemName ? wizardData.itemName : null),
             subtypeId: isRootOnlyFinish ? null : (subObj?.id || res?.subtypeId || (wizardData.subtypeName || null)),
             parentName: rootObj?.name || wizardData.itemName || '',

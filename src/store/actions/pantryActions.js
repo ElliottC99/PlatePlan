@@ -104,20 +104,21 @@ export async function learnIngredientAlias(ingredientId, rawString, subtypeId = 
   const ing = ingredientsList.find(i => String(i.id) === String(ingredientId));
   if (!ing) return;
 
-  let cleanAlias = String(rawString).trim().toLowerCase();
+  let cleanAlias = '';
   try {
     const { cleanIngredientPhraseForAlias } = await import('../../services/RecipeIngredientParser.js');
-    const parsedClean = cleanIngredientPhraseForAlias(rawString);
-    if (parsedClean) cleanAlias = parsedClean.toLowerCase();
+    cleanAlias = String(cleanIngredientPhraseForAlias(rawString) || '').trim().toLowerCase();
   } catch (_) {
-    cleanAlias = cleanAlias
+    cleanAlias = String(rawString)
+      .trim()
+      .toLowerCase()
       .replace(/^[\d\s\/\.\-\u00BC-\u00BE\u2150-\u215E]+(?:x\s*)?(?:g|kg|ml|l|oz|lb|tbsp|tsp|cup|cups|scoop|scoops|pinch|can|cans|tin|tins|clove|cloves|slice|slices|pack|packs|bunch|bunches)?\s+(?:of\s+)?/i, '')
       .split(',')[0]
       .replace(/\(.*?\)/g, '')
       .trim()
       .toLowerCase();
   }
-  if (!cleanAlias || cleanAlias.length < 2) return;
+  if (!cleanAlias || cleanAlias.length < 2 || /^\d+$/.test(cleanAlias)) return;
 
   let targetDoc = ing;
   if (subtypeId && Array.isArray(ing.subtypes)) {

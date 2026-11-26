@@ -38,8 +38,10 @@ export function unpackAndSplitRecipeBlocks(rawText) {
   structural.forEach(h => { clean = clean.replace(new RegExp(`([^\\n])(${h})`, 'gi'), '$1\n$2'); });
 
   // 2. Normalise dividers and ensure headers have clear boundaries
+  // Never split mid-line on "Source Name:" — only split bare Title:/Name: at line start
   clean = clean.replace(/(?:^|\n)\s*[-=_*~]{3,}\s*(?:\n|$)/g, '\n\n__RECIPE_SPLIT__\n\n')
-    .replace(/([^\n])\n*((?:Dish|Recipe)\s*(?:#?\s*\d+[:\.\-\s]?|[:\-])|(?:Recipe\s*)?(?:Title|Name):)/gi, '$1\n\n$2');
+    .replace(/([^\n])\n*((?:Dish|Recipe)\s*(?:#?\s*\d+[:\.\-\s]?|[:\-])|Recipe\s+(?:Title|Name):)/gi, '$1\n\n$2')
+    .replace(/([^\n])\n((?:Title|Name):)/gi, '$1\n\n$2');
 
   // 3. Line-by-line semantic state machine
   const lines = clean.split('\n');
@@ -295,7 +297,7 @@ export function isIngredientOrSectionLine(line) {
 export function isHeaderMetadataLine(line) {
   if (!line) return false;
   const trimmed = line.trim();
-  return /^(?:(?:Dish|Recipe)\s*#?\s*\d+|(?:Recipe\s*)?(?:Title|Name):|(?:Makes|Serves|Yield|Servings|Total\s+Servings)\b|(?:Prep|Cook)\s+Time\b|(?:Source(?:\s+URL|\s+Book)?|URL|Link|Book|Cookbook|Page(?:\s+number)?):|https?:\/\/\S+$|Difficulty|Calories|Author|Course|Cuisine)/i.test(trimmed);
+  return /^(?:(?:Dish|Recipe)\s*#?\s*\d+|(?:Recipe\s*)?(?:Title|Name):|(?:Makes|Serves|Yield|Servings|Total\s+Servings)\b|(?:Prep|Cook)\s+Time\b|(?:Source(?:\s+URL|\s+Book|\s+Type|\s+Name)?|URL|Link|Book|Cookbook|Page(?:\s+number)?):|https?:\/\/\S+$|Difficulty|Calories|Author|Course|Cuisine)/i.test(trimmed);
 }
 
 /**
@@ -447,7 +449,7 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
     if (boundary) rawMethodText = rawMethodText.slice(0, boundary.index);
   }
 
-  let title = 'Imported Recipe', servings = null, prepMinutes = 15, cookMinutes = 30;
+  let title = 'Imported Recipe', servings = null, prepMinutes = null, cookMinutes = null;
   let sourceType = '', sourceUrl = '', sourceBook = '', sourcePage = '';
 
   const applySourceLine = (line) => {
@@ -484,6 +486,37 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
         bookVal = bookVal.slice(0, inlinePage.index).replace(/[,\s]+$/, '').trim();
       }
       sourceBook = bookVal;
+      return true;
+    }
+
+    const sourceTypeMatch = trimmed.match(/^Source\s+Type:\s*(.+)$/i);
+    if (sourceTypeMatch) {
+      const val = sourceTypeMatch[1].trim().toLowerCase();
+      if (/online|web|url|blog|site/.test(val)) {
+        sourceType = 'online';
+      } else if (/book|cookbook|magazine|print/.test(val)) {
+        sourceType = 'book';
+      }
+      return true;
+    }
+
+    const sourceNameMatch = trimmed.match(/^Source\s+Name:\s*(.+)$/i);
+    if (sourceNameMatch) {
+      const val = sourceNameMatch[1].trim();
+      const urlInVal = val.match(/(https?:\/\/\S+)/i);
+      if (urlInVal) {
+        sourceType = 'online';
+        sourceUrl = urlInVal[1].trim();
+      } else if (val) {
+        if (!sourceType) sourceType = 'book';
+        const inlinePage = val.match(/,?\s*(?:pages?|pp?\.?)\s*([0-9]+(?:\s*[-–]\s*[0-9]+)?)$/i);
+        if (inlinePage) {
+          sourcePage = sourcePage || inlinePage[1].trim();
+          sourceBook = val.slice(0, inlinePage.index).replace(/[,\s]+$/, '').trim();
+        } else {
+          sourceBook = val;
+        }
+      }
       return true;
     }
 
@@ -549,12 +582,12 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
       if (match) servings = parseInt(match[0], 10);
       return;
     }
-    if (/^Prep\s+Time(?:\s*\(Hours\s*&\s*Mins\))?:/i.test(line)) {
-      prepMinutes = parseDurationMinutes(line);
+    if (/^Prep\s+Time(?:\s*\([^)]*\))?:/i.test(line)) {
+      prepMinutes = parseDurationMinutes(line, null);
       return;
     }
-    if (/^Cook\s+Time(?:\s*\(Hours\s*&\s*Mins\))?:/i.test(line)) {
-      cookMinutes = parseDurationMinutes(line);
+    if (/^Cook\s+Time(?:\s*\([^)]*\))?:/i.test(line)) {
+      cookMinutes = parseDurationMinutes(line, null);
       return;
     }
     if (!titleAssigned && !isHeaderMetadataLine(line)) {
@@ -570,30 +603,95 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
 
   const sectionsMap = { 'Main Ingredients': [] };
   let currentSectionTitle = 'Main Ingredients';
+  let notes = '';
 
   if (rawIngText) {
-    const unpackedIngText = unpackCollapsedIngredients(rawIngText);
-    const rawIngLines = unpackedIngText.split('\n').map(l => l.trim()).filter(Boolean);
-    const ingLines = [];
-    for (let i = 0; i < rawIngLines.length; i++) {
-      let line = rawIngLines[i];
-      if (/^\d+\s*x$/i.test(line) && i + 1 < rawIngLines.length) {
-        line = `${line} ${rawIngLines[i + 1]}`;
-        i++;
+    // Separate non-ingredient callout/tip blocks and in-ingredients "Serves N" lines before unpacking
+    const isCalloutHeader = (l) =>
+      /^(?:Make\s+it\s+[A-Za-z][A-Za-z\s-]{0,25}|Cooking\s+Hacks?|Chef'?s?\s+Tips?|Cook'?s?\s+Tips?|Kitchen\s+Tips?|Top\s+Tips?|Tips?|Recipe\s+Notes?|Notes?|Serving\s+Suggestions?|Storage|Variations?|Swaps?|Substitutions?)\s*:/i.test(l);
+    const isStrictQtyUnitIng = (l) =>
+      /^(?:[\*\-•●◦▪▫▫️▪️]\s*)?(?:\d+(?:\s+\d+\/\d+|\.\d+)?|\d+\/\d+|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])\s*(?:[xX×]\s*\d+(?:\.\d+)?\s*)?(?:g|kg|ml|l|tbsp|tablespoons?|tsp|teaspoons?|cups?|oz|lbs?|cloves?|cans?|tins?|packs?|packets?|pinch(?:es)?|slices?|handfuls?|bunches?|stalks?)\b/i.test(l);
+    const isExplicitIngSection = (l) =>
+      /^(?:for\s+the\s+[a-zA-Z\s]+:?|to\s+serve:?)$/i.test(l);
+
+    const preLines = rawIngText.replace(/\r\n/g, '\n').split('\n');
+    const keptIngLines = [];
+    const capturedNoteLines = [];
+    let inCallout = false;
+
+    for (const rawLine of preLines) {
+      const trimmed = rawLine.trim();
+      if (!trimmed) {
+        if (inCallout) {
+          capturedNoteLines.push('');
+        } else {
+          keptIngLines.push('');
+        }
+        continue;
       }
-      ingLines.push(line);
+
+      if (inCallout) {
+        if (isExplicitIngSection(trimmed) || isStrictQtyUnitIng(trimmed)) {
+          inCallout = false;
+          keptIngLines.push(rawLine);
+        } else {
+          capturedNoteLines.push(trimmed);
+        }
+        continue;
+      }
+
+      if (isCalloutHeader(trimmed)) {
+        inCallout = true;
+        if (capturedNoteLines.length > 0 && capturedNoteLines[capturedNoteLines.length - 1] !== '') {
+          capturedNoteLines.push('');
+        }
+        capturedNoteLines.push(trimmed);
+        continue;
+      }
+
+      if (/^(?:Makes|Serves|Yield|Servings|Total\s+Servings)\b/i.test(trimmed)) {
+        const srvMatch = trimmed.match(/\d+/);
+        if (srvMatch && servings === null) {
+          servings = parseInt(srvMatch[0], 10);
+        }
+        continue;
+      }
+
+      keptIngLines.push(rawLine);
     }
 
-    ingLines.forEach(line => {
-      if (/^(?:for\s+the\s+[a-zA-Z\s]+:?|to\s+serve:?|[a-zA-Z\s]+:)$/i.test(line) && !/^\d+\b|serves|yield|prep|cook/i.test(line)) {
-        let cleanSec = line.replace(':', '').trim();
-        cleanSec = cleanSec.replace(/^for\s+the\s+to\s+serve/i, 'To Serve').replace(/^for\s+the\s+/i, '');
-        currentSectionTitle = toTitleCase(cleanSec);
-        if (!sectionsMap[currentSectionTitle]) sectionsMap[currentSectionTitle] = [];
-        return;
+    notes = capturedNoteLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    const cleanedRawIngText = keptIngLines.join('\n').trim();
+
+    if (cleanedRawIngText) {
+      const unpackedIngText = unpackCollapsedIngredients(cleanedRawIngText);
+      const rawIngLines = unpackedIngText.split('\n').map(l => l.trim()).filter(Boolean);
+      const ingLines = [];
+      for (let i = 0; i < rawIngLines.length; i++) {
+        let line = rawIngLines[i];
+        if (/^\d+\s*x$/i.test(line) && i + 1 < rawIngLines.length) {
+          line = `${line} ${rawIngLines[i + 1]}`;
+          i++;
+        }
+        ingLines.push(line);
       }
-      parseIngredientLine(line, currentSectionTitle, sectionsMap, ingredientsBank);
-    });
+
+      ingLines.forEach(line => {
+        if (/^(?:Makes|Serves|Yield|Servings|Total\s+Servings)\b/i.test(line)) {
+          const srvMatch = line.match(/\d+/);
+          if (srvMatch && servings === null) servings = parseInt(srvMatch[0], 10);
+          return;
+        }
+        if (/^(?:for\s+the\s+[a-zA-Z\s]+:?|to\s+serve:?|[a-zA-Z\s]+:)$/i.test(line) && !/^\d+\b|serves|yield|prep|cook/i.test(line)) {
+          let cleanSec = line.replace(':', '').trim();
+          cleanSec = cleanSec.replace(/^for\s+the\s+to\s+serve/i, 'To Serve').replace(/^for\s+the\s+/i, '');
+          currentSectionTitle = toTitleCase(cleanSec);
+          if (!sectionsMap[currentSectionTitle]) sectionsMap[currentSectionTitle] = [];
+          return;
+        }
+        parseIngredientLine(line, currentSectionTitle, sectionsMap, ingredientsBank);
+      });
+    }
   }
 
   const ingredientSections = Object.entries(sectionsMap)
@@ -620,12 +718,13 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
   return {
     title: cleanTitle,
     servings,
-    prepTime: { hours: Math.floor(prepMinutes / 60), minutes: prepMinutes % 60 },
-    cookTime: { hours: Math.floor(cookMinutes / 60), minutes: cookMinutes % 60 },
+    prepTime: prepMinutes === null ? { hours: '', minutes: '' } : { hours: Math.floor(prepMinutes / 60), minutes: prepMinutes % 60 },
+    cookTime: cookMinutes === null ? { hours: '', minutes: '' } : { hours: Math.floor(cookMinutes / 60), minutes: cookMinutes % 60 },
     sourceType,
     sourceUrl,
     sourceBook,
     sourcePage,
+    notes,
     mealSuitability: [inferredMeal],
     types: [inferredMeal.toLowerCase()],
     mealType: inferredMeal.toLowerCase(),
@@ -717,26 +816,38 @@ function cleanRecipeTitle(raw) {
   return str.trim();
 }
 
-function parseDurationMinutes(line) {
+function parseDurationMinutes(line, fallback = 15) {
   let mins = 0;
-  const hrMatch = line.match(/(\d+)\s*(?:h|hr|hours?)\b/i), minMatch = line.match(/(\d+)\s*(?:m|min|mins|minutes?)\b/i);
+  const hrMatch = line.match(/(\d+)\s*(?:h|hr|hrs|hours?)\b/i);
+  const minMatch = line.match(/(\d+)\s*(?:m|min|mins|minutes?)\b/i);
   if (hrMatch) mins += parseInt(hrMatch[1], 10) * 60;
   if (minMatch) mins += parseInt(minMatch[1], 10);
-  if (!hrMatch && !minMatch) { const raw = line.match(/\d+/); if (raw) mins = parseInt(raw[0], 10); }
-  return mins || 15;
+  if (hrMatch || minMatch) return mins;
+  const raw = line.match(/\d+/);
+  if (raw) return parseInt(raw[0], 10);
+  return fallback;
 }
 
 function parseIngredientLine(line, currentSectionTitle, sectionsMap, ingredientsBank) {
   if (!line || /^[:\-\*•\s]+$/.test(line.trim())) return;
   if (!sectionsMap[currentSectionTitle]) sectionsMap[currentSectionTitle] = [];
 
-  // Protect parentheticals from quantity splits e.g. "(about 160g)", "(to serve, optional)"
+  // Protect parentheticals and compound split-quantity tails ("4 tsp olive oil, plus 4 tbsp")
   const parens = [];
-  const safeLine = line.replace(/\([^)]*\)/g, m => { parens.push(m); return `###PAREN_${parens.length - 1}###`; });
+  let safeLine = line.replace(/\([^)]*\)/g, m => { parens.push(m); return `###PAREN_${parens.length - 1}###`; });
+
+  const compoundTails = [];
+  safeLine = safeLine.replace(
+    /(?:,\s*|\s+)(?:plus|\+)\s+(?:(?:\d+\s+)?\d+\/\d+|\d+(?:\.\d+)?|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])\s*(?:g|kg|ml|l|tbsp|tablespoons?|tsp|teaspoons?|cups?|oz|lbs?|cloves?|cans?|tins?|packs?|pinches?|slices?|handfuls?|bunches?|stalks?)\b[^,\n]*/gi,
+    m => { compoundTails.push(m); return `###COMPOUND_${compoundTails.length - 1}###`; }
+  );
 
   const rawSubLines = safeLine.split(/(?<=[^\n])\s+(?=\d+(?:\.\d+)?\s*(?:g|kg|ml|l|tbsp|tsp|cup|cloves?|cans?|packs?|pinches?|slices?|handfuls?|bunches?|stalks?)\b)/gi);
   rawSubLines.forEach(subLine => {
-    const unmasked = subLine.replace(/###PAREN_(\d+)###/g, (_, i) => parens[Number(i)]).trim();
+    const unmasked = subLine
+      .replace(/###COMPOUND_(\d+)###/g, (_, i) => compoundTails[Number(i)])
+      .replace(/###PAREN_(\d+)###/g, (_, i) => parens[Number(i)])
+      .trim();
     if (!unmasked || /^[:\-\*•\s]+$/.test(unmasked)) return;
     const parsed = parseIngredientString(unmasked);
     if (parsed) {

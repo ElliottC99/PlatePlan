@@ -15,6 +15,7 @@ import { getSortedRecipes } from '../services/FitScoreService.js';
 import { formatRecipeIngredientRow, renderRecipeIngredientsListHTML } from '../components/recipe/RecipeDetailModalUI.js';
 import { subscribe } from '../store/store.js';
 import { findDuplicateRecipeClusters, mergeDuplicateRecipeCluster } from '../services/RecipeFirestoreRepository.js';
+import { normalizeSearchText, tokenizeSearchQuery, matchesSearchQuery } from '../utils/searchUtils.js';
 import { escapeHtml, escapeAttr } from '../utils/stringUtils.js';
 
 export { renderVaultRecipeCard, getNormalizedRecipeTypes, renderVaultGridContainer, VaultFilterToolbar, calculateMealFitScore, getSortedRecipes, formatRecipeIngredientRow, renderRecipeIngredientsListHTML, findDuplicateRecipeClusters, mergeDuplicateRecipeCluster };
@@ -195,11 +196,13 @@ function getFastRecipeSearchText(r, types) {
     if (typeof ing === 'string') return ing;
     return [ing.name, ing.ingredientName, ing.family, ing.subtypeName, ing.subtype, ing.productName, ing.brand, ing.raw].filter(Boolean).join(' ');
   });
-  const text = [
+  const text = normalizeSearchText([
     r.name,
     r.title,
     r.category,
     r.source,
+    r.sourceBook,
+    r.notes,
     r.who,
     ...(types || []),
     ...(Array.isArray(r.tags) ? r.tags : []),
@@ -210,7 +213,7 @@ function getFastRecipeSearchText(r, types) {
     enh?.changes,
     ...collectIngText(enh?.ingredients),
     ...(Array.isArray(enh?.ingredientSections) ? enh.ingredientSections.flatMap(s => collectIngText(s?.ingredients)) : [])
-  ].filter(Boolean).join(' ').toLowerCase();
+  ].filter(Boolean).join(' '));
   _recipeSearchTextCache.set(r, text);
   return text;
 }
@@ -299,6 +302,7 @@ export function renderRecipeVault() {
 
   const allRecipes = getState()?.recipes || (window.Store && typeof window.Store.getState === 'function' ? window.Store.getState().recipes : []) || [];
   const ftNorm = String(ft || 'all').toLowerCase();
+  const searchTokens = q ? tokenizeSearchQuery(q) : [];
   const recipes = allRecipes.filter(r => {
     if (isFavOnly) {
       const hasAnyFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
@@ -311,8 +315,8 @@ export function renderRecipeVault() {
     const types = getNormalizedRecipeTypes(r);
     if (ftNorm !== 'all' && !types.includes(ftNorm)) return false;
 
-    if (!q) return true;
-    return getFastRecipeSearchText(r, types).includes(q);
+    if (searchTokens.length === 0) return true;
+    return matchesSearchQuery(searchTokens, '', getFastRecipeSearchText(r, types));
   });
 
   renderRecipeGrid(recipes);

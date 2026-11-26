@@ -7,6 +7,7 @@
 import { getState, setRecipes } from '../../store/store.js';
 import { batchUpdateRecipesInDb } from '../../services/HouseholdRepository.js';
 import { openTaxonomyCreationModal } from '../recipe/RecipeWizardTaxonomyModal.js';
+import { tokenizeSearchQuery, matchesSearchQuery } from '../../utils/searchUtils.js';
 
 let activeModalOverlay = null;
 
@@ -159,7 +160,8 @@ function attachSweeperSearchEvents(container, unlinkedGroups = []) {
     if (!dropdown) return;
 
     const renderFilteredOptions = () => {
-      const query = (input.value || '').toLowerCase().trim();
+      const query = (input.value || '').trim();
+      const searchTokens = tokenizeSearchQuery(query);
       const st = (typeof getState === 'function' ? getState() : (window.Store?.getState?.() || {})) || {};
       const masterItems = Array.isArray(st.ingredients) ? st.ingredients : [];
 
@@ -168,11 +170,11 @@ function attachSweeperSearchEvents(container, unlinkedGroups = []) {
 
       masterItems.forEach(ing => {
         if (!ing?.id) return;
-        const ingName = String(ing.name || '').toLowerCase();
-        const ingCat = String(ing.category || '').toLowerCase();
+        const ingName = String(ing.name || '');
+        const ingCat = String(ing.category || '');
         const subTypes = Array.isArray(ing.subtypes) ? ing.subtypes : [];
-        const matchesMain = !query || ingName.includes(query) || ingCat.includes(query);
-        const matchingSubs = subTypes.filter(s => !query || String(s.name || '').toLowerCase().includes(query) || ingName.includes(query));
+        const matchesMain = searchTokens.length === 0 || matchesSearchQuery(searchTokens, [ingName, ingCat]);
+        const matchingSubs = subTypes.filter(s => searchTokens.length === 0 || matchesSearchQuery(searchTokens, [s.name, ingName, ingCat]));
 
         if (matchesMain || matchingSubs.length > 0) {
           matchCount++;
