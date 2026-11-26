@@ -263,6 +263,10 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       wizardState.activeRecipe.sourcePage = e.target.value.trim();
       return;
     }
+    if (e.target && e.target.matches('#wiz-step2-notes')) {
+      wizardState.activeRecipe.notes = e.target.value.trim();
+      return;
+    }
     if (e.target && e.target.matches('.wiz-ing-qty, .wiz-ing-name, .wiz-ing-water-ml, #wiz-servings-input')) {
       const sIdx = parseInt(e.target.dataset?.sidx, 10);
       const iIdx = parseInt(e.target.dataset?.iidx, 10);

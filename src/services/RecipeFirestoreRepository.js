@@ -171,6 +171,8 @@ export function sanitizeForFirestore(val, isRoot = true) {
       }
     } else if (k === 'enhanced' || k === 'sourceUrl' || k === 'sourceBook' || k === 'sourcePage') {
       clean[k] = null;
+    } else if (k === 'notes') {
+      clean[k] = '';
     }
   }
   return clean;
@@ -603,6 +605,12 @@ export async function mergeDuplicateRecipeCluster(clusterMembers, chosenCanonica
       merged.sourceBook = srcDonor.sourceBook || '';
       merged.sourcePage = srcDonor.sourcePage || '';
       merged.source = srcDonor.source || '';
+    }
+  }
+  if (!merged.notes) {
+    const notesDonor = duplicatesToDelete.find(d => d.notes && String(d.notes).trim());
+    if (notesDonor) {
+      merged.notes = String(notesDonor.notes).trim();
     }
   }
 

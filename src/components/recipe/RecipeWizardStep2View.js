@@ -344,8 +344,13 @@ export function renderState2Mapping() {
         </div>
       </div>
 
-      <div style="margin-bottom: 20px;">
+      <div style="margin-bottom: 16px;">
         ${stepsHtml || '<p style="color:var(--text2);font-size:12px;">No method steps.</p>'}
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <label for="wiz-step2-notes" style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px;">📝 Recipe Notes & Tips</label>
+        <textarea id="wiz-step2-notes" name="wiz_step2_notes" aria-label="Recipe notes and tips" rows="3" placeholder="Cooking hacks, vegetarian swaps, storage notes..." style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #cbd5e1); border-radius: 8px; font-size: 12.5px; background: var(--surface, #fff); resize: vertical;">${escapeHtml(activeRecipe.notes || '')}</textarea>
       </div>
     </div>
   `;

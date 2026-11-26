@@ -144,6 +144,11 @@ export function renderState1AManual() {
           <label for="wiz-method-raw" style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px;">Method Instructions (1 step per line)</label>
           <textarea id="wiz-method-raw" name="method_raw" rows="4" placeholder="1. Press the tofu block and cube.&#10;2. Sauté garlic in olive oil.&#10;3. Add tomatoes and simmer." style="width: 100%; padding: 10px; border: 1px solid var(--border, #ccc); border-radius: 8px; font-size: 13px; font-family: monospace; resize: vertical;">${escapeHtml(recipe.methodRaw)}</textarea>
         </div>
+
+        <div>
+          <label for="wiz-notes" style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px;">Recipe Notes & Tips (optional)</label>
+          <textarea id="wiz-notes" name="recipe_notes" rows="3" placeholder="Cooking hacks, vegetarian swaps, storage notes..." style="width: 100%; padding: 10px; border: 1px solid var(--border, #ccc); border-radius: 8px; font-size: 13px; resize: vertical;">${escapeHtml(recipe.notes || '')}</textarea>
+        </div>
       </div>
 
       <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 20px; border-top: 1px solid var(--border, #eee); padding-top: 14px;">

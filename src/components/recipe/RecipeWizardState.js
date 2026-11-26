@@ -29,6 +29,7 @@ export const wizardState = {
     sourceUrl: '',
     sourceBook: '',
     sourcePage: '',
+    notes: '',
     ingredientsRaw: '',
     methodRaw: '',
     ingredientSections: [
@@ -248,6 +249,7 @@ export function resetWizardState() {
     sourceUrl: '',
     sourceBook: '',
     sourcePage: '',
+    notes: '',
     ingredientsRaw: '',
     methodRaw: '',
     ingredientSections: [
@@ -427,6 +429,8 @@ export function syncStep2InputsToState(modalWrap) {
   if (step2SrcBook) wizardState.activeRecipe.sourceBook = step2SrcBook.value.trim();
   const step2SrcPage = modalWrap.querySelector?.('#wiz-step2-source-page');
   if (step2SrcPage) wizardState.activeRecipe.sourcePage = step2SrcPage.value.trim();
+  const step2Notes = modalWrap.querySelector?.('#wiz-step2-notes');
+  if (step2Notes) wizardState.activeRecipe.notes = step2Notes.value.trim();
 
   // Servings yield
   const servingsInput = modalWrap.querySelector?.('#wiz-servings-input');
@@ -508,6 +512,8 @@ export function syncStep3InputsToState(modalWrap) {
   if (srcBookEl) rec.sourceBook = srcBookEl.value.trim();
   const srcPageEl = modalWrap.querySelector('#wiz-rev-source-page');
   if (srcPageEl) rec.sourcePage = srcPageEl.value.trim();
+  const revNotesEl = modalWrap.querySelector('#wiz-rev-notes');
+  if (revNotesEl) rec.notes = revNotesEl.value.trim();
 
   stashActiveVariantSnapshot();
 }

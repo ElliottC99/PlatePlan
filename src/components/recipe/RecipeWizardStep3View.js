@@ -366,6 +366,11 @@ export function renderState3Review() {
         <ol style="padding-left: 20px; margin: 0;">
           ${stepsReviewHtml || '<li style="font-size:12px; color:var(--text2);">No method steps.</li>'}
         </ol>
+
+        <div style="margin-top: 14px;">
+          <label for="wiz-rev-notes" style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px;">📝 Recipe Notes & Tips</label>
+          <textarea id="wiz-rev-notes" name="rev_notes" aria-label="Recipe notes and tips" rows="3" placeholder="Cooking hacks, vegetarian swaps, storage notes..." style="width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12.5px; background: var(--surface); resize: vertical;">${escapeHtml(recipe.notes || '')}</textarea>
+        </div>
       </div>
 
       <div style="display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border, #eee); padding-top: 14px;">

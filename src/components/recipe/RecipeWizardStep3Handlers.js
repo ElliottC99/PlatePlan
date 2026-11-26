@@ -444,6 +444,7 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal = () => {}, sh
     sourceBook,
     sourcePage,
     source: sourceFormatted,
+    notes: String(rec.notes ?? baseOrig.notes ?? '').trim(),
     ingredientSections: origSections,
     ingredients: origIngs,
     instructions: origSteps,

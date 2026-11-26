@@ -331,6 +331,7 @@ export function renderRecipePreview() {
     mealType,
     baseServes,
     sourceHtml,
+    notes: String(activeR.notes ?? r.notes ?? '').trim(),
     ingredientsHtml,
     methodHtml,
     macroSplitHtml,

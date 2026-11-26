@@ -257,6 +257,51 @@ export function parseIngredientString(rawStr) {
     };
   }
 
+  // 0b. Compound split-quantity lines e.g. "4 tsp olive oil, plus 4 tbsp" or "1 tbsp oil + 2 tsp extra"
+  const compoundSplitMatch = clean.match(/^(.+?)(?:,\s*|\s+)(?:plus|\+)\s+((?:\d+\s+)?\d+\/\d+|\d+(?:\.\d+)?)\s*([a-zA-Z]+)\b(.*)$/i);
+  if (compoundSplitMatch) {
+    const primaryStr = compoundSplitMatch[1].trim();
+    const rawQ2Str = compoundSplitMatch[2].trim();
+    const rawU2Str = compoundSplitMatch[3].trim();
+    const tailQualifier = (compoundSplitMatch[4] || '').replace(/^[\s,]+/, '').trim();
+    const u2NormKey = rawU2Str.toLowerCase().replace(/[.,]/g, '');
+
+    if (UNIT_MAP[u2NormKey] && primaryStr) {
+      const primaryParsed = parseIngredientString(primaryStr);
+      if (primaryParsed) {
+        const q2 = parseFractionOrNumber(rawQ2Str);
+        const u2 = UNIT_MAP[u2NormKey];
+        const secondaryStrict = convertToStrictUnit(q2, u2, primaryParsed.name);
+        const rawPrimaryMeasureMatch = primaryStr.match(/^((?:\d+\s+)?\d+\/\d+|\d+(?:\.\d+)?)\s*([a-zA-Z]+)\b/);
+        const primaryMeasureLabel = rawPrimaryMeasureMatch
+          ? `${rawPrimaryMeasureMatch[1].trim()} ${rawPrimaryMeasureMatch[2].trim()}`
+          : `${primaryParsed.qty}${primaryParsed.unit}`;
+        const secondaryMeasureLabel = `${rawQ2Str} ${rawU2Str}${tailQualifier ? ` ${tailQualifier}` : ''}`;
+
+        if (secondaryStrict.unit === primaryParsed.unit) {
+          const totalQty = Math.round((primaryParsed.qty + secondaryStrict.qty) * 100) / 100;
+          const splitNote = `${primaryMeasureLabel} + ${secondaryMeasureLabel}`;
+          const mergedNotes = [primaryParsed.notes, splitNote].filter(Boolean).join(', ');
+          return {
+            ...primaryParsed,
+            raw: s,
+            qty: totalQty,
+            isEstimated: Boolean(primaryParsed.isEstimated || secondaryStrict.isEstimated),
+            notes: mergedNotes
+          };
+        }
+
+        const extraNote = `plus ${secondaryMeasureLabel}`;
+        const mergedNotes = [primaryParsed.notes, extraNote].filter(Boolean).join(', ');
+        return {
+          ...primaryParsed,
+          raw: s,
+          notes: mergedNotes
+        };
+      }
+    }
+  }
+
   // 1. Loose measures without leading numbers e.g. "small handful of basil", "handful of parsley", "pinch of black pepper", "drizzle of olive oil"
   const looseMatch = clean.match(/^(?:a\s+)?((?:(?:small|large|generous|big)\s+)?(?:handful|handfuls|bunch|bunches)|pinch|pinches|drizzle|drizzles|dash|dashes|splash|splashes)\s+(?:of\s+)?(.*)/i);
   if (looseMatch) {
@@ -391,11 +436,13 @@ export function parseIngredientString(rawStr) {
   let cleanedName = servingInfo.name;
   let extraNotes = '';
 
-  const parenMatch = cleanedName.match(/^(.*?)\((.*?)\)(.*)$/);
-  if (parenMatch) {
-    cleanedName = (parenMatch[1] + ' ' + parenMatch[3]).trim();
-    extraNotes = parenMatch[2].trim();
-  }
+  const extractedParens = [];
+  cleanedName = cleanedName.replace(/\(([^)]*)\)/g, (_, inner) => {
+    const trimmedInner = inner.trim();
+    if (trimmedInner) extractedParens.push(trimmedInner);
+    return ' ';
+  }).replace(/\s+/g, ' ').trim();
+  extraNotes = extractedParens.join(', ');
 
   if (cleanedName.includes(',')) {
     const parts = cleanedName.split(',');
