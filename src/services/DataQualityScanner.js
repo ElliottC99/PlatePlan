@@ -10,9 +10,20 @@ import { calculateItemNutrition, rollupNutritionTotals } from './NutritionServic
 import { isLiquidIngredient, getIngredientDensity, findDensity } from './UnitConversionService.js';
 import { DQ_CONFIDENCE_THRESHOLD } from '../config/businessRules.js';
 import { resolveDynamicProductForIngredient } from './PantryTaxonomyService.js';
-import { getState, setIngredients, runOptimisticMutation } from '../store/store.js';
-import { dismissAdvisoryInDb } from './HouseholdRepository.js';
+import { getState, setIngredients, setRecipes, setPreferences, runOptimisticMutation } from '../store/store.js';
+import {
+  dismissAdvisoryInDb,
+  savePreferencesWithAutoPrune,
+  clearReviewedRecipeMetadataInDb,
+  saveRecipe,
+  isDbAvailable
+} from './HouseholdRepository.js';
 import { saveRootItem as saveIngredient } from './PantryTaxonomyService.js';
+import {
+  calculateMealFitScore,
+  extractRecipeMacros,
+  getVaultTargetMacros
+} from '../utils/fitScoreCalculator.js';
 
 export { getIngredientDensity, findDensity };
 
@@ -574,10 +585,462 @@ export async function verifyZeroCalorieIngredient(ingredientId, ingredients = []
   }
 }
 
+export const MEAL_TYPE_OPTIONS = [
+  { key: 'breakfast', label: 'Breakfast' },
+  { key: 'lunch', label: 'Lunch' },
+  { key: 'dinner', label: 'Dinner' },
+  { key: 'snack', label: 'Snacking' }
+];
+
+const MEAL_TYPE_DISPLAY_MAP = {
+  breakfast: 'Breakfast',
+  lunch: 'Lunch',
+  dinner: 'Dinner',
+  snack: 'Snacking'
+};
+
+const SERVINGS_CANDIDATES = [1, 2, 3, 4, 5, 6, 8];
+
+const MEAL_TYPE_TITLE_PATTERNS = {
+  breakfast: /\b(oats|oatmeal|porridge|granola|pancakes?|waffles?|smoothie|bagel|breakfast|frittata|shakshuka|french toast|muesli|overnight\s+(?:oats|chia|porridge)|bircher|omelette|scrambled eggs?|poached eggs?|avocado toast|acai|chia pudding|weetabix|cereal)\b/i,
+  snack: /\b(snack|protein balls?|energy balls?|bites?|flapjacks?|brownies?|cookies?|muffins?|protein bars?|cereal bars?|granola bars?|traybake|truffles?|protein shake|mug cake)\b/i,
+  lunch: /\b(sandwich|sandwiches|wrap|wraps|toastie|toasties|panini|baguette|pitta|pita|quesadilla|soup|salad bowl|lunch|ciabatta|focaccia|flatbread|bento)\b/i
+};
+
+export function normalizeMealTypeKey(raw) {
+  const s = String(raw || '').trim().toLowerCase();
+  if (!s) return null;
+  if (s === 'snacking' || s === 'snacks' || s === 'snack') return 'snack';
+  if (s === 'breakfast' || s === 'lunch' || s === 'dinner') return s;
+  return null;
+}
+
+export function formatMealTypeLabel(key) {
+  const norm = normalizeMealTypeKey(key) || 'dinner';
+  return MEAL_TYPE_DISPLAY_MAP[norm] || 'Dinner';
+}
+
+export function getRecipeMealTypes(recipe) {
+  const r = recipe?.recipe || recipe || {};
+  const rawList = Array.isArray(r.types) && r.types.length > 0
+    ? r.types
+    : (Array.isArray(r.mealSuitability) && r.mealSuitability.length > 0
+      ? r.mealSuitability
+      : [r.mealType || r.type || 'dinner']);
+  const cleaned = rawList.map(normalizeMealTypeKey).filter(Boolean);
+  return cleaned.length > 0 ? Array.from(new Set(cleaned)) : ['dinner'];
+}
+
+export function getRecipeServings(recipe) {
+  const r = recipe?.recipe || recipe || {};
+  const raw = Number(r.serves ?? r.servings ?? r.yield ?? 2);
+  return Number.isFinite(raw) && raw > 0 ? raw : 2;
+}
+
+function getAverageMealTargetKcal(mealType, preferences = {}) {
+  const targets = getVaultTargetMacros(mealType || 'dinner', preferences);
+  const eCal = Number(targets?.targetCal_E || 0);
+  const cCal = Number(targets?.targetCal_C || 0);
+  if (eCal > 0 && cCal > 0) return (eCal + cCal) / 2;
+  return eCal || cCal || 550;
+}
+
+function getBasePerServingMacros(recipe, ingredients = [], products = []) {
+  const dynamic = calculateRecipeDynamicMacros(recipe, ingredients, products);
+  if (dynamic?.perServing && dynamic.perServing.cal > 0) {
+    return {
+      cal: Number(dynamic.perServing.cal) || 0,
+      prot: Number(dynamic.perServing.prot) || 0,
+      carb: Number(dynamic.perServing.carb) || 0,
+      fat: Number(dynamic.perServing.fat) || 0,
+      source: 'dynamic'
+    };
+  }
+  const extracted = extractRecipeMacros(recipe, 'original', { useStaticOnly: true });
+  const cal = Number(extracted?.cal ?? recipe?.macros?.calories ?? recipe?.macros?.cal ?? recipe?.calories ?? recipe?.cal ?? 0) || 0;
+  const prot = Number(extracted?.prot ?? recipe?.macros?.protein ?? recipe?.macros?.prot ?? recipe?.protein ?? recipe?.prot ?? 0) || 0;
+  const carb = Number(recipe?.macros?.carbs ?? recipe?.macros?.carb ?? recipe?.carbs ?? recipe?.carb ?? 0) || 0;
+  const fat = Number(recipe?.macros?.fat ?? recipe?.fat ?? 0) || 0;
+  return { cal, prot, carb, fat, source: 'stored' };
+}
+
+/**
+ * Computes scaled per-serving macros and Fit Score preview for a recipe under
+ * candidate servings and meal types without mutating the original recipe.
+ */
+export function computeScaledRecipePreview(recipe, newServes, mealTypes, context = {}) {
+  const currentServes = getRecipeServings(recipe);
+  const safeServes = Math.max(1, Number(newServes) || currentServes);
+  const normTypes = (Array.isArray(mealTypes) && mealTypes.length > 0
+    ? mealTypes.map(normalizeMealTypeKey).filter(Boolean)
+    : getRecipeMealTypes(recipe));
+  const safeTypes = normTypes.length > 0 ? Array.from(new Set(normTypes)) : ['dinner'];
+  const ingredients = context.ingredients || context.rootItems || [];
+  const products = context.products || [];
+  const preferences = context.preferences || context.userPrefs || {};
+
+  let perServing = null;
+  const dynamicWithNewServes = calculateRecipeDynamicMacros(
+    { ...recipe, serves: safeServes, servings: safeServes },
+    ingredients,
+    products
+  );
+  if (dynamicWithNewServes?.perServing && dynamicWithNewServes.perServing.cal > 0) {
+    perServing = {
+      cal: Math.round(dynamicWithNewServes.perServing.cal),
+      prot: Math.round(dynamicWithNewServes.perServing.prot * 10) / 10,
+      carb: Math.round(dynamicWithNewServes.perServing.carb * 10) / 10,
+      fat: Math.round(dynamicWithNewServes.perServing.fat * 10) / 10
+    };
+  } else {
+    const base = context.baseMacros || getBasePerServingMacros(recipe, ingredients, products);
+    const ratio = currentServes / safeServes;
+    perServing = {
+      cal: Math.round(base.cal * ratio),
+      prot: Math.round(base.prot * ratio * 10) / 10,
+      carb: Math.round(base.carb * ratio * 10) / 10,
+      fat: Math.round(base.fat * ratio * 10) / 10
+    };
+  }
+
+  const baseRecipe = recipe?.recipe || recipe || {};
+  const { nutrition: _ignoredNut, perServing: _ignoredPerServ, recipe: _ignoredNested, ...cleanBase } = baseRecipe;
+
+  const candidateRecipe = {
+    ...cleanBase,
+    serves: safeServes,
+    servings: safeServes,
+    types: safeTypes,
+    mealSuitability: safeTypes.map(formatMealTypeLabel),
+    mealType: safeTypes[0],
+    type: safeTypes[0],
+    macros: {
+      ...(baseRecipe?.macros || {}),
+      calories: perServing.cal,
+      cal: perServing.cal,
+      protein: perServing.prot,
+      prot: perServing.prot,
+      carbs: perServing.carb,
+      carb: perServing.carb,
+      fat: perServing.fat
+    },
+    cal: perServing.cal,
+    calories: perServing.cal,
+    prot: perServing.prot,
+    protein: perServing.prot,
+    carb: perServing.carb,
+    carbs: perServing.carb,
+    fat: perServing.fat
+  };
+
+  let bestFit = null;
+  for (const mt of safeTypes) {
+    const res = calculateMealFitScore(candidateRecipe, mt, {
+      useStaticOnly: true,
+      preferences
+    });
+    if (!bestFit || res.score > bestFit.score) {
+      bestFit = res;
+    }
+  }
+
+  return {
+    serves: safeServes,
+    mealTypes: safeTypes,
+    macros: perServing,
+    fitResult: bestFit || { score: 0, tier: 'red', tierIcon: '🔴', tierLabel: 'Missing Macros', color: '#ef4444' },
+    fitScore: bestFit?.score ?? 0
+  };
+}
+
+/**
+ * Smart scanner for recipe servings and meal-type mismatches.
+ * Respects preferences.reviewedRecipeMetadata unless options.includeReviewed is true.
+ */
+export function scanServingsAndMealTypeMismatches(state = {}, options = {}) {
+  const recipes = Array.isArray(state.recipes) ? state.recipes : Object.values(state.recipes || {});
+  const ingredients = Array.isArray(state.rootItems)
+    ? state.rootItems
+    : (Array.isArray(state.ingredients) ? state.ingredients : Object.values(state.ingredients || {}));
+  const products = Array.isArray(state.products) ? state.products : Object.values(state.products || {});
+  const preferences = state.preferences || state.userPrefs || {};
+  const reviewedMap = (preferences.reviewedRecipeMetadata && typeof preferences.reviewedRecipeMetadata === 'object')
+    ? preferences.reviewedRecipeMetadata
+    : {};
+
+  const flagged = [];
+
+  for (const recipe of recipes) {
+    if (!recipe || !recipe.id) continue;
+    const recipeId = String(recipe.id);
+    if (!options.includeReviewed && reviewedMap[recipeId]) continue;
+
+    const recipeName = String(recipe.name || recipe.title || 'Untitled Recipe').trim();
+    const currentServes = getRecipeServings(recipe);
+    const currentMealTypes = getRecipeMealTypes(recipe);
+    const baseMacros = getBasePerServingMacros(recipe, ingredients, products);
+    const hasMacros = baseMacros.cal > 0;
+    const ctx = { ingredients, products, preferences, baseMacros };
+
+    const currentPreview = computeScaledRecipePreview(recipe, currentServes, currentMealTypes, ctx);
+
+    // 1. Meal-type mismatch detection (Title keywords first, then macro Fit Score lift)
+    let hasMealTypeMismatch = false;
+    let suggestedMealTypes = [...currentMealTypes];
+    let mealTypeReason = '';
+
+    const titleMatchedTypes = [];
+    for (const [mt, regex] of Object.entries(MEAL_TYPE_TITLE_PATTERNS)) {
+      if (regex.test(recipeName)) titleMatchedTypes.push(mt);
+    }
+
+    const missingTitleTypes = titleMatchedTypes.filter(mt => !currentMealTypes.includes(mt));
+    if (missingTitleTypes.length > 0) {
+      hasMealTypeMismatch = true;
+      const primaryTitleType = missingTitleTypes[0];
+      if (currentMealTypes.length === 1 && currentMealTypes[0] === 'dinner' && (primaryTitleType === 'breakfast' || primaryTitleType === 'snack')) {
+        suggestedMealTypes = [primaryTitleType];
+      } else {
+        suggestedMealTypes = Array.from(new Set([...currentMealTypes, ...missingTitleTypes]));
+      }
+      mealTypeReason = `Title suggests ${missingTitleTypes.map(formatMealTypeLabel).join(' / ')} (currently tagged ${currentMealTypes.map(formatMealTypeLabel).join(', ')}).`;
+    }
+
+    // 2. Servings mismatch detection (evaluated against effective/suggested meal type)
+    let hasServingsMismatch = false;
+    let suggestedServes = currentServes;
+    let servingsReason = '';
+
+    if (hasMacros) {
+      const evalMealTypes = suggestedMealTypes.length > 0 ? suggestedMealTypes : currentMealTypes;
+      const primaryEvalType = evalMealTypes[0] || 'dinner';
+      const targetKcal = getAverageMealTargetKcal(primaryEvalType, preferences);
+      const currentEvalPreview = computeScaledRecipePreview(recipe, currentServes, evalMealTypes, ctx);
+      const currentCal = currentEvalPreview.macros.cal;
+      const isCalorieOutlier = currentCal > targetKcal * 1.45 || currentCal < targetKcal * 0.55;
+
+      let bestCandidate = null;
+      for (const candidateServes of SERVINGS_CANDIDATES) {
+        if (candidateServes === currentServes) continue;
+        const preview = computeScaledRecipePreview(recipe, candidateServes, evalMealTypes, ctx);
+        const distFromTarget = Math.abs(preview.macros.cal - targetKcal);
+        if (
+          !bestCandidate
+          || preview.fitScore > bestCandidate.fitScore
+          || (preview.fitScore === bestCandidate.fitScore && distFromTarget < bestCandidate.distFromTarget)
+        ) {
+          bestCandidate = {
+            serves: candidateServes,
+            fitScore: preview.fitScore,
+            cal: preview.macros.cal,
+            distFromTarget
+          };
+        }
+      }
+
+      if (bestCandidate) {
+        const fitGain = bestCandidate.fitScore - currentEvalPreview.fitScore;
+        const currentDist = Math.abs(currentCal - targetKcal);
+        const improvesOutlier = isCalorieOutlier && bestCandidate.distFromTarget < currentDist * 0.75 && bestCandidate.fitScore >= currentEvalPreview.fitScore;
+
+        if (fitGain >= 12 || improvesOutlier) {
+          hasServingsMismatch = true;
+          suggestedServes = bestCandidate.serves;
+          if (isCalorieOutlier) {
+            const direction = currentCal > targetKcal ? 'high' : 'low';
+            servingsReason = `Per-serving calories (${currentCal} kcal) look ${direction} for ${formatMealTypeLabel(primaryEvalType)} (target ~${Math.round(targetKcal)} kcal); ${suggestedServes} servings gives ${bestCandidate.cal} kcal/serving.`;
+          } else {
+            servingsReason = `Adjusting from ${currentServes} to ${suggestedServes} servings lifts Fit Score by +${fitGain} pts (${currentEvalPreview.fitScore} → ${bestCandidate.fitScore}).`;
+          }
+        }
+      }
+    }
+
+    // 3. Macro-based meal-type mismatch check (if title didn't already flag one)
+    if (!hasMealTypeMismatch && hasMacros) {
+      const evalServes = suggestedServes || currentServes;
+      const baselineForCurrentTypes = computeScaledRecipePreview(recipe, evalServes, currentMealTypes, ctx);
+      let bestAltType = null;
+      for (const opt of MEAL_TYPE_OPTIONS) {
+        if (currentMealTypes.includes(opt.key)) continue;
+        const altPreview = computeScaledRecipePreview(recipe, evalServes, [opt.key], ctx);
+        const gain = altPreview.fitScore - baselineForCurrentTypes.fitScore;
+        if (gain >= 15 && (!bestAltType || altPreview.fitScore > bestAltType.fitScore)) {
+          bestAltType = { key: opt.key, score: altPreview.fitScore, gain };
+        }
+      }
+      if (bestAltType) {
+        hasMealTypeMismatch = true;
+        suggestedMealTypes = [bestAltType.key];
+        mealTypeReason = `Macros fit ${formatMealTypeLabel(bestAltType.key)} much better (+${bestAltType.gain} pts: ${baselineForCurrentTypes.fitScore} → ${bestAltType.score}).`;
+      }
+    }
+
+    if (hasServingsMismatch || hasMealTypeMismatch) {
+      const suggestedPreview = computeScaledRecipePreview(recipe, suggestedServes, suggestedMealTypes, ctx);
+      flagged.push({
+        key: `meta:recipe:${recipeId}`,
+        recipeId,
+        recipeName,
+        recipe,
+        currentServes,
+        suggestedServes,
+        hasServingsMismatch,
+        servingsReason,
+        currentMealTypes,
+        suggestedMealTypes,
+        hasMealTypeMismatch,
+        mealTypeReason,
+        currentMacros: currentPreview.macros,
+        suggestedMacros: suggestedPreview.macros,
+        currentFitScore: currentPreview.fitScore,
+        suggestedFitScore: suggestedPreview.fitScore,
+        severity: 'advisory'
+      });
+    }
+  }
+
+  return flagged;
+}
+
+export async function markRecipeMetadataReviewed(recipeId, decision = {}) {
+  if (!recipeId) return null;
+  const state = getState();
+  const currentPrefs = state.preferences || state.userPrefs || {};
+  const previousPrefs = JSON.parse(JSON.stringify(currentPrefs));
+  const existingMap = (currentPrefs.reviewedRecipeMetadata && typeof currentPrefs.reviewedRecipeMetadata === 'object')
+    ? currentPrefs.reviewedRecipeMetadata
+    : {};
+
+  const entry = {
+    status: decision.status || 'kept',
+    serves: decision.serves ?? null,
+    mealTypes: Array.isArray(decision.mealTypes) ? decision.mealTypes : null,
+    reviewedAt: new Date().toISOString()
+  };
+
+  const updatedPrefs = {
+    ...currentPrefs,
+    reviewedRecipeMetadata: {
+      ...existingMap,
+      [String(recipeId)]: entry
+    }
+  };
+
+  setPreferences(updatedPrefs);
+  try {
+    await savePreferencesWithAutoPrune(updatedPrefs);
+    return entry;
+  } catch (err) {
+    setPreferences(previousPrefs);
+    throw err;
+  }
+}
+
+export async function resetReviewedRecipeMetadata() {
+  const state = getState();
+  const currentPrefs = state.preferences || state.userPrefs || {};
+  const previousPrefs = JSON.parse(JSON.stringify(currentPrefs));
+  const updatedPrefs = {
+    ...currentPrefs,
+    reviewedRecipeMetadata: {}
+  };
+  setPreferences(updatedPrefs);
+  try {
+    if (isDbAvailable()) {
+      const cleared = await clearReviewedRecipeMetadataInDb();
+      if (!cleared) {
+        throw new Error('Failed to clear reviewedRecipeMetadata in Firestore.');
+      }
+    }
+    await savePreferencesWithAutoPrune(updatedPrefs);
+    return updatedPrefs;
+  } catch (err) {
+    setPreferences(previousPrefs);
+    throw err;
+  }
+}
+
+export async function applyRecipeMetadataReview(recipeId, { serves, mealTypes } = {}) {
+  const state = getState();
+  const previousRecipes = Array.isArray(state.recipes) ? [...state.recipes] : [];
+  const recipes = [...previousRecipes];
+  const idx = recipes.findIndex(r => String(r.id) === String(recipeId));
+  if (idx < 0) return null;
+
+  const original = recipes[idx];
+  const safeServes = Math.max(1, Number(serves) || getRecipeServings(original));
+  const safeMealTypes = (Array.isArray(mealTypes) && mealTypes.length > 0
+    ? Array.from(new Set(mealTypes.map(normalizeMealTypeKey).filter(Boolean)))
+    : getRecipeMealTypes(original));
+  const finalTypes = safeMealTypes.length > 0 ? safeMealTypes : ['dinner'];
+
+  const preview = computeScaledRecipePreview(original, safeServes, finalTypes, {
+    ingredients: state.rootItems || state.ingredients || [],
+    products: state.products || [],
+    preferences: state.preferences || state.userPrefs || {}
+  });
+
+  const { nutrition: _ignoredNut, perServing: _ignoredPerServ, ...cleanOriginal } = original;
+  const updatedRecipe = {
+    ...cleanOriginal,
+    serves: safeServes,
+    servings: safeServes,
+    types: finalTypes,
+    mealSuitability: finalTypes.map(formatMealTypeLabel),
+    mealType: finalTypes[0],
+    type: finalTypes[0],
+    macros: {
+      ...(original.macros || {}),
+      calories: preview.macros.cal,
+      cal: preview.macros.cal,
+      protein: preview.macros.prot,
+      prot: preview.macros.prot,
+      carbs: preview.macros.carb,
+      carb: preview.macros.carb,
+      fat: preview.macros.fat
+    },
+    cal: preview.macros.cal,
+    calories: preview.macros.cal,
+    prot: preview.macros.prot,
+    protein: preview.macros.prot,
+    carb: preview.macros.carb,
+    carbs: preview.macros.carb,
+    fat: preview.macros.fat,
+    updatedAt: new Date().toISOString()
+  };
+
+  recipes[idx] = updatedRecipe;
+  setRecipes(recipes);
+
+  try {
+    if (isDbAvailable()) {
+      const saveRes = await saveRecipe(updatedRecipe);
+      if (saveRes && saveRes.success === false) {
+        throw new Error(saveRes.error || 'Failed to save updated recipe metadata.');
+      }
+    }
+    await markRecipeMetadataReviewed(recipeId, {
+      status: 'applied',
+      serves: safeServes,
+      mealTypes: finalTypes
+    });
+    return updatedRecipe;
+  } catch (err) {
+    setRecipes(previousRecipes);
+    throw err;
+  }
+}
+
 if (typeof window !== 'undefined') {
   window.DataQualityScanner = {
     runAudit,
     scanDataQualitySummary,
+    scanServingsAndMealTypeMismatches,
+    computeScaledRecipePreview,
+    markRecipeMetadataReviewed,
+    resetReviewedRecipeMetadata,
+    applyRecipeMetadataReview,
     getEffectiveIngredientMacros,
     calculateRecipeDynamicMacros,
     autoRecalibrateRecipeDrift,

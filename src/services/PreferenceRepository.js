@@ -11,13 +11,13 @@ export function whitelistPreferences(preferences) {
   if (!preferences || typeof preferences !== 'object') return {};
   const whitelisted = {};
   const allowedKeys = [
-    'nutritionTargets', 'profiles', 'fitScoreParams', 'settings', 'theme', 'mealPlanSettings', 'activeView', 'userPrefs', 'dismissedQualityAdvisories', 'dismissedAdvisories', 'dismissed_advisories', 'swapPreferences', 'autoDefaultStrategy', 'autoDefaultCriterion', 'productPriority', 'autoMappingStrategy', 'gridTemplates', 'updatedAt'
+    'nutritionTargets', 'profiles', 'fitScoreParams', 'settings', 'theme', 'mealPlanSettings', 'activeView', 'userPrefs', 'dismissedQualityAdvisories', 'dismissedAdvisories', 'dismissed_advisories', 'reviewedRecipeMetadata', 'swapPreferences', 'autoDefaultStrategy', 'autoDefaultCriterion', 'productPriority', 'autoMappingStrategy', 'gridTemplates', 'updatedAt'
   ];
   Object.keys(preferences).forEach(key => {
     if (!allowedKeys.includes(key)) return;
     const val = preferences[key];
     const valSizeBytes = new Blob([JSON.stringify(val)]).size;
-    const maxKeyBytes = key === 'gridTemplates' ? 102400 : 10240;
+    const maxKeyBytes = key === 'gridTemplates' ? 102400 : (key === 'reviewedRecipeMetadata' ? 51200 : 10240);
     if (valSizeBytes > maxKeyBytes) return;
     whitelisted[key] = val;
   });
@@ -271,4 +271,33 @@ export async function saveHouseholdSwapPreference(ingredientKey, swapData) {
 export function getHouseholdSwapPreferences() {
   const storeState = (typeof getStoreState === 'function') ? getStoreState() : {};
   return storeState.preferences?.swapPreferences || {};
+}
+
+/**
+ * Replaces the reviewedRecipeMetadata map with {} in Firestore.
+ * Uses update() so Firestore replaces the map field rather than recursively merging {} over existing keys.
+ */
+export async function clearReviewedRecipeMetadataInDb() {
+  if (!isDbAvailable()) return false;
+  const prefRef = db.collection('households').doc(HOUSEHOLD_ID).collection('settings').doc('preferences');
+  const rootRef = db.collection('households').doc(HOUSEHOLD_ID);
+  const ts = new Date().toISOString();
+  try {
+    await Promise.all([
+      prefRef.update({ reviewedRecipeMetadata: {}, updatedAt: ts }),
+      rootRef.update({ 'preferences.reviewedRecipeMetadata': {}, updatedAt: ts })
+    ]);
+    return true;
+  } catch (err) {
+    try {
+      await Promise.all([
+        prefRef.set({ reviewedRecipeMetadata: {}, updatedAt: ts }, { mergeFields: ['reviewedRecipeMetadata', 'updatedAt'] }),
+        rootRef.set({ preferences: { reviewedRecipeMetadata: {} }, updatedAt: ts }, { mergeFields: ['preferences.reviewedRecipeMetadata', 'updatedAt'] })
+      ]);
+      return true;
+    } catch (fallbackErr) {
+      console.warn('[PreferenceRepository] clearReviewedRecipeMetadataInDb failed:', fallbackErr);
+      return false;
+    }
+  }
 }

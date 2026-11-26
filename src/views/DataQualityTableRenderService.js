@@ -4,10 +4,17 @@
  */
 
 import { getState, setIngredients, runOptimisticMutation } from '../store/store.js';
-import { runAudit } from '../services/DataQualityScanner.js';
+import {
+  runAudit,
+  scanServingsAndMealTypeMismatches,
+  formatMealTypeLabel,
+  performGlobalProductRelink,
+  verifyZeroCalorieIngredient
+} from '../services/DataQualityScanner.js';
 import { saveRootItem as saveIngredient } from '../services/PantryTaxonomyService.js';
 import { savePreferencesWithAutoPrune } from '../services/HouseholdRepository.js';
 import { openMacroDriftPreviewModal } from '../components/data-quality/MacroDriftPreviewModal.js';
+import { openServingsMealTypeReviewModal } from '../components/data-quality/ServingsMealTypeReviewModalUI.js';
 import { openSubtypeOrphanResolverModal } from '../components/data-quality/SubtypeOrphanResolverModal.js';
 import { openMealPlanSyncWarningModal } from '../components/data-quality/MealPlanSyncWarningModal.js';
 import { openMergeIngredientsModal } from '../components/data-quality/MergeIngredientsModal.js';
@@ -18,7 +25,6 @@ import { findDuplicateCategoryClusters } from '../components/pantry/CategoryMerg
 import { findDuplicateRecipeClusters } from '../services/RecipeFirestoreRepository.js';
 import { openRecipeDeduplicationModal } from './RecipeVaultView.js';
 import { auditRecipeMappings } from '../utils/RecipeAuditService.js';
-import { performGlobalProductRelink, verifyZeroCalorieIngredient } from '../services/DataQualityScanner.js';
 import { showCustomDensityModal } from '../components/ui/DialogHelpers.js';
 
 export function escapeHtml(str) {
@@ -74,6 +80,10 @@ function initDataQualityEvents(container) {
     // Top action bar triggers
     if (action === 'open-macro-recalibrate') {
       openMacroDriftPreviewModal();
+      return;
+    }
+    if (action === 'open-servings-mealtype-review') {
+      openServingsMealTypeReviewModal(btn.dataset.recipeId || null);
       return;
     }
     if (action === 'open-duplicate-merge') {
@@ -274,6 +284,13 @@ export function renderDataQualityView() {
     recipeClusters = [];
   }
 
+  let servingsMealTypeIssues = [];
+  try {
+    servingsMealTypeIssues = scanServingsAndMealTypeMismatches(state);
+  } catch (e) {
+    servingsMealTypeIssues = [];
+  }
+
   container.innerHTML = `
     <div style="max-width:920px; margin:0 auto; padding:20px; box-sizing:border-box;">
       
@@ -303,6 +320,9 @@ export function renderDataQualityView() {
           <button type="button" class="btn sm" data-action-dq="open-macro-recalibrate" style="font-weight:600; background:#3b82f6; color:#fff; ${audit.macroDrift.length === 0 ? 'opacity:0.55; cursor:default;' : ''}">
             📉 Macro Recalibration (${audit.macroDrift.length}${audit.macroDrift.length === 0 ? ' ✓' : ''})
           </button>
+          <button type="button" class="btn sm" data-action-dq="open-servings-mealtype-review" style="font-weight:600; background:#d97706; color:#fff; ${servingsMealTypeIssues.length === 0 ? 'opacity:0.65;' : ''}">
+            🍽️ Servings &amp; Meal-Type Review (${servingsMealTypeIssues.length}${servingsMealTypeIssues.length === 0 ? ' ✓' : ''})
+          </button>
           <button type="button" class="btn sm" data-action-dq="open-duplicate-merge" style="font-weight:600; background:#8b5cf6; color:#fff; ${audit.duplicates.length === 0 ? 'opacity:0.55; cursor:default;' : ''}">
             👥 Deduplication Wizard (${audit.duplicates.length}${audit.duplicates.length === 0 ? ' ✓' : ''})
           </button>
@@ -330,6 +350,31 @@ export function renderDataQualityView() {
       <!-- Health Pillars Grid -->
       <div style="display:grid; grid-template-columns:1fr; gap:16px;">
         
+        <!-- 0A. SERVINGS & MEAL-TYPE SUGGESTIONS CARD -->
+        ${renderAuditCard('Servings & Meal-Type Suggestions', '🍽️', servingsMealTypeIssues, (item) => {
+          const summaryParts = [];
+          if (item.hasServingsMismatch) {
+            summaryParts.push(`Servings: ${item.currentServes} → ${item.suggestedServes} (${item.currentMacros.cal} → ${item.suggestedMacros.cal} kcal/serv)`);
+          }
+          if (item.hasMealTypeMismatch) {
+            summaryParts.push(`Meal Type: ${item.currentMealTypes.map(formatMealTypeLabel).join(', ')} → ${item.suggestedMealTypes.map(formatMealTypeLabel).join(', ')}`);
+          }
+          return `
+            <div style="padding:12px 14px; background:var(--surface2); border:1px solid var(--border,#e7e5e4); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <div style="min-width:0;">
+                <strong style="font-size:13.5px; color:var(--text);">${escapeHtml(item.recipeName)}</strong>
+                <div style="font-size:12px; color:var(--text2,#78716c); margin-top:3px;">${escapeHtml(summaryParts.join(' · '))}</div>
+              </div>
+              <div style="display:flex; gap:6px; flex-shrink:0;">
+                <button type="button" class="btn sm primary dq-action-btn"
+                  data-action-dq="open-servings-mealtype-review"
+                  data-recipe-id="${escapeAttr(item.recipeId)}"
+                  style="background:#d97706; color:#fff; font-weight:600;">Review</button>
+              </div>
+            </div>
+          `;
+        }, `<button type="button" class="btn sm ghost dq-action-btn" data-action-dq="open-servings-mealtype-review" style="font-weight:700;">${servingsMealTypeIssues.length > 0 ? `Open Wizard (${servingsMealTypeIssues.length})` : 'Manage Reviewed'}</button>`)}
+
         <!-- 0. DUPLICATE RECIPES CARD -->
         ${renderAuditCard('Duplicate Recipe Candidates', '🍲', recipeClusters.map(c => ({
           title: c.title,
