@@ -244,18 +244,14 @@ export function routeAction(actionName, target, event) {
 
   // 6. View Switcher Navigation & Mobile Drawer Routing
   if (normalizedAction === 'navigate-view' || normalizedAction === 'show-view' || normalizedAction.includes('mobilemoreview') || normalizedAction.includes('showview')) {
-    if (normalizedAction.includes('clearproductgroupfilter') || ds.view === 'bank') {
-      clearProductGroupFilter();
-    }
     const match = actionName.match(/(?:mobileMoreView|showView)\(['"]?([^'"]+)['"]?\)/i);
     const viewName = ds.view || (match ? match[1] : null);
+    if (normalizedAction.includes('clearproductgroupfilter') || viewName === 'bank') {
+      clearProductGroupFilter({ skipRender: viewName === 'bank' });
+    }
     if (viewName) {
       document.getElementById('mobile-more-wrap')?.classList.remove('open');
       showView(viewName);
-      if (viewName === 'vault') setTimeout(renderRecipeVault, 30);
-      else if (viewName === 'planner') setTimeout(renderPlanner, 30);
-      else if (viewName === 'prefs' || viewName === 'settings') setTimeout(renderSettingsView, 30);
-      else if (viewName === 'data' || viewName === 'quality') setTimeout(renderDataQualityView, 30);
     }
     return true;
   }

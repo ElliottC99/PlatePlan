@@ -331,11 +331,18 @@ export function renderVaultRecipeCard(r, options = {}) {
     r.time ? `<span class="tag">${escapeHtml(r.time)}m</span>` : ''
   ].filter(Boolean).join(' ');
 
+  const precomputedKey = `${requestedMealType}::${activeProfile}`;
+  const hasMatchingPrecomputed = r._precomputedFitKey === precomputedKey;
+
   const buildFit = (_active, useEnhanced = false) => {
     const variantKey = useEnhanced ? 'enhanced' : 'original';
-    const liveFitData = typeof window.calculateMealFitScore === 'function'
-      ? window.calculateMealFitScore(_active, requestedMealType, { activeProfile, variant: variantKey, portionScaled: true })
+    const precomputed = hasMatchingPrecomputed
+      ? (useEnhanced ? r._precomputedFitEnh : r._precomputedFitOrig)
       : null;
+    const liveFitData = precomputed
+      || (typeof window.calculateMealFitScore === 'function'
+        ? window.calculateMealFitScore(_active, requestedMealType, { activeProfile, variant: variantKey, portionScaled: true })
+        : null);
     const resolvedMealType = liveFitData?.mealType || (requestedMealType !== 'all' ? requestedMealType : (types[0] || 'dinner'));
     
     // Derive portion display directly from liveFitData details

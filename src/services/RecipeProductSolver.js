@@ -25,7 +25,9 @@ const DISCRETE_UNITS = new Set(['', 'qty', 'piece', 'pieces', 'item', 'items', '
 const CHURN_GATE_POINTS = 3;
 const BNB_MAX_VARIABLE_LINES = 6;
 const BNB_MAX_NODES = 2500;
-const MEMO_MAX_ENTRIES = 1200;
+const DP_MAX_OPTIONS_PER_LINE = 12;
+const DP_MAX_STATES = 600;
+const MEMO_MAX_ENTRIES = 3000;
 
 let catalogEpoch = 1;
 let prefsEpoch = 1;
@@ -805,7 +807,9 @@ function solveForSingleMealType(recipe, variant, ingredients, lineKeys, index, c
   // 2D Bucketed DP fallback for outlier recipes with >6 variable lines or huge branching
   if (exceededBudget) {
     let states = new Map();
-    states.set(`${Math.round(fixedCal / 2)}:${Math.round(fixedProt * 4)}`, {
+    const calBucketSize = 5;
+    const protBucketScale = 2;
+    states.set(`${Math.round(fixedCal / calBucketSize)}:${Math.round(fixedProt * protBucketScale)}`, {
       cal: fixedCal,
       prot: fixedProt,
       cost: fixedCost,
@@ -816,7 +820,26 @@ function solveForSingleMealType(recipe, variant, ingredients, lineKeys, index, c
 
     for (let i = 0; i < K; i++) {
       const nextStates = new Map();
-      const opts = lineEntries[i].options;
+      const rawOpts = lineEntries[i].options;
+      // Cap per-line branching in DP fallback while preserving baseline and macro-diverse extremes
+      let opts = rawOpts;
+      if (rawOpts.length > DP_MAX_OPTIONS_PER_LINE) {
+        const picked = new Set();
+        const baselineOpt = rawOpts.find(o => o.isBaseline) || rawOpts[0];
+        if (baselineOpt) picked.add(baselineOpt);
+        const byCal = [...rawOpts].sort((a, b) => a.cal - b.cal);
+        const byProt = [...rawOpts].sort((a, b) => b.prot - a.prot);
+        picked.add(byCal[0]);
+        picked.add(byCal[byCal.length - 1]);
+        picked.add(byProt[0]);
+        picked.add(byProt[byProt.length - 1]);
+        for (const o of rawOpts) {
+          if (picked.size >= DP_MAX_OPTIONS_PER_LINE) break;
+          picked.add(o);
+        }
+        opts = Array.from(picked);
+      }
+
       for (const st of states.values()) {
         for (const opt of opts) {
           const nCal = st.cal + opt.cal;
@@ -824,7 +847,7 @@ function solveForSingleMealType(recipe, variant, ingredients, lineKeys, index, c
           const nCost = st.cost + opt.cost;
           const nDep = st.departures + (opt.isBaseline ? 0 : 1);
           const nRank = st.strategyRank + opt.strategyRank;
-          const key = `${Math.round(nCal / 2)}:${Math.round(nProt * 4)}`;
+          const key = `${Math.round(nCal / calBucketSize)}:${Math.round(nProt * protBucketScale)}`;
           const prev = nextStates.get(key);
           if (
             !prev ||
@@ -842,7 +865,27 @@ function solveForSingleMealType(recipe, variant, ingredients, lineKeys, index, c
           }
         }
       }
-      states = nextStates;
+
+      // Beam-cap DP state count so extreme category-level recipes stay bounded (<20ms)
+      if (nextStates.size > DP_MAX_STATES) {
+        const remMinCal = sufMinCal[i + 1];
+        const remMaxCal = sufMaxCal[i + 1];
+        const remMinProt = sufMinProt[i + 1];
+        const remMaxProt = sufMaxProt[i + 1];
+        const ranked = Array.from(nextStates.entries()).map(([k, st]) => ({
+          k,
+          st,
+          ub: computeUpperBound(st.cal + remMinCal, st.cal + remMaxCal, st.prot + remMinProt, st.prot + remMaxProt, ctx)
+        }));
+        ranked.sort((a, b) => b.ub - a.ub || a.st.departures - b.st.departures || a.st.strategyRank - b.st.strategyRank);
+        const trimmed = new Map();
+        for (let rIdx = 0; rIdx < DP_MAX_STATES; rIdx++) {
+          trimmed.set(ranked[rIdx].k, ranked[rIdx].st);
+        }
+        states = trimmed;
+      } else {
+        states = nextStates;
+      }
     }
 
     for (const st of states.values()) {
@@ -982,11 +1025,14 @@ export function solveOptimalRecipeProducts(recipe, context = {}) {
     : (r.servings ?? r.serves ?? 1);
   const serves = Math.max(1, Number(servesRaw) || 1);
 
-  // Check memo cache when no ad-hoc overrides are passed and caller didn't supply detached prefs
+  // Check memo cache when no ad-hoc overrides are passed
   let memoKey = null;
-  if (!hasOverrides && !context.fitScoreParams) {
+  if (!hasOverrides) {
     const fp = buildRecipeFingerprint(r, variant, ingredients, serves);
-    memoKey = `${fp}::${rawMealType}::${activeProfile}::${criterion}::c${catalogEpoch}::p${prefsEpoch}::n${products.length}::i${pantryIngredients.length}`;
+    const paramsSig = context.fitScoreParams
+      ? `${context.fitScoreParams.calorieWeightPct ?? ''}_${context.fitScoreParams.calMinOptPct ?? ''}_${context.fitScoreParams.calMaxOptPct ?? ''}_${context.fitScoreParams.protMinOptPct ?? ''}_${context.fitScoreParams.protMaxOptPct ?? ''}`
+      : '';
+    memoKey = `${fp}::${rawMealType}::${activeProfile}::${criterion}::${paramsSig}::c${catalogEpoch}::p${prefsEpoch}::n${products.length}::i${pantryIngredients.length}`;
     const hit = solverMemoCache.get(memoKey);
     if (hit) return hit;
   }
@@ -1011,7 +1057,13 @@ export function solveOptimalRecipeProducts(recipe, context = {}) {
 
   if (memoKey && result) {
     if (solverMemoCache.size >= MEMO_MAX_ENTRIES) {
-      solverMemoCache.clear();
+      // Evict oldest 25% of entries instead of wiping the entire memo cache
+      const evictCount = Math.floor(MEMO_MAX_ENTRIES * 0.25);
+      let evicted = 0;
+      for (const oldKey of solverMemoCache.keys()) {
+        solverMemoCache.delete(oldKey);
+        if (++evicted >= evictCount) break;
+      }
     }
     solverMemoCache.set(memoKey, result);
   }
