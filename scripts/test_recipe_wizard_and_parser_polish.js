@@ -100,6 +100,24 @@ Method:
   assert.equal(plain500.unit, 'qty');
   assert.equal(plain500.name, 'Vegetable Stock Cube');
   assert.equal(plain500.waterMl, 500);
+
+  const paren500 = parseIngredientString('500ml (17fl oz) chicken stock');
+  assert.equal(paren500.qty, 1);
+  assert.equal(paren500.unit, 'qty');
+  assert.equal(paren500.name, 'Chicken Stock Cube');
+  assert.equal(paren500.waterMl, 500);
+
+  const comma1000 = parseIngredientString('1,000ml (35fl oz) hot chicken or veg stock');
+  assert.equal(comma1000.qty, 1);
+  assert.equal(comma1000.unit, 'qty');
+  assert.equal(comma1000.name, 'Chicken Stock Cube');
+  assert.equal(comma1000.waterMl, 1000);
+
+  const slash1L = parseIngredientString('1L / 35fl oz beef bone broth');
+  assert.equal(slash1L.qty, 1);
+  assert.equal(slash1L.unit, 'qty');
+  assert.equal(slash1L.name, 'Beef Stock Cube');
+  assert.equal(slash1L.waterMl, 1000);
 }
 
 // AE3: Alias cleaner and learnIngredientAlias strip weights, volumes, ranges, and reject unit-only strings
