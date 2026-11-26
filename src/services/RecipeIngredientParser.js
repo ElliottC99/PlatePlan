@@ -257,14 +257,29 @@ export function parseIngredientString(rawStr) {
     };
   }
 
-  // 0a. Liquid stock / broth volumes (e.g., "1000ml vegetable stock", "1L chicken stock", "500ml hot veg stock", "500ml stock")
-  const liquidStockMatch = clean.match(
-    /^((?:\d+\s+)?\d+\/\d+|\d+(?:\.\d+)?)\s*(ml|millilit(?:er|re)s?|mls?|l|lit(?:er|re)s?)\b\s+(?:(?:of|hot|warm|boiling|cold|fresh|good[- ]quality|low[- ]salt|reduced[- ]salt|organic|homemade)\s+)*(?:(vegetable|veg|chicken|beef|fish|lamb|vegan|mushroom|onion|pork|turkey)\s+)?(?:stock|bouillon|broth)\b(.*)$/i
+  // 0a. Liquid stock / broth volumes (e.g., "500ml (17fl oz) chicken stock", "1,000ml vegetable stock", "1L chicken stock", "500ml hot veg stock", "2 cups chicken stock")
+  const cleanForLiquidStock = clean
+    .replace(/(\d),(\d{3})(?!\d)/g, '$1$2')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\s*\/\s*\d+(?:\.\d+)?\s*(?:fl\.?\s*oz|oz|cups?|pints?|pt|ml|mls?|l|lit(?:er|re)s?)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const liquidStockMatch = cleanForLiquidStock.match(
+    /^((?:\d+\s+)?\d+\/\d+|\d+(?:\.\d+)?)\s*(ml|millilit(?:er|re)s?|mls?|l|lit(?:er|re)s?|pints?|pt|cups?)\b\s+(?:(?:of|hot|warm|boiling|cold|fresh|good[- ]quality|low[- ]salt|reduced[- ]salt|organic|homemade)\s+)*(?:(vegetable|veg|chicken|beef|fish|lamb|vegan|mushroom|onion|pork|turkey)(?:\s*(?:or|\/)\s*(?:vegetable|veg|chicken|beef|fish|lamb|vegan|mushroom|onion|pork|turkey))?\s+)?(?:bone\s+)?(?:stock|bouillon|broth)\b(.*)$/i
   );
   if (liquidStockMatch) {
     const rawVol = parseFractionOrNumber(liquidStockMatch[1]);
     const volUnit = liquidStockMatch[2].toLowerCase();
-    const waterMl = Math.round((volUnit.startsWith('l') ? rawVol * 1000 : rawVol));
+    let waterMl = 0;
+    if (volUnit.startsWith('l')) {
+      waterMl = Math.round(rawVol * 1000);
+    } else if (volUnit.startsWith('pint') || volUnit === 'pt') {
+      waterMl = Math.round(rawVol * 568);
+    } else if (volUnit.startsWith('cup')) {
+      waterMl = Math.round(rawVol * 240);
+    } else {
+      waterMl = Math.round(rawVol);
+    }
     if (waterMl > 0) {
       const rawType = (liquidStockMatch[3] || '').toLowerCase();
       const stockType = rawType === 'veg' ? 'Vegetable' : (rawType ? toTitleCase(rawType) : 'Vegetable');
