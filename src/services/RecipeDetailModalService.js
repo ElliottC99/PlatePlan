@@ -11,6 +11,8 @@ import { calculateMealFitScore, getFitScoreTierMeta, extractRecipeMacros } from 
 import { resolveMealSplitPercentages } from '../utils/nutritionCalculator.js';
 import { getState } from '../store/store.js';
 import { normalizeMethodSteps } from '../utils/stringUtils.js';
+import { solveOptimalRecipeProducts, buildRecipeLineKeys } from './RecipeProductSolver.js';
+import { extractSlotProductOverrides } from './MealPlanGeneratorService.js';
 import { openEnhancementModal } from '../components/recipe/RecipeEnhancementModalUI.js';
 import { saveRecipe } from './HouseholdRepository.js';
 
@@ -100,7 +102,7 @@ export function updateRecipePreviewScale(val) {
       const ingredients = Array.isArray(rawIngs) ? rawIngs : Object.values(rawIngs);
       const sections = Array.isArray(activeR.ingredientSections) && activeR.ingredientSections.length > 0 ? activeR.ingredientSections : (r.ingredientSections || []);
       const state = (typeof window !== 'undefined' ? getState() : {}) || {};
-      ingListEl.innerHTML = renderRecipeIngredientsListHTML(ingredients, state, scaleMultiplier, sections);
+      ingListEl.innerHTML = renderRecipeIngredientsListHTML(ingredients, state, scaleMultiplier, sections, previewState.solveContext || null);
     } else {
       renderRecipePreview();
     }
@@ -122,7 +124,7 @@ export function updateSinglePersonServes(val, person = 'elliott') {
       const rawIngs = activeR.ingredients || activeR.parsedIngredients || activeR.rawIngredients || r.ingredients || [];
       const ingredients = Array.isArray(rawIngs) ? rawIngs : Object.values(rawIngs);
       const sections = Array.isArray(activeR.ingredientSections) && activeR.ingredientSections.length > 0 ? activeR.ingredientSections : (r.ingredientSections || []);
-      ingListEl.innerHTML = renderRecipeIngredientsListHTML(ingredients, state, scaleMultiplier, sections);
+      ingListEl.innerHTML = renderRecipeIngredientsListHTML(ingredients, state, scaleMultiplier, sections, previewState.solveContext || null);
     } else {
       renderRecipePreview();
     }
@@ -194,11 +196,18 @@ export function renderRecipePreview() {
   const types = r.types || [r.type || 'dinner'];
   const baseServes = Number(activeR?.serves || activeR?.servings || r?.serves || r?.servings || 2) || 2;
 
+  const state = (typeof window !== 'undefined' ? getState() : {}) || {};
+  const activeProfile = previewState.servingMode === 'both' ? 'everyone' : previewState.servingMode;
+  const planOverrides = previewState.instanceId && state.currentPlan
+    ? extractSlotProductOverrides(state.currentPlan, [previewState.instanceId])
+    : null;
+
   // 1. Calculate Universal Fit Score & Dynamic Macros first (picks best eligible mealType when 'all')
   const fitResult = typeof calculateMealFitScore === 'function' ? calculateMealFitScore(r, previewState.mealType || 'all', {
-    activeProfile: previewState.servingMode === 'both' ? 'everyone' : previewState.servingMode,
+    activeProfile,
     variant: isEnh ? 'enhanced' : 'original',
-    portionScaled: true
+    portionScaled: true,
+    ...(planOverrides ? { productOverrides: planOverrides } : {})
   }) : null;
   const mealType = fitResult?.mealType || types[0] || 'dinner';
 
@@ -213,8 +222,24 @@ export function renderRecipePreview() {
     ? activeR.ingredientSections
     : (Array.isArray(r.ingredientSections) && r.ingredientSections.length > 0 ? r.ingredientSections : []);
 
-  const state = (typeof window !== 'undefined' ? getState() : {}) || {};
-  const ingredientsHtml = renderRecipeIngredientsListHTML(ingredients, state, scaleMultiplier, sections);
+  const flatForSolve = sections.length > 0 ? sections.flatMap(s => s?.ingredients || []) : ingredients;
+  const solvedResult = (Array.isArray(state.products) && state.products.length > 0)
+    ? solveOptimalRecipeProducts(r, {
+        variant: isEnh ? 'enhanced' : 'original',
+        mealType,
+        activeProfile,
+        products: state.products,
+        ingredients: state.rootItems || state.ingredients || [],
+        preferences: state.preferences || state.userPrefs || state.settings || {},
+        ...(planOverrides ? { productOverrides: planOverrides } : {})
+      })
+    : null;
+  const solveContext = solvedResult
+    ? { solvedResult, lineKeys: buildRecipeLineKeys(flatForSolve), manualOverrides: planOverrides }
+    : null;
+  previewState.solveContext = solveContext;
+
+  const ingredientsHtml = renderRecipeIngredientsListHTML(ingredients, state, scaleMultiplier, sections, solveContext);
 
   // Render method steps
   const steps = normalizeMethodSteps(activeR, r);

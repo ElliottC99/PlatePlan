@@ -749,10 +749,17 @@ function renderEnhancementModalContent(wrap, plan) {
         });
       });
 
+      if ((activeRoute.noForkNeeded || plan.noForkNeeded) && (!activeRoute.adjustments || activeRoute.adjustments.length === 0)) {
+        if (typeof window !== 'undefined' && typeof window.showPlatePlanToast === 'function') {
+          window.showPlatePlanToast('✨ Already 85%+ with optimal pantry products — no Enhanced fork needed.');
+        }
+        return;
+      }
+
       const liveData = buildLiveEnhancedRecipe(activeRoute, plan.originalRecipe);
       const finalPayload = liveData?.livePayload || activeRoute.enhancedRecipePayload || plan.enhancedRecipePayload;
 
-      if (typeof currentOnApply === 'function') {
+      if (finalPayload && typeof currentOnApply === 'function') {
         currentOnApply(finalPayload);
       }
     };

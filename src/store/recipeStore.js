@@ -5,7 +5,7 @@
  */
 
 import { saveStateCache } from './cacheSlice.js';
-import { autoRecalibrateRecipeDrift } from '../services/DataQualityScanner.js';
+import { invalidateSolverCache } from '../services/RecipeProductSolver.js';
 
 let recipeState = {
   recipes: [],
@@ -28,28 +28,24 @@ export function getRecipeState() {
   return recipeState;
 }
 
-export function setRecipes(newRecipes, ingredients = [], products = []) {
-  const processed = (Array.isArray(newRecipes) ? newRecipes : []).map(r => {
-    const res = autoRecalibrateRecipeDrift(r, ingredients, products);
-    return res.recipe;
-  });
-  recipeState.recipes = processed;
+export function setRecipes(newRecipes) {
+  recipeState.recipes = Array.isArray(newRecipes) ? newRecipes : [];
+  invalidateSolverCache();
 
   saveStateCache(recipeState);
   dispatchStateEvent('plateplan:state:recipes', recipeState.recipes);
 }
 
-export function updateRecipeInStore(recipe, ingredients = [], products = []) {
+export function updateRecipeInStore(recipe) {
   if (!recipe || !recipe.id) return;
-  const res = autoRecalibrateRecipeDrift(recipe, ingredients, products);
-  const processed = res.recipe;
 
-  const index = recipeState.recipes.findIndex(r => r.id === processed.id);
+  const index = recipeState.recipes.findIndex(r => r.id === recipe.id);
   if (index !== -1) {
-    recipeState.recipes[index] = { ...recipeState.recipes[index], ...processed };
+    recipeState.recipes[index] = { ...recipeState.recipes[index], ...recipe };
   } else {
-    recipeState.recipes.push(processed);
+    recipeState.recipes.push(recipe);
   }
+  invalidateSolverCache();
 
   saveStateCache(recipeState);
   dispatchStateEvent('plateplan:state:recipes', recipeState.recipes);

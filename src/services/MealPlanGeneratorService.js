@@ -82,9 +82,15 @@ export function getPlanSlotInfo(slotData) {
     return { id, variant, instanceId, recipe: null, active: null };
   }
 
-  const active = (variant === 'enhanced' && recipe.enhanced) 
-    ? { ...recipe, ...recipe.enhanced, ingredients: recipe.enhanced.ingredients || recipe.ingredients }
-    : recipe;
+  const active = (variant === 'enhanced' && recipe.enhanced)
+    ? {
+        ...recipe,
+        ...recipe.enhanced,
+        _variant: 'enhanced',
+        ingredients: recipe.enhanced.ingredients || recipe.ingredients,
+        ingredientSections: recipe.enhanced.ingredientSections || (recipe.enhanced.ingredients ? [] : recipe.ingredientSections)
+      }
+    : { ...recipe, _variant: 'original' };
 
   return { id, variant, instanceId, recipe, active };
 }
@@ -92,19 +98,84 @@ export function getPlanSlotInfo(slotData) {
 export const resolvePlannedSlotRecipe = getPlanSlotInfo;
 
 /**
- * Resolves nutrition for a planned slot.
+ * Extracts scoped product overrides (substitutions > productSelections) for a planned slot.
+ */
+export function extractSlotProductOverrides(plan, eventIds = []) {
+  if (!plan || typeof plan !== 'object') return null;
+  const selections = plan.productSelections || {};
+  const substitutions = plan.substitutions || {};
+  const overrides = {};
+  let hasAny = false;
+
+  const expandedPrefixes = new Set(eventIds.filter(Boolean).map(String));
+  // Expand any instanceId to its matching `${dayKey}_${slotKey}` and `prepGroupId` keys
+  if (plan.slots && typeof plan.slots === 'object' && expandedPrefixes.size > 0) {
+    const prepGroups = Array.isArray(plan.mealPrepGroups) ? plan.mealPrepGroups : [];
+    Object.entries(plan.slots).forEach(([dayKey, daySlots]) => {
+      if (!daySlots || typeof daySlots !== 'object') return;
+      const dayNum = parseInt(String(dayKey).replace(/\D/g, ''), 10);
+      Object.entries(daySlots).forEach(([sk, sv]) => {
+        if (!sv || typeof sv !== 'object') return;
+        const matchesInst = sv.instanceId && expandedPrefixes.has(String(sv.instanceId));
+        const matchesBareSlot = expandedPrefixes.has(String(sk));
+        if (matchesInst || matchesBareSlot) {
+          expandedPrefixes.add(`${dayKey}_${sk}`);
+          const recId = String(sv.recipeId || sv.id || '').split('::')[0];
+          const meal = getMealTypeFromSlotKey(sk);
+          const matchedPrep = prepGroups.find(g =>
+            String(g.recipeId).split('::')[0] === recId &&
+            (!g.mealType || String(g.mealType).toLowerCase() === meal) &&
+            Array.isArray(g.days) && g.days.some(d => Number(d) === dayNum)
+          );
+          if (matchedPrep) {
+            expandedPrefixes.add(matchedPrep.id || matchedPrep.prepGroupId || matchedPrep.key || `prep_${matchedPrep.recipeId}`);
+          }
+        }
+      });
+    });
+  }
+
+  const collectFrom = (dict, prefixes) => {
+    for (const prefix of prefixes) {
+      const p = `${prefix}:`;
+      for (const [k, v] of Object.entries(dict)) {
+        if (!v) continue;
+        if (k.startsWith(p)) {
+          const lineKey = k.slice(p.length);
+          overrides[lineKey] = typeof v === 'object' ? (v.productId || v.id) : v;
+          hasAny = true;
+        }
+      }
+    }
+  };
+
+  const validPrefixes = Array.from(expandedPrefixes);
+  if (validPrefixes.length > 0) {
+    collectFrom(selections, validPrefixes);
+    collectFrom(substitutions, validPrefixes);
+  }
+  return hasAny ? overrides : null;
+}
+
+/**
+ * Resolves nutrition for a planned slot, honoring plan.substitutions > plan.productSelections > live solver.
  */
 export function getPlannedSlotNutrition(activeRecipe, slotKey = 'dinnerE', instanceId = null, plan = null) {
   if (!activeRecipe) return { cal: 0, prot: 0 };
   const mealType = getMealTypeFromSlotKey(slotKey) || 'dinner';
-  const person = slotKey.endsWith('E') ? 'elliott' : 'chloe';
+  const person = slotKey.endsWith('E') ? 'elliott' : (slotKey.endsWith('C') ? 'chloe' : 'everyone');
+  const activePlan = plan || (typeof getState === 'function' ? (getState()?.currentPlan || null) : null);
+  const candidateIds = [instanceId, slotKey].filter(Boolean);
+  const productOverrides = extractSlotProductOverrides(activePlan, candidateIds);
 
   const res = calculateMealFitScore(activeRecipe, mealType, {
     activeProfile: person,
-    portionScaled: true
+    variant: activeRecipe._variant || 'original',
+    portionScaled: true,
+    ...(productOverrides ? { productOverrides } : {})
   });
 
-  const detail = res?.details?.[person];
+  const detail = person === 'everyone' ? (res?.details?.elliott || res?.details?.chloe) : res?.details?.[person];
   if (detail) {
     return { cal: detail.scaledKcal || 0, prot: detail.scaledProtein || 0 };
   }
@@ -348,7 +419,7 @@ export function generateMealPlan(options = {}) {
   fillMealType('lunch', lunches, cadence.lunch || 2);
   fillMealType('dinner', dinners, cadence.dinner || 2);
 
-  return stripPlanPayload({
+  const draftPlan = {
     days,
     startDate: startDateStr,
     dayDates,
@@ -357,7 +428,20 @@ export function generateMealPlan(options = {}) {
     skeletonGrid,
     mealPrepGroups,
     createdAt: new Date().toISOString()
-  });
+  };
+
+  try {
+    draftPlan.productSelections = freezeProductSelectionsForPlan(draftPlan, {
+      recipes: rawRecipes,
+      products: options?.products || getState()?.products || [],
+      ingredients: options?.ingredients || getState()?.rootItems || getState()?.ingredients || [],
+      preferences: options?.preferences || getState()?.preferences || getState()?.userPrefs || getState()?.settings || {}
+    });
+  } catch (err) {
+    console.warn('[MealPlanGeneratorService] Failed to freeze productSelections:', err);
+  }
+
+  return stripPlanPayload(draftPlan);
 }
 
 /**

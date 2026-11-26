@@ -272,8 +272,14 @@ export function selectAndSwapRecipe(recipeId, variant = 'original') {
     const slot = makePlanSlot(recipeId, variant);
     plan.slots[day][meal + 'E'] = slot;
     plan.slots[day][meal + 'C'] = { ...slot };
+    if (typeof window.lockProductSelectionsForSlots === 'function') {
+      plan.productSelections = window.lockProductSelectionsForSlots(plan.slots, null, [{ dayKey: day, slotKeys: [meal + 'E', meal + 'C'] }]);
+    }
   } else {
     plan.slots[day][slotKey] = makePlanSlot(recipeId, variant);
+    if (typeof window.lockProductSelectionsForSlots === 'function') {
+      plan.productSelections = window.lockProductSelectionsForSlots(plan.slots, null, [{ dayKey: day, slotKeys: [slotKey] }]);
+    }
   }
 
   const toast = (m, type) => { if (typeof window.showPlatePlanToast === 'function') window.showPlatePlanToast(m, type); };

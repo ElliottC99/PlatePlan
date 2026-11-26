@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ideation: Per-Recipe Combinatorial Product Mapping for Fit Score</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-muted: #f1f5f9;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --border: #e2e8f0;
+      --accent: #0f766e;
+      --accent-soft: #ccfbf1;
+      --warn: #b45309;
+      --warn-soft: #fef3c7;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    main { max-width: 960px; margin: 0 auto; padding: 32px 20px 64px; }
+    header { margin-bottom: 20px; }
+    h1 { font-size: 1.85rem; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.02em; }
+    .subtitle { color: var(--text-muted); margin: 0 0 12px; font-size: 1rem; }
+    details.meta-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 24px;
+      font-size: 0.9rem;
+    }
+    details.meta-box summary { cursor: pointer; font-weight: 600; color: var(--text-muted); }
+    dl.meta-grid { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; margin: 10px 0 0; }
+    dl.meta-grid dt { font-weight: 600; color: var(--text-muted); }
+    dl.meta-grid dd { margin: 0; }
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      margin-bottom: 20px;
+    }
+    h2 { font-size: 1.25rem; margin: 0 0 14px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    h3 { font-size: 1.08rem; margin: 0 0 8px; }
+    .axes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+    .axis-pill {
+      background: var(--surface-muted);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    nav.jump-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 18px;
+      padding: 12px;
+      background: var(--surface-muted);
+      border-radius: 8px;
+    }
+    nav.jump-list a {
+      text-decoration: none;
+      color: var(--accent);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    article.idea-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 16px;
+      background: #fff;
+    }
+    .idea-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; font-size: 0.8rem; }
+    .badge {
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-weight: 600;
+      background: var(--surface-muted);
+      color: var(--text-muted);
+    }
+    .badge.axis { background: var(--accent-soft); color: var(--accent); }
+    dl.idea-fields { margin: 12px 0 0; display: grid; grid-template-columns: 110px 1fr; gap: 8px 12px; font-size: 0.92rem; }
+    dl.idea-fields dt { font-weight: 600; color: var(--text-muted); }
+    dl.idea-fields dd { margin: 0; }
+    .diagram-wrap { margin: 14px 0 6px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: var(--surface-muted); font-weight: 600; }
+    code { background: var(--surface-muted); padding: 1px 5px; border-radius: 4px; font-size: 0.88em; }
+    footer.composition-signal {
+      margin-top: 28px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Per-Recipe Combinatorial Product Mapping for Fit Score</h1>
+      <p class="subtitle">Focus: Quickly and automatically evaluating combinations of products across a recipe's ingredients to maximize that specific recipe's Fit Score.</p>
+    </header>
+
+    <details class="meta-box">
+      <summary>Document metadata</summary>
+      <dl class="meta-grid">
+        <dt>date</dt><dd><time datetime="2026-11-26">2026-11-26</time></dd>
+        <dt>topic</dt><dd>per-recipe-product-combination-fit-score</dd>
+        <dt>focus</dt><dd>Quickly and automatically evaluating combinations of products across a recipe's ingredients to maximize that specific recipe's Fit Score</dd>
+        <dt>mode</dt><dd>repo-grounded</dd>
+      </dl>
+    </details>
+
+    <section id="grounding-context">
+      <h2>Codebase Context</h2>
+      <ul>
+        <li><strong>Abstract recipes:</strong> <code>RecipeFirestoreRepository.saveRecipe</code> runs <code>stripProductIdsFromIngredients</code>, so recipes bind to <code>subtypeId</code>, <code>ingredientId</code>, or <code>categoryId</code> rather than concrete products.</li>
+        <li><strong>Greedy single-line resolution:</strong> <code>PantryTaxonomyService.resolveDynamicProductForIngredient</code> resolves one line at a time via linear <code>.filter()</code> scans and <code>isAutoDefault</code> / <code>compareProductsByStrategy</code> (default <code>highest_protein_per_kcal</code>), ignoring the rest of the recipe and often pushing total calories into a deficit penalty.</li>
+        <li><strong>Static macro masking:</strong> <code>macroScoringUtils.extractRecipeMacros</code> returns saved <code>recipe.macros</code> whenever <code>&gt; 0</code>, hiding pantry updates from Vault Fit Scores and Planner selection.</li>
+        <li><strong>Asymmetric dual-person curves:</strong> <code>fitScoreCalculator.calculateMealFitScore</code> scores per-serving <code>(cal, prot)</code> for Elliott and Chloe across wide <code>100</code>-point plateaus (85–105% kcal, 100–120% protein).</li>
+        <li><strong>Plan locking &amp; shopping ticks:</strong> <code>MealPlanGeneratorService.generateMealPlan</code> currently skips <code>freezeProductSelectionsForPlan</code>, while <code>ShoppingCalculationService</code> already reads slot-scoped <code>plan.productSelections</code> ahead of dynamic resolution.</li>
+      </ul>
+      <div class="diagram-wrap">
+        <svg viewBox="0 0 860 150" width="100%" height="150" role="img" aria-label="Proposed combinatorial product optimization pipeline">
+          <rect x="8" y="25" width="150" height="90" rx="10" fill="#f1f5f9" stroke="#cbd5e1"/>
+          <text x="83" y="58" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">1. CatalogIndex</text>
+          <text x="83" y="78" text-anchor="middle" font-size="11" fill="#475569">Map by sub / ing / cat</text>
+          <text x="83" y="95" text-anchor="middle" font-size="11" fill="#475569">+ Epoch Memo</text>
+
+          <line x1="158" y1="70" x2="188" y2="70" stroke="#0f766e" stroke-width="2"/>
+          <polygon points="188,65 198,70 188,75" fill="#0f766e"/>
+
+          <rect x="198" y="25" width="165" height="90" rx="10" fill="#f1f5f9" stroke="#cbd5e1"/>
+          <text x="280" y="58" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">2. Fold &amp; Bucket</text>
+          <text x="280" y="78" text-anchor="middle" font-size="11" fill="#475569">Constant (baseCal, baseProt)</text>
+          <text x="280" y="95" text-anchor="middle" font-size="11" fill="#475569">+ 2-5 variable lines</text>
+
+          <line x1="363" y1="70" x2="393" y2="70" stroke="#0f766e" stroke-width="2"/>
+          <polygon points="393,65 403,70 393,75" fill="#0f766e"/>
+
+          <rect x="403" y="25" width="210" height="90" rx="10" fill="#ccfbf1" stroke="#0f766e"/>
+          <text x="508" y="58" text-anchor="middle" font-size="13" font-weight="700" fill="#0f766e">3. Interval Branch &amp; Bound</text>
+          <text x="508" y="78" text-anchor="middle" font-size="11" fill="#0f172a">Unimodal upper-bound pruning</text>
+          <text x="508" y="95" text-anchor="middle" font-size="11" fill="#0f172a">+ Lexicographic tie-break</text>
+
+          <line x1="613" y1="70" x2="643" y2="70" stroke="#0f766e" stroke-width="2"/>
+          <polygon points="643,65 653,70 643,75" fill="#0f766e"/>
+
+          <rect x="653" y="25" width="195" height="90" rx="10" fill="#f1f5f9" stroke="#cbd5e1"/>
+          <text x="750" y="58" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">4. Unified Outputs</text>
+          <text x="750" y="78" text-anchor="middle" font-size="11" fill="#475569">Vault / Modal Live Macros</text>
+          <text x="750" y="95" text-anchor="middle" font-size="11" fill="#475569">Plan Freeze → Shopping</text>
+        </svg>
+      </div>
+    </section>
+
+    <section id="topic-axes">
+      <h2>Topic Axes</h2>
+      <div class="axes-grid">
+        <div class="axis-pill">1. Candidate Space &amp; Culinary Constraints</div>
+        <div class="axis-pill">2. Search &amp; Scoring Algorithm</div>
+        <div class="axis-pill">3. Persistence &amp; Ownership Contract</div>
+        <div class="axis-pill">4. Evaluation Triggers, Caching &amp; UX Surfaces</div>
+      </div>
+    </section>
+
+    <section id="ranked-ideas">
+      <h2>Ranked Ideas</h2>
+      <nav class="jump-list" aria-label="Ranked Ideas">
+        <a href="#idea-1">1. Interval Branch-and-Bound</a>
+        <a href="#idea-2">2. Indexed Pools &amp; Folding</a>
+        <a href="#idea-3">3. Epoch-Memoized Live Macros</a>
+        <a href="#idea-4">4. Slot-Scoped Plan Freeze</a>
+        <a href="#idea-5">5. Bi-Directional Culinary Pools</a>
+        <a href="#idea-6">6. Plateau Tie-Breaking</a>
+        <a href="#idea-7">7. Two-Stage Auto-Enhance</a>
+      </nav>
+
+      <article class="idea-card" id="idea-1">
+        <h3>1. Join-Ordered Interval Branch-and-Bound with O(1) Vector Scoring</h3>
+        <div class="idea-badges">
+          <span class="badge axis">Search &amp; Scoring Algorithm</span>
+          <span class="badge">Confidence: 95%</span>
+          <span class="badge">Complexity: Medium</span>
+        </div>
+        <p>Precompute each candidate product's per-serving <code>(cal, prot)</code> once via <code>NutritionService.calculateItemNutrition</code>, compile Elliott/Chloe meal targets into a zero-allocation scalar <code>scoreMacroPair(cal, prot, ctx)</code>, sort variable lines by macro swing descending, and run Branch-and-Bound using exact suffix <code>[remMin, remMax]</code> interval bounds against the unimodal piecewise curves in <code>calculateCalorieScore</code> / <code>calculateProteinScore</code>. Parameterize by <code>(variant, mealType, activeProfile)</code> and fall back to 2D bucketed DP if a recipe exceeds 6 variable lines.</p>
+        <dl class="idea-fields">
+          <dt>Basis</dt><dd><code>direct:</code> <code>src/utils/fitScoreCalculator.js:109-241</code>, <code>src/utils/macroScoringUtils.js:229-255</code>, <code>src/components/ProductSwapModal.js:289-315</code>; <code>external:</code> interval-bounded Branch-and-Bound &amp; query-planner join ordering.</dd>
+          <dt>Rationale</dt><dd>Guarantees the exact global Fit Score optimum in &lt;2 ms per recipe on mobile without brute-force explosion or object cloning.</dd>
+          <dt>Downsides</dt><dd>Requires maintaining parity between <code>scoreMacroPair</code> and <code>calculateSingleMealTypeFitScore</code> if curve weights change.</dd>
+        </dl>
+      </article>
+
+      <article class="idea-card" id="idea-2">
+        <h3>2. Pre-Indexed Pantry Pools, Constant Folding &amp; Macro-Equivalence Bucketing</h3>
+        <div class="idea-badges">
+          <span class="badge axis">Candidate Space &amp; Culinary Constraints</span>
+          <span class="badge">Confidence: 95%</span>
+          <span class="badge">Complexity: Medium</span>
+        </div>
+        <p>Replace repeated <code>O(N*M)</code> linear <code>.filter()</code> scans in <code>PantryTaxonomyService.resolveDynamicProductForIngredient</code> with a single <code>CatalogIndex</code> (<code>Map</code>s by <code>subtypeId</code>, <code>ingredientId</code>, and <code>category</code>). Fold <code>excludeNutrition</code>, single-SKU, and low-variance lines (&lt;5 kcal, &lt;0.5 g protein spread) into a static <code>(baseCal, baseProt)</code> offset, and collapse macro-identical supermarket SKUs (±3 kcal, ±0.3 g protein) to one strategy/price representative before search.</p>
+        <dl class="idea-fields">
+          <dt>Basis</dt><dd><code>direct:</code> <code>src/services/PantryTaxonomyService.js:676-753</code>, <code>src/services/NutritionService.js:168-251</code>; <code>external:</code> compiler constant folding &amp; Pareto dominance pruning.</dd>
+          <dt>Rationale</dt><dd>Shrinks typical 12-ingredient recipes down to 2–5 genuinely distinct variable lines so combinatorial search runs instantaneously even as Pantry grows.</dd>
+          <dt>Downsides</dt><dd>Small quantization buckets (±3 kcal) can theoretically shift a boundary score by 1 point unless bucket size stays tight.</dd>
+        </dl>
+      </article>
+
+      <article class="idea-card" id="idea-3">
+        <h3>3. Epoch-Memoized Dynamic Macros as Live Authority</h3>
+        <div class="idea-badges">
+          <span class="badge axis">Evaluation Triggers, Caching &amp; UX Surfaces</span>
+          <span class="badge">Confidence: 90%</span>
+          <span class="badge">Complexity: Medium</span>
+        </div>
+        <p>Stop trusting stale static <code>recipe.macros &gt; 0</code> in <code>extractRecipeMacros</code> when pantry products are hydrated. Instead, maintain monotonic <code>pantryEpoch</code> and <code>prefsEpoch</code> counters in <code>Store</code> plus a reverse dependency map (<code>ingredientId/subtypeId -&gt; recipeIds</code>), memoize solved <code>(selections, macros, fitScore)</code> per epoch in memory, pre-warm in idle slices on startup, and eliminate the duplicate <code>getSortedRecipes</code> → <code>VaultRecipeCard</code> re-scoring with zero startup Firestore recipe writes.</p>
+        <dl class="idea-fields">
+          <dt>Basis</dt><dd><code>direct:</code> <code>src/utils/macroScoringUtils.js:104-199</code>, <code>src/views/RecipeVaultView.js:142</code>, <code>src/components/vault/VaultRecipeCard.js:334</code>, <code>src/services/CacheMaintenanceService.js:54-66</code>; <code>external:</code> Salsa incremental memoization.</dd>
+          <dt>Rationale</dt><dd>Ends header-vs-ingredient macro drift and keeps Vault filtering/scrolling at 60 fps on phones without burning Firestore write quota.</dd>
+          <dt>Downsides</dt><dd>Recipes whose ingredients fail to resolve to any pantry product must still fall back to stored <code>recipe.macros</code>.</dd>
+        </dl>
+      </article>
+
+      <article class="idea-card" id="idea-4">
+        <h3>4. Slot-Scoped <code>plan.productSelections</code> Freezing &amp; <code>shoppingAtHome</code> Stability</h3>
+        <div class="idea-badges">
+          <span class="badge axis">Persistence &amp; Ownership Contract</span>
+          <span class="badge">Confidence: 90%</span>
+          <span class="badge">Complexity: Medium</span>
+        </div>
+        <p>Keep <code>recipes/*</code> strictly free of <code>productId</code>/<code>bankId</code> (<code>stripProductIdsFromIngredients</code>), and wire <code>MealPlanGeneratorService.generateMealPlan</code> (currently missing) and <code>PlannerSwapModalUI</code> (currently passing invalid <code>'protein'</code> priority) to freeze the solver's slot-optimal combo strictly under <code>${eventId}:${ingKey}</code> in <code>plan.productSelections</code>. Anchor <code>atHomeKey</code> in <code>ShoppingCalculationService</code> to the authored line's own taxonomy rather than <code>matchedProd.subtypeId</code>.</p>
+        <dl class="idea-fields">
+          <dt>Basis</dt><dd><code>direct:</code> <code>src/services/RecipeFirestoreRepository.js:179-211</code>, <code>src/services/MealPlanGeneratorService.js:162-361,495</code>, <code>src/components/planner/PlannerSwapModalUI.js:218-219</code>, <code>src/services/ShoppingCalculationService.js:228-254,307-312</code>.</dd>
+          <dt>Rationale</dt><dd>Ensures the exact product combo that won a planned slot's Fit Score appears on the Shopping List without breaking recipe abstraction or dropping <code>atHome</code> ticks.</dd>
+          <dt>Downsides</dt><dd>Existing plans with unscoped <code>productSelections</code> need clean fallback handling during transition.</dd>
+        </dl>
+      </article>
+
+      <article class="idea-card" id="idea-5">
+        <h3>5. Binding-Granularity Guardrails &amp; Bi-Directional Culinary Pools</h3>
+        <div class="idea-badges">
+          <span class="badge axis">Candidate Space &amp; Culinary Constraints</span>
+          <span class="badge">Confidence: 85%</span>
+          <span class="badge">Complexity: Medium</span>
+        </div>
+        <p>Bypass <code>defaultProductId</code>/<code>isAutoDefault</code> hard locks during combo search and allow <code>ingredientId</code>-bound lines (plus explicitly unlocked siblings) to explore both leaner <em>and</em> fuller-fat products—curing the Calorie Deficit Paradox where lean defaults starve calories. Guard candidate pools with <code>classifyIngredientRole</code> and <code>resolveProductItemWeight &gt; 0</code> for discrete <code>qty</code> lines instead of the 6 hardcoded <code>SWAP_OPPORTUNITIES</code> regexes.</p>
+        <dl class="idea-fields">
+          <dt>Basis</dt><dd><code>direct:</code> <code>src/services/PantryTaxonomyService.js:693,704,719</code>, <code>src/services/RecipeEnhancementSwaps.js:10-101,162</code>, <code>src/services/RecipeEnhancementNutrition.js:182-224</code>, <code>docs/solutions/logic-errors/asymmetric-calorie-deficit-tapering-and-taxonomy-elevation.md</code>.</dd>
+          <dt>Rationale</dt><dd>Every new Tesco product added to Pantry becomes combinatorially usable in both directions with zero regex maintenance or broken unit-weight swaps.</dd>
+          <dt>Downsides</dt><dd>Pantry items bound only at <code>categoryId</code> level still need role/form tagging to avoid edge-case mismatches.</dd>
+        </dl>
+      </article>
+
+      <article class="idea-card" id="idea-6">
+        <h3>6. Plateau-Aware Lexicographic Tie-Breaking &amp; Churn Gate</h3>
+        <div class="idea-badges">
+          <span class="badge axis">Search &amp; Scoring Algorithm</span>
+          <span class="badge">Confidence: 90%</span>
+          <span class="badge">Complexity: Small</span>
+        </div>
+        <p>Because <code>fitScoreWeights.js</code> grants <code>100</code> across wide plateaus, rank equal or near-equal combinations lexicographically: (1) official <code>finalScore</code> (within a <code>+3 pt</code> churn gate over baseline <code>isAutoDefault</code> picks), (2) <code>min(fitScoreE, fitScoreC)</code> fairness so one partner never scores red behind a green average, (3) <code>autoDefaultStrategy</code> (<code>compareProductsByStrategy</code>), and (4) lowest basket cost.</p>
+        <dl class="idea-fields">
+          <dt>Basis</dt><dd><code>direct:</code> <code>src/utils/fitScoreCalculator.js:182-183</code>, <code>src/utils/fitScoreWeights.js:14-29,109-120</code>, <code>src/services/PantryHierarchyService.js:65-104</code>, <code>src/services/ShoppingCalculationService.js:50-91</code>.</dd>
+          <dt>Rationale</dt><dd>Prevents noisy product swaps for +1 point gains while turning wide Fit Score plateaus into deterministic £ savings and Elliott/Chloe balance.</dd>
+          <dt>Downsides</dt><dd>Requires choosing a sensible churn threshold (e.g. +3 pts) so small wins aren't over-suppressed.</dd>
+        </dl>
+      </article>
+
+      <article class="idea-card" id="idea-7">
+        <h3>7. Two-Stage Auto-Enhance &amp; "Lock One, Re-Solve Rest" Attribution</h3>
+        <div class="idea-badges">
+          <span class="badge axis">Evaluation Triggers, Caching &amp; UX Surfaces</span>
+          <span class="badge">Confidence: 85%</span>
+          <span class="badge">Complexity: Medium</span>
+        </div>
+        <p>Run the pantry combo solver as Stage A inside <code>RecipeEnhancementService</code> and <code>RecipeDetailModal</code> before proposing quantity/serving edits or creating duplicate <code>.enhanced</code> variants. Badge only the 1–2 non-default lines inline (e.g. <code>5% → 12% Mince (+11 Fit)</code>), and when a user pins or swaps one product in <code>RecipeDetailModal</code> or <code>ProductSwapModal</code>, re-solve the remaining unlocked lines in &lt;2 ms to compensate.</p>
+        <dl class="idea-fields">
+          <dt>Basis</dt><dd><code>direct:</code> <code>src/services/RecipeEnhancementService.js:440-545</code>, <code>src/components/recipe/RecipeDetailModalUI.js:66-106</code>, <code>src/components/ProductSwapModal.js:77-139,274-317</code>.</dd>
+          <dt>Rationale</dt><dd>Captures Fit Score gains on original recipes without cloning variants, while making automatic product picks transparent and reversible.</dd>
+          <dt>Downsides</dt><dd>Adds small UI badge/pin affordances to <code>RecipeDetailModalUI</code> that must stay compact on mobile.</dd>
+        </dl>
+      </article>
+    </section>
+
+    <section id="rejection-summary">
+      <h2>Rejection &amp; Consolidation Summary</h2>
+      <table>
+        <thead>
+          <tr><th>Candidate</th><th>Disposition</th><th>Reason</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>C4: Asymmetric Component Forking (Shared Base, Split Topper)</td><td>Deferred</td><td>Adds per-person split product rows to shared meals and shopping lists; better evaluated after single-product-per-line combo optimization is live.</td></tr>
+          <tr><td>C8: Top-K Cross-Plan Pack &amp; Cost Synergy</td><td>Deferred</td><td>Cross-day SKU consolidation builds on top of single-recipe optimization and belongs to a follow-on planner phase.</td></tr>
+          <tr><td>C3, C7, C11, C12, C14</td><td>Merged</td><td>Folded directly into Ideas #5, #1, #4, #3, and #7 to keep one coherent implementation track per axis.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer class="composition-signal">
+      Composed 2026-11-26T10:42Z by <code>ce-ideate</code> from codebase grounding, <code>docs/solutions/</code> learnings, and external optimization research.
+    </footer>
+  </main>
+</body>
+</html>

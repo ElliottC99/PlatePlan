@@ -55,9 +55,9 @@ export async function runDeferredMaintenance(preferencesData, mergedCategories, 
       try {
         const recalibratedCount = await window.sweepAndRecalibrateIngredientDefaults();
         if (recalibratedCount > 0) {
-          const { recalculateAllRecipeMacros } = await import('./MaintenanceService.js');
-          if (typeof recalculateAllRecipeMacros === 'function') {
-            await recalculateAllRecipeMacros({ forceAll: false });
+          const { invalidateSolverCache } = await import('./RecipeProductSolver.js');
+          if (typeof invalidateSolverCache === 'function') {
+            invalidateSolverCache();
           }
         }
       } catch (e) {

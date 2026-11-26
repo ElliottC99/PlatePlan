@@ -273,6 +273,24 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
 
   function evaluateSwapFitScore(item) {
     if (!hasValidRecipe || !targetRecipe) return { baseScore, newScore: baseScore, delta: 0 };
+
+    // When pantry products are hydrated, evaluate via productOverrides so live combo macros reflect the swap
+    const stateProducts = Array.isArray(state.products) ? state.products : [];
+    if (stateProducts.length > 0 && item?.id) {
+      const overrideMap = {};
+      const keys = targetItem?.subtypeId
+        ? [targetItem.subtypeId]
+        : [targetItem?.ingredientId, targetItem?.groupId, targetItem?.name].filter(Boolean);
+      keys.forEach(k => { overrideMap[String(k)] = item.id; });
+      const newScoreResult = calculateMealFitScore(targetRecipe, mealType, {
+        activeProfile: 'everyone',
+        preferences: state.preferences || state.userPrefs,
+        productOverrides: overrideMap
+      });
+      const newScore = typeof newScoreResult === 'number' ? newScoreResult : (newScoreResult?.score ?? baseScore);
+      return { baseScore, newScore, delta: newScore - baseScore };
+    }
+
     const serves = Math.max(1, Number(targetRecipe.servings || targetRecipe.serves || 1));
     const usageQty = Number(primaryUsage.qty || targetItem?.buyQty || 100) || 100;
     const usageUnit = targetItem?.unit || 'g';
@@ -311,7 +329,7 @@ export function renderScrollableSwapModal(param1, param2, param3, optionalContex
     applyDeltasToNode(clonedRecipe);
     if (clonedRecipe.enhanced) applyDeltasToNode(clonedRecipe.enhanced);
 
-    const newScoreResult = calculateMealFitScore(clonedRecipe, mealType, { activeProfile: 'everyone', preferences: state.preferences || state.userPrefs });
+    const newScoreResult = calculateMealFitScore(clonedRecipe, mealType, { activeProfile: 'everyone', preferences: state.preferences || state.userPrefs, useStaticOnly: true });
     const newScore = typeof newScoreResult === 'number' ? newScoreResult : (newScoreResult?.score || baseScore);
     return { baseScore, newScore, delta: newScore - baseScore };
   }
