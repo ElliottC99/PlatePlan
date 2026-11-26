@@ -628,6 +628,8 @@ function calculateProteinEfficiency(prod) {
   return `${protPerPound.toFixed(1)}g P/£`;
 }
 
+let _productBankSearchTimer = null;
+
 export function renderProductBank() {
   if (typeof document === 'undefined') return;
   const container = document.getElementById('bank-groups-panel');
@@ -655,7 +657,12 @@ export function renderProductBank() {
     container.innerHTML = renderProductBankBase(query);
     cardsWrap = document.getElementById('product-bank-cards-wrap');
     searchInput = document.getElementById('product-bank-search');
-    if (searchInput) searchInput.oninput = () => renderProductBank();
+    if (searchInput) {
+      searchInput.oninput = () => {
+        clearTimeout(_productBankSearchTimer);
+        _productBankSearchTimer = setTimeout(() => renderProductBank(), 120);
+      };
+    }
   }
 
   if (allProducts.length === 0) {
@@ -668,6 +675,11 @@ export function renderProductBank() {
     return;
   }
 
+  const ingredientsById = new Map();
+  for (const ing of ingredients) {
+    if (ing && ing.id != null) ingredientsById.set(String(ing.id), ing);
+  }
+
   const groups = {};
   products.forEach(p => {
     const cat = p.category || p.cat || 'General';
@@ -678,28 +690,34 @@ export function renderProductBank() {
   cardsWrap.innerHTML = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([cat, items]) => {
     const cardsHtml = items.map(p => {
       const efficiency = calculateProteinEfficiency(p);
-      const mappedIng = ingredients.find(i => String(i.id) === String(p.ingredientId) || String(i.id) === String(p.groupId));
+      const mappedIng = (p.ingredientId != null ? ingredientsById.get(String(p.ingredientId)) : null)
+        || (p.groupId != null ? ingredientsById.get(String(p.groupId)) : null);
       const tescoSearchUrl = p.tescoUrl || `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(p.name)}`;
       return renderProductCard({ p, mappedIng, efficiency, tescoSearchUrl });
     }).join('');
     return renderCategoryGroup(cat, items.length, cardsHtml);
   }).join('');
 
-  container.onclick = (e) => {
-    const btn = e.target.closest('[data-action]');
-    if (!btn) return;
-    const { action, productId: pid, ingredientId: ingId } = btn.dataset;
-    if (action === 'edit-product') openProductEditModal(pid);
-    else if (action === 'reallocate-product') promptReallocateProduct(pid);
-    else if (action === 'make-auto-default') handleMakeAutoDefault(pid, ingId);
-    else if (action === 'delete-product') handleDeleteProduct(pid);
-  };
+  if (!container.__productBankDelegated) {
+    container.__productBankDelegated = true;
+    container.onclick = (e) => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const { action, productId: pid, ingredientId: ingId } = btn.dataset;
+      if (action === 'edit-product') openProductEditModal(pid);
+      else if (action === 'reallocate-product') promptReallocateProduct(pid);
+      else if (action === 'make-auto-default') handleMakeAutoDefault(pid, ingId);
+      else if (action === 'delete-product') handleDeleteProduct(pid);
+    };
+  }
 }
 
-export function clearProductGroupFilter() {
+export function clearProductGroupFilter(options = {}) {
   const searchInput = document.getElementById('product-bank-search');
   if (searchInput) searchInput.value = '';
-  renderProductBank();
+  if (!options?.skipRender) {
+    renderProductBank();
+  }
 }
 
 // Imported directly: window.openTescoImportModal only exists once a Pantry dialog has loaded the module.

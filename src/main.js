@@ -301,6 +301,12 @@ function sanitizeRecipes(recipes) {
   return recipes.map(recipe => deepMutate(safeClone(recipe)));
 }
 
+function isViewActive(viewId) {
+  if (typeof document === 'undefined') return false;
+  const el = document.getElementById('view-' + viewId);
+  return Boolean(el && el.classList.contains('active'));
+}
+
 let isSubscribed = false;
 function setupSubscriptions() {
   if (isSubscribed) return;
@@ -309,23 +315,33 @@ function setupSubscriptions() {
   subscribe('recipes', (recipes) => {
     const clean = sanitizeRecipes(recipes);
     if (typeof window !== 'undefined') { getState().recipes = clean; window.allRecipes = clean; window.recipes = clean; }
-    renderRecipeVault(); renderToday(); if (getState().currentPlan && typeof renderPlanner === 'function') renderPlanner();
-    renderDataQualityView();
+    if (isViewActive('vault')) renderRecipeVault();
+    if (isViewActive('today')) renderToday();
+    if (isViewActive('planner') && getState().currentPlan && typeof renderPlanner === 'function') renderPlanner();
+    if (isViewActive('data')) renderDataQualityView();
   });
   subscribe('ingredients', (ings) => {
     if (typeof window !== 'undefined' && getState()) getState().ingredients = Array.isArray(ings) ? ings : [];
-    renderIngredientBank(); renderDataQualityView();
-    if (typeof renderRecipeVault === 'function') renderRecipeVault();
-    if (getState().currentPlan && typeof renderPlanner === 'function') renderPlanner();
+    if (isViewActive('ingredients')) renderIngredientBank();
+    if (isViewActive('data')) renderDataQualityView();
+    if (isViewActive('vault') && typeof renderRecipeVault === 'function') renderRecipeVault();
+    if (isViewActive('planner') && getState().currentPlan && typeof renderPlanner === 'function') renderPlanner();
   });
   subscribe('products', (prods) => {
     if (typeof window !== 'undefined' && getState()) getState().products = Array.isArray(prods) ? prods : [];
-    renderProductBank(); renderDataQualityView();
-    if (typeof renderRecipeVault === 'function') renderRecipeVault();
-    if (getState().currentPlan && typeof renderPlanner === 'function') renderPlanner();
+    if (isViewActive('bank')) renderProductBank();
+    if (isViewActive('data')) renderDataQualityView();
+    if (isViewActive('vault') && typeof renderRecipeVault === 'function') renderRecipeVault();
+    if (isViewActive('planner') && getState().currentPlan && typeof renderPlanner === 'function') renderPlanner();
   });
-  subscribe('preferences', () => { renderSettingsView(); renderToday(); });
-  subscribe('plan', () => { renderToday(); renderPlanner(); });
+  subscribe('preferences', () => {
+    if (isViewActive('settings') || isViewActive('prefs')) renderSettingsView();
+    if (isViewActive('today')) renderToday();
+  });
+  subscribe('plan', () => {
+    if (isViewActive('today')) renderToday();
+    if (isViewActive('planner')) renderPlanner();
+  });
 }
 
 let isAppInitialized = false;
@@ -342,8 +358,14 @@ async function initApp() {
 
   const initialRender = () => {
     try {
-      renderToday(); renderRecipeVault(); renderPlanner();
-      renderIngredientBank(); renderProductBank(); renderDataQualityView();
+      let renderedAny = false;
+      if (isViewActive('today')) { renderToday(); renderedAny = true; }
+      if (isViewActive('vault')) { renderRecipeVault(); renderedAny = true; }
+      if (isViewActive('planner')) { renderPlanner(); renderedAny = true; }
+      if (isViewActive('ingredients')) { renderIngredientBank(); renderedAny = true; }
+      if (isViewActive('bank')) { renderProductBank(); renderedAny = true; }
+      if (isViewActive('data')) { renderDataQualityView(); renderedAny = true; }
+      if (!renderedAny) renderToday();
     } catch (renderErr) {
       console.warn('[initApp] initialRender warning:', renderErr);
     }

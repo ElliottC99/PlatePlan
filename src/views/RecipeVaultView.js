@@ -126,6 +126,8 @@ export function toggleVaultFavouritesFilter() {
   renderRecipeVault();
 }
 
+let _lastVaultGridContext = { mealType: 'all', activeProfile: 'everyone' };
+
 export function renderRecipeGrid(recipesToRender) {
   const list = document.getElementById('vault-list');
   if (!list) return;
@@ -140,6 +142,7 @@ export function renderRecipeGrid(recipesToRender) {
   const selectedMealType = ft !== 'all' ? ft : 'all';
 
   const sortedRecipes = getSortedRecipes(recipesToRender || [], sort, selectedMealType, { activeProfile });
+  _lastVaultGridContext = { mealType: selectedMealType, activeProfile };
 
   if (!sortedRecipes.length) {
     list.innerHTML = renderVaultGridContainer({ recipes: [] });
@@ -157,7 +160,7 @@ export function renderRecipeGrid(recipesToRender) {
       const variant = target.dataset.variant || 'original';
       
       if (action === 'view-recipe') {
-        if (typeof window.viewRecipe === 'function') window.viewRecipe(recipeId, null, variant, activeProfile, target.dataset.mealType || selectedMealType);
+        if (typeof window.viewRecipe === 'function') window.viewRecipe(recipeId, null, variant, _lastVaultGridContext.activeProfile, target.dataset.mealType || _lastVaultGridContext.mealType);
       } else if (action === 'toggle-favorite') {
         if (typeof window.toggleRecipeFavourite === 'function') window.toggleRecipeFavourite(recipeId, e, variant);
       } else if (action === 'open-recipe-actions') {
@@ -234,48 +237,52 @@ export function renderRecipeVault() {
   }
   const clusterCount = _dedupCacheCount;
 
-  // Inject Recipe Actions Bar
-  const actionsBar = document.createElement('div');
-  actionsBar.className = 'recipe-actions-bar';
-  actionsBar.style.display = 'flex';
-  actionsBar.style.gap = '6px';
-  actionsBar.style.marginBottom = '10px';
-  actionsBar.style.flexWrap = 'wrap';
-  actionsBar.innerHTML = `
-    <button id="btn-manual-recipe" class="btn primary sm">Create Recipe</button>
-    <button id="btn-import-recipe" class="btn secondary sm">Paste & Parse Recipes</button>
-    <button id="btn-dedup-recipe" class="btn ghost sm" style="font-weight:600; color:var(--text); ${clusterCount > 0 ? 'background:var(--surface2);' : ''}">
-      🧹 Deduplicate Recipes ${clusterCount > 0 ? `(${clusterCount})` : ''}
-    </button>
-  `;
-  
-  // Clear existing before adding if it exists
-  const existingBar = list?.parentElement?.querySelector('.recipe-actions-bar');
-  if (existingBar) existingBar.remove();
-  if (list?.parentElement) list.parentElement.insertBefore(actionsBar, list);
+  // Inject Recipe Actions Bar once and update deduplicate count in place
+  let actionsBar = list?.parentElement?.querySelector('.recipe-actions-bar');
+  if (!actionsBar && list?.parentElement) {
+    actionsBar = document.createElement('div');
+    actionsBar.className = 'recipe-actions-bar';
+    actionsBar.style.display = 'flex';
+    actionsBar.style.gap = '6px';
+    actionsBar.style.marginBottom = '10px';
+    actionsBar.style.flexWrap = 'wrap';
+    actionsBar.innerHTML = `
+      <button id="btn-manual-recipe" class="btn primary sm">Create Recipe</button>
+      <button id="btn-import-recipe" class="btn secondary sm">Paste & Parse Recipes</button>
+      <button id="btn-dedup-recipe" class="btn ghost sm" style="font-weight:600; color:var(--text);">
+        🧹 Deduplicate Recipes
+      </button>
+    `;
+    list.parentElement.insertBefore(actionsBar, list);
 
-  // Bind actions
-  const btnManual = actionsBar.querySelector('#btn-manual-recipe');
-  if (btnManual) {
-    btnManual.addEventListener('click', () => {
-      if (typeof window.openRecipeWizard === 'function') window.openRecipeWizard('manual');
-      else if (typeof window.openRecipeEditor === 'function') window.openRecipeEditor();
-    });
+    const btnManual = actionsBar.querySelector('#btn-manual-recipe');
+    if (btnManual) {
+      btnManual.addEventListener('click', () => {
+        if (typeof window.openRecipeWizard === 'function') window.openRecipeWizard('manual');
+        else if (typeof window.openRecipeEditor === 'function') window.openRecipeEditor();
+      });
+    }
+    const btnImport = actionsBar.querySelector('#btn-import-recipe');
+    if (btnImport) {
+      btnImport.addEventListener('click', () => {
+        if (typeof window.openRecipeWizard === 'function') window.openRecipeWizard('bulk');
+        else if (typeof window.openBulkRecipeImporterModal === 'function') window.openBulkRecipeImporterModal();
+      });
+    }
+    const btnDedup = actionsBar.querySelector('#btn-dedup-recipe');
+    if (btnDedup) {
+      btnDedup.addEventListener('click', () => {
+        openRecipeDeduplicationModal();
+      });
+    }
   }
-  
-  const btnImport = actionsBar.querySelector('#btn-import-recipe');
-  if (btnImport) {
-    btnImport.addEventListener('click', () => {
-      if (typeof window.openRecipeWizard === 'function') window.openRecipeWizard('bulk');
-      else if (typeof window.openBulkRecipeImporterModal === 'function') window.openBulkRecipeImporterModal();
-    });
-  }
-
-  const btnDedup = actionsBar.querySelector('#btn-dedup-recipe');
+  const btnDedup = actionsBar?.querySelector('#btn-dedup-recipe');
   if (btnDedup) {
-    btnDedup.addEventListener('click', () => {
-      openRecipeDeduplicationModal();
-    });
+    const nextLabel = `🧹 Deduplicate Recipes ${clusterCount > 0 ? `(${clusterCount})` : ''}`.trim();
+    if (btnDedup.textContent.trim() !== nextLabel) {
+      btnDedup.textContent = nextLabel;
+    }
+    btnDedup.style.background = clusterCount > 0 ? 'var(--surface2)' : '';
   }
 
 
@@ -395,11 +402,8 @@ export function mount(container) {
     });
   }
 
-  vaultUnsub = subscribe('recipes', (recipes) => {
-    if (typeof renderRecipeVault === 'function') {
-      renderRecipeVault();
-    }
-  });
+  // Note: recipes subscription is handled centrally in main.js (gated on #view-vault.active)
+  // to avoid rendering the Vault twice on every recipe state update.
 
   // Re-render on hydration or preference changes
   document.addEventListener('plateplan:state:preferences', handlePreferencesUpdated);

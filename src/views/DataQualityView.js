@@ -54,13 +54,34 @@ export function updateDataQualityBadge() {
   }
 }
 
-function initDataQualitySubscriptions() {
+const DQ_STATE_EVENTS = [
+  'plateplan:state:ingredients',
+  'plateplan:state:products',
+  'plateplan:state:recipes',
+  'plateplan:state:plan',
+  'plateplan:state:preferences'
+];
+
+let dqSubscriptionsActive = false;
+
+function handleDataQualityStateChange() {
   if (typeof document === 'undefined') return;
-  document.addEventListener('plateplan:state:ingredients', () => { renderDataQualityView(); updateDataQualityBadge(); });
-  document.addEventListener('plateplan:state:products', () => { renderDataQualityView(); updateDataQualityBadge(); });
-  document.addEventListener('plateplan:state:recipes', () => { renderDataQualityView(); updateDataQualityBadge(); });
-  document.addEventListener('plateplan:state:plan', () => { renderDataQualityView(); updateDataQualityBadge(); });
-  document.addEventListener('plateplan:state:preferences', () => { renderDataQualityView(); updateDataQualityBadge(); });
+  const viewEl = document.getElementById('view-data');
+  if (!viewEl || !viewEl.classList.contains('active')) return;
+  renderDataQualityView();
+  updateDataQualityBadge();
+}
+
+function initDataQualitySubscriptions() {
+  if (typeof document === 'undefined' || dqSubscriptionsActive) return;
+  dqSubscriptionsActive = true;
+  DQ_STATE_EVENTS.forEach(evt => document.addEventListener(evt, handleDataQualityStateChange));
+}
+
+export function unmount() {
+  if (typeof document === 'undefined' || !dqSubscriptionsActive) return;
+  dqSubscriptionsActive = false;
+  DQ_STATE_EVENTS.forEach(evt => document.removeEventListener(evt, handleDataQualityStateChange));
 }
 
 export function mount(container) {
