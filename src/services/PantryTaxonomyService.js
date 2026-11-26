@@ -14,7 +14,7 @@ import { getProducts, saveProduct, deleteProduct, addProductToBatch } from './Pr
 import { addRecipeToBatch, batchUpdateRecipesInDb } from './RecipeFirestoreRepository.js';
 import { compareProductsByStrategy } from './PantryHierarchyService.js';
 import { cleanIngredientPhraseForAlias, normalizeTaxonomyName, stemIngredientName } from './RecipeIngredientParser.js';
-import { solveOptimalRecipeProducts, buildRecipeLineKeys } from './RecipeProductSolver.js';
+import { solveOptimalRecipeProducts, buildRecipeLineKeys, buildCatalogIndex } from './RecipeProductSolver.js';
 
 function isDbAvailable() {
   if (!db) { console.warn('[PantryTaxonomyService] Firestore db instance not initialised.'); return false; }
@@ -682,6 +682,7 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
   const state = typeof getState === 'function' ? (getState() || {}) : {};
   const activePrefs = preferences || state.preferences || state.settings || state.userPrefs || {};
   const criterion = activePrefs.autoDefaultStrategy || activePrefs.autoDefaultCriterion || activePrefs.productPriority || 'highest_protein_per_kcal';
+  const index = buildCatalogIndex(prodsList, ingsList);
 
   const subId = line.subtypeId || line.subTypeId || null;
   const ingId = line.ingredientId || line.groupId || null;
@@ -694,19 +695,20 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
       const explicitAuto = candidatePool.find(p => p && p.isAutoDefault);
       if (explicitAuto) return explicitAuto;
     }
+    if (candidatePool.length === 1) return candidatePool[0];
     const sorted = [...candidatePool].sort((a, b) => compareProductsByStrategy(a, b, criterion));
     return sorted[0] || null;
   }
 
   // 1. If bound to a Sub-Type
   if (subId) {
-    const parentRoot = ingsList.find(i => (i.subtypes || []).some(s => String(s.id) === String(subId)) || String(i.id) === String(ingId));
-    const subObj = parentRoot?.subtypes?.find(s => String(s.id) === String(subId));
+    const subStr = String(subId);
+    const subObj = index.subtypeById.get(subStr);
     if (subObj?.defaultProductId) {
-      const def = prodsList.find(p => String(p.id) === String(subObj.defaultProductId));
+      const def = index.productsById.get(String(subObj.defaultProductId));
       if (def) return def;
     }
-    const subPool = prodsList.filter(p => String(p.subtypeId) === String(subId));
+    const subPool = index.productsBySubtypeId.get(subStr) || [];
     if (subPool.length > 0) {
       const best = pickBestProduct(subPool);
       if (best) return best;
@@ -715,14 +717,14 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
 
   // 2. If bound to a Root Item (cascade to all sub-types under the root item)
   if (ingId) {
-    const rootItem = ingsList.find(i => String(i.id) === String(ingId));
+    const ingStr = String(ingId).replace(/^grp_/, '');
+    const rootItem = index.ingredientsById.get(ingStr) || index.ingredientsById.get(String(ingId));
     if (rootItem) {
       if (rootItem.defaultProductId) {
-        const def = prodsList.find(p => String(p.id) === String(rootItem.defaultProductId));
+        const def = index.productsById.get(String(rootItem.defaultProductId));
         if (def) return def;
       }
-      const subtypeIds = new Set((rootItem.subtypes || []).map(s => String(s.id)));
-      const candidatePool = prodsList.filter(p => subtypeIds.has(String(p.subtypeId)) || String(p.ingredientId) === String(ingId));
+      const candidatePool = index.productsByIngredientId.get(String(rootItem.id)) || [];
       if (candidatePool.length > 0) {
         const best = pickBestProduct(candidatePool);
         if (best) return best;
@@ -733,18 +735,7 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
   // 3. If bound to a Category (cascade to all sub-types under root items in the category)
   if (cat) {
     const normCat = String(cat).trim().toLowerCase();
-    const matchingRoots = ingsList.filter(i => String(i.category || '').trim().toLowerCase() === normCat);
-    const subtypeIds = new Set();
-    const rootIds = new Set();
-    matchingRoots.forEach(r => {
-      rootIds.add(String(r.id));
-      (r.subtypes || []).forEach(s => subtypeIds.add(String(s.id)));
-    });
-    const candidatePool = prodsList.filter(p =>
-      subtypeIds.has(String(p.subtypeId)) ||
-      rootIds.has(String(p.ingredientId)) ||
-      String(p.category || p.cat || '').trim().toLowerCase() === normCat
-    );
+    const candidatePool = index.productsByCategoryLower.get(normCat) || [];
     if (candidatePool.length > 0) {
       // Category pools span multiple Root Items (each with its own per-root isAutoDefault),
       // so compare macros/strategy across the whole category instead of picking the first isAutoDefault.
@@ -755,14 +746,14 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
 
   // 4. Backward-compatibility fallback: direct productId
   if (directProdId) {
-    const matched = prodsList.find(p => String(p.id) === String(directProdId));
+    const matched = index.productsById.get(String(directProdId));
     if (matched) return matched;
   }
 
   // 5. Name fallback: match by raw ingredient name against products, root items, or sub-types
   const rawName = String(line.name || line.matchedName || line.ingredient || '').trim().toLowerCase();
   if (rawName) {
-    const nameMatched = prodsList.find(p => String(p.name || '').trim().toLowerCase() === rawName);
+    const nameMatched = index.productsByNameLower.get(rawName);
     if (nameMatched) return nameMatched;
 
     const resolveRootProduct = (root) => {

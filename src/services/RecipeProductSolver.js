@@ -982,11 +982,14 @@ export function solveOptimalRecipeProducts(recipe, context = {}) {
     : (r.servings ?? r.serves ?? 1);
   const serves = Math.max(1, Number(servesRaw) || 1);
 
-  // Check memo cache when no ad-hoc overrides are passed and caller didn't supply detached prefs
+  // Check memo cache when no ad-hoc overrides are passed
   let memoKey = null;
-  if (!hasOverrides && !context.fitScoreParams) {
+  if (!hasOverrides) {
     const fp = buildRecipeFingerprint(r, variant, ingredients, serves);
-    memoKey = `${fp}::${rawMealType}::${activeProfile}::${criterion}::c${catalogEpoch}::p${prefsEpoch}::n${products.length}::i${pantryIngredients.length}`;
+    const paramsSig = context.fitScoreParams
+      ? `${context.fitScoreParams.calorieWeightPct ?? ''}_${context.fitScoreParams.calMinOptPct ?? ''}_${context.fitScoreParams.calMaxOptPct ?? ''}_${context.fitScoreParams.protMinOptPct ?? ''}_${context.fitScoreParams.protMaxOptPct ?? ''}`
+      : '';
+    memoKey = `${fp}::${rawMealType}::${activeProfile}::${criterion}::${paramsSig}::c${catalogEpoch}::p${prefsEpoch}::n${products.length}::i${pantryIngredients.length}`;
     const hit = solverMemoCache.get(memoKey);
     if (hit) return hit;
   }

@@ -178,6 +178,40 @@ export function handleRecipeSearch(query) {
   renderRecipeVault();
 }
 
+let _dedupCacheRef = null;
+let _dedupCacheLen = -1;
+let _dedupCacheCount = 0;
+const _recipeSearchTextCache = new WeakMap();
+
+function getFastRecipeSearchText(r, types) {
+  const cached = _recipeSearchTextCache.get(r);
+  if (cached !== undefined) return cached;
+  const enh = r.enhanced;
+  const collectIngText = (list) => (Array.isArray(list) ? list : []).map(ing => {
+    if (!ing) return '';
+    if (typeof ing === 'string') return ing;
+    return [ing.name, ing.ingredientName, ing.family, ing.subtypeName, ing.subtype, ing.productName, ing.brand, ing.raw].filter(Boolean).join(' ');
+  });
+  const text = [
+    r.name,
+    r.title,
+    r.category,
+    r.source,
+    r.who,
+    ...(types || []),
+    ...(Array.isArray(r.tags) ? r.tags : []),
+    ...collectIngText(r.ingredients),
+    ...(Array.isArray(r.ingredientSections) ? r.ingredientSections.flatMap(s => collectIngText(s?.ingredients)) : []),
+    enh?.name,
+    enh?.title,
+    enh?.changes,
+    ...collectIngText(enh?.ingredients),
+    ...(Array.isArray(enh?.ingredientSections) ? enh.ingredientSections.flatMap(s => collectIngText(s?.ingredients)) : [])
+  ].filter(Boolean).join(' ').toLowerCase();
+  _recipeSearchTextCache.set(r, text);
+  return text;
+}
+
 export function renderRecipeVault() {
   if (typeof window !== 'undefined') window.renderRecipeVault = renderRecipeVault;
   const ftEl = document.getElementById('filter-type');
@@ -193,8 +227,12 @@ export function renderRecipeVault() {
 
   const allRecipesForDedup = getState()?.recipes || (window.Store && typeof window.Store.getState === 'function' ? window.Store.getState().recipes : []) || [];
   const favListForDedup = ensureVariantFavoritingPrefs();
-  const duplicateClusters = findDuplicateRecipeClusters(allRecipesForDedup, favListForDedup);
-  const clusterCount = duplicateClusters.length;
+  if (_dedupCacheRef !== allRecipesForDedup || _dedupCacheLen !== allRecipesForDedup.length) {
+    _dedupCacheRef = allRecipesForDedup;
+    _dedupCacheLen = allRecipesForDedup.length;
+    _dedupCacheCount = findDuplicateRecipeClusters(allRecipesForDedup, favListForDedup).length;
+  }
+  const clusterCount = _dedupCacheCount;
 
   // Inject Recipe Actions Bar
   const actionsBar = document.createElement('div');
@@ -253,31 +291,21 @@ export function renderRecipeVault() {
   const fwNorm = String(fw || 'all').toLowerCase();
 
   const allRecipes = getState()?.recipes || (window.Store && typeof window.Store.getState === 'function' ? window.Store.getState().recipes : []) || [];
+  const ftNorm = String(ft || 'all').toLowerCase();
   const recipes = allRecipes.filter(r => {
-    const hasAnyFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
-    if (isFavOnly && !hasAnyFav) return false;
-    const ftNorm = String(ft || 'all').toLowerCase();
-    const types = getNormalizedRecipeTypes(r);
-    const enh = r.enhanced;
-    const searchable = [
-      r.name,
-      r.title,
-      r.category,
-      r.source,
-      r.who,
-      ...(types || []),
-      ...(Array.isArray(r.tags) ? r.tags : []),
-      ...(r.ingredients || []).map(ing => formatRecipeIngredientRow(ing, getState())),
-      enh?.name,
-      enh?.title,
-      enh?.changes,
-      ...(enh?.ingredients || []).map(ing => formatRecipeIngredientRow(ing, getState()))
-    ].filter(Boolean).join(' ').toLowerCase();
-
+    if (isFavOnly) {
+      const hasAnyFav = isRecipeVariantFavourite(r.id, 'original') || isRecipeVariantFavourite(r.id, 'enhanced') || (!hasVariantFavoritingInitialized() && (r.isFavourite || r.isFavorite));
+      if (!hasAnyFav) return false;
+    }
     const rWhoNorm = String(r.who || 'both').toLowerCase();
     const matchesWho = fwNorm === 'all' || rWhoNorm === fwNorm || (fwNorm === 'both' && (rWhoNorm === 'both' || !r.who));
+    if (!matchesWho) return false;
 
-    return (ftNorm === 'all' || types.includes(ftNorm)) && matchesWho && (!q || searchable.includes(q));
+    const types = getNormalizedRecipeTypes(r);
+    if (ftNorm !== 'all' && !types.includes(ftNorm)) return false;
+
+    if (!q) return true;
+    return getFastRecipeSearchText(r, types).includes(q);
   });
 
   renderRecipeGrid(recipes);
@@ -314,14 +342,21 @@ export function renderRecipeVault() {
   }
 }
 
+let _recipeSearchDebounceTimer = null;
+
 function bindSearchListeners() {
   const searchEl = document.getElementById('recipe-search-input') || document.getElementById('vault-search') || document.getElementById('global-search-input');
   if (searchEl && !searchEl.__recipeSearchBound) {
     searchEl.__recipeSearchBound = true;
     searchEl.addEventListener('input', (e) => {
-      handleRecipeSearch(e.target.value);
+      const val = e.target.value;
+      clearTimeout(_recipeSearchDebounceTimer);
+      _recipeSearchDebounceTimer = setTimeout(() => {
+        handleRecipeSearch(val);
+      }, 120);
     });
     searchEl.addEventListener('search', (e) => {
+      clearTimeout(_recipeSearchDebounceTimer);
       handleRecipeSearch(e.target.value);
     });
   }
