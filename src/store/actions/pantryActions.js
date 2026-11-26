@@ -7,11 +7,13 @@
 import { state, dispatchStateEvent } from '../coreState.js';
 import { saveStateCache } from '../cacheSlice.js';
 import { setIngredients as setPantryIngredients, setProducts as setPantryProducts, setCategories as setPantryCategories } from '../pantryStore.js';
+import { bumpSolverCatalogEpoch, bumpSolverPrefsEpoch } from '../../services/RecipeProductSolver.js';
 
 export function setIngredients(newIngredients) {
   setPantryIngredients(newIngredients);
   state.ingredients = Array.isArray(newIngredients) ? newIngredients : [];
   state.rootItems = state.ingredients;
+  bumpSolverCatalogEpoch();
   saveStateCache(state);
   dispatchStateEvent('plateplan:state:ingredients', state.ingredients);
   dispatchStateEvent('plateplan:state:root-items', state.rootItems);
@@ -24,6 +26,7 @@ export function setRootItems(newRootItems) {
 export function setProducts(newProducts) {
   setPantryProducts(newProducts);
   state.products = Array.isArray(newProducts) ? newProducts : [];
+  bumpSolverCatalogEpoch();
   saveStateCache(state);
   dispatchStateEvent('plateplan:state:products', state.products);
 }
@@ -31,6 +34,7 @@ export function setProducts(newProducts) {
 export function setCategories(newCategories) {
   setPantryCategories(newCategories);
   state.categories = Array.isArray(newCategories) ? newCategories : [];
+  bumpSolverCatalogEpoch();
   saveStateCache(state);
   dispatchStateEvent('plateplan:state:categories', state.categories);
 }
@@ -43,6 +47,7 @@ export function updateIngredientInStore(ingredient) {
   } else {
     state.ingredients.push(ingredient);
   }
+  bumpSolverCatalogEpoch();
   saveStateCache(state);
   dispatchStateEvent('plateplan:state:ingredients', state.ingredients);
 }
@@ -50,6 +55,7 @@ export function updateIngredientInStore(ingredient) {
 export function removeIngredientFromStore(ingredientId) {
   if (!ingredientId) return;
   state.ingredients = state.ingredients.filter(i => i.id !== ingredientId);
+  bumpSolverCatalogEpoch();
   saveStateCache(state);
   dispatchStateEvent('plateplan:state:ingredients', state.ingredients);
 }
@@ -87,6 +93,7 @@ export function setPreferences(newPreferences) {
   state.preferences = safe || null;
   state.userPrefs = (safe && safe.userPrefs) ? safe.userPrefs : (safe || {});
   state.settings = (safe && safe.settings) ? safe.settings : {};
+  bumpSolverPrefsEpoch();
   saveStateCache(state);
   dispatchStateEvent('plateplan:state:preferences', state.preferences);
 }

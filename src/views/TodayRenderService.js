@@ -6,6 +6,9 @@
 
 import { escapeAttr, escapeHtml } from '../utils/stringUtils.js';
 import { renderFitScoreBadge } from '../components/FitScoreBadge.js';
+import { extractSlotProductOverrides } from '../services/MealPlanGeneratorService.js';
+import { extractRecipeMacros } from '../utils/macroScoringUtils.js';
+import { getState } from '../store/store.js';
 import { isMealEatenOnDate } from '../services/TodayViewService.js';
 
 /**
@@ -117,10 +120,20 @@ export function renderTodayMealCard(slot, { info: slotInfo, person }, eatenMeals
     : isMealEatenOnDate(eatenMeals, currentDateStr, slot.type, 'both');
   const personLabel = person === 'e' ? ' · Elliott' : person === 'c' ? ' · Chloe' : '';
   const activeProfile = person === 'e' ? 'elliott' : person === 'c' ? 'chloe' : 'everyone';
+  const currentPlan = typeof getState === 'function' ? (getState()?.currentPlan || null) : null;
+  const slotSuffix = person === 'e' ? 'E' : (person === 'c' ? 'C' : '');
+  const candidateEventIds = [
+    slotInfo.instanceId,
+    dayKey && slotSuffix ? `${dayKey}_${slot.type}${slotSuffix}` : null,
+    dayKey ? `${dayKey}_${slot.type}E` : null,
+    dayKey ? `${dayKey}_${slot.type}` : null
+  ].filter(Boolean);
+  const productOverrides = extractSlotProductOverrides(currentPlan, candidateEventIds);
   const fitBadge = renderFitScoreBadge(slotInfo.recipe || recipe, slot.type, {
     activeProfile,
     variant: slotInfo.variant || 'original',
-    showLabel: true
+    showLabel: true,
+    ...(productOverrides ? { productOverrides } : {})
   });
 
   const eatenLabel = isEaten ? '✓ Eaten' : 'Mark Eaten';
@@ -145,8 +158,13 @@ export function renderTodayMealCard(slot, { info: slotInfo, person }, eatenMeals
       ⇄ Swap
     </button>` : '';
 
-  const cal = Math.round(recipe.nutrition?.perServing?.cal ?? recipe.macros?.calories ?? 0);
-  const prot = Math.round(recipe.nutrition?.perServing?.prot ?? recipe.macros?.protein ?? 0);
+  const liveMacros = extractRecipeMacros(slotInfo.recipe || recipe, slotInfo.variant || 'original', {
+    mealType: slot.type,
+    activeProfile,
+    ...(productOverrides ? { productOverrides } : {})
+  });
+  const cal = Math.round(liveMacros?.cal ?? recipe.nutrition?.perServing?.cal ?? recipe.macros?.calories ?? 0);
+  const prot = Math.round(liveMacros?.prot ?? recipe.nutrition?.perServing?.prot ?? recipe.macros?.protein ?? 0);
 
   return `
     <div class="ios-grouped-card" style="padding: 16px; margin-bottom: 14px; opacity:${isEaten ? '0.78' : '1'}; transition:opacity 0.2s ease;">

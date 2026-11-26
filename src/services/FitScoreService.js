@@ -115,6 +115,20 @@ export function attachComputedFitScores(recipes = [], targetSlot = 'dinner', con
  */
 export function getSortedRecipes(recipes = [], sortOption = 'fit-desc', activeSlotTargets = 'all', context = {}) {
   if (!Array.isArray(recipes)) return [];
+  const normSort = String(sortOption || 'fit-desc').toLowerCase();
+
+  // Name sorts do not need to score every recipe up front
+  if (normSort === 'name' || normSort === 'name-asc') {
+    return [...recipes].sort((a, b) =>
+      String(a?.label || a?.title || a?.name || '').localeCompare(String(b?.label || b?.title || b?.name || ''))
+    );
+  }
+  if (normSort === 'name-desc') {
+    return [...recipes].sort((a, b) =>
+      String(b?.label || b?.title || b?.name || '').localeCompare(String(a?.label || a?.title || a?.name || ''))
+    );
+  }
+
   const slot = typeof activeSlotTargets === 'string' ? activeSlotTargets : (activeSlotTargets?.mealType || 'all');
   const activeProfile = context.activeProfile || 'everyone';
 
@@ -127,32 +141,31 @@ export function getSortedRecipes(recipes = [], sortOption = 'fit-desc', activeSl
       };
     }
     const baseRecipe = item.recipe || item;
-    const resOrig = calculateMealFitScore(baseRecipe, slot, { ...context, activeProfile, variant: item.variant || 'original', portionScaled: true });
+    const rawWho = String(baseRecipe.who || '').toLowerCase();
+    const effectiveProfile = (activeProfile === 'everyone' || activeProfile === 'all' || activeProfile === 'both')
+      ? ((rawWho === 'elliott' || rawWho === 'e') ? 'elliott' : ((rawWho === 'chloe' || rawWho === 'c') ? 'chloe' : activeProfile))
+      : activeProfile;
+    const resOrig = calculateMealFitScore(baseRecipe, slot, { ...context, activeProfile: effectiveProfile, variant: item.variant || 'original', portionScaled: true });
     const scoreOrig = resOrig.score;
     const hasEnh = !item.variant && !!(baseRecipe.enhanced);
     const resEnh = hasEnh
-      ? calculateMealFitScore(baseRecipe, slot, { ...context, activeProfile, variant: 'enhanced', portionScaled: true })
+      ? calculateMealFitScore(baseRecipe, slot, { ...context, activeProfile: effectiveProfile, variant: 'enhanced', portionScaled: true })
       : resOrig;
     const scoreEnh = resEnh.score;
 
     return {
       ...item,
       _computedFitScore: Math.max(scoreOrig, scoreEnh),
-      _bestMealType: scoreEnh > scoreOrig ? resEnh.mealType : resOrig.mealType
+      _bestMealType: scoreEnh > scoreOrig ? resEnh.mealType : resOrig.mealType,
+      _precomputedFitKey: `${slot}::${effectiveProfile}`,
+      _precomputedFitOrig: resOrig,
+      _precomputedFitEnh: hasEnh ? resEnh : null
     };
   });
-
-  const normSort = String(sortOption || 'fit-desc').toLowerCase();
 
   return scoredRecipes.sort((a, b) => {
     if (normSort === 'needs-work' || normSort === 'fit-asc') {
       return (a._computedFitScore ?? 0) - (b._computedFitScore ?? 0);
-    }
-    if (normSort === 'name' || normSort === 'name-asc') {
-      return String(a.label || a.title || a.name || '').localeCompare(String(b.label || b.title || b.name || ''));
-    }
-    if (normSort === 'name-desc') {
-      return String(b.label || b.title || b.name || '').localeCompare(String(a.label || a.title || a.name || ''));
     }
     // 'best-fit', 'fit-desc' and any unrecognised value
     return (b._computedFitScore ?? 0) - (a._computedFitScore ?? 0);

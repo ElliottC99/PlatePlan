@@ -2,6 +2,7 @@ import { convertToStrictUnit } from './UnitConversionService.js';
 import { getState } from '../store/store.js';
 import { showCustomConfirm, showCustomCopyModal } from '../components/ui/DialogHelpers.js';
 import { resolveDynamicProductForIngredient } from './PantryTaxonomyService.js';
+import { buildRecipeLineKeys } from './RecipeProductSolver.js';
 
 /**
  * src/services/ShoppingCalculationService.js (v3.31.31)
@@ -160,8 +161,8 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
   const processSlotNode = (slotNode, personCount = 1, dayNum = 1, mealType = 'meal', dayKey = null, slotKey = null) => {
     if (!slotNode || slotNode.isSkipped || slotNode.skipped) return;
     if (slotNode.isSplit && (slotNode.elliott || slotNode.chloe)) {
-      if (slotNode.elliott) processSlotNode(slotNode.elliott, 1, dayNum, mealType, dayKey, slotKey);
-      if (slotNode.chloe) processSlotNode(slotNode.chloe, 1, dayNum, mealType, dayKey, slotKey);
+      if (slotNode.elliott) processSlotNode(slotNode.elliott, 1, dayNum, mealType, dayKey, slotKey ? `${slotKey}_E` : `${mealType}_E`);
+      if (slotNode.chloe) processSlotNode(slotNode.chloe, 1, dayNum, mealType, dayKey, slotKey ? `${slotKey}_C` : `${mealType}_C`);
       return;
     }
     const rawRecipeId = typeof slotNode === 'string' ? slotNode : (slotNode.recipeId || slotNode.id);
@@ -192,7 +193,11 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
     const rawIngs = enhancedIngs.length > 0 ? enhancedIngs : extractIngredientsList(fullRecipe);
 
     const recipeName = fullRecipe.title || fullRecipe.name || 'Recipe';
-    const matchedPrep = prepGroups.find(g => String(g.recipeId).split('::')[0] === String(recipeId) && Array.isArray(g.days) && g.days.some(d => Number(d) === Number(dayNum)));
+    const matchedPrep = prepGroups.find(g =>
+      String(g.recipeId).split('::')[0] === String(recipeId) &&
+      (!g.mealType || String(g.mealType).toLowerCase() === String(mealType).toLowerCase()) &&
+      Array.isArray(g.days) && g.days.some(d => Number(d) === Number(dayNum))
+    );
     const prepGroupId = matchedPrep?.id || matchedPrep?.prepGroupId || matchedPrep?.key || (matchedPrep ? `prep_${matchedPrep.recipeId}` : null);
     const slotInstanceId = (typeof slotNode === 'object' && slotNode.instanceId) ? slotNode.instanceId : `instance_${recipeId}_d${dayNum}_${mealType}`;
     const cookingEventId = prepGroupId || slotInstanceId;
@@ -204,10 +209,13 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
       `d${dayNum}_${mealType}`
     ].filter(Boolean);
 
-    rawIngs.forEach(ing => {
+    const lineKeys = buildRecipeLineKeys(rawIngs);
+    rawIngs.forEach((ing, ingIdx) => {
       if (!ing) return;
+      const lineKey = lineKeys[ingIdx];
       const ingId = typeof ing === 'object' ? (ing.id || ing.ingredientId || ing.groupId || null) : null;
       const subId = typeof ing === 'object' ? (ing.subtypeId || ing.subTypeId || null) : null;
+      const catId = typeof ing === 'object' ? (ing.categoryId || ing.category || ing.cat || null) : null;
       const prodId = typeof ing === 'object' ? (ing.productId || ing.bankId || null) : null;
 
       let rawName = typeof ing === 'string' ? ing : (ing.name || ing.ingredient || ing.title || ing.item || ing.raw || '');
@@ -226,7 +234,7 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
       const planProductSelections = activePlan.productSelections || {};
 
       const lookupKeys = [
-        subId, ing.subtypeId, ing.subTypeId, canonicalIngId, ing.bankId, ing.productId, ing.id, ing.ingredientId, ing.groupId, ingId, rawName
+        lineKey, subId, ing.subtypeId, ing.subTypeId, canonicalIngId, catId ? `cat:${String(catId).trim().toLowerCase()}` : null, ing.bankId, ing.productId, ing.id, ing.ingredientId, ing.groupId, ingId, rawName
       ].filter(Boolean).map(String);
       // Sub-type lines must not fall back to unscoped root-item selections, which belong to another sub-type.
       const globalLookupKeys = subId
@@ -304,12 +312,17 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
       const canonicalUnit = strict.unit;
 
       const key = `${String(resolvedId).toLowerCase().replace(/\s+/g, '_')}:${String(canonicalUnit || 'qty').toLowerCase()}`;
-      // At-home ticks are keyed by sub-type/ingredient line (not product), so swapping brands keeps the tick
-      // while distinct sub-types or items under one root (e.g. Cherry Tomatoes vs Baby Plum Tomatoes) tick separately.
-      const rawAtHomeBase = effectiveSubId
-        ? `${rootOrIngId || 'ing'}:${effectiveSubId}`
-        : (rootOrIngId && rawName ? `${rootOrIngId}:${rawName}` : (rootOrIngId || rawName));
+      // At-home ticks are anchored to the recipe line's authored taxonomy (not matchedProd.subtypeId),
+      // so cross-subtype combo optimization never drops ticks while legacy ticks remain readable.
+      const authoredSubId = subId || ing.subtypeId || ing.subTypeId || null;
+      const rawAtHomeBase = authoredSubId
+        ? `${rootOrIngId || 'ing'}:${authoredSubId}`
+        : (rootOrIngId || rawName);
       const atHomeKey = String(rawAtHomeBase).toLowerCase().replace(/\s+/g, '_');
+      const legacyAtHomeKey = (!authoredSubId && effectiveSubId)
+        ? String(`${rootOrIngId || 'ing'}:${effectiveSubId}`).toLowerCase().replace(/\s+/g, '_')
+        : null;
+      const isAtHomeChecked = Boolean(atHomeMap[atHomeKey] || (legacyAtHomeKey && atHomeMap[legacyAtHomeKey]));
 
       const displayName = isProductlessSubtypeFallback
         ? (matchedIng?.subtypes?.find(s => String(s.id) === String(subId))?.name || rawName)
@@ -332,8 +345,8 @@ export function aggregateShoppingListFromPlan(plan = null, state = null, maybeIn
         unit: canonicalUnit,
         recipeBreakdown: [],
         atHomeKey,
-        isAtHome: !!atHomeMap[atHomeKey],
-        checked: !!atHomeMap[atHomeKey]
+        isAtHome: isAtHomeChecked,
+        checked: isAtHomeChecked
       };
 
       if (!existing.unit && canonicalUnit) existing.unit = canonicalUnit;

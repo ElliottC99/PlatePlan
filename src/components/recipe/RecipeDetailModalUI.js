@@ -44,7 +44,7 @@ function formatBrandProductPair(product, fallbackBrand = '', fallbackProductName
 /**
  * Formats a recipe ingredient row with hierarchical category/item structure and scaled volumes.
  */
-export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1) {
+export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1, solveContext = null, lineIdx = -1) {
   if (!ing) return '';
   if (typeof ing === 'string') return ing.trim();
 
@@ -63,10 +63,25 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
     }
   }
 
-  let prodObj = resolveDynamicProductForIngredient(ing, {
+  const solvedLineKey = (solveContext?.lineKeys && lineIdx >= 0) ? solveContext.lineKeys[lineIdx] : null;
+  const solvedProd = (solvedLineKey && solveContext?.solvedResult?.selections)
+    ? solveContext.solvedResult.selections.get(solvedLineKey)
+    : null;
+  const departureMeta = (solvedLineKey && Array.isArray(solveContext?.solvedResult?.departures))
+    ? solveContext.solvedResult.departures.find(d => d.lineKey === solvedLineKey)
+    : null;
+  const isManualOverride = Boolean(
+    solvedLineKey && solveContext?.manualOverrides && (
+      solveContext.manualOverrides[solvedLineKey] ||
+      (subId && solveContext.manualOverrides[String(subId)]) ||
+      (ingId && solveContext.manualOverrides[String(ingId)])
+    )
+  );
+
+  let prodObj = solvedProd || resolveDynamicProductForIngredient(ing, {
     products,
     ingredients: pantryIngs,
-    preferences: appState.preferences || appState.settings || {}
+    preferences: appState?.preferences || appState?.settings || {}
   });
 
   if (!ingObj && prodObj?.ingredientId) {
@@ -98,11 +113,16 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
   }
 
   let formattedLine = hierarchyPart;
+  const attributionChip = isManualOverride
+    ? ` <span class="badge" style="background:var(--surface-muted,#f1f5f9);color:var(--text2,#475569);font-size:10px;padding:1px 6px;border-radius:999px;font-weight:600;">📌 Swapped</span>`
+    : (departureMeta && departureMeta.recipeFitLift > 0
+      ? ` <span class="badge" style="background:var(--badge-green-bg,#dcfce7);color:var(--badge-green-text,#166534);font-size:10px;padding:1px 6px;border-radius:999px;font-weight:600;">✨ Best Fit (+${departureMeta.recipeFitLift})</span>`
+      : '');
   if (prodObj) {
     const prodName = brandProductLabel || prodObj.name || prodObj.title;
     const prodId = prodObj.id || prodObj.productId;
     const prodUrl = prodObj.tescoUrl || `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(prodName)}`;
-    formattedLine = `${hierarchyPart} - <a class="product-link" href="${prodUrl}" target="_blank" rel="noopener noreferrer" data-product-id="${prodId}" style="color:var(--primary,#4f46e5); text-decoration:none; border-bottom:1px dashed var(--primary);">${escapeHtml(prodName)}</a>`;
+    formattedLine = `${hierarchyPart} - <a class="product-link" href="${prodUrl}" target="_blank" rel="noopener noreferrer" data-product-id="${prodId}" style="color:var(--primary,#4f46e5); text-decoration:none; border-bottom:1px dashed var(--primary);">${escapeHtml(prodName)}</a>${attributionChip}`;
   } else if (brandProductLabel && brandProductLabel.toLowerCase() !== ingredientLabel.toLowerCase() && brandProductLabel.toLowerCase() !== subtypeLabel.toLowerCase()) {
     const searchUrl = `https://www.tesco.com/groceries/en-GB/search?query=${encodeURIComponent(brandProductLabel)}`;
     formattedLine = `${hierarchyPart} - <a class="product-link" href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--primary,#4f46e5); text-decoration:underline;">${escapeHtml(brandProductLabel)}</a>`;
@@ -150,8 +170,9 @@ export function formatRecipeIngredientRow(ing, state = null, scaleMultiplier = 1
 /**
  * Renders ingredients list with section groupings or flat items.
  */
-export function renderRecipeIngredientsListHTML(ingredients = [], state = null, scaleMultiplier = 1, sections = []) {
+export function renderRecipeIngredientsListHTML(ingredients = [], state = null, scaleMultiplier = 1, sections = [], solveContext = null) {
   if (Array.isArray(sections) && sections.length > 0) {
+    let runningIdx = 0;
     return `
       <div class="recipe-view-sections-wrapper" style="display:flex;flex-direction:column;gap:14px">
         ${sections.map(sec => {
@@ -162,7 +183,8 @@ export function renderRecipeIngredientsListHTML(ingredients = [], state = null, 
               <h4 style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;margin:0 0 6px 0;padding-bottom:4px;border-bottom:1px solid var(--border)">${secTitle}</h4>
               <ul class="recipe-view-ingredients-list" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:5px">
                 ${secList.map(ing => {
-                  const html = formatRecipeIngredientRow(ing, state, scaleMultiplier);
+                  const idx = runningIdx++;
+                  const html = formatRecipeIngredientRow(ing, state, scaleMultiplier, solveContext, idx);
                   return `<li style="font-size:13px;color:var(--text);padding:4px 0;border-bottom:1px solid var(--border-subtle, rgba(0,0,0,0.04))">• ${html}</li>`;
                 }).join('')}
               </ul>
@@ -179,8 +201,8 @@ export function renderRecipeIngredientsListHTML(ingredients = [], state = null, 
   }
   return `
     <ul class="recipe-view-ingredients-list" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px">
-      ${list.map(ing => {
-        const html = formatRecipeIngredientRow(ing, state, scaleMultiplier);
+      ${list.map((ing, idx) => {
+        const html = formatRecipeIngredientRow(ing, state, scaleMultiplier, solveContext, idx);
         return `<li style="font-size:13px;color:var(--text);padding:5px 0;border-bottom:1px solid var(--border)">• ${html}</li>`;
       }).join('')}
     </ul>

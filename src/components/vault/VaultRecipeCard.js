@@ -300,8 +300,11 @@ function closeAllRecipeActionMenus() {
 export function renderVaultRecipeCard(r, options = {}) {
   const types = getNormalizedRecipeTypes(r);
   const requestedMealType = options.mealType || 'all';
-  const activeProfile = options.activeProfile || 'everyone';
+  const rawActiveProfile = options.activeProfile || 'everyone';
   const whoKey = String(r.who || 'both').toLowerCase();
+  const activeProfile = (rawActiveProfile === 'everyone' || rawActiveProfile === 'all' || rawActiveProfile === 'both')
+    ? ((whoKey === 'elliott' || whoKey === 'e') ? 'elliott' : ((whoKey === 'chloe' || whoKey === 'c') ? 'chloe' : rawActiveProfile))
+    : rawActiveProfile;
   const showE = whoKey === 'both' || whoKey === 'elliott' || whoKey === 'e';
   const showC = whoKey === 'both' || whoKey === 'chloe' || whoKey === 'c';
   const personLabel = whoKey === 'both' ? 'Shared' : (whoKey === 'elliott' || whoKey === 'e' ? 'Elliott' : 'Chloe');
@@ -328,11 +331,18 @@ export function renderVaultRecipeCard(r, options = {}) {
     r.time ? `<span class="tag">${escapeHtml(r.time)}m</span>` : ''
   ].filter(Boolean).join(' ');
 
+  const precomputedKey = `${requestedMealType}::${activeProfile}`;
+  const hasMatchingPrecomputed = r._precomputedFitKey === precomputedKey;
+
   const buildFit = (_active, useEnhanced = false) => {
     const variantKey = useEnhanced ? 'enhanced' : 'original';
-    const liveFitData = typeof window.calculateMealFitScore === 'function'
-      ? window.calculateMealFitScore(_active, requestedMealType, { activeProfile, variant: variantKey, portionScaled: true })
+    const precomputed = hasMatchingPrecomputed
+      ? (useEnhanced ? r._precomputedFitEnh : r._precomputedFitOrig)
       : null;
+    const liveFitData = precomputed
+      || (typeof window.calculateMealFitScore === 'function'
+        ? window.calculateMealFitScore(_active, requestedMealType, { activeProfile, variant: variantKey, portionScaled: true })
+        : null);
     const resolvedMealType = liveFitData?.mealType || (requestedMealType !== 'all' ? requestedMealType : (types[0] || 'dinner'));
     
     // Derive portion display directly from liveFitData details

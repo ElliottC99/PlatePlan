@@ -14,6 +14,7 @@ import { getProducts, saveProduct, deleteProduct, addProductToBatch } from './Pr
 import { addRecipeToBatch, batchUpdateRecipesInDb } from './RecipeFirestoreRepository.js';
 import { compareProductsByStrategy } from './PantryHierarchyService.js';
 import { cleanIngredientPhraseForAlias, normalizeTaxonomyName, stemIngredientName } from './RecipeIngredientParser.js';
+import { solveOptimalRecipeProducts, buildRecipeLineKeys, buildCatalogIndex } from './RecipeProductSolver.js';
 
 function isDbAvailable() {
   if (!db) { console.warn('[PantryTaxonomyService] Firestore db instance not initialised.'); return false; }
@@ -681,6 +682,7 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
   const state = typeof getState === 'function' ? (getState() || {}) : {};
   const activePrefs = preferences || state.preferences || state.settings || state.userPrefs || {};
   const criterion = activePrefs.autoDefaultStrategy || activePrefs.autoDefaultCriterion || activePrefs.productPriority || 'highest_protein_per_kcal';
+  const index = buildCatalogIndex(prodsList, ingsList);
 
   const subId = line.subtypeId || line.subTypeId || null;
   const ingId = line.ingredientId || line.groupId || null;
@@ -693,19 +695,20 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
       const explicitAuto = candidatePool.find(p => p && p.isAutoDefault);
       if (explicitAuto) return explicitAuto;
     }
+    if (candidatePool.length === 1) return candidatePool[0];
     const sorted = [...candidatePool].sort((a, b) => compareProductsByStrategy(a, b, criterion));
     return sorted[0] || null;
   }
 
   // 1. If bound to a Sub-Type
   if (subId) {
-    const parentRoot = ingsList.find(i => (i.subtypes || []).some(s => String(s.id) === String(subId)) || String(i.id) === String(ingId));
-    const subObj = parentRoot?.subtypes?.find(s => String(s.id) === String(subId));
+    const subStr = String(subId);
+    const subObj = index.subtypeById.get(subStr);
     if (subObj?.defaultProductId) {
-      const def = prodsList.find(p => String(p.id) === String(subObj.defaultProductId));
+      const def = index.productsById.get(String(subObj.defaultProductId));
       if (def) return def;
     }
-    const subPool = prodsList.filter(p => String(p.subtypeId) === String(subId));
+    const subPool = index.productsBySubtypeId.get(subStr) || [];
     if (subPool.length > 0) {
       const best = pickBestProduct(subPool);
       if (best) return best;
@@ -714,14 +717,14 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
 
   // 2. If bound to a Root Item (cascade to all sub-types under the root item)
   if (ingId) {
-    const rootItem = ingsList.find(i => String(i.id) === String(ingId));
+    const ingStr = String(ingId).replace(/^grp_/, '');
+    const rootItem = index.ingredientsById.get(ingStr) || index.ingredientsById.get(String(ingId));
     if (rootItem) {
       if (rootItem.defaultProductId) {
-        const def = prodsList.find(p => String(p.id) === String(rootItem.defaultProductId));
+        const def = index.productsById.get(String(rootItem.defaultProductId));
         if (def) return def;
       }
-      const subtypeIds = new Set((rootItem.subtypes || []).map(s => String(s.id)));
-      const candidatePool = prodsList.filter(p => subtypeIds.has(String(p.subtypeId)) || String(p.ingredientId) === String(ingId));
+      const candidatePool = index.productsByIngredientId.get(String(rootItem.id)) || [];
       if (candidatePool.length > 0) {
         const best = pickBestProduct(candidatePool);
         if (best) return best;
@@ -732,18 +735,7 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
   // 3. If bound to a Category (cascade to all sub-types under root items in the category)
   if (cat) {
     const normCat = String(cat).trim().toLowerCase();
-    const matchingRoots = ingsList.filter(i => String(i.category || '').trim().toLowerCase() === normCat);
-    const subtypeIds = new Set();
-    const rootIds = new Set();
-    matchingRoots.forEach(r => {
-      rootIds.add(String(r.id));
-      (r.subtypes || []).forEach(s => subtypeIds.add(String(s.id)));
-    });
-    const candidatePool = prodsList.filter(p =>
-      subtypeIds.has(String(p.subtypeId)) ||
-      rootIds.has(String(p.ingredientId)) ||
-      String(p.category || p.cat || '').trim().toLowerCase() === normCat
-    );
+    const candidatePool = index.productsByCategoryLower.get(normCat) || [];
     if (candidatePool.length > 0) {
       // Category pools span multiple Root Items (each with its own per-root isAutoDefault),
       // so compare macros/strategy across the whole category instead of picking the first isAutoDefault.
@@ -754,14 +746,14 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
 
   // 4. Backward-compatibility fallback: direct productId
   if (directProdId) {
-    const matched = prodsList.find(p => String(p.id) === String(directProdId));
+    const matched = index.productsById.get(String(directProdId));
     if (matched) return matched;
   }
 
   // 5. Name fallback: match by raw ingredient name against products, root items, or sub-types
   const rawName = String(line.name || line.matchedName || line.ingredient || '').trim().toLowerCase();
   if (rawName) {
-    const nameMatched = prodsList.find(p => String(p.name || '').trim().toLowerCase() === rawName);
+    const nameMatched = index.productsByNameLower.get(rawName);
     if (nameMatched) return nameMatched;
 
     const resolveRootProduct = (root) => {
@@ -834,9 +826,20 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
  * @param {Object} [options]
  * @returns {Object} productSelections dictionary
  */
-export function freezeProductSelectionsForPlan(plan, { products = [], ingredients = [], recipes = [], preferences = null } = {}) {
+export function freezeProductSelectionsForPlan(plan, { products = [], ingredients = [], recipes = [], preferences = null, forceOverwrite = false, clearDaySlots = null } = {}) {
   if (!plan || typeof plan !== 'object') return {};
   const currentSelections = { ...(plan.productSelections || {}) };
+
+  if (Array.isArray(clearDaySlots)) {
+    clearDaySlots.forEach(({ dayKey, slotKeys }) => {
+      (slotKeys || []).forEach(sk => {
+        const prefix = `${dayKey}_${sk}:`;
+        Object.keys(currentSelections).forEach(k => {
+          if (k.startsWith(prefix)) delete currentSelections[k];
+        });
+      });
+    });
+  }
 
   const state = (products.length && ingredients.length && recipes.length)
     ? null
@@ -845,65 +848,123 @@ export function freezeProductSelectionsForPlan(plan, { products = [], ingredient
   const allProducts = products.length ? products : (state?.products || []);
   const allIngredients = ingredients.length ? ingredients : (state?.rootItems || state?.ingredients || []);
   const allRecipes = recipes.length ? recipes : (state?.recipes || []);
-  const activePrefs = preferences || state?.preferences || state?.settings || {};
+  const activePrefs = preferences || state?.preferences || state?.userPrefs || state?.settings || {};
+  const prepGroups = Array.isArray(plan.mealPrepGroups) ? plan.mealPrepGroups : [];
 
-  const processSlot = (dayKey, slotKey, slotVal) => {
-    if (!slotVal || slotVal.isSkipped || slotVal.skipped) return;
-    if (slotVal.isSplit && (slotVal.elliott || slotVal.chloe)) {
-      if (slotVal.elliott) processSlot(dayKey, `${slotKey}_E`, slotVal.elliott);
-      if (slotVal.chloe) processSlot(dayKey, `${slotKey}_C`, slotVal.chloe);
-      return;
-    }
-    const recipeId = slotVal.recipeId || slotVal.id || (typeof slotVal === 'string' ? slotVal : null);
-    if (!recipeId) return;
-    const rec = allRecipes.find(r => String(r.id) === String(recipeId));
-    if (!rec) return;
+  const getMealType = (sk) => {
+    const base = String(sk || '').replace(/_?(E|C)$/, '').toLowerCase();
+    return ['breakfast', 'lunch', 'dinner', 'snack', 'snacking'].includes(base) ? (base === 'snacking' ? 'snack' : base) : 'dinner';
+  };
 
-    const variant = slotVal.variant || 'original';
-    const source = (variant === 'enhanced' && rec.enhanced) ? rec.enhanced : rec;
+  const writeSolvedSelections = (eventIds, recipe, variant, mealType, activeProfile) => {
+    const source = (variant === 'enhanced' && recipe.enhanced) ? recipe.enhanced : recipe;
     const ingList = (source.ingredientSections && source.ingredientSections.length)
       ? source.ingredientSections.flatMap(s => s.ingredients || [])
       : (Array.isArray(source.ingredients) ? source.ingredients : []);
+    if (ingList.length === 0) return;
 
-    const eventId = `${dayKey}_${slotKey}`;
-    ingList.forEach(ing => {
+    const lineKeys = buildRecipeLineKeys(ingList);
+    const solved = allProducts.length > 0
+      ? solveOptimalRecipeProducts(recipe, {
+          variant,
+          mealType,
+          activeProfile,
+          products: allProducts,
+          ingredients: allIngredients,
+          preferences: activePrefs
+        })
+      : null;
+
+    ingList.forEach((ing, idx) => {
       if (!ing || ing.excludeNutrition) return;
-      const key = ing.subtypeId || ing.ingredientId || ing.name;
-      if (!key) return;
-      const scopedKey = `${eventId}:${key}`;
-      if (currentSelections[scopedKey]) return;
+      const lineKey = lineKeys[idx];
+      const legacyKey = ing.subtypeId || ing.ingredientId || (ing.categoryId ? `cat:${String(ing.categoryId).trim().toLowerCase()}` : ing.name);
+      const writeKey = lineKey || legacyKey;
+      if (!writeKey) return;
 
-      const resolved = resolveDynamicProductForIngredient(ing, {
+      const resolved = solved?.selections?.get(lineKey) || resolveDynamicProductForIngredient(ing, {
         products: allProducts,
         ingredients: allIngredients,
         preferences: activePrefs
       });
-      if (resolved && resolved.id) {
+      if (!resolved || !resolved.id) return;
+
+      eventIds.forEach(evId => {
+        const scopedKey = `${evId}:${writeKey}`;
+        if (!forceOverwrite && currentSelections[scopedKey]) return;
         currentSelections[scopedKey] = resolved.id;
-        if (!currentSelections[key]) {
-          currentSelections[key] = resolved.id;
+      });
+    });
+  };
+
+  const processSingleSlot = (dayKey, slotKey, slotVal, profileOverride = null) => {
+    if (!slotVal || slotVal.isSkipped || slotVal.skipped) return;
+    if (slotVal.isSplit && (slotVal.elliott || slotVal.chloe)) {
+      if (slotVal.elliott) processSingleSlot(dayKey, `${slotKey}_E`, slotVal.elliott, 'elliott');
+      if (slotVal.chloe) processSingleSlot(dayKey, `${slotKey}_C`, slotVal.chloe, 'chloe');
+      return;
+    }
+    const recipeId = slotVal.recipeId || slotVal.id || (typeof slotVal === 'string' ? slotVal : null);
+    if (!recipeId) return;
+    const cleanRecId = String(recipeId).split('::')[0];
+    const rec = allRecipes.find(r => String(r.id) === cleanRecId);
+    if (!rec) return;
+
+    const variant = slotVal.variant || (String(recipeId).includes('::enhanced') ? 'enhanced' : 'original');
+    const mealType = getMealType(slotKey);
+    const inferredProfile = profileOverride || (String(slotKey).endsWith('E') || String(slotKey).endsWith('_E')
+      ? 'elliott'
+      : (String(slotKey).endsWith('C') || String(slotKey).endsWith('_C') ? 'chloe' : 'everyone'));
+    writeSolvedSelections([`${dayKey}_${slotKey}`], rec, variant, mealType, inferredProfile);
+  };
+
+  const processDaySlots = (dayKey, daySlots) => {
+    if (typeof daySlots !== 'object' || daySlots === null) return;
+    const handledKeys = new Set();
+    const dayNum = parseInt(String(dayKey).replace(/\D/g, ''), 10);
+
+    // Group shared E/C slots (same recipeId + variant, !isSplit) and solve ONCE with 'everyone'
+    for (const meal of ['breakfast', 'lunch', 'dinner', 'snack']) {
+      const kE = `${meal}E`;
+      const kC = `${meal}C`;
+      const sE = daySlots[kE];
+      const sC = daySlots[kC];
+      if (!sE || !sC || sE.isSkipped || sC.isSkipped || sE.isSplit || sC.isSplit) continue;
+      const idE = String(sE.recipeId || sE.id || (typeof sE === 'string' ? sE : '')).split('::')[0];
+      const idC = String(sC.recipeId || sC.id || (typeof sC === 'string' ? sC : '')).split('::')[0];
+      const varE = sE.variant || 'original';
+      const varC = sC.variant || 'original';
+      if (idE && idE === idC && varE === varC) {
+        const rec = allRecipes.find(r => String(r.id) === idE);
+        if (rec) {
+          const evIds = [`${dayKey}_${kE}`, `${dayKey}_${kC}`];
+          const matchedPrep = prepGroups.find(g =>
+            String(g.recipeId).split('::')[0] === idE &&
+            (!g.mealType || String(g.mealType).toLowerCase() === meal) &&
+            Array.isArray(g.days) && g.days.some(d => Number(d) === dayNum)
+          );
+          if (matchedPrep) {
+            const pId = matchedPrep.id || matchedPrep.prepGroupId || matchedPrep.key || `prep_${matchedPrep.recipeId}`;
+            evIds.push(pId);
+          }
+          writeSolvedSelections(evIds, rec, varE, meal, 'everyone');
+          handledKeys.add(kE);
+          handledKeys.add(kC);
         }
       }
+    }
+
+    Object.entries(daySlots).forEach(([slotKey, slotVal]) => {
+      if (handledKeys.has(slotKey)) return;
+      processSingleSlot(dayKey, slotKey, slotVal);
     });
   };
 
   const slots = plan.slots || {};
   if (Array.isArray(slots)) {
-    slots.forEach((daySlots, dayIdx) => {
-      if (typeof daySlots === 'object' && daySlots !== null) {
-        Object.entries(daySlots).forEach(([slotKey, slotVal]) => {
-          processSlot(dayIdx, slotKey, slotVal);
-        });
-      }
-    });
+    slots.forEach((daySlots, dayIdx) => processDaySlots(dayIdx, daySlots));
   } else if (typeof slots === 'object' && slots !== null) {
-    Object.entries(slots).forEach(([dayKey, daySlots]) => {
-      if (typeof daySlots === 'object' && daySlots !== null) {
-        Object.entries(daySlots).forEach(([slotKey, slotVal]) => {
-          processSlot(dayKey, slotKey, slotVal);
-        });
-      }
-    });
+    Object.entries(slots).forEach(([dayKey, daySlots]) => processDaySlots(dayKey, daySlots));
   }
 
   if (Array.isArray(plan.days)) {
@@ -912,7 +973,7 @@ export function freezeProductSelectionsForPlan(plan, { products = [], ingredient
       if (Array.isArray(dayObj.meals)) {
         dayObj.meals.forEach(meal => {
           if (meal && meal.recipeId) {
-            processSlot(dayKey, meal.mealType || 'meal', meal);
+            processSingleSlot(dayKey, meal.mealType || 'meal', meal, 'everyone');
           }
         });
       }
@@ -922,14 +983,22 @@ export function freezeProductSelectionsForPlan(plan, { products = [], ingredient
   return currentSelections;
 }
 
-export function lockProductSelectionsForSlots(slots, priority = 'protein') {
+export function lockProductSelectionsForSlots(slots, priority = null, clearDaySlots = null) {
   const state = typeof window !== 'undefined' && typeof window.getState === 'function'
     ? window.getState()
     : (typeof getState === 'function' ? getState() : {});
   const plan = state?.currentPlan || state?.plan || {};
+  const basePrefs = state?.preferences || state?.userPrefs || state?.settings || {};
+  const resolvedCriterion = (priority && priority !== 'protein')
+    ? priority
+    : (basePrefs.autoDefaultStrategy || basePrefs.autoDefaultCriterion || basePrefs.productPriority || 'highest_protein_per_kcal');
   return freezeProductSelectionsForPlan(
-    { ...plan, slots },
-    { preferences: { autoDefaultCriterion: priority } }
+    { productSelections: plan.productSelections, mealPrepGroups: plan.mealPrepGroups, slots },
+    {
+      preferences: { ...basePrefs, autoDefaultStrategy: resolvedCriterion, autoDefaultCriterion: resolvedCriterion },
+      forceOverwrite: Boolean(clearDaySlots),
+      clearDaySlots
+    }
   );
 }
 

@@ -6,7 +6,6 @@ import store from "../store/store.js";
  * Decomposed: Weights and Macro utilities moved to dedicated modules.
  */
 
-import { saveCurrentPlan } from '../services/HouseholdRepository.js';
 import { DEFAULT_SPLITS, DEFAULT_FIT_SCORE_PARAMS, resolveFitScoreParams, getFitScoreTierMeta } from './fitScoreWeights.js';
 import { 
   extractRecipeMacros, 
@@ -109,7 +108,20 @@ export function getEligibleMealTypes(recipe) {
 function calculateSingleMealTypeFitScore(recipe, mealType = 'dinner', options = {}) {
   const r = recipe?.recipe || recipe || {};
   const requestedVariant = options.variant || (r._variant === 'enhanced' ? 'enhanced' : 'original');
-  const macros = extractRecipeMacros(r, requestedVariant);
+  const normMeal = String(mealType || 'dinner').toLowerCase();
+  const rawProfile = String(options.activeProfile || 'everyone').toLowerCase();
+  const activeProfile = (rawProfile === 'both' || rawProfile === 'all') ? 'everyone' : rawProfile;
+
+  const macros = extractRecipeMacros(r, requestedVariant, {
+    mealType: normMeal,
+    activeProfile,
+    products: options.products,
+    ingredients: options.ingredients,
+    preferences: options.preferences || options.userPrefs,
+    fitScoreParams: options.fitScoreParams || options.userPrefs?.fitScoreParams || options.preferences?.fitScoreParams || null,
+    productOverrides: options.productOverrides || null,
+    useStaticOnly: Boolean(options.useStaticOnly)
+  });
   const totalKcal = macros.cal;
   const totalProt = macros.prot;
 
@@ -120,16 +132,12 @@ function calculateSingleMealTypeFitScore(recipe, mealType = 'dinner', options = 
       tierIcon: '🔴',
       tierLabel: 'Missing Macros',
       color: '#ef4444',
-      mealType: String(mealType || 'dinner').toLowerCase(),
+      mealType: normMeal,
       variant: requestedVariant,
       isMissingMacros: true,
       error: 'Missing Calorie/Protein Data'
     };
   }
-
-  const normMeal = String(mealType || 'dinner').toLowerCase();
-  const rawProfile = String(options.activeProfile || 'everyone').toLowerCase();
-  const activeProfile = (rawProfile === 'both' || rawProfile === 'all') ? 'everyone' : rawProfile;
 
   const { elliott: profileE, chloe: profileC } = resolveHouseholdProfiles(options);
   const scoringParams = getActiveFitScoreParams(
