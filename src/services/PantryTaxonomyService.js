@@ -700,7 +700,7 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
     return sorted[0] || null;
   }
 
-  // 1. If bound to a Sub-Type
+  // 1. If bound to a Sub-Type (never bleed productless sub-type into sibling sub-types under the root item)
   if (subId) {
     const subStr = String(subId);
     const subObj = index.subtypeById.get(subStr);
@@ -713,6 +713,7 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
       const best = pickBestProduct(subPool);
       if (best) return best;
     }
+    if (subObj) return null;
   }
 
   // 2. If bound to a Root Item (cascade to all sub-types under the root item)
@@ -727,6 +728,25 @@ export function resolveDynamicProductForIngredient(line, { products = [], ingred
       const candidatePool = index.productsByIngredientId.get(String(rootItem.id)) || [];
       if (candidatePool.length > 0) {
         const best = pickBestProduct(candidatePool);
+        if (best) return best;
+      }
+    }
+  }
+
+  // 2b. Exact product / root item name match BEFORE broad category sweep
+  const rawNameEarly = String(line.name || line.matchedName || line.ingredient || '').trim().toLowerCase();
+  if (!ingId && !subId && rawNameEarly) {
+    const nameMatchedEarly = index.productsByNameLower.get(rawNameEarly);
+    if (nameMatchedEarly) return nameMatchedEarly;
+    const exactRootEarly = index.ingredientsByNameLower.get(rawNameEarly);
+    if (exactRootEarly) {
+      if (exactRootEarly.defaultProductId) {
+        const def = index.productsById.get(String(exactRootEarly.defaultProductId));
+        if (def) return def;
+      }
+      const rootPool = index.productsByIngredientId.get(String(exactRootEarly.id)) || [];
+      if (rootPool.length > 0) {
+        const best = pickBestProduct(rootPool);
         if (best) return best;
       }
     }

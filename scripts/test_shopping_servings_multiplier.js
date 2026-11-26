@@ -228,12 +228,15 @@ const planSectioned = {
   productSelections: { ing_tomatoes: 'prod_vine_tom' }
 };
 const result6 = aggregateShoppingListFromPlan(planSectioned, [...vaultRecipes, sectionedRecipe], extraIngredients, extraProducts);
-assert.ok(result6.items.length >= 4, `Expected >= 4 distinct shopping rows (not collapsed or dropped), got ${result6.items.length}: ${result6.items.map(i => `${i.name}(${i.buyQty}${i.unit})`).join(', ')}`);
+assert.equal(result6.items.length, 3, `Expected 3 distinct shopping rows (with mixed-unit Vine Tomatoes combined), got ${result6.items.length}: ${result6.items.map(i => `${i.name}(${i.quantity})`).join(', ')}`);
 assert.ok(result6.items.some(i => i.subtypeId === 'sub_plum_no_prod' && i.buyQty === 150), 'Productless sub-type Baby Plum Tomatoes must remain a separate 150g row');
-assert.ok(result6.items.some(i => i.subtypeId === 'sub_vine' && i.unit === 'g' && i.buyQty === 200), 'Vine Tomatoes 200g row must stay separate from qty row');
-assert.ok(result6.items.some(i => i.subtypeId === 'sub_vine' && i.unit === 'qty' && i.buyQty === 2), 'Vine Tomatoes 2qty row must stay separate from g row');
+const vineRow = result6.items.find(i => i.subtypeId === 'sub_vine');
+assert.ok(vineRow && vineRow.isMixedUnits === true, 'Vine Tomatoes used in g and qty must combine into one mixed-unit row');
+assert.equal(vineRow.quantity, '200g + 2 qty', `Expected combined recorded units "200g + 2 qty", got "${vineRow.quantity}"`);
+assert.equal(vineRow.unitTotals.g, 200, 'Expected 200g recorded in unitTotals');
+assert.equal(vineRow.unitTotals.qty, 2, 'Expected 2 qty recorded in unitTotals');
 const riceRow = result6.items.find(i => i.name.toLowerCase().includes('rice'));
 assert.ok(riceRow && !riceRow.name.toLowerCase().includes('vinegar'), `Plain "Rice" must not match "Rice Vinegar", got ${riceRow?.name}`);
-console.log('✅ Test 6 Passed: Sectioned recipes, productless sub-types, mixed units, and word-boundary matching work.\n');
+console.log('✅ Test 6 Passed: Sectioned recipes, productless sub-types, combined mixed units, and word-boundary matching work.\n');
 
 console.log('=== ALL SHOPPING LIST SERVINGS MULTIPLIER TESTS PASSED SUCCESSFULLY! ===');
