@@ -225,6 +225,7 @@ export function renderRecipeDetailModalContent(props = {}) {
   const singleServes = Number(props.singleServes) || 1;
   const instanceId = props.instanceId || null;
   const sourceHtml = props.sourceHtml || '';
+  const recipeNotes = String(props.notes ?? activeR.notes ?? r.notes ?? '').trim();
   const ingredientsHtml = props.ingredientsHtml || '';
   const methodHtml = props.methodHtml || '';
   const ingredientsCount = props.ingredientsCount || 0;
@@ -401,6 +402,13 @@ export function renderRecipeDetailModalContent(props = {}) {
             ${methodHtml}
           </div>
         </div>
+
+        ${recipeNotes ? `
+          <div class="recipe-modal-notes-card recipe-modal-col-card" style="margin-top:14px;">
+            <h3 style="margin-top:0;margin-bottom:8px;font-size:15px;font-weight:700;color:var(--text);">📝 Recipe Notes</h3>
+            <div class="recipe-modal-notes-body" style="font-size:13.5px;line-height:1.55;color:var(--text);white-space:pre-line;">${escapeHtml(recipeNotes)}</div>
+          </div>
+        ` : ''}
       </div>
     </div>
   `;

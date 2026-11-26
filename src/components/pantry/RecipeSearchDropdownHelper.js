@@ -7,6 +7,7 @@
 
 import { getState } from '../../store/store.js';
 import { getUnifiedCategories } from '../../services/CategoryRepository.js';
+import { tokenizeSearchQuery, matchesSearchQuery } from '../../utils/searchUtils.js';
 
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const escapeAttr = (str) => escapeHtml(str).replace(/`/g, '&#96;');
@@ -71,12 +72,11 @@ export function createTaxonomySearchInput({
   const filterAndRender = () => {
     const rawVal = inputEl.value || '';
     const cleanQuery = cleanSearchQuery(rawVal);
-    const searchTokens = cleanQuery.split(/\s+/).filter(Boolean);
+    const searchTokens = tokenizeSearchQuery(cleanQuery);
 
     const matchesTokens = (text) => {
       if (!searchTokens.length) return true;
-      const t = String(text || '').toLowerCase();
-      return searchTokens.every(tok => t.includes(tok));
+      return matchesSearchQuery(searchTokens, text);
     };
 
     let html = '';

@@ -16,7 +16,8 @@ import {
   getPreferences,
   savePreferences,
   saveHouseholdSwapPreference,
-  getHouseholdSwapPreferences
+  getHouseholdSwapPreferences,
+  clearReviewedRecipeMetadataInDb
 } from './PreferenceRepository.js';
 import { getUnifiedCategories, getCategories, saveCategories } from './CategoryRepository.js';
 import { executeSubcollectionMigration, cleanPreferencesBloat } from './SyncRepository.js';
@@ -169,6 +170,7 @@ const HouseholdRepository = {
   savePreferences,
   saveHouseholdSwapPreference,
   getHouseholdSwapPreferences,
+  clearReviewedRecipeMetadataInDb,
   dismissAdvisoryInDb,
   savePreferencesWithAutoPrune,
   batchResolveOrphansWithNewSubtypeInDb,
@@ -197,6 +199,7 @@ export {
   savePreferences,
   saveHouseholdSwapPreference,
   getHouseholdSwapPreferences,
+  clearReviewedRecipeMetadataInDb,
   getUnifiedCategories,
   getCategories,
   saveCategories,

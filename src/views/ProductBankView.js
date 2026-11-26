@@ -12,6 +12,7 @@ import { reallocateProduct, setAutoDefaultProduct, getActiveCategories, addSubty
 import { promptReallocateProduct as openReallocateModal } from '../components/pantry/ReallocateProductModalUI.js';
 import { showCustomAlert, showCustomConfirm } from '../components/ui/DialogHelpers.js';
 import { escapeHtml, escapeAttr } from '../utils/stringUtils.js';
+import { tokenizeSearchQuery, matchesSearchQuery } from '../utils/searchUtils.js';
 import { parseTescoProduct, cleanProductName, toTitleCase } from '../services/TescoImportService.js';
 import { createTaxonomySearchInput } from '../components/pantry/RecipeSearchDropdownHelper.js';
 
@@ -643,13 +644,9 @@ export function renderProductBank() {
   const query = (searchInput?.value || '').trim().toLowerCase();
 
   let products = allProducts;
-  if (query.length > 0) {
-    products = allProducts.filter(p => {
-      const pName = (p.name || '').toLowerCase();
-      const pBrand = (p.brand || '').toLowerCase();
-      const pCat = (p.category || p.cat || '').toLowerCase();
-      return pName.includes(query) || pBrand.includes(query) || pCat.includes(query);
-    });
+  const searchTokens = tokenizeSearchQuery(query);
+  if (searchTokens.length > 0) {
+    products = allProducts.filter(p => matchesSearchQuery(searchTokens, [p.name, p.brand, p.category || p.cat]));
   }
 
   let cardsWrap = document.getElementById('product-bank-cards-wrap');

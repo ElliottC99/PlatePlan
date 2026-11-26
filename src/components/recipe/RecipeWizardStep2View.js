@@ -117,10 +117,13 @@ export function renderState2Mapping() {
 
       const isStock = String(item.name || '').toLowerCase().includes('stock') || String(item.name || '').toLowerCase().includes('bouillon') || String(item.name || '').toLowerCase().includes('cube') || String(item.raw || '').toLowerCase().includes('stock') || String(item.raw || '').toLowerCase().includes('bouillon') || String(item.raw || '').toLowerCase().includes('cube');
 
-      if (isStock && item.waterMl === undefined) {
+      if (isStock && (item.waterMl === undefined || item.waterMl === null)) {
         const rawLower = String(item.raw || '').toLowerCase();
-        const mlMatch = /(\d+)\s*(?:ml|millilitres|ml\b)/i.exec(rawLower);
-        item.waterMl = mlMatch ? parseInt(mlMatch[1], 10) : 400;
+        const mlMatch = /(\d+(?:\.\d+)?)\s*(?:ml|millilit(?:er|re)s?|mls?)\b/i.exec(rawLower);
+        const lMatch = !mlMatch && /(\d+(?:\.\d+)?)\s*(?:l|lit(?:er|re)s?)\b/i.exec(rawLower);
+        item.waterMl = mlMatch
+          ? Math.round(parseFloat(mlMatch[1]))
+          : (lMatch ? Math.round(parseFloat(lMatch[1]) * 1000) : 400);
       }
 
       const rawDisplay = item.raw || `${qty} ${item.unit || 'g'} ${item.name || ''}`.trim();
@@ -344,8 +347,13 @@ export function renderState2Mapping() {
         </div>
       </div>
 
-      <div style="margin-bottom: 20px;">
+      <div style="margin-bottom: 16px;">
         ${stepsHtml || '<p style="color:var(--text2);font-size:12px;">No method steps.</p>'}
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <label for="wiz-step2-notes" style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px;">📝 Recipe Notes & Tips</label>
+        <textarea id="wiz-step2-notes" name="wiz_step2_notes" aria-label="Recipe notes and tips" rows="3" placeholder="Cooking hacks, vegetarian swaps, storage notes..." style="width: 100%; padding: 8px 10px; border: 1px solid var(--border, #cbd5e1); border-radius: 8px; font-size: 12.5px; background: var(--surface, #fff); resize: vertical;">${escapeHtml(activeRecipe.notes || '')}</textarea>
       </div>
     </div>
   `;

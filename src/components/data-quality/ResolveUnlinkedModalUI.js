@@ -11,6 +11,7 @@ import { reallocateProduct, reparentSubtype, mergeIngredients } from '../../mode
 import { parseTescoProduct } from '../../services/TescoImportService.js';
 import { openProductEditModal } from '../../views/ProductBankView.js';
 import { renderResolveModalShell, renderRemapMatchRow, renderLinkProductRow } from './ResolveUnlinkedModalRenderService.js';
+import { filterAndRankBySearch } from '../../utils/searchUtils.js';
 
 let activeTargetId = null, activeTargetType = 'ingredient', activeParentIngredientId = null, activeRecipeId = null, activeRecipeItemIndex = null, activeTargetName = '';
 
@@ -125,7 +126,7 @@ export function filterResolveRemapOptions(query) {
     }
   });
 
-  const matches = q ? options.filter(o => o.label.toLowerCase().includes(q)).slice(0, MAX_MATCHES) : options.slice(0, MAX_MATCHES);
+  const matches = q ? filterAndRankBySearch(options, q, o => o.label).slice(0, MAX_MATCHES) : options.slice(0, MAX_MATCHES);
   container.style.display = 'block';
   if (!matches.length) {
     container.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--text3,#a8a29e);text-align:center">No matching ingredients found.</div>';
@@ -181,7 +182,7 @@ export function filterResolveLinkProducts(query) {
   if (!container) return;
   const q = String(query || '').trim().toLowerCase();
   if (!q) { container.style.display = 'none'; return; }
-  const matches = safeGetProducts().filter(p => String(p.name || '').toLowerCase().includes(q) || String(p.brand || '').toLowerCase().includes(q)).slice(0, 10);
+  const matches = filterAndRankBySearch(safeGetProducts(), q, p => [p.name, p.brand]).slice(0, 10);
   container.style.display = 'block';
   if (!matches.length) {
     container.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--text3,#a8a29e);text-align:center">No matching products found.</div>';

@@ -6,6 +6,7 @@
 import { getState } from '../../store/coreState.js';
 
 import { calculateMealFitScore, extractRecipeMacros } from '../../utils/fitScoreCalculator.js';
+import { filterAndRankBySearch } from '../../utils/searchUtils.js';
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
 import { escapeHtml, escapeAttr } from '../../utils/stringUtils.js';
 
@@ -88,7 +89,7 @@ export function renderRecipeCandidateRows(recipes, { dayIndex, mealType, person 
       });
     }
   });
-  const filtered = expandedRecipes.filter(r => !q || (r.name || '').toLowerCase().includes(q)).slice(0, 15);
+  const filtered = filterAndRankBySearch(expandedRecipes, q, r => r.name || '').slice(0, 15);
   if (!filtered.length) {
     return '<div style="font-size:12px;color:#94a3b8;padding:8px;text-align:center">No matching recipes found</div>';
   }

@@ -444,6 +444,7 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal = () => {}, sh
     sourceBook,
     sourcePage,
     source: sourceFormatted,
+    notes: String(rec.notes ?? baseOrig.notes ?? '').trim(),
     ingredientSections: origSections,
     ingredients: origIngs,
     instructions: origSteps,
@@ -522,13 +523,13 @@ export async function onSaveRecipe(modalWrap, { renderWizardModal = () => {}, sh
       const actionContainer = btnSave ? btnSave.parentElement : modalWrap;
       const banner = document.createElement('div');
       banner.id = 'wiz-queue-saved-banner';
-      banner.style.cssText = 'background: #ecfdf5; border: 1px solid #10b981; border-radius: 10px; padding: 14px 18px; margin-top: 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px;';
+      banner.style.cssText = 'background: #ecfdf5; border: 1px solid #10b981; border-radius: 10px; padding: 6px 12px; width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; box-sizing: border-box;';
       banner.innerHTML = `
-        <div style="font-size: 13.5px; font-weight: 600; color: #065f46;">
-          ✅ Recipe saved! Remaining in queue: <strong>${wizardState.processingQueue.length}</strong>
+        <div style="font-size: 12.5px; font-weight: 600; color: #065f46; white-space: nowrap;">
+          ✅ Saved! Remaining: <strong>${wizardState.processingQueue.length}</strong>
         </div>
-        <button type="button" id="btn-wiz-map-next-recipe" class="btn primary sm" style="font-weight: 600; cursor: pointer;">
-          Map Next Recipe (${escapeHtml(nextDishTitle)}) →
+        <button type="button" id="btn-wiz-map-next-recipe" class="btn primary sm" style="font-weight: 600; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%;">
+          Map Next (${escapeHtml(nextDishTitle)}) →
         </button>
       `;
       actionContainer.replaceChildren(banner);

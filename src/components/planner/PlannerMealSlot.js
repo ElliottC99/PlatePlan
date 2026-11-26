@@ -6,6 +6,7 @@
 import { getState } from '../../store/coreState.js';
 
 import { calculateMealFitScore, extractRecipeMacros } from '../../utils/fitScoreCalculator.js';
+import { tokenizeSearchQuery, matchesSearchQuery } from '../../utils/searchUtils.js';
 import { renderFitScoreBadge } from '../FitScoreBadge.js';
 import { getMealTypeFromSlotKey, makePlanSlot } from '../../services/MealPlanGeneratorService.js';
 import { saveCurrentPlan } from '../../services/HouseholdRepository.js';
@@ -209,18 +210,20 @@ export function filterSearchableRecipeSwapModal(query = '') {
     }
   });
 
+  const searchTokens = tokenizeSearchQuery(cleanQ);
   const candidates = flattenedCandidates.filter(item => {
     const r = item.recipe;
     if (r.id === currentId && item.variant === 'original') return false;
-    if (!cleanQ) return true;
-    const searchTarget = item.name.toLowerCase();
-    if (searchTarget.includes(cleanQ)) return true;
+    if (searchTokens.length === 0) return true;
     const ingList = item.variant === 'enhanced' ? (r.enhanced.ingredients || r.ingredients) : r.ingredients;
-    const ingMatch = Array.isArray(ingList) && ingList.some(i => (i?.name || i?.raw || '').toLowerCase().includes(cleanQ));
-    if (ingMatch) return true;
-    const tagMatch = Array.isArray(r.tags) && r.tags.some(t => String(t).toLowerCase().includes(cleanQ));
-    if (tagMatch) return true;
-    return (r.category || r.cuisine || '').toLowerCase().includes(cleanQ);
+    const fields = [
+      item.name,
+      r.category,
+      r.cuisine,
+      ...(Array.isArray(r.tags) ? r.tags : []),
+      ...(Array.isArray(ingList) ? ingList.map(i => i?.name || i?.raw || '') : [])
+    ];
+    return matchesSearchQuery(searchTokens, fields);
   });
 
   resultsContainer.innerHTML = '';

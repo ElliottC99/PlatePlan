@@ -7,6 +7,7 @@ import { getState } from '../../store/coreState.js';
 
 import { calculateMealFitScore, extractRecipeMacros } from '../../utils/fitScoreCalculator.js';
 import { getSortedRecipes } from '../../services/FitScoreService.js';
+import { tokenizeSearchQuery, matchesSearchQuery } from '../../utils/searchUtils.js';
 import { buildPlannedMealActionItems } from './PlannerModalsUI.js';
 import { renderSwapModalBase, renderSwapModalItem } from './PlannerSwapModalRenderService.js';
 
@@ -160,15 +161,15 @@ export function renderSwapModalOptionsList() {
   if (!container || !currentSwapModalContext) return;
 
   const { curValue, items, selectedRecipeValue } = currentSwapModalContext;
-  const rawQuery = (document.getElementById('swap-modal-search-input')?.value || '').trim().toLowerCase();
-  const terms = rawQuery.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  const rawQuery = (document.getElementById('swap-modal-search-input')?.value || '').trim();
+  const terms = tokenizeSearchQuery(rawQuery);
 
   let filtered = items.filter(item => {
     const isFav = item.isFavourite || item.isFavorite;
     if ((currentSwapModalFilter === 'favourites' || currentSwapModalFilter === 'favorites') && !isFav) return false;
     if (currentSwapModalFilter === 'enhanced' && item.variant !== 'enhanced') return false;
     if (currentSwapModalFilter === 'original' && item.variant === 'enhanced') return false;
-    return !terms.length || terms.every(t => item.searchHaystack.includes(t));
+    return terms.length === 0 || matchesSearchQuery(terms, item.searchHaystack);
   });
 
   const sortOption = document.getElementById('swap-modal-sort-select')?.value || 'best-fit';
