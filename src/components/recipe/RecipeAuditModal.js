@@ -11,6 +11,7 @@ import { AUDIT_SUGGESTION_THRESHOLD } from '../../config/businessRules.js';
 import { createTaxonomySearchInput } from '../pantry/RecipeSearchDropdownHelper.js';
 import { openTaxonomyCreationModal } from './RecipeWizardTaxonomyModal.js';
 import { getUnifiedCategories } from '../../services/CategoryRepository.js';
+import { tokenizeSearchQuery, matchesSearchQuery } from '../../utils/searchUtils.js';
 
 let modalOverlay = null;
 let currentFilter = 'all';
@@ -30,14 +31,12 @@ function renderModalContent() {
   const ingredients = state.ingredients || [];
   const { summary, issues } = auditReport;
 
+  const searchTokens = currentSearch ? tokenizeSearchQuery(currentSearch) : [];
   const filteredIssues = issues.filter(issue => {
     if (targetRecipeFilter && issue.recipeId !== targetRecipeFilter) return false;
     if (currentFilter !== 'all' && issue.issueType !== currentFilter) return false;
-    if (currentSearch) {
-      const q = currentSearch.toLowerCase();
-      const matchRec = issue.recipeName.toLowerCase().includes(q);
-      const matchIng = issue.itemName.toLowerCase().includes(q);
-      if (!matchRec && !matchIng) return false;
+    if (searchTokens.length > 0) {
+      if (!matchesSearchQuery(searchTokens, [issue.recipeName, issue.itemName])) return false;
     }
     return true;
   });

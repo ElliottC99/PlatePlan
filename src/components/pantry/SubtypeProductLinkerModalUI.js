@@ -7,6 +7,7 @@
 import { getState, setProducts } from '../../store/store.js';
 import { saveProduct } from '../../services/ProductRepository.js';
 import { parseTescoProduct, cleanProductName, toTitleCase } from '../../services/TescoImportService.js';
+import { filterAndRankBySearch } from '../../utils/searchUtils.js';
 
 const escapeHTML = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -135,8 +136,10 @@ export function openSubtypeExistingProductPickerModal(subtypeId, parentId, onSuc
   };
 
   const renderList = (filterText = '') => {
-    const query = filterText.toLowerCase().trim();
-    const filtered = products.filter(p => !query || (p.name || '').toLowerCase().includes(query) || (p.brand || '').toLowerCase().includes(query));
+    const query = filterText.trim();
+    const filtered = query
+      ? filterAndRankBySearch(products, query, p => [p.name, p.brand, p.category || p.cat])
+      : products;
 
     if (!filtered.length) {
       listContainer.innerHTML = `<div style="text-align:center; padding:16px; font-size:12px; color:var(--text2);">No products found matching "${escapeHTML(query)}".</div>`;
