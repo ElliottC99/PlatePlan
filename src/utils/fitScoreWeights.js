@@ -119,3 +119,84 @@ export function getFitScoreTierMeta(score) {
   }
   return { tier: 'red', icon: '🔴', label: 'Poor Match', color: 'var(--system-red)', bg: 'var(--badge-red-bg)', text: 'var(--badge-red-text)', border: 'var(--badge-red-border)' };
 }
+
+/**
+ * Pure piecewise asymmetric curve used by both Calorie and Protein Fit Score calculators.
+ */
+export function interpolateAsymmetricCurve(r, lowFloor, minGrace, minOpt, maxOpt, maxGrace, highCeil) {
+  if (r >= minOpt && r <= maxOpt) return 100;
+
+  if (r >= minGrace && r < minOpt) {
+    const span = minOpt - minGrace;
+    return span > 0 ? 86 + ((r - minGrace) / span) * (99 - 86) : 99;
+  }
+
+  if (r > maxOpt && r <= maxGrace) {
+    const span = maxGrace - maxOpt;
+    return span > 0 ? 99 - ((r - maxOpt) / span) * (99 - 86) : 99;
+  }
+
+  if (r < minGrace) {
+    if (r <= lowFloor) return 0;
+    const span = minGrace - lowFloor;
+    return span > 0 ? ((r - lowFloor) / span) * 85 : 0;
+  }
+
+  if (r > maxGrace) {
+    if (r >= highCeil) return 0;
+    const span = highCeil - maxGrace;
+    return span > 0 ? (1 - ((r - maxGrace) / span)) * 85 : 0;
+  }
+
+  return 0;
+}
+
+export function calculateCalorieScoreWithParams(actual, target, params) {
+  if (!target || target <= 0 || actual === null || actual === undefined || actual <= 0) return 0;
+  const r = actual / target;
+  return interpolateAsymmetricCurve(
+    r,
+    params.calLowFloor,
+    params.calMinGrace,
+    params.calMinOpt,
+    params.calMaxOpt,
+    params.calMaxGrace,
+    params.calHighCeil
+  );
+}
+
+export function calculateProteinScoreWithParams(actual, target, params) {
+  if (!target || target <= 0 || actual === null || actual === undefined || actual <= 0) return 0;
+  const r = actual / target;
+  return interpolateAsymmetricCurve(
+    r,
+    params.protLowFloor,
+    params.protMinGrace,
+    params.protMinOpt,
+    params.protMaxOpt,
+    params.protMaxGrace,
+    params.protHighCeil
+  );
+}
+
+/**
+ * Pure helper returning the flattened ingredient list for a recipe and variant,
+ * preferring non-empty `ingredientSections` and falling back to `ingredients`
+ * without letting base `ingredientSections` shadow `enhanced.ingredients`.
+ */
+export function extractRecipeIngredients(recipe, variant = 'original') {
+  if (!recipe || typeof recipe !== 'object') return [];
+  const fromObj = (obj) => {
+    if (!obj || typeof obj !== 'object') return [];
+    if (Array.isArray(obj.ingredientSections) && obj.ingredientSections.length > 0) {
+      const flattened = obj.ingredientSections.flatMap(sec => Array.isArray(sec?.ingredients) ? sec.ingredients : []);
+      if (flattened.length > 0) return flattened;
+    }
+    return Array.isArray(obj.ingredients) ? obj.ingredients : [];
+  };
+  if (variant === 'enhanced' && recipe.enhanced && typeof recipe.enhanced === 'object') {
+    const enhList = fromObj(recipe.enhanced);
+    if (enhList.length > 0) return enhList;
+  }
+  return fromObj(recipe);
+}

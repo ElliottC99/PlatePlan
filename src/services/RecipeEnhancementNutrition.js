@@ -6,7 +6,8 @@
 
 import { getState } from "../store/coreState.js";
 import { getTarget } from "../utils/fitScoreCalculator.js";
-import { calculateItemNutrition, normalizeEnergyKcal, resolveProductItemWeight } from "./NutritionService.js";
+import { calculateItemNutrition, normalizeEnergyKcal, resolveProductItemWeight, classifyIngredientRole } from "./NutritionService.js";
+export { classifyIngredientRole };
 import { toGrams } from "./UnitConversionService.js";
 import { resolveProductForIngredient } from "../components/recipe/RecipeWizardStep3Handlers.js";
 
@@ -174,53 +175,6 @@ export function quantizeQuantity(qty, unit = 'g') {
     return Math.round(num);
   }
   return Math.round(num * 10) / 10;
-}
-
-/**
- * Classifies ingredient into a culinary role based on name, category, and macros.
- */
-export function classifyIngredientRole(item, matchedProduct = null) {
-  const rawName = String(item?.name || item?.raw || '').toLowerCase();
-  const prodName = String(matchedProduct?.name || '').toLowerCase();
-  const cat = String(item?.categoryId || item?.category || matchedProduct?.category || '').toLowerCase();
-  const text = `${rawName} ${prodName} ${cat}`;
-
-  // 1. Cooking Fats & Pure Oils
-  if (/\b(oil|olive oil|vegetable oil|sunflower oil|sesame oil|rapeseed oil|butter|ghee|lard|frylight|cooking spray|margarine)\b/i.test(text)
-      && !/\b(sardines? in oil|tuna in oil)\b/i.test(text)) {
-    return 'cooking_fat';
-  }
-
-  // 2. Rich Dairy / Fats
-  if (/\b(coconut milk|coconut cream|double cream|heavy cream|single cream|sour cream|cream cheese|mayo|mayonnaise|cheddar|parmesan|mozzarella|cheese)\b/i.test(text)) {
-    return 'rich_dairy_fat';
-  }
-
-  // 3. Primary Proteins
-  if (/\b(chicken|turkey|beef|steak|mince|pork|lamb|bacon|salmon|tuna|cod|prawns?|shrimp|tofu|tempeh|seitan|quorn|eggs?|egg whites?|lentils?|chickpeas?|black beans?|kidney beans?|edamame)\b/i.test(text)
-      || cat.includes('meat') || cat.includes('fish') || cat.includes('seafood') || cat.includes('protein')) {
-    return 'primary_protein';
-  }
-
-  // 4. Starch / Carbs
-  if (/\b(rice|pasta|spaghetti|penne|fusilli|noodles?|potatoes?|sweet potatoes?|bread|toast|couscous|quinoa|wrap|tortilla|oats?|flour)\b/i.test(text)
-      || cat.includes('carbs') || cat.includes('grains') || cat.includes('pasta')) {
-    return 'starch_carb';
-  }
-
-  // 5. Produce (Vegetables, Fruit, Aromatics)
-  if (/\b(onion|garlic|ginger|pepper|peppers|broccoli|spinach|mushroom|mushrooms|carrot|carrots|tomato|tomatoes|chilli|chillies|lemon|lime|coriander|parsley|basil|kale|courgette|cucumber)\b/i.test(text)
-      || cat.includes('produce') || cat.includes('veg') || cat.includes('fruit')) {
-    return 'produce';
-  }
-
-  // 6. Seasonings & Condiments
-  if (/\b(salt|black pepper|soy sauce|fish sauce|vinegar|paprika|cumin|turmeric|oregano|thyme|stock|stock cube|paste)\b/i.test(text)
-      || cat.includes('spice') || cat.includes('seasoning')) {
-    return 'seasoning';
-  }
-
-  return 'other';
 }
 
 /**

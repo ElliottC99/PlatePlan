@@ -300,8 +300,11 @@ function closeAllRecipeActionMenus() {
 export function renderVaultRecipeCard(r, options = {}) {
   const types = getNormalizedRecipeTypes(r);
   const requestedMealType = options.mealType || 'all';
-  const activeProfile = options.activeProfile || 'everyone';
+  const rawActiveProfile = options.activeProfile || 'everyone';
   const whoKey = String(r.who || 'both').toLowerCase();
+  const activeProfile = (rawActiveProfile === 'everyone' || rawActiveProfile === 'all' || rawActiveProfile === 'both')
+    ? ((whoKey === 'elliott' || whoKey === 'e') ? 'elliott' : ((whoKey === 'chloe' || whoKey === 'c') ? 'chloe' : rawActiveProfile))
+    : rawActiveProfile;
   const showE = whoKey === 'both' || whoKey === 'elliott' || whoKey === 'e';
   const showC = whoKey === 'both' || whoKey === 'chloe' || whoKey === 'c';
   const personLabel = whoKey === 'both' ? 'Shared' : (whoKey === 'elliott' || whoKey === 'e' ? 'Elliott' : 'Chloe');

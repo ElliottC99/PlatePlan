@@ -7,6 +7,7 @@
 
 import { getState } from "../store/coreState.js";
 import { normalizeMethodSteps } from "../utils/stringUtils.js";
+import { solveOptimalRecipeProducts } from "./RecipeProductSolver.js";
 import { calculateMealFitScore } from "../utils/fitScoreCalculator.js";
 import { calculateItemNutrition, normalizeEnergyKcal, resolveProductItemWeight } from "./NutritionService.js";
 import { toGrams } from "./UnitConversionService.js";
@@ -442,15 +443,61 @@ export function generateEnhancementPlan(recipe, options = {}) {
 
   const state = typeof getState === 'function' ? (getState() || {}) : {};
   const products = Array.isArray(options.products) ? options.products : (state.products || []);
-  const allIngredients = Array.isArray(options.ingredients) ? options.ingredients : (state.ingredients || []);
+  const allIngredients = Array.isArray(options.ingredients) ? options.ingredients : (state.rootItems || state.ingredients || []);
   const swapPreferences = options.swapPreferences || state.preferences?.swapPreferences || {};
 
   const targets = resolveRecipeTargets(recipe, options);
   const targetMealType = targets.mealType;
+  const currentServings = Number(recipe.servings || recipe.serves || 2) || 2;
+
+  // Stage A: Zero-edit pantry product combination check before mutating recipe quantities/yield
+  const stageA = products.length > 0
+    ? solveOptimalRecipeProducts(recipe, {
+        variant: 'original',
+        mealType: targetMealType,
+        activeProfile: targets.audience || 'everyone',
+        products,
+        ingredients: allIngredients,
+        preferences: options.preferences || options.userPrefs || state.preferences || state.userPrefs || state.settings || {}
+      })
+    : null;
+
+  if (stageA && stageA.usedCombo && stageA.score >= 85 && !options.forceStageB) {
+    const stageARoute = {
+      id: 'route_pantry_combo',
+      name: 'Pantry Combo (Zero Recipe Edits)',
+      badge: '✨ Pantry Combo',
+      description: 'Reaches 85+ Fit Score using existing pantry products alone — no quantity changes or Enhanced variant needed.',
+      beforeScore: stageA.baselineScore,
+      predictedScore: stageA.score,
+      proposedServings: currentServings,
+      adjustments: [],
+      stageAOptimal: true,
+      noForkNeeded: true,
+      stageADepartures: stageA.departures,
+      enhancedRecipePayload: null
+    };
+    return {
+      recipeId: recipe.id,
+      recipeTitle: recipe.name || recipe.title || 'Recipe',
+      originalRecipe: recipe,
+      originalServings: currentServings,
+      targets,
+      beforeScore: stageA.baselineScore,
+      predictedScore: stageA.score,
+      proposedServings: currentServings,
+      adjustments: [],
+      stageAOptimal: true,
+      noForkNeeded: true,
+      stageADepartures: stageA.departures,
+      enhancedRecipePayload: null,
+      selectedRouteId: stageARoute.id,
+      routes: [stageARoute]
+    };
+  }
+
   const initialFit = calculateMealFitScore(recipe, targetMealType, { ...options, variant: 'original' });
   const beforeScore = Math.round(Number(initialFit?.score) || 0);
-
-  const currentServings = Number(recipe.servings || recipe.serves || 2) || 2;
 
   // Build candidate routes (Quantity-focused)
   const r1 = buildRoutePlan({

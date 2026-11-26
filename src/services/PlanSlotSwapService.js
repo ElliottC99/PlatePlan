@@ -87,7 +87,32 @@ export function swapPlanMealSlots(plan, sourceDayKey, targetDayKey, mealType = '
   slots[srcKey] = srcDay;
   slots[tgtKey] = tgtDay;
 
-  // 2. Clear eaten ticks for both dates for this mealType
+  // 2. Migrate day-scoped productSelections and substitutions for this mealType
+  const swapDayScopedDict = (dict) => {
+    if (!dict || typeof dict !== 'object') return;
+    const suffixes = [keyMain, keyE, keyC, `${keyMain}_E`, `${keyMain}_C`];
+    const srcEntries = [];
+    const tgtEntries = [];
+    for (const sfx of suffixes) {
+      const srcPrefix = `${srcKey}_${sfx}:`;
+      const tgtPrefix = `${tgtKey}_${sfx}:`;
+      for (const k of Object.keys(dict)) {
+        if (k.startsWith(srcPrefix)) {
+          srcEntries.push([`${tgtPrefix}${k.slice(srcPrefix.length)}`, dict[k]]);
+          delete dict[k];
+        } else if (k.startsWith(tgtPrefix)) {
+          tgtEntries.push([`${srcPrefix}${k.slice(tgtPrefix.length)}`, dict[k]]);
+          delete dict[k];
+        }
+      }
+    }
+    srcEntries.forEach(([k, v]) => { dict[k] = v; });
+    tgtEntries.forEach(([k, v]) => { dict[k] = v; });
+  };
+  swapDayScopedDict(nextPlan.productSelections);
+  swapDayScopedDict(nextPlan.substitutions);
+
+  // 3. Clear eaten ticks for both dates for this mealType
   if (nextPlan.eatenMeals && typeof nextPlan.eatenMeals === 'object') {
     const dayDates = nextPlan.dayDates || {};
     const srcDate = dayDates[srcKey];
