@@ -14,6 +14,7 @@ import { extractRecipeMacros } from '../../utils/fitScoreCalculator.js';
 import { wizardState, resetWizardState, syncStep2InputsToState, stashActiveVariantSnapshot } from './RecipeWizardState.js';
 import { renderStepBadge, renderState0Choice, renderState1AManual, renderState1BBulk, renderState3Review } from './RecipeWizardViews.js';
 import { renderState2Mapping, renderStep2Footer } from './RecipeWizardStep2View.js';
+import { renderStep3Footer } from './RecipeWizardStep3View.js';
 import { renderStep1Point5 } from './RecipeWizardStep15View.js';
 import { bindStep01Events } from './RecipeWizardStep1Handlers.js';
 import { bindStep2Events } from './RecipeWizardStep2Handlers.js';
@@ -21,7 +22,7 @@ import { bindStep3Events } from './RecipeWizardStep3Handlers.js';
 
 const TOAST_DURATION_MS = 4000;
 
-function normalizeTime(t, defH = 0, defM = 0) {
+function normalizeTime(t, defH = '', defM = '') {
   if (typeof t === 'number' && !isNaN(t)) {
     return { hours: Math.floor(t / 60), minutes: t % 60 };
   }
@@ -32,9 +33,12 @@ function normalizeTime(t, defH = 0, defM = 0) {
   if (t && typeof t === 'object') {
     const h = parseInt(t.hours, 10);
     const m = parseInt(t.minutes, 10);
+    if (isNaN(h) && isNaN(m)) {
+      return { hours: defH, minutes: defM };
+    }
     return {
-      hours: isNaN(h) ? defH : Math.max(0, h),
-      minutes: isNaN(m) ? defM : Math.max(0, Math.min(59, m))
+      hours: isNaN(h) ? 0 : Math.max(0, h),
+      minutes: isNaN(m) ? 0 : Math.max(0, Math.min(59, m))
     };
   }
   return { hours: defH, minutes: defM };
@@ -124,11 +128,11 @@ export function openRecipeWizard(initialMode = 'manual', editRecipeId = null, va
         : ['Dinner'];
 
       const prepTime = targetSource.prepTime !== undefined && targetSource.prepTime !== null
-        ? normalizeTime(targetSource.prepTime, 0, 15)
-        : (targetSource.time ? normalizeTime(targetSource.time, 0, 15) : { hours: 0, minutes: 15 });
+        ? normalizeTime(targetSource.prepTime, '', '')
+        : (targetSource.time ? normalizeTime(targetSource.time, '', '') : { hours: '', minutes: '' });
       const cookTime = targetSource.cookTime !== undefined && targetSource.cookTime !== null
-        ? normalizeTime(targetSource.cookTime, 0, 30)
-        : { hours: 0, minutes: 30 };
+        ? normalizeTime(targetSource.cookTime, '', '')
+        : { hours: '', minutes: '' };
 
       let ingredientSections = [];
       if (Array.isArray(targetSource.ingredientSections) && targetSource.ingredientSections.length > 0) {
@@ -407,6 +411,9 @@ export function loadNextRecipeFromQueue() {
 export function renderWizardFooter() {
   if (wizardState.currentStep === 2) {
     return renderStep2Footer();
+  }
+  if (wizardState.currentStep === 3) {
+    return renderStep3Footer();
   }
   return '';
 }

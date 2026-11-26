@@ -117,10 +117,13 @@ export function renderState2Mapping() {
 
       const isStock = String(item.name || '').toLowerCase().includes('stock') || String(item.name || '').toLowerCase().includes('bouillon') || String(item.name || '').toLowerCase().includes('cube') || String(item.raw || '').toLowerCase().includes('stock') || String(item.raw || '').toLowerCase().includes('bouillon') || String(item.raw || '').toLowerCase().includes('cube');
 
-      if (isStock && item.waterMl === undefined) {
+      if (isStock && (item.waterMl === undefined || item.waterMl === null)) {
         const rawLower = String(item.raw || '').toLowerCase();
-        const mlMatch = /(\d+)\s*(?:ml|millilitres|ml\b)/i.exec(rawLower);
-        item.waterMl = mlMatch ? parseInt(mlMatch[1], 10) : 400;
+        const mlMatch = /(\d+(?:\.\d+)?)\s*(?:ml|millilit(?:er|re)s?|mls?)\b/i.exec(rawLower);
+        const lMatch = !mlMatch && /(\d+(?:\.\d+)?)\s*(?:l|lit(?:er|re)s?)\b/i.exec(rawLower);
+        item.waterMl = mlMatch
+          ? Math.round(parseFloat(mlMatch[1]))
+          : (lMatch ? Math.round(parseFloat(lMatch[1]) * 1000) : 400);
       }
 
       const rawDisplay = item.raw || `${qty} ${item.unit || 'g'} ${item.name || ''}`.trim();

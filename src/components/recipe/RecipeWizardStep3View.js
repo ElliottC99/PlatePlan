@@ -372,11 +372,17 @@ export function renderState3Review() {
           <textarea id="wiz-rev-notes" name="rev_notes" aria-label="Recipe notes and tips" rows="3" placeholder="Cooking hacks, vegetarian swaps, storage notes..." style="width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12.5px; background: var(--surface); resize: vertical;">${escapeHtml(recipe.notes || '')}</textarea>
         </div>
       </div>
+    </div>
+  `;
+}
 
-      <div style="display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border, #eee); padding-top: 14px;">
-        <button type="button" class="btn ghost" data-action="go-to-wizard-step" data-step="2">← Back to Mapping</button>
-        <button type="button" class="btn primary" id="btn-save-wizard-recipe">💾 ${escapeHtml(saveBtnText)}</button>
-      </div>
+export function renderStep3Footer() {
+  const recipe = wizardState.activeRecipe || {};
+  const saveBtnText = getSaveButtonLabel(recipe);
+  return `
+    <div class="ios-fullscreen-footer" id="wizard-step3-footer">
+      <button type="button" class="btn ghost" data-action="go-to-wizard-step" data-step="2">← Back to Mapping</button>
+      <button type="button" class="btn primary" id="btn-save-wizard-recipe">💾 ${escapeHtml(saveBtnText)}</button>
     </div>
   `;
 }

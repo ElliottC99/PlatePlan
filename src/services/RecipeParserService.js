@@ -449,7 +449,7 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
     if (boundary) rawMethodText = rawMethodText.slice(0, boundary.index);
   }
 
-  let title = 'Imported Recipe', servings = null, prepMinutes = 15, cookMinutes = 30;
+  let title = 'Imported Recipe', servings = null, prepMinutes = null, cookMinutes = null;
   let sourceType = '', sourceUrl = '', sourceBook = '', sourcePage = '';
 
   const applySourceLine = (line) => {
@@ -583,11 +583,11 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
       return;
     }
     if (/^Prep\s+Time(?:\s*\([^)]*\))?:/i.test(line)) {
-      prepMinutes = parseDurationMinutes(line, 15);
+      prepMinutes = parseDurationMinutes(line, null);
       return;
     }
     if (/^Cook\s+Time(?:\s*\([^)]*\))?:/i.test(line)) {
-      cookMinutes = parseDurationMinutes(line, 30);
+      cookMinutes = parseDurationMinutes(line, null);
       return;
     }
     if (!titleAssigned && !isHeaderMetadataLine(line)) {
@@ -718,8 +718,8 @@ export function parseSingleRecipeText(block, ingredientsBank = []) {
   return {
     title: cleanTitle,
     servings,
-    prepTime: { hours: Math.floor(prepMinutes / 60), minutes: prepMinutes % 60 },
-    cookTime: { hours: Math.floor(cookMinutes / 60), minutes: cookMinutes % 60 },
+    prepTime: prepMinutes === null ? { hours: '', minutes: '' } : { hours: Math.floor(prepMinutes / 60), minutes: prepMinutes % 60 },
+    cookTime: cookMinutes === null ? { hours: '', minutes: '' } : { hours: Math.floor(cookMinutes / 60), minutes: cookMinutes % 60 },
     sourceType,
     sourceUrl,
     sourceBook,

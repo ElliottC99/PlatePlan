@@ -44,9 +44,9 @@ export function promptRecipeWizardAliases(allIngs, onProceed) {
       }
     }
 
-    const rawPhrase = String(ing.raw || '').trim();
-    const cleanedPhrase = cleanIngredientPhraseForAlias(ing) || rawPhrase.replace(/^[\d\s\/\.\-\u00BC-\u00BE\u2150-\u215E]+(?:g|kg|ml|l|oz|lb|tbsp|tsp|cup|cups|scoop|scoops|pinch|can|clove|slice|slices)?\s+(?:of\s+)?/i, '').trim();
-    const rawClean = (cleanedPhrase || rawPhrase).toLowerCase();
+    const cleanedPhrase = cleanIngredientPhraseForAlias(ing);
+    if (!cleanedPhrase || cleanedPhrase.length <= 2) return;
+    const rawClean = cleanedPhrase.toLowerCase();
     const existingAliases = (targetDoc.aliases || []).map(a => String(a).toLowerCase());
     const stemmedRaw = stemIngredientName(rawClean);
     const isAlreadyKnown = rawClean === targetOwnName
@@ -56,7 +56,7 @@ export function promptRecipeWizardAliases(allIngs, onProceed) {
       || existingAliases.some(a => stemIngredientName(a) === stemmedRaw);
 
     if (!isAlreadyKnown && rawClean.length > 2) {
-      candidates.push({ ing, targetName, rawClean, cleanedPhrase: cleanedPhrase || rawPhrase });
+      candidates.push({ ing, targetName, rawClean, cleanedPhrase });
     }
   });
 

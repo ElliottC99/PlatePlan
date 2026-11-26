@@ -350,6 +350,53 @@ export function renderTaxonomySearchHTML(sIdx, iIdx, item, ingredientsBank = [],
   `;
 }
 
+export function applyCreatedTaxonomySelection({
+  created,
+  inputEl,
+  dropdownEl = null,
+  currentIngName = '',
+  sIdx,
+  iIdx,
+  onSelectCallback = null
+} = {}) {
+  if (!created || !inputEl) return null;
+  if (dropdownEl) dropdownEl.style.display = 'none';
+  if (created.category && !created.ingredientId && !created.rootItem) {
+    const combinedKey = `cat:${created.category}`;
+    const displayLabel = `📂 [Category] ${created.category}`;
+    inputEl.dataset.taxVal = combinedKey;
+    inputEl.value = displayLabel;
+    inputEl.setAttribute('value', displayLabel);
+    inputEl.style.borderColor = '#10b981';
+    inputEl.style.backgroundColor = '#ecfdf5';
+    inputEl.style.color = 'var(--text,#1e293b)';
+    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+    if (typeof onSelectCallback === 'function') {
+      onSelectCallback(sIdx, iIdx, combinedKey, created);
+    }
+    return { combinedKey, displayLabel };
+  }
+
+  const ingId = created.ingredientId || created.rootItem?.id || created.id || 'custom';
+  const startedAtRoot = created.startAt === 'item';
+  const subId = startedAtRoot ? null : (created.subtypeId || created.subtype?.id || null);
+  const parentName = created.parentName || created.rootItem?.name || created.rootItemName || currentIngName;
+  const subName = subId ? (created.subtypeName || created.subtype?.name || '') : '';
+  const combinedKey = subId ? `${ingId}:${subId}` : `${ingId}`;
+  const displayLabel = subName && subName !== parentName ? `🏷️ ${subName} (${parentName})` : `📦 ${parentName}`;
+  inputEl.dataset.taxVal = combinedKey;
+  inputEl.value = displayLabel;
+  inputEl.setAttribute('value', displayLabel);
+  inputEl.style.borderColor = '#10b981';
+  inputEl.style.backgroundColor = '#ecfdf5';
+  inputEl.style.color = 'var(--text,#1e293b)';
+  inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+  if (typeof onSelectCallback === 'function') {
+    onSelectCallback(sIdx, iIdx, combinedKey, created);
+  }
+  return { combinedKey, displayLabel };
+}
+
 export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
   const storeState = getState();
   const ingredientsBank = storeState.rootItems || storeState.ingredients || [];
@@ -435,42 +482,15 @@ export function bindTaxonomyAutocompleteEvents(modalWrap, onSelectCallback) {
             iIdx,
             initialName: currentIngName,
             onComplete: (created) => {
-              if (!created) return;
-              if (dropdownEl) dropdownEl.style.display = 'none';
-              if (created.category && !created.ingredientId && !created.rootItem) {
-                const combinedKey = `cat:${created.category}`;
-                const displayLabel = `📂 [Category] ${created.category}`;
-                inputEl.dataset.taxVal = combinedKey;
-                inputEl.value = displayLabel;
-                inputEl.setAttribute('value', displayLabel);
-                inputEl.style.borderColor = '#10b981';
-                inputEl.style.backgroundColor = '#ecfdf5';
-                inputEl.style.color = 'var(--text,#1e293b)';
-                inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-                if (typeof onSelectCallback === 'function') {
-                  onSelectCallback(sIdx, iIdx, combinedKey, created);
-                }
-                return;
-              }
-              const ingId = created.ingredientId || created.rootItem?.id || created.id || 'custom';
-              const subId = created.subtypeId || created.subtype?.id || null;
-              const parentName = created.parentName || created.rootItem?.name || created.rootItemName || currentIngName;
-              const subName = created.subtypeName || created.subtype?.name || '';
-              const combinedKey = subId ? `${ingId}:${subId}` : `${ingId}`;
-              const displayLabel = subName && subName !== parentName ? `🏷️ ${subName} (${parentName})` : `📦 ${parentName}`;
-              inputEl.dataset.taxVal = combinedKey;
-              inputEl.value = displayLabel;
-              inputEl.setAttribute('value', displayLabel);
-              inputEl.style.borderColor = '#10b981';
-              inputEl.style.backgroundColor = '#ecfdf5';
-              inputEl.style.color = 'var(--text,#1e293b)';
-              inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-              if (rowNameInput) {
-                rowNameInput.value = subName || parentName;
-              }
-              if (typeof onSelectCallback === 'function') {
-                onSelectCallback(sIdx, iIdx, combinedKey, created);
-              }
+              applyCreatedTaxonomySelection({
+                created,
+                inputEl,
+                dropdownEl,
+                currentIngName,
+                sIdx,
+                iIdx,
+                onSelectCallback
+              });
             }
           });
           return;

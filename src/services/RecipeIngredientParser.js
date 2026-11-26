@@ -257,6 +257,32 @@ export function parseIngredientString(rawStr) {
     };
   }
 
+  // 0a. Liquid stock / broth volumes (e.g., "1000ml vegetable stock", "1L chicken stock", "500ml hot veg stock", "500ml stock")
+  const liquidStockMatch = clean.match(
+    /^((?:\d+\s+)?\d+\/\d+|\d+(?:\.\d+)?)\s*(ml|millilit(?:er|re)s?|mls?|l|lit(?:er|re)s?)\b\s+(?:(?:of|hot|warm|boiling|cold|fresh|good[- ]quality|low[- ]salt|reduced[- ]salt|organic|homemade)\s+)*(?:(vegetable|veg|chicken|beef|fish|lamb|vegan|mushroom|onion|pork|turkey)\s+)?(?:stock|bouillon|broth)\b(.*)$/i
+  );
+  if (liquidStockMatch) {
+    const rawVol = parseFractionOrNumber(liquidStockMatch[1]);
+    const volUnit = liquidStockMatch[2].toLowerCase();
+    const waterMl = Math.round((volUnit.startsWith('l') ? rawVol * 1000 : rawVol));
+    if (waterMl > 0) {
+      const rawType = (liquidStockMatch[3] || '').toLowerCase();
+      const stockType = rawType === 'veg' ? 'Vegetable' : (rawType ? toTitleCase(rawType) : 'Vegetable');
+      const extraTail = (liquidStockMatch[4] || '').replace(/^[\s,]+/, '').trim();
+      const notes = extraTail ? `dissolved in ${waterMl}ml water, ${extraTail}` : `dissolved in ${waterMl}ml water`;
+      return {
+        raw: s,
+        qty: 1,
+        unit: 'qty',
+        isEstimated: false,
+        name: `${stockType} Stock Cube`,
+        notes,
+        waterMl,
+        isToServe: false
+      };
+    }
+  }
+
   // 0b. Compound split-quantity lines e.g. "4 tsp olive oil, plus 4 tbsp" or "1 tbsp oil + 2 tsp extra"
   const compoundSplitMatch = clean.match(/^(.+?)(?:,\s*|\s+)(?:plus|\+)\s+((?:\d+\s+)?\d+\/\d+|\d+(?:\.\d+)?)\s*([a-zA-Z]+)\b(.*)$/i);
   if (compoundSplitMatch) {
@@ -522,12 +548,13 @@ export function cleanIngredientPhraseForAlias(rawOrItem) {
     .split(',')[0]
     .replace(/^[\s*\-–—~•●◦▪▫▫️▪️+\p{Extended_Pictographic}\uFE0F\u200D]+\s*/u, ' ');
 
-  // Strip leading, mid-string, or trailing numeric/fraction + multiplier + unit measurements
+  // Strip leading, mid-string, or trailing numeric/fraction/range + multiplier + unit measurements
   cleaned = cleaned
-    .replace(/(?:^|\s|\/)(?:\d+(?:\s+\d+\/\d+|\.\d+)?|\d+\/\d+)\s*(?:[xX×]\s*(?:\d+(?:\.\d+)?)?\s*)?(?:g|grams?|kg|kilograms?|kilos?|mg|ml|millilit(?:er|re)s?|mls?|l|lit(?:er|re)s?|oz|fl\.?\s*oz|ounces?|lbs?|pounds?|tbsp|tablespoons?|tbl|tbs|tb|tsp|teaspoons?|cups?|scoops?|pinch(?:es)?|dash(?:es)?|drizzles?|splash(?:es)?|cloves?|slices?|sprigs?|stalks?|sticks?|heads?|bulbs?|cm|mm|inch(?:es)?|qty|items?|units?)\b/gi, ' ')
+    .replace(/(?:^|[\s\/\-–—])(?:\d+(?:\s+\d+\/\d+|\.\d+)?|\d+\/\d+)(?:\s*[-–—]\s*(?:\d+(?:\s+\d+\/\d+|\.\d+)?|\d+\/\d+))?\s*(?:[xX×]\s*(?:\d+(?:\.\d+)?)?\s*)?(?:g|grams?|kg|kilograms?|kilos?|mg|ml|millilit(?:er|re)s?|mls?|l|lit(?:er|re)s?|oz|fl\.?\s*oz|ounces?|lbs?|pounds?|tbsp|tablespoons?|tbl|tbs|tb|tsp|teaspoons?|cups?|scoops?|pinch(?:es)?|dash(?:es)?|drizzles?|splash(?:es)?|cloves?|slices?|sprigs?|stalks?|sticks?|heads?|bulbs?|cm|mm|inch(?:es)?|qty|items?|units?)\b/gi, ' ')
     .replace(/\b(?:tins?|cans?|pots?|tubs?|pouch(?:es)?|sachets?|cartons?|jars?|bottles?|packs?|packets?|packages?|pkg|bags?|box(?:es)?|blocks?)\b(?:\s+of\b)?/gi, ' ')
     .replace(/\b\d+\s*\/\s*\d+\b/g, ' ')
     .replace(/\b\d+(?:\.\d+)?\s*(?:[xX×]\b)?/g, ' ')
+    .replace(/\b(?:g|grams?|kg|kilograms?|kilos?|mg|ml|millilit(?:er|re)s?|mls?|l|lit(?:er|re)s?|oz|ounces?|lbs?|pounds?|tbsp|tablespoons?|tsp|teaspoons?|cups?|qty)\b/gi, ' ')
     .replace(/^(?:\s*(?:of|a|an|one|two|three|four|five|half|heaped|heaping|level|generous|scant|rounded|approx\.?|about|x|×)\b[\s\/]*)+/i, ' ');
 
   const norm = normalizeTaxonomyName(cleaned)

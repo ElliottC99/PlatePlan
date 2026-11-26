@@ -8,7 +8,7 @@ import { bindTaxonomyAutocompleteEvents, isIngredientUnlinked, getIngredientQtyV
 import { renderQtyIssueBannerHTML } from './RecipeWizardStep2View.js';
 import { promptRecipeWizardAliases } from './RecipeWizardAliasesPrompt.js';
 import { getState, setProducts, learnIngredientAlias } from '../../store/store.js';
-import { stemIngredientName } from '../../services/RecipeIngredientParser.js';
+import { stemIngredientName, cleanIngredientPhraseForAlias } from '../../services/RecipeIngredientParser.js';
 import { saveProduct } from '../../services/ProductRepository.js';
 import { toTitleCase } from '../../utils/stringUtils.js';
 import { recalculateWizardMacros, resolveProductForIngredient } from './RecipeWizardStep3Handlers.js';
@@ -576,7 +576,7 @@ export function bindStep2Events(modalWrap, { renderWizardModal, showWizardNotice
       const allIngs = storeState.rootItems || storeState.ingredients || [];
       if (item.ingredientId) {
         const chosenIng = allIngs.find(i => String(i.id) === String(item.ingredientId));
-        const phrase = String(item.name || item.raw || '').trim();
+        const phrase = cleanIngredientPhraseForAlias(item.name || item.raw || '');
         if (chosenIng && phrase && Array.isArray(chosenIng.subtypes) && chosenIng.subtypes.length > 0) {
           const phraseStem = stemIngredientName(phrase);
           const rootStem = stemIngredientName(chosenIng.name || '');
