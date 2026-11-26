@@ -24,7 +24,9 @@ export function renderShoppingItemRow(item) {
     : (item.name || 'Store product');
 
   const rawQty = item.buyQty !== undefined ? item.buyQty : (item.needQty || item.qty || 1);
-  const rawAmountLabel = rawQty + (item.unit ? ` ${item.unit}` : 'x');
+  const rawAmountLabel = item.isMixedUnits
+    ? (item.formattedRecordedTotals || item.quantity || `${rawQty}`)
+    : (rawQty + (item.unit ? ` ${item.unit}` : 'x'));
   const packsNeeded = Number(item.packsNeeded || 0);
   const formattedQty = (item.bankIng && packsNeeded >= 1)
     ? `${packsNeeded} ${packsNeeded === 1 ? 'pack' : 'packs'} (${rawAmountLabel})`
@@ -89,7 +91,7 @@ export function renderShoppingItemRow(item) {
           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--label); margin-bottom: 4px;">
             <span><strong>${escapeHtml(r.recipeName)}</strong></span>
             <div style="display: flex; align-items: center; gap: 12px;">
-              <span style="font-weight: 600; color: var(--tint-color);">${r.totalQty}${item.unit || ''}</span>
+              <span style="font-weight: 600; color: var(--tint-color);">${escapeHtml(r.formattedQty || `${r.totalQty}${r.unit || item.unit || ''}`)}</span>
               <button type="button" class="btn sm ghost" style="font-size: 10px; padding: 2px 6px;" 
                 data-action="toggle-inline-subst" 
                 data-item-key="${escapeAttr(item.key)}" 

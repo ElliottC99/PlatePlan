@@ -225,15 +225,17 @@ function resolveOverrideProduct(line, lineKey, productOverrides, index) {
   const prodId = line?.productId || line?.bankId || null;
   const rawName = String(line?.name || line?.raw || '').trim();
 
-  const keys = [
-    lineKey,
-    subId,
-    ingId,
-    catId ? `cat:${String(catId).trim().toLowerCase()}` : null,
-    catId,
-    prodId,
-    rawName
-  ].filter(Boolean).map(String);
+  // Sub-type-bound lines only match sub-type/line/product overrides so sibling sub-types never bleed into each other
+  const keys = subId
+    ? [lineKey, subId, prodId].filter(Boolean).map(String)
+    : [
+        lineKey,
+        ingId,
+        catId ? `cat:${String(catId).trim().toLowerCase()}` : null,
+        catId,
+        prodId,
+        rawName
+      ].filter(Boolean).map(String);
 
   for (const k of keys) {
     const val = productOverrides[k];
@@ -281,7 +283,7 @@ export function buildLineCandidates(line, lineKey, index, { criterion = 'highest
   const cat = line.categoryId || line.category || line.cat || null;
   const directProdId = line.productId || line.bankId || null;
 
-  // 1. Sub-Type binding (locked within sub-type for culinary safety)
+  // 1. Sub-Type binding (locked within sub-type for culinary safety — never bleed into sibling sub-types)
   if (subId) {
     const subStr = String(subId);
     const subObj = index.subtypeById.get(subStr);
@@ -296,7 +298,10 @@ export function buildLineCandidates(line, lineKey, index, { criterion = 'highest
       const defProd = index.productsById.get(String(subObj.defaultProductId));
       if (defProd) return { pool: [defProd], baseline: defProd, pinned: false, bindingLevel: 'subtype' };
     }
-    // Fall through to root item only if sub-type has 0 products
+    // Keep productless sub-types isolated (e.g. Mushroom Ketchup must not fall through to Tomato Ketchup)
+    if (subObj) {
+      return { pool: [], baseline: null, pinned: false, bindingLevel: 'subtype' };
+    }
   }
 
   // 2. Root Item binding (explores sibling sub-types bi-directionally)
@@ -312,6 +317,24 @@ export function buildLineCandidates(line, lineKey, index, { criterion = 'highest
     if (rootItem?.defaultProductId) {
       const defProd = index.productsById.get(String(rootItem.defaultProductId));
       if (defProd) return { pool: [defProd], baseline: defProd, pinned: false, bindingLevel: 'ingredient' };
+    }
+  }
+
+  // 2b. Exact product or root-item name match BEFORE broad category sweep
+  // Prevents a named ingredient with only a categoryId (e.g. "Harissa Paste" in "Sauces")
+  // from being swept into an unrelated product in the same category (e.g. "Passata").
+  const rawNameEarly = String(line.name || line.matchedName || line.ingredient || '').trim().toLowerCase();
+  if (!ingId && !subId && rawNameEarly) {
+    const exactProdEarly = index.productsByNameLower.get(rawNameEarly);
+    if (exactProdEarly) return { pool: [exactProdEarly], baseline: exactProdEarly, pinned: false, bindingLevel: 'name' };
+
+    const exactRootEarly = index.ingredientsByNameLower.get(rawNameEarly);
+    if (exactRootEarly) {
+      const rootPool = index.productsByIngredientId.get(String(exactRootEarly.id)) || [];
+      if (rootPool.length > 0) {
+        const baseline = pickBaselineFromPool(rootPool, exactRootEarly.defaultProductId, criterion, { respectExplicitAutoDefault: true });
+        return { pool: rootPool, baseline, pinned: false, bindingLevel: 'name' };
+      }
     }
   }
 

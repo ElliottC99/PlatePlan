@@ -117,6 +117,10 @@ export function patchWizardStep3Shopping(plan) {
   return false;
 }
 
+if (typeof window !== 'undefined') {
+  window.patchWizardStep3Shopping = patchWizardStep3Shopping;
+}
+
 /**
  * Renders the Step 3 shopping list review screen.
  * @param {Object} plan - The current plan.
